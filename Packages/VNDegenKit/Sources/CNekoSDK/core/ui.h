@@ -1,6 +1,6 @@
 // What the runtime draws around the story: the message window's buttons, which each game's msg_button.ini lists, and the
-// menus, which its exe holds in code and so VNDegen holds as a table for each game (tables.cpp). Everything draws from
-// the game's own art.
+// menus, which its exe holds in code and so VNDegen holds as a table for each game (tables/, one file a game). Everything
+// draws from the game's own art.
 #pragma once
 #include <functional>
 #include <map>
