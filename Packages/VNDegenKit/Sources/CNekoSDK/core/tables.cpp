@@ -35,7 +35,7 @@ datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
 slotnew obj\e010_000.bmp -11 -6
-slotcomment 189 114 327 13 クリックでコメントを入力
+slotcomment 189 115 327 19 クリックでコメントを入力
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -76,7 +76,7 @@ datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
 slotnew obj\e010_000.bmp -11 -6
-slotcomment 189 114 327 13 クリックでコメントを入力
+slotcomment 189 115 327 19 クリックでコメントを入力
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -4219,7 +4219,7 @@ slotlock obj\e012_000.bmp 446 63
 slotdelete obj\e013_000.bmp 476 63
 slotprogress obj\e010_000.bmp 279 37 5
 slotnew obj\e014_000.bmp 5 104
-slotcomment 183 110 330 12 クリックでコメントを入力
+slotcomment 184 111 330 18 クリックでコメントを入力
 button page0 obj\e006_000.bmp 410 26 10 5 0
 button page1 obj\e006_000.bmp 460 26 10 5 1
 button page2 obj\e006_000.bmp 510 26 10 5 2
@@ -4262,7 +4262,7 @@ slotlock obj\e012_000.bmp 446 63
 slotdelete obj\e013_000.bmp 476 63
 slotprogress obj\e010_000.bmp 279 37 5
 slotnew obj\e014_000.bmp 5 104
-slotcomment 183 110 330 12 クリックでコメントを入力
+slotcomment 184 111 330 18 クリックでコメントを入力
 # The Q-Save page takes only quick saves.
 pageoff 10
 button page0 obj\e006_000.bmp 410 26 10 5 0
@@ -4677,8 +4677,9 @@ button test:voice:voice\tou9_0003.ogg obj\h023_000.bmp 533 489 1 5 0
 screen log
 pic obj\m001_000.bmp 1185 110
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1185 110 500
-# Four entries a page, each under a rule, in text of 18 pixels to the message window's 24, measured under Wine.
-rows obj\m000_000.bmp 77 69 165 4 99 39 18
+# Four entries a page, each under a rule, measured under Wine. The text is the message window's size: under Wine,
+# with a stand-in for MS Gothic, the log's letters and the window's came out the same size.
+rows obj\m000_000.bmp 77 69 165 4 99 39
 button log_close obj\l001_000.bmp 1240 22 2 5 0
 button log_top obj\m003_000.bmp 1180 34 4 5 0
 button log_up obj\m003_000.bmp 1180 68 4 5 1
