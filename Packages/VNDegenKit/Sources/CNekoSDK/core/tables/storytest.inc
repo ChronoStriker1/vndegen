@@ -24,8 +24,8 @@ open selftestwait 2 -> S 9 # waits for two presses
 on 2 goto two
 set S 10 = 1               # skipped
 label two
-scene scr\b.txt           # two lines of text, then the choice
-choice obj\n001_000.bmp 2
+scene scr\b.txt @20       # two lines of text, then the choice; @20 is the PC's number for the place
+choice obj\n001_000.bmp 2 @25
 on 1 goto second
 set S 13 = 1               # skipped: the second option is taken
 label second

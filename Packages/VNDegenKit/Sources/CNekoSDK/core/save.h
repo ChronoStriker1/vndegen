@@ -73,6 +73,9 @@ struct SaveData {
     // The block before the variables as a PC save holds it, kept so the save is written back as it was: in saves at a
     // choice it holds numbers the runtime doesn't use yet. Empty in the runtime's own saves, which write the layout's.
     std::vector<uint8_t> beforeVariables;
+    // In the story-in-exe games, the last choice's result, 2 while one waits, or -1 to leave the layout's (set 1, Test
+    // Game 87): 112 bytes into the block before the variables.
+    int lastChoice = -1;
     std::map<int, int> variables;  // the 10,000 ints, by number
     int dateFlag = 0;  // the PC sets it in a game with a flow past its first script. Its meaning isn't known
     int width = 1280, height = 720;

@@ -13,6 +13,10 @@
 //   chapter N                 the scenes a game part gives for chapter N
 //   end / staffroll / jump FLOW
 //
+// A `scene` or `choice` line may end with `@N`, the PC's own number for that place in its story, which its saves hold as
+// the flow node and need to go on from it (Test Game 87, set 1): the runtime writes it in its saves, and a PC save goes on
+// from the line with its number before the first line naming its scene.
+//
 // Words from one starting with `#` are a comment. Paths are UTF-8 here and CP932 in the game's files.
 #include <cstdlib>
 
@@ -32,6 +36,14 @@ std::vector<std::string> withoutComment(const std::vector<std::string> &w) {
         out.push_back(word);
     }
     return out;
+}
+
+// A line's `@N`, taken off its words: the PC's number for the place, or 0.
+int pcNumber(std::vector<std::string> &w) {
+    if (w.size() < 2 || w.back().size() < 2 || w.back()[0] != '@') return 0;
+    int number = std::atoi(w.back().c_str() + 1);
+    w.pop_back();
+    return number;
 }
 
 int toInt(const std::string &s) { return std::atoi(s.c_str()); }
@@ -95,6 +107,7 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
     for (const auto &raw : table->second.lines) {
         auto w = withoutComment(raw);
         if (w.empty()) continue;
+        int pc = pcNumber(w);
         if (w[0] == "flow") {
             if (inFlow) break;
             inFlow = w.size() >= 2 && w[1] == flowName;
@@ -105,13 +118,16 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
             labels[w[1]] = int(script->nodes.size()) + 1;
             continue;
         } else if (w[0] == "scene" && w.size() >= 2) {
-            add(1).s[1] = sjis::fromUtf8(w[1]);
+            Node &n = add(1);
+            n.s[1] = sjis::fromUtf8(w[1]);
+            n.p[kStoryPcNumber] = pc;
         } else if (w[0] == "choice" && w.size() >= 3) {
             Node &n = add(3);
             n.s[1] = sjis::fromUtf8(w[1]);
             // A flow's choice gives its count less one, and in parameters 10 to 13 each route's answer, 4 for none.
             n.p[0] = n.p[1] = toInt(w[2]) - 1;
             for (size_t r = 10; r < 14; r++) n.p[r] = 4;
+            n.p[kStoryPcNumber] = pc;
         } else if (w[0] == "on" && w.size() >= 4 && w[2] == "goto") {
             Node &n = add(4);
             n.p[0] = toInt(w[1]);
@@ -227,6 +243,31 @@ bool Engine::restoreStoryPlace(const Sidecar &side, bool &atChoice) {
             partResultNumber_ = side.screenNumber;
         }
     return true;
+}
+
+// A PC save of a game without flow scripts names its scene and the PC's number for its place in the story, 3 for while a
+// choice waits: the line with that number, if the table gives numbers, is the place.
+bool Engine::resumeStoryAtNumber(int number, int active, bool &atChoice) {
+    auto table = screens_.find("story");
+    if (table == screens_.end() || number <= 0) return false;
+    for (const auto &line : table->second.lines) {
+        if (line.size() < 2 || line[0] != "flow") continue;
+        auto flow = loadScript("story:" + line[1]);
+        if (!flow) continue;
+        for (const Node &n : flow->nodes) {
+            if (n.p[kStoryPcNumber] != number) continue;
+            if (n.opcode == 3) {
+                // A save while the choice waits asks it again; one after it goes on past it.
+                atChoice = active == 3;
+                stack_.push_back({flow, atChoice ? &n : flow->node(n.next)});
+            } else {
+                stack_.push_back({flow, flow->node(n.next)});
+            }
+            flowCallId_ = number;
+            return true;
+        }
+    }
+    return false;
 }
 
 // A PC save of a game without flow scripts names only its scene, so the story goes on after the first `scene` line that

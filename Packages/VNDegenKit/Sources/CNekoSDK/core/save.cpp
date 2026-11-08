@@ -474,6 +474,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     size_t before = w.zeros(kBeforeVariables);
     if (d.beforeVariables.size() == size_t(kBeforeVariables)) std::copy(d.beforeVariables.begin(), d.beforeVariables.end(), w.b.begin() + std::ptrdiff_t(before));
     else apply(layout.beforeVariables, w.b.data() + before);
+    if (d.lastChoice >= 0) w.setI32(before + 112, d.lastChoice);
     size_t table = w.zeros(size_t(kVariables) * 4);
     for (const auto &[index, value] : d.variables)
         if (index >= 0 && index < kVariables) w.setI32(table + size_t(index) * 4, value);

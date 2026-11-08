@@ -2084,6 +2084,16 @@ SaveData Engine::captureSave() {
     // A story table's flows and chapters aren't files: the PC's saves of those games name no flow, and nor do ours.
     if (d.flow.rfind("story:", 0) == 0 || d.flow.rfind("chapter:", 0) == 0) d.flow.clear();
     d.flowNode = flowCallId_;
+    // A story table's game saves as the PC does around a choice (Test Game 87's saves, set 1): 3 while one waits and its
+    // number as the flow node, and the last choice's result, 2 while one waits.
+    if (!stack_.empty() && stack_.back().script->name.rfind("story:", 0) == 0) {
+        bool asking = waiting_ == Waiting::Choice;
+        d.flowActive = asking ? 3 : 1;
+        if (asking)
+            for (const Node &c : stack_.back().script->nodes)
+                if (c.opcode == 3 && stack_.back().node && c.next == stack_.back().node->id && c.p[kStoryPcNumber]) d.flowNode = c.p[kStoryPcNumber];
+        d.lastChoice = asking ? 2 : choiceImage_.empty() ? -1 : choiceResult_;
+    }
     d.choiceImage = choiceImage_;
     d.dateFlag = choiceImage_.empty() ? 0 : 1;
     d.variables = scenario_;
@@ -2305,7 +2315,8 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAt(d.scene)) {
+    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, atChoice) &&
+               !resumeStoryAt(d.scene)) {
         complain("The story table has no place for the save's scene " + d.scene);
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d, side);
@@ -3345,7 +3356,8 @@ void Engine::runFlow(const Node &n) {
         if (script && script->first()) {
             scene_ = {script, script->first()};
             lastScene_ = script->name;
-            flowCallId_ = n.id;
+            // A story table's line saves the PC's own number for its place, when the table gives one.
+            flowCallId_ = flow.script->name.rfind("story:", 0) == 0 && n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
             log("scene %s", script->name.c_str());
         }
         break;
