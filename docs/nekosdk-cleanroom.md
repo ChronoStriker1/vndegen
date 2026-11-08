@@ -224,6 +224,17 @@ from `h006_000`, spoken by one of the cast, whose portrait darkens (`h005_002`, 
 while it shows; the bubble sits by the speaker. No help shows over a lit control, such as Stop while nothing plays,
 or a disabled one. Table pictures can be shown `ifhover` or `unlesshover` a control, or a named `hover` area.
 
+## Test Game 88's outfit lock
+
+Its sprite gallery (立ち絵鑑賞) lists each heroine's faces, outfits and poses in `cfg\sc_view.ini`: `#p N face`,
+`clothes` and `pose` sections of thumbnails, `#p 100` the backgrounds, each ending `##`, with a second field on bonus
+lines. An outfit's thumbnail `clothes_HHH_OOO_...` names the heroine's sprite number HHH and the outfit OOO of her story
+sprites `sc\sc_HHH_OOO_PPP_SSS_FFF`. With 服装固定 on, the PC under Wine, loading a save whose script shows
+`sc_001_002_000_001_000`, read that file and then `sc_001_001_000_001_000`, the gallery's chosen outfit, and showed
+it: the outfit field is replaced and the pose, size and face kept. Each heroine has her own outfit and lock, which the
+PC keeps in `cfg.sav`: the outfit's place in her list at 1212, 1216 and 1220, and the lock at 1224, 1228 and 1232
+(a quit after locking Akiho's third outfit and Ai's fifth wrote 2, 4, 1, 1; global 65 was set with them).
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on

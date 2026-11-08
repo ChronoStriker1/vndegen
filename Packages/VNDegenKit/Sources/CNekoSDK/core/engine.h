@@ -360,6 +360,23 @@ private:
     bool galleryImageSeen(const GalleryEntry &entry, size_t image) const;
     bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }
     std::vector<std::string> tracks_, trackTitles_;
+    // Test Game 88's sprite gallery, from cfg\sc_view.ini: its backgrounds, and each heroine's faces, outfits and poses as
+    // the thumbnails the pickers show. A heroine's sprites are sc\sc_HHH_OOO_PPP_SSS_FFF, HHH her number in the file names.
+    struct SpriteOutfit {
+        std::string thumbnail;
+        int id = 0;    // the OOO of her sprites in this outfit
+        int bonus = 0;  // the line's second field: 0, or which bonus it comes with
+    };
+    struct SpriteHeroine {
+        int number = 0;
+        std::vector<std::string> faces, poses;
+        std::vector<SpriteOutfit> outfits;
+    };
+    std::vector<std::pair<std::string, int>> spriteBackgrounds_;
+    std::vector<SpriteHeroine> spriteHeroines_;
+    // Each heroine's chosen outfit, as its place in her list, and whether the story wears it, kept in cfg.sav as the PC does.
+    std::vector<int> spriteOutfit_, spriteLocked_;
+    std::string lockedSprite(const std::string &path) const;
     std::unordered_map<std::string, bool> seen_;
     // The text read, by script and node id, for Config's read-only skip.
     std::unordered_map<std::string, std::set<int>> readNodes_;

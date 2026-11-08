@@ -40,7 +40,7 @@ static std::string voicePath(const std::string &name) { return name.find('\\') =
 constexpr int kCountEdgeR = 200, kCountEdgeG = 30, kCountEdgeB = 30;
 // cfg.sav's tables of what's been unlocked: a row of ints for each CG, a picture to an int, and an int for each track.
 // They sit after a string at byte 44020, so they move with its length.
-constexpr size_t kConfigSize = 104000, kConfigStringAt = 44020, kCgFlagsAt = 48000, kTrackFlagsAt = 100000;
+constexpr size_t kConfigSize = 104000, kConfigStringAt = 44020, kCgFlagsAt = 48000, kTrackFlagsAt = 100000, kSpriteOutfitAt = 1212, kSpriteLockAt = 1224;
 // How long Auto waits after the text and voice are done.
 constexpr int kAutoDelayMs = 1000;
 constexpr float kPi = 3.14159265f;
@@ -1086,6 +1086,39 @@ void Engine::loadGalleries() {
             if (!key.empty() && key != "0") e.keys.push_back(key);
         sceneEntries_.push_back(e);
     }
+    // cfg\sc_view.ini: `#p 100` lists backgrounds, `#p N face|clothes|pose` heroine N's thumbnails, each section ending
+    // `##`. Paths there have their backslashes doubled, and a line's second field marks what comes with a bonus.
+    {
+        int heroine = -1;
+        std::string kind;
+        for (const std::string &line : lines("cfg\\sc_view.ini")) {
+            auto f = fields(line);
+            if (f.empty()) continue;
+            if (f[0] == "##") { heroine = -1; continue; }
+            if (f[0] == "#p" && f.size() >= 2) {
+                heroine = std::atoi(f[1].c_str());
+                kind = f.size() >= 3 ? f[2] : "";
+                if (heroine >= 0 && heroine < 100 && int(spriteHeroines_.size()) <= heroine) spriteHeroines_.resize(size_t(heroine) + 1);
+                continue;
+            }
+            std::string path = f[0];
+            for (size_t at; (at = path.find("\\\\")) != std::string::npos;) path.erase(at, 1);
+            int bonus = f.size() >= 2 ? std::atoi(f[1].c_str()) : 0;
+            if (heroine == 100) spriteBackgrounds_.push_back({path, bonus});
+            else if (heroine >= 0 && heroine < 100) {
+                SpriteHeroine &h = spriteHeroines_[size_t(heroine)];
+                std::string name = path.substr(path.find_last_of('\\') + 1);
+                // clothes_HHH_OOO_000_000_000.bmp: her number and the outfit's.
+                if (kind == "clothes" && name.size() >= 15) {
+                    h.number = std::atoi(name.substr(8, 3).c_str());
+                    h.outfits.push_back({path, std::atoi(name.substr(12, 3).c_str()), bonus});
+                } else if (kind == "face") h.faces.push_back(path);
+                else if (kind == "pose") h.poses.push_back(path);
+            }
+        }
+        spriteOutfit_.assign(spriteHeroines_.size(), 0);
+        spriteLocked_.assign(spriteHeroines_.size(), 0);
+    }
     // A track's file, then in Test Game 84 the picture of its title.
     for (const std::string &line : lines("cfg\\sound_view.ini")) {
         auto f = fields(line);
@@ -1887,6 +1920,14 @@ void Engine::loadGlobals() {
         configFile_.clear();
         return;
     }
+    // The sprite gallery's outfit and lock for each heroine, at 1212 and 1224 (Test Game 88 under Wine).
+    for (size_t h = 0; h < spriteHeroines_.size() && h < 3; h++) {
+        int32_t outfit = 0, locked = 0;
+        std::memcpy(&outfit, &configFile_[kSpriteOutfitAt + h * 4], 4);
+        std::memcpy(&locked, &configFile_[kSpriteLockAt + h * 4], 4);
+        spriteOutfit_[h] = outfit;
+        spriteLocked_[h] = locked;
+    }
     for (int i = 0; i < 10000; i++) {
         int32_t v;
         std::memcpy(&v, &configFile_[4000 + size_t(i) * 4], 4);
@@ -1958,6 +1999,11 @@ void Engine::saveGlobals() {
         auto it = globals_.find(i);
         int32_t v = it == globals_.end() ? 0 : it->second;
         std::memcpy(&configFile_[4000 + size_t(i) * 4], &v, 4);
+    }
+    for (size_t h = 0; h < spriteHeroines_.size() && h < 3; h++) {
+        int32_t outfit = spriteOutfit_[h], locked = spriteLocked_[h];
+        std::memcpy(&configFile_[kSpriteOutfitAt + h * 4], &outfit, 4);
+        std::memcpy(&configFile_[kSpriteLockAt + h * 4], &locked, 4);
     }
     size_t moved = configStringLength();
     auto setFlag = [&](size_t at) {
@@ -4290,7 +4336,30 @@ bool Engine::artSwitchable() const {
     return false;
 }
 
-std::string Engine::shownPath(const std::string &path) const {
+// A heroine's story sprite in the outfit the sprite gallery locked for her, as the PC wears it, when that file exists.
+std::string Engine::lockedSprite(const std::string &path) const {
+    if (spriteHeroines_.empty()) return path;
+    std::string name = normalizedPath(path);
+    auto slash = name.rfind('\\');
+    size_t at = slash == std::string::npos ? 0 : slash + 1;
+    // sc\sc_HHH_OOO_PPP_SSS_FFF.bmp
+    if (name.compare(0, 3, "sc\\") != 0 || name.size() < at + 23 || name.compare(at, 3, "sc_") != 0) return path;
+    int number = std::atoi(name.substr(at + 3, 3).c_str());
+    for (size_t h = 0; h < spriteHeroines_.size(); h++) {
+        const SpriteHeroine &heroine = spriteHeroines_[h];
+        if (heroine.number != number || heroine.outfits.empty() || !spriteLocked_[h]) continue;
+        int pick = std::clamp(spriteOutfit_[h], 0, int(heroine.outfits.size()) - 1);
+        char id[8];
+        std::snprintf(id, sizeof id, "%03d", heroine.outfits[size_t(pick)].id);
+        std::string worn = name;
+        worn.replace(at + 7, 3, id);
+        return files_.exists(worn) ? worn : path;
+    }
+    return path;
+}
+
+std::string Engine::shownPath(const std::string &rawPath) const {
+    std::string path = lockedSprite(rawPath);
     if (!artVersions_.empty()) return plainVariant(versionPath(path));
     if (setting("express")) return path;
     auto it = plainArt_.find(normalizedPath(path));
