@@ -622,6 +622,10 @@ private:
     int markX_ = 0, markY_ = 0, markPatterns_ = 1;
     float markSpeed_ = 1;
     int fontFace_ = 0, fontSize_ = 28, fontType_ = 0, lineInterval_ = 0, maxChars_ = 64;
+    // How the PC places text, where it isn't what the font gives: a gap after each glyph's own advance, a line pitch, and
+    // an offset from init.ini's positions. 0 keeps the font's own.
+    float textGap_ = 0;
+    int textLine_ = 0, textDX_ = 0, textDY_ = 0;
     int textR_ = 255, textG_ = 255, textB_ = 255, shadowR_ = 0, shadowG_ = 0, shadowB_ = 0;
     std::vector<Glyph> nameGlyphs_, textGlyphs_;
     int charMs_ = 20;

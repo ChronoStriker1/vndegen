@@ -248,6 +248,24 @@ Test Game 94's save and load screens, measured under Wine against saves the PC m
 
 Test Game 94's choices, under Wine. A choice's count is its parameter 0 and one in every game's flows, Test Game 84's five heroines (4) and the two options of 89, 92, 93 and The Alchemist (1) alike; parameter 1 gives the count too in those, but 1 in Test Game 94's two-option choices, where the runtime had shown one option. When the choice comes up the PC reads its prompt `obj\n000_000`, its sheet, the mouse icons `obj\b003_000` and the route labels `obj\e011_000` (traced). The scene darkens to about 0.4 of itself, the prompt sits at 483, 107, the options at 467, 195 and 467, 308, and the left button's icon by the first at 393, 192 and the right button's by the second at 393, 305. Clicking an option takes it; a left click anywhere else took the first, and the right button the second. Once an ending was set, each option named the routes whose choice parameter (10 to 13) is that option, a label each from `e011_000`'s row for the route, in its second column for a route whose ending is set and its first otherwise, 30 pixels apart and centred on the option, at x 818; with no ending set there were none.
 
+## Text placement
+
+The PC engine draws its text from a glyph atlas: Wine's font log (`WINEDEBUG=+font`) shows each game creating its
+text font at a cell height and at four times it, with the face init.ini's MsgFont names. The official English
+releases (The Alchemist, Funbag Fantasy 4, Horny Elves and a Moral Orc) ask for Lucida Sans Unicode instead, which
+VNDegen maps to Open Sans ([fonts.md](fonts.md)). Text placement was measured by loading the same PC save on the PC
+under Wine, with VNDegen's stand-in fonts mapped in place of the Windows ones, and here, and comparing the same lines.
+The PC sets each glyph a fixed gap past its own advance and lines a fixed pitch apart, neither of which init.ini's
+MsgCharInterval and MsgLineInterval predict, so each game's table gives them (`textgap`, `textline`, `textshift`,
+`textfont`, `textsize`, and for the log `rows` with a size, `loggap` and `logline`). Test Game 94: gap 1, lines 28
+apart, the first glyph 2 pixels in. Test Game 88: gap 2, lines 27, 2 in. Test Game 92 and Ore o Hoshigaru Tsuma to
+Gibo: no gap, lines 29. Yarinaoshi no Christmas: gap 4. Each log was placed under its rules as the PC's is, and the
+fitted lines end on the PC's pixel or one off. For the Lucida Sans Unicode games the publisher's Windows screenshots
+were the reference, since Wine has no Lucida Sans Unicode and font-links it to Noto Sans CJK: The Alchemist sets
+Open Sans 22 with a gap of 5.93, lines 42 apart; Funbag Fantasy 4 size 14, gap 3.52, lines 25; Moral Orc size 16,
+gap 3.93, lines 27; each with its first glyph one gap in. A save card's comment has a font of its own, a cell of 18
+in the Gothic games and 32 in The Alchemist, with no gap.
+
 ## The CG viewer
 
 The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist, Yarinaoshi no Christmas, Funbag Fantasy 4, Ore o Hoshigaru Tsuma to Gibo and Horny Elves and a Moral Orc under Wine, and the panel, buttons and picture match the PC's to within blending noise. The PC games behave alike:

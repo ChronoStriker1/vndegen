@@ -138,6 +138,7 @@ int vnneko_take_comment_request(VNNekoEngine *e, char *utf8, size_t size) {
     return slot;
 }
 bool vnneko_set_comment(VNNekoEngine *e, int slot, const char *utf8) { return e->engine.setComment(slot, utf8 ? utf8 : ""); }
+void vnneko_debug_table_prefix(const char *text) { neko::menuTablePrefix() = text ? text : ""; }
 bool vnneko_debug_save(VNNekoEngine *e, int slot) { return e->engine.saveToSlot(slot); }
 bool vnneko_debug_load(VNNekoEngine *e, int slot) { return e->engine.loadFromSlot(slot); }
 void vnneko_debug_toggle_lock(VNNekoEngine *e, int slot) { e->engine.toggleLock(slot); }

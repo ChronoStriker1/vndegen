@@ -10,6 +10,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <fstream>
+#include <iterator>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -65,6 +67,11 @@ int main(int argc, char **argv) {
             if (f) std::fclose(f);
         }
         else if (a == "--choose") chooseIndex = std::atoi(next());
+        else if (a == "--table") {
+            // Table lines read ahead of the game's own, to try settings against the PC without rebuilding.
+            std::ifstream f(next());
+            vnneko_debug_table_prefix(std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()).c_str());
+        }
         else if (a == "--period") { period = std::atoi(next()); nextBeat = period; }
         else if (a == "--jump") { jumpScript = next(); jumpNode = std::atoi(next()); }
         else if (a == "--shots") {

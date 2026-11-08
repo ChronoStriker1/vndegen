@@ -7,5 +7,7 @@ namespace neko {
 
 // The table for a game, by the normalized UserDataDirectory its init.ini names, or null when VNDegen doesn't have one yet.
 const char *menuTable(const std::string &userDataDirectory);
+// For measuring against the PC: table lines read ahead of every game's own, so their settings win. Empty in the app.
+std::string &menuTablePrefix();
 
 }  // namespace neko
