@@ -81,6 +81,8 @@ New bugs get a GitHub issue and a line here.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 - [#46](https://github.com/ChronoStriker1/vndegen/issues/46) NekoSDK: scene unlocks from a PC backup (play_view.sav) aren't read.
 - [#63](https://github.com/ChronoStriker1/vndegen/issues/63) NekoSDK: Yarinaoshi no Christmas draws save comments too small.
+- [#64](https://github.com/ChronoStriker1/vndegen/issues/64) NekoSDK: The Alchemist's text uses the wrong font and runs wide.
+- [#65](https://github.com/ChronoStriker1/vndegen/issues/65) NekoSDK: Yarinaoshi no Christmas's text spacing and log placement differ from the PC.
 - [#62](https://github.com/ChronoStriker1/vndegen/issues/62) Metadata: Rinjin matched to the wrong VNDB entry.
 
 ## In progress
