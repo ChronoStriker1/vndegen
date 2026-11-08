@@ -1,6 +1,13 @@
 // Test Game 87's (Funbag Fantasy: Sideboob Story 2) table, a raw string that tables.cpp includes and menuTable() hands
 // out. Its story order is in its exe, so the table gives it.
 const char kSideboob2[] = R"(
+screen defaults
+# Standing pictures: the slot is chosen by the second number of 位置, x by the first, and 14 deletes by slot, from 21
+# PC saves under Wine.
+layoutslotby p1
+layoutslots 200 300 400 500 600
+layoutx -512 -256 0 256 512
+
 screen story
 # Traced from the PC under Wine through both choices and both endings, in the order of the exe's scene list.
 # S 101 is 1 on route B, the second choice's second option, as the PC's saves hold it.
