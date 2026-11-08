@@ -259,6 +259,7 @@ private:
     void pointerToward(float &x, float &y) const;
     // Whether the player's Individual Voices settings let this voice file play.
     bool voiceAllowed(const std::string &voice) const;
+    int soundGroup(int kind, const std::string &path) const;  // the volume a sound plays at
     int cardsPerPage() const;
     void cardPlace(int index, int &x, int &y) const;
     std::string mainFlowKey() const;
@@ -578,6 +579,7 @@ private:
     std::string dialogOpener_;  // the action of the menu button whose question is open
     int dialogQuestion_ = 0, dialogHover_ = -1;
     std::function<void()> dialogYes_;
+    int testPlayer_ = 0;  // Config's test sound
     bool dialogNoAsk_ = false;  // the "don't ask again" box, ticked
     void answerDialog(bool yes);
 

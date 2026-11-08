@@ -24,6 +24,9 @@ namespace {
 constexpr int kKindBgm = 0, kKindSe = 1, kKindVoice = 2;
 // A group kept at no volume, for voices whose speaker the player has unchecked while they play.
 constexpr int kMutedVoices = 4;
+// Test Game 94's Config gives H sound effects (files named hse_) and background voices (voice_type.ini's types from 50)
+// volumes of their own.
+constexpr int kGroupHse = 5, kGroupBackVoice = 6;
 // How long the message window takes to slide in, read from the PC game's footage.
 constexpr int kWindowSlideMs = 200;
 // How long each character of text takes to fade in, measured from the PC game's footage.
@@ -59,8 +62,10 @@ std::string matchCase(const std::string &base, const std::string &relative);
 // What Config shows before the player changes anything, which is what the PC's shows.
 const std::map<std::string, int> &defaultSettings() {
     static const std::map<std::string, int> defaults = {
-        {"master", 100}, {"bgm", 80}, {"se", 80}, {"voice", 80},
-        {"mute_master", 0}, {"mute_bgm", 0}, {"mute_se", 0}, {"mute_voice", 0},
+        {"master", 100}, {"bgm", 80}, {"se", 80}, {"voice", 80}, {"hse", 80}, {"backvoice", 80},
+        {"mute_master", 0}, {"mute_bgm", 0}, {"mute_se", 0}, {"mute_voice", 0}, {"mute_hse", 0}, {"mute_backvoice", 0},
+        // Whether a click that moves the text on stops its voice, as the PC games without the setting always do.
+        {"voice_stop", 1},
         {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60}, {"count_color", 1}, {"gt_off", 0}, {"express", 1}, {"bar_always", 0},
         {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1},
         // Config's effects, waits, clicking past waits and the H scenes' camera work, as the PC starts them.
@@ -526,6 +531,24 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "LogMode") { openLog(); return; }
+    // `test:se:FILE` or `test:voice:FILE`: Config's ♪ plays a sample at that group's volume, the one Test Game 94's PC reads
+    // for it under Wine.
+    if (action.rfind("test:", 0) == 0) {
+        std::string rest = action.substr(5);
+        size_t colon = rest.find(':');
+        if (colon == std::string::npos) return;
+        if (testPlayer_) audio_.close(testPlayer_);
+        testPlayer_ = 0;
+        if (Bytes data = files_.read(rest.substr(colon + 1))) {
+            testPlayer_ = audio_.open(data);
+            if (testPlayer_) {
+                audio_.setGroup(testPlayer_, rest.compare(0, colon, "voice") == 0 ? kKindVoice : kKindSe);
+                audio_.setLoops(testPlayer_, 1);
+                audio_.play(testPlayer_);
+            }
+        }
+        return;
+    }
     if (action == "Voice") {
         if (!currentText_.voice.empty() && voiceAllowed(currentText_.voice)) {
             if (voicePlayer_) audio_.close(voicePlayer_);
@@ -534,7 +557,7 @@ void Engine::runAction(const std::string &action) {
                 voicePlayer_ = audio_.open(data);
                 if (voicePlayer_) {
                     voiceFiles_[voicePlayer_] = currentText_.voice;
-                    audio_.setGroup(voicePlayer_, kKindVoice);
+                    audio_.setGroup(voicePlayer_, soundGroup(kKindVoice, currentText_.voice));
                     audio_.setLoops(voicePlayer_, 1);
                     audio_.play(voicePlayer_);
                 }
@@ -1485,7 +1508,7 @@ void Engine::applyVoiceChoices() {
     auto follow = [&](int player) {
         auto file = voiceFiles_.find(player);
         if (!player || file == voiceFiles_.end()) return;
-        audio_.setGroup(player, voiceAllowed(file->second) ? kKindVoice : kMutedVoices);
+        audio_.setGroup(player, voiceAllowed(file->second) ? soundGroup(kKindVoice, file->second) : kMutedVoices);
         playing.insert(*file);
     };
     follow(voicePlayer_);
@@ -1499,6 +1522,8 @@ void Engine::applySettings() {
     audio_.setGroupVolume(0, loud("bgm", "mute_bgm"));
     audio_.setGroupVolume(1, loud("se", "mute_se"));
     audio_.setGroupVolume(2, loud("voice", "mute_voice"));
+    audio_.setGroupVolume(kGroupHse, loud("hse", "mute_hse"));
+    audio_.setGroupVolume(kGroupBackVoice, loud("backvoice", "mute_backvoice"));
     audio_.setGroupVolume(3, setting("music") * master / 100);
     audio_.setGroupVolume(kMutedVoices, 0);
     applyVoiceChoices();
@@ -2061,7 +2086,7 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         Bytes data = files_.read(sound.path);
         int player = data ? audio_.open(data) : 0;
         if (!player) continue;
-        audio_.setGroup(player, kind);
+        audio_.setGroup(player, soundGroup(kind, sound.path));
         audio_.setLoops(player, 0);
         audio_.fade(player, 0, sound.volume, false);
         if (sound.pan) audio_.setPan(player, sound.pan, 0);
@@ -2501,6 +2526,16 @@ void Engine::pointerToward(float &x, float &y) const {
 
 // A voice plays while its speaker's Individual Voices box is checked. A voice of several speakers, listed in the table as
 // `voicejoint TYPE SPEAKER...`, plays only while all of theirs are, which the PC's cfg.sav shows for Test Game 84.
+int Engine::soundGroup(int kind, const std::string &path) const {
+    std::string name = normalizedPath(path);
+    name = name.substr(name.find_last_of('\\') + 1);
+    if (kind == kKindSe && name.rfind("hse", 0) == 0) return kGroupHse;
+    if (kind == kKindVoice)
+        for (const auto &[start, type] : voiceTypes_)
+            if (name.rfind(start, 0) == 0) return type >= 50 ? kGroupBackVoice : kKindVoice;
+    return kind;
+}
+
 bool Engine::voiceAllowed(const std::string &voice) const {
     std::string name = normalizedPath(voice);
     name = name.substr(name.find_last_of('\\') + 1);
@@ -3348,13 +3383,18 @@ bool Engine::step(int ms) {
         autoReadyAt_ = -1;
     }
     if (waiting_ == Waiting::Click && (clicked_ || skipping || autoNext)) {
+        bool clickedNow = clicked_;
         clicked_ = false;
         if (!textDone_ && !skipping) {
             // The first click finishes the text; the next one moves on.
             textDone_ = true;
             dirty_ = true;
         } else {
-            if (voicePlayer_) { audio_.close(voicePlayer_); voicePlayer_ = 0; }
+            // Config's クリック時、ボイスを止める: off, a click lets the line's voice play on until the next line's.
+            if (voicePlayer_ && (!clickedNow || setting("voice_stop"))) {
+                audio_.close(voicePlayer_);
+                voicePlayer_ = 0;
+            }
             waiting_ = Waiting::None;
         }
     }
@@ -4547,7 +4587,7 @@ void Engine::showText(const Node &n) {
             voicePlayer_ = audio_.open(data);
             if (voicePlayer_) {
                 voiceFiles_[voicePlayer_] = n.s[3];
-                audio_.setGroup(voicePlayer_, kKindVoice);
+                audio_.setGroup(voicePlayer_, soundGroup(kKindVoice, n.s[3]));
                 audio_.setLoops(voicePlayer_, 1);
                 audio_.start(voicePlayer_);
             }
@@ -4582,7 +4622,7 @@ void Engine::playSound(const Node &n, int kind) {
     audio_.setLoops(player, kind == kKindBgm ? 0 : p[4]);
     if (p[2]) audio_.setPan(player, p[2], 0);
     int fade = p[3], volume = p[1];
-    audio_.setGroup(player, kind);
+    audio_.setGroup(player, soundGroup(kind, n.s[1]));
     audio_.fade(player, 0, fade > 0 ? 0 : volume, false);
     if (fade > 0) audio_.fade(player, fade, volume, false);
     audio_.start(player);
