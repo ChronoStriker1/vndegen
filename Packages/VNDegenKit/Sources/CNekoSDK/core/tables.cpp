@@ -4316,147 +4316,148 @@ viewerbutton hide obj\l001_000.bmp 1240 588 2 0 help 0
 viewernumber index obj\j002_000.bmp 926 630 13 2
 viewernumber total obj\j002_001.bmp 966 648 11 2
 viewerauto 8000 0
-# The galleries' room, and each tab's two women, standing sprites the exe reads from sys.pak (traced under Wine), 73
-# pixels further left a tab.
-pic obj\f000_001.bmp 0 0
-pic sys\sc_000_002_000_001_001.bmp -163 -39 tab 0
-pic sys\sc_001_002_000_001_003.bmp 596 -39 tab 0
-pic sys\sc_000_002_000_001_000.bmp -236 -39 tab 1
-pic sys\sc_001_002_000_001_000.bmp 523 -39 tab 1
-pic sys\sc_000_002_000_001_003.bmp -309 -39 tab 2
-pic sys\sc_001_002_000_001_001.bmp 450 -39 tab 2
-# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
-# of bars lies over the top and bottom.
-pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+# Each tab's place and couple, measured under Wine: the room with Kazuki and his wife in front of him, and the
+# apartment block with Kanamori and her in front of him.
+pic obj\f000_000.bmp 0 0 tab 0
+pic obj\f002_001.bmp -74 -39 tab 0
+pic obj\f002_000.bmp 58 -39 tab 0
+pic obj\f000_001.bmp 0 0 tab 1
+pic obj\f002_003.bmp 52 -39 tab 1
+pic obj\f002_002.bmp -93 -39 tab 1
+pic obj\f003_001.bmp 0 567
+pic obj\e003_000.bmp 1118 0
 pic obj\e001_000.bmp 0 0
 pic obj\f001_000.bmp 0 0 1 2 0 0
 cellhide
-cellsheet obj\f003_000.bmp
-cellsize 186 156
-cellthumb 10 29
-cell 279 82
-cell 478 82
-cell 677 82
-cell 279 245
-cell 478 245
-cell 677 245
-cell 279 408
-cell 478 408
-cell 677 408
-celllabel obj\e008_000.bmp -2 8
-celldigits obj\e008_001.bmp 28 3 3 18
-cellcount obj\f004_000.bmp obj\f004_001.bmp 100 125 128 141
-gallerytabs 1
-cellshift 0 80
-cellshift 2 -80
-button page0 obj\e006_000.bmp 282 34 10 5 0
-button gtab0 obj\f002_000.bmp 8 654 3 5 0
-button gtab1 obj\f002_000.bmp 384 654 3 5 1
-button gtab2 obj\f002_000.bmp 760 654 3 5 2
-button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
-button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
+cellsheet obj\f005_000.bmp
+cellsize 180 150
+cellthumb 10 25
+cell 476 136
+cell 675 136
+cell 874 136
+cell 516 299
+cell 715 299
+cell 914 299
+cell 476 462
+cell 675 462
+cell 874 462
+celllabel obj\e008_000.bmp 6 11
+celldigits obj\e008_001.bmp 36 6 3 18
+# The pictures seen in the card's numerals, then a small slash and the total.
+cellcount obj\e008_001.bmp obj\f006_001.bmp 95 120 131 144 2
+celltotal obj\f006_000.bmp 3
+gallerytabs 0
+# The gallery pages are 56 apart, wider than the save pages, as many as a tab needs.
+button page0 obj\e006_000.bmp 410 26 10 5 0
+button page1 obj\e006_000.bmp 466 26 10 5 1
+button page2 obj\e006_000.bmp 522 26 10 5 2
+button page3 obj\e006_000.bmp 578 26 10 5 3
+button page4 obj\e006_000.bmp 634 26 10 5 4
+button gtab0 obj\f003_000.bmp 57 601 2 5 0
+button gtab1 obj\f003_000.bmp 231 601 2 5 1
+# 拘り表現 and 通常表現, Config's こだわり表現.
+button express1 obj\f004_000.bmp 231 655 2 5 0
+button express0 obj\f004_000.bmp 311 655 2 5 1
+button nav_save obj\e004_000.bmp 1172 94 9 5 0 help obj\e005_000.bmp 948 666 1 9 0 0
+button nav_load obj\e004_000.bmp 1172 135 9 5 1 help obj\e005_000.bmp 948 666 1 9 0 1
+button nav_cg obj\e004_000.bmp 1172 176 9 5 2 help obj\e005_000.bmp 948 666 1 9 0 2
+button nav_scene obj\e004_000.bmp 1172 217 9 5 3 help obj\e005_000.bmp 948 666 1 9 0 3
+button nav_music obj\e004_000.bmp 1172 258 9 5 4 help obj\e005_000.bmp 948 666 1 9 0 4
+button nav_config obj\e004_000.bmp 1172 299 9 5 5 help obj\e005_000.bmp 948 666 1 9 0 5
+button nav_title obj\e004_000.bmp 1172 340 9 5 6 help obj\e005_000.bmp 948 666 1 9 0 6
+button nav_quit obj\e004_000.bmp 1172 381 9 5 7 help obj\e005_000.bmp 948 666 1 9 0 7
+button back obj\e004_000.bmp 1172 463 9 5 8 help obj\e005_000.bmp 948 666 1 9 0 8
 
 screen scene
 helplast
 selectedlook
-# The galleries' room, and each tab's two women, standing sprites the exe reads from sys.pak (traced under Wine), 73
-# pixels further left a tab.
-pic obj\f000_001.bmp 0 0
-pic sys\sc_000_002_000_001_001.bmp -163 -39 tab 0
-pic sys\sc_001_002_000_001_003.bmp 596 -39 tab 0
-pic sys\sc_000_002_000_001_000.bmp -236 -39 tab 1
-pic sys\sc_001_002_000_001_000.bmp 523 -39 tab 1
-pic sys\sc_000_002_000_001_003.bmp -309 -39 tab 2
-pic sys\sc_001_002_000_001_001.bmp 450 -39 tab 2
-# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
-# of bars lies over the top and bottom.
-pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+# Each tab's place and couple, measured under Wine: the room with Kazuki and his wife in front of him, and the
+# apartment block with Kanamori and her in front of him.
+pic obj\f000_000.bmp 0 0 tab 0
+pic obj\f002_001.bmp -74 -39 tab 0
+pic obj\f002_000.bmp 58 -39 tab 0
+pic obj\f000_001.bmp 0 0 tab 1
+pic obj\f002_003.bmp 52 -39 tab 1
+pic obj\f002_002.bmp -93 -39 tab 1
+pic obj\f003_001.bmp 0 567
+pic obj\e003_000.bmp 1118 0
 pic obj\e001_000.bmp 0 0
 pic obj\f001_000.bmp 0 0 1 2 0 1
 cellhide
-cellsheet obj\f003_000.bmp
-cellsize 186 156
-cellthumb 10 29
-cell 279 82
-cell 478 82
-cell 677 82
-cell 279 245
-cell 478 245
-cell 677 245
-cell 279 408
-cell 478 408
-cell 677 408
-celllabel obj\e008_000.bmp -2 8
-celldigits obj\e008_001.bmp 28 3 3 18
-cellcount obj\f004_000.bmp obj\f004_001.bmp 100 125 128 141
-gallerytabs 1
-cellshift 0 80
-cellshift 2 -80
-button page0 obj\e006_000.bmp 282 34 10 5 0
-button gtab0 obj\f002_000.bmp 8 654 3 5 0
-button gtab1 obj\f002_000.bmp 384 654 3 5 1
-button gtab2 obj\f002_000.bmp 760 654 3 5 2
-button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
-button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
+cellsheet obj\f005_000.bmp
+cellsize 180 150
+cellthumb 10 25
+cell 476 136
+cell 675 136
+cell 874 136
+cell 516 299
+cell 715 299
+cell 914 299
+cell 476 462
+cell 675 462
+cell 874 462
+celllabel obj\e008_000.bmp 6 11
+celldigits obj\e008_001.bmp 36 6 3 18
+gallerytabs 0
+# The gallery pages are 56 apart, wider than the save pages, as many as a tab needs.
+button page0 obj\e006_000.bmp 410 26 10 5 0
+button page1 obj\e006_000.bmp 466 26 10 5 1
+button page2 obj\e006_000.bmp 522 26 10 5 2
+button page3 obj\e006_000.bmp 578 26 10 5 3
+button page4 obj\e006_000.bmp 634 26 10 5 4
+button gtab0 obj\f003_000.bmp 57 601 2 5 0
+button gtab1 obj\f003_000.bmp 231 601 2 5 1
+# 拘り表現 and 通常表現, Config's こだわり表現.
+button express1 obj\f004_000.bmp 231 655 2 5 0
+button express0 obj\f004_000.bmp 311 655 2 5 1
+button nav_save obj\e004_000.bmp 1172 94 9 5 0 help obj\e005_000.bmp 948 666 1 9 0 0
+button nav_load obj\e004_000.bmp 1172 135 9 5 1 help obj\e005_000.bmp 948 666 1 9 0 1
+button nav_cg obj\e004_000.bmp 1172 176 9 5 2 help obj\e005_000.bmp 948 666 1 9 0 2
+button nav_scene obj\e004_000.bmp 1172 217 9 5 3 help obj\e005_000.bmp 948 666 1 9 0 3
+button nav_music obj\e004_000.bmp 1172 258 9 5 4 help obj\e005_000.bmp 948 666 1 9 0 4
+button nav_config obj\e004_000.bmp 1172 299 9 5 5 help obj\e005_000.bmp 948 666 1 9 0 5
+button nav_title obj\e004_000.bmp 1172 340 9 5 6 help obj\e005_000.bmp 948 666 1 9 0 6
+button nav_quit obj\e004_000.bmp 1172 381 9 5 7 help obj\e005_000.bmp 948 666 1 9 0 7
+button back obj\e004_000.bmp 1172 463 9 5 8 help obj\e005_000.bmp 948 666 1 9 0 8
 
 screen music
 helplast
 selectedlook
-hover 343 676 534 708 obj\g006_000.bmp 868 666 8 7
+# The room, the player and the ten tracks, measured under Wine, with a help line for each control and the volume.
+hover 733 583 896 607 obj\g007_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
-# Line art of the three women pans down behind the list, each sketch in turn, from a random one (measured under Wine).
-drift obj\g000_001.bmp -170 -791 -17
-drift obj\g000_002.bmp -300 -1035 -16
-drift obj\g000_005.bmp 211 -1098 -135
-drift obj\g000_003.bmp -32 -815 -18
-drift obj\g000_006.bmp 145 -1022 -25
-driftmotion 30 2250 1000 120
-# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
-# of bars lies over the top and bottom.
-pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e003_000.bmp 1118 0
 pic obj\e001_000.bmp 0 0
 pic obj\g001_000.bmp 0 0
-pic obj\g004_000.bmp 343 676
-slider music obj\g004_001.bmp 370 681
-number music obj\g005_000.bmp 461 659
-button music_prev obj\g003_000.bmp 20 668 7 5 0 help obj\g006_000.bmp 868 669 1 8 0 0
-button music_play obj\g003_000.bmp 64 668 7 5 1 help obj\g006_000.bmp 868 669 1 8 0 1
-button music_pause obj\g003_000.bmp 108 668 7 5 2
-button music_stop obj\g003_000.bmp 152 668 7 5 3
-button music_next obj\g003_000.bmp 196 668 7 5 4 help obj\g006_000.bmp 868 669 1 8 0 4
-button music_repeat obj\g003_000.bmp 240 668 7 5 5 help obj\g006_000.bmp 868 669 1 8 0 5
-button music_shuffle obj\g003_000.bmp 284 668 7 5 6 help obj\g006_000.bmp 868 669 1 8 0 6
-button track0 obj\g002_000.bmp 84 164 8 5 0
-button track1 obj\g002_000.bmp 84 267 8 5 1
-button track2 obj\g002_000.bmp 84 370 8 5 2
-button track3 obj\g002_000.bmp 84 473 8 5 3
-button track4 obj\g002_000.bmp 599 164 8 5 4
-button track5 obj\g002_000.bmp 599 267 8 5 5
-button track6 obj\g002_000.bmp 599 370 8 5 6
-button track7 obj\g002_000.bmp 599 473 8 5 7
-button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
-button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
+pic obj\g003_000.bmp 356 555
+slider music obj\g005_000.bmp 734 584
+number music obj\g006_000.bmp 940 591 11
+button music_prev obj\g004_000.bmp 380 575 7 5 0 help obj\g007_000.bmp 868 666 1 8 0 0
+button music_play obj\g004_000.bmp 424 575 7 5 1 help obj\g007_000.bmp 868 666 1 8 0 1
+button music_pause obj\g004_000.bmp 468 575 7 5 2 help obj\g007_000.bmp 868 666 1 8 0 2
+button music_stop obj\g004_000.bmp 512 575 7 5 3 help obj\g007_000.bmp 868 666 1 8 0 3
+button music_next obj\g004_000.bmp 556 575 7 5 4 help obj\g007_000.bmp 868 666 1 8 0 4
+button music_repeat obj\g004_000.bmp 600 575 7 5 5 help obj\g007_000.bmp 868 666 1 8 0 5
+button music_shuffle obj\g004_000.bmp 644 575 7 5 6 help obj\g007_000.bmp 868 666 1 8 0 6
+button track0 obj\g002_000.bmp 51 95 10 5 0
+button track1 obj\g002_000.bmp 51 181 10 5 1
+button track2 obj\g002_000.bmp 51 267 10 5 2
+button track3 obj\g002_000.bmp 51 353 10 5 3
+button track4 obj\g002_000.bmp 51 439 10 5 4
+button track5 obj\g002_000.bmp 551 95 10 5 5
+button track6 obj\g002_000.bmp 551 181 10 5 6
+button track7 obj\g002_000.bmp 551 267 10 5 7
+button track8 obj\g002_000.bmp 551 353 10 5 8
+button track9 obj\g002_000.bmp 551 439 10 5 9
+button nav_save obj\e004_000.bmp 1172 94 9 5 0 help obj\e005_000.bmp 948 666 1 9 0 0
+button nav_load obj\e004_000.bmp 1172 135 9 5 1 help obj\e005_000.bmp 948 666 1 9 0 1
+button nav_cg obj\e004_000.bmp 1172 176 9 5 2 help obj\e005_000.bmp 948 666 1 9 0 2
+button nav_scene obj\e004_000.bmp 1172 217 9 5 3 help obj\e005_000.bmp 948 666 1 9 0 3
+button nav_music obj\e004_000.bmp 1172 258 9 5 4 help obj\e005_000.bmp 948 666 1 9 0 4
+button nav_config obj\e004_000.bmp 1172 299 9 5 5 help obj\e005_000.bmp 948 666 1 9 0 5
+button nav_title obj\e004_000.bmp 1172 340 9 5 6 help obj\e005_000.bmp 948 666 1 9 0 6
+button nav_quit obj\e004_000.bmp 1172 381 9 5 7 help obj\e005_000.bmp 948 666 1 9 0 7
+button back obj\e004_000.bmp 1172 463 9 5 8 help obj\e005_000.bmp 948 666 1 9 0 8
 
 screen config
 helplast

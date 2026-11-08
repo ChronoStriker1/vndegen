@@ -509,6 +509,12 @@ void Engine::runAction(const std::string &action) {
         saveSettings();
         return;
     }
+    // Test Game 94's galleries choose 拘り表現 (`express1`) or 通常表現 (`express0`), Config's こだわり表現 setting.
+    if (action == "express1" || action == "express0") {
+        changeSetting("express", action == "express1" ? 1 : 0);
+        saveSettings();
+        return;
+    }
     if (action == "Ejaculation") { gtEjaculate(); return; }
     if (action == "Extension") {
         if (gt_.active && !gt_.extending) gt_.extend = !gt_.extend;
@@ -2643,7 +2649,7 @@ void Engine::composeScreen(Canvas &out) {
         if (b.action.rfind("page", 0) == 0 && !galleryPageExists(std::atoi(b.action.c_str() + 4))) continue;
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
         ButtonState state = over ? StateHover : StateNormal;
-        bool current = (!subMenu_.empty() && ((b.action.rfind("submenu:", 0) == 0 && submenuOpen(b.action.substr(8))) || (b.action == "start" && submenuOpen("start")))) || b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
+        bool current = (!subMenu_.empty() && ((b.action.rfind("submenu:", 0) == 0 && submenuOpen(b.action.substr(8))) || (b.action == "start" && submenuOpen("start")))) || b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) || b.action == "express" + std::to_string(setting("express")) ||
                        (screen_->name.rfind("config", 0) == 0 && b.action == "tab" + screen_->name.substr(6));
         // `selectedlook`: the current one keeps its selected look under the pointer, as in Test Games 92 and 93.
         if (current) state = over && !screen_->setting("selectedlook") ? StateSelectedHover : StateSelected;
