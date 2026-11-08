@@ -249,6 +249,7 @@ private:
         std::string flow;  // the flow script the save is in, for its chapter's name
         int route = 0;  // its route mode, for the card's progress label
         std::string comment;  // typed on a PC, UTF-8
+        std::map<int, int> variables;  // the save's scenario variables, by number, for `slotvar`
     };
     SlotInfo &slotInfo(int slot);
     bool pageOff(const std::string &action) const;

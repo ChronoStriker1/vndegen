@@ -2064,6 +2064,7 @@ Engine::SlotInfo &Engine::slotInfo(int slot) {
     info.flow = data.flow;
     if (auto it = data.variables.find(routeVar_); routeVar_ >= 0 && it != data.variables.end()) info.route = it->second;
     info.comment = sjis::toUtf8(data.comment);
+    info.variables = data.variables;
     auto bmp = readWhole(savePath(slot, "bmp"));
     if (!bmp.empty()) info.thumbnail = decodeBmpBytes(bmp);
     return info;
@@ -2611,15 +2612,16 @@ void Engine::composeSlots(Canvas &out) {
     // NEW marks the card saved to last, which the PC keeps in global 0: Test Game 94's held 2 and The Alchemist's 1, the
     // cards their screens marked.
     int newest = variable(0, 0);
-    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10) {
+    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10, int step = 0) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / cells;
+        if (step <= 0) step = w;
         for (int i = count - 1; i >= 0; i--) {
             int digit = value % 10;
             value /= 10;
-            drawPart(out, *sheetOfTen, x + i * w, y, digit * w, 0, w, sheetOfTen->h, 1);
+            drawPart(out, *sheetOfTen, x + i * step, y, digit * w, 0, w, sheetOfTen->h, 1);
         }
-        return x + count * w;
+        return x + count * step;
     };
     for (int index = 0; index < perPage; index++) {
             int slot = page_ * perPage + index + 1;
@@ -2635,6 +2637,9 @@ void Engine::composeSlots(Canvas &out) {
             drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, sheet->w, cardH, cardOpacity);
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
             else if (empty) drawPart(out, *empty, cx + offset("slotempty", 1), cy + offset("slotempty", 2), 0, 0, empty->w, empty->h, 1);
+            // `slotthumbframe SHEET X Y`: a frame around every saved thumbnail, as Test Game 82's cards have.
+            if (ImageRef around = picture("slotthumbframe"); around && info.thumbnail)
+                drawPart(out, *around, cx + offset("slotthumbframe", 1), cy + offset("slotthumbframe", 2), 0, 0, around->w, around->h, 1);
             if (frame && frame->h >= 5 && slot == hovered) drawPart(out, *frame, cx + offset("slotframe", 1), cy + offset("slotframe", 2), 0, frame->h / 5, frame->w, frame->h / 5, 1);
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
             // `slotchapter SHEET X Y ROWS FLOW...`: the name of the chapter a save is in, a row of the sheet for each flow
@@ -2658,7 +2663,8 @@ void Engine::composeSlots(Canvas &out) {
                 drawPart(out, *quickMark, numberX, cy + offset("slotdigits", 2), 0, 0, quickMark->w, quickMark->h, 1);
                 numberX += quickMark->w;
             }
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2));
+            // `slotdigits SHEET X Y COUNT [STEP]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide digits).
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), 10, offset("slotdigits", 4));
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -2677,6 +2683,14 @@ void Engine::composeSlots(Canvas &out) {
                 if (ImageRef names = images_->get((*progress)[0]); names && info.route >= 0 && info.route < field(*progress, 3)) {
                     int h = names->h / std::max(1, field(*progress, 3));
                     drawPart(out, *names, cx + field(*progress, 1), cy + field(*progress, 2), 0, info.route * h, names->w, h, 1);
+                }
+            // `slotvar SHEET X Y COLS S N`: a cell of a row of COLS picked by the save's scenario variable N, as Test Game 82's
+            // cards name the chapter by S5000. A value outside the row draws nothing.
+            if (const auto *chosen = screen_->setting("slotvar"); chosen && chosen->size() >= 6 && info.exists && (*chosen)[4] == "S")
+                if (ImageRef names = images_->get((*chosen)[0])) {
+                    auto it = info.variables.find(field(*chosen, 5));
+                    int value = it == info.variables.end() ? 0 : it->second, columns = std::max(1, field(*chosen, 3)), w = names->w / columns;
+                    if (value >= 0 && value < columns) drawPart(out, *names, cx + field(*chosen, 1), cy + field(*chosen, 2), value * w, 0, w, names->h, 1);
                 }
             // `slotnew SHEET X Y`: the card saved to last.
             if (ImageRef mark = picture("slotnew"); mark && slot == newest && info.exists)
