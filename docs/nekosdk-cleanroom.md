@@ -154,8 +154,10 @@ maps to Open Sans ([fonts.md](fonts.md)). The PC sets each glyph a fixed gap pas
 pitch apart, which init.ini's MsgCharInterval and MsgLineInterval don't predict, so a game's table gives them
 (`textgap`, `textline`, `textshift`, `textfont`, `textsize`, `commentfont`). Yarinaoshi no Christmas, measured by
 loading the same PC save on the PC under Wine, with VNDegen's stand-in fonts mapped in place of the Windows ones, and
-here: gap 4, comments in MS Gothic at 18, its log placed under its rules as the PC's is, the fitted lines ending on
-the PC's pixel. The Alchemist, from the publisher's Windows screenshots, since Wine has no Lucida Sans Unicode and
+here: comments in MS Gothic at 18, and its log placed under its rules as the PC's is. Christmas asks for Meiryo, which
+Ume P Gothic stands in for without matching its widths; with it the PC sets a gap of 4 and many lines run off the
+screen, the opening's among them, so that gap belongs to the stand-in and is left out. The Alchemist, from the
+publisher's Windows screenshots, since Wine has no Lucida Sans Unicode and
 font-links it to Noto Sans CJK: Open Sans 22 with a gap of 5.93, lines 42 apart and the first glyph one gap in, which
 puts capitals within a pixel of the screenshots; its comments at 20, sized from Wine's capture.
 
