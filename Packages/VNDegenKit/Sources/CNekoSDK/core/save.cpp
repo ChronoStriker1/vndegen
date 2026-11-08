@@ -183,6 +183,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // Test Game 92 saves as Ore o Hoshigaru Tsuma to Gibo does: its PC save reads with that layout.
     if (folder == "waffle\\animother") return &kTsumaGibo;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
+    // The runtime's own story-table test game saves as The Alchemist does.
+    if (folder == "vndegen\\storytest") return &kAlchemist;
     return nullptr;
 }
 

@@ -291,6 +291,7 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     log("started: %dx%d, %d scripts in scr, %s, movies %s", width_, height_, int(files_.list("scr").size()), screens_.empty() ? "no menus yet" : "menus",
         hasMovies_ ? "through the host's decoder" : "left out, with no decoder");
     loadGalleries();
+    loadParts();
     loadGlobals();
     loadSettings();
     if (screens_.count("title")) openScreen("title");
@@ -372,6 +373,7 @@ void Engine::endStory(const std::string &screen) {
     staffRollLayers_ = nullptr;
     gt_ = {};
     splashes_.clear();
+    resetParts();
     stack_.clear();
     scene_ = {};
     back_.clear();
@@ -418,7 +420,10 @@ void Engine::startStory() {
     if (routeVar_ >= 0 && pendingRoute_) scenario_[routeVar_] = pendingRoute_;
     pendingRoute_ = 0;
     staffRollLayers_ = nullptr;
+    resetParts();
     std::string first = config_.text(storyFlowKey_.c_str());
+    // A game with no flow scripts starts at its story table's first flow.
+    if (first.empty() && storyFlowKey_ == "FirstFlow" && !firstStoryFlow().empty()) first = "story:" + firstStoryFlow();
     auto flow = first.empty() ? nullptr : loadScript(first);
     if (!flow || !flow->first()) {
         complain("This game has no flow script to start from.");
@@ -2075,6 +2080,8 @@ SaveData Engine::captureSave() {
     d.date[4] = local.tm_min;
     d.date[5] = local.tm_sec;
     d.flow = stack_.empty() ? "" : files_.savedName(stack_.back().script->name);
+    // A story table's flows and chapters aren't files: the PC's saves of those games name no flow, and nor do ours.
+    if (d.flow.rfind("story:", 0) == 0 || d.flow.rfind("chapter:", 0) == 0) d.flow.clear();
     d.flowNode = flowCallId_;
     d.choiceImage = choiceImage_;
     d.dateFlag = choiceImage_.empty() ? 0 : 1;
@@ -2139,6 +2146,7 @@ SaveData Engine::captureSave() {
         out.endAlpha = int(end.alpha * 256 + 0.5f);
         d.sprites.push_back(out);
     }
+    for (const auto &[name, part] : parts_) part->savePC(d);
     d.windowShown = windowShown_;
     d.current = currentText_;
     d.backlog = backlog_;
@@ -2268,8 +2276,11 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
+    } else if (d.flow.empty() && !d.scene.empty() && !firstStoryFlow().empty() && !resumeStoryAt(d.scene)) {
+        complain("The story table has no place for the save's scene " + d.scene);
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d, slot);
+    loadPartsState(d, slot);
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
         // The film noise starts again where the save left it running.
@@ -3176,6 +3187,13 @@ std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
     std::string key = normalizedPath(path);
     auto it = scripts_.find(key);
     if (it != scripts_.end()) return it->second;
+    // The story table's flows, and a game part's chapters, which come from the table and the part, not the game's files.
+    if (path.rfind("story:", 0) == 0) {
+        auto script = compileStory(path.substr(6));
+        if (script) scripts_[key] = script;
+        return script;
+    }
+    if (path.rfind("chapter:", 0) == 0) return compileChapter(std::atoi(path.c_str() + 8));
     Bytes data = files_.read(path);
     if (!data) {
         complain("Missing script " + path);
@@ -3254,10 +3272,12 @@ void Engine::run() {
             continue;
         }
         const Node &n = *stack_.back().node;
-        Frame &flow = stack_.back();
-        const Node *before = flow.node;
+        // By place, since a chapter pushes another frame, which can move the stack's frames.
+        size_t at = stack_.size() - 1;
+        auto script = stack_.back().script;
+        const Node *before = stack_.back().node;
         runFlow(n);
-        if (flow.node == before) flow.node = flow.script->node(n.next);
+        if (at < stack_.size() && stack_[at].node == before && stack_[at].script == script) stack_[at].node = script->node(n.next);
     }
     warnOnce("A script ran too long without waiting.");
 }
@@ -3326,6 +3346,37 @@ void Engine::runFlow(const Node &n) {
         auto next = loadScript(n.s[1]);
         flow.script = next;
         flow.node = next ? next->first() : nullptr;
+        break;
+    }
+    case 1001:  // the story table's goto
+        flow.node = flow.script->node(n.otherwise);
+        break;
+    case 1002: {  // the story table's `open`: a game part's screen, which the flow waits on
+        std::vector<int> args(n.p.begin() + 4, n.p.begin() + 4 + std::clamp(n.p[3], 0, 24));
+        partResultScope_ = n.p[0];
+        partResultNumber_ = n.p[1];
+        flow.node = flow.script->node(n.next);
+        bool opened = false;
+        for (auto &[name, part] : parts_) {
+            // Set first, so a screen that finishes as it opens finds itself the one open.
+            partScreen_ = part.get();
+            if (part->openScreen(*partHost_, n.s[1], args)) {
+                opened = true;
+                break;
+            }
+        }
+        if (!opened) {
+            partScreen_ = nullptr;
+            complain("No game part opens the screen " + n.s[1]);
+        } else if (partScreen_) {
+            waiting_ = Waiting::PartScreen;
+        }
+        dirty_ = true;
+        break;
+    }
+    case 1003: {  // the story table's `chapter N`: the scenes a game part gives, then on
+        flow.node = flow.script->node(n.next);
+        if (auto chapter = loadScript("chapter:" + std::to_string(n.p[0]))) stack_.push_back({chapter, chapter->first()});
         break;
     }
     default:
@@ -3635,6 +3686,7 @@ void Engine::runScene(const Node &n) {
         shakeLock_ = 1 << 30;
         break;
     default:
+        if (partCommand(n)) break;
         warnOnce("scene opcode " + std::to_string(n.opcode) + " isn't built: " + sjis::toUtf8(n.s[0]));
         break;
     }
@@ -3674,6 +3726,8 @@ bool Engine::step(int ms) {
         return waiting_ != Waiting::Ended;
     }
     now_ += ms;
+    for (auto &[name, part] : parts_)
+        if (part->step(*partHost_)) dirty_ = true;
     advanceFlipbooks();
     stepMovies();
     for (auto &[slot, splash] : splashes_) {
@@ -3766,6 +3820,7 @@ void Engine::mouseMove(float x, float y) {
     pointerY_ = py;
     pointerSeen_ = true;
     if (spriteScreen() && moved) spritePointerMoved();
+    if (partScreen_ && moved && !screen_ && !dialogOpen_ && !logOpen_) partScreen_->pointer(*partHost_, px, py);
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
         else pressSettingsWidget(px, py, true);
@@ -3788,6 +3843,11 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (!down) return;
+    // A game part's open screen takes the presses, unless a menu or dialog is over it.
+    if (partScreen_ && waiting_ == Waiting::PartScreen && !screen_ && !dialogOpen_ && !logOpen_) {
+        if (partScreen_->press(*partHost_, pointerX_, pointerY_, button)) dirty_ = true;
+        return;
+    }
     // `mousechoice`: the right button takes a choice's last option, as Test Game 94's mouse icons say.
     if (button == 1 && waiting_ == Waiting::Choice && choiceSheet_ && !screen_ && !dialogOpen_ && !logOpen_ && choiceTable("mousechoice")) {
         choose(choiceCount_ - 1);
@@ -4026,7 +4086,7 @@ bool Engine::jump(const std::string &script, int node) {
 
 const char *Engine::debugStatus() {
     char buffer[256];
-    const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : waiting_ == Waiting::Choice ? "choice" : waiting_ == Waiting::StaffRoll ? "staff roll" : "ended";
+    const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : waiting_ == Waiting::Choice ? "choice" : waiting_ == Waiting::StaffRoll ? "staff roll" : waiting_ == Waiting::PartScreen ? "part screen" : "ended";
     std::snprintf(buffer, sizeof buffer, "%s #%d %s t=%lld", scene_.script ? scene_.script->name.c_str() : "(flow)", scene_.node ? scene_.node->id : -1, waiting, (long long)now_);
     status_ = buffer;
     return status_.c_str();
@@ -4136,7 +4196,39 @@ void Engine::writeFlipModes(int slot, const SaveData &d) {
     std::string text = "at " + sjis::toUtf8(d.scene) + " " + std::to_string(d.node) + "\n";
     for (const auto &[at, s] : front_)
         if (s.flipCount) text += "flip " + std::to_string(at) + " " + (s.flipLoop ? "1" : "0") + " " + (s.flipReverse ? "1" : "0") + " " + sjis::toUtf8(s.path) + "\n";
+    // Game parts' state, `part NAME LINE`, kept beside the save as the flipbooks' modes are.
+    for (const auto &[name, part] : parts_) {
+        std::vector<std::string> lines;
+        part->save(lines);
+        for (const std::string &line : lines) text += "part " + name + " " + line + "\n";
+    }
     writeWhole(savePath(slot, "vnd"), std::vector<uint8_t>(text.begin(), text.end()));
+}
+
+// Game parts start afresh, then take what the PC's save holds for them, then their own lines beside the save when it was
+// written with this save.
+void Engine::loadPartsState(const SaveData &d, int slot) {
+    resetParts();
+    for (const auto &[name, part] : parts_) part->loadPC(d);
+    if (slot < 0) return;
+    auto bytes = readWhole(savePath(slot, "vnd"));
+    std::istringstream in(std::string(bytes.begin(), bytes.end()));
+    std::string line, scene;
+    int node = -1;
+    std::map<std::string, std::vector<std::string>> lines;
+    while (std::getline(in, line)) {
+        std::istringstream words(line);
+        std::string kind;
+        words >> kind;
+        if (kind == "at") words >> scene >> node;
+        else if (kind == "part") {
+            std::string name, rest;
+            if (words >> name && std::getline(words >> std::ws, rest)) lines[name].push_back(rest);
+        }
+    }
+    if (node < 0 || normalizedPath(sjis::fromUtf8(scene)) != normalizedPath(d.scene) || node != d.node) return;
+    for (const auto &[name, part] : parts_)
+        if (auto it = lines.find(name); it != lines.end()) part->load(it->second);
 }
 
 void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots) {
@@ -5165,6 +5257,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
     for (const auto &[slot, s] : sprites) {
         if (!s.image) continue;
         composeSplashes(out, drawnTo, slot);
+        drawParts(out, Layer::Slot, drawnTo, slot);
         drawnTo = slot;
         if (s.noise) {
             drawNoise(out, s);
@@ -5205,6 +5298,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX * zoom, v.scaleY * zoom, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
     }
     composeSplashes(out, drawnTo, INT_MAX);
+    drawParts(out, Layer::Slot, drawnTo, INT_MAX);
 }
 
 void Engine::compose() {
@@ -5278,8 +5372,11 @@ void Engine::compose() {
 
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
+    drawParts(canvas_, Layer::UnderWindow);
     composeMessage(canvas_);
+    drawParts(canvas_, Layer::OverWindow);
     composeCameraPanel(canvas_);
+    if (partScreen_) drawParts(canvas_, Layer::Screen);
     if (dialogOpen_) composeDialog(canvas_);
 
     if (waiting_ == Waiting::Choice && choiceSheet_) {
@@ -5338,6 +5435,7 @@ void Engine::composeMessage(Canvas &out) {
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
+    drawParts(out, Layer::Window);
     drawGlyphRun(out);
     composeGtCount(out);
     composeMessageButtons(out);

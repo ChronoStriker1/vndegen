@@ -91,6 +91,8 @@ struct Screen {
     std::vector<Button> buttons;
     // Other lines of the table, by their first word, for the parts each kind of screen draws for itself.
     std::multimap<std::string, std::vector<std::string>> settings;
+    // The same lines in the order the table gives them, first word included, for a block read in order: the story.
+    std::vector<std::vector<std::string>> lines;
     const std::vector<std::string> *setting(const std::string &key) const {
         auto it = settings.find(key);
         return it == settings.end() ? nullptr : &it->second;

@@ -20,6 +20,7 @@
 #include "canvas.h"
 #include "image.h"
 #include "movie.h"
+#include "parts.h"
 #include "save.h"
 #include "script.h"
 #include "ui.h"
@@ -172,7 +173,8 @@ public:
     void toggleLock(int slot);
 
 private:
-    enum class Waiting { None, Time, Click, Choice, StaffRoll, Ended };
+    friend class PartHost;
+    enum class Waiting { None, Time, Click, Choice, StaffRoll, Ended, PartScreen };
     struct Frame {
         std::shared_ptr<Script> script;
         const Node *node = nullptr;
@@ -596,6 +598,23 @@ private:
 
     Files files_;
     std::unique_ptr<Images> images_;
+    // Game parts the table turns on (parts.h), the one whose screen is open, and where its result goes.
+    std::vector<std::pair<std::string, std::unique_ptr<GamePart>>> parts_;
+    GamePart *partScreen_ = nullptr;
+    int partResultScope_ = -1, partResultNumber_ = 0;
+    std::unique_ptr<PartHost> partHost_;
+    void loadParts();
+    void resetParts();
+    bool partCommand(const Node &n);
+    void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
+    void finishPartScreen(int result);
+    void loadPartsState(const SaveData &d, int slot);
+    // The story table (story.cpp): a game without flow scripts has its story order as `flow` blocks under `screen
+    // story`, compiled to flow nodes. Flows are scripts named `story:NAME`; `chapter N` plays `chapter:N`.
+    std::shared_ptr<Script> compileStory(const std::string &flow);
+    std::shared_ptr<Script> compileChapter(int number);
+    std::string firstStoryFlow() const;
+    bool resumeStoryAt(const std::string &scene);
     Config config_;
     Audio audio_;
     FILE *log_ = nullptr;

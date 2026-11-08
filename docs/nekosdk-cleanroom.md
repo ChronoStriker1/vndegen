@@ -447,3 +447,9 @@ Test Game 92's movies come with its `sys_5` patch, the animation edition: only t
 - `loop:0` repeating for ever is read from a street ambience and from `loop:1` on one-shot effects.
 - `pos:` on sound commands isn't applied. Its values look like pan.
 - What a load's parameter 0 means. A load keeps the slot's position and scale.
+
+## Games with their story in the exe
+
+Test Games 82, 83, 86, 87, 90 and 96 have no flow scripts: the order of their scenes, choices and route variables is in the exe. The order is found black-box, by tracing which scene scripts the PC game opens under Wine, in order, through each route, and written as data in the game's table, under `screen story` (the format is at the top of `core/story.cpp`, and `core/tables/storytest.inc` is an example). Each `flow` there compiles to the nodes a flow script has, so the same flow interpreter runs it. A PC save of these games names no flow, only the scene and its node (checked in a save of Test Game 82), so the runtime's saves of them name none either, and a load goes on after the first `scene` line that names the save's scene, or inside a chapter that plays it.
+
+What one of these games does that no other does, such as Test Game 90's face pictures and select screens or Test Game 96's comments, is a game part: a file of its own under `core/` that the list in `core/parts.cpp` names and the game's table turns on with `parts NAME` under `screen defaults` (`core/parts.h`). A part takes the scene commands the engine doesn't know, draws at fixed layers of the frame, opens screens the story table's `open` line waits on and branches on, gives a chapter's scenes, and keeps its own state with a save, in the PC's save and in VNDegen's file beside it.
