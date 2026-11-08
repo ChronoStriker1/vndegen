@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.26.5",
+          "buildVersion": "1435",
+          "date": "2026-11-08T05:10:30Z",
+          "localizedDescription": "Text placement fixes for Yarinaoshi no Christmas and The Alchemist & His Battle-Scarred Homunculus.\n\n## Downloads\n\n- `VNDegen-0.26.5-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.26.5.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- Yarinaoshi no Christmas: text is no longer drawn half again too large. The game asks for Meiryo, which Windows draws at about two thirds of its requested size, while VNDegen's stand-in filled the whole space. Size, letter spacing, line pitch and position now match a Windows screenshot of the English fan patch: line ends within a pixel, baselines on its rows, and no line runs off the screen. (#65)\n- The Alchemist: text sits 3 pixels lower, as in the publisher's screenshots.\n\n## Known limits\n\n- Christmas's log text position is worked out from the two fonts' heights, not measured, since no screenshot shows the PC's log.\n\n## What wasn't tested\n\n- No physical device was used. Christmas was released only in Japanese, so its reference is two screenshots of the fan translation running on Windows.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.26.5/VNDegen-0.26.5.ipa",
+          "size": 123339726,
+          "sha256": "71b67a9fc213b19a84c88f9d5e05ed6e51caff7c88da25301bb28378ea3f33f1",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.26.4",
           "buildVersion": "1427",
           "date": "2026-11-08T04:20:11Z",
