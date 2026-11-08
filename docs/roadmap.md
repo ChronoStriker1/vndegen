@@ -84,6 +84,7 @@ New bugs get a GitHub issue and a line here.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 - [#62](https://github.com/ChronoStriker1/vndegen/issues/62) Metadata: Rinjin matched to the wrong VNDB entry.
 - [#67](https://github.com/ChronoStriker1/vndegen/issues/67) `build.sh test` can exit 1 without showing which Swift test failed.
+- [#68](https://github.com/ChronoStriker1/vndegen/issues/68) NekoSDK: saves VNDegen writes load on the PC without their pictures (fixed on `feat/nekosdk-stage3`).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
