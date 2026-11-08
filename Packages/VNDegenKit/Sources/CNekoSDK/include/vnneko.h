@@ -82,6 +82,11 @@ bool vnneko_is_supported(const char *gameRoot);
 // Runs through text and waits for as long as it's on, as holding Ctrl does.
 void vnneko_set_skip(VNNekoEngine *e, bool on);
 
+// A click on a save card's comment asks the host for one. Returns the card's slot, with its comment now in `utf8`, once
+// per click, or 0 when nothing is asked. The host shows a text field and answers with vnneko_set_comment, which writes
+// the comment into that save, cut to the 36 bytes of CP932 the PC's box takes. Cancelling just doesn't answer.
+int vnneko_take_comment_request(VNNekoEngine *e, char *utf8, size_t size);
+bool vnneko_set_comment(VNNekoEngine *e, int slot, const char *utf8);
 // Stops the clock and sound. vnneko_step does nothing while paused.
 void vnneko_set_paused(VNNekoEngine *e, bool paused);
 

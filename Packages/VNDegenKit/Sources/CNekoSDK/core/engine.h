@@ -150,6 +150,10 @@ public:
         return it == table.end() ? 0 : it->second;
     }
     bool jump(const std::string &script, int node);
+    // A click on a card's comment asks the host for one: the card's slot and its comment now, or 0 when nothing's asked.
+    int takeCommentRequest(std::string &utf8);
+    // The comment the player typed, written into that card's save as the PC writes it.
+    bool setComment(int slot, const std::string &utf8);
     // Saving, loading and a card's lock, which tests also call.
     bool saveToSlot(int slot);
     bool loadFromSlot(int slot);
@@ -205,6 +209,9 @@ private:
     int newestSlot(int first, int last);
     // A locked save can be loaded but not saved over or deleted. The lock is kept in cfg.sav, as the PC keeps it.
     bool locked(int slot) const;
+    // `slotcomment X BASELINE WIDTH SIZE PROMPT...`: the comment's place on a card, and what an empty one shows.
+    bool overComment(int slot, int x, int y) const;
+    int commentRequest_ = 0;
     std::string lastScene_;
     int64_t screenMs_ = 0, openingFrom_ = -1;  // a menu's own clock, and when the title's opening began
     std::unordered_map<std::string, bool> paintedOnBlack_;

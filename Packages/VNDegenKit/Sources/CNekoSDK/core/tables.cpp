@@ -35,7 +35,7 @@ datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
 slotnew obj\e010_000.bmp -11 -6
-slotcomment 189 114 327 13
+slotcomment 189 114 327 13 クリックでコメントを入力
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -76,7 +76,7 @@ datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
 slotnew obj\e010_000.bmp -11 -6
-slotcomment 189 114 327 13
+slotcomment 189 114 327 13 クリックでコメントを入力
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -459,7 +459,7 @@ datecolon obj\e009_003.bmp
 datedash obj\e009_001.bmp
 slotlock obj\e011_000.bmp 15 139
 slotnew obj\e012_000.bmp -6 -6
-slotcomment 278 157 452 21
+slotcomment 278 157 452 21 Click to set a comment
 slotdelete obj\e011_001.bmp 672 19
 dategap 21
 button page0 obj\e005_000.bmp 458 64 11 5 0
@@ -499,7 +499,7 @@ datecolon obj\e009_003.bmp
 datedash obj\e009_001.bmp
 slotlock obj\e011_000.bmp 15 139
 slotnew obj\e012_000.bmp -6 -6
-slotcomment 278 157 452 21
+slotcomment 278 157 452 21 Click to set a comment
 slotdelete obj\e011_001.bmp 672 19
 dategap 21
 button page0 obj\e005_000.bmp 458 64 11 5 0
@@ -4219,6 +4219,7 @@ slotlock obj\e012_000.bmp 446 63
 slotdelete obj\e013_000.bmp 476 63
 slotprogress obj\e010_000.bmp 279 37 5
 slotnew obj\e014_000.bmp 5 104
+slotcomment 183 110 330 12 クリックでコメントを入力
 button page0 obj\e006_000.bmp 410 26 10 5 0
 button page1 obj\e006_000.bmp 460 26 10 5 1
 button page2 obj\e006_000.bmp 510 26 10 5 2
@@ -4261,6 +4262,7 @@ slotlock obj\e012_000.bmp 446 63
 slotdelete obj\e013_000.bmp 476 63
 slotprogress obj\e010_000.bmp 279 37 5
 slotnew obj\e014_000.bmp 5 104
+slotcomment 183 110 330 12 クリックでコメントを入力
 # The Q-Save page takes only quick saves.
 pageoff 10
 button page0 obj\e006_000.bmp 410 26 10 5 0

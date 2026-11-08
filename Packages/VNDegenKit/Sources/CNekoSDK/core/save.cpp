@@ -148,6 +148,29 @@ void writeText(Writer &w, const SavedText &t, int trail) {
 
 }  // namespace
 
+std::vector<uint8_t> withComment(const std::vector<uint8_t> &plain, std::string comment) {
+    if (plain.size() < 5) return {};
+    uint32_t old;
+    std::memcpy(&old, &plain[1], 4);
+    if (old > plain.size() - 5) return {};
+    // Test Game 94's box stopped at 36 bytes, 36 letters or 18 kana, under Wine. A character isn't split.
+    size_t keep = 0;
+    for (size_t i = 0; i < comment.size();) {
+        unsigned char c = static_cast<unsigned char>(comment[i]);
+        size_t width = (c >= 0x81 && c <= 0x9F) || (c >= 0xE0 && c <= 0xFC) ? 2 : 1;
+        if (i + width > 36 || i + width > comment.size()) break;
+        i += width;
+        keep = i;
+    }
+    comment.resize(keep);
+    std::vector<uint8_t> out(plain.begin(), plain.begin() + 1);
+    const uint32_t length = uint32_t(comment.size());
+    out.insert(out.end(), reinterpret_cast<const uint8_t *>(&length), reinterpret_cast<const uint8_t *>(&length) + 4);
+    out.insert(out.end(), comment.begin(), comment.end());
+    out.insert(out.end(), plain.begin() + 5 + old, plain.end());
+    return out;
+}
+
 const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\x2019_retry") return &kChristmas;
     if (folder == "waffle\\alchemy") return &kAlchemist;

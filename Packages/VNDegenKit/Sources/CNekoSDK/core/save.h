@@ -68,6 +68,10 @@ const SaveLayout *saveLayout(const std::string &userDataDirectory);
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out);
 std::vector<uint8_t> buildSave(const SaveData &data, const SaveLayout &layout);
 
+// A save with its card's comment replaced and nothing else changed, as the PC rewrites it, or nothing when the save is
+// too short to hold one. The comment is CP932, cut to the 36 bytes the PC's box takes.
+std::vector<uint8_t> withComment(const std::vector<uint8_t> &plain, std::string comment);
+
 // The container save files share with archive entries: packed, and unpacked with unpackEntry.
 std::vector<uint8_t> packEntry(const std::vector<uint8_t> &plain);
 

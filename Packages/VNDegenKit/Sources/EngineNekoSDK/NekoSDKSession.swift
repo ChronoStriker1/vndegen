@@ -134,6 +134,7 @@ final class NekoSDKSession: EngineSession {
             finish(byGame: true)
             return
         }
+        askForCommentIfWanted(engine)
         var w: Int32 = 0, h: Int32 = 0
         var changed = false
         if let pixels = vnneko_frame(engine, &w, &h, &changed), changed {
@@ -144,6 +145,24 @@ final class NekoSDKSession: EngineSession {
         pacing?.note(tick: now, presented: changed, stepEnd: ended, target: link.targetTimestamp - link.timestamp, workTime: ended - began,
                      progress: "text=\(vnneko_debug_text_count(engine))")
         #endif
+    }
+
+    private var askingForComment = false
+
+    /// A click on a save card's comment: a text field, whose text goes into that save.
+    private func askForCommentIfWanted(_ engine: OpaquePointer) {
+        guard !askingForComment else { return }
+        var current = [CChar](repeating: 0, count: 256)
+        let slot = vnneko_take_comment_request(engine, &current, current.count)
+        guard slot > 0 else { return }
+        askingForComment = true
+        let comment = current.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        askForComment(comment, over: view) { [weak self] text in
+            guard let self else { return }
+            askingForComment = false
+            if let text, let engine = self.engine { vnneko_set_comment(engine, slot, text) }
+            frameView.takeFocus()
+        }
     }
 
     private func pointer(_ event: PointerEvent, at location: CGPoint) {

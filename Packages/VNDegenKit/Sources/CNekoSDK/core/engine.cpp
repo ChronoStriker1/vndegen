@@ -681,6 +681,8 @@ bool Engine::moveFocus(int dx, int dy) {
                         if (const auto *line = screen_->setting(key); line && line->size() >= 3)
                             if (ImageRef icon = images_->get((*line)[0]))
                                 spots.push_back({cx + field(*line, 1) + icon->w / 2, cy + field(*line, 2) + icon->h / 10});
+                    if (const auto *line = screen_->setting("slotcomment"); line && line->size() >= 4)
+                        spots.push_back({cx + field(*line, 0) + field(*line, 2) / 2, cy + field(*line, 1) - field(*line, 3) / 2});
                 }
             }
         }
@@ -2180,6 +2182,34 @@ void Engine::toggleLock(int slot) {
     dirty_ = true;
 }
 
+bool Engine::overComment(int slot, int x, int y) const {
+    const auto *line = screen_ ? screen_->setting("slotcomment") : nullptr;
+    int cx, cy;
+    if (!line || line->size() < 4 || !cardAt(slot, cx, cy)) return false;
+    int size = field(*line, 3);
+    return inRect(x, y, cx + field(*line, 0) - 4, cy + field(*line, 1) - size - 4, field(*line, 2) + 8, size + 12);
+}
+
+int Engine::takeCommentRequest(std::string &utf8) {
+    int slot = std::exchange(commentRequest_, 0);
+    if (slot) utf8 = slotInfo(slot).comment;
+    return slot;
+}
+
+bool Engine::setComment(int slot, const std::string &utf8) {
+    auto packed = readWhole(savePath(slot, "sav"));
+    auto plain = packed.empty() ? packed : unpackEntry(packed.data(), packed.size());
+    auto changed = plain.empty() ? plain : withComment(plain, sjis::fromUtf8(utf8));
+    if (changed.empty() || !writeWhole(savePath(slot, "sav"), packEntry(changed))) {
+        complain("The comment couldn't be written.");
+        return false;
+    }
+    slots_.erase(slot);
+    log("slot %d comment set", slot);
+    dirty_ = true;
+    return true;
+}
+
 bool Engine::overCardPart(const char *key, int slot, int x, int y) const {
     const auto *line = screen_ ? screen_->setting(key) : nullptr;
     int cx, cy;
@@ -2295,9 +2325,14 @@ void Engine::composeSlots(Canvas &out) {
             // `slotnew SHEET X Y`: the card saved to last.
             if (ImageRef mark = picture("slotnew"); mark && slot == newest && info.exists)
                 drawPart(out, *mark, cx + offset("slotnew", 1), cy + offset("slotnew", 2), 0, 0, mark->w, mark->h, 1);
-            // `slotcomment X BASELINE WIDTH SIZE`: a comment typed on a PC, in white on the card's bar, cut off at its width.
-            if (const auto *line = screen_->setting("slotcomment"); line && line->size() >= 4 && !info.comment.empty())
-                drawComment(out, info.comment, cx + field(*line, 0), cy + field(*line, 1), field(*line, 2), field(*line, 3));
+            // `slotcomment X BASELINE WIDTH SIZE PROMPT...`: the card's comment in white on its bar, cut off at its width, or
+            // for a save with none the PC's prompt to click and type one.
+            if (const auto *line = screen_->setting("slotcomment"); line && line->size() >= 4 && info.exists) {
+                std::string text = info.comment;
+                if (text.empty())
+                    for (size_t i = 4; i < line->size(); i++) text += (i > 4 ? " " : "") + (*line)[i];
+                drawComment(out, text, cx + field(*line, 0), cy + field(*line, 1), field(*line, 2), field(*line, 3));
+            }
             int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
             auto mark = [&](const ImageRef &m, int cellInSheet) {
                 if (m) {
@@ -3470,6 +3505,11 @@ void Engine::mouseButton(int button, bool down) {
         }
         int slot = slotAt(pointerX_, pointerY_);
         if (slot < 0) return;
+        // A click on a card's comment asks for one, from the save and load screens alike, as the PC's box opens.
+        if (overComment(slot, pointerX_, pointerY_) && slotInfo(slot).exists) {
+            commentRequest_ = slot;
+            return;
+        }
         if (overCardPart("slotlock", slot, pointerX_, pointerY_)) {
             if (slotInfo(slot).exists) toggleLock(slot);
             return;

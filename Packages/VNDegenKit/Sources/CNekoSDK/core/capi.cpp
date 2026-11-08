@@ -131,6 +131,13 @@ bool vnneko_debug_press(VNNekoEngine *e, const char *action) { return e->engine.
 int vnneko_debug_choice_count(VNNekoEngine *e) { return e->engine.choiceCount(); }
 void vnneko_debug_choose(VNNekoEngine *e, int index) { e->engine.choose(index); }
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node) { return e->engine.jump(script, node); }
+int vnneko_take_comment_request(VNNekoEngine *e, char *utf8, size_t size) {
+    std::string comment;
+    int slot = e->engine.takeCommentRequest(comment);
+    if (slot && utf8 && size) std::snprintf(utf8, size, "%s", comment.c_str());
+    return slot;
+}
+bool vnneko_set_comment(VNNekoEngine *e, int slot, const char *utf8) { return e->engine.setComment(slot, utf8 ? utf8 : ""); }
 bool vnneko_debug_save(VNNekoEngine *e, int slot) { return e->engine.saveToSlot(slot); }
 bool vnneko_debug_load(VNNekoEngine *e, int slot) { return e->engine.loadFromSlot(slot); }
 void vnneko_debug_toggle_lock(VNNekoEngine *e, int slot) { e->engine.toggleLock(slot); }
