@@ -65,8 +65,9 @@ struct SavedSound {
 
 struct SaveData {
     std::string flow, choiceImage;
-    // The older engine's other picture name, 236 bytes after the flow's: empty in saves at a choice, which name theirs
-    // where the newer engine does, and a choice's picture in one of Test Game 87's saves made after it. Kept as read.
+    // The older engine's other picture name, empty in every PC save seen and kept as read: the first, 236 bytes after the
+    // flow, in Test Games 82 and 83, which name a choice's picture where the newer engine does, or the newer place in Test
+    // Game 87, which names it in the first.
     std::string olderImage;
     // The card's comment, typed on the PC's save screen and kept at the save's start; a comment there moves all that follows.
     std::string comment;  // CP932
@@ -107,6 +108,10 @@ struct SaveData {
 };
 
 struct SaveLayout;
+// What a game's PC writes 360 bytes into the date block (SaveData::dateFlag) in its main saves: 1 while it holds a choice's
+// picture, in the newer engine's games; 1 once a choice has been made, in Test Game 87, whose saves at its first choice
+// have 0 (set 1); or always 0, in Test Games 82 and 83, whose Previous Choice files alone have 1 (sets 2 and 3).
+enum class ChoiceFlag { Picture, Made, Never };
 // The layout for a game, by its normalized UserDataDirectory, or null when VNDegen hasn't checked one yet.
 const SaveLayout *saveLayout(const std::string &userDataDirectory);
 
@@ -115,6 +120,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
 // picture of a save without it, and Test Game 84's crashes loading a save with it (under Wine), so it's per game, from
 // the PC's own saves; a game none of whose PC saves is known leaves it empty, as every save VNDegen wrote before did.
 bool namesPictureTwice(const SaveLayout &layout);
+ChoiceFlag choiceFlag(const SaveLayout &layout);
 std::vector<uint8_t> buildSave(const SaveData &data, const SaveLayout &layout);
 
 // A save with its card's comment replaced and nothing else changed, as the PC rewrites it, or nothing when the save is

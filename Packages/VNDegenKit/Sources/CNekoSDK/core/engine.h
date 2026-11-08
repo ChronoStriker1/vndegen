@@ -647,7 +647,8 @@ private:
     std::string firstStoryFlow() const;
     bool resumeStoryAt(const std::string &scene);
     bool storyFlowExists(const std::string &name) const;
-    bool resumeStoryAtNumber(int number, int active, bool &atChoice);
+    bool resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice);
+    bool storySceneIs(const Node &n, const std::string &scene);
     // The parameter of a story table's `scene` and `choice` nodes that holds the PC's number for the place.
     static constexpr int kStoryPcNumber = 31;
     // A story table's choice's columns of its picture: how many at this parameter, then the columns.
@@ -729,6 +730,7 @@ private:
     std::string returnTo_;
     int flowCallId_ = 0;
     std::string choiceImage_;
+    bool choiceMade_ = false;  // a choice has been made this game, as Test Game 87's saves hold it
     std::vector<SavedText> backlog_;
     SavedText currentText_;
     struct Playing {

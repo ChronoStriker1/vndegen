@@ -259,29 +259,38 @@ bool Engine::restoreStoryPlace(const Sidecar &side, bool &atChoice) {
     return true;
 }
 
+// Whether a story line is a `scene` line for this scene, by the table's name for it or a patch's.
+bool Engine::storySceneIs(const Node &n, const std::string &scene) {
+    std::string want = normalizedPath(scene);
+    return n.opcode == 1 && (normalizedPath(n.s[1]) == want || normalizedPath(files_.savedName(n.s[1])) == want);
+}
+
 // A PC save of a game without flow scripts names its scene and the PC's number for its place in the story, 3 for while a
-// choice waits: the line with that number, if the table gives numbers, is the place.
-bool Engine::resumeStoryAtNumber(int number, int active, bool &atChoice) {
+// choice waits: the line with that number, if the table gives numbers, is the place. Numbers repeat, as both options of
+// Test Game 87's choices and each ending's last scene share one (set 1), so the line whose scene the save names wins.
+bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice) {
     auto table = screens_.find("story");
     if (table == screens_.end() || number <= 0) return false;
+    std::shared_ptr<Script> found;
+    const Node *at = nullptr;
     for (const auto &line : table->second.lines) {
         if (line.size() < 2 || line[0] != "flow") continue;
         auto flow = loadScript("story:" + line[1]);
         if (!flow) continue;
         for (const Node &n : flow->nodes) {
-            if (n.p[kStoryPcNumber] != number) continue;
-            if (n.opcode == 3) {
-                // A save while the choice waits asks it again; one after it goes on past it.
-                atChoice = active == 3;
-                stack_.push_back({flow, atChoice ? &n : flow->node(n.next)});
-            } else {
-                stack_.push_back({flow, flow->node(n.next)});
-            }
-            flowCallId_ = number;
-            return true;
+            if (n.p[kStoryPcNumber] != number || (at && !storySceneIs(n, scene))) continue;
+            found = flow;
+            at = &n;
+            if (storySceneIs(n, scene)) break;
         }
+        if (at && storySceneIs(*at, scene)) break;
     }
-    return false;
+    if (!at) return false;
+    // A save while the choice waits asks it again; one after it goes on past it.
+    atChoice = at->opcode == 3 && active == 3;
+    stack_.push_back({found, atChoice ? at : found->node(at->next)});
+    flowCallId_ = number;
+    return true;
 }
 
 // A PC save of a game without flow scripts names only its scene, so the story goes on after the first `scene` line that
@@ -290,10 +299,7 @@ bool Engine::resumeStoryAtNumber(int number, int active, bool &atChoice) {
 bool Engine::resumeStoryAt(const std::string &scene) {
     auto table = screens_.find("story");
     if (table == screens_.end()) return false;
-    std::string want = normalizedPath(scene);
-    auto names = [&](const Node &n) {
-        return n.opcode == 1 && (normalizedPath(n.s[1]) == want || normalizedPath(files_.savedName(n.s[1])) == want);
-    };
+    auto names = [&](const Node &n) { return storySceneIs(n, scene); };
     for (const auto &line : table->second.lines) {
         if (line.size() < 2 || line[0] != "flow") continue;
         auto flow = loadScript("story:" + line[1]);

@@ -416,6 +416,7 @@ void Engine::startStory() {
     scenario_.clear();
     backlog_.clear();
     choiceImage_.clear();
+    choiceMade_ = false;
     replaying_ = false;
     waiting_ = Waiting::None;
     if (routeVar_ >= 0 && pendingRoute_) scenario_[routeVar_] = pendingRoute_;
@@ -450,6 +451,8 @@ std::string Engine::mainFlowKey() const {
 void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
     dirty_ = true;
+    // The PC doesn't save during a staff roll: a save there holds the scene after it (set 1, Test Game 87).
+    if ((action == "nav_save" || action == "Save" || action == "QuickSave") && waiting_ == Waiting::StaffRoll) return;
     if (action.rfind("submenu:", 0) == 0) {
         // Pressed again, a submenu closes, and any inside it, back to the one it opened in.
         std::string name = action.substr(8);
@@ -2102,7 +2105,11 @@ SaveData Engine::captureSave() {
         d.lastChoice = asking || (made && !choiceImage_.empty()) ? 2 : choiceImage_.empty() ? -1 : choiceResult_;
     }
     d.choiceImage = choiceImage_;
-    d.dateFlag = choiceImage_.empty() ? 0 : 1;
+    switch (layout_ ? choiceFlag(*layout_) : ChoiceFlag::Picture) {
+        case ChoiceFlag::Picture: d.dateFlag = choiceImage_.empty() ? 0 : 1; break;
+        case ChoiceFlag::Made: d.dateFlag = choiceMade_ ? 1 : 0; break;
+        case ChoiceFlag::Never: d.dateFlag = 0; break;
+    }
     d.variables = scenario_;
     d.width = canvas_.w;
     d.height = canvas_.h;
@@ -2321,6 +2328,8 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     blur_ = false;
     scenario_ = d.variables;
     choiceImage_ = d.choiceImage;
+    // Only Test Game 87's saves say whether a choice has been made; elsewhere a choice's picture means one was.
+    choiceMade_ = layout_ && choiceFlag(*layout_) == ChoiceFlag::Made ? d.dateFlag != 0 : !d.choiceImage.empty();
     flowCallId_ = d.flowNode;
     bool atChoice = false;
     // Game parts first, since a part's chapters, which the story's place is found in, can depend on its state.
@@ -2337,7 +2346,7 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, atChoice) &&
+    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice) &&
                !resumeStoryAt(d.scene)) {
         complain("The story table has no place for the save's scene " + d.scene);
     }
@@ -3508,6 +3517,7 @@ void Engine::beginChoice(const Node &n) {
     if (int answer = route() >= 1 && route() <= 4 && n.opcode == 3 ? n.p[size_t(9 + route())] : -1; answer == 0 || answer == 1) {
         choiceSheet_ = nullptr;
         choiceResult_ = answer;
+        choiceMade_ = true;
         log("choice %s made for route %d: %d", n.s[1].c_str(), route(), answer);
         return;
     }
@@ -3534,6 +3544,7 @@ void Engine::beginChoice(const Node &n) {
 void Engine::choose(int index) {
     if (waiting_ != Waiting::Choice) return;
     choiceResult_ = index;
+    choiceMade_ = true;
     log("chose %d", index);
     // `close MS SCALE`: the chosen option shows pressed, and the box shrinks about its middle to SCALE and fades out over
     // MS before the story goes on, as Test Game 82's does (set 2, from Wine shots).
