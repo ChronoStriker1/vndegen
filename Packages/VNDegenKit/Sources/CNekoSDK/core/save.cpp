@@ -36,8 +36,8 @@ namespace {
 #include "save_layouts.inc"
 
 // The older engine's layout, from PC saves made under Wine: Test Game 83's seven (set 3) and Test Game 87's 21 (set 1),
-// every region checked in each. A save names its choice's picture 236 bytes after the flow, then holds an empty string
-// where the newer engine names it. A sprite record's fixed part is 383 bytes, with x and y as ints, and zeros come
+// every region checked in each. A save names a picture 236 bytes after the flow, and the choice it was made at where the
+// newer engine names it, 4,196 bytes after the flow, with all that follows moved by the first name's length. A sprite record's fixed part is 383 bytes, with x and y as ints, and zeros come
 // between records. Text records end 8 bytes after their strings, as Test Game 94's do. Sound channels come with no byte
 // before them, each ending a byte after its time, the first 30 for music and the rest for effects. How many channels
 // there are and how many zeros follow them can't be told apart in these saves, whose last channels are all empty; the
@@ -72,7 +72,7 @@ constexpr int kNoiseKind = 4;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
 constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
 constexpr int kDateFlag = 360;
-// The older engine's choice picture, after the flow; its record's fields from the end of the two path strings; and its
+// The older engine's first picture name, after the flow; its record's fields from the end of the two path strings; and its
 // sound channels for music, before the effects'.
 constexpr int kOlderBeforeChoice = 236;
 constexpr int kOlderX = 0xD5, kOlderScale = 0xE9, kOlderAlpha = 0xF9, kOlderEndX = 0x129, kOlderEndAlpha = 0x131;
@@ -239,9 +239,9 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     bool older = layout.olderRecord > 0;
     if (older) {
         r.skip(kOlderBeforeChoice);
-        out.choiceImage = r.str();
+        out.olderImage = r.str();
         r.skip(kBeforeChoice - kOlderBeforeChoice - 4);
-        r.str();
+        out.choiceImage = r.str();
     } else {
         r.skip(kBeforeChoice);
         out.choiceImage = r.str();
@@ -252,6 +252,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     r.skip(kDateBlock - 24);
     out.flowActive = r.i32();
     out.flowNode = r.i32();
+    if (r.at + kBeforeVariables <= plain.size()) out.beforeVariables.assign(plain.begin() + std::ptrdiff_t(r.at), plain.begin() + std::ptrdiff_t(r.at + kBeforeVariables));
     r.skip(kBeforeVariables);
     out.variables.clear();
     for (int i = 0; i < kVariables; i++) {
@@ -261,6 +262,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     int count = r.i32();
     r.skip(kAfterCount);
     if (!r.ok || count < 0 || count > 2000) return false;
+    out.noRecords = count == 0;
     out.sprites.clear();
     int extra = layout.recordExtra;
     for (int k = 0; k < count && r.ok; k++) {
@@ -350,10 +352,11 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     }
     if (!r.ok) return false;
     out.windowShown = r.u8() != 0;
-    r.u8();
+    out.windowAfter = r.u8();
+    if (out.windowAfter == int(out.windowShown)) out.windowAfter = -1;
     readText(r, out.current, layout.textTail);
     for (uint8_t &b : out.afterText) b = r.u8();
-    r.skip(4);
+    out.logLength = r.i32();
     int logged = r.i32();
     if (!r.ok || logged < 0 || logged > 100000) return false;
     out.backlog.clear();
@@ -401,9 +404,9 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     bool older = layout.olderRecord > 0;
     if (older) {
         w.zeros(kOlderBeforeChoice);
-        w.str(d.choiceImage);
+        w.str(d.olderImage);
         w.zeros(kBeforeChoice - kOlderBeforeChoice - 4);
-        w.str("");
+        w.str(d.choiceImage);
     } else {
         w.zeros(kBeforeChoice);
         w.str(d.choiceImage);
@@ -415,11 +418,12 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     w.i32(d.flowActive);
     w.i32(d.flowNode);
     size_t before = w.zeros(kBeforeVariables);
-    apply(layout.beforeVariables, w.b.data() + before);
+    if (d.beforeVariables.size() == size_t(kBeforeVariables)) std::copy(d.beforeVariables.begin(), d.beforeVariables.end(), w.b.begin() + std::ptrdiff_t(before));
+    else apply(layout.beforeVariables, w.b.data() + before);
     size_t table = w.zeros(size_t(kVariables) * 4);
     for (const auto &[index, value] : d.variables)
         if (index >= 0 && index < kVariables) w.setI32(table + size_t(index) * 4, value);
-    w.i32(int32_t(d.sprites.size()) + 1);
+    w.i32(d.noRecords ? 0 : int32_t(d.sprites.size()) + 1);
     w.zeros(kAfterCount);
 
     int extra = layout.recordExtra;
@@ -492,16 +496,18 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     };
     SavedSprite rootSprite;
     rootSprite.alpha = rootSprite.endAlpha = 256;
-    record(rootSprite, true, older && !d.sprites.empty());
-    for (size_t i = 0; i < d.sprites.size(); i++) record(d.sprites[i], false, i + 1 < d.sprites.size());
+    if (!d.noRecords) {
+        record(rootSprite, true, older && !d.sprites.empty());
+        for (size_t i = 0; i < d.sprites.size(); i++) record(d.sprites[i], false, i + 1 < d.sprites.size());
+    }
 
     size_t after = w.zeros(size_t(layout.afterSize));
     apply(layout.after, w.b.data() + after);
     w.u8(d.windowShown ? 1 : 0);
-    w.u8(d.windowShown ? 1 : 0);
+    w.u8(uint8_t(d.windowAfter >= 0 ? d.windowAfter : d.windowShown ? 1 : 0));
     writeText(w, d.current, layout.textTail);
     w.b.insert(w.b.end(), d.afterText.begin(), d.afterText.end());
-    w.i32(60);
+    w.i32(d.logLength);
     w.i32(int32_t(d.backlog.size()));
     for (const SavedText &t : d.backlog) writeText(w, t, layout.textTail);
 

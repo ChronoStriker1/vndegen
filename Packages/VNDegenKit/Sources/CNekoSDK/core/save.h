@@ -47,18 +47,30 @@ struct SavedSound {
 
 struct SaveData {
     std::string flow, choiceImage;
+    // The older engine's other picture name, 236 bytes after the flow's: empty in saves at a choice, which name theirs
+    // where the newer engine does, and a choice's picture in one of Test Game 87's saves made after it. Kept as read.
+    std::string olderImage;
     // The card's comment, typed on the PC's save screen and kept at the save's start; a comment there moves all that follows.
     std::string comment;  // CP932
     int date[6] = {2026, 1, 1, 0, 0, 0};
     int flowActive = 1, flowNode = 0;
+    // The block before the variables as a PC save holds it, kept so the save is written back as it was: in saves at a
+    // choice it holds numbers the runtime doesn't use yet. Empty in the runtime's own saves, which write the layout's.
+    std::vector<uint8_t> beforeVariables;
     std::map<int, int> variables;  // the 10,000 ints, by number
     int dateFlag = 0;  // the PC sets it in a game with a flow past its first script. Its meaning isn't known
     int width = 1280, height = 720;
     std::vector<SavedSprite> sprites;
     bool windowShown = true;
+    // The byte after it, which is 0 in Test Game 83's saves at a choice, or -1 for the same as windowShown.
+    int windowAfter = -1;
+    // A save with no records at all, not even the screen's: the PC's Previous Choice file before any choice.
+    bool noRecords = false;
     SavedText current;
     // The 24 bytes after the text on screen, whose meaning isn't known: zeros in most saves, kept as the PC wrote them.
     std::array<uint8_t, 24> afterText{};
+    // Then the number before the log's lines: 60, most likely the log's length, and 0 in a save with nothing in it.
+    int logLength = 60;
     std::vector<SavedText> backlog;  // newest first
     std::vector<SavedSound> sounds;
     std::string scene;
