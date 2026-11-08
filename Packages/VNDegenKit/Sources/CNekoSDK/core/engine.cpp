@@ -3101,7 +3101,8 @@ void Engine::drawComment(Canvas &out, const std::string &utf8, int x, int baseli
         i += size_t(extra) + 1;
         GlyphImage g;
         if (!glyph(fontFace_, cp, px, false, g)) continue;
-        if (pen + g.advance > x + width) break;
+        // A glyph's ink can reach past its advance, as a box-drawing line's does, so both stay inside the width.
+        if (pen + std::max(g.advance, g.left + g.w) > x + width) break;
         if (g.w > 0 && g.h > 0) drawCoverage(out, g.coverage.data(), g.w, g.h, pen + g.left, baseline - g.top, 255, 255, 255, 256);
         pen += g.advance;
     }
