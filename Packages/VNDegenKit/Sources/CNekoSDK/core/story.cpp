@@ -206,6 +206,28 @@ std::shared_ptr<Script> Engine::compileChapter(int number) {
     return script;
 }
 
+// The exact place VNDegen's lines beside its own save hold: each flow frame, the last result, and a part screen open.
+bool Engine::restoreStoryPlace(const Sidecar &side, bool &atChoice) {
+    if (side.story.empty()) return false;
+    std::vector<Frame> frames;
+    for (const auto &[name, id] : side.story) {
+        auto script = loadScript(name);
+        if (!script) return false;
+        frames.push_back({script, id ? script->node(id) : nullptr});
+    }
+    stack_ = std::move(frames);
+    if (side.hasResult) choiceResult_ = side.result;
+    const Node *top = stack_.back().node;
+    atChoice = top && top->opcode == 3;
+    for (auto &[name, part] : parts_)
+        if (name == side.screen) {
+            partScreen_ = part.get();
+            partResultScope_ = side.screenScope;
+            partResultNumber_ = side.screenNumber;
+        }
+    return true;
+}
+
 // A PC save of a game without flow scripts names only its scene, so the story goes on after the first `scene` line that
 // names it, in any flow. A save names a scene a patch gives by the patch's name for it, and the PC's saves of the same
 // game unpatched by its own.

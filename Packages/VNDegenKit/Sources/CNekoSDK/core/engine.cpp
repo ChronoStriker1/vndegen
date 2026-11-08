@@ -2266,6 +2266,9 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     choiceImage_ = d.choiceImage;
     flowCallId_ = d.flowNode;
     bool atChoice = false;
+    // Game parts first, since a part's chapters, which the story's place is found in, can depend on its state.
+    Sidecar side = readSidecar(d, slot);
+    loadPartsState(d, side);
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
         const Node *call = flow->node(d.flowNode);
         // The PC's save made while a choice waits names the choice, and it's asked again. Ours names the scene before, which
@@ -2277,11 +2280,10 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-    } else if (d.flow.empty() && !d.scene.empty() && !firstStoryFlow().empty() && !resumeStoryAt(d.scene)) {
+    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAt(d.scene)) {
         complain("The story table has no place for the save's scene " + d.scene);
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d, slot);
-    loadPartsState(d, slot);
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
         // The film noise starts again where the save left it running.
@@ -2399,7 +2401,8 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     layoutText(atChoice ? "" : sjis::toUtf8(d.current.name), atChoice ? "" : sjis::toUtf8(d.current.text));
     textStart_ = now_;
     textDone_ = true;
-    waiting_ = atChoice ? Waiting::None : Waiting::Click;
+    // A game part's screen saved open waits for its input again, as it was.
+    waiting_ = partScreen_ ? Waiting::PartScreen : atChoice ? Waiting::None : Waiting::Click;
     dirty_ = true;
 }
 
@@ -3272,13 +3275,12 @@ void Engine::run() {
             }
             continue;
         }
-        const Node &n = *stack_.back().node;
-        // By place, since a chapter pushes another frame, which can move the stack's frames.
-        size_t at = stack_.size() - 1;
+        // On to the next node first, so a jump, even to the node itself, replaces it. The script is held, since a jump to
+        // another flow lets go of this one.
         auto script = stack_.back().script;
-        const Node *before = stack_.back().node;
+        const Node &n = *stack_.back().node;
+        stack_.back().node = script->node(n.next);
         runFlow(n);
-        if (at < stack_.size() && stack_[at].node == before && stack_[at].script == script) stack_[at].node = script->node(n.next);
     }
     warnOnce("A script ran too long without waiting.");
 }
@@ -4210,34 +4212,62 @@ void Engine::writeFlipModes(int slot, const SaveData &d) {
         std::vector<std::string> lines;
         part->save(lines);
         for (const std::string &line : lines) text += "part " + name + " " + line + "\n";
+        if (part.get() == partScreen_)
+            text += "screen " + name + " " + std::to_string(partResultScope_) + " " + std::to_string(partResultNumber_) + "\n";
+    }
+    // A story table's game: its exact place, `story SCRIPT NODE` for each flow frame, which the PC's save can't hold, and
+    // the last result. A choice waiting is saved as the choice, to be asked again.
+    if (d.flow.empty() && !firstStoryFlow().empty()) {
+        for (size_t i = 0; i < stack_.size(); i++) {
+            const Frame &frame = stack_[i];
+            int id = frame.node ? frame.node->id : 0;
+            if (i + 1 == stack_.size() && waiting_ == Waiting::Choice)
+                for (const Node &c : frame.script->nodes)
+                    if (c.opcode == 3 && c.next == id) id = c.id;
+            text += "story " + frame.script->name + " " + std::to_string(id) + "\n";
+        }
+        text += "result " + std::to_string(choiceResult_) + "\n";
     }
     writeWhole(savePath(slot, "vnd"), std::vector<uint8_t>(text.begin(), text.end()));
 }
 
-// Game parts start afresh, then take what the PC's save holds for them, then their own lines beside the save when it was
-// written with this save.
-void Engine::loadPartsState(const SaveData &d, int slot) {
-    resetParts();
-    for (const auto &[name, part] : parts_) part->loadPC(d);
-    if (slot < 0) return;
+Engine::Sidecar Engine::readSidecar(const SaveData &d, int slot) {
+    Sidecar side;
+    if (slot < 0) return side;
     auto bytes = readWhole(savePath(slot, "vnd"));
     std::istringstream in(std::string(bytes.begin(), bytes.end()));
     std::string line, scene;
     int node = -1;
-    std::map<std::string, std::vector<std::string>> lines;
     while (std::getline(in, line)) {
         std::istringstream words(line);
         std::string kind;
         words >> kind;
-        if (kind == "at") words >> scene >> node;
-        else if (kind == "part") {
+        if (kind == "at") {
+            words >> scene >> node;
+        } else if (kind == "part") {
             std::string name, rest;
-            if (words >> name && std::getline(words >> std::ws, rest)) lines[name].push_back(rest);
+            if (words >> name && std::getline(words >> std::ws, rest)) side.parts[name].push_back(rest);
+        } else if (kind == "story") {
+            std::string script;
+            int id = 0;
+            if (words >> script >> id) side.story.push_back({script, id});
+        } else if (kind == "result") {
+            side.hasResult = bool(words >> side.result);
+        } else if (kind == "screen") {
+            words >> side.screen >> side.screenScope >> side.screenNumber;
         }
     }
-    if (node < 0 || normalizedPath(sjis::fromUtf8(scene)) != normalizedPath(d.scene) || node != d.node) return;
+    // Lines written with another save than this one, such as a PC save copied over ours, don't count.
+    if (node < 0 || normalizedPath(sjis::fromUtf8(scene)) != normalizedPath(d.scene) || node != d.node) return {};
+    return side;
+}
+
+// Game parts start afresh, then take what the PC's save holds for them, then their own lines beside the save.
+void Engine::loadPartsState(const SaveData &d, const Sidecar &side) {
+    resetParts();
+    for (const auto &[name, part] : parts_) part->loadPC(d);
     for (const auto &[name, part] : parts_)
-        if (auto it = lines.find(name); it != lines.end()) part->load(it->second);
+        if (auto it = side.parts.find(name); it != side.parts.end()) part->load(it->second);
 }
 
 void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots) {

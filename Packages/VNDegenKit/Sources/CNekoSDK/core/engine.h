@@ -615,7 +615,19 @@ private:
     bool partCommand(const Node &n);
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
     void finishPartScreen(int result);
-    void loadPartsState(const SaveData &d, int slot);
+    // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story
+    // table's game the exact place in the story, the last choice's or screen's result, and the part screen open.
+    struct Sidecar {
+        std::map<std::string, std::vector<std::string>> parts;
+        std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
+        bool hasResult = false;
+        int result = 0;
+        std::string screen;
+        int screenScope = -1, screenNumber = 0;
+    };
+    Sidecar readSidecar(const SaveData &d, int slot);
+    void loadPartsState(const SaveData &d, const Sidecar &side);
+    bool restoreStoryPlace(const Sidecar &side, bool &atChoice);
     // The story table (story.cpp): a game without flow scripts has its story order as `flow` blocks under `screen
     // story`, compiled to flow nodes. Flows are scripts named `story:NAME`; `chapter N` plays `chapter:N`.
     std::shared_ptr<Script> compileStory(const std::string &flow);

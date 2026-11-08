@@ -4,8 +4,9 @@ import Testing
 import TestSupport
 
 // A game with no flow scripts plays the order its table's `screen story` gives (core/tables/storytest.inc): scenes, a
-// game part's screen and its result, branches on it and on variables, and a part's chapter. A save names no flow, as the
-// PC's saves of those games don't, and a load goes on from the save's scene, inside the chapter too.
+// game part's screens and their results, branches on them and on variables, and a part's chapter. A save names no flow,
+// as the PC's saves of those games don't. VNDegen's lines beside its save keep the exact place, the last result and a
+// screen open; a PC save, without them, goes on from its scene, inside the chapter too.
 @Suite struct NekoSDKStoryTableTests {
     private func game() throws -> URL {
         let scene = NekoSDKFlowFixture.flow([.init(op: 0, next: 0)])
@@ -21,19 +22,33 @@ import TestSupport
         ])
     }
 
+    private func status(_ e: OpaquePointer) -> String { String(cString: vnneko_debug_status(e)) }
+
     // The scene playing, by the table's name for it or a save's, which here is the patch folder's.
     private func at(_ e: OpaquePointer, _ scene: String) -> Bool {
-        let name = String(cString: vnneko_debug_status(e)).components(separatedBy: " ").first ?? ""
+        let name = status(e).components(separatedBy: " ").first ?? ""
         return name == scene || name == "sys_1\\" + scene
     }
 
-    @Test func theTablePlaysAndASaveGoesOnFromItsScene() throws {
+    private func click(_ e: OpaquePointer) {
+        vnneko_mouse_move(e, 640, 360)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+    }
+
+    private func steps(_ e: OpaquePointer, _ count: Int) {
+        for _ in 0..<count { _ = vnneko_step(e, 16) }
+    }
+
+    @Test func theTablePlaysAndSavesKeepItsPlace() throws {
         let root = try game()
         defer { try? FileManager.default.removeItem(at: root) }
         let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytest/save")
+
         let first = try #require(NekoSDKFlowFixture.start(root, data: data))
-        for _ in 0..<10 { _ = vnneko_step(first, 16) }
-        #expect(at(first, "scr\\c2.txt"), "\(String(cString: vnneko_debug_status(first)))")
+        steps(first, 10)
+        #expect(at(first, "scr\\c2.txt"), "\(status(first))")
         #expect(vnneko_debug_variable(first, 1, 5) == 3)
         #expect(vnneko_debug_variable(first, 1, 6) == 0)
         #expect(vnneko_debug_variable(first, 1, 7) == 0)
@@ -41,19 +56,48 @@ import TestSupport
         #expect(vnneko_debug_save(first, 1))
         vnneko_stop(first)
 
+        // VNDegen's save: the place, and the screen's result for the `on` past the chapter.
         let second = try #require(NekoSDKFlowFixture.start(root, data: data))
-        defer { vnneko_stop(second) }
         #expect(vnneko_debug_load(second, 1))
-        for _ in 0..<3 { _ = vnneko_step(second, 16) }
-        #expect(at(second, "scr\\c2.txt"), "\(String(cString: vnneko_debug_status(second)))")
-        #expect(vnneko_debug_variable(second, 1, 8) == 3)
-        // A load waits for a click, as the PC's does at the save's line. Then the chapter's scene ends, and the flow goes on
-        // after the chapter.
+        steps(second, 3)
+        #expect(at(second, "scr\\c2.txt"), "\(status(second))")
+        // A load waits for a click, as the PC's does at the save's line.
         #expect(vnneko_debug_waiting_for_click(second))
-        vnneko_mouse_move(second, 640, 360)
-        vnneko_mouse_button(second, 0, true)
-        vnneko_mouse_button(second, 0, false)
-        for _ in 0..<200 { _ = vnneko_step(second, 16) }
-        #expect(at(second, "scr\\b.txt"), "\(String(cString: vnneko_debug_status(second)))")
+        click(second)
+        steps(second, 200)
+        #expect(status(second).contains("part screen"), "\(status(second))")
+        #expect(vnneko_debug_variable(second, 1, 11) == 0)
+        // One press of two, then a save with the screen open.
+        click(second)
+        steps(second, 3)
+        #expect(status(second).contains("part screen"), "\(status(second))")
+        #expect(vnneko_debug_save(second, 2))
+        vnneko_stop(second)
+
+        // The screen comes back open with its one press, and the second finishes it.
+        let third = try #require(NekoSDKFlowFixture.start(root, data: data))
+        #expect(vnneko_debug_load(third, 2))
+        steps(third, 3)
+        #expect(status(third).contains("part screen"), "\(status(third))")
+        click(third)
+        steps(third, 10)
+        #expect(at(third, "scr\\b.txt"), "\(status(third))")
+        #expect(vnneko_debug_variable(third, 1, 9) == 2)
+        #expect(vnneko_debug_variable(third, 1, 10) == 0)
+        vnneko_stop(third)
+
+        // A PC save has no lines beside it: the story goes on from its scene, here inside the chapter.
+        let sidecar = try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save001.vnd" }
+        try FileManager.default.removeItem(at: try #require(sidecar))
+        let fourth = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(fourth) }
+        #expect(vnneko_debug_load(fourth, 1))
+        steps(fourth, 3)
+        #expect(at(fourth, "scr\\c2.txt"), "\(status(fourth))")
+        #expect(vnneko_debug_variable(fourth, 1, 8) == 3)
+        click(fourth)
+        steps(fourth, 200)
+        #expect(status(fourth).contains("part screen"), "\(status(fourth))")
     }
 }

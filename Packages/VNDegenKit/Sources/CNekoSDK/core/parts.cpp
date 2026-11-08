@@ -1,5 +1,7 @@
 #include "parts.h"
 
+#include <cstdio>
+
 #include "engine.h"
 
 namespace neko {
@@ -18,15 +20,34 @@ const PartEntry kParts[] = {
     {"selftest", makeSelfTestPart},
 };
 
-// A part for the runtime's own tests: `open selftest N` finishes at once with N, and chapter N is scr\cN.txt.
+// A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses
+// with N, kept with a save, and chapter N is scr\cN.txt.
 class SelfTestPart : public GamePart {
 public:
     std::vector<std::string> chapter(PartHost &, int number) override { return {"scr\\c" + std::to_string(number) + ".txt"}; }
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
-        if (name != "selftest") return false;
-        host.finishScreen(args.empty() ? 0 : args[0]);
+        int count = args.empty() ? 0 : args[0];
+        if (name == "selftest") {
+            host.finishScreen(count);
+            return true;
+        }
+        if (name != "selftestwait") return false;
+        presses_ = 0;
+        needed_ = count;
         return true;
     }
+    bool press(PartHost &host, int, int, int) override {
+        if (++presses_ >= needed_) host.finishScreen(presses_);
+        return true;
+    }
+    void save(std::vector<std::string> &lines) const override { lines.push_back(std::to_string(presses_) + " " + std::to_string(needed_)); }
+    void load(const std::vector<std::string> &lines) override {
+        if (!lines.empty()) std::sscanf(lines[0].c_str(), "%d %d", &presses_, &needed_);
+    }
+    void reset() override { presses_ = needed_ = 0; }
+
+private:
+    int presses_ = 0, needed_ = 0;
 };
 
 }  // namespace
