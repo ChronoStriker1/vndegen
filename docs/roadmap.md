@@ -73,6 +73,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - PC saves with a comment load in the two NekoSDK games, with save locks, the NEW mark and the "Don't ask again" box (0.26.3).
 - The Alchemist's text in Open Sans at the PC's spacing, and Yarinaoshi no Christmas's comments and log placed as on the PC (0.26.4).
 - Yarinaoshi no Christmas's text at the PC's size, and The Alchemist's text 3 px lower (0.26.5).
+- NekoSDK stage 3: Funbag Fantasy 3 if, Funbag Fantasy 4, Haha Sannin to Ana Asobi, Horny Elves and a Moral Orc, Ore o Hoshigaru Tsuma to Gibo and Test Games 92 and 94, with movies, PC read marks both ways, save locks and comments (0.27.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
