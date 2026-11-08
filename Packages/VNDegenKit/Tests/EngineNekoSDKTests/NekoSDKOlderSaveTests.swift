@@ -35,8 +35,8 @@ import TestSupport
         data.subdata(in: (data.startIndex + at)..<(data.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) }
     }
 
-    @Test func aSaveInTheOlderLayoutKeepsItsPictureAndLoads() throws {
-        let root = try NekoSDKFlowFixture.game([
+    private func game() throws -> URL {
+        try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tWaffle\\FunbagFantasy2\nFirstFlow\tflow\\t.txt\n".utf8),
             "bg.pak": NekoSDKFlowFixture.archive([("g.bmp", bmp(4, 4, [0, 255, 0]))]),
             "sc.pak": NekoSDKFlowFixture.archive([("r.bmp", bmp(101, 81, [0, 0, 255]))]),
@@ -54,6 +54,17 @@ import TestSupport
                 .init(op: 2, next: 0, p: [0: 100_000]),
             ]),
         ])
+    }
+
+    private func saves(_ data: URL) -> URL { data.appendingPathComponent("AppData/Roaming/Waffle/FunbagFantasy2/save") }
+
+    private func file(_ data: URL, _ name: String) throws -> URL {
+        try #require(try FileManager.default.contentsOfDirectory(at: saves(data), includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == name })
+    }
+
+    @Test func aSaveInTheOlderLayoutKeepsItsPictureAndLoads() throws {
+        let root = try game()
         defer { try? FileManager.default.removeItem(at: root) }
         let data = root.appendingPathComponent("data")
         let first = try #require(NekoSDKFlowFixture.start(root, data: data))
@@ -63,10 +74,7 @@ import TestSupport
         vnneko_stop(first)
 
         // The standing picture's record: slot 600 for place 3, and x and y as ints 0xD5 after its two paths.
-        let folder = data.appendingPathComponent("AppData/Roaming/Waffle/FunbagFantasy2/save")
-        let file = try #require(try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-            .first { $0.lastPathComponent.lowercased() == "save001.sav" })
-        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav")))
         let path = try #require(save.range(of: Data("sc\\r.bmp".utf8)))
         let at = path.lowerBound - save.startIndex
         #expect(int32(save, at - 12) == 600)
@@ -84,6 +92,34 @@ import TestSupport
         let second = try #require(NekoSDKFlowFixture.start(root, data: data))
         defer { vnneko_stop(second) }
         #expect(vnneko_debug_load(second, 1))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(pixel(second, 194, 326) == [255, 0, 0])
+        #expect(pixel(second, 0, 0) == [0, 255, 0])
+    }
+
+    // A PC save of a standing picture with a named animation running names command 19's text 0x125 into the record's
+    // fixed part, and all after it moves by the text's length (Test Game 87, set 1). Such a save loads.
+    @Test func aRecordWithAnAnimationsTextLoads() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(first, 16) }
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav")))
+        let path = try #require(save.range(of: Data("sc\\r.bmp".utf8)))
+        let text = Data("relative_pos_y,0,0,30,liner".utf8)
+        let at = path.lowerBound - save.startIndex + 8 + 4 + 0x125
+        #expect(int32(save, at) == 0)
+        save.replaceSubrange((save.startIndex + at)..<(save.startIndex + at + 4), with: withUnsafeBytes(of: Int32(text.count).littleEndian, { Data($0) }))
+        save.insert(contentsOf: text, at: save.startIndex + at + 4)
+        try NekoSDKFlowFixture.packed(save).write(to: saves(data).appendingPathComponent("save002.sav"))
+
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 2))
         for _ in 0..<3 { _ = vnneko_step(second, 16) }
         #expect(pixel(second, 194, 326) == [255, 0, 0])
         #expect(pixel(second, 0, 0) == [0, 255, 0])
