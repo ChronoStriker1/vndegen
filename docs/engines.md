@@ -153,7 +153,7 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - Test Game 92's menus follow the PC's under Wine, and its saves read with Ore o Hoshigaru Tsuma to Gibo's layout. Its anime gallery plays each entry's movies, looping with their sound, in the CG viewer's panel. Its galleries draw each tab's two mothers, the sprites its exe reads, as the PC does.
 - The noise effect some scenes of The Alchemist ask for isn't drawn. A repeating animation saved while it runs plays out once after a load.
 - Yarinaoshi no Christmas's Manual and Version info buttons aren't there.
-- A repeat of one replay's H choice has two options by assumption. The music screen's first mode button, beside repeat and shuffle, does nothing.
+- A repeat of one replay's H choice has two options by assumption.
 - Menu backgrounds that change on the PC stay the same here. Help that comes up on hover over Config's settings groups follows the PC's to within 32 pixels at the groups' edges in The Alchemist, and 20 in the others.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.

@@ -2208,9 +2208,11 @@ button music_prev obj\h005_000.bmp 122 590 5 5 0
 button music_toggle obj\h005_000.bmp 211 590 5 5 2
 button music_stop obj\h005_000.bmp 300 590 5 5 3
 button music_next obj\h005_000.bmp 388 590 5 5 4
-pic obj\h006_000.bmp 482 590 3 5 0 0
-button music_repeat obj\h006_000.bmp 513 590 3 5 1
-button music_shuffle obj\h006_000.bmp 544 590 3 5 2
+# Three modes, one always on, as the PC's run: the track over again, the list round from the top (the default, after
+# whose last track the PC turns back to the first page), or at random. A click on the lit one changes nothing.
+button music_one obj\h006_000.bmp 482 590 3 5 0
+button music_all obj\h006_000.bmp 513 590 3 5 1
+button music_random obj\h006_000.bmp 544 590 3 5 2
 button nav_save obj\c010_020.bmp 1047 85 10 5 0
 button nav_load obj\c010_020.bmp 1042 121 10 5 1
 button nav_cg obj\c010_020.bmp 1037 157 10 5 2

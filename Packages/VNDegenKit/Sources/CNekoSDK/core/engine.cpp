@@ -505,6 +505,14 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "music_shuffle") { trackShuffle_ = !trackShuffle_; return; }
+    // `music_one`, `music_all` and `music_random`: Test Game 84's three modes, of which one is always on: the track
+    // over again, the list round from the top after its last, or tracks at random. Repeating the list is the default.
+    if (action == "music_one" || action == "music_all" || action == "music_random") {
+        trackRepeat_ = action == "music_one";
+        trackShuffle_ = action == "music_random";
+        if (trackPlayer_) audio_.setLoops(trackPlayer_, trackRepeat_ ? 0 : 1);
+        return;
+    }
     if (action.rfind("tab", 0) == 0) {
         std::string keep = returnTo_;
         openScreen("config" + action.substr(3));
@@ -2726,7 +2734,9 @@ void Engine::composeScreen(Canvas &out) {
         if (b.action == "quickload" && !newestQuickSlot()) state = StateDisabled;
         if (b.action == "track" + std::to_string(currentTrack_) && trackPlayer_) state = over ? StateSelectedHover : StateSelected;
         bool musicOn = (b.action == "music_stop" && !trackPlayer_) || (b.action == "music_play" && trackPlayer_ && !trackPaused_) || (b.action == "music_pause" && trackPaused_) ||
-                       (b.action == "music_repeat" && trackRepeat_) || (b.action == "music_shuffle" && trackShuffle_);
+                       (b.action == "music_repeat" && trackRepeat_) || (b.action == "music_shuffle" && trackShuffle_) ||
+                       (b.action == "music_one" && trackRepeat_) || (b.action == "music_all" && !trackRepeat_ && !trackShuffle_) ||
+                       (b.action == "music_random" && trackShuffle_);
         if (musicOn) state = over ? StateSelectedHover : StateSelected;
         // `askerlit`: the button that asked a question stays lit, with its help, until it's answered, as in Test Game 84.
         if (dialogOpen_ && b.action == dialogOpener_ && screen_->setting("askerlit")) {
@@ -3351,6 +3361,9 @@ bool Engine::step(int ms) {
         int next = nextTrack(1);
         if (next < 0) stopTrack();
         else playTrack(next);
+        // A track that starts on its own brings its page of the list up, as Test Game 84's does after the last track.
+        if (next >= 0 && screen_ && screen_->name == "music")
+            if (int perPage = int(screen_->settings.count("cell"))) page_ = next / perPage;
         dirty_ = true;
     }
     // A menu only redraws when something changes, and the music screen's clock and bar change as a track plays.
