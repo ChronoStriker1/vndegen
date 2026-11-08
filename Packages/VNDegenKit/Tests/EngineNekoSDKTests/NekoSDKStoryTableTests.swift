@@ -139,6 +139,25 @@ import TestSupport
         #expect(vnneko_debug_save(fifth, 6))
         vnneko_stop(fifth)
 
+        // The save holds what the PC's do at a choice: the choice's number as the flow node, 3 for a choice waiting, and 2 for
+        // the last choice's result while one waits.
+        let atChoice = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save006.sav" })
+        let plain = try NekoSDKFlowFixture.unpacked(Data(contentsOf: atChoice))
+        func int32(_ at: Int) -> Int32 { plain.subdata(in: (plain.startIndex + at)..<(plain.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } }
+        let picture = Int(int32(0xCD + 4 + 4196))
+        let date = 0xCD + 4 + 4196 + 4 + picture + 39596
+        #expect(int32(date + 400) == 3)
+        #expect(int32(date + 404) == 25)
+        #expect(int32(date + 520) == 2)
+        // As a PC save, without VNDegen's lines beside it, it goes on from the line with its number: the choice, asked again.
+        try FileManager.default.copyItem(at: atChoice, to: saves.appendingPathComponent("save007.sav"))
+        let seventh = try #require(NekoSDKFlowFixture.start(root, data: data))
+        #expect(vnneko_debug_load(seventh, 7))
+        steps(seventh, 3)
+        #expect(vnneko_debug_choice_count(seventh) == 2)
+        vnneko_stop(seventh)
+
         let sixth = try #require(NekoSDKFlowFixture.start(root, data: data))
         #expect(vnneko_debug_load(sixth, 6))
         steps(sixth, 3)
