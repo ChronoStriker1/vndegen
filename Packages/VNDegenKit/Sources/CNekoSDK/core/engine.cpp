@@ -4349,21 +4349,33 @@ bool Engine::gtNextScript() {
     return true;
 }
 
-// `gtcount HEART X Y UNITS X Y TENS X Y` in the table's `gt` screen: the heart and the two digits on it.
+// The count before GOOD Timing's marker, as Test Game 88's PC draws it, from the table's `gt` screen:
+//   gtcount HEART X Y DIGITS TENSX UNITSX Y LAST      the heart and the count in two digits from the DIGITS sheet, and
+//                                                     at a count of 1 from the LAST sheet, a red 0 and 1, instead
+//   gtpieces FILE,X,Y...                              the heart's segments, lit while the count is above their place:
+//                                                     at N the last N are lit, the first going dark first
 void Engine::composeGtCount(Canvas &out) {
     if (gt_.shownCount <= 0 || setting("gt_off")) return;
     auto table = screens_.find("gt");
-    const auto *f = table == screens_.end() ? nullptr : table->second.setting("gtcount");
-    if (!f || f->size() < 9) return;
-    ImageRef heart = images_->get((*f)[0]), units = images_->get((*f)[3]), tens = images_->get((*f)[6]);
-    if (heart) drawPart(out, *heart, field(*f, 1), field(*f, 2), 0, 0, heart->w, heart->h, 1);
-    if (units) {
-        int w = units->w / 10;
-        drawPart(out, *units, field(*f, 4), field(*f, 5), gt_.shownCount % 10 * w, 0, w, units->h, 1);
+    if (table == screens_.end()) return;
+    const auto *f = table->second.setting("gtcount");
+    if (!f || f->size() < 8) return;
+    auto draw = [&](const std::string &path, int x, int y) {
+        if (ImageRef image = images_->get(path)) drawPart(out, *image, x, y, 0, 0, image->w, image->h, 1);
+    };
+    draw((*f)[0], field(*f, 1), field(*f, 2));
+    if (const auto *pieces = table->second.setting("gtpieces")) {
+        int count = int(pieces->size());
+        for (int i = std::max(0, count - gt_.shownCount); i < count; i++) {
+            auto parts = split((*pieces)[size_t(i)], ',');
+            if (parts.size() >= 3) draw(parts[0], std::atoi(parts[1].c_str()), std::atoi(parts[2].c_str()));
+        }
     }
-    if (tens) {
-        int w = tens->w / 2;
-        drawPart(out, *tens, field(*f, 7), field(*f, 8), std::min(gt_.shownCount / 10, 1) * w, 0, w, tens->h, 1);
+    bool last = gt_.shownCount == 1;
+    if (ImageRef digits = images_->get((*f)[last ? 7 : 3])) {
+        int w = digits->w / (last ? 2 : 10), value = std::min(gt_.shownCount, 99);
+        drawPart(out, *digits, field(*f, 4), field(*f, 6), value / 10 * w, 0, w, digits->h, 1);
+        drawPart(out, *digits, field(*f, 5), field(*f, 6), value % 10 * w, 0, w, digits->h, 1);
     }
 }
 

@@ -1402,7 +1402,10 @@ button no obj\b003_000.bmp 449 350 2 5 1
 button noask obj\i001_000.bmp 498 444 1 5 0
 
 screen gt
-gtcount obj\l005_000.bmp 1147 607 obj\l007_000.bmp 1173 616 obj\l007_001.bmp 1156 616
+# The count before the marker, measured under Wine: a heart of twelve segments, which go dark one a count clockwise
+# from the top of its right lobe, the count in navy digits, and at 1 a red 01.
+gtcount obj\l005_000.bmp 1147 607 obj\l007_000.bmp 1156 1173 616 obj\l007_001.bmp
+gtpieces obj\l006_000.bmp,1175,609 obj\l006_001.bmp,1180,609 obj\l006_002.bmp,1184,620 obj\l006_003.bmp,1186,627 obj\l006_004.bmp,1177,637 obj\l006_005.bmp,1175,641 obj\l006_006.bmp,1165,641 obj\l006_007.bmp,1159,638 obj\l006_008.bmp,1149,627 obj\l006_009.bmp,1149,619 obj\l006_010.bmp,1149,609 obj\l006_011.bmp,1159,609
 
 screen sprites
 # The sprite gallery (立ち絵鑑賞), measured under Wine: an explanation page, then the heroine (her story sprite in the
