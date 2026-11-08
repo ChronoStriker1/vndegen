@@ -119,6 +119,10 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 else if (key == "if") p.needs = numbers(value);
                 else if (key == "ifread") p.ifRead = value;
                 else if (key == "unlessread") p.unlessRead = value;
+                else if (key == "ifhover" || key == "unlesshover") {
+                    std::istringstream in(value);
+                    for (std::string action; std::getline(in, action, ',');) (key == "ifhover" ? p.ifHover : p.unlessHover).push_back(action);
+                }
                 else if ((key == "move" || key == "clamp" || key == "fadein" || key == "fadeout") && at + 2 < w.size()) {
                     const std::string &second = w[at + 2];
                     if (key == "move") {

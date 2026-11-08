@@ -507,6 +507,8 @@ private:
     void composeScene(Canvas &out, const Sprites &sprites);
     void composeMessage(Canvas &out);
     std::string readSwapped(const std::string &sheet) const;
+    bool hoverAllows(const Picture &p) const;
+    bool musicLit(const Button &b) const;
     // Test Game 92's manual animation control: while a movie shows and Config allows it, the wheel and a panel zoom the
     // movie, and the zoomed movie follows the pointer. The table's `animpanel`, `animbuttons`, `animdigits`, `animhelp`
     // and `animzoom` place it.

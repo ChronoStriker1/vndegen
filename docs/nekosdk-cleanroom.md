@@ -215,6 +215,15 @@ Its `cfg.sav` also showed the file's second string: after the script name at 440
 (`movie\bga_001_000_000_000_000.wmv`, 33 bytes), which the other games leave empty. Both strings move the unlock flags
 that follow them, so the runtime had read Moral Orc's CG flags from the wrong place; it now counts both.
 
+## Horny Elves and a Moral Orc's music screen
+
+Its bottom is the galleries' band, then an outline (`h005_000`) and the cast over it: the orc, Fiona (her silhouette
+`h105_009` until `ep_011_001_000` has been read), Myshla, Eymie and Alycia, placed and layered against the PC's frame
+to the pixel. Its top band is the galleries' leafy one over the menus' own. Each control's help is a speech bubble
+from `h006_000`, spoken by one of the cast, whose portrait darkens (`h005_002`, `_004`, `_006`, `_008`, `_010`)
+while it shows; the bubble sits by the speaker. No help shows over a lit control, such as Stop while nothing plays,
+or a disabled one. Table pictures can be shown `ifhover` or `unlesshover` a control, or a named `hover` area.
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on

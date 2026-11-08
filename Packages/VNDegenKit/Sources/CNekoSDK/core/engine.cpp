@@ -2687,10 +2687,39 @@ bool Engine::shown(const Button &b) const {
            (b.ifRead.empty() || seen(b.ifRead)) && (b.unlessRead.empty() || !seen(b.unlessRead));
 }
 
+// Whether a music control is lit: the player's state, a mode that's on, or a ♪ played.
+bool Engine::musicLit(const Button &b) const {
+    return (b.action == "music_stop" && !trackPlayer_) || (b.action == "music_play" && trackPlayer_ && !trackPaused_) || (b.action == "music_pause" && trackPaused_) ||
+           (b.action == "music_repeat" && trackRepeat_) || (b.action == "music_shuffle" && trackShuffle_) ||
+           (b.action == "music_one" && trackRepeat_) || (b.action == "music_all" && !trackRepeat_ && !trackShuffle_) ||
+           (b.action == "music_random" && trackShuffle_) || testsPlayed_.count(b.action);
+}
+
+// A picture's `ifhover` and `unlesshover`: the action of the menu button under the pointer, if any.
+bool Engine::hoverAllows(const Picture &p) const {
+    if (p.ifHover.empty() && p.unlessHover.empty()) return true;
+    // Only a control that shows its help counts: not one disabled, nor one lit on a `nolithelp` screen.
+    std::string over;
+    if (screen_ && pointerSeen_ && !dialogOpen_)
+        for (const Button &b : screen_->buttons)
+            if (b.sheet && shown(b) && b.contains(pointerX_, pointerY_) && !(b.action == "music_pause" && !trackPlayer_) &&
+                !(screen_->setting("nolithelp") && musicLit(b)))
+                over = b.action;
+    // Or a `hover` line's name, its tenth field, as Moral Orc's volume has its help on the part of the screen it covers.
+    if (over.empty() && screen_ && pointerSeen_ && !dialogOpen_)
+        for (auto [it, end] = screen_->settings.equal_range("hover"); it != end; ++it) {
+            const auto &f = it->second;
+            if (f.size() >= 10 && inRect(pointerX_, pointerY_, field(f, 0), field(f, 1), field(f, 2) - field(f, 0), field(f, 3) - field(f, 1))) over = f[9];
+        }
+    auto listed = [&](const std::vector<std::string> &list) { return std::find(list.begin(), list.end(), over) != list.end(); };
+    if (!p.ifHover.empty() && !listed(p.ifHover)) return false;
+    return !listed(p.unlessHover);
+}
+
 bool Engine::shown(const Picture &p) const {
     bool staged = screen_ && screen_->setting("menustages");
     return (!staged || p.stage == 0 || p.stage == menuStage_) && (p.group.empty() || submenuOpen(p.group)) && (p.needs.empty() || anyGlobalSet(p.needs)) &&
-           (p.ifRead.empty() || seen(p.ifRead)) && (p.unlessRead.empty() || !seen(p.unlessRead));
+           (p.ifRead.empty() || seen(p.ifRead)) && (p.unlessRead.empty() || !seen(p.unlessRead)) && hoverAllows(p);
 }
 
 // Whether the submenu of this name is open, or one inside it.
@@ -2903,11 +2932,15 @@ void Engine::composeScreen(Canvas &out) {
         }
         if (b.action == "quickload" && !newestQuickSlot()) state = StateDisabled;
         if (b.action == "track" + std::to_string(currentTrack_) && trackPlayer_) state = over ? StateSelectedHover : StateSelected;
-        bool musicOn = (b.action == "music_stop" && !trackPlayer_) || (b.action == "music_play" && trackPlayer_ && !trackPaused_) || (b.action == "music_pause" && trackPaused_) ||
-                       (b.action == "music_repeat" && trackRepeat_) || (b.action == "music_shuffle" && trackShuffle_) ||
-                       (b.action == "music_one" && trackRepeat_) || (b.action == "music_all" && !trackRepeat_ && !trackShuffle_) ||
-                       (b.action == "music_random" && trackShuffle_) || testsPlayed_.count(b.action);
+        bool musicOn = musicLit(b);
         if (musicOn) state = over ? StateSelectedHover : StateSelected;
+        // `nolithelp`: a lit control shows no help, as Moral Orc's music screen shows none over Stop while nothing plays.
+        if (musicOn && over && screen_->setting("nolithelp")) {
+            Button quiet = b;
+            quiet.help = nullptr;
+            drawButton(out, quiet, state);
+            continue;
+        }
         // `askerlit`: the button that asked a question stays lit, with its help, until it's answered, as in Test Game 84.
         if (dialogOpen_ && b.action == dialogOpener_ && screen_->setting("askerlit")) {
             drawButton(out, b, StateSelected, true);
@@ -2930,7 +2963,7 @@ void Engine::composeScreen(Canvas &out) {
         drawButton(out, b, state);
     }
     if (helpOf) drawButtonHelp(out, *helpOf);
-    // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW]`: a line of help shown while the pointer is over that part of the screen,
+    // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW [NAME]]`: a line of help shown while the pointer is over that part of the screen,
     // such as a settings group in Config, as the PC games show them. Test Game 84 keeps its lines as rows of one sheet.
     if (pointerSeen_ && !dialogOpen_)
         for (auto [it, end] = screen_->settings.equal_range("hover"); it != end; ++it) {

@@ -46,6 +46,9 @@ struct Picture {
     std::vector<int> needs;  // `if G,G...`: shown only once one of these global variables is set
     // `ifread SCRIPT` and `unlessread SCRIPT`: shown only once that script has been read to its end, or only until then.
     std::string ifRead, unlessRead;
+    // `ifhover A,A...` and `unlesshover A,A...`: shown only while the pointer is over a button of one of those actions, or
+    // only while it isn't, as Moral Orc's music screen shades the portrait of whoever speaks a control's help.
+    std::vector<std::string> ifHover, unlessHover;
     // `more FILE,FILE...`: other pictures that can take this one's place when the screen opens. `pickby G` shows the
     // one global variable G numbers, and `randomif G,G...` one at random once any of those is set, as Test Game 94's
     // title picks its art. `variants` holds them all, this one first.
