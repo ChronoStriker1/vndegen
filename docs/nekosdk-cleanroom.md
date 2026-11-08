@@ -154,11 +154,15 @@ maps to Open Sans ([fonts.md](fonts.md)). The PC sets each glyph a fixed gap pas
 pitch apart, which init.ini's MsgCharInterval and MsgLineInterval don't predict, so a game's table gives them
 (`textgap`, `textline`, `textshift`, `textfont`, `textsize`, `commentfont`). Yarinaoshi no Christmas, measured by
 loading the same PC save on the PC under Wine, with VNDegen's stand-in fonts mapped in place of the Windows ones, and
-here: comments in MS Gothic at 18, and its log placed under its rules as the PC's is. Christmas asks for Meiryo, which
-Ume P Gothic stands in for without matching its widths; with it the PC sets a gap of 4 and many lines run off the
-screen, the opening's among them, so that gap belongs to the stand-in and is left out. The Alchemist, from the
-publisher's Windows screenshots, since Wine has no Lucida Sans Unicode and
-font-links it to Noto Sans CJK: Open Sans 22 with a gap of 5.93, lines 42 apart and the first glyph one gap in, which
+here: comments in MS Gothic at 18, and its log placed under its rules as the PC's is. Christmas asks for Meiryo at a
+32-pixel cell, which Windows draws at about 21 pixels to the em, two thirds of the cell; Ume P Gothic, its stand-in,
+fills the cell, so under Wine the PC's lines run off the screen. Christmas was released only in Japanese, so its text
+was fitted to a Windows screenshot of its English patch, two lines whose glyphs have Meiryo's Verdana-like shapes and
+an 11-pixel x-height: Ume P Gothic 22 with a gap of 4.66, lines 35 apart, the first glyph 2 pixels in and the baseline
+4 lower than Wine's, which puts glyphs within 2 pixels, the lines' ends within one and the baselines on the
+screenshot's rows. Its log's text drops by the same 4, inferred from the two faces' ascents. `nekocheck` lays out
+every message and fails on one that runs off the screen. The Alchemist, from the publisher's Windows screenshots,
+since Wine has no Lucida Sans Unicode and font-links it to Noto Sans CJK: Open Sans 22 with a gap of 5.93, lines 42 apart and the first glyph one gap in, which
 puts capitals within a pixel of the screenshots; its comments at 20, sized from Wine's capture.
 
 ## The CG viewer

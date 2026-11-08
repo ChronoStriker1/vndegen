@@ -119,6 +119,11 @@ public:
         return it == table.end() ? 0 : it->second;
     }
     bool jump(const std::string &script, int node);
+    // For checks: lays out a message as the message window sets it, replacing the one shown, and gives the furthest
+    // right and lowest pixel its ink reaches, and the canvas's size to hold them against.
+    void messageExtent(const std::string &utf8Name, const std::string &utf8Text, int &right, int &bottom);
+    int canvasWidth() const { return width_; }
+    int canvasHeight() const { return height_; }
     // Saving, loading and a card's lock, which tests also call.
     bool saveToSlot(int slot);
     bool loadFromSlot(int slot);

@@ -388,8 +388,9 @@ check voice0 obj\h022_000.bmp 600 198 1 5 0
 screen log
 pic obj\m001_000.bmp 1185 110
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1185 110 500
-# Four entries a page, each under a rule, measured under Wine.
-rows obj\m000_000.bmp 77 124 165 4 163 6
+# Four entries a page, each under a rule, measured under Wine. Each entry's text sits 4 pixels lower than Wine put it,
+# as the message window's does: Meiryo's ascent at a 32-pixel cell is about 23, its stand-in's at 22 is 19.
+rows obj\m000_000.bmp 77 124 165 4 163 10
 button log_close obj\m003_000.bmp 1232 22 5 5 0
 button log_top obj\m003_000.bmp 1180 34 5 5 1
 button log_up obj\m003_000.bmp 1180 68 5 5 2
@@ -426,9 +427,14 @@ run 2120 9 1
 run 2160 1 1
 
 screen defaults
-# Christmas asks for Meiryo, which Ume P Gothic stands in for without matching its widths. Under Wine with Ume P Gothic
-# in its place the PC sets each glyph four pixels past its advance, and many of its lines run off the screen, so that
-# gap belongs to the stand-in, not the game, and is left out here. Comments are in MS Gothic, as the PC asks.
+# Christmas asks for Meiryo at a 32-pixel cell, which Windows draws at about 21 pixels to the em; Ume P Gothic, its
+# stand-in, fills the whole cell, so under Wine its lines run off the screen. Fitted to a Windows screenshot of the
+# English patch's text: Ume P Gothic at 22, each glyph 4.66 pixels past its advance, lines 35 apart, the first glyph
+# 2 pixels in and the baseline 4 lower. Comments are in MS Gothic, as the PC asks.
+textsize 22
+textgap 4.66
+textline 35
+textshift 2 4
 commentfont 0
 )";
 

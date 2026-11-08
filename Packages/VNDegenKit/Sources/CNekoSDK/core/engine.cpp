@@ -3080,6 +3080,19 @@ void Engine::layoutText(const std::string &name, const std::string &text) {
     layoutRun(text, textX_ + textDX_, textY_ + textDY_ + ascent, false, textGlyphs_);
 }
 
+void Engine::messageExtent(const std::string &name, const std::string &text, int &right, int &bottom) {
+    layoutText(name, text);
+    right = bottom = 0;
+    for (const auto *run : {&nameGlyphs_, &textGlyphs_})
+        for (const Glyph &g : *run) {
+            GlyphImage image;
+            if (!glyph(fontFace_, g.codepoint, fontSize_, false, image) || image.w <= 0 || image.h <= 0) continue;
+            int lean = g.italic ? image.h / 5 + 1 : 0;
+            right = std::max(right, g.x + image.left + image.w + lean);
+            bottom = std::max(bottom, g.y - image.top + image.h);
+        }
+}
+
 void Engine::drawGlyph(Canvas &out, const Glyph &g, int pass, int alpha, int r, int gr, int b, int fr, int fg, int fb) {
     if (alpha <= 0) return;
     // init.ini's font types: 1 a shadow, 2 a thin frame, 9 both, 13 a wide frame, 17 a wider one.
