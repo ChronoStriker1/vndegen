@@ -2232,9 +2232,10 @@ void Engine::composeSlots(Canvas &out) {
             SlotInfo &info = slotInfo(slot);
             int cx, cy;
             cardPlace(index, cx, cy);
-            // Test Game 94's PC draws a locked card as it draws an empty one on the load screen.
+            // `lockdim`: Test Games 92 and 94 draw a locked card as an empty one on the load screen. The Alchemist and Yarinaoshi
+            // no Christmas draw it as any other.
             bool isLocked = info.exists && locked(slot);
-            int row = (loading && !info.exists) || isLocked ? int(StateDisabled) : slot == hovered ? int(StateHover) : int(StateNormal);
+            int row = (loading && !info.exists) || (isLocked && screen_->setting("lockdim")) ? int(StateDisabled) : slot == hovered ? int(StateHover) : int(StateNormal);
             // `emptycards OPACITY`: Test Game 92's PC draws an empty card on the load screen faded, at 80 of 256.
             float cardOpacity = loading && !info.exists && screen_->setting("emptycards") ? float(offset("emptycards", 0)) / 256 : 1;
             drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, sheet->w, cardH, cardOpacity);
