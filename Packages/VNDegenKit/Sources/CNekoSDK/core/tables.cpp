@@ -14,6 +14,7 @@ namespace {
 #include "tables/moralorc.inc"
 #include "tables/animother.inc"
 #include "tables/rinjin.inc"
+#include "tables/funbagfantasy1.inc"
 #include "tables/storytest.inc"
 #include "tables/layouttest.inc"
 
@@ -34,6 +35,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\moralorc") return kMoralOrc;
     if (folder == "waffle\\animother") return kAniMother;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return kRinjin;
+    if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
     if (folder == "vndegen\\storytest") return kStoryTest;
     if (folder == "vndegen\\layouttest") return kLayoutTest;
     return nullptr;
