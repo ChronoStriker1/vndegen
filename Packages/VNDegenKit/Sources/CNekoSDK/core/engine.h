@@ -625,6 +625,7 @@ private:
     // How the PC places text, where it isn't what the font gives: a gap after each glyph's own advance, a line pitch, and
     // an offset from init.ini's positions. 0 keeps the font's own.
     float textGap_ = 0;
+    int commentFace_ = 0;
     int textLine_ = 0, textDX_ = 0, textDY_ = 0;
     int textR_ = 255, textG_ = 255, textB_ = 255, shadowR_ = 0, shadowG_ = 0, shadowB_ = 0;
     std::vector<Glyph> nameGlyphs_, textGlyphs_;
