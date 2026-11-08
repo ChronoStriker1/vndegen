@@ -117,6 +117,17 @@ The runtime writes zeros for the values it doesn't read. A quick save the runtim
 
 A card's comment, typed on the PC's save screen, is the string after the save's first byte: with an input method under Wine, typing あいう on a card of The Alchemist and of Test Game 94 rewrote that save with 6 and the three characters in CP932 at byte 1, and everything after, the flow script's name first, 6 bytes later. With no comment the length is 0 and the flow's name is at 0xCD, the fixed place the runtime had read, so a save with a comment didn't read and showed as an empty card. The runtime reads the comment and shows it on the card in white (`slotcomment`, placed and sized against the PC's: 21 pixels in The Alchemist, 19 in Christmas, 18 in Test Game 94; the last two are MS Gothic, so they were measured under Wine with Ume Gothic, VNDegen's own stand-in for it, put in its place, as Wine had drawn them in another, smaller face), and a card with a save and no comment shows the PC's prompt, クリックでコメントを入力 or Click to set a comment. A click there, on the save or load screen, asks the host for a comment in a text field, and the runtime writes it as the PC does: only the comment changes in the file, the rest as it was. Test Game 94's box stopped at 36 bytes, 36 letters or 18 kana, so a longer comment is cut there, never inside a character. A save VNDegen writes has no comment.
 
+
+### The older engine's saves
+
+Test Games 83 and 87, which keep their story in the exe, save in an older layout of the same stream, worked out from 28 PC saves made under Wine (seven of Test Game 83 from set 3, 21 of Test Game 87 from set 1). The runtime reads every one of them and writes it back byte for byte. Where it differs from the newer layout:
+
+- The choice's picture is named 236 bytes after the flow's name, and an empty string sits where the newer layout names it, 4,196 bytes after the flow, so all that follows moves by the picture name's length.
+- A sprite record's fixed part, after its two paths, is 383 bytes, with x and y as ints at 0xD5 and again at 0x129 and 0x161, scale as floats at 0xE9, and alpha at 0xF9, 255 for a picture shown. Zeros come between records, 26 bytes in Test Game 83 and 39 in Test Game 87. The first record keeps the screen's size at 13.
+- After the records, Test Game 87 has 33 bytes, one of them always 100; Test Game 83 has none. Text records end 8 bytes after their strings: the voice's volume, then a number that is 60 or -60 on some lines, most likely the voice's pan.
+- Sound channels come with no byte before them and end a byte after their time. The first 30 are music and the rest effects, where the newer layout has 60 for music. How many channels there are and how many zeros follow them can't be told apart in these saves, whose last channels are all empty; the most that fit is taken, 123 in Test Game 83 and 183 in Test Game 87, with 19 zeros before the scene's name. After the scene's name come the node and then zeros, 818 bytes in Test Game 83 and 5,779 in Test Game 87, one of them always 60. Neither has the GOOD Timing fields.
+- The 24 bytes after the text on screen hold numbers in one of Test Game 87's saves whose meaning isn't known, and the runtime keeps them as they were, as it does the volume and pan of a channel with no sound.
+
 ## Meanings settled by comparison with the PC game
 
 Each was measured from recordings of Test Game 97 under Wine: its opening, and ten minutes clicking through the first

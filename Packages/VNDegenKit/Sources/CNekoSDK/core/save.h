@@ -3,6 +3,7 @@
 // the values the PC wrote in the saves the layouts were taken from.
 #pragma once
 #include <cstdint>
+#include <array>
 #include <map>
 #include <string>
 #include <vector>
@@ -32,6 +33,8 @@ struct SavedText {
     int tag = -10;
     std::string name, text, voice;  // CP932
     int volume = 100, kind = 4;
+    // The 4 bytes after the voice's volume: 60 and -60 in some of Test Game 83's lines, most likely the voice's pan.
+    int pan = 0;
 };
 
 struct SavedSound {
@@ -54,6 +57,8 @@ struct SaveData {
     std::vector<SavedSprite> sprites;
     bool windowShown = true;
     SavedText current;
+    // The 24 bytes after the text on screen, whose meaning isn't known: zeros in most saves, kept as the PC wrote them.
+    std::array<uint8_t, 24> afterText{};
     std::vector<SavedText> backlog;  // newest first
     std::vector<SavedSound> sounds;
     std::string scene;
