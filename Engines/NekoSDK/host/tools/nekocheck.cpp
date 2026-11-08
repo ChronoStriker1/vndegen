@@ -1,6 +1,6 @@
 // Checks the script reader against a game's own bytes: every script must parse to its last byte, every `next` must name
 // a node, no two nodes in a script may share a number, and the numbers a node shows in its readable first string must equal
-// its parameters.
+// its parameters. Every message must also fit on the screen as the runtime sets it, in its stand-in fonts.
 // usage: nekocheck <game folder>...
 #include <cstdio>
 #include <cstdlib>
@@ -9,7 +9,9 @@
 #include <string>
 
 #include "archive.h"
+#include "engine.h"
 #include "script.h"
+#include "sjis.h"
 
 using namespace neko;
 
@@ -25,6 +27,7 @@ bool field(const std::string &s, const char *key, long &out) {
 
 struct Totals {
     long scripts = 0, nodes = 0, badParse = 0, trailing = 0, badNext = 0, compared = 0, differ = 0, duplicates = 0, known = 0;
+    long messages = 0, offScreen = 0;
 };
 
 // Two nodes sharing a number are a fault in the game's script, and each one needs checking against the PC game before it's
@@ -54,6 +57,30 @@ void compare(const Node &n, const char *key, int value, Totals &t, const std::st
     if (shown != value) {
         t.differ++;
         if (t.differ <= 20) std::printf("  differs: %s #%d op %d %s shows %ld, parameter %d\n", script.c_str(), n.id, n.opcode, key, shown, value);
+    }
+}
+
+// Lays out every message of the game's scenes as the runtime sets it, and counts those whose ink runs past the canvas.
+void checkMessages(const char *root, const Files &files, Totals &t) {
+    Engine engine;
+    std::string error;
+    if (!engine.start(root, "", "/dev/null", NEKO_FONTS_DIR, error)) {
+        std::printf("  the runtime didn't start: %s\n", error.c_str());
+        t.offScreen++;
+        return;
+    }
+    for (const std::string &path : files.list("scr")) {
+        Bytes data = files.read(path);
+        Script script;
+        if (!data || !parseScript(data->data(), data->size(), script)) continue;
+        for (const Node &n : script.nodes) {
+            if (n.opcode != 5) continue;
+            t.messages++;
+            int right, bottom;
+            engine.messageExtent(sjis::toUtf8(n.s[1]), sjis::toUtf8(n.s[2]), right, bottom);
+            if (right <= engine.canvasWidth() && bottom <= engine.canvasHeight()) continue;
+            if (++t.offScreen <= 10) std::printf("  off the screen: %s #%d reaches %d, %d\n", path.c_str(), n.id, right, bottom);
+        }
     }
 }
 
@@ -122,8 +149,10 @@ int main(int argc, char **argv) {
                 }
             }
         }
+        checkMessages(argv[a], files, t);
         std::printf("%s: scripts %ld, nodes %ld, unreadable %ld, with bytes after the last node %ld, next naming no node %ld, fields compared %ld, differing %ld\n",
                     argv[a], t.scripts, t.nodes, t.badParse, t.trailing, t.badNext, t.compared, t.differ);
+        std::printf("%s: messages %ld, off the screen %ld\n", argv[a], t.messages, t.offScreen);
         all.scripts += t.scripts;
         all.nodes += t.nodes;
         all.badParse += t.badParse;
@@ -131,7 +160,8 @@ int main(int argc, char **argv) {
         all.badNext += t.badNext;
         all.differ += t.differ;
         all.duplicates += t.duplicates;
+        all.offScreen += t.offScreen;
         std::printf("%s: new duplicate node numbers %ld, known %ld\n", argv[a], t.duplicates, t.known);
     }
-    return all.badParse || all.trailing || all.badNext || all.differ || all.duplicates ? 1 : 0;
+    return all.badParse || all.trailing || all.badNext || all.differ || all.duplicates || all.offScreen ? 1 : 0;
 }
