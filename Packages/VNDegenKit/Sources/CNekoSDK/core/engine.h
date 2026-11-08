@@ -318,6 +318,9 @@ private:
     void compose();
     void layoutText(const std::string &utf8Name, const std::string &utf8Text);
     void layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out);
+    // init.ini's font types: 1 a shadow, 2 a thin frame, 9 both, 13 a wide frame, 17 a wider one.
+    int frameWidth() const { return fontType_ == 17 ? 3 : fontType_ == 13 ? 2 : (fontType_ == 2 || fontType_ == 9) ? 1 : 0; }
+    bool hasShadow() const { return fontType_ == 1 || fontType_ == 9; }
     void drawGlyph(Canvas &out, const Glyph &g, int pass, int alpha, int r, int gr, int b, int fr, int fg, int fb);
     void drawGlyphs(Canvas &out, const std::vector<Glyph> &glyphs, int r, int g, int b, int fr, int fg, int fb);
     void drawGlyphRun(Canvas &out);
