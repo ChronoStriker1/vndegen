@@ -220,11 +220,13 @@ private:
         ImageRef thumbnail;
         std::string flow;  // the flow script the save is in, for its chapter's name
         int route = 0;  // its route mode, for the card's progress label
+        std::string comment;  // typed on a PC, UTF-8
     };
     SlotInfo &slotInfo(int slot);
     bool pageOff(const std::string &action) const;
     bool pageStepOff(const std::string &action) const;
     void composeSlots(Canvas &out);
+    void drawComment(Canvas &out, const std::string &utf8, int x, int baseline, int width, int px);
     int slotAt(int x, int y) const;
     void composeDialog(Canvas &out);
     void openDialog(int question, const std::function<void()> &yes);
@@ -569,7 +571,7 @@ private:
     std::string dialogOpener_;  // the action of the menu button whose question is open
     int dialogQuestion_ = 0, dialogHover_ = -1;
     std::function<void()> dialogYes_;
-    bool dialogNoAsk_ = false;  // Test Game 94's "don't ask again" box, ticked
+    bool dialogNoAsk_ = false;  // the "don't ask again" box, ticked
     void answerDialog(bool yes);
 
     // Menus, and the message window's buttons.

@@ -70,6 +70,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Ponscripter, with both Umineko Arcs; on phones held upright the game on top and the controls below; one library view button; an iPhone Duo layout pass; and an engine clock that keeps real time on every display (0.26.0).
 - The Alchemist starts on its default art, and the CG viewer's control panel in the two NekoSDK games (0.26.1).
 - The Alchemist's endings follow the player's choices, and its prologue flag moves to and from a PC (0.26.2).
+- PC saves with a comment load in the two NekoSDK games, with save locks, the NEW mark and the "Don't ask again" box (0.26.3).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
