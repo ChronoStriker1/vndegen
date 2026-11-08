@@ -87,6 +87,11 @@ void vnneko_set_skip(VNNekoEngine *e, bool on);
 // the comment into that save, cut to the 36 bytes of CP932 the PC's box takes. Cancelling just doesn't answer.
 int vnneko_take_comment_request(VNNekoEngine *e, char *utf8, size_t size);
 bool vnneko_set_comment(VNNekoEngine *e, int slot, const char *utf8);
+// Something the title asks the host to show, once per click: kind "alert" with its text (the PC's Version info box),
+// "manual" with the full path of the game's own manual page, to show in a web view that loads only that folder, or
+// "url" with a web page the PC opens in a browser, to open only after asking the player. False when nothing's asked.
+// A press through vnneko_debug_press never asks for the web page.
+bool vnneko_take_host_request(VNNekoEngine *e, char *kind, size_t kindSize, char *payload, size_t payloadSize);
 // Stops the clock and sound. vnneko_step does nothing while paused.
 void vnneko_set_paused(VNNekoEngine *e, bool paused);
 

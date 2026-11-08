@@ -162,7 +162,12 @@ enum DebugHooks {
                 guard let sheet = NSApp.windows.compactMap(\.attachedSheet).first, let content = sheet.contentView else { return }
                 func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
                 views(content).compactMap { $0 as? NSTextField }.first { $0.isEditable }?.stringValue = "Mac comment"
-                views(content).compactMap { $0 as? NSButton }.first { $0.keyEquivalent == "\r" }?.performClick(nil)
+                if let button = views(content).compactMap({ $0 as? NSButton }).first(where: { $0.keyEquivalent == "\r" }) {
+                    button.performClick(nil)
+                } else if let parent = sheet.sheetParent {
+                    // An alert whose buttons this can't find ends with its first button, OK or Cancel.
+                    parent.endSheet(sheet, returnCode: .alertFirstButtonReturn)
+                }
             }
         }
         var snapshotToken: Int32 = 0

@@ -8,7 +8,7 @@ const char kChristmas[] = R"(
 screen title
 pic obj\d000_000.bmp 0 0
 pic obj\d002_000.bmp 596 457
-pic obj\d001_000.bmp 32 690 1 1 0 0
+button versioninfo obj\d001_000.bmp 32 690 1 1 0
 button start obj\d004_000.bmp 67 44 9 5 0
 button load obj\d004_000.bmp 67 84 9 5 1
 button quickload obj\d004_000.bmp 67 124 9 5 2
@@ -16,6 +16,8 @@ button cg obj\d004_000.bmp 67 164 9 5 3
 button scene obj\d004_000.bmp 67 204 9 5 4
 button music obj\d004_000.bmp 67 244 9 5 5
 button config obj\d004_000.bmp 67 284 9 5 6
+# The manual opens in a browser on the PC, and in the app here.
+button manual obj\d004_000.bmp 67 324 9 5 7
 button quit obj\d004_000.bmp 67 364 9 5 8
 
 screen load
@@ -427,6 +429,10 @@ run 2120 9 1
 run 2160 1 1
 
 screen defaults
+# Version info, the PC's message box, as it shows under Wine.
+versionline 【やりなおしのクリスマス】
+versionline ファイルバージョン：1, 0, 0, 0
+manual manual\index.html
 # Christmas asks for Meiryo at a 32-pixel cell, which Windows draws at about 21 pixels to the em; Ume P Gothic, its
 # stand-in, fills the whole cell, so under Wine its lines run off the screen. Fitted to a Windows screenshot of the
 # English patch's text: Ume P Gothic at 22, each glyph 4.66 pixels past its advance, lines 35 apart, the first glyph
@@ -950,10 +956,12 @@ screen title
 pic obj\d000_000.bmp 0 -128
 pic obj\d002_000.bmp 0 558
 pic obj\d001_000.bmp 42 2
-pic obj\d004_000.bmp 1122 7 1 5 0 0
+button versioninfo obj\d004_000.bmp 1122 7 1 5 0 help obj\d005_000.bmp 0 686 1 12 0 11
 pic obj\d003_000.bmp 174 638 11 5 6 0
-pic obj\d003_000.bmp 532 638 11 5 8 0
-pic obj\d003_000.bmp 1074 638 11 5 10 0
+# The manual and the web survey open in a browser on the PC; here the manual opens in the app and the survey only after
+# asking.
+button manual obj\d003_000.bmp 532 638 11 5 8 help obj\d005_000.bmp 0 686 1 12 0 8
+button websurvey obj\d003_000.bmp 1074 638 11 5 10 help obj\d005_000.bmp 0 686 1 12 0 10
 button start obj\d003_000.bmp 59 592 11 5 0 help obj\d005_000.bmp 0 686 1 12 0 0
 button load obj\d003_000.bmp 238 592 11 5 1 help obj\d005_000.bmp 0 686 1 12 0 1
 button quickload obj\d003_000.bmp 417 592 11 5 2 help obj\d005_000.bmp 0 686 1 12 0 2
@@ -1369,6 +1377,14 @@ screen gt
 gtcount obj\l005_000.bmp 1147 607 obj\l007_000.bmp 1173 616 obj\l007_001.bmp 1156 616
 
 screen defaults
+# Version info, the PC's message box, as it shows for the copy measured under Wine; which installed parts each bonus
+# line needs isn't known.
+versionline 【母三人とアナあそび】
+versionline ファイルバージョン：1, 0, 0, 0
+versionline
+versionline ○オフィシャル通販特典
+manual manual\index.html
+websurvey webアンケート.url
 default onahole 1
 default bar_always 1
 default opacity 100
@@ -1418,9 +1434,11 @@ screen title
 pic obj\d000_000.bmp 0 -128
 pic obj\d002_000.bmp 0 558
 pic obj\d001_000.bmp 79 2
-pic obj\d004_000.bmp 1122 7 1 5 0 0
-pic obj\d003_000.bmp 815 640 10 5 7 0
-pic obj\d003_000.bmp 1005 640 10 5 9 0
+button versioninfo obj\d004_000.bmp 1122 7 1 5 0 help obj\d005_000.bmp 0 686 1 11 0 10
+# The manual and the web survey open in a browser on the PC; here the manual opens in the app and the survey only after
+# asking.
+button manual obj\d003_000.bmp 815 640 10 5 7 help obj\d005_000.bmp 0 686 1 11 0 6
+button websurvey obj\d003_000.bmp 1005 640 10 5 9 help obj\d005_000.bmp 0 686 1 11 0 9
 button start obj\d003_000.bmp 135 596 10 5 0 help obj\d005_000.bmp 0 686 1 11 0 0
 button load obj\d003_000.bmp 321 596 10 5 1 help obj\d005_000.bmp 0 686 1 11 0 1
 button quickload obj\d003_000.bmp 509 596 10 5 2 help obj\d005_000.bmp 0 686 1 11 0 2
@@ -1926,6 +1944,12 @@ button start_prologue obj\d007_000.bmp 449 268 2 5 0
 button start_main obj\d007_000.bmp 449 350 2 5 1
 
 screen defaults
+# Version info, the PC's message box, as it shows for the copy measured under Wine; which installed parts each bonus
+# line needs isn't known.
+versionline 【俺を欲しがる妻と義母】
+versionline ファイルバージョン：1, 0, 0, 0
+manual manual\index.html
+websurvey webアンケート.url
 default onahole 1
 default bar_always 1
 default opacity 100
@@ -3625,10 +3649,11 @@ screen title
 pic sys_5\obj\d000_000.bmp 0 -110
 pic sys_5\obj\d002_000.bmp 0 558
 pic sys_5\obj\d001_000.bmp 111 2
-pic obj\d004_000.bmp 1122 7 1 5 0 0
-# The manual and the web survey open a browser on the PC.
-pic sys_5\obj\d003_000.bmp 885 592 11 5 8 0
-pic sys_5\obj\d003_000.bmp 1000 638 11 5 10 0
+button versioninfo obj\d004_000.bmp 1122 7 1 5 0 help sys_5\obj\d005_000.bmp 0 686 1 12 0 11
+# The manual and the web survey open in a browser on the PC; here the manual opens in the app and the survey only after
+# asking.
+button manual sys_5\obj\d003_000.bmp 885 592 11 5 8 help sys_5\obj\d005_000.bmp 0 686 1 12 0 7
+button websurvey sys_5\obj\d003_000.bmp 1000 638 11 5 10 help sys_5\obj\d005_000.bmp 0 686 1 12 0 10
 button anime sys_5\obj\d003_000.bmp 433 638 11 5 5 help sys_5\obj\d005_000.bmp 0 686 1 12 0 5
 button start sys_5\obj\d003_000.bmp 129 592 11 5 0 help sys_5\obj\d005_000.bmp 0 686 1 12 0 0
 button load sys_5\obj\d003_000.bmp 318 592 11 5 1 help sys_5\obj\d005_000.bmp 0 686 1 12 0 1
@@ -4223,6 +4248,15 @@ button start_prologue obj\d007_000.bmp 449 268 2 5 0
 button start_main obj\d007_000.bmp 449 350 2 5 1
 
 screen defaults
+# Version info, the PC's message box, as it shows for the copy measured under Wine; which installed parts each bonus
+# line needs isn't known.
+versionline 【俺を欲しがる二人の母アニメ追加版】
+versionline ファイルバージョン：2, 0, 0, 0
+versionline
+versionline ○特典ストーリー：メイド編
+versionline ○アニメ追加版！
+manual sys_5\manual\index.html manual\index.html
+websurvey sys_5\webアンケート.url webアンケート.url
 default onahole 1
 default bar_always 1
 default opacity 100

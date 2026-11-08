@@ -58,6 +58,7 @@ std::string flipPicture(const std::string &first, int index) {
 }
 std::string nameInFolder(const std::string &folder, const std::string &name);
 std::string matchCase(const std::string &base, const std::string &relative);
+std::vector<uint8_t> readWhole(const std::string &path);
 
 // What Config shows before the player changes anything, which is what the PC's shows.
 const std::map<std::string, int> &defaultSettings() {
@@ -165,6 +166,7 @@ void Engine::complain(const std::string &what) {
 bool Engine::start(const std::string &root, const std::string &dataDir, const std::string &logPath, const std::string &fontDir, std::string &error) {
     log_ = logPath.empty() ? stderr : std::fopen(logPath.c_str(), "a");
     if (!log_) log_ = stderr;
+    root_ = root;
     if (!files_.open(root)) {
         error = "No NekoSDK archives were found in this folder.";
         return false;
@@ -301,6 +303,8 @@ void Engine::openScreen(const std::string &name) {
         return;
     }
     bool fromStory = !screen_ && name != "title";
+    // A ♪ stays lit once played while Config is open, as on the PC; a later visit starts them unlit.
+    if (name.rfind("config", 0) != 0) testsPlayed_.clear();
     // Test Game 84's title opens with its art revealed in four tiles and its menu fading in, when the game starts or the
     // story returns to it. From another menu it's simply there.
     openingFrom_ = name == "title" && !screen_ && it->second.setting("opening") ? screenMs_ : -1;
@@ -558,6 +562,46 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "LogMode") { openLog(); return; }
+    // `versioninfo`: the PC's Version info box, its lines in the table's `versionline` settings, a blank line for one with
+    // none.
+    if (action == "versioninfo") {
+        std::string text;
+        if (auto it = screens_.find("defaults"); it != screens_.end())
+            for (auto [line, end] = it->second.settings.equal_range("versionline"); line != end; ++line) {
+                if (!text.empty()) text += "\n";
+                for (size_t i = 0; i < line->second.size(); i++) text += (i ? " " : "") + line->second[i];
+            }
+        hostRequestKind_ = "alert";
+        hostRequestPayload_ = text;
+        return;
+    }
+    // `manual` and `websurvey`: the title's Manual opens the game's own manual page, and its web survey the page the
+    // game's .url file names, which the PC opens in a browser. The table lists the files to look for, a patch's first.
+    // A test host's press never asks for the survey, a page on the web.
+    if (action == "manual" || (action == "websurvey" && !testPress_)) {
+        auto it = screens_.find("defaults");
+        const auto *files = it != screens_.end() ? it->second.setting(action) : nullptr;
+        for (size_t i = 0; files && i < files->size(); i++) {
+            std::string relative = (*files)[i];
+            std::replace(relative.begin(), relative.end(), '\\', '/');
+            std::string path = matchCase(root_, relative);
+            std::vector<uint8_t> bytes = readWhole(path);
+            if (bytes.empty()) continue;
+            if (action == "manual") {
+                hostRequestKind_ = "manual";
+                hostRequestPayload_ = path;
+                return;
+            }
+            std::string text(bytes.begin(), bytes.end());
+            size_t at = text.find("URL=");
+            if (at == std::string::npos) continue;
+            size_t end = text.find_first_of("\r\n", at);
+            hostRequestKind_ = "url";
+            hostRequestPayload_ = text.substr(at + 4, end == std::string::npos ? std::string::npos : end - at - 4);
+            return;
+        }
+        return;
+    }
     // `test:se:FILE` or `test:voice:FILE`: Config's ♪ plays a sample at that group's volume, the one Test Game 94's PC reads
     // for it under Wine.
     if (action.rfind("test:", 0) == 0) {
@@ -566,6 +610,7 @@ void Engine::runAction(const std::string &action) {
         if (colon == std::string::npos) return;
         if (testPlayer_) audio_.close(testPlayer_);
         testPlayer_ = 0;
+        testsPlayed_.insert(action);
         if (Bytes data = files_.read(rest.substr(colon + 1))) {
             testPlayer_ = audio_.open(data);
             if (testPlayer_) {
@@ -2249,6 +2294,14 @@ bool Engine::overComment(int slot, int x, int y) const {
     return inRect(x, y, cx + field(*line, 0) - 4, cy + field(*line, 1) - size - 4, field(*line, 2) + 8, size + 12);
 }
 
+bool Engine::takeHostRequest(std::string &kind, std::string &payload) {
+    if (hostRequestKind_.empty()) return false;
+    kind = std::exchange(hostRequestKind_, std::string());
+    log("host takes a %s request", kind.c_str());
+    payload = std::exchange(hostRequestPayload_, std::string());
+    return true;
+}
+
 int Engine::takeCommentRequest(std::string &utf8) {
     int slot = std::exchange(commentRequest_, 0);
     if (slot) utf8 = slotInfo(slot).comment;
@@ -2510,7 +2563,9 @@ bool Engine::pressAction(const std::string &action) {
             for (const Button &b : *list)
                 if (b.action == action) {
                     std::string copy = action;
+                    testPress_ = true;
                     runAction(copy);
+                    testPress_ = false;
                     return true;
                 }
     return false;
@@ -2737,7 +2792,7 @@ void Engine::composeScreen(Canvas &out) {
         bool musicOn = (b.action == "music_stop" && !trackPlayer_) || (b.action == "music_play" && trackPlayer_ && !trackPaused_) || (b.action == "music_pause" && trackPaused_) ||
                        (b.action == "music_repeat" && trackRepeat_) || (b.action == "music_shuffle" && trackShuffle_) ||
                        (b.action == "music_one" && trackRepeat_) || (b.action == "music_all" && !trackRepeat_ && !trackShuffle_) ||
-                       (b.action == "music_random" && trackShuffle_);
+                       (b.action == "music_random" && trackShuffle_) || testsPlayed_.count(b.action);
         if (musicOn) state = over ? StateSelectedHover : StateSelected;
         // `askerlit`: the button that asked a question stays lit, with its help, until it's answered, as in Test Game 84.
         if (dialogOpen_ && b.action == dialogOpener_ && screen_->setting("askerlit")) {

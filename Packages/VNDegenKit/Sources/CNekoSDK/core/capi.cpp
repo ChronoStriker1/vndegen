@@ -138,6 +138,13 @@ int vnneko_take_comment_request(VNNekoEngine *e, char *utf8, size_t size) {
     return slot;
 }
 bool vnneko_set_comment(VNNekoEngine *e, int slot, const char *utf8) { return e->engine.setComment(slot, utf8 ? utf8 : ""); }
+bool vnneko_take_host_request(VNNekoEngine *e, char *kind, size_t kindSize, char *payload, size_t payloadSize) {
+    std::string k, p;
+    if (!e->engine.takeHostRequest(k, p)) return false;
+    if (kind && kindSize) std::snprintf(kind, kindSize, "%s", k.c_str());
+    if (payload && payloadSize) std::snprintf(payload, payloadSize, "%s", p.c_str());
+    return true;
+}
 void vnneko_debug_table_prefix(const char *text) { neko::menuTablePrefix() = text ? text : ""; }
 bool vnneko_debug_save(VNNekoEngine *e, int slot) { return e->engine.saveToSlot(slot); }
 bool vnneko_debug_load(VNNekoEngine *e, int slot) { return e->engine.loadFromSlot(slot); }

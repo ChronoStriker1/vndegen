@@ -109,6 +109,9 @@ int main(int argc, char **argv) {
     bool ended = false;
     while (elapsed < maxMs) {
         if (!vnneko_step(e, dt)) { ended = true; break; }
+        // What the title asks the host to show: printed, never opened.
+        char kind[16], payload[1024];
+        while (vnneko_take_host_request(e, kind, sizeof kind, payload, sizeof payload)) std::printf("host request at %d ms: %s: %s\n", elapsed, kind, payload);
         elapsed += dt;
         if (wavFile || true) {
             audioOwed += 44100.0 * dt / 1000;

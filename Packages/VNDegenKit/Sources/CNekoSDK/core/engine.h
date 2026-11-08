@@ -154,6 +154,10 @@ public:
     int takeCommentRequest(std::string &utf8);
     // The comment the player typed, written into that card's save as the PC writes it.
     bool setComment(int slot, const std::string &utf8);
+    // Something the title asks the host to show, once per click: "alert" with its text (Version info), "manual" with the
+    // full path of the game's own manual page, or "url" with a web page the PC opens in a browser. False when nothing's
+    // asked. A press from a test host never asks for the web page.
+    bool takeHostRequest(std::string &kind, std::string &payload);
     // For checks: lays out a message as the message window sets it, replacing the one shown, and gives the furthest
     // right and lowest pixel its ink reaches, and the canvas's size to hold them against.
     void messageExtent(const std::string &utf8Name, const std::string &utf8Text, int &right, int &bottom);
@@ -217,6 +221,9 @@ private:
     // `slotcomment X BASELINE WIDTH SIZE PROMPT...`: the comment's place on a card, and what an empty one shows.
     bool overComment(int slot, int x, int y) const;
     int commentRequest_ = 0;
+    std::string root_, hostRequestKind_, hostRequestPayload_;
+    bool testPress_ = false;
+    std::set<std::string> testsPlayed_;
     std::string lastScene_;
     int64_t screenMs_ = 0, openingFrom_ = -1;  // a menu's own clock, and when the title's opening began
     std::unordered_map<std::string, bool> paintedOnBlack_;

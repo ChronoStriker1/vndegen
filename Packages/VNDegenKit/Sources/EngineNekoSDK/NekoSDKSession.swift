@@ -135,6 +135,7 @@ final class NekoSDKSession: EngineSession {
             return
         }
         askForCommentIfWanted(engine)
+        showTitleRequestIfWanted(engine)
         var w: Int32 = 0, h: Int32 = 0
         var changed = false
         if let pixels = vnneko_frame(engine, &w, &h, &changed), changed {
@@ -148,6 +149,26 @@ final class NekoSDKSession: EngineSession {
     }
 
     private var askingForComment = false
+    private var showingTitleRequest = false
+
+    /// Version info, the manual or a web page, asked for by the title.
+    private func showTitleRequestIfWanted(_ engine: OpaquePointer) {
+        guard !showingTitleRequest else { return }
+        var kind = [CChar](repeating: 0, count: 16), payload = [CChar](repeating: 0, count: 2048)
+        guard vnneko_take_host_request(engine, &kind, kind.count, &payload, payload.count) else { return }
+        showingTitleRequest = true
+        let text = { (chars: [CChar]) in chars.withUnsafeBufferPointer { String(cString: $0.baseAddress!) } }
+        let shown = (text(kind), text(payload))
+        // On the next turn of the main queue, outside the frame's step.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            TitleRequests.show(kind: shown.0, payload: shown.1, over: view) { [weak self] in
+            guard let self else { return }
+            showingTitleRequest = false
+            frameView.takeFocus()
+            }
+        }
+    }
 
     /// A click on a save card's comment: a text field, whose text goes into that save.
     private func askForCommentIfWanted(_ engine: OpaquePointer) {
