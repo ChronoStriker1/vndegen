@@ -35,6 +35,7 @@ import QuartzCore
 ///   notifyutil -p vndegen.app.resign   posts the app's resign-active notice, and .app.become its become-active one
 ///   notifyutil -p vndegen.app.quit   quits the app as Command-Q does, macOS only
 ///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only. See -snapshot
+///   notifyutil -p vndegen.app.fillsheet   types "Mac comment" into the open sheet's text field and presses OK, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -rgss-ruby <file>        RPG Maker XP, VX and VX Ace games run the Ruby file once their scripts have loaded, through
@@ -152,6 +153,17 @@ enum DebugHooks {
         var quitToken: Int32 = 0
         notify_register_dispatch("\(prefix).app.quit", &quitToken, .main) { _ in
             MainActor.assumeIsolated { MacAppDelegate.quit() }
+        }
+        // `notifyutil -p vndegen.app.fillsheet` types "Mac comment" into the open sheet's text field and presses its first
+        // button, for a game's text prompt, such as a NekoSDK save card's comment.
+        var fillToken: Int32 = 0
+        notify_register_dispatch("\(prefix).app.fillsheet", &fillToken, .main) { _ in
+            MainActor.assumeIsolated {
+                guard let sheet = NSApp.windows.compactMap(\.attachedSheet).first, let content = sheet.contentView else { return }
+                func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
+                views(content).compactMap { $0 as? NSTextField }.first { $0.isEditable }?.stringValue = "Mac comment"
+                views(content).compactMap { $0 as? NSButton }.first { $0.keyEquivalent == "\r" }?.performClick(nil)
+            }
         }
         var snapshotToken: Int32 = 0
         notify_register_dispatch("\(prefix).app.snapshot", &snapshotToken, .main) { _ in
