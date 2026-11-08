@@ -2664,8 +2664,8 @@ void Engine::composeSlots(Canvas &out) {
             drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, sheet->w, cardH, cardOpacity);
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
             else if (empty) drawPart(out, *empty, cx + offset("slotempty", 1), cy + offset("slotempty", 2), 0, 0, empty->w, empty->h, 1);
-            // `slotthumbframe SHEET X Y`: a frame around every saved thumbnail, as Test Game 82's cards have.
-            if (ImageRef around = picture("slotthumbframe"); around && info.thumbnail)
+            // `slotthumbframe SHEET X Y`: a frame around the thumbnail of every card with a save, as Test Game 82's cards have.
+            if (ImageRef around = picture("slotthumbframe"); around && info.exists)
                 drawPart(out, *around, cx + offset("slotthumbframe", 1), cy + offset("slotthumbframe", 2), 0, 0, around->w, around->h, 1);
             if (frame && frame->h >= 5 && slot == hovered) drawPart(out, *frame, cx + offset("slotframe", 1), cy + offset("slotframe", 2), 0, frame->h / 5, frame->w, frame->h / 5, 1);
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
