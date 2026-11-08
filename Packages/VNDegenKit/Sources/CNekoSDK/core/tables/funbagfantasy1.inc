@@ -33,10 +33,16 @@ pic obj\d001_001.bmp 0 18
 slots obj\d003_000.bmp 60 99 510 119 5 2 1
 slotrows 5
 slotthumb 29 10
-slotdigits obj\d003_001.bmp 229 6 3
-datedigits obj\d003_001.bmp 251 28
+slotthumbframe obj\d004_001.bmp 27 8
+slotdigits obj\d003_001.bmp 229 6 3 15
+datedigits obj\d003_001.bmp 0 0
+datefield year 251 28 15
+datefield month 347 28 15 blank
+datefield day 406 28 15 blank
+datefield hour 347 50 15 blank
+datefield minute 406 50 15 blank   # no minute under 10 seen yet, so its leading zero is a guess
+slotvar obj\d003_002.bmp 350 6 5 S 5000
 slotnew obj\d004_002.bmp -12 -2
-# Still to come from the lead: the chapter title from S5000 (d003_002 at 350,6) and the date as fixed fields.
 button page0 obj\d002_000.bmp 379 25 10 5 0
 button page1 obj\d002_000.bmp 441 25 10 5 1
 button page2 obj\d002_000.bmp 503 25 10 5 2
@@ -64,10 +70,16 @@ pic obj\d001_000.bmp 0 18
 slots obj\d003_000.bmp 60 99 510 119 5 2 1
 slotrows 5
 slotthumb 29 10
-slotdigits obj\d003_001.bmp 229 6 3
-datedigits obj\d003_001.bmp 251 28
+slotthumbframe obj\d004_001.bmp 27 8
+slotdigits obj\d003_001.bmp 229 6 3 15
+datedigits obj\d003_001.bmp 0 0
+datefield year 251 28 15
+datefield month 347 28 15 blank
+datefield day 406 28 15 blank
+datefield hour 347 50 15 blank
+datefield minute 406 50 15 blank   # no minute under 10 seen yet, so its leading zero is a guess
+slotvar obj\d003_002.bmp 350 6 5 S 5000
 slotnew obj\d004_002.bmp -12 -2
-# Still to come from the lead: the chapter title from S5000 (d003_002 at 350,6) and the date as fixed fields.
 button page0 obj\d002_000.bmp 379 25 10 5 0
 button page1 obj\d002_000.bmp 441 25 10 5 1
 button page2 obj\d002_000.bmp 503 25 10 5 2
@@ -285,10 +297,10 @@ radio screen 0 obj\h001_001.bmp 264 124 10 5 0
 radio screen 1 obj\h001_001.bmp 381 124 10 5 1
 # Screen mode (colour depth) and resolution do nothing here; drawn as the PC draws them.
 pic obj\h001_001.bmp 264 152 10 5 2 0
-pic obj\h001_001.bmp 381 152 10 5 3 2
+pic obj\h001_001.bmp 381 152 10 5 3 0
 pic obj\h001_001.bmp 216 180 10 5 4 2
-pic obj\h001_001.bmp 323 180 10 5 5 4
-pic obj\h001_001.bmp 430 180 10 5 6 4
+pic obj\h001_001.bmp 323 180 10 5 5 0
+pic obj\h001_001.bmp 430 180 10 5 6 0
 pic obj\h001_001.bmp 216 208 10 5 7 4
 pic obj\h001_001.bmp 323 208 10 5 8 4
 pic obj\h001_001.bmp 430 208 10 5 9 4
@@ -296,13 +308,21 @@ radio effect 1 obj\h001_002.bmp 264 236 2 5 0
 radio effect 0 obj\h001_002.bmp 381 236 2 5 1
 radio wait 1 obj\h001_002.bmp 264 264 2 5 0
 radio wait 0 obj\h001_002.bmp 381 264 2 5 1
+pic obj\h001_005.bmp 88 321
 slider opacity obj\h001_006.bmp 88 321
+# The numbers are text, MS Gothic at 20 (Ume Gothic here) 15 apart, white with a purple edge, fitted to Wine's shots.
+number opacity text 488 311 20 15 255 255 255 76 10 73
+number bgm text 1024 313 20 15 255 255 255 76 10 73
+number se text 1024 369 20 15 255 255 255 76 10 73
+number voice text 1024 425 20 15 255 255 255 76 10 73
+number backvoice text 1024 481 20 15 255 255 255 76 10 73
 step opacity -1 obj\h001_003.bmp 60 317 2 5 0
 step opacity 1 obj\h001_003.bmp 508 317 2 5 1
-radio confirm 1 obj\h001_002.bmp 264 348 2 5 0
-radio confirm 0 obj\h001_002.bmp 381 348 2 5 1
-radio explain 1 obj\h001_002.bmp 264 376 2 5 0
-radio explain 0 obj\h001_002.bmp 381 376 2 5 1
+# One switch for every confirmation on the PC; the runtime has one setting for each question (a gap, to the lead).
+radio confirm_saveload 1 obj\h001_002.bmp 264 348 2 5 0
+radio confirm_saveload 0 obj\h001_002.bmp 381 348 2 5 1
+radio tutorial 1 obj\h001_002.bmp 264 376 2 5 0
+radio tutorial 0 obj\h001_002.bmp 381 376 2 5 1
 pic obj\a001_003.bmp 101 403 1 5 0 0
 radio skipall 0 obj\h003_001.bmp 800 124 9 5 0
 radio skipall 1 obj\h003_001.bmp 917 124 9 5 1
@@ -313,31 +333,44 @@ radio rightclick 3 obj\h003_001.bmp 800 180 9 5 5
 radio rightclick 4 obj\h003_001.bmp 917 180 9 5 6
 radio deckey 0 obj\h003_001.bmp 800 208 9 5 7
 radio deckey 1 obj\h003_001.bmp 917 208 9 5 8
+pic obj\h001_005.bmp 624 323
 slider bgm obj\h001_006.bmp 624 323
 step bgm -1 obj\h001_003.bmp 596 319 2 5 0
 step bgm 1 obj\h001_003.bmp 1044 319 2 5 1
 check mute_bgm obj\h004_003.bmp 949 292 1 5 0
+pic obj\h001_005.bmp 624 379
 slider se obj\h001_006.bmp 624 379
 step se -1 obj\h001_003.bmp 596 375 2 5 0
 step se 1 obj\h001_003.bmp 1044 375 2 5 1
 check mute_se obj\h004_003.bmp 949 348 1 5 0
+pic obj\h001_005.bmp 624 435
 slider voice obj\h001_006.bmp 624 435
 step voice -1 obj\h001_003.bmp 596 431 2 5 0
 step voice 1 obj\h001_003.bmp 1044 431 2 5 1
 check mute_voice obj\h004_003.bmp 949 404 1 5 0
+pic obj\h001_005.bmp 624 491
 slider backvoice obj\h001_006.bmp 624 491
 step backvoice -1 obj\h001_003.bmp 596 487 2 5 0
 step backvoice 1 obj\h001_003.bmp 1044 487 2 5 1
 check mute_backvoice obj\h004_003.bmp 949 460 1 5 0
-radio backvoice_on 1 obj\h001_002.bmp 800 518 2 5 0
-radio backvoice_on 0 obj\h001_002.bmp 917 518 2 5 1
+# Background voices on or off, apart from their volume: no runtime setting yet; drawn as the PC's first run has it.
+pic obj\h001_002.bmp 800 518 2 5 0 2
+pic obj\h001_002.bmp 917 518 2 5 1 0
 radio voice_stop 1 obj\h001_002.bmp 800 546 2 5 0
 radio voice_stop 0 obj\h001_002.bmp 917 546 2 5 1
+# Individual voices: the three switches and the button to the per-character screen, not measured yet; drawn as the PC has them.
+pic obj\h004_001.bmp 752 574 4 5 0 0
+pic obj\h004_001.bmp 859 574 4 5 1 0
+pic obj\h004_001.bmp 966 574 4 5 2 0
+pic obj\h004_001.bmp 752 602 4 5 3 0
 # Text speed, auto speed and auto wait are 0-100 sliders on the PC (x 88, y 518, 574, 630); the runtime's text and auto are
 # four steps. Waiting on the lead.
-pic obj\h001_006.bmp 88 518
-pic obj\h001_006.bmp 88 574
-pic obj\h001_006.bmp 88 630
+pic obj\h001_005.bmp 88 518
+bar obj\h001_006.bmp 88 518 50
+pic obj\h001_005.bmp 88 574
+bar obj\h001_006.bmp 88 574 50
+pic obj\h001_005.bmp 88 630
+bar obj\h001_006.bmp 88 630 50
 # Help: zones are each row's extent; their exact edges aren't measured yet (hov.py).
 hover 24 124 536 147 obj\h001_008.bmp 50 10 8 0
 hover 24 152 536 175 obj\h001_008.bmp 50 38 8 1

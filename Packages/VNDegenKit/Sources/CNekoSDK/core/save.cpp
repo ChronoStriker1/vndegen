@@ -237,6 +237,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     // The runtime's own story-table test game saves as The Alchemist does.
     if (folder == "vndegen\\storytest") return &kAlchemist;
+    // And so does the save card test game.
+    if (folder == "vndegen\\cardtest") return &kAlchemist;
     if (folder == "waffle\\funbagfantasy") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy2") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
