@@ -72,6 +72,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - The Alchemist's endings follow the player's choices, and its prologue flag moves to and from a PC (0.26.2).
 - PC saves with a comment load in the two NekoSDK games, with save locks, the NEW mark and the "Don't ask again" box (0.26.3).
 - The Alchemist's text in Open Sans at the PC's spacing, and Yarinaoshi no Christmas's comments and log placed as on the PC (0.26.4).
+- Yarinaoshi no Christmas's text at the PC's size, and The Alchemist's text 3 px lower (0.26.5).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
