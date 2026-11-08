@@ -1317,21 +1317,31 @@ number se obj\h011_000.bmp 415 256
 step se -1 obj\h010_000.bmp 119 286 2 5 0
 step se 1 obj\h010_000.bmp 469 286 2 5 1
 check mute_se obj\h024_000.bmp 479 251 1 5 0
-bar obj\h009_000.bmp 154 362 80
-pic obj\h010_000.bmp 119 364 2 5 0 4
-pic obj\h010_000.bmp 469 364 2 5 1 4
-pic obj\h024_000.bmp 479 329 1 5 0 4
+slider hse obj\h009_000.bmp 154 362
+number hse obj\h011_000.bmp 415 334
+step hse -1 obj\h010_000.bmp 119 364 2 5 0
+step hse 1 obj\h010_000.bmp 469 364 2 5 1
+check mute_hse obj\h024_000.bmp 479 329 1 5 0
 slider voice obj\h009_000.bmp 154 440
 number voice obj\h011_000.bmp 415 412
 step voice -1 obj\h010_000.bmp 119 442 2 5 0
 step voice 1 obj\h010_000.bmp 469 442 2 5 1
 check mute_voice obj\h024_000.bmp 479 407 1 5 0
-bar obj\h009_000.bmp 154 518 80
-pic obj\h010_000.bmp 119 520 2 5 0 4
-pic obj\h010_000.bmp 469 520 2 5 1 4
-pic obj\h024_000.bmp 479 485 1 5 0 4
-pic obj\h008_000.bmp 617 114 2 5 0 4
-pic obj\h008_000.bmp 698 114 2 5 1 4
+slider backvoice obj\h009_000.bmp 154 518
+number backvoice obj\h011_000.bmp 415 490
+step backvoice -1 obj\h010_000.bmp 119 520 2 5 0
+step backvoice 1 obj\h010_000.bmp 469 520 2 5 1
+check mute_backvoice obj\h024_000.bmp 479 485 1 5 0
+# クリック時、ボイスを止める.
+radio voice_stop 1 obj\h008_000.bmp 617 114 2 5 0
+radio voice_stop 0 obj\h008_000.bmp 698 114 2 5 1
+# Each ♪ plays the sample the PC reads for it under Wine; master and music have none, as on the PC.
+pic obj\h023_000.bmp 533 95 1 5 0 4
+pic obj\h023_000.bmp 533 173 1 5 0 4
+button test:se:se\se_05.ogg obj\h023_000.bmp 533 251 1 5 0
+button test:se:se\hse_002_005.ogg obj\h023_000.bmp 533 329 1 5 0
+button test:voice:voice\ai0_0161.ogg obj\h023_000.bmp 533 407 1 5 0
+button test:voice:voice\ai9_0003.ogg obj\h023_000.bmp 533 485 1 5 0
 check voice0 obj\h022_000.bmp 612 528 5 5 0
 check voice1 obj\h022_000.bmp 785 528 5 5 1
 check voice2 obj\h022_000.bmp 958 528 5 5 2
@@ -1857,21 +1867,32 @@ number se obj\h011_000.bmp 415 256
 step se -1 obj\h010_000.bmp 119 286 2 5 0
 step se 1 obj\h010_000.bmp 469 286 2 5 1
 check mute_se obj\h024_000.bmp 479 251 1 5 0
-bar obj\h009_000.bmp 154 362 80
-pic obj\h010_000.bmp 119 364 2 5 0 4
-pic obj\h010_000.bmp 469 364 2 5 1 4
-pic obj\h024_000.bmp 479 329 1 5 0 4
+slider hse obj\h009_000.bmp 154 362
+number hse obj\h011_000.bmp 415 334
+step hse -1 obj\h010_000.bmp 119 364 2 5 0
+step hse 1 obj\h010_000.bmp 469 364 2 5 1
+check mute_hse obj\h024_000.bmp 479 329 1 5 0
 slider voice obj\h009_000.bmp 154 440
 number voice obj\h011_000.bmp 415 412
 step voice -1 obj\h010_000.bmp 119 442 2 5 0
 step voice 1 obj\h010_000.bmp 469 442 2 5 1
 check mute_voice obj\h024_000.bmp 479 407 1 5 0
-bar obj\h009_000.bmp 154 518 80
-pic obj\h010_000.bmp 119 520 2 5 0 4
-pic obj\h010_000.bmp 469 520 2 5 1 4
-pic obj\h024_000.bmp 479 485 1 5 0 4
-pic obj\h008_000.bmp 617 114 2 5 0 4
-pic obj\h008_000.bmp 698 114 2 5 1 4
+slider backvoice obj\h009_000.bmp 154 518
+number backvoice obj\h011_000.bmp 415 490
+step backvoice -1 obj\h010_000.bmp 119 520 2 5 0
+step backvoice 1 obj\h010_000.bmp 469 520 2 5 1
+check mute_backvoice obj\h024_000.bmp 479 485 1 5 0
+# クリック時、ボイスを止める.
+radio voice_stop 1 obj\h008_000.bmp 617 114 2 5 0
+radio voice_stop 0 obj\h008_000.bmp 698 114 2 5 1
+# Each ♪ plays the sample the PC reads for it under Wine; master and music have none, as on the PC.
+# The PC asks for se\se_05.ogg for the effects' ♪, which this game doesn't have, so it plays nothing, as here.
+pic obj\h023_000.bmp 533 95 1 5 0 4
+pic obj\h023_000.bmp 533 173 1 5 0 4
+button test:se:se\se_05.ogg obj\h023_000.bmp 533 251 1 5 0
+button test:se:se\hse_002_005.ogg obj\h023_000.bmp 533 329 1 5 0
+button test:voice:voice\miy0_0012.ogg obj\h023_000.bmp 533 407 1 5 0
+button test:voice:voice\san9_0003.ogg obj\h023_000.bmp 533 485 1 5 0
 check voice0 obj\h022_000.bmp 671 528 4 5 0
 check voice1 obj\h022_000.bmp 881 528 4 5 1
 
@@ -4142,21 +4163,31 @@ number se obj\h011_000.bmp 415 256
 step se -1 obj\h010_000.bmp 119 286 2 5 0
 step se 1 obj\h010_000.bmp 469 286 2 5 1
 check mute_se obj\h024_000.bmp 479 251 1 5 0
-bar obj\h009_000.bmp 154 362 80
-pic obj\h010_000.bmp 119 364 2 5 0 4
-pic obj\h010_000.bmp 469 364 2 5 1 4
-pic obj\h024_000.bmp 479 329 1 5 0 4
+slider hse obj\h009_000.bmp 154 362
+number hse obj\h011_000.bmp 415 334
+step hse -1 obj\h010_000.bmp 119 364 2 5 0
+step hse 1 obj\h010_000.bmp 469 364 2 5 1
+check mute_hse obj\h024_000.bmp 479 329 1 5 0
 slider voice obj\h009_000.bmp 154 440
 number voice obj\h011_000.bmp 415 412
 step voice -1 obj\h010_000.bmp 119 442 2 5 0
 step voice 1 obj\h010_000.bmp 469 442 2 5 1
 check mute_voice obj\h024_000.bmp 479 407 1 5 0
-bar obj\h009_000.bmp 154 518 80
-pic obj\h010_000.bmp 119 520 2 5 0 4
-pic obj\h010_000.bmp 469 520 2 5 1 4
-pic obj\h024_000.bmp 479 485 1 5 0 4
-pic obj\h008_000.bmp 617 114 2 5 0 4
-pic obj\h008_000.bmp 698 114 2 5 1 4
+slider backvoice obj\h009_000.bmp 154 518
+number backvoice obj\h011_000.bmp 415 490
+step backvoice -1 obj\h010_000.bmp 119 520 2 5 0
+step backvoice 1 obj\h010_000.bmp 469 520 2 5 1
+check mute_backvoice obj\h024_000.bmp 479 485 1 5 0
+# クリック時、ボイスを止める.
+radio voice_stop 1 obj\h008_000.bmp 617 114 2 5 0
+radio voice_stop 0 obj\h008_000.bmp 698 114 2 5 1
+# Each ♪ plays the sample the PC reads for it under Wine; master and music have none, as on the PC.
+pic obj\h023_000.bmp 533 95 1 5 0 4
+pic obj\h023_000.bmp 533 173 1 5 0 4
+button test:se:se\se_05.ogg obj\h023_000.bmp 533 251 1 5 0
+button test:se:se\hse_002_005.ogg obj\h023_000.bmp 533 329 1 5 0
+button test:voice:voice\aki0_0048.ogg obj\h023_000.bmp 533 407 1 5 0
+button test:voice:voice\yui9_0003.ogg obj\h023_000.bmp 533 485 1 5 0
 check voice0 obj\h022_000.bmp 671 528 4 5 0
 check voice1 obj\h022_000.bmp 881 528 4 5 1
 
