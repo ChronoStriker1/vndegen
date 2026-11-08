@@ -2703,6 +2703,27 @@ void Engine::composeSlots(Canvas &out) {
                     for (size_t i = 4; i < line->size(); i++) text += (i > 4 ? " " : "") + (*line)[i];
                 drawComment(out, text, cx + field(*line, 0), cy + field(*line, 1), field(*line, 2), field(*line, 3));
             }
+            // `datefield year|month|day|hour|minute X Y [STEP] [blank]`: each part of the date at a place of its own on the card,
+            // in place of the running layout, as Test Game 82's cards have it. STEP is the distance between digits, the sheet's
+            // cell width when absent; `blank` leaves a leading zero out, the number keeping its right edge.
+            if (screen_->setting("datefield")) {
+                if (!info.exists || !dateDigits) continue;
+                static const char *const kParts[] = {"year", "month", "day", "hour", "minute"};
+                for (auto [line, end] = screen_->settings.equal_range("datefield"); line != end; ++line) {
+                    const auto &w = line->second;
+                    if (w.size() < 3) continue;
+                    int part = int(std::find(std::begin(kParts), std::end(kParts), w[0]) - std::begin(kParts));
+                    if (part >= 5) continue;
+                    int count = part == 0 ? 4 : 2, cell = dateDigits->w / dateColumns, step = w.size() >= 4 && w[3] != "blank" ? field(w, 3) : cell;
+                    bool blank = std::find(w.begin() + 3, w.end(), "blank") != w.end();
+                    int value = info.date[part];
+                    for (int i = count - 1; i >= 0; i--, value /= 10) {
+                        if (blank && value == 0 && i < count - 1) break;
+                        drawPart(out, *dateDigits, cx + field(w, 1) + i * step, cy + field(w, 2), value % 10 * cell, 0, cell, dateDigits->h, 1);
+                    }
+                }
+                continue;
+            }
             int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
             auto mark = [&](const ImageRef &m, int cellInSheet) {
                 if (m) {
