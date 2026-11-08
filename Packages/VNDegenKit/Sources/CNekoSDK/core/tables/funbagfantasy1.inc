@@ -394,6 +394,101 @@ hover 560 518 1096 541 obj\h004_002.bmp 586 404 7 4
 hover 560 546 1096 569 obj\h004_002.bmp 586 432 7 5
 hover 560 574 1096 625 obj\h004_002.bmp 586 459 7 6
 
+# The staff rolls its exe draws, one for each ending with that ending's four pictures, measured under Wine on Aisis's
+# (frames every quarter second): white fading out over 2.2 s from 0.7, the dark column with the logo fading in from 3 s,
+# the credits scrolling up from the bottom at 60 pixels a second from 7.79 s, a picture changing every 11.9 s with a
+# 0.75 s crossfade, the whole screen crossfading to B100_000 at 55 s, Fin at 59.3 s, and white again from 70.1 s, with M01.
+# The other four rolls are assumed to keep Aisis's timing; their pictures are the ones each ending read.
+screen staffroll_ai
+length 71800
+music bgm\M01-m.ogg
+pic obj\n001_001.bmp 0 0
+pic obj\n000_008.bmp 401 0
+pic obj\n000_009.bmp 401 0 fadein 14600 750
+pic obj\n000_010.bmp 401 0 fadein 26500 750
+pic obj\n000_011.bmp 401 0 fadein 38100 750
+pic obj\n002_000.bmp 81 240 move 7790 60 fadein 3000 3000
+pic obj\n002_001.bmp 22 720 move 7790 60
+pic obj\n002_002.bmp 22 1382 move 7790 60
+pic obj\n002_003.bmp 22 1733 move 7790 60
+pic obj\n002_004.bmp 22 2171 move 7790 60
+pic bg\B100_000.bmp 0 0 fadein 55000 750
+pic obj\n001_000.bmp 1008 586 fadein 59300 1000
+pic bg\bg_w.bmp 0 0 fadeout 700 2200
+pic bg\bg_w.bmp 0 0 fadein 70100 1700
+
+screen staffroll_ss
+length 71800
+music bgm\M01-m.ogg
+pic obj\n001_001.bmp 0 0
+pic obj\n000_000.bmp 401 0
+pic obj\n000_001.bmp 401 0 fadein 14600 750
+pic obj\n000_002.bmp 401 0 fadein 26500 750
+pic obj\n000_003.bmp 401 0 fadein 38100 750
+pic obj\n002_000.bmp 81 240 move 7790 60 fadein 3000 3000
+pic obj\n002_001.bmp 22 720 move 7790 60
+pic obj\n002_002.bmp 22 1382 move 7790 60
+pic obj\n002_003.bmp 22 1733 move 7790 60
+pic obj\n002_004.bmp 22 2171 move 7790 60
+pic bg\B100_000.bmp 0 0 fadein 55000 750
+pic obj\n001_000.bmp 1008 586 fadein 59300 1000
+pic bg\bg_w.bmp 0 0 fadeout 700 2200
+pic bg\bg_w.bmp 0 0 fadein 70100 1700
+
+screen staffroll_lc
+length 71800
+music bgm\M01-m.ogg
+pic obj\n001_001.bmp 0 0
+pic obj\n000_004.bmp 401 0
+pic obj\n000_005.bmp 401 0 fadein 14600 750
+pic obj\n000_006.bmp 401 0 fadein 26500 750
+pic obj\n000_007.bmp 401 0 fadein 38100 750
+pic obj\n002_000.bmp 81 240 move 7790 60 fadein 3000 3000
+pic obj\n002_001.bmp 22 720 move 7790 60
+pic obj\n002_002.bmp 22 1382 move 7790 60
+pic obj\n002_003.bmp 22 1733 move 7790 60
+pic obj\n002_004.bmp 22 2171 move 7790 60
+pic bg\B100_000.bmp 0 0 fadein 55000 750
+pic obj\n001_000.bmp 1008 586 fadein 59300 1000
+pic bg\bg_w.bmp 0 0 fadeout 700 2200
+pic bg\bg_w.bmp 0 0 fadein 70100 1700
+
+screen staffroll_rk
+length 71800
+music bgm\M01-m.ogg
+pic obj\n001_001.bmp 0 0
+pic obj\n000_012.bmp 401 0
+pic obj\n000_013.bmp 401 0 fadein 14600 750
+pic obj\n000_014.bmp 401 0 fadein 26500 750
+pic obj\n000_015.bmp 401 0 fadein 38100 750
+pic obj\n002_000.bmp 81 240 move 7790 60 fadein 3000 3000
+pic obj\n002_001.bmp 22 720 move 7790 60
+pic obj\n002_002.bmp 22 1382 move 7790 60
+pic obj\n002_003.bmp 22 1733 move 7790 60
+pic obj\n002_004.bmp 22 2171 move 7790 60
+pic bg\B100_000.bmp 0 0 fadein 55000 750
+pic obj\n001_000.bmp 1008 586 fadein 59300 1000
+pic bg\bg_w.bmp 0 0 fadeout 700 2200
+pic bg\bg_w.bmp 0 0 fadein 70100 1700
+
+screen staffroll_zh
+length 71800
+music bgm\M01-m.ogg
+pic obj\n001_001.bmp 0 0
+pic obj\n000_016.bmp 401 0
+pic obj\n000_017.bmp 401 0 fadein 14600 750
+pic obj\n000_018.bmp 401 0 fadein 26500 750
+pic obj\n000_019.bmp 401 0 fadein 38100 750
+pic obj\n002_000.bmp 81 240 move 7790 60 fadein 3000 3000
+pic obj\n002_001.bmp 22 720 move 7790 60
+pic obj\n002_002.bmp 22 1382 move 7790 60
+pic obj\n002_003.bmp 22 1733 move 7790 60
+pic obj\n002_004.bmp 22 2171 move 7790 60
+pic bg\B100_000.bmp 0 0 fadein 55000 750
+pic obj\n001_000.bmp 1008 586 fadein 59300 1000
+pic bg\bg_w.bmp 0 0 fadeout 700 2200
+pic bg\bg_w.bmp 0 0 fadein 70100 1700
+
 screen defaults
 layoutcgslot 102             # 82's saves hold a CG in slot 102, and a background and a CG each take the other away
 default opacity 100          # the PC's message window is solid until Config changes it
@@ -512,15 +607,17 @@ scene scr\ep_02_08.txt
 scene scr\ep_02_09.txt
 scene scr\ep_02_10.txt
 scene scr\ep_ai_00.txt       # Aisis's ending
-staffroll
+staffroll ai
 scene scr\ep_ai_01.txt
+set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label capital
 scene scr\ep_02_07a.txt
 scene scr\ep_02_07b.txt
 scene scr\ep_ss_00.txt       # Shamsiel's ending
-staffroll
+staffroll ss
 scene scr\ep_ss_01.txt
+set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label commander
 scene scr\ep_00_12b.txt
@@ -566,8 +663,9 @@ scene scr\ep_03_10c.txt
 choice obj\m000_000.bmp 2 cells 13 14  # Class has finished / Call in an additional teacher
 on 1 goto harem
 scene scr\ep_lc_00.txt       # Lucelia's ending
-staffroll
+staffroll lc
 scene scr\ep_lc_01.txt
+set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label harem
 scene scr\ep_03_10d.txt
@@ -576,16 +674,18 @@ scene scr\ep_03_11a.txt
 scene scr\ep_03_12.txt
 scene scr\ep_03_13.txt
 scene scr\ep_03_14.txt
-staffroll                    # the harem ending's roll comes before its first scene
+staffroll zh                 # the harem ending's roll comes before its first scene
 scene scr\ep_zh_00.txt
 choice obj\m000_000.bmp 3 cells 15 15 15  # Let nature take its course / Let nature take its course / Let nature take its course
 scene scr\ep_zh_01.txt       # every option goes on here
 scene scr\ep_zh_02.txt
 scene scr\ep_zh_03.txt
+set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label boan
 scene scr\ep_rk_00.txt       # Roxanne's ending
-staffroll
+staffroll rk
 scene scr\ep_rk_01.txt
+set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 )";
