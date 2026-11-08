@@ -4,6 +4,13 @@ const char kFunbagFantasy1[] = R"(
 screen defaults
 layoutcgslot 102             # 82's saves hold a CG in slot 102, and a background and a CG each take the other away
 
+screen choice
+# Measured under Wine to the pixel: the dialogs' frame, "Choose an option" from the titles' strip, and the options from
+# m000_000's strip of all sixteen, two or three of them from 212 down, 56 apart, whatever their count.
+pic obj\j000_000.bmp 438 144
+pic obj\j001_000.bmp 542 124 7 1 6 0
+place 212 56
+
 screen story
 # Story order, traced from the PC under Wine: the scene scripts it opened, in order, through every route, and saves at
 # every choice for the variables. Every choice is the box obj\m000_000.bmp with text the exe draws, copied from the
