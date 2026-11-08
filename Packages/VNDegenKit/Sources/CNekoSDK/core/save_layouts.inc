@@ -69,3 +69,17 @@ const SaveLayout kMoralOrc = {
     7514, {{9, "68"}, {819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1013, "04"}, {1045, "3c"}, {6672, "68"}, {7482, "ffffffff"}},
     16,  // the bytes of a text record after its strings
 };
+// Test Game 94's PC saves, from a scene whose background has camera work: sprite records 4 bytes shorter than Test Game
+// 92's, text records with 8 bytes after their strings, and 183 sound channels.
+const SaveLayout kRinjin = {
+    -140,  // the extra bytes of this engine's sprite record over the oldest layout seen
+    {},
+    {{12, "ff00050000d002"}, {115, "803f"}, {135, "803f"}, {155, "803f"}, {175, "803f"}, {243, "803f0000803f"}, {258, "01"}},
+    {{115, "803f"}, {135, "803f"}, {155, "803f"}, {175, "803f"}, {249, "8002000068010000ff"}, {295, "01"}},
+    {{116, "ffffffff64"}},
+    96, 22, {{2, "ffffffff"}, {72, "ffffffff"}},
+    6126, {{819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1037, "3c"}, {5284, "68"}, {6094, "ffffffff"}},
+    8,  // the bytes of a text record after its strings
+    13,  // where the first record holds the screen size
+    183,  // the sound channels saved
+};

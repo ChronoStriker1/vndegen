@@ -23,6 +23,7 @@ struct SaveLayout {
     std::vector<Patch> tail;
     int textTail = 16;  // the bytes of a text record after its strings
     int rootSizeAt = 0x11;  // where the first record holds the screen size
+    int channels = 243;  // the sound channels saved
 };
 
 namespace {
@@ -39,7 +40,6 @@ constexpr int kDateFlag = 360;
 
 constexpr int kFlowHeader = 0xCD, kBeforeChoice = 4196, kAfterChoice = 39596, kDateBlock = 400;
 constexpr int kVariables = 10000, kBeforeVariables = 39600 - 8, kAfterCount = 40;
-constexpr int kChannels = 243;
 
 void apply(const std::vector<Patch> &patches, uint8_t *to) {
     auto nibble = [](char c) { return c <= '9' ? c - '0' : c - 'a' + 10; };
@@ -125,6 +125,8 @@ void readText(Reader &r, SavedText &t, int trail) {
     t.voice = r.str();
     t.volume = r.i32();
     r.skip(4);
+    // Test Game 94's records end there, 8 bytes after the strings.
+    if (trail < 12) return;
     t.kind = r.i32();
     r.skip(size_t(trail - 12));
 }
@@ -136,8 +138,9 @@ void writeText(Writer &w, const SavedText &t, int trail) {
     w.str(t.voice);
     w.i32(t.volume);
     w.i32(0);
+    if (trail < 12) return;
     w.i32(t.kind);
-    if (trail > 12) w.zeros(size_t(trail - 12));
+    w.zeros(size_t(trail - 12));
 }
 
 }  // namespace
@@ -152,8 +155,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\moralorc") return &kMoralOrc;
     // Test Game 92 saves as Ore o Hoshigaru Tsuma to Gibo does: its PC save reads with that layout.
     if (folder == "waffle\\animother") return &kTsumaGibo;
-    // Test Game 94 saves the same way, as far as its PC saves show.
-    if (folder == "waffle\\隣人に壊されていく俺の妻") return &kTsumaGibo;
+    if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     return nullptr;
 }
 
@@ -251,7 +253,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     }
     r.skip(1);
     out.sounds.clear();
-    for (int i = 0; i < kChannels && r.ok; i++) {
+    for (int i = 0; i < layout.channels && r.ok; i++) {
         SavedSound s;
         s.index = i;
         s.playing = r.u8() != 0;
@@ -361,7 +363,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     w.zeros(1);
     std::map<int, const SavedSound *> byIndex;
     for (const SavedSound &s : d.sounds) byIndex[s.index] = &s;
-    for (int i = 0; i < kChannels; i++) {
+    for (int i = 0; i < layout.channels; i++) {
         auto it = byIndex.find(i);
         if (it == byIndex.end()) {
             w.u8(0);
