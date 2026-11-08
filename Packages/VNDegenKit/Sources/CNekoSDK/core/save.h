@@ -21,6 +21,9 @@ struct SavedSprite {
     bool waveOn = false;
     int waveSpeed = 0, waveRows = 0, waveSize = 0;
     bool animated = false;
+    // Whether the animation repeats, the byte after `animated`: 1 in every PC save of a named animation running, and the
+    // PC plays one without it once and drops it, as loading such saves under Wine shows.
+    bool repeat = false;
     int animationFrames = 0;  // how far into the animation
     std::string animation;    // lines such as `relative_pos_x,-200,0,2400,linear`
     float endX = 0, endY = 0, endScaleX = 1, endScaleY = 1;
@@ -29,6 +32,9 @@ struct SavedSprite {
     bool noise = false;
     // A splash effect's record (Test Game 88's 200 and 201): no picture, its droplet's picture named in the record, and
     // command 200's parameters 0, 5, 1 to 4, 6, 10, 11 and 7 to 9, in that order.
+    // A flipbook's: whether it repeats, and command 121's parameter 16, which a PC save needs to keep the flipbook (Test
+    // Game 88's, under Wine), or -1 when the record doesn't say.
+    int flipRepeat = -1, flipStep = 0;
     bool splash = false;
     std::string splashImage;
     std::array<int, 12> splashNumbers{};

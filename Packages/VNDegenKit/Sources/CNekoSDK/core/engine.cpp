@@ -2095,7 +2095,11 @@ SaveData Engine::captureSave() {
         out.slot = slot;
         out.path = s.path;
         out.noise = s.noise;
-        if (s.flipCount > 0) out.flipFrame = s.flipShown;
+        if (s.flipCount > 0) {
+            out.flipFrame = s.flipShown;
+            out.flipRepeat = s.flipLoop ? 1 : 0;
+            out.flipStep = s.flipStep;
+        }
         out.x = s.x;
         out.y = s.y;
         out.scaleX = s.scaleX;
@@ -2134,7 +2138,15 @@ SaveData Engine::captureSave() {
         for (const Animation &a : s.changes) writeTracks(a, a.begunMs);
         if (s.looping) writeTracks(s.loop, loopBegun);
         out.animated = !out.animation.empty();
+        // A repeating named animation with nothing else running is saved as the PC saves one: its text as command 19 gave
+        // it, the frames since it began, and the byte that says it repeats, so it goes on repeating after a load, here and
+        // on the PC.
+        out.repeat = s.looping && s.loop.repeat && s.changes.empty();
         out.animationFrames = out.animated ? frames(now_ - oldest) : 0;
+        if (out.repeat && !s.loop.source.empty()) {
+            out.animation = s.loop.source;
+            out.animationFrames = frames(now_ - s.loop.begunMs);
+        }
         // Where it ends up.
         Sprite last = s;
         for (Animation &a : last.changes) a.begunMs = -1000000000;
@@ -2351,12 +2363,21 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         }
         if (saved.flipFrame >= 0) {
             resumeFlipbook(s);
-            restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes);
+            s.flipStep = saved.flipStep;
+            restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes, saved.flipRepeat);
         }
         if (!saved.animation.empty()) {
             Animation a = parseAnimation(saved.animation, s);
             a.begunMs = now_ - int64_t(saved.animationFrames) * 1000 / std::max(1, fps_);
-            s.changes.push_back(std::move(a));
+            // A repeating one runs on as the named animation, at the place in its cycle the save was made at.
+            if (saved.repeat && a.periodMs > 0) {
+                a.repeat = true;
+                a.source = saved.animation;
+                s.loop = std::move(a);
+                s.looping = true;
+            } else {
+                s.changes.push_back(std::move(a));
+            }
         }
         front_[saved.slot] = s;
     }
@@ -4155,6 +4176,7 @@ void Engine::startFlipbook(const Node &n) {
     s.anchorX = s.anchorY = p[8] ? -1 : 0;
     s.flipLoop = p[14] != 0;
     s.flipReverse = p[1] != 0;
+    s.flipStep = p[16];
     resumeFlipbook(s);
     if (!s.flipCount) warnOnce("A flipbook isn't in anime_cfg.ini: " + n.s[1]);
     else if (s.flipReverse) {
@@ -4319,7 +4341,7 @@ void Engine::loadPartsState(const SaveData &d, const Sidecar &side) {
         if (auto it = side.parts.find(name); it != side.parts.end()) part->load(it->second);
 }
 
-void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots) {
+void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat) {
     if (!s.flipCount) return;
     s.flipLoop = true;
     auto it = slots.find(slot);
@@ -4327,6 +4349,8 @@ void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map
         s.flipLoop = it->second.loop;
         s.flipReverse = it->second.reverse;
     }
+    // A record that says whether it repeats, as a PC save of Test Game 88 made while it plays does, is believed first.
+    if (recordRepeat >= 0) s.flipLoop = recordRepeat != 0;
     if (!s.flipLoop && frame >= s.flipCount) {
         s.flipBegun = now_ - int64_t(s.flipCount) * s.flipMs;
         s.flipShown = s.flipCount;
@@ -5103,6 +5127,7 @@ void Engine::namedAnimation(Sprite &s, const Node &n) {
     foldFinishedChanges(s);
     Animation a = parseAnimation(n.s[1], s);
     a.repeat = n.p[1] != 0;
+    a.source = n.s[1];
     s.loop = std::move(a);
     s.looping = true;
 }

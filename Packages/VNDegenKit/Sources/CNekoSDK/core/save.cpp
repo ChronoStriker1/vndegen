@@ -78,8 +78,9 @@ constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0
 // A splash record names its droplet's picture this far into its fixed part, before the engine's extra bytes: an empty
 // name in every other record. Only Test Game 88 has splashes, so it's checked in that layout alone.
 constexpr int kSplashNameAt = 201;
-// The bytes of a record after its animation text.
-constexpr size_t kRecordTail = 0x261 - 0x1BD;
+// The bytes of a record after its animation text, and a flipbook's fields among them: whether it repeats, two bytes of 1
+// while it plays, command 121's parameter 16, and a byte of 0 where every other record has 100.
+constexpr size_t kRecordTail = 0x261 - 0x1BD, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipStep = 108, kTailFlipHundred = 120;
 constexpr int kNoiseKind = 4;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
 constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
@@ -356,6 +357,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.waveRows = r.i32At(f + kRecordWave + 5 + extra);
         s.waveSize = r.i32At(f + kRecordWave + 9 + extra);
         s.animated = f + kRecordAnimated + extra < plain.size() && plain[f + kRecordAnimated + extra] != 0;
+        s.repeat = plain[f + kRecordAnimated + 1 + extra] != 0;
         r.at = fixedEnd;
         s.animationFrames = r.i32();
         s.animation = r.str();
@@ -370,6 +372,10 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.endScaleX = r.f32At(g + 20);
         s.endScaleY = r.f32At(g + 24);
         s.rawTail.assign(plain.begin() + std::ptrdiff_t(g), plain.begin() + std::ptrdiff_t(g + kRecordTail));
+        if (s.flipFrame >= 0 && (plain[g + kTailFlipPlaying] || plain[g + kTailFlipPlaying + 1])) {
+            s.flipRepeat = plain[g + kTailFlipRepeat];
+            s.flipStep = r.i32At(g + kTailFlipStep);
+        }
         r.at = g + kRecordTail;
         // The film noise's has no picture and nothing more, under Wine in The Alchemist.
         if (s.slot != -999999) {
@@ -555,6 +561,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(f + kRecordWave + 5 + extra, s.waveRows);
         w.setI32(f + kRecordWave + 9 + extra, s.waveSize);
         w.b[f + kRecordAnimated + extra] = s.animated ? 1 : 0;
+        w.b[f + kRecordAnimated + 1 + extra] = s.animated && s.repeat ? 1 : 0;
         w.i32(s.animationFrames);
         w.str(s.animation);
         size_t g = w.zeros(kRecordTail);
@@ -577,6 +584,12 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setF32(g + 24, s.endScaleY);
         w.setI32(g + 28, s.anchorX);
         w.setI32(g + 32, s.anchorY);
+        if (s.flipFrame >= 0 && s.flipRepeat >= 0) {
+            w.b[g + kTailFlipRepeat] = s.flipRepeat ? 1 : 0;
+            w.b[g + kTailFlipPlaying] = w.b[g + kTailFlipPlaying + 1] = 1;
+            w.setI32(g + kTailFlipStep, s.flipStep);
+            w.b[g + kTailFlipHundred] = 0;
+        }
         if (!layout.recordExtra) w.setI32(g + kRecordTail - 4, hasNext ? 1 : 0);
     };
     SavedSprite rootSprite;

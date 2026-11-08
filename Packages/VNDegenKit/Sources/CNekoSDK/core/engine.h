@@ -55,6 +55,8 @@ struct Animation {
     int periodMs = 0;
     bool hasPivot = false;
     int pivotX = -1, pivotY = -1;  // the point a named `scale` keeps still, -1 for the middle
+    // A named animation's text as command 19 gave it, which the PC writes into a save as it is.
+    std::string source;
 };
 
 struct Sprite {
@@ -77,6 +79,8 @@ struct Sprite {
     int64_t movieFrom = 0;
     int64_t flipBegun = 0;
     bool flipLoop = false, flipReverse = false;
+    // Command 121's parameter 16, which saves keep for the PC.
+    int flipStep = 0;
     bool waveOn = false;
     // An effect painted on black, which the PC game adds to the picture.
     bool additive = false;
@@ -282,7 +286,7 @@ private:
     bool galleryPageExists(int page) const;
     void composeTrackCards(Canvas &out);
     void composeTrackTime(Canvas &out);
-    void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots);
+    void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat = -1);
     std::map<std::string, std::pair<int, int>> flipbooks_;
     // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
     // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
