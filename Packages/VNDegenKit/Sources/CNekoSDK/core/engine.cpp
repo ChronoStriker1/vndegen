@@ -675,6 +675,12 @@ bool Engine::moveFocus(int dx, int dy) {
                     int cx, cy;
                     cardPlace(i, cx, cy);
                     spots.push_back({cx + sheet->w / 2, cy + sheet->h / (rows ? field(*rows, 0) : 5) / 2});
+                    // A card with a save has its lock and Delete to reach too, without a pointer.
+                    if (!slotInfo(page_ * perPage + i + 1).exists) continue;
+                    for (const char *key : {"slotlock", "slotdelete"})
+                        if (const auto *line = screen_->setting(key); line && line->size() >= 3)
+                            if (ImageRef icon = images_->get((*line)[0]))
+                                spots.push_back({cx + field(*line, 1) + icon->w / 2, cy + field(*line, 2) + icon->h / 10});
                 }
             }
         }
