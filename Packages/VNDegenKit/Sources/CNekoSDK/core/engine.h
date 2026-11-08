@@ -80,6 +80,9 @@ struct Sprite {
     // An effect painted on black, which the PC game adds to the picture.
     bool additive = false;
     int waveSpeed = 0, waveRows = 0, waveSize = 0;
+    // The SDK's film noise (commands 51 and 52), its picture the noise frame and the story time it began.
+    bool noise = false;
+    int64_t noiseFrom = 0;
 };
 
 struct SpriteView {
@@ -644,6 +647,10 @@ private:
     bool shakeSustained_ = false;
     float shakeAmpX_ = 0, shakeAmpY_ = 0, shakePeriodX_ = 1, shakePeriodY_ = 1;
     int flashMs_ = 0, flashR_ = 0, flashG_ = 0, flashB_ = 0;
+    // The film noise as drawn: the crop of its frame for one step of its random places, kept until the step changes.
+    void drawNoise(Canvas &out, const Sprite &s);
+    ImageRef noiseCrop_;
+    int64_t noiseCropStep_ = -1;
     int64_t flashStart_ = 0;
     bool blur_ = false, blurEnding_ = false, previousValid_ = false;
     int blurAmount_ = 0, blurEndMs_ = 0;

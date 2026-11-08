@@ -16,8 +16,9 @@ and nothing copied or ported from GPL, LGPL or unlicensed code.
 - **The executables, by strings and imports only.** `strings` for the asset names and scene lists, and the import table.
   Test Game 94's `rinjin.exe` was disassembled once, on 2026-11-07, without asking first, for the four behaviours
   [read from Test Game 94's exe](#read-from-test-game-94s-exe) lists. The coordinator approved that use after the fact the
-  same day. No other executable has been disassembled or decompiled. Any disassembly needs the coordinator's approval
-  first.
+  same day. The Alchemist's `alchemy.exe` was disassembled on 2026-11-08 with approval given in advance, for the film
+  noise alone ([the film noise](#the-film-noise-read-from-the-alchemists-exe)). No other executable has been disassembled
+  or decompiled. Any disassembly needs the coordinator's approval first.
 - **VNDegen's own earlier code.** `audio`, `font` and `sjis` are adapted from the System 4 runtime. `stb_image` and
   `stb_vorbis` (public domain or MIT) are the same copies System 4 uses, and zlib (zlib license) unpacks archives.
 - **VNDegen's own feasibility test,** `docs/nekosdk.md` and its Python tools on branch `ws/nekosdk`.
@@ -314,6 +315,35 @@ On 2026-11-07 the runtime's author disassembled Test Game 94's `rinjin.exe` (`ob
 4. **The staff roll.** A scene end (flow command 2) with parameter 0 set to 1 plays the staff roll, then the flow goes on, and Test Game 94 sets its ending's flag after it before the plain scene end that returns to the title. Its movie is `movie\staffroll_kazuki`, `movie\staffroll_touka` or `sys_1\movie\staffroll_kanamori` (names from `strings`) for `SITE_STAFFROLL` (scenario variable 104) of 0, 1 or 2. A click ends it only when an ending was already set as it began. Test Game 84 has seven of these nodes and no movie for them; its staff roll is drawn from pictures, as the next section describes.
 
 Checked under Wine on the same day. Points 2 and 4: route A, started from Start with `GLB_PROLOGUE_OVER` and `GLB_ENDING_B` set in `cfg.sav` and the skip held, ran through the prologue and main story without stopping at the choices that give it 0 or 1, stopped at both that give 4 (口内射精/顔にかける and 中に出す/外に出す), played Kazuki's staff roll, which the held skip didn't pass, and came back to the title with `GLB_ENDING_A` set and `GLB_TITLE_BG` at 3 in the `cfg.sav` it wrote on quitting, as the runtime's run of the same route does. Point 1: the backgrounds above. Point 3: in Test Game 92 under Wine, choosing 秋穂 at both of its choices led to 秋穂END (`ep_000_060_100.txt` showed), which needs her counter at 2 after two `秋穂カウンタ++`, and the condition that holds taking its other target, as the runtime now does.
+
+## The film noise, read from The Alchemist's exe
+
+Script commands 51 and 52 start and end a film noise over the scene: The Alchemist has 36 starts in its flashbacks, and
+most NekoSDK games ship its frames, `noise2_small` to `noise6_small` (1920 by 1080, with alpha), in `sys.pak` or
+`effect.pak`. Black-box captures under Wine first: a PC frame replayed to the same moment from the same save, by
+`nekorun`'s `--saveat` and the PC's Quick Load, differs from the runtime's frame without noise by 30 levels on average,
+and by 4.3 with `noise2_small` laid over at its own alpha. What was left, soft blotches and vertical scratches changing
+every frame or two, matched none of the frames at any offset or flip, so the coordinator approved in advance on
+2026-11-08 reading The Alchemist's exe (`objdump -d`) for the routine behind those two commands and what it calls to draw,
+and nothing else in it, for behaviour only: no code structure, constant tables or control flow taken into the runtime.
+The listing was deleted once this was written up. What was read:
+
+- Command 51 puts the noise in picture slot 10000, whatever the node's parameters say, replacing what's there, and
+  command 52 deletes that slot. It is a picture like any other there, so deleting every slot ends it too, which is why
+  the scripts start it again after each such delete.
+- The exe names one file for it, `effect\noise2_small.bmp` in The Alchemist and `sys\noise2_small.bmp` in the other
+  games. Each frame it draws a crop of that picture half as wide and half as high, scaled by twice the window's width
+  over 1920, from the top left, at full strength, with smooth sampling for the scale.
+- Every fourth frame the crop moves to a new place, taken at random below half the picture's width and half its height.
+  The runtime picks those places with a hash of the step rather than the PC's generator.
+- A save keeps the noise as a record with no picture: not an ordinary sprite, slot 10000, kind 4, the window's size
+  where the first record keeps the screen's, and no more bytes after the fixed part, unlike a splash's 35. The runtime
+  read past it as a splash before, so a PC save made during the noise didn't load; it reads and writes it now.
+
+Checked against the replayed PC frames: with the crop's place found for each frame by search, the runtime's drawing
+matches them to within 1.3 to 1.4 levels at half size, against about 4 for a crop at any other place, and its random
+places give frames within 4 levels and a mean brightness within a level or two of the PC's. A PC quick save made under
+Wine during the noise reads back with its noise record and writes back with only the window's height different there.
 
 ## Funbag Fantasy 3 if's staff roll
 

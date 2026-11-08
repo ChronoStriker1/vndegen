@@ -34,6 +34,7 @@ namespace {
 constexpr int kRecordX = 0x169, kRecordScale = 0x17D, kRecordAnchor = 0x185, kRecordAlpha = 0x18D, kRecordAnimated = 0x1B3;
 constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0x192, kRecordWave = 0x1A6;
 constexpr size_t kSplashExtra = 35;
+constexpr int kNoiseKind = 4;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
 constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
 constexpr int kDateFlag = 360;
@@ -218,6 +219,10 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.slot = r.i32();
         int number = r.i32();
         if (!ordinary) s.flipFrame = number;
+        if (!ordinary && number == kNoiseKind) {
+            s.noise = true;
+            s.flipFrame = -1;
+        }
         s.path = r.str();
         s.nextPath = r.str();
         size_t f = r.at;
@@ -250,8 +255,10 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.endScaleX = r.f32At(g + 20);
         s.endScaleY = r.f32At(g + 24);
         r.at = g + 0x261 - 0x1BD;
-        // A splash effect's record has no picture, and 35 more bytes that describe it. VNDegen starts splashes afresh.
-        if (s.path.empty() && s.slot != -999999) r.skip(kSplashExtra);
+        // A splash effect's record has no picture, and 35 more bytes that describe it. VNDegen starts splashes afresh. The film
+        // noise's has no picture and nothing more, under Wine in The Alchemist.
+        if (s.noise) out.sprites.push_back(s);
+        else if (s.path.empty() && s.slot != -999999) r.skip(kSplashExtra);
         else if (s.slot != -999999) out.sprites.push_back(s);
         else {
             out.width = r.i32At(f + size_t(layout.rootSizeAt));
@@ -331,14 +338,14 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     int extra = layout.recordExtra;
     auto record = [&](const SavedSprite &s, bool root, bool hasNext) {
         w.u8(1);
-        w.u8(s.flipFrame >= 0 ? 0 : 1);
+        w.u8(s.flipFrame >= 0 || s.noise ? 0 : 1);
         w.i32(root ? -999999 : s.slot);
-        w.i32(root ? 3 : s.flipFrame >= 0 ? s.flipFrame : 0);
+        w.i32(root ? 3 : s.noise ? kNoiseKind : s.flipFrame >= 0 ? s.flipFrame : 0);
         w.str(s.path);
         w.str(s.nextPath);
         size_t f = w.zeros(size_t(kRecordAnimationAt) + extra);
         apply(root ? layout.rootHead : layout.spriteHead, &w.b[f]);
-        if (root) {
+        if (root || s.noise) {
             w.setI32(f + size_t(layout.rootSizeAt), d.width);
             w.setI32(f + size_t(layout.rootSizeAt) + 4, d.height);
         }
@@ -360,7 +367,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.str(s.animation);
         size_t g = w.zeros(0x261 - 0x1BD);
         apply(layout.spriteTail, &w.b[g]);
-        w.setI32(g, root ? 0 : s.slot);
+        w.setI32(g, root || s.noise ? 0 : s.slot);
         w.setF32(g + 4, s.endX);
         w.setF32(g + 8, s.endY);
         w.setI32(g + 12, s.endAlpha);

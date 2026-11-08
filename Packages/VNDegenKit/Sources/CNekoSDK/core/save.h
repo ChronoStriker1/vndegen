@@ -24,6 +24,8 @@ struct SavedSprite {
     std::string animation;    // lines such as `relative_pos_x,-200,0,2400,linear`
     float endX = 0, endY = 0, endScaleX = 1, endScaleY = 1;
     int endAlpha = 256;
+    // The film noise's record: no picture, kind 4, and the window's size where the first record keeps the screen's.
+    bool noise = false;
 };
 
 struct SavedText {

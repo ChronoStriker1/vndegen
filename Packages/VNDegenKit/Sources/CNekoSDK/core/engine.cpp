@@ -29,6 +29,8 @@ constexpr int kMutedVoices = 4;
 constexpr int kGroupHse = 5, kGroupBackVoice = 6;
 // How long the message window takes to slide in, read from the PC game's footage.
 constexpr int kWindowSlideMs = 200;
+// The film noise's slot, and how many frames each random place of its crop lasts, as The Alchemist's exe has them.
+constexpr int kNoiseSlot = 10000, kNoiseFramesPerPlace = 4;
 // How long each character of text takes to fade in, measured from the PC game's footage.
 constexpr int kCharFadeMs = 160;
 // How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
@@ -2084,6 +2086,7 @@ SaveData Engine::captureSave() {
         SavedSprite out;
         out.slot = slot;
         out.path = s.path;
+        out.noise = s.noise;
         if (s.flipCount > 0) out.flipFrame = s.flipShown;
         out.x = s.x;
         out.y = s.y;
@@ -2269,6 +2272,15 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     std::map<int, FlipModes> flipModes = flipModesAt(d, slot);
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
+        // The film noise starts again where the save left it running.
+        if (saved.noise) {
+            s.image = images_->get("effect\\noise2_small.bmp");
+            if (!s.image) s.image = images_->get("sys\\noise2_small.bmp");
+            s.noise = true;
+            s.noiseFrom = now_;
+            if (s.image) front_[saved.slot] = s;
+            continue;
+        }
         s.path = saved.path;
         // A movie starts again from its beginning. Whether it looped isn't known from the save, and the library's
         // looping ones are backgrounds, so it loops.
@@ -3490,9 +3502,22 @@ void Engine::runScene(const Node &n) {
         flashStart_ = now_;
         dirty_ = true;
         break;
-    case 51:  // noise over the screen, and its end: not drawn yet
+    case 51: {  // film noise over the scene, a picture in slot 10000 whatever the node says, as the PC's exe has it
+        ImageRef frame = images_->get("effect\\noise2_small.bmp");
+        if (!frame) frame = images_->get("sys\\noise2_small.bmp");
+        if (!frame) {
+            warnOnce("no noise picture");
+            break;
+        }
+        Sprite &s = back_[kNoiseSlot];
+        s = {};
+        s.image = frame;
+        s.noise = true;
+        s.noiseFrom = now_;
+        break;
+    }
     case 52:
-        warnOnce("noise isn't drawn yet");
+        back_.erase(kNoiseSlot);
         break;
     case 53:  // shake the screen
         if (!setting("effect")) break;
@@ -4451,6 +4476,36 @@ void Engine::splashBurst(const Node &n) {
     dirty_ = true;
 }
 
+// The film noise, read from The Alchemist's exe with approval (nekosdk-cleanroom.md): a crop of its frame half as wide
+// and half as high, scaled up twice over at 1920 wide so it fills the screen, from a new random place every fourth frame.
+void Engine::drawNoise(Canvas &out, const Sprite &s) {
+    const Image &frame = *s.image;
+    int w = frame.w / 2, h = frame.h / 2;
+    if (w <= 0 || h <= 0) return;
+    int64_t step = (now_ - s.noiseFrom) * std::max(1, fps_) / (1000 * kNoiseFramesPerPlace);
+    // Any spread-out choice will do for the place, so a hash of the step and the noise's start stands in for the PC's
+    // random numbers, and the same step draws the same crop however often the frame is redrawn.
+    uint64_t key = uint64_t(step) * 0x9E3779B97F4A7C15ull ^ uint64_t(s.noiseFrom) * 0xC2B2AE3D27D4EB4Full;
+    if (!noiseCrop_ || int64_t(key) != noiseCropStep_) {
+        uint64_t z = key + 0x9E3779B97F4A7C15ull;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+        z ^= z >> 31;
+        int ox = int(z % uint64_t(w)), oy = int((z >> 32) % uint64_t(h));
+        auto crop = std::make_shared<Image>();
+        crop->w = w;
+        crop->h = h;
+        crop->opaque = false;
+        crop->rgba.resize(size_t(w) * size_t(h) * 4);
+        for (int y = 0; y < h; y++)
+            std::memcpy(&crop->rgba[size_t(y) * size_t(w) * 4], &frame.rgba[(size_t(oy + y) * size_t(frame.w) + size_t(ox)) * 4], size_t(w) * 4);
+        noiseCrop_ = crop;
+        noiseCropStep_ = int64_t(key);
+    }
+    float scale = 2.0f * float(out.w) / 1920;
+    drawImage(out, *noiseCrop_, float(w) * scale / 2, float(h) * scale / 2, scale, scale, 0, 1, nullptr, false);
+}
+
 void Engine::composeSplashes(Canvas &out, int fromSlot, int toSlot) {
     for (auto &[slot, splash] : splashes_) {
         if (slot < fromSlot || slot >= toSlot || !splash.image) continue;
@@ -5060,6 +5115,7 @@ void Engine::foldFinishedChanges(Sprite &s) {
 
 bool Engine::anythingMoves() const {
     if (transitioning_ || shakeType_ || flashMs_ || blur_) return true;
+    if (auto noise = front_.find(kNoiseSlot); noise != front_.end() && noise->second.noise) return true;
     for (const auto &[slot, splash] : splashes_)
         if (!splash.droplets.empty()) return true;
     if (now_ - windowShownAt_ < kWindowSlideMs) return true;
@@ -5098,6 +5154,10 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         if (!s.image) continue;
         composeSplashes(out, drawnTo, slot);
         drawnTo = slot;
+        if (s.noise) {
+            drawNoise(out, s);
+            continue;
+        }
         SpriteView v = view(s);
         float dx = slot < shakeLock_ ? shakeX : 0, dy = slot < shakeLock_ ? shakeY : 0;
         // About an eighth of the amount as a radius gives the sharpness of the PC game's footage.
