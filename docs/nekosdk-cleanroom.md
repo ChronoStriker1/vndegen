@@ -259,10 +259,12 @@ The PC sets each glyph a fixed gap past its own advance and lines a fixed pitch 
 MsgCharInterval and MsgLineInterval predict, so each game's table gives them (`textgap`, `textline`, `textshift`,
 `textfont`, `textsize`, and for the log `rows` with a size, `loggap` and `logline`). Test Game 94: gap 1, lines 28
 apart, the first glyph 2 pixels in. Test Game 88: gap 2, lines 27, 2 in. Test Game 92 and Ore o Hoshigaru Tsuma to
-Gibo: no gap, lines 29. Yarinaoshi no Christmas: gap 4. Each log was placed under its rules as the PC's is, and the
-fitted lines end on the PC's pixel or one off. For the Lucida Sans Unicode games the publisher's Windows screenshots
-were the reference, since Wine has no Lucida Sans Unicode and font-links it to Noto Sans CJK: The Alchemist sets
-Open Sans 22 with a gap of 5.93, lines 42 apart; Funbag Fantasy 4 size 14, gap 3.52, lines 25; Moral Orc size 16,
+Gibo: no gap, lines 29. Yarinaoshi no Christmas asks for Meiryo, which Ume P Gothic stands in for without matching its
+widths; with it the PC sets a gap of 4 and many lines run off the screen, so that gap belongs to the stand-in and is
+left out. Each log was placed under its rules as the PC's is, and the fitted lines end on the PC's pixel or one off.
+For the Lucida Sans Unicode games the publisher's Windows screenshots were the reference, since Wine has no Lucida
+Sans Unicode and font-links it to Noto Sans CJK: The Alchemist sets Open Sans 22 with a gap of 5.93, lines 42 apart;
+Funbag Fantasy 4 size 14, gap 3.52, lines 25; Moral Orc size 16,
 gap 3.93, lines 27; each with its first glyph one gap in. A save card's comment has a font of its own, a cell of 18
 in the Gothic games and 32 in The Alchemist, with no gap.
 

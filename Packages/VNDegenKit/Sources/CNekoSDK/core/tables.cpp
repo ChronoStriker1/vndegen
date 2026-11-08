@@ -426,10 +426,9 @@ run 2120 9 1
 run 2160 1 1
 
 screen defaults
-# How the PC sets the message window's text, measured under Wine against the same lines here, with VNDegen's stand-in
-# fonts in place of the Windows ones. Each glyph four pixels further on than its advance. Comments are in MS Gothic, as
-# the PC asks.
-textgap 4
+# Christmas asks for Meiryo, which Ume P Gothic stands in for without matching its widths. Under Wine with Ume P Gothic
+# in its place the PC sets each glyph four pixels past its advance, and many of its lines run off the screen, so that
+# gap belongs to the stand-in, not the game, and is left out here. Comments are in MS Gothic, as the PC asks.
 commentfont 0
 )";
 
