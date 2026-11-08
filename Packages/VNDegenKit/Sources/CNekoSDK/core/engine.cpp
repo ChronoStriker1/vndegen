@@ -67,7 +67,7 @@ const std::map<std::string, int> &defaultSettings() {
         {"mute_master", 0}, {"mute_bgm", 0}, {"mute_se", 0}, {"mute_voice", 0}, {"mute_hse", 0}, {"mute_backvoice", 0},
         // Whether a click that moves the text on stops its voice, as the PC games without the setting always do.
         {"voice_stop", 1},
-        {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60}, {"count_color", 1}, {"gt_off", 0}, {"express", 1}, {"bar_always", 0},
+        {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60}, {"count_color", 1}, {"gt_off", 0}, {"express", 1}, {"bar_always", 0}, {"cg_anim", 1}, {"anim_manual", 0},
         {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1},
         // Config's effects, waits, clicking past waits and the H scenes' camera work, as the PC starts them.
         {"effect", 1}, {"wait", 1}, {"waitskip", 0}, {"camera", 1}, {"tutorial", 1},
@@ -832,8 +832,80 @@ void Engine::mouseWheel(int notches) {
         return;
     }
     if (screen_ || dialogOpen_) return;
+    // With manual animation control on, the wheel zooms a movie showing in the story instead of opening the log.
+    if (!logOpen_ && cameraActive()) {
+        const auto *zoom = screens_.at("defaults").setting("animzoom");
+        cameraZoom(notches * (zoom && zoom->size() >= 3 ? field(*zoom, 2) : 5));
+        return;
+    }
     if (logOpen_) scrollLog(notches);
     else if (notches > 0) openLog();
+}
+
+bool Engine::movieShowing() const {
+    for (const auto &[slot, s] : front_)
+        if (s.movie && s.image) return true;
+    return false;
+}
+
+bool Engine::cameraActive() const {
+    auto it = screens_.find("defaults");
+    return it != screens_.end() && it->second.setting("animpanel") && setting("anim_manual") && !screen_ && movieShowing();
+}
+
+bool Engine::cameraPanelShown() const { return cameraActive() && windowShown_ && !windowHiddenByPlayer_ && !logOpen_; }
+
+void Engine::cameraZoom(int hundredths) {
+    const auto *zoom = screens_.at("defaults").setting("animzoom");
+    int low = zoom && zoom->size() >= 2 ? field(*zoom, 0) : 100, high = zoom && zoom->size() >= 2 ? field(*zoom, 1) : 100;
+    movieZoom_ = std::clamp(movieZoom_ + hundredths, low, high);
+    dirty_ = true;
+}
+
+// The panel's button under a point: 0 zooms out, 1 resets, 2 zooms in; -1 for none.
+int Engine::cameraButtonAt(int x, int y) const {
+    if (!cameraPanelShown()) return -1;
+    const auto *b = screens_.at("defaults").setting("animbuttons");
+    if (!b || b->size() < 5) return -1;
+    ImageRef sheet = images_->get((*b)[0]);
+    if (!sheet) return -1;
+    int w = sheet->w / 3, h = sheet->h / 5, bx = field(*b, 1);
+    for (int i = 0; i < 3; i++) {
+        int by = field(*b, 2 + i);
+        if (x >= bx && y >= by && x < bx + w && y < by + h) return i;
+    }
+    return -1;
+}
+
+void Engine::composeCameraPanel(Canvas &out) {
+    if (!cameraPanelShown()) return;
+    const Screen &d = screens_.at("defaults");
+    const auto *panel = d.setting("animpanel"), *buttons = d.setting("animbuttons"), *digits = d.setting("animdigits"), *help = d.setting("animhelp"),
+               *zoom = d.setting("animzoom");
+    int low = zoom && zoom->size() >= 2 ? field(*zoom, 0) : 100, high = zoom && zoom->size() >= 2 ? field(*zoom, 1) : 100;
+    if (ImageRef art = images_->get((*panel)[0]); art && panel->size() >= 3) drawPart(out, *art, field(*panel, 1), field(*panel, 2), 0, 0, art->w, art->h, 1);
+    // The zoom as three digits: units, then tenths and hundredths after the panel's own point.
+    if (digits && digits->size() >= 5)
+        if (ImageRef art = images_->get((*digits)[0])) {
+            int w = art->w / 10, value[3] = {movieZoom_ / 100, movieZoom_ / 10 % 10, movieZoom_ % 10};
+            for (int i = 0; i < 3; i++) drawPart(out, *art, field(*digits, 1 + i), field(*digits, 4), value[i] * w, 0, w, art->h, 1);
+        }
+    int hovered = pointerSeen_ ? cameraButtonAt(pointerX_, pointerY_) : -1;
+    if (buttons && buttons->size() >= 5)
+        if (ImageRef sheet = images_->get((*buttons)[0])) {
+            int w = sheet->w / 3, h = sheet->h / 5;
+            for (int i = 0; i < 3; i++) {
+                // Zooming out or resetting at the smallest zoom, and zooming in at the largest, are drawn disabled.
+                bool off = (i < 2 && movieZoom_ <= low) || (i == 2 && movieZoom_ >= high);
+                int row = off ? 4 : hovered == i ? 1 : 0;
+                drawPart(out, *sheet, field(*buttons, 1), field(*buttons, 2 + i), i * w, row * h, w, h, 1);
+            }
+        }
+    if (hovered >= 0 && help && help->size() >= 3)
+        if (ImageRef art = images_->get((*help)[0])) {
+            int h = art->h / 3;
+            drawPart(out, *art, field(*help, 1), field(*help, 2), 0, hovered * h, art->w, h, 1);
+        }
 }
 
 namespace {
@@ -3669,6 +3741,14 @@ void Engine::mouseButton(int button, bool down) {
         }
         return;
     }
+    // The manual animation control's panel takes its own clicks.
+    if (int button = cameraButtonAt(pointerX_, pointerY_); button >= 0) {
+        const auto *zoom = screens_.at("defaults").setting("animzoom");
+        int step = zoom && zoom->size() >= 3 ? field(*zoom, 2) : 5;
+        if (button == 1) cameraZoom(-movieZoom_);
+        else cameraZoom(button == 2 ? step : -step);
+        return;
+    }
     if (windowShown_) {
         // A touch has no hover, so a tap where hidden buttons sit shows them, and the next tap presses one.
         if (pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_ && !setting("bar_always")) return;
@@ -4862,7 +4942,16 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
             float size = float(s.waveSize) * std::abs(v.scaleX);
             for (int y = 0; y < out.h; y++) shifts[size_t(y)] = int(std::lround(size * std::sin(2 * kPi * (float(y) / rows + float(now_) / ms))));
         }
-        drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX, v.scaleY, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
+        // A movie zoomed by the manual animation control scales about the canvas, and the part shown follows the pointer:
+        // with it at an edge, the movie's edge meets the screen's.
+        float zoom = 1;
+        if (s.movie && movieZoom_ > 100 && setting("anim_manual")) {
+            zoom = float(movieZoom_) / 100;
+            float px = pointerSeen_ ? float(pointerX_) : float(out.w) / 2, py = pointerSeen_ ? float(pointerY_) : float(out.h) / 2;
+            middleX = middleX * zoom - (zoom - 1) * px;
+            middleY = middleY * zoom - (zoom - 1) * py;
+        }
+        drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX * zoom, v.scaleY * zoom, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
     }
     composeSplashes(out, drawnTo, INT_MAX);
 }
@@ -4882,6 +4971,8 @@ void Engine::compose() {
         composeStaffRoll(canvas_);
         return;
     }
+    // A zoom ends with the movie it was for.
+    if (movieZoom_ != 100 && !movieShowing()) movieZoom_ = 100;
     composeScene(canvas_, front_);
 
     if (transitioning_) {
@@ -4937,6 +5028,7 @@ void Engine::compose() {
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
     composeMessage(canvas_);
+    composeCameraPanel(canvas_);
     if (dialogOpen_) composeDialog(canvas_);
 
     if (waiting_ == Waiting::Choice && choiceSheet_) {

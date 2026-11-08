@@ -376,6 +376,7 @@ private:
     bool viewPanelHidden_ = false, viewAuto_ = false, viewMuted_ = false, replayFromViewer_ = false;
     int64_t viewMs_ = 0, viewAutoFrom_ = 0;
     int viewZoom_ = 100, viewMusic_ = 0;
+    int movieZoom_ = 100;  // the manual animation control's zoom, in hundredths
     std::string viewMusicPath_;
     // The anime gallery's movie in the viewer, looping from viewMovieFrom_ on the viewer's clock, and whether the mix
     // reads its sound.
@@ -501,6 +502,15 @@ private:
     void foldFinishedChanges(Sprite &s);
     void composeScene(Canvas &out, const Sprites &sprites);
     void composeMessage(Canvas &out);
+    // Test Game 92's manual animation control: while a movie shows and Config allows it, the wheel and a panel zoom the
+    // movie, and the zoomed movie follows the pointer. The table's `animpanel`, `animbuttons`, `animdigits`, `animhelp`
+    // and `animzoom` place it.
+    bool movieShowing() const;
+    bool cameraActive() const;
+    bool cameraPanelShown() const;
+    int cameraButtonAt(int x, int y) const;
+    void cameraZoom(int hundredths);
+    void composeCameraPanel(Canvas &out);
     void markRect(int &x, int &y, int &w, int &h) const;
     bool markShowing() const;
     void drawMark(Canvas &out);

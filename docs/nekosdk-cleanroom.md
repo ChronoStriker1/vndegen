@@ -177,6 +177,16 @@ The titles' Version info is a Windows message box: the game's name in brackets, 
 bonus content, of which each copy measured shows its own. Manual opens the game's `manual\index.html`, a patch's
 first, and the web survey the page its `webアンケート.url` names, both in a browser on the PC.
 
+## Test Game 92's animation switches
+
+Config's 「CGのアニメーション切り替え」 ("turns some H scenes' CGs into animation", its help says) changed nothing on the PC
+under Wine: from a save just before the first movie scene's movie, and one just before a flipbook, the frames with it on
+and off were the same to the pixel, and the same movie file was opened. 「アニメーションの手動操作」 ("the animation's
+camera, zoom and move, by hand") shows a panel at the bottom right while a movie plays: the wheel zooms 0.05 a notch
+from ×1.00 to ×2.50, the panel's buttons zoom out, reset and zoom in, and the zoomed movie follows the pointer, its
+offset (zoom − 1) times the pointer's position, fitted to four PC frames within 2 pixels. The panel hides with the
+message window. Its second Config tab's help sheet has eight rows, of which the table had read six.
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on

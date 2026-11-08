@@ -1,10 +1,10 @@
 // Runs a game headless: steps the clock, clicks through text, writes a PNG of chosen moments, and renders the sound.
 // usage: nekorun <game folder> [--out dir] [--every n] [--click ms] [--max ms] [--dt ms] [--jump script node]
 //                [--shots ms,ms,...] [--wav file] [--period ms] [--choose index] [--press action]...
-//                [--slow ms] [--script file]: lines of `ms click x y`, `ms rclick x y`, `ms down x y`, `ms up x y`,
+//                [--saveat script node slot] [--slow ms] [--script file]: lines of `ms click x y`, `ms rclick x y`, `ms down x y`, `ms up x y`,
 //                `ms move x y`, `ms focus dx dy` (a controller's direction), `ms wheel notches`, `ms pause`, `ms resume`,
 //                `ms window CAN FULL` (the host window's state),
-//                `ms press action` or `ms shot name`, with x and y in canvas pixels
+//                `ms press action`, `ms shot name` or `ms save slot` (a save the PC game reads), with x and y in canvas pixels
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
 #include <algorithm>
 #include <chrono>
@@ -37,6 +37,8 @@ int main(int argc, char **argv) {
     double slowReport = 0;
     int every = 0, clickMs = 300, maxMs = 3600 * 1000, dt = 16, jumpNode = 0, period = 0, nextBeat = 0, chooseIndex = 0;
     std::vector<int> shots;
+    std::string saveAt;
+    int saveSlot = 0;
     std::vector<std::string> presses;
     struct Step { int ms; std::string what; int x, y; std::string name; };
     std::vector<Step> steps;
@@ -67,6 +69,11 @@ int main(int argc, char **argv) {
             if (f) std::fclose(f);
         }
         else if (a == "--choose") chooseIndex = std::atoi(next());
+        else if (a == "--saveat") {
+            saveAt = next();
+            saveAt += std::string(" #") + next();
+            saveSlot = std::atoi(next());
+        }
         else if (a == "--table") {
             // Table lines read ahead of the game's own, to try settings against the PC without rebuilding.
             std::ifstream f(next());
@@ -109,6 +116,24 @@ int main(int argc, char **argv) {
     bool ended = false;
     while (elapsed < maxMs) {
         if (!vnneko_step(e, dt)) { ended = true; break; }
+        // NEKORUN_TRACE prints each script the story enters, with the node it enters at, and `clicks` each click it waits for.
+        if (std::getenv("NEKORUN_TRACE")) {
+            static std::string lastScript;
+            std::string status = vnneko_debug_status(e), script = status.substr(0, status.find(" #"));
+            if (script != lastScript) std::printf("enters %s at %d ms\n", status.c_str(), elapsed);
+            static std::string lastWait;
+            if (std::string(std::getenv("NEKORUN_TRACE")) == "clicks" && status.find(" click ") != std::string::npos && status.substr(0, status.find(" t=")) != lastWait) {
+                lastWait = status.substr(0, status.find(" t="));
+                std::printf("waits %s\n", lastWait.c_str());
+            }
+            lastScript = script;
+        }
+        // `--saveat SCRIPT NODE SLOT`: a save the PC game reads, once the story reaches that node, in its flow.
+        // A patched script is named by its patch, so the script's own name is matched anywhere in the path.
+        if (!saveAt.empty() && std::string(vnneko_debug_status(e)).find(saveAt + " ") != std::string::npos) {
+            std::printf("saved slot %d at %s: %d\n", saveSlot, saveAt.c_str(), vnneko_debug_save(e, saveSlot));
+            saveAt.clear();
+        }
         // What the title asks the host to show: printed, never opened.
         char kind[16], payload[1024];
         while (vnneko_take_host_request(e, kind, sizeof kind, payload, sizeof payload)) std::printf("host request at %d ms: %s: %s\n", elapsed, kind, payload);
@@ -160,6 +185,8 @@ int main(int argc, char **argv) {
                 vnneko_step(e, 0);
                 const uint8_t *now = vnneko_frame(e, &w, &h, &changed);
                 writePng(out + "/" + s.name, now, w, h);
+            } else if (s.what == "save") {
+                if (!vnneko_debug_save(e, s.x)) std::fprintf(stderr, "couldn't save to slot %d\n", s.x);
             } else if (s.what == "window") {
                 vnneko_set_window_state(e, s.x != 0, s.y != 0);
             } else if (s.what == "wheel") {

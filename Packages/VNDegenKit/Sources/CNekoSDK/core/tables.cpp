@@ -4070,13 +4070,13 @@ screen config2
 helplast
 selectedlook
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
-hover 581 294 810 342 sys_5\obj\h004_002.bmp 362 669 6 5
-hover 581 85 810 150 sys_5\obj\h004_002.bmp 362 669 6 0
-hover 810 85 1050 150 sys_5\obj\h004_002.bmp 362 669 6 1
-hover 581 222 810 294 sys_5\obj\h004_002.bmp 362 669 6 3
-hover 810 222 1050 294 sys_5\obj\h004_002.bmp 362 669 6 4
+hover 581 294 810 342 sys_5\obj\h004_002.bmp 362 669 8 5
+hover 581 85 810 150 sys_5\obj\h004_002.bmp 362 669 8 0
+hover 810 85 1050 150 sys_5\obj\h004_002.bmp 362 669 8 1
+hover 581 222 810 294 sys_5\obj\h004_002.bmp 362 669 8 3
+hover 810 222 1050 294 sys_5\obj\h004_002.bmp 362 669 8 4
 hover 50 85 565 150 obj\h004_001.bmp 380 669 3 0
-hover 581 150 1090 222 sys_5\obj\h004_002.bmp 362 669 6 2
+hover 581 150 1090 222 sys_5\obj\h004_002.bmp 362 669 8 2
 hover 50 174 565 246 obj\h004_001.bmp 380 669 3 1
 hover 50 534 565 606 obj\h004_001.bmp 380 669 3 2
 pic obj\h000_000.bmp 0 0
@@ -4126,12 +4126,15 @@ radio onahole 1 obj\h008_000.bmp 845 250 2 5 0
 radio onahole 0 obj\h008_000.bmp 926 250 2 5 1
 radio count_color 1 obj\h008_000.bmp 617 314 2 5 0
 radio count_color 0 obj\h008_000.bmp 698 314 2 5 1
-# Switching some H scenes' CGs to animation, and moving its camera by hand, show as the PC starts them. Under Wine
-# neither changed what the first movie scene showed, so they stay disabled until what they do is found.
-pic obj\h008_000.bmp 617 378 2 5 0 2
-pic obj\h008_000.bmp 698 378 2 5 1 4
-pic obj\h008_000.bmp 845 378 2 5 0 4
-pic obj\h008_000.bmp 926 378 2 5 1 2
+# Switching some H scenes' CGs to animation: on the PC under Wine neither the first movie scene, from its start, nor a
+# flipbook changed with it, so it's kept and changes nothing here either.
+radio cg_anim 1 obj\h008_000.bmp 617 378 2 5 0
+radio cg_anim 0 obj\h008_000.bmp 698 378 2 5 1
+# Moving the animation's camera by hand: a movie zooms with the wheel and the panel, and follows the pointer.
+radio anim_manual 1 obj\h008_000.bmp 845 378 2 5 0
+radio anim_manual 0 obj\h008_000.bmp 926 378 2 5 1
+hover 581 342 810 410 sys_5\obj\h004_002.bmp 362 669 8 6
+hover 810 342 1050 410 sys_5\obj\h004_002.bmp 362 669 8 7
 # Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
 range waittime 70 130
 slider waittime obj\h009_000.bmp 155 568 200
@@ -4248,6 +4251,14 @@ button start_prologue obj\d007_000.bmp 449 268 2 5 0
 button start_main obj\d007_000.bmp 449 350 2 5 1
 
 screen defaults
+# Manual animation control, measured under Wine: the panel at the screen's bottom right, its buttons to zoom out, reset
+# and zoom in, the zoom's digits beside the panel's point, the buttons' help right-aligned where the bar's sits, and the
+# zoom from ×1.00 to ×2.50, 0.05 a wheel notch.
+animpanel sys_5\obj\l010_000.bmp 1225 557
+animbuttons sys_5\obj\l010_001.bmp 1240 674 635 596
+animdigits sys_5\obj\l010_002.bmp 1239 1252 1261 570
+animhelp sys_5\obj\l010_004.bmp 862 508
+animzoom 100 250 5
 # Version info, the PC's message box, as it shows for the copy measured under Wine; which installed parts each bonus
 # line needs isn't known.
 versionline 【俺を欲しがる二人の母アニメ追加版】
@@ -4314,10 +4325,11 @@ pic obj\d004_000.bmp 0 690
 pic obj\d003_000.bmp 251 422 stage 1 blink 2000
 pic dim 0 0 alpha 215 stage 2
 pic obj\d005_000.bmp 135 121 stage 2
-# Version information opens a message box on the PC, and the manual and the web survey a browser.
-pic obj\d008_000.bmp 1118 10 1 5 0 4 stage 2
-pic obj\d006_000.bmp 150 465 8 5 5 4 stage 2
-pic obj\d006_000.bmp 150 577 8 5 7 4 stage 2
+# Version information opens a message box on the PC, and the manual and the web survey a browser; here the manual opens
+# in the app and the survey only after asking. This copy has no webアンケート.url, and its PC opens nothing for it.
+button versioninfo obj\d008_000.bmp 1118 10 1 5 0 stage 2 help obj\d008_001.bmp 0 666 1 1 0 0
+button manual obj\d006_000.bmp 150 465 8 5 5 stage 2 help obj\d007_000.bmp 0 666 1 8 0 5
+button websurvey obj\d006_000.bmp 150 577 8 5 7 stage 2 help obj\d007_000.bmp 0 666 1 8 0 7
 button start obj\d006_000.bmp 150 185 8 5 0 stage 2 help obj\d007_000.bmp 0 666 1 8 0 0
 button load obj\d006_000.bmp 150 241 8 5 1 stage 2 help obj\d007_000.bmp 0 666 1 8 0 1
 button quickload obj\d006_000.bmp 150 297 8 5 2 stage 2 help obj\d007_000.bmp 0 666 1 8 0 2
@@ -4682,13 +4694,13 @@ screen config2
 helplast
 selectedlook
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
-hover 581 294 810 342 obj\h004_002.bmp 362 669 6 5
-hover 581 85 810 150 obj\h004_002.bmp 362 669 6 0
-hover 810 85 1050 150 obj\h004_002.bmp 362 669 6 1
-hover 581 222 810 294 obj\h004_002.bmp 362 669 6 3
-hover 810 222 1050 294 obj\h004_002.bmp 362 669 6 4
+# The count colour has no help on the PC.
+hover 581 85 810 150 obj\h004_002.bmp 33 669 5 0
+hover 810 85 1050 150 obj\h004_002.bmp 33 669 5 1
+hover 581 222 810 294 obj\h004_002.bmp 33 669 5 3
+hover 810 222 1050 294 obj\h004_002.bmp 33 669 5 4
 hover 50 85 565 150 obj\h004_001.bmp 380 669 3 0
-hover 581 150 1090 222 obj\h004_002.bmp 362 669 6 2
+hover 581 150 1090 222 obj\h004_002.bmp 33 669 5 2
 hover 50 174 565 246 obj\h004_001.bmp 380 669 3 1
 hover 50 534 565 606 obj\h004_001.bmp 380 669 3 2
 pic obj\h000_000.bmp 0 0
@@ -4865,6 +4877,14 @@ button start_prologue obj\d007_000.bmp 449 268 2 5 0
 button start_main obj\d007_000.bmp 449 350 2 5 1
 
 screen defaults
+# Version info, the PC's message box, as it shows for the copy measured under Wine; which installed parts each bonus
+# line needs isn't known.
+versionline 【隣人に壊されていく俺の妻】
+versionline ファイルバージョン：1, 0, 0, 0
+versionline
+versionline ○オフィシャル通販特典
+manual manual\index.html
+websurvey webアンケート.url
 default onahole 1
 default bar_always 1
 default opacity 100
