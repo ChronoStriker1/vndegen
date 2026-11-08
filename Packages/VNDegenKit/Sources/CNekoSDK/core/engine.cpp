@@ -569,7 +569,8 @@ void Engine::runAction(const std::string &action) {
         if (Bytes data = files_.read(rest.substr(colon + 1))) {
             testPlayer_ = audio_.open(data);
             if (testPlayer_) {
-                audio_.setGroup(testPlayer_, rest.compare(0, colon, "voice") == 0 ? kKindVoice : kKindSe);
+                // At its own group's volume: HSE samples at HSE's, background voices at theirs.
+                audio_.setGroup(testPlayer_, soundGroup(rest.compare(0, colon, "voice") == 0 ? kKindVoice : kKindSe, rest.substr(colon + 1)));
                 audio_.setLoops(testPlayer_, 1);
                 audio_.play(testPlayer_);
             }
