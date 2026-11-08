@@ -1770,6 +1770,10 @@ check confirm_title obj\h013_000.bmp 603 231 8 5 4
 check confirm_exit obj\h013_000.bmp 603 259 8 5 5
 check tutorial obj\h013_000.bmp 603 287 8 5 6
 pic obj\h013_000.bmp 603 315 8 5 7 4
+# CG art: detailed (拘り表現), the variant a script names, or normal (通常表現), its base; on the PC under Wine the normal
+# art read cg_001_000_000_000_003 and _004 where the detailed read the script's _203 and _304.
+radio express 1 obj\h014_000.bmp 656 595 2 5 0
+radio express 0 obj\h014_000.bmp 913 595 2 5 1
 
 screen config2
 helplast
@@ -1944,6 +1948,7 @@ button start_prologue obj\d007_000.bmp 449 268 2 5 0
 button start_main obj\d007_000.bmp 449 350 2 5 1
 
 screen defaults
+plainvariants
 # Version info, the PC's message box, as it shows for the copy measured under Wine; which installed parts each bonus
 # line needs isn't known.
 versionline 【俺を欲しがる妻と義母】

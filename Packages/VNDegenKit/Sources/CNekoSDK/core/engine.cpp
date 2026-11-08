@@ -4214,7 +4214,7 @@ bool Engine::artSwitchable() const {
 }
 
 std::string Engine::shownPath(const std::string &path) const {
-    if (!artVersions_.empty()) return versionPath(path);
+    if (!artVersions_.empty()) return plainVariant(versionPath(path));
     if (setting("express")) return path;
     auto it = plainArt_.find(normalizedPath(path));
     return it == plainArt_.end() ? path : it->second;
@@ -4236,6 +4236,20 @@ std::string Engine::versionPath(const std::string &path) const {
     std::string other = name;
     other.replace((slash == std::string::npos ? 0 : slash + 1) + 11, 3, digits);
     return files_.exists(other) ? other : path;
+}
+
+std::string Engine::plainVariant(const std::string &path) const {
+    if (setting("express")) return path;
+    auto it = screens_.find("defaults");
+    if (it == screens_.end() || !it->second.setting("plainvariants")) return path;
+    std::string name = normalizedPath(path);
+    auto slash = name.rfind('\\');
+    size_t at = (slash == std::string::npos ? 0 : slash + 1) + 19;
+    // `cg\cg_001_000_000_000_304.bmp`: the fifth number's hundreds.
+    if (name.size() < at + 3 || name.compare(at - 19, 3, "cg_") != 0 || name[at] < '1' || name[at] > '9') return path;
+    std::string base = name;
+    base[at] = '0';
+    return files_.exists(base) ? base : path;
 }
 
 void Engine::applyArtSwitch() {

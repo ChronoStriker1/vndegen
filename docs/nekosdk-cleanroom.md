@@ -187,6 +187,13 @@ from ×1.00 to ×2.50, the panel's buttons zoom out, reset and zoom in, and the 
 offset (zoom − 1) times the pointer's position, fitted to four PC frames within 2 pixels. The panel hides with the
 message window. Its second Config tab's help sheet has eight rows, of which the table had read six.
 
+## Ore o Hoshigaru Tsuma to Gibo's CG art
+
+Config's 「CG表現の切り替え」 picks detailed (拘り表現) or normal (通常表現) art. The scripts name the detailed variants,
+numbered in the hundreds, as `cg_001_000_000_000_304`; from a save just before them, the PC under Wine read those with
+detailed art and `_003` and `_004`, the same numbers less their hundreds, with normal art, and the normal frames lacked
+the detailed ones' falling drops. The runtime shows a variant's base when normal art is chosen and the base exists.
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on
