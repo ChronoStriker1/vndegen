@@ -647,6 +647,9 @@ private:
     bool resumeStoryAtNumber(int number, int active, bool &atChoice);
     // The parameter of a story table's `scene` and `choice` nodes that holds the PC's number for the place.
     static constexpr int kStoryPcNumber = 31;
+    // A story table's choice's columns of its picture: how many at this parameter, then the columns.
+    static constexpr int kChoiceCells = 14;
+    static constexpr size_t kChoiceCellsMax = 5;
     Config config_;
     Audio audio_;
     FILE *log_ = nullptr;
@@ -685,6 +688,12 @@ private:
     // A choice: a sheet with one column per option and one row per state (normal, hovered, chosen, ...).
     ImageRef choiceSheet_, choiceBack_;
     int choiceCount_ = 0, choiceHover_ = -1, choiceResult_ = 0;
+    // Each option's column of the choice's picture, when the story table names them, and the box closing after a press
+    // (`close MS SCALE` under `screen choice`): when it began, or -1.
+    std::vector<int> choiceCells_;
+    int64_t choiceClosingFrom_ = -1;
+    int choiceColumns() const;
+    void composeChoice(Canvas &out);
     std::array<int, 4> choiceRoutes_{-1, -1, -1, -1};  // the option each of Test Game 94's routes takes, or another value
     const std::vector<std::string> *choiceTable(const std::string &key) const;
     float mouseX_ = 0, mouseY_ = 0;

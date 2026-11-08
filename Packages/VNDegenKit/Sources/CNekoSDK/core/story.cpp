@@ -4,7 +4,8 @@
 //
 //   flow NAME                 a flow; New Game starts at the first
 //   scene PATH                play a scene script to its end
-//   choice PICTURE COUNT      ask a choice
+//   choice PICTURE COUNT [cells C...]   ask a choice; `cells` names each option's column of the picture, which
+//                             `choicecolumns N` under `screen choice` divides, as Test Game 82's one sheet of all its options
 //   on N goto LABEL           when the last choice or screen gave N, go to LABEL, else on; a choice's options count from 0
 //   goto LABEL / label LABEL
 //   set S|G NUMBER OP VALUE   OP = + - += -=; VALUE a number, or S n or G n
@@ -128,6 +129,11 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
             n.p[0] = n.p[1] = toInt(w[2]) - 1;
             for (size_t r = 10; r < 14; r++) n.p[r] = 4;
             n.p[kStoryPcNumber] = pc;
+            // Each option's column, in parameters no flow script's choice uses: how many in 14, the columns from 15.
+            if (w.size() > 4 && w[3] == "cells") {
+                for (size_t i = 4; i < w.size() && i - 4 < kChoiceCellsMax; i++) n.p[kChoiceCells + 1 + (i - 4)] = toInt(w[i]);
+                n.p[kChoiceCells] = int(std::min(w.size() - 4, size_t(kChoiceCellsMax)));
+            }
         } else if (w[0] == "on" && w.size() >= 4 && w[2] == "goto") {
             Node &n = add(4);
             n.p[0] = toInt(w[1]);

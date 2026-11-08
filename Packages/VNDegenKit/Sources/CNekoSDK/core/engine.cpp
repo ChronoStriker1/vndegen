@@ -3496,6 +3496,10 @@ void Engine::beginChoice(const Node &n) {
     // and one in every game's flows; parameter 1 is it too in most, but 1 in Test Game 94's two-option choices.
     choiceCount_ = n.opcode == 20 ? 2 : std::max(1, n.p[0] + 1);
     for (int r = 0; r < 4; r++) choiceRoutes_[size_t(r)] = n.opcode == 3 ? n.p[size_t(10 + r)] : -1;
+    choiceCells_.clear();
+    choiceClosingFrom_ = -1;
+    if (n.opcode == 3)
+        for (int i = 0; i < std::min(n.p[kChoiceCells], int(kChoiceCellsMax)); i++) choiceCells_.push_back(n.p[size_t(kChoiceCells + 1 + i)]);
     choiceBack_ = images_->get(config_.text("ChoiceBackFilename", "obj\\n000_000.bmp"));
     choiceHover_ = -1;
     waiting_ = Waiting::Choice;
@@ -3507,10 +3511,71 @@ void Engine::choose(int index) {
     if (waiting_ != Waiting::Choice) return;
     choiceResult_ = index;
     log("chose %d", index);
+    // `close MS SCALE`: the chosen option shows pressed, and the box shrinks about its middle to SCALE and fades out over
+    // MS before the story goes on, as Test Game 82's does (set 2, from Wine shots).
+    if (const auto *close = choiceTable("close"); close && !close->empty() && field(*close, 0) > 0) {
+        choiceHover_ = index;
+        choiceClosingFrom_ = now_;
+        waiting_ = Waiting::Time;
+        waitUntil_ = now_ + field(*close, 0);
+        dirty_ = true;
+        return;
+    }
     choiceSheet_ = nullptr;
     choiceBack_ = nullptr;
     waiting_ = Waiting::None;
     dirty_ = true;
+}
+
+// The choice box closing: each of its pictures and options, the chosen one pressed (row 2), drawn smaller about the box's
+// middle, the first picture's, and fainter as it goes.
+void Engine::composeChoice(Canvas &out) {
+    const auto *close = choiceTable("close");
+    int ms = close && !close->empty() ? std::max(1, field(*close, 0)) : 1;
+    float end = close && close->size() >= 2 ? float(std::atof((*close)[1].c_str())) : 1;
+    float t = std::clamp(float(now_ - choiceClosingFrom_) / float(ms), 0.0f, 1.0f);
+    float scale = 1 - (1 - end) * t, alpha = 1 - t;
+    auto table = screens_.find("choice");
+    float cx = float(width_) / 2, cy = float(height_) / 2;
+    std::vector<std::pair<Image, std::pair<float, float>>> pieces;  // a piece's pixels and its middle
+    auto crop = [](const Image &from, int x, int y, int w, int h) {
+        Image part;
+        part.w = std::max(0, std::min(w, from.w - x));
+        part.h = std::max(0, std::min(h, from.h - y));
+        part.opaque = from.opaque;
+        part.rgba.resize(size_t(part.w) * size_t(part.h) * 4);
+        for (int row = 0; row < part.h; row++)
+            std::copy_n(&from.rgba[(size_t(y + row) * size_t(from.w) + size_t(x)) * 4], size_t(part.w) * 4, &part.rgba[size_t(row) * size_t(part.w) * 4]);
+        return part;
+    };
+    if (table != screens_.end()) {
+        bool first = true;
+        for (const Picture &p : table->second.pictures) {
+            if (!p.image) continue;
+            int w = p.image->w / std::max(1, p.cols), h = p.image->h / std::max(1, p.rows);
+            if (first) {
+                cx = float(p.x) + float(w) / 2;
+                cy = float(p.y) + float(h) / 2;
+                first = false;
+            }
+            pieces.push_back({crop(*p.image, p.column * w, p.row * h, w, h), {float(p.x) + float(w) / 2, float(p.y) + float(h) / 2}});
+        }
+    }
+    int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
+    choicePlace(x, top, step, slant);
+    for (int i = 0; i < choiceCount_; i++) {
+        int column = size_t(i) < choiceCells_.size() ? choiceCells_[size_t(i)] : i;
+        pieces.push_back({crop(*choiceSheet_, column * cellW, (i == choiceResult_ ? 2 : 0) * cellH, cellW, cellH),
+                          {float(x + i * slant) + float(cellW) / 2, float(top + i * step) + float(cellH) / 2}});
+    }
+    for (const auto &[image, middle] : pieces)
+        drawImage(out, image, cx + (middle.first - cx) * scale, cy + (middle.second - cy) * scale, scale, scale, 0, alpha);
+    dirty_ = true;
+}
+
+int Engine::choiceColumns() const {
+    const auto *columns = choiceTable("choicecolumns");
+    return columns && !columns->empty() && field(*columns, 0) > 0 ? field(*columns, 0) : choiceCount_;
 }
 
 void Engine::runScene(const Node &n) {
@@ -3823,6 +3888,13 @@ bool Engine::step(int ms) {
         waiting_ = Waiting::None;
         clicked_ = false;
     }
+    // A choice box that has finished closing goes, and the story goes on.
+    if (choiceClosingFrom_ >= 0 && waiting_ != Waiting::Time) {
+        choiceClosingFrom_ = -1;
+        choiceSheet_ = nullptr;
+        choiceBack_ = nullptr;
+        dirty_ = true;
+    }
 
     if (!textDone_) {
         // The last character has finished fading in.
@@ -4080,7 +4152,7 @@ void Engine::mouseButton(int button, bool down) {
 // The table's `choice` screen gives where options start and the step between them. Without one they stack in the middle.
 void Engine::choicePlace(int &x, int &top, int &step, int &slant) const {
     slant = 0;
-    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
+    int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5;
     x = (width_ - cellW) / 2;
     top = (height_ - cellH * choiceCount_) / 2;
     step = cellH;
@@ -4105,7 +4177,7 @@ void Engine::choicePlace(int &x, int &top, int &step, int &slant) const {
 
 void Engine::updateChoice() {
     if (waiting_ != Waiting::Choice || !choiceSheet_) return;
-    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step, slant;
+    int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
     choicePlace(x, top, step, slant);
     int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
     int hover = -1;
@@ -5504,6 +5576,7 @@ void Engine::compose() {
     if (partScreen_) drawParts(canvas_, Layer::Screen);
     if (dialogOpen_) composeDialog(canvas_);
 
+    if (choiceSheet_ && choiceClosingFrom_ >= 0) composeChoice(canvas_);
     if (waiting_ == Waiting::Choice && choiceSheet_) {
         auto table = screens_.find("choice");
         if (table != screens_.end()) {
@@ -5514,10 +5587,12 @@ void Engine::compose() {
         } else if (choiceBack_) {
             drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
         }
-        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step, slant;
+        int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
         choicePlace(x, top, step, slant);
-        for (int i = 0; i < choiceCount_; i++)
-            drawPart(canvas_, *choiceSheet_, x + i * slant, top + i * step, i * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
+        for (int i = 0; i < choiceCount_; i++) {
+            int column = size_t(i) < choiceCells_.size() ? choiceCells_[size_t(i)] : i;
+            drawPart(canvas_, *choiceSheet_, x + i * slant, top + i * step, column * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
+        }
         // `routes FILE X STEP G G G G`: once one of the routes' ending globals is set, each option names the routes that
         // take it, a sheet row per route and a column for cleared or not, stacked STEP apart beside the option's middle,
         // as Test Game 94 does.
