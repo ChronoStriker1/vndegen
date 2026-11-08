@@ -30,6 +30,11 @@ struct SaveLayout {
     // layouts, then the zeros before each record, the first's within the 40 bytes after the count, and those between the
     // sound channels and the scene's name.
     int olderRecord = 0, olderRecordGap = 0, olderSoundGap = 0;
+    // Test Game 87 names a choice's picture in the older engine's first place, 236 bytes after the flow, and leaves the
+    // newer place empty, at a choice and after it; its PC shows a choice with no options from a save that has it the
+    // other way round (set 1, under Wine). Test Games 82 and 83 name it in the newer place.
+    bool choiceInFirstPlace = false;
+    ChoiceFlag choiceFlag = ChoiceFlag::Picture;
 };
 
 namespace {
@@ -37,8 +42,9 @@ namespace {
 #include "save_layouts.inc"
 
 // The older engine's layout, from PC saves made under Wine: Test Game 83's seven (set 3) and Test Game 87's 21 (set 1),
-// every region checked in each. A save names a picture 236 bytes after the flow, and the choice it was made at where the
-// newer engine names it, 4,196 bytes after the flow, with all that follows moved by the first name's length. A sprite record's fixed part is 383 bytes, with x and y as ints, and zeros come
+// every region checked in each. A save names a picture 236 bytes after the flow and another where the newer engine names
+// the choice's, 4,196 bytes after the flow, with all that follows moved by the first name's length; which one holds the
+// choice's picture is per game. A sprite record's fixed part is 383 bytes, with x and y as ints, and zeros come
 // before each record, the first's within the 40 bytes after the record count, as a save with no records shows. Text records end 8 bytes after their strings, as Test Game 94's do. Sound channels come with no byte
 // before them, each ending a byte after its time, the first 30 for music and the rest for effects. How many channels
 // there are and how many zeros follow them can't be told apart in these saves, whose last channels are all empty; the
@@ -62,15 +68,26 @@ SaveLayout older(int recordGap, int afterSize, std::vector<Patch> after, int tai
     return l;
 }
 
-const SaveLayout kFunbag2 = older(26, 0, {}, 818, {}, 123);
+const SaveLayout kAniMother = kTsumaGibo;
+const SaveLayout kFunbag2 = [] {
+    SaveLayout l = older(26, 0, {}, 818, {}, 123);
+    l.choiceFlag = ChoiceFlag::Never;
+    return l;
+}();
 // Test Game 82's 32 PC saves (set 2), half of them Previous Choice files, are Test Game 83's layout with sprite records
 // 4 bytes shorter and the zeros before each 4 bytes longer.
 const SaveLayout kFunbag1 = [] {
     SaveLayout l = older(30, 0, {}, 818, {}, 123);
     l.olderRecord = 379;
+    l.choiceFlag = ChoiceFlag::Never;
     return l;
 }();
-const SaveLayout kSideboob2 = older(39, 33, {{5, "64"}}, 5779, {{903, "3c"}}, 183);
+const SaveLayout kSideboob2 = [] {
+    SaveLayout l = older(39, 33, {{5, "64"}}, 5779, {{903, "3c"}}, 183);
+    l.choiceInFirstPlace = true;
+    l.choiceFlag = ChoiceFlag::Made;
+    return l;
+}();
 
 // Where the fields sit, from the end of a record's two path strings. A newer engine adds `recordExtra` bytes before them.
 constexpr int kRecordX = 0x169, kRecordScale = 0x17D, kRecordAnchor = 0x185, kRecordAlpha = 0x18D, kRecordAnimated = 0x1B3;
@@ -78,9 +95,11 @@ constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0
 // A splash record names its droplet's picture this far into its fixed part, before the engine's extra bytes: an empty
 // name in every other record. Only Test Game 88 has splashes, so it's checked in that layout alone.
 constexpr int kSplashNameAt = 201;
-// The bytes of a record after its animation text, and a flipbook's fields among them: whether it repeats, two bytes of 1
-// while it plays, command 121's parameter 16, and a byte of 0 where every other record has 100.
-constexpr size_t kRecordTail = 0x261 - 0x1BD, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipStep = 108, kTailFlipHundred = 120;
+// The bytes of a record after its animation text, and a flipbook's fields among them: whether it runs backward and
+// repeats (parameters 1 and 14), two bytes of 1 while it plays, parameters 15 and 16, and a byte of 0 where every other
+// record has 100.
+constexpr size_t kRecordTail = 0x261 - 0x1BD, kTailFlipReverse = 97, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipParam15 = 104,
+                 kTailFlipStep = 108, kTailFlipHundred = 120;
 constexpr int kNoiseKind = 4;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
 constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
@@ -233,7 +252,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\funbag4") return &kFunbag4;
     if (folder == "waffle\\moralorc") return &kMoralOrc;
     // Test Game 92 saves as Ore o Hoshigaru Tsuma to Gibo does: its PC save reads with that layout.
-    if (folder == "waffle\\animother") return &kTsumaGibo;
+    if (folder == "waffle\\animother") return &kAniMother;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     // The runtime's own story-table test game saves as The Alchemist does.
     if (folder == "vndegen\\storytest") return &kAlchemist;
@@ -242,6 +261,17 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
     return nullptr;
 }
+
+bool namesPictureTwice(const SaveLayout &layout) {
+    // The PC's own saves name it twice in the Christmas game, The Alchemist, Test Games 85, 88 and 93; Test Games 84, 89,
+    // 92 and 94's and the older engine's leave it empty. Test Game 94's PC, given a save of the runtime's with the name
+    // twice, lost the picture and went on elsewhere, and with it once came back as from its own save there (under Wine).
+    for (const SaveLayout *twice : {&kChristmas, &kAlchemist, &kMother3, &kTsumaGibo, &kFunbag4})
+        if (&layout == twice) return true;
+    return false;
+}
+
+ChoiceFlag choiceFlag(const SaveLayout &layout) { return layout.choiceFlag; }
 
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out) {
     if (plain.size() < 100000) return false;
@@ -253,9 +283,9 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     bool older = layout.olderRecord > 0;
     if (older) {
         r.skip(kOlderBeforeChoice);
-        out.olderImage = r.str();
+        (layout.choiceInFirstPlace ? out.choiceImage : out.olderImage) = r.str();
         r.skip(kBeforeChoice - kOlderBeforeChoice - 4);
-        out.choiceImage = r.str();
+        (layout.choiceInFirstPlace ? out.olderImage : out.choiceImage) = r.str();
     } else {
         r.skip(kBeforeChoice);
         out.choiceImage = r.str();
@@ -372,9 +402,13 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.endScaleX = r.f32At(g + 20);
         s.endScaleY = r.f32At(g + 24);
         s.rawTail.assign(plain.begin() + std::ptrdiff_t(g), plain.begin() + std::ptrdiff_t(g + kRecordTail));
-        if (s.flipFrame >= 0 && (plain[g + kTailFlipPlaying] || plain[g + kTailFlipPlaying + 1])) {
+        // A finished one-shot flipbook keeps its fields with the playing bytes at 0, as Test Game 84's reversed slash does.
+        if (s.flipFrame >= 0 && (plain[g + kTailFlipPlaying] || plain[g + kTailFlipPlaying + 1] || r.i32At(g + kTailFlipStep))) {
             s.flipRepeat = plain[g + kTailFlipRepeat];
+            s.flipReverse = plain[g + kTailFlipReverse];
+            s.flipPlaying = plain[g + kTailFlipPlaying] != 0;
             s.flipStep = r.i32At(g + kTailFlipStep);
+            s.flipParam15 = r.i32At(g + kTailFlipParam15);
         }
         r.at = g + kRecordTail;
         // The film noise's has no picture and nothing more, under Wine in The Alchemist.
@@ -458,9 +492,9 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     bool older = layout.olderRecord > 0;
     if (older) {
         w.zeros(kOlderBeforeChoice);
-        w.str(d.olderImage);
+        w.str(layout.choiceInFirstPlace ? d.choiceImage : d.olderImage);
         w.zeros(kBeforeChoice - kOlderBeforeChoice - 4);
-        w.str(d.choiceImage);
+        w.str(layout.choiceInFirstPlace ? d.olderImage : d.choiceImage);
     } else {
         w.zeros(kBeforeChoice);
         w.str(d.choiceImage);
@@ -586,8 +620,10 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(g + 28, s.anchorX);
         w.setI32(g + 32, s.anchorY);
         if (s.flipFrame >= 0 && s.flipRepeat >= 0) {
+            w.b[g + kTailFlipReverse] = s.flipReverse ? 1 : 0;
             w.b[g + kTailFlipRepeat] = s.flipRepeat ? 1 : 0;
-            w.b[g + kTailFlipPlaying] = w.b[g + kTailFlipPlaying + 1] = 1;
+            w.b[g + kTailFlipPlaying] = w.b[g + kTailFlipPlaying + 1] = s.flipPlaying ? 1 : 0;
+            w.setI32(g + kTailFlipParam15, s.flipParam15);
             w.setI32(g + kTailFlipStep, s.flipStep);
             w.b[g + kTailFlipHundred] = 0;
         }

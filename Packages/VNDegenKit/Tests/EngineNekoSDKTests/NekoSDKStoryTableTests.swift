@@ -24,7 +24,7 @@ import TestSupport
                 .init(op: 5, next: 3, s: [2: "one"]),
                 .init(op: 5, next: 0, s: [2: "two"]),
             ]),
-            "scr/e.txt": waiting(100_000),
+            "scr/e.txt": waiting(1000),
         ])
     }
 
@@ -58,6 +58,20 @@ import TestSupport
 
     private func steps(_ e: OpaquePointer, _ count: Int) {
         for _ in 0..<count { _ = vnneko_step(e, 16) }
+    }
+
+    // A jump to a scene of a story table's game goes on after the scene as the table has it, as nekorun's --jump needs.
+    @Test func aJumpGoesOnFromTheTable() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        // The scene's last line, then past it.
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
     }
 
     @Test func theTablePlaysAndSavesKeepItsPlace() throws {
@@ -166,7 +180,33 @@ import TestSupport
         steps(sixth, 10)
         #expect(at(sixth, "scr\\e.txt"), "\(status(sixth))")
         #expect(vnneko_debug_variable(sixth, 1, 13) == 0)
+        // A save in the scene after the choice holds 2 where the last choice goes, with `lastchoice made`, whichever
+        // option was taken.
+        #expect(vnneko_debug_save(sixth, 8))
+        let after = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save008.sav" })
+        let afterPlain = try NekoSDKFlowFixture.unpacked(Data(contentsOf: after))
+        func int32After(_ at: Int) -> Int32 { afterPlain.subdata(in: (afterPlain.startIndex + at)..<(afterPlain.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } }
+        let afterPicture = Int(int32After(0xCD + 4 + 4196))
+        let afterDate = 0xCD + 4 + 4196 + 4 + afterPicture + 39596
+        #expect(int32After(afterDate + 400) == 1)
+        #expect(int32After(afterDate + 404) == 30)
+        #expect(int32After(afterDate + 520) == 2)
         vnneko_stop(sixth)
+
+        // As a PC save, its number is also the first scene's, and its scene picks the last: the story ends after it rather
+        // than going on to the screen after the first.
+        try FileManager.default.copyItem(at: after, to: saves.appendingPathComponent("save009.sav"))
+        let ninth = try #require(NekoSDKFlowFixture.start(root, data: data))
+        #expect(vnneko_debug_load(ninth, 9))
+        steps(ninth, 3)
+        #expect(at(ninth, "scr\\e.txt"), "\(status(ninth))")
+        click(ninth)
+        steps(ninth, 200)
+        click(ninth)
+        steps(ninth, 200)
+        #expect(!status(ninth).contains("part screen"), "\(status(ninth))")
+        vnneko_stop(ninth)
 
         // A PC save has no lines beside it: the story goes on from its scene, here inside the chapter.
         let sidecar = try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
