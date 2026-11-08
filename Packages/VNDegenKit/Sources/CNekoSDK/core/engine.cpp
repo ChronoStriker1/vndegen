@@ -29,6 +29,8 @@ constexpr int kMutedVoices = 4;
 constexpr int kGroupHse = 5, kGroupBackVoice = 6;
 // How long the message window takes to slide in, read from the PC game's footage.
 constexpr int kWindowSlideMs = 200;
+// The film noise's slot, and how many frames each random place of its crop lasts, as The Alchemist's exe has them.
+constexpr int kNoiseSlot = 10000, kNoiseFramesPerPlace = 4;
 // How long each character of text takes to fade in, measured from the PC game's footage.
 constexpr int kCharFadeMs = 160;
 // How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
@@ -289,6 +291,8 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     log("started: %dx%d, %d scripts in scr, %s, movies %s", width_, height_, int(files_.list("scr").size()), screens_.empty() ? "no menus yet" : "menus",
         hasMovies_ ? "through the host's decoder" : "left out, with no decoder");
     loadGalleries();
+    loadParts();
+    loadOldLayout();
     loadGlobals();
     loadSettings();
     if (screens_.count("title")) openScreen("title");
@@ -370,6 +374,7 @@ void Engine::endStory(const std::string &screen) {
     staffRollLayers_ = nullptr;
     gt_ = {};
     splashes_.clear();
+    resetParts();
     stack_.clear();
     scene_ = {};
     back_.clear();
@@ -411,12 +416,17 @@ void Engine::startStory() {
     scenario_.clear();
     backlog_.clear();
     choiceImage_.clear();
+    choiceMade_ = false;
     replaying_ = false;
     waiting_ = Waiting::None;
     if (routeVar_ >= 0 && pendingRoute_) scenario_[routeVar_] = pendingRoute_;
     pendingRoute_ = 0;
     staffRollLayers_ = nullptr;
+    resetParts();
     std::string first = config_.text(storyFlowKey_.c_str());
+    // A game with no flow scripts starts at its story table's first flow, or past the prologue at the story flow `screen
+    // start` names.
+    if (first.empty() && !firstStoryFlow().empty()) first = "story:" + (storyFlowKey_ == "FirstFlow" ? firstStoryFlow() : storyFlowKey_);
     auto flow = first.empty() ? nullptr : loadScript(first);
     if (!flow || !flow->first()) {
         complain("This game has no flow script to start from.");
@@ -441,6 +451,8 @@ std::string Engine::mainFlowKey() const {
 void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
     dirty_ = true;
+    // The PC doesn't save during a staff roll: a save there holds the scene after it (set 1, Test Game 87).
+    if ((action == "nav_save" || action == "Save" || action == "QuickSave") && waiting_ == Waiting::StaffRoll) return;
     if (action.rfind("submenu:", 0) == 0) {
         // Pressed again, a submenu closes, and any inside it, back to the one it opened in.
         std::string name = action.substr(8);
@@ -451,7 +463,7 @@ void Engine::runAction(const std::string &action) {
     if (action == "start") {
         // A game whose init.ini names no FirstFlow starts at its table's `flow`, as Test Game 89's New Game starts its
         // first chapter.
-        if (config_.text("FirstFlow").empty()) {
+        if (config_.text("FirstFlow").empty() && firstStoryFlow().empty()) {
             storyFlowKey_ = mainFlowKey();
             startStory();
             return;
@@ -464,7 +476,8 @@ void Engine::runAction(const std::string &action) {
         // Past the prologue a game may offer to skip it, when its table has that question.
         if (auto it = screens_.find("start"); it != screens_.end()) {
             const auto *after = it->second.setting("after");
-            if (!config_.text(mainFlowKey()).empty() && variableValue(0, after ? field(*after, 0) : 1)) {
+            bool hasMain = !config_.text(mainFlowKey()).empty() || storyFlowExists(mainFlowKey());
+            if (hasMain && variableValue(0, after ? field(*after, 0) : 1)) {
                 openScreen("start");
                 return;
             }
@@ -2073,9 +2086,30 @@ SaveData Engine::captureSave() {
     d.date[4] = local.tm_min;
     d.date[5] = local.tm_sec;
     d.flow = stack_.empty() ? "" : files_.savedName(stack_.back().script->name);
+    // A story table's flows and chapters aren't files: the PC's saves of those games name no flow, and nor do ours.
+    if (d.flow.rfind("story:", 0) == 0 || d.flow.rfind("chapter:", 0) == 0) d.flow.clear();
     d.flowNode = flowCallId_;
+    // A story table's game saves as the PC does around a choice: 3 while one waits and its number as the flow node, and
+    // the last choice's result, 2 while one waits, as Test Game 87's saves have it (set 1). `lastchoice made` under
+    // `screen defaults` writes 2 there instead from the first choice on, as Test Game 83's do whichever option was taken
+    // (set 3).
+    if (!stack_.empty() && stack_.back().script->name.rfind("story:", 0) == 0) {
+        bool asking = waiting_ == Waiting::Choice;
+        d.flowActive = asking ? 3 : 1;
+        if (asking)
+            for (const Node &c : stack_.back().script->nodes)
+                if (c.opcode == 3 && stack_.back().node && c.next == stack_.back().node->id && c.p[kStoryPcNumber]) d.flowNode = c.p[kStoryPcNumber];
+        const Screen *defaults = screens_.count("defaults") ? &screens_.at("defaults") : nullptr;
+        const auto *mode = defaults ? defaults->setting("lastchoice") : nullptr;
+        bool made = mode && !mode->empty() && (*mode)[0] == "made";
+        d.lastChoice = asking || (made && !choiceImage_.empty()) ? 2 : choiceImage_.empty() ? -1 : choiceResult_;
+    }
     d.choiceImage = choiceImage_;
-    d.dateFlag = choiceImage_.empty() ? 0 : 1;
+    switch (layout_ ? choiceFlag(*layout_) : ChoiceFlag::Picture) {
+        case ChoiceFlag::Picture: d.dateFlag = choiceImage_.empty() ? 0 : 1; break;
+        case ChoiceFlag::Made: d.dateFlag = choiceMade_ ? 1 : 0; break;
+        case ChoiceFlag::Never: d.dateFlag = 0; break;
+    }
     d.variables = scenario_;
     d.width = canvas_.w;
     d.height = canvas_.h;
@@ -2084,7 +2118,18 @@ SaveData Engine::captureSave() {
         SavedSprite out;
         out.slot = slot;
         out.path = s.path;
-        if (s.flipCount > 0) out.flipFrame = s.flipShown;
+        // Some games' PC names the picture twice and loads it from the second (namesPictureTwice).
+        out.nextPath = !s.noise && layout_ && namesPictureTwice(*layout_) ? s.path : "";
+        out.noise = s.noise;
+        if (s.flipCount > 0) {
+            out.flipFrame = s.flipShown;
+            out.flipRepeat = s.flipLoop ? 1 : 0;
+            out.flipReverse = s.flipReverse ? 1 : 0;
+            out.flipStep = s.flipStep;
+            out.flipParam15 = s.flipParam15;
+            // A one-shot flipbook past its last picture has finished, which the PC saves with its playing bytes at 0.
+            out.flipPlaying = s.flipLoop || s.flipShown < s.flipCount;
+        }
         out.x = s.x;
         out.y = s.y;
         out.scaleX = s.scaleX;
@@ -2094,6 +2139,9 @@ SaveData Engine::captureSave() {
         anchorOf(s, anchorX, anchorY);
         out.anchorX = anchorX < 0 ? s.image->w / 2 : anchorX;
         out.anchorY = anchorY < 0 ? s.image->h / 2 : anchorY;
+        bool pivoted = s.looping && s.loop.hasPivot;
+        for (const Animation &a : s.changes) pivoted = pivoted || a.hasPivot;
+        if (!s.anchorSet && !pivoted) out.anchorX = out.anchorY = 0;
         out.alpha = int(s.alpha * 256 + 0.5f);
         out.blur = s.blurAmount;
         out.blurOn = s.blurOn;
@@ -2116,14 +2164,28 @@ SaveData Engine::captureSave() {
                 const char *name = t.property == Track::X ? (t.relative ? "relative_pos_x" : "pos_x") : t.property == Track::Y ? (t.relative ? "relative_pos_y" : "pos_y") : t.property == Track::ScaleX ? "scale_x" : t.property == Track::ScaleY ? "scale_y" : t.property == Track::Alpha ? "alpha" : "rotate";
                 int length = framesOf(t.lengthMs);
                 char line[128];
-                std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                // A scale line names its pivot, the point of the picture it keeps still, as the PC writes one:
+                // `scale_x,1.100000,640,0,2400,linear`.
+                if (t.property == Track::ScaleX || t.property == Track::ScaleY)
+                    std::snprintf(line, sizeof line, "%s,%f,%d,%d,%d,%s\n", name, double(t.to), t.property == Track::ScaleX ? out.anchorX : out.anchorY,
+                                  framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                else
+                    std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
                 out.animation += line;
             }
         };
         for (const Animation &a : s.changes) writeTracks(a, a.begunMs);
         if (s.looping) writeTracks(s.loop, loopBegun);
         out.animated = !out.animation.empty();
+        // A repeating named animation with nothing else running is saved as the PC saves one: its text as command 19 gave
+        // it, the frames since it began, and the byte that says it repeats, so it goes on repeating after a load, here and
+        // on the PC.
+        out.repeat = s.looping && s.loop.repeat && s.changes.empty();
         out.animationFrames = out.animated ? frames(now_ - oldest) : 0;
+        if (out.repeat && !s.loop.source.empty()) {
+            out.animation = s.loop.source;
+            out.animationFrames = frames(now_ - s.loop.begunMs);
+        }
         // Where it ends up.
         Sprite last = s;
         for (Animation &a : last.changes) a.begunMs = -1000000000;
@@ -2136,6 +2198,19 @@ SaveData Engine::captureSave() {
         out.endAlpha = int(end.alpha * 256 + 0.5f);
         d.sprites.push_back(out);
     }
+    // Splash emitters are records of their own, in their slots among the pictures', as the PC writes them. A droplet
+    // lives a second or so, so only the emitter is kept.
+    for (const auto &[slot, splash] : splashes_) {
+        if (splash.path.empty()) continue;
+        SavedSprite out;
+        out.slot = slot;
+        out.splash = true;
+        out.splashImage = splash.path;
+        out.splashNumbers = splash.saved;
+        auto at = std::find_if(d.sprites.begin(), d.sprites.end(), [&](const SavedSprite &s) { return s.slot > slot; });
+        d.sprites.insert(at, out);
+    }
+    for (const auto &[name, part] : parts_) part->savePC(d);
     d.windowShown = windowShown_;
     d.current = currentText_;
     d.backlog = backlog_;
@@ -2182,7 +2257,7 @@ bool Engine::saveToSlot(int slot) {
     if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
     writeFlipModes(slot, data);
     // The card that shows NEW, kept in cfg.sav as the PC keeps it.
-    globals_[0] = slot;
+    globals_[0] = newCardNumber(layout_, slot);
     saveGlobals();
     saveSeen();
     saveReadText();
@@ -2246,14 +2321,20 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     stack_.clear();
     back_.clear();
     front_.clear();
+    splashes_.clear();
     transitioning_ = false;
     shakeType_ = 0;
     flashMs_ = 0;
     blur_ = false;
     scenario_ = d.variables;
     choiceImage_ = d.choiceImage;
+    // Only Test Game 87's saves say whether a choice has been made; elsewhere a choice's picture means one was.
+    choiceMade_ = layout_ && choiceFlag(*layout_) == ChoiceFlag::Made ? d.dateFlag != 0 : !d.choiceImage.empty();
     flowCallId_ = d.flowNode;
     bool atChoice = false;
+    // Game parts first, since a part's chapters, which the story's place is found in, can depend on its state.
+    Sidecar side = readSidecar(d, slot);
+    loadPartsState(d, side);
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
         const Node *call = flow->node(d.flowNode);
         // The PC's save made while a choice waits names the choice, and it's asked again. Ours names the scene before, which
@@ -2265,10 +2346,37 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
+    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice) &&
+               !resumeStoryAt(d.scene)) {
+        complain("The story table has no place for the save's scene " + d.scene);
     }
-    std::map<int, FlipModes> flipModes = flipModesAt(d, slot);
+    std::map<int, FlipModes> flipModes = flipModesAt(d, side);
     for (const SavedSprite &saved : d.sprites) {
+        // A splash's emitter comes back ready for the scene's next burst, as command 200 made it; its speed, which the
+        // save doesn't keep, is the 300 every one of Test Game 88's has.
+        if (saved.splash) {
+            const auto &v = saved.splashNumbers;
+            Splash &splash = splashes_[saved.slot];
+            splash.path = saved.splashImage;
+            splash.image = images_->get(saved.splashImage);
+            splash.saved = v;
+            splash.cap = std::max(1, v[1]);
+            splash.minLife = std::max(1, v[7]);
+            splash.maxLife = std::max(splash.minLife, v[8]);
+            splash.speed = 300;
+            if (!splash.image) warnOnce("A save names a missing splash picture: " + saved.splashImage);
+            continue;
+        }
         Sprite s;
+        // The film noise starts again where the save left it running.
+        if (saved.noise) {
+            s.image = images_->get("effect\\noise2_small.bmp");
+            if (!s.image) s.image = images_->get("sys\\noise2_small.bmp");
+            s.noise = true;
+            s.noiseFrom = now_;
+            if (s.image) front_[saved.slot] = s;
+            continue;
+        }
         s.path = saved.path;
         // A movie starts again from its beginning. Whether it looped isn't known from the save, and the library's
         // looping ones are backgrounds, so it loops.
@@ -2294,15 +2402,26 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         if (s.image || s.movie) {
             s.anchorX = saved.anchorX;
             s.anchorY = saved.anchorY;
+            s.anchorSet = saved.anchorX != 0 || saved.anchorY != 0;
         }
         if (saved.flipFrame >= 0) {
             resumeFlipbook(s);
-            restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes);
+            s.flipStep = saved.flipStep;
+            s.flipParam15 = saved.flipParam15;
+            restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes, saved.flipRepeat, saved.flipRepeat >= 0 ? saved.flipReverse : -1);
         }
         if (!saved.animation.empty()) {
             Animation a = parseAnimation(saved.animation, s);
             a.begunMs = now_ - int64_t(saved.animationFrames) * 1000 / std::max(1, fps_);
-            s.changes.push_back(std::move(a));
+            // A repeating one runs on as the named animation, at the place in its cycle the save was made at.
+            if (saved.repeat && a.periodMs > 0) {
+                a.repeat = true;
+                a.source = saved.animation;
+                s.loop = std::move(a);
+                s.looping = true;
+            } else {
+                s.changes.push_back(std::move(a));
+            }
         }
         front_[saved.slot] = s;
     }
@@ -2375,7 +2494,8 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     layoutText(atChoice ? "" : sjis::toUtf8(d.current.name), atChoice ? "" : sjis::toUtf8(d.current.text));
     textStart_ = now_;
     textDone_ = true;
-    waiting_ = atChoice ? Waiting::None : Waiting::Click;
+    // A game part's screen saved open waits for its input again, as it was.
+    waiting_ = partScreen_ ? Waiting::PartScreen : atChoice ? Waiting::None : Waiting::Click;
     dirty_ = true;
 }
 
@@ -2522,8 +2642,8 @@ void Engine::composeSlots(Canvas &out) {
     bool loading = screen_->name == "load";
     int hovered = pointerSeen_ ? slotAt(pointerX_, pointerY_) : -1;
     // NEW marks the card saved to last, which the PC keeps in global 0: Test Game 94's held 2 and The Alchemist's 1, the
-    // cards their screens marked.
-    int newest = variable(0, 0);
+    // cards their screens marked, and Test Game 87 counts from 0.
+    int newest = newCardSlot(layout_, variable(0, 0));
     auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / cells;
@@ -3164,6 +3284,13 @@ std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
     std::string key = normalizedPath(path);
     auto it = scripts_.find(key);
     if (it != scripts_.end()) return it->second;
+    // The story table's flows, and a game part's chapters, which come from the table and the part, not the game's files.
+    if (path.rfind("story:", 0) == 0) {
+        auto script = compileStory(path.substr(6));
+        if (script) scripts_[key] = script;
+        return script;
+    }
+    if (path.rfind("chapter:", 0) == 0) return compileChapter(std::atoi(path.c_str() + 8));
     Bytes data = files_.read(path);
     if (!data) {
         complain("Missing script " + path);
@@ -3241,11 +3368,12 @@ void Engine::run() {
             }
             continue;
         }
+        // On to the next node first, so a jump, even to the node itself, replaces it. The script is held, since a jump to
+        // another flow lets go of this one.
+        auto script = stack_.back().script;
         const Node &n = *stack_.back().node;
-        Frame &flow = stack_.back();
-        const Node *before = flow.node;
+        stack_.back().node = script->node(n.next);
         runFlow(n);
-        if (flow.node == before) flow.node = flow.script->node(n.next);
     }
     warnOnce("A script ran too long without waiting.");
 }
@@ -3261,7 +3389,8 @@ void Engine::runFlow(const Node &n) {
         if (script && script->first()) {
             scene_ = {script, script->first()};
             lastScene_ = script->name;
-            flowCallId_ = n.id;
+            // A story table's line saves the PC's own number for its place, when the table gives one.
+            flowCallId_ = flow.script->name.rfind("story:", 0) == 0 && n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
             log("scene %s", script->name.c_str());
         }
         break;
@@ -3316,6 +3445,37 @@ void Engine::runFlow(const Node &n) {
         flow.node = next ? next->first() : nullptr;
         break;
     }
+    case 1001:  // the story table's goto
+        flow.node = flow.script->node(n.otherwise);
+        break;
+    case 1002: {  // the story table's `open`: a game part's screen, which the flow waits on
+        std::vector<int> args(n.p.begin() + 4, n.p.begin() + 4 + std::clamp(n.p[3], 0, 24));
+        partResultScope_ = n.p[0];
+        partResultNumber_ = n.p[1];
+        flow.node = flow.script->node(n.next);
+        bool opened = false;
+        for (auto &[name, part] : parts_) {
+            // Set first, so a screen that finishes as it opens finds itself the one open.
+            partScreen_ = part.get();
+            if (part->openScreen(*partHost_, n.s[1], args)) {
+                opened = true;
+                break;
+            }
+        }
+        if (!opened) {
+            partScreen_ = nullptr;
+            complain("No game part opens the screen " + n.s[1]);
+        } else if (partScreen_) {
+            waiting_ = Waiting::PartScreen;
+        }
+        dirty_ = true;
+        break;
+    }
+    case 1003: {  // the story table's `chapter N`: the scenes a game part gives, then on
+        flow.node = flow.script->node(n.next);
+        if (auto chapter = loadScript("chapter:" + std::to_string(n.p[0]))) stack_.push_back({chapter, chapter->first()});
+        break;
+    }
     default:
         warnOnce("flow opcode " + std::to_string(n.opcode) + " isn't built: " + sjis::toUtf8(n.s[0]));
         break;
@@ -3357,6 +3517,7 @@ void Engine::beginChoice(const Node &n) {
     if (int answer = route() >= 1 && route() <= 4 && n.opcode == 3 ? n.p[size_t(9 + route())] : -1; answer == 0 || answer == 1) {
         choiceSheet_ = nullptr;
         choiceResult_ = answer;
+        choiceMade_ = true;
         log("choice %s made for route %d: %d", n.s[1].c_str(), route(), answer);
         return;
     }
@@ -3369,6 +3530,10 @@ void Engine::beginChoice(const Node &n) {
     // and one in every game's flows; parameter 1 is it too in most, but 1 in Test Game 94's two-option choices.
     choiceCount_ = n.opcode == 20 ? 2 : std::max(1, n.p[0] + 1);
     for (int r = 0; r < 4; r++) choiceRoutes_[size_t(r)] = n.opcode == 3 ? n.p[size_t(10 + r)] : -1;
+    choiceCells_.clear();
+    choiceClosingFrom_ = -1;
+    if (n.opcode == 3)
+        for (int i = 0; i < std::min(n.p[kChoiceCells], int(kChoiceCellsMax)); i++) choiceCells_.push_back(n.p[size_t(kChoiceCells + 1 + i)]);
     choiceBack_ = images_->get(config_.text("ChoiceBackFilename", "obj\\n000_000.bmp"));
     choiceHover_ = -1;
     waiting_ = Waiting::Choice;
@@ -3379,11 +3544,73 @@ void Engine::beginChoice(const Node &n) {
 void Engine::choose(int index) {
     if (waiting_ != Waiting::Choice) return;
     choiceResult_ = index;
+    choiceMade_ = true;
     log("chose %d", index);
+    // `close MS SCALE`: the chosen option shows pressed, and the box shrinks about its middle to SCALE and fades out over
+    // MS before the story goes on, as Test Game 82's does (set 2, from Wine shots).
+    if (const auto *close = choiceTable("close"); close && !close->empty() && field(*close, 0) > 0) {
+        choiceHover_ = index;
+        choiceClosingFrom_ = now_;
+        waiting_ = Waiting::Time;
+        waitUntil_ = now_ + field(*close, 0);
+        dirty_ = true;
+        return;
+    }
     choiceSheet_ = nullptr;
     choiceBack_ = nullptr;
     waiting_ = Waiting::None;
     dirty_ = true;
+}
+
+// The choice box closing: each of its pictures and options, the chosen one pressed (row 2), drawn smaller about the box's
+// middle, the first picture's, and fainter as it goes.
+void Engine::composeChoice(Canvas &out) {
+    const auto *close = choiceTable("close");
+    int ms = close && !close->empty() ? std::max(1, field(*close, 0)) : 1;
+    float end = close && close->size() >= 2 ? float(std::atof((*close)[1].c_str())) : 1;
+    float t = std::clamp(float(now_ - choiceClosingFrom_) / float(ms), 0.0f, 1.0f);
+    float scale = 1 - (1 - end) * t, alpha = 1 - t;
+    auto table = screens_.find("choice");
+    float cx = float(width_) / 2, cy = float(height_) / 2;
+    std::vector<std::pair<Image, std::pair<float, float>>> pieces;  // a piece's pixels and its middle
+    auto crop = [](const Image &from, int x, int y, int w, int h) {
+        Image part;
+        part.w = std::max(0, std::min(w, from.w - x));
+        part.h = std::max(0, std::min(h, from.h - y));
+        part.opaque = from.opaque;
+        part.rgba.resize(size_t(part.w) * size_t(part.h) * 4);
+        for (int row = 0; row < part.h; row++)
+            std::copy_n(&from.rgba[(size_t(y + row) * size_t(from.w) + size_t(x)) * 4], size_t(part.w) * 4, &part.rgba[size_t(row) * size_t(part.w) * 4]);
+        return part;
+    };
+    if (table != screens_.end()) {
+        bool first = true;
+        for (const Picture &p : table->second.pictures) {
+            if (!p.image) continue;
+            int w = p.image->w / std::max(1, p.cols), h = p.image->h / std::max(1, p.rows);
+            if (first) {
+                cx = float(p.x) + float(w) / 2;
+                cy = float(p.y) + float(h) / 2;
+                first = false;
+            }
+            pieces.push_back({crop(*p.image, p.column * w, p.row * h, w, h), {float(p.x) + float(w) / 2, float(p.y) + float(h) / 2}});
+        }
+    }
+    int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
+    choicePlace(x, top, step, slant);
+    for (int i = 0; i < choiceCount_; i++) {
+        int column = size_t(i) < choiceCells_.size() ? choiceCells_[size_t(i)] : i;
+        pieces.push_back({crop(*choiceSheet_, column * cellW, (i == choiceResult_ ? 2 : 0) * cellH, cellW, cellH),
+                          {float(x + i * slant) + float(cellW) / 2, float(top + i * step) + float(cellH) / 2}});
+    }
+    for (const auto &[image, middle] : pieces)
+        drawImage(out, image, cx + (middle.first - cx) * scale, cy + (middle.second - cy) * scale, scale, scale, 0, alpha);
+    dirty_ = true;
+}
+
+int Engine::choiceColumns() const {
+    const auto *columns = choiceTable("choicecolumns");
+    return columns && !columns->empty() && field(*columns, 0) > 0 ? field(*columns, 0) : choiceCount_;
 }
 
 void Engine::runScene(const Node &n) {
@@ -3408,6 +3635,14 @@ void Engine::runScene(const Node &n) {
         break;
     case 9:
         screenUpdate(n);
+        break;
+    case 10:  // the older layout's background, CG and standing pictures
+    case 11:
+    case 12:
+    case 13:
+    case 14:
+    case 21:
+        runOldLayout(n);
         break;
     case 15:  // load an image into a slot
     case 23:  // load an image for a difference switch: the same, shown by the next update
@@ -3490,9 +3725,22 @@ void Engine::runScene(const Node &n) {
         flashStart_ = now_;
         dirty_ = true;
         break;
-    case 51:  // noise over the screen, and its end: not drawn yet
+    case 51: {  // film noise over the scene, a picture in slot 10000 whatever the node says, as the PC's exe has it
+        ImageRef frame = images_->get("effect\\noise2_small.bmp");
+        if (!frame) frame = images_->get("sys\\noise2_small.bmp");
+        if (!frame) {
+            warnOnce("no noise picture");
+            break;
+        }
+        Sprite &s = back_[kNoiseSlot];
+        s = {};
+        s.image = frame;
+        s.noise = true;
+        s.noiseFrom = now_;
+        break;
+    }
     case 52:
-        warnOnce("noise isn't drawn yet");
+        back_.erase(kNoiseSlot);
         break;
     case 53:  // shake the screen
         if (!setting("effect")) break;
@@ -3578,6 +3826,9 @@ void Engine::runScene(const Node &n) {
     case 200: {
         Splash &splash = splashes_[p[0]];
         splash.image = images_->get(n.s[1]);
+        splash.path = n.s[1];
+        // What a save keeps of it: parameters 0, 5, 1 to 4, 6, 10, 11 and 7 to 9, as Test Game 88's saves hold them.
+        splash.saved = {p[0], p[5], p[1], p[2], p[3], p[4], p[6], p[10], p[11], p[7], p[8], p[9]};
         splash.cap = std::max(1, p[5]);
         splash.minLife = std::max(1, p[10]);
         splash.maxLife = std::max(splash.minLife, p[11]);
@@ -3610,6 +3861,7 @@ void Engine::runScene(const Node &n) {
         shakeLock_ = 1 << 30;
         break;
     default:
+        if (partCommand(n)) break;
         warnOnce("scene opcode " + std::to_string(n.opcode) + " isn't built: " + sjis::toUtf8(n.s[0]));
         break;
     }
@@ -3649,6 +3901,8 @@ bool Engine::step(int ms) {
         return waiting_ != Waiting::Ended;
     }
     now_ += ms;
+    for (auto &[name, part] : parts_)
+        if (part->step(*partHost_)) dirty_ = true;
     advanceFlipbooks();
     stepMovies();
     for (auto &[slot, splash] : splashes_) {
@@ -3668,6 +3922,13 @@ bool Engine::step(int ms) {
     if (waiting_ == Waiting::Time && (skip_ || skipToggle_ || now_ >= waitUntil_ || (clicked_ && setting("waitskip")))) {
         waiting_ = Waiting::None;
         clicked_ = false;
+    }
+    // A choice box that has finished closing goes, and the story goes on.
+    if (choiceClosingFrom_ >= 0 && waiting_ != Waiting::Time) {
+        choiceClosingFrom_ = -1;
+        choiceSheet_ = nullptr;
+        choiceBack_ = nullptr;
+        dirty_ = true;
     }
 
     if (!textDone_) {
@@ -3741,6 +4002,7 @@ void Engine::mouseMove(float x, float y) {
     pointerY_ = py;
     pointerSeen_ = true;
     if (spriteScreen() && moved) spritePointerMoved();
+    if (partScreen_ && moved && !screen_ && !dialogOpen_ && !logOpen_) partScreen_->pointer(*partHost_, px, py);
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
         else pressSettingsWidget(px, py, true);
@@ -3763,6 +4025,11 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (!down) return;
+    // A game part's open screen takes the presses, unless a menu or dialog is over it.
+    if (partScreen_ && waiting_ == Waiting::PartScreen && !screen_ && !dialogOpen_ && !logOpen_) {
+        if (partScreen_->press(*partHost_, pointerX_, pointerY_, button)) dirty_ = true;
+        return;
+    }
     // `mousechoice`: the right button takes a choice's last option, as Test Game 94's mouse icons say.
     if (button == 1 && waiting_ == Waiting::Choice && choiceSheet_ && !screen_ && !dialogOpen_ && !logOpen_ && choiceTable("mousechoice")) {
         choose(choiceCount_ - 1);
@@ -3920,7 +4187,7 @@ void Engine::mouseButton(int button, bool down) {
 // The table's `choice` screen gives where options start and the step between them. Without one they stack in the middle.
 void Engine::choicePlace(int &x, int &top, int &step, int &slant) const {
     slant = 0;
-    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
+    int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5;
     x = (width_ - cellW) / 2;
     top = (height_ - cellH * choiceCount_) / 2;
     step = cellH;
@@ -3945,7 +4212,7 @@ void Engine::choicePlace(int &x, int &top, int &step, int &slant) const {
 
 void Engine::updateChoice() {
     if (waiting_ != Waiting::Choice || !choiceSheet_) return;
-    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step, slant;
+    int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
     choicePlace(x, top, step, slant);
     int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
     int hover = -1;
@@ -3976,6 +4243,12 @@ bool Engine::jump(const std::string &script, int node) {
     auto target = loadScript(script);
     // A negative node starts the script from its top.
     if (!target || (node >= 0 && !target->node(node))) return false;
+    // In a story table's game the story goes on after the scene, from the first line that names it, as a load does.
+    if (!firstStoryFlow().empty()) {
+        stack_.clear();
+        partScreen_ = nullptr;
+        resumeStoryAt(target->name);
+    }
     const Node *n = target->first();
     scene_ = {target, n};
     waiting_ = Waiting::None;
@@ -4001,7 +4274,7 @@ bool Engine::jump(const std::string &script, int node) {
 
 const char *Engine::debugStatus() {
     char buffer[256];
-    const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : waiting_ == Waiting::Choice ? "choice" : waiting_ == Waiting::StaffRoll ? "staff roll" : "ended";
+    const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : waiting_ == Waiting::Choice ? "choice" : waiting_ == Waiting::StaffRoll ? "staff roll" : waiting_ == Waiting::PartScreen ? "part screen" : "ended";
     std::snprintf(buffer, sizeof buffer, "%s #%d %s t=%lld", scene_.script ? scene_.script->name.c_str() : "(flow)", scene_.node ? scene_.node->id : -1, waiting, (long long)now_);
     status_ = buffer;
     return status_.c_str();
@@ -4026,8 +4299,11 @@ void Engine::startFlipbook(const Node &n) {
     s.scaleX = float(p[4]) / 1000;
     s.scaleY = float(p[5]) / 1000;
     s.anchorX = s.anchorY = p[8] ? -1 : 0;
+    s.anchorSet = true;
     s.flipLoop = p[14] != 0;
     s.flipReverse = p[1] != 0;
+    s.flipStep = p[16];
+    s.flipParam15 = p[15];
     resumeFlipbook(s);
     if (!s.flipCount) warnOnce("A flipbook isn't in anime_cfg.ini: " + n.s[1]);
     else if (s.flipReverse) {
@@ -4043,29 +4319,10 @@ void Engine::startFlipbook(const Node &n) {
 // Timing's marker up to it, then the script the save is in. A walk that never reaches its place, as when a patch took that
 // node away, says nothing, and a flipbook found nowhere repeats, as nearly all of them do. A PC save made after Ejaculate
 // was pressed early can't say where the press was, so its walk runs to the marker.
-std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d, int slot) {
+std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d, const Sidecar &side) {
     std::map<int, FlipModes> slots;
-    if (slot >= 0) {
-        // `at SCENE NODE`, then `flip SLOT LOOP REVERSE PATH` lines. It counts only when it was written with this save.
-        auto bytes = readWhole(savePath(slot, "vnd"));
-        std::istringstream in(std::string(bytes.begin(), bytes.end()));
-        std::string line, scene;
-        int node = -1;
-        std::map<int, FlipModes> kept;
-        while (std::getline(in, line)) {
-            std::istringstream words(line);
-            std::string kind;
-            words >> kind;
-            if (kind == "at") words >> scene >> node;
-            else if (kind == "flip") {
-                int at = 0, loop = 1, reverse = 0;
-                std::string path;
-                if (words >> at >> loop >> reverse && std::getline(words >> std::ws, path) && !path.empty())
-                    kept[at] = {sjis::fromUtf8(path), loop != 0, reverse != 0};
-            }
-        }
-        if (node >= 0 && normalizedPath(sjis::fromUtf8(scene)) == normalizedPath(d.scene) && node == d.node) return kept;
-    }
+    // The modes VNDegen kept beside its save, or else the ones the scripts set on the way to the save's node.
+    if (side.valid) return side.flips;
     auto walk = [&](const std::string &name, int stopAt) {
         auto script = name.empty() ? nullptr : loadScript(name);
         if (!script) return;
@@ -4108,13 +4365,110 @@ std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d, int slot
 }
 
 void Engine::writeFlipModes(int slot, const SaveData &d) {
-    std::string text = "at " + sjis::toUtf8(d.scene) + " " + std::to_string(d.node) + "\n";
+    // `at SCENE NODE`, with `-` for no scene, and the fingerprint of the save it was written with.
+    std::string text = "at " + (d.scene.empty() ? std::string("-") : sjis::toUtf8(d.scene)) + " " + std::to_string(d.node) + "\n";
+    text += "print " + std::to_string(saveFingerprint(d)) + "\n";
     for (const auto &[at, s] : front_)
         if (s.flipCount) text += "flip " + std::to_string(at) + " " + (s.flipLoop ? "1" : "0") + " " + (s.flipReverse ? "1" : "0") + " " + sjis::toUtf8(s.path) + "\n";
+    // Game parts' state, `part NAME LINE`, kept beside the save as the flipbooks' modes are.
+    for (const auto &[name, part] : parts_) {
+        std::vector<std::string> lines;
+        part->save(lines);
+        for (const std::string &line : lines) text += "part " + name + " " + line + "\n";
+        if (part.get() == partScreen_)
+            text += "screen " + name + " " + std::to_string(partResultScope_) + " " + std::to_string(partResultNumber_) + "\n";
+    }
+    // A story table's game: its exact place, `story SCRIPT NODE` for each flow frame, which the PC's save can't hold, and
+    // the last result. A choice waiting is saved as the choice, to be asked again.
+    if (d.flow.empty() && !firstStoryFlow().empty()) {
+        for (size_t i = 0; i < stack_.size(); i++) {
+            const Frame &frame = stack_[i];
+            int id = frame.node ? frame.node->id : 0;
+            if (i + 1 == stack_.size() && waiting_ == Waiting::Choice)
+                for (const Node &c : frame.script->nodes)
+                    if (c.opcode == 3 && c.next == id) id = c.id;
+            text += "story " + frame.script->name + " " + std::to_string(id) + "\n";
+        }
+        text += "result " + std::to_string(choiceResult_) + "\n";
+        if (waiting_ == Waiting::Choice) text += "choice\n";
+    }
     writeWhole(savePath(slot, "vnd"), std::vector<uint8_t>(text.begin(), text.end()));
 }
 
-void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots) {
+// What a save holds of the story's state, for telling whether VNDegen's lines beside it were written with it: its time,
+// scene, node and scenario variables. The card's comment, which can change later, isn't in it.
+uint32_t Engine::saveFingerprint(const SaveData &d) {
+    uint32_t h = 2166136261u;
+    auto mix = [&](uint32_t v) {
+        for (int i = 0; i < 4; i++) h = (h ^ ((v >> (8 * i)) & 0xff)) * 16777619u;
+    };
+    for (int v : d.date) mix(uint32_t(v));
+    for (char c : normalizedPath(d.scene)) mix(uint8_t(c));
+    mix(uint32_t(d.node));
+    for (const auto &[number, value] : d.variables)
+        if (value) {
+            mix(uint32_t(number));
+            mix(uint32_t(value));
+        }
+    return h;
+}
+
+Engine::Sidecar Engine::readSidecar(const SaveData &d, int slot) {
+    Sidecar side;
+    if (slot < 0) return side;
+    auto bytes = readWhole(savePath(slot, "vnd"));
+    std::istringstream in(std::string(bytes.begin(), bytes.end()));
+    std::string line, scene;
+    int node = -1;
+    bool printed = false;
+    uint32_t print = 0;
+    while (std::getline(in, line)) {
+        std::istringstream words(line);
+        std::string kind;
+        words >> kind;
+        if (kind == "at") {
+            words >> scene >> node;
+            if (scene == "-") scene.clear();
+        } else if (kind == "print") {
+            printed = bool(words >> print);
+        } else if (kind == "flip") {
+            int at = 0, loop = 1, reverse = 0;
+            std::string path;
+            if (words >> at >> loop >> reverse && std::getline(words >> std::ws, path) && !path.empty())
+                side.flips[at] = {sjis::fromUtf8(path), loop != 0, reverse != 0};
+        } else if (kind == "choice") {
+            side.atChoice = true;
+        } else if (kind == "part") {
+            std::string name, rest;
+            if (words >> name && std::getline(words >> std::ws, rest)) side.parts[name].push_back(rest);
+        } else if (kind == "story") {
+            std::string script;
+            int id = 0;
+            if (words >> script >> id) side.story.push_back({script, id});
+        } else if (kind == "result") {
+            side.hasResult = bool(words >> side.result);
+        } else if (kind == "screen") {
+            words >> side.screen >> side.screenScope >> side.screenNumber;
+        }
+    }
+    // Lines written with another save than this one, such as a PC save copied over ours, don't count: the fingerprint
+    // tells, or in lines from before it was kept, the scene and node.
+    bool same = printed ? print == saveFingerprint(d)
+                        : node >= 0 && normalizedPath(sjis::fromUtf8(scene)) == normalizedPath(d.scene) && node == d.node;
+    if (!same) return {};
+    side.valid = true;
+    return side;
+}
+
+// Game parts start afresh, then take what the PC's save holds for them, then their own lines beside the save.
+void Engine::loadPartsState(const SaveData &d, const Sidecar &side) {
+    resetParts();
+    for (const auto &[name, part] : parts_) part->loadPC(d);
+    for (const auto &[name, part] : parts_)
+        if (auto it = side.parts.find(name); it != side.parts.end()) part->load(it->second);
+}
+
+void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat, int recordReverse) {
     if (!s.flipCount) return;
     s.flipLoop = true;
     auto it = slots.find(slot);
@@ -4122,6 +4476,9 @@ void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map
         s.flipLoop = it->second.loop;
         s.flipReverse = it->second.reverse;
     }
+    // A record that says whether it repeats, as a PC save of Test Game 88 made while it plays does, is believed first.
+    if (recordRepeat >= 0) s.flipLoop = recordRepeat != 0;
+    if (recordReverse >= 0) s.flipReverse = recordReverse != 0;
     if (!s.flipLoop && frame >= s.flipCount) {
         s.flipBegun = now_ - int64_t(s.flipCount) * s.flipMs;
         s.flipShown = s.flipCount;
@@ -4324,21 +4681,33 @@ bool Engine::gtNextScript() {
     return true;
 }
 
-// `gtcount HEART X Y UNITS X Y TENS X Y` in the table's `gt` screen: the heart and the two digits on it.
+// The count before GOOD Timing's marker, as Test Game 88's PC draws it, from the table's `gt` screen:
+//   gtcount HEART X Y DIGITS TENSX UNITSX Y LAST      the heart and the count in two digits from the DIGITS sheet, and
+//                                                     at a count of 1 from the LAST sheet, a red 0 and 1, instead
+//   gtpieces FILE,X,Y...                              the heart's segments, lit while the count is above their place:
+//                                                     at N the last N are lit, the first going dark first
 void Engine::composeGtCount(Canvas &out) {
     if (gt_.shownCount <= 0 || setting("gt_off")) return;
     auto table = screens_.find("gt");
-    const auto *f = table == screens_.end() ? nullptr : table->second.setting("gtcount");
-    if (!f || f->size() < 9) return;
-    ImageRef heart = images_->get((*f)[0]), units = images_->get((*f)[3]), tens = images_->get((*f)[6]);
-    if (heart) drawPart(out, *heart, field(*f, 1), field(*f, 2), 0, 0, heart->w, heart->h, 1);
-    if (units) {
-        int w = units->w / 10;
-        drawPart(out, *units, field(*f, 4), field(*f, 5), gt_.shownCount % 10 * w, 0, w, units->h, 1);
+    if (table == screens_.end()) return;
+    const auto *f = table->second.setting("gtcount");
+    if (!f || f->size() < 8) return;
+    auto draw = [&](const std::string &path, int x, int y) {
+        if (ImageRef image = images_->get(path)) drawPart(out, *image, x, y, 0, 0, image->w, image->h, 1);
+    };
+    draw((*f)[0], field(*f, 1), field(*f, 2));
+    if (const auto *pieces = table->second.setting("gtpieces")) {
+        int count = int(pieces->size());
+        for (int i = std::max(0, count - gt_.shownCount); i < count; i++) {
+            auto parts = split((*pieces)[size_t(i)], ',');
+            if (parts.size() >= 3) draw(parts[0], std::atoi(parts[1].c_str()), std::atoi(parts[2].c_str()));
+        }
     }
-    if (tens) {
-        int w = tens->w / 2;
-        drawPart(out, *tens, field(*f, 7), field(*f, 8), std::min(gt_.shownCount / 10, 1) * w, 0, w, tens->h, 1);
+    bool last = gt_.shownCount == 1;
+    if (ImageRef digits = images_->get((*f)[last ? 7 : 3])) {
+        int w = digits->w / (last ? 2 : 10), value = std::min(gt_.shownCount, 99);
+        drawPart(out, *digits, field(*f, 4), field(*f, 6), value / 10 * w, 0, w, digits->h, 1);
+        drawPart(out, *digits, field(*f, 5), field(*f, 6), value % 10 * w, 0, w, digits->h, 1);
     }
 }
 
@@ -4451,6 +4820,36 @@ void Engine::splashBurst(const Node &n) {
     dirty_ = true;
 }
 
+// The film noise, read from The Alchemist's exe with approval (nekosdk-cleanroom.md): a crop of its frame half as wide
+// and half as high, scaled up twice over at 1920 wide so it fills the screen, from a new random place every fourth frame.
+void Engine::drawNoise(Canvas &out, const Sprite &s) {
+    const Image &frame = *s.image;
+    int w = frame.w / 2, h = frame.h / 2;
+    if (w <= 0 || h <= 0) return;
+    int64_t step = (now_ - s.noiseFrom) * std::max(1, fps_) / (1000 * kNoiseFramesPerPlace);
+    // Any spread-out choice will do for the place, so a hash of the step and the noise's start stands in for the PC's
+    // random numbers, and the same step draws the same crop however often the frame is redrawn.
+    uint64_t key = uint64_t(step) * 0x9E3779B97F4A7C15ull ^ uint64_t(s.noiseFrom) * 0xC2B2AE3D27D4EB4Full;
+    if (!noiseCrop_ || int64_t(key) != noiseCropStep_) {
+        uint64_t z = key + 0x9E3779B97F4A7C15ull;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+        z ^= z >> 31;
+        int ox = int(z % uint64_t(w)), oy = int((z >> 32) % uint64_t(h));
+        auto crop = std::make_shared<Image>();
+        crop->w = w;
+        crop->h = h;
+        crop->opaque = false;
+        crop->rgba.resize(size_t(w) * size_t(h) * 4);
+        for (int y = 0; y < h; y++)
+            std::memcpy(&crop->rgba[size_t(y) * size_t(w) * 4], &frame.rgba[(size_t(oy + y) * size_t(frame.w) + size_t(ox)) * 4], size_t(w) * 4);
+        noiseCrop_ = crop;
+        noiseCropStep_ = int64_t(key);
+    }
+    float scale = 2.0f * float(out.w) / 1920;
+    drawImage(out, *noiseCrop_, float(w) * scale / 2, float(h) * scale / 2, scale, scale, 0, 1, nullptr, false);
+}
+
 void Engine::composeSplashes(Canvas &out, int fromSlot, int toSlot) {
     for (auto &[slot, splash] : splashes_) {
         if (slot < fromSlot || slot >= toSlot || !splash.image) continue;
@@ -4482,6 +4881,7 @@ void Engine::loadImage(const Node &n) {
         s.y = float(n.p[2] + (placed ? (height_ - image->h) / 2 : 0));
         s.scaleX = s.scaleY = 1;
         s.anchorX = s.anchorY = -1;
+        s.anchorSet = false;
         s.rotation = 0;
         s.alpha = 1;
         s.changes.clear();
@@ -4709,6 +5109,7 @@ void Engine::anchorOf(const Sprite &s, int &x, int &y) const {
 void Engine::takeScaleAnchor(Sprite &s, const Node &n) {
     s.anchorX = n.p[8] ? -1 : n.p[6];
     s.anchorY = n.p[9] ? -1 : n.p[7];
+    s.anchorSet = true;
 }
 
 // Parameters 16 to 19 say which of position, scale, rotation and alpha the command changes.
@@ -4856,6 +5257,7 @@ void Engine::namedAnimation(Sprite &s, const Node &n) {
     foldFinishedChanges(s);
     Animation a = parseAnimation(n.s[1], s);
     a.repeat = n.p[1] != 0;
+    a.source = n.s[1];
     s.loop = std::move(a);
     s.looping = true;
 }
@@ -4886,6 +5288,7 @@ void Engine::abortChange(int slot) {
             if (change.hasPivot) {
                 s.anchorX = change.pivotX;
                 s.anchorY = change.pivotY;
+                s.anchorSet = true;
             }
         s.changes.clear();
     }
@@ -5053,6 +5456,7 @@ void Engine::foldFinishedChanges(Sprite &s) {
         if (s.changes.front().hasPivot) {
             s.anchorX = s.changes.front().pivotX;
             s.anchorY = s.changes.front().pivotY;
+            s.anchorSet = true;
         }
         s.changes.erase(s.changes.begin());
     }
@@ -5060,6 +5464,7 @@ void Engine::foldFinishedChanges(Sprite &s) {
 
 bool Engine::anythingMoves() const {
     if (transitioning_ || shakeType_ || flashMs_ || blur_) return true;
+    if (auto noise = front_.find(kNoiseSlot); noise != front_.end() && noise->second.noise) return true;
     for (const auto &[slot, splash] : splashes_)
         if (!splash.droplets.empty()) return true;
     if (now_ - windowShownAt_ < kWindowSlideMs) return true;
@@ -5097,7 +5502,12 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
     for (const auto &[slot, s] : sprites) {
         if (!s.image) continue;
         composeSplashes(out, drawnTo, slot);
+        drawParts(out, Layer::Slot, drawnTo, slot);
         drawnTo = slot;
+        if (s.noise) {
+            drawNoise(out, s);
+            continue;
+        }
         SpriteView v = view(s);
         float dx = slot < shakeLock_ ? shakeX : 0, dy = slot < shakeLock_ ? shakeY : 0;
         // About an eighth of the amount as a radius gives the sharpness of the PC game's footage.
@@ -5133,6 +5543,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX * zoom, v.scaleY * zoom, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
     }
     composeSplashes(out, drawnTo, INT_MAX);
+    drawParts(out, Layer::Slot, drawnTo, INT_MAX);
 }
 
 void Engine::compose() {
@@ -5206,10 +5617,14 @@ void Engine::compose() {
 
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
+    drawParts(canvas_, Layer::UnderWindow);
     composeMessage(canvas_);
+    drawParts(canvas_, Layer::OverWindow);
     composeCameraPanel(canvas_);
+    if (partScreen_) drawParts(canvas_, Layer::Screen);
     if (dialogOpen_) composeDialog(canvas_);
 
+    if (choiceSheet_ && choiceClosingFrom_ >= 0) composeChoice(canvas_);
     if (waiting_ == Waiting::Choice && choiceSheet_) {
         auto table = screens_.find("choice");
         if (table != screens_.end()) {
@@ -5220,10 +5635,12 @@ void Engine::compose() {
         } else if (choiceBack_) {
             drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
         }
-        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step, slant;
+        int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
         choicePlace(x, top, step, slant);
-        for (int i = 0; i < choiceCount_; i++)
-            drawPart(canvas_, *choiceSheet_, x + i * slant, top + i * step, i * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
+        for (int i = 0; i < choiceCount_; i++) {
+            int column = size_t(i) < choiceCells_.size() ? choiceCells_[size_t(i)] : i;
+            drawPart(canvas_, *choiceSheet_, x + i * slant, top + i * step, column * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
+        }
         // `routes FILE X STEP G G G G`: once one of the routes' ending globals is set, each option names the routes that
         // take it, a sheet row per route and a column for cleared or not, stacked STEP apart beside the option's middle,
         // as Test Game 94 does.
@@ -5266,6 +5683,7 @@ void Engine::composeMessage(Canvas &out) {
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
+    drawParts(out, Layer::Window);
     drawGlyphRun(out);
     composeGtCount(out);
     composeMessageButtons(out);

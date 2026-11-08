@@ -20,6 +20,7 @@
 #include "canvas.h"
 #include "image.h"
 #include "movie.h"
+#include "parts.h"
 #include "save.h"
 #include "script.h"
 #include "ui.h"
@@ -54,6 +55,8 @@ struct Animation {
     int periodMs = 0;
     bool hasPivot = false;
     int pivotX = -1, pivotY = -1;  // the point a named `scale` keeps still, -1 for the middle
+    // A named animation's text as command 19 gave it, which the PC writes into a save as it is.
+    std::string source;
 };
 
 struct Sprite {
@@ -67,8 +70,10 @@ struct Sprite {
     std::vector<Animation> changes;
     Animation loop;
     bool looping = false;
-    // The point in the picture a scale keeps in place, or -1 for its middle.
+    // The point in the picture a scale keeps in place, or -1 for its middle, and whether a command has set it: the PC saves
+    // 0, 0 for a picture whose anchor nothing set (Test Game 93 under Wine).
     int anchorX = -1, anchorY = -1;
+    bool anchorSet = false;
     // A flipbook: numbered pictures shown in turn.
     int flipCount = 0, flipMs = 25, flipShown = 0;
     // A movie playing as the picture, and the story time it started at.
@@ -76,10 +81,15 @@ struct Sprite {
     int64_t movieFrom = 0;
     int64_t flipBegun = 0;
     bool flipLoop = false, flipReverse = false;
+    // Command 121's parameters 15 and 16, which saves keep for the PC.
+    int flipStep = 0, flipParam15 = 0;
     bool waveOn = false;
     // An effect painted on black, which the PC game adds to the picture.
     bool additive = false;
     int waveSpeed = 0, waveRows = 0, waveSize = 0;
+    // The SDK's film noise (commands 51 and 52), its picture the noise frame and the story time it began.
+    bool noise = false;
+    int64_t noiseFrom = 0;
 };
 
 struct SpriteView {
@@ -169,7 +179,8 @@ public:
     void toggleLock(int slot);
 
 private:
-    enum class Waiting { None, Time, Click, Choice, StaffRoll, Ended };
+    friend class PartHost;
+    enum class Waiting { None, Time, Click, Choice, StaffRoll, Ended, PartScreen };
     struct Frame {
         std::shared_ptr<Script> script;
         const Node *node = nullptr;
@@ -260,7 +271,6 @@ private:
     void advanceFlipbooks();
     void resumeFlipbook(Sprite &s);
     struct FlipModes { std::string path; bool loop, reverse; };
-    std::map<int, FlipModes> flipModesAt(const SaveData &d, int slot);
     void writeFlipModes(int slot, const SaveData &d);
     void takeScaleAnchor(Sprite &s, const Node &n);
     void anchorOf(const Sprite &s, int &x, int &y) const;
@@ -278,7 +288,7 @@ private:
     bool galleryPageExists(int page) const;
     void composeTrackCards(Canvas &out);
     void composeTrackTime(Canvas &out);
-    void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots);
+    void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat = -1, int recordReverse = -1);
     std::map<std::string, std::pair<int, int>> flipbooks_;
     // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
     // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
@@ -306,7 +316,8 @@ private:
     // Splash effects: droplets a burst throws out, at a slot's place in the draw order. Their motion is a guess from
     // the commands' numbers and the look of the PC game.
     struct Droplet { float x, y, vx, vy, scale; int bornMs, lifeMs; };
-    struct Splash { ImageRef image; int perBurstScale = 1000, gravity = 0, minLife = 500, maxLife = 1000, speed = 300, cap = 100; std::vector<Droplet> droplets; };
+    // Command 200's emitter, with its picture's name and the numbers a save keeps, in the save's order.
+    struct Splash { ImageRef image; std::string path; std::array<int, 12> saved{}; int perBurstScale = 1000, gravity = 0, minLife = 500, maxLife = 1000, speed = 300, cap = 100; std::vector<Droplet> droplets; };
     std::map<int, Splash> splashes_;
     void splashBurst(const Node &n);
     void composeSplashes(Canvas &out, int fromSlot, int toSlot);
@@ -532,6 +543,11 @@ private:
     // its choices name in parameters 10 to 13. The route is a scenario variable, `routevar N` in the defaults table (94's
     // SENARIO_STATUS, 4000), set as the story starts: the PC's saves carry it, and a load goes on in the route.
     int pendingRoute_ = 0, routeVar_ = -1;
+    // The older layout's slot for each place of a standing picture, each place's middle from the screen's, and the
+    // background's and the CG's slots, as Test Game 83 has them.
+    std::vector<int> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
+    bool layoutSlotByP1_ = false;
+    int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;
 
     // Commands.
@@ -593,6 +609,51 @@ private:
 
     Files files_;
     std::unique_ptr<Images> images_;
+    // Game parts the table turns on (parts.h), the one whose screen is open, and where its result goes.
+    std::vector<std::pair<std::string, std::unique_ptr<GamePart>>> parts_;
+    GamePart *partScreen_ = nullptr;
+    int partResultScope_ = -1, partResultNumber_ = 0;
+    std::unique_ptr<PartHost> partHost_;
+    void loadParts();
+    // The older layout's commands, 10 to 14 and 21 (oldlayout.cpp).
+    void loadOldLayout();
+    void runOldLayout(const Node &n);
+    void resetParts();
+    bool partCommand(const Node &n);
+    void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
+    void finishPartScreen(int result);
+    // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story
+    // table's game the exact place in the story, the last choice's or screen's result, and the part screen open.
+    struct Sidecar {
+        bool valid = false;
+        std::map<int, FlipModes> flips;
+        std::map<std::string, std::vector<std::string>> parts;
+        std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
+        bool hasResult = false;
+        int result = 0;
+        std::string screen;
+        int screenScope = -1, screenNumber = 0;
+        bool atChoice = false;
+    };
+    static uint32_t saveFingerprint(const SaveData &d);
+    Sidecar readSidecar(const SaveData &d, int slot);
+    std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
+    void loadPartsState(const SaveData &d, const Sidecar &side);
+    bool restoreStoryPlace(const Sidecar &side, bool &atChoice);
+    // The story table (story.cpp): a game without flow scripts has its story order as `flow` blocks under `screen
+    // story`, compiled to flow nodes. Flows are scripts named `story:NAME`; `chapter N` plays `chapter:N`.
+    std::shared_ptr<Script> compileStory(const std::string &flow);
+    std::shared_ptr<Script> compileChapter(int number);
+    std::string firstStoryFlow() const;
+    bool resumeStoryAt(const std::string &scene);
+    bool storyFlowExists(const std::string &name) const;
+    bool resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice);
+    bool storySceneIs(const Node &n, const std::string &scene);
+    // The parameter of a story table's `scene` and `choice` nodes that holds the PC's number for the place.
+    static constexpr int kStoryPcNumber = 31;
+    // A story table's choice's columns of its picture: how many at this parameter, then the columns.
+    static constexpr int kChoiceCells = 14;
+    static constexpr size_t kChoiceCellsMax = 5;
     Config config_;
     Audio audio_;
     FILE *log_ = nullptr;
@@ -631,6 +692,12 @@ private:
     // A choice: a sheet with one column per option and one row per state (normal, hovered, chosen, ...).
     ImageRef choiceSheet_, choiceBack_;
     int choiceCount_ = 0, choiceHover_ = -1, choiceResult_ = 0;
+    // Each option's column of the choice's picture, when the story table names them, and the box closing after a press
+    // (`close MS SCALE` under `screen choice`): when it began, or -1.
+    std::vector<int> choiceCells_;
+    int64_t choiceClosingFrom_ = -1;
+    int choiceColumns() const;
+    void composeChoice(Canvas &out);
     std::array<int, 4> choiceRoutes_{-1, -1, -1, -1};  // the option each of Test Game 94's routes takes, or another value
     const std::vector<std::string> *choiceTable(const std::string &key) const;
     float mouseX_ = 0, mouseY_ = 0;
@@ -644,6 +711,10 @@ private:
     bool shakeSustained_ = false;
     float shakeAmpX_ = 0, shakeAmpY_ = 0, shakePeriodX_ = 1, shakePeriodY_ = 1;
     int flashMs_ = 0, flashR_ = 0, flashG_ = 0, flashB_ = 0;
+    // The film noise as drawn: the crop of its frame for one step of its random places, kept until the step changes.
+    void drawNoise(Canvas &out, const Sprite &s);
+    ImageRef noiseCrop_;
+    int64_t noiseCropStep_ = -1;
     int64_t flashStart_ = 0;
     bool blur_ = false, blurEnding_ = false, previousValid_ = false;
     int blurAmount_ = 0, blurEndMs_ = 0;
@@ -659,6 +730,7 @@ private:
     std::string returnTo_;
     int flowCallId_ = 0;
     std::string choiceImage_;
+    bool choiceMade_ = false;  // a choice has been made this game, as Test Game 87's saves hold it
     std::vector<SavedText> backlog_;
     SavedText currentText_;
     struct Playing {

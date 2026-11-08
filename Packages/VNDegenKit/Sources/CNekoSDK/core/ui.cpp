@@ -200,6 +200,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 screen->pictures.push_back(marker);
             }
             screen->settings.emplace(w[0], std::vector<std::string>(w.begin() + 1, w.end()));
+            screen->lines.push_back(w);
         }
     }
     return screens;

@@ -30,6 +30,17 @@ int main(int argc, char **argv) {
             failures++;
             continue;
         }
+        // With NEKOSAVE_FRESH set, the parts kept as read are dropped first, so the save is written as the runtime writes
+        // one of its own, and what differs is what that can't reproduce.
+        if (std::getenv("NEKOSAVE_FRESH")) {
+            for (SavedSprite &sprite : data.sprites) sprite.rawFixed.clear(), sprite.rawTail.clear();
+            data.rootFixed.clear();
+            data.rootTail.clear();
+            data.afterRecords.clear();
+            data.tailBefore.clear();
+            data.tailAfter.clear();
+            data.beforeVariables.clear();
+        }
         auto again = buildSave(data, *layout);
         // With NEKOSAVE_WRITE naming a folder, the save as VNDegen writes it goes there under the same name, for the PC to load.
         if (const char *out = std::getenv("NEKOSAVE_WRITE")) {
@@ -43,6 +54,10 @@ int main(int argc, char **argv) {
                 if (first == size_t(-1)) first = i;
                 differ++;
             }
+        // Bytes one has past the other's end differ too.
+        size_t shorter = std::min(plain.size(), again.size());
+        differ += std::max(plain.size(), again.size()) - shorter;
+        if (first == size_t(-1) && plain.size() != again.size()) first = shorter;
         std::printf("%s: flow %s #%d, scene %s #%d, %d sprites, %d log lines, %d sounds; %zu bytes, written %zu, %zu differ, first at 0x%zx\n", argv[a], data.flow.c_str(),
                     data.flowNode, data.scene.c_str(), data.node, int(data.sprites.size()), int(data.backlog.size()), int(data.sounds.size()), plain.size(), again.size(), differ, first);
         // With NEKOSAVE_SPRITES set, each sprite's place, which is how to learn what a load command's position modes mean.
