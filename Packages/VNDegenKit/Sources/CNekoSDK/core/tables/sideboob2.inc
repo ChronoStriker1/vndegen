@@ -1,6 +1,29 @@
 // Test Game 87's (Funbag Fantasy: Sideboob Story 2) table, a raw string that tables.cpp includes and menuTable() hands
 // out. Its story order is in its exe, so the table gives it.
 const char kSideboob2[] = R"(
+screen title
+# Measured under Wine. The background holds the frame and the copyright, and the logo goes over it. Each button's help,
+# a card from d002_000, shows 88 pixels above it, the submenus' from d002_001 beside them. A submenu dims the five
+# buttons (their last row) and shows no help for them, and the right button closes it.
+pic obj\d000_000.bmp 0 0
+pic obj\d000_001.bmp 268 55
+button start obj\d001_000.bmp 530 422 5 5 0 help obj\d002_000.bmp 382 334 6 1 0 0
+button load obj\d001_000.bmp 530 471 5 5 1 help obj\d002_000.bmp 382 383 6 1 1 0
+button submenu:extras obj\d001_000.bmp 530 520 5 5 2 help obj\d002_000.bmp 382 432 6 1 2 0
+button config obj\d001_000.bmp 530 569 5 5 3 help obj\d002_000.bmp 382 481 6 1 3 0
+button quit obj\d001_000.bmp 530 618 5 5 4 help obj\d002_000.bmp 382 530 6 1 4 0
+# Once chapter 2 has begun (G 2), Start offers the prologue or chapter 2.
+startmenu 2
+button start_prologue obj\d001_002.bmp 756 422 6 5 0 group start help obj\d002_001.bmp 608 334 6 1 0 0
+button start_main obj\d001_002.bmp 756 471 6 5 1 group start help obj\d002_001.bmp 608 383 6 1 1 0
+button cg obj\d001_002.bmp 756 422 6 5 2 group extras help obj\d002_001.bmp 608 334 6 1 2 0
+button sprites obj\d001_002.bmp 756 471 6 5 3 group extras help obj\d002_001.bmp 608 383 6 1 3 0
+button scene obj\d001_002.bmp 756 520 6 5 4 group extras help obj\d002_001.bmp 608 432 6 1 4 0
+
+# Start's Chapter 2 starts the story table's flow of that name.
+screen start
+flow chapter2
+
 screen defaults
 # Standing pictures: the slot is chosen by the second number of 位置, x by the first, and 14 deletes by slot, from 21
 # PC saves under Wine.
