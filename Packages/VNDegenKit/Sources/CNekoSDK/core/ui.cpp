@@ -1,5 +1,6 @@
 #include "ui.h"
 
+#include <cctype>
 #include <cstdlib>
 #include <sstream>
 
@@ -18,6 +19,14 @@ std::vector<std::string> words(const std::string &line) {
 
 int number(const std::string &s) { return std::atoi(s.c_str()); }
 
+// "1,2,3" as numbers.
+std::vector<int> numbers(const std::string &s) {
+    std::vector<int> out;
+    std::istringstream in(s);
+    for (std::string part; std::getline(in, part, ',');) out.push_back(number(part));
+    return out;
+}
+
 std::string withoutComment(const std::string &line) {
     auto at = line.find("//");
     return at == std::string::npos ? line : line.substr(0, at);
@@ -34,23 +43,32 @@ bool pair(const std::string &s, int &a, int &b) {
 
 }  // namespace
 
-void drawPicture(Canvas &out, const Picture &p) {
+void drawPicture(Canvas &out, const Picture &p, float towardX, float towardY) {
     if (!p.image) return;
+    if (p.followX != 0 || p.followY != 0) {
+        drawShifted(out, *p.image, float(p.x) - p.followX * towardX, float(p.y) - p.followY * towardY, p.alpha);
+        return;
+    }
+    if (p.partW > 0 && p.partH > 0) {
+        drawPart(out, *p.image, p.x, p.y, p.partX, p.partY, p.partW, p.partH, p.alpha);
+        return;
+    }
     int w = p.image->w / std::max(1, p.cols), h = p.image->h / std::max(1, p.rows);
     drawPart(out, *p.image, p.x, p.y, p.column * w, p.row * h, w, h, p.alpha);
 }
 
-void drawButton(Canvas &out, const Button &b, ButtonState state) {
+void drawButton(Canvas &out, const Button &b, ButtonState state, bool withHelp) {
     if (!b.sheet) return;
     int row = state == StateNormal ? b.normalRow : state == StateHover ? b.hoverRow : int(state);
     row = std::min(row, b.rows - 1);
     drawPart(out, *b.sheet, b.x, b.y, b.column * b.cellW(), row * b.cellH(), b.cellW(), b.cellH(), 1);
-    if (state == StateHover || state == StateSelectedHover) {
-        if (b.help) {
-            int w = b.help->w / b.helpCols, h = b.help->h / b.helpRows;
-            drawPart(out, *b.help, b.helpX, b.helpY, b.helpColumn * w, b.helpRow * h, w, h, 1);
-        }
-    }
+    if (withHelp || state == StateHover || state == StateSelectedHover) drawButtonHelp(out, b);
+}
+
+void drawButtonHelp(Canvas &out, const Button &b) {
+    if (!b.help) return;
+    int w = b.help->w / b.helpCols, h = b.help->h / b.helpRows;
+    drawPart(out, *b.help, b.helpX, b.helpY, b.helpColumn * w, b.helpRow * h, w, h, 1);
 }
 
 std::map<std::string, Screen> parseScreens(const char *table, Images &images, const std::function<void(const std::string &)> &warn) {
@@ -73,17 +91,75 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             continue;
         } else if (w[0] == "pic" && w.size() >= 4) {
             Picture p;
-            p.image = image(w[1]);
+            p.dim = w[1] == "dim";
+            p.image = p.dim ? nullptr : image(w[1]);
             p.x = number(w[2]);
             p.y = number(w[3]);
-            if (w.size() >= 8) {
+            size_t at = 4;
+            if (w.size() >= 8 && (std::isdigit(uint8_t(w[4][0])) || w[4][0] == '-')) {
                 p.cols = number(w[4]);
                 p.rows = number(w[5]);
                 p.column = number(w[6]);
                 p.row = number(w[7]);
+                at = 8;
             }
-            // `alpha N` of 256, at the end of the line.
-            if (w.size() >= 6 && w[w.size() - 2] == "alpha") p.alpha = float(number(w.back())) / 256;
+            for (; at + 1 < w.size(); at += 2) {
+                const std::string &key = w[at], &value = w[at + 1];
+                if (key == "alpha") p.alpha = float(number(value)) / 256;  // of 256
+                else if (key == "tab") p.tab = number(value);              // only on that tab of a gallery
+                else if (key == "stage") p.stage = number(value);
+                else if (key == "group") p.group = value;
+                else if (key == "blink") p.blinkMs = number(value);
+                else if (key == "rise") {
+                    std::istringstream in(value);
+                    for (std::string point; std::getline(in, point, ',');)
+                        if (auto colon = point.find(':'); colon != std::string::npos)
+                            p.rise.push_back({number(point.substr(0, colon)), number(point.substr(colon + 1))});
+                }
+                else if (key == "if") p.needs = numbers(value);
+                else if (key == "ifread") p.ifRead = value;
+                else if (key == "unlessread") p.unlessRead = value;
+                else if (key == "ifhover" || key == "unlesshover") {
+                    std::istringstream in(value);
+                    for (std::string action; std::getline(in, action, ',');) (key == "ifhover" ? p.ifHover : p.unlessHover).push_back(action);
+                }
+                else if ((key == "move" || key == "clamp" || key == "fadein" || key == "fadeout") && at + 2 < w.size()) {
+                    const std::string &second = w[at + 2];
+                    if (key == "move") {
+                        p.moveFrom = number(value);
+                        p.speed = std::strtof(second.c_str(), nullptr);
+                    } else if (key == "clamp") {
+                        p.clampTop = number(value);
+                        p.clampBottom = number(second);
+                    } else if (key == "fadein") {
+                        p.fadeInAt = number(value);
+                        p.fadeInMs = number(second);
+                    } else {
+                        p.fadeOutAt = number(value);
+                        p.fadeOutMs = number(second);
+                    }
+                    at++;
+                }
+                else if (key == "pickby") p.pickBy = number(value);
+                else if (key == "randomif") p.randomIf = numbers(value);
+                else if (key == "more") {
+                    p.variants = {p.image};
+                    std::istringstream files(value);
+                    for (std::string file; std::getline(files, file, ',');) p.variants.push_back(image(file));
+                }
+                else if (key == "part" && at + 4 < w.size()) {
+                    p.partX = number(value);
+                    p.partY = number(w[at + 2]);
+                    p.partW = number(w[at + 3]);
+                    p.partH = number(w[at + 4]);
+                    at += 3;
+                }
+                else if (key == "follow" && at + 2 < w.size()) {
+                    p.followX = std::strtof(value.c_str(), nullptr);
+                    p.followY = std::strtof(w[at + 2].c_str(), nullptr);
+                    at++;
+                }
+            }
             screen->pictures.push_back(p);
         } else if (w[0] == "button" && w.size() >= 8) {
             Button b;
@@ -96,6 +172,11 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             b.column = number(w[7]);
             for (size_t i = 8; i < w.size(); i++) {
                 if (w[i] == "toggle") b.toggle = true;
+                if (w[i] == "stage" && i + 1 < w.size()) b.stage = number(w[++i]);
+                if (w[i] == "group" && i + 1 < w.size()) b.group = w[++i];
+                if (w[i] == "if" && i + 1 < w.size()) b.needs = numbers(w[++i]);
+                if (w[i] == "ifread" && i + 1 < w.size()) b.ifRead = w[++i];
+                if (w[i] == "unlessread" && i + 1 < w.size()) b.unlessRead = w[++i];
                 if (w[i] == "swap") {  // this sheet's first row is the hovered look
                     b.normalRow = 1;
                     b.hoverRow = 0;
@@ -113,6 +194,11 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             }
             screen->buttons.push_back(b);
         } else {
+            if (w[0] == "drift" && !screen->settings.count("drift")) {
+                Picture marker;
+                marker.drift = true;
+                screen->pictures.push_back(marker);
+            }
             screen->settings.emplace(w[0], std::vector<std::string>(w.begin() + 1, w.end()));
         }
     }

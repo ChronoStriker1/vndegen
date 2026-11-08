@@ -142,10 +142,70 @@ void drawPart(Canvas &dst, const Image &image, int x, int y, int partX, int part
     });
 }
 
-void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, float sy, float radians, float alpha) {
+void drawShifted(Canvas &dst, const Image &image, float left, float top, float alpha) {
+    int ix = int(std::floor(left)), iy = int(std::floor(top));
+    int fx = int((left - float(ix)) * 256 + 0.5f), fy = int((top - float(iy)) * 256 + 0.5f);
+    if (fx == 256) { ix++; fx = 0; }
+    if (fy == 256) { iy++; fy = 0; }
+    if (fx == 0 && fy == 0) {
+        drawPart(dst, image, ix, iy, 0, 0, image.w, image.h, alpha);
+        return;
+    }
+    if (alpha <= 0 || image.w == 0 || image.h == 0) return;
+    // A screen pixel at x takes source pixels x - ix - 1 and x - ix, weighted fx and 256 - fx, and likewise down. A source
+    // pixel beyond the image counts as clear, so the picture's edges soften as they would between pixels.
+    int x0 = std::max(0, ix), x1 = std::min(dst.w, ix + image.w + 1);
+    int y0 = std::max(0, iy), y1 = std::min(dst.h, iy + image.h + 1);
+    if (x0 >= x1 || y0 >= y1) return;
+    int w00 = fx * fy, w10 = (256 - fx) * fy, w01 = fx * (256 - fy), w11 = (256 - fx) * (256 - fy);
+    int a256 = int(alpha * 256 + 0.5f);
+    const uint8_t *src = image.rgba.data();
+    forRows(y1 - y0, size_t(x1 - x0) * (y1 - y0), [&](int row0, int row1) {
+        for (int y = y0 + row0; y < y0 + row1; y++) {
+            int sy = y - iy - 1;
+            const uint8_t *rows[2] = {sy >= 0 ? src + size_t(sy) * image.w * 4 : nullptr, sy + 1 < image.h ? src + size_t(sy + 1) * image.w * 4 : nullptr};
+            uint8_t *d = dst.px.data() + (size_t(y) * dst.w + x0) * 4;
+            for (int x = x0; x < x1; x++, d += 4) {
+                int sx = x - ix - 1;
+                const uint8_t *taps[4] = {nullptr, nullptr, nullptr, nullptr};
+                const int weights[4] = {w00, w10, w01, w11};
+                for (int r = 0; r < 2; r++)
+                    if (rows[r]) {
+                        if (sx >= 0) taps[r * 2] = rows[r] + size_t(sx) * 4;
+                        if (sx + 1 < image.w) taps[r * 2 + 1] = rows[r] + size_t(sx + 1) * 4;
+                    }
+                // Colour is mixed by alpha, so a clear source pixel's colour doesn't bleed into the edge.
+                int64_t cr = 0, cg = 0, cb = 0, ca = 0;
+                for (int t = 0; t < 4; t++) {
+                    if (!taps[t]) continue;
+                    int64_t wa = weights[t] * taps[t][3];
+                    cr += taps[t][0] * wa;
+                    cg += taps[t][1] * wa;
+                    cb += taps[t][2] * wa;
+                    ca += wa;
+                }
+                if (ca == 0) continue;
+                int a = int((ca * a256) >> 24);
+                a += a >> 7;
+                blendPixel(d, int(cr / ca), int(cg / ca), int(cb / ca), a);
+            }
+        }
+    });
+}
+
+void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, float sy, float radians, float alpha, const std::vector<int> *rowShift, bool additive) {
     if (alpha <= 0 || sx == 0 || sy == 0 || image.w == 0 || image.h == 0) return;
     float halfW = image.w * 0.5f, halfH = image.h * 0.5f;
-    if (radians == 0 && sx == 1 && sy == 1) {
+    auto put = [additive](uint8_t *d, int r, int g, int b, int a) {
+        if (!additive) {
+            blendPixel(d, r, g, b, a);
+            return;
+        }
+        d[0] = uint8_t(std::min(255, d[0] + ((r * a) >> 8)));
+        d[1] = uint8_t(std::min(255, d[1] + ((g * a) >> 8)));
+        d[2] = uint8_t(std::min(255, d[2] + ((b * a) >> 8)));
+    };
+    if (!rowShift && !additive && radians == 0 && sx == 1 && sy == 1) {
         float left = cx - halfW, top = cy - halfH;
         if (left == std::floor(left) && top == std::floor(top)) {
             drawPart(dst, image, int(left), int(top), 0, 0, image.w, image.h, alpha);
@@ -155,7 +215,10 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
     // The screen rectangle that holds the transformed image.
     float c = std::cos(radians), s = std::sin(radians);
     float ex = std::abs(halfW * sx * c) + std::abs(halfH * sy * s), ey = std::abs(halfW * sx * s) + std::abs(halfH * sy * c);
-    int x0 = std::max(0, int(std::floor(cx - ex))), x1 = std::min(dst.w, int(std::ceil(cx + ex)) + 1);
+    int margin = 0;
+    if (rowShift)
+        for (int shift : *rowShift) margin = std::max(margin, std::abs(shift));
+    int x0 = std::max(0, int(std::floor(cx - ex)) - margin), x1 = std::min(dst.w, int(std::ceil(cx + ex)) + 1 + margin);
     int y0 = std::max(0, int(std::floor(cy - ey))), y1 = std::min(dst.h, int(std::ceil(cy + ey)) + 1);
     if (x0 >= x1 || y0 >= y1) return;
     // Each destination pixel's source position, in 16.16 fixed point, stepping along the row. Sampling points sit half
@@ -166,10 +229,11 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
     int maxU = (image.w - 1) << 16, maxV = (image.h - 1) << 16;
     bool bilinear = !(radians == 0 && sx == 1 && sy == 1);
     const uint8_t *src = image.rgba.data();
-    bool solid = image.opaque && a256 >= 256;
+    // An opaque picture at full strength simply replaces what's there, unless it adds to it.
+    bool solid = image.opaque && a256 >= 256 && !additive;
     forRows(y1 - y0, size_t(x1 - x0) * (y1 - y0), [&](int row0, int row1) {
         for (int y = y0 + row0; y < y0 + row1; y++) {
-            float rx = x0 + 0.5f - cx, ry = y + 0.5f - cy;
+            float rx = x0 + 0.5f - cx - (rowShift ? float((*rowShift)[size_t(y)]) : 0.0f), ry = y + 0.5f - cy;
             // Double precision would cost more than it gains: a row is at most a few thousand pixels of steps under 1.
             int32_t u = int32_t((rx * dux + ry * duy + halfW - 0.5f) * kOne), v = int32_t((rx * dvx + ry * dvy + halfH - 0.5f) * kOne);
             int32_t stepU = int32_t(dux * kOne), stepV = int32_t(dvx * kOne);
@@ -183,7 +247,7 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
                 if (!bilinear) {
                     int a = (p[3] * a256) >> 8;
                     a += a >> 7;
-                    blendPixel(d, p[0], p[1], p[2], a);
+                    put(d, p[0], p[1], p[2], a);
                     continue;
                 }
                 int fu = (ux >> 8) & 255, fv = (vy >> 8) & 255;
@@ -203,7 +267,7 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
                 int sa = image.opaque ? 255 : (p[3] * w00 + pr[3] * w10 + pd[3] * w01 + pdr[3] * w11) >> 16;
                 int a = (sa * a256) >> 8;
                 a += a >> 7;
-                blendPixel(d, r, g, b, a);
+                put(d, r, g, b, a);
             }
         }
     });

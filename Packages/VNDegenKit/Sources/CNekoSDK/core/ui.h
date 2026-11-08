@@ -23,6 +23,11 @@ struct Button {
     int normalRow = 0, hoverRow = 1;
     bool toggle = false;   // stays down until pressed again
     bool always = false;   // reacts even when `disabled` asks otherwise
+    int stage = 0;         // in a title with `menustages`, 2 for the menu a click brings up
+    std::string group;     // shown only while the screen's submenu of this name, or one inside it, is open
+    std::vector<int> needs;  // `if G,G...`: shown only once one of these global variables is set
+    // `ifread SCRIPT` and `unlessread SCRIPT`: shown only once that script has been read to its end, or only until then.
+    std::string ifRead, unlessRead;
     ImageRef help;         // shown while hovered
     int helpX = 0, helpY = 0, helpCols = 1, helpRows = 1, helpColumn = 0, helpRow = 0;
     int cellW() const { return sheet ? sheet->w / cols : 0; }
@@ -35,10 +40,49 @@ struct Picture {
     int x = 0, y = 0;
     int cols = 1, rows = 1, column = 0, row = 0;
     float alpha = 1;
+    int tab = -1;  // a gallery's art for one of its tabs, or -1 for all of them
+    int stage = 0;  // in a title with an opening, 1 for the art the tiles reveal and 2 for what fades in after
+    std::string group;  // shown only while the screen's submenu of this name, or one inside it, is open
+    std::vector<int> needs;  // `if G,G...`: shown only once one of these global variables is set
+    // `ifread SCRIPT` and `unlessread SCRIPT`: shown only once that script has been read to its end, or only until then.
+    std::string ifRead, unlessRead;
+    // `ifhover A,A...` and `unlesshover A,A...`: shown only while the pointer is over a button of one of those actions, or
+    // only while it isn't, as Moral Orc's music screen shades the portrait of whoever speaks a control's help.
+    std::vector<std::string> ifHover, unlessHover;
+    // `more FILE,FILE...`: other pictures that can take this one's place when the screen opens. `pickby G` shows the
+    // one global variable G numbers, and `randomif G,G...` one at random once any of those is set, as Test Game 94's
+    // title picks its art. `variants` holds them all, this one first.
+    std::vector<ImageRef> variants;
+    int pickBy = -1;
+    std::vector<int> randomIf;
+    // How far, in pixels, the picture moves against the pointer when it's at the screen's edge, across and down.
+    float followX = 0, followY = 0;
+    // `part X Y W H`: only that rectangle of the picture, drawn at the picture's place.
+    int partX = 0, partY = 0, partW = 0, partH = 0;
+    // Where a screen's `drift` line art draws among its pictures. It has no image of its own.
+    bool drift = false;
+    // `rise MS:DY,MS:DY...`: on a gallery tab, how far below its place the picture is that long after the tab opens,
+    // between the points in a straight line, as Horny Elves and a Moral Orc's characters come up.
+    std::vector<std::pair<int, int>> rise;
+    // `pic dim 0 0 alpha N`: the screen behind it darkened by N of 256, as Test Game 94's main menu dims its title.
+    bool dim = false;
+    // `blink MS`: fades in and out, fully shown every MS, as Test Game 94's title prompt does.
+    int blinkMs = 0;
+    // A staff roll's layer, by milliseconds from its start: `move MS SPEED` moves it up SPEED pixels a second from then
+    // (down for a negative SPEED), `clamp TOP BOTTOM` keeps its top between those, and `fadein MS LENGTH` and
+    // `fadeout MS LENGTH` fade it in and out.
+    int moveFrom = -1;
+    float speed = 0;
+    int clampTop = -1000000, clampBottom = 1000000;
+    int fadeInAt = -1, fadeInMs = 0, fadeOutAt = -1, fadeOutMs = 0;
 };
 
-void drawPicture(Canvas &out, const Picture &p);
-void drawButton(Canvas &out, const Button &b, ButtonState state);
+// `towardX` and `towardY` are where the pointer is, from -1 at the screen's left or top edge to 1 at the other.
+void drawPicture(Canvas &out, const Picture &p, float towardX = 0, float towardY = 0);
+// `withHelp` shows the button's help whatever its state, as for the button whose question is open.
+void drawButton(Canvas &out, const Button &b, ButtonState state, bool withHelp = false);
+// A button's help alone, for a screen that draws it after all of its buttons so none covers it.
+void drawButtonHelp(Canvas &out, const Button &b);
 
 // A menu screen from a game's table: pictures and buttons, drawn in order, and where the screen's own parts go.
 struct Screen {
@@ -53,9 +97,9 @@ struct Screen {
     }
 };
 
-// Reads a game's menu table. Lines: `screen NAME`, `pic PATH X Y [COLS ROWS COL ROW]`,
+// Reads a game's menu table. Lines: `screen NAME`, `pic PATH X Y [COLS ROWS COL ROW] [alpha N] [tab N] [stage N] [follow X Y]`,
 // `button ACTION PATH X Y COLS ROWS COL [toggle] [help PATH X Y COLS ROWS COL ROW]`, and any other line a setting of the
-// screen it's in.
+// screen it's in. The first `drift` line also marks where the drifting line art draws among the pictures.
 std::map<std::string, Screen> parseScreens(const char *table, Images &images, const std::function<void(const std::string &)> &warn);
 
 // The message window's buttons, from msg_button.ini: `#under` ones show while the pointer's at the bottom of the screen, and

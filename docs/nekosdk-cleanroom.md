@@ -14,7 +14,10 @@ and nothing copied or ported from GPL, LGPL or unlicensed code.
 - **The PC games under Wine, as black boxes.** Headless gamescope for stills and input, Xvfb with `x11grab` for video, on
   CachyOS. Real saves made there, and recordings of the opening of Test Game 97.
 - **The executables, by strings and imports only.** `strings` for the asset names and scene lists, and the import table.
-  No executable has been disassembled or decompiled. Any disassembly needs the coordinator's approval first.
+  Test Game 94's `rinjin.exe` was disassembled once, on 2026-11-07, without asking first, for the four behaviours
+  [read from Test Game 94's exe](#read-from-test-game-94s-exe) lists. The coordinator approved that use after the fact the
+  same day. No other executable has been disassembled or decompiled. Any disassembly needs the coordinator's approval
+  first.
 - **VNDegen's own earlier code.** `audio`, `font` and `sjis` are adapted from the System 4 runtime. `stb_image` and
   `stb_vorbis` (public domain or MIT) are the same copies System 4 uses, and zlib (zlib license) unpacks archives.
 - **VNDegen's own feasibility test,** `docs/nekosdk.md` and its Python tools on branch `ws/nekosdk`.
@@ -78,15 +81,40 @@ After the records come the text on screen and the last 60 lines of the backlog, 
 
 **Checked both ways on Test Game 97 under Wine:** a save the PC wrote loads in the runtime, shows the same text, and moves on to the next line. A save the runtime wrote appears on the PC's load screen with its date and thumbnail, loads, shows the same text, and moves on. Test Game 95's saves load in the runtime. A save the runtime writes for Test Game 95 hasn't been loaded on its PC copy yet.
 
-`cfg.sav` holds the PC's settings, with the 10,000 global variables at byte 4000 (a macro of 1000 sits at byte 8000 after the prologue). The runtime keeps the rest of the file as it found it. `read.sav` isn't read or written, so PC read marks don't carry over. Config's settings are kept in a small file of VNDegen's, so they don't move to or from a PC.
+`cfg.sav` holds the PC's settings, with the 10,000 global variables at byte 4000 (a macro of 1000 sits at byte 8000 after the prologue). The runtime keeps the rest of the file as it found it. `read.sav`, packed the same way, lists the scripts the PC has read to their end: a count, then for each its name's length, the name, a count of node ranges, and the ranges as pairs of ints, the last two (0, 0) and (-2, -2). The runtime reads the names for the Scene gallery (below), and the ranges, inclusive node ids, as text already read for Config's read-only skip, which stops at the first line not read. The marks are every node the PC has run, not only text: Test Game 89's file gives a scene's script `(131, 132), (214, 214), (280, 280)`, a stretch of two lines then a music stop and a clear, consecutive ids along the chain. A script is listed once it has been read to its end. VNDegen keeps its own marks in `vndegen_read.txt` and writes `read.sav` back the same way, the PC's scripts first, in its order and with its ranges and any read since, then each script finished in VNDegen. Checked under Wine: with the file VNDegen wrote, the PC showed the scene finished in VNDegen unlocked, and its read-only skip (Config's byte 28 of `cfg.sav`) ran through the text read in VNDegen and stopped where that reading ended. Config's settings are kept in a small file of VNDegen's, so they don't move to or from a PC.
 
-The same file keeps what's been unlocked, read by comparing PC files with what the PC's galleries show: an int at byte 48000 plus 4 times each picture's number in `cg_view.ini`, and an int for each track in `sound_view.ini` from byte 100000. Both move by the length of a string at byte 44020 that names a scene: a file the PC has just made has none and is 104,000 bytes, and one with a 22-character name has its tables 22 bytes later. Test Game 95's file with 5, 4 and 7 pictures seen in its first three entries, and its 10 tracks heard of 15, gives those numbers, and Test Game 97's file agrees on the tracks. A CG row in Test Game 97 is assumed to match.
+The same file keeps what's been unlocked, read by comparing PC files with what the PC's galleries show: an int at byte 48000 plus 4 times each picture's number in `cg_view.ini`, and an int for each track in `sound_view.ini` from byte 100000. Both move by the length of a string at byte 44020 that names the last script read to its end (Test Game 89's changed from `ep_001_004_100` to `ep_001_005_000` as that script ended): a file the PC has just made has none and is 104,000 bytes, and one with a 22-character name has its tables 22 bytes later. Test Game 95's file with 5, 4 and 7 pictures seen in its first three entries, and its 10 tracks heard of 15, gives those numbers, and Test Game 97's file agrees on the tracks. A CG row in Test Game 97 is assumed to match.
+
+Test Games 92 and 93's music screens pan line art behind the track list, measured under Wine by tracking each frame against the five 2200-pixel-tall sketches `obj\g000_001` to `_006`. They come in the order 001, 002, 005, 003, 006 and round again, starting from one picked at random each time the screen opens. Each moves down at 30 pixels a second, at x -170, -300, 211, -32 and 145, from y -791, -1035, -1098, -815 and -1022 to -17, -16, -135, -18 and -25, fading in and out over 2.25 seconds at its ends, with a second of nothing before the next. It draws at 120 of 256 over the room, under the side panel and the frame of bars. The exe reads the sketches as the screen opens, so the order and places are its own; both games share them.
+
+Config's first tab is the same in every game, read from the PC's help lines and measured under Wine on Test Game 92's opening:
+
+- Effects off cuts a timed screen update straight to the new picture, makes a timed image change happen at once, and leaves out named animations and motion blur; the 2.5 second fade-in became a cut while the 4 second wait after it still waited. Flash and screen shake are left out with them, by their names, untested.
+- Waits off skips the `[ウエイト]` waits; the opening's fade still played.
+- Clicking past waits, when on, lets a click end a `[ウエイト]` wait: a click at 5.5 seconds brought the next picture at 5.8 instead of 6.3.
+- Camera work off keeps an event CG whole: timed and immediate image changes don't move or scale a `cg\` picture, though its fades still run, and its named animations don't run. With it on, the opening pans and zooms over the CG.
+- Explanations off hides the pop-ups msg_button.ini gives the message window's buttons.
+- The second tab's wait time runs from ×0.70 to ×1.30 in steps of 0.01, its bar full at ×2.00, and stretches `[ウエイト]` waits and timed screen updates alike: at ×0.70 the opening's 2.5 second fade took 1.75, and at ×1.30, 3.25.
+
+Config's second tab keeps the rest of the measured options. The confirm key, Space or Enter, is the key that acts as the left button, and the other one acts as the right button, as its help says. "Stop the game when inactive" is off to start. Test Game 92's CG animation switch is byte 76 of `cfg.sav` (1 on, 0 off), and with it off, set and saved by quitting, the first movie scene read the same pictures and movies under Wine; the PC writes `cfg.sav` only when it quits. What it and the manual animation camera switch change is still open.
+
+A scene unlocks once its key script, the last field of its `play_view.ini` line, has been read to its end, measured under Wine on Test Game 89. Leaving its second scene's script partway, after a few lines, and going back to the title left the scene locked, and that script wasn't in `read.sav`. The first scene, whose script `read.sav` lists, was unlocked. A line can name up to three key scripts, with 0 for none, and any one read unlocks the scene: Test Game 84's second scene names two, and the PC unlocked it with a `read.sav` that listed either alone, as well as both. The PC read those files, made by adding names with no ranges read to its own, and unlocked the scenes they named. So the runtime unlocks a scene as one of its scripts ends, and reads `read.sav` to unlock what the PC has. `play_view.sav` isn't about unlocks: unpacked, Test Game 88's has a save's layout, with a date at byte 44004 and sprite records, and the runtime leaves it alone.
 
 When no `cfg.sav` exists the runtime writes the values the PC game wrote on a first run under Wine, listed in `tables.cpp`, because a file of zeros sets the PC game's volumes to 0 and turns its confirmations off.
 
-Quick saves are ordinary saves in slots 81 to 88, which the Q-Save page after the ten pages of eight shows. Under Wine a session's first quick save overwrote slot 81 and its second went to slot 82. That a page's eight fill and then wrap is assumed, and so is quick load taking the newest. A card's lock is a global variable, 200 for the first card and on from there: locking a card changed nothing while the game ran and, in the `cfg.sav` the PC wrote as it quit, only global 200 for the first card in The Alchemist, Yarinaoshi no Christmas and Test Game 92, and 204 for Test Game 94's fifth. The next session opened with the card locked: its lock closed and its Delete disabled. The runtime keeps the lock there, refuses to save over or delete a locked card, and passes it over for a quick save. NEW marks the card saved to last, which the PC keeps in global 0 and writes as it quits: after saving to Christmas's third card and quitting, its file held 3, and The Alchemist's held 1 with NEW on its first card, though another save was newer. The question's "don't ask again" box, in both games, turns that question off whichever answer follows: under Wine in Test Game 94, a ticked box and No, and the next save went through unasked. The runtime turns off Config's setting for that question.
+Quick saves are ordinary saves in slots 81 to 88, which the Q-Save page after the ten pages of eight shows. Under Wine a session's first quick save overwrote slot 81 and its second went to slot 82. That a page's eight fill and then wrap is assumed, and so is quick load taking the newest. A card's lock is a global variable, 200 for the first card and on from there: locking Test Game 94's fifth card and then its first, and the first card of Test Game 92, The Alchemist and Yarinaoshi no Christmas, changed only those globals (204, then 200; 200) in the `cfg.sav` the PC wrote as it quit, and nothing while it ran. A locked card shows its closed lock and its Delete disabled, and the next session opened with it locked. Test Games 92 and 94 also draw the card as an empty one on the load screen (`lockdim`); The Alchemist and Christmas draw it as any other. The runtime keeps the lock there in every game, refuses to save over or delete a locked card, and passes it over for a quick save.
 
-A card's comment, typed on the PC's save screen, is the string after the save's first byte: with an input method under Wine, typing あいう on a card of The Alchemist and of Test Game 94 rewrote that save with 6 and the three characters in CP932 at byte 1, and everything after, the flow script's name first, 6 bytes later. With no comment the length is 0 and the flow's name is at 0xCD, the fixed place the runtime had read, so a save with a comment didn't read and showed as an empty card. The runtime reads the comment now and shows it on the card in white (`slotcomment`, placed and sized against the PC's: 21 pixels in The Alchemist, 13 in Christmas), and writes an empty one. The PC writes クリックでコメントを入力 or Click to set a comment on a card with none, a prompt to type one, which the runtime leaves out while it can't take one.
+
+Test Game 89's saves come back byte for byte except where the runtime doesn't read yet. Offsets below are from the end of a sprite record's two strings, in 89's layout:
+- A sprite running an animation has 1 at offset 388, beside the flag at 387 the runtime reads. The runtime writes 0 there.
+- A sprite with no animation has 0 where the runtime writes its slot number, at offset 397, the start of the record's tail. One with an animation has its slot number there in the PC's files too.
+- One sprite record holds 200 at offset 527, a value of its own that the runtime doesn't read.
+- 13242 and 13246 bytes after the records, the PC writes 6 and 3. 277, 285 and 289 bytes after them, a save made just after a load holds 1, 1 and 10.
+- In a save made just after a load, the base record's two alpha fields hold 255 where a fresh one, and the runtime, hold 256.
+
+The runtime writes zeros for the values it doesn't read. A quick save the runtime wrote from the PC's own save loads in the PC game under Wine and shows the same scene. 89's quick saves are slots 61 to 66, after its 60 cards.
+
+A card's comment, typed on the PC's save screen, is the string after the save's first byte: with an input method under Wine, typing あいう on a card of The Alchemist and of Test Game 94 rewrote that save with 6 and the three characters in CP932 at byte 1, and everything after, the flow script's name first, 6 bytes later. With no comment the length is 0 and the flow's name is at 0xCD, the fixed place the runtime had read, so a save with a comment didn't read and showed as an empty card. The runtime reads the comment and shows it on the card in white (`slotcomment`, placed and sized against the PC's: 21 pixels in The Alchemist, 19 in Christmas, 18 in Test Game 94; the last two are MS Gothic, so they were measured under Wine with Ume Gothic, VNDegen's own stand-in for it, put in its place, as Wine had drawn them in another, smaller face), and a card with a save and no comment shows the PC's prompt, クリックでコメントを入力 or Click to set a comment. A click there, on the save or load screen, asks the host for a comment in a text field, and the runtime writes it as the PC does: only the comment changes in the file, the rest as it was. Test Game 94's box stopped at 36 bytes, 36 letters or 18 kana, so a longer comment is cut there, never inside a character. A save VNDegen writes has no comment.
 
 ## Meanings settled by comparison with the PC game
 
@@ -115,13 +143,136 @@ scene.
 - A shake is a burst of about 300 ms that dies away, by frame-to-frame motion in the recording. Type 4 moves sideways and
   type 8 moves both ways, inferred from the order of the bursts against the order of the commands.
 
+## Files a script names that the game doesn't have
+
+Test Game 84's scripts name two sounds, `se\\512.ogg` and `se\\se_686.ogg`, and a flipbook, `anime\\_ef_000_011_000.bmp`, that aren't in its archives, and once load an image with no name. The PC game, from a test save just before `se_686.ogg`, shows no message and goes on to the same next line as the runtime, which skips such files and logs them. The nameless load is just after the scene clears every slot, so nothing shows there either way.
+
+## Fog and effect flipbooks
+
+Test Game 84's one fog command, 80, changes nothing on the PC game: frames from before it and for 20 seconds after match to the pixel, and the frame a few lines later matches the runtime's, which draws no fog. The exe's fog is Direct3D's, which doesn't touch the game's flat pictures.
+
+Test Games 84 and 85 play short sword and hit effects as flipbooks of pictures with no alpha, over 89% black. Drawn opaque they'd black out the scene, which the PC game never shows, so the runtime adds them. CG flipbooks without alpha in other games are under 10% black and stay opaque. A flipbook that doesn't repeat shows nothing once it's past its last picture: 88's PC saves hold one at picture 23 of 20, and after 84's reverse slash ends no trace of its brightest picture is left in the PC's frame. The blend itself during the effect's 0.13 seconds is inferred, since screenshots under Wine can't catch it.
+
+## Particles
+
+Command 95, light particles, names `parts\\000_000_042.bmp` in Test Games 84 and 89, and neither game has that picture. The PC game shows no particles in 84 over ten seconds of captures after the command, so there's nothing to draw.
+
+## Test Game 84's title
+
+When the game starts, each quarter of the screen shows the title art from its outer edge: top left growing rightward, top right downward, bottom right leftward and bottom left upward, all with the same quadratic ease out over 0.52 seconds. Fitted over six launches captured under Wine at staggered phases, within 4 pixels. The menu and logo then fade in from 0.92 to 1.93 seconds. Each quarter is revealed four times over, each copy 70 ms behind the one before, and the art shows at 33, 65 or 87% of its brightness where one, two or three copies cover it, in full under all four. Every one of 19 PC screenshots taken during the opening, from six launches, matches a frame of the runtime's within 2.2 of 255 on average, with the pointer where the PC's was.
+
+Once the opening ends, the title is three layers: the background at 0, 0, and the two characters at -60, -40 and 362, -40. The game's shadow, glow and light streak pictures don't show. The characters move against the pointer, linearly and at once, with no easing between two frames: from the middle to an edge, the left one by 1 pixel across and 1.5 down, the right one by 0.625 and 1, between pixels. The table's `follow` gives a picture that movement. It was measured at 15 pointer places under Wine, and at the 8 checked, the runtime's title matches the PC's to within 0.7 of 255 on average. The menu's buttons sit at 119 to 359, 40 apart, and Quit at 559. Hovering one shows its line of help, `b005`, 33 pixels above it. The Start button shows its selected row and its help while its choice of Prologue or Main Story is open.
+
 ## Individual Voices
 
-`cfg\voice_type.ini` gives each speaker a type, `#type N`, and lists how the names of their voice files start. Types from 50 hold the background voices of the speaker 50 below. Recordings of a NekoSDK game's sound under Wine show that an unchecked speaker's lines and background voice don't play. The Alchemist's Audio tab has boxes for Mel and the two Misc types, drawn from a sheet of four columns of which the second is unused, and Yarinaoshi no Christmas's has one for Sonya. The boxes' places and their rows for on, off and hovered were matched against the PC game.
+`cfg\voice_type.ini` gives each speaker a type, `#type N`, and lists how the names of their voice files start. Every one of Test Game 84's 22,731 voice files matches exactly one start. Types from 50 hold the background voices of the speaker 50 below, and the PC clears both flags together when that speaker's box is unchecked. Its cfg.sav keeps each type's flag as 4 bytes at 400 plus 4 times the type, written when the game quits. A voice of several speakers has a type of its own with no box, and its flag is cleared whenever any of them is: unchecking only Venus, only Destra, or only either Misc box cleared exactly the joint types whose notes in the ini name them, so the table lists those speakers. Recordings of the PC's sound under Wine show an unchecked speaker's lines and background voice don't play. In Test Game 84, All Women and All Men are boxes of their own that set the whole column, the Misc box with it, to their new state. Unchecking one speaker leaves All checked. Test Game 85 shows a card per type in its Sound tab, and the same runs on it found its five joint types following the speakers their notes name, with the one for everyone following the two Misc cards. Its cards' sheet rows run on, on and hovered, off, then off and hovered. Test Games 88 and 93 have a name plate under each heroine's portrait, and no voice files of their joint types. The Alchemist's Audio tab has boxes for Mel and the two Misc types, drawn from a sheet of four columns of which the second is unused, and Yarinaoshi no Christmas's has one for Sonya. The boxes' places and their rows for on, off and hovered were matched against the PC game.
+
+## Config's sound tab and the title's extra buttons
+
+In Test Games 88, 89, 92 and 93, as in 94, the PC's sound tab under Wine steps the HSE and background voice volumes,
+turns the stop-voice switch, and plays a sample for each ♪ but master's and music's. The sample is the file the PC
+reads at the click, from a trace of its reads; 93 asks for `se\se_05.ogg`, which it doesn't have, and plays nothing.
+A ♪ turns lit once played and stays so while the tab is open; whether a later visit starts them unlit wasn't seen.
+The titles' Version info is a Windows message box: the game's name in brackets, its file version, and lines for
+bonus content, of which each copy measured shows its own. Manual opens the game's `manual\index.html`, a patch's
+first, and the web survey the page its `webアンケート.url` names, both in a browser on the PC.
+
+## Test Game 92's animation switches
+
+Config's 「CGのアニメーション切り替え」 ("turns some H scenes' CGs into animation", its help says) changed nothing on the PC
+under Wine: from a save just before the first movie scene's movie, and one just before a flipbook, the frames with it on
+and off were the same to the pixel, and the same movie file was opened. 「アニメーションの手動操作」 ("the animation's
+camera, zoom and move, by hand") shows a panel at the bottom right while a movie plays: the wheel zooms 0.05 a notch
+from ×1.00 to ×2.50, the panel's buttons zoom out, reset and zoom in, and the zoomed movie follows the pointer, its
+offset (zoom − 1) times the pointer's position, fitted to four PC frames within 2 pixels. The panel hides with the
+message window. Its second Config tab's help sheet has eight rows, of which the table had read six.
+
+## Ore o Hoshigaru Tsuma to Gibo's CG art
+
+Config's 「CG表現の切り替え」 picks detailed (拘り表現) or normal (通常表現) art. The scripts name the detailed variants,
+numbered in the hundreds, as `cg_001_000_000_000_304`; from a save just before them, the PC under Wine read those with
+detailed art and `_003` and `_004`, the same numbers less their hundreds, with normal art, and the normal frames lacked
+the detailed ones' falling drops. The runtime shows a variant's base when normal art is chosen and the base exists.
+
+## Gallery figures
+
+Test Game 88's CG and Scene galleries draw its three heroines over each tab's room, from the `sc` sprites the PC reads
+for each tab under Wine, the tab's own heroine in her other pose (`_001`), at the places fitted to the PC's frames.
+Its tab buttons' labels lie in the sheet in another order from the entries' tab numbers: the second button, whose
+label is the sheet's third, lists `cg_view.ini`'s tab 2, eight entries, as the PC shows. The cards move 80 pixels away
+from the tab's heroine, as the PC draws them, and like 93's show how many of an entry's pictures have been seen. Horny
+Elves and a Moral Orc draws each tab's character, its `sc` sprite, and on the harem tab the picture `g002_000`; a 30
+fps recording under Wine shows the character come up from below over about 0.17 seconds, overshooting by 21 pixels.
+
+## Horny Elves and a Moral Orc's Fiona
+
+Its CG and Scene galleries' Fiona tab and Config's portrait and voice box for her follow `read.sav`: under Wine, with
+every episode's global set the PC still showed ???? and her silhouette and no tab, and with `scr\ep_011_001_000.txt`
+alone added to its `read.sav` it showed all three. Revealed, it draws `i018` and `i019` where it drew `i118` and
+`i119`. The runtime has table lines shown `ifread` or `unlessread` a script, and `readswap` for a widget's sheet.
+
+Its `cfg.sav` also showed the file's second string: after the script name at 44020, a movie's name 56 bytes on
+(`movie\bga_001_000_000_000_000.wmv`, 33 bytes), which the other games leave empty. Both strings move the unlock flags
+that follow them, so the runtime had read Moral Orc's CG flags from the wrong place; it now counts both.
+
+## Horny Elves and a Moral Orc's music screen
+
+Its bottom is the galleries' band, then an outline (`h005_000`) and the cast over it: the orc, Fiona (her silhouette
+`h105_009` until `ep_011_001_000` has been read), Myshla, Eymie and Alycia, placed and layered against the PC's frame
+to the pixel. Its top band is the galleries' leafy one over the menus' own. Each control's help is a speech bubble
+from `h006_000`, spoken by one of the cast, whose portrait darkens (`h005_002`, `_004`, `_006`, `_008`, `_010`)
+while it shows; the bubble sits by the speaker. No help shows over a lit control, such as Stop while nothing plays,
+or a disabled one. Table pictures can be shown `ifhover` or `unlesshover` a control, or a named `hover` area.
+
+## Test Game 88's outfit lock
+
+Its sprite gallery (立ち絵鑑賞) lists each heroine's faces, outfits and poses in `cfg\sc_view.ini`: `#p N face`,
+`clothes` and `pose` sections of thumbnails, `#p 100` the backgrounds, each ending `##`, with a second field on bonus
+lines. An outfit's thumbnail `clothes_HHH_OOO_...` names the heroine's sprite number HHH and the outfit OOO of her story
+sprites `sc\sc_HHH_OOO_PPP_SSS_FFF`. With 服装固定 on, the PC under Wine, loading a save whose script shows
+`sc_001_002_000_001_000`, read that file and then `sc_001_001_000_001_000`, the gallery's chosen outfit, and showed
+it: the outfit field is replaced and the pose, size and face kept. Each heroine has her own outfit and lock, which the
+PC keeps in `cfg.sav`: the outfit's place in her list at 1212, 1216 and 1220, and the lock at 1224, 1228 and 1232
+(a quit after locking Akiho's third outfit and Ai's fifth wrote 2, 4, 1, 1; global 65 was set with them).
+
+The viewer itself was measured against the PC's frames under Wine, its pieces placed to the pixel. The figure is
+centred and, taller than the screen, moves with the pointer: its top is -(height - 720) x pointer y / 720, at any zoom,
+which fits shots at five pointer heights and at x1.10. The panel, the picker bar with the pin, the hint and 終了 slide
+off the screen, each by its own size, together in about 0.3 s, starting about 3 s after the panels last appeared (the
+explanation or a list closing, or a click bringing them back) or a click changed something; a click on nothing, on the
+side already chosen or the pointer moving doesn't keep them, and a move doesn't bring them back. A chosen radio stays
+red under the pointer. Each radio's help bubble shows over either side, not the icon.
+
+Each thumbnail opens its own window (`p025`, `p022`, `p017`, `p016`, `p014` for backgrounds, faces, outfits, poses and
+heroines). Backgrounds, faces and outfits are tiles, the `thumb_` file beside each thumbnail, lit by a five-row sheet:
+red when chosen, blue under the pointer. Outfits show a box ticked on the chosen one, a number and a name per heroine,
+two rows at a time with a scroll bar, and the chosen one large (`preview_`); the box chooses as the tile does and
+doesn't set the lock. Poses and heroines are the heroine's own sprites at 0.8, each centred unscaled on its column and
+scaled from her top left, multiplied by 166,106,106 when chosen, 199,245,250 under the pointer and 106,106,106
+otherwise (a per-channel fit against the sprites, to within a few levels); a click goes to the nearest column. A click
+on an entry chooses it and leaves the list open; the × or a click outside the window closes it. A bonus whose patch
+folder is there without its pictures (`sys_1`) is listed by name alone and can't be chosen; one whose folder isn't
+(`sys_2`) isn't listed, and numbers count only what's listed.
+
+## Funbag Fantasy 3 if's music modes
+
+Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on
+the PC under Wine, one is always lit and a click on the lit one changes nothing; the middle one is lit when the screen
+opens. With the first lit, a track that ends starts again; with the middle one, the list plays on, and after the last
+track heard the first starts and the screen turns back to its page; the third picks tracks at random. The runtime has
+them as `music_one`, `music_all` and `music_random`, and turns the page to any track that starts on its own.
 
 ## Replays
 
 A replay from the Scene gallery uses the bar `MsgButtonPlayViewDeclFilename` names in `init.ini`, `cfg\msg_button_playview.ini`, in place of the usual one. In every game seen it differs only in Exit's help picture, which says the gallery ends rather than the game. Under Wine, Test Game 84's Exit in a replay goes straight back to the Scene Library, with no question.
+
+## Test Game 84's CG viewer
+
+Measured under Wine. A picture opens with a panel over its bottom right: Replay the scene, previous and next CG, previous and next variant, a count, Auto, Return, and a button that hides the panel. A right click hides or shows it, and a click on the picture does nothing. The count is the picture's place among all of its entry's pictures, locked ones too. The variant buttons step through the entry's unlocked pictures and wrap. The CG buttons step between entries with a picture unlocked, across the gallery's tabs and wrapping at the ends. Next lands on an entry's first unlocked picture, and so does Previous within a tab, but Previous into another tab lands on its last, in all five cases tried. Auto moves to the next unlocked picture every 8 seconds, and its button fills from the right over 7.2 seconds with its selected look, the rest being its hovered look tinted 100 of 256 toward red. Replay shows only while the picture's scene is unlocked in the Scene gallery, and leaving the replay comes back to the viewer at that picture. Return goes to the gallery's tab and page for the picture. The gallery itself has 20 cards to a page, each unlocked one with a count of its pictures, and none past a tab's last entry.
+
+## Help on hover
+
+Every PC game seen shows a line of help while the pointer is over a menu button or a settings group, except over the tab, page or menu already open. Each was found by hovering every control of the PC game under Wine, and Config's groups by hovering a grid of points over each tab, 40 by 24 pixels apart (64 in The Alchemist). Funbag Fantasy 4 and The Alchemist draw a picture for each, beside the control. Funbag Fantasy 3 if, Haha Sannin to Ana Asobi and Ore o Hoshigaru Tsuma to Gibo draw one row of a sheet of them, at the bottom left for the title and at the bottom right for Config and music, with rows 34 pixels apart on the title's sheet and 39 on the others. Some sheets are drawn flush with the screen's right edge and others at a fixed place, as measured. The Alchemist's Change Illustration help is a picture of its own, `l999_001`.
 
 ## Two nodes with one number
 
@@ -131,52 +282,122 @@ One script of Test Game 95 has two nodes numbered 1125. The first ends the scene
 
 A sprite's x and y are the top left of the unscaled picture. Parameter 0 of the image load command places a picture: 1 centres it, 2 and 3 put its middle 256 to the left and right of centre, 4 and 5 put it 512 away, and parameters 1 and 2 add to that. It always sits halfway down. Every load with command 15 starts the slot afresh, at 0, 0 and scale 1 with parameter 0 at 0, and with full alpha, which Test Game 93's saves show. The rotation going back too is assumed. Command 23, a difference image, keeps the slot's place, scale and alpha. Parameter 0 of the set-position command, 18, makes its position a move from where the sprite is, as it does for command 25. These were checked by replaying scenes to the node each PC save names and comparing the sprite places the PC saved, in Test Games 84, 93, 95 and 97, at 1280 and 1920 wide, with C's division toward zero. Three sprites in a save of Test Game 88 inside a GOOD Timing script don't fit, and those are unexplained. Sprites kept from an earlier scene can't be checked that way. Scaling keeps a point of the picture still: parameters 6 and 7 of the scaling commands name it, and 8 and 9 say the middle instead, on each axis. The saved anchors match.
 
-A picture's unlock flag in `cfg.sav` goes by its number in `cg_view.ini`, the middle field of its line, so a flag is 4 bytes at 48000 plus that number times 4. Every flag set in the PC files of Test Games 84, 88 and 93 is such a number, and those numbers don't track the entries.
+The ripple command, 98, shifts rows sideways, in the picture's own pixels, so it scales with the sprite: parameter 3 pixels each way, 520 over parameter 2 rows to a wave, and 7.8 seconds over parameter 1 for a wave to pass upward. Bursts of PC screenshots fit it at 2, 2 and 10 on a sprite at scale 1 (10 pixels, 260 rows, 3.9 seconds), and at 1, 3 and 15 on a half-transparent background at scale 1.5, where the unscaled rule fits more than twice as badly.
 
-The block after the sprite records holds a count at byte 22 and that many sprite numbers after the block's fixed part. The PC's save made at a choice names the choice as its flow node. Its later blocks also hold state the runtime doesn't write, and a save of ours naming the choice makes the PC run past it, so ours names the scene before, and the PC then asks the choice itself.
+## Files
 
-## Flow variables
+A folder such as `scr` or `cfg` beside the archives outranks them. Test Game 93 keeps its English in them: the same line shows in English on PC and in Japanese from `scr.pak`. An archive named with a number, such as `cg2.pak`, adds to the folder of that name without the number, because scripts name its pictures under `cg\\`. Under Wine these games' Gothic font falls back to one narrower than the runtime's, so the PC's text there looks smaller than it would on Windows.
 
-A flow's condition (command 5) and change (command 6) name their variable by scope, parameter 0, and by its place in that scope's list in `macrolist.ini`. The places count in the names' order, not the file's: The Alchemist's file lists `GLB_PROLOGUE_OVER` (1000) before `GLB_ENDING` (1050), and its flow's `プロローグ完了` names place 1, which by name is 1000, the number a save the PC made after the prologue holds. Other games' flows show the same, such as Test Game 84's, whose chapter 1A is place 2, between `GLB_01_OVER` and `GLB_02_OVER`. VNDegen 0.26.1 counted in the file's order, so it set 1050 at The Alchemist's prologue's end (#59). The table's `implies 1050 1000` puts such a `cfg.sav` right as it's read: an ending means the prologue was seen. Checked under Wine: with the file repaired, the PC's Start offered Prologue or Main Story.
+Funbag Fantasy 3 if keeps 892 more pictures in an `sc` folder beside `sc.pak`, one to a file. Each is a `NEKOPACK4S` archive: the same entry as an `A` archive's index, with no index size before it. Its file name is the picture's name with the extension written as character codes, `97108112` for `alp`, which the runtime doesn't need since the entry names it. Its scripts name voices as `voice\\x.ogg` and, on 1,464 lines, as a bare `x`. The audio from the PC game under Wine shows both kinds play.
 
-A condition that holds goes to the node's other target, the one a choice's branch takes for its option, and to `next` when it doesn't. The Alchemist's last flow settles it: `HAPPYEND_COUNTER <= 3 の時` has 正規ルートEND as its other target and 幸福ルートEND as `next`, and the counter goes up at the choices toward the happy ending. Test Game 84's `1:デス＆エス` likewise has デストラ＆エスケルダを選んでた as its other target. VNDegen 0.26.1 had it the other way round, so The Alchemist's endings were swapped (#58).
+## GOOD Timing
+
+From Test Game 88 under Wine, its manual, and PC saves compared. `cfg` files under `gt/cfg` list groups of scripts. Opcode 153 names one and opcode 154 marks where Ejaculate lands. The save's tail holds, after the scene name: a state at byte 819 that's -1 when off, 0 in the scene and a small number inside the extra scripts; the count twice at 823; the first counted text's node at 831; the marker's node at 835; then two strings, the scene and the config. The marker's first parameter was 12 and the count started 12 text nodes before it. Saves taken with Extend on and off differ only in the time and play counters, so it isn't saved, and it stays on across a load. Pressing Ejaculate before the marker plays the `Ejaculate` script and goes on after the marker; pressing it in the extra scripts goes straight there, because that save's backlog has no line of the script.
+
+A picture's unlock flag in `cfg.sav` goes by its number in `cg_view.ini`, the middle field of its line: every flag set in three PC games' files is such a number, and those numbers don't track the entries, so a flag is 4 bytes at 48000 plus that number times 4. A sprite record holds a ripple at 0x1A6 before the layout's adjustment, a byte that's 1 when on and three ints, the command's parameters 1, 2 and 3.
+
+The block after the sprite records holds a count at byte 22 and that many sprite numbers after the block's fixed part, in every game seen. They are the sprites a fade was taking away when the save was made: The Alchemist's save from the middle of one lists 110 and 310, copies of the background and a character at alpha 50, each record of which also holds the fade's state after its end values, with 0 where the sprite's number usually is. A move under way is kept there too, as are three ints just before the variables that are 2, 2 and 1 in some of its saves and 0 in others. The runtime writes none of this, so a PC save read and written again comes out shorter or different in those places (#60), but under Wine the PC loads such a rewrite exactly as it loads its own: the same frame 1.5 seconds after loading and after the next click, for the save made mid-fade and for one made during a move. The runtime itself shows the save made mid-fade as the PC does, without the fading copies. The PC's save made at a choice names the choice as its flow node. Its later blocks also hold state the runtime doesn't write, and a save of ours naming the choice makes the PC run past it, so ours names the scene before, and the PC then asks the choice itself.
+
+A flipbook's sprite record has 0 in its second byte and its current picture where other records have 0. The record doesn't say whether the flipbook repeats or runs backward, so a save of VNDegen's keeps that beside it, in `save###.vnd`, with the scene and node it was made at, and uses it only when they still match. For a PC save the runtime walks the script to the saved node, after the scene the flow called before it, since one scene of Test Game 93 leaves a flipbook running into the next. A PC save made after Ejaculate was pressed early holds the marker but not where the press was, so its walk runs to the marker; that matters only if the same slot starts the same picture again with other modes, or erases it, between the two. A splash's record has no picture and 35 more bytes. Test Game 88's text records are 4 bytes shorter than Test Game 97's.
 
 ## Menus
 
-The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables.cpp` holds a table for each game: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled.
+The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables.cpp` holds a table for each game: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled for the menus' layout; what Test Game 94's exe gave is in the next section.
+
+## Read from Test Game 94's exe
+
+On 2026-11-07 the runtime's author disassembled Test Game 94's `rinjin.exe` (`objdump -d`) without the approval this file asks for, and read four behaviours from it. The coordinator approved that use after the fact the same day, on the condition that only the behaviour is used: what values mean, what a command does and when a flag is set, with no code structure, constant tables or control flow taken into the runtime. The listing was deleted once these were written up.
+
+1. **The title's background.** Until one of the endings `GLB_ENDING_A` to `D` (51 to 54) is set, the title shows `obj\d000_N.bmp` for the N that `GLB_TITLE_BG` (55) holds, and the first past 3. Once one is set, it shows one of the four at random each time the title opens. Under Wine, two runs with endings set showed two different backgrounds and one with none set the first.
+2. **Where Start's choices begin.** 本編から starts at `MainFlow1` and 桃華視点シナリオ at `SubFlow1`, as `init.ini`'s comments on those keys also say. Route A to D starts at `FirstFlow`, the prologue, with each choice made for that route: route N takes the option that choice parameter 9 + N gives, 0 the upper and 1 the lower. A choice that doesn't matter to the route gives 4 for every route. The listing was read as the 4 becoming the choice's result, but under Wine the PC stops and asks such a choice, as the runtime now does. Where the route is kept came later, from saves (next section's end).
+3. **Flow changes and conditions.** A change's parameter 3 is 0 to set, 1 to add one, 2 to take one, 3 to add the operand and 4 to take it. The runtime had read 1 as add one and anything else as set, so Test Game 92's `秋穂カウンタ++` (3, with 1) only ever set its counter to 1. A condition's comparisons are `==`, `!=`, `<=`, `>=`, `<` and `>`, the order the runtime had guessed. The operand is parameter 5 itself when parameter 4 is 2, else the global (0) or scenario variable (1) parameter 5 numbers, by its number, not by a place in the list.
+4. **The staff roll.** A scene end (flow command 2) with parameter 0 set to 1 plays the staff roll, then the flow goes on, and Test Game 94 sets its ending's flag after it before the plain scene end that returns to the title. Its movie is `movie\staffroll_kazuki`, `movie\staffroll_touka` or `sys_1\movie\staffroll_kanamori` (names from `strings`) for `SITE_STAFFROLL` (scenario variable 104) of 0, 1 or 2. A click ends it only when an ending was already set as it began. Test Game 84 has seven of these nodes and no movie for them; its staff roll is drawn from pictures, as the next section describes.
+
+Checked under Wine on the same day. Points 2 and 4: route A, started from Start with `GLB_PROLOGUE_OVER` and `GLB_ENDING_B` set in `cfg.sav` and the skip held, ran through the prologue and main story without stopping at the choices that give it 0 or 1, stopped at both that give 4 (口内射精/顔にかける and 中に出す/外に出す), played Kazuki's staff roll, which the held skip didn't pass, and came back to the title with `GLB_ENDING_A` set and `GLB_TITLE_BG` at 3 in the `cfg.sav` it wrote on quitting, as the runtime's run of the same route does. Point 1: the backgrounds above. Point 3: in Test Game 92 under Wine, choosing 秋穂 at both of its choices led to 秋穂END (`ep_000_060_100.txt` showed), which needs her counter at 2 after two `秋穂カウンタ++`, and the condition that holds taking its other target, as the runtime now does.
+
+## Funbag Fantasy 3 if's staff roll
+
+Test Game 84's exe draws its staff roll itself, and it was rebuilt as a black box, without disassembly: one run of the 1A ending under Wine with the screen captured about once a second and its file reads traced (`strace`, mapped to archive entries). As the roll begins the game reads `obj\s000_000` to `s000_006` and `bgm\M19.ogg`, then `s000_007` 100 seconds in, and the title 107.7 seconds in. Matched against the captures: a near-black backdrop (`s000_000`); the logo (`s000_003`, at 288, 148) and the letterbox bars (`s000_001` at the top, 115 high, and `s000_002` at 603 with the copyright) fading in over 2 seconds from 2.96; the scene fading in over 2 seconds from 7.03 while the logo fades out; in it the sky (`s000_004`, 1280 by 3067) moving up 23.41 pixels a second, the characters (`s000_005`, 1280 by 2600, with alpha) moving down 22.38, and the credits (`s000_006`, at x 574) rising from the bottom at 39.8, each a straight line through the fits; the scene fading to black over 2 seconds from 97; and Waffle's card (`s000_007`, at 534, 347) fading in from 100. The scene fades as one picture, its characters solid over its sky: fading its layers apart matched the captures worse. Rendered by the runtime at the captures' times, the frames match the PC's exactly before the scene and at the card, and in between to within 2 or 3 pixels of motion, a capture's timing. A second run recorded at 30 frames a second under Xvfb settled the fades' curve: straight lines in the pictures' values, the fade-out losing 1/60 of the scene a frame for 1.99 seconds and the fade-in rising from 7.03 to 9.00 seconds when the fade-out is taken to start at 97 (the stills had put it at 7.05), both regions of the scene falling by the same ratio. The runtime's frames at the recording's times match its brightness to within 3 or 4 of 255 through the fade; the larger differences of the once-a-second stills came from when they were taken. After the roll the PC's `cfg.sav` had one global changed, `GLB_99_ENDING` (1050, スタッフロール見た？), which no flow sets, so the runtime sets it as the roll ends. A click ended the roll at once when 1050 was already set as it began, and did nothing in the same run with it clear.
+
+## Flow variables
+
+A flow's condition (command 5) and change (command 6) name their variable by scope, parameter 0 (0 global, 1 scenario), and by its place in that scope's list in `macrolist.ini`. The place is parameter 1 for a global and parameter 2 for a scenario variable: the editor keeps both, so the other can hold a stale value, as Test Game 94's title background changes do (global place 5, scenario place 2). The places count in the names' order, not the file's. The flows' own comments settle it: The Alchemist's file lists `GLB_PROLOGUE_OVER` (1000) before `GLB_ENDING` (1050), and its flow's `プロローグ完了` names place 1, which by name is 1000, the number a save the PC made after the prologue holds; Test Game 84's mark chapter 1A at place 2, between `GLB_01_OVER` and `GLB_02_OVER`, and 2 at place 3; Test Game 88's three heroines' counters are 1 for 秋穂 (`SENARIO_AKIHO`), 5 for 結衣 (`SENARIO_YUI`) and 0 for 藍 (`SENARIO_AI`); and Test Game 94's endings A to D are 0 to 3, the prologue 4 and the title background 5, though its file lists `GLB_PROLOGUE_OVER` first. The runtime had taken parameter 1 for both scopes, which merged Test Games 88, 92 and 93's scenario variables, and the file's order, which shifted 84's chapter flags and set The Alchemist's 1050 at its prologue's end in VNDegen 0.26.1 (#59). The table's `implies 1050 1000` puts such a `cfg.sav` right as it's read, changing only that flag: an ending means the prologue was seen. Checked under Wine: with the file repaired, the PC's Start offered Prologue or Main Story, and with 0.26.1's it went straight to the prologue.
+
+A condition that holds goes to the node's other target, the one a choice's branch takes for its option, and to `next` when it doesn't. The flows settle this too: The Alchemist's `HAPPYEND_COUNTER <= 3 の時` has 正規ルートEND as its other target and 幸福ルートEND as `next`, the counter going up at the choices toward the happy ending, so 0.26.1 swapped its endings (#58); Test Game 84's `1:デス＆エス` has デストラ＆エスケルダを選んでた as its other target and the next heroine's question as `next`, and Test Game 92's ending branch reaches 秋穂END from `秋穂を２回選択した` holding. The runtime had it the other way round, so 84's heroine choice always took the last branch, and with its counters only ever set to 1, 92 always reached the harem ending.
+
+Test Game 94's Start, seen under Wine with globals set in `cfg.sav`: with `GLB_PROLOGUE_OVER` (1000) unset it starts the story; set, it opens a submenu of プロローグから and 本編から beside the main menu, and with any ending (51 to 54) set ルート選択 and 桃華視点シナリオ as well. Route select opens routes A to D beside it, each with its 攻略済み label once its ending is set, and every route showing either way. Start pressed again closes both, and the right button goes back to the title art. Its sheets have the five rows of the other menus' and sit at x 362, as the gallery's do.
+
+The message window's こだわり表現 button (`EXpress`) shows its last row, 切替不可, wherever nothing on screen has another version in `change_texture_list.ini`, in Test Games 92 and 94 under Wine, and then does nothing; with such a CG up it switches as before. The runtime does the same in every game with the button.
+
+Test Game 94's save and load screens, measured under Wine against saves the PC made:
+- **The route is `SENARIO_STATUS`.** A save made in route A holds scenario variable 4000 (`SENARIO_STATUS`, シナリオ進行度 in `macrolist.ini`) at 1 and nothing else, and one from ordinary play holds none, so the route, 1 to 4, is that variable, set as the route starts and carried by its saves. The card's progress label, `obj\e010_000`, shows the row for that value, 通常進行 for 0 and ルート選択 (ルートA) to (ルートD) for 1 to 4. The runtime keeps the route there (the table's `routevar`), so a load goes on in its route.
+- **NEW** marks the card saved to last, which the PC keeps in global 0 and writes as it quits: Test Game 94's `cfg.sav` held 2 with NEW on the second card, and The Alchemist's 1 with NEW on the first, though another of its saves was newer.
+- **Saves.** A sprite record is 4 bytes shorter than Test Game 92's, a text record ends 8 bytes after its strings, and 183 sound channels are saved, against 243 in the other games. Three of the PC's saves, one in route A and one after a background's camera move, read and write back byte for byte with that layout. The runtime had read them with Test Game 92's and failed, so it showed every card empty.
+- **The question** darkens the screen behind to 35 of 256 and has the mouse icons of the choices beside its answers. A left click away from the answers says yes, as the right button says no. Ticking 次回以降この確認を行わない turns that question off, also when No follows: the next save went through unasked. The Alchemist, Yarinaoshi no Christmas, Funbag Fantasy 3 if, Funbag Fantasy 4, Haha Sannin to Ana Asobi, Ore o Hoshigaru Tsuma to Gibo and Test Game 92 have the same box, at 498, 444 in the last three, and the runtime makes it work in each, turning off Config's setting for that question. Their tables had drawn it as a picture, and Haha Sannin's and Tsuma to Gibo's had drawn the screen mode's question, この画面解像度でよろしいですか？, in its place.
+- **The comment line.** A card with a save shows クリックでコメントを入力, and a click opens an input box. The comment is kept in the save itself (below, after the quick saves): it was found by typing through an input method under Wine, as no key reached the box without one and text put into the save's zero areas made the PC crash or stop drawing the screen.
+- From the title and from the story the screens have the same background, the room `obj\e000_000`.
+
+Test Game 94's choices, under Wine. A choice's count is its parameter 0 and one in every game's flows, Test Game 84's five heroines (4) and the two options of 89, 92, 93 and The Alchemist (1) alike; parameter 1 gives the count too in those, but 1 in Test Game 94's two-option choices, where the runtime had shown one option. When the choice comes up the PC reads its prompt `obj\n000_000`, its sheet, the mouse icons `obj\b003_000` and the route labels `obj\e011_000` (traced). The scene darkens to about 0.4 of itself, the prompt sits at 483, 107, the options at 467, 195 and 467, 308, and the left button's icon by the first at 393, 192 and the right button's by the second at 393, 305. Clicking an option takes it; a left click anywhere else took the first, and the right button the second. Once an ending was set, each option named the routes whose choice parameter (10 to 13) is that option, a label each from `e011_000`'s row for the route, in its second column for a route whose ending is set and its first otherwise, 30 pixels apart and centred on the option, at x 818; with no ending set there were none.
 
 ## Text placement
 
 The PC engine draws its text from a glyph atlas: Wine's font log (`WINEDEBUG=+font`) shows each game creating its
 text font at a cell height and at four times it, with the face init.ini's MsgFont names, and a second font for save
-card comments. The Alchemist's official English release asks for Lucida Sans Unicode for both instead, which VNDegen
-maps to Open Sans ([fonts.md](fonts.md)). The PC sets each glyph a fixed gap past its own advance and lines a fixed
-pitch apart, which init.ini's MsgCharInterval and MsgLineInterval don't predict, so a game's table gives them
-(`textgap`, `textline`, `textshift`, `textfont`, `textsize`, `commentfont`). Yarinaoshi no Christmas, measured by
-loading the same PC save on the PC under Wine, with VNDegen's stand-in fonts mapped in place of the Windows ones, and
-here: comments in MS Gothic at 18, and its log placed under its rules as the PC's is. Christmas asks for Meiryo at a
-32-pixel cell, which Windows draws at about 21 pixels to the em, two thirds of the cell; Ume P Gothic, its stand-in,
-fills the cell, so under Wine the PC's lines run off the screen. Christmas was released only in Japanese, so its text
-was fitted to a Windows screenshot of its English patch, two lines whose glyphs have Meiryo's Verdana-like shapes and
-an 11-pixel x-height: Ume P Gothic 22 with a gap of 4.66, lines 35 apart, the first glyph 2 pixels in and the baseline
-4 lower than Wine's, which puts glyphs within 2 pixels, the lines' ends within one and the baselines on the
-screenshot's rows. Its log's text drops by the same 4, inferred from the two faces' ascents. `nekocheck` lays out
-every message and fails on one that runs off the screen. The Alchemist, from the publisher's Windows screenshots,
-since Wine has no Lucida Sans Unicode and font-links it to Noto Sans CJK: Open Sans 22 with a gap of 5.93, lines 42 apart and the first glyph one gap in, which
-puts capitals within a pixel of the screenshots; its comments at 20, sized from Wine's capture.
+card comments. The official English
+releases (The Alchemist, Funbag Fantasy 3 if, Funbag Fantasy 4, Horny Elves and a Moral Orc) ask for Lucida Sans Unicode instead, which
+VNDegen maps to Open Sans ([fonts.md](fonts.md)). Text placement was measured by loading the same PC save on the PC
+under Wine, with VNDegen's stand-in fonts mapped in place of the Windows ones, and here, and comparing the same lines.
+The PC sets each glyph a fixed gap past its own advance and lines a fixed pitch apart, neither of which init.ini's
+MsgCharInterval and MsgLineInterval predict, so each game's table gives them (`textgap`, `textline`, `textshift`,
+`textfont`, `textsize`, and for the log `rows` with a size, `loggap` and `logline`). Some games create their text
+font smaller than init.ini's MsgFontSize says, which Wine's font log shows: Test Games 92 and 93 at 22 for 25, Test
+Game 94 at 21 for 24. A size fitted only by where lines end can't show this, since a gap makes up the width, so each
+was checked by the glyphs' height against the PC's capture too. Test Game 94: size 21, gap 2, lines 28 apart, the
+first glyph 2 pixels in and the baseline 1 higher. Test Game 88: gap 2, lines 27, 2 in, 1 higher. Test Game 92 and
+Ore o Hoshigaru Tsuma to Gibo: size 22, gap 2, lines 29, 2 in. Each log was placed under its rules as the PC's is,
+and the fitted lines end on the PC's pixel or one off. Yarinaoshi no Christmas asks for Meiryo at a 32-pixel cell, which Windows draws at about 21 pixels
+to the em, two thirds of the cell; Ume P Gothic, its stand-in, fills the cell, so under Wine the PC's lines run off
+the screen. Christmas was released only in Japanese, so the reference is a Windows screenshot of its English patch,
+two lines whose glyphs have Meiryo's Verdana-like shapes and an 11-pixel x-height: Ume P Gothic 22 with a gap of
+4.66, lines 35 apart, the first glyph 2 pixels in and the baseline 4 lower than Wine's, which puts glyphs within 2
+pixels, the lines' ends within one and the baselines on the screenshot's rows. Its log's text drops by the same 4, inferred from the two faces' ascents.
+For the Lucida Sans Unicode games the publisher's Windows screenshots were the reference, since Wine has no Lucida
+Sans Unicode and font-links it to Noto Sans CJK. Word widths alone chose the size poorly, since the runtime's hinted
+advances run about half a pixel a glyph wider than the unhinted ones the first fit used, so each was settled by
+rendering screenshot lines here and laying them over the PC's, for both ends and the x-height: The Alchemist sets
+Open Sans 22 with a gap of 5.93, lines 42 apart, the baseline 3 lower; Funbag Fantasy 4 size 16, gap 2.25, lines 25;
+Funbag Fantasy 3 if, whose program names only Lucida Sans Unicode, size 16, gap 2.75, lines 23, the baseline 1
+higher; Moral Orc size 16, gap 3.93, lines 27; each with its first glyph one gap in. Test Game 84's PC game stops
+taking input at its title under Wine with the stand-in fonts mapped, so its log keeps the placement measured before. A save card's comment has a font of its own, a cell of 18
+in the Gothic games and 32 in The Alchemist, with no gap; Christmas's comments are in MS Gothic at 18, as the PC asks,
+and The Alchemist's at 20, sized from Wine's capture. `nekocheck` lays out every message and fails on one that runs
+off the screen. Ore o Hoshigaru Tsuma to Gibo carries untranslated scenes that nothing names, whose lines are longer
+than the screen; the check reports those apart. Four untranslated Japanese lines, three in Ore o Hoshigaru Tsuma to
+Gibo's sex scenes and one in Test Game 94's, wrap at init.ini's MsgMaxCharNum, 50 full-width characters, past the right
+edge; the PC applies the same limit at the same pitch, but they haven't been seen on the PC, and the check lists them.
 
 ## The CG viewer
 
-The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist and Yarinaoshi no Christmas under Wine, and the panel, buttons and picture match the PC's to within blending noise. Both PC games behave alike:
+The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist, Yarinaoshi no Christmas, Funbag Fantasy 4, Ore o Hoshigaru Tsuma to Gibo and Horny Elves and a Moral Orc under Wine, and the panel, buttons and picture match the PC's to within blending noise. The PC games behave alike:
 - The zoom runs from 1.00 to 3.00 in steps of 0.05, from the buttons or a wheel notch, and keeps the point under the pointer still. Zoom out and reset are disabled at 1.00, and zoom in at 3.00. Reset is immediate.
 - The slideshow moves on every 8 seconds.
 - The entry's music, the fourth field of its line in `cg_view.ini`, starts with the viewer at the music screen's volume. Its button mutes and unmutes it while it goes on playing.
 - A right click hides or shows the panel, and a click on the picture does nothing.
 - Previous lands on an entry's last picture when it crosses into another gallery tab or wraps round, and otherwise on its first. Next always lands on the first.
-- A disabled button shows no help.
+- A disabled button shows no help. The variant buttons are disabled for an entry of one picture, as Funbag Fantasy 4 shows, and not for an entry with only one of several pictures unlocked.
 - The Alchemist's art button switches the same setting as Config's Change Illustration and the message window's art button.
 
+Ore o Hoshigaru Tsuma to Gibo's `cfg\change_texture_list.ini` lists each CG group with two flags instead of Haha Sannin to Ana Asobi's pairs of pictures: whether the group has a version with the protagonist see-through and one without pubic hair. The third number of a CG's name picks the version, 100 for the first, 1 for the second and 101 for both, so `cg_000_000_100_000_000.bmp` is `cg_000_000_000_000_000.bmp` with the protagonist see-through. Its CG viewer has a play and a mute button in place of one music button, and switches for the two versions, which change the picture at once and are the same settings as Config's. Their help lines are Config's, in `h004_004.bmp`. Its message window's picture reaches 721 pixels down, and the PC's screen stays 720.
+
+Horny Elves and a Moral Orc's `cg_view.ini` header has no type field, so its BGM comes third, and each picture line names its replay flow fourth. Its viewer's help comes up as speech bubbles, which fade in.
+
 Slider fills round to the nearest pixel: at 60, The Alchemist's 173-pixel music bar fills 104 and Yarinaoshi no Christmas's 161-pixel one 97.
+
+## Movies
+
+Test Game 89 loads its movies with command 100, `[ムービーロード]`: string 1 names `movie\x.wmv`, which on disk is `movie/x` with no extension, parameter 3 is the slot, and parameter 9 is 1 on the loads that come back round, read as looping. The runtime puts the movie in the slot like a picture, shows the frame due at the story's clock, and holds the last frame of one that doesn't loop. The files are WMV 9 in ASF, played through the host's decoder ([video.md](video.md#vnffmovie-wmv-through-the-apps-ffmpeg)). Where a movie sits and what happens at its end haven't been checked against the PC game yet.
+
+Test Game 92's movies come with its `sys_5` patch, the animation edition: only the patched scripts load them, so the patch must win over the older scripts in its top-level `scr` folder. They load the same way, with names that have no extension, into slots 100 and 101, and command 101, `[ムービー削除]`, deletes the movie in slot parameter 0. A scene plays a `normal` movie, then deletes it and loads the `hard` one. The 72 files are WMV 9 with WMA Pro sound, 1280 by 720 at 30 frames a second, and each `camera` file has its `hard` file's length. The exe holds the strings `_hard` and `_camera` and the scripts never name a `camera` file, so Config's 演出のカメラワーク (camera work) was thought to swap `_hard` for `_camera`. Under Wine it doesn't decide it: Config's switch is byte 260 of `cfg.sav`, 0 for on and 1 for off, and with either, in a replay and in the story, with Ejaculate clicked at two different moments, the first scene's GOOD Timing went from `mv_001_004_normal` straight to `mv_001_004_camera2_naked` where its script names `hard2_naked`. What picks the `camera` file, and the branch GOOD Timing takes there, are still open. Its `cfg\anime_view.ini` lists each gallery entry's movies. The animation gallery's lines are `#p TAB THUMBNAIL KEY BGM FLOW`, then a `0,0,movie\x` line for each movie, then `##`. Under Wine with a `read.sav` naming the keys, an entry unlocks whole once its key script has been read, as a scene does. Opening one plays its first movie full screen, looping, under the CG viewer's panel without the art switches: the count steps through all of the entry's movies, 10 in the first, and the entry's music plays. Its cards show no count, there are none past a tab's last entry, and the gallery opens on its middle tab, as the CG and Scene galleries do.
 
 ## Readings not yet checked
 

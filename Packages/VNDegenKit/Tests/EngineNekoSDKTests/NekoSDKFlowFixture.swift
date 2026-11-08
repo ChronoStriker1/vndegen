@@ -10,14 +10,15 @@ enum NekoSDKFlowFixture {
         var next: UInt32
         var otherwise: UInt32 = 0
         var p: [Int: Int32] = [:]
+        var s: [Int: String] = [:]
     }
 
     static func game(_ files: [String: Data]) throws -> URL {
         let root = TestFolders.root.appendingPathComponent("nekosdk-flow-\(UUID().uuidString)")
         var all = files
-        all["obj.pak"] = Data("NEKOPACK4A".utf8) + Data([4, 0, 0, 0, 0, 0, 0, 0])
+        if all["obj.pak"] == nil { all["obj.pak"] = Data("NEKOPACK4A".utf8) + Data([4, 0, 0, 0, 0, 0, 0, 0]) }
         for (path, data) in all {
-            let url = root.appendingPathComponent(path == "obj.pak" ? path : "sys_1/" + path)
+            let url = root.appendingPathComponent(path.hasSuffix(".pak") ? path : "sys_1/" + path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: url)
         }
@@ -35,7 +36,12 @@ enum NekoSDKFlowFixture {
             put(node.next)
             put(node.otherwise)
             for _ in 1..<16 { put(Int32(0)) }
-            for _ in 0..<33 { put(UInt32(0)) }
+            for k in 0..<33 {
+                // Each string is its length then its bytes, NUL included, in CP932, as the editor writes them.
+                let text = (node.s[k] ?? "").data(using: .shiftJIS) ?? Data()
+                put(UInt32(text.isEmpty ? 0 : text.count + 1))
+                if !text.isEmpty { data.append(text + Data([0])) }
+            }
         }
         return data
     }
@@ -45,7 +51,7 @@ enum NekoSDKFlowFixture {
         let gamePath: String = root.path, dataDirPath: String = data.path
         return gamePath.withCString { rootPath in
             dataDirPath.withCString { dataPath in
-                var launch = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: nil, fontDir: nil)
+                var launch = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: nil, fontDir: nil, movies: nil)
                 return vnneko_start(&launch)
             }
         }
@@ -85,6 +91,27 @@ enum NekoSDKFlowFixture {
         var key = UInt32(z.count / 8 + 0x22)
         for i in 0..<4 { z[i] ^= UInt8(key & 0xff); key <<= 3 }
         return z
+    }
+
+    // A NEKOPACK4A archive of these entries: the index lists each name with its offset and size XORed with the sum of
+    // the name's signed bytes, and each entry is packed as cfg.sav is. Art has to come from an archive, since a patch
+    // folder's art is used only as its art set.
+    static func archive(_ entries: [(String, Data)]) -> Data {
+        var index = Data(), body = Data()
+        let header = 14 + entries.reduce(0) { $0 + 4 + $1.0.utf8.count + 1 + 8 }
+        func put(_ v: UInt32, _ d: inout Data) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+        for (name, plain) in entries {
+            let entry = packed(plain), bytes = Array(name.utf8) + [0]
+            let key = bytes.reduce(UInt32(0)) { $0 &+ UInt32(bitPattern: Int32(Int8(bitPattern: $1))) }
+            put(UInt32(bytes.count), &index)
+            index.append(contentsOf: bytes)
+            put(UInt32(header + body.count) ^ key, &index)
+            put(UInt32(entry.count) ^ key, &index)
+            body.append(entry)
+        }
+        var data = Data("NEKOPACK4A".utf8)
+        put(UInt32(index.count), &data)
+        return data + index + body
     }
 
     // The plain bytes of a packed file.

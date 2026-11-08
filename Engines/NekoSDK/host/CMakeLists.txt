@@ -24,13 +24,31 @@ target_link_libraries(nekosdk PUBLIC ZLIB::ZLIB PkgConfig::FREETYPE pthread)
 # Tools write PNGs with stb_image_write, from the Wolf runtime's copy of stb.
 target_include_directories(nekosdk PUBLIC ${RUNTIME}/../CWolfRPG/third_party)
 
+# The app's movie decoder, vnffmovie, against the system's FFmpeg, for WMV movies. Without FFmpeg the tools run the
+# games with their movies left out.
+pkg_check_modules(FFMPEG IMPORTED_TARGET libavformat libavcodec libswscale libswresample libavutil)
+if(FFMPEG_FOUND)
+  add_library(hostmovies STATIC ${SHARED}/vnffmovie.cpp)
+  target_include_directories(hostmovies PUBLIC ${SHARED})
+  target_link_libraries(hostmovies PUBLIC PkgConfig::FFMPEG pthread)
+  target_compile_definitions(hostmovies PUBLIC NEKO_HOST_MOVIES)
+  add_executable(vnffmovie_test ${SHARED}/vnffmovie_test.cpp)
+  target_link_libraries(vnffmovie_test PRIVATE hostmovies)
+endif()
+
 foreach(tool nekocheck nekorun nekosave)
   add_executable(${tool} tools/${tool}.cpp)
   target_link_libraries(${tool} PRIVATE nekosdk)
+  if(FFMPEG_FOUND)
+    target_link_libraries(${tool} PRIVATE hostmovies)
+  endif()
 endforeach()
 # A window and speakers for playing by hand. The runtime never uses SDL.
 find_package(SDL3 CONFIG)
 if(SDL3_FOUND)
   add_executable(nekoplay tools/nekoplay.cpp)
   target_link_libraries(nekoplay PRIVATE nekosdk SDL3::SDL3)
+  if(FFMPEG_FOUND)
+    target_link_libraries(nekoplay PRIVATE hostmovies)
+  endif()
 endif()

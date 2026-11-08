@@ -26,7 +26,7 @@ VNDegen's movie decoder, `vndegen/movie_decoder.cpp`, uses FFmpeg 8.1.2. vcpkg b
 ```
 --disable-everything --disable-network
 --enable-demuxer=mpegps,mpegvideo,asf,mov
---enable-decoder=mpeg1video,mpeg2video,mp1,mp2,mp3,wmv1,wmv2,wmv3,vc1,wmav1,wmav2,h264,hevc,aac
+--enable-decoder=mpeg1video,mpeg2video,mp1,mp2,mp3,wmv1,wmv2,wmv3,vc1,wmav1,wmav2,wmapro,wmalossless,h264,hevc,aac
 --enable-parser=mpegvideo,mpegaudio,vc1,h264,hevc,aac
 --enable-hwaccel=h264_videotoolbox,hevc_videotoolbox
 ```
@@ -35,7 +35,7 @@ The port adds the rest of the configure line: `--enable-pic --disable-doc --enab
 
 With FFmpeg and the player, the iOS device framework grew from 11.0 MB to 16.7 MB.
 
-FFmpeg is linked statically. LGPL 2.1 allows that when the recipient can relink the program against a modified library, which VNDegen's public source permits. The app must show FFmpeg's LGPL notice alongside the krkrsdl3 license.
+The NekoSDK runtime uses this FFmpeg too, through `vnffmovie`, which the framework exports, so the app has one copy of it. FFmpeg is linked statically. LGPL 2.1 allows that when the recipient can relink the program against a modified library, which VNDegen's public source permits. The app must show FFmpeg's LGPL notice alongside the krkrsdl3 license.
 
 ## Left out
 
@@ -51,6 +51,7 @@ FFmpeg is linked statically. LGPL 2.1 allows that when the recipient can relink 
 - `vndegen/movie_decoder.cpp`: decodes a movie with FFmpeg on a worker thread, reading it through the engine's storage streams, so archive ciphers apply. Audio stays in packets until the sound output has room for it, however far the decoder reads ahead for video. `vndegen/movie_test.cpp` builds `KiriKiriMovieTest`, which decodes movies with it and checks frame counts, audio, and seeking.
 - `vndegen/movie_player.cpp`: the movie player behind `krmovie.h`'s `iTVPVideoOverlay`. It shows each decoded frame when the engine's clock reaches it, as an overlay sprite over the window or into the two bitmaps a layer-mode `VideoOverlay` shows, and plays the audio through the engine's sound output. The clock is the engine's tick count, which stops while the engine is paused, kept within 40 ms of the audio played. `vndegen/movie-check/startup.tjs` is a script-only game that `scripts/kirikiri-movie-check.sh` runs to check overlay and layer mode, loops, segment loops, period events, seeking, and pausing.
   Left out: only the first audio stream plays, and `audioBalance`, `playRate`, the picture adjustments such as `contrast`, and the mixer mode's mixing bitmap have no effect. Mixer and Media Foundation modes draw as overlay mode does. Movie audio follows `audioVolume` but not the global sound volume.
+- `../Shared/vnffmovie.cpp`: a movie decoder over the same FFmpeg, with a five-function C interface the framework exports for other engines. NekoSDK plays its WMV movies with it ([docs/video.md](../../docs/video.md#vnffmovie-wmv-through-the-apps-ffmpeg)). The engine itself doesn't call it.
 - `vndegen/sigcheck.cpp`: a `sigcheck.dll` stub. Its `Window.checkSignature` reports every file's signature as valid without checking it.
 - `vndegen/steam.cpp`: stubs for Steam builds. `krkrsteam.dll` defines a `Steam` class with the members of `DummySteam.tjs`, the stand-in in wamsoft's plugin source: its achievement, cloud, screenshot, broadcast, and DLC calls do nothing, it reports no Steam user, `initialized` is true, and `getLanguage` returns Steam's name for the system's preferred language, or `english`. `DrawDeviceForSteam.dll` makes `DrawDeviceForSteam` the engine's `Window.BasicDrawDevice`. `steam_api.dll` needs nothing, since linking a missing plugin is not an error.
 

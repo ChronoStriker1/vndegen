@@ -8,6 +8,7 @@
 #define VNNEKO_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -16,12 +17,40 @@ extern "C" {
 
 typedef struct VNNekoEngine VNNekoEngine;
 
+// A movie decoder the host lends the runtime, for the games' WMV movies: the app's is vnffmovie in the KiriKiri
+// framework, found with dlsym, and the Linux host's the same code built against the system's FFmpeg. These are its
+// five functions, with the same layouts and meanings as `Engines/Shared/vnffmovie.h`.
+typedef struct VNNekoMovieInfo {
+    int width, height;
+    double fps;
+    double duration;
+    int audioRate, audioChannels;
+} VNNekoMovieInfo;
+
+typedef int64_t (*VNNekoMovieRead)(void *user, uint64_t offset, void *buffer, size_t length);
+
+typedef struct VNNekoMovies {
+    void *(*open)(VNNekoMovieRead read, void *user, uint64_t size, int loop, VNNekoMovieInfo *info, char *error,
+                  size_t errorSize);
+    const uint8_t *(*frame)(void *movie, double time, int *changed, int *ended);
+    size_t (*audio)(void *movie, float *out, size_t frames);
+    void (*seek)(void *movie, double time);
+    void (*close)(void *movie);
+} VNNekoMovies;
+
 typedef struct VNNekoLaunch {
     const char *gameRoot;  // folder holding the game's .pak archives
     const char *dataDir;   // the game's data folder, where saves go, under AppData/Roaming as on Windows
     const char *logPath;   // file the runtime's log is appended to; NULL logs to stderr
     const char *fontDir;   // folder holding the Windows font pack's fonts.tsv
+    // The movie decoder, copied at start. NULL when the host has none: each movie is then logged and left out, and
+    // the game goes on without it.
+    const VNNekoMovies *movies;
 } VNNekoLaunch;
+
+// The app's movie decoder, vnffmovie, found with dlsym among the libraries the process has loaded: the KiriKiri
+// framework exports it. NULL, with the missing function's name in vnneko_start_error(), when it isn't there.
+const VNNekoMovies *vnneko_find_movies(void);
 
 // Starts a game. Returns NULL when it can't, with the reason in vnneko_start_error().
 VNNekoEngine *vnneko_start(const VNNekoLaunch *launch);
@@ -53,8 +82,29 @@ bool vnneko_is_supported(const char *gameRoot);
 // Runs through text and waits for as long as it's on, as holding Ctrl does.
 void vnneko_set_skip(VNNekoEngine *e, bool on);
 
+// A click on a save card's comment asks the host for one. Returns the card's slot, with its comment now in `utf8`, once
+// per click, or 0 when nothing is asked. The host shows a text field and answers with vnneko_set_comment, which writes
+// the comment into that save, cut to the 36 bytes of CP932 the PC's box takes. Cancelling just doesn't answer.
+int vnneko_take_comment_request(VNNekoEngine *e, char *utf8, size_t size);
+bool vnneko_set_comment(VNNekoEngine *e, int slot, const char *utf8);
+// Something the title asks the host to show, once per click: kind "alert" with its text (the PC's Version info box),
+// "manual" with the full path of the game's own manual page, to show in a web view that loads only that folder, or
+// "url" with a web page the PC opens in a browser, to open only after asking the player. False when nothing's asked.
+// A press through vnneko_debug_press never asks for the web page.
+bool vnneko_take_host_request(VNNekoEngine *e, char *kind, size_t kindSize, char *payload, size_t payloadSize);
 // Stops the clock and sound. vnneko_step does nothing while paused.
 void vnneko_set_paused(VNNekoEngine *e, bool paused);
+
+// The host window, for Config's screen mode: whether it can go full screen, as a Mac's window can and an iPad's can't,
+// and whether it is. Call it each frame; the screen mode buttons show it.
+void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScreen);
+// The screen mode Config's buttons asked for since the last call: 0 a window, 1 full screen, -1 none.
+int vnneko_take_window_request(VNNekoEngine *e);
+
+// Whether Config asks for the game to stop while the app isn't active. The host pauses it with vnneko_set_paused.
+bool vnneko_pauses_when_inactive(VNNekoEngine *e);
+// Config's confirm key: 0 for Space, 1 for Enter. The other one acts as the right button.
+int vnneko_confirm_key(VNNekoEngine *e);
 
 // Frees the engine.
 void vnneko_stop(VNNekoEngine *e);
@@ -72,10 +122,15 @@ bool vnneko_debug_press(VNNekoEngine *e, const char *action);
 // For test hosts: the options of the choice on screen, or -1, and picking one.
 int vnneko_debug_choice_count(VNNekoEngine *e);
 void vnneko_debug_choose(VNNekoEngine *e, int index);
-// For test hosts: starts this scene script and runs it without waiting up to the node. False when it's not there.
+// For test hosts: starts this scene script and runs it without waiting up to the node, or a flow script (under `flow\`)
+// from that node, or from its start for 0 or less. False when it is not there.
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node);
 // For tests: the stored size of the file the game's archives and patches give for this path, or -1 when none has it.
 int64_t vnneko_debug_file_size(const char *gameRoot, const char *path);
+// For tests: the name a save gives that file, which for a file a patch provides is the patch's name for it.
+bool vnneko_debug_saved_name(const char *gameRoot, const char *path, char *out, size_t size);
+// For measuring against the PC: table lines read ahead of each game's own, so their settings win. Call before vnneko_start.
+void vnneko_debug_table_prefix(const char *text);
 // For tests: saves to a slot, loads one, or turns a card's lock on or off, as the save and load screens do.
 bool vnneko_debug_save(VNNekoEngine *e, int slot);
 bool vnneko_debug_load(VNNekoEngine *e, int slot);

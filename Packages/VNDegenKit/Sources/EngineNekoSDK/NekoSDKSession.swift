@@ -49,6 +49,33 @@ final class NekoSDKSession: EngineSession {
             vnneko_mouse_wheel(engine, Int32(whole))
         }
         frameView.onKey = { [weak self] usage, pressed, _ in self?.hostKey(usage, pressed) }
+        // Config's "stop the game when inactive" pauses it while VNDegen isn't the active app.
+        #if canImport(UIKit)
+        let resign = UIApplication.willResignActiveNotification, become = UIApplication.didBecomeActiveNotification
+        #else
+        let resign = NSApplication.didResignActiveNotification, become = NSApplication.didBecomeActiveNotification
+        #endif
+        activityObservers = [
+            NotificationCenter.default.addObserver(forName: resign, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setInactive(true) }
+            },
+            NotificationCenter.default.addObserver(forName: become, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setInactive(false) }
+            },
+        ]
+    }
+
+    private var activityObservers: [NSObjectProtocol] = []
+    private var inactive = false
+
+    /// Pauses the runtime while the app is inactive, when Config asks for it. The hub's own pause, `paused`, wins.
+    private func setInactive(_ inactive: Bool) {
+        self.inactive = inactive
+        guard let engine, !paused else { return }
+        let stop = inactive && vnneko_pauses_when_inactive(engine)
+        vnneko_set_paused(engine, stop)
+        if stop { audio?.pause() } else { audio?.resume() }
+        clock.reset()
     }
 
     private func start() {
@@ -56,11 +83,18 @@ final class NekoSDKSession: EngineSession {
         let logURL = launch.dataDirectory.appendingPathComponent("logs/nekosdk.txt")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? Data().write(to: logURL)
+        // The movie decoder is vnffmovie in the KiriKiri framework the app embeds. Without it the game runs with its
+        // movies left out.
+        let movies = vnneko_find_movies()
+        if movies == nil {
+            let missing = vnneko_start_error().map { String(cString: $0) } ?? "unknown"
+            nekoSDKLog.notice("movies left out: the KiriKiri framework's decoder isn't loaded (\(missing, privacy: .public))")
+        }
         // The Windows font pack is already set up app-wide (FontPack), so the runtime is given no folder of its own.
         let started: OpaquePointer? = root.path.withCString { rootPath in
             logURL.path.withCString { logPath in
                 launch.dataDirectory.path.withCString { dataPath in
-                    var settings = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: logPath, fontDir: nil)
+                    var settings = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: logPath, fontDir: nil, movies: movies)
                     return vnneko_start(&settings)
                 }
             }
@@ -91,14 +125,17 @@ final class NekoSDKSession: EngineSession {
         guard let engine else { return }
         let now = link.timestamp
         let ms = clock.tick(at: now)
-        guard !paused else { return }
+        guard !paused, !(inactive && vnneko_pauses_when_inactive(engine)) else { return }
         #if DEBUG
         let began = CACurrentMediaTime()
         #endif
+        syncWindow(engine)
         if !vnneko_step(engine, Int32(min(max(ms, 0), 100))) {
             finish(byGame: true)
             return
         }
+        askForCommentIfWanted(engine)
+        showTitleRequestIfWanted(engine)
         var w: Int32 = 0, h: Int32 = 0
         var changed = false
         if let pixels = vnneko_frame(engine, &w, &h, &changed), changed {
@@ -109,6 +146,44 @@ final class NekoSDKSession: EngineSession {
         pacing?.note(tick: now, presented: changed, stepEnd: ended, target: link.targetTimestamp - link.timestamp, workTime: ended - began,
                      progress: "text=\(vnneko_debug_text_count(engine))")
         #endif
+    }
+
+    private var askingForComment = false
+    private var showingTitleRequest = false
+
+    /// Version info, the manual or a web page, asked for by the title.
+    private func showTitleRequestIfWanted(_ engine: OpaquePointer) {
+        guard !showingTitleRequest else { return }
+        var kind = [CChar](repeating: 0, count: 16), payload = [CChar](repeating: 0, count: 2048)
+        guard vnneko_take_host_request(engine, &kind, kind.count, &payload, payload.count) else { return }
+        showingTitleRequest = true
+        let text = { (chars: [CChar]) in chars.withUnsafeBufferPointer { String(cString: $0.baseAddress!) } }
+        let shown = (text(kind), text(payload))
+        // On the next turn of the main queue, outside the frame's step.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            TitleRequests.show(kind: shown.0, payload: shown.1, over: view) { [weak self] in
+            guard let self else { return }
+            showingTitleRequest = false
+            frameView.takeFocus()
+            }
+        }
+    }
+
+    /// A click on a save card's comment: a text field, whose text goes into that save.
+    private func askForCommentIfWanted(_ engine: OpaquePointer) {
+        guard !askingForComment else { return }
+        var current = [CChar](repeating: 0, count: 256)
+        let slot = vnneko_take_comment_request(engine, &current, current.count)
+        guard slot > 0 else { return }
+        askingForComment = true
+        let comment = current.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        askForComment(comment, over: view) { [weak self] text in
+            guard let self else { return }
+            askingForComment = false
+            if let text, let engine = self.engine { vnneko_set_comment(engine, slot, text) }
+            frameView.takeFocus()
+        }
     }
 
     private func pointer(_ event: PointerEvent, at location: CGPoint) {
@@ -123,6 +198,8 @@ final class NekoSDKSession: EngineSession {
     }
 
     private func finish(byGame: Bool) {
+        activityObservers.forEach(NotificationCenter.default.removeObserver)
+        activityObservers = []
         displayLink?.invalidate()
         displayLink = nil
         audio?.stop()
@@ -161,8 +238,13 @@ final class NekoSDKSession: EngineSession {
             scrolledPoints -= Double(notches) * 40
             // Content scrolling down is the wheel turned toward the player.
             vnneko_mouse_wheel(engine, Int32(-notches))
-        case .key:
-            break
+        case let .key(key, pressed):
+            // A key bound to a button, or a debug hook's key: Enter and Space go where the keyboard's would.
+            switch key.keyCode {
+            case 13: hostKey(40, pressed)
+            case 32: hostKey(44, pressed)
+            default: break
+            }
         }
     }
 
@@ -185,9 +267,29 @@ final class NekoSDKSession: EngineSession {
     }
 
     /// A hardware keyboard: Return and Space click, Escape is the right button, Ctrl skips while held, and the arrows move.
+    /// Config's screen mode follows the Mac window and asks it to change. An iPhone or iPad has no full screen to offer,
+    /// so the buttons show disabled there.
+    private func syncWindow(_ engine: OpaquePointer) {
+        #if os(macOS)
+        guard let window = view.window else {
+            vnneko_set_window_state(engine, false, false)
+            return
+        }
+        let full = window.styleMask.contains(.fullScreen)
+        vnneko_set_window_state(engine, window.collectionBehavior.contains(.fullScreenPrimary) || window.styleMask.contains(.resizable), full)
+        let request = vnneko_take_window_request(engine)
+        if request >= 0, (request == 1) != full { window.toggleFullScreen(nil) }
+        #else
+        vnneko_set_window_state(engine, false, false)
+        #endif
+    }
+
     private func hostKey(_ usage: Int, _ pressed: Bool) {
+        // Config's confirm key is Space or Enter, and the other one does what the right button does, as on the PC.
+        let enterConfirms = engine.map { vnneko_confirm_key($0) == 1 } ?? false
         switch usage {
-        case 40, 88, 44: control(.confirm, pressed)
+        case 40, 88: control(enterConfirms ? .confirm : .cancel, pressed)
+        case 44: control(enterConfirms ? .cancel : .confirm, pressed)
         case 41: control(.cancel, pressed)
         case 224, 228: control(.dash, pressed)
         case 79: control(.right, pressed)
@@ -203,8 +305,10 @@ final class NekoSDKSession: EngineSession {
     func setPaused(_ paused: Bool) {
         self.paused = paused
         guard let engine else { return }
-        vnneko_set_paused(engine, paused)
-        if paused { audio?.pause() } else { audio?.resume() }
+        // Back from the hub's pause, the runtime stays stopped while the app is inactive, if Config asks for that.
+        let stop = paused || (inactive && vnneko_pauses_when_inactive(engine))
+        vnneko_set_paused(engine, stop)
+        if stop { audio?.pause() } else { audio?.resume() }
         clock.reset()
         if !paused { frameView.takeFocus() }
     }

@@ -328,6 +328,8 @@ set(KIRIKIRI_SHARED ${CMAKE_CURRENT_LIST_DIR}/../Shared)
 add_library(kirikiri_engine OBJECT
     ${KIRIKIRI_SHARED}/casepath.c
     ${KIRIKIRI_SHARED}/vnfont.c
+    # The movie decoder the framework exports for other engines, such as NekoSDK. KiriKiri itself doesn't call it.
+    ${KIRIKIRI_SHARED}/vnffmovie.cpp
     vndegen/ciphers.cpp
     vndegen/game_menu.cpp
     vndegen/menubar_scan.cpp

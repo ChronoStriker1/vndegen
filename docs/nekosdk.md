@@ -59,7 +59,7 @@ Every `.pak` is NEKOPACK4 mode `A`. GARbro's layout holds for all 16 games:
 - Each index record is a `u32` name length, a CP932 name with its NUL, then a `u32` offset and `u32` size, both XORed with the signed sum of the name bytes. A zero length ends the index.
 - An entry's first 4 bytes are XORed with a rolling key that starts at `size / 8 + 0x22` and shifts left 3 bits per byte. The entry is then a zlib stream, and its last 4 bytes give the unpacked size.
 
-A path like `bg\B300_000.bmp` names entry `B300_000.bmp` in `bg.pak`. Some archives store entries with folders, such as `cfg\gt_000_001_100.txt` in `gt.pak` or `cfg\msg_button.ini` in `sys_5.pak`. Patches come as `sys_N.pak` archives and `sys_N/` folders, and a later patch outranks an earlier one. Within a patch, its loose files outrank the archives in its folder, which outrank its `sys_N.pak`. Names are classified after `/` becomes `\`, so `cg/x.bmp` in a patch is art too. A folder holds loose files, archives such as `sys_5/obj.pak` for its `obj` files, or both. The games name a patch's files by the patch, as in `sys_2\voice\kur1_0116.ogg` or `sys_5\obj\c000_000.bmp`, and the runtime gives every patch file that name. A patch's files outside its art folders also take the place of the base file of the same path: The Alchemist's `sys_5\cfg\msg_button.ini` adds the art button to the message window that way. Its art, in `cg`, `sc`, `obj` and `parts`, the folders the PC engine maps to a patch's own, answers only to the patch's name, because it can be a second set under the base names:
+A path like `bg\B300_000.bmp` names entry `B300_000.bmp` in `bg.pak`. Some archives store entries with folders, such as `cfg\gt_000_001_100.txt` in `gt.pak` or `cfg\msg_button.ini` in `sys_5.pak`. Patches come as `sys_N.pak` archives and `sys_N/` folders, and a later patch outranks an earlier one. A file is looked up, highest first, among a patch's loose files, the archives in its folder, its `sys_N.pak`, folders such as `scr` beside the base archives, then the base archives. Names are classified after `/` becomes `\`, so `cg/x.bmp` in a patch is art too. Test Game 92's exe, traced under Wine, opens `sys_5\scr\ep_000_000_100.txt` and never the older copy in its top-level `scr`. Its saves name such a script `sys_5\scr\…`, and a plain `scr\…` in a save loads the older copy, without the movies, so VNDegen's saves name a patched script the same way. A folder holds loose files, archives such as `sys_5/obj.pak` for its `obj` files, or both. The games name a patch's files by the patch, as in `sys_2\voice\kur1_0116.ogg` or `sys_5\obj\c000_000.bmp`, and the runtime gives every patch file that name. A patch's files outside its art folders also take the place of the base file of the same path: The Alchemist's `sys_5\cfg\msg_button.ini` adds the art button to the message window that way. Its art, in `cg`, `sc`, `obj` and `parts`, the folders the PC engine maps to a patch's own, answers only to the patch's name, because it can be a second set under the base names:
 
 | Patch | Holds | Art |
 |---|---|---|
@@ -112,7 +112,7 @@ Three games ship movies as extensionless ASF files, all WMV3 Main profile at 128
 |---|---|---|---|---|
 | Test Game 89 | 31 | 76 s, mostly loops of 0.4 to 10 s | None | Script opcode 100 on a sprite slot, 56 times in 28 scripts |
 | Test Game 92 | 72 | 757 s, about 21 Mbit/s | WMA Pro | Script opcode 100 on a sprite slot, 49 times in 8 scripts |
-| Test Game 94 | 2 | 264 s | WMA Lossless | Staff rolls the exe starts, named in the exe and not in scripts |
+| Test Game 94 | 2 | 264 s | WMA Lossless | Staff rolls a flow's scene end starts, named in the exe and not in scripts |
 
 The other 13 games use no movies. Apple's frameworks decode neither video codec nor these audio ones. vnvideo plays only MPEG-1 and Ogg Theora. The KiriKiri plugin's WMV support is FFmpeg, which is LGPL, and its build enables `wmv3` but not `wmapro` or `wmalossless`.
 
@@ -120,7 +120,7 @@ The proposed handling is for the plugin to play `movie/<name>.mp4` (H.264 and AA
 
 ### Saves
 
-Each game saves to `%APPDATA%\<UserDataDirectory>`, a folder named in `init.ini`, in files `save\save%03d.sav` with a `save%03d.bmp` thumbnail, `save\cfg.sav`, `save\read.sav`, and `play_view.sav`. Ludusavi paths can be computed from `init.ini`.
+Each game saves to `%APPDATA%\<UserDataDirectory>`, a folder named in `init.ini`, in files `save\save%03d.sav` with a `save%03d.bmp` thumbnail, `save\cfg.sav`, `save\read.sav` (the scripts read to their end), and `play_view.sav` (a save's layout, not unlocks). Ludusavi paths can be computed from `init.ini`.
 
 This test had no PC saves. The runtime's work has since made them under Wine and worked out the format, so saves move between VNDegen and the PC in both directions. `docs/nekosdk-cleanroom.md` has the format.
 

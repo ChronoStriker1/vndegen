@@ -60,4 +60,36 @@ import TestSupport
         defer { vnneko_stop(second) }
         #expect(vnneko_debug_load(second, 1))
     }
+
+    // A comment typed here goes into the save as the PC writes it: its length after the first byte, then CP932, with the
+    // rest of the file as it was. Test Game 94's box took 36 bytes, so a longer one is cut there, never inside a character.
+    @Test func aTypedCommentIsWrittenAsThePCWritesIt() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let file = data.appendingPathComponent("AppData/Roaming/waffle/alchemy/save/save002.sav")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        var nothing = [CChar](repeating: 0, count: 8)
+        #expect(vnneko_take_comment_request(e, &nothing, nothing.count) == 0)
+        #expect(vnneko_debug_save(e, 2))
+        let before = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+
+        #expect(vnneko_set_comment(e, 2, "あいう"))
+        let typed = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        let kana = try #require("あいう".data(using: .shiftJIS))
+        #expect(typed[1..<5].elementsEqual([6, 0, 0, 0]))
+        #expect(typed[5..<11].elementsEqual(kana))
+        #expect(typed[11...].elementsEqual(before[5...]))
+
+        #expect(vnneko_set_comment(e, 2, String(repeating: "ア", count: 17) + "ab" + "あ"))
+        let long = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        #expect(long[1..<5].elementsEqual([36, 0, 0, 0]))
+        #expect(long[41...].elementsEqual(before[5...]))
+        #expect(vnneko_debug_load(e, 2))
+
+        #expect(vnneko_set_comment(e, 2, ""))
+        #expect(try NekoSDKFlowFixture.unpacked(Data(contentsOf: file)) == before)
+    }
 }
+

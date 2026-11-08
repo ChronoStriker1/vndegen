@@ -21,6 +21,9 @@ struct SaveLayout {
     std::vector<Patch> after;
     int tailSize;
     std::vector<Patch> tail;
+    int textTail = 16;  // the bytes of a text record after its strings
+    int rootSizeAt = 0x11;  // where the first record holds the screen size
+    int channels = 243;  // the sound channels saved
 };
 
 namespace {
@@ -29,7 +32,10 @@ namespace {
 
 // Where the fields sit, from the end of a record's two path strings. A newer engine adds `recordExtra` bytes before them.
 constexpr int kRecordX = 0x169, kRecordScale = 0x17D, kRecordAnchor = 0x185, kRecordAlpha = 0x18D, kRecordAnimated = 0x1B3;
-constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0x192;
+constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0x192, kRecordWave = 0x1A6;
+constexpr size_t kSplashExtra = 35;
+// In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
+constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
 constexpr int kDateFlag = 360;
 
 // A save opens with a byte of 1 and the card's comment, then this many bytes before the flow script's name: a save
@@ -37,7 +43,6 @@ constexpr int kDateFlag = 360;
 constexpr int kAfterComment = 200;
 constexpr int kBeforeChoice = 4196, kAfterChoice = 39596, kDateBlock = 400;
 constexpr int kVariables = 10000, kBeforeVariables = 39600 - 8, kAfterCount = 40;
-constexpr int kChannels = 243;
 
 void apply(const std::vector<Patch> &patches, uint8_t *to) {
     auto nibble = [](char c) { return c <= '9' ? c - '0' : c - 'a' + 10; };
@@ -116,33 +121,67 @@ public:
     void setF32(size_t at, float v) { std::memcpy(&b[at], &v, 4); }
 };
 
-void readText(Reader &r, SavedText &t) {
+void readText(Reader &r, SavedText &t, int trail) {
     t.tag = r.i32();
     t.name = r.str();
     t.text = r.str();
     t.voice = r.str();
     t.volume = r.i32();
     r.skip(4);
+    // Test Game 94's records end there, 8 bytes after the strings.
+    if (trail < 12) return;
     t.kind = r.i32();
-    r.skip(4);
+    r.skip(size_t(trail - 12));
 }
 
-void writeText(Writer &w, const SavedText &t) {
+void writeText(Writer &w, const SavedText &t, int trail) {
     w.i32(t.tag);
     w.str(t.name);
     w.str(t.text);
     w.str(t.voice);
     w.i32(t.volume);
     w.i32(0);
+    if (trail < 12) return;
     w.i32(t.kind);
-    w.i32(0);
+    w.zeros(size_t(trail - 12));
 }
 
 }  // namespace
 
+std::vector<uint8_t> withComment(const std::vector<uint8_t> &plain, std::string comment) {
+    if (plain.size() < 5) return {};
+    uint32_t old;
+    std::memcpy(&old, &plain[1], 4);
+    if (old > plain.size() - 5) return {};
+    // Test Game 94's box stopped at 36 bytes, 36 letters or 18 kana, under Wine. A character isn't split.
+    size_t keep = 0;
+    for (size_t i = 0; i < comment.size();) {
+        unsigned char c = static_cast<unsigned char>(comment[i]);
+        size_t width = (c >= 0x81 && c <= 0x9F) || (c >= 0xE0 && c <= 0xFC) ? 2 : 1;
+        if (i + width > 36 || i + width > comment.size()) break;
+        i += width;
+        keep = i;
+    }
+    comment.resize(keep);
+    std::vector<uint8_t> out(plain.begin(), plain.begin() + 1);
+    const uint32_t length = uint32_t(comment.size());
+    out.insert(out.end(), reinterpret_cast<const uint8_t *>(&length), reinterpret_cast<const uint8_t *>(&length) + 4);
+    out.insert(out.end(), comment.begin(), comment.end());
+    out.insert(out.end(), plain.begin() + 5 + old, plain.end());
+    return out;
+}
+
 const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\x2019_retry") return &kChristmas;
     if (folder == "waffle\\alchemy") return &kAlchemist;
+    if (folder == "waffle\\mother3") return &kMother3;
+    if (folder == "waffle\\tmgb") return &kTsumaGibo;
+    if (folder == "waffle\\funbagfantasy3") return &kFunbagFantasy;
+    if (folder == "waffle\\funbag4") return &kFunbag4;
+    if (folder == "waffle\\moralorc") return &kMoralOrc;
+    // Test Game 92 saves as Ore o Hoshigaru Tsuma to Gibo does: its PC save reads with that layout.
+    if (folder == "waffle\\animother") return &kTsumaGibo;
+    if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     return nullptr;
 }
 
@@ -174,9 +213,11 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     int extra = layout.recordExtra;
     for (int k = 0; k < count && r.ok; k++) {
         SavedSprite s;
-        r.skip(2);
+        r.skip(1);
+        bool ordinary = r.u8() != 0;
         s.slot = r.i32();
-        r.skip(4);
+        int number = r.i32();
+        if (!ordinary) s.flipFrame = number;
         s.path = r.str();
         s.nextPath = r.str();
         size_t f = r.at;
@@ -194,6 +235,10 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.alpha = r.i32At(f + kRecordAlpha + extra);
         s.blurOn = plain[f + kRecordBlurOn + extra] != 0;
         s.blur = r.i32At(f + kRecordBlur + extra);
+        s.waveOn = plain[f + kRecordWave + extra] != 0;
+        s.waveSpeed = r.i32At(f + kRecordWave + 1 + extra);
+        s.waveRows = r.i32At(f + kRecordWave + 5 + extra);
+        s.waveSize = r.i32At(f + kRecordWave + 9 + extra);
         s.animated = f + kRecordAnimated + extra < plain.size() && plain[f + kRecordAnimated + extra] != 0;
         r.at = f + kRecordAnimationAt + extra;
         s.animationFrames = r.i32();
@@ -205,10 +250,12 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.endScaleX = r.f32At(g + 20);
         s.endScaleY = r.f32At(g + 24);
         r.at = g + 0x261 - 0x1BD;
-        if (s.slot != -999999) out.sprites.push_back(s);
+        // A splash effect's record has no picture, and 35 more bytes that describe it. VNDegen starts splashes afresh.
+        if (s.path.empty() && s.slot != -999999) r.skip(kSplashExtra);
+        else if (s.slot != -999999) out.sprites.push_back(s);
         else {
-            out.width = r.i32At(f + 0x11);
-            out.height = r.i32At(f + 0x15);
+            out.width = r.i32At(f + size_t(layout.rootSizeAt));
+            out.height = r.i32At(f + size_t(layout.rootSizeAt) + 4);
         }
     }
     size_t afterStart = r.at;
@@ -221,7 +268,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     if (!r.ok) return false;
     out.windowShown = r.u8() != 0;
     r.u8();
-    readText(r, out.current);
+    readText(r, out.current, layout.textTail);
     r.skip(0x18);
     r.skip(4);
     int logged = r.i32();
@@ -229,12 +276,12 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     out.backlog.clear();
     for (int i = 0; i < logged && r.ok; i++) {
         SavedText t;
-        readText(r, t);
+        readText(r, t, layout.textTail);
         out.backlog.push_back(t);
     }
     r.skip(1);
     out.sounds.clear();
-    for (int i = 0; i < kChannels && r.ok; i++) {
+    for (int i = 0; i < layout.channels && r.ok; i++) {
         SavedSound s;
         s.index = i;
         s.playing = r.u8() != 0;
@@ -247,7 +294,15 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     }
     r.skip(16);
     out.scene = r.str();
-    out.node = r.i32At(r.at);
+    size_t tail = r.at;
+    out.node = r.i32At(tail);
+    out.gtState = r.i32At(tail + kTailGtState);
+    out.gtCount = r.i32At(tail + kTailGtCount);
+    out.gtStartNode = r.i32At(tail + kTailGtStart);
+    out.gtMarker = r.i32At(tail + kTailGtMarker);
+    r.at = tail + kTailGtStrings;
+    out.gtScene = r.str();
+    out.gtConfig = r.str();
     return r.ok;
 }
 
@@ -276,16 +331,16 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     int extra = layout.recordExtra;
     auto record = [&](const SavedSprite &s, bool root, bool hasNext) {
         w.u8(1);
-        w.u8(1);
+        w.u8(s.flipFrame >= 0 ? 0 : 1);
         w.i32(root ? -999999 : s.slot);
-        w.i32(root ? 3 : 0);
+        w.i32(root ? 3 : s.flipFrame >= 0 ? s.flipFrame : 0);
         w.str(s.path);
         w.str(s.nextPath);
         size_t f = w.zeros(size_t(kRecordAnimationAt) + extra);
         apply(root ? layout.rootHead : layout.spriteHead, &w.b[f]);
         if (root) {
-            w.setI32(f + 0x11, d.width);
-            w.setI32(f + 0x15, d.height);
+            w.setI32(f + size_t(layout.rootSizeAt), d.width);
+            w.setI32(f + size_t(layout.rootSizeAt) + 4, d.height);
         }
         w.setF32(f + kRecordX + extra, s.x);
         w.setF32(f + kRecordX + 4 + extra, s.y);
@@ -296,6 +351,10 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(f + kRecordAlpha + extra, s.alpha);
         w.b[f + kRecordBlurOn + extra] = s.blurOn ? 1 : 0;
         w.setI32(f + kRecordBlur + extra, s.blur);
+        w.b[f + kRecordWave + extra] = s.waveOn ? 1 : 0;
+        w.setI32(f + kRecordWave + 1 + extra, s.waveSpeed);
+        w.setI32(f + kRecordWave + 5 + extra, s.waveRows);
+        w.setI32(f + kRecordWave + 9 + extra, s.waveSize);
         w.b[f + kRecordAnimated + extra] = s.animated ? 1 : 0;
         w.i32(s.animationFrames);
         w.str(s.animation);
@@ -324,16 +383,16 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     apply(layout.after, &w.b[after]);
     w.u8(d.windowShown ? 1 : 0);
     w.u8(d.windowShown ? 1 : 0);
-    writeText(w, d.current);
+    writeText(w, d.current, layout.textTail);
     w.zeros(0x18);
     w.i32(60);
     w.i32(int32_t(d.backlog.size()));
-    for (const SavedText &t : d.backlog) writeText(w, t);
+    for (const SavedText &t : d.backlog) writeText(w, t, layout.textTail);
 
     w.zeros(1);
     std::map<int, const SavedSound *> byIndex;
     for (const SavedSound &s : d.sounds) byIndex[s.index] = &s;
-    for (int i = 0; i < kChannels; i++) {
+    for (int i = 0; i < layout.channels; i++) {
         auto it = byIndex.find(i);
         if (it == byIndex.end()) {
             w.u8(0);
@@ -354,6 +413,18 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     size_t tail = w.zeros(size_t(layout.tailSize));
     apply(layout.tail, &w.b[tail]);
     w.setI32(tail, d.node);
+    w.setI32(tail + kTailGtState, d.gtState);
+    w.setI32(tail + kTailGtCount, d.gtCount);
+    w.setI32(tail + kTailGtCount + 4, d.gtCount);
+    w.setI32(tail + kTailGtStart, d.gtStartNode);
+    w.setI32(tail + kTailGtMarker, d.gtMarker);
+    // The tail's two strings are empty in the layouts, so their text goes in place of those two lengths.
+    Writer strings;
+    strings.str(d.gtScene);
+    strings.str(d.gtConfig);
+    auto at = w.b.begin() + std::ptrdiff_t(tail + kTailGtStrings);
+    w.b.erase(at, at + 8);
+    w.b.insert(w.b.begin() + std::ptrdiff_t(tail + kTailGtStrings), strings.b.begin(), strings.b.end());
     return w.b;
 }
 

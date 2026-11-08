@@ -6,16 +6,20 @@
 #include <cstdint>
 #include <cstdio>
 #include <functional>
+#include <array>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "archive.h"
 #include "audio.h"
 #include "canvas.h"
 #include "image.h"
+#include "movie.h"
 #include "save.h"
 #include "script.h"
 #include "ui.h"
@@ -57,14 +61,25 @@ struct Sprite {
     std::string path;
     float x = 0, y = 0, scaleX = 1, scaleY = 1, rotation = 0, alpha = 1;
     int blurAmount = 0;
-    // The point in the picture a scale keeps in place, or -1 for its middle.
-    int anchorX = -1, anchorY = -1;
     bool blurOn = false;
     // Timed changes run side by side until each finishes, when it folds into the values above. The named animation
     // runs over them all until it's stopped.
     std::vector<Animation> changes;
     Animation loop;
     bool looping = false;
+    // The point in the picture a scale keeps in place, or -1 for its middle.
+    int anchorX = -1, anchorY = -1;
+    // A flipbook: numbered pictures shown in turn.
+    int flipCount = 0, flipMs = 25, flipShown = 0;
+    // A movie playing as the picture, and the story time it started at.
+    std::shared_ptr<Movie> movie;
+    int64_t movieFrom = 0;
+    int64_t flipBegun = 0;
+    bool flipLoop = false, flipReverse = false;
+    bool waveOn = false;
+    // An effect painted on black, which the PC game adds to the picture.
+    bool additive = false;
+    int waveSpeed = 0, waveRows = 0, waveSize = 0;
 };
 
 struct SpriteView {
@@ -88,6 +103,8 @@ MacroLists parseMacroList(const std::vector<uint8_t> &file);
 class Engine {
 public:
     bool start(const std::string &root, const std::string &dataDir, const std::string &logPath, const std::string &fontDir, std::string &error);
+    // The host's movie decoder, before start. Without one, movies are logged and left out.
+    void setMovies(const VNNekoMovies &movies) { movies_ = movies; hasMovies_ = true; }
     ~Engine();
 
     bool step(int ms);
@@ -102,11 +119,25 @@ public:
     void mouseWheel(int notches);
     // Moves the pointer to the nearest control that way, for a controller or arrow keys. False when there is none here.
     bool moveFocus(int dx, int dy);
-    void setSkip(bool on) { skip_ = on; }
+    // A held skip stopped at unread text stays stopped until it's let go.
+    void setSkip(bool on) {
+        skip_ = on && !skipStopped_;
+        if (!on) skipStopped_ = false;
+    }
     bool inMenu() const { return screen_ != nullptr; }
     // For test hosts: presses a menu button by its action, as a click on it does.
     bool pressAction(const std::string &action);
     void setPaused(bool paused);
+    // The host window's state, for Config's screen mode, and the change Config asks for: 0 a window, 1 full screen, -1
+    // none.
+    void setWindowState(bool canFullScreen, bool fullScreen) {
+        if (canFullScreen != canFullScreen_ || fullScreen != fullScreen_) dirty_ = true;
+        canFullScreen_ = canFullScreen;
+        fullScreen_ = fullScreen;
+    }
+    int takeWindowRequest() { return std::exchange(windowRequest_, -1); }
+    bool pausesWhenInactive() const { return setting("pause_inactive") != 0; }
+    int confirmKey() const { return setting("deckey"); }
 
     const char *problem() const { return problem_.empty() ? nullptr : problem_.c_str(); }
     const char *debugStatus();
@@ -119,6 +150,14 @@ public:
         return it == table.end() ? 0 : it->second;
     }
     bool jump(const std::string &script, int node);
+    // A click on a card's comment asks the host for one: the card's slot and its comment now, or 0 when nothing's asked.
+    int takeCommentRequest(std::string &utf8);
+    // The comment the player typed, written into that card's save as the PC writes it.
+    bool setComment(int slot, const std::string &utf8);
+    // Something the title asks the host to show, once per click: "alert" with its text (Version info), "manual" with the
+    // full path of the game's own manual page, or "url" with a web page the PC opens in a browser. False when nothing's
+    // asked. A press from a test host never asks for the web page.
+    bool takeHostRequest(std::string &kind, std::string &payload);
     // For checks: lays out a message as the message window sets it, replacing the one shown, and gives the furthest
     // right and lowest pixel its ink reaches, and the canvas's size to hold them against.
     void messageExtent(const std::string &utf8Name, const std::string &utf8Text, int &right, int &bottom);
@@ -130,7 +169,7 @@ public:
     void toggleLock(int slot);
 
 private:
-    enum class Waiting { None, Time, Click, Choice, Ended };
+    enum class Waiting { None, Time, Click, Choice, StaffRoll, Ended };
     struct Frame {
         std::shared_ptr<Script> script;
         const Node *node = nullptr;
@@ -138,6 +177,26 @@ private:
 
     void log(const char *format, ...) __attribute__((format(printf, 2, 3)));
     void warnOnce(const std::string &what);
+    // Movies: command 100 loads one into a slot like a picture, and each step shows the frame due.
+    void loadMovie(const Node &n);
+    // A flow's staff roll, the table's `staffroll` screen: `movie VARIABLE FILE...` plays the file the scenario
+    // variable numbers, over everything, and `skipif G G...` lets a click end it once one of those globals is set.
+    // Or, as Test Game 84's exe draws its own, the screen's pictures as layers over black, `length MS` long, with `music
+    // FILE`, and `sets G` set as it ends.
+    void startStaffRoll();
+    void stepStaffRoll();
+    void endStaffRoll();
+    void composeStaffRoll(Canvas &out);
+    Canvas staffRollGroup_;
+    bool staffRollSkips_ = false;
+    const Screen *staffRollLayers_ = nullptr;
+    int64_t staffRollFrom_ = 0;
+    std::shared_ptr<Movie> openMovie(const std::string &path, bool loop);
+    void stepMovies();
+    void stopMovieSound();
+    VNNekoMovies movies_{};
+    bool hasMovies_ = false;
+    std::shared_ptr<Movie> soundMovie_;  // the movie whose sound the mix plays
     void complain(const std::string &what);
 
     // Interpreter.
@@ -155,22 +214,36 @@ private:
     bool cardAt(int slot, int &x, int &y) const;
     bool overCardDelete(int slot, int x, int y) const { return overCardPart("slotdelete", slot, x, y); }
     bool overCardPart(const char *key, int slot, int x, int y) const;
-    int newestQuickSlot();
+    int newestQuickSlot() { return newestSlot(firstQuickSlot_, lastQuickSlot_); }
+    int newestSlot(int first, int last);
     // A locked save can be loaded but not saved over or deleted. The lock is kept in cfg.sav, as the PC keeps it.
     bool locked(int slot) const;
+    // `slotcomment X BASELINE WIDTH SIZE PROMPT...`: the comment's place on a card, and what an empty one shows.
+    bool overComment(int slot, int x, int y) const;
+    int commentRequest_ = 0;
+    std::string root_, hostRequestKind_, hostRequestPayload_;
+    bool testPress_ = false;
+    std::set<std::string> testsPlayed_;
     std::string lastScene_;
-    int nextQuickSlot_ = 81;
+    int64_t screenMs_ = 0, openingFrom_ = -1;  // a menu's own clock, and when the title's opening began
+    std::unordered_map<std::string, bool> paintedOnBlack_;
+    int64_t trackQuarterShown_ = -1;
+    int firstQuickSlot_ = 81, lastQuickSlot_ = 88, nextQuickSlot_ = 81;
     bool barPinned_ = false;
     SaveData captureSave();
-    void restoreSave(const SaveData &data);
+    void restoreSave(const SaveData &data, int slot = -1);
     void noteThumbnail();
     struct SlotInfo {
         bool exists = false;
         int date[6] = {};
         ImageRef thumbnail;
+        std::string flow;  // the flow script the save is in, for its chapter's name
+        int route = 0;  // its route mode, for the card's progress label
         std::string comment;  // typed on a PC, UTF-8
     };
     SlotInfo &slotInfo(int slot);
+    bool pageOff(const std::string &action) const;
+    bool pageStepOff(const std::string &action) const;
     void composeSlots(Canvas &out);
     void drawComment(Canvas &out, const std::string &utf8, int x, int baseline, int width, int px);
     int slotAt(int x, int y) const;
@@ -182,6 +255,69 @@ private:
     void noteSeen(const std::string &path);
     bool seen(const std::string &path) const;
     void saveSeen();
+    // Flipbooks, and what anime_cfg.ini gives each: its pictures and the ms each shows.
+    void startFlipbook(const Node &n);
+    void advanceFlipbooks();
+    void resumeFlipbook(Sprite &s);
+    struct FlipModes { std::string path; bool loop, reverse; };
+    std::map<int, FlipModes> flipModesAt(const SaveData &d, int slot);
+    void writeFlipModes(int slot, const SaveData &d);
+    void takeScaleAnchor(Sprite &s, const Node &n);
+    void anchorOf(const Sprite &s, int &x, int &y) const;
+    bool paintedOnBlack(const std::string &path);
+    bool fullWidthPlate() const;
+    bool composeTitleOpening(Canvas &out);
+    // Where the pointer is, from -1 at the screen's left or top edge to 1 at the other, or the middle before it's been seen.
+    void pointerToward(float &x, float &y) const;
+    // Whether the player's Individual Voices settings let this voice file play.
+    bool voiceAllowed(const std::string &voice) const;
+    int soundGroup(int kind, const std::string &path) const;  // the volume a sound plays at
+    int cardsPerPage() const;
+    void cardPlace(int index, int &x, int &y) const;
+    std::string mainFlowKey() const;
+    bool galleryPageExists(int page) const;
+    void composeTrackCards(Canvas &out);
+    void composeTrackTime(Canvas &out);
+    void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots);
+    std::map<std::string, std::pair<int, int>> flipbooks_;
+    // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
+    // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
+    struct GoodTiming {
+        bool active = false, extend = false, extending = false, ejaculating = false;
+        std::shared_ptr<Script> main;
+        int marker = 0, count = 0, group = -1, index = 0, played = 0, shownCount = 0;
+        std::string config;
+        std::vector<int> texts;  // the text nodes before the marker
+        std::vector<std::string> extension, ejaculate;
+        std::vector<std::string> groups[3];
+    } gt_;
+    // change_texture_list.ini's pairs: with Config's art switch off, the second picture of a pair shows as the first.
+    std::map<std::string, std::string> plainArt_;
+    // Ore o Hoshigaru Tsuma to Gibo's CG groups, from the same file: whether each has a see-through protagonist and a
+    // version without pubic hair, which Config's and the CG viewer's switches pick.
+    std::map<std::string, std::pair<bool, bool>> artVersions_;
+    std::string shownPath(const std::string &path) const;
+    bool artSwitchable() const;
+    std::string versionPath(const std::string &path) const;
+    // Test Game 93's normal CG art: a CG variant numbered in the hundreds, the detailed one a script names, shown as its
+    // base, the same number less its hundreds, when Config asks for normal art and that file exists.
+    std::string plainVariant(const std::string &path) const;
+    void applyArtSwitch();
+    // Splash effects: droplets a burst throws out, at a slot's place in the draw order. Their motion is a guess from
+    // the commands' numbers and the look of the PC game.
+    struct Droplet { float x, y, vx, vy, scale; int bornMs, lifeMs; };
+    struct Splash { ImageRef image; int perBurstScale = 1000, gravity = 0, minLife = 500, maxLife = 1000, speed = 300, cap = 100; std::vector<Droplet> droplets; };
+    std::map<int, Splash> splashes_;
+    void splashBurst(const Node &n);
+    void composeSplashes(Canvas &out, int fromSlot, int toSlot);
+    bool readGtConfig(const std::string &path);
+    void gtMeasure(const Script &script, int marker);
+    void gtBegin(const Node &n);
+    void gtReachMarker(const Node &n);
+    void gtEjaculate();
+    bool gtNextScript();
+    bool gtBackToStory();
+    void composeGtCount(Canvas &out);
     size_t configStringLength() const;
     int nextTrack(int direction);
     void playTrack(int index);
@@ -194,13 +330,104 @@ private:
     void openGalleryCell(int index);
     struct GalleryEntry {
         int page = 0;
-        std::string thumbnail, flow, key, bgm;
+        std::string thumbnail, flow, bgm;
+        // A scene's scripts, any one of which read to its end unlocks it.
+        std::vector<std::string> keys;
         std::vector<std::string> images;
         std::vector<int> imageIds;
     };
-    std::vector<GalleryEntry> cgEntries_, sceneEntries_;
-    std::vector<std::string> tracks_;
+    bool sceneUnlocked(const GalleryEntry &scene) const;
+    // Test Game 92's anime gallery, from its anime_view.ini: entries of movies, unlocked whole by a scene's script as a
+    // scene is, and shown in the CG viewer.
+    std::vector<GalleryEntry> cgEntries_, sceneEntries_, animeEntries_;
+    // The entries of the gallery on screen, and whether one of an entry's pictures is unlocked.
+    const std::vector<GalleryEntry> &galleryEntries() const;
+    int cellShift() const;
+    int clampSetting(const std::string &name, int value) const;
+    // The host window, for Config's screen mode: whether it can go full screen, whether it is, and a change asked for,
+    // -1 for none.
+    bool canFullScreen_ = false, fullScreen_ = false;
+    int windowRequest_ = -1;
+    // Whether a slot, or a picture, is an event CG, which Config's camera work moves.
+    bool isCgPath(const std::string &path) const;
+    static std::string withoutPatch(const std::string &key);
+    static std::string readKey(const std::string &name);
+    bool isCgSlot(int slot) const;
+    void composeDrift(Canvas &out);
+    int64_t driftFrom_ = 0;
+    size_t driftFirst_ = 0;
+    ImageRef galleryThumbnail(const std::string &path) const;
+    bool galleryImageSeen(const GalleryEntry &entry, size_t image) const;
+    bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }
+    std::vector<std::string> tracks_, trackTitles_;
+    // Test Game 88's sprite gallery, from cfg\sc_view.ini: its backgrounds, and each heroine's faces, outfits and poses as
+    // the thumbnails the pickers show. A heroine's sprites are sc\sc_HHH_OOO_PPP_SSS_FFF, HHH her number in the file names.
+    struct SpriteOutfit {
+        std::string thumbnail;
+        int id = 0;    // the OOO of her sprites in this outfit
+        int bonus = 0;  // the line's second field: 0, or which bonus it comes with
+    };
+    struct SpriteHeroine {
+        int number = 0;
+        std::vector<std::string> faces, poses;
+        std::vector<SpriteOutfit> outfits;
+    };
+    std::vector<std::pair<std::string, int>> spriteBackgrounds_;
+    std::vector<SpriteHeroine> spriteHeroines_;
+    // Each heroine's chosen outfit, as its place in her list, and whether the story wears it, kept in cfg.sav as the PC does.
+    std::vector<int> spriteOutfit_, spriteLocked_;
+    std::string lockedSprite(const std::string &path) const;
+    // The sprite gallery's screen (sprites.cpp): what's shown, and its music.
+    struct SpriteGallery {
+        bool explaining = true, music = true, blur = false, pinned = false, panelsHidden = false;
+        int heroine = 0, background = 0, zoom = 100, list = -1, listScroll = 0;
+        std::vector<int> face, pose;
+        int64_t restingSince = 0, slideSince = -1000000;
+    } sprite_;
+    int spriteMusic_ = 0;
+    bool spriteScreen() const;
+    void openSprites();
+    void closeSprites();
+    void playSpriteMusic();
+    bool spriteAvailable(const std::string &thumbnail) const;
+    std::vector<int> spriteChoices(int picker) const;
+    int &spriteChoice(int picker);
+    int spriteChoice(int picker) const { return const_cast<Engine *>(this)->spriteChoice(picker); }
+    void stepSpriteChoice(int picker, int direction);
+    std::string spriteThumbnail(int picker, int index) const;
+    std::string spriteFigure() const;
+    std::string spriteBackground() const;
+    bool spritePanelsShown() const;
+    float spriteSlide() const;
+    std::pair<std::string, int> spriteControlAt(int x, int y) const;
+    void pressSprites(int x, int y);
+    void stepSprites();
+    void spritePointerMoved();
+    void composeSprites(Canvas &out);
+    void composeSpriteList(Canvas &out);
+    void pressSpriteList(int x, int y);
+    struct SpriteListEntry {
+        int index = 0;      // its place in sc_view.ini's list
+        bool shown = true;  // false for a bonus the copy has only the name of
+    };
+    std::vector<SpriteListEntry> spriteListEntries(int picker) const;
+    std::string spriteListFigure(int picker, int index) const;
+    std::pair<int, int> spriteListPlace(int position) const;
+    int spriteListRows() const;
+    int spriteListAt(int x, int y, bool *onCheck = nullptr) const;
+    // The figures a list shows tinted, by file and state, as last drawn.
+    std::map<std::string, ImageRef> spriteTinted_;
+    // Whether each bonus patch folder the lists name is there.
+    mutable std::map<std::string, bool> spritePatches_;
     std::unordered_map<std::string, bool> seen_;
+    // The text read, by script and node id, for Config's read-only skip.
+    std::unordered_map<std::string, std::set<int>> readNodes_;
+    bool readChanged_ = false, skipStopped_ = false, jumping_ = false, textFresh_ = false;
+    void loadReadText();
+    void saveReadText();
+    void noteTextRead(const Node &n);
+    void writeReadSav();
+    std::vector<std::string> readScripts_;  // read.sav's scripts, as the PC named them
     bool seenChanged_ = false;
     std::vector<std::string> viewing_;
     size_t viewingIndex_ = 0;
@@ -211,7 +438,17 @@ private:
     bool viewPanelHidden_ = false, viewAuto_ = false, viewMuted_ = false, replayFromViewer_ = false;
     int64_t viewMs_ = 0, viewAutoFrom_ = 0;
     int viewZoom_ = 100, viewMusic_ = 0;
+    int movieZoom_ = 100;  // the manual animation control's zoom, in hundredths
     std::string viewMusicPath_;
+    // The anime gallery's movie in the viewer, looping from viewMovieFrom_ on the viewer's clock, and whether the mix
+    // reads its sound.
+    std::shared_ptr<Movie> viewMovie_;
+    int64_t viewMovieFrom_ = 0;
+    ImageRef viewMovieImage_;
+    bool viewMovieSound_ = false;
+    std::string viewerGallery_ = "cg";  // the gallery the viewer was opened from
+    void stopViewerMovie();
+    void stopViewerMovieSound();
     bool viewerPanel() const;
     void openViewer(size_t entry);
     void viewerShow(size_t entry, size_t image);
@@ -240,13 +477,14 @@ private:
 
     // Settings, by the names the menu tables use, kept in a small file of VNDegen's beside the saves.
     void loadSettings();
-    // What Config starts at for this game: the shared defaults, and every Individual Voices box checked.
-    std::map<std::string, int> startingSettings() const;
-    // Whether the player's Individual Voices settings let this voice file play.
-    bool voiceAllowed(const std::string &voice) const;
     void saveSettings();
     void applySettings();
     void applyArtSet();
+    std::map<std::string, int> startingSettings() const;
+    int galleryTab_ = 0;
+    int64_t galleryTabAt_ = 0;  // the menu clock when the gallery's tab opened
+    // A cell's entry, or -1. A game with tabs lists only the tab's entries.
+    int galleryEntry(int cell) const;
     int setting(const std::string &name) const;
     void changeSetting(const std::string &name, int value);
     std::map<std::string, int> settings_, settingsWhenOpened_;
@@ -263,6 +501,7 @@ private:
 
     // Global variables, in the PC's cfg.sav.
     void loadGlobals();
+    void loadReadScripts();
     void saveGlobals();
     std::vector<uint8_t> configFile_;
 
@@ -280,19 +519,33 @@ private:
     void scrollLog(int lines);
     void composeLog(Canvas &out);
     Button *buttonAt(int x, int y, std::vector<Button> &buttons);
+    // `menustages`: Test Game 94's title shows its art until a click brings up the menu, stage 2, and the right button
+    // puts it away. A `submenu:NAME` button opens the buttons and pictures of that group beside it, and a group named
+    // `PARENT/NAME` opens inside PARENT's.
+    int menuStage_ = 2;
+    std::string subMenu_;
+    bool submenuOpen(const std::string &name) const;
+    bool anyGlobalSet(const std::vector<int> &numbers) const;
+    bool shown(const Button &b) const;
+    bool shown(const Picture &p) const;
+    // Test Game 94's route buttons replay the story from the prologue with each choice made for that route, 1 to 4, which
+    // its choices name in parameters 10 to 13. The route is a scenario variable, `routevar N` in the defaults table (94's
+    // SENARIO_STATUS, 4000), set as the story starts: the PC's saves carry it, and a load goes on in the route.
+    int pendingRoute_ = 0, routeVar_ = -1;
+    int route() const;
 
     // Commands.
     void beginChoice(const Node &n);
     void updateChoice();
-    void choicePlace(int &x, int &top, int &step) const;
+    void choicePlace(int &x, int &top, int &step, int &slant) const;
+    static int variableIndex(const Node &n);
+    int operand(const Node &n) const;
     int variableValue(int scope, int index) const;
     int variableNumber(int scope, int index) const;
     void endStory(const std::string &screen);
     void loadImage(const Node &n);
     void transform(const Node &n);
     void transformOverTime(const Node &n);
-    void takeScaleAnchor(Sprite &s, const Node &n);
-    void anchorOf(const Sprite &s, int &x, int &y) const;
     void changeOverTime(Sprite &s, const Node &n);
     void startNamedAnimation(const Node &n);
     void namedAnimation(Sprite &s, const Node &n);
@@ -312,6 +565,18 @@ private:
     void foldFinishedChanges(Sprite &s);
     void composeScene(Canvas &out, const Sprites &sprites);
     void composeMessage(Canvas &out);
+    std::string readSwapped(const std::string &sheet) const;
+    bool hoverAllows(const Picture &p) const;
+    bool musicLit(const Button &b) const;
+    // Test Game 92's manual animation control: while a movie shows and Config allows it, the wheel and a panel zoom the
+    // movie, and the zoomed movie follows the pointer. The table's `animpanel`, `animbuttons`, `animdigits`, `animhelp`
+    // and `animzoom` place it.
+    bool movieShowing() const;
+    bool cameraActive() const;
+    bool cameraPanelShown() const;
+    int cameraButtonAt(int x, int y) const;
+    void cameraZoom(int hundredths);
+    void composeCameraPanel(Canvas &out);
     void markRect(int &x, int &y, int &w, int &h) const;
     bool markShowing() const;
     void drawMark(Canvas &out);
@@ -366,6 +631,8 @@ private:
     // A choice: a sheet with one column per option and one row per state (normal, hovered, chosen, ...).
     ImageRef choiceSheet_, choiceBack_;
     int choiceCount_ = 0, choiceHover_ = -1, choiceResult_ = 0;
+    std::array<int, 4> choiceRoutes_{-1, -1, -1, -1};  // the option each of Test Game 94's routes takes, or another value
+    const std::vector<std::string> *choiceTable(const std::string &key) const;
     float mouseX_ = 0, mouseY_ = 0;
     bool mouseMoved_ = false;
 
@@ -400,8 +667,10 @@ private:
     };
     std::map<int, Playing> bgmNow_, seNow_;
     bool dialogOpen_ = false;
+    std::string dialogOpener_;  // the action of the menu button whose question is open
     int dialogQuestion_ = 0, dialogHover_ = -1;
     std::function<void()> dialogYes_;
+    int testPlayer_ = 0;  // Config's test sound
     bool dialogNoAsk_ = false;  // the "don't ask again" box, ticked
     void answerDialog(bool yes);
 

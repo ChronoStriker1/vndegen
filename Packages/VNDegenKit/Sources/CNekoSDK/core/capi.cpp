@@ -1,4 +1,7 @@
+#include <dlfcn.h>
+
 #include <algorithm>
+#include <cstdio>
 #include <string>
 
 #include "engine.h"
@@ -16,9 +19,30 @@ static std::string startError;
 
 extern "C" {
 
+const VNNekoMovies *vnneko_find_movies(void) {
+    static VNNekoMovies movies;
+    static bool found = false;
+    if (found) return &movies;
+    void *pointers[5];
+    const char *names[5] = {"vnffmovie_open", "vnffmovie_frame", "vnffmovie_audio", "vnffmovie_seek", "vnffmovie_close"};
+    for (int i = 0; i < 5; i++)
+        if (!(pointers[i] = dlsym(RTLD_DEFAULT, names[i]))) {
+            startError = std::string("no ") + names[i];
+            return nullptr;
+        }
+    movies.open = reinterpret_cast<decltype(movies.open)>(pointers[0]);
+    movies.frame = reinterpret_cast<decltype(movies.frame)>(pointers[1]);
+    movies.audio = reinterpret_cast<decltype(movies.audio)>(pointers[2]);
+    movies.seek = reinterpret_cast<decltype(movies.seek)>(pointers[3]);
+    movies.close = reinterpret_cast<decltype(movies.close)>(pointers[4]);
+    found = true;
+    return &movies;
+}
+
 VNNekoEngine *vnneko_start(const VNNekoLaunch *launch) {
     auto e = std::make_unique<VNNekoEngine>();
     startError.clear();
+    if (launch->movies) e->engine.setMovies(*launch->movies);
     if (!e->engine.start(launch->gameRoot, launch->dataDir ? launch->dataDir : "", launch->logPath ? launch->logPath : "", launch->fontDir ? launch->fontDir : "", startError)) return nullptr;
     return e.release();
 }
@@ -76,6 +100,12 @@ int64_t vnneko_debug_file_size(const char *gameRoot, const char *path) {
     neko::Files files;
     return files.open(gameRoot) ? files.storedSize(path) : -1;
 }
+bool vnneko_debug_saved_name(const char *gameRoot, const char *path, char *out, size_t size) {
+    neko::Files files;
+    if (!files.open(gameRoot) || !size) return false;
+    std::snprintf(out, size, "%s", files.savedName(path).c_str());
+    return true;
+}
 int vnneko_debug_variable(VNNekoEngine *e, int scope, int number) { return e->engine.variable(scope, number); }
 int vnneko_debug_macro_number(const char *gameRoot, int scope, int index) {
     neko::Files files;
@@ -88,6 +118,10 @@ int vnneko_debug_macro_number(const char *gameRoot, int scope, int index) {
 }
 void vnneko_set_skip(VNNekoEngine *e, bool on) { e->engine.setSkip(on); }
 void vnneko_set_paused(VNNekoEngine *e, bool paused) { e->engine.setPaused(paused); }
+void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScreen) { e->engine.setWindowState(canFullScreen, fullScreen); }
+int vnneko_take_window_request(VNNekoEngine *e) { return e->engine.takeWindowRequest(); }
+bool vnneko_pauses_when_inactive(VNNekoEngine *e) { return e->engine.pausesWhenInactive(); }
+int vnneko_confirm_key(VNNekoEngine *e) { return e->engine.confirmKey(); }
 void vnneko_stop(VNNekoEngine *e) { delete e; }
 const char *vnneko_problem(VNNekoEngine *e) { return e->engine.problem(); }
 const char *vnneko_debug_status(VNNekoEngine *e) { return e->engine.debugStatus(); }
@@ -97,6 +131,21 @@ bool vnneko_debug_press(VNNekoEngine *e, const char *action) { return e->engine.
 int vnneko_debug_choice_count(VNNekoEngine *e) { return e->engine.choiceCount(); }
 void vnneko_debug_choose(VNNekoEngine *e, int index) { e->engine.choose(index); }
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node) { return e->engine.jump(script, node); }
+int vnneko_take_comment_request(VNNekoEngine *e, char *utf8, size_t size) {
+    std::string comment;
+    int slot = e->engine.takeCommentRequest(comment);
+    if (slot && utf8 && size) std::snprintf(utf8, size, "%s", comment.c_str());
+    return slot;
+}
+bool vnneko_set_comment(VNNekoEngine *e, int slot, const char *utf8) { return e->engine.setComment(slot, utf8 ? utf8 : ""); }
+bool vnneko_take_host_request(VNNekoEngine *e, char *kind, size_t kindSize, char *payload, size_t payloadSize) {
+    std::string k, p;
+    if (!e->engine.takeHostRequest(k, p)) return false;
+    if (kind && kindSize) std::snprintf(kind, kindSize, "%s", k.c_str());
+    if (payload && payloadSize) std::snprintf(payload, payloadSize, "%s", p.c_str());
+    return true;
+}
+void vnneko_debug_table_prefix(const char *text) { neko::menuTablePrefix() = text ? text : ""; }
 bool vnneko_debug_save(VNNekoEngine *e, int slot) { return e->engine.saveToSlot(slot); }
 bool vnneko_debug_load(VNNekoEngine *e, int slot) { return e->engine.loadFromSlot(slot); }
 void vnneko_debug_toggle_lock(VNNekoEngine *e, int slot) { e->engine.toggleLock(slot); }
