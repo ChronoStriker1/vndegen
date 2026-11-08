@@ -38,4 +38,26 @@ import TestSupport
         #expect(vnneko_debug_variable(second, 0, 202) == 0)
         #expect(try global(202) == 0)
     }
+
+    // A card's comment, typed on the PC, is the string after the save's first byte, and everything after it moves along.
+    // VNDegen 0.26.2 read a fixed place there, so such a save from a PC showed as an empty card and didn't load.
+    @Test func aSaveWithAPCCommentLoads() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let file = data.appendingPathComponent("AppData/Roaming/waffle/alchemy/save/save001.sav")
+
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        var plain = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        #expect(plain[0] == 1 && plain[1..<5].allSatisfy { $0 == 0 })
+        let comment = try #require("あいう".data(using: .shiftJIS))
+        plain.replaceSubrange(1..<5, with: withUnsafeBytes(of: UInt32(comment.count).littleEndian, Array.init) + comment)
+        try NekoSDKFlowFixture.packed(plain).write(to: file)
+
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
+    }
 }

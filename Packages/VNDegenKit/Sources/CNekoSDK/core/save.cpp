@@ -32,7 +32,10 @@ constexpr int kRecordX = 0x169, kRecordScale = 0x17D, kRecordAnchor = 0x185, kRe
 constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0x192;
 constexpr int kDateFlag = 360;
 
-constexpr int kFlowHeader = 0xCD, kBeforeChoice = 4196, kAfterChoice = 39596, kDateBlock = 400;
+// A save opens with a byte of 1 and the card's comment, then this many bytes before the flow script's name: a save
+// with no comment names its flow at 0xCD.
+constexpr int kAfterComment = 200;
+constexpr int kBeforeChoice = 4196, kAfterChoice = 39596, kDateBlock = 400;
 constexpr int kVariables = 10000, kBeforeVariables = 39600 - 8, kAfterCount = 40;
 constexpr int kChannels = 243;
 
@@ -146,7 +149,9 @@ const SaveLayout *saveLayout(const std::string &folder) {
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out) {
     if (plain.size() < 100000) return false;
     Reader r(plain);
-    r.skip(kFlowHeader);
+    r.skip(1);
+    out.comment = r.str();
+    r.skip(kAfterComment);
     out.flow = r.str();
     r.skip(kBeforeChoice);
     out.choiceImage = r.str();
@@ -248,8 +253,9 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
 
 std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     Writer w;
-    w.zeros(kFlowHeader);
-    w.b[0] = 1;
+    w.u8(1);
+    w.str(d.comment);
+    w.zeros(kAfterComment);
     w.str(d.flow);
     w.zeros(kBeforeChoice);
     w.str(d.choiceImage);
