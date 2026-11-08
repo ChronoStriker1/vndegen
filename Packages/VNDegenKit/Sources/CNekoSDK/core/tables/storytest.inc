@@ -8,7 +8,7 @@ lastchoice made            # saves hold 2 once a choice is made, as Test Game 83
 screen story
 flow main
 open selftestwait 1 -> S 12 # a screen before any scene, so a save there names none
-scene scr\a.txt
+scene scr\a.txt @30        # the same number as the last scene: a PC save picks between them by its scene
 open selftest 3 -> S 5     # a game part's screen; its result to scenario variable 5
 on 3 goto three
 set S 6 = 1                # skipped: the screen gave 3
@@ -30,6 +30,6 @@ choice obj\n001_000.bmp 2 @25
 on 1 goto second
 set S 13 = 1               # skipped: the second option is taken
 label second
-scene scr\e.txt
+scene scr\e.txt @30
 end
 )";

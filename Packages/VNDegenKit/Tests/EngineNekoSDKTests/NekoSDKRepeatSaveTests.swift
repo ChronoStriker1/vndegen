@@ -60,7 +60,12 @@ import TestSupport
         for _ in 0..<40 { _ = vnneko_step(first, 16) }
         #expect(vnneko_debug_save(first, 1))
         vnneko_stop(first)
-        let saved = try #require(flags(try saveFile(data, 1)))
+        // The picture is named twice, as the PC needs to load it (Test Game 93 under Wine): its name, then the same again.
+        let first1 = try saveFile(data, 1)
+        let name = Data("obj\\r.bmp".utf8)
+        let at = try #require(first1.range(of: name))
+        #expect(first1.subdata(in: at.upperBound + 4..<at.upperBound + 4 + name.count) == name)
+        let saved = try #require(flags(first1))
         #expect(saved.animated == 1)
         #expect(saved.repeats == 1)
 
