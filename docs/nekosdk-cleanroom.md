@@ -194,6 +194,16 @@ numbered in the hundreds, as `cg_001_000_000_000_304`; from a save just before t
 detailed art and `_003` and `_004`, the same numbers less their hundreds, with normal art, and the normal frames lacked
 the detailed ones' falling drops. The runtime shows a variant's base when normal art is chosen and the base exists.
 
+## Gallery figures
+
+Test Game 88's CG and Scene galleries draw its three heroines over each tab's room, from the `sc` sprites the PC reads
+for each tab under Wine, the tab's own heroine in her other pose (`_001`), at the places fitted to the PC's frames.
+Its tab buttons' labels lie in the sheet in another order from the entries' tab numbers: the second button, whose
+label is the sheet's third, lists `cg_view.ini`'s tab 2, eight entries, as the PC shows. The cards move 80 pixels away
+from the tab's heroine, as the PC draws them, and like 93's show how many of an entry's pictures have been seen. Horny
+Elves and a Moral Orc draws each tab's character, its `sc` sprite, and on the harem tab the picture `g002_000`; a 30
+fps recording under Wine shows the character come up from below over about 0.17 seconds, overshooting by 21 pixels.
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on

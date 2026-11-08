@@ -1047,9 +1047,23 @@ button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen cg
 pic obj\f000_000.bmp 0 0 tab 0
-pic obj\f000_002.bmp 0 0 tab 1
-pic obj\f000_001.bmp 0 0 tab 2
+pic obj\f000_002.bmp 0 0 tab 2
+pic obj\f000_001.bmp 0 0 tab 1
 pic obj\f000_003.bmp 0 0 tab 3
+# The three heroines over each tab's room, the sprites the PC reads: Akiho, Ai and Yui, the tab's own heroine in her
+# other pose, placed as the PC places them on that tab under Wine.
+pic sc\sc_001_002_000_001_000.bmp 252 -58 tab 0
+pic sc\sc_002_003_000_001_000.bmp -400 -84 tab 0
+pic sc\sc_000_002_000_001_000.bmp 564 -60 tab 0
+pic sc\sc_001_002_000_001_000.bmp 328 -56 tab 2
+pic sc\sc_002_003_000_001_001.bmp -328 -84 tab 2
+pic sc\sc_000_002_000_001_000.bmp 636 -60 tab 2
+pic sc\sc_001_002_000_001_001.bmp 180 -56 tab 1
+pic sc\sc_002_003_000_001_000.bmp -472 -84 tab 1
+pic sc\sc_000_002_000_001_000.bmp 488 -60 tab 1
+pic sc\sc_001_002_000_001_000.bmp 180 -56 tab 3
+pic sc\sc_002_003_000_001_000.bmp -472 -84 tab 3
+pic sc\sc_000_002_000_001_001.bmp 488 -60 tab 3
 pic obj\e003_000.bmp 1138 0
 pic obj\f001_000.bmp 0 0 1 2 0 0
 cellsheet obj\f003_000.bmp
@@ -1064,11 +1078,19 @@ cell 502 408
 celllabel obj\e008_000.bmp 10 15
 celldigits obj\e008_001.bmp 38 10 2 14
 gallerytabs
+# As on the PC, no cards past a tab's last entry.
+cellhide
+# The cards move away from the tab's own heroine, as on the PC under Wine.
+cellshift 2 80
+cellshift 1 -80
+cellshift 3 -80
+# Pictures seen of the entry's, over how many it has, as the PC draws them.
+cellcount obj\f004_000.bmp obj\f004_001.bmp 105 124 133 146
 button page0 obj\e006_000.bmp 280 34 10 5 0
 button page1 obj\e006_000.bmp 330 34 10 5 1
 button gtab0 obj\f002_000.bmp 8 654 4 5 0
-button gtab1 obj\f002_000.bmp 288 654 4 5 2
-button gtab2 obj\f002_000.bmp 568 654 4 5 1
+button gtab2 obj\f002_000.bmp 288 654 4 5 2
+button gtab1 obj\f002_000.bmp 568 654 4 5 1
 button gtab3 obj\f002_000.bmp 848 654 4 5 3
 button nav_save obj\e004_000.bmp 1152 93 10 5 0
 button nav_load obj\e004_000.bmp 1152 135 10 5 1
@@ -1083,8 +1105,8 @@ button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen scene
 pic obj\f000_000.bmp 0 0 tab 0
-pic obj\f000_002.bmp 0 0 tab 1
-pic obj\f000_001.bmp 0 0 tab 2
+pic obj\f000_002.bmp 0 0 tab 2
+pic obj\f000_001.bmp 0 0 tab 1
 pic obj\f000_003.bmp 0 0 tab 3
 pic obj\e003_000.bmp 1138 0
 pic obj\f001_000.bmp 0 0 1 2 0 1
@@ -1100,11 +1122,17 @@ cell 502 408
 celllabel obj\e008_000.bmp 10 15
 celldigits obj\e008_001.bmp 38 10 2 14
 gallerytabs
+# As on the PC, no cards past a tab's last entry.
+cellhide
+# The cards move away from the tab's own heroine, as on the PC under Wine.
+cellshift 2 80
+cellshift 1 -80
+cellshift 3 -80
 button page0 obj\e006_000.bmp 280 34 10 5 0
 button page1 obj\e006_000.bmp 330 34 10 5 1
 button gtab0 obj\f002_000.bmp 8 654 4 5 0
-button gtab1 obj\f002_000.bmp 288 654 4 5 2
-button gtab2 obj\f002_000.bmp 568 654 4 5 1
+button gtab2 obj\f002_000.bmp 288 654 4 5 2
+button gtab1 obj\f002_000.bmp 568 654 4 5 1
 button gtab3 obj\f002_000.bmp 848 654 4 5 3
 button nav_save obj\e004_000.bmp 1152 93 10 5 0
 button nav_load obj\e004_000.bmp 1152 135 10 5 1
@@ -3258,12 +3286,17 @@ viewerbutton hide obj\k001_000.bmp 1232 593 help 0
 viewernumber index obj\g007_000.bmp 880 651 22 2
 viewernumber total obj\g008_000.bmp 945 676 18 2
 viewerauto 8000 0
-# The PC draws a character beside the cards, from sprite parts the runtime doesn't build yet.
 pic obj\g000_000.bmp 0 0 tab 0
 pic obj\g000_000.bmp 0 0 tab 1
 pic obj\g000_001.bmp 0 0 tab 2
 pic obj\g000_002.bmp 0 0 tab 3
 pic obj\g000_003.bmp 0 0 tab 4
+# Each tab's character, the sprite the PC reads for it, comes up from below when the tab opens and settles with a
+# little overshoot, from a 30 fps recording under Wine (the first two points are below the screen, so not seen).
+pic sc\sc_000_000_000_001_000.bmp 340 -40 tab 0 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
+pic sc\sc_001_000_000_001_000.bmp 340 -40 tab 1 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
+pic sc\sc_002_000_000_001_000.bmp 340 -40 tab 2 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
+pic obj\g002_000.bmp 200 -40 tab 4 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
 pic obj\g001_000.bmp 0 0 tab 0
 pic obj\g001_001.bmp 0 628 tab 0
 pic obj\g001_000.bmp 0 0 tab 1

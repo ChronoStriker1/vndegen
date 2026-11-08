@@ -110,6 +110,12 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 else if (key == "stage") p.stage = number(value);
                 else if (key == "group") p.group = value;
                 else if (key == "blink") p.blinkMs = number(value);
+                else if (key == "rise") {
+                    std::istringstream in(value);
+                    for (std::string point; std::getline(in, point, ',');)
+                        if (auto colon = point.find(':'); colon != std::string::npos)
+                            p.rise.push_back({number(point.substr(0, colon)), number(point.substr(colon + 1))});
+                }
                 else if (key == "if") p.needs = numbers(value);
                 else if ((key == "move" || key == "clamp" || key == "fadein" || key == "fadeout") && at + 2 < w.size()) {
                     const std::string &second = w[at + 2];

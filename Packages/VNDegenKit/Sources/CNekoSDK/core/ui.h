@@ -54,6 +54,9 @@ struct Picture {
     int partX = 0, partY = 0, partW = 0, partH = 0;
     // Where a screen's `drift` line art draws among its pictures. It has no image of its own.
     bool drift = false;
+    // `rise MS:DY,MS:DY...`: on a gallery tab, how far below its place the picture is that long after the tab opens,
+    // between the points in a straight line, as Horny Elves and a Moral Orc's characters come up.
+    std::vector<std::pair<int, int>> rise;
     // `pic dim 0 0 alpha N`: the screen behind it darkened by N of 256, as Test Game 94's main menu dims its title.
     bool dim = false;
     // `blink MS`: fades in and out, fully shown every MS, as Test Game 94's title prompt does.

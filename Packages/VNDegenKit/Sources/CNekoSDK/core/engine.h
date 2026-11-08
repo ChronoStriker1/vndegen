@@ -423,6 +423,7 @@ private:
     void applyArtSet();
     std::map<std::string, int> startingSettings() const;
     int galleryTab_ = 0;
+    int64_t galleryTabAt_ = 0;  // the menu clock when the gallery's tab opened
     // A cell's entry, or -1. A game with tabs lists only the tab's entries.
     int galleryEntry(int cell) const;
     int setting(const std::string &name) const;

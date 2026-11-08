@@ -319,6 +319,7 @@ void Engine::openScreen(const std::string &name) {
     subMenu_.clear();
     // The drifting line art starts from a sketch picked at random, as the PC's does.
     driftFrom_ = screenMs_;
+    galleryTabAt_ = screenMs_;
     driftFirst_ = screen_->settings.count("drift") ? size_t(std::rand()) % screen_->settings.count("drift") : 0;
     for (Picture &p : screen_->pictures) {
         if (p.variants.empty()) continue;
@@ -663,6 +664,7 @@ void Engine::runAction(const std::string &action) {
     }
     if (action.rfind("gtab", 0) == 0) {
         galleryTab_ = std::atoi(action.c_str() + 4);
+        galleryTabAt_ = screenMs_;
         page_ = 0;
         return;
     }
@@ -840,6 +842,19 @@ void Engine::mouseWheel(int notches) {
     }
     if (logOpen_) scrollLog(notches);
     else if (notches > 0) openLog();
+}
+
+// A `rise` picture's offset that long after its tab opened, in a straight line between its points, and none past the last.
+static int riseOffset(const std::vector<std::pair<int, int>> &points, int64_t ms) {
+    if (points.empty() || ms >= points.back().first) return 0;
+    if (ms <= points.front().first) return points.front().second;
+    for (size_t i = 1; i < points.size(); i++)
+        if (ms <= points[i].first) {
+            auto [t0, y0] = points[i - 1];
+            auto [t1, y1] = points[i];
+            return y0 + int(std::lround(double(y1 - y0) * double(ms - t0) / double(std::max(1, t1 - t0))));
+        }
+    return 0;
 }
 
 bool Engine::movieShowing() const {
@@ -2808,7 +2823,15 @@ void Engine::composeScreen(Canvas &out) {
             Picture faded = p;
             faded.alpha *= float(0.5 + 0.5 * std::cos(2 * kPi * double(screenMs_ % p.blinkMs) / p.blinkMs));
             drawPicture(out, faded, towardX, towardY);
-        } else if ((p.tab < 0 || p.tab == galleryTab_) && shown(p)) drawPicture(out, p, towardX, towardY);
+        } else if ((p.tab < 0 || p.tab == galleryTab_) && shown(p)) {
+            if (p.rise.empty()) {
+                drawPicture(out, p, towardX, towardY);
+                continue;
+            }
+            Picture risen = p;
+            risen.y += riseOffset(p.rise, screenMs_ - galleryTabAt_);
+            drawPicture(out, risen, towardX, towardY);
+        }
     composeSlots(out);
     composeGallery(out);
     if (viewingImage_) return;
@@ -3505,6 +3528,8 @@ bool Engine::step(int ms) {
     if (screen_) {
         screenMs_ += ms;
         if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages")) dirty_ = true;
+        // A gallery's character coming up after its tab opens.
+        if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
         stepViewer(ms);
     }
     if (screen_ || logOpen_ || dialogOpen_) {
