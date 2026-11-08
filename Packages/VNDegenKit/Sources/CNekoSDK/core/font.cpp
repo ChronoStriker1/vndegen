@@ -37,10 +37,11 @@ struct FontSource {
     int face = 0;
 };
 
-// The Windows names behind init.ini's MsgFont numbers, as its comment lists them.
+// The Windows names behind init.ini's MsgFont numbers, as its comment lists them, and 7 for Lucida Sans Unicode, which the
+// official English releases ask for in place of them.
 const char *windowsFontName(int face) {
-    static const char *const names[] = {"MS Gothic", "MS PGothic", "MS Mincho", "MS PMincho", "MS UI Gothic", "Meiryo", "Meiryo UI"};
-    return face >= 0 && face < 7 ? names[face] : names[0];
+    static const char *const names[] = {"MS Gothic", "MS PGothic", "MS Mincho", "MS PMincho", "MS UI Gothic", "Meiryo", "Meiryo UI", "Lucida Sans Unicode"};
+    return face >= 0 && face < 8 ? names[face] : names[0];
 }
 
 bool packFont(int face, FontSource &out) {
@@ -72,6 +73,19 @@ public:
             CFRetain(descriptor_);
         }
         CFRelease(list);
+    }
+    // Whether the face itself has the character, before any fallback.
+    bool has(uint32_t cp) {
+        UniChar chars[2] = {UniChar(cp), 0};
+        CFIndex n = 1;
+        if (cp >= 0x10000) {
+            chars[0] = UniChar(0xD800 + ((cp - 0x10000) >> 10));
+            chars[1] = UniChar(0xDC00 + ((cp - 0x10000) & 0x3FF));
+            n = 2;
+        }
+        CGGlyph glyphs[2] = {0, 0};
+        CTFontRef font = fontFor(16);
+        return font && CTFontGetGlyphsForCharacters(font, chars, glyphs, n) && glyphs[0];
     }
     bool glyph(uint32_t cp, int px, bool bold, GlyphImage &out) {
         UniChar chars[2];
@@ -171,6 +185,8 @@ public:
             if (FT_New_Memory_Face(library(), src_.data.data(), FT_Long(src_.data.size()), src_.face, &face_)) face_ = nullptr;
         }
     }
+    // Whether the face itself has the character.
+    bool has(uint32_t cp) { return face_ && FT_Get_Char_Index(face_, cp) != 0; }
     bool glyph(uint32_t cp, int px, bool bold, GlyphImage &out) {
         if (!face_) return false;
         FT_UInt index = FT_Get_Char_Index(face_, cp);
@@ -225,6 +241,9 @@ bool glyph(int face, uint32_t cp, int px, bool bold, GlyphImage &out) {
     using Key = std::tuple<int, uint32_t, int, bool>;
     static std::map<Key, GlyphImage> cache;
     std::lock_guard<std::mutex> lock(mu);
+    // Windows draws what Lucida Sans Unicode lacks, such as kana and ♪, from MS UI Gothic, the first of its font link,
+    // so its stand-in's missing characters come from MS UI Gothic's.
+    if (face == 7 && !faceFor(7).has(cp)) face = 4;
     Key k{face, cp, px, bold};
     auto it = cache.find(k);
     if (it != cache.end()) { out = it->second; return true; }

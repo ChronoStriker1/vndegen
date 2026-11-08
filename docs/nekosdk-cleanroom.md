@@ -145,6 +145,22 @@ A condition that holds goes to the node's other target, the one a choice's branc
 
 The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables.cpp` holds a table for each game: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled.
 
+## Text placement
+
+The PC engine draws its text from a glyph atlas: Wine's font log (`WINEDEBUG=+font`) shows each game creating its
+text font at a cell height and at four times it, with the face init.ini's MsgFont names, and a second font for save
+card comments. The Alchemist's official English release asks for Lucida Sans Unicode for both instead, which VNDegen
+maps to Open Sans ([fonts.md](fonts.md)). The PC sets each glyph a fixed gap past its own advance and lines a fixed
+pitch apart, which init.ini's MsgCharInterval and MsgLineInterval don't predict, so a game's table gives them
+(`textgap`, `textline`, `textshift`, `textfont`, `textsize`, `commentfont`). Yarinaoshi no Christmas, measured by
+loading the same PC save on the PC under Wine, with VNDegen's stand-in fonts mapped in place of the Windows ones, and
+here: comments in MS Gothic at 18, and its log placed under its rules as the PC's is. Christmas asks for Meiryo, which
+Ume P Gothic stands in for without matching its widths; with it the PC sets a gap of 4 and many lines run off the
+screen, the opening's among them, so that gap belongs to the stand-in and is left out. The Alchemist, from the
+publisher's Windows screenshots, since Wine has no Lucida Sans Unicode and
+font-links it to Noto Sans CJK: Open Sans 22 with a gap of 5.93, lines 42 apart and the first glyph one gap in, which
+puts capitals within a pixel of the screenshots; its comments at 20, sized from Wine's capture.
+
 ## The CG viewer
 
 The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist and Yarinaoshi no Christmas under Wine, and the panel, buttons and picture match the PC's to within blending noise. Both PC games behave alike:

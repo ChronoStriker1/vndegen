@@ -222,6 +222,25 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
 
     if (const char *table = menuTable(folder_))
         screens_ = parseScreens(table, *images_, [this](const std::string &what) { warnOnce(what); });
+    commentFace_ = fontFace_;
+    // `textfont N`, `textsize N`, `textgap G`, `textline N` and `textshift DX DY`: the text as the PC sets it, the log's
+    // as well as the message window's. The face is a number as init.ini's MsgFont gives one, 7 for Lucida Sans Unicode,
+    // which the official English releases ask for (Wine's font log). Measured under Wine with VNDegen's stand-in fonts in
+    // place of the Windows ones, and for Lucida Sans Unicode from the publisher's Windows screenshots.
+    if (auto it = screens_.find("defaults"); it != screens_.end()) {
+        const Screen &d = it->second;
+        if (const auto *f = d.setting("textfont"); f && !f->empty()) fontFace_ = field(*f, 0);
+        commentFace_ = fontFace_;
+        // `commentfont N`: the face of a save card's comment, which the PC asks for apart from the text's.
+        if (const auto *f = d.setting("commentfont"); f && !f->empty()) commentFace_ = field(*f, 0);
+        if (const auto *f = d.setting("textsize"); f && !f->empty()) fontSize_ = field(*f, 0);
+        if (const auto *f = d.setting("textgap"); f && !f->empty()) textGap_ = float(std::atof((*f)[0].c_str()));
+        if (const auto *f = d.setting("textline"); f && !f->empty()) textLine_ = field(*f, 0);
+        if (const auto *f = d.setting("textshift"); f && f->size() >= 2) {
+            textDX_ = field(*f, 0);
+            textDY_ = field(*f, 1);
+        }
+    }
     log("started: %dx%d, %d scripts in scr, %s", width_, height_, int(files_.list("scr").size()), screens_.empty() ? "no menus yet" : "menus");
     loadGalleries();
     loadGlobals();
@@ -3014,9 +3033,10 @@ void Engine::drawMark(Canvas &out) {
 
 // Lays out a line or lines of UTF-8 from a pen position. `endsThere` lays a name out to end at x rather than start there.
 void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out) {
-    int lineHeight = fontSize_ + lineInterval_ + 4;
+    int lineHeight = textLine_ > 0 ? textLine_ : fontSize_ + lineInterval_ + 4;
     size_t first = out.size();
-    int penX = x, penY = y, used = 0;
+    float penX = float(x);
+    int penY = y, used = 0;
     bool italic = false;
     for (size_t i = 0; i < text.size();) {
         // `|i` starts italics and `^i` ends them.
@@ -3033,19 +3053,20 @@ void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, st
         if (cp == '\r') continue;
         int units = cp < 0x100 ? 1 : 2;
         if (cp == '\n' || used + units > maxChars_) {
-            penX = x;
+            penX = float(x);
             penY += lineHeight;
             used = 0;
             if (cp == '\n') continue;
         }
         GlyphImage g;
         if (!glyph(fontFace_, cp, fontSize_, false, g)) continue;
-        out.push_back({penX, penY, cp, italic});
-        penX += g.advance;
+        out.push_back({int(std::lround(penX)), penY, cp, italic});
+        penX += float(g.advance) + textGap_;
         used += units;
     }
     if (endsThere) {
-        int width = penX - x;
+        // A run that ends at its position, as a name beside the text does, ends at its last glyph, not the gap after it.
+        int width = int(std::lround(penX - (out.size() > first ? textGap_ : 0))) - x;
         for (size_t i = first; i < out.size(); i++) out[i].x -= width;
     }
 }
@@ -3055,8 +3076,8 @@ void Engine::layoutText(const std::string &name, const std::string &text) {
     textGlyphs_.clear();
     int ascent = fontAscent(fontFace_, fontSize_);
     // A name to the left of the text, on its line, ends at its position. One on a line of its own starts there.
-    layoutRun(name, nameX_, nameY_ + ascent, nameY_ == textY_, nameGlyphs_);
-    layoutRun(text, textX_, textY_ + ascent, false, textGlyphs_);
+    layoutRun(name, nameX_ + textDX_, nameY_ + textDY_ + ascent, nameY_ == textY_, nameGlyphs_);
+    layoutRun(text, textX_ + textDX_, textY_ + textDY_ + ascent, false, textGlyphs_);
 }
 
 void Engine::drawGlyph(Canvas &out, const Glyph &g, int pass, int alpha, int r, int gr, int b, int fr, int fg, int fb) {
@@ -3100,7 +3121,7 @@ void Engine::drawComment(Canvas &out, const std::string &utf8, int x, int baseli
         for (int k = 1; k <= extra && i + k < utf8.size(); k++) cp = cp << 6 | (static_cast<unsigned char>(utf8[i + k]) & 0x3F);
         i += size_t(extra) + 1;
         GlyphImage g;
-        if (!glyph(fontFace_, cp, px, false, g)) continue;
+        if (!glyph(commentFace_, cp, px, false, g)) continue;
         // A glyph's ink can reach past its advance, as a box-drawing line's does, so both stay inside the width.
         if (pen + std::max(g.advance, g.left + g.w) > x + width) break;
         if (g.w > 0 && g.h > 0) drawCoverage(out, g.coverage.data(), g.w, g.h, pen + g.left, baseline - g.top, 255, 255, 255, 256);
