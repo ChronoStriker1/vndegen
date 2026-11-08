@@ -149,7 +149,7 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - A card's lock and the NEW mark on the card saved to last work as on the PC and are kept in `cfg.sav`, so they move with a backup. A card's comment typed on a PC shows on its card, but a comment can't be typed here yet.
 - The noise effect some scenes of The Alchemist ask for isn't drawn. A repeating animation saved while it runs plays out once after a load.
 - Yarinaoshi no Christmas's Manual and Version info buttons aren't there.
-- Menu backgrounds that change on the PC stay the same here, and a confirmation's "Do not show again" box isn't there.
+- Menu backgrounds that change on the PC stay the same here.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.
 

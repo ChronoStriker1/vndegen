@@ -532,8 +532,18 @@ bool Engine::moveFocus(int dx, int dy) {
         if (grid && grid->size() >= 7) {
             ImageRef sheet = images_->get((*grid)[0]);
             int x0 = std::atoi((*grid)[1].c_str()), y0 = std::atoi((*grid)[2].c_str()), gx = std::atoi((*grid)[3].c_str()), gy = std::atoi((*grid)[4].c_str());
-            for (int c = 0; sheet && c < std::atoi((*grid)[6].c_str()); c++)
-                for (int r = 0; r < std::atoi((*grid)[5].c_str()); r++) spots.push_back({x0 + c * gx + sheet->w / 2, y0 + r * gy + sheet->h / 10});
+            int perColumn = std::atoi((*grid)[5].c_str()), columns = std::atoi((*grid)[6].c_str());
+            for (int c = 0; sheet && c < columns; c++)
+                for (int r = 0; r < perColumn; r++) {
+                    int cx = x0 + c * gx, cy = y0 + r * gy, slot = page_ * perColumn * columns + c * perColumn + r + 1;
+                    spots.push_back({cx + sheet->w / 2, cy + sheet->h / 10});
+                    // A card with a save has its lock and Delete to reach too, without a pointer.
+                    if (!slotInfo(slot).exists) continue;
+                    for (const char *key : {"slotlock", "slotdelete"})
+                        if (const auto *line = screen_->setting(key); line && line->size() >= 3)
+                            if (ImageRef icon = images_->get((*line)[0]))
+                                spots.push_back({cx + field(*line, 1) + icon->w / 2, cy + field(*line, 2) + icon->h / 10});
+                }
         }
         auto addWidgets = [&](const char *kind, size_t at) {
             for (auto [it, end] = screen_->settings.equal_range(kind); it != end; ++it) {
