@@ -415,8 +415,10 @@ private:
     std::pair<int, int> spriteListPlace(int position) const;
     int spriteListRows() const;
     int spriteListAt(int x, int y, bool *onCheck = nullptr) const;
-    // Figures tinted as the lists light them, by file and row.
+    // The figures a list shows tinted, by file and state, as last drawn.
     std::map<std::string, ImageRef> spriteTinted_;
+    // Whether each bonus patch folder the lists name is there.
+    mutable std::map<std::string, bool> spritePatches_;
     std::unordered_map<std::string, bool> seen_;
     // The text read, by script and node id, for Config's read-only skip.
     std::unordered_map<std::string, std::set<int>> readNodes_;

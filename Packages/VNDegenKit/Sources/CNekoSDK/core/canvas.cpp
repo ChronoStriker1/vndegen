@@ -229,7 +229,8 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
     int maxU = (image.w - 1) << 16, maxV = (image.h - 1) << 16;
     bool bilinear = !(radians == 0 && sx == 1 && sy == 1);
     const uint8_t *src = image.rgba.data();
-    bool solid = image.opaque && a256 >= 256;
+    // An opaque picture at full strength simply replaces what's there, unless it adds to it.
+    bool solid = image.opaque && a256 >= 256 && !additive;
     forRows(y1 - y0, size_t(x1 - x0) * (y1 - y0), [&](int row0, int row1) {
         for (int y = y0 + row0; y < y0 + row1; y++) {
             float rx = x0 + 0.5f - cx - (rowShift ? float((*rowShift)[size_t(y)]) : 0.0f), ry = y + 0.5f - cy;

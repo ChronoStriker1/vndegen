@@ -139,6 +139,8 @@ Engine::~Engine() {
     // The audio thread may be reading a movie's sound, which goes with the sprites.
     audio_.clearStream();
     saveSeen();
+    // Quitting from the sprite gallery keeps its outfits and locks, as leaving it does.
+    if (spriteScreen()) saveGlobals();
     saveReadText();
     if (log_ && log_ != stderr) std::fclose(log_);
 }
@@ -692,12 +694,10 @@ void Engine::runAction(const std::string &action) {
         viewingImage_ = false;
         stopTrack();
         saveSettings();
-        if (returnTo_.empty()) closeScreen();
-        else {
-            std::string to = returnTo_;
-            screen_ = nullptr;
-            openScreen(to);
-        }
+        // Closed first either way, so a screen that keeps something on leaving, such as the sprite gallery, does.
+        std::string to = returnTo_;
+        closeScreen();
+        if (!to.empty()) openScreen(to);
         return;
     }
     if (action.rfind("page", 0) == 0) {
@@ -1930,8 +1930,10 @@ void Engine::loadGlobals() {
         int32_t outfit = 0, locked = 0;
         std::memcpy(&outfit, &configFile_[kSpriteOutfitAt + h * 4], 4);
         std::memcpy(&locked, &configFile_[kSpriteLockAt + h * 4], 4);
-        spriteOutfit_[h] = outfit;
-        spriteLocked_[h] = locked;
+        // A value the gallery couldn't have written, from a damaged file, falls back to her first outfit.
+        int count = int(spriteHeroines_[h].outfits.size());
+        spriteOutfit_[h] = outfit >= 0 && outfit < count ? outfit : 0;
+        spriteLocked_[h] = locked ? 1 : 0;
     }
     for (int i = 0; i < 10000; i++) {
         int32_t v;

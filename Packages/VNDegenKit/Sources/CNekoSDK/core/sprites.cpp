@@ -428,8 +428,13 @@ std::vector<Engine::SpriteListEntry> Engine::spriteListEntries(int picker) const
     for (size_t i = 0; i < count; i++) {
         std::string thumbnail = spriteThumbnail(picker, int(i));
         if (picker == 4 || spriteAvailable(thumbnail)) out.push_back({int(i), true});
-        else if (auto slash = thumbnail.find('\\'); slash != std::string::npos && thumbnail.compare(0, 4, "sys_") == 0 && !files_.list(thumbnail.substr(0, slash)).empty())
-            out.push_back({int(i), false});
+        else if (auto slash = thumbnail.find('\\'); slash != std::string::npos && thumbnail.compare(0, 4, "sys_") == 0) {
+            // Whether the patch folder is there, looked up once, since a lookup goes through every file.
+            std::string folder = thumbnail.substr(0, slash);
+            auto known = spritePatches_.find(folder);
+            if (known == spritePatches_.end()) known = spritePatches_.emplace(folder, !files_.list(folder).empty()).first;
+            if (known->second) out.push_back({int(i), false});
+        }
     }
     return out;
 }
@@ -523,6 +528,8 @@ void Engine::composeSpriteList(Canvas &out) {
     if (const auto *f = line("spritelistfigure"); f && f->size() >= 4) {
         float scale = float(std::atof((*f)[2].c_str())), top = float(number(*f, 1));
         const auto *tint = line("spritelisttint");
+        // Only the copies drawn now are kept, so moving through outfits and faces doesn't pile them up.
+        std::map<std::string, ImageRef> kept;
         for (size_t i = 0; i < entries.size() && i + 3 < f->size(); i++) {
             std::string path = spriteListFigure(picker, entries[i].index);
             ImageRef figure = images_->get(path);
@@ -533,13 +540,16 @@ void Engine::composeSpriteList(Canvas &out) {
                 auto [r, g] = point((*tint)[1 + state]);
                 const std::string &text = (*tint)[1 + state];
                 int colour[3] = {r, g, std::atoi(text.c_str() + text.rfind(',') + 1)};
-                auto &copy = spriteTinted_[path + '#' + std::to_string(state)];
+                std::string key = path + '#' + std::to_string(state);
+                auto &copy = kept[key];
+                if (auto old = spriteTinted_.find(key); old != spriteTinted_.end()) copy = old->second;
                 if (!copy) copy = tinted(*figure, colour);
                 figure = copy;
             }
             float left = float(number(*f, i + 3) - figure->w / 2);
             drawImage(out, *figure, left + float(figure->w) * scale / 2, top + float(figure->h) * scale / 2, scale, scale, 0, 1, nullptr, false);
         }
+        spriteTinted_ = std::move(kept);
         if (const auto *fade = line("spritelistfade"); fade && fade->size() >= 4) draw((*fade)[1], number(*fade, 2), number(*fade, 3));
         if (const auto *p = line("spritelistplace"); p && p->size() >= 3)
             for (size_t i = 0; i < entries.size() && i + 2 < p->size(); i++) {
@@ -617,10 +627,12 @@ void Engine::pressSpriteList(int x, int y) {
     };
     if (const auto *c = screen_->setting("spritelistclose"); c && c->size() >= 3 && inside((*c)[0], number(*c, 1), number(*c, 2), 5)) {
         sprite_.list = -1;
+        spriteTinted_.clear();
         return;
     }
     if (const auto *f = listLine(*screen_, "spritelistframe", sprite_.list); f && f->size() >= 4 && !inside((*f)[1], number(*f, 2), number(*f, 3), 1)) {
         sprite_.list = -1;
+        spriteTinted_.clear();
         return;
     }
     if (const auto *a = listLine(*screen_, "spritelistarrows", sprite_.list); a && a->size() >= 7) {
