@@ -492,6 +492,14 @@ pic bg\bg_w.bmp 0 0 fadein 70100 1700
 screen defaults
 layoutcgslot 102             # 82's saves hold a CG in slot 102, and a background and a CG each take the other away
 default opacity 100          # the PC's message window is solid until Config changes it
+# The text asks for Verdana (face 8, DejaVu Sans here, chosen by the lead against real Verdana). Size 19 and gap 0.64 are
+# Verdana-at-24's widths plus the PC's own gap, 0.2 over its face's advances, measured under Wine; lines 30 apart, the
+# first baseline at 588 and the ink from x 213 as there.
+textfont 8
+textsize 19
+textgap 0.64
+textline 30
+textshift 1 0                 # ink from x 213 and the first baseline at 588, as under Wine (rendered and checked)
 
 screen choice
 # Measured under Wine to the pixel: the dialogs' frame, "Choose an option" from the titles' strip, and the options from
