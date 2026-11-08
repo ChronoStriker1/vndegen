@@ -130,7 +130,12 @@ final class ManualController: PlatformViewController, WKNavigationDelegate {
         configuration.websiteDataStore = .nonPersistent()
         return WKWebView(frame: .zero, configuration: configuration)
     }()
-    private static let offlineRules = #"[{"trigger":{"url-filter":"^(https?|wss?|ftp)://"},"action":{"type":"block"}}]"#
+    // One rule a scheme: WebKit's rule patterns have no alternation.
+    private static let offlineRules = #"""
+        [{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}},
+         {"trigger":{"url-filter":"^wss?://"},"action":{"type":"block"}},
+         {"trigger":{"url-filter":"^ftp://"},"action":{"type":"block"}}]
+        """#
 
     init(page: URL, folder: URL, done: @escaping () -> Void) {
         self.page = page
