@@ -9,9 +9,9 @@
 // and 3. Every picture in those saves is 780 tall, so halfway down is inferred from command 15, which it matches there.
 // A CG's slot is the background's there, inferred: command 12 deletes "background or CG" with no slot named.
 //
-// Test Game 82 (set 2, seven PC saves under Wine) keeps its CGs in slot 102: a CG loaded after a background, with no
-// delete between, leaves only the CG's record, so 11 takes the background away. That 10 takes a CG away in turn is
-// inferred, until a save there says.
+// Test Game 82 (set 2, nine PC saves under Wine) keeps its CGs in slot 102, and a CG or a background loaded over the
+// other, with no delete between, leaves only its own record: each takes the other away. Its places 0 to 2 match Test
+// Game 83's; places 3 to 5 aren't checked there yet.
 //
 // A game whose exe places them otherwise says so in its table, under `screen defaults`:
 //   layoutslots S0 S1 S2 S3 S4 S5     the slot for each place
