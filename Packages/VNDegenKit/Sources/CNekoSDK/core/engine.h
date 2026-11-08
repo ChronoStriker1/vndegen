@@ -150,6 +150,10 @@ public:
         return it == table.end() ? 0 : it->second;
     }
     bool jump(const std::string &script, int node);
+    // Saving, loading and a card's lock, which tests also call.
+    bool saveToSlot(int slot);
+    bool loadFromSlot(int slot);
+    void toggleLock(int slot);
 
 private:
     enum class Waiting { None, Time, Click, Choice, StaffRoll, Ended };
@@ -193,12 +197,14 @@ private:
 
     // Saves.
     std::string savePath(int slot, const char *extension) const;
-    bool saveToSlot(int slot);
-    bool loadFromSlot(int slot);
     void deleteSlot(int slot);
     bool cardAt(int slot, int &x, int &y) const;
-    bool overCardDelete(int slot, int x, int y) const;
-    int newestQuickSlot();
+    bool overCardDelete(int slot, int x, int y) const { return overCardPart("slotdelete", slot, x, y); }
+    bool overCardPart(const char *key, int slot, int x, int y) const;
+    int newestQuickSlot() { return newestSlot(firstQuickSlot_, lastQuickSlot_); }
+    int newestSlot(int first, int last);
+    // A locked save can be loaded but not saved over or deleted. The lock is kept in cfg.sav, as the PC keeps it.
+    bool locked(int slot) const;
     std::string lastScene_;
     int64_t screenMs_ = 0, openingFrom_ = -1;  // a menu's own clock, and when the title's opening began
     std::unordered_map<std::string, bool> paintedOnBlack_;
@@ -213,6 +219,7 @@ private:
         int date[6] = {};
         ImageRef thumbnail;
         std::string flow;  // the flow script the save is in, for its chapter's name
+        int route = 0;  // its route mode, for the card's progress label
     };
     SlotInfo &slotInfo(int slot);
     bool pageOff(const std::string &action) const;
@@ -436,8 +443,10 @@ private:
     bool shown(const Button &b) const;
     bool shown(const Picture &p) const;
     // Test Game 94's route buttons replay the story from the prologue with each choice made for that route, 1 to 4, which
-    // its choices name in parameters 10 to 13. Nothing saves it: a load or a new start plays the choices as asked.
-    int pendingRoute_ = 0, autoRoute_ = 0;
+    // its choices name in parameters 10 to 13. The route is a scenario variable, `routevar N` in the defaults table (94's
+    // SENARIO_STATUS, 4000), set as the story starts: the PC's saves carry it, and a load goes on in the route.
+    int pendingRoute_ = 0, routeVar_ = -1;
+    int route() const;
 
     // Commands.
     void beginChoice(const Node &n);
@@ -560,6 +569,8 @@ private:
     std::string dialogOpener_;  // the action of the menu button whose question is open
     int dialogQuestion_ = 0, dialogHover_ = -1;
     std::function<void()> dialogYes_;
+    bool dialogNoAsk_ = false;  // Test Game 94's "don't ask again" box, ticked
+    void answerDialog(bool yes);
 
     // Menus, and the message window's buttons.
     std::map<std::string, Screen> screens_;

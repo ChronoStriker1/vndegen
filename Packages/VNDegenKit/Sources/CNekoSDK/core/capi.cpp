@@ -131,5 +131,8 @@ bool vnneko_debug_press(VNNekoEngine *e, const char *action) { return e->engine.
 int vnneko_debug_choice_count(VNNekoEngine *e) { return e->engine.choiceCount(); }
 void vnneko_debug_choose(VNNekoEngine *e, int index) { e->engine.choose(index); }
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node) { return e->engine.jump(script, node); }
+bool vnneko_debug_save(VNNekoEngine *e, int slot) { return e->engine.saveToSlot(slot); }
+bool vnneko_debug_load(VNNekoEngine *e, int slot) { return e->engine.loadFromSlot(slot); }
+void vnneko_debug_toggle_lock(VNNekoEngine *e, int slot) { e->engine.toggleLock(slot); }
 
 }

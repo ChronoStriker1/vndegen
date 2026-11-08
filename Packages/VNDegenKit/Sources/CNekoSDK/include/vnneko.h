@@ -119,6 +119,10 @@ bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node);
 int64_t vnneko_debug_file_size(const char *gameRoot, const char *path);
 // For tests: the name a save gives that file, which for a file a patch provides is the patch's name for it.
 bool vnneko_debug_saved_name(const char *gameRoot, const char *path, char *out, size_t size);
+// For tests: saves to a slot, loads one, or turns a card's lock on or off, as the save and load screens do.
+bool vnneko_debug_save(VNNekoEngine *e, int slot);
+bool vnneko_debug_load(VNNekoEngine *e, int slot);
+void vnneko_debug_toggle_lock(VNNekoEngine *e, int slot);
 // For tests: the value of the global (scope 0) or scenario variable (1) with this number.
 int vnneko_debug_variable(VNNekoEngine *e, int scope, int number);
 // For tests: the number of the variable a script names by its place in macrolist.ini's list, global (scope 0) or

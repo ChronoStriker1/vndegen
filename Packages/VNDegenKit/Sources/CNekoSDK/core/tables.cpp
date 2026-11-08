@@ -1314,7 +1314,8 @@ pic obj\b001_000.bmp 0 130
 pic obj\i000_000.bmp 414 173 1 8 0 0
 button yes obj\b003_000.bmp 449 268 2 5 0
 button no obj\b003_000.bmp 449 350 2 5 1
-pic obj\b002_000.bmp 414 440
+# The box that stops the question, whichever answer follows, as on the PC.
+button noask obj\i001_000.bmp 498 444 1 5 0
 
 screen gt
 gtcount obj\l005_000.bmp 1147 607 obj\l007_000.bmp 1173 616 obj\l007_001.bmp 1156 616
@@ -1844,7 +1845,8 @@ pic obj\b001_000.bmp 0 130
 pic obj\i000_000.bmp 414 173 1 8 0 0
 button yes obj\b003_000.bmp 449 268 2 5 0
 button no obj\b003_000.bmp 449 350 2 5 1
-pic obj\b002_000.bmp 414 440
+# The box that stops the question, whichever answer follows, as on the PC.
+button noask obj\i001_000.bmp 498 444 1 5 0
 
 screen choice
 pic obj\b001_000.bmp 0 130
@@ -2398,7 +2400,8 @@ question obj\m000_004.bmp 243 118
 question obj\m000_005.bmp 243 118
 question obj\m000_006.bmp 243 118
 question obj\m000_007.bmp 243 118
-pic obj\m002_000.bmp 539 481 1 5 0 0
+# The box that stops the question, whichever answer follows, as on the PC.
+button noask obj\m002_000.bmp 539 481 1 5 0
 button yes obj\a003_001.bmp 492 333 2 5 0
 button no obj\a003_001.bmp 715 324 2 5 1
 
@@ -2962,7 +2965,8 @@ pic obj\b001_000.bmp 0 174
 pic obj\i000_000.bmp 346 220 1 8 0 0
 button yes obj\b003_000.bmp 424 320 2 5 0
 button no obj\b003_000.bmp 700 320 2 5 1
-pic obj\i001_000.bmp 477 452 1 5 0 0
+# The box that stops the question, whichever answer follows, as on the PC.
+button noask obj\i001_000.bmp 477 452 1 5 0
 
 screen choice
 pic obj\b001_000.bmp 0 174
@@ -4085,6 +4089,8 @@ pic obj\b001_000.bmp 0 130
 pic obj\i000_000.bmp 422 171 1 8 0 0
 button yes obj\b003_000.bmp 449 261 2 5 0
 button no obj\b003_000.bmp 449 350 2 5 1
+# The box that stops the question, whichever answer follows, as on the PC.
+button noask obj\i001_000.bmp 498 444 1 5 0
 
 screen choice
 pic obj\b001_000.bmp 0 130
@@ -4182,82 +4188,85 @@ screen load
 helplast
 selectedlook
 pic obj\e000_000.bmp 0 0
-# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
-# of bars lies over the top and bottom.
-pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e003_000.bmp 1118 0
 pic obj\e001_000.bmp 0 0
 pic obj\e002_000.bmp 0 0 1 2 0 1
-slots obj\e007_000.bmp 26 106 546 134 4 2
-slotlabel obj\e008_000.bmp 3 9
-slotdigits obj\e008_001.bmp 33 4
-slotthumb 8 11
-datedigits obj\e009_000.bmp 193 58
+slots obj\e007_000.bmp 26 95 546 140 4 2
+slotlabel obj\e008_000.bmp 6 11
+slotdigits obj\e008_001.bmp 36 6
+slotthumb 15 26
+datedigits obj\e009_000.bmp 233 68
 dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
-slotlock obj\e010_000.bmp 446 52
-slotdelete obj\e011_000.bmp 473 52
-emptycards 80
-dategap 13
-button page0 obj\e006_000.bmp 282 34 10 5 0
-button page1 obj\e006_000.bmp 332 34 10 5 1
-button page2 obj\e006_000.bmp 382 34 10 5 2
-button page3 obj\e006_000.bmp 432 34 10 5 3
-button page4 obj\e006_000.bmp 482 34 10 5 4
-button page5 obj\e006_000.bmp 532 34 10 5 5
-button page6 obj\e006_000.bmp 582 34 10 5 6
-button page7 obj\e006_000.bmp 632 34 10 5 7
-button page8 obj\e006_000.bmp 682 34 10 5 8
-button page9 obj\e006_000.bmp 732 34 10 5 9
-button page10 obj\e006_001.bmp 782 34 1 5 0
-button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
-button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
+datedash obj\e009_001.bmp
+dategap 8
+slotlock obj\e012_000.bmp 446 63
+slotdelete obj\e013_000.bmp 476 63
+slotprogress obj\e010_000.bmp 279 37 5
+slotnew obj\e014_000.bmp 5 104
+button page0 obj\e006_000.bmp 410 26 10 5 0
+button page1 obj\e006_000.bmp 460 26 10 5 1
+button page2 obj\e006_000.bmp 510 26 10 5 2
+button page3 obj\e006_000.bmp 560 26 10 5 3
+button page4 obj\e006_000.bmp 610 26 10 5 4
+button page5 obj\e006_000.bmp 660 26 10 5 5
+button page6 obj\e006_000.bmp 710 26 10 5 6
+button page7 obj\e006_000.bmp 760 26 10 5 7
+button page8 obj\e006_000.bmp 810 26 10 5 8
+button page9 obj\e006_000.bmp 860 26 10 5 9
+button page10 obj\e006_001.bmp 910 26 1 5 0
+button nav_save obj\e004_000.bmp 1172 94 9 5 0 help obj\e005_000.bmp 948 666 1 9 0 0
+button nav_load obj\e004_000.bmp 1172 135 9 5 1 help obj\e005_000.bmp 948 666 1 9 0 1
+button nav_cg obj\e004_000.bmp 1172 176 9 5 2 help obj\e005_000.bmp 948 666 1 9 0 2
+button nav_scene obj\e004_000.bmp 1172 217 9 5 3 help obj\e005_000.bmp 948 666 1 9 0 3
+button nav_music obj\e004_000.bmp 1172 258 9 5 4 help obj\e005_000.bmp 948 666 1 9 0 4
+button nav_config obj\e004_000.bmp 1172 299 9 5 5 help obj\e005_000.bmp 948 666 1 9 0 5
+button nav_title obj\e004_000.bmp 1172 340 9 5 6 help obj\e005_000.bmp 948 666 1 9 0 6
+button nav_quit obj\e004_000.bmp 1172 381 9 5 7 help obj\e005_000.bmp 948 666 1 9 0 7
+button back obj\e004_000.bmp 1172 463 9 5 8 help obj\e005_000.bmp 948 666 1 9 0 8
 
 screen save
 helplast
 selectedlook
 pic obj\e000_000.bmp 0 0
-# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
-# of bars lies over the top and bottom.
-pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e003_000.bmp 1118 0
 pic obj\e001_000.bmp 0 0
 pic obj\e002_000.bmp 0 0 1 2 0 0
-slots obj\e007_000.bmp 26 106 546 134 4 2
-slotlabel obj\e008_000.bmp 3 9
-slotdigits obj\e008_001.bmp 33 4
-slotthumb 8 11
-datedigits obj\e009_000.bmp 193 58
+slots obj\e007_000.bmp 26 95 546 140 4 2
+slotlabel obj\e008_000.bmp 6 11
+slotdigits obj\e008_001.bmp 36 6
+slotthumb 15 26
+datedigits obj\e009_000.bmp 233 68
 dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
-slotlock obj\e010_000.bmp 446 52
-slotdelete obj\e011_000.bmp 473 52
-dategap 13
-button page0 obj\e006_000.bmp 282 34 10 5 0
-button page1 obj\e006_000.bmp 332 34 10 5 1
-button page2 obj\e006_000.bmp 382 34 10 5 2
-button page3 obj\e006_000.bmp 432 34 10 5 3
-button page4 obj\e006_000.bmp 482 34 10 5 4
-button page5 obj\e006_000.bmp 532 34 10 5 5
-button page6 obj\e006_000.bmp 582 34 10 5 6
-button page7 obj\e006_000.bmp 632 34 10 5 7
-button page8 obj\e006_000.bmp 682 34 10 5 8
-button page9 obj\e006_000.bmp 732 34 10 5 9
-button page10 obj\e006_001.bmp 782 34 1 5 0
-button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
-button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
+datedash obj\e009_001.bmp
+dategap 8
+slotlock obj\e012_000.bmp 446 63
+slotdelete obj\e013_000.bmp 476 63
+slotprogress obj\e010_000.bmp 279 37 5
+slotnew obj\e014_000.bmp 5 104
+# The Q-Save page takes only quick saves.
+pageoff 10
+button page0 obj\e006_000.bmp 410 26 10 5 0
+button page1 obj\e006_000.bmp 460 26 10 5 1
+button page2 obj\e006_000.bmp 510 26 10 5 2
+button page3 obj\e006_000.bmp 560 26 10 5 3
+button page4 obj\e006_000.bmp 610 26 10 5 4
+button page5 obj\e006_000.bmp 660 26 10 5 5
+button page6 obj\e006_000.bmp 710 26 10 5 6
+button page7 obj\e006_000.bmp 760 26 10 5 7
+button page8 obj\e006_000.bmp 810 26 10 5 8
+button page9 obj\e006_000.bmp 860 26 10 5 9
+button page10 obj\e006_001.bmp 910 26 1 5 0
+button nav_save obj\e004_000.bmp 1172 94 9 5 0 help obj\e005_000.bmp 948 666 1 9 0 0
+button nav_load obj\e004_000.bmp 1172 135 9 5 1 help obj\e005_000.bmp 948 666 1 9 0 1
+button nav_cg obj\e004_000.bmp 1172 176 9 5 2 help obj\e005_000.bmp 948 666 1 9 0 2
+button nav_scene obj\e004_000.bmp 1172 217 9 5 3 help obj\e005_000.bmp 948 666 1 9 0 3
+button nav_music obj\e004_000.bmp 1172 258 9 5 4 help obj\e005_000.bmp 948 666 1 9 0 4
+button nav_config obj\e004_000.bmp 1172 299 9 5 5 help obj\e005_000.bmp 948 666 1 9 0 5
+button nav_title obj\e004_000.bmp 1172 340 9 5 6 help obj\e005_000.bmp 948 666 1 9 0 6
+button nav_quit obj\e004_000.bmp 1172 381 9 5 7 help obj\e005_000.bmp 948 666 1 9 0 7
+button back obj\e004_000.bmp 1172 463 9 5 8 help obj\e005_000.bmp 948 666 1 9 0 8
 
 screen cg
 helplast
@@ -4644,11 +4653,16 @@ button log_down obj\m003_000.bmp 1180 622 4 5 2
 button log_bottom obj\m003_000.bmp 1180 655 4 5 3
 
 screen dialog
-pic obj\b001_000.bmp 0 130
-pic obj\i000_000.bmp 414 173 1 8 0 0
-button yes obj\b003_000.bmp 449 268 2 5 0
-button no obj\b003_000.bmp 449 350 2 5 1
-pic obj\b002_000.bmp 414 440
+# Measured under Wine: the screen behind at 35 of 256, the mouse beside each answer, a left click away from them for yes
+# and a right click for no, and a box that stops the question, whichever answer follows.
+dim 221
+mousechoice
+pic obj\i000_000.bmp 417 107 1 8 0 0
+pic obj\b003_000.bmp 393 192 2 1 0 0
+pic obj\b003_000.bmp 393 305 2 1 1 0
+button yes obj\b002_000.bmp 467 195 2 5 0
+button no obj\b002_000.bmp 467 308 2 5 1
+button noask obj\i001_000.bmp 498 429 1 5 0
 
 # A choice, measured under Wine: the scene darkened, its prompt, and the options with a mouse icon each, the left
 # button's by the first and the right button's by the second, which take them. Once an ending is reached each option
@@ -4671,6 +4685,8 @@ screen defaults
 default onahole 1
 default bar_always 1
 default opacity 100
+# SENARIO_STATUS in the macro list holds the route, as the PC's saves show.
+routevar 4000
 
 screen cfgsav
 run 4 2 1
