@@ -8,7 +8,7 @@ engine reads it.
 ## The fonts
 
 The app bundles the Latin and Japanese fonts in `Engines/Shared/fonts/`, unmodified and under their upstream names.
-They take 27.2 MB in the app and about 13 MB in the zipped IPA. The Chinese and Korean fonts are large, so Settings,
+They take 27.3 MB in the app and about 13 MB in the zipped IPA. The Chinese and Korean fonts are large, so Settings,
 Fonts offers them as downloads of Source Han Sans from Adobe's release: 50.7 MB for Chinese and 26 MB for Korean.
 Games started after a download use it. A device font with the name a game asks for, such as Arial on Apple systems,
 comes before the substitute. The RPG Maker MV and MZ and TyranoScript engines read the table through the `FontPack`
@@ -20,6 +20,7 @@ module, and KiriKiri, RGSS, and the other native engines through `Engines/Shared
 | Times New Roman, Georgia, MS Serif | Liberation Serif | `LiberationSerif-Regular.ttf`, `-Bold.ttf` | Liberation 2.1.5 release | SIL OFL 1.1 |
 | Courier New, Lucida Console | Liberation Mono | `LiberationMono-Regular.ttf`, `-Bold.ttf` | Liberation 2.1.5 release | SIL OFL 1.1 |
 | Tahoma, MS Shell Dlg 2 | DejaVu Sans Condensed | `DejaVuSansCondensed.ttf`, `-Bold.ttf` | DejaVu 2.37 release | Bitstream Vera license, DejaVu changes public domain |
+| Lucida Sans Unicode | Open Sans (closest, not a metric match) | `OpenSans-Regular.ttf` | Open Sans 3.003, googlefonts/opensans | SIL OFL 1.1 |
 | MS Gothic, ＭＳ ゴシック | Ume Gothic | `ume-tgo4.ttf` | Ume font 670 | Ume font license |
 | MS PGothic, ＭＳ Ｐゴシック | Ume P Gothic | `ume-pgo4.ttf` | Ume font 670 | Ume font license |
 | MS UI Gothic | Ume UI Gothic | `ume-ugo4.ttf` | Ume font 670 | Ume font license |
@@ -42,6 +43,10 @@ Where each comes from:
 - DejaVu: `dejavu-fonts-ttf-2.37.tar.bz2` from the 2.37 release of github.com/dejavu-fonts/dejavu-fonts (SHA-256
   `fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7`). Its license allows selling the fonts as part
   of a larger software package. Wine's own Tahoma is LGPL, so VNDegen doesn't use it.
+- Open Sans: `fonts/ttf/OpenSans-Regular.ttf` of github.com/googlefonts/opensans at commit
+  `bd7e37632246368c60fdcbd374dbf9bad11969b6`, version 3.003 (SHA-256
+  `c53aceea2dcf5b4098099c0c4d0a061d17e178a049317b42a422b1a9f7f8eb59`), with the repository's `OFL.txt`. Regular only:
+  the games that ask for Lucida Sans Unicode never ask for it bold.
 - Source Han Sans: Adobe's 2.005R release on github.com/adobe-fonts/source-han-sans, pinned by SHA-256 in
   `FontPack.swift`. The download keeps Regular, Bold, and Adobe's `LICENSE.txt`. Proton builds its Microsoft YaHei,
   SimSun, and Malgun Gothic from the same fonts.
@@ -62,6 +67,15 @@ Measured with the advance widths in each font, against the real Windows fonts:
 - DejaVu Sans Condensed is the closest permissive match for Tahoma: a line of English text is 2.0% wider in regular
   and 1.3% wider in bold, and the line is 1.16 em tall against Tahoma's 1.21 em. Liberation Sans is closer in
   regular (0.5%) but 5.4% narrower in bold, and its letters differ more one by one.
+- Lucida Sans Unicode, which the official English releases of The Alchemist & His Battle-Scarred Homunculus, Funbag
+  Fantasy 4 and Horny Elves and a Moral Orc ask for (Wine's font log), has no free metric match. Five freely licensed
+  humanist sans were scored against the publisher's Windows screenshots of the three games: one size and one letter
+  gap fitted per game, as the NekoSDK engine sets text, and the RMS error of each word's predicted width, over 66, 42
+  and 20 words. Open Sans did best in all three (1.60, 2.27 and 1.58 pixels), then Noto Sans (1.77, 2.53, 1.64),
+  Source Sans 3 (1.84, 2.52, 1.81), DejaVu Sans (1.87, 2.62, 1.83) and Fira Sans (2.07, 2.66, 1.86), against 6.1 to
+  7.7 for Ume Gothic, which VNDegen had used. At their fitted sizes all five give lowercase letters within a pixel of
+  the screenshots' height, so the x-height doesn't separate them. The screenshots and the scoring stay in the
+  project's private evidence.
 - Meiryo and Yu Gothic have no free metric match. They get Ume P Gothic, a Japanese proportional Gothic.
 - Source Han Sans doesn't match the metrics of the Chinese and Korean Windows fonts. Proton uses it for the same
   reason VNDegen does: it is the free font that covers them.
