@@ -1340,7 +1340,7 @@ screen log
 pic obj\m001_000.bmp 1185 110
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1185 110 500
 # Four entries a page, each under a rule, measured under Wine.
-rows obj\m000_000.bmp 77 74 165 4 99 36
+rows obj\m000_000.bmp 77 74 165 4 100 35
 button log_close obj\l001_000.bmp 1240 22 2 5 0
 button log_top obj\m003_000.bmp 1180 34 4 5 0
 button log_up obj\m003_000.bmp 1180 68 4 5 1
@@ -1395,10 +1395,11 @@ run 2160 1 1
 
 screen defaults
 # How the PC sets the message window's text, measured under Wine against the same lines here, with VNDegen's stand-in
-# fonts in place of the Windows ones. Each glyph two pixels further on than its advance, lines 27 apart, and the first glyph 2 pixels in.
+# fonts in place of the Windows ones. Each glyph two pixels further on than its advance, lines 27 apart, the first glyph 2
+# pixels in and the baseline 1 higher.
 textgap 2
 textline 27
-textshift 2 0
+textshift 2 -1
 )";
 
 // Test Game 93.
@@ -1878,7 +1879,7 @@ screen log
 pic obj\m001_000.bmp 1185 110
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1185 110 500
 # Four entries a page, each under a rule, measured under Wine.
-rows obj\m000_000.bmp 77 69 165 4 140 36
+rows obj\m000_000.bmp 77 69 165 4 141 36
 button log_close obj\l001_000.bmp 1240 22 2 5 0
 button log_top obj\m003_000.bmp 1180 34 4 5 0
 button log_up obj\m003_000.bmp 1180 68 4 5 1
@@ -1939,8 +1940,13 @@ run 2160 1 1
 
 screen defaults
 # How the PC sets the message window's text, measured under Wine against the same lines here, with VNDegen's stand-in
-# fonts in place of the Windows ones. The glyphs at their own advances, lines 29 apart.
+# fonts in place of the Windows ones.
+# The PC creates its text font at a cell of 22 (Wine's font log), not init.ini's 25, so its glyphs are that size.
+# Each glyph two pixels further on than its advance, lines 29 apart, and the first glyph 2 pixels in.
+textsize 22
+textgap 2
 textline 29
+textshift 2 0
 )";
 
 }  // namespace
@@ -4157,7 +4163,7 @@ screen log
 pic obj\m001_000.bmp 1185 110
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1185 110 500
 # Four entries a page, each under a rule, measured under Wine.
-rows obj\m000_000.bmp 77 69 165 4 140 36
+rows obj\m000_000.bmp 77 69 165 4 141 36
 button log_close obj\l001_000.bmp 1240 22 2 5 0
 button log_top obj\m003_000.bmp 1180 34 4 5 0
 button log_up obj\m003_000.bmp 1180 68 4 5 1
@@ -4220,8 +4226,13 @@ run 2160 1 1
 
 screen defaults
 # How the PC sets the message window's text, measured under Wine against the same lines here, with VNDegen's stand-in
-# fonts in place of the Windows ones. The glyphs at their own advances, lines 29 apart.
+# fonts in place of the Windows ones.
+# The PC creates its text font at a cell of 22 (Wine's font log), not init.ini's 25, so its glyphs are that size.
+# Each glyph two pixels further on than its advance, lines 29 apart, and the first glyph 2 pixels in.
+textsize 22
+textgap 2
 textline 29
+textshift 2 0
 )";
 
 // Test Game 94's menus start from Ore o Hoshigaru Tsuma to Gibo's, the same template, and its title is its own: the art
@@ -4751,8 +4762,7 @@ pic obj\m001_000.bmp 1185 110
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1185 110 500
 # Four entries a page, each under a rule, measured under Wine. The text is the message window's size: under Wine,
 # with a stand-in for MS Gothic, the log's letters and the window's came out the same size.
-# Four entries a page, each under a rule, measured under Wine.
-rows obj\m000_000.bmp 77 69 165 4 99 36
+rows obj\m000_000.bmp 77 69 165 4 101 35
 button log_close obj\l001_000.bmp 1240 22 2 5 0
 button log_top obj\m003_000.bmp 1180 34 4 5 0
 button log_up obj\m003_000.bmp 1180 68 4 5 1
@@ -4826,10 +4836,13 @@ run 2160 1 1
 
 screen defaults
 # How the PC sets the message window's text, measured under Wine against the same lines here, with VNDegen's stand-in
-# fonts in place of the Windows ones. Each glyph one pixel further on than its advance, lines 28 apart, and the first glyph 2 pixels in.
-textgap 1
+# fonts in place of the Windows ones.
+# The PC creates its text font at a cell of 21 (Wine's font log), not init.ini's 24, so its glyphs are that size.
+# Each glyph two pixels further on than its advance, lines 28 apart, the first glyph 2 pixels in and the baseline 1 higher.
+textsize 21
+textgap 2
 textline 28
-textshift 2 0
+textshift 2 -1
 )";
 
 

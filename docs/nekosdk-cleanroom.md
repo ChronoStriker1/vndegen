@@ -179,10 +179,6 @@ Measured under Wine. A picture opens with a panel over its bottom right: Replay 
 
 Every PC game seen shows a line of help while the pointer is over a menu button or a settings group, except over the tab, page or menu already open. Each was found by hovering every control of the PC game under Wine, and Config's groups by hovering a grid of points over each tab, 40 by 24 pixels apart (64 in The Alchemist). Funbag Fantasy 4 and The Alchemist draw a picture for each, beside the control. Funbag Fantasy 3 if, Haha Sannin to Ana Asobi and Ore o Hoshigaru Tsuma to Gibo draw one row of a sheet of them, at the bottom left for the title and at the bottom right for Config and music, with rows 34 pixels apart on the title's sheet and 39 on the others. Some sheets are drawn flush with the screen's right edge and others at a fixed place, as measured. The Alchemist's Change Illustration help is a picture of its own, `l999_001`.
 
-## Replays
-
-A replay from the Scene gallery uses the bar `MsgButtonPlayViewDeclFilename` names in `init.ini`, `cfg\msg_button_playview.ini`, in place of the usual one. In every game seen it differs only in Exit's help picture, which says the gallery ends rather than the game. Under Wine, Test Game 84's Exit in a replay goes straight back to the Scene Library, with no question.
-
 ## Two nodes with one number
 
 One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.
@@ -251,21 +247,25 @@ Test Game 94's choices, under Wine. A choice's count is its parameter 0 and one 
 ## Text placement
 
 The PC engine draws its text from a glyph atlas: Wine's font log (`WINEDEBUG=+font`) shows each game creating its
-text font at a cell height and at four times it, with the face init.ini's MsgFont names. The official English
-releases (The Alchemist, Funbag Fantasy 4, Horny Elves and a Moral Orc) ask for Lucida Sans Unicode instead, which
+text font at a cell height and at four times it, with the face init.ini's MsgFont names, and a second font for save
+card comments. The official English
+releases (The Alchemist, Funbag Fantasy 3 if, Funbag Fantasy 4, Horny Elves and a Moral Orc) ask for Lucida Sans Unicode instead, which
 VNDegen maps to Open Sans ([fonts.md](fonts.md)). Text placement was measured by loading the same PC save on the PC
 under Wine, with VNDegen's stand-in fonts mapped in place of the Windows ones, and here, and comparing the same lines.
 The PC sets each glyph a fixed gap past its own advance and lines a fixed pitch apart, neither of which init.ini's
 MsgCharInterval and MsgLineInterval predict, so each game's table gives them (`textgap`, `textline`, `textshift`,
-`textfont`, `textsize`, and for the log `rows` with a size, `loggap` and `logline`). Test Game 94: gap 1, lines 28
-apart, the first glyph 2 pixels in. Test Game 88: gap 2, lines 27, 2 in. Test Game 92 and Ore o Hoshigaru Tsuma to
-Gibo: no gap, lines 29. Each log was placed under its rules as the PC's is, and the fitted lines end on the PC's
-pixel or one off. Yarinaoshi no Christmas asks for Meiryo at a 32-pixel cell, which Windows draws at about 21 pixels
+`textfont`, `textsize`, and for the log `rows` with a size, `loggap` and `logline`). Some games create their text
+font smaller than init.ini's MsgFontSize says, which Wine's font log shows: Test Games 92 and 93 at 22 for 25, Test
+Game 94 at 21 for 24. A size fitted only by where lines end can't show this, since a gap makes up the width, so each
+was checked by the glyphs' height against the PC's capture too. Test Game 94: size 21, gap 2, lines 28 apart, the
+first glyph 2 pixels in and the baseline 1 higher. Test Game 88: gap 2, lines 27, 2 in, 1 higher. Test Game 92 and
+Ore o Hoshigaru Tsuma to Gibo: size 22, gap 2, lines 29, 2 in. Each log was placed under its rules as the PC's is,
+and the fitted lines end on the PC's pixel or one off. Yarinaoshi no Christmas asks for Meiryo at a 32-pixel cell, which Windows draws at about 21 pixels
 to the em, two thirds of the cell; Ume P Gothic, its stand-in, fills the cell, so under Wine the PC's lines run off
 the screen. Christmas was released only in Japanese, so the reference is a Windows screenshot of its English patch,
 two lines whose glyphs have Meiryo's Verdana-like shapes and an 11-pixel x-height: Ume P Gothic 22 with a gap of
 4.66, lines 35 apart, the first glyph 2 pixels in and the baseline 4 lower than Wine's, which puts glyphs within 2
-pixels, the lines' ends within one and the baselines on the screenshot's rows. Its log's text drops by the same 4.
+pixels, the lines' ends within one and the baselines on the screenshot's rows. Its log's text drops by the same 4, inferred from the two faces' ascents.
 For the Lucida Sans Unicode games the publisher's Windows screenshots were the reference, since Wine has no Lucida
 Sans Unicode and font-links it to Noto Sans CJK. Word widths alone chose the size poorly, since the runtime's hinted
 advances run about half a pixel a glyph wider than the unhinted ones the first fit used, so each was settled by
@@ -274,7 +274,12 @@ Open Sans 22 with a gap of 5.93, lines 42 apart, the baseline 3 lower; Funbag Fa
 Funbag Fantasy 3 if, whose program names only Lucida Sans Unicode, size 16, gap 2.75, lines 23, the baseline 1
 higher; Moral Orc size 16, gap 3.93, lines 27; each with its first glyph one gap in. Test Game 84's PC game stops
 taking input at its title under Wine with the stand-in fonts mapped, so its log keeps the placement measured before. A save card's comment has a font of its own, a cell of 18
-in the Gothic games and 32 in The Alchemist, with no gap.
+in the Gothic games and 32 in The Alchemist, with no gap; Christmas's comments are in MS Gothic at 18, as the PC asks,
+and The Alchemist's at 20, sized from Wine's capture. `nekocheck` lays out every message and fails on one that runs
+off the screen. Ore o Hoshigaru Tsuma to Gibo carries untranslated scenes that nothing names, whose lines are longer
+than the screen; the check reports those apart. Four untranslated Japanese lines, three in Ore o Hoshigaru Tsuma to
+Gibo's sex scenes and one in Test Game 94's, wrap at init.ini's MsgMaxCharNum, 50 full-width characters, past the right
+edge; the PC applies the same limit at the same pitch, but they haven't been seen on the PC, and the check lists them.
 
 ## The CG viewer
 

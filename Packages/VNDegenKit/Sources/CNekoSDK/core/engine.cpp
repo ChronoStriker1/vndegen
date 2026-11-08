@@ -5017,11 +5017,24 @@ void Engine::layoutText(const std::string &name, const std::string &text) {
     layoutRun(text, textX_ + textDX_, textY_ + textDY_ + ascent, false, textGlyphs_);
 }
 
+void Engine::messageExtent(const std::string &name, const std::string &text, int &right, int &bottom) {
+    layoutText(name, text);
+    right = bottom = 0;
+    for (const auto *run : {&nameGlyphs_, &textGlyphs_})
+        for (const Glyph &g : *run) {
+            GlyphImage image;
+            if (!glyph(fontFace_, g.codepoint, fontSize_, false, image) || image.w <= 0 || image.h <= 0) continue;
+            // The frame reaches its width past the ink on every side, and the shadow 2 pixels right and down.
+            int lean = g.italic ? image.h / 5 + 1 : 0, reach = std::max(frameWidth(), hasShadow() ? 2 : 0);
+            right = std::max(right, g.x + image.left + image.w + lean + reach);
+            bottom = std::max(bottom, g.y - image.top + image.h + reach);
+        }
+}
+
 void Engine::drawGlyph(Canvas &out, const Glyph &g, int pass, int alpha, int r, int gr, int b, int fr, int fg, int fb) {
     if (alpha <= 0) return;
-    // init.ini's font types: 1 a shadow, 2 a thin frame, 9 both, 13 a wide frame, 17 a wider one.
-    int frame = fontType_ == 17 ? 3 : fontType_ == 13 ? 2 : (fontType_ == 2 || fontType_ == 9) ? 1 : 0;
-    bool shadow = fontType_ == 1 || fontType_ == 9;
+    int frame = frameWidth();
+    bool shadow = hasShadow();
     GlyphImage image;
     if (!glyph(fontFace_, g.codepoint, fontSize_, false, image) || image.w <= 0 || image.h <= 0) return;
     std::vector<uint8_t> slanted;

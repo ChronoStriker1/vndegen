@@ -165,6 +165,8 @@ int main(int argc, char **argv) {
                 vnneko_set_paused(e, s.what == "pause");
             } else if (s.what == "focus") {
                 if (!vnneko_move_focus(e, s.x, s.y)) std::printf("focus %d %d: nothing to move to\n", s.x, s.y);
+            } else if (s.what == "wheel") {
+                vnneko_mouse_wheel(e, s.x);
             } else {
                 vnneko_mouse_move(e, float(s.x + 0.5) / float(w), float(s.y + 0.5) / float(h));
                 int button = s.what == "rclick" ? 1 : 0;

@@ -154,6 +154,11 @@ public:
     int takeCommentRequest(std::string &utf8);
     // The comment the player typed, written into that card's save as the PC writes it.
     bool setComment(int slot, const std::string &utf8);
+    // For checks: lays out a message as the message window sets it, replacing the one shown, and gives the furthest
+    // right and lowest pixel its ink reaches, and the canvas's size to hold them against.
+    void messageExtent(const std::string &utf8Name, const std::string &utf8Text, int &right, int &bottom);
+    int canvasWidth() const { return width_; }
+    int canvasHeight() const { return height_; }
     // Saving, loading and a card's lock, which tests also call.
     bool saveToSlot(int slot);
     bool loadFromSlot(int slot);
@@ -495,6 +500,9 @@ private:
     void compose();
     void layoutText(const std::string &utf8Name, const std::string &utf8Text);
     void layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out);
+    // init.ini's font types: 1 a shadow, 2 a thin frame, 9 both, 13 a wide frame, 17 a wider one.
+    int frameWidth() const { return fontType_ == 17 ? 3 : fontType_ == 13 ? 2 : (fontType_ == 2 || fontType_ == 9) ? 1 : 0; }
+    bool hasShadow() const { return fontType_ == 1 || fontType_ == 9; }
     void drawGlyph(Canvas &out, const Glyph &g, int pass, int alpha, int r, int gr, int b, int fr, int fg, int fb);
     void drawGlyphs(Canvas &out, const std::vector<Glyph> &glyphs, int r, int g, int b, int fr, int fg, int fb);
     void drawGlyphRun(Canvas &out);
