@@ -70,7 +70,9 @@ import TestSupport
         let path = try #require(save.range(of: Data("sc\\r.bmp".utf8)))
         let at = path.lowerBound - save.startIndex
         #expect(int32(save, at - 12) == 600)
+        // After the name come the second name, empty in the older engine's saves, then the fixed part.
         let fixed = at + 8 + 4
+        #expect(int32(save, at + 8) == 0)
         #expect(int32(save, fixed + 0xD5) == 194)
         #expect(int32(save, fixed + 0xD9) == 326)
         // The flow's name at 0xCD, here the patch folder's, and the choice's picture, here none, 236 bytes after it.

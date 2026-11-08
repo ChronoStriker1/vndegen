@@ -243,6 +243,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     return nullptr;
 }
 
+bool olderLayout(const SaveLayout &layout) { return layout.olderRecord > 0; }
+
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out) {
     if (plain.size() < 100000) return false;
     Reader r(plain);

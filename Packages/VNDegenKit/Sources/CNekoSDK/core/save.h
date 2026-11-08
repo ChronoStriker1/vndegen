@@ -109,6 +109,8 @@ struct SaveLayout;
 const SaveLayout *saveLayout(const std::string &userDataDirectory);
 
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out);
+// Whether a layout is the older engine's, whose saves leave a record's second picture name empty.
+bool olderLayout(const SaveLayout &layout);
 std::vector<uint8_t> buildSave(const SaveData &data, const SaveLayout &layout);
 
 // A save with its card's comment replaced and nothing else changed, as the PC rewrites it, or nothing when the save is

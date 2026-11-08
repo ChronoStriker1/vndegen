@@ -2109,6 +2109,10 @@ SaveData Engine::captureSave() {
         SavedSprite out;
         out.slot = slot;
         out.path = s.path;
+        // The newer engine's PC names the picture twice, and loads it from the second: a save with that empty loads on the
+        // PC with every picture gone (Test Game 93 under Wine). Every PC save of the newer engine holds the same name in
+        // both, and every one of the older engine's leaves the second empty.
+        out.nextPath = s.noise || (layout_ && olderLayout(*layout_)) ? "" : s.path;
         out.noise = s.noise;
         if (s.flipCount > 0) {
             out.flipFrame = s.flipShown;
@@ -2146,7 +2150,13 @@ SaveData Engine::captureSave() {
                 const char *name = t.property == Track::X ? (t.relative ? "relative_pos_x" : "pos_x") : t.property == Track::Y ? (t.relative ? "relative_pos_y" : "pos_y") : t.property == Track::ScaleX ? "scale_x" : t.property == Track::ScaleY ? "scale_y" : t.property == Track::Alpha ? "alpha" : "rotate";
                 int length = framesOf(t.lengthMs);
                 char line[128];
-                std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                // A scale line names its pivot, the point of the picture it keeps still, as the PC writes one:
+                // `scale_x,1.100000,640,0,2400,linear`.
+                if (t.property == Track::ScaleX || t.property == Track::ScaleY)
+                    std::snprintf(line, sizeof line, "%s,%f,%d,%d,%d,%s\n", name, double(t.to), t.property == Track::ScaleX ? out.anchorX : out.anchorY,
+                                  framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                else
+                    std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
                 out.animation += line;
             }
         };
