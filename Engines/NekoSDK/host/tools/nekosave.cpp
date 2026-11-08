@@ -31,6 +31,12 @@ int main(int argc, char **argv) {
             continue;
         }
         auto again = buildSave(data, *layout);
+        // With NEKOSAVE_WRITE naming a folder, the save as VNDegen writes it goes there under the same name, for the PC to load.
+        if (const char *out = std::getenv("NEKOSAVE_WRITE")) {
+            std::string name = argv[a];
+            auto bytes = packEntry(again);
+            std::ofstream(std::string(out) + "/" + name.substr(name.find_last_of('/') + 1), std::ios::binary).write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size()));
+        }
         size_t differ = 0, first = size_t(-1);
         for (size_t i = 0; i < std::min(plain.size(), again.size()); i++)
             if (plain[i] != again[i]) {

@@ -3,8 +3,9 @@ import Foundation
 import Testing
 import TestSupport
 
-// Test Game 94's route mode and card locks, kept where its PC keeps them, as seen under Wine: the route in the scenario
-// variable SENARIO_STATUS (4000), which its saves carry, and a card's lock in global 199 plus the card's number.
+// Test Game 94's route mode, card locks and NEW, kept where its PC keeps them, as seen under Wine: the route in the
+// scenario variable SENARIO_STATUS (4000), which its saves carry, a card's lock in global 199 plus the card's number, and
+// the card saved to last in global 0.
 @Suite struct NekoSDKRinjinSaveTests {
     private let folder = "waffle\\隣人に壊されていく俺の妻"
 
@@ -68,6 +69,8 @@ import TestSupport
         let e = try #require(NekoSDKFlowFixture.start(root, data: data))
         #expect(vnneko_debug_press(e, "route1"))
         #expect(vnneko_debug_save(e, 5))
+        // NEW marks the card saved to last, global 0.
+        #expect(vnneko_debug_variable(e, 0, 0) == 5)
         vnneko_debug_toggle_lock(e, 5)
         #expect(vnneko_debug_variable(e, 0, 204) == 1)
         #expect(try lockByte(5) == 1)

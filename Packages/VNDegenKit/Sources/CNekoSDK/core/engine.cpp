@@ -1911,6 +1911,9 @@ bool Engine::saveToSlot(int slot) {
     }
     if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
     writeFlipModes(slot, data);
+    // The card that shows NEW, kept in cfg.sav as the PC keeps it.
+    globals_[0] = slot;
+    saveGlobals();
     saveSeen();
     saveReadText();
     slots_.erase(slot);
@@ -2211,7 +2214,9 @@ void Engine::composeSlots(Canvas &out) {
     int dateColumns = offset("datedigits", 3) ? offset("datedigits", 3) : 10, numberDigits = offset("slotdigits", 3) ? offset("slotdigits", 3) : 2;
     bool loading = screen_->name == "load";
     int hovered = pointerSeen_ ? slotAt(pointerX_, pointerY_) : -1;
-    int newest = screen_->setting("slotnew") ? newestSlot(1, lastQuickSlot_) : 0;
+    // NEW marks the card saved to last, which the PC keeps in global 0: Test Game 94's held 2 and The Alchemist's 1, the
+    // cards their screens marked.
+    int newest = variable(0, 0);
     auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / cells;
@@ -2278,8 +2283,8 @@ void Engine::composeSlots(Canvas &out) {
                     int h = names->h / std::max(1, field(*progress, 3));
                     drawPart(out, *names, cx + field(*progress, 1), cy + field(*progress, 2), 0, info.route * h, names->w, h, 1);
                 }
-            // `slotnew SHEET X Y`: the newest save of all, as dated, unless it's locked, as Test Game 94's PC shows.
-            if (ImageRef mark = picture("slotnew"); mark && slot == newest && !isLocked)
+            // `slotnew SHEET X Y`: the card saved to last.
+            if (ImageRef mark = picture("slotnew"); mark && slot == newest && info.exists)
                 drawPart(out, *mark, cx + offset("slotnew", 1), cy + offset("slotnew", 2), 0, 0, mark->w, mark->h, 1);
             int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
             auto mark = [&](const ImageRef &m, int cellInSheet) {
