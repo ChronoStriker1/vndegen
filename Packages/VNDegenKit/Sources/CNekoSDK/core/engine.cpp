@@ -2257,7 +2257,7 @@ bool Engine::saveToSlot(int slot) {
     if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
     writeFlipModes(slot, data);
     // The card that shows NEW, kept in cfg.sav as the PC keeps it.
-    globals_[0] = slot;
+    globals_[0] = newCardNumber(layout_, slot);
     saveGlobals();
     saveSeen();
     saveReadText();
@@ -2642,8 +2642,8 @@ void Engine::composeSlots(Canvas &out) {
     bool loading = screen_->name == "load";
     int hovered = pointerSeen_ ? slotAt(pointerX_, pointerY_) : -1;
     // NEW marks the card saved to last, which the PC keeps in global 0: Test Game 94's held 2 and The Alchemist's 1, the
-    // cards their screens marked.
-    int newest = variable(0, 0);
+    // cards their screens marked, and Test Game 87 counts from 0.
+    int newest = newCardSlot(layout_, variable(0, 0));
     auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / cells;

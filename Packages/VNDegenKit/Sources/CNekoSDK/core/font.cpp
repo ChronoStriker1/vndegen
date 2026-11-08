@@ -37,11 +37,12 @@ struct FontSource {
     int face = 0;
 };
 
-// The Windows names behind init.ini's MsgFont numbers, as its comment lists them, and 7 for Lucida Sans Unicode, which the
-// official English releases ask for in place of them.
+// The Windows names behind init.ini's MsgFont numbers, as its comment lists them, 7 for Lucida Sans Unicode, which the
+// official English releases ask for in place of them, and 8 for Verdana, which Test Game 82's program names for MsgFont 0
+// (set 2, from Wine's font log).
 const char *windowsFontName(int face) {
-    static const char *const names[] = {"MS Gothic", "MS PGothic", "MS Mincho", "MS PMincho", "MS UI Gothic", "Meiryo", "Meiryo UI", "Lucida Sans Unicode"};
-    return face >= 0 && face < 8 ? names[face] : names[0];
+    static const char *const names[] = {"MS Gothic", "MS PGothic", "MS Mincho", "MS PMincho", "MS UI Gothic", "Meiryo", "Meiryo UI", "Lucida Sans Unicode", "Verdana"};
+    return face >= 0 && face < 9 ? names[face] : names[0];
 }
 
 bool packFont(int face, FontSource &out) {
@@ -243,7 +244,8 @@ bool glyph(int face, uint32_t cp, int px, bool bold, GlyphImage &out) {
     std::lock_guard<std::mutex> lock(mu);
     // Windows draws what Lucida Sans Unicode lacks, such as kana and ♪, from MS UI Gothic, the first of its font link,
     // so its stand-in's missing characters come from MS UI Gothic's.
-    if (face == 7 && !faceFor(7).has(cp)) face = 4;
+    // Verdana's stand-in does the same, which isn't measured: Test Game 82's English text has nothing it lacks.
+    if ((face == 7 || face == 8) && !faceFor(face).has(cp)) face = 4;
     Key k{face, cp, px, bold};
     auto it = cache.find(k);
     if (it != cache.end()) { out = it->second; return true; }

@@ -46,6 +46,8 @@ int main(int argc, char **argv) {
     expect("ＭＳ 明朝", 0, 0, "ume-tmo3.ttf", 0, 0);
     expect("MS PMincho", 0, 0, "ume-pmo3.ttf", 0, 0);
     expect("Tahoma", 1, 0, "DejaVuSansCondensed-Bold.ttf", 0, 0);
+    // Verdana has no bold line, so bold falls back to regular, drawn bolder.
+    expect("Verdana", 1, 0, "DejaVuSans.ttf", 1, 0);
     expect("Courier New", 0, 0, "LiberationMono-Regular.ttf", 0, 0);
     expect("Comic Sans MS", 0, 0, NULL, 0, 0);
     expect("", 0, 0, NULL, 0, 0);

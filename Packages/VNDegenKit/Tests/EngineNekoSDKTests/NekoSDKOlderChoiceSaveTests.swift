@@ -5,7 +5,8 @@ import TestSupport
 
 // Test Game 87's saves name a choice's picture in the older engine's first place, 236 bytes after the flow, with the
 // newer place empty, and hold 1 360 bytes into the date block only once a choice has been made, as its PC writes them
-// (set 1, under Wine): its PC shows a choice with no options from a save with the picture in the newer place.
+// (set 1, under Wine): its PC shows a choice with no options from a save with the picture in the newer place. Its cfg.sav
+// counts the NEW card from 0.
 @Suite struct NekoSDKOlderChoiceSaveTests {
     // A 24-bit BMP of two rows of options.
     private func sheet() -> Data {
@@ -77,6 +78,12 @@ import TestSupport
         #expect(atSecond.newer.isEmpty)
         #expect(atSecond.flag == 1)
         vnneko_stop(first)
+        // Global 0 names the card NEW marks counting from 0 in this game, so 1 for the second card: one past the last card
+        // crashes its PC's Load page.
+        let cfg = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try #require(try FileManager.default.contentsOfDirectory(
+            at: data.appendingPathComponent("AppData/Roaming/waffle/funbag_fantasy_sideboob_story_2/save"), includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "cfg.sav" })))
+        #expect(cfg.subdata(in: (cfg.startIndex + 4000)..<(cfg.startIndex + 4004)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } == 1)
 
         // Each loads and saves again as it was.
         for (slot, again, flag) in [(1, 3, Int32(0)), (2, 4, Int32(1))] {

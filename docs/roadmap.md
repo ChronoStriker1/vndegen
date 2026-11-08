@@ -73,6 +73,8 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - PC saves with a comment load in the two NekoSDK games, with save locks, the NEW mark and the "Don't ask again" box (0.26.3).
 - The Alchemist's text in Open Sans at the PC's spacing, and Yarinaoshi no Christmas's comments and log placed as on the PC (0.26.4).
 - Yarinaoshi no Christmas's text at the PC's size, and The Alchemist's text 3 px lower (0.26.5).
+- NekoSDK stage 3: Funbag Fantasy 3 if, Funbag Fantasy 4, Haha Sannin to Ana Asobi, Horny Elves and a Moral Orc, Ore o Hoshigaru Tsuma to Gibo and Test Games 92 and 94, with movies, PC read marks both ways, save locks and comments (0.27.0).
+- NekoSDK saves that move to a PC with their pictures (#68), animations that go on after a load, The Alchemist's film noise, the GOOD Timing heart, and Config hover help placed to the pixel (0.27.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -82,10 +84,11 @@ New bugs get a GitHub issue and a line here.
 - [#40](https://github.com/ChronoStriker1/vndegen/issues/40) Registry sync merges canonically equivalent value names.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 - [#62](https://github.com/ChronoStriker1/vndegen/issues/62) Metadata: Rinjin matched to the wrong VNDB entry.
+- [#67](https://github.com/ChronoStriker1/vndegen/issues/67) `build.sh test` can exit 1 without showing which Swift test failed.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- NekoSDK, on `feat/nekosdk-stage3`: stage 3's remaining gaps (Haha Sannin to Ana Asobi's 4:3 mode and its Config's dark band, more of GOOD Timing's rules watched), then the six games that keep their story order in the exe, three workers in parallel: Mankitsu Happening with Funbag Fantasy: Sideboob Story 2, Yabai! -Fukushuu Yami Site- with Funbag Fantasy, and Funbag Fantasy 2 with Funbag Fantasy: Sideboob Story. First the older layout's background, CG and sprite commands, and a story table for games without flow scripts.
+- NekoSDK, on `feat/nekosdk-stage3`: stage 3's last gaps (Haha Sannin to Ana Asobi's 4:3 mode and its Config's dark band, more of GOOD Timing's rules watched, and small checks). The six games that keep their story order in the exe are in three parallel sets, merged through `feat/nekosdk-stage3`: Mankitsu Happening with Funbag Fantasy: Sideboob Story 2 on `feat/nekosdk-set1`, Yabai! -Fukushuu Yami Site- with Funbag Fantasy on `-set2`, and Funbag Fantasy 2 with Funbag Fantasy: Sideboob Story on `-set3`. The older layout's commands and story tables for games without flow scripts are in.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
@@ -110,6 +113,7 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 14. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
 15. Cheats for games that aren't visual novels: quick cheats such as gold, items, encounters and game speed, plus a variable and switch editor, through each engine's own state, so saves stay in the PC format. Plan in `docs/cheats.md`. Done: RPG Maker MV and MZ in 0.14.0, XP, VX, VX Ace and Wolf RPG Editor in 0.15.0, Godot and Flash game speed in 0.16.0, and AliceSoft System 3 and 4 in 0.17.0.
 16. What released engines still lacked, built only for the library games that need it: Artemis movies and screen effects (0.18.0), Wolf RPG Editor's newer data formats (0.19.0) and its mouse and text input (0.20.0), RPG Maker VX Ace movies and message boxes (0.19.0), and AliceSoft System 3's transitions (0.20.0). Their small fixes followed, through 0.21.1.
+17. Playing over AirPlay with the iPhone or iPad as the controller. The game fills the AirPlay screen, and the device shows the touch gamepad, the touch cursor's trackpad, or, with a Bluetooth controller, just the VNDegen menu button. Sound goes with the picture, and ending AirPlay brings the game back to the device without restarting it. (#66)
 
 ## Runtime packages
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.
