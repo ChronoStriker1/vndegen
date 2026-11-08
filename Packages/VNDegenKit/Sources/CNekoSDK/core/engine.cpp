@@ -2283,7 +2283,7 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAt(d.scene)) {
         complain("The story table has no place for the save's scene " + d.scene);
     }
-    std::map<int, FlipModes> flipModes = flipModesAt(d, slot);
+    std::map<int, FlipModes> flipModes = flipModesAt(d, side);
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
         // The film noise starts again where the save left it running.
@@ -4139,29 +4139,10 @@ void Engine::startFlipbook(const Node &n) {
 // Timing's marker up to it, then the script the save is in. A walk that never reaches its place, as when a patch took that
 // node away, says nothing, and a flipbook found nowhere repeats, as nearly all of them do. A PC save made after Ejaculate
 // was pressed early can't say where the press was, so its walk runs to the marker.
-std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d, int slot) {
+std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d, const Sidecar &side) {
     std::map<int, FlipModes> slots;
-    if (slot >= 0) {
-        // `at SCENE NODE`, then `flip SLOT LOOP REVERSE PATH` lines. It counts only when it was written with this save.
-        auto bytes = readWhole(savePath(slot, "vnd"));
-        std::istringstream in(std::string(bytes.begin(), bytes.end()));
-        std::string line, scene;
-        int node = -1;
-        std::map<int, FlipModes> kept;
-        while (std::getline(in, line)) {
-            std::istringstream words(line);
-            std::string kind;
-            words >> kind;
-            if (kind == "at") words >> scene >> node;
-            else if (kind == "flip") {
-                int at = 0, loop = 1, reverse = 0;
-                std::string path;
-                if (words >> at >> loop >> reverse && std::getline(words >> std::ws, path) && !path.empty())
-                    kept[at] = {sjis::fromUtf8(path), loop != 0, reverse != 0};
-            }
-        }
-        if (node >= 0 && normalizedPath(sjis::fromUtf8(scene)) == normalizedPath(d.scene) && node == d.node) return kept;
-    }
+    // The modes VNDegen kept beside its save, or else the ones the scripts set on the way to the save's node.
+    if (side.valid) return side.flips;
     auto walk = [&](const std::string &name, int stopAt) {
         auto script = name.empty() ? nullptr : loadScript(name);
         if (!script) return;
@@ -4204,7 +4185,9 @@ std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d, int slot
 }
 
 void Engine::writeFlipModes(int slot, const SaveData &d) {
-    std::string text = "at " + sjis::toUtf8(d.scene) + " " + std::to_string(d.node) + "\n";
+    // `at SCENE NODE`, with `-` for no scene, and the fingerprint of the save it was written with.
+    std::string text = "at " + (d.scene.empty() ? std::string("-") : sjis::toUtf8(d.scene)) + " " + std::to_string(d.node) + "\n";
+    text += "print " + std::to_string(saveFingerprint(d)) + "\n";
     for (const auto &[at, s] : front_)
         if (s.flipCount) text += "flip " + std::to_string(at) + " " + (s.flipLoop ? "1" : "0") + " " + (s.flipReverse ? "1" : "0") + " " + sjis::toUtf8(s.path) + "\n";
     // Game parts' state, `part NAME LINE`, kept beside the save as the flipbooks' modes are.
@@ -4227,8 +4210,27 @@ void Engine::writeFlipModes(int slot, const SaveData &d) {
             text += "story " + frame.script->name + " " + std::to_string(id) + "\n";
         }
         text += "result " + std::to_string(choiceResult_) + "\n";
+        if (waiting_ == Waiting::Choice) text += "choice\n";
     }
     writeWhole(savePath(slot, "vnd"), std::vector<uint8_t>(text.begin(), text.end()));
+}
+
+// What a save holds of the story's state, for telling whether VNDegen's lines beside it were written with it: its time,
+// scene, node and scenario variables. The card's comment, which can change later, isn't in it.
+uint32_t Engine::saveFingerprint(const SaveData &d) {
+    uint32_t h = 2166136261u;
+    auto mix = [&](uint32_t v) {
+        for (int i = 0; i < 4; i++) h = (h ^ ((v >> (8 * i)) & 0xff)) * 16777619u;
+    };
+    for (int v : d.date) mix(uint32_t(v));
+    for (char c : normalizedPath(d.scene)) mix(uint8_t(c));
+    mix(uint32_t(d.node));
+    for (const auto &[number, value] : d.variables)
+        if (value) {
+            mix(uint32_t(number));
+            mix(uint32_t(value));
+        }
+    return h;
 }
 
 Engine::Sidecar Engine::readSidecar(const SaveData &d, int slot) {
@@ -4238,12 +4240,24 @@ Engine::Sidecar Engine::readSidecar(const SaveData &d, int slot) {
     std::istringstream in(std::string(bytes.begin(), bytes.end()));
     std::string line, scene;
     int node = -1;
+    bool printed = false;
+    uint32_t print = 0;
     while (std::getline(in, line)) {
         std::istringstream words(line);
         std::string kind;
         words >> kind;
         if (kind == "at") {
             words >> scene >> node;
+            if (scene == "-") scene.clear();
+        } else if (kind == "print") {
+            printed = bool(words >> print);
+        } else if (kind == "flip") {
+            int at = 0, loop = 1, reverse = 0;
+            std::string path;
+            if (words >> at >> loop >> reverse && std::getline(words >> std::ws, path) && !path.empty())
+                side.flips[at] = {sjis::fromUtf8(path), loop != 0, reverse != 0};
+        } else if (kind == "choice") {
+            side.atChoice = true;
         } else if (kind == "part") {
             std::string name, rest;
             if (words >> name && std::getline(words >> std::ws, rest)) side.parts[name].push_back(rest);
@@ -4257,8 +4271,12 @@ Engine::Sidecar Engine::readSidecar(const SaveData &d, int slot) {
             words >> side.screen >> side.screenScope >> side.screenNumber;
         }
     }
-    // Lines written with another save than this one, such as a PC save copied over ours, don't count.
-    if (node < 0 || normalizedPath(sjis::fromUtf8(scene)) != normalizedPath(d.scene) || node != d.node) return {};
+    // Lines written with another save than this one, such as a PC save copied over ours, don't count: the fingerprint
+    // tells, or in lines from before it was kept, the scene and node.
+    bool same = printed ? print == saveFingerprint(d)
+                        : node >= 0 && normalizedPath(sjis::fromUtf8(scene)) == normalizedPath(d.scene) && node == d.node;
+    if (!same) return {};
+    side.valid = true;
     return side;
 }
 

@@ -46,7 +46,18 @@ import TestSupport
         let data = root.appendingPathComponent("data")
         let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytest/save")
 
+        // A screen open before any scene: a save there names no scene, and its screen comes back.
+        let opening = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(opening, 3)
+        #expect(status(opening).contains("part screen"), "\(status(opening))")
+        #expect(vnneko_debug_save(opening, 3))
+        vnneko_stop(opening)
+
         let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        #expect(vnneko_debug_load(first, 3))
+        steps(first, 3)
+        #expect(status(first).contains("part screen"), "\(status(first))")
+        click(first)
         steps(first, 10)
         #expect(at(first, "scr\\c2.txt"), "\(status(first))")
         #expect(vnneko_debug_variable(first, 1, 5) == 3)

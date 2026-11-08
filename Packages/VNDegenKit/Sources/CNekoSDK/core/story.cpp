@@ -218,7 +218,8 @@ bool Engine::restoreStoryPlace(const Sidecar &side, bool &atChoice) {
     stack_ = std::move(frames);
     if (side.hasResult) choiceResult_ = side.result;
     const Node *top = stack_.back().node;
-    atChoice = top && top->opcode == 3;
+    // Only a save made while the choice waited asks it again; one in the scene before goes on from the scene.
+    atChoice = side.atChoice && top && top->opcode == 3;
     for (auto &[name, part] : parts_)
         if (name == side.screen) {
             partScreen_ = part.get();

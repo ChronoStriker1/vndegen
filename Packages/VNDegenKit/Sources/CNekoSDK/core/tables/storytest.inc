@@ -6,6 +6,7 @@ parts selftest
 
 screen story
 flow main
+open selftestwait 1 -> S 12 # a screen before any scene, so a save there names none
 scene scr\a.txt
 open selftest 3 -> S 5     # a game part's screen; its result to scenario variable 5
 on 3 goto three

@@ -265,7 +265,6 @@ private:
     void advanceFlipbooks();
     void resumeFlipbook(Sprite &s);
     struct FlipModes { std::string path; bool loop, reverse; };
-    std::map<int, FlipModes> flipModesAt(const SaveData &d, int slot);
     void writeFlipModes(int slot, const SaveData &d);
     void takeScaleAnchor(Sprite &s, const Node &n);
     void anchorOf(const Sprite &s, int &x, int &y) const;
@@ -618,14 +617,19 @@ private:
     // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story
     // table's game the exact place in the story, the last choice's or screen's result, and the part screen open.
     struct Sidecar {
+        bool valid = false;
+        std::map<int, FlipModes> flips;
         std::map<std::string, std::vector<std::string>> parts;
         std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
         bool hasResult = false;
         int result = 0;
         std::string screen;
         int screenScope = -1, screenNumber = 0;
+        bool atChoice = false;
     };
+    static uint32_t saveFingerprint(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);
+    std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
     void loadPartsState(const SaveData &d, const Sidecar &side);
     bool restoreStoryPlace(const Sidecar &side, bool &atChoice);
     // The story table (story.cpp): a game without flow scripts has its story order as `flow` blocks under `screen
