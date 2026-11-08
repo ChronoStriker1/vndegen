@@ -265,7 +265,6 @@ private:
     void advanceFlipbooks();
     void resumeFlipbook(Sprite &s);
     struct FlipModes { std::string path; bool loop, reverse; };
-    std::map<int, FlipModes> flipModesAt(const SaveData &d, int slot);
     void writeFlipModes(int slot, const SaveData &d);
     void takeScaleAnchor(Sprite &s, const Node &n);
     void anchorOf(const Sprite &s, int &x, int &y) const;
@@ -538,9 +537,10 @@ private:
     // SENARIO_STATUS, 4000), set as the story starts: the PC's saves carry it, and a load goes on in the route.
     int pendingRoute_ = 0, routeVar_ = -1;
     // The older layout's slot for each place of a standing picture, each place's middle from the screen's, and the
-    // background's slot, as Test Game 83 has them.
-    std::array<int, 6> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
-    int layoutBgSlot_ = 100;
+    // background's and the CG's slots, as Test Game 83 has them.
+    std::vector<int> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
+    bool layoutSlotByP1_ = false;
+    int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;
 
     // Commands.
@@ -615,7 +615,24 @@ private:
     bool partCommand(const Node &n);
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
     void finishPartScreen(int result);
-    void loadPartsState(const SaveData &d, int slot);
+    // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story
+    // table's game the exact place in the story, the last choice's or screen's result, and the part screen open.
+    struct Sidecar {
+        bool valid = false;
+        std::map<int, FlipModes> flips;
+        std::map<std::string, std::vector<std::string>> parts;
+        std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
+        bool hasResult = false;
+        int result = 0;
+        std::string screen;
+        int screenScope = -1, screenNumber = 0;
+        bool atChoice = false;
+    };
+    static uint32_t saveFingerprint(const SaveData &d);
+    Sidecar readSidecar(const SaveData &d, int slot);
+    std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
+    void loadPartsState(const SaveData &d, const Sidecar &side);
+    bool restoreStoryPlace(const Sidecar &side, bool &atChoice);
     // The story table (story.cpp): a game without flow scripts has its story order as `flow` blocks under `screen
     // story`, compiled to flow nodes. Flows are scripts named `story:NAME`; `chapter N` plays `chapter:N`.
     std::shared_ptr<Script> compileStory(const std::string &flow);

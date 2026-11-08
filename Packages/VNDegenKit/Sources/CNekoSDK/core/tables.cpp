@@ -16,6 +16,7 @@ namespace {
 #include "tables/rinjin.inc"
 #include "tables/sideboob2.inc"
 #include "tables/storytest.inc"
+#include "tables/layouttest.inc"
 
 }  // namespace
 
@@ -36,6 +37,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\隣人に壊されていく俺の妻") return kRinjin;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return kSideboob2;
     if (folder == "vndegen\\storytest") return kStoryTest;
+    if (folder == "vndegen\\layouttest") return kLayoutTest;
     return nullptr;
 }
 
