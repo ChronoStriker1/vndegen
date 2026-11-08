@@ -423,8 +423,9 @@ void Engine::startStory() {
     staffRollLayers_ = nullptr;
     resetParts();
     std::string first = config_.text(storyFlowKey_.c_str());
-    // A game with no flow scripts starts at its story table's first flow.
-    if (first.empty() && storyFlowKey_ == "FirstFlow" && !firstStoryFlow().empty()) first = "story:" + firstStoryFlow();
+    // A game with no flow scripts starts at its story table's first flow, or past the prologue at the story flow `screen
+    // start` names.
+    if (first.empty() && !firstStoryFlow().empty()) first = "story:" + (storyFlowKey_ == "FirstFlow" ? firstStoryFlow() : storyFlowKey_);
     auto flow = first.empty() ? nullptr : loadScript(first);
     if (!flow || !flow->first()) {
         complain("This game has no flow script to start from.");
@@ -459,7 +460,7 @@ void Engine::runAction(const std::string &action) {
     if (action == "start") {
         // A game whose init.ini names no FirstFlow starts at its table's `flow`, as Test Game 89's New Game starts its
         // first chapter.
-        if (config_.text("FirstFlow").empty()) {
+        if (config_.text("FirstFlow").empty() && firstStoryFlow().empty()) {
             storyFlowKey_ = mainFlowKey();
             startStory();
             return;
@@ -472,7 +473,8 @@ void Engine::runAction(const std::string &action) {
         // Past the prologue a game may offer to skip it, when its table has that question.
         if (auto it = screens_.find("start"); it != screens_.end()) {
             const auto *after = it->second.setting("after");
-            if (!config_.text(mainFlowKey()).empty() && variableValue(0, after ? field(*after, 0) : 1)) {
+            bool hasMain = !config_.text(mainFlowKey()).empty() || storyFlowExists(mainFlowKey());
+            if (hasMain && variableValue(0, after ? field(*after, 0) : 1)) {
                 openScreen("start");
                 return;
             }
@@ -4223,6 +4225,12 @@ bool Engine::jump(const std::string &script, int node) {
     auto target = loadScript(script);
     // A negative node starts the script from its top.
     if (!target || (node >= 0 && !target->node(node))) return false;
+    // In a story table's game the story goes on after the scene, from the first line that names it, as a load does.
+    if (!firstStoryFlow().empty()) {
+        stack_.clear();
+        partScreen_ = nullptr;
+        resumeStoryAt(target->name);
+    }
     const Node *n = target->first();
     scene_ = {target, n};
     waiting_ = Waiting::None;

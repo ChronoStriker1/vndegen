@@ -60,6 +60,20 @@ import TestSupport
         for _ in 0..<count { _ = vnneko_step(e, 16) }
     }
 
+    // A jump to a scene of a story table's game goes on after the scene as the table has it, as nekorun's --jump needs.
+    @Test func aJumpGoesOnFromTheTable() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        // The scene's last line, then past it.
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+    }
+
     @Test func theTablePlaysAndSavesKeepItsPlace() throws {
         let root = try game()
         defer { try? FileManager.default.removeItem(at: root) }

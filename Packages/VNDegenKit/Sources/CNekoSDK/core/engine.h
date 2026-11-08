@@ -644,6 +644,7 @@ private:
     std::shared_ptr<Script> compileChapter(int number);
     std::string firstStoryFlow() const;
     bool resumeStoryAt(const std::string &scene);
+    bool storyFlowExists(const std::string &name) const;
     bool resumeStoryAtNumber(int number, int active, bool &atChoice);
     // The parameter of a story table's `scene` and `choice` nodes that holds the PC's number for the place.
     static constexpr int kStoryPcNumber = 31;

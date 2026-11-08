@@ -59,6 +59,14 @@ std::string Engine::firstStoryFlow() const {
     return "";
 }
 
+bool Engine::storyFlowExists(const std::string &name) const {
+    auto it = screens_.find("story");
+    if (it == screens_.end()) return false;
+    for (const auto &line : it->second.lines)
+        if (line.size() >= 2 && line[0] == "flow" && line[1] == name) return true;
+    return false;
+}
+
 std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
     auto table = screens_.find("story");
     if (table == screens_.end()) return nullptr;
