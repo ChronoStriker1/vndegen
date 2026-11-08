@@ -39,6 +39,8 @@ struct SavedSound {
 
 struct SaveData {
     std::string flow, choiceImage;
+    // The card's comment, typed on the PC's save screen and kept at the save's start; a comment there moves all that follows.
+    std::string comment;  // CP932
     int date[6] = {2026, 1, 1, 0, 0, 0};
     int flowActive = 1, flowNode = 0;
     std::map<int, int> variables;  // the 10,000 ints, by number
