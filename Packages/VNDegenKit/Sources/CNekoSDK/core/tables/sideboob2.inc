@@ -27,7 +27,12 @@ scene scr\ep_000_007_000.txt @70
 scene scr\ep_000_008_000.txt @80
 scene scr\ep_000_009_000.txt @90
 scene scr\ep_000_010_000.txt @200
+jump chapter2
+# Start's Chapter 2 entry, which the title offers once G 2 is 1: the PC sets it as chapter 2 begins, and with it 0 Start
+# plays the prologue (checked under Wine by clearing it in cfg.sav).
+flow chapter2
 set S 4000 = 2
+set G 2 = 1
 scene scr\ep_001_000_000.txt @220
 scene scr\ep_001_001_000.txt @230
 scene scr\ep_001_002_000.txt @240
