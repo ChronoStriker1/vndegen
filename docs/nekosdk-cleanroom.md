@@ -267,9 +267,13 @@ two lines whose glyphs have Meiryo's Verdana-like shapes and an 11-pixel x-heigh
 4.66, lines 35 apart, the first glyph 2 pixels in and the baseline 4 lower than Wine's, which puts glyphs within 2
 pixels, the lines' ends within one and the baselines on the screenshot's rows. Its log's text drops by the same 4.
 For the Lucida Sans Unicode games the publisher's Windows screenshots were the reference, since Wine has no Lucida
-Sans Unicode and font-links it to Noto Sans CJK: The Alchemist sets Open Sans 22 with a gap of 5.93, lines 42 apart;
-Funbag Fantasy 4 size 14, gap 3.52, lines 25; Moral Orc size 16,
-gap 3.93, lines 27; each with its first glyph one gap in. A save card's comment has a font of its own, a cell of 18
+Sans Unicode and font-links it to Noto Sans CJK. Word widths alone chose the size poorly, since the runtime's hinted
+advances run about half a pixel a glyph wider than the unhinted ones the first fit used, so each was settled by
+rendering screenshot lines here and laying them over the PC's, for both ends and the x-height: The Alchemist sets
+Open Sans 22 with a gap of 5.93, lines 42 apart, the baseline 3 lower; Funbag Fantasy 4 size 16, gap 2.25, lines 25;
+Funbag Fantasy 3 if, whose program names only Lucida Sans Unicode, size 16, gap 2.75, lines 23, the baseline 1
+higher; Moral Orc size 16, gap 3.93, lines 27; each with its first glyph one gap in. Test Game 84's PC game stops
+taking input at its title under Wine with the stand-in fonts mapped, so its log keeps the placement measured before. A save card's comment has a font of its own, a cell of 18
 in the Gothic games and 32 in The Alchemist, with no gap.
 
 ## The CG viewer

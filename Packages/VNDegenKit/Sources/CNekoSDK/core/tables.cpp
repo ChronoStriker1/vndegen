@@ -936,12 +936,12 @@ run 2160 1 1
 screen defaults
 # The official English release sets its text in Lucida Sans Unicode (Wine's font log), here Open Sans, at the size and
 # letter gap that best fit the word widths of the publisher's Windows screenshots, lines as far apart as there, and the
-# first glyph one gap in.
+# first glyph one gap in. Rendered here and laid over three screenshot lines, the baseline sits 3 lower.
 textfont 7
 textsize 22
 textgap 5.93
 textline 42
-textshift 6 0
+textshift 6 3
 )";
 
 // Test Game 88.
@@ -2432,7 +2432,9 @@ screen log
 dim 200
 pic obj\r000_001.bmp 1157 11
 scroll obj\r000_002.bmp obj\r000_003.bmp obj\r000_004.bmp 1175 100 520
-rows obj\r000_000.bmp 77 69 165 4 140 47
+# Measured under Wine, where the text falls back to another face; with Open Sans in place of MS Gothic the text's
+# offset grows by the 3 pixels between their ascents, so its baseline stays where the PC drew it there.
+rows obj\r000_000.bmp 77 69 165 4 140 50
 button log_close obj\r002_000.bmp 1231 14 1 5 0
 button log_top obj\r001_000.bmp 1172 28 4 5 0
 button log_up obj\r001_000.bmp 1172 65 4 5 1
@@ -2483,6 +2485,14 @@ placefor 2 283 79 340 3
 placefor 5 129 78 328 6
 
 screen defaults
+# The official English release asks for Lucida Sans Unicode (the one face its program names), here Open Sans, sized
+# and spaced against the publisher's Windows screenshots: 16, nearest their x-height, with the gap that ends three
+# lines within a few pixels of theirs; lines as far apart as there, the first glyph 3 in and the baseline 1 higher.
+textfont 7
+textsize 16
+textgap 2.75
+textline 23
+textshift 3 -1
 default voice_women 1
 default voice_men 1
 voicejoint 30 5 6
@@ -3060,12 +3070,12 @@ run 2120 9 1
 run 2160 1 1
 
 screen defaults
-# The official English release sets its text in Lucida Sans Unicode (Wine's font log), here Open Sans, at the size and
-# letter gap that best fit the word widths of the publisher's Windows screenshots, lines as far apart as there, and the
-# first glyph one gap in.
+# The official English release sets its text in Lucida Sans Unicode (Wine's font log), here Open Sans, sized and spaced
+# by rendering a line of the publisher's Windows screenshots here and laying it over theirs: 16 with a gap of 2.25
+# matches its x-height and both its ends within 2 pixels. Lines as far apart as there, the first glyph one gap in.
 textfont 7
-textsize 14
-textgap 3.52
+textsize 16
+textgap 2.25
 textline 25
 textshift 3 0
 )";
