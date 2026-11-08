@@ -3153,6 +3153,22 @@ void Engine::composeScreen(Canvas &out) {
             }
             break;
         }
+    // `band Y R G B`, a line for each of two or more rows: the rows from the first listed to the last are multiplied by the
+    // colour between the listed rows around them, across the screen and over all it draws, its help too. Test Game 88's
+    // Config darkens its bottom so on all three pages (under Wine, against its background picture: within half a level).
+    std::vector<std::array<int, 4>> band;
+    for (auto [it, end] = screen_->settings.equal_range("band"); it != end; ++it)
+        if (it->second.size() >= 4) band.push_back({field(it->second, 0), field(it->second, 1), field(it->second, 2), field(it->second, 3)});
+    std::sort(band.begin(), band.end());
+    for (size_t i = 0; i + 1 < band.size(); i++)
+        for (int y = std::max(0, band[i][0]); y < std::min(out.h, band[i + 1][0] + (i + 2 == band.size() ? 1 : 0)); y++) {
+            float t = float(y - band[i][0]) / float(std::max(1, band[i + 1][0] - band[i][0]));
+            float m[3];
+            for (int c = 0; c < 3; c++) m[c] = (float(band[i][c + 1]) + (float(band[i + 1][c + 1]) - float(band[i][c + 1])) * t) / 255.0f;
+            uint8_t *row = out.px.data() + size_t(y) * size_t(out.w) * 4;
+            for (int x = 0; x < out.w; x++)
+                for (int c = 0; c < 3; c++) row[x * 4 + c] = uint8_t(std::lround(float(row[x * 4 + c]) * m[c]));
+        }
     if (dialogOpen_) composeDialog(out);
 }
 
