@@ -37,7 +37,8 @@ struct SaveLayout {
     ChoiceFlag choiceFlag = ChoiceFlag::Picture;
     // The number global 0 gives the first card, the one NEW marks after a save to it: 1 in Test Game 94 and The Alchemist,
     // whose cfg.sav held 2 and 1 for their second and first cards, and 0 in Test Game 87, which held 2 after a save to
-    // its third and crashed opening a Load page whose global 0 was one past its last card (set 1, under Wine).
+    // its third and crashed opening a Load page whose global 0 was one past its last card (set 1, under Wine). Test
+    // Game 82 counts from 0 too: 2 after a save to its third card, which NEW marked (set 2).
     int firstCard = 1;
 };
 
@@ -84,6 +85,7 @@ const SaveLayout kFunbag1 = [] {
     SaveLayout l = older(30, 0, {}, 818, {}, 123);
     l.olderRecord = 379;
     l.choiceFlag = ChoiceFlag::Never;
+    l.firstCard = 0;
     return l;
 }();
 const SaveLayout kSideboob2 = [] {
