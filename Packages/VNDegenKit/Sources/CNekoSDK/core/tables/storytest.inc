@@ -3,6 +3,7 @@
 const char kStoryTest[] = R"(
 screen defaults
 parts selftest
+lastchoice made            # saves hold 2 once a choice is made, as Test Game 83's do
 
 screen story
 flow main
