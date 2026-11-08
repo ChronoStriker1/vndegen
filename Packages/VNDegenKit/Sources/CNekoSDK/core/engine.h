@@ -538,7 +538,8 @@ private:
     int pendingRoute_ = 0, routeVar_ = -1;
     // The older layout's slot for each place of a standing picture, each place's middle from the screen's, and the
     // background's and the CG's slots, as Test Game 83 has them.
-    std::array<int, 6> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
+    std::vector<int> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
+    bool layoutSlotByP1_ = false;
     int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;
 

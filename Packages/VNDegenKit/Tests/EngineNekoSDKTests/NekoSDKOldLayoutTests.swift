@@ -69,6 +69,41 @@ import TestSupport
         #expect(pixel(e, 194, 326) != [255, 0, 0])
     }
 
+    // Test Game 87 picks a standing picture's slot by parameter 1 (`layoutslotby p1`), and 14 deletes by that number.
+    @Test func slotsByParameter1AndDeletesBySlot() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\layouttest\nFirstFlow\tflow\\t.txt\n".utf8),
+            "sc.pak": NekoSDKFlowFixture.archive([("r.bmp", bmp(101, 81, [0, 0, 255]))]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                // 位置:1_2, slot 400, its middle 256 left of the screen's; 位置:3_0, slot 200, 256 right.
+                .init(op: 13, next: 3, p: [0: 1, 1: 2], s: [1: "sc\\r.bmp"]),
+                .init(op: 13, next: 4, p: [0: 3], s: [1: "sc\\r.bmp"]),
+                .init(op: 9, next: 5),
+                .init(op: 2, next: 6, p: [0: 1000]),
+                // 位置:2 deletes slot 400, the first, though no picture is at place 2.
+                .init(op: 14, next: 7, p: [0: 2]),
+                .init(op: 9, next: 8),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        // (1280 - 101) / 2 = 589, and 589 - 256 = 333, 589 + 256 = 845; (720 - 81) / 2 = 319.
+        #expect(pixel(e, 333, 319) == [255, 0, 0])
+        #expect(pixel(e, 845, 319) == [255, 0, 0])
+        for _ in 0..<100 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 333, 319) != [255, 0, 0])
+        #expect(pixel(e, 845, 319) == [255, 0, 0])
+    }
+
     // Test Game 82 keeps its CGs in slot 102 (`layoutcgslot`), and a CG takes the background away, and a background the CG.
     @Test func aCGSlotOfItsOwnTakesTheBackgroundAway() throws {
         let root = try NekoSDKFlowFixture.game([
