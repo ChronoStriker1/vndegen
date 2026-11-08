@@ -365,8 +365,9 @@ pic obj\h004_001.bmp 966 574 4 5 2 0
 pic obj\h004_001.bmp 752 602 4 5 3 0
 # Text speed, auto speed and auto wait, measured under Wine (evidence speed82/): text speed 0-100 types at about
 # max(0, 167 - 3 x value) ms a character, default 50; auto speed 0-100 waits about (100 - value) ms a character of the
-# line before going on, default 50; auto wait runs x1 to x200, default x100, and no effect on auto's pace was found
-# in narration, voiced lines or script waits. The runtime's own handling of these three is the lead's (to come).
+# line before going on, default 50; auto wait (the PC's help: "length of delay in game scenes") runs x0 to x200, default
+# x100, and makes each [ウエイト] wait last its time x value / 100 in manual play (0, 6.0 and 12.07 s for 6 s of waits);
+# it doesn't change auto's pace, and the fades aren't stretched. The runtime's handling of these three is the lead's.
 pic obj\h001_005.bmp 88 518
 slider textspeed obj\h001_006.bmp 88 518
 step textspeed -1 obj\h001_003.bmp 60 514 2 5 0
@@ -378,7 +379,7 @@ step autospeed -1 obj\h001_003.bmp 60 570 2 5 0
 step autospeed 1 obj\h001_003.bmp 508 570 2 5 1
 number autospeed text 488 563 20 15 255 255 255 76 10 73
 pic obj\h001_005.bmp 88 630
-range autowait 1 200
+range autowait 0 200
 slider autowait obj\h001_006.bmp 88 630 200
 step autowait -1 obj\h001_003.bmp 60 626 2 5 0
 step autowait 1 obj\h001_003.bmp 508 626 2 5 1
