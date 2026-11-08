@@ -27,6 +27,14 @@ struct SavedSprite {
     int endAlpha = 256;
     // The film noise's record: no picture, kind 4, and the window's size where the first record keeps the screen's.
     bool noise = false;
+    // A splash effect's record (Test Game 88's 200 and 201): no picture, its droplet's picture named in the record, and
+    // command 200's parameters 0, 5, 1 to 4, 6, 10, 11 and 7 to 9, in that order.
+    bool splash = false;
+    std::string splashImage;
+    std::array<int, 12> splashNumbers{};
+    // The record's fixed part and its last 164 bytes as a PC save holds them, kept so the save is written back as it
+    // was, with what the runtime reads written over them. Empty in the runtime's own saves.
+    std::vector<uint8_t> rawFixed, rawTail;
 };
 
 struct SavedText {
@@ -43,6 +51,8 @@ struct SavedSound {
     std::string path;
     int volume = 0, pan = 0;
     double seconds = 0;
+    // The byte or two after the time, whose meaning isn't known: 1 on some channels in Test Game 88's saves.
+    std::array<uint8_t, 2> trailer{};
 };
 
 struct SaveData {
@@ -68,6 +78,9 @@ struct SaveData {
     bool noRecords = false;
     // The screen's record's two alpha fields: 256, or 255 in a save the PC made just after a load.
     int rootAlpha = 256;
+    // As read from a PC save, kept so it's written back as it was: the screen record's raw parts, the block after the
+    // records with its list of slots, and the tail after the scene's name around the fields the runtime reads.
+    std::vector<uint8_t> rootFixed, rootTail, afterRecords, tailBefore, tailAfter;
     SavedText current;
     // The 24 bytes after the text on screen, whose meaning isn't known: zeros in most saves, kept as the PC wrote them.
     std::array<uint8_t, 24> afterText{};

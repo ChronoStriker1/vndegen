@@ -2147,6 +2147,18 @@ SaveData Engine::captureSave() {
         out.endAlpha = int(end.alpha * 256 + 0.5f);
         d.sprites.push_back(out);
     }
+    // Splash emitters are records of their own, in their slots among the pictures', as the PC writes them. A droplet
+    // lives a second or so, so only the emitter is kept.
+    for (const auto &[slot, splash] : splashes_) {
+        if (splash.path.empty()) continue;
+        SavedSprite out;
+        out.slot = slot;
+        out.splash = true;
+        out.splashImage = splash.path;
+        out.splashNumbers = splash.saved;
+        auto at = std::find_if(d.sprites.begin(), d.sprites.end(), [&](const SavedSprite &s) { return s.slot > slot; });
+        d.sprites.insert(at, out);
+    }
     for (const auto &[name, part] : parts_) part->savePC(d);
     d.windowShown = windowShown_;
     d.current = currentText_;
@@ -2258,6 +2270,7 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     stack_.clear();
     back_.clear();
     front_.clear();
+    splashes_.clear();
     transitioning_ = false;
     shakeType_ = 0;
     flashMs_ = 0;
@@ -2285,6 +2298,21 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d, side);
     for (const SavedSprite &saved : d.sprites) {
+        // A splash's emitter comes back ready for the scene's next burst, as command 200 made it; its speed, which the
+        // save doesn't keep, is the 300 every one of Test Game 88's has.
+        if (saved.splash) {
+            const auto &v = saved.splashNumbers;
+            Splash &splash = splashes_[saved.slot];
+            splash.path = saved.splashImage;
+            splash.image = images_->get(saved.splashImage);
+            splash.saved = v;
+            splash.cap = std::max(1, v[1]);
+            splash.minLife = std::max(1, v[7]);
+            splash.maxLife = std::max(splash.minLife, v[8]);
+            splash.speed = 300;
+            if (!splash.image) warnOnce("A save names a missing splash picture: " + saved.splashImage);
+            continue;
+        }
         Sprite s;
         // The film noise starts again where the save left it running.
         if (saved.noise) {
@@ -3665,6 +3693,9 @@ void Engine::runScene(const Node &n) {
     case 200: {
         Splash &splash = splashes_[p[0]];
         splash.image = images_->get(n.s[1]);
+        splash.path = n.s[1];
+        // What a save keeps of it: parameters 0, 5, 1 to 4, 6, 10, 11 and 7 to 9, as Test Game 88's saves hold them.
+        splash.saved = {p[0], p[5], p[1], p[2], p[3], p[4], p[6], p[10], p[11], p[7], p[8], p[9]};
         splash.cap = std::max(1, p[5]);
         splash.minLife = std::max(1, p[10]);
         splash.maxLife = std::max(splash.minLife, p[11]);

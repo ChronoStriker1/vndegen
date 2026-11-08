@@ -30,6 +30,17 @@ int main(int argc, char **argv) {
             failures++;
             continue;
         }
+        // With NEKOSAVE_FRESH set, the parts kept as read are dropped first, so the save is written as the runtime writes
+        // one of its own, and what differs is what that can't reproduce.
+        if (std::getenv("NEKOSAVE_FRESH")) {
+            for (SavedSprite &sprite : data.sprites) sprite.rawFixed.clear(), sprite.rawTail.clear();
+            data.rootFixed.clear();
+            data.rootTail.clear();
+            data.afterRecords.clear();
+            data.tailBefore.clear();
+            data.tailAfter.clear();
+            data.beforeVariables.clear();
+        }
         auto again = buildSave(data, *layout);
         // With NEKOSAVE_WRITE naming a folder, the save as VNDegen writes it goes there under the same name, for the PC to load.
         if (const char *out = std::getenv("NEKOSAVE_WRITE")) {

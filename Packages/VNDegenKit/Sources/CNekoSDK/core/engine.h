@@ -310,7 +310,8 @@ private:
     // Splash effects: droplets a burst throws out, at a slot's place in the draw order. Their motion is a guess from
     // the commands' numbers and the look of the PC game.
     struct Droplet { float x, y, vx, vy, scale; int bornMs, lifeMs; };
-    struct Splash { ImageRef image; int perBurstScale = 1000, gravity = 0, minLife = 500, maxLife = 1000, speed = 300, cap = 100; std::vector<Droplet> droplets; };
+    // Command 200's emitter, with its picture's name and the numbers a save keeps, in the save's order.
+    struct Splash { ImageRef image; std::string path; std::array<int, 12> saved{}; int perBurstScale = 1000, gravity = 0, minLife = 500, maxLife = 1000, speed = 300, cap = 100; std::vector<Droplet> droplets; };
     std::map<int, Splash> splashes_;
     void splashBurst(const Node &n);
     void composeSplashes(Canvas &out, int fromSlot, int toSlot);
