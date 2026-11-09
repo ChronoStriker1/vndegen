@@ -539,7 +539,14 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action.rfind("track", 0) == 0) {
-        playTrack(std::atoi(action.c_str() + 5));
+        int index = std::atoi(action.c_str() + 5);
+        // `trackselects` on the music screen: with nothing playing a track is only chosen, lit with its title shown, and
+        // Play starts it; while one plays, another starts at once. Test Game 96's PC does so (set 2, under Wine).
+        if (!trackPlayer_ && screen_ && screen_->setting("trackselects")) {
+            if (index >= 0 && size_t(index) < tracks_.size() && seen(tracks_[size_t(index)])) currentTrack_ = index;
+            return;
+        }
+        playTrack(index);
         return;
     }
     if (action == "music_stop") { stopTrack(); return; }
@@ -3674,7 +3681,7 @@ void Engine::composeScreen(Canvas &out) {
             continue;
         }
         if (b.action == "quickload" && !newestQuickSlot()) state = StateDisabled;
-        if (b.action == "track" + std::to_string(currentTrack_) && trackPlayer_) state = over ? StateSelectedHover : StateSelected;
+        if (b.action == "track" + std::to_string(currentTrack_) && (trackPlayer_ || screen_->setting("trackselects"))) state = over ? StateSelectedHover : StateSelected;
         bool musicOn = musicLit(b);
         if (musicOn) state = over ? StateSelectedHover : StateSelected;
         // `nolithelp`: a lit control shows no help, as Moral Orc's music screen shows none over Stop while nothing plays.
@@ -3689,7 +3696,8 @@ void Engine::composeScreen(Canvas &out) {
             drawButton(out, b, StateSelected, true);
             continue;
         }
-        if (b.action == "music_pause" && !trackPlayer_) state = StateDisabled;
+        // Pause is drawn disabled with nothing playing, but not on a `trackselects` screen: Test Game 96's stays plain.
+        if (b.action == "music_pause" && !trackPlayer_ && !screen_->setting("trackselects")) state = StateDisabled;
         // The current page's button sits higher in Test Game 84.
         if (const auto *lift = screen_->setting("pagelift"); lift && current && b.action.rfind("page", 0) == 0) {
             Button raised = b;
@@ -3734,7 +3742,7 @@ void Engine::composeScreen(Canvas &out) {
         }
     // `musictitle SHEET X Y COLS`: the playing track's title, its cell of a strip across, as Test Game 87's music screen
     // writes it under Reproduction music (set 1).
-    if (const auto *title = screen_->setting("musictitle"); title && title->size() >= 4 && trackPlayer_ && currentTrack_ >= 0)
+    if (const auto *title = screen_->setting("musictitle"); title && title->size() >= 4 && (trackPlayer_ || screen_->setting("trackselects")) && currentTrack_ >= 0)
         if (ImageRef strip = images_->get((*title)[0])) {
             int cols = std::max(1, field(*title, 3)), w = strip->w / cols;
             if (currentTrack_ < cols) drawPart(out, *strip, field(*title, 1), field(*title, 2), currentTrack_ * w, 0, w, strip->h, 1);
