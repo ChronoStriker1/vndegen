@@ -56,6 +56,7 @@ constexpr int kFollowMs = 120;  // the second strip's lag behind the first, in a
 
 constexpr int kTitleBottomShift = 152;
 constexpr int kTitleMs = 4333, kTitleFadeMs = 600, kTitleTrimSpeed = 240, kTitleTrimPeriod = 600;
+constexpr int kMenuTrimSpeed = 240;
 constexpr int kWeekVar = 3000, kHalfVar = 3001, kHeartVar = 3010, kChapterVar = 10904, kEndingVar = 10906;
 constexpr int kPhases = 10, kMaxHearts = 4;
 
@@ -229,6 +230,8 @@ public:
 
     bool step(PartHost &host) override {
         if (menu_ == "title") return true;  // the backgrounds and the trim move
+        // A menu's trims move while it's drawn: the frame after its last drawing is the last one asked for.
+        if (std::exchange(frameDrawn_, false)) return true;
         int64_t now = host.nowMs();
         bool fading = now - fadeFrom_ < fadeMs_;
         // Moves that have ended stay, as where the face now is; a flipbook runs from the end of the update that showed it.
@@ -446,12 +449,21 @@ private:
         return -1;
     }
 
-    // Trims along the top and bottom and the screen's name plate at the top left, fitted on PC shots of Save and Load
-    // (set 1): the trims at y -34 and 696, the plate at 4, 6. The trims move on the PC; their pace isn't measured yet.
+    // Trims along the top and bottom and the screen's name plate at the top left (set 1, fitted over the screen's paper
+    // on PC shots and a 30 fps recording, within 0.01 of 255): the top trim at y -36, and at 0 on Save and Load, where
+    // the page buttons hang from it, moving left; the bottom one at y 662, moving right; both 8 pixels a frame of the
+    // recording, 240 a second. The plate at 4, 6. Where along their strips the trims start isn't measured.
     void drawMenuFrame(PartHost &host, Canvas &out) {
-        if (ImageRef trim = host.image("obj\\e004_001.bmp")) {
-            for (int x = -5; x < out.w; x += trim->w) drawPart(out, *trim, x, -34, 0, 0, trim->w, trim->h, 1);
-            for (int x = -572; x < out.w; x += trim->w) drawPart(out, *trim, x, 696, 0, 0, trim->w, trim->h, 1);
+        frameDrawn_ = true;
+        int moved = int(std::max<int64_t>(0, host.screenMs()) * kMenuTrimSpeed / 1000);
+        bool slots = menuPlate() < 2;
+        if (ImageRef top = host.image("obj\\e004_000.bmp"))
+            for (int x = -(moved % top->w); x < out.w; x += top->w) drawPart(out, *top, x, slots ? 0 : -36, 0, 0, top->w, top->h, 1);
+        // On Save and Load the PC draws the cards, which end at y 702, over the bottom trim. This layer comes after the
+        // cards, so only the trim's rows below them are drawn there.
+        if (ImageRef bottom = host.image("obj\\e004_001.bmp")) {
+            int skip = slots ? 702 - 662 : 0;
+            for (int x = moved % bottom->w - bottom->w; x < out.w; x += bottom->w) drawPart(out, *bottom, x, 662 + skip, 0, skip, bottom->w, bottom->h - skip, 1);
         }
         put(host, out, "obj\\e000_001.bmp", 4, 6, 6, 1, menuPlate(), 0);
     }
@@ -771,6 +783,7 @@ private:
     int pendingChapter_ = 0, titleFirst_ = 0;
     int64_t titleFrom_ = 0;
     std::string menu_;
+    bool frameDrawn_ = false;
     int confirming_ = -1, px_ = -1, py_ = -1;
     std::array<std::array<Card, 4>, kPhases> phaseCards_{};
     std::array<std::vector<int>, 3> charPlaces_;
