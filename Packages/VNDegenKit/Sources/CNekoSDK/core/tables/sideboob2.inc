@@ -346,7 +346,73 @@ cell 891 485
 celllabel obj\e003_001.bmp 5 5
 celldigits obj\e003_002.bmp 39 5 2 18
 cellcount obj\e003_002.bmp obj\e003_003.bmp 129 147 165 176 7
-celltotal obj\e003_004.bmp 7
+celltotal obj\e003_004.bmp 7 12
+gallerytabs
+cellhide
+button page0 obj\e002_000.bmp 416 18 10 5 0
+button page1 obj\e002_000.bmp 486 18 10 5 1
+button page2 obj\e002_000.bmp 556 18 10 5 2
+button page3 obj\e002_000.bmp 626 18 10 5 3
+button page4 obj\e002_000.bmp 696 18 10 5 4
+button page5 obj\e002_000.bmp 766 18 10 5 5
+button page6 obj\e002_000.bmp 836 18 10 5 6
+button page7 obj\e002_000.bmp 906 18 10 5 7
+button page8 obj\e002_000.bmp 976 18 10 5 8
+button page9 obj\e002_000.bmp 1046 18 10 5 9
+button gtab0 obj\f000_000.bmp 22 502 12 5 0
+button gtab1 obj\f000_000.bmp 158 502 12 5 1
+button gtab2 obj\f000_000.bmp 294 502 12 5 2
+button gtab3 obj\f000_000.bmp 22 556 12 5 3
+button gtab4 obj\f000_000.bmp 158 556 12 5 4
+button gtab5 obj\f000_000.bmp 294 556 12 5 5
+button gtab6 obj\f000_000.bmp 22 610 12 5 6
+button gtab7 obj\f000_000.bmp 158 610 12 5 7
+button gtab8 obj\f000_000.bmp 294 610 12 5 8
+button gtab9 obj\f000_000.bmp 22 664 12 5 9
+button gtab10 obj\f000_000.bmp 158 664 12 5 10
+button gtab11 obj\f000_000.bmp 294 664 12 5 11
+button nav_save obj\e001_001.bmp 1168 103 10 5 0 help obj\e001_002.bmp 1044 15 10 1 0 0
+button nav_load obj\e001_001.bmp 1168 155 10 5 1 help obj\e001_002.bmp 1044 63 10 1 1 0
+button nav_cg obj\e001_001.bmp 1168 207 10 5 2 help obj\e001_002.bmp 1044 111 10 1 2 0
+button nav_sprites obj\e001_001.bmp 1168 259 10 5 3 help obj\e001_002.bmp 1044 159 10 1 3 0
+button nav_scene obj\e001_001.bmp 1168 311 10 5 4 help obj\e001_002.bmp 1044 207 10 1 4 0
+button nav_music obj\e001_001.bmp 1168 363 10 5 5 help obj\e001_002.bmp 1044 255 10 1 5 0
+button nav_config obj\e001_001.bmp 1168 415 10 5 6 help obj\e001_002.bmp 1044 303 10 1 6 0
+button nav_title obj\e001_001.bmp 1168 467 10 5 7 help obj\e001_002.bmp 1044 351 10 1 7 0
+button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 10 1 8 0
+button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
+
+screen scene
+# As the CG gallery, measured under Wine: the same tabs, pictures and cards, without the counts.
+pic obj\e000_000.bmp 0 3
+pic obj\e000_001.bmp 75 14 7 1 4 0
+pic obj\e001_000.bmp 1154 0
+pic sc\sc_100_000_000_000_000.bmp -111 -23 tab 0
+pic sc\sc_101_000_000_000_000.bmp -431 -295 tab 1
+pic sc\sc_102_000_000_000_000.bmp -47 -23 tab 2
+pic sc\sc_000_000_000_000_000.bmp -47 -55 tab 3
+pic sc\sc_001_000_000_000_000.bmp -47 -23 tab 4
+pic sc\sc_002_000_000_000_000.bmp -11 -55 tab 5
+pic sc\sc_003_000_000_000_000.bmp -47 -39 tab 6
+pic sc\sc_004_000_000_000_000.bmp -47 -55 tab 7
+pic sc\sc_005_000_000_000_000.bmp -111 -39 tab 8
+pic sc\sc_006_000_000_000_000.bmp -47 -55 tab 9
+pic sc\sc_007_000_000_000_000.bmp 17 -55 tab 10
+pic obj\f004_000.bmp -15 1 tab 11
+cellsheet obj\f002_000.bmp
+cellsize 204 174
+cellthumb 9 36
+cell 463 85
+cell 677 85
+cell 891 85
+cell 463 285
+cell 677 285
+cell 891 285
+cell 463 485
+cell 677 485
+cell 891 485
+celllabel obj\e003_001.bmp 5 5
+celldigits obj\e003_002.bmp 39 5 2 18
 gallerytabs
 cellhide
 button page0 obj\e002_000.bmp 416 18 10 5 0
@@ -385,12 +451,13 @@ button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1
 
 screen music
 # Measured under Wine: 26 tracks in three columns of ten, seven seals with their help cards (none for pause and
-# stop), and the volume knob. The playing track's name under "Reproduction music" waits on the runtime.
+# stop), the volume knob, and the playing track's name under "Reproduction music".
 pic obj\i000_000.bmp 0 3
 pic obj\e000_001.bmp 75 14 7 1 5 0
 pic obj\e001_000.bmp 1154 0
 # The music's volume, a dark knob whose middle runs along the 142-pixel line from x 388 (60 at x 461).
 knob music obj\i001_001.bmp 376 651 1.42
+musictitle obj\i002_000.bmp 684 582 26
 button track0 obj\i003_000.bmp 48 124 26 5 0
 button track1 obj\i003_000.bmp 48 168 26 5 1
 button track2 obj\i003_000.bmp 48 212 26 5 2
@@ -448,13 +515,18 @@ button log_top obj\k001_000.bmp 1185 31 4 5 0
 button log_up obj\k001_000.bmp 1185 61 4 5 1
 button log_down obj\k001_000.bmp 1185 633 4 5 2
 button log_bottom obj\k001_000.bmp 1185 663 4 5 3
+keepwindow
+edgesoff
+logvoice obj\h000_001.bmp 3 5 2 1120 35
+lognamey -30
 
 screen dialog
-# Measured under Wine: the screen dimmed to 155 of 256, the stacked cards, and YES and NO. The question is a cell of
-# obj\a004_000.bmp (six of 491 pixels: resolution, save, load, overwrite, exit, title) at 394 237, which waits on
-# the runtime.
+# Measured under Wine: the screen dimmed to 155 of 256, the stacked cards, the question, a cell of obj\a004_000.bmp,
+# and YES and NO.
+questions resolution save load overwrite exit title
 dim 155
 pic obj\a003_000.bmp 362 186
+pic obj\a004_000.bmp 394 237 6 1 0 0
 button yes obj\a005_000.bmp 389 295 2 5 0
 button no obj\a005_000.bmp 389 359 2 5 1
 
@@ -465,6 +537,9 @@ pic obj\l000_000.bmp 394 237
 placefor 2 295 64 389 0
 
 screen defaults
+# Its message window's buttons, both rows, while the pointer is at y 360 or below and has moved in the last 3.4 s.
+barhover 360 3400
+parts scroll
 # Its click-wait mark (obj\h005_000) is keyed on pure green, which the PC leaves out.
 colorkey 0 255 0
 # Its program asks for Lucida Sans Unicode, here Open Sans as in Funbag Fantasy 3 if, sized and spaced to the PC's lines
