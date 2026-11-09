@@ -24,11 +24,13 @@
 //   S 10906   the heroine whose ending follows, 1 to 3, or 0 for none, set with the last pick
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdlib>
 #include <map>
 #include <sstream>
 
 #include "parts.h"
+#include "save.h"
 
 namespace neko {
 namespace {
@@ -197,8 +199,42 @@ public:
         return true;
     }
 
-    // `chapter S 10904`: the scenes a pick plays, from the number choose() put there.
-    std::vector<std::string> chapter(PartHost &, int number) override {
+    // A PC save in a pick's scenes holds no chapter number, only what the PC keeps: the half-week (S 3000 and 3001, still
+    // the one picked at), the card (the last result), and the hearts, a heroine's already counting the event she was
+    // picked for (set 1, PC saves in every scene of the first four half-weeks' picks). The chapter is worked out from
+    // those here and played when the story asks for chapter 0, which is what such a save's S 10904 holds.
+    void loadPC(const SaveData &d) override {
+        pendingChapter_ = 0;
+        auto var = [&](int n) {
+            auto it = d.variables.find(n);
+            return it == d.variables.end() ? 0 : it->second;
+        };
+        int ph = 2 * var(kWeekVar) + var(kHalfVar), card = d.lastChoice;
+        if (d.flowActive != 1 || ph < 0 || ph >= kPhases || card < 0 || card > 3) return;
+        const CardScenes &cs = kCards[ph][card];
+        int before = 0;
+        if (cs.heroine >= 0) {
+            int after = std::clamp(var(kHeartVar + cs.heroine), 0, kMaxHearts);
+            // At four hearts the pick was either her fourth event or one of her late short scenes, which add none.
+            bool late = false;
+            for (const char *scene : kLate[cs.heroine])
+                if (normalizedName(d.scene) == std::string("scr\\") + scene + ".txt") late = true;
+            before = late ? kMaxHearts : std::max(0, after - 1);
+        }
+        int ending = 0;
+        if (ph == kPhases - 1)
+            for (int heroine = 0; heroine < 3; heroine++)
+                if (var(kHeartVar + heroine) >= kMaxHearts) ending = heroine + 1;
+        pendingChapter_ = chapterNumber(ph, card, before, ending);
+    }
+
+    // `chapter S 10904`: the scenes a pick plays, from the number choose() put there, or for 0, the one a PC save's
+    // state gave (loadPC), which is then kept in S 10904 so VNDegen's own saves after it hold it.
+    std::vector<std::string> chapter(PartHost &host, int number) override {
+        if (number == 0 && pendingChapter_) {
+            number = pendingChapter_;
+            host.setVariable(1, kChapterVar, number);
+        }
         int phase = number / 1000 - 1, card = number / 100 % 10, hearts = number / 10 % 10, ending = number % 10;
         if (phase < 0 || phase >= kPhases || card > 3) return {};
         std::vector<std::string> out;
@@ -238,6 +274,7 @@ public:
         slideFrom_ = outFrom_ = -1;
         selecting_ = false;
         confirming_ = -1;
+        pendingChapter_ = 0;
     }
 
 private:
@@ -330,6 +367,13 @@ private:
     static Rect yesRect() { return {339, 293, 592, 72}; }
     static Rect noRect() { return {339, 380, 592, 72}; }
 
+    static int chapterNumber(int phase, int card, int heartsBefore, int ending) { return 1000 * (phase + 1) + 100 * card + 10 * heartsBefore + ending; }
+    static std::string normalizedName(const std::string &cp932) {
+        std::string out = cp932;
+        for (char &c : out) c = char(std::tolower(uint8_t(c)));
+        return out;
+    }
+
     int phase(PartHost &host) const { return std::clamp(2 * host.variable(1, kWeekVar) + host.variable(1, kHalfVar), 0, kPhases - 1); }
     int hearts(PartHost &host, int heroine) const { return std::clamp(host.variable(1, kHeartVar + heroine), 0, kMaxHearts); }
 
@@ -350,7 +394,7 @@ private:
         if (ph == kPhases - 1)
             for (int heroine = 0; heroine < 3; heroine++)
                 if (hearts(host, heroine) >= kMaxHearts) ending = heroine + 1;
-        host.setVariable(1, kChapterVar, 1000 * (ph + 1) + 100 * c + 10 * h + ending);
+        host.setVariable(1, kChapterVar, chapterNumber(ph, c, h, ending));
         host.setVariable(1, kEndingVar, ending);
         selecting_ = false;
         confirming_ = -1;
@@ -450,6 +494,7 @@ private:
     }
 
     bool selecting_ = false, inisRead_ = false;
+    int pendingChapter_ = 0;
     int confirming_ = -1, px_ = -1, py_ = -1;
     std::array<std::array<Card, 4>, kPhases> phaseCards_{};
     std::array<std::vector<int>, 3> charPlaces_;
