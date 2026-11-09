@@ -16,8 +16,11 @@ public:
             // PC shots half a second apart show each moved 15 pixels on its 116-pixel repeat, one way and the other,
             // which 500 a second gives and 30 would too; unconfirmed between them. With p11 and p12 set, Test Game
             // 83's fog (p3 1000), the picture stays still on the PC: frames 0.7, 1.4 and 2 seconds apart fit at no shift.
+            // It is tiled there all the same, from a place that differed between two runs (44 and 398 pixels along), by
+            // a rule not found; here it starts from the left edge. loadImage tiles only what scrolls, so a still one
+            // is given a speed too small to see, a pixel in a quarter of an hour.
             bool still = n.p[11] != 0 || n.p[12] != 0;
-            host.loadImage(n.p[0], n.s[1], 0, n.p[2], false, still ? 0 : float(n.p[3]), 0);
+            host.loadImage(n.p[0], n.s[1], 0, n.p[2], false, still ? 0.001f : float(n.p[3]), 0);
             return true;
         }
         case 91:

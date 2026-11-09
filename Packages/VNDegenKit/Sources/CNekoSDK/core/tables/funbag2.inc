@@ -111,7 +111,7 @@ button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 
 button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
 
 screen defaults
-parts scroll
+parts scroll particles
 # The program asks for Lucida Sans Unicode at a cell of 25 (Wine's font log), here Open Sans. Sized and spaced to the
 # publisher's Windows screenshots of two messages: x-height 9, lines 27 apart, baselines on the screenshots' rows and
 # the lines' ends within 4 pixels of theirs.
