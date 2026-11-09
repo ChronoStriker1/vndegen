@@ -1606,7 +1606,20 @@ const std::vector<Engine::GalleryEntry> &Engine::galleryEntries() const {
 // A picture unlocks once seen. An anime entry's movies unlock together with its scene's script.
 bool Engine::galleryImageSeen(const GalleryEntry &entry, size_t image) const {
     if (screen_ && screen_->name == "anime") return sceneUnlocked(entry);
-    return image < entry.images.size() && seen(entry.images[image]);
+    return cgPictureSeen(entry, image);
+}
+
+// `cgwhole` under `screen defaults`: an entry's pictures are all seen once any of them is, as Test Game 96's PC flags
+// every picture of an entry, its other swimsuit versions too, after a scene that shows only the first four (set 2, from
+// the PC's cfg.sav).
+bool Engine::cgPictureSeen(const GalleryEntry &entry, size_t image) const {
+    if (image >= entry.images.size()) return false;
+    if (seen(entry.images[image])) return true;
+    auto defaults = screens_.find("defaults");
+    if (defaults == screens_.end() || !defaults->second.setting("cgwhole")) return false;
+    for (const std::string &other : entry.images)
+        if (seen(other)) return true;
+    return false;
 }
 
 bool Engine::sceneUnlocked(const GalleryEntry &scene) const {
@@ -2324,7 +2337,7 @@ void Engine::saveGlobals() {
     };
     for (const GalleryEntry &e : cgEntries_)
         for (size_t p = 0; p < e.images.size(); p++)
-            if (int at = cgFlagAt(e, p); at >= 0 && seen(e.images[p])) setFlag(size_t(at));
+            if (int at = cgFlagAt(e, p); at >= 0 && cgPictureSeen(e, p)) setFlag(size_t(at));
     for (size_t i = 0; i < tracks_.size(); i++)
         if (seen(tracks_[i])) setFlag(configLayout("tracks", kTrackFlagsAt) + i * 4);
     auto packed = packEntry(configFile_);
