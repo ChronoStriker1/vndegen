@@ -333,8 +333,9 @@ screen story
 # Traced under Wine (set 1): the opening, then ten half-weeks of the select screen, each pick playing the scenes the part
 # gives (`chapter S 10904`), then the ending of the heroine with four hearts and her route. G 80, 81 and 82 are set as
 # Kururu's, Otona's and Rei's routes end, and once all three are, a route goes on into the shared ending, which sets G 83
-# (the title's six silhouettes, checked by editing cfg.sav under Wine). Each route skips one of its scripts on the PC
-# runs, ep_002_005, ep_003_005 and ep_004_004, each with another heroine in it; what plays them isn't known yet. The
+# (the title's six silhouettes, checked by editing cfg.sav under Wine). Each route has one script with another heroine in it,
+# ep_002_005 (Rei), ep_003_005 (Kururu) and ep_004_004 (Otona), which plays only when she has two hearts or more, as PC
+# runs with her at two, one and none showed for the first two; Rei's route's isn't confirmed yet. The
 # ending with no heroine at four hearts is ep_001_029 alone, then the title (seen under Wine). S 4000 names the route on
 # a save's card: 1 in every PC save of the common route so far; where it becomes 2 to 5 is taken from the card's labels
 # and not yet read from PC saves (unconfirmed).
@@ -416,6 +417,12 @@ scene scr\eye_catch1.txt
 scene scr\ep_002_004_000.txt
 scene scr\ep_002_004_001.txt
 scene scr\eye_catch1.txt
+# With Rei at two hearts or more: seen with her at two, and not at one or none.
+if S 3012 < 2 goto kururu5
+scene scr\ep_002_005_000.txt
+scene scr\ep_002_005_001.txt
+scene scr\eye_catch1.txt
+label kururu5
 scene scr\ep_002_006_000.txt
 scene scr\ep_002_006_001.txt
 scene scr\eye_catch1.txt
@@ -450,6 +457,12 @@ scene scr\ep_003_004_000.txt
 scene scr\ep_003_004_001.txt
 scene scr\ep_003_004_002.txt
 scene scr\eye_catch2.txt
+# With Kururu at two hearts or more: seen with her at two, and not at none.
+if S 3010 < 2 goto otona5
+scene scr\ep_003_005_000.txt
+scene scr\ep_003_005_001.txt
+scene scr\eye_catch2.txt
+label otona5
 scene scr\ep_003_006_000.txt
 scene scr\ep_003_006_001.txt
 scene scr\eye_catch2.txt
