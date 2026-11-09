@@ -426,6 +426,7 @@ private:
     size_t driftFirst_ = 0;
     ImageRef galleryThumbnail(const std::string &path) const;
     bool galleryImageSeen(const GalleryEntry &entry, size_t image) const;
+    bool cgPictureSeen(const GalleryEntry &entry, size_t image) const;
     bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }
     std::vector<std::string> tracks_, trackTitles_;
     // Test Game 88's sprite gallery, from cfg\sc_view.ini: its backgrounds, and each heroine's faces, outfits and poses as
