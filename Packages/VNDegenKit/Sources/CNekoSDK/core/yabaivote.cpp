@@ -52,6 +52,17 @@ struct Rect {
     bool contains(int px, int py) const { return px >= x && px < x + w && py >= y && py < y + h; }
 };
 constexpr Rect kTreeButton{12, 581, 190, 95};
+// The narrator's thoughts behind the panels (obj\n008_000 to _013): one comes up somewhere on the screen every 0.3 to
+// 1.8 seconds, fades in over half a second, grows about its middle by a tenth a second, and fades out over the last
+// second of its four. Tracked over 30 seconds of the PC's pick screen (lead, under Wine): widths growing 6 to 12 percent
+// a second and lives of 3.5 to 4 seconds; the pace and the strength were then fitted until a run of VNDegen's showed as
+// many lit rows as the PC's, as bright (116 bands of mean 55 against the PC's 125 of 54, both peaking at 195). Where
+// each comes up looked random and is. Which five a truth's pick shows was read from the PC's picks of truths 1, 3, 4
+// and 5; truth 2's wasn't seen and is taken as 1's.
+const int kThoughts[5][5] = {{0, 1, 2, 3, 13}, {0, 1, 2, 3, 13}, {0, 1, 2, 3, 13}, {4, 5, 6, 7, 13}, {8, 9, 10, 11, 12}};
+constexpr int kThoughtLifeMs = 4000, kThoughtInMs = 500, kThoughtOutMs = 1000;
+constexpr int kThoughtGapMs = 300, kThoughtGapSpanMs = 1500;
+constexpr float kThoughtAlpha = 0.95f, kThoughtGrowth = 0.1f;
 
 // The vote: the script's clock starts 9.9 seconds after the pick, as the countdown does, after the doors open and
 // 投票開始 shows from 4.4 to 5.9 seconds.
@@ -131,6 +142,8 @@ public:
         readBase(host);
         phase_ = Phase::Pick;
         opened_ = host.nowMs();
+        thoughts_.clear();
+        nextThought_ = opened_;
         host.setVariable(1, kModeVar, kModePick);
         host.redraw();
         return true;
@@ -176,7 +189,17 @@ public:
 
     bool step(PartHost &host) override {
         reopen(host);
-        if (phase_ == Phase::Pick) return true;  // the panels shimmer
+        if (phase_ == Phase::Pick) {
+            // The panels shimmer, and the narrator's thoughts come and go.
+            int64_t now = host.nowMs();
+            auto gone = [&](const Thought &t) { return now - t.born >= kThoughtLifeMs; };
+            thoughts_.erase(std::remove_if(thoughts_.begin(), thoughts_.end(), gone), thoughts_.end());
+            if (now >= nextThought_) {
+                thoughts_.push_back({kThoughts[truth_ - 1][std::rand() % 5], 250 + std::rand() % 780, 110 + std::rand() % 450, now});
+                nextThought_ = now + kThoughtGapMs + std::rand() % kThoughtGapSpanMs;
+            }
+            return true;
+        }
         if (phase_ != Phase::Vote) return false;
         int64_t ms = host.nowMs() - voteStart_;
         int frame = ms < kVoteStartMs ? -1 : int((ms - kVoteStartMs) * 60 / 1000);
@@ -239,6 +262,8 @@ private:
         readBase(host);
         phase_ = Phase::Pick;
         opened_ = host.nowMs();
+        thoughts_.clear();
+        nextThought_ = opened_;
     }
 
     // vote_base.ini: `KeyNN value`, `//` starting a comment.
@@ -416,6 +441,17 @@ private:
         // Its two blue edges over the dark ground.
         put(host, out, "obj\\n000_001.bmp", 0, 0, in);
         put(host, out, "obj\\n000_002.bmp", 0, 0, in);
+        for (const Thought &t : thoughts_) {
+            char name[32];
+            std::snprintf(name, sizeof name, "obj\\n008_%03d.bmp", t.picture);
+            ImageRef image = host.image(name);
+            if (!image) continue;
+            int64_t age = host.nowMs() - t.born;
+            float fadeIn = std::min(1.0f, float(age) / kThoughtInMs), fadeOut = std::min(1.0f, float(kThoughtLifeMs - age) / kThoughtOutMs);
+            float alpha = kThoughtAlpha * fadeIn * std::max(0.0f, fadeOut);
+            float scale = 1 + kThoughtGrowth * float(age) / 1000;
+            drawImage(out, *image, float(t.x), float(t.y), scale, scale, 0, alpha * in);
+        }
         int frame = int(ms / kPanelFrameMs) % 3;
         int hovered = in >= 1 ? panelAt(host, px_, py_) : -1;
         for (int h = 0; h < 3; h++) {
@@ -603,6 +639,13 @@ private:
         drawPart(out, *image, x, y, col * w, row * h, w, h, alpha);
     }
 
+    // One of the narrator's thoughts on the pick screen: its picture's number, its middle, and when it came.
+    struct Thought {
+        int picture, x, y;
+        int64_t born;
+    };
+    std::vector<Thought> thoughts_;
+    int64_t nextThought_ = 0;
     Phase phase_ = Phase::Closed;
     int truth_ = 1, pick_ = 0, allFrames_ = 6900, px_ = -1, py_ = -1, lastFrame_ = -1;
     size_t next_ = 0;
