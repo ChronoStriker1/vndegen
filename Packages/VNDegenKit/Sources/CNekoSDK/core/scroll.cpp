@@ -1,6 +1,7 @@
 // The `scroll` game part: the older engine's scrolling pictures (90 and 91) and its second image load (92), measured
 // under Wine on Test Games 83 and 86. All three load a picture into a scene slot through PartHost::loadImage, so the
 // next screen update shows it, 17 and 22 take it away, and saves keep it as any other picture.
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <map>
@@ -33,13 +34,18 @@ public:
             // second.
             if (host.loadImage(n.p[0], n.s[1], 0, n.p[2], false, perSecond(n.p[3]), 0, kScrollKind))
                 across_[n.p[0]] = {n.p[3], n.p[11], n.p[12]};
+            else
+                across_.erase(n.p[0]);
             return true;
         case 91:
             // Down: slot p0, its left at x p1, tiled over the height and moving p3 at the same rate (negative moves it
             // up). Set 1 measured it on Test Game 90's PC, frame by frame in a recording at 60 frames a second: the
             // picture sits at x p1 (-110 in all four uses, with p2 0), and p3 -35000 moved it 7,340 pixels in 210
             // frames. Neither of set 3's games uses it.
+            // Where the PC's save keeps this one's speed isn't known (no PC save of one has been read), so its record
+            // is written with none, and not with what command 90 left for the slot.
             host.loadImage(n.p[0], n.s[1], n.p[1], 0, false, 0, perSecond(n.p[3]), kScrollKind);
+            across_.erase(n.p[0]);
             return true;
         case 92:
             // A picture at p1, p2 in slot p3, added to the scene when p4 is 1: Test Game 83's sword strokes, four
@@ -76,7 +82,9 @@ public:
             std::memcpy(&speed, &s.rawFixed[size_t(kAtSpeed)], 4);
             std::memcpy(&p11, &s.rawFixed[size_t(kAtP11)], 4);
             std::memcpy(&p12, &s.rawFixed[size_t(kAtP12)], 4);
-            across_[s.slot] = {int(std::lround(speed * 1000)), p11, p12};
+            // A save's bytes may be anything: a speed that isn't a number is none.
+            if (!std::isfinite(speed)) speed = 0;
+            across_[s.slot] = {int(std::lround(std::clamp(speed, -1.0e6f, 1.0e6f) * 1000)), p11, p12};
         }
     }
     void reset() override { across_.clear(); }

@@ -94,20 +94,14 @@ public:
     // numbers.
     void savePC(SaveData &d) const override {
         for (SavedSprite &s : d.sprites) {
-            auto it = emitters_.find(s.slot);
-            if (s.kind != kEmitterKind || !s.path.empty() || it == emitters_.end()) continue;
-            const Emitter &e = it->second;
-            for (size_t i = 0; i < 3; i++) s.names[i] = i < e.names.size() ? e.names[i] : "";
-            s.fixedBytes = {
-                {kAtCount, int32(e.p[1])},
-                {kAtEvery, float32(float(e.p[2]) / 1000)},
-                {kAtLife, float32(float(e.p[7]) / 1000)},
-                {kAtP8, int32(e.p[8])},
-                {kAtP9, int32(e.p[9])},
-                {kAtP3, int32(e.p[3])},
-                {kAtP4, float32(float(e.p[4]))},
-                {kAtP5, float32(float(e.p[5]))},
-            };
+            if (s.kind != kEmitterKind || !s.path.empty()) continue;
+            if (auto it = emitters_.find(s.slot); it != emitters_.end()) {
+                fill(s, it->second.names, it->second.p);
+                continue;
+            }
+            // Straight after a load the emitters still wait for their first step, and a save made then keeps them.
+            for (const Pending &e : pending_)
+                if (e.slot == s.slot) fill(s, e.names, e.p);
         }
     }
     void loadPC(const SaveData &d) override {
@@ -123,13 +117,13 @@ public:
             auto f = [&](int at) { float v; std::memcpy(&v, &s.rawFixed[size_t(at)], 4); return v; };
             e.p[0] = s.slot;
             e.p[1] = i(kAtCount);
-            e.p[2] = int(std::lround(f(kAtEvery) * 1000));
-            e.p[7] = int(std::lround(f(kAtLife) * 1000));
+            e.p[2] = whole(f(kAtEvery) * 1000);
+            e.p[7] = whole(f(kAtLife) * 1000);
             e.p[8] = i(kAtP8);
             e.p[9] = i(kAtP9);
             e.p[3] = i(kAtP3);
-            e.p[4] = int(std::lround(f(kAtP4)));
-            e.p[5] = int(std::lround(f(kAtP5)));
+            e.p[4] = whole(f(kAtP4));
+            e.p[5] = whole(f(kAtP5));
             pending_.push_back(e);
         }
     }
@@ -140,6 +134,24 @@ public:
     }
 
 private:
+    static void fill(SavedSprite &s, const std::vector<std::string> &names, const int p[10]) {
+        for (size_t i = 0; i < 3; i++) s.names[i] = i < names.size() ? names[i] : "";
+        s.fixedBytes = {
+            {kAtCount, int32(p[1])},
+            {kAtEvery, float32(float(p[2]) / 1000)},
+            {kAtLife, float32(float(p[7]) / 1000)},
+            {kAtP8, int32(p[8])},
+            {kAtP9, int32(p[9])},
+            {kAtP3, int32(p[3])},
+            {kAtP4, float32(float(p[4]))},
+            {kAtP5, float32(float(p[5]))},
+        };
+    }
+    // A float from a save as a whole number: a save's bytes may be anything.
+    static int whole(float v) {
+        if (!std::isfinite(v)) return 0;
+        return int(std::lround(std::clamp(v, -1.0e9f, 1.0e9f)));
+    }
     static std::vector<uint8_t> int32(int32_t v) {
         std::vector<uint8_t> b(4);
         std::memcpy(b.data(), &v, 4);
@@ -173,8 +185,9 @@ private:
         if (e.pictures.empty()) return;
         for (int i = 0; i < 10; i++) e.p[i] = p[i];
         e.bornMs = now;
-        int every = std::max(1, p[2]);
-        int count = std::min(400, std::max(1, p[1] * p[7] / every * 5 / 8));
+        // A script's numbers may be anything, so the sum is done wide and held to 1 to 400 dots.
+        int64_t made = int64_t(std::max(0, p[1])) * std::max(0, p[7]) / std::max(1, p[2]) * 5 / 8;
+        int count = int(std::clamp<int64_t>(made, 1, 400));
         Random random{uint32_t(slot) * 2654435761u + 12345u};
         float w = float(host.width()), h = float(host.height());
         for (int i = 0; i < count; i++) {
