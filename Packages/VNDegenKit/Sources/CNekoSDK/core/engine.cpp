@@ -5267,7 +5267,7 @@ void Engine::splashBurst(const Node &n) {
 }
 
 // The film noise, read from The Alchemist's exe with approval (nekosdk-cleanroom.md): a crop of its frame half as wide
-// and half as high, scaled up twice over at 1920 wide so it fills the screen, from a new random place every fourth frame.
+// and half as high, scaled up so it fills the screen, from a new random place every fourth frame.
 void Engine::drawNoise(Canvas &out, const Sprite &s) {
     const Image &frame = *s.image;
     int w = frame.w / 2, h = frame.h / 2;
@@ -5292,7 +5292,9 @@ void Engine::drawNoise(Canvas &out, const Sprite &s) {
         noiseCrop_ = crop;
         noiseCropStep_ = int64_t(key);
     }
-    float scale = 2.0f * float(out.w) / 1920;
+    // The half-size crop fills the screen: twice the screen's width over the noise picture's, which is 1920 in The
+    // Alchemist and 1280 in Test Game 82 (set 2, under Wine: a 640x360 crop at x2.0 fits its frames at rms 0.29).
+    float scale = 2.0f * float(out.w) / float(std::max(1, frame.w));
     drawImage(out, *noiseCrop_, float(w) * scale / 2, float(h) * scale / 2, scale, scale, 0, 1, nullptr, false);
 }
 
