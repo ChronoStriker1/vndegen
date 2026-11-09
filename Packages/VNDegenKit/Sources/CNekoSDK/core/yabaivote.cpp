@@ -7,7 +7,7 @@
 // found a pick of either plays the right ending). Heroines are numbered as ElectedNum counts them, 0 Misuzu, 1 Ayano,
 // 2 Rina, which is also the vote's columns from the left.
 //
-// Laid out against the PC under Wine (lead, .audit/evidence/nekosdk/lead/vote96). The pick screen was shot as a menu;
+// Laid out against the PC under Wine (lead, .audit/evidence/nekosdk/lead/vote96), with the hub's bars as set 2 placed them. The pick screen was shot as a menu;
 // the vote shows the heroines' standing pictures behind its coffins, so it was measured only by locating its pictures in
 // shots that were never looked at, and by crops of its bars. What wasn't measured is marked so.
 #include <algorithm>
@@ -23,7 +23,9 @@
 namespace neko {
 namespace {
 
-constexpr int kHourVar = 15104, kDayVar = 15105;  // set 2's hub variables, for the pick screen's clock
+// The pick screen's clock from the PC's own S 2000 (the truth, which is the day) and S 2001 (the hour), as set 2's hub
+// keeps them, or the hub's S 15105 and S 15104; and S 105, the PC's mode, 8 at a pick.
+constexpr int kPcDayVar = 2000, kPcHourVar = 2001, kHourVar = 15104, kDayVar = 15105, kModeVar = 105, kModePick = 8;
 constexpr int kResultTree = 9;
 
 // The pick screen: each heroine's panel (390 by 340 cells, three frames of a shimmer across and its states down: 0 at
@@ -110,6 +112,7 @@ public:
         readBase(host);
         phase_ = Phase::Pick;
         opened_ = host.nowMs();
+        host.setVariable(1, kModeVar, kModePick);
         host.redraw();
         return true;
     }
@@ -389,18 +392,22 @@ private:
         }
         // The bars the hub has too: the band and line along the top, the bar along the bottom with 真相 N on it.
         put(host, out, "obj\\l000_003.bmp", 0, 0, in);
-        put(host, out, "obj\\l000_004.bmp", 173, 45, in);
+        put(host, out, "obj\\l000_004.bmp", 244, 45, in);
         put(host, out, "obj\\n002_000.bmp", 1036, 19, in);
         put(host, out, "obj\\n003_000.bmp", 0, 592, in);
         cell(host, out, "obj\\l005_001.bmp", 5, 1, truth_ - 1, 0, 669, 625, in);
         cell(host, out, "obj\\n003_001.bmp", 5, 1, truth_ - 1, 0, 899, 607, in);
         cell(host, out, "obj\\l004_000.bmp", 1, 5, 0, kTreeButton.contains(px_, py_) ? 1 : 0, kTreeButton.x, kTreeButton.y, in);
+        // The red line under it, 過去の自白内容を確認することが出来ます。 (set 2's place).
+        put(host, out, "obj\\l004_001.bmp", 0, 667, in);
         drawClock(host, out, true, in);
     }
 
     // The day, and on the pick screen the time: o000_000's digits 32 apart, o000_001 for 日目 and the colon.
     void drawClock(PartHost &host, Canvas &out, bool time, float alpha) {
-        int day = std::clamp(host.variable(1, kDayVar), 1, 9), hour = host.variable(1, kHourVar) % 24;
+        int pcDay = host.variable(1, kPcDayVar);
+        int day = std::clamp(pcDay ? pcDay : host.variable(1, kDayVar), 1, 9);
+        int hour = (pcDay ? host.variable(1, kPcHourVar) : host.variable(1, kHourVar)) % 24;
         cell(host, out, "obj\\o000_000.bmp", 10, 1, day, 0, 14, 24, alpha);
         if (!time) {
             // Only 日目, the colon's part left out.
