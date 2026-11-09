@@ -1086,9 +1086,13 @@ void Engine::loadGalleries() {
             if (f.size() > 5) e.flow = f[5];  // the replay of the scene it's from
             // Test Game 89's header has no type field: the BGM comes third, and each picture line names the replay.
             if (f.size() == 4 && normalizedPath(f[3]).find(".ogg") != std::string::npos) e.bgm = f[3];
+            // Test Game 87's names the scene script that replays it (set 1).
+            if (f.size() == 4 && normalizedPath(f[3]).find(".txt") != std::string::npos) e.flow = "replayscene:" + f[3];
             cgEntries_.push_back(e);
         } else if (f[0] != "##" && !cgEntries_.empty()) {
             auto parts = split(f[0], ',');
+            // Test Game 87's picture lines are separated by tabs, `PAGE ID PICTURE` (set 1).
+            if (parts.size() < 3 && f.size() >= 3) parts = {f[0], f[1], f[2]};
             if (parts.size() >= 3) {
                 cgEntries_.back().imageIds.push_back(std::atoi(parts[1].c_str()));
                 if (parts.size() >= 4 && cgEntries_.back().flow.empty()) cgEntries_.back().flow = trim(parts[3]);
@@ -1132,6 +1136,26 @@ void Engine::loadGalleries() {
             if (!key.empty() && key != "0") e.keys.push_back(key);
         sceneEntries_.push_back(e);
     }
+    // With play_view.ini empty, play_view2.ini's `TAB THUMB BALLOON STEP KEY KEY2 KIND`, by commas in Test Game 83 and
+    // tabs in 87 (sets 1 and 3): either key read unlocks the scene, 0 for none, and the replay plays the first key's
+    // scene alone, unless the scene table's `replayflow KEY FLOW` names a story flow for it.
+    if (sceneEntries_.empty())
+        for (const std::string &line : lines("cfg\\play_view2.ini")) {
+            std::vector<std::string> f;
+            if (line.find(',') != std::string::npos)
+                for (const std::string &part : split(line, ',')) f.push_back(trim(part));
+            else
+                f = fields(line);
+            if (f.size() < 5 || f[0].empty() || !std::isdigit(uint8_t(f[0][0]))) continue;
+            GalleryEntry e;
+            e.page = std::atoi(f[0].c_str());
+            e.thumbnail = f[1];
+            for (size_t i = 4; i < std::min<size_t>(f.size(), 6); i++)
+                if (!f[i].empty() && f[i] != "0" && normalizedPath(f[i]).find(".txt") != std::string::npos) e.keys.push_back(f[i]);
+            if (e.keys.empty()) continue;
+            e.flow = "replayscene:" + e.keys[0];
+            sceneEntries_.push_back(e);
+        }
     // cfg\sc_view.ini: `#p 100` lists backgrounds, `#p N face|clothes|pose` heroine N's thumbnails, each section ending
     // `##`. Paths there have their backslashes doubled, and a line's second field marks what comes with a bonus.
     {
@@ -1653,9 +1677,10 @@ void Engine::composeGallery(Canvas &out) {
                 // `celltotal DIGITS DY`: the total in a sheet of its own, DY lower, as Test Game 89 draws it.
                 if (const auto *total = screen_->setting("celltotal"); total && total->size() >= 2) {
                     if (ImageRef totalDigits = images_->get((*total)[0])) {
-                        int tw = totalDigits->w / 10, tx = cx + field(*counts, 5), ty = y + field(*total, 1);
+                        // `celltotal DIGITS DY [STEP]`: STEP apart, the cell width unless given (Test Game 87's 12, set 1).
+                        int tw = totalDigits->w / 10, tx = cx + field(*counts, 5), ty = y + field(*total, 1), tstep = total->size() >= 3 ? field(*total, 2) : tw;
                         drawPart(out, *totalDigits, tx, ty, all / 10 % 10 * tw, 0, tw, totalDigits->h, 1);
-                        drawPart(out, *totalDigits, tx + tw, ty, all % 10 * tw, 0, tw, totalDigits->h, 1);
+                        drawPart(out, *totalDigits, tx + tstep, ty, all % 10 * tw, 0, tw, totalDigits->h, 1);
                     }
                 } else {
                     two(all, cx + field(*counts, 5));
@@ -1689,7 +1714,13 @@ void Engine::openGalleryCell(int index) {
 
 // A replay runs its own flow, and ending it comes back to the gallery it started from.
 bool Engine::startReplay(const GalleryEntry &scene) {
-    auto flow = loadScript(scene.flow);
+    std::string name = scene.flow;
+    // `replayflow KEY FLOW` under `screen scene`: the story table's flow for a scene whose first key is KEY, as Test Game
+    // 83's scenes after a choice replay the scene before it and the choice (set 3).
+    if (auto table = screens_.find("scene"); table != screens_.end() && !scene.keys.empty())
+        for (auto [it, end] = table->second.settings.equal_range("replayflow"); it != end; ++it)
+            if (it->second.size() >= 2 && normalizedPath(it->second[0]) == normalizedPath(scene.keys[0])) name = "story:" + it->second[1];
+    auto flow = loadScript(name);
     if (!flow || !flow->first()) return false;
     stopTrack();
     if (titleMusic_) {
@@ -2023,7 +2054,7 @@ int Engine::cgFlagAt(const GalleryEntry &e, size_t picture) const {
     const auto *byGroup = defaults == screens_.end() ? nullptr : defaults->second.setting("cgflagsbygroup");
     if (byGroup && !byGroup->empty() && picture < e.imageGroups.size() && picture < e.imagePlaces.size()) {
         long at = long(kCgFlagsAt) + long(field(*byGroup, 0)) * e.imageGroups[picture] + 4L * e.imagePlaces[picture];
-        return at >= long(kCgFlagsAt) && at + 4 <= long(kTrackFlagsAt) ? int(at) : -1;
+        return at >= long(kCgFlagsAt) && at + 4 <= long(configLayout("tracks", kTrackFlagsAt)) ? int(at) : -1;
     }
     return validCgId(e.imageIds[picture]) ? int(kCgFlagsAt + size_t(e.imageIds[picture]) * 4) : -1;
 }
@@ -2081,7 +2112,7 @@ void Engine::loadGlobals() {
         for (size_t p = 0; p < e.images.size(); p++)
             if (int at = cgFlagAt(e, p); at >= 0 && flag(size_t(at))) seen_[normalizedPath(e.images[p])] = true;
     for (size_t i = 0; i < tracks_.size(); i++)
-        if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
+        if (flag(configLayout("tracks", kTrackFlagsAt) + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
     // Only that flag changes in the file: what VNDegen has unlocked besides goes in at its next save, as before.
     if (repaired) {
         auto packed = packEntry(configFile_);
@@ -2092,14 +2123,24 @@ void Engine::loadGlobals() {
 // cfg.sav holds two strings of their own length, which move what follows them: a script's name at 44020 and, 56 bytes
 // after it, a movie's, which Horny Elves and a Moral Orc's PC writes (`movie\bga_001_000_000_000_000.wmv`) and the other
 // games leave empty. The file's size says whether both are counted.
+// The table's `screen cfgsav` lines `size N`, `tracks AT` and `nostring`: Test Game 83's older file is 96,000 bytes, its
+// heard tracks from 92000 and no string before its flags to move them (set 3, from the PC's file after six endings).
+size_t Engine::configLayout(const char *key, size_t otherwise) const {
+    auto table = screens_.find("cfgsav");
+    const auto *line = table == screens_.end() ? nullptr : table->second.setting(key);
+    if (!line) return otherwise;
+    return line->empty() ? 1 : size_t(std::max(0, field(*line, 0)));
+}
+
 size_t Engine::configStringLength() const {
+    if (configLayout("nostring", 0)) return 0;
     auto lengthAt = [&](size_t at) {
         int32_t length = 0;
         if (at + 4 <= configFile_.size()) std::memcpy(&length, &configFile_[at], 4);
         return length > 0 && at + 4 + size_t(length) <= configFile_.size() ? size_t(length) : 0;
     };
     size_t first = lengthAt(kConfigStringAt), second = lengthAt(kConfigStringAt + 60 + first);
-    if (second && kConfigSize + first + second == configFile_.size()) return first + second;
+    if (second && configLayout("size", kConfigSize) + first + second == configFile_.size()) return first + second;
     return first;
 }
 
@@ -2108,7 +2149,7 @@ void Engine::saveGlobals() {
     // A game with no file of the PC's yet gets what the PC writes on its first run. Zeros there would set the PC game's
     // volumes to nothing when the saves move to a PC.
     if (configFile_.empty()) {
-        configFile_.assign(kConfigSize, 0);
+        configFile_.assign(configLayout("size", kConfigSize), 0);
         auto table = screens_.find("cfgsav");
         if (table != screens_.end())
             for (auto [it, end] = table->second.settings.equal_range("run"); it != end; ++it) {
@@ -2135,7 +2176,7 @@ void Engine::saveGlobals() {
         for (size_t p = 0; p < e.images.size(); p++)
             if (int at = cgFlagAt(e, p); at >= 0 && seen(e.images[p])) setFlag(size_t(at));
     for (size_t i = 0; i < tracks_.size(); i++)
-        if (seen(tracks_[i])) setFlag(kTrackFlagsAt + i * 4);
+        if (seen(tracks_[i])) setFlag(configLayout("tracks", kTrackFlagsAt) + i * 4);
     auto packed = packEntry(configFile_);
     if (!packed.empty()) writeWhole(saveDir_ + "/" + nameInFolder(saveDir_, "cfg.sav"), packed);
 }
@@ -3509,6 +3550,27 @@ std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
         return script;
     }
     if (path.rfind("chapter:", 0) == 0) return compileChapter(std::atoi(path.c_str() + 8));
+    // `replayscene:SCRIPT`: a flow that plays that one scene and ends, for a gallery that names the scene and no flow, as
+    // Test Games 83 and 87's play_view2.ini and 87's cg_view.ini do (sets 1 and 3).
+    if (path.rfind("replayscene:", 0) == 0) {
+        auto script = std::make_shared<Script>();
+        script->name = path;
+        Node start, call, end;
+        start.id = 1;
+        start.next = 2;
+        call.id = 2;
+        call.opcode = 1;
+        call.next = 3;
+        call.s[1] = path.substr(12);
+        end.id = 3;
+        end.opcode = 2;
+        for (const Node &n : {start, call, end}) {
+            script->byId[n.id] = int(script->nodes.size());
+            script->nodes.push_back(n);
+        }
+        scripts_[key] = script;
+        return script;
+    }
     Bytes data = files_.read(path);
     if (!data) {
         complain("Missing script " + path);

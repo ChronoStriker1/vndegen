@@ -360,6 +360,7 @@ private:
     // Where a picture's unlock flag sits in cfg.sav: by its number, or with `cgflagsbygroup STRIDE` under `screen defaults`
     // STRIDE bytes a group and 4 a place, as Test Game 83 keeps them (set 3). -1 for none.
     int cgFlagAt(const GalleryEntry &e, size_t picture) const;
+    size_t configLayout(const char *key, size_t otherwise) const;
     bool sceneUnlocked(const GalleryEntry &scene) const;
     // Test Game 92's anime gallery, from its anime_view.ini: entries of movies, unlocked whole by a scene's script as a
     // scene is, and shown in the CG viewer.
