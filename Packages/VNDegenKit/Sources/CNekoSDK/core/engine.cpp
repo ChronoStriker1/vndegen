@@ -3008,8 +3008,10 @@ void Engine::composeSlots(Canvas &out) {
                 drawPart(out, *quickMark, numberX, cy + offset("slotdigits", 2), 0, 0, quickMark->w, quickMark->h, 1);
                 numberX += quickMark->w;
             }
-            // `slotdigits SHEET X Y COUNT [STEP]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide digits).
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), 10, offset("slotdigits", 4));
+            // `slotdigits SHEET X Y COUNT [STEP] [CELLS]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide
+            // digits), from a sheet of CELLS, 10 when absent (13 for Test Game 96's, its date's marks after the digits).
+            int numberCells = offset("slotdigits", 5) > 0 ? offset("slotdigits", 5) : 10;
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4));
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -3058,6 +3060,14 @@ void Engine::composeSlots(Canvas &out) {
                         if (blank && value == 0 && i < count - 1) break;
                         drawPart(out, *dateDigits, cx + field(w, 1) + i * step, cy + field(w, 2), value % 10 * cell, 0, cell, dateDigits->h, 1);
                     }
+                }
+                // `datemark CELL X Y`: that cell of the date's sheet at a place of its own, as Test Game 96's slashes and colon
+                // are (set 2).
+                for (auto [line, end] = screen_->settings.equal_range("datemark"); line != end; ++line) {
+                    const auto &w = line->second;
+                    if (w.size() < 3) continue;
+                    int cell = dateDigits->w / dateColumns;
+                    drawPart(out, *dateDigits, cx + field(w, 1), cy + field(w, 2), field(w, 0) * cell, 0, cell, dateDigits->h, 1);
                 }
                 continue;
             }
