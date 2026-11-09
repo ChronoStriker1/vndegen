@@ -244,7 +244,12 @@ public:
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
         if (layer == Layer::Menu && menu_ == "title") drawTitle(host, out);
         if (layer == Layer::Menu && menuPlate() >= 0) drawMenuFrame(host, out);
-        if (layer == Layer::Window) drawFaces(host, out);
+        if (layer == Layer::Window) {
+            // The drink gauge at the window's right, a still picture on the PC at rest: msg_button.ini's `#openmenu` panel,
+            // 94 left of the screen's right edge and 2 above the window's top (set 1, fitted on a PC shot).
+            put(host, out, "obj\\h000_002.bmp", 1186, 510);
+            drawFaces(host, out);
+        }
         if (layer == Layer::OverWindow) drawSlide(host, out);
         if (layer == Layer::Screen && selecting_) drawSelect(host, out);
     }
