@@ -270,6 +270,9 @@ final class NekoSDKSession: EngineSession {
     /// Config's screen mode follows the Mac window and asks it to change. An iPhone or iPad has no full screen to offer,
     /// so the buttons show disabled there.
     private func syncWindow(_ engine: OpaquePointer) {
+        // The space the game gets, from which a game with a 4:3 layout picks its shape.
+        let size = frameView.bounds.size
+        vnneko_set_view_size(engine, Float(size.width), Float(size.height))
         #if os(macOS)
         guard let window = view.window else {
             vnneko_set_window_state(engine, false, false)

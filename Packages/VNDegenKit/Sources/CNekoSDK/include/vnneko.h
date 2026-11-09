@@ -98,6 +98,10 @@ void vnneko_set_paused(VNNekoEngine *e, bool paused);
 // The host window, for Config's screen mode: whether it can go full screen, as a Mac's window can and an iPad's can't,
 // and whether it is. Call it each frame; the screen mode buttons show it.
 void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScreen);
+// The size the host's view gives the game, in any unit: a game with a 4:3 layout (init.ini's MsgWinSquare) draws in it
+// when the view is nearer 4:3 than 16:9 and Config leaves the shape automatic. Call it each frame; vnneko_frame's size
+// follows.
+void vnneko_set_view_size(VNNekoEngine *e, float width, float height);
 // The screen mode Config's buttons asked for since the last call: 0 a window, 1 full screen, -1 none.
 int vnneko_take_window_request(VNNekoEngine *e);
 
@@ -123,7 +127,9 @@ bool vnneko_debug_press(VNNekoEngine *e, const char *action);
 int vnneko_debug_choice_count(VNNekoEngine *e);
 void vnneko_debug_choose(VNNekoEngine *e, int index);
 // For test hosts: starts this scene script and runs it without waiting up to the node, or a flow script (under `flow\`)
-// from that node, or from its start for 0 or less. False when it is not there.
+// from that node, or from its start for 0 or less. False when it is not there. A scene started so in a game with flow
+// scripts has no flow behind it, and a save made after it names none, which the PC game refuses to load; a story
+// table's game goes on from its table, as a load does.
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node);
 // For tests: the stored size of the file the game's archives and patches give for this path, or -1 when none has it.
 int64_t vnneko_debug_file_size(const char *gameRoot, const char *path);

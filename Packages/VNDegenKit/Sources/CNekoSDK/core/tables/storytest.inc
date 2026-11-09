@@ -17,7 +17,8 @@ if S 5 == 3 goto yes
 set S 7 = 1                # skipped: the condition holds
 label yes
 set S 8 += S 5
-chapter 2                  # the selftest part gives scr\c2.txt
+set S 14 = 2
+chapter S 14               # the selftest part gives scr\c2.txt, the chapter S 14 holds
 on 3 goto kept             # the screen's result still, across the chapter and a load
 set S 11 = 1               # skipped
 label kept
@@ -32,4 +33,25 @@ set S 13 = 1               # skipped: the second option is taken
 label second
 scene scr\e.txt @30
 end
+
+flow roll                  # a named staff roll, as each of Test Game 82's endings has
+scene scr\r.txt @40
+staffroll t
+set S 20 = 1
+end
+
+screen staffroll_t
+length 1000
+pic obj\n001_000.bmp 0 0
+)";
+
+// The load screen and question box the `storytestload` folder adds: one card at 100, 100, and a Yes over the place where
+// the story's choice draws its first option.
+const char kStoryLoadScreens[] = R"(
+screen load
+slots obj\b.bmp 100 100 300 100 1 1
+
+screen dialog
+button yes obj\b.bmp 615 335 1 5 0
+button no obj\b.bmp 615 500 1 5 0
 )";

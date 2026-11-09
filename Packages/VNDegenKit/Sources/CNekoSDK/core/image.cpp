@@ -1,4 +1,5 @@
 #include "image.h"
+#include "webp.h"
 
 #include <algorithm>
 #include <cstring>
@@ -132,10 +133,20 @@ ImageRef Images::decode(const std::string &path) const {
         image->rgba.assign(px, px + size_t(w) * h * 4);
         image->opaque = n != 2 && n != 4;
         stbi_image_free(px);
+    } else if (isWebP(*data)) {
+        if (!decodeWebP(*data, path, [this](const std::string &base) { return decode(base); }, *image)) return nullptr;
     } else {
         return nullptr;
     }
     if (Bytes alp = files_.read(withExtension(path, ".alp"))) applyAlpha(*alp, *image);
+    else if (colorKey_ >= 0 && image->opaque) {
+        uint8_t r = uint8_t(colorKey_ >> 16), g = uint8_t(colorKey_ >> 8), b = uint8_t(colorKey_);
+        for (size_t i = 0; i + 3 < image->rgba.size(); i += 4)
+            if (image->rgba[i] == r && image->rgba[i + 1] == g && image->rgba[i + 2] == b) {
+                image->rgba[i + 3] = 0;
+                image->opaque = false;
+            }
+    }
     return image;
 }
 

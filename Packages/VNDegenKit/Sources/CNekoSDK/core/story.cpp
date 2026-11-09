@@ -11,8 +11,8 @@
 //   set S|G NUMBER OP VALUE   OP = + - += -=; VALUE a number, or S n or G n
 //   if S|G NUMBER CMP VALUE goto LABEL     CMP == != <= >= < >
 //   open NAME ARGS... [-> S|G NUMBER]      a game part's screen; its result to the variable and the last result
-//   chapter N                 the scenes a game part gives for chapter N
-//   end / staffroll / jump FLOW
+//   chapter N / chapter S n / chapter G n   a game part's scenes for chapter N, or the number a variable holds
+//   end / staffroll [NAME] / jump FLOW
 //
 // A `scene` or `choice` line may end with `@N`, the PC's own number for that place in its story, which its saves hold as
 // the flow node and need to go on from it (Test Game 87, set 1): the runtime writes it in its saves, and a PC save goes on
@@ -178,11 +178,17 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
                 n.p[1] = toInt(w[i + 2]);
             }
         } else if (w[0] == "chapter" && w.size() >= 2) {
-            add(kStoryChapter).p[0] = toInt(w[1]);
+            // `chapter N`, or `chapter S n` / `chapter G n` for the number a variable holds when the line runs, as Test
+            // Game 96's hub leaves the chapter it chose in a variable (set 2).
+            Node &chapter = add(kStoryChapter);
+            operand(w, 1, chapter);
         } else if (w[0] == "end") {
             add(2);
         } else if (w[0] == "staffroll") {
-            add(2).p[0] = 1;
+            // `staffroll NAME` opens the table's `screen staffroll_NAME`, as Test Game 82 has a roll to each ending (set 2).
+            Node &roll = add(2);
+            roll.p[0] = 1;
+            if (w.size() >= 2) roll.s[1] = w[1];
         } else if (w[0] == "jump" && w.size() >= 2) {
             add(31).s[1] = "story:" + w[1];
         } else {
@@ -305,19 +311,21 @@ bool Engine::resumeStoryAt(const std::string &scene) {
         auto flow = loadScript("story:" + line[1]);
         if (!flow) continue;
         for (const Node &n : flow->nodes) {
+            // The place is the line's PC number when it has one, as running it sets, so a save after this one holds it
+            // (set 2: after a jump, Test Game 82's saves had held the line's node instead).
             if (names(n)) {
                 stack_.push_back({flow, flow->node(n.next)});
-                flowCallId_ = n.id;
+                flowCallId_ = n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
                 return true;
             }
             // Or inside a chapter: the flow goes on after the chapter, and the chapter after the scene.
             if (n.opcode == kStoryChapter)
-                if (auto chapter = loadScript("chapter:" + std::to_string(n.p[0])))
+                if (auto chapter = loadScript("chapter:" + std::to_string(operand(n))))
                     for (const Node &c : chapter->nodes)
                         if (names(c)) {
                             stack_.push_back({flow, flow->node(n.next)});
                             stack_.push_back({chapter, chapter->node(c.next)});
-                            flowCallId_ = n.id;
+                            flowCallId_ = c.p[kStoryPcNumber] ? c.p[kStoryPcNumber] : n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
                             return true;
                         }
         }

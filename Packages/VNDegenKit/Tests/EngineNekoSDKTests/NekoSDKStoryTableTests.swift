@@ -8,14 +8,14 @@ import TestSupport
 // as the PC's saves of those games don't. VNDegen's lines beside its save keep the exact place, the last result and a
 // screen open; a PC save, without them, goes on from its scene, inside the chapter too.
 @Suite struct NekoSDKStoryTableTests {
-    private func game() throws -> URL {
+    private func game(_ folder: String = "storytest", _ more: [String: Data] = [:]) throws -> URL {
         let scene = NekoSDKFlowFixture.flow([.init(op: 0, next: 0)])
         // A scene that waits twice, so the test can find the story there and save inside it.
         func waiting(_ ms: Int32) -> Data {
             NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 3, p: [0: ms]), .init(op: 2, next: 0, p: [0: ms])])
         }
-        return try NekoSDKFlowFixture.game([
-            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\storytest\n".utf8),
+        return try NekoSDKFlowFixture.game(more.merging([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\n".utf8),
             "obj.pak": NekoSDKFlowFixture.archive([("n001_000.bmp", choice())]),
             "scr/a.txt": scene,
             "scr/c2.txt": waiting(1000),
@@ -25,7 +25,8 @@ import TestSupport
                 .init(op: 5, next: 0, s: [2: "two"]),
             ]),
             "scr/e.txt": waiting(1000),
-        ])
+            "scr/r.txt": scene,
+        ]) { mine, _ in mine })
     }
 
     // A choice's sheet, a 24-bit BMP of two rows of options.
@@ -60,6 +61,115 @@ import TestSupport
         for _ in 0..<count { _ = vnneko_step(e, 16) }
     }
 
+    // Return to Choice (BackSelection), in a game whose saves keep a Previous Choice file as Test Game 82's do: the state
+    // as the latest choice was asked, kept in `saveNNNs.sav` beside a save and read back with it.
+    @Test func returnToChoiceGoesBackToTheLatestChoiceAcrossALoad() throws {
+        // A message window button for it: the sheet, its kind, place, cells, five cells' places, then its help.
+        let button = ["obj\\n001_000.bmp", "1", "0,0", "1,2", "0,0", "0,1", "0,0", "0,0", "0,0", "none", "0,0", "1,1"]
+        let ini = "#inner BackSelection\n" + button.joined(separator: "\n") + "\n##\n"
+        let root = try game("storytestpc", ["cfg/msg_button.ini": Data(ini.utf8)])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_debug_choose(e, 1)
+        steps(e, 30)
+        #expect(at(e, "scr\\e.txt"), "\(status(e))")
+        #expect(vnneko_debug_save(e, 4))
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytestpc/save")
+        let names = try FileManager.default.contentsOfDirectory(atPath: saves.path).map { $0.lowercased() }
+        #expect(names.contains("save004s.sav"), "\(names)")
+        // It names the scene whose end asked the choice, at its top, as the PC's do, though the jump started that scene.
+        let previous = try NekoSDKFlowFixture.unpacked(Data(contentsOf: saves.appendingPathComponent("save004s.sav")))
+        #expect(previous.range(of: Data("scr\\b.txt".utf8)) != nil)
+        #expect(vnneko_debug_press(e, "BackSelection"))
+        steps(e, 5)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_stop(e)
+
+        // After a load, from the file beside the save.
+        let again = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(again) }
+        #expect(vnneko_debug_load(again, 4))
+        steps(again, 30)
+        #expect(at(again, "scr\\e.txt"), "\(status(again))")
+        #expect(vnneko_debug_press(again, "BackSelection"))
+        steps(again, 5)
+        #expect(vnneko_debug_choice_count(again) == 2, "\(status(again))")
+        vnneko_debug_choose(again, 0)
+        steps(again, 30)
+        #expect(vnneko_debug_variable(again, 1, 13) == 1)
+    }
+
+    // One tap on the load question's Yes, over the place the loaded choice draws its first option: the tap loads, and the
+    // choice it brings up waits for a tap of its own (set 1, Test Game 87 on an iPad).
+    @Test func aTapAcrossALoadDoesntTakeTheChoice() throws {
+        let card = { () -> Data in
+            let w = 50, h = 250, row = (w * 3 + 3) & ~3
+            var d = Data("BM".utf8)
+            func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+            put(UInt32(54 + row * h)); put(0); put(54)
+            put(40); put(UInt32(w)); put(UInt32(h))
+            d.append(contentsOf: [1, 0, 24, 0])
+            put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+            d.append(Data(repeating: 120, count: row * h))
+            return d
+        }()
+        let load = ["obj\\b.bmp", "1", "0,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try game("storytestload", [
+            "obj.pak": NekoSDKFlowFixture.archive([("n001_000.bmp", choice()), ("b.bmp", card)]),
+            "cfg/msg_button.ini": Data(("#inner Load\n" + load.joined(separator: "\n") + "\n##\n").utf8),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        #expect(vnneko_debug_save(e, 1))
+        vnneko_debug_choose(e, 1)
+        steps(e, 30)
+        #expect(vnneko_debug_press(e, "Load"))
+        steps(e, 30)
+        // The card, then the question's Yes, each a tap: down, a few frames held, up.
+        func tap(_ x: Int, _ y: Int) {
+            vnneko_mouse_move(e, Float(x) / 1280, Float(y) / 720)
+            steps(e, 2)
+            vnneko_mouse_button(e, 0, true)
+            steps(e, 6)
+            vnneko_mouse_button(e, 0, false)
+            steps(e, 30)
+        }
+        tap(125, 125)
+        tap(640, 359)
+        #expect(status(e).contains(" choice "), "\(status(e))")
+        // A tap of its own takes the option under it, the second here, which leaves S 13 alone.
+        tap(640, 361)
+        #expect(!status(e).contains(" choice "), "\(status(e))")
+        steps(e, 30)
+        #expect(vnneko_debug_variable(e, 1, 13) == 0)
+    }
+
+    // `staffroll NAME` plays the table's `screen staffroll_NAME`, its length long, then the story goes on.
+    @Test func aNamedStaffRollPlaysItsOwnScreen() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\r.txt", 1))
+        steps(e, 30)
+        #expect(status(e).contains("staff roll"), "\(status(e))")
+        #expect(vnneko_debug_variable(e, 1, 20) == 0)
+        steps(e, 100)
+        #expect(vnneko_debug_variable(e, 1, 20) == 1, "\(status(e))")
+    }
+
     // A jump to a scene of a story table's game goes on after the scene as the table has it, as nekorun's --jump needs.
     @Test func aJumpGoesOnFromTheTable() throws {
         let root = try game()
@@ -67,6 +177,16 @@ import TestSupport
         let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
         defer { vnneko_stop(e) }
         #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        // A save there holds the line's PC number, @20, as one after running to it does (set 2).
+        steps(e, 3)
+        #expect(vnneko_debug_save(e, 9))
+        let saves = root.appendingPathComponent("data/AppData/Roaming/vndegen/storytest/save")
+        let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save009.sav" })
+        let plain = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        func int32(_ at: Int) -> Int32 { plain.subdata(in: (plain.startIndex + at)..<(plain.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } }
+        let picture = Int(int32(0xCD + 4 + 4196))
+        #expect(int32(0xCD + 4 + 4196 + 4 + picture + 39596 + 404) == 20)
         // The scene's last line, then past it.
         steps(e, 200)
         click(e)

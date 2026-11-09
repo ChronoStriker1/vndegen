@@ -103,7 +103,14 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 p.row = number(w[7]);
                 at = 8;
             }
-            for (; at + 1 < w.size(); at += 2) {
+            while (at < w.size()) {
+                // `random` takes no value, and can come last.
+                if (w[at] == "random") {
+                    p.randomAlways = true;
+                    at++;
+                    continue;
+                }
+                if (at + 1 >= w.size()) break;
                 const std::string &key = w[at], &value = w[at + 1];
                 if (key == "alpha") p.alpha = float(number(value)) / 256;  // of 256
                 else if (key == "tab") p.tab = number(value);              // only on that tab of a gallery
@@ -159,6 +166,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                     p.followY = std::strtof(w[at + 2].c_str(), nullptr);
                     at++;
                 }
+                at += 2;
             }
             screen->pictures.push_back(p);
         } else if (w[0] == "button" && w.size() >= 8) {

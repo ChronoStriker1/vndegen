@@ -9,6 +9,7 @@
 #include <array>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -43,6 +44,8 @@ struct Track {
     enum Property { X, Y, ScaleX, ScaleY, Rotation, Alpha } property = X;
     bool relative = false;
     bool easeOut = false;
+    // `quadratic` with a positive length, which Test Game 87's fly-outs ease in by.
+    bool easeIn = false;
     float from = 0, to = 0;
     int startMs = 0, lengthMs = 0;
 };
@@ -86,6 +89,10 @@ struct Sprite {
     bool waveOn = false;
     // An effect painted on black, which the PC game adds to the picture.
     bool additive = false;
+    // A picture tiled along an axis and moving along it, in pixels a second, from scrollFrom: Test Game 86's lace strips
+    // (commands 90 and 91, a game part's, through PartHost::loadImage).
+    float scrollX = 0, scrollY = 0;
+    int64_t scrollFrom = 0;
     int waveSpeed = 0, waveRows = 0, waveSize = 0;
     // The SDK's film noise (commands 51 and 52), its picture the noise frame and the story time it began.
     bool noise = false;
@@ -119,6 +126,8 @@ public:
 
     bool step(int ms);
     const uint8_t *frame(int &w, int &h, bool &changed);
+    // The size of the host's view for the game, from which an automatic 4:3 frame is chosen.
+    void setViewSize(float w, float h) { viewAspect_ = h > 0 ? w / h : 0; }
     Audio &audio() { return audio_; }
 
     void mouseMove(float x, float y);
@@ -193,8 +202,8 @@ private:
     // A flow's staff roll, the table's `staffroll` screen: `movie VARIABLE FILE...` plays the file the scenario
     // variable numbers, over everything, and `skipif G G...` lets a click end it once one of those globals is set.
     // Or, as Test Game 84's exe draws its own, the screen's pictures as layers over black, `length MS` long, with `music
-    // FILE`, and `sets G` set as it ends.
-    void startStaffRoll();
+    // FILE`, and `sets G` set as it ends. A story table's `staffroll NAME` opens `screen staffroll_NAME` instead.
+    void startStaffRoll(const std::string &name);
     void stepStaffRoll();
     void endStaffRoll();
     void composeStaffRoll(Canvas &out);
@@ -220,7 +229,8 @@ private:
     bool flowActive() const { return !stack_.empty(); }
 
     // Saves.
-    std::string savePath(int slot, const char *extension) const;
+    // `suffix` "s" for the Previous Choice file beside the save.
+    std::string savePath(int slot, const char *extension, const char *suffix = "") const;
     void deleteSlot(int slot);
     bool cardAt(int slot, int &x, int &y) const;
     bool overCardDelete(int slot, int x, int y) const { return overCardPart("slotdelete", slot, x, y); }
@@ -242,7 +252,6 @@ private:
     int firstQuickSlot_ = 81, lastQuickSlot_ = 88, nextQuickSlot_ = 81;
     bool barPinned_ = false;
     SaveData captureSave();
-    void restoreSave(const SaveData &data, int slot = -1);
     void noteThumbnail();
     struct SlotInfo {
         bool exists = false;
@@ -250,6 +259,7 @@ private:
         ImageRef thumbnail;
         std::string flow;  // the flow script the save is in, for its chapter's name
         int route = 0;  // its route mode, for the card's progress label
+        std::map<int, int> variables;  // the save's scenario variables, for a card that names its chapter by one
         std::string comment;  // typed on a PC, UTF-8
     };
     SlotInfo &slotInfo(int slot);
@@ -271,7 +281,28 @@ private:
     void advanceFlipbooks();
     void resumeFlipbook(Sprite &s);
     struct FlipModes { std::string path; bool loop, reverse; };
+    // VNDegen's lines beside a save, kept in `saveNNN.vnd`.
     void writeFlipModes(int slot, const SaveData &d);
+    std::string sidecarText(const SaveData &d);
+    // Return to Choice (BackSelection): the story as the latest choice began waiting, as the PC's Previous Choice file
+    // holds it, with VNDegen's lines for it. Taken on the step after the choice is asked, written beside each save and
+    // read back with it.
+    struct PreviousChoice {
+        SaveData data;
+        std::string side;
+    };
+    std::optional<PreviousChoice> previousChoice_;
+    bool previousChoiceDue_ = false;
+    // The latest choice asked, as Test Games 82 and 83's saves keep it (SaveData::choiceColumns): its options, the sheet's
+    // columns, and the cells shown, never cleared.
+    int askedCount_ = 0, askedColumns_ = 0, askedResult_ = 0;
+    std::vector<int> askedCells_;
+    void notePreviousChoice();
+    void writePreviousChoice(int slot);
+    void readPreviousChoice(int slot);
+    void returnToChoice();
+    // The switch that asks a dialog question: Config's own for it, or the one `confirm` covering every question.
+    std::string confirmSetting(int question) const;
     void takeScaleAnchor(Sprite &s, const Node &n);
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
@@ -346,7 +377,14 @@ private:
         std::vector<std::string> keys;
         std::vector<std::string> images;
         std::vector<int> imageIds;
+        // Each picture's group, the first field of its line, and its place among its group's lines in the file, for a
+        // game that keeps its flags by group (`cgflagsbygroup`).
+        std::vector<int> imageGroups, imagePlaces;
     };
+    // Where a picture's unlock flag sits in cfg.sav: by its number, or with `cgflagsbygroup STRIDE` under `screen defaults`
+    // STRIDE bytes a group and 4 a place, as Test Game 83 keeps them (set 3). -1 for none.
+    int cgFlagAt(const GalleryEntry &e, size_t picture) const;
+    size_t configLayout(const char *key, size_t otherwise) const;
     bool sceneUnlocked(const GalleryEntry &scene) const;
     // Test Game 92's anime gallery, from its anime_view.ini: entries of movies, unlocked whole by a scene's script as a
     // scene is, and shown in the CG viewer.
@@ -536,6 +574,41 @@ private:
     int menuStage_ = 2;
     std::string subMenu_;
     bool submenuOpen(const std::string &name) const;
+    bool dimmedBySubmenu(const Button &b) const;
+    int questionCell(int question) const;
+    int64_t barMovedAt_ = -1000000;
+    bool barHover() const;
+    bool barHovered() const;
+    // When `barhover`'s rows last came up, and how much of them shows as they fade in and out.
+    int64_t barShownAt_ = -1000000;
+    float barOpacity() const;
+    // `submenuopen MS`: a submenu's buttons grow from their left edge as it opens and shrink back as it closes.
+    std::string shownSubMenu_, squeezeGroup_;
+    int64_t squeezeAt_ = -1000000;
+    bool squeezeOpening_ = false;
+    float squeezeOf(const Button &b) const;
+    float squeezeProgress() const;
+    // What the last frame drew, so a fade or squeeze gets the frame that finishes it.
+    float squeezeDrawn_ = 1, barDrawnOpacity_ = 1;
+    void trackSubmenu();
+    Canvas barLayer_;
+    void playVoiceAgain(const std::string &voice);
+    bool logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &sheet, int &col) const;
+    int autoPerCharMs_ = -1;
+    int autoBaseMs_ = 0;
+    // `autowithvoice`: auto's pause runs alongside the voice, not after it.
+    bool autoWithVoice_ = false;
+    // `inwindow` under `screen log`: the backlog shown a line at a time in the message window, as Test Game 83's (set 3).
+    // windowLog_ is how many lines back is showing, 0 for the line in play.
+    int windowLog_ = 0;
+    bool logInWindow() const;
+    void stepWindowLog(int lines);
+    int plateHiddenX_ = 0;
+    bool plateRests_ = false, plateRaised_ = false;
+    int charFadeMs_ = 160;  // each character's fade in, `textfade` or 160  // auto's pause for each character of the line, from `autocurve`, or -1 for a fixed pause
+    // The setting a wait command scales by, Config's wait time unless `waitscale SETTING` names another that scales only
+    // waits, not fades, as Test Game 82's auto wait does (set 2, timed under Wine).
+    std::string waitScale() const;
     bool anyGlobalSet(const std::vector<int> &numbers) const;
     bool shown(const Button &b) const;
     bool shown(const Picture &p) const;
@@ -620,6 +693,8 @@ private:
     void runOldLayout(const Node &n);
     void resetParts();
     bool partCommand(const Node &n);
+    GamePart *menuPart() const;
+    bool loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY);
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
     void finishPartScreen(int result);
     // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story
@@ -634,9 +709,15 @@ private:
         std::string screen;
         int screenScope = -1, screenNumber = 0;
         bool atChoice = false;
+        // `slotfx SLOT ADDITIVE SX SY`: a slot's additive drawing and scrolling, which the PC's record doesn't hold.
+        std::map<int, std::array<float, 3>> slotFx;
+        // `var NUMBER VALUE`: VNDegen's own story variables, past those the PC's save has room for.
+        std::map<int, int> variables;
     };
     static uint32_t saveFingerprint(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);
+    Sidecar parseSidecar(const SaveData &d, const std::string &text);
+    void restoreSave(const SaveData &data, const Sidecar &side);
     std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
     void loadPartsState(const SaveData &d, const Sidecar &side);
     bool restoreStoryPlace(const Sidecar &side, bool &atChoice);
@@ -663,6 +744,18 @@ private:
 
     int width_ = 1280, height_ = 720, fps_ = 60;
     Canvas canvas_, from_, previous_;
+    // The 4:3 frame of a game whose init.ini names a MsgWinSquare picture, as Test Game 88's PC draws it in a 1280x960
+    // window: the 16:9 frame on top, the picture under it, and the message window, text and buttons moved down onto
+    // it. square_ is whether it's on, from Config's `screensize` or, set to automatic, the host's view.
+    ImageRef squareImage_;
+    int squareY_ = 720, squareShift_ = 240;
+    bool square_ = false, messageInStrip_ = false;
+    float viewAspect_ = 0;
+    Canvas frame_, strip_;
+    bool wantsSquare() const;
+    void composeStrip();
+    // The pointer's y as the message window's layer has it, which the 4:3 frame moves down.
+    int messagePointerY() const { return pointerY_ - (square_ ? squareShift_ : 0); }
     bool dirty_ = true, frameChanged_ = false, markSaved_ = false;
     std::vector<uint8_t> underMark_;
     int64_t now_ = 0;
@@ -730,6 +823,7 @@ private:
     std::string returnTo_;
     int flowCallId_ = 0;
     std::string choiceImage_;
+    bool windowArtOnly_ = false;  // the frame behind the log with `keepwindow`: the window's picture alone
     bool choiceMade_ = false;  // a choice has been made this game, as Test Game 87's saves hold it
     std::vector<SavedText> backlog_;
     SavedText currentText_;

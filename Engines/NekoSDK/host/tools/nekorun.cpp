@@ -6,6 +6,9 @@
 //                `ms window CAN FULL` (the host window's state),
 //                `ms press action`, `ms shot name` or `ms save slot` (a save the PC game reads), with x and y in canvas pixels
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
+// --jump to a scene script (under `scr\`) starts that scene with no flow behind it in a game with flow scripts, so a save
+// made after it names no flow and the PC game refuses it ("failed to load the flowchart"). For a save the PC loads, jump
+// to the flow node that calls the scene (`--jump flow\X.txt NODE`) and let it run to the place, with --saveat.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -30,7 +33,9 @@ void writePng(const std::string &path, const uint8_t *px, int w, int h) { stbi_w
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: nekorun <game folder> [options]\n");
+        std::fprintf(stderr, "usage: nekorun <game folder> [options]\n"
+                             "  --jump to a scene script leaves no flow behind it, so a save made after it doesn't load in the PC game;\n"
+                             "  jump to the flow node that calls the scene instead. See the comment at the top of nekorun.cpp.\n");
         return 2;
     }
     std::string out, wav, jumpScript;
@@ -40,6 +45,7 @@ int main(int argc, char **argv) {
     std::string saveAt;
     int saveSlot = 0;
     std::vector<std::string> presses;
+    float viewW = 0, viewH = 0;  // --view W H: the host's view, for a game with a 4:3 layout
     struct Step { int ms; std::string what; int x, y; std::string name; };
     std::vector<Step> steps;
     for (int i = 2; i < argc; i++) {
@@ -53,6 +59,7 @@ int main(int argc, char **argv) {
         else if (a == "--wav") wav = next();
         else if (a == "--slow") slowReport = std::atof(next());
         else if (a == "--press") presses.push_back(next());
+        else if (a == "--view") { viewW = float(std::atof(next())); viewH = float(std::atof(next())); }
         else if (a == "--script") {
             FILE *f = std::fopen(next(), "r");
             char line[256];
@@ -115,6 +122,7 @@ int main(int argc, char **argv) {
     double slowest = 0, totalDraw = 0;
     bool ended = false;
     while (elapsed < maxMs) {
+        if (viewW > 0) vnneko_set_view_size(e, viewW, viewH);
         if (!vnneko_step(e, dt)) { ended = true; break; }
         // NEKORUN_TRACE prints each script the story enters, with the node it enters at, and `clicks` each click it waits for.
         if (std::getenv("NEKORUN_TRACE")) {

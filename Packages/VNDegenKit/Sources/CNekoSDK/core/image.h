@@ -44,8 +44,12 @@ public:
     // CGs and sprites, `cg\x.bmp` and `sc\x.bmp`, come from this patch's own set where it has them, as The Alchemist's
     // original art does from `sys_5`. Empty for the base set.
     void setArtSet(const std::string &patch);
+    // A colour drawn transparent in pictures without an .alp, as Test Game 83's older engine keys out pure green: RGB as
+    // 0xRRGGBB, or -1 for none. Set before any picture is decoded.
+    void setColorKey(int rgb) { colorKey_ = rgb; }
 
 private:
+    int colorKey_ = -1;
     void work();
     ImageRef decode(const std::string &path) const;
     ImageRef remember(const std::string &key, ImageRef image);

@@ -119,6 +119,7 @@ int vnneko_debug_macro_number(const char *gameRoot, int scope, int index) {
 void vnneko_set_skip(VNNekoEngine *e, bool on) { e->engine.setSkip(on); }
 void vnneko_set_paused(VNNekoEngine *e, bool paused) { e->engine.setPaused(paused); }
 void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScreen) { e->engine.setWindowState(canFullScreen, fullScreen); }
+void vnneko_set_view_size(VNNekoEngine *e, float width, float height) { e->engine.setViewSize(width, height); }
 int vnneko_take_window_request(VNNekoEngine *e) { return e->engine.takeWindowRequest(); }
 bool vnneko_pauses_when_inactive(VNNekoEngine *e) { return e->engine.pausesWhenInactive(); }
 int vnneko_confirm_key(VNNekoEngine *e) { return e->engine.confirmKey(); }

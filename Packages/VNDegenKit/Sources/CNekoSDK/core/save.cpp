@@ -35,6 +35,12 @@ struct SaveLayout {
     // other way round (set 1, under Wine). Test Games 82 and 83 name it in the newer place.
     bool choiceInFirstPlace = false;
     ChoiceFlag choiceFlag = ChoiceFlag::Picture;
+    // Test Games 82 and 83's PC writes a Previous Choice file, `saveNNNs.sav`, beside each save, and reads it with the
+    // save: the state at the last choice, which Return to Choice goes back to (sets 2 and 3).
+    bool previousChoice = false;
+    // What 116 bytes into the block before the variables holds (SaveData::choiceColumns): Test Game 82's choice sheet's
+    // columns, or in Test Game 83 the option taken, and the count while a choice waits (sets 2 and 3).
+    bool choiceResultAt116 = false;
     // The number global 0 gives the first card, the one NEW marks after a save to it: 1 in Test Game 94 and The Alchemist,
     // whose cfg.sav held 2 and 1 for their second and first cards, and 0 in Test Game 87, which held 2 after a save to
     // its third and crashed opening a Load page whose global 0 was one past its last card (set 1, under Wine). Test
@@ -79,6 +85,8 @@ const SaveLayout kAniMother = kTsumaGibo;
 const SaveLayout kFunbag2 = [] {
     SaveLayout l = older(26, 0, {}, 818, {}, 123);
     l.choiceFlag = ChoiceFlag::Never;
+    l.previousChoice = true;
+    l.choiceResultAt116 = true;
     return l;
 }();
 // Test Game 82's 32 PC saves (set 2), half of them Previous Choice files, are Test Game 83's layout with sprite records
@@ -87,6 +95,7 @@ const SaveLayout kFunbag1 = [] {
     SaveLayout l = older(30, 0, {}, 818, {}, 123);
     l.olderRecord = 379;
     l.choiceFlag = ChoiceFlag::Never;
+    l.previousChoice = true;
     return l;
 }();
 const SaveLayout kSideboob2 = [] {
@@ -124,7 +133,9 @@ constexpr int kOlderAnimation = 0x125;
 // with no comment names its flow at 0xCD.
 constexpr int kAfterComment = 200;
 constexpr int kBeforeChoice = 4196, kAfterChoice = 39596, kDateBlock = 400;
-constexpr int kVariables = 10000, kBeforeVariables = 39600 - 8, kAfterCount = 40;
+constexpr int kVariables = kSavedVariables, kBeforeVariables = 39600 - 8, kAfterCount = 40;
+// The latest choice's columns and cells in the block before the variables (SaveData::choiceColumns), up to 8 cells read.
+constexpr size_t kBeforeChoiceColumns = 116, kBeforeChoiceCells = 152, kBeforeChoiceCellsMax = 8;
 
 void apply(const std::vector<Patch> &patches, uint8_t *to) {
     auto nibble = [](char c) { return c <= '9' ? c - '0' : c - 'a' + 10; };
@@ -265,7 +276,11 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\animother") return &kAniMother;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     // The runtime's own story-table test game saves as The Alchemist does.
-    if (folder == "vndegen\\storytest") return &kAlchemist;
+    if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestload") return &kAlchemist;
+    // And so do the save card and confession tree test games.
+    if (folder == "vndegen\\cardtest" || folder == "vndegen\\treetest") return &kAlchemist;
+    // And as Test Game 82 does, with a Previous Choice file beside each save.
+    if (folder == "vndegen\\storytestpc") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy2") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
@@ -282,6 +297,9 @@ bool namesPictureTwice(const SaveLayout &layout) {
 }
 
 ChoiceFlag choiceFlag(const SaveLayout &layout) { return layout.choiceFlag; }
+bool writesPreviousChoice(const SaveLayout &layout) { return layout.previousChoice; }
+bool olderEngine(const SaveLayout &layout) { return layout.olderRecord > 0; }
+bool choiceResultAt116(const SaveLayout &layout) { return layout.choiceResultAt116; }
 int newCardNumber(const SaveLayout *layout, int slot) { return slot - 1 + (layout ? layout->firstCard : 1); }
 int newCardSlot(const SaveLayout *layout, int number) { return number + 1 - (layout ? layout->firstCard : 1); }
 
@@ -308,7 +326,13 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     r.skip(kDateBlock - 24);
     out.flowActive = r.i32();
     out.flowNode = r.i32();
-    if (r.at + kBeforeVariables <= plain.size()) out.beforeVariables.assign(plain.begin() + std::ptrdiff_t(r.at), plain.begin() + std::ptrdiff_t(r.at + kBeforeVariables));
+    if (r.at + kBeforeVariables <= plain.size()) {
+        out.beforeVariables.assign(plain.begin() + std::ptrdiff_t(r.at), plain.begin() + std::ptrdiff_t(r.at + kBeforeVariables));
+        auto i32 = [&](size_t at) { return int32_t(uint32_t(plain[r.at + at]) | uint32_t(plain[r.at + at + 1]) << 8 | uint32_t(plain[r.at + at + 2]) << 16 | uint32_t(plain[r.at + at + 3]) << 24); };
+        out.lastChoice = i32(112);
+        out.choiceColumns = i32(kBeforeChoiceColumns);
+        for (size_t i = 0; i < kBeforeChoiceCellsMax; i++) out.choiceCells.push_back(i32(kBeforeChoiceCells + 4 * i));
+    }
     r.skip(kBeforeVariables);
     out.variables.clear();
     for (int i = 0; i < kVariables; i++) {
@@ -533,6 +557,8 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     if (d.beforeVariables.size() == size_t(kBeforeVariables)) std::copy(d.beforeVariables.begin(), d.beforeVariables.end(), w.b.begin() + std::ptrdiff_t(before));
     else apply(layout.beforeVariables, w.b.data() + before);
     if (d.lastChoice >= 0) w.setI32(before + 112, d.lastChoice);
+    if (d.choiceColumns >= 0) w.setI32(before + kBeforeChoiceColumns, d.choiceColumns);
+    for (size_t i = 0; i < std::min(d.choiceCells.size(), kBeforeChoiceCellsMax); i++) w.setI32(before + kBeforeChoiceCells + 4 * i, d.choiceCells[i]);
     size_t table = w.zeros(size_t(kVariables) * 4);
     for (const auto &[index, value] : d.variables)
         if (index >= 0 && index < kVariables) w.setI32(table + size_t(index) * 4, value);
