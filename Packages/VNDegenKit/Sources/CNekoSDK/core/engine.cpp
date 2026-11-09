@@ -434,6 +434,7 @@ void Engine::startStory() {
     front_.clear();
     scenario_.clear();
     backlog_.clear();
+    windowLog_ = 0;
     choiceImage_.clear();
     choiceMade_ = false;
     replaying_ = false;
@@ -604,6 +605,16 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "LogMode") { openLog(); return; }
+    // The window's own up and down buttons step through the backlog in it, or open the log screen.
+    if (action == "BackText") {
+        if (logInWindow()) stepWindowLog(1);
+        else openLog();
+        return;
+    }
+    if (action == "NextText") {
+        if (logInWindow()) stepWindowLog(-1);
+        return;
+    }
     // `versioninfo`: the PC's Version info box, its lines in the table's `versionline` settings, a blank line for one with
     // none.
     if (action == "versioninfo") {
@@ -764,6 +775,23 @@ void Engine::runAction(const std::string &action) {
     warnOnce("Button not built yet: " + action);
 }
 
+bool Engine::logInWindow() const {
+    auto log = screens_.find("log");
+    return log != screens_.end() && log->second.setting("inwindow");
+}
+
+// Older lines in the window's own place, in init.ini's MsgLogColor; past the newest the line in play comes back, as on
+// Test Game 83's PC under Wine (set 3).
+void Engine::stepWindowLog(int lines) {
+    int to = std::clamp(windowLog_ + lines, 0, std::max(0, int(backlog_.size()) - 1));
+    if (to == windowLog_) return;
+    windowLog_ = to;
+    const SavedText &t = windowLog_ > 0 ? backlog_[size_t(windowLog_)] : currentText_;
+    layoutText(sjis::toUtf8(t.name), sjis::toUtf8(t.text));
+    textDone_ = true;
+    dirty_ = true;
+}
+
 void Engine::openLog() {
     if (backlog_.empty() || !screens_.count("log")) return;
     // The frame behind the log has no message on it.
@@ -878,6 +906,10 @@ void Engine::mouseWheel(int notches) {
     if (!logOpen_ && cameraActive()) {
         const auto *zoom = screens_.at("defaults").setting("animzoom");
         cameraZoom(notches * (zoom && zoom->size() >= 3 ? field(*zoom, 2) : 5));
+        return;
+    }
+    if (logInWindow()) {
+        if (windowShown_ && !windowHiddenByPlayer_) stepWindowLog(notches);
         return;
     }
     if (logOpen_) scrollLog(notches);
@@ -2576,6 +2608,7 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     }
     back_ = front_;
     backlog_ = d.backlog;
+    windowLog_ = 0;
     currentText_ = d.current;
     for (const SavedSound &sound : d.sounds) {
         if (!sound.playing) continue;
@@ -2973,8 +3006,21 @@ void Engine::composeSlots(Canvas &out) {
 // The questions in the order of the game's sheet of them, and the Config setting that turns each off.
 static const char *const kConfirmSetting[] = {"confirm_saveload", "confirm_saveload", "confirm_overwrite", "confirm_delete", "confirm_quick", "confirm_quick", "confirm_title", "confirm_exit"};
 
+// `questions NAME...` under `screen dialog`: the sheet's cells in its order, by these names, and any other name for a cell
+// the runtime never asks, as Test Game 83's seven across (set 3). The cell of a question, or -1 when the sheet has none.
+static const char *const kQuestionNames[] = {"save", "load", "overwrite", "delete", "quicksave", "quickload", "title", "exit"};
+
+int Engine::questionCell(int question) const {
+    auto dialog = screens_.find("dialog");
+    const auto *names = dialog == screens_.end() ? nullptr : dialog->second.setting("questions");
+    if (!names) return question;
+    for (size_t i = 0; i < names->size(); i++)
+        if ((*names)[i] == kQuestionNames[question]) return int(i);
+    return -1;
+}
+
 void Engine::openDialog(int question, const std::function<void()> &yes) {
-    if (!screens_.count("dialog") || !setting(kConfirmSetting[question])) {
+    if (!screens_.count("dialog") || !setting(kConfirmSetting[question]) || questionCell(question) < 0) {
         yes();
         return;
     }
@@ -3011,9 +3057,12 @@ void Engine::composeDialog(Canvas &out) {
     for (auto [it, end] = dialog.settings.equal_range("question"); it != end; ++it, question++)
         if (question == dialogQuestion_ && it->second.size() >= 3)
             if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2), 0, 0, picture->w, picture->h, 1);
+    int cell = questionCell(dialogQuestion_);
     for (const Picture &p : dialog.pictures) {
         Picture shown = p;
-        if (p.rows > 1 && !separate) shown.row = dialogQuestion_;
+        // The sheet of questions: a row each, or with `questions` a cell each across when the cells run that way.
+        if (p.rows > 1 && !separate) shown.row = cell;
+        else if (p.cols > 1 && !separate && dialog.setting("questions")) shown.column = cell;
         drawPicture(out, shown);
     }
     for (const Button &b : dialog.buttons) {
@@ -3390,6 +3439,13 @@ void Engine::composeScreen(Canvas &out) {
             }
             break;
         }
+    // `musictitle SHEET X Y COLS`: the playing track's title, its cell of a strip across, as Test Game 87's music screen
+    // writes it under Reproduction music (set 1).
+    if (const auto *title = screen_->setting("musictitle"); title && title->size() >= 4 && trackPlayer_ && currentTrack_ >= 0)
+        if (ImageRef strip = images_->get((*title)[0])) {
+            int cols = std::max(1, field(*title, 3)), w = strip->w / cols;
+            if (currentTrack_ < cols) drawPart(out, *strip, field(*title, 1), field(*title, 2), currentTrack_ * w, 0, w, strip->h, 1);
+        }
     // `band Y R G B`, a line for each of two or more rows: the rows from the first listed to the last are multiplied by the
     // colour between the listed rows around them, across the screen and over all it draws, its help too. Test Game 88's
     // Config darkens its bottom so on all three pages (under Wine, against its background picture: within half a level).
@@ -3455,6 +3511,8 @@ void Engine::composeMessageButtons(Canvas &out) {
             on = gt_.extend;
         }
         if (b.action == "GOODTiming") on = setting("gt_off") != 0;
+        // Lit while an older line shows in the window, as Test Game 83's down button is.
+        if (b.action == "NextText") on = windowLog_ > 0;
         if (b.action == "EXpress") {
             // 切替不可 while nothing on screen has another version, as Test Games 92 and 94 show it.
             if (!artSwitchable()) return StateDisabled;
@@ -4224,7 +4282,7 @@ bool Engine::step(int ms) {
     bool skipping = skip_ || skipToggle_;
     // Auto moves on a moment after the text and any voice have finished.
     bool autoNext = false;
-    if (autoMode_ && waiting_ == Waiting::Click && textDone_) {
+    if (autoMode_ && waiting_ == Waiting::Click && textDone_ && !windowLog_) {
         bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
         if (voiceGoing) autoReadyAt_ = -1;
         else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + (autoPerCharMs_ >= 0 ? autoPerCharMs_ * int64_t(textGlyphs_.size()) : autoDelayMs_);
@@ -4474,6 +4532,11 @@ void Engine::mouseButton(int button, bool down) {
                 runAction(action);
                 return;
             }
+    }
+    // A click with an older line in the window brings the line in play back and goes no further (Test Game 83).
+    if (windowLog_ > 0) {
+        stepWindowLog(-windowLog_);
+        return;
     }
     if (waiting_ == Waiting::Choice) {
         updateChoice();
@@ -5661,6 +5724,7 @@ void Engine::showText(const Node &n) {
     currentText_.voice = n.s[3];
     backlog_.insert(backlog_.begin(), currentText_);
     if (backlog_.size() > 60) backlog_.pop_back();
+    windowLog_ = 0;
     if (!windowShown_) {
         windowShown_ = true;
         windowShownAt_ = now_;
@@ -6205,6 +6269,7 @@ void Engine::drawGlyphRun(Canvas &out) {
         // The last lines before the marker have a red edge, which Config can turn off.
         bool counting = gt_.shownCount > 0 && setting("count_color") && !setting("gt_off");
         int shadowR_ = counting ? kCountEdgeR : this->shadowR_, shadowG_ = counting ? kCountEdgeG : this->shadowG_, shadowB_ = counting ? kCountEdgeB : this->shadowB_;
+        int textR_ = windowLog_ ? logTextR_ : this->textR_, textG_ = windowLog_ ? logTextG_ : this->textG_, textB_ = windowLog_ ? logTextB_ : this->textB_;
         for (const Glyph &g : nameGlyphs_) drawGlyph(out, g, pass, 256, textR_, textG_, textB_, shadowR_, shadowG_, shadowB_);
         int index = 0;
         for (const Glyph &g : textGlyphs_) {

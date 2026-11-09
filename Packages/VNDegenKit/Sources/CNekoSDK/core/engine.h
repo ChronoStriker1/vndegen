@@ -551,7 +551,13 @@ private:
     std::string subMenu_;
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;
+    int questionCell(int question) const;
     int autoPerCharMs_ = -1;
+    // `inwindow` under `screen log`: the backlog shown a line at a time in the message window, as Test Game 83's (set 3).
+    // windowLog_ is how many lines back is showing, 0 for the line in play.
+    int windowLog_ = 0;
+    bool logInWindow() const;
+    void stepWindowLog(int lines);
     int plateHiddenX_ = 0;
     bool plateRests_ = false, plateRaised_ = false;
     int charFadeMs_ = 160;  // each character's fade in, `textfade` or 160  // auto's pause for each character of the line, from `autocurve`, or -1 for a fixed pause
