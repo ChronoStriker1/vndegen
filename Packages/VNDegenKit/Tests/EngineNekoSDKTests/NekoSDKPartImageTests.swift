@@ -308,6 +308,65 @@ import TestSupport
         #expect(near(after, before + (speed.isFinite ? 30 : 0)), "\(before) to \(after)")
     }
 
+    // The `scroll` part's own record through a load and a save. Command 90's picture saves its speed, 0.5 a frame for
+    // 500 thousandths, and its parameters 11 and 12 where the PC keeps them. A PC save's record then comes back out of
+    // a load and a save with the bytes it had: a speed too small for a command's thousandths, one the engine won't
+    // play, and one that isn't a number.
+    @Test(arguments: [Float(0.0004), 20000, .nan]) func aScrollingPicturesRecordKeepsItsBytes(speed: Float) throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\scrollsave\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("lace.bmp", bmp(100, 40) { $0 < 10 ? [255, 0, 0] : [0, 0, 255] })]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 90, next: 3, p: [0: 150, 2: 300, 3: 500, 11: 7, 12: 9], s: [1: "obj\\lace.bmp"]),
+                .init(op: 9, next: 4),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/scrollsave/save")
+        func file(_ name: String) throws -> URL {
+            try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil).first { $0.lastPathComponent.lowercased() == name })
+        }
+        // The record's fixed part starts past its two names, the second empty; the numbers' places are scroll.cpp's.
+        func numbers(_ save: Data) throws -> (speed: UInt32, p11: [Int32], p12: [Int32]) {
+            let fixed = try #require(save.range(of: Data("obj\\lace.bmp".utf8))).lowerBound + 12 + 4
+            func word<T>(_ at: Int) -> T { save.subdata(in: (fixed + at)..<(fixed + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: T.self) } }
+            return (word(45), [word(225), word(333)], [word(229), word(337)])
+        }
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(first, 300)
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file("save001.sav")))
+        let own = try numbers(save)
+        #expect(own.speed == Float(0.5).bitPattern && own.p11 == [7, 7] && own.p12 == [9, 9])
+
+        // As a PC save: no lines of VNDegen's beside it, and numbers of its own.
+        try FileManager.default.removeItem(at: try file("save001.vnd"))
+        let fixed = try #require(save.range(of: Data("obj\\lace.bmp".utf8))).lowerBound + 12 + 4
+        func put<T>(_ value: T, _ at: Int) { save.replaceSubrange((fixed + at)..<(fixed + at + 4), with: withUnsafeBytes(of: value, { Data($0) })) }
+        put(speed.bitPattern.littleEndian, 45)
+        for at in [225, 333] { put(Int32(11).littleEndian, at) }
+        for at in [229, 337] { put(Int32(13).littleEndian, at) }
+        try NekoSDKFlowFixture.packed(save).write(to: try file("save001.sav"))
+
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_load(e, 1))
+        steps(e, 300)
+        #expect(vnneko_debug_save(e, 2))
+        let again = try numbers(try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file("save002.sav"))))
+        #expect(again.speed == speed.bitPattern, "\(again.speed) for \(speed.bitPattern)")
+        #expect(again.p11 == [11, 11] && again.p12 == [13, 13])
+    }
+
     // With the table's `fliptime` and `flipsound`, as Test Game 90 has them: command 121's parameter 16, 30, shows each
     // picture two frames at 60 a second where the ini's 16 ms would show it one, so ten pictures last a third of a second
     // and not a sixth; and the flipbook plays the sound its ini line names.

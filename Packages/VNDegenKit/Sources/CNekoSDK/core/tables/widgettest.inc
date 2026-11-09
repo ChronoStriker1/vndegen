@@ -128,3 +128,10 @@ parts selftest
 fliptime
 flipsound
 )";
+
+// A game that saves in Test Game 83's layout with the `scroll` part on, for a scrolling picture's record through a load
+// and a save (NekoSDKPartImageTests).
+const char kScrollSaveTest[] = R"(
+screen defaults
+parts scroll
+)";

@@ -142,4 +142,65 @@ import TestSupport
         for _ in 0..<3 { _ = vnneko_step(e, 16) }
         #expect(moving())
     }
+
+    // The Comment button's state, as 96's PC draws it: disabled until the scene loads a comment list, plain from then on
+    // with no comment on screen, and lit once pressed. The sheet's rows are told apart by their blue.
+    @Test func theCommentButtonIsDisabledUntilAListLoads() throws {
+        let button: Data = {
+            let w = 40, h = 100, row = w * 3
+            var d = Data("BM".utf8)
+            func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+            put(UInt32(54 + row * h)); put(0); put(54)
+            put(40); put(UInt32(w)); put(UInt32(h))
+            d.append(contentsOf: [1, 0, 24, 0])
+            put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+            // Bottom row first: blue 20 for the top state, 180 for the fifth.
+            for y in (0..<h).reversed() { for _ in 0..<w { d.append(contentsOf: [UInt8(40 * (y / 20) + 20), 0, 255]) } }
+            return d
+        }()
+        let inner = ["obj\\b.bmp", "2", "1000,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\commenttest\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/com/c.ini": Data("#p 0 40 80\r\nABCDE\r\n##\r\n".utf8),
+            "cfg/msg_button.ini": Data(("#inner Comment\n" + inner.joined(separator: "\n") + "\n##\n").utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", button)]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 5, next: 3, s: [2: "one"]),
+                .init(op: 110, next: 4, s: [1: "cfg\\com\\c.ini"]),
+                .init(op: 5, next: 5, s: [2: "two"]),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        vnneko_mouse_move(e, 0.5, 0.3)
+        for _ in 0..<40 { _ = vnneko_step(e, 16) }
+        func row() -> Int {
+            for _ in 0..<3 { _ = vnneko_step(e, 16) }
+            var w: Int32 = 0, h: Int32 = 0, changed = false
+            guard let px = vnneko_frame(e, &w, &h, &changed) else { return -1 }
+            let at = (610 * Int(w) + 1020) * 4
+            return px[at] > 200 && px[at + 1] < 60 ? (Int(px[at + 2]) - 20) / 40 : -1
+        }
+        #expect(row() == 4)
+        // A press does nothing while it's disabled.
+        #expect(vnneko_debug_press(e, "Comment"))
+        #expect(row() == 4)
+        // On to the second line, past the list's load: no comment plays, and the button is plain.
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        for _ in 0..<40 { _ = vnneko_step(e, 16) }
+        #expect(row() == 0)
+        #expect(vnneko_debug_press(e, "Comment"))
+        #expect(row() == 2)
+        #expect(vnneko_debug_press(e, "Comment"))
+        #expect(row() == 0)
+    }
 }
