@@ -2980,11 +2980,17 @@ bool Engine::pageOff(const std::string &action) const {
 //     release greys out Music wherever it stands, having none (set 1, under Wine).
 //   A gallery's tab with no entry, `gtabN`: the same release shows its CG and Scene tabs 0 to 3 so, with entries only
 //     on tab 4 (set 1). No other game's gallery has an empty tab.
+bool Engine::partDisables(const std::string &action) const {
+    for (const auto &[name, part] : parts_)
+        if (part->actionLit(action) == 2) return true;
+    return false;
+}
+
 bool Engine::buttonOff(const std::string &action) const {
     if (!screen_) return false;
     if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
         if (const auto *off = defaults->second.setting("buttonsoff"); off && std::find(off->begin(), off->end(), action) != off->end()) return true;
-    if (action.rfind("gtab", 0) == 0 && (isPictureGallery() || screen_->name == "scene")) {
+    if (action.rfind("gtab", 0) == 0 && defaultsHave("emptytabsoff") && (isPictureGallery() || screen_->name == "scene")) {
         int tab = std::atoi(action.c_str() + 4);
         const auto &entries = galleryEntries();
         return !entries.empty() && std::none_of(entries.begin(), entries.end(), [&](const GalleryEntry &e) { return e.page == tab; });
@@ -4899,9 +4905,7 @@ void Engine::mouseButton(int button, bool down) {
             if (b) {
                 std::string action = b->action;
                 // One a part draws disabled does nothing, as Auto and Skip over Test Game 96's hub.
-                bool off = false;
-                for (const auto &[name, part] : parts_) off = off || part->actionLit(action) == 2;
-                if (!off) runAction(action);
+                if (!partDisables(action)) runAction(action);
                 return;
             }
         }
@@ -5071,13 +5075,13 @@ void Engine::mouseButton(int button, bool down) {
         if (innerWereShown_)
             if (Button *b = buttonAt(pointerX_, messagePointerY(), bar().inner)) {
                 std::string action = b->action;
-                runAction(action);
+                if (!partDisables(action)) runAction(action);
                 return;
             }
         if (underWereShown_)
             if (Button *b = buttonAt(pointerX_, messagePointerY(), bar().under)) {
                 std::string action = b->action;
-                runAction(action);
+                if (!partDisables(action)) runAction(action);
                 return;
             }
     }

@@ -273,6 +273,7 @@ private:
     bool pageOff(const std::string &action) const;
     bool pageStepOff(const std::string &action) const;
     bool buttonOff(const std::string &action) const;
+    bool partDisables(const std::string &action) const;
     void composeSlots(Canvas &out);
     void drawComment(Canvas &out, const std::string &utf8, int x, int baseline, int width, int px);
     int slotAt(int x, int y) const;
