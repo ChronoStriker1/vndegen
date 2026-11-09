@@ -1435,7 +1435,10 @@ void Engine::writeReadSav() {
         if (on && path.size() > 4 && path.compare(path.size() - 4, 4, ".txt") == 0) finished.push_back(path);
     std::sort(finished.begin(), finished.end());
     for (const std::string &path : finished)
-        if (std::none_of(scripts.begin(), scripts.end(), [&](const std::string &s) { return readKey(s) == readKey(path); })) scripts.push_back(path);
+        if (std::none_of(scripts.begin(), scripts.end(), [&](const std::string &s) { return readKey(s) == readKey(path); })) {
+            auto named = readNames_.find(path);
+            scripts.push_back(named == readNames_.end() ? path : named->second);
+        }
     if (scripts.empty()) return;
     std::vector<uint8_t> out;
     auto put = [&](int32_t v) { out.insert(out.end(), reinterpret_cast<uint8_t *>(&v), reinterpret_cast<uint8_t *>(&v) + 4); };
@@ -1534,8 +1537,13 @@ void Engine::noteSeen(const std::string &path) {
     if (seen_[key]) return;
     seen_[key] = true;
     seenChanged_ = true;
-    // A script read to its end goes into read.sav too.
-    if (key.size() > 4 && key.compare(key.size() - 4, 4, ".txt") == 0) readChanged_ = true;
+    // A script read to its end goes into read.sav too, under the name the story gave it when that has a doubled
+    // backslash: Test Game 96's PC lists its scenes as its chapter list writes them, `scr\\sc_….txt`, and unlocks its
+    // Scene gallery by those names (set 2, from the PC's read.sav).
+    if (key.size() > 4 && key.compare(key.size() - 4, 4, ".txt") == 0) {
+        readChanged_ = true;
+        if (path.find("\\\\") != std::string::npos) readNames_[key] = path;
+    }
 }
 
 // A card's picture. Ore o Hoshigaru Tsuma to Gibo's ini names `obj\small\cg\...` for pictures whose full versions are in

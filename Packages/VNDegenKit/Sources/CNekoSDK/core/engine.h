@@ -491,6 +491,7 @@ private:
     // Whether each bonus patch folder the lists name is there.
     mutable std::map<std::string, bool> spritePatches_;
     std::unordered_map<std::string, bool> seen_;
+    std::unordered_map<std::string, std::string> readNames_;  // a finished script as the story named it, by its seen_ key
     // The text read, by script and node id, for Config's read-only skip.
     std::unordered_map<std::string, std::set<int>> readNodes_;
     bool readChanged_ = false, skipStopped_ = false, jumping_ = false, textFresh_ = false;
