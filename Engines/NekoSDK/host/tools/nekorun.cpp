@@ -195,6 +195,8 @@ int main(int argc, char **argv) {
                 writePng(out + "/" + s.name, now, w, h);
             } else if (s.what == "save") {
                 if (!vnneko_debug_save(e, s.x)) std::fprintf(stderr, "couldn't save to slot %d\n", s.x);
+            } else if (s.what == "load") {
+                if (!vnneko_debug_load(e, s.x)) std::fprintf(stderr, "couldn't load slot %d\n", s.x);
             } else if (s.what == "window") {
                 vnneko_set_window_state(e, s.x != 0, s.y != 0);
             } else if (s.what == "wheel") {

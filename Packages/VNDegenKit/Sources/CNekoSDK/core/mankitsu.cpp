@@ -17,8 +17,9 @@
 // scene the PC's exe lists for that half-week and card. Which scene plays was traced under Wine from runs down each
 // route and one skipping a heroine (set 1): events go by hearts, not by half-week. The screen's pieces were placed by
 // fitting PC shots, the cards exactly (within 0.03 of 255 over the card area). State is in the story variables the PC's
-// saves hold it in (set 1, nine PC saves along one path): S 3000 the week, 0 to 4, and 5 once the last is chosen, S 3001
-// the half, S 3010 to 3012 Kururu's, Otona's and Rei's hearts. VNDegen's own, kept beside the save:
+// saves hold it in (set 1, PC saves along one path): S 3000 the week, 0 to 4, S 3001 the half, which the story table
+// moves on after the pick's scenes, as the PC's saves in them still hold the half they were picked at, and S 3010 to
+// 3012 Kururu's, Otona's and Rei's hearts. VNDegen's own, kept beside the save:
 //   S 10904   the chapter the pick plays (`chapter S 10904`)
 //   S 10906   the heroine whose ending follows, 1 to 3, or 0 for none, set with the last pick
 #include <algorithm>
@@ -45,6 +46,7 @@ constexpr int kDrawOrder[4] = {0, 2, 1, 3};
 constexpr int kCardW = 373, kCardH = 232, kLift = 4;
 constexpr int kSideX = 1172, kSideY = 457, kSideStep = 58;
 constexpr int kSideColumns[4] = {0, 1, 5, 6};  // save, load, config, title in e001_000
+const char *const kSideActions[4] = {"nav_save", "nav_load", "nav_config", "nav_title"};
 
 // What a card plays: a heroine's event (by her hearts) or a fixed scene list.
 struct CardScenes {
@@ -174,10 +176,9 @@ public:
                 return true;
             }
         for (int k = 0; k < 4; k++)
-            if (sideRect(k).contains(x, y) && !warnedSide_) {
-                // Save, load, config and title from here need a way into the menus that PartHost doesn't give yet.
-                host.log("Test Game 90's select screen buttons aren't wired to the menus yet");
-                warnedSide_ = true;
+            if (sideRect(k).contains(x, y)) {
+                host.openMenu(kSideActions[k]);
+                return true;
             }
         return true;
     }
@@ -351,8 +352,6 @@ private:
                 if (hearts(host, heroine) >= kMaxHearts) ending = heroine + 1;
         host.setVariable(1, kChapterVar, 1000 * (ph + 1) + 100 * c + 10 * h + ending);
         host.setVariable(1, kEndingVar, ending);
-        host.setVariable(1, kWeekVar, (ph + 1) / 2);
-        host.setVariable(1, kHalfVar, (ph + 1) % 2);
         selecting_ = false;
         confirming_ = -1;
         host.finishScreen(c);
@@ -450,7 +449,7 @@ private:
         }
     }
 
-    bool selecting_ = false, inisRead_ = false, warnedSide_ = false;
+    bool selecting_ = false, inisRead_ = false;
     int confirming_ = -1, px_ = -1, py_ = -1;
     std::array<std::array<Card, 4>, kPhases> phaseCards_{};
     std::array<std::vector<int>, 3> charPlaces_;

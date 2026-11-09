@@ -27,10 +27,41 @@ scene scr\ep_001_004_000.txt
 scene scr\ep_001_005_000.txt
 scene scr\ep_001_005_001.txt
 scene scr\ep_001_006_000.txt
-label week
-open select
+# Each half-week's select screen carries the PC's number for it, which its saves there hold (set 1, PC saves at all
+# ten); S 3000 and 3001 move on after the pick's scenes.
+open select @15
 chapter S 10904
-if S 3000 < 5 goto week
+set S 3001 = 1
+open select @61
+chapter S 10904
+set S 3000 = 1
+set S 3001 = 0
+open select @85
+chapter S 10904
+set S 3001 = 1
+open select @111
+chapter S 10904
+set S 3000 = 2
+set S 3001 = 0
+open select @143
+chapter S 10904
+set S 3001 = 1
+open select @147
+chapter S 10904
+set S 3000 = 3
+set S 3001 = 0
+open select @172
+chapter S 10904
+set S 3001 = 1
+open select @177
+chapter S 10904
+set S 3000 = 4
+set S 3001 = 0
+open select @197
+chapter S 10904
+set S 3001 = 1
+open select @211
+chapter S 10904
 if S 10906 == 1 goto kururu
 if S 10906 == 2 goto otona
 if S 10906 == 3 goto rei
