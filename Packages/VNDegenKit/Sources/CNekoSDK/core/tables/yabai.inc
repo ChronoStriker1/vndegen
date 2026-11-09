@@ -58,9 +58,11 @@ pic obj\e001_000.bmp 0 0 6 1 1 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
 slotnew obj\e005_000.bmp -13 -14
-# Pending from the lead: slotdigits with a 13-cell sheet, and datemark for the date's "/" and ":".
-slotdigits obj\e004_001.bmp 40 135 3 11
+slotdigits obj\e004_001.bmp 40 135 3 11 13
 datedigits obj\e004_001.bmp 0 0 13
+datemark 10 263 26
+datemark 10 296 26
+datemark 11 307 50
 datefield year 219 26 11
 datefield month 274 26 11
 datefield day 307 26 11 blank
@@ -94,9 +96,11 @@ pic obj\e001_000.bmp 0 0 6 1 1 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
 slotnew obj\e005_000.bmp -13 -14
-# Pending from the lead: slotdigits with a 13-cell sheet, and datemark for the date's "/" and ":".
-slotdigits obj\e004_001.bmp 40 135 3 11
+slotdigits obj\e004_001.bmp 40 135 3 11 13
 datedigits obj\e004_001.bmp 0 0 13
+datemark 10 263 26
+datemark 10 296 26
+datemark 11 307 50
 datefield year 219 26 11
 datefield month 274 26 11
 datefield day 307 26 11 blank
@@ -124,6 +128,10 @@ button back obj\\e002_000.bmp 1091 637 9 5 8
 
 screen story
 flow main
+# The PC keeps its mode in S 105: 2 at the hub, 4 in a scene, 8 at a vote's pick screen, 11 in the tutorial. A PC save
+# at the hub or a pick goes on there, its truth in S 2000; one in a scene goes on from its scene.
+resume S 105 == 2 at hub
+resume S 105 == 8 at pickresume
 chapter 0
 chapter 1
 # The tutorial dialog: "尋問パートの説明を見ますか？" (yes 10, no 20).
@@ -177,19 +185,30 @@ open vote 1 -> S 15140
 goto picked
 label vote2
 chapter 4600
+label pick2
 open vote 2 -> S 15140
 goto picked
 label vote3
 chapter 4700
+label pick3
 open vote 3 -> S 15140
 goto picked
 label vote4
 chapter 4800
+label pick4
 open vote 4 -> S 15140
 goto picked
 label vote5
 chapter 4900
+label pick5
 open vote 5 -> S 15140
+goto picked
+label pickresume
+if S 2000 == 1 goto pick1
+if S 2000 == 2 goto pick2
+if S 2000 == 3 goto pick3
+if S 2000 == 4 goto pick4
+goto pick5
 label picked
 on 0 goto wrong
 if S 15100 == 1 goto right1
