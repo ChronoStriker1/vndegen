@@ -13,6 +13,9 @@ let unityLog = Logger(subsystem: "VNDegen", category: "Unity")
 @MainActor
 class UnityExternalSession: EngineSession {
     private(set) var failedToStart = false
+    /// Set once the game's own process is running. An error after that, such as one saving its settings after it quit,
+    /// ends a session that did play.
+    var gameStarted = false
     let view: PlatformView
     let launch: GameLaunch
     let host: UnityHostView
@@ -39,7 +42,7 @@ class UnityExternalSession: EngineSession {
             } catch {
                 unityLog.error("\(self.launch.game.id.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 if !ending {
-                    failedToStart = true
+                    if !gameStarted { failedToStart = true }
                     host.fail("\(launch.game.title) couldn't start. \(error.localizedDescription)")
                     return
                 }
@@ -118,17 +121,19 @@ final class UnityCrossOverSession: UnityExternalSession {
         guard !ending else { return }
         host.setMessage("\(launch.game.title) is running in CrossOver, in its own window.", showsGame: true)
         let process = try Self.process(bottle.run(exe, workdir: workdir, environment: environment), log: logFile())
-        let status = await withCheckedContinuation { (done: CheckedContinuation<Int32, Never>) in
+        // A game CrossOver can't start ends the session as one that didn't start, with the reason on screen.
+        let status = try await withCheckedThrowingContinuation { (done: CheckedContinuation<Int32, any Error>) in
             process.terminationHandler = { done.resume(returning: $0.terminationStatus) }
             do {
                 try process.run()
                 game = process
+                gameStarted = true
                 unityLog.info("started \(self.launch.game.id.rawValue, privacy: .public) in CrossOver, pid \(process.processIdentifier)")
                 Task { await self.bringGameForward() }
             } catch {
                 process.terminationHandler = nil
                 unityLog.error("starting CrossOver failed: \(error.localizedDescription, privacy: .public)")
-                done.resume(returning: -1)
+                done.resume(throwing: error)
             }
         }
         game = nil
@@ -374,6 +379,7 @@ final class UnityMacAppSession: UnityExternalSession {
         configuration.activates = true
         let running = try await NSWorkspace.shared.openApplication(at: app, configuration: configuration)
         self.running = running
+        gameStarted = true
         unityLog.info("opened \(self.app.lastPathComponent, privacy: .public), pid \(running.processIdentifier)")
         if ending {
             // The hub ended the session while the app was opening, before `stopGame` could reach it.
