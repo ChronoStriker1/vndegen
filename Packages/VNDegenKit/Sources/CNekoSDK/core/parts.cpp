@@ -1,5 +1,6 @@
 #include "parts.h"
 
+#include <algorithm>
 #include <cstdio>
 
 #include "engine.h"
@@ -24,9 +25,15 @@ const PartEntry kParts[] = {
 
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses
 // with N, kept with a save, and chapter N is scr\cN.txt. Scene command 9000 loads its picture into slot p3 at p1, p2
-// through PartHost::loadImage, additive when p4 is 1 and scrolling p5 and p6 pixels a second.
+// through PartHost::loadImage, additive when p4 is 1 and scrolling p5 and p6 pixels a second. On a table screen naming
+// it, the widget test game's sprite gallery, it draws a square at 400, 400, blue and red once pressed, takes the presses on it,
+// and after two covers the top left corner over everything.
 class SelfTestPart : public GamePart {
 public:
+    void draw(PartHost &, Canvas &out, Layer layer, int, int) override {
+        if (layer == Layer::Menu) fill(out, 400, 400, 10, menuPresses_ ? 255 : 0, 0, menuPresses_ ? 0 : 255);
+        if (layer == Layer::Screen && menuPresses_ >= 2) fill(out, 0, 0, 20, 0, 0, 255);
+    }
     bool command(PartHost &host, const Node &n) override {
         if (n.opcode != 9000) return false;
         host.loadImage(n.p[3], n.s[1], n.p[1], n.p[2], n.p[4] == 1, float(n.p[5]), float(n.p[6]));
@@ -35,6 +42,11 @@ public:
     std::vector<std::string> chapter(PartHost &, int number) override { return {"scr\\c" + std::to_string(number) + ".txt"}; }
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
         int count = args.empty() ? 0 : args[0];
+        onMenu_ = name == "sprites";
+        if (onMenu_) {
+            menuPresses_ = 0;
+            return true;
+        }
         if (name == "selftest") {
             host.finishScreen(count);
             return true;
@@ -44,7 +56,12 @@ public:
         needed_ = count;
         return true;
     }
-    bool press(PartHost &host, int, int, int) override {
+    bool press(PartHost &host, int x, int y, int) override {
+        if (onMenu_) {
+            if (x < 400 || x >= 410 || y < 400 || y >= 410) return false;
+            menuPresses_++;
+            return true;
+        }
         if (++presses_ >= needed_) host.finishScreen(presses_);
         return true;
     }
@@ -52,10 +69,21 @@ public:
     void load(const std::vector<std::string> &lines) override {
         if (!lines.empty()) std::sscanf(lines[0].c_str(), "%d %d", &presses_, &needed_);
     }
-    void reset() override { presses_ = needed_ = 0; }
+    void reset() override {
+        presses_ = needed_ = menuPresses_ = 0;
+        onMenu_ = false;
+    }
 
 private:
-    int presses_ = 0, needed_ = 0;
+    static void fill(Canvas &out, int x0, int y0, int side, uint8_t r, uint8_t g, uint8_t b) {
+        for (int y = y0; y < std::min(out.h, y0 + side); y++)
+            for (int x = x0; x < std::min(out.w, x0 + side); x++) {
+                uint8_t *p = out.px.data() + (size_t(y) * size_t(out.w) + size_t(x)) * 4;
+                p[0] = r, p[1] = g, p[2] = b, p[3] = 255;
+            }
+    }
+    int presses_ = 0, needed_ = 0, menuPresses_ = 0;
+    bool onMenu_ = false;
 };
 
 }  // namespace
@@ -92,8 +120,10 @@ void PartHost::setVariable(int scope, int number, int value) {
 }
 
 int64_t PartHost::nowMs() { return e_.now_; }
+int64_t PartHost::screenMs() { return e_.screenMs_; }
 int PartHost::width() { return e_.width_; }
 int PartHost::height() { return e_.height_; }
+int PartHost::page() { return e_.page_; }
 void PartHost::redraw() { e_.dirty_ = true; }
 
 void PartHost::waitClick() { e_.waiting_ = Engine::Waiting::Click; }
@@ -141,6 +171,15 @@ void Engine::resetParts() {
 
 bool PartHost::loadImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY) {
     return e_.loadPartImage(slot, path, x, y, additive, scrollX, scrollY);
+}
+
+// The part a table screen names with `part NAME`, while that screen is open.
+GamePart *Engine::menuPart() const {
+    const auto *line = screen_ ? screen_->setting("part") : nullptr;
+    if (!line || line->empty()) return nullptr;
+    for (const auto &[name, part] : parts_)
+        if (name == (*line)[0]) return part.get();
+    return nullptr;
 }
 
 bool Engine::partCommand(const Node &n) {
