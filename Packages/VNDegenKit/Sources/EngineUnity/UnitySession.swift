@@ -73,6 +73,8 @@ class UnityExternalSession: EngineSession {
 
     func terminate() {
         ending = true
+        // Ended while CrossOver was still getting ready, which can take minutes, so the game never ran.
+        if !gameStarted { failedToStart = true }
         stopGame()
     }
 

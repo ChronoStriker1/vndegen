@@ -222,8 +222,9 @@ public protocol EngineSession: AnyObject {
     func chooseGameMenuItem(_ id: GameMenuItem.ID)
     /// The game's cheats, for VNDegen's Cheats page. Nil, the default, for engines that offer none.
     var cheats: (any CheatSession)? { get }
-    /// True once the game has failed to start, such as an engine that couldn't load it. Set it before calling `onExit`,
-    /// so the hub doesn't count the launch as played. The default is false.
+    /// True once the game has failed to start, such as an engine that couldn't load it, or was ended before it started.
+    /// Set it before calling `onExit`, or in `terminate`, so the hub doesn't count the launch as played. The default is
+    /// false.
     var failedToStart: Bool { get }
 }
 
