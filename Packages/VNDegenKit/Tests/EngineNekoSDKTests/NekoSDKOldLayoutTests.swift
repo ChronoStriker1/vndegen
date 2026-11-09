@@ -69,6 +69,49 @@ import TestSupport
         #expect(pixel(e, 194, 326) != [255, 0, 0])
     }
 
+    // `layoutpairs`: Test Game 96's PC saves hold each place's picture twice, the lit one in the slot after the place's
+    // own, and the story's commands know only the place. Here command 15 stands in for a loaded save's lit pictures, in
+    // slots 601 and 101: taking place 3's picture away takes 601's with it, and a new background takes 101's.
+    @Test(arguments: [true, false]) func aPlacesSecondSlotGoesWithIt(pairs: Bool) throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(pairs ? "layoutpairs" : "layoutold")\nFirstFlow\tflow\\t.txt\n".utf8),
+            "bg.pak": NekoSDKFlowFixture.archive([("g.bmp", bmp(4, 4, [0, 255, 0]))]),
+            "sc.pak": NekoSDKFlowFixture.archive([("r.bmp", bmp(101, 81, [0, 0, 255]))]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 10, next: 3, s: [1: "bg\\g.bmp"]),
+                .init(op: 13, next: 4, p: [0: 3], s: [1: "sc\\r.bmp"]),
+                .init(op: 15, next: 5, p: [1: 900, 2: 100, 3: 601], s: [1: "sc\\r.bmp"]),
+                .init(op: 15, next: 6, p: [1: 900, 2: 300, 3: 101], s: [1: "sc\\r.bmp"]),
+                .init(op: 9, next: 7),
+                .init(op: 2, next: 8, p: [0: 1000]),
+                .init(op: 14, next: 9, p: [0: 3]),
+                .init(op: 10, next: 10, s: [1: "bg\\g.bmp"]),
+                .init(op: 9, next: 11),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        let red: [UInt8] = [255, 0, 0]
+        #expect(pixel(e, 189, 319) == red)
+        #expect(pixel(e, 950, 140) == red)
+        #expect(pixel(e, 950, 340) == red)
+        for _ in 0..<100 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 0, 0) == [0, 255, 0])
+        #expect(pixel(e, 189, 319) != red)
+        // Without the setting the slots after are no one's, and stay.
+        #expect((pixel(e, 950, 140) == red) == !pairs)
+        #expect((pixel(e, 950, 340) == red) == !pairs)
+    }
+
     // Test Game 87 picks a standing picture's slot by parameter 1 (`layoutslotby p1`), and 14 deletes by that number.
     @Test func slotsByParameter1AndDeletesBySlot() throws {
         let root = try NekoSDKFlowFixture.game([

@@ -12,3 +12,10 @@ screen choice
 choicecolumns 4
 close 200 0.5
 )";
+
+// The older layout with a second record to each place, `layoutpairs`, as Test Game 96's PC saves hold a lit picture in
+// the slot after each place's own (NekoSDKOldLayoutTests).
+const char kLayoutPairsTest[] = R"(
+screen defaults
+layoutpairs
+)";

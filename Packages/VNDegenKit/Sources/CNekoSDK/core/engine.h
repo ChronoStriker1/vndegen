@@ -508,6 +508,8 @@ private:
     // all of the entry's pictures, the panel hidden, the slideshow, zoom in hundredths, the entry's music and the art shown.
     size_t viewEntry_ = 0, viewImage_ = 0;
     bool viewPanelHidden_ = false, viewAuto_ = false, viewMuted_ = false, replayFromViewer_ = false;
+    // The Scene screen's tab and page as a replay began, for `replaykeeps`.
+    int replayTab_ = 0, replayPage_ = -1;
     int64_t viewMs_ = 0, viewAutoFrom_ = 0;
     int viewZoom_ = 100, viewMusic_ = 0;
     int movieZoom_ = 100;  // the manual animation control's zoom, in hundredths
@@ -642,6 +644,8 @@ private:
     // The older layout's slot for each place of a standing picture, each place's middle from the screen's, and the
     // background's and the CG's slots, as Test Game 83 has them.
     std::vector<int> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
+    bool layoutPairs_ = false;
+    void clearLayoutSlot(int slot);
     bool layoutSlotByP1_ = false;
     int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;

@@ -437,6 +437,13 @@ void Engine::endStory(const std::string &screen) {
         closeViewer();
         viewerShow(viewEntry_, viewImage_);
     }
+    // `replaykeeps` under `screen scene`: a replay comes back to the tab and page its card was on, as Test Game 96's PC
+    // does (set 2, under Wine). Other games come back to the screen as it opens, which no one has measured on their PCs.
+    if (to == "scene" && !toViewer && replayPage_ >= 0 && screen_ && screen_->setting("replaykeeps")) {
+        galleryTab_ = replayTab_;
+        if (galleryPageExists(replayPage_)) page_ = replayPage_;
+    }
+    replayPage_ = -1;
 }
 
 void Engine::startStory() {
@@ -1897,6 +1904,8 @@ bool Engine::startReplay(const GalleryEntry &scene) {
             if (it->second.size() >= 2 && normalizedPath(it->second[0]) == normalizedPath(scene.keys[0])) name = "story:" + it->second[1];
     auto flow = loadScript(name);
     if (!flow || !flow->first()) return false;
+    replayTab_ = galleryTab_;
+    replayPage_ = screen_ && screen_->name == "scene" ? page_ : -1;
     stopTrack();
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
