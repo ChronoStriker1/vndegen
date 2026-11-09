@@ -48,18 +48,20 @@ public:
         if (layer == Layer::UnderWindow && !hidden_) comments_.draw(host, out);
     }
     // The message window's Comment button (msg_button.ini's `#inner Comment`, a toggle) hides the comments and shows
-    // them again; they go on running hidden. With no comments on screen or to come it's drawn disabled, as the PC draws
-    // it on a line that has none (set 2, a PC shot under Wine), and does nothing. It's drawn lit while they're hidden,
-    // which hasn't been checked on the PC.
+    // them again; they go on running hidden. Measured on the PC under Wine in sc_001_000_000_001 (set 2, the button's
+    // rows read from shots): it's drawn disabled until the scene loads a comment list (command 110), plain from then on,
+    // on lines with no comment on screen too, and can be pressed there; pressed it's lit and the comments are hidden,
+    // and pressed again they're moving where they'd have got to. Whether a later scene with no list disables it again
+    // wasn't measured: here it stays usable until the story ends.
     bool action(PartHost &host, const std::string &name) override {
         if (name != "Comment") return false;
-        if (comments_.active()) hidden_ = !hidden_;
+        if (usable()) hidden_ = !hidden_;
         host.redraw();
         return true;
     }
     int actionLit(const std::string &name) const override {
         if (name != "Comment") return -1;
-        return !comments_.active() ? 2 : hidden_ ? 1 : 0;
+        return !usable() ? 2 : hidden_ ? 1 : 0;
     }
     void save(std::vector<std::string> &lines) const override { comments_.saveState(lines); }
     void load(const std::vector<std::string> &lines) override { pending_ = lines; }
@@ -69,6 +71,7 @@ public:
     }
 
 private:
+    bool usable() const { return comments_.loaded() || comments_.active(); }
     CommentStream comments_;
     std::vector<std::string> pending_;
     bool hidden_ = false;  // the player's choice, kept across scenes and loads
