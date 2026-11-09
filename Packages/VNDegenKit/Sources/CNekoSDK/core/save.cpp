@@ -38,6 +38,9 @@ struct SaveLayout {
     // Test Games 82 and 83's PC writes a Previous Choice file, `saveNNNs.sav`, beside each save, and reads it with the
     // save: the state at the last choice, which Return to Choice goes back to (sets 2 and 3).
     bool previousChoice = false;
+    // What 116 bytes into the block before the variables holds (SaveData::choiceColumns): Test Game 82's choice sheet's
+    // columns, or in Test Game 83 the option taken, and the count while a choice waits (sets 2 and 3).
+    bool choiceResultAt116 = false;
     // The number global 0 gives the first card, the one NEW marks after a save to it: 1 in Test Game 94 and The Alchemist,
     // whose cfg.sav held 2 and 1 for their second and first cards, and 0 in Test Game 87, which held 2 after a save to
     // its third and crashed opening a Load page whose global 0 was one past its last card (set 1, under Wine). Test
@@ -83,6 +86,7 @@ const SaveLayout kFunbag2 = [] {
     SaveLayout l = older(26, 0, {}, 818, {}, 123);
     l.choiceFlag = ChoiceFlag::Never;
     l.previousChoice = true;
+    l.choiceResultAt116 = true;
     return l;
 }();
 // Test Game 82's 32 PC saves (set 2), half of them Previous Choice files, are Test Game 83's layout with sprite records
@@ -292,6 +296,7 @@ bool namesPictureTwice(const SaveLayout &layout) {
 
 ChoiceFlag choiceFlag(const SaveLayout &layout) { return layout.choiceFlag; }
 bool writesPreviousChoice(const SaveLayout &layout) { return layout.previousChoice; }
+bool choiceResultAt116(const SaveLayout &layout) { return layout.choiceResultAt116; }
 int newCardNumber(const SaveLayout *layout, int slot) { return slot - 1 + (layout ? layout->firstCard : 1); }
 int newCardSlot(const SaveLayout *layout, int number) { return number + 1 - (layout ? layout->firstCard : 1); }
 

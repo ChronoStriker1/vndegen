@@ -79,9 +79,10 @@ struct SaveData {
     // In the story-in-exe games, the last choice's result, 2 while one waits, or -1 to leave the layout's (set 1, Test
     // Game 87), or in Test Game 83 2 once any choice is made (set 3): 112 bytes into the block before the variables.
     int lastChoice = -1;
-    // Test Games 82 and 83 keep the latest choice asked in the same block: its options' count in lastChoice's place, the
-    // choice sheet's columns 116 bytes in, and from 152 the cells it showed, a list the PC never clears, so a choice with
-    // fewer options leaves the last one's later cells (sets 2 and 3's PC saves). -1 and none when not written.
+    // Test Games 82 and 83 keep the latest choice asked in the same block: its options' count in lastChoice's place, 116
+    // bytes in the choice sheet's columns in 82 and the option taken in 83 (the count while it waits), and from 152 the
+    // cells it showed, a list the PC never clears, so a choice with fewer options leaves the last one's later cells (sets
+    // 2 and 3's PC saves). -1 and none when not written.
     int choiceColumns = -1;
     std::vector<int> choiceCells;
     std::map<int, int> variables;  // the 10,000 ints, by number
@@ -128,6 +129,8 @@ bool namesPictureTwice(const SaveLayout &layout);
 ChoiceFlag choiceFlag(const SaveLayout &layout);
 // Whether the game's PC keeps a Previous Choice file, `saveNNNs.sav`, beside each save.
 bool writesPreviousChoice(const SaveLayout &layout);
+// Whether SaveData::choiceColumns holds the option taken, as in Test Game 83, rather than the sheet's columns.
+bool choiceResultAt116(const SaveLayout &layout);
 // The NEW card as cfg.sav's global 0 holds it, from a save slot (1 for save001), and back: per game, counted from 1 or 0.
 int newCardNumber(const SaveLayout *layout, int slot);
 int newCardSlot(const SaveLayout *layout, int number);
