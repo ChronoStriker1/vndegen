@@ -1,10 +1,19 @@
 // Test Game 90 (Mankitsu Happening)'s face pictures and scene-change slides, commands 130 to 145 and 160 to 163, which
 // no other game uses. Measured on the PC game under Wine (set 1), from 30 fps recordings of its first scenes.
 //
-// Faces: 130 loads an `ac\` picture into a face slot (parameter 2, 2000), 131 removes one (parameter 0) and 138 all of
-// them, and 132 shows what's loaded, fading over parameter 1 ms as a screen update does. A face sits at the message
-// window's top left, (0, 512), over its plate and under its text, exactly where the PC draws it, and goes with the
-// window. 136 (moving a face), 139 (a face flipbook) and 145 (a face shake) are taken and not yet drawn.
+// Faces: a layer of its own inside the message window, with its origin at the window's top left, (0, 512), over its
+// plate and under its text, and gone with the window. 130 loads an `ac\` picture into a face slot (parameter 2: 2000,
+// or 2001 for a second face beside it) at parameters 0 and 1 from that origin; 131 removes one (parameter 0) and 138 all
+// of them; 132 shows what's loaded, fading over parameter 1 ms as a screen update does. 136 is the scene's timed change
+// (25) for a face slot, used only to move one, a nod or a hop: by parameters 0 and 1, after parameter 24 frames and over
+// parameter 25 (negative easing out), at 60 frames a second. 139 is the scene's flipbook (121) there, the emotion marks:
+// slot parameter 0 (3000), the unscaled picture's top left at parameters 2 and 3, scaled about its middle by parameters
+// 4 and 5 in thousandths, each picture shown for parameter 16 ms, and repeating with parameter 14. A face's place was
+// fitted exactly on PC frames, and an anger mark at -20, -20 and 0.31 sits at 46, 47 from the origin, as these rules
+// give; its 41 pictures took 1.3 s, two frames each for parameter 16's 30 ms and not anime_bustup_cfg.ini's 16 (30 fps
+// recordings under Wine). The hop's pace wasn't settled (10 pixels came back over about 0.27 s where 10 frames would be 0.17), and
+// 130's parameters 3 to 5 (1, 1, 200 in a quarter of the loads, each still followed by a 132) show nothing; the one
+// face shake (145) isn't drawn.
 //
 // Slides: 160 names two panel pictures (s1, s2), 162 starts bars of them sliding in from the left until they cover the
 // screen, 161 waits until they do, while the scene changes behind them, and 163 slides them off to the right and waits
@@ -31,6 +40,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <map>
 #include <sstream>
@@ -105,6 +115,26 @@ struct Rect {
     bool contains(int px, int py) const { return px >= x && px < x + w && py >= y && py < y + h; }
 };
 
+// A face slot's picture, or its flipbook of emotion marks.
+struct Face {
+    std::string path;
+    int x = 0, y = 0;
+    // A flipbook (139): its pictures and time each, scale, whether it repeats, and when the update that showed it ended.
+    int flipCount = 0, flipMs = 0;
+    int64_t flipFrom = 0;
+    float scale = 1;
+    bool flipLoop = false, scaleAboutMiddle = true;
+    bool same(const Face &o) const { return path == o.path && x == o.x && y == o.y && flipCount == o.flipCount; }
+};
+
+// A timed move of a face slot (136).
+struct FaceMove {
+    int slot = 0, dx = 0, dy = 0;
+    int64_t from = 0;
+    int ms = 0;
+    bool easeOut = false;
+};
+
 struct Bar {
     int y = 0, h = 0;
     int inDelay = 0, inMs = 0, outDelay = 0, outMs = 0;
@@ -114,20 +144,66 @@ class MankitsuPart : public GamePart {
 public:
     bool command(PartHost &host, const Node &n) override {
         switch (n.opcode) {
-        case 130: loaded_[n.p[2]] = n.s[1]; return true;
-        case 131: loaded_.erase(n.p[0]); return true;
-        case 138: loaded_.clear(); return true;
+        case 130: {
+            Face f;
+            f.path = n.s[1];
+            f.x = n.p[0];
+            f.y = n.p[1];
+            loaded_[n.p[2]] = f;
+            dropMoves(n.p[2]);
+            return true;
+        }
+        case 131:
+            loaded_.erase(n.p[0]);
+            return true;
+        case 138:
+            loaded_.clear();
+            return true;
         case 132:
             from_ = shown_;
             shown_ = loaded_;
             fadeFrom_ = host.nowMs();
             fadeMs_ = std::max(0, int(n.p[1]));
+            // A flipbook plays from halfway through the update that first shows it, as the PC's anger mark was on its tenth
+            // picture two frames after a 500 ms update ended (one mark, so unconfirmed), and goes on through later ones.
+            for (auto &[slot, f] : shown_) {
+                auto before = from_.find(slot);
+                f.flipFrom = before != from_.end() && before->second.same(f) ? before->second.flipFrom : fadeFrom_ + fadeMs_ / 2;
+                loaded_[slot].flipFrom = f.flipFrom;
+            }
             host.redraw();
             return true;
-        case 136: case 139: case 145:
-            if (!warned_) host.log("Test Game 90's face move, flipbook and shake aren't drawn yet");
-            warned_ = true;
+        case 136: {
+            FaceMove m;
+            m.slot = n.p[2];
+            m.dx = n.p[0];
+            m.dy = n.p[1];
+            m.from = host.nowMs() + int64_t(n.p[24]) * 1000 / 60;
+            m.ms = std::abs(int(n.p[25])) * 1000 / 60;
+            m.easeOut = n.p[25] < 0;
+            moves_.push_back(m);
             return true;
+        }
+        case 139: {
+            readFlipbooks(host);
+            Face f;
+            f.path = n.s[1];
+            f.x = n.p[2];
+            f.y = n.p[3];
+            f.scale = n.p[4] > 0 ? float(n.p[4]) / 1000 : 1;
+            f.scaleAboutMiddle = n.p[8] != 0;
+            f.flipLoop = n.p[14] != 0;
+            auto it = flipbooks_.find(lower(n.s[1]));
+            f.flipCount = it == flipbooks_.end() ? 1 : it->second.first;
+            // Parameter 16's ms a picture, in whole frames of 60 a second: 30 ms held each of an anger mark's pictures two
+            // frames on the PC.
+            int ms = n.p[16] > 0 ? n.p[16] : it == flipbooks_.end() ? 16 : it->second.second;
+            f.flipMs = std::max(1, (ms * 60 + 999) / 1000) * 1000 / 60;
+            loaded_[n.p[0]] = f;
+            return true;
+        }
+        case 145:
+            return true;  // a face shake, once in the game: not drawn
         case 160:
             panels_[0] = n.s[1];
             panels_[1] = n.s[2];
@@ -151,6 +227,11 @@ public:
         if (menu_ == "title") return true;  // the backgrounds and the trim move
         int64_t now = host.nowMs();
         bool fading = now - fadeFrom_ < fadeMs_;
+        // Moves that have ended stay, as where the face now is; a flipbook runs from the end of the update that showed it.
+        for (const FaceMove &m : moves_)
+            if (now < m.from + m.ms) fading = true;
+        for (const auto &[slot, f] : shown_)
+            if (f.flipCount > 1 && (f.flipLoop || now - f.flipFrom < int64_t(f.flipCount) * f.flipMs)) fading = true;
         bool sliding = slideFrom_ >= 0 && (outFrom_ < 0 || now - outFrom_ < uncoverMs());
         if (outFrom_ >= 0 && now - outFrom_ >= uncoverMs()) slideFrom_ = outFrom_ = -1;
         return fading || sliding;
@@ -317,16 +398,19 @@ public:
     }
 
     void save(std::vector<std::string> &lines) const override {
-        for (const auto &[slot, path] : shown_) lines.push_back("face " + std::to_string(slot) + " " + path);
+        // `face SLOT X Y PATH`; a flipbook has played by the time a save can be made, and isn't kept.
+        for (const auto &[slot, f] : shown_)
+            if (!f.flipCount) lines.push_back("face " + std::to_string(slot) + " " + std::to_string(f.x) + " " + std::to_string(f.y) + " " + f.path);
     }
 
     void load(const std::vector<std::string> &lines) override {
         reset();
         for (const std::string &line : lines) {
             std::istringstream in(line);
-            std::string word, path;
+            std::string word;
+            Face f;
             int slot = 0;
-            if (in >> word >> slot >> path && word == "face") shown_[slot] = loaded_[slot] = path;
+            if (in >> word >> slot >> f.x >> f.y >> f.path && word == "face") shown_[slot] = loaded_[slot] = f;
         }
     }
 
@@ -334,6 +418,7 @@ public:
         loaded_.clear();
         shown_.clear();
         from_.clear();
+        moves_.clear();
         fadeMs_ = 0;
         slideFrom_ = outFrom_ = -1;
         selecting_ = false;
@@ -371,18 +456,80 @@ private:
         put(host, out, six ? "obj\\d010_002.bmp" : "obj\\d006_002.bmp", 842, 694);
     }
 
+    static std::string lower(std::string text) {
+        for (char &c : text) c = char(std::tolower(uint8_t(c)));
+        return text;
+    }
+
+    void dropMoves(int slot) {
+        moves_.erase(std::remove_if(moves_.begin(), moves_.end(), [&](const FaceMove &m) { return m.slot == slot; }), moves_.end());
+    }
+
+    // cfg\anime_bustup_cfg.ini: `#anime PICTURES FIRST MS ...` for each flipbook the face layer plays.
+    void readFlipbooks(PartHost &host) {
+        if (flipbooksRead_) return;
+        flipbooksRead_ = true;
+        auto bytes = host.read("cfg\\anime_bustup_cfg.ini");
+        if (!bytes) return;
+        std::istringstream in(std::string(bytes->begin(), bytes->end()));
+        for (std::string line; std::getline(in, line);) {
+            std::istringstream words(line);
+            std::string word, path;
+            int count = 0, ms = 0;
+            if (words >> word >> count >> path >> ms && word == "#anime" && count > 0 && ms > 0) flipbooks_[lower(path)] = {count, ms};
+        }
+    }
+
+    // A flipbook's picture: the first's name with its last number counted on.
+    static std::string flipPicture(const std::string &first, int index) {
+        size_t dot = first.rfind('.');
+        if (dot == std::string::npos || dot < 3) return first;
+        char digits[8];
+        std::snprintf(digits, sizeof digits, "%03d", index);
+        return first.substr(0, dot - 3) + digits + first.substr(dot);
+    }
+
     void drawFaces(PartHost &host, Canvas &out) {
-        float t = fadeMs_ > 0 ? std::clamp(float(host.nowMs() - fadeFrom_) / float(fadeMs_), 0.0f, 1.0f) : 1.0f;
-        auto drawSet = [&](const std::map<int, std::string> &set, float alpha) {
+        int64_t now = host.nowMs();
+        float t = fadeMs_ > 0 ? std::clamp(float(now - fadeFrom_) / float(fadeMs_), 0.0f, 1.0f) : 1.0f;
+        auto drawSet = [&](const std::map<int, Face> &set, float alpha) {
             if (alpha <= 0) return;
-            for (const auto &[slot, path] : set)
-                if (ImageRef img = host.image(path)) drawPart(out, *img, kFaceX, kFaceY, 0, 0, img->w, img->h, alpha);
+            for (const auto &[slot, f] : set) {
+                float x = float(kFaceX + f.x), y = float(kFaceY + f.y);
+                for (const FaceMove &m : moves_) {
+                    if (m.slot != slot || now <= m.from) continue;
+                    float p = m.ms > 0 ? std::min(1.0f, float(now - m.from) / float(m.ms)) : 1.0f;
+                    if (m.easeOut) p = 1 - (1 - p) * (1 - p);
+                    x += float(m.dx) * p;
+                    y += float(m.dy) * p;
+                }
+                std::string path = f.path;
+                if (f.flipCount > 0) {
+                    if (now < f.flipFrom) continue;
+                    int64_t step = (now - f.flipFrom) / std::max(1, f.flipMs);
+                    if (!f.flipLoop && step >= f.flipCount) continue;  // played: nothing is left of it
+                    path = flipPicture(f.path, int(step % f.flipCount));
+                }
+                ImageRef img = host.image(path);
+                if (!img) continue;
+                if (f.scale == 1) {
+                    drawPart(out, *img, int(std::lround(x)), int(std::lround(y)), 0, 0, img->w, img->h, alpha);
+                } else {
+                    // The unscaled picture's top left is the place; scaling keeps its middle there.
+                    float cx = x + float(img->w) / 2, cy = y + float(img->h) / 2;
+                    if (!f.scaleAboutMiddle) {
+                        cx = x + float(img->w) * f.scale / 2;
+                        cy = y + float(img->h) * f.scale / 2;
+                    }
+                    drawImage(out, *img, cx, cy, f.scale, f.scale, 0, alpha);
+                }
+            }
         };
         // A face that stays is drawn once, in full; one going fades out as one coming fades in.
-        std::map<int, std::string> going, coming, staying;
-        for (const auto &[slot, path] : from_) (shown_.count(slot) && shown_.at(slot) == path ? staying : going)[slot] = path;
-        for (const auto &[slot, path] : shown_)
-            if (!staying.count(slot)) coming[slot] = path;
+        std::map<int, Face> going, coming, staying;
+        for (const auto &[slot, f] : from_) (shown_.count(slot) && shown_.at(slot).same(f) ? staying : going)[slot] = f;
+        for (const auto &[slot, f] : shown_)
+            if (!staying.count(slot)) coming[slot] = f;
         drawSet(staying, 1);
         drawSet(going, 1 - t);
         drawSet(coming, t);
@@ -594,7 +741,10 @@ private:
     std::array<std::array<Card, 4>, kPhases> phaseCards_{};
     std::array<std::vector<int>, 3> charPlaces_;
 
-    std::map<int, std::string> loaded_, shown_, from_;
+    std::map<int, Face> loaded_, shown_, from_;
+    std::vector<FaceMove> moves_;
+    std::map<std::string, std::pair<int, int>> flipbooks_;
+    bool flipbooksRead_ = false;
     int64_t fadeFrom_ = 0;
     int fadeMs_ = 0;
     std::string panels_[2];
@@ -602,7 +752,6 @@ private:
     std::vector<Bar> bars_;
     int64_t slideFrom_ = -1, outFrom_ = -1;
     uint32_t slides_ = 0;
-    bool warned_ = false;
 };
 
 }  // namespace
