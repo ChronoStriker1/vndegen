@@ -592,6 +592,9 @@ private:
     void playVoiceAgain(const std::string &voice);
     bool logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &sheet, int &col) const;
     int autoPerCharMs_ = -1;
+    int autoBaseMs_ = 0;
+    // `autowithvoice`: auto's pause runs alongside the voice, not after it.
+    bool autoWithVoice_ = false;
     // `inwindow` under `screen log`: the backlog shown a line at a time in the message window, as Test Game 83's (set 3).
     // windowLog_ is how many lines back is showing, 0 for the line in play.
     int windowLog_ = 0;

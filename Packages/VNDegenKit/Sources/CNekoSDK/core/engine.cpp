@@ -1896,6 +1896,8 @@ void Engine::applySettings() {
     static const int kAutoPercent[] = {200, 100, 50, 0};
     autoDelayMs_ = kAutoDelayMs * kAutoPercent[std::clamp(setting("auto"), 0, 3)] / 100;
     autoPerCharMs_ = -1;
+    autoBaseMs_ = 0;
+    autoWithVoice_ = false;
     charFadeMs_ = kCharFadeMs;
     // `textcurve SETTING A B` and `autocurve SETTING A B` under `screen defaults`: a 0 to 100 slider's text speed as
     // A - B x value ms a character, and auto's pause after a line as that many ms for each of its characters, as Test
@@ -1917,8 +1919,17 @@ void Engine::applySettings() {
         }
         // `textfade MS`: how long each character takes to fade in, under 50 ms in Test Game 87 (set 1, under Wine).
         if (const auto *fade = defaults->second.setting("textfade"); fade && !fade->empty()) charFadeMs_ = std::max(0, field(*fade, 0));
-        if (const auto *curve = defaults->second.setting("autocurve"); curve && curve->size() >= 3)
-            autoPerCharMs_ = std::max(0, field(*curve, 1) - field(*curve, 2) * setting((*curve)[0]));
+        // `autocurve SETTING A B BASE BASESLOPE` adds BASE - BASESLOPE x value ms to the pause while it has any per character,
+        // as Test Game 87's does: 104 - 1.04v ms a character and about 527 - v ms more, and none at 100, where it goes on
+        // within a frame or two (set 1, 30 fps recordings under Wine at 0, 50, 75 and 100, within 33 to 90 ms rms).
+        if (const auto *curve = defaults->second.setting("autocurve"); curve && curve->size() >= 3) {
+            double v = setting((*curve)[0]);
+            autoPerCharMs_ = std::max(0, int(std::lround(std::atof((*curve)[1].c_str()) - std::atof((*curve)[2].c_str()) * v)));
+            if (curve->size() >= 5 && autoPerCharMs_ > 0)
+                autoBaseMs_ = std::max(0, int(std::lround(std::atof((*curve)[3].c_str()) - std::atof((*curve)[4].c_str()) * v)));
+        }
+        // Test Game 87 goes on at whichever ends later, the voice or the pause after the text (set 1, under Wine).
+        autoWithVoice_ = defaults->second.setting("autowithvoice") != nullptr;
     }
     if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
     applyArtSwitch();
@@ -4509,8 +4520,12 @@ bool Engine::step(int ms) {
     bool autoNext = false;
     if (autoMode_ && waiting_ == Waiting::Click && textDone_ && !windowLog_) {
         bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
-        if (voiceGoing) autoReadyAt_ = -1;
-        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + (autoPerCharMs_ >= 0 ? autoPerCharMs_ * int64_t(textGlyphs_.size()) : autoDelayMs_);
+        int64_t pause = autoPerCharMs_ >= 0 ? autoBaseMs_ + autoPerCharMs_ * int64_t(textGlyphs_.size()) : autoDelayMs_;
+        if (autoWithVoice_) {
+            if (autoReadyAt_ < 0) autoReadyAt_ = now_ + pause;
+            else if (now_ >= autoReadyAt_ && !voiceGoing) autoNext = true;
+        } else if (voiceGoing) autoReadyAt_ = -1;
+        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + pause;
         else if (now_ >= autoReadyAt_) autoNext = true;
     } else {
         autoReadyAt_ = -1;
