@@ -23,8 +23,11 @@ namespace neko {
 namespace {
 
 // The pick screen's clock from the PC's own S 2000 (the truth, which is the day) and S 2001 (the hour), as set 2's hub
-// keeps them, or the hub's S 15105 and S 15104; and S 105, the PC's mode, 8 at a pick.
-constexpr int kPcDayVar = 2000, kPcHourVar = 2001, kHourVar = 15104, kDayVar = 15105, kModeVar = 105, kModePick = 8;
+// keeps them, or the hub's S 15105 and S 15104; and S 105, the PC's mode, 8 at a pick and 4 in a scene.
+constexpr int kPcDayVar = 2000, kPcHourVar = 2001, kHourVar = 15104, kDayVar = 15105;
+constexpr int kModeVar = 105, kModePick = 8, kModeScene = 4;
+// PartHost's sound kinds, and the vote's own channels: a voice for each heroine from 0, and her effect from 20.
+constexpr int kEffectKind = 1, kVoiceKind = 2, kEffectChannel = 20;
 constexpr int kResultTree = 9;
 
 // The pick screen: each heroine's panel (390 by 340 cells, three frames of a shimmer across and its states down: 0 at
@@ -285,8 +288,12 @@ private:
         for (int h = 2; h >= 0; h--) {
             const Panel &p = kPanels[h];
             if (!Rect{p.x, p.y, kPanelW, kPanelH}.contains(x, y)) continue;
+            // A sheet that's missing, or too small to hold the place, as a replacement picture can be, leaves the whole
+            // rectangle to press.
             ImageRef sheet = host.image(p.sheet);
-            if (!sheet || sheet->rgba[(size_t(y - p.y) * sheet->w + size_t(x - p.x)) * 4 + 3] > 128) return h;
+            int sx = x - p.x, sy = y - p.y;
+            if (!sheet || sx >= sheet->w || sy >= sheet->h) return h;
+            if (sheet->rgba[(size_t(sy) * size_t(sheet->w) + size_t(sx)) * 4 + 3] > 128) return h;
         }
         return -1;
     }
@@ -313,6 +320,14 @@ private:
     }
 
     bool finish(PartHost &host, int result) {
+        // The vote's voices and effects end with it, so none runs on into the story's next line; and the story is in
+        // a scene again, 4 in the PC's mode, unless the tree opens and the pick comes back.
+        if (phase_ == Phase::Vote)
+            for (int who = 0; who < 3; who++) {
+                host.stopSound(kVoiceKind, who);
+                host.stopSound(kEffectKind, kEffectChannel + who);
+            }
+        if (result != kResultTree) host.setVariable(1, kModeVar, kModeScene);
         phase_ = Phase::Closed;
         comments_.reset();
         host.finishScreen(result);
@@ -364,10 +379,12 @@ private:
             h.pop = arg(5) == "POP";
             h.text = path(arg(6));
             h.bubbleAt = host.nowMs();
-            if (!arg(7).empty()) host.playSound(2, e.who, path(arg(7)));
+            if (!arg(7).empty()) host.playSound(kVoiceKind, e.who, path(arg(7)));
         } else if (e.kind == "se_shake") {
             // `se_shake PATH SINGLE MS`; one of vote 1's names no sound.
-            if (arg(0).rfind("se", 0) == 0) host.playSound(1, 20 + e.who, path(arg(0)));
+            if (arg(0).rfind("se", 0) == 0) host.playSound(kEffectKind, kEffectChannel + e.who, path(arg(0)));
+        } else if (e.kind == "se_stop") {
+            host.stopSound(kEffectKind, kEffectChannel + e.who);
         }
     }
 
@@ -388,7 +405,7 @@ private:
         // A bubble goes when its voice has finished, two seconds on at the least.
         for (int w = 0; w < 3; w++) {
             Heroine &h = heroines_[size_t(w)];
-            if (h.bubble && host.nowMs() - h.bubbleAt >= kBubbleMinMs && !host.soundPlaying(2, w)) h.bubble = false;
+            if (h.bubble && host.nowMs() - h.bubbleAt >= kBubbleMinMs && !host.soundPlaying(kVoiceKind, w)) h.bubble = false;
         }
     }
 
@@ -505,7 +522,8 @@ private:
         if (h.pop && in < 1) {
             // POP grows from the middle.
             float scale = 0.5f + 0.5f * in;
-            if (sheet) drawImage(out, *cellOf(sheet, 6, side.cell), x + kBubbleW / 2.0f, y + kBubbleH / 2.0f, scale, scale, 0, 1);
+            ImageRef shape = sheet ? cellOf(sheet, 6, side.cell) : nullptr;
+            if (shape) drawImage(out, *shape, x + kBubbleW / 2.0f, y + kBubbleH / 2.0f, scale, scale, 0, 1);
             if (text) drawImage(out, *text, x + kBubbleW / 2.0f, y + kBubbleH / 2.0f, scale, scale, 0, 1);
             return;
         }
@@ -522,8 +540,9 @@ private:
         auto key = std::make_pair(sheet.get(), col);
         auto it = cells_.find(key);
         if (it != cells_.end()) return it->second;
-        auto image = std::make_shared<Image>();
         int w = sheet->w / cols;
+        if (w <= 0 || sheet->h <= 0) return nullptr;
+        auto image = std::make_shared<Image>();
         image->w = w;
         image->h = sheet->h;
         image->opaque = false;

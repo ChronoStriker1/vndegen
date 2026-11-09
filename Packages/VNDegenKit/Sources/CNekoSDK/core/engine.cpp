@@ -6198,6 +6198,12 @@ void Engine::playSound(const Node &n, int kind) {
     if (kind == kKindSe && p[4] == 0) seNow_[channel] = {n.s[1], volume, p[2]};
 }
 
+bool Engine::soundPlaying(int kind, int channel) {
+    auto &channels = channelsOf(kind);
+    auto it = channels.find(channel);
+    return it != channels.end() && audio_.playing(it->second);
+}
+
 void Engine::changeVolume(int kind, int channel, int volume, int ms) {
     auto &channels = channelsOf(kind);
     auto it = channels.find(channel);

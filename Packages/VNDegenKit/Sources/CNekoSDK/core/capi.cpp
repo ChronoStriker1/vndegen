@@ -107,6 +107,15 @@ bool vnneko_debug_saved_name(const char *gameRoot, const char *path, char *out, 
     return true;
 }
 int vnneko_debug_variable(VNNekoEngine *e, int scope, int number) { return e->engine.variable(scope, number); }
+bool vnneko_debug_sound_playing(VNNekoEngine *e, int kind, int channel) { return e->engine.soundPlaying(kind, channel); }
+size_t vnneko_debug_rebuild_save(const char *userDataDirectory, const uint8_t *plain, size_t size, uint8_t *out, size_t outSize) {
+    const neko::SaveLayout *layout = neko::saveLayout(userDataDirectory);
+    neko::SaveData data;
+    if (!layout || !neko::parseSave(std::vector<uint8_t>(plain, plain + size), *layout, data)) return 0;
+    std::vector<uint8_t> built = neko::buildSave(data, *layout);
+    std::copy_n(built.begin(), std::min(built.size(), outSize), out);
+    return built.size();
+}
 int vnneko_debug_macro_number(const char *gameRoot, int scope, int index) {
     neko::Files files;
     if (!files.open(gameRoot)) return -1;

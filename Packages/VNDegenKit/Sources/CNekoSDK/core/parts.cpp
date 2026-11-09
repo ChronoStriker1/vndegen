@@ -156,11 +156,9 @@ void PartHost::waitMs(int ms) {
 void PartHost::finishScreen(int result) { e_.finishPartScreen(result); }
 void PartHost::openMenu(const std::string &action) { e_.runAction(action); }
 
-bool PartHost::soundPlaying(int kind, int channel) {
-    auto &channels = e_.channelsOf(kind);
-    auto it = channels.find(channel);
-    return it != channels.end() && e_.audio_.playing(it->second);
-}
+bool PartHost::soundPlaying(int kind, int channel) { return e_.soundPlaying(kind, channel); }
+
+void PartHost::stopSound(int kind, int channel) { e_.stopChannel(kind, channel, 0); }
 
 void PartHost::playSound(int kind, int channel, const std::string &path, int volume, bool loop) {
     Node n;

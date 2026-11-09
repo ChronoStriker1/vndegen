@@ -143,6 +143,12 @@ bool vnneko_debug_load(VNNekoEngine *e, int slot);
 void vnneko_debug_toggle_lock(VNNekoEngine *e, int slot);
 // For tests: the value of the global (scope 0) or scenario variable (1) with this number.
 int vnneko_debug_variable(VNNekoEngine *e, int scope, int number);
+// For tests: whether a sound still plays in this channel of music (kind 0), effects (1) or voices (2).
+bool vnneko_debug_sound_playing(VNNekoEngine *e, int kind, int channel);
+// For tests: a save's plain bytes read with the layout of the game whose UserDataDirectory this is, lower case, and
+// built again into `out`. Returns the built save's size, which may be more than `outSize` holds, or 0 when the save
+// can't be read or the folder has no layout.
+size_t vnneko_debug_rebuild_save(const char *userDataDirectory, const uint8_t *plain, size_t size, uint8_t *out, size_t outSize);
 // For tests: the number of the variable a script names by its place in macrolist.ini's list, global (scope 0) or
 // scenario (1), or -1 when there's no such place.
 int vnneko_debug_macro_number(const char *gameRoot, int scope, int index);

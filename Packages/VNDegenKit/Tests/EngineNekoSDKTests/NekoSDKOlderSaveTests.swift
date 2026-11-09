@@ -206,4 +206,32 @@ import TestSupport
         #expect(pixel(second, 194, 326) == [255, 0, 0])
         #expect(pixel(second, 0, 0) == [0, 255, 0])
     }
+
+    // A save read and built again keeps a sprite's alpha as it is, a value above 256 too, as a PC save of Test Game 94
+    // can hold: only Test Game 90's layout changes one, and only the 255 its shown sprites hold.
+    @Test func aRebuiltSaveKeepsAnAlphaAbove256() throws {
+        // The alpha's place past the record's names: 257 in Test Game 94's layout, 249 in 90's.
+        for (folder, place) in [("layout94", 257), ("layout90", 249)] {
+            let root = try game(folder)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let data = root.appendingPathComponent("data")
+            let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+            for _ in 0..<10 { _ = vnneko_step(e, 16) }
+            #expect(vnneko_debug_save(e, 1))
+            vnneko_stop(e)
+            var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", folder)))
+            let path = try #require(save.range(of: Data("sc\\r.bmp".utf8)))
+            let at = path.lowerBound - save.startIndex + 12 + place
+            #expect(int32(save, at) == (folder == "layout90" ? 255 : 256), "\(folder)")
+            for alpha in [Int32(512), 300, 255, 256, 100] {
+                // 90's layout holds 255 for a shown sprite and never 256, which it would write back as 255.
+                if folder == "layout90" && alpha == 256 { continue }
+                save.replaceSubrange((save.startIndex + at)..<(save.startIndex + at + 4), with: withUnsafeBytes(of: alpha.littleEndian, { Data($0) }))
+                var built = [UInt8](repeating: 0, count: save.count + 64)
+                let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\\(folder)", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+                #expect(size == save.count, "\(folder) \(alpha)")
+                #expect(Data(built.prefix(size)) == save, "\(folder) \(alpha)")
+            }
+        }
+    }
 }
