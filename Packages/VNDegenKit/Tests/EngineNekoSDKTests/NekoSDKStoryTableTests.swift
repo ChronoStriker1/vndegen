@@ -380,6 +380,12 @@ import TestSupport
         #expect(!status(ninth).contains("part screen"), "\(status(ninth))")
         vnneko_stop(ninth)
 
+        // A save inside the chapter holds the chapter scene's PC number, 102 for chapter 2.
+        let inside = try NekoSDKFlowFixture.unpacked(Data(contentsOf: saves.appendingPathComponent("save001.sav")))
+        func int32Inside(_ at: Int) -> Int32 { inside.subdata(in: (inside.startIndex + at)..<(inside.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } }
+        let insidePicture = Int(int32Inside(0xCD + 4 + 4196))
+        #expect(int32Inside(0xCD + 4 + 4196 + 4 + insidePicture + 39596 + 404) == 102)
+
         // A PC save has no lines beside it: the story goes on from its scene, here inside the chapter.
         let sidecar = try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
             .first { $0.lastPathComponent.lowercased() == "save001.vnd" }
