@@ -186,9 +186,10 @@ private:
         if (e.pictures.empty()) return;
         for (int i = 0; i < 10; i++) e.p[i] = p[i];
         e.bornMs = now;
-        // A script's numbers may be anything, so the sum is done wide and held to 1 to 400 dots.
-        int64_t made = int64_t(std::max(0, p[1])) * std::max(0, p[7]) / std::max(1, p[2]) * 5 / 8;
-        int count = int(std::clamp<int64_t>(made, 1, 400));
+        // A script's numbers may be anything, so the sum is done wide and cut at 640 before the five eighths: 1 to 400
+        // dots.
+        int64_t made = int64_t(std::max(0, p[1])) * std::max(0, p[7]) / std::max(1, p[2]);
+        int count = std::max(1, int(std::min<int64_t>(made, 640)) * 5 / 8);
         Random random{uint32_t(slot) * 2654435761u + 12345u};
         float w = float(host.width()), h = float(host.height());
         for (int i = 0; i < count; i++) {
