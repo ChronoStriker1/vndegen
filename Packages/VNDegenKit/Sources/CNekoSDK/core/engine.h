@@ -798,6 +798,7 @@ private:
     std::string returnTo_;
     int flowCallId_ = 0;
     std::string choiceImage_;
+    bool windowArtOnly_ = false;  // the frame behind the log with `keepwindow`: the window's picture alone
     bool choiceMade_ = false;  // a choice has been made this game, as Test Game 87's saves hold it
     std::vector<SavedText> backlog_;
     SavedText currentText_;

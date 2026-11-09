@@ -822,10 +822,14 @@ bool Engine::logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &s
 
 void Engine::openLog() {
     if (backlog_.empty() || !screens_.count("log")) return;
-    // The frame behind the log has no message on it, unless `keepwindow`, as Test Game 87's keeps it (set 1).
+    // The frame behind the log has no message on it. With `keepwindow` it keeps the window's picture, but not its text,
+    // buttons or wait mark, as Test Game 87's PC draws it (set 1).
     bool hidden = windowHiddenByPlayer_;
-    windowHiddenByPlayer_ = !screens_.at("log").setting("keepwindow");
+    bool keep = screens_.at("log").setting("keepwindow");
+    windowHiddenByPlayer_ = !keep;
+    windowArtOnly_ = keep;
     compose();
+    windowArtOnly_ = false;
     windowHiddenByPlayer_ = hidden;
     logBase_ = canvas_;
     logTop_ = 0;
@@ -6259,6 +6263,7 @@ void Engine::composeMessage(Canvas &out) {
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
+    if (windowArtOnly_) return;
     drawParts(out, Layer::Window);
     drawGlyphRun(out);
     composeGtCount(out);
@@ -6283,7 +6288,7 @@ void Engine::markRect(int &x, int &y, int &w, int &h) const {
 }
 
 bool Engine::markShowing() const {
-    return !screen_ && !logOpen_ && !dialogOpen_ && !windowHiddenByPlayer_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
+    return !screen_ && !logOpen_ && !dialogOpen_ && !windowHiddenByPlayer_ && !windowArtOnly_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
 }
 
 // The mark is the last thing drawn, over a copy of what's beneath it, so a tick where only the mark moved redraws just
