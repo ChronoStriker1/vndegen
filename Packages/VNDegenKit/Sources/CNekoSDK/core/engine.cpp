@@ -2626,7 +2626,8 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen) &&
+    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryByRule(atScreen) &&
+               !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen) &&
                !resumeStoryAt(d.scene)) {
         complain("The story table has no place for the save's scene " + d.scene);
     }
@@ -2731,7 +2732,9 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         channelsOf(kind)[channel] = player;
         (kind == kKindBgm ? bgmNow_ : seNow_)[channel] = {sound.path, sound.volume, sound.pan};
     }
-    auto script = d.scene.empty() ? nullptr : loadScript(d.scene);
+    // A PC save resumed at a screen's line opens the screen, without playing on in the scene it names, which a save keeps
+    // naming as the PC's does.
+    auto script = d.scene.empty() || atScreen ? nullptr : loadScript(d.scene);
     scene_ = script ? Frame{script, script->node(d.node)} : Frame{};
     lastScene_ = d.scene;
     // The latest choice asked comes back with the save, for the next save to keep (82 and 83).
@@ -3005,8 +3008,10 @@ void Engine::composeSlots(Canvas &out) {
                 drawPart(out, *quickMark, numberX, cy + offset("slotdigits", 2), 0, 0, quickMark->w, quickMark->h, 1);
                 numberX += quickMark->w;
             }
-            // `slotdigits SHEET X Y COUNT [STEP]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide digits).
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), 10, offset("slotdigits", 4));
+            // `slotdigits SHEET X Y COUNT [STEP] [CELLS]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide
+            // digits), from a sheet of CELLS, 10 when absent (13 for Test Game 96's, its date's marks after the digits).
+            int numberCells = offset("slotdigits", 5) > 0 ? offset("slotdigits", 5) : 10;
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4));
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -3055,6 +3060,14 @@ void Engine::composeSlots(Canvas &out) {
                         if (blank && value == 0 && i < count - 1) break;
                         drawPart(out, *dateDigits, cx + field(w, 1) + i * step, cy + field(w, 2), value % 10 * cell, 0, cell, dateDigits->h, 1);
                     }
+                }
+                // `datemark CELL X Y`: that cell of the date's sheet at a place of its own, as Test Game 96's slashes and colon
+                // are (set 2).
+                for (auto [line, end] = screen_->settings.equal_range("datemark"); line != end; ++line) {
+                    const auto &w = line->second;
+                    if (w.size() < 3) continue;
+                    int cell = dateDigits->w / dateColumns;
+                    drawPart(out, *dateDigits, cx + field(w, 1), cy + field(w, 2), field(w, 0) * cell, 0, cell, dateDigits->h, 1);
                 }
                 continue;
             }
@@ -3964,7 +3977,8 @@ void Engine::runFlow(const Node &n) {
             scene_ = {script, script->first()};
             lastScene_ = script->name;
             // A story table's line saves the PC's own number for its place, when the table gives one.
-            flowCallId_ = flow.script->name.rfind("story:", 0) == 0 && n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
+            bool table = flow.script->name.rfind("story:", 0) == 0 || flow.script->name.rfind("chapter:", 0) == 0;
+            flowCallId_ = table && n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
             log("scene %s", script->name.c_str());
         }
         break;
@@ -3991,13 +4005,12 @@ void Engine::runFlow(const Node &n) {
     case 21:
         flow.node = flow.script->node(choiceResult_ == (n.opcode == 4 ? n.p[0] : 0) ? n.otherwise : n.next);
         break;
-    case 5: {  // a condition on a variable: the other target when it holds, `next` when it doesn't, as a choice's branch
-        // The comparisons, as Test Game 94's exe orders them: ==, !=, <=, >=, <, >.
-        int left = variableValue(n.p[0], variableIndex(n)), right = operand(n);
-        bool holds = n.p[3] == 0 ? left == right : n.p[3] == 1 ? left != right : n.p[3] == 2 ? left <= right : n.p[3] == 3 ? left >= right : n.p[3] == 4 ? left < right : left > right;
-        flow.node = flow.script->node(holds ? n.otherwise : n.next);
+    case 5:  // a condition on a variable: the other target when it holds, `next` when it doesn't, as a choice's branch
+        flow.node = flow.script->node(storyConditionHolds(n) ? n.otherwise : n.next);
         break;
-    }
+    case kStoryResume:  // only for a PC save's load (resumeStoryByRule)
+        flow.node = flow.script->node(n.next);
+        break;
     case 6: {  // a change to a variable: set, add one, take one, add or take the operand, as the exe orders them
         auto &table = n.p[0] == 1 ? scenario_ : globals_;
         int number = variableNumber(n.p[0], variableIndex(n)), value = operand(n);

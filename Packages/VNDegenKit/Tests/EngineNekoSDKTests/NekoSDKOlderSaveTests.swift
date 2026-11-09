@@ -161,4 +161,30 @@ import TestSupport
         #expect(pixel(second, 194, 326) == [255, 0, 0])
         #expect(pixel(second, 0, 0) == [0, 255, 0])
     }
+
+    // Test Game 90's layout: the newer engine's sprite records with x and y as floats 0xD5 after their names, a shorter
+    // last block, and a tail without the GOOD Timing fields.
+    @Test func aSaveInTestGame90sLayoutLoads() throws {
+        let root = try game("layout90")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(first, 16) }
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", "layout90")))
+        let path = try #require(save.range(of: Data("sc\\r.bmp".utf8)))
+        let at = path.lowerBound - save.startIndex
+        #expect(int32(save, at - 12) == 600)
+        let x = save.subdata(in: (save.startIndex + at + 12 + 0xD5)..<(save.startIndex + at + 12 + 0xD9)).withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
+        #expect(x == 194)
+
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(pixel(second, 194, 326) == [255, 0, 0])
+        #expect(pixel(second, 0, 0) == [0, 255, 0])
+    }
 }

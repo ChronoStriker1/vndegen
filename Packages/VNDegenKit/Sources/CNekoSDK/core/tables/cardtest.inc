@@ -1,5 +1,6 @@
 // The runtime's own test game for save cards laid out as Test Game 82's are (NekoSDKCardFieldTests): the chapter by a
-// scenario variable, the date's parts at places of their own, a frame around the thumbnail and spaced card numbers; and
+// scenario variable, the date's parts at places of their own with a mark of the date's sheet between, a frame around the
+// thumbnail and spaced card numbers; and
 // a Config number drawn as text (NekoSDKNumberTextTests); and a dialog whose question is a cell of a strip, over its
 // frame, and a gallery card from Test Game 82's `ID,PICTURE` lines with a frame over its thumbnail (NekoSDKCardFieldTests).
 const char kCardTest[] = R"(
@@ -19,6 +20,7 @@ datedigits obj\d.bmp 0 0
 datefield year 251 28 15
 datefield month 347 28 15 blank
 datefield day 406 28 15 blank
+datemark 9 330 28
 slotchaptervar obj\n.bmp 350 6 3 5000
 
 screen dialog

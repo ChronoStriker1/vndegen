@@ -78,6 +78,8 @@ import TestSupport
             #expect(digitAt(60 + x + 15 + 7, 99 + 28 + 10) == value % 10)
             #expect(digitAt(60 + x + 7, 99 + 28 + 10) == (value >= 10 ? value / 10 : nil))
         }
+        // `datemark 9 330 28`: the date sheet's cell 9 at its own place between the year and the month.
+        #expect(digitAt(60 + 330 + 7, 99 + 28 + 10) == 9)
         // The chapter from S5000: cell 2, green 150.
         #expect(pixel(e, 60 + 350 + 5, 99 + 6 + 5) == [0, 150, 0])
         // The frame's corner, outside the thumbnail.
