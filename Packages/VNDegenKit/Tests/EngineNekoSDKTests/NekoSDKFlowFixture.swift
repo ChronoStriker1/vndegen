@@ -96,12 +96,15 @@ enum NekoSDKFlowFixture {
     // A NEKOPACK4A archive of these entries: the index lists each name with its offset and size XORed with the sum of
     // the name's signed bytes, and each entry is packed as cfg.sav is. Art has to come from an archive, since a patch
     // folder's art is used only as its art set.
-    static func archive(_ entries: [(String, Data)]) -> Data {
+    static func archive(_ entries: [(String, Data)]) -> Data { archive(raw: entries.map { (Array($0.0.utf8), $0.1) }) }
+
+    // The same with each name as its bytes, for names in the games' own code page.
+    static func archive(raw entries: [([UInt8], Data)]) -> Data {
         var index = Data(), body = Data()
-        let header = 14 + entries.reduce(0) { $0 + 4 + $1.0.utf8.count + 1 + 8 }
+        let header = 14 + entries.reduce(0) { $0 + 4 + $1.0.count + 1 + 8 }
         func put(_ v: UInt32, _ d: inout Data) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
         for (name, plain) in entries {
-            let entry = packed(plain), bytes = Array(name.utf8) + [0]
+            let entry = packed(plain), bytes = name + [0]
             let key = bytes.reduce(UInt32(0)) { $0 &+ UInt32(bitPattern: Int32(Int8(bitPattern: $1))) }
             put(UInt32(bytes.count), &index)
             index.append(contentsOf: bytes)

@@ -218,4 +218,22 @@ import TestSupport
         #expect(size(root, "cfg\\init.ini") == 53)
         #expect(size(root, "sys_2\\cfg\\init.ini") == 52)
     }
+
+    // ソ is 83 5C in the games' code page, its second byte a backslash's: it isn't a separator, the separator after it
+    // stays, and a doubled separator after it counts as one, as Test Game 96's saves write their scenes' names.
+    @Test func aCharacterEndingInABackslashsByteKeepsItsSeparator() throws {
+        let so: [UInt8] = [0x83, 0x5C]
+        let name = so + Array("\\x.bmp".utf8)
+        let root = try game(["cg.pak": NekoSDKFlowFixture.archive(raw: [(name, Data(count: 30))])])
+        defer { try? FileManager.default.removeItem(at: root) }
+        // The entry's stored size, or -1 when there's no such file.
+        func size(_ path: [UInt8]) -> Int64 { vnneko_debug_file_size(root.path, (path + [0]).map { CChar(bitPattern: $0) }) }
+        let cg = Array("cg\\".utf8)
+        let stored = size(cg + so + Array("\\x.bmp".utf8))
+        #expect(stored > 0)
+        #expect(size(cg + so + Array("\\\\x.bmp".utf8)) == stored)
+        #expect(size(Array("cg\\\\".utf8) + so + Array("\\x.bmp".utf8)) == stored)
+        // Without its separator it's another name, which nothing has.
+        #expect(size(cg + so + Array("x.bmp".utf8)) == -1)
+    }
 }

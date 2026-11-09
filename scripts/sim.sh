@@ -2,7 +2,7 @@
 # Runs on a Mac. Drives one iOS simulator that belongs to the caller.
 #   SIM_NAME=vn-runtime SIM_TYPE=iPhone-Duo scripts/sim.sh boot
 #   scripts/sim.sh install                     installs build/sim's VNDegen.app
-#   scripts/sim.sh add-game ~/vndegen-testgames/"No Socks RPG"
+#   scripts/sim.sh add-game ~/Projects/vndegen/games/"No Socks RPG"
 #   scripts/sim.sh launch -autolaunch "No Socks RPG"
 #   scripts/sim.sh shot /tmp/x.png
 #   scripts/sim.sh log 20                      last N seconds of the app's log

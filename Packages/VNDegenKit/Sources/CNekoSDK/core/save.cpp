@@ -340,6 +340,9 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
     // Test Game 96, and its layout's test game under a folder of its own, with no menu table.
     if (folder == "waffle\\ヤバい！－復讐・闇サイト－" || folder == "vndegen\\layout96") return &kYabai;
+    // The vote's test game saves as Test Game 96 does, and the newer layout's test game as Test Game 94 does.
+    if (folder == "vndegen\\votetest") return &kYabai;
+    if (folder == "vndegen\\layout94") return &kRinjin;
     // Test Game 90, and its layout's test game under a folder of its own, with no menu table.
     if (folder == "waffle\\漫喫ハプニング" || folder == "vndegen\\layout90") return &kMankitsu;
     return nullptr;
@@ -722,8 +725,10 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setF32(f + kRecordScale + 4 + extra, s.scaleY);
         w.setI32(f + kRecordAnchor + extra, s.anchorX);
         w.setI32(f + kRecordAnchor + 4 + extra, s.anchorY);
-        int most = root ? 256 : layout.shownAlpha;
-        w.setI32(f + kRecordAlpha + extra, std::min(most, s.alpha));
+        // Only a layout whose shown sprites hold 255 changes the value, and only that one: any other is written as it is,
+        // as a PC save of Test Game 94 with 512 there must come back with 512.
+        auto shown = [&](int alpha) { return layout.shownAlpha == 255 && !root && alpha == 256 ? 255 : alpha; };
+        w.setI32(f + kRecordAlpha + extra, shown(s.alpha));
         w.b[f + kRecordBlurOn + extra] = s.blurOn ? 1 : 0;
         w.setI32(f + kRecordBlur + extra, s.blur);
         w.b[f + kRecordWave + extra] = s.waveOn ? 1 : 0;
@@ -745,7 +750,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(g, root || s.noise ? 0 : s.slot);
         w.setF32(g + 4, s.endX);
         w.setF32(g + 8, s.endY);
-        w.setI32(g + 12, std::min(most, s.endAlpha));
+        w.setI32(g + 12, shown(s.endAlpha));
         w.setI32(g + 16, s.blur);
         // A third copy of where the sprite started.
         w.setF32(g + 0x3C, s.x);
