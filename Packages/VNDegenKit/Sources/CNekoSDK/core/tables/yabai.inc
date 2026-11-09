@@ -563,7 +563,9 @@ keepwindow
 edgesoff
 pic obj\j000_000.bmp 1125 108
 scroll obj\j000_001.bmp obj\j000_001.bmp obj\j000_001.bmp 1127 110 500
-rows obj\j000_003.bmp 92 168 174 4 139 -105
+# The log's text is a little larger than the window's (25): 26 is the nearest whole size. The PC's letters there are a
+# pixel shorter and as wide, so they differ from these by a pixel here and there.
+rows obj\j000_003.bmp 92 168 174 4 139 -107 26
 lognamey -30
 logvoice obj\i000_001.bmp 3 5 2 1046 -105
 button log_top obj\j000_002.bmp 1120 22 4 5 0
