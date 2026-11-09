@@ -73,6 +73,8 @@ struct SaveData {
     // flow, in Test Games 82 and 83, which name a choice's picture where the newer engine does, or the newer place in Test
     // Game 87, which names it in the first.
     std::string olderImage;
+    // A second picture's name right after the choice's, in the layouts that have one (SaveLayout::afterChoiceName).
+    std::string afterChoiceImage;
     // The card's comment, typed on the PC's save screen and kept at the save's start; a comment there moves all that follows.
     std::string comment;  // CP932
     int date[6] = {2026, 1, 1, 0, 0, 0};

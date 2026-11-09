@@ -47,6 +47,12 @@ struct SaveLayout {
     // Games 82 and 83 count from 0 too, each 2 after a save to its third card, which NEW marked (sets 2 and 3), so the
     // older engine's layouts all do.
     int firstCard = 1;
+    // Test Game 96's saves name a second picture right after the choice's, where the other newer layouts have 4 zeros
+    // (an empty name), and every PC save of it names the same two: these, which VNDegen writes when it has none (set 2's
+    // 18 saves, lead).
+    const char *choiceName = nullptr, *afterChoiceName = nullptr;
+    // Bytes of the date block after the date that hold the same every time, from its start.
+    std::vector<Patch> dateBlock;
 };
 
 namespace {
@@ -82,6 +88,20 @@ SaveLayout older(int recordGap, int afterSize, std::vector<Patch> after, int tai
 }
 
 const SaveLayout kAniMother = kTsumaGibo;
+// Test Game 96's, from set 2's 18 PC saves (lead): the older engine's records, 396 bytes each after their names with 26
+// zeros before each, and the older text records, sound channels and tail, with the newer place for the choice's picture
+// and a second picture's name after it. 154 channels and 14 zeros before the scene's name are the most that fit; the tail
+// is 819 bytes with the node. The date block holds 1 at 240 and 0 at the flag in every save.
+const SaveLayout kYabai = [] {
+    SaveLayout l = older(26, 0, {}, 819, {}, 154);
+    l.olderRecord = 396;
+    l.olderSoundGap = 14;
+    l.choiceFlag = ChoiceFlag::Never;
+    l.choiceName = "obj\\a003_001.bmp";
+    l.afterChoiceName = "obj\\t000_000.bmp";
+    l.dateBlock = {{240, "01"}};
+    return l;
+}();
 const SaveLayout kFunbag2 = [] {
     SaveLayout l = older(26, 0, {}, 818, {}, 123);
     l.choiceFlag = ChoiceFlag::Never;
@@ -286,6 +306,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // The older layout's test game saves as Test Game 83 does, under a folder of its own so it gets no menu table.
     if (folder == "vndegen\\layoutold") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
+    // Test Game 96, and its layout's test game under a folder of its own, with no menu table.
+    if (folder == "waffle\\ヤバい！－復讐・闇サイト－" || folder == "vndegen\\layout96") return &kYabai;
     return nullptr;
 }
 
@@ -322,7 +344,12 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         r.skip(kBeforeChoice);
         out.choiceImage = r.str();
     }
-    r.skip(kAfterChoice);
+    if (layout.afterChoiceName) {
+        out.afterChoiceImage = r.str();
+        r.skip(kAfterChoice - 4);
+    } else {
+        r.skip(kAfterChoice);
+    }
     for (int &d : out.date) d = r.i32();
     out.dateFlag = r.i32At(r.at + kDateFlag - 24);
     r.skip(kDateBlock - 24);
@@ -540,18 +567,25 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     w.zeros(kAfterComment);
     w.str(d.flow);
     bool older = layout.olderRecord > 0;
+    std::string choice = d.choiceImage.empty() && layout.choiceName ? std::string(layout.choiceName) : d.choiceImage;
     if (older) {
         w.zeros(kOlderBeforeChoice);
-        w.str(layout.choiceInFirstPlace ? d.choiceImage : d.olderImage);
+        w.str(layout.choiceInFirstPlace ? choice : d.olderImage);
         w.zeros(kBeforeChoice - kOlderBeforeChoice - 4);
-        w.str(layout.choiceInFirstPlace ? d.olderImage : d.choiceImage);
+        w.str(layout.choiceInFirstPlace ? d.olderImage : choice);
     } else {
         w.zeros(kBeforeChoice);
-        w.str(d.choiceImage);
+        w.str(choice);
     }
-    w.zeros(kAfterChoice);
+    if (layout.afterChoiceName) {
+        w.str(d.afterChoiceImage.empty() ? std::string(layout.afterChoiceName) : d.afterChoiceImage);
+        w.zeros(kAfterChoice - 4);
+    } else {
+        w.zeros(kAfterChoice);
+    }
     for (int v : d.date) w.i32(v);
     size_t dateRest = w.zeros(kDateBlock - 24);
+    apply(layout.dateBlock, w.b.data() + dateRest - 24);
     w.setI32(dateRest + kDateFlag - 24, d.dateFlag);
     w.i32(d.flowActive);
     w.i32(d.flowNode);
