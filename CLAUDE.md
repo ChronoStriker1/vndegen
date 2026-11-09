@@ -14,6 +14,9 @@ This repo is edited on Linux; Apple builds run on a Mac over SSH. `scripts/remot
 - After each release, the coordinator installs the released Mac app into `/Applications` on both of the maintainer's Macs for testing, replacing the old copy without keeping a backup. Skip a Mac where VNDegen is running, and say so.
 - Simulators and the Mac app are the acceptance test. Nothing waits on a physical device. The maintainer tests on real hardware when they choose and reports any bugs they find.
 
+## Code
+Don't add comments to code. Leave the comments already there as they are. What a change is for goes in the commit message, and what a reader needs to know about a design goes in `docs/`.
+
 ## Reviews
 Code review is by Codex `gpt-6.1-sol` (xhigh). Claude subagents run Opus 5.5 at medium or high only.
 
