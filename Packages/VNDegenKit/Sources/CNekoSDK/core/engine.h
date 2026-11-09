@@ -9,6 +9,7 @@
 #include <array>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -199,8 +200,8 @@ private:
     // A flow's staff roll, the table's `staffroll` screen: `movie VARIABLE FILE...` plays the file the scenario
     // variable numbers, over everything, and `skipif G G...` lets a click end it once one of those globals is set.
     // Or, as Test Game 84's exe draws its own, the screen's pictures as layers over black, `length MS` long, with `music
-    // FILE`, and `sets G` set as it ends.
-    void startStaffRoll();
+    // FILE`, and `sets G` set as it ends. A story table's `staffroll NAME` opens `screen staffroll_NAME` instead.
+    void startStaffRoll(const std::string &name);
     void stepStaffRoll();
     void endStaffRoll();
     void composeStaffRoll(Canvas &out);
@@ -226,7 +227,8 @@ private:
     bool flowActive() const { return !stack_.empty(); }
 
     // Saves.
-    std::string savePath(int slot, const char *extension) const;
+    // `suffix` "s" for the Previous Choice file beside the save.
+    std::string savePath(int slot, const char *extension, const char *suffix = "") const;
     void deleteSlot(int slot);
     bool cardAt(int slot, int &x, int &y) const;
     bool overCardDelete(int slot, int x, int y) const { return overCardPart("slotdelete", slot, x, y); }
@@ -248,7 +250,6 @@ private:
     int firstQuickSlot_ = 81, lastQuickSlot_ = 88, nextQuickSlot_ = 81;
     bool barPinned_ = false;
     SaveData captureSave();
-    void restoreSave(const SaveData &data, int slot = -1);
     void noteThumbnail();
     struct SlotInfo {
         bool exists = false;
@@ -278,7 +279,24 @@ private:
     void advanceFlipbooks();
     void resumeFlipbook(Sprite &s);
     struct FlipModes { std::string path; bool loop, reverse; };
+    // VNDegen's lines beside a save, kept in `saveNNN.vnd`.
     void writeFlipModes(int slot, const SaveData &d);
+    std::string sidecarText(const SaveData &d);
+    // Return to Choice (BackSelection): the story as the latest choice began waiting, as the PC's Previous Choice file
+    // holds it, with VNDegen's lines for it. Taken on the step after the choice is asked, written beside each save and
+    // read back with it.
+    struct PreviousChoice {
+        SaveData data;
+        std::string side;
+    };
+    std::optional<PreviousChoice> previousChoice_;
+    bool previousChoiceDue_ = false;
+    void notePreviousChoice();
+    void writePreviousChoice(int slot);
+    void readPreviousChoice(int slot);
+    void returnToChoice();
+    // The switch that asks a dialog question: Config's own for it, or the one `confirm` covering every question.
+    std::string confirmSetting(int question) const;
     void takeScaleAnchor(Sprite &s, const Node &n);
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
@@ -673,6 +691,8 @@ private:
     };
     static uint32_t saveFingerprint(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);
+    Sidecar parseSidecar(const SaveData &d, const std::string &text);
+    void restoreSave(const SaveData &data, const Sidecar &side);
     std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
     void loadPartsState(const SaveData &d, const Sidecar &side);
     bool restoreStoryPlace(const Sidecar &side, bool &atChoice);
