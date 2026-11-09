@@ -3,7 +3,7 @@
 // thumbnail, spaced card numbers and a comment button; and
 // a Config number drawn as text (NekoSDKNumberTextTests); and a dialog whose question is a cell of a strip, over its
 // frame, and a gallery card from Test Game 82's `ID,PICTURE` lines with a frame over its thumbnail, and title pictures
-// that turn and that draw at half size (NekoSDKCardFieldTests).
+// that turn and that draw at half size, and a scene card from Test Game 90's five-field lines (NekoSDKCardFieldTests).
 const char kCardTest[] = R"(
 screen title
 pic obj\spin.bmp 1100 600 turn 90
@@ -12,6 +12,7 @@ button load obj\none.bmp 0 0 1 1 0
 button config obj\none.bmp 0 0 1 1 0
 button quit obj\none.bmp 0 0 1 1 0
 button cg obj\none.bmp 0 0 1 1 0
+button scene obj\none.bmp 0 0 1 1 0
 
 screen load
 slots obj\c.bmp 60 99 510 119 5 2 1
@@ -43,6 +44,10 @@ screen cg
 cell 100 100
 cellthumb 10 10
 cellthumbframe obj\f.bmp 8 8
+
+screen scene
+cell 300 300
+cellthumb 0 0
 
 screen config
 number opacity text 200 100 20 15 255 255 255 76 10 73

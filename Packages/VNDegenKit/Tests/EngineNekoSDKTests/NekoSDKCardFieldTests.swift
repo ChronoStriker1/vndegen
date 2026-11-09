@@ -184,4 +184,23 @@ import TestSupport
         #expect(pixel(e, 60, 45) == [0, 0, 0])
         #expect(pixel(e, 45, 60) == [0, 0, 0])
     }
+
+    // Test Game 90's play_view.ini lines are `TAB THUMB STEP NUMBER SCRIPT`: the scene's card shows its thumbnail once
+    // that script has been read, and not before.
+    @Test(arguments: [false, true]) func aSceneFromAFiveFieldLineUnlocksByItsScript(read: Bool) throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\cardtest\n".utf8),
+            "cfg/play_view.ini": Data("//tab\tthumb\tstep\tnumber\tscript\n0\tobj\\t.bmp\t-1\t1000\tscr\\ep_001.txt\t//one\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("t.bmp", bmp(40, 30) { _, _ in [0, 0, 250] })]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/cardtest/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        if read { try Data("scr\\ep_001.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt")) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_press(e, "scene"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect((pixel(e, 320, 315) == [250, 0, 0]) == read)
+    }
 }

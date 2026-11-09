@@ -1226,8 +1226,20 @@ void Engine::loadGalleries() {
     }
     // `page thumbnail 0 0 flow key,0,0`, with up to three keys and 0 for none. Test Game 84's second scene names two, and
     // on the PC either one read unlocks it.
+    // Test Game 90's lines are `TAB THUMB STEP NUMBER SCRIPT`, five fields: the script read unlocks the scene, and its
+    // replay plays that script alone and comes back (set 1, by a file trace under Wine). STEP is -1 on every line there
+    // and NUMBER counts up by tab, and neither changes anything set 1 could see.
     for (const std::string &line : lines("cfg\\play_view.ini")) {
         auto f = fields(line);
+        if (f.size() == 5 && normalizedPath(f[4]).find(".txt") != std::string::npos) {
+            GalleryEntry e;
+            e.page = std::atoi(f[0].c_str());
+            e.thumbnail = f[1];
+            e.keys = {f[4]};
+            e.flow = "replayscene:" + f[4];
+            sceneEntries_.push_back(e);
+            continue;
+        }
         if (f.size() < 6) continue;
         GalleryEntry e;
         e.page = std::atoi(f[0].c_str());
