@@ -8,6 +8,13 @@ parts mankitsu scroll
 # PC does (set 1: an anger mark's 41 pictures took 1.3 s at 30 ms, and a file trace reads the sound with the first picture).
 fliptime
 flipsound
+# The text as the PC sets it: MS Gothic at a cell of 22, not init.ini's 25 (Wine's font log), each glyph 3 past its
+# advance and lines 31 apart, the first glyph 1 in and 1 up. Fitted under Wine with Ume Gothic mapped to the game's
+# Japanese font name: a name and a line end on the PC's pixels, and the next line starts on its row (set 1).
+textsize 22
+textgap 3
+textline 31
+textshift 1 -1
 # Config as 90's PC starts it (its first-run cfg.sav under Wine): the window at 80.
 default opacity 80
 
