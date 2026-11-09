@@ -1259,6 +1259,13 @@ void Engine::loadGalleries() {
     // With play_view.ini empty, play_view2.ini's `TAB THUMB BALLOON STEP KEY KEY2 KIND`, by commas in Test Game 83 and
     // tabs in 87 (sets 1 and 3): either key read unlocks the scene, 0 for none, and the replay plays the first key's
     // scene alone, unless the scene table's `replayflow KEY FLOW` names a story flow for it.
+    // `replaychapters` under `screen scene`: the fourth field is the chapter the replay plays, which a game part gives
+    // the scenes of, and any of the line's scripts read unlocks the scene. Test Game 96's lines are
+    // `TAB,THUMB,-1,CHAPTER,SCRIPT,SCRIPT,SCRIPT`: three cards share their three scripts and differ only in the chapter,
+    // and on the PC each opens its own chapter's file and comes back to the Scene screen (set 2, by a file trace under
+    // Wine). Other games keep other numbers in that field, so only the table says it's a chapter.
+    auto sceneTable = screens_.find("scene");
+    bool replayChapters = sceneTable != screens_.end() && sceneTable->second.setting("replaychapters");
     if (sceneEntries_.empty())
         for (const std::string &line : lines("cfg\\play_view2.ini")) {
             std::vector<std::string> f;
@@ -1270,10 +1277,10 @@ void Engine::loadGalleries() {
             GalleryEntry e;
             e.page = std::atoi(f[0].c_str());
             e.thumbnail = f[1];
-            for (size_t i = 4; i < std::min<size_t>(f.size(), 6); i++)
+            for (size_t i = 4; i < std::min<size_t>(f.size(), replayChapters ? 7 : 6); i++)
                 if (!f[i].empty() && f[i] != "0" && normalizedPath(f[i]).find(".txt") != std::string::npos) e.keys.push_back(f[i]);
             if (e.keys.empty()) continue;
-            e.flow = "replayscene:" + e.keys[0];
+            e.flow = replayChapters && std::atoi(f[3].c_str()) > 0 ? "chapter:" + f[3] : "replayscene:" + e.keys[0];
             sceneEntries_.push_back(e);
         }
     // cfg\sc_view.ini: `#p 100` lists backgrounds, `#p N face|clothes|pose` heroine N's thumbnails, each section ending
@@ -3619,13 +3626,14 @@ void Engine::composeScreen(Canvas &out) {
             risen.y += riseOffset(p.rise, screenMs_ - galleryTabAt_);
             drawPicture(out, risen, towardX, towardY);
         }
+    GamePart *part = menuPart();
+    if (part) part->draw(*partHost_, out, Layer::MenuUnder, 0, 0);
     composeSlots(out);
     composeGallery(out);
     if (viewingImage_) return;
     composeTrackCards(out);
     composeTrackTime(out);
     composeSettingsWidgets(out);
-    GamePart *part = menuPart();
     if (part) part->draw(*partHost_, out, Layer::Menu, 0, 0);
     bool fromTitle = returnTo_ == "title";
     // `helplast`: hovered help draws after every button, as Test Games 92 and 93 draw their side menu's bubbles over the
