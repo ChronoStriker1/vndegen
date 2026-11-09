@@ -79,6 +79,11 @@ struct SaveData {
     // In the story-in-exe games, the last choice's result, 2 while one waits, or -1 to leave the layout's (set 1, Test
     // Game 87), or in Test Game 83 2 once any choice is made (set 3): 112 bytes into the block before the variables.
     int lastChoice = -1;
+    // Test Games 82 and 83 keep the latest choice asked in the same block: its options' count in lastChoice's place, the
+    // choice sheet's columns 116 bytes in, and from 152 the cells it showed, a list the PC never clears, so a choice with
+    // fewer options leaves the last one's later cells (sets 2 and 3's PC saves). -1 and none when not written.
+    int choiceColumns = -1;
+    std::vector<int> choiceCells;
     std::map<int, int> variables;  // the 10,000 ints, by number
     int dateFlag = 0;  // the PC sets it in a game with a flow past its first script. Its meaning isn't known
     int width = 1280, height = 720;

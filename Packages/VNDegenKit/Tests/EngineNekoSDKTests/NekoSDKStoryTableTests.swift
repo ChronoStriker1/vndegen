@@ -83,6 +83,9 @@ import TestSupport
         let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytestpc/save")
         let names = try FileManager.default.contentsOfDirectory(atPath: saves.path).map { $0.lowercased() }
         #expect(names.contains("save004s.sav"), "\(names)")
+        // It names the scene whose end asked the choice, at its top, as the PC's do, though the jump started that scene.
+        let previous = try NekoSDKFlowFixture.unpacked(Data(contentsOf: saves.appendingPathComponent("save004s.sav")))
+        #expect(previous.range(of: Data("scr\\b.txt".utf8)) != nil)
         #expect(vnneko_debug_press(e, "BackSelection"))
         steps(e, 5)
         #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")

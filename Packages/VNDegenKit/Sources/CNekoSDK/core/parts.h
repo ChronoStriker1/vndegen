@@ -22,7 +22,8 @@ enum class Layer {
     UnderWindow,  // over the scene, under the message window
     Window,       // inside the message window, over its plate and under its text
     OverWindow,   // over the message window and its buttons
-    Screen,       // the part's own screen, while it's open, over everything
+    Menu,         // a table screen naming the part with `part NAME`: over its pictures, under its buttons
+    Screen,       // the part's own screen, while it's open, over everything, or over a table screen naming the part
 };
 
 // What a part may use of the engine.
@@ -37,9 +38,13 @@ public:
     // Variables by the number saves and cfg.sav keep them: scope 1 for the story's own, 0 for globals.
     int variable(int scope, int number);
     void setVariable(int scope, int number, int value);
+    // The story's clock, which stops while a menu is open, and the menus' clock, which runs while one is.
     int64_t nowMs();
+    int64_t screenMs();
     int width();
     int height();
+    // The open table screen's page, from 0, as its `page` buttons set it.
+    int page();
     void redraw();
     // From command(): the scene waits for a click, or for a time, before its next command.
     void waitClick();
@@ -68,8 +73,10 @@ public:
     // Drawing at a layer. For Layer::Slot, what sits in slots from `fromSlot` to before `toSlot`.
     virtual void draw(PartHost &, Canvas &, Layer, int fromSlot, int toSlot) {}
     // The story table's `open NAME ARGS...`: true when this part opened that screen. It gets the input until it calls
-    // finishScreen.
+    // finishScreen. A table screen with `part NAME` calls it too as it opens, with the screen's name and no ARGS; while
+    // that screen is open the part draws at Layer::Menu and Layer::Screen and is offered each press first.
     virtual bool openScreen(PartHost &, const std::string &name, const std::vector<int> &args) { return false; }
+    // A press at x, y, button 0 left and 1 right: true when this part took it.
     virtual bool press(PartHost &, int x, int y, int button) { return false; }
     virtual void pointer(PartHost &, int x, int y) {}
     // The story table's `chapter N`: the scene scripts to play, in order, or none when this part doesn't know it.

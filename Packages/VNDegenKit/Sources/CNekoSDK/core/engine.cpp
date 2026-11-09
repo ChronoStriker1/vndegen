@@ -340,6 +340,10 @@ void Engine::openScreen(const std::string &name) {
     if (spriteScreen() && name != "sprites") closeSprites();
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
+    if (const auto *line = screen_->setting("part"); line && !line->empty()) {
+        if (GamePart *part = menuPart()) part->openScreen(*partHost_, name, {});
+        else warnOnce("The screen " + name + " names a part the table doesn't turn on: " + (*line)[0]);
+    }
     pressed_.clear();
     dirty_ = true;
     page_ = 0;
@@ -394,6 +398,8 @@ void Engine::endStory(const std::string &screen) {
     gt_ = {};
     previousChoice_.reset();
     previousChoiceDue_ = false;
+    askedCount_ = askedColumns_ = 0;
+    askedCells_.clear();
     splashes_.clear();
     resetParts();
     stack_.clear();
@@ -446,6 +452,8 @@ void Engine::startStory() {
     staffRollLayers_ = nullptr;
     previousChoice_.reset();
     previousChoiceDue_ = false;
+    askedCount_ = askedColumns_ = 0;
+    askedCells_.clear();
     resetParts();
     std::string first = config_.text(storyFlowKey_.c_str());
     // A game with no flow scripts starts at its story table's first flow, or past the prologue at the story flow `screen
@@ -1221,8 +1229,11 @@ void Engine::loadGalleries() {
             sceneEntries_.push_back(e);
         }
     // cfg\sc_view.ini: `#p 100` lists backgrounds, `#p N face|clothes|pose` heroine N's thumbnails, each section ending
-    // `##`. Paths there have their backslashes doubled, and a line's second field marks what comes with a bonus.
-    {
+    // `##`. Paths there have their backslashes doubled, and a line's second field marks what comes with a bonus. A game
+    // whose `screen sprites` names a part reads its own file there: Test Game 87's sc_view.ini is another format, which
+    // read as heroines would take over its screen and dress its story's sprites (set 1).
+    auto sprites = screens_.find("sprites");
+    if (sprites == screens_.end() || !sprites->second.setting("part")) {
         int heroine = -1;
         std::string kind;
         for (const std::string &line : lines("cfg\\sc_view.ini")) {
@@ -2333,6 +2344,12 @@ SaveData Engine::captureSave() {
         bool made = mode && !mode->empty() && (*mode)[0] == "made";
         d.lastChoice = asking || (made && !choiceImage_.empty()) ? 2 : choiceImage_.empty() ? -1 : choiceResult_;
     }
+    // Test Games 82 and 83 keep the latest choice asked instead, its count where 87 keeps its result (sets 2 and 3).
+    if (layout_ && choiceFlag(*layout_) == ChoiceFlag::Never && askedCount_ > 0) {
+        d.lastChoice = askedCount_;
+        d.choiceColumns = askedColumns_;
+        d.choiceCells = askedCells_;
+    }
     d.choiceImage = choiceImage_;
     switch (layout_ ? choiceFlag(*layout_) : ChoiceFlag::Picture) {
         case ChoiceFlag::Picture: d.dateFlag = choiceImage_.empty() ? 0 : 1; break;
@@ -2686,6 +2703,12 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     auto script = d.scene.empty() ? nullptr : loadScript(d.scene);
     scene_ = script ? Frame{script, script->node(d.node)} : Frame{};
     lastScene_ = d.scene;
+    // The latest choice asked comes back with the save, for the next save to keep (82 and 83).
+    if (layout_ && choiceFlag(*layout_) == ChoiceFlag::Never) {
+        askedCount_ = std::max(0, d.lastChoice);
+        askedColumns_ = std::max(0, d.choiceColumns);
+        askedCells_ = d.choiceCells;
+    }
     // The PC's saves don't hold Extend: two saves differing only in it match. It stays as it was across a load.
     bool extendWas = gt_.extend;
     gt_ = {};
@@ -3412,6 +3435,8 @@ void Engine::composeScreen(Canvas &out) {
     composeTrackCards(out);
     composeTrackTime(out);
     composeSettingsWidgets(out);
+    GamePart *part = menuPart();
+    if (part) part->draw(*partHost_, out, Layer::Menu, 0, 0);
     bool fromTitle = returnTo_ == "title";
     // `helplast`: hovered help draws after every button, as Test Games 92 and 93 draw their side menu's bubbles over the
     // entry above.
@@ -3547,6 +3572,7 @@ void Engine::composeScreen(Canvas &out) {
             for (int x = 0; x < out.w; x++)
                 for (int c = 0; c < 3; c++) row[x * 4 + c] = uint8_t(std::lround(float(row[x * 4 + c]) * m[c]));
         }
+    if (part) part->draw(*partHost_, out, Layer::Screen, 0, 0);
     if (dialogOpen_) composeDialog(out);
 }
 
@@ -3990,6 +4016,10 @@ void Engine::beginChoice(const Node &n) {
         for (int i = 0; i < std::min(n.p[kChoiceCells], int(kChoiceCellsMax)); i++) choiceCells_.push_back(n.p[size_t(kChoiceCells + 1 + i)]);
     choiceBack_ = images_->get(config_.text("ChoiceBackFilename", "obj\\n000_000.bmp"));
     choiceHover_ = -1;
+    askedCount_ = choiceCount_;
+    askedColumns_ = choiceColumns();
+    if (askedCells_.size() < size_t(choiceCount_)) askedCells_.resize(size_t(choiceCount_));
+    for (int i = 0; i < choiceCount_; i++) askedCells_[size_t(i)] = i < int(choiceCells_.size()) ? choiceCells_[size_t(i)] : i;
     waiting_ = Waiting::Choice;
     previousChoiceDue_ = true;
     dirty_ = true;
@@ -4357,6 +4387,8 @@ bool Engine::step(int ms) {
         stepViewer(ms);
     }
     if (screen_ || logOpen_ || dialogOpen_) {
+        // A table screen's part goes on stepping, as its own screen would.
+        if (GamePart *part = screen_ && !dialogOpen_ ? menuPart() : nullptr; part && part->step(*partHost_)) dirty_ = true;
         // The story's clock stops, and a movie's sound with it.
         stopMovieSound();
         return waiting_ != Waiting::Ended;
@@ -4478,6 +4510,11 @@ void Engine::mouseMove(float x, float y) {
     }
     if (spriteScreen() && moved) spritePointerMoved();
     if (partScreen_ && moved && !screen_ && !dialogOpen_ && !logOpen_) partScreen_->pointer(*partHost_, px, py);
+    if (moved && screen_ && !dialogOpen_)
+        if (GamePart *part = menuPart()) {
+            part->pointer(*partHost_, px, py);
+            dirty_ = true;
+        }
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
         else pressSettingsWidget(px, py, true);
@@ -4505,6 +4542,12 @@ void Engine::mouseButton(int button, bool down) {
         if (partScreen_->press(*partHost_, pointerX_, pointerY_, button)) dirty_ = true;
         return;
     }
+    // A table screen's part takes the presses it wants first, and the screen's buttons get the rest.
+    if (screen_ && !dialogOpen_ && !logOpen_)
+        if (GamePart *part = menuPart(); part && part->press(*partHost_, pointerX_, pointerY_, button)) {
+            dirty_ = true;
+            return;
+        }
     // `mousechoice`: the right button takes a choice's last option, as Test Game 94's mouse icons say.
     if (button == 1 && waiting_ == Waiting::Choice && choiceSheet_ && !screen_ && !dialogOpen_ && !logOpen_ && choiceTable("mousechoice")) {
         choose(choiceCount_ - 1);
@@ -4751,6 +4794,8 @@ bool Engine::jump(const std::string &script, int node) {
     }
     const Node *n = target->first();
     scene_ = {target, n};
+    // As a scene the flow calls: a save after it ends, at a choice, names it, as the PC's do (set 2).
+    lastScene_ = target->name;
     waiting_ = Waiting::None;
     screen_ = nullptr;
     if (node < 0) return true;

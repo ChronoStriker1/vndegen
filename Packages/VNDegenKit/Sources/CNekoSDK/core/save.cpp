@@ -130,6 +130,8 @@ constexpr int kOlderAnimation = 0x125;
 constexpr int kAfterComment = 200;
 constexpr int kBeforeChoice = 4196, kAfterChoice = 39596, kDateBlock = 400;
 constexpr int kVariables = 10000, kBeforeVariables = 39600 - 8, kAfterCount = 40;
+// The latest choice's columns and cells in the block before the variables (SaveData::choiceColumns), up to 8 cells read.
+constexpr size_t kBeforeChoiceColumns = 116, kBeforeChoiceCells = 152, kBeforeChoiceCellsMax = 8;
 
 void apply(const std::vector<Patch> &patches, uint8_t *to) {
     auto nibble = [](char c) { return c <= '9' ? c - '0' : c - 'a' + 10; };
@@ -318,7 +320,13 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     r.skip(kDateBlock - 24);
     out.flowActive = r.i32();
     out.flowNode = r.i32();
-    if (r.at + kBeforeVariables <= plain.size()) out.beforeVariables.assign(plain.begin() + std::ptrdiff_t(r.at), plain.begin() + std::ptrdiff_t(r.at + kBeforeVariables));
+    if (r.at + kBeforeVariables <= plain.size()) {
+        out.beforeVariables.assign(plain.begin() + std::ptrdiff_t(r.at), plain.begin() + std::ptrdiff_t(r.at + kBeforeVariables));
+        auto i32 = [&](size_t at) { return int32_t(uint32_t(plain[r.at + at]) | uint32_t(plain[r.at + at + 1]) << 8 | uint32_t(plain[r.at + at + 2]) << 16 | uint32_t(plain[r.at + at + 3]) << 24); };
+        out.lastChoice = i32(112);
+        out.choiceColumns = i32(kBeforeChoiceColumns);
+        for (size_t i = 0; i < kBeforeChoiceCellsMax; i++) out.choiceCells.push_back(i32(kBeforeChoiceCells + 4 * i));
+    }
     r.skip(kBeforeVariables);
     out.variables.clear();
     for (int i = 0; i < kVariables; i++) {
@@ -543,6 +551,8 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     if (d.beforeVariables.size() == size_t(kBeforeVariables)) std::copy(d.beforeVariables.begin(), d.beforeVariables.end(), w.b.begin() + std::ptrdiff_t(before));
     else apply(layout.beforeVariables, w.b.data() + before);
     if (d.lastChoice >= 0) w.setI32(before + 112, d.lastChoice);
+    if (d.choiceColumns >= 0) w.setI32(before + kBeforeChoiceColumns, d.choiceColumns);
+    for (size_t i = 0; i < std::min(d.choiceCells.size(), kBeforeChoiceCellsMax); i++) w.setI32(before + kBeforeChoiceCells + 4 * i, d.choiceCells[i]);
     size_t table = w.zeros(size_t(kVariables) * 4);
     for (const auto &[index, value] : d.variables)
         if (index >= 0 && index < kVariables) w.setI32(table + size_t(index) * 4, value);
