@@ -76,6 +76,8 @@ public:
     void holdSlot(int slot, int kind);
     // Whether that slot is held, shown or waiting for the next screen update.
     bool slotHeld(int slot);
+    // Config's Effects setting, which the PC's effects such as Test Game 83's particles follow.
+    bool effectsOn();
     void log(const std::string &line);
 
 private:
