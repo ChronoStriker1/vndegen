@@ -168,6 +168,100 @@ button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8
 button pageprev obj\e003_000.bmp 22 331 2 5 0
 button pagenext obj\e003_000.bmp 1218 331 2 5 1
 
+# The CG and scene galleries, measured on the PC under Wine: a tab for each heroine and one for the rest along the
+# bottom, eight cards a page, and the tab's heroine standing at the right (the others' panel for the last tab).
+screen cg
+selectedlook
+pic bg\bg_001_000_000_000_000.bmp 0 0
+pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
+pic obj\e001_000.bmp 0 0 6 1 2 0
+# The tab's heroine stands over the top bar and stops at the bottom one.
+pic sc\sc_000_000_000_000_000.bmp 850 0 part 0 0 500 628 tab 0
+pic sc\sc_001_000_000_000_000.bmp 850 0 part 0 0 400 628 tab 1
+pic sc\sc_002_000_000_000_000.bmp 850 0 part 0 0 500 628 tab 2
+pic sc\sc_003_000_000_000_000.bmp 850 0 part 0 0 400 628 tab 3
+pic obj\f001_001.bmp 850 0 part 0 0 455 628 tab 4
+gallerytabs
+button gtab0 obj\f001_000.bmp 147 547 5 5 0
+button gtab1 obj\f001_000.bmp 297 547 5 5 1
+button gtab2 obj\f001_000.bmp 447 547 5 5 2
+button gtab3 obj\f001_000.bmp 597 547 5 5 3
+button gtab4 obj\f001_000.bmp 747 547 5 5 4
+cellsheet obj\f000_000.bmp
+cellsize 205 176
+cellthumb 5 6
+celldigits obj\e004_001.bmp 40 120 2 11 13
+cellcount obj\e004_001.bmp - 143 151 165 176 0 13
+cellcountdash 12
+cell 90 139
+cell 314 139
+cell 538 139
+cell 762 139
+cell 90 337
+cell 314 337
+cell 538 337
+cell 762 337
+button page0 obj\e003_001.bmp 698 68 10 5 0
+button page1 obj\e003_001.bmp 748 68 10 5 1
+button page2 obj\e003_001.bmp 798 68 10 5 2
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
+
+screen scene
+selectedlook
+pic bg\bg_001_000_000_000_000.bmp 0 0
+pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
+pic obj\e001_000.bmp 0 0 6 1 3 0
+# The tab's heroine stands over the top bar and stops at the bottom one.
+pic sc\sc_000_000_000_000_000.bmp 850 0 part 0 0 500 628 tab 0
+pic sc\sc_001_000_000_000_000.bmp 850 0 part 0 0 400 628 tab 1
+pic sc\sc_002_000_000_000_000.bmp 850 0 part 0 0 500 628 tab 2
+pic sc\sc_003_000_000_000_000.bmp 850 0 part 0 0 400 628 tab 3
+pic obj\f001_001.bmp 850 0 part 0 0 455 628 tab 4
+gallerytabs
+button gtab0 obj\f001_000.bmp 147 547 5 5 0
+button gtab1 obj\f001_000.bmp 297 547 5 5 1
+button gtab2 obj\f001_000.bmp 447 547 5 5 2
+button gtab3 obj\f001_000.bmp 597 547 5 5 3
+button gtab4 obj\f001_000.bmp 747 547 5 5 4
+cellsheet obj\f000_000.bmp
+cellsize 205 176
+cellthumb 5 6
+celldigits obj\e004_001.bmp 40 120 2 11 13
+cell 90 139
+cell 314 139
+cell 538 139
+cell 762 139
+cell 90 337
+cell 314 337
+cell 538 337
+cell 762 337
+button page0 obj\e003_001.bmp 698 68 10 5 0
+button page1 obj\e003_001.bmp 748 68 10 5 1
+button page2 obj\e003_001.bmp 798 68 10 5 2
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
+
 # Config, measured on the PC under Wine: four tabs over one frame, with the side arrows going round them. Each row's help
 # stands 69 above it at x 218 while the pointer is in the row's band (found by moving the pointer across its edges).
 # Screen mode, colours and resolutions are the PC window's own and are drawn as the PC showed them.
