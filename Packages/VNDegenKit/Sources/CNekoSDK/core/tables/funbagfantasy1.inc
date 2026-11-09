@@ -735,8 +735,8 @@ scene scr\ep_03_06.txt @208
 scene scr\ep_03_07.txt @209
 scene scr\ep_03_08.txt @210
 scene scr\ep_03_09.txt @211
-scene scr\ep_03_09a.txt @212  # @ inferred from the chapter count
-scene scr\ep_03_10.txt @213  # @ inferred from the chapter count
+scene scr\ep_03_09a.txt @212  # between the measured 211 and 214
+scene scr\ep_03_10.txt @213   # between the measured 211 and 214
 choice obj\m000_000.bmp 2 cells 11 12 @214  # Squeeze her boobs / Suck on her boobs
 on 1 goto c8b
 scene scr\ep_03_10a.txt @215
