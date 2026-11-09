@@ -942,7 +942,8 @@ bool Engine::moveFocus(int dx, int dy) {
         }
     }
     if (!best) return true;
-    mouseMove((float(best->x) + 0.5f) / float(width_), (float(best->y) + 0.5f) / float(height_));
+    // The pointer's height, as mouseMove takes it: the whole 4:3 frame when the window drops below the scene.
+    mouseMove((float(best->x) + 0.5f) / float(width_), (float(best->y) + 0.5f) / float(square_ ? squareY_ + squareShift_ : height_));
     return true;
 }
 
@@ -2605,6 +2606,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     flashMs_ = 0;
     blur_ = false;
     scenario_ = d.variables;
+    for (const auto &[number, value] : side.variables) scenario_[number] = value;
     choiceImage_ = d.choiceImage;
     // Only Test Game 87's saves say whether a choice has been made; elsewhere a choice's picture means one was.
     choiceMade_ = layout_ && choiceFlag(*layout_) == ChoiceFlag::Made ? d.dateFlag != 0 : !d.choiceImage.empty();
@@ -5033,6 +5035,9 @@ std::string Engine::sidecarText(const SaveData &d) {
             std::snprintf(line, sizeof line, "slotfx %d %d %g %g\n", at, s.additive ? 1 : 0, double(s.scrollX), double(s.scrollY));
             text += line;
         }
+    // VNDegen's own story variables, `var NUMBER VALUE`, past those the PC's save has room for.
+    for (const auto &[number, value] : d.variables)
+        if (value && (number < 0 || number >= kSavedVariables)) text += "var " + std::to_string(number) + " " + std::to_string(value) + "\n";
     // Game parts' state, `part NAME LINE`, kept beside the save as the flipbooks' modes are.
     for (const auto &[name, part] : parts_) {
         std::vector<std::string> lines;
@@ -5105,7 +5110,7 @@ void Engine::returnToChoice() {
 }
 
 // What a save holds of the story's state, for telling whether VNDegen's lines beside it were written with it: its time,
-// scene, node and scenario variables. The card's comment, which can change later, isn't in it.
+// scene, node and the scenario variables it has room for. The card's comment, which can change later, isn't in it.
 uint32_t Engine::saveFingerprint(const SaveData &d) {
     uint32_t h = 2166136261u;
     auto mix = [&](uint32_t v) {
@@ -5115,7 +5120,7 @@ uint32_t Engine::saveFingerprint(const SaveData &d) {
     for (char c : normalizedPath(d.scene)) mix(uint8_t(c));
     mix(uint32_t(d.node));
     for (const auto &[number, value] : d.variables)
-        if (value) {
+        if (value && number >= 0 && number < kSavedVariables) {
             mix(uint32_t(number));
             mix(uint32_t(value));
         }
@@ -5161,6 +5166,9 @@ Engine::Sidecar Engine::parseSidecar(const SaveData &d, const std::string &text)
             side.hasResult = bool(words >> side.result);
         } else if (kind == "screen") {
             words >> side.screen >> side.screenScope >> side.screenNumber;
+        } else if (kind == "var") {
+            int number = 0, value = 0;
+            if (words >> number >> value && (number < 0 || number >= kSavedVariables)) side.variables[number] = value;
         } else if (kind == "slotfx") {
             int at = 0, additive = 0;
             float sx = 0, sy = 0;

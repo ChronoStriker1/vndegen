@@ -103,11 +103,12 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 p.row = number(w[7]);
                 at = 8;
             }
-            for (; at + 1 < w.size(); at += 2) {
-                // `random` takes no value.
-                while (at < w.size() && w[at] == "random") {
+            while (at < w.size()) {
+                // `random` takes no value, and can come last.
+                if (w[at] == "random") {
                     p.randomAlways = true;
                     at++;
+                    continue;
                 }
                 if (at + 1 >= w.size()) break;
                 const std::string &key = w[at], &value = w[at + 1];
@@ -165,6 +166,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                     p.followY = std::strtof(w[at + 2].c_str(), nullptr);
                     at++;
                 }
+                at += 2;
             }
             screen->pictures.push_back(p);
         } else if (w[0] == "button" && w.size() >= 8) {
