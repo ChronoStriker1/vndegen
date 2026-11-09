@@ -44,6 +44,8 @@ struct Track {
     enum Property { X, Y, ScaleX, ScaleY, Rotation, Alpha } property = X;
     bool relative = false;
     bool easeOut = false;
+    // `quadratic` with a positive length, which Test Game 87's fly-outs ease in by.
+    bool easeIn = false;
     float from = 0, to = 0;
     int startMs = 0, lengthMs = 0;
 };

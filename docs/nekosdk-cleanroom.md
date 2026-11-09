@@ -203,6 +203,13 @@ scene.
   frame 20 over 180 frames sat at +80 and +48 on the way down and at 0 afterwards, by a masked fit of the recording.
 - A negative length is `quadratic`: a save holds a change of -120 written as `relative_pos_y,120,0,-120,quadratic`, and the
   recording's steps along such a move fall in even amounts, which is a quadratic easing out.
+- In a named animation's text (opcode 19), `quadratic` with a positive length eases in, and `bright` is opacity of 256.
+  Test Game 87's 21 fly-outs, `relative_pos_x,-1300,0,100,liner`, `relative_pos_y,-900,0,100,quadratic`,
+  `bright,64,0,100,liner` and `scale,0.6,center,center,0,100,liner`, were recorded at 30 frames a second under Wine and
+  the sprite fitted frame by frame (set 1): it rises by p squared of its 900 pixels (0.027, 0.113 and 0.209 of it where p
+  squared is 0.023, 0.109 and 0.203) and fades over the backdrop to a quarter, its colours unchanged (opacity 0.886, 0.750
+  and 0.657 where 1 - 0.75p is 0.888, 0.753 and 0.670). The runtime's frames match it within 0.01 of opacity and 4 pixels
+  across; it sits up to 10 pixels lower, as the bounce before it was at another phase when the fly-out began.
 - Parameters 16 to 19 of opcodes 18 and 25 say which of position, scale, rotation and alpha change: a command with a scale
   in 4 and 5 but no 17 left the background at scale 2.00 in a fit of the recording.
 - On full-screen art, a sprite's position is the screen's top left plus its x and y, and scale is about the centre: fits of the recording give

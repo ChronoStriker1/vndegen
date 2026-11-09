@@ -105,6 +105,7 @@ float progressOf(const Track &t, int ms) {
     if (ms <= t.startMs) return 0;
     if (t.lengthMs <= 0 || ms >= t.startMs + t.lengthMs) return 1;
     float linear = float(ms - t.startMs) / float(t.lengthMs);
+    if (t.easeIn) return linear * linear;
     if (!t.easeOut) return linear;
     float left = 1 - linear;
     return 1 - left * left;
@@ -2430,9 +2431,9 @@ SaveData Engine::captureSave() {
                 // `scale_x,1.100000,640,0,2400,linear`.
                 if (t.property == Track::ScaleX || t.property == Track::ScaleY)
                     std::snprintf(line, sizeof line, "%s,%f,%d,%d,%d,%s\n", name, double(t.to), t.property == Track::ScaleX ? out.anchorX : out.anchorY,
-                                  framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                                  framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut || t.easeIn ? "quadratic" : "linear");
                 else
-                    std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                    std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut || t.easeIn ? "quadratic" : "linear");
                 out.animation += line;
             }
         };
@@ -5868,14 +5869,17 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
         if (parts.size() < 4) { warnOnce("animation line not read: " + line); continue; }
         const std::string &name = parts[0];
         float value = float(std::atof(parts[1].c_str()));
-        // In frames, as a timed change's are. A negative length is `quadratic`, which eases out.
+        // In frames, as a timed change's are. A negative length eases out, as `quadratic` does with one; `quadratic` with a
+        // positive length eases in: Test Game 87's fly-outs rise by p squared of their 900 pixels as they cross the
+        // screen (set 1, a 30 fps recording under Wine).
         int frames = std::atoi(parts[parts.size() - 2].c_str());
         int start = std::atoi(parts[parts.size() - 3].c_str()) * 1000 / std::max(1, fps_);
         int length = std::abs(frames) * 1000 / std::max(1, fps_);
         Track t;
         t.startMs = start;
         t.lengthMs = length;
-        t.easeOut = frames < 0 || parts.back() == "quadratic";
+        t.easeOut = frames < 0;
+        t.easeIn = frames > 0 && parts.back() == "quadratic";
         a.periodMs = std::max(a.periodMs, start + length);
         auto push = [&](Track::Property property, bool relative, float from, float to) {
             t.property = property;
@@ -5902,6 +5906,9 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
         else if (name == "scale_x") { push(Track::ScaleX, false, lastScaleX, value); lastScaleX = value; }
         else if (name == "scale_y") { push(Track::ScaleY, false, lastScaleY, value); lastScaleY = value; }
         else if (name == "alpha") { push(Track::Alpha, false, lastAlpha, value); lastAlpha = value; }
+        // The older layout's opacity, of 256: Test Game 87's fly-outs (`bright,64`) fade to a quarter as they go, the
+        // sprite over the backdrop with its colours unchanged (set 1, a 30 fps recording under Wine).
+        else if (name == "bright") { push(Track::Alpha, false, lastAlpha, value / 256); lastAlpha = value / 256; }
         else if (name == "rotate") { push(Track::Rotation, false, lastRotation, value); lastRotation = value; }
         else warnOnce("animation property not read: " + name);
     }
