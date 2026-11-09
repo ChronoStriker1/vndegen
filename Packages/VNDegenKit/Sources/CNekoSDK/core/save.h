@@ -83,6 +83,9 @@ struct SaveData {
     std::string olderImage;
     // A second picture's name right after the choice's, in the layouts that have one (SaveLayout::afterChoiceName).
     std::string afterChoiceImage;
+    // Read from a save's file by parseSave: its picture names are written back as read, empty ones too, where a save of
+    // the runtime's own takes the layout's (a PC save of Test Game 96 from before a new game's first question has none).
+    bool fromFile = false;
     // The card's comment, typed on the PC's save screen and kept at the save's start; a comment there moves all that follows.
     std::string comment;  // CP932
     int date[6] = {2026, 1, 1, 0, 0, 0};

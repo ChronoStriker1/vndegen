@@ -71,9 +71,12 @@ constexpr int64_t kVoteStartMs = 9900, kStartBannerFrom = 4400, kStartBannerTo =
 // its number of pixels a frame.
 constexpr int kFaceX = 119, kColumnStep = 400, kRowH = 50, kRowM = 200, kRowL = 350;
 // Each heroine's coffin, o012_002's cell for her, hangs 69 below her face's row at 65 + 400 a column, on a rope
-// (o012_001) from a wheel (o012_000) at the monitor's top; the face's tail points at it. The wheel's place, and whether it
-// turns, aren't measured.
-constexpr int kCoffinX = 65, kCoffinDY = 69, kCoffinW = 95, kWheelY = 96;
+// (o012_001) from a wheel (o012_000) at the top of her column. The wheel sits still at 96 + 400 a column, 74, its upper
+// half under the monitor's frame: its lower half fits there in every frame of a run of the PC's vote, and the rope's
+// own colours were found 11 to its right (lead, under Wine, by numbers alone). How far up the rope's picture reaches
+// isn't measured; it hangs from the top to the coffin. Ayano's coffin was never found whole on the PC, likely with
+// something over it, and is drawn as the others are.
+constexpr int kCoffinX = 65, kCoffinDY = 69, kWheelX = 96, kWheelY = 74, kRopeX = 107;
 // The monitor's inside, which all of that is drawn within, on a dark red: the PC's mean colour there over the vote, in
 // cells no face or bubble crosses, measured from the shots' numbers alone (lead). Which picture gives it isn't known.
 constexpr Rect kInside{40, 96, 1200, 544};
@@ -517,8 +520,8 @@ private:
             const Heroine &h = heroines_[size_t(w)];
             int coffinX = kCoffinX + kColumnStep * w + h.shakeX, coffinY = int(h.y) + kCoffinDY + h.shakeY;
             if (ImageRef rope = host.image("obj\\o012_001.bmp"))
-                inside(host, out, "obj\\o012_001.bmp", 0, 1, coffinX + kCoffinW / 2 - rope->w / 2, coffinY - rope->h);
-            inside(host, out, "obj\\o012_000.bmp", 0, 1, kCoffinX + kColumnStep * w + kCoffinW / 2 - 20, kWheelY);
+                inside(host, out, "obj\\o012_001.bmp", 0, 1, kRopeX + kColumnStep * w + h.shakeX, coffinY - rope->h);
+            inside(host, out, "obj\\o012_000.bmp", 0, 1, kWheelX + kColumnStep * w, kWheelY);
             inside(host, out, "obj\\o012_002.bmp", w, 3, coffinX, coffinY);
             inside(host, out, kFaceSheets[w], h.face, kFaceCells[w], kFaceX + kColumnStep * w + h.shakeX, int(h.y) + h.shakeY);
         }
