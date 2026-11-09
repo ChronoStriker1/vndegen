@@ -436,6 +436,19 @@ button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 
 button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
 
 
+screen log
+# Measured under Wine: a rule each 166 pixels with the name and text in yellow, the scroll track and its thumb, the
+# close button and four arrows.
+dim 0
+pic obj\k000_002.bmp 1185 110
+scroll obj\k000_003t.bmp obj\k000_003m.bmp obj\k000_003b.bmp 1185 110 500
+rows obj\k000_000.bmp 127 52 166 4 142 32
+button log_close obj\k000_001.bmp 1228 17 1 5 0
+button log_top obj\k001_000.bmp 1185 31 4 5 0
+button log_up obj\k001_000.bmp 1185 61 4 5 1
+button log_down obj\k001_000.bmp 1185 633 4 5 2
+button log_bottom obj\k001_000.bmp 1185 663 4 5 3
+
 screen dialog
 # Measured under Wine: the screen dimmed to 155 of 256, the stacked cards, and YES and NO. The question is a cell of
 # obj\a004_000.bmp (six of 491 pixels: resolution, save, load, overwrite, exit, title) at 394 237, which waits on
@@ -452,6 +465,13 @@ pic obj\l000_000.bmp 394 237
 placefor 2 295 64 389 0
 
 screen defaults
+# Its program asks for Lucida Sans Unicode, here Open Sans as in Funbag Fantasy 3 if, sized and spaced to the PC's lines
+# under Wine (cap height 15, a 69-character line 636 pixels wide, lines 32 apart), within 2 pixels.
+textfont 7
+textsize 20
+textgap 0.3
+textline 32
+textshift 1 -3
 # No quick saves: its ten pages of nine cards run to 90, all ordinary.
 quickslots 91 98
 # Its sex scenes' sound effects are se_h*, at the Sex SFX volume.
