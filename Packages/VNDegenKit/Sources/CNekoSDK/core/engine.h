@@ -291,6 +291,10 @@ private:
     };
     std::optional<PreviousChoice> previousChoice_;
     bool previousChoiceDue_ = false;
+    // The latest choice asked, as Test Games 82 and 83's saves keep it (SaveData::choiceColumns): its options, the sheet's
+    // columns, and the cells shown, never cleared.
+    int askedCount_ = 0, askedColumns_ = 0;
+    std::vector<int> askedCells_;
     void notePreviousChoice();
     void writePreviousChoice(int slot);
     void readPreviousChoice(int slot);
