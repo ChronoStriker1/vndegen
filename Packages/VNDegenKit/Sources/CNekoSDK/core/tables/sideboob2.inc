@@ -313,6 +313,76 @@ hovercols 134 527 870 599 obj\j016_000.bmp 72 450 8 5
 hovercols 134 607 700 656 obj\j016_000.bmp 72 542 8 6
 
 
+screen cg
+# Measured under Wine: twelve character tabs, each with her standing picture where the PC draws it, nine cards a
+# page with the number, thumbnail and how many of the entry's pictures have been seen.
+pic obj\e000_000.bmp 0 3
+pic obj\e000_001.bmp 75 14 7 1 2 0
+pic obj\e001_000.bmp 1154 0
+pic sc\sc_100_000_000_000_000.bmp -111 -23 tab 0
+pic sc\sc_101_000_000_000_000.bmp -431 -295 tab 1
+pic sc\sc_102_000_000_000_000.bmp -47 -23 tab 2
+pic sc\sc_000_000_000_000_000.bmp -47 -55 tab 3
+pic sc\sc_001_000_000_000_000.bmp -47 -23 tab 4
+pic sc\sc_002_000_000_000_000.bmp -11 -55 tab 5
+pic sc\sc_003_000_000_000_000.bmp -47 -39 tab 6
+pic sc\sc_004_000_000_000_000.bmp -47 -55 tab 7
+pic sc\sc_005_000_000_000_000.bmp -111 -39 tab 8
+pic sc\sc_006_000_000_000_000.bmp -47 -55 tab 9
+pic sc\sc_007_000_000_000_000.bmp 17 -55 tab 10
+pic obj\f004_000.bmp -15 1 tab 11
+cellsheet obj\f002_000.bmp
+cellsize 204 174
+cellthumb 9 36
+cell 463 85
+cell 677 85
+cell 891 85
+cell 463 285
+cell 677 285
+cell 891 285
+cell 463 485
+cell 677 485
+cell 891 485
+celllabel obj\e003_001.bmp 5 5
+celldigits obj\e003_002.bmp 39 5 2 18
+cellcount obj\e003_002.bmp obj\e003_003.bmp 129 147 165 176 7
+celltotal obj\e003_004.bmp 7
+gallerytabs
+cellhide
+button page0 obj\e002_000.bmp 416 18 10 5 0
+button page1 obj\e002_000.bmp 486 18 10 5 1
+button page2 obj\e002_000.bmp 556 18 10 5 2
+button page3 obj\e002_000.bmp 626 18 10 5 3
+button page4 obj\e002_000.bmp 696 18 10 5 4
+button page5 obj\e002_000.bmp 766 18 10 5 5
+button page6 obj\e002_000.bmp 836 18 10 5 6
+button page7 obj\e002_000.bmp 906 18 10 5 7
+button page8 obj\e002_000.bmp 976 18 10 5 8
+button page9 obj\e002_000.bmp 1046 18 10 5 9
+button gtab0 obj\f000_000.bmp 22 502 12 5 0
+button gtab1 obj\f000_000.bmp 158 502 12 5 1
+button gtab2 obj\f000_000.bmp 294 502 12 5 2
+button gtab3 obj\f000_000.bmp 22 556 12 5 3
+button gtab4 obj\f000_000.bmp 158 556 12 5 4
+button gtab5 obj\f000_000.bmp 294 556 12 5 5
+button gtab6 obj\f000_000.bmp 22 610 12 5 6
+button gtab7 obj\f000_000.bmp 158 610 12 5 7
+button gtab8 obj\f000_000.bmp 294 610 12 5 8
+button gtab9 obj\f000_000.bmp 22 664 12 5 9
+button gtab10 obj\f000_000.bmp 158 664 12 5 10
+button gtab11 obj\f000_000.bmp 294 664 12 5 11
+button nav_save obj\e001_001.bmp 1168 103 10 5 0 help obj\e001_002.bmp 1044 15 10 1 0 0
+button nav_load obj\e001_001.bmp 1168 155 10 5 1 help obj\e001_002.bmp 1044 63 10 1 1 0
+button nav_cg obj\e001_001.bmp 1168 207 10 5 2 help obj\e001_002.bmp 1044 111 10 1 2 0
+button nav_sprites obj\e001_001.bmp 1168 259 10 5 3 help obj\e001_002.bmp 1044 159 10 1 3 0
+button nav_scene obj\e001_001.bmp 1168 311 10 5 4 help obj\e001_002.bmp 1044 207 10 1 4 0
+button nav_music obj\e001_001.bmp 1168 363 10 5 5 help obj\e001_002.bmp 1044 255 10 1 5 0
+button nav_config obj\e001_001.bmp 1168 415 10 5 6 help obj\e001_002.bmp 1044 303 10 1 6 0
+button nav_title obj\e001_001.bmp 1168 467 10 5 7 help obj\e001_002.bmp 1044 351 10 1 7 0
+button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 10 1 8 0
+button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
+
+
 screen defaults
 # No quick saves: its ten pages of nine cards run to 90, all ordinary.
 quickslots 91 98
