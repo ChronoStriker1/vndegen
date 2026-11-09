@@ -3018,6 +3018,14 @@ void Engine::composeSlots(Canvas &out) {
                 int shown = !info.exists || isLocked ? int(StateDisabled) : over ? int(StateHover) : int(StateNormal);
                 drawPart(out, *del, cx + offset("slotdelete", 1), cy + offset("slotdelete", 2), 0, shown * h, del->w, h, 1);
             }
+            // `slotcommentbutton SHEET X Y`: a button of five rows on each card that asks for its comment, as Test Game 96's
+            // コメント does (set 2); none to press on a card with no save.
+            if (ImageRef button = picture("slotcommentbutton"); button && button->h >= 5) {
+                int h = button->h / 5;
+                bool over = pointerSeen_ && !dialogOpen_ && overCardPart("slotcommentbutton", slot, pointerX_, pointerY_);
+                int shown = !info.exists ? int(StateDisabled) : over ? int(StateHover) : int(StateNormal);
+                drawPart(out, *button, cx + offset("slotcommentbutton", 1), cy + offset("slotcommentbutton", 2), 0, shown * h, button->w, h, 1);
+            }
             // The lock's rows: open, open under the pointer, closed, closed under the pointer, and none to set.
             if (ImageRef lock = picture("slotlock"); lock && lock->h >= 5) {
                 int h = lock->h / 5;
@@ -4787,8 +4795,9 @@ void Engine::mouseButton(int button, bool down) {
         }
         int slot = slotAt(pointerX_, pointerY_);
         if (slot < 0) return;
-        // A click on a card's comment asks for one, from the save and load screens alike, as the PC's box opens.
-        if (overComment(slot, pointerX_, pointerY_) && slotInfo(slot).exists) {
+        // A click on a card's comment, or its comment button, asks for one, from the save and load screens alike, as the
+        // PC's box opens.
+        if ((overComment(slot, pointerX_, pointerY_) || overCardPart("slotcommentbutton", slot, pointerX_, pointerY_)) && slotInfo(slot).exists) {
             commentRequest_ = slot;
             return;
         }

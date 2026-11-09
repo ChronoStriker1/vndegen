@@ -160,6 +160,20 @@ import TestSupport
         for _ in 0..<3 { _ = vnneko_step(second, 16) }
         #expect(pixel(second, 194, 326) == [255, 0, 0])
         #expect(pixel(second, 0, 0) == [0, 255, 0])
+
+        // 96's PC saves name their scene with a doubled backslash, as its chapter list writes it: the scene still loads.
+        var doubled = save
+        let end = try #require(doubled.range(of: Data("s.txt".utf8), options: .backwards)).upperBound - doubled.startIndex
+        var start = end - 5
+        while start > 4 && Int(int32(doubled, start - 4)) != end - start { start -= 1 }
+        let name = String(decoding: doubled.subdata(in: (doubled.startIndex + start)..<(doubled.startIndex + end)), as: UTF8.self)
+        let twice = Data(name.replacingOccurrences(of: "\\", with: "\\\\").utf8)
+        doubled.replaceSubrange((doubled.startIndex + start - 4)..<(doubled.startIndex + end), with: withUnsafeBytes(of: Int32(twice.count).littleEndian, { Data($0) }) + twice)
+        try NekoSDKFlowFixture.packed(doubled).write(to: saves(data, "layout96").appendingPathComponent("save002.sav"))
+        #expect(vnneko_debug_load(second, 2))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(String(cString: vnneko_debug_status(second)).contains("s.txt"), "\(String(cString: vnneko_debug_status(second)))")
+        #expect(pixel(second, 194, 326) == [255, 0, 0])
     }
 
     // Test Game 90's layout: the newer engine's sprite records with x and y as floats 0xD5 after their names, a shorter
