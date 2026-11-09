@@ -1,7 +1,104 @@
 // Test Game 83, Funbag Fantasy 2. Its story order is in the exe; the flow below was traced under Wine, which scene
 // scripts the PC reads through each route and what its saves at each choice hold. Picture names and numbers only.
 const char kFunbag2[] = R"(
+screen title
+# Measured under Wine: the art with "Click Any Mouse Button" until a click, then the menu. The menu's help is a circle
+# 143 pixels above the button under the pointer. Start opens Prologue and Main Story in the first two rows once the
+# prologue has been read (global 2), and Extra its three galleries in its own rows; the main buttons go while one is open.
+screen title
+menustages
+startmenu 2
+submenudim hide
+pic obj\d000_000.bmp 0 0
+# Not yet drawn: the three lace mandalas (obj\d001_000 to _002) that turn slowly over the art on the PC.
+pic obj\a002_001.bmp 0 0
+pic obj\d000_001.bmp 334 11
+pic obj\d000_002.bmp 473 647
+pic obj\d000_003.bmp 351 419 stage 1
+button start obj\d000_004.bmp 480 363 6 5 0 stage 2 help obj\d000_006.bmp 356 220 6 1 0 0
+button load obj\d000_004.bmp 480 409 6 5 1 stage 2 help obj\d000_006.bmp 356 266 6 1 1 0
+button submenu:extra obj\d000_004.bmp 480 455 6 5 2 stage 2 help obj\d000_006.bmp 356 312 6 1 2 0
+button config obj\d000_004.bmp 480 501 6 5 3 stage 2 help obj\d000_006.bmp 356 358 6 1 3 0
+button websurvey obj\d000_004.bmp 480 547 6 5 4 stage 2 help obj\d000_006.bmp 356 404 6 1 4 0
+button quit obj\d000_004.bmp 480 593 6 5 5 stage 2 help obj\d000_006.bmp 356 450 6 1 5 0
+button start_prologue obj\d000_005.bmp 514 363 5 5 0 stage 2 group start help obj\d000_007.bmp 356 220 5 1 0 0
+button start_main obj\d000_005.bmp 514 409 5 5 1 stage 2 group start help obj\d000_007.bmp 356 266 5 1 1 0
+button cg obj\d000_005.bmp 514 455 5 5 2 stage 2 group extra help obj\d000_007.bmp 356 312 5 1 2 0
+button scene obj\d000_005.bmp 514 501 5 5 3 stage 2 group extra help obj\d000_007.bmp 356 358 5 1 3 0
+button music obj\d000_005.bmp 514 547 5 5 4 stage 2 group extra help obj\d000_007.bmp 356 404 5 1 4 0
+
+screen load
+pic obj\e000_000.bmp 0 0
+pic obj\e000_001.bmp 22 18 6 1 1 0
+slots obj\e002_000.bmp 60 99 510 119 5 2 1
+slotthumb 29 10
+slotdigits obj\e002_002.bmp 239 6 3
+slotnew obj\e003_000.bmp -23 -3
+# The chapter is S 5000, a cell of the strip: the prologue, then chapters 1 to 4 as the PC's cards name them.
+slotchaptervar obj\e004_000.bmp 358 4 5 5000
+datefield year 251 28 15
+# Day, hour and minute show no leading zero on the PC. The month is taken to do the same, as only 11 has been seen.
+datefield month 347 28 15 blank
+datefield day 406 28 15 blank
+datefield hour 251 50 15 blank
+datefield minute 310 50 15 blank
+button page0 obj\e001_003.bmp 408 31 10 5 0
+button page1 obj\e001_003.bmp 470 31 10 5 1
+button page2 obj\e001_003.bmp 532 31 10 5 2
+button page3 obj\e001_003.bmp 594 31 10 5 3
+button page4 obj\e001_003.bmp 656 31 10 5 4
+button page5 obj\e001_003.bmp 718 31 10 5 5
+button page6 obj\e001_003.bmp 780 31 10 5 6
+button page7 obj\e001_003.bmp 842 31 10 5 7
+button page8 obj\e001_003.bmp 904 31 10 5 8
+button page9 obj\e001_003.bmp 966 31 10 5 9
+button nav_save obj\e001_001.bmp 1114 61 9 5 0 help obj\e001_002.bmp 947 15 9 1 0 0
+button nav_load obj\e001_001.bmp 1114 131 9 5 1 help obj\e001_002.bmp 947 85 9 1 1 0
+button nav_cg obj\e001_001.bmp 1114 201 9 5 2 help obj\e001_002.bmp 947 155 9 1 2 0
+button nav_scene obj\e001_001.bmp 1114 271 9 5 3 help obj\e001_002.bmp 947 225 9 1 3 0
+button nav_music obj\e001_001.bmp 1114 341 9 5 4 help obj\e001_002.bmp 947 295 9 1 4 0
+button nav_config obj\e001_001.bmp 1114 411 9 5 5 help obj\e001_002.bmp 947 365 9 1 5 0
+button nav_title obj\e001_001.bmp 1114 481 9 5 6 help obj\e001_002.bmp 947 435 9 1 6 0
+button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 1 7 0
+button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
+
+screen save
+pic obj\e000_000.bmp 0 0
+pic obj\e000_001.bmp 22 18 6 1 0 0
+slots obj\e002_000.bmp 60 99 510 119 5 2 1
+slotthumb 29 10
+slotdigits obj\e002_002.bmp 239 6 3
+slotnew obj\e003_000.bmp -23 -3
+# The chapter is S 5000, a cell of the strip: the prologue, then chapters 1 to 4 as the PC's cards name them.
+slotchaptervar obj\e004_000.bmp 358 4 5 5000
+datefield year 251 28 15
+# Day, hour and minute show no leading zero on the PC. The month is taken to do the same, as only 11 has been seen.
+datefield month 347 28 15 blank
+datefield day 406 28 15 blank
+datefield hour 251 50 15 blank
+datefield minute 310 50 15 blank
+button page0 obj\e001_003.bmp 408 31 10 5 0
+button page1 obj\e001_003.bmp 470 31 10 5 1
+button page2 obj\e001_003.bmp 532 31 10 5 2
+button page3 obj\e001_003.bmp 594 31 10 5 3
+button page4 obj\e001_003.bmp 656 31 10 5 4
+button page5 obj\e001_003.bmp 718 31 10 5 5
+button page6 obj\e001_003.bmp 780 31 10 5 6
+button page7 obj\e001_003.bmp 842 31 10 5 7
+button page8 obj\e001_003.bmp 904 31 10 5 8
+button page9 obj\e001_003.bmp 966 31 10 5 9
+button nav_save obj\e001_001.bmp 1114 61 9 5 0 help obj\e001_002.bmp 947 15 9 1 0 0
+button nav_load obj\e001_001.bmp 1114 131 9 5 1 help obj\e001_002.bmp 947 85 9 1 1 0
+button nav_cg obj\e001_001.bmp 1114 201 9 5 2 help obj\e001_002.bmp 947 155 9 1 2 0
+button nav_scene obj\e001_001.bmp 1114 271 9 5 3 help obj\e001_002.bmp 947 225 9 1 3 0
+button nav_music obj\e001_001.bmp 1114 341 9 5 4 help obj\e001_002.bmp 947 295 9 1 4 0
+button nav_config obj\e001_001.bmp 1114 411 9 5 5 help obj\e001_002.bmp 947 365 9 1 5 0
+button nav_title obj\e001_001.bmp 1114 481 9 5 6 help obj\e001_002.bmp 947 435 9 1 6 0
+button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 1 7 0
+button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
+
 screen defaults
+parts scroll
 layoutcgslot 102
 lastchoice made
 
