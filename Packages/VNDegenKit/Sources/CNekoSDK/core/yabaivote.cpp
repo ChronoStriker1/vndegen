@@ -71,9 +71,12 @@ constexpr int64_t kVoteStartMs = 9900, kStartBannerFrom = 4400, kStartBannerTo =
 // its number of pixels a frame.
 constexpr int kFaceX = 119, kColumnStep = 400, kRowH = 50, kRowM = 200, kRowL = 350;
 // Each heroine's coffin, o012_002's cell for her, hangs 69 below her face's row at 65 + 400 a column, on a rope
-// (o012_001) from a wheel (o012_000) at the monitor's top; the face's tail points at it. The wheel's place, and whether it
-// turns, aren't measured.
-constexpr int kCoffinX = 65, kCoffinDY = 69, kCoffinW = 95, kWheelY = 96;
+// (o012_001) from a wheel (o012_000) at the top of her column. The wheel sits still at 96 + 400 a column, 74, its upper
+// half under the monitor's frame: its lower half fits there in every frame of a run of the PC's vote, and the rope's
+// own colours were found 11 to its right (lead, under Wine, by numbers alone). How far up the rope's picture reaches
+// isn't measured; it hangs from the top to the coffin. Ayano's coffin was never found whole on the PC, likely with
+// something over it, and is drawn as the others are.
+constexpr int kCoffinX = 65, kCoffinDY = 69, kWheelX = 96, kWheelY = 74, kRopeX = 107;
 // The monitor's inside, which all of that is drawn within, on a dark red: the PC's mean colour there over the vote, in
 // cells no face or bubble crosses, measured from the shots' numbers alone (lead). Which picture gives it isn't known.
 constexpr Rect kInside{40, 96, 1200, 544};
@@ -203,8 +206,12 @@ public:
         if (phase_ != Phase::Vote) return false;
         int64_t ms = host.nowMs() - voteStart_;
         int frame = ms < kVoteStartMs ? -1 : int((ms - kVoteStartMs) * 60 / 1000);
-        while (frame >= 0 && next_ < events_.size() && events_[next_].frame <= frame) run(host, events_[next_++]);
-        for (int f = lastFrame_ + 1; f <= frame; f++) advance(host, f);
+        // Each frame's lines run before that frame moves, however many frames a step covers, so a move starts on its own
+        // frame at any pace of steps.
+        for (int f = lastFrame_ + 1; f <= frame; f++) {
+            while (next_ < events_.size() && events_[next_].frame <= f) run(host, events_[next_++]);
+            advance(host, f);
+        }
         lastFrame_ = std::max(lastFrame_, frame);
         comments_.step(host);
         if (frame >= allFrames_ + kEndHoldFrames) return endVote(host), true;
@@ -513,8 +520,8 @@ private:
             const Heroine &h = heroines_[size_t(w)];
             int coffinX = kCoffinX + kColumnStep * w + h.shakeX, coffinY = int(h.y) + kCoffinDY + h.shakeY;
             if (ImageRef rope = host.image("obj\\o012_001.bmp"))
-                inside(host, out, "obj\\o012_001.bmp", 0, 1, coffinX + kCoffinW / 2 - rope->w / 2, coffinY - rope->h);
-            inside(host, out, "obj\\o012_000.bmp", 0, 1, kCoffinX + kColumnStep * w + kCoffinW / 2 - 20, kWheelY);
+                inside(host, out, "obj\\o012_001.bmp", 0, 1, kRopeX + kColumnStep * w + h.shakeX, coffinY - rope->h);
+            inside(host, out, "obj\\o012_000.bmp", 0, 1, kWheelX + kColumnStep * w, kWheelY);
             inside(host, out, "obj\\o012_002.bmp", w, 3, coffinX, coffinY);
             inside(host, out, kFaceSheets[w], h.face, kFaceCells[w], kFaceX + kColumnStep * w + h.shakeX, int(h.y) + h.shakeY);
         }
@@ -575,7 +582,7 @@ private:
     ImageRef cellOf(const ImageRef &sheet, int cols, int col) {
         auto key = std::make_pair(sheet.get(), col);
         auto it = cells_.find(key);
-        if (it != cells_.end()) return it->second;
+        if (it != cells_.end()) return it->second.made;
         int w = sheet->w / cols;
         if (w <= 0 || sheet->h <= 0) return nullptr;
         auto image = std::make_shared<Image>();
@@ -585,16 +592,18 @@ private:
         image->rgba.resize(size_t(w) * size_t(sheet->h) * 4);
         for (int y = 0; y < sheet->h; y++)
             std::copy_n(&sheet->rgba[(size_t(y) * sheet->w + size_t(col * w)) * 4], size_t(w) * 4, &image->rgba[size_t(y) * w * 4]);
-        return cells_[key] = image;
+        cells_[key] = {sheet, image};
+        return image;
     }
 
     // The countdown's pictures in red, their green and blue taken out, as the PC draws its last ten seconds.
     ImageRef redOf(const ImageRef &image) {
         auto it = red_.find(image.get());
-        if (it != red_.end()) return it->second;
+        if (it != red_.end()) return it->second.made;
         auto copy = std::make_shared<Image>(*image);
         for (size_t i = 0; i < copy->rgba.size(); i += 4) copy->rgba[i + 1] = copy->rgba[i + 2] = 0;
-        return red_[image.get()] = copy;
+        red_[image.get()] = {image, copy};
+        return copy;
     }
 
     void digit(PartHost &host, Canvas &out, const char *sheet, int value, int x, int y, bool red) {
@@ -656,8 +665,13 @@ private:
     std::string commentList_;
     std::array<Heroine, 3> heroines_{};
     CommentStream comments_;
-    std::map<std::pair<const Image *, int>, ImageRef> cells_;
-    std::map<const Image *, ImageRef> red_;
+    // Pictures made from others, by the other's address: each keeps its source, so the address stays that picture's
+    // while the entry lasts.
+    struct Made {
+        ImageRef source, made;
+    };
+    std::map<std::pair<const Image *, int>, Made> cells_;
+    std::map<const Image *, Made> red_;
 };
 
 }  // namespace

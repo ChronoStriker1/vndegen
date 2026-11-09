@@ -370,6 +370,7 @@ int newCardSlot(const SaveLayout *layout, int number) { return number + 1 - (lay
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out) {
     if (plain.size() < 100000) return false;
     Reader r(plain);
+    out.fromFile = true;
     r.skip(1);
     out.comment = r.str();
     r.skip(kAfterComment);
@@ -625,7 +626,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     w.zeros(kAfterComment);
     w.str(d.flow);
     bool older = layout.olderRecord > 0;
-    std::string choice = d.choiceImage.empty() && layout.choiceName ? std::string(layout.choiceName) : d.choiceImage;
+    std::string choice = d.choiceImage.empty() && layout.choiceName && !d.fromFile ? std::string(layout.choiceName) : d.choiceImage;
     if (older) {
         w.zeros(kOlderBeforeChoice);
         w.str(layout.choiceInFirstPlace ? choice : d.olderImage);
@@ -636,7 +637,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.str(choice);
     }
     if (layout.afterChoiceName) {
-        w.str(d.afterChoiceImage.empty() ? std::string(layout.afterChoiceName) : d.afterChoiceImage);
+        w.str(d.afterChoiceImage.empty() && !d.fromFile ? std::string(layout.afterChoiceName) : d.afterChoiceImage);
         w.zeros(kAfterChoice - 4);
     } else {
         w.zeros(kAfterChoice);

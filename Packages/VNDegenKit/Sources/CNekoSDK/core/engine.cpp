@@ -33,6 +33,8 @@ constexpr int kWindowSlideMs = 200;
 constexpr int kNoiseSlot = 10000, kNoiseFramesPerPlace = 4;
 // A save record's kind for a part's tiled picture, and where its fixed part keeps the speed (SavedSprite::kind).
 constexpr int kTiledKind = 6;
+// The effects channel a flipbook's own sound plays in (`flipsound`), which game parts can use for theirs too.
+constexpr int kFlipSoundChannel = 180;
 constexpr size_t kTiledSpeedAt = 45;
 // How long each character of text takes to fade in, measured from the PC game's footage.
 constexpr int kCharFadeMs = 160;
@@ -1313,12 +1315,19 @@ void Engine::loadGalleries() {
         else if (voiceType >= 0) voiceTypes_.emplace_back(normalizedPath(fields(line)[0]), voiceType);
     }
     std::stable_sort(voiceTypes_.begin(), voiceTypes_.end(), [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
-    // `#anime PICTURES FIRST MS`. Each number is read as ms because an effect of 39 pictures at 16 lasts 0.6 s that way.
+    // `#anime PICTURES FIRST MS`, and on some lines `N SOUND VOLUME` after. Each number is read as ms because an effect
+    // of 39 pictures at 16 lasts 0.6 s that way. What N is, 0, 1 or 10, isn't known.
     for (const std::string &line : lines("cfg\\anime_cfg.ini")) {
         std::istringstream in(line);
-        std::string word, path;
-        int count = 0, ms = 0;
-        if (in >> word >> count >> path >> ms && word == "#anime" && count > 0 && ms > 0) flipbooks_[normalizedPath(path)] = {count, ms};
+        std::string word, path, sound;
+        int count = 0, ms = 0, n = 0, volume = 100;
+        if (!(in >> word >> count >> path >> ms) || word != "#anime" || count <= 0 || ms <= 0) continue;
+        FlipbookInfo info{count, ms, "", 100};
+        if (in >> n >> sound >> volume && sound.rfind("//", 0) != 0) {
+            info.sound = sound;
+            info.volume = volume;
+        }
+        flipbooks_[normalizedPath(path)] = info;
     }
     if (!saveDir_.empty()) {
         std::ifstream f(saveDir_ + "/vndegen_seen.txt");
@@ -2714,6 +2723,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             resumeFlipbook(s);
             s.flipStep = saved.flipStep;
             s.flipParam15 = saved.flipParam15;
+            applyFlipTime(s);
             restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes, saved.flipRepeat, saved.flipRepeat >= 0 ? saved.flipReverse : -1);
         }
         if (!saved.animation.empty()) {
@@ -3743,10 +3753,13 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 
 // `partplate` under `screen defaults`: a game part's open screen keeps the message window's plate and its buttons over
 // it, as Test Game 96's hub and vote show the plate's Menu tab at its resting place (set 2).
-bool Engine::partPlate() const {
+bool Engine::defaultsHave(const char *key) const {
     auto defaults = screens_.find("defaults");
-    return partScreen_ && waiting_ == Waiting::PartScreen && defaults != screens_.end() && defaults->second.setting("partplate") &&
-           partScreen_->showsPlate();
+    return defaults != screens_.end() && defaults->second.setting(key);
+}
+
+bool Engine::partPlate() const {
+    return partScreen_ && waiting_ == Waiting::PartScreen && defaultsHave("partplate") && partScreen_->showsPlate();
 }
 
 bool Engine::underButtonsShown() const {
@@ -5039,6 +5052,18 @@ void Engine::startFlipbook(const Node &n) {
     s.flipStep = p[16];
     s.flipParam15 = p[15];
     resumeFlipbook(s);
+    applyFlipTime(s);
+    // `flipsound` under `screen defaults`: a flipbook plays the sound its anime_cfg.ini line names, once, as Test Game
+    // 90's PC reads the sound's file each time it loads an emotion mark's pictures, in scenes with no command playing it
+    // (set 1, a file trace under Wine). Which channel the PC uses isn't known; the last effects channel is taken.
+    if (auto it = flipbooks_.find(normalizedPath(s.path)); it != flipbooks_.end() && !it->second.sound.empty() && defaultsHave("flipsound")) {
+        Node sound;
+        sound.p[0] = kFlipSoundChannel;
+        sound.p[1] = it->second.volume;
+        sound.p[4] = 1;
+        sound.s[1] = it->second.sound;
+        playSound(sound, kKindSe);
+    }
     if (!s.flipCount) warnOnce("A flipbook isn't in anime_cfg.ini: " + n.s[1]);
     else if (s.flipReverse) {
         s.flipShown = s.flipCount - 1;
@@ -5295,11 +5320,22 @@ void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map
     if (ImageRef image = images_->get(flipPicture(s.path, s.flipShown))) s.image = image;
 }
 
+// `fliptime` under `screen defaults`: command 121's parameter 16, when set, is how long each picture shows, in
+// milliseconds taken up to whole frames at 60 a second, in place of the ini's time. Test Game 90's PC held each picture
+// of its 41-picture anger mark, 16 in the ini and 30 in parameter 16, for two frames, 1.3 seconds in all, and its joy
+// mark's 57 for about 2.0 (set 1, recordings under Wine). Test Game 84's PC doesn't: its effects with 50 there run at the
+// ini's 16, so it's a setting of the game's table.
+void Engine::applyFlipTime(Sprite &s) {
+    if (s.flipStep <= 0 || !s.flipCount || !defaultsHave("fliptime")) return;
+    int frames = (s.flipStep * 60 + 999) / 1000;
+    s.flipMs = std::max(1, (frames * 1000 + 30) / 60);
+}
+
 void Engine::resumeFlipbook(Sprite &s) {
     auto it = flipbooks_.find(normalizedPath(s.path));
     if (it == flipbooks_.end()) return;
-    s.flipCount = it->second.first;
-    s.flipMs = it->second.second;
+    s.flipCount = it->second.count;
+    s.flipMs = it->second.ms;
     s.flipBegun = now_;
     s.flipShown = 0;
     s.additive = paintedOnBlack(s.path);
