@@ -6,7 +6,7 @@ import TestSupport
 // Test Game 96's viewer comments through the `yabai` part: command 110 loads a list, 112 plays a group of it, and each
 // comment crosses the screen from right to left in 6.05 seconds, white with a black edge, as the PC draws them.
 @Suite struct NekoSDKCommentTests {
-    private func game() throws -> URL {
+    private func game(endAfter: Int32? = nil) throws -> URL {
         // A list of one group, `#p 0 40 80`, two lines; the scene loads it, plays the group and waits.
         let list = "//test\r\n#p 0 40 80\r\nABCDE\r\nFGHIJ\r\n\r\n##\r\n"
         return try NekoSDKFlowFixture.game([
@@ -17,7 +17,14 @@ import TestSupport
                 .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
                 .init(op: 2, next: 0),
             ]),
-            "scr/s.txt": NekoSDKFlowFixture.flow([
+            "scr/s.txt": NekoSDKFlowFixture.flow(endAfter.map { ms in [
+                .init(op: 0, next: 2),
+                .init(op: 110, next: 3, s: [1: "cfg\\com\\c.ini"]),
+                .init(op: 112, next: 4, p: [0: 0]),
+                .init(op: 2, next: 5, p: [0: ms]),
+                .init(op: 111, next: 6, p: [0: 0]),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ] } ?? [
                 .init(op: 0, next: 2),
                 .init(op: 110, next: 3, s: [1: "cfg\\com\\c.ini"]),
                 .init(op: 112, next: 4, p: [0: 0]),
@@ -57,6 +64,18 @@ import TestSupport
         #expect(moved > 180 && moved < 260, "moved \(moved)")
         // After seven seconds both have crossed and gone.
         for _ in 0..<440 { _ = vnneko_step(e, 16) }
+        #expect(textColumns(e).isEmpty)
+    }
+
+    // Command 111 takes the comments away at once, those on their way too, as 96's PC does.
+    @Test func endingTheCommentsTakesThemAway() throws {
+        let root = try game(endAfter: 1000)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<40 { _ = vnneko_step(e, 16) }
+        #expect(!textColumns(e).isEmpty)
+        for _ in 0..<40 { _ = vnneko_step(e, 16) }
         #expect(textColumns(e).isEmpty)
     }
 }
