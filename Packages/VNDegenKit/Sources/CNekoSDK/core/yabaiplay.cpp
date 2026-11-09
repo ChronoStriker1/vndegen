@@ -197,12 +197,16 @@ public:
         // screen and may drift on the PC; it's held still here.
         if (ImageRef rim = host.image("obj\\l000_001.bmp")) drawPart(out, *rim, -125, 0, 0, 0, rim->w, rim->h, 0.75f);
         if (ImageRef dark = host.image("obj\\l000_002.bmp")) drawPart(out, *dark, 0, 0, 0, 0, dark->w, dark->h, 0.75f);
+        // The dark band behind the clock and the line under it, as on the PC's hub.
+        put(host, out, "obj\\l000_003.bmp", 0, 0);
+        put(host, out, "obj\\l000_004.bmp", 244, 45);
         // The heroine shown, l006 sheet 2 * heroine: 16 frames 525 wide, frame 3 * (truth - 1) + (stage - 1), at x 0 (matched
         // on the PC's hub). The sheet after it is the same frames with her eyes closed; when the PC uses it isn't measured.
         cell(host, out, "obj\\l006_00" + std::to_string(2 * shown) + ".bmp", 0, 0,
              525 * (3 * (truth(host) - 1) + std::min(3, std::max(1, stage)) - 1), 0, 525, 720);
         put(host, out, "obj\\l001_000.bmp", 256, 21);
         put(host, out, "obj\\l005_000.bmp", 0, 592);
+        put(host, out, "obj\\l004_001.bmp", 0, 667);  // 過去の自白内容を確認することが出来ます。
         cell(host, out, "obj\\l004_000.bmp", kTreeButton[0], kTreeButton[1], 0, 0, 190, 95);
         drawClock(host, out);
         // The heroine tabs: row 2 for the one shown, 4 (grey) once she's done, else row 0.
