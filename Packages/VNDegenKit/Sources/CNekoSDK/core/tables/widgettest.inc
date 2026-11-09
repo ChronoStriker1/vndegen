@@ -44,6 +44,7 @@ const char kWidgetTestPart[] = R"(
 screen defaults
 parts selftest
 buttonsoff nav_music
+emptytabsoff
 
 screen title
 button sprites obj\b.bmp 0 0 1 5 0
@@ -55,9 +56,12 @@ pic obj\d.bmp 380 401
 button nav_title obj\b.bmp 0 0 1 5 0
 button nav_load obj\b.bmp 405 405 1 5 0
 
+screen music
+
 screen scene
 part selftest
 pic obj\d.bmp 290 312
+gallerytabs 0
 replaychapters
 replaykeeps
 button page1 obj\b.bmp 700 0 1 5 0
@@ -138,4 +142,17 @@ flipsound
 const char kScrollSaveTest[] = R"(
 screen defaults
 parts scroll
+)";
+
+const char kWidgetTestTabs[] = R"(
+screen title
+button scene obj\b.bmp 600 0 1 5 0
+
+screen scene
+gallerytabs 0
+cell 300 300
+cellsize 40 30
+cellthumb 0 0
+button gtab0 obj\b.bmp 800 0 1 5 0
+button gtab1 obj\b.bmp 900 0 1 5 0
 )";

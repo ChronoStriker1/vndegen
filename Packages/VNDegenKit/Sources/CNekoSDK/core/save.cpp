@@ -161,7 +161,7 @@ const SaveLayout kSideboob2 = [] {
 constexpr int kRecordX = 0x169, kRecordScale = 0x17D, kRecordAnchor = 0x185, kRecordAlpha = 0x18D, kRecordAnimated = 0x1B3;
 constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0x192, kRecordWave = 0x1A6;
 // A splash record names its droplet's picture this far into its fixed part, before the engine's extra bytes: an empty
-// name in every other record. Only Test Game 88 has splashes, so it's checked in that layout alone.
+// name in every other record.
 constexpr int kSplashNameAt = 201;
 // The bytes of a record after its animation text, and a flipbook's fields among them: whether it runs backward and
 // repeats (parameters 1 and 14), two bytes of 1 while it plays, parameters 15 and 16, and a byte of 0 where every other
@@ -169,6 +169,7 @@ constexpr int kSplashNameAt = 201;
 constexpr size_t kTailFlipReverse = 97, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipParam15 = 104,
                  kTailFlipStep = 108, kTailFlipHundred = 120;
 constexpr int kNoiseKind = 4;
+constexpr int kNoiseSlot = 10000;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
 constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
 constexpr int kDateFlag = 360;
@@ -425,12 +426,12 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.slot = r.i32();
         int number = r.i32();
         if (!ordinary) s.flipFrame = number;
-        if (!ordinary && number == kNoiseKind) {
+        s.path = r.str();
+        s.nextPath = r.str();
+        if (!ordinary && number == kNoiseKind && s.slot == kNoiseSlot && s.path.empty()) {
             s.noise = true;
             s.flipFrame = -1;
         }
-        s.path = r.str();
-        s.nextPath = r.str();
         size_t f = r.at;
         if (older) {
             // A part's record, an ordinary one of another kind than a picture's, names three pictures in its fixed
@@ -516,7 +517,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.anchorY = r.i32At(f + kRecordAnchor + 4 + extra);
         s.alpha = r.i32At(f + kRecordAlpha + extra);
         // A record with no picture keeps the value it has: Test Game 90's bonus release writes 256 in one (set 1's PC save).
-        if (layout.shownAlpha == 255 && s.slot != -999999 && !s.path.empty() && s.alpha == 255) s.alpha = 256;
+        if (layout.shownAlpha == 255 && s.slot != -999999 && (!s.path.empty() || s.noise) && s.alpha == 255) s.alpha = 256;
         s.blurOn = plain[f + kRecordBlurOn + extra] != 0;
         s.blur = r.i32At(f + kRecordBlur + extra);
         s.waveOn = plain[f + kRecordWave + extra] != 0;
@@ -536,7 +537,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.endX = r.f32At(g + 4);
         s.endY = r.f32At(g + 8);
         s.endAlpha = r.i32At(g + 12);
-        if (layout.shownAlpha == 255 && s.slot != -999999 && !s.path.empty() && s.endAlpha == 255) s.endAlpha = 256;
+        if (layout.shownAlpha == 255 && s.slot != -999999 && (!s.path.empty() || s.noise) && s.endAlpha == 255) s.endAlpha = 256;
         s.endScaleX = r.f32At(g + 20);
         s.endScaleY = r.f32At(g + 24);
         s.rawTail.assign(plain.begin() + std::ptrdiff_t(g), plain.begin() + std::ptrdiff_t(g + kRecordTail));
@@ -762,7 +763,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(f + kRecordAnchor + 4 + extra, s.anchorY);
         // Only a layout whose shown sprites hold 255 changes the value, and only that one: any other is written as it is,
         // as a PC save of Test Game 94 with 512 there must come back with 512.
-        auto shown = [&](int alpha) { return layout.shownAlpha == 255 && !root && !s.path.empty() && alpha == 256 ? 255 : alpha; };
+        auto shown = [&](int alpha) { return layout.shownAlpha == 255 && !root && (!s.path.empty() || s.noise) && alpha == 256 ? 255 : alpha; };
         w.setI32(f + kRecordAlpha + extra, shown(s.alpha));
         w.b[f + kRecordBlurOn + extra] = s.blurOn ? 1 : 0;
         w.setI32(f + kRecordBlur + extra, s.blur);
