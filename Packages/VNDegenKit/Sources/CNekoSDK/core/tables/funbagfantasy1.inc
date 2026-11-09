@@ -588,9 +588,8 @@ scene scr\ep_00_10b.txt
 label c4
 scene scr\ep_00_10c.txt
 scene scr\ep_00_11.txt
-if S 200 >= 3 goto c5a     # inside all three times: 11a and its choice; under 3 (checked at 2), straight to 11b
-scene scr\ep_00_11b.txt      # also the second option's scene below: told apart by S200 (under 3 here)
-goto c5
+if S 200 >= 3 goto c5a     # inside all three times: 11a and its choice; under 3 (checked at 1 and 2), straight on to 11d:
+goto c5                      # the PC opens 11b's file there but plays none of it (79 lines from 11's end landed in 11d)
 label c5a
 scene scr\ep_00_11a.txt
 choice obj\m000_000.bmp 2 cells 4 5  # I promise to return after I reach the capital! / I'll never forget you, Roxanne.
@@ -599,7 +598,7 @@ set S 200 += 2
 scene scr\ep_00_11c.txt
 goto c5
 label c5b
-scene scr\ep_00_11b.txt      # with S200 at 3: the first place has it under 3
+scene scr\ep_00_11b.txt
 label c5
 scene scr\ep_00_11d.txt
 scene scr\ep_00_12.txt
