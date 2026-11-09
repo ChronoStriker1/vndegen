@@ -728,9 +728,11 @@ private:
     std::string firstStoryFlow() const;
     bool resumeStoryAt(const std::string &scene);
     bool storyFlowExists(const std::string &name) const;
-    bool resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice);
+    bool resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice, bool &atScreen);
     bool storySceneIs(const Node &n, const std::string &scene);
-    // The parameter of a story table's `scene` and `choice` nodes that holds the PC's number for the place.
+    // Opcodes the story table needs that flow scripts don't have. Flow scripts' own stop well below these.
+    static constexpr int kStoryGoto = 1001, kStoryOpen = 1002, kStoryChapter = 1003;
+    // The parameter of a story table's `scene`, `choice` and `open` nodes that holds the PC's number for the place.
     static constexpr int kStoryPcNumber = 31;
     // A story table's choice's columns of its picture: how many at this parameter, then the columns.
     static constexpr int kChoiceCells = 14;
