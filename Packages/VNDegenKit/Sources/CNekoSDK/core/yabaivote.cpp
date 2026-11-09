@@ -12,7 +12,6 @@
 // shots that were never looked at, and by crops of its bars. What wasn't measured is marked so.
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstdlib>
 #include <iterator>
 #include <map>
@@ -64,6 +63,19 @@ constexpr int kCoffinX = 65, kCoffinDY = 69, kCoffinW = 95, kWheelY = 96;
 // The monitor's inside, which all of that is drawn within, on a dark red: the PC's mean colour there over the vote, in
 // cells no face or bubble crosses, measured from the shots' numbers alone (lead). Which picture gives it isn't known.
 constexpr Rect kInside{40, 96, 1200, 544};
+// The viewers' raised hands along the monitor's bottom, the same in each column from its start: o013_001 to o013_005, each
+// an animation of one hand rising in cells 144 tall standing on the bottom edge, placed so their fingertips fall where set
+// 2 found them on the PC (x 94, 138, 215, 323 and 350 from the column's start). Their pace and order aren't measured; each
+// rises and sinks through its cells on a slow beat of its own.
+struct Hand {
+    const char *sheet;
+    int cells, x;
+};
+const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 56}, {"obj\\o013_002.bmp", 7, 119}, {"obj\\o013_003.bmp", 7, 157},
+                       {"obj\\o013_004.bmp", 6, 292}, {"obj\\o013_005.bmp", 8, 324}};
+constexpr int kHandsBottom = 640, kHandFrameMs = 300;
+// The thin black dividers between the columns (o003_000), as set 2 placed them.
+constexpr int kDividerX[2] = {437, 837}, kDividerY = 16;
 constexpr uint8_t kInsideRed[3] = {55, 2, 2};
 const char *const kFaceSheets[3] = {"obj\\o014_000.bmp", "obj\\o014_001.bmp", "obj\\o014_002.bmp"};
 const int kFaceCells[3] = {10, 12, 10};
@@ -179,6 +191,9 @@ public:
         if (phase_ == Phase::Pick) drawPick(host, out);
         else drawVote(host, out);
     }
+
+    // The message window's plate (`partplate`) shows over the pick screen, not while the vote runs (set 2).
+    bool showsPlate() const override { return phase_ != Phase::Vote; }
 
     // A vote isn't kept with a save: one made during it comes back to the pick screen, which is where the PC's saves of a
     // vote are (set 2's pick saves).
@@ -432,11 +447,15 @@ private:
         fill(out, kInside.x, kInside.y, kInside.w, kInside.h, kInsideRed[0], kInsideRed[1], kInsideRed[2]);
         // The coffins' columns, under the monitor's glass. What's behind the faces isn't drawn: it's the heroines' standing
         // pictures, laid out in shots that weren't looked at, still to be placed.
-        // The silhouettes of the viewers' arms along the bottom, two strips that sway (not measured: a slow sway of a few
-        // pixels, as the places they were found at suggest).
-        float sway = std::sin(float(ms) / 900.0f);
-        inside(host, out, "obj\\o013_006.bmp", 0, 1, 20 + int(4 * sway), 452);
-        inside(host, out, "obj\\o013_007.bmp", 0, 1, 60 - int(6 * sway), 448);
+        for (int column = 0; column < 3; column++)
+            for (size_t k = 0; k < std::size(kHands); k++) {
+                const Hand &hand = kHands[k];
+                // Up through the cells and down again, each hand a step out from the last.
+                int steps = 2 * (hand.cells - 1), at = int((ms / kHandFrameMs + int64_t(k) * 3 + column) % steps);
+                int cellNow = at < hand.cells ? at : steps - at;
+                inside(host, out, hand.sheet, cellNow, hand.cells, kInside.x + kColumnStep * column + hand.x, kHandsBottom - 144);
+            }
+        for (int x : kDividerX) inside(host, out, "obj\\o003_000.bmp", 0, 1, x, kDividerY);
         for (int w = 0; w < 3; w++) {
             const Heroine &h = heroines_[size_t(w)];
             int coffinX = kCoffinX + kColumnStep * w + h.shakeX, coffinY = int(h.y) + kCoffinDY + h.shakeY;
@@ -447,12 +466,12 @@ private:
             inside(host, out, kFaceSheets[w], h.face, kFaceCells[w], kFaceX + kColumnStep * w + h.shakeX, int(h.y) + h.shakeY);
         }
         for (int w = 0; w < 3; w++) drawBubble(host, out, w);
-        // Bubbles end at the monitor's edge too: black again outside it, where the PC's shots are.
+        if (!commentsHidden_) comments_.draw(host, out);
+        // Bubbles and comments end at the monitor's edge too: black again outside it, as on the PC (set 2).
         fill(out, 0, 0, out.w, kInside.y, 0, 0, 0);
         fill(out, 0, kInside.y + kInside.h, out.w, out.h - kInside.y - kInside.h, 0, 0, 0);
         fill(out, 0, kInside.y, kInside.x, kInside.h, 0, 0, 0);
         fill(out, kInside.x + kInside.w, kInside.y, out.w - kInside.x - kInside.w, kInside.h, 0, 0, 0);
-        if (!commentsHidden_) comments_.draw(host, out);
         put(host, out, "obj\\o002_000.bmp", 14, 66, 1);
         // The top bar: the day, the vote's title (o006_000, a cell for each truth), the countdown and スキップ.
         drawClock(host, out, false, 1);

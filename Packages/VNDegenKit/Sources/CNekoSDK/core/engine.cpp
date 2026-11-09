@@ -3714,7 +3714,8 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 // it, as Test Game 96's hub and vote show the plate's Menu tab at its resting place (set 2).
 bool Engine::partPlate() const {
     auto defaults = screens_.find("defaults");
-    return partScreen_ && waiting_ == Waiting::PartScreen && defaults != screens_.end() && defaults->second.setting("partplate");
+    return partScreen_ && waiting_ == Waiting::PartScreen && defaults != screens_.end() && defaults->second.setting("partplate") &&
+           partScreen_->showsPlate();
 }
 
 bool Engine::underButtonsShown() const {
