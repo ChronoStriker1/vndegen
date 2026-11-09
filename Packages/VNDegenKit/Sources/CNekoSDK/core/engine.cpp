@@ -539,7 +539,14 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action.rfind("track", 0) == 0) {
-        playTrack(std::atoi(action.c_str() + 5));
+        int index = std::atoi(action.c_str() + 5);
+        // `trackselects` on the music screen: with nothing playing a track is only chosen, lit with its title shown, and
+        // Play starts it; while one plays, another starts at once. Test Game 96's PC does so (set 2, under Wine).
+        if (!trackPlayer_ && screen_ && screen_->setting("trackselects")) {
+            if (index >= 0 && size_t(index) < tracks_.size() && seen(tracks_[size_t(index)])) currentTrack_ = index;
+            return;
+        }
+        playTrack(index);
         return;
     }
     if (action == "music_stop") { stopTrack(); return; }
@@ -1226,8 +1233,20 @@ void Engine::loadGalleries() {
     }
     // `page thumbnail 0 0 flow key,0,0`, with up to three keys and 0 for none. Test Game 84's second scene names two, and
     // on the PC either one read unlocks it.
+    // Test Game 90's lines are `TAB THUMB STEP NUMBER SCRIPT`, five fields: the script read unlocks the scene, and its
+    // replay plays that script alone and comes back (set 1, by a file trace under Wine). STEP is -1 on every line there
+    // and NUMBER counts up by tab, and neither changes anything set 1 could see.
     for (const std::string &line : lines("cfg\\play_view.ini")) {
         auto f = fields(line);
+        if (f.size() == 5 && normalizedPath(f[4]).find(".txt") != std::string::npos) {
+            GalleryEntry e;
+            e.page = std::atoi(f[0].c_str());
+            e.thumbnail = f[1];
+            e.keys = {f[4]};
+            e.flow = "replayscene:" + f[4];
+            sceneEntries_.push_back(e);
+            continue;
+        }
         if (f.size() < 6) continue;
         GalleryEntry e;
         e.page = std::atoi(f[0].c_str());
@@ -1423,7 +1442,10 @@ void Engine::writeReadSav() {
         if (on && path.size() > 4 && path.compare(path.size() - 4, 4, ".txt") == 0) finished.push_back(path);
     std::sort(finished.begin(), finished.end());
     for (const std::string &path : finished)
-        if (std::none_of(scripts.begin(), scripts.end(), [&](const std::string &s) { return readKey(s) == readKey(path); })) scripts.push_back(path);
+        if (std::none_of(scripts.begin(), scripts.end(), [&](const std::string &s) { return readKey(s) == readKey(path); })) {
+            auto named = readNames_.find(path);
+            scripts.push_back(named == readNames_.end() ? path : named->second);
+        }
     if (scripts.empty()) return;
     std::vector<uint8_t> out;
     auto put = [&](int32_t v) { out.insert(out.end(), reinterpret_cast<uint8_t *>(&v), reinterpret_cast<uint8_t *>(&v) + 4); };
@@ -1522,8 +1544,13 @@ void Engine::noteSeen(const std::string &path) {
     if (seen_[key]) return;
     seen_[key] = true;
     seenChanged_ = true;
-    // A script read to its end goes into read.sav too.
-    if (key.size() > 4 && key.compare(key.size() - 4, 4, ".txt") == 0) readChanged_ = true;
+    // A script read to its end goes into read.sav too, under the name the story gave it when that has a doubled
+    // backslash: Test Game 96's PC lists its scenes as its chapter list writes them, `scr\\sc_….txt`, and unlocks its
+    // Scene gallery by those names (set 2, from the PC's read.sav).
+    if (key.size() > 4 && key.compare(key.size() - 4, 4, ".txt") == 0) {
+        readChanged_ = true;
+        if (path.find("\\\\") != std::string::npos) readNames_[key] = path;
+    }
 }
 
 // A card's picture. Ore o Hoshigaru Tsuma to Gibo's ini names `obj\small\cg\...` for pictures whose full versions are in
@@ -1606,7 +1633,20 @@ const std::vector<Engine::GalleryEntry> &Engine::galleryEntries() const {
 // A picture unlocks once seen. An anime entry's movies unlock together with its scene's script.
 bool Engine::galleryImageSeen(const GalleryEntry &entry, size_t image) const {
     if (screen_ && screen_->name == "anime") return sceneUnlocked(entry);
-    return image < entry.images.size() && seen(entry.images[image]);
+    return cgPictureSeen(entry, image);
+}
+
+// `cgwhole` under `screen defaults`: an entry's pictures are all seen once any of them is, as Test Game 96's PC flags
+// every picture of an entry, its other swimsuit versions too, after a scene that shows only the first four (set 2, from
+// the PC's cfg.sav).
+bool Engine::cgPictureSeen(const GalleryEntry &entry, size_t image) const {
+    if (image >= entry.images.size()) return false;
+    if (seen(entry.images[image])) return true;
+    auto defaults = screens_.find("defaults");
+    if (defaults == screens_.end() || !defaults->second.setting("cgwhole")) return false;
+    for (const std::string &other : entry.images)
+        if (seen(other)) return true;
+    return false;
 }
 
 bool Engine::sceneUnlocked(const GalleryEntry &scene) const {
@@ -1762,18 +1802,32 @@ void Engine::composeGallery(Canvas &out) {
             if (ImageRef no = images_->get((*label)[0])) drawPart(out, *no, cx + field(*label, 1), cy + field(*label, 2), 0, 0, no->w, no->h, faint);
         if (const auto *digits = screen_->setting("celldigits"); digits && digits->size() >= 5)
             if (ImageRef sheetOfTen = images_->get((*digits)[0])) {
-                int w = sheetOfTen->w / 10, count = field(*digits, 3), step = field(*digits, 4), value = page_ * perPage + index + 1;
+                // `celldigits SHEET X Y COUNT STEP [CELLS]`: CELLS is the sheet's cell count, the digits first, 10 when absent, as
+                // Test Game 96's sheet of 13 goes on with a slash, a colon and a dash (set 2).
+                int w = sheetOfTen->w / (digits->size() >= 6 ? std::max(10, field(*digits, 5)) : 10), count = field(*digits, 3), step = field(*digits, 4), value = page_ * perPage + index + 1;
                 for (int i = count - 1; i >= 0; i--, value /= 10)
                     drawPart(out, *sheetOfTen, cx + field(*digits, 1) + i * step, cy + field(*digits, 2), value % 10 * w, 0, w, sheetOfTen->h, faint);
             }
         const auto *counts = screen_->setting("cellcount");
+        // `cellcountdash CELL`: a locked card shows the count as dashes, the sheet's cell CELL, around the sheet's slash, as
+        // Test Game 96's `--/--` (set 2, under Wine). Only with the slash in the sheet.
+        if (const auto *dash = screen_->setting("cellcountdash"); !unlocked && dash && !dash->empty() && counts && counts->size() >= 8 && (*counts)[1] == "-")
+            if (ImageRef sheetOfCells = images_->get((*counts)[0])) {
+                int w = sheetOfCells->w / std::max(11, field(*counts, 7)), y = cy + field(*counts, 3);
+                const auto *stepLine = screen_->setting("cellcountstep");
+                int step = stepLine && !stepLine->empty() ? field(*stepLine, 0) : w;
+                for (int at : {cx + field(*counts, 2), cx + field(*counts, 2) + step, cx + field(*counts, 5), cx + field(*counts, 5) + step})
+                    drawPart(out, *sheetOfCells, at, y, field(*dash, 0) * w, 0, w, sheetOfCells->h, faint);
+                drawPart(out, *sheetOfCells, cx + field(*counts, 4), y + field(*counts, 6), 10 * w, 0, w, sheetOfCells->h, faint);
+            }
         if (unlocked && counts && counts->size() >= 6 && screen_->name == "cg") {
             // `cellcount DIGITS SLASH X Y SLASHX TOTALX [SLASHY] [CELLS]`. A SLASH of `-` is the digit sheet's cell after 9, as
             // in Test Game 84, whose sheet of CELLS also holds a colon.
             bool slashInSheet = (*counts)[1] == "-";
             ImageRef sheetOfTen = images_->get((*counts)[0]), slash = slashInSheet ? nullptr : images_->get((*counts)[1]);
             const auto &pictures = entries[entry].images;
-            int have = int(std::count_if(pictures.begin(), pictures.end(), [&](const std::string &p) { return seen(p); })), all = int(pictures.size());
+            int have = 0, all = int(pictures.size());
+            for (size_t i = 0; i < pictures.size(); i++) have += cgPictureSeen(entries[entry], i) ? 1 : 0;
             if (sheetOfTen && (slash || slashInSheet)) {
                 int cells = slashInSheet && counts->size() >= 8 ? std::max(11, field(*counts, 7)) : slashInSheet ? 11 : 10;
                 int w = sheetOfTen->w / cells, x = cx + field(*counts, 2), y = cy + field(*counts, 3);
@@ -2324,7 +2378,7 @@ void Engine::saveGlobals() {
     };
     for (const GalleryEntry &e : cgEntries_)
         for (size_t p = 0; p < e.images.size(); p++)
-            if (int at = cgFlagAt(e, p); at >= 0 && seen(e.images[p])) setFlag(size_t(at));
+            if (int at = cgFlagAt(e, p); at >= 0 && cgPictureSeen(e, p)) setFlag(size_t(at));
     for (size_t i = 0; i < tracks_.size(); i++)
         if (seen(tracks_[i])) setFlag(configLayout("tracks", kTrackFlagsAt) + i * 4);
     auto packed = packEntry(configFile_);
@@ -3360,6 +3414,8 @@ bool Engine::dimmedBySubmenu(const Button &b) const {
     if (!dim || subMenu_.empty() || !b.group.empty()) return false;
     // With `hide` the opener goes too: the submenu takes its row, as Test Game 83's CG Mode takes Extra's (set 3).
     if (!dim->empty() && (*dim)[0] == "hide") return true;
+    // With `all` the opener dims with the rest of its row, as Test Game 96's START and ADDITION do (set 2, under Wine).
+    if (!dim->empty() && (*dim)[0] == "all") return true;
     bool opener = (b.action.rfind("submenu:", 0) == 0 && submenuOpen(b.action.substr(8))) || (b.action == "start" && submenuOpen("start"));
     return !opener;
 }
@@ -3465,7 +3521,7 @@ bool Engine::composeTitleOpening(Canvas &out) {
         c.resize(out.w, out.h);
         c.clear();
         for (const Picture &p : screen_->pictures)
-            if (p.stage <= upTo) drawPicture(c, p, towardX, towardY);
+            if (p.stage <= upTo) drawPicture(c, p.turn != 0 ? turned(p) : p, towardX, towardY);
         if (buttons)
             for (Button &b : screen_->buttons) drawButton(c, b, StateNormal);
     };
@@ -3556,7 +3612,7 @@ void Engine::composeScreen(Canvas &out) {
             drawPicture(out, faded, towardX, towardY);
         } else if ((p.tab < 0 || p.tab == galleryTab_) && shown(p)) {
             if (p.rise.empty()) {
-                drawPicture(out, p, towardX, towardY);
+                drawPicture(out, p.turn != 0 ? turned(p) : p, towardX, towardY);
                 continue;
             }
             Picture risen = p;
@@ -3637,7 +3693,7 @@ void Engine::composeScreen(Canvas &out) {
             continue;
         }
         if (b.action == "quickload" && !newestQuickSlot()) state = StateDisabled;
-        if (b.action == "track" + std::to_string(currentTrack_) && trackPlayer_) state = over ? StateSelectedHover : StateSelected;
+        if (b.action == "track" + std::to_string(currentTrack_) && (trackPlayer_ || screen_->setting("trackselects"))) state = over ? StateSelectedHover : StateSelected;
         bool musicOn = musicLit(b);
         if (musicOn) state = over ? StateSelectedHover : StateSelected;
         // `nolithelp`: a lit control shows no help, as Moral Orc's music screen shows none over Stop while nothing plays.
@@ -3652,7 +3708,8 @@ void Engine::composeScreen(Canvas &out) {
             drawButton(out, b, StateSelected, true);
             continue;
         }
-        if (b.action == "music_pause" && !trackPlayer_) state = StateDisabled;
+        // Pause is drawn disabled with nothing playing, but not on a `trackselects` screen: Test Game 96's stays plain.
+        if (b.action == "music_pause" && !trackPlayer_ && !screen_->setting("trackselects")) state = StateDisabled;
         // The current page's button sits higher in Test Game 84.
         if (const auto *lift = screen_->setting("pagelift"); lift && current && b.action.rfind("page", 0) == 0) {
             Button raised = b;
@@ -3697,7 +3754,7 @@ void Engine::composeScreen(Canvas &out) {
         }
     // `musictitle SHEET X Y COLS`: the playing track's title, its cell of a strip across, as Test Game 87's music screen
     // writes it under Reproduction music (set 1).
-    if (const auto *title = screen_->setting("musictitle"); title && title->size() >= 4 && trackPlayer_ && currentTrack_ >= 0)
+    if (const auto *title = screen_->setting("musictitle"); title && title->size() >= 4 && (trackPlayer_ || screen_->setting("trackselects")) && currentTrack_ >= 0)
         if (ImageRef strip = images_->get((*title)[0])) {
             int cols = std::max(1, field(*title, 3)), w = strip->w / cols;
             if (currentTrack_ < cols) drawPart(out, *strip, field(*title, 1), field(*title, 2), currentTrack_ * w, 0, w, strip->h, 1);
@@ -3766,6 +3823,12 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 
 // `partplate` under `screen defaults`: a game part's open screen keeps the message window's plate and its buttons over
 // it, as Test Game 96's hub and vote show the plate's Menu tab at its resting place (set 2).
+Picture Engine::turned(const Picture &p) const {
+    Picture now = p;
+    now.angle = p.turn * float(screenMs_) / 1000 * kPi / 180;
+    return now;
+}
+
 bool Engine::defaultsHave(const char *key) const {
     auto defaults = screens_.find("defaults");
     return defaults != screens_.end() && defaults->second.setting(key);
@@ -3828,7 +3891,8 @@ void Engine::composeMessageButtons(Canvas &out) {
             on = setting("express") == 0;
         }
         for (const auto &[name, part] : parts_)
-            if (int lit = part->actionLit(b.action); lit >= 0) on = lit != 0;
+            if (int lit = part->actionLit(b.action); lit == 2) return StateDisabled;
+            else if (lit >= 0) on = lit != 0;
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
     // `barhover`'s rows fade: drawn on a copy of the frame, mixed back in by how much of them shows.
@@ -4580,7 +4644,7 @@ bool Engine::step(int ms) {
     if (screen_) {
         screenMs_ += ms;
         stepSprites();
-        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages")) dirty_ = true;
+        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages") || screen_->turning) dirty_ = true;
         // A gallery's character coming up after its tab opens.
         if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
         stepViewer(ms);

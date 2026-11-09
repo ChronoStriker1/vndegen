@@ -30,6 +30,8 @@ public:
     void lines(PartHost &host, const std::vector<std::string> &texts);
     // The comments end; command 111's parameter says how.
     void end(PartHost &host, int how);
+    // Whether any comment shows or is still to come.
+    bool active() const { return !cursors_.empty() || !pending_.empty() || !live_.empty(); }
     // Each frame, on host.nowMs(); true while anything moves, and on the frame the last one goes.
     bool step(PartHost &host);
     // Over the scene, at the layer the holder chooses.

@@ -314,6 +314,8 @@ private:
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
     bool fullWidthPlate() const;
+    // A table picture with `turn`, at the angle the screen's clock has brought it to.
+    Picture turned(const Picture &p) const;
     bool plateUp() const;
     bool partPlate() const;
     // Whether the table's `screen defaults` has this setting.
@@ -426,6 +428,7 @@ private:
     size_t driftFirst_ = 0;
     ImageRef galleryThumbnail(const std::string &path) const;
     bool galleryImageSeen(const GalleryEntry &entry, size_t image) const;
+    bool cgPictureSeen(const GalleryEntry &entry, size_t image) const;
     bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }
     std::vector<std::string> tracks_, trackTitles_;
     // Test Game 88's sprite gallery, from cfg\sc_view.ini: its backgrounds, and each heroine's faces, outfits and poses as
@@ -488,6 +491,7 @@ private:
     // Whether each bonus patch folder the lists name is there.
     mutable std::map<std::string, bool> spritePatches_;
     std::unordered_map<std::string, bool> seen_;
+    std::unordered_map<std::string, std::string> readNames_;  // a finished script as the story named it, by its seen_ key
     // The text read, by script and node id, for Config's read-only skip.
     std::unordered_map<std::string, std::set<int>> readNodes_;
     bool readChanged_ = false, skipStopped_ = false, jumping_ = false, textFresh_ = false;

@@ -1,6 +1,7 @@
 #include "ui.h"
 
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <sstream>
 
@@ -41,10 +42,57 @@ bool pair(const std::string &s, int &a, int &b) {
     return true;
 }
 
+// A picture at PERCENT of its size, each new pixel the mean of the area it covers, so 50 averages each 2 by 2 block.
+// Colour is weighted by alpha, so a clear pixel's colour doesn't bleed into its neighbours.
+ImageRef scaled(const Image &from, int percent) {
+    auto to = std::make_shared<Image>();
+    to->w = std::max(1, (from.w * percent + 50) / 100);
+    to->h = std::max(1, (from.h * percent + 50) / 100);
+    to->opaque = from.opaque;
+    to->rgba.resize(size_t(to->w) * to->h * 4);
+    // Along one axis, the source pixels each new pixel covers and how much of each.
+    struct Span { int first; std::vector<float> weights; };
+    auto spans = [](int from, int to) {
+        std::vector<Span> out(to);
+        double step = double(from) / to;
+        for (int i = 0; i < to; i++) {
+            double a = i * step, b = std::min(double(from), (i + 1) * step);
+            int first = std::min(from - 1, int(a)), last = std::min(from - 1, int(std::ceil(b)) - 1);
+            out[i].first = first;
+            for (int s = first; s <= std::max(first, last); s++)
+                out[i].weights.push_back(float(std::max(1e-6, std::min(b, double(s + 1)) - std::max(a, double(s)))));
+        }
+        return out;
+    };
+    auto across = spans(from.w, to->w), down = spans(from.h, to->h);
+    for (int y = 0; y < to->h; y++) {
+        for (int x = 0; x < to->w; x++) {
+            float sum[3] = {0, 0, 0}, alpha = 0, area = 0;
+            for (size_t j = 0; j < down[y].weights.size(); j++) {
+                const uint8_t *row = &from.rgba[(size_t(down[y].first + int(j)) * from.w + across[x].first) * 4];
+                for (size_t i = 0; i < across[x].weights.size(); i++, row += 4) {
+                    float weight = down[y].weights[j] * across[x].weights[i], covered = weight * row[3];
+                    for (int c = 0; c < 3; c++) sum[c] += covered * row[c];
+                    alpha += covered;
+                    area += weight;
+                }
+            }
+            uint8_t *out = &to->rgba[(size_t(y) * to->w + x) * 4];
+            for (int c = 0; c < 3; c++) out[c] = alpha > 0 ? uint8_t(std::lround(sum[c] / alpha)) : 0;
+            out[3] = uint8_t(std::lround(alpha / area));
+        }
+    }
+    return to;
+}
+
 }  // namespace
 
 void drawPicture(Canvas &out, const Picture &p, float towardX, float towardY) {
     if (!p.image) return;
+    if (p.turn != 0) {
+        drawImage(out, *p.image, float(p.x) + float(p.image->w) * 0.5f, float(p.y) + float(p.image->h) * 0.5f, 1, 1, p.angle, p.alpha);
+        return;
+    }
     if (p.followX != 0 || p.followY != 0) {
         drawShifted(out, *p.image, float(p.x) - p.followX * towardX, float(p.y) - p.followY * towardY, p.alpha);
         return;
@@ -96,6 +144,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             p.x = number(w[2]);
             p.y = number(w[3]);
             size_t at = 4;
+            int scale = 100;
             if (w.size() >= 8 && (std::isdigit(uint8_t(w[4][0])) || w[4][0] == '-')) {
                 p.cols = number(w[4]);
                 p.rows = number(w[5]);
@@ -117,6 +166,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 else if (key == "stage") p.stage = number(value);
                 else if (key == "group") p.group = value;
                 else if (key == "blink") p.blinkMs = number(value);
+                else if (key == "turn") p.turn = std::strtof(value.c_str(), nullptr);
+                else if (key == "scale") scale = number(value);
                 else if (key == "rise") {
                     std::istringstream in(value);
                     for (std::string point; std::getline(in, point, ',');)
@@ -167,6 +218,12 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                     at++;
                 }
                 at += 2;
+            }
+            if (p.turn != 0) screen->turning = true;
+            if (scale > 0 && scale != 100) {
+                if (p.image) p.image = scaled(*p.image, scale);
+                for (ImageRef &variant : p.variants)
+                    if (variant) variant = scaled(*variant, scale);
             }
             screen->pictures.push_back(p);
         } else if (w[0] == "button" && w.size() >= 8) {

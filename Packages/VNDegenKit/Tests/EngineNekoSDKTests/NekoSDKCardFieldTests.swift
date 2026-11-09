@@ -142,4 +142,65 @@ import TestSupport
         #expect(pixel(e, 108, 108) == [0, 250, 250])
         #expect(pixel(e, 120, 120) == [0, 250, 0])
     }
+
+    // `pic FILE X Y turn DEGREES` turns a picture about its middle by the screen's clock, as Test Game 83's title turns
+    // its lace circles: a bar 100 by 20 at 1100, 600 lies across at first, and stands upright a second later at 90 a second.
+    @Test func aTitlePictureTurnsAboutItsMiddle() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\cardtest\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("spin.bmp", bmp(100, 20) { _, _ in [0, 0, 250] })]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<2 { _ = vnneko_step(e, 16) }
+        // 40 right of its middle, 1150, 610, and 40 below it.
+        #expect(pixel(e, 1190, 610) == [250, 0, 0])
+        #expect(pixel(e, 1150, 650) != [250, 0, 0])
+        for _ in 0..<60 { _ = vnneko_step(e, 16) }
+        _ = vnneko_step(e, 8)
+        #expect(pixel(e, 1190, 610) != [250, 0, 0])
+        #expect(pixel(e, 1150, 650) == [250, 0, 0])
+    }
+
+    // `pic FILE X Y scale 50` draws a picture at half size with its top left at X, Y, each pixel the mean of a 2 by 2
+    // block, as Test Game 90 shows one gallery picture (set 1). The picture's blue alternates across and its green down,
+    // so every block averages to the same half of each, and its right half is red.
+    @Test func aPictureDrawsAtHalfSizeAveraged() throws {
+        let half = bmp(40, 40) { x, y in [x % 2 == 0 ? 0 : 200, y % 2 == 0 ? 0 : 100, x >= 20 ? 240 : 0] }
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\cardtest\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("half.bmp", half)]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<2 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 40, 40) == [0, 50, 100])
+        #expect(pixel(e, 49, 59) == [0, 50, 100])
+        #expect(pixel(e, 50, 45) == [240, 50, 100])
+        #expect(pixel(e, 59, 59) == [240, 50, 100])
+        // Twenty across and down and no more.
+        #expect(pixel(e, 60, 45) == [0, 0, 0])
+        #expect(pixel(e, 45, 60) == [0, 0, 0])
+    }
+
+    // Test Game 90's play_view.ini lines are `TAB THUMB STEP NUMBER SCRIPT`: the scene's card shows its thumbnail once
+    // that script has been read, and not before.
+    @Test(arguments: [false, true]) func aSceneFromAFiveFieldLineUnlocksByItsScript(read: Bool) throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\cardtest\n".utf8),
+            "cfg/play_view.ini": Data("//tab\tthumb\tstep\tnumber\tscript\n0\tobj\\t.bmp\t-1\t1000\tscr\\ep_001.txt\t//one\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("t.bmp", bmp(40, 30) { _, _ in [0, 0, 250] })]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/cardtest/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        if read { try Data("scr\\ep_001.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt")) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_press(e, "scene"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect((pixel(e, 320, 315) == [250, 0, 0]) == read)
+    }
 }

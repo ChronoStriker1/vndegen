@@ -1,6 +1,7 @@
 // The `scroll` game part: the older engine's scrolling pictures (90 and 91) and its second image load (92), measured
 // under Wine on Test Games 83 and 86. All three load a picture into a scene slot through PartHost::loadImage, so the
 // next screen update shows it, 17 and 22 take it away, and saves keep it as any other picture.
+#include <cmath>
 #include <cstring>
 #include <map>
 
@@ -51,7 +52,7 @@ public:
     }
 
     // The PC's record of each picture command 90 loaded, which the engine writes as a picture's: its speed and
-    // parameters 11 and 12 go where the PC keeps them. A record read from a save keeps its own bytes.
+    // parameters 11 and 12 go where the PC keeps them.
     void savePC(SaveData &d) const override {
         for (SavedSprite &s : d.sprites) {
             auto it = across_.find(s.slot);
@@ -64,7 +65,20 @@ public:
             };
         }
     }
-    void loadPC(const SaveData &) override { across_.clear(); }
+    // A load brings the picture back, and its numbers with it: the next save writes them again. Without them a save
+    // made in VNDegen after loading a PC save held speed 0, and the PC then showed the fog standing still.
+    void loadPC(const SaveData &d) override {
+        across_.clear();
+        for (const SavedSprite &s : d.sprites) {
+            if (s.kind != kScrollKind || s.rawFixed.size() < size_t(kAtP12Again) + 4) continue;
+            float speed;
+            int32_t p11, p12;
+            std::memcpy(&speed, &s.rawFixed[size_t(kAtSpeed)], 4);
+            std::memcpy(&p11, &s.rawFixed[size_t(kAtP11)], 4);
+            std::memcpy(&p12, &s.rawFixed[size_t(kAtP12)], 4);
+            across_[s.slot] = {int(std::lround(speed * 1000)), p11, p12};
+        }
+    }
     void reset() override { across_.clear(); }
 
 private:
