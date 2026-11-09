@@ -307,6 +307,7 @@ private:
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
     bool fullWidthPlate() const;
+    bool partPlate() const;
     bool composeTitleOpening(Canvas &out);
     // Where the pointer is, from -1 at the screen's left or top edge to 1 at the other, or the middle before it's been seen.
     void pointerToward(float &x, float &y) const;

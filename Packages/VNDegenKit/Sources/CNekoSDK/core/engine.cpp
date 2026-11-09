@@ -268,11 +268,15 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     plateX_ = config_.number("MsgWinButtonPlatePosX");
     plateY_ = config_.number("MsgWinButtonPlatePosY");
     if (buttonPlate_ && buttonPlate_->w >= width_) barTop_ = plateY_;
-    plateHiddenY_ = config_.number("MsgWinButtonPlateBottomPosY", height_);
-    plateHiddenX_ = config_.number("MsgWinButtonPlateBottomPosX", plateX_);
+    // Test Game 96's init.ini names the resting place `HiddenPos` where Test Game 83's says `BottomPos`.
+    bool bottom = !config_.text("MsgWinButtonPlateBottomPosY").empty(), hidden = !config_.text("MsgWinButtonPlateHiddenPosY").empty();
+    const char *restY = bottom || !hidden ? "MsgWinButtonPlateBottomPosY" : "MsgWinButtonPlateHiddenPosY";
+    const char *restX = bottom || !hidden ? "MsgWinButtonPlateBottomPosX" : "MsgWinButtonPlateHiddenPosX";
+    plateHiddenY_ = config_.number(restY, height_);
+    plateHiddenX_ = config_.number(restX, plateX_);
     // Show type 3, "from below to the set place": the plate rests at its bottom place and rises with the pointer on it, as
     // Test Game 83's control panel does (set 3, under Wine).
-    plateRests_ = config_.number("MsgWinButtonShowType") == 3 && buttonPlate_ && config_.text("MsgWinButtonPlateBottomPosY").size() > 0;
+    plateRests_ = config_.number("MsgWinButtonShowType") == 3 && buttonPlate_ && (bottom || hidden);
     if (Bytes ini = files_.read(config_.text("MsgButtonDeclFilename", "cfg\\msg_button.ini"))) messageButtons_ = parseMessageButtons(*ini, *images_);
     if (Bytes ini = files_.read(config_.text("MsgButtonPlayViewDeclFilename", "cfg\\msg_button_playview.ini"))) {
         replayButtons_ = parseMessageButtons(*ini, *images_);
@@ -3706,6 +3710,13 @@ bool Engine::innerButtonsShown() const {
 // A plate as wide as the screen carries both rows of buttons, and comes up with the pointer on it, as in Test Game 85.
 bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= width_; }
 
+// `partplate` under `screen defaults`: a game part's open screen keeps the message window's plate and its buttons over
+// it, as Test Game 96's hub and vote show the plate's Menu tab at its resting place (set 2).
+bool Engine::partPlate() const {
+    auto defaults = screens_.find("defaults");
+    return partScreen_ && waiting_ == Waiting::PartScreen && defaults != screens_.end() && defaults->second.setting("partplate");
+}
+
 bool Engine::underButtonsShown() const {
     if (fullWidthPlate()) return innerButtonsShown();
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
@@ -4666,8 +4677,18 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (!down) return;
-    // A game part's open screen takes the presses, unless a menu or dialog is over it.
+    // A game part's open screen takes the presses, unless a menu or dialog is over it, or with `partplate` the message
+    // window's buttons showing over it.
     if (partScreen_ && waiting_ == Waiting::PartScreen && !screen_ && !dialogOpen_ && !logOpen_) {
+        if (partPlate()) {
+            Button *b = innerWereShown_ ? buttonAt(pointerX_, messagePointerY(), bar().inner) : nullptr;
+            if (!b && underWereShown_) b = buttonAt(pointerX_, messagePointerY(), bar().under);
+            if (b) {
+                std::string action = b->action;
+                runAction(action);
+                return;
+            }
+        }
         if (partScreen_->press(*partHost_, pointerX_, pointerY_, button)) dirty_ = true;
         return;
     }
@@ -6430,6 +6451,7 @@ void Engine::compose() {
     drawParts(canvas_, Layer::OverWindow);
     composeCameraPanel(canvas_);
     if (partScreen_) drawParts(canvas_, Layer::Screen);
+    if (partPlate()) composeMessageButtons(canvas_);
     if (dialogOpen_) composeDialog(canvas_);
 
     if (choiceSheet_ && choiceClosingFrom_ >= 0) composeChoice(canvas_);
