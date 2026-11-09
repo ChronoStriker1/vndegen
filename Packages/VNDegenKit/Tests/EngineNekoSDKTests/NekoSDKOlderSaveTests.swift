@@ -256,4 +256,27 @@ import TestSupport
             }
         }
     }
+
+    @Test func aRebuiltSaveKeepsAPicturelessRecordAsItWas() throws {
+        let root = try game("layout90")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_save(e, 1))
+        vnneko_stop(e)
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", "layout90")))
+        let name = try #require(save.range(of: Data("sc\\r.bmp".utf8)))
+        let length = name.lowerBound - 4
+        #expect(int32(save, length - save.startIndex) == 8)
+        #expect(int32(save, length - save.startIndex - 4) == 0)
+        save.replaceSubrange(length..<name.upperBound, with: Data(count: 4))
+        let alpha = length - save.startIndex + 4 + 4 + 249
+        #expect(int32(save, alpha) == 255)
+        save.replaceSubrange((save.startIndex + alpha)..<(save.startIndex + alpha + 4), with: withUnsafeBytes(of: Int32(256).littleEndian, { Data($0) }))
+        var built = [UInt8](repeating: 0, count: save.count + 64)
+        let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout90", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+        #expect(size == save.count)
+        #expect(Data(built.prefix(size)) == save)
+    }
 }

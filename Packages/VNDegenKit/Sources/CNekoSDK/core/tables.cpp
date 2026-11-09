@@ -14,6 +14,7 @@ namespace {
 #include "tables/moralorc.inc"
 #include "tables/animother.inc"
 #include "tables/rinjin.inc"
+#include "tables/funbag2.inc"
 #include "tables/sideboob2.inc"
 #include "tables/mankitsu.inc"
 #include "tables/funbagfantasy1.inc"
@@ -40,6 +41,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\moralorc") return kMoralOrc;
     if (folder == "waffle\\animother") return kAniMother;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return kRinjin;
+    if (folder == "waffle\\funbagfantasy2") return kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return kSideboob2;
     // Test Game 90 and its bonus story disc share every screen but the title and the story.
     if (folder == "waffle\\漫喫ハプニング") {
