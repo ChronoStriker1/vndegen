@@ -17,6 +17,8 @@ namespace {
 #include "tables/sideboob2.inc"
 #include "tables/storytest.inc"
 #include "tables/layouttest.inc"
+#include "tables/bandtest.inc"
+#include "tables/widgettest.inc"
 
 }  // namespace
 
@@ -38,6 +40,8 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return kSideboob2;
     if (folder == "vndegen\\storytest") return kStoryTest;
     if (folder == "vndegen\\layouttest") return kLayoutTest;
+    if (folder == "vndegen\\bandtest") return kBandTest;
+    if (folder == "vndegen\\widgettest") return kWidgetTest;
     return nullptr;
 }
 

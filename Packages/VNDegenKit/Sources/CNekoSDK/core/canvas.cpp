@@ -44,6 +44,9 @@ public:
             body(0, rows);
             return;
         }
+        // One job at a time: the pool holds a single job, and engines on other threads, as the tests run them side by
+        // side, would otherwise overwrite it and wait for each other for ever.
+        std::lock_guard<std::mutex> one(runMu_);
         // Small bands, so a core that a busy machine holds back only delays a little of the frame.
         int band = std::max(8, rows / (int(workers_.size() + 1) * 4));
         {
@@ -91,7 +94,7 @@ private:
             if (--active_ == 0) done_.notify_one();
         }
     }
-    std::mutex mu_;
+    std::mutex mu_, runMu_;
     std::condition_variable wake_, done_;
     std::vector<std::thread> workers_;
     const std::function<void(int, int)> *body_ = nullptr;

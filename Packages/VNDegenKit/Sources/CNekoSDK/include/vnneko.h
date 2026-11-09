@@ -98,6 +98,10 @@ void vnneko_set_paused(VNNekoEngine *e, bool paused);
 // The host window, for Config's screen mode: whether it can go full screen, as a Mac's window can and an iPad's can't,
 // and whether it is. Call it each frame; the screen mode buttons show it.
 void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScreen);
+// The size the host's view gives the game, in any unit: a game with a 4:3 layout (init.ini's MsgWinSquare) draws in it
+// when the view is nearer 4:3 than 16:9 and Config leaves the shape automatic. Call it each frame; vnneko_frame's size
+// follows.
+void vnneko_set_view_size(VNNekoEngine *e, float width, float height);
 // The screen mode Config's buttons asked for since the last call: 0 a window, 1 full screen, -1 none.
 int vnneko_take_window_request(VNNekoEngine *e);
 
