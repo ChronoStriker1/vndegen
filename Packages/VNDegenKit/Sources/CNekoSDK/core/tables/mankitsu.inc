@@ -463,6 +463,23 @@ button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 
 button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
 button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
 
+# The backlog, measured under Wine (set 1, each piece fitted on a PC shot): a rule each 166 pixels with the name and text
+# in yellow, a voiced line's button at the right, the scroll track and its thumb, the close button and four arrows.
+screen log
+dim 180
+pic obj\k000_002.bmp 1185 110
+scroll obj\k000_003t.bmp obj\k000_003m.bmp obj\k000_003b.bmp 1185 110 500
+rows obj\k000_000.bmp 127 52 166 4 140 34
+button log_close obj\k000_001.bmp 1230 19 1 5 0
+button log_top obj\k001_000.bmp 1185 31 4 5 0
+button log_up obj\k001_000.bmp 1185 61 4 5 1
+button log_down obj\k001_000.bmp 1185 633 4 5 2
+button log_bottom obj\k001_000.bmp 1185 663 4 5 3
+keepwindow
+edgesoff
+logvoice obj\h000_001.bmp 6 5 3 1125 35
+lognamey -30
+
 screen dialog
 # Measured under Wine: the screen dimmed to 100 of 256 of its brightness, the question, and Yes and No.
 questions resolution save load overwrite exit title
