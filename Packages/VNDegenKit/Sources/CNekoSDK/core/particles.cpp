@@ -4,24 +4,32 @@
 // What the PC showed there, from 70 frames over 12 seconds: dots of the emitter's three pictures in equal numbers,
 // all over the screen from the first frame. Each pixel is added to the scene times its own brightness, its brightest
 // channel: the green dots' levels 27, 54, 88, 130 and 186 show as 3, 11, 30, 66 and 136, their squares over 255, so
-// the pictures' dim edges vanish and no box shows round a spark. Each dot rises the whole height at its own 48 to 60 pixels
-// a second, sways sideways some 40 to 90 pixels over tens of seconds, and brightens and dims slowly. They draw at the
-// emitter's slot, parameter 0: over the standing pictures in 300 and 400, under the fog in 3333. An emitter that names
-// a picture the game doesn't have makes nothing, as 83's second one (parts\p000_000_000.bmp) and Test Games 84 and 89's
-// show. How many there are is a reading of one emitter (parameter 1 every parameter 2 milliseconds over parameter 7,
-// times five eighths, 78 there, which matches the PC's count of dots in its frames); the PC's own rule isn't known.
+// the pictures' dim edges vanish and no box shows round a spark. Each dot rises the whole height at its own 48 to 60
+// pixels a second, sways sideways some 40 to 90 pixels over tens of seconds, and brightens and dims slowly. The emitter
+// is a record in its slot, parameter 0, as the PC's save holds it (kind 15, its three pictures and its numbers): the
+// dots draw there, over the standing pictures in 300 and 400 and under the fog in 3333, and what takes a picture away
+// takes it away. A save holds no dot, so a load starts them afresh. An emitter that names a picture the game doesn't
+// have makes nothing, as 83's second one (parts\p000_000_000.bmp) and Test Games 84 and 89's show. How many there are
+// is a reading of one emitter (parameter 1 every parameter 2 milliseconds over parameter 7, times five eighths, 78
+// there, which matches the PC's count of dots in its frames); the PC's own rule isn't known.
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <map>
-#include <sstream>
 
 #include "parts.h"
+#include "save.h"
 
 namespace neko {
 namespace {
 
 constexpr float kTwoPi = 6.2831853f;
+// The number the PC's save holds after an emitter's slot.
+constexpr int kEmitterKind = 15;
+// Where the record keeps the command's numbers, in its fixed part with the three names taken out (Test Game 83's PC
+// save): parameter 1, then parameters 2 and 7 as seconds, 8, 9 and 3 as they are, and 4 and 5 as floats.
+constexpr int kAtCount = 53, kAtEvery = 77, kAtLife = 81, kAtP8 = 85, kAtP9 = 89, kAtP3 = 93, kAtP4 = 97, kAtP5 = 101;
 
 struct Dot {
     size_t picture = 0;
@@ -53,6 +61,7 @@ class ParticlesPart : public GamePart {
 public:
     bool command(PartHost &host, const Node &n) override {
         if (n.opcode == 96) {
+            // Its dots go with it at once; how the PC lets them die away hasn't been seen (Test Game 86 uses it).
             emitters_.erase(n.p[0]);
             host.redraw();
             return true;
@@ -69,45 +78,86 @@ public:
 
     bool step(PartHost &host) override {
         if (!pending_.empty()) startPending(host);
+        // An emitter whose slot the scene has cleared is over.
+        for (auto it = emitters_.begin(); it != emitters_.end();)
+            it = host.slotHeld(it->first) ? std::next(it) : emitters_.erase(it);
         return !emitters_.empty();
     }
 
-    void draw(PartHost &host, Canvas &out, Layer layer, int fromSlot, int toSlot) override {
-        if (layer != Layer::Slot) return;
-        for (auto it = emitters_.lower_bound(fromSlot); it != emitters_.end() && it->first < toSlot; ++it) drawEmitter(host, out, it->second);
+    void drawSlot(PartHost &host, Canvas &out, int slot, float alpha) override {
+        auto it = emitters_.find(slot);
+        if (it != emitters_.end() && alpha > 0) drawEmitter(host, out, it->second, alpha);
     }
 
-    // VNDegen's own saves keep each emitter's command, and a load starts its dots afresh, as the PC's record holds no dot.
-    void save(std::vector<std::string> &lines) const override {
-        for (const auto &[slot, e] : emitters_) {
-            std::string line = "emitter " + std::to_string(slot);
-            for (int v : e.p) line += " " + std::to_string(v);
-            for (const std::string &name : e.names) line += " " + name;
-            lines.push_back(line);
+    // The PC's record of each emitter: the engine writes the slot's own, and this fills in the pictures and the
+    // numbers.
+    void savePC(SaveData &d) const override {
+        for (SavedSprite &s : d.sprites) {
+            auto it = emitters_.find(s.slot);
+            if (s.kind != kEmitterKind || !s.path.empty() || it == emitters_.end()) continue;
+            const Emitter &e = it->second;
+            for (size_t i = 0; i < 3; i++) s.names[i] = i < e.names.size() ? e.names[i] : "";
+            s.fixedBytes = {
+                {kAtCount, int32(e.p[1])},
+                {kAtEvery, float32(float(e.p[2]) / 1000)},
+                {kAtLife, float32(float(e.p[7]) / 1000)},
+                {kAtP8, int32(e.p[8])},
+                {kAtP9, int32(e.p[9])},
+                {kAtP3, int32(e.p[3])},
+                {kAtP4, float32(float(e.p[4]))},
+                {kAtP5, float32(float(e.p[5]))},
+            };
         }
     }
-    void load(const std::vector<std::string> &lines) override {
+    void loadPC(const SaveData &d) override {
+        emitters_.clear();
         pending_.clear();
-        for (const std::string &line : lines) {
-            std::istringstream in(line);
-            std::string word;
+        for (const SavedSprite &s : d.sprites) {
+            if (s.kind != kEmitterKind || !s.path.empty() || s.rawFixed.size() < size_t(kAtP5) + 4) continue;
             Pending e;
-            if (!(in >> word >> e.slot) || word != "emitter") continue;
-            for (int &v : e.p) in >> v;
-            for (std::string name; in >> name;) e.names.push_back(name);
+            e.slot = s.slot;
+            for (const std::string &name : s.names)
+                if (!name.empty()) e.names.push_back(name);
+            auto i = [&](int at) { int32_t v; std::memcpy(&v, &s.rawFixed[size_t(at)], 4); return int(v); };
+            auto f = [&](int at) { float v; std::memcpy(&v, &s.rawFixed[size_t(at)], 4); return v; };
+            e.p[0] = s.slot;
+            e.p[1] = i(kAtCount);
+            e.p[2] = int(std::lround(f(kAtEvery) * 1000));
+            e.p[7] = int(std::lround(f(kAtLife) * 1000));
+            e.p[8] = i(kAtP8);
+            e.p[9] = i(kAtP9);
+            e.p[3] = i(kAtP3);
+            e.p[4] = int(std::lround(f(kAtP4)));
+            e.p[5] = int(std::lround(f(kAtP5)));
             pending_.push_back(e);
         }
     }
-    void reset() override { emitters_.clear(); }
+
+    void reset() override {
+        emitters_.clear();
+        pending_.clear();
+    }
 
 private:
+    static std::vector<uint8_t> int32(int32_t v) {
+        std::vector<uint8_t> b(4);
+        std::memcpy(b.data(), &v, 4);
+        return b;
+    }
+    static std::vector<uint8_t> float32(float v) {
+        std::vector<uint8_t> b(4);
+        std::memcpy(b.data(), &v, 4);
+        return b;
+    }
+
     struct Pending {
         int slot = 0;
         int p[10] = {};
         std::vector<std::string> names;
     };
 
-    void start(PartHost &host, int slot, const std::vector<std::string> &names, const int p[10], int64_t now) {
+    void start(PartHost &host, int slot, const std::vector<std::string> &names, const int p[10], int64_t now,
+               bool hold = true) {
         emitters_.erase(slot);
         Emitter e;
         e.names = names;
@@ -139,6 +189,8 @@ private:
             d.glowPhase = random.between(0, kTwoPi);
             e.dots.push_back(d);
         }
+        // From a command the slot is taken now; after a load the engine has brought it back already.
+        if (hold) host.holdSlot(slot, kEmitterKind);
         emitters_[slot] = std::move(e);
         host.redraw();
     }
@@ -154,11 +206,9 @@ private:
         return out;
     }
 
-    void drawEmitter(PartHost &host, Canvas &out, const Emitter &e) {
+    void drawEmitter(PartHost &host, Canvas &out, const Emitter &e, float alpha) {
         float t = float(host.nowMs() - e.bornMs) / 1000;
         if (t < 0) t = 0;
-        // They come up over the first half second.
-        float fadeIn = std::min(1.0f, t / 0.5f);
         float h = float(host.height());
         for (const Dot &d : e.dots) {
             const Image &picture = *e.pictures[d.picture];
@@ -169,13 +219,13 @@ private:
             y -= float(picture.h) / 2;
             float x = d.x + d.sway * std::sin(kTwoPi * t / d.swayPeriod + d.swayPhase);
             float glow = 0.78f + 0.22f * std::sin(kTwoPi * t / d.glowPeriod + d.glowPhase);
-            drawImage(out, picture, x, y, 1, 1, 0, glow * fadeIn, nullptr, true);
+            drawImage(out, picture, x, y, 1, 1, 0, glow * alpha, nullptr, true);
         }
     }
 
     // After load(), the emitters to start once a host is there to read their pictures: at the next step.
     void startPending(PartHost &host) {
-        for (const Pending &e : pending_) start(host, e.slot, e.names, e.p, host.nowMs());
+        for (const Pending &e : pending_) start(host, e.slot, e.names, e.p, host.nowMs(), false);
         pending_.clear();
     }
 
