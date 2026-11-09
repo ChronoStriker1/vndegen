@@ -182,6 +182,16 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     }
     config_.parse(*init);
     images_ = std::make_unique<Images>(files_);
+    // `colorkey R G B` in the game's table: read now, ahead of the table itself, since the window's pictures load first.
+    if (const char *table = menuTable(normalizedPath(config_.text("UserDataDirectory")))) {
+        std::istringstream lines(menuTablePrefix() + table);
+        for (std::string line; std::getline(lines, line);) {
+            std::istringstream words(line);
+            std::string key;
+            int r = 0, g = 0, b = 0;
+            if (words >> key && key == "colorkey" && words >> r >> g >> b) images_->setColorKey((r << 16) | (g << 8) | b);
+        }
+    }
     setFontPackDir(fontDir);
 
     fps_ = config_.number("FPS", 60);
@@ -258,6 +268,10 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     plateY_ = config_.number("MsgWinButtonPlatePosY");
     if (buttonPlate_ && buttonPlate_->w >= width_) barTop_ = plateY_;
     plateHiddenY_ = config_.number("MsgWinButtonPlateBottomPosY", height_);
+    plateHiddenX_ = config_.number("MsgWinButtonPlateBottomPosX", plateX_);
+    // Show type 3, "from below to the set place": the plate rests at its bottom place and rises with the pointer on it, as
+    // Test Game 83's control panel does (set 3, under Wine).
+    plateRests_ = config_.number("MsgWinButtonShowType") == 3 && buttonPlate_ && config_.text("MsgWinButtonPlateBottomPosY").size() > 0;
     if (Bytes ini = files_.read(config_.text("MsgButtonDeclFilename", "cfg\\msg_button.ini"))) messageButtons_ = parseMessageButtons(*ini, *images_);
     if (Bytes ini = files_.read(config_.text("MsgButtonPlayViewDeclFilename", "cfg\\msg_button_playview.ini"))) {
         replayButtons_ = parseMessageButtons(*ini, *images_);
@@ -338,7 +352,7 @@ void Engine::openScreen(const std::string &name) {
     for (Picture &p : screen_->pictures) {
         if (p.variants.empty()) continue;
         size_t pick = 0;
-        if (!p.randomIf.empty() && anyGlobalSet(p.randomIf)) pick = size_t(std::rand()) % p.variants.size();
+        if (p.randomAlways || (!p.randomIf.empty() && anyGlobalSet(p.randomIf))) pick = size_t(std::rand()) % p.variants.size();
         else if (auto it = globals_.find(p.pickBy); p.pickBy >= 0 && it != globals_.end() && it->second >= 0) pick = size_t(it->second);
         // Past the last, the PC keeps its first.
         p.image = pick < p.variants.size() && p.variants[pick] ? p.variants[pick] : p.variants[0];
@@ -576,9 +590,12 @@ void Engine::runAction(const std::string &action) {
         saveSettings();
         return;
     }
-    if (action == "Ejaculation") { gtEjaculate(); return; }
+    if (action == "Ejaculation") {
+        if (!setting("gt_off")) gtEjaculate();
+        return;
+    }
     if (action == "Extension") {
-        if (gt_.active && !gt_.extending) gt_.extend = !gt_.extend;
+        if (gt_.active && !gt_.extending && !setting("gt_off")) gt_.extend = !gt_.extend;
         return;
     }
     if (action == "GOODTiming") {
@@ -1748,6 +1765,7 @@ void Engine::applySettings() {
     static const int kAutoPercent[] = {200, 100, 50, 0};
     autoDelayMs_ = kAutoDelayMs * kAutoPercent[std::clamp(setting("auto"), 0, 3)] / 100;
     autoPerCharMs_ = -1;
+    charFadeMs_ = kCharFadeMs;
     // `textcurve SETTING A B` and `autocurve SETTING A B` under `screen defaults`: a 0 to 100 slider's text speed as
     // A - B x value ms a character, and auto's pause after a line as that many ms for each of its characters, as Test
     // Game 82's are (set 2, timed under Wine: 167 - 3v and 100 - v).
@@ -1766,6 +1784,8 @@ void Engine::applySettings() {
             }
             charMs_ = std::max(0, int(std::lround(ms)));
         }
+        // `textfade MS`: how long each character takes to fade in, under 50 ms in Test Game 87 (set 1, under Wine).
+        if (const auto *fade = defaults->second.setting("textfade"); fade && !fade->empty()) charFadeMs_ = std::max(0, field(*fade, 0));
         if (const auto *curve = defaults->second.setting("autocurve"); curve && curve->size() >= 3)
             autoPerCharMs_ = std::max(0, field(*curve, 1) - field(*curve, 2) * setting((*curve)[0]));
     }
@@ -1863,8 +1883,9 @@ void Engine::composeSettingsWidgets(Canvas &out) {
     // track (set 1).
     for (auto [it, end] = lines("knob"); it != end; ++it) {
         const auto &f = it->second;
+        // STEP may have decimals, as Test Game 83's 4.08 for its 408-pixel track (set 3).
         if (ImageRef knob = f.size() >= 5 ? images_->get(f[1]) : nullptr)
-            drawPart(out, *knob, field(f, 2) + field(f, 4) * setting(f[0]), field(f, 3), 0, 0, knob->w, knob->h, 1);
+            drawPart(out, *knob, field(f, 2) + int(std::lround(std::atof(f[4].c_str()) * setting(f[0]))), field(f, 3), 0, 0, knob->w, knob->h, 1);
     }
     for (auto [it, end] = lines("bar"); it != end; ++it) {
         const auto &f = it->second;
@@ -1877,13 +1898,17 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         if (!digits) continue;
         // A STEP spaces the digits apart, and X2 X3 place the second and third, as round the point a panel prints in a wait
         // time of ×1.00.
-        int w = digits->w / 10, value = setting(f[0]), step = f.size() >= 5 ? field(f, 4) : w;
+        // A last `blank` leaves out leading zeros, the digits keeping their places, as Test Game 83's volumes (set 3).
+        bool blank = f.back() == "blank";
+        size_t n = f.size() - (blank ? 1 : 0);
+        int w = digits->w / 10, value = setting(f[0]), shown = value, step = n >= 5 ? field(f, 4) : w;
         int xs[3] = {field(f, 2), field(f, 2) + step, field(f, 2) + 2 * step};
-        if (f.size() >= 6) {
+        if (n >= 6) {
             xs[1] = field(f, 4);
             xs[2] = field(f, 5);
         }
-        for (int i = 2; i >= 0; i--, value /= 10) drawPart(out, *digits, xs[i], field(f, 3), value % 10 * w, 0, w, digits->h, 1);
+        for (int i = 2; i >= 0; i--, value /= 10)
+            if (!blank || i == 2 || shown >= (i == 1 ? 10 : 100)) drawPart(out, *digits, xs[i], field(f, 3), value % 10 * w, 0, w, digits->h, 1);
     }
     for (auto [it, end] = lines("radio"); it != end; ++it) {
         const auto &f = it->second;
@@ -1930,11 +1955,12 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
     for (auto [it, end] = lines("knob"); it != end; ++it) {
         const auto &f = it->second;
         ImageRef knob = f.size() >= 5 ? images_->get(f[1]) : nullptr;
-        int x0 = field(f, 2), top = field(f, 3), step = std::max(1, field(f, 4));
+        int x0 = field(f, 2), top = field(f, 3);
+        double step = std::max(0.01, std::atof(f[4].c_str()));
         if (!knob) continue;
-        int right = x0 + step * clampSetting(f[0], 1 << 20) + knob->w;
+        int right = x0 + int(std::lround(step * clampSetting(f[0], 1 << 20))) + knob->w;
         if (y >= top && y < top + knob->h && x >= x0 - (dragging ? 40 : 0) && x < right + (dragging ? 40 : 0)) {
-            int value = (x - x0 - knob->w / 2 + step / 2) / step;
+            int value = int(std::lround(double(x - x0 - knob->w / 2) / step));
             changeSetting(f[0], clampSetting(f[0], value));
             return true;
         }
@@ -2707,15 +2733,16 @@ void Engine::composeSlots(Canvas &out) {
     // NEW marks the card saved to last, which the PC keeps in global 0: Test Game 94's held 2 and The Alchemist's 1, the
     // cards their screens marked, and Test Game 87 counts from 0.
     int newest = newCardSlot(layout_, variable(0, 0));
-    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10) {
+    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10, int step = 0) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / cells;
+        if (step <= 0) step = w;
         for (int i = count - 1; i >= 0; i--) {
             int digit = value % 10;
             value /= 10;
-            drawPart(out, *sheetOfTen, x + i * w, y, digit * w, 0, w, sheetOfTen->h, 1);
+            drawPart(out, *sheetOfTen, x + i * step, y, digit * w, 0, w, sheetOfTen->h, 1);
         }
-        return x + count * w;
+        return x + count * step;
     };
     for (int index = 0; index < perPage; index++) {
             int slot = page_ * perPage + index + 1;
@@ -2770,7 +2797,8 @@ void Engine::composeSlots(Canvas &out) {
                 drawPart(out, *quickMark, numberX, cy + offset("slotdigits", 2), 0, 0, quickMark->w, quickMark->h, 1);
                 numberX += quickMark->w;
             }
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2));
+            // `slotdigits SHEET X Y COUNT [STEP]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide digits).
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), 10, offset("slotdigits", 4));
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -3331,6 +3359,7 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 
 bool Engine::underButtonsShown() const {
     if (fullWidthPlate()) return innerButtonsShown();
+    if (plateRests_) return plateRaised_;
     return buttonPlate_ && pointerSeen_ && messagePointerY() >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
 }
 
@@ -3355,9 +3384,11 @@ void Engine::composeMessageButtons(Canvas &out) {
                   (b.action == "ModeChange" && setting("art"));
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
         if (b.action == "Voice" && currentText_.voice.empty()) return StateDisabled;
-        if (b.action == "Ejaculation" && !gt_.active) return StateDisabled;
+        // With the GT switch off, Ejaculate and Extend are disabled for the whole scene, as Test Game 88's PC draws them
+        // (under Wine: their sheet's last row with it off, the first with it on, at every line through a scene).
+        if (b.action == "Ejaculation" && (!gt_.active || setting("gt_off"))) return StateDisabled;
         if (b.action == "Extension") {
-            if (!gt_.active || gt_.extending) return StateDisabled;
+            if (!gt_.active || gt_.extending || setting("gt_off")) return StateDisabled;
             on = gt_.extend;
         }
         if (b.action == "GOODTiming") on = setting("gt_off") != 0;
@@ -3372,7 +3403,10 @@ void Engine::composeMessageButtons(Canvas &out) {
         if (fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         for (const Button &b : bar().inner) drawButton(out, b, state(b));
     }
-    if (!underButtonsShown()) return;
+    if (!underButtonsShown()) {
+        if (plateRests_) drawPart(out, *buttonPlate_, plateHiddenX_, plateHiddenY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+        return;
+    }
     if (!fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
     for (const Button &b : bar().under) drawButton(out, b, state(b));
 }
@@ -4101,7 +4135,7 @@ bool Engine::step(int ms) {
     if (!textDone_) {
         // The last character has finished fading in.
         dirty_ = true;
-        if (skip_ || now_ - textStart_ >= int64_t(textGlyphs_.size()) * charMs_ + kCharFadeMs) textDone_ = true;
+        if (skip_ || now_ - textStart_ >= int64_t(textGlyphs_.size()) * charMs_ + charFadeMs_) textDone_ = true;
     }
     bool skipping = skip_ || skipToggle_;
     // Auto moves on a moment after the text and any voice have finished.
@@ -4168,6 +4202,16 @@ void Engine::mouseMove(float x, float y) {
     pointerX_ = px;
     pointerY_ = py;
     pointerSeen_ = true;
+    // A resting plate rises with the pointer on it and stays up while the pointer is on the raised plate.
+    if (plateRests_) {
+        int my = messagePointerY();
+        bool raised = plateRaised_ ? my >= plateY_ && px >= plateX_ && px < plateX_ + buttonPlate_->w
+                                   : my >= plateHiddenY_ && px >= plateHiddenX_ && px < plateHiddenX_ + buttonPlate_->w;
+        if (raised != plateRaised_) {
+            plateRaised_ = raised;
+            dirty_ = true;
+        }
+    }
     if (spriteScreen() && moved) spritePointerMoved();
     if (partScreen_ && moved && !screen_ && !dialogOpen_ && !logOpen_) partScreen_->pointer(*partHost_, px, py);
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
@@ -4213,13 +4257,15 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
         } else if (screen_) {
             // `cancel ACTION` names what the right button does on a screen that isn't left with Back.
-            if (screen_->setting("menustages") && menuStage_ >= 2) {
-                menuStage_ = 1;
-                subMenu_.clear();
-                dirty_ = true;
-            } else if (screen_->setting("submenudim") && !subMenu_.empty()) {
+            // An open submenu closes first and leaves the menu up, as Test Game 82's does (set 2, under Wine); then a
+            // title with menu stages goes back to its first.
+            if (screen_->setting("submenudim") && !subMenu_.empty()) {
                 size_t slash = subMenu_.rfind('/');
                 subMenu_ = slash == std::string::npos ? "" : subMenu_.substr(0, slash);
+                dirty_ = true;
+            } else if (screen_->setting("menustages") && menuStage_ >= 2) {
+                menuStage_ = 1;
+                subMenu_.clear();
                 dirty_ = true;
             } else if (const auto *cancel = screen_->setting("cancel"); cancel && !cancel->empty()) runAction((*cancel)[0]);
             else if (screen_->name != "title") runAction("back");
@@ -6079,7 +6125,7 @@ void Engine::drawGlyphRun(Canvas &out) {
         int index = 0;
         for (const Glyph &g : textGlyphs_) {
             int64_t since = now_ - textStart_ - int64_t(index++) * charMs_;
-            drawGlyph(out, g, pass, textDone_ ? 256 : int(std::clamp<int64_t>(since * 256 / kCharFadeMs, 0, 256)), textR_, textG_, textB_, shadowR_, shadowG_, shadowB_);
+            drawGlyph(out, g, pass, textDone_ ? 256 : int(std::clamp<int64_t>(since * 256 / std::max(1, charFadeMs_), 0, 256)), textR_, textG_, textB_, shadowR_, shadowG_, shadowB_);
         }
     }
 }
