@@ -77,6 +77,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - NekoSDK saves that move to a PC with their pictures (#68), animations that go on after a load, The Alchemist's film noise, the GOOD Timing heart, and Config hover help placed to the pixel (0.27.1).
 - NekoSDK: Funbag Fantasy and Funbag Fantasy: Sideboob Story 2, the first games with their story order in the exe, and Haha Sannin to Ana Asobi's 4:3 mode and Config band (0.28.0).
 - A failed launch no longer counts as played (#39), every line of a wrapped NScripter choice responds (#37), save sync keeps registry value names that differ only in Unicode form (#40), a short title is no longer matched to an obscure VNDB entry (#62), and the build script fixes (#38, #67, #69) (0.28.1).
+- NekoSDK: Funbag Fantasy 2, with its particles, fog and 100 save slots, and a fix for an animation saved on its fifth picture coming back as film noise (0.29.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -86,7 +87,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- NekoSDK, on `feat/nekosdk-stage3`: the four games left that keep their story order in the exe, in parallel sets merged through `feat/nekosdk-stage3`: Mankitsu Happening on `feat/nekosdk-set1`, Yabai! -Fukushuu Yami Site- on `-set2` with the lead, and Funbag Fantasy 2 and Funbag Fantasy: Sideboob Story on `-set3`. GOOD Timing's last two guessed rules after that. Each game is released when it's finished, without waiting for the others, and Funbag Fantasy 2 is the closest.
+- NekoSDK, on `feat/nekosdk-stage3`: the three games left that keep their story order in the exe, in parallel sets merged through `feat/nekosdk-stage3`: Mankitsu Happening on `feat/nekosdk-set1`, Yabai! -Fukushuu Yami Site- on `-set2` with the lead, and Funbag Fantasy: Sideboob Story on `-set3`. Each game is released when it's finished, without waiting for the others.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
