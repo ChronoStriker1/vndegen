@@ -11,6 +11,7 @@ namespace neko {
 std::unique_ptr<GamePart> makeSelfTestPart();
 std::unique_ptr<GamePart> makeScrollPart();
 std::unique_ptr<GamePart> makeCharGalleryPart();
+std::unique_ptr<GamePart> makeMankitsuPart();
 std::unique_ptr<GamePart> makeYabaiPart();
 std::unique_ptr<GamePart> makeYabaiTreePart();
 
@@ -25,6 +26,7 @@ const PartEntry kParts[] = {
     {"selftest", makeSelfTestPart},
     {"scroll", makeScrollPart},
     {"chargallery", makeCharGalleryPart},
+    {"mankitsu", makeMankitsuPart},
     {"yabai", makeYabaiPart},
     {"yabaitree", makeYabaiTreePart},
 };
