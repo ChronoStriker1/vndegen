@@ -743,6 +743,7 @@ const char kMankitsuBonus[] = R"(
 # Its PC greys the Music buttons everywhere, on the title's Appendix submenu and every menu's side.
 screen defaults
 buttonsoff nav_music music
+emptytabsoff
 
 screen title
 part mankitsu
