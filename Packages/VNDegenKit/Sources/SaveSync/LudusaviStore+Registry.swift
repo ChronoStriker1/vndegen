@@ -70,13 +70,13 @@ extension LudusaviStore {
     }
 
     /// The values `save` keeps in a restore of `backup`. Nil when that backup holds none for its key.
-    static func backupRegistryValues(_ mapping: LudusaviMapping, backup: String?, save: RegistrySave, in gameDir: URL) -> [String: RegistryValue]? {
+    static func backupRegistryValues(_ mapping: LudusaviMapping, backup: String?, save: RegistrySave, in gameDir: URL) -> [RegistryName: RegistryValue]? {
         storedRegistry(mapping, backup: backup, in: gameDir).flatMap { registryData($0, in: gameDir) }?.values(of: save.key)
     }
 
     /// The values in the game's file here. Nil when there is no file. A file holding anything but its key is refused,
     /// so no other key ever reaches a backup.
-    static func localRegistryValues(_ save: RegistrySave) throws -> [String: RegistryValue]? {
+    static func localRegistryValues(_ save: RegistrySave) throws -> [RegistryName: RegistryValue]? {
         let data: Data
         do {
             data = try Data(contentsOf: save.file)
@@ -96,19 +96,19 @@ extension LudusaviStore {
     /// Writes `values` as the game's file, holding its key alone.
     /// Writes `values` as the game's file, holding its key alone. A value whose name breaks a line is left out, as the
     /// file goes to Wine's regedit, which couldn't read it as one value.
-    static func writeLocalRegistry(_ values: [String: RegistryValue], to save: RegistrySave) throws {
+    static func writeLocalRegistry(_ values: [RegistryName: RegistryValue], to save: RegistrySave) throws {
         try FileManager.default.createDirectory(at: save.file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(registryFile(RegistryData.writable(values), key: save.key).regText.utf8).write(to: save.file, options: .atomic)
     }
 
-    static func registryFile(_ values: [String: RegistryValue], key: String) -> RegistryData {
+    static func registryFile(_ values: [RegistryName: RegistryValue], key: String) -> RegistryData {
         var file = RegistryData()
         file.setValues(values, of: key)
         return file
     }
 
     /// Compares the key's values here and in a backup, whatever case either spells the key in.
-    static func registryHash(_ values: [String: RegistryValue], key: String) -> String {
+    static func registryHash(_ values: [RegistryName: RegistryValue], key: String) -> String {
         sha1(Data(registryFile(values, key: key).regText.utf8))
     }
 
@@ -127,9 +127,9 @@ extension LudusaviStore {
         var data = RegistryData()
         for hive in hives {
             for key in try mapping(hive.value) {
-                var values: [String: RegistryValue] = [:]
+                var values: [RegistryName: RegistryValue] = [:]
                 for entry in try mapping(key.value) {
-                    if let value = try registryValue(entry.value) { values[entry.key] = value }
+                    if let value = try registryValue(entry.value) { values[RegistryName(entry.key)] = value }
                 }
                 data.setValues(values, of: "\(hive.key)\\\(key.key)")
             }

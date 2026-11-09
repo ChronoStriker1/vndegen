@@ -16,6 +16,7 @@ nonisolated let nekoSDKLog = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// thread and draws into a CPU frame that `FrameView` shows; its sound plays through `PCMAudioOutput`. The game ending
 /// itself ends the session through `onExit`.
 final class NekoSDKSession: EngineSession {
+    private(set) var failedToStart = false
     let view: PlatformView
     private let frameView = FrameView()
     private let launch: GameLaunch
@@ -102,6 +103,7 @@ final class NekoSDKSession: EngineSession {
         guard let started else {
             let reason = vnneko_start_error().map { String(cString: $0) } ?? "unknown"
             nekoSDKLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
+            failedToStart = true
             finish(byGame: true)
             return
         }

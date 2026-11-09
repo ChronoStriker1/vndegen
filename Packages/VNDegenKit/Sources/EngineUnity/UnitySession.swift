@@ -12,6 +12,10 @@ let unityLog = Logger(subsystem: "VNDegen", category: "Unity")
 /// the post-session save backup work as for any game.
 @MainActor
 class UnityExternalSession: EngineSession {
+    private(set) var failedToStart = false
+    /// Set once the game's own process is running. An error after that, such as one saving its settings after it quit,
+    /// ends a session that did play.
+    var gameStarted = false
     let view: PlatformView
     let launch: GameLaunch
     let host: UnityHostView
@@ -38,6 +42,7 @@ class UnityExternalSession: EngineSession {
             } catch {
                 unityLog.error("\(self.launch.game.id.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 if !ending {
+                    if !gameStarted { failedToStart = true }
                     host.fail("\(launch.game.title) couldn't start. \(error.localizedDescription)")
                     return
                 }
@@ -68,6 +73,8 @@ class UnityExternalSession: EngineSession {
 
     func terminate() {
         ending = true
+        // Ended while CrossOver was still getting ready, which can take minutes, so the game never ran.
+        if !gameStarted { failedToStart = true }
         stopGame()
     }
 
@@ -116,17 +123,19 @@ final class UnityCrossOverSession: UnityExternalSession {
         guard !ending else { return }
         host.setMessage("\(launch.game.title) is running in CrossOver, in its own window.", showsGame: true)
         let process = try Self.process(bottle.run(exe, workdir: workdir, environment: environment), log: logFile())
-        let status = await withCheckedContinuation { (done: CheckedContinuation<Int32, Never>) in
+        // A game CrossOver can't start ends the session as one that didn't start, with the reason on screen.
+        let status = try await withCheckedThrowingContinuation { (done: CheckedContinuation<Int32, any Error>) in
             process.terminationHandler = { done.resume(returning: $0.terminationStatus) }
             do {
                 try process.run()
                 game = process
+                gameStarted = true
                 unityLog.info("started \(self.launch.game.id.rawValue, privacy: .public) in CrossOver, pid \(process.processIdentifier)")
                 Task { await self.bringGameForward() }
             } catch {
                 process.terminationHandler = nil
                 unityLog.error("starting CrossOver failed: \(error.localizedDescription, privacy: .public)")
-                done.resume(returning: -1)
+                done.resume(throwing: error)
             }
         }
         game = nil
@@ -198,23 +207,22 @@ final class UnityCrossOverSession: UnityExternalSession {
     }
 
     /// `key` with `values`, and `"name"=-` for each of `removing` that `values` lacks, compared without case.
-    static func importText(key: String, values: [String: RegistryValue], removing: Set<String>) -> String {
+    static func importText(key: String, values: [RegistryName: RegistryValue], removing: Set<RegistryName>) -> String {
         var data = RegistryData()
         data.setValues(values, of: key)
         var text = data.regText
-        let kept = Set(values.keys.map { $0.lowercased() })
+        let kept = Set(values.keys.map(\.lowercased))
         // A name with a line break can't be written, so it can't be deleted either, and stays as the bottle has it.
-        let gone = removing.filter { !kept.contains($0.lowercased()) && !RegistryData.breaksLine($0) }
-            .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
+        let gone = removing.filter { !kept.contains($0.lowercased) && !RegistryData.breaksLine($0.text) }.sorted()
         if !gone.isEmpty {
             text.removeLast()
-            text += gone.map { "\n\"\(RegistryData.escape($0))\"=-" }.joined() + "\n"
+            text += gone.map { "\n\"\(RegistryData.escape($0.text))\"=-" }.joined() + "\n"
         }
         return text
     }
 
     /// The values the bottle holds under `key`, not its subkeys'. Nil when the key isn't there or regedit fails.
-    private func bottleValues(_ key: String) async -> [String: RegistryValue]? {
+    private func bottleValues(_ key: String) async -> [RegistryName: RegistryValue]? {
         let staged = launch.dataDirectory.appendingPathComponent("PlayerPrefs-export.reg")
         defer { try? FileManager.default.removeItem(at: staged) }
         try? FileManager.default.removeItem(at: staged)
@@ -373,6 +381,7 @@ final class UnityMacAppSession: UnityExternalSession {
         configuration.activates = true
         let running = try await NSWorkspace.shared.openApplication(at: app, configuration: configuration)
         self.running = running
+        gameStarted = true
         unityLog.info("opened \(self.app.lastPathComponent, privacy: .public), pid \(running.processIdentifier)")
         if ending {
             // The hub ended the session while the app was opening, before `stopGame` could reach it.

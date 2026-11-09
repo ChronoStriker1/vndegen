@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.28.1",
+          "buildVersion": "1766",
+          "date": "2026-11-09T22:05:03Z",
+          "localizedDescription": "A game that fails to start no longer counts as played, long NScripter choices can be clicked on every line, and two save sync and metadata mistakes are fixed.\n\n## Downloads\n\n- `VNDegen-0.28.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.28.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- A game that fails to start no longer moves to the front of Recently played or gains play time. A game that starts and then stops partway still counts as played. (#39)\n- NScripter: every line of a choice long enough to wrap can be clicked, and hovering any line lights the whole choice. Before, only its first line answered. Choices that fit on one line are unchanged. (#37)\n- Save sync: registry values whose names differ only in how an accented letter is stored are kept apart, as Ludusavi keeps them. Before, a backup that updated a Unity game's settings could keep only one of them. (#40)\n- Metadata: a short title that is also the start of better-known titles is left for you to choose, rather than matched to an obscure entry of the same name. (#62)\n- For people building VNDegen: `build.sh test` names every failing test with its whole message (#67), concurrent Godot builds no longer delete each other's SCons venv (#69), and the save sync case test skips with a reason on a disk that ignores case (#38).\n\n## Known limits\n\n- A game that can't start goes back to the library without saying why. (#70)\n- Leaving a game while its engine is still starting still counts as played, except for Unity games being set up in CrossOver. (#72)\n\n## What wasn't tested\n\n- No physical device was used. The failed-start fix was checked in the Mac app with one NScripter game and by a test of the library's launch path. The Unity and web game failure paths were read and reviewed but not triggered.\n- The NScripter choice fix was checked on Linux with Tsukihime and a made-up script, not in the Mac or iPhone and iPad apps. It's code every build shares.\n- The metadata change was checked against live VNDB for 712 library titles: one match changed, from a wrong sequel to a choice for the player.\n- The Mac app was built on one Mac only.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.28.1/VNDegen-0.28.1.ipa",
+          "size": 124089061,
+          "sha256": "cd605217caa1fb60bb44bcd35c6c5814e1a912b2e5b0d5e613db8d3f484aeef9",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.28.0",
           "buildVersion": "1748",
           "date": "2026-11-09T09:32:49Z",

@@ -109,9 +109,18 @@ enum TitleMatch {
             .map(\.candidate)
     }
 
-    /// The best candidate when it is safe to apply without asking: the same normalized title, or nearly so.
+    /// The best candidate when it is safe to apply without asking: the same normalized title, or nearly so. A short
+    /// title can be the whole name of an obscure entry and the start of better-known ones, as "Rinjin" is on VNDB (#62).
+    /// When the source rates a longer title that starts with it higher, the match waits for the player to pick.
     static func confidentMatch(in candidates: [MetadataCandidate], for title: String) -> MetadataCandidate? {
-        rank(candidates, for: title).first { similarity($0.title, title) >= confidentSimilarity }
+        guard let best = rank(candidates, for: title).first(where: { similarity($0.title, title) >= confidentSimilarity })
+        else { return nil }
+        let start = normalize(title) + " "
+        let outranked = candidates.contains { other in
+            guard let votes = best.votes, let otherVotes = other.votes else { return false }
+            return other.ref.source == best.ref.source && otherVotes > votes && normalize(other.title).hasPrefix(start)
+        }
+        return outranked ? nil : best
     }
 
     /// Which source's entry becomes the primary match when titles tie. VNDB and IGDB have the richest text metadata.

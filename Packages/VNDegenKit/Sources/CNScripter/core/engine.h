@@ -597,7 +597,7 @@ public:
     Cursor selectReturn_;
     size_t selectFirst_ = 0;
     std::vector<int> selectRows_;
-    // Ponscripter: each choice's characters on the page and the bottom of its last line, since a choice may wrap.
+    // Each choice's characters on the page and the bottom of its last line, since a choice may wrap.
     std::vector<std::pair<size_t, size_t>> selectChars_;
     std::vector<int> selectBottoms_;
     int selectHover_ = -1;

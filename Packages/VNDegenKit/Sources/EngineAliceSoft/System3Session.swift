@@ -17,6 +17,7 @@ nonisolated let system3Log = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// A System 3 game running on VNDegen's runtime (CSystem3) in this process. The runtime steps once per display refresh
 /// on the main thread and draws into a CPU frame that `FrameView` shows; its sound plays through `PCMAudioOutput`.
 final class System3Session: EngineSession {
+    private(set) var failedToStart = false
     let view: PlatformView
     private let frameView = FrameView()
     private let launch: GameLaunch
@@ -94,6 +95,7 @@ final class System3Session: EngineSession {
         guard let started else {
             let reason = String(decoding: problem.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             system3Log.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
+            failedToStart = true
             finish(byGame: true)
             return
         }

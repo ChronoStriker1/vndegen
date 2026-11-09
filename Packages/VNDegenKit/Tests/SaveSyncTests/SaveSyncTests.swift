@@ -661,12 +661,22 @@ private func freshLibrary() async throws -> (library: LibraryStore, directory: U
 }
 #endif
 
-/// A PC backup's `File1.rmmzsave` restores over a local `file1.rmmzsave`, as it would on Windows, rather than beside it.
-/// `VNDEGEN_TEST_DIR` puts the game on a case-sensitive volume, which `scripts/build.sh test` mounts.
-@Test func restoreReplacesASaveThatDiffersOnlyInCase() throws {
-    let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+/// A folder on a disk that keeps case: `VNDEGEN_TEST_DIR`, the case-sensitive volume `scripts/build.sh test` mounts, or
+/// the test folder where its disk keeps case, as on Linux. Nil where neither does, such as a Mac's own disk.
+private let caseSensitiveScratch: URL? = {
+    let folder = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
         ?? TestFolders.root
-    let base = scratch.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    let probe = folder.appendingPathComponent("Case-\(UUID().uuidString)")
+    guard fm.createFile(atPath: probe.path, contents: nil) else { return nil }
+    defer { try? fm.removeItem(at: probe) }
+    return fm.fileExists(atPath: folder.appendingPathComponent(probe.lastPathComponent.lowercased()).path) ? nil : folder
+}()
+
+/// A PC backup's `File1.rmmzsave` restores over a local `file1.rmmzsave`, as it would on Windows, rather than beside it.
+/// Only a disk that keeps case can hold the local save under the other spelling.
+@Test(.enabled(if: caseSensitiveScratch != nil, "needs a disk that keeps case: run it through scripts/build.sh test"))
+func restoreReplacesASaveThatDiffersOnlyInCase() throws {
+    let base = caseSensitiveScratch!.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
     defer { try? fm.removeItem(at: base) }
     let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
     try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
