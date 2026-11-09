@@ -121,12 +121,15 @@ screen story
 # Kururu's, Otona's and Rei's routes end, and once all three are, a route goes on into the shared ending, which sets G 83
 # (the title's six silhouettes, checked by editing cfg.sav under Wine). Each route skips one of its scripts on the PC
 # runs, ep_002_005, ep_003_005 and ep_004_004, each with another heroine in it; what plays them isn't known yet. The
-# ending with no heroine at four hearts is ep_001_029 alone, then the title (seen under Wine).
+# ending with no heroine at four hearts is ep_001_029 alone, then the title (seen under Wine). S 4000 names the route on
+# a save's card: 1 in every PC save of the common route so far; where it becomes 2 to 5 is taken from the card's labels
+# and not yet read from PC saves (unconfirmed).
 flow main
 scene scr\ep_000_000_000.txt
 scene scr\ep_000_000_001.txt
 scene scr\ep_000_000_002.txt
 scene scr\ep_000_000_003.txt
+set S 4000 = 1
 scene scr\ep_001_000_000.txt
 scene scr\ep_001_001_000.txt
 scene scr\ep_001_001_001.txt
@@ -142,6 +145,7 @@ jump weeks
 # Main Story from the title starts with a scene of three lines that New Game's way doesn't play, its PC number 14 (set
 # 1, under Wine), and then the first select screen.
 flow chapter2
+set S 4000 = 1
 scene scr\ep_001_006_001.txt @14
 jump weeks
 
@@ -186,6 +190,7 @@ if S 10906 == 2 goto otona
 if S 10906 == 3 goto rei
 end
 label kururu
+set S 4000 = 2
 scene scr\ep_002_000_000.txt
 scene scr\ep_002_000_001.txt
 scene scr\eye_catch1.txt
@@ -218,6 +223,7 @@ scene scr\ep_002_014_000.txt
 set G 80 = 1
 goto shared
 label otona
+set S 4000 = 3
 scene scr\ep_003_000_000.txt
 scene scr\ep_003_000_001.txt
 scene scr\eye_catch2.txt
@@ -247,6 +253,7 @@ scene scr\ep_003_012_000.txt
 set G 81 = 1
 goto shared
 label rei
+set S 4000 = 4
 scene scr\ep_004_000_000.txt
 scene scr\ep_004_001_000.txt
 scene scr\ep_004_002_000.txt
@@ -279,6 +286,7 @@ label shared
 if G 80 == 0 goto done
 if G 81 == 0 goto done
 if G 82 == 0 goto done
+set S 4000 = 5
 scene scr\ep_005_000_000.txt
 scene scr\ep_005_000_001.txt
 scene scr\ep_005_001_000.txt
