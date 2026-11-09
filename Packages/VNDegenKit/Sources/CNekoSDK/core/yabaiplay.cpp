@@ -4,6 +4,7 @@
 // + 10 * (stage - 1) + question, with the prologue, the truths' openings, the votes and endings below 1000.
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <map>
 #include <sstream>
@@ -147,7 +148,16 @@ public:
         }
         open_ = true;
         hoverQ_ = -1;
+        bubblesFor_ = -1;
         host.redraw();
+        return true;
+    }
+
+    // The bubbles move on the story's clock, so a menu over the hub holds them still.
+    bool step(PartHost &host) override {
+        if (!open_ || ask_) return false;
+        moveBubbles(host);
+        hover(host);
         return true;
     }
 
@@ -174,8 +184,28 @@ public:
                 return true;
             }
         int shown = host.variable(1, kShown);
+        if (int q = bubbleAt(host, x, y); q >= 0) return ask(host, shown, q);
+        return true;
+    }
+
+    // Controller and keyboard: the questions still to ask, the heroines' tabs and the tree's button; on a question band,
+    // its answers.
+    bool focusSpots(PartHost &host, std::vector<std::pair<int, int>> &spots) override {
+        if (ask_) {
+            for (int i = 0; i < (ask_ == 4 ? 3 : 2); i++) {
+                if (ask_ == 4) spots.push_back({640, 298 + 55 * i});
+                else spots.push_back({576 + 128 * i, 409});
+            }
+            return true;
+        }
+        if (!open_) return false;
+        moveBubbles(host);
+        int shown = host.variable(1, kShown);
         for (int q = 0; q < 3; q++)
-            if (inside(x, y, bubbleRect(q)) && !locked(host, shown) && !(asked(host, shown) & (1 << q))) return ask(host, shown, q);
+            if (askable(host, shown, q)) spots.push_back({int(bubbles_[q].x), int(bubbles_[q].y)});
+        for (int h = 0; h < 3; h++)
+            if (host.variable(1, kStage + h) <= 3) spots.push_back({kTab[h][0] + kTab[h][2] / 2, kTab[h][1] + kTab[h][3] / 2});
+        spots.push_back({kTreeButton[0] + kTreeButton[2] / 2, kTreeButton[1] + kTreeButton[3] / 2});
         return true;
     }
 
@@ -186,10 +216,8 @@ public:
             return;
         }
         if (!open_) return;
-        int shown = host.variable(1, kShown), hit = -1;
-        for (int q = 0; q < 3 && hit < 0; q++)
-            if (inside(x, y, bubbleRect(q)) && !locked(host, shown) && !(asked(host, shown) & (1 << q))) hit = q;
-        if (hit != hoverQ_) hoverQ_ = hit, host.redraw();
+        pointerX_ = x, pointerY_ = y, pointerSeen_ = true;
+        hover(host);
     }
 
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
@@ -230,24 +258,39 @@ public:
         // A locked stage's questions are all dark, as asked ones are.
         bool shut = locked(host, shown);
         int bits = shut ? 7 : asked(host, shown);
+        if (stage <= 3) moveBubbles(host);
+        float seconds = float(host.nowMs() - bubblesFrom_) / 1000;
         for (int q = 0; q < 3 && stage <= 3; q++) {
-            auto r = bubbleRect(q);
-            // Frames: blue for a question still to ask, dark once asked (l010, 3 shapes across, 5 states down).
-            // Under the pointer, the frame's glowing row 1 and the panel's lit row 1 (hover state, as seen on the PC).
+            // Frames: lit for a question still to ask, dark once asked (5 states down). Under the pointer, the frame's
+            // glowing row 1 and the panel's lit row 1 (hover state, as seen on the PC).
             int state = bits & (1 << q) ? 4 : q == hoverQ_ ? 1 : 0;
-            // Each stage's own frames: l010_000 blue, _001 green, _002 pink.
-            cell(host, out, "obj\\l010_00" + std::to_string(std::min(3, std::max(1, stage)) - 1) + ".bmp", r[0], r[1], q * 337,
-                 state * 202, 337, 202);
-            // Each panel is its question's text in five states down, centred in its frame.
-            if (ImageRef text = host.image(panel(host, shown, stage, q))) {
-                int w = text->w, h = text->h / 5;
-                drawPart(out, *text, r[0] + (337 - w) / 2, r[1] + (202 - h) / 2, 0, state * h, w, h, 1);
-            }
+            const Bubble &b = bubbles_[q];
+            float degrees = kRock * std::sin(2 * kPi * seconds / kRockSeconds[q] + kRockPhase[q]);
+            // The PC's tilt is measured anticlockwise; drawImage turns clockwise.
+            if (ImageRef picture = bubblePicture(host, shown, stage, q, state))
+                drawImage(out, *picture, b.x, b.y, 1, 1, -degrees * kPi / 180, 1);
         }
         if (shut) put(host, out, "obj\\l015_001.bmp", 326, 260);
     }
 
-    void reset() override { open_ = false, ask_ = 0; }
+    // The plate's Auto and Skip are drawn disabled over the hub, as the PC draws them there (a PC shot under Wine with
+    // the plate up: both in their sheet's last row).
+    int actionLit(const std::string &name) const override { return open_ && !ask_ && (name == "Auto" || name == "Skip") ? 2 : -1; }
+
+    // The hub's bubbles, each question's middle now, for headless play: `hub 598,279 896,286 834,465`.
+    std::string debugStatus() const override {
+        if (ask_) return "ask " + std::to_string(ask_);
+        if (!open_) return {};
+        std::string words = "hub";
+        for (const Bubble &b : bubbles_) words += " " + std::to_string(int(b.x)) + "," + std::to_string(int(b.y));
+        return words;
+    }
+
+    void reset() override {
+        open_ = false, ask_ = 0;
+        bubblesFor_ = -1;
+        pictures_.clear();
+    }
 
     std::vector<std::string> chapter(PartHost &host, int number) override {
         if (!loaded_) {
@@ -260,15 +303,125 @@ public:
     }
 
 private:
-    // Places measured on the PC's hub (1280x720): the 自白内容確認 button and the three heroine tabs. The bubbles drift on
-    // the PC; until that's measured they sit at the middle of where they were seen.
+    // Places measured on the PC's hub (1280x720): the 自白内容確認 button and the three heroine tabs.
     static constexpr int kTreeButton[4] = {12, 581, 190, 95};
     static constexpr int kTab[3][4] = {{752, 50, 118, 58}, {870, 50, 118, 58}, {988, 50, 118, 58}};
-    static constexpr int kBubble[3][2] = {{480, 160}, {760, 250}, {500, 370}};
+
+    // The bubbles drift and rock. Tracked on the PC under Wine through 76 s of one hub, 300 frames (set 2):
+    // - Each moves in a straight line at a steady speed and turns back at the edges of the area: its frame's top at 160,
+    //   bottom at 600, right side at 1280, left side at 355.
+    // - Two bubbles turn each other back up or down where the gap between their middles crosses half their heights less
+    //   51, from either side, while their middles are nearer across than half their widths less about 60. Seen 8 times.
+    //   Nothing was seen to turn one back sideways but the area's edges.
+    // - Each rocks 10 degrees either way as a sine, over 50.0, 19.3 and 26.1 s.
+    // The places, speeds and phases below are that hub's at the start of the 76 s. The PC starts each hub differently
+    // (another load of the same save began elsewhere), and how it picks them isn't known; there the first two bubbles
+    // slid sideways for 4 s before settling into the up-and-down lines kept here.
+    struct Bubble {
+        float x = 0, y = 0;    // its middle
+        float vx = 0, vy = 0;  // pixels a second
+        int w = 337, h = 202;  // its frame: 337 by 202, or 512 by 165 for a long question
+    };
+    static constexpr float kStart[3][4] = {{598, 279, 0, -9.2f}, {896, 286, 0, -9.0f}, {834, 465, 10.33f, -6.0f}};
+    static constexpr float kAreaLeft = 355, kAreaTop = 160, kAreaRight = 1280, kAreaBottom = 600;
+    static constexpr float kTouchY = 51, kTouchX = 60;
+    static constexpr float kPi = 3.14159265f, kRock = 10;
+    static constexpr float kRockSeconds[3] = {50.0f, 19.3f, 26.1f}, kRockPhase[3] = {-1.571f, 3.34f, 0.80f};
+    static constexpr int kMoveMs = 16;
 
     static bool inside(int x, int y, const int (&r)[4]) { return x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]; }
-    static std::array<int, 4> bubbleRect(int q) { return {kBubble[q][0], kBubble[q][1], 337, 202}; }
-    static bool inside(int x, int y, const std::array<int, 4> &r) { return x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]; }
+
+    bool askable(PartHost &host, int heroine, int q) { return !locked(host, heroine) && !(asked(host, heroine) & (1 << q)); }
+
+    // Whether two bubbles' middles are nearer up and down than where they touch.
+    bool near(int i, int j) const {
+        return std::fabs(bubbles_[i].y - bubbles_[j].y) < float(bubbles_[i].h + bubbles_[j].h) / 2 - kTouchY;
+    }
+
+    // The bubbles where the clock has them now, laid out afresh for another heroine, stage or truth.
+    void moveBubbles(PartHost &host) {
+        int shown = host.variable(1, kShown), stage = std::min(3, std::max(1, host.variable(1, kStage + shown)));
+        int64_t now = host.nowMs();
+        if (int key = truth(host) * 100 + shown * 10 + stage; key != bubblesFor_) {
+            bubblesFor_ = key;
+            bubblesFrom_ = bubblesAt_ = now;
+            pictures_.clear();
+            for (int q = 0; q < 3; q++) {
+                Bubble &b = bubbles_[q];
+                b = Bubble{kStart[q][0], kStart[q][1], kStart[q][2], kStart[q][3]};
+                if (ImageRef text = host.image(panel(host, shown, stage, q)); text && text->w > b.w) b.w = text->w, b.h = text->h / 5;
+                b.x = std::min(std::max(b.x, kAreaLeft + float(b.w) / 2), kAreaRight - float(b.w) / 2);
+            }
+            for (int pair = 0; pair < 3; pair++) wasNear_[pair] = near(kPairs[pair][0], kPairs[pair][1]);
+        }
+        // A long gap, such as the app waking, isn't caught up.
+        if (now - bubblesAt_ > 2000 || now < bubblesAt_) bubblesAt_ = now;
+        for (; bubblesAt_ + kMoveMs <= now; bubblesAt_ += kMoveMs) {
+            float dt = float(kMoveMs) / 1000;
+            for (Bubble &b : bubbles_) {
+                b.x += b.vx * dt, b.y += b.vy * dt;
+                if ((b.y - float(b.h) / 2 < kAreaTop && b.vy < 0) || (b.y + float(b.h) / 2 > kAreaBottom && b.vy > 0)) b.vy = -b.vy;
+                if ((b.x - float(b.w) / 2 < kAreaLeft && b.vx < 0) || (b.x + float(b.w) / 2 > kAreaRight && b.vx > 0)) b.vx = -b.vx;
+            }
+            for (int pair = 0; pair < 3; pair++) {
+                Bubble &a = bubbles_[kPairs[pair][0]], &b = bubbles_[kPairs[pair][1]];
+                bool across = std::fabs(a.x - b.x) < float(a.w + b.w) / 2 - kTouchX;
+                bool isNear = near(kPairs[pair][0], kPairs[pair][1]);
+                // Turned back, the two return to the side of the line they came from, so what was stays as it was.
+                if (across && isNear != wasNear_[pair]) a.vy = -a.vy, b.vy = -b.vy;
+                else if (!across) wasNear_[pair] = isNear;
+            }
+        }
+    }
+
+    // The question whose bubble is at x, y and can still be asked, the one drawn last first, or -1. A bubble takes
+    // presses on its frame's inside, the frame less the margin its art leaves.
+    int bubbleAt(PartHost &host, int x, int y) {
+        int shown = host.variable(1, kShown);
+        if (host.variable(1, kStage + shown) > 3) return -1;
+        moveBubbles(host);
+        for (int q = 2; q >= 0; q--) {
+            const Bubble &b = bubbles_[q];
+            if (std::fabs(float(x) - b.x) < float(b.w) / 2 - 20 && std::fabs(float(y) - b.y) < float(b.h) / 2 - 26) return askable(host, shown, q) ? q : -1;
+        }
+        return -1;
+    }
+
+    void hover(PartHost &host) {
+        int hit = pointerSeen_ ? bubbleAt(host, pointerX_, pointerY_) : -1;
+        if (hit != hoverQ_) hoverQ_ = hit, host.redraw();
+    }
+
+    // A bubble as one picture, so it can be drawn tilted: its frame (l010_000 to _002 for stages 1 to 3, blue, green and
+    // pink, three shapes across; l010_003 to _005 the wide ones a 512-wide panel takes) with the question's panel over
+    // it, both in the same one of their five states.
+    ImageRef bubblePicture(PartHost &host, int heroine, int stage, int q, int state) {
+        int at = q * 5 + state;
+        if (auto it = pictures_.find(at); it != pictures_.end()) return it->second;
+        const Bubble &b = bubbles_[q];
+        int colour = std::min(3, std::max(1, stage)) - 1 + (b.w > 337 ? 3 : 0);
+        ImageRef frame = host.image("obj\\l010_00" + std::to_string(colour) + ".bmp"), text = host.image(panel(host, heroine, stage, q));
+        if (!frame || (q + 1) * b.w > frame->w || (state + 1) * b.h > frame->h) return pictures_[at] = nullptr;
+        auto picture = std::make_shared<Image>();
+        picture->w = b.w, picture->h = b.h, picture->opaque = false;
+        picture->rgba.resize(size_t(b.w) * size_t(b.h) * 4);
+        for (int y = 0; y < b.h; y++)
+            std::copy_n(&frame->rgba[(size_t(state * b.h + y) * size_t(frame->w) + size_t(q * b.w)) * 4], size_t(b.w) * 4, &picture->rgba[size_t(y) * size_t(b.w) * 4]);
+        if (text && text->w <= b.w && text->h / 5 <= b.h) {
+            int tw = text->w, th = text->h / 5, left = (b.w - tw) / 2, top = (b.h - th) / 2;
+            for (int y = 0; y < th; y++)
+                for (int x = 0; x < tw; x++) {
+                    const uint8_t *src = &text->rgba[(size_t(state * th + y) * size_t(tw) + size_t(x)) * 4];
+                    uint8_t *dst = &picture->rgba[(size_t(top + y) * size_t(b.w) + size_t(left + x)) * 4];
+                    // Straight alpha, the panel over the frame.
+                    int sa = src[3], da = dst[3] * (255 - sa) / 255, a = sa + da;
+                    if (!a) continue;
+                    for (int c = 0; c < 3; c++) dst[c] = uint8_t((src[c] * sa + dst[c] * da) / a);
+                    dst[3] = uint8_t(a);
+                }
+        }
+        return pictures_[at] = picture;
+    }
 
     static int truth(PartHost &host) { return std::max(1, std::min(5, host.variable(1, kTruth))); }
     static int askedVar(PartHost &host, int heroine) {
@@ -533,6 +686,17 @@ private:
 
     int ask_ = 0, hoverAsk_ = -1, hoverQ_ = -1, pendingDevil_ = 0;
     bool open_ = false;
+    // The hub's bubbles: where they are, the clock they've been moved up to and the one their rocking counts from, what
+    // they were laid out for (truth, heroine and stage), each pair's side of its touching line, and their pictures by
+    // question and state.
+    static constexpr int kPairs[3][2] = {{0, 1}, {0, 2}, {1, 2}};
+    std::array<Bubble, 3> bubbles_;
+    int64_t bubblesAt_ = 0, bubblesFrom_ = 0;
+    int bubblesFor_ = -1;
+    bool wasNear_[3] = {false, false, false};
+    std::map<int, ImageRef> pictures_;
+    int pointerX_ = 0, pointerY_ = 0;
+    bool pointerSeen_ = false;
     bool loaded_ = false;
     bool questionsLoaded_ = false;
     std::map<int, std::vector<std::string>> chapters_;
