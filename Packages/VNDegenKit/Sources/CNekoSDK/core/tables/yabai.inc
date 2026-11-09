@@ -54,6 +54,8 @@ screen load
 selectedlook
 pic bg\bg_001_000_000_000_000.bmp 0 0
 pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
 pic obj\e001_000.bmp 0 0 6 1 1 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
@@ -68,30 +70,34 @@ datefield month 274 26 11
 datefield day 307 26 11 blank
 datefield hour 285 50 11 blank
 datefield minute 318 50 11
-button page0 obj\\e003_001.bmp 698 68 10 5 0
-button page1 obj\\e003_001.bmp 748 68 10 5 1
-button page2 obj\\e003_001.bmp 798 68 10 5 2
-button page3 obj\\e003_001.bmp 848 68 10 5 3
-button page4 obj\\e003_001.bmp 898 68 10 5 4
-button page5 obj\\e003_001.bmp 948 68 10 5 5
-button page6 obj\\e003_001.bmp 998 68 10 5 6
-button page7 obj\\e003_001.bmp 1048 68 10 5 7
-button page8 obj\\e003_001.bmp 1098 68 10 5 8
-button page9 obj\\e003_001.bmp 1148 68 10 5 9
-button nav_save obj\\e002_000.bmp 51 637 9 5 0
-button nav_load obj\\e002_000.bmp 181 637 9 5 1
-button nav_cg obj\\e002_000.bmp 311 637 9 5 2
-button nav_scene obj\\e002_000.bmp 441 637 9 5 3
-button nav_music obj\\e002_000.bmp 571 637 9 5 4
-button nav_config obj\\e002_000.bmp 701 637 9 5 5
-button nav_title obj\\e002_000.bmp 831 637 9 5 6
-button nav_quit obj\\e002_000.bmp 961 637 9 5 7
-button back obj\\e002_000.bmp 1091 637 9 5 8
+button page0 obj\e003_001.bmp 698 68 10 5 0
+button page1 obj\e003_001.bmp 748 68 10 5 1
+button page2 obj\e003_001.bmp 798 68 10 5 2
+button page3 obj\e003_001.bmp 848 68 10 5 3
+button page4 obj\e003_001.bmp 898 68 10 5 4
+button page5 obj\e003_001.bmp 948 68 10 5 5
+button page6 obj\e003_001.bmp 998 68 10 5 6
+button page7 obj\e003_001.bmp 1048 68 10 5 7
+button page8 obj\e003_001.bmp 1098 68 10 5 8
+button page9 obj\e003_001.bmp 1148 68 10 5 9
+button nav_save obj\e002_000.bmp 51 637 9 5 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1
+button nav_cg obj\e002_000.bmp 311 637 9 5 2
+button nav_scene obj\e002_000.bmp 441 637 9 5 3
+button nav_music obj\e002_000.bmp 571 637 9 5 4
+button nav_config obj\e002_000.bmp 701 637 9 5 5
+button nav_title obj\e002_000.bmp 831 637 9 5 6
+button nav_quit obj\e002_000.bmp 961 637 9 5 7
+button back obj\e002_000.bmp 1091 637 9 5 8
+button pageprev obj\e003_000.bmp 22 331 2 5 0
+button pagenext obj\e003_000.bmp 1218 331 2 5 1
 
 screen save
 selectedlook
 pic bg\bg_001_000_000_000_000.bmp 0 0
 pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
 pic obj\e001_000.bmp 0 0 6 1 1 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
@@ -106,25 +112,27 @@ datefield month 274 26 11
 datefield day 307 26 11 blank
 datefield hour 285 50 11 blank
 datefield minute 318 50 11
-button page0 obj\\e003_001.bmp 698 68 10 5 0
-button page1 obj\\e003_001.bmp 748 68 10 5 1
-button page2 obj\\e003_001.bmp 798 68 10 5 2
-button page3 obj\\e003_001.bmp 848 68 10 5 3
-button page4 obj\\e003_001.bmp 898 68 10 5 4
-button page5 obj\\e003_001.bmp 948 68 10 5 5
-button page6 obj\\e003_001.bmp 998 68 10 5 6
-button page7 obj\\e003_001.bmp 1048 68 10 5 7
-button page8 obj\\e003_001.bmp 1098 68 10 5 8
-button page9 obj\\e003_001.bmp 1148 68 10 5 9
-button nav_save obj\\e002_000.bmp 51 637 9 5 0
-button nav_load obj\\e002_000.bmp 181 637 9 5 1
-button nav_cg obj\\e002_000.bmp 311 637 9 5 2
-button nav_scene obj\\e002_000.bmp 441 637 9 5 3
-button nav_music obj\\e002_000.bmp 571 637 9 5 4
-button nav_config obj\\e002_000.bmp 701 637 9 5 5
-button nav_title obj\\e002_000.bmp 831 637 9 5 6
-button nav_quit obj\\e002_000.bmp 961 637 9 5 7
-button back obj\\e002_000.bmp 1091 637 9 5 8
+button page0 obj\e003_001.bmp 698 68 10 5 0
+button page1 obj\e003_001.bmp 748 68 10 5 1
+button page2 obj\e003_001.bmp 798 68 10 5 2
+button page3 obj\e003_001.bmp 848 68 10 5 3
+button page4 obj\e003_001.bmp 898 68 10 5 4
+button page5 obj\e003_001.bmp 948 68 10 5 5
+button page6 obj\e003_001.bmp 998 68 10 5 6
+button page7 obj\e003_001.bmp 1048 68 10 5 7
+button page8 obj\e003_001.bmp 1098 68 10 5 8
+button page9 obj\e003_001.bmp 1148 68 10 5 9
+button nav_save obj\e002_000.bmp 51 637 9 5 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1
+button nav_cg obj\e002_000.bmp 311 637 9 5 2
+button nav_scene obj\e002_000.bmp 441 637 9 5 3
+button nav_music obj\e002_000.bmp 571 637 9 5 4
+button nav_config obj\e002_000.bmp 701 637 9 5 5
+button nav_title obj\e002_000.bmp 831 637 9 5 6
+button nav_quit obj\e002_000.bmp 961 637 9 5 7
+button back obj\e002_000.bmp 1091 637 9 5 8
+button pageprev obj\e003_000.bmp 22 331 2 5 0
+button pagenext obj\e003_000.bmp 1218 331 2 5 1
 
 screen story
 flow main
