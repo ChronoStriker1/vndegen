@@ -252,10 +252,10 @@ public:
 private:
     enum class Phase { Closed, Reopen, Pick, Vote };
     static constexpr int kEndHoldFrames = 120;  // 投票終了 shows two seconds before the result: not measured
+    static constexpr float kFallSpeed = 14;     // rows a frame in a `fall_move`
 
     struct Heroine {
         float y = kRowL, target = kRowL, speed = 0;
-        bool falling = false;
         int face = 0;
         int shakeAmp = 0, shakeUntil = -1, shakeX = 0, shakeY = 0;
         bool shakeSideways = false;
@@ -398,12 +398,12 @@ private:
         } else if (e.kind == "up_move" || e.kind == "down_move") {
             h.target = float(row(arg(0)));
             h.speed = std::strtof(arg(1).c_str(), nullptr);
-            h.falling = false;
         } else if (e.kind == "fall_move") {
-            // A fall gathers speed; how fast isn't measured.
+            // A fall is a fast steady move. On the PC under Wine, in shots about 90 ms apart, Misuzu's coffin in vote 1
+            // was 60 rows down, then 135, then at rest 150 down: about 830 rows a second, 14 a frame, with no sign of
+            // gathering speed between the two samples a fall this short gives.
             h.target = float(row(arg(0)));
-            h.speed = 0;
-            h.falling = true;
+            h.speed = kFallSpeed;
         } else if (e.kind == "message") {
             // `message N SIDE SHAPE 0 0 HOW TEXT VOICE`.
             h.bubble = true;
@@ -427,7 +427,6 @@ private:
     // A frame of the moves and shakes, at 60 a second.
     void advance(PartHost &host, int frame) {
         for (Heroine &h : heroines_) {
-            if (h.falling) h.speed += 0.25f;
             if (h.y < h.target) h.y = std::min(h.target, h.y + h.speed);
             else if (h.y > h.target) h.y = std::max(h.target, h.y - h.speed);
             auto jitter = [](int amp) { return amp > 0 ? std::rand() % (2 * amp + 1) - amp : 0; };
