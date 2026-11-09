@@ -5906,6 +5906,7 @@ void Engine::loadImage(const Node &n) {
     s.path = n.s[1];
     s.flipCount = 0;
     s.movie.reset();
+    s.noise = false;
     // A picture in a slot a part held takes the slot over: it's drawn and saved as a picture, not as the part's.
     if (s.held) {
         s.held = false;

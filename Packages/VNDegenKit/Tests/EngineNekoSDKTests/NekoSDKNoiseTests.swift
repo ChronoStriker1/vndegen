@@ -96,4 +96,50 @@ import TestSupport
         #expect(size == save.count)
         #expect(Data(built.prefix(size)) == save)
     }
+
+    @Test func aPictureLoadedIntoTheNoisesSlotReplacesIt() throws {
+        var blue = red()
+        for at in stride(from: 54, to: blue.count, by: 8) {
+            blue.replaceSubrange((blue.startIndex + at)..<(blue.startIndex + at + 6), with: [255, 0, 0, 255, 0, 0])
+        }
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\layout94\nFirstFlow\tflow\\t.txt\n".utf8),
+            "sys/noise2_small.bmp": red(),
+            "obj.pak": NekoSDKFlowFixture.archive([("blue.bmp", blue)]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 51, next: 3),
+                .init(op: 9, next: 4),
+                .init(op: 2, next: 5, p: [0: 300]),
+                .init(op: 15, next: 6, p: [3: 10000], s: [1: "obj\\blue.bmp"]),
+                .init(op: 9, next: 7),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(first, 16) }
+        #expect(topLeft(first) == [255, 0, 0])
+        for _ in 0..<40 { _ = vnneko_step(first, 16) }
+        #expect(topLeft(first) == [0, 0, 255])
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/layout94/save")
+        let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save001.sav" })
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        let name = try #require(save.range(of: Data("obj\\blue.bmp".utf8))).lowerBound
+        #expect(save[name - 13] == 1)
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(topLeft(second) == [0, 0, 255])
+    }
 }

@@ -169,6 +169,7 @@ constexpr int kSplashNameAt = 201;
 constexpr size_t kTailFlipReverse = 97, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipParam15 = 104,
                  kTailFlipStep = 108, kTailFlipHundred = 120;
 constexpr int kNoiseKind = 4;
+constexpr int kNoiseSlot = 10000;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
 constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
 constexpr int kDateFlag = 360;
@@ -427,7 +428,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         if (!ordinary) s.flipFrame = number;
         s.path = r.str();
         s.nextPath = r.str();
-        if (!ordinary && number == kNoiseKind && s.path.empty()) {
+        if (!ordinary && number == kNoiseKind && s.slot == kNoiseSlot && s.path.empty()) {
             s.noise = true;
             s.flipFrame = -1;
         }
