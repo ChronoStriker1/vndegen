@@ -105,6 +105,7 @@ float progressOf(const Track &t, int ms) {
     if (ms <= t.startMs) return 0;
     if (t.lengthMs <= 0 || ms >= t.startMs + t.lengthMs) return 1;
     float linear = float(ms - t.startMs) / float(t.lengthMs);
+    if (t.easeIn) return linear * linear;
     if (!t.easeOut) return linear;
     float left = 1 - linear;
     return 1 - left * left;
@@ -941,7 +942,8 @@ bool Engine::moveFocus(int dx, int dy) {
         }
     }
     if (!best) return true;
-    mouseMove((float(best->x) + 0.5f) / float(width_), (float(best->y) + 0.5f) / float(height_));
+    // The pointer's height, as mouseMove takes it: the whole 4:3 frame when the window drops below the scene.
+    mouseMove((float(best->x) + 0.5f) / float(width_), (float(best->y) + 0.5f) / float(square_ ? squareY_ + squareShift_ : height_));
     return true;
 }
 
@@ -1895,6 +1897,8 @@ void Engine::applySettings() {
     static const int kAutoPercent[] = {200, 100, 50, 0};
     autoDelayMs_ = kAutoDelayMs * kAutoPercent[std::clamp(setting("auto"), 0, 3)] / 100;
     autoPerCharMs_ = -1;
+    autoBaseMs_ = 0;
+    autoWithVoice_ = false;
     charFadeMs_ = kCharFadeMs;
     // `textcurve SETTING A B` and `autocurve SETTING A B` under `screen defaults`: a 0 to 100 slider's text speed as
     // A - B x value ms a character, and auto's pause after a line as that many ms for each of its characters, as Test
@@ -1916,8 +1920,17 @@ void Engine::applySettings() {
         }
         // `textfade MS`: how long each character takes to fade in, under 50 ms in Test Game 87 (set 1, under Wine).
         if (const auto *fade = defaults->second.setting("textfade"); fade && !fade->empty()) charFadeMs_ = std::max(0, field(*fade, 0));
-        if (const auto *curve = defaults->second.setting("autocurve"); curve && curve->size() >= 3)
-            autoPerCharMs_ = std::max(0, field(*curve, 1) - field(*curve, 2) * setting((*curve)[0]));
+        // `autocurve SETTING A B BASE BASESLOPE` adds BASE - BASESLOPE x value ms to the pause while it has any per character,
+        // as Test Game 87's does: 104 - 1.04v ms a character and about 527 - v ms more, and none at 100, where it goes on
+        // within a frame or two (set 1, 30 fps recordings under Wine at 0, 50, 75 and 100, within 33 to 90 ms rms).
+        if (const auto *curve = defaults->second.setting("autocurve"); curve && curve->size() >= 3) {
+            double v = setting((*curve)[0]);
+            autoPerCharMs_ = std::max(0, int(std::lround(std::atof((*curve)[1].c_str()) - std::atof((*curve)[2].c_str()) * v)));
+            if (curve->size() >= 5 && autoPerCharMs_ > 0)
+                autoBaseMs_ = std::max(0, int(std::lround(std::atof((*curve)[3].c_str()) - std::atof((*curve)[4].c_str()) * v)));
+        }
+        // Test Game 87 goes on at whichever ends later, the voice or the pause after the text (set 1, under Wine).
+        autoWithVoice_ = defaults->second.setting("autowithvoice") != nullptr;
     }
     if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
     applyArtSwitch();
@@ -2430,9 +2443,9 @@ SaveData Engine::captureSave() {
                 // `scale_x,1.100000,640,0,2400,linear`.
                 if (t.property == Track::ScaleX || t.property == Track::ScaleY)
                     std::snprintf(line, sizeof line, "%s,%f,%d,%d,%d,%s\n", name, double(t.to), t.property == Track::ScaleX ? out.anchorX : out.anchorY,
-                                  framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                                  framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut || t.easeIn ? "quadratic" : "linear");
                 else
-                    std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                    std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut || t.easeIn ? "quadratic" : "linear");
                 out.animation += line;
             }
         };
@@ -2593,6 +2606,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     flashMs_ = 0;
     blur_ = false;
     scenario_ = d.variables;
+    for (const auto &[number, value] : side.variables) scenario_[number] = value;
     choiceImage_ = d.choiceImage;
     // Only Test Game 87's saves say whether a choice has been made; elsewhere a choice's picture means one was.
     choiceMade_ = layout_ && choiceFlag(*layout_) == ChoiceFlag::Made ? d.dateFlag != 0 : !d.choiceImage.empty();
@@ -3279,6 +3293,33 @@ std::string Engine::waitScale() const {
     return line && !line->empty() ? (*line)[0] : "waittime";
 }
 
+// How wide a submenu's button draws as the submenu opens or closes, of its width; 1 when it isn't moving. Test Game 87's
+// title grows its submenu's buttons from their left edge by 1 - (1 - t)^2 and shrinks them by (1 - t)^2, each over 0.33 s,
+// squeezing their pictures, with the main buttons dimmed and lit at once (set 1, a 30 fps recording under Wine).
+// Notes a submenu opening or closing, on the menus' clock, from the step and from the frame drawn before it.
+void Engine::trackSubmenu() {
+    if (subMenu_ != shownSubMenu_ && screen_ && screen_->setting("submenuopen")) {
+        squeezeOpening_ = !subMenu_.empty() && (shownSubMenu_.empty() || subMenu_.rfind(shownSubMenu_ + "/", 0) == 0);
+        squeezeGroup_ = squeezeOpening_ ? subMenu_ : shownSubMenu_;
+        squeezeAt_ = screenMs_;
+    }
+    shownSubMenu_ = subMenu_;
+}
+
+// How far the latest opening or closing has gone, 0 to 1, and 1 with none.
+float Engine::squeezeProgress() const {
+    const auto *open = screen_ ? screen_->setting("submenuopen") : nullptr;
+    if (!open || open->empty() || squeezeGroup_.empty()) return 1;
+    return std::min(1.0f, float(screenMs_ - squeezeAt_) / std::max(1, field(*open, 0)));
+}
+
+float Engine::squeezeOf(const Button &b) const {
+    if (b.group.empty() || b.group != squeezeGroup_) return 1;
+    float t = squeezeProgress();
+    if (t >= 1) return squeezeOpening_ ? 1 : 0;
+    return squeezeOpening_ ? 1 - (1 - t) * (1 - t) : (1 - t) * (1 - t);
+}
+
 bool Engine::submenuOpen(const std::string &name) const {
     return subMenu_ == name || subMenu_.rfind(name + "/", 0) == 0;
 }
@@ -3468,8 +3509,20 @@ void Engine::composeScreen(Canvas &out) {
         }
         neko::drawButton(c, b, state, withHelp);
     };
+    trackSubmenu();
+    squeezeDrawn_ = squeezeProgress();
     for (Button &b : screen_->buttons) {
-        if (!shown(b)) continue;
+        float squeeze = squeezeOf(b);
+        bool closing = !squeezeOpening_ && squeeze > 0 && !b.group.empty() && b.group == squeezeGroup_;
+        if (!shown(b) && !closing) continue;
+        if (squeeze < 1 || closing) {
+            // Column by column, each from the picture's column at that fraction of its width.
+            if (!b.sheet) continue;
+            int w = b.cellW(), h = b.cellH(), shownW = int(float(w) * squeeze + 0.5f), row = std::min(b.normalRow, b.rows - 1);
+            for (int i = 0; i < shownW; i++)
+                drawPart(out, *b.sheet, b.x + i, b.y, b.column * w + std::min(w - 1, int((float(i) + 0.5f) / squeeze)), row * h, 1, h, 1);
+            continue;
+        }
         if (b.action.rfind("track", 0) == 0) {
             size_t index = size_t(std::atoi(b.action.c_str() + 5));
             if (index >= tracks_.size() || !seen(tracks_[index])) continue;
@@ -3595,13 +3648,24 @@ void Engine::composeScreen(Canvas &out) {
 // `under` buttons come up with their plate when the pointer's at the left of the bar, and `inner` ones when it's anywhere else
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 // `barhover Y MS` under `screen defaults`: with no plate, both rows show while the pointer is at or below Y and has moved
-// within the last MS, as Test Game 87's do (set 1, under Wine: anywhere at y 360 and below, gone about 3.4 s after the
-// pointer stops). The PC fades them; here they come and go at once.
+// within the last MS, as Test Game 87's do (set 1, under Wine: anywhere at y 360 and below). They fade in over the first
+// kBarFadeMs and out over the last, straight lines in a 30 fps recording: in from the move, out from 3.23 s, gone at 3.49.
 bool Engine::barHovered() const {
     auto defaults = screens_.find("defaults");
     const auto *line = defaults == screens_.end() ? nullptr : defaults->second.setting("barhover");
     if (!line || line->size() < 2) return false;
     return pointerSeen_ && messagePointerY() >= field(*line, 0) && now_ - barMovedAt_ < field(*line, 1);
+}
+
+constexpr int kBarFadeMs = 250;
+
+float Engine::barOpacity() const {
+    if (!barHover() || barPinned_ || setting("bar_always")) return 1;
+    auto defaults = screens_.find("defaults");
+    const auto *line = defaults->second.setting("barhover");
+    if (line->size() < 2) return 1;
+    float in = float(now_ - barShownAt_) / kBarFadeMs, out = float(field(*line, 1) - (now_ - barMovedAt_)) / kBarFadeMs;
+    return std::clamp(std::min(in, out), 0.0f, 1.0f);
 }
 
 bool Engine::barHover() const {
@@ -3665,6 +3729,18 @@ void Engine::composeMessageButtons(Canvas &out) {
         }
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
+    // `barhover`'s rows fade: drawn on a copy of the frame, mixed back in by how much of them shows.
+    float opacity = barOpacity();
+    barDrawnOpacity_ = opacity;
+    if (opacity < 1 && innerButtonsShown()) {
+        barLayer_ = out;
+        Canvas &shown = barLayer_;
+        for (const Button &b : bar().inner) drawButton(shown, b, state(b));
+        if (underButtonsShown())
+            for (const Button &b : bar().under) drawButton(shown, b, state(b));
+        blendFrame(out, shown, int(opacity * 256));
+        return;
+    }
     if (innerButtonsShown()) {
         if (fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         for (const Button &b : bar().inner) drawButton(out, b, state(b));
@@ -4402,6 +4478,8 @@ bool Engine::step(int ms) {
         // A gallery's character coming up after its tab opens.
         if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
         stepViewer(ms);
+        trackSubmenu();
+        if (squeezeProgress() != squeezeDrawn_) dirty_ = true;
     }
     if (screen_ || logOpen_ || dialogOpen_) {
         // A table screen's part goes on stepping, as its own screen would.
@@ -4451,8 +4529,12 @@ bool Engine::step(int ms) {
     bool autoNext = false;
     if (autoMode_ && waiting_ == Waiting::Click && textDone_ && !windowLog_) {
         bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
-        if (voiceGoing) autoReadyAt_ = -1;
-        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + (autoPerCharMs_ >= 0 ? autoPerCharMs_ * int64_t(textGlyphs_.size()) : autoDelayMs_);
+        int64_t pause = autoPerCharMs_ >= 0 ? autoBaseMs_ + autoPerCharMs_ * int64_t(textGlyphs_.size()) : autoDelayMs_;
+        if (autoWithVoice_) {
+            if (autoReadyAt_ < 0) autoReadyAt_ = now_ + pause;
+            else if (now_ >= autoReadyAt_ && !voiceGoing) autoNext = true;
+        } else if (voiceGoing) autoReadyAt_ = -1;
+        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + pause;
         else if (now_ >= autoReadyAt_) autoNext = true;
     } else {
         autoReadyAt_ = -1;
@@ -4483,6 +4565,9 @@ bool Engine::step(int ms) {
     bool inner = innerButtonsShown(), under = underButtonsShown();
     // A row that goes with time, as `barhover`'s do, needs the frame drawn again.
     if (inner != innerWereShown_ || under != underWereShown_) dirty_ = true;
+    if (inner && !innerWereShown_) barShownAt_ = now_;
+    // A fade's frames, and its last one, which the frame before may have fallen short of.
+    if (inner && barOpacity() != barDrawnOpacity_) dirty_ = true;
     innerWereShown_ = inner;
     underWereShown_ = under;
 
@@ -4950,6 +5035,9 @@ std::string Engine::sidecarText(const SaveData &d) {
             std::snprintf(line, sizeof line, "slotfx %d %d %g %g\n", at, s.additive ? 1 : 0, double(s.scrollX), double(s.scrollY));
             text += line;
         }
+    // VNDegen's own story variables, `var NUMBER VALUE`, past those the PC's save has room for.
+    for (const auto &[number, value] : d.variables)
+        if (value && (number < 0 || number >= kSavedVariables)) text += "var " + std::to_string(number) + " " + std::to_string(value) + "\n";
     // Game parts' state, `part NAME LINE`, kept beside the save as the flipbooks' modes are.
     for (const auto &[name, part] : parts_) {
         std::vector<std::string> lines;
@@ -5022,7 +5110,7 @@ void Engine::returnToChoice() {
 }
 
 // What a save holds of the story's state, for telling whether VNDegen's lines beside it were written with it: its time,
-// scene, node and scenario variables. The card's comment, which can change later, isn't in it.
+// scene, node and the scenario variables it has room for. The card's comment, which can change later, isn't in it.
 uint32_t Engine::saveFingerprint(const SaveData &d) {
     uint32_t h = 2166136261u;
     auto mix = [&](uint32_t v) {
@@ -5032,7 +5120,7 @@ uint32_t Engine::saveFingerprint(const SaveData &d) {
     for (char c : normalizedPath(d.scene)) mix(uint8_t(c));
     mix(uint32_t(d.node));
     for (const auto &[number, value] : d.variables)
-        if (value) {
+        if (value && number >= 0 && number < kSavedVariables) {
             mix(uint32_t(number));
             mix(uint32_t(value));
         }
@@ -5078,6 +5166,9 @@ Engine::Sidecar Engine::parseSidecar(const SaveData &d, const std::string &text)
             side.hasResult = bool(words >> side.result);
         } else if (kind == "screen") {
             words >> side.screen >> side.screenScope >> side.screenNumber;
+        } else if (kind == "var") {
+            int number = 0, value = 0;
+            if (words >> number >> value && (number < 0 || number >= kSavedVariables)) side.variables[number] = value;
         } else if (kind == "slotfx") {
             int at = 0, additive = 0;
             float sx = 0, sy = 0;
@@ -5868,14 +5959,17 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
         if (parts.size() < 4) { warnOnce("animation line not read: " + line); continue; }
         const std::string &name = parts[0];
         float value = float(std::atof(parts[1].c_str()));
-        // In frames, as a timed change's are. A negative length is `quadratic`, which eases out.
+        // In frames, as a timed change's are. A negative length eases out, as `quadratic` does with one; `quadratic` with a
+        // positive length eases in: Test Game 87's fly-outs rise by p squared of their 900 pixels as they cross the
+        // screen (set 1, a 30 fps recording under Wine).
         int frames = std::atoi(parts[parts.size() - 2].c_str());
         int start = std::atoi(parts[parts.size() - 3].c_str()) * 1000 / std::max(1, fps_);
         int length = std::abs(frames) * 1000 / std::max(1, fps_);
         Track t;
         t.startMs = start;
         t.lengthMs = length;
-        t.easeOut = frames < 0 || parts.back() == "quadratic";
+        t.easeOut = frames < 0;
+        t.easeIn = frames > 0 && parts.back() == "quadratic";
         a.periodMs = std::max(a.periodMs, start + length);
         auto push = [&](Track::Property property, bool relative, float from, float to) {
             t.property = property;
@@ -5902,6 +5996,11 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
         else if (name == "scale_x") { push(Track::ScaleX, false, lastScaleX, value); lastScaleX = value; }
         else if (name == "scale_y") { push(Track::ScaleY, false, lastScaleY, value); lastScaleY = value; }
         else if (name == "alpha") { push(Track::Alpha, false, lastAlpha, value); lastAlpha = value; }
+        // The older layout's opacity, of 256: Test Game 87's fly-outs (`bright,64`) fade to a quarter as they go, the
+        // sprite over the backdrop with its colours unchanged (set 1, a 30 fps recording under Wine).
+        // Only in the older engine, where it was measured: Test Game 88's newer engine uses `bright` 642 times, 256 then 0
+        // within a fly-in, where it can't be opacity, and plays as on its PC without it.
+        else if (name == "bright" && layout_ && olderEngine(*layout_)) { push(Track::Alpha, false, lastAlpha, value / 256); lastAlpha = value / 256; }
         else if (name == "rotate") { push(Track::Rotation, false, lastRotation, value); lastRotation = value; }
         else warnOnce("animation property not read: " + name);
     }
@@ -5992,6 +6091,8 @@ void Engine::showText(const Node &n) {
     layoutText(sjis::toUtf8(n.s[1]), sjis::toUtf8(n.s[2]));
     textStart_ = now_;
     textDone_ = skip_;
+    // Each line times its own auto pause, from when its text is done.
+    autoReadyAt_ = -1;
     textCount_++;
     waiting_ = Waiting::Click;
     dirty_ = true;

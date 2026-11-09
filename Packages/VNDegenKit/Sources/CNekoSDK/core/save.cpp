@@ -133,7 +133,7 @@ constexpr int kOlderAnimation = 0x125;
 // with no comment names its flow at 0xCD.
 constexpr int kAfterComment = 200;
 constexpr int kBeforeChoice = 4196, kAfterChoice = 39596, kDateBlock = 400;
-constexpr int kVariables = 10000, kBeforeVariables = 39600 - 8, kAfterCount = 40;
+constexpr int kVariables = kSavedVariables, kBeforeVariables = 39600 - 8, kAfterCount = 40;
 // The latest choice's columns and cells in the block before the variables (SaveData::choiceColumns), up to 8 cells read.
 constexpr size_t kBeforeChoiceColumns = 116, kBeforeChoiceCells = 152, kBeforeChoiceCellsMax = 8;
 
@@ -277,8 +277,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     // The runtime's own story-table test game saves as The Alchemist does.
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestload") return &kAlchemist;
-    // And so does the save card test game.
-    if (folder == "vndegen\\cardtest") return &kAlchemist;
+    // And so do the save card and confession tree test games.
+    if (folder == "vndegen\\cardtest" || folder == "vndegen\\treetest") return &kAlchemist;
     // And as Test Game 82 does, with a Previous Choice file beside each save.
     if (folder == "vndegen\\storytestpc") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy") return &kFunbag1;
@@ -298,6 +298,7 @@ bool namesPictureTwice(const SaveLayout &layout) {
 
 ChoiceFlag choiceFlag(const SaveLayout &layout) { return layout.choiceFlag; }
 bool writesPreviousChoice(const SaveLayout &layout) { return layout.previousChoice; }
+bool olderEngine(const SaveLayout &layout) { return layout.olderRecord > 0; }
 bool choiceResultAt116(const SaveLayout &layout) { return layout.choiceResultAt116; }
 int newCardNumber(const SaveLayout *layout, int slot) { return slot - 1 + (layout ? layout->firstCard : 1); }
 int newCardSlot(const SaveLayout *layout, int number) { return number + 1 - (layout ? layout->firstCard : 1); }

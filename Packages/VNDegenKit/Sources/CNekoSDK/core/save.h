@@ -10,6 +10,10 @@
 
 namespace neko {
 
+// The scenario variables a PC save holds, 0 to 9999. VNDegen's own story variables above them, such as Test Game 96's
+// from 15000, go in its lines beside the save instead.
+constexpr int kSavedVariables = 10000;
+
 struct SavedSprite {
     int slot = 0;
     int flipFrame = -1;  // the picture a flipbook is on, or -1 for an ordinary sprite
@@ -129,6 +133,8 @@ bool namesPictureTwice(const SaveLayout &layout);
 ChoiceFlag choiceFlag(const SaveLayout &layout);
 // Whether the game's PC keeps a Previous Choice file, `saveNNNs.sav`, beside each save.
 bool writesPreviousChoice(const SaveLayout &layout);
+// Whether the game runs the older engine, as Test Games 82, 83 and 87 do (their saves' older layout).
+bool olderEngine(const SaveLayout &layout);
 // Whether SaveData::choiceColumns holds the option taken, as in Test Game 83, rather than the sheet's columns.
 bool choiceResultAt116(const SaveLayout &layout);
 // The NEW card as cfg.sav's global 0 holds it, from a save slot (1 for save001), and back: per game, counted from 1 or 0.
