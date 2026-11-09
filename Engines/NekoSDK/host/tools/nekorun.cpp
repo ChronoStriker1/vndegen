@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "vnneko.h"
@@ -45,6 +46,9 @@ int main(int argc, char **argv) {
     std::string saveAt;
     int saveSlot = 0;
     std::vector<std::string> presses;
+    std::vector<std::pair<int, int>> screenClicks;
+    size_t screenClick = 0;
+    int screenClickAt = 0;
     float viewW = 0, viewH = 0;  // --view W H: the host's view, for a game with a 4:3 layout
     struct Step { int ms; std::string what; int x, y; std::string name; };
     std::vector<Step> steps;
@@ -59,6 +63,20 @@ int main(int argc, char **argv) {
         else if (a == "--wav") wav = next();
         else if (a == "--slow") slowReport = std::atof(next());
         else if (a == "--press") presses.push_back(next());
+        else if (a == "--screenclicks") {
+            // `--screenclicks X:Y,X:Y,...`: while a game part's screen waits (a select screen), the next click of the list,
+            // one every half second, so a run can pick its way through such screens.
+            std::string list = next();
+            for (size_t at = 0; at < list.size();) {
+                int x = std::atoi(list.c_str() + at);
+                size_t colon = list.find(':', at);
+                if (colon == std::string::npos) break;
+                screenClicks.push_back({x, std::atoi(list.c_str() + colon + 1)});
+                at = list.find(',', colon);
+                if (at == std::string::npos) break;
+                at++;
+            }
+        }
         else if (a == "--view") { viewW = float(std::atof(next())); viewH = float(std::atof(next())); }
         else if (a == "--script") {
             FILE *f = std::fopen(next(), "r");
@@ -213,6 +231,18 @@ int main(int argc, char **argv) {
                 if (s.what == "click" || s.what == "rclick" || s.what == "down") vnneko_mouse_button(e, button, true);
                 if (s.what == "click" || s.what == "rclick" || s.what == "up") vnneko_mouse_button(e, button, false);
             }
+        }
+        if (screenClick < screenClicks.size() && elapsed - screenClickAt >= 500 && std::string(vnneko_debug_status(e)).find(" part screen ") != std::string::npos &&
+            std::string(vnneko_debug_status(e)).find(" menu ") == std::string::npos) {
+            int fw, fh;
+            bool fc;
+            vnneko_frame(e, &fw, &fh, &fc);
+            auto [x, y] = screenClicks[screenClick++];
+            vnneko_mouse_move(e, float(x + 0.5) / float(fw), float(y + 0.5) / float(fh));
+            vnneko_mouse_button(e, 0, true);
+            vnneko_mouse_button(e, 0, false);
+            screenClickAt = elapsed;
+            std::printf("screen click %d,%d at %d ms\n", x, y, elapsed);
         }
         if (int request = vnneko_take_window_request(e); request >= 0) std::printf("window request %d\n", request);
         int count = vnneko_debug_text_count(e);
