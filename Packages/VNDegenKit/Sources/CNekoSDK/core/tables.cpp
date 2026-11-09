@@ -16,6 +16,7 @@ namespace {
 #include "tables/rinjin.inc"
 #include "tables/sideboob2.inc"
 #include "tables/funbagfantasy1.inc"
+#include "tables/yabai.inc"
 #include "tables/storytest.inc"
 #include "tables/layouttest.inc"
 #include "tables/cardtest.inc"
@@ -41,6 +42,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\隣人に壊されていく俺の妻") return kRinjin;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return kSideboob2;
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
+    if (folder == "waffle\\ヤバい！－復讐・闇サイト－") return kYabai1;
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpc") return kStoryTest;
     // The same story with a load screen and a question box, for a tap across a load (NekoSDKStoryTableTests).
     if (folder == "vndegen\\storytestload") {
