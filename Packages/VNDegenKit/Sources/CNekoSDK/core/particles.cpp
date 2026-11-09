@@ -61,8 +61,9 @@ class ParticlesPart : public GamePart {
 public:
     bool command(PartHost &host, const Node &n) override {
         if (n.opcode == 96) {
-            // Its dots go with it at once; how the PC lets them die away hasn't been seen (Test Game 86 uses it).
-            emitters_.erase(n.p[0]);
+            // Its dots go with it at once; how the PC lets them die away hasn't been seen (Test Game 86 uses it). Its
+            // slot is let go too, so a save made after this holds no record of an emitter that isn't there.
+            if (emitters_.erase(n.p[0])) host.releaseSlot(n.p[0]);
             host.redraw();
             return true;
         }

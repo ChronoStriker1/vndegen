@@ -144,6 +144,9 @@ default bar_always 1
 # All 100 cards are ordinary saves: the game has no quick save, so none of its pages counts from 1 again.
 quickslots 101 100
 layoutcgslot 102
+# In the 4:3 frame the PC's window sits exactly MsgWinSquareMovement rows below its 16:9 place, by its gold border in
+# shots of both under Wine.
+squarewindow 0
 
 # Config, one page, measured under Wine. Its help is a circle above or below the row under the pointer. The screen's
 # colour depth and resolution, and asking for the resolution at start, are drawn disabled, as VNDegen sizes the window.
