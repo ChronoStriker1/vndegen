@@ -79,6 +79,8 @@ enum : int {
     kPCSolved = 2005,      // + 5 * heroine + (truth - 1)
     kPCTotal = 2070,       // + heroine
     kPCAsked = 3000,       // + 500 * heroine + 100 * (truth - 1) + 10 * (stage - 1) + question
+    kPCChapter = 1000,     // the chapter playing
+    kPCMode = 105,         // 2 at the hub, 4 in a scene, 8 at a pick, 11 in the tutorial
 };
 
 // What the hub's screen gives the story table.
@@ -104,7 +106,16 @@ public:
         if (name != "hub") return false;
         loadQuestions(host);
         // A PC save, which holds only the PC's variables: take the hub's state from them.
-        if (!host.variable(1, kTruth) && host.variable(1, kPCTruth)) fromPC(host);
+        if (!host.variable(1, kTruth) && host.variable(1, kPCTruth)) {
+            fromPC(host);
+            // Saved inside a question's scene: the PC counts the question once its scene is over, so count it now.
+            int c = host.variable(1, kPCChapter);
+            if (host.variable(1, kPCMode) == 4 && c >= 1000 && c < 4000 && (c % 1000) / 100 + 1 == truth(host)) {
+                int heroine = c / 1000 - 1, stage = (c % 100) / 10 + 1, question = c % 10;
+                if (stage == host.variable(1, kStage + heroine) && !(asked(host, heroine) & (1 << question))) account(host, heroine, question);
+            }
+        }
+        host.setVariable(1, kPCMode, 2);
         // Back from the tree: a replay plays at no cost; an ask is a question like a bubble's.
         int action = host.variable(1, kTreeAction), picked = host.variable(1, kTreeChapter);
         host.setVariable(1, kTreeAction, 0);
@@ -304,6 +315,14 @@ private:
         int t = truth(host), stage = host.variable(1, kStage + heroine);
         if (stage < 1 || stage > 3 || question < 0 || question > 2) return true;
         int chapter = 1000 * (heroine + 1) + 100 * (t - 1) + 10 * (stage - 1) + question;
+        account(host, heroine, question);
+        host.setVariable(1, kPCMode, 4);
+        return finishWith(host, kPlay, chapter);
+    }
+
+    // A question asked: an hour gone, its flag set, and a right answer's next stage, as the PC counts them.
+    void account(PartHost &host, int heroine, int question) {
+        int t = truth(host), stage = host.variable(1, kStage + heroine);
         host.setVariable(1, askedVar(host, heroine), asked(host, heroine) | (1 << question));
         host.setVariable(1, kHoursLeft, host.variable(1, kHoursLeft) - 1);
         host.setVariable(1, kHour, host.variable(1, kHour) + 1);
@@ -318,7 +337,6 @@ private:
         // Truth 5: a heroine's last right answer is followed at once by her devil scene, 910, 920 or 930 (Wine).
         if (t == 5 && host.variable(1, kStage + heroine) == 4 && stage == 3) pendingDevil_ = 910 + 10 * heroine;
         toPC(host);
-        return finishWith(host, kPlay, chapter);
     }
 
     void toPC(PartHost &host) {
@@ -367,7 +385,9 @@ private:
     }
 
     bool finishWith(PartHost &host, int result, int chapter) {
-        if (chapter) host.setVariable(1, kTreeChapter, chapter);
+        // The chapter to play goes where the PC keeps it, S 1000, so the story table's `chapter S 1000` plays it and a PC
+        // save made inside it is found there; the tree's own hand-back stays in S 15110.
+        if (chapter) host.setVariable(1, kPCChapter, chapter);
         open_ = false;
         host.finishScreen(result);
         return true;

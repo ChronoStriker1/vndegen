@@ -60,6 +60,7 @@ pic obj\e001_000.bmp 0 0 6 1 1 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
 slotnew obj\e005_000.bmp -13 -14
+slotcommentbutton obj\e004_002.bmp 253 130
 slotdigits obj\e004_001.bmp 40 135 3 11 13
 datedigits obj\e004_001.bmp 0 0 13
 datemark 10 263 26
@@ -102,6 +103,7 @@ pic obj\e001_000.bmp 0 0 6 1 1 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
 slotnew obj\e005_000.bmp -13 -14
+slotcommentbutton obj\e004_002.bmp 253 130
 slotdigits obj\e004_001.bmp 40 135 3 11 13
 datedigits obj\e004_001.bmp 0 0 13
 datemark 10 263 26
@@ -158,7 +160,7 @@ on 2 goto vote
 on 3 goto timeout
 on 4 goto event
 on 5 goto devil
-chapter S 15110
+chapter S 1000
 goto hub
 label tree
 open tree
@@ -168,7 +170,7 @@ chapter 50
 goto hub
 label devil
 # Each heroine finishing truth 5 plays her devil scene at once: 910 Ayano, 920 Misuzu, 930 Rina.
-chapter S 15110
+chapter S 1000
 goto hub
 label timeout
 chapter 900
