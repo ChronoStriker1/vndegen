@@ -109,6 +109,10 @@ const SaveLayout kMankitsu = [] {
     // 94's bytes the PC drew a CG of VNDegen's save as nothing).
     l.spriteTail = {};
     l.shownAlpha = 255;
+    // And the fixed bytes of its records' heads sit where its 12 PC saves have them, 8 earlier than 94's past the screen
+    // size: 94's places left four 1.0s where 90's PC reads 0, and it drew the CG of VNDegen's save as nothing (set 1).
+    l.rootHead = {{12, "ff00050000d002"}, {107, "803f"}, {127, "803f"}, {147, "803f"}, {167, "803f"}, {235, "803f0000803f"}, {250, "01"}};
+    l.spriteHead = {{107, "803f"}, {127, "803f"}, {147, "803f"}, {167, "803f"}};
     l.byteBeforeSounds = false;
     l.gtTail = false;
     l.tailSize = 6063;

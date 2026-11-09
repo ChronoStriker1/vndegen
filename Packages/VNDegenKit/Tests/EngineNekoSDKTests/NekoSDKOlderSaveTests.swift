@@ -193,8 +193,11 @@ import TestSupport
         #expect(int32(save, at - 12) == 600)
         let x = save.subdata(in: (save.startIndex + at + 12 + 0xD5)..<(save.startIndex + at + 12 + 0xD9)).withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
         #expect(x == 194)
-        // A shown sprite holds 255 as its alpha, as 90's PC writes it and needs to draw it (set 1).
+        // A shown sprite holds 255 as its alpha, as 90's PC writes it and needs to draw it (set 1), and the head's 1.0s
+        // where 90's PC has them, 105 into the record past its names.
         #expect(int32(save, at + 12 + 249) == 255)
+        for place in [105, 125, 145, 165] { #expect(int32(save, at + 12 + place) == 0x3F80_0000, "\(place)") }
+        #expect(int32(save, at + 12 + 113) == 0)
 
         let second = try #require(NekoSDKFlowFixture.start(root, data: data))
         defer { vnneko_stop(second) }
