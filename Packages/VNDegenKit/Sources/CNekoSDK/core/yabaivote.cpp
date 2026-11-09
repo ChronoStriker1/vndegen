@@ -87,13 +87,17 @@ constexpr Rect kInside{40, 96, 1200, 544};
 // on average across the column, and each part of it comes round every 1.35 to 1.7 seconds. Which hands make which
 // cluster couldn't be fitted, so this arrangement is a stand-in with those measures: the five hands standing 68 below
 // the edge, so only their tops show, three times over, each set 18 to the right of the last and a third of a turn
-// behind. Now and then on the PC they all sink together, which isn't drawn.
+// behind. A later run of shots about 90 ms apart over 12 seconds puts the strip's own repeat at 1.67 seconds (it
+// comes closest to itself after 1.67, 3.3 and 5.0 seconds), with a weaker one at 1.35, so the three slower hands turn
+// in 100 frames. Now and then one column's hands shrink to nothing over about two seconds and are back at once: seen in
+// Misuzu's column while her coffin came down to the lowest row, so likely the coffin passing over them, which this
+// draws too. The arrangement itself stays unconfirmed.
 struct Hand {
     const char *sheet;
     int cells, x, periodMs;
 };
-const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 40, 1350}, {"obj\\o013_002.bmp", 7, 132, 1700}, {"obj\\o013_003.bmp", 7, 150, 1700},
-                       {"obj\\o013_004.bmp", 6, 212, 1680}, {"obj\\o013_005.bmp", 8, 296, 1350}};
+const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 40, 1350}, {"obj\\o013_002.bmp", 7, 132, 1667}, {"obj\\o013_003.bmp", 7, 150, 1667},
+                       {"obj\\o013_004.bmp", 6, 212, 1667}, {"obj\\o013_005.bmp", 8, 296, 1350}};
 constexpr int kHandsBottom = 640 + 68, kHandsCopies = 3, kHandsCopyDX = 18;
 // The thin black dividers between the columns (o003_000), as set 2 placed them.
 constexpr int kDividerX[2] = {437, 837}, kDividerY = 16;
