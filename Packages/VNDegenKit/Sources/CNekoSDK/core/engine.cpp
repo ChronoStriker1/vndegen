@@ -782,12 +782,14 @@ bool Engine::logInWindow() const {
 }
 
 // Older lines in the window's own place, in init.ini's MsgLogColor; past the newest the line in play comes back, as on
-// Test Game 83's PC under Wine (set 3).
+// Test Game 83's PC under Wine (set 3). The first step back shows the line on screen itself in that colour, and only the
+// next goes to the line before, as Test Game 82's PC does (set 2): step N shows the backlog's line N - 1, whose first is
+// the line on screen.
 void Engine::stepWindowLog(int lines) {
-    int to = std::clamp(windowLog_ + lines, 0, std::max(0, int(backlog_.size()) - 1));
+    int to = std::clamp(windowLog_ + lines, 0, int(backlog_.size()));
     if (to == windowLog_) return;
     windowLog_ = to;
-    const SavedText &t = windowLog_ > 0 ? backlog_[size_t(windowLog_)] : currentText_;
+    const SavedText &t = windowLog_ > 0 ? backlog_[size_t(windowLog_ - 1)] : currentText_;
     layoutText(sjis::toUtf8(t.name), sjis::toUtf8(t.text));
     textDone_ = true;
     dirty_ = true;
@@ -4723,7 +4725,9 @@ void Engine::updateChoice() {
     if (waiting_ != Waiting::Choice || !choiceSheet_) return;
     int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
     choicePlace(x, top, step, slant);
-    int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
+    // The pointer in the frame's own rows: in the 4:3 frame the scene keeps its rows at the top, with the window's strip
+    // under it, so scaling by the scene's height put the options' hit boxes below where they're drawn (set 1, on an iPad).
+    int px = pointerX_, py = pointerY_;
     int hover = -1;
     for (int i = 0; i < choiceCount_; i++)
         if (px >= x + i * slant && px < x + i * slant + cellW && py >= top + i * step && py < top + i * step + cellH) hover = i;
@@ -4788,6 +4792,8 @@ const char *Engine::debugStatus() {
     const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : waiting_ == Waiting::Choice ? "choice" : waiting_ == Waiting::StaffRoll ? "staff roll" : waiting_ == Waiting::PartScreen ? "part screen" : "ended";
     std::snprintf(buffer, sizeof buffer, "%s #%d %s t=%lld", scene_.script ? scene_.script->name.c_str() : "(flow)", scene_.node ? scene_.node->id : -1, waiting, (long long)now_);
     status_ = buffer;
+    // How far back the window's own log shows, when it does.
+    if (windowLog_ > 0) status_ += " log " + std::to_string(windowLog_);
     return status_.c_str();
 }
 
