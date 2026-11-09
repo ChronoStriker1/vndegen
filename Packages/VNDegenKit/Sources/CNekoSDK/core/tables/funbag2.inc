@@ -28,8 +28,8 @@ button scene obj\d000_005.bmp 514 501 5 5 3 stage 2 group extra help obj\d000_00
 button music obj\d000_005.bmp 514 547 5 5 4 stage 2 group extra help obj\d000_007.bmp 356 404 5 1 4 0
 
 screen load
-# The room behind the menus is bg_000_023_000 at 46 percent, under the side panel and the frame.
-pic bg\bg_000_023_000.bmp 0 0
+# The room behind the menus is one of the 15 the exe lists, picked afresh each time a screen opens, at 46 percent.
+pic bg\bg_000_000_000.bmp 0 0 more bg\bg_000_000_000.bmp,bg\bg_000_001_000.bmp,bg\bg_000_002_000.bmp,bg\bg_000_003_000.bmp,bg\bg_000_004_000.bmp,bg\bg_000_005_000.bmp,bg\bg_000_006_000.bmp,bg\bg_000_008_000.bmp,bg\bg_000_009_000.bmp,bg\bg_000_017_000.bmp,bg\bg_000_018_000.bmp,bg\bg_000_020_000.bmp,bg\bg_000_022_000.bmp,bg\bg_000_023_000.bmp,bg\bg_000_025_000.bmp random
 pic dim 0 0 alpha 138
 pic obj\e001_000.bmp 1103 0
 pic obj\e000_000.bmp 0 0
@@ -68,8 +68,8 @@ button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 
 button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
 
 screen save
-# The room behind the menus is bg_000_023_000 at 46 percent, under the side panel and the frame.
-pic bg\bg_000_023_000.bmp 0 0
+# The room behind the menus is one of the 15 the exe lists, picked afresh each time a screen opens, at 46 percent.
+pic bg\bg_000_000_000.bmp 0 0 more bg\bg_000_000_000.bmp,bg\bg_000_001_000.bmp,bg\bg_000_002_000.bmp,bg\bg_000_003_000.bmp,bg\bg_000_004_000.bmp,bg\bg_000_005_000.bmp,bg\bg_000_006_000.bmp,bg\bg_000_008_000.bmp,bg\bg_000_009_000.bmp,bg\bg_000_017_000.bmp,bg\bg_000_018_000.bmp,bg\bg_000_020_000.bmp,bg\bg_000_022_000.bmp,bg\bg_000_023_000.bmp,bg\bg_000_025_000.bmp random
 pic dim 0 0 alpha 138
 pic obj\e001_000.bmp 1103 0
 pic obj\e000_000.bmp 0 0
@@ -109,6 +109,8 @@ button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 
 
 screen defaults
 parts scroll
+# The wait mark has no .alp: its pure green is see-through on the PC.
+colorkey 0 255 0
 # The PC draws the message window at its .alp as it is. Config's first-run values, as the PC shows them under Wine.
 default opacity 100
 default text 50
@@ -124,7 +126,7 @@ lastchoice made
 # Config, one page, measured under Wine. Its help is a circle above or below the row under the pointer. The screen's
 # colour depth and resolution, and asking for the resolution at start, are drawn disabled, as VNDegen sizes the window.
 screen config
-pic bg\bg_000_023_000.bmp 0 0
+pic bg\bg_000_000_000.bmp 0 0 more bg\bg_000_000_000.bmp,bg\bg_000_001_000.bmp,bg\bg_000_002_000.bmp,bg\bg_000_003_000.bmp,bg\bg_000_004_000.bmp,bg\bg_000_005_000.bmp,bg\bg_000_006_000.bmp,bg\bg_000_008_000.bmp,bg\bg_000_009_000.bmp,bg\bg_000_017_000.bmp,bg\bg_000_018_000.bmp,bg\bg_000_020_000.bmp,bg\bg_000_022_000.bmp,bg\bg_000_023_000.bmp,bg\bg_000_025_000.bmp random
 pic dim 0 0 alpha 138
 pic obj\e001_000.bmp 1103 0
 pic obj\e000_000.bmp 0 0
@@ -162,10 +164,10 @@ radio wait 0 obj\h001_002.bmp 381 264 2 5 1
 pic obj\h001_010.bmp 88 321
 slider opacity obj\h001_006.bmp 88 321
 pic obj\h001_005.bmp 88 321
-knob opacity obj\h001_004.bmp 73 315 4
+knob opacity obj\h001_004.bmp 73 315 4.08
 step opacity -1 obj\h001_003.bmp 52 317 2 5 0
 step opacity 1 obj\h001_003.bmp 516 317 2 5 1
-number opacity obj\e002_002.bmp 443 293 15
+number opacity obj\e002_002.bmp 443 293 15 blank
 radio confirm_saveload 1 obj\h001_002.bmp 264 348 2 5 0
 radio confirm_saveload 0 obj\h001_002.bmp 381 348 2 5 1
 group confirm_saveload confirm_overwrite confirm_delete confirm_quick confirm_title confirm_exit
@@ -175,22 +177,22 @@ pic obj\h001_007.bmp 101 403 1 5 0 4
 pic obj\h001_010.bmp 88 518
 slider text obj\h001_006.bmp 88 518
 pic obj\h001_005.bmp 88 518
-knob text obj\h001_004.bmp 73 512 4
+knob text obj\h001_004.bmp 73 512 4.08
 step text -1 obj\h001_003.bmp 52 514 2 5 0
 step text 1 obj\h001_003.bmp 516 514 2 5 1
-number text obj\e002_002.bmp 443 490 15
+number text obj\e002_002.bmp 443 490 15 blank
 pic obj\h001_010.bmp 88 574
 slider auto obj\h001_006.bmp 88 574
 pic obj\h001_005.bmp 88 574
-knob auto obj\h001_004.bmp 73 568 4
+knob auto obj\h001_004.bmp 73 568 4.08
 step auto -1 obj\h001_003.bmp 52 570 2 5 0
 step auto 1 obj\h001_003.bmp 516 570 2 5 1
-number auto obj\e002_002.bmp 443 546 15
+number auto obj\e002_002.bmp 443 546 15 blank
 # The wait time runs from x0.50 to x1.50, its rose in the middle at x1.00 (inferred from the PC's middle place).
 range waittime 50 150
 pic obj\h001_010.bmp 88 630
 pic obj\h001_005.bmp 88 630
-knob waittime obj\h001_004.bmp -127 624 4
+knob waittime obj\h001_004.bmp -131 624 4.08
 step waittime -1 obj\h001_003.bmp 52 626 2 5 0
 step waittime 1 obj\h001_003.bmp 516 626 2 5 1
 number waittime obj\e002_002.bmp 435 602 459 474
@@ -206,31 +208,31 @@ radio deckey 1 obj\h003_001.bmp 917 208 9 5 8
 pic obj\h001_010.bmp 624 323
 slider bgm obj\h001_006.bmp 624 323
 pic obj\h001_005.bmp 624 323
-knob bgm obj\h001_004.bmp 609 317 4
+knob bgm obj\h001_004.bmp 609 317 4.08
 step bgm -1 obj\h001_003.bmp 588 319 2 5 0
 step bgm 1 obj\h001_003.bmp 1052 319 2 5 1
-number bgm obj\e002_002.bmp 979 295 15
+number bgm obj\e002_002.bmp 979 295 15 blank
 pic obj\h001_010.bmp 624 379
 slider se obj\h001_006.bmp 624 379
 pic obj\h001_005.bmp 624 379
-knob se obj\h001_004.bmp 609 373 4
+knob se obj\h001_004.bmp 609 373 4.08
 step se -1 obj\h001_003.bmp 588 375 2 5 0
 step se 1 obj\h001_003.bmp 1052 375 2 5 1
-number se obj\e002_002.bmp 979 351 15
+number se obj\e002_002.bmp 979 351 15 blank
 pic obj\h001_010.bmp 624 435
 slider voice obj\h001_006.bmp 624 435
 pic obj\h001_005.bmp 624 435
-knob voice obj\h001_004.bmp 609 429 4
+knob voice obj\h001_004.bmp 609 429 4.08
 step voice -1 obj\h001_003.bmp 588 431 2 5 0
 step voice 1 obj\h001_003.bmp 1052 431 2 5 1
-number voice obj\e002_002.bmp 979 407 15
+number voice obj\e002_002.bmp 979 407 15 blank
 pic obj\h001_010.bmp 624 491
 slider backvoice obj\h001_006.bmp 624 491
 pic obj\h001_005.bmp 624 491
-knob backvoice obj\h001_004.bmp 609 485 4
+knob backvoice obj\h001_004.bmp 609 485 4.08
 step backvoice -1 obj\h001_003.bmp 588 487 2 5 0
 step backvoice 1 obj\h001_003.bmp 1052 487 2 5 1
-number backvoice obj\e002_002.bmp 979 463 15
+number backvoice obj\e002_002.bmp 979 463 15 blank
 radio mute_backvoice 0 obj\h001_002.bmp 800 518 2 5 0
 radio mute_backvoice 1 obj\h001_002.bmp 917 518 2 5 1
 radio voice_stop 1 obj\h001_002.bmp 800 546 2 5 0
