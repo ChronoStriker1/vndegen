@@ -7,6 +7,7 @@ lastchoice made            # saves hold 2 once a choice is made, as Test Game 83
 
 screen story
 flow main
+resume S 30 == 4 at kept    # a PC save with S 30 at 4 opens the screen at `kept`
 open selftestwait 1 -> S 12 @50 # a screen before any scene, so a save there names none, and its PC number
 scene scr\a.txt @30        # the same number as the last scene: a PC save picks between them by its scene
 open selftest 3 -> S 5     # a game part's screen; its result to scenario variable 5

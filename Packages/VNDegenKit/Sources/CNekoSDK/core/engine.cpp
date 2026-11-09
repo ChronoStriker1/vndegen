@@ -2626,7 +2626,8 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen) &&
+    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryByRule(atScreen) &&
+               !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen) &&
                !resumeStoryAt(d.scene)) {
         complain("The story table has no place for the save's scene " + d.scene);
     }
@@ -2731,7 +2732,9 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         channelsOf(kind)[channel] = player;
         (kind == kKindBgm ? bgmNow_ : seNow_)[channel] = {sound.path, sound.volume, sound.pan};
     }
-    auto script = d.scene.empty() ? nullptr : loadScript(d.scene);
+    // A PC save resumed at a screen's line opens the screen, without playing on in the scene it names, which a save keeps
+    // naming as the PC's does.
+    auto script = d.scene.empty() || atScreen ? nullptr : loadScript(d.scene);
     scene_ = script ? Frame{script, script->node(d.node)} : Frame{};
     lastScene_ = d.scene;
     // The latest choice asked comes back with the save, for the next save to keep (82 and 83).
@@ -3992,13 +3995,12 @@ void Engine::runFlow(const Node &n) {
     case 21:
         flow.node = flow.script->node(choiceResult_ == (n.opcode == 4 ? n.p[0] : 0) ? n.otherwise : n.next);
         break;
-    case 5: {  // a condition on a variable: the other target when it holds, `next` when it doesn't, as a choice's branch
-        // The comparisons, as Test Game 94's exe orders them: ==, !=, <=, >=, <, >.
-        int left = variableValue(n.p[0], variableIndex(n)), right = operand(n);
-        bool holds = n.p[3] == 0 ? left == right : n.p[3] == 1 ? left != right : n.p[3] == 2 ? left <= right : n.p[3] == 3 ? left >= right : n.p[3] == 4 ? left < right : left > right;
-        flow.node = flow.script->node(holds ? n.otherwise : n.next);
+    case 5:  // a condition on a variable: the other target when it holds, `next` when it doesn't, as a choice's branch
+        flow.node = flow.script->node(storyConditionHolds(n) ? n.otherwise : n.next);
         break;
-    }
+    case kStoryResume:  // only for a PC save's load (resumeStoryByRule)
+        flow.node = flow.script->node(n.next);
+        break;
     case 6: {  // a change to a variable: set, add one, take one, add or take the operand, as the exe orders them
         auto &table = n.p[0] == 1 ? scenario_ : globals_;
         int number = variableNumber(n.p[0], variableIndex(n)), value = operand(n);
