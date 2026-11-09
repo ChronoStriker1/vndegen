@@ -234,7 +234,10 @@ std::shared_ptr<Script> Engine::compileChapter(int number) {
         n.id = int(script->nodes.size()) + 1;
         n.opcode = 1;
         n.next = n.id + 1;
-        n.s[1] = scene;
+        // `scr\x.txt @N`: the scene and the PC's number for it, as Test Game 90's picks have one for each (set 1).
+        size_t at = scene.rfind(" @");
+        n.s[1] = at == std::string::npos ? scene : scene.substr(0, at);
+        if (at != std::string::npos) n.p[kStoryPcNumber] = std::atoi(scene.c_str() + at + 2);
         script->nodes.push_back(n);
     }
     script->nodes.back().next = 0;
@@ -278,21 +281,40 @@ bool Engine::storySceneIs(const Node &n, const std::string &scene) {
 bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice, bool &atScreen) {
     auto table = screens_.find("story");
     if (table == screens_.end() || number <= 0) return false;
-    std::shared_ptr<Script> found;
-    const Node *at = nullptr;
+    std::shared_ptr<Script> found, chapter;
+    const Node *at = nullptr, *call = nullptr;
+    // A line of a flow, or of a chapter a flow plays, with the number; the one whose scene the save names wins.
+    auto consider = [&](const std::shared_ptr<Script> &flow, const Node &n, const std::shared_ptr<Script> &in, const Node *from) {
+        if (n.p[kStoryPcNumber] != number || (at && !storySceneIs(n, scene))) return false;
+        found = flow;
+        chapter = in;
+        at = &n;
+        call = from;
+        return storySceneIs(n, scene);
+    };
+    bool named = false;
     for (const auto &line : table->second.lines) {
+        if (named) break;
         if (line.size() < 2 || line[0] != "flow") continue;
         auto flow = loadScript("story:" + line[1]);
         if (!flow) continue;
         for (const Node &n : flow->nodes) {
-            if (n.p[kStoryPcNumber] != number || (at && !storySceneIs(n, scene))) continue;
-            found = flow;
-            at = &n;
-            if (storySceneIs(n, scene)) break;
+            if ((named = consider(flow, n, nullptr, nullptr))) break;
+            if (n.opcode == kStoryChapter)
+                if (auto inside = loadScript("chapter:" + std::to_string(operand(n))))
+                    for (const Node &c : inside->nodes)
+                        if ((named = consider(flow, c, inside, &n))) break;
+            if (named) break;
         }
-        if (at && storySceneIs(*at, scene)) break;
     }
     if (!at) return false;
+    // Inside a chapter: the flow goes on after the chapter, and the chapter after the scene.
+    if (chapter) {
+        stack_.push_back({found, found->node(call->next)});
+        stack_.push_back({chapter, chapter->node(at->next)});
+        flowCallId_ = number;
+        return true;
+    }
     // A save while the choice waits asks it again; one after it goes on past it. One at a screen's number opens the
     // screen again.
     atChoice = at->opcode == 3 && active == 3;

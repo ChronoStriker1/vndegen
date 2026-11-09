@@ -3964,7 +3964,8 @@ void Engine::runFlow(const Node &n) {
             scene_ = {script, script->first()};
             lastScene_ = script->name;
             // A story table's line saves the PC's own number for its place, when the table gives one.
-            flowCallId_ = flow.script->name.rfind("story:", 0) == 0 && n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
+            bool table = flow.script->name.rfind("story:", 0) == 0 || flow.script->name.rfind("chapter:", 0) == 0;
+            flowCallId_ = table && n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
             log("scene %s", script->name.c_str());
         }
         break;

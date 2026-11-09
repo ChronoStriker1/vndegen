@@ -32,10 +32,11 @@ const PartEntry kParts[] = {
 };
 
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses
-// with N, kept with a save, the right button there opening the load menu over it, and chapter N is scr\cN.txt. Scene
-// command 9000 loads its picture into slot p3 at p1, p2 through PartHost::loadImage, additive when p4 is 1 and scrolling
-// p5 and p6 pixels a second. On a table screen naming it, the widget test game's sprite gallery, it draws a square at
-// 400, 400, blue and red once pressed, takes the presses on it, and after two covers the top left corner over everything.
+// with N, kept with a save, the right button there opening the load menu over it, and chapter N is scr\cN.txt with the
+// PC number 100 + N. Scene command 9000 loads its picture into slot p3 at p1, p2 through PartHost::loadImage, additive
+// when p4 is 1 and scrolling p5 and p6 pixels a second. On a table screen naming it, the widget test game's sprite
+// gallery, it draws a square at 400, 400, blue and red once pressed, takes the presses on it, and after two covers the
+// top left corner over everything.
 class SelfTestPart : public GamePart {
 public:
     bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) override {
@@ -51,7 +52,9 @@ public:
         host.loadImage(n.p[3], n.s[1], n.p[1], n.p[2], n.p[4] == 1, float(n.p[5]), float(n.p[6]));
         return true;
     }
-    std::vector<std::string> chapter(PartHost &, int number) override { return {"scr\\c" + std::to_string(number) + ".txt"}; }
+    std::vector<std::string> chapter(PartHost &, int number) override {
+        return {"scr\\c" + std::to_string(number) + ".txt @" + std::to_string(100 + number)};
+    }
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
         int count = args.empty() ? 0 : args[0];
         onMenu_ = name == "sprites";

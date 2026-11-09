@@ -26,6 +26,13 @@ struct SaveLayout {
     int textTail = 16;  // the bytes of a text record after its strings
     int rootSizeAt = 0x11;  // where the first record holds the screen size
     int channels = 243;  // the sound channels saved
+    // A sprite record's last block, after its animation's text: 164 bytes, or 137 in Test Game 90.
+    int recordTail = 0x261 - 0x1BD;
+    // The newer engine's byte before the sound channels, which Test Game 90's saves don't have.
+    bool byteBeforeSounds = true;
+    // The GOOD Timing fields after the scene's node (SaveData::gtState and on), which Test Game 90's tail doesn't have:
+    // its fixed bytes sit 31 earlier than Test Game 94's, and it keeps zeros where an off GOOD Timing keeps -1.
+    bool gtTail = true;
     // The older engine of the games that keep their story in the exe: a sprite record's fixed part, 0 in the newer
     // layouts, then the zeros before each record, the first's within the 40 bytes after the count, and those between the
     // sound channels and the scene's name.
@@ -47,6 +54,12 @@ struct SaveLayout {
     // Games 82 and 83 count from 0 too, each 2 after a save to its third card, which NEW marked (sets 2 and 3), so the
     // older engine's layouts all do.
     int firstCard = 1;
+    // Test Game 96's saves name a second picture right after the choice's, where the other newer layouts have 4 zeros
+    // (an empty name), and every PC save of it names the same two: these, which VNDegen writes when it has none (set 2's
+    // 18 saves, lead).
+    const char *choiceName = nullptr, *afterChoiceName = nullptr;
+    // Bytes of the date block after the date that hold the same every time, from its start.
+    std::vector<Patch> dateBlock;
 };
 
 namespace {
@@ -82,6 +95,34 @@ SaveLayout older(int recordGap, int afterSize, std::vector<Patch> after, int tai
 }
 
 const SaveLayout kAniMother = kTsumaGibo;
+// Test Game 90's, from set 1's 12 PC saves (lead): Test Game 94's, with sprite records 8 bytes shorter and their last
+// block 137 bytes, no byte before the sound channels, and a tail 6,063 bytes long with no GOOD Timing fields. Each save
+// parses and is built again byte for byte.
+const SaveLayout kMankitsu = [] {
+    SaveLayout l = kRinjin;
+    l.recordExtra = -148;
+    l.recordTail = 137;
+    l.byteBeforeSounds = false;
+    l.gtTail = false;
+    l.tailSize = 6063;
+    l.tail = {{862, "ffffffff"}, {932, "ffffffff"}, {1006, "3c"}};
+    l.firstCard = 0;
+    return l;
+}();
+// Test Game 96's, from set 2's 18 PC saves (lead): the older engine's records, 396 bytes each after their names with 26
+// zeros before each, and the older text records, sound channels and tail, with the newer place for the choice's picture
+// and a second picture's name after it. 154 channels and 14 zeros before the scene's name are the most that fit; the tail
+// is 819 bytes with the node. The date block holds 1 at 240 and 0 at the flag in every save.
+const SaveLayout kYabai = [] {
+    SaveLayout l = older(26, 0, {}, 819, {}, 154);
+    l.olderRecord = 396;
+    l.olderSoundGap = 14;
+    l.choiceFlag = ChoiceFlag::Never;
+    l.choiceName = "obj\\a003_001.bmp";
+    l.afterChoiceName = "obj\\t000_000.bmp";
+    l.dateBlock = {{240, "01"}};
+    return l;
+}();
 const SaveLayout kFunbag2 = [] {
     SaveLayout l = older(26, 0, {}, 818, {}, 123);
     l.choiceFlag = ChoiceFlag::Never;
@@ -114,7 +155,7 @@ constexpr int kSplashNameAt = 201;
 // The bytes of a record after its animation text, and a flipbook's fields among them: whether it runs backward and
 // repeats (parameters 1 and 14), two bytes of 1 while it plays, parameters 15 and 16, and a byte of 0 where every other
 // record has 100.
-constexpr size_t kRecordTail = 0x261 - 0x1BD, kTailFlipReverse = 97, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipParam15 = 104,
+constexpr size_t kTailFlipReverse = 97, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipParam15 = 104,
                  kTailFlipStep = 108, kTailFlipHundred = 120;
 constexpr int kNoiseKind = 4;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
@@ -286,6 +327,10 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // The older layout's test game saves as Test Game 83 does, under a folder of its own so it gets no menu table.
     if (folder == "vndegen\\layoutold") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
+    // Test Game 96, and its layout's test game under a folder of its own, with no menu table.
+    if (folder == "waffle\\ヤバい！－復讐・闇サイト－" || folder == "vndegen\\layout96") return &kYabai;
+    // Test Game 90, and its layout's test game under a folder of its own, with no menu table.
+    if (folder == "waffle\\漫喫ハプニング" || folder == "vndegen\\layout90") return &kMankitsu;
     return nullptr;
 }
 
@@ -322,7 +367,12 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         r.skip(kBeforeChoice);
         out.choiceImage = r.str();
     }
-    r.skip(kAfterChoice);
+    if (layout.afterChoiceName) {
+        out.afterChoiceImage = r.str();
+        r.skip(kAfterChoice - 4);
+    } else {
+        r.skip(kAfterChoice);
+    }
     for (int &d : out.date) d = r.i32();
     out.dateFlag = r.i32At(r.at + kDateFlag - 24);
     r.skip(kDateBlock - 24);
@@ -347,6 +397,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     out.noRecords = count == 0;
     out.sprites.clear();
     int extra = layout.recordExtra;
+    const size_t kRecordTail = size_t(layout.recordTail);
     for (int k = 0; k < count && r.ok; k++) {
         SavedSprite s;
         if (older) r.skip(size_t(layout.olderRecordGap));
@@ -493,7 +544,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         readText(r, t, layout.textTail);
         out.backlog.push_back(t);
     }
-    if (!older) r.skip(1);
+    if (!older && layout.byteBeforeSounds) r.skip(1);
     out.sounds.clear();
     for (int i = 0; i < layout.channels && r.ok; i++) {
         SavedSound s;
@@ -515,7 +566,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     // The tail starts with the scene's node; a save cut short before it doesn't read.
     if (tail + 4 > plain.size()) return false;
     out.node = r.i32At(tail);
-    if (older) {
+    if (older || !layout.gtTail) {
         if (r.ok && tail <= plain.size()) out.tailBefore.assign(plain.begin() + std::ptrdiff_t(tail), plain.end());
         return r.ok;
     }
@@ -540,18 +591,25 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     w.zeros(kAfterComment);
     w.str(d.flow);
     bool older = layout.olderRecord > 0;
+    std::string choice = d.choiceImage.empty() && layout.choiceName ? std::string(layout.choiceName) : d.choiceImage;
     if (older) {
         w.zeros(kOlderBeforeChoice);
-        w.str(layout.choiceInFirstPlace ? d.choiceImage : d.olderImage);
+        w.str(layout.choiceInFirstPlace ? choice : d.olderImage);
         w.zeros(kBeforeChoice - kOlderBeforeChoice - 4);
-        w.str(layout.choiceInFirstPlace ? d.olderImage : d.choiceImage);
+        w.str(layout.choiceInFirstPlace ? d.olderImage : choice);
     } else {
         w.zeros(kBeforeChoice);
-        w.str(d.choiceImage);
+        w.str(choice);
     }
-    w.zeros(kAfterChoice);
+    if (layout.afterChoiceName) {
+        w.str(d.afterChoiceImage.empty() ? std::string(layout.afterChoiceName) : d.afterChoiceImage);
+        w.zeros(kAfterChoice - 4);
+    } else {
+        w.zeros(kAfterChoice);
+    }
     for (int v : d.date) w.i32(v);
     size_t dateRest = w.zeros(kDateBlock - 24);
+    apply(layout.dateBlock, w.b.data() + dateRest - 24);
     w.setI32(dateRest + kDateFlag - 24, d.dateFlag);
     w.i32(d.flowActive);
     w.i32(d.flowNode);
@@ -568,6 +626,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     w.zeros(older ? size_t(kAfterCount - layout.olderRecordGap) : kAfterCount);
 
     int extra = layout.recordExtra;
+    const size_t kRecordTail = size_t(layout.recordTail);
     auto record = [&](const SavedSprite &s, bool root, bool hasNext) {
         if (older) w.zeros(size_t(layout.olderRecordGap));
         w.u8(1);
@@ -712,7 +771,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     w.i32(int32_t(d.backlog.size()));
     for (const SavedText &t : d.backlog) writeText(w, t, layout.textTail);
 
-    if (!older) w.zeros(1);
+    if (!older && layout.byteBeforeSounds) w.zeros(1);
     std::map<int, const SavedSound *> byIndex;
     for (const SavedSound &s : d.sounds) byIndex[older && s.index >= 60 ? s.index - 60 + kOlderMusicChannels : s.index] = &s;
     size_t trail = older ? 1 : 2;
@@ -735,7 +794,8 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     w.zeros(older ? size_t(layout.olderSoundGap) : 16);
     w.str(d.scene);
     // A PC save's tail goes back as it was, with what the runtime reads written over it.
-    bool rawTail = older ? d.tailBefore.size() >= 4 : d.tailBefore.size() == kTailGtStrings;
+    bool wholeTail = older || !layout.gtTail;
+    bool rawTail = wholeTail ? d.tailBefore.size() >= 4 : d.tailBefore.size() == kTailGtStrings;
     size_t tail = w.b.size();
     if (rawTail) w.b.insert(w.b.end(), d.tailBefore.begin(), d.tailBefore.end());
     else {
@@ -744,7 +804,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         apply(layout.tail, w.b.data() + zeros);
     }
     w.setI32(tail, d.node);
-    if (older) return w.b;
+    if (wholeTail) return w.b;
     w.setI32(tail + kTailGtState, d.gtState);
     w.setI32(tail + kTailGtCount, d.gtCount);
     w.setI32(tail + kTailGtCount + 4, d.gtCount);
