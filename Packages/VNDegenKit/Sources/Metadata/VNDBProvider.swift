@@ -15,9 +15,10 @@ struct VNDBProvider: MetadataProvider {
     }
 
     func search(_ title: String) async throws -> [MetadataCandidate] {
-        let page: Page<VN> = try await query("vn", ["filters": ["search", "=", title], "fields": "title,released,image.thumbnail", "results": 10])
+        let page: Page<VN> = try await query("vn", ["filters": ["search", "=", title], "fields": "title,released,image.thumbnail,votecount", "results": 10])
         return page.results.map { vn in
-            MetadataCandidate(ref: ref(vn.id), title: vn.title, year: vn.released.flatMap(Self.year), thumbnail: vn.image?.thumbnail)
+            MetadataCandidate(ref: ref(vn.id), title: vn.title, year: vn.released.flatMap(Self.year), thumbnail: vn.image?.thumbnail,
+                              votes: vn.votecount)
         }
     }
 
@@ -117,6 +118,8 @@ private struct VN: Decodable {
     var released: String?
     var description: String?
     var rating: Double?
+    /// Asked for in search results only.
+    var votecount: Int?
     var image: Image?
     var developers: [Named]?
     var tags: [Tag]?

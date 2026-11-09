@@ -9,13 +9,16 @@ public struct MetadataCandidate: Identifiable, Hashable, Sendable {
     public var title: String
     public var year: String?
     public var thumbnail: URL?
+    /// How many people rated the entry on its source, where the source says, as VNDB does.
+    public var votes: Int?
     public var id: String { "\(ref.source.rawValue):\(ref.id)" }
 
-    public init(ref: ExternalRef, title: String, year: String? = nil, thumbnail: URL? = nil) {
+    public init(ref: ExternalRef, title: String, year: String? = nil, thumbnail: URL? = nil, votes: Int? = nil) {
         self.ref = ref
         self.title = title
         self.year = year
         self.thumbnail = thumbnail
+        self.votes = votes
     }
 }
 

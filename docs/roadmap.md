@@ -80,7 +80,6 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
-- [#62](https://github.com/ChronoStriker1/vndegen/issues/62) Metadata: Rinjin matched to the wrong VNDB entry.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
