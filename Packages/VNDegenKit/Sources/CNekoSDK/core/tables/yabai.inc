@@ -262,6 +262,51 @@ button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 
 button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
 button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
 
+# Music, measured on the PC under Wine: eleven tracks down three columns, each listed once heard, and the player bar.
+# With nothing playing a track is only chosen and Play starts it. The volume knob runs 1.9 pixels to a unit (60 at
+# x 687, 100 at 763).
+screen music
+selectedlook
+trackselects
+pic bg\bg_001_000_000_000_000.bmp 0 0
+pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
+pic obj\e001_000.bmp 0 0 6 1 4 0
+pic obj\g000_000.bmp 87 141
+pic obj\g002_000.bmp 88 503
+musictitle obj\g003_000.bmp 112 505 11
+knob music obj\g002_001.bmp 573 517 1.9
+hovercols 577 512 790 546 obj\g002_003.bmp 538 430 8 7
+button track0 obj\g001_000.bmp 87 158 11 5 0
+button track1 obj\g001_000.bmp 87 229 11 5 1
+button track2 obj\g001_000.bmp 87 300 11 5 2
+button track3 obj\g001_000.bmp 87 371 11 5 3
+button track4 obj\g001_000.bmp 462 158 11 5 4
+button track5 obj\g001_000.bmp 462 229 11 5 5
+button track6 obj\g001_000.bmp 462 300 11 5 6
+button track7 obj\g001_000.bmp 462 371 11 5 7
+button track8 obj\g001_000.bmp 837 158 11 5 8
+button track9 obj\g001_000.bmp 837 229 11 5 9
+button track10 obj\g001_000.bmp 837 300 11 5 10
+button music_prev obj\g002_002.bmp 849 512 7 5 0 help obj\g002_003.bmp 754 430 8 1 0 0
+button music_pause obj\g002_002.bmp 900 512 7 5 1 help obj\g002_003.bmp 805 430 8 1 1 0
+button music_play obj\g002_002.bmp 951 512 7 5 2 help obj\g002_003.bmp 856 430 8 1 2 0
+button music_stop obj\g002_002.bmp 1002 512 7 5 3
+button music_next obj\g002_002.bmp 1053 512 7 5 4 help obj\g002_003.bmp 958 430 8 1 4 0
+button music_repeat obj\g002_002.bmp 1104 512 7 5 5 help obj\g002_003.bmp 1009 430 8 1 5 0
+button music_shuffle obj\g002_002.bmp 1155 512 7 5 6 help obj\g002_003.bmp 1060 430 8 1 6 0
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
+
 # Config, measured on the PC under Wine: four tabs over one frame, with the side arrows going round them. Each row's help
 # stands 69 above it at x 218 while the pointer is in the row's band (found by moving the pointer across its edges).
 # Screen mode, colours and resolutions are the PC window's own and are drawn as the PC showed them.
