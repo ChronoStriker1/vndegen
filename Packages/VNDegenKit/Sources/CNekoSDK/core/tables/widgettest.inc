@@ -16,3 +16,15 @@ screen config
 range rose 0 50
 knob rose obj\k.bmp 100 300 6
 )";
+
+// The same title with `submenudim hide`: the other buttons go while a submenu is open (Test Game 83's).
+const char kWidgetTestHide[] = R"(
+screen title
+submenudim hide
+button submenu:menu obj\b.bmp 0 0 1 5 0
+button config obj\b.bmp 0 100 1 5 0
+button sub obj\b.bmp 200 0 1 5 0 group menu
+
+screen config
+knob rose obj\k.bmp 100 300 6
+)";

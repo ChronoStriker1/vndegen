@@ -42,6 +42,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\layouttest") return kLayoutTest;
     if (folder == "vndegen\\bandtest") return kBandTest;
     if (folder == "vndegen\\widgettest") return kWidgetTest;
+    if (folder == "vndegen\\widgettesthide") return kWidgetTestHide;
     return nullptr;
 }
 

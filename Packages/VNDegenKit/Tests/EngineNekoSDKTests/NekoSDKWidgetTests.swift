@@ -31,10 +31,10 @@ import TestSupport
     private let white: [UInt8] = [255, 255, 255], yellow: [UInt8] = [255, 255, 0], red: [UInt8] = [255, 0, 0],
                 magenta: [UInt8] = [255, 0, 255], grey: [UInt8] = [128, 128, 128], green: [UInt8] = [0, 255, 0]
 
-    private func game() throws -> URL {
+    private func game(_ folder: String = "widgettest") throws -> URL {
         let rows = [white, yellow, red, magenta, grey]
         return try NekoSDKFlowFixture.game([
-            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\widgettest\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
             "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", bmp(50, 250) { rows[$0 / 50] }), ("k.bmp", bmp(10, 10) { _ in [0, 255, 0] })]),
             "flow/t.txt": NekoSDKFlowFixture.flow([
                 .init(op: 0, next: 2),
@@ -98,6 +98,25 @@ import TestSupport
         // At the track's end it stops at the range's 50.
         click(e, 100 + 6 * 50 + 4, 305)
         #expect(pixel(e, 100 + 6 * 50 + 3, 303) == green)
+    }
+
+    // `submenudim hide`: the other buttons aren't drawn while the submenu is open, and still take no press.
+    @Test func aSubmenuCanHideTheOtherButtons() throws {
+        let root = try game("widgettesthide")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 10, 110) == white)
+        click(e, 10, 10)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 10, 110) == [0, 0, 0])
+        click(e, 10, 110)
+        #expect(pixel(e, 103, 303) != green)
+        click(e, 640, 600, button: 1)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 10, 110) == white)
     }
 
     // `waitscale autowait`, at its default 50: a wait of 1000 ms lasts 500.
