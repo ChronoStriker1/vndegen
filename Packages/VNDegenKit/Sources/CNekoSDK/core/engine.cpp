@@ -498,9 +498,20 @@ std::string Engine::mainFlowKey() const {
     return flow && !flow->empty() ? (*flow)[0] : "MainFlow";
 }
 
+// `replayoff ACTION ACTION...` under `screen defaults`: message window buttons that are drawn disabled and take no
+// press during a Scene replay, as Test Game 90's PC does with Save, Load, Config and Title, leaving Exit (set 1, under
+// Wine). Its replay's button file lists all five as the story's does, so the rule isn't in the game's files.
+bool Engine::replayOff(const std::string &action) const {
+    if (!replaying_ || screen_) return false;
+    auto defaults = screens_.find("defaults");
+    const auto *off = defaults != screens_.end() ? defaults->second.setting("replayoff") : nullptr;
+    return off && std::find(off->begin(), off->end(), action) != off->end();
+}
+
 void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
     dirty_ = true;
+    if (replayOff(action)) return;
     // The PC doesn't save during a staff roll: a save there holds the scene after it (set 1, Test Game 87).
     if ((action == "nav_save" || action == "Save" || action == "QuickSave") && waiting_ == Waiting::StaffRoll) return;
     if (action.rfind("submenu:", 0) == 0) {
@@ -864,13 +875,18 @@ bool Engine::logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &s
 void Engine::openLog() {
     if (backlog_.empty() || !screens_.count("log")) return;
     // The frame behind the log has no message on it. With `keepwindow` it keeps the window's picture, but not its text,
-    // buttons or wait mark, as Test Game 87's PC draws it (set 1).
-    bool hidden = windowHiddenByPlayer_;
-    bool keep = screens_.at("log").setting("keepwindow");
+    // buttons or wait mark, as Test Game 87's PC draws it (set 1). `keepwindow buttons` keeps the window's buttons and
+    // what the game's parts draw in the window too, as Test Game 90's PC shows them under the log's dim (set 1); none
+    // of the buttons is lit, as the pointer is the log's.
+    bool hidden = windowHiddenByPlayer_, seen = pointerSeen_;
+    const auto *keepLine = screens_.at("log").setting("keepwindow");
+    bool keep = keepLine != nullptr;
     windowHiddenByPlayer_ = !keep;
-    windowArtOnly_ = keep;
+    windowArtOnly_ = !keep ? 0 : !keepLine->empty() && (*keepLine)[0] == "buttons" ? 2 : 1;
+    if (windowArtOnly_ == 2) pointerSeen_ = false;
     compose();
-    windowArtOnly_ = false;
+    windowArtOnly_ = 0;
+    pointerSeen_ = seen;
     windowHiddenByPlayer_ = hidden;
     logBase_ = canvas_;
     logTop_ = 0;
@@ -3888,6 +3904,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         // original does.
         bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_) ||
                   (b.action == "ModeChange" && setting("art"));
+        if (replayOff(b.action)) return StateDisabled;
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
         if (b.action == "BackSelection" && !previousChoice_) return StateDisabled;
         if (b.action == "Voice" && currentText_.voice.empty()) return StateDisabled;
@@ -5854,6 +5871,12 @@ void Engine::holdPartSlot(int slot, int kind) {
     back_[slot] = std::move(s);
 }
 
+// The opposite of holdPartSlot: the slot goes at the next screen update, as command 17 takes a picture away, and a save
+// from then on holds no record of it.
+void Engine::releasePartSlot(int slot) {
+    if (auto it = back_.find(slot); it != back_.end() && it->second.held) back_.erase(it);
+}
+
 bool Engine::partSlotHeld(int slot) const {
     for (const auto *set : {&front_, &back_})
         if (auto it = set->find(slot); it != set->end() && it->second.held) return true;
@@ -6716,17 +6739,24 @@ void Engine::composeMessage(Canvas &out) {
     if (!windowShown_ || windowHiddenByPlayer_) return;
     if (windowImage_) {
         // In the 4:3 frame Test Game 88's PC puts its window two rows lower than the rest of the layer moves (under Wine).
-        int top = windowY_ + (square_ ? 2 : 0), y = top;
+        // `squarewindow ROWS` under `screen defaults` gives another game's: Test Game 83's PC puts it exactly where the
+        // layer moves, 0 (set 3, on the window's top border in its PC's two frames).
+        int drop = 2;
+        if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+            if (const auto *rows = defaults->second.setting("squarewindow"); rows && !rows->empty()) drop = field(*rows, 0);
+        int top = windowY_ + (square_ ? drop : 0), y = top;
         if (windowShowType_ == 2) {
             int elapsed = int(now_ - windowShownAt_);
             if (elapsed < kWindowSlideMs) y = out.h - (out.h - top) * elapsed / kWindowSlideMs;
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
-    if (windowArtOnly_) return;
+    if (windowArtOnly_ == 1) return;
     drawParts(out, Layer::Window);
-    drawGlyphRun(out);
-    composeGtCount(out);
+    if (!windowArtOnly_) {
+        drawGlyphRun(out);
+        composeGtCount(out);
+    }
     composeMessageButtons(out);
 }
 
@@ -6753,6 +6783,9 @@ bool Engine::markShowing() const {
     // Not while an older line shows in the window, and not under a resting plate that has come up over it, as Test Game
     // 83's PC draws neither (set 3, shots under Wine): the mark is the window's, and the plate comes over the window.
     if (windowLog_ > 0) return false;
+    // Nor while a game with no plate shows its lower row, `underbelow`: what Test Game 90 draws behind that row covers
+    // the mark on its PC (set 1, under Wine).
+    if (!buttonPlate_ && defaultsHave("underbelow") && underButtonsShown()) return false;
     if (plateRests_ && plateRaised_ && buttonPlate_) {
         int x, y, w, h;
         markRect(x, y, w, h);

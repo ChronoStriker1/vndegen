@@ -225,14 +225,14 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
     return script;
 }
 
-std::shared_ptr<Script> Engine::compileChapter(int number) {
+std::shared_ptr<Script> Engine::compileChapter(int number, bool complains) {
     std::vector<std::string> scenes;
     for (auto &[name, part] : parts_) {
         scenes = part->chapter(*partHost_, number);
         if (!scenes.empty()) break;
     }
     if (scenes.empty()) {
-        complain("No game part plays chapter " + std::to_string(number));
+        if (complains) complain("No game part plays chapter " + std::to_string(number));
         return nullptr;
     }
     auto script = std::make_shared<Script>();
@@ -337,7 +337,7 @@ bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scen
         for (const Node &n : flow->nodes) {
             if ((named = consider(flow, n, nullptr, nullptr))) break;
             if (n.opcode == kStoryChapter)
-                if (auto inside = loadScript("chapter:" + std::to_string(operand(n))))
+                if (auto inside = compileChapter(operand(n), false))
                     for (const Node &c : inside->nodes)
                         if ((named = consider(flow, c, inside, &n))) break;
             if (named) break;
@@ -381,7 +381,7 @@ bool Engine::resumeStoryAt(const std::string &scene) {
             }
             // Or inside a chapter: the flow goes on after the chapter, and the chapter after the scene.
             if (n.opcode == kStoryChapter)
-                if (auto chapter = loadScript("chapter:" + std::to_string(operand(n))))
+                if (auto chapter = compileChapter(operand(n), false))
                     for (const Node &c : chapter->nodes)
                         if (names(c)) {
                             stack_.push_back({flow, flow->node(n.next)});

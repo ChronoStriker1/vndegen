@@ -723,7 +723,9 @@ private:
     GamePart *menuPart() const;
     bool loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY, int kind);
     void holdPartSlot(int slot, int kind);
+    void releasePartSlot(int slot);
     bool partSlotHeld(int slot) const;
+    bool replayOff(const std::string &action) const;
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
     void finishPartScreen(int result);
     // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story
@@ -753,7 +755,8 @@ private:
     // The story table (story.cpp): a game without flow scripts has its story order as `flow` blocks under `screen
     // story`, compiled to flow nodes. Flows are scripts named `story:NAME`; `chapter N` plays `chapter:N`.
     std::shared_ptr<Script> compileStory(const std::string &flow);
-    std::shared_ptr<Script> compileChapter(int number);
+    // `complains`: false for a search through the story's chapters, where one no part plays yet is no fault.
+    std::shared_ptr<Script> compileChapter(int number, bool complains = true);
     std::string firstStoryFlow() const;
     bool resumeStoryAt(const std::string &scene);
     bool storyFlowExists(const std::string &name) const;
@@ -857,7 +860,8 @@ private:
     std::string returnTo_;
     int flowCallId_ = 0;
     std::string choiceImage_;
-    bool windowArtOnly_ = false;  // the frame behind the log with `keepwindow`: the window's picture alone
+    // The frame behind the log with `keepwindow`: 1 for the window's picture alone, 2 with its buttons and the parts' layer.
+    int windowArtOnly_ = 0;
     bool choiceMade_ = false;  // a choice has been made this game, as Test Game 87's saves hold it
     std::vector<SavedText> backlog_;
     SavedText currentText_;

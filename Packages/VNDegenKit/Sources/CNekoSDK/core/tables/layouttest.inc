@@ -19,3 +19,10 @@ const char kLayoutPairsTest[] = R"(
 screen defaults
 layoutpairs
 )";
+
+// A 4:3 frame whose window sits exactly where the layer moves, `squarewindow 0`, as Test Game 83's does
+// (NekoSDKSquareFrameTests).
+const char kSquareWindowTest[] = R"(
+screen defaults
+squarewindow 0
+)";

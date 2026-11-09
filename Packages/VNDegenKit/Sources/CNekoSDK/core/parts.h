@@ -78,6 +78,9 @@ public:
     // picture, which the part's savePC fills (SavedSprite::names and fixedBytes); a load brings the slot back from such a
     // record, which the part's loadPC reads.
     void holdSlot(int slot, int kind);
+    // Lets a held slot go: taken away at the next screen update, as command 17 takes a picture, and out of saves from
+    // then on. Test Game 86's command 96 ends a particle emitter so (set 3).
+    void releaseSlot(int slot);
     // Whether that slot is held, shown or waiting for the next screen update.
     bool slotHeld(int slot);
     // Config's Effects setting, which the PC's effects such as Test Game 83's particles follow.
