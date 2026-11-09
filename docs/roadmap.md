@@ -86,7 +86,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - NekoSDK, on `feat/nekosdk-stage3`: the four games left that keep their story order in the exe, in parallel sets merged through `feat/nekosdk-stage3`: Mankitsu Happening on `feat/nekosdk-set1`, Yabai! -Fukushuu Yami Site- on `-set2` with the lead, and Funbag Fantasy 2 and Funbag Fantasy: Sideboob Story on `-set3`. GOOD Timing's last two guessed rules after that. Each game is released when it's finished, without waiting for the others, and Funbag Fantasy 2 is the closest.
-- The open bugs above, as one batch on `fix/bug-batch-3`, starting with the two build script bugs (#67, #69).
+- The open bugs above, as one batch on `fix/bug-batch-3`. The two build script bugs (#67, #69) are fixed on `dev`.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
