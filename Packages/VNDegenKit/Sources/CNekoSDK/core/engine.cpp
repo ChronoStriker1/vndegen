@@ -3979,10 +3979,12 @@ void Engine::composeMessageButtons(Canvas &out) {
         blendFrame(out, shown, int(opacity * 256));
         return;
     }
-    if (innerButtonsShown()) {
-        if (fullWidthPlate() && plateUp()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    // A plate as wide as the screen is drawn whenever it's up, under either row: over a game part's screen, where the
+    // window's own buttons stay away, Test Game 96's PC still brings it up black behind the lower row (set 2, PC shots).
+    if (fullWidthPlate() && plateUp() && (innerButtonsShown() || underButtonsShown()))
+        drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    if (innerButtonsShown())
         for (const Button &b : bar().inner) drawButton(out, b, state(b));
-    }
     if (!underButtonsShown()) {
         if (plateRests_) drawPart(out, *buttonPlate_, plateHiddenX_, plateHiddenY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         return;

@@ -346,9 +346,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // The vote's test game saves as Test Game 96 does, and the newer layout's test game as Test Game 94 does.
     if (folder == "vndegen\\votetest") return &kYabai;
     if (folder == "vndegen\\layout94") return &kRinjin;
-    // Test Game 90, its bonus release (a game of its own with the same screens: 13 of set 1's 14 PC saves of it are
-    // built again byte for byte, and one with a pictureless record is a single byte off), and the layout's test game
-    // under a folder of its own, with no menu table.
+    // Test Game 90, its bonus release (a game of its own with the same screens: set 1's 14 PC saves of it are each
+    // built again byte for byte), and the layout's test game under a folder of its own, with no menu table.
     if (folder == "waffle\\漫喫ハプニング" || folder == "waffle\\漫喫ハプニング特典ストーリー" || folder == "vndegen\\layout90") return &kMankitsu;
     return nullptr;
 }
@@ -487,7 +486,9 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
             }
             continue;
         }
-        s.splash = !s.noise && s.path.empty() && s.slot != -999999;
+        // A splash's record has no picture and the number 25. Another pictureless record is kept as it is: Test Game
+        // 90's bonus release saves one for a flipbook's slot, with 0 there (set 1's PC save).
+        s.splash = !s.noise && s.path.empty() && s.slot != -999999 && ordinary && number == 25;
         size_t nameLength = 0;
         if (s.splash) {
             size_t at = f + size_t(kSplashNameAt + extra);
@@ -514,7 +515,8 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.anchorX = r.i32At(f + kRecordAnchor + extra);
         s.anchorY = r.i32At(f + kRecordAnchor + 4 + extra);
         s.alpha = r.i32At(f + kRecordAlpha + extra);
-        if (layout.shownAlpha == 255 && s.slot != -999999 && s.alpha == 255) s.alpha = 256;
+        // A record with no picture keeps the value it has: Test Game 90's bonus release writes 256 in one (set 1's PC save).
+        if (layout.shownAlpha == 255 && s.slot != -999999 && !s.path.empty() && s.alpha == 255) s.alpha = 256;
         s.blurOn = plain[f + kRecordBlurOn + extra] != 0;
         s.blur = r.i32At(f + kRecordBlur + extra);
         s.waveOn = plain[f + kRecordWave + extra] != 0;
@@ -534,7 +536,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.endX = r.f32At(g + 4);
         s.endY = r.f32At(g + 8);
         s.endAlpha = r.i32At(g + 12);
-        if (layout.shownAlpha == 255 && s.slot != -999999 && s.endAlpha == 255) s.endAlpha = 256;
+        if (layout.shownAlpha == 255 && s.slot != -999999 && !s.path.empty() && s.endAlpha == 255) s.endAlpha = 256;
         s.endScaleX = r.f32At(g + 20);
         s.endScaleY = r.f32At(g + 24);
         s.rawTail.assign(plain.begin() + std::ptrdiff_t(g), plain.begin() + std::ptrdiff_t(g + kRecordTail));
@@ -760,7 +762,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(f + kRecordAnchor + 4 + extra, s.anchorY);
         // Only a layout whose shown sprites hold 255 changes the value, and only that one: any other is written as it is,
         // as a PC save of Test Game 94 with 512 there must come back with 512.
-        auto shown = [&](int alpha) { return layout.shownAlpha == 255 && !root && alpha == 256 ? 255 : alpha; };
+        auto shown = [&](int alpha) { return layout.shownAlpha == 255 && !root && !s.path.empty() && alpha == 256 ? 255 : alpha; };
         w.setI32(f + kRecordAlpha + extra, shown(s.alpha));
         w.b[f + kRecordBlurOn + extra] = s.blurOn ? 1 : 0;
         w.setI32(f + kRecordBlur + extra, s.blur);
