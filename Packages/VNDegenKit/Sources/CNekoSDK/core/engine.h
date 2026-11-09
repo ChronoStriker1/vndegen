@@ -314,6 +314,7 @@ private:
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
     bool fullWidthPlate() const;
+    bool plateUp() const;
     bool partPlate() const;
     // Whether the table's `screen defaults` has this setting.
     bool defaultsHave(const char *key) const;
