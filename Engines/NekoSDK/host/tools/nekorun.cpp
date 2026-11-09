@@ -6,6 +6,9 @@
 //                `ms window CAN FULL` (the host window's state),
 //                `ms press action`, `ms shot name` or `ms save slot` (a save the PC game reads), with x and y in canvas pixels
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
+// --jump to a scene script (under `scr\`) starts that scene with no flow behind it in a game with flow scripts, so a save
+// made after it names no flow and the PC game refuses it ("failed to load the flowchart"). For a save the PC loads, jump
+// to the flow node that calls the scene (`--jump flow\X.txt NODE`) and let it run to the place, with --saveat.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -30,7 +33,9 @@ void writePng(const std::string &path, const uint8_t *px, int w, int h) { stbi_w
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: nekorun <game folder> [options]\n");
+        std::fprintf(stderr, "usage: nekorun <game folder> [options]\n"
+                             "  --jump to a scene script leaves no flow behind it, so a save made after it doesn't load in the PC game;\n"
+                             "  jump to the flow node that calls the scene instead. See the comment at the top of nekorun.cpp.\n");
         return 2;
     }
     std::string out, wav, jumpScript;
