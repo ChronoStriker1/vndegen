@@ -267,6 +267,56 @@ hovercols 576 518 1080 544 obj\h004_002.bmp 555 353 7 4
 hovercols 576 546 1080 572 obj\h004_002.bmp 555 380 7 5
 hovercols 576 574 1080 628 obj\h004_002.bmp 555 407 7 6
 
+# The CG gallery, measured under Wine: a tab for each heroine and one for the rest, each with her figure at the left,
+# twelve cards a page.
+screen cg
+pic bg\bg_000_000_000.bmp 0 0 more bg\bg_000_000_000.bmp,bg\bg_000_001_000.bmp,bg\bg_000_002_000.bmp,bg\bg_000_003_000.bmp,bg\bg_000_004_000.bmp,bg\bg_000_005_000.bmp,bg\bg_000_006_000.bmp,bg\bg_000_008_000.bmp,bg\bg_000_009_000.bmp,bg\bg_000_017_000.bmp,bg\bg_000_018_000.bmp,bg\bg_000_020_000.bmp,bg\bg_000_022_000.bmp,bg\bg_000_023_000.bmp,bg\bg_000_025_000.bmp random
+pic dim 0 0 alpha 138
+pic obj\e001_000.bmp 1103 0
+pic obj\e000_000.bmp 0 0
+pic obj\e000_001.bmp 22 18 6 1 2 0
+pic sc\sc_000_000_000.bmp -80 0 tab 0
+pic sc\sc_000_001_000.bmp -60 0 tab 1
+pic sc\sc_000_002_000.bmp -450 0 tab 2
+pic sc\sc_000_003_000.bmp -140 0 tab 3
+pic sc\sc_000_004_000.bmp -80 0 tab 4
+pic obj\f002_000.bmp -170 0 tab 5
+button nav_save obj\e001_001.bmp 1114 61 9 5 0 help obj\e001_002.bmp 947 15 9 1 0 0
+button nav_load obj\e001_001.bmp 1114 131 9 5 1 help obj\e001_002.bmp 947 85 9 1 1 0
+button nav_cg obj\e001_001.bmp 1114 201 9 5 2 help obj\e001_002.bmp 947 155 9 1 2 0
+button nav_scene obj\e001_001.bmp 1114 271 9 5 3 help obj\e001_002.bmp 947 225 9 1 3 0
+button nav_music obj\e001_001.bmp 1114 341 9 5 4 help obj\e001_002.bmp 947 295 9 1 4 0
+button nav_config obj\e001_001.bmp 1114 411 9 5 5 help obj\e001_002.bmp 947 365 9 1 5 0
+button nav_title obj\e001_001.bmp 1114 481 9 5 6 help obj\e001_002.bmp 947 435 9 1 6 0
+button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 1 7 0
+button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
+button gtab0 obj\f001_000.bmp 31 540 6 5 0
+button gtab1 obj\f001_000.bmp 139 540 6 5 1
+button gtab2 obj\f001_000.bmp 247 540 6 5 2
+button gtab3 obj\f001_000.bmp 31 619 6 5 3
+button gtab4 obj\f001_000.bmp 139 619 6 5 4
+button gtab5 obj\f001_000.bmp 247 619 6 5 5
+button page0 obj\e001_003.bmp 408 31 10 5 0
+button page1 obj\e001_003.bmp 470 31 10 5 1
+gallerytabs 0
+cellsheet obj\f000_000.bmp
+cellsize 220 141
+cellthumb 32 12
+celldigits obj\e002_002.bmp 60 107 2 15
+cellcount obj\e002_002.bmp obj\f000_002.bmp 114 107 145 158 2
+cell 362 91
+cell 602 91
+cell 842 91
+cell 362 241
+cell 602 241
+cell 842 241
+cell 362 391
+cell 602 391
+cell 842 391
+cell 362 541
+cell 602 541
+cell 842 541
+
 screen story
 # The six choices are obj\l000_000 to _005, two options each. Sex scenes end on l000_000, which only picks the next
 # scene; option 0 also counts in S 5001 (option 1 never set it, in a run that took it every time). S 5000 is the
