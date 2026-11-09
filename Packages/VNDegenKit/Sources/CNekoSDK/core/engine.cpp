@@ -6047,7 +6047,11 @@ void Engine::compose() {
     if (waiting_ == Waiting::Choice && choiceSheet_) {
         auto table = screens_.find("choice");
         if (table != screens_.end()) {
-            for (const Picture &p : table->second.pictures) drawPicture(canvas_, p);
+            // A `dim` picture darkens the scene behind the choice, as Test Game 83's does to 0.138 (set 3).
+            for (const Picture &p : table->second.pictures) {
+                if (p.dim) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
+                else drawPicture(canvas_, p);
+            }
             for (auto [line, end] = table->second.settings.equal_range("framefor"); line != end; ++line)
                 if (line->second.size() >= 4 && field(line->second, 0) == choiceCount_)
                     if (ImageRef frame = images_->get(line->second[1])) drawPart(canvas_, *frame, field(line->second, 2), field(line->second, 3), 0, 0, frame->w, frame->h, 1);
