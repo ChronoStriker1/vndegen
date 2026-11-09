@@ -43,3 +43,14 @@ screen staffroll_t
 length 1000
 pic obj\n001_000.bmp 0 0
 )";
+
+// The load screen and question box the `storytestload` folder adds: one card at 100, 100, and a Yes over the place where
+// the story's choice draws its first option.
+const char kStoryLoadScreens[] = R"(
+screen load
+slots obj\b.bmp 100 100 300 100 1 1
+
+screen dialog
+button yes obj\b.bmp 615 335 1 5 0
+button no obj\b.bmp 615 500 1 5 0
+)";
