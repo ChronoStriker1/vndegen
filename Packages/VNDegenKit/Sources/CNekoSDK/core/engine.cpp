@@ -70,7 +70,7 @@ const std::map<std::string, int> &defaultSettings() {
         // Whether a click that moves the text on stops its voice, as the PC games without the setting always do.
         {"voice_stop", 1},
         {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60}, {"count_color", 1}, {"gt_off", 0}, {"express", 1}, {"bar_always", 0}, {"cg_anim", 1}, {"anim_manual", 0},
-        {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1},
+        {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1}, {"confirm_back", 1}, {"confirm", 1},
         // Config's effects, waits, clicking past waits and the H scenes' camera work, as the PC starts them.
         {"effect", 1}, {"wait", 1}, {"waitskip", 0}, {"camera", 1}, {"tutorial", 1},
         // How long waits and fades last, in hundredths: Config's wait time runs from ×0.70 to ×1.30.
@@ -392,6 +392,8 @@ void Engine::endStory(const std::string &screen) {
     windowHiddenByPlayer_ = false;
     staffRollLayers_ = nullptr;
     gt_ = {};
+    previousChoice_.reset();
+    previousChoiceDue_ = false;
     splashes_.clear();
     resetParts();
     stack_.clear();
@@ -442,6 +444,8 @@ void Engine::startStory() {
     if (routeVar_ >= 0 && pendingRoute_) scenario_[routeVar_] = pendingRoute_;
     pendingRoute_ = 0;
     staffRollLayers_ = nullptr;
+    previousChoice_.reset();
+    previousChoiceDue_ = false;
     resetParts();
     std::string first = config_.text(storyFlowKey_.c_str());
     // A game with no flow scripts starts at its story table's first flow, or past the prologue at the story flow `screen
@@ -570,6 +574,7 @@ void Engine::runAction(const std::string &action) {
     }
     if (action == "quit" || action == "Exit") { openDialog(7, [this] { waiting_ = Waiting::Ended; }); return; }
     if (action == "Title") { openDialog(6, [this] { endStory("title"); }); return; }
+    if (action == "BackSelection") { returnToChoice(); return; }
     if (action == "Skip") { skipToggle_ = !skipToggle_; return; }
     if (action == "Auto") { autoMode_ = !autoMode_; return; }
     if (action == "ModeChange") {
@@ -817,10 +822,14 @@ bool Engine::logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &s
 
 void Engine::openLog() {
     if (backlog_.empty() || !screens_.count("log")) return;
-    // The frame behind the log has no message on it, unless `keepwindow`, as Test Game 87's keeps it (set 1).
+    // The frame behind the log has no message on it. With `keepwindow` it keeps the window's picture, but not its text,
+    // buttons or wait mark, as Test Game 87's PC draws it (set 1).
     bool hidden = windowHiddenByPlayer_;
-    windowHiddenByPlayer_ = !screens_.at("log").setting("keepwindow");
+    bool keep = screens_.at("log").setting("keepwindow");
+    windowHiddenByPlayer_ = !keep;
+    windowArtOnly_ = keep;
     compose();
+    windowArtOnly_ = false;
     windowHiddenByPlayer_ = hidden;
     logBase_ = canvas_;
     logTop_ = 0;
@@ -2238,9 +2247,9 @@ void Engine::saveGlobals() {
 
 // MARK: Saves
 
-std::string Engine::savePath(int slot, const char *extension) const {
-    char name[32];
-    std::snprintf(name, sizeof name, "save%03d.%s", slot, extension);
+std::string Engine::savePath(int slot, const char *extension, const char *suffix) const {
+    char name[40];
+    std::snprintf(name, sizeof name, "save%03d%s.%s", slot, suffix, extension);
     return saveDir_ + "/" + nameInFolder(saveDir_, name);
 }
 
@@ -2454,6 +2463,7 @@ bool Engine::saveToSlot(int slot) {
     }
     if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
     writeFlipModes(slot, data);
+    writePreviousChoice(slot);
     // The card that shows NEW, kept in cfg.sav as the PC keeps it.
     globals_[0] = newCardNumber(layout_, slot);
     saveGlobals();
@@ -2481,6 +2491,8 @@ void Engine::deleteSlot(int slot) {
     std::remove(savePath(slot, "sav").c_str());
     std::remove(savePath(slot, "bmp").c_str());
     std::remove(savePath(slot, "vnd").c_str());
+    std::remove(savePath(slot, "sav", "s").c_str());
+    std::remove(savePath(slot, "vnd", "s").c_str());
     slots_.erase(slot);
     log("deleted slot %d", slot);
     dirty_ = true;
@@ -2495,12 +2507,13 @@ bool Engine::loadFromSlot(int slot) {
         complain("That save couldn't be read.");
         return false;
     }
-    restoreSave(data, slot);
+    restoreSave(data, readSidecar(data, slot));
+    readPreviousChoice(slot);
     log("loaded slot %d at %s #%d", slot, data.scene.c_str(), data.node);
     return true;
 }
 
-void Engine::restoreSave(const SaveData &d, int slot) {
+void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit, and the CG
     // viewer it may have come from.
     replaying_ = false;
@@ -2531,7 +2544,6 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     flowCallId_ = d.flowNode;
     bool atChoice = false;
     // Game parts first, since a part's chapters, which the story's place is found in, can depend on its state.
-    Sidecar side = readSidecar(d, slot);
     loadPartsState(d, side);
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
         const Node *call = flow->node(d.flowNode);
@@ -3027,11 +3039,11 @@ void Engine::composeSlots(Canvas &out) {
 }
 
 // The questions in the order of the game's sheet of them, and the Config setting that turns each off.
-static const char *const kConfirmSetting[] = {"confirm_saveload", "confirm_saveload", "confirm_overwrite", "confirm_delete", "confirm_quick", "confirm_quick", "confirm_title", "confirm_exit"};
+static const char *const kConfirmSetting[] = {"confirm_saveload", "confirm_saveload", "confirm_overwrite", "confirm_delete", "confirm_quick", "confirm_quick", "confirm_title", "confirm_exit", "confirm_back"};
 
 // `questions NAME...` under `screen dialog`: the sheet's cells in its order, by these names, and any other name for a cell
 // the runtime never asks, as Test Game 83's seven across (set 3). The cell of a question, or -1 when the sheet has none.
-static const char *const kQuestionNames[] = {"save", "load", "overwrite", "delete", "quicksave", "quickload", "title", "exit"};
+static const char *const kQuestionNames[] = {"save", "load", "overwrite", "delete", "quicksave", "quickload", "title", "exit", "back"};
 
 int Engine::questionCell(int question) const {
     auto dialog = screens_.find("dialog");
@@ -3042,8 +3054,22 @@ int Engine::questionCell(int question) const {
     return -1;
 }
 
+// A table whose Config has a `confirm` switch and none of the separate ones asks every question by that one, as Test Game
+// 82's does (set 2).
+std::string Engine::confirmSetting(int question) const {
+    bool one = false;
+    for (const auto &[name, screen] : screens_)
+        for (const char *kind : {"radio", "check"})
+            for (auto [it, end] = screen.settings.equal_range(kind); it != end; ++it) {
+                if (it->second.empty()) continue;
+                if (it->second[0].rfind("confirm_", 0) == 0) return kConfirmSetting[question];
+                if (it->second[0] == "confirm") one = true;
+            }
+    return one ? "confirm" : kConfirmSetting[question];
+}
+
 void Engine::openDialog(int question, const std::function<void()> &yes) {
-    if (!screens_.count("dialog") || !setting(kConfirmSetting[question]) || questionCell(question) < 0) {
+    if (!screens_.count("dialog") || !setting(confirmSetting(question)) || questionCell(question) < 0) {
         yes();
         return;
     }
@@ -3061,7 +3087,7 @@ void Engine::answerDialog(bool yes) {
     dialogYes_ = nullptr;
     // The box turns the question off whichever answer closes it, as the PC does, in the Config setting for it.
     if (dialogNoAsk_) {
-        changeSetting(kConfirmSetting[dialogQuestion_], 0);
+        changeSetting(confirmSetting(dialogQuestion_), 0);
         saveSettings();
         dialogNoAsk_ = false;
     }
@@ -3542,6 +3568,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_) ||
                   (b.action == "ModeChange" && setting("art"));
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
+        if (b.action == "BackSelection" && !previousChoice_) return StateDisabled;
         if (b.action == "Voice" && currentText_.voice.empty()) return StateDisabled;
         // With the GT switch off, Ejaculate and Extend are disabled for the whole scene, as Test Game 88's PC draws them
         // (under Wine: their sheet's last row with it off, the first with it on, at every line through a scene).
@@ -3789,7 +3816,7 @@ void Engine::runFlow(const Node &n) {
     case 2:  // the end of the story, which goes back to the title, or with parameter 0 set the staff roll, then on
         if (n.p[0] == 1) {
             flow.node = flow.script->node(n.next);
-            startStaffRoll();
+            startStaffRoll(flow.script->name.rfind("story:", 0) == 0 ? n.s[1] : "");
             break;
         }
         log("flow end: %s", sjis::toUtf8(n.s[0]).c_str());
@@ -3928,6 +3955,7 @@ void Engine::beginChoice(const Node &n) {
     choiceBack_ = images_->get(config_.text("ChoiceBackFilename", "obj\\n000_000.bmp"));
     choiceHover_ = -1;
     waiting_ = Waiting::Choice;
+    previousChoiceDue_ = true;
     dirty_ = true;
     log("choice %s, %d options", n.s[1].c_str(), choiceCount_);
 }
@@ -4260,6 +4288,7 @@ void Engine::runScene(const Node &n) {
 
 bool Engine::step(int ms) {
     if (paused_) return waiting_ != Waiting::Ended;
+    if (previousChoiceDue_) notePreviousChoice();
     if (bool square = wantsSquare(); square != square_) {
         square_ = square;
         dirty_ = true;
@@ -4800,6 +4829,11 @@ std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d, const Si
 }
 
 void Engine::writeFlipModes(int slot, const SaveData &d) {
+    std::string text = sidecarText(d);
+    writeWhole(savePath(slot, "vnd"), std::vector<uint8_t>(text.begin(), text.end()));
+}
+
+std::string Engine::sidecarText(const SaveData &d) {
     // `at SCENE NODE`, with `-` for no scene, and the fingerprint of the save it was written with.
     std::string text = "at " + (d.scene.empty() ? std::string("-") : sjis::toUtf8(d.scene)) + " " + std::to_string(d.node) + "\n";
     text += "print " + std::to_string(saveFingerprint(d)) + "\n";
@@ -4834,7 +4868,53 @@ void Engine::writeFlipModes(int slot, const SaveData &d) {
         text += "result " + std::to_string(choiceResult_) + "\n";
         if (waiting_ == Waiting::Choice) text += "choice\n";
     }
-    writeWhole(savePath(slot, "vnd"), std::vector<uint8_t>(text.begin(), text.end()));
+    return text;
+}
+
+void Engine::notePreviousChoice() {
+    previousChoiceDue_ = false;
+    if (!layout_ || !writesPreviousChoice(*layout_) || replaying_ || waiting_ != Waiting::Choice) return;
+    SaveData d = captureSave();
+    // The PC's Previous Choice files alone hold 1 where its main saves always hold 0 (sets 2 and 3).
+    if (choiceFlag(*layout_) == ChoiceFlag::Never) d.dateFlag = 1;
+    previousChoice_ = PreviousChoice{d, sidecarText(d)};
+}
+
+// Beside each save, the state at the latest choice. Before any choice there is none, and an older file is taken away.
+void Engine::writePreviousChoice(int slot) {
+    if (!layout_ || !writesPreviousChoice(*layout_)) return;
+    std::string sav = savePath(slot, "sav", "s"), vnd = savePath(slot, "vnd", "s");
+    if (!previousChoice_) {
+        std::remove(sav.c_str());
+        std::remove(vnd.c_str());
+        return;
+    }
+    writeWhole(sav, packEntry(buildSave(previousChoice_->data, *layout_)));
+    writeWhole(vnd, std::vector<uint8_t>(previousChoice_->side.begin(), previousChoice_->side.end()));
+}
+
+// A load takes the Previous Choice file beside the save, the PC's or ours. The PC's before any choice has no records.
+void Engine::readPreviousChoice(int slot) {
+    previousChoice_.reset();
+    if (!layout_ || !writesPreviousChoice(*layout_)) return;
+    auto packed = readWhole(savePath(slot, "sav", "s"));
+    auto plain = packed.empty() ? packed : unpackEntry(packed.data(), packed.size());
+    SaveData d;
+    if (plain.empty() || !parseSave(plain, *layout_, d) || d.noRecords) return;
+    auto side = readWhole(savePath(slot, "vnd", "s"));
+    previousChoice_ = PreviousChoice{d, std::string(side.begin(), side.end())};
+}
+
+// Return to Choice: after the dialog's question, the state at the latest choice, restored as a load restores a save, and
+// kept for going back again, as under Wine (set 2).
+void Engine::returnToChoice() {
+    if (!previousChoice_) return;
+    openDialog(8, [this] {
+        PreviousChoice back = *previousChoice_;
+        restoreSave(back.data, parseSidecar(back.data, back.side));
+        previousChoice_ = back;
+        log("returned to the choice at %s #%d", back.data.scene.c_str(), back.data.node);
+    });
 }
 
 // What a save holds of the story's state, for telling whether VNDegen's lines beside it were written with it: its time,
@@ -4856,10 +4936,13 @@ uint32_t Engine::saveFingerprint(const SaveData &d) {
 }
 
 Engine::Sidecar Engine::readSidecar(const SaveData &d, int slot) {
-    Sidecar side;
-    if (slot < 0) return side;
     auto bytes = readWhole(savePath(slot, "vnd"));
-    std::istringstream in(std::string(bytes.begin(), bytes.end()));
+    return parseSidecar(d, std::string(bytes.begin(), bytes.end()));
+}
+
+Engine::Sidecar Engine::parseSidecar(const SaveData &d, const std::string &text) {
+    Sidecar side;
+    std::istringstream in(text);
     std::string line, scene;
     int node = -1;
     bool printed = false;
@@ -5393,8 +5476,8 @@ void Engine::loadMovie(const Node &n) {
 // staff roll goes straight on: Test Game 84's draws its own, which isn't built yet.
 constexpr int kStaffRollSlot = 1 << 20;
 
-void Engine::startStaffRoll() {
-    auto it = screens_.find("staffroll");
+void Engine::startStaffRoll(const std::string &name) {
+    auto it = screens_.find(name.empty() ? "staffroll" : "staffroll_" + name);
     const auto *movie = it == screens_.end() ? nullptr : it->second.setting("movie");
     if (it != screens_.end() && !movie && !it->second.pictures.empty()) {
         const Screen &roll = it->second;
@@ -5424,7 +5507,7 @@ void Engine::startStaffRoll() {
         return;
     }
     if (!movie || movie->size() < 2) {
-        warnOnce("This game's staff roll isn't built, so the story goes on past it.");
+        warnOnce(name.empty() ? "This game's staff roll isn't built, so the story goes on past it." : "The table has no staff roll " + name + ", so the story goes on past it.");
         return;
     }
     auto value = scenario_.find(field(*movie, 0));
@@ -6180,6 +6263,7 @@ void Engine::composeMessage(Canvas &out) {
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
+    if (windowArtOnly_) return;
     drawParts(out, Layer::Window);
     drawGlyphRun(out);
     composeGtCount(out);
@@ -6204,7 +6288,7 @@ void Engine::markRect(int &x, int &y, int &w, int &h) const {
 }
 
 bool Engine::markShowing() const {
-    return !screen_ && !logOpen_ && !dialogOpen_ && !windowHiddenByPlayer_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
+    return !screen_ && !logOpen_ && !dialogOpen_ && !windowHiddenByPlayer_ && !windowArtOnly_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
 }
 
 // The mark is the last thing drawn, over a copy of what's beneath it, so a tick where only the mark moved redraws just

@@ -32,4 +32,14 @@ set S 13 = 1               # skipped: the second option is taken
 label second
 scene scr\e.txt @30
 end
+
+flow roll                  # a named staff roll, as each of Test Game 82's endings has
+scene scr\r.txt @40
+staffroll t
+set S 20 = 1
+end
+
+screen staffroll_t
+length 1000
+pic obj\n001_000.bmp 0 0
 )";

@@ -428,7 +428,7 @@ pic obj\a003_001.bmp 351 228 2 1 1 0
 pic obj\a003_001.bmp 695 228 2 1 0 0
 pic obj\a003_001.bmp 695 228 2 1 1 0
 pic obj\a003_000.bmp 392 51 7 1 0 0
-questions resolution save load overwrite exit title backselection
+questions resolution save load overwrite exit title back
 button yes obj\a003_002.bmp 306 312 2 5 0
 button no obj\a003_002.bmp 650 312 2 5 1
 
