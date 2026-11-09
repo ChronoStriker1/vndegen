@@ -62,21 +62,23 @@ fetch() {
   rm -rf "$3" && mv "$3.part" "$3"
 }
 
-# The venv is shared by every build folder, so one build at a time checks and installs it.
-venv_lock="$cache/venv.lock"
-until mkdir "$venv_lock" 2>/dev/null; do
-  holder=$(cat "$venv_lock/pid" 2>/dev/null || true)
-  if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$venv_lock"; continue; fi
-  sleep 5
-done
-echo $$ > "$venv_lock/pid"
-if [ ! -x "$cache/venv/bin/scons" ] || [ "$("$cache/venv/bin/scons" --version | sed -n 's/.*SCons: v\([0-9.]*\).*/\1/p' | head -1)" != "$scons_version" ]; then
-  rm -rf "$cache/venv"
-  python3 -m venv "$cache/venv"
-  "$cache/venv/bin/pip" install --quiet "scons==$scons_version"
+# SCons runs from a venv that every build folder shares, and builds run SCons without a lock. So a venv, once made, is
+# never changed or removed (#69). Each is named after the SCons version and the Python that made it, so a new Python, as
+# a Homebrew update brings, or a new SCons gets a venv of its own beside the old one, which stays. One build at a time
+# makes one, under a lock on a file it holds open, which the system lets go of however the build ends.
+venv="$cache/venvs/$( (echo "$scons_version"; python3 -c 'import sys; print(sys.version, sys.base_prefix)') | shasum -a 256 | cut -c1-16)"
+mkdir -p "$cache/venvs"
+exec 9>"$cache/venvs/.lock"
+lockf 9
+if [ ! -f "$venv/.vndegen-ready" ]; then
+  # Without the mark, making this venv stopped partway, and no build has used it.
+  rm -rf "$venv"
+  python3 -m venv "$venv"
+  "$venv/bin/pip" install --quiet "scons==$scons_version"
+  touch "$venv/.vndegen-ready"
 fi
-rm -rf "$venv_lock"
-scons="$cache/venv/bin/scons"
+exec 9>&-
+scons="$venv/bin/scons"
 
 # prepare <major> <commit>: the patched sources in $work/godot<major>. They are made fresh, then copied over the
 # sources the builds use by content, so unchanged files keep their times and SCons rebuilds only what changed.

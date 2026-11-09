@@ -2,7 +2,7 @@
 
 This records the test that came before the runtime, as it stood then, apart from its saves section. `docs/engines.md` says how the games run now, and `docs/nekosdk-cleanroom.md` where the runtime's knowledge came from.
 
-Roadmap item 10. NekoSDK has no runtime or reimplementation anywhere, so supporting it means writing one from the game files. This test mapped the formats of the 16 library games (Test Games 82 to 97, 49 GB unpacked) on Linux, parsed every script, and rendered the first scene of two games. It ran no Windows executable and decompiled none. The executables were only searched for strings.
+On the roadmap as NekoSDK. NekoSDK has no runtime or reimplementation anywhere, so supporting it means writing one from the game files. This test mapped the formats of the 16 library games (Test Games 82 to 97, 49 GB unpacked) on Linux, parsed every script, and rendered the first scene of two games. It ran no Windows executable and decompiled none. The executables were only searched for strings.
 
 ## Summary
 
