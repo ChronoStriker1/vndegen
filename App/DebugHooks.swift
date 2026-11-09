@@ -34,6 +34,8 @@ import QuartzCore
 ///   notifyutil -s vndegen.key 13 -p vndegen.key   presses and releases a key in the game, by web keyCode (13 Enter, 32 Space)
 ///   notifyutil -p vndegen.app.resign   posts the app's resign-active notice, and .app.become its become-active one
 ///   notifyutil -p vndegen.app.quit   quits the app as Command-Q does, macOS only
+///   notifyutil -s vndegen.app.windowsize 10240768 -p vndegen.app.windowsize   resizes the main window's content to
+///                            1024 by 768 (width then height, four digits each), macOS only
 ///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only. See -snapshot
 ///   notifyutil -p vndegen.app.fillsheet   types "Mac comment" into the open sheet's text field and presses OK, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
@@ -150,6 +152,19 @@ enum DebugHooks {
             }
         }
         #if os(macOS)
+        // `notifyutil -s vndegen.app.windowsize 10240768 -p vndegen.app.windowsize` resizes the main window's content
+        // to width then height, four digits each, here 1024 by 768, as dragging its corner would, for a game's frame
+        // that follows the window's shape.
+        var sizeToken: Int32 = 0
+        notify_register_dispatch("\(prefix).app.windowsize", &sizeToken, .main) { token in
+            var state: UInt64 = 0
+            notify_get_state(token, &state)
+            let size = CGSize(width: Double(state / 10000), height: Double(state % 10000))
+            MainActor.assumeIsolated {
+                guard size.width > 0, size.height > 0, let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }) else { return }
+                window.setContentSize(size)
+            }
+        }
         var quitToken: Int32 = 0
         notify_register_dispatch("\(prefix).app.quit", &quitToken, .main) { _ in
             MainActor.assumeIsolated { MacAppDelegate.quit() }
