@@ -109,10 +109,161 @@ button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 
 
 screen defaults
 parts scroll
-# The PC draws the message window at its .alp as it is.
+# The PC draws the message window at its .alp as it is. Config's first-run values, as the PC shows them under Wine.
 default opacity 100
+default text 50
+default auto 50
+default bgm 60
+default se 60
+default voice 80
+default backvoice 80
+default skipall 1
 layoutcgslot 102
 lastchoice made
+
+# Config, one page, measured under Wine. Its help is a circle above or below the row under the pointer. The screen's
+# colour depth and resolution, and asking for the resolution at start, are drawn disabled, as VNDegen sizes the window.
+screen config
+pic bg\bg_000_023_000.bmp 0 0
+pic dim 0 0 alpha 138
+pic obj\e001_000.bmp 1103 0
+pic obj\e000_000.bmp 0 0
+pic obj\e000_001.bmp 22 18 6 1 5 0
+pic obj\h001_000.bmp 24 89
+pic obj\h002_000.bmp 24 454
+pic obj\h003_000.bmp 560 89
+pic obj\h004_000.bmp 560 259
+button cfg_defaults obj\h000_000.bmp 736 31 3 5 0 help obj\h000_001.bmp 696 86 3 1 0 0
+button cfg_undo obj\h000_000.bmp 856 31 3 5 1 help obj\h000_001.bmp 816 86 3 1 1 0
+button cfg_apply obj\h000_000.bmp 976 31 3 5 2 help obj\h000_001.bmp 936 86 3 1 2 0
+button nav_save obj\e001_001.bmp 1114 61 9 5 0 help obj\e001_002.bmp 947 15 9 1 0 0
+button nav_load obj\e001_001.bmp 1114 131 9 5 1 help obj\e001_002.bmp 947 85 9 1 1 0
+button nav_cg obj\e001_001.bmp 1114 201 9 5 2 help obj\e001_002.bmp 947 155 9 1 2 0
+button nav_scene obj\e001_001.bmp 1114 271 9 5 3 help obj\e001_002.bmp 947 225 9 1 3 0
+button nav_music obj\e001_001.bmp 1114 341 9 5 4 help obj\e001_002.bmp 947 295 9 1 4 0
+button nav_config obj\e001_001.bmp 1114 411 9 5 5 help obj\e001_002.bmp 947 365 9 1 5 0
+button nav_title obj\e001_001.bmp 1114 481 9 5 6 help obj\e001_002.bmp 947 435 9 1 6 0
+button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 1 7 0
+button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
+radio screen 0 obj\h001_001.bmp 264 124 10 5 0
+radio screen 1 obj\h001_001.bmp 381 124 10 5 1
+pic obj\h001_001.bmp 264 152 10 5 2 4
+pic obj\h001_001.bmp 381 152 10 5 3 4
+pic obj\h001_001.bmp 216 180 10 5 4 4
+pic obj\h001_001.bmp 323 180 10 5 5 4
+pic obj\h001_001.bmp 430 180 10 5 6 4
+pic obj\h001_001.bmp 216 208 10 5 7 4
+pic obj\h001_001.bmp 323 208 10 5 8 4
+pic obj\h001_001.bmp 430 208 10 5 9 4
+radio effect 1 obj\h001_002.bmp 264 236 2 5 0
+radio effect 0 obj\h001_002.bmp 381 236 2 5 1
+radio wait 1 obj\h001_002.bmp 264 264 2 5 0
+radio wait 0 obj\h001_002.bmp 381 264 2 5 1
+pic obj\h001_010.bmp 88 321
+slider opacity obj\h001_006.bmp 88 321
+pic obj\h001_005.bmp 88 321
+knob opacity obj\h001_004.bmp 73 315 4
+step opacity -1 obj\h001_003.bmp 52 317 2 5 0
+step opacity 1 obj\h001_003.bmp 516 317 2 5 1
+number opacity obj\e002_002.bmp 443 293 15
+radio confirm_saveload 1 obj\h001_002.bmp 264 348 2 5 0
+radio confirm_saveload 0 obj\h001_002.bmp 381 348 2 5 1
+group confirm_saveload confirm_overwrite confirm_delete confirm_quick confirm_title confirm_exit
+radio tutorial 1 obj\h001_002.bmp 264 376 2 5 0
+radio tutorial 0 obj\h001_002.bmp 381 376 2 5 1
+pic obj\h001_007.bmp 101 403 1 5 0 4
+pic obj\h001_010.bmp 88 518
+slider text obj\h001_006.bmp 88 518
+pic obj\h001_005.bmp 88 518
+knob text obj\h001_004.bmp 73 512 4
+step text -1 obj\h001_003.bmp 52 514 2 5 0
+step text 1 obj\h001_003.bmp 516 514 2 5 1
+number text obj\e002_002.bmp 443 490 15
+pic obj\h001_010.bmp 88 574
+slider auto obj\h001_006.bmp 88 574
+pic obj\h001_005.bmp 88 574
+knob auto obj\h001_004.bmp 73 568 4
+step auto -1 obj\h001_003.bmp 52 570 2 5 0
+step auto 1 obj\h001_003.bmp 516 570 2 5 1
+number auto obj\e002_002.bmp 443 546 15
+# The wait time runs from x0.50 to x1.50, its rose in the middle at x1.00 (inferred from the PC's middle place).
+range waittime 50 150
+pic obj\h001_010.bmp 88 630
+pic obj\h001_005.bmp 88 630
+knob waittime obj\h001_004.bmp -127 624 4
+step waittime -1 obj\h001_003.bmp 52 626 2 5 0
+step waittime 1 obj\h001_003.bmp 516 626 2 5 1
+number waittime obj\e002_002.bmp 435 602 459 474
+radio skipall 0 obj\h003_001.bmp 800 124 9 5 0
+radio skipall 1 obj\h003_001.bmp 917 124 9 5 1
+radio rightclick 0 obj\h003_001.bmp 752 152 9 5 2
+radio rightclick 1 obj\h003_001.bmp 859 152 9 5 3
+radio rightclick 2 obj\h003_001.bmp 966 152 9 5 4
+radio rightclick 3 obj\h003_001.bmp 800 180 9 5 5
+radio rightclick 4 obj\h003_001.bmp 917 180 9 5 6
+radio deckey 0 obj\h003_001.bmp 800 208 9 5 7
+radio deckey 1 obj\h003_001.bmp 917 208 9 5 8
+pic obj\h001_010.bmp 624 323
+slider bgm obj\h001_006.bmp 624 323
+pic obj\h001_005.bmp 624 323
+knob bgm obj\h001_004.bmp 609 317 4
+step bgm -1 obj\h001_003.bmp 588 319 2 5 0
+step bgm 1 obj\h001_003.bmp 1052 319 2 5 1
+number bgm obj\e002_002.bmp 979 295 15
+pic obj\h001_010.bmp 624 379
+slider se obj\h001_006.bmp 624 379
+pic obj\h001_005.bmp 624 379
+knob se obj\h001_004.bmp 609 373 4
+step se -1 obj\h001_003.bmp 588 375 2 5 0
+step se 1 obj\h001_003.bmp 1052 375 2 5 1
+number se obj\e002_002.bmp 979 351 15
+pic obj\h001_010.bmp 624 435
+slider voice obj\h001_006.bmp 624 435
+pic obj\h001_005.bmp 624 435
+knob voice obj\h001_004.bmp 609 429 4
+step voice -1 obj\h001_003.bmp 588 431 2 5 0
+step voice 1 obj\h001_003.bmp 1052 431 2 5 1
+number voice obj\e002_002.bmp 979 407 15
+pic obj\h001_010.bmp 624 491
+slider backvoice obj\h001_006.bmp 624 491
+pic obj\h001_005.bmp 624 491
+knob backvoice obj\h001_004.bmp 609 485 4
+step backvoice -1 obj\h001_003.bmp 588 487 2 5 0
+step backvoice 1 obj\h001_003.bmp 1052 487 2 5 1
+number backvoice obj\e002_002.bmp 979 463 15
+radio mute_backvoice 0 obj\h001_002.bmp 800 518 2 5 0
+radio mute_backvoice 1 obj\h001_002.bmp 917 518 2 5 1
+radio voice_stop 1 obj\h001_002.bmp 800 546 2 5 0
+radio voice_stop 0 obj\h001_002.bmp 917 546 2 5 1
+pic obj\h004_003.bmp 949 294 1 5 0 4
+pic obj\h004_003.bmp 949 350 1 5 0 0
+pic obj\h004_003.bmp 949 406 1 5 0 0
+pic obj\h004_003.bmp 949 462 1 5 0 0
+pic obj\h004_001.bmp 752 574 4 5 0 0
+pic obj\h004_001.bmp 859 574 4 5 1 0
+pic obj\h004_001.bmp 966 574 4 5 2 0
+pic obj\h004_001.bmp 752 602 4 5 3 0
+hovercols 40 124 540 150 obj\h001_008.bmp 29 146 8 0
+hovercols 40 152 540 178 obj\h001_008.bmp 29 174 8 1
+hovercols 40 180 540 234 obj\h001_008.bmp 29 15 8 2
+hovercols 40 236 540 262 obj\h001_008.bmp 29 71 8 3
+hovercols 40 264 540 290 obj\h001_008.bmp 29 99 8 4
+hovercols 40 292 540 345 obj\h001_008.bmp 29 126 8 5
+hovercols 40 348 540 374 obj\h001_008.bmp 29 183 8 6
+hovercols 40 376 540 402 obj\h001_008.bmp 29 211 8 7
+hovercols 40 488 540 540 obj\h002_001.bmp 29 321 3 0
+hovercols 40 545 540 597 obj\h002_001.bmp 29 378 3 1
+hovercols 40 600 540 652 obj\h002_001.bmp 29 435 3 2
+hovercols 576 124 1080 150 obj\h003_002.bmp 555 146 3 0
+hovercols 576 152 1080 206 obj\h003_002.bmp 555 174 3 1
+hovercols 576 208 1080 234 obj\h003_002.bmp 555 42 3 2
+hovercols 576 292 1080 345 obj\h004_002.bmp 555 126 7 0
+hovercols 576 349 1080 401 obj\h004_002.bmp 555 184 7 1
+hovercols 576 405 1080 457 obj\h004_002.bmp 555 240 7 2
+hovercols 576 461 1080 513 obj\h004_002.bmp 555 296 7 3
+hovercols 576 518 1080 544 obj\h004_002.bmp 555 353 7 4
+hovercols 576 546 1080 572 obj\h004_002.bmp 555 380 7 5
+hovercols 576 574 1080 628 obj\h004_002.bmp 555 407 7 6
 
 screen story
 # The six choices are obj\l000_000 to _005, two options each. Sex scenes end on l000_000, which only picks the next
