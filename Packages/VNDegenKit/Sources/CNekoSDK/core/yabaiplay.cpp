@@ -170,6 +170,7 @@ public:
         cell(host, out, "obj\\l006_00" + std::to_string(2 * shown) + ".bmp", 105, 0,
              560 * (3 * (truth(host) - 1) + std::min(3, std::max(1, stage)) - 1), 0, 560, 720);
         put(host, out, "obj\\l001_000.bmp", 256, 21);
+        put(host, out, "obj\\l005_000.bmp", 0, 592);
         cell(host, out, "obj\\l004_000.bmp", kTreeButton[0], kTreeButton[1], 0, 0, 190, 95);
         drawClock(host, out);
         // The heroine tabs: row 2 for the one shown, 4 (grey) once she's done, else row 0.
@@ -180,6 +181,7 @@ public:
         put(host, out, "obj\\l002_002.bmp", 1002, 19);
         cell(host, out, "obj\\l001_001.bmp", 465, 21, 123 * (truth(host) - 1), 0, 123, 25);
         cell(host, out, "obj\\l005_001.bmp", 669, 625, 216 * (truth(host) - 1), 0, 216, 73);
+        cell(host, out, "obj\\l005_002.bmp", 899, 607, 374 * (truth(host) - 1), 0, 374, 91);
         // A locked stage's questions are all dark, as asked ones are.
         bool shut = locked(host, shown);
         int bits = shut ? 7 : asked(host, shown);
