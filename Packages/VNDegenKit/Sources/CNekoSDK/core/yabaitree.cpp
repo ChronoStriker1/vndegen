@@ -43,7 +43,7 @@ class YabaiTreePart : public GamePart {
 public:
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &) override {
         if (name != "tree") return false;
-        if (!loaded_) load(host);
+        if (!loaded_) readTrees(host);
         open_ = true;
         truth_ = viewed_ = std::clamp(host.variable(1, kTruthVar), 1, 5);
         heroine_ = std::clamp(host.variable(1, kShownVar), 0, 2);
@@ -59,6 +59,7 @@ public:
 
     bool press(PartHost &host, int x, int y, int button) override {
         if (!open_) return false;
+        if (!loaded_) readTrees(host);
         if (button == 1 || kClose.contains(x, y)) return leave(host, 0, 0);
         for (int h = 0; h < 3; h++)
             if (tab(h).contains(x, y)) {
@@ -84,8 +85,29 @@ public:
         return true;
     }
 
+    // Controller focus: the close button, the tabs and plates, each ▶ replay and each question to ask.
+    bool focusSpots(PartHost &host, std::vector<std::pair<int, int>> &spots) override {
+        if (!open_) return false;
+        if (!loaded_) readTrees(host);
+        auto middle = [&](const Rect &r) { spots.push_back({r.x + r.w / 2, r.y + r.h / 2}); };
+        middle(kClose);
+        for (int h = 0; h < 3; h++) middle(tab(h));
+        for (int t = 1; t <= truth_; t++) middle(plate(t));
+        int shown = shownStages(host);
+        for (int s = 1; s <= shown; s++) {
+            const Stage &st = stage(viewed_, s);
+            for (int q = 0; q < st.questions; q++) {
+                bool asked = isAsked(host, viewed_, s, q);
+                if (asked) middle(replay(st, s, q));
+                else if (askable(host, s)) middle(panel(st, s, q, true));
+            }
+        }
+        return true;
+    }
+
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
         if (!open_ || layer != Layer::Screen) return;
+        if (!loaded_) readTrees(host);
         put(host, out, "obj\\m000_000.bmp", 0, 8);
         put(host, out, "obj\\m000_003.bmp", 21, 34);
         put(host, out, "obj\\m000_004.bmp", 880, 92);
@@ -136,6 +158,24 @@ public:
         } else {
             // The hint under the questions to ask, 5 rows below them.
             put(host, out, "obj\\m002_000.bmp", 30, rowTop(shown) + 89 + 5);
+        }
+    }
+
+    // An open tree is kept with a save, `open TRUTH VIEWED HEROINE`, so a load brings it back as it was.
+    void save(std::vector<std::string> &lines) const override {
+        if (open_) lines.push_back("open " + std::to_string(truth_) + " " + std::to_string(viewed_) + " " + std::to_string(heroine_));
+    }
+    void load(const std::vector<std::string> &lines) override {
+        for (const std::string &line : lines) {
+            std::istringstream words(line);
+            std::string kind;
+            int truth = 0, viewed = 0, heroine = 0;
+            if (words >> kind >> truth >> viewed >> heroine && kind == "open") {
+                open_ = true;
+                truth_ = std::clamp(truth, 1, 5);
+                viewed_ = std::clamp(viewed, 1, truth_);
+                heroine_ = std::clamp(heroine, 0, 2);
+            }
         }
     }
 
@@ -193,7 +233,7 @@ private:
 
     // Each heroine's tree file: `LevelNNRankMMNum`, `...Ans`, and the question pictures in lines the file keeps as
     // comments (`//LevelNNRankMMFilename` and `AfterFilename`), with the red lines `LevelNNRedLineFileK` and `PosK`.
-    void load(PartHost &host) {
+    void readTrees(PartHost &host) {
         loaded_ = true;
         for (int h = 0; h < 3; h++) {
             auto bytes = host.read(kTreeFiles[h]);

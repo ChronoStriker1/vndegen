@@ -174,7 +174,8 @@ void CommentStream::lines(PartHost &host, const std::vector<std::string> &texts)
 // The comments go, those on their way too, and no more start. The parameter is the group that last played (111 7 after
 // group 7, 111 10 after group 10): on Test Game 96's PC, 111 10 came while group 10 still sent comments, and none was
 // left three seconds on, where those on their way would have taken six (lead, under Wine).
-void CommentStream::end(PartHost &, int) {
+void CommentStream::end(PartHost &host, int) {
+    if (!live_.empty()) host.redraw();
     ended_ = true;
     playing_.clear();
     cursors_.clear();
@@ -220,8 +221,10 @@ bool CommentStream::step(PartHost &host) {
         start(host, it->text, it->y, it->at);
         it = pending_.erase(it);
     }
+    size_t before = live_.size();
     live_.erase(std::remove_if(live_.begin(), live_.end(), [&](const Live &c) { return now - c.born >= kCrossMs; }), live_.end());
-    return !live_.empty();
+    // The frame a comment left on is drawn again too, to take its last pixels away.
+    return !live_.empty() || live_.size() != before;
 }
 
 void CommentStream::draw(PartHost &host, Canvas &out) const {

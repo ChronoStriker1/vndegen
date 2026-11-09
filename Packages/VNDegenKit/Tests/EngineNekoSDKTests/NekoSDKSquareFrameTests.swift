@@ -161,5 +161,12 @@ import TestSupport
         let f = frame(e, view: (1024, 768))
         #expect(pixel(f, 640, 410) == [255, 255, 0], "\(pixel(f, 640, 410))")
         #expect(pixel(f, 640, 300) == [255, 255, 255], "\(pixel(f, 640, 300))")
+
+        // Focus down from the first option goes to the second where it's drawn, not a quarter lower.
+        vnneko_mouse_move(e, 0.5, 330.0 / 960)
+        #expect(vnneko_move_focus(e, 0, 1))
+        let focused = frame(e, view: (1024, 768))
+        #expect(pixel(focused, 640, 410) == [255, 255, 0], "\(pixel(focused, 640, 410))")
+        #expect(pixel(focused, 640, 300) == [255, 255, 255], "\(pixel(focused, 640, 300))")
     }
 }

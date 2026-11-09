@@ -10,6 +10,10 @@
 
 namespace neko {
 
+// The scenario variables a PC save holds, 0 to 9999. VNDegen's own story variables above them, such as Test Game 96's
+// from 15000, go in its lines beside the save instead.
+constexpr int kSavedVariables = 10000;
+
 struct SavedSprite {
     int slot = 0;
     int flipFrame = -1;  // the picture a flipbook is on, or -1 for an ordinary sprite
