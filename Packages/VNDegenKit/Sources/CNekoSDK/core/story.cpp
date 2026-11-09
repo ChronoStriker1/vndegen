@@ -27,9 +27,6 @@
 namespace neko {
 namespace {
 
-// Opcodes the story table needs that flow scripts don't have. Flow scripts' own stop well below these.
-constexpr int kStoryGoto = 1001, kStoryOpen = 1002, kStoryChapter = 1003;
-
 std::vector<std::string> withoutComment(const std::vector<std::string> &w) {
     std::vector<std::string> out;
     for (const std::string &word : w) {
@@ -165,6 +162,18 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
             size_t at = operand(w, 4, n);
             if (at + 1 < w.size() && w[at] == "goto") pendingJumps.push_back({script->nodes.size() - 1, w[at + 1]});
             else fail(w, "an `if` ends with goto LABEL");
+        } else if (w[0] == "resume" && w.size() >= 7) {
+            // `resume S n OP VALUE at LABEL`: a PC save without VNDegen's lines, whose variable holds, goes on from
+            // LABEL, as Test Game 96's saves at its hub and its vote's pick say where they are only in S 105 (set 2).
+            // The story passes over the line itself.
+            Node &n = add(kStoryResume);
+            variable(w[1], w[2], n, w);
+            const std::string &cmp = w[3];
+            n.p[3] = cmp == "==" ? 0 : cmp == "!=" ? 1 : cmp == "<=" ? 2 : cmp == ">=" ? 3 : cmp == "<" ? 4 : cmp == ">" ? 5 : -1;
+            if (n.p[3] < 0) fail(w, "a comparison is == != <= >= < or >");
+            size_t at = operand(w, 4, n);
+            if (at + 1 < w.size() && w[at] == "at") pendingJumps.push_back({script->nodes.size() - 1, w[at + 1]});
+            else fail(w, "a `resume` ends with at LABEL");
         } else if (w[0] == "open" && w.size() >= 2) {
             Node &n = add(kStoryOpen);
             n.s[1] = w[1];
@@ -173,6 +182,9 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
             for (; i < w.size() && w[i] != "->" && count < 24; i++) n.p[size_t(4 + count++)] = toInt(w[i]);
             n.p[3] = count;
             n.p[0] = -1;
+            // `@N` on an open line: the PC's number while that screen waits, as Test Game 90's select screen has one for
+            // each half-week (set 1).
+            n.p[kStoryPcNumber] = pc;
             if (i + 2 < w.size() && w[i] == "->") {
                 n.p[0] = w[i + 1] == "S" ? 1 : 0;
                 n.p[1] = toInt(w[i + 2]);
@@ -234,7 +246,10 @@ std::shared_ptr<Script> Engine::compileChapter(int number) {
         n.id = int(script->nodes.size()) + 1;
         n.opcode = 1;
         n.next = n.id + 1;
-        n.s[1] = scene;
+        // `scr\x.txt @N`: the scene and the PC's number for it, as Test Game 90's picks have one for each (set 1).
+        size_t at = scene.rfind(" @");
+        n.s[1] = at == std::string::npos ? scene : scene.substr(0, at);
+        if (at != std::string::npos) n.p[kStoryPcNumber] = std::atoi(scene.c_str() + at + 2);
         script->nodes.push_back(n);
     }
     script->nodes.back().next = 0;
@@ -271,30 +286,76 @@ bool Engine::storySceneIs(const Node &n, const std::string &scene) {
     return n.opcode == 1 && (normalizedPath(n.s[1]) == want || normalizedPath(files_.savedName(n.s[1])) == want);
 }
 
-// A PC save of a game without flow scripts names its scene and the PC's number for its place in the story, 3 for while a
-// choice waits: the line with that number, if the table gives numbers, is the place. Numbers repeat, as both options of
-// Test Game 87's choices and each ending's last scene share one (set 1), so the line whose scene the save names wins.
-bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice) {
+bool Engine::storyConditionHolds(const Node &n) {
+    int left = variableValue(n.p[0], variableIndex(n)), right = operand(n);
+    return n.p[3] == 0 ? left == right : n.p[3] == 1 ? left != right : n.p[3] == 2 ? left <= right : n.p[3] == 3 ? left >= right : n.p[3] == 4 ? left < right : left > right;
+}
+
+// A PC save, without VNDegen's lines beside it, at a place only its variables tell: the first `resume` line whose
+// condition holds is the place, its label's line run at once.
+bool Engine::resumeStoryByRule(bool &atScreen) {
     auto table = screens_.find("story");
-    if (table == screens_.end() || number <= 0) return false;
-    std::shared_ptr<Script> found;
-    const Node *at = nullptr;
+    if (table == screens_.end()) return false;
     for (const auto &line : table->second.lines) {
         if (line.size() < 2 || line[0] != "flow") continue;
         auto flow = loadScript("story:" + line[1]);
         if (!flow) continue;
         for (const Node &n : flow->nodes) {
-            if (n.p[kStoryPcNumber] != number || (at && !storySceneIs(n, scene))) continue;
-            found = flow;
-            at = &n;
-            if (storySceneIs(n, scene)) break;
+            if (n.opcode != kStoryResume || !n.otherwise || !storyConditionHolds(n)) continue;
+            stack_.push_back({flow, flow->node(n.otherwise)});
+            atScreen = true;
+            return true;
         }
-        if (at && storySceneIs(*at, scene)) break;
+    }
+    return false;
+}
+
+// A PC save of a game without flow scripts names its scene and the PC's number for its place in the story, 3 for while a
+// choice waits: the line with that number, if the table gives numbers, is the place, a `scene` or `choice` line or an
+// `open` line, whose screen opens again. Numbers repeat, as both options of
+// Test Game 87's choices and each ending's last scene share one (set 1), so the line whose scene the save names wins.
+bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice, bool &atScreen) {
+    auto table = screens_.find("story");
+    if (table == screens_.end() || number <= 0) return false;
+    std::shared_ptr<Script> found, chapter;
+    const Node *at = nullptr, *call = nullptr;
+    // A line of a flow, or of a chapter a flow plays, with the number; the one whose scene the save names wins.
+    auto consider = [&](const std::shared_ptr<Script> &flow, const Node &n, const std::shared_ptr<Script> &in, const Node *from) {
+        if (n.p[kStoryPcNumber] != number || (at && !storySceneIs(n, scene))) return false;
+        found = flow;
+        chapter = in;
+        at = &n;
+        call = from;
+        return storySceneIs(n, scene);
+    };
+    bool named = false;
+    for (const auto &line : table->second.lines) {
+        if (named) break;
+        if (line.size() < 2 || line[0] != "flow") continue;
+        auto flow = loadScript("story:" + line[1]);
+        if (!flow) continue;
+        for (const Node &n : flow->nodes) {
+            if ((named = consider(flow, n, nullptr, nullptr))) break;
+            if (n.opcode == kStoryChapter)
+                if (auto inside = loadScript("chapter:" + std::to_string(operand(n))))
+                    for (const Node &c : inside->nodes)
+                        if ((named = consider(flow, c, inside, &n))) break;
+            if (named) break;
+        }
     }
     if (!at) return false;
-    // A save while the choice waits asks it again; one after it goes on past it.
+    // Inside a chapter: the flow goes on after the chapter, and the chapter after the scene.
+    if (chapter) {
+        stack_.push_back({found, found->node(call->next)});
+        stack_.push_back({chapter, chapter->node(at->next)});
+        flowCallId_ = number;
+        return true;
+    }
+    // A save while the choice waits asks it again; one after it goes on past it. One at a screen's number opens the
+    // screen again.
     atChoice = at->opcode == 3 && active == 3;
-    stack_.push_back({found, atChoice ? at : found->node(at->next)});
+    atScreen = at->opcode == kStoryOpen;
+    stack_.push_back({found, atChoice || atScreen ? at : found->node(at->next)});
     flowCallId_ = number;
     return true;
 }

@@ -307,6 +307,7 @@ private:
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
     bool fullWidthPlate() const;
+    bool partPlate() const;
     bool composeTitleOpening(Canvas &out);
     // Where the pointer is, from -1 at the screen's left or top edge to 1 at the other, or the middle before it's been seen.
     void pointerToward(float &x, float &y) const;
@@ -728,9 +729,14 @@ private:
     std::string firstStoryFlow() const;
     bool resumeStoryAt(const std::string &scene);
     bool storyFlowExists(const std::string &name) const;
-    bool resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice);
+    bool resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice, bool &atScreen);
     bool storySceneIs(const Node &n, const std::string &scene);
-    // The parameter of a story table's `scene` and `choice` nodes that holds the PC's number for the place.
+    bool resumeStoryByRule(bool &atScreen);
+    // A flow condition's comparison, as Test Game 94's exe orders them: ==, !=, <=, >=, <, >.
+    bool storyConditionHolds(const Node &n);
+    // Opcodes the story table needs that flow scripts don't have. Flow scripts' own stop well below these.
+    static constexpr int kStoryGoto = 1001, kStoryOpen = 1002, kStoryChapter = 1003, kStoryResume = 1004;
+    // The parameter of a story table's `scene`, `choice` and `open` nodes that holds the PC's number for the place.
     static constexpr int kStoryPcNumber = 31;
     // A story table's choice's columns of its picture: how many at this parameter, then the columns.
     static constexpr int kChoiceCells = 14;

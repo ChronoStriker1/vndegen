@@ -35,9 +35,9 @@ import TestSupport
         data.subdata(in: (data.startIndex + at)..<(data.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) }
     }
 
-    private func game() throws -> URL {
+    private func game(_ folder: String = "layoutold") throws -> URL {
         try NekoSDKFlowFixture.game([
-            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\layoutold\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
             "bg.pak": NekoSDKFlowFixture.archive([("g.bmp", bmp(4, 4, [0, 255, 0]))]),
             "sc.pak": NekoSDKFlowFixture.archive([("r.bmp", bmp(101, 81, [0, 0, 255]))]),
             "flow/t.txt": NekoSDKFlowFixture.flow([
@@ -56,10 +56,12 @@ import TestSupport
         ])
     }
 
-    private func saves(_ data: URL) -> URL { data.appendingPathComponent("AppData/Roaming/vndegen/layoutold/save") }
+    private func saves(_ data: URL, _ folder: String = "layoutold") -> URL {
+        data.appendingPathComponent("AppData/Roaming/vndegen/\(folder)/save")
+    }
 
-    private func file(_ data: URL, _ name: String) throws -> URL {
-        try #require(try FileManager.default.contentsOfDirectory(at: saves(data), includingPropertiesForKeys: nil)
+    private func file(_ data: URL, _ name: String, _ folder: String = "layoutold") throws -> URL {
+        try #require(try FileManager.default.contentsOfDirectory(at: saves(data, folder), includingPropertiesForKeys: nil)
             .first { $0.lastPathComponent.lowercased() == name })
     }
 
@@ -120,6 +122,86 @@ import TestSupport
         let second = try #require(NekoSDKFlowFixture.start(root, data: data))
         defer { vnneko_stop(second) }
         #expect(vnneko_debug_load(second, 2))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(pixel(second, 194, 326) == [255, 0, 0])
+        #expect(pixel(second, 0, 0) == [0, 255, 0])
+    }
+
+    // Test Game 96's layout: the older engine's records, 396 bytes after their names with 26 zeros before each, and the
+    // newer place for the choice's picture with a second picture's name after it, the two every PC save of it names.
+    @Test func aSaveInTestGame96sLayoutLoads() throws {
+        let root = try game("layout96")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(first, 16) }
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", "layout96")))
+        let flow = Int(int32(save, 0xCD))
+        let choice = 0xCD + 4 + flow + 4196
+        let names = ["obj\\a003_001.bmp", "obj\\t000_000.bmp"]
+        #expect(Int(int32(save, choice)) == names[0].utf8.count)
+        #expect(save.subdata(in: (save.startIndex + choice + 4)..<(save.startIndex + choice + 20)) == Data(names[0].utf8))
+        #expect(Int(int32(save, choice + 20)) == names[1].utf8.count)
+        // The date block, 39,592 bytes after the second name: 1 at 240.
+        let date = choice + 40 + 39592
+        #expect(save[save.startIndex + date + 240] == 1)
+        // The standing picture's record, the second, 26 zeros after the first's 396 bytes past its empty names.
+        let path = try #require(save.range(of: Data("sc\\r.bmp".utf8)))
+        let at = path.lowerBound - save.startIndex
+        #expect(int32(save, at - 12) == 600)
+        #expect(int32(save, at + 8 + 4 + 0xD5) == 194)
+
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(pixel(second, 194, 326) == [255, 0, 0])
+        #expect(pixel(second, 0, 0) == [0, 255, 0])
+
+        // 96's PC saves name their scene with a doubled backslash, as its chapter list writes it: the scene still loads.
+        var doubled = save
+        let end = try #require(doubled.range(of: Data("s.txt".utf8), options: .backwards)).upperBound - doubled.startIndex
+        var start = end - 5
+        while start > 4 && Int(int32(doubled, start - 4)) != end - start { start -= 1 }
+        let name = String(decoding: doubled.subdata(in: (doubled.startIndex + start)..<(doubled.startIndex + end)), as: UTF8.self)
+        let twice = Data(name.replacingOccurrences(of: "\\", with: "\\\\").utf8)
+        doubled.replaceSubrange((doubled.startIndex + start - 4)..<(doubled.startIndex + end), with: withUnsafeBytes(of: Int32(twice.count).littleEndian, { Data($0) }) + twice)
+        try NekoSDKFlowFixture.packed(doubled).write(to: saves(data, "layout96").appendingPathComponent("save002.sav"))
+        #expect(vnneko_debug_load(second, 2))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(String(cString: vnneko_debug_status(second)).contains("s.txt"), "\(String(cString: vnneko_debug_status(second)))")
+        #expect(pixel(second, 194, 326) == [255, 0, 0])
+    }
+
+    // Test Game 90's layout: the newer engine's sprite records with x and y as floats 0xD5 after their names, a shorter
+    // last block, and a tail without the GOOD Timing fields.
+    @Test func aSaveInTestGame90sLayoutLoads() throws {
+        let root = try game("layout90")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(first, 16) }
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", "layout90")))
+        let path = try #require(save.range(of: Data("sc\\r.bmp".utf8)))
+        let at = path.lowerBound - save.startIndex
+        #expect(int32(save, at - 12) == 600)
+        let x = save.subdata(in: (save.startIndex + at + 12 + 0xD5)..<(save.startIndex + at + 12 + 0xD9)).withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
+        #expect(x == 194)
+        // A shown sprite holds 255 as its alpha, as 90's PC writes it and needs to draw it (set 1), and the head's 1.0s
+        // where 90's PC has them, 105 into the record past its names.
+        #expect(int32(save, at + 12 + 249) == 255)
+        for place in [105, 125, 145, 165] { #expect(int32(save, at + 12 + place) == 0x3F80_0000, "\(place)") }
+        #expect(int32(save, at + 12 + 113) == 0)
+
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
         for _ in 0..<3 { _ = vnneko_step(second, 16) }
         #expect(pixel(second, 194, 326) == [255, 0, 0])
         #expect(pixel(second, 0, 0) == [0, 255, 0])

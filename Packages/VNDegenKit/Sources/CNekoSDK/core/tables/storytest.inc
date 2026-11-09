@@ -7,7 +7,8 @@ lastchoice made            # saves hold 2 once a choice is made, as Test Game 83
 
 screen story
 flow main
-open selftestwait 1 -> S 12 # a screen before any scene, so a save there names none
+resume S 30 == 4 at kept    # a PC save with S 30 at 4 opens the screen at `kept`
+open selftestwait 1 -> S 12 @50 # a screen before any scene, so a save there names none, and its PC number
 scene scr\a.txt @30        # the same number as the last scene: a PC save picks between them by its scene
 open selftest 3 -> S 5     # a game part's screen; its result to scenario variable 5
 on 3 goto three
@@ -45,11 +46,12 @@ length 1000
 pic obj\n001_000.bmp 0 0
 )";
 
-// The load screen and question box the `storytestload` folder adds: one card at 100, 100, and a Yes over the place where
-// the story's choice draws its first option.
+// The load screen and question box the `storytestload` folder adds: one card at 100, 100, a Back at 900, 600, and a Yes
+// over the place where the story's choice draws its first option.
 const char kStoryLoadScreens[] = R"(
 screen load
 slots obj\b.bmp 100 100 300 100 1 1
+button back obj\b.bmp 900 600 1 5 0
 
 screen dialog
 button yes obj\b.bmp 615 335 1 5 0
