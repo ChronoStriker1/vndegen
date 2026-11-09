@@ -5990,7 +5990,9 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
         else if (name == "alpha") { push(Track::Alpha, false, lastAlpha, value); lastAlpha = value; }
         // The older layout's opacity, of 256: Test Game 87's fly-outs (`bright,64`) fade to a quarter as they go, the
         // sprite over the backdrop with its colours unchanged (set 1, a 30 fps recording under Wine).
-        else if (name == "bright") { push(Track::Alpha, false, lastAlpha, value / 256); lastAlpha = value / 256; }
+        // Only in the older engine, where it was measured: Test Game 88's newer engine uses `bright` 642 times, 256 then 0
+        // within a fly-in, where it can't be opacity, and plays as on its PC without it.
+        else if (name == "bright" && layout_ && olderEngine(*layout_)) { push(Track::Alpha, false, lastAlpha, value / 256); lastAlpha = value / 256; }
         else if (name == "rotate") { push(Track::Rotation, false, lastRotation, value); lastRotation = value; }
         else warnOnce("animation property not read: " + name);
     }
