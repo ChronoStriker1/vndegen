@@ -65,3 +65,23 @@ const char kCommentTest[] = R"(
 screen defaults
 parts yabai
 )";
+
+// Test Game 96's confession tree, the `yabaitree` part, opened from a story table with its hub's variables set
+// (NekoSDKTreeTests): truth 1, Misuzu shown at stage 3 with questions 0 and 2 of stage 1 and 1 and 2 of stage 2 asked.
+const char kTreeTest[] = R"(
+screen defaults
+parts yabaitree
+
+screen story
+flow main
+set S 15100 = 1
+set S 15101 = 3
+set S 15102 = 3
+set S 15103 = 4
+set S 15108 = 1
+set S 15133 = 5
+set S 15134 = 6
+open tree -> S 15120
+set S 15121 = 1
+end
+)";
