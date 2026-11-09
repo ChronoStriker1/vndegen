@@ -255,4 +255,25 @@ import TestSupport
             #expect(status().contains(" menu scene"), "\(status())")
         }
     }
+
+    @Test func anEmptyTabOpensWithoutTheKey() throws {
+        let root = try game("widgettesttabs", [
+            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\k.txt,0,0\n".utf8),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/widgettesttabs/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try Data("scr\\k.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_press(e, "scene"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 305, 305) == green)
+        #expect(pixel(e, 925, 25) == white)
+        click(e, 925, 25)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 305, 305) != green)
+    }
 }

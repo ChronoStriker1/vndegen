@@ -279,4 +279,27 @@ import TestSupport
         #expect(size == save.count)
         #expect(Data(built.prefix(size)) == save)
     }
+
+    @Test func aFlipbookOnItsFifthPictureIsNotNoise() throws {
+        let root = try game("layout94")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(first, 16) }
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        let url = try file(data, "save001.sav", "layout94")
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: url))
+        let name = try #require(save.range(of: Data("sc\\r.bmp".utf8))).lowerBound
+        #expect(save[name - 13] == 1)
+        save[name - 13] = 0
+        save.replaceSubrange((name - 8)..<(name - 4), with: withUnsafeBytes(of: Int32(4).littleEndian, { Data($0) }))
+        try NekoSDKFlowFixture.packed(save).write(to: url)
+        try? FileManager.default.removeItem(at: try file(data, "save001.vnd", "layout94"))
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(pixel(second, 194, 326) == [255, 0, 0])
+    }
 }
