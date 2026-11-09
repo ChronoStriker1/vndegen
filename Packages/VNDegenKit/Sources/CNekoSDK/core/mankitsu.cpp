@@ -65,6 +65,7 @@ constexpr int kSparkles = 9, kSparkleX = 24, kSparkleW = 640, kSparkleFrom = 690
 constexpr int kRowRise = 82, kRowRiseMs = 170, kRowGapMs = 100;
 constexpr int kWeekVar = 3000, kHalfVar = 3001, kHeartVar = 3010, kChapterVar = 10904, kEndingVar = 10906;
 constexpr int kPhases = 10, kMaxHearts = 4;
+constexpr int kHeartCap = 5;
 
 // A card's place on the select screen, top left of its frame: top, left, right, bottom, in the ini's order.
 constexpr int kCardX[4] = {399, 35, 842, 478}, kCardY[4] = {12, 297, 82, 367};
@@ -344,9 +345,8 @@ public:
         const CardScenes &cs = kCards[ph][card];
         int before = 0;
         if (cs.heroine >= 0) {
-            int after = std::clamp(var(kHeartVar + cs.heroine), 0, kMaxHearts);
-            // At four hearts the pick was either her fourth event or one of her late short scenes, which add none.
-            bool late = false;
+            int after = std::clamp(var(kHeartVar + cs.heroine), 0, kHeartCap);
+            bool late = after > kMaxHearts;
             for (const char *scene : kLate[cs.heroine])
                 if (normalizedName(d.scene) == std::string("scr\\") + scene + ".txt") late = true;
             before = late ? kMaxHearts : std::max(0, after - 1);
@@ -730,7 +730,7 @@ private:
     }
 
     int phase(PartHost &host) const { return std::clamp(2 * host.variable(1, kWeekVar) + host.variable(1, kHalfVar), 0, kPhases - 1); }
-    int hearts(PartHost &host, int heroine) const { return std::clamp(host.variable(1, kHeartVar + heroine), 0, kMaxHearts); }
+    int hearts(PartHost &host, int heroine) const { return std::clamp(host.variable(1, kHeartVar + heroine), 0, kHeartCap); }
 
     // The place a card stands at: its own, or for a heroine at -1, the next in her SelectChar list.
     int placeOf(PartHost &host, const Card &card) const {
@@ -744,7 +744,7 @@ private:
         int ph = phase(host);
         const CardScenes &cs = kCards[ph][c];
         int h = cs.heroine >= 0 ? hearts(host, cs.heroine) : 0;
-        if (cs.heroine >= 0 && h < kMaxHearts) host.setVariable(1, kHeartVar + cs.heroine, h + 1);
+        if (cs.heroine >= 0 && h < kHeartCap) host.setVariable(1, kHeartVar + cs.heroine, h + 1);
         int ending = 0;
         if (ph == kPhases - 1)
             for (int heroine = 0; heroine < 3; heroine++)
@@ -823,7 +823,7 @@ private:
             put(host, out, "obj\\n005_000.bmp", x + 257, y - 41, 8, 5, card.character, lifted ? 1 : 0);
             if (card.character <= 2) {
                 put(host, out, "obj\\n006_000.bmp", x + 246, y + 157);
-                for (int k = 0; k < hearts(host, card.character); k++) put(host, out, "obj\\n006_001.bmp", x + 250 + 44 * k, y + 161);
+                for (int k = 0; k < std::min(hearts(host, card.character), kMaxHearts); k++) put(host, out, "obj\\n006_001.bmp", x + 250 + 44 * k, y + 161);
             }
         }
         put(host, out, "obj\\n001_000.bmp", 0, 30);
