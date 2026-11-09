@@ -3280,6 +3280,27 @@ std::string Engine::waitScale() const {
     return line && !line->empty() ? (*line)[0] : "waittime";
 }
 
+// How wide a submenu's button draws as the submenu opens or closes, of its width; 1 when it isn't moving. Test Game 87's
+// title grows its submenu's buttons from their left edge by 1 - (1 - t)^2 and shrinks them by (1 - t)^2, each over 0.33 s,
+// squeezing their pictures, with the main buttons dimmed and lit at once (set 1, a 30 fps recording under Wine).
+// Notes a submenu opening or closing, on the menus' clock, from the step and from the frame drawn before it.
+void Engine::trackSubmenu() {
+    if (subMenu_ != shownSubMenu_ && screen_ && screen_->setting("submenuopen")) {
+        squeezeOpening_ = !subMenu_.empty() && (shownSubMenu_.empty() || subMenu_.rfind(shownSubMenu_ + "/", 0) == 0);
+        squeezeGroup_ = squeezeOpening_ ? subMenu_ : shownSubMenu_;
+        squeezeAt_ = screenMs_;
+    }
+    shownSubMenu_ = subMenu_;
+}
+
+float Engine::squeezeOf(const Button &b) const {
+    const auto *open = screen_ ? screen_->setting("submenuopen") : nullptr;
+    if (!open || open->empty() || b.group.empty() || b.group != squeezeGroup_) return 1;
+    float t = float(screenMs_ - squeezeAt_) / std::max(1, field(*open, 0));
+    if (t >= 1) return squeezeOpening_ ? 1 : 0;
+    return squeezeOpening_ ? 1 - (1 - t) * (1 - t) : (1 - t) * (1 - t);
+}
+
 bool Engine::submenuOpen(const std::string &name) const {
     return subMenu_ == name || subMenu_.rfind(name + "/", 0) == 0;
 }
@@ -3469,8 +3490,19 @@ void Engine::composeScreen(Canvas &out) {
         }
         neko::drawButton(c, b, state, withHelp);
     };
+    trackSubmenu();
     for (Button &b : screen_->buttons) {
-        if (!shown(b)) continue;
+        float squeeze = squeezeOf(b);
+        bool closing = !squeezeOpening_ && squeeze > 0 && b.group == squeezeGroup_;
+        if (!shown(b) && !closing) continue;
+        if (squeeze < 1 || closing) {
+            // Column by column, each from the picture's column at that fraction of its width.
+            if (!b.sheet) continue;
+            int w = b.cellW(), h = b.cellH(), shownW = int(float(w) * squeeze + 0.5f), row = std::min(b.normalRow, b.rows - 1);
+            for (int i = 0; i < shownW; i++)
+                drawPart(out, *b.sheet, b.x + i, b.y, b.column * w + std::min(w - 1, int((float(i) + 0.5f) / squeeze)), row * h, 1, h, 1);
+            continue;
+        }
         if (b.action.rfind("track", 0) == 0) {
             size_t index = size_t(std::atoi(b.action.c_str() + 5));
             if (index >= tracks_.size() || !seen(tracks_[index])) continue;
@@ -3596,13 +3628,24 @@ void Engine::composeScreen(Canvas &out) {
 // `under` buttons come up with their plate when the pointer's at the left of the bar, and `inner` ones when it's anywhere else
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 // `barhover Y MS` under `screen defaults`: with no plate, both rows show while the pointer is at or below Y and has moved
-// within the last MS, as Test Game 87's do (set 1, under Wine: anywhere at y 360 and below, gone about 3.4 s after the
-// pointer stops). The PC fades them; here they come and go at once.
+// within the last MS, as Test Game 87's do (set 1, under Wine: anywhere at y 360 and below). They fade in over the first
+// kBarFadeMs and out over the last, straight lines in a 30 fps recording: in from the move, out from 3.23 s, gone at 3.49.
 bool Engine::barHovered() const {
     auto defaults = screens_.find("defaults");
     const auto *line = defaults == screens_.end() ? nullptr : defaults->second.setting("barhover");
     if (!line || line->size() < 2) return false;
     return pointerSeen_ && messagePointerY() >= field(*line, 0) && now_ - barMovedAt_ < field(*line, 1);
+}
+
+constexpr int kBarFadeMs = 250;
+
+float Engine::barOpacity() const {
+    if (!barHover() || barPinned_ || setting("bar_always")) return 1;
+    auto defaults = screens_.find("defaults");
+    const auto *line = defaults->second.setting("barhover");
+    if (line->size() < 2) return 1;
+    float in = float(now_ - barShownAt_) / kBarFadeMs, out = float(field(*line, 1) - (now_ - barMovedAt_)) / kBarFadeMs;
+    return std::clamp(std::min(in, out), 0.0f, 1.0f);
 }
 
 bool Engine::barHover() const {
@@ -3666,6 +3709,17 @@ void Engine::composeMessageButtons(Canvas &out) {
         }
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
+    // `barhover`'s rows fade: drawn on a copy of the frame, mixed back in by how much of them shows.
+    float opacity = barOpacity();
+    if (opacity < 1 && innerButtonsShown()) {
+        barLayer_ = out;
+        Canvas &shown = barLayer_;
+        for (const Button &b : bar().inner) drawButton(shown, b, state(b));
+        if (underButtonsShown())
+            for (const Button &b : bar().under) drawButton(shown, b, state(b));
+        blendFrame(out, shown, int(opacity * 256));
+        return;
+    }
     if (innerButtonsShown()) {
         if (fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         for (const Button &b : bar().inner) drawButton(out, b, state(b));
@@ -4403,6 +4457,9 @@ bool Engine::step(int ms) {
         // A gallery's character coming up after its tab opens.
         if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
         stepViewer(ms);
+        trackSubmenu();
+        if (const auto *open = screen_->setting("submenuopen"); open && !open->empty() && !squeezeGroup_.empty() && screenMs_ - squeezeAt_ <= field(*open, 0))
+            dirty_ = true;
     }
     if (screen_ || logOpen_ || dialogOpen_) {
         // A table screen's part goes on stepping, as its own screen would.
@@ -4484,6 +4541,8 @@ bool Engine::step(int ms) {
     bool inner = innerButtonsShown(), under = underButtonsShown();
     // A row that goes with time, as `barhover`'s do, needs the frame drawn again.
     if (inner != innerWereShown_ || under != underWereShown_) dirty_ = true;
+    if (inner && !innerWereShown_) barShownAt_ = now_;
+    if (inner && barOpacity() < 1) dirty_ = true;
     innerWereShown_ = inner;
     underWereShown_ = under;
 

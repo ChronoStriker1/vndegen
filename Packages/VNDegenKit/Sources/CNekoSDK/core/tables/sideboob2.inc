@@ -6,6 +6,7 @@ screen title
 # a card from d002_000, shows 88 pixels above it, the submenus' from d002_001 beside them. A submenu dims the five
 # buttons (their last row) and shows no help for them, and the right button closes it.
 submenudim
+submenuopen 333
 pic obj\d000_000.bmp 0 0
 pic obj\d000_001.bmp 268 55
 button start obj\d001_000.bmp 530 422 5 5 0 help obj\d002_000.bmp 382 334 6 1 0 0
@@ -610,7 +611,7 @@ button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1
 
 screen defaults
 # Its message window's buttons, both rows, while the pointer is at y 360 or below and has moved in the last 3.4 s.
-barhover 360 3400
+barhover 360 3490
 parts scroll chargallery
 # Its click-wait mark (obj\h005_000) is keyed on pure green, which the PC leaves out.
 colorkey 0 255 0

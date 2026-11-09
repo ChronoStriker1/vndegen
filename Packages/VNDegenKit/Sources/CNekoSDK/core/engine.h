@@ -579,6 +579,16 @@ private:
     int64_t barMovedAt_ = -1000000;
     bool barHover() const;
     bool barHovered() const;
+    // When `barhover`'s rows last came up, and how much of them shows as they fade in and out.
+    int64_t barShownAt_ = -1000000;
+    float barOpacity() const;
+    // `submenuopen MS`: a submenu's buttons grow from their left edge as it opens and shrink back as it closes.
+    std::string shownSubMenu_, squeezeGroup_;
+    int64_t squeezeAt_ = -1000000;
+    bool squeezeOpening_ = false;
+    float squeezeOf(const Button &b) const;
+    void trackSubmenu();
+    Canvas barLayer_;
     void playVoiceAgain(const std::string &voice);
     bool logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &sheet, int &col) const;
     int autoPerCharMs_ = -1;
