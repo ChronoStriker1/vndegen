@@ -2975,6 +2975,23 @@ bool Engine::pageOff(const std::string &action) const {
     return false;
 }
 
+// A menu button that is drawn disabled and takes no press.
+//   `buttonsoff ACTION ACTION...` under `screen defaults`: those actions, on every screen, as Test Game 90's bonus
+//     release greys out Music wherever it stands, having none (set 1, under Wine).
+//   A gallery's tab with no entry, `gtabN`: the same release shows its CG and Scene tabs 0 to 3 so, with entries only
+//     on tab 4 (set 1). No other game's gallery has an empty tab.
+bool Engine::buttonOff(const std::string &action) const {
+    if (!screen_) return false;
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        if (const auto *off = defaults->second.setting("buttonsoff"); off && std::find(off->begin(), off->end(), action) != off->end()) return true;
+    if (action.rfind("gtab", 0) == 0 && (isPictureGallery() || screen_->name == "scene")) {
+        int tab = std::atoi(action.c_str() + 4);
+        const auto &entries = galleryEntries();
+        return !entries.empty() && std::none_of(entries.begin(), entries.end(), [&](const GalleryEntry &e) { return e.page == tab; });
+    }
+    return false;
+}
+
 void Engine::cardPlace(int index, int &x, int &y) const {
     const auto &grid = *screen_->setting("slots");
     int perColumn = field(grid, 5), columns = field(grid, 6);
@@ -3733,7 +3750,7 @@ void Engine::composeScreen(Canvas &out) {
             continue;
         }
         if (b.action == "nav_save" && fromTitle) state = StateDisabled;
-        if (pageOff(b.action) || pageStepOff(b.action)) state = StateDisabled;
+        if (pageOff(b.action) || pageStepOff(b.action) || buttonOff(b.action)) state = StateDisabled;
         // The PC games show no help for the tab, page or menu already open.
         if (current && b.help) {
             Button shown = b;
@@ -3858,7 +3875,11 @@ bool Engine::barHover() const {
 
 // `inneralways` under `screen defaults`: the window's own buttons show whenever the window does, while the plate still
 // comes up only with the pointer, as Test Game 96's four are there with its plate resting (set 2, PC shots under Wine).
-bool Engine::innerButtonsShown() const { return defaultsHave("inneralways") || plateUp(); }
+// Over a game part's screen they stay away, with the plate up too, as Test Game 96's hub has none of the four (set 2).
+bool Engine::innerButtonsShown() const {
+    if (partScreen_ && waiting_ == Waiting::PartScreen) return false;
+    return defaultsHave("inneralways") || plateUp();
+}
 
 bool Engine::plateUp() const {
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
@@ -3918,8 +3939,9 @@ void Engine::composeMessageButtons(Canvas &out) {
         bool over = pointerSeen_ && b.contains(pointerX_, messagePointerY());
         // The art button reads ORIGINAL.ver while the arranged art shows, and ARRANGE.ver, its selected cells, while the
         // original does.
+        // The log's own button is lit in the frame kept behind the log, as Test Game 90's PC shows it (set 1).
         bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_) ||
-                  (b.action == "ModeChange" && setting("art"));
+                  (b.action == "ModeChange" && setting("art")) || (b.action == "LogMode" && windowArtOnly_ == 2);
         if (replayOff(b.action)) return StateDisabled;
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
         if (b.action == "BackSelection" && !previousChoice_) return StateDisabled;
@@ -3957,10 +3979,12 @@ void Engine::composeMessageButtons(Canvas &out) {
         blendFrame(out, shown, int(opacity * 256));
         return;
     }
-    if (innerButtonsShown()) {
-        if (fullWidthPlate() && plateUp()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    // A plate as wide as the screen is drawn whenever it's up, under either row: over a game part's screen, where the
+    // window's own buttons stay away, Test Game 96's PC still brings it up black behind the lower row (set 2, PC shots).
+    if (fullWidthPlate() && plateUp() && (innerButtonsShown() || underButtonsShown()))
+        drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    if (innerButtonsShown())
         for (const Button &b : bar().inner) drawButton(out, b, state(b));
-    }
     if (!underButtonsShown()) {
         if (plateRests_) drawPart(out, *buttonPlate_, plateHiddenX_, plateHiddenY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         return;
@@ -4874,7 +4898,10 @@ void Engine::mouseButton(int button, bool down) {
             if (!b && underWereShown_) b = buttonAt(pointerX_, messagePointerY(), bar().under);
             if (b) {
                 std::string action = b->action;
-                runAction(action);
+                // One a part draws disabled does nothing, as Auto and Skip over Test Game 96's hub.
+                bool off = false;
+                for (const auto &[name, part] : parts_) off = off || part->actionLit(action) == 2;
+                if (!off) runAction(action);
                 return;
             }
         }
@@ -4986,7 +5013,7 @@ void Engine::mouseButton(int button, bool down) {
         }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
-            if (!(action == "nav_save" && returnTo_ == "title") && !pageOff(action) && !pageStepOff(action)) runAction(action);
+            if (!(action == "nav_save" && returnTo_ == "title") && !pageOff(action) && !pageStepOff(action) && !buttonOff(action)) runAction(action);
             if (dialogOpen_) dialogOpener_ = action;
             return;
         }
@@ -5170,6 +5197,9 @@ const char *Engine::debugStatus() {
     if (windowLog_ > 0) status_ += " log " + std::to_string(windowLog_);
     // The menu table screen open over the story, when one is.
     if (screen_) status_ += " menu " + screen_->name;
+    // A game part's own words on its open screen.
+    if (waiting_ == Waiting::PartScreen && partScreen_)
+        if (std::string words = partScreen_->debugStatus(); !words.empty()) status_ += " " + words;
     return status_.c_str();
 }
 
