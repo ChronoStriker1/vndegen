@@ -60,10 +60,13 @@ screen log
 inwindow
 )";
 
-// Test Game 96's comments through the `yabai` part (NekoSDKCommentTests).
+// Test Game 96's comments through the `yabai` part, with the window's own buttons always showing and its wait mark
+// still, as 96's are (NekoSDKCommentTests).
 const char kCommentTest[] = R"(
 screen defaults
 parts yabai
+inneralways
+markstill
 )";
 
 // Test Game 96's confession tree, the `yabaitree` part, opened from a story table with its hub's variables set

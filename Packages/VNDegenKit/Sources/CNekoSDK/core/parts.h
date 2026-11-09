@@ -22,6 +22,7 @@ enum class Layer {
     Slot,         // between the scene's picture slots: draw what sits from `fromSlot` up to before `toSlot`
     UnderWindow,  // over the scene, under the message window
     Window,       // inside the message window, over its plate and under its text
+    ButtonRow,    // just under the message window's lower row of buttons, while that row shows
     OverWindow,   // over the message window and its buttons
     Menu,         // a table screen naming the part with `part NAME`: over its pictures, under its buttons
     Screen,       // the part's own screen, while it's open, over everything, or over a table screen naming the part
@@ -107,6 +108,10 @@ public:
     // moves the pointer between and Confirm presses as a click there. True when only these count, as for a viewer open
     // over a table screen's own controls.
     virtual bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) { return false; }
+    // A button's action the engine doesn't know, such as a message window button of the game's own: true when this
+    // part took it. And how such a button of this part's is drawn: 1 lit, 0 not, -1 when the action isn't this part's.
+    virtual bool action(PartHost &, const std::string &name) { return false; }
+    virtual int actionLit(const std::string &name) const { return -1; }
     // With the table's `partplate`, whether the message window's plate shows over this part's screen now.
     virtual bool showsPlate() const { return true; }
     // The story table's `chapter N`: the scene scripts to play, in order, or none when this part doesn't know it. A scene

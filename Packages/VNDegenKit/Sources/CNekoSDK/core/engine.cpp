@@ -784,6 +784,12 @@ void Engine::runAction(const std::string &action) {
     if ((action == "nav_sprites" || action == "sprites") && screens_.count("sprites")) { go("sprites"); return; }
     if (action == "nav_title") { runAction("Title"); return; }
     if (action == "nav_quit") { runAction("quit"); return; }
+    // A game's own button, such as Test Game 96's Comment, is a part's.
+    for (auto &[name, part] : parts_)
+        if (part->action(*partHost_, action)) {
+            dirty_ = true;
+            return;
+        }
     warnOnce("Button not built yet: " + action);
 }
 
@@ -2082,7 +2088,10 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         // A last `blank` leaves out leading zeros, the digits keeping their places, as Test Game 83's volumes (set 3).
         bool blank = f.back() == "blank";
         size_t n = f.size() - (blank ? 1 : 0);
-        int w = digits->w / 10, value = setting(f[0]), shown = value, step = n >= 5 ? field(f, 4) : w;
+        // `numbercells N`: the digit sheets of this screen hold N cells, the digits first, as Test Game 96's sheet of 13
+        // goes on with a slash, a colon and a dash (set 2). Ten when absent.
+        const auto *cells = screen_->setting("numbercells");
+        int w = digits->w / (cells && !cells->empty() ? std::max(10, field(*cells, 0)) : 10), value = setting(f[0]), shown = value, step = n >= 5 ? field(f, 4) : w;
         int xs[3] = {field(f, 2), field(f, 2) + step, field(f, 2) + 2 * step};
         if (n >= 6) {
             xs[1] = field(f, 4);
@@ -3741,7 +3750,11 @@ bool Engine::barHover() const {
     return defaults != screens_.end() && defaults->second.setting("barhover");
 }
 
-bool Engine::innerButtonsShown() const {
+// `inneralways` under `screen defaults`: the window's own buttons show whenever the window does, while the plate still
+// comes up only with the pointer, as Test Game 96's four are there with its plate resting (set 2, PC shots under Wine).
+bool Engine::innerButtonsShown() const { return defaultsHave("inneralways") || plateUp(); }
+
+bool Engine::plateUp() const {
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
     // A plate as wide as the screen comes up with all the buttons when the pointer's on it, as in Test Game 85.
     if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= plateY_);
@@ -3763,9 +3776,16 @@ bool Engine::partPlate() const {
 }
 
 bool Engine::underButtonsShown() const {
-    if (fullWidthPlate()) return innerButtonsShown();
+    if (fullWidthPlate()) return plateUp();
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
     if (plateRests_) return plateRaised_;
+    // `underbelow Y` under `screen defaults`: a game with no plate shows its lower row while the pointer is at or below
+    // Y, at any x, as Test Game 90's PC does from 632 (set 1, under Wine).
+    if (!buttonPlate_) {
+        auto defaults = screens_.find("defaults");
+        const auto *below = defaults != screens_.end() ? defaults->second.setting("underbelow") : nullptr;
+        return below && !below->empty() && pointerSeen_ && messagePointerY() >= field(*below, 0);
+    }
     return buttonPlate_ && pointerSeen_ && messagePointerY() >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
 }
 
@@ -3799,13 +3819,16 @@ void Engine::composeMessageButtons(Canvas &out) {
             on = gt_.extend;
         }
         if (b.action == "GOODTiming") on = setting("gt_off") != 0;
-        // Lit while an older line shows in the window, as Test Game 83's down button is.
-        if (b.action == "NextText") on = windowLog_ > 0;
+        // The down button has nowhere to go while the line in play shows, and is drawn disabled; with an older line in
+        // the window it's an ordinary button, as on Test Game 83's PC (set 3, shots under Wine).
+        if (b.action == "NextText" && windowLog_ <= 0) return StateDisabled;
         if (b.action == "EXpress") {
             // 切替不可 while nothing on screen has another version, as Test Games 92 and 94 show it.
             if (!artSwitchable()) return StateDisabled;
             on = setting("express") == 0;
         }
+        for (const auto &[name, part] : parts_)
+            if (int lit = part->actionLit(b.action); lit >= 0) on = lit != 0;
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
     // `barhover`'s rows fade: drawn on a copy of the frame, mixed back in by how much of them shows.
@@ -3821,7 +3844,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         return;
     }
     if (innerButtonsShown()) {
-        if (fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+        if (fullWidthPlate() && plateUp()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         for (const Button &b : bar().inner) drawButton(out, b, state(b));
     }
     if (!underButtonsShown()) {
@@ -3829,6 +3852,8 @@ void Engine::composeMessageButtons(Canvas &out) {
         return;
     }
     if (buttonPlate_ && !fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    // What a game part draws behind the lower row, as Test Game 90's has a moving picture there (set 1).
+    drawParts(out, Layer::ButtonRow);
     for (const Button &b : bar().under) drawButton(out, b, state(b));
 }
 
@@ -6637,7 +6662,17 @@ void Engine::markRect(int &x, int &y, int &w, int &h) const {
 }
 
 bool Engine::markShowing() const {
-    return !screen_ && !logOpen_ && !dialogOpen_ && !windowHiddenByPlayer_ && !windowArtOnly_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
+    if (screen_ || logOpen_ || dialogOpen_ || windowHiddenByPlayer_ || windowArtOnly_ || !windowShown_ || !waitMark_ || waiting_ != Waiting::Click || !textDone_)
+        return false;
+    // Not while an older line shows in the window, and not under a resting plate that has come up over it, as Test Game
+    // 83's PC draws neither (set 3, shots under Wine): the mark is the window's, and the plate comes over the window.
+    if (windowLog_ > 0) return false;
+    if (plateRests_ && plateRaised_ && buttonPlate_) {
+        int x, y, w, h;
+        markRect(x, y, w, h);
+        if (x < plateX_ + buttonPlate_->w && x + w > plateX_ && y + h > plateY_ && y < plateY_ + buttonPlate_->h) return false;
+    }
+    return true;
 }
 
 // The mark is the last thing drawn, over a copy of what's beneath it, so a tick where only the mark moved redraws just
@@ -6647,7 +6682,11 @@ void Engine::drawMark(Canvas &out) {
     if (!markShowing()) return;
     // One picture turns; several are the cells of a sheet, stepped through at the same speed.
     float turns = float(now_ - textStart_) / 1000 * markSpeed_;
-    if (markPatterns_ == 1) {
+    if (markPatterns_ == 1 && defaultsHave("markstill")) {
+        // `markstill` under `screen defaults`: a mark of one picture stands as it is, as Test Game 96's is upright at
+        // the same place in every PC shot (set 2, under Wine).
+        drawPart(out, *waitMark_, markX_, markY_, 0, 0, waitMark_->w, waitMark_->h, 1);
+    } else if (markPatterns_ == 1) {
         drawImage(out, *waitMark_, float(markX_) + waitMark_->w * 0.5f, float(markY_) + waitMark_->h * 0.5f, 1, 1, turns * 2 * kPi, 1);
     } else {
         int cell = waitMark_->w / markPatterns_;
