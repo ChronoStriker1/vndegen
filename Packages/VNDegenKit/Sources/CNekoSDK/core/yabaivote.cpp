@@ -87,13 +87,17 @@ constexpr Rect kInside{40, 96, 1200, 544};
 // on average across the column, and each part of it comes round every 1.35 to 1.7 seconds. Which hands make which
 // cluster couldn't be fitted, so this arrangement is a stand-in with those measures: the five hands standing 68 below
 // the edge, so only their tops show, three times over, each set 18 to the right of the last and a third of a turn
-// behind. Now and then on the PC they all sink together, which isn't drawn.
+// behind. A later run of shots about 90 ms apart over 12 seconds puts the strip's own repeat at 1.67 seconds (it
+// comes closest to itself after 1.67, 3.3 and 5.0 seconds), with a weaker one at 1.35, so the three slower hands turn
+// in 100 frames. Now and then one column's hands shrink to nothing over about two seconds and are back at once: seen in
+// Misuzu's column while her coffin came down to the lowest row, so likely the coffin passing over them, which this
+// draws too. The arrangement itself stays unconfirmed.
 struct Hand {
     const char *sheet;
     int cells, x, periodMs;
 };
-const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 40, 1350}, {"obj\\o013_002.bmp", 7, 132, 1700}, {"obj\\o013_003.bmp", 7, 150, 1700},
-                       {"obj\\o013_004.bmp", 6, 212, 1680}, {"obj\\o013_005.bmp", 8, 296, 1350}};
+const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 40, 1350}, {"obj\\o013_002.bmp", 7, 132, 1667}, {"obj\\o013_003.bmp", 7, 150, 1667},
+                       {"obj\\o013_004.bmp", 6, 212, 1667}, {"obj\\o013_005.bmp", 8, 296, 1350}};
 constexpr int kHandsBottom = 640 + 68, kHandsCopies = 3, kHandsCopyDX = 18;
 // The thin black dividers between the columns (o003_000), as set 2 placed them.
 constexpr int kDividerX[2] = {437, 837}, kDividerY = 16;
@@ -115,7 +119,11 @@ const BubbleSide kSides[] = {{"B", 4, -74, 189}, {"T", 1, -74, -171}, {"RT", 0, 
                              {"RB", 5, 166, 139}, {"LB", 3, -356, 139}, {"LT", 2, -356, -102}};
 constexpr int kBubbleW = 468, kBubbleH = 240;
 constexpr int64_t kBubbleMinMs = 2000;  // a bubble stays its voice's length, or two seconds at least
-constexpr int kBubbleInMs = 150;        // how POP and FADE come in isn't measured
+// A bubble comes in over 8 frames. On the PC under Wine, in shots about 85 ms apart, Ayano's first FADE in vote 1 was
+// 28% in, then 90%, then whole, a straight fade of about 130 ms. Misuzu's first POP was whole within two shots of
+// starting, so it takes no longer, but its one shot between differs from the bubble more than the empty scene does:
+// whether it grows from small or settles from large isn't measured, and growing from half size is a guess.
+constexpr int kBubbleInMs = 133;
 
 // The countdown: 残り時間 over minutes and seconds in o005_001's digits and the hundredths in o007_002's, red under ten
 // seconds.
@@ -252,10 +260,10 @@ public:
 private:
     enum class Phase { Closed, Reopen, Pick, Vote };
     static constexpr int kEndHoldFrames = 120;  // 投票終了 shows two seconds before the result: not measured
+    static constexpr float kFallSpeed = 14;     // rows a frame in a `fall_move`
 
     struct Heroine {
         float y = kRowL, target = kRowL, speed = 0;
-        bool falling = false;
         int face = 0;
         int shakeAmp = 0, shakeUntil = -1, shakeX = 0, shakeY = 0;
         bool shakeSideways = false;
@@ -398,12 +406,12 @@ private:
         } else if (e.kind == "up_move" || e.kind == "down_move") {
             h.target = float(row(arg(0)));
             h.speed = std::strtof(arg(1).c_str(), nullptr);
-            h.falling = false;
         } else if (e.kind == "fall_move") {
-            // A fall gathers speed; how fast isn't measured.
+            // A fall is a fast steady move. On the PC under Wine, in shots about 90 ms apart, Misuzu's coffin in vote 1
+            // was 60 rows down, then 135, then at rest 150 down: about 830 rows a second, 14 a frame, with no sign of
+            // gathering speed between the two samples a fall this short gives.
             h.target = float(row(arg(0)));
-            h.speed = 0;
-            h.falling = true;
+            h.speed = kFallSpeed;
         } else if (e.kind == "message") {
             // `message N SIDE SHAPE 0 0 HOW TEXT VOICE`.
             h.bubble = true;
@@ -427,7 +435,6 @@ private:
     // A frame of the moves and shakes, at 60 a second.
     void advance(PartHost &host, int frame) {
         for (Heroine &h : heroines_) {
-            if (h.falling) h.speed += 0.25f;
             if (h.y < h.target) h.y = std::min(h.target, h.y + h.speed);
             else if (h.y > h.target) h.y = std::max(h.target, h.y - h.speed);
             auto jitter = [](int amp) { return amp > 0 ? std::rand() % (2 * amp + 1) - amp : 0; };

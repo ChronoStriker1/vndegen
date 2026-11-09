@@ -32,10 +32,9 @@ public:
             // 1.76 seconds on the PC, fitted frame by frame over 12 seconds, and its PC save keeps 1.0 for it; Test
             // Game 86's lace strips, -500 along the top and +500 along the bottom, each move 15 pixels in half a
             // second.
+            // A picture the game doesn't have loads nothing: what the slot showed stays, and its numbers with it.
             if (host.loadImage(n.p[0], n.s[1], 0, n.p[2], false, perSecond(n.p[3]), 0, kScrollKind))
                 across_[n.p[0]] = {n.p[3], n.p[11], n.p[12]};
-            else
-                across_.erase(n.p[0]);
             return true;
         case 91:
             // Down: slot p0, its left at x p1, tiled over the height and moving p3 at the same rate (negative moves it
@@ -44,13 +43,13 @@ public:
             // frames. Neither of set 3's games uses it.
             // Where the PC's save keeps this one's speed isn't known (no PC save of one has been read), so its record
             // is written with none, and not with what command 90 left for the slot.
-            host.loadImage(n.p[0], n.s[1], n.p[1], 0, false, 0, perSecond(n.p[3]), kScrollKind);
-            across_.erase(n.p[0]);
+            if (host.loadImage(n.p[0], n.s[1], n.p[1], 0, false, 0, perSecond(n.p[3]), kScrollKind))
+                across_.erase(n.p[0]);
             return true;
         case 92:
             // A picture at p1, p2 in slot p3, added to the scene when p4 is 1: Test Game 83's sword strokes, four
             // copies of one picture painted on black, show over each other and over the scene on the PC.
-            host.loadImage(n.p[3], n.s[1], n.p[1], n.p[2], n.p[4] == 1);
+            if (host.loadImage(n.p[3], n.s[1], n.p[1], n.p[2], n.p[4] == 1)) across_.erase(n.p[3]);
             return true;
         default:
             return false;

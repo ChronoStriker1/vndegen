@@ -342,7 +342,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "vndegen\\layoutold" || folder == "vndegen\\partslot") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
     // Test Game 96, and its layout's test game under a folder of its own, with no menu table.
-    if (folder == "waffle\\ヤバい！－復讐・闇サイト－" || folder == "vndegen\\layout96") return &kYabai;
+    if (folder == "waffle\\ヤバい！－復讐・闇サイト－" || folder == "vndegen\\layout96" || folder == "vndegen\\layoutpairs") return &kYabai;
     // The vote's test game saves as Test Game 96 does, and the newer layout's test game as Test Game 94 does.
     if (folder == "vndegen\\votetest") return &kYabai;
     if (folder == "vndegen\\layout94") return &kRinjin;

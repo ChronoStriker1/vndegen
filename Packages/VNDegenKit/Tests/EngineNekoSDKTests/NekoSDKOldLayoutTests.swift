@@ -104,6 +104,23 @@ import TestSupport
         #expect(pixel(e, 189, 319) == red)
         #expect(pixel(e, 950, 140) == red)
         #expect(pixel(e, 950, 340) == red)
+        if pairs {
+            // A save holds each pair with the slot after first, as 96's PC writes them: of the three records naming
+            // the standing picture, 101 (before the background's 100), then 601, then 600. The slot is 12 bytes before
+            // the name's length in this layout's records.
+            #expect(vnneko_debug_save(e, 1))
+            let saves = root.appendingPathComponent("data/AppData/Roaming/vndegen/layoutpairs/save")
+            let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+                .first { $0.lastPathComponent.lowercased() == "save001.sav" })
+            let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+            var slots: [Int32] = [], from = save.startIndex
+            while let found = save.range(of: Data("sc\\r.bmp".utf8), in: from..<save.endIndex) {
+                let at = found.lowerBound - 12
+                slots.append(save.subdata(in: at..<(at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) })
+                from = found.upperBound
+            }
+            #expect(slots == [101, 601, 600], "\(slots)")
+        }
         for _ in 0..<100 { _ = vnneko_step(e, 16) }
         #expect(pixel(e, 0, 0) == [0, 255, 0])
         #expect(pixel(e, 189, 319) != red)
