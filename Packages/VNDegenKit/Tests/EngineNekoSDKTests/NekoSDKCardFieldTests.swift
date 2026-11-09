@@ -3,7 +3,7 @@ import Foundation
 import Testing
 import TestSupport
 
-// Test Game 82's save cards: the chapter's title picked by the save's S5000 (`slotvar`), each part of the date at a place
+// Test Game 82's save cards: the chapter's title picked by the save's S5000 (`slotchaptervar`), each part of the date at a place
 // of its own with a blank for a leading zero (`datefield`), a frame around the thumbnail (`slotthumbframe`) and card
 // numbers 15 apart from 14-wide digits (`slotdigits`' step).
 @Suite struct NekoSDKCardFieldTests {

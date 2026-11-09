@@ -42,7 +42,7 @@ datefield month 347 28 15 blank
 datefield day 406 28 15 blank
 datefield hour 347 50 15 blank
 datefield minute 406 50 15 blank   # no minute under 10 seen yet, so its leading zero is a guess
-slotvar obj\d003_002.bmp 350 6 5 S 5000
+slotchaptervar obj\d003_002.bmp 350 6 5 5000
 slotnew obj\d004_002.bmp -12 -2
 button page0 obj\d002_000.bmp 379 25 10 5 0
 button page1 obj\d002_000.bmp 441 25 10 5 1
@@ -79,7 +79,7 @@ datefield month 347 28 15 blank
 datefield day 406 28 15 blank
 datefield hour 347 50 15 blank
 datefield minute 406 50 15 blank   # no minute under 10 seen yet, so its leading zero is a guess
-slotvar obj\d003_002.bmp 350 6 5 S 5000
+slotchaptervar obj\d003_002.bmp 350 6 5 5000
 slotnew obj\d004_002.bmp -12 -2
 button page0 obj\d002_000.bmp 379 25 10 5 0
 button page1 obj\d002_000.bmp 441 25 10 5 1

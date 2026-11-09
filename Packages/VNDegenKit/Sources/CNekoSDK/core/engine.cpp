@@ -2811,14 +2811,6 @@ void Engine::composeSlots(Canvas &out) {
                     int h = names->h / std::max(1, field(*progress, 3));
                     drawPart(out, *names, cx + field(*progress, 1), cy + field(*progress, 2), 0, info.route * h, names->w, h, 1);
                 }
-            // `slotvar SHEET X Y COLS S N`: a cell of a row of COLS picked by the save's scenario variable N, as Test Game 82's
-            // cards name the chapter by S5000. A value outside the row draws nothing.
-            if (const auto *chosen = screen_->setting("slotvar"); chosen && chosen->size() >= 6 && info.exists && (*chosen)[4] == "S")
-                if (ImageRef names = images_->get((*chosen)[0])) {
-                    auto it = info.variables.find(field(*chosen, 5));
-                    int value = it == info.variables.end() ? 0 : it->second, columns = std::max(1, field(*chosen, 3)), w = names->w / columns;
-                    if (value >= 0 && value < columns) drawPart(out, *names, cx + field(*chosen, 1), cy + field(*chosen, 2), value * w, 0, w, names->h, 1);
-                }
             // `slotnew SHEET X Y`: the card saved to last.
             if (ImageRef mark = picture("slotnew"); mark && slot == newest && info.exists)
                 drawPart(out, *mark, cx + offset("slotnew", 1), cy + offset("slotnew", 2), 0, 0, mark->w, mark->h, 1);

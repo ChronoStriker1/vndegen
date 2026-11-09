@@ -16,7 +16,7 @@ datedigits obj\d.bmp 0 0
 datefield year 251 28 15
 datefield month 347 28 15 blank
 datefield day 406 28 15 blank
-slotvar obj\n.bmp 350 6 3 S 5000
+slotchaptervar obj\n.bmp 350 6 3 5000
 
 screen config
 number opacity text 200 100 20 15 255 255 255 76 10 73
