@@ -166,7 +166,8 @@ import TestSupport
         click(e, 25, 25)
         vnneko_mouse_move(e, 0.9, 0.9)
         #expect(pixel(e, 402, 402) == [0, 0, 0])
-        // Opening the screen again tells the part, which starts afresh.
+        // Opening the screen again tells the part, which starts afresh. Going to the title holds presses a moment first.
+        for _ in 0..<20 { _ = vnneko_step(e, 16) }
         click(e, 10, 10)
         vnneko_mouse_move(e, 0.9, 0.9)
         #expect(pixel(e, 402, 402) == blue)

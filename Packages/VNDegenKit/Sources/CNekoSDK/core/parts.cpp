@@ -11,6 +11,7 @@ namespace neko {
 std::unique_ptr<GamePart> makeSelfTestPart();
 std::unique_ptr<GamePart> makeScrollPart();
 std::unique_ptr<GamePart> makeCharGalleryPart();
+std::unique_ptr<GamePart> makeYabaiPart();
 
 namespace {
 
@@ -23,6 +24,7 @@ const PartEntry kParts[] = {
     {"selftest", makeSelfTestPart},
     {"scroll", makeScrollPart},
     {"chargallery", makeCharGalleryPart},
+    {"yabai", makeYabaiPart},
 };
 
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses

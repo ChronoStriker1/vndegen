@@ -105,6 +105,33 @@ import TestSupport
         #expect(vnneko_debug_variable(again, 1, 13) == 1)
     }
 
+    // A press in the moment after Return to Choice is dropped, so the press that went back doesn't also take the choice it
+    // brings up, when a host reports one tap twice (set 1, a load on an iPad); a later press takes it.
+    @Test func aPressRightAfterGoingBackDoesntTakeTheChoice() throws {
+        let button = ["obj\\n001_000.bmp", "1", "0,0", "1,2", "0,0", "0,1", "0,0", "0,0", "0,0", "none", "0,0", "1,1"]
+        let ini = "#inner BackSelection\n" + button.joined(separator: "\n") + "\n##\n"
+        let root = try game("storytestpc", ["cfg/msg_button.ini": Data(ini.utf8)])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        vnneko_debug_choose(e, 1)
+        steps(e, 30)
+        #expect(vnneko_debug_press(e, "BackSelection"))
+        steps(e, 3)
+        #expect(status(e).contains(" choice "), "\(status(e))")
+        click(e)
+        steps(e, 2)
+        #expect(status(e).contains(" choice "), "\(status(e))")
+        steps(e, 20)
+        click(e)
+        steps(e, 5)
+        #expect(!status(e).contains(" choice "), "\(status(e))")
+    }
+
     // `staffroll NAME` plays the table's `screen staffroll_NAME`, its length long, then the story goes on.
     @Test func aNamedStaffRollPlaysItsOwnScreen() throws {
         let root = try game()
