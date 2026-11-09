@@ -314,7 +314,12 @@ private:
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
     bool fullWidthPlate() const;
+    // A table picture with `turn`, at the angle the screen's clock has brought it to.
+    Picture turned(const Picture &p) const;
+    bool plateUp() const;
     bool partPlate() const;
+    // Whether the table's `screen defaults` has this setting.
+    bool defaultsHave(const char *key) const;
     bool composeTitleOpening(Canvas &out);
     // Where the pointer is, from -1 at the screen's left or top edge to 1 at the other, or the middle before it's been seen.
     void pointerToward(float &x, float &y) const;
@@ -328,7 +333,15 @@ private:
     void composeTrackCards(Canvas &out);
     void composeTrackTime(Canvas &out);
     void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat = -1, int recordReverse = -1);
-    std::map<std::string, std::pair<int, int>> flipbooks_;
+    // A flipbook's line of anime_cfg.ini: how many pictures, how long each shows, and the sound and volume a line can
+    // name after them.
+    struct FlipbookInfo {
+        int count = 0, ms = 0;
+        std::string sound;
+        int volume = 100;
+    };
+    std::map<std::string, FlipbookInfo> flipbooks_;
+    void applyFlipTime(Sprite &s);
     // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
     // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
     struct GoodTiming {
@@ -415,6 +428,7 @@ private:
     size_t driftFirst_ = 0;
     ImageRef galleryThumbnail(const std::string &path) const;
     bool galleryImageSeen(const GalleryEntry &entry, size_t image) const;
+    bool cgPictureSeen(const GalleryEntry &entry, size_t image) const;
     bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }
     std::vector<std::string> tracks_, trackTitles_;
     // Test Game 88's sprite gallery, from cfg\sc_view.ini: its backgrounds, and each heroine's faces, outfits and poses as

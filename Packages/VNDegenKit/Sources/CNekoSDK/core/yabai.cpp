@@ -3,6 +3,7 @@
 //   111 [コメント終了]          ends the comments, with p0 (0 or 6 to 10)
 //   112 [コメントグループ再生]   plays group p0 of the list
 //   113 [強調文再生]            plays the lines in s1, one to a line, some as `《text》,X,Y`
+// and the message window's Comment button, which hides and shows them.
 // The first uses are in scr\sc_001_000_000_001.txt, from node 974.
 #include <sstream>
 
@@ -44,7 +45,21 @@ public:
         return comments_.step(host);
     }
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
-        if (layer == Layer::UnderWindow) comments_.draw(host, out);
+        if (layer == Layer::UnderWindow && !hidden_) comments_.draw(host, out);
+    }
+    // The message window's Comment button (msg_button.ini's `#inner Comment`, a toggle) hides the comments and shows
+    // them again; they go on running hidden. With no comments on screen or to come it's drawn disabled, as the PC draws
+    // it on a line that has none (set 2, a PC shot under Wine), and does nothing. It's drawn lit while they're hidden,
+    // which hasn't been checked on the PC.
+    bool action(PartHost &host, const std::string &name) override {
+        if (name != "Comment") return false;
+        if (comments_.active()) hidden_ = !hidden_;
+        host.redraw();
+        return true;
+    }
+    int actionLit(const std::string &name) const override {
+        if (name != "Comment") return -1;
+        return !comments_.active() ? 2 : hidden_ ? 1 : 0;
     }
     void save(std::vector<std::string> &lines) const override { comments_.saveState(lines); }
     void load(const std::vector<std::string> &lines) override { pending_ = lines; }
@@ -56,6 +71,7 @@ public:
 private:
     CommentStream comments_;
     std::vector<std::string> pending_;
+    bool hidden_ = false;  // the player's choice, kept across scenes and loads
 };
 
 }  // namespace

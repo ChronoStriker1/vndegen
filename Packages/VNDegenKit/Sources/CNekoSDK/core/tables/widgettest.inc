@@ -60,10 +60,13 @@ screen log
 inwindow
 )";
 
-// Test Game 96's comments through the `yabai` part (NekoSDKCommentTests).
+// Test Game 96's comments through the `yabai` part, with the window's own buttons always showing and its wait mark
+// still, as 96's are (NekoSDKCommentTests).
 const char kCommentTest[] = R"(
 screen defaults
 parts yabai
+inneralways
+markstill
 )";
 
 // Test Game 96's confession tree, the `yabaitree` part, opened from a story table with its hub's variables set
@@ -102,9 +105,12 @@ set S 15141 = 1
 end
 )";
 
-// A game that saves in Test Game 83's layout with the test part on, for a part's own slot and its save record
+// A game that saves in Test Game 83's layout with the test part on, for a part's own slot and its save record, and with
+// flipbooks timed by command 121's parameter 16 and playing their ini line's sound, as Test Game 90's are
 // (NekoSDKPartImageTests).
 const char kPartSlotTest[] = R"(
 screen defaults
 parts selftest
+fliptime
+flipsound
 )";

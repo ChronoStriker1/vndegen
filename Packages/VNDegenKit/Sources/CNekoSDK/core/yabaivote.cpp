@@ -81,16 +81,20 @@ constexpr int kCoffinX = 65, kCoffinDY = 69, kWheelX = 96, kWheelY = 74, kRopeX 
 // cells no face or bubble crosses, measured from the shots' numbers alone (lead). Which picture gives it isn't known.
 constexpr Rect kInside{40, 96, 1200, 544};
 // The viewers' raised hands along the monitor's bottom, the same in each column from its start: o013_001 to o013_005, each
-// an animation of one hand rising in cells 144 tall standing on the bottom edge, placed so their fingertips fall where set
-// 2 found them on the PC (x 94, 138, 215, 323 and 350 from the column's start). Their pace and order aren't measured; each
-// rises and sinks through its cells on a slow beat of its own.
+// an animation of one hand rising in cells 144 tall. What the PC's strip measures (lead, under Wine, the silhouette's
+// height in each column over 37 seconds, by numbers alone; set 2's shots agree): it stands on the bottom edge, never more
+// than about 70 pixels high, in four clusters some 60 wide from 40, 132, 212 and 296 of the column, about 13 pixels high
+// on average across the column, and each part of it comes round every 1.35 to 1.7 seconds. Which hands make which
+// cluster couldn't be fitted, so this arrangement is a stand-in with those measures: the five hands standing 68 below
+// the edge, so only their tops show, three times over, each set 18 to the right of the last and a third of a turn
+// behind. Now and then on the PC they all sink together, which isn't drawn.
 struct Hand {
     const char *sheet;
-    int cells, x;
+    int cells, x, periodMs;
 };
-const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 56}, {"obj\\o013_002.bmp", 7, 119}, {"obj\\o013_003.bmp", 7, 157},
-                       {"obj\\o013_004.bmp", 6, 292}, {"obj\\o013_005.bmp", 8, 324}};
-constexpr int kHandsBottom = 640, kHandFrameMs = 300;
+const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 40, 1350}, {"obj\\o013_002.bmp", 7, 132, 1700}, {"obj\\o013_003.bmp", 7, 150, 1700},
+                       {"obj\\o013_004.bmp", 6, 212, 1680}, {"obj\\o013_005.bmp", 8, 296, 1350}};
+constexpr int kHandsBottom = 640 + 68, kHandsCopies = 3, kHandsCopyDX = 18;
 // The thin black dividers between the columns (o003_000), as set 2 placed them.
 constexpr int kDividerX[2] = {437, 837}, kDividerY = 16;
 constexpr uint8_t kInsideRed[3] = {55, 2, 2};
@@ -510,10 +514,14 @@ private:
         for (int column = 0; column < 3; column++)
             for (size_t k = 0; k < std::size(kHands); k++) {
                 const Hand &hand = kHands[k];
-                // Up through the cells and down again, each hand a step out from the last.
-                int steps = 2 * (hand.cells - 1), at = int((ms / kHandFrameMs + int64_t(k) * 3 + column) % steps);
-                int cellNow = at < hand.cells ? at : steps - at;
-                inside(host, out, hand.sheet, cellNow, hand.cells, kInside.x + kColumnStep * column + hand.x, kHandsBottom - 144);
+                // Through its cells and round again, each hand a little out of step with the last, and each copy a third
+                // of a turn behind the one before.
+                for (int copy = 0; copy < kHandsCopies; copy++) {
+                    int64_t at = (ms + int64_t(k) * 400 + copy * hand.periodMs / kHandsCopies) % hand.periodMs;
+                    int cellNow = int(at * hand.cells / hand.periodMs);
+                    int x = kInside.x + kColumnStep * column + hand.x + copy * kHandsCopyDX;
+                    inside(host, out, hand.sheet, cellNow, hand.cells, x, kHandsBottom - 144);
+                }
             }
         for (int x : kDividerX) inside(host, out, "obj\\o003_000.bmp", 0, 1, x, kDividerY);
         for (int w = 0; w < 3; w++) {
