@@ -3360,6 +3360,8 @@ bool Engine::dimmedBySubmenu(const Button &b) const {
     if (!dim || subMenu_.empty() || !b.group.empty()) return false;
     // With `hide` the opener goes too: the submenu takes its row, as Test Game 83's CG Mode takes Extra's (set 3).
     if (!dim->empty() && (*dim)[0] == "hide") return true;
+    // With `all` the opener dims with the rest of its row, as Test Game 96's START and ADDITION do (set 2, under Wine).
+    if (!dim->empty() && (*dim)[0] == "all") return true;
     bool opener = (b.action.rfind("submenu:", 0) == 0 && submenuOpen(b.action.substr(8))) || (b.action == "start" && submenuOpen("start"));
     return !opener;
 }
