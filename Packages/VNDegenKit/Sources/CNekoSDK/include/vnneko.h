@@ -127,7 +127,9 @@ bool vnneko_debug_press(VNNekoEngine *e, const char *action);
 int vnneko_debug_choice_count(VNNekoEngine *e);
 void vnneko_debug_choose(VNNekoEngine *e, int index);
 // For test hosts: starts this scene script and runs it without waiting up to the node, or a flow script (under `flow\`)
-// from that node, or from its start for 0 or less. False when it is not there.
+// from that node, or from its start for 0 or less. False when it is not there. A scene started so in a game with flow
+// scripts has no flow behind it, and a save made after it names none, which the PC game refuses to load; a story
+// table's game goes on from its table, as a load does.
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node);
 // For tests: the stored size of the file the game's archives and patches give for this path, or -1 when none has it.
 int64_t vnneko_debug_file_size(const char *gameRoot, const char *path);

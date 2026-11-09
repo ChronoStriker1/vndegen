@@ -50,3 +50,12 @@ pic obj\d.bmp 380 401
 button nav_title obj\b.bmp 0 0 1 5 0
 button nav_load obj\b.bmp 405 405 1 5 0
 )";
+
+// The log in the message window, `inwindow`, stepped by the window's BackText and NextText buttons (NekoSDKWindowLogTests).
+const char kWindowLogTest[] = R"(
+screen defaults
+default bar_always 1
+
+screen log
+inwindow
+)";
