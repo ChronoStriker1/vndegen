@@ -61,6 +61,10 @@ constexpr int kFaceX = 119, kColumnStep = 400, kRowH = 50, kRowM = 200, kRowL = 
 // (o012_001) from a wheel (o012_000) at the monitor's top; the face's tail points at it. The wheel's place, and whether it
 // turns, aren't measured.
 constexpr int kCoffinX = 65, kCoffinDY = 69, kCoffinW = 95, kWheelY = 96;
+// The monitor's inside, which all of that is drawn within, on a dark red: the PC's mean colour there over the vote, in
+// cells no face or bubble crosses, measured from the shots' numbers alone (lead). Which picture gives it isn't known.
+constexpr Rect kInside{40, 96, 1200, 544};
+constexpr uint8_t kInsideRed[3] = {55, 2, 2};
 const char *const kFaceSheets[3] = {"obj\\o014_000.bmp", "obj\\o014_001.bmp", "obj\\o014_002.bmp"};
 const int kFaceCells[3] = {10, 12, 10};
 // The speech bubbles: a sheet for each heroine, plain (N) and spiky (S), of six cells by where the tail points, placed
@@ -424,28 +428,35 @@ private:
     void drawVote(PartHost &host, Canvas &out) {
         int64_t ms = host.nowMs() - voteStart_;
         int frame = ms < kVoteStartMs ? -1 : int((ms - kVoteStartMs) * 60 / 1000);
-        fill(out, 0, 0, out.w, out.h);
+        fill(out, 0, 0, out.w, out.h, 0, 0, 0);
+        fill(out, kInside.x, kInside.y, kInside.w, kInside.h, kInsideRed[0], kInsideRed[1], kInsideRed[2]);
         // The coffins' columns, under the monitor's glass. What's behind the faces isn't drawn: it's the heroines' standing
         // pictures, laid out in shots that weren't looked at, still to be placed.
         // The silhouettes of the viewers' arms along the bottom, two strips that sway (not measured: a slow sway of a few
         // pixels, as the places they were found at suggest).
         float sway = std::sin(float(ms) / 900.0f);
-        put(host, out, "obj\\o013_006.bmp", 20 + int(4 * sway), 452, 1);
-        put(host, out, "obj\\o013_007.bmp", 60 - int(6 * sway), 448, 1);
+        inside(host, out, "obj\\o013_006.bmp", 0, 1, 20 + int(4 * sway), 452);
+        inside(host, out, "obj\\o013_007.bmp", 0, 1, 60 - int(6 * sway), 448);
         for (int w = 0; w < 3; w++) {
             const Heroine &h = heroines_[size_t(w)];
             int coffinX = kCoffinX + kColumnStep * w + h.shakeX, coffinY = int(h.y) + kCoffinDY + h.shakeY;
             if (ImageRef rope = host.image("obj\\o012_001.bmp"))
-                drawPart(out, *rope, coffinX + kCoffinW / 2 - rope->w / 2, coffinY - rope->h, 0, 0, rope->w, rope->h, 1);
-            put(host, out, "obj\\o012_000.bmp", kCoffinX + kColumnStep * w + kCoffinW / 2 - 20, kWheelY, 1);
-            cell(host, out, "obj\\o012_002.bmp", 3, 1, w, 0, coffinX, coffinY, 1);
-            cell(host, out, kFaceSheets[w], kFaceCells[w], 1, h.face, 0, kFaceX + kColumnStep * w + h.shakeX, int(h.y) + h.shakeY, 1);
+                inside(host, out, "obj\\o012_001.bmp", 0, 1, coffinX + kCoffinW / 2 - rope->w / 2, coffinY - rope->h);
+            inside(host, out, "obj\\o012_000.bmp", 0, 1, kCoffinX + kColumnStep * w + kCoffinW / 2 - 20, kWheelY);
+            inside(host, out, "obj\\o012_002.bmp", w, 3, coffinX, coffinY);
+            inside(host, out, kFaceSheets[w], h.face, kFaceCells[w], kFaceX + kColumnStep * w + h.shakeX, int(h.y) + h.shakeY);
         }
         for (int w = 0; w < 3; w++) drawBubble(host, out, w);
+        // Bubbles end at the monitor's edge too: black again outside it, where the PC's shots are.
+        fill(out, 0, 0, out.w, kInside.y, 0, 0, 0);
+        fill(out, 0, kInside.y + kInside.h, out.w, out.h - kInside.y - kInside.h, 0, 0, 0);
+        fill(out, 0, kInside.y, kInside.x, kInside.h, 0, 0, 0);
+        fill(out, kInside.x + kInside.w, kInside.y, out.w - kInside.x - kInside.w, kInside.h, 0, 0, 0);
         if (!commentsHidden_) comments_.draw(host, out);
         put(host, out, "obj\\o002_000.bmp", 14, 66, 1);
-        // The top bar: the day, the countdown and スキップ.
+        // The top bar: the day, the vote's title (o006_000, a cell for each truth), the countdown and スキップ.
         drawClock(host, out, false, 1);
+        cell(host, out, "obj\\o006_000.bmp", 5, 1, truth_ - 1, 0, 108, 0, 1);
         put(host, out, "obj\\o007_000.bmp", 963, 5, 1);
         int left = std::max(0, allFrames_ - std::max(0, frame));
         bool red = left < 600;
@@ -527,13 +538,22 @@ private:
         drawPart(out, *image, x, y, 0, 0, image->w, image->h, 1);
     }
 
-    static void fill(Canvas &out, int x0, int y0, int w, int h) {
+    static void fill(Canvas &out, int x0, int y0, int w, int h, uint8_t r, uint8_t g, uint8_t b) {
         for (int y = std::max(0, y0); y < std::min(out.h, y0 + h); y++)
             for (int x = std::max(0, x0); x < std::min(out.w, x0 + w); x++) {
                 uint8_t *p = out.px.data() + (size_t(y) * size_t(out.w) + size_t(x)) * 4;
-                p[0] = p[1] = p[2] = 0;
-                p[3] = 255;
+                p[0] = r, p[1] = g, p[2] = b, p[3] = 255;
             }
+    }
+    // A cell of a sheet of COLS across, clipped to the monitor's inside.
+    void inside(PartHost &host, Canvas &out, const std::string &name, int col, int cols, int x, int y) {
+        ImageRef image = host.image(name);
+        if (!image) return;
+        int w = image->w / cols, h = image->h, sx = col * w;
+        int left = std::max(x, kInside.x), top = std::max(y, kInside.y);
+        int right = std::min(x + w, kInside.x + kInside.w), bottom = std::min(y + h, kInside.y + kInside.h);
+        if (right <= left || bottom <= top) return;
+        drawPart(out, *image, left, top, sx + left - x, top - y, right - left, bottom - top, 1);
     }
     void put(PartHost &host, Canvas &out, const std::string &name, int x, int y, float alpha) {
         if (ImageRef image = host.image(name)) drawPart(out, *image, x, y, 0, 0, image->w, image->h, alpha);
