@@ -219,6 +219,8 @@ button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8
 
 screen scene
 selectedlook
+# Each card replays the chapter its play_view2.ini line names (5000 and up in the chapter list), as the PC does.
+replaychapters
 pic bg\bg_001_000_000_000_000.bmp 0 0
 pic obj\d000_000.bmp 0 0
 pic obj\e000_001.bmp 0 628
@@ -551,6 +553,23 @@ hovercols 219 403 1045 460 obj\h009_000.bmp 218 331 8 4
 hovercols 219 467 1045 524 obj\h009_000.bmp 218 394 8 5
 hovercols 219 546 1045 571 obj\h009_000.bmp 218 476 8 6
 hovercols 219 582 1045 608 obj\h009_000.bmp 218 512 8 7
+
+# The log, measured on the PC under Wine: the scene dimmed to about 30% with the window kept, four entries each over a
+# rule 174 apart, the name 30 above its text, a replay button by a voiced entry, the scroll track with a thumb as long
+# as its share of the lines, and four arrows, the lower two disabled on the newest lines.
+screen log
+dim 180
+keepwindow
+edgesoff
+pic obj\j000_000.bmp 1125 108
+scroll obj\j000_001.bmp obj\j000_001.bmp obj\j000_001.bmp 1127 110 500
+rows obj\j000_003.bmp 92 168 174 4 139 -105
+lognamey -30
+logvoice obj\i000_001.bmp 3 5 2 1046 -105
+button log_top obj\j000_002.bmp 1120 22 4 5 0
+button log_up obj\j000_002.bmp 1120 58 4 5 1
+button log_down obj\j000_002.bmp 1120 634 4 5 2
+button log_bottom obj\j000_002.bmp 1120 670 4 5 3
 
 # The PC's questions, measured under Wine on "ロードしますか？": the screen behind dimmed to about 14%, the band across
 # the middle with the question (a cell of obj\a003_000.bmp, in the order below) and はい and いいえ under it, as the
