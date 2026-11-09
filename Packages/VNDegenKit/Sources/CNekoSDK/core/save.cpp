@@ -346,8 +346,10 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // The vote's test game saves as Test Game 96 does, and the newer layout's test game as Test Game 94 does.
     if (folder == "vndegen\\votetest") return &kYabai;
     if (folder == "vndegen\\layout94") return &kRinjin;
-    // Test Game 90, and its layout's test game under a folder of its own, with no menu table.
-    if (folder == "waffle\\漫喫ハプニング" || folder == "vndegen\\layout90") return &kMankitsu;
+    // Test Game 90, its bonus release (a game of its own with the same screens: 13 of set 1's 14 PC saves of it are
+    // built again byte for byte, and one with a pictureless record is a single byte off), and the layout's test game
+    // under a folder of its own, with no menu table.
+    if (folder == "waffle\\漫喫ハプニング" || folder == "waffle\\漫喫ハプニング特典ストーリー" || folder == "vndegen\\layout90") return &kMankitsu;
     return nullptr;
 }
 
