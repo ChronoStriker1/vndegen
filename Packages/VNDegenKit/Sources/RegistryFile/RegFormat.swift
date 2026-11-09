@@ -20,7 +20,7 @@ extension RegistryData {
         var scanner = RegScanner(text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text)
         guard let format = scanner.header() else { throw ReadError.header }
         var current: String?
-        var pending: [String: RegistryValue] = [:]
+        var pending: [RegistryName: RegistryValue] = [:]
         func flush() {
             if let current { add(pending, to: current) }
             pending = [:]
@@ -37,10 +37,11 @@ extension RegistryData {
                 } else {
                     current = name
                 }
-            case let .value(name, value):
+            case let .value(text, value):
                 guard current != nil else { continue }
-                let lower = name.lowercased()
-                let existing = pending.keys.first { $0.lowercased() == lower }
+                let name = RegistryName(text)
+                let lower = name.lowercased
+                let existing = pending.keys.first { $0.lowercased == lower }
                 if let value { pending[existing ?? name] = value } else if let existing { pending[existing] = nil }
             case .skip:
                 continue
@@ -58,7 +59,7 @@ extension RegistryData {
             parts.append("\n\n")
             var lines = ["[\(key)]"]
             for (name, value) in values.sortedByUTF8 {
-                let quoted = "\"\(Self.escape(name))\""
+                let quoted = "\"\(Self.escape(name.text))\""
                 lines.append("\(quoted)=\(Self.serialize(value, offset: quoted.utf8.count + 1))")
             }
             parts.append(lines.joined(separator: "\n"))
@@ -89,8 +90,8 @@ extension RegistryData {
     }
 
     /// `values` without the ones whose names a `.reg` file can't hold.
-    public static func writable(_ values: [String: RegistryValue]) -> [String: RegistryValue] {
-        values.filter { !breaksLine($0.key) }
+    public static func writable(_ values: [RegistryName: RegistryValue]) -> [RegistryName: RegistryValue] {
+        values.filter { !breaksLine($0.key.text) }
     }
 
     public static func escape(_ text: String) -> String {

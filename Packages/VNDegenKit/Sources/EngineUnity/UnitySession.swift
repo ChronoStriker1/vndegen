@@ -200,23 +200,22 @@ final class UnityCrossOverSession: UnityExternalSession {
     }
 
     /// `key` with `values`, and `"name"=-` for each of `removing` that `values` lacks, compared without case.
-    static func importText(key: String, values: [String: RegistryValue], removing: Set<String>) -> String {
+    static func importText(key: String, values: [RegistryName: RegistryValue], removing: Set<RegistryName>) -> String {
         var data = RegistryData()
         data.setValues(values, of: key)
         var text = data.regText
-        let kept = Set(values.keys.map { $0.lowercased() })
+        let kept = Set(values.keys.map(\.lowercased))
         // A name with a line break can't be written, so it can't be deleted either, and stays as the bottle has it.
-        let gone = removing.filter { !kept.contains($0.lowercased()) && !RegistryData.breaksLine($0) }
-            .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
+        let gone = removing.filter { !kept.contains($0.lowercased) && !RegistryData.breaksLine($0.text) }.sorted()
         if !gone.isEmpty {
             text.removeLast()
-            text += gone.map { "\n\"\(RegistryData.escape($0))\"=-" }.joined() + "\n"
+            text += gone.map { "\n\"\(RegistryData.escape($0.text))\"=-" }.joined() + "\n"
         }
         return text
     }
 
     /// The values the bottle holds under `key`, not its subkeys'. Nil when the key isn't there or regedit fails.
-    private func bottleValues(_ key: String) async -> [String: RegistryValue]? {
+    private func bottleValues(_ key: String) async -> [RegistryName: RegistryValue]? {
         let staged = launch.dataDirectory.appendingPathComponent("PlayerPrefs-export.reg")
         defer { try? FileManager.default.removeItem(at: staged) }
         try? FileManager.default.removeItem(at: staged)
