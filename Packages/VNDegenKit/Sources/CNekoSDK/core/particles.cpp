@@ -61,10 +61,10 @@ class ParticlesPart : public GamePart {
 public:
     bool command(PartHost &host, const Node &n) override {
         if (n.opcode == 96) {
-            // Its dots go with it at once; how the PC lets them die away hasn't been seen (Test Game 86 uses it). Its
-            // slot is let go too, so a save made after this holds no record of an emitter that isn't there.
-            if (emitters_.erase(n.p[0])) host.releaseSlot(n.p[0]);
-            host.redraw();
+            // Its slot is let go, and the emitter goes with it at the next screen update, as a picture command 17 takes
+            // away does: step() ends it once the slot is no longer held. Until then it draws, and a save still holds
+            // its record whole. How the PC lets the dots die away hasn't been seen (Test Game 86 uses it).
+            host.releaseSlot(n.p[0]);
             return true;
         }
         if (n.opcode != 95) return false;
