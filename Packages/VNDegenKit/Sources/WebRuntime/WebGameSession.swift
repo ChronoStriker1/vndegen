@@ -141,6 +141,7 @@ nonisolated public struct WebMenuCommand: Sendable, Equatable {
 /// Runs an HTML5 game in a WKWebView that looks enough like NW.js that the game reads and writes its own folder through
 /// Node's `fs`, the way its desktop build does.
 final class WebGameSession: NSObject, EngineSession {
+    private(set) var failedToStart = false
     static let bridgePrefix = "\u{1}vndegen:"
     static let messageName = "vndegen"
 
@@ -585,6 +586,8 @@ extension WebGameSession: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
         log.error("navigation failed: \(error.localizedDescription, privacy: .public)")
+        // No page has loaded yet, so the game never started.
+        if webView.backForwardList.currentItem == nil { failedToStart = true }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {

@@ -18,6 +18,7 @@ nonisolated let artemisLog = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// controls sit over it. The core runs one frame per display refresh on the main thread. The game starts once the view
 /// is on screen. The game quitting itself ends the session through `onExit`.
 final class ArtemisSession: EngineSession {
+    private(set) var failedToStart = false
     let view: PlatformView
     private let host: ArtemisHostView
     private let core: ArtemisCore
@@ -142,7 +143,9 @@ final class ArtemisSession: EngineSession {
         }
     }
 
+    /// The game couldn't start.
     private func fail(_ reason: String) {
+        failedToStart = true
         artemisLog.error("\(self.launch.game.id.rawValue, privacy: .public): \(reason, privacy: .public)")
         writeLog("[E] \(reason)")
         finish()

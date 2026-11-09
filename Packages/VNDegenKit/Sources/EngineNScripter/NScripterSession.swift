@@ -17,6 +17,7 @@ nonisolated let nScripterLog = Logger(subsystem: "com.chronostriker1.vndegen", c
 /// ending itself ends the session through `onExit`. When the hub ends it instead, the runtime writes the game's system
 /// data first.
 final class NScripterSession: EngineSession {
+    private(set) var failedToStart = false
     let view: PlatformView
     private let frameView = FrameView()
     private let launch: GameLaunch
@@ -71,6 +72,7 @@ final class NScripterSession: EngineSession {
         guard let started else {
             let reason = vnns_start_error().map { String(cString: $0) } ?? "unknown"
             nScripterLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
+            failedToStart = true
             finish(byGame: true)
             return
         }

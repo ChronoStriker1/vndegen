@@ -12,6 +12,7 @@ let unityLog = Logger(subsystem: "VNDegen", category: "Unity")
 /// the post-session save backup work as for any game.
 @MainActor
 class UnityExternalSession: EngineSession {
+    private(set) var failedToStart = false
     let view: PlatformView
     let launch: GameLaunch
     let host: UnityHostView
@@ -38,6 +39,7 @@ class UnityExternalSession: EngineSession {
             } catch {
                 unityLog.error("\(self.launch.game.id.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 if !ending {
+                    failedToStart = true
                     host.fail("\(launch.game.title) couldn't start. \(error.localizedDescription)")
                     return
                 }

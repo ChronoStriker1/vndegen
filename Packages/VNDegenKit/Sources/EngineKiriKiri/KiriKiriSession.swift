@@ -17,6 +17,7 @@ nonisolated let kiriKiriLog = Logger(subsystem: "com.chronostriker1.vndegen", ca
 /// `onExit`. When the hub ends the session instead, the game closes through its normal path, which writes its system
 /// saves, and `waitUntilStopped()` returns once it has.
 final class KiriKiriSession: EngineSession {
+    private(set) var failedToStart = false
     private enum State {
         /// Waiting for the view to be on screen.
         case waiting
@@ -107,6 +108,7 @@ final class KiriKiriSession: EngineSession {
         let cancelled = if case .starting(cancelled: true) = state { true } else { false }
         guard result == 0 else {
             kiriKiriLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start, see \(self.paths.log.path, privacy: .public)")
+            failedToStart = true
             engine.stop()
             Self.engineInUse = false
             stopped()

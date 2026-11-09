@@ -16,6 +16,7 @@ nonisolated let system4Log = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// thread of its own; each display refresh steps it on the main thread and shows its CPU frame through `FrameView`,
 /// and its sound plays through `PCMAudioOutput`. The game ending itself ends the session through `onExit`.
 final class System4Session: EngineSession {
+    private(set) var failedToStart = false
     let view: PlatformView
     private let frameView = FrameView()
     private let launch: GameLaunch
@@ -151,6 +152,7 @@ final class System4Session: EngineSession {
         guard let started else {
             let reason = vns4_start_error().map { String(cString: $0) } ?? "unknown"
             system4Log.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
+            failedToStart = true
             finish(byGame: true)
             return
         }
