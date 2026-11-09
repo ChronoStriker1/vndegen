@@ -517,6 +517,7 @@ question obj\j001_000.bmp 542 124 7 0
 question obj\j001_000.bmp 542 124 7 1
 question obj\j001_000.bmp 542 124 7 4
 question obj\j001_000.bmp 542 124 7 3
+question obj\j001_000.bmp 542 124 7 5    # back: Return to Choice asks "Is this fine?"
 button yes obj\j001_001.bmp 486 242 2 5 0
 button no obj\j001_001.bmp 486 298 2 5 1
 

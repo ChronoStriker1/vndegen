@@ -121,6 +121,8 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
 // the PC's own saves; a game none of whose PC saves is known leaves it empty, as every save VNDegen wrote before did.
 bool namesPictureTwice(const SaveLayout &layout);
 ChoiceFlag choiceFlag(const SaveLayout &layout);
+// Whether the game's PC keeps a Previous Choice file, `saveNNNs.sav`, beside each save.
+bool writesPreviousChoice(const SaveLayout &layout);
 // The NEW card as cfg.sav's global 0 holds it, from a save slot (1 for save001), and back: per game, counted from 1 or 0.
 int newCardNumber(const SaveLayout *layout, int slot);
 int newCardSlot(const SaveLayout *layout, int number);
