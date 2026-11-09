@@ -204,6 +204,12 @@ public:
         return true;
     }
 
+    // The PC's saves at the select screen hold 6 where its saves in a scene hold 1 (flowActive); given 1 there, its PC
+    // went on into the scenes of card 0 instead of opening the select screen (set 1, under Wine).
+    void savePC(SaveData &d) const override {
+        if (selecting_) d.flowActive = 6;
+    }
+
     // A PC save in a pick's scenes holds no chapter number, only what the PC keeps: the half-week (S 3000 and 3001, still
     // the one picked at), the card (the last result), and the hearts, a heroine's already counting the event she was
     // picked for (set 1, PC saves in every scene of the first four half-weeks' picks). The chapter is worked out from
