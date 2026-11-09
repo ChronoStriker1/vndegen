@@ -31,6 +31,9 @@ constexpr int kGroupHse = 5, kGroupBackVoice = 6;
 constexpr int kWindowSlideMs = 200;
 // The film noise's slot, and how many frames each random place of its crop lasts, as The Alchemist's exe has them.
 constexpr int kNoiseSlot = 10000, kNoiseFramesPerPlace = 4;
+// A save record's kind for a part's tiled picture, and where its fixed part keeps the speed (SavedSprite::kind).
+constexpr int kTiledKind = 6;
+constexpr size_t kTiledSpeedAt = 45;
 // How long each character of text takes to fade in, measured from the PC game's footage.
 constexpr int kCharFadeMs = 160;
 // How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
@@ -2725,6 +2728,16 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             } else {
                 s.changes.push_back(std::move(a));
             }
+        }
+        // The older layout's record of a tiled, moving picture, kind 6, keeps its speed as a float 45 bytes into its
+        // fixed part, in pixels a frame at 60 a second (set 3, from Test Game 83's fog: command 90's p3 in thousandths).
+        // A PC save has only that, so the picture is tiled and moved across by it. Command 91's, down the screen,
+        // isn't known in a save: neither 83 nor 86 uses it.
+        if (saved.kind == kTiledKind && saved.rawFixed.size() >= kTiledSpeedAt + 4) {
+            float speed;
+            std::memcpy(&speed, saved.rawFixed.data() + kTiledSpeedAt, 4);
+            s.scrollX = speed * 60;
+            s.scrollFrom = now_;
         }
         if (auto fx = side.slotFx.find(saved.slot); fx != side.slotFx.end() && side.valid) {
             s.additive = fx->second[0] != 0;

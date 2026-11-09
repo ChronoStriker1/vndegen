@@ -172,6 +172,58 @@ import TestSupport
         #expect(pixel(e, 605, 305) == [255, 0, 0])
     }
 
+    // A PC save's record of a tiled, moving picture, kind 6 with its speed as a float 45 bytes into the fixed part, comes
+    // back tiled and moving at 60 times that in pixels a second, with no lines of VNDegen's beside the save.
+    @Test func aPCSavesTiledPictureMovesAgain() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\partslot\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("lace.bmp", bmp(100, 40) { $0 < 10 ? [255, 0, 0] : [0, 0, 255] })]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 9000, next: 3, p: [1: 0, 2: 300, 3: 150], s: [1: "obj\\lace.bmp"]),
+                .init(op: 9, next: 4),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(first, 300)
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+
+        // As the PC writes it: the record's kind 6, 8 bytes before the name's length, and 0.5 at 45 past the two names.
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/partslot/save")
+        let files = try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+        let file = try #require(files.first { $0.lastPathComponent.lowercased() == "save001.sav" })
+        try FileManager.default.removeItem(at: try #require(files.first { $0.lastPathComponent.lowercased() == "save001.vnd" }))
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        let name = try #require(save.range(of: Data("obj\\lace.bmp".utf8))).lowerBound - save.startIndex
+        func put<T>(_ value: T, _ at: Int) { save.replaceSubrange((save.startIndex + at)..<(save.startIndex + at + 4), with: withUnsafeBytes(of: value, { Data($0) })) }
+        put(Int32(6).littleEndian, name - 8)
+        put(Float(0.5).bitPattern.littleEndian, name + 12 + 4 + 45)
+        try NekoSDKFlowFixture.packed(save).write(to: file)
+
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_load(e, 1))
+        steps(e, 100)
+        // Tiled across the frame: the strip's blue far to the right of its own 100 pixels.
+        let f = frame(e)
+        let far = (320 * f.w + 1050) * 4
+        #expect(f.px[far + 2] > 200 || f.px[far] > 200)
+        // And moving 30 pixels a second to the right.
+        let before = try #require(bandStart(e))
+        steps(e, 1000)
+        let after = try #require(bandStart(e))
+        #expect(near(after, before + 30), "\(before) to \(after)")
+    }
+
     // An 8-bit picture with a palette is read, as one of Test Game 83's backgrounds is: two colours, blue and green.
     @Test func anEightBitPictureIsRead() throws {
         var d = Data("BM".utf8)

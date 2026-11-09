@@ -197,6 +197,7 @@ void PartHost::playSound(int kind, int channel, const std::string &path, int vol
 
 void PartHost::holdSlot(int slot, int kind) { e_.holdPartSlot(slot, kind); }
 bool PartHost::slotHeld(int slot) { return e_.partSlotHeld(slot); }
+bool PartHost::effectsOn() { return e_.setting("effect") != 0; }
 void PartHost::log(const std::string &line) { e_.log("%s", line.c_str()); }
 
 // MARK: The engine's side
