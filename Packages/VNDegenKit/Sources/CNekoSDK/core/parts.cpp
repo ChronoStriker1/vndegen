@@ -38,7 +38,8 @@ const PartEntry kParts[] = {
 // names a picture in its save record: its square at 600, 300 is drawn where the slot's number puts it, green once the
 // part knows the picture and blue before. On a table screen naming the part, the widget test game's sprite gallery,
 // it draws a square at 400, 400, blue and red once pressed, takes the presses on it, and after two covers the top left
-// corner over everything.
+// corner over everything. Under a screen's cards, Layer::MenuUnder, it draws a blue square of 20 at 300, 300, and on the
+// Scene screen it leaves every press to the screen.
 class SelfTestPart : public GamePart {
 public:
     bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) override {
@@ -46,6 +47,7 @@ public:
         return false;
     }
     void draw(PartHost &, Canvas &out, Layer layer, int, int) override {
+        if (layer == Layer::MenuUnder) fill(out, 300, 300, 20, 0, 0, 255);
         if (layer == Layer::Menu) fill(out, 400, 400, 10, menuPresses_ ? 255 : 0, 0, menuPresses_ ? 0 : 255);
         if (layer == Layer::Screen && menuPresses_ >= 2) fill(out, 0, 0, 20, 0, 0, 255);
     }
@@ -84,6 +86,8 @@ public:
             menuPresses_ = 0;
             return true;
         }
+        onScene_ = name == "scene";
+        if (onScene_) return true;
         if (name == "selftest") {
             host.finishScreen(count);
             return true;
@@ -99,6 +103,7 @@ public:
             menuPresses_++;
             return true;
         }
+        if (onScene_) return false;
         // The right button opens the load menu over the waiting screen (PartHost::openMenu).
         if (button == 1) {
             host.openMenu("nav_load");
@@ -114,6 +119,7 @@ public:
     void reset() override {
         presses_ = needed_ = menuPresses_ = 0;
         onMenu_ = false;
+        onScene_ = false;
         heldPicture_.clear();
     }
 
@@ -127,7 +133,7 @@ private:
     }
     static constexpr int kHeldKind = 15;
     int presses_ = 0, needed_ = 0, menuPresses_ = 0;
-    bool onMenu_ = false;
+    bool onMenu_ = false, onScene_ = false;
     std::string heldPicture_;
 };
 
