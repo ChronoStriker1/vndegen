@@ -1225,8 +1225,11 @@ void Engine::loadGalleries() {
             sceneEntries_.push_back(e);
         }
     // cfg\sc_view.ini: `#p 100` lists backgrounds, `#p N face|clothes|pose` heroine N's thumbnails, each section ending
-    // `##`. Paths there have their backslashes doubled, and a line's second field marks what comes with a bonus.
-    {
+    // `##`. Paths there have their backslashes doubled, and a line's second field marks what comes with a bonus. A game
+    // whose `screen sprites` names a part reads its own file there: Test Game 87's sc_view.ini is another format, which
+    // read as heroines would take over its screen and dress its story's sprites (set 1).
+    auto sprites = screens_.find("sprites");
+    if (sprites == screens_.end() || !sprites->second.setting("part")) {
         int heroine = -1;
         std::string kind;
         for (const std::string &line : lines("cfg\\sc_view.ini")) {

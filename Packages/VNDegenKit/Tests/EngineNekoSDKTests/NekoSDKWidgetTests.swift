@@ -31,9 +31,9 @@ import TestSupport
     private let white: [UInt8] = [255, 255, 255], yellow: [UInt8] = [255, 255, 0], red: [UInt8] = [255, 0, 0],
                 magenta: [UInt8] = [255, 0, 255], grey: [UInt8] = [128, 128, 128], green: [UInt8] = [0, 254, 0]
 
-    private func game(_ folder: String = "widgettest") throws -> URL {
+    private func game(_ folder: String = "widgettest", _ more: [String: Data] = [:]) throws -> URL {
         let rows = [white, yellow, red, magenta, grey]
-        return try NekoSDKFlowFixture.game([
+        return try NekoSDKFlowFixture.game(more.merging([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
             "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", bmp(50, 250) { rows[$0 / 50] }), ("k.bmp", bmp(10, 10) { _ in [0, 254, 0] }),
                                                       // Green all round a red middle, for the colour key; and ten white digits.
@@ -49,7 +49,7 @@ import TestSupport
                 .init(op: 2, next: 3, p: [0: 1000]),
                 .init(op: 2, next: 0, p: [0: 100_000]),
             ]),
-        ])
+        ]) { $1 })
     }
 
     private func pixel(_ e: OpaquePointer, _ x: Int, _ y: Int) -> [UInt8] {
@@ -141,10 +141,11 @@ import TestSupport
         #expect(pixel(e, 633, 403) == white)
     }
 
-    // `part selftest` on Config: the part's square over the screen's picture and under its button, the presses on the
+    // `part selftest` on the sprite gallery: Test Game 88's reader leaves its sc_view.ini alone, here one it would read as
+    // a heroine, and the part's square over the screen's picture and under its button, the presses on the
     // square its own and the rest the screen's, and its top layer over the screen's buttons.
     @Test func aTableScreenCanHostAGamePart() throws {
-        let root = try game("widgettestpart")
+        let root = try game("widgettestpart", ["cfg/sc_view.ini": Data("#p 0 face\nobj\\\\b.bmp\n##\n".utf8)])
         defer { try? FileManager.default.removeItem(at: root) }
         let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
         defer { vnneko_stop(e) }
