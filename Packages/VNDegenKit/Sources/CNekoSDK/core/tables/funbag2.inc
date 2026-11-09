@@ -35,7 +35,7 @@ pic obj\e000_000.bmp 0 0
 pic obj\e000_001.bmp 22 18 6 1 1 0
 slots obj\e002_000.bmp 60 99 510 119 5 2 1
 slotthumb 29 10
-slotdigits obj\e002_002.bmp 239 6 3
+slotdigits obj\e002_002.bmp 239 6 3 15
 slotnew obj\e003_000.bmp -23 -3
 # The chapter is S 5000, a cell of the strip: the prologue, then chapters 1 to 4 as the PC's cards name them.
 slotchaptervar obj\e004_000.bmp 358 4 5 5000
@@ -75,7 +75,7 @@ pic obj\e000_000.bmp 0 0
 pic obj\e000_001.bmp 22 18 6 1 0 0
 slots obj\e002_000.bmp 60 99 510 119 5 2 1
 slotthumb 29 10
-slotdigits obj\e002_002.bmp 239 6 3
+slotdigits obj\e002_002.bmp 239 6 3 15
 slotnew obj\e003_000.bmp -23 -3
 # The chapter is S 5000, a cell of the strip: the prologue, then chapters 1 to 4 as the PC's cards name them.
 slotchaptervar obj\e004_000.bmp 358 4 5 5000
