@@ -4,6 +4,10 @@
 const char kYabai1[] = R"(
 screen defaults
 parts yabai yabaiplay yabaitree yabaivote
+# MS Gothic at init.ini's 25, as the exe names only the Japanese faces; the PC's lines 30 apart, its ink 1 right and 1 up
+# from where the runtime puts it (Wine with ＭＳ ゴシック substituted, prologue's sixth line).
+textline 30
+textshift 1 -1
 
 # The interrogation hub (yabaiplay), as measured under Wine:
 #   truth T HOURS FIRST [START]   the hours truth T gives, whom the hub shows first, and its starting hour (8 if left out)
