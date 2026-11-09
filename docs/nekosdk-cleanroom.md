@@ -169,6 +169,8 @@ More `screen defaults` settings, each measured on one game's PC under Wine by it
 
 A table picture can turn: `pic FILE X Y turn DEGREES` draws it turned about its own middle by the screen's clock, that many degrees a second clockwise, and the screen is drawn again each frame while one is there. Test Game 83's title has three lace circles doing so, 12 and 6 degrees a second one way and 6 the other, fitted by angle on its PC from frames half a second apart (set 3, under Wine).
 
+A table picture can be drawn smaller: `pic FILE X Y scale PERCENT` draws it at that share of its size with X and Y the new top left, each pixel the mean of the area it covers. Test Game 90's fifth gallery tab shows one 1320 by 3232 picture at half size; against a PC shot, averaging each 2 by 2 block is 0.19 of 255 off, bilinear 0.27 and nearest 0.57 (set 1, under Wine).
+
 A table screen can host a part too, as Test Game 87's character gallery is an ordinary menu screen around a part's card grid and viewer (set 1): `part NAME` under the screen. The part is told as the screen opens, draws at `Layer::Menu` over the screen's pictures and under its buttons and at `Layer::Screen` over everything, is offered each press before the screen's buttons, gets the pointer and steps on the menus' clock, `PartHost::screenMs`, with the screen's page from `PartHost::page`. A controller or keyboard reaches a part's controls through `focusSpots`, the middles a direction moves the pointer between and Confirm presses, added to the screen's own or, while the part says so (a viewer over the screen), alone; on a story part's own screen they are the only ones.
 
 ### Gallery cards against the PC

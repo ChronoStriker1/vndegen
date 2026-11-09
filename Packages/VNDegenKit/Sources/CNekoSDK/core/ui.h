@@ -74,6 +74,9 @@ struct Picture {
     // way when negative), as the three lace circles of Test Game 83's title turn (set 3). `angle` is where it has got
     // to, in radians, set by the screen as it draws.
     float turn = 0, angle = 0;
+    // `scale PERCENT` draws the picture at that share of its size, with X and Y its new top left. Each pixel is the mean
+    // of the area it covers, which is what Test Game 90's PC shows for its one half-size gallery picture (set 1: 0.19 of
+    // 255 from a PC shot, against 0.27 for bilinear and 0.57 for nearest). The picture is shrunk once, as the table is read.
     // A staff roll's layer, by milliseconds from its start: `move MS SPEED` moves it up SPEED pixels a second from then
     // (down for a negative SPEED), `clamp TOP BOTTOM` keeps its top between those, and `fadein MS LENGTH` and
     // `fadeout MS LENGTH` fade it in and out.

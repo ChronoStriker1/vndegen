@@ -2,11 +2,12 @@
 // scenario variable, the date's parts at places of their own with a mark of the date's sheet between, a frame around the
 // thumbnail, spaced card numbers and a comment button; and
 // a Config number drawn as text (NekoSDKNumberTextTests); and a dialog whose question is a cell of a strip, over its
-// frame, and a gallery card from Test Game 82's `ID,PICTURE` lines with a frame over its thumbnail, and a title picture
-// that turns (NekoSDKCardFieldTests).
+// frame, and a gallery card from Test Game 82's `ID,PICTURE` lines with a frame over its thumbnail, and title pictures
+// that turn and that draw at half size (NekoSDKCardFieldTests).
 const char kCardTest[] = R"(
 screen title
 pic obj\spin.bmp 1100 600 turn 90
+pic obj\half.bmp 40 40 scale 50
 button load obj\none.bmp 0 0 1 1 0
 button config obj\none.bmp 0 0 1 1 0
 button quit obj\none.bmp 0 0 1 1 0
