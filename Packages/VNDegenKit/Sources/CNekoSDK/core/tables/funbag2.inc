@@ -174,10 +174,13 @@ set S 5000 = 4
 scene scr\ep_05_01_00.txt @5001
 scene scr\ep_05_01_01.txt @5002
 scene scr\ep_05_02_00.txt @5003
-# Use Zebia's body (an ending) or thank her (chapters 6 and 7).
+# Use Zebia's body or thank her. Thanks goes on to chapters 6 and 7. Her body ends the story only when every one of the
+# four sex scenes on this route took option 0: PC saves edited to S 5001 = 1, 2 and 3 went on as thanks does, and a
+# real run with 4 ended. Where the exe checks it isn't known, so it's checked here, after her scene.
 choice obj\l000_005.bmp 2 @5004
 on 1 goto thanks
 scene scr\ep_05_02_01.txt @5030
+if S 5001 < 4 goto thanked
 scene scr\ep_05_03_00.txt @5031
 scene scr\ep_05_03_01.txt
 scene scr\ep_05_03_02.txt @5051
@@ -189,6 +192,7 @@ scene scr\ep_05_04_03.txt
 end
 label thanks
 scene scr\ep_05_02_02.txt @5030
+label thanked
 scene scr\ep_05_03_00.txt @5031
 scene scr\ep_05_03_02.txt @5051
 scene scr\ep_05_03_03.txt @5052
