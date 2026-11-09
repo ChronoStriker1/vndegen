@@ -436,6 +436,15 @@ button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 
 button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
 
 
+screen dialog
+# Measured under Wine: the screen dimmed to 155 of 256, the stacked cards, and YES and NO. The question is a cell of
+# obj\a004_000.bmp (six of 491 pixels: resolution, save, load, overwrite, exit, title) at 394 237, which waits on
+# the runtime.
+dim 155
+pic obj\a003_000.bmp 362 186
+button yes obj\a005_000.bmp 389 295 2 5 0
+button no obj\a005_000.bmp 389 359 2 5 1
+
 screen defaults
 # No quick saves: its ten pages of nine cards run to 90, all ordinary.
 quickslots 91 98
