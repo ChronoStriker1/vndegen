@@ -4725,7 +4725,9 @@ void Engine::updateChoice() {
     if (waiting_ != Waiting::Choice || !choiceSheet_) return;
     int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
     choicePlace(x, top, step, slant);
-    int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
+    // The pointer in the frame's own rows: in the 4:3 frame the scene keeps its rows at the top, with the window's strip
+    // under it, so scaling by the scene's height put the options' hit boxes below where they're drawn (set 1, on an iPad).
+    int px = pointerX_, py = pointerY_;
     int hover = -1;
     for (int i = 0; i < choiceCount_; i++)
         if (px >= x + i * slant && px < x + i * slant + cellW && py >= top + i * step && py < top + i * step + cellH) hover = i;

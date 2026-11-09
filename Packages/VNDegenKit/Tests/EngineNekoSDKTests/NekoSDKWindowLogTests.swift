@@ -78,6 +78,8 @@ import TestSupport
         #expect(yellow(e))
         click(e, 25, 625)
         #expect(status(e).hasSuffix(" log 2"), "\(status(e))")
+        // Every step stays in the log's colour until the line in play comes back.
+        #expect(yellow(e))
         click(e, 125, 625)
         #expect(status(e).hasSuffix(" log 1"), "\(status(e))")
         // A click elsewhere brings the line in play back and goes no further.
