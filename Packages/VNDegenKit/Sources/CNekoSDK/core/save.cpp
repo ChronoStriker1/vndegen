@@ -35,6 +35,9 @@ struct SaveLayout {
     // other way round (set 1, under Wine). Test Games 82 and 83 name it in the newer place.
     bool choiceInFirstPlace = false;
     ChoiceFlag choiceFlag = ChoiceFlag::Picture;
+    // Test Games 82 and 83's PC writes a Previous Choice file, `saveNNNs.sav`, beside each save, and reads it with the
+    // save: the state at the last choice, which Return to Choice goes back to (sets 2 and 3).
+    bool previousChoice = false;
     // The number global 0 gives the first card, the one NEW marks after a save to it: 1 in Test Game 94 and The Alchemist,
     // whose cfg.sav held 2 and 1 for their second and first cards, and 0 in Test Game 87, which held 2 after a save to
     // its third and crashed opening a Load page whose global 0 was one past its last card (set 1, under Wine). Test
@@ -79,6 +82,7 @@ const SaveLayout kAniMother = kTsumaGibo;
 const SaveLayout kFunbag2 = [] {
     SaveLayout l = older(26, 0, {}, 818, {}, 123);
     l.choiceFlag = ChoiceFlag::Never;
+    l.previousChoice = true;
     return l;
 }();
 // Test Game 82's 32 PC saves (set 2), half of them Previous Choice files, are Test Game 83's layout with sprite records
@@ -87,6 +91,7 @@ const SaveLayout kFunbag1 = [] {
     SaveLayout l = older(30, 0, {}, 818, {}, 123);
     l.olderRecord = 379;
     l.choiceFlag = ChoiceFlag::Never;
+    l.previousChoice = true;
     return l;
 }();
 const SaveLayout kSideboob2 = [] {
@@ -266,6 +271,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     // The runtime's own story-table test game saves as The Alchemist does.
     if (folder == "vndegen\\storytest") return &kAlchemist;
+    // And as Test Game 82 does, with a Previous Choice file beside each save.
+    if (folder == "vndegen\\storytestpc") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy2") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
@@ -282,6 +289,7 @@ bool namesPictureTwice(const SaveLayout &layout) {
 }
 
 ChoiceFlag choiceFlag(const SaveLayout &layout) { return layout.choiceFlag; }
+bool writesPreviousChoice(const SaveLayout &layout) { return layout.previousChoice; }
 int newCardNumber(const SaveLayout *layout, int slot) { return slot - 1 + (layout ? layout->firstCard : 1); }
 int newCardSlot(const SaveLayout *layout, int number) { return number + 1 - (layout ? layout->firstCard : 1); }
 

@@ -12,7 +12,7 @@
 //   if S|G NUMBER CMP VALUE goto LABEL     CMP == != <= >= < >
 //   open NAME ARGS... [-> S|G NUMBER]      a game part's screen; its result to the variable and the last result
 //   chapter N                 the scenes a game part gives for chapter N
-//   end / staffroll / jump FLOW
+//   end / staffroll [NAME] / jump FLOW
 //
 // A `scene` or `choice` line may end with `@N`, the PC's own number for that place in its story, which its saves hold as
 // the flow node and need to go on from it (Test Game 87, set 1): the runtime writes it in its saves, and a PC save goes on
@@ -182,7 +182,10 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
         } else if (w[0] == "end") {
             add(2);
         } else if (w[0] == "staffroll") {
-            add(2).p[0] = 1;
+            // `staffroll NAME` opens the table's `screen staffroll_NAME`, as Test Game 82 has a roll to each ending (set 2).
+            Node &roll = add(2);
+            roll.p[0] = 1;
+            if (w.size() >= 2) roll.s[1] = w[1];
         } else if (w[0] == "jump" && w.size() >= 2) {
             add(31).s[1] = "story:" + w[1];
         } else {
