@@ -728,13 +728,13 @@ scene scr\ep_03_00.txt @201
 scene scr\ep_03_01.txt @202
 scene scr\ep_03_02.txt @203
 scene scr\ep_03_02a.txt @204
-scene scr\ep_03_03.txt @205  # @ inferred from the chapter count
-scene scr\ep_03_04.txt @206  # @ inferred from the chapter count
-scene scr\ep_03_05.txt @207  # @ inferred from the chapter count
-scene scr\ep_03_06.txt @208  # @ inferred from the chapter count
-scene scr\ep_03_07.txt @209  # @ inferred from the chapter count
-scene scr\ep_03_08.txt @210  # @ inferred from the chapter count
-scene scr\ep_03_09.txt @211  # @ inferred from the chapter count
+scene scr\ep_03_03.txt @205  # between the measured 204 and 206
+scene scr\ep_03_04.txt @206
+scene scr\ep_03_05.txt @207  # between the measured 206 and 208
+scene scr\ep_03_06.txt @208
+scene scr\ep_03_07.txt @209
+scene scr\ep_03_08.txt @210
+scene scr\ep_03_09.txt @211
 scene scr\ep_03_09a.txt @212  # @ inferred from the chapter count
 scene scr\ep_03_10.txt @213  # @ inferred from the chapter count
 choice obj\m000_000.bmp 2 cells 11 12 @214  # Squeeze her boobs / Suck on her boobs
@@ -758,13 +758,13 @@ scene scr\ep_03_11.txt @219
 scene scr\ep_03_11a.txt @220
 scene scr\ep_03_12.txt @221
 scene scr\ep_03_13.txt @222
-scene scr\ep_03_14.txt @223  # @ inferred from the chapter count
+scene scr\ep_03_14.txt @920  # the PC counts it as the harem ending's first line
 staffroll zh                 # the harem ending's roll comes before its first scene
 scene scr\ep_zh_00.txt @922
 choice obj\m000_000.bmp 3 cells 15 15 15 @923  # Let nature take its course / Let nature take its course / Let nature take its course
-scene scr\ep_zh_01.txt @924   # every option goes on here
-scene scr\ep_zh_02.txt @925  # @ inferred from the chapter count
-scene scr\ep_zh_03.txt @926  # @ inferred from the chapter count
+scene scr\ep_zh_01.txt @925   # every option goes on here
+scene scr\ep_zh_02.txt @926
+scene scr\ep_zh_03.txt @999
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label boan
