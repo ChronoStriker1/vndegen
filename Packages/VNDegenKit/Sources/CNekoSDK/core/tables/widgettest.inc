@@ -85,3 +85,17 @@ open tree -> S 15120
 set S 15121 = 1
 end
 )";
+
+// Test Game 96's vote, the `yabaivote` part, opened from a story table with the hub's clock set (NekoSDKVoteTests).
+const char kVoteTest[] = R"(
+screen defaults
+parts yabaivote
+
+screen story
+flow main
+set S 15104 = 21
+set S 15105 = 1
+open vote 1 -> S 15140
+set S 15141 = 1
+end
+)";
