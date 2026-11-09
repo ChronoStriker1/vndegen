@@ -108,6 +108,14 @@ button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 
 
 screen defaults
 parts scroll
+# The program asks for Lucida Sans Unicode at a cell of 25 (Wine's font log), here Open Sans. Sized and spaced to the
+# publisher's Windows screenshots of two messages: x-height 9, lines 27 apart, baselines on the screenshots' rows and
+# the lines' ends within 4 pixels of theirs.
+textfont 7
+textsize 19
+textgap 1.4
+textline 27
+textshift 1 -2
 # CG flags by group: 48000 + 4000 x group + 4 x place, as the PC's cfg.sav holds them.
 cgflagsbygroup 4000
 # The wait mark has no .alp: its pure green is see-through on the PC.
