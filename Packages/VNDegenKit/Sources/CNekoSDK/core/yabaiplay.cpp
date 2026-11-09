@@ -124,8 +124,11 @@ public:
             int hit = askOption(x, y);
             if (hit >= 0) {
                 int result = ask_ == 4 ? hit : hit == 0 ? 1 : 0;
+                bool save = ask_ == 3 && result == 1;
                 ask_ = 0;
                 host.finishScreen(result);
+                // はい to saving opens the save menu, and the story goes on once it closes, as on the PC.
+                if (save) host.openMenu("nav_save");
             }
             return true;
         }
@@ -160,6 +163,15 @@ public:
         put(host, out, "obj\\l000_000.bmp", 0, 0);
         put(host, out, "obj\\l001_000.bmp", 256, 21);
         cell(host, out, "obj\\l004_000.bmp", kTreeButton[0], kTreeButton[1], 0, 0, 190, 95);
+        drawClock(host, out);
+        // The heroine tabs: row 2 for the one shown, 4 (grey) once she's done, else row 0.
+        for (int h = 0; h < 3; h++) {
+            int row = h == shown ? 2 : host.variable(1, kStage + h) > 3 ? 4 : 0;
+            cell(host, out, "obj\\l002_003.bmp", kTab[h][0], kTab[h][1], 118 * h, 58 * row, 118, 58);
+        }
+        put(host, out, "obj\\l002_002.bmp", 1002, 19);
+        cell(host, out, "obj\\l001_001.bmp", 465, 21, 123 * (truth(host) - 1), 0, 123, 25);
+        cell(host, out, "obj\\l005_001.bmp", 669, 625, 216 * (truth(host) - 1), 0, 216, 73);
         // A locked stage's questions are all dark, as asked ones are.
         bool shut = locked(host, shown);
         int bits = shut ? 7 : asked(host, shown);
@@ -192,7 +204,7 @@ private:
     // Places measured on the PC's hub (1280x720): the 自白内容確認 button and the three heroine tabs. The bubbles drift on
     // the PC; until that's measured they sit at the middle of where they were seen.
     static constexpr int kTreeButton[4] = {12, 581, 190, 95};
-    static constexpr int kTab[3][4] = {{760, 45, 66, 45}, {873, 45, 66, 45}, {983, 45, 66, 45}};
+    static constexpr int kTab[3][4] = {{752, 50, 118, 58}, {870, 50, 118, 58}, {988, 50, 118, 58}};
     static constexpr int kBubble[3][2] = {{480, 160}, {760, 250}, {500, 370}};
 
     static bool inside(int x, int y, const int (&r)[4]) { return x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]; }
@@ -324,6 +336,27 @@ private:
             if (x >= 522 + 128 * i && x < 631 + 128 * i && y >= 390 && y < 429) return i;
         return -1;
     }
+    // The clock and the hours left in o000's digits (32 wide), the day's "日目 :" in o000_001, and the limit under the
+    // band in l002's small red digits (19 wide), all placed on the PC's hub shots. A one-digit count of hours left is
+    // taken as centred over the two places; not yet seen on the PC.
+    static void digits(PartHost &host, Canvas &out, const char *sheet, int w, int h, int x, int y, int value, int places) {
+        for (int i = places - 1; i >= 0; i--, value /= 10) cell(host, out, sheet, x + w * i, y, w * (value % 10), 0, w, h);
+    }
+    static void drawClock(PartHost &host, Canvas &out) {
+        int day = host.variable(1, kDay), hour = host.variable(1, kHour), left = host.variable(1, kHoursLeft);
+        digits(host, out, "obj\\o000_000.bmp", 32, 40, 14, 24, day, 1);
+        put(host, out, "obj\\o000_001.bmp", 46, 35);
+        digits(host, out, "obj\\o000_000.bmp", 32, 40, 104, 24, hour, 2);
+        digits(host, out, "obj\\o000_000.bmp", 32, 40, 185, 24, 0, 2);
+        if (left >= 10) digits(host, out, "obj\\o000_000.bmp", 32, 40, 297, 7, left, 2);
+        else digits(host, out, "obj\\o000_000.bmp", 32, 40, 313, 7, std::max(0, left), 1);
+        // "タイムリミット D日目 HH時": the limit is the truth's start plus its hours.
+        put(host, out, "obj\\l002_000.bmp", 257, 53);
+        int limit = hour + left;
+        digits(host, out, "obj\\l002_001.bmp", 19, 21, 350, 48, day, 1);
+        digits(host, out, "obj\\l002_001.bmp", 19, 21, 396, 48, limit, 2);
+    }
+
     void drawAsk(PartHost &host, Canvas &out) const {
         int bandY = ask_ == 4 ? 205 : 316;
         put(host, out, "obj\\a002_000.bmp", 0, bandY);
