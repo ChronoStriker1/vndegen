@@ -576,9 +576,12 @@ void Engine::runAction(const std::string &action) {
         saveSettings();
         return;
     }
-    if (action == "Ejaculation") { gtEjaculate(); return; }
+    if (action == "Ejaculation") {
+        if (!setting("gt_off")) gtEjaculate();
+        return;
+    }
     if (action == "Extension") {
-        if (gt_.active && !gt_.extending) gt_.extend = !gt_.extend;
+        if (gt_.active && !gt_.extending && !setting("gt_off")) gt_.extend = !gt_.extend;
         return;
     }
     if (action == "GOODTiming") {
@@ -2707,15 +2710,16 @@ void Engine::composeSlots(Canvas &out) {
     // NEW marks the card saved to last, which the PC keeps in global 0: Test Game 94's held 2 and The Alchemist's 1, the
     // cards their screens marked, and Test Game 87 counts from 0.
     int newest = newCardSlot(layout_, variable(0, 0));
-    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10) {
+    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10, int step = 0) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / cells;
+        if (step <= 0) step = w;
         for (int i = count - 1; i >= 0; i--) {
             int digit = value % 10;
             value /= 10;
-            drawPart(out, *sheetOfTen, x + i * w, y, digit * w, 0, w, sheetOfTen->h, 1);
+            drawPart(out, *sheetOfTen, x + i * step, y, digit * w, 0, w, sheetOfTen->h, 1);
         }
-        return x + count * w;
+        return x + count * step;
     };
     for (int index = 0; index < perPage; index++) {
             int slot = page_ * perPage + index + 1;
@@ -2770,7 +2774,8 @@ void Engine::composeSlots(Canvas &out) {
                 drawPart(out, *quickMark, numberX, cy + offset("slotdigits", 2), 0, 0, quickMark->w, quickMark->h, 1);
                 numberX += quickMark->w;
             }
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2));
+            // `slotdigits SHEET X Y COUNT [STEP]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide digits).
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), 10, offset("slotdigits", 4));
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -3355,9 +3360,11 @@ void Engine::composeMessageButtons(Canvas &out) {
                   (b.action == "ModeChange" && setting("art"));
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
         if (b.action == "Voice" && currentText_.voice.empty()) return StateDisabled;
-        if (b.action == "Ejaculation" && !gt_.active) return StateDisabled;
+        // With the GT switch off, Ejaculate and Extend are disabled for the whole scene, as Test Game 88's PC draws them
+        // (under Wine: their sheet's last row with it off, the first with it on, at every line through a scene).
+        if (b.action == "Ejaculation" && (!gt_.active || setting("gt_off"))) return StateDisabled;
         if (b.action == "Extension") {
-            if (!gt_.active || gt_.extending) return StateDisabled;
+            if (!gt_.active || gt_.extending || setting("gt_off")) return StateDisabled;
             on = gt_.extend;
         }
         if (b.action == "GOODTiming") on = setting("gt_off") != 0;
@@ -4213,13 +4220,15 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
         } else if (screen_) {
             // `cancel ACTION` names what the right button does on a screen that isn't left with Back.
-            if (screen_->setting("menustages") && menuStage_ >= 2) {
-                menuStage_ = 1;
-                subMenu_.clear();
-                dirty_ = true;
-            } else if (screen_->setting("submenudim") && !subMenu_.empty()) {
+            // An open submenu closes first and leaves the menu up, as Test Game 82's does (set 2, under Wine); then a
+            // title with menu stages goes back to its first.
+            if (screen_->setting("submenudim") && !subMenu_.empty()) {
                 size_t slash = subMenu_.rfind('/');
                 subMenu_ = slash == std::string::npos ? "" : subMenu_.substr(0, slash);
+                dirty_ = true;
+            } else if (screen_->setting("menustages") && menuStage_ >= 2) {
+                menuStage_ = 1;
+                subMenu_.clear();
                 dirty_ = true;
             } else if (const auto *cancel = screen_->setting("cancel"); cancel && !cancel->empty()) runAction((*cancel)[0]);
             else if (screen_->name != "title") runAction("back");

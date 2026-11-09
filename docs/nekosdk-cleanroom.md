@@ -348,6 +348,8 @@ Funbag Fantasy 3 if keeps 892 more pictures in an `sc` folder beside `sc.pak`, o
 
 From Test Game 88 under Wine, its manual, and PC saves compared. `cfg` files under `gt/cfg` list groups of scripts. Opcode 153 names one and opcode 154 marks where Ejaculate lands. The save's tail holds, after the scene name: a state at byte 819 that's -1 when off, 0 in the scene and a small number inside the extra scripts; the count twice at 823; the first counted text's node at 831; the marker's node at 835; then two strings, the scene and the config. The marker's first parameter was 12 and the count started 12 text nodes before it. Saves taken with Extend on and off differ only in the time and play counters, so it isn't saved, and it stays on across a load. Pressing Ejaculate before the marker plays the `Ejaculate` script and goes on after the marker; pressing it in the extra scripts goes straight there, because that save's backlog has no line of the script.
 
+The GT switch, a message window button, was checked by loading the same PC save before a marker twice and clicking through 45 lines, with the switch turned off in one run: with it off the count's heart doesn't show, Ejaculate and Extend are drawn in their sheet's last row, disabled, at every line (the first row with it on), and the story's lines and pictures are otherwise the same.
+
 The count's heart was matched against Test Game 88 under Wine, loading a save 38 lines before a marker and clicking through
 with a shot after each line. The heart (`l005_000`, at 1147, 607) is grey with twelve segments, and `l006_000` to `_011`
 are those segments in pink, from a deep pink at the top of the right lobe to a pale one at the top of the left, in pairs
