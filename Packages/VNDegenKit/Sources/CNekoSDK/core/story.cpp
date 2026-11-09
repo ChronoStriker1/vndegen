@@ -27,9 +27,6 @@
 namespace neko {
 namespace {
 
-// Opcodes the story table needs that flow scripts don't have. Flow scripts' own stop well below these.
-constexpr int kStoryGoto = 1001, kStoryOpen = 1002, kStoryChapter = 1003;
-
 std::vector<std::string> withoutComment(const std::vector<std::string> &w) {
     std::vector<std::string> out;
     for (const std::string &word : w) {
@@ -173,6 +170,9 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
             for (; i < w.size() && w[i] != "->" && count < 24; i++) n.p[size_t(4 + count++)] = toInt(w[i]);
             n.p[3] = count;
             n.p[0] = -1;
+            // `@N` on an open line: the PC's number while that screen waits, as Test Game 90's select screen has one for
+            // each half-week (set 1).
+            n.p[kStoryPcNumber] = pc;
             if (i + 2 < w.size() && w[i] == "->") {
                 n.p[0] = w[i + 1] == "S" ? 1 : 0;
                 n.p[1] = toInt(w[i + 2]);
@@ -272,9 +272,10 @@ bool Engine::storySceneIs(const Node &n, const std::string &scene) {
 }
 
 // A PC save of a game without flow scripts names its scene and the PC's number for its place in the story, 3 for while a
-// choice waits: the line with that number, if the table gives numbers, is the place. Numbers repeat, as both options of
+// choice waits: the line with that number, if the table gives numbers, is the place, a `scene` or `choice` line or an
+// `open` line, whose screen opens again. Numbers repeat, as both options of
 // Test Game 87's choices and each ending's last scene share one (set 1), so the line whose scene the save names wins.
-bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice) {
+bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scene, bool &atChoice, bool &atScreen) {
     auto table = screens_.find("story");
     if (table == screens_.end() || number <= 0) return false;
     std::shared_ptr<Script> found;
@@ -292,9 +293,11 @@ bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scen
         if (at && storySceneIs(*at, scene)) break;
     }
     if (!at) return false;
-    // A save while the choice waits asks it again; one after it goes on past it.
+    // A save while the choice waits asks it again; one after it goes on past it. One at a screen's number opens the
+    // screen again.
     atChoice = at->opcode == 3 && active == 3;
-    stack_.push_back({found, atChoice ? at : found->node(at->next)});
+    atScreen = at->opcode == kStoryOpen;
+    stack_.push_back({found, atChoice || atScreen ? at : found->node(at->next)});
     flowCallId_ = number;
     return true;
 }

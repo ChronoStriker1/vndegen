@@ -30,10 +30,10 @@ const PartEntry kParts[] = {
 };
 
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses
-// with N, kept with a save, and chapter N is scr\cN.txt. Scene command 9000 loads its picture into slot p3 at p1, p2
-// through PartHost::loadImage, additive when p4 is 1 and scrolling p5 and p6 pixels a second. On a table screen naming
-// it, the widget test game's sprite gallery, it draws a square at 400, 400, blue and red once pressed, takes the presses on it,
-// and after two covers the top left corner over everything.
+// with N, kept with a save, the right button there opening the load menu over it, and chapter N is scr\cN.txt. Scene
+// command 9000 loads its picture into slot p3 at p1, p2 through PartHost::loadImage, additive when p4 is 1 and scrolling
+// p5 and p6 pixels a second. On a table screen naming it, the widget test game's sprite gallery, it draws a square at
+// 400, 400, blue and red once pressed, takes the presses on it, and after two covers the top left corner over everything.
 class SelfTestPart : public GamePart {
 public:
     bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) override {
@@ -66,10 +66,15 @@ public:
         needed_ = count;
         return true;
     }
-    bool press(PartHost &host, int x, int y, int) override {
+    bool press(PartHost &host, int x, int y, int button) override {
         if (onMenu_) {
             if (x < 400 || x >= 410 || y < 400 || y >= 410) return false;
             menuPresses_++;
+            return true;
+        }
+        // The right button opens the load menu over the waiting screen (PartHost::openMenu).
+        if (button == 1) {
+            host.openMenu("nav_load");
             return true;
         }
         if (++presses_ >= needed_) host.finishScreen(presses_);
@@ -144,6 +149,7 @@ void PartHost::waitMs(int ms) {
 }
 
 void PartHost::finishScreen(int result) { e_.finishPartScreen(result); }
+void PartHost::openMenu(const std::string &action) { e_.runAction(action); }
 
 void PartHost::playSound(int kind, int channel, const std::string &path, int volume, bool loop) {
     Node n;

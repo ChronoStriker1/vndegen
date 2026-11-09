@@ -2611,7 +2611,8 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     // Only Test Game 87's saves say whether a choice has been made; elsewhere a choice's picture means one was.
     choiceMade_ = layout_ && choiceFlag(*layout_) == ChoiceFlag::Made ? d.dateFlag != 0 : !d.choiceImage.empty();
     flowCallId_ = d.flowNode;
-    bool atChoice = false;
+    // atScreen: a PC save at an `open` line's number, whose screen opens at once.
+    bool atChoice = false, atScreen = false;
     // Game parts first, since a part's chapters, which the story's place is found in, can depend on its state.
     loadPartsState(d, side);
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
@@ -2625,7 +2626,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice) &&
+    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen) &&
                !resumeStoryAt(d.scene)) {
         complain("The story table has no place for the save's scene " + d.scene);
     }
@@ -2786,8 +2787,9 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     layoutText(atChoice ? "" : sjis::toUtf8(d.current.name), atChoice ? "" : sjis::toUtf8(d.current.text));
     textStart_ = now_;
     textDone_ = true;
-    // A game part's screen saved open waits for its input again, as it was.
-    waiting_ = partScreen_ ? Waiting::PartScreen : atChoice ? Waiting::None : Waiting::Click;
+    // A game part's screen saved open waits for its input again, as it was; a PC save at a table's `open` line opens it
+    // at once, with no click first.
+    waiting_ = partScreen_ ? Waiting::PartScreen : atChoice || atScreen ? Waiting::None : Waiting::Click;
     dirty_ = true;
 }
 
@@ -4020,10 +4022,12 @@ void Engine::runFlow(const Node &n) {
     case 1001:  // the story table's goto
         flow.node = flow.script->node(n.otherwise);
         break;
-    case 1002: {  // the story table's `open`: a game part's screen, which the flow waits on
+    case kStoryOpen: {  // the story table's `open`: a game part's screen, which the flow waits on
         std::vector<int> args(n.p.begin() + 4, n.p.begin() + 4 + std::clamp(n.p[3], 0, 24));
         partResultScope_ = n.p[0];
         partResultNumber_ = n.p[1];
+        // A save while the screen waits holds the PC's number for it, when the table gives one.
+        if (n.p[kStoryPcNumber]) flowCallId_ = n.p[kStoryPcNumber];
         flow.node = flow.script->node(n.next);
         bool opened = false;
         for (auto &[name, part] : parts_) {
@@ -4930,6 +4934,8 @@ const char *Engine::debugStatus() {
     status_ = buffer;
     // How far back the window's own log shows, when it does.
     if (windowLog_ > 0) status_ += " log " + std::to_string(windowLog_);
+    // The menu table screen open over the story, when one is.
+    if (screen_) status_ += " menu " + screen_->name;
     return status_.c_str();
 }
 
