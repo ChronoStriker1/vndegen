@@ -445,6 +445,12 @@ pic obj\a003_000.bmp 362 186
 button yes obj\a005_000.bmp 389 295 2 5 0
 button no obj\a005_000.bmp 389 359 2 5 1
 
+screen choice
+# Measured under Wine: the dialog's stacked cards and "Please make your CHOICE", and the options 64 apart.
+pic obj\a003_000.bmp 362 186
+pic obj\l000_000.bmp 394 237
+placefor 2 295 64 389 0
+
 screen defaults
 # No quick saves: its ten pages of nine cards run to 90, all ordinary.
 quickslots 91 98
