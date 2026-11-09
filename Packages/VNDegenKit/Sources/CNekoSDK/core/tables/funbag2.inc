@@ -133,6 +133,9 @@ default se 60
 default voice 80
 default backvoice 80
 default skipall 1
+# The message window's four round buttons (hide, the log's back and on, voice) show all the time on the PC, wherever
+# the pointer is; only the control panel's row waits for the pointer. Config has no switch for it.
+default bar_always 1
 layoutcgslot 102
 
 # Config, one page, measured under Wine. Its help is a circle above or below the row under the pointer. The screen's
@@ -656,7 +659,6 @@ scene scr\ep_05_04_00.txt @5053
 if S 5001 < 5 goto chapter5on
 scene scr\ep_05_04_02.txt @5061
 scene scr\ep_staff.txt
-# 999 is inferred from the other endings' last scenes, which all hold it.
 scene scr\ep_05_04_03.txt @999
 end
 label chapter5on
@@ -720,10 +722,10 @@ scene scr\ep_staff.txt
 # Chapter 7, the epilogue.
 scene scr\ep_07_00_00.txt @7001
 scene scr\ep_07_00_01.txt @7002
-# 7003 to 7005 are inferred from 7001 and 7002.
 scene scr\ep_07_00_02.txt @7003
 scene scr\ep_07_00_03.txt @7004
-scene scr\ep_07_00_04.txt @7005
+# The story's last scene holds 999 as every ending's does, with no staff roll before it here.
+scene scr\ep_07_00_04.txt @999
 end
 flow replay1
 scene scr\ep_01_04_01.txt @1005
