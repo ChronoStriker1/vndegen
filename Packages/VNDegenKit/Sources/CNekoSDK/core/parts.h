@@ -24,7 +24,10 @@ enum class Layer {
     Window,       // inside the message window, over its plate and under its text
     ButtonRow,    // just under the message window's lower row of buttons, while that row shows
     OverWindow,   // over the message window and its buttons
-    Menu,         // a table screen naming the part with `part NAME`: over its pictures, under its buttons
+    // A table screen naming the part with `part NAME`: over its `pic` lines and under its cards, as the strip along the
+    // bottom of Test Game 90's Save and Load runs behind the lowest row of cards (set 1, under Wine).
+    MenuUnder,
+    Menu,         // the same screen: over its pictures and cards, under its buttons
     Screen,       // the part's own screen, while it's open, over everything, or over a table screen naming the part
 };
 
@@ -99,7 +102,7 @@ public:
     virtual void drawSlot(PartHost &, Canvas &, int slot, float alpha) {}
     // The story table's `open NAME ARGS...`: true when this part opened that screen. It gets the input until it calls
     // finishScreen. A table screen with `part NAME` calls it too as it opens, with the screen's name and no ARGS; while
-    // that screen is open the part draws at Layer::Menu and Layer::Screen and is offered each press first.
+    // that screen is open the part draws at Layer::MenuUnder, Layer::Menu and Layer::Screen and is offered each press first.
     virtual bool openScreen(PartHost &, const std::string &name, const std::vector<int> &args) { return false; }
     // A press at x, y, button 0 left and 1 right: true when this part took it.
     virtual bool press(PartHost &, int x, int y, int button) { return false; }

@@ -196,4 +196,37 @@ import TestSupport
         for _ in 0..<12 { _ = vnneko_step(e, 16) }  // about 600 ms in
         #expect(status().contains("s.txt #-1 time"), "\(status())")
     }
+
+    // `replaychapters` on the Scene screen: a play_view2.ini line's fourth field is the chapter its card replays, which a
+    // game part gives the scenes of, as each of Test Game 96's cards plays its own chapter's file though three share
+    // their scripts (set 2). Any of the line's three scripts read unlocks it, here the third, and the replay's end
+    // comes back to the Scene screen.
+    @Test func aSceneCardReplaysTheChapterItsLineNames() throws {
+        let root = try game("widgettestpart", [
+            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\a.txt,src\\\\b.txt,scr\\\\k.txt\n".utf8),
+            // The test part's chapter 7 is this one scene.
+            "scr/c7.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0, p: [0: 1000])]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/widgettestpart/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try Data("scr\\k.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_press(e, "scene"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        // The part's square under the cards, Layer::MenuUnder: blue 20 across at 300, 300, over the screen's white
+        // picture and under the card's green thumbnail, 10 across.
+        #expect(pixel(e, 305, 305) == green)
+        #expect(pixel(e, 315, 305) == [0, 0, 255])
+        #expect(pixel(e, 315, 315) == [0, 0, 255])
+        #expect(pixel(e, 350, 315) == white)
+        click(e, 320, 315)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().hasPrefix("scr\\c7.txt"), "\(status())")
+        for _ in 0..<90 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu scene"), "\(status())")
+    }
 }
