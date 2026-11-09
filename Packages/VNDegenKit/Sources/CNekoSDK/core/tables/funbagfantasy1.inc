@@ -502,6 +502,24 @@ pic obj\n001_000.bmp 1008 586 fadein 59300 1000
 pic bg\bg_w.bmp 0 0 fadeout 700 2200
 pic bg\bg_w.bmp 0 0 fadein 70100 1700
 
+screen dialog
+# The choice box's frame with a title from j001_000's seven (Save to this slot?, Load this file?, Overwrite this file?,
+# Finished?, Return to title screen?, Is this fine?, Choose an option) and Yes and No from j001_001, measured under Wine;
+# the screen behind darkens to 37.3%, the same everywhere. 82 has no delete or quick save; those questions take the
+# nearest title.
+dim 160
+pic obj\j000_000.bmp 438 144
+question obj\j001_000.bmp 542 124 7 0
+question obj\j001_000.bmp 542 124 7 1
+question obj\j001_000.bmp 542 124 7 2
+question obj\j001_000.bmp 542 124 7 5
+question obj\j001_000.bmp 542 124 7 0
+question obj\j001_000.bmp 542 124 7 1
+question obj\j001_000.bmp 542 124 7 4
+question obj\j001_000.bmp 542 124 7 3
+button yes obj\j001_001.bmp 486 242 2 5 0
+button no obj\j001_001.bmp 486 298 2 5 1
+
 screen defaults
 layoutcgslot 102             # 82's saves hold a CG in slot 102, and a background and a CG each take the other away
 default opacity 100          # the PC's message window is solid until Config changes it
