@@ -82,12 +82,12 @@ public struct LudusaviStore: Sendable {
         /// Paths in the backup that are not saves this engine keeps.
         var skipped: [String]
         /// The game's registry values the backup holds, when it keeps any.
-        var registry: [String: RegistryValue]?
+        var registry: [RegistryName: RegistryValue]?
     }
 
     /// `registry` is what the backup holds for the game's registry key, which `backupRegistryValues` reads.
     static func restorePlan(_ mapping: LudusaviMapping, backup: String?, locations: [SaveLocation],
-                            registry: [String: RegistryValue]? = nil) throws -> RestorePlan {
+                            registry: [RegistryName: RegistryValue]? = nil) throws -> RestorePlan {
         guard let files = mapping.effectiveFiles(backup) else { throw SaveSyncError.noBackups }
         let recorded = RecordedPaths(files.keys, locations: locations)
         var plan = RestorePlan(items: [], skipped: [], registry: registry)
