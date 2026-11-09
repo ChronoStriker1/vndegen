@@ -31,6 +31,11 @@ constexpr int kGroupHse = 5, kGroupBackVoice = 6;
 constexpr int kWindowSlideMs = 200;
 // The film noise's slot, and how many frames each random place of its crop lasts, as The Alchemist's exe has them.
 constexpr int kNoiseSlot = 10000, kNoiseFramesPerPlace = 4;
+// A save record's kind for a part's tiled picture, and where its fixed part keeps the speed (SavedSprite::kind).
+constexpr int kTiledKind = 6;
+// The effects channel a flipbook's own sound plays in (`flipsound`), which game parts can use for theirs too.
+constexpr int kFlipSoundChannel = 180;
+constexpr size_t kTiledSpeedAt = 45;
 // How long each character of text takes to fade in, measured from the PC game's footage.
 constexpr int kCharFadeMs = 160;
 // How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
@@ -779,6 +784,12 @@ void Engine::runAction(const std::string &action) {
     if ((action == "nav_sprites" || action == "sprites") && screens_.count("sprites")) { go("sprites"); return; }
     if (action == "nav_title") { runAction("Title"); return; }
     if (action == "nav_quit") { runAction("quit"); return; }
+    // A game's own button, such as Test Game 96's Comment, is a part's.
+    for (auto &[name, part] : parts_)
+        if (part->action(*partHost_, action)) {
+            dirty_ = true;
+            return;
+        }
     warnOnce("Button not built yet: " + action);
 }
 
@@ -1310,12 +1321,19 @@ void Engine::loadGalleries() {
         else if (voiceType >= 0) voiceTypes_.emplace_back(normalizedPath(fields(line)[0]), voiceType);
     }
     std::stable_sort(voiceTypes_.begin(), voiceTypes_.end(), [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
-    // `#anime PICTURES FIRST MS`. Each number is read as ms because an effect of 39 pictures at 16 lasts 0.6 s that way.
+    // `#anime PICTURES FIRST MS`, and on some lines `N SOUND VOLUME` after. Each number is read as ms because an effect
+    // of 39 pictures at 16 lasts 0.6 s that way. What N is, 0, 1 or 10, isn't known.
     for (const std::string &line : lines("cfg\\anime_cfg.ini")) {
         std::istringstream in(line);
-        std::string word, path;
-        int count = 0, ms = 0;
-        if (in >> word >> count >> path >> ms && word == "#anime" && count > 0 && ms > 0) flipbooks_[normalizedPath(path)] = {count, ms};
+        std::string word, path, sound;
+        int count = 0, ms = 0, n = 0, volume = 100;
+        if (!(in >> word >> count >> path >> ms) || word != "#anime" || count <= 0 || ms <= 0) continue;
+        FlipbookInfo info{count, ms, "", 100};
+        if (in >> n >> sound >> volume && sound.rfind("//", 0) != 0) {
+            info.sound = sound;
+            info.volume = volume;
+        }
+        flipbooks_[normalizedPath(path)] = info;
     }
     if (!saveDir_.empty()) {
         std::ifstream f(saveDir_ + "/vndegen_seen.txt");
@@ -2396,6 +2414,14 @@ SaveData Engine::captureSave() {
     d.width = canvas_.w;
     d.height = canvas_.h;
     for (const auto &[slot, s] : front_) {
+        // A slot a part holds saves as a record of the part's kind with no picture, which the part's savePC fills.
+        if (s.held) {
+            SavedSprite out;
+            out.slot = slot;
+            out.kind = s.kind;
+            out.alpha = out.endAlpha = int(s.alpha * 256 + 0.5f);
+            d.sprites.push_back(out);
+        }
         if (!s.image) continue;
         SavedSprite out;
         out.slot = slot;
@@ -2403,6 +2429,7 @@ SaveData Engine::captureSave() {
         // Some games' PC names the picture twice and loads it from the second (namesPictureTwice).
         out.nextPath = !s.noise && layout_ && namesPictureTwice(*layout_) ? s.path : "";
         out.noise = s.noise;
+        out.kind = s.kind;
         if (s.flipCount > 0) {
             out.flipFrame = s.flipShown;
             out.flipRepeat = s.flipLoop ? 1 : 0;
@@ -2665,7 +2692,16 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             if (s.image) front_[saved.slot] = s;
             continue;
         }
+        // A part's slot with no picture comes back held, for the part's loadPC to fill from the same record.
+        if (saved.path.empty() && saved.kind != 0) {
+            s.held = true;
+            s.kind = saved.kind;
+            s.alpha = float(saved.alpha) / 256;
+            front_[saved.slot] = s;
+            continue;
+        }
         s.path = saved.path;
+        s.kind = saved.kind;
         // A movie starts again from its beginning. Whether it looped isn't known from the save, and the library's
         // looping ones are backgrounds, so it loops.
         if (normalizedPath(saved.path).rfind("movie\\", 0) == 0 && (s.movie = openMovie(saved.path, true))) {
@@ -2696,6 +2732,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             resumeFlipbook(s);
             s.flipStep = saved.flipStep;
             s.flipParam15 = saved.flipParam15;
+            applyFlipTime(s);
             restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes, saved.flipRepeat, saved.flipRepeat >= 0 ? saved.flipReverse : -1);
         }
         if (!saved.animation.empty()) {
@@ -2710,6 +2747,16 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             } else {
                 s.changes.push_back(std::move(a));
             }
+        }
+        // The older layout's record of a tiled, moving picture, kind 6, keeps its speed as a float 45 bytes into its
+        // fixed part, in pixels a frame at 60 a second (set 3, from Test Game 83's fog: command 90's p3 in thousandths).
+        // A PC save has only that, so the picture is tiled and moved across by it. Command 91's, down the screen,
+        // isn't known in a save: neither 83 nor 86 uses it.
+        if (saved.kind == kTiledKind && saved.rawFixed.size() >= kTiledSpeedAt + 4) {
+            float speed;
+            std::memcpy(&speed, saved.rawFixed.data() + kTiledSpeedAt, 4);
+            s.scrollX = speed * 60;
+            s.scrollFrom = now_;
         }
         if (auto fx = side.slotFx.find(saved.slot); fx != side.slotFx.end() && side.valid) {
             s.additive = fx->second[0] != 0;
@@ -3705,7 +3752,11 @@ bool Engine::barHover() const {
     return defaults != screens_.end() && defaults->second.setting("barhover");
 }
 
-bool Engine::innerButtonsShown() const {
+// `inneralways` under `screen defaults`: the window's own buttons show whenever the window does, while the plate still
+// comes up only with the pointer, as Test Game 96's four are there with its plate resting (set 2, PC shots under Wine).
+bool Engine::innerButtonsShown() const { return defaultsHave("inneralways") || plateUp(); }
+
+bool Engine::plateUp() const {
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
     // A plate as wide as the screen comes up with all the buttons when the pointer's on it, as in Test Game 85.
     if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= plateY_);
@@ -3717,16 +3768,26 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 
 // `partplate` under `screen defaults`: a game part's open screen keeps the message window's plate and its buttons over
 // it, as Test Game 96's hub and vote show the plate's Menu tab at its resting place (set 2).
-bool Engine::partPlate() const {
+bool Engine::defaultsHave(const char *key) const {
     auto defaults = screens_.find("defaults");
-    return partScreen_ && waiting_ == Waiting::PartScreen && defaults != screens_.end() && defaults->second.setting("partplate") &&
-           partScreen_->showsPlate();
+    return defaults != screens_.end() && defaults->second.setting(key);
+}
+
+bool Engine::partPlate() const {
+    return partScreen_ && waiting_ == Waiting::PartScreen && defaultsHave("partplate") && partScreen_->showsPlate();
 }
 
 bool Engine::underButtonsShown() const {
-    if (fullWidthPlate()) return innerButtonsShown();
+    if (fullWidthPlate()) return plateUp();
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
     if (plateRests_) return plateRaised_;
+    // `underbelow Y` under `screen defaults`: a game with no plate shows its lower row while the pointer is at or below
+    // Y, at any x, as Test Game 90's PC does from 632 (set 1, under Wine).
+    if (!buttonPlate_) {
+        auto defaults = screens_.find("defaults");
+        const auto *below = defaults != screens_.end() ? defaults->second.setting("underbelow") : nullptr;
+        return below && !below->empty() && pointerSeen_ && messagePointerY() >= field(*below, 0);
+    }
     return buttonPlate_ && pointerSeen_ && messagePointerY() >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
 }
 
@@ -3760,13 +3821,16 @@ void Engine::composeMessageButtons(Canvas &out) {
             on = gt_.extend;
         }
         if (b.action == "GOODTiming") on = setting("gt_off") != 0;
-        // Lit while an older line shows in the window, as Test Game 83's down button is.
-        if (b.action == "NextText") on = windowLog_ > 0;
+        // The down button has nowhere to go while the line in play shows, and is drawn disabled; with an older line in
+        // the window it's an ordinary button, as on Test Game 83's PC (set 3, shots under Wine).
+        if (b.action == "NextText" && windowLog_ <= 0) return StateDisabled;
         if (b.action == "EXpress") {
             // 切替不可 while nothing on screen has another version, as Test Games 92 and 94 show it.
             if (!artSwitchable()) return StateDisabled;
             on = setting("express") == 0;
         }
+        for (const auto &[name, part] : parts_)
+            if (int lit = part->actionLit(b.action); lit >= 0) on = lit != 0;
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
     // `barhover`'s rows fade: drawn on a copy of the frame, mixed back in by how much of them shows.
@@ -3782,7 +3846,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         return;
     }
     if (innerButtonsShown()) {
-        if (fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+        if (fullWidthPlate() && plateUp()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         for (const Button &b : bar().inner) drawButton(out, b, state(b));
     }
     if (!underButtonsShown()) {
@@ -3790,6 +3854,8 @@ void Engine::composeMessageButtons(Canvas &out) {
         return;
     }
     if (buttonPlate_ && !fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    // What a game part draws behind the lower row, as Test Game 90's has a moving picture there (set 1).
+    drawParts(out, Layer::ButtonRow);
     for (const Button &b : bar().under) drawButton(out, b, state(b));
 }
 
@@ -5013,6 +5079,18 @@ void Engine::startFlipbook(const Node &n) {
     s.flipStep = p[16];
     s.flipParam15 = p[15];
     resumeFlipbook(s);
+    applyFlipTime(s);
+    // `flipsound` under `screen defaults`: a flipbook plays the sound its anime_cfg.ini line names, once, as Test Game
+    // 90's PC reads the sound's file each time it loads an emotion mark's pictures, in scenes with no command playing it
+    // (set 1, a file trace under Wine). Which channel the PC uses isn't known; the last effects channel is taken.
+    if (auto it = flipbooks_.find(normalizedPath(s.path)); it != flipbooks_.end() && !it->second.sound.empty() && defaultsHave("flipsound")) {
+        Node sound;
+        sound.p[0] = kFlipSoundChannel;
+        sound.p[1] = it->second.volume;
+        sound.p[4] = 1;
+        sound.s[1] = it->second.sound;
+        playSound(sound, kKindSe);
+    }
     if (!s.flipCount) warnOnce("A flipbook isn't in anime_cfg.ini: " + n.s[1]);
     else if (s.flipReverse) {
         s.flipShown = s.flipCount - 1;
@@ -5269,11 +5347,22 @@ void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map
     if (ImageRef image = images_->get(flipPicture(s.path, s.flipShown))) s.image = image;
 }
 
+// `fliptime` under `screen defaults`: command 121's parameter 16, when set, is how long each picture shows, in
+// milliseconds taken up to whole frames at 60 a second, in place of the ini's time. Test Game 90's PC held each picture
+// of its 41-picture anger mark, 16 in the ini and 30 in parameter 16, for two frames, 1.3 seconds in all, and its joy
+// mark's 57 for about 2.0 (set 1, recordings under Wine). Test Game 84's PC doesn't: its effects with 50 there run at the
+// ini's 16, so it's a setting of the game's table.
+void Engine::applyFlipTime(Sprite &s) {
+    if (s.flipStep <= 0 || !s.flipCount || !defaultsHave("fliptime")) return;
+    int frames = (s.flipStep * 60 + 999) / 1000;
+    s.flipMs = std::max(1, (frames * 1000 + 30) / 60);
+}
+
 void Engine::resumeFlipbook(Sprite &s) {
     auto it = flipbooks_.find(normalizedPath(s.path));
     if (it == flipbooks_.end()) return;
-    s.flipCount = it->second.first;
-    s.flipMs = it->second.second;
+    s.flipCount = it->second.count;
+    s.flipMs = it->second.ms;
     s.flipBegun = now_;
     s.flipShown = 0;
     s.additive = paintedOnBlack(s.path);
@@ -5674,7 +5763,20 @@ void Engine::loadImage(const Node &n) {
     s.movie.reset();
 }
 
-bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY) {
+void Engine::holdPartSlot(int slot, int kind) {
+    Sprite s;
+    s.held = true;
+    s.kind = kind;
+    back_[slot] = std::move(s);
+}
+
+bool Engine::partSlotHeld(int slot) const {
+    for (const auto *set : {&front_, &back_})
+        if (auto it = set->find(slot); it != set->end() && it->second.held) return true;
+    return false;
+}
+
+bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY, int kind) {
     noteSeen(path);
     ImageRef image = images_->get(shownPath(path));
     if (!image) {
@@ -5690,6 +5792,7 @@ bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool
     s.scrollX = scrollX;
     s.scrollY = scrollY;
     s.scrollFrom = now_;
+    s.kind = kind;
     back_[slot] = std::move(s);
     return true;
 }
@@ -6320,10 +6423,16 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
     }
     int drawnTo = INT_MIN;
     for (const auto &[slot, s] : sprites) {
-        if (!s.image) continue;
+        if (!s.image && !s.held) continue;
         composeSplashes(out, drawnTo, slot);
         drawParts(out, Layer::Slot, drawnTo, slot);
         drawnTo = slot;
+        if (s.held) {
+            // A part's own slot, which the part draws.
+            float alpha = view(s).alpha;
+            for (auto &[name, part] : parts_) part->drawSlot(*partHost_, out, slot, alpha);
+            continue;
+        }
         if (s.noise) {
             drawNoise(out, s);
             continue;
@@ -6555,7 +6664,17 @@ void Engine::markRect(int &x, int &y, int &w, int &h) const {
 }
 
 bool Engine::markShowing() const {
-    return !screen_ && !logOpen_ && !dialogOpen_ && !windowHiddenByPlayer_ && !windowArtOnly_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
+    if (screen_ || logOpen_ || dialogOpen_ || windowHiddenByPlayer_ || windowArtOnly_ || !windowShown_ || !waitMark_ || waiting_ != Waiting::Click || !textDone_)
+        return false;
+    // Not while an older line shows in the window, and not under a resting plate that has come up over it, as Test Game
+    // 83's PC draws neither (set 3, shots under Wine): the mark is the window's, and the plate comes over the window.
+    if (windowLog_ > 0) return false;
+    if (plateRests_ && plateRaised_ && buttonPlate_) {
+        int x, y, w, h;
+        markRect(x, y, w, h);
+        if (x < plateX_ + buttonPlate_->w && x + w > plateX_ && y + h > plateY_ && y < plateY_ + buttonPlate_->h) return false;
+    }
+    return true;
 }
 
 // The mark is the last thing drawn, over a copy of what's beneath it, so a tick where only the mark moved redraws just
@@ -6565,7 +6684,11 @@ void Engine::drawMark(Canvas &out) {
     if (!markShowing()) return;
     // One picture turns; several are the cells of a sheet, stepped through at the same speed.
     float turns = float(now_ - textStart_) / 1000 * markSpeed_;
-    if (markPatterns_ == 1) {
+    if (markPatterns_ == 1 && defaultsHave("markstill")) {
+        // `markstill` under `screen defaults`: a mark of one picture stands as it is, as Test Game 96's is upright at
+        // the same place in every PC shot (set 2, under Wine).
+        drawPart(out, *waitMark_, markX_, markY_, 0, 0, waitMark_->w, waitMark_->h, 1);
+    } else if (markPatterns_ == 1) {
         drawImage(out, *waitMark_, float(markX_) + waitMark_->w * 0.5f, float(markY_) + waitMark_->h * 0.5f, 1, 1, turns * 2 * kPi, 1);
     } else {
         int cell = waitMark_->w / markPatterns_;

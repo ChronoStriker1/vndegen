@@ -52,6 +52,17 @@ struct Rect {
     bool contains(int px, int py) const { return px >= x && px < x + w && py >= y && py < y + h; }
 };
 constexpr Rect kTreeButton{12, 581, 190, 95};
+// The narrator's thoughts behind the panels (obj\n008_000 to _013): one comes up somewhere on the screen every 0.3 to
+// 1.8 seconds, fades in over half a second, grows about its middle by a tenth a second, and fades out over the last
+// second of its four. Tracked over 30 seconds of the PC's pick screen (lead, under Wine): widths growing 6 to 12 percent
+// a second and lives of 3.5 to 4 seconds; the pace and the strength were then fitted until a run of VNDegen's showed as
+// many lit rows as the PC's, as bright (116 bands of mean 55 against the PC's 125 of 54, both peaking at 195). Where
+// each comes up looked random and is. Which five a truth's pick shows was read from the PC's picks of truths 1, 3, 4
+// and 5; truth 2's wasn't seen and is taken as 1's.
+const int kThoughts[5][5] = {{0, 1, 2, 3, 13}, {0, 1, 2, 3, 13}, {0, 1, 2, 3, 13}, {4, 5, 6, 7, 13}, {8, 9, 10, 11, 12}};
+constexpr int kThoughtLifeMs = 4000, kThoughtInMs = 500, kThoughtOutMs = 1000;
+constexpr int kThoughtGapMs = 300, kThoughtGapSpanMs = 1500;
+constexpr float kThoughtAlpha = 0.95f, kThoughtGrowth = 0.1f;
 
 // The vote: the script's clock starts 9.9 seconds after the pick, as the countdown does, after the doors open and
 // 投票開始 shows from 4.4 to 5.9 seconds.
@@ -60,23 +71,30 @@ constexpr int64_t kVoteStartMs = 9900, kStartBannerFrom = 4400, kStartBannerTo =
 // its number of pixels a frame.
 constexpr int kFaceX = 119, kColumnStep = 400, kRowH = 50, kRowM = 200, kRowL = 350;
 // Each heroine's coffin, o012_002's cell for her, hangs 69 below her face's row at 65 + 400 a column, on a rope
-// (o012_001) from a wheel (o012_000) at the monitor's top; the face's tail points at it. The wheel's place, and whether it
-// turns, aren't measured.
-constexpr int kCoffinX = 65, kCoffinDY = 69, kCoffinW = 95, kWheelY = 96;
+// (o012_001) from a wheel (o012_000) at the top of her column. The wheel sits still at 96 + 400 a column, 74, its upper
+// half under the monitor's frame: its lower half fits there in every frame of a run of the PC's vote, and the rope's
+// own colours were found 11 to its right (lead, under Wine, by numbers alone). How far up the rope's picture reaches
+// isn't measured; it hangs from the top to the coffin. Ayano's coffin was never found whole on the PC, likely with
+// something over it, and is drawn as the others are.
+constexpr int kCoffinX = 65, kCoffinDY = 69, kWheelX = 96, kWheelY = 74, kRopeX = 107;
 // The monitor's inside, which all of that is drawn within, on a dark red: the PC's mean colour there over the vote, in
 // cells no face or bubble crosses, measured from the shots' numbers alone (lead). Which picture gives it isn't known.
 constexpr Rect kInside{40, 96, 1200, 544};
 // The viewers' raised hands along the monitor's bottom, the same in each column from its start: o013_001 to o013_005, each
-// an animation of one hand rising in cells 144 tall standing on the bottom edge, placed so their fingertips fall where set
-// 2 found them on the PC (x 94, 138, 215, 323 and 350 from the column's start). Their pace and order aren't measured; each
-// rises and sinks through its cells on a slow beat of its own.
+// an animation of one hand rising in cells 144 tall. What the PC's strip measures (lead, under Wine, the silhouette's
+// height in each column over 37 seconds, by numbers alone; set 2's shots agree): it stands on the bottom edge, never more
+// than about 70 pixels high, in four clusters some 60 wide from 40, 132, 212 and 296 of the column, about 13 pixels high
+// on average across the column, and each part of it comes round every 1.35 to 1.7 seconds. Which hands make which
+// cluster couldn't be fitted, so this arrangement is a stand-in with those measures: the five hands standing 68 below
+// the edge, so only their tops show, three times over, each set 18 to the right of the last and a third of a turn
+// behind. Now and then on the PC they all sink together, which isn't drawn.
 struct Hand {
     const char *sheet;
-    int cells, x;
+    int cells, x, periodMs;
 };
-const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 56}, {"obj\\o013_002.bmp", 7, 119}, {"obj\\o013_003.bmp", 7, 157},
-                       {"obj\\o013_004.bmp", 6, 292}, {"obj\\o013_005.bmp", 8, 324}};
-constexpr int kHandsBottom = 640, kHandFrameMs = 300;
+const Hand kHands[] = {{"obj\\o013_001.bmp", 9, 40, 1350}, {"obj\\o013_002.bmp", 7, 132, 1700}, {"obj\\o013_003.bmp", 7, 150, 1700},
+                       {"obj\\o013_004.bmp", 6, 212, 1680}, {"obj\\o013_005.bmp", 8, 296, 1350}};
+constexpr int kHandsBottom = 640 + 68, kHandsCopies = 3, kHandsCopyDX = 18;
 // The thin black dividers between the columns (o003_000), as set 2 placed them.
 constexpr int kDividerX[2] = {437, 837}, kDividerY = 16;
 constexpr uint8_t kInsideRed[3] = {55, 2, 2};
@@ -131,6 +149,8 @@ public:
         readBase(host);
         phase_ = Phase::Pick;
         opened_ = host.nowMs();
+        thoughts_.clear();
+        nextThought_ = opened_;
         host.setVariable(1, kModeVar, kModePick);
         host.redraw();
         return true;
@@ -176,12 +196,26 @@ public:
 
     bool step(PartHost &host) override {
         reopen(host);
-        if (phase_ == Phase::Pick) return true;  // the panels shimmer
+        if (phase_ == Phase::Pick) {
+            // The panels shimmer, and the narrator's thoughts come and go.
+            int64_t now = host.nowMs();
+            auto gone = [&](const Thought &t) { return now - t.born >= kThoughtLifeMs; };
+            thoughts_.erase(std::remove_if(thoughts_.begin(), thoughts_.end(), gone), thoughts_.end());
+            if (now >= nextThought_) {
+                thoughts_.push_back({kThoughts[truth_ - 1][std::rand() % 5], 250 + std::rand() % 780, 110 + std::rand() % 450, now});
+                nextThought_ = now + kThoughtGapMs + std::rand() % kThoughtGapSpanMs;
+            }
+            return true;
+        }
         if (phase_ != Phase::Vote) return false;
         int64_t ms = host.nowMs() - voteStart_;
         int frame = ms < kVoteStartMs ? -1 : int((ms - kVoteStartMs) * 60 / 1000);
-        while (frame >= 0 && next_ < events_.size() && events_[next_].frame <= frame) run(host, events_[next_++]);
-        for (int f = lastFrame_ + 1; f <= frame; f++) advance(host, f);
+        // Each frame's lines run before that frame moves, however many frames a step covers, so a move starts on its own
+        // frame at any pace of steps.
+        for (int f = lastFrame_ + 1; f <= frame; f++) {
+            while (next_ < events_.size() && events_[next_].frame <= f) run(host, events_[next_++]);
+            advance(host, f);
+        }
         lastFrame_ = std::max(lastFrame_, frame);
         comments_.step(host);
         if (frame >= allFrames_ + kEndHoldFrames) return endVote(host), true;
@@ -239,6 +273,8 @@ private:
         readBase(host);
         phase_ = Phase::Pick;
         opened_ = host.nowMs();
+        thoughts_.clear();
+        nextThought_ = opened_;
     }
 
     // vote_base.ini: `KeyNN value`, `//` starting a comment.
@@ -416,6 +452,17 @@ private:
         // Its two blue edges over the dark ground.
         put(host, out, "obj\\n000_001.bmp", 0, 0, in);
         put(host, out, "obj\\n000_002.bmp", 0, 0, in);
+        for (const Thought &t : thoughts_) {
+            char name[32];
+            std::snprintf(name, sizeof name, "obj\\n008_%03d.bmp", t.picture);
+            ImageRef image = host.image(name);
+            if (!image) continue;
+            int64_t age = host.nowMs() - t.born;
+            float fadeIn = std::min(1.0f, float(age) / kThoughtInMs), fadeOut = std::min(1.0f, float(kThoughtLifeMs - age) / kThoughtOutMs);
+            float alpha = kThoughtAlpha * fadeIn * std::max(0.0f, fadeOut);
+            float scale = 1 + kThoughtGrowth * float(age) / 1000;
+            drawImage(out, *image, float(t.x), float(t.y), scale, scale, 0, alpha * in);
+        }
         int frame = int(ms / kPanelFrameMs) % 3;
         int hovered = in >= 1 ? panelAt(host, px_, py_) : -1;
         for (int h = 0; h < 3; h++) {
@@ -467,18 +514,22 @@ private:
         for (int column = 0; column < 3; column++)
             for (size_t k = 0; k < std::size(kHands); k++) {
                 const Hand &hand = kHands[k];
-                // Up through the cells and down again, each hand a step out from the last.
-                int steps = 2 * (hand.cells - 1), at = int((ms / kHandFrameMs + int64_t(k) * 3 + column) % steps);
-                int cellNow = at < hand.cells ? at : steps - at;
-                inside(host, out, hand.sheet, cellNow, hand.cells, kInside.x + kColumnStep * column + hand.x, kHandsBottom - 144);
+                // Through its cells and round again, each hand a little out of step with the last, and each copy a third
+                // of a turn behind the one before.
+                for (int copy = 0; copy < kHandsCopies; copy++) {
+                    int64_t at = (ms + int64_t(k) * 400 + copy * hand.periodMs / kHandsCopies) % hand.periodMs;
+                    int cellNow = int(at * hand.cells / hand.periodMs);
+                    int x = kInside.x + kColumnStep * column + hand.x + copy * kHandsCopyDX;
+                    inside(host, out, hand.sheet, cellNow, hand.cells, x, kHandsBottom - 144);
+                }
             }
         for (int x : kDividerX) inside(host, out, "obj\\o003_000.bmp", 0, 1, x, kDividerY);
         for (int w = 0; w < 3; w++) {
             const Heroine &h = heroines_[size_t(w)];
             int coffinX = kCoffinX + kColumnStep * w + h.shakeX, coffinY = int(h.y) + kCoffinDY + h.shakeY;
             if (ImageRef rope = host.image("obj\\o012_001.bmp"))
-                inside(host, out, "obj\\o012_001.bmp", 0, 1, coffinX + kCoffinW / 2 - rope->w / 2, coffinY - rope->h);
-            inside(host, out, "obj\\o012_000.bmp", 0, 1, kCoffinX + kColumnStep * w + kCoffinW / 2 - 20, kWheelY);
+                inside(host, out, "obj\\o012_001.bmp", 0, 1, kRopeX + kColumnStep * w + h.shakeX, coffinY - rope->h);
+            inside(host, out, "obj\\o012_000.bmp", 0, 1, kWheelX + kColumnStep * w, kWheelY);
             inside(host, out, "obj\\o012_002.bmp", w, 3, coffinX, coffinY);
             inside(host, out, kFaceSheets[w], h.face, kFaceCells[w], kFaceX + kColumnStep * w + h.shakeX, int(h.y) + h.shakeY);
         }
@@ -539,7 +590,7 @@ private:
     ImageRef cellOf(const ImageRef &sheet, int cols, int col) {
         auto key = std::make_pair(sheet.get(), col);
         auto it = cells_.find(key);
-        if (it != cells_.end()) return it->second;
+        if (it != cells_.end()) return it->second.made;
         int w = sheet->w / cols;
         if (w <= 0 || sheet->h <= 0) return nullptr;
         auto image = std::make_shared<Image>();
@@ -549,16 +600,18 @@ private:
         image->rgba.resize(size_t(w) * size_t(sheet->h) * 4);
         for (int y = 0; y < sheet->h; y++)
             std::copy_n(&sheet->rgba[(size_t(y) * sheet->w + size_t(col * w)) * 4], size_t(w) * 4, &image->rgba[size_t(y) * w * 4]);
-        return cells_[key] = image;
+        cells_[key] = {sheet, image};
+        return image;
     }
 
     // The countdown's pictures in red, their green and blue taken out, as the PC draws its last ten seconds.
     ImageRef redOf(const ImageRef &image) {
         auto it = red_.find(image.get());
-        if (it != red_.end()) return it->second;
+        if (it != red_.end()) return it->second.made;
         auto copy = std::make_shared<Image>(*image);
         for (size_t i = 0; i < copy->rgba.size(); i += 4) copy->rgba[i + 1] = copy->rgba[i + 2] = 0;
-        return red_[image.get()] = copy;
+        red_[image.get()] = {image, copy};
+        return copy;
     }
 
     void digit(PartHost &host, Canvas &out, const char *sheet, int value, int x, int y, bool red) {
@@ -603,6 +656,13 @@ private:
         drawPart(out, *image, x, y, col * w, row * h, w, h, alpha);
     }
 
+    // One of the narrator's thoughts on the pick screen: its picture's number, its middle, and when it came.
+    struct Thought {
+        int picture, x, y;
+        int64_t born;
+    };
+    std::vector<Thought> thoughts_;
+    int64_t nextThought_ = 0;
     Phase phase_ = Phase::Closed;
     int truth_ = 1, pick_ = 0, allFrames_ = 6900, px_ = -1, py_ = -1, lastFrame_ = -1;
     size_t next_ = 0;
@@ -613,8 +673,13 @@ private:
     std::string commentList_;
     std::array<Heroine, 3> heroines_{};
     CommentStream comments_;
-    std::map<std::pair<const Image *, int>, ImageRef> cells_;
-    std::map<const Image *, ImageRef> red_;
+    // Pictures made from others, by the other's address: each keeps its source, so the address stays that picture's
+    // while the entry lasts.
+    struct Made {
+        ImageRef source, made;
+    };
+    std::map<std::pair<const Image *, int>, Made> cells_;
+    std::map<const Image *, Made> red_;
 };
 
 }  // namespace

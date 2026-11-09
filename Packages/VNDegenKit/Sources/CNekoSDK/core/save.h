@@ -47,6 +47,14 @@ struct SavedSprite {
     // The record's fixed part and its last 164 bytes as a PC save holds them, kept so the save is written back as it
     // was, with what the runtime reads written over them. Empty in the runtime's own saves.
     std::vector<uint8_t> rawFixed, rawTail;
+    // The older layout's records of a game part's (set 3, from Test Game 83's PC saves). `kind` is the number after the
+    // slot: 0 for a picture, 6 for command 90's tiled picture, 15 for command 95's particle emitter, which has no
+    // picture of its own and names its three in `names`, 57 bytes into the fixed part, where every other record has
+    // three empty names. `fixedBytes` are bytes a part sets in the fixed part of a record it makes, by their place
+    // with the names empty; a PC save's record keeps them in rawFixed.
+    int kind = 0;
+    std::array<std::string, 3> names;
+    std::vector<std::pair<int, std::vector<uint8_t>>> fixedBytes;
 };
 
 struct SavedText {
@@ -75,6 +83,9 @@ struct SaveData {
     std::string olderImage;
     // A second picture's name right after the choice's, in the layouts that have one (SaveLayout::afterChoiceName).
     std::string afterChoiceImage;
+    // Read from a save's file by parseSave: its picture names are written back as read, empty ones too, where a save of
+    // the runtime's own takes the layout's (a PC save of Test Game 96 from before a new game's first question has none).
+    bool fromFile = false;
     // The card's comment, typed on the PC's save screen and kept at the save's start; a comment there moves all that follows.
     std::string comment;  // CP932
     int date[6] = {2026, 1, 1, 0, 0, 0};

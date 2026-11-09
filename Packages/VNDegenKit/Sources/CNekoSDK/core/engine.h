@@ -93,6 +93,11 @@ struct Sprite {
     // (commands 90 and 91, a game part's, through PartHost::loadImage).
     float scrollX = 0, scrollY = 0;
     int64_t scrollFrom = 0;
+    // A slot a game part holds with no picture of its own (PartHost::holdSlot): the part draws it in the slot's order,
+    // and it's shown and taken away as a picture is. `kind` is the number a save's record holds for a part's slot,
+    // held or a picture (SavedSprite::kind), 0 for the engine's own.
+    bool held = false;
+    int kind = 0;
     int waveSpeed = 0, waveRows = 0, waveSize = 0;
     // The SDK's film noise (commands 51 and 52), its picture the noise frame and the story time it began.
     bool noise = false;
@@ -309,7 +314,10 @@ private:
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
     bool fullWidthPlate() const;
+    bool plateUp() const;
     bool partPlate() const;
+    // Whether the table's `screen defaults` has this setting.
+    bool defaultsHave(const char *key) const;
     bool composeTitleOpening(Canvas &out);
     // Where the pointer is, from -1 at the screen's left or top edge to 1 at the other, or the middle before it's been seen.
     void pointerToward(float &x, float &y) const;
@@ -323,7 +331,15 @@ private:
     void composeTrackCards(Canvas &out);
     void composeTrackTime(Canvas &out);
     void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat = -1, int recordReverse = -1);
-    std::map<std::string, std::pair<int, int>> flipbooks_;
+    // A flipbook's line of anime_cfg.ini: how many pictures, how long each shows, and the sound and volume a line can
+    // name after them.
+    struct FlipbookInfo {
+        int count = 0, ms = 0;
+        std::string sound;
+        int volume = 100;
+    };
+    std::map<std::string, FlipbookInfo> flipbooks_;
+    void applyFlipTime(Sprite &s);
     // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
     // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
     struct GoodTiming {
@@ -697,7 +713,9 @@ private:
     void resetParts();
     bool partCommand(const Node &n);
     GamePart *menuPart() const;
-    bool loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY);
+    bool loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY, int kind);
+    void holdPartSlot(int slot, int kind);
+    bool partSlotHeld(int slot) const;
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
     void finishPartScreen(int result);
     // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story

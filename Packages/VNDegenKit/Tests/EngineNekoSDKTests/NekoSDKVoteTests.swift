@@ -34,7 +34,23 @@ import TestSupport
         return d
     }
 
-    private func game(panels: Bool = false) throws -> URL {
+    // A 24-bit BMP of one colour, as blue, green, red.
+    private func bmp(_ w: Int, _ h: Int, _ bgr: [UInt8]) -> Data {
+        let row = (w * 3 + 3) & ~3
+        var d = Data("BM".utf8)
+        func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+        put(UInt32(54 + row * h)); put(0); put(54)
+        put(40); put(UInt32(w)); put(UInt32(h))
+        d.append(contentsOf: [1, 0, 24, 0])
+        put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+        var line = Data()
+        for _ in 0..<w { line.append(contentsOf: bgr) }
+        line.append(Data(repeating: 0, count: row - w * 3))
+        for _ in 0..<h { d.append(line) }
+        return d
+    }
+
+    private func game(panels: Bool = false, faces: Bool = false) throws -> URL {
         // Vote 1: two seconds, Ayano elected; its script moves Misuzu and gives Ayano a line.
         let base = """
             AllTime01\t\t120\t// 残り時間
@@ -56,7 +72,9 @@ import TestSupport
             "cfg/m.ini": Data(script.utf8),
             "cfg/c.ini": Data("#p 0 30 90\nABC\n##\n".utf8),
             // The panels as one-pixel pictures, as a replacement could be: far smaller than the place a press lands.
-            "obj.pak": NekoSDKFlowFixture.archive(panels ? ["n004_000.bmp", "n004_001.bmp", "n004_002.bmp"].map { ($0, pixel) } : []),
+            // And Misuzu's faces as a sheet of green, ten cells of 258 by 235.
+            "obj.pak": NekoSDKFlowFixture.archive((panels ? ["n004_000.bmp", "n004_001.bmp", "n004_002.bmp"].map { ($0, pixel) } : [])
+                + (faces ? [("o014_000.bmp", bmp(2580, 235, [0, 255, 0]))] : [])),
             "voice.pak": NekoSDKFlowFixture.archive([("aya5_0000.ogg", sound)]),
         ])
     }
@@ -226,5 +244,33 @@ import TestSupport
         steps(e, 5)
         #expect(vnneko_debug_variable(e, 1, 15140) == 1, "\(status(e))")
         #expect(vnneko_debug_variable(e, 1, 15141) == 1)
+    }
+
+    // The vote's script runs by its own frames, 60 a second, whatever the pace of the steps: Misuzu's move down, from
+    // frame 10 at 0.8 pixels a frame, has her face's top at the same row 110 frames in, stepped 16 ms or 160 ms at a time.
+    @Test func aMoveStartsOnItsFrameAtAnyPaceOfSteps() throws {
+        func faceTop(coarse: Bool) throws -> Int? {
+            let root = try game(faces: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let e = try start(root)
+            defer { vnneko_stop(e) }
+            press(e, 150, 500)
+            // 9.9 seconds to the vote's clock and 110 frames more, less the 32 ms the press took: 11,696 ms.
+            if coarse {
+                for _ in 0..<73 { _ = vnneko_step(e, 160) }
+                _ = vnneko_step(e, 16)
+            } else {
+                for _ in 0..<731 { _ = vnneko_step(e, 16) }
+            }
+            var w: Int32 = 0, h: Int32 = 0, changed = false
+            guard let px = vnneko_frame(e, &w, &h, &changed) else { return nil }
+            return (96..<640).first { y in
+                let at = (y * Int(w) + 200) * 4
+                return px[at] < 40 && px[at + 1] > 200 && px[at + 2] < 40
+            }
+        }
+        let fine = try #require(try faceTop(coarse: false)), coarse = try #require(try faceTop(coarse: true))
+        #expect(fine == coarse)
+        #expect((127...131).contains(fine), "\(fine)")
     }
 }
