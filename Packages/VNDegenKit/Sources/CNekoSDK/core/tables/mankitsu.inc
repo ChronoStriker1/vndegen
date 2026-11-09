@@ -33,6 +33,9 @@ autowithvoice
 hseprefix se_h
 # The window's own buttons always show, as on the PC under Wine.
 default bar_always 1
+# The lower row (Save, Load, Config, Title, End) shows while the pointer is at or below y 632: not at 630, there at 635,
+# at any x (PC shots under Wine).
+underbelow 632
 
 screen title
 # Measured under Wine. The mankitsu part draws the backgrounds, silhouettes, logo and trims; the buttons are 40 pixels
@@ -321,6 +324,145 @@ radio voice_stop 0 obj\j013_000.bmp 533 633 2 5 1
 button tabvoices obj\j015_000.bmp 736 623 1 5 0
 
 
+# The Appendix, measured under Wine (set 1, each piece fitted on a PC shot). CG and Scene: five tabs (the three heroines,
+# the sub-heroines, the others), each with its standing pictures at the left over the screen's name plate, the fifth
+# a large picture at half size; nine cards a page, a card past the tab's last entry not drawn, a locked one an empty
+# dashed card with its number; CG cards count the pictures seen.
+screen cg
+pic obj\f000_000.bmp 0 0
+pic obj\f001_000.bmp 0 400
+pic obj\f000_001.bmp 468 74
+pic obj\e000_001.bmp 4 6 6 1 2 0
+pic sc\sc_000_000_000_000_000.bmp -66 2 tab 0
+pic sc\sc_001_000_000_000_000.bmp -130 2 tab 1
+pic sc\sc_002_000_000_000_000.bmp -66 2 tab 2
+pic sc\sc_005_000_000_000_000.bmp -236 2 tab 3
+pic sc\sc_004_000_000_000_000.bmp 114 2 tab 3
+pic sc\sc_003_000_000_000_000.bmp -66 2 tab 3
+pic sc\sc_007_000_000_002_000.bmp -130 2 tab 4 scale 50
+cellsheet obj\f002_000.bmp
+cellsize 180 174
+cellthumb 6 33
+cell 514 109
+cell 728 109
+cell 942 109
+cell 514 318
+cell 728 318
+cell 942 318
+cell 514 527
+cell 728 527
+cell 942 527
+celllabel obj\f002_001.bmp 4 4
+celldigits obj\f003_000.bmp 38 4 2 14
+cellcount obj\f003_000.bmp obj\f003_001.bmp 91 127 127 139 0
+cellcountstep 14
+celltotal obj\f003_002.bmp 7 12
+gallerytabs
+cellhide
+button page0 obj\e002_000.bmp 627 15 10 5 0
+button page1 obj\e002_000.bmp 681 15 10 5 1
+button page2 obj\e002_000.bmp 735 15 10 5 2
+button gtab0 obj\f001_001.bmp 24 493 7 5 0
+button gtab1 obj\f001_001.bmp 174 493 7 5 1
+button gtab2 obj\f001_001.bmp 324 493 7 5 2
+button gtab3 obj\f001_001.bmp 99 598 7 5 3
+button gtab4 obj\f001_001.bmp 249 598 7 5 6
+button nav_save obj\e001_000.bmp 1172 104 9 5 0 help obj\e001_002.bmp 1026 0 9 1 0 0
+button nav_load obj\e001_000.bmp 1172 162 9 5 1 help obj\e001_002.bmp 1026 58 9 1 1 0
+button nav_cg obj\e001_000.bmp 1172 220 9 5 2 help obj\e001_002.bmp 1026 116 9 1 2 0
+button nav_scene obj\e001_000.bmp 1172 278 9 5 3 help obj\e001_002.bmp 1026 174 9 1 3 0
+button nav_music obj\e001_000.bmp 1172 336 9 5 4 help obj\e001_002.bmp 1026 232 9 1 4 0
+button nav_config obj\e001_000.bmp 1172 394 9 5 5 help obj\e001_002.bmp 1026 290 9 1 5 0
+button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 9 1 6 0
+button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
+button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
+
+# As the CG screen, without the counts.
+screen scene
+pic obj\f000_000.bmp 0 0
+pic obj\f001_000.bmp 0 400
+pic obj\f000_001.bmp 468 74
+pic obj\e000_001.bmp 4 6 6 1 3 0
+pic sc\sc_000_000_000_000_000.bmp -66 2 tab 0
+pic sc\sc_001_000_000_000_000.bmp -130 2 tab 1
+pic sc\sc_002_000_000_000_000.bmp -66 2 tab 2
+pic sc\sc_005_000_000_000_000.bmp -236 2 tab 3
+pic sc\sc_004_000_000_000_000.bmp 114 2 tab 3
+pic sc\sc_003_000_000_000_000.bmp -66 2 tab 3
+pic sc\sc_007_000_000_002_000.bmp -130 2 tab 4 scale 50
+cellsheet obj\f002_000.bmp
+cellsize 180 174
+cellthumb 6 33
+cell 514 109
+cell 728 109
+cell 942 109
+cell 514 318
+cell 728 318
+cell 942 318
+cell 514 527
+cell 728 527
+cell 942 527
+celllabel obj\f002_001.bmp 4 4
+celldigits obj\f003_000.bmp 38 4 2 14
+gallerytabs
+cellhide
+button page0 obj\e002_000.bmp 627 15 10 5 0
+button page1 obj\e002_000.bmp 681 15 10 5 1
+button page2 obj\e002_000.bmp 735 15 10 5 2
+button gtab0 obj\f001_001.bmp 24 493 7 5 0
+button gtab1 obj\f001_001.bmp 174 493 7 5 1
+button gtab2 obj\f001_001.bmp 324 493 7 5 2
+button gtab3 obj\f001_001.bmp 99 598 7 5 3
+button gtab4 obj\f001_001.bmp 249 598 7 5 6
+button nav_save obj\e001_000.bmp 1172 104 9 5 0 help obj\e001_002.bmp 1026 0 9 1 0 0
+button nav_load obj\e001_000.bmp 1172 162 9 5 1 help obj\e001_002.bmp 1026 58 9 1 1 0
+button nav_cg obj\e001_000.bmp 1172 220 9 5 2 help obj\e001_002.bmp 1026 116 9 1 2 0
+button nav_scene obj\e001_000.bmp 1172 278 9 5 3 help obj\e001_002.bmp 1026 174 9 1 3 0
+button nav_music obj\e001_000.bmp 1172 336 9 5 4 help obj\e001_002.bmp 1026 232 9 1 4 0
+button nav_config obj\e001_000.bmp 1172 394 9 5 5 help obj\e001_002.bmp 1026 290 9 1 5 0
+button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 9 1 6 0
+button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
+button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
+
+# Music: thirteen tracks in two columns, seven seals with their help cards 104 above (none for pause and stop), the
+# volume knob, whose left edge runs from x 83 to 219, and the playing track's name in the strip. The mankitsu part
+# draws the trims and the name plate.
+screen music
+part mankitsu
+pic obj\e000_000.bmp 0 0
+pic obj\i000_000.bmp 39 113
+knob music obj\i001_001.bmp 83 608 1.36
+musictitle obj\i003_000.bmp 365 614 13
+button track0 obj\i002_000.bmp 215 160 13 5 0
+button track1 obj\i002_000.bmp 215 211 13 5 1
+button track2 obj\i002_000.bmp 215 262 13 5 2
+button track3 obj\i002_000.bmp 215 313 13 5 3
+button track4 obj\i002_000.bmp 215 364 13 5 4
+button track5 obj\i002_000.bmp 215 415 13 5 5
+button track6 obj\i002_000.bmp 215 466 13 5 6
+button track7 obj\i002_000.bmp 605 160 13 5 7
+button track8 obj\i002_000.bmp 605 211 13 5 8
+button track9 obj\i002_000.bmp 605 262 13 5 9
+button track10 obj\i002_000.bmp 605 313 13 5 10
+button track11 obj\i002_000.bmp 605 364 13 5 11
+button track12 obj\i002_000.bmp 605 415 13 5 12
+button music_prev obj\i001_000.bmp 700 598 7 5 0 help obj\i004_000.bmp 554 494 8 1 0 0
+button music_pause obj\i001_000.bmp 756 598 7 5 1
+button music_play obj\i001_000.bmp 812 598 7 5 2 help obj\i004_000.bmp 666 494 8 1 2 0
+button music_stop obj\i001_000.bmp 868 598 7 5 3
+button music_next obj\i001_000.bmp 924 598 7 5 4 help obj\i004_000.bmp 778 494 8 1 4 0
+button music_repeat obj\i001_000.bmp 980 598 7 5 5 help obj\i004_000.bmp 834 494 8 1 5 0
+button music_shuffle obj\i001_000.bmp 1036 598 7 5 6 help obj\i004_000.bmp 890 494 8 1 6 0
+button nav_save obj\e001_000.bmp 1172 104 9 5 0 help obj\e001_002.bmp 1026 0 9 1 0 0
+button nav_load obj\e001_000.bmp 1172 162 9 5 1 help obj\e001_002.bmp 1026 58 9 1 1 0
+button nav_cg obj\e001_000.bmp 1172 220 9 5 2 help obj\e001_002.bmp 1026 116 9 1 2 0
+button nav_scene obj\e001_000.bmp 1172 278 9 5 3 help obj\e001_002.bmp 1026 174 9 1 3 0
+button nav_music obj\e001_000.bmp 1172 336 9 5 4 help obj\e001_002.bmp 1026 232 9 1 4 0
+button nav_config obj\e001_000.bmp 1172 394 9 5 5 help obj\e001_002.bmp 1026 290 9 1 5 0
+button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 9 1 6 0
+button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
+button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
+
 screen dialog
 # Measured under Wine: the screen dimmed to 100 of 256 of its brightness, the question, and Yes and No.
 questions resolution save load overwrite exit title
@@ -335,7 +477,7 @@ screen story
 # Kururu's, Otona's and Rei's routes end, and once all three are, a route goes on into the shared ending, which sets G 83
 # (the title's six silhouettes, checked by editing cfg.sav under Wine). Each route has one script with another heroine in it,
 # ep_002_005 (Rei), ep_003_005 (Kururu) and ep_004_004 (Otona), which plays only when she has two hearts or more, as PC
-# runs with her at two, one and none showed for the first two; Rei's route's isn't confirmed yet. The
+# runs showed (the first two with her at two, one and none; Rei's route's with Otona at two and at none). The
 # ending with no heroine at four hearts is ep_001_029 alone, then the title (seen under Wine). S 4000 names the route on
 # a save's card: 1 in every PC save of the common route so far; where it becomes 2 to 5 is taken from the card's labels
 # and not yet read from PC saves (unconfirmed).
@@ -488,6 +630,12 @@ scene scr\ep_004_002_001.txt
 scene scr\eye_catch3.txt
 scene scr\ep_004_003_000.txt
 scene scr\ep_004_003_001.txt
+# With Otona at two hearts or more: seen with her at two, and not with her at none.
+if S 3011 < 2 goto rei4
+scene scr\ep_004_004_000.txt
+scene scr\ep_004_004_001.txt
+scene scr\eye_catch3.txt
+label rei4
 scene scr\ep_004_005_000.txt
 scene scr\ep_004_005_001.txt
 scene scr\eye_catch3.txt
