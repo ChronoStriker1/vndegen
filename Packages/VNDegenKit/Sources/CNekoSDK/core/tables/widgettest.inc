@@ -34,3 +34,19 @@ screen config
 knob rose obj\k.bmp 100 300 4.08
 number rose obj\d.bmp 600 400 15 blank
 )";
+
+// Config naming a game part, `part selftest`: the part draws over the screen's pictures and under its buttons, takes
+// the presses it wants, and draws over everything (NekoSDKWidgetTests).
+const char kWidgetTestPart[] = R"(
+screen defaults
+parts selftest
+
+screen title
+button config obj\b.bmp 0 0 1 5 0
+
+screen config
+part selftest
+pic obj\d.bmp 380 401
+button nav_title obj\b.bmp 0 0 1 5 0
+button nav_load obj\b.bmp 405 405 1 5 0
+)";

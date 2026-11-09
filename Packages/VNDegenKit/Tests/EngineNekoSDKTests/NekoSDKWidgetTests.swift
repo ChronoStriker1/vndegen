@@ -141,6 +141,37 @@ import TestSupport
         #expect(pixel(e, 633, 403) == white)
     }
 
+    // `part selftest` on Config: the part's square over the screen's picture and under its button, the presses on the
+    // square its own and the rest the screen's, and its top layer over the screen's buttons.
+    @Test func aTableScreenCanHostAGamePart() throws {
+        let root = try game("widgettestpart")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        click(e, 10, 10)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        let blue: [UInt8] = [0, 0, 255]
+        #expect(pixel(e, 402, 402) == blue)
+        #expect(pixel(e, 407, 407) == white)
+        #expect(pixel(e, 5, 5) == white)
+        click(e, 402, 402)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 402, 402) == red)
+        click(e, 407, 407)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 5, 5) == blue)
+        // A press off its square goes to the button there: back to the title, whose Config button sits at 0, 0.
+        click(e, 25, 25)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 402, 402) == [0, 0, 0])
+        // Opening the screen again tells the part, which starts afresh.
+        click(e, 10, 10)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 402, 402) == blue)
+        #expect(pixel(e, 5, 5) == white)
+    }
+
     // `waitscale autowait`, at its default 50: a wait of 1000 ms lasts 500.
     @Test func aWaitScalesByItsOwnSetting() throws {
         let root = try game()
