@@ -11,7 +11,7 @@
 //   set S|G NUMBER OP VALUE   OP = + - += -=; VALUE a number, or S n or G n
 //   if S|G NUMBER CMP VALUE goto LABEL     CMP == != <= >= < >
 //   open NAME ARGS... [-> S|G NUMBER]      a game part's screen; its result to the variable and the last result
-//   chapter N                 the scenes a game part gives for chapter N
+//   chapter N / chapter S n / chapter G n   a game part's scenes for chapter N, or the number a variable holds
 //   end / staffroll [NAME] / jump FLOW
 //
 // A `scene` or `choice` line may end with `@N`, the PC's own number for that place in its story, which its saves hold as
@@ -178,7 +178,10 @@ std::shared_ptr<Script> Engine::compileStory(const std::string &flowName) {
                 n.p[1] = toInt(w[i + 2]);
             }
         } else if (w[0] == "chapter" && w.size() >= 2) {
-            add(kStoryChapter).p[0] = toInt(w[1]);
+            // `chapter N`, or `chapter S n` / `chapter G n` for the number a variable holds when the line runs, as Test
+            // Game 96's hub leaves the chapter it chose in a variable (set 2).
+            Node &chapter = add(kStoryChapter);
+            operand(w, 1, chapter);
         } else if (w[0] == "end") {
             add(2);
         } else if (w[0] == "staffroll") {
@@ -317,7 +320,7 @@ bool Engine::resumeStoryAt(const std::string &scene) {
             }
             // Or inside a chapter: the flow goes on after the chapter, and the chapter after the scene.
             if (n.opcode == kStoryChapter)
-                if (auto chapter = loadScript("chapter:" + std::to_string(n.p[0])))
+                if (auto chapter = loadScript("chapter:" + std::to_string(operand(n))))
                     for (const Node &c : chapter->nodes)
                         if (names(c)) {
                             stack_.push_back({flow, flow->node(n.next)});

@@ -17,7 +17,8 @@ if S 5 == 3 goto yes
 set S 7 = 1                # skipped: the condition holds
 label yes
 set S 8 += S 5
-chapter 2                  # the selftest part gives scr\c2.txt
+set S 14 = 2
+chapter S 14               # the selftest part gives scr\c2.txt, the chapter S 14 holds
 on 3 goto kept             # the screen's result still, across the chapter and a load
 set S 11 = 1               # skipped
 label kept
