@@ -3304,10 +3304,16 @@ void Engine::trackSubmenu() {
     shownSubMenu_ = subMenu_;
 }
 
-float Engine::squeezeOf(const Button &b) const {
+// How far the latest opening or closing has gone, 0 to 1, and 1 with none.
+float Engine::squeezeProgress() const {
     const auto *open = screen_ ? screen_->setting("submenuopen") : nullptr;
-    if (!open || open->empty() || b.group.empty() || b.group != squeezeGroup_) return 1;
-    float t = float(screenMs_ - squeezeAt_) / std::max(1, field(*open, 0));
+    if (!open || open->empty() || squeezeGroup_.empty()) return 1;
+    return std::min(1.0f, float(screenMs_ - squeezeAt_) / std::max(1, field(*open, 0)));
+}
+
+float Engine::squeezeOf(const Button &b) const {
+    if (b.group.empty() || b.group != squeezeGroup_) return 1;
+    float t = squeezeProgress();
     if (t >= 1) return squeezeOpening_ ? 1 : 0;
     return squeezeOpening_ ? 1 - (1 - t) * (1 - t) : (1 - t) * (1 - t);
 }
@@ -3502,6 +3508,7 @@ void Engine::composeScreen(Canvas &out) {
         neko::drawButton(c, b, state, withHelp);
     };
     trackSubmenu();
+    squeezeDrawn_ = squeezeProgress();
     for (Button &b : screen_->buttons) {
         float squeeze = squeezeOf(b);
         bool closing = !squeezeOpening_ && squeeze > 0 && !b.group.empty() && b.group == squeezeGroup_;
@@ -3722,6 +3729,7 @@ void Engine::composeMessageButtons(Canvas &out) {
     };
     // `barhover`'s rows fade: drawn on a copy of the frame, mixed back in by how much of them shows.
     float opacity = barOpacity();
+    barDrawnOpacity_ = opacity;
     if (opacity < 1 && innerButtonsShown()) {
         barLayer_ = out;
         Canvas &shown = barLayer_;
@@ -4469,8 +4477,7 @@ bool Engine::step(int ms) {
         if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
         stepViewer(ms);
         trackSubmenu();
-        if (const auto *open = screen_->setting("submenuopen"); open && !open->empty() && !squeezeGroup_.empty() && screenMs_ - squeezeAt_ <= field(*open, 0))
-            dirty_ = true;
+        if (squeezeProgress() != squeezeDrawn_) dirty_ = true;
     }
     if (screen_ || logOpen_ || dialogOpen_) {
         // A table screen's part goes on stepping, as its own screen would.
@@ -4557,7 +4564,8 @@ bool Engine::step(int ms) {
     // A row that goes with time, as `barhover`'s do, needs the frame drawn again.
     if (inner != innerWereShown_ || under != underWereShown_) dirty_ = true;
     if (inner && !innerWereShown_) barShownAt_ = now_;
-    if (inner && barOpacity() < 1) dirty_ = true;
+    // A fade's frames, and its last one, which the frame before may have fallen short of.
+    if (inner && barOpacity() != barDrawnOpacity_) dirty_ = true;
     innerWereShown_ = inner;
     underWereShown_ = under;
 
@@ -6073,6 +6081,8 @@ void Engine::showText(const Node &n) {
     layoutText(sjis::toUtf8(n.s[1]), sjis::toUtf8(n.s[2]));
     textStart_ = now_;
     textDone_ = skip_;
+    // Each line times its own auto pause, from when its text is done.
+    autoReadyAt_ = -1;
     textCount_++;
     waiting_ = Waiting::Click;
     dirty_ = true;

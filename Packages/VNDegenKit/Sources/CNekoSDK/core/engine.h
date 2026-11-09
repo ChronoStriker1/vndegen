@@ -587,6 +587,9 @@ private:
     int64_t squeezeAt_ = -1000000;
     bool squeezeOpening_ = false;
     float squeezeOf(const Button &b) const;
+    float squeezeProgress() const;
+    // What the last frame drew, so a fade or squeeze gets the frame that finishes it.
+    float squeezeDrawn_ = 1, barDrawnOpacity_ = 1;
     void trackSubmenu();
     Canvas barLayer_;
     void playVoiceAgain(const std::string &voice);
