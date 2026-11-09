@@ -552,6 +552,9 @@ private:
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;
     int questionCell(int question) const;
+    int64_t barMovedAt_ = -1000000;
+    bool barHover() const;
+    bool barHovered() const;
     void playVoiceAgain(const std::string &voice);
     bool logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &sheet, int &col) const;
     int autoPerCharMs_ = -1;

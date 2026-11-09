@@ -3490,7 +3490,23 @@ void Engine::composeScreen(Canvas &out) {
 
 // `under` buttons come up with their plate when the pointer's at the left of the bar, and `inner` ones when it's anywhere else
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
+// `barhover Y MS` under `screen defaults`: with no plate, both rows show while the pointer is at or below Y and has moved
+// within the last MS, as Test Game 87's do (set 1, under Wine: anywhere at y 360 and below, gone about 3.4 s after the
+// pointer stops). The PC fades them; here they come and go at once.
+bool Engine::barHovered() const {
+    auto defaults = screens_.find("defaults");
+    const auto *line = defaults == screens_.end() ? nullptr : defaults->second.setting("barhover");
+    if (!line || line->size() < 2) return false;
+    return pointerSeen_ && messagePointerY() >= field(*line, 0) && now_ - barMovedAt_ < field(*line, 1);
+}
+
+bool Engine::barHover() const {
+    auto defaults = screens_.find("defaults");
+    return defaults != screens_.end() && defaults->second.setting("barhover");
+}
+
 bool Engine::innerButtonsShown() const {
+    if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
     // A plate as wide as the screen comes up with all the buttons when the pointer's on it, as in Test Game 85.
     if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= plateY_);
     return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
@@ -3501,6 +3517,7 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 
 bool Engine::underButtonsShown() const {
     if (fullWidthPlate()) return innerButtonsShown();
+    if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
     if (plateRests_) return plateRaised_;
     return buttonPlate_ && pointerSeen_ && messagePointerY() >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
 }
@@ -3551,7 +3568,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         if (plateRests_) drawPart(out, *buttonPlate_, plateHiddenX_, plateHiddenY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         return;
     }
-    if (!fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    if (buttonPlate_ && !fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
     for (const Button &b : bar().under) drawButton(out, b, state(b));
 }
 
@@ -4349,8 +4366,11 @@ bool Engine::step(int ms) {
     }
     run();
     prefetchAhead();
-    innerWereShown_ = innerButtonsShown();
-    underWereShown_ = underButtonsShown();
+    bool inner = innerButtonsShown(), under = underButtonsShown();
+    // A row that goes with time, as `barhover`'s do, needs the frame drawn again.
+    if (inner != innerWereShown_ || under != underWereShown_) dirty_ = true;
+    innerWereShown_ = inner;
+    underWereShown_ = under;
 
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set) foldFinishedChanges(s);
@@ -4380,6 +4400,7 @@ void Engine::mouseMove(float x, float y) {
     pointerX_ = px;
     pointerY_ = py;
     pointerSeen_ = true;
+    if (moved) barMovedAt_ = now_;
     // A resting plate rises with the pointer on it and stays up while the pointer is on the raised plate.
     if (plateRests_) {
         int my = messagePointerY();
