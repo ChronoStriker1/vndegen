@@ -243,6 +243,7 @@ public:
 
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
         if (layer == Layer::Menu && menu_ == "title") drawTitle(host, out);
+        if (layer == Layer::Menu && menuPlate() >= 0) drawMenuFrame(host, out);
         if (layer == Layer::Window) drawFaces(host, out);
         if (layer == Layer::OverWindow) drawSlide(host, out);
         if (layer == Layer::Screen && selecting_) drawSelect(host, out);
@@ -432,6 +433,24 @@ public:
     }
 
 private:
+    // The menus' shared frame: which name plate of obj\\e000_001 a table screen shows, or -1 for a screen without one.
+    int menuPlate() const {
+        static const char *const kNames[] = {"save", "load", "cg", "scene", "music", "config"};
+        for (int i = 0; i < 6; i++)
+            if (menu_.rfind(kNames[i], 0) == 0) return i;
+        return -1;
+    }
+
+    // Trims along the top and bottom and the screen's name plate at the top left, fitted on PC shots of Save and Load
+    // (set 1): the trims at y -34 and 696, the plate at 4, 6. The trims move on the PC; their pace isn't measured yet.
+    void drawMenuFrame(PartHost &host, Canvas &out) {
+        if (ImageRef trim = host.image("obj\\e004_001.bmp")) {
+            for (int x = -5; x < out.w; x += trim->w) drawPart(out, *trim, x, -34, 0, 0, trim->w, trim->h, 1);
+            for (int x = -572; x < out.w; x += trim->w) drawPart(out, *trim, x, 696, 0, 0, trim->w, trim->h, 1);
+        }
+        put(host, out, "obj\\e000_001.bmp", 4, 6, 6, 1, menuPlate(), 0);
+    }
+
     void drawTitle(PartHost &host, Canvas &out) {
         bool six = host.variable(0, 83) != 0;
         int64_t t = std::max<int64_t>(0, host.screenMs() - titleFrom_);

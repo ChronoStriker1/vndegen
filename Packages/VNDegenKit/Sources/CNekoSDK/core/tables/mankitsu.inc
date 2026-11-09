@@ -33,6 +33,88 @@ button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 6
 screen start
 flow chapter2
 
+# Save and load, measured under Wine (set 1, each piece fitted on a PC shot): nine cards a page on ten pages, each a
+# save's number, thumbnail, its route by S 4000 (prologue, common, Kururu's, Otona's, Rei's, harem), the date and time at
+# places of their own around the card's painted slashes and colon, NEW on the one saved last, and a comment button. The
+# mankitsu part draws the moving trims and the screen's name plate over the paper.
+screen load
+part mankitsu
+pic obj\e000_000.bmp 0 0
+slots obj\e003_000.bmp 30 118 368 202 3 3 1
+slotdigits obj\e003_001.bmp 39 9 3
+slotthumb 8 34
+slotchaptervar obj\e003_003.bmp 125 7 6 4000
+slotnew obj\e003_004.bmp 262 -15
+slotcommentbutton obj\e003_002.bmp 251 104
+datedigits obj\e003_001.bmp 200 56
+datefield year 200 56
+datefield month 272 56
+datefield day 316 56
+datefield hour 272 79
+datefield minute 316 79
+button page0 obj\e002_000.bmp 627 15 10 5 0
+button page1 obj\e002_000.bmp 681 15 10 5 1
+button page2 obj\e002_000.bmp 735 15 10 5 2
+button page3 obj\e002_000.bmp 789 15 10 5 3
+button page4 obj\e002_000.bmp 843 15 10 5 4
+button page5 obj\e002_000.bmp 897 15 10 5 5
+button page6 obj\e002_000.bmp 951 15 10 5 6
+button page7 obj\e002_000.bmp 1005 15 10 5 7
+button page8 obj\e002_000.bmp 1059 15 10 5 8
+button page9 obj\e002_000.bmp 1113 15 10 5 9
+button nav_save obj\e001_000.bmp 1172 104 9 5 0 help obj\e001_002.bmp 1026 0 9 1 0 0
+button nav_load obj\e001_000.bmp 1172 162 9 5 1 help obj\e001_002.bmp 1026 58 9 1 1 0
+button nav_cg obj\e001_000.bmp 1172 220 9 5 2 help obj\e001_002.bmp 1026 116 9 1 2 0
+button nav_scene obj\e001_000.bmp 1172 278 9 5 3 help obj\e001_002.bmp 1026 174 9 1 3 0
+button nav_music obj\e001_000.bmp 1172 336 9 5 4 help obj\e001_002.bmp 1026 232 9 1 4 0
+button nav_config obj\e001_000.bmp 1172 394 9 5 5 help obj\e001_002.bmp 1026 290 9 1 5 0
+button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 9 1 6 0
+button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
+button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
+
+screen save
+part mankitsu
+pic obj\e000_000.bmp 0 0
+slots obj\e003_000.bmp 30 118 368 202 3 3 1
+slotdigits obj\e003_001.bmp 39 9 3
+slotthumb 8 34
+slotchaptervar obj\e003_003.bmp 125 7 6 4000
+slotnew obj\e003_004.bmp 262 -15
+slotcommentbutton obj\e003_002.bmp 251 104
+datedigits obj\e003_001.bmp 200 56
+datefield year 200 56
+datefield month 272 56
+datefield day 316 56
+datefield hour 272 79
+datefield minute 316 79
+button page0 obj\e002_000.bmp 627 15 10 5 0
+button page1 obj\e002_000.bmp 681 15 10 5 1
+button page2 obj\e002_000.bmp 735 15 10 5 2
+button page3 obj\e002_000.bmp 789 15 10 5 3
+button page4 obj\e002_000.bmp 843 15 10 5 4
+button page5 obj\e002_000.bmp 897 15 10 5 5
+button page6 obj\e002_000.bmp 951 15 10 5 6
+button page7 obj\e002_000.bmp 1005 15 10 5 7
+button page8 obj\e002_000.bmp 1059 15 10 5 8
+button page9 obj\e002_000.bmp 1113 15 10 5 9
+button nav_save obj\e001_000.bmp 1172 104 9 5 0 help obj\e001_002.bmp 1026 0 9 1 0 0
+button nav_load obj\e001_000.bmp 1172 162 9 5 1 help obj\e001_002.bmp 1026 58 9 1 1 0
+button nav_cg obj\e001_000.bmp 1172 220 9 5 2 help obj\e001_002.bmp 1026 116 9 1 2 0
+button nav_scene obj\e001_000.bmp 1172 278 9 5 3 help obj\e001_002.bmp 1026 174 9 1 3 0
+button nav_music obj\e001_000.bmp 1172 336 9 5 4 help obj\e001_002.bmp 1026 232 9 1 4 0
+button nav_config obj\e001_000.bmp 1172 394 9 5 5 help obj\e001_002.bmp 1026 290 9 1 5 0
+button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 9 1 6 0
+button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
+button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
+
+screen dialog
+# Measured under Wine: the screen dimmed to 100 of 256 of its brightness, the question, and Yes and No.
+questions resolution save load overwrite exit title
+dim 155
+pic obj\a003_000.bmp 325 228 6 1 0 0
+button yes obj\a004_000.bmp 339 293 2 5 0
+button no obj\a004_000.bmp 339 380 2 5 1
+
 screen story
 # Traced under Wine (set 1): the opening, then ten half-weeks of the select screen, each pick playing the scenes the part
 # gives (`chapter S 10904`), then the ending of the heroine with four hearts and her route. G 80, 81 and 82 are set as
