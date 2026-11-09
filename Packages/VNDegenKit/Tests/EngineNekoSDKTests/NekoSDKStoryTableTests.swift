@@ -156,6 +156,58 @@ import TestSupport
         #expect(vnneko_debug_variable(e, 1, 13) == 0)
     }
 
+    // A part's screen can open a menu over itself (PartHost::openMenu), as Test Game 90's select screen's side buttons do:
+    // the menu takes the input, and its Back returns to the part's screen, still waiting, which a press then finishes.
+    @Test func aPartsScreenOpensAMenuAndComesBack() throws {
+        let root = try game("storytestload")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        steps(e, 30)
+        #expect(status(e).contains("part screen") && !status(e).contains(" menu "), "\(status(e))")
+        vnneko_mouse_move(e, 0.5, 0.5)
+        vnneko_mouse_button(e, 1, true)
+        vnneko_mouse_button(e, 1, false)
+        steps(e, 10)
+        #expect(status(e).contains(" menu load"), "\(status(e))")
+        // A press in the menu isn't the part's.
+        click(e)
+        steps(e, 10)
+        #expect(vnneko_debug_variable(e, 1, 12) == 0)
+        #expect(vnneko_debug_press(e, "back"))
+        steps(e, 10)
+        #expect(status(e).contains("part screen") && !status(e).contains(" menu "), "\(status(e))")
+        click(e)
+        steps(e, 10)
+        #expect(vnneko_debug_variable(e, 1, 12) == 1, "\(status(e))")
+    }
+
+    // An `open` line's `@N` is the PC's number while its screen waits: a save there holds it, and a PC save with it, which
+    // has no lines beside it, opens the screen again at once, as Test Game 90's saves at its select screen need (set 1).
+    @Test func aPCSaveAtAScreensNumberOpensItAgain() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytest/save")
+        let opening = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(opening, 3)
+        #expect(status(opening).contains("part screen"), "\(status(opening))")
+        #expect(vnneko_debug_save(opening, 3))
+        vnneko_stop(opening)
+        let sidecar = try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save003.vnd" }
+        try FileManager.default.removeItem(at: try #require(sidecar))
+
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_load(e, 3))
+        steps(e, 3)
+        #expect(status(e).contains("part screen"), "\(status(e))")
+        click(e)
+        steps(e, 10)
+        #expect(vnneko_debug_variable(e, 1, 12) == 1, "\(status(e))")
+    }
+
     // `staffroll NAME` plays the table's `screen staffroll_NAME`, its length long, then the story goes on.
     @Test func aNamedStaffRollPlaysItsOwnScreen() throws {
         let root = try game()

@@ -52,6 +52,9 @@ public:
     void waitMs(int ms);
     // From an open screen: it closes, and the story goes on with this result.
     void finishScreen(int result);
+    // A menu table button's action from the part's own screen, such as nav_save, nav_load, nav_config or nav_title: the
+    // menu opens over the part's screen as from the story, and its Back returns there, the part waiting as it was.
+    void openMenu(const std::string &action);
     // A sound on one of the engine's channels: kind 0 music, 1 effects, 2 voice.
     void playSound(int kind, int channel, const std::string &path, int volume = 100, bool loop = false);
     // A picture into a slot as command 15 loads one, shown by the next screen update and gone with 17 or 22, saved as any
