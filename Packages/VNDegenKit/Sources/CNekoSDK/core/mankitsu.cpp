@@ -22,6 +22,12 @@
 // 3012 Kururu's, Otona's and Rei's hearts. VNDegen's own, kept beside the save:
 //   S 10904   the chapter the pick plays (`chapter S 10904`)
 //   S 10906   the heroine whose ending follows, 1 to 3, or 0 for none, set with the last pick
+//
+// The title, `part mankitsu` under its table screen, under the table's buttons: one of nine backgrounds at a time, in
+// order, 4.33 s each and crossfading over about 0.6 s (a 75 s recording under Wine, two rounds), the three heroines'
+// silhouettes, the logo and the trims, the top one moving left 240 pixels a second. Once the shared ending is seen
+// (G 83) the title has six silhouettes and blue trims, each from its own pictures, as editing cfg.sav showed. Which
+// background a launch starts on wasn't the same twice under Wine; it starts on a random one here.
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -38,6 +44,8 @@ namespace {
 constexpr int kFaceX = 0, kFaceY = 512;
 constexpr int kFollowMs = 120;  // the second strip's lag behind the first, in and out
 
+constexpr int kTitleBottomShift = 152;
+constexpr int kTitleMs = 4333, kTitleFadeMs = 600, kTitleTrimSpeed = 240, kTitleTrimPeriod = 600;
 constexpr int kWeekVar = 3000, kHalfVar = 3001, kHeartVar = 3010, kChapterVar = 10904, kEndingVar = 10906;
 constexpr int kPhases = 10, kMaxHearts = 4;
 
@@ -140,6 +148,7 @@ public:
     }
 
     bool step(PartHost &host) override {
+        if (menu_ == "title") return true;  // the backgrounds and the trim move
         int64_t now = host.nowMs();
         bool fading = now - fadeFrom_ < fadeMs_;
         bool sliding = slideFrom_ >= 0 && (outFrom_ < 0 || now - outFrom_ < uncoverMs());
@@ -148,12 +157,19 @@ public:
     }
 
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
+        if (layer == Layer::Menu && menu_ == "title") drawTitle(host, out);
         if (layer == Layer::Window) drawFaces(host, out);
         if (layer == Layer::OverWindow) drawSlide(host, out);
         if (layer == Layer::Screen && selecting_) drawSelect(host, out);
     }
 
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &) override {
+        menu_ = name;
+        if (name == "title") {
+            titleFrom_ = host.screenMs();
+            titleFirst_ = std::rand() % 9;
+            return true;
+        }
         if (name != "select") return false;
         readInis(host);
         selecting_ = true;
@@ -323,9 +339,38 @@ public:
         selecting_ = false;
         confirming_ = -1;
         pendingChapter_ = 0;
+        menu_.clear();
     }
 
 private:
+    void drawTitle(PartHost &host, Canvas &out) {
+        bool six = host.variable(0, 83) != 0;
+        int64_t t = std::max<int64_t>(0, host.screenMs() - titleFrom_);
+        int shown = int(t / kTitleMs), into = int(t % kTitleMs);
+        auto bg = [&](int k) {
+            char path[32];
+            std::snprintf(path, sizeof path, "obj\\%s_%03d.bmp", six ? "d008" : "d004", (titleFirst_ + k) % 9);
+            return host.image(path);
+        };
+        // The pink under it all, which the backgrounds' holes show as the silhouettes (within 0.24 of 255).
+        put(host, out, "obj\\d000_000.bmp", 0, 0);
+        if (ImageRef now = bg(shown)) drawPart(out, *now, 0, 0, 0, 0, now->w, now->h, 1);
+        if (shown > 0 && into < kTitleFadeMs)
+            if (ImageRef before = bg(shown - 1)) drawPart(out, *before, 0, 0, 0, 0, before->w, before->h, 1 - float(into) / kTitleFadeMs);
+        put(host, out, six ? "obj\\d009_000.bmp" : "obj\\d005_000.bmp", 0, 0);
+        put(host, out, six ? "obj\\d011_000.bmp" : "obj\\d007_000.bmp", 24, 363);
+        put(host, out, six ? "obj\\d999_003.bmp" : "obj\\d999_002.bmp", six ? 45 : 36, 662);
+        // The top trim, a strip that repeats every 600 pixels, moving left; the bottom one still.
+        if (ImageRef top = host.image(six ? "obj\\d010_000.bmp" : "obj\\d006_000.bmp")) {
+            int shift = int(t * kTitleTrimSpeed / 1000 % kTitleTrimPeriod);
+            for (int x = -shift; x < out.w; x += top->w) drawPart(out, *top, x, 0, 0, 0, top->w, top->h, 1);
+        }
+        if (ImageRef bottom = host.image(six ? "obj\\d010_001.bmp" : "obj\\d006_001.bmp"))
+            for (int x = -kTitleBottomShift; x < out.w; x += bottom->w) drawPart(out, *bottom, x, 720 - bottom->h, 0, 0, bottom->w, bottom->h, 1);
+        put(host, out, "obj\\d000_001.bmp", 16, 5);
+        put(host, out, six ? "obj\\d010_002.bmp" : "obj\\d006_002.bmp", 842, 694);
+    }
+
     void drawFaces(PartHost &host, Canvas &out) {
         float t = fadeMs_ > 0 ? std::clamp(float(host.nowMs() - fadeFrom_) / float(fadeMs_), 0.0f, 1.0f) : 1.0f;
         auto drawSet = [&](const std::map<int, std::string> &set, float alpha) {
@@ -542,7 +587,9 @@ private:
     }
 
     bool selecting_ = false, inisRead_ = false;
-    int pendingChapter_ = 0;
+    int pendingChapter_ = 0, titleFirst_ = 0;
+    int64_t titleFrom_ = 0;
+    std::string menu_;
     int confirming_ = -1, px_ = -1, py_ = -1;
     std::array<std::array<Card, 4>, kPhases> phaseCards_{};
     std::array<std::vector<int>, 3> charPlaces_;

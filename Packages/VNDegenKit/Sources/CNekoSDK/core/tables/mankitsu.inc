@@ -5,6 +5,30 @@ screen defaults
 # Faces, scene-change slides and the select screen (core/mankitsu.cpp).
 parts mankitsu scroll
 
+screen title
+# Measured under Wine. The mankitsu part draws the backgrounds, silhouettes, logo and trims; the buttons are 40 pixels
+# apart, each with its help card 104 above it at x 600, and a submenu takes the buttons' place. New Game offers the
+# prologue or the main story once the prologue has been seen (G 2, found by clearing globals in cfg.sav under Wine);
+# before that it starts at once. The Web Questionnaire button opens nothing: the game names no page for it.
+part mankitsu
+submenudim hide
+startmenu 2
+button start obj\d001_000.bmp 746 382 6 5 0 help obj\d002_000.bmp 600 278 12 1 0 0
+button load obj\d001_000.bmp 746 422 6 5 2 help obj\d002_000.bmp 600 318 12 1 2 0
+button submenu:extras obj\d001_000.bmp 746 462 6 5 3 help obj\d002_000.bmp 600 358 12 1 3 0
+button config obj\d001_000.bmp 746 502 6 5 4 help obj\d002_000.bmp 600 398 12 1 4 0
+button quit obj\d001_000.bmp 746 542 6 5 5 help obj\d002_000.bmp 600 438 12 1 5 0
+button websurvey obj\d001_001.bmp 866 620 1 5 0 help obj\d002_000.bmp 720 516 12 1 6 0
+button start_prologue obj\d001_002.bmp 746 382 5 5 0 group start help obj\d002_000.bmp 600 278 12 1 7 0
+button start_main obj\d001_002.bmp 746 422 5 5 1 group start help obj\d002_000.bmp 600 318 12 1 8 0
+button cg obj\d001_002.bmp 746 382 5 5 2 group extras help obj\d002_000.bmp 600 278 12 1 9 0
+button scene obj\d001_002.bmp 746 422 5 5 3 group extras help obj\d002_000.bmp 600 318 12 1 10 0
+button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 600 358 12 1 11 0
+
+# Main Story starts after the prologue, at the first select screen.
+screen start
+flow chapter2
+
 screen story
 # Traced under Wine (set 1): the opening, then ten half-weeks of the select screen, each pick playing the scenes the part
 # gives (`chapter S 10904`), then the ending of the heroine with four hearts and her route. G 80, 81 and 82 are set as
@@ -27,6 +51,10 @@ scene scr\ep_001_004_000.txt
 scene scr\ep_001_005_000.txt
 scene scr\ep_001_005_001.txt
 scene scr\ep_001_006_000.txt
+jump chapter2
+
+# Main Story from the title starts here.
+flow chapter2
 # Each half-week's select screen carries the PC's number for it, which its saves there hold (set 1, PC saves at all
 # ten); S 3000 and 3001 move on after the pick's scenes.
 open select @15
