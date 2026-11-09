@@ -10,6 +10,17 @@ partplate
 # from where the runtime puts it (Wine with ＭＳ ゴシック substituted, prologue's sixth line).
 textline 30
 textshift 1 -1
+# Config as the PC's 初期化 leaves it.
+default opacity 100
+default text 50
+default auto 50
+default bgm 60
+default se 60
+default hse 60
+default voice 80
+default backvoice 80
+default skipall 0
+default bulb 1
 
 # The interrogation hub (yabaiplay), as measured under Wine:
 #   truth T HOURS FIRST [START]   the hours truth T gives, whom the hub shows first, and its starting hour (8 if left out)
@@ -58,6 +69,7 @@ pic bg\bg_001_000_000_000_000.bmp 0 0
 pic obj\d000_000.bmp 0 0
 pic obj\e000_001.bmp 0 628
 pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
 pic obj\e001_000.bmp 0 0 6 1 1 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
@@ -101,6 +113,7 @@ pic bg\bg_001_000_000_000_000.bmp 0 0
 pic obj\d000_000.bmp 0 0
 pic obj\e000_001.bmp 0 628
 pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
 pic obj\e001_000.bmp 0 0 6 1 0 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
@@ -137,6 +150,233 @@ button nav_quit obj\e002_000.bmp 961 637 9 5 7
 button back obj\e002_000.bmp 1091 637 9 5 8
 button pageprev obj\e003_000.bmp 22 331 2 5 0
 button pagenext obj\e003_000.bmp 1218 331 2 5 1
+
+# Config, measured on the PC under Wine: four tabs over one frame, with the side arrows going round them. Each row's help
+# stands 69 above it at x 218 while the pointer is in the row's band (found by moving the pointer across its edges).
+# Screen mode, colours and resolutions are the PC window's own and are drawn as the PC showed them.
+screen config
+pic bg\bg_001_000_000_000_000.bmp 0 0
+pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
+pic obj\e001_000.bmp 0 0 6 1 5 0
+pic obj\h001_000.bmp 385 66
+numbercells 13
+button tab obj\h001_001.bmp 392 73 4 5 0
+button tab2 obj\h001_001.bmp 525 73 4 5 1
+button tab3 obj\h001_001.bmp 658 73 4 5 2
+button tab4 obj\h001_001.bmp 791 73 4 5 3
+button cfg_apply obj\h000_000.bmp 1122 100 3 5 0 help obj\h000_001.bmp 1058 26 3 1 0 0
+button cfg_undo obj\h000_000.bmp 1122 158 3 5 1 help obj\h000_001.bmp 1058 84 3 1 1 0
+button cfg_defaults obj\h000_000.bmp 1122 216 3 5 2 help obj\h000_001.bmp 1058 142 3 1 2 0
+button tab4 obj\e003_000.bmp 22 331 2 5 0
+button tab2 obj\e003_000.bmp 1218 331 2 5 1
+button nav_save obj\e002_000.bmp 51 637 9 5 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1
+button nav_cg obj\e002_000.bmp 311 637 9 5 2
+button nav_scene obj\e002_000.bmp 441 637 9 5 3
+button nav_music obj\e002_000.bmp 571 637 9 5 4
+button nav_config obj\e002_000.bmp 701 637 9 5 5
+button nav_title obj\e002_000.bmp 831 637 9 5 6
+button nav_quit obj\e002_000.bmp 961 637 9 5 7
+button back obj\e002_000.bmp 1091 637 9 5 8
+pic obj\h002_000.bmp 214 128
+radio screen 0 obj\h002_001.bmp 557 163 10 5 0
+radio screen 1 obj\h002_001.bmp 671 163 10 5 1
+pic obj\h002_001.bmp 557 199 10 5 2 0
+pic obj\h002_001.bmp 671 199 10 5 3 0
+pic obj\h002_001.bmp 557 235 10 5 4 2
+pic obj\h002_001.bmp 671 235 10 5 5 0
+pic obj\h002_001.bmp 785 235 10 5 6 0
+pic obj\h002_001.bmp 557 271 10 5 7 4
+pic obj\h002_001.bmp 671 271 10 5 8 4
+pic obj\h002_001.bmp 785 271 10 5 9 0
+radio effect 1 obj\h002_002.bmp 557 307 2 5 0
+radio effect 0 obj\h002_002.bmp 671 307 2 5 1
+# 背景の電球演出, the flickering bulb some backgrounds have (cfg\light_info.ini); the flicker itself isn't drawn yet.
+radio bulb 1 obj\h002_002.bmp 557 343 2 5 0
+radio bulb 0 obj\h002_002.bmp 671 343 2 5 1
+# The PC draws this row's OFF 3 pixels lower than its ON.
+radio wait 1 obj\h002_002.bmp 557 383 2 5 0
+radio wait 0 obj\h002_002.bmp 671 386 2 5 1
+knob opacity obj\g002_001.bmp 321 461 6
+number opacity obj\e004_001.bmp 896 422 blank
+step opacity -1 obj\h002_003.bmp 282 458 2 5 0
+step opacity 1 obj\h002_003.bmp 954 458 2 5 1
+radio confirm_saveload 1 obj\h002_002.bmp 557 506 2 5 0
+radio confirm_saveload 0 obj\h002_002.bmp 671 506 2 5 1
+group confirm_saveload confirm_overwrite confirm_delete confirm_quick confirm_title confirm_exit
+radio tutorial 1 obj\h002_002.bmp 557 542 2 5 0
+radio tutorial 0 obj\h002_002.bmp 671 542 2 5 1
+# ゲームを起動するたびに画面解像度を選択する: the PC window's own, shown unticked.
+pic obj\a001_002.bmp 417 588 1 5 0 0
+hovercols 219 163 1045 189 obj\h003_000.bmp 218 94 9 0
+hovercols 219 199 1045 225 obj\h003_000.bmp 218 130 9 1
+hovercols 219 235 1045 297 obj\h003_000.bmp 218 166 9 2
+hovercols 219 307 1045 333 obj\h003_000.bmp 218 238 9 3
+hovercols 219 343 1045 369 obj\h003_000.bmp 218 274 9 4
+hovercols 219 383 1045 409 obj\h003_000.bmp 218 314 9 5
+hovercols 219 419 1045 497 obj\h003_000.bmp 218 350 9 6
+hovercols 219 506 1045 532 obj\h003_000.bmp 218 438 9 7
+hovercols 219 542 1045 568 obj\h003_000.bmp 218 474 9 8
+
+screen config2
+pic bg\bg_001_000_000_000_000.bmp 0 0
+pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
+pic obj\e001_000.bmp 0 0 6 1 5 0
+pic obj\h001_000.bmp 385 66
+numbercells 13
+button tab obj\h001_001.bmp 392 73 4 5 0
+button tab2 obj\h001_001.bmp 525 73 4 5 1
+button tab3 obj\h001_001.bmp 658 73 4 5 2
+button tab4 obj\h001_001.bmp 791 73 4 5 3
+button cfg_apply obj\h000_000.bmp 1122 100 3 5 0 help obj\h000_001.bmp 1058 26 3 1 0 0
+button cfg_undo obj\h000_000.bmp 1122 158 3 5 1 help obj\h000_001.bmp 1058 84 3 1 1 0
+button cfg_defaults obj\h000_000.bmp 1122 216 3 5 2 help obj\h000_001.bmp 1058 142 3 1 2 0
+button tab obj\e003_000.bmp 22 331 2 5 0
+button tab3 obj\e003_000.bmp 1218 331 2 5 1
+button nav_save obj\e002_000.bmp 51 637 9 5 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1
+button nav_cg obj\e002_000.bmp 311 637 9 5 2
+button nav_scene obj\e002_000.bmp 441 637 9 5 3
+button nav_music obj\e002_000.bmp 571 637 9 5 4
+button nav_config obj\e002_000.bmp 701 637 9 5 5
+button nav_title obj\e002_000.bmp 831 637 9 5 6
+button nav_quit obj\e002_000.bmp 961 637 9 5 7
+button back obj\e002_000.bmp 1091 637 9 5 8
+pic obj\h004_000.bmp 214 128
+knob text obj\g002_001.bmp 321 205 6
+number text obj\e004_001.bmp 896 166 blank
+step text -1 obj\h002_003.bmp 282 202 2 5 0
+step text 1 obj\h002_003.bmp 954 202 2 5 1
+knob auto obj\g002_001.bmp 321 300 6
+number auto obj\e004_001.bmp 896 261 blank
+step auto -1 obj\h002_003.bmp 282 297 2 5 0
+step auto 1 obj\h002_003.bmp 954 297 2 5 1
+# The wait time runs from x0.00 to x2.00 on the PC, its knob 3 pixels to a hundredth.
+range waittime 0 200
+knob waittime obj\g002_001.bmp 321 395 3
+number waittime obj\e004_001.bmp 890 356 907 918
+step waittime -1 obj\h002_003.bmp 282 392 2 5 0
+step waittime 1 obj\h002_003.bmp 954 392 2 5 1
+pic obj\h003_002.bmp 878 357
+
+screen config3
+pic bg\bg_001_000_000_000_000.bmp 0 0
+pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
+pic obj\e001_000.bmp 0 0 6 1 5 0
+pic obj\h001_000.bmp 385 66
+numbercells 13
+button tab obj\h001_001.bmp 392 73 4 5 0
+button tab2 obj\h001_001.bmp 525 73 4 5 1
+button tab3 obj\h001_001.bmp 658 73 4 5 2
+button tab4 obj\h001_001.bmp 791 73 4 5 3
+button cfg_apply obj\h000_000.bmp 1122 100 3 5 0 help obj\h000_001.bmp 1058 26 3 1 0 0
+button cfg_undo obj\h000_000.bmp 1122 158 3 5 1 help obj\h000_001.bmp 1058 84 3 1 1 0
+button cfg_defaults obj\h000_000.bmp 1122 216 3 5 2 help obj\h000_001.bmp 1058 142 3 1 2 0
+button tab2 obj\e003_000.bmp 22 331 2 5 0
+button tab4 obj\e003_000.bmp 1218 331 2 5 1
+button nav_save obj\e002_000.bmp 51 637 9 5 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1
+button nav_cg obj\e002_000.bmp 311 637 9 5 2
+button nav_scene obj\e002_000.bmp 441 637 9 5 3
+button nav_music obj\e002_000.bmp 571 637 9 5 4
+button nav_config obj\e002_000.bmp 701 637 9 5 5
+button nav_title obj\e002_000.bmp 831 637 9 5 6
+button nav_quit obj\e002_000.bmp 961 637 9 5 7
+button back obj\e002_000.bmp 1091 637 9 5 8
+pic obj\h006_000.bmp 214 128
+radio skipall 0 obj\h006_001.bmp 557 163 9 5 0
+radio skipall 1 obj\h006_001.bmp 671 163 9 5 1
+radio rightclick 0 obj\h006_001.bmp 557 199 9 5 2
+radio rightclick 1 obj\h006_001.bmp 671 199 9 5 3
+radio rightclick 2 obj\h006_001.bmp 785 199 9 5 4
+radio rightclick 3 obj\h006_001.bmp 557 235 9 5 5
+radio rightclick 4 obj\h006_001.bmp 671 235 9 5 6
+radio deckey 0 obj\h006_001.bmp 557 271 9 5 7
+radio deckey 1 obj\h006_001.bmp 671 271 9 5 8
+radio pause_inactive 1 obj\h002_002.bmp 557 307 2 5 0
+radio pause_inactive 0 obj\h002_002.bmp 671 307 2 5 1
+
+screen config4
+pic bg\bg_001_000_000_000_000.bmp 0 0
+pic obj\d000_000.bmp 0 0
+pic obj\e000_001.bmp 0 628
+pic obj\d000_001.bmp 0 0
+pic obj\e000_000.bmp 0 0
+pic obj\e001_000.bmp 0 0 6 1 5 0
+pic obj\h001_000.bmp 385 66
+numbercells 13
+button tab obj\h001_001.bmp 392 73 4 5 0
+button tab2 obj\h001_001.bmp 525 73 4 5 1
+button tab3 obj\h001_001.bmp 658 73 4 5 2
+button tab4 obj\h001_001.bmp 791 73 4 5 3
+button cfg_apply obj\h000_000.bmp 1122 100 3 5 0 help obj\h000_001.bmp 1058 26 3 1 0 0
+button cfg_undo obj\h000_000.bmp 1122 158 3 5 1 help obj\h000_001.bmp 1058 84 3 1 1 0
+button cfg_defaults obj\h000_000.bmp 1122 216 3 5 2 help obj\h000_001.bmp 1058 142 3 1 2 0
+button tab3 obj\e003_000.bmp 22 331 2 5 0
+button tab obj\e003_000.bmp 1218 331 2 5 1
+button nav_save obj\e002_000.bmp 51 637 9 5 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1
+button nav_cg obj\e002_000.bmp 311 637 9 5 2
+button nav_scene obj\e002_000.bmp 441 637 9 5 3
+button nav_music obj\e002_000.bmp 571 637 9 5 4
+button nav_config obj\e002_000.bmp 701 637 9 5 5
+button nav_title obj\e002_000.bmp 831 637 9 5 6
+button nav_quit obj\e002_000.bmp 961 637 9 5 7
+button back obj\e002_000.bmp 1091 637 9 5 8
+pic obj\h008_000.bmp 214 128
+knob master obj\g002_001.bmp 351 177 6
+number master obj\e004_001.bmp 896 156 blank
+step master -1 obj\h002_003.bmp 312 174 2 5 0
+step master 1 obj\h002_003.bmp 984 174 2 5 1
+check mute_master obj\h008_002.bmp 238 166 1 5 0
+pic obj\h010_000.bmp 843 153 1 5 0 4
+knob bgm obj\g002_001.bmp 351 240 6
+number bgm obj\e004_001.bmp 896 219 blank
+step bgm -1 obj\h002_003.bmp 312 237 2 5 0
+step bgm 1 obj\h002_003.bmp 984 237 2 5 1
+check mute_bgm obj\h008_002.bmp 238 230 1 5 0
+pic obj\h010_000.bmp 843 217 1 5 0 4
+knob se obj\g002_001.bmp 351 304 6
+number se obj\e004_001.bmp 896 283 blank
+step se -1 obj\h002_003.bmp 312 301 2 5 0
+step se 1 obj\h002_003.bmp 984 301 2 5 1
+check mute_se obj\h008_002.bmp 238 294 1 5 0
+button TEST2 obj\h010_000.bmp 843 281 1 5 0
+knob hse obj\g002_001.bmp 351 368 6
+number hse obj\e004_001.bmp 896 347 blank
+step hse -1 obj\h002_003.bmp 312 365 2 5 0
+step hse 1 obj\h002_003.bmp 984 365 2 5 1
+check mute_hse obj\h008_002.bmp 238 358 1 5 0
+button TEST3 obj\h010_000.bmp 843 345 1 5 0
+knob voice obj\g002_001.bmp 351 432 6
+number voice obj\e004_001.bmp 896 411 blank
+step voice -1 obj\h002_003.bmp 312 429 2 5 0
+step voice 1 obj\h002_003.bmp 984 429 2 5 1
+check mute_voice obj\h008_002.bmp 238 422 1 5 0
+button TEST4 obj\h010_000.bmp 843 409 1 5 0
+knob backvoice obj\g002_001.bmp 351 496 6
+number backvoice obj\e004_001.bmp 896 475 blank
+step backvoice -1 obj\h002_003.bmp 312 493 2 5 0
+step backvoice 1 obj\h002_003.bmp 984 493 2 5 1
+check mute_backvoice obj\h008_002.bmp 238 486 1 5 0
+button TEST5 obj\h010_000.bmp 843 473 1 5 0
+radio voice_stop 1 obj\h002_002.bmp 557 544 2 5 0
+radio voice_stop 0 obj\h002_002.bmp 671 544 2 5 1
+check voice0 obj\h008_001.bmp 376 580 6 5 0
+check voice1 obj\h008_001.bmp 490 580 6 5 1
+check voice2 obj\h008_001.bmp 604 580 6 5 2
+check voice3 obj\h008_001.bmp 718 580 6 5 3
+check voice4 obj\h008_001.bmp 832 580 6 5 4
+check voice5 obj\h008_001.bmp 946 580 6 5 5
 
 screen story
 flow main
