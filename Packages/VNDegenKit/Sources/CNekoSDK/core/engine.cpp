@@ -3858,7 +3858,11 @@ bool Engine::barHover() const {
 
 // `inneralways` under `screen defaults`: the window's own buttons show whenever the window does, while the plate still
 // comes up only with the pointer, as Test Game 96's four are there with its plate resting (set 2, PC shots under Wine).
-bool Engine::innerButtonsShown() const { return defaultsHave("inneralways") || plateUp(); }
+// Over a game part's screen they stay away, with the plate up too, as Test Game 96's hub has none of the four (set 2).
+bool Engine::innerButtonsShown() const {
+    if (partScreen_ && waiting_ == Waiting::PartScreen) return false;
+    return defaultsHave("inneralways") || plateUp();
+}
 
 bool Engine::plateUp() const {
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
@@ -4874,7 +4878,10 @@ void Engine::mouseButton(int button, bool down) {
             if (!b && underWereShown_) b = buttonAt(pointerX_, messagePointerY(), bar().under);
             if (b) {
                 std::string action = b->action;
-                runAction(action);
+                // One a part draws disabled does nothing, as Auto and Skip over Test Game 96's hub.
+                bool off = false;
+                for (const auto &[name, part] : parts_) off = off || part->actionLit(action) == 2;
+                if (!off) runAction(action);
                 return;
             }
         }
@@ -5170,6 +5177,9 @@ const char *Engine::debugStatus() {
     if (windowLog_ > 0) status_ += " log " + std::to_string(windowLog_);
     // The menu table screen open over the story, when one is.
     if (screen_) status_ += " menu " + screen_->name;
+    // A game part's own words on its open screen.
+    if (waiting_ == Waiting::PartScreen && partScreen_)
+        if (std::string words = partScreen_->debugStatus(); !words.empty()) status_ += " " + words;
     return status_.c_str();
 }
 

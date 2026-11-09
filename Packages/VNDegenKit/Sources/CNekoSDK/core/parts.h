@@ -131,6 +131,9 @@ public:
     virtual void loadPC(const SaveData &) {}
     // A new story, a load, or back to the title.
     virtual void reset() {}
+    // For tests and headless tools: a few words on the part's open screen, added to vnneko_debug_status's line, such as
+    // where its moving controls are now.
+    virtual std::string debugStatus() const { return {}; }
 };
 
 // A new part by the name parts.cpp's list gives it, or none.
