@@ -558,6 +558,44 @@ button nav_title obj\e001_001.bmp 1168 467 10 5 7 help obj\e001_002.bmp 1044 351
 button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 10 1 8 0
 button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
 
+screen configvoices
+# Individual Voices, measured under Wine: the portraits are part of the paper, a name card for each voice over it
+# (column by column, speaker on and crossed out when muted), and the close button. The group voices (types 18 to 35
+# in voice_type.ini) play while all of their speakers are on.
+cancel tab4
+pic obj\e000_000.bmp 0 3
+pic obj\j017_000.bmp 0 3
+pic obj\e001_000.bmp 1154 0
+check voice0 obj\j017_001.bmp 55 184 18 5 0 0 1 2 3
+check voice1 obj\j017_001.bmp 55 335 18 5 1 0 1 2 3
+check voice2 obj\j017_001.bmp 55 486 18 5 2 0 1 2 3
+check voice3 obj\j017_001.bmp 55 637 18 5 3 0 1 2 3
+check voice4 obj\j017_001.bmp 262 184 18 5 4 0 1 2 3
+check voice5 obj\j017_001.bmp 262 335 18 5 5 0 1 2 3
+check voice6 obj\j017_001.bmp 262 486 18 5 6 0 1 2 3
+check voice7 obj\j017_001.bmp 262 637 18 5 7 0 1 2 3
+check voice8 obj\j017_001.bmp 469 184 18 5 8 0 1 2 3
+check voice9 obj\j017_001.bmp 469 335 18 5 9 0 1 2 3
+check voice10 obj\j017_001.bmp 469 486 18 5 10 0 1 2 3
+check voice11 obj\j017_001.bmp 469 637 18 5 11 0 1 2 3
+check voice12 obj\j017_001.bmp 676 184 18 5 12 0 1 2 3
+check voice13 obj\j017_001.bmp 676 335 18 5 13 0 1 2 3
+check voice14 obj\j017_001.bmp 676 486 18 5 14 0 1 2 3
+check voice15 obj\j017_001.bmp 676 637 18 5 15 0 1 2 3
+check voice16 obj\j017_001.bmp 883 184 18 5 16 0 1 2 3
+check voice17 obj\j017_001.bmp 883 335 18 5 17 0 1 2 3
+button tab4 obj\k000_001.bmp 1084 21 1 5 0
+button nav_save obj\e001_001.bmp 1168 103 10 5 0 help obj\e001_002.bmp 1044 15 10 1 0 0
+button nav_load obj\e001_001.bmp 1168 155 10 5 1 help obj\e001_002.bmp 1044 63 10 1 1 0
+button nav_cg obj\e001_001.bmp 1168 207 10 5 2 help obj\e001_002.bmp 1044 111 10 1 2 0
+button nav_sprites obj\e001_001.bmp 1168 259 10 5 3 help obj\e001_002.bmp 1044 159 10 1 3 0
+button nav_scene obj\e001_001.bmp 1168 311 10 5 4 help obj\e001_002.bmp 1044 207 10 1 4 0
+button nav_music obj\e001_001.bmp 1168 363 10 5 5 help obj\e001_002.bmp 1044 255 10 1 5 0
+button nav_config obj\e001_001.bmp 1168 415 10 5 6 help obj\e001_002.bmp 1044 303 10 1 6 0
+button nav_title obj\e001_001.bmp 1168 467 10 5 7 help obj\e001_002.bmp 1044 351 10 1 7 0
+button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 10 1 8 0
+button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
+
 screen defaults
 # Its message window's buttons, both rows, while the pointer is at y 360 or below and has moved in the last 3.4 s.
 barhover 360 3400
@@ -575,6 +613,25 @@ textshift 1 -3
 quickslots 91 98
 # Its sex scenes' sound effects are se_h*, at the Sex SFX volume.
 hseprefix se_h
+# Its group voices (voice_type.ini types 18 to 35) play while every one of their speakers is on.
+voicejoint 18 5 7
+voicejoint 19 0 1 9
+voicejoint 20 2 9
+voicejoint 21 7 10
+voicejoint 22 3 4
+voicejoint 23 3 7
+voicejoint 24 3 4 5
+voicejoint 25 9 10
+voicejoint 26 6 8
+voicejoint 27 4 6 8
+voicejoint 28 2 6 8
+voicejoint 29 5 6 8
+voicejoint 30 2 6
+voicejoint 31 6 9
+voicejoint 32 0 1
+voicejoint 33 5 10
+voicejoint 34 4 5 6 7 8
+voicejoint 35 2 8
 # Config as the PC starts it, read from its first-run screens. Auto speed is 50 of 100 there too; its pause isn't timed
 # yet (the PC's Auto seems to wait on looping sounds), so 10 ms a character at 50 stands in, as in the other games.
 default auto 50
