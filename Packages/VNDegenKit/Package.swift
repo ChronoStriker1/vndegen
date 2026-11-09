@@ -139,6 +139,7 @@ let package = Package(
             name: "CNekoSDK", dependencies: ["CVNFont"], exclude: ["third_party"],
             cSettings: [.unsafeFlags(["-O2"])], cxxSettings: [.unsafeFlags(["-std=c++20", "-O2"])],
             linkerSettings: [.linkedLibrary("z"),
+                             .linkedFramework("ImageIO", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
         .target(name: "EngineNekoSDK", dependencies: ["VNCore", "CNekoSDK", "FrameHost"], swiftSettings: mainActorByDefault),
