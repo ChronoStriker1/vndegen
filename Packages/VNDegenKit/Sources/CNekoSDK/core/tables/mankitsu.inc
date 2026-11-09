@@ -36,6 +36,8 @@ default bar_always 1
 # The lower row (Save, Load, Config, Title, End) shows while the pointer is at or below y 632: not at 630, there at 635,
 # at any x (PC shots under Wine).
 underbelow 632
+# In a Scene replay the PC draws these four disabled and they take no press; only Exit works (a PC shot under Wine).
+replayoff Save Load Config Title
 
 screen title
 # Measured under Wine. The mankitsu part draws the backgrounds, silhouettes, logo and trims; the buttons are 40 pixels
@@ -477,7 +479,8 @@ button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9
 button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
 
 # The backlog, measured under Wine (set 1, each piece fitted on a PC shot): a rule each 166 pixels with the name and text
-# in yellow, a voiced line's button at the right, the scroll track and its thumb, the close button and four arrows.
+# in yellow, a voiced line's button at the right, the scroll track and its thumb, the close button and four arrows, over
+# the scene and the whole message window, its buttons, gauge and face, dimmed.
 screen log
 dim 180
 pic obj\k000_002.bmp 1185 110
@@ -488,7 +491,7 @@ button log_top obj\k001_000.bmp 1185 31 4 5 0
 button log_up obj\k001_000.bmp 1185 61 4 5 1
 button log_down obj\k001_000.bmp 1185 633 4 5 2
 button log_bottom obj\k001_000.bmp 1185 663 4 5 3
-keepwindow
+keepwindow buttons
 edgesoff
 logvoice obj\h000_001.bmp 6 5 3 1125 35
 lognamey -30
