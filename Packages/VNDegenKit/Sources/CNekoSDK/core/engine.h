@@ -544,7 +544,10 @@ private:
     std::string subMenu_;
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;
-    int autoPerCharMs_ = -1;  // auto's pause for each character of the line, from `autocurve`, or -1 for a fixed pause
+    int autoPerCharMs_ = -1;
+    int plateHiddenX_ = 0;
+    bool plateRests_ = false, plateRaised_ = false;
+    int charFadeMs_ = 160;  // each character's fade in, `textfade` or 160  // auto's pause for each character of the line, from `autocurve`, or -1 for a fixed pause
     // The setting a wait command scales by, Config's wait time unless `waitscale SETTING` names another that scales only
     // waits, not fades, as Test Game 82's auto wait does (set 2, timed under Wine).
     std::string waitScale() const;

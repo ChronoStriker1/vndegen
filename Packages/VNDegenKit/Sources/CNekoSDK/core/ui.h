@@ -55,6 +55,8 @@ struct Picture {
     std::vector<ImageRef> variants;
     int pickBy = -1;
     std::vector<int> randomIf;
+    // `random`: one at random each time the screen opens, as Test Game 83's menus pick their room (set 3).
+    bool randomAlways = false;
     // How far, in pixels, the picture moves against the pointer when it's at the screen's edge, across and down.
     float followX = 0, followY = 0;
     // `part X Y W H`: only that rectangle of the picture, drawn at the picture's place.
