@@ -627,14 +627,13 @@ uint32_t Engine::selectColor(bool hover) const {
 }
 
 bool Engine::pollSelect() {
-    int rowH = win_.fh + win_.py;
     int hover = -1;
     for (size_t i = 0; i < selectRows_.size(); i++) {
         int y = selectRows_[i];
         if (y < 0) continue;
         int top = win_.ty + y;
-        // A Ponscripter choice may wrap onto more lines; NScripter's are taken a row each, as before.
-        int bottom = ponscripter_ ? win_.ty + selectBottoms_[i] : top + rowH;
+        // A choice may wrap onto more lines, and each of them responds (#37).
+        int bottom = win_.ty + selectBottoms_[i];
         if (mouseY_ >= top && mouseY_ < bottom && mouseX_ >= win_.tx && mouseX_ < win_.tx + win_.cols * fullAdvance())
             hover = int(i);
     }
@@ -655,9 +654,7 @@ bool Engine::pollSelect() {
     {
         selectHover_ = hover;
         for (size_t i = selectFirst_; i < page_.size(); i++) {
-            int y = page_[i].y - win_.ty - (rubyOn_ ? rubyH_ : 0);
-            bool on = hover >= 0 && (ponscripter_ ? i >= selectChars_[size_t(hover)].first && i < selectChars_[size_t(hover)].second
-                                                  : selectRows_[size_t(hover)] == y);
+            bool on = hover >= 0 && i >= selectChars_[size_t(hover)].first && i < selectChars_[size_t(hover)].second;
             page_[i].color = selectColor(on);
         }
         sceneDirty_ = true;
