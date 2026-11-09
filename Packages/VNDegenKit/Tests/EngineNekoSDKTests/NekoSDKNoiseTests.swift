@@ -25,9 +25,9 @@ import TestSupport
         return data
     }
 
-    private func game() throws -> URL {
+    private func game(_ folder: String = "waffle\\alchemy") throws -> URL {
         try NekoSDKFlowFixture.game([
-            "cfg/init.ini": Data("UserDataDirectory\twaffle\\alchemy\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/init.ini": Data("UserDataDirectory\t\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
             "sys/noise2_small.bmp": red(),
             "flow/t.txt": NekoSDKFlowFixture.flow([
                 .init(op: 0, next: 2),
@@ -72,5 +72,28 @@ import TestSupport
         #expect(vnneko_debug_load(second, 1))
         for _ in 0..<3 { _ = vnneko_step(second, 16) }
         #expect(topLeft(second) == [255, 0, 0])
+    }
+
+    @Test func noiseInTestGame90sLayoutHolds255() throws {
+        let root = try game("vndegen\\layout90")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(topLeft(e) == [255, 0, 0])
+        #expect(vnneko_debug_save(e, 1))
+        vnneko_stop(e)
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/layout90/save")
+        let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save001.sav" })
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        let record = try #require(save.range(of: Data([1, 0, 0x10, 0x27, 0, 0, 4, 0, 0, 0])))
+        let alpha = record.lowerBound + 18 + 249
+        let value = save.subdata(in: alpha..<(alpha + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) }
+        #expect(value == 255)
+        var built = [UInt8](repeating: 0, count: save.count + 64)
+        let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout90", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+        #expect(size == save.count)
+        #expect(Data(built.prefix(size)) == save)
     }
 }

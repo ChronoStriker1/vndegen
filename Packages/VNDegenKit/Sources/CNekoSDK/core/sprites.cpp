@@ -231,7 +231,7 @@ void Engine::pressSprites(int x, int y) {
     if (Button *b = buttonAt(x, y, screen_->buttons)) {
         sprite_.restingSince = screenMs_;
         std::string action = b->action;
-        if (!buttonOff(action)) runAction(action);
+        runAction(action);
         return;
     }
     auto [kind, index] = spriteControlAt(x, y);
@@ -390,7 +390,7 @@ void Engine::composeSprites(Canvas &out) {
     for (const Button &b : screen_->buttons) {
         Button shown = b;
         shown.x += int(std::lround(slide * float(out.w - b.x)));
-        drawButton(out, shown, buttonOff(b.action) ? StateDisabled : pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
+        drawButton(out, shown, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
     }
     if (sprite_.list >= 0) composeSpriteList(out);
 }

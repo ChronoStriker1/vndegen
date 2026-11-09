@@ -425,12 +425,12 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.slot = r.i32();
         int number = r.i32();
         if (!ordinary) s.flipFrame = number;
-        if (!ordinary && number == kNoiseKind) {
+        s.path = r.str();
+        s.nextPath = r.str();
+        if (!ordinary && number == kNoiseKind && s.path.empty()) {
             s.noise = true;
             s.flipFrame = -1;
         }
-        s.path = r.str();
-        s.nextPath = r.str();
         size_t f = r.at;
         if (older) {
             // A part's record, an ordinary one of another kind than a picture's, names three pictures in its fixed

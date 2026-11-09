@@ -143,3 +143,16 @@ const char kScrollSaveTest[] = R"(
 screen defaults
 parts scroll
 )";
+
+const char kWidgetTestTabs[] = R"(
+screen title
+button scene obj\b.bmp 600 0 1 5 0
+
+screen scene
+gallerytabs 0
+cell 300 300
+cellsize 40 30
+cellthumb 0 0
+button gtab0 obj\b.bmp 800 0 1 5 0
+button gtab1 obj\b.bmp 900 0 1 5 0
+)";
