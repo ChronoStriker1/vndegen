@@ -353,7 +353,14 @@ private:
         std::vector<std::string> keys;
         std::vector<std::string> images;
         std::vector<int> imageIds;
+        // Each picture's group, the first field of its line, and its place among its group's lines in the file, for a
+        // game that keeps its flags by group (`cgflagsbygroup`).
+        std::vector<int> imageGroups, imagePlaces;
     };
+    // Where a picture's unlock flag sits in cfg.sav: by its number, or with `cgflagsbygroup STRIDE` under `screen defaults`
+    // STRIDE bytes a group and 4 a place, as Test Game 83 keeps them (set 3). -1 for none.
+    int cgFlagAt(const GalleryEntry &e, size_t picture) const;
+    size_t configLayout(const char *key, size_t otherwise) const;
     bool sceneUnlocked(const GalleryEntry &scene) const;
     // Test Game 92's anime gallery, from its anime_view.ini: entries of movies, unlocked whole by a scene's script as a
     // scene is, and shown in the CG viewer.
@@ -544,7 +551,18 @@ private:
     std::string subMenu_;
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;
+    int questionCell(int question) const;
+    int64_t barMovedAt_ = -1000000;
+    bool barHover() const;
+    bool barHovered() const;
+    void playVoiceAgain(const std::string &voice);
+    bool logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &sheet, int &col) const;
     int autoPerCharMs_ = -1;
+    // `inwindow` under `screen log`: the backlog shown a line at a time in the message window, as Test Game 83's (set 3).
+    // windowLog_ is how many lines back is showing, 0 for the line in play.
+    int windowLog_ = 0;
+    bool logInWindow() const;
+    void stepWindowLog(int lines);
     int plateHiddenX_ = 0;
     bool plateRests_ = false, plateRaised_ = false;
     int charFadeMs_ = 160;  // each character's fade in, `textfade` or 160  // auto's pause for each character of the line, from `autocurve`, or -1 for a fixed pause

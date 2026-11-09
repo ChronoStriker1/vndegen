@@ -115,6 +115,11 @@ import TestSupport
         click(e, 10, 10)
         vnneko_mouse_move(e, 0.9, 0.9)
         #expect(pixel(e, 10, 110) == [0, 0, 0])
+        // The opener goes too, and a click where it was doesn't close the submenu.
+        #expect(pixel(e, 10, 10) == [0, 0, 0])
+        click(e, 10, 10)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 210, 10) != [0, 0, 0])
         click(e, 10, 110)
         #expect(pixel(e, 103, 303) != green)
         click(e, 640, 600, button: 1)

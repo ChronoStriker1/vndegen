@@ -67,6 +67,16 @@ import TestSupport
         let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
         defer { vnneko_stop(e) }
         #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        // A save there holds the line's PC number, @20, as one after running to it does (set 2).
+        steps(e, 3)
+        #expect(vnneko_debug_save(e, 9))
+        let saves = root.appendingPathComponent("data/AppData/Roaming/vndegen/storytest/save")
+        let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save009.sav" })
+        let plain = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        func int32(_ at: Int) -> Int32 { plain.subdata(in: (plain.startIndex + at)..<(plain.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } }
+        let picture = Int(int32(0xCD + 4 + 4196))
+        #expect(int32(0xCD + 4 + 4196 + 4 + picture + 39596 + 404) == 20)
         // The scene's last line, then past it.
         steps(e, 200)
         click(e)
