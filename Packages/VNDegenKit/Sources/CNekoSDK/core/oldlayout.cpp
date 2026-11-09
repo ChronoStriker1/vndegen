@@ -52,6 +52,17 @@ void Engine::loadOldLayout() {
     if (const auto *slot = d.setting("layoutbgslot"); slot && !slot->empty()) layoutBgSlot_ = number(*slot, 0);
     layoutCgSlot_ = layoutBgSlot_;
     if (const auto *slot = d.setting("layoutcgslot"); slot && !slot->empty()) layoutCgSlot_ = number(*slot, 0);
+    layoutPairs_ = d.setting("layoutpairs") != nullptr;
+}
+
+// `layoutpairs` under `screen defaults`: the PC keeps each place's picture as two records, the slot's own and the slot
+// after it, as Test Game 96 keeps the dark and the lit version of every standing picture and background for its
+// flickering bulb (set 2, from its PC saves). The runtime draws one, in the slot itself, so whatever takes a place's
+// picture away or puts another there clears the slot after it too. Without that, the lit picture a PC save brought
+// stayed on screen after the story removed it.
+void Engine::clearLayoutSlot(int slot) {
+    back_.erase(slot);
+    if (layoutPairs_) back_.erase(slot + 1);
 }
 
 void Engine::runOldLayout(const Node &n) {
@@ -69,7 +80,8 @@ void Engine::runOldLayout(const Node &n) {
         }
         // A background and a CG in slots of their own each take the other away.
         int slot = n.opcode == 10 ? layoutBgSlot_ : layoutCgSlot_, other = n.opcode == 10 ? layoutCgSlot_ : layoutBgSlot_;
-        if (other != slot) back_.erase(other);
+        if (other != slot) clearLayoutSlot(other);
+        clearLayoutSlot(slot);
         Sprite &s = back_[slot];
         s = Sprite{};
         s.image = image;
@@ -77,8 +89,8 @@ void Engine::runOldLayout(const Node &n) {
         break;
     }
     case 12:
-        back_.erase(layoutBgSlot_);
-        back_.erase(layoutCgSlot_);
+        clearLayoutSlot(layoutBgSlot_);
+        clearLayoutSlot(layoutCgSlot_);
         break;
     case 13: {
         noteSeen(n.s[1]);
@@ -89,7 +101,9 @@ void Engine::runOldLayout(const Node &n) {
         }
         // Test Game 87 gives a second number with the place, and one load in Test Game 83 parameter 4; neither is known yet.
         if ((p[1] != 0 && !layoutSlotByP1_) || p[4] != 0) warnOnce("A standing picture's parameter 1 or 4 isn't known yet: " + sjis::toUtf8(n.s[0]));
-        Sprite &s = back_[slotOf(layoutSlotByP1_ ? p[1] : p[0])];
+        int slot = slotOf(layoutSlotByP1_ ? p[1] : p[0]);
+        clearLayoutSlot(slot);
+        Sprite &s = back_[slot];
         s = Sprite{};
         s.image = image;
         s.path = n.s[1];
@@ -98,10 +112,10 @@ void Engine::runOldLayout(const Node &n) {
         break;
     }
     case 14:
-        back_.erase(slotOf(p[0]));
+        clearLayoutSlot(slotOf(p[0]));
         break;
     case 21:
-        for (int slot : layoutSlots_) back_.erase(slot);
+        for (int slot : layoutSlots_) clearLayoutSlot(slot);
         break;
     default:
         break;

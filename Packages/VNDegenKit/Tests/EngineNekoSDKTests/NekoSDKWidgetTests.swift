@@ -203,9 +203,11 @@ import TestSupport
     // comes back to the Scene screen.
     @Test func aSceneCardReplaysTheChapterItsLineNames() throws {
         let root = try game("widgettestpart", [
-            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\a.txt,src\\\\b.txt,scr\\\\k.txt\n".utf8),
-            // The test part's chapter 7 is this one scene.
+            // Two cards with the same scripts and chapters of their own, one to a page.
+            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\a.txt,src\\\\b.txt,scr\\\\k.txt\n0,obj\\k.bmp,-1,8,scr\\\\a.txt,src\\\\b.txt,scr\\\\k.txt\n".utf8),
+            // The test part's chapter 7 is this one scene, and its chapter 8 the other.
             "scr/c7.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0, p: [0: 1000])]),
+            "scr/c8.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0, p: [0: 1000])]),
         ])
         defer { try? FileManager.default.removeItem(at: root) }
         let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/widgettestpart/save")
@@ -228,5 +230,18 @@ import TestSupport
         #expect(status().hasPrefix("scr\\c7.txt"), "\(status())")
         for _ in 0..<90 { _ = vnneko_step(e, 16) }
         #expect(status().contains(" menu scene"), "\(status())")
+        // The second page's card has the same scripts and plays its own chapter. `replaykeeps`: its replay comes back to
+        // that page, so the card under the pointer is still the second.
+        for round in 0..<2 {
+            for _ in 0..<30 { _ = vnneko_step(e, 16) }
+            if !status().contains(" menu scene") { break }
+            if round == 0 { #expect(vnneko_debug_press(e, "page1")) }
+            for _ in 0..<5 { _ = vnneko_step(e, 16) }
+            click(e, 320, 315)
+            for _ in 0..<5 { _ = vnneko_step(e, 16) }
+            #expect(status().hasPrefix("scr\\c8.txt"), "\(status())")
+            for _ in 0..<90 { _ = vnneko_step(e, 16) }
+            #expect(status().contains(" menu scene"), "\(status())")
+        }
     }
 }
