@@ -3969,7 +3969,7 @@ void Engine::runFlow(const Node &n) {
     }
     case 1003: {  // the story table's `chapter N`: the scenes a game part gives, then on
         flow.node = flow.script->node(n.next);
-        if (auto chapter = loadScript("chapter:" + std::to_string(n.p[0]))) stack_.push_back({chapter, chapter->first()});
+        if (auto chapter = loadScript("chapter:" + std::to_string(operand(n)))) stack_.push_back({chapter, chapter->first()});
         break;
     }
     default:
