@@ -80,6 +80,15 @@ import TestSupport
         }
         // `datemark 9 330 28`: the date sheet's cell 9 at its own place between the year and the month.
         #expect(digitAt(60 + 330 + 7, 99 + 28 + 10) == 9)
+        // `slotcommentbutton`: the button at 200, 60 on the card, whose press asks the host for the card's comment.
+        #expect(pixel(e, 60 + 200 + 5, 99 + 60 + 5) == [250, 250, 0])
+        vnneko_mouse_move(e, Float(60 + 200 + 5) / 1280, Float(99 + 60 + 5) / 720)
+        _ = vnneko_step(e, 16)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        _ = vnneko_step(e, 16)
+        var comment = [CChar](repeating: 0, count: 64)
+        #expect(vnneko_take_comment_request(e, &comment, comment.count) == 1)
         // The chapter from S5000: cell 2, green 150.
         #expect(pixel(e, 60 + 350 + 5, 99 + 6 + 5) == [0, 150, 0])
         // The frame's corner, outside the thumbnail.

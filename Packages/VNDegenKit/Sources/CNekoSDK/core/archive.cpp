@@ -68,14 +68,24 @@ int patchNumber(const std::string &name) {
 }  // namespace
 
 std::string normalizedPath(std::string path) {
+    // A doubled backslash counts as one, as Test Game 96's saves name their scenes with the `scr\\` its chapter list
+    // writes (set 2). A character's second byte can be a backslash's, and stays.
+    std::string out;
+    out.reserve(path.size());
     bool lead = false;
-    for (auto &c : path) {
+    for (char c : path) {
         auto u = static_cast<unsigned char>(c);
-        if (lead) { lead = false; continue; }
-        if ((u >= 0x81 && u <= 0x9F) || (u >= 0xE0 && u <= 0xFC)) { lead = true; continue; }
-        if (c == '/') c = '\\';
+        if (lead) {
+            lead = false;
+        } else if ((u >= 0x81 && u <= 0x9F) || (u >= 0xE0 && u <= 0xFC)) {
+            lead = true;
+        } else {
+            if (c == '/') c = '\\';
+            if (c == '\\' && !out.empty() && out.back() == '\\') continue;
+        }
+        out += c;
     }
-    return lower(std::move(path));
+    return lower(std::move(out));
 }
 
 std::vector<uint8_t> unpackEntry(const uint8_t *data, size_t size) {
