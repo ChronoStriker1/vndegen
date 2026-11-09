@@ -23,6 +23,14 @@ default skipall 0
 default bulb 1
 # The H sound effects, with a volume of their own, are the se_h files.
 hseprefix se_h
+# The PC keeps a seen-CG flag for each picture by its line's group in cg_view.ini (its heroine; 1,000 flags a group) and
+# its place in the group, and flags an entry's every picture once one is seen: after Ayano's and two of Rina's truth 3
+# scenes its cfg.sav gained flags 43 to 54 and 2032 to 2053, three whole entries.
+cgflagsbygroup 4000
+cgwhole
+# The window's four buttons show whenever the window does, and the click-wait mark stands still, as on the PC.
+inneralways
+markstill
 
 # The interrogation hub (yabaiplay), as measured under Wine:
 #   truth T HOURS FIRST [START]   the hours truth T gives, whom the hub shows first, and its starting hour (8 if left out)
@@ -404,6 +412,31 @@ hovercols 219 403 1045 460 obj\h009_000.bmp 218 331 8 4
 hovercols 219 467 1045 524 obj\h009_000.bmp 218 394 8 5
 hovercols 219 546 1045 571 obj\h009_000.bmp 218 476 8 6
 hovercols 219 582 1045 608 obj\h009_000.bmp 218 512 8 7
+
+# 96's cfg.sav is the older 96,000 bytes, as 82's: seen CGs from 48000, heard tracks from 92000, no string before them.
+# The `run` lines are what the PC's first file holds before the globals (its Config as numbers), so a file VNDegen
+# starts doesn't hand the PC a Config of zeros.
+screen cfgsav
+size 96000
+tracks 92000
+nostring
+run 4 2 1
+run 16 2 50
+run 24 1 100
+run 36 1 100
+run 40 2 1
+run 48 1 2
+run 52 1 1
+run 76 1 1
+run 80 1 100
+run 84 3 60
+run 96 2 80
+run 104 1 60
+run 120 7 1
+run 160 1 3
+run 168 2 1
+run 220 1 1
+run 400 100 1
 
 screen story
 # New Game, and START > PROLOGUE.
