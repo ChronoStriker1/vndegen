@@ -39,10 +39,11 @@ number rose obj\d.bmp 600 400 15 blank
 // and under its buttons, takes the presses it wants, and draws over everything (NekoSDKWidgetTests). Its Scene screen
 // replays the chapter a play_view2.ini line names, `replaychapters`, as Test Game 96's does, and the part draws under its
 // card, Layer::MenuUnder, as Test Game 90's Save and Load strip runs behind their cards. `replaykeeps` brings a replay
-// back to the page its card was on.
+// back to the page its card was on. Its Music button is off by `buttonsoff`, and its second tab for having no scene.
 const char kWidgetTestPart[] = R"(
 screen defaults
 parts selftest
+buttonsoff nav_music
 
 screen title
 button sprites obj\b.bmp 0 0 1 5 0
@@ -60,6 +61,9 @@ pic obj\d.bmp 290 312
 replaychapters
 replaykeeps
 button page1 obj\b.bmp 700 0 1 5 0
+button gtab0 obj\b.bmp 800 0 1 5 0
+button gtab1 obj\b.bmp 900 0 1 5 0
+button nav_music obj\b.bmp 1000 0 1 5 0
 cell 300 300
 cellsize 40 30
 cellthumb 0 0
@@ -127,4 +131,11 @@ screen defaults
 parts selftest
 fliptime
 flipsound
+)";
+
+// A game that saves in Test Game 83's layout with the `scroll` part on, for a scrolling picture's record through a load
+// and a save (NekoSDKPartImageTests).
+const char kScrollSaveTest[] = R"(
+screen defaults
+parts scroll
 )";

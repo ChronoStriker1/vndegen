@@ -1,8 +1,6 @@
 // The `scroll` game part: the older engine's scrolling pictures (90 and 91) and its second image load (92), measured
 // under Wine on Test Games 83 and 86. All three load a picture into a scene slot through PartHost::loadImage, so the
 // next screen update shows it, 17 and 22 take it away, and saves keep it as any other picture.
-#include <algorithm>
-#include <cmath>
 #include <cstring>
 #include <map>
 
@@ -32,10 +30,9 @@ public:
             // 1.76 seconds on the PC, fitted frame by frame over 12 seconds, and its PC save keeps 1.0 for it; Test
             // Game 86's lace strips, -500 along the top and +500 along the bottom, each move 15 pixels in half a
             // second.
+            // A picture the game doesn't have loads nothing: what the slot showed stays, and its numbers with it.
             if (host.loadImage(n.p[0], n.s[1], 0, n.p[2], false, perSecond(n.p[3]), 0, kScrollKind))
-                across_[n.p[0]] = {n.p[3], n.p[11], n.p[12]};
-            else
-                across_.erase(n.p[0]);
+                across_[n.p[0]] = {float(n.p[3]) / 1000, n.p[11], n.p[12]};
             return true;
         case 91:
             // Down: slot p0, its left at x p1, tiled over the height and moving p3 at the same rate (negative moves it
@@ -44,13 +41,13 @@ public:
             // frames. Neither of set 3's games uses it.
             // Where the PC's save keeps this one's speed isn't known (no PC save of one has been read), so its record
             // is written with none, and not with what command 90 left for the slot.
-            host.loadImage(n.p[0], n.s[1], n.p[1], 0, false, 0, perSecond(n.p[3]), kScrollKind);
-            across_.erase(n.p[0]);
+            if (host.loadImage(n.p[0], n.s[1], n.p[1], 0, false, 0, perSecond(n.p[3]), kScrollKind))
+                across_.erase(n.p[0]);
             return true;
         case 92:
             // A picture at p1, p2 in slot p3, added to the scene when p4 is 1: Test Game 83's sword strokes, four
             // copies of one picture painted on black, show over each other and over the scene on the PC.
-            host.loadImage(n.p[3], n.s[1], n.p[1], n.p[2], n.p[4] == 1);
+            if (host.loadImage(n.p[3], n.s[1], n.p[1], n.p[2], n.p[4] == 1)) across_.erase(n.p[3]);
             return true;
         default:
             return false;
@@ -63,7 +60,7 @@ public:
         for (SavedSprite &s : d.sprites) {
             auto it = across_.find(s.slot);
             if (s.kind != kScrollKind || it == across_.end()) continue;
-            float speed = float(it->second.speed) / 1000;
+            float speed = it->second.speed;
             int32_t p11 = it->second.p11, p12 = it->second.p12;
             s.fixedBytes = {
                 {kAtSpeed, bytes(&speed)},   {kAtP11, bytes(&p11)},      {kAtP12, bytes(&p12)},
@@ -72,7 +69,10 @@ public:
         }
     }
     // A load brings the picture back, and its numbers with it: the next save writes them again. Without them a save
-    // made in VNDegen after loading a PC save held speed 0, and the PC then showed the fog standing still.
+    // made in VNDegen after loading a PC save held speed 0, and the PC then showed the fog standing still. The speed
+    // is kept as the float the save held, whatever it is, so a PC save's record comes through a load and a save with
+    // the bytes it had: one too small for a command's thousandths, and one the engine won't play (it alone decides
+    // that, in engine.cpp's restore, and draws such a picture standing still).
     void loadPC(const SaveData &d) override {
         across_.clear();
         for (const SavedSprite &s : d.sprites) {
@@ -82,9 +82,7 @@ public:
             std::memcpy(&speed, &s.rawFixed[size_t(kAtSpeed)], 4);
             std::memcpy(&p11, &s.rawFixed[size_t(kAtP11)], 4);
             std::memcpy(&p12, &s.rawFixed[size_t(kAtP12)], 4);
-            // A save's bytes may be anything: a speed that isn't a number is none.
-            if (!std::isfinite(speed)) speed = 0;
-            across_[s.slot] = {int(std::lround(std::clamp(speed, -1.0e6f, 1.0e6f) * 1000)), p11, p12};
+            across_[s.slot] = {speed, p11, p12};
         }
     }
     void reset() override { across_.clear(); }
@@ -95,8 +93,11 @@ private:
         std::memcpy(b.data(), value, sizeof(T));
         return b;
     }
+    // A scrolling picture's saved numbers: its speed in pixels a frame, as the PC's record holds it, and the command's
+    // parameters 11 and 12.
     struct Across {
-        int speed = 0, p11 = 0, p12 = 0;
+        float speed = 0;
+        int p11 = 0, p12 = 0;
     };
     std::map<int, Across> across_;
 };

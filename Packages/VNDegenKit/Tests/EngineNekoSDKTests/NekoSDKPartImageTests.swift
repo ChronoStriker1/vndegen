@@ -148,6 +148,45 @@ import TestSupport
         #expect(save.range(of: Data("parts\\one.bmp".utf8)) == nil)
     }
 
+    // A picture loaded into a slot a part holds takes the slot over: the picture is drawn, the part's square isn't, and a
+    // save holds the picture's record alone.
+    @Test func aPictureTakesOverAPartsSlot() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\partslot\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("red.bmp", bmp(1280, 720) { _ in [255, 0, 0] }), ("blue.bmp", bmp(100, 100) { _ in [0, 0, 255] })]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [3: 100], s: [1: "obj\\red.bmp"]),
+                .init(op: 9001, next: 4, p: [0: 500], s: [1: "parts\\one.bmp"]),
+                .init(op: 9, next: 5),
+                .init(op: 2, next: 6, p: [0: 1000]),
+                .init(op: 15, next: 7, p: [1: 560, 2: 260, 3: 500], s: [1: "obj\\blue.bmp"]),
+                .init(op: 9, next: 8),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        steps(e, 2500)
+        let f = frame(e)
+        let at = (305 * f.w + 605) * 4
+        #expect(Array(f.px[at..<at + 3]) == [0, 0, 255])
+        #expect(vnneko_debug_save(e, 1))
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/partslot/save")
+        let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save001.sav" })
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        #expect(save.range(of: Data("parts\\one.bmp".utf8)) == nil)
+        #expect(save.range(of: Data("obj\\blue.bmp".utf8)) != nil)
+    }
+
     // A slot a part holds with no picture (PartHost::holdSlot, the selftest part's command 9001): the part draws it in
     // the slot's order once a screen update shows it, command 17 takes it away as it does a picture, and a save in the
     // older layout holds its record as Test Game 83's PC writes a particle emitter's: kind 15, no picture, three names 57
@@ -217,7 +256,8 @@ import TestSupport
 
     // A PC save's record of a tiled, moving picture, kind 6 with its speed as a float 45 bytes into the fixed part, comes
     // back tiled and moving at 60 times that in pixels a second, with no lines of VNDegen's beside the save.
-    @Test func aPCSavesTiledPictureMovesAgain() throws {
+    // A speed that isn't a number, as a damaged save could hold, is none: the picture stands still.
+    @Test(arguments: [Float(0.5), .nan, .infinity]) func aPCSavesTiledPictureMovesAgain(speed: Float) throws {
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\partslot\nFirstFlow\tflow\\t.txt\n".utf8),
             "obj.pak": NekoSDKFlowFixture.archive([("lace.bmp", bmp(100, 40) { $0 < 10 ? [255, 0, 0] : [0, 0, 255] })]),
@@ -249,7 +289,7 @@ import TestSupport
         let name = try #require(save.range(of: Data("obj\\lace.bmp".utf8))).lowerBound - save.startIndex
         func put<T>(_ value: T, _ at: Int) { save.replaceSubrange((save.startIndex + at)..<(save.startIndex + at + 4), with: withUnsafeBytes(of: value, { Data($0) })) }
         put(Int32(6).littleEndian, name - 8)
-        put(Float(0.5).bitPattern.littleEndian, name + 12 + 4 + 45)
+        put(speed.bitPattern.littleEndian, name + 12 + 4 + 45)
         try NekoSDKFlowFixture.packed(save).write(to: file)
 
         let e = try #require(NekoSDKFlowFixture.start(root, data: data))
@@ -259,12 +299,72 @@ import TestSupport
         // Tiled across the frame: the strip's blue far to the right of its own 100 pixels.
         let f = frame(e)
         let far = (320 * f.w + 1050) * 4
-        #expect(f.px[far + 2] > 200 || f.px[far] > 200)
+        // With no speed it's a picture standing where it was, and isn't tiled.
+        #expect((f.px[far + 2] > 200 || f.px[far] > 200) == speed.isFinite)
         // And moving 30 pixels a second to the right.
         let before = try #require(bandStart(e))
         steps(e, 1000)
         let after = try #require(bandStart(e))
-        #expect(near(after, before + 30), "\(before) to \(after)")
+        #expect(near(after, before + (speed.isFinite ? 30 : 0)), "\(before) to \(after)")
+    }
+
+    // The `scroll` part's own record through a load and a save. Command 90's picture saves its speed, 0.5 a frame for
+    // 500 thousandths, and its parameters 11 and 12 where the PC keeps them. A PC save's record then comes back out of
+    // a load and a save with the bytes it had: a speed too small for a command's thousandths, one the engine won't
+    // play, and one that isn't a number.
+    @Test(arguments: [Float(0.0004), 20000, .nan]) func aScrollingPicturesRecordKeepsItsBytes(speed: Float) throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\scrollsave\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("lace.bmp", bmp(100, 40) { $0 < 10 ? [255, 0, 0] : [0, 0, 255] })]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 90, next: 3, p: [0: 150, 2: 300, 3: 500, 11: 7, 12: 9], s: [1: "obj\\lace.bmp"]),
+                .init(op: 9, next: 4),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/scrollsave/save")
+        func file(_ name: String) throws -> URL {
+            try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil).first { $0.lastPathComponent.lowercased() == name })
+        }
+        // The record's fixed part starts past its two names, the second empty; the numbers' places are scroll.cpp's.
+        func numbers(_ save: Data) throws -> (speed: UInt32, p11: [Int32], p12: [Int32]) {
+            let fixed = try #require(save.range(of: Data("obj\\lace.bmp".utf8))).lowerBound + 12 + 4
+            func word<T>(_ at: Int) -> T { save.subdata(in: (fixed + at)..<(fixed + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: T.self) } }
+            return (word(45), [word(225), word(333)], [word(229), word(337)])
+        }
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(first, 300)
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file("save001.sav")))
+        let own = try numbers(save)
+        #expect(own.speed == Float(0.5).bitPattern && own.p11 == [7, 7] && own.p12 == [9, 9])
+
+        // As a PC save: no lines of VNDegen's beside it, and numbers of its own.
+        try FileManager.default.removeItem(at: try file("save001.vnd"))
+        let fixed = try #require(save.range(of: Data("obj\\lace.bmp".utf8))).lowerBound + 12 + 4
+        func put<T>(_ value: T, _ at: Int) { save.replaceSubrange((fixed + at)..<(fixed + at + 4), with: withUnsafeBytes(of: value, { Data($0) })) }
+        put(speed.bitPattern.littleEndian, 45)
+        for at in [225, 333] { put(Int32(11).littleEndian, at) }
+        for at in [229, 337] { put(Int32(13).littleEndian, at) }
+        try NekoSDKFlowFixture.packed(save).write(to: try file("save001.sav"))
+
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_load(e, 1))
+        steps(e, 300)
+        #expect(vnneko_debug_save(e, 2))
+        let again = try numbers(try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file("save002.sav"))))
+        #expect(again.speed == speed.bitPattern, "\(again.speed) for \(speed.bitPattern)")
+        #expect(again.p11 == [11, 11] && again.p12 == [13, 13])
     }
 
     // With the table's `fliptime` and `flipsound`, as Test Game 90 has them: command 121's parameter 16, 30, shows each
