@@ -158,3 +158,84 @@ private struct SlowPlugin: EnginePlugin {
     #expect(ControlMethod.controller(mouse: .cursor).switchingMouseStyle == .controller(mouse: .touch))
     #expect(ControlMethod.controller(mouse: nil).switchingMouseStyle == .controller(mouse: nil))
 }
+
+/// A game whose test decides whether it started, and which ends itself as an engine does, through `onExit`.
+@MainActor
+private final class StartingSession: EngineSession {
+    let view = PlatformView()
+    let launch: GameLaunch
+    var failedToStart = false
+
+    init(_ launch: GameLaunch) { self.launch = launch }
+
+    func send(_ event: ControllerEvent) {}
+    func setPaused(_ paused: Bool) {}
+    func terminate() {}
+}
+
+@MainActor
+private final class StartingSessions {
+    var made: [StartingSession] = []
+}
+
+private struct StartingPlugin: EnginePlugin {
+    let sessions: StartingSessions
+
+    var descriptor: EngineDescriptor {
+        EngineDescriptor(id: EngineID("starting"), displayName: "Starting", shortName: "Starting", platforms: Set(Platform.allCases))
+    }
+
+    func detect(_ probe: FolderProbe) -> EngineMatch? {
+        probe.contains("start.txt") ? EngineMatch(engine: descriptor.id, confidence: .certain, evidence: "start.txt") : nil
+    }
+
+    @MainActor func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
+        let session = StartingSession(launch)
+        sessions.made.append(session)
+        return session
+    }
+
+    func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] { [] }
+}
+
+/// Only a launch that starts the game counts as played (#39). A game that fails to start keeps its last played time and
+/// play time, and one that ends, whether quit from the hub or by itself partway through, counts.
+@MainActor
+@Test func onlyALaunchThatStartsTheGameCountsAsPlayed() async throws {
+    let base = TestFolders.root.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
+    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
+    let names = ["Fails To Start", "Quit From The Hub", "Ends Midway"]
+    for name in names {
+        try FileManager.default.createDirectory(at: paths.gamesRoot.appendingPathComponent(name), withIntermediateDirectories: true)
+        try Data().write(to: paths.gamesRoot.appendingPathComponent("\(name)/start.txt"))
+    }
+    let sessions = StartingSessions()
+    let library = LibraryStore(paths: paths, engines: [StartingPlugin(sessions: sessions)])
+    await library.refresh()
+    let hub = Hub(library: library, metadata: MetadataService(), input: InputHub(),
+                  lock: LockService(keychainService: "vndegen-tests-\(UUID().uuidString)", defaults: UserDefaults(suiteName: UUID().uuidString)!),
+                  saveSync: SaveSyncService(library: library))
+    let failed = GameID(names[0]), quit = GameID(names[1]), midway = GameID(names[2])
+    let earlier = Date(timeIntervalSinceNow: -86_400)
+    library.update(failed) { $0.lastPlayedAt = earlier }
+
+    hub.launch(failed)
+    sessions.made[0].failedToStart = true
+    sessions.made[0].launch.onExit()
+    guard case .library = hub.screen else { Issue.record("the failed game is still on screen"); return }
+    #expect(library.game(failed)?.lastPlayedAt == earlier)
+    #expect(library.game(failed)?.playTime == 0)
+
+    let launched = Date.now
+    hub.launch(quit)
+    try await Task.sleep(for: .milliseconds(50))
+    hub.endSession()
+    #expect(try #require(library.game(quit)?.lastPlayedAt) >= launched)
+    #expect(try #require(library.game(quit)?.playTime) > 0)
+
+    hub.launch(midway)
+    try await Task.sleep(for: .milliseconds(50))
+    sessions.made[2].launch.onExit()
+    #expect(try #require(library.game(midway)?.lastPlayedAt) >= launched)
+    #expect(try #require(library.game(midway)?.playTime) > 0)
+}

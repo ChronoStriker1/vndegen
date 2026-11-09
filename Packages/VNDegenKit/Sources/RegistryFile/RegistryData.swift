@@ -13,11 +13,34 @@ public enum RegistryValue: Equatable, Sendable {
     case raw(kind: UInt8, bytes: [UInt8])
 }
 
+/// A registry value's name. Names are the same when their UTF-8 bytes are, as Rust strings compare in Ludusavi's
+/// regashii, so `é` and `e` followed by a combining accent are two names. Swift strings would compare them as one (#40).
+public struct RegistryName: Hashable, Comparable, Sendable, ExpressibleByStringLiteral, CustomStringConvertible {
+    public let text: String
+
+    public init(_ text: String) { self.text = text }
+    public init(stringLiteral text: String) { self.text = text }
+
+    public var description: String { text }
+
+    /// The name in lower case, for comparing names without case, as regashii's `to_lowercase` does.
+    public var lowercased: RegistryName { RegistryName(text.lowercased()) }
+
+    public static func == (a: RegistryName, b: RegistryName) -> Bool { a.text.utf8.elementsEqual(b.text.utf8) }
+
+    public func hash(into hasher: inout Hasher) {
+        for byte in text.utf8 { hasher.combine(byte) }
+    }
+
+    /// By UTF-8 bytes, as Rust's `BTreeMap` orders regashii's names.
+    public static func < (a: RegistryName, b: RegistryName) -> Bool { a.text.utf8.lexicographicallyPrecedes(b.text.utf8) }
+}
+
 /// Registry keys and their values: Ludusavi's `Hives`, with each key named in full, such as
 /// `HKEY_CURRENT_USER\Software\Company\Game`. Names compare without case, as Windows and regashii compare them, and keep
 /// the spelling they were first seen with.
 public struct RegistryData: Equatable, Sendable {
-    public private(set) var keys: [String: [String: RegistryValue]] = [:]
+    public private(set) var keys: [String: [RegistryName: RegistryValue]] = [:]
 
     public init() {}
 
@@ -27,14 +50,14 @@ public struct RegistryData: Equatable, Sendable {
     public var isEmpty: Bool { keys.isEmpty }
 
     /// The values of `key`, matched without case. Only that key's own, never its subkeys'.
-    public func values(of key: String) -> [String: RegistryValue]? {
+    public func values(of key: String) -> [RegistryName: RegistryValue]? {
         spelling(of: key).flatMap { keys[$0] }
     }
 
     /// Replaces the values of `key`, keeping the spelling it already has. Every other key stays as it is.
-    public mutating func setValues(_ values: [String: RegistryValue], of key: String) {
+    public mutating func setValues(_ values: [RegistryName: RegistryValue], of key: String) {
         let name = spelling(of: key) ?? Self.normalized(key)
-        var merged: [String: RegistryValue] = [:]
+        var merged: [RegistryName: RegistryValue] = [:]
         for (valueName, value) in values.sortedByUTF8 { Self.insert(value, named: valueName, into: &merged) }
         keys[name] = merged
     }
@@ -64,7 +87,7 @@ public struct RegistryData: Equatable, Sendable {
 
     /// Adds `values` under `key`, merging with a key spelled otherwise, as regashii's `Registry::insert` merges keys
     /// added twice.
-    mutating func add(_ values: [String: RegistryValue], to key: String) {
+    mutating func add(_ values: [RegistryName: RegistryValue], to key: String) {
         let name = spelling(of: key) ?? Self.normalized(key)
         var merged = keys[name] ?? [:]
         for (valueName, value) in values.sortedByUTF8 { Self.insert(value, named: valueName, into: &merged) }
@@ -72,9 +95,9 @@ public struct RegistryData: Equatable, Sendable {
     }
 
     /// A later value replaces one whose name differs only in case, under the name first seen.
-    private static func insert(_ value: RegistryValue, named name: String, into values: inout [String: RegistryValue]) {
-        let lower = name.lowercased()
-        let existing = values.keys.first { $0.lowercased() == lower }
+    private static func insert(_ value: RegistryValue, named name: RegistryName, into values: inout [RegistryName: RegistryValue]) {
+        let lower = name.lowercased
+        let existing = values.keys.first { $0.lowercased == lower }
         values[existing ?? name] = value
     }
 }
@@ -84,4 +107,9 @@ extension Dictionary where Key == String {
     var sortedByUTF8: [(key: String, value: Value)] {
         sorted { Array($0.key.utf8).lexicographicallyPrecedes(Array($1.key.utf8)) }
     }
+}
+
+extension Dictionary where Key == RegistryName {
+    /// Sorted as regashii writes them, by UTF-8 bytes.
+    var sortedByUTF8: [(key: RegistryName, value: Value)] { sorted { $0.key < $1.key } }
 }

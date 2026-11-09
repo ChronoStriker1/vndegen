@@ -159,6 +159,39 @@ import Testing
         #expect(read == data && read.regText == text)
     }
 
+    /// `café` spelled with a precomposed é and with a combining accent are two names, as regashii 356cf0d reads and
+    /// writes them, while two spellings that differ only in case are still one (#40). `expected` is regashii's output for
+    /// `text`.
+    @Test func keepsCanonicallyEquivalentNamesApart() throws {
+        let text = """
+            Windows Registry Editor Version 5.00
+
+            [HKEY_CURRENT_USER\\Software\\S\\G]
+            "caf\u{E9}"=dword:00000001
+            "cafe\u{301}"=dword:00000002
+            "Name"=dword:00000003
+            "name"=dword:00000004
+
+            """
+        let expected = """
+            Windows Registry Editor Version 5.00
+
+            [HKEY_CURRENT_USER\\Software\\S\\G]
+            "Name"=dword:00000004
+            "cafe\u{301}"=dword:00000002
+            "caf\u{E9}"=dword:00000001
+
+            """
+        let data = try RegistryData(reg: text)
+        let values = try #require(data.values(of: #"HKEY_CURRENT_USER\Software\S\G"#))
+        #expect(values == [RegistryName("caf\u{E9}"): .dword(1), RegistryName("cafe\u{301}"): .dword(2), "Name": .dword(4)])
+        #expect(Array(data.regText.utf8) == Array(expected.utf8))
+
+        var rewritten = RegistryData()
+        rewritten.setValues(values, of: #"HKEY_CURRENT_USER\Software\S\G"#)
+        #expect(Array(rewritten.regText.utf8) == Array(expected.utf8))
+    }
+
     @Test func writesUTF16WithAByteOrderMark() {
         #expect(RegistryData.utf16File("Aあ") == Data([0xFF, 0xFE, 0x41, 0x00, 0x42, 0x30]))
     }
