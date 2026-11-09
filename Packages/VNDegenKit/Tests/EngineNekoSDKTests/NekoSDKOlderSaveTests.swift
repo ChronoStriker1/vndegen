@@ -193,6 +193,8 @@ import TestSupport
         #expect(int32(save, at - 12) == 600)
         let x = save.subdata(in: (save.startIndex + at + 12 + 0xD5)..<(save.startIndex + at + 12 + 0xD9)).withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
         #expect(x == 194)
+        // A shown sprite holds 255 as its alpha, as 90's PC writes it and needs to draw it (set 1).
+        #expect(int32(save, at + 12 + 249) == 255)
 
         let second = try #require(NekoSDKFlowFixture.start(root, data: data))
         defer { vnneko_stop(second) }
