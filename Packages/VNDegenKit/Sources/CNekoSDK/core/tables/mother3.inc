@@ -234,6 +234,23 @@ button nav_quit obj\e004_000.bmp 1152 471 10 5 8
 button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen config
+# The dark band the PC draws across the bottom of each Config page, over its help too, measured under Wine against
+# obj\h000_000.bmp on all three pages: a multiply that comes in over eight rows and turns slightly blue to the bottom.
+band 643 255 255 255
+band 644 251 251 251
+band 645 245 245 245
+band 646 235 235 235
+band 647 223 223 224
+band 648 211 212 213
+band 649 206 207 208
+band 650 200 202 203
+band 651 196 198 199
+band 652 193 195 196
+band 660 191 195 197
+band 670 189 195 198
+band 685 186 195 200
+band 700 183 194 201
+band 719 182 194 202
 # Help shown over each settings group, its edges found to the pixel under Wine by moving the pointer across them.
 hover 399 203 559 261 obj\h004_000.bmp 350 669 9 4
 hover 221 203 387 261 obj\h004_000.bmp 350 669 9 3
@@ -266,12 +283,16 @@ button nav_quit obj\e004_000.bmp 1152 471 10 5 8
 button back obj\e004_000.bmp 1152 513 10 5 9
 radio screen 0 obj\h006_000.bmp 172 93 2 5 0
 radio screen 1 obj\h006_000.bmp 294 93 2 5 1
-pic obj\h007_000.bmp 172 133 6 5 0 4
-pic obj\h007_000.bmp 294 133 6 5 1 4
-pic obj\h007_000.bmp 416 133 6 5 2 4
-pic obj\h007_000.bmp 172 165 6 5 3 4
-pic obj\h007_000.bmp 294 165 6 5 4 4
-pic obj\h007_000.bmp 416 165 6 5 5 4
+# The window sizes, 1280x720, 1024x576 and 800x450, then 1280x960, 1024x768 and 800x600: here they pick the frame's shape,
+# 16:9 or 4:3, which the view is scaled to fit. None chosen is automatic, the shape nearer the view's; choosing the one
+# already chosen goes back to it.
+radio screensize 1 obj\h007_000.bmp 172 133 6 5 0
+radio screensize 2 obj\h007_000.bmp 294 133 6 5 1
+radio screensize 3 obj\h007_000.bmp 416 133 6 5 2
+radio screensize 4 obj\h007_000.bmp 172 165 6 5 3
+radio screensize 5 obj\h007_000.bmp 294 165 6 5 4
+radio screensize 6 obj\h007_000.bmp 416 165 6 5 5
+radiooff screensize
 radio effect 1 obj\h008_000.bmp 50 229 2 5 0
 radio effect 0 obj\h008_000.bmp 131 229 2 5 1
 radio wait 1 obj\h008_000.bmp 226 229 2 5 0
@@ -296,6 +317,23 @@ radio express 1 obj\h014_000.bmp 656 597 2 5 0
 radio express 0 obj\h014_000.bmp 818 597 2 5 1
 
 screen config2
+# The dark band the PC draws across the bottom of each Config page, over its help too, measured under Wine against
+# obj\h000_000.bmp on all three pages: a multiply that comes in over eight rows and turns slightly blue to the bottom.
+band 643 255 255 255
+band 644 251 251 251
+band 645 245 245 245
+band 646 235 235 235
+band 647 223 223 224
+band 648 211 212 213
+band 649 206 207 208
+band 650 200 202 203
+band 651 196 198 199
+band 652 193 195 196
+band 660 191 195 197
+band 670 189 195 198
+band 685 186 195 200
+band 700 183 194 201
+band 719 182 194 202
 # Help shown over each settings group, its edges found to the pixel under Wine by moving the pointer across them.
 hover 584 291 804 346 obj\h004_002.bmp 362 669 6 5
 hover 584 87 807 147 obj\h004_002.bmp 362 669 6 0
@@ -358,6 +396,23 @@ step waittime -1 obj\h010_000.bmp 119 570 2 5 0
 step waittime 1 obj\h010_000.bmp 469 570 2 5 1
 
 screen config3
+# The dark band the PC draws across the bottom of each Config page, over its help too, measured under Wine against
+# obj\h000_000.bmp on all three pages: a multiply that comes in over eight rows and turns slightly blue to the bottom.
+band 643 255 255 255
+band 644 251 251 251
+band 645 245 245 245
+band 646 235 235 235
+band 647 223 223 224
+band 648 211 212 213
+band 649 206 207 208
+band 650 200 202 203
+band 651 196 198 199
+band 652 193 195 196
+band 660 191 195 197
+band 670 189 195 198
+band 685 186 195 200
+band 700 183 194 201
+band 719 182 194 202
 # Help shown over each settings group, its edges found to the pixel under Wine by moving the pointer across them.
 hover 585 88 806 146 obj\h004_003.bmp 372 669 8 6
 hover 46 88 560 159 obj\h004_003.bmp 372 669 8 0

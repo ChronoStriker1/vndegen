@@ -509,6 +509,9 @@ default textspeed 50
 default autospeed 50
 default autowait 100
 default backvoice_on 1
+textcurve textspeed 167 3      # max(0, 167 - 3v) ms a character, measured under Wine
+autocurve autospeed 100 1      # auto waits (100 - v) ms a character of the line
+waitscale autowait             # [ウエイト] waits last time x autowait / 100; fades aren't stretched
 # The text asks for Verdana (face 8, DejaVu Sans here, chosen by the lead against real Verdana). Size 19 and gap 0.64 are
 # Verdana-at-24's widths plus the PC's own gap, 0.2 over its face's advances, measured under Wine; lines 30 apart, the
 # first baseline at 588 and the ink from x 213 as there.
