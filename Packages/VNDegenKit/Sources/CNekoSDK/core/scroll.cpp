@@ -11,7 +11,7 @@ namespace neko {
 namespace {
 
 // The number the PC's save holds after the slot of command 90's picture (Test Game 83's fog, in a PC save). Command
-// 91's is taken to be the same.
+// 91's is taken to be the same; no PC save of one has been read.
 constexpr int kScrollKind = 6;
 // Where that record keeps the command's numbers, in its fixed part with its three names empty: the speed as pixels a
 // frame, and parameters 11 and 12 twice. With the speed left at 0 the PC loads the picture and holds it still, as it
@@ -34,9 +34,11 @@ public:
                 across_[n.p[0]] = {n.p[3], n.p[11], n.p[12]};
             return true;
         case 91:
-            // Down: as 90 turned, its left at x p2 and p3 at the same rate, tiled over the height. Neither of set 3's
-            // games uses it; it's inferred from 90 for Test Game 90.
-            host.loadImage(n.p[0], n.s[1], n.p[2], 0, false, 0, perSecond(n.p[3]), kScrollKind);
+            // Down: slot p0, its left at x p1, tiled over the height and moving p3 at the same rate (negative moves it
+            // up). Set 1 measured it on Test Game 90's PC, frame by frame in a recording at 60 frames a second: the
+            // picture sits at x p1 (-110 in all four uses, with p2 0), and p3 -35000 moved it 7,340 pixels in 210
+            // frames. Neither of set 3's games uses it.
+            host.loadImage(n.p[0], n.s[1], n.p[1], 0, false, 0, perSecond(n.p[3]), kScrollKind);
             return true;
         case 92:
             // A picture at p1, p2 in slot p3, added to the scene when p4 is 1: Test Game 83's sword strokes, four

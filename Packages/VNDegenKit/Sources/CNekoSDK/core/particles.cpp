@@ -85,8 +85,9 @@ public:
     }
 
     void drawSlot(PartHost &host, Canvas &out, int slot, float alpha) override {
+        // With Config's Effects off the PC shows no dot at all; the emitter stays, and its record in a save.
         auto it = emitters_.find(slot);
-        if (it != emitters_.end() && alpha > 0) drawEmitter(host, out, it->second, alpha);
+        if (it != emitters_.end() && alpha > 0 && host.effectsOn()) drawEmitter(host, out, it->second, alpha);
     }
 
     // The PC's record of each emitter: the engine writes the slot's own, and this fills in the pictures and the
