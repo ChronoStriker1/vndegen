@@ -42,6 +42,13 @@ underbelow 632
 replayoff Save Load Config Title
 # The title's three bonus stories start the story with S 10907 naming one (see `screen title` and `flow main`).
 routevar 10907
+# A standing picture loaded by command 13 takes its slot from its second number, 200 and 100 for each, and its place
+# across from its first: the bonus disc's PC save with three standing holds them in slots 200, 500 and 600 for second
+# numbers 0, 3 and 4, and draws them in that order (lead and set 1, under Wine). No script has command 14. The five
+# places are 256 apart about the middle: with them that scene is the PC's to the pixel.
+layoutslotby p1
+layoutslots 200 300 400 500 600
+layoutx -512 -256 0 256 512
 
 # Save and load, measured under Wine (set 1, each piece fitted on a PC shot): nine cards a page on ten pages, each a
 # save's number, thumbnail, its route by S 4000 (prologue, common, Kururu's, Otona's, Rei's, harem), the date and time at
