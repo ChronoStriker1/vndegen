@@ -1,7 +1,5 @@
 // The `yabaiplay` game part: Test Game 96's story pieces that its PC keeps in the exe (set 2).
 //   chapter N   the scene scripts cfg\chapter_file.ini lists under `#chapter N`, in order
-// Its chapters number the interrogation as 1000 * heroine (1 Ayano, 2 Misuzu, 3 Rina) + 100 * (truth - 1)
-// + 10 * (stage - 1) + question, with the prologue, the truths' openings, the votes and endings below 1000.
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -57,7 +55,7 @@ std::map<std::string, std::string> parseKeys(const std::string &text) {
 enum : int {
     kTruth = 15100,      // 1..5
     kStage = 15101,      // + heroine: 1..3, 4 when she's done
-    kHour = 15104,       // the clock's hour, 8 at a truth's start, counting past 24 as the PC's limit does
+    kHour = 15104,
     kDay = 15105,
     kSolved = 15106,     // right answers this truth
     kHoursLeft = 15107,
@@ -131,8 +129,9 @@ public:
         host.setVariable(1, kTreeChapter, 0);
         if (action == 1 && picked > 0) return finishWith(host, kPlay, picked);
         if (action == 2 && picked > 0) {
-            int heroine = picked / 1000 - 1, question = picked % 10;
-            if (heroine >= 0 && heroine < 3) return ask(host, heroine, question);
+            int heroine = picked / 1000 - 1, question = picked % 10, stage = (picked % 100) / 10 + 1;
+            bool here = heroine >= 0 && heroine < 3 && question < 3 && (picked % 1000) / 100 + 1 == truth(host) && stage == host.variable(1, kStage + heroine);
+            if (here && stage <= 3 && askable(host, heroine, question)) return ask(host, heroine, question);
         }
         if (pendingDevil_) {
             int devil = pendingDevil_;
@@ -146,6 +145,7 @@ public:
             host.setVariable(1, kEventDone, 1);
             return finishWith(host, kTimeEvent, 0);
         }
+        if (int shown = shownHeroine(host); host.variable(1, kStage + shown) > 3) host.setVariable(1, kShown, openFrom(host, shown));
         open_ = true;
         hoverQ_ = -1;
         bubblesFor_ = -1;
@@ -183,7 +183,7 @@ public:
                 host.redraw();
                 return true;
             }
-        int shown = host.variable(1, kShown);
+        int shown = shownHeroine(host);
         if (int q = bubbleAt(host, x, y); q >= 0) return ask(host, shown, q);
         return true;
     }
@@ -200,9 +200,18 @@ public:
         }
         if (!open_) return false;
         moveBubbles(host);
-        int shown = host.variable(1, kShown);
-        for (int q = 0; q < 3; q++)
-            if (askable(host, shown, q)) spots.push_back({int(bubbles_[q].x), int(bubbles_[q].y)});
+        int shown = shownHeroine(host);
+        for (int q = 0; q < 3; q++) {
+            if (!askable(host, shown, q)) continue;
+            const Bubble &b = bubbles_[q];
+            static constexpr int kOffsets[9][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+            for (const auto &offset : kOffsets) {
+                int x = int(b.x) + offset[0] * b.w / 4, y = int(b.y) + offset[1] * b.h / 5;
+                if (bubbleAt(host, x, y) != q) continue;
+                spots.push_back({x, y});
+                break;
+            }
+        }
         for (int h = 0; h < 3; h++)
             if (host.variable(1, kStage + h) <= 3) spots.push_back({kTab[h][0] + kTab[h][2] / 2, kTab[h][1] + kTab[h][3] / 2});
         spots.push_back({kTreeButton[0] + kTreeButton[2] / 2, kTreeButton[1] + kTreeButton[3] / 2});
@@ -227,7 +236,8 @@ public:
             return;
         }
         if (!open_) return;
-        int shown = host.variable(1, kShown), stage = host.variable(1, kStage + shown);
+        loadQuestions(host);
+        int shown = shownHeroine(host), stage = host.variable(1, kStage + shown);
         put(host, out, "obj\\l000_000.bmp", 0, 0);
         // The red rim and the dark vignette over it, fitted to the PC's hub at three quarters. The rim is wider than the
         // screen and may drift on the PC; it's held still here.
@@ -286,6 +296,22 @@ public:
         return words;
     }
 
+    void save(std::vector<std::string> &lines) const override {
+        if (ask_) lines.push_back("ask " + std::to_string(ask_));
+        else if (open_) lines.push_back("hub");
+    }
+    void load(const std::vector<std::string> &lines) override {
+        for (const std::string &line : lines) {
+            std::istringstream words(line);
+            std::string kind;
+            int number = 0;
+            words >> kind >> number;
+            if (kind == "hub") open_ = true;
+            if (kind == "ask" && number >= 1 && number <= 4) ask_ = number;
+        }
+        hoverAsk_ = hoverQ_ = -1;
+    }
+
     void reset() override {
         open_ = false, ask_ = 0;
         bubblesFor_ = -1;
@@ -331,7 +357,9 @@ private:
 
     static bool inside(int x, int y, const int (&r)[4]) { return x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]; }
 
-    bool askable(PartHost &host, int heroine, int q) { return !locked(host, heroine) && !(asked(host, heroine) & (1 << q)); }
+    bool askable(PartHost &host, int heroine, int q) {
+        return host.variable(1, kStage + heroine) <= 3 && !locked(host, heroine) && !(asked(host, heroine) & (1 << q));
+    }
 
     // Whether two bubbles' middles are nearer up and down than where they touch.
     bool near(int i, int j) const {
@@ -340,7 +368,8 @@ private:
 
     // The bubbles where the clock has them now, laid out afresh for another heroine, stage or truth.
     void moveBubbles(PartHost &host) {
-        int shown = host.variable(1, kShown), stage = std::min(3, std::max(1, host.variable(1, kStage + shown)));
+        loadQuestions(host);
+        int shown = shownHeroine(host), stage = std::min(3, std::max(1, host.variable(1, kStage + shown)));
         int64_t now = host.nowMs();
         if (int key = truth(host) * 100 + shown * 10 + stage; key != bubblesFor_) {
             bubblesFor_ = key;
@@ -352,24 +381,29 @@ private:
                 if (ImageRef text = host.image(panel(host, shown, stage, q)); text && text->w > b.w) b.w = text->w, b.h = text->h / 5;
                 b.x = std::min(std::max(b.x, kAreaLeft + float(b.w) / 2), kAreaRight - float(b.w) / 2);
             }
-            for (int pair = 0; pair < 3; pair++) wasNear_[pair] = near(kPairs[pair][0], kPairs[pair][1]);
+            for (int pair = 0; pair < 3; pair++) wasNear_[pair] = near(kPairs[pair][0], kPairs[pair][1]), turned_[pair] = false;
         }
         // A long gap, such as the app waking, isn't caught up.
         if (now - bubblesAt_ > 2000 || now < bubblesAt_) bubblesAt_ = now;
         for (; bubblesAt_ + kMoveMs <= now; bubblesAt_ += kMoveMs) {
             float dt = float(kMoveMs) / 1000;
-            for (Bubble &b : bubbles_) {
-                b.x += b.vx * dt, b.y += b.vy * dt;
-                if ((b.y - float(b.h) / 2 < kAreaTop && b.vy < 0) || (b.y + float(b.h) / 2 > kAreaBottom && b.vy > 0)) b.vy = -b.vy;
-                if ((b.x - float(b.w) / 2 < kAreaLeft && b.vx < 0) || (b.x + float(b.w) / 2 > kAreaRight && b.vx > 0)) b.vx = -b.vx;
-            }
+            for (Bubble &b : bubbles_) b.x += b.vx * dt, b.y += b.vy * dt;
             for (int pair = 0; pair < 3; pair++) {
                 Bubble &a = bubbles_[kPairs[pair][0]], &b = bubbles_[kPairs[pair][1]];
                 bool across = std::fabs(a.x - b.x) < float(a.w + b.w) / 2 - kTouchX;
                 bool isNear = near(kPairs[pair][0], kPairs[pair][1]);
                 // Turned back, the two return to the side of the line they came from, so what was stays as it was.
-                if (across && isNear != wasNear_[pair]) a.vy = -a.vy, b.vy = -b.vy;
-                else if (!across) wasNear_[pair] = isNear;
+                if (across && isNear != wasNear_[pair] && !turned_[pair]) {
+                    a.vy = -a.vy, b.vy = -b.vy;
+                    turned_[pair] = true;
+                } else {
+                    if (!across || turned_[pair]) wasNear_[pair] = isNear;
+                    turned_[pair] = false;
+                }
+            }
+            for (Bubble &b : bubbles_) {
+                if ((b.y - float(b.h) / 2 < kAreaTop && b.vy < 0) || (b.y + float(b.h) / 2 > kAreaBottom && b.vy > 0)) b.vy = -b.vy;
+                if ((b.x - float(b.w) / 2 < kAreaLeft && b.vx < 0) || (b.x + float(b.w) / 2 > kAreaRight && b.vx > 0)) b.vx = -b.vx;
             }
         }
     }
@@ -377,7 +411,7 @@ private:
     // The question whose bubble is at x, y and can still be asked, the one drawn last first, or -1. A bubble takes
     // presses on its frame's inside, the frame less the margin its art leaves.
     int bubbleAt(PartHost &host, int x, int y) {
-        int shown = host.variable(1, kShown);
+        int shown = shownHeroine(host);
         if (host.variable(1, kStage + shown) > 3) return -1;
         moveBubbles(host);
         for (int q = 2; q >= 0; q--) {
@@ -424,6 +458,7 @@ private:
     }
 
     static int truth(PartHost &host) { return std::max(1, std::min(5, host.variable(1, kTruth))); }
+    static int shownHeroine(PartHost &host) { return std::max(0, std::min(2, host.variable(1, kShown))); }
     static int askedVar(PartHost &host, int heroine) {
         int stage = std::max(1, std::min(3, host.variable(1, kStage + heroine)));
         return kAsked + 9 * (truth(host) - 1) + 3 * heroine + (stage - 1);
@@ -628,6 +663,7 @@ private:
     // band in l002's small red digits (19 wide), all placed on the PC's hub shots. A one-digit count of hours left is
     // taken as centred over the two places; not yet seen on the PC.
     static void digits(PartHost &host, Canvas &out, const char *sheet, int w, int h, int x, int y, int value, int places) {
+        value = std::max(0, value);
         for (int i = places - 1; i >= 0; i--, value /= 10) cell(host, out, sheet, x + w * i, y, w * (value % 10), 0, w, h);
     }
     static void drawClock(PartHost &host, Canvas &out) {
@@ -661,7 +697,7 @@ private:
                 int x = 1146 + 42 * q;
                 bool asked = bits & (1 << q);
                 // The question under the pointer shows red (cell 4) in the current row, as on the PC.
-                int colour = !solved && q == hoverQ_ && heroine == host.variable(1, kShown) ? 4 : stage - 1;
+                int colour = !solved && q == hoverQ_ && heroine == shownHeroine(host) ? 4 : stage - 1;
                 if (ImageRef cells = host.image("obj\\l003_002.bmp"))
                     drawPart(out, *cells, x, y, 38 * colour, 0, 38, 18, solved && !asked ? 0.35f : 1);
                 if (asked) put(host, out, "obj\\l003_006.bmp", x + 9, y - 1);
@@ -693,7 +729,7 @@ private:
     std::array<Bubble, 3> bubbles_;
     int64_t bubblesAt_ = 0, bubblesFrom_ = 0;
     int bubblesFor_ = -1;
-    bool wasNear_[3] = {false, false, false};
+    bool wasNear_[3] = {false, false, false}, turned_[3] = {false, false, false};
     std::map<int, ImageRef> pictures_;
     int pointerX_ = 0, pointerY_ = 0;
     bool pointerSeen_ = false;

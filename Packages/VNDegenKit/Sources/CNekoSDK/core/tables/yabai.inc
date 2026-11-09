@@ -748,7 +748,15 @@ if S 2000 == 4 goto pick4
 goto pick5
 label picktree
 open tree
+if S 15111 == 1 goto pickreplay
+set S 15110 = 0
+set S 15111 = 0
 goto pickresume
+label pickreplay
+set S 15111 = 0
+chapter S 15110
+set S 15110 = 0
+goto picktree
 label picked
 on 0 goto wrong
 on 9 goto picktree
@@ -865,5 +873,11 @@ chapter S 1000
 goto hub
 label tree
 open tree
+if S 15111 == 1 goto treereplay
 goto hub
+label treereplay
+set S 15111 = 0
+chapter S 15110
+set S 15110 = 0
+goto tree
 )";
