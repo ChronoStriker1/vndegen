@@ -180,6 +180,9 @@ constexpr int kOlderEndScale = 0x139, kOlderThirdX = 0x161, kOlderMusicChannels 
 // A named animation's text, command 19's, is a string 0x125 into an older record's fixed part, empty unless one runs, and
 // the fields after it move by its length (Test Game 87's saves at a standing picture bouncing, set 1).
 constexpr int kOlderAnimation = 0x125;
+// Where an older record names a part's three pictures (SavedSprite::names), each a length and its bytes: in Test Game
+// 83's saves, the only ones seen with such a record.
+constexpr size_t kOlderNames = 57;
 
 // A save opens with a byte of 1 and the card's comment, then this many bytes before the flow script's name: a save
 // with no comment names its flow at 0xCD.
@@ -336,7 +339,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\funbagfantasy") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy2") return &kFunbag2;
     // The older layout's test game saves as Test Game 83 does, under a folder of its own so it gets no menu table.
-    if (folder == "vndegen\\layoutold") return &kFunbag2;
+    if (folder == "vndegen\\layoutold" || folder == "vndegen\\partslot") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
     // Test Game 96, and its layout's test game under a folder of its own, with no menu table.
     if (folder == "waffle\\ヤバい！－復讐・闇サイト－" || folder == "vndegen\\layout96") return &kYabai;
@@ -428,17 +431,31 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.nextPath = r.str();
         size_t f = r.at;
         if (older) {
-            int text = f + kOlderAnimation + 4 <= plain.size() ? r.i32At(f + kOlderAnimation) : -1;
-            if (!r.ok || text < 0 || f + size_t(layout.olderRecord) + size_t(text) > plain.size()) {
+            // A part's record, an ordinary one of another kind than a picture's, names three pictures in its fixed
+            // part, and all after them moves by their length.
+            size_t named = 0;
+            if (ordinary && number != 0 && s.slot != -999999) {
+                s.kind = number;
+                r.at = f + kOlderNames;
+                for (std::string &name : s.names) {
+                    name = r.str();
+                    named += name.size();
+                }
+                r.at = f;
+            }
+            size_t animationAt = f + kOlderAnimation + named;
+            int text = r.ok && animationAt + 4 <= plain.size() ? r.i32At(animationAt) : -1;
+            if (!r.ok || text < 0 || f + size_t(layout.olderRecord) + named + size_t(text) > plain.size()) {
                 r.ok = false;
                 break;
             }
-            size_t textAt = f + kOlderAnimation + 4;
+            size_t textAt = animationAt + 4, end = f + size_t(layout.olderRecord) + named + size_t(text);
             s.animation.assign(plain.begin() + std::ptrdiff_t(textAt), plain.begin() + std::ptrdiff_t(textAt + size_t(text)));
-            // The fixed part as it would be with no text, which every field is read from.
-            std::vector<uint8_t> fixed(plain.begin() + std::ptrdiff_t(f), plain.begin() + std::ptrdiff_t(textAt));
-            fixed.insert(fixed.end(), plain.begin() + std::ptrdiff_t(textAt + size_t(text)),
-                         plain.begin() + std::ptrdiff_t(f + size_t(layout.olderRecord) + size_t(text)));
+            // The fixed part as it would be with no names and no text, which every field is read from.
+            std::vector<uint8_t> fixed(plain.begin() + std::ptrdiff_t(f), plain.begin() + std::ptrdiff_t(f + kOlderNames));
+            fixed.resize(fixed.size() + 12, 0);
+            fixed.insert(fixed.end(), plain.begin() + std::ptrdiff_t(f + kOlderNames + 12 + named), plain.begin() + std::ptrdiff_t(textAt));
+            fixed.insert(fixed.end(), plain.begin() + std::ptrdiff_t(textAt + size_t(text)), plain.begin() + std::ptrdiff_t(end));
             std::fill(fixed.begin() + kOlderAnimation, fixed.begin() + kOlderAnimation + 4, uint8_t(0));
             Reader fr(fixed);
             s.x = float(fr.i32At(kOlderX));
@@ -452,7 +469,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
             s.endAlpha = fr.i32At(kOlderEndAlpha) == 255 ? 256 : fr.i32At(kOlderEndAlpha);
             s.endScaleX = fr.f32At(kOlderEndScale);
             s.endScaleY = fr.f32At(kOlderEndScale + 4);
-            r.at = f + size_t(layout.olderRecord) + size_t(text);
+            r.at = end;
             if (s.slot == -999999) {
                 out.width = fr.i32At(size_t(layout.rootSizeAt));
                 out.height = fr.i32At(size_t(layout.rootSizeAt) + 4);
@@ -460,8 +477,9 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
                 out.rootFixed = fixed;
             }
             s.rawFixed = std::move(fixed);
-            if (s.slot != -999999 && (s.noise || !s.path.empty())) {
-                // The film noise's record has no picture, as in the newer engine: Test Game 82's opening shows it.
+            if (s.slot != -999999 && (s.noise || !s.path.empty() || s.kind != 0)) {
+                // The film noise's record has no picture, as in the newer engine: Test Game 82's opening shows it. Nor
+                // has a part's emitter.
                 out.sprites.push_back(s);
             }
             continue;
@@ -649,14 +667,19 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.u8(s.flipFrame >= 0 || s.noise ? 0 : 1);
         w.i32(root ? -999999 : s.slot);
         // A splash's record is kind 25, as Test Game 88's saves have it.
-        w.i32(root ? 3 : s.noise ? kNoiseKind : s.splash ? 25 : s.flipFrame >= 0 ? s.flipFrame : 0);
+        w.i32(root ? 3 : s.noise ? kNoiseKind : s.splash ? 25 : s.flipFrame >= 0 ? s.flipFrame : older ? s.kind : 0);
         w.str(s.path);
         w.str(s.nextPath);
         if (older) {
             size_t f = w.zeros(size_t(layout.olderRecord));
             const auto &raw = root ? d.rootFixed : s.rawFixed;
-            if (raw.size() == size_t(layout.olderRecord)) std::copy(raw.begin(), raw.end(), w.b.begin() + std::ptrdiff_t(f));
-            else apply(root || s.noise ? layout.rootHead : layout.spriteHead, w.b.data() + f);
+            if (raw.size() == size_t(layout.olderRecord)) {
+                std::copy(raw.begin(), raw.end(), w.b.begin() + std::ptrdiff_t(f));
+            } else {
+                apply(root || s.noise ? layout.rootHead : layout.spriteHead, w.b.data() + f);
+                for (const auto &[at, bytes] : s.fixedBytes)
+                    if (at >= 0 && size_t(at) + bytes.size() <= size_t(layout.olderRecord)) std::copy(bytes.begin(), bytes.end(), w.b.begin() + std::ptrdiff_t(f) + at);
+            }
             if (root || s.noise) {
                 // The film noise's record is the screen's without its first byte, at full alpha, 256.
                 if (s.noise) w.b[f + 12] = 0;
@@ -685,6 +708,13 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
                 if (raw.size() == size_t(layout.olderRecord) && !s.animation.empty()) {
                     w.setI32(f + kOlderAnimation, int32_t(s.animation.size()));
                     w.b.insert(w.b.begin() + std::ptrdiff_t(f + kOlderAnimation + 4), s.animation.begin(), s.animation.end());
+                }
+                // A part's three pictures, named last since all after them moves.
+                size_t at = f + kOlderNames;
+                for (const std::string &name : s.names) {
+                    w.setI32(at, int32_t(name.size()));
+                    w.b.insert(w.b.begin() + std::ptrdiff_t(at + 4), name.begin(), name.end());
+                    at += 4 + name.size();
                 }
             }
             return;

@@ -65,7 +65,17 @@ public:
     // A picture into a slot as command 15 loads one, shown by the next screen update and gone with 17 or 22, saved as any
     // picture: its top left at x, y, its light added to the scene when `additive`, and, with a scroll, tiled along that
     // axis and moving that many pixels a second along it. False when the picture is missing.
-    bool loadImage(int slot, const std::string &path, int x, int y, bool additive = false, float scrollX = 0, float scrollY = 0);
+    // A picture into a scene slot, shown by the next screen update as any picture is. `kind` is the number the PC's save
+    // holds for such a record in the older layout (SavedSprite::kind), 0 for a plain picture.
+    bool loadImage(int slot, const std::string &path, int x, int y, bool additive = false, float scrollX = 0, float scrollY = 0, int kind = 0);
+    // A scene slot of the part's own with no picture, such as a particle emitter's: the next screen update shows it,
+    // the scene's commands take it away and fade it as they do a picture, and while it's there the part's drawSlot
+    // draws it in the slot's order. In the older save layout a save holds a record for it, of this kind and with no
+    // picture, which the part's savePC fills (SavedSprite::names and fixedBytes); a load brings the slot back from such a
+    // record, which the part's loadPC reads.
+    void holdSlot(int slot, int kind);
+    // Whether that slot is held, shown or waiting for the next screen update.
+    bool slotHeld(int slot);
     void log(const std::string &line);
 
 private:
@@ -81,6 +91,9 @@ public:
     virtual bool step(PartHost &) { return false; }
     // Drawing at a layer. For Layer::Slot, what sits in slots from `fromSlot` to before `toSlot`.
     virtual void draw(PartHost &, Canvas &, Layer, int fromSlot, int toSlot) {}
+    // A slot this part holds (PartHost::holdSlot), drawn where its number puts it among the scene's pictures, at the
+    // slot's alpha. Every part is offered every held slot.
+    virtual void drawSlot(PartHost &, Canvas &, int slot, float alpha) {}
     // The story table's `open NAME ARGS...`: true when this part opened that screen. It gets the input until it calls
     // finishScreen. A table screen with `part NAME` calls it too as it opens, with the screen's name and no ARGS; while
     // that screen is open the part draws at Layer::Menu and Layer::Screen and is offered each press first.

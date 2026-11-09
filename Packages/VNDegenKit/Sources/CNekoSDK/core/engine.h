@@ -93,6 +93,11 @@ struct Sprite {
     // (commands 90 and 91, a game part's, through PartHost::loadImage).
     float scrollX = 0, scrollY = 0;
     int64_t scrollFrom = 0;
+    // A slot a game part holds with no picture of its own (PartHost::holdSlot): the part draws it in the slot's order,
+    // and it's shown and taken away as a picture is. `kind` is the number a save's record holds for a part's slot,
+    // held or a picture (SavedSprite::kind), 0 for the engine's own.
+    bool held = false;
+    int kind = 0;
     int waveSpeed = 0, waveRows = 0, waveSize = 0;
     // The SDK's film noise (commands 51 and 52), its picture the noise frame and the story time it began.
     bool noise = false;
@@ -697,7 +702,9 @@ private:
     void resetParts();
     bool partCommand(const Node &n);
     GamePart *menuPart() const;
-    bool loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY);
+    bool loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY, int kind);
+    void holdPartSlot(int slot, int kind);
+    bool partSlotHeld(int slot) const;
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
     void finishPartScreen(int result);
     // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story
