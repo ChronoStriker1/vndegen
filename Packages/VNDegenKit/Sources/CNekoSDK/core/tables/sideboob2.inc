@@ -333,19 +333,19 @@ pic sc\sc_007_000_000_000_000.bmp 17 -55 tab 10
 pic obj\f004_000.bmp -15 1 tab 11
 cellsheet obj\f002_000.bmp
 cellsize 204 174
-cellthumb 9 36
-cell 463 85
-cell 677 85
-cell 891 85
-cell 463 285
-cell 677 285
-cell 891 285
-cell 463 485
-cell 677 485
-cell 891 485
-celllabel obj\e003_001.bmp 5 5
-celldigits obj\e003_002.bmp 39 5 2 18
-cellcount obj\e003_002.bmp obj\e003_003.bmp 129 147 165 176 7
+cellthumb 8 35
+cell 464 86
+cell 678 86
+cell 892 86
+cell 464 286
+cell 678 286
+cell 892 286
+cell 464 486
+cell 678 486
+cell 892 486
+celllabel obj\e003_001.bmp 4 4
+celldigits obj\e003_002.bmp 38 4 2 18
+cellcount obj\e003_002.bmp obj\e003_003.bmp 128 146 164 175 7
 celltotal obj\e003_004.bmp 7 12
 gallerytabs
 cellhide
@@ -401,18 +401,18 @@ pic sc\sc_007_000_000_000_000.bmp 17 -55 tab 10
 pic obj\f004_000.bmp -15 1 tab 11
 cellsheet obj\f002_000.bmp
 cellsize 204 174
-cellthumb 9 36
-cell 463 85
-cell 677 85
-cell 891 85
-cell 463 285
-cell 677 285
-cell 891 285
-cell 463 485
-cell 677 485
-cell 891 485
-celllabel obj\e003_001.bmp 5 5
-celldigits obj\e003_002.bmp 39 5 2 18
+cellthumb 8 35
+cell 464 86
+cell 678 86
+cell 892 86
+cell 464 286
+cell 678 286
+cell 892 286
+cell 464 486
+cell 678 486
+cell 892 486
+celllabel obj\e003_001.bmp 4 4
+celldigits obj\e003_002.bmp 38 4 2 18
 gallerytabs
 cellhide
 button page0 obj\e002_000.bmp 416 18 10 5 0
@@ -536,10 +536,32 @@ pic obj\a003_000.bmp 362 186
 pic obj\l000_000.bmp 394 237
 placefor 2 295 64 389 0
 
+screen sprites
+# The character gallery: the paper, title, four page seals and side bar here; the cards and the viewer are the
+# chargallery part (core/chargallery.cpp), measured under Wine.
+part chargallery
+pic obj\e000_000.bmp 0 3
+pic obj\e000_001.bmp 75 14 7 1 3 0
+pic obj\e001_000.bmp 1154 0
+button page0 obj\e002_000.bmp 416 18 10 5 0
+button page1 obj\e002_000.bmp 486 18 10 5 1
+button page2 obj\e002_000.bmp 556 18 10 5 2
+button page3 obj\e002_000.bmp 626 18 10 5 3
+button nav_save obj\e001_001.bmp 1168 103 10 5 0 help obj\e001_002.bmp 1044 15 10 1 0 0
+button nav_load obj\e001_001.bmp 1168 155 10 5 1 help obj\e001_002.bmp 1044 63 10 1 1 0
+button nav_cg obj\e001_001.bmp 1168 207 10 5 2 help obj\e001_002.bmp 1044 111 10 1 2 0
+button nav_sprites obj\e001_001.bmp 1168 259 10 5 3 help obj\e001_002.bmp 1044 159 10 1 3 0
+button nav_scene obj\e001_001.bmp 1168 311 10 5 4 help obj\e001_002.bmp 1044 207 10 1 4 0
+button nav_music obj\e001_001.bmp 1168 363 10 5 5 help obj\e001_002.bmp 1044 255 10 1 5 0
+button nav_config obj\e001_001.bmp 1168 415 10 5 6 help obj\e001_002.bmp 1044 303 10 1 6 0
+button nav_title obj\e001_001.bmp 1168 467 10 5 7 help obj\e001_002.bmp 1044 351 10 1 7 0
+button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 10 1 8 0
+button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
+
 screen defaults
 # Its message window's buttons, both rows, while the pointer is at y 360 or below and has moved in the last 3.4 s.
 barhover 360 3400
-parts scroll
+parts scroll chargallery
 # Its click-wait mark (obj\h005_000) is keyed on pure green, which the PC leaves out.
 colorkey 0 255 0
 # Its program asks for Lucida Sans Unicode, here Open Sans as in Funbag Fantasy 3 if, sized and spaced to the PC's lines
