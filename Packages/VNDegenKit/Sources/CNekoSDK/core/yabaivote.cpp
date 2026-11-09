@@ -180,6 +180,9 @@ public:
         else drawVote(host, out);
     }
 
+    // The message window's plate (`partplate`) shows over the pick screen, not while the vote runs (set 2).
+    bool showsPlate() const override { return phase_ != Phase::Vote; }
+
     // A vote isn't kept with a save: one made during it comes back to the pick screen, which is where the PC's saves of a
     // vote are (set 2's pick saves).
     void save(std::vector<std::string> &lines) const override {
@@ -447,12 +450,12 @@ private:
             inside(host, out, kFaceSheets[w], h.face, kFaceCells[w], kFaceX + kColumnStep * w + h.shakeX, int(h.y) + h.shakeY);
         }
         for (int w = 0; w < 3; w++) drawBubble(host, out, w);
-        // Bubbles end at the monitor's edge too: black again outside it, where the PC's shots are.
+        if (!commentsHidden_) comments_.draw(host, out);
+        // Bubbles and comments end at the monitor's edge too: black again outside it, as on the PC (set 2).
         fill(out, 0, 0, out.w, kInside.y, 0, 0, 0);
         fill(out, 0, kInside.y + kInside.h, out.w, out.h - kInside.y - kInside.h, 0, 0, 0);
         fill(out, 0, kInside.y, kInside.x, kInside.h, 0, 0, 0);
         fill(out, kInside.x + kInside.w, kInside.y, out.w - kInside.x - kInside.w, kInside.h, 0, 0, 0);
-        if (!commentsHidden_) comments_.draw(host, out);
         put(host, out, "obj\\o002_000.bmp", 14, 66, 1);
         // The top bar: the day, the vote's title (o006_000, a cell for each truth), the countdown and スキップ.
         drawClock(host, out, false, 1);

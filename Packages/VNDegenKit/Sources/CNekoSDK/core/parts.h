@@ -90,6 +90,8 @@ public:
     // moves the pointer between and Confirm presses as a click there. True when only these count, as for a viewer open
     // over a table screen's own controls.
     virtual bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) { return false; }
+    // With the table's `partplate`, whether the message window's plate shows over this part's screen now.
+    virtual bool showsPlate() const { return true; }
     // The story table's `chapter N`: the scene scripts to play, in order, or none when this part doesn't know it. A scene
     // may end in ` @N`, the PC's number for it, which a save in it holds and a PC save with it resumes at.
     virtual std::vector<std::string> chapter(PartHost &, int number) { return {}; }
