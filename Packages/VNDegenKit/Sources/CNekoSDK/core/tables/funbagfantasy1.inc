@@ -107,25 +107,32 @@ pic obj\d005_000.bmp 1123 0                # the side bar; its place is a guess 
 pic obj\e000_000.bmp 0 18
 pic obj\d001_002.bmp 314 8
 pic obj\e000_002.bmp 0 113
+# Each tab's character: the disc, her portrait (e001_002 on), the gold rim over it, and her name on its band, measured
+# under Wine.
 pic obj\e001_000.bmp 0 198 tab 0
-pic obj\e001_001.bmp 0 198 tab 0
+pic obj\e001_002.bmp 0 198 tab 0
 pic obj\e002_000.bmp 0 501 tab 0
+pic obj\e001_001.bmp 0 198 tab 0
 pic obj\e002_001.bmp 0 501 tab 0
 pic obj\e001_000.bmp 0 198 tab 1
-pic obj\e001_002.bmp 0 198 tab 1
+pic obj\e001_003.bmp 0 198 tab 1
 pic obj\e002_000.bmp 0 501 tab 1
+pic obj\e001_001.bmp 0 198 tab 1
 pic obj\e002_002.bmp 0 501 tab 1
 pic obj\e001_000.bmp 0 198 tab 2
-pic obj\e001_003.bmp 0 198 tab 2
+pic obj\e001_004.bmp 0 198 tab 2
 pic obj\e002_000.bmp 0 501 tab 2
+pic obj\e001_001.bmp 0 198 tab 2
 pic obj\e002_003.bmp 0 501 tab 2
 pic obj\e001_000.bmp 0 198 tab 3
-pic obj\e001_004.bmp 0 198 tab 3
+pic obj\e001_005.bmp 0 198 tab 3
 pic obj\e002_000.bmp 0 501 tab 3
+pic obj\e001_001.bmp 0 198 tab 3
 pic obj\e002_004.bmp 0 501 tab 3
 pic obj\e001_000.bmp 0 198 tab 4
-pic obj\e001_005.bmp 0 198 tab 4
+pic obj\e001_006.bmp 0 198 tab 4
 pic obj\e002_000.bmp 0 501 tab 4
+pic obj\e001_001.bmp 0 198 tab 4
 pic obj\e002_005.bmp 0 501 tab 4
 gallerytabs
 button gtab0 obj\e003_000.bmp 130 146 5 5 0
@@ -133,11 +140,13 @@ button gtab1 obj\e003_000.bmp 204 239 5 5 1
 button gtab2 obj\e003_000.bmp 226 358 5 5 2
 button gtab3 obj\e003_000.bmp 204 475 5 5 3
 button gtab4 obj\e003_000.bmp 130 568 5 5 4
-cellcard obj\e004_000.bmp
+cellsheet obj\e004_000.bmp
 cellsize 220 141
 cellthumb 32 12
+cellthumbframe obj\d004_001.bmp 30 10
 celldigits obj\d003_001.bmp 60 106 2 15
-cellcount obj\d003_001.bmp obj\e005_001.bmp 114 106 145 158 109
+cellcount obj\d003_001.bmp obj\e005_001.bmp 114 106 145 158 3
+cellcountstep 15
 cell 362 91
 cell 602 91
 cell 842 91
@@ -180,25 +189,32 @@ pic obj\d005_000.bmp 1123 0                # the side bar; its place is a guess 
 pic obj\e000_001.bmp 0 18
 pic obj\d001_002.bmp 314 8
 pic obj\e000_002.bmp 0 113
+# Each tab's character: the disc, her portrait (e001_002 on), the gold rim over it, and her name on its band, measured
+# under Wine.
 pic obj\e001_000.bmp 0 198 tab 0
-pic obj\e001_001.bmp 0 198 tab 0
+pic obj\e001_002.bmp 0 198 tab 0
 pic obj\e002_000.bmp 0 501 tab 0
+pic obj\e001_001.bmp 0 198 tab 0
 pic obj\e002_001.bmp 0 501 tab 0
 pic obj\e001_000.bmp 0 198 tab 1
-pic obj\e001_002.bmp 0 198 tab 1
+pic obj\e001_003.bmp 0 198 tab 1
 pic obj\e002_000.bmp 0 501 tab 1
+pic obj\e001_001.bmp 0 198 tab 1
 pic obj\e002_002.bmp 0 501 tab 1
 pic obj\e001_000.bmp 0 198 tab 2
-pic obj\e001_003.bmp 0 198 tab 2
+pic obj\e001_004.bmp 0 198 tab 2
 pic obj\e002_000.bmp 0 501 tab 2
+pic obj\e001_001.bmp 0 198 tab 2
 pic obj\e002_003.bmp 0 501 tab 2
 pic obj\e001_000.bmp 0 198 tab 3
-pic obj\e001_004.bmp 0 198 tab 3
+pic obj\e001_005.bmp 0 198 tab 3
 pic obj\e002_000.bmp 0 501 tab 3
+pic obj\e001_001.bmp 0 198 tab 3
 pic obj\e002_004.bmp 0 501 tab 3
 pic obj\e001_000.bmp 0 198 tab 4
-pic obj\e001_005.bmp 0 198 tab 4
+pic obj\e001_006.bmp 0 198 tab 4
 pic obj\e002_000.bmp 0 501 tab 4
+pic obj\e001_001.bmp 0 198 tab 4
 pic obj\e002_005.bmp 0 501 tab 4
 gallerytabs
 button gtab0 obj\e003_000.bmp 130 146 5 5 0
@@ -206,9 +222,10 @@ button gtab1 obj\e003_000.bmp 204 239 5 5 1
 button gtab2 obj\e003_000.bmp 226 358 5 5 2
 button gtab3 obj\e003_000.bmp 204 475 5 5 3
 button gtab4 obj\e003_000.bmp 130 568 5 5 4
-cellcard obj\e004_000.bmp
+cellsheet obj\e004_000.bmp
 cellsize 220 141
 cellthumb 32 12
+cellthumbframe obj\d004_001.bmp 30 10
 celldigits obj\d003_001.bmp 60 106 2 15
 cell 362 91
 cell 602 91
@@ -520,6 +537,13 @@ question obj\j001_000.bmp 542 124 7 3
 question obj\j001_000.bmp 542 124 7 5    # back: Return to Choice asks "Is this fine?"
 button yes obj\j001_001.bmp 486 242 2 5 0
 button no obj\j001_001.bmp 486 298 2 5 1
+
+screen cfgsav
+# 82's cfg.sav is the older 96,000 bytes, as 83's: seen CGs from 48000, heard tracks from 92000, no string before them
+# (read from the PC's file after all five endings).
+size 96000
+tracks 92000
+nostring
 
 screen defaults
 layoutcgslot 102             # 82's saves hold a CG in slot 102, and a background and a CG each take the other away
