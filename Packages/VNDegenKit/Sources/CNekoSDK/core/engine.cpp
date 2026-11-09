@@ -3849,7 +3849,8 @@ void Engine::composeMessageButtons(Canvas &out) {
             on = setting("express") == 0;
         }
         for (const auto &[name, part] : parts_)
-            if (int lit = part->actionLit(b.action); lit >= 0) on = lit != 0;
+            if (int lit = part->actionLit(b.action); lit == 2) return StateDisabled;
+            else if (lit >= 0) on = lit != 0;
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
     // `barhover`'s rows fade: drawn on a copy of the frame, mixed back in by how much of them shows.

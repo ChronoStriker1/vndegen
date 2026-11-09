@@ -109,7 +109,8 @@ public:
     // over a table screen's own controls.
     virtual bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) { return false; }
     // A button's action the engine doesn't know, such as a message window button of the game's own: true when this
-    // part took it. And how such a button of this part's is drawn: 1 lit, 0 not, -1 when the action isn't this part's.
+    // part took it. And how such a button of this part's is drawn: 0 plain, 1 lit, 2 disabled, or -1 when the action
+    // isn't this part's.
     virtual bool action(PartHost &, const std::string &name) { return false; }
     virtual int actionLit(const std::string &name) const { return -1; }
     // With the table's `partplate`, whether the message window's plate shows over this part's screen now.
