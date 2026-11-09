@@ -299,7 +299,8 @@ import TestSupport
         // Tiled across the frame: the strip's blue far to the right of its own 100 pixels.
         let f = frame(e)
         let far = (320 * f.w + 1050) * 4
-        #expect(f.px[far + 2] > 200 || f.px[far] > 200)
+        // With no speed it's a picture standing where it was, and isn't tiled.
+        #expect((f.px[far + 2] > 200 || f.px[far] > 200) == speed.isFinite)
         // And moving 30 pixels a second to the right.
         let before = try #require(bandStart(e))
         steps(e, 1000)
