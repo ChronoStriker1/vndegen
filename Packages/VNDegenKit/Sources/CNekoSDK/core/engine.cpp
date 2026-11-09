@@ -2070,7 +2070,10 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         // A last `blank` leaves out leading zeros, the digits keeping their places, as Test Game 83's volumes (set 3).
         bool blank = f.back() == "blank";
         size_t n = f.size() - (blank ? 1 : 0);
-        int w = digits->w / 10, value = setting(f[0]), shown = value, step = n >= 5 ? field(f, 4) : w;
+        // `numbercells N`: the digit sheets of this screen hold N cells, the digits first, as Test Game 96's sheet of 13
+        // goes on with a slash, a colon and a dash (set 2). Ten when absent.
+        const auto *cells = screen_->setting("numbercells");
+        int w = digits->w / (cells && !cells->empty() ? std::max(10, field(*cells, 0)) : 10), value = setting(f[0]), shown = value, step = n >= 5 ? field(f, 4) : w;
         int xs[3] = {field(f, 2), field(f, 2) + step, field(f, 2) + 2 * step};
         if (n >= 6) {
             xs[1] = field(f, 4);
