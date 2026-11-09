@@ -104,6 +104,12 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 at = 8;
             }
             for (; at + 1 < w.size(); at += 2) {
+                // `random` takes no value.
+                while (at < w.size() && w[at] == "random") {
+                    p.randomAlways = true;
+                    at++;
+                }
+                if (at + 1 >= w.size()) break;
                 const std::string &key = w[at], &value = w[at + 1];
                 if (key == "alpha") p.alpha = float(number(value)) / 256;  // of 256
                 else if (key == "tab") p.tab = number(value);              // only on that tab of a gallery

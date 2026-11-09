@@ -29,13 +29,16 @@ import TestSupport
 
     // The button sheet's rows: normal, hover, selected, selected and hovered, disabled.
     private let white: [UInt8] = [255, 255, 255], yellow: [UInt8] = [255, 255, 0], red: [UInt8] = [255, 0, 0],
-                magenta: [UInt8] = [255, 0, 255], grey: [UInt8] = [128, 128, 128], green: [UInt8] = [0, 255, 0]
+                magenta: [UInt8] = [255, 0, 255], grey: [UInt8] = [128, 128, 128], green: [UInt8] = [0, 254, 0]
 
     private func game(_ folder: String = "widgettest") throws -> URL {
         let rows = [white, yellow, red, magenta, grey]
         return try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
-            "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", bmp(50, 250) { rows[$0 / 50] }), ("k.bmp", bmp(10, 10) { _ in [0, 255, 0] })]),
+            "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", bmp(50, 250) { rows[$0 / 50] }), ("k.bmp", bmp(10, 10) { _ in [0, 254, 0] }),
+                                                      // Green all round a red middle, for the colour key; and ten white digits.
+                                                      ("g.bmp", bmp(10, 10) { $0 >= 4 && $0 < 6 ? [255, 0, 0] : [0, 255, 0] }),
+                                                      ("d.bmp", bmp(100, 10) { _ in [255, 255, 255] })]),
             "flow/t.txt": NekoSDKFlowFixture.flow([
                 .init(op: 0, next: 2),
                 .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
@@ -117,6 +120,20 @@ import TestSupport
         click(e, 640, 600, button: 1)
         vnneko_mouse_move(e, 0.9, 0.9)
         #expect(pixel(e, 10, 110) == white)
+        // The colour key: the green round the picture's red rows is drawn as nothing.
+        #expect(pixel(e, 302, 302) == [0, 0, 0])
+        #expect(pixel(e, 302, 305) == red)
+
+        // Config: a knob 4.08 pixels a unit, and its value with no leading zeros.
+        click(e, 10, 110)
+        #expect(pixel(e, 603, 403) == [0, 0, 0])
+        #expect(pixel(e, 618, 403) == [0, 0, 0])
+        #expect(pixel(e, 633, 403) == white)
+        click(e, 100 + 204 + 5, 305)
+        #expect(pixel(e, 100 + 204 + 3, 303) == green)
+        #expect(pixel(e, 603, 403) == [0, 0, 0])
+        #expect(pixel(e, 618, 403) == white)
+        #expect(pixel(e, 633, 403) == white)
     }
 
     // `waitscale autowait`, at its default 50: a wait of 1000 ms lasts 500.
