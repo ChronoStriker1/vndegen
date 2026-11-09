@@ -203,8 +203,12 @@ public:
         if (phase_ != Phase::Vote) return false;
         int64_t ms = host.nowMs() - voteStart_;
         int frame = ms < kVoteStartMs ? -1 : int((ms - kVoteStartMs) * 60 / 1000);
-        while (frame >= 0 && next_ < events_.size() && events_[next_].frame <= frame) run(host, events_[next_++]);
-        for (int f = lastFrame_ + 1; f <= frame; f++) advance(host, f);
+        // Each frame's lines run before that frame moves, however many frames a step covers, so a move starts on its own
+        // frame at any pace of steps.
+        for (int f = lastFrame_ + 1; f <= frame; f++) {
+            while (next_ < events_.size() && events_[next_].frame <= f) run(host, events_[next_++]);
+            advance(host, f);
+        }
         lastFrame_ = std::max(lastFrame_, frame);
         comments_.step(host);
         if (frame >= allFrames_ + kEndHoldFrames) return endVote(host), true;
@@ -575,7 +579,7 @@ private:
     ImageRef cellOf(const ImageRef &sheet, int cols, int col) {
         auto key = std::make_pair(sheet.get(), col);
         auto it = cells_.find(key);
-        if (it != cells_.end()) return it->second;
+        if (it != cells_.end()) return it->second.made;
         int w = sheet->w / cols;
         if (w <= 0 || sheet->h <= 0) return nullptr;
         auto image = std::make_shared<Image>();
@@ -585,16 +589,18 @@ private:
         image->rgba.resize(size_t(w) * size_t(sheet->h) * 4);
         for (int y = 0; y < sheet->h; y++)
             std::copy_n(&sheet->rgba[(size_t(y) * sheet->w + size_t(col * w)) * 4], size_t(w) * 4, &image->rgba[size_t(y) * w * 4]);
-        return cells_[key] = image;
+        cells_[key] = {sheet, image};
+        return image;
     }
 
     // The countdown's pictures in red, their green and blue taken out, as the PC draws its last ten seconds.
     ImageRef redOf(const ImageRef &image) {
         auto it = red_.find(image.get());
-        if (it != red_.end()) return it->second;
+        if (it != red_.end()) return it->second.made;
         auto copy = std::make_shared<Image>(*image);
         for (size_t i = 0; i < copy->rgba.size(); i += 4) copy->rgba[i + 1] = copy->rgba[i + 2] = 0;
-        return red_[image.get()] = copy;
+        red_[image.get()] = {image, copy};
+        return copy;
     }
 
     void digit(PartHost &host, Canvas &out, const char *sheet, int value, int x, int y, bool red) {
@@ -656,8 +662,13 @@ private:
     std::string commentList_;
     std::array<Heroine, 3> heroines_{};
     CommentStream comments_;
-    std::map<std::pair<const Image *, int>, ImageRef> cells_;
-    std::map<const Image *, ImageRef> red_;
+    // Pictures made from others, by the other's address: each keeps its source, so the address stays that picture's
+    // while the entry lasts.
+    struct Made {
+        ImageRef source, made;
+    };
+    std::map<std::pair<const Image *, int>, Made> cells_;
+    std::map<const Image *, Made> red_;
 };
 
 }  // namespace
