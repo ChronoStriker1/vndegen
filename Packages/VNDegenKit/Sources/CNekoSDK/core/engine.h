@@ -803,6 +803,9 @@ private:
     std::string returnTo_;
     int flowCallId_ = 0;
     std::string choiceImage_;
+    // The steps' total time, and until when presses are dropped after a question is answered or a save loaded.
+    int64_t inputClock_ = 0, quietUntil_ = -1;
+    void holdPresses();
     bool windowArtOnly_ = false;  // the frame behind the log with `keepwindow`: the window's picture alone
     bool choiceMade_ = false;  // a choice has been made this game, as Test Game 87's saves hold it
     std::vector<SavedText> backlog_;
