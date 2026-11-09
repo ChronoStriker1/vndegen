@@ -711,6 +711,8 @@ private:
         bool atChoice = false;
         // `slotfx SLOT ADDITIVE SX SY`: a slot's additive drawing and scrolling, which the PC's record doesn't hold.
         std::map<int, std::array<float, 3>> slotFx;
+        // `var NUMBER VALUE`: VNDegen's own story variables, past those the PC's save has room for.
+        std::map<int, int> variables;
     };
     static uint32_t saveFingerprint(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);

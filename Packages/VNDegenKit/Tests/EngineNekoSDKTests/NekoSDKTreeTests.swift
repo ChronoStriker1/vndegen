@@ -72,4 +72,46 @@ import TestSupport
         #expect(vnneko_debug_variable(e, 1, 15108) == 0)
         #expect(vnneko_debug_variable(e, 1, 15121) == 1)
     }
+
+    // A save made with the tree open brings it back open on a load, with the hub's variables, which the PC's save has no
+    // room for, from VNDegen's lines beside it; and it still takes a press.
+    @Test func aSaveWithTheTreeOpenLoadsItOpen() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_save(e, 3))
+        // Leave by Ayano's tab and the right button, then load.
+        press(e, 842 + 59, 35 + 29)
+        press(e, 640, 360, button: 1)
+        #expect(vnneko_debug_variable(e, 1, 15121) == 1)
+        #expect(vnneko_debug_load(e, 3))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status(e).contains("part screen"), "\(status(e))")
+        #expect(vnneko_debug_variable(e, 1, 15102) == 3)
+        #expect(vnneko_debug_variable(e, 1, 15134) == 6)
+        #expect(vnneko_debug_variable(e, 1, 15121) == 0)
+        // Misuzu again, as saved: her stage 3, question 1 asks chapter 2021.
+        press(e, 508 + 135, 396 + 44)
+        #expect(vnneko_debug_variable(e, 1, 15110) == 2021)
+    }
+
+    // A controller reaches the tree's controls: down from between stages 2 and 3 to the question below, which Confirm
+    // presses where the pointer went.
+    @Test func focusMovesToAQuestion() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        vnneko_mouse_move(e, Float(508 + 135) / 1280, 360.0 / 720)
+        for _ in 0..<2 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_move_focus(e, 0, 1))
+        for _ in 0..<2 { _ = vnneko_step(e, 16) }
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_variable(e, 1, 15110) == 2021)
+    }
 }
