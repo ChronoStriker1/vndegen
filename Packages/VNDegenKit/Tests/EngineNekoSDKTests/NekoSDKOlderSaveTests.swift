@@ -4,8 +4,8 @@ import Testing
 import TestSupport
 
 // The older engine's saves (Test Games 83 and 87, core/save.cpp): the choice's picture 236 bytes after the flow, sprite
-// records of 383 bytes with x and y as ints, and fewer sound channels. VNDegen's save of a scene in Test Game 83's
-// folder holds its standing picture where the PC's saves do, and loads back.
+// records of 383 bytes with x and y as ints, and fewer sound channels. VNDegen's save of a scene with Test Game 83's
+// layout, in a folder of its own with no menu table, holds its standing picture where the PC's saves do, and loads back.
 @Suite struct NekoSDKOlderSaveTests {
     // A 24-bit BMP of one colour, `w` by `h`, as blue, green, red.
     private func bmp(_ w: Int, _ h: Int, _ bgr: [UInt8]) -> Data {
@@ -37,7 +37,7 @@ import TestSupport
 
     private func game() throws -> URL {
         try NekoSDKFlowFixture.game([
-            "cfg/init.ini": Data("UserDataDirectory\tWaffle\\FunbagFantasy2\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\layoutold\nFirstFlow\tflow\\t.txt\n".utf8),
             "bg.pak": NekoSDKFlowFixture.archive([("g.bmp", bmp(4, 4, [0, 255, 0]))]),
             "sc.pak": NekoSDKFlowFixture.archive([("r.bmp", bmp(101, 81, [0, 0, 255]))]),
             "flow/t.txt": NekoSDKFlowFixture.flow([
@@ -56,7 +56,7 @@ import TestSupport
         ])
     }
 
-    private func saves(_ data: URL) -> URL { data.appendingPathComponent("AppData/Roaming/Waffle/FunbagFantasy2/save") }
+    private func saves(_ data: URL) -> URL { data.appendingPathComponent("AppData/Roaming/vndegen/layoutold/save") }
 
     private func file(_ data: URL, _ name: String) throws -> URL {
         try #require(try FileManager.default.contentsOfDirectory(at: saves(data), includingPropertiesForKeys: nil)
