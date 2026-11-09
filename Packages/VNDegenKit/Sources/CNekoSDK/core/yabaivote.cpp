@@ -115,7 +115,11 @@ const BubbleSide kSides[] = {{"B", 4, -74, 189}, {"T", 1, -74, -171}, {"RT", 0, 
                              {"RB", 5, 166, 139}, {"LB", 3, -356, 139}, {"LT", 2, -356, -102}};
 constexpr int kBubbleW = 468, kBubbleH = 240;
 constexpr int64_t kBubbleMinMs = 2000;  // a bubble stays its voice's length, or two seconds at least
-constexpr int kBubbleInMs = 150;        // how POP and FADE come in isn't measured
+// A bubble comes in over 8 frames. On the PC under Wine, in shots about 85 ms apart, Ayano's first FADE in vote 1 was
+// 28% in, then 90%, then whole, a straight fade of about 130 ms. Misuzu's first POP was whole within two shots of
+// starting, so it takes no longer, but its one shot between differs from the bubble more than the empty scene does:
+// whether it grows from small or settles from large isn't measured, and growing from half size is a guess.
+constexpr int kBubbleInMs = 133;
 
 // The countdown: 残り時間 over minutes and seconds in o005_001's digits and the hundredths in o007_002's, red under ten
 // seconds.
