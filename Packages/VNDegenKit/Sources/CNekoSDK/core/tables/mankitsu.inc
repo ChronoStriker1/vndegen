@@ -25,7 +25,7 @@ button cg obj\d001_002.bmp 746 382 5 5 2 group extras help obj\d002_000.bmp 600 
 button scene obj\d001_002.bmp 746 422 5 5 3 group extras help obj\d002_000.bmp 600 318 12 1 10 0
 button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 600 358 12 1 11 0
 
-# Main Story starts after the prologue, at the first select screen.
+# Main Story starts after the prologue, just before the first select screen.
 screen start
 flow chapter2
 
@@ -51,10 +51,15 @@ scene scr\ep_001_004_000.txt
 scene scr\ep_001_005_000.txt
 scene scr\ep_001_005_001.txt
 scene scr\ep_001_006_000.txt
-jump chapter2
+jump weeks
 
-# Main Story from the title starts here.
+# Main Story from the title starts with a scene of three lines that New Game's way doesn't play, its PC number 14 (set
+# 1, under Wine), and then the first select screen.
 flow chapter2
+scene scr\ep_001_006_001.txt @14
+jump weeks
+
+flow weeks
 # Each half-week's select screen carries the PC's number for it, which its saves there hold (set 1, PC saves at all
 # ten); S 3000 and 3001 move on after the pick's scenes.
 open select @15
