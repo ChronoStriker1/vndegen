@@ -59,3 +59,9 @@ default bar_always 1
 screen log
 inwindow
 )";
+
+// Test Game 96's comments through the `yabai` part (NekoSDKCommentTests).
+const char kCommentTest[] = R"(
+screen defaults
+parts yabai
+)";

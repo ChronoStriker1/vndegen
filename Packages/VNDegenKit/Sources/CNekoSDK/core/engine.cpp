@@ -183,8 +183,8 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     config_.parse(*init);
     images_ = std::make_unique<Images>(files_);
     // `colorkey R G B` in the game's table: read now, ahead of the table itself, since the window's pictures load first.
-    if (const char *table = menuTable(normalizedPath(config_.text("UserDataDirectory")))) {
-        std::istringstream lines(menuTablePrefix() + table);
+    if (const char *table = menuTable(normalizedPath(config_.text("UserDataDirectory"))); table || !menuTablePrefix().empty()) {
+        std::istringstream lines(menuTablePrefix() + (table ? table : ""));
         for (std::string line; std::getline(lines, line);) {
             std::istringstream words(line);
             std::string key;
@@ -279,8 +279,9 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     }
     titleBgm_ = config_.text("TitleBGM");
 
-    if (const char *table = menuTable(folder_))
-        screens_ = parseScreens((menuTablePrefix() + table).c_str(), *images_, [this](const std::string &what) { warnOnce(what); });
+    // A test host's table lines go ahead of the game's own, or stand alone for a game with no table yet.
+    if (const char *table = menuTable(folder_); table || !menuTablePrefix().empty())
+        screens_ = parseScreens((menuTablePrefix() + (table ? table : "")).c_str(), *images_, [this](const std::string &what) { warnOnce(what); });
     commentFace_ = fontFace_;
     // `textfont N`, `textsize N`, `textgap G`, `textline N` and `textshift DX DY`: the message window's text as the PC sets
     // it. The face is a number as init.ini's MsgFont gives one, 7 for Lucida Sans Unicode, which the official English
@@ -867,8 +868,14 @@ bool Engine::moveFocus(int dx, int dy) {
         for (const Button &b : buttons)
             if (b.sheet && shown(b)) spots.push_back({b.x + b.cellW() / 2, b.y + b.cellH() / 2});
     };
+    // A game part's controls: on its own screen, or added to a table screen's, or alone while it says so.
+    std::vector<std::pair<int, int>> partSpots;
+    GamePart *part = dialogOpen_ || logOpen_ ? nullptr : screen_ ? menuPart() : waiting_ == Waiting::PartScreen ? partScreen_ : nullptr;
+    bool partOnly = part && part->focusSpots(*partHost_, partSpots);
     if (dialogOpen_) {
         addButtons(screens_.at("dialog").buttons);
+    } else if (part && (partOnly || !screen_)) {
+        for (auto [x, y] : partSpots) spots.push_back({x, y});
     } else if (logOpen_) {
         addButtons(screens_.at("log").buttons);
     } else if (waiting_ == Waiting::Choice && choiceSheet_ && !screen_) {
@@ -913,6 +920,7 @@ bool Engine::moveFocus(int dx, int dy) {
         if (size && size->size() >= 2)
             for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it)
                 spots.push_back({std::atoi(it->second[0].c_str()) + cellShift() + std::atoi((*size)[0].c_str()) / 2, std::atoi(it->second[1].c_str()) + std::atoi((*size)[1].c_str()) / 2});
+        for (auto [x, y] : partSpots) spots.push_back({x, y});
     } else {
         return false;
     }
@@ -1167,6 +1175,8 @@ void Engine::loadGalleries() {
             auto parts = split(f[0], ',');
             // Test Game 87's picture lines are separated by tabs, `PAGE ID PICTURE` (set 1).
             if (parts.size() < 3 && f.size() >= 3) parts = {f[0], f[1], f[2]};
+            // Test Game 82's are `ID,PICTURE`, its entries' pictures numbered across the file, grouped by the entry's page.
+            if (parts.size() == 2) parts = {std::to_string(cgEntries_.back().page), parts[0], parts[1]};
             if (parts.size() >= 3) {
                 cgEntries_.back().imageIds.push_back(std::atoi(parts[1].c_str()));
                 if (parts.size() >= 4 && cgEntries_.back().flow.empty()) cgEntries_.back().flow = trim(parts[3]);
@@ -1716,6 +1726,9 @@ void Engine::composeGallery(Canvas &out) {
         }
         if (unlocked)
             if (ImageRef thumb = galleryThumbnail(entries[entry].thumbnail)) drawPart(out, *thumb, cx + dx, cy + dy, 0, 0, thumb->w, thumb->h, 1);
+        // `cellthumbframe FILE X Y`: a frame over every unlocked card's thumbnail, as Test Game 82's PC draws d004_001.
+        if (const auto *around = screen_->setting("cellthumbframe"); unlocked && around && around->size() >= 3)
+            if (ImageRef art = images_->get((*around)[0])) drawPart(out, *art, cx + field(*around, 1), cy + field(*around, 2), 0, 0, art->w, art->h, 1);
         if (unlocked && index == hovered && frame && frame->size() >= 3)
             if (ImageRef art = images_->get((*frame)[0]); art && art->h >= 5) drawPart(out, *art, cx + field(*frame, 1), cy + field(*frame, 2), 0, art->h / 5, art->w, art->h / 5, 1);
         // A card's number, faint on a locked card in some games, and how many of a CG's pictures have been seen.
@@ -2011,6 +2024,28 @@ void Engine::composeSettingsWidgets(Canvas &out) {
     }
     for (auto [it, end] = lines("number"); it != end; ++it) {
         const auto &f = it->second;
+        // `number NAME text RIGHT BASELINE SIZE STEP R G B OR OG OB`: the value as text in face 0 (MS Gothic's stand-in), its
+        // digits STEP apart and the last one's cell ending at RIGHT, with no leading zeros and a one-pixel outline, as Test
+        // Game 82's Config draws its numbers, from no picture.
+        if (f.size() >= 12 && f[1] == "text") {
+            std::string digits = std::to_string(setting(f[0]));
+            int size = field(f, 4), step = field(f, 5), left = field(f, 2) - step * int(digits.size()), baseline = field(f, 3);
+            for (int pass = 0; pass < 2; pass++)
+                for (size_t i = 0; i < digits.size(); i++) {
+                    GlyphImage g;
+                    if (!glyph(0, uint32_t(digits[i]), size, false, g) || g.w <= 0 || g.h <= 0) continue;
+                    // Each digit sits in the middle of its step, as the PC's wider spacing leaves it.
+                    int x = left + int(i) * step + (step - g.advance) / 2 + g.left, y = baseline - g.top;
+                    if (pass == 0) {
+                        for (int dy = -1; dy <= 1; dy++)
+                            for (int dx = -1; dx <= 1; dx++)
+                                if (dx || dy) drawCoverage(out, g.coverage.data(), g.w, g.h, x + dx, y + dy, field(f, 9), field(f, 10), field(f, 11), 256);
+                    } else {
+                        drawCoverage(out, g.coverage.data(), g.w, g.h, x, y, field(f, 6), field(f, 7), field(f, 8), 256);
+                    }
+                }
+            continue;
+        }
         ImageRef digits = f.size() >= 4 ? images_->get(f[1]) : nullptr;
         if (!digits) continue;
         // A STEP spaces the digits apart, and X2 X3 place the second and third, as round the point a panel prints in a wait
@@ -2286,9 +2321,9 @@ Engine::SlotInfo &Engine::slotInfo(int slot) {
     info.exists = true;
     std::copy(std::begin(data.date), std::end(data.date), info.date);
     info.flow = data.flow;
-    info.variables = data.variables;
     if (auto it = data.variables.find(routeVar_); routeVar_ >= 0 && it != data.variables.end()) info.route = it->second;
     info.comment = sjis::toUtf8(data.comment);
+    info.variables = data.variables;
     auto bmp = readWhole(savePath(slot, "bmp"));
     if (!bmp.empty()) info.thumbnail = decodeBmpBytes(bmp);
     return info;
@@ -2912,6 +2947,9 @@ void Engine::composeSlots(Canvas &out) {
             drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, sheet->w, cardH, cardOpacity);
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
             else if (empty) drawPart(out, *empty, cx + offset("slotempty", 1), cy + offset("slotempty", 2), 0, 0, empty->w, empty->h, 1);
+            // `slotthumbframe SHEET X Y`: a frame around the thumbnail of every card with a save, as Test Game 82's cards have.
+            if (ImageRef around = picture("slotthumbframe"); around && info.exists)
+                drawPart(out, *around, cx + offset("slotthumbframe", 1), cy + offset("slotthumbframe", 2), 0, 0, around->w, around->h, 1);
             if (frame && frame->h >= 5 && slot == hovered) drawPart(out, *frame, cx + offset("slotframe", 1), cy + offset("slotframe", 2), 0, frame->h / 5, frame->w, frame->h / 5, 1);
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
             // `slotpic SHEET X Y`: a picture on every card, full or empty, as Test Game 87's Save Date label (set 1).
@@ -3126,12 +3164,22 @@ void Engine::composeDialog(Canvas &out) {
     // `dim N` of 256 darkens what's behind; Test Game 84's questions don't.
     const auto *dim = dialog.setting("dim");
     tintFrame(out, 0, 0, 0, dim && !dim->empty() ? field(*dim, 0) : 128);
-    // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, and fixed art besides.
-    int question = 0;
+    // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, behind fixed art besides.
+    // `question FILE X Y COLS COL`: a cell of a strip instead, drawn over the art, as Test Game 82's titles are seven
+    // across one picture over the frame they name.
     bool separate = dialog.settings.count("question") != 0;
-    for (auto [it, end] = dialog.settings.equal_range("question"); it != end; ++it, question++)
-        if (question == dialogQuestion_ && it->second.size() >= 3)
-            if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2), 0, 0, picture->w, picture->h, 1);
+    auto drawQuestion = [&](bool cells) {
+        int question = 0;
+        for (auto [it, end] = dialog.settings.equal_range("question"); it != end; ++it, question++) {
+            const auto &q = it->second;
+            if (question != dialogQuestion_ || q.size() < 3 || (q.size() >= 5) != cells) continue;
+            if (ImageRef picture = images_->get(q[0])) {
+                int cols = cells ? std::max(1, field(q, 3)) : 1, w = picture->w / cols, col = cells ? std::clamp(field(q, 4), 0, cols - 1) : 0;
+                drawPart(out, *picture, field(q, 1), field(q, 2), col * w, 0, w, picture->h, 1);
+            }
+        }
+    };
+    drawQuestion(false);
     int cell = questionCell(dialogQuestion_);
     for (const Picture &p : dialog.pictures) {
         Picture shown = p;
@@ -3140,6 +3188,7 @@ void Engine::composeDialog(Canvas &out) {
         else if (p.cols > 1 && !separate && dialog.setting("questions")) shown.column = cell;
         drawPicture(out, shown);
     }
+    drawQuestion(true);
     for (const Button &b : dialog.buttons) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
         bool ticked = b.action == "noask" && dialogNoAsk_;
@@ -4490,6 +4539,8 @@ void Engine::mouseMove(float x, float y) {
 }
 
 void Engine::mouseButton(int button, bool down) {
+    // Each edge in the game's log, so a host's taps can be told from the log: one tap is one down and one up.
+    log("pointer %s %d at %d,%d", down ? "down" : "up", button, pointerX_, pointerY_);
     if (button == 0) {
         // The CG viewer's volume is kept when the slider's let go.
         if (!down && leftHeld_ && viewerDragging_) {
@@ -4725,7 +4776,9 @@ void Engine::updateChoice() {
     if (waiting_ != Waiting::Choice || !choiceSheet_) return;
     int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
     choicePlace(x, top, step, slant);
-    int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
+    // The pointer in the frame's own rows: in the 4:3 frame the scene keeps its rows at the top, with the window's strip
+    // under it, so scaling by the scene's height put the options' hit boxes below where they're drawn (set 1, on an iPad).
+    int px = pointerX_, py = pointerY_;
     int hover = -1;
     for (int i = 0; i < choiceCount_; i++)
         if (px >= x + i * slant && px < x + i * slant + cellW && py >= top + i * step && py < top + i * step + cellH) hover = i;

@@ -10,6 +10,7 @@ namespace neko {
 // Each game part's maker, defined in the part's own file. A set adds its declaration and its line in the list below.
 std::unique_ptr<GamePart> makeSelfTestPart();
 std::unique_ptr<GamePart> makeScrollPart();
+std::unique_ptr<GamePart> makeYabaiPart();
 
 namespace {
 
@@ -21,6 +22,7 @@ struct PartEntry {
 const PartEntry kParts[] = {
     {"selftest", makeSelfTestPart},
     {"scroll", makeScrollPart},
+    {"yabai", makeYabaiPart},
 };
 
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses
@@ -30,6 +32,10 @@ const PartEntry kParts[] = {
 // and after two covers the top left corner over everything.
 class SelfTestPart : public GamePart {
 public:
+    bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) override {
+        if (onMenu_) spots.push_back({405, 405});
+        return false;
+    }
     void draw(PartHost &, Canvas &out, Layer layer, int, int) override {
         if (layer == Layer::Menu) fill(out, 400, 400, 10, menuPresses_ ? 255 : 0, 0, menuPresses_ ? 0 : 255);
         if (layer == Layer::Screen && menuPresses_ >= 2) fill(out, 0, 0, 20, 0, 0, 255);

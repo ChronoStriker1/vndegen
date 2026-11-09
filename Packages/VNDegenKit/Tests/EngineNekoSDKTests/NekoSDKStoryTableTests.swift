@@ -26,7 +26,7 @@ import TestSupport
             ]),
             "scr/e.txt": waiting(1000),
             "scr/r.txt": scene,
-        ]) { $1 })
+        ]) { mine, _ in mine })
     }
 
     // A choice's sheet, a 24-bit BMP of two rows of options.
@@ -103,6 +103,57 @@ import TestSupport
         vnneko_debug_choose(again, 0)
         steps(again, 30)
         #expect(vnneko_debug_variable(again, 1, 13) == 1)
+    }
+
+    // One tap on the load question's Yes, over the place the loaded choice draws its first option: the tap loads, and the
+    // choice it brings up waits for a tap of its own (set 1, Test Game 87 on an iPad).
+    @Test func aTapAcrossALoadDoesntTakeTheChoice() throws {
+        let card = { () -> Data in
+            let w = 50, h = 250, row = (w * 3 + 3) & ~3
+            var d = Data("BM".utf8)
+            func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+            put(UInt32(54 + row * h)); put(0); put(54)
+            put(40); put(UInt32(w)); put(UInt32(h))
+            d.append(contentsOf: [1, 0, 24, 0])
+            put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+            d.append(Data(repeating: 120, count: row * h))
+            return d
+        }()
+        let load = ["obj\\b.bmp", "1", "0,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try game("storytestload", [
+            "obj.pak": NekoSDKFlowFixture.archive([("n001_000.bmp", choice()), ("b.bmp", card)]),
+            "cfg/msg_button.ini": Data(("#inner Load\n" + load.joined(separator: "\n") + "\n##\n").utf8),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        #expect(vnneko_debug_save(e, 1))
+        vnneko_debug_choose(e, 1)
+        steps(e, 30)
+        #expect(vnneko_debug_press(e, "Load"))
+        steps(e, 30)
+        // The card, then the question's Yes, each a tap: down, a few frames held, up.
+        func tap(_ x: Int, _ y: Int) {
+            vnneko_mouse_move(e, Float(x) / 1280, Float(y) / 720)
+            steps(e, 2)
+            vnneko_mouse_button(e, 0, true)
+            steps(e, 6)
+            vnneko_mouse_button(e, 0, false)
+            steps(e, 30)
+        }
+        tap(125, 125)
+        tap(640, 359)
+        #expect(status(e).contains(" choice "), "\(status(e))")
+        // A tap of its own takes the option under it, the second here, which leaves S 13 alone.
+        tap(640, 361)
+        #expect(!status(e).contains(" choice "), "\(status(e))")
+        steps(e, 30)
+        #expect(vnneko_debug_variable(e, 1, 13) == 0)
     }
 
     // `staffroll NAME` plays the table's `screen staffroll_NAME`, its length long, then the story goes on.
