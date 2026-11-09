@@ -25,18 +25,37 @@ bool decodeBmp(const std::vector<uint8_t> &d, Image &out) {
     if (d.size() < 54) return false;
     int32_t offset = rd32(&d[10]), w = rd32(&d[18]), h = rd32(&d[22]);
     int bits = d[28] | d[29] << 8;
-    if (rd32(&d[30]) != 0 || (bits != 24 && bits != 32) || w <= 0 || h == 0 || offset < 54) return false;
+    if (rd32(&d[30]) != 0 || (bits != 8 && bits != 24 && bits != 32) || w <= 0 || h == 0 || offset < 54) return false;
     bool bottomUp = h > 0;
     h = std::abs(h);
     size_t stride = (size_t(w) * (bits / 8) + 3) & ~size_t(3);
     if (size_t(offset) + stride * size_t(h) > d.size()) return false;
+    // An 8-bit picture's colours, 4 bytes each after the header, as one of Test Game 83's backgrounds has (set 3): as
+    // many as the header says, or 256, or as fit before the pixels.
+    const uint8_t *palette = nullptr;
+    size_t colours = 0;
+    if (bits == 8) {
+        int32_t header = rd32(&d[14]), used = rd32(&d[46]);
+        if (header < 40 || size_t(14) + size_t(header) > size_t(offset)) return false;
+        palette = d.data() + 14 + header;
+        colours = std::min({size_t(used > 0 ? used : 256), size_t(256), (size_t(offset) - 14 - size_t(header)) / 4});
+    }
     out.w = w;
     out.h = h;
     out.rgba.resize(size_t(w) * h * 4);
     for (int y = 0; y < h; y++) {
         const uint8_t *src = d.data() + offset + stride * size_t(bottomUp ? h - 1 - y : y);
         uint8_t *dst = out.rgba.data() + size_t(y) * w * 4;
-        if (bits == 24) {
+        if (bits == 8) {
+            // A pixel past the colours the file has is black.
+            for (int x = 0; x < w; x++, src++, dst += 4) {
+                const uint8_t *colour = *src < colours ? palette + size_t(*src) * 4 : nullptr;
+                dst[0] = colour ? colour[2] : 0;
+                dst[1] = colour ? colour[1] : 0;
+                dst[2] = colour ? colour[0] : 0;
+                dst[3] = 255;
+            }
+        } else if (bits == 24) {
             for (int x = 0; x < w; x++, src += 3, dst += 4) {
                 dst[0] = src[2];
                 dst[1] = src[1];

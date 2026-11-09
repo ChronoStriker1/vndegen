@@ -31,6 +31,9 @@ constexpr int kGroupHse = 5, kGroupBackVoice = 6;
 constexpr int kWindowSlideMs = 200;
 // The film noise's slot, and how many frames each random place of its crop lasts, as The Alchemist's exe has them.
 constexpr int kNoiseSlot = 10000, kNoiseFramesPerPlace = 4;
+// A save record's kind for a part's tiled picture, and where its fixed part keeps the speed (SavedSprite::kind).
+constexpr int kTiledKind = 6;
+constexpr size_t kTiledSpeedAt = 45;
 // How long each character of text takes to fade in, measured from the PC game's footage.
 constexpr int kCharFadeMs = 160;
 // How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
@@ -2393,6 +2396,14 @@ SaveData Engine::captureSave() {
     d.width = canvas_.w;
     d.height = canvas_.h;
     for (const auto &[slot, s] : front_) {
+        // A slot a part holds saves as a record of the part's kind with no picture, which the part's savePC fills.
+        if (s.held) {
+            SavedSprite out;
+            out.slot = slot;
+            out.kind = s.kind;
+            out.alpha = out.endAlpha = int(s.alpha * 256 + 0.5f);
+            d.sprites.push_back(out);
+        }
         if (!s.image) continue;
         SavedSprite out;
         out.slot = slot;
@@ -2400,6 +2411,7 @@ SaveData Engine::captureSave() {
         // Some games' PC names the picture twice and loads it from the second (namesPictureTwice).
         out.nextPath = !s.noise && layout_ && namesPictureTwice(*layout_) ? s.path : "";
         out.noise = s.noise;
+        out.kind = s.kind;
         if (s.flipCount > 0) {
             out.flipFrame = s.flipShown;
             out.flipRepeat = s.flipLoop ? 1 : 0;
@@ -2662,7 +2674,16 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             if (s.image) front_[saved.slot] = s;
             continue;
         }
+        // A part's slot with no picture comes back held, for the part's loadPC to fill from the same record.
+        if (saved.path.empty() && saved.kind != 0) {
+            s.held = true;
+            s.kind = saved.kind;
+            s.alpha = float(saved.alpha) / 256;
+            front_[saved.slot] = s;
+            continue;
+        }
         s.path = saved.path;
+        s.kind = saved.kind;
         // A movie starts again from its beginning. Whether it looped isn't known from the save, and the library's
         // looping ones are backgrounds, so it loops.
         if (normalizedPath(saved.path).rfind("movie\\", 0) == 0 && (s.movie = openMovie(saved.path, true))) {
@@ -2707,6 +2728,16 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             } else {
                 s.changes.push_back(std::move(a));
             }
+        }
+        // The older layout's record of a tiled, moving picture, kind 6, keeps its speed as a float 45 bytes into its
+        // fixed part, in pixels a frame at 60 a second (set 3, from Test Game 83's fog: command 90's p3 in thousandths).
+        // A PC save has only that, so the picture is tiled and moved across by it. Command 91's, down the screen,
+        // isn't known in a save: neither 83 nor 86 uses it.
+        if (saved.kind == kTiledKind && saved.rawFixed.size() >= kTiledSpeedAt + 4) {
+            float speed;
+            std::memcpy(&speed, saved.rawFixed.data() + kTiledSpeedAt, 4);
+            s.scrollX = speed * 60;
+            s.scrollFrom = now_;
         }
         if (auto fx = side.slotFx.find(saved.slot); fx != side.slotFx.end() && side.valid) {
             s.additive = fx->second[0] != 0;
@@ -5669,7 +5700,20 @@ void Engine::loadImage(const Node &n) {
     s.movie.reset();
 }
 
-bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY) {
+void Engine::holdPartSlot(int slot, int kind) {
+    Sprite s;
+    s.held = true;
+    s.kind = kind;
+    back_[slot] = std::move(s);
+}
+
+bool Engine::partSlotHeld(int slot) const {
+    for (const auto *set : {&front_, &back_})
+        if (auto it = set->find(slot); it != set->end() && it->second.held) return true;
+    return false;
+}
+
+bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY, int kind) {
     noteSeen(path);
     ImageRef image = images_->get(shownPath(path));
     if (!image) {
@@ -5685,6 +5729,7 @@ bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool
     s.scrollX = scrollX;
     s.scrollY = scrollY;
     s.scrollFrom = now_;
+    s.kind = kind;
     back_[slot] = std::move(s);
     return true;
 }
@@ -6315,10 +6360,16 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
     }
     int drawnTo = INT_MIN;
     for (const auto &[slot, s] : sprites) {
-        if (!s.image) continue;
+        if (!s.image && !s.held) continue;
         composeSplashes(out, drawnTo, slot);
         drawParts(out, Layer::Slot, drawnTo, slot);
         drawnTo = slot;
+        if (s.held) {
+            // A part's own slot, which the part draws.
+            float alpha = view(s).alpha;
+            for (auto &[name, part] : parts_) part->drawSlot(*partHost_, out, slot, alpha);
+            continue;
+        }
         if (s.noise) {
             drawNoise(out, s);
             continue;
