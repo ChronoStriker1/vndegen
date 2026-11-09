@@ -24,10 +24,10 @@ import TestSupport
         return d
     }
 
-    private func game() throws -> URL {
+    private func game(_ folder: String = "squaretest") throws -> URL {
         try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("""
-                UserDataDirectory\tvndegen\\squaretest
+                UserDataDirectory\tvndegen\\\(folder)
                 FirstFlow\tflow\\t.txt
                 MsgWinFilename\tobj\\win.bmp
                 MsgWinPosY\t480
@@ -51,9 +51,9 @@ import TestSupport
     }
 
     // A run with these lines in the game's settings, the window opaque so its colour shows as it is.
-    private func start(_ root: URL, _ settings: String = "") throws -> OpaquePointer {
+    private func start(_ root: URL, _ settings: String = "", folder: String = "squaretest") throws -> OpaquePointer {
         let data = root.appendingPathComponent("data")
-        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/squaretest/save")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/\(folder)/save")
         try FileManager.default.createDirectory(at: saves, withIntermediateDirectories: true)
         try Data("opacity 100\n\(settings)".utf8).write(to: saves.appendingPathComponent("vndegen_settings.txt"))
         let e = try #require(NekoSDKFlowFixture.start(root, data: data))
@@ -98,6 +98,19 @@ import TestSupport
         #expect(frame(e, view: (1550, 1000)).h == 960)
         #expect(frame(e, view: (1700, 1000)).h == 720)
         #expect(frame(e, view: (1550, 1000)).h == 720)
+    }
+
+    // `squarewindow 0`: Test Game 83's PC puts the window exactly as far down as the layer moves, 240 rows, where
+    // Test Game 88's, the default, sits two rows lower.
+    @Test func theWindowCanSitExactlyWhereTheLayerMoves() throws {
+        let root = try game("squaretest0")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try start(root, folder: "squaretest0")
+        defer { vnneko_stop(e) }
+        let square = frame(e, view: (1024, 768))
+        #expect(square.w == 1280 && square.h == 960)
+        #expect(pixel(square, 10, 719) != [255, 0, 0])
+        #expect(pixel(square, 10, 720) == [255, 0, 0])
     }
 
     // Config's sizes fix the shape whatever the view: 1 to 3 for 16:9 and 4 to 6 for 4:3.

@@ -105,6 +105,49 @@ import TestSupport
         #expect(Array(g.px[dimAgain..<dimAgain + 3]) == [255, 0, 64])
     }
 
+    // PartHost::releaseSlot (the selftest part's command 9002): a held slot goes at the next screen update, as Test Game
+    // 86's command 96 ends an emitter, and a save after it holds no record of the slot.
+    @Test func aPartLetsItsSlotGo() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\partslot\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("red.bmp", bmp(1280, 720) { _ in [255, 0, 0] })]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [3: 100], s: [1: "obj\\red.bmp"]),
+                .init(op: 9001, next: 4, p: [0: 500], s: [1: "parts\\one.bmp"]),
+                .init(op: 9, next: 5),
+                .init(op: 2, next: 6, p: [0: 3000]),
+                .init(op: 9002, next: 7, p: [0: 500]),
+                .init(op: 9, next: 8),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        func pixel(_ e: OpaquePointer, _ x: Int, _ y: Int) -> [UInt8] {
+            let f = frame(e)
+            let at = (y * f.w + x) * 4
+            return [f.px[at], f.px[at + 1], f.px[at + 2]]
+        }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        steps(e, 500)
+        #expect(pixel(e, 605, 305) == [0, 255, 0])
+        steps(e, 4000)
+        #expect(pixel(e, 605, 305) == [255, 0, 0])
+        #expect(vnneko_debug_save(e, 1))
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/partslot/save")
+        let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save001.sav" })
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        #expect(save.range(of: Data("parts\\one.bmp".utf8)) == nil)
+    }
+
     // A slot a part holds with no picture (PartHost::holdSlot, the selftest part's command 9001): the part draws it in
     // the slot's order once a screen update shows it, command 17 takes it away as it does a picture, and a save in the
     // older layout holds its record as Test Game 83's PC writes a particle emitter's: kind 15, no picture, three names 57

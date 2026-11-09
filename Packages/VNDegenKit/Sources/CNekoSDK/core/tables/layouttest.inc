@@ -12,3 +12,17 @@ screen choice
 choicecolumns 4
 close 200 0.5
 )";
+
+// The older layout with a second record to each place, `layoutpairs`, as Test Game 96's PC saves hold a lit picture in
+// the slot after each place's own (NekoSDKOldLayoutTests).
+const char kLayoutPairsTest[] = R"(
+screen defaults
+layoutpairs
+)";
+
+// A 4:3 frame whose window sits exactly where the layer moves, `squarewindow 0`, as Test Game 83's does
+// (NekoSDKSquareFrameTests).
+const char kSquareWindowTest[] = R"(
+screen defaults
+squarewindow 0
+)";
