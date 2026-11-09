@@ -71,7 +71,7 @@ enum : int {
 const char *const kNames[3] = {"Ayano", "Misuzu", "Rina"};
 
 // What the hub's screen gives the story table.
-enum HubResult { kPlay = 1, kAllSolved = 2, kTimeUp = 3, kTimeEvent = 4, kOpenTree = 9 };
+enum HubResult { kPlay = 1, kAllSolved = 2, kTimeUp = 3, kTimeEvent = 4, kDevil = 5, kOpenTree = 9 };
 
 class YabaiPlayPart : public GamePart {
 public:
@@ -80,6 +80,14 @@ public:
         if (name == "hubstart") {
             startTruth(host, args.empty() ? 1 : args[0]);
             host.finishScreen(0);
+            return true;
+        }
+        // `open ask N`: one of the PC's own questions on a band (1 the interrogation tutorial, 2 the vote's, 3 save
+        // before the ending), はい 1 and いいえ 0; 4 the ending's three ways, 0 to 2. Placed as on the PC (Wine).
+        if (name == "ask") {
+            ask_ = args.empty() ? 1 : args[0];
+            hoverAsk_ = -1;
+            host.redraw();
             return true;
         }
         if (name != "hub") return false;
@@ -92,6 +100,11 @@ public:
         if (action == 2 && picked > 0) {
             int heroine = picked / 1000 - 1, question = picked % 10;
             if (heroine >= 0 && heroine < 3) return ask(host, heroine, question);
+        }
+        if (pendingDevil_) {
+            int devil = pendingDevil_;
+            pendingDevil_ = 0;
+            return finishWith(host, kDevil, devil);
         }
         if (solvedAll(host)) return finishWith(host, kAllSolved, 0);
         if (host.variable(1, kHoursLeft) <= 0) return finishWith(host, kTimeUp, 0);
@@ -106,6 +119,16 @@ public:
     }
 
     bool press(PartHost &host, int x, int y, int button) override {
+        if (ask_) {
+            if (button != 0) return true;
+            int hit = askOption(x, y);
+            if (hit >= 0) {
+                int result = ask_ == 4 ? hit : hit == 0 ? 1 : 0;
+                ask_ = 0;
+                host.finishScreen(result);
+            }
+            return true;
+        }
         if (!open_ || button != 0) return open_;
         if (inside(x, y, kTreeButton)) return finishWith(host, kOpenTree, 0);
         for (int h = 0; h < 3; h++)
@@ -120,8 +143,19 @@ public:
         return true;
     }
 
+    void pointer(PartHost &host, int x, int y) override {
+        if (!ask_) return;
+        int hit = askOption(x, y);
+        if (hit != hoverAsk_) hoverAsk_ = hit, host.redraw();
+    }
+
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
-        if (layer != Layer::Screen || !open_) return;
+        if (layer != Layer::Screen) return;
+        if (ask_) {
+            drawAsk(host, out);
+            return;
+        }
+        if (!open_) return;
         int shown = host.variable(1, kShown), stage = host.variable(1, kStage + shown);
         put(host, out, "obj\\l000_000.bmp", 0, 0);
         put(host, out, "obj\\l001_000.bmp", 256, 21);
@@ -142,7 +176,7 @@ public:
         if (shut) put(host, out, "obj\\l015_001.bmp", 326, 260);
     }
 
-    void reset() override { open_ = false; }
+    void reset() override { open_ = false, ask_ = 0; }
 
     std::vector<std::string> chapter(PartHost &host, int number) override {
         if (!loaded_) {
@@ -182,13 +216,15 @@ private:
         for (int h = 0; h < 3; h++) host.setVariable(1, kStage + h, 1);
         for (int i = 0; i < 9; i++) host.setVariable(1, kAsked + 9 * (t - 1) + i, 0);
         host.setVariable(1, kSolved, 0);
-        host.setVariable(1, kHour, 8);
+        auto line = truthLine(host, t);
+        host.setVariable(1, kHour, line.size() > 3 ? std::atoi(line[3].c_str()) : 8);
         host.setVariable(1, kDay, t);
         host.setVariable(1, kHoursLeft, hours(host, t));
         host.setVariable(1, kShown, std::max(0, std::min(2, firstShown(host, t))));
     }
 
-    // `truth T HOURS FIRST` under `screen hub`: the hours truth T gives and whom the hub shows first (A, M or R), and
+    // `truth T HOURS FIRST [START]` under `screen hub`: the hours truth T gives, whom the hub shows first (A, M or R) and
+    // the hour it starts at (8 unless given), and
     // `lock T HEROINE STAGE NEEDS...`: that stage opens once each heroine it needs is done, as seen under Wine.
     std::vector<std::string> truthLine(PartHost &host, int t) {
         for (auto &line : host.setting("hub", "truth"))
@@ -230,6 +266,8 @@ private:
             for (int i = 0; i < 3 && (host.variable(1, kStage + next) > 3 || locked(host, next)); i++) next = (next + 1) % 3;
             host.setVariable(1, kShown, next);
         }
+        // Truth 5: a heroine's last right answer is followed at once by her devil scene, 910, 920 or 930 (Wine).
+        if (t == 5 && host.variable(1, kStage + heroine) == 4 && stage == 3) pendingDevil_ = 910 + 10 * heroine;
         return finishWith(host, kPlay, chapter);
     }
 
@@ -274,6 +312,29 @@ private:
             drawPart(out, *image, x, y, cx, cy, w, h, 1);
     }
 
+    // The ask band's places: band and question at y 316 (choice: 205), はい and いいえ at 522 and 650, y 390, 109x39;
+    // the ending's three ways at x 390, y 279 + 55 each, 501x39.
+    int askOption(int x, int y) const {
+        if (ask_ == 4) {
+            for (int i = 0; i < 3; i++)
+                if (x >= 390 && x < 891 && y >= 279 + 55 * i && y < 318 + 55 * i) return i;
+            return -1;
+        }
+        for (int i = 0; i < 2; i++)
+            if (x >= 522 + 128 * i && x < 631 + 128 * i && y >= 390 && y < 429) return i;
+        return -1;
+    }
+    void drawAsk(PartHost &host, Canvas &out) const {
+        int bandY = ask_ == 4 ? 205 : 316;
+        put(host, out, "obj\\a002_000.bmp", 0, bandY);
+        cell(host, out, "obj\\t000_000.bmp", 438, bandY, 404 * (ask_ - 1), 0, 404, 38);
+        if (ask_ == 4)
+            for (int i = 0; i < 3; i++) cell(host, out, "obj\\t001_000.bmp", 390, 279 + 55 * i, 501 * i, (hoverAsk_ == i ? 1 : 0) * 39, 501, 39);
+        else
+            for (int i = 0; i < 2; i++) cell(host, out, "obj\\a003_001.bmp", 522 + 128 * i, 390, 109 * i, (hoverAsk_ == i ? 1 : 0) * 39, 109, 39);
+    }
+
+    int ask_ = 0, hoverAsk_ = -1, pendingDevil_ = 0;
     bool open_ = false;
     bool loaded_ = false;
     bool questionsLoaded_ = false;
