@@ -81,6 +81,9 @@ enum : int {
     kPCAsked = 3000,       // + 500 * heroine + 100 * (truth - 1) + 10 * (stage - 1) + question
     kPCChapter = 1000,     // the chapter playing
     kPCMode = 105,         // 2 at the hub, 4 in a scene, 8 at a pick, 11 in the tutorial
+    kPCLastAsked = 2030,   // the asked flag's number of the question last asked, set as it's asked
+    kPCTalked = 2045,      // 1 once a truth's questions have all been answered
+    kPCTruthDone = 2100,   // + (truth - 1): 1 once that truth's questions have all been answered
 };
 
 // What the hub's screen gives the story table.
@@ -286,6 +289,7 @@ private:
         for (int h = 0; h < 3; h++) host.setVariable(1, kStage + h, 1);
         for (int i = 0; i < 9; i++) host.setVariable(1, kAsked + 9 * (t - 1) + i, 0);
         host.setVariable(1, kSolved, 0);
+        host.setVariable(1, kPCLastAsked, 0);
         auto line = truthLine(host, t);
         host.setVariable(1, kHour, line.size() > 3 ? std::atoi(line[3].c_str()) : 8);
         host.setVariable(1, kDay, t);
@@ -336,6 +340,7 @@ private:
     bool ask(PartHost &host, int heroine, int question) {
         int t = truth(host), stage = host.variable(1, kStage + heroine);
         if (stage < 1 || stage > 3 || question < 0 || question > 2) return true;
+        host.setVariable(1, kPCLastAsked, kPCAsked + 500 * heroine + 100 * (t - 1) + 10 * (stage - 1) + question);
         return finishWith(host, kPlay, 1000 * (heroine + 1) + 100 * (t - 1) + 10 * (stage - 1) + question);
     }
 
@@ -343,12 +348,20 @@ private:
     void account(PartHost &host, int heroine, int question) {
         int t = truth(host), stage = host.variable(1, kStage + heroine);
         host.setVariable(1, askedVar(host, heroine), asked(host, heroine) | (1 << question));
-        host.setVariable(1, kHoursLeft, host.variable(1, kHoursLeft) - 1);
-        host.setVariable(1, kHour, host.variable(1, kHour) + 1);
         if (question == answer(host, heroine, stage)) {
             host.setVariable(1, kStage + heroine, stage + 1);
             host.setVariable(1, kSolved, host.variable(1, kSolved) + 1);
             host.setVariable(1, kShown, openFrom(host, heroine));
+        }
+        // The answer that finishes the truth costs no hour: the PC's saves at a pick hold the clock from before it
+        // (16:00 with 7 hours left after truth 3's nine right answers from 08:00 with 15).
+        if (solvedAll(host)) {
+            host.setVariable(1, kPCTruthDone + t - 1, 1);
+            host.setVariable(1, kPCTalked, 1);
+        } else {
+            host.setVariable(1, kHoursLeft, host.variable(1, kHoursLeft) - 1);
+            host.setVariable(1, kHour, host.variable(1, kHour) + 1);
+            host.setVariable(1, kPCLastAsked, 0);  // the PC's hub saves hold 0 here, its pick saves the last question
         }
         // Truth 5: a heroine's last right answer is followed at once by her devil scene, 910, 920 or 930 (Wine).
         if (t == 5 && host.variable(1, kStage + heroine) == 4 && stage == 3) pendingDevil_ = 910 + 10 * heroine;

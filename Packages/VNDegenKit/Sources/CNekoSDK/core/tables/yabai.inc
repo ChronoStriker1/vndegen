@@ -143,13 +143,20 @@ flow main
 # The PC keeps its mode in S 105: 2 at the hub, 4 in a scene, 8 at a vote's pick screen, 11 in the tutorial. A PC save
 # at the hub or a pick goes on there, its truth in S 2000. A PC save in a scene goes on from the first line below
 # naming its scene, so the lines with a chapter of their own come first and the hub's `chapter S 1000` last.
+# S 2060 is 1 from a vote's pick until the next truth starts.
 # Before each chapter the table sets what the PC's saves hold there: the chapter in S 1000, the mode in S 105, and in
 # S 110 the story chapter last begun (seen 1, 100 to 400 and 503 in the PC's saves; 500 is taken as the same kind).
 resume S 105 == 2 at hub
 resume S 105 == 8 at pickresume
+# S 2083 is 1 outside the truths, in the prologue and from the ending's start: a save in the prologue without it goes on
+# to the game over on the PC. The PC's save inside chapter 1 already holds truth 1's clock, so each truth starts before
+# its opening chapter.
+set S 2083 = 1
 set S 1000 = 0
 set S 105 = 4
 chapter 0
+set S 2083 = 0
+open hubstart 1
 set S 1000 = 1
 set S 105 = 4
 set S 110 = 1
@@ -166,7 +173,6 @@ set S 1000 = 10
 set S 105 = 11
 chapter 10
 label t1
-open hubstart 1
 goto hub
 label event
 set S 1000 = 50
@@ -200,6 +206,7 @@ set S 1000 = 4510
 set S 105 = 4
 chapter 4510
 label pick1
+set S 2060 = 1
 open vote 1 -> S 15140
 goto picked
 label vote2
@@ -207,6 +214,7 @@ set S 1000 = 4600
 set S 105 = 4
 chapter 4600
 label pick2
+set S 2060 = 1
 open vote 2 -> S 15140
 goto picked
 label vote3
@@ -214,6 +222,7 @@ set S 1000 = 4700
 set S 105 = 4
 chapter 4700
 label pick3
+set S 2060 = 1
 open vote 3 -> S 15140
 goto picked
 label vote4
@@ -221,6 +230,7 @@ set S 1000 = 4800
 set S 105 = 4
 chapter 4800
 label pick4
+set S 2060 = 1
 open vote 4 -> S 15140
 goto picked
 label vote5
@@ -228,6 +238,7 @@ set S 1000 = 4900
 set S 105 = 4
 chapter 4900
 label pick5
+set S 2060 = 1
 open vote 5 -> S 15140
 goto picked
 label pickresume
@@ -256,41 +267,45 @@ label right1
 set S 1000 = 4000
 set S 105 = 4
 chapter 4000
+set S 2060 = 0
+open hubstart 2
 set S 1000 = 100
 set S 105 = 4
 set S 110 = 100
 chapter 100
-open hubstart 2
 goto hub
 label right2
 set S 1000 = 4100
 set S 105 = 4
 chapter 4100
+set S 2060 = 0
+open hubstart 3
 set S 1000 = 200
 set S 105 = 4
 set S 110 = 200
 chapter 200
-open hubstart 3
 goto hub
 label right3
 set S 1000 = 4200
 set S 105 = 4
 chapter 4200
+set S 2060 = 0
+open hubstart 4
 set S 1000 = 300
 set S 105 = 4
 set S 110 = 300
 chapter 300
-open hubstart 4
 goto hub
 label right4
 set S 1000 = 4300
 set S 105 = 4
 chapter 4300
+set S 2060 = 0
+open hubstart 5
 set S 1000 = 400
 set S 105 = 4
 set S 110 = 400
 chapter 400
-open hubstart 5
 goto hub
 label wrong
 set S 1000 = 4010
@@ -298,6 +313,9 @@ set S 105 = 4
 chapter 4010
 end
 label ending
+# The PC's save before the ending's choice counts vote 5 among the truths done.
+set S 2083 = 1
+set S 2003 = 5
 set S 1000 = 500
 set S 105 = 4
 set S 110 = 500
