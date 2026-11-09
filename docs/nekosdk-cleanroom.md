@@ -131,10 +131,16 @@ A splash effect's record (Test Game 88's commands 200 and 201) has no picture of
 ### Table settings for the story-in-exe games' menus
 
 Sets 1 and 2 measured these under Wine on Test Games 82 and 87, and the runtime's tables give them:
+- `submenudim hide` leaves them out instead, as Test Game 83's submenus take the main buttons' rows (set 3).
 - `submenudim` on a title dims the main buttons while a submenu is open, to their sheet's last row, and they take no pointer, no help and no press; the button that opened it stays selected, and the right button closes the submenu. A left click elsewhere does nothing.
+- `datefield year|month|day|hour|minute X Y [STEP] [blank]`: each part of a card's date at its own place, with nothing between, `blank` leaving out a leading zero (set 2's, for 82; 83 uses it too).
 - On save cards: `slotpic SHEET X Y` puts a picture on every card, full or empty (87's Save Date); `slotchaptervar SHEET X Y COLS VAR` names the chapter by a scenario variable of the save, a cell of a strip across with rounded edges (87's S 4000); `slotnoseconds` stops a 10-digit sheet's time at the minute; `dateslash2 DX` moves the second slash (2 in 87).
 - In Config: `knob NAME SHEET X0 Y STEP`, a knob that sits STEP pixels further on for each unit and that a press or drag on its track moves (87's rose); `hovercols`, the hover help's lines side by side in their sheet (87); a radio's `group`, as a check's, so one Confirmations switch sets all six (87).
 - Speeds, under `screen defaults`: `textcurve SETTING A B`, text at A − B × value ms a character (82: 167 − 3v); `textpoints SETTING V MS V MS…`, straight lines between measured points, for a curve that isn't a line (87); `autocurve SETTING A B`, auto's pause as A − B × value ms for each character of the line (82: 100 − v); `waitscale SETTING`, the setting a wait command scales by over 100 in place of Config's wait time, which leaves fades unstretched (82's auto wait, 0 to 200). 82's fades don't hold the next node, which the runtime already does for every game. `hseprefix PREFIX` names the sex effects another way than hse (87's se_h).
+
+### Pictures from game parts
+
+A game part loads a picture into a slot with `PartHost::loadImage(slot, path, x, y, additive, scrollX, scrollY)`, as command 15 loads one: shown by the next screen update, gone with 17 or 22, saved as any picture. Its top left is at x, y; `additive` adds its light to the scene, as Test Game 83's command 92 streaks do over a black screen (set 3: four copies at once, visible together, which only adding gives); a scroll tiles it along that axis and moves it that many pixels a second, as Test Game 86's command 90 lace strips do (set 3: 500 px a second, two shots 0.5 s apart). The PC's record doesn't hold either, so VNDegen's file beside the save keeps them (`slotfx SLOT ADDITIVE SX SY`). Scene commands the engine doesn't know, 95 and 96 among them, go to the game's parts.
 
 ### The 4:3 frame
 
@@ -291,6 +297,14 @@ otherwise (a per-channel fit against the sprites, to within a few levels); a cli
 on an entry chooses it and leaves the list open; the × or a click outside the window closes it. A bonus whose patch
 folder is there without its pictures (`sys_1`) is listed by name alone and can't be chosen; one whose folder isn't
 (`sys_2`) isn't listed, and numbers count only what's listed.
+
+Two details checked under Wine later, with the runtime driven through the same clicks at the same moments and its log
+saying which list was open (the panels go 3 s after the explanation closes, so a click after that opens nothing, on
+the PC and here alike): the pose list draws each pose with the face chosen, not the first, as the runtime does (with
+the face stepped twice, the PC's figures' faces matched the runtime's drawn with the chosen face, 0.059 against 0.094
+with the first); and the outfit list's help bubble for its boxes, `p021_006`, which the archive has, didn't show with
+the pointer on a box, so the runtime draws none (the PC's frame and the runtime's matched within 0.01, and a search for
+the bubble scored both the same). `p021_008` is a Now Loading animation the PC wasn't seen to show either.
 
 ## Funbag Fantasy 3 if's music modes
 
