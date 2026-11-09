@@ -141,6 +141,8 @@ default skipall 1
 # The message window's four round buttons (hide, the log's back and on, voice) show all the time on the PC, wherever
 # the pointer is; only the control panel's row waits for the pointer. Config has no switch for it.
 default bar_always 1
+# All 100 cards are ordinary saves: the game has no quick save, so none of its pages counts from 1 again.
+quickslots 101 100
 layoutcgslot 102
 
 # Config, one page, measured under Wine. Its help is a circle above or below the row under the pointer. The screen's
