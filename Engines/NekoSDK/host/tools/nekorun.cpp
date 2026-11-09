@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
     std::string saveAt;
     int saveSlot = 0;
     std::vector<std::string> presses;
+    float viewW = 0, viewH = 0;  // --view W H: the host's view, for a game with a 4:3 layout
     struct Step { int ms; std::string what; int x, y; std::string name; };
     std::vector<Step> steps;
     for (int i = 2; i < argc; i++) {
@@ -53,6 +54,7 @@ int main(int argc, char **argv) {
         else if (a == "--wav") wav = next();
         else if (a == "--slow") slowReport = std::atof(next());
         else if (a == "--press") presses.push_back(next());
+        else if (a == "--view") { viewW = float(std::atof(next())); viewH = float(std::atof(next())); }
         else if (a == "--script") {
             FILE *f = std::fopen(next(), "r");
             char line[256];
@@ -115,6 +117,7 @@ int main(int argc, char **argv) {
     double slowest = 0, totalDraw = 0;
     bool ended = false;
     while (elapsed < maxMs) {
+        if (viewW > 0) vnneko_set_view_size(e, viewW, viewH);
         if (!vnneko_step(e, dt)) { ended = true; break; }
         // NEKORUN_TRACE prints each script the story enters, with the node it enters at, and `clicks` each click it waits for.
         if (std::getenv("NEKORUN_TRACE")) {

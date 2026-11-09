@@ -195,6 +195,11 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     height_ = std::max(config_.number("WindowHeight", 720), windowImage_ ? std::min(windowY_ + windowImage_->h, width_ * 9 / 16) : 0);
     canvas_.resize(width_, height_);
     canvas_.clear();
+    if (std::string square = config_.text("MsgWinSquareFilename"); !square.empty()) {
+        squareImage_ = images_->get(square);
+        squareY_ = config_.number("MsgWinSquarePosY", height_);
+        squareShift_ = config_.number("MsgWinSquareMovement", 240);
+    }
 
     windowShowType_ = config_.number("MsgWinShowType");
     waitMark_ = images_->get(config_.text("MsgWaitMarkFilename"));
@@ -1742,6 +1747,28 @@ void Engine::applySettings() {
     charMs_ = kCharMs[std::clamp(setting("text"), 0, 3)];
     static const int kAutoPercent[] = {200, 100, 50, 0};
     autoDelayMs_ = kAutoDelayMs * kAutoPercent[std::clamp(setting("auto"), 0, 3)] / 100;
+    autoPerCharMs_ = -1;
+    // `textcurve SETTING A B` and `autocurve SETTING A B` under `screen defaults`: a 0 to 100 slider's text speed as
+    // A - B x value ms a character, and auto's pause after a line as that many ms for each of its characters, as Test
+    // Game 82's are (set 2, timed under Wine: 167 - 3v and 100 - v).
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end()) {
+        if (const auto *curve = defaults->second.setting("textcurve"); curve && curve->size() >= 3)
+            charMs_ = std::max(0, field(*curve, 1) - field(*curve, 2) * setting((*curve)[0]));
+        // `textpoints SETTING V MS V MS...`: the same by straight lines between measured points, as Test Game 87's text
+        // speed, which isn't a line (set 1, under Wine).
+        if (const auto *points = defaults->second.setting("textpoints"); points && points->size() >= 5) {
+            double v = setting((*points)[0]), ms = std::atof((*points)[2].c_str());
+            for (size_t i = 1; i + 3 < points->size(); i += 2) {
+                double v0 = std::atof((*points)[i].c_str()), m0 = std::atof((*points)[i + 1].c_str());
+                double v1 = std::atof((*points)[i + 2].c_str()), m1 = std::atof((*points)[i + 3].c_str());
+                if (v >= v0 && v <= v1 && v1 > v0) { ms = m0 + (m1 - m0) * (v - v0) / (v1 - v0); break; }
+                if (v > v1) ms = m1;
+            }
+            charMs_ = std::max(0, int(std::lround(ms)));
+        }
+        if (const auto *curve = defaults->second.setting("autocurve"); curve && curve->size() >= 3)
+            autoPerCharMs_ = std::max(0, field(*curve, 1) - field(*curve, 2) * setting((*curve)[0]));
+    }
     if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
     applyArtSwitch();
     applyArtSet();
@@ -1832,6 +1859,13 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         if (ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr)
             drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, (fill->w * setting(f[0]) + scale / 2) / scale, fill->h, 1);
     }
+    // `knob NAME SHEET X0 Y STEP`: a knob that sits STEP pixels further on for each unit, as Test Game 87's rose on its
+    // track (set 1).
+    for (auto [it, end] = lines("knob"); it != end; ++it) {
+        const auto &f = it->second;
+        if (ImageRef knob = f.size() >= 5 ? images_->get(f[1]) : nullptr)
+            drawPart(out, *knob, field(f, 2) + field(f, 4) * setting(f[0]), field(f, 3), 0, 0, knob->w, knob->h, 1);
+    }
     for (auto [it, end] = lines("bar"); it != end; ++it) {
         const auto &f = it->second;
         if (ImageRef fill = f.size() >= 4 ? images_->get(f[0]) : nullptr)
@@ -1892,6 +1926,19 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
             return true;
         }
     }
+    // A press on a knob's track, or a drag along it, puts the knob's middle under the pointer.
+    for (auto [it, end] = lines("knob"); it != end; ++it) {
+        const auto &f = it->second;
+        ImageRef knob = f.size() >= 5 ? images_->get(f[1]) : nullptr;
+        int x0 = field(f, 2), top = field(f, 3), step = std::max(1, field(f, 4));
+        if (!knob) continue;
+        int right = x0 + step * clampSetting(f[0], 1 << 20) + knob->w;
+        if (y >= top && y < top + knob->h && x >= x0 - (dragging ? 40 : 0) && x < right + (dragging ? 40 : 0)) {
+            int value = (x - x0 - knob->w / 2 + step / 2) / step;
+            changeSetting(f[0], clampSetting(f[0], value));
+            return true;
+        }
+    }
     if (dragging) return false;
     for (auto [it, end] = lines("radio"); it != end; ++it)
         if (it->second.size() >= 8 && within(it->second, 2)) {
@@ -1900,7 +1947,16 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
                 if (canFullScreen_) windowRequest_ = field(it->second, 1);
                 return true;
             }
-            changeSetting(it->second[0], field(it->second, 1));
+            // `radiooff NAME`: pressing the chosen one again sets 0, as Test Game 88's screen sizes go back to automatic.
+            bool off = false;
+            for (auto [o, oEnd] = lines("radiooff"); o != oEnd; ++o)
+                if (!o->second.empty() && o->second[0] == it->second[0]) off = setting(it->second[0]) == field(it->second, 1);
+            int value = off ? 0 : field(it->second, 1);
+            changeSetting(it->second[0], value);
+            // A radio's `group` sets the others with it, as Test Game 87's one Confirmations switch covers six (set 1).
+            for (auto [g, gEnd] = lines("group"); g != gEnd; ++g)
+                if (!g->second.empty() && g->second[0] == it->second[0])
+                    for (size_t i = 1; i < g->second.size(); i++) changeSetting(g->second[i], value);
             return true;
         }
     for (auto [it, end] = lines("check"); it != end; ++it)
@@ -2067,6 +2123,7 @@ Engine::SlotInfo &Engine::slotInfo(int slot) {
     info.exists = true;
     std::copy(std::begin(data.date), std::end(data.date), info.date);
     info.flow = data.flow;
+    info.variables = data.variables;
     if (auto it = data.variables.find(routeVar_); routeVar_ >= 0 && it != data.variables.end()) info.route = it->second;
     info.comment = sjis::toUtf8(data.comment);
     auto bmp = readWhole(savePath(slot, "bmp"));
@@ -2670,6 +2727,22 @@ void Engine::composeSlots(Canvas &out) {
             else if (empty) drawPart(out, *empty, cx + offset("slotempty", 1), cy + offset("slotempty", 2), 0, 0, empty->w, empty->h, 1);
             if (frame && frame->h >= 5 && slot == hovered) drawPart(out, *frame, cx + offset("slotframe", 1), cy + offset("slotframe", 2), 0, frame->h / 5, frame->w, frame->h / 5, 1);
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
+            // `slotpic SHEET X Y`: a picture on every card, full or empty, as Test Game 87's Save Date label (set 1).
+            for (auto [it, end] = screen_->settings.equal_range("slotpic"); it != end; ++it)
+                if (it->second.size() >= 3)
+                    if (ImageRef pic = images_->get(it->second[0])) drawPart(out, *pic, cx + field(it->second, 1), cy + field(it->second, 2), 0, 0, pic->w, pic->h, 1);
+            // `slotchaptervar SHEET X Y COLS VAR`: the chapter's name by a scenario variable of the save, cell VAR's value of
+            // a strip of COLS across, its edges rounded, as Test Game 87's cards name theirs by S 4000 (set 1).
+            if (const auto *chapter = screen_->setting("slotchaptervar"); chapter && chapter->size() >= 5 && info.exists)
+                if (ImageRef names = images_->get((*chapter)[0])) {
+                    int cols = std::max(1, field(*chapter, 3));
+                    auto it = info.variables.find(field(*chapter, 4));
+                    int k = it == info.variables.end() ? 0 : it->second;
+                    if (k >= 0 && k < cols) {
+                        int x0 = (k * names->w + cols / 2) / cols, x1 = ((k + 1) * names->w + cols / 2) / cols;
+                        drawPart(out, *names, cx + field(*chapter, 1), cy + field(*chapter, 2), x0, 0, x1 - x0, names->h, 1);
+                    }
+                }
             // `slotchapter SHEET X Y ROWS FLOW...`: the name of the chapter a save is in, a row of the sheet for each flow
             // script named in order, as Test Game 89's cards show.
             if (const auto *chapter = screen_->setting("slotchapter"); chapter && chapter->size() >= 5 && info.exists)
@@ -2738,6 +2811,8 @@ void Engine::composeSlots(Canvas &out) {
                 x = drawNumber(dateDigits, info.date[0], 4, x, y, dateColumns);
                 mark(slash, 10);
                 x = drawNumber(dateDigits, info.date[1], 2, x, y, dateColumns);
+                // `dateslash2 DX`: the second slash that much further on, as Test Game 87's sits 2 pixels right (set 1).
+                x += offset("dateslash2", 0);
                 mark(slash, 10);
                 x = drawNumber(dateDigits, info.date[2], 2, x, y, dateColumns);
                 x += offset("dategap", 0);
@@ -2749,8 +2824,8 @@ void Engine::composeSlots(Canvas &out) {
                 x = drawNumber(dateDigits, info.date[3], 2, x, y, dateColumns);
                 mark(colon, 11);
                 x = drawNumber(dateDigits, info.date[4], 2, x, y, dateColumns);
-                // Test Game 84's dates stop at the minute.
-                if (dateColumns == 10) {
+                // Test Game 84's dates stop at the minute, and with `slotnoseconds` Test Game 87's too (set 1).
+                if (dateColumns == 10 && !screen_->setting("slotnoseconds")) {
                     mark(colon, 11);
                     x = drawNumber(dateDigits, info.date[5], 2, x, y);
                 }
@@ -2763,6 +2838,7 @@ void Engine::composeSlots(Canvas &out) {
                 dashes(4);
                 mark(slash, 10);
                 dashes(2);
+                x += offset("dateslash2", 0);
                 mark(slash, 10);
                 dashes(2);
                 x += offset("dategap", 0);
@@ -2849,8 +2925,10 @@ bool Engine::pressAction(const std::string &action) {
 }
 
 Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
+    // A dialog's buttons over a title stay live while the title's are dimmed.
+    bool own = screen_ && &buttons == &screen_->buttons;
     for (Button &b : buttons)
-        if (shown(b) && b.contains(x, y)) return &b;
+        if (shown(b) && !(own && dimmedBySubmenu(b)) && b.contains(x, y)) return &b;
     return nullptr;
 }
 
@@ -2896,6 +2974,20 @@ bool Engine::shown(const Picture &p) const {
 }
 
 // Whether the submenu of this name is open, or one inside it.
+// `submenudim` on a title: while a submenu is open, the main buttons other than its opener are drawn in their sheet's
+// last row and take no pointer, as Test Games 82 and 87's titles do (sets 1 and 2, under Wine).
+bool Engine::dimmedBySubmenu(const Button &b) const {
+    if (!screen_ || subMenu_.empty() || !b.group.empty() || !screen_->setting("submenudim")) return false;
+    bool opener = (b.action.rfind("submenu:", 0) == 0 && submenuOpen(b.action.substr(8))) || (b.action == "start" && submenuOpen("start"));
+    return !opener;
+}
+
+std::string Engine::waitScale() const {
+    auto defaults = screens_.find("defaults");
+    const auto *line = defaults == screens_.end() ? nullptr : defaults->second.setting("waitscale");
+    return line && !line->empty() ? (*line)[0] : "waittime";
+}
+
 bool Engine::submenuOpen(const std::string &name) const {
     return subMenu_ == name || subMenu_.rfind(name + "/", 0) == 0;
 }
@@ -2920,7 +3012,11 @@ void Engine::pointerToward(float &x, float &y) const {
 int Engine::soundGroup(int kind, const std::string &path) const {
     std::string name = normalizedPath(path);
     name = name.substr(name.find_last_of('\\') + 1);
-    if (kind == kKindSe && name.rfind("hse", 0) == 0) return kGroupHse;
+    // `hseprefix PREFIX` under `screen defaults` names the sex effects another way, as Test Game 87's se_h files (set 1).
+    std::string prefix = "hse";
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        if (const auto *line = defaults->second.setting("hseprefix"); line && !line->empty()) prefix = normalizedPath((*line)[0]);
+    if (kind == kKindSe && name.rfind(prefix, 0) == 0) return kGroupHse;
     if (kind == kKindVoice)
         for (const auto &[start, type] : voiceTypes_)
             if (name.rfind(start, 0) == 0) return type >= 50 ? kGroupBackVoice : kKindVoice;
@@ -3086,6 +3182,12 @@ void Engine::composeScreen(Canvas &out) {
             if (index >= tracks_.size() || !seen(tracks_[index])) continue;
         }
         if (b.action.rfind("page", 0) == 0 && !galleryPageExists(std::atoi(b.action.c_str() + 4))) continue;
+        if (dimmedBySubmenu(b)) {
+            Button shown = b;
+            shown.help = nullptr;
+            drawButton(out, shown, StateDisabled);
+            continue;
+        }
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
         ButtonState state = over ? StateHover : StateNormal;
         bool current = (!subMenu_.empty() && ((b.action.rfind("submenu:", 0) == 0 && submenuOpen(b.action.substr(8))) || (b.action == "start" && submenuOpen("start")))) || b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) || b.action == "express" + std::to_string(setting("express")) ||
@@ -3143,6 +3245,7 @@ void Engine::composeScreen(Canvas &out) {
     if (helpOf) drawButtonHelp(out, *helpOf);
     // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW [NAME]]`: a line of help shown while the pointer is over that part of the screen,
     // such as a settings group in Config, as the PC games show them. Test Game 84 keeps its lines as rows of one sheet.
+    bool hoverShown = false;
     if (pointerSeen_ && !dialogOpen_)
         for (auto [it, end] = screen_->settings.equal_range("hover"); it != end; ++it) {
             const auto &f = it->second;
@@ -3151,7 +3254,36 @@ void Engine::composeScreen(Canvas &out) {
                 int rows = f.size() >= 9 ? std::max(1, field(f, 7)) : 1, h = help->h / rows;
                 drawPart(out, *help, field(f, 5), field(f, 6), 0, (f.size() >= 9 ? field(f, 8) : 0) * h, help->w, h, 1);
             }
+            hoverShown = true;
             break;
+        }
+    // `hovercols X0 Y0 X1 Y1 PICTURE X Y COLS COL`: the same with the lines side by side in the sheet, as Test Game 87's
+    // help cards are (set 1).
+    if (pointerSeen_ && !dialogOpen_ && !hoverShown)
+        for (auto [it, end] = screen_->settings.equal_range("hovercols"); it != end; ++it) {
+            const auto &f = it->second;
+            if (f.size() < 9 || !inRect(pointerX_, pointerY_, field(f, 0), field(f, 1), field(f, 2) - field(f, 0), field(f, 3) - field(f, 1))) continue;
+            if (ImageRef help = images_->get(f[4])) {
+                int w = help->w / std::max(1, field(f, 7));
+                drawPart(out, *help, field(f, 5), field(f, 6), field(f, 8) * w, 0, w, help->h, 1);
+            }
+            break;
+        }
+    // `band Y R G B`, a line for each of two or more rows: the rows from the first listed to the last are multiplied by the
+    // colour between the listed rows around them, across the screen and over all it draws, its help too. Test Game 88's
+    // Config darkens its bottom so on all three pages (under Wine, against its background picture: within half a level).
+    std::vector<std::array<int, 4>> band;
+    for (auto [it, end] = screen_->settings.equal_range("band"); it != end; ++it)
+        if (it->second.size() >= 4) band.push_back({field(it->second, 0), field(it->second, 1), field(it->second, 2), field(it->second, 3)});
+    std::sort(band.begin(), band.end());
+    for (size_t i = 0; i + 1 < band.size(); i++)
+        for (int y = std::max(0, band[i][0]); y < std::min(out.h, band[i + 1][0] + (i + 2 == band.size() ? 1 : 0)); y++) {
+            float t = float(y - band[i][0]) / float(std::max(1, band[i + 1][0] - band[i][0]));
+            float m[3];
+            for (int c = 0; c < 3; c++) m[c] = (float(band[i][c + 1]) + (float(band[i + 1][c + 1]) - float(band[i][c + 1])) * t) / 255.0f;
+            uint8_t *row = out.px.data() + size_t(y) * size_t(out.w) * 4;
+            for (int x = 0; x < out.w; x++)
+                for (int c = 0; c < 3; c++) row[x * 4 + c] = uint8_t(std::lround(float(row[x * 4 + c]) * m[c]));
         }
     if (dialogOpen_) composeDialog(out);
 }
@@ -3160,8 +3292,8 @@ void Engine::composeScreen(Canvas &out) {
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 bool Engine::innerButtonsShown() const {
     // A plate as wide as the screen comes up with all the buttons when the pointer's on it, as in Test Game 85.
-    if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= plateY_);
-    return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
+    if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= plateY_);
+    return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
 }
 
 // A plate as wide as the screen carries both rows of buttons, and comes up with the pointer on it, as in Test Game 85.
@@ -3169,7 +3301,7 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 
 bool Engine::underButtonsShown() const {
     if (fullWidthPlate()) return innerButtonsShown();
-    return buttonPlate_ && pointerSeen_ && pointerY_ >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
+    return buttonPlate_ && pointerSeen_ && messagePointerY() >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
 }
 
 void Engine::composeMessageButtons(Canvas &out) {
@@ -3186,7 +3318,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         neko::drawButton(c, shown, st);
     };
     auto state = [&](const Button &b) {
-        bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
+        bool over = pointerSeen_ && b.contains(pointerX_, messagePointerY());
         // The art button reads ORIGINAL.ver while the arranged art shows, and ARRANGE.ver, its selected cells, while the
         // original does.
         bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_) ||
@@ -3622,7 +3754,7 @@ void Engine::runScene(const Node &n) {
     case 2:  // wait, unless Config turns waits off
         if (!setting("wait")) break;
         waiting_ = Waiting::Time;
-        waitUntil_ = now_ + int64_t(p[0]) * setting("waittime") / 100;
+        waitUntil_ = now_ + int64_t(p[0]) * setting(waitScale()) / 100;
         break;
     case 4:  // hide the text window
         if (windowShown_) dirty_ = true;
@@ -3869,6 +4001,11 @@ void Engine::runScene(const Node &n) {
 
 bool Engine::step(int ms) {
     if (paused_) return waiting_ != Waiting::Ended;
+    if (bool square = wantsSquare(); square != square_) {
+        square_ = square;
+        dirty_ = true;
+        log("frame %s", square ? "4:3" : "16:9");
+    }
     // The player's track ending comes first, since its screen is a menu.
     if (trackPlayer_ && !trackPaused_ && !audio_.playing(trackPlayer_)) {
         int next = nextTrack(1);
@@ -3942,7 +4079,7 @@ bool Engine::step(int ms) {
     if (autoMode_ && waiting_ == Waiting::Click && textDone_) {
         bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
         if (voiceGoing) autoReadyAt_ = -1;
-        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + autoDelayMs_;
+        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + (autoPerCharMs_ >= 0 ? autoPerCharMs_ * int64_t(textGlyphs_.size()) : autoDelayMs_);
         else if (now_ >= autoReadyAt_) autoNext = true;
     } else {
         autoReadyAt_ = -1;
@@ -3995,7 +4132,7 @@ void Engine::mouseMove(float x, float y) {
     mouseX_ = x;
     mouseY_ = y;
     mouseMoved_ = true;
-    int px = int(x * float(width_)), py = int(y * float(height_));
+    int px = int(x * float(width_)), py = int(y * float(square_ ? squareY_ + squareShift_ : height_));
     bool moved = px != pointerX_ || py != pointerY_;
     if (moved || !pointerSeen_) dirty_ = true;
     pointerX_ = px;
@@ -4049,6 +4186,10 @@ void Engine::mouseButton(int button, bool down) {
             if (screen_->setting("menustages") && menuStage_ >= 2) {
                 menuStage_ = 1;
                 subMenu_.clear();
+                dirty_ = true;
+            } else if (screen_->setting("submenudim") && !subMenu_.empty()) {
+                size_t slash = subMenu_.rfind('/');
+                subMenu_ = slash == std::string::npos ? "" : subMenu_.substr(0, slash);
                 dirty_ = true;
             } else if (const auto *cancel = screen_->setting("cancel"); cancel && !cancel->empty()) runAction((*cancel)[0]);
             else if (screen_->name != "title") runAction("back");
@@ -4160,15 +4301,15 @@ void Engine::mouseButton(int button, bool down) {
     }
     if (windowShown_) {
         // A touch has no hover, so a tap where hidden buttons sit shows them, and the next tap presses one.
-        if (pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_ && !setting("bar_always")) return;
+        if (messagePointerY() >= barTop_ && !innerWereShown_ && !underWereShown_ && !setting("bar_always")) return;
         if (innerWereShown_)
-            if (Button *b = buttonAt(pointerX_, pointerY_, bar().inner)) {
+            if (Button *b = buttonAt(pointerX_, messagePointerY(), bar().inner)) {
                 std::string action = b->action;
                 runAction(action);
                 return;
             }
         if (underWereShown_)
-            if (Button *b = buttonAt(pointerX_, pointerY_, bar().under)) {
+            if (Button *b = buttonAt(pointerX_, messagePointerY(), bar().under)) {
                 std::string action = b->action;
                 runAction(action);
                 return;
@@ -5547,6 +5688,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
 }
 
 void Engine::compose() {
+    messageInStrip_ = false;
     if (screen_) {
         composeScreen(canvas_);
         return;
@@ -5618,7 +5760,8 @@ void Engine::compose() {
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
     drawParts(canvas_, Layer::UnderWindow);
-    composeMessage(canvas_);
+    messageInStrip_ = square_;
+    if (!square_) composeMessage(canvas_);
     drawParts(canvas_, Layer::OverWindow);
     composeCameraPanel(canvas_);
     if (partScreen_) drawParts(canvas_, Layer::Screen);
@@ -5676,10 +5819,11 @@ const std::vector<std::string> *Engine::choiceTable(const std::string &key) cons
 void Engine::composeMessage(Canvas &out) {
     if (!windowShown_ || windowHiddenByPlayer_) return;
     if (windowImage_) {
-        int y = windowY_;
+        // In the 4:3 frame Test Game 88's PC puts its window two rows lower than the rest of the layer moves (under Wine).
+        int top = windowY_ + (square_ ? 2 : 0), y = top;
         if (windowShowType_ == 2) {
             int elapsed = int(now_ - windowShownAt_);
-            if (elapsed < kWindowSlideMs) y = out.h - (out.h - windowY_) * elapsed / kWindowSlideMs;
+            if (elapsed < kWindowSlideMs) y = out.h - (out.h - top) * elapsed / kWindowSlideMs;
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
@@ -5866,6 +6010,20 @@ const uint8_t *Engine::frame(int &w, int &h, bool &changed) {
         markSaved_ = false;
         frameChanged_ = true;
     }
+    // The 4:3 frame is built again whenever the 16:9 one changes or the mark is showing, which moves with the strip.
+    if (square_) {
+        bool mark = messageInStrip_ && markShowing();
+        if (frameChanged_ || mark || markSaved_ || frame_.h != squareY_ + squareShift_) {
+            composeStrip();
+            markSaved_ = mark;
+            frameChanged_ = true;
+        }
+        w = frame_.w;
+        h = frame_.h;
+        changed = frameChanged_;
+        frameChanged_ = false;
+        return frame_.px.data();
+    }
     if (markShowing()) {
         markRect(mx, my, mw, mh);
         if (markSaved_) canvas_.restoreRect(mx, my, mw, mh, underMark_);
@@ -5885,6 +6043,37 @@ const uint8_t *Engine::frame(int &w, int &h, bool &changed) {
     changed = frameChanged_;
     frameChanged_ = false;
     return canvas_.px.data();
+}
+
+// Whether the frame is 4:3: Config's `screensize` picks 16:9 (1 to 3) or 4:3 (4 to 6), and with it automatic (0) the
+// shape nearer the host's view, with room either side of the middle so a window dragged across it doesn't flicker.
+bool Engine::wantsSquare() const {
+    if (!squareImage_) return false;
+    int size = setting("screensize");
+    if (size >= 1 && size <= 3) return false;
+    if (size >= 4 && size <= 6) return true;
+    if (viewAspect_ <= 0) return square_;
+    return square_ ? viewAspect_ < 1.60f : viewAspect_ < 1.48f;
+}
+
+// The 4:3 frame: the 16:9 frame, the MsgWinSquare picture under it, and over that picture the message layer drawn as
+// for 16:9 and moved down MsgWinSquareMovement rows, as Test Game 88's PC draws it in a 1280x960 window (under Wine).
+void Engine::composeStrip() {
+    int total = squareY_ + squareShift_;
+    if (frame_.w != width_ || frame_.h != total) frame_.resize(width_, total);
+    if (strip_.w != width_ || strip_.h != height_) strip_.resize(width_, height_);
+    size_t row = size_t(width_) * 4;
+    std::memcpy(frame_.px.data(), canvas_.px.data(), row * size_t(std::min(canvas_.h, total)));
+    // The layer's rows from height_ - squareShift_ go to squareY_; under them is the picture.
+    int from = height_ - squareShift_;
+    std::fill(strip_.px.begin(), strip_.px.end(), uint8_t(0));
+    drawPart(strip_, *squareImage_, 0, from, 0, 0, squareImage_->w, squareImage_->h, 1);
+    if (messageInStrip_) {
+        composeMessage(strip_);
+        if (markShowing()) drawMark(strip_);
+    }
+    for (int y = 0; y < squareShift_ && from + y < strip_.h && squareY_ + y < total; y++)
+        std::memcpy(frame_.px.data() + size_t(squareY_ + y) * row, strip_.px.data() + size_t(from + y) * row, row);
 }
 
 }  // namespace neko
