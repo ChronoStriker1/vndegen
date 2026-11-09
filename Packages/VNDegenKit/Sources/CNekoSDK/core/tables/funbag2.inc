@@ -28,6 +28,10 @@ button scene obj\d000_005.bmp 514 501 5 5 3 stage 2 group extra help obj\d000_00
 button music obj\d000_005.bmp 514 547 5 5 4 stage 2 group extra help obj\d000_007.bmp 356 404 5 1 4 0
 
 screen load
+# The room behind the menus is bg_000_023_000 at 46 percent, under the side panel and the frame.
+pic bg\bg_000_023_000.bmp 0 0
+pic dim 0 0 alpha 138
+pic obj\e001_000.bmp 1103 0
 pic obj\e000_000.bmp 0 0
 pic obj\e000_001.bmp 22 18 6 1 1 0
 slots obj\e002_000.bmp 60 99 510 119 5 2 1
@@ -36,6 +40,7 @@ slotdigits obj\e002_002.bmp 239 6 3
 slotnew obj\e003_000.bmp -23 -3
 # The chapter is S 5000, a cell of the strip: the prologue, then chapters 1 to 4 as the PC's cards name them.
 slotchaptervar obj\e004_000.bmp 358 4 5 5000
+datedigits obj\e002_002.bmp 0 0
 datefield year 251 28 15
 # Day, hour and minute show no leading zero on the PC. The month is taken to do the same, as only 11 has been seen.
 datefield month 347 28 15 blank
@@ -63,6 +68,10 @@ button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 
 button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
 
 screen save
+# The room behind the menus is bg_000_023_000 at 46 percent, under the side panel and the frame.
+pic bg\bg_000_023_000.bmp 0 0
+pic dim 0 0 alpha 138
+pic obj\e001_000.bmp 1103 0
 pic obj\e000_000.bmp 0 0
 pic obj\e000_001.bmp 22 18 6 1 0 0
 slots obj\e002_000.bmp 60 99 510 119 5 2 1
@@ -71,6 +80,7 @@ slotdigits obj\e002_002.bmp 239 6 3
 slotnew obj\e003_000.bmp -23 -3
 # The chapter is S 5000, a cell of the strip: the prologue, then chapters 1 to 4 as the PC's cards name them.
 slotchaptervar obj\e004_000.bmp 358 4 5 5000
+datedigits obj\e002_002.bmp 0 0
 datefield year 251 28 15
 # Day, hour and minute show no leading zero on the PC. The month is taken to do the same, as only 11 has been seen.
 datefield month 347 28 15 blank
@@ -99,6 +109,8 @@ button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 
 
 screen defaults
 parts scroll
+# The PC draws the message window at its .alp as it is.
+default opacity 100
 layoutcgslot 102
 lastchoice made
 
