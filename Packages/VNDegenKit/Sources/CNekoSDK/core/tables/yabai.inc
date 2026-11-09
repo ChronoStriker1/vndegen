@@ -31,6 +31,9 @@ cgwhole
 # The window's four buttons show whenever the window does, and the click-wait mark stands still, as on the PC.
 inneralways
 markstill
+# The PC keeps each standing picture and background as two records, the lit one in the slot after the dark one's (for
+# its flickering bulb), so what takes a place's picture away takes both.
+layoutpairs
 
 # The interrogation hub (yabaiplay), as measured under Wine:
 #   truth T HOURS FIRST [START]   the hours truth T gives, whom the hub shows first, and its starting hour (8 if left out)
@@ -196,6 +199,21 @@ cellthumb 5 6
 celldigits obj\e004_001.bmp 40 120 2 11 13
 cellcount obj\e004_001.bmp - 143 151 165 176 0 13
 cellcountdash 12
+# The viewer, measured on the PC under Wine: a panel along the bottom with the picture's number in its entry and the
+# entry's count, previous and next (which go round within the entry), the slideshow (a picture every 5 seconds, on
+# into the next entry), the next entry, and the way out, each with a help over it, and an X that hides the panel. A
+# click on the picture shows the next one, on into the next entry; the right button leaves, or brings a hidden panel back.
+viewer obj\f002_000.bmp 44 606
+viewerclicks
+viewerauto 5000 0
+viewernumber index obj\f002_001.bmp 234 667 25 2
+viewernumber total obj\f002_002.bmp 313 673 21 2
+viewerbutton prevvar obj\f002_003.bmp 413 648 2 0 helppic obj\f004_000.bmp 358 552 cols 5 0
+viewerbutton nextvar obj\f002_003.bmp 525 648 2 1 helppic obj\f004_000.bmp 470 552 cols 5 1
+viewerbutton auto obj\f002_004.bmp 637 648 3 0 helppic obj\f004_000.bmp 582 552 cols 5 2
+viewerbutton nextcg obj\f002_004.bmp 761 648 3 1 helppic obj\f004_000.bmp 706 552 cols 5 3
+viewerbutton return obj\f002_004.bmp 917 648 3 2 helppic obj\f004_000.bmp 862 552 cols 5 4
+viewerbutton hide obj\i000_001.bmp 1197 616 3 0 helppic obj\f005_000.bmp 1038 540
 cell 90 139
 cell 314 139
 cell 538 139
@@ -221,6 +239,8 @@ screen scene
 selectedlook
 # Each card replays the chapter its play_view2.ini line names (5000 and up in the chapter list), as the PC does.
 replaychapters
+# A replay comes back to the tab and page its card is on, as the PC does.
+replaykeeps
 pic bg\bg_001_000_000_000_000.bmp 0 0
 pic obj\d000_000.bmp 0 0
 pic obj\e000_001.bmp 0 628
