@@ -292,6 +292,14 @@ on an entry chooses it and leaves the list open; the × or a click outside the w
 folder is there without its pictures (`sys_1`) is listed by name alone and can't be chosen; one whose folder isn't
 (`sys_2`) isn't listed, and numbers count only what's listed.
 
+Two details checked under Wine later, with the runtime driven through the same clicks at the same moments and its log
+saying which list was open (the panels go 3 s after the explanation closes, so a click after that opens nothing, on
+the PC and here alike): the pose list draws each pose with the face chosen, not the first, as the runtime does (with
+the face stepped twice, the PC's figures' faces matched the runtime's drawn with the chosen face, 0.059 against 0.094
+with the first); and the outfit list's help bubble for its boxes, `p021_006`, which the archive has, didn't show with
+the pointer on a box, so the runtime draws none (the PC's frame and the runtime's matched within 0.01, and a search for
+the bubble scored both the same). `p021_008` is a Now Loading animation the PC wasn't seen to show either.
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on
