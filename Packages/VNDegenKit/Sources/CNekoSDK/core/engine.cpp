@@ -36,6 +36,9 @@ constexpr int kTiledKind = 6;
 // The effects channel a flipbook's own sound plays in (`flipsound`), which game parts can use for theirs too.
 constexpr int kFlipSoundChannel = 180;
 constexpr size_t kTiledSpeedAt = 45;
+// A scroll speed read from a save, in pixels a second. A save's bytes may be anything: one that isn't a number, or is
+// too great to tile by, is none.
+static float sanePerSecond(float speed) { return std::isfinite(speed) && std::fabs(speed) <= 1.0e6f ? speed : 0; }
 // How long each character of text takes to fade in, measured from the PC game's footage.
 constexpr int kCharFadeMs = 160;
 // How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
@@ -2507,6 +2510,7 @@ SaveData Engine::captureSave() {
             out.kind = s.kind;
             out.alpha = out.endAlpha = int(s.alpha * 256 + 0.5f);
             d.sprites.push_back(out);
+            continue;  // one record to a slot
         }
         if (!s.image) continue;
         SavedSprite out;
@@ -2593,6 +2597,18 @@ SaveData Engine::captureSave() {
         out.endAlpha = int(end.alpha * 256 + 0.5f);
         d.sprites.push_back(out);
     }
+    // `layoutpairs`: the PC writes a place's two records with the slot after first, 101 then 100 and 201 then 200 (set
+    // 2, from Test Game 96's PC saves). Written in slot order, the PC showed a loaded save's old lit picture until the
+    // next picture change. Only a PC save loaded and saved again holds both.
+    if (layoutPairs_)
+        for (size_t i = 0; i + 1 < d.sprites.size(); i++) {
+            int slot = d.sprites[i].slot;
+            bool place = slot == layoutBgSlot_ || slot == layoutCgSlot_ || std::find(layoutSlots_.begin(), layoutSlots_.end(), slot) != layoutSlots_.end();
+            if (place && d.sprites[i + 1].slot == slot + 1) {
+                std::swap(d.sprites[i], d.sprites[i + 1]);
+                i++;
+            }
+        }
     // Splash emitters are records of their own, in their slots among the pictures', as the PC writes them. A droplet
     // lives a second or so, so only the emitter is kept.
     for (const auto &[slot, splash] : splashes_) {
@@ -2841,13 +2857,13 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         if (saved.kind == kTiledKind && saved.rawFixed.size() >= kTiledSpeedAt + 4) {
             float speed;
             std::memcpy(&speed, saved.rawFixed.data() + kTiledSpeedAt, 4);
-            s.scrollX = speed * 60;
+            s.scrollX = sanePerSecond(speed * 60);
             s.scrollFrom = now_;
         }
         if (auto fx = side.slotFx.find(saved.slot); fx != side.slotFx.end() && side.valid) {
             s.additive = fx->second[0] != 0;
-            s.scrollX = fx->second[1];
-            s.scrollY = fx->second[2];
+            s.scrollX = sanePerSecond(fx->second[1]);
+            s.scrollY = sanePerSecond(fx->second[2]);
             s.scrollFrom = now_;
         }
         front_[saved.slot] = s;
@@ -5862,6 +5878,11 @@ void Engine::loadImage(const Node &n) {
     s.path = n.s[1];
     s.flipCount = 0;
     s.movie.reset();
+    // A picture in a slot a part held takes the slot over: it's drawn and saved as a picture, not as the part's.
+    if (s.held) {
+        s.held = false;
+        s.kind = 0;
+    }
 }
 
 void Engine::holdPartSlot(int slot, int kind) {
