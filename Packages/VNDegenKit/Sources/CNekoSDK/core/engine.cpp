@@ -2970,17 +2970,28 @@ void Engine::composeDialog(Canvas &out) {
     // `dim N` of 256 darkens what's behind; Test Game 84's questions don't.
     const auto *dim = dialog.setting("dim");
     tintFrame(out, 0, 0, 0, dim && !dim->empty() ? field(*dim, 0) : 128);
-    // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, and fixed art besides.
-    int question = 0;
+    // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, behind fixed art besides.
+    // `question FILE X Y COLS COL`: a cell of a strip instead, drawn over the art, as Test Game 82's titles are seven
+    // across one picture over the frame they name.
     bool separate = dialog.settings.count("question") != 0;
-    for (auto [it, end] = dialog.settings.equal_range("question"); it != end; ++it, question++)
-        if (question == dialogQuestion_ && it->second.size() >= 3)
-            if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2), 0, 0, picture->w, picture->h, 1);
+    auto drawQuestion = [&](bool cells) {
+        int question = 0;
+        for (auto [it, end] = dialog.settings.equal_range("question"); it != end; ++it, question++) {
+            const auto &q = it->second;
+            if (question != dialogQuestion_ || q.size() < 3 || (q.size() >= 5) != cells) continue;
+            if (ImageRef picture = images_->get(q[0])) {
+                int cols = cells ? std::max(1, field(q, 3)) : 1, w = picture->w / cols, col = cells ? std::clamp(field(q, 4), 0, cols - 1) : 0;
+                drawPart(out, *picture, field(q, 1), field(q, 2), col * w, 0, w, picture->h, 1);
+            }
+        }
+    };
+    drawQuestion(false);
     for (const Picture &p : dialog.pictures) {
         Picture shown = p;
         if (p.rows > 1 && !separate) shown.row = dialogQuestion_;
         drawPicture(out, shown);
     }
+    drawQuestion(true);
     for (const Button &b : dialog.buttons) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
         bool ticked = b.action == "noask" && dialogNoAsk_;

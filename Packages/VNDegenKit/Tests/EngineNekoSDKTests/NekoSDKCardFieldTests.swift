@@ -86,4 +86,23 @@ import TestSupport
         #expect(pixel(e, 570 + 27, 99 + 8) == [0, 0, 200])
         #expect(pixel(e, 570 + 350 + 5, 99 + 6 + 5) == [0, 0, 200])
     }
+
+    // Test Game 82's dialogs take their question from a strip of seven titles (`question FILE X Y COLS COL`), drawn over
+    // the frame the table names: quit's is the strip's third cell, here green 150, over a frame of yellow.
+    @Test func aDialogQuestionIsACellOfAStripOverItsFrame() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\cardtest\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([
+                ("n.bmp", bmp(342, 22) { x, _ in [0, UInt8(60 * (x / 114) + 30), 0] }),
+                ("f.bmp", bmp(158, 90) { _, _ in [0, 250, 250] }),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_press(e, "quit"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 315, 315) == [0, 150, 0])
+        #expect(pixel(e, 440, 380) == [250, 250, 0])
+    }
 }
