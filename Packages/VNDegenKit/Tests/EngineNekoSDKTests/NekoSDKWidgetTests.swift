@@ -225,6 +225,17 @@ import TestSupport
         #expect(pixel(e, 315, 305) == [0, 0, 255])
         #expect(pixel(e, 315, 315) == [0, 0, 255])
         #expect(pixel(e, 350, 315) == white)
+        // The second tab has no scene and Music is in the table's `buttonsoff`: both are drawn disabled and take no
+        // press, as Test Game 90's bonus release draws its empty tabs and its Music. The first tab is as it was.
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 925, 25) == grey)
+        #expect(pixel(e, 1025, 25) == grey)
+        #expect(pixel(e, 825, 25) != grey)
+        click(e, 925, 25)
+        click(e, 1025, 25)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(status().contains(" menu scene"), "\(status())")
+        #expect(pixel(e, 305, 305) == green)
         click(e, 320, 315)
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().hasPrefix("scr\\c7.txt"), "\(status())")
@@ -243,5 +254,26 @@ import TestSupport
             for _ in 0..<90 { _ = vnneko_step(e, 16) }
             #expect(status().contains(" menu scene"), "\(status())")
         }
+    }
+
+    @Test func anEmptyTabOpensWithoutTheKey() throws {
+        let root = try game("widgettesttabs", [
+            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\k.txt,0,0\n".utf8),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/widgettesttabs/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try Data("scr\\k.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_press(e, "scene"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 305, 305) == green)
+        #expect(pixel(e, 925, 25) == white)
+        click(e, 925, 25)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 305, 305) != green)
     }
 }

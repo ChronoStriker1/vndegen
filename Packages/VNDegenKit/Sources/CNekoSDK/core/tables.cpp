@@ -14,6 +14,7 @@ namespace {
 #include "tables/moralorc.inc"
 #include "tables/animother.inc"
 #include "tables/rinjin.inc"
+#include "tables/funbag2.inc"
 #include "tables/sideboob2.inc"
 #include "tables/funbagfantasy1.inc"
 #include "tables/storytest.inc"
@@ -39,6 +40,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\moralorc") return kMoralOrc;
     if (folder == "waffle\\animother") return kAniMother;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return kRinjin;
+    if (folder == "waffle\\funbagfantasy2") return kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return kSideboob2;
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpc") return kStoryTest;
@@ -55,6 +57,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\widgettest") return kWidgetTest;
     if (folder == "vndegen\\widgettesthide") return kWidgetTestHide;
     if (folder == "vndegen\\widgettestpart") return kWidgetTestPart;
+    if (folder == "vndegen\\widgettesttabs") return kWidgetTestTabs;
     if (folder == "vndegen\\windowlogtest") return kWindowLogTest;
     if (folder == "vndegen\\commenttest") return kCommentTest;
     if (folder == "vndegen\\treetest") return kTreeTest;
