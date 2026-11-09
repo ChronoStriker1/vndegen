@@ -193,6 +193,19 @@ hovercols 134 384 870 466 obj\j004_000.bmp 34 298 9 5
 hovercols 134 471 870 503 obj\j004_000.bmp 34 385 9 6
 hovercols 134 507 870 539 obj\j004_000.bmp 34 421 9 7
 hovercols 134 541 870 573 obj\j004_000.bmp 34 454 9 8
+# The Questionnaire Privilege panel under the first tab, from sys_3.pak: the heroines' standing pictures as normal, in
+# underwear or nude, with a sample of each under the pointer. On the PC under Wine the choice is kept and nothing else
+# changes: its story and galleries go on reading the same pictures (a file trace), and the game names a `sys_1\sc`
+# folder that this release doesn't have. So the buttons are here and change nothing. The PC shows no sample over the
+# chosen button; here each button shows its own, and not the row's help card with it. The mankitsu part draws the
+# panel, sys_3\j200_000.bmp at 53, 653, since it lies over the bottom trim.
+radio outfit 0 sys_3\j200_001.bmp 419 672 3 5 0
+radio outfit 1 sys_3\j200_001.bmp 533 672 3 5 1
+radio outfit 2 sys_3\j200_001.bmp 647 672 3 5 2
+hovercols 419 672 523 700 sys_3\j200_003.bmp 586 360 3 0
+hovercols 533 672 637 700 sys_3\j200_003.bmp 586 360 3 1
+hovercols 647 672 751 700 sys_3\j200_003.bmp 586 360 3 2
+hovercols 94 660 908 708 sys_3\j200_002.bmp 2 570 1 0
 
 screen config2
 part mankitsu

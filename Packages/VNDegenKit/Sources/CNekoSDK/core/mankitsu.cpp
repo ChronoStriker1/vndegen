@@ -467,6 +467,8 @@ private:
             for (int x = -(moved % top->w); x < out.w; x += top->w) drawPart(out, *top, x, menuPlate() < 2 ? 0 : -36, 0, 0, top->w, top->h, 1);
         if (ImageRef bottom = host.image("obj\\e004_001.bmp"))
             for (int x = moved % bottom->w - bottom->w; x < out.w; x += bottom->w) drawPart(out, *bottom, x, 662, 0, 0, bottom->w, bottom->h, 1);
+        // Config's first tab has the Questionnaire Privilege panel over the bottom trim, under its buttons.
+        if (menu_ == "config") put(host, out, "sys_3\\j200_000.bmp", 53, 653);
     }
 
     // The red liquid behind the lower row of message buttons (set 1, from a 60 fps recording under Wine): three wave
