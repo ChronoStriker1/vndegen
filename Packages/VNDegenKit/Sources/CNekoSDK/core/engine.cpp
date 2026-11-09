@@ -868,8 +868,14 @@ bool Engine::moveFocus(int dx, int dy) {
         for (const Button &b : buttons)
             if (b.sheet && shown(b)) spots.push_back({b.x + b.cellW() / 2, b.y + b.cellH() / 2});
     };
+    // A game part's controls: on its own screen, or added to a table screen's, or alone while it says so.
+    std::vector<std::pair<int, int>> partSpots;
+    GamePart *part = dialogOpen_ || logOpen_ ? nullptr : screen_ ? menuPart() : waiting_ == Waiting::PartScreen ? partScreen_ : nullptr;
+    bool partOnly = part && part->focusSpots(*partHost_, partSpots);
     if (dialogOpen_) {
         addButtons(screens_.at("dialog").buttons);
+    } else if (part && (partOnly || !screen_)) {
+        for (auto [x, y] : partSpots) spots.push_back({x, y});
     } else if (logOpen_) {
         addButtons(screens_.at("log").buttons);
     } else if (waiting_ == Waiting::Choice && choiceSheet_ && !screen_) {
@@ -914,6 +920,7 @@ bool Engine::moveFocus(int dx, int dy) {
         if (size && size->size() >= 2)
             for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it)
                 spots.push_back({std::atoi(it->second[0].c_str()) + cellShift() + std::atoi((*size)[0].c_str()) / 2, std::atoi(it->second[1].c_str()) + std::atoi((*size)[1].c_str()) / 2});
+        for (auto [x, y] : partSpots) spots.push_back({x, y});
     } else {
         return false;
     }

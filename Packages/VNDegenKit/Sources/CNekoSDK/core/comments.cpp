@@ -17,8 +17,10 @@ namespace {
 constexpr int kFace = 0, kSize = 24, kEdge = 2;
 constexpr int64_t kCrossMs = 6050;
 constexpr int kLaneTop = 10, kLanePitch = 40, kLanes = 12;
-// Command 113's lines start one about every 2.1 seconds.
+// Command 113's lines start one about every 2.1 seconds. A placed line's text stands about 10 pixels below its row,
+// where a picture's own text starts about 3 below its top.
 constexpr int64_t kInlineGapMs = 2100;
+constexpr int kPlacedDrop = 7;
 
 int64_t framesMs(int frames) { return int64_t(frames) * 1000 / 60; }
 
@@ -120,9 +122,10 @@ bool CommentStream::load(PartHost &host, const std::string &path) {
     return true;
 }
 
-// A group's lines start in the file's order, the first at once and each next after A to B frames, and the group ends
-// with its last: group 0 of Test Game 96's first list, 12 lines at 40 to 80, gave about 12 comments 0.4 to 1.2 seconds
-// apart, then none. The gap's unit and spread are unconfirmed.
+// A group's lines start in the file's order, the first at once and each next after A to B frames at 60 a second, and
+// the group ends with its last: group 0 of Test Game 96's first list, 12 lines at 40 to 80, gave about 12 comments 0.4
+// to 1.2 seconds apart, then none, and group 10's 150 to 300 gave 2.3 to 4.5 seconds. The spread within A to B is taken
+// as even.
 void CommentStream::play(PartHost &host, int group) {
     playing_.push_back(group);
     ended_ = false;
@@ -139,8 +142,8 @@ void CommentStream::play(PartHost &host, int group) {
     cursors_.push_back(std::move(cursor));
 }
 
-// Command 113's lines start one every 2.1 seconds; one placed as `《text》,X,Y` starts X frames on at row Y, which is
-// a reading of the numbers not yet checked against the PC.
+// Command 113's lines start one every 2.1 seconds; one placed as `《text》,X,Y` starts X frames on at row Y, as the
+// PC's do: seven at 0 entered together at rows 20 to 440, and those at 90 about 1.5 seconds later (lead, under Wine).
 void CommentStream::lines(PartHost &host, const std::vector<std::string> &texts) {
     Cursor cursor;
     int64_t now = host.nowMs();
@@ -154,7 +157,7 @@ void CommentStream::lines(PartHost &host, const std::vector<std::string> &texts)
             char *end = nullptr;
             long x = std::strtol(text.c_str() + before + 1, &end, 10);
             if (end && *end == ',') {
-                pending_.push_back({text.substr(0, before), std::atoi(text.c_str() + comma + 1), now + framesMs(int(x))});
+                pending_.push_back({text.substr(0, before), std::atoi(text.c_str() + comma + 1) + kPlacedDrop, now + framesMs(int(x))});
                 continue;
             }
         }
@@ -165,12 +168,15 @@ void CommentStream::lines(PartHost &host, const std::vector<std::string> &texts)
     cursors_.push_back(std::move(cursor));
 }
 
-// No more start; those on their way go on across. What the parameter changes isn't known.
+// The comments go, those on their way too, and no more start. The parameter is the group that last played (111 7 after
+// group 7, 111 10 after group 10): on Test Game 96's PC, 111 10 came while group 10 still sent comments, and none was
+// left three seconds on, where those on their way would have taken six (lead, under Wine).
 void CommentStream::end(PartHost &, int) {
     ended_ = true;
     playing_.clear();
     cursors_.clear();
     pending_.clear();
+    live_.clear();
 }
 
 void CommentStream::start(PartHost &host, const std::string &text, int y, int64_t at) {

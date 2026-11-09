@@ -5,6 +5,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "canvas.h"
@@ -79,6 +80,10 @@ public:
     // A press at x, y, button 0 left and 1 right: true when this part took it.
     virtual bool press(PartHost &, int x, int y, int button) { return false; }
     virtual void pointer(PartHost &, int x, int y) {}
+    // Controller and keyboard focus while this part's screen is open: the middles of its controls, which a direction
+    // moves the pointer between and Confirm presses as a click there. True when only these count, as for a viewer open
+    // over a table screen's own controls.
+    virtual bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) { return false; }
     // The story table's `chapter N`: the scene scripts to play, in order, or none when this part doesn't know it.
     virtual std::vector<std::string> chapter(PartHost &, int number) { return {}; }
     // State kept with a save: lines in VNDegen's own sidecar, and the PC's save.

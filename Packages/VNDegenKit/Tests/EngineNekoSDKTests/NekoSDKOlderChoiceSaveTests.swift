@@ -61,6 +61,10 @@ import TestSupport
         let data = root.appendingPathComponent("data")
         let first = try #require(NekoSDKFlowFixture.start(root, data: data))
         for _ in 0..<5 { _ = vnneko_step(first, 16) }
+        // With 87's table its title comes first, and Start runs the first flow (set 1); without one the flow is already
+        // running, and there's no Start to press.
+        _ = vnneko_debug_press(first, "start")
+        for _ in 0..<5 { _ = vnneko_step(first, 16) }
         #expect(vnneko_debug_choice_count(first) == 2)
         // At the first choice, none made yet.
         #expect(vnneko_debug_save(first, 1))
