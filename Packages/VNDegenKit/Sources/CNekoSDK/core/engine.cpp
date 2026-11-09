@@ -3098,7 +3098,6 @@ std::string Engine::confirmSetting(int question) const {
 void Engine::openDialog(int question, const std::function<void()> &yes) {
     if (!screens_.count("dialog") || !setting(confirmSetting(question)) || questionCell(question) < 0) {
         yes();
-        holdPresses();
         return;
     }
     dialogOpen_ = true;
@@ -3110,7 +3109,6 @@ void Engine::openDialog(int question, const std::function<void()> &yes) {
 
 void Engine::answerDialog(bool yes) {
     dialogOpen_ = false;
-    holdPresses();
     dirty_ = true;
     auto then = dialogYes_;
     dialogYes_ = nullptr;
@@ -4324,7 +4322,6 @@ void Engine::runScene(const Node &n) {
 }
 
 bool Engine::step(int ms) {
-    inputClock_ += ms;
     if (paused_) return waiting_ != Waiting::Ended;
     if (previousChoiceDue_) notePreviousChoice();
     if (bool square = wantsSquare(); square != square_) {
@@ -4493,15 +4490,9 @@ void Engine::mouseMove(float x, float y) {
     }
 }
 
-// A press that answers a question, or does what one would have asked, is that press's whole effect: presses in the next
-// moment are dropped,
-// so a host that reports one tap twice doesn't also take the choice a load brings up under the same place (set 1, Test
-// Game 87 on an iPad), as the PC takes none while it loads.
-constexpr int64_t kQuietAfterMs = 250;
-void Engine::holdPresses() { quietUntil_ = inputClock_ + kQuietAfterMs; }
-
 void Engine::mouseButton(int button, bool down) {
-    if (down && inputClock_ < quietUntil_) return;
+    // Each edge in the game's log, so a host's taps can be told from the log: one tap is one down and one up.
+    log("pointer %s %d at %d,%d", down ? "down" : "up", button, pointerX_, pointerY_);
     if (button == 0) {
         // The CG viewer's volume is kept when the slider's let go.
         if (!down && leftHeld_ && viewerDragging_) {
