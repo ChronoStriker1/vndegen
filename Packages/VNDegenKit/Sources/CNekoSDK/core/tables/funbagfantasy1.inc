@@ -428,7 +428,8 @@ hover 560 574 1096 625 obj\h004_002.bmp 586 459 7 6
 # (frames every quarter second): white fading out over 2.2 s from 0.7, the dark column with the logo fading in from 3 s,
 # the credits scrolling up from the bottom at 60 pixels a second from 7.79 s, a picture changing every 11.9 s with a
 # 0.75 s crossfade, the whole screen crossfading to B100_000 at 55 s, Fin at 59.3 s, and white again from 70.1 s, with M01.
-# The other four rolls are assumed to keep Aisis's timing; their pictures are the ones each ending read.
+# The other four keep Aisis's timing, checked under Wine: each runs 72.3 s from its first picture to the next scene,
+# as Aisis's does, and reads its pictures again at the same 14.9, 26.7 and 38.5 s.
 screen staffroll_ai
 length 71800
 music bgm\M01-m.ogg
