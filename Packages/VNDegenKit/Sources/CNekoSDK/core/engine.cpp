@@ -2480,6 +2480,12 @@ void Engine::restoreSave(const SaveData &d, int slot) {
                 s.changes.push_back(std::move(a));
             }
         }
+        if (auto fx = side.slotFx.find(saved.slot); fx != side.slotFx.end() && side.valid) {
+            s.additive = fx->second[0] != 0;
+            s.scrollX = fx->second[1];
+            s.scrollY = fx->second[2];
+            s.scrollFrom = now_;
+        }
         front_[saved.slot] = s;
     }
     back_ = front_;
@@ -3204,6 +3210,9 @@ void Engine::composeScreen(Canvas &out) {
         }
         if (b.action.rfind("page", 0) == 0 && !galleryPageExists(std::atoi(b.action.c_str() + 4))) continue;
         if (dimmedBySubmenu(b)) {
+            // `submenudim hide`: the submenu takes their place, as on Test Game 83's title (set 3), so they aren't drawn.
+            const auto *dim = screen_->setting("submenudim");
+            if (dim && !dim->empty() && (*dim)[0] == "hide") continue;
             Button shown = b;
             shown.help = nullptr;
             drawButton(out, shown, StateDisabled);
@@ -4532,6 +4541,13 @@ void Engine::writeFlipModes(int slot, const SaveData &d) {
     text += "print " + std::to_string(saveFingerprint(d)) + "\n";
     for (const auto &[at, s] : front_)
         if (s.flipCount) text += "flip " + std::to_string(at) + " " + (s.flipLoop ? "1" : "0") + " " + (s.flipReverse ? "1" : "0") + " " + sjis::toUtf8(s.path) + "\n";
+    // A part's additive or scrolling picture, which the PC's record doesn't hold.
+    for (const auto &[at, s] : front_)
+        if (!s.flipCount && (s.additive || s.scrollX != 0 || s.scrollY != 0)) {
+            char line[96];
+            std::snprintf(line, sizeof line, "slotfx %d %d %g %g\n", at, s.additive ? 1 : 0, double(s.scrollX), double(s.scrollY));
+            text += line;
+        }
     // Game parts' state, `part NAME LINE`, kept beside the save as the flipbooks' modes are.
     for (const auto &[name, part] : parts_) {
         std::vector<std::string> lines;
@@ -4611,6 +4627,10 @@ Engine::Sidecar Engine::readSidecar(const SaveData &d, int slot) {
             side.hasResult = bool(words >> side.result);
         } else if (kind == "screen") {
             words >> side.screen >> side.screenScope >> side.screenNumber;
+        } else if (kind == "slotfx") {
+            int at = 0, additive = 0;
+            float sx = 0, sy = 0;
+            if (words >> at >> additive >> sx >> sy) side.slotFx[at] = {float(additive), sx, sy};
         }
     }
     // Lines written with another save than this one, such as a PC save copied over ours, don't count: the fingerprint
@@ -5053,6 +5073,26 @@ void Engine::loadImage(const Node &n) {
     s.path = n.s[1];
     s.flipCount = 0;
     s.movie.reset();
+}
+
+bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY) {
+    noteSeen(path);
+    ImageRef image = images_->get(shownPath(path));
+    if (!image) {
+        complain("Missing image " + path);
+        return false;
+    }
+    Sprite s;
+    s.image = image;
+    s.path = path;
+    s.x = float(x);
+    s.y = float(y);
+    s.additive = additive;
+    s.scrollX = scrollX;
+    s.scrollY = scrollY;
+    s.scrollFrom = now_;
+    back_[slot] = std::move(s);
+    return true;
 }
 
 std::shared_ptr<Movie> Engine::openMovie(const std::string &path, bool loop) {
@@ -5626,6 +5666,8 @@ void Engine::foldFinishedChanges(Sprite &s) {
 
 bool Engine::anythingMoves() const {
     if (transitioning_ || shakeType_ || flashMs_ || blur_) return true;
+    for (const auto &[slot, s] : front_)
+        if (s.scrollX != 0 || s.scrollY != 0) return true;
     if (auto noise = front_.find(kNoiseSlot); noise != front_.end() && noise->second.noise) return true;
     for (const auto &[slot, splash] : splashes_)
         if (!splash.droplets.empty()) return true;
@@ -5701,6 +5743,25 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
             float px = pointerSeen_ ? float(pointerX_) : float(out.w) / 2, py = pointerSeen_ ? float(pointerY_) : float(out.h) / 2;
             middleX = middleX * zoom - (zoom - 1) * px;
             middleY = middleY * zoom - (zoom - 1) * py;
+        }
+        if (s.scrollX != 0 || s.scrollY != 0) {
+            // Tiled along the axis it scrolls on, across the whole frame, each copy one picture's length from the next.
+            float tileW = w * std::abs(v.scaleX), tileH = h * std::abs(v.scaleY), seconds = float(now_ - s.scrollFrom) / 1000;
+            float offX = tileW > 0 ? std::fmod(s.scrollX * seconds, tileW) : 0, offY = tileH > 0 ? std::fmod(s.scrollY * seconds, tileH) : 0;
+            float baseX = middleX + dx + offX, baseY = middleY + dy + offY;
+            int fromX = 0, toX = 0, fromY = 0, toY = 0;
+            if (s.scrollX != 0 && tileW > 0) {
+                fromX = int(std::floor((-tileW / 2 - baseX) / tileW)) - 1;
+                toX = int(std::ceil((float(out.w) + tileW / 2 - baseX) / tileW)) + 1;
+            }
+            if (s.scrollY != 0 && tileH > 0) {
+                fromY = int(std::floor((-tileH / 2 - baseY) / tileH)) - 1;
+                toY = int(std::ceil((float(out.h) + tileH / 2 - baseY) / tileH)) + 1;
+            }
+            for (int ky = fromY; ky <= toY; ky++)
+                for (int kx = fromX; kx <= toX; kx++)
+                    drawImage(out, image ? *image : *s.image, baseX + float(kx) * tileW, baseY + float(ky) * tileH, v.scaleX, v.scaleY, v.rotation, v.alpha, nullptr, s.additive);
+            continue;
         }
         drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX * zoom, v.scaleY * zoom, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
     }

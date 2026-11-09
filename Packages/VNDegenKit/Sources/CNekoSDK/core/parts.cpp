@@ -21,9 +21,15 @@ const PartEntry kParts[] = {
 };
 
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses
-// with N, kept with a save, and chapter N is scr\cN.txt.
+// with N, kept with a save, and chapter N is scr\cN.txt. Scene command 9000 loads its picture into slot p3 at p1, p2
+// through PartHost::loadImage, additive when p4 is 1 and scrolling p5 and p6 pixels a second.
 class SelfTestPart : public GamePart {
 public:
+    bool command(PartHost &host, const Node &n) override {
+        if (n.opcode != 9000) return false;
+        host.loadImage(n.p[3], n.s[1], n.p[1], n.p[2], n.p[4] == 1, float(n.p[5]), float(n.p[6]));
+        return true;
+    }
     std::vector<std::string> chapter(PartHost &, int number) override { return {"scr\\c" + std::to_string(number) + ".txt"}; }
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
         int count = args.empty() ? 0 : args[0];
@@ -129,6 +135,10 @@ void Engine::loadParts() {
 void Engine::resetParts() {
     partScreen_ = nullptr;
     for (auto &[name, part] : parts_) part->reset();
+}
+
+bool PartHost::loadImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY) {
+    return e_.loadPartImage(slot, path, x, y, additive, scrollX, scrollY);
 }
 
 bool Engine::partCommand(const Node &n) {

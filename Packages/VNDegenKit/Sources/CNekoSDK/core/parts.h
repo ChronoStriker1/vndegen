@@ -48,6 +48,10 @@ public:
     void finishScreen(int result);
     // A sound on one of the engine's channels: kind 0 music, 1 effects, 2 voice.
     void playSound(int kind, int channel, const std::string &path, int volume = 100, bool loop = false);
+    // A picture into a slot as command 15 loads one, shown by the next screen update and gone with 17 or 22, saved as any
+    // picture: its top left at x, y, its light added to the scene when `additive`, and, with a scroll, tiled along that
+    // axis and moving that many pixels a second along it. False when the picture is missing.
+    bool loadImage(int slot, const std::string &path, int x, int y, bool additive = false, float scrollX = 0, float scrollY = 0);
     void log(const std::string &line);
 
 private:
