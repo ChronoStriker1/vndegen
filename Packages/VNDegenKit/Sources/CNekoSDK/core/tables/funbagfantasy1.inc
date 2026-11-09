@@ -554,6 +554,9 @@ screen story
 # S200 counts Roxanne's points. S1000 is set by the Royal Guard, and nothing seen reads it. S5000 is the chapter
 # a save card names (d003_002's cells: 0 Prologue, 1 Boobs of Boan, 2 A Treasonous Affair, 3 Complications in the
 # Capital, 4 The Depths of Desire).
+# Each scene and choice line ends with the PC's own number for it (its saves' flowNode), read from PC saves made there
+# under Wine. Each chapter counts on from a base (ep_00 from 1, ep_01 from 101, ep_03 from 201, ep_02 from 301, the
+# endings from 901) and the scene after a staff roll is 999; the few not yet saved at are filled by that count and marked.
 flow main                    # New Game, and its Prologue once an ending is seen
 scene scr\ep_00_00.txt @1
 jump mainstory
@@ -653,7 +656,7 @@ scene scr\ep_02_09.txt @403
 scene scr\ep_02_10.txt @930
 scene scr\ep_ai_00.txt @931   # Aisis's ending
 staffroll ai
-scene scr\ep_ai_01.txt
+scene scr\ep_ai_01.txt @999
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label capital
@@ -678,59 +681,59 @@ scene scr\ep_01_04.txt @107
 scene scr\ep_01_04a.txt @108
 scene scr\ep_01_05.txt @109
 scene scr\ep_01_06.txt @110
-scene scr\ep_01_07.txt
-scene scr\ep_01_07a.txt
-scene scr\ep_01_08.txt
-scene scr\ep_01_09.txt
-scene scr\ep_01_10.txt
+scene scr\ep_01_07.txt @111
+scene scr\ep_01_07a.txt @112
+scene scr\ep_01_08.txt @113
+scene scr\ep_01_09.txt @114  # @ inferred from the chapter count
+scene scr\ep_01_10.txt @115  # @ inferred from the chapter count
 set S 5000 = 3               # Complications in the Capital, in saves at ep_03_10
-scene scr\ep_03_00.txt
-scene scr\ep_03_01.txt
-scene scr\ep_03_02.txt
-scene scr\ep_03_02a.txt
-scene scr\ep_03_03.txt
-scene scr\ep_03_04.txt
-scene scr\ep_03_05.txt
-scene scr\ep_03_06.txt
-scene scr\ep_03_07.txt
-scene scr\ep_03_08.txt
-scene scr\ep_03_09.txt
-scene scr\ep_03_09a.txt
-scene scr\ep_03_10.txt
+scene scr\ep_03_00.txt @201  # @ inferred from the chapter count
+scene scr\ep_03_01.txt @202  # @ inferred from the chapter count
+scene scr\ep_03_02.txt @203  # @ inferred from the chapter count
+scene scr\ep_03_02a.txt @204  # @ inferred from the chapter count
+scene scr\ep_03_03.txt @205  # @ inferred from the chapter count
+scene scr\ep_03_04.txt @206  # @ inferred from the chapter count
+scene scr\ep_03_05.txt @207  # @ inferred from the chapter count
+scene scr\ep_03_06.txt @208  # @ inferred from the chapter count
+scene scr\ep_03_07.txt @209  # @ inferred from the chapter count
+scene scr\ep_03_08.txt @210  # @ inferred from the chapter count
+scene scr\ep_03_09.txt @211  # @ inferred from the chapter count
+scene scr\ep_03_09a.txt @212  # @ inferred from the chapter count
+scene scr\ep_03_10.txt @213  # @ inferred from the chapter count
 choice obj\m000_000.bmp 2 cells 11 12 @214  # Squeeze her boobs / Suck on her boobs
 on 1 goto c8b
-scene scr\ep_03_10a.txt
+scene scr\ep_03_10a.txt @215  # @ inferred from the chapter count
 goto c8
 label c8b
-scene scr\ep_03_10b.txt
+scene scr\ep_03_10b.txt @215  # @ inferred from the chapter count
 label c8
-scene scr\ep_03_10c.txt
+scene scr\ep_03_10c.txt @216  # @ inferred from the chapter count
 choice obj\m000_000.bmp 2 cells 13 14 @217  # Class has finished / Call in an additional teacher
 on 1 goto harem
-scene scr\ep_lc_00.txt       # Lucelia's ending
+scene scr\ep_lc_00.txt @911   # Lucelia's ending
 staffroll lc
-scene scr\ep_lc_01.txt
+scene scr\ep_lc_01.txt @999  # @ inferred from the chapter count
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label harem
-scene scr\ep_03_10d.txt
-scene scr\ep_03_11.txt
-scene scr\ep_03_11a.txt
-scene scr\ep_03_12.txt
-scene scr\ep_03_13.txt
-scene scr\ep_03_14.txt
+scene scr\ep_03_10d.txt @218
+scene scr\ep_03_11.txt @219
+scene scr\ep_03_11a.txt @220  # @ inferred from the chapter count
+scene scr\ep_03_12.txt @221  # @ inferred from the chapter count
+scene scr\ep_03_13.txt @222  # @ inferred from the chapter count
+scene scr\ep_03_14.txt @223  # @ inferred from the chapter count
 staffroll zh                 # the harem ending's roll comes before its first scene
 scene scr\ep_zh_00.txt @922
 choice obj\m000_000.bmp 3 cells 15 15 15 @923  # Let nature take its course / Let nature take its course / Let nature take its course
-scene scr\ep_zh_01.txt       # every option goes on here
-scene scr\ep_zh_02.txt
-scene scr\ep_zh_03.txt
+scene scr\ep_zh_01.txt @924   # every option goes on here
+scene scr\ep_zh_02.txt @925  # @ inferred from the chapter count
+scene scr\ep_zh_03.txt @926  # @ inferred from the chapter count
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label boan
 scene scr\ep_rk_00.txt @901   # Roxanne's ending
 staffroll rk
-scene scr\ep_rk_01.txt
+scene scr\ep_rk_01.txt @999
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 )";
