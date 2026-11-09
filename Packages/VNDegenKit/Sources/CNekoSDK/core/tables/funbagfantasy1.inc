@@ -519,6 +519,12 @@ pic obj\n001_000.bmp 1008 586 fadein 59300 1000
 pic bg\bg_w.bmp 0 0 fadeout 700 2200
 pic bg\bg_w.bmp 0 0 fadein 70100 1700
 
+screen log
+# 82 has no log screen: BackText shows the backlog in the message window, a line further back each press, in init.ini's
+# MsgLogColor (yellow), and NextText steps forward; past the newest, or on a click, the line in play comes back in white
+# (measured under Wine), as 83's `inwindow` does.
+inwindow
+
 screen dialog
 # The choice box's frame with a title from j001_000's seven (Save to this slot?, Load this file?, Overwrite this file?,
 # Finished?, Return to title screen?, Is this fine?, Choose an option) and Yes and No from j001_001, measured under Wine;
@@ -552,6 +558,7 @@ default textspeed 50
 default autospeed 50
 default autowait 100
 default backvoice_on 1
+default bar_always 1           # the window's own buttons (close, back, next, voice) always show, as on the PC under Wine
 textcurve textspeed 167 3      # max(0, 167 - 3v) ms a character, measured under Wine
 autocurve autospeed 100 1      # auto waits (100 - v) ms a character of the line
 waitscale autowait             # [ウエイト] waits last time x autowait / 100; fades aren't stretched
@@ -662,7 +669,13 @@ on 2 goto boan
 label guard
 set S 1000 = 1
 scene scr\ep_00_12a.txt @80
-scene scr\ep_00_12c.txt @81   # also on the commander's way: told apart by S1000 (1 here, 0 there)
+goto c12c
+label commander
+scene scr\ep_00_12b.txt @80
+label c12c
+# One line for both routes, so a PC save in ep_00_12c resumes here and S1000 (1 for the Royal Guard) picks the way on.
+scene scr\ep_00_12c.txt @81
+if S 1000 == 0 goto ep01
 set S 5000 = 4               # The Depths of Desire, in saves at ep_02_07
 scene scr\ep_02_00.txt @301
 scene scr\ep_02_01.txt @302
@@ -692,9 +705,7 @@ staffroll ss
 scene scr\ep_ss_01.txt @999
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
-label commander
-scene scr\ep_00_12b.txt @80
-scene scr\ep_00_12c.txt @81   # also on the Royal Guard's way: told apart by S1000 (0 here)
+label ep01
 set S 5000 = 2               # A Treasonous Affair: the one title left for ep_01
 scene scr\ep_01_00.txt @101
 scene scr\ep_01_01.txt @102
