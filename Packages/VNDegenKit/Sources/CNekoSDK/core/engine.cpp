@@ -1783,18 +1783,32 @@ void Engine::composeGallery(Canvas &out) {
             if (ImageRef no = images_->get((*label)[0])) drawPart(out, *no, cx + field(*label, 1), cy + field(*label, 2), 0, 0, no->w, no->h, faint);
         if (const auto *digits = screen_->setting("celldigits"); digits && digits->size() >= 5)
             if (ImageRef sheetOfTen = images_->get((*digits)[0])) {
-                int w = sheetOfTen->w / 10, count = field(*digits, 3), step = field(*digits, 4), value = page_ * perPage + index + 1;
+                // `celldigits SHEET X Y COUNT STEP [CELLS]`: CELLS is the sheet's cell count, the digits first, 10 when absent, as
+                // Test Game 96's sheet of 13 goes on with a slash, a colon and a dash (set 2).
+                int w = sheetOfTen->w / (digits->size() >= 6 ? std::max(10, field(*digits, 5)) : 10), count = field(*digits, 3), step = field(*digits, 4), value = page_ * perPage + index + 1;
                 for (int i = count - 1; i >= 0; i--, value /= 10)
                     drawPart(out, *sheetOfTen, cx + field(*digits, 1) + i * step, cy + field(*digits, 2), value % 10 * w, 0, w, sheetOfTen->h, faint);
             }
         const auto *counts = screen_->setting("cellcount");
+        // `cellcountdash CELL`: a locked card shows the count as dashes, the sheet's cell CELL, around the sheet's slash, as
+        // Test Game 96's `--/--` (set 2, under Wine). Only with the slash in the sheet.
+        if (const auto *dash = screen_->setting("cellcountdash"); !unlocked && dash && !dash->empty() && counts && counts->size() >= 8 && (*counts)[1] == "-")
+            if (ImageRef sheetOfCells = images_->get((*counts)[0])) {
+                int w = sheetOfCells->w / std::max(11, field(*counts, 7)), y = cy + field(*counts, 3);
+                const auto *stepLine = screen_->setting("cellcountstep");
+                int step = stepLine && !stepLine->empty() ? field(*stepLine, 0) : w;
+                for (int at : {cx + field(*counts, 2), cx + field(*counts, 2) + step, cx + field(*counts, 5), cx + field(*counts, 5) + step})
+                    drawPart(out, *sheetOfCells, at, y, field(*dash, 0) * w, 0, w, sheetOfCells->h, faint);
+                drawPart(out, *sheetOfCells, cx + field(*counts, 4), y + field(*counts, 6), 10 * w, 0, w, sheetOfCells->h, faint);
+            }
         if (unlocked && counts && counts->size() >= 6 && screen_->name == "cg") {
             // `cellcount DIGITS SLASH X Y SLASHX TOTALX [SLASHY] [CELLS]`. A SLASH of `-` is the digit sheet's cell after 9, as
             // in Test Game 84, whose sheet of CELLS also holds a colon.
             bool slashInSheet = (*counts)[1] == "-";
             ImageRef sheetOfTen = images_->get((*counts)[0]), slash = slashInSheet ? nullptr : images_->get((*counts)[1]);
             const auto &pictures = entries[entry].images;
-            int have = int(std::count_if(pictures.begin(), pictures.end(), [&](const std::string &p) { return seen(p); })), all = int(pictures.size());
+            int have = 0, all = int(pictures.size());
+            for (size_t i = 0; i < pictures.size(); i++) have += cgPictureSeen(entries[entry], i) ? 1 : 0;
             if (sheetOfTen && (slash || slashInSheet)) {
                 int cells = slashInSheet && counts->size() >= 8 ? std::max(11, field(*counts, 7)) : slashInSheet ? 11 : 10;
                 int w = sheetOfTen->w / cells, x = cx + field(*counts, 2), y = cy + field(*counts, 3);
