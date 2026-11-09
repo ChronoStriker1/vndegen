@@ -676,19 +676,7 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "Voice") {
-        if (!currentText_.voice.empty() && voiceAllowed(currentText_.voice)) {
-            if (voicePlayer_) audio_.close(voicePlayer_);
-            voicePlayer_ = 0;
-            if (Bytes data = files_.read(voicePath(currentText_.voice))) {
-                voicePlayer_ = audio_.open(data);
-                if (voicePlayer_) {
-                    voiceFiles_[voicePlayer_] = currentText_.voice;
-                    audio_.setGroup(voicePlayer_, soundGroup(kKindVoice, currentText_.voice));
-                    audio_.setLoops(voicePlayer_, 1);
-                    audio_.play(voicePlayer_);
-                }
-            }
-        }
+        playVoiceAgain(currentText_.voice);
         return;
     }
     if (action == "QuickSave") {
@@ -792,11 +780,46 @@ void Engine::stepWindowLog(int lines) {
     dirty_ = true;
 }
 
+// A line's voice again, as the window's Voice button and a log entry's replay button play it.
+void Engine::playVoiceAgain(const std::string &voice) {
+    if (voice.empty() || !voiceAllowed(voice)) return;
+    if (voicePlayer_) audio_.close(voicePlayer_);
+    voicePlayer_ = 0;
+    if (Bytes data = files_.read(voicePath(voice))) {
+        voicePlayer_ = audio_.open(data);
+        if (voicePlayer_) {
+            voiceFiles_[voicePlayer_] = voice;
+            audio_.setGroup(voicePlayer_, soundGroup(kKindVoice, voice));
+            audio_.setLoops(voicePlayer_, 1);
+            audio_.play(voicePlayer_);
+        }
+    }
+}
+
+// `logvoice SHEET COLS ROWS COL X DY` under `screen log`: a replay button by each voiced entry, X across and DY below
+// the entry's rule, as Test Game 87's (set 1). Where entry `row` of the page has its button, false for none.
+bool Engine::logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &sheet, int &col) const {
+    auto log = screens_.find("log");
+    if (log == screens_.end()) return false;
+    const auto *line = log->second.setting("logvoice");
+    const auto *rows = log->second.setting("rows");
+    if (!line || line->size() < 6 || !rows || rows->size() < 7) return false;
+    sheet = images_->get((*line)[0]);
+    if (!sheet) return false;
+    int cols = std::max(1, field(*line, 1)), rowsInSheet = std::max(1, field(*line, 2));
+    w = sheet->w / cols;
+    h = sheet->h / rowsInSheet;
+    col = field(*line, 3);
+    x = field(*line, 4);
+    y = field(*rows, 2) + row * field(*rows, 3) + field(*line, 5);
+    return true;
+}
+
 void Engine::openLog() {
     if (backlog_.empty() || !screens_.count("log")) return;
-    // The frame behind the log has no message on it.
+    // The frame behind the log has no message on it, unless `keepwindow`, as Test Game 87's keeps it (set 1).
     bool hidden = windowHiddenByPlayer_;
-    windowHiddenByPlayer_ = true;
+    windowHiddenByPlayer_ = !screens_.at("log").setting("keepwindow");
     compose();
     windowHiddenByPlayer_ = hidden;
     logBase_ = canvas_;
@@ -3563,7 +3586,11 @@ void Engine::composeLog(Canvas &out) {
             int y = field(*thumb, 2) + (total <= shown ? travel : travel * (total - shown - from) / (total - shown));
             drawPart(out, *picture, field(*thumb, 1), y, 0, 0, picture->w, picture->h, 1);
         }
-    for (const Button &b : log->buttons) drawButton(out, b, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
+    for (const Button &b : log->buttons) {
+        // `edgesoff`: down and bottom are disabled at the newest line, as Test Game 87's are (set 1).
+        bool off = log->setting("edgesoff") && logTop_ == 0 && (b.action == "log_down" || b.action == "log_bottom");
+        drawButton(out, b, off ? StateDisabled : pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
+    }
     const auto *rows = log->setting("rows");
     if (!rows || rows->size() < 7) return;
     ImageRef rule = images_->get((*rows)[0]);
@@ -3586,7 +3613,16 @@ void Engine::composeLog(Canvas &out) {
         std::vector<Glyph> glyphs;
         // A name beside the text hangs to its left, and one above sits as far above it as in the message window.
         bool beside = nameY_ == textY_;
-        layoutRun(name, beside ? textX - (textX_ - nameX_) : textX, y + textY + ascent + (beside ? 0 : nameY_ - textY_), beside, glyphs);
+        // `lognamey DY`: the name DY from the text, where the log sets it apart from the window (30 above in Test Game 87).
+        const auto *nameAt = log->setting("lognamey");
+        int nameDY = nameAt && !nameAt->empty() ? field(*nameAt, 0) : nameY_ - textY_;
+        layoutRun(name, beside ? textX - (textX_ - nameX_) : textX, y + textY + ascent + (beside ? 0 : nameDY), beside, glyphs);
+        int vx, vy, vw, vh, vcol;
+        ImageRef sheet;
+        if (!t.voice.empty() && logVoiceButton(row, vx, vy, vw, vh, sheet, vcol)) {
+            bool over = pointerSeen_ && inRect(pointerX_, pointerY_, vx, vy, vw, vh);
+            drawPart(out, *sheet, vx, vy, vcol * vw, (over ? 1 : 0) * vh, vw, vh, 1);
+        }
         drawGlyphs(out, glyphs, logTextR_, logTextG_, logTextB_, logFrameR_, logFrameG_, logFrameB_);
         glyphs.clear();
         layoutRun(text, textX, y + textY + ascent, false, glyphs);
@@ -4431,6 +4467,20 @@ void Engine::mouseButton(int button, bool down) {
         if (Button *b = buttonAt(pointerX_, pointerY_, log.buttons)) {
             std::string action = b->action;
             runAction(action);
+            return;
+        }
+        // An entry's replay button plays its voice again.
+        if (const auto *rows = log.setting("rows"); rows && rows->size() >= 7) {
+            int count = field(*rows, 4), lastRow = std::min(count, int(backlog_.size()) - logTop_);
+            for (int row = 0; row < lastRow; row++) {
+                const SavedText &t = backlog_[size_t(logTop_ + lastRow - 1 - row)];
+                int vx, vy, vw, vh, vcol;
+                ImageRef sheet;
+                if (!t.voice.empty() && logVoiceButton(row, vx, vy, vw, vh, sheet, vcol) && inRect(pointerX_, pointerY_, vx, vy, vw, vh)) {
+                    playVoiceAgain(t.voice);
+                    break;
+                }
+            }
         }
         return;
     }

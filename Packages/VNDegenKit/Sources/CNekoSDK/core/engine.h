@@ -552,6 +552,8 @@ private:
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;
     int questionCell(int question) const;
+    void playVoiceAgain(const std::string &voice);
+    bool logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &sheet, int &col) const;
     int autoPerCharMs_ = -1;
     // `inwindow` under `screen log`: the backlog shown a line at a time in the message window, as Test Game 83's (set 3).
     // windowLog_ is how many lines back is showing, 0 for the line in play.
