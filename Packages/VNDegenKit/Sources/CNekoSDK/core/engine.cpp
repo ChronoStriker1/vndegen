@@ -3465,7 +3465,7 @@ bool Engine::composeTitleOpening(Canvas &out) {
         c.resize(out.w, out.h);
         c.clear();
         for (const Picture &p : screen_->pictures)
-            if (p.stage <= upTo) drawPicture(c, p, towardX, towardY);
+            if (p.stage <= upTo) drawPicture(c, p.turn != 0 ? turned(p) : p, towardX, towardY);
         if (buttons)
             for (Button &b : screen_->buttons) drawButton(c, b, StateNormal);
     };
@@ -3556,7 +3556,7 @@ void Engine::composeScreen(Canvas &out) {
             drawPicture(out, faded, towardX, towardY);
         } else if ((p.tab < 0 || p.tab == galleryTab_) && shown(p)) {
             if (p.rise.empty()) {
-                drawPicture(out, p, towardX, towardY);
+                drawPicture(out, p.turn != 0 ? turned(p) : p, towardX, towardY);
                 continue;
             }
             Picture risen = p;
@@ -3766,6 +3766,12 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 
 // `partplate` under `screen defaults`: a game part's open screen keeps the message window's plate and its buttons over
 // it, as Test Game 96's hub and vote show the plate's Menu tab at its resting place (set 2).
+Picture Engine::turned(const Picture &p) const {
+    Picture now = p;
+    now.angle = p.turn * float(screenMs_) / 1000 * kPi / 180;
+    return now;
+}
+
 bool Engine::defaultsHave(const char *key) const {
     auto defaults = screens_.find("defaults");
     return defaults != screens_.end() && defaults->second.setting(key);
@@ -4580,7 +4586,7 @@ bool Engine::step(int ms) {
     if (screen_) {
         screenMs_ += ms;
         stepSprites();
-        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages")) dirty_ = true;
+        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages") || screen_->turning) dirty_ = true;
         // A gallery's character coming up after its tab opens.
         if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
         stepViewer(ms);
