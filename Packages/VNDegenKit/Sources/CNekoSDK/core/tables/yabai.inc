@@ -4,6 +4,8 @@
 const char kYabai1[] = R"(
 screen defaults
 parts yabai yabaiplay yabaitree yabaivote
+# The message window's plate and its Menu tab stay over the hub and the vote, as on the PC.
+partplate
 # MS Gothic at init.ini's 25, as the exe names only the Japanese faces; the PC's lines 30 apart, its ink 1 right and 1 up
 # from where the runtime puts it (Wine with ＭＳ ゴシック substituted, prologue's sixth line).
 textline 30
