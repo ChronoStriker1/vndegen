@@ -108,12 +108,6 @@ std::vector<CommentGroup> parseCommentList(const std::string &text) {
     return groups;
 }
 
-const CommentGroup *findCommentGroup(const std::vector<CommentGroup> &groups, int number) {
-    for (const CommentGroup &group : groups)
-        if (group.number == number) return &group;
-    return number >= 0 && size_t(number) < groups.size() ? &groups[size_t(number)] : nullptr;
-}
-
 bool CommentStream::load(PartHost &host, const std::string &path) {
     auto bytes = host.read(path);
     if (!bytes) {
@@ -128,24 +122,27 @@ bool CommentStream::load(PartHost &host, const std::string &path) {
     return true;
 }
 
-// A group's lines start in the file's order, the first at once and each next after A to B frames at 60 a second, and
-// the group ends with its last: group 0 of Test Game 96's first list, 12 lines at 40 to 80, gave about 12 comments 0.4
-// to 1.2 seconds apart, then none, and group 10's 150 to 300 gave 2.3 to 4.5 seconds. The spread within A to B is taken
-// as even.
+// Each block numbered N sends its lines once each in a shuffled order, the first at once and each next after A to B
+// frames at 60 a second: group 0 of Test Game 96's first list, 12 lines at 40 to 80, gave about 12 comments 0.4 to 1.2
+// seconds apart, then none, and group 10's 150 to 300 gave 2.3 to 4.5 seconds. A list with two blocks numbered 1 sent
+// both at once, in pairs, lines from the middle of each first, and plays nothing for a number no block has, as three of
+// 96's lists ask (lead, under Wine, the text read by OCR). The spread within A to B is taken as even.
 void CommentStream::play(PartHost &host, int group) {
     playing_.push_back(group);
     ended_ = false;
-    const CommentGroup *found = findCommentGroup(groups_, group);
-    if (!found) {
-        host.log("comment group missing: " + std::to_string(group));
-        return;
+    bool any = false;
+    for (const CommentGroup &block : groups_) {
+        if (block.number != group || block.lines.empty()) continue;
+        any = true;
+        Cursor cursor;
+        cursor.lines = block.lines;
+        for (size_t i = cursor.lines.size() - 1; i > 0; i--) std::swap(cursor.lines[i], cursor.lines[size_t(std::rand()) % (i + 1)]);
+        cursor.a = block.a;
+        cursor.b = std::max(block.a, block.b);
+        cursor.at = host.nowMs();
+        cursors_.push_back(std::move(cursor));
     }
-    Cursor cursor;
-    cursor.lines = found->lines;
-    cursor.a = found->a;
-    cursor.b = std::max(found->a, found->b);
-    cursor.at = host.nowMs();
-    cursors_.push_back(std::move(cursor));
+    if (!any) host.log("comment group missing: " + std::to_string(group));
 }
 
 // Command 113's lines start one every 2.1 seconds; one placed as `《text》,X,Y` starts X frames on at row Y, as the

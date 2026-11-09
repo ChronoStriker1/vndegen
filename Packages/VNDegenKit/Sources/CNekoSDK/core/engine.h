@@ -44,6 +44,8 @@ struct Track {
     enum Property { X, Y, ScaleX, ScaleY, Rotation, Alpha } property = X;
     bool relative = false;
     bool easeOut = false;
+    // `quadratic` with a positive length, which Test Game 87's fly-outs ease in by.
+    bool easeIn = false;
     float from = 0, to = 0;
     int startMs = 0, lengthMs = 0;
 };
@@ -577,9 +579,25 @@ private:
     int64_t barMovedAt_ = -1000000;
     bool barHover() const;
     bool barHovered() const;
+    // When `barhover`'s rows last came up, and how much of them shows as they fade in and out.
+    int64_t barShownAt_ = -1000000;
+    float barOpacity() const;
+    // `submenuopen MS`: a submenu's buttons grow from their left edge as it opens and shrink back as it closes.
+    std::string shownSubMenu_, squeezeGroup_;
+    int64_t squeezeAt_ = -1000000;
+    bool squeezeOpening_ = false;
+    float squeezeOf(const Button &b) const;
+    float squeezeProgress() const;
+    // What the last frame drew, so a fade or squeeze gets the frame that finishes it.
+    float squeezeDrawn_ = 1, barDrawnOpacity_ = 1;
+    void trackSubmenu();
+    Canvas barLayer_;
     void playVoiceAgain(const std::string &voice);
     bool logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &sheet, int &col) const;
     int autoPerCharMs_ = -1;
+    int autoBaseMs_ = 0;
+    // `autowithvoice`: auto's pause runs alongside the voice, not after it.
+    bool autoWithVoice_ = false;
     // `inwindow` under `screen log`: the backlog shown a line at a time in the message window, as Test Game 83's (set 3).
     // windowLog_ is how many lines back is showing, 0 for the line in play.
     int windowLog_ = 0;

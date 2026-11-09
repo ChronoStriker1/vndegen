@@ -298,6 +298,7 @@ bool namesPictureTwice(const SaveLayout &layout) {
 
 ChoiceFlag choiceFlag(const SaveLayout &layout) { return layout.choiceFlag; }
 bool writesPreviousChoice(const SaveLayout &layout) { return layout.previousChoice; }
+bool olderEngine(const SaveLayout &layout) { return layout.olderRecord > 0; }
 bool choiceResultAt116(const SaveLayout &layout) { return layout.choiceResultAt116; }
 int newCardNumber(const SaveLayout *layout, int slot) { return slot - 1 + (layout ? layout->firstCard : 1); }
 int newCardSlot(const SaveLayout *layout, int number) { return number + 1 - (layout ? layout->firstCard : 1); }
