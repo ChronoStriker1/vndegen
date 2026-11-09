@@ -9,7 +9,12 @@ menustages
 startmenu 2
 submenudim hide
 pic obj\d000_000.bmp 0 0
-# Not yet drawn: the three lace mandalas (obj\d001_000 to _002) that turn slowly over the art on the PC.
+# Three lace circles turn over the art and under the frame and logo. On the PC under Wine, from frames half a second
+# apart fitted by angle: their centres at 1280,0, 140,582 and 1028,640, at 6 degrees a second anticlockwise, 12
+# clockwise and 6 clockwise. Which lies over which where they cross wasn't looked at.
+pic obj\d001_001.bmp 670 -610 turn -6
+pic obj\d001_000.bmp -165 276 turn 12
+pic obj\d001_002.bmp 829 441 turn 6
 pic obj\a002_001.bmp 0 0
 pic obj\d000_001.bmp 334 11
 pic obj\d000_002.bmp 473 647
