@@ -63,6 +63,22 @@ filter() {
   { grep -E "$1" | grep -v "^/Applications" || true; } | awk 'NR <= 60'
 }
 
+# Prints every failing test of a swift test run, with its whole message, and each test target's summary (#67). Swift
+# Testing prints ✘ before each issue and failing test and ↳ before an issue's details, and a message's later lines start
+# with two spaces. XCTest's later lines follow its error line, up to the next test event. The tests' own logging and the
+# version, platform, and XCTest count of no tests that each target prints are left out.
+swift_test_failures() {
+  awk '
+    /↳ (Testing Library Version|Target Platform):/ { next }
+    swift && /^(↳|  )/ { print; next }
+    xctest && !/^Test (Case|Suite) / && !/^\t Executed/ { print; next }
+    { swift = 0; xctest = 0 }
+    /✘ .* recorded an issue/ { swift = 1 }
+    /: error: -\[/ { xctest = 1 }
+    /error:|✘|↳|Test run with|Executed [1-9]|failed/ { print }
+  '
+}
+
 case "${1:?destination}" in
   test)
     # The shared font lookup the native engines compile, against the bundled table.
@@ -100,7 +116,10 @@ case "${1:?destination}" in
     mkdir "$case_run/casepath"
     cc -std=c11 -Wall -Wextra -Werror -o build/casepath_test Engines/Shared/casepath.c Engines/Shared/casepath_test.c
     build/casepath_test "$case_run/casepath"
-    (cd Packages/VNDegenKit && VNDEGEN_TEST_DIR="$case_run" swift test 2>&1 | filter 'error:|✘|Test run|Executed|failed') ;;
+    # On a Mac, Swift Testing marks a failure with an SF Symbols glyph that no pattern here can name, so it prints the
+    # plain symbols swift_test_failures reads. The whole output stays in build/swift-test.log.
+    (cd Packages/VNDegenKit && VNDEGEN_TEST_DIR="$case_run" SWT_SF_SYMBOLS_ENABLED=0 swift test 2>&1) | tee build/swift-test.log |
+      swift_test_failures ;;
   mac) xcb -destination 'platform=macOS' -derivedDataPath build/mac build ;;
   ios-sim) xcb -destination 'generic/platform=iOS Simulator' -derivedDataPath build/sim build ;;
   ipa)
