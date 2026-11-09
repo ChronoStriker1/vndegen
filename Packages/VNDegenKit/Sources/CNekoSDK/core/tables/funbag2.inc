@@ -378,6 +378,18 @@ pic obj\a003_000.bmp 392 51 7 1 1 0
 button yes obj\a003_002.bmp 306 312 2 5 0
 button no obj\a003_002.bmp 650 312 2 5 1
 
+# A choice, as on the PC under Wine: the same box as the question's, with the choice's own two options in place of yes
+# and no, and its prompt plate. Each choice picture's options are its two columns.
+screen choice
+pic dim 0 0 alpha 221
+pic obj\a003_001.bmp 351 228 2 1 0 0
+pic obj\a003_001.bmp 351 228 2 1 1 0
+pic obj\a003_001.bmp 695 228 2 1 0 0
+pic obj\a003_001.bmp 695 228 2 1 1 0
+pic obj\a003_003.bmp 392 51
+choicecolumns 2
+placefor 2 288 0 306 344
+
 screen story
 # The six choices are obj\l000_000 to _005, two options each. Sex scenes end on l000_000, which only picks the next
 # scene; option 0 also counts in S 5001 (option 1 never set it, in a run that took it every time). S 5000 is the
