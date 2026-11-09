@@ -25,7 +25,7 @@ fi
 build_number=$(git rev-list --count HEAD)
 host=${VNDEGEN_MAC:-$(cat ~/.config/vndegen/mac-host 2>/dev/null)}
 [ -n "$host" ] || { echo "set VNDEGEN_MAC or write the Mac's hostname to ~/.config/vndegen/mac-host" >&2; exit 2; }
-remote_dir="vndegen-build/${VNDEGEN_REMOTE_NAME:-$(basename "$root")}"
+remote_dir="Projects/vndegen/build/${VNDEGEN_REMOTE_NAME:-$(basename "$root")}"
 scripts/remote.sh scripts/build.sh release "$version" "$build_number"
 
 out="build/release/$version"

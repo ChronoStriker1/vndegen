@@ -69,20 +69,25 @@ int patchNumber(const std::string &name) {
 
 std::string normalizedPath(std::string path) {
     // A doubled backslash counts as one, as Test Game 96's saves name their scenes with the `scr\\` its chapter list
-    // writes (set 2). A character's second byte can be a backslash's, and stays.
+    // writes (set 2). A character's second byte can be a backslash's: it stays, and so does a separator after it.
     std::string out;
     out.reserve(path.size());
-    bool lead = false;
+    // `separator`: the last byte kept was a separator of its own, not the second byte of a character such as ソ, whose
+    // second byte is a backslash's too.
+    bool lead = false, separator = false;
     for (char c : path) {
         auto u = static_cast<unsigned char>(c);
+        bool isSeparator = false;
         if (lead) {
             lead = false;
         } else if ((u >= 0x81 && u <= 0x9F) || (u >= 0xE0 && u <= 0xFC)) {
             lead = true;
         } else {
             if (c == '/') c = '\\';
-            if (c == '\\' && !out.empty() && out.back() == '\\') continue;
+            isSeparator = c == '\\';
+            if (isSeparator && separator) continue;
         }
+        separator = isSeparator;
         out += c;
     }
     return lower(std::move(out));
