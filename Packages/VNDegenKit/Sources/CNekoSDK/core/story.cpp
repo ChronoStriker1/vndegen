@@ -305,9 +305,11 @@ bool Engine::resumeStoryAt(const std::string &scene) {
         auto flow = loadScript("story:" + line[1]);
         if (!flow) continue;
         for (const Node &n : flow->nodes) {
+            // The place is the line's PC number when it has one, as running it sets, so a save after this one holds it
+            // (set 2: after a jump, Test Game 82's saves had held the line's node instead).
             if (names(n)) {
                 stack_.push_back({flow, flow->node(n.next)});
-                flowCallId_ = n.id;
+                flowCallId_ = n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
                 return true;
             }
             // Or inside a chapter: the flow goes on after the chapter, and the chapter after the scene.
@@ -317,7 +319,7 @@ bool Engine::resumeStoryAt(const std::string &scene) {
                         if (names(c)) {
                             stack_.push_back({flow, flow->node(n.next)});
                             stack_.push_back({chapter, chapter->node(c.next)});
-                            flowCallId_ = n.id;
+                            flowCallId_ = c.p[kStoryPcNumber] ? c.p[kStoryPcNumber] : n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
                             return true;
                         }
         }
