@@ -1,6 +1,6 @@
 # Frame rate check
 
-This is the check from item 1 of the roadmap's Next section, done on 2026-11-03. [development.md](development.md#frame-rate) has the rule. It covers games that aren't strictly visual novels, and visual novels' video scenes.
+This is the frame rate check from the roadmap's first plan, now under Finished from the plan, done on 2026-11-03. [development.md](development.md#frame-rate) has the rule. It covers games that aren't strictly visual novels, and visual novels' video scenes.
 
 ## How to read the table
 

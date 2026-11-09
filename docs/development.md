@@ -13,12 +13,12 @@ scripts/build.sh ios-sim   # iOS simulator app in build/sim/Build/Products/Debug
 scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ```
 
-`scripts/build.sh test` also runs the file name lookups' unit tests on a case-sensitive disk image.
+`scripts/build.sh test` also runs the file name lookups' unit tests on a case-sensitive disk image. It prints every failing Swift test with its message and each test target's summary, and keeps the whole `swift test` output in `build/swift-test.log`.
 
 ### What a build makes first
 
 - **KiriKiri.** Every app build first builds the KiriKiri engine into `build/kirikiri` with `scripts/kirikiri-engine.sh`, which does nothing when the engine is up to date. Its dependencies come from vcpkg, cached in `~/Library/Caches/VNDegen`, so the first build takes a while and later ones skip it.
-- **Godot.** Every app build first builds Godot 3 and 4 into `build/godot` with `scripts/godot-engine.sh`, which does nothing when its inputs haven't changed. The Godot sources and SCons are cached in `~/Library/Caches/VNDegen/godot`, and each build folder gets its own work folder there, so builds of different branches don't rebuild each other's objects. A first build in a new folder compiles Godot from scratch, which can take a Mac's load past 500, so run it where nothing else is going. `VNDEGEN_GODOT_CACHE` moves the cache.
+- **Godot.** Every app build first builds Godot 3 and 4 into `build/godot` with `scripts/godot-engine.sh`, which does nothing when its inputs haven't changed. The Godot sources and SCons are cached in `~/Library/Caches/VNDegen/godot`, SCons in one venv per Python and SCons version that builds share and never change once made, and each build folder gets its own work folder there, so builds of different branches don't rebuild each other's objects. A first build in a new folder compiles Godot from scratch, which can take a Mac's load past 500, so run it where nothing else is going. `VNDEGEN_GODOT_CACHE` moves the cache.
 - **Alpha clips.** Every build makes the VP9 decoder the RPG Maker clip converter links, with `scripts/alpha-video.sh`, from the libvpx source in `Engines/Shared/third_party`. It builds the decoder alone.
 - **rclone.** Every build first makes rclone's library from `Packages/VNDegenKit/Rclone/` for iPhone, iPad, the simulator, and the Mac (`scripts/rclone-runtime.sh`, kept until its sources or the Go version change).
 - **Ren'Py.** The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). iOS builds also download Ren'Py's iOS libraries (renios) and link them into the app. `scripts/build.sh` does that before it builds. In Xcode, run `scripts/renpy-runtime.sh build/renpy ios` once first.

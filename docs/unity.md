@@ -1,6 +1,6 @@
 # Unity feasibility study
 
-Roadmap item 10. **Decided 2026-11-05:** VNDegen detects Unity games (option 1, done), and on a Mac opens them outside VNDegen, through the game's own Mac version or the player's CrossOver (option 2, built: see [Mac launcher](#mac-launcher)). iPhone and iPad keep the page's explanation. Options 3 and 4 aren't being done.
+On the roadmap as Unity. **Decided 2026-11-05:** VNDegen detects Unity games (option 1, done), and on a Mac opens them outside VNDegen, through the game's own Mac version or the player's CrossOver (option 2, built: see [Mac launcher](#mac-launcher)). iPhone and iPad keep the page's explanation. Options 3 and 4 aren't being done.
 
 This study classifies the library's Unity games from their files, weighs each way of running them, and ends with options for the maintainer. No engine was built. It ran on Linux, reading metadata and assemblies only. It decoded no game art, ran no game code, and used no Unity runtime.
 
