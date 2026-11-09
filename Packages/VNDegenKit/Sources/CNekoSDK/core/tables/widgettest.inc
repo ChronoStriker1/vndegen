@@ -38,7 +38,8 @@ number rose obj\d.bmp 600 400 15 blank
 // A sprite gallery naming a game part, `part selftest`, as Test Game 87's does: the part draws over the screen's pictures
 // and under its buttons, takes the presses it wants, and draws over everything (NekoSDKWidgetTests). Its Scene screen
 // replays the chapter a play_view2.ini line names, `replaychapters`, as Test Game 96's does, and the part draws under its
-// card, Layer::MenuUnder, as Test Game 90's Save and Load strip runs behind their cards.
+// card, Layer::MenuUnder, as Test Game 90's Save and Load strip runs behind their cards. `replaykeeps` brings a replay
+// back to the page its card was on.
 const char kWidgetTestPart[] = R"(
 screen defaults
 parts selftest
@@ -57,6 +58,8 @@ screen scene
 part selftest
 pic obj\d.bmp 290 312
 replaychapters
+replaykeeps
+button page1 obj\b.bmp 700 0 1 5 0
 cell 300 300
 cellsize 40 30
 cellthumb 0 0

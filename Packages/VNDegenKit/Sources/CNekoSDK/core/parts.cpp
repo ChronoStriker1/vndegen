@@ -38,7 +38,8 @@ const PartEntry kParts[] = {
 // PC number 100 + N. Scene command 9000 loads its picture into slot p3 at p1, p2 through PartHost::loadImage, additive
 // when p4 is 1 and scrolling p5 and p6 pixels a second. Command 9001 holds slot p0 as the part's own, of kind 15, and
 // names a picture in its save record: its square at 600, 300 is drawn where the slot's number puts it, green once the
-// part knows the picture and blue before. On a table screen naming the part, the widget test game's sprite gallery,
+// part knows the picture and blue before. Command 9002 lets slot p0 go again (PartHost::releaseSlot). On a table screen
+// naming the part, the widget test game's sprite gallery,
 // it draws a square at 400, 400, blue and red once pressed, takes the presses on it, and after two covers the top left
 // corner over everything. Under a screen's cards, Layer::MenuUnder, it draws a blue square of 20 at 300, 300, and on the
 // Scene screen it leaves every press to the screen.
@@ -57,6 +58,10 @@ public:
         if (n.opcode == 9001) {
             host.holdSlot(n.p[0], kHeldKind);
             heldPicture_ = n.s[1];
+            return true;
+        }
+        if (n.opcode == 9002) {
+            host.releaseSlot(n.p[0]);
             return true;
         }
         if (n.opcode != 9000) return false;
@@ -204,6 +209,7 @@ void PartHost::playSound(int kind, int channel, const std::string &path, int vol
 }
 
 void PartHost::holdSlot(int slot, int kind) { e_.holdPartSlot(slot, kind); }
+void PartHost::releaseSlot(int slot) { e_.releasePartSlot(slot); }
 bool PartHost::slotHeld(int slot) { return e_.partSlotHeld(slot); }
 bool PartHost::effectsOn() { return e_.setting("effect") != 0; }
 void PartHost::log(const std::string &line) { e_.log("%s", line.c_str()); }
