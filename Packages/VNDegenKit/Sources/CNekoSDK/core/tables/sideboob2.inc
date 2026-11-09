@@ -187,6 +187,7 @@ step text 1 obj\j003_003.bmp 820 192 2 5 1
 number auto obj\j003_004.bmp 762 245
 step auto -1 obj\j003_003.bmp 148 287 2 5 0
 step auto 1 obj\j003_003.bmp 820 287 2 5 1
+range waittime 20 180
 number waittime obj\j003_004.bmp 756 340 780 798
 step waittime -1 obj\j003_003.bmp 148 382 2 5 0
 step waittime 1 obj\j003_003.bmp 820 382 2 5 1
@@ -258,26 +259,32 @@ number master obj\j003_004.bmp 800 142
 step master -1 obj\j003_003.bmp 186 180 2 5 0
 step master 1 obj\j003_003.bmp 858 180 2 5 1
 check mute_master obj\j014_000.bmp 92 177 1 5 0
+pic obj\j012_000.bmp 879 143 1 5 0 4
 number bgm obj\j003_004.bmp 800 220
 step bgm -1 obj\j003_003.bmp 186 258 2 5 0
 step bgm 1 obj\j003_003.bmp 858 258 2 5 1
 check mute_bgm obj\j014_000.bmp 92 255 1 5 0
+pic obj\j012_000.bmp 879 221 1 5 0 4
 number se obj\j003_004.bmp 800 298
 step se -1 obj\j003_003.bmp 186 336 2 5 0
 step se 1 obj\j003_003.bmp 858 336 2 5 1
 check mute_se obj\j014_000.bmp 92 333 1 5 0
+button test:se:se\se_277.ogg obj\j012_000.bmp 879 299 1 5 0
 number hse obj\j003_004.bmp 800 376
 step hse -1 obj\j003_003.bmp 186 414 2 5 0
 step hse 1 obj\j003_003.bmp 858 414 2 5 1
 check mute_hse obj\j014_000.bmp 92 411 1 5 0
+button test:se:se\se_h11.ogg obj\j012_000.bmp 879 377 1 5 0
 number voice obj\j003_004.bmp 800 454
 step voice -1 obj\j003_003.bmp 186 492 2 5 0
 step voice 1 obj\j003_003.bmp 858 492 2 5 1
 check mute_voice obj\j014_000.bmp 92 489 1 5 0
+button test:voice:voice\roz0_0004.ogg obj\j012_000.bmp 879 455 1 5 0
 number backvoice obj\j003_004.bmp 800 532
 step backvoice -1 obj\j003_003.bmp 186 570 2 5 0
 step backvoice 1 obj\j003_003.bmp 858 570 2 5 1
 check mute_backvoice obj\j014_000.bmp 92 567 1 5 0
+button test:voice:voice\roz9_0017.ogg obj\j012_000.bmp 879 533 1 5 0
 radio voice_stop 1 obj\j013_000.bmp 423 633 2 5 0
 radio voice_stop 0 obj\j013_000.bmp 537 633 2 5 1
 button tabvoices obj\j015_000.bmp 777 620 1 5 0
