@@ -16,10 +16,9 @@
 // reach in cfg\SelectChar.ini and plays her next event, which gives her a heart, up to four; the other cards play the
 // scene the PC's exe lists for that half-week and card. Which scene plays was traced under Wine from runs down each
 // route and one skipping a heroine (set 1): events go by hearts, not by half-week. The screen's pieces were placed by
-// fitting PC shots, the cards exactly (within 0.03 of 255 over the card area). State is in VNDegen's own story
-// variables, kept beside the save:
-//   S 10900   the half-week, 0 to 9, and 10 once the last is chosen
-//   S 10901..10903   Kururu's, Otona's and Rei's hearts
+// fitting PC shots, the cards exactly (within 0.03 of 255 over the card area). State is in the story variables the PC's
+// saves hold it in (set 1, nine PC saves along one path): S 3000 the week, 0 to 4, and 5 once the last is chosen, S 3001
+// the half, S 3010 to 3012 Kururu's, Otona's and Rei's hearts. VNDegen's own, kept beside the save:
 //   S 10904   the chapter the pick plays (`chapter S 10904`)
 //   S 10906   the heroine whose ending follows, 1 to 3, or 0 for none, set with the last pick
 #include <algorithm>
@@ -36,7 +35,7 @@ namespace {
 constexpr int kFaceX = 0, kFaceY = 512;
 constexpr int kFollowMs = 120;  // the second strip's lag behind the first, in and out
 
-constexpr int kPhaseVar = 10900, kHeartVar = 10901, kChapterVar = 10904, kEndingVar = 10906;
+constexpr int kWeekVar = 3000, kHalfVar = 3001, kHeartVar = 3010, kChapterVar = 10904, kEndingVar = 10906;
 constexpr int kPhases = 10, kMaxHearts = 4;
 
 // A card's place on the select screen, top left of its frame: top, left, right, bottom, in the ini's order.
@@ -330,7 +329,7 @@ private:
     static Rect yesRect() { return {339, 293, 592, 72}; }
     static Rect noRect() { return {339, 380, 592, 72}; }
 
-    int phase(PartHost &host) const { return std::clamp(host.variable(1, kPhaseVar), 0, kPhases - 1); }
+    int phase(PartHost &host) const { return std::clamp(2 * host.variable(1, kWeekVar) + host.variable(1, kHalfVar), 0, kPhases - 1); }
     int hearts(PartHost &host, int heroine) const { return std::clamp(host.variable(1, kHeartVar + heroine), 0, kMaxHearts); }
 
     // The place a card stands at: its own, or for a heroine at -1, the next in her SelectChar list.
@@ -352,7 +351,8 @@ private:
                 if (hearts(host, heroine) >= kMaxHearts) ending = heroine + 1;
         host.setVariable(1, kChapterVar, 1000 * (ph + 1) + 100 * c + 10 * h + ending);
         host.setVariable(1, kEndingVar, ending);
-        host.setVariable(1, kPhaseVar, ph + 1);
+        host.setVariable(1, kWeekVar, (ph + 1) / 2);
+        host.setVariable(1, kHalfVar, (ph + 1) % 2);
         selecting_ = false;
         confirming_ = -1;
         host.finishScreen(c);

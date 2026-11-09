@@ -30,7 +30,7 @@ scene scr\ep_001_006_000.txt
 label week
 open select
 chapter S 10904
-if S 10900 < 10 goto week
+if S 3000 < 5 goto week
 if S 10906 == 1 goto kururu
 if S 10906 == 2 goto otona
 if S 10906 == 3 goto rei
