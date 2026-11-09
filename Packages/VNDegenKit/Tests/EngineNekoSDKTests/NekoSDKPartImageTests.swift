@@ -224,6 +224,56 @@ import TestSupport
         #expect(near(after, before + 30), "\(before) to \(after)")
     }
 
+    // With the table's `fliptime` and `flipsound`, as Test Game 90 has them: command 121's parameter 16, 30, shows each
+    // picture two frames at 60 a second where the ini's 16 ms would show it one, so ten pictures last a third of a second
+    // and not a sixth; and the flipbook plays the sound its ini line names.
+    @Test func aFlipbookTakesItsTimeFromParameter16AndPlaysItsSound() throws {
+        var wav = Data("RIFF".utf8)
+        func put32(_ v: UInt32) { wav.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+        func put16(_ v: UInt16) { wav.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+        put32(36 + 16_000)
+        wav.append(Data("WAVEfmt ".utf8))
+        put32(16); put16(1); put16(1); put32(8_000); put32(16_000); put16(2); put16(16)
+        wav.append(Data("data".utf8))
+        put32(16_000)
+        wav.append(Data(count: 16_000))
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\partslot\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/anime_cfg.ini": Data("#anime\t10\tanime\\a_000.bmp\t16\t0\tse\\x.ogg\t80\t//mark\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("red.bmp", bmp(1280, 720) { _ in [255, 0, 0] })]),
+            "anime.pak": NekoSDKFlowFixture.archive((0..<10).map { (String(format: "a_%03d.bmp", $0), bmp(20, 20) { _ in [0, 255, 0] }) }),
+            "se.pak": NekoSDKFlowFixture.archive([("x.ogg", wav)]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [3: 100], s: [1: "obj\\red.bmp"]),
+                .init(op: 9, next: 4),
+                .init(op: 2, next: 5, p: [0: 200]),
+                .init(op: 121, next: 6, p: [0: 300, 2: 100, 3: 100, 4: 1000, 5: 1000, 16: 30], s: [1: "anime\\a_000.bmp"]),
+                .init(op: 9, next: 7),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        // The flipbook's green at 110, 110, counted in steps of 10 ms from its start to its end.
+        var shown = 0, heard = false
+        for _ in 0..<120 {
+            _ = vnneko_step(e, 10)
+            let f = frame(e)
+            let at = (110 * f.w + 110) * 4
+            if f.px[at + 1] > 200 && f.px[at] < 50 { shown += 1 }
+            heard = heard || vnneko_debug_sound_playing(e, 1, 180)
+        }
+        #expect((30...38).contains(shown), "\(shown * 10) ms")
+        #expect(heard)
+    }
+
     // An 8-bit picture with a palette is read, as one of Test Game 83's backgrounds is: two colours, blue and green.
     @Test func anEightBitPictureIsRead() throws {
         var d = Data("BM".utf8)

@@ -102,9 +102,12 @@ set S 15141 = 1
 end
 )";
 
-// A game that saves in Test Game 83's layout with the test part on, for a part's own slot and its save record
+// A game that saves in Test Game 83's layout with the test part on, for a part's own slot and its save record, and with
+// flipbooks timed by command 121's parameter 16 and playing their ini line's sound, as Test Game 90's are
 // (NekoSDKPartImageTests).
 const char kPartSlotTest[] = R"(
 screen defaults
 parts selftest
+fliptime
+flipsound
 )";
