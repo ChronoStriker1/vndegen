@@ -1,7 +1,6 @@
 // Test Game 83, Funbag Fantasy 2. Its story order is in the exe; the flow below was traced under Wine, which scene
 // scripts the PC reads through each route and what its saves at each choice hold. Picture names and numbers only.
 const char kFunbag2[] = R"(
-screen title
 # Measured under Wine: the art with "Click Any Mouse Button" until a click, then the menu. The menu's help is a circle
 # 143 pixels above the button under the pointer. Start opens Prologue and Main Story in the first two rows once the
 # prologue has been read (global 2), and Extra its three galleries in its own rows; the main buttons go while one is open.
@@ -109,6 +108,8 @@ button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 
 
 screen defaults
 parts scroll
+# CG flags by group: 48000 + 4000 x group + 4 x place, as the PC's cfg.sav holds them.
+cgflagsbygroup 4000
 # The wait mark has no .alp: its pure green is see-through on the PC.
 colorkey 0 255 0
 # The PC draws the message window at its .alp as it is. Config's first-run values, as the PC shows them under Wine.
@@ -303,6 +304,7 @@ cellsheet obj\f000_000.bmp
 cellsize 220 141
 cellthumb 32 12
 celldigits obj\e002_002.bmp 60 107 2 15
+cellcountstep 15
 cellcount obj\e002_002.bmp obj\f000_002.bmp 114 107 145 158 2
 cell 362 91
 cell 602 91
@@ -316,6 +318,57 @@ cell 842 391
 cell 362 541
 cell 602 541
 cell 842 541
+
+screen scene
+pic bg\bg_000_000_000.bmp 0 0 more bg\bg_000_000_000.bmp,bg\bg_000_001_000.bmp,bg\bg_000_002_000.bmp,bg\bg_000_003_000.bmp,bg\bg_000_004_000.bmp,bg\bg_000_005_000.bmp,bg\bg_000_006_000.bmp,bg\bg_000_008_000.bmp,bg\bg_000_009_000.bmp,bg\bg_000_017_000.bmp,bg\bg_000_018_000.bmp,bg\bg_000_020_000.bmp,bg\bg_000_022_000.bmp,bg\bg_000_023_000.bmp,bg\bg_000_025_000.bmp random
+pic dim 0 0 alpha 138
+pic obj\e001_000.bmp 1103 0
+pic obj\e000_000.bmp 0 0
+pic obj\e000_001.bmp 22 18 6 1 3 0
+pic sc\sc_000_000_000.bmp -80 0 tab 0
+pic sc\sc_000_001_000.bmp -60 0 tab 1
+pic sc\sc_000_002_000.bmp -450 0 tab 2
+pic sc\sc_000_003_000.bmp -140 0 tab 3
+pic sc\sc_000_004_000.bmp -80 0 tab 4
+pic obj\f002_000.bmp -170 0 tab 5
+button nav_save obj\e001_001.bmp 1114 61 9 5 0 help obj\e001_002.bmp 947 15 9 1 0 0
+button nav_load obj\e001_001.bmp 1114 131 9 5 1 help obj\e001_002.bmp 947 85 9 1 1 0
+button nav_cg obj\e001_001.bmp 1114 201 9 5 2 help obj\e001_002.bmp 947 155 9 1 2 0
+button nav_scene obj\e001_001.bmp 1114 271 9 5 3 help obj\e001_002.bmp 947 225 9 1 3 0
+button nav_music obj\e001_001.bmp 1114 341 9 5 4 help obj\e001_002.bmp 947 295 9 1 4 0
+button nav_config obj\e001_001.bmp 1114 411 9 5 5 help obj\e001_002.bmp 947 365 9 1 5 0
+button nav_title obj\e001_001.bmp 1114 481 9 5 6 help obj\e001_002.bmp 947 435 9 1 6 0
+button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 1 7 0
+button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
+button gtab0 obj\f001_000.bmp 31 540 6 5 0
+button gtab1 obj\f001_000.bmp 139 540 6 5 1
+button gtab2 obj\f001_000.bmp 247 540 6 5 2
+button gtab3 obj\f001_000.bmp 31 619 6 5 3
+button gtab4 obj\f001_000.bmp 139 619 6 5 4
+button gtab5 obj\f001_000.bmp 247 619 6 5 5
+button page0 obj\e001_003.bmp 408 31 10 5 0
+gallerytabs 0
+cellhide
+cellsheet obj\f000_000.bmp
+cellsize 220 141
+cellthumb 32 12
+celldigits obj\e002_002.bmp 60 107 2 15
+cell 362 91
+cell 602 91
+cell 842 91
+cell 362 241
+cell 602 241
+cell 842 241
+cell 362 391
+cell 602 391
+cell 842 391
+cell 362 541
+cell 602 541
+cell 842 541
+# The two-key scenes replay from the scene before their choice, ask it again, and play the variant taken.
+replayflow scr\ep_01_04_02.txt replay1
+replayflow scr\ep_01_05_02.txt replay2
+replayflow scr\ep_01_07_02.txt replay3
 
 # The music screen, measured under Wine: the tracks in three columns, the player under them and its volume at the left.
 screen music
@@ -374,7 +427,8 @@ pic obj\a003_001.bmp 351 228 2 1 0 0
 pic obj\a003_001.bmp 351 228 2 1 1 0
 pic obj\a003_001.bmp 695 228 2 1 0 0
 pic obj\a003_001.bmp 695 228 2 1 1 0
-pic obj\a003_000.bmp 392 51 7 1 1 0
+pic obj\a003_000.bmp 392 51 7 1 0 0
+questions resolution save load overwrite exit title backselection
 button yes obj\a003_002.bmp 306 312 2 5 0
 button no obj\a003_002.bmp 650 312 2 5 1
 
@@ -389,6 +443,15 @@ pic obj\a003_001.bmp 695 228 2 1 1 0
 pic obj\a003_003.bmp 392 51
 choicecolumns 2
 placefor 2 288 0 306 344
+
+# The backlog shows in the message window itself, older lines in init.ini's log colour.
+screen log
+inwindow
+
+screen cfgsav
+size 96000
+tracks 92000
+nostring
 
 screen story
 # The six choices are obj\l000_000 to _005, two options each. Sex scenes end on l000_000, which only picks the next
@@ -644,5 +707,32 @@ scene scr\ep_07_00_01.txt
 scene scr\ep_07_00_02.txt
 scene scr\ep_07_00_03.txt
 scene scr\ep_07_00_04.txt
+end
+flow replay1
+scene scr\ep_01_04_01.txt @1005
+choice obj\l000_000.bmp 2 @1006
+on 1 goto b
+scene scr\ep_01_04_02.txt @1030
+end
+label b
+scene scr\ep_01_04_03.txt @1030
+end
+flow replay2
+scene scr\ep_01_05_01.txt @1033
+choice obj\l000_000.bmp 2 @1034
+on 1 goto b
+scene scr\ep_01_05_02.txt @1060
+end
+label b
+scene scr\ep_01_05_03.txt @1060
+end
+flow replay3
+scene scr\ep_01_07_01.txt @1064
+choice obj\l000_000.bmp 2 @1065
+on 1 goto b
+scene scr\ep_01_07_02.txt @1090
+end
+label b
+scene scr\ep_01_07_03.txt @1090
 end
 )";
