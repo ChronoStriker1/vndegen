@@ -34,9 +34,11 @@ const PartEntry kParts[] = {
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses
 // with N, kept with a save, the right button there opening the load menu over it, and chapter N is scr\cN.txt with the
 // PC number 100 + N. Scene command 9000 loads its picture into slot p3 at p1, p2 through PartHost::loadImage, additive
-// when p4 is 1 and scrolling p5 and p6 pixels a second. On a table screen naming it, the widget test game's sprite
-// gallery, it draws a square at 400, 400, blue and red once pressed, takes the presses on it, and after two covers the
-// top left corner over everything.
+// when p4 is 1 and scrolling p5 and p6 pixels a second. Command 9001 holds slot p0 as the part's own, of kind 15, and
+// names a picture in its save record: its square at 600, 300 is drawn where the slot's number puts it, green once the
+// part knows the picture and blue before. On a table screen naming the part, the widget test game's sprite gallery,
+// it draws a square at 400, 400, blue and red once pressed, takes the presses on it, and after two covers the top left
+// corner over everything.
 class SelfTestPart : public GamePart {
 public:
     bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) override {
@@ -48,9 +50,29 @@ public:
         if (layer == Layer::Screen && menuPresses_ >= 2) fill(out, 0, 0, 20, 0, 0, 255);
     }
     bool command(PartHost &host, const Node &n) override {
+        if (n.opcode == 9001) {
+            host.holdSlot(n.p[0], kHeldKind);
+            heldPicture_ = n.s[1];
+            return true;
+        }
         if (n.opcode != 9000) return false;
         host.loadImage(n.p[3], n.s[1], n.p[1], n.p[2], n.p[4] == 1, float(n.p[5]), float(n.p[6]));
         return true;
+    }
+    void drawSlot(PartHost &, Canvas &out, int, float alpha) override {
+        if (alpha > 0) fill(out, 600, 300, 10, 0, heldPicture_.empty() ? 0 : 255, heldPicture_.empty() ? 255 : 0);
+    }
+    // The held slot's record names the picture first of its three and keeps 7 at the fixed part's 53.
+    void savePC(SaveData &d) const override {
+        for (SavedSprite &s : d.sprites)
+            if (s.kind == kHeldKind && s.path.empty()) {
+                s.names[0] = heldPicture_;
+                s.fixedBytes = {{53, {7, 0, 0, 0}}};
+            }
+    }
+    void loadPC(const SaveData &d) override {
+        for (const SavedSprite &s : d.sprites)
+            if (s.kind == kHeldKind && s.path.empty() && s.rawFixed.size() > 53 && s.rawFixed[53] == 7) heldPicture_ = s.names[0];
     }
     std::vector<std::string> chapter(PartHost &, int number) override {
         return {"scr\\c" + std::to_string(number) + ".txt @" + std::to_string(100 + number)};
@@ -92,6 +114,7 @@ public:
     void reset() override {
         presses_ = needed_ = menuPresses_ = 0;
         onMenu_ = false;
+        heldPicture_.clear();
     }
 
 private:
@@ -102,8 +125,10 @@ private:
                 p[0] = r, p[1] = g, p[2] = b, p[3] = 255;
             }
     }
+    static constexpr int kHeldKind = 15;
     int presses_ = 0, needed_ = 0, menuPresses_ = 0;
     bool onMenu_ = false;
+    std::string heldPicture_;
 };
 
 }  // namespace
@@ -170,6 +195,8 @@ void PartHost::playSound(int kind, int channel, const std::string &path, int vol
     e_.playSound(n, kind);
 }
 
+void PartHost::holdSlot(int slot, int kind) { e_.holdPartSlot(slot, kind); }
+bool PartHost::slotHeld(int slot) { return e_.partSlotHeld(slot); }
 void PartHost::log(const std::string &line) { e_.log("%s", line.c_str()); }
 
 // MARK: The engine's side
@@ -194,8 +221,8 @@ void Engine::resetParts() {
     for (auto &[name, part] : parts_) part->reset();
 }
 
-bool PartHost::loadImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY) {
-    return e_.loadPartImage(slot, path, x, y, additive, scrollX, scrollY);
+bool PartHost::loadImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY, int kind) {
+    return e_.loadPartImage(slot, path, x, y, additive, scrollX, scrollY, kind);
 }
 
 // The part a table screen names with `part NAME`, while that screen is open.

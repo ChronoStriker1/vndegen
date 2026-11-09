@@ -104,4 +104,95 @@ import TestSupport
         let dimAgain = (15 * g.w + 605) * 4
         #expect(Array(g.px[dimAgain..<dimAgain + 3]) == [255, 0, 64])
     }
+
+    // A slot a part holds with no picture (PartHost::holdSlot, the selftest part's command 9001): the part draws it in
+    // the slot's order once a screen update shows it, command 17 takes it away as it does a picture, and a save in the
+    // older layout holds its record as Test Game 83's PC writes a particle emitter's: kind 15, no picture, three names 57
+    // bytes into the fixed part and the part's own bytes in it. A load brings the slot back for the part to fill.
+    @Test func aPartsOwnSlotDrawsSavesAndGoes() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\partslot\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("red.bmp", bmp(1280, 720) { _ in [255, 0, 0] })]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [3: 100], s: [1: "obj\\red.bmp"]),
+                .init(op: 9001, next: 4, p: [0: 500], s: [1: "parts\\one.bmp"]),
+                .init(op: 9, next: 5),
+                .init(op: 2, next: 6, p: [0: 3000]),
+                .init(op: 17, next: 7, p: [0: 500]),
+                .init(op: 9, next: 8),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        func pixel(_ e: OpaquePointer, _ x: Int, _ y: Int) -> [UInt8] {
+            let f = frame(e)
+            let at = (y * f.w + x) * 4
+            return [f.px[at], f.px[at + 1], f.px[at + 2]]
+        }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        steps(e, 500)
+        // The part's square, over the red picture in slot 100.
+        #expect(pixel(e, 605, 305) == [0, 255, 0])
+        #expect(pixel(e, 590, 305) == [255, 0, 0])
+        #expect(vnneko_debug_save(e, 1))
+
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/partslot/save")
+        let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save001.sav" })
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        func int32(_ at: Int) -> Int32 { save.subdata(in: (save.startIndex + at)..<(save.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } }
+        let name = try #require(save.range(of: Data("parts\\one.bmp".utf8))).lowerBound - save.startIndex
+        // The record's fixed part starts 61 before the name: its slot and kind before its two empty names, the name's
+        // length 57 in, the part's 7 at 53, and the two other names empty after it.
+        let fixed = name - 61
+        #expect(int32(fixed - 16) == 500)
+        #expect(int32(fixed - 12) == 15)
+        #expect(int32(fixed - 8) == 0 && int32(fixed - 4) == 0)
+        #expect(int32(fixed + 57) == 13)
+        #expect(int32(fixed + 53) == 7)
+        #expect(int32(name + 13) == 0 && int32(name + 17) == 0)
+
+        // A new run: the load brings the slot back, and the part reads the picture's name from its record.
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
+        steps(second, 100)
+        #expect(pixel(second, 605, 305) == [0, 255, 0])
+
+        // Command 17 and the next update take the slot away.
+        steps(e, 3500)
+        #expect(pixel(e, 605, 305) == [255, 0, 0])
+    }
+
+    // An 8-bit picture with a palette is read, as one of Test Game 83's backgrounds is: two colours, blue and green.
+    @Test func anEightBitPictureIsRead() throws {
+        var d = Data("BM".utf8)
+        func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+        let w = 6, h = 2, row = 8
+        put(UInt32(54 + 8 + row * h)); put(0); put(54 + 8)
+        put(40); put(UInt32(w)); put(UInt32(h))
+        d.append(contentsOf: [1, 0, 8, 0])
+        put(0); put(UInt32(row * h)); put(0); put(0); put(2); put(0)
+        d.append(contentsOf: [255, 0, 0, 0, 0, 255, 0, 0])
+        // Bottom row first: all colour 1, then the top row, colour 0 first.
+        d.append(contentsOf: [1, 1, 1, 1, 1, 1, 0, 0])
+        d.append(contentsOf: [0, 1, 1, 1, 1, 1, 0, 0])
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\partslot\n".utf8),
+            "cg.pak": NekoSDKFlowFixture.archive([("p.bmp", d)]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        var out = [UInt32](repeating: 0, count: 3)
+        #expect(vnneko_debug_art_pixels(root.path, "cg\\p.bmp", "", &out))
+        // The first pixel, top left, is colour 0: blue and opaque, as red, green, blue and alpha from the top byte.
+        #expect(out[0] == 0x0000_FFFF, "\(String(out[0], radix: 16))")
+    }
 }

@@ -101,3 +101,10 @@ open vote 1 -> S 15140
 set S 15141 = 1
 end
 )";
+
+// A game that saves in Test Game 83's layout with the test part on, for a part's own slot and its save record
+// (NekoSDKPartImageTests).
+const char kPartSlotTest[] = R"(
+screen defaults
+parts selftest
+)";

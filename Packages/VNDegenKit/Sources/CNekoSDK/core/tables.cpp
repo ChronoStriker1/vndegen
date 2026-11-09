@@ -57,6 +57,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\commenttest") return kCommentTest;
     if (folder == "vndegen\\treetest") return kTreeTest;
     if (folder == "vndegen\\votetest") return kVoteTest;
+    if (folder == "vndegen\\partslot") return kPartSlotTest;
     return nullptr;
 }
 

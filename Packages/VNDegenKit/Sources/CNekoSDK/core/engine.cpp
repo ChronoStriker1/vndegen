@@ -2393,6 +2393,14 @@ SaveData Engine::captureSave() {
     d.width = canvas_.w;
     d.height = canvas_.h;
     for (const auto &[slot, s] : front_) {
+        // A slot a part holds saves as a record of the part's kind with no picture, which the part's savePC fills.
+        if (s.held) {
+            SavedSprite out;
+            out.slot = slot;
+            out.kind = s.kind;
+            out.alpha = out.endAlpha = int(s.alpha * 256 + 0.5f);
+            d.sprites.push_back(out);
+        }
         if (!s.image) continue;
         SavedSprite out;
         out.slot = slot;
@@ -2400,6 +2408,7 @@ SaveData Engine::captureSave() {
         // Some games' PC names the picture twice and loads it from the second (namesPictureTwice).
         out.nextPath = !s.noise && layout_ && namesPictureTwice(*layout_) ? s.path : "";
         out.noise = s.noise;
+        out.kind = s.kind;
         if (s.flipCount > 0) {
             out.flipFrame = s.flipShown;
             out.flipRepeat = s.flipLoop ? 1 : 0;
@@ -2662,7 +2671,16 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             if (s.image) front_[saved.slot] = s;
             continue;
         }
+        // A part's slot with no picture comes back held, for the part's loadPC to fill from the same record.
+        if (saved.path.empty() && saved.kind != 0) {
+            s.held = true;
+            s.kind = saved.kind;
+            s.alpha = float(saved.alpha) / 256;
+            front_[saved.slot] = s;
+            continue;
+        }
         s.path = saved.path;
+        s.kind = saved.kind;
         // A movie starts again from its beginning. Whether it looped isn't known from the save, and the library's
         // looping ones are backgrounds, so it loops.
         if (normalizedPath(saved.path).rfind("movie\\", 0) == 0 && (s.movie = openMovie(saved.path, true))) {
@@ -5669,7 +5687,20 @@ void Engine::loadImage(const Node &n) {
     s.movie.reset();
 }
 
-bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY) {
+void Engine::holdPartSlot(int slot, int kind) {
+    Sprite s;
+    s.held = true;
+    s.kind = kind;
+    back_[slot] = std::move(s);
+}
+
+bool Engine::partSlotHeld(int slot) const {
+    for (const auto *set : {&front_, &back_})
+        if (auto it = set->find(slot); it != set->end() && it->second.held) return true;
+    return false;
+}
+
+bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY, int kind) {
     noteSeen(path);
     ImageRef image = images_->get(shownPath(path));
     if (!image) {
@@ -5685,6 +5716,7 @@ bool Engine::loadPartImage(int slot, const std::string &path, int x, int y, bool
     s.scrollX = scrollX;
     s.scrollY = scrollY;
     s.scrollFrom = now_;
+    s.kind = kind;
     back_[slot] = std::move(s);
     return true;
 }
@@ -6315,10 +6347,16 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
     }
     int drawnTo = INT_MIN;
     for (const auto &[slot, s] : sprites) {
-        if (!s.image) continue;
+        if (!s.image && !s.held) continue;
         composeSplashes(out, drawnTo, slot);
         drawParts(out, Layer::Slot, drawnTo, slot);
         drawnTo = slot;
+        if (s.held) {
+            // A part's own slot, which the part draws.
+            float alpha = view(s).alpha;
+            for (auto &[name, part] : parts_) part->drawSlot(*partHost_, out, slot, alpha);
+            continue;
+        }
         if (s.noise) {
             drawNoise(out, s);
             continue;
