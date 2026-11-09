@@ -26,6 +26,10 @@ button cg obj\d000_005.bmp 514 455 5 5 2 stage 2 group extra help obj\d000_007.b
 button scene obj\d000_005.bmp 514 501 5 5 3 stage 2 group extra help obj\d000_007.bmp 356 358 5 1 3 0
 button music obj\d000_005.bmp 514 547 5 5 4 stage 2 group extra help obj\d000_007.bmp 356 404 5 1 4 0
 
+# Start's Main Story starts the story table's flow of that name; Prologue starts its first.
+screen start
+flow story
+
 screen load
 # The room behind the menus is one of the 15 the exe lists, picked afresh each time a screen opens, at 46 percent.
 pic bg\bg_000_000_000.bmp 0 0 more bg\bg_000_000_000.bmp,bg\bg_000_001_000.bmp,bg\bg_000_002_000.bmp,bg\bg_000_003_000.bmp,bg\bg_000_004_000.bmp,bg\bg_000_005_000.bmp,bg\bg_000_006_000.bmp,bg\bg_000_008_000.bmp,bg\bg_000_009_000.bmp,bg\bg_000_017_000.bmp,bg\bg_000_018_000.bmp,bg\bg_000_020_000.bmp,bg\bg_000_022_000.bmp,bg\bg_000_023_000.bmp,bg\bg_000_025_000.bmp random
@@ -701,7 +705,8 @@ scene scr\ep_06_14_01.txt @6049
 scene scr\ep_06_15_00.txt @6050
 scene scr\ep_06_15_01.txt @6051
 scene scr\ep_06_15_02.txt @6052
-scene scr\ep_06_15_03.txt
+# 6053 is inferred: the scene passes too quickly to save in, and its neighbours are 6052 and 6054.
+scene scr\ep_06_15_03.txt @6053
 scene scr\ep_06_15_04.txt @6054
 scene scr\ep_06_15_05.txt @6055
 scene scr\ep_06_15_06.txt @6056

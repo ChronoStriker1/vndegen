@@ -10,13 +10,16 @@ class ScrollPart : public GamePart {
 public:
     bool command(PartHost &host, const Node &n) override {
         switch (n.opcode) {
-        case 90:
+        case 90: {
             // Across: slot p0, its top at y p2, moving p3 pixels a second (negative to the left), tiled over the width.
             // Test Game 86's character cards run a lace strip at -500 along the top and +500 along the bottom, and two
-            // PC shots half a second apart show each moved 250 pixels, one way and the other. A use with p11 and p12 set,
-            // Test Game 83's fog at 1000, may count otherwise; unconfirmed.
-            host.loadImage(n.p[0], n.s[1], 0, n.p[2], false, float(n.p[3]), 0);
+            // PC shots half a second apart show each moved 15 pixels on its 116-pixel repeat, one way and the other,
+            // which 500 a second gives and 30 would too; unconfirmed between them. With p11 and p12 set, Test Game
+            // 83's fog (p3 1000), the picture stays still on the PC: frames 0.7, 1.4 and 2 seconds apart fit at no shift.
+            bool still = n.p[11] != 0 || n.p[12] != 0;
+            host.loadImage(n.p[0], n.s[1], 0, n.p[2], false, still ? 0 : float(n.p[3]), 0);
             return true;
+        }
         case 91:
             // Down: as 90 turned, its left at x p2 and p3 pixels a second, tiled over the height. Neither of set 3's games
             // uses it; it's inferred from 90 for Test Game 90.
