@@ -156,7 +156,11 @@ import TestSupport
         #expect(pixel(e, 402, 402) == blue)
         #expect(pixel(e, 407, 407) == white)
         #expect(pixel(e, 5, 5) == white)
-        click(e, 402, 402)
+        // A controller reaches the part's square too: a step down from above it lands there, and Confirm presses it.
+        vnneko_mouse_move(e, 405.0 / 1280, 300.0 / 720)
+        #expect(vnneko_move_focus(e, 0, 1))
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
         vnneko_mouse_move(e, 0.9, 0.9)
         #expect(pixel(e, 402, 402) == red)
         click(e, 407, 407)

@@ -34,6 +34,10 @@ const PartEntry kParts[] = {
 // and after two covers the top left corner over everything.
 class SelfTestPart : public GamePart {
 public:
+    bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) override {
+        if (onMenu_) spots.push_back({405, 405});
+        return false;
+    }
     void draw(PartHost &, Canvas &out, Layer layer, int, int) override {
         if (layer == Layer::Menu) fill(out, 400, 400, 10, menuPresses_ ? 255 : 0, 0, menuPresses_ ? 0 : 255);
         if (layer == Layer::Screen && menuPresses_ >= 2) fill(out, 0, 0, 20, 0, 0, 255);

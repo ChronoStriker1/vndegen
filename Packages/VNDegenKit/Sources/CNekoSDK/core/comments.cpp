@@ -17,8 +17,10 @@ namespace {
 constexpr int kFace = 0, kSize = 24, kEdge = 2;
 constexpr int64_t kCrossMs = 6050;
 constexpr int kLaneTop = 10, kLanePitch = 40, kLanes = 12;
-// Command 113's lines start one about every 2.1 seconds.
+// Command 113's lines start one about every 2.1 seconds. A placed line's text stands about 10 pixels below its row,
+// where a picture's own text starts about 3 below its top.
 constexpr int64_t kInlineGapMs = 2100;
+constexpr int kPlacedDrop = 7;
 
 int64_t framesMs(int frames) { return int64_t(frames) * 1000 / 60; }
 
@@ -139,8 +141,8 @@ void CommentStream::play(PartHost &host, int group) {
     cursors_.push_back(std::move(cursor));
 }
 
-// Command 113's lines start one every 2.1 seconds; one placed as `《text》,X,Y` starts X frames on at row Y, which is
-// a reading of the numbers not yet checked against the PC.
+// Command 113's lines start one every 2.1 seconds; one placed as `《text》,X,Y` starts X frames on at row Y, as the
+// PC's do: seven at 0 entered together at rows 20 to 440, and those at 90 about 1.5 seconds later (lead, under Wine).
 void CommentStream::lines(PartHost &host, const std::vector<std::string> &texts) {
     Cursor cursor;
     int64_t now = host.nowMs();
@@ -154,7 +156,7 @@ void CommentStream::lines(PartHost &host, const std::vector<std::string> &texts)
             char *end = nullptr;
             long x = std::strtol(text.c_str() + before + 1, &end, 10);
             if (end && *end == ',') {
-                pending_.push_back({text.substr(0, before), std::atoi(text.c_str() + comma + 1), now + framesMs(int(x))});
+                pending_.push_back({text.substr(0, before), std::atoi(text.c_str() + comma + 1) + kPlacedDrop, now + framesMs(int(x))});
                 continue;
             }
         }
