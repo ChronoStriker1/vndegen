@@ -4110,6 +4110,11 @@ void Engine::run() {
         if (stack_.empty() || !stack_.back().node) {
             if (!stack_.empty()) stack_.pop_back();
             if (stack_.empty()) {
+                // A replay whose flow runs off its end, as a chapter's does, goes back to the Scene gallery.
+                if (replaying_) {
+                    endStory("scene");
+                    return;
+                }
                 waiting_ = Waiting::Ended;
                 log("the flow ended");
                 return;
