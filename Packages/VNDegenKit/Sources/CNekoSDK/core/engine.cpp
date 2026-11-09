@@ -398,7 +398,7 @@ void Engine::endStory(const std::string &screen) {
     gt_ = {};
     previousChoice_.reset();
     previousChoiceDue_ = false;
-    askedCount_ = askedColumns_ = 0;
+    askedCount_ = askedColumns_ = askedResult_ = 0;
     askedCells_.clear();
     splashes_.clear();
     resetParts();
@@ -452,7 +452,7 @@ void Engine::startStory() {
     staffRollLayers_ = nullptr;
     previousChoice_.reset();
     previousChoiceDue_ = false;
-    askedCount_ = askedColumns_ = 0;
+    askedCount_ = askedColumns_ = askedResult_ = 0;
     askedCells_.clear();
     resetParts();
     std::string first = config_.text(storyFlowKey_.c_str());
@@ -2322,10 +2322,11 @@ SaveData Engine::captureSave() {
         bool made = mode && !mode->empty() && (*mode)[0] == "made";
         d.lastChoice = asking || (made && !choiceImage_.empty()) ? 2 : choiceImage_.empty() ? -1 : choiceResult_;
     }
-    // Test Games 82 and 83 keep the latest choice asked instead, its count where 87 keeps its result (sets 2 and 3).
+    // Test Games 82 and 83 keep the latest choice asked instead: its count where 87 keeps its result, then in 82 the
+    // sheet's columns and in 83 the option taken (sets 2 and 3).
     if (layout_ && choiceFlag(*layout_) == ChoiceFlag::Never && askedCount_ > 0) {
         d.lastChoice = askedCount_;
-        d.choiceColumns = askedColumns_;
+        d.choiceColumns = !choiceResultAt116(*layout_) ? askedColumns_ : waiting_ == Waiting::Choice ? askedCount_ : askedResult_;
         d.choiceCells = askedCells_;
     }
     d.choiceImage = choiceImage_;
@@ -2684,7 +2685,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     // The latest choice asked comes back with the save, for the next save to keep (82 and 83).
     if (layout_ && choiceFlag(*layout_) == ChoiceFlag::Never) {
         askedCount_ = std::max(0, d.lastChoice);
-        askedColumns_ = std::max(0, d.choiceColumns);
+        askedColumns_ = askedResult_ = std::max(0, d.choiceColumns);
         askedCells_ = d.choiceCells;
     }
     // The PC's saves don't hold Extend: two saves differing only in it match. It stays as it was across a load.
@@ -3993,6 +3994,7 @@ void Engine::beginChoice(const Node &n) {
 void Engine::choose(int index) {
     if (waiting_ != Waiting::Choice) return;
     choiceResult_ = index;
+    askedResult_ = index;
     choiceMade_ = true;
     log("chose %d", index);
     // `close MS SCALE`: the chosen option shows pressed, and the box shrinks about its middle to SCALE and fades out over

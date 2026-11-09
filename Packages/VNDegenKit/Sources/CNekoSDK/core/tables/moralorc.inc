@@ -144,18 +144,18 @@ pic obj\g001_007.bmp 0 628 tab 4
 pic obj\g003_000.bmp 12 15 1 2 0 0
 cellsheet obj\g006_000.bmp
 cellsize 110 76
-cellthumb 29 33
-cell 154 178
-cell 154 360
-cell 404 178
-cell 404 360
-cell 654 178
-cell 654 360
-cell 904 178
-cell 904 360
-celllabel obj\f011_000.bmp 13 18
-celldigits obj\f011_001.bmp 55 12 2 22
-cellcount obj\g007_000.bmp obj\g009_000.bmp 119 113 159 172 0
+cellthumb 28 33
+cell 155 178
+cell 155 360
+cell 405 178
+cell 405 360
+cell 655 178
+cell 655 360
+cell 905 178
+cell 905 360
+celllabel obj\f011_000.bmp 12 18
+celldigits obj\f011_001.bmp 54 12 2 22
+cellcount obj\g007_000.bmp obj\g009_000.bmp 118 113 158 171 0
 celltotal obj\g008_000.bmp 4
 gallerytabs
 cellhide
@@ -200,17 +200,17 @@ pic obj\g001_007.bmp 0 628 tab 4
 pic obj\g003_000.bmp 12 15 1 2 0 1
 cellsheet obj\g006_000.bmp
 cellsize 110 76
-cellthumb 29 33
-cell 154 178
-cell 154 360
-cell 404 178
-cell 404 360
-cell 654 178
-cell 654 360
-cell 904 178
-cell 904 360
-celllabel obj\f011_000.bmp 13 18
-celldigits obj\f011_001.bmp 55 12 2 22
+cellthumb 28 33
+cell 155 178
+cell 155 360
+cell 405 178
+cell 405 360
+cell 655 178
+cell 655 360
+cell 905 178
+cell 905 360
+celllabel obj\f011_000.bmp 12 18
+celldigits obj\f011_001.bmp 54 12 2 22
 gallerytabs
 cellhide
 button pageprev obj\g005_000.bmp 20 264 2 5 0
