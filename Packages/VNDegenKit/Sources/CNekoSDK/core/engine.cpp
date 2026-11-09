@@ -1165,6 +1165,8 @@ void Engine::loadGalleries() {
             auto parts = split(f[0], ',');
             // Test Game 87's picture lines are separated by tabs, `PAGE ID PICTURE` (set 1).
             if (parts.size() < 3 && f.size() >= 3) parts = {f[0], f[1], f[2]};
+            // Test Game 82's are `ID,PICTURE`, its entries' pictures numbered across the file, grouped by the entry's page.
+            if (parts.size() == 2) parts = {std::to_string(cgEntries_.back().page), parts[0], parts[1]};
             if (parts.size() >= 3) {
                 cgEntries_.back().imageIds.push_back(std::atoi(parts[1].c_str()));
                 if (parts.size() >= 4 && cgEntries_.back().flow.empty()) cgEntries_.back().flow = trim(parts[3]);
@@ -1714,6 +1716,9 @@ void Engine::composeGallery(Canvas &out) {
         }
         if (unlocked)
             if (ImageRef thumb = galleryThumbnail(entries[entry].thumbnail)) drawPart(out, *thumb, cx + dx, cy + dy, 0, 0, thumb->w, thumb->h, 1);
+        // `cellthumbframe FILE X Y`: a frame over every unlocked card's thumbnail, as Test Game 82's PC draws d004_001.
+        if (const auto *around = screen_->setting("cellthumbframe"); unlocked && around && around->size() >= 3)
+            if (ImageRef art = images_->get((*around)[0])) drawPart(out, *art, cx + field(*around, 1), cy + field(*around, 2), 0, 0, art->w, art->h, 1);
         if (unlocked && index == hovered && frame && frame->size() >= 3)
             if (ImageRef art = images_->get((*frame)[0]); art && art->h >= 5) drawPart(out, *art, cx + field(*frame, 1), cy + field(*frame, 2), 0, art->h / 5, art->w, art->h / 5, 1);
         // A card's number, faint on a locked card in some games, and how many of a CG's pictures have been seen.

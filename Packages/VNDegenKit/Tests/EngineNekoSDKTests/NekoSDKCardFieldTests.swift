@@ -105,4 +105,28 @@ import TestSupport
         #expect(pixel(e, 315, 315) == [0, 150, 0])
         #expect(pixel(e, 440, 380) == [250, 250, 0])
     }
+
+    // Test Game 82's cg_view.ini lists pictures as `ID,PICTURE`; one seen in cfg.sav unlocks its card, whose thumbnail gets
+    // the frame `cellthumbframe` names, as the PC draws d004_001 over every unlocked card.
+    @Test func aCardFromAnIdPictureLineShowsWithItsThumbnailFrame() throws {
+        var cfg = Data(count: 104_000)
+        cfg[48_000] = 1
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\cardtest\n".utf8),
+            "cfg/cg_view.ini": Data("#p 0 obj\\t.bmp none\n0,cg\\a.bmp\n##\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([
+                ("t.bmp", bmp(40, 30) { _, _ in [0, 0, 250] }),
+                ("f.bmp", bmp(44, 34) { x, y in x < 2 || y < 2 ? [250, 250, 0] : [0, 250, 0] }),
+            ]),
+            "data/AppData/Roaming/vndegen/cardtest/save/cfg.sav": NekoSDKFlowFixture.packed(cfg),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_press(e, "cg"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        // The frame's edge at the card plus 8, then the frame's inside over the thumbnail.
+        #expect(pixel(e, 108, 108) == [0, 250, 250])
+        #expect(pixel(e, 120, 120) == [0, 250, 0])
+    }
 }
