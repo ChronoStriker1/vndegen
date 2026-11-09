@@ -70,6 +70,17 @@ enum : int {
 };
 const char *const kNames[3] = {"Ayano", "Misuzu", "Rina"};
 
+// The PC's own variables for the same state, read from its saves (decoded with the lead's kYabai layout): the truth, the
+// clock's hour, the hours left, the truths done, each heroine's stages solved in each truth (0 to 3), her total solved,
+// and a flag for each question asked. The hub keeps them in step with its own, so its saves load on the PC and the PC's
+// load here.
+enum : int {
+    kPCTruth = 2000, kPCHour = 2001, kPCHoursLeft = 2002, kPCTruthsDone = 2003,
+    kPCSolved = 2005,      // + 5 * heroine + (truth - 1)
+    kPCTotal = 2070,       // + heroine
+    kPCAsked = 3000,       // + 500 * heroine + 100 * (truth - 1) + 10 * (stage - 1) + question
+};
+
 // What the hub's screen gives the story table.
 enum HubResult { kPlay = 1, kAllSolved = 2, kTimeUp = 3, kTimeEvent = 4, kDevil = 5, kOpenTree = 9 };
 
@@ -92,6 +103,8 @@ public:
         }
         if (name != "hub") return false;
         loadQuestions(host);
+        // A PC save, which holds only the PC's variables: take the hub's state from them.
+        if (!host.variable(1, kTruth) && host.variable(1, kPCTruth)) fromPC(host);
         // Back from the tree: a replay plays at no cost; an ask is a question like a bubble's.
         int action = host.variable(1, kTreeAction), picked = host.variable(1, kTreeChapter);
         host.setVariable(1, kTreeAction, 0);
@@ -256,6 +269,7 @@ private:
         host.setVariable(1, kDay, t);
         host.setVariable(1, kHoursLeft, hours(host, t));
         host.setVariable(1, kShown, std::max(0, std::min(2, firstShown(host, t))));
+        toPC(host);
     }
 
     // `truth T HOURS FIRST [START]` under `screen hub`: the hours truth T gives, whom the hub shows first (A, M or R) and
@@ -303,7 +317,53 @@ private:
         }
         // Truth 5: a heroine's last right answer is followed at once by her devil scene, 910, 920 or 930 (Wine).
         if (t == 5 && host.variable(1, kStage + heroine) == 4 && stage == 3) pendingDevil_ = 910 + 10 * heroine;
+        toPC(host);
         return finishWith(host, kPlay, chapter);
+    }
+
+    void toPC(PartHost &host) {
+        int t = truth(host);
+        host.setVariable(1, kPCTruth, t);
+        host.setVariable(1, kPCHour, host.variable(1, kHour));
+        host.setVariable(1, kPCHoursLeft, host.variable(1, kHoursLeft));
+        host.setVariable(1, kPCTruthsDone, t - 1);
+        for (int h = 0; h < 3; h++) {
+            int before = host.variable(1, kPCSolved + 5 * h + (t - 1)), now = std::min(3, host.variable(1, kStage + h) - 1);
+            host.setVariable(1, kPCSolved + 5 * h + (t - 1), now);
+            host.setVariable(1, kPCTotal + h, host.variable(1, kPCTotal + h) + now - before);
+            for (int stage = 1; stage <= 3; stage++) {
+                int bits = host.variable(1, kAsked + 9 * (t - 1) + 3 * h + (stage - 1));
+                for (int q = 0; q < 3; q++)
+                    if (bits & (1 << q)) host.setVariable(1, kPCAsked + 500 * h + 100 * (t - 1) + 10 * (stage - 1) + q, 1);
+            }
+        }
+    }
+
+    void fromPC(PartHost &host) {
+        int t = std::max(1, std::min(5, host.variable(1, kPCTruth)));
+        host.setVariable(1, kTruth, t);
+        host.setVariable(1, kDay, t);
+        host.setVariable(1, kHour, host.variable(1, kPCHour));
+        host.setVariable(1, kHoursLeft, host.variable(1, kPCHoursLeft));
+        int solved = 0;
+        for (int h = 0; h < 3; h++) {
+            int done = std::max(0, std::min(3, host.variable(1, kPCSolved + 5 * h + (t - 1))));
+            host.setVariable(1, kStage + h, done + 1);
+            solved += done;
+            for (int tt = 1; tt <= 5; tt++)
+                for (int stage = 1; stage <= 3; stage++) {
+                    int bits = 0;
+                    for (int q = 0; q < 3; q++)
+                        if (host.variable(1, kPCAsked + 500 * h + 100 * (tt - 1) + 10 * (stage - 1) + q)) bits |= 1 << q;
+                    host.setVariable(1, kAsked + 9 * (tt - 1) + 3 * h + (stage - 1), bits);
+                }
+        }
+        host.setVariable(1, kSolved, solved);
+        // Truth 1's 12:00 scene has played once its clock is past noon; whom to show: the first with an open stage.
+        host.setVariable(1, kEventDone, t > 1 || host.variable(1, kHour) > 12);
+        int shown = std::max(0, std::min(2, firstShown(host, t)));
+        for (int i = 0; i < 3 && (host.variable(1, kStage + shown) > 3 || locked(host, shown)); i++) shown = (shown + 1) % 3;
+        host.setVariable(1, kShown, shown);
     }
 
     bool finishWith(PartHost &host, int result, int chapter) {
