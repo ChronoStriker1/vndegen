@@ -176,6 +176,28 @@ import TestSupport
         #expect(pixel(second, 194, 326) == [255, 0, 0])
     }
 
+    // A PC save of Test Game 96 from before a new game's first question names neither picture, and all after them sits
+    // 32 bytes earlier: read and built again it keeps them empty, where a save of the runtime's own names both.
+    @Test func aSaveWithNoPictureNamesIsBuiltAgainWithNone() throws {
+        let root = try game("layout96")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_save(e, 1))
+        vnneko_stop(e)
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", "layout96")))
+        let flow = Int(int32(save, 0xCD))
+        let choice = 0xCD + 4 + flow + 4196
+        #expect(int32(save, choice) == 16 && int32(save, choice + 20) == 16)
+        // Both names taken out, their lengths left as zeros.
+        save.replaceSubrange((save.startIndex + choice)..<(save.startIndex + choice + 40), with: Data(count: 8))
+        var built = [UInt8](repeating: 0, count: save.count + 64)
+        let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout96", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+        #expect(size == save.count)
+        #expect(Data(built.prefix(size)) == save)
+    }
+
     // Test Game 90's layout: the newer engine's sprite records with x and y as floats 0xD5 after their names, a shorter
     // last block, and a tail without the GOOD Timing fields.
     @Test func aSaveInTestGame90sLayoutLoads() throws {

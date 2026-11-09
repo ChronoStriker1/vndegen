@@ -13,7 +13,10 @@ namespace {
 
 // As Test Game 96's PC draws them (lead, under Wine, .audit/evidence/nekosdk/lead/comments96): white 24-pixel MS Gothic
 // with a black edge about 2 pixels wide, crossing the screen from right to left in 6.05 seconds whatever their length, in
-// twelve rows 40 pixels apart from the top.
+// twelve rows 40 pixels apart from the top. Their widths were checked again with the face's Japanese name, ＭＳ ゴシック,
+// given a stand-in under Wine, which the first measuring lacked (set 2 found the exe asks for that name): the white of
+// the vote's first comments is as wide on the PC as in VNDegen, 116 to 118 pixels for five characters, 138 to 143 for
+// six, 148, 167, 181, 224 and 246 for longer lines, so 24 pixels a full-width character and 12 a half-width one.
 constexpr int kFace = 0, kSize = 24, kEdge = 2;
 constexpr int64_t kCrossMs = 6050;
 constexpr int kLaneTop = 10, kLanePitch = 40, kLanes = 12;
