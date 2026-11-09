@@ -33,6 +33,9 @@ struct SaveLayout {
     // The GOOD Timing fields after the scene's node (SaveData::gtState and on), which Test Game 90's tail doesn't have:
     // its fixed bytes sit 31 earlier than Test Game 94's, and it keeps zeros where an off GOOD Timing keeps -1.
     bool gtTail = true;
+    // What a shown sprite's alpha and end alpha hold: 256, or 255 in Test Game 90's records, as the older engine's hold;
+    // its first record keeps 256 either way.
+    int shownAlpha = 256;
     // The older engine of the games that keep their story in the exe: a sprite record's fixed part, 0 in the newer
     // layouts, then the zeros before each record, the first's within the 40 bytes after the count, and those between the
     // sound channels and the scene's name.
@@ -102,6 +105,10 @@ const SaveLayout kMankitsu = [] {
     SaveLayout l = kRinjin;
     l.recordExtra = -148;
     l.recordTail = 137;
+    // Its sprites' last blocks hold none of Test Game 94's fixed bytes, and a shown sprite holds 255 (set 1: with 256 and
+    // 94's bytes the PC drew a CG of VNDegen's save as nothing).
+    l.spriteTail = {};
+    l.shownAlpha = 255;
     l.byteBeforeSounds = false;
     l.gtTail = false;
     l.tailSize = 6063;
@@ -479,6 +486,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.anchorX = r.i32At(f + kRecordAnchor + extra);
         s.anchorY = r.i32At(f + kRecordAnchor + 4 + extra);
         s.alpha = r.i32At(f + kRecordAlpha + extra);
+        if (layout.shownAlpha == 255 && s.slot != -999999 && s.alpha == 255) s.alpha = 256;
         s.blurOn = plain[f + kRecordBlurOn + extra] != 0;
         s.blur = r.i32At(f + kRecordBlur + extra);
         s.waveOn = plain[f + kRecordWave + extra] != 0;
@@ -498,6 +506,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.endX = r.f32At(g + 4);
         s.endY = r.f32At(g + 8);
         s.endAlpha = r.i32At(g + 12);
+        if (layout.shownAlpha == 255 && s.slot != -999999 && s.endAlpha == 255) s.endAlpha = 256;
         s.endScaleX = r.f32At(g + 20);
         s.endScaleY = r.f32At(g + 24);
         s.rawTail.assign(plain.begin() + std::ptrdiff_t(g), plain.begin() + std::ptrdiff_t(g + kRecordTail));
@@ -709,7 +718,8 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setF32(f + kRecordScale + 4 + extra, s.scaleY);
         w.setI32(f + kRecordAnchor + extra, s.anchorX);
         w.setI32(f + kRecordAnchor + 4 + extra, s.anchorY);
-        w.setI32(f + kRecordAlpha + extra, s.alpha);
+        int most = root ? 256 : layout.shownAlpha;
+        w.setI32(f + kRecordAlpha + extra, std::min(most, s.alpha));
         w.b[f + kRecordBlurOn + extra] = s.blurOn ? 1 : 0;
         w.setI32(f + kRecordBlur + extra, s.blur);
         w.b[f + kRecordWave + extra] = s.waveOn ? 1 : 0;
@@ -731,7 +741,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(g, root || s.noise ? 0 : s.slot);
         w.setF32(g + 4, s.endX);
         w.setF32(g + 8, s.endY);
-        w.setI32(g + 12, s.endAlpha);
+        w.setI32(g + 12, std::min(most, s.endAlpha));
         w.setI32(g + 16, s.blur);
         // A third copy of where the sprite started.
         w.setF32(g + 0x3C, s.x);

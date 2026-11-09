@@ -268,11 +268,15 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     plateX_ = config_.number("MsgWinButtonPlatePosX");
     plateY_ = config_.number("MsgWinButtonPlatePosY");
     if (buttonPlate_ && buttonPlate_->w >= width_) barTop_ = plateY_;
-    plateHiddenY_ = config_.number("MsgWinButtonPlateBottomPosY", height_);
-    plateHiddenX_ = config_.number("MsgWinButtonPlateBottomPosX", plateX_);
+    // Test Game 96's init.ini names the resting place `HiddenPos` where Test Game 83's says `BottomPos`.
+    bool bottom = !config_.text("MsgWinButtonPlateBottomPosY").empty(), hidden = !config_.text("MsgWinButtonPlateHiddenPosY").empty();
+    const char *restY = bottom || !hidden ? "MsgWinButtonPlateBottomPosY" : "MsgWinButtonPlateHiddenPosY";
+    const char *restX = bottom || !hidden ? "MsgWinButtonPlateBottomPosX" : "MsgWinButtonPlateHiddenPosX";
+    plateHiddenY_ = config_.number(restY, height_);
+    plateHiddenX_ = config_.number(restX, plateX_);
     // Show type 3, "from below to the set place": the plate rests at its bottom place and rises with the pointer on it, as
     // Test Game 83's control panel does (set 3, under Wine).
-    plateRests_ = config_.number("MsgWinButtonShowType") == 3 && buttonPlate_ && config_.text("MsgWinButtonPlateBottomPosY").size() > 0;
+    plateRests_ = config_.number("MsgWinButtonShowType") == 3 && buttonPlate_ && (bottom || hidden);
     if (Bytes ini = files_.read(config_.text("MsgButtonDeclFilename", "cfg\\msg_button.ini"))) messageButtons_ = parseMessageButtons(*ini, *images_);
     if (Bytes ini = files_.read(config_.text("MsgButtonPlayViewDeclFilename", "cfg\\msg_button_playview.ini"))) {
         replayButtons_ = parseMessageButtons(*ini, *images_);
@@ -2626,7 +2630,8 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen) &&
+    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryByRule(atScreen) &&
+               !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen) &&
                !resumeStoryAt(d.scene)) {
         complain("The story table has no place for the save's scene " + d.scene);
     }
@@ -2731,7 +2736,9 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         channelsOf(kind)[channel] = player;
         (kind == kKindBgm ? bgmNow_ : seNow_)[channel] = {sound.path, sound.volume, sound.pan};
     }
-    auto script = d.scene.empty() ? nullptr : loadScript(d.scene);
+    // A PC save resumed at a screen's line opens the screen, without playing on in the scene it names, which a save keeps
+    // naming as the PC's does.
+    auto script = d.scene.empty() || atScreen ? nullptr : loadScript(d.scene);
     scene_ = script ? Frame{script, script->node(d.node)} : Frame{};
     lastScene_ = d.scene;
     // The latest choice asked comes back with the save, for the next save to keep (82 and 83).
@@ -3005,13 +3012,23 @@ void Engine::composeSlots(Canvas &out) {
                 drawPart(out, *quickMark, numberX, cy + offset("slotdigits", 2), 0, 0, quickMark->w, quickMark->h, 1);
                 numberX += quickMark->w;
             }
-            // `slotdigits SHEET X Y COUNT [STEP]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide digits).
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), 10, offset("slotdigits", 4));
+            // `slotdigits SHEET X Y COUNT [STEP] [CELLS]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide
+            // digits), from a sheet of CELLS, 10 when absent (13 for Test Game 96's, its date's marks after the digits).
+            int numberCells = offset("slotdigits", 5) > 0 ? offset("slotdigits", 5) : 10;
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4));
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
                 int shown = !info.exists || isLocked ? int(StateDisabled) : over ? int(StateHover) : int(StateNormal);
                 drawPart(out, *del, cx + offset("slotdelete", 1), cy + offset("slotdelete", 2), 0, shown * h, del->w, h, 1);
+            }
+            // `slotcommentbutton SHEET X Y`: a button of five rows on each card that asks for its comment, as Test Game 96's
+            // コメント does (set 2); none to press on a card with no save.
+            if (ImageRef button = picture("slotcommentbutton"); button && button->h >= 5) {
+                int h = button->h / 5;
+                bool over = pointerSeen_ && !dialogOpen_ && overCardPart("slotcommentbutton", slot, pointerX_, pointerY_);
+                int shown = !info.exists ? int(StateDisabled) : over ? int(StateHover) : int(StateNormal);
+                drawPart(out, *button, cx + offset("slotcommentbutton", 1), cy + offset("slotcommentbutton", 2), 0, shown * h, button->w, h, 1);
             }
             // The lock's rows: open, open under the pointer, closed, closed under the pointer, and none to set.
             if (ImageRef lock = picture("slotlock"); lock && lock->h >= 5) {
@@ -3055,6 +3072,14 @@ void Engine::composeSlots(Canvas &out) {
                         if (blank && value == 0 && i < count - 1) break;
                         drawPart(out, *dateDigits, cx + field(w, 1) + i * step, cy + field(w, 2), value % 10 * cell, 0, cell, dateDigits->h, 1);
                     }
+                }
+                // `datemark CELL X Y`: that cell of the date's sheet at a place of its own, as Test Game 96's slashes and colon
+                // are (set 2).
+                for (auto [line, end] = screen_->settings.equal_range("datemark"); line != end; ++line) {
+                    const auto &w = line->second;
+                    if (w.size() < 3) continue;
+                    int cell = dateDigits->w / dateColumns;
+                    drawPart(out, *dateDigits, cx + field(w, 1), cy + field(w, 2), field(w, 0) * cell, 0, cell, dateDigits->h, 1);
                 }
                 continue;
             }
@@ -3685,6 +3710,13 @@ bool Engine::innerButtonsShown() const {
 // A plate as wide as the screen carries both rows of buttons, and comes up with the pointer on it, as in Test Game 85.
 bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= width_; }
 
+// `partplate` under `screen defaults`: a game part's open screen keeps the message window's plate and its buttons over
+// it, as Test Game 96's hub and vote show the plate's Menu tab at its resting place (set 2).
+bool Engine::partPlate() const {
+    auto defaults = screens_.find("defaults");
+    return partScreen_ && waiting_ == Waiting::PartScreen && defaults != screens_.end() && defaults->second.setting("partplate");
+}
+
 bool Engine::underButtonsShown() const {
     if (fullWidthPlate()) return innerButtonsShown();
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
@@ -3992,13 +4024,12 @@ void Engine::runFlow(const Node &n) {
     case 21:
         flow.node = flow.script->node(choiceResult_ == (n.opcode == 4 ? n.p[0] : 0) ? n.otherwise : n.next);
         break;
-    case 5: {  // a condition on a variable: the other target when it holds, `next` when it doesn't, as a choice's branch
-        // The comparisons, as Test Game 94's exe orders them: ==, !=, <=, >=, <, >.
-        int left = variableValue(n.p[0], variableIndex(n)), right = operand(n);
-        bool holds = n.p[3] == 0 ? left == right : n.p[3] == 1 ? left != right : n.p[3] == 2 ? left <= right : n.p[3] == 3 ? left >= right : n.p[3] == 4 ? left < right : left > right;
-        flow.node = flow.script->node(holds ? n.otherwise : n.next);
+    case 5:  // a condition on a variable: the other target when it holds, `next` when it doesn't, as a choice's branch
+        flow.node = flow.script->node(storyConditionHolds(n) ? n.otherwise : n.next);
         break;
-    }
+    case kStoryResume:  // only for a PC save's load (resumeStoryByRule)
+        flow.node = flow.script->node(n.next);
+        break;
     case 6: {  // a change to a variable: set, add one, take one, add or take the operand, as the exe orders them
         auto &table = n.p[0] == 1 ? scenario_ : globals_;
         int number = variableNumber(n.p[0], variableIndex(n)), value = operand(n);
@@ -4646,8 +4677,18 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (!down) return;
-    // A game part's open screen takes the presses, unless a menu or dialog is over it.
+    // A game part's open screen takes the presses, unless a menu or dialog is over it, or with `partplate` the message
+    // window's buttons showing over it.
     if (partScreen_ && waiting_ == Waiting::PartScreen && !screen_ && !dialogOpen_ && !logOpen_) {
+        if (partPlate()) {
+            Button *b = innerWereShown_ ? buttonAt(pointerX_, messagePointerY(), bar().inner) : nullptr;
+            if (!b && underWereShown_) b = buttonAt(pointerX_, messagePointerY(), bar().under);
+            if (b) {
+                std::string action = b->action;
+                runAction(action);
+                return;
+            }
+        }
         if (partScreen_->press(*partHost_, pointerX_, pointerY_, button)) dirty_ = true;
         return;
     }
@@ -4775,8 +4816,9 @@ void Engine::mouseButton(int button, bool down) {
         }
         int slot = slotAt(pointerX_, pointerY_);
         if (slot < 0) return;
-        // A click on a card's comment asks for one, from the save and load screens alike, as the PC's box opens.
-        if (overComment(slot, pointerX_, pointerY_) && slotInfo(slot).exists) {
+        // A click on a card's comment, or its comment button, asks for one, from the save and load screens alike, as the
+        // PC's box opens.
+        if ((overComment(slot, pointerX_, pointerY_) || overCardPart("slotcommentbutton", slot, pointerX_, pointerY_)) && slotInfo(slot).exists) {
             commentRequest_ = slot;
             return;
         }
@@ -6409,6 +6451,7 @@ void Engine::compose() {
     drawParts(canvas_, Layer::OverWindow);
     composeCameraPanel(canvas_);
     if (partScreen_) drawParts(canvas_, Layer::Screen);
+    if (partPlate()) composeMessageButtons(canvas_);
     if (dialogOpen_) composeDialog(canvas_);
 
     if (choiceSheet_ && choiceClosingFrom_ >= 0) composeChoice(canvas_);

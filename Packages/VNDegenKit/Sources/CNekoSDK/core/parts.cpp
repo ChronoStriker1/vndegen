@@ -14,6 +14,7 @@ std::unique_ptr<GamePart> makeCharGalleryPart();
 std::unique_ptr<GamePart> makeMankitsuPart();
 std::unique_ptr<GamePart> makeYabaiPart();
 std::unique_ptr<GamePart> makeYabaiTreePart();
+std::unique_ptr<GamePart> makeYabaiVotePart();
 
 namespace {
 
@@ -29,6 +30,7 @@ const PartEntry kParts[] = {
     {"mankitsu", makeMankitsuPart},
     {"yabai", makeYabaiPart},
     {"yabaitree", makeYabaiTreePart},
+    {"yabaivote", makeYabaiVotePart},
 };
 
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses
@@ -155,6 +157,12 @@ void PartHost::waitMs(int ms) {
 
 void PartHost::finishScreen(int result) { e_.finishPartScreen(result); }
 void PartHost::openMenu(const std::string &action) { e_.runAction(action); }
+
+bool PartHost::soundPlaying(int kind, int channel) {
+    auto &channels = e_.channelsOf(kind);
+    auto it = channels.find(channel);
+    return it != channels.end() && e_.audio_.playing(it->second);
+}
 
 void PartHost::playSound(int kind, int channel, const std::string &path, int volume, bool loop) {
     Node n;

@@ -208,6 +208,44 @@ import TestSupport
         #expect(vnneko_debug_variable(e, 1, 12) == 1, "\(status(e))")
     }
 
+    // A `resume` line: a PC save whose variable holds goes on from the line's label at once, before its number is
+    // looked for, as Test Game 96's saves at its hub say where they are only in a variable (set 2).
+    @Test func aResumeRulePlacesAPCSaveByItsVariable() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytest/save")
+        let opening = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(opening, 3)
+        #expect(vnneko_debug_save(opening, 4))
+        vnneko_stop(opening)
+        let files = try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+        try FileManager.default.removeItem(at: try #require(files.first { $0.lastPathComponent.lowercased() == "save004.vnd" }))
+        // S 30 = 4, among the variables 40,000 bytes after the date.
+        let file = try #require(files.first { $0.lastPathComponent.lowercased() == "save004.sav" })
+        var plain = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        func int32(_ at: Int) -> Int32 { plain.subdata(in: (plain.startIndex + at)..<(plain.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } }
+        let flow = Int(int32(0xCD))
+        let picture = Int(int32(0xCD + 4 + flow + 4196))
+        let variables = 0xCD + 4 + flow + 4196 + 4 + picture + 39596 + 40000
+        plain.replaceSubrange((plain.startIndex + variables + 4 * 30)..<(plain.startIndex + variables + 4 * 31), with: withUnsafeBytes(of: Int32(4).littleEndian, { Data($0) }))
+        try NekoSDKFlowFixture.packed(plain).write(to: file)
+
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_load(e, 4))
+        steps(e, 3)
+        #expect(status(e).contains("part screen"), "\(status(e))")
+        // The screen at `kept` wants two presses, where the opening's wanted one.
+        click(e)
+        steps(e, 10)
+        #expect(status(e).contains("part screen"), "\(status(e))")
+        click(e)
+        steps(e, 10)
+        #expect(vnneko_debug_variable(e, 1, 9) == 2, "\(status(e))")
+        #expect(vnneko_debug_variable(e, 1, 12) == 0)
+    }
+
     // `staffroll NAME` plays the table's `screen staffroll_NAME`, its length long, then the story goes on.
     @Test func aNamedStaffRollPlaysItsOwnScreen() throws {
         let root = try game()
