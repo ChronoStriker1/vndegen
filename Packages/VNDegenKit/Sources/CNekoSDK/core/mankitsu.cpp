@@ -168,7 +168,11 @@ public:
             // picture two frames after a 500 ms update ended (one mark, so unconfirmed), and goes on through later ones.
             for (auto &[slot, f] : shown_) {
                 auto before = from_.find(slot);
-                f.flipFrom = before != from_.end() && before->second.same(f) ? before->second.flipFrom : fadeFrom_ + fadeMs_ / 2;
+                bool fresh = before == from_.end() || !before->second.same(f);
+                f.flipFrom = fresh ? fadeFrom_ + fadeMs_ / 2 : before->second.flipFrom;
+                // Its sound, in the effects channel after the scene's flipbooks' (180), so both can sound at once.
+                if (auto sound = flipSounds_.find(lower(f.path)); fresh && f.flipCount > 0 && sound != flipSounds_.end())
+                    host.playSound(1, 181, sound->second.first, sound->second.second);
                 loaded_[slot].flipFrom = f.flipFrom;
             }
             host.redraw();
@@ -476,7 +480,13 @@ private:
             std::istringstream words(line);
             std::string word, path;
             int count = 0, ms = 0;
-            if (words >> word >> count >> path >> ms && word == "#anime" && count > 0 && ms > 0) flipbooks_[lower(path)] = {count, ms};
+            if (!(words >> word >> count >> path >> ms) || word != "#anime" || count <= 0 || ms <= 0) continue;
+            flipbooks_[lower(path)] = {count, ms};
+            // `... N SOUND VOLUME`: the sound a mark plays as it shows, as the scene's flipbooks do (the PC reads it with
+            // the first picture, in a file trace under Wine).
+            int n = 0, volume = 100;
+            std::string sound;
+            if (words >> n >> sound >> volume && sound.rfind("//", 0) != 0) flipSounds_[lower(path)] = {sound, volume};
         }
     }
 
@@ -744,6 +754,7 @@ private:
     std::map<int, Face> loaded_, shown_, from_;
     std::vector<FaceMove> moves_;
     std::map<std::string, std::pair<int, int>> flipbooks_;
+    std::map<std::string, std::pair<std::string, int>> flipSounds_;
     bool flipbooksRead_ = false;
     int64_t fadeFrom_ = 0;
     int fadeMs_ = 0;

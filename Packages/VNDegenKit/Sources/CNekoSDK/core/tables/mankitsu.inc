@@ -4,6 +4,10 @@ const char kMankitsu[] = R"(
 screen defaults
 # Faces, scene-change slides and the select screen (core/mankitsu.cpp).
 parts mankitsu scroll
+# A flipbook shows each picture for its command's parameter 16 and plays the sound its anime_cfg.ini line names, as 90's
+# PC does (set 1: an anger mark's 41 pictures took 1.3 s at 30 ms, and a file trace reads the sound with the first picture).
+fliptime
+flipsound
 
 screen title
 # Measured under Wine. The mankitsu part draws the backgrounds, silhouettes, logo and trims; the buttons are 40 pixels
