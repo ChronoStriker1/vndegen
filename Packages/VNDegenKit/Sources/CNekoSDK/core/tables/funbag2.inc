@@ -603,7 +603,7 @@ label zebialeads
 scene scr\ep_03_15_00.txt @3031
 scene scr\ep_03_15_02.txt @3032
 scene scr\ep_03_16_00.txt @3033
-scene scr\ep_03_18_00.txt
+scene scr\ep_03_18_00.txt @3051
 scene scr\ep_03_18_01.txt @3052
 scene scr\ep_staff.txt
 scene scr\ep_03_19_00.txt @999
@@ -633,29 +633,33 @@ set S 5000 = 4
 scene scr\ep_05_01_00.txt @5001
 scene scr\ep_05_01_01.txt @5002
 scene scr\ep_05_02_00.txt @5003
-# Use Zebia's body or thank her. Thanks goes on to chapters 6 and 7. Her body ends the story only when every one of the
-# four sex scenes on this route took option 0: PC saves edited to S 5001 = 1, 2 and 3 went on as thanks does, and a
-# real run with 4 ended. Where the exe checks it isn't known, so it's checked here, after her scene.
+# Use Zebia's body or thank her. Her body counts in S 5001 as the sex scenes' option 0 does (PC saves before and after
+# the choice hold 3 and 4, and so on), and the story ends with her only at 5: every sex scene's option 0 and hers. The
+# PC reads the count twice, after ep_05_03_00 and after ep_05_04_00, not the option taken: a save in ep_05_03_00 on
+# the thanks side with S 5001 set to 5 went on to ep_05_03_01, one in ep_05_04_00 on the body side with 4 to
+# ep_05_04_01, and saves the PC made at this choice with 1, 2 and 3 went on as thanks does.
 choice obj\l000_005.bmp 2 @5004
 on 1 goto thanks
+set S 5001 += 1
 scene scr\ep_05_02_01.txt @5030
-if S 5001 < 4 goto thanked
-scene scr\ep_05_03_00.txt @5031
-scene scr\ep_05_03_01.txt
-scene scr\ep_05_03_02.txt @5051
-scene scr\ep_05_03_03.txt @5052
-scene scr\ep_05_04_00.txt @5053
-scene scr\ep_05_04_02.txt
-scene scr\ep_staff.txt
-scene scr\ep_05_04_03.txt
-end
+goto thanked
 label thanks
 scene scr\ep_05_02_02.txt @5030
 label thanked
 scene scr\ep_05_03_00.txt @5031
+if S 5001 < 5 goto notherbody
+scene scr\ep_05_03_01.txt @5050
+label notherbody
 scene scr\ep_05_03_02.txt @5051
 scene scr\ep_05_03_03.txt @5052
 scene scr\ep_05_04_00.txt @5053
+if S 5001 < 5 goto chapter5on
+scene scr\ep_05_04_02.txt @5061
+scene scr\ep_staff.txt
+# 999 is inferred from the other endings' last scenes, which all hold it.
+scene scr\ep_05_04_03.txt @999
+end
+label chapter5on
 scene scr\ep_05_04_01.txt @5071
 scene scr\ep_05_05_00.txt @5072
 scene scr\ep_05_06_00.txt @5073
@@ -715,10 +719,11 @@ scene scr\ep_06_15_08.txt @6058
 scene scr\ep_staff.txt
 # Chapter 7, the epilogue.
 scene scr\ep_07_00_00.txt @7001
-scene scr\ep_07_00_01.txt
-scene scr\ep_07_00_02.txt
-scene scr\ep_07_00_03.txt
-scene scr\ep_07_00_04.txt
+scene scr\ep_07_00_01.txt @7002
+# 7003 to 7005 are inferred from 7001 and 7002.
+scene scr\ep_07_00_02.txt @7003
+scene scr\ep_07_00_03.txt @7004
+scene scr\ep_07_00_04.txt @7005
 end
 flow replay1
 scene scr\ep_01_04_01.txt @1005
