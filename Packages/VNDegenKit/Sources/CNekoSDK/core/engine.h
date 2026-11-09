@@ -163,6 +163,8 @@ public:
     bool waitingForClick() const { return waiting_ == Waiting::Click; }
     int textCount() const { return textCount_; }
     // A global (scope 0) or scenario variable (1) by its number, for tests.
+    // Whether a sound still plays in this channel of music (kind 0), effects (1) or voices (2).
+    bool soundPlaying(int kind, int channel);
     int variable(int scope, int number) const {
         const auto &table = scope == 1 ? scenario_ : globals_;
         auto it = table.find(number);

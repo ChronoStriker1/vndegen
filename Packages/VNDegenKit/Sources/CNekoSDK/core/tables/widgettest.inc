@@ -93,8 +93,10 @@ parts yabaivote
 
 screen story
 flow main
+resume S 105 == 8 at pick   # a PC save at the pick, which the PC's mode alone tells
 set S 15104 = 21
 set S 15105 = 1
+label pick
 open vote 1 -> S 15140
 set S 15141 = 1
 end

@@ -60,6 +60,8 @@ public:
     void playSound(int kind, int channel, const std::string &path, int volume = 100, bool loop = false);
     // Whether that channel's sound is still playing.
     bool soundPlaying(int kind, int channel);
+    // That channel's sound stops now.
+    void stopSound(int kind, int channel);
     // A picture into a slot as command 15 loads one, shown by the next screen update and gone with 17 or 22, saved as any
     // picture: its top left at x, y, its light added to the scene when `additive`, and, with a scroll, tiled along that
     // axis and moving that many pixels a second along it. False when the picture is missing.
