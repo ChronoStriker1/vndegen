@@ -122,7 +122,6 @@ default voice 80
 default backvoice 80
 default skipall 1
 layoutcgslot 102
-lastchoice made
 
 # Config, one page, measured under Wine. Its help is a circle above or below the row under the pointer. The screen's
 # colour depth and resolution, and asking for the resolution at start, are drawn disabled, as VNDegen sizes the window.
