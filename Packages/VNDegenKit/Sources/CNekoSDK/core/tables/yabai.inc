@@ -21,6 +21,8 @@ default voice 80
 default backvoice 80
 default skipall 0
 default bulb 1
+# The H sound effects, with a volume of their own, are the se_h files.
+hseprefix se_h
 
 # The interrogation hub (yabaiplay), as measured under Wine:
 #   truth T HOURS FIRST [START]   the hours truth T gives, whom the hub shows first, and its starting hour (8 if left out)
@@ -341,6 +343,7 @@ button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 
 button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
 button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
 pic obj\h008_000.bmp 214 128
+# The test buttons play what the PC plays (the files it opened under Wine).
 knob master obj\g002_001.bmp 351 177 6
 number master obj\e004_001.bmp 896 156 blank
 step master -1 obj\h002_003.bmp 312 174 2 5 0
@@ -358,25 +361,25 @@ number se obj\e004_001.bmp 896 283 blank
 step se -1 obj\h002_003.bmp 312 301 2 5 0
 step se 1 obj\h002_003.bmp 984 301 2 5 1
 check mute_se obj\h008_002.bmp 238 294 1 5 0
-button TEST2 obj\h010_000.bmp 843 281 1 5 0
+button test:se:se\se_603d.ogg obj\h010_000.bmp 843 281 1 5 0
 knob hse obj\g002_001.bmp 351 368 6
 number hse obj\e004_001.bmp 896 347 blank
 step hse -1 obj\h002_003.bmp 312 365 2 5 0
 step hse 1 obj\h002_003.bmp 984 365 2 5 1
 check mute_hse obj\h008_002.bmp 238 358 1 5 0
-button TEST3 obj\h010_000.bmp 843 345 1 5 0
+button test:se:se\se_h21.ogg obj\h010_000.bmp 843 345 1 5 0
 knob voice obj\g002_001.bmp 351 432 6
 number voice obj\e004_001.bmp 896 411 blank
 step voice -1 obj\h002_003.bmp 312 429 2 5 0
 step voice 1 obj\h002_003.bmp 984 429 2 5 1
 check mute_voice obj\h008_002.bmp 238 422 1 5 0
-button TEST4 obj\h010_000.bmp 843 409 1 5 0
+button test:voice:voice\rin1_0078.ogg obj\h010_000.bmp 843 409 1 5 0
 knob backvoice obj\g002_001.bmp 351 496 6
 number backvoice obj\e004_001.bmp 896 475 blank
 step backvoice -1 obj\h002_003.bmp 312 493 2 5 0
 step backvoice 1 obj\h002_003.bmp 984 493 2 5 1
 check mute_backvoice obj\h008_002.bmp 238 486 1 5 0
-button TEST5 obj\h010_000.bmp 843 473 1 5 0
+button test:voice:voice\aya9_0019.ogg obj\h010_000.bmp 843 473 1 5 0
 radio voice_stop 1 obj\h002_002.bmp 557 544 2 5 0
 radio voice_stop 0 obj\h002_002.bmp 671 544 2 5 1
 check voice0 obj\h008_001.bmp 376 580 6 5 0
