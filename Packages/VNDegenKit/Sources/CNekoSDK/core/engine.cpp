@@ -183,8 +183,8 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     config_.parse(*init);
     images_ = std::make_unique<Images>(files_);
     // `colorkey R G B` in the game's table: read now, ahead of the table itself, since the window's pictures load first.
-    if (const char *table = menuTable(normalizedPath(config_.text("UserDataDirectory")))) {
-        std::istringstream lines(menuTablePrefix() + table);
+    if (const char *table = menuTable(normalizedPath(config_.text("UserDataDirectory"))); table || !menuTablePrefix().empty()) {
+        std::istringstream lines(menuTablePrefix() + (table ? table : ""));
         for (std::string line; std::getline(lines, line);) {
             std::istringstream words(line);
             std::string key;
@@ -279,8 +279,9 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     }
     titleBgm_ = config_.text("TitleBGM");
 
-    if (const char *table = menuTable(folder_))
-        screens_ = parseScreens((menuTablePrefix() + table).c_str(), *images_, [this](const std::string &what) { warnOnce(what); });
+    // A test host's table lines go ahead of the game's own, or stand alone for a game with no table yet.
+    if (const char *table = menuTable(folder_); table || !menuTablePrefix().empty())
+        screens_ = parseScreens((menuTablePrefix() + (table ? table : "")).c_str(), *images_, [this](const std::string &what) { warnOnce(what); });
     commentFace_ = fontFace_;
     // `textfont N`, `textsize N`, `textgap G`, `textline N` and `textshift DX DY`: the message window's text as the PC sets
     // it. The face is a number as init.ini's MsgFont gives one, 7 for Lucida Sans Unicode, which the official English
@@ -3127,6 +3128,7 @@ std::string Engine::confirmSetting(int question) const {
 void Engine::openDialog(int question, const std::function<void()> &yes) {
     if (!screens_.count("dialog") || !setting(confirmSetting(question)) || questionCell(question) < 0) {
         yes();
+        holdPresses();
         return;
     }
     dialogOpen_ = true;
@@ -3138,6 +3140,7 @@ void Engine::openDialog(int question, const std::function<void()> &yes) {
 
 void Engine::answerDialog(bool yes) {
     dialogOpen_ = false;
+    holdPresses();
     dirty_ = true;
     auto then = dialogYes_;
     dialogYes_ = nullptr;
@@ -4362,6 +4365,7 @@ void Engine::runScene(const Node &n) {
 }
 
 bool Engine::step(int ms) {
+    inputClock_ += ms;
     if (paused_) return waiting_ != Waiting::Ended;
     if (previousChoiceDue_) notePreviousChoice();
     if (bool square = wantsSquare(); square != square_) {
@@ -4530,7 +4534,15 @@ void Engine::mouseMove(float x, float y) {
     }
 }
 
+// A press that answers a question, or does what one would have asked, is that press's whole effect: presses in the next
+// moment are dropped,
+// so a host that reports one tap twice doesn't also take the choice a load brings up under the same place (set 1, Test
+// Game 87 on an iPad), as the PC takes none while it loads.
+constexpr int64_t kQuietAfterMs = 250;
+void Engine::holdPresses() { quietUntil_ = inputClock_ + kQuietAfterMs; }
+
 void Engine::mouseButton(int button, bool down) {
+    if (down && inputClock_ < quietUntil_) return;
     if (button == 0) {
         // The CG viewer's volume is kept when the slider's let go.
         if (!down && leftHeld_ && viewerDragging_) {
@@ -4766,7 +4778,9 @@ void Engine::updateChoice() {
     if (waiting_ != Waiting::Choice || !choiceSheet_) return;
     int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
     choicePlace(x, top, step, slant);
-    int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
+    // The pointer in the frame's own rows: in the 4:3 frame the scene keeps its rows at the top, with the window's strip
+    // under it, so scaling by the scene's height put the options' hit boxes below where they're drawn (set 1, on an iPad).
+    int px = pointerX_, py = pointerY_;
     int hover = -1;
     for (int i = 0; i < choiceCount_; i++)
         if (px >= x + i * slant && px < x + i * slant + cellW && py >= top + i * step && py < top + i * step + cellH) hover = i;

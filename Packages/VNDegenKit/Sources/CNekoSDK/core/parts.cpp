@@ -10,6 +10,7 @@ namespace neko {
 // Each game part's maker, defined in the part's own file. A set adds its declaration and its line in the list below.
 std::unique_ptr<GamePart> makeSelfTestPart();
 std::unique_ptr<GamePart> makeScrollPart();
+std::unique_ptr<GamePart> makeYabaiPart();
 
 namespace {
 
@@ -21,6 +22,7 @@ struct PartEntry {
 const PartEntry kParts[] = {
     {"selftest", makeSelfTestPart},
     {"scroll", makeScrollPart},
+    {"yabai", makeYabaiPart},
 };
 
 // A part for the runtime's own tests: `open selftest N` finishes at once with N, `open selftestwait N` after N presses

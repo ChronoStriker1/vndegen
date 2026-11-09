@@ -110,4 +110,56 @@ import TestSupport
             vnneko_stop(e)
         }
     }
+
+    // A sheet of five rows, each its own colour (blue, green, red): white normal, yellow under the pointer.
+    private func rows(_ w: Int, _ h: Int) -> Data {
+        let row = (w * 3 + 3) & ~3
+        var d = Data("BM".utf8)
+        func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+        put(UInt32(54 + row * h)); put(0); put(54)
+        put(40); put(UInt32(w)); put(UInt32(h))
+        d.append(contentsOf: [1, 0, 24, 0])
+        put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+        let colours: [[UInt8]] = [[255, 255, 255], [0, 255, 255], [0, 0, 255], [255, 0, 255], [128, 128, 128]]
+        // Bottom row first: the sheet's last cell row is written first.
+        for y in (0..<h).reversed() {
+            var line = Data()
+            for _ in 0..<w { line.append(contentsOf: colours[y * 5 / h]) }
+            line.append(Data(repeating: 0, count: row - w * 3))
+            d.append(line)
+        }
+        return d
+    }
+
+    // In the 4:3 frame the scene keeps its rows at the top, so a choice's option takes the pointer where it's drawn, as
+    // on an iPad (set 1, Test Game 87): options 100 rows tall from y 260, the second from 360.
+    @Test func aChoiceTakesThePointerWhereItsDrawnInTheSquareFrame() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("""
+                UserDataDirectory\tvndegen\\squaretest
+                FirstFlow\tflow\\t.txt
+                MsgWinSquareFilename\tobj\\sq.bmp
+                MsgWinSquarePosY\t720
+                MsgWinSquareMovement\t240
+
+                """.utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("sq.bmp", bmp(1280, 240, [255, 0, 0])), ("c.bmp", rows(400, 500))]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 3, next: 3, p: [0: 1, 1: 1], s: [1: "obj\\c.bmp"]),
+                .init(op: 2, next: 0),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try start(root)
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "flow\\t.txt", 0))
+        #expect(frame(e, view: (1024, 768)).h == 960)
+        #expect(vnneko_debug_choice_count(e) == 2)
+        // The pointer at the second option as drawn, 410 of the frame's 960 rows.
+        vnneko_mouse_move(e, 0.5, 410.0 / 960)
+        let f = frame(e, view: (1024, 768))
+        #expect(pixel(f, 640, 410) == [255, 255, 0], "\(pixel(f, 640, 410))")
+        #expect(pixel(f, 640, 300) == [255, 255, 255], "\(pixel(f, 640, 300))")
+    }
 }
