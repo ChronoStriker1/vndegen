@@ -552,6 +552,17 @@ hovercols 219 467 1045 524 obj\h009_000.bmp 218 394 8 5
 hovercols 219 546 1045 571 obj\h009_000.bmp 218 476 8 6
 hovercols 219 582 1045 608 obj\h009_000.bmp 218 512 8 7
 
+# The PC's questions, measured under Wine on "ロードしますか？": the screen behind dimmed to about 14%, the band across
+# the middle with the question (a cell of obj\a003_000.bmp, in the order below) and はい and いいえ under it, as the
+# story's own questions are (the yabaiplay part's `open ask`).
+screen dialog
+questions resolution save load overwrite exit title
+dim 221
+pic obj\a002_000.bmp 0 316
+pic obj\a003_000.bmp 438 316 6 1 0 0
+button yes obj\a003_001.bmp 522 390 2 5 0
+button no obj\a003_001.bmp 650 390 2 5 1
+
 # 96's cfg.sav is the older 96,000 bytes, as 82's: seen CGs from 48000, heard tracks from 92000, no string before them.
 # The `run` lines are what the PC's first file holds before the globals (its Config as numbers), so a file VNDegen
 # starts doesn't hand the PC a Config of zeros.
