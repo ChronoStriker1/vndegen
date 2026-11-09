@@ -131,10 +131,20 @@ A splash effect's record (Test Game 88's commands 200 and 201) has no picture of
 ### Table settings for the story-in-exe games' menus
 
 Sets 1 and 2 measured these under Wine on Test Games 82 and 87, and the runtime's tables give them:
+- `submenudim hide` leaves them out instead, as Test Game 83's submenus take the main buttons' rows (set 3).
 - `submenudim` on a title dims the main buttons while a submenu is open, to their sheet's last row, and they take no pointer, no help and no press; the button that opened it stays selected, and the right button closes the submenu. A left click elsewhere does nothing.
+- `datefield year|month|day|hour|minute X Y [STEP] [blank]`: each part of a card's date at its own place, with nothing between, `blank` leaving out a leading zero (set 2's, for 82; 83 uses it too).
 - On save cards: `slotpic SHEET X Y` puts a picture on every card, full or empty (87's Save Date); `slotchaptervar SHEET X Y COLS VAR` names the chapter by a scenario variable of the save, a cell of a strip across with rounded edges (87's S 4000); `slotnoseconds` stops a 10-digit sheet's time at the minute; `dateslash2 DX` moves the second slash (2 in 87).
 - In Config: `knob NAME SHEET X0 Y STEP`, a knob that sits STEP pixels further on for each unit and that a press or drag on its track moves (87's rose); `hovercols`, the hover help's lines side by side in their sheet (87); a radio's `group`, as a check's, so one Confirmations switch sets all six (87).
+- A knob's STEP may have decimals (83's 4.08, a 408-pixel track over 100); `number … blank` leaves out leading zeros and keeps the digits' places (83's volumes); `pic … more A,B,… random` picks one at random each time the screen opens (83's menu room, one of 15).
+- `colorkey R G B` under `screen defaults`: pictures with no `.alp` draw that colour as nothing, as 83's older engine draws its wait mark's pure green (set 3). It's read ahead of the rest of the table, since the window's pictures load first.
+- `textfade MS` under `screen defaults`: each character's fade in, 160 ms unless given; 87's is under 50 (set 1: a whole line is there within 0.05 s of the click at full speed).
+- Init.ini's MsgWinButtonShowType 3, "from below to the set place", with MsgWinButtonPlateBottomPosX and Y: the plate rests at its bottom place with no buttons, rises to its place with its buttons while the pointer is on it, and stays up while the pointer is on the raised plate, as 83's control panel does (set 3, placed against the PC to the pixel at rest). The PC's rise is a slide; here it's at once.
 - Speeds, under `screen defaults`: `textcurve SETTING A B`, text at A − B × value ms a character (82: 167 − 3v); `textpoints SETTING V MS V MS…`, straight lines between measured points, for a curve that isn't a line (87); `autocurve SETTING A B`, auto's pause as A − B × value ms for each character of the line (82: 100 − v); `waitscale SETTING`, the setting a wait command scales by over 100 in place of Config's wait time, which leaves fades unstretched (82's auto wait, 0 to 200). 82's fades don't hold the next node, which the runtime already does for every game. `hseprefix PREFIX` names the sex effects another way than hse (87's se_h).
+
+### Pictures from game parts
+
+A game part loads a picture into a slot with `PartHost::loadImage(slot, path, x, y, additive, scrollX, scrollY)`, as command 15 loads one: shown by the next screen update, gone with 17 or 22, saved as any picture. Its top left is at x, y; `additive` adds its light to the scene, as Test Game 83's command 92 streaks do over a black screen (set 3: four copies at once, visible together, which only adding gives); a scroll tiles it along that axis and moves it that many pixels a second, as Test Game 86's command 90 lace strips do (set 3: 500 px a second, two shots 0.5 s apart). The PC's record doesn't hold either, so VNDegen's file beside the save keeps them (`slotfx SLOT ADDITIVE SX SY`). Scene commands the engine doesn't know, 95 and 96 among them, go to the game's parts.
 
 ### The 4:3 frame
 
@@ -292,6 +302,14 @@ on an entry chooses it and leaves the list open; the × or a click outside the w
 folder is there without its pictures (`sys_1`) is listed by name alone and can't be chosen; one whose folder isn't
 (`sys_2`) isn't listed, and numbers count only what's listed.
 
+Two details checked under Wine later, with the runtime driven through the same clicks at the same moments and its log
+saying which list was open (the panels go 3 s after the explanation closes, so a click after that opens nothing, on
+the PC and here alike): the pose list draws each pose with the face chosen, not the first, as the runtime does (with
+the face stepped twice, the PC's figures' faces matched the runtime's drawn with the chosen face, 0.059 against 0.094
+with the first); and the outfit list's help bubble for its boxes, `p021_006`, which the archive has, didn't show with
+the pointer on a box, so the runtime draws none (the PC's frame and the runtime's matched within 0.01, and a search for
+the bubble scored both the same). `p021_008` is a Now Loading animation the PC wasn't seen to show either.
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on
@@ -333,6 +351,8 @@ Funbag Fantasy 3 if keeps 892 more pictures in an `sc` folder beside `sc.pak`, o
 ## GOOD Timing
 
 From Test Game 88 under Wine, its manual, and PC saves compared. `cfg` files under `gt/cfg` list groups of scripts. Opcode 153 names one and opcode 154 marks where Ejaculate lands. The save's tail holds, after the scene name: a state at byte 819 that's -1 when off, 0 in the scene and a small number inside the extra scripts; the count twice at 823; the first counted text's node at 831; the marker's node at 835; then two strings, the scene and the config. The marker's first parameter was 12 and the count started 12 text nodes before it. Saves taken with Extend on and off differ only in the time and play counters, so it isn't saved, and it stays on across a load. Pressing Ejaculate before the marker plays the `Ejaculate` script and goes on after the marker; pressing it in the extra scripts goes straight there, because that save's backlog has no line of the script.
+
+The GT switch, a message window button, was checked by loading the same PC save before a marker twice and clicking through 45 lines, with the switch turned off in one run: with it off the count's heart doesn't show, Ejaculate and Extend are drawn in their sheet's last row, disabled, at every line (the first row with it on), and the story's lines and pictures are otherwise the same.
 
 The count's heart was matched against Test Game 88 under Wine, loading a save 38 lines before a marker and clicking through
 with a shot after each line. The heart (`l005_000`, at 1147, 607) is grey with twelve segments, and `l006_000` to `_011`

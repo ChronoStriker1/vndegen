@@ -86,6 +86,10 @@ struct Sprite {
     bool waveOn = false;
     // An effect painted on black, which the PC game adds to the picture.
     bool additive = false;
+    // A picture tiled along an axis and moving along it, in pixels a second, from scrollFrom: Test Game 86's lace strips
+    // (commands 90 and 91, a game part's, through PartHost::loadImage).
+    float scrollX = 0, scrollY = 0;
+    int64_t scrollFrom = 0;
     int waveSpeed = 0, waveRows = 0, waveSize = 0;
     // The SDK's film noise (commands 51 and 52), its picture the noise frame and the story time it began.
     bool noise = false;
@@ -540,7 +544,10 @@ private:
     std::string subMenu_;
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;
-    int autoPerCharMs_ = -1;  // auto's pause for each character of the line, from `autocurve`, or -1 for a fixed pause
+    int autoPerCharMs_ = -1;
+    int plateHiddenX_ = 0;
+    bool plateRests_ = false, plateRaised_ = false;
+    int charFadeMs_ = 160;  // each character's fade in, `textfade` or 160  // auto's pause for each character of the line, from `autocurve`, or -1 for a fixed pause
     // The setting a wait command scales by, Config's wait time unless `waitscale SETTING` names another that scales only
     // waits, not fades, as Test Game 82's auto wait does (set 2, timed under Wine).
     std::string waitScale() const;
@@ -628,6 +635,7 @@ private:
     void runOldLayout(const Node &n);
     void resetParts();
     bool partCommand(const Node &n);
+    bool loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY);
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
     void finishPartScreen(int result);
     // VNDegen's own lines beside a save, read only when they were written with it: game parts' state, and in a story
@@ -642,6 +650,8 @@ private:
         std::string screen;
         int screenScope = -1, screenNumber = 0;
         bool atChoice = false;
+        // `slotfx SLOT ADDITIVE SX SY`: a slot's additive drawing and scrolling, which the PC's record doesn't hold.
+        std::map<int, std::array<float, 3>> slotFx;
     };
     static uint32_t saveFingerprint(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);

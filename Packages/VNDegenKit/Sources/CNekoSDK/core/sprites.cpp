@@ -122,6 +122,7 @@ int &Engine::spriteChoice(int picker) {
 }
 
 void Engine::stepSpriteChoice(int picker, int direction) {
+    log("sprite step %d %+d", picker, direction);
     std::vector<int> choices = spriteChoices(picker);
     if (choices.empty()) return;
     int &value = spriteChoice(picker);
@@ -241,6 +242,7 @@ void Engine::pressSprites(int x, int y) {
     if (kind == "arrow") stepSpriteChoice(index / 2, index % 2 ? 1 : -1);
     else if (kind == "thumb") {
         sprite_.list = index;
+        log("sprite list %d", index);
         sprite_.listScroll = 0;
         // Opened scrolled to the chosen entry's row when it lies past the rows showing.
         const auto *g = listLine(*screen_, "spritelist", index);
