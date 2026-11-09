@@ -114,6 +114,7 @@ public:
             return finishWith(host, kTimeEvent, 0);
         }
         open_ = true;
+        hoverQ_ = -1;
         host.redraw();
         return true;
     }
@@ -147,9 +148,16 @@ public:
     }
 
     void pointer(PartHost &host, int x, int y) override {
-        if (!ask_) return;
-        int hit = askOption(x, y);
-        if (hit != hoverAsk_) hoverAsk_ = hit, host.redraw();
+        if (ask_) {
+            int hit = askOption(x, y);
+            if (hit != hoverAsk_) hoverAsk_ = hit, host.redraw();
+            return;
+        }
+        if (!open_) return;
+        int shown = host.variable(1, kShown), hit = -1;
+        for (int q = 0; q < 3 && hit < 0; q++)
+            if (inside(x, y, bubbleRect(q)) && !locked(host, shown) && !(asked(host, shown) & (1 << q))) hit = q;
+        if (hit != hoverQ_) hoverQ_ = hit, host.redraw();
     }
 
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
@@ -178,6 +186,7 @@ public:
             int row = h == shown ? 2 : host.variable(1, kStage + h) > 3 ? 4 : 0;
             cell(host, out, "obj\\l002_003.bmp", kTab[h][0], kTab[h][1], 118 * h, 58 * row, 118, 58);
         }
+        drawMiniTree(host, out, shown);
         put(host, out, "obj\\l002_002.bmp", 1002, 19);
         cell(host, out, "obj\\l001_001.bmp", 465, 21, 123 * (truth(host) - 1), 0, 123, 25);
         cell(host, out, "obj\\l005_001.bmp", 669, 625, 216 * (truth(host) - 1), 0, 216, 73);
@@ -188,11 +197,15 @@ public:
         for (int q = 0; q < 3 && stage <= 3; q++) {
             auto r = bubbleRect(q);
             // Frames: blue for a question still to ask, dark once asked (l010, 3 shapes across, 5 states down).
-            cell(host, out, "obj\\l010_000.bmp", r[0], r[1], q * 337, (bits & (1 << q) ? 4 : 0) * 202, 337, 202);
+            // Under the pointer, the frame's glowing row 1 and the panel's lit row 1 (hover state, as seen on the PC).
+            int state = bits & (1 << q) ? 4 : q == hoverQ_ ? 1 : 0;
+            // Each stage's own frames: l010_000 blue, _001 green, _002 pink.
+            cell(host, out, "obj\\l010_00" + std::to_string(std::min(3, std::max(1, stage)) - 1) + ".bmp", r[0], r[1], q * 337,
+                 state * 202, 337, 202);
             // Each panel is its question's text in five states down, centred in its frame.
             if (ImageRef text = host.image(panel(host, shown, stage, q))) {
                 int w = text->w, h = text->h / 5;
-                drawPart(out, *text, r[0] + (337 - w) / 2, r[1] + (202 - h) / 2, 0, (bits & (1 << q) ? 4 : 0) * h, w, h, 1);
+                drawPart(out, *text, r[0] + (337 - w) / 2, r[1] + (202 - h) / 2, 0, state * h, w, h, 1);
             }
         }
         if (shut) put(host, out, "obj\\l015_001.bmp", 326, 260);
@@ -367,6 +380,35 @@ private:
         digits(host, out, "obj\\l002_001.bmp", 19, 21, 396, 48, limit, 2);
     }
 
+    // The small 質問進行ツリー at the top right, for the heroine shown, as on the PC's hub (truth 1 at 20:00): a row per
+    // stage reached, 28 apart from y 100, three cells 42 apart from x 1146 in that stage's colour (l003_002: blue, green,
+    // pink). An asked question carries the red X (l003_006). A solved stage's unasked ones are dimmed, and its right
+    // answer joins the row below by a stem (l003_003) and a bar over the three (l003_005). How dim isn't measured.
+    void drawMiniTree(PartHost &host, Canvas &out, int heroine) {
+        put(host, out, "obj\\l003_000.bmp", 1073, 0);
+        put(host, out, "obj\\l003_001.bmp", 1116, 76);
+        int t = truth(host), current = std::min(3, host.variable(1, kStage + heroine));
+        for (int stage = 1; stage <= current; stage++) {
+            int y = 100 + 28 * (stage - 1);
+            bool solved = stage < host.variable(1, kStage + heroine);
+            int bits = host.variable(1, kAsked + 9 * (t - 1) + 3 * heroine + (stage - 1));
+            for (int q = 0; q < 3; q++) {
+                int x = 1146 + 42 * q;
+                bool asked = bits & (1 << q);
+                // The question under the pointer shows red (cell 4) in the current row, as on the PC.
+                int colour = !solved && q == hoverQ_ && heroine == host.variable(1, kShown) ? 4 : stage - 1;
+                if (ImageRef cells = host.image("obj\\l003_002.bmp"))
+                    drawPart(out, *cells, x, y, 38 * colour, 0, 38, 18, solved && !asked ? 0.35f : 1);
+                if (asked) put(host, out, "obj\\l003_006.bmp", x + 9, y - 1);
+            }
+            if (solved && stage < 3) {
+                int right = answer(host, heroine, stage);
+                if (right >= 0) put(host, out, "obj\\l003_003.bmp", 1146 + 42 * right + 18, y + 15);
+                put(host, out, "obj\\l003_005.bmp", 1164, y + 22);
+            }
+        }
+    }
+
     void drawAsk(PartHost &host, Canvas &out) const {
         int bandY = ask_ == 4 ? 205 : 316;
         put(host, out, "obj\\a002_000.bmp", 0, bandY);
@@ -377,7 +419,7 @@ private:
             for (int i = 0; i < 2; i++) cell(host, out, "obj\\a003_001.bmp", 522 + 128 * i, 390, 109 * i, (hoverAsk_ == i ? 1 : 0) * 39, 109, 39);
     }
 
-    int ask_ = 0, hoverAsk_ = -1, pendingDevil_ = 0;
+    int ask_ = 0, hoverAsk_ = -1, hoverQ_ = -1, pendingDevil_ = 0;
     bool open_ = false;
     bool loaded_ = false;
     bool questionsLoaded_ = false;
