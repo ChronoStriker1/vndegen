@@ -75,6 +75,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Yarinaoshi no Christmas's text at the PC's size, and The Alchemist's text 3 px lower (0.26.5).
 - NekoSDK stage 3: Funbag Fantasy 3 if, Funbag Fantasy 4, Haha Sannin to Ana Asobi, Horny Elves and a Moral Orc, Ore o Hoshigaru Tsuma to Gibo and Test Games 92 and 94, with movies, PC read marks both ways, save locks and comments (0.27.0).
 - NekoSDK saves that move to a PC with their pictures (#68), animations that go on after a load, The Alchemist's film noise, the GOOD Timing heart, and Config hover help placed to the pixel (0.27.1).
+- NekoSDK: Funbag Fantasy and Funbag Fantasy: Sideboob Story 2, the first games with their story order in the exe, and Haha Sannin to Ana Asobi's 4:3 mode and Config band (0.28.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -85,10 +86,11 @@ New bugs get a GitHub issue and a line here.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 - [#62](https://github.com/ChronoStriker1/vndegen/issues/62) Metadata: Rinjin matched to the wrong VNDB entry.
 - [#67](https://github.com/ChronoStriker1/vndegen/issues/67) `build.sh test` can exit 1 without showing which Swift test failed.
+- [#69](https://github.com/ChronoStriker1/vndegen/issues/69) Godot build: a concurrent build can delete the shared SCons venv mid-build.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- NekoSDK, on `feat/nekosdk-stage3`: stage 3's last gaps (Haha Sannin to Ana Asobi's 4:3 mode and its Config's dark band, more of GOOD Timing's rules watched, and small checks). The six games that keep their story order in the exe are in three parallel sets, merged through `feat/nekosdk-stage3`: Mankitsu Happening with Funbag Fantasy: Sideboob Story 2 on `feat/nekosdk-set1`, Yabai! -Fukushuu Yami Site- with Funbag Fantasy on `-set2`, and Funbag Fantasy 2 with Funbag Fantasy: Sideboob Story on `-set3`. The older layout's commands and story tables for games without flow scripts are in.
+- NekoSDK, on `feat/nekosdk-stage3`: the four games left that keep their story order in the exe, in parallel sets merged through `feat/nekosdk-stage3`: Mankitsu Happening on `feat/nekosdk-set1`, Yabai! -Fukushuu Yami Site- on `-set2` with the lead, and Funbag Fantasy 2 and Funbag Fantasy: Sideboob Story on `-set3`. GOOD Timing's last two guessed rules after that.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
