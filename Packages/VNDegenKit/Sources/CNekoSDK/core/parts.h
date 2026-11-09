@@ -56,7 +56,10 @@ public:
     // menu opens over the part's screen as from the story, and its Back returns there, the part waiting as it was.
     void openMenu(const std::string &action);
     // A sound on one of the engine's channels: kind 0 music, 1 effects, 2 voice.
+    // Kind 0 music, 1 effects, 2 voices, each in its own channels.
     void playSound(int kind, int channel, const std::string &path, int volume = 100, bool loop = false);
+    // Whether that channel's sound is still playing.
+    bool soundPlaying(int kind, int channel);
     // A picture into a slot as command 15 loads one, shown by the next screen update and gone with 17 or 22, saved as any
     // picture: its top left at x, y, its light added to the scene when `additive`, and, with a scroll, tiled along that
     // axis and moving that many pixels a second along it. False when the picture is missing.
