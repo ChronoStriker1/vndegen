@@ -87,6 +87,11 @@ const std::vector<const char *> kFinal[4] = {
     {"ep_001_029_000"}, {"ep_001_026_000", "ep_001_026_001"}, {"ep_001_027_000", "ep_001_027_001"}, {"ep_001_028_000", "ep_001_028_001"},
 };
 
+// The PC's numbers: the last before each half-week's next select screen, and a fixed half-week's card's own (0 for the
+// half-weeks whose cards share the last number).
+constexpr int kPhaseEnd[kPhases] = {60, 84, 110, 142, 146, 171, 176, 196, 210, 220};
+constexpr int kCardNumber[kPhases] = {0, 81, 0, 140, 0, 170, 0, 195, 0, 0};
+
 struct Rect {
     int x, y, w, h;
     bool contains(int px, int py) const { return px >= x && px < x + w && py >= y && py < y + h; }
@@ -238,17 +243,54 @@ public:
         int phase = number / 1000 - 1, card = number / 100 % 10, hearts = number / 10 % 10, ending = number % 10;
         if (phase < 0 || phase >= kPhases || card > 3) return {};
         std::vector<std::string> out;
+        // Each scene with the PC's number for it, which its saves there hold (set 1, a PC save in each scene of every
+        // card's pick): numbers are given as `next` counts on, and 0 leaves a scene without one.
+        int next = 0;
         auto add = [&](const std::vector<const char *> &list) {
-            for (const char *scene : list) out.push_back(std::string("scr\\") + scene + ".txt");
+            for (const char *scene : list) {
+                std::string line = std::string("scr\\") + scene + ".txt";
+                if (next > 0) line += " @" + std::to_string(next);
+                out.push_back(line);
+            }
+        };
+        auto addNumbered = [&](const std::vector<const char *> &list, int first, int rest) {
+            for (size_t i = 0; i < list.size(); i++) {
+                next = i == 0 ? first : rest;
+                add({list[i]});
+            }
         };
         const CardScenes &cs = kCards[phase][card];
-        if (cs.heroine < 0) add(cs.scenes);
-        else if (hearts < kMaxHearts) add(kEvents[cs.heroine][hearts]);
-        else add({kLate[cs.heroine][phase == kPhases - 1 ? 1 : 0]});
+        int end = kPhaseEnd[phase];
+        if (cs.heroine < 0) {
+            // A card of the fixed half-weeks has its own number and the common scenes count on from it; in the others a
+            // card's scene takes the number just before the next select screen.
+            next = kCardNumber[phase] ? kCardNumber[phase] : end;
+            add(cs.scenes);
+        } else if (hearts < kMaxHearts) {
+            // A heroine's event: week 1's own numbers, or 801, 851 or 901 and 2 for each event before it, and the
+            // rest of the event the number before the next select screen.
+            int first = phase == 0 ? 21 + 10 * cs.heroine : 801 + 50 * cs.heroine + 2 * hearts;
+            addNumbered(kEvents[cs.heroine][hearts], first, end);
+        } else {
+            next = end;  // unconfirmed: no PC save in a heroine's late short scene yet
+            add({kLate[cs.heroine][phase == kPhases - 1 ? 1 : 0]});
+        }
+        if (kCardNumber[phase]) next = kCardNumber[phase] + 1;
         // The last pick: the heroine's last event and two common scenes, or with none at four hearts 029 alone, after
         // which the PC goes back to the title (set 1, a run picking no heroine).
-        if (phase == kPhases - 1) add(kFinal[std::clamp(ending, 0, 3)]);
-        if (phase < kPhases - 1 || ending > 0) add(kAfter[phase]);
+        if (phase == kPhases - 1) {
+            // No heroine: 029 holds 9999, as each ending's last scene does; a heroine's last event and the two common
+            // scenes after it aren't numbered yet.
+            next = ending == 0 ? 9999 : 0;
+            add(kFinal[std::clamp(ending, 0, 3)]);
+            next = 0;
+            if (ending > 0) add(kAfter[phase]);
+            return out;
+        }
+        for (const char *scene : kAfter[phase]) {
+            add({scene});
+            next++;
+        }
         return out;
     }
 
