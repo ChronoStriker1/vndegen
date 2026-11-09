@@ -239,7 +239,8 @@ const std::vector<std::string> *Engine::viewerButtonAt(int x, int y) const {
 //     replay, prevcg, nextcg, prevvar, nextvar, auto, return, hide, zoomout, zoomreset, zoomin, bgm, which mutes and
 //     unmutes the music, bgmplay and bgmmute, a pair for the same, art, which switches the game's art set, or set:NAME,
 //     which turns the setting NAME on and off. `hide` leaves it out, rather than disabled, while it can't be used.
-//     `helppic PICTURE X Y [ROWS ROW]` is a help picture of its own, or a row of one.
+//     `helppic PICTURE X Y [ROWS ROW]` is a help picture of its own, or a row of one; `helppic PICTURE X Y cols COLS COL`
+//     is a column of one, as Test Game 96's five helps lie side by side on one sheet.
 //   `viewerhelp SHEET X Y ROWS`, where a hovered button's help row goes.
 //   `viewernumber WHAT SHEET X Y STEP DIGITS [CELLS]`, WHAT being index, total, zoom (the whole part), zoomfrac or volume.
 //   `viewercell SHEET X Y CELLS CELL`, a fixed cell, such as a slash.
@@ -248,6 +249,9 @@ const std::vector<std::string> *Engine::viewerButtonAt(int x, int y) const {
 //   `viewerauto EVERY FILL` in ms: with FILL, the slideshow button fills from the right over FILL ms, as Test Game 84's does.
 //   `viewerbgm PLAYCOL PLAYROW MUTECOL MUTEROW`, the music button's column and row playing and muted.
 //   `viewerlook set:NAME ONCOL ONROW OFFCOL OFFROW`, a setting button's column and row on and off.
+//   `viewerclicks`: the picture takes clicks, as Test Game 96's does (set 2, under Wine). A left click on it shows the
+//     next picture, running on into the next entry after the last, with the panel hidden too. The right button leaves
+//     the viewer while the panel shows, and brings a hidden panel back.
 void Engine::composeViewer(Canvas &out) {
     if (!viewerPanel() || viewPanelHidden_) return;
     const auto *panel = screen_->setting("viewer");
@@ -350,9 +354,12 @@ void Engine::composeViewer(Canvas &out) {
     if (helpPicture)
         if (ImageRef pic = images_->get(helpPicture[0])) {
             bool oneRow = helpPictureFields >= 5 && std::isdigit(uint8_t(helpPicture[3][0]));
+            bool oneCol = helpPictureFields >= 6 && helpPicture[3] == "cols";
             int rows = oneRow ? std::max(1, std::atoi(helpPicture[3].c_str())) : 1, h = pic->h / rows;
             int row = oneRow ? std::atoi(helpPicture[4].c_str()) : 0;
-            drawPart(out, *pic, std::atoi(helpPicture[1].c_str()), std::atoi(helpPicture[2].c_str()), 0, row * h, pic->w, h, 1);
+            int cols = oneCol ? std::max(1, std::atoi(helpPicture[4].c_str())) : 1, w = pic->w / cols;
+            int col = oneCol ? std::atoi(helpPicture[5].c_str()) : 0;
+            drawPart(out, *pic, std::atoi(helpPicture[1].c_str()), std::atoi(helpPicture[2].c_str()), col * w, row * h, w, h, 1);
         }
     if (const auto *help = screen_->setting("viewerhelp"); help && help->size() >= 4 && helpRow >= 0)
         if (ImageRef sheet = images_->get((*help)[0])) {
@@ -393,10 +400,22 @@ std::vector<std::pair<int, int>> Engine::viewerSpots() const {
 }
 
 void Engine::pressViewer(int x, int y) {
-    if (viewPanelHidden_) return;
+    bool clicks = screen_->setting("viewerclicks");
+    if (viewPanelHidden_) {
+        if (clicks) viewerAdvance();
+        return;
+    }
     dragViewerSlider(x, y);
     if (viewerDragging_) return;
     const auto *f = viewerButtonAt(x, y);
+    if (!f && clicks) {
+        // Only a click on the picture counts: one on the panel between its buttons hasn't been tried on the PC.
+        const auto *panel = screen_->setting("viewer");
+        ImageRef art = panel->size() >= 3 ? images_->get((*panel)[0]) : nullptr;
+        int left = number(*panel, 1), top = number(*panel, 2);
+        if (!art || x < left || y < top || x >= left + art->w || y >= top + art->h) viewerAdvance();
+        return;
+    }
     if (!f || viewerButtonRow(*f, false) == kDisabled || viewerButtonRow(*f, false) < 0) return;
     const std::string &action = (*f)[0];
     if (action == "replay") {

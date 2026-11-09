@@ -4899,7 +4899,9 @@ void Engine::mouseButton(int button, bool down) {
         } else if (logOpen_) {
             closeLog();
         } else if (screen_ && viewingImage_ && viewerPanel()) {
-            viewPanelHidden_ = !viewPanelHidden_;
+            // `viewerclicks`: it leaves the viewer while the panel shows (viewer.cpp).
+            if (screen_->setting("viewerclicks") && !viewPanelHidden_) closeViewer();
+            else viewPanelHidden_ = !viewPanelHidden_;
             dirty_ = true;
         } else if (screen_) {
             // `cancel ACTION` names what the right button does on a screen that isn't left with Back.
