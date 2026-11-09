@@ -537,129 +537,129 @@ screen story
 # a save card names (d003_002's cells: 0 Prologue, 1 Boobs of Boan, 2 A Treasonous Affair, 3 Complications in the
 # Capital, 4 The Depths of Desire).
 flow main                    # New Game, and its Prologue once an ending is seen
-scene scr\ep_00_00.txt
+scene scr\ep_00_00.txt @1
 jump mainstory
 flow mainstory               # New Game > Main Story, offered once an ending is seen
 set S 5000 = 1               # Boobs of Boan: 0 (Prologue) in ep_00_00's saves, 1 in ep_00_03a's
-scene scr\ep_00_01.txt
-scene scr\ep_00_02.txt
-scene scr\ep_00_03.txt
-scene scr\ep_00_03a.txt
-scene scr\ep_00_04.txt
-scene scr\ep_00_04a.txt
-scene scr\ep_00_05.txt
-scene scr\ep_00_06.txt
-scene scr\ep_00_06a.txt
-scene scr\ep_00_07.txt
-scene scr\ep_00_07a.txt
-scene scr\ep_00_08.txt
-choice obj\m000_000.bmp 2 cells 0 1  # Cum inside Roxanne / Pull out of Roxanne
+scene scr\ep_00_01.txt @2
+scene scr\ep_00_02.txt @3
+scene scr\ep_00_03.txt @4
+scene scr\ep_00_03a.txt @5
+scene scr\ep_00_04.txt @6
+scene scr\ep_00_04a.txt @7
+scene scr\ep_00_05.txt @8
+scene scr\ep_00_06.txt @9
+scene scr\ep_00_06a.txt @10
+scene scr\ep_00_07.txt @11
+scene scr\ep_00_07a.txt @12
+scene scr\ep_00_08.txt @13
+choice obj\m000_000.bmp 2 cells 0 1 @14  # Cum inside Roxanne / Pull out of Roxanne
 on 1 goto c1b
 set S 200 += 1
-scene scr\ep_00_08a.txt
+scene scr\ep_00_08a.txt @15
 goto c1
 label c1b
-scene scr\ep_00_08b.txt
+scene scr\ep_00_08b.txt @15
 label c1
-scene scr\ep_00_08c.txt
-choice obj\m000_000.bmp 2 cells 2 3  # Shamsiel's tit-fuck feels better! / Roxanne's pussy feels better!
+scene scr\ep_00_08c.txt @16
+choice obj\m000_000.bmp 2 cells 2 3 @17  # Shamsiel's tit-fuck feels better! / Roxanne's pussy feels better!
 on 1 goto c2b
-scene scr\ep_00_08d.txt
+scene scr\ep_00_08d.txt @18
 goto c2
 label c2b
-scene scr\ep_00_08e.txt
+scene scr\ep_00_08e.txt @18
 label c2
-scene scr\ep_00_08f.txt
-scene scr\ep_00_09.txt
-choice obj\m000_000.bmp 2 cells 0 1  # Cum inside Roxanne / Pull out of Roxanne
+scene scr\ep_00_08f.txt @19
+scene scr\ep_00_09.txt @20
+choice obj\m000_000.bmp 2 cells 0 1 @21  # Cum inside Roxanne / Pull out of Roxanne
 on 1 goto c3b
 set S 200 += 1
-scene scr\ep_00_09a.txt
+scene scr\ep_00_09a.txt @22
 goto c3
 label c3b
-scene scr\ep_00_09b.txt
+scene scr\ep_00_09b.txt @22
 label c3
-scene scr\ep_00_09c.txt
-scene scr\ep_00_10.txt
-choice obj\m000_000.bmp 2 cells 0 1  # Cum inside Roxanne / Pull out of Roxanne
+scene scr\ep_00_09c.txt @23
+scene scr\ep_00_10.txt @24
+choice obj\m000_000.bmp 2 cells 0 1 @25  # Cum inside Roxanne / Pull out of Roxanne
 on 1 goto c4b
 set S 200 += 1
-scene scr\ep_00_10a.txt
+scene scr\ep_00_10a.txt @26
 goto c4
 label c4b
-scene scr\ep_00_10b.txt
+scene scr\ep_00_10b.txt @26
 label c4
-scene scr\ep_00_10c.txt
-scene scr\ep_00_11.txt
+scene scr\ep_00_10c.txt @27
+scene scr\ep_00_11.txt @28
 if S 200 >= 3 goto c5a     # inside all three times: 11a and its choice; under 3 (checked at 1 and 2), straight on to 11d:
 goto c5                      # the PC opens 11b's file there but plays none of it (79 lines from 11's end landed in 11d)
 label c5a
 scene scr\ep_00_11a.txt
-choice obj\m000_000.bmp 2 cells 4 5  # I promise to return after I reach the capital! / I'll never forget you, Roxanne.
+choice obj\m000_000.bmp 2 cells 4 5 @31  # I promise to return after I reach the capital! / I'll never forget you, Roxanne.
 on 1 goto c5b
 set S 200 += 2
-scene scr\ep_00_11c.txt
+scene scr\ep_00_11c.txt @50
 goto c5
 label c5b
-scene scr\ep_00_11b.txt
+scene scr\ep_00_11b.txt @50
 label c5
-scene scr\ep_00_11d.txt
-scene scr\ep_00_12.txt
+scene scr\ep_00_11d.txt @51
+scene scr\ep_00_12.txt @52
 if S 200 >= 5 goto route3    # Boan Castle is offered only with S200 at 5 (checked: not at 2 or 3)
-choice obj\m000_000.bmp 2 cells 6 7  # Be assigned to the Royal Guard / Be stationed as a commander
+choice obj\m000_000.bmp 2 cells 6 7 @61  # Be assigned to the Royal Guard / Be stationed as a commander
 on 1 goto commander
 goto guard
 label route3
-choice obj\m000_000.bmp 3 cells 6 7 8  # Be assigned to the Royal Guard / Be stationed as a commander / Return to Boan Castle
+choice obj\m000_000.bmp 3 cells 6 7 8 @56  # Be assigned to the Royal Guard / Be stationed as a commander / Return to Boan Castle
 on 1 goto commander
 on 2 goto boan
 label guard
 set S 1000 = 1
-scene scr\ep_00_12a.txt
-scene scr\ep_00_12c.txt      # also on the commander's way: told apart by S1000 (1 here, 0 there)
+scene scr\ep_00_12a.txt @80
+scene scr\ep_00_12c.txt @81   # also on the commander's way: told apart by S1000 (1 here, 0 there)
 set S 5000 = 4               # The Depths of Desire, in saves at ep_02_07
-scene scr\ep_02_00.txt
-scene scr\ep_02_01.txt
-scene scr\ep_02_02.txt
-scene scr\ep_02_03.txt
-scene scr\ep_02_03a.txt
-scene scr\ep_02_04.txt
-scene scr\ep_02_05.txt
-scene scr\ep_02_06.txt
-scene scr\ep_02_07.txt
-choice obj\m000_000.bmp 2 cells 9 10  # Search for the sanctum / Return to the capital
+scene scr\ep_02_00.txt @301
+scene scr\ep_02_01.txt @302
+scene scr\ep_02_02.txt @303
+scene scr\ep_02_03.txt @304
+scene scr\ep_02_03a.txt @305
+scene scr\ep_02_04.txt @306
+scene scr\ep_02_05.txt @307
+scene scr\ep_02_06.txt @308
+scene scr\ep_02_07.txt @309
+choice obj\m000_000.bmp 2 cells 9 10 @310  # Search for the sanctum / Return to the capital
 on 1 goto capital
-scene scr\ep_02_07c.txt
-scene scr\ep_02_08.txt
-scene scr\ep_02_09.txt
-scene scr\ep_02_10.txt
-scene scr\ep_ai_00.txt       # Aisis's ending
+scene scr\ep_02_07c.txt @401
+scene scr\ep_02_08.txt @402
+scene scr\ep_02_09.txt @403
+scene scr\ep_02_10.txt @930
+scene scr\ep_ai_00.txt @931   # Aisis's ending
 staffroll ai
 scene scr\ep_ai_01.txt
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label capital
-scene scr\ep_02_07a.txt
-scene scr\ep_02_07b.txt
-scene scr\ep_ss_00.txt       # Shamsiel's ending
+scene scr\ep_02_07a.txt @501
+scene scr\ep_02_07b.txt @940
+scene scr\ep_ss_00.txt @941   # Shamsiel's ending
 staffroll ss
-scene scr\ep_ss_01.txt
+scene scr\ep_ss_01.txt @999
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label commander
-scene scr\ep_00_12b.txt
-scene scr\ep_00_12c.txt      # also on the Royal Guard's way: told apart by S1000 (0 here)
+scene scr\ep_00_12b.txt @80
+scene scr\ep_00_12c.txt @81   # also on the Royal Guard's way: told apart by S1000 (0 here)
 set S 5000 = 2               # A Treasonous Affair: the one title left for ep_01
-scene scr\ep_01_00.txt
-scene scr\ep_01_01.txt
-scene scr\ep_01_01a.txt
-scene scr\ep_01_02.txt
-scene scr\ep_01_02a.txt
-scene scr\ep_01_03.txt
-scene scr\ep_01_04.txt
-scene scr\ep_01_04a.txt
-scene scr\ep_01_05.txt
-scene scr\ep_01_06.txt
+scene scr\ep_01_00.txt @101
+scene scr\ep_01_01.txt @102
+scene scr\ep_01_01a.txt @103
+scene scr\ep_01_02.txt @104
+scene scr\ep_01_02a.txt @105
+scene scr\ep_01_03.txt @106
+scene scr\ep_01_04.txt @107
+scene scr\ep_01_04a.txt @108
+scene scr\ep_01_05.txt @109
+scene scr\ep_01_06.txt @110
 scene scr\ep_01_07.txt
 scene scr\ep_01_07a.txt
 scene scr\ep_01_08.txt
@@ -679,7 +679,7 @@ scene scr\ep_03_08.txt
 scene scr\ep_03_09.txt
 scene scr\ep_03_09a.txt
 scene scr\ep_03_10.txt
-choice obj\m000_000.bmp 2 cells 11 12  # Squeeze her boobs / Suck on her boobs
+choice obj\m000_000.bmp 2 cells 11 12 @214  # Squeeze her boobs / Suck on her boobs
 on 1 goto c8b
 scene scr\ep_03_10a.txt
 goto c8
@@ -687,7 +687,7 @@ label c8b
 scene scr\ep_03_10b.txt
 label c8
 scene scr\ep_03_10c.txt
-choice obj\m000_000.bmp 2 cells 13 14  # Class has finished / Call in an additional teacher
+choice obj\m000_000.bmp 2 cells 13 14 @217  # Class has finished / Call in an additional teacher
 on 1 goto harem
 scene scr\ep_lc_00.txt       # Lucelia's ending
 staffroll lc
@@ -702,15 +702,15 @@ scene scr\ep_03_12.txt
 scene scr\ep_03_13.txt
 scene scr\ep_03_14.txt
 staffroll zh                 # the harem ending's roll comes before its first scene
-scene scr\ep_zh_00.txt
-choice obj\m000_000.bmp 3 cells 15 15 15  # Let nature take its course / Let nature take its course / Let nature take its course
+scene scr\ep_zh_00.txt @922
+choice obj\m000_000.bmp 3 cells 15 15 15 @923  # Let nature take its course / Let nature take its course / Let nature take its course
 scene scr\ep_zh_01.txt       # every option goes on here
 scene scr\ep_zh_02.txt
 scene scr\ep_zh_03.txt
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
 end
 label boan
-scene scr\ep_rk_00.txt       # Roxanne's ending
+scene scr\ep_rk_00.txt @901   # Roxanne's ending
 staffroll rk
 scene scr\ep_rk_01.txt
 set G 2 = 1                  # an ending seen: New Game offers Prologue and Main Story (checked under Wine)
