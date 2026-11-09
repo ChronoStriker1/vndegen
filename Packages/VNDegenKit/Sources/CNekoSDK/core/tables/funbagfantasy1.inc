@@ -583,7 +583,8 @@ close 280 0.42            # from frames under Wine: about 75% size and half fade
 screen story
 # Story order, traced from the PC under Wine: the scene scripts it opened, in order, through every route, and saves at
 # every choice for the variables. The options are cells of obj\m000_000.bmp, a sheet of all sixteen; their text is noted.
-# S200 counts Roxanne's points. S1000 is set by the Royal Guard, and nothing seen reads it. S5000 is the chapter
+# S200 counts Roxanne's points. S1000 is 1 on the Royal Guard route, which the shared ep_00_12c line branches on.
+# S5000 is the chapter
 # a save card names (d003_002's cells: 0 Prologue, 1 Boobs of Boan, 2 A Treasonous Affair, 3 Complications in the
 # Capital, 4 The Depths of Desire).
 # Each scene and choice line ends with the PC's own number for it (its saves' flowNode), read from PC saves made there
