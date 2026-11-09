@@ -353,7 +353,13 @@ private:
         std::vector<std::string> keys;
         std::vector<std::string> images;
         std::vector<int> imageIds;
+        // Each picture's group, the first field of its line, and its place among its group's lines in the file, for a
+        // game that keeps its flags by group (`cgflagsbygroup`).
+        std::vector<int> imageGroups, imagePlaces;
     };
+    // Where a picture's unlock flag sits in cfg.sav: by its number, or with `cgflagsbygroup STRIDE` under `screen defaults`
+    // STRIDE bytes a group and 4 a place, as Test Game 83 keeps them (set 3). -1 for none.
+    int cgFlagAt(const GalleryEntry &e, size_t picture) const;
     bool sceneUnlocked(const GalleryEntry &scene) const;
     // Test Game 92's anime gallery, from its anime_view.ini: entries of movies, unlocked whole by a scene's script as a
     // scene is, and shown in the CG viewer.

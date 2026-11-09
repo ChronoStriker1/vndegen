@@ -1093,8 +1093,14 @@ void Engine::loadGalleries() {
                 cgEntries_.back().imageIds.push_back(std::atoi(parts[1].c_str()));
                 if (parts.size() >= 4 && cgEntries_.back().flow.empty()) cgEntries_.back().flow = trim(parts[3]);
                 cgEntries_.back().images.push_back(parts[2]);
+                cgEntries_.back().imageGroups.push_back(std::atoi(parts[0].c_str()));
             }
         }
+    }
+    {
+        std::map<int, int> placeInGroup;
+        for (GalleryEntry &e : cgEntries_)
+            for (int group : e.imageGroups) e.imagePlaces.push_back(placeInGroup[group]++);
     }
     // `#p page thumbnail key bgm flow`, then a `0,0,movie` line for each of the entry's movies, then `##`.
     for (const std::string &line : lines("cfg\\anime_view.ini")) {
@@ -1633,9 +1639,12 @@ void Engine::composeGallery(Canvas &out) {
             if (sheetOfTen && (slash || slashInSheet)) {
                 int cells = slashInSheet && counts->size() >= 8 ? std::max(11, field(*counts, 7)) : slashInSheet ? 11 : 10;
                 int w = sheetOfTen->w / cells, x = cx + field(*counts, 2), y = cy + field(*counts, 3);
+                // `cellcountstep N`: the digits N apart, the cell width unless given, as Test Game 83's 15 (set 3).
+                const auto *stepLine = screen_->setting("cellcountstep");
+                int step = stepLine && !stepLine->empty() ? field(*stepLine, 0) : w;
                 auto two = [&](int value, int at) {
                     drawPart(out, *sheetOfTen, at, y, value / 10 % 10 * w, 0, w, sheetOfTen->h, 1);
-                    drawPart(out, *sheetOfTen, at + w, y, value % 10 * w, 0, w, sheetOfTen->h, 1);
+                    drawPart(out, *sheetOfTen, at + step, y, value % 10 * w, 0, w, sheetOfTen->h, 1);
                 };
                 two(have, x);
                 int slashY = y + (counts->size() >= 7 ? field(*counts, 6) : slashInSheet ? 0 : -1);
@@ -2009,6 +2018,16 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
 // A damaged cg_view.ini's number mustn't reach past the flags, which end where the tracks' begin.
 static bool validCgId(int id) { return id >= 0 && size_t(id) < (kTrackFlagsAt - kCgFlagsAt) / 4; }
 
+int Engine::cgFlagAt(const GalleryEntry &e, size_t picture) const {
+    auto defaults = screens_.find("defaults");
+    const auto *byGroup = defaults == screens_.end() ? nullptr : defaults->second.setting("cgflagsbygroup");
+    if (byGroup && !byGroup->empty() && picture < e.imageGroups.size() && picture < e.imagePlaces.size()) {
+        long at = long(kCgFlagsAt) + long(field(*byGroup, 0)) * e.imageGroups[picture] + 4L * e.imagePlaces[picture];
+        return at >= long(kCgFlagsAt) && at + 4 <= long(kTrackFlagsAt) ? int(at) : -1;
+    }
+    return validCgId(e.imageIds[picture]) ? int(kCgFlagsAt + size_t(e.imageIds[picture]) * 4) : -1;
+}
+
 // cfg.sav holds the game's settings, then its 10,000 global variables at byte 4000: a save of Test Game 95's has 1 at its
 // macro GLB_PROLOGUE_OVER's number, 1000, after the prologue. VNDegen keeps the rest of the file as it found it.
 void Engine::loadGlobals() {
@@ -2060,7 +2079,7 @@ void Engine::loadGlobals() {
     // A picture's flag goes by its number in cg_view.ini, which needn't run in step with the entries.
     for (const GalleryEntry &e : cgEntries_)
         for (size_t p = 0; p < e.images.size(); p++)
-            if (validCgId(e.imageIds[p]) && flag(kCgFlagsAt + size_t(e.imageIds[p]) * 4)) seen_[normalizedPath(e.images[p])] = true;
+            if (int at = cgFlagAt(e, p); at >= 0 && flag(size_t(at))) seen_[normalizedPath(e.images[p])] = true;
     for (size_t i = 0; i < tracks_.size(); i++)
         if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
     // Only that flag changes in the file: what VNDegen has unlocked besides goes in at its next save, as before.
@@ -2114,7 +2133,7 @@ void Engine::saveGlobals() {
     };
     for (const GalleryEntry &e : cgEntries_)
         for (size_t p = 0; p < e.images.size(); p++)
-            if (validCgId(e.imageIds[p]) && seen(e.images[p])) setFlag(kCgFlagsAt + size_t(e.imageIds[p]) * 4);
+            if (int at = cgFlagAt(e, p); at >= 0 && seen(e.images[p])) setFlag(size_t(at));
     for (size_t i = 0; i < tracks_.size(); i++)
         if (seen(tracks_[i])) setFlag(kTrackFlagsAt + i * 4);
     auto packed = packEntry(configFile_);
