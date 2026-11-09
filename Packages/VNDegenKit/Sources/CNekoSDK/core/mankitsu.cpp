@@ -10,7 +10,21 @@
 // screen, 161 waits until they do, while the scene changes behind them, and 163 slides them off to the right and waits
 // for that. On the PC the bars' heights and speeds vary from slide to slide, as if random; these are drawn in the same
 // style over the times the recording shows (in over 0.6 s, out over 0.8 s), not the PC's own bars. Unconfirmed.
+//
+// The select screen, `open select` from the story table: ten half-weeks of four cards, each a character at a place, as
+// cfg\SelectPhase.ini lists them (top, left, right, bottom). A heroine's card at place -1 stands at the place her hearts
+// reach in cfg\SelectChar.ini and plays her next event, which gives her a heart, up to four; the other cards play the
+// scene the PC's exe lists for that half-week and card. Which scene plays was traced under Wine from runs down each
+// route and one skipping a heroine (set 1): events go by hearts, not by half-week. The screen's pieces were placed by
+// fitting PC shots, the cards exactly (within 0.03 of 255 over the card area). State is in VNDegen's own story
+// variables, kept beside the save:
+//   S 10900   the half-week, 0 to 9, and 10 once the last is chosen
+//   S 10901..10903   Kururu's, Otona's and Rei's hearts
+//   S 10904   the chapter the pick plays (`chapter S 10904`)
+//   S 10906   the heroine whose ending follows, 1 to 3, or 0 for none, set with the last pick
 #include <algorithm>
+#include <array>
+#include <cstdlib>
 #include <map>
 #include <sstream>
 
@@ -21,6 +35,59 @@ namespace {
 
 constexpr int kFaceX = 0, kFaceY = 512;
 constexpr int kFollowMs = 120;  // the second strip's lag behind the first, in and out
+
+constexpr int kPhaseVar = 10900, kHeartVar = 10901, kChapterVar = 10904, kEndingVar = 10906;
+constexpr int kPhases = 10, kMaxHearts = 4;
+
+// A card's place on the select screen, top left of its frame: top, left, right, bottom, in the ini's order.
+constexpr int kCardX[4] = {399, 35, 842, 478}, kCardY[4] = {12, 297, 82, 367};
+// The PC draws the cards in this order, top, right, left, bottom.
+constexpr int kDrawOrder[4] = {0, 2, 1, 3};
+constexpr int kCardW = 373, kCardH = 232, kLift = 4;
+constexpr int kSideX = 1172, kSideY = 457, kSideStep = 58;
+constexpr int kSideColumns[4] = {0, 1, 5, 6};  // save, load, config, title in e001_000
+
+// What a card plays: a heroine's event (by her hearts) or a fixed scene list.
+struct CardScenes {
+    int heroine = -1;  // 0 to 2: her next event, or her late short scene at four hearts
+    std::vector<const char *> scenes;
+};
+
+// Each half-week's cards, top, left, right, bottom, as the exe lists them (set 1, under Wine).
+const CardScenes kCards[kPhases][4] = {
+    {{0, {}}, {1, {}}, {2, {}}, {-1, {"ep_006_000_000"}}},
+    {{-1, {"ep_007_001_000"}}, {-1, {"ep_007_002_000"}}, {-1, {"ep_007_003_000"}}, {-1, {"ep_007_000_003"}}},
+    {{0, {}}, {1, {}}, {2, {}}, {-1, {"ep_006_002_000"}}},
+    {{-1, {"ep_006_001_000"}}, {-1, {"ep_007_001_001"}}, {-1, {"ep_007_000_002"}}, {-1, {"ep_006_003_000"}}},
+    {{0, {}}, {1, {}}, {2, {}}, {-1, {"ep_006_004_000"}}},
+    {{-1, {"ep_007_001_002"}}, {-1, {"ep_007_002_001"}}, {-1, {"ep_007_003_001"}}, {-1, {"ep_007_000_000"}}},
+    {{0, {}}, {1, {}}, {2, {}}, {-1, {"ep_007_000_001"}}},
+    {{-1, {"ep_007_000_004"}}, {-1, {"ep_006_005_000"}}, {-1, {"ep_006_006_000"}}, {-1, {"ep_006_007_000"}}},
+    {{0, {}}, {1, {}}, {2, {}}, {-1, {"ep_007_000_005"}}},
+    {{0, {}}, {1, {}}, {2, {}}, {-1, {"ep_006_008_000"}}},
+};
+// Each heroine's four events, by the hearts she has, each with its second part; Otona's third goes on into 019.
+const std::vector<const char *> kEvents[3][kMaxHearts] = {
+    {{"ep_001_007_000", "ep_001_007_001"}, {"ep_001_012_000", "ep_001_012_001"}, {"ep_001_017_000", "ep_001_017_001"}, {"ep_001_022_000", "ep_001_022_001"}},
+    {{"ep_001_008_000", "ep_001_008_001"}, {"ep_001_013_000", "ep_001_013_001"},
+     {"ep_001_018_000", "ep_001_018_001", "ep_001_019_000", "ep_001_019_001"}, {"ep_001_023_000", "ep_001_023_001"}},
+    {{"ep_001_009_000", "ep_001_009_001"}, {"ep_001_014_000", "ep_001_014_001"}, {"ep_001_020_000", "ep_001_020_001"}, {"ep_001_024_000", "ep_001_024_001"}},
+};
+// A heroine with four hearts in the last two half-weeks: a short scene of hers.
+const char *const kLate[3][2] = {{"ep_007_001_003", "ep_007_001_004"}, {"ep_007_002_002", "ep_007_002_003"}, {"ep_007_003_003", "ep_007_003_004"}};
+// The common scenes after a half-week's pick, and at the end the heroine's last event (none: 029) and two more.
+const std::vector<const char *> kAfter[kPhases] = {
+    {}, {"ep_001_010_000", "ep_001_011_000", "ep_001_011_001"}, {}, {"ep_001_015_000", "ep_001_016_000"}, {},
+    {"ep_001_021_000"}, {}, {"ep_001_025_000"}, {}, {"ep_001_030_000", "ep_001_031_000"},
+};
+const std::vector<const char *> kFinal[4] = {
+    {"ep_001_029_000"}, {"ep_001_026_000", "ep_001_026_001"}, {"ep_001_027_000", "ep_001_027_001"}, {"ep_001_028_000", "ep_001_028_001"},
+};
+
+struct Rect {
+    int x, y, w, h;
+    bool contains(int px, int py) const { return px >= x && px < x + w && py >= y && py < y + h; }
+};
 
 struct Bar {
     int y = 0, h = 0;
@@ -75,6 +142,76 @@ public:
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
         if (layer == Layer::Window) drawFaces(host, out);
         if (layer == Layer::OverWindow) drawSlide(host, out);
+        if (layer == Layer::Screen && selecting_) drawSelect(host, out);
+    }
+
+    bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &) override {
+        if (name != "select") return false;
+        readInis(host);
+        selecting_ = true;
+        confirming_ = -1;
+        host.redraw();
+        return true;
+    }
+
+    void pointer(PartHost &host, int x, int y) override {
+        px_ = x;
+        py_ = y;
+        if (selecting_) host.redraw();
+    }
+
+    bool press(PartHost &host, int x, int y, int button) override {
+        if (!selecting_) return false;
+        host.redraw();
+        if (confirming_ >= 0) {
+            if (button == 0 && yesRect().contains(x, y)) return choose(host, confirming_);
+            if (button == 1 || (button == 0 && noRect().contains(x, y))) confirming_ = -1;
+            return true;
+        }
+        if (button != 0) return true;
+        for (int c = 0; c < 4; c++)
+            if (cardRect(c).contains(x, y)) {
+                confirming_ = c;
+                return true;
+            }
+        for (int k = 0; k < 4; k++)
+            if (sideRect(k).contains(x, y) && !warnedSide_) {
+                // Save, load, config and title from here need a way into the menus that PartHost doesn't give yet.
+                host.log("Test Game 90's select screen buttons aren't wired to the menus yet");
+                warnedSide_ = true;
+            }
+        return true;
+    }
+
+    // Controller focus: the four cards, the side buttons, and yes and no while asking.
+    bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) override {
+        if (!selecting_) return false;
+        auto middle = [&](const Rect &r) { spots.push_back({r.x + r.w / 2, r.y + r.h / 2}); };
+        if (confirming_ >= 0) {
+            middle(yesRect());
+            middle(noRect());
+            return true;
+        }
+        for (int c = 0; c < 4; c++) middle(cardRect(c));
+        for (int k = 0; k < 4; k++) middle(sideRect(k));
+        return true;
+    }
+
+    // `chapter S 10904`: the scenes a pick plays, from the number choose() put there.
+    std::vector<std::string> chapter(PartHost &, int number) override {
+        int phase = number / 1000 - 1, card = number / 100 % 10, hearts = number / 10 % 10, ending = number % 10;
+        if (phase < 0 || phase >= kPhases || card > 3) return {};
+        std::vector<std::string> out;
+        auto add = [&](const std::vector<const char *> &list) {
+            for (const char *scene : list) out.push_back(std::string("scr\\") + scene + ".txt");
+        };
+        const CardScenes &cs = kCards[phase][card];
+        if (cs.heroine < 0) add(cs.scenes);
+        else if (hearts < kMaxHearts) add(kEvents[cs.heroine][hearts]);
+        else add({kLate[cs.heroine][phase == kPhases - 1 ? 1 : 0]});
+        if (phase == kPhases - 1) add(kFinal[std::clamp(ending, 0, 3)]);
+        add(kAfter[phase]);
+        return out;
     }
 
     void save(std::vector<std::string> &lines) const override {
@@ -97,6 +234,8 @@ public:
         from_.clear();
         fadeMs_ = 0;
         slideFrom_ = outFrom_ = -1;
+        selecting_ = false;
+        confirming_ = -1;
     }
 
 private:
@@ -178,6 +317,141 @@ private:
             }
         }
     }
+
+    // The select screen.
+    struct Card {
+        int character = 7, place = 0;  // n005_000's column; PosNameIndex, -1 for the heroine's own by her hearts
+    };
+
+    static Rect cardRect(int c) { return {kCardX[c], kCardY[c], kCardW, kCardH}; }
+    static Rect sideRect(int k) { return {kSideX, kSideY + kSideStep * k, 108, 52}; }
+    static Rect yesRect() { return {339, 293, 592, 72}; }
+    static Rect noRect() { return {339, 380, 592, 72}; }
+
+    int phase(PartHost &host) const { return std::clamp(host.variable(1, kPhaseVar), 0, kPhases - 1); }
+    int hearts(PartHost &host, int heroine) const { return std::clamp(host.variable(1, kHeartVar + heroine), 0, kMaxHearts); }
+
+    // The place a card stands at: its own, or for a heroine at -1, the next in her SelectChar list.
+    int placeOf(PartHost &host, const Card &card) const {
+        if (card.place >= 0 || card.character > 2) return std::clamp(card.place, 0, 11);
+        const auto &list = charPlaces_[size_t(card.character)];
+        int h = hearts(host, card.character);
+        return list.empty() ? 0 : std::clamp(list[size_t(std::min(h, int(list.size()) - 1))], 0, 11);
+    }
+
+    bool choose(PartHost &host, int c) {
+        int ph = phase(host);
+        const CardScenes &cs = kCards[ph][c];
+        int h = cs.heroine >= 0 ? hearts(host, cs.heroine) : 0;
+        if (cs.heroine >= 0 && h < kMaxHearts) host.setVariable(1, kHeartVar + cs.heroine, h + 1);
+        int ending = 0;
+        if (ph == kPhases - 1)
+            for (int heroine = 0; heroine < 3; heroine++)
+                if (hearts(host, heroine) >= kMaxHearts) ending = heroine + 1;
+        host.setVariable(1, kChapterVar, 1000 * (ph + 1) + 100 * c + 10 * h + ending);
+        host.setVariable(1, kEndingVar, ending);
+        host.setVariable(1, kPhaseVar, ph + 1);
+        selecting_ = false;
+        confirming_ = -1;
+        host.finishScreen(c);
+        return true;
+    }
+
+    // cfg\SelectPhase.ini's `#p WEEK HALF` blocks of CharIndex and PosNameIndex, and SelectChar.ini's `#p HEROINE N`
+    // PosIndex lists.
+    void readInis(PartHost &host) {
+        if (inisRead_) return;
+        inisRead_ = true;
+        auto lines = [&](const char *path) {
+            std::vector<std::vector<std::string>> out;
+            auto bytes = host.read(path);
+            if (!bytes) return out;
+            std::istringstream in(std::string(bytes->begin(), bytes->end()));
+            for (std::string line; std::getline(in, line);) {
+                if (size_t c = line.find("//"); c != std::string::npos) line.erase(c);
+                std::istringstream words(line);
+                std::vector<std::string> w;
+                for (std::string word; words >> word;) w.push_back(word);
+                if (!w.empty()) out.push_back(w);
+            }
+            return out;
+        };
+        int block = -1, n = 0;
+        for (const auto &w : lines("cfg\\SelectPhase.ini")) {
+            if (w[0] == "#p" && w.size() >= 3) {
+                block = std::atoi(w[1].c_str()) * 2 + std::atoi(w[2].c_str());
+                n = 0;
+            } else if (block >= 0 && block < kPhases && n < 4) {
+                if (w[0] == "CharIndex" && w.size() >= 2) phaseCards_[size_t(block)][size_t(n)].character = std::clamp(std::atoi(w[1].c_str()), 0, 7);
+                else if (w[0] == "PosNameIndex" && w.size() >= 2) phaseCards_[size_t(block)][size_t(n)].place = std::atoi(w[1].c_str());
+                else if (w[0] == "AddArray") n++;
+            }
+        }
+        int heroine = -1;
+        for (const auto &w : lines("cfg\\SelectChar.ini")) {
+            if (w[0] == "#p" && w.size() >= 3) heroine = std::atoi(w[1].c_str());
+            else if (w[0] == "PosIndex" && w.size() >= 2 && heroine >= 0 && heroine < 3) charPlaces_[size_t(heroine)].push_back(std::atoi(w[1].c_str()));
+        }
+    }
+
+    static void put(PartHost &host, Canvas &out, const std::string &path, int x, int y, int cols = 1, int rows = 1, int col = 0, int row = 0) {
+        ImageRef img = host.image(path);
+        if (!img) return;
+        int w = img->w / cols, h = img->h / rows;
+        drawPart(out, *img, x, y, col * w, row * h, w, h, 1);
+    }
+
+    void drawSelect(PartHost &host, Canvas &out) {
+        int ph = phase(host);
+        int hover = -1;
+        if (confirming_ < 0)
+            for (int c = 0; c < 4; c++)
+                if (cardRect(c).contains(px_, py_)) hover = c;
+        put(host, out, "obj\\n000_000.bmp", 0, 0);
+        for (int c : kDrawOrder) {
+            put(host, out, "obj\\n003_002.bmp", kCardX[c] - 16, kCardY[c] + 155);
+            put(host, out, "obj\\n003_001.bmp", kCardX[c] + 66, kCardY[c] + 207);
+        }
+        for (int c : kDrawOrder) {
+            const Card &card = phaseCards_[size_t(ph)][size_t(c)];
+            bool lifted = c == hover;
+            int x = kCardX[c], y = kCardY[c] - (lifted ? kLift : 0);
+            char place[32];
+            std::snprintf(place, sizeof place, "obj\\n004_%03d.bmp", placeOf(host, card));
+            put(host, out, place, x + 23, y + 28);
+            put(host, out, "obj\\n003_000.bmp", x, y, 1, 5, 0, c == confirming_ ? 2 : lifted ? 1 : 0);
+            put(host, out, "obj\\n005_000.bmp", x + 257, y - 41, 8, 5, card.character, lifted ? 1 : 0);
+            if (card.character <= 2) {
+                put(host, out, "obj\\n006_000.bmp", x + 246, y + 157);
+                for (int k = 0; k < hearts(host, card.character); k++) put(host, out, "obj\\n006_001.bmp", x + 250 + 44 * k, y + 161);
+            }
+        }
+        put(host, out, "obj\\n001_000.bmp", 0, 30);
+        put(host, out, "obj\\n001_001.bmp", 32, 29, 10, 1, (ph / 2 + 1) % 10, 0);
+        put(host, out, "obj\\n001_002.bmp", 183, 29, 2, 1, ph % 2, 0);
+        put(host, out, "obj\\n002_000.bmp", 0, 104);
+        if (hover >= 0) {
+            int x = kCardX[hover] + 37, y = kCardY[hover] + 261;
+            put(host, out, "obj\\n007_000.bmp", x, y);
+            put(host, out, "obj\\n007_001.bmp", x + 63, y + 8, 12, 1, placeOf(host, phaseCards_[size_t(ph)][size_t(hover)]), 0);
+        }
+        for (int k = 0; k < 4; k++) {
+            bool over = confirming_ < 0 && sideRect(k).contains(px_, py_);
+            put(host, out, "obj\\e001_000.bmp", kSideX, kSideY + kSideStep * k, 9, 5, kSideColumns[k], over ? 1 : 0);
+            if (over) put(host, out, "obj\\e001_002.bmp", 1026, kSideY + kSideStep * k - 104, 9, 1, kSideColumns[k], 0);
+        }
+        if (confirming_ >= 0) {
+            tintFrame(out, 0, 0, 0, 155);
+            put(host, out, "obj\\a003_001.bmp", 325, 228);
+            put(host, out, "obj\\a004_000.bmp", 339, 293, 2, 5, 0, yesRect().contains(px_, py_) ? 1 : 0);
+            put(host, out, "obj\\a004_000.bmp", 339, 380, 2, 5, 1, noRect().contains(px_, py_) ? 1 : 0);
+        }
+    }
+
+    bool selecting_ = false, inisRead_ = false, warnedSide_ = false;
+    int confirming_ = -1, px_ = -1, py_ = -1;
+    std::array<std::array<Card, 4>, kPhases> phaseCards_{};
+    std::array<std::vector<int>, 3> charPlaces_;
 
     std::map<int, std::string> loaded_, shown_, from_;
     int64_t fadeFrom_ = 0;
