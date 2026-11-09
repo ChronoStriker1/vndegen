@@ -493,7 +493,9 @@ private:
     }
 
     void drawTitle(PartHost &host, Canvas &out) {
-        bool six = host.variable(0, 83) != 0;
+        // The bonus story disc has the game's title with three silhouettes and its own logo over the game's.
+        bool disc = host.exists("obj\\d300_001.bmp");
+        bool six = !disc && host.variable(0, 83) != 0;
         int64_t t = std::max<int64_t>(0, host.screenMs() - titleFrom_);
         int shown = int(t / kTitleMs), into = int(t % kTitleMs);
         auto bg = [&](int k) {
@@ -517,6 +519,7 @@ private:
         if (ImageRef bottom = host.image(six ? "obj\\d010_001.bmp" : "obj\\d006_001.bmp"))
             for (int x = -kTitleBottomShift; x < out.w; x += bottom->w) drawPart(out, *bottom, x, 720 - bottom->h, 0, 0, bottom->w, bottom->h, 1);
         put(host, out, "obj\\d000_001.bmp", 16, 5);
+        if (disc) put(host, out, "obj\\d300_001.bmp", 16, 5);
         put(host, out, six ? "obj\\d010_002.bmp" : "obj\\d006_002.bmp", 842, 694);
         drawNews(host, out, t);
     }

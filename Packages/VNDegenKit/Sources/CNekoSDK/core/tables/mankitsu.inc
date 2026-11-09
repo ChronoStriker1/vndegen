@@ -1,6 +1,8 @@
-// Test Game 90's (Mankitsu Happening) table, a raw string that tables.cpp includes and menuTable() hands out. Measured
-// on the PC game under Wine (set 1). Its story order is in its exe, so the table gives it.
-const char kMankitsu[] = R"(
+// Test Game 90's (Mankitsu Happening) table, raw strings that tables.cpp includes and menuTable() hands out. Measured on
+// the PC game under Wine (set 1). Its story order is in its exe, so the table gives it. kMankitsuShared is every
+// screen the game and its bonus story disc share; kMankitsuGame is the game's own title and story, and
+// kMankitsuBonus the bonus story's ("School Swimsuit DLC", a release of its own with the same screens).
+const char kMankitsuShared[] = R"(
 screen defaults
 # Faces, scene-change slides and the select screen (core/mankitsu.cpp).
 parts mankitsu scroll
@@ -40,37 +42,6 @@ underbelow 632
 replayoff Save Load Config Title
 # The title's three bonus stories start the story with S 10907 naming one (see `screen title` and `flow main`).
 routevar 10907
-
-screen title
-# Measured under Wine. The mankitsu part draws the backgrounds, silhouettes, logo and trims; the buttons are 40 pixels
-# apart, each with its help card 104 above it at x 600, and a submenu takes the buttons' place. New Game offers the
-# prologue or the main story once the prologue has been seen (G 2, found by clearing globals in cfg.sav under Wine);
-# before that it starts at once. The Web Questionnaire button opens nothing: the game names no page for it.
-part mankitsu
-submenudim hide
-startmenu 2
-button start obj\d001_000.bmp 746 382 6 5 0 help obj\d002_000.bmp 600 278 12 1 0 0
-button load obj\d001_000.bmp 746 422 6 5 2 help obj\d002_000.bmp 600 318 12 1 2 0
-button submenu:extras obj\d001_000.bmp 746 462 6 5 3 help obj\d002_000.bmp 600 358 12 1 3 0
-button config obj\d001_000.bmp 746 502 6 5 4 help obj\d002_000.bmp 600 398 12 1 4 0
-button quit obj\d001_000.bmp 746 542 6 5 5 help obj\d002_000.bmp 600 438 12 1 5 0
-button websurvey obj\d001_001.bmp 866 620 1 5 0 help obj\d002_000.bmp 720 516 12 1 6 0
-button start_prologue obj\d001_002.bmp 746 382 5 5 0 group start help obj\d002_000.bmp 600 278 12 1 7 0
-button start_main obj\d001_002.bmp 746 422 5 5 1 group start help obj\d002_000.bmp 600 318 12 1 8 0
-button cg obj\d001_002.bmp 746 382 5 5 2 group extras help obj\d002_000.bmp 600 278 12 1 9 0
-button scene obj\d001_002.bmp 746 422 5 5 3 group extras help obj\d002_000.bmp 600 318 12 1 10 0
-button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 600 358 12 1 11 0
-# The additional edition (the release's second exe, with sys_2.pak): three book covers, each playing its bonus story and
-# coming back here, with a help card over it. Fitted on PC shots of that exe under Wine, exact. The mankitsu part draws
-# the Information box and its ticker. Without sys_2.pak none of it is there. That exe's small label beside the
-# copyright isn't drawn: no picture of the game's holds it.
-button route1 sys_2\obj\d400_001.bmp 759 147 3 5 0 help sys_2\obj\d400_002.bmp 579 61 3 1 0 0
-button route2 sys_2\obj\d400_001.bmp 919 147 3 5 1 help sys_2\obj\d400_002.bmp 739 61 3 1 1 0
-button route3 sys_2\obj\d400_001.bmp 1079 147 3 5 2 help sys_2\obj\d400_002.bmp 899 61 3 1 2 0
-
-# Main Story starts after the prologue, just before the first select screen.
-screen start
-flow chapter2
 
 # Save and load, measured under Wine (set 1, each piece fitted on a PC shot): nine cards a page on ten pages, each a
 # save's number, thumbnail, its route by S 4000 (prologue, common, Kururu's, Otona's, Rei's, harem), the date and time at
@@ -347,7 +318,34 @@ radio voice_stop 1 obj\j013_000.bmp 419 633 2 5 0
 radio voice_stop 0 obj\j013_000.bmp 533 633 2 5 1
 button tabvoices obj\j015_000.bmp 736 623 1 5 0
 
+# The backlog, measured under Wine (set 1, each piece fitted on a PC shot): a rule each 166 pixels with the name and text
+# in yellow, a voiced line's button at the right, the scroll track and its thumb, the close button and four arrows, over
+# the scene and the whole message window, its buttons, gauge and face, dimmed.
+screen log
+dim 180
+pic obj\k000_002.bmp 1185 110
+scroll obj\k000_003t.bmp obj\k000_003m.bmp obj\k000_003b.bmp 1185 110 500
+rows obj\k000_000.bmp 127 52 166 4 140 34
+button log_close obj\k000_001.bmp 1230 19 1 5 0
+button log_top obj\k001_000.bmp 1185 31 4 5 0
+button log_up obj\k001_000.bmp 1185 61 4 5 1
+button log_down obj\k001_000.bmp 1185 633 4 5 2
+button log_bottom obj\k001_000.bmp 1185 663 4 5 3
+keepwindow buttons
+edgesoff
+logvoice obj\h000_001.bmp 6 5 3 1125 35
+lognamey -30
 
+screen dialog
+# Measured under Wine: the screen dimmed to 100 of 256 of its brightness, the question, and Yes and No.
+questions resolution save load overwrite exit title
+dim 155
+pic obj\a003_000.bmp 325 228 6 1 0 0
+button yes obj\a004_000.bmp 339 293 2 5 0
+button no obj\a004_000.bmp 339 380 2 5 1
+)";
+
+const char kMankitsuGame[] = R"(
 # The Appendix, measured under Wine (set 1, each piece fitted on a PC shot). CG and Scene: five tabs (the three heroines,
 # the sub-heroines, the others), each with its standing pictures at the left over the screen's name plate, the fifth
 # a large picture at half size; nine cards a page, a card past the tab's last entry not drawn, a locked one an empty
@@ -487,31 +485,36 @@ button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 
 button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
 button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
 
-# The backlog, measured under Wine (set 1, each piece fitted on a PC shot): a rule each 166 pixels with the name and text
-# in yellow, a voiced line's button at the right, the scroll track and its thumb, the close button and four arrows, over
-# the scene and the whole message window, its buttons, gauge and face, dimmed.
-screen log
-dim 180
-pic obj\k000_002.bmp 1185 110
-scroll obj\k000_003t.bmp obj\k000_003m.bmp obj\k000_003b.bmp 1185 110 500
-rows obj\k000_000.bmp 127 52 166 4 140 34
-button log_close obj\k000_001.bmp 1230 19 1 5 0
-button log_top obj\k001_000.bmp 1185 31 4 5 0
-button log_up obj\k001_000.bmp 1185 61 4 5 1
-button log_down obj\k001_000.bmp 1185 633 4 5 2
-button log_bottom obj\k001_000.bmp 1185 663 4 5 3
-keepwindow buttons
-edgesoff
-logvoice obj\h000_001.bmp 6 5 3 1125 35
-lognamey -30
+screen title
+# Measured under Wine. The mankitsu part draws the backgrounds, silhouettes, logo and trims; the buttons are 40 pixels
+# apart, each with its help card 104 above it at x 600, and a submenu takes the buttons' place. New Game offers the
+# prologue or the main story once the prologue has been seen (G 2, found by clearing globals in cfg.sav under Wine);
+# before that it starts at once. The Web Questionnaire button opens nothing: the game names no page for it.
+part mankitsu
+submenudim hide
+startmenu 2
+button start obj\d001_000.bmp 746 382 6 5 0 help obj\d002_000.bmp 600 278 12 1 0 0
+button load obj\d001_000.bmp 746 422 6 5 2 help obj\d002_000.bmp 600 318 12 1 2 0
+button submenu:extras obj\d001_000.bmp 746 462 6 5 3 help obj\d002_000.bmp 600 358 12 1 3 0
+button config obj\d001_000.bmp 746 502 6 5 4 help obj\d002_000.bmp 600 398 12 1 4 0
+button quit obj\d001_000.bmp 746 542 6 5 5 help obj\d002_000.bmp 600 438 12 1 5 0
+button websurvey obj\d001_001.bmp 866 620 1 5 0 help obj\d002_000.bmp 720 516 12 1 6 0
+button start_prologue obj\d001_002.bmp 746 382 5 5 0 group start help obj\d002_000.bmp 600 278 12 1 7 0
+button start_main obj\d001_002.bmp 746 422 5 5 1 group start help obj\d002_000.bmp 600 318 12 1 8 0
+button cg obj\d001_002.bmp 746 382 5 5 2 group extras help obj\d002_000.bmp 600 278 12 1 9 0
+button scene obj\d001_002.bmp 746 422 5 5 3 group extras help obj\d002_000.bmp 600 318 12 1 10 0
+button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 600 358 12 1 11 0
+# The additional edition (the release's second exe, with sys_2.pak): three book covers, each playing its bonus story and
+# coming back here, with a help card over it. Fitted on PC shots of that exe under Wine, exact. The mankitsu part draws
+# the Information box and its ticker. Without sys_2.pak none of it is there. That exe's small label beside the
+# copyright isn't drawn: no picture of the game's holds it.
+button route1 sys_2\obj\d400_001.bmp 759 147 3 5 0 help sys_2\obj\d400_002.bmp 579 61 3 1 0 0
+button route2 sys_2\obj\d400_001.bmp 919 147 3 5 1 help sys_2\obj\d400_002.bmp 739 61 3 1 1 0
+button route3 sys_2\obj\d400_001.bmp 1079 147 3 5 2 help sys_2\obj\d400_002.bmp 899 61 3 1 2 0
 
-screen dialog
-# Measured under Wine: the screen dimmed to 100 of 256 of its brightness, the question, and Yes and No.
-questions resolution save load overwrite exit title
-dim 155
-pic obj\a003_000.bmp 325 228 6 1 0 0
-button yes obj\a004_000.bmp 339 293 2 5 0
-button no obj\a004_000.bmp 339 380 2 5 1
+# Main Story starts after the prologue, just before the first select screen.
+screen start
+flow chapter2
 
 screen story
 # Traced under Wine (set 1): the opening, then ten half-weeks of the select screen, each pick playing the scenes the part
@@ -723,5 +726,113 @@ scene scr\ep_005_001_000.txt
 scene scr\ep_005_002_000.txt
 set G 83 = 1
 label done
+end
+)";
+
+const char kMankitsuBonus[] = R"(
+# The bonus story disc (Mankitsu Happening Tokuten Story), measured on its own exe under Wine (set 1): the game's title
+# with the disc's logo and three silhouettes, no Web Questionnaire button, and New Game playing its four scripts in
+# order, then the title (a file trace). Its PC numbers are 1, 2, 3 and 9999, from PC saves made in each script.
+screen title
+part mankitsu
+submenudim hide
+button start obj\d001_000.bmp 746 382 6 5 0 help obj\d002_000.bmp 600 278 12 1 0 0
+button load obj\d001_000.bmp 746 422 6 5 2 help obj\d002_000.bmp 600 318 12 1 2 0
+button submenu:extras obj\d001_000.bmp 746 462 6 5 3 help obj\d002_000.bmp 600 358 12 1 3 0
+button config obj\d001_000.bmp 746 502 6 5 4 help obj\d002_000.bmp 600 398 12 1 4 0
+button quit obj\d001_000.bmp 746 542 6 5 5 help obj\d002_000.bmp 600 438 12 1 5 0
+button cg obj\d001_002.bmp 746 382 5 5 2 group extras help obj\d002_000.bmp 600 278 12 1 9 0
+button scene obj\d001_002.bmp 746 422 5 5 3 group extras help obj\d002_000.bmp 600 318 12 1 10 0
+button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 600 358 12 1 11 0
+
+# Its CG and Scene screens: the game's without the standing pictures, opening on the fifth tab, the only one with
+# entries (its PC greys the other four and the Music buttons).
+screen cg
+pic obj\f000_000.bmp 0 0
+pic obj\f001_000.bmp 0 400
+pic obj\f000_001.bmp 468 74
+pic obj\e000_001.bmp 4 6 6 1 2 0
+cellsheet obj\f002_000.bmp
+cellsize 180 174
+cellthumb 6 33
+cell 514 109
+cell 728 109
+cell 942 109
+cell 514 318
+cell 728 318
+cell 942 318
+cell 514 527
+cell 728 527
+cell 942 527
+celllabel obj\f002_001.bmp 4 4
+celldigits obj\f003_000.bmp 38 4 2 14
+cellcount obj\f003_000.bmp obj\f003_001.bmp 91 127 127 139 0
+cellcountstep 14
+celltotal obj\f003_002.bmp 7 12
+gallerytabs 4
+cellhide
+button page0 obj\e002_000.bmp 627 15 10 5 0
+button page1 obj\e002_000.bmp 681 15 10 5 1
+button page2 obj\e002_000.bmp 735 15 10 5 2
+button gtab0 obj\f001_001.bmp 24 493 7 5 0
+button gtab1 obj\f001_001.bmp 174 493 7 5 1
+button gtab2 obj\f001_001.bmp 324 493 7 5 2
+button gtab3 obj\f001_001.bmp 99 598 7 5 3
+button gtab4 obj\f001_001.bmp 249 598 7 5 6
+button nav_save obj\e001_000.bmp 1172 104 9 5 0 help obj\e001_002.bmp 1026 0 9 1 0 0
+button nav_load obj\e001_000.bmp 1172 162 9 5 1 help obj\e001_002.bmp 1026 58 9 1 1 0
+button nav_cg obj\e001_000.bmp 1172 220 9 5 2 help obj\e001_002.bmp 1026 116 9 1 2 0
+button nav_scene obj\e001_000.bmp 1172 278 9 5 3 help obj\e001_002.bmp 1026 174 9 1 3 0
+button nav_music obj\e001_000.bmp 1172 336 9 5 4 help obj\e001_002.bmp 1026 232 9 1 4 0
+button nav_config obj\e001_000.bmp 1172 394 9 5 5 help obj\e001_002.bmp 1026 290 9 1 5 0
+button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 9 1 6 0
+button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
+button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
+
+screen scene
+pic obj\f000_000.bmp 0 0
+pic obj\f001_000.bmp 0 400
+pic obj\f000_001.bmp 468 74
+pic obj\e000_001.bmp 4 6 6 1 3 0
+cellsheet obj\f002_000.bmp
+cellsize 180 174
+cellthumb 6 33
+cell 514 109
+cell 728 109
+cell 942 109
+cell 514 318
+cell 728 318
+cell 942 318
+cell 514 527
+cell 728 527
+cell 942 527
+celllabel obj\f002_001.bmp 4 4
+celldigits obj\f003_000.bmp 38 4 2 14
+gallerytabs 4
+cellhide
+button page0 obj\e002_000.bmp 627 15 10 5 0
+button page1 obj\e002_000.bmp 681 15 10 5 1
+button page2 obj\e002_000.bmp 735 15 10 5 2
+button gtab0 obj\f001_001.bmp 24 493 7 5 0
+button gtab1 obj\f001_001.bmp 174 493 7 5 1
+button gtab2 obj\f001_001.bmp 324 493 7 5 2
+button gtab3 obj\f001_001.bmp 99 598 7 5 3
+button gtab4 obj\f001_001.bmp 249 598 7 5 6
+button nav_save obj\e001_000.bmp 1172 104 9 5 0 help obj\e001_002.bmp 1026 0 9 1 0 0
+button nav_load obj\e001_000.bmp 1172 162 9 5 1 help obj\e001_002.bmp 1026 58 9 1 1 0
+button nav_cg obj\e001_000.bmp 1172 220 9 5 2 help obj\e001_002.bmp 1026 116 9 1 2 0
+button nav_scene obj\e001_000.bmp 1172 278 9 5 3 help obj\e001_002.bmp 1026 174 9 1 3 0
+button nav_music obj\e001_000.bmp 1172 336 9 5 4 help obj\e001_002.bmp 1026 232 9 1 4 0
+button nav_config obj\e001_000.bmp 1172 394 9 5 5 help obj\e001_002.bmp 1026 290 9 1 5 0
+button nav_title obj\e001_000.bmp 1172 452 9 5 6 help obj\e001_002.bmp 1026 348 9 1 6 0
+button nav_quit obj\e001_000.bmp 1172 510 9 5 7 help obj\e001_002.bmp 1026 406 9 1 7 0
+button back obj\e001_000.bmp 1172 652 9 5 8 help obj\e001_002.bmp 1026 548 9 1 8 0
+
+screen story
+flow main
+scene scr\ep_010_000_000.txt @1
+scene scr\ep_010_000_001.txt @2
+scene scr\ep_010_000_002.txt @3
+scene scr\ep_010_000_003.txt @9999
 end
 )";
