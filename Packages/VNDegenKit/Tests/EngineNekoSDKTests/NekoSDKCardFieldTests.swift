@@ -118,10 +118,12 @@ import TestSupport
                 ("t.bmp", bmp(40, 30) { _, _ in [0, 0, 250] }),
                 ("f.bmp", bmp(44, 34) { x, y in x < 2 || y < 2 ? [250, 250, 0] : [0, 250, 0] }),
             ]),
-            "data/AppData/Roaming/vndegen/cardtest/save/cfg.sav": NekoSDKFlowFixture.packed(cfg),
         ])
         defer { try? FileManager.default.removeItem(at: root) }
-        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/cardtest/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try NekoSDKFlowFixture.packed(cfg).write(to: save.appendingPathComponent("cfg.sav"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
         defer { vnneko_stop(e) }
         #expect(vnneko_debug_press(e, "cg"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
