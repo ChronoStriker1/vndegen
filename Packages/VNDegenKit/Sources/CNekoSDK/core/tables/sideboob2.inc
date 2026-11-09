@@ -318,8 +318,11 @@ screen defaults
 quickslots 91 98
 # Its sex scenes' sound effects are se_h*, at the Sex SFX volume.
 hseprefix se_h
-# Config as the PC starts it, read from its first-run screens. Text and auto speed are 50 of 100 there, which the
-# runtime's four steps can't hold yet.
+# Config as the PC starts it, read from its first-run screens. Auto speed is 50 of 100 there too, still to be timed.
+default text 50
+# Text speed, the gap between characters: a 69-character line timed under Wine to fully shown at nine settings, less
+# 50 ms that the shot and the PC's short fade take (at 100 the line is whole within it).
+textpoints text 0 184.9 10 153.7 25 101.8 40 52.6 50 17.6 60 4.9 75 2.6 90 1.5 100 0
 default opacity 80
 default bgm 60
 default se 60
