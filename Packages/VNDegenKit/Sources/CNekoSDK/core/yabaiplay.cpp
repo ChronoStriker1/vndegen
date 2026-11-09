@@ -84,7 +84,7 @@ enum : int {
 };
 
 // What the hub's screen gives the story table.
-enum HubResult { kPlay = 1, kAllSolved = 2, kTimeUp = 3, kTimeEvent = 4, kDevil = 5, kOpenTree = 9 };
+enum HubResult { kPlay = 1, kAllSolved = 2, kTimeUp = 3, kTimeEvent = 4, kOpenTree = 9 };
 
 class YabaiPlayPart : public GamePart {
 public:
@@ -103,17 +103,24 @@ public:
             host.redraw();
             return true;
         }
+        // `open hubsync`: a PC save, which holds only the PC's variables, gives the hub's own, for the tree and the vote
+        // when the story goes on at a pick.
+        if (name == "hubsync") {
+            loadQuestions(host);
+            if (!host.variable(1, kTruth) && host.variable(1, kPCTruth)) fromPC(host);
+            host.finishScreen(0);
+            return true;
+        }
         if (name != "hub") return false;
         loadQuestions(host);
-        // A PC save, which holds only the PC's variables: take the hub's state from them.
-        if (!host.variable(1, kTruth) && host.variable(1, kPCTruth)) {
-            fromPC(host);
-            // Saved inside a question's scene: the PC counts the question once its scene is over, so count it now.
-            int c = host.variable(1, kPCChapter);
-            if (host.variable(1, kPCMode) == 4 && c >= 1000 && c < 4000 && (c % 1000) / 100 + 1 == truth(host)) {
-                int heroine = c / 1000 - 1, stage = (c % 100) / 10 + 1, question = c % 10;
-                if (stage == host.variable(1, kStage + heroine) && !(asked(host, heroine) & (1 << question))) account(host, heroine, question);
-            }
+        if (!host.variable(1, kTruth) && host.variable(1, kPCTruth)) fromPC(host);
+        // Back from a question's scene, or a save made inside one: the PC counts a question once its scene is over (its
+        // save inside the scene still has the hour and the stage from before), so it's counted here. A replay's
+        // question is already marked asked, and isn't counted again.
+        if (int c = host.variable(1, kPCChapter); host.variable(1, kPCMode) == 4 && c >= 1000 && c < 4000 && (c % 1000) / 100 + 1 == truth(host)) {
+            int heroine = c / 1000 - 1, stage = (c % 100) / 10 + 1, question = c % 10;
+            if (heroine < 3 && question < 3 && stage == host.variable(1, kStage + heroine) && !(asked(host, heroine) & (1 << question)))
+                account(host, heroine, question);
         }
         host.setVariable(1, kPCMode, 2);
         // Back from the tree: a replay plays at no cost; an ask is a question like a bubble's.
@@ -128,7 +135,7 @@ public:
         if (pendingDevil_) {
             int devil = pendingDevil_;
             pendingDevil_ = 0;
-            return finishWith(host, kDevil, devil);
+            return finishWith(host, kPlay, devil);
         }
         if (solvedAll(host)) return finishWith(host, kAllSolved, 0);
         if (host.variable(1, kHoursLeft) <= 0) return finishWith(host, kTimeUp, 0);
@@ -315,13 +322,21 @@ private:
         return false;
     }
 
+    // Whom the hub shows after a right answer: the same heroine while her next stage is open, else the first of Ayano,
+    // Misuzu and Rina with an open stage. All five truths' orders under Wine fit it (truth 2 goes from Misuzu back to
+    // Ayano, not on to Rina).
+    int openFrom(PartHost &host, int heroine) {
+        auto open = [&](int h) { return host.variable(1, kStage + h) <= 3 && !locked(host, h); };
+        if (open(heroine)) return heroine;
+        for (int h = 0; h < 3; h++)
+            if (open(h)) return h;
+        return heroine;
+    }
+
     bool ask(PartHost &host, int heroine, int question) {
         int t = truth(host), stage = host.variable(1, kStage + heroine);
         if (stage < 1 || stage > 3 || question < 0 || question > 2) return true;
-        int chapter = 1000 * (heroine + 1) + 100 * (t - 1) + 10 * (stage - 1) + question;
-        account(host, heroine, question);
-        host.setVariable(1, kPCMode, 4);
-        return finishWith(host, kPlay, chapter);
+        return finishWith(host, kPlay, 1000 * (heroine + 1) + 100 * (t - 1) + 10 * (stage - 1) + question);
     }
 
     // A question asked: an hour gone, its flag set, and a right answer's next stage, as the PC counts them.
@@ -333,10 +348,7 @@ private:
         if (question == answer(host, heroine, stage)) {
             host.setVariable(1, kStage + heroine, stage + 1);
             host.setVariable(1, kSolved, host.variable(1, kSolved) + 1);
-            // She stays on screen while her next stage is open; else the next of Ayano, Misuzu, Rina who has one (Wine).
-            int next = heroine;
-            for (int i = 0; i < 3 && (host.variable(1, kStage + next) > 3 || locked(host, next)); i++) next = (next + 1) % 3;
-            host.setVariable(1, kShown, next);
+            host.setVariable(1, kShown, openFrom(host, heroine));
         }
         // Truth 5: a heroine's last right answer is followed at once by her devil scene, 910, 920 or 930 (Wine).
         if (t == 5 && host.variable(1, kStage + heroine) == 4 && stage == 3) pendingDevil_ = 910 + 10 * heroine;
@@ -381,17 +393,22 @@ private:
                 }
         }
         host.setVariable(1, kSolved, solved);
-        // Truth 1's 12:00 scene has played once its clock is past noon; whom to show: the first with an open stage.
-        host.setVariable(1, kEventDone, t > 1 || host.variable(1, kHour) > 12);
-        int shown = std::max(0, std::min(2, firstShown(host, t)));
-        for (int i = 0; i < 3 && (host.variable(1, kStage + shown) > 3 || locked(host, shown)); i++) shown = (shown + 1) % 3;
-        host.setVariable(1, kShown, shown);
+        // Truth 1's 12:00 scene has played once its clock is past noon, or at noon when it's the chapter last played.
+        int last = host.variable(1, kPCChapter), hour = host.variable(1, kHour);
+        host.setVariable(1, kEventDone, t > 1 || hour > 12 || (hour == 12 && last == 50));
+        // Whom to show: the heroine of the question last asked in this truth, as the PC's hub opens on her (a PC save at
+        // truth 3's hub after Ayano's question, loaded under Wine), else the truth's first; then on to an open stage.
+        int shown = last >= 1000 && last < 4000 && (last % 1000) / 100 + 1 == t ? last / 1000 - 1 : std::max(0, std::min(2, firstShown(host, t)));
+        host.setVariable(1, kShown, openFrom(host, shown));
     }
 
     bool finishWith(PartHost &host, int result, int chapter) {
-        // The chapter to play goes where the PC keeps it, S 1000, so the story table's `chapter S 1000` plays it and a PC
-        // save made inside it is found there; the tree's own hand-back stays in S 15110.
-        if (chapter) host.setVariable(1, kPCChapter, chapter);
+        // The chapter to play goes where the PC keeps it, S 1000, with its mode for a scene, so the story table's
+        // `chapter S 1000` plays it and a save made inside it is the PC's; the tree's own hand-back stays in S 15110.
+        if (chapter) {
+            host.setVariable(1, kPCChapter, chapter);
+            host.setVariable(1, kPCMode, 4);
+        }
         open_ = false;
         host.finishScreen(result);
         return true;

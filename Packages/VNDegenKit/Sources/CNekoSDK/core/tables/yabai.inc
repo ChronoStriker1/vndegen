@@ -101,7 +101,7 @@ pic bg\bg_001_000_000_000_000.bmp 0 0
 pic obj\d000_000.bmp 0 0
 pic obj\e000_001.bmp 0 628
 pic obj\d000_001.bmp 0 0
-pic obj\e001_000.bmp 0 0 6 1 1 0
+pic obj\e001_000.bmp 0 0 6 1 0 0
 slots obj\e004_000.bmp 90 144 371 224 2 3 1
 slotthumb 13 13
 slotnew obj\e005_000.bmp -13 -14
@@ -141,138 +141,214 @@ button pagenext obj\e003_000.bmp 1218 331 2 5 1
 screen story
 flow main
 # The PC keeps its mode in S 105: 2 at the hub, 4 in a scene, 8 at a vote's pick screen, 11 in the tutorial. A PC save
-# at the hub or a pick goes on there, its truth in S 2000; one in a scene goes on from its scene.
+# at the hub or a pick goes on there, its truth in S 2000. A PC save in a scene goes on from the first line below
+# naming its scene, so the lines with a chapter of their own come first and the hub's `chapter S 1000` last.
+# Before each chapter the table sets what the PC's saves hold there: the chapter in S 1000, the mode in S 105, and in
+# S 110 the story chapter last begun (seen 1, 100 to 400 and 503 in the PC's saves; 500 is taken as the same kind).
 resume S 105 == 2 at hub
 resume S 105 == 8 at pickresume
+set S 1000 = 0
+set S 105 = 4
 chapter 0
+set S 1000 = 1
+set S 105 = 4
+set S 110 = 1
 chapter 1
 # The tutorial dialog: "尋問パートの説明を見ますか？" (yes 10, no 20).
 open ask 1 -> S 15121
 on 1 goto tut1
+set S 1000 = 20
+set S 105 = 4
 chapter 20
 goto t1
 label tut1
+set S 1000 = 10
+set S 105 = 11
 chapter 10
 label t1
 open hubstart 1
+goto hub
+label event
+set S 1000 = 50
+set S 105 = 4
+chapter 50
+goto hub
+label timeout
+set S 1000 = 900
+set S 105 = 4
+chapter 900
+end
+label vote
+if S 2000 == 1 goto vote1
+if S 2000 == 2 goto vote2
+if S 2000 == 3 goto vote3
+if S 2000 == 4 goto vote4
+goto vote5
+label vote1
+set S 1000 = 4500
+set S 105 = 4
+chapter 4500
+# "ネット投票の説明を見ますか？" (yes 4510, no 4520).
+open ask 2 -> S 15121
+on 1 goto vtut1
+set S 1000 = 4520
+set S 105 = 4
+chapter 4520
+goto pick1
+label vtut1
+set S 1000 = 4510
+set S 105 = 4
+chapter 4510
+label pick1
+open vote 1 -> S 15140
+goto picked
+label vote2
+set S 1000 = 4600
+set S 105 = 4
+chapter 4600
+label pick2
+open vote 2 -> S 15140
+goto picked
+label vote3
+set S 1000 = 4700
+set S 105 = 4
+chapter 4700
+label pick3
+open vote 3 -> S 15140
+goto picked
+label vote4
+set S 1000 = 4800
+set S 105 = 4
+chapter 4800
+label pick4
+open vote 4 -> S 15140
+goto picked
+label vote5
+set S 1000 = 4900
+set S 105 = 4
+chapter 4900
+label pick5
+open vote 5 -> S 15140
+goto picked
+label pickresume
+# A PC save at a pick has none of VNDegen's own variables, which the tree reads: the hub's part takes them from the PC's.
+open hubsync
+if S 2000 == 1 goto pick1
+if S 2000 == 2 goto pick2
+if S 2000 == 3 goto pick3
+if S 2000 == 4 goto pick4
+goto pick5
+label picktree
+open tree
+goto pickresume
+label picked
+on 0 goto wrong
+on 9 goto picktree
+if S 2000 == 1 goto right1
+if S 2000 == 2 goto right2
+if S 2000 == 3 goto right3
+if S 2000 == 4 goto right4
+set S 1000 = 4400
+set S 105 = 4
+chapter 4400
+goto ending
+label right1
+set S 1000 = 4000
+set S 105 = 4
+chapter 4000
+set S 1000 = 100
+set S 105 = 4
+set S 110 = 100
+chapter 100
+open hubstart 2
+goto hub
+label right2
+set S 1000 = 4100
+set S 105 = 4
+chapter 4100
+set S 1000 = 200
+set S 105 = 4
+set S 110 = 200
+chapter 200
+open hubstart 3
+goto hub
+label right3
+set S 1000 = 4200
+set S 105 = 4
+chapter 4200
+set S 1000 = 300
+set S 105 = 4
+set S 110 = 300
+chapter 300
+open hubstart 4
+goto hub
+label right4
+set S 1000 = 4300
+set S 105 = 4
+chapter 4300
+set S 1000 = 400
+set S 105 = 4
+set S 110 = 400
+chapter 400
+open hubstart 5
+goto hub
+label wrong
+set S 1000 = 4010
+set S 105 = 4
+chapter 4010
+end
+label ending
+set S 1000 = 500
+set S 105 = 4
+set S 110 = 500
+chapter 500
+# "セーブを行いますか？": yes opens the save screen.
+open ask 3 -> S 15121
+set S 1000 = 503
+set S 105 = 4
+set S 110 = 503
+chapter 503
+# "復讐の方法を選択してください。"
+open ask 4 -> S 15121
+on 1 goto arson
+on 2 goto release
+set S 1000 = 600
+set S 105 = 4
+chapter 600
+staffroll
+set S 1000 = 602
+set S 105 = 4
+chapter 602
+end
+label arson
+set S 1000 = 610
+set S 105 = 4
+chapter 610
+staffroll
+set S 1000 = 612
+set S 105 = 4
+chapter 612
+end
+label release
+set S 1000 = 620
+set S 105 = 4
+chapter 620
+staffroll
+set S 1000 = 622
+set S 105 = 4
+chapter 622
+end
+# The interrogation hub, last: its chapters are the questions' (1000 to 3999), a replay's from the tree, and in truth 5
+# each heroine's devil scene (910 Ayano, 920 Misuzu, 930 Rina), all handed over in S 1000.
 label hub
 open hub -> S 15120
 on 9 goto tree
 on 2 goto vote
 on 3 goto timeout
 on 4 goto event
-on 5 goto devil
 chapter S 1000
 goto hub
 label tree
 open tree
 goto hub
-label event
-chapter 50
-goto hub
-label devil
-# Each heroine finishing truth 5 plays her devil scene at once: 910 Ayano, 920 Misuzu, 930 Rina.
-chapter S 1000
-goto hub
-label timeout
-chapter 900
-end
-label vote
-if S 15100 == 1 goto vote1
-if S 15100 == 2 goto vote2
-if S 15100 == 3 goto vote3
-if S 15100 == 4 goto vote4
-goto vote5
-label vote1
-chapter 4500
-# "ネット投票の説明を見ますか？" (yes 4510, no 4520).
-open ask 2 -> S 15121
-on 1 goto vtut1
-chapter 4520
-goto pick1
-label vtut1
-chapter 4510
-label pick1
-open vote 1 -> S 15140
-goto picked
-label vote2
-chapter 4600
-label pick2
-open vote 2 -> S 15140
-goto picked
-label vote3
-chapter 4700
-label pick3
-open vote 3 -> S 15140
-goto picked
-label vote4
-chapter 4800
-label pick4
-open vote 4 -> S 15140
-goto picked
-label vote5
-chapter 4900
-label pick5
-open vote 5 -> S 15140
-goto picked
-label pickresume
-if S 2000 == 1 goto pick1
-if S 2000 == 2 goto pick2
-if S 2000 == 3 goto pick3
-if S 2000 == 4 goto pick4
-goto pick5
-label picked
-on 0 goto wrong
-if S 15100 == 1 goto right1
-if S 15100 == 2 goto right2
-if S 15100 == 3 goto right3
-if S 15100 == 4 goto right4
-chapter 4400
-goto ending
-label right1
-chapter 4000
-chapter 100
-open hubstart 2
-goto hub
-label right2
-chapter 4100
-chapter 200
-open hubstart 3
-goto hub
-label right3
-chapter 4200
-chapter 300
-open hubstart 4
-goto hub
-label right4
-chapter 4300
-chapter 400
-open hubstart 5
-goto hub
-label wrong
-chapter 4010
-end
-label ending
-chapter 500
-# "セーブを行いますか？": yes opens the save screen.
-open ask 3 -> S 15121
-chapter 503
-# "復讐の方法を選択してください。"
-open ask 4 -> S 15121
-on 1 goto arson
-on 2 goto release
-chapter 600
-staffroll
-chapter 602
-end
-label arson
-chapter 610
-staffroll
-chapter 612
-end
-label release
-chapter 620
-staffroll
-chapter 622
-end
 )";
