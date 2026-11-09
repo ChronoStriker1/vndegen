@@ -2,6 +2,9 @@
 //   chapter N   the scene scripts cfg\chapter_file.ini lists under `#chapter N`, in order
 // Its chapters number the interrogation as 1000 * heroine (1 Ayano, 2 Misuzu, 3 Rina) + 100 * (truth - 1)
 // + 10 * (stage - 1) + question, with the prologue, the truths' openings, the votes and endings below 1000.
+#include <algorithm>
+#include <array>
+#include <cstdio>
 #include <map>
 #include <sstream>
 
@@ -37,8 +40,110 @@ std::map<int, std::vector<std::string>> parseChapters(const std::string &text) {
     return chapters;
 }
 
+// `Key<tab>value` lines, as question_0N.ini has them; `//` starts a comment.
+std::map<std::string, std::string> parseKeys(const std::string &text) {
+    std::map<std::string, std::string> keys;
+    std::istringstream in(text);
+    for (std::string line; std::getline(in, line);) {
+        if (size_t cut = line.find("//"); cut != std::string::npos) line.erase(cut);
+        std::istringstream words(line);
+        std::string key, value;
+        if (words >> key >> value) keys[key] = value;
+    }
+    return keys;
+}
+
+// The hub's variables, VNDegen's own, in a range 96's PC saves leave empty (theirs end at 14021, then 19999). The lead's
+// tree part reads the same numbers.
+enum : int {
+    kTruth = 15100,      // 1..5
+    kStage = 15101,      // + heroine: 1..3, 4 when she's done
+    kHour = 15104,       // the clock's hour, 8 at a truth's start, counting past 24 as the PC's limit does
+    kDay = 15105,
+    kSolved = 15106,     // right answers this truth
+    kHoursLeft = 15107,
+    kShown = 15108,      // the heroine on screen, 0 Ayano, 1 Misuzu, 2 Rina
+    kEventDone = 15109,  // truth 1's 12:00 scene has played
+    kTreeChapter = 15110,
+    kTreeAction = 15111,  // from the tree: 1 replay, 2 ask
+    kAsked = 15130,      // + 9 * (truth - 1) + 3 * heroine + (stage - 1): bit q when question q was asked
+};
+const char *const kNames[3] = {"Ayano", "Misuzu", "Rina"};
+
+// What the hub's screen gives the story table.
+enum HubResult { kPlay = 1, kAllSolved = 2, kTimeUp = 3, kTimeEvent = 4, kOpenTree = 9 };
+
 class YabaiPlayPart : public GamePart {
 public:
+    bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
+        // `open hubstart T`: truth T begins, with the hours, start and order its `truth` line under `screen hub` gives.
+        if (name == "hubstart") {
+            startTruth(host, args.empty() ? 1 : args[0]);
+            host.finishScreen(0);
+            return true;
+        }
+        if (name != "hub") return false;
+        loadQuestions(host);
+        // Back from the tree: a replay plays at no cost; an ask is a question like a bubble's.
+        int action = host.variable(1, kTreeAction), picked = host.variable(1, kTreeChapter);
+        host.setVariable(1, kTreeAction, 0);
+        host.setVariable(1, kTreeChapter, 0);
+        if (action == 1 && picked > 0) return finishWith(host, kPlay, picked);
+        if (action == 2 && picked > 0) {
+            int heroine = picked / 1000 - 1, question = picked % 10;
+            if (heroine >= 0 && heroine < 3) return ask(host, heroine, question);
+        }
+        if (solvedAll(host)) return finishWith(host, kAllSolved, 0);
+        if (host.variable(1, kHoursLeft) <= 0) return finishWith(host, kTimeUp, 0);
+        // Truth 1's time event, once its clock has reached 12:00 (seen under Wine after the question that took it there).
+        if (truth(host) == 1 && host.variable(1, kHour) >= 12 && !host.variable(1, kEventDone)) {
+            host.setVariable(1, kEventDone, 1);
+            return finishWith(host, kTimeEvent, 0);
+        }
+        open_ = true;
+        host.redraw();
+        return true;
+    }
+
+    bool press(PartHost &host, int x, int y, int button) override {
+        if (!open_ || button != 0) return open_;
+        if (inside(x, y, kTreeButton)) return finishWith(host, kOpenTree, 0);
+        for (int h = 0; h < 3; h++)
+            if (inside(x, y, kTab[h]) && host.variable(1, kStage + h) <= 3) {
+                host.setVariable(1, kShown, h);
+                host.redraw();
+                return true;
+            }
+        int shown = host.variable(1, kShown);
+        for (int q = 0; q < 3; q++)
+            if (inside(x, y, bubbleRect(q)) && !locked(host, shown) && !(asked(host, shown) & (1 << q))) return ask(host, shown, q);
+        return true;
+    }
+
+    void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
+        if (layer != Layer::Screen || !open_) return;
+        int shown = host.variable(1, kShown), stage = host.variable(1, kStage + shown);
+        put(host, out, "obj\\l000_000.bmp", 0, 0);
+        put(host, out, "obj\\l001_000.bmp", 256, 21);
+        cell(host, out, "obj\\l004_000.bmp", kTreeButton[0], kTreeButton[1], 0, 0, 190, 95);
+        // A locked stage's questions are all dark, as asked ones are.
+        bool shut = locked(host, shown);
+        int bits = shut ? 7 : asked(host, shown);
+        for (int q = 0; q < 3 && stage <= 3; q++) {
+            auto r = bubbleRect(q);
+            // Frames: blue for a question still to ask, dark once asked (l010, 3 shapes across, 5 states down).
+            cell(host, out, "obj\\l010_000.bmp", r[0], r[1], q * 337, (bits & (1 << q) ? 4 : 0) * 202, 337, 202);
+            // Each panel is its question's text in five states down, centred in its frame.
+            if (ImageRef text = host.image(panel(host, shown, stage, q))) {
+                int w = text->w, h = text->h / 5;
+                drawPart(out, *text, r[0] + (337 - w) / 2, r[1] + (202 - h) / 2, 0, (bits & (1 << q) ? 4 : 0) * h, w, h, 1);
+            }
+        }
+        if (shut) put(host, out, "obj\\l015_001.bmp", 326, 260);
+    }
+
+    void reset() override { open_ = false; }
+
     std::vector<std::string> chapter(PartHost &host, int number) override {
         if (!loaded_) {
             loaded_ = true;
@@ -50,8 +155,130 @@ public:
     }
 
 private:
+    // Places measured on the PC's hub (1280x720): the 自白内容確認 button and the three heroine tabs. The bubbles drift on
+    // the PC; until that's measured they sit at the middle of where they were seen.
+    static constexpr int kTreeButton[4] = {12, 581, 190, 95};
+    static constexpr int kTab[3][4] = {{760, 45, 66, 45}, {873, 45, 66, 45}, {983, 45, 66, 45}};
+    static constexpr int kBubble[3][2] = {{480, 160}, {760, 250}, {500, 370}};
+
+    static bool inside(int x, int y, const int (&r)[4]) { return x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]; }
+    static std::array<int, 4> bubbleRect(int q) { return {kBubble[q][0], kBubble[q][1], 337, 202}; }
+    static bool inside(int x, int y, const std::array<int, 4> &r) { return x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]; }
+
+    static int truth(PartHost &host) { return std::max(1, std::min(5, host.variable(1, kTruth))); }
+    static int askedVar(PartHost &host, int heroine) {
+        int stage = std::max(1, std::min(3, host.variable(1, kStage + heroine)));
+        return kAsked + 9 * (truth(host) - 1) + 3 * heroine + (stage - 1);
+    }
+    static int asked(PartHost &host, int heroine) { return host.variable(1, askedVar(host, heroine)); }
+    static bool solvedAll(PartHost &host) {
+        for (int h = 0; h < 3; h++)
+            if (host.variable(1, kStage + h) <= 3) return false;
+        return true;
+    }
+
+    void startTruth(PartHost &host, int t) {
+        host.setVariable(1, kTruth, t);
+        for (int h = 0; h < 3; h++) host.setVariable(1, kStage + h, 1);
+        for (int i = 0; i < 9; i++) host.setVariable(1, kAsked + 9 * (t - 1) + i, 0);
+        host.setVariable(1, kSolved, 0);
+        host.setVariable(1, kHour, 8);
+        host.setVariable(1, kDay, t);
+        host.setVariable(1, kHoursLeft, hours(host, t));
+        host.setVariable(1, kShown, std::max(0, std::min(2, firstShown(host, t))));
+    }
+
+    // `truth T HOURS FIRST` under `screen hub`: the hours truth T gives and whom the hub shows first (A, M or R), and
+    // `lock T HEROINE STAGE NEEDS...`: that stage opens once each heroine it needs is done, as seen under Wine.
+    std::vector<std::string> truthLine(PartHost &host, int t) {
+        for (auto &line : host.setting("hub", "truth"))
+            if (!line.empty() && std::atoi(line[0].c_str()) == t) return line;
+        return {};
+    }
+    int hours(PartHost &host, int t) {
+        auto line = truthLine(host, t);
+        return line.size() > 1 ? std::atoi(line[1].c_str()) : 18;
+    }
+    static int heroineOf(const std::string &word) { return word == "M" ? 1 : word == "R" ? 2 : word == "A" ? 0 : -1; }
+    int firstShown(PartHost &host, int t) {
+        auto line = truthLine(host, t);
+        return line.size() > 2 ? heroineOf(line[2]) : 0;
+    }
+    bool locked(PartHost &host, int heroine) {
+        int t = truth(host), stage = host.variable(1, kStage + heroine);
+        for (auto &line : host.setting("hub", "lock")) {
+            if (line.size() < 4 || std::atoi(line[0].c_str()) != t || heroineOf(line[1]) != heroine || std::atoi(line[2].c_str()) != stage)
+                continue;
+            for (size_t i = 3; i < line.size(); i++)
+                if (int need = heroineOf(line[i]); need >= 0 && host.variable(1, kStage + need) <= 3) return true;
+        }
+        return false;
+    }
+
+    bool ask(PartHost &host, int heroine, int question) {
+        int t = truth(host), stage = host.variable(1, kStage + heroine);
+        if (stage < 1 || stage > 3 || question < 0 || question > 2) return true;
+        int chapter = 1000 * (heroine + 1) + 100 * (t - 1) + 10 * (stage - 1) + question;
+        host.setVariable(1, askedVar(host, heroine), asked(host, heroine) | (1 << question));
+        host.setVariable(1, kHoursLeft, host.variable(1, kHoursLeft) - 1);
+        host.setVariable(1, kHour, host.variable(1, kHour) + 1);
+        if (question == answer(host, heroine, stage)) {
+            host.setVariable(1, kStage + heroine, stage + 1);
+            host.setVariable(1, kSolved, host.variable(1, kSolved) + 1);
+            // She stays on screen while her next stage is open; else the next of Ayano, Misuzu, Rina who has one (Wine).
+            int next = heroine;
+            for (int i = 0; i < 3 && (host.variable(1, kStage + next) > 3 || locked(host, next)); i++) next = (next + 1) % 3;
+            host.setVariable(1, kShown, next);
+        }
+        return finishWith(host, kPlay, chapter);
+    }
+
+    bool finishWith(PartHost &host, int result, int chapter) {
+        if (chapter) host.setVariable(1, kTreeChapter, chapter);
+        open_ = false;
+        host.finishScreen(result);
+        return true;
+    }
+
+    void loadQuestions(PartHost &host) {
+        if (questionsLoaded_) return;
+        questionsLoaded_ = true;
+        for (int t = 1; t <= 5; t++)
+            if (auto bytes = host.read("cfg\\question_0" + std::to_string(t) + ".ini"))
+                for (auto &[k, v] : parseKeys(std::string(bytes->begin(), bytes->end()))) questions_[k] = v;
+    }
+    std::string key(PartHost &host, int heroine, int stage, const std::string &what) {
+        char buf[64];
+        std::snprintf(buf, sizeof buf, "%sLevel%02dRank%02d%s", kNames[heroine], truth(host), stage, what.c_str());
+        return buf;
+    }
+    int answer(PartHost &host, int heroine, int stage) {
+        auto it = questions_.find(key(host, heroine, stage, "AnsNum"));
+        return it == questions_.end() ? -1 : std::atoi(it->second.c_str());
+    }
+    std::string panel(PartHost &host, int heroine, int stage, int q) {
+        auto it = questions_.find(key(host, heroine, stage, "Panel" + std::to_string(q + 1)));
+        if (it == questions_.end()) return {};
+        std::string path;
+        for (size_t i = 0; i < it->second.size(); i++)
+            if (!(it->second[i] == '\\' && i + 1 < it->second.size() && it->second[i + 1] == '\\')) path += it->second[i];
+        return path;
+    }
+
+    static void put(PartHost &host, Canvas &out, const std::string &path, int x, int y) {
+        if (ImageRef image = host.image(path)) drawPart(out, *image, x, y, 0, 0, image->w, image->h, 1);
+    }
+    static void cell(PartHost &host, Canvas &out, const std::string &path, int x, int y, int cx, int cy, int w, int h) {
+        if (path.empty()) return;
+        if (ImageRef image = host.image(path); image && cx + w <= image->w && cy + h <= image->h)
+            drawPart(out, *image, x, y, cx, cy, w, h, 1);
+    }
+
+    bool open_ = false;
     bool loaded_ = false;
+    bool questionsLoaded_ = false;
     std::map<int, std::vector<std::string>> chapters_;
+    std::map<std::string, std::string> questions_;
 };
 
 }  // namespace
