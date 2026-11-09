@@ -465,6 +465,8 @@ pic obj\l000_000.bmp 394 237
 placefor 2 295 64 389 0
 
 screen defaults
+# Its click-wait mark (obj\h005_000) is keyed on pure green, which the PC leaves out.
+colorkey 0 255 0
 # Its program asks for Lucida Sans Unicode, here Open Sans as in Funbag Fantasy 3 if, sized and spaced to the PC's lines
 # under Wine (cap height 15, a 69-character line 636 pixels wide, lines 32 apart), within 2 pixels.
 textfont 7
