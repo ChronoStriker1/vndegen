@@ -26,9 +26,8 @@ screen start
 flow chapter2
 
 # Save and load, measured under Wine: nine cards a page on ten pages, each card a save's number, thumbnail, date and
-# time, and NEW on the one saved last. The side bar's help steps 48 pixels a button while the buttons step 52. Still
-# to add: the card's "Save Date" label and its chapter name, which the runtime can't draw yet, and the backdrop the
-# paper's torn edges show, which no picture in the archives matches.
+# time, its chapter by S 4000, and NEW on the one saved last. The side bar's help steps 48 pixels a button while the
+# buttons step 52. The backdrop the paper's torn edges show matches no picture in the archives, and is left black.
 screen load
 pic obj\e000_000.bmp 0 3
 pic obj\e000_001.bmp 75 14 7 1 1 0
@@ -38,6 +37,10 @@ slotlabel obj\e003_001.bmp 5 5
 slotdigits obj\e003_002.bmp 39 5 3
 slotthumb 7 32
 slotnew obj\e003_010.bmp 289 -18
+slotpic obj\e003_009.bmp 203 29
+slotchaptervar obj\e003_008.bmp 107 5 7 4000
+slotnoseconds
+dateslash2 2
 datedigits obj\e003_004.bmp 203 59
 dateslash obj\e003_003.bmp
 datecolon obj\e003_006.bmp
@@ -73,6 +76,10 @@ slotlabel obj\e003_001.bmp 5 5
 slotdigits obj\e003_002.bmp 39 5 3
 slotthumb 7 32
 slotnew obj\e003_010.bmp 289 -18
+slotpic obj\e003_009.bmp 203 29
+slotchaptervar obj\e003_008.bmp 107 5 7 4000
+slotnoseconds
+dateslash2 2
 datedigits obj\e003_004.bmp 203 59
 dateslash obj\e003_003.bmp
 datecolon obj\e003_006.bmp
@@ -100,8 +107,7 @@ button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 
 button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
 
 # Config, four tabs, measured under Wine (fitted to the PC's shots, hover areas found by halving to each edge).
-# Its sliders are a rose knob on a fixed track, x0 + 6 a step, which the runtime can't draw yet: their values, digits
-# and arrows are here. Text and auto speed run 0 to 100 on the PC.
+# Its sliders are a rose knob on a fixed track, x0 + 6 a step (the delay's 3). Text and auto speed run 0 to 100.
 screen config
 pic obj\e000_000.bmp 0 3
 pic obj\e000_001.bmp 75 14 7 1 6 0
@@ -138,6 +144,7 @@ radio effect 1 obj\j013_000.bmp 423 297 2 5 0
 radio effect 0 obj\j013_000.bmp 537 297 2 5 1
 radio wait 1 obj\j013_000.bmp 423 333 2 5 0
 radio wait 0 obj\j013_000.bmp 537 333 2 5 1
+knob opacity obj\j003_002.bmp 184 409 6
 number opacity obj\j003_004.bmp 762 366
 step opacity -1 obj\j003_003.bmp 148 408 2 5 0
 step opacity 1 obj\j003_003.bmp 820 408 2 5 1
@@ -149,15 +156,15 @@ radio tutorial 0 obj\j013_000.bmp 537 492 2 5 1
 radio waitskip 1 obj\j013_000.bmp 423 528 2 5 0
 radio waitskip 0 obj\j013_000.bmp 537 528 2 5 1
 pic obj\a001_002.bmp 280 571 1 5 0 4
-hover 134 140 870 180 obj\j004_000.bmp 34 62 9 0
-hover 134 185 870 216 obj\j004_000.bmp 34 98 9 1
-hover 134 221 870 287 obj\j004_000.bmp 34 134 9 2
-hover 134 292 870 324 obj\j004_000.bmp 34 206 9 3
-hover 134 328 870 360 obj\j004_000.bmp 34 242 9 4
-hover 134 364 870 446 obj\j004_000.bmp 34 278 9 5
-hover 134 451 870 483 obj\j004_000.bmp 34 365 9 6
-hover 134 487 870 519 obj\j004_000.bmp 34 401 9 7
-hover 134 521 870 553 obj\j004_000.bmp 34 434 9 8
+hovercols 134 140 870 180 obj\j004_000.bmp 34 62 9 0
+hovercols 134 185 870 216 obj\j004_000.bmp 34 98 9 1
+hovercols 134 221 870 287 obj\j004_000.bmp 34 134 9 2
+hovercols 134 292 870 324 obj\j004_000.bmp 34 206 9 3
+hovercols 134 328 870 360 obj\j004_000.bmp 34 242 9 4
+hovercols 134 364 870 446 obj\j004_000.bmp 34 278 9 5
+hovercols 134 451 870 483 obj\j004_000.bmp 34 365 9 6
+hovercols 134 487 870 519 obj\j004_000.bmp 34 401 9 7
+hovercols 134 521 870 553 obj\j004_000.bmp 34 434 9 8
 
 screen config2
 pic obj\e000_000.bmp 0 3
@@ -181,19 +188,22 @@ button cfg_apply obj\j000_000.bmp 992 100 3 5 0 help obj\j001_000.bmp 848 12 3 1
 button cfg_undo obj\j000_000.bmp 992 158 3 5 1 help obj\j001_000.bmp 848 70 3 1 1 0
 button cfg_defaults obj\j000_000.bmp 992 216 3 5 2 help obj\j001_000.bmp 848 128 3 1 2 0
 pic obj\j007_000.bmp 53 106
+knob text obj\j003_002.bmp 184 193 6
 number text obj\j003_004.bmp 762 150
 step text -1 obj\j003_003.bmp 148 192 2 5 0
 step text 1 obj\j003_003.bmp 820 192 2 5 1
+knob auto obj\j003_002.bmp 184 288 6
 number auto obj\j003_004.bmp 762 245
 step auto -1 obj\j003_003.bmp 148 287 2 5 0
 step auto 1 obj\j003_003.bmp 820 287 2 5 1
 range waittime 20 180
+knob waittime obj\j003_002.bmp 184 383 3
 number waittime obj\j003_004.bmp 756 340 780 798
 step waittime -1 obj\j003_003.bmp 148 382 2 5 0
 step waittime 1 obj\j003_003.bmp 820 382 2 5 1
-hover 134 150 870 228 obj\j008_000.bmp 34 62 3 0
-hover 134 233 870 323 obj\j008_000.bmp 34 157 3 1
-hover 134 328 870 419 obj\j008_000.bmp 34 252 3 2
+hovercols 134 150 870 228 obj\j008_000.bmp 34 62 3 0
+hovercols 134 233 870 323 obj\j008_000.bmp 34 157 3 1
+hovercols 134 328 870 419 obj\j008_000.bmp 34 252 3 2
 
 screen config3
 pic obj\e000_000.bmp 0 3
@@ -228,10 +238,10 @@ radio deckey 0 obj\j009_001.bmp 423 261 11 5 7
 radio deckey 1 obj\j009_001.bmp 537 261 11 5 8
 radio pause_inactive 1 obj\j009_001.bmp 423 297 11 5 9
 radio pause_inactive 0 obj\j009_001.bmp 537 297 11 5 10
-hover 134 144 870 177 obj\j010_000.bmp 34 62 4 0
-hover 134 182 870 249 obj\j010_000.bmp 34 98 4 1
-hover 134 255 870 286 obj\j010_000.bmp 34 170 4 2
-hover 134 291 870 323 obj\j010_000.bmp 34 206 4 3
+hovercols 134 144 870 177 obj\j010_000.bmp 34 62 4 0
+hovercols 134 182 870 249 obj\j010_000.bmp 34 98 4 1
+hovercols 134 255 870 286 obj\j010_000.bmp 34 170 4 2
+hovercols 134 291 870 323 obj\j010_000.bmp 34 206 4 3
 
 screen config4
 pic obj\e000_000.bmp 0 3
@@ -255,31 +265,37 @@ button cfg_apply obj\j000_000.bmp 992 100 3 5 0 help obj\j001_000.bmp 848 12 3 1
 button cfg_undo obj\j000_000.bmp 992 158 3 5 1 help obj\j001_000.bmp 848 70 3 1 1 0
 button cfg_defaults obj\j000_000.bmp 992 216 3 5 2 help obj\j001_000.bmp 848 128 3 1 2 0
 pic obj\j011_000.bmp 53 106
+knob master obj\j003_002.bmp 222 182 6
 number master obj\j003_004.bmp 800 142
 step master -1 obj\j003_003.bmp 186 180 2 5 0
 step master 1 obj\j003_003.bmp 858 180 2 5 1
 check mute_master obj\j014_000.bmp 92 177 1 5 0
 pic obj\j012_000.bmp 879 143 1 5 0 4
+knob bgm obj\j003_002.bmp 222 260 6
 number bgm obj\j003_004.bmp 800 220
 step bgm -1 obj\j003_003.bmp 186 258 2 5 0
 step bgm 1 obj\j003_003.bmp 858 258 2 5 1
 check mute_bgm obj\j014_000.bmp 92 255 1 5 0
 pic obj\j012_000.bmp 879 221 1 5 0 4
+knob se obj\j003_002.bmp 222 338 6
 number se obj\j003_004.bmp 800 298
 step se -1 obj\j003_003.bmp 186 336 2 5 0
 step se 1 obj\j003_003.bmp 858 336 2 5 1
 check mute_se obj\j014_000.bmp 92 333 1 5 0
 button test:se:se\se_277.ogg obj\j012_000.bmp 879 299 1 5 0
+knob hse obj\j003_002.bmp 222 416 6
 number hse obj\j003_004.bmp 800 376
 step hse -1 obj\j003_003.bmp 186 414 2 5 0
 step hse 1 obj\j003_003.bmp 858 414 2 5 1
 check mute_hse obj\j014_000.bmp 92 411 1 5 0
 button test:se:se\se_h11.ogg obj\j012_000.bmp 879 377 1 5 0
+knob voice obj\j003_002.bmp 222 494 6
 number voice obj\j003_004.bmp 800 454
 step voice -1 obj\j003_003.bmp 186 492 2 5 0
 step voice 1 obj\j003_003.bmp 858 492 2 5 1
 check mute_voice obj\j014_000.bmp 92 489 1 5 0
 button test:voice:voice\roz0_0004.ogg obj\j012_000.bmp 879 455 1 5 0
+knob backvoice obj\j003_002.bmp 222 572 6
 number backvoice obj\j003_004.bmp 800 532
 step backvoice -1 obj\j003_003.bmp 186 570 2 5 0
 step backvoice 1 obj\j003_003.bmp 858 570 2 5 1
@@ -288,18 +304,20 @@ button test:voice:voice\roz9_0017.ogg obj\j012_000.bmp 879 533 1 5 0
 radio voice_stop 1 obj\j013_000.bmp 423 633 2 5 0
 radio voice_stop 0 obj\j013_000.bmp 537 633 2 5 1
 button tabvoices obj\j015_000.bmp 777 620 1 5 0
-hover 134 144 870 211 obj\j016_000.bmp 72 62 8 0
-hover 134 217 870 289 obj\j016_000.bmp 72 140 8 1
-hover 134 294 870 366 obj\j016_000.bmp 72 217 8 2
-hover 134 372 870 444 obj\j016_000.bmp 72 295 8 3
-hover 134 450 870 522 obj\j016_000.bmp 72 373 8 4
-hover 134 527 870 599 obj\j016_000.bmp 72 450 8 5
-hover 134 607 700 656 obj\j016_000.bmp 72 542 8 6
+hovercols 134 144 870 211 obj\j016_000.bmp 72 62 8 0
+hovercols 134 217 870 289 obj\j016_000.bmp 72 140 8 1
+hovercols 134 294 870 366 obj\j016_000.bmp 72 217 8 2
+hovercols 134 372 870 444 obj\j016_000.bmp 72 295 8 3
+hovercols 134 450 870 522 obj\j016_000.bmp 72 373 8 4
+hovercols 134 527 870 599 obj\j016_000.bmp 72 450 8 5
+hovercols 134 607 700 656 obj\j016_000.bmp 72 542 8 6
 
 
 screen defaults
 # No quick saves: its ten pages of nine cards run to 90, all ordinary.
 quickslots 91 98
+# Its sex scenes' sound effects are se_h*, at the Sex SFX volume.
+hseprefix se_h
 # Config as the PC starts it, read from its first-run screens. Text and auto speed are 50 of 100 there, which the
 # runtime's four steps can't hold yet.
 default opacity 80
