@@ -3032,7 +3032,10 @@ bool Engine::shown(const Picture &p) const {
 // `submenudim` on a title: while a submenu is open, the main buttons other than its opener are drawn in their sheet's
 // last row and take no pointer, as Test Games 82 and 87's titles do (sets 1 and 2, under Wine).
 bool Engine::dimmedBySubmenu(const Button &b) const {
-    if (!screen_ || subMenu_.empty() || !b.group.empty() || !screen_->setting("submenudim")) return false;
+    const auto *dim = screen_ ? screen_->setting("submenudim") : nullptr;
+    if (!dim || subMenu_.empty() || !b.group.empty()) return false;
+    // With `hide` the opener goes too: the submenu takes its row, as Test Game 83's CG Mode takes Extra's (set 3).
+    if (!dim->empty() && (*dim)[0] == "hide") return true;
     bool opener = (b.action.rfind("submenu:", 0) == 0 && submenuOpen(b.action.substr(8))) || (b.action == "start" && submenuOpen("start"));
     return !opener;
 }
