@@ -383,6 +383,59 @@ button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 
 button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
 
 
+screen music
+# Measured under Wine: 26 tracks in three columns of ten, seven seals with their help cards (none for pause and
+# stop), and the volume knob. The playing track's name under "Reproduction music" waits on the runtime.
+pic obj\i000_000.bmp 0 3
+pic obj\e000_001.bmp 75 14 7 1 5 0
+pic obj\e001_000.bmp 1154 0
+# The music's volume, a dark knob whose middle runs along the 142-pixel line from x 388 (60 at x 461).
+knob music obj\i001_001.bmp 376 651 1.42
+button track0 obj\i003_000.bmp 48 124 26 5 0
+button track1 obj\i003_000.bmp 48 168 26 5 1
+button track2 obj\i003_000.bmp 48 212 26 5 2
+button track3 obj\i003_000.bmp 48 256 26 5 3
+button track4 obj\i003_000.bmp 48 300 26 5 4
+button track5 obj\i003_000.bmp 48 344 26 5 5
+button track6 obj\i003_000.bmp 48 388 26 5 6
+button track7 obj\i003_000.bmp 48 432 26 5 7
+button track8 obj\i003_000.bmp 48 476 26 5 8
+button track9 obj\i003_000.bmp 48 520 26 5 9
+button track10 obj\i003_000.bmp 406 124 26 5 10
+button track11 obj\i003_000.bmp 406 168 26 5 11
+button track12 obj\i003_000.bmp 406 212 26 5 12
+button track13 obj\i003_000.bmp 406 256 26 5 13
+button track14 obj\i003_000.bmp 406 300 26 5 14
+button track15 obj\i003_000.bmp 406 344 26 5 15
+button track16 obj\i003_000.bmp 406 388 26 5 16
+button track17 obj\i003_000.bmp 406 432 26 5 17
+button track18 obj\i003_000.bmp 406 476 26 5 18
+button track19 obj\i003_000.bmp 406 520 26 5 19
+button track20 obj\i003_000.bmp 764 124 26 5 20
+button track21 obj\i003_000.bmp 764 168 26 5 21
+button track22 obj\i003_000.bmp 764 212 26 5 22
+button track23 obj\i003_000.bmp 764 256 26 5 23
+button track24 obj\i003_000.bmp 764 300 26 5 24
+button track25 obj\i003_000.bmp 764 344 26 5 25
+button music_prev obj\i001_000.bmp 626 622 7 5 0 help obj\i005_000.bmp 566 534 8 1 0 0
+button music_pause obj\i001_000.bmp 696 622 7 5 1
+button music_play obj\i001_000.bmp 766 622 7 5 2 help obj\i005_000.bmp 706 534 8 1 2 0
+button music_stop obj\i001_000.bmp 836 622 7 5 3
+button music_next obj\i001_000.bmp 906 622 7 5 4 help obj\i005_000.bmp 846 534 8 1 4 0
+button music_repeat obj\i001_000.bmp 976 622 7 5 5 help obj\i005_000.bmp 916 534 8 1 5 0
+button music_shuffle obj\i001_000.bmp 1046 622 7 5 6 help obj\i005_000.bmp 986 534 8 1 6 0
+button nav_save obj\e001_001.bmp 1168 103 10 5 0 help obj\e001_002.bmp 1044 15 10 1 0 0
+button nav_load obj\e001_001.bmp 1168 155 10 5 1 help obj\e001_002.bmp 1044 63 10 1 1 0
+button nav_cg obj\e001_001.bmp 1168 207 10 5 2 help obj\e001_002.bmp 1044 111 10 1 2 0
+button nav_sprites obj\e001_001.bmp 1168 259 10 5 3 help obj\e001_002.bmp 1044 159 10 1 3 0
+button nav_scene obj\e001_001.bmp 1168 311 10 5 4 help obj\e001_002.bmp 1044 207 10 1 4 0
+button nav_music obj\e001_001.bmp 1168 363 10 5 5 help obj\e001_002.bmp 1044 255 10 1 5 0
+button nav_config obj\e001_001.bmp 1168 415 10 5 6 help obj\e001_002.bmp 1044 303 10 1 6 0
+button nav_title obj\e001_001.bmp 1168 467 10 5 7 help obj\e001_002.bmp 1044 351 10 1 7 0
+button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 10 1 8 0
+button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
+
+
 screen defaults
 # No quick saves: its ten pages of nine cards run to 90, all ordinary.
 quickslots 91 98
