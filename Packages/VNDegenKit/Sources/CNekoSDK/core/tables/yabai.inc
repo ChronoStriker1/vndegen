@@ -95,15 +95,15 @@ button page6 obj\e003_001.bmp 998 68 10 5 6
 button page7 obj\e003_001.bmp 1048 68 10 5 7
 button page8 obj\e003_001.bmp 1098 68 10 5 8
 button page9 obj\e003_001.bmp 1148 68 10 5 9
-button nav_save obj\e002_000.bmp 51 637 9 5 0
-button nav_load obj\e002_000.bmp 181 637 9 5 1
-button nav_cg obj\e002_000.bmp 311 637 9 5 2
-button nav_scene obj\e002_000.bmp 441 637 9 5 3
-button nav_music obj\e002_000.bmp 571 637 9 5 4
-button nav_config obj\e002_000.bmp 701 637 9 5 5
-button nav_title obj\e002_000.bmp 831 637 9 5 6
-button nav_quit obj\e002_000.bmp 961 637 9 5 7
-button back obj\e002_000.bmp 1091 637 9 5 8
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
 button pageprev obj\e003_000.bmp 22 331 2 5 0
 button pagenext obj\e003_000.bmp 1218 331 2 5 1
 
@@ -139,15 +139,15 @@ button page6 obj\e003_001.bmp 998 68 10 5 6
 button page7 obj\e003_001.bmp 1048 68 10 5 7
 button page8 obj\e003_001.bmp 1098 68 10 5 8
 button page9 obj\e003_001.bmp 1148 68 10 5 9
-button nav_save obj\e002_000.bmp 51 637 9 5 0
-button nav_load obj\e002_000.bmp 181 637 9 5 1
-button nav_cg obj\e002_000.bmp 311 637 9 5 2
-button nav_scene obj\e002_000.bmp 441 637 9 5 3
-button nav_music obj\e002_000.bmp 571 637 9 5 4
-button nav_config obj\e002_000.bmp 701 637 9 5 5
-button nav_title obj\e002_000.bmp 831 637 9 5 6
-button nav_quit obj\e002_000.bmp 961 637 9 5 7
-button back obj\e002_000.bmp 1091 637 9 5 8
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
 button pageprev obj\e003_000.bmp 22 331 2 5 0
 button pagenext obj\e003_000.bmp 1218 331 2 5 1
 
@@ -172,15 +172,15 @@ button cfg_undo obj\h000_000.bmp 1122 158 3 5 1 help obj\h000_001.bmp 1058 84 3 
 button cfg_defaults obj\h000_000.bmp 1122 216 3 5 2 help obj\h000_001.bmp 1058 142 3 1 2 0
 button tab4 obj\e003_000.bmp 22 331 2 5 0
 button tab2 obj\e003_000.bmp 1218 331 2 5 1
-button nav_save obj\e002_000.bmp 51 637 9 5 0
-button nav_load obj\e002_000.bmp 181 637 9 5 1
-button nav_cg obj\e002_000.bmp 311 637 9 5 2
-button nav_scene obj\e002_000.bmp 441 637 9 5 3
-button nav_music obj\e002_000.bmp 571 637 9 5 4
-button nav_config obj\e002_000.bmp 701 637 9 5 5
-button nav_title obj\e002_000.bmp 831 637 9 5 6
-button nav_quit obj\e002_000.bmp 961 637 9 5 7
-button back obj\e002_000.bmp 1091 637 9 5 8
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
 pic obj\h002_000.bmp 214 128
 radio screen 0 obj\h002_001.bmp 557 163 10 5 0
 radio screen 1 obj\h002_001.bmp 671 163 10 5 1
@@ -239,15 +239,15 @@ button cfg_undo obj\h000_000.bmp 1122 158 3 5 1 help obj\h000_001.bmp 1058 84 3 
 button cfg_defaults obj\h000_000.bmp 1122 216 3 5 2 help obj\h000_001.bmp 1058 142 3 1 2 0
 button tab obj\e003_000.bmp 22 331 2 5 0
 button tab3 obj\e003_000.bmp 1218 331 2 5 1
-button nav_save obj\e002_000.bmp 51 637 9 5 0
-button nav_load obj\e002_000.bmp 181 637 9 5 1
-button nav_cg obj\e002_000.bmp 311 637 9 5 2
-button nav_scene obj\e002_000.bmp 441 637 9 5 3
-button nav_music obj\e002_000.bmp 571 637 9 5 4
-button nav_config obj\e002_000.bmp 701 637 9 5 5
-button nav_title obj\e002_000.bmp 831 637 9 5 6
-button nav_quit obj\e002_000.bmp 961 637 9 5 7
-button back obj\e002_000.bmp 1091 637 9 5 8
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
 pic obj\h004_000.bmp 214 128
 knob text obj\g002_001.bmp 321 205 6
 number text obj\e004_001.bmp 896 166 blank
@@ -264,6 +264,10 @@ number waittime obj\e004_001.bmp 890 356 907 918
 step waittime -1 obj\h002_003.bmp 282 392 2 5 0
 step waittime 1 obj\h002_003.bmp 954 392 2 5 1
 pic obj\h003_002.bmp 878 357
+# Each slider's help while the pointer is in its band; the bands' edges are within 3 pixels of the PC's.
+hovercols 219 163 1045 247 obj\h005_000.bmp 218 94 3 0
+hovercols 219 258 1045 343 obj\h005_000.bmp 218 189 3 1
+hovercols 219 353 1045 439 obj\h005_000.bmp 218 284 3 2
 
 screen config3
 pic bg\bg_001_000_000_000_000.bmp 0 0
@@ -283,15 +287,15 @@ button cfg_undo obj\h000_000.bmp 1122 158 3 5 1 help obj\h000_001.bmp 1058 84 3 
 button cfg_defaults obj\h000_000.bmp 1122 216 3 5 2 help obj\h000_001.bmp 1058 142 3 1 2 0
 button tab2 obj\e003_000.bmp 22 331 2 5 0
 button tab4 obj\e003_000.bmp 1218 331 2 5 1
-button nav_save obj\e002_000.bmp 51 637 9 5 0
-button nav_load obj\e002_000.bmp 181 637 9 5 1
-button nav_cg obj\e002_000.bmp 311 637 9 5 2
-button nav_scene obj\e002_000.bmp 441 637 9 5 3
-button nav_music obj\e002_000.bmp 571 637 9 5 4
-button nav_config obj\e002_000.bmp 701 637 9 5 5
-button nav_title obj\e002_000.bmp 831 637 9 5 6
-button nav_quit obj\e002_000.bmp 961 637 9 5 7
-button back obj\e002_000.bmp 1091 637 9 5 8
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
 pic obj\h006_000.bmp 214 128
 radio skipall 0 obj\h006_001.bmp 557 163 9 5 0
 radio skipall 1 obj\h006_001.bmp 671 163 9 5 1
@@ -304,6 +308,10 @@ radio deckey 0 obj\h006_001.bmp 557 271 9 5 7
 radio deckey 1 obj\h006_001.bmp 671 271 9 5 8
 radio pause_inactive 1 obj\h002_002.bmp 557 307 2 5 0
 radio pause_inactive 0 obj\h002_002.bmp 671 307 2 5 1
+hovercols 219 163 1045 189 obj\h007_000.bmp 218 94 4 0
+hovercols 219 199 1045 261 obj\h007_000.bmp 218 130 4 1
+hovercols 219 271 1045 297 obj\h007_000.bmp 218 202 4 2
+hovercols 219 307 1045 333 obj\h007_000.bmp 218 238 4 3
 
 screen config4
 pic bg\bg_001_000_000_000_000.bmp 0 0
@@ -323,15 +331,15 @@ button cfg_undo obj\h000_000.bmp 1122 158 3 5 1 help obj\h000_001.bmp 1058 84 3 
 button cfg_defaults obj\h000_000.bmp 1122 216 3 5 2 help obj\h000_001.bmp 1058 142 3 1 2 0
 button tab3 obj\e003_000.bmp 22 331 2 5 0
 button tab obj\e003_000.bmp 1218 331 2 5 1
-button nav_save obj\e002_000.bmp 51 637 9 5 0
-button nav_load obj\e002_000.bmp 181 637 9 5 1
-button nav_cg obj\e002_000.bmp 311 637 9 5 2
-button nav_scene obj\e002_000.bmp 441 637 9 5 3
-button nav_music obj\e002_000.bmp 571 637 9 5 4
-button nav_config obj\e002_000.bmp 701 637 9 5 5
-button nav_title obj\e002_000.bmp 831 637 9 5 6
-button nav_quit obj\e002_000.bmp 961 637 9 5 7
-button back obj\e002_000.bmp 1091 637 9 5 8
+button nav_save obj\e002_000.bmp 51 637 9 5 0 help obj\e002_001.bmp 2 556 9 1 0 0
+button nav_load obj\e002_000.bmp 181 637 9 5 1 help obj\e002_001.bmp 134 556 9 1 1 0
+button nav_cg obj\e002_000.bmp 311 637 9 5 2 help obj\e002_001.bmp 266 556 9 1 2 0
+button nav_scene obj\e002_000.bmp 441 637 9 5 3 help obj\e002_001.bmp 398 556 9 1 3 0
+button nav_music obj\e002_000.bmp 571 637 9 5 4 help obj\e002_001.bmp 530 556 9 1 4 0
+button nav_config obj\e002_000.bmp 701 637 9 5 5 help obj\e002_001.bmp 662 556 9 1 5 0
+button nav_title obj\e002_000.bmp 831 637 9 5 6 help obj\e002_001.bmp 794 556 9 1 6 0
+button nav_quit obj\e002_000.bmp 961 637 9 5 7 help obj\e002_001.bmp 926 556 9 1 7 0
+button back obj\e002_000.bmp 1091 637 9 5 8 help obj\e002_001.bmp 1058 556 9 1 8 0
 pic obj\h008_000.bmp 214 128
 knob master obj\g002_001.bmp 351 177 6
 number master obj\e004_001.bmp 896 156 blank
@@ -377,6 +385,15 @@ check voice2 obj\h008_001.bmp 604 580 6 5 2
 check voice3 obj\h008_001.bmp 718 580 6 5 3
 check voice4 obj\h008_001.bmp 832 580 6 5 4
 check voice5 obj\h008_001.bmp 946 580 6 5 5
+# The volumes' bands are taken as 57 tall around each knob; the PC's edges were probed only to about 6 pixels.
+hovercols 219 148 1045 205 obj\h009_000.bmp 218 79 8 0
+hovercols 219 211 1045 268 obj\h009_000.bmp 218 142 8 1
+hovercols 219 275 1045 332 obj\h009_000.bmp 218 205 8 2
+hovercols 219 339 1045 396 obj\h009_000.bmp 218 268 8 3
+hovercols 219 403 1045 460 obj\h009_000.bmp 218 331 8 4
+hovercols 219 467 1045 524 obj\h009_000.bmp 218 394 8 5
+hovercols 219 546 1045 571 obj\h009_000.bmp 218 476 8 6
+hovercols 219 582 1045 608 obj\h009_000.bmp 218 512 8 7
 
 screen story
 flow main
