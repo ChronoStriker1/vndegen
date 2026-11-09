@@ -878,9 +878,7 @@ bool Engine::logVoiceButton(int row, int &x, int &y, int &w, int &h, ImageRef &s
 void Engine::openLog() {
     if (backlog_.empty() || !screens_.count("log")) return;
     // The frame behind the log has no message on it. With `keepwindow` it keeps the window's picture, but not its text,
-    // buttons or wait mark, as Test Game 87's PC draws it (set 1). `keepwindow buttons` keeps the window's buttons and
-    // what the game's parts draw in the window too, as Test Game 90's PC shows them under the log's dim (set 1); none
-    // of the buttons is lit, as the pointer is the log's.
+    // buttons or wait mark, as Test Game 87's PC draws it (set 1).
     bool hidden = windowHiddenByPlayer_, seen = pointerSeen_;
     const auto *keepLine = screens_.at("log").setting("keepwindow");
     bool keep = keepLine != nullptr;
@@ -2975,11 +2973,6 @@ bool Engine::pageOff(const std::string &action) const {
     return false;
 }
 
-// A menu button that is drawn disabled and takes no press.
-//   `buttonsoff ACTION ACTION...` under `screen defaults`: those actions, on every screen, as Test Game 90's bonus
-//     release greys out Music wherever it stands, having none (set 1, under Wine).
-//   A gallery's tab with no entry, `gtabN`: the same release shows its CG and Scene tabs 0 to 3 so, with entries only
-//     on tab 4 (set 1). No other game's gallery has an empty tab.
 bool Engine::partDisables(const std::string &action) const {
     for (const auto &[name, part] : parts_)
         if (part->actionLit(action) == 2) return true;
@@ -4904,7 +4897,6 @@ void Engine::mouseButton(int button, bool down) {
             if (!b && underWereShown_) b = buttonAt(pointerX_, messagePointerY(), bar().under);
             if (b) {
                 std::string action = b->action;
-                // One a part draws disabled does nothing, as Auto and Skip over Test Game 96's hub.
                 if (!partDisables(action)) runAction(action);
                 return;
             }

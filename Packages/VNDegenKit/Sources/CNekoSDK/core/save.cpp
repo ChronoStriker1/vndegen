@@ -161,7 +161,7 @@ const SaveLayout kSideboob2 = [] {
 constexpr int kRecordX = 0x169, kRecordScale = 0x17D, kRecordAnchor = 0x185, kRecordAlpha = 0x18D, kRecordAnimated = 0x1B3;
 constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0x192, kRecordWave = 0x1A6;
 // A splash record names its droplet's picture this far into its fixed part, before the engine's extra bytes: an empty
-// name in every other record. Only Test Game 88 has splashes, so it's checked in that layout alone.
+// name in every other record.
 constexpr int kSplashNameAt = 201;
 // The bytes of a record after its animation text, and a flipbook's fields among them: whether it runs backward and
 // repeats (parameters 1 and 14), two bytes of 1 while it plays, parameters 15 and 16, and a byte of 0 where every other
