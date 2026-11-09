@@ -733,6 +733,10 @@ const char kMankitsuBonus[] = R"(
 # The bonus story disc (Mankitsu Happening Tokuten Story), measured on its own exe under Wine (set 1): the game's title
 # with the disc's logo and three silhouettes, no Web Questionnaire button, and New Game playing its four scripts in
 # order, then the title (a file trace). Its PC numbers are 1, 2, 3 and 9999, from PC saves made in each script.
+# Its PC greys the Music buttons everywhere, on the title's Appendix submenu and every menu's side.
+screen defaults
+buttonsoff nav_music music
+
 screen title
 part mankitsu
 submenudim hide
@@ -746,7 +750,7 @@ button scene obj\d001_002.bmp 746 422 5 5 3 group extras help obj\d002_000.bmp 6
 button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 600 358 12 1 11 0
 
 # Its CG and Scene screens: the game's without the standing pictures, opening on the fifth tab, the only one with
-# entries (its PC greys the other four and the Music buttons).
+# entries; the other four are greyed, as on its PC.
 screen cg
 pic obj\f000_000.bmp 0 0
 pic obj\f001_000.bmp 0 400
