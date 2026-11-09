@@ -57,6 +57,9 @@ constexpr int kFollowMs = 120;  // the second strip's lag behind the first, in a
 constexpr int kTitleBottomShift = 152;
 constexpr int kTitleMs = 4333, kTitleFadeMs = 600, kTitleTrimSpeed = 240, kTitleTrimPeriod = 600;
 constexpr int kMenuTrimSpeed = 240;
+// The lower row's liquid: how far and how long it rises as the row opens, and the gap in its drawing that makes the next
+// drawing a new opening.
+constexpr int kRowRise = 82, kRowRiseMs = 170, kRowGapMs = 100;
 constexpr int kWeekVar = 3000, kHalfVar = 3001, kHeartVar = 3010, kChapterVar = 10904, kEndingVar = 10906;
 constexpr int kPhases = 10, kMaxHearts = 4;
 
@@ -232,6 +235,7 @@ public:
         if (menu_ == "title") return true;  // the backgrounds and the trim move
         // A menu's trims move while it's drawn: the frame after its last drawing is the last one asked for.
         if (std::exchange(frameDrawn_, false)) return true;
+        if (std::exchange(rowDrawn_, false)) return true;  // and so the lower row's liquid
         int64_t now = host.nowMs();
         bool fading = now - fadeFrom_ < fadeMs_;
         // Moves that have ended stay, as where the face now is; a flipbook runs from the end of the update that showed it.
@@ -246,7 +250,9 @@ public:
 
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
         if (layer == Layer::Menu && menu_ == "title") drawTitle(host, out);
-        if (layer == Layer::Menu && menuPlate() >= 0) drawMenuFrame(host, out);
+        if (layer == Layer::MenuUnder && menuPlate() >= 0) drawMenuTrims(host, out);
+        if (layer == Layer::Menu && menuPlate() >= 0) put(host, out, "obj\\e000_001.bmp", 4, 6, 6, 1, menuPlate(), 0);
+        if (layer == Layer::ButtonRow) drawLiquid(host, out);
         if (layer == Layer::Window) {
             // The drink gauge at the window's right, a still picture on the PC at rest: msg_button.ini's `#openmenu` panel,
             // 94 left of the screen's right edge and 2 above the window's top (set 1, fitted on a PC shot).
@@ -449,23 +455,38 @@ private:
         return -1;
     }
 
-    // Trims along the top and bottom and the screen's name plate at the top left (set 1, fitted over the screen's paper
-    // on PC shots and a 30 fps recording, within 0.01 of 255): the top trim at y -36, and at 0 on Save and Load, where
-    // the page buttons hang from it, moving left; the bottom one at y 662, moving right; both 8 pixels a frame of the
-    // recording, 240 a second. The plate at 4, 6. Where along their strips the trims start isn't measured.
-    void drawMenuFrame(PartHost &host, Canvas &out) {
+    // A menu's trims along the top and bottom, under its cards and buttons, and the screen's name plate at 4, 6 (set 1,
+    // fitted over the screen's paper on PC shots and a 30 fps recording, within 0.01 of 255): the top trim at y -36,
+    // and at 0 on Save and Load, where the page buttons hang from it, moving left; the bottom one at y 662, moving
+    // right; both 8 pixels a frame of the recording, 240 a second. Where along their strips the trims start isn't
+    // measured.
+    void drawMenuTrims(PartHost &host, Canvas &out) {
         frameDrawn_ = true;
         int moved = int(std::max<int64_t>(0, host.screenMs()) * kMenuTrimSpeed / 1000);
-        bool slots = menuPlate() < 2;
         if (ImageRef top = host.image("obj\\e004_000.bmp"))
-            for (int x = -(moved % top->w); x < out.w; x += top->w) drawPart(out, *top, x, slots ? 0 : -36, 0, 0, top->w, top->h, 1);
-        // On Save and Load the PC draws the cards, which end at y 702, over the bottom trim. This layer comes after the
-        // cards, so only the trim's rows below them are drawn there.
-        if (ImageRef bottom = host.image("obj\\e004_001.bmp")) {
-            int skip = slots ? 702 - 662 : 0;
-            for (int x = moved % bottom->w - bottom->w; x < out.w; x += bottom->w) drawPart(out, *bottom, x, 662 + skip, 0, skip, bottom->w, bottom->h - skip, 1);
-        }
-        put(host, out, "obj\\e000_001.bmp", 4, 6, 6, 1, menuPlate(), 0);
+            for (int x = -(moved % top->w); x < out.w; x += top->w) drawPart(out, *top, x, menuPlate() < 2 ? 0 : -36, 0, 0, top->w, top->h, 1);
+        if (ImageRef bottom = host.image("obj\\e004_001.bmp"))
+            for (int x = moved % bottom->w - bottom->w; x < out.w; x += bottom->w) drawPart(out, *bottom, x, 662, 0, 0, bottom->w, bottom->h, 1);
+    }
+
+    // The red liquid behind the lower row of message buttons (set 1, from a 60 fps recording under Wine): three wave
+    // strips, each repeating across the screen with its foot on the screen's bottom edge, the dark one under two
+    // translucent ones, moving left 2, 6 and 10 pixels a frame of the recording (120, 360 and 600 a second); a frame
+    // drawn so is within 1 of 255 of the PC's. It rises from the bottom edge in about a sixth of a second as the row
+    // opens; that rise is drawn evenly, which the PC's isn't quite. The PC's bubbles in it aren't drawn. It passes in
+    // front of the gauge's foot, as on the PC.
+    void drawLiquid(PartHost &host, Canvas &out) {
+        static const struct { const char *path; int speed; } kWaves[] = {{"obj\\h001_000.bmp", 120}, {"obj\\h001_001.bmp", 360}, {"obj\\h001_002.bmp", 600}};
+        int64_t now = host.nowMs();
+        if (now - rowSeen_ > kRowGapMs || now < rowSeen_) rowFrom_ = now;
+        rowSeen_ = now;
+        rowDrawn_ = true;
+        int sunk = int(std::max<int64_t>(0, kRowRiseMs - (now - rowFrom_)) * kRowRise / kRowRiseMs);
+        for (const auto &wave : kWaves)
+            if (ImageRef strip = host.image(wave.path)) {
+                int moved = int(now * wave.speed / 1000 % strip->w);
+                for (int x = -moved; x < out.w; x += strip->w) drawPart(out, *strip, x, out.h - strip->h + sunk, 0, 0, strip->w, strip->h, 1);
+            }
     }
 
     void drawTitle(PartHost &host, Canvas &out) {
@@ -784,6 +805,8 @@ private:
     int64_t titleFrom_ = 0;
     std::string menu_;
     bool frameDrawn_ = false;
+    bool rowDrawn_ = false;
+    int64_t rowFrom_ = 0, rowSeen_ = -1000000;
     int confirming_ = -1, px_ = -1, py_ = -1;
     std::array<std::array<Card, 4>, kPhases> phaseCards_{};
     std::array<std::vector<int>, 3> charPlaces_;
