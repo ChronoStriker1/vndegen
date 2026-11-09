@@ -314,6 +314,8 @@ private:
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
     bool fullWidthPlate() const;
+    // A table picture with `turn`, at the angle the screen's clock has brought it to.
+    Picture turned(const Picture &p) const;
     bool plateUp() const;
     bool partPlate() const;
     // Whether the table's `screen defaults` has this setting.

@@ -45,6 +45,10 @@ bool pair(const std::string &s, int &a, int &b) {
 
 void drawPicture(Canvas &out, const Picture &p, float towardX, float towardY) {
     if (!p.image) return;
+    if (p.turn != 0) {
+        drawImage(out, *p.image, float(p.x) + float(p.image->w) * 0.5f, float(p.y) + float(p.image->h) * 0.5f, 1, 1, p.angle, p.alpha);
+        return;
+    }
     if (p.followX != 0 || p.followY != 0) {
         drawShifted(out, *p.image, float(p.x) - p.followX * towardX, float(p.y) - p.followY * towardY, p.alpha);
         return;
@@ -117,6 +121,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 else if (key == "stage") p.stage = number(value);
                 else if (key == "group") p.group = value;
                 else if (key == "blink") p.blinkMs = number(value);
+                else if (key == "turn") p.turn = std::strtof(value.c_str(), nullptr);
                 else if (key == "rise") {
                     std::istringstream in(value);
                     for (std::string point; std::getline(in, point, ',');)
@@ -168,6 +173,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 }
                 at += 2;
             }
+            if (p.turn != 0) screen->turning = true;
             screen->pictures.push_back(p);
         } else if (w[0] == "button" && w.size() >= 8) {
             Button b;

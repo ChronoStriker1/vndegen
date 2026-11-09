@@ -142,4 +142,24 @@ import TestSupport
         #expect(pixel(e, 108, 108) == [0, 250, 250])
         #expect(pixel(e, 120, 120) == [0, 250, 0])
     }
+
+    // `pic FILE X Y turn DEGREES` turns a picture about its middle by the screen's clock, as Test Game 83's title turns
+    // its lace circles: a bar 100 by 20 at 1100, 600 lies across at first, and stands upright a second later at 90 a second.
+    @Test func aTitlePictureTurnsAboutItsMiddle() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\cardtest\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("spin.bmp", bmp(100, 20) { _, _ in [0, 0, 250] })]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<2 { _ = vnneko_step(e, 16) }
+        // 40 right of its middle, 1150, 610, and 40 below it.
+        #expect(pixel(e, 1190, 610) == [250, 0, 0])
+        #expect(pixel(e, 1150, 650) != [250, 0, 0])
+        for _ in 0..<60 { _ = vnneko_step(e, 16) }
+        _ = vnneko_step(e, 8)
+        #expect(pixel(e, 1190, 610) != [250, 0, 0])
+        #expect(pixel(e, 1150, 650) == [250, 0, 0])
+    }
 }
