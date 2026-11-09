@@ -216,6 +216,8 @@ scene.
 
 Test Game 84's scripts name two sounds, `se\\512.ogg` and `se\\se_686.ogg`, and a flipbook, `anime\\_ef_000_011_000.bmp`, that aren't in its archives, and once load an image with no name. The PC game, from a test save just before `se_686.ogg`, shows no message and goes on to the same next line as the runtime, which skips such files and logs them. The nameless load is just after the scene clears every slot, so nothing shows there either way.
 
+Test Game 87's scripts name six files its archives don't have: four sounds (`se_608a`, named in 106 scenes, `se\\平手打ち.ogg`, `se_5.ogg` and `se_511ｄ.ogg`), an achievement picture, `parts\\funbag_000_002_000.bmp`, and Isis's standing picture `sc\\sc_002_000_000_001_104.bmp` in `ep_004_003_100`. Under Wine the PC went through the scenes naming five of them with no message (set 1: skipping from PC saves through `ep_000_002`, `ep_000_010`, `ep_001_010` to `ep_001_050`, and `ep_004_003_100`), with `se_511ｄ` taken as the same kind as the others. At the line after the missing standing picture the PC shows the room with no one in it, as the runtime does.
+
 ## Fog and effect flipbooks
 
 Test Game 84's one fog command, 80, changes nothing on the PC game: frames from before it and for 20 seconds after match to the pixel, and the frame a few lines later matches the runtime's, which draws no fog. The exe's fog is Direct3D's, which doesn't touch the game's flat pictures.
@@ -395,6 +397,8 @@ A flipbook's sprite record has 0 in its second byte and its current picture wher
 ## Menus
 
 The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables/` holds a table for each game, a file each, which `tables.cpp` gathers: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled for the menus' layout; what Test Game 94's exe gave is in the next section.
+
+Test Game 87's menus are a torn paper over a backdrop that shows at its edges, a different picture per menu, each matched exactly against the PC under Wine (set 1): `bg\\bg_154_000_000` behind Save and Load, `bg_145_000_000` behind Config, and `bg_000_000_000_000_000` behind CG, Sprites, Sex Scenes and Music. Individual Voices sits on Config's at half its brightness (`pic dim` at 128), matching the PC's to within 0.3 of 255.
 
 ## Read from Test Game 94's exe
 
