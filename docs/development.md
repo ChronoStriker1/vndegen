@@ -13,7 +13,7 @@ scripts/build.sh ios-sim   # iOS simulator app in build/sim/Build/Products/Debug
 scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ```
 
-`scripts/build.sh test` also runs the file name lookups' unit tests on a case-sensitive disk image.
+`scripts/build.sh test` also runs the file name lookups' unit tests on a case-sensitive disk image. It prints every failing Swift test with its message and each test target's summary, and keeps the whole `swift test` output in `build/swift-test.log`.
 
 ### What a build makes first
 

@@ -85,7 +85,6 @@ New bugs get a GitHub issue and a line here.
 - [#40](https://github.com/ChronoStriker1/vndegen/issues/40) Registry sync merges canonically equivalent value names.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 - [#62](https://github.com/ChronoStriker1/vndegen/issues/62) Metadata: Rinjin matched to the wrong VNDB entry.
-- [#67](https://github.com/ChronoStriker1/vndegen/issues/67) `build.sh test` can exit 1 without showing which Swift test failed.
 - [#69](https://github.com/ChronoStriker1/vndegen/issues/69) Godot build: a concurrent build can delete the shared SCons venv mid-build.
 
 ## In progress
