@@ -103,6 +103,24 @@ public:
         return true;
     }
 
+    // A controller reaches the cards beside the screen's own buttons, and only the panel's buttons while the viewer is
+    // open; in the full-height view any spot closes it, as a click does.
+    bool focusSpots(PartHost &host, std::vector<std::pair<int, int>> &spots) override {
+        if (viewing_ < 0) {
+            int first = host.page() * kPerPage;
+            for (int i = 0; i < kPerPage && first + i < int(cards_.size()); i++)
+                spots.push_back({kCardX + (i % kColumns) * kCardStepX + kCardW / 2, kCardY + (i / kColumns) * kCardStepY + kCardH / 2});
+            return false;
+        }
+        if (full_) {
+            spots.push_back({host.width() / 2, host.height() / 2});
+            return true;
+        }
+        for (const PanelButton &b : kButtons)
+            if (ImageRef sheet = host.image(b.sheet)) spots.push_back({b.x + sheet->w / b.cols / 2, b.y + sheet->h / 10});
+        return true;
+    }
+
     void reset() override {
         viewing_ = -1;
         full_ = auto_ = false;
