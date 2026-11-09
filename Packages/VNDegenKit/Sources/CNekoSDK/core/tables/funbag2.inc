@@ -366,6 +366,18 @@ button music_next obj\g003_001.bmp 723 614 7 5 4 help obj\g003_002.bmp 587 470 8
 button music_repeat obj\g003_001.bmp 793 614 7 5 5 help obj\g003_002.bmp 657 470 8 1 5 0
 button music_shuffle obj\g003_001.bmp 863 614 7 5 6 help obj\g003_002.bmp 727 470 8 1 6 0
 
+# The question, as the PC asks it under Wine: the scene darkened to 0.14, the question's plate above two answers, each
+# over a pair of crossed swords (the sheet's two halves drawn at one place).
+screen dialog
+dim 35
+pic obj\a003_001.bmp 351 228 2 1 0 0
+pic obj\a003_001.bmp 351 228 2 1 1 0
+pic obj\a003_001.bmp 695 228 2 1 0 0
+pic obj\a003_001.bmp 695 228 2 1 1 0
+pic obj\a003_000.bmp 392 51 7 1 1 0
+button yes obj\a003_002.bmp 306 312 2 5 0
+button no obj\a003_002.bmp 650 312 2 5 1
+
 screen story
 # The six choices are obj\l000_000 to _005, two options each. Sex scenes end on l000_000, which only picks the next
 # scene; option 0 also counts in S 5001 (option 1 never set it, in a run that took it every time). S 5000 is the
