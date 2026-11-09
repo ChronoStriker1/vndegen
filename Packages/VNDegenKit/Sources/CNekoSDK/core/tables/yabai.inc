@@ -45,10 +45,12 @@ lock 5 A 3 M R
 
 # Title, measured under Wine: the hall, its dark frame and the logo; five buttons and WEB QUESTION along the bottom, each
 # with its help box 46 left of and 80 above it. ADDITION opens GRAPHIC, SCENE and MUSIC above it and dims the row.
-# PROLOGUE and MAIN (d001_002's first two) belong to START; when the PC offers them isn't known yet.
+# Once the prologue has been played through (cfg.sav's global 2), START opens PROLOGUE and MAIN above it instead: MAIN
+# begins at truth 1's opening.
 screen title
 selectedlook
-submenudim
+submenudim all
+startmenu 2
 pic bg\bg_001_000_000_000_000.bmp 0 0
 pic obj\d000_000.bmp 0 0
 pic obj\d000_002.bmp 240 55
@@ -60,9 +62,14 @@ button submenu:bonus obj\d001_000.bmp 548 636 5 5 2 help obj\d002_000.bmp 502 55
 button config obj\d001_000.bmp 694 636 5 5 3 help obj\d002_000.bmp 648 556 6 1 3 0
 button quit obj\d001_000.bmp 840 636 5 5 4 help obj\d002_000.bmp 794 556 6 1 4 0
 button websurvey obj\d001_001.bmp 1026 636 1 5 0 help obj\d002_000.bmp 980 556 6 1 5 0
+button start_prologue obj\d001_002.bmp 256 509 5 5 0 group start help obj\d002_001.bmp 210 429 5 1 0 0
+button start_main obj\d001_002.bmp 256 569 5 5 1 group start help obj\d002_001.bmp 210 489 5 1 1 0
 button cg obj\d001_002.bmp 548 450 5 5 2 group bonus help obj\d002_001.bmp 502 370 5 1 2 0
 button scene obj\d001_002.bmp 548 510 5 5 3 group bonus help obj\d002_001.bmp 502 430 5 1 3 0
 button music obj\d001_002.bmp 548 570 5 5 4 group bonus help obj\d002_001.bmp 502 490 5 1 4 0
+
+screen start
+flow mainstory
 
 # Load and save, measured on the PC's load screen: six cards three across, ten pages, the nav bar along the bottom.
 screen load
@@ -399,6 +406,7 @@ hovercols 219 546 1045 571 obj\h009_000.bmp 218 476 8 6
 hovercols 219 582 1045 608 obj\h009_000.bmp 218 512 8 7
 
 screen story
+# New Game, and START > PROLOGUE.
 flow main
 # The PC keeps its mode in S 105: 2 at the hub, 4 in a scene, 8 at a vote's pick screen, 11 in the tutorial. A PC save
 # at the hub or a pick goes on there, its truth in S 2000. A PC save in a scene goes on from the first line below
@@ -406,8 +414,6 @@ flow main
 # S 2060 is 1 from a vote's pick until the next truth starts.
 # Before each chapter the table sets what the PC's saves hold there: the chapter in S 1000, the mode in S 105, and in
 # S 110 the story chapter last begun (seen 1, 100 to 400 and 503 in the PC's saves; 500 is taken as the same kind).
-resume S 105 == 2 at hub
-resume S 105 == 8 at pickresume
 # S 2083 is 1 outside the truths, in the prologue and from the ending's start: a save in the prologue without it goes on
 # to the game over on the PC. The PC's save inside chapter 1 already holds truth 1's clock, so each truth starts before
 # its opening chapter.
@@ -415,6 +421,13 @@ set S 2083 = 1
 set S 1000 = 0
 set S 105 = 4
 chapter 0
+# The prologue played through: START offers PROLOGUE and MAIN from now on (cfg.sav under Wine).
+set G 2 = 1
+jump mainstory
+# START > MAIN begins here, at truth 1's opening (the PC opens sc_000_001_000_000 at once).
+flow mainstory
+resume S 105 == 2 at hub
+resume S 105 == 8 at pickresume
 set S 2083 = 0
 open hubstart 1
 set S 1000 = 1
