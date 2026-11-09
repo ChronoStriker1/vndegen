@@ -30,6 +30,8 @@ public final class Hub {
     /// sessions never write the same saves. A backup gets at most `closingTimeout` once the game stopped.
     public private(set) var closing: Set<GameID> = []
     @ObservationIgnored private var sessionStart: Date?
+    /// The running game's last played time before this launch, put back if the game fails to start.
+    @ObservationIgnored private var lastPlayedBefore: Date?
     @ObservationIgnored private var matching: Task<Void, Never>?
     /// The automatic backups that closed sessions started, chained so the last one finishes after all the others.
     @ObservationIgnored private var sessionEndWork: Task<Void, Never>?
@@ -96,6 +98,8 @@ public final class Hub {
             guard let launch = try library.makeLaunch(id, onExit: { [weak self] in self?.endSession() }) else { return }
             let session = try plugin.makeSession(launch)
             sessionStart = .now
+            lastPlayedBefore = game.lastPlayedAt
+            // Set at launch rather than at the end, so a game VNDegen quits or crashes in still counts as played.
             library.update(id) { $0.lastPlayedAt = .now }
             screen = .playing(id, session)
         } catch {
@@ -113,10 +117,14 @@ public final class Hub {
         // The player's input handler captures the session. The library attaches its own when it reappears.
         input.onEvent = nil
         session.terminate()
-        if let start = sessionStart {
+        if session.failedToStart {
+            // A launch counts as played only once the game has started (#39).
+            library.update(id) { [lastPlayedBefore] in $0.lastPlayedAt = lastPlayedBefore }
+        } else if let start = sessionStart {
             library.update(id) { $0.playTime += Date.now.timeIntervalSince(start) }
         }
         sessionStart = nil
+        lastPlayedBefore = nil
         screen = .library
         closing.insert(id)
         let stopped = Task { await session.waitUntilStopped() }

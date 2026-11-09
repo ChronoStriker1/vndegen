@@ -34,6 +34,21 @@ private func storedURL(_ slot: ArtworkSlot, _ id: GameID, _ library: LibraryStor
     #expect(TitleMatch.confidentMatch(in: [candidate("Socks")], for: "No Socks RPG") == nil)
 }
 
+/// VNDB's "Rinjin" is an obscure 2002 entry, and better-known entries start with that word, such as the one a folder
+/// named "Rinjin" was (#62). That waits for the player. An exact title that is the best known of its kind still matches.
+@Test func aShortTitleThatBetterKnownEntriesStartWithIsNotConfident() {
+    let vn = { (id: String, title: String, votes: Int) in MetadataCandidate(ref: ExternalRef(source: .vndb, id: id), title: title, votes: votes) }
+    let rinjin = [vn("v4103", "Rinjin Kansatsu", 99), vn("v6798", "Rinjin", 2), vn("v20484", "Rinjin ni Kowasareteiku Ore no Tsuma", 172),
+                  vn("v891", "Furifuri ~Futsuu no Mainichi ni Warikondekita, Fushigi na Rinjin-tachi no Ohanashi Ohanashi~", 16)]
+    #expect(TitleMatch.confidentMatch(in: rinjin, for: "Rinjin") == nil)
+    #expect(TitleMatch.confidentMatch(in: rinjin, for: "Rinjin ni Kowasareteiku Ore no Tsuma")?.ref.id == "v20484")
+
+    let tsukihime = [vn("v7", "Tsukihime", 11706), vn("v47", "Kagetsu Tooya", 3569), vn("v17909", "Tsukihime -A piece of blue glass moon-", 3082)]
+    #expect(TitleMatch.confidentMatch(in: tsukihime, for: "Tsukihime")?.ref.id == "v7")
+    // A word that only begins another title is no rival.
+    #expect(TitleMatch.confidentMatch(in: [vn("v1", "Mizu", 5), vn("v2", "Mizuiro", 121)], for: "Mizu")?.ref.id == "v1")
+}
+
 @Test @MainActor func searchRanksEveryConfiguredSourceByTitle() async {
     let network = StubNetwork()
     let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
