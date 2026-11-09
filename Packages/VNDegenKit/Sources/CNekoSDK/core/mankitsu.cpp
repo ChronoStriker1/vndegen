@@ -75,7 +75,7 @@ const std::vector<const char *> kEvents[3][kMaxHearts] = {
 };
 // A heroine with four hearts in the last two half-weeks: a short scene of hers.
 const char *const kLate[3][2] = {{"ep_007_001_003", "ep_007_001_004"}, {"ep_007_002_002", "ep_007_002_003"}, {"ep_007_003_003", "ep_007_003_004"}};
-// The common scenes after a half-week's pick, and at the end the heroine's last event (none: 029) and two more.
+// The common scenes after a half-week's pick, and at the end the heroine's last event and two more (none: 029 alone).
 const std::vector<const char *> kAfter[kPhases] = {
     {}, {"ep_001_010_000", "ep_001_011_000", "ep_001_011_001"}, {}, {"ep_001_015_000", "ep_001_016_000"}, {},
     {"ep_001_021_000"}, {}, {"ep_001_025_000"}, {}, {"ep_001_030_000", "ep_001_031_000"},
@@ -209,8 +209,10 @@ public:
         if (cs.heroine < 0) add(cs.scenes);
         else if (hearts < kMaxHearts) add(kEvents[cs.heroine][hearts]);
         else add({kLate[cs.heroine][phase == kPhases - 1 ? 1 : 0]});
+        // The last pick: the heroine's last event and two common scenes, or with none at four hearts 029 alone, after
+        // which the PC goes back to the title (set 1, a run picking no heroine).
         if (phase == kPhases - 1) add(kFinal[std::clamp(ending, 0, 3)]);
-        add(kAfter[phase]);
+        if (phase < kPhases - 1 || ending > 0) add(kAfter[phase]);
         return out;
     }
 

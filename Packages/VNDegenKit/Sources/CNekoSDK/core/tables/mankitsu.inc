@@ -11,7 +11,7 @@ screen story
 # Kururu's, Otona's and Rei's routes end, and once all three are, a route goes on into the shared ending, which sets G 83
 # (the title's six silhouettes, checked by editing cfg.sav under Wine). Each route skips one of its scripts on the PC
 # runs, ep_002_005, ep_003_005 and ep_004_004, each with another heroine in it; what plays them isn't known yet. The
-# ending with no heroine at four hearts (ep_001_029) is the part's guess from the exe's list, not yet seen.
+# ending with no heroine at four hearts is ep_001_029 alone, then the title (seen under Wine).
 flow main
 scene scr\ep_000_000_000.txt
 scene scr\ep_000_000_001.txt
