@@ -1,4 +1,5 @@
 #include "image.h"
+#include "webp.h"
 
 #include <algorithm>
 #include <cstring>
@@ -132,6 +133,8 @@ ImageRef Images::decode(const std::string &path) const {
         image->rgba.assign(px, px + size_t(w) * h * 4);
         image->opaque = n != 2 && n != 4;
         stbi_image_free(px);
+    } else if (isWebP(*data)) {
+        if (!decodeWebP(*data, path, [this](const std::string &base) { return decode(base); }, *image)) return nullptr;
     } else {
         return nullptr;
     }

@@ -85,8 +85,8 @@ ImageRef commentPicture(const std::string &text) {
 }  // namespace
 
 // `//` starts a comment line. A group's lines run from its `#p` line to `##`.
-std::map<int, CommentGroup> parseCommentList(const std::string &text) {
-    std::map<int, CommentGroup> groups;
+std::vector<CommentGroup> parseCommentList(const std::string &text) {
+    std::vector<CommentGroup> groups;
     std::istringstream in(text);
     std::string line;
     CommentGroup *open = nullptr;
@@ -95,10 +95,10 @@ std::map<int, CommentGroup> parseCommentList(const std::string &text) {
         if (line.rfind("//", 0) == 0) continue;
         if (line.rfind("#p", 0) == 0) {
             std::istringstream words(line.substr(2));
-            int number = 0;
             CommentGroup group;
-            words >> number >> group.a >> group.b;
-            open = &(groups[number] = group);
+            words >> group.number >> group.a >> group.b;
+            groups.push_back(group);
+            open = &groups.back();
         } else if (line == "##") {
             open = nullptr;
         } else if (open && !line.empty()) {
@@ -106,6 +106,12 @@ std::map<int, CommentGroup> parseCommentList(const std::string &text) {
         }
     }
     return groups;
+}
+
+const CommentGroup *findCommentGroup(const std::vector<CommentGroup> &groups, int number) {
+    for (const CommentGroup &group : groups)
+        if (group.number == number) return &group;
+    return number >= 0 && size_t(number) < groups.size() ? &groups[size_t(number)] : nullptr;
 }
 
 bool CommentStream::load(PartHost &host, const std::string &path) {
@@ -129,15 +135,15 @@ bool CommentStream::load(PartHost &host, const std::string &path) {
 void CommentStream::play(PartHost &host, int group) {
     playing_.push_back(group);
     ended_ = false;
-    auto it = groups_.find(group);
-    if (it == groups_.end()) {
+    const CommentGroup *found = findCommentGroup(groups_, group);
+    if (!found) {
         host.log("comment group missing: " + std::to_string(group));
         return;
     }
     Cursor cursor;
-    cursor.lines = it->second.lines;
-    cursor.a = it->second.a;
-    cursor.b = std::max(it->second.a, it->second.b);
+    cursor.lines = found->lines;
+    cursor.a = found->a;
+    cursor.b = std::max(found->a, found->b);
     cursor.at = host.nowMs();
     cursors_.push_back(std::move(cursor));
 }

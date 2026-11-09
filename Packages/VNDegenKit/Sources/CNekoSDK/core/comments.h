@@ -2,7 +2,6 @@
 // commands load a list of them and play its groups (the `yabai` part), and the vote screens play their own lists
 // (set 2's part), each through a CommentStream of its own.
 #pragma once
-#include <map>
 #include <string>
 #include <vector>
 
@@ -12,14 +11,18 @@
 
 namespace neko {
 
-// One `#p GROUP A B` block of a list file: its two numbers and its lines, in the file's code page.
+// One `#p GROUP A B` block of a list file: its number, its two numbers and its lines, in the file's code page.
 struct CommentGroup {
-    int a = 0, b = 0;
+    int number = 0, a = 0, b = 0;
     std::vector<std::string> lines;
 };
 
-// The groups of a list file's text, by number.
-std::map<int, CommentGroup> parseCommentList(const std::string &text);
+// The blocks of a list file's text, in the file's order.
+std::vector<CommentGroup> parseCommentList(const std::string &text);
+// Group N of a list: the first block numbered N, or with none, the block at place N. Test Game 96's com_11_0003 and
+// _0004 number two blocks 1 and none 2, and com_31_0003 two 5 and none 8, though their scenes play 2 and 8; com_21_0003
+// numbers its sixth block 8 and its ninth 5, so the numbers count where they're given. Which the PC plays is unconfirmed.
+const CommentGroup *findCommentGroup(const std::vector<CommentGroup> &groups, int number);
 
 class CommentStream {
 public:
@@ -64,7 +67,7 @@ private:
     int freeLane(PartHost &host, int64_t now) const;
 
     std::string path_;
-    std::map<int, CommentGroup> groups_;
+    std::vector<CommentGroup> groups_;
     std::vector<int> playing_;  // the groups started, in order, for a save
     std::vector<Pending> pending_;
     std::vector<Cursor> cursors_;

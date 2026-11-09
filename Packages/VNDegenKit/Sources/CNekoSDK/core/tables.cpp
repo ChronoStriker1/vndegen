@@ -15,8 +15,10 @@ namespace {
 #include "tables/animother.inc"
 #include "tables/rinjin.inc"
 #include "tables/sideboob2.inc"
+#include "tables/funbagfantasy1.inc"
 #include "tables/storytest.inc"
 #include "tables/layouttest.inc"
+#include "tables/cardtest.inc"
 #include "tables/bandtest.inc"
 #include "tables/widgettest.inc"
 
@@ -38,6 +40,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\animother") return kAniMother;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return kRinjin;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return kSideboob2;
+    if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpc") return kStoryTest;
     // The same story with a load screen and a question box, for a tap across a load (NekoSDKStoryTableTests).
     if (folder == "vndegen\\storytestload") {
@@ -45,6 +48,7 @@ const char *menuTable(const std::string &folder) {
         return table.c_str();
     }
     if (folder == "vndegen\\layouttest") return kLayoutTest;
+    if (folder == "vndegen\\cardtest") return kCardTest;
     if (folder == "vndegen\\bandtest") return kBandTest;
     if (folder == "vndegen\\widgettest") return kWidgetTest;
     if (folder == "vndegen\\widgettesthide") return kWidgetTestHide;

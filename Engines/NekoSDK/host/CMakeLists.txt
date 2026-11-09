@@ -15,12 +15,14 @@ set(SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Shared)
 find_package(ZLIB REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
+# Test Game 82's WebP pictures. Apple builds use ImageIO instead.
+pkg_check_modules(WEBP REQUIRED IMPORTED_TARGET libwebp)
 
 file(GLOB RUNTIME_SOURCES ${RUNTIME}/core/*.cpp ${RUNTIME}/core/*.c)
 add_library(nekosdk STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c)
 target_include_directories(nekosdk PUBLIC ${RUNTIME}/core ${RUNTIME}/include ${SHARED})
 target_compile_definitions(nekosdk PUBLIC NEKO_FONTS_DIR="${SHARED}/fonts")
-target_link_libraries(nekosdk PUBLIC ZLIB::ZLIB PkgConfig::FREETYPE pthread)
+target_link_libraries(nekosdk PUBLIC ZLIB::ZLIB PkgConfig::FREETYPE PkgConfig::WEBP pthread)
 # Tools write PNGs with stb_image_write, from the Wolf runtime's copy of stb.
 target_include_directories(nekosdk PUBLIC ${RUNTIME}/../CWolfRPG/third_party)
 
