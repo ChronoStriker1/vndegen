@@ -3504,7 +3504,7 @@ void Engine::composeScreen(Canvas &out) {
     trackSubmenu();
     for (Button &b : screen_->buttons) {
         float squeeze = squeezeOf(b);
-        bool closing = !squeezeOpening_ && squeeze > 0 && b.group == squeezeGroup_;
+        bool closing = !squeezeOpening_ && squeeze > 0 && !b.group.empty() && b.group == squeezeGroup_;
         if (!shown(b) && !closing) continue;
         if (squeeze < 1 || closing) {
             // Column by column, each from the picture's column at that fraction of its width.
