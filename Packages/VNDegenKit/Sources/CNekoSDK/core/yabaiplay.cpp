@@ -30,11 +30,9 @@ std::map<int, std::vector<std::string>> parseChapters(const std::string &text) {
             open = nullptr;
         } else if (open) {
             // A file may be followed by `,0` or `,1` (whether the swimsuit choice changes it); 96 writes none.
-            line = line.substr(0, line.find(','));
-            std::string path;
-            for (size_t i = 0; i < line.size(); i++)
-                if (!(line[i] == '\\' && i + 1 < line.size() && line[i + 1] == '\\')) path += line[i];
-            open->push_back(path);
+            // The name is kept as written, doubled backslash and all: the PC's saves and read.sav name scenes that way,
+            // and its scene gallery unlocks by those names.
+            open->push_back(line.substr(0, line.find(',')));
         }
     }
     return chapters;
