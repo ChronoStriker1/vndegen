@@ -19,16 +19,12 @@ struct CommentGroup {
 
 // The blocks of a list file's text, in the file's order.
 std::vector<CommentGroup> parseCommentList(const std::string &text);
-// Group N of a list: the first block numbered N, or with none, the block at place N. Test Game 96's com_11_0003 and
-// _0004 number two blocks 1 and none 2, and com_31_0003 two 5 and none 8, though their scenes play 2 and 8; com_21_0003
-// numbers its sixth block 8 and its ninth 5, so the numbers count where they're given. Which the PC plays is unconfirmed.
-const CommentGroup *findCommentGroup(const std::vector<CommentGroup> &groups, int number);
 
 class CommentStream {
 public:
     // A list file's groups: `#p GROUP A B`, its lines, `##` (cfg\com\*.ini, cfg\CommentList*.ini). False when missing.
     bool load(PartHost &host, const std::string &path);
-    // Group N of the loaded list starts now; one already playing goes on.
+    // Every block numbered N in the loaded list starts now, each sending its own comments; one already playing goes on.
     void play(PartHost &host, int group);
     // Lines given inline, as command 113's: each `《text》` or `《text》,X,Y`.
     void lines(PartHost &host, const std::vector<std::string> &texts);
