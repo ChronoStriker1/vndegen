@@ -317,6 +317,55 @@ cell 362 541
 cell 602 541
 cell 842 541
 
+# The music screen, measured under Wine: the tracks in three columns, the player under them and its volume at the left.
+screen music
+pic bg\bg_000_000_000.bmp 0 0 more bg\bg_000_000_000.bmp,bg\bg_000_001_000.bmp,bg\bg_000_002_000.bmp,bg\bg_000_003_000.bmp,bg\bg_000_004_000.bmp,bg\bg_000_005_000.bmp,bg\bg_000_006_000.bmp,bg\bg_000_008_000.bmp,bg\bg_000_009_000.bmp,bg\bg_000_017_000.bmp,bg\bg_000_018_000.bmp,bg\bg_000_020_000.bmp,bg\bg_000_022_000.bmp,bg\bg_000_023_000.bmp,bg\bg_000_025_000.bmp random
+pic dim 0 0 alpha 138
+pic obj\e001_000.bmp 1103 0
+pic obj\e000_000.bmp 0 0
+pic obj\e000_001.bmp 22 18 6 1 4 0
+pic obj\g000_000.bmp 15 93
+pic obj\g001_000.bmp 283 495
+pic obj\g002_000.bmp 135 591
+pic obj\g003_000.bmp 397 591
+slider music obj\g002_002.bmp 191 627
+knob music obj\g002_001.bmp 186 625 1.08
+hover 135 591 366 684 obj\g003_002.bmp 8 470 8 1 7 0
+button nav_save obj\e001_001.bmp 1114 61 9 5 0 help obj\e001_002.bmp 947 15 9 1 0 0
+button nav_load obj\e001_001.bmp 1114 131 9 5 1 help obj\e001_002.bmp 947 85 9 1 1 0
+button nav_cg obj\e001_001.bmp 1114 201 9 5 2 help obj\e001_002.bmp 947 155 9 1 2 0
+button nav_scene obj\e001_001.bmp 1114 271 9 5 3 help obj\e001_002.bmp 947 225 9 1 3 0
+button nav_music obj\e001_001.bmp 1114 341 9 5 4 help obj\e001_002.bmp 947 295 9 1 4 0
+button nav_config obj\e001_001.bmp 1114 411 9 5 5 help obj\e001_002.bmp 947 365 9 1 5 0
+button nav_title obj\e001_001.bmp 1114 481 9 5 6 help obj\e001_002.bmp 947 435 9 1 6 0
+button nav_quit obj\e001_001.bmp 1114 551 9 5 7 help obj\e001_002.bmp 947 505 9 1 7 0
+button back obj\e001_001.bmp 1114 639 9 5 8 help obj\e001_002.bmp 947 593 9 1 8 0
+button track0 obj\g000_001.bmp 163 108 18 5 0
+button track1 obj\g000_001.bmp 163 155 18 5 1
+button track2 obj\g000_001.bmp 163 202 18 5 2
+button track3 obj\g000_001.bmp 163 249 18 5 3
+button track4 obj\g000_001.bmp 163 296 18 5 4
+button track5 obj\g000_001.bmp 163 343 18 5 5
+button track6 obj\g000_001.bmp 442 108 18 5 6
+button track7 obj\g000_001.bmp 442 155 18 5 7
+button track8 obj\g000_001.bmp 442 202 18 5 8
+button track9 obj\g000_001.bmp 442 249 18 5 9
+button track10 obj\g000_001.bmp 442 296 18 5 10
+button track11 obj\g000_001.bmp 442 343 18 5 11
+button track12 obj\g000_001.bmp 721 108 18 5 12
+button track13 obj\g000_001.bmp 721 155 18 5 13
+button track14 obj\g000_001.bmp 721 202 18 5 14
+button track15 obj\g000_001.bmp 721 249 18 5 15
+button track16 obj\g000_001.bmp 721 296 18 5 16
+button track17 obj\g000_001.bmp 721 343 18 5 17
+button music_prev obj\g003_001.bmp 443 614 7 5 0 help obj\g003_002.bmp 307 470 8 1 0 0
+button music_pause obj\g003_001.bmp 513 614 7 5 1 help obj\g003_002.bmp 377 470 8 1 1 0
+button music_play obj\g003_001.bmp 583 614 7 5 2 help obj\g003_002.bmp 447 470 8 1 2 0
+button music_stop obj\g003_001.bmp 653 614 7 5 3 help obj\g003_002.bmp 517 470 8 1 3 0
+button music_next obj\g003_001.bmp 723 614 7 5 4 help obj\g003_002.bmp 587 470 8 1 4 0
+button music_repeat obj\g003_001.bmp 793 614 7 5 5 help obj\g003_002.bmp 657 470 8 1 5 0
+button music_shuffle obj\g003_001.bmp 863 614 7 5 6 help obj\g003_002.bmp 727 470 8 1 6 0
+
 screen story
 # The six choices are obj\l000_000 to _005, two options each. Sex scenes end on l000_000, which only picks the next
 # scene; option 0 also counts in S 5001 (option 1 never set it, in a run that took it every time). S 5000 is the
