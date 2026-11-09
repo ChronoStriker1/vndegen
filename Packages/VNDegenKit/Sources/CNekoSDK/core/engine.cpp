@@ -340,6 +340,10 @@ void Engine::openScreen(const std::string &name) {
     if (spriteScreen() && name != "sprites") closeSprites();
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
+    if (const auto *line = screen_->setting("part"); line && !line->empty()) {
+        if (GamePart *part = menuPart()) part->openScreen(*partHost_, name, {});
+        else warnOnce("The screen " + name + " names a part the table doesn't turn on: " + (*line)[0]);
+    }
     pressed_.clear();
     dirty_ = true;
     page_ = 0;
@@ -3376,6 +3380,8 @@ void Engine::composeScreen(Canvas &out) {
     composeTrackCards(out);
     composeTrackTime(out);
     composeSettingsWidgets(out);
+    GamePart *part = menuPart();
+    if (part) part->draw(*partHost_, out, Layer::Menu, 0, 0);
     bool fromTitle = returnTo_ == "title";
     // `helplast`: hovered help draws after every button, as Test Games 92 and 93 draw their side menu's bubbles over the
     // entry above.
@@ -3511,6 +3517,7 @@ void Engine::composeScreen(Canvas &out) {
             for (int x = 0; x < out.w; x++)
                 for (int c = 0; c < 3; c++) row[x * 4 + c] = uint8_t(std::lround(float(row[x * 4 + c]) * m[c]));
         }
+    if (part) part->draw(*partHost_, out, Layer::Screen, 0, 0);
     if (dialogOpen_) composeDialog(out);
 }
 
@@ -4321,6 +4328,8 @@ bool Engine::step(int ms) {
         stepViewer(ms);
     }
     if (screen_ || logOpen_ || dialogOpen_) {
+        // A table screen's part goes on stepping, as its own screen would.
+        if (GamePart *part = screen_ && !dialogOpen_ ? menuPart() : nullptr; part && part->step(*partHost_)) dirty_ = true;
         // The story's clock stops, and a movie's sound with it.
         stopMovieSound();
         return waiting_ != Waiting::Ended;
@@ -4442,6 +4451,11 @@ void Engine::mouseMove(float x, float y) {
     }
     if (spriteScreen() && moved) spritePointerMoved();
     if (partScreen_ && moved && !screen_ && !dialogOpen_ && !logOpen_) partScreen_->pointer(*partHost_, px, py);
+    if (moved && screen_ && !dialogOpen_)
+        if (GamePart *part = menuPart()) {
+            part->pointer(*partHost_, px, py);
+            dirty_ = true;
+        }
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
         else pressSettingsWidget(px, py, true);
@@ -4469,6 +4483,12 @@ void Engine::mouseButton(int button, bool down) {
         if (partScreen_->press(*partHost_, pointerX_, pointerY_, button)) dirty_ = true;
         return;
     }
+    // A table screen's part takes the presses it wants first, and the screen's buttons get the rest.
+    if (screen_ && !dialogOpen_ && !logOpen_)
+        if (GamePart *part = menuPart(); part && part->press(*partHost_, pointerX_, pointerY_, button)) {
+            dirty_ = true;
+            return;
+        }
     // `mousechoice`: the right button takes a choice's last option, as Test Game 94's mouse icons say.
     if (button == 1 && waiting_ == Waiting::Choice && choiceSheet_ && !screen_ && !dialogOpen_ && !logOpen_ && choiceTable("mousechoice")) {
         choose(choiceCount_ - 1);

@@ -671,6 +671,7 @@ private:
     void runOldLayout(const Node &n);
     void resetParts();
     bool partCommand(const Node &n);
+    GamePart *menuPart() const;
     bool loadPartImage(int slot, const std::string &path, int x, int y, bool additive, float scrollX, float scrollY);
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);
     void finishPartScreen(int result);
