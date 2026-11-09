@@ -57,6 +57,7 @@ constexpr int kFollowMs = 120;  // the second strip's lag behind the first, in a
 constexpr int kTitleBottomShift = 152;
 constexpr int kTitleMs = 4333, kTitleFadeMs = 600, kTitleTrimSpeed = 240, kTitleTrimPeriod = 600;
 constexpr int kMenuTrimSpeed = 240;
+constexpr int kNewsX = 803, kNewsW = 414, kNewsSpeed = 120;
 // The lower row's liquid: how far and how long it rises as the row opens, and the gap in its drawing that makes the next
 // drawing a new opening.
 constexpr int kRowRise = 82, kRowRiseMs = 170, kRowGapMs = 100;
@@ -517,6 +518,23 @@ private:
             for (int x = -kTitleBottomShift; x < out.w; x += bottom->w) drawPart(out, *bottom, x, 720 - bottom->h, 0, 0, bottom->w, bottom->h, 1);
         put(host, out, "obj\\d000_001.bmp", 16, 5);
         put(host, out, six ? "obj\\d010_002.bmp" : "obj\\d006_002.bmp", 842, 694);
+        drawNews(host, out, t);
+    }
+
+    // The additional edition's Information box, from sys_2.pak (set 1, fitted on shots and a 30 fps recording of the
+    // release's second exe under Wine): the box at 770, 57, and in its window, 414 wide from x 803, one line of text
+    // at y 91 moving left 4 pixels a frame of the recording (120 a second) and coming round every 414, under the
+    // window's shade. Where along its round the text starts isn't measured.
+    void drawNews(PartHost &host, Canvas &out, int64_t t) {
+        ImageRef box = host.image("sys_2\\obj\\d401_000.bmp"), text = host.image("sys_2\\obj\\d401_001.bmp");
+        if (!box || !text) return;
+        drawPart(out, *box, 770, 57, 0, 0, box->w, box->h, 1);
+        int moved = int(t * kNewsSpeed / 1000 % kNewsW);
+        for (int x = kNewsX + kNewsW - moved - kNewsW; x < kNewsX + kNewsW; x += kNewsW) {
+            int from = std::max(x, kNewsX), to = std::min(x + text->w, kNewsX + kNewsW);
+            if (to > from) drawPart(out, *text, from, 91, from - x, 0, to - from, text->h, 1);
+        }
+        put(host, out, "sys_2\\obj\\d401_002.bmp", kNewsX, 84);
     }
 
     static std::string lower(std::string text) {

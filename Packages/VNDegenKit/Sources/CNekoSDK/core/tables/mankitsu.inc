@@ -38,6 +38,8 @@ default bar_always 1
 underbelow 632
 # In a Scene replay the PC draws these four disabled and they take no press; only Exit works (a PC shot under Wine).
 replayoff Save Load Config Title
+# The title's three bonus stories start the story with S 10907 naming one (see `screen title` and `flow main`).
+routevar 10907
 
 screen title
 # Measured under Wine. The mankitsu part draws the backgrounds, silhouettes, logo and trims; the buttons are 40 pixels
@@ -58,6 +60,13 @@ button start_main obj\d001_002.bmp 746 422 5 5 1 group start help obj\d002_000.b
 button cg obj\d001_002.bmp 746 382 5 5 2 group extras help obj\d002_000.bmp 600 278 12 1 9 0
 button scene obj\d001_002.bmp 746 422 5 5 3 group extras help obj\d002_000.bmp 600 318 12 1 10 0
 button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 600 358 12 1 11 0
+# The additional edition (the release's second exe, with sys_2.pak): three book covers, each playing its bonus story and
+# coming back here, with a help card over it. Fitted on PC shots of that exe under Wine, exact. The mankitsu part draws
+# the Information box and its ticker. Without sys_2.pak none of it is there. That exe's small label beside the
+# copyright isn't drawn: no picture of the game's holds it.
+button route1 sys_2\obj\d400_001.bmp 759 147 3 5 0 help sys_2\obj\d400_002.bmp 579 61 3 1 0 0
+button route2 sys_2\obj\d400_001.bmp 919 147 3 5 1 help sys_2\obj\d400_002.bmp 739 61 3 1 1 0
+button route3 sys_2\obj\d400_001.bmp 1079 147 3 5 2 help sys_2\obj\d400_002.bmp 899 61 3 1 2 0
 
 # Main Story starts after the prologue, just before the first select screen.
 screen start
@@ -515,6 +524,10 @@ screen story
 # a save's card: 1 in every PC save of the common route so far; where it becomes 2 to 5 is taken from the card's labels
 # and not yet read from PC saves (unconfirmed).
 flow main
+# A bonus story from the title's covers: its one script, then the title (a file trace of the second exe under Wine).
+if S 10907 == 1 goto bonus1
+if S 10907 == 2 goto bonus2
+if S 10907 == 3 goto bonus3
 scene scr\ep_000_000_000.txt
 scene scr\ep_000_000_001.txt
 scene scr\ep_000_000_002.txt
@@ -531,6 +544,15 @@ scene scr\ep_001_005_000.txt
 scene scr\ep_001_005_001.txt
 scene scr\ep_001_006_000.txt
 jump weeks
+label bonus1
+scene sys_2\scr\ep_011_000_000.txt
+end
+label bonus2
+scene sys_2\scr\ep_011_000_001.txt
+end
+label bonus3
+scene sys_2\scr\ep_011_000_002.txt
+end
 
 # Main Story from the title starts with a scene of three lines that New Game's way doesn't play, its PC number 14 (set
 # 1, under Wine), and then the first select screen.
