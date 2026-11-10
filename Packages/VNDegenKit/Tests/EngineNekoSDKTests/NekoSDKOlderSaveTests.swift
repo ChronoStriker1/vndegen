@@ -333,4 +333,25 @@ import TestSupport
         for _ in 0..<3 { _ = vnneko_step(again, 16) }
         #expect(pixel(again, 194, 326) == [255, 0, 0])
     }
+
+    @Test func aChanceCountWithNoSecondListStillReadsAsBefore() throws {
+        let root = try game("layout90")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_save(e, 1))
+        vnneko_stop(e)
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", "layout90")))
+        let name = try #require(save.range(of: Data("sc\\r.bmp".utf8))).lowerBound
+        let block = name - 14 + 452 + 8 - save.startIndex
+        #expect(int32(save, block + 26) == 0)
+        for count in [Int32(1), 2, 64] {
+            save.replaceSubrange((save.startIndex + block + 26)..<(save.startIndex + block + 30), with: withUnsafeBytes(of: count.littleEndian, { Data($0) }))
+            var built = [UInt8](repeating: 0, count: save.count + 64)
+            let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout90", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+            #expect(size == save.count, "\(count)")
+            #expect(Data(built.prefix(size)) == save, "\(count)")
+        }
+    }
 }

@@ -5673,6 +5673,7 @@ bool Engine::gtBackToStory() {
 bool Engine::gtNextScript() {
     if (gt_.ejaculating) return gtBackToStory();
     if (!gt_.extending) return false;
+    if (setting("gt_off")) return gtBackToStory();
     gt_.played++;
     if (gt_.group >= 0 && size_t(gt_.index + 1) < gt_.groups[gt_.group].size()) {
         gt_.index++;

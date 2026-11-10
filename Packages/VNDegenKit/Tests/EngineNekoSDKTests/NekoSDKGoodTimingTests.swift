@@ -131,4 +131,22 @@ import TestSupport
         click(e)
         #expect(playing(e) == "scr\\s2.txt")
     }
+
+    @Test func theSwitchTurnedOffEndsAnExtensionAtItsNextScript() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(playing(e) == "scr\\s1.txt")
+        #expect(vnneko_debug_press(e, "Extension"))
+        click(e)
+        #expect(playing(e) == "gt\\scr\\onex.txt")
+        click(e)
+        #expect(playing(e) == "gt\\scr\\oneA1.txt")
+        #expect(vnneko_debug_press(e, "GOODTiming"))
+        click(e)
+        #expect(playing(e) == "scr\\s1.txt")
+        click(e)
+        #expect(playing(e) == "scr\\s2.txt")
+    }
 }

@@ -424,8 +424,13 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     for (int k = 0; k < count && r.ok; k++) {
         SavedSprite s;
         if (older) r.skip(size_t(layout.olderRecordGap));
-        r.skip(1);
-        bool ordinary = r.u8() != 0;
+        uint8_t lead = r.u8();
+        uint8_t kind = r.u8();
+        if (&into != &out.sprites && (lead != 1 || kind > 1)) {
+            r.ok = false;
+            break;
+        }
+        bool ordinary = kind != 0;
         s.slot = r.i32();
         int number = r.i32();
         if (!ordinary) s.flipFrame = number;
