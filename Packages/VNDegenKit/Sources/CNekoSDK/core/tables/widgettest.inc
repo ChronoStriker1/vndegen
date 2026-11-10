@@ -15,6 +15,7 @@ button sub obj\b.bmp 200 0 1 5 0 group menu
 screen config
 range rose 0 50
 knob rose obj\k.bmp 100 300 6
+slider rose obj\k.bmp 100 500 50 10
 )";
 
 // The same title with `submenudim hide`: the other buttons go while a submenu is open (Test Game 83's); a colour key, a
