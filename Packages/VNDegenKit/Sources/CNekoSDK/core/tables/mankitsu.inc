@@ -24,11 +24,9 @@ default se 60
 default hse 60
 default voice 80
 default backvoice 80
-# Text and auto speed run 0 to 100 and start at 50, as its Config shows. Their pace isn't timed on 90's PC yet: Test
-# Game 87's, the same Config, stands in (unconfirmed).
 default text 50
 textfade 50
-textpoints text 0 184.9 10 153.7 25 101.8 40 52.6 50 17.6 60 4.9 75 2.6 90 1.5 100 0
+textpoints text 1 296 21 181 30 147 40 88.3 50 29.6 60 9.4 71 5.4 81 4.1 91 3.1 100 0
 default auto 50
 autocurve auto 104 1.04 527 1
 autowithvoice
