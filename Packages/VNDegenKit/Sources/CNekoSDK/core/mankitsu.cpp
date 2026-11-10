@@ -52,6 +52,7 @@ namespace {
 
 constexpr int kFaceX = 0, kFaceY = 512;
 constexpr int kFollowMs = 120;  // the second strip's lag behind the first, in and out
+constexpr int kCaptionInMs = 100, kCaptionBack = 15, kCaptionDrift = 30;
 
 constexpr int kTitleBottomShift = 152;
 constexpr int kTitleMs = 4333, kTitleFadeMs = 600, kTitleTrimSpeed = 240, kTitleTrimPeriod = 600;
@@ -226,6 +227,13 @@ public:
             panels_[0] = n.s[1];
             panels_[1] = n.s[2];
             holdMs_ = std::max(0, int(n.p[14]));
+            slideIn_ = std::clamp(int(n.p[4]), 1, 600);
+            slideOut_ = std::clamp(int(n.p[7]), 1, 600);
+            captionIn_ = std::clamp(int(n.p[5]), 0, 600);
+            captionStay_ = std::clamp(int(n.p[6]), 0, 6000);
+            caption_ = captionIn_ + captionStay_ > 0 ? n.s[3] : std::string();
+            captionCols_ = n.p[0] == 2 ? 2 : 1;
+            captionCol_ = std::clamp(int(n.p[2]), 0, captionCols_ - 1);
             return true;
         case 162: startSlide(host); return true;
         case 161:
@@ -751,15 +759,16 @@ private:
             Bar b;
             b.y = y;
             b.h = std::min(rnd(12, 64), host.height() - y);
-            b.inDelay = rnd(0, 200);
-            b.inMs = rnd(300, 400);
-            b.outDelay = rnd(0, 300);
-            b.outMs = rnd(350, 500);
+            int in = slideIn_ * 1000 / 60, away = slideOut_ * 1000 / 60;
+            b.inDelay = rnd(0, in * 30 / 100);
+            b.inMs = rnd(in * 40 / 100, in * 50 / 100);
+            b.outDelay = rnd(0, away * 30 / 100);
+            b.outMs = rnd(away * 50 / 100, away * 70 / 100);
             bars_.push_back(b);
             y += b.h;
         }
         slideFrom_ = host.nowMs();
-        outFrom_ = slideFrom_ + coverMs() + holdMs_;
+        outFrom_ = caption_.empty() ? slideFrom_ + coverMs() + holdMs_ : slideFrom_ + int64_t(slideIn_ + captionIn_ + captionStay_ + slideOut_) * 1000 / 60;
         host.redraw();
     }
 
@@ -799,6 +808,24 @@ private:
                 drawImage(out, *img, (left + right) / 2.0f, b.y + b.h / 2.0f, sx, sy, 0, 1);
             }
         }
+        ImageRef caption = caption_.empty() ? nullptr : host.image(caption_);
+        if (!caption) return;
+        int cw = caption->w / captionCols_;
+        int64_t t = now - slideFrom_, arrive = int64_t(slideIn_ + captionIn_) * 1000 / 60 + kCaptionInMs;
+        int64_t leave = arrive + int64_t(captionStay_) * 1000 / 60 - kCaptionInMs, away = int64_t(slideOut_) * 1000 / 60;
+        float rest = float(w - cw) / 2 - kCaptionBack, x = 0;
+        if (t < arrive - kCaptionInMs || t >= leave + away) return;
+        if (t < arrive) {
+            float u = 1 - float(arrive - t) / float(kCaptionInMs);
+            x = float(-cw) + (rest + float(cw)) * (1 - (1 - u) * (1 - u));
+        } else if (t < leave) {
+            float u = float(t - arrive) / float(std::max<int64_t>(1, leave - arrive));
+            x = rest + float(kCaptionDrift) * u * u;
+        } else {
+            float u = float(t - leave) / float(std::max<int64_t>(1, away));
+            x = rest + float(kCaptionDrift) + (float(w) - rest - float(kCaptionDrift)) * u * u;
+        }
+        drawPart(out, *caption, int(std::lround(x)), (host.height() - caption->h) / 2, captionCol_ * cw, 0, cw, caption->h, 1);
     }
 
     // The select screen.
@@ -961,6 +988,8 @@ private:
     int64_t fadeFrom_ = 0;
     int fadeMs_ = 0;
     std::string panels_[2];
+    std::string caption_;
+    int slideIn_ = 30, slideOut_ = 30, captionIn_ = 0, captionStay_ = 0, captionCols_ = 1, captionCol_ = 0;
     int holdMs_ = 0;
     std::vector<Bar> bars_;
     int64_t slideFrom_ = -1, outFrom_ = -1;
