@@ -52,6 +52,9 @@ const KnownLong kKnownLong[] = {
     {"waffle\\tmgb", "scr\\gt_023_001_005.txt", 11},
     {"waffle\\tmgb", "scr\\gt_301_001_001.txt", 6},
     {"waffle\\隣人に壊されていく俺の妻", "scr\\ep_900_000_025_100.txt", 4},
+    // Test Game 96: an English line that wraps to five lines at MS Gothic 25 and overflows by 1 pixel, as the PC does with
+    // the Japanese face substituted under Wine (set 2).
+    {"waffle\\ヤバい！－復讐・闇サイト－", "scr\\sc_004_000_002_001.txt", 852},
 };
 
 // Plain-text notes a game keeps among its scripts, which aren't scripts.

@@ -13,6 +13,7 @@ std::unique_ptr<GamePart> makeScrollPart();
 std::unique_ptr<GamePart> makeParticlesPart();
 std::unique_ptr<GamePart> makeCharGalleryPart();
 std::unique_ptr<GamePart> makeYabaiPart();
+std::unique_ptr<GamePart> makeYabaiPlayPart();
 std::unique_ptr<GamePart> makeYabaiTreePart();
 std::unique_ptr<GamePart> makeYabaiVotePart();
 
@@ -29,6 +30,7 @@ const PartEntry kParts[] = {
     {"particles", makeParticlesPart},
     {"chargallery", makeCharGalleryPart},
     {"yabai", makeYabaiPart},
+    {"yabaiplay", makeYabaiPlayPart},
     {"yabaitree", makeYabaiTreePart},
     {"yabaivote", makeYabaiVotePart},
 };
