@@ -88,7 +88,7 @@ New bugs get a GitHub issue and a line here.
 - [#71](https://github.com/ChronoStriker1/vndegen/issues/71) Unity: an error saving PlayerPrefs after play shows "couldn't start".
 - [#72](https://github.com/ChronoStriker1/vndegen/issues/72) Leaving a game while its engine is still starting counts as played.
 - [#76](https://github.com/ChronoStriker1/vndegen/issues/76) NekoSDK: Funbag Fantasy 2's text appears at once and Auto doesn't wait. Fixed on `feat/nekosdk-stage3`, for 0.31.2.
-- [#77](https://github.com/ChronoStriker1/vndegen/issues/77) NekoSDK: a click beside Config's wait-time knob jumps it to its lowest value in Funbag Fantasy 2. Fixed on `feat/nekosdk-stage3`, for 0.31.2.
+- [#77](https://github.com/ChronoStriker1/vndegen/issues/77) NekoSDK: a tap on the arrow beside a Config slider or knob throws it to its lowest or highest value, in every NekoSDK game. Fixed on `feat/nekosdk-stage3`, for 0.31.2.
 - [#78](https://github.com/ChronoStriker1/vndegen/issues/78) NekoSDK: a plain press on the Music screen's volume does nothing. Fixed on `feat/nekosdk-stage3`, for 0.31.2.
 
 ## In progress
