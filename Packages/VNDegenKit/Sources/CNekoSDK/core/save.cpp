@@ -27,6 +27,7 @@ struct SaveLayout {
     int rootSizeAt = 0x11;  // where the first record holds the screen size
     int channels = 243;  // the sound channels saved
     int soundTrailer = -1;
+    int twinKind = -1;
     // A sprite record's last block, after its animation's text: 164 bytes, or 137 in Test Game 90.
     int recordTail = 0x261 - 0x1BD;
     // The newer engine's byte before the sound channels, which Test Game 90's saves don't have.
@@ -154,7 +155,9 @@ const SaveLayout kFunbag1 = [] {
 const SaveLayout kFunbagGaiden = [] {
     SaveLayout l = kFunbag1;
     l.soundTrailer = 0;
-    l.olderSoundGap = 22;
+    l.channels = 124;
+    l.olderSoundGap = 1;
+    l.twinKind = 17;
     return l;
 }();
 const SaveLayout kSideboob2 = [] {
@@ -360,6 +363,10 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // built again byte for byte), and the layout's test game under a folder of its own, with no menu table.
     if (folder == "waffle\\漫喫ハプニング" || folder == "waffle\\漫喫ハプニング特典ストーリー" || folder == "vndegen\\layout90" || folder == "vndegen\\windowlist" || folder == "vndegen\\outfittest") return &kMankitsu;
     return nullptr;
+}
+
+bool twinRecord(const SaveLayout &layout, const SavedSprite &sprite) {
+    return layout.twinKind >= 0 && sprite.kind == layout.twinKind && !sprite.path.empty();
 }
 
 bool namesPictureTwice(const SaveLayout &layout) {

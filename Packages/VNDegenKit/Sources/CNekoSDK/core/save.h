@@ -145,6 +145,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
 // picture of a save without it, and Test Game 84's crashes loading a save with it (under Wine), so it's per game, from
 // the PC's own saves; a game none of whose PC saves is known leaves it empty, as every save VNDegen wrote before did.
 bool namesPictureTwice(const SaveLayout &layout);
+bool twinRecord(const SaveLayout &layout, const SavedSprite &sprite);
 ChoiceFlag choiceFlag(const SaveLayout &layout);
 // Whether the game's PC keeps a Previous Choice file, `saveNNNs.sav`, beside each save.
 bool writesPreviousChoice(const SaveLayout &layout);

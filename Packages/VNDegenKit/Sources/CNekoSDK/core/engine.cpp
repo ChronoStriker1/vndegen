@@ -1949,6 +1949,7 @@ bool Engine::startReplay(const GalleryEntry &scene) {
     viewAuto_ = false;
     // The anime viewer's movie and its sound go with it; coming back opens the picture afresh.
     stopViewerMovie();
+    resetParts();
     stack_.clear();
     scene_ = {};
     back_.clear();
@@ -2797,6 +2798,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             if (!splash.image) warnOnce("A save names a missing splash picture: " + saved.splashImage);
             continue;
         }
+        if (layout_ && twinRecord(*layout_, saved)) continue;
         Sprite s;
         // The film noise starts again where the save left it running.
         if (saved.noise) {
@@ -6836,6 +6838,10 @@ void Engine::composeMessage(Canvas &out) {
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        for (auto [it, end] = defaults->second.settings.equal_range("windowpic"); it != end; ++it)
+            if (it->second.size() >= 3)
+                if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2), 0, 0, picture->w, picture->h, windowOpacity_);
     if (windowArtOnly_ == 1) return;
     drawParts(out, Layer::Window);
     if (!windowArtOnly_) {
@@ -6899,10 +6905,19 @@ void Engine::drawMark(Canvas &out) {
     }
 }
 
-int Engine::debugTextAdvance(uint32_t cp) const {
+int Engine::debugTextAdvance(uint32_t cp) {
     if (!cp) return fontMissingAdvance(fontFace_, fontSize_);
-    GlyphImage g;
-    return glyph(fontFace_, cp, fontSize_, false, g) ? textAdvance(cp, g.advance) : -1;
+    std::string text;
+    if (cp < 0x80) text = {char(cp)};
+    else if (cp < 0x800) text = {char(0xC0 | (cp >> 6)), char(0x80 | (cp & 0x3F))};
+    else if (cp < 0x10000) text = {char(0xE0 | (cp >> 12)), char(0x80 | ((cp >> 6) & 0x3F)), char(0x80 | (cp & 0x3F))};
+    else return -1;
+    std::vector<Glyph> laid;
+    layoutRun("A" + text + "A", 0, 0, false, laid);
+    int gap = int(std::lround(textGap_));
+    if (laid.size() == 3) return laid[2].x - laid[1].x - gap;
+    if (laid.size() == 2 && cp != 'A') return laid[1].x - laid[0].x - debugTextAdvance('A') - 2 * gap;
+    return -1;
 }
 
 int Engine::textAdvance(uint32_t cp, int own) const {
@@ -6957,7 +6972,10 @@ void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, st
             if (cp == '\n') continue;
         }
         GlyphImage g;
-        if (!glyph(fontFace_, cp, fontSize_, false, g)) continue;
+        if (!glyph(fontFace_, cp, fontSize_, false, g)) {
+            if (int width = textAdvance(cp, 0)) penX += float(width) + textGap_;
+            continue;
+        }
         out.push_back({int(std::lround(penX)), penY, cp, italic});
         penX += float(textAdvance(cp, g.advance)) + textGap_;
         used += units;
@@ -7129,7 +7147,10 @@ void Engine::composeStrip() {
     std::fill(strip_.px.begin(), strip_.px.end(), uint8_t(0));
     drawPart(strip_, *squareImage_, 0, from, 0, 0, squareImage_->w, squareImage_->h, 1);
     if (messageInStrip_) {
+        int artOnly = windowArtOnly_;
+        if (partScreen_ && waiting_ == Waiting::PartScreen && !artOnly) windowArtOnly_ = 1;
         composeMessage(strip_);
+        windowArtOnly_ = artOnly;
         if (markShowing()) drawMark(strip_);
     }
     for (int y = 0; y < squareShift_ && from + y < strip_.h && squareY_ + y < total; y++)

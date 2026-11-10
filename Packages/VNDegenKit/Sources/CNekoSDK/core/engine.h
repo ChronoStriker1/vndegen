@@ -168,7 +168,7 @@ public:
     bool waitingForClick() const { return waiting_ == Waiting::Click; }
     int textCount() const { return textCount_; }
     int textAdvance(uint32_t cp, int own) const;
-    int debugTextAdvance(uint32_t cp) const;
+    int debugTextAdvance(uint32_t cp);
     // A global (scope 0) or scenario variable (1) by its number, for tests.
     // Whether a sound still plays in this channel of music (kind 0), effects (1) or voices (2).
     bool soundPlaying(int kind, int channel);

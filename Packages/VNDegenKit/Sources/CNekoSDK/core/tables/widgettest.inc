@@ -171,6 +171,7 @@ button back obj\b.bmp 400 100 1 5 0
 const char kTwoByteTest[] = R"(
 screen defaults
 twobyteadvance
+windowpic obj\e.bmp 1000 500
 )";
 
 const char kPartPlateTest[] = R"(

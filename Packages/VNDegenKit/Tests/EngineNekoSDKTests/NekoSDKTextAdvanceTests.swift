@@ -37,4 +37,48 @@ import TestSupport
             #expect(width(c) == vnneko_debug_text_advance(plain, c.unicodeScalars.first!.value))
         }
     }
+
+    @Test func aWindowPictureShowsWithTheWindow() throws {
+        func bmp(_ w: Int, _ h: Int, _ bgr: [UInt8]) -> Data {
+            let row = (w * 3 + 3) & ~3
+            var d = Data("BM".utf8)
+            func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+            put(UInt32(54 + row * h)); put(0); put(54)
+            put(40); put(UInt32(w)); put(UInt32(h))
+            d.append(contentsOf: [1, 0, 24, 0])
+            put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+            var line = Data()
+            for _ in 0..<w { line.append(contentsOf: bgr) }
+            line.append(Data(repeating: 0, count: row - w * 3))
+            for _ in 0..<h { d.append(line) }
+            return d
+        }
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\twobytetest\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("e.bmp", bmp(20, 20, [0, 200, 0]))]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 2, next: 3, p: [0: 500]),
+                .init(op: 5, next: 0, s: [2: "x"]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        func emblem() -> Bool {
+            var w: Int32 = 0, h: Int32 = 0, changed = false
+            guard let px = vnneko_frame(e, &w, &h, &changed) else { return false }
+            let at = (510 * Int(w) + 1010) * 4
+            return px[at] == 0 && px[at + 1] >= 100 && px[at + 2] == 0
+        }
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(!emblem())
+        for _ in 0..<60 { _ = vnneko_step(e, 16) }
+        #expect(emblem())
+    }
 }
