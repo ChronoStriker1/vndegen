@@ -175,6 +175,11 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                     at++;
                     continue;
                 }
+                if (w[at] == "underwindow") {
+                    p.underWindow = true;
+                    at++;
+                    continue;
+                }
                 if (at + 1 >= w.size()) break;
                 const std::string &key = w[at], &value = w[at + 1];
                 if (key == "alpha") p.alpha = float(number(value)) / 256;  // of 256

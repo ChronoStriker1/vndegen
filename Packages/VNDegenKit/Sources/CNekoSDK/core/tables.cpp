@@ -58,6 +58,14 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
     if (folder == "waffle\\ヤバい！－復讐・闇サイト－") return kYabai1;
     if (folder == "vndegen\\storytest") return kStoryTest;
+    if (folder == "vndegen\\storytestdim") {
+        static const std::string table = std::string(kStoryTest) + "\nscreen defaults\ninneralways\n\nscreen choice\npic dim 0 0 alpha 128 underwindow\n";
+        return table.c_str();
+    }
+    if (folder == "vndegen\\storytestdimover") {
+        static const std::string table = std::string(kStoryTest) + "\nscreen defaults\ninneralways\n\nscreen choice\npic dim 0 0 alpha 128\n";
+        return table.c_str();
+    }
     if (folder == "vndegen\\storytestpc") {
         static const std::string table = std::string(kStoryTest) + "\nscreen defaults\nchoicekeepsline\n";
         return table.c_str();

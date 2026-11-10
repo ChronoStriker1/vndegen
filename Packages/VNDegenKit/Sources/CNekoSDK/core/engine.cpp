@@ -7069,6 +7069,10 @@ void Engine::compose() {
 
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
+    if (waiting_ == Waiting::Choice && choiceSheet_)
+        if (auto table = screens_.find("choice"); table != screens_.end())
+            for (const Picture &p : table->second.pictures)
+                if (p.dim && p.underWindow) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
     drawParts(canvas_, Layer::UnderWindow);
     messageInStrip_ = square_;
     if (!square_) composeMessage(canvas_);
@@ -7084,8 +7088,8 @@ void Engine::compose() {
         if (table != screens_.end()) {
             // A `dim` picture darkens the scene behind the choice, as Test Game 83's does to 0.138 (set 3).
             for (const Picture &p : table->second.pictures) {
-                if (p.dim) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
-                else drawPicture(canvas_, p);
+                if (p.dim && !p.underWindow) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
+                else if (!p.dim) drawPicture(canvas_, p);
             }
             for (auto [line, end] = table->second.settings.equal_range("framefor"); line != end; ++line)
                 if (line->second.size() >= 4 && field(line->second, 0) == choiceCount_)
