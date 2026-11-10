@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
+#include <random>
 #include <sstream>
 
 #include "font.h"
@@ -167,6 +168,8 @@ public:
         hoverQ_ = -1;
         bubblesFor_ = -1;
         pointerSeen_ = false;
+        moveBubbles(host);
+        refreshSpots(host);
         host.redraw();
         return true;
     }
@@ -189,8 +192,7 @@ public:
         if (!open_ || ask_) return false;
         moveBubbles(host);
         hover(host);
-        for (int q = 0; q < 3; q++)
-            if (!pressPoint(host, shownHeroine(host), q, spotX_[q], spotY_[q])) spotX_[q] = spotY_[q] = -1;
+        refreshSpots(host);
         return true;
     }
 
@@ -282,6 +284,10 @@ public:
         // on the PC's hub). The sheet after it is the same frames with her eyes closed; when the PC uses it isn't measured.
         cell(host, out, "obj\\l006_00" + std::to_string(2 * shown) + ".bmp", 0, 0,
              525 * (3 * (truth(host) - 1) + std::min(3, std::max(1, stage)) - 1), 0, 525, 720);
+        if (stage <= 3) {
+            moveBubbles(host);
+            drawThoughts(host, out, shown, stage);
+        }
         put(host, out, "obj\\l001_000.bmp", 256, 21);
         put(host, out, "obj\\l005_000.bmp", 0, 592);
         put(host, out, "obj\\l004_001.bmp", 0, 667);  // 過去の自白内容を確認することが出来ます。
@@ -301,7 +307,6 @@ public:
         bool shut = locked(host, shown);
         int bits = shut ? 7 : asked(host, shown);
         if (stage <= 3) moveBubbles(host);
-        if (stage <= 3) drawThoughts(host, out, shown, stage);
         float seconds = float(host.nowMs() - bubblesFrom_) / 1000;
         for (int q = 0; q < 3 && stage <= 3; q++) {
             // Frames: lit for a question still to ask, dark once asked (5 states down). Under the pointer, the frame's
@@ -359,10 +364,12 @@ public:
         }
         hoverAsk_ = hoverQ_ = -1;
         pointerSeen_ = false;
+        for (int q = 0; q < 3; q++) spotX_[q] = spotY_[q] = -1;
     }
 
     void reset() override {
         open_ = false, ask_ = 0;
+        for (int q = 0; q < 3; q++) spotX_[q] = spotY_[q] = -1;
         staff_ = 0;
         orphan_ = false;
         bubblesFor_ = -1;
@@ -387,9 +394,6 @@ private:
     // The bubbles drift and rock. Tracked on the PC under Wine through 76 s of one hub, 300 frames (set 2):
     // - Each moves in a straight line at a steady speed and turns back at the edges of the area: its frame's top at 160,
     //   bottom at 600, right side at 1280, left side at 355.
-    // - Two bubbles turn each other back up or down where the gap between their middles crosses half their heights less
-    //   51, from either side, while their middles are nearer across than half their widths less about 60. Seen 8 times.
-    //   Nothing was seen to turn one back sideways but the area's edges.
     // - Each rocks 10 degrees either way as a sine, over 50.0, 19.3 and 26.1 s.
     struct Bubble {
         float x = 0, y = 0;    // its middle
@@ -410,9 +414,9 @@ private:
         return stage >= 1 && stage <= 3 && !locked(host, heroine) && !(asked(host, heroine) & (1 << q));
     }
 
-    // Whether two bubbles' middles are nearer up and down than where they touch.
-    bool near(int i, int j) const {
-        return std::fabs(bubbles_[i].y - bubbles_[j].y) < float(bubbles_[i].h + bubbles_[j].h) / 2 - kTouchY;
+    bool touch(int i, int j) const {
+        return std::fabs(bubbles_[i].y - bubbles_[j].y) < float(bubbles_[i].h + bubbles_[j].h) / 2 - kTouchY &&
+               std::fabs(bubbles_[i].x - bubbles_[j].x) < float(bubbles_[i].w + bubbles_[j].w) / 2 - kTouchX;
     }
 
     // The bubbles where the clock has them now, laid out afresh for another heroine, stage or truth.
@@ -424,19 +428,25 @@ private:
             bubblesFor_ = key;
             bubblesFrom_ = bubblesAt_ = now;
             pictures_.clear();
-            for (int q = 0; q < 3; q++) {
-                Bubble &b = bubbles_[q];
-                b = Bubble{};
-                if (ImageRef text = host.image(panel(host, shown, stage, q)); text && text->w > b.w) b.w = text->w, b.h = text->h / 5;
-                uint32_t seed = mixed(uint32_t(now) * 2654435761u + uint32_t(key) * 97u + uint32_t(q) * 7919u);
-                auto unit = [&](uint32_t salt) { return float(mixed(seed + salt) % 10000) / 10000; };
-                b.x = kAreaLeft + float(b.w) / 2 + unit(1) * (kAreaRight - kAreaLeft - float(b.w));
-                b.y = kAreaTop + float(b.h) / 2 + unit(2) * (kAreaBottom - kAreaTop - float(b.h));
-                float heading = unit(3) * 2 * kPi;
-                b.vx = kBubbleSpeed * std::cos(heading), b.vy = kBubbleSpeed * std::sin(heading);
-                rockPhase_[q] = unit(4) * 2 * kPi;
+            for (int attempt = 0; attempt < 40; attempt++) {
+                layoutSeed_ = mixed(chance_++ * 2654435761u + uint32_t(key) * 97u);
+                for (int q = 0; q < 3; q++) {
+                    Bubble &b = bubbles_[q];
+                    b = Bubble{};
+                    if (ImageRef text = host.image(panel(host, shown, stage, q)); text && text->w > b.w) b.w = text->w, b.h = text->h / 5;
+                    uint32_t seed = mixed(layoutSeed_ + uint32_t(q) * 7919u);
+                    auto unit = [&](uint32_t salt) { return float(mixed(seed + salt) % 10000) / 10000; };
+                    b.x = kAreaLeft + float(b.w) / 2 + unit(1) * (kAreaRight - kAreaLeft - float(b.w));
+                    b.y = kAreaTop + float(b.h) / 2 + unit(2) * (kAreaBottom - kAreaTop - float(b.h));
+                    float heading = unit(3) * 2 * kPi;
+                    b.vx = kBubbleSpeed * std::cos(heading), b.vy = kBubbleSpeed * std::sin(heading);
+                    rockPhase_[q] = unit(4) * 2 * kPi;
+                }
+                bool touching = false;
+                for (int pair = 0; pair < 3; pair++) touching = touching || touch(kPairs[pair][0], kPairs[pair][1]);
+                if (!touching) break;
             }
-            for (int pair = 0; pair < 3; pair++) wasNear_[pair] = near(kPairs[pair][0], kPairs[pair][1]), turned_[pair] = false;
+            for (int pair = 0; pair < 3; pair++) wasNear_[pair] = touch(kPairs[pair][0], kPairs[pair][1]);
         }
         // A long gap, such as the app waking, isn't caught up.
         if (now - bubblesAt_ > 2000 || now < bubblesAt_) bubblesAt_ = now;
@@ -445,16 +455,18 @@ private:
             for (Bubble &b : bubbles_) b.x += b.vx * dt, b.y += b.vy * dt;
             for (int pair = 0; pair < 3; pair++) {
                 Bubble &a = bubbles_[kPairs[pair][0]], &b = bubbles_[kPairs[pair][1]];
-                bool across = std::fabs(a.x - b.x) < float(a.w + b.w) / 2 - kTouchX;
-                bool isNear = near(kPairs[pair][0], kPairs[pair][1]);
-                // Turned back, the two return to the side of the line they came from, so what was stays as it was.
-                if (across && isNear != wasNear_[pair] && !turned_[pair]) {
-                    a.vy = -a.vy, b.vy = -b.vy;
-                    turned_[pair] = true;
-                } else {
-                    if (!across || turned_[pair]) wasNear_[pair] = isNear;
-                    turned_[pair] = false;
+                bool touching = touch(kPairs[pair][0], kPairs[pair][1]);
+                if (touching && !wasNear_[pair]) {
+                    float deepY = float(a.h + b.h) / 2 - kTouchY - std::fabs(a.y - b.y), deepX = float(a.w + b.w) / 2 - kTouchX - std::fabs(a.x - b.x);
+                    if (deepX < deepY) {
+                        float away = a.x < b.x ? -1.0f : 1.0f;
+                        a.vx = away * std::fabs(a.vx), b.vx = -away * std::fabs(b.vx);
+                    } else {
+                        float away = a.y < b.y ? -1.0f : 1.0f;
+                        a.vy = away * std::fabs(a.vy), b.vy = -away * std::fabs(b.vy);
+                    }
                 }
+                wasNear_[pair] = touching;
             }
             for (Bubble &b : bubbles_) {
                 if ((b.y - float(b.h) / 2 < kAreaTop && b.vy < 0) || (b.y + float(b.h) / 2 > kAreaBottom && b.vy > 0)) b.vy = -b.vy;
@@ -469,12 +481,16 @@ private:
         int shown = shownHeroine(host);
         if (host.variable(1, kStage + shown) > 3) return -1;
         moveBubbles(host);
-        for (int q = 2; q >= 0; q--) {
+        int nearest = -1;
+        float best = 0;
+        for (int q = 0; q < 3; q++) {
             const Bubble &b = bubbles_[q];
             if (!bubblePicture(host, shown, std::min(3, std::max(1, host.variable(1, kStage + shown))), q, 0)) continue;
-            if (std::fabs(float(x) - b.x) < float(b.w) / 2 - 20 && std::fabs(float(y) - b.y) < float(b.h) / 2 - 26) return askable(host, shown, q) ? q : -1;
+            float dx = std::fabs(float(x) - b.x) / (float(b.w) / 2 - 20), dy = std::fabs(float(y) - b.y) / (float(b.h) / 2 - 26);
+            float far = std::max(dx, dy);
+            if (far < 1 && (nearest < 0 || far < best)) nearest = q, best = far;
         }
-        return -1;
+        return nearest >= 0 && askable(host, shown, nearest) ? nearest : -1;
     }
 
     bool pressPoint(PartHost &host, int shown, int q, int &x, int &y) {
@@ -486,6 +502,11 @@ private:
             if (bubbleAt(host, x, y) == q) return true;
         }
         return false;
+    }
+
+    void refreshSpots(PartHost &host) {
+        for (int q = 0; q < 3; q++)
+            if (!pressPoint(host, shownHeroine(host), q, spotX_[q], spotY_[q])) spotX_[q] = spotY_[q] = -1;
     }
 
     void hover(PartHost &host) {
@@ -937,7 +958,8 @@ private:
     std::array<Bubble, 3> bubbles_;
     int64_t bubblesAt_ = 0, bubblesFrom_ = 0;
     int bubblesFor_ = -1;
-    bool wasNear_[3] = {false, false, false}, turned_[3] = {false, false, false};
+    bool wasNear_[3] = {false, false, false};
+    uint32_t chance_ = std::random_device{}(), layoutSeed_ = 0;
     float rockPhase_[3] = {0, 0, 0};
     int spotX_[3] = {-1, -1, -1}, spotY_[3] = {-1, -1, -1};
     std::map<int, ImageRef> pictures_;
@@ -998,7 +1020,7 @@ private:
         for (int64_t index = std::max<int64_t>(0, (ms - life) / kThoughtEveryMs); index * kThoughtEveryMs <= ms; index++) {
             int64_t age = ms - index * kThoughtEveryMs;
             if (age >= life) continue;
-            uint32_t seed = mixed(uint32_t(bubblesFrom_) * 2654435761u + uint32_t(index) * 40503u + uint32_t(bubblesFor_));
+            uint32_t seed = mixed(layoutSeed_ + uint32_t(index) * 40503u);
             const Thought &thought = *pool[seed % pool.size()];
             ImageRef image = host.image(thought.picture);
             if (!image) continue;

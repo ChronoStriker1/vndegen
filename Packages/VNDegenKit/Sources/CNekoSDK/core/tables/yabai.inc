@@ -14,6 +14,8 @@ textshift 1 -1
 default opacity 100
 default text 50
 textpoints text 0 156 50 17 100 0
+autocurve auto 104 1.04 527 1
+autowithvoice
 default auto 50
 default bgm 60
 default se 60
@@ -745,6 +747,7 @@ set S 2060 = 1
 open vote 5 -> S 15122
 goto picked
 label pickresume
+set G 46 = 1
 # A PC save at a pick has none of VNDegen's own variables, which the tree reads: the hub's part takes them from the PC's.
 open hubsync
 if S 2000 == 1 goto pick1
@@ -868,6 +871,7 @@ set S 105 = 4
 chapter 622
 end
 label hub
+set G 46 = 1
 open hub -> S 15120
 on 9 goto tree
 on 2 goto vote
