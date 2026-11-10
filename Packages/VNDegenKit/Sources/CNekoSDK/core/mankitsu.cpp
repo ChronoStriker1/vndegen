@@ -61,6 +61,7 @@ constexpr int kNewsX = 803, kNewsW = 414, kNewsSpeed = 120, kNewsStart = 134;
 // The title's rising dots: how many, the strip they start along (the silhouettes' feet) and how far they rise.
 constexpr int kSparkles = 14, kSmallSparkles = 9, kSparkleX = 24, kSparkleW = 640, kSparkleFrom = 666, kSparkleRise = 320;
 constexpr int kSparkleSlow = 37, kSparkleFast = 82;
+constexpr int kShakeDelayMs = 50, kShakeMs = 167, kShakeTurns = 10;
 // The lower row's liquid: how far and how long it rises as the row opens, and the gap in its drawing that makes the next
 // drawing a new opening.
 constexpr int kRowRise = 82, kRowRiseMs = 170, kRowGapMs = 100;
@@ -224,7 +225,10 @@ public:
             return true;
         }
         case 145:
-            return true;  // a face shake, once in the game: not drawn
+            shakeFrom_ = host.nowMs() + kShakeDelayMs;
+            shakeBy_ = std::clamp(int(n.p[1]), 0, 200);
+            shakeSeed_ = uint32_t(n.id) * 2654435761u + uint32_t(shakeFrom_);
+            return true;
         case 160:
             panels_[0] = n.s[1];
             panels_[1] = n.s[2];
@@ -262,6 +266,7 @@ public:
             if (now < m.from + m.ms) fading = true;
         for (const auto &[slot, f] : shown_)
             if (f.flipCount > 1 && now - f.flipFrom < int64_t(f.flipCount) * f.flipTimes * f.flipMs) fading = true;
+        if (now < shakeFrom_ + kShakeMs) fading = true;
         bool sliding = slideFrom_ >= 0 && now - outFrom_ < uncoverMs();
         if (slideFrom_ >= 0 && !sliding) slideFrom_ = outFrom_ = -1;
         return fading || sliding;
@@ -541,6 +546,7 @@ public:
         from_.clear();
         moves_.clear();
         fadeMs_ = 0;
+        shakeFrom_ = -1000000;
         slideFrom_ = outFrom_ = -1;
         covering_ = false;
         selecting_ = false;
@@ -728,10 +734,18 @@ private:
     void drawFaces(PartHost &host, Canvas &out) {
         int64_t now = host.nowMs();
         float t = fadeMs_ > 0 ? std::clamp(float(now - fadeFrom_) / float(fadeMs_), 0.0f, 1.0f) : 1.0f;
+        float shakeX = 0, shakeY = 0;
+        if (now >= shakeFrom_ && now < shakeFrom_ + kShakeMs) {
+            int turn = int((now - shakeFrom_) * kShakeTurns / kShakeMs), reach = shakeBy_ * (kShakeTurns - turn) / kShakeTurns;
+            uint32_t h = (shakeSeed_ + uint32_t(turn)) * 2246822519u;
+            h ^= h >> 15;
+            shakeX = float(int(h % uint32_t(2 * reach + 1)) - reach);
+            shakeY = float(int((h >> 12) % uint32_t(2 * reach + 1)) - reach);
+        }
         auto drawSet = [&](const std::map<int, Face> &set, float alpha) {
             if (alpha <= 0) return;
             for (const auto &[slot, f] : set) {
-                float x = float(kFaceX + f.x), y = float(kFaceY + f.y);
+                float x = float(kFaceX + f.x) + shakeX, y = float(kFaceY + f.y) + shakeY;
                 for (const FaceMove &m : moves_) {
                     if (m.slot != slot || now <= m.from) continue;
                     float p = m.ms > 0 ? std::min(1.0f, float(now - m.from) / float(m.ms)) : 1.0f;
@@ -1016,7 +1030,9 @@ private:
     int slideIn_ = 30, slideOut_ = 30, captionIn_ = 0, captionStay_ = 0, captionCols_ = 1, captionCol_ = 0;
     int holdMs_ = 0;
     std::vector<Bar> bars_;
-    int64_t slideFrom_ = -1, outFrom_ = -1;
+    int64_t slideFrom_ = -1, outFrom_ = -1, shakeFrom_ = -1000000;
+    int shakeBy_ = 0;
+    uint32_t shakeSeed_ = 0;
     bool covering_ = false;
     uint32_t slides_ = 0;
 };
