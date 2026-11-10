@@ -51,7 +51,7 @@ pic obj\n001_000.bmp 0 0
 const char kStoryLoadScreens[] = R"(
 screen load
 pic obj\b.bmp 1000 100 1 5 0 0 overdim
-pic obj\b.bmp 1000 300 1 5 0 0
+pic obj\b.bmp 1020 120 1 5 0 0
 slots obj\b.bmp 100 100 300 100 1 1
 button back obj\b.bmp 900 600 1 5 0
 

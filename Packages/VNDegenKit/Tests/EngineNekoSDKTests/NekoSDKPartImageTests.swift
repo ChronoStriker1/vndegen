@@ -105,6 +105,37 @@ import TestSupport
         #expect(Array(g.px[dimAgain..<dimAgain + 3]) == [255, 0, 64])
     }
 
+    @Test(arguments: [0, 1]) func aScreenUpdateTakesNoTimeWhileAPartHidesTheScene(hides: Int32) throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\windowlist\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("red.bmp", bmp(1280, 720) { _ in [255, 0, 0] })]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [3: 100], s: [1: "obj\\red.bmp"]),
+                .init(op: 9004, next: 4, p: [0: hides]),
+                .init(op: 9, next: 5, p: [0: 0, 1: 1000]),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        func middle() -> [UInt8] {
+            let f = frame(e)
+            let at = (360 * f.w + 640) * 4
+            return [f.px[at], f.px[at + 1], f.px[at + 2]]
+        }
+        steps(e, 200)
+        #expect((middle() == [255, 0, 0]) == (hides == 1), "\(middle())")
+        steps(e, 1500)
+        #expect(middle() == [255, 0, 0])
+    }
+
     @Test func aPartsWindowPictureGoesThroughTheSavesSecondList() throws {
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\windowlist\nFirstFlow\tflow\\t.txt\n".utf8),

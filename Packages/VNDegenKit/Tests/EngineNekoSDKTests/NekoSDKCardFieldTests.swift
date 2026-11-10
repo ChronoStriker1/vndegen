@@ -32,7 +32,7 @@ import TestSupport
         return [px[at], px[at + 1], px[at + 2]]
     }
 
-    @Test(arguments: ["emptycards", "emptycardsnumber"]) func anEmptyCardsNumberFadesWithItOnlyWhereTheTableSays(folder: String) throws {
+    @Test(arguments: ["emptycards", "emptycardsnumber", "emptycardsown"]) func anEmptyCardsNumberFadesOnlyWhereTheTableSays(folder: String) throws {
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
             "obj.pak": NekoSDKFlowFixture.archive([
@@ -50,8 +50,10 @@ import TestSupport
         #expect(card[2] > 60 && card[2] < 140, "\(card)")
         if folder == "emptycards" {
             #expect(number == [30, 0, 0], "\(number)")
+        } else if folder == "emptycardsnumber" {
+            #expect(number[0] >= 13 && number[0] <= 17 && number[2] > 20, "\(number)")
         } else {
-            #expect(number[0] > 5 && number[0] < 25 && number[2] > 20, "\(number)")
+            #expect(number[0] >= 6 && number[0] <= 9 && number[2] > 40, "\(number)")
         }
     }
 
@@ -164,6 +166,62 @@ import TestSupport
         // The frame's edge at the card plus 8, then the frame's inside over the thumbnail.
         #expect(pixel(e, 108, 108) == [0, 250, 250])
         #expect(pixel(e, 120, 120) == [0, 250, 0])
+    }
+
+    @Test func aClickOnAnOpenPictureIsNotAPressOnTheButtonUnderIt() throws {
+        var cfg = Data(count: 104_000)
+        cfg[48_000] = 1
+        cfg[48_004] = 1
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\cardtest\n".utf8),
+            "cfg/cg_view.ini": Data("#p 0 obj\\t.bmp none\n0,cg\\a.bmp\n1,cg\\b.bmp\n##\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([
+                ("t.bmp", bmp(40, 30) { _, _ in [0, 0, 250] }),
+                ("f.bmp", bmp(44, 34) { _, _ in [0, 250, 0] }),
+            ]),
+            "cg.pak": NekoSDKFlowFixture.archive([
+                ("a.bmp", bmp(1280, 720) { _, _ in [250, 0, 0] }),
+                ("b.bmp", bmp(1280, 720) { _, _ in [250, 0, 250] }),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/cardtest/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try NekoSDKFlowFixture.packed(cfg).write(to: save.appendingPathComponent("cfg.sav"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        func click(_ x: Int, _ y: Int) {
+            vnneko_mouse_move(e, Float(x) / 1280, Float(y) / 720)
+            _ = vnneko_step(e, 16)
+            vnneko_mouse_button(e, 0, true)
+            vnneko_mouse_button(e, 0, false)
+            for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        }
+        #expect(vnneko_debug_press(e, "cg"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 610, 610) == [0, 250, 0])
+        click(120, 120)
+        #expect(pixel(e, 610, 610) == [0, 0, 250], "\(pixel(e, 610, 610))")
+        click(610, 610)
+        #expect(status().contains(" menu cg"), "\(status())")
+        #expect(pixel(e, 610, 610) == [250, 0, 250], "\(pixel(e, 610, 610))")
+        vnneko_mouse_button(e, 1, true)
+        vnneko_mouse_button(e, 1, false)
+        for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu cg"), "\(status())")
+        #expect(pixel(e, 610, 610) == [0, 250, 0])
+        click(120, 120)
+        click(610, 610)
+        click(610, 610)
+        #expect(status().contains(" menu cg"), "\(status())")
+        #expect(pixel(e, 610, 610) == [0, 250, 0])
+        click(120, 120)
+        #expect(pixel(e, 610, 610) == [0, 0, 250])
+        #expect(vnneko_debug_press(e, "nav_scene"))
+        for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu scene"), "\(status())")
+        #expect(pixel(e, 610, 610) != [0, 0, 250])
     }
 
     // `pic FILE X Y turn DEGREES` turns a picture about its middle by the screen's clock, as Test Game 83's title turns

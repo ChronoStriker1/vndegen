@@ -123,6 +123,7 @@ public:
     // With the table's `partplate`, whether the message window's plate shows over this part's screen now.
     virtual bool showsPlate() const { return true; }
     virtual bool coversFrame() const { return true; }
+    virtual bool hidesScene() const { return false; }
     // The story table's `chapter N`: the scene scripts to play, in order, or none when this part doesn't know it. A scene
     // may end in ` @N`, the PC's number for it, which a save in it holds and a PC save with it resumes at.
     virtual std::vector<std::string> chapter(PartHost &, int number) { return {}; }

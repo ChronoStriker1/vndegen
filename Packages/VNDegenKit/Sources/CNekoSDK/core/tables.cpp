@@ -74,15 +74,21 @@ const char *menuTable(const std::string &folder) {
         static const std::string table = std::string(kEmptyCardTest) + "emptycards 128 number\n";
         return table.c_str();
     }
+    if (folder == "vndegen\\emptycardsown") {
+        static const std::string table = std::string(kEmptyCardTest) + "emptycards 128 number 64\n";
+        return table.c_str();
+    }
     if (folder == "vndegen\\bandtest") return kBandTest;
     if (folder == "vndegen\\widgettest") return kWidgetTest;
     if (folder == "vndegen\\widgettesthide") return kWidgetTestHide;
     if (folder == "vndegen\\widgettestpart") return kWidgetTestPart;
-    if (folder == "vndegen\\widgettesttabs") return kWidgetTestTabs;
+    if (folder == "vndegen\\widgettesttabs" || folder == "vndegen\\widgettesttabspc") return kWidgetTestTabs;
     if (folder == "vndegen\\outfittest") return kOutfitTest;
     if (folder == "vndegen\\twobytetest") return kTwoByteTest;
     if (folder == "vndegen\\partplatetest") return kPartPlateTest;
     if (folder == "vndegen\\partbandtest") return kPartBandTest;
+    if (folder == "vndegen\\disctest") return kDiscTest;
+    if (folder == "vndegen\\plateholdstest") return kPlateHoldsTest;
     if (folder == "vndegen\\partplatebandtest") return kPartPlateBandTest;
     if (folder == "vndegen\\windowlogtest") return kWindowLogTest;
     if (folder == "vndegen\\commenttest") return kCommentTest;

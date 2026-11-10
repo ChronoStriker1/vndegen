@@ -44,6 +44,8 @@ screen cg
 cell 100 100
 cellthumb 10 10
 cellthumbframe obj\f.bmp 8 8
+cellsize 60 50
+button nav_scene obj\f.bmp 600 600 1 1 0
 
 screen scene
 cell 300 300

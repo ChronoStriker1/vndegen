@@ -304,6 +304,14 @@ private:
         std::string side;
     };
     std::optional<PreviousChoice> previousChoice_;
+    std::optional<PreviousChoice> setAside_, setAsideChoice_;
+    int64_t clockMs_ = 0, discFrom_ = 0;
+    const void *discOf_ = nullptr;
+    bool discDrawn_ = false, discTurning_ = false;
+    void drawDisc(Canvas &out, const void *owner, const Image &sheet, int x, int y, int cols, int rows, int column, int row, int axis, float speed);
+    void drawButtonDisc(Canvas &out, const Button &b);
+    bool discUpFor(const ImageRef &picture);
+    bool resumeSetAside();
     bool previousChoiceDue_ = false;
     // The latest choice asked, as Test Games 82 and 83's saves keep it (SaveData::choiceColumns): its options, the sheet's
     // columns, and the cells shown, never cleared.
@@ -660,6 +668,8 @@ private:
     std::vector<std::vector<BulbStep>> bulbPatterns_;
     int bulbPattern_ = -1, bulbFrom_ = 255, bulbDrawn_ = 255;
     bool bulbSeen_ = false;
+    std::map<std::pair<const Picture *, int>, std::pair<ImageRef, ImageRef>> darkened_;
+    ImageRef darkened(const Picture &p, const std::vector<const Picture *> &frames, int dark);
     int64_t bulbStart_ = 0;
     std::map<std::string, std::string> bulbDark_;
     void loadBulb();
