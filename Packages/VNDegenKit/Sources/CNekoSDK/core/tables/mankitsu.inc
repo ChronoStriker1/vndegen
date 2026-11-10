@@ -388,6 +388,17 @@ const char kMankitsuGame[] = R"(
 # dashed card with its number; CG cards count the pictures seen.
 screen cg
 part mankitsu
+viewer obj\g000_000.bmp 0 616
+viewerclicks
+viewerauto 5000 0
+viewernumber index obj\g001_000.bmp 999 667 21 2
+viewernumber total obj\g001_001.bmp 1058 673 17 2
+viewerbutton replay obj\g004_000.bmp 605 665
+viewerbutton auto obj\g003_000.bmp 753 670 3 0
+viewerbutton nextcg obj\g003_000.bmp 827 670 3 1
+viewerbutton prevvar obj\g002_000.bmp 927 663 2 0
+viewerbutton nextvar obj\g002_000.bmp 1123 663 2 1
+viewerbutton return obj\g003_000.bmp 1191 670 3 2
 pic obj\f000_000.bmp 0 0
 pic obj\f001_000.bmp 0 400
 pic obj\f000_001.bmp 468 74
@@ -802,6 +813,17 @@ button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 6
 # entries; the other four are greyed, as on its PC.
 screen cg
 part mankitsu
+viewer obj\g000_000.bmp 0 616
+viewerclicks
+viewerauto 5000 0
+viewernumber index obj\g001_000.bmp 999 667 21 2
+viewernumber total obj\g001_001.bmp 1058 673 17 2
+viewerbutton replay obj\g004_000.bmp 605 665
+viewerbutton auto obj\g003_000.bmp 753 670 3 0
+viewerbutton nextcg obj\g003_000.bmp 827 670 3 1
+viewerbutton prevvar obj\g002_000.bmp 927 663 2 0
+viewerbutton nextvar obj\g002_000.bmp 1123 663 2 1
+viewerbutton return obj\g003_000.bmp 1191 670 3 2
 pic obj\f000_000.bmp 0 0
 pic obj\f001_000.bmp 0 400
 pic obj\f000_001.bmp 468 74
