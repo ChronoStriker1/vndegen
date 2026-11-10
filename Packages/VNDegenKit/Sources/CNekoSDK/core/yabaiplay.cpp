@@ -974,8 +974,8 @@ private:
     bool thoughtsLoaded_ = false;
     std::vector<Thought> thoughts_;
     static constexpr int kThoughtEveryMs = 2400, kThoughtInMs = 500, kThoughtHoldMs = 2300, kThoughtOutMs = 1300;
-    static constexpr float kThoughtGrow = 0.34f, kThoughtShown = 0.8f;
-    static constexpr int kThoughtLeft = 400, kThoughtWide = 500, kThoughtTop = 165, kThoughtTall = 425;
+    static constexpr float kThoughtFrom = 0.95f, kThoughtGrow = 0.47f, kThoughtShown = 0.96f;
+    static constexpr int kThoughtLeft = 400, kThoughtWide = 570, kThoughtTop = 120, kThoughtTall = 480;
 
     void loadThoughts(PartHost &host) {
         if (thoughtsLoaded_) return;
@@ -1025,7 +1025,7 @@ private:
             ImageRef image = host.image(thought.picture);
             if (!image) continue;
             float shown = age < kThoughtInMs ? float(age) / kThoughtInMs : age < kThoughtInMs + kThoughtHoldMs ? 1 : 1 - float(age - kThoughtInMs - kThoughtHoldMs) / kThoughtOutMs;
-            float scale = 1 + kThoughtGrow * float(age) / float(life);
+            float scale = kThoughtFrom + kThoughtGrow * float(age) / float(life);
             float x = float(kThoughtLeft + int(mixed(seed + 1) % kThoughtWide)), y = float(kThoughtTop + int(mixed(seed + 2) % kThoughtTall));
             drawImage(out, *image, x, y, scale, scale, 0, shown * kThoughtShown);
         }
