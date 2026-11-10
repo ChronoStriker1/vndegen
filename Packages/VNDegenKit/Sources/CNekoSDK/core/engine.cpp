@@ -326,6 +326,18 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     loadGalleries();
     loadParts();
     loadOldLayout();
+    twoByteAdvance_ = defaultsHave("twobyteadvance");
+    outfitSetting_.clear();
+    outfitSwitch_.clear();
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        if (const auto *line = defaults->second.setting("outfitswitch"); line && line->size() >= 2) {
+            outfitSetting_ = (*line)[0];
+            for (size_t i = 1; i < line->size(); i++) {
+                std::vector<int> numbers;
+                for (const std::string &part : split((*line)[i], ':')) numbers.push_back(std::atoi(part.c_str()));
+                if (numbers.size() >= 2) outfitSwitch_[numbers[0]] = std::vector<int>(numbers.begin() + 1, numbers.end());
+            }
+        }
     loadGlobals();
     loadSettings();
     if (screens_.count("title")) openScreen("title");
@@ -5757,8 +5769,30 @@ std::string Engine::lockedSprite(const std::string &path) const {
     return path;
 }
 
+std::string Engine::switchedOutfit(const std::string &path) const {
+    if (outfitSetting_.empty()) return path;
+    int choice = setting(outfitSetting_);
+    if (choice <= 0) return path;
+    std::string name = normalizedPath(path);
+    auto slash = name.rfind('\\');
+    size_t at = slash == std::string::npos ? 0 : slash + 1;
+    bool standing = name.compare(0, 3, "sc\\") == 0 && name.compare(at, 3, "sc_") == 0;
+    bool face = name.compare(0, 3, "ac\\") == 0 && name.compare(at, 3, "ac_") == 0;
+    if ((!standing && !face) || name.size() < at + 10) return path;
+    for (size_t i = at + 3; i < at + 10; i++)
+        if (i != at + 6 && !std::isdigit(uint8_t(name[i]))) return path;
+    auto worn = outfitSwitch_.find(std::atoi(name.substr(at + 3, 3).c_str()));
+    if (worn == outfitSwitch_.end() || size_t(choice) > worn->second.size()) return path;
+    int outfit = std::atoi(name.substr(at + 7, 3).c_str()) / 100 * 100 + worn->second[size_t(choice) - 1];
+    char id[8];
+    std::snprintf(id, sizeof id, "%03d", outfit % 1000);
+    std::string other = name;
+    other.replace(at + 7, 3, id);
+    return files_.exists(other) ? other : path;
+}
+
 std::string Engine::shownPath(const std::string &rawPath) const {
-    std::string path = lockedSprite(rawPath);
+    std::string path = switchedOutfit(lockedSprite(rawPath));
     if (!artVersions_.empty()) return plainVariant(versionPath(path));
     if (setting("express")) return path;
     auto it = plainArt_.find(normalizedPath(path));
@@ -5798,7 +5832,7 @@ std::string Engine::plainVariant(const std::string &path) const {
 }
 
 void Engine::applyArtSwitch() {
-    if (plainArt_.empty() && artVersions_.empty()) return;
+    if (plainArt_.empty() && artVersions_.empty() && outfitSetting_.empty()) return;
     bool changed = false;
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set)
@@ -6862,6 +6896,36 @@ void Engine::drawMark(Canvas &out) {
     }
 }
 
+int Engine::debugTextAdvance(uint32_t cp) const {
+    if (!cp) return fontMissingAdvance(fontFace_, fontSize_);
+    GlyphImage g;
+    return glyph(fontFace_, cp, fontSize_, false, g) ? textAdvance(cp, g.advance) : -1;
+}
+
+int Engine::textAdvance(uint32_t cp, int own) const {
+    if (!twoByteAdvance_ || cp < 0x80) return own;
+    std::string utf8;
+    if (cp < 0x800) {
+        utf8 = {char(0xC0 | (cp >> 6)), char(0x80 | (cp & 0x3F))};
+    } else if (cp < 0x10000) {
+        utf8 = {char(0xE0 | (cp >> 12)), char(0x80 | ((cp >> 6) & 0x3F)), char(0x80 | (cp & 0x3F))};
+    } else {
+        return own;
+    }
+    std::string bytes = sjis::fromUtf8(utf8);
+    if (bytes.size() != 2) return own;
+    static const uint16_t kHigh[32] = {0x20AC, 0, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0, 0x017D, 0,
+                                       0, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0, 0x017E, 0x0178};
+    int missing = fontMissingAdvance(fontFace_, fontSize_), width = 0;
+    for (char c : bytes) {
+        auto b = uint8_t(c);
+        uint32_t single = b >= 0x80 && b < 0xA0 ? kHigh[b - 0x80] : b;
+        GlyphImage g;
+        width += single && glyph(fontFace_, single, fontSize_, false, g) ? g.advance : missing;
+    }
+    return width;
+}
+
 // Lays out a line or lines of UTF-8 from a pen position. `endsThere` lays a name out to end at x rather than start there.
 void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out) {
     int lineHeight = textLine_ > 0 ? textLine_ : fontSize_ + lineInterval_ + 4;
@@ -6892,7 +6956,7 @@ void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, st
         GlyphImage g;
         if (!glyph(fontFace_, cp, fontSize_, false, g)) continue;
         out.push_back({int(std::lround(penX)), penY, cp, italic});
-        penX += float(g.advance) + textGap_;
+        penX += float(textAdvance(cp, g.advance)) + textGap_;
         used += units;
     }
     if (endsThere) {

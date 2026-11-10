@@ -172,6 +172,7 @@ std::unique_ptr<GamePart> makePart(const std::string &name) {
 }
 
 ImageRef PartHost::image(const std::string &path) { return e_.images_->get(path); }
+std::string PartHost::shownPath(const std::string &path) { return e_.shownPath(path); }
 std::shared_ptr<const std::vector<uint8_t>> PartHost::read(const std::string &path) { return e_.files_.read(path); }
 bool PartHost::exists(const std::string &path) { return e_.files_.exists(path); }
 

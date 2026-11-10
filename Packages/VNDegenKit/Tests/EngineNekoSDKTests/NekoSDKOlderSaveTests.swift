@@ -396,4 +396,29 @@ import TestSupport
         broken[broken.startIndex + block + 70 + second.count] = 0
         #expect(rebuilt(broken).isEmpty)
     }
+
+    @Test func aSaveInTestGame86sLayoutLoads() throws {
+        var sizes: [String: Int] = [:]
+        for folder in ["layout82", "layout86"] {
+            let root = try game(folder)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let data = root.appendingPathComponent("data")
+            let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+            for _ in 0..<10 { _ = vnneko_step(first, 16) }
+            #expect(vnneko_debug_save(first, 1))
+            vnneko_stop(first)
+            let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", folder)))
+            sizes[folder] = save.count
+            var built = [UInt8](repeating: 0, count: save.count + 64)
+            let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\\(folder)", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+            #expect(size == save.count, "\(folder)")
+            #expect(Data(built.prefix(size)) == save, "\(folder)")
+            let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+            #expect(vnneko_debug_load(second, 1), "\(folder)")
+            for _ in 0..<3 { _ = vnneko_step(second, 16) }
+            #expect(pixel(second, 194, 326) == [255, 0, 0], "\(folder)")
+            vnneko_stop(second)
+        }
+        #expect((sizes["layout82"] ?? 0) - (sizes["layout86"] ?? 0) == 123 * 22 + 19 - (123 * 21 + 22))
+    }
 }
