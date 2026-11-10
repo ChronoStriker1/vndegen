@@ -116,6 +116,7 @@ int main(int argc, char **argv) {
     }
     VNNekoLaunch launch{argv[1], std::getenv("NEKO_DATA"), nullptr, NEKO_FONTS_DIR, hostMovies()};
     VNNekoEngine *e = vnneko_start(&launch);
+    if (e) vnneko_debug_host_taps(e, true);
     if (!e) {
         std::fprintf(stderr, "did not start: %s\n", vnneko_start_error());
         return 1;

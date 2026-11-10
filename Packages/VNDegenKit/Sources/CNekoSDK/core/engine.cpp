@@ -369,6 +369,7 @@ void Engine::openScreen(const std::string &name) {
         viewingImage_ = false;
     }
     darkened_.clear();
+    dragWidget_ = nullptr;
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -408,6 +409,7 @@ void Engine::openScreen(const std::string &name) {
 
 void Engine::closeScreen() {
     darkened_.clear();
+    dragWidget_ = nullptr;
     if (spriteScreen()) closeSprites();
     screen_ = nullptr;
     dirty_ = true;
@@ -2286,18 +2288,21 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
     };
     for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
+        if (dragging && &f != dragWidget_) continue;
         ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr;
         // A held press keeps following the finger along the bar, past its ends.
         int left = field(f, 2), top = field(f, 3);
         if (fill && y >= top && y < top + fill->h && x >= left - (dragging ? 40 : 0) && x < left + fill->w + (dragging ? 40 : 0)) {
             int from = f.size() >= 6 ? field(f, 5) : 0, scale = std::max(1, (f.size() >= 5 ? field(f, 4) : 100) - from);
             changeSetting(f[0], clampSetting(f[0], from + (x - left) * scale / std::max(1, fill->w - 1)));
+            dragWidget_ = &f;
             return true;
         }
     }
     // A press on a knob's track, or a drag along it, puts the knob's middle under the pointer.
     for (auto [it, end] = lines("knob"); it != end; ++it) {
         const auto &f = it->second;
+        if (dragging && &f != dragWidget_) continue;
         ImageRef knob = f.size() >= 5 ? images_->get(f[1]) : nullptr;
         int x0 = field(f, 2), top = field(f, 3);
         double step = std::max(0.01, std::atof(f[4].c_str()));
@@ -2306,6 +2311,7 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
         if (y >= top && y < top + knob->h && x >= left - (dragging ? 40 : 0) && x < right + (dragging ? 40 : 0)) {
             int value = int(std::lround(double(x - x0 - knob->w / 2) / step));
             changeSetting(f[0], clampSetting(f[0], value));
+            dragWidget_ = &f;
             return true;
         }
     }
@@ -5079,7 +5085,7 @@ void Engine::mouseMove(float x, float y) {
         }
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
-        else if (!viewingImage_) pressSettingsWidget(px, py, true);
+        else if (!viewingImage_ && dragWidget_) pressSettingsWidget(px, py, true);
     }
 }
 
@@ -5088,11 +5094,13 @@ void Engine::mouseButton(int button, bool down) {
     log("pointer %s %d at %d,%d", down ? "down" : "up", button, pointerX_, pointerY_);
     if (button == 0) {
         // The CG viewer's volume is kept when the slider's let go.
+        if (!down && leftHeld_ && hostTaps_) mouseMove(mouseX_, mouseY_);
         if (!down && leftHeld_ && viewerDragging_) {
             viewerDragging_ = false;
             saveSettings();
         }
         leftHeld_ = down;
+        dragWidget_ = nullptr;
     }
     // A click during the title's opening ends it and does nothing more.
     if (down && openingFrom_ >= 0 && screen_ && screen_->name == "title") {
