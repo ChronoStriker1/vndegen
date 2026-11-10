@@ -261,6 +261,13 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                     b.helpRow = number(w[i + 7]);
                     i += 7;
                 }
+                if (w[i] == "disc" && i + 2 < w.size()) {
+                    b.disc = image(w[i + 1]);
+                    b.discSpeed = std::strtof(w[i + 2].c_str(), nullptr);
+                    b.discX = b.helpX;
+                    b.discY = b.helpY;
+                    i += 2;
+                }
             }
             screen->buttons.push_back(b);
         } else {
@@ -297,11 +304,23 @@ MessageButtons parseMessageButtons(const std::vector<uint8_t> &ini, Images &imag
         pair(fields[4], b.column, row);
         // A patched file could give anything here, and drawing divides by these.
         if (b.cols <= 0 || b.rows <= 0 || b.column < 0 || b.column >= b.cols) return;
-        b.help = images.get(fields[9]);
-        pair(fields[10], b.helpX, b.helpY);
-        if (fields.size() > 12) {
-            pair(fields[11], b.helpCols, b.helpRows);
-            pair(fields[12], b.helpColumn, b.helpRow);
+        size_t help = 9;
+        if (fields.size() >= 21 && fields[16].find('.') != std::string::npos) {
+            b.disc = images.get(fields[9]);
+            pair(fields[10], b.discX, b.discY);
+            pair(fields[11], b.discCols, b.discRows);
+            pair(fields[12], b.discColumn, b.discRow);
+            int axis = number(fields[14]);
+            b.discAxis = axis >= 1 && axis <= 3 ? axis : 3;
+            b.discSpeed = float(number(fields[15])) * 60 / 1000;
+            if (b.discCols <= 0 || b.discRows <= 0 || b.discColumn < 0 || b.discRow < 0 || b.discColumn >= b.discCols || b.discRow >= b.discRows) b.disc = nullptr;
+            help = 16;
+        }
+        b.help = images.get(fields[help]);
+        pair(fields[help + 1], b.helpX, b.helpY);
+        if (fields.size() > help + 3) {
+            pair(fields[help + 2], b.helpCols, b.helpRows);
+            pair(fields[help + 3], b.helpColumn, b.helpRow);
         }
         if (b.helpCols <= 0 || b.helpRows <= 0 || b.helpColumn < 0 || b.helpRow < 0 || b.helpColumn >= b.helpCols || b.helpRow >= b.helpRows) b.help = nullptr;
         (group == "under" ? out.under : out.inner).push_back(b);
