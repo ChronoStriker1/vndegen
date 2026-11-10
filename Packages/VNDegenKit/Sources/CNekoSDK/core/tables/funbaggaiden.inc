@@ -305,6 +305,7 @@ button gtab7 obj\f001_001.bmp 17 511 10 5 7
 button gtab8 obj\f001_001.bmp 17 571 10 5 8
 gallerytabs 0
 cellhide
+replaykeeps
 cellsheet obj\f003_000.bmp
 cellsize 222 143
 cellthumb 34 20
