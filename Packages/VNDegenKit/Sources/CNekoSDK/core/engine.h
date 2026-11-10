@@ -450,6 +450,9 @@ private:
     // Each heroine's chosen outfit, as its place in her list, and whether the story wears it, kept in cfg.sav as the PC does.
     std::vector<int> spriteOutfit_, spriteLocked_;
     std::string lockedSprite(const std::string &path) const;
+    std::string switchedOutfit(const std::string &path) const;
+    std::string outfitSetting_;
+    std::map<int, std::vector<int>> outfitSwitch_;
     // The sprite gallery's screen (sprites.cpp): what's shown, and its music.
     struct SpriteGallery {
         bool explaining = true, music = true, blur = false, pinned = false, panelsHidden = false;

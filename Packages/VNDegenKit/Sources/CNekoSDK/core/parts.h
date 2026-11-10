@@ -36,6 +36,7 @@ class PartHost {
 public:
     explicit PartHost(Engine &engine) : e_(engine) {}
     ImageRef image(const std::string &path);
+    std::string shownPath(const std::string &path);
     std::shared_ptr<const std::vector<uint8_t>> read(const std::string &path);
     bool exists(const std::string &path);
     // The game's table: the lines of `key` on `screen`, each as its fields, in order.
