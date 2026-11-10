@@ -1,17 +1,12 @@
 // The `particles` game part: the older engine's particles (95 starts an emitter, 96 ends one), measured under Wine on
-// Test Game 83's ep_05_05_00, where one emitter fills the screen with about a hundred glowing dots.
+// Test Game 83's ep_05_05_00.
 //
-// What the PC showed there, from 70 frames over 12 seconds: dots of the emitter's three pictures in equal numbers,
-// all over the screen from the first frame. Each pixel is added to the scene times its own brightness, its brightest
+// Each pixel is added to the scene times its own brightness, its brightest
 // channel: the green dots' levels 27, 54, 88, 130 and 186 show as 3, 11, 30, 66 and 136, their squares over 255, so
-// the pictures' dim edges vanish and no box shows round a spark. Each dot rises the whole height at its own 48 to 60
-// pixels a second, sways sideways some 40 to 90 pixels over tens of seconds, and brightens and dims slowly. The emitter
-// is a record in its slot, parameter 0, as the PC's save holds it (kind 15, its three pictures and its numbers): the
-// dots draw there, over the standing pictures in 300 and 400 and under the fog in 3333, and what takes a picture away
-// takes it away. A save holds no dot, so a load starts them afresh. An emitter that names a picture the game doesn't
-// have makes nothing, as 83's second one (parts\p000_000_000.bmp) and Test Games 84 and 89's show. How many there are
-// is a reading of one emitter (parameter 1 every parameter 2 milliseconds over parameter 7, times five eighths, 78
-// there, which matches the PC's count of dots in its frames); the PC's own rule isn't known.
+// the pictures' dim edges vanish and no box shows round a spark. The emitter
+// is a record in its slot, parameter 0, as the PC's save holds it (kind 15, its three pictures and its numbers).
+// A save holds no dot, so a load starts them afresh. An emitter that names a picture the game doesn't
+// have makes nothing, as 83's second one (parts\p000_000_000.bmp) and Test Games 84 and 89's show.
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -25,26 +20,28 @@ namespace neko {
 namespace {
 
 constexpr float kTwoPi = 6.2831853f;
+constexpr float kShare = 0.625f;
 // The number the PC's save holds after an emitter's slot.
 constexpr int kEmitterKind = 15;
 // Where the record keeps the command's numbers, in its fixed part with the three names taken out (Test Game 83's PC
 // save): parameter 1, then parameters 2 and 7 as seconds, 8, 9 and 3 as they are, and 4 and 5 as floats.
 constexpr int kAtCount = 53, kAtEvery = 77, kAtLife = 81, kAtP8 = 85, kAtP9 = 89, kAtP3 = 93, kAtP4 = 97, kAtP5 = 101;
 
-struct Dot {
-    size_t picture = 0;
-    float x = 0, y = 0;                    // where it started
-    float rise = 0;                        // pixels a second, upward
-    float sway = 0, swayPeriod = 1, swayPhase = 0;
-    float glowPeriod = 1, glowPhase = 0;
-};
-
 struct Emitter {
     std::vector<std::string> names;
     std::vector<ImageRef> pictures;
     int p[10] = {};
     int64_t bornMs = 0;
-    std::vector<Dot> dots;
+    int64_t stoppedMs = -1;
+    uint32_t seed = 0;
+
+    int perBatch() const { return std::clamp(p[1], 1, 64); }
+    int lifeMs() const { return std::clamp(p[7], 100, 30000); }
+    int everyMs() const {
+        int64_t every = std::clamp(p[2], 16, 60000);
+        return int(std::max<int64_t>(every, int64_t(perBatch()) * lifeMs() / 400));
+    }
+    bool over(int64_t now) const { return stoppedMs >= 0 && now - stoppedMs >= lifeMs(); }
 };
 
 // A small generator of its own, so an emitter's dots come out the same on every run and every host.
@@ -61,10 +58,10 @@ class ParticlesPart : public GamePart {
 public:
     bool command(PartHost &host, const Node &n) override {
         if (n.opcode == 96) {
-            // Its slot is let go, and the emitter goes with it at the next screen update, as a picture command 17 takes
-            // away does: step() ends it once the slot is no longer held. Until then it draws, and a save still holds
-            // its record whole. How the PC lets the dots die away hasn't been seen (Test Game 86 uses it).
+            if (auto it = emitters_.find(n.p[0]); it != emitters_.end() && it->second.stoppedMs < 0)
+                it->second.stoppedMs = host.nowMs();
             host.releaseSlot(n.p[0]);
+            host.redraw();
             return true;
         }
         if (n.opcode != 95) return false;
@@ -79,16 +76,32 @@ public:
 
     bool step(PartHost &host) override {
         if (!pending_.empty()) startPending(host);
-        // An emitter whose slot the scene has cleared is over.
-        for (auto it = emitters_.begin(); it != emitters_.end();)
-            it = host.slotHeld(it->first) ? std::next(it) : emitters_.erase(it);
-        return !emitters_.empty();
+        int64_t now = host.nowMs();
+        for (auto it = emitters_.begin(); it != emitters_.end();) {
+            if (host.slotHeld(it->first)) {
+                ++it;
+                continue;
+            }
+            if (!it->second.pictures.empty()) retire(std::move(it->second), now);
+            it = emitters_.erase(it);
+        }
+        auto dead = std::remove_if(ending_.begin(), ending_.end(), [&](const Emitter &e) { return e.over(now); });
+        ending_.erase(dead, ending_.end());
+        return !emitters_.empty() || !ending_.empty();
     }
 
     void drawSlot(PartHost &host, Canvas &out, int slot, float alpha) override {
         // With Config's Effects off the PC shows no dot at all; the emitter stays, and its record in a save.
         auto it = emitters_.find(slot);
-        if (it != emitters_.end() && alpha > 0 && host.effectsOn()) drawEmitter(host, out, it->second, alpha);
+        if (it == emitters_.end() || alpha <= 0 || !host.effectsOn() || it->second.stoppedMs >= 0) return;
+        drawEmitter(host, out, it->second, alpha);
+    }
+
+    void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
+        if (layer != Layer::UnderWindow || !host.effectsOn()) return;
+        for (const auto &[slot, e] : emitters_)
+            if (e.stoppedMs >= 0) drawEmitter(host, out, e, 1);
+        for (const Emitter &e : ending_) drawEmitter(host, out, e, 1);
     }
 
     // The PC's record of each emitter: the engine writes the slot's own, and this fills in the pictures and the
@@ -107,6 +120,7 @@ public:
     }
     void loadPC(const SaveData &d) override {
         emitters_.clear();
+        ending_.clear();
         pending_.clear();
         for (const SavedSprite &s : d.sprites) {
             if (s.kind != kEmitterKind || !s.path.empty() || s.rawFixed.size() < size_t(kAtP5) + 4) continue;
@@ -131,6 +145,7 @@ public:
 
     void reset() override {
         emitters_.clear();
+        ending_.clear();
         pending_.clear();
     }
 
@@ -196,25 +211,9 @@ private:
             }
             return;
         }
-        // A script's numbers may be anything, so the sum is done wide and cut at 640 before the five eighths: 1 to 400
-        // dots.
-        int64_t made = int64_t(std::max(0, p[1])) * std::max(0, p[7]) / std::max(1, p[2]);
-        int count = std::max(1, int(std::min<int64_t>(made, 640)) * 5 / 8);
-        Random random{uint32_t(slot) * 2654435761u + 12345u};
-        float w = float(host.width()), h = float(host.height());
-        for (int i = 0; i < count; i++) {
-            Dot d;
-            d.picture = size_t(i) % e.pictures.size();
-            d.x = random.between(0, w);
-            d.y = random.between(0, h);
-            d.rise = random.between(48, 60);
-            d.sway = random.between(40, 90);
-            d.swayPeriod = random.between(16, 32);
-            d.swayPhase = random.between(0, kTwoPi);
-            d.glowPeriod = random.between(4, 9);
-            d.glowPhase = random.between(0, kTwoPi);
-            e.dots.push_back(d);
-        }
+        e.seed = uint32_t(slot) * 2654435761u + uint32_t(now) * 40503u + 12345u;
+        if (auto old = emitters_.find(slot); old != emitters_.end() && !old->second.pictures.empty())
+            retire(std::move(old->second), now);
         // From a command the slot is taken now; after a load the engine has brought it back already.
         if (hold) host.holdSlot(slot, kEmitterKind);
         emitters_[slot] = std::move(e);
@@ -232,20 +231,37 @@ private:
         return out;
     }
 
+    void retire(Emitter &&e, int64_t now) {
+        if (e.stoppedMs < 0) e.stoppedMs = now;
+        if (!e.over(now)) ending_.push_back(std::move(e));
+    }
+
     void drawEmitter(PartHost &host, Canvas &out, const Emitter &e, float alpha) {
-        float t = float(host.nowMs() - e.bornMs) / 1000;
-        if (t < 0) t = 0;
-        float h = float(host.height());
-        for (const Dot &d : e.dots) {
-            const Image &picture = *e.pictures[d.picture];
-            // Off the top, a dot comes round again from below the bottom.
-            float span = h + float(picture.h);
-            float y = std::fmod(d.y - d.rise * t + float(picture.h) / 2, span);
-            if (y < 0) y += span;
-            y -= float(picture.h) / 2;
-            float x = d.x + d.sway * std::sin(kTwoPi * t / d.swayPeriod + d.swayPhase);
-            float glow = 0.78f + 0.22f * std::sin(kTwoPi * t / d.glowPeriod + d.glowPhase);
-            drawImage(out, picture, x, y, 1, 1, 0, glow * alpha, nullptr, true);
+        if (e.pictures.empty()) return;
+        int64_t now = host.nowMs();
+        int64_t t = std::max<int64_t>(0, now - e.bornMs);
+        int64_t emitted = e.stoppedMs >= 0 ? std::max<int64_t>(0, e.stoppedMs - e.bornMs) : t;
+        int every = e.everyMs(), life = e.lifeMs(), perBatch = e.perBatch();
+        int64_t first = t >= life ? (t - life) / every + 1 : 0, last = std::min(t, emitted) / every;
+        float w = float(host.width()), h = float(host.height());
+        float seconds = float(t) / 1000;
+        for (int64_t batch = first; batch <= last; batch++) {
+            int64_t age = t - batch * every;
+            if (age < 0 || age >= life) continue;
+            float u = float(age) / float(life);
+            float shown = std::min(1.0f, u / 0.05f) * std::min(1.0f, 0.7f + 0.6f * u) * std::min(1.0f, (1 - u) / 0.1f);
+            for (int i = 0; i < perBatch; i++) {
+                Random random{e.seed ^ (uint32_t(batch) * 0x9E3779B1u) ^ (uint32_t(i + 1) * 0x85EBCA6Bu)};
+                if (random.next() >= kShare) continue;
+                const Image &picture = *e.pictures[size_t(batch * perBatch + i) % e.pictures.size()];
+                float x = random.between(0, w), y = random.between(0, h);
+                float rise = random.between(48, 60);
+                float sway = random.between(40, 90), swayPeriod = random.between(16, 32);
+                float swayPhase = random.between(0, kTwoPi);
+                y -= rise * float(age) / 1000;
+                x += sway * std::sin(kTwoPi * seconds / swayPeriod + swayPhase);
+                drawImage(out, picture, x, y, 1, 1, 0, shown * alpha, nullptr, true);
+            }
         }
     }
 
@@ -256,6 +272,7 @@ private:
     }
 
     std::map<int, Emitter> emitters_;
+    std::vector<Emitter> ending_;
     std::vector<Pending> pending_;
 };
 
