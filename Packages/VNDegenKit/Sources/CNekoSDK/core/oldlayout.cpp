@@ -116,7 +116,7 @@ int Engine::bulbLevel() {
 }
 
 std::string Engine::bulbDark(const std::string &shown, const Image &lit) {
-    if (!layoutPairs_ || bulbPatterns_.empty() || shown.empty()) return "";
+    if (!layoutPairs_ || bulbPatterns_.empty() || shown.empty() || !setting("bulb")) return "";
     auto found = bulbDark_.find(shown);
     if (found != bulbDark_.end()) return found->second;
     std::string name = normalizedPath(shown), dark;
