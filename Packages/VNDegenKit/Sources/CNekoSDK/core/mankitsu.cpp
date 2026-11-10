@@ -12,12 +12,10 @@
 // fitted exactly on PC frames, and an anger mark at -20, -20 and 0.31 sits at 46, 47 from the origin, as these rules
 // give; its 41 pictures took 1.3 s, two frames each for parameter 16's 30 ms and not anime_bustup_cfg.ini's 16 (30 fps
 // recordings under Wine). The hop's pace wasn't settled (10 pixels came back over about 0.27 s where 10 frames would be 0.17), and
-// 130's parameters 3 to 5 (1, 1, 200 in a quarter of the loads, each still followed by a 132) show nothing; the one
-// face shake (145) isn't drawn.
+// 130's parameters 3 to 5 (1, 1, 200 in a quarter of the loads, each still followed by a 132) show nothing.
 //
 // Slides: 160 names two panel pictures (s1, s2), 162 starts bars of them sliding in from the left until they cover the
-// screen, 161 waits until they do, while the scene changes behind them. On the PC the bars' heights and speeds vary from slide to slide, as if random; these are drawn in the same
-// style over the times the recording shows (in over 0.6 s, out over 0.8 s), not the PC's own bars. Unconfirmed.
+// screen, 161 waits until they do, while the scene changes behind them. On the PC the bars' heights and speeds vary from slide to slide, as if random.
 //
 // The select screen, `open select` from the story table: ten half-weeks of four cards, each a character at a place, as
 // cfg\SelectPhase.ini lists them (top, left, right, bottom). A heroine's card at place -1 stands at the place her hearts
@@ -244,6 +242,7 @@ public:
         case 162: startSlide(host); return true;
         case 161:
             if (int left = int(slideFrom_ + coverMs() - host.nowMs()); left > 0) host.waitMs(left);
+            covered_ = slideFrom_ >= 0;
             return true;
         case 163:
             if (slideFrom_ >= 0)
@@ -254,7 +253,7 @@ public:
     }
 
     bool step(PartHost &host) override {
-        covering_ = slideFrom_ >= 0 && host.nowMs() >= slideFrom_ + coverMs() && host.nowMs() < outFrom_;
+        covering_ = slideFrom_ >= 0 && covered_ && host.nowMs() < outFrom_;
         if (menu_ == "title") return true;  // the backgrounds and the trim move
         // A menu's trims move while it's drawn: the frame after its last drawing is the last one asked for.
         if (std::exchange(frameDrawn_, false)) return true;
@@ -266,7 +265,7 @@ public:
             if (now < m.from + m.ms) fading = true;
         for (const auto &[slot, f] : shown_)
             if (f.flipCount > 1 && now - f.flipFrom < int64_t(f.flipCount) * f.flipTimes * f.flipMs) fading = true;
-        if (now < shakeFrom_ + kShakeMs) fading = true;
+        if (now < shakeFrom_ + kShakeMs || (shaking_ && now < shakeFrom_ + kShakeMs + 1000)) fading = true;
         bool sliding = slideFrom_ >= 0 && now - outFrom_ < uncoverMs();
         if (slideFrom_ >= 0 && !sliding) slideFrom_ = outFrom_ = -1;
         return fading || sliding;
@@ -295,7 +294,8 @@ public:
     }
 
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
-        if (menu_.rfind("config", 0) != 0 || name.rfind("config", 0) != 0) menuFrom_ = host.screenMs();
+        bool tab = menu_.rfind("config", 0) == 0 && name.rfind("config", 0) == 0 && host.nowMs() == menuDrawnNow_;
+        if (!tab) menuFrom_ = host.screenMs();
         menu_ = name;
         if (name == "title") {
             titleFrom_ = host.screenMs();
@@ -548,7 +548,7 @@ public:
         fadeMs_ = 0;
         shakeFrom_ = -1000000;
         slideFrom_ = outFrom_ = -1;
-        covering_ = false;
+        covering_ = covered_ = shaking_ = false;
         selecting_ = false;
         confirming_ = -1;
         pendingChapter_ = 0;
@@ -574,6 +574,7 @@ private:
     // right; both 8 pixels a frame of the recording, 240 a second.
     void drawMenuTrims(PartHost &host, Canvas &out) {
         frameDrawn_ = true;
+        menuDrawnNow_ = host.nowMs();
         int moved = int(std::max<int64_t>(0, host.screenMs() - menuFrom_) * kMenuTrimSpeed / 1000);
         if (ImageRef top = host.image("obj\\e004_000.bmp"))
             for (int x = -(moved % top->w); x < out.w; x += top->w) drawPart(out, *top, x, menuPlate() < 2 ? 0 : -36, 0, 0, top->w, top->h, 1);
@@ -735,7 +736,8 @@ private:
         int64_t now = host.nowMs();
         float t = fadeMs_ > 0 ? std::clamp(float(now - fadeFrom_) / float(fadeMs_), 0.0f, 1.0f) : 1.0f;
         float shakeX = 0, shakeY = 0;
-        if (now >= shakeFrom_ && now < shakeFrom_ + kShakeMs) {
+        shaking_ = now >= shakeFrom_ && now < shakeFrom_ + kShakeMs;
+        if (shaking_) {
             int turn = int((now - shakeFrom_) * kShakeTurns / kShakeMs), reach = shakeBy_ * (kShakeTurns - turn) / kShakeTurns;
             uint32_t h = (shakeSeed_ + uint32_t(turn)) * 2246822519u;
             h ^= h >> 15;
@@ -806,6 +808,7 @@ private:
             y += b.h;
         }
         slideFrom_ = host.nowMs();
+        covered_ = false;
         outFrom_ = caption_.empty() ? slideFrom_ + coverMs() + holdMs_ : slideFrom_ + int64_t(slideIn_ + captionIn_ + captionStay_ + slideOut_) * 1000 / 60;
         host.redraw();
     }
@@ -1006,7 +1009,7 @@ private:
 
     bool selecting_ = false, inisRead_ = false;
     int pendingChapter_ = 0, titleFirst_ = 0;
-    int64_t titleFrom_ = 0, menuFrom_ = 0;
+    int64_t titleFrom_ = 0, menuFrom_ = 0, menuDrawnNow_ = -1;
     std::string menu_;
     bool frameDrawn_ = false;
     bool menuFrame_ = false, menuOver_ = false;
@@ -1033,7 +1036,7 @@ private:
     int64_t slideFrom_ = -1, outFrom_ = -1, shakeFrom_ = -1000000;
     int shakeBy_ = 0;
     uint32_t shakeSeed_ = 0;
-    bool covering_ = false;
+    bool covering_ = false, covered_ = false, shaking_ = false;
     uint32_t slides_ = 0;
 };
 
