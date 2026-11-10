@@ -5,6 +5,8 @@ startmenu 2
 submenudim
 pic obj\d000_002.bmp 0 0
 pic obj\d000_000.bmp 0 0
+pic obj\d000_001.bmp 0 361 scroll 60
+pic obj\d000_001.bmp 0 660 scroll -60
 pic obj\d000_004.bmp 461 672
 pic obj\d000_005.bmp 159 0 stage 1
 pic obj\d001_000.bmp 397 506 stage 1
@@ -29,7 +31,7 @@ screen load
 askerlit
 pic obj\a103_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
-pic obj\l000_003.bmp 1110 106
+pic obj\l000_003.bmp 1110 106 flip 120
 pic obj\a002_001.bmp 0 0 overdim
 pic obj\e000_001.bmp 26 25
 emptycards 80 number 152
@@ -68,7 +70,7 @@ screen save
 askerlit
 pic obj\a002_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
-pic obj\l000_003.bmp 1110 106
+pic obj\l000_003.bmp 1110 106 flip 120
 pic obj\a002_001.bmp 0 0 overdim
 pic obj\e000_000.bmp 26 25
 slots obj\e002_000.bmp 60 98 520 120 5 2 1
@@ -127,7 +129,7 @@ screen config
 askerlit
 pic obj\a002_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
-pic obj\l000_003.bmp 1110 106
+pic obj\l000_003.bmp 1110 106 flip 120
 pic obj\a002_001.bmp 0 0
 pic obj\h000_000.bmp 26 25
 pic obj\h001_000.bmp 22 94
@@ -263,7 +265,7 @@ askerlit
 pic obj\a002_000.bmp 0 0
 pic obj\a002_001.bmp 0 0
 pic obj\e003_000.bmp 1102 0
-pic obj\l000_003.bmp 1110 106
+pic obj\l000_003.bmp 1110 106 flip 120
 pic obj\f000_000.bmp 26 25
 button page0 obj\f002_000.bmp 399 37 3 5 0
 button page1 obj\f002_000.bmp 459 37 3 5 1
@@ -307,7 +309,7 @@ screen scene
 askerlit
 pic obj\a002_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
-pic obj\l000_003.bmp 1110 106
+pic obj\l000_003.bmp 1110 106 flip 120
 pic obj\a002_001.bmp 0 0
 pic obj\f000_001.bmp 26 25
 button page0 obj\f002_000.bmp 399 37 3 5 0
@@ -353,7 +355,7 @@ askerlit
 nolithelp
 pic obj\a002_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
-pic obj\l000_003.bmp 1110 106
+pic obj\l000_003.bmp 1110 106 flip 120
 pic obj\a002_001.bmp 0 0
 pic obj\g000_000.bmp 26 25
 pic obj\g001_000.bmp 119 101
@@ -417,6 +419,7 @@ textshift 0 -1
 twobyteadvance
 inneralways
 plateholds
+choicekeepsline
 quickslots 101 100
 layoutcgslot 102
 squarewindow 0

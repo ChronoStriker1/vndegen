@@ -232,3 +232,14 @@ screen music
 slider music obj\k.bmp 100 600
 button back obj\b.bmp 700 0 1 5 0
 )";
+
+const char kTitleReturnTest[] = R"(
+screen title
+menustages
+submenudim
+button submenu:extra obj\b.bmp 0 0 1 5 0 stage 2
+button music obj\b.bmp 200 0 1 5 0 stage 2 group extra
+
+screen music
+button back obj\b.bmp 700 0 1 5 0
+)";

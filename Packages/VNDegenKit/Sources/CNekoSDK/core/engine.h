@@ -139,6 +139,7 @@ public:
     void mouseMove(float x, float y);
     void setHostTaps(bool on) { hostTaps_ = on; }
     int choiceResult() const { return choiceResult_; }
+    bool choiceLine() const { return choiceLine_; }
     bool choiceKept() const { return choiceMade_ || !choiceImage_.empty(); }
     // For test hosts: the choice on screen, or -1, and picking one.
     int choiceCount() const { return waiting_ == Waiting::Choice ? choiceCount_ : -1; }
@@ -313,6 +314,10 @@ private:
     bool hostTaps_ = false;
     int64_t clockMs_ = 0, discFrom_ = 0, discSeenAt_ = -1000000;
     bool discUp_ = false, discTurning_ = false;
+    bool helpUp_ = false, helpChanged_ = false;
+    int helpX_ = 0, helpY_ = 0;
+    int64_t helpFrom_ = 0;
+    bool helpOver(const Picture &p) const { return helpUp_ && helpX_ == p.x && helpY_ == p.y; }
     void drawDisc(Canvas &out, const ImageRef &picture, int x, int y, int cols, int rows, int column, int row, int axis, float speed);
     std::vector<std::pair<const Picture *, const Image *>> darkenedOver_;
     void drawButtonDisc(Canvas &out, const Button &b, int down = 0);
@@ -626,7 +631,9 @@ private:
     // `menustages`: Test Game 94's title shows its art until a click brings up the menu, stage 2, and the right button
     // puts it away. A `submenu:NAME` button opens the buttons and pictures of that group beside it, and a group named
     // `PARENT/NAME` opens inside PARENT's.
-    int menuStage_ = 2;
+    int menuStage_ = 2, titleStage_ = 2;
+    std::string titleSubMenu_;
+    bool titleKept_ = false, backToTitle_ = false;
     std::string subMenu_;
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;
@@ -797,7 +804,9 @@ private:
     bool storyPlaceNumbered(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);
     Sidecar parseSidecar(const SaveData &d, const std::string &text);
-    void restoreSave(const SaveData &data, const Sidecar &side);
+    void restoreSave(const SaveData &data, const Sidecar &side, bool keepLine = false);
+    void clearChoiceLine();
+    bool choiceLine_ = false, windowCleared_ = false, setAsideLine_ = false;
     std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
     void loadPartsState(const SaveData &d, const Sidecar &side);
     bool restoreStoryPlace(const Sidecar &side, bool &atChoice);

@@ -160,6 +160,7 @@ void vnneko_debug_table_prefix(const char *text) { neko::menuTablePrefix() = tex
 void vnneko_debug_host_taps(VNNekoEngine *e, bool on) { e->engine.setHostTaps(on); }
 int vnneko_debug_choice_result(VNNekoEngine *e) { return e->engine.choiceResult(); }
 bool vnneko_debug_choice_kept(VNNekoEngine *e) { return e->engine.choiceKept(); }
+bool vnneko_debug_choice_line(VNNekoEngine *e) { return e->engine.choiceLine(); }
 bool vnneko_debug_save(VNNekoEngine *e, int slot) { return e->engine.saveToSlot(slot); }
 bool vnneko_debug_load(VNNekoEngine *e, int slot) { return e->engine.loadFromSlot(slot); }
 void vnneko_debug_toggle_lock(VNNekoEngine *e, int slot) { e->engine.toggleLock(slot); }

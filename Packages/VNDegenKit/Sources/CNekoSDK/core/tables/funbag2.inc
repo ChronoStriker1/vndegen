@@ -474,7 +474,7 @@ button no obj\a003_002.bmp 650 312 2 5 1
 # A choice, as on the PC under Wine: the same box as the question's, with the choice's own two options in place of yes
 # and no, and its prompt plate. Each choice picture's options are its two columns.
 screen choice
-pic dim 0 0 alpha 221
+pic dim 0 0 alpha 221 underwindow
 pic obj\a003_001.bmp 351 228 2 1 0 0
 pic obj\a003_001.bmp 351 228 2 1 1 0
 pic obj\a003_001.bmp 695 228 2 1 0 0

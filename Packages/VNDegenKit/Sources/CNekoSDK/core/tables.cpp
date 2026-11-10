@@ -57,7 +57,19 @@ const char *menuTable(const std::string &folder) {
     }
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
     if (folder == "waffle\\ヤバい！－復讐・闇サイト－") return kYabai1;
-    if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpc") return kStoryTest;
+    if (folder == "vndegen\\storytest") return kStoryTest;
+    if (folder == "vndegen\\storytestdim") {
+        static const std::string table = std::string(kStoryTest) + "\nscreen defaults\ninneralways\n\nscreen choice\npic dim 0 0 alpha 128 underwindow\n";
+        return table.c_str();
+    }
+    if (folder == "vndegen\\storytestdimover") {
+        static const std::string table = std::string(kStoryTest) + "\nscreen defaults\ninneralways\n\nscreen choice\npic dim 0 0 alpha 128\n";
+        return table.c_str();
+    }
+    if (folder == "vndegen\\storytestpc") {
+        static const std::string table = std::string(kStoryTest) + "\nscreen defaults\nchoicekeepsline\n";
+        return table.c_str();
+    }
     // The same story with a load screen and a question box, for a tap across a load (NekoSDKStoryTableTests).
     if (folder == "vndegen\\storytestload") {
         static const std::string table = std::string(kStoryTest) + kStoryLoadScreens;
@@ -69,6 +81,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\squaretest0") return kSquareWindowTest;
     if (folder == "vndegen\\cardtest") return kCardTest;
     if (folder == "vndegen\\viewerrests") return kViewerRestsTest;
+    if (folder == "vndegen\\movingpic") return kMovingPicTest;
     if (folder == "vndegen\\emptycards") {
         static const std::string table = std::string(kEmptyCardTest) + "emptycards 128\n";
         return table.c_str();
@@ -95,6 +108,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\partplatetest") return kPartPlateTest;
     if (folder == "vndegen\\partbandtest") return kPartBandTest;
     if (folder == "vndegen\\disctest") return kDiscTest;
+    if (folder == "vndegen\\titlereturn") return kTitleReturnTest;
     if (folder == "vndegen\\musicvolume") return kMusicVolumeTest;
     if (folder == "vndegen\\plateholdstest") return kPlateHoldsTest;
     if (folder == "vndegen\\partplatebandtest") return kPartPlateBandTest;

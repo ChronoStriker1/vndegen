@@ -86,9 +86,22 @@ import TestSupport
         // It names the scene whose end asked the choice, at its top, as the PC's do, though the jump started that scene.
         let previous = try NekoSDKFlowFixture.unpacked(Data(contentsOf: saves.appendingPathComponent("save004s.sav")))
         #expect(previous.range(of: Data("scr\\b.txt".utf8)) != nil)
+        #expect(!vnneko_debug_choice_line(e))
         #expect(vnneko_debug_press(e, "BackSelection"))
         steps(e, 5)
         #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        #expect(vnneko_debug_choice_line(e))
+        vnneko_mouse_move(e, 640.0 / 1280, 359.0 / 720)
+        steps(e, 2)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        steps(e, 5)
+        #expect(!vnneko_debug_choice_line(e))
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        steps(e, 30)
+        #expect(vnneko_debug_choice_count(e) != 2, "\(status(e))")
         vnneko_stop(e)
 
         // After a load, from the file beside the save.
@@ -103,6 +116,39 @@ import TestSupport
         vnneko_debug_choose(again, 0)
         steps(again, 30)
         #expect(vnneko_debug_variable(again, 1, 13) == 1)
+    }
+
+    @Test(arguments: [true, false]) func aChoicesDarkCanLieUnderTheMessageWindow(under: Bool) throws {
+        let card = { () -> Data in
+            let w = 50, h = 250, row = (w * 3 + 3) & ~3
+            var d = Data("BM".utf8)
+            func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+            put(UInt32(54 + row * h)); put(0); put(54)
+            put(40); put(UInt32(w)); put(UInt32(h))
+            d.append(contentsOf: [1, 0, 24, 0])
+            put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+            d.append(Data(repeating: 120, count: row * h))
+            return d
+        }()
+        let load = ["obj\\b.bmp", "1", "0,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try game(under ? "storytestdim" : "storytestdimover", [
+            "obj.pak": NekoSDKFlowFixture.archive([("n001_000.bmp", choice()), ("b.bmp", card)]),
+            "cfg/msg_button.ini": Data(("#inner Load\n" + load.joined(separator: "\n") + "\n##\n").utf8),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_mouse_move(e, 0.9, 0.1)
+        steps(e, 2)
+        var w: Int32 = 0, h: Int32 = 0, changed = false
+        let px = try #require(vnneko_frame(e, &w, &h, &changed))
+        let red = px[(610 * Int(w) + 10) * 4]
+        #expect(under ? red == 120 : red >= 58 && red <= 62, "\(red)")
     }
 
     @Test func aChoiceTakenAsItAppearsStillKeepsThePreviousChoice() throws {

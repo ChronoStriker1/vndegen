@@ -358,7 +358,7 @@ void Engine::openScreen(const std::string &name) {
     if (name.rfind("config", 0) != 0) testsPlayed_.clear();
     // Test Game 84's title opens with its art revealed in four tiles and its menu fading in, when the game starts or the
     // story returns to it. From another menu it's simply there.
-    openingFrom_ = name == "title" && !screen_ && it->second.setting("opening") ? screenMs_ : -1;
+    openingFrom_ = name == "title" && !screen_ && !backToTitle_ && it->second.setting("opening") ? screenMs_ : -1;
     if (fromStory) returnTo_.clear();
     else if (screen_ && screen_->name == "title") returnTo_ = "title";
     else if (name == "title") returnTo_.clear();
@@ -370,6 +370,12 @@ void Engine::openScreen(const std::string &name) {
     }
     darkened_.clear();
     dragSetting_.clear();
+    if (screen_ && screen_->name == "title" && name != "title") {
+        titleStage_ = menuStage_;
+        titleSubMenu_ = subMenu_;
+        titleKept_ = true;
+    }
+    bool backToTitle = name == "title" && titleKept_ && backToTitle_ && it->second.setting("menustages");
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -381,6 +387,10 @@ void Engine::openScreen(const std::string &name) {
     page_ = 0;
     menuStage_ = screen_->setting("menustages") ? 1 : 2;
     subMenu_.clear();
+    if (backToTitle) {
+        menuStage_ = titleStage_;
+        subMenu_ = titleSubMenu_;
+    }
     // The drifting line art starts from a sketch picked at random, as the PC's does.
     driftFrom_ = screenMs_;
     galleryTabAt_ = screenMs_;
@@ -420,7 +430,7 @@ bool Engine::resumeSetAside() {
     PreviousChoice story = *setAside_;
     std::optional<PreviousChoice> choice = setAsideChoice_;
     int result = setAsideResult_;
-    restoreSave(story.data, parseSidecar(story.data, story.side));
+    restoreSave(story.data, parseSidecar(story.data, story.side), setAsideLine_);
     previousChoice_ = choice;
     choiceResult_ = result;
     log("back to the story at %s #%d", story.data.scene.c_str(), story.data.node);
@@ -433,6 +443,7 @@ void Engine::endStory(const std::string &screen) {
         setAside_.reset();
         setAsideChoice_.reset();
     }
+    choiceLine_ = false;
     stopTrack();  // first, since a held player's fade would never finish
     stopKind(kKindBgm, 500);
     stopKind(kKindSe, 500);
@@ -487,6 +498,8 @@ void Engine::endStory(const std::string &screen) {
 }
 
 void Engine::startStory() {
+    titleKept_ = false;
+    choiceLine_ = false;
     setAside_.reset();
     setAsideChoice_.reset();
     stopTrack();
@@ -771,7 +784,7 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "Voice") {
-        playVoiceAgain(currentText_.voice);
+        if (!choiceLine_) playVoiceAgain(currentText_.voice);
         return;
     }
     if (action == "QuickSave") {
@@ -827,7 +840,9 @@ void Engine::runAction(const std::string &action) {
         std::string to = returnTo_;
         closeScreen();
         if (to == "title" && resumeSetAside()) return;
+        backToTitle_ = to == "title";
         if (!to.empty()) openScreen(to);
+        backToTitle_ = false;
         return;
     }
     if (action.rfind("page", 0) == 0) {
@@ -879,7 +894,8 @@ void Engine::stepWindowLog(int lines) {
     if (to == windowLog_) return;
     windowLog_ = to;
     const SavedText &t = windowLog_ > 0 ? backlog_[size_t(windowLog_ - 1)] : currentText_;
-    layoutText(sjis::toUtf8(t.name), sjis::toUtf8(t.text));
+    bool cleared = windowLog_ == 0 && windowCleared_;
+    layoutText(cleared ? "" : sjis::toUtf8(t.name), cleared ? "" : sjis::toUtf8(t.text));
     textDone_ = true;
     dirty_ = true;
 }
@@ -1991,7 +2007,9 @@ bool Engine::startReplay(const GalleryEntry &scene) {
         setAside_ = PreviousChoice{story, sidecarText(story)};
         setAsideChoice_ = previousChoice_;
         setAsideResult_ = choiceResult_;
+        setAsideLine_ = choiceLine_;
     }
+    choiceLine_ = false;
     previousChoice_.reset();
     askedCount_ = askedColumns_ = askedResult_ = 0;
     askedCells_.clear();
@@ -2797,7 +2815,8 @@ bool Engine::loadFromSlot(int slot) {
     return true;
 }
 
-void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
+void Engine::restoreSave(const SaveData &d, const Sidecar &side, bool keepLine) {
+    titleKept_ = false;
     setAside_.reset();
     setAsideChoice_.reset();
     // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit, and the CG
@@ -3029,8 +3048,10 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     }
     windowShown_ = d.windowShown;
     windowShownAt_ = -100000;
-    // The PC shows the choice in an empty window, with nothing to click through first.
-    layoutText(atChoice ? "" : sjis::toUtf8(d.current.name), atChoice ? "" : sjis::toUtf8(d.current.text));
+    choiceLine_ = atChoice && keepLine && defaultsHave("choicekeepsline") && !d.current.text.empty();
+    bool empty = atChoice && !choiceLine_;
+    windowCleared_ = empty;
+    layoutText(empty ? "" : sjis::toUtf8(d.current.name), empty ? "" : sjis::toUtf8(d.current.text));
     textStart_ = now_;
     textDone_ = true;
     // A game part's screen saved open waits for its input again, as it was; a PC save at a table's `open` line opens it
@@ -3702,7 +3723,7 @@ bool Engine::composeTitleOpening(Canvas &out) {
         c.resize(out.w, out.h);
         c.clear();
         for (const Picture &p : screen_->pictures)
-            if (p.stage <= upTo) drawPicture(c, p.turn != 0 ? turned(p) : p, towardX, towardY);
+            if (p.stage <= upTo) drawPicture(c, p.turn != 0 || p.scroll != 0 || p.flip != 0 ? turned(p) : p, towardX, towardY);
         if (buttons)
             for (Button &b : screen_->buttons) drawButton(c, b, StateNormal);
     };
@@ -3793,7 +3814,7 @@ void Engine::composeScreen(Canvas &out) {
             drawPicture(out, faded, towardX, towardY);
         } else if ((p.tab < 0 || p.tab == galleryTab_) && shown(p)) {
             if (p.rise.empty()) {
-                drawPicture(out, p.turn != 0 ? turned(p) : p, towardX, towardY);
+                drawPicture(out, p.turn != 0 || p.scroll != 0 || p.flip != 0 ? turned(p) : p, towardX, towardY);
                 continue;
             }
             Picture risen = p;
@@ -3814,8 +3835,15 @@ void Engine::composeScreen(Canvas &out) {
     // entry above.
     bool helpLast = screen_->setting("helplast") != nullptr;
     const Button *helpOf = nullptr;
+    bool helpNow = false;
+    int helpNowX = 0, helpNowY = 0;
     auto drawButton = [&](Canvas &c, const Button &b, ButtonState state, bool withHelp = false) {
         bool helped = b.help && (withHelp || state == StateHover || state == StateSelectedHover);
+        if (helped) {
+            helpNow = true;
+            helpNowX = b.helpX;
+            helpNowY = b.helpY;
+        }
         if (helped && (helpLast || b.disc)) {
             Button shown = b;
             shown.help = nullptr;
@@ -3916,6 +3944,13 @@ void Engine::composeScreen(Canvas &out) {
     if (helpOf) {
         drawButtonDisc(out, *helpOf);
         drawButtonHelp(out, *helpOf);
+    }
+    if (screen_->flips && (helpNow != helpUp_ || (helpNow && (helpNowX != helpX_ || helpNowY != helpY_)))) {
+        if (helpNow && !helpUp_) helpFrom_ = clockMs_;
+        helpUp_ = helpNow;
+        helpX_ = helpNowX;
+        helpY_ = helpNowY;
+        helpChanged_ = true;
     }
     // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW [NAME]]`: a line of help shown while the pointer is over that part of the screen,
     // such as a settings group in Config, as the PC games show them. Test Game 84 keeps its lines as rows of one sheet.
@@ -4023,6 +4058,8 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 Picture Engine::turned(const Picture &p) const {
     Picture now = p;
     now.angle = p.turn * float(screenMs_) / 1000 * kPi / 180;
+    now.shift = p.scroll * float(screenMs_) / 1000;
+    if (p.flip != 0) now.angle = helpOver(p) ? p.flip * float(clockMs_ - helpFrom_) / 1000 * kPi / 180 : 0;
     return now;
 }
 
@@ -4142,7 +4179,7 @@ ButtonState Engine::messageButtonState(const Button &b) {
     if (replayOff(b.action)) return StateDisabled;
     if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
     if (b.action == "BackSelection" && !previousChoice_) return StateDisabled;
-    if (b.action == "Voice" && currentText_.voice.empty()) return StateDisabled;
+    if (b.action == "Voice" && (choiceLine_ || currentText_.voice.empty())) return StateDisabled;
     // With the GT switch off, Ejaculate and Extend are disabled for the whole scene, as Test Game 88's PC draws them
     // (under Wine: their sheet's last row with it off, the first with it on, at every line through a scene).
     if (b.action == "Ejaculation" && (!gt_.active || setting("gt_off"))) return StateDisabled;
@@ -4592,9 +4629,17 @@ void Engine::beginChoice(const Node &n) {
     log("choice %s, %d options", n.s[1].c_str(), choiceCount_);
 }
 
+void Engine::clearChoiceLine() {
+    choiceLine_ = false;
+    windowCleared_ = true;
+    layoutText("", "");
+    dirty_ = true;
+}
+
 void Engine::choose(int index) {
     if (waiting_ != Waiting::Choice) return;
     if (previousChoiceDue_) notePreviousChoice();
+    choiceLine_ = false;
     choiceResult_ = index;
     askedResult_ = index;
     choiceMade_ = true;
@@ -4952,7 +4997,8 @@ bool Engine::step(int ms) {
     if (screen_) {
         screenMs_ += ms;
         stepSprites();
-        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages") || screen_->turning) dirty_ = true;
+        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages") || screen_->turning || (screen_->flips && (helpUp_ || helpChanged_))) dirty_ = true;
+        helpChanged_ = false;
         // A gallery's character coming up after its tab opens.
         if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
         stepViewer(ms);
@@ -5329,7 +5375,8 @@ void Engine::mouseButton(int button, bool down) {
     }
     if (waiting_ == Waiting::Choice) {
         updateChoice();
-        if (choiceHover_ >= 0) choose(choiceHover_);
+        if (choiceLine_) clearChoiceLine();
+        else if (choiceHover_ >= 0) choose(choiceHover_);
         // And a left click away from the options, the first.
         else if (choiceSheet_ && choiceTable("mousechoice")) choose(0);
         return;
@@ -5628,7 +5675,7 @@ void Engine::returnToChoice() {
     if (!previousChoice_) return;
     openDialog(8, [this] {
         PreviousChoice back = *previousChoice_;
-        restoreSave(back.data, parseSidecar(back.data, back.side));
+        restoreSave(back.data, parseSidecar(back.data, back.side), true);
         previousChoice_ = back;
         log("returned to the choice at %s #%d", back.data.scene.c_str(), back.data.node);
     });
@@ -6670,6 +6717,7 @@ void Engine::showText(const Node &n) {
     }
     noteTextRead(n);
     currentText_ = {};
+    windowCleared_ = false;
     currentText_.tag = n.s[3].empty() ? -10 : 0;
     currentText_.name = n.s[1];
     currentText_.text = n.s[2];
@@ -7021,6 +7069,10 @@ void Engine::compose() {
 
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
+    if (waiting_ == Waiting::Choice && choiceSheet_)
+        if (auto table = screens_.find("choice"); table != screens_.end())
+            for (const Picture &p : table->second.pictures)
+                if (p.dim && p.underWindow) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
     drawParts(canvas_, Layer::UnderWindow);
     messageInStrip_ = square_;
     if (!square_) composeMessage(canvas_);
@@ -7036,8 +7088,8 @@ void Engine::compose() {
         if (table != screens_.end()) {
             // A `dim` picture darkens the scene behind the choice, as Test Game 83's does to 0.138 (set 3).
             for (const Picture &p : table->second.pictures) {
-                if (p.dim) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
-                else drawPicture(canvas_, p);
+                if (p.dim && !p.underWindow) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
+                else if (!p.dim) drawPicture(canvas_, p);
             }
             for (auto [line, end] = table->second.settings.equal_range("framefor"); line != end; ++line)
                 if (line->second.size() >= 4 && field(line->second, 0) == choiceCount_)
@@ -7134,7 +7186,8 @@ void Engine::markRect(int &x, int &y, int &w, int &h) const {
 }
 
 bool Engine::markShowing() const {
-    if (screen_ || logOpen_ || dialogOpen_ || windowHiddenByPlayer_ || windowArtOnly_ || !windowShown_ || !waitMark_ || waiting_ != Waiting::Click || !textDone_)
+    bool waits = waiting_ == Waiting::Click || (waiting_ == Waiting::Choice && choiceLine_);
+    if (screen_ || logOpen_ || dialogOpen_ || windowHiddenByPlayer_ || windowArtOnly_ || !windowShown_ || !waitMark_ || !waits || !textDone_)
         return false;
     // Not while an older line shows in the window, and not under a resting plate that has come up over it, as Test Game
     // 83's PC draws neither (set 3, shots under Wine): the mark is the window's, and the plate comes over the window.

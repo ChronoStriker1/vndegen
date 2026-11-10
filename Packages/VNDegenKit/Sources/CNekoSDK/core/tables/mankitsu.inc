@@ -28,7 +28,7 @@ default text 50
 textfade 50
 textpoints text 1 296 21 181 30 147 40 88.3 50 29.6 60 9.4 71 5.4 81 4.1 91 3.1 100 0
 default auto 50
-autocurve auto 104 1.04 527 1
+autocurve auto 105 1.05 418 0
 autowithvoice
 hseprefix se_h
 # The window's own buttons always show, as on the PC under Wine.
