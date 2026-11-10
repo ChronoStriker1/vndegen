@@ -118,6 +118,32 @@ import TestSupport
         click(e, 140, 405)
         #expect(pixel(e, 211, 403) == green)
         #expect(pixel(e, 163, 403) != green)
+        vnneko_mouse_move(e, 140.0 / 1280, 405.0 / 720)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_move(e, 142.0 / 1280, 406.0 / 720)
+        vnneko_mouse_button(e, 0, false)
+        for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 205, 403) == green)
+        #expect(pixel(e, 163, 403) != green)
+        click(e, 163, 405)
+        #expect(pixel(e, 163, 403) == green)
+        #expect(pixel(e, 175, 403) != green)
+    }
+
+    @Test(arguments: [true, false]) func aPressOnTheMusicScreensVolumeSetsIt(held: Bool) throws {
+        let root = try game("musicvolume")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        vnneko_debug_host_taps(e, held)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_press(e, "music"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        click(e, 109, 605)
+        #expect(pixel(e, 108, 605) == green)
+        click(e, 104, 605)
+        #expect(pixel(e, 102, 605) == green)
+        #expect(pixel(e, 108, 605) != green)
     }
 
     // `submenudim hide`: the other buttons aren't drawn while the submenu is open, and still take no press.
@@ -358,9 +384,10 @@ import TestSupport
         #expect(vnneko_debug_jump(e, "flow\\c.txt", 0))
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(vnneko_debug_choice_count(e) == 2, "\(status())")
-        vnneko_debug_choose(e, 0)
+        vnneko_debug_choose(e, 1)
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #"), "\(status())")
+        #expect(vnneko_debug_choice_result(e) == 1)
         #expect(vnneko_debug_save(e, 4))
         #expect(files().contains("save004s.sav"), "\(files())")
         #expect(vnneko_debug_press(e, "scene"))
@@ -368,12 +395,14 @@ import TestSupport
         click(e, 320, 315)
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().contains("k.txt #"), "\(status())")
+        #expect(vnneko_debug_choice_result(e) == 0)
         #expect(vnneko_debug_save(e, 5))
         #expect(files().contains("save005.sav") && !files().contains("save005s.sav"), "\(files())")
         for _ in 0..<90 { _ = vnneko_step(e, 16) }
         #expect(vnneko_debug_press(e, "back"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
+        #expect(vnneko_debug_choice_result(e) == 1)
         #expect(vnneko_debug_save(e, 6))
         #expect(files().contains("save006s.sav"), "\(files())")
         func previous(_ slot: Int) throws -> Data {

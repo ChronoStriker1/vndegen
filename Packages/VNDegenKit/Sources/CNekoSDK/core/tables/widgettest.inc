@@ -223,3 +223,12 @@ const char kPlateHoldsTest[] = R"(
 screen defaults
 plateholds
 )";
+
+const char kMusicVolumeTest[] = R"(
+screen title
+button music obj\b.bmp 0 0 1 5 0
+
+screen music
+slider music obj\k.bmp 100 600
+button back obj\b.bmp 700 0 1 5 0
+)";
