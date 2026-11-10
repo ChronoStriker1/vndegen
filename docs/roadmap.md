@@ -83,6 +83,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - NekoSDK: a Scene replay started from inside the story keeps the story (#74), and Yabai!'s thought lines, text speed and Auto pace (0.31.1).
 - NekoSDK: a tap on the arrow beside a Config slider steps it by one in every game (#77), and Funbag Fantasy 2's text and Auto at the PC's pace (#76) (0.31.2).
 - NekoSDK: Mankitsu Happening's CG viewer bar, scene wipe captions and text speed, and Yabai!'s text speed across the slider (0.31.3).
+- NekoSDK: Funbag Fantasy: Sideboob Story, the fifteenth and last NekoSDK game (0.32.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
