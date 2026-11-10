@@ -390,6 +390,7 @@ screen cg
 part mankitsu
 viewer obj\g000_000.bmp 0 616
 viewerclicks
+viewerrests 2400 360
 viewerauto 5000 0
 viewernumber index obj\g001_000.bmp 999 667 21 2
 viewernumber total obj\g001_001.bmp 1058 673 17 2
@@ -815,6 +816,7 @@ screen cg
 part mankitsu
 viewer obj\g000_000.bmp 0 616
 viewerclicks
+viewerrests 2400 360
 viewerauto 5000 0
 viewernumber index obj\g001_000.bmp 999 667 21 2
 viewernumber total obj\g001_001.bmp 1058 673 17 2
