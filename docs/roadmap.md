@@ -90,12 +90,11 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Save sync over FTP and WebDAV, with Ludusavi's settings for each, beside SMB (0.33.0).
 
 ## Bugs to fix
-New bugs get a GitHub issue and a line here.
-- [#83](https://github.com/ChronoStriker1/vndegen/issues/83) Tests: a TyranoScript test fails when the build Mac is heavily loaded.
+New bugs get a GitHub issue and a line here. None are open.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Nothing right now. Item 1 under Next is the next thread.
+- Nothing right now. Feature work is paused at the maintainer's word (2026-11-10).
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses

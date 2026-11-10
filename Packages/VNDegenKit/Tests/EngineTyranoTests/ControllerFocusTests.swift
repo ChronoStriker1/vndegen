@@ -195,6 +195,20 @@ for (const id of ['skip', 'auto']) document.getElementById(id).addEventListener(
     try await view.callAsyncJavaScript("return String(eval(code))", arguments: ["code": script], contentWorld: .page) as? String ?? ""
 }
 
+@MainActor private func settled(_ view: WKWebView, _ script: String, on expected: String) async -> String {
+    var last = ""
+    for _ in 0..<150 {
+        do {
+            last = try await read(view, script)
+            if last == expected { return last }
+        } catch {
+            last = "threw: \(error.localizedDescription)"
+        }
+        try? await Task.sleep(for: .milliseconds(100))
+    }
+    return last
+}
+
 @MainActor @Test func skipAndAutoTurnOnWhileALineIsStillShowing() async throws {
     let (view, loader) = try await modesView()
     _ = loader
@@ -281,13 +295,11 @@ for (const id of ['skip', 'auto']) document.getElementById(id).addEventListener(
     _ = loader
     let lit = { (id: String) in "getComputedStyle(document.getElementById('\(id)')).filter !== 'none'" }
     _ = try await read(view, "stat.is_auto = true")
-    try await Task.sleep(for: .milliseconds(500))
-    #expect(try await read(view, lit("auto")) == "true")
-    #expect(try await read(view, lit("skip")) == "false")
+    #expect(await settled(view, lit("auto"), on: "true") == "true")
+    #expect(await settled(view, lit("skip"), on: "false") == "false")
     _ = try await read(view, "stat.is_auto = false; stat.is_skip = true")
-    try await Task.sleep(for: .milliseconds(500))
-    #expect(try await read(view, lit("auto")) == "false")
-    #expect(try await read(view, lit("skip")) == "true")
+    #expect(await settled(view, lit("skip"), on: "true") == "true")
+    #expect(await settled(view, lit("auto"), on: "false") == "false")
     #expect(try await read(view, "document.getElementById('skip').className") == "", "saved layers keep their HTML as the PC build expects")
 }
 
