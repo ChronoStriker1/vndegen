@@ -838,7 +838,7 @@ on 2 goto release
 set S 1000 = 600
 set S 105 = 4
 chapter 600
-staffroll
+open staff 1
 set S 1000 = 602
 set S 105 = 4
 chapter 602
@@ -847,7 +847,7 @@ label arson
 set S 1000 = 610
 set S 105 = 4
 chapter 610
-staffroll
+open staff 2
 set S 1000 = 612
 set S 105 = 4
 chapter 612
@@ -856,7 +856,7 @@ label release
 set S 1000 = 620
 set S 105 = 4
 chapter 620
-staffroll
+open staff 3
 set S 1000 = 622
 set S 105 = 4
 chapter 622

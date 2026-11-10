@@ -7,7 +7,9 @@
 #include <map>
 #include <sstream>
 
+#include "font.h"
 #include "parts.h"
+#include "sjis.h"
 
 namespace neko {
 namespace {
@@ -97,6 +99,18 @@ public:
         }
         // `open ask N`: one of the PC's own questions on a band (1 the interrogation tutorial, 2 the vote's, 3 save
         // before the ending), はい 1 and いいえ 0; 4 the ending's three ways, 0 to 2. Placed as on the PC (Wine).
+        if (name == "staff") {
+            staff_ = std::max(1, std::min(3, args.empty() ? 1 : args[0]));
+            staffFrom_ = host.nowMs();
+            staffResumeMs_ = -1;
+            loadStaff(host);
+            if (steps_.empty()) {
+                staff_ = 0;
+                host.finishScreen(0);
+            }
+            host.redraw();
+            return true;
+        }
         if (name == "ask") {
             ask_ = args.empty() ? 1 : args[0];
             hoverAsk_ = -1;
@@ -155,6 +169,13 @@ public:
 
     // The bubbles move on the story's clock, so a menu over the hub holds them still.
     bool step(PartHost &host) override {
+        if (staff_) {
+            if (staffMs(host) >= staffEndMs()) {
+                staff_ = 0;
+                host.finishScreen(0);
+            }
+            return true;
+        }
         if (!open_ || ask_) return false;
         moveBubbles(host);
         hover(host);
@@ -162,6 +183,7 @@ public:
     }
 
     bool press(PartHost &host, int x, int y, int button) override {
+        if (staff_) return true;
         if (ask_) {
             if (button != 0) return true;
             int hit = askOption(x, y);
@@ -191,6 +213,7 @@ public:
     // Controller and keyboard: the questions still to ask, the heroines' tabs and the tree's button; on a question band,
     // its answers.
     bool focusSpots(PartHost &host, std::vector<std::pair<int, int>> &spots) override {
+        if (staff_) return true;
         if (ask_) {
             for (int i = 0; i < (ask_ == 4 ? 3 : 2); i++) {
                 if (ask_ == 4) spots.push_back({640, 298 + 55 * i});
@@ -231,6 +254,10 @@ public:
 
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
         if (layer != Layer::Screen) return;
+        if (staff_) {
+            drawStaff(host, out);
+            return;
+        }
         if (ask_) {
             drawAsk(host, out);
             return;
@@ -286,9 +313,11 @@ public:
     // The plate's Auto and Skip are drawn disabled over the hub, as the PC draws them there (a PC shot under Wine with
     // the plate up: both in their sheet's last row).
     int actionLit(const std::string &name) const override { return open_ && !ask_ && (name == "Auto" || name == "Skip") ? 2 : -1; }
+    bool showsPlate() const override { return !staff_; }
 
     // The hub's bubbles, each question's middle now, for headless play: `hub 598,279 896,286 834,465`.
     std::string debugStatus() const override {
+        if (staff_) return "staff " + std::to_string(staff_);
         if (ask_) return "ask " + std::to_string(ask_);
         if (!open_) return {};
         std::string words = "hub";
@@ -297,7 +326,8 @@ public:
     }
 
     void save(std::vector<std::string> &lines) const override {
-        if (ask_) lines.push_back("ask " + std::to_string(ask_));
+        if (staff_) lines.push_back("staff " + std::to_string(staff_) + " " + std::to_string(std::max<int64_t>(0, staffSeenMs_)));
+        else if (ask_) lines.push_back("ask " + std::to_string(ask_));
         else if (open_) lines.push_back("hub");
     }
     void load(const std::vector<std::string> &lines) override {
@@ -308,12 +338,20 @@ public:
             words >> kind >> number;
             if (kind == "hub") open_ = true;
             if (kind == "ask" && number >= 1 && number <= 4) ask_ = number;
+            if (kind == "staff" && number >= 1 && number <= 3) {
+                int64_t ms = 0;
+                words >> ms;
+                staff_ = number;
+                staffResumeMs_ = std::max<int64_t>(0, ms);
+                steps_.clear();
+            }
         }
         hoverAsk_ = hoverQ_ = -1;
     }
 
     void reset() override {
         open_ = false, ask_ = 0;
+        staff_ = 0;
         bubblesFor_ = -1;
         pictures_.clear();
     }
@@ -722,6 +760,144 @@ private:
 
     int ask_ = 0, hoverAsk_ = -1, hoverQ_ = -1, pendingDevil_ = 0;
     bool open_ = false;
+    struct Post {
+        std::string head, name, date;
+        std::vector<std::string> lines;
+        std::string image;
+        int height = 0;
+    };
+    struct StaffStep {
+        int first = 0, count = 0, slid = 0;
+        bool appended = false;
+    };
+    int staff_ = 0, staffLoaded_ = 0;
+    int64_t staffFrom_ = 0, staffResumeMs_ = -1, staffSeenMs_ = 0;
+    std::vector<Post> posts_;
+    std::vector<StaffStep> steps_;
+    static constexpr int kStaffStepMs = 4083, kStaffSlideMs = 250, kStaffTailMs = 3100, kStaffFadeMs = 4000, kStaffBlackMs = 1100;
+    static constexpr int kPanelMs = 10000, kPanelFadeMs = 1667, kPanelHoldMs = 6000, kPanels = 11;
+    static constexpr int kPageX = 42, kPageY = 98, kScanY = 34, kPanelX = 880, kPanelY = 96, kPageBottom = 670;
+    static constexpr int kPostTop = 98, kPostLine = 27, kImageLines = 7, kHeadX = 106, kBodyX = 156;
+    static constexpr int kStaffFace = 1, kStaffSize = 24, kHeadDrop = 2, kBodyDrop = 1;
+
+    int64_t staffMs(PartHost &host) {
+        if (staffResumeMs_ >= 0) {
+            staffFrom_ = host.nowMs() - staffResumeMs_;
+            staffResumeMs_ = -1;
+        }
+        loadStaff(host);
+        staffSeenMs_ = std::max<int64_t>(0, host.nowMs() - staffFrom_);
+        return staffSeenMs_;
+    }
+    int64_t staffEndMs() const {
+        return int64_t(std::max<size_t>(1, steps_.size()) - 1) * kStaffStepMs + kStaffTailMs + kStaffFadeMs + kStaffBlackMs;
+    }
+
+    void loadStaff(PartHost &host) {
+        if (staffLoaded_ == staff_ && !steps_.empty()) return;
+        staffLoaded_ = staff_;
+        posts_.clear();
+        steps_.clear();
+        auto bytes = host.read("cfg\\staff" + std::to_string(staff_) + ".ini");
+        if (!bytes) {
+            host.log("staff thread missing: cfg\\staff" + std::to_string(staff_) + ".ini");
+            return;
+        }
+        std::istringstream in(std::string(bytes->begin(), bytes->end()));
+        std::vector<std::string> lines;
+        for (std::string line; std::getline(in, line);) {
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) line.pop_back();
+            if (!line.empty()) lines.push_back(line);
+        }
+        for (size_t i = 0; i < lines.size(); i++) {
+            if (lines[i] != "#thread" || i + 3 >= lines.size()) continue;
+            Post post;
+            post.head = lines[i + 1];
+            post.name = lines[i + 2];
+            post.date = lines[i + 3];
+            for (i += 4; i < lines.size() && lines[i] != "##"; i++) {
+                if (lines[i].rfind("msg,", 0) == 0) post.lines.push_back(lines[i].substr(4));
+                if (lines[i].rfind("img,", 0) == 0) {
+                    const std::string raw = lines[i].substr(4);
+                    post.image.clear();
+                    for (size_t c = 0; c < raw.size(); c++)
+                        if (!(raw[c] == '\\' && c + 1 < raw.size() && raw[c + 1] == '\\')) post.image += raw[c];
+                }
+            }
+            post.height = kPostLine * (1 + int(post.lines.size()) + (post.image.empty() ? 0 : kImageLines));
+            posts_.push_back(post);
+        }
+        int first = 0, count = 0, total = int(posts_.size());
+        auto bottom = [&] {
+            int y = kPostTop;
+            for (int i = first; i <= count && i < total; i++) y += posts_[size_t(i)].height;
+            return y;
+        };
+        while (count < total && steps_.size() < size_t(4 * total + 4)) {
+            StaffStep step;
+            if (bottom() > kPageBottom && first < count) step.slid = posts_[size_t(first++)].height;
+            if (bottom() <= kPageBottom || first == count) count++, step.appended = true;
+            step.first = first, step.count = count;
+            steps_.push_back(step);
+        }
+    }
+
+    static int staffText(Canvas &out, const std::string &text, int x, int y, int r, int g, int b) {
+        int ascent = fontAscent(kStaffFace, kStaffSize);
+        for (size_t i = 0; i < text.size();) {
+            int length = 1;
+            char32_t code = sjis::decodeAt(text, i, &length);
+            i += size_t(std::max(1, length));
+            GlyphImage glyphImage;
+            if (!glyph(kStaffFace, uint32_t(code), kStaffSize, false, glyphImage)) continue;
+            if (glyphImage.w > 0 && glyphImage.h > 0)
+                drawCoverage(out, glyphImage.coverage.data(), glyphImage.w, glyphImage.h, x + glyphImage.left, y + ascent - glyphImage.top, r, g, b, 256);
+            x += glyphImage.advance;
+        }
+        return x;
+    }
+
+    void drawPost(PartHost &host, Canvas &out, const Post &post, int y) {
+        static const std::string kColon = " \x81\x46 ";
+        int x = staffText(out, post.head + kColon, kHeadX, y + kHeadDrop, 0, 0, 0);
+        x = staffText(out, post.name, x, y + kHeadDrop, 0, 0, 255);
+        staffText(out, kColon + post.date, x, y + kHeadDrop, 0, 0, 0);
+        y += kPostLine;
+        for (const std::string &line : post.lines) {
+            staffText(out, line, kBodyX, y + kBodyDrop, 0, 0, 0);
+            y += kPostLine;
+        }
+        if (!post.image.empty()) put(host, out, post.image, kBodyX, y);
+    }
+
+    void drawStaff(PartHost &host, Canvas &out) {
+        int64_t ms = staffMs(host);
+        if (steps_.empty()) return;
+        tintFrame(out, 0, 0, 0, 256);
+        put(host, out, "obj\\s000_002.bmp", kPageX, kPageY);
+        size_t at = std::min(size_t(ms / kStaffStepMs), steps_.size() - 1);
+        const StaffStep &step = steps_[at];
+        int64_t into = ms - int64_t(at) * kStaffStepMs;
+        bool sliding = step.slid > 0 && into < kStaffSlideMs;
+        int first = sliding ? step.first - 1 : step.first, last = sliding && step.appended ? step.count - 1 : step.count;
+        int y = kPostTop + (sliding ? -int(int64_t(step.slid) * into / kStaffSlideMs) : 0);
+        for (int i = first; i < last; i++) {
+            drawPost(host, out, posts_[size_t(i)], y);
+            y += posts_[size_t(i)].height;
+        }
+        int panel = int(std::min<int64_t>(ms / kPanelMs, kPanels - 1));
+        int64_t rel = ms - int64_t(panel) * kPanelMs;
+        float shown = rel < kPanelFadeMs ? float(rel) / kPanelFadeMs
+                      : rel < kPanelFadeMs + kPanelHoldMs ? 1
+                      : rel < 2 * kPanelFadeMs + kPanelHoldMs ? 1 - float(rel - kPanelFadeMs - kPanelHoldMs) / kPanelFadeMs : 0;
+        char name[32];
+        std::snprintf(name, sizeof name, "obj\\s001_%03d.bmp", panel);
+        if (ImageRef image = host.image(name); image && shown > 0) drawPart(out, *image, kPanelX, kPanelY, 0, 0, image->w, image->h, shown * shown);
+        put(host, out, "obj\\s000_000.bmp", 0, 0);
+        put(host, out, "obj\\s000_001.bmp", kPageX, kScanY);
+        int64_t fadeFrom = int64_t(steps_.size() - 1) * kStaffStepMs + kStaffTailMs;
+        if (ms > fadeFrom) tintFrame(out, 0, 0, 0, int(std::min<int64_t>(256, (ms - fadeFrom) * 256 / kStaffFadeMs)));
+    }
     // The hub's bubbles: where they are, the clock they've been moved up to and the one their rocking counts from, what
     // they were laid out for (truth, heroine and stage), each pair's side of its touching line, and their pictures by
     // question and state.
