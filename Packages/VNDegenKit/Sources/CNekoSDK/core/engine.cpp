@@ -1988,6 +1988,9 @@ bool Engine::startReplay(const GalleryEntry &scene) {
         previousChoice_.reset();
         askedCount_ = askedColumns_ = askedResult_ = 0;
         askedCells_.clear();
+        choiceResult_ = 0;
+        choiceImage_.clear();
+        choiceMade_ = false;
     }
     stopTrack();
     if (titleMusic_) {
@@ -3461,6 +3464,13 @@ void Engine::composeDialog(Canvas &out) {
     if (screen_) {
         bool over = false;
         std::vector<const Picture *> frames;
+        std::vector<const Image *> bright;
+        for (const Picture &p : screen_->pictures)
+            if (p.overDim && p.image && (p.tab < 0 || p.tab == galleryTab_) && shown(p)) bright.push_back(p.image.get());
+        if (bright != darkenedOver_) {
+            darkened_.clear();
+            darkenedOver_ = bright;
+        }
         for (const Picture &p : screen_->pictures) {
             if (!p.image || (p.tab >= 0 && p.tab != galleryTab_) || !shown(p)) continue;
             if (p.overDim) {
@@ -3922,7 +3932,7 @@ void Engine::composeScreen(Canvas &out) {
             const auto &f = it->second;
             if (f.size() < 9 || !inRect(pointerX_, pointerY_, field(f, 0), field(f, 1), field(f, 2) - field(f, 0), field(f, 3) - field(f, 1))) continue;
             if (f.size() >= 12 && f[9] == "disc")
-                if (ImageRef disc = images_->get(f[10])) drawDisc(out, *disc, field(f, 5), field(f, 6), 1, 1, 0, 0, 3, std::strtof(f[11].c_str(), nullptr));
+                if (ImageRef disc = images_->get(f[10])) drawDisc(out, disc, field(f, 5), field(f, 6), 1, 1, 0, 0, 3, std::strtof(f[11].c_str(), nullptr));
             if (ImageRef help = images_->get(f[4])) {
                 int w = help->w / std::max(1, field(f, 7));
                 drawPart(out, *help, field(f, 5), field(f, 6), field(f, 8) * w, 0, w, help->h, 1);
@@ -4010,7 +4020,8 @@ Picture Engine::turned(const Picture &p) const {
     return now;
 }
 
-void Engine::drawDisc(Canvas &out, const Image &sheet, int x, int y, int cols, int rows, int column, int row, int axis, float speed) {
+void Engine::drawDisc(Canvas &out, const ImageRef &picture, int x, int y, int cols, int rows, int column, int row, int axis, float speed) {
+    const Image &sheet = *picture;
     cols = std::max(1, cols);
     rows = std::max(1, rows);
     int w = sheet.w / cols, h = sheet.h / rows;
@@ -4038,7 +4049,7 @@ void Engine::drawDisc(Canvas &out, const Image &sheet, int x, int y, int cols, i
         for (int line = 0; line < h; line++)
             std::copy_n(&sheet.rgba[(size_t(row * h + line) * size_t(sheet.w) + size_t(column * w)) * 4], size_t(w) * 4, &cell->rgba[size_t(line) * size_t(w) * 4]);
         if (discCells_.size() > 16) discCells_.clear();
-        made = discCells_.emplace(key, std::make_pair(ImageRef(), ImageRef(cell))).first;
+        made = discCells_.emplace(key, std::make_pair(picture, ImageRef(cell))).first;
     }
     drawImage(out, *made->second.second, middleX, middleY, scaleX, scaleY, turn, 1);
 }
@@ -4055,7 +4066,7 @@ bool Engine::discUpFor(const std::string &picture) {
 }
 
 void Engine::drawButtonDisc(Canvas &out, const Button &b, int down) {
-    if (b.disc) drawDisc(out, *b.disc, b.discX, b.discY + down, b.discCols, b.discRows, b.discColumn, b.discRow, b.discAxis, b.discSpeed);
+    if (b.disc) drawDisc(out, b.disc, b.discX, b.discY + down, b.discCols, b.discRows, b.discColumn, b.discRow, b.discAxis, b.discSpeed);
 }
 
 ImageRef Engine::darkened(const Picture &p, const std::vector<const Picture *> &frames, int dark) {
