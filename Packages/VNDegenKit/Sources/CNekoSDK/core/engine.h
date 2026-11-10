@@ -307,10 +307,13 @@ private:
     std::optional<PreviousChoice> setAside_, setAsideChoice_;
     int setAsideResult_ = 0;
     int64_t clockMs_ = 0, discFrom_ = 0, discSeenAt_ = -1000000;
-    bool discTurning_ = false;
+    bool discUp_ = false, discTurning_ = false;
     void drawDisc(Canvas &out, const Image &sheet, int x, int y, int cols, int rows, int column, int row, int axis, float speed);
-    void drawButtonDisc(Canvas &out, const Button &b);
-    bool discUpFor(const ImageRef &picture);
+    void drawButtonDisc(Canvas &out, const Button &b, int down = 0);
+    bool discUpFor(const std::string &picture);
+    ButtonState messageButtonState(const Button &b);
+    int windowMoved_ = 0;
+    std::map<std::tuple<const Image *, int, int>, std::pair<ImageRef, ImageRef>> discCells_;
     bool resumeSetAside();
     bool previousChoiceDue_ = false;
     // The latest choice asked, as Test Games 82 and 83's saves keep it (SaveData::choiceColumns): its options, the sheet's

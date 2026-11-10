@@ -31,6 +31,7 @@ struct Button {
     ImageRef help;         // shown while hovered
     int helpX = 0, helpY = 0, helpCols = 1, helpRows = 1, helpColumn = 0, helpRow = 0;
     ImageRef disc;
+    std::string discPath;
     int discX = 0, discY = 0, discCols = 1, discRows = 1, discColumn = 0, discRow = 0, discAxis = 3;
     float discSpeed = 0;
     int cellW() const { return sheet ? sheet->w / cols : 0; }

@@ -214,9 +214,6 @@ end
 )";
 
 const char kDiscTest[] = R"(
-screen defaults
-windowpic obj\e.bmp 1000 500
-
 screen title
 button config obj\b.bmp 0 100 1 5 0 help obj\h.bmp 300 300 1 1 0 0 disc obj\bar.bmp 90
 )";
