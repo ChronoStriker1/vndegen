@@ -74,7 +74,7 @@ import TestSupport
             var w: Int32 = 0, h: Int32 = 0, changed = false
             guard let px = vnneko_frame(e, &w, &h, &changed) else { return false }
             let at = (510 * Int(w) + 1010) * 4
-            return px[at] == 0 && px[at + 1] >= 100 && px[at + 2] == 0
+            return px[at] == 0 && px[at + 1] == 200 && px[at + 2] == 0
         }
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(!emblem())
