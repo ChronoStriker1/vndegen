@@ -368,6 +368,7 @@ void Engine::openScreen(const std::string &name) {
         if (viewerPanel()) closeViewer();
         viewingImage_ = false;
     }
+    if (screen_ != &it->second) darkened_.clear();
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -406,13 +407,28 @@ void Engine::openScreen(const std::string &name) {
 }
 
 void Engine::closeScreen() {
+    darkened_.clear();
     if (spriteScreen()) closeSprites();
     screen_ = nullptr;
     dirty_ = true;
 }
 
+bool Engine::resumeSetAside() {
+    if (!setAside_) return false;
+    PreviousChoice story = *setAside_;
+    std::optional<PreviousChoice> choice = setAsideChoice_;
+    restoreSave(story.data, parseSidecar(story.data, story.side));
+    previousChoice_ = choice;
+    log("back to the story at %s #%d", story.data.scene.c_str(), story.data.node);
+    return true;
+}
+
 // Back from the story to a menu, with its sound and sprites cleared.
 void Engine::endStory(const std::string &screen) {
+    if (screen != "scene") {
+        setAside_.reset();
+        setAsideChoice_.reset();
+    }
     stopTrack();  // first, since a held player's fade would never finish
     stopKind(kKindBgm, 500);
     stopKind(kKindSe, 500);
@@ -466,6 +482,8 @@ void Engine::endStory(const std::string &screen) {
 }
 
 void Engine::startStory() {
+    setAside_.reset();
+    setAsideChoice_.reset();
     stopTrack();
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
@@ -803,6 +821,7 @@ void Engine::runAction(const std::string &action) {
         // Closed first either way, so a screen that keeps something on leaving, such as the sprite gallery, does.
         std::string to = returnTo_;
         closeScreen();
+        if (to == "title" && resumeSetAside()) return;
         if (!to.empty()) openScreen(to);
         return;
     }
@@ -1795,7 +1814,7 @@ void Engine::composeTrackTime(Canvas &out) {
         clock(at, field(*times, 1), field(*times, 2));
         clock(all, field(*times, 3), field(*times, 4));
     }
-    if (const auto *playing = screen_->setting("playingpic"); playing && playing->size() >= 3 && trackPlayer_ && currentTrack_ >= 0) {
+    if (const auto *playing = screen_->setting("playingpic"); playing && playing->size() >= 3 && (trackPlayer_ || screen_->setting("trackselects")) && currentTrack_ >= 0) {
         std::string name = (*playing)[0];
         size_t dot = name.rfind('.');
         if (dot != std::string::npos && dot >= 3 && std::isdigit(uint8_t(name[dot - 1])) && std::isdigit(uint8_t(name[dot - 2])) && std::isdigit(uint8_t(name[dot - 3]))) {
@@ -1957,6 +1976,12 @@ bool Engine::startReplay(const GalleryEntry &scene) {
     if (!flow || !flow->first()) return false;
     replayTab_ = galleryTab_;
     replayPage_ = screen_ && screen_->name == "scene" ? page_ : -1;
+    if (!replaying_ && !setAside_ && !stack_.empty()) {
+        SaveData story = captureSave();
+        setAside_ = PreviousChoice{story, sidecarText(story)};
+        setAsideChoice_ = previousChoice_;
+        previousChoice_.reset();
+    }
     stopTrack();
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
@@ -2753,6 +2778,8 @@ bool Engine::loadFromSlot(int slot) {
 }
 
 void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
+    setAside_.reset();
+    setAsideChoice_.reset();
     // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit, and the CG
     // viewer it may have come from.
     replaying_ = false;
@@ -3226,8 +3253,9 @@ void Engine::composeSlots(Canvas &out) {
             // digits), from a sheet of CELLS, 10 when absent (13 for Test Game 96's, its date's marks after the digits).
             int numberCells = offset("slotdigits", 5) > 0 ? offset("slotdigits", 5) : 10;
             const auto *faded = screen_->setting("emptycards");
-            bool numberFades = faded && faded->size() >= 2 && (*faded)[1] == "number";
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4), numberFades ? cardOpacity : 1);
+            bool numberFades = cardOpacity < 1 && faded && faded->size() >= 2 && (*faded)[1] == "number";
+            float numberOpacity = !numberFades ? 1 : faded->size() >= 3 ? std::clamp(float(field(*faded, 2)) / 256, 0.0f, 1.0f) : cardOpacity;
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4), numberOpacity);
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -3416,10 +3444,24 @@ void Engine::composeDialog(Canvas &out) {
     const Screen &dialog = screens_.at("dialog");
     // `dim N` of 256 darkens what's behind; Test Game 84's questions don't.
     const auto *dim = dialog.setting("dim");
-    tintFrame(out, 0, 0, 0, dim && !dim->empty() ? field(*dim, 0) : 128);
-    if (screen_)
-        for (const Picture &p : screen_->pictures)
-            if (p.overDim && p.image && (p.tab < 0 || p.tab == galleryTab_) && shown(p)) drawPicture(out, p);
+    int dark = std::clamp(dim && !dim->empty() ? field(*dim, 0) : 128, 0, 256);
+    tintFrame(out, 0, 0, 0, dark);
+    if (screen_) {
+        bool over = false;
+        std::vector<const Picture *> frames;
+        for (const Picture &p : screen_->pictures) {
+            if (!p.image || (p.tab >= 0 && p.tab != galleryTab_) || !shown(p)) continue;
+            if (p.overDim) {
+                drawPicture(out, p);
+                over = true;
+                frames.push_back(&p);
+            } else if (over) {
+                Picture dimmed = p;
+                dimmed.image = darkened(p, frames, dark);
+                drawPicture(out, dimmed);
+            }
+        }
+    }
     // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, behind fixed art besides.
     // `question FILE X Y COLS COL`: a cell of a strip instead, drawn over the art, as Test Game 82's titles are seven
     // across one picture over the frame they name.
@@ -3745,11 +3787,17 @@ void Engine::composeScreen(Canvas &out) {
     bool helpLast = screen_->setting("helplast") != nullptr;
     const Button *helpOf = nullptr;
     auto drawButton = [&](Canvas &c, const Button &b, ButtonState state, bool withHelp = false) {
-        if (helpLast && b.help && (withHelp || state == StateHover || state == StateSelectedHover)) {
+        bool helped = b.help && (withHelp || state == StateHover || state == StateSelectedHover);
+        if (helped && (helpLast || b.disc)) {
             Button shown = b;
             shown.help = nullptr;
             neko::drawButton(c, shown, state);
-            helpOf = &b;
+            if (helpLast) {
+                helpOf = &b;
+                return;
+            }
+            drawButtonDisc(c, b);
+            drawButtonHelp(c, b);
             return;
         }
         neko::drawButton(c, b, state, withHelp);
@@ -3820,8 +3868,8 @@ void Engine::composeScreen(Canvas &out) {
             drawButton(out, b, StateSelected, true);
             continue;
         }
-        // Pause is drawn disabled with nothing playing, but not on a `trackselects` screen: Test Game 96's stays plain.
-        if (b.action == "music_pause" && !trackPlayer_ && !screen_->setting("trackselects")) state = StateDisabled;
+        const auto *selects = screen_->setting("trackselects");
+        if (b.action == "music_pause" && !trackPlayer_ && (!selects || (!selects->empty() && (*selects)[0] == "pauseoff"))) state = StateDisabled;
         // The current page's button sits higher in Test Game 84.
         if (const auto *lift = screen_->setting("pagelift"); lift && current && b.action.rfind("page", 0) == 0) {
             Button raised = b;
@@ -3837,7 +3885,10 @@ void Engine::composeScreen(Canvas &out) {
         }
         drawButton(out, b, state);
     }
-    if (helpOf) drawButtonHelp(out, *helpOf);
+    if (helpOf) {
+        drawButtonDisc(out, *helpOf);
+        drawButtonHelp(out, *helpOf);
+    }
     // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW [NAME]]`: a line of help shown while the pointer is over that part of the screen,
     // such as a settings group in Config, as the PC games show them. Test Game 84 keeps its lines as rows of one sheet.
     bool hoverShown = false;
@@ -3858,6 +3909,8 @@ void Engine::composeScreen(Canvas &out) {
         for (auto [it, end] = screen_->settings.equal_range("hovercols"); it != end; ++it) {
             const auto &f = it->second;
             if (f.size() < 9 || !inRect(pointerX_, pointerY_, field(f, 0), field(f, 1), field(f, 2) - field(f, 0), field(f, 3) - field(f, 1))) continue;
+            if (f.size() >= 12 && f[9] == "disc")
+                if (ImageRef disc = images_->get(f[10])) drawDisc(out, &f, *disc, field(f, 5), field(f, 6), 1, 1, 0, 0, 3, std::strtof(f[11].c_str(), nullptr));
             if (ImageRef help = images_->get(f[4])) {
                 int w = help->w / std::max(1, field(f, 7));
                 drawPart(out, *help, field(f, 5), field(f, 6), field(f, 8) * w, 0, w, help->h, 1);
@@ -3930,7 +3983,7 @@ bool Engine::innerButtonsShown() const {
 bool Engine::plateUp() const {
     if (barHover()) return barPinned_ || setting("bar_always") || barHovered();
     // A plate as wide as the screen comes up with all the buttons when the pointer's on it, as in Test Game 85.
-    if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= plateY_);
+    if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (plateRests_ && defaultsHave("plateholds") ? plateRaised_ : pointerSeen_ && messagePointerY() >= plateY_);
     return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
 }
 
@@ -3943,6 +3996,79 @@ Picture Engine::turned(const Picture &p) const {
     Picture now = p;
     now.angle = p.turn * float(screenMs_) / 1000 * kPi / 180;
     return now;
+}
+
+void Engine::drawDisc(Canvas &out, const void *owner, const Image &sheet, int x, int y, int cols, int rows, int column, int row, int axis, float speed) {
+    cols = std::max(1, cols);
+    rows = std::max(1, rows);
+    int w = sheet.w / cols, h = sheet.h / rows;
+    if (w <= 0 || h <= 0 || column < 0 || row < 0 || column >= cols || row >= rows) return;
+    if (discOf_ != owner) {
+        discOf_ = owner;
+        discFrom_ = clockMs_;
+    }
+    discDrawn_ = true;
+    if (speed != 0) discTurning_ = true;
+    float angle = speed * float(clockMs_ - discFrom_) / 1000 * kPi / 180;
+    float scaleX = axis == 1 ? std::cos(angle) : 1, scaleY = axis == 2 ? std::cos(angle) : 1, turn = axis == 3 ? angle : 0;
+    float middleX = float(x) + float(w) / 2, middleY = float(y) + float(h) / 2;
+    if (cols == 1 && rows == 1) {
+        drawImage(out, sheet, middleX, middleY, scaleX, scaleY, turn, 1);
+        return;
+    }
+    Image cell;
+    cell.w = w;
+    cell.h = h;
+    cell.opaque = sheet.opaque;
+    cell.rgba.resize(size_t(w) * size_t(h) * 4);
+    for (int line = 0; line < h; line++)
+        std::copy_n(&sheet.rgba[(size_t(row * h + line) * size_t(sheet.w) + size_t(column * w)) * 4], size_t(w) * 4, &cell.rgba[size_t(line) * size_t(w) * 4]);
+    drawImage(out, cell, middleX, middleY, scaleX, scaleY, turn, 1);
+}
+
+bool Engine::discUpFor(const ImageRef &picture) {
+    if (!setting("tutorial") || !pointerSeen_ || !innerButtonsShown()) return false;
+    for (const Button &b : bar().inner)
+        if (b.disc == picture && b.help && b.contains(pointerX_, messagePointerY())) return true;
+    return false;
+}
+
+void Engine::drawButtonDisc(Canvas &out, const Button &b) {
+    if (b.disc) drawDisc(out, &b, *b.disc, b.discX, b.discY, b.discCols, b.discRows, b.discColumn, b.discRow, b.discAxis, b.discSpeed);
+}
+
+ImageRef Engine::darkened(const Picture &p, const std::vector<const Picture *> &frames, int dark) {
+    auto cell = [](const Picture &q, int &sx, int &sy, int &w, int &h) {
+        if (q.partW > 0 && q.partH > 0) {
+            sx = q.partX, sy = q.partY, w = q.partW, h = q.partH;
+            return;
+        }
+        w = q.image->w / std::max(1, q.cols), h = q.image->h / std::max(1, q.rows);
+        sx = q.column * w, sy = q.row * h;
+    };
+    auto key = std::make_pair(&p, dark);
+    if (auto made = darkened_.find(key); made != darkened_.end()) return made->second.second;
+    auto copy = std::make_shared<Image>(*p.image);
+    copy->opaque = false;
+    int keep = 256 - dark, sx, sy, w, h;
+    cell(p, sx, sy, w, h);
+    for (int y = std::max(0, sy); y < std::min(sy + h, copy->h); y++)
+        for (int x = std::max(0, sx); x < std::min(sx + w, copy->w); x++) {
+            uint8_t *px = &copy->rgba[(size_t(y) * size_t(copy->w) + size_t(x)) * 4];
+            int atX = p.x + x - sx, atY = p.y + y - sy, under = 0;
+            for (const Picture *f : frames) {
+                int fx, fy, fw, fh;
+                cell(*f, fx, fy, fw, fh);
+                int ix = atX - f->x, iy = atY - f->y;
+                if (ix < 0 || iy < 0 || ix >= fw || iy >= fh || fx + ix >= f->image->w || fy + iy >= f->image->h || fx + ix < 0 || fy + iy < 0) continue;
+                int alpha = int(float(f->image->rgba[(size_t(fy + iy) * size_t(f->image->w) + size_t(fx + ix)) * 4 + 3]) * std::clamp(f->alpha, 0.0f, 1.0f));
+                under = std::max(under, alpha);
+            }
+            for (int c = 0; c < 3; c++) px[c] = uint8_t((px[c] * keep) >> 8);
+            px[3] = uint8_t(px[3] * under / 255);
+        }
+    darkened_[key] = {p.image, copy};
+    return copy;
 }
 
 bool Engine::defaultsHave(const char *key) const {
@@ -3973,13 +4099,17 @@ void Engine::composeMessageButtons(Canvas &out) {
     // it's on.
     bool explain = setting("tutorial") != 0;
     auto drawButton = [&](Canvas &c, const Button &b, ButtonState st) {
-        if (explain || !b.help) {
+        if ((explain && !b.disc) || !b.help) {
             neko::drawButton(c, b, st);
             return;
         }
         Button shown = b;
         shown.help = nullptr;
         neko::drawButton(c, shown, st);
+        if (explain && (st == StateHover || st == StateSelectedHover)) {
+            drawButtonDisc(c, b);
+            drawButtonHelp(c, b);
+        }
     };
     auto state = [&](const Button &b) {
         bool over = pointerSeen_ && b.contains(pointerX_, messagePointerY());
@@ -4420,6 +4550,7 @@ void Engine::beginChoice(const Node &n) {
 
 void Engine::choose(int index) {
     if (waiting_ != Waiting::Choice) return;
+    if (previousChoiceDue_) notePreviousChoice();
     choiceResult_ = index;
     askedResult_ = index;
     choiceMade_ = true;
@@ -4747,6 +4878,8 @@ void Engine::runScene(const Node &n) {
 
 bool Engine::step(int ms) {
     if (paused_) return waiting_ != Waiting::Ended;
+    clockMs_ += ms;
+    if (discTurning_) dirty_ = true;
     if (previousChoiceDue_) notePreviousChoice();
     if (bool square = wantsSquare(); square != square_) {
         square_ = square;
@@ -6454,7 +6587,8 @@ void Engine::abortChange(int slot) {
 void Engine::screenUpdate(const Node &n) {
     const auto &p = n.p;
     // With Config's effects off the PC cuts straight to the new picture, though a wait after it still waits.
-    if (skip_ || p[1] <= 0 || !setting("effect")) {
+    bool hidden = std::any_of(parts_.begin(), parts_.end(), [](const auto &part) { return part.second->hidesScene(); });
+    if (skip_ || p[1] <= 0 || !setting("effect") || hidden) {
         front_ = back_;
         dirty_ = true;
         return;
@@ -6759,6 +6893,8 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
 void Engine::compose() {
     windowDrawnAt_ = now_;
     bulbSeen_ = false;
+    if (!discDrawn_) discOf_ = nullptr;
+    discDrawn_ = discTurning_ = false;
     messageInStrip_ = false;
     if (screen_) {
         composeScreen(canvas_);
@@ -6913,7 +7049,7 @@ void Engine::composeMessage(Canvas &out) {
     if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
         for (auto [it, end] = defaults->second.settings.equal_range("windowpic"); it != end; ++it)
             if (it->second.size() >= 3)
-                if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2) + moved, 0, 0, picture->w, picture->h, 1);
+                if (ImageRef picture = images_->get(it->second[0]); picture && !discUpFor(picture)) drawPart(out, *picture, field(it->second, 1), field(it->second, 2) + moved, 0, 0, picture->w, picture->h, 1);
     if (windowArtOnly_ == 1) return;
     drawParts(out, Layer::Window);
     if (!windowArtOnly_) {

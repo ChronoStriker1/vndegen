@@ -32,7 +32,7 @@ import TestSupport
         return [px[at], px[at + 1], px[at + 2]]
     }
 
-    @Test(arguments: ["emptycards", "emptycardsnumber"]) func anEmptyCardsNumberFadesWithItOnlyWhereTheTableSays(folder: String) throws {
+    @Test(arguments: ["emptycards", "emptycardsnumber", "emptycardsown"]) func anEmptyCardsNumberFadesOnlyWhereTheTableSays(folder: String) throws {
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
             "obj.pak": NekoSDKFlowFixture.archive([
@@ -50,8 +50,10 @@ import TestSupport
         #expect(card[2] > 60 && card[2] < 140, "\(card)")
         if folder == "emptycards" {
             #expect(number == [30, 0, 0], "\(number)")
+        } else if folder == "emptycardsnumber" {
+            #expect(number[0] >= 13 && number[0] <= 17 && number[2] > 20, "\(number)")
         } else {
-            #expect(number[0] > 5 && number[0] < 25 && number[2] > 20, "\(number)")
+            #expect(number[0] >= 6 && number[0] <= 9 && number[2] > 40, "\(number)")
         }
     }
 
