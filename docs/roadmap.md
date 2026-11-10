@@ -82,6 +82,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - NekoSDK: Mankitsu Happening, with its select screens, bonus stories and School Swimsuit DLC, a Scene replay that ends at the Scene screen (#73), and a tap on a CG that no longer presses a hidden gallery button (#75) (0.31.0).
 - NekoSDK: a Scene replay started from inside the story keeps the story (#74), and Yabai!'s thought lines, text speed and Auto pace (0.31.1).
 - NekoSDK: a tap on the arrow beside a Config slider steps it by one in every game (#77), and Funbag Fantasy 2's text and Auto at the PC's pace (#76) (0.31.2).
+- NekoSDK: Mankitsu Happening's CG viewer bar, scene wipe captions and text speed, and Yabai!'s text speed across the slider (0.31.3).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -93,7 +94,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- NekoSDK, on `feat/nekosdk-stage3`: the last game that keeps its story order in the exe, Funbag Fantasy: Sideboob Story, on `feat/nekosdk-set3`. Yabai! -Fukushuu Yami Site- shipped in 0.30.0 and Mankitsu Happening in 0.31.0; `-set2` and `-set1` are finishing a few checks against the PC for each.
+- NekoSDK, on `feat/nekosdk-stage3`: the last game that keeps its story order in the exe, Funbag Fantasy: Sideboob Story, on `feat/nekosdk-set3`. Yabai! -Fukushuu Yami Site- shipped in 0.30.0 and Mankitsu Happening in 0.31.0, and both sets' follow-ups in 0.31.3. `-set2` is done. `-set1` has Mankitsu Happening's Auto speed left to measure.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:

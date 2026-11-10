@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.31.3",
+          "buildVersion": "2129",
+          "date": "2026-11-10T11:37:00Z",
+          "localizedDescription": "Mankitsu Happening gets its CG viewer's bar, its scene wipes' captions and its own text speed, and Yabai! -Fukushuu Yami Site- its text speed across the whole slider.\n\n## Downloads\n\n- `VNDegen-0.31.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.31.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- Mankitsu Happening: the CG viewer has the PC's bar, with Replay, Auto, Next CG, Return, the picture arrows and a count. It goes on through every unlocked entry, as on the PC. The bar goes away about 2.4 seconds after the pointer rests and comes back when the pointer moves in the lower half. On a touch screen a tap where the hidden bar lies shows it, and the next tap presses its buttons.\n- Mankitsu Happening: the wipes between scenes run on the PC's timings and carry their caption pictures.\n- Mankitsu Happening: text speed follows the PC's, measured at ten settings. Before, it used another game's.\n- Mankitsu Happening: the liquid's bubbles, the title's rising dots, where the menus' moving trims and the Information text start, and the face shake are drawn as measured on the PC.\n- Yabai!: text speed follows the PC's across the whole slider, from 178 ms a character at the slowest to the whole line at once at the fastest. The slowest setting in 0.31.1 was a little too fast.\n- Yabai!: the hub's thought lines are drawn at the PC's strength and grow as much as the PC's do.\n\n## Known limits\n\n- Mankitsu Happening's Auto speed still uses another game's curve.\n- Its face shake was measured in one recording, so one of its settings is unconfirmed.\n- Yabai!'s Auto away from its default, fastest and slowest settings isn't timed on the PC.\n- One NekoSDK game is still being built: Funbag Fantasy: Sideboob Story.\n\n## What wasn't tested\n\n- No physical device was used.\n- Mankitsu Happening's CG viewer was run in the Mac app and on the iPad simulator by touch. Its wipes, captions, face shake, bubbles and menu trims were run in the headless build only.\n- Yabai!'s changes were run in the headless build on seven routes. The Mac app was built with them but not played.\n- The last fixes to the viewer's bar, from review, were tested but not read by a reviewer.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.31.3/VNDegen-0.31.3.ipa",
+          "size": 124528031,
+          "sha256": "f5397418cf30fc1aa64bb849cb2fea33abd77ce04f8437cc4acf3165fbc45265",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.31.2",
           "buildVersion": "2106",
           "date": "2026-11-10T11:15:03Z",
