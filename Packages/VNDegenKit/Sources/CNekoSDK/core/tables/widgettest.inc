@@ -16,6 +16,8 @@ screen config
 range rose 0 50
 knob rose obj\k.bmp 100 300 6
 slider rose obj\k.bmp 100 500 50 10
+range low 10 50
+knob low obj\k.bmp 100 400 6
 )";
 
 // The same title with `submenudim hide`: the other buttons go while a submenu is open (Test Game 83's); a colour key, a

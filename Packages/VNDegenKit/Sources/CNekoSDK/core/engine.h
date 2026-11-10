@@ -305,10 +305,10 @@ private:
     };
     std::optional<PreviousChoice> previousChoice_;
     std::optional<PreviousChoice> setAside_, setAsideChoice_;
-    int64_t clockMs_ = 0, discFrom_ = 0;
-    const void *discOf_ = nullptr;
-    bool discDrawn_ = false, discTurning_ = false;
-    void drawDisc(Canvas &out, const void *owner, const Image &sheet, int x, int y, int cols, int rows, int column, int row, int axis, float speed);
+    int setAsideResult_ = 0;
+    int64_t clockMs_ = 0, discFrom_ = 0, discSeenAt_ = -1000000;
+    bool discTurning_ = false;
+    void drawDisc(Canvas &out, const Image &sheet, int x, int y, int cols, int rows, int column, int row, int axis, float speed);
     void drawButtonDisc(Canvas &out, const Button &b);
     bool discUpFor(const ImageRef &picture);
     bool resumeSetAside();

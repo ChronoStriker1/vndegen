@@ -108,6 +108,10 @@ import TestSupport
         click(e, 100, 505)
         #expect(pixel(e, 163, 303) == green)
         #expect(pixel(e, 100, 505) != green)
+        click(e, 110, 405)
+        #expect(pixel(e, 163, 403) != green)
+        click(e, 100 + 6 * 20 + 5, 405)
+        #expect(pixel(e, 223, 403) == green)
     }
 
     // `submenudim hide`: the other buttons aren't drawn while the submenu is open, and still take no press.
@@ -312,6 +316,11 @@ import TestSupport
         #expect(status().contains("k.txt #"), "\(status())")
         for _ in 0..<90 { _ = vnneko_step(e, 16) }
         #expect(status().contains(" menu scene"), "\(status())")
+        click(e, 320, 315)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("k.txt #"), "\(status())")
+        for _ in 0..<90 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu scene"), "\(status())")
         #expect(vnneko_debug_press(e, "back"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
@@ -346,6 +355,8 @@ import TestSupport
         vnneko_debug_choose(e, 0)
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #"), "\(status())")
+        #expect(vnneko_debug_save(e, 4))
+        #expect(files().contains("save004s.sav"), "\(files())")
         #expect(vnneko_debug_press(e, "scene"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         click(e, 320, 315)
@@ -359,6 +370,12 @@ import TestSupport
         #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
         #expect(vnneko_debug_save(e, 6))
         #expect(files().contains("save006s.sav"), "\(files())")
+        func previous(_ slot: Int) throws -> Data {
+            let name = "save00\(slot)s.sav"
+            let url = try #require(try FileManager.default.contentsOfDirectory(at: save, includingPropertiesForKeys: nil).first { $0.lastPathComponent.lowercased() == name })
+            return try NekoSDKFlowFixture.unpacked(Data(contentsOf: url))
+        }
+        #expect(try previous(6) == previous(4))
     }
 
     @Test func anEmptyTabOpensWithoutTheKey() throws {

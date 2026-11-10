@@ -368,7 +368,7 @@ void Engine::openScreen(const std::string &name) {
         if (viewerPanel()) closeViewer();
         viewingImage_ = false;
     }
-    if (screen_ != &it->second) darkened_.clear();
+    darkened_.clear();
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -417,8 +417,10 @@ bool Engine::resumeSetAside() {
     if (!setAside_) return false;
     PreviousChoice story = *setAside_;
     std::optional<PreviousChoice> choice = setAsideChoice_;
+    int result = setAsideResult_;
     restoreSave(story.data, parseSidecar(story.data, story.side));
     previousChoice_ = choice;
+    choiceResult_ = result;
     log("back to the story at %s #%d", story.data.scene.c_str(), story.data.node);
     return true;
 }
@@ -1976,11 +1978,14 @@ bool Engine::startReplay(const GalleryEntry &scene) {
     if (!flow || !flow->first()) return false;
     replayTab_ = galleryTab_;
     replayPage_ = screen_ && screen_->name == "scene" ? page_ : -1;
-    if (!replaying_ && !setAside_ && !stack_.empty()) {
+    if (!replaying_ && !setAside_ && !stack_.empty() && waiting_ != Waiting::StaffRoll) {
         SaveData story = captureSave();
         setAside_ = PreviousChoice{story, sidecarText(story)};
         setAsideChoice_ = previousChoice_;
+        setAsideResult_ = choiceResult_;
         previousChoice_.reset();
+        askedCount_ = askedColumns_ = askedResult_ = 0;
+        askedCells_.clear();
     }
     stopTrack();
     if (titleMusic_) {
@@ -2297,8 +2302,8 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
         int x0 = field(f, 2), top = field(f, 3);
         double step = std::max(0.01, std::atof(f[4].c_str()));
         if (!knob) continue;
-        int right = x0 + int(std::lround(step * clampSetting(f[0], 1 << 20))) + knob->w;
-        if (y >= top && y < top + knob->h && x >= x0 - (dragging ? 40 : 0) && x < right + (dragging ? 40 : 0)) {
+        int left = x0 + int(std::lround(step * clampSetting(f[0], -(1 << 20)))), right = x0 + int(std::lround(step * clampSetting(f[0], 1 << 20))) + knob->w;
+        if (y >= top && y < top + knob->h && x >= left - (dragging ? 40 : 0) && x < right + (dragging ? 40 : 0)) {
             int value = int(std::lround(double(x - x0 - knob->w / 2) / step));
             changeSetting(f[0], clampSetting(f[0], value));
             return true;
@@ -3910,7 +3915,7 @@ void Engine::composeScreen(Canvas &out) {
             const auto &f = it->second;
             if (f.size() < 9 || !inRect(pointerX_, pointerY_, field(f, 0), field(f, 1), field(f, 2) - field(f, 0), field(f, 3) - field(f, 1))) continue;
             if (f.size() >= 12 && f[9] == "disc")
-                if (ImageRef disc = images_->get(f[10])) drawDisc(out, &f, *disc, field(f, 5), field(f, 6), 1, 1, 0, 0, 3, std::strtof(f[11].c_str(), nullptr));
+                if (ImageRef disc = images_->get(f[10])) drawDisc(out, *disc, field(f, 5), field(f, 6), 1, 1, 0, 0, 3, std::strtof(f[11].c_str(), nullptr));
             if (ImageRef help = images_->get(f[4])) {
                 int w = help->w / std::max(1, field(f, 7));
                 drawPart(out, *help, field(f, 5), field(f, 6), field(f, 8) * w, 0, w, help->h, 1);
@@ -3998,16 +4003,13 @@ Picture Engine::turned(const Picture &p) const {
     return now;
 }
 
-void Engine::drawDisc(Canvas &out, const void *owner, const Image &sheet, int x, int y, int cols, int rows, int column, int row, int axis, float speed) {
+void Engine::drawDisc(Canvas &out, const Image &sheet, int x, int y, int cols, int rows, int column, int row, int axis, float speed) {
     cols = std::max(1, cols);
     rows = std::max(1, rows);
     int w = sheet.w / cols, h = sheet.h / rows;
     if (w <= 0 || h <= 0 || column < 0 || row < 0 || column >= cols || row >= rows) return;
-    if (discOf_ != owner) {
-        discOf_ = owner;
-        discFrom_ = clockMs_;
-    }
-    discDrawn_ = true;
+    if (clockMs_ - discSeenAt_ > 250) discFrom_ = clockMs_;
+    discSeenAt_ = clockMs_;
     if (speed != 0) discTurning_ = true;
     float angle = speed * float(clockMs_ - discFrom_) / 1000 * kPi / 180;
     float scaleX = axis == 1 ? std::cos(angle) : 1, scaleY = axis == 2 ? std::cos(angle) : 1, turn = axis == 3 ? angle : 0;
@@ -4034,7 +4036,7 @@ bool Engine::discUpFor(const ImageRef &picture) {
 }
 
 void Engine::drawButtonDisc(Canvas &out, const Button &b) {
-    if (b.disc) drawDisc(out, &b, *b.disc, b.discX, b.discY, b.discCols, b.discRows, b.discColumn, b.discRow, b.discAxis, b.discSpeed);
+    if (b.disc) drawDisc(out, *b.disc, b.discX, b.discY, b.discCols, b.discRows, b.discColumn, b.discRow, b.discAxis, b.discSpeed);
 }
 
 ImageRef Engine::darkened(const Picture &p, const std::vector<const Picture *> &frames, int dark) {
@@ -4047,7 +4049,7 @@ ImageRef Engine::darkened(const Picture &p, const std::vector<const Picture *> &
         sx = q.column * w, sy = q.row * h;
     };
     auto key = std::make_pair(&p, dark);
-    if (auto made = darkened_.find(key); made != darkened_.end()) return made->second.second;
+    if (auto made = darkened_.find(key); made != darkened_.end() && made->second.first == p.image) return made->second.second;
     auto copy = std::make_shared<Image>(*p.image);
     copy->opaque = false;
     int keep = 256 - dark, sx, sy, w, h;
@@ -5215,6 +5217,7 @@ void Engine::mouseButton(int button, bool down) {
             pressSettingsWidget(pointerX_, pointerY_, false);
             return;
         }
+        if (screen_->name == "music" && pressSettingsWidget(pointerX_, pointerY_, false)) return;
         int cell = galleryCellAt(pointerX_, pointerY_);
         if (cell >= 0) {
             if (screen_->name == "music") playTrack(page_ * int(screen_->settings.count("cell")) + cell);
@@ -6893,8 +6896,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
 void Engine::compose() {
     windowDrawnAt_ = now_;
     bulbSeen_ = false;
-    if (!discDrawn_) discOf_ = nullptr;
-    discDrawn_ = discTurning_ = false;
+    discTurning_ = false;
     messageInStrip_ = false;
     if (screen_) {
         composeScreen(canvas_);
