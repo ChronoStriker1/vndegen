@@ -172,6 +172,7 @@ import TestSupport
         #expect(red(1010, 110) == 120)
         #expect(red(1030, 130) < 100)
         #expect(red(1060, 160) < 100)
+        #expect(red(1110, 310) >= 28 && red(1110, 310) <= 32, "\(red(1110, 310))")
         tap(640, 359)
         #expect(status(e).contains(" choice "), "\(status(e))")
         // A tap of its own takes the option under it, the second here, which leaves S 13 alone.

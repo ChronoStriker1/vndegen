@@ -108,6 +108,58 @@ import TestSupport
         click(e, 100, 505)
         #expect(pixel(e, 163, 303) == green)
         #expect(pixel(e, 100, 505) != green)
+        click(e, 102, 405)
+        #expect(pixel(e, 163, 403) != green)
+        click(e, 100 + 6 * 20 + 5, 405)
+        #expect(pixel(e, 223, 403) == green)
+        click(e, 140, 420)
+        #expect(pixel(e, 217, 403) == green)
+        #expect(pixel(e, 163, 403) != green)
+        click(e, 140, 405)
+        #expect(pixel(e, 211, 403) == green)
+        #expect(pixel(e, 163, 403) != green)
+        vnneko_mouse_move(e, 140.0 / 1280, 405.0 / 720)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_move(e, 142.0 / 1280, 406.0 / 720)
+        vnneko_mouse_button(e, 0, false)
+        for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 205, 403) == green)
+        #expect(pixel(e, 163, 403) != green)
+        click(e, 163, 405)
+        #expect(pixel(e, 163, 403) == green)
+        #expect(pixel(e, 175, 403) != green)
+        #expect(pixel(e, 163, 303) == green)
+        vnneko_mouse_move(e, 225.0 / 1280, 405.0 / 720)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_move(e, 130.0 / 1280, 305.0 / 720)
+        vnneko_mouse_move(e, 104.0 / 1280, 505.0 / 720)
+        vnneko_mouse_move(e, 225.0 / 1280, 405.0 / 720)
+        vnneko_mouse_button(e, 0, false)
+        for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 223, 403) == green)
+        #expect(pixel(e, 163, 303) == green)
+        vnneko_mouse_move(e, 100.0 / 1280, 505.0 / 720)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_move(e, (100.0 + 6 * 30 + 5) / 1280, 305.0 / 720)
+        vnneko_mouse_button(e, 0, false)
+        for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 283, 303) == green)
+    }
+
+    @Test(arguments: [true, false]) func aPressOnTheMusicScreensVolumeSetsIt(held: Bool) throws {
+        let root = try game("musicvolume")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        vnneko_debug_host_taps(e, held)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_press(e, "music"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        click(e, 109, 605)
+        #expect(pixel(e, 108, 605) == green)
+        click(e, 104, 605)
+        #expect(pixel(e, 102, 605) == green)
+        #expect(pixel(e, 108, 605) != green)
     }
 
     // `submenudim hide`: the other buttons aren't drawn while the submenu is open, and still take no press.
@@ -312,6 +364,11 @@ import TestSupport
         #expect(status().contains("k.txt #"), "\(status())")
         for _ in 0..<90 { _ = vnneko_step(e, 16) }
         #expect(status().contains(" menu scene"), "\(status())")
+        click(e, 320, 315)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("k.txt #"), "\(status())")
+        for _ in 0..<90 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu scene"), "\(status())")
         #expect(vnneko_debug_press(e, "back"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
@@ -343,22 +400,79 @@ import TestSupport
         #expect(vnneko_debug_jump(e, "flow\\c.txt", 0))
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(vnneko_debug_choice_count(e) == 2, "\(status())")
-        vnneko_debug_choose(e, 0)
+        vnneko_debug_choose(e, 1)
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #"), "\(status())")
+        #expect(vnneko_debug_choice_result(e) == 1)
+        #expect(vnneko_debug_save(e, 4))
+        #expect(files().contains("save004s.sav"), "\(files())")
         #expect(vnneko_debug_press(e, "scene"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         click(e, 320, 315)
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().contains("k.txt #"), "\(status())")
+        #expect(vnneko_debug_choice_result(e) == 0)
+        #expect(!vnneko_debug_choice_kept(e))
         #expect(vnneko_debug_save(e, 5))
         #expect(files().contains("save005.sav") && !files().contains("save005s.sav"), "\(files())")
         for _ in 0..<90 { _ = vnneko_step(e, 16) }
         #expect(vnneko_debug_press(e, "back"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
+        #expect(vnneko_debug_choice_result(e) == 1)
+        #expect(vnneko_debug_choice_kept(e))
         #expect(vnneko_debug_save(e, 6))
         #expect(files().contains("save006s.sav"), "\(files())")
+        func previous(_ slot: Int) throws -> Data {
+            let name = "save00\(slot)s.sav"
+            let url = try #require(try FileManager.default.contentsOfDirectory(at: save, includingPropertiesForKeys: nil).first { $0.lastPathComponent.lowercased() == name })
+            return try NekoSDKFlowFixture.unpacked(Data(contentsOf: url))
+        }
+        #expect(try previous(6) == previous(4))
+    }
+
+    @Test func aSecondReplayStartsWithoutTheFirstsChoice() throws {
+        let button = ["obj\\b.bmp", "1", "0,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try game("widgettesttabspc", [
+            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\asks.txt,0,0\n".utf8),
+            "cfg/msg_button.ini": Data(("#inner scene\n" + button.joined(separator: "\n") + "\n##\n").utf8),
+            "scr/asks.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0, p: [0: 300])]),
+            "sys.pak": NekoSDKFlowFixture.archive([("c.bmp", bmp(50, 250) { _ in [200, 200, 200] })]),
+            "flow/c.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 3, next: 3, p: [0: 1, 1: 1], s: [1: "sys\\c.bmp"]),
+                .init(op: 1, next: 4, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/widgettesttabspc/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try Data("scr\\asks.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        func steps(_ n: Int) { for _ in 0..<n { _ = vnneko_step(e, 16) } }
+        #expect(vnneko_debug_jump(e, "flow\\c.txt", 0))
+        steps(10)
+        vnneko_debug_choose(e, 0)
+        steps(10)
+        #expect(status().contains("s.txt #"), "\(status())")
+        #expect(vnneko_debug_press(e, "scene"))
+        steps(5)
+        click(e, 320, 315)
+        steps(5)
+        #expect(status().contains("asks.txt #"), "\(status())")
+        for _ in 0..<60 where vnneko_debug_choice_count(e) <= 0 { steps(1) }
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status())")
+        vnneko_debug_choose(e, 1)
+        steps(30)
+        #expect(status().contains(" menu scene"), "\(status())")
+        click(e, 320, 315)
+        steps(5)
+        #expect(status().contains("asks.txt #"), "\(status())")
+        #expect(vnneko_debug_choice_result(e) == 0)
+        #expect(!vnneko_debug_choice_kept(e))
     }
 
     @Test func anEmptyTabOpensWithoutTheKey() throws {
