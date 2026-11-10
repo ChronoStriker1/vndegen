@@ -199,6 +199,26 @@ Measured: the pick screen's pictures and drifting thoughts (within about 1% of t
 
 Unconfirmed, kept as drawn: the raised hands' arrangement (their strip repeats every 1.67 seconds on the PC with a weaker repeat at 1.35, which the hands' periods follow, but which hand makes which cluster was never fitted); whether a POP bubble grows from small or settles from large; how long 投票終了 shows before the result and where it sits; the pace of the pick panels' shimmer; and the picture behind the monitor's dark red, drawn as its measured flat colour.
 
+### Test Game 96's hub, questions and endings
+
+The interrogation hub, the yes/no and choice bands, the chapters and the endings' roll are the `yabaiplay` part (`core/yabaiplay.cpp`) and the story table in `core/tables/yabai.inc`. The game keeps this order in its exe, so all of it was taken from the PC under Wine by playing: which scene files it opens (the file-open trace), what its saves hold, and its frames, read by numbers. Frames that hold story art were located by matching and compared by pixel differences, and were not looked at.
+
+Measured:
+- The story's order: prologue, five truths, each a hub, a lead-in talk and a vote, the punishments and openings between them, the time-out and wrong-vote game overs, truth 1's 12:00 scene, truth 5's devil scenes, the save question, the three endings. Each question costs an hour except the one that finishes a truth. The hours, the first heroine and the stage locks of each truth are the table's `truth` and `lock` lines.
+- The PC's save variables the hub keeps in step (S 105 mode, S 1000 chapter, S 2000 to 2003, the stage counts, the asked flags), checked both ways: PC saves at the hub, in a question, at a pick and in the prologue load in VNDegen, and VNDegen's load on the PC at the same places.
+- The hub's bubbles, tracked through 300 frames over 76 s: straight lines at a steady speed (about 9 pixels a second up and down for two, 12 at 30 degrees for the third), turning back at the area's edges (top 160, bottom 600, left 355, right 1280) and where two meet up and down (the gap between middles crossing half their heights less 51, with middles nearer across than half their widths less about 60), and a rock of 10 degrees either way as a sine over 50.0, 19.3 and 26.1 s. A long question takes the wide frame.
+- A replay started from the tree, at the hub or at a pick, comes back to the tree.
+- The endings' roll, from 1400 frames of the third ending: the page at 42,98 under the monitor picture, the scan lines at 42,34, the staff panels at 880,96 one every 10 s (in over 1.67 s, held 6 s, out over 1.67 s), a post every 4.083 s at 27 pixels a line with a picture taking 7 lines, the top post sliding away when the next doesn't fit (one a step), and the fade 3.1 s after the last post. Ctrl, a click and Enter don't shorten it. All 25 steps give the PC's post places. The second ending was seen to read its own thread file; the first was seen to read its own and run as long under Ctrl.
+- The CG viewer's panel, clicks and 5 s slideshow, the menus, the log and the Comment button's three looks, each against PC shots.
+
+Unconfirmed, kept as drawn:
+- Where the bubbles start and how fast: the PC differs from one hub to the next, and VNDegen always starts from one measured hub. Over long times the PC's first two bubbles also move sideways, which wasn't fitted.
+- The panels' fade is drawn as the square of its progress, fitted by eye to seven samples.
+- The roll's timing for the first two endings, taken to be the third's.
+- The log's and the roll's letters differ from the PC's at their edges; the roll uses the font pack's MS PGothic at 24, the log size 26.
+
+Not drawn: the pink thought lines that drift behind the hub's bubbles (one sample: in over 0.5 s, about 10 pixels a second for 2.3 s, out over 1.3 s; which line goes with which heroine and truth isn't known), the second portrait sheet (never shown in 76 s of hub nor under the pointer), and the bulb's flicker.
+
 ### The 4:3 frame
 
 Test Game 88's init.ini names a MsgWinSquare picture, `obj\o000_000.bmp` (1280x240) at 0,720, and MsgWinSquareMovement 240, "the message window's Y change in 4:3". Under Wine, in a fresh prefix on a display 1280x1024, the PC opens a 1280x960 window, and its Config offers 1280x960, 1024x768 and 800x600 beside the 16:9 sizes, greying out any taller than the display. In that window the top 720 rows are the 16:9 frame unchanged: the title matches the 16:9 title exactly, and the scene in play matches 16:9's. The square picture is under the bottom 240 rows on every screen, the title included, and the message window's whole layer moves down 240 rows onto it, nothing covering the scene: the same line's text ink lands 240 rows lower at the same x, and so do the click-wait mark and the message buttons, which show with the pointer in their place in the strip. The window picture itself, with its `.alp` (alpha up to 128), lands two rows further, at y 722, measured to the row (median error 0.2 against the picture over the square); where 16:9 puts it couldn't be told to the row, as its alpha has no sharp edge and the scene behind it is unknown.
