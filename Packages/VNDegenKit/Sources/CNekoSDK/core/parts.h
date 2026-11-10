@@ -36,6 +36,7 @@ class PartHost {
 public:
     explicit PartHost(Engine &engine) : e_(engine) {}
     ImageRef image(const std::string &path);
+    std::string shownPath(const std::string &path);
     std::shared_ptr<const std::vector<uint8_t>> read(const std::string &path);
     bool exists(const std::string &path);
     // The game's table: the lines of `key` on `screen`, each as its fields, in order.
@@ -121,6 +122,7 @@ public:
     virtual int actionLit(const std::string &name) const { return -1; }
     // With the table's `partplate`, whether the message window's plate shows over this part's screen now.
     virtual bool showsPlate() const { return true; }
+    virtual bool coversFrame() const { return true; }
     // The story table's `chapter N`: the scene scripts to play, in order, or none when this part doesn't know it. A scene
     // may end in ` @N`, the PC's number for it, which a save in it holds and a PC save with it resumes at.
     virtual std::vector<std::string> chapter(PartHost &, int number) { return {}; }

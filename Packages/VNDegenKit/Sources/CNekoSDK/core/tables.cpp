@@ -17,6 +17,7 @@ namespace {
 #include "tables/funbag2.inc"
 #include "tables/sideboob2.inc"
 #include "tables/funbagfantasy1.inc"
+#include "tables/yabai.inc"
 #include "tables/storytest.inc"
 #include "tables/layouttest.inc"
 #include "tables/cardtest.inc"
@@ -43,12 +44,14 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\funbagfantasy2") return kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return kSideboob2;
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
+    if (folder == "waffle\\ヤバい！－復讐・闇サイト－") return kYabai1;
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpc") return kStoryTest;
     // The same story with a load screen and a question box, for a tap across a load (NekoSDKStoryTableTests).
     if (folder == "vndegen\\storytestload") {
         static const std::string table = std::string(kStoryTest) + kStoryLoadScreens;
         return table.c_str();
     }
+    if (folder == "vndegen\\storynumber") return kStoryNumberTest;
     if (folder == "vndegen\\layouttest") return kLayoutTest;
     if (folder == "vndegen\\layoutpairs") return kLayoutPairsTest;
     if (folder == "vndegen\\squaretest0") return kSquareWindowTest;
@@ -58,6 +61,11 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\widgettesthide") return kWidgetTestHide;
     if (folder == "vndegen\\widgettestpart") return kWidgetTestPart;
     if (folder == "vndegen\\widgettesttabs") return kWidgetTestTabs;
+    if (folder == "vndegen\\outfittest") return kOutfitTest;
+    if (folder == "vndegen\\twobytetest") return kTwoByteTest;
+    if (folder == "vndegen\\partplatetest") return kPartPlateTest;
+    if (folder == "vndegen\\partbandtest") return kPartBandTest;
+    if (folder == "vndegen\\partplatebandtest") return kPartPlateBandTest;
     if (folder == "vndegen\\windowlogtest") return kWindowLogTest;
     if (folder == "vndegen\\commenttest") return kCommentTest;
     if (folder == "vndegen\\treetest") return kTreeTest;

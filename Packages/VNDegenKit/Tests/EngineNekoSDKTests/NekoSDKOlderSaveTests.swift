@@ -396,4 +396,77 @@ import TestSupport
         broken[broken.startIndex + block + 70 + second.count] = 0
         #expect(rebuilt(broken).isEmpty)
     }
+
+    @Test func aSaveInTestGame86sLayoutLoads() throws {
+        var sizes: [String: Int] = [:]
+        for folder in ["layout82", "layout86"] {
+            let root = try game(folder)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let data = root.appendingPathComponent("data")
+            let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+            for _ in 0..<10 { _ = vnneko_step(first, 16) }
+            #expect(vnneko_debug_save(first, 1))
+            vnneko_stop(first)
+            let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", folder)))
+            sizes[folder] = save.count
+            var built = [UInt8](repeating: 0, count: save.count + 64)
+            let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\\(folder)", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+            #expect(size == save.count, "\(folder)")
+            #expect(Data(built.prefix(size)) == save, "\(folder)")
+            if folder == "layout86" {
+                let scene = try #require(save.range(of: Data("sys_1\\scr\\s.txt".utf8), options: .backwards)).lowerBound - save.startIndex
+                #expect(int32(save, scene - 4) == 15)
+                var loud = save
+                loud.replaceSubrange((loud.startIndex + scene - 21)..<(loud.startIndex + scene - 17), with: withUnsafeBytes(of: Int32(77).littleEndian, { Data($0) }))
+                var again = [UInt8](repeating: 0, count: loud.count + 64)
+                let length = loud.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout86", $0.bindMemory(to: UInt8.self).baseAddress, loud.count, &again, again.count) }
+                #expect(Data(again.prefix(length)) == loud)
+            }
+            let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+            #expect(vnneko_debug_load(second, 1), "\(folder)")
+            for _ in 0..<3 { _ = vnneko_step(second, 16) }
+            #expect(pixel(second, 194, 326) == [255, 0, 0], "\(folder)")
+            vnneko_stop(second)
+        }
+        #expect((sizes["layout82"] ?? 0) - (sizes["layout86"] ?? 0) == 123 * 22 + 19 - (124 * 21 + 1))
+    }
+
+    @Test func aTwinRecordInTestGame86sLayoutIsKeptButNotDrawn() throws {
+        let root = try game("layout86")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(first, 16) }
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        let url = try file(data, "save001.sav", "layout86")
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: url))
+        let name = try #require(save.range(of: Data("sc\\r.bmp".utf8))).lowerBound
+        let record = (name - 14 - 30)..<(name + 8 + 4 + 379)
+        var twin = save.subdata(in: record)
+        func put(_ value: Int32, _ at: Int, in data: inout Data) {
+            data.replaceSubrange((data.startIndex + at)..<(data.startIndex + at + 4), with: withUnsafeBytes(of: value.littleEndian, { Data($0) }))
+        }
+        #expect(int32(twin, 30 + 2) == 600)
+        put(1601, 30 + 2, in: &twin)
+        put(17, 30 + 6, in: &twin)
+        twin.replaceSubrange((twin.startIndex + 44)..<(twin.startIndex + 52), with: Data("bg\\g.bmp".utf8))
+        let root3 = try #require(save.range(of: Data([1, 1, 0xC1, 0xBD, 0xF0, 0xFF]))).lowerBound - save.startIndex
+        var count = root3 - 4
+        while count > root3 - 96 && int32(save, count) != 3 { count -= 1 }
+        #expect(int32(save, count) == 3)
+        put(4, count, in: &save)
+        save.insert(contentsOf: twin, at: record.upperBound)
+        var built = [UInt8](repeating: 0, count: save.count + 64)
+        let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout86", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+        #expect(size == save.count)
+        #expect(Data(built.prefix(size)) == save)
+        try NekoSDKFlowFixture.packed(save).write(to: url)
+        try? FileManager.default.removeItem(at: try file(data, "save001.vnd", "layout86"))
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
+        for _ in 0..<3 { _ = vnneko_step(second, 16) }
+        #expect(pixel(second, 194, 326) == [255, 0, 0])
+    }
 }

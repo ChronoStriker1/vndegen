@@ -326,6 +326,18 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     loadGalleries();
     loadParts();
     loadOldLayout();
+    twoByteAdvance_ = defaultsHave("twobyteadvance");
+    outfitSetting_.clear();
+    outfitSwitch_.clear();
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        if (const auto *line = defaults->second.setting("outfitswitch"); line && line->size() >= 2) {
+            outfitSetting_ = (*line)[0];
+            for (size_t i = 1; i < line->size(); i++) {
+                std::vector<int> numbers;
+                for (const std::string &part : split((*line)[i], ':')) numbers.push_back(std::atoi(part.c_str()));
+                if (numbers.size() >= 2) outfitSwitch_[numbers[0]] = std::vector<int>(numbers.begin() + 1, numbers.end());
+            }
+        }
     loadGlobals();
     loadSettings();
     if (screens_.count("title")) openScreen("title");
@@ -489,6 +501,7 @@ void Engine::startStory() {
     // A new run has no scene of its own yet, so a save before its first names none.
     lastScene_.clear();
     flowCallId_ = 0;
+    flowCallNumbered_ = false;
     stack_.push_back({flow, flow->first()});
     log("story from %s", first.c_str());
     dirty_ = true;
@@ -1937,6 +1950,7 @@ bool Engine::startReplay(const GalleryEntry &scene) {
     viewAuto_ = false;
     // The anime viewer's movie and its sound go with it; coming back opens the picture afresh.
     stopViewerMovie();
+    resetParts();
     stack_.clear();
     scene_ = {};
     back_.clear();
@@ -1944,6 +1958,7 @@ bool Engine::startReplay(const GalleryEntry &scene) {
     // A new run has no scene of its own yet, so a save before its first names none.
     lastScene_.clear();
     flowCallId_ = 0;
+    flowCallNumbered_ = false;
     stack_.push_back({flow, flow->first()});
     replaying_ = true;
     waiting_ = Waiting::None;
@@ -2055,6 +2070,7 @@ void Engine::applyArtSet() {
     if (wanted == artShown_) return;
     artShown_ = wanted;
     images_->setArtSet(wanted);
+    bulbDark_.clear();
     for (Sprites *sprites : {&back_, &front_})
         for (auto &[slot, sprite] : *sprites)
             if (!sprite.path.empty() && !sprite.flipCount)
@@ -2748,6 +2764,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     // Only Test Game 87's saves say whether a choice has been made; elsewhere a choice's picture means one was.
     choiceMade_ = layout_ && choiceFlag(*layout_) == ChoiceFlag::Made ? d.dateFlag != 0 : !d.choiceImage.empty();
     flowCallId_ = d.flowNode;
+    flowCallNumbered_ = side.flowNumbered;
     // atScreen: a PC save at an `open` line's number, whose screen opens at once.
     bool atChoice = false, atScreen = false;
     // Game parts first, since a part's chapters, which the story's place is found in, can depend on its state.
@@ -2762,11 +2779,17 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         // Back to the scene before, so that saving again here writes what the PC can ask the choice from.
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
-                if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryByRule(atScreen) &&
-               !resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen) &&
-               !resumeStoryAt(d.scene)) {
-        complain("The story table has no place for the save's scene " + d.scene);
+                if (candidate.opcode == 1 && candidate.next == call->id) {
+                    flowCallId_ = candidate.id;
+                    flowCallNumbered_ = false;
+                }
+    } else if (d.flow.empty() && !firstStoryFlow().empty()) {
+        if (restoreStoryPlace(side, atChoice)) {
+            if (!side.hasFlowNumbered) flowCallNumbered_ = storyPlaceNumbered(d);
+        } else if (!resumeStoryByRule(atScreen) && !(side.flowNumbered && resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen)) &&
+                   !resumeStoryAt(d.scene)) {
+            complain("The story table has no place for the save's scene " + d.scene);
+        }
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d, side);
     for (const SavedSprite &saved : d.sprites) {
@@ -2785,6 +2808,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             if (!splash.image) warnOnce("A save names a missing splash picture: " + saved.splashImage);
             continue;
         }
+        if (layout_ && twinRecord(*layout_, saved)) continue;
         Sprite s;
         // The film noise starts again where the save left it running.
         if (saved.noise) {
@@ -4209,7 +4233,8 @@ void Engine::runFlow(const Node &n) {
             lastScene_ = script->name;
             // A story table's line saves the PC's own number for its place, when the table gives one.
             bool table = flow.script->name.rfind("story:", 0) == 0 || flow.script->name.rfind("chapter:", 0) == 0;
-            flowCallId_ = table && n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
+            flowCallNumbered_ = table && n.p[kStoryPcNumber];
+            flowCallId_ = flowCallNumbered_ ? n.p[kStoryPcNumber] : n.id;
             log("scene %s", script->name.c_str());
         }
         break;
@@ -4271,7 +4296,10 @@ void Engine::runFlow(const Node &n) {
         partResultScope_ = n.p[0];
         partResultNumber_ = n.p[1];
         // A save while the screen waits holds the PC's number for it, when the table gives one.
-        if (n.p[kStoryPcNumber]) flowCallId_ = n.p[kStoryPcNumber];
+        if (n.p[kStoryPcNumber]) {
+            flowCallId_ = n.p[kStoryPcNumber];
+            flowCallNumbered_ = true;
+        }
         flow.node = flow.script->node(n.next);
         bool opened = false;
         for (auto &[name, part] : parts_) {
@@ -4740,6 +4768,11 @@ bool Engine::step(int ms) {
     for (auto &[name, part] : parts_)
         if (part->step(*partHost_)) dirty_ = true;
     advanceFlipbooks();
+    if (!bulbPatterns_.empty())
+        if (int level = bulbLevel(); level != bulbDrawn_) {
+            bulbDrawn_ = level;
+            if (bulbSeen_) dirty_ = true;
+        }
     stepMovies();
     for (auto &[slot, splash] : splashes_) {
         auto gone = [this](const Droplet &d) { return now_ - d.bornMs >= d.lifeMs; };
@@ -5335,6 +5368,8 @@ std::string Engine::sidecarText(const SaveData &d) {
                     if (c.opcode == 3 && c.next == id) id = c.id;
             text += "story " + frame.script->name + " " + std::to_string(id) + "\n";
         }
+        text += "storytable " + std::to_string(storyTableHash()) + "\n";
+        text += std::string("storynumber ") + (flowCallNumbered_ || d.flowNode != flowCallId_ ? "1" : "0") + "\n";
         text += "result " + std::to_string(choiceResult_) + "\n";
         if (waiting_ == Waiting::Choice) text += "choice\n";
     }
@@ -5440,6 +5475,12 @@ Engine::Sidecar Engine::parseSidecar(const SaveData &d, const std::string &text)
             std::string script;
             int id = 0;
             if (words >> script >> id) side.story.push_back({script, id});
+        } else if (kind == "storytable") {
+            side.hasStoryTable = bool(words >> side.storyTable);
+        } else if (kind == "storynumber") {
+            int numbered = 1;
+            side.hasFlowNumbered = bool(words >> numbered);
+            if (side.hasFlowNumbered) side.flowNumbered = numbered != 0;
         } else if (kind == "result") {
             side.hasResult = bool(words >> side.result);
         } else if (kind == "screen") {
@@ -5757,8 +5798,30 @@ std::string Engine::lockedSprite(const std::string &path) const {
     return path;
 }
 
+std::string Engine::switchedOutfit(const std::string &path) const {
+    if (outfitSetting_.empty()) return path;
+    int choice = setting(outfitSetting_);
+    if (choice <= 0) return path;
+    std::string name = normalizedPath(path);
+    auto slash = name.rfind('\\');
+    size_t at = slash == std::string::npos ? 0 : slash + 1;
+    bool standing = name.compare(0, 3, "sc\\") == 0 && name.compare(at, 3, "sc_") == 0;
+    bool face = name.compare(0, 3, "ac\\") == 0 && name.compare(at, 3, "ac_") == 0;
+    if ((!standing && !face) || name.size() < at + 10) return path;
+    for (size_t i = at + 3; i < at + 10; i++)
+        if (i != at + 6 && !std::isdigit(uint8_t(name[i]))) return path;
+    auto worn = outfitSwitch_.find(std::atoi(name.substr(at + 3, 3).c_str()));
+    if (worn == outfitSwitch_.end() || size_t(choice) > worn->second.size()) return path;
+    int outfit = std::atoi(name.substr(at + 7, 3).c_str()) / 100 * 100 + worn->second[size_t(choice) - 1];
+    char id[8];
+    std::snprintf(id, sizeof id, "%03d", outfit % 1000);
+    std::string other = name;
+    other.replace(at + 7, 3, id);
+    return files_.exists(other) ? other : path;
+}
+
 std::string Engine::shownPath(const std::string &rawPath) const {
-    std::string path = lockedSprite(rawPath);
+    std::string path = switchedOutfit(lockedSprite(rawPath));
     if (!artVersions_.empty()) return plainVariant(versionPath(path));
     if (setting("express")) return path;
     auto it = plainArt_.find(normalizedPath(path));
@@ -5798,7 +5861,7 @@ std::string Engine::plainVariant(const std::string &path) const {
 }
 
 void Engine::applyArtSwitch() {
-    if (plainArt_.empty() && artVersions_.empty()) return;
+    if (plainArt_.empty() && artVersions_.empty() && outfitSetting_.empty()) return;
     bool changed = false;
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set)
@@ -6545,7 +6608,7 @@ bool Engine::anythingMoves() const {
     if (auto noise = front_.find(kNoiseSlot); noise != front_.end() && noise->second.noise) return true;
     for (const auto &[slot, splash] : splashes_)
         if (!splash.droplets.empty()) return true;
-    if (now_ - windowShownAt_ < kWindowSlideMs) return true;
+    if (windowShown_ && windowDrawnAt_ - windowShownAt_ < kWindowSlideMs) return true;
     for (const auto &[slot, s] : front_) {
         if (s.looping) return true;
         if (!s.changes.empty()) return true;
@@ -6599,6 +6662,23 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         if (s.flipCount && s.flipShown >= s.flipCount) continue;
         std::string shown = s.flipCount ? flipPicture(s.path, s.flipShown) : shownPath(s.path);
         ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.image;
+        ImageRef dark;
+        int lit = 255;
+        if (layoutPairs_ && !s.flipCount && !s.movie && !s.additive && !sprites.count(slot + 1))
+            if (std::string name = bulbDark(shown, *s.image); !name.empty()) {
+                bulbSeen_ = true;
+                lit = bulbLevel();
+                if (lit < 255) dark = radius > 0 ? images_->blurred(name, radius) : images_->get(name);
+            }
+        auto draw = [&](float x, float y, float scaleX, float scaleY, const std::vector<int> *rows) {
+            const Image &top = image ? *image : *s.image;
+            if (!dark) {
+                drawImage(out, top, x, y, scaleX, scaleY, v.rotation, v.alpha, rows, s.additive);
+                return;
+            }
+            drawImage(out, *dark, x, y, scaleX, scaleY, v.rotation, v.alpha, rows, s.additive);
+            if (lit > 0) drawImage(out, top, x, y, scaleX, scaleY, v.rotation, v.alpha * float(lit) / 255, rows, s.additive);
+        };
         // The position is the unscaled picture's top left, and it scales about its anchor, its middle unless told otherwise.
         int pivotX, pivotY;
         anchorOf(s, pivotX, pivotY);
@@ -6640,16 +6720,18 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
             }
             for (int ky = fromY; ky <= toY; ky++)
                 for (int kx = fromX; kx <= toX; kx++)
-                    drawImage(out, image ? *image : *s.image, baseX + float(kx) * tileW, baseY + float(ky) * tileH, v.scaleX, v.scaleY, v.rotation, v.alpha, nullptr, s.additive);
+                    draw(baseX + float(kx) * tileW, baseY + float(ky) * tileH, v.scaleX, v.scaleY, nullptr);
             continue;
         }
-        drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX * zoom, v.scaleY * zoom, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
+        draw(middleX + dx, middleY + dy, v.scaleX * zoom, v.scaleY * zoom, s.waveOn ? &shifts : nullptr);
     }
     composeSplashes(out, drawnTo, INT_MAX);
     drawParts(out, Layer::Slot, drawnTo, INT_MAX);
 }
 
 void Engine::compose() {
+    windowDrawnAt_ = now_;
+    bulbSeen_ = false;
     messageInStrip_ = false;
     if (screen_) {
         composeScreen(canvas_);
@@ -6785,6 +6867,7 @@ const std::vector<std::string> *Engine::choiceTable(const std::string &key) cons
 
 void Engine::composeMessage(Canvas &out) {
     if (!windowShown_ || windowHiddenByPlayer_) return;
+    int moved = 0;
     if (windowImage_) {
         // In the 4:3 frame Test Game 88's PC puts its window two rows lower than the rest of the layer moves (under Wine).
         // `squarewindow ROWS` under `screen defaults` gives another game's: Test Game 83's PC puts it exactly where the
@@ -6797,15 +6880,20 @@ void Engine::composeMessage(Canvas &out) {
             int elapsed = int(now_ - windowShownAt_);
             if (elapsed < kWindowSlideMs) y = out.h - (out.h - top) * elapsed / kWindowSlideMs;
         }
+        moved = y - windowY_;
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        for (auto [it, end] = defaults->second.settings.equal_range("windowpic"); it != end; ++it)
+            if (it->second.size() >= 3)
+                if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2) + moved, 0, 0, picture->w, picture->h, windowOpacity_);
     if (windowArtOnly_ == 1) return;
     drawParts(out, Layer::Window);
     if (!windowArtOnly_) {
         drawGlyphRun(out);
         composeGtCount(out);
     }
-    composeMessageButtons(out);
+    if (!(square_ && partPlate())) composeMessageButtons(out);
 }
 
 // The rectangle the wait mark can touch at any angle.
@@ -6862,6 +6950,45 @@ void Engine::drawMark(Canvas &out) {
     }
 }
 
+int Engine::debugTextAdvance(uint32_t cp) {
+    if (!cp) return fontMissingAdvance(fontFace_, fontSize_);
+    std::string text;
+    if (cp < 0x80) text = {char(cp)};
+    else if (cp < 0x800) text = {char(0xC0 | (cp >> 6)), char(0x80 | (cp & 0x3F))};
+    else if (cp < 0x10000) text = {char(0xE0 | (cp >> 12)), char(0x80 | ((cp >> 6) & 0x3F)), char(0x80 | (cp & 0x3F))};
+    else return -1;
+    std::vector<Glyph> laid;
+    layoutRun("A" + text + "A", 0, 0, false, laid);
+    int gap = int(std::lround(textGap_));
+    if (laid.size() == 3) return laid[2].x - laid[1].x - gap;
+    if (laid.size() == 2 && cp != 'A') return laid[1].x - laid[0].x - debugTextAdvance('A') - 2 * gap;
+    return -1;
+}
+
+int Engine::textAdvance(uint32_t cp, int own) const {
+    if (!twoByteAdvance_ || cp < 0x80) return own;
+    std::string utf8;
+    if (cp < 0x800) {
+        utf8 = {char(0xC0 | (cp >> 6)), char(0x80 | (cp & 0x3F))};
+    } else if (cp < 0x10000) {
+        utf8 = {char(0xE0 | (cp >> 12)), char(0x80 | ((cp >> 6) & 0x3F)), char(0x80 | (cp & 0x3F))};
+    } else {
+        return own;
+    }
+    std::string bytes = sjis::fromUtf8(utf8);
+    if (bytes.size() != 2) return own;
+    static const uint16_t kHigh[32] = {0x20AC, 0, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0, 0x017D, 0,
+                                       0, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0, 0x017E, 0x0178};
+    int missing = fontMissingAdvance(fontFace_, fontSize_), width = 0;
+    for (char c : bytes) {
+        auto b = uint8_t(c);
+        uint32_t single = b >= 0x80 && b < 0xA0 ? kHigh[b - 0x80] : b;
+        GlyphImage g;
+        width += single && glyph(fontFace_, single, fontSize_, false, g) ? g.advance : missing;
+    }
+    return width;
+}
+
 // Lays out a line or lines of UTF-8 from a pen position. `endsThere` lays a name out to end at x rather than start there.
 void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out) {
     int lineHeight = textLine_ > 0 ? textLine_ : fontSize_ + lineInterval_ + 4;
@@ -6890,9 +7017,15 @@ void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, st
             if (cp == '\n') continue;
         }
         GlyphImage g;
-        if (!glyph(fontFace_, cp, fontSize_, false, g)) continue;
+        if (!glyph(fontFace_, cp, fontSize_, false, g)) {
+            if (int width = textAdvance(cp, 0)) {
+                penX += float(width) + textGap_;
+                used += units;
+            }
+            continue;
+        }
         out.push_back({int(std::lround(penX)), penY, cp, italic});
-        penX += float(g.advance) + textGap_;
+        penX += float(textAdvance(cp, g.advance)) + textGap_;
         used += units;
     }
     if (endsThere) {
@@ -7062,7 +7195,10 @@ void Engine::composeStrip() {
     std::fill(strip_.px.begin(), strip_.px.end(), uint8_t(0));
     drawPart(strip_, *squareImage_, 0, from, 0, 0, squareImage_->w, squareImage_->h, 1);
     if (messageInStrip_) {
+        int artOnly = windowArtOnly_;
+        if (partScreen_ && waiting_ == Waiting::PartScreen && !artOnly && partScreen_->coversFrame()) windowArtOnly_ = 1;
         composeMessage(strip_);
+        windowArtOnly_ = artOnly;
         if (markShowing()) drawMark(strip_);
     }
     for (int y = 0; y < squareShift_ && from + y < strip_.h && squareY_ + y < total; y++)

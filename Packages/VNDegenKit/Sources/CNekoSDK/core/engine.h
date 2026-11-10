@@ -3,6 +3,7 @@
 // Command meanings come from the games' own data and the PC game under Wine; docs/nekosdk-cleanroom.md says which are
 // settled and which are readings still to be checked.
 #pragma once
+#include <tuple>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
@@ -167,6 +168,8 @@ public:
     const char *debugStatus();
     bool waitingForClick() const { return waiting_ == Waiting::Click; }
     int textCount() const { return textCount_; }
+    int textAdvance(uint32_t cp, int own) const;
+    int debugTextAdvance(uint32_t cp);
     // A global (scope 0) or scenario variable (1) by its number, for tests.
     // Whether a sound still plays in this channel of music (kind 0), effects (1) or voices (2).
     bool soundPlaying(int kind, int channel);
@@ -450,6 +453,9 @@ private:
     // Each heroine's chosen outfit, as its place in her list, and whether the story wears it, kept in cfg.sav as the PC does.
     std::vector<int> spriteOutfit_, spriteLocked_;
     std::string lockedSprite(const std::string &path) const;
+    std::string switchedOutfit(const std::string &path) const;
+    std::string outfitSetting_;
+    std::map<int, std::vector<int>> outfitSwitch_;
     // The sprite gallery's screen (sprites.cpp): what's shown, and its music.
     struct SpriteGallery {
         bool explaining = true, music = true, blur = false, pinned = false, panelsHidden = false;
@@ -648,6 +654,17 @@ private:
     std::vector<int> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
     bool layoutPairs_ = false;
     void clearLayoutSlot(int slot);
+    struct BulbStep {
+        int frames = 0, level = -1;
+    };
+    std::vector<std::vector<BulbStep>> bulbPatterns_;
+    int bulbPattern_ = -1, bulbFrom_ = 255, bulbDrawn_ = 255;
+    bool bulbSeen_ = false;
+    int64_t bulbStart_ = 0;
+    std::map<std::string, std::string> bulbDark_;
+    void loadBulb();
+    int bulbLevel();
+    std::string bulbDark(const std::string &shown, const Image &lit);
     bool layoutSlotByP1_ = false;
     int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;
@@ -701,6 +718,7 @@ private:
     void compose();
     void layoutText(const std::string &utf8Name, const std::string &utf8Text);
     void layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out);
+    bool twoByteAdvance_ = false;
     // init.ini's font types: 1 a shadow, 2 a thin frame, 9 both, 13 a wide frame, 17 a wider one.
     int frameWidth() const { return fontType_ == 17 ? 3 : fontType_ == 13 ? 2 : (fontType_ == 2 || fontType_ == 9) ? 1 : 0; }
     bool hasShadow() const { return fontType_ == 1 || fontType_ == 9; }
@@ -737,6 +755,9 @@ private:
         std::map<int, FlipModes> flips;
         std::map<std::string, std::vector<std::string>> parts;
         std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
+        bool hasStoryTable = false;
+        uint32_t storyTable = 0;
+        bool hasFlowNumbered = false, flowNumbered = true;
         bool hasResult = false;
         int result = 0;
         std::string screen;
@@ -748,6 +769,8 @@ private:
         std::map<int, int> variables;
     };
     static uint32_t saveFingerprint(const SaveData &d);
+    uint32_t storyTableHash() const;
+    bool storyPlaceNumbered(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);
     Sidecar parseSidecar(const SaveData &d, const std::string &text);
     void restoreSave(const SaveData &data, const Sidecar &side);
@@ -794,7 +817,7 @@ private:
     bool wantsSquare() const;
     void composeStrip();
     // The pointer's y as the message window's layer has it, which the 4:3 frame moves down.
-    int messagePointerY() const { return pointerY_ - (square_ ? squareShift_ : 0); }
+    int messagePointerY() const { return pointerY_ - (square_ && !partPlate() ? squareShift_ : 0); }
     bool dirty_ = true, frameChanged_ = false, markSaved_ = false;
     std::vector<uint8_t> underMark_;
     int64_t now_ = 0;
@@ -861,6 +884,7 @@ private:
     int page_ = 0;
     std::string returnTo_;
     int flowCallId_ = 0;
+    bool flowCallNumbered_ = false;
     std::string choiceImage_;
     // The frame behind the log with `keepwindow`: 1 for the window's picture alone, 2 with its buttons and the parts' layer.
     int windowArtOnly_ = 0;
@@ -909,6 +933,7 @@ private:
     // The message window.
     bool windowShown_ = false;
     int64_t windowShownAt_ = -100000;
+    int64_t windowDrawnAt_ = 0;
     ImageRef windowImage_, waitMark_;
     std::vector<ImageRef> bars_;
     std::vector<int> barY_;

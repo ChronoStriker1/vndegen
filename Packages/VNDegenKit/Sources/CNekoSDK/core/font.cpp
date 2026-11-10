@@ -150,6 +150,15 @@ public:
         if (!f) f = hiraginoFor(px);
         return f ? int(std::lround(CTFontGetAscent(f))) : px * 86 / 100;
     }
+    int missingAdvance(int px) {
+        CTFontRef f = fontFor(px);
+        if (!f) f = hiraginoFor(px);
+        if (!f) return px / 2;
+        CGGlyph none = 0;
+        CGSize adv;
+        CTFontGetAdvancesForGlyphs(f, kCTFontOrientationHorizontal, &none, &adv, 1);
+        return int(std::lround(adv.width));
+    }
 
 private:
     CTFontRef fontFor(int px) {
@@ -213,6 +222,12 @@ public:
         FT_Set_Pixel_Sizes(face_, 0, FT_UInt(px));
         return int(face_->size->metrics.ascender >> 6);
     }
+    int missingAdvance(int px) {
+        if (!face_) return px / 2;
+        FT_Set_Pixel_Sizes(face_, 0, FT_UInt(px));
+        if (FT_Load_Glyph(face_, 0, FT_LOAD_NO_BITMAP)) return px / 2;
+        return int(face_->glyph->advance.x >> 6);
+    }
 
 private:
     FontSource src_;
@@ -245,7 +260,7 @@ bool glyph(int face, uint32_t cp, int px, bool bold, GlyphImage &out) {
     // Windows draws what Lucida Sans Unicode lacks, such as kana and ♪, from MS UI Gothic, the first of its font link,
     // so its stand-in's missing characters come from MS UI Gothic's.
     // Verdana's stand-in does the same, which isn't measured: Test Game 82's English text has nothing it lacks.
-    if ((face == 7 || face == 8) && !faceFor(face).has(cp)) face = 4;
+    if ((face == 7 || face == 8 || face == 9) && !faceFor(face).has(cp)) face = 4;
     Key k{face, cp, px, bold};
     auto it = cache.find(k);
     if (it != cache.end()) { out = it->second; return true; }
@@ -258,6 +273,11 @@ bool glyph(int face, uint32_t cp, int px, bool bold, GlyphImage &out) {
 int fontAscent(int face, int px) {
     std::lock_guard<std::mutex> lock(mu);
     return faceFor(face).ascent(px);
+}
+
+int fontMissingAdvance(int face, int px) {
+    std::lock_guard<std::mutex> lock(mu);
+    return faceFor(face).missingAdvance(px);
 }
 
 }  // namespace neko
