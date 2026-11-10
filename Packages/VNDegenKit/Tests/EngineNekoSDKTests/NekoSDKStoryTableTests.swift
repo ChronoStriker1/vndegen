@@ -284,6 +284,38 @@ import TestSupport
         #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
     }
 
+    @Test func aSaveMadeWithAnotherTableResumesAsAPCSaveDoes() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytest/save")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(first, 3)
+        click(first)
+        steps(first, 10)
+        #expect(at(first, "scr\\c2.txt"), "\(status(first))")
+        #expect(vnneko_debug_save(first, 1))
+        #expect(vnneko_debug_save(first, 2))
+        vnneko_stop(first)
+        let sidecar = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save002.vnd" })
+        let lines = try String(contentsOf: sidecar, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+        #expect(lines.contains { $0.hasPrefix("storytable ") })
+        try lines.map { $0.hasPrefix("storytable ") ? "storytable 1" : String($0) }.joined(separator: "\n")
+            .write(to: sidecar, atomically: true, encoding: .utf8)
+        for (slot, kept) in [(Int32(1), true), (2, false)] {
+            let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+            #expect(vnneko_debug_load(e, slot))
+            steps(e, 3)
+            #expect(at(e, "scr\\c2.txt"), "\(status(e))")
+            click(e)
+            steps(e, 200)
+            #expect(status(e).contains("part screen"), "\(status(e))")
+            #expect(vnneko_debug_variable(e, 1, 11) == (kept ? 0 : 1), "slot \(slot)")
+            vnneko_stop(e)
+        }
+    }
+
     @Test func theTablePlaysAndSavesKeepItsPlace() throws {
         let root = try game()
         defer { try? FileManager.default.removeItem(at: root) }

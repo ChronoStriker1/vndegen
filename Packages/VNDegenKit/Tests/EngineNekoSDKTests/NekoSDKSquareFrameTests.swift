@@ -182,4 +182,62 @@ import TestSupport
         #expect(pixel(focused, 640, 410) == [255, 255, 0], "\(pixel(focused, 640, 410))")
         #expect(pixel(focused, 640, 300) == [255, 255, 255], "\(pixel(focused, 640, 300))")
     }
+
+    @Test func thePlateOverAPartsScreenTakesThePointerWhereItIsDrawn() throws {
+        let rows: [[UInt8]] = [[200, 200, 200], [0, 200, 200], [0, 0, 200], [200, 0, 200], [80, 80, 80]]
+        let sheet: Data = {
+            let w = 50, h = 250
+            var d = Data("BM".utf8)
+            func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+            put(UInt32(54 + (w * 3 + 2) * h)); put(0); put(54)
+            put(40); put(UInt32(w)); put(UInt32(h))
+            d.append(contentsOf: [1, 0, 24, 0])
+            put(0); put(UInt32((w * 3 + 2) * h)); put(0); put(0); put(0); put(0)
+            for y in (0..<h).reversed() {
+                for _ in 0..<w { d.append(contentsOf: rows[y / 50]) }
+                d.append(contentsOf: [0, 0])
+            }
+            return d
+        }()
+        let under = ["#under Auto", "obj\\b.bmp", "2", "400,650", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("""
+                UserDataDirectory\tvndegen\\partplatetest
+                MsgWinFilename\tobj\\win.bmp
+                MsgWinPosY\t480
+                MsgWinSquareFilename\tobj\\sq.bmp
+                MsgWinSquarePosY\t720
+                MsgWinSquareMovement\t240
+                MsgWinButtonPlateFilename\tobj\\plate.bmp
+                MsgWinButtonPlatePosX\t0
+                MsgWinButtonPlatePosY\t626
+
+                """.utf8),
+            "cfg/msg_button.ini": Data((under.joined(separator: "\n") + "\n##\n").utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([
+                ("win.bmp", bmp(1280, 241, [0, 0, 255])), ("sq.bmp", bmp(1280, 240, [255, 0, 0])),
+                ("plate.bmp", bmp(1280, 94, [100, 100, 100])), ("b.bmp", sheet),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<20 { _ = vnneko_step(e, 16) }
+        #expect(String(cString: vnneko_debug_status(e)).contains("part screen"), "\(String(cString: vnneko_debug_status(e)))")
+        vnneko_mouse_move(e, 10.0 / 1280, 300.0 / 960)
+        var square = frame(e, view: (1024, 768))
+        #expect(square.w == 1280 && square.h == 960)
+        #expect(pixel(square, 10, 640) != [100, 100, 100])
+        vnneko_mouse_move(e, 425.0 / 1280, 675.0 / 960)
+        square = frame(e, view: (1024, 768))
+        #expect(pixel(square, 10, 640) == [100, 100, 100])
+        #expect(pixel(square, 425, 675) == [200, 200, 0])
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        square = frame(e, view: (1024, 768))
+        #expect(pixel(square, 425, 675) == [200, 0, 200])
+        vnneko_mouse_move(e, 425.0 / 1280, 915.0 / 960)
+        square = frame(e, view: (1024, 768))
+        #expect(pixel(square, 425, 675) == [200, 0, 0])
+    }
 }
