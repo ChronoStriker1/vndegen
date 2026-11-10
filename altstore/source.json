@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.32.0",
+          "buildVersion": "2176",
+          "date": "2026-11-10T11:51:34Z",
+          "localizedDescription": "Funbag Fantasy: Sideboob Story plays, from New Game to its three endings, with saves that move to and from a PC. It is the fifteenth NekoSDK game, and the last of the ones VNDegen set out to run.\n\n## Downloads\n\n- `VNDegen-0.32.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.32.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- NekoSDK: Funbag Fantasy: Sideboob Story plays. It's the sixth game that keeps its story order in the program itself, so VNDegen plays it from a table of that order traced from the PC game: a prologue and three chapters, three choices, and three endings, each with its staff roll.\n- Its own menus: the title, Save and Load, Config, the CG, Scene and Music screens, the log in the message window, and Previous Choice.\n- Its text is set in Carlito, which has the widths of the Calibri the PC asks for, so lines break where the PC's do.\n- Its effects: the glowing dots that rise and sway, as in Funbag Fantasy 2.\n- A PC save loads in VNDegen, and a save made in VNDegen loads on the PC.\n- Where the window is nearer 4:3 than 16:9, as on an iPad, the picture stays on top and the message window moves under it.\n\n## Known limits\n\n- Return from a menu opened from the title shows \"Click any mouse button\" again. On the PC it goes back to the title's menu (#79). Funbag Fantasy 2 does the same. A fix is written and comes next.\n- After Previous Choice the message window is empty. On the PC it still shows the scene's last line (#80).\n- The title's two moving lace bands, the side panel's emblem turning in the menus, and the disc under Config's three top buttons aren't drawn.\n- Auto was timed on the PC at its default setting only. The other settings follow another game's curve.\n- Mankitsu Happening's Auto speed still uses another game's curve.\n\n## What wasn't tested\n\n- No physical device was used. Sideboob Story was played on five routes to its three endings in the Linux test build, in the Mac app, and on the iPad simulator by touch.\n- Saves moving to and from a PC were checked with the PC game running under Wine on Linux, not on Windows.\n- The Mac app was checked on one Mac only.\n- The game's last small fixes from review were tested but not read by a second reviewer.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.32.0/VNDegen-0.32.0.ipa",
+          "size": 124528639,
+          "sha256": "d66bc89a6d8609a6e94ed5d7b5b13213244fcfcf53ece2fa862b5f99efcdc7c1",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.31.3",
           "buildVersion": "2129",
           "date": "2026-11-10T11:37:00Z",
