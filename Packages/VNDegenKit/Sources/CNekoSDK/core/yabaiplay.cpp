@@ -324,6 +324,7 @@ public:
     // the plate up: both in their sheet's last row).
     int actionLit(const std::string &name) const override { return open_ && !ask_ && (name == "Auto" || name == "Skip") ? 2 : -1; }
     bool showsPlate() const override { return !staff_; }
+    bool coversFrame() const override { return !ask_; }
 
     // The hub's bubbles, each question's middle now, for headless play: `hub 598,279 896,286 834,465`.
     std::string debugStatus() const override {

@@ -299,4 +299,39 @@ import TestSupport
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(pixel(e, 5, 5) == [0, 255, 0])
     }
+
+    @Test(arguments: [(true, UInt8(100)), (false, UInt8(100)), (true, UInt8(255))]) func theBulbFlickersBetweenAPictureAndItsDarkerTwin(on: Bool, blue: UInt8) throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\layoutpairs\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/light_info.ini": Data("#p 0\r\nlight,30,0\r\nwait,60\r\nlight,30,255\r\nwait,60\r\n##\r\n".utf8),
+            "bg.pak": NekoSDKFlowFixture.archive([("bg_000.bmp", bmp(10, 10, [0, 0, 255])), ("bg_001.bmp", bmp(10, 10, [blue, 0, 0]))]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 10, next: 3, s: [1: "bg\\bg_000.bmp"]),
+                .init(op: 9, next: 4),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), saves = data.appendingPathComponent("AppData/Roaming/vndegen/layoutpairs/save")
+        try FileManager.default.createDirectory(at: saves, withIntermediateDirectories: true)
+        try Data("bulb \(on ? 1 : 0)\n".utf8).write(to: saves.appendingPathComponent("vndegen_settings.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        let lit: [UInt8] = [255, 0, 0], dark: [UInt8] = [0, 0, blue], flickers = on && blue < 255
+        func at(_ ms: Int) -> [UInt8] {
+            for _ in 0..<(ms / 10) { _ = vnneko_step(e, 10) }
+            return pixel(e, 5, 5)
+        }
+        #expect(at(1000) == (flickers ? dark : lit))
+        #expect(at(1500) == lit)
+        #expect(at(1500) == (flickers ? dark : lit))
+        let middle = at(650)
+        #expect(flickers ? (middle != lit && middle != dark) : middle == lit)
+    }
 }

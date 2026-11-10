@@ -413,6 +413,15 @@ import TestSupport
             let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\\(folder)", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
             #expect(size == save.count, "\(folder)")
             #expect(Data(built.prefix(size)) == save, "\(folder)")
+            if folder == "layout86" {
+                let scene = try #require(save.range(of: Data("sys_1\\scr\\s.txt".utf8), options: .backwards)).lowerBound - save.startIndex
+                #expect(int32(save, scene - 4) == 15)
+                var loud = save
+                loud.replaceSubrange((loud.startIndex + scene - 21)..<(loud.startIndex + scene - 17), with: withUnsafeBytes(of: Int32(77).littleEndian, { Data($0) }))
+                var again = [UInt8](repeating: 0, count: loud.count + 64)
+                let length = loud.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout86", $0.bindMemory(to: UInt8.self).baseAddress, loud.count, &again, again.count) }
+                #expect(Data(again.prefix(length)) == loud)
+            }
             let second = try #require(NekoSDKFlowFixture.start(root, data: data))
             #expect(vnneko_debug_load(second, 1), "\(folder)")
             for _ in 0..<3 { _ = vnneko_step(second, 16) }

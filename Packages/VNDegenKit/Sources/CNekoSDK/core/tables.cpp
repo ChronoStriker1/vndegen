@@ -61,6 +61,7 @@ const char *menuTable(const std::string &folder) {
         static const std::string table = std::string(kStoryTest) + kStoryLoadScreens;
         return table.c_str();
     }
+    if (folder == "vndegen\\storynumber") return kStoryNumberTest;
     if (folder == "vndegen\\layouttest") return kLayoutTest;
     if (folder == "vndegen\\layoutpairs") return kLayoutPairsTest;
     if (folder == "vndegen\\squaretest0") return kSquareWindowTest;
@@ -73,6 +74,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\outfittest") return kOutfitTest;
     if (folder == "vndegen\\twobytetest") return kTwoByteTest;
     if (folder == "vndegen\\partplatetest") return kPartPlateTest;
+    if (folder == "vndegen\\partbandtest") return kPartBandTest;
     if (folder == "vndegen\\windowlogtest") return kWindowLogTest;
     if (folder == "vndegen\\commenttest") return kCommentTest;
     if (folder == "vndegen\\treetest") return kTreeTest;

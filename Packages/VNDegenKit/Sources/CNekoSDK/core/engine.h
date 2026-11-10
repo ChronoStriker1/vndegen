@@ -3,6 +3,7 @@
 // Command meanings come from the games' own data and the PC game under Wine; docs/nekosdk-cleanroom.md says which are
 // settled and which are readings still to be checked.
 #pragma once
+#include <tuple>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
@@ -653,6 +654,17 @@ private:
     std::vector<int> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
     bool layoutPairs_ = false;
     void clearLayoutSlot(int slot);
+    struct BulbStep {
+        int frames = 0, level = -1;
+    };
+    std::vector<std::vector<BulbStep>> bulbPatterns_;
+    int bulbPattern_ = -1, bulbFrom_ = 255, bulbDrawn_ = 255;
+    int64_t bulbStart_ = 0;
+    std::map<std::string, std::string> bulbDark_;
+    std::map<std::tuple<const Image *, const Image *, int>, ImageRef> bulbBlends_;
+    void loadBulb();
+    int bulbLevel();
+    ImageRef bulbImage(const Sprite &s, ImageRef lit);
     bool layoutSlotByP1_ = false;
     int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;
@@ -745,6 +757,7 @@ private:
         std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
         bool hasStoryTable = false;
         uint32_t storyTable = 0;
+        bool flowNumbered = true;
         bool hasResult = false;
         int result = 0;
         std::string screen;
@@ -870,6 +883,7 @@ private:
     int page_ = 0;
     std::string returnTo_;
     int flowCallId_ = 0;
+    bool flowCallNumbered_ = false;
     std::string choiceImage_;
     // The frame behind the log with `keepwindow`: 1 for the window's picture alone, 2 with its buttons and the parts' layer.
     int windowArtOnly_ = 0;
@@ -918,6 +932,7 @@ private:
     // The message window.
     bool windowShown_ = false;
     int64_t windowShownAt_ = -100000;
+    int64_t windowDrawnAt_ = 0;
     ImageRef windowImage_, waitMark_;
     std::vector<ImageRef> bars_;
     std::vector<int> barY_;

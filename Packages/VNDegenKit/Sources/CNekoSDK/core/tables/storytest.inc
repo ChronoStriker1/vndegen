@@ -57,3 +57,12 @@ screen dialog
 button yes obj\b.bmp 615 335 1 5 0
 button no obj\b.bmp 615 500 1 5 0
 )";
+
+const char kStoryNumberTest[] = R"(
+screen story
+flow main
+scene scr\a.txt @3
+scene scr\c2.txt
+scene scr\e.txt
+end
+)";
