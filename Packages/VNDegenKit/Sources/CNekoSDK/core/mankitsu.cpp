@@ -26,8 +26,7 @@
 // scene the PC's exe lists for that half-week and card. Which scene plays was traced under Wine from runs down each
 // route and one skipping a heroine (set 1): events go by hearts, not by half-week. The screen's pieces were placed by
 // fitting PC shots, the cards exactly (within 0.03 of 255 over the card area). State is in the story variables the PC's
-// saves hold it in (set 1, PC saves along one path): S 3000 the week, 0 to 4, S 3001 the half, which the story table
-// moves on after the pick's scenes, as the PC's saves in them still hold the half they were picked at, and S 3010 to
+// saves hold it in (set 1, PC saves along one path): S 3000 the week, 0 to 4, S 3001 the half, and S 3010 to
 // 3012 Kururu's, Otona's and Rei's hearts. VNDegen's own, kept beside the save:
 //   S 10904   the chapter the pick plays (`chapter S 10904`)
 //   S 10906   the heroine whose ending follows, 1 to 3, or 0 for none, set with the last pick
@@ -117,6 +116,7 @@ const std::vector<const char *> kFinal[4] = {
 // half-weeks whose cards share the last number).
 constexpr int kPhaseEnd[kPhases] = {60, 84, 110, 142, 146, 171, 176, 196, 210, 220};
 constexpr int kCardNumber[kPhases] = {0, 81, 0, 140, 0, 170, 0, 195, 0, 0};
+constexpr int kFinalFirst = 261, kFinalStep = 5, kFinalSecond = 275;
 
 struct Rect {
     int x, y, w, h;
@@ -267,7 +267,7 @@ public:
         if (layer == Layer::Screen && selecting_) drawSelect(host, out);
     }
 
-    bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &) override {
+    bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
         menu_ = name;
         if (name == "title") {
             titleFrom_ = host.screenMs();
@@ -275,6 +275,11 @@ public:
             return true;
         }
         if (name != "select") return false;
+        if (!args.empty()) {
+            int ph = std::clamp(args[0], 0, kPhases - 1);
+            host.setVariable(1, kWeekVar, ph / 2);
+            host.setVariable(1, kHalfVar, ph % 2);
+        }
         readInis(host);
         selecting_ = true;
         confirming_ = -1;
@@ -364,6 +369,7 @@ public:
         if (number == 0 && pendingChapter_) {
             number = pendingChapter_;
             host.setVariable(1, kChapterVar, number);
+            host.setVariable(1, kEndingVar, number % 10);
         }
         int phase = number / 1000 - 1, card = number / 100 % 10, hearts = number / 10 % 10, ending = number % 10;
         if (phase < 0 || phase >= kPhases || card > 3) return {};
@@ -397,19 +403,24 @@ public:
             int first = phase == 0 ? 21 + 10 * cs.heroine : 801 + 50 * cs.heroine + 2 * hearts;
             addNumbered(kEvents[cs.heroine][hearts], first, end);
         } else {
-            next = end;  // unconfirmed: no PC save in a heroine's late short scene yet
+            next = end;
             add({kLate[cs.heroine][phase == kPhases - 1 ? 1 : 0]});
         }
         if (kCardNumber[phase]) next = kCardNumber[phase] + 1;
         // The last pick: the heroine's last event and two common scenes, or with none at four hearts 029 alone, after
         // which the PC goes back to the title (set 1, a run picking no heroine).
         if (phase == kPhases - 1) {
-            // No heroine: 029 holds 9999, as each ending's last scene does; a heroine's last event and the two common
-            // scenes after it aren't numbered yet.
-            next = ending == 0 ? 9999 : 0;
-            add(kFinal[std::clamp(ending, 0, 3)]);
-            next = 0;
-            if (ending > 0) add(kAfter[phase]);
+            if (ending <= 0) {
+                next = 9999;
+                add(kFinal[0]);
+                return out;
+            }
+            addNumbered(kFinal[std::min(ending, 3)], kFinalFirst + kFinalStep * (ending - 1), kFinalSecond);
+            next = kFinalSecond;
+            for (const char *scene : kAfter[phase]) {
+                next++;
+                add({scene});
+            }
             return out;
         }
         for (const char *scene : kAfter[phase]) {

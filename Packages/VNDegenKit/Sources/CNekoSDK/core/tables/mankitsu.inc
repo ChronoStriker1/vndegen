@@ -538,21 +538,21 @@ flow main
 if S 10907 == 1 goto bonus1
 if S 10907 == 2 goto bonus2
 if S 10907 == 3 goto bonus3
-scene scr\ep_000_000_000.txt
-scene scr\ep_000_000_001.txt
-scene scr\ep_000_000_002.txt
-scene scr\ep_000_000_003.txt
-scene scr\ep_001_000_000.txt
-scene scr\ep_001_001_000.txt
-scene scr\ep_001_001_001.txt
-scene scr\ep_001_002_000.txt
-scene scr\ep_001_003_000.txt
-scene scr\ep_001_003_001.txt
-scene scr\ep_001_004_000.txt
-scene scr\ep_001_005_000.txt
-scene scr\ep_001_005_001.txt
+scene scr\ep_000_000_000.txt @1
+scene scr\ep_000_000_001.txt @2
+scene scr\ep_000_000_002.txt @3
+scene scr\ep_000_000_003.txt @4
+scene scr\ep_001_000_000.txt @5
+scene scr\ep_001_001_000.txt @6
+scene scr\ep_001_001_001.txt @7
+scene scr\ep_001_002_000.txt @8
+scene scr\ep_001_003_000.txt @9
+scene scr\ep_001_003_001.txt @10
+scene scr\ep_001_004_000.txt @11
+scene scr\ep_001_005_000.txt @12
+scene scr\ep_001_005_001.txt @13
 set S 4000 = 1
-scene scr\ep_001_006_000.txt
+scene scr\ep_001_006_000.txt @14
 jump weeks
 label bonus1
 scene sys_2\scr\ep_011_000_000.txt
@@ -572,165 +572,174 @@ scene scr\ep_001_006_001.txt @14
 jump weeks
 
 flow weeks
-# Each half-week's select screen carries the PC's number for it, which its saves there hold (set 1, PC saves at all
-# ten); S 3000 and 3001 move on after the pick's scenes.
-open select @15
-chapter S 10904
-set S 3001 = 1
-open select @61
-chapter S 10904
-set S 3000 = 1
-set S 3001 = 0
-open select @85
-chapter S 10904
-set S 3001 = 1
-open select @111
-chapter S 10904
-set S 3000 = 2
-set S 3001 = 0
-open select @143
-chapter S 10904
-set S 3001 = 1
-open select @147
-chapter S 10904
-set S 3000 = 3
-set S 3001 = 0
-open select @172
-chapter S 10904
-set S 3001 = 1
-open select @177
-chapter S 10904
-set S 3000 = 4
-set S 3001 = 0
-open select @197
-chapter S 10904
-set S 3001 = 1
-open select @211
+label p0
+open select 0 @15
+goto play
+label p1
+open select 1 @61
+goto play
+label p2
+open select 2 @85
+goto play
+label p3
+open select 3 @111
+goto play
+label p4
+open select 4 @143
+goto play
+label p5
+open select 5 @147
+goto play
+label p6
+open select 6 @172
+goto play
+label p7
+open select 7 @177
+goto play
+label p8
+open select 8 @197
+goto play
+label p9
+open select 9 @211
+goto play
+label play
 chapter S 10904
 if S 10906 == 1 goto kururu
 if S 10906 == 2 goto otona
 if S 10906 == 3 goto rei
+if S 3001 == 1 goto half2
+if S 3000 == 0 goto p1
+if S 3000 == 1 goto p3
+if S 3000 == 2 goto p5
+if S 3000 == 3 goto p7
+if S 3000 == 4 goto p9
+end
+label half2
+if S 3000 == 0 goto p2
+if S 3000 == 1 goto p4
+if S 3000 == 2 goto p6
+if S 3000 == 3 goto p8
 end
 label kururu
 set S 4000 = 2
-scene scr\ep_002_000_000.txt
-scene scr\ep_002_000_001.txt
-scene scr\eye_catch1.txt
-scene scr\ep_002_001_000.txt
-scene scr\ep_002_001_001.txt
-scene scr\ep_002_002_000.txt
-scene scr\ep_002_003_000.txt
-scene scr\eye_catch1.txt
-scene scr\ep_002_004_000.txt
-scene scr\ep_002_004_001.txt
+scene scr\ep_002_000_000.txt @301
+scene scr\ep_002_000_001.txt @302
+scene scr\eye_catch1.txt @303
+scene scr\ep_002_001_000.txt @304
+scene scr\ep_002_001_001.txt @305
+scene scr\ep_002_002_000.txt @306
+scene scr\ep_002_003_000.txt @307
+scene scr\eye_catch1.txt @308
+scene scr\ep_002_004_000.txt @309
+scene scr\ep_002_004_001.txt @310
 scene scr\eye_catch1.txt
 # With Rei at two hearts or more: seen with her at two, and not at one or none.
 if S 3012 < 2 goto kururu5
-scene scr\ep_002_005_000.txt
-scene scr\ep_002_005_001.txt
+scene scr\ep_002_005_000.txt @351
+scene scr\ep_002_005_001.txt @352
 scene scr\eye_catch1.txt
 label kururu5
-scene scr\ep_002_006_000.txt
-scene scr\ep_002_006_001.txt
-scene scr\eye_catch1.txt
-scene scr\ep_002_007_000.txt
-scene scr\ep_002_008_000.txt
-scene scr\ep_002_008_001.txt
-scene scr\eye_catch1.txt
-scene scr\ep_002_009_000.txt
-scene scr\ep_002_009_001.txt
-scene scr\eye_catch1.txt
-scene scr\ep_002_009_002.txt
-scene scr\ep_002_010_000.txt
-scene scr\ep_002_011_000.txt
-scene scr\ep_002_012_000.txt
-scene scr\ep_002_013_000.txt
-scene scr\ep_002_013_001.txt
-scene scr\ep_002_013_002.txt
-scene scr\ep_002_014_000.txt
+scene scr\ep_002_006_000.txt @316
+scene scr\ep_002_006_001.txt @317
+scene scr\eye_catch1.txt @318
+scene scr\ep_002_007_000.txt @319
+scene scr\ep_002_008_000.txt @320
+scene scr\ep_002_008_001.txt @325
+scene scr\eye_catch1.txt @326
+scene scr\ep_002_009_000.txt @327
+scene scr\ep_002_009_001.txt @328
+scene scr\eye_catch1.txt @329
+scene scr\ep_002_009_002.txt @330
+scene scr\ep_002_010_000.txt @331
+scene scr\ep_002_011_000.txt @332
+scene scr\ep_002_012_000.txt @333
+scene scr\ep_002_013_000.txt @334
+scene scr\ep_002_013_001.txt @335
+scene scr\ep_002_013_002.txt @336
+scene scr\ep_002_014_000.txt @600
 set G 80 = 1
 goto shared
 label otona
 set S 4000 = 3
-scene scr\ep_003_000_000.txt
-scene scr\ep_003_000_001.txt
-scene scr\eye_catch2.txt
-scene scr\ep_003_001_000.txt
-scene scr\ep_003_002_000.txt
-scene scr\ep_003_003_000.txt
-scene scr\ep_003_003_001.txt
-scene scr\eye_catch2.txt
-scene scr\ep_003_004_000.txt
-scene scr\ep_003_004_001.txt
-scene scr\ep_003_004_002.txt
+scene scr\ep_003_000_000.txt @401
+scene scr\ep_003_000_001.txt @402
+scene scr\eye_catch2.txt @403
+scene scr\ep_003_001_000.txt @404
+scene scr\ep_003_002_000.txt @405
+scene scr\ep_003_003_000.txt @406
+scene scr\ep_003_003_001.txt @407
+scene scr\eye_catch2.txt @408
+scene scr\ep_003_004_000.txt @409
+scene scr\ep_003_004_001.txt @410
+scene scr\ep_003_004_002.txt @411
 scene scr\eye_catch2.txt
 # With Kururu at two hearts or more: seen with her at two, and not at none.
 if S 3010 < 2 goto otona5
-scene scr\ep_003_005_000.txt
-scene scr\ep_003_005_001.txt
+scene scr\ep_003_005_000.txt @416
+scene scr\ep_003_005_001.txt @417
 scene scr\eye_catch2.txt
 label otona5
-scene scr\ep_003_006_000.txt
-scene scr\ep_003_006_001.txt
+scene scr\ep_003_006_000.txt @421
+scene scr\ep_003_006_001.txt @422
+scene scr\eye_catch2.txt @423
+scene scr\ep_003_007_000.txt @424
+scene scr\ep_003_007_001.txt @425
+scene scr\eye_catch2.txt @426
+scene scr\ep_003_008_000.txt @427
+scene scr\ep_003_009_000.txt @428
+scene scr\ep_003_010_000.txt @429
+scene scr\eye_catch2.txt @430
+scene scr\ep_003_011_000.txt @431
+scene scr\ep_003_011_001.txt @432
 scene scr\eye_catch2.txt
-scene scr\ep_003_007_000.txt
-scene scr\ep_003_007_001.txt
-scene scr\eye_catch2.txt
-scene scr\ep_003_008_000.txt
-scene scr\ep_003_009_000.txt
-scene scr\ep_003_010_000.txt
-scene scr\eye_catch2.txt
-scene scr\ep_003_011_000.txt
-scene scr\ep_003_011_001.txt
-scene scr\eye_catch2.txt
-scene scr\ep_003_012_000.txt
+scene scr\ep_003_012_000.txt @600
 set G 81 = 1
 goto shared
 label rei
 set S 4000 = 4
-scene scr\ep_004_000_000.txt
-scene scr\ep_004_001_000.txt
-scene scr\ep_004_002_000.txt
-scene scr\ep_004_002_001.txt
-scene scr\eye_catch3.txt
-scene scr\ep_004_003_000.txt
-scene scr\ep_004_003_001.txt
+scene scr\ep_004_000_000.txt @501
+scene scr\ep_004_001_000.txt @502
+scene scr\ep_004_002_000.txt @503
+scene scr\ep_004_002_001.txt @504
+scene scr\eye_catch3.txt @505
+scene scr\ep_004_003_000.txt @506
+scene scr\ep_004_003_001.txt @507
 # With Otona at two hearts or more: seen with her at two, and not with her at none.
 if S 3011 < 2 goto rei4
-scene scr\ep_004_004_000.txt
-scene scr\ep_004_004_001.txt
+scene scr\ep_004_004_000.txt @511
+scene scr\ep_004_004_001.txt @512
 scene scr\eye_catch3.txt
 label rei4
-scene scr\ep_004_005_000.txt
-scene scr\ep_004_005_001.txt
-scene scr\eye_catch3.txt
-scene scr\ep_004_006_000.txt
-scene scr\ep_004_006_001.txt
-scene scr\eye_catch3.txt
-scene scr\ep_004_007_000.txt
-scene scr\ep_004_008_000.txt
-scene scr\ep_004_009_000.txt
-scene scr\ep_004_009_001.txt
-scene scr\eye_catch3.txt
-scene scr\ep_004_010_000.txt
-scene scr\ep_004_011_000.txt
-scene scr\ep_004_011_001.txt
-scene scr\ep_004_012_000.txt
-scene scr\ep_004_013_000.txt
-scene scr\ep_004_014_000.txt
-scene scr\ep_004_014_001.txt
-scene scr\ep_004_015_000.txt
-scene scr\ep_004_015_001.txt
+scene scr\ep_004_005_000.txt @516
+scene scr\ep_004_005_001.txt @517
+scene scr\eye_catch3.txt @518
+scene scr\ep_004_006_000.txt @519
+scene scr\ep_004_006_001.txt @520
+scene scr\eye_catch3.txt @521
+scene scr\ep_004_007_000.txt @522
+scene scr\ep_004_008_000.txt @523
+scene scr\ep_004_009_000.txt @524
+scene scr\ep_004_009_001.txt @525
+scene scr\eye_catch3.txt @526
+scene scr\ep_004_010_000.txt @527
+scene scr\ep_004_011_000.txt @528
+scene scr\ep_004_011_001.txt @529
+scene scr\ep_004_012_000.txt @530
+scene scr\ep_004_013_000.txt @531
+scene scr\ep_004_014_000.txt @532
+scene scr\ep_004_014_001.txt @533
+scene scr\ep_004_015_000.txt @534
+scene scr\ep_004_015_001.txt @600
 set G 82 = 1
 label shared
 if G 80 == 0 goto done
 if G 81 == 0 goto done
 if G 82 == 0 goto done
 set S 4000 = 5
-scene scr\ep_005_000_000.txt
-scene scr\ep_005_000_001.txt
-scene scr\ep_005_001_000.txt
-scene scr\ep_005_002_000.txt
+scene scr\ep_005_000_000.txt @601
+scene scr\ep_005_000_001.txt @602
+scene scr\ep_005_001_000.txt @603
+scene scr\ep_005_002_000.txt @9999
 set G 83 = 1
 label done
 end
