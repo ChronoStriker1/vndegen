@@ -91,7 +91,8 @@ New bugs get a GitHub issue and a line here.
 - [#71](https://github.com/ChronoStriker1/vndegen/issues/71) Unity: an error saving PlayerPrefs after play shows "couldn't start".
 - [#72](https://github.com/ChronoStriker1/vndegen/issues/72) Leaving a game while its engine is still starting counts as played.
 - [#79](https://github.com/ChronoStriker1/vndegen/issues/79) NekoSDK: Return from a menu opened from the title shows the click prompt again in Funbag Fantasy 2, where the PC goes back to the title's menu. With the NekoSDK lead.
-- [#80](https://github.com/ChronoStriker1/vndegen/issues/80) NekoSDK: after Previous Choice the message window is empty, where the PC keeps the scene's last line. Measured on Funbag Fantasy: Sideboob Story; likely in Funbag Fantasy and Funbag Fantasy 2. With the NekoSDK lead.
+- [#80](https://github.com/ChronoStriker1/vndegen/issues/80) NekoSDK: after Previous Choice the message window is empty, where the PC keeps the scene's last line. Funbag Fantasy: Sideboob Story only: Funbag Fantasy 2's PC shows an empty window too. Fixed on `feat/nekosdk-stage3`, for the next release.
+- [#81](https://github.com/ChronoStriker1/vndegen/issues/81) NekoSDK: Funbag Fantasy 3 if's title opening plays again after every Back from a menu. Fixed on `feat/nekosdk-stage3`, for the next release.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
