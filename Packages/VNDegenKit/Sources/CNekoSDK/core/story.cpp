@@ -257,13 +257,12 @@ std::shared_ptr<Script> Engine::compileChapter(int number, bool complains) {
     return script;
 }
 
-// The exact place VNDegen's lines beside its own save hold: each flow frame, the last result, and a part screen open.
 uint32_t Engine::storyTableHash() const {
     uint32_t hash = 2166136261u;
     auto table = screens_.find("story");
     if (table == screens_.end()) return hash;
     for (const auto &line : table->second.lines) {
-        for (const std::string &word : line) {
+        for (const std::string &word : withoutComment(line)) {
             for (char c : word) hash = (hash ^ uint8_t(c)) * 16777619u;
             hash = (hash ^ 0x20u) * 16777619u;
         }
@@ -272,8 +271,10 @@ uint32_t Engine::storyTableHash() const {
     return hash;
 }
 
+// The exact place VNDegen's lines beside its own save hold: each flow frame, the last result, and a part screen open.
 bool Engine::restoreStoryPlace(const Sidecar &side, bool &atChoice) {
     if (side.story.empty()) return false;
+    if (side.hasResult) choiceResult_ = side.result;
     if (side.hasStoryTable && side.storyTable != storyTableHash()) return false;
     std::vector<Frame> frames;
     for (const auto &[name, id] : side.story) {
@@ -282,7 +283,6 @@ bool Engine::restoreStoryPlace(const Sidecar &side, bool &atChoice) {
         frames.push_back({script, id ? script->node(id) : nullptr});
     }
     stack_ = std::move(frames);
-    if (side.hasResult) choiceResult_ = side.result;
     const Node *top = stack_.back().node;
     // Only a save made while the choice waited asks it again; one in the scene before goes on from the scene.
     atChoice = side.atChoice && top && top->opcode == 3;
@@ -364,6 +364,7 @@ bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scen
         stack_.push_back({found, found->node(call->next)});
         stack_.push_back({chapter, chapter->node(at->next)});
         flowCallId_ = number;
+        flowCallNumbered_ = true;
         return true;
     }
     // A save while the choice waits asks it again; one after it goes on past it. One at a screen's number opens the
@@ -372,6 +373,7 @@ bool Engine::resumeStoryAtNumber(int number, int active, const std::string &scen
     atScreen = at->opcode == kStoryOpen;
     stack_.push_back({found, atChoice || atScreen ? at : found->node(at->next)});
     flowCallId_ = number;
+    flowCallNumbered_ = true;
     return true;
 }
 
@@ -391,7 +393,8 @@ bool Engine::resumeStoryAt(const std::string &scene) {
             // (set 2: after a jump, Test Game 82's saves had held the line's node instead).
             if (names(n)) {
                 stack_.push_back({flow, flow->node(n.next)});
-                flowCallId_ = n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
+                flowCallNumbered_ = n.p[kStoryPcNumber] != 0;
+                flowCallId_ = flowCallNumbered_ ? n.p[kStoryPcNumber] : n.id;
                 return true;
             }
             // Or inside a chapter: the flow goes on after the chapter, and the chapter after the scene.
@@ -401,6 +404,7 @@ bool Engine::resumeStoryAt(const std::string &scene) {
                         if (names(c)) {
                             stack_.push_back({flow, flow->node(n.next)});
                             stack_.push_back({chapter, chapter->node(c.next)});
+                            flowCallNumbered_ = c.p[kStoryPcNumber] || n.p[kStoryPcNumber];
                             flowCallId_ = c.p[kStoryPcNumber] ? c.p[kStoryPcNumber] : n.p[kStoryPcNumber] ? n.p[kStoryPcNumber] : n.id;
                             return true;
                         }

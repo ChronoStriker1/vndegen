@@ -240,4 +240,45 @@ import TestSupport
         square = frame(e, view: (1024, 768))
         #expect(pixel(square, 425, 675) == [200, 0, 0])
     }
+
+    @Test func theBandKeepsTheWindowsLayerUnderAPartsScreenThatLeavesTheSceneShowing() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("""
+                UserDataDirectory\tvndegen\\partbandtest
+                MsgWinFilename\tobj\\win.bmp
+                MsgWinPosY\t480
+                MsgWinSquareFilename\tobj\\sq.bmp
+                MsgWinSquarePosY\t720
+                MsgWinSquareMovement\t240
+
+                """.utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("win.bmp", bmp(1280, 241, [0, 0, 255])), ("sq.bmp", bmp(1280, 240, [255, 0, 0]))]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 5, next: 0, s: [2: "hello"])]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<20 { _ = vnneko_step(e, 16) }
+        vnneko_mouse_move(e, 0.5, 0.3)
+        for _ in 0..<5 where !String(cString: vnneko_debug_status(e)).contains("part screen") {
+            vnneko_mouse_button(e, 0, true)
+            vnneko_mouse_button(e, 0, false)
+            for _ in 0..<20 { _ = vnneko_step(e, 16) }
+        }
+        #expect(String(cString: vnneko_debug_status(e)).contains("part screen"), "\(String(cString: vnneko_debug_status(e)))")
+        let open = frame(e, view: (1024, 768))
+        #expect(open.h == 960)
+        #expect(pixel(open, 10, 955) != pixel(open, 10, 721))
+        #expect(pixel(open, 805, 895) == [0, 255, 0])
+        for _ in 0..<2 {
+            vnneko_mouse_button(e, 0, true)
+            vnneko_mouse_button(e, 0, false)
+            for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        }
+        #expect(vnneko_debug_variable(e, 1, 1) == 2)
+        #expect(String(cString: vnneko_debug_status(e)).contains("part screen"), "\(String(cString: vnneko_debug_status(e)))")
+        let covered = frame(e, view: (1024, 768))
+        #expect(pixel(covered, 805, 895) == pixel(covered, 10, 955))
+        #expect(pixel(covered, 10, 955) == pixel(open, 10, 955))
+    }
 }

@@ -757,6 +757,7 @@ private:
         std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
         bool hasStoryTable = false;
         uint32_t storyTable = 0;
+        bool flowNumbered = true;
         bool hasResult = false;
         int result = 0;
         std::string screen;
@@ -882,6 +883,7 @@ private:
     int page_ = 0;
     std::string returnTo_;
     int flowCallId_ = 0;
+    bool flowCallNumbered_ = false;
     std::string choiceImage_;
     // The frame behind the log with `keepwindow`: 1 for the window's picture alone, 2 with its buttons and the parts' layer.
     int windowArtOnly_ = 0;
@@ -930,6 +932,7 @@ private:
     // The message window.
     bool windowShown_ = false;
     int64_t windowShownAt_ = -100000;
+    int64_t windowDrawnAt_ = 0;
     ImageRef windowImage_, waitMark_;
     std::vector<ImageRef> bars_;
     std::vector<int> barY_;
