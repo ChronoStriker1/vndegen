@@ -4754,6 +4754,11 @@ bool Engine::step(int ms) {
     for (auto &[name, part] : parts_)
         if (part->step(*partHost_)) dirty_ = true;
     advanceFlipbooks();
+    if (!bulbPatterns_.empty() && !screen_)
+        if (int level = bulbLevel(); level != bulbDrawn_) {
+            bulbDrawn_ = level;
+            dirty_ = true;
+        }
     stepMovies();
     for (auto &[slot, splash] : splashes_) {
         auto gone = [this](const Droplet &d) { return now_ - d.bornMs >= d.lifeMs; };
@@ -6637,7 +6642,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
         if (s.flipCount && s.flipShown >= s.flipCount) continue;
         std::string shown = s.flipCount ? flipPicture(s.path, s.flipShown) : shownPath(s.path);
-        ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.image;
+        ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.flipCount || s.movie ? s.image : bulbImage(s, s.image);
         // The position is the unscaled picture's top left, and it scales about its anchor, its middle unless told otherwise.
         int pivotX, pivotY;
         anchorOf(s, pivotX, pivotY);

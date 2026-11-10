@@ -18,6 +18,7 @@ close 200 0.5
 const char kLayoutPairsTest[] = R"(
 screen defaults
 layoutpairs
+default bulb 1
 )";
 
 // A 4:3 frame whose window sits exactly where the layer moves, `squarewindow 0`, as Test Game 83's does
