@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.33.0",
+          "buildVersion": "2225",
+          "date": "2026-11-10T18:50:02Z",
+          "localizedDescription": "Save sync works with Ludusavi's FTP and WebDAV cloud types, as well as SMB.\n\n## Downloads\n\n- `VNDegen-0.33.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.33.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- Save sync over FTP and WebDAV. In Settings, under Ludusavi backups, pick the type (SMB, FTP or WebDAV) and enter what Ludusavi's cloud settings show for it: host, port, username and password for FTP; URL, provider, username and password for WebDAV. [docs/ludusavi.md](../ludusavi.md) has the setup for all three.\n- Each type keeps its own password. Trying another type never asks for your SMB password again, and an SMB setup from an earlier version is unchanged.\n\n## Changes\n\n- The save sync messages say \"Ludusavi server\" where they said \"Ludusavi share\", since the server is no longer always an SMB share.\n\n## Known limits\n\n- FTP is plain FTP, as in Ludusavi. It sends your password and your saves unencrypted.\n- An FTP server has to accept `LIST -a`, and has to replace a file when another is renamed over it. A server that can't fails with a message that says so, at Test Connection or at the backup, and nothing is deleted.\n- On WebDAV, replacing a game's backup list takes the server two steps, so for a moment the game has no list on the server. Another VNDegen looking then skips the game until its next refresh, and a Ludusavi download at that instant drops that game's list on that PC until its next download. SMB and FTP don't have this gap. No backup is lost by it.\n- The app is about 3.5 MB larger on iPhone and iPad and about 7 MB larger on a Mac.\n\n## What wasn't tested\n\n- No real server was used. FTP was tested against vsftpd and rclone's own FTP server, and WebDAV against rclone's own WebDAV server, all started for the tests on the test machines.\n- Not tested: ProFTPD, Pure-FTPd, IIS and FileZilla Server; Nextcloud, ownCloud and SharePoint with their own sign-ins; WebDAV over https.\n- The settings pages were looked at in the Mac app and on the iPad simulator, not on an iPhone.\n- A server that refuses the rename was tested at the level of the sync code, not as a whole backup from the app.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.33.0/VNDegen-0.33.0.ipa",
+          "size": 125851519,
+          "sha256": "ce0cd73db25a8d4b6144efc634d89f4a47801c13b108e009b4bcdb4dac7d7fd8",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.32.3",
           "buildVersion": "2212",
           "date": "2026-11-10T14:06:49Z",
