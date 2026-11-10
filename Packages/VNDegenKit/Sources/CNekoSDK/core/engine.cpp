@@ -326,6 +326,18 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     loadGalleries();
     loadParts();
     loadOldLayout();
+    twoByteAdvance_ = defaultsHave("twobyteadvance");
+    outfitSetting_.clear();
+    outfitSwitch_.clear();
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        if (const auto *line = defaults->second.setting("outfitswitch"); line && line->size() >= 2) {
+            outfitSetting_ = (*line)[0];
+            for (size_t i = 1; i < line->size(); i++) {
+                std::vector<int> numbers;
+                for (const std::string &part : split((*line)[i], ':')) numbers.push_back(std::atoi(part.c_str()));
+                if (numbers.size() >= 2) outfitSwitch_[numbers[0]] = std::vector<int>(numbers.begin() + 1, numbers.end());
+            }
+        }
     loadGlobals();
     loadSettings();
     if (screens_.count("title")) openScreen("title");
@@ -1937,6 +1949,7 @@ bool Engine::startReplay(const GalleryEntry &scene) {
     viewAuto_ = false;
     // The anime viewer's movie and its sound go with it; coming back opens the picture afresh.
     stopViewerMovie();
+    resetParts();
     stack_.clear();
     scene_ = {};
     back_.clear();
@@ -2785,6 +2798,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
             if (!splash.image) warnOnce("A save names a missing splash picture: " + saved.splashImage);
             continue;
         }
+        if (layout_ && twinRecord(*layout_, saved)) continue;
         Sprite s;
         // The film noise starts again where the save left it running.
         if (saved.noise) {
@@ -5335,6 +5349,7 @@ std::string Engine::sidecarText(const SaveData &d) {
                     if (c.opcode == 3 && c.next == id) id = c.id;
             text += "story " + frame.script->name + " " + std::to_string(id) + "\n";
         }
+        text += "storytable " + std::to_string(storyTableHash()) + "\n";
         text += "result " + std::to_string(choiceResult_) + "\n";
         if (waiting_ == Waiting::Choice) text += "choice\n";
     }
@@ -5440,6 +5455,8 @@ Engine::Sidecar Engine::parseSidecar(const SaveData &d, const std::string &text)
             std::string script;
             int id = 0;
             if (words >> script >> id) side.story.push_back({script, id});
+        } else if (kind == "storytable") {
+            side.hasStoryTable = bool(words >> side.storyTable);
         } else if (kind == "result") {
             side.hasResult = bool(words >> side.result);
         } else if (kind == "screen") {
@@ -5757,8 +5774,30 @@ std::string Engine::lockedSprite(const std::string &path) const {
     return path;
 }
 
+std::string Engine::switchedOutfit(const std::string &path) const {
+    if (outfitSetting_.empty()) return path;
+    int choice = setting(outfitSetting_);
+    if (choice <= 0) return path;
+    std::string name = normalizedPath(path);
+    auto slash = name.rfind('\\');
+    size_t at = slash == std::string::npos ? 0 : slash + 1;
+    bool standing = name.compare(0, 3, "sc\\") == 0 && name.compare(at, 3, "sc_") == 0;
+    bool face = name.compare(0, 3, "ac\\") == 0 && name.compare(at, 3, "ac_") == 0;
+    if ((!standing && !face) || name.size() < at + 10) return path;
+    for (size_t i = at + 3; i < at + 10; i++)
+        if (i != at + 6 && !std::isdigit(uint8_t(name[i]))) return path;
+    auto worn = outfitSwitch_.find(std::atoi(name.substr(at + 3, 3).c_str()));
+    if (worn == outfitSwitch_.end() || size_t(choice) > worn->second.size()) return path;
+    int outfit = std::atoi(name.substr(at + 7, 3).c_str()) / 100 * 100 + worn->second[size_t(choice) - 1];
+    char id[8];
+    std::snprintf(id, sizeof id, "%03d", outfit % 1000);
+    std::string other = name;
+    other.replace(at + 7, 3, id);
+    return files_.exists(other) ? other : path;
+}
+
 std::string Engine::shownPath(const std::string &rawPath) const {
-    std::string path = lockedSprite(rawPath);
+    std::string path = switchedOutfit(lockedSprite(rawPath));
     if (!artVersions_.empty()) return plainVariant(versionPath(path));
     if (setting("express")) return path;
     auto it = plainArt_.find(normalizedPath(path));
@@ -5798,7 +5837,7 @@ std::string Engine::plainVariant(const std::string &path) const {
 }
 
 void Engine::applyArtSwitch() {
-    if (plainArt_.empty() && artVersions_.empty()) return;
+    if (plainArt_.empty() && artVersions_.empty() && outfitSetting_.empty()) return;
     bool changed = false;
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set)
@@ -6799,6 +6838,10 @@ void Engine::composeMessage(Canvas &out) {
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        for (auto [it, end] = defaults->second.settings.equal_range("windowpic"); it != end; ++it)
+            if (it->second.size() >= 3)
+                if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2), 0, 0, picture->w, picture->h, windowOpacity_);
     if (windowArtOnly_ == 1) return;
     drawParts(out, Layer::Window);
     if (!windowArtOnly_) {
@@ -6862,6 +6905,45 @@ void Engine::drawMark(Canvas &out) {
     }
 }
 
+int Engine::debugTextAdvance(uint32_t cp) {
+    if (!cp) return fontMissingAdvance(fontFace_, fontSize_);
+    std::string text;
+    if (cp < 0x80) text = {char(cp)};
+    else if (cp < 0x800) text = {char(0xC0 | (cp >> 6)), char(0x80 | (cp & 0x3F))};
+    else if (cp < 0x10000) text = {char(0xE0 | (cp >> 12)), char(0x80 | ((cp >> 6) & 0x3F)), char(0x80 | (cp & 0x3F))};
+    else return -1;
+    std::vector<Glyph> laid;
+    layoutRun("A" + text + "A", 0, 0, false, laid);
+    int gap = int(std::lround(textGap_));
+    if (laid.size() == 3) return laid[2].x - laid[1].x - gap;
+    if (laid.size() == 2 && cp != 'A') return laid[1].x - laid[0].x - debugTextAdvance('A') - 2 * gap;
+    return -1;
+}
+
+int Engine::textAdvance(uint32_t cp, int own) const {
+    if (!twoByteAdvance_ || cp < 0x80) return own;
+    std::string utf8;
+    if (cp < 0x800) {
+        utf8 = {char(0xC0 | (cp >> 6)), char(0x80 | (cp & 0x3F))};
+    } else if (cp < 0x10000) {
+        utf8 = {char(0xE0 | (cp >> 12)), char(0x80 | ((cp >> 6) & 0x3F)), char(0x80 | (cp & 0x3F))};
+    } else {
+        return own;
+    }
+    std::string bytes = sjis::fromUtf8(utf8);
+    if (bytes.size() != 2) return own;
+    static const uint16_t kHigh[32] = {0x20AC, 0, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0, 0x017D, 0,
+                                       0, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0, 0x017E, 0x0178};
+    int missing = fontMissingAdvance(fontFace_, fontSize_), width = 0;
+    for (char c : bytes) {
+        auto b = uint8_t(c);
+        uint32_t single = b >= 0x80 && b < 0xA0 ? kHigh[b - 0x80] : b;
+        GlyphImage g;
+        width += single && glyph(fontFace_, single, fontSize_, false, g) ? g.advance : missing;
+    }
+    return width;
+}
+
 // Lays out a line or lines of UTF-8 from a pen position. `endsThere` lays a name out to end at x rather than start there.
 void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out) {
     int lineHeight = textLine_ > 0 ? textLine_ : fontSize_ + lineInterval_ + 4;
@@ -6890,9 +6972,12 @@ void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, st
             if (cp == '\n') continue;
         }
         GlyphImage g;
-        if (!glyph(fontFace_, cp, fontSize_, false, g)) continue;
+        if (!glyph(fontFace_, cp, fontSize_, false, g)) {
+            if (int width = textAdvance(cp, 0)) penX += float(width) + textGap_;
+            continue;
+        }
         out.push_back({int(std::lround(penX)), penY, cp, italic});
-        penX += float(g.advance) + textGap_;
+        penX += float(textAdvance(cp, g.advance)) + textGap_;
         used += units;
     }
     if (endsThere) {
@@ -7062,7 +7147,10 @@ void Engine::composeStrip() {
     std::fill(strip_.px.begin(), strip_.px.end(), uint8_t(0));
     drawPart(strip_, *squareImage_, 0, from, 0, 0, squareImage_->w, squareImage_->h, 1);
     if (messageInStrip_) {
+        int artOnly = windowArtOnly_;
+        if (partScreen_ && waiting_ == Waiting::PartScreen && !artOnly) windowArtOnly_ = 1;
         composeMessage(strip_);
+        windowArtOnly_ = artOnly;
         if (markShowing()) drawMark(strip_);
     }
     for (int y = 0; y < squareShift_ && from + y < strip_.h && squareY_ + y < total; y++)

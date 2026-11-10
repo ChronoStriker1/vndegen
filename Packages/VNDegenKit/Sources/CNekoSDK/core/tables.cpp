@@ -60,6 +60,9 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\widgettesthide") return kWidgetTestHide;
     if (folder == "vndegen\\widgettestpart") return kWidgetTestPart;
     if (folder == "vndegen\\widgettesttabs") return kWidgetTestTabs;
+    if (folder == "vndegen\\outfittest") return kOutfitTest;
+    if (folder == "vndegen\\twobytetest") return kTwoByteTest;
+    if (folder == "vndegen\\partplatetest") return kPartPlateTest;
     if (folder == "vndegen\\windowlogtest") return kWindowLogTest;
     if (folder == "vndegen\\commenttest") return kCommentTest;
     if (folder == "vndegen\\treetest") return kTreeTest;

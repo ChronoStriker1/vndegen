@@ -196,4 +196,107 @@ import TestSupport
         for _ in 0..<100 { _ = vnneko_step(e, 16) }
         #expect(pixel(e, 0, 0) == [0, 255, 0])
     }
+
+    @Test(arguments: [0, 1, 2]) func theOutfitSwitchChangesAStandingPicturesOutfit(choice: Int) throws {
+        let red: [UInt8] = [0, 0, 255], green: [UInt8] = [0, 255, 0], blue: [UInt8] = [255, 0, 0]
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\outfittest\nFirstFlow\tflow\\t.txt\n".utf8),
+            "sc.pak": NekoSDKFlowFixture.archive([
+                ("sc_000_000_000_000_000.bmp", bmp(10, 10, red)), ("sc_000_003_000_000_000.bmp", bmp(10, 10, green)),
+                ("sc_000_004_000_000_000.bmp", bmp(10, 10, blue)),
+                ("sc_000_101_000_000_000.bmp", bmp(10, 10, red)), ("sc_000_103_000_000_000.bmp", bmp(10, 10, green)),
+                ("sc_000_104_000_000_000.bmp", bmp(10, 10, blue)),
+                ("sc_001_000_000_000_000.bmp", bmp(10, 10, red)), ("sc_001_002_000_000_000.bmp", bmp(10, 10, green)),
+                ("sc_009_000_000_000_000.bmp", bmp(10, 10, red)), ("sc_009_003_000_000_000.bmp", bmp(10, 10, green)),
+            ]),
+            "ac.pak": NekoSDKFlowFixture.archive([
+                ("ac_000_000_000_000_000.bmp", bmp(10, 10, red)), ("ac_000_003_000_000_000.bmp", bmp(10, 10, green)),
+                ("ac_000_004_000_000_000.bmp", bmp(10, 10, blue)),
+            ]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [1: 0, 3: 200], s: [1: "sc\\sc_000_000_000_000_000.bmp"]),
+                .init(op: 15, next: 4, p: [1: 20, 3: 201], s: [1: "sc\\sc_000_101_000_000_000.bmp"]),
+                .init(op: 15, next: 5, p: [1: 40, 3: 202], s: [1: "sc\\sc_001_000_000_000_000.bmp"]),
+                .init(op: 15, next: 6, p: [1: 60, 3: 203], s: [1: "sc\\sc_009_000_000_000_000.bmp"]),
+                .init(op: 15, next: 7, p: [1: 80, 3: 204], s: [1: "ac\\ac_000_000_000_000_000.bmp"]),
+                .init(op: 13, next: 8, p: [0: 3], s: [1: "sc\\sc_000_000_000_000_000.bmp"]),
+                .init(op: 9, next: 9),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), saves = data.appendingPathComponent("AppData/Roaming/vndegen/outfittest/save")
+        try FileManager.default.createDirectory(at: saves, withIntermediateDirectories: true)
+        try Data("outfit \(choice)\n".utf8).write(to: saves.appendingPathComponent("vndegen_settings.txt"))
+        let shown: [[UInt8]] = [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+        func check(_ e: OpaquePointer) {
+            #expect(pixel(e, 5, 5) == shown[choice])
+            #expect(pixel(e, 25, 5) == shown[choice])
+            #expect(pixel(e, 45, 5) == (choice == 1 ? shown[1] : shown[0]))
+            #expect(pixel(e, 65, 5) == shown[0])
+            #expect(pixel(e, 85, 5) == shown[choice])
+            #expect(pixel(e, 240, 360) == shown[choice])
+        }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        check(e)
+        #expect(vnneko_debug_save(e, 1))
+        vnneko_stop(e)
+        let file = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save001.sav" })
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: file))
+        #expect(save.range(of: Data("sc\\sc_000_000_000_000_000.bmp".utf8)) != nil)
+        #expect(save.range(of: Data("sc\\sc_000_003_000_000_000.bmp".utf8)) == nil)
+        #expect(save.range(of: Data("sc\\sc_000_004_000_000_000.bmp".utf8)) == nil)
+        let again = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(again) }
+        #expect(vnneko_debug_load(again, 1))
+        for _ in 0..<3 { _ = vnneko_step(again, 16) }
+        check(again)
+    }
+
+    @Test func theOutfitSwitchRedressesAPictureOnScreen() throws {
+        let red: [UInt8] = [0, 0, 255], green: [UInt8] = [0, 255, 0]
+        let inner = ["#inner Config", "obj\\b.bmp", "1", "1000,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\outfittest\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/msg_button.ini": Data((inner.joined(separator: "\n") + "\n##\n").utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", bmp(50, 250, [200, 200, 200]))]),
+            "sc.pak": NekoSDKFlowFixture.archive([
+                ("sc_000_000_000_000_000.bmp", bmp(10, 10, red)), ("sc_000_003_000_000_000.bmp", bmp(10, 10, green)),
+            ]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [1: 0, 3: 200], s: [1: "sc\\sc_000_000_000_000_000.bmp"]),
+                .init(op: 9, next: 4),
+                .init(op: 5, next: 5, s: [2: "x"]),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<20 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 5, 5) == [255, 0, 0])
+        #expect(vnneko_debug_press(e, "Config"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        vnneko_mouse_move(e, 225.0 / 1280, 125.0 / 720)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_press(e, "back"))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 5, 5) == [0, 255, 0])
+    }
 }

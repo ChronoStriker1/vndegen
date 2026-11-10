@@ -40,11 +40,11 @@ struct KnownDuplicate {
 const KnownDuplicate kKnownDuplicates[] = {{"waffle\\alchemy", "scr\\ep_004_000_000.txt", 1125}};
 
 // Messages longer than the screen as the runtime wraps them, at init.ini's MsgMaxCharNum: 50 full-width characters
-// at the PC's pitch reach past the right edge. All are untranslated Japanese lines in sex scenes. The PC applies the
-// same limit at the same pitch, but these lines haven't been seen on the PC yet.
+// at the PC's pitch reach past the right edge.
 struct KnownLong {
     const char *game, *script;
     int id;
+    bool onPc = false;
 };
 const KnownLong kKnownLong[] = {
     {"waffle\\tmgb", "scr\\gt_018_001_003.txt", 8},
@@ -53,7 +53,7 @@ const KnownLong kKnownLong[] = {
     {"waffle\\隣人に壊されていく俺の妻", "scr\\ep_900_000_025_100.txt", 4},
     // Test Game 96: an English line that wraps to five lines at MS Gothic 25 and overflows by 1 pixel, as the PC does with
     // the Japanese face substituted under Wine (set 2).
-    {"waffle\\ヤバい！－復讐・闇サイト－", "scr\\sc_004_000_002_001.txt", 852},
+    {"waffle\\ヤバい！－復讐・闇サイト－", "scr\\sc_004_000_002_001.txt", 852, true},
 };
 
 // Plain-text notes a game keeps among its scripts, which aren't scripts.
@@ -125,11 +125,12 @@ void checkMessages(const char *root, const Files &files, const std::string &key,
             }
             t.messages++;
             if (fits) continue;
-            bool known = false;
-            for (const KnownLong &k : kKnownLong) known = known || (key == normalizedPath(k.game) && path == normalizedPath(k.script) && n.id == k.id);
+            const KnownLong *known = nullptr;
+            for (const KnownLong &k : kKnownLong)
+                if (key == normalizedPath(k.game) && path == normalizedPath(k.script) && n.id == k.id) known = &k;
             if (known) {
                 t.knownLong++;
-                std::printf("  off the screen (known, not yet seen on the PC): %s #%d reaches %d, %d\n", path.c_str(), n.id, right, bottom);
+                std::printf("  off the screen (known, %s): %s #%d reaches %d, %d\n", known->onPc ? "as on the PC" : "not yet seen on the PC", path.c_str(), n.id, right, bottom);
                 continue;
             }
             if (++t.offScreen <= 10) std::printf("  off the screen: %s #%d reaches %d, %d\n", path.c_str(), n.id, right, bottom);

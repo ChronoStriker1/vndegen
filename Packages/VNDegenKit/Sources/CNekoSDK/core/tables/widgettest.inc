@@ -156,3 +156,31 @@ cellthumb 0 0
 button gtab0 obj\b.bmp 800 0 1 5 0
 button gtab1 obj\b.bmp 900 0 1 5 0
 )";
+
+const char kOutfitTest[] = R"(
+screen defaults
+outfitswitch outfit 000:003:004 001:002:003
+
+screen config
+radio outfit 0 obj\b.bmp 100 100 1 5 0
+radio outfit 1 obj\b.bmp 200 100 1 5 0
+radio outfit 2 obj\b.bmp 300 100 1 5 0
+button back obj\b.bmp 400 100 1 5 0
+)";
+
+const char kTwoByteTest[] = R"(
+screen defaults
+twobyteadvance
+windowpic obj\e.bmp 1000 500
+)";
+
+const char kPartPlateTest[] = R"(
+screen defaults
+parts selftest
+partplate
+
+screen story
+flow main
+open selftestwait 9 -> S 1
+end
+)";
