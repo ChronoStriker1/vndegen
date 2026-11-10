@@ -408,7 +408,21 @@ void Engine::closeScreen() {
 }
 
 // Back from the story to a menu, with its sound and sprites cleared.
+bool Engine::resumeSetAside() {
+    if (!setAside_) return false;
+    PreviousChoice story = *setAside_;
+    std::optional<PreviousChoice> choice = setAsideChoice_;
+    restoreSave(story.data, parseSidecar(story.data, story.side));
+    previousChoice_ = choice;
+    log("back to the story at %s #%d", story.data.scene.c_str(), story.data.node);
+    return true;
+}
+
 void Engine::endStory(const std::string &screen) {
+    if (screen != "scene") {
+        setAside_.reset();
+        setAsideChoice_.reset();
+    }
     stopTrack();  // first, since a held player's fade would never finish
     stopKind(kKindBgm, 500);
     stopKind(kKindSe, 500);
@@ -462,6 +476,8 @@ void Engine::endStory(const std::string &screen) {
 }
 
 void Engine::startStory() {
+    setAside_.reset();
+    setAsideChoice_.reset();
     stopTrack();
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
@@ -799,6 +815,7 @@ void Engine::runAction(const std::string &action) {
         // Closed first either way, so a screen that keeps something on leaving, such as the sprite gallery, does.
         std::string to = returnTo_;
         closeScreen();
+        if (to == "title" && resumeSetAside()) return;
         if (!to.empty()) openScreen(to);
         return;
     }
@@ -1790,7 +1807,7 @@ void Engine::composeTrackTime(Canvas &out) {
         clock(at, field(*times, 1), field(*times, 2));
         clock(all, field(*times, 3), field(*times, 4));
     }
-    if (const auto *playing = screen_->setting("playingpic"); playing && playing->size() >= 3 && trackPlayer_ && currentTrack_ >= 0) {
+    if (const auto *playing = screen_->setting("playingpic"); playing && playing->size() >= 3 && (trackPlayer_ || screen_->setting("trackselects")) && currentTrack_ >= 0) {
         std::string name = (*playing)[0];
         size_t dot = name.rfind('.');
         if (dot != std::string::npos && dot >= 3 && std::isdigit(uint8_t(name[dot - 1])) && std::isdigit(uint8_t(name[dot - 2])) && std::isdigit(uint8_t(name[dot - 3]))) {
@@ -1952,6 +1969,11 @@ bool Engine::startReplay(const GalleryEntry &scene) {
     if (!flow || !flow->first()) return false;
     replayTab_ = galleryTab_;
     replayPage_ = screen_ && screen_->name == "scene" ? page_ : -1;
+    if (!replaying_ && !setAside_ && !stack_.empty()) {
+        SaveData story = captureSave();
+        setAside_ = PreviousChoice{story, sidecarText(story)};
+        setAsideChoice_ = previousChoice_;
+    }
     stopTrack();
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
@@ -2748,6 +2770,8 @@ bool Engine::loadFromSlot(int slot) {
 }
 
 void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
+    setAside_.reset();
+    setAsideChoice_.reset();
     // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit, and the CG
     // viewer it may have come from.
     replaying_ = false;
@@ -3221,8 +3245,9 @@ void Engine::composeSlots(Canvas &out) {
             // digits), from a sheet of CELLS, 10 when absent (13 for Test Game 96's, its date's marks after the digits).
             int numberCells = offset("slotdigits", 5) > 0 ? offset("slotdigits", 5) : 10;
             const auto *faded = screen_->setting("emptycards");
-            bool numberFades = faded && faded->size() >= 2 && (*faded)[1] == "number";
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4), numberFades ? cardOpacity : 1);
+            bool numberFades = cardOpacity < 1 && faded && faded->size() >= 2 && (*faded)[1] == "number";
+            float numberOpacity = !numberFades ? 1 : faded->size() >= 3 ? std::clamp(float(field(*faded, 2)) / 256, 0.0f, 1.0f) : cardOpacity;
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4), numberOpacity);
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -3411,10 +3436,22 @@ void Engine::composeDialog(Canvas &out) {
     const Screen &dialog = screens_.at("dialog");
     // `dim N` of 256 darkens what's behind; Test Game 84's questions don't.
     const auto *dim = dialog.setting("dim");
-    tintFrame(out, 0, 0, 0, dim && !dim->empty() ? field(*dim, 0) : 128);
-    if (screen_)
-        for (const Picture &p : screen_->pictures)
-            if (p.overDim && p.image && (p.tab < 0 || p.tab == galleryTab_) && shown(p)) drawPicture(out, p);
+    int dark = std::clamp(dim && !dim->empty() ? field(*dim, 0) : 128, 0, 256);
+    tintFrame(out, 0, 0, 0, dark);
+    if (screen_) {
+        bool over = false;
+        for (const Picture &p : screen_->pictures) {
+            if (!p.image || (p.tab >= 0 && p.tab != galleryTab_) || !shown(p)) continue;
+            if (p.overDim) {
+                drawPicture(out, p);
+                over = true;
+            } else if (over) {
+                Picture dimmed = p;
+                dimmed.image = darkened(p.image, dark);
+                drawPicture(out, dimmed);
+            }
+        }
+    }
     // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, behind fixed art besides.
     // `question FILE X Y COLS COL`: a cell of a strip instead, drawn over the art, as Test Game 82's titles are seven
     // across one picture over the frame they name.
@@ -3816,7 +3853,8 @@ void Engine::composeScreen(Canvas &out) {
             continue;
         }
         // Pause is drawn disabled with nothing playing, but not on a `trackselects` screen: Test Game 96's stays plain.
-        if (b.action == "music_pause" && !trackPlayer_ && !screen_->setting("trackselects")) state = StateDisabled;
+        const auto *selects = screen_->setting("trackselects");
+        if (b.action == "music_pause" && !trackPlayer_ && (!selects || (!selects->empty() && (*selects)[0] == "pauseoff"))) state = StateDisabled;
         // The current page's button sits higher in Test Game 84.
         if (const auto *lift = screen_->setting("pagelift"); lift && current && b.action.rfind("page", 0) == 0) {
             Button raised = b;
@@ -3938,6 +3976,18 @@ Picture Engine::turned(const Picture &p) const {
     Picture now = p;
     now.angle = p.turn * float(screenMs_) / 1000 * kPi / 180;
     return now;
+}
+
+ImageRef Engine::darkened(const ImageRef &image, int dark) {
+    auto key = std::make_pair(image.get(), dark);
+    if (auto made = darkened_.find(key); made != darkened_.end()) return made->second.second;
+    auto copy = std::make_shared<Image>(*image);
+    int keep = 256 - dark;
+    for (size_t i = 0; i + 3 < copy->rgba.size(); i += 4)
+        for (size_t c = 0; c < 3; c++) copy->rgba[i + c] = uint8_t((copy->rgba[i + c] * keep) >> 8);
+    if (darkened_.size() > 16) darkened_.clear();
+    darkened_[key] = {image, copy};
+    return copy;
 }
 
 bool Engine::defaultsHave(const char *key) const {
@@ -4415,6 +4465,7 @@ void Engine::beginChoice(const Node &n) {
 
 void Engine::choose(int index) {
     if (waiting_ != Waiting::Choice) return;
+    if (previousChoiceDue_) notePreviousChoice();
     choiceResult_ = index;
     askedResult_ = index;
     choiceMade_ = true;

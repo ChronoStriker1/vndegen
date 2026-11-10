@@ -285,6 +285,36 @@ import TestSupport
         #expect(status().contains(" menu scene"), "\(status())")
     }
 
+    @Test func aReplayStartedInsideTheStoryPutsTheStoryBack() throws {
+        let button = ["obj\\b.bmp", "1", "0,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try game("widgettesttabs", [
+            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\k.txt,0,0\n".utf8),
+            "cfg/msg_button.ini": Data(("#inner scene\n" + button.joined(separator: "\n") + "\n##\n").utf8),
+            "scr/k.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0, p: [0: 500])]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/widgettesttabs/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try Data("scr\\k.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        #expect(vnneko_debug_jump(e, "flow\\t.txt", 0))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
+        #expect(vnneko_debug_press(e, "scene"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu scene"), "\(status())")
+        click(e, 320, 315)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("k.txt #"), "\(status())")
+        for _ in 0..<90 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu scene"), "\(status())")
+        #expect(vnneko_debug_press(e, "back"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
+    }
+
     @Test func anEmptyTabOpensWithoutTheKey() throws {
         let root = try game("widgettesttabs", [
             "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\k.txt,0,0\n".utf8),
