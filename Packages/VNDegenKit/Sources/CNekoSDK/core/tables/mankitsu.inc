@@ -552,6 +552,7 @@ scene scr\ep_001_005_000.txt @12
 scene scr\ep_001_005_001.txt @13
 set S 4000 = 1
 scene scr\ep_001_006_000.txt @14
+set G 2 = 1
 jump weeks
 label bonus1
 scene sys_2\scr\ep_011_000_000.txt
