@@ -64,5 +64,7 @@ flow main
 scene scr\a.txt @3
 scene scr\c2.txt
 scene scr\e.txt
+scene scr\b.txt
+choice obj\n001_000.bmp 2 @25
 end
 )";

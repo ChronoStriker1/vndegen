@@ -348,6 +348,53 @@ import TestSupport
         click(e)
         steps(e, 100)
         #expect(at(e, "scr\\e.txt"), "\(status(e))")
+        steps(e, 130)
+        for _ in 0..<10 where vnneko_debug_choice_count(e) <= 0 {
+            click(e)
+            steps(e, 20)
+        }
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        #expect(vnneko_debug_save(e, 3))
+        let asking = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save003.vnd" })
+        #expect(try String(contentsOf: asking, encoding: .utf8).split(separator: "\n").contains("storynumber 1"))
+
+        try lines.filter { !$0.hasPrefix("storynumber ") }.joined(separator: "\n").write(to: sidecar, atomically: true, encoding: .utf8)
+        let older = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(older) }
+        #expect(vnneko_debug_load(older, 1))
+        steps(older, 3)
+        #expect(vnneko_debug_save(older, 2))
+        let again = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save002.vnd" })
+        #expect(try String(contentsOf: again, encoding: .utf8).split(separator: "\n").contains("storynumber 0"))
+    }
+
+    @Test func anOlderSidecarsPCNumberIsKnownForOneWhenTheSaveIsMadeAgain() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytest/save")
+        func sidecar(_ slot: Int) throws -> URL {
+            try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+                .first { $0.lastPathComponent.lowercased() == "save00\(slot).vnd" })
+        }
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(first, 3)
+        click(first)
+        steps(first, 10)
+        #expect(at(first, "scr\\c2.txt"), "\(status(first))")
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        let lines = try String(contentsOf: try sidecar(1), encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+        #expect(lines.contains("storynumber 1"))
+        try lines.filter { !$0.hasPrefix("storynumber ") }.joined(separator: "\n").write(to: try sidecar(1), atomically: true, encoding: .utf8)
+        let older = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(older) }
+        #expect(vnneko_debug_load(older, 1))
+        steps(older, 3)
+        #expect(vnneko_debug_save(older, 2))
+        #expect(try String(contentsOf: try sidecar(2), encoding: .utf8).split(separator: "\n").contains("storynumber 1"))
     }
 
     @Test func theTablePlaysAndSavesKeepItsPlace() throws {

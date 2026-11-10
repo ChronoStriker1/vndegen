@@ -295,6 +295,14 @@ bool Engine::restoreStoryPlace(const Sidecar &side, bool &atChoice) {
     return true;
 }
 
+bool Engine::storyPlaceNumbered(const SaveData &d) {
+    if (d.flowNode <= 0) return false;
+    for (const Frame &frame : stack_)
+        for (const Node &n : frame.script->nodes)
+            if (n.p[kStoryPcNumber] == d.flowNode && (n.opcode != 1 || storySceneIs(n, d.scene))) return true;
+    return false;
+}
+
 // Whether a story line is a `scene` line for this scene, by the table's name for it or a patch's.
 bool Engine::storySceneIs(const Node &n, const std::string &scene) {
     std::string want = normalizedPath(scene);

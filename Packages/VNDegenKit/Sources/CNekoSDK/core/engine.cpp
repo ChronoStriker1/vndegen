@@ -2070,6 +2070,7 @@ void Engine::applyArtSet() {
     if (wanted == artShown_) return;
     artShown_ = wanted;
     images_->setArtSet(wanted);
+    bulbDark_.clear();
     for (Sprites *sprites : {&back_, &front_})
         for (auto &[slot, sprite] : *sprites)
             if (!sprite.path.empty() && !sprite.flipCount)
@@ -2782,10 +2783,13 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
                     flowCallId_ = candidate.id;
                     flowCallNumbered_ = false;
                 }
-    } else if (d.flow.empty() && !firstStoryFlow().empty() && !restoreStoryPlace(side, atChoice) && !resumeStoryByRule(atScreen) &&
-               !(side.flowNumbered && resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen)) &&
-               !resumeStoryAt(d.scene)) {
-        complain("The story table has no place for the save's scene " + d.scene);
+    } else if (d.flow.empty() && !firstStoryFlow().empty()) {
+        if (restoreStoryPlace(side, atChoice)) {
+            if (!side.hasFlowNumbered) flowCallNumbered_ = storyPlaceNumbered(d);
+        } else if (!resumeStoryByRule(atScreen) && !(side.flowNumbered && resumeStoryAtNumber(d.flowNode, d.flowActive, d.scene, atChoice, atScreen)) &&
+                   !resumeStoryAt(d.scene)) {
+            complain("The story table has no place for the save's scene " + d.scene);
+        }
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d, side);
     for (const SavedSprite &saved : d.sprites) {
@@ -4764,10 +4768,10 @@ bool Engine::step(int ms) {
     for (auto &[name, part] : parts_)
         if (part->step(*partHost_)) dirty_ = true;
     advanceFlipbooks();
-    if (!bulbPatterns_.empty() && !screen_)
+    if (!bulbPatterns_.empty())
         if (int level = bulbLevel(); level != bulbDrawn_) {
             bulbDrawn_ = level;
-            dirty_ = true;
+            if (bulbSeen_) dirty_ = true;
         }
     stepMovies();
     for (auto &[slot, splash] : splashes_) {
@@ -5365,7 +5369,7 @@ std::string Engine::sidecarText(const SaveData &d) {
             text += "story " + frame.script->name + " " + std::to_string(id) + "\n";
         }
         text += "storytable " + std::to_string(storyTableHash()) + "\n";
-        text += std::string("storynumber ") + (flowCallNumbered_ ? "1" : "0") + "\n";
+        text += std::string("storynumber ") + (flowCallNumbered_ || d.flowNode != flowCallId_ ? "1" : "0") + "\n";
         text += "result " + std::to_string(choiceResult_) + "\n";
         if (waiting_ == Waiting::Choice) text += "choice\n";
     }
@@ -5475,7 +5479,8 @@ Engine::Sidecar Engine::parseSidecar(const SaveData &d, const std::string &text)
             side.hasStoryTable = bool(words >> side.storyTable);
         } else if (kind == "storynumber") {
             int numbered = 1;
-            if (words >> numbered) side.flowNumbered = numbered != 0;
+            side.hasFlowNumbered = bool(words >> numbered);
+            if (side.hasFlowNumbered) side.flowNumbered = numbered != 0;
         } else if (kind == "result") {
             side.hasResult = bool(words >> side.result);
         } else if (kind == "screen") {
@@ -6656,7 +6661,24 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
         if (s.flipCount && s.flipShown >= s.flipCount) continue;
         std::string shown = s.flipCount ? flipPicture(s.path, s.flipShown) : shownPath(s.path);
-        ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.flipCount || s.movie ? s.image : bulbImage(s, s.image);
+        ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.image;
+        ImageRef dark;
+        int lit = 255;
+        if (layoutPairs_ && !s.flipCount && !s.movie && !s.additive && !sprites.count(slot + 1))
+            if (std::string name = bulbDark(shown, *s.image); !name.empty()) {
+                bulbSeen_ = true;
+                lit = bulbLevel();
+                if (lit < 255) dark = radius > 0 ? images_->blurred(name, radius) : images_->get(name);
+            }
+        auto draw = [&](float x, float y, float scaleX, float scaleY, const std::vector<int> *rows) {
+            const Image &top = image ? *image : *s.image;
+            if (!dark) {
+                drawImage(out, top, x, y, scaleX, scaleY, v.rotation, v.alpha, rows, s.additive);
+                return;
+            }
+            drawImage(out, *dark, x, y, scaleX, scaleY, v.rotation, v.alpha, rows, s.additive);
+            if (lit > 0) drawImage(out, top, x, y, scaleX, scaleY, v.rotation, v.alpha * float(lit) / 255, rows, s.additive);
+        };
         // The position is the unscaled picture's top left, and it scales about its anchor, its middle unless told otherwise.
         int pivotX, pivotY;
         anchorOf(s, pivotX, pivotY);
@@ -6698,10 +6720,10 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
             }
             for (int ky = fromY; ky <= toY; ky++)
                 for (int kx = fromX; kx <= toX; kx++)
-                    drawImage(out, image ? *image : *s.image, baseX + float(kx) * tileW, baseY + float(ky) * tileH, v.scaleX, v.scaleY, v.rotation, v.alpha, nullptr, s.additive);
+                    draw(baseX + float(kx) * tileW, baseY + float(ky) * tileH, v.scaleX, v.scaleY, nullptr);
             continue;
         }
-        drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX * zoom, v.scaleY * zoom, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
+        draw(middleX + dx, middleY + dy, v.scaleX * zoom, v.scaleY * zoom, s.waveOn ? &shifts : nullptr);
     }
     composeSplashes(out, drawnTo, INT_MAX);
     drawParts(out, Layer::Slot, drawnTo, INT_MAX);
@@ -6709,6 +6731,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
 
 void Engine::compose() {
     windowDrawnAt_ = now_;
+    bulbSeen_ = false;
     messageInStrip_ = false;
     if (screen_) {
         composeScreen(canvas_);
@@ -6870,7 +6893,7 @@ void Engine::composeMessage(Canvas &out) {
         drawGlyphRun(out);
         composeGtCount(out);
     }
-    composeMessageButtons(out);
+    if (!(square_ && partPlate())) composeMessageButtons(out);
 }
 
 // The rectangle the wait mark can touch at any angle.
