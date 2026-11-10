@@ -196,4 +196,51 @@ import TestSupport
         for _ in 0..<100 { _ = vnneko_step(e, 16) }
         #expect(pixel(e, 0, 0) == [0, 255, 0])
     }
+
+    @Test(arguments: [0, 1, 2]) func theOutfitSwitchChangesAStandingPicturesOutfit(choice: Int) throws {
+        let red: [UInt8] = [0, 0, 255], green: [UInt8] = [0, 255, 0], blue: [UInt8] = [255, 0, 0]
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\outfittest\nFirstFlow\tflow\\t.txt\n".utf8),
+            "sc.pak": NekoSDKFlowFixture.archive([
+                ("sc_000_000_000_000_000.bmp", bmp(10, 10, red)), ("sc_000_003_000_000_000.bmp", bmp(10, 10, green)),
+                ("sc_000_004_000_000_000.bmp", bmp(10, 10, blue)),
+                ("sc_000_101_000_000_000.bmp", bmp(10, 10, red)), ("sc_000_103_000_000_000.bmp", bmp(10, 10, green)),
+                ("sc_000_104_000_000_000.bmp", bmp(10, 10, blue)),
+                ("sc_001_000_000_000_000.bmp", bmp(10, 10, red)), ("sc_001_002_000_000_000.bmp", bmp(10, 10, green)),
+                ("sc_009_000_000_000_000.bmp", bmp(10, 10, red)), ("sc_009_003_000_000_000.bmp", bmp(10, 10, green)),
+            ]),
+            "ac.pak": NekoSDKFlowFixture.archive([
+                ("ac_000_000_000_000_000.bmp", bmp(10, 10, red)), ("ac_000_003_000_000_000.bmp", bmp(10, 10, green)),
+                ("ac_000_004_000_000_000.bmp", bmp(10, 10, blue)),
+            ]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [1: 0, 3: 200], s: [1: "sc\\sc_000_000_000_000_000.bmp"]),
+                .init(op: 15, next: 4, p: [1: 20, 3: 201], s: [1: "sc\\sc_000_101_000_000_000.bmp"]),
+                .init(op: 15, next: 5, p: [1: 40, 3: 202], s: [1: "sc\\sc_001_000_000_000_000.bmp"]),
+                .init(op: 15, next: 6, p: [1: 60, 3: 203], s: [1: "sc\\sc_009_000_000_000_000.bmp"]),
+                .init(op: 15, next: 7, p: [1: 80, 3: 204], s: [1: "ac\\ac_000_000_000_000_000.bmp"]),
+                .init(op: 9, next: 8),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), saves = data.appendingPathComponent("AppData/Roaming/vndegen/outfittest/save")
+        try FileManager.default.createDirectory(at: saves, withIntermediateDirectories: true)
+        try Data("outfit \(choice)\n".utf8).write(to: saves.appendingPathComponent("vndegen_settings.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        let shown: [[UInt8]] = [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+        #expect(pixel(e, 5, 5) == shown[choice])
+        #expect(pixel(e, 25, 5) == shown[choice])
+        #expect(pixel(e, 45, 5) == (choice == 1 ? shown[1] : shown[0]))
+        #expect(pixel(e, 65, 5) == shown[0])
+        #expect(pixel(e, 85, 5) == shown[choice])
+    }
 }

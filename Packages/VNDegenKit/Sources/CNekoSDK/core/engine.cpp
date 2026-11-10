@@ -326,6 +326,17 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     loadGalleries();
     loadParts();
     loadOldLayout();
+    outfitSetting_.clear();
+    outfitSwitch_.clear();
+    if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
+        if (const auto *line = defaults->second.setting("outfitswitch"); line && line->size() >= 2) {
+            outfitSetting_ = (*line)[0];
+            for (size_t i = 1; i < line->size(); i++) {
+                std::vector<int> numbers;
+                for (const std::string &part : split((*line)[i], ':')) numbers.push_back(std::atoi(part.c_str()));
+                if (numbers.size() >= 2) outfitSwitch_[numbers[0]] = std::vector<int>(numbers.begin() + 1, numbers.end());
+            }
+        }
     loadGlobals();
     loadSettings();
     if (screens_.count("title")) openScreen("title");
@@ -5757,8 +5768,30 @@ std::string Engine::lockedSprite(const std::string &path) const {
     return path;
 }
 
+std::string Engine::switchedOutfit(const std::string &path) const {
+    if (outfitSetting_.empty()) return path;
+    int choice = setting(outfitSetting_);
+    if (choice <= 0) return path;
+    std::string name = normalizedPath(path);
+    auto slash = name.rfind('\\');
+    size_t at = slash == std::string::npos ? 0 : slash + 1;
+    bool standing = name.compare(0, 3, "sc\\") == 0 && name.compare(at, 3, "sc_") == 0;
+    bool face = name.compare(0, 3, "ac\\") == 0 && name.compare(at, 3, "ac_") == 0;
+    if ((!standing && !face) || name.size() < at + 10) return path;
+    for (size_t i = at + 3; i < at + 10; i++)
+        if (i != at + 6 && !std::isdigit(uint8_t(name[i]))) return path;
+    auto worn = outfitSwitch_.find(std::atoi(name.substr(at + 3, 3).c_str()));
+    if (worn == outfitSwitch_.end() || size_t(choice) > worn->second.size()) return path;
+    int outfit = std::atoi(name.substr(at + 7, 3).c_str()) / 100 * 100 + worn->second[size_t(choice) - 1];
+    char id[8];
+    std::snprintf(id, sizeof id, "%03d", outfit % 1000);
+    std::string other = name;
+    other.replace(at + 7, 3, id);
+    return files_.exists(other) ? other : path;
+}
+
 std::string Engine::shownPath(const std::string &rawPath) const {
-    std::string path = lockedSprite(rawPath);
+    std::string path = switchedOutfit(lockedSprite(rawPath));
     if (!artVersions_.empty()) return plainVariant(versionPath(path));
     if (setting("express")) return path;
     auto it = plainArt_.find(normalizedPath(path));

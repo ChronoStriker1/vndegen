@@ -156,3 +156,8 @@ cellthumb 0 0
 button gtab0 obj\b.bmp 800 0 1 5 0
 button gtab1 obj\b.bmp 900 0 1 5 0
 )";
+
+const char kOutfitTest[] = R"(
+screen defaults
+outfitswitch outfit 000:003:004 001:002:003
+)";
