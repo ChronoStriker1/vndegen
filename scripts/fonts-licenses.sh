@@ -10,6 +10,7 @@ rm -rf "$out.part" && mkdir -p "$out.part"
 cp "$src/Liberation-2.1.5-LICENSE" "$out.part/Liberation fonts 2.1.5 (Arial, Times New Roman, Courier New).txt"
 cp "$src/DejaVu-2.37-LICENSE" "$out.part/DejaVu fonts 2.37 (Tahoma).txt"
 cp "$src/OpenSans-3.003-OFL.txt" "$out.part/Open Sans 3.003 (Lucida Sans Unicode).txt"
+cp "$src/Carlito-1.104-OFL.txt" "$out.part/Carlito 1.104 (Calibri).txt"
 # The Ume fonts' license is a web page. Its text, without the markup, is the notice.
 sed -e 's/<[^>]*>//g' -e '/^[[:space:]]*$/d' "$src/umefont-670-license.html" >"$out.part/Ume fonts 670 (MS Gothic, MS Mincho).txt"
 rm -rf "$out" && mv "$out.part" "$out"
