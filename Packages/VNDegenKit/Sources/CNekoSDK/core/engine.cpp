@@ -370,6 +370,7 @@ void Engine::openScreen(const std::string &name) {
     }
     darkened_.clear();
     dragSetting_.clear();
+    helpUp_ = false;
     if (screen_ && screen_->name == "title" && name != "title") {
         titleStage_ = menuStage_;
         titleSubMenu_ = subMenu_;
@@ -3048,9 +3049,9 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side, bool keepLine) 
     }
     windowShown_ = d.windowShown;
     windowShownAt_ = -100000;
-    choiceLine_ = atChoice && keepLine && defaultsHave("choicekeepsline") && !d.current.text.empty();
+    choiceLine_ = atChoice && keepLine && defaultsHave("choicekeepsline") && d.windowShown && !d.current.text.empty();
     bool empty = atChoice && !choiceLine_;
-    windowCleared_ = empty;
+    windowCleared_ = false;
     layoutText(empty ? "" : sjis::toUtf8(d.current.name), empty ? "" : sjis::toUtf8(d.current.text));
     textStart_ = now_;
     textDone_ = true;
@@ -3946,7 +3947,7 @@ void Engine::composeScreen(Canvas &out) {
         drawButtonHelp(out, *helpOf);
     }
     if (screen_->flips && (helpNow != helpUp_ || (helpNow && (helpNowX != helpX_ || helpNowY != helpY_)))) {
-        if (helpNow && !helpUp_) helpFrom_ = clockMs_;
+        if (helpNow) helpFrom_ = clockMs_;
         helpUp_ = helpNow;
         helpX_ = helpNowX;
         helpY_ = helpNowY;
@@ -7080,7 +7081,6 @@ void Engine::compose() {
     composeCameraPanel(canvas_);
     if (partScreen_) drawParts(canvas_, Layer::Screen);
     if (partPlate()) composeMessageButtons(canvas_);
-    if (dialogOpen_) composeDialog(canvas_);
 
     if (choiceSheet_ && choiceClosingFrom_ >= 0) composeChoice(canvas_);
     if (waiting_ == Waiting::Choice && choiceSheet_) {
@@ -7089,13 +7089,17 @@ void Engine::compose() {
             // A `dim` picture darkens the scene behind the choice, as Test Game 83's does to 0.138 (set 3).
             for (const Picture &p : table->second.pictures) {
                 if (p.dim && !p.underWindow) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
-                else if (!p.dim) drawPicture(canvas_, p);
+                else if (!p.dim && !dialogOpen_) drawPicture(canvas_, p);
             }
-            for (auto [line, end] = table->second.settings.equal_range("framefor"); line != end; ++line)
+            for (auto [line, end] = table->second.settings.equal_range("framefor"); line != end && !dialogOpen_; ++line)
                 if (line->second.size() >= 4 && field(line->second, 0) == choiceCount_)
                     if (ImageRef frame = images_->get(line->second[1])) drawPart(canvas_, *frame, field(line->second, 2), field(line->second, 3), 0, 0, frame->w, frame->h, 1);
-        } else if (choiceBack_) {
+        } else if (choiceBack_ && !dialogOpen_) {
             drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
+        }
+        if (dialogOpen_) {
+            composeDialog(canvas_);
+            return;
         }
         int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
         choicePlace(x, top, step, slant);
@@ -7127,6 +7131,7 @@ void Engine::compose() {
             }
         }
     }
+    if (dialogOpen_) composeDialog(canvas_);
 }
 
 // A line of the table's choice screen, or null.

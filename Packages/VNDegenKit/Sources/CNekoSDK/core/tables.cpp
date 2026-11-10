@@ -57,7 +57,7 @@ const char *menuTable(const std::string &folder) {
     }
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
     if (folder == "waffle\\ヤバい！－復讐・闇サイト－") return kYabai1;
-    if (folder == "vndegen\\storytest") return kStoryTest;
+    if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpcplain") return kStoryTest;
     if (folder == "vndegen\\storytestdim") {
         static const std::string table = std::string(kStoryTest) + "\nscreen defaults\ninneralways\n\nscreen choice\npic dim 0 0 alpha 128 underwindow\n";
         return table.c_str();
@@ -109,6 +109,15 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\partbandtest") return kPartBandTest;
     if (folder == "vndegen\\disctest") return kDiscTest;
     if (folder == "vndegen\\titlereturn") return kTitleReturnTest;
+    if (folder == "vndegen\\titlereturnplain" || folder == "vndegen\\titlereturnopening") {
+        static const std::string plain = [] {
+            std::string table = kTitleReturnTest;
+            table.erase(table.find("menustages\n"), 11);
+            return table;
+        }();
+        static const std::string opening = "\nscreen title\nopening 500 900 1000\n" + plain;
+        return folder == "vndegen\\titlereturnopening" ? opening.c_str() : plain.c_str();
+    }
     if (folder == "vndegen\\musicvolume") return kMusicVolumeTest;
     if (folder == "vndegen\\plateholdstest") return kPlateHoldsTest;
     if (folder == "vndegen\\partplatebandtest") return kPartPlateBandTest;

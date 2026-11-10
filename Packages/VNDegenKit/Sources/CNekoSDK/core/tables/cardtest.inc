@@ -86,6 +86,7 @@ viewerbutton return obj\t.bmp 900 650 1 0
 const char kMovingPicTest[] = R"(
 screen title
 pic obj\band.bmp 0 300 scroll 60
+pic obj\band.bmp 0 400 scroll -60
 pic obj\bar.bmp 600 500 flip 90
 button config obj\b.bmp 0 100 1 5 0 help obj\h.bmp 600 500 1 1 0 0
 )";
