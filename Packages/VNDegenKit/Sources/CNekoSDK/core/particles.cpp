@@ -63,7 +63,7 @@ public:
         if (n.opcode == 96) {
             // Its slot is let go, and the emitter goes with it at the next screen update, as a picture command 17 takes
             // away does: step() ends it once the slot is no longer held. Until then it draws, and a save still holds
-            // its record whole. How the PC lets the dots die away hasn't been seen (Test Game 86 uses it).
+            // its record whole.
             host.releaseSlot(n.p[0]);
             return true;
         }
@@ -73,6 +73,10 @@ public:
             if (!n.s[size_t(i)].empty()) names.push_back(n.s[size_t(i)]);
         int p[10];
         for (int i = 0; i < 10; i++) p[i] = n.p[i];
+        if (auto it = emitters_.find(n.p[0]); it != emitters_.end() && !it->second.pictures.empty() && host.slotHeld(n.p[0])) {
+            host.holdSlot(n.p[0], kEmitterKind);
+            return true;
+        }
         start(host, n.p[0], names, p, host.nowMs());
         return true;
     }
@@ -82,7 +86,9 @@ public:
         // An emitter whose slot the scene has cleared is over.
         for (auto it = emitters_.begin(); it != emitters_.end();)
             it = host.slotHeld(it->first) ? std::next(it) : emitters_.erase(it);
-        return !emitters_.empty();
+        for (const auto &[slot, e] : emitters_)
+            if (!e.pictures.empty()) return true;
+        return false;
     }
 
     void drawSlot(PartHost &host, Canvas &out, int slot, float alpha) override {
@@ -172,20 +178,30 @@ private:
 
     void start(PartHost &host, int slot, const std::vector<std::string> &names, const int p[10], int64_t now,
                bool hold = true) {
-        emitters_.erase(slot);
         Emitter e;
         e.names = names;
+        for (int i = 0; i < 10; i++) e.p[i] = p[i];
+        e.bornMs = now;
+        bool whole = !names.empty();
         for (const std::string &name : names) {
             ImageRef picture = host.image(name);
             if (!picture) {
                 host.log("particles: no " + name + ", so this emitter makes nothing");
-                return;
+                whole = false;
+                break;
             }
             e.pictures.push_back(glowing(*picture));
         }
-        if (e.pictures.empty()) return;
-        for (int i = 0; i < 10; i++) e.p[i] = p[i];
-        e.bornMs = now;
+        if (!whole) {
+            // From a command nothing changes: no slot is taken, and an emitter already in the slot goes on. From a
+            // load the engine has brought the slot back, so its names and numbers are kept, drawing nothing, and the
+            // next save writes the record as it was read.
+            if (!hold) {
+                e.pictures.clear();
+                emitters_[slot] = std::move(e);
+            }
+            return;
+        }
         // A script's numbers may be anything, so the sum is done wide and cut at 640 before the five eighths: 1 to 400
         // dots.
         int64_t made = int64_t(std::max(0, p[1])) * std::max(0, p[7]) / std::max(1, p[2]);
