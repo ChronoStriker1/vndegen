@@ -16,12 +16,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/textproto"
 	"strings"
 	"sync"
 	"unsafe"
 
+	"github.com/rclone/rclone/backend/ftp"
 	"github.com/rclone/rclone/backend/local"
 	"github.com/rclone/rclone/backend/smb"
+	"github.com/rclone/rclone/backend/webdav"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/accounting"
 	"github.com/rclone/rclone/fs/config"
@@ -139,13 +142,12 @@ func init() {
 		Title: "Renames a file over another when the other still holds the expected bytes",
 		Help: `Parameters: fs, srcRemote, dstRemote, and expected, the bytes dstRemote must hold (base64), or null when it
 must not exist. Reads dstRemote whole, compares, and on a match renames srcRemote over it with the backend's own
-rename, which replaces the file in one step. Returns replaced: false, and changes nothing, on a mismatch.`,
+rename. Returns replaced: false, and changes nothing, on a mismatch.`,
 	})
 }
 
 // replaceFile is the last step of VNDegen's mapping.yaml commit. rclone's operations/movefile deletes an existing
 // destination before it renames, which leaves a moment with no file at all, so this calls the backend's Move itself.
-// Only backends whose Move replaces the destination in one step are allowed.
 func replaceFile(ctx context.Context, in rc.Params) (rc.Params, error) {
 	f, err := rc.GetFs(ctx, in)
 	if err != nil {
@@ -170,7 +172,7 @@ func replaceFile(ctx context.Context, in rc.Params) (rc.Params, error) {
 		}
 	}
 	switch f.(type) {
-	case *smb.Fs, *local.Fs:
+	case *smb.Fs, *local.Fs, *ftp.Fs, *webdav.Fs:
 	default:
 		return nil, fmt.Errorf("%s can't replace a file in one step", f.Name())
 	}
@@ -196,6 +198,10 @@ func replaceFile(ctx context.Context, in rc.Params) (rc.Params, error) {
 	// of the file, the read's CLOSE, the backend's parent folder check (CREATE and CLOSE), the rename's CREATE of the
 	// source, and its SET_INFO, which replaces the file. A few milliseconds on a LAN.
 	if _, err := move(ctx, source, dst); err != nil {
+		var reply *textproto.Error
+		if _, isFTP := f.(*ftp.Fs); isFTP && errors.As(err, &reply) && reply.Code >= 500 {
+			return nil, fmt.Errorf("vndegen: the server refused to rename over an existing file: %w", err)
+		}
 		return nil, err
 	}
 	return rc.Params{"replaced": true}, nil

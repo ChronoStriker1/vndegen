@@ -16,14 +16,37 @@ public struct SaveServer: Codable, Equatable, Sendable {
     }
 }
 
-/// One of Ludusavi's cloud types. Only SMB so far; the others can join as more cases.
 public enum CloudRemote: Codable, Equatable, Sendable {
     case smb(SMBRemote)
+    case ftp(FTPRemote)
+    case webdav(WebDAVRemote)
+
+    public enum Kind: String, CaseIterable, Sendable {
+        case smb, ftp, webdav
+
+        public var title: String {
+            switch self {
+            case .smb: "SMB"
+            case .ftp: "FTP"
+            case .webdav: "WebDAV"
+            }
+        }
+    }
+
+    public var kind: Kind {
+        switch self {
+        case .smb: .smb
+        case .ftp: .ftp
+        case .webdav: .webdav
+        }
+    }
 
     /// The machine the store is on, for labels.
     public var host: String {
         switch self {
         case let .smb(smb): smb.host
+        case let .ftp(ftp): ftp.host
+        case let .webdav(webdav): URL(string: webdav.url)?.host() ?? webdav.url
         }
     }
 }
@@ -47,6 +70,47 @@ public struct SMBRemote: Codable, Equatable, Sendable {
     public var isGuest: Bool { username == Self.guest }
 }
 
+public struct FTPRemote: Codable, Equatable, Sendable {
+    public var host: String
+    public var port: Int
+    public var username: String
+
+    public static let defaultPort = 21
+
+    public init(host: String, port: Int = FTPRemote.defaultPort, username: String) {
+        self.host = host
+        self.port = port
+        self.username = username
+    }
+}
+
+public struct WebDAVRemote: Codable, Equatable, Sendable {
+    public var url: String
+    public var username: String
+    public var vendor: Vendor
+
+    public enum Vendor: String, Codable, CaseIterable, Sendable {
+        case other, nextcloud, owncloud, sharepoint
+        case sharepointNTLM = "sharepoint-ntlm"
+
+        public var title: String {
+            switch self {
+            case .other: "Other"
+            case .nextcloud: "Nextcloud"
+            case .owncloud: "Owncloud"
+            case .sharepoint: "Sharepoint"
+            case .sharepointNTLM: "Sharepoint (NTLM)"
+            }
+        }
+    }
+
+    public init(url: String, username: String, vendor: Vendor = .other) {
+        self.url = url
+        self.username = username
+        self.vendor = vendor
+    }
+}
+
 /// The store as rclone names it, and the way to call rclone.
 public struct RemoteAccess: Sendable {
     /// rclone's name for the store folder: `<remote name>:<path>`, or in tests a local folder path (rclone's local backend).
@@ -56,6 +120,22 @@ public struct RemoteAccess: Sendable {
     public init(root: String, call: @escaping @Sendable (_ method: String, _ input: Data) async throws -> Data = { try await Rclone.call($0, json: $1) }) {
         self.root = root
         self.call = call
+    }
+
+    public static func connect(_ server: SaveServer, password: String?, name: String? = nil) async throws -> RemoteAccess {
+        switch server.remote {
+        case .smb:
+            return try await smb(server, password: password, name: name)
+        case let .ftp(ftp):
+            let parameters = ["host": ftp.host, "port": String(ftp.port), "user": ftp.username, "force_list_hidden": "true"]
+            return try await create(server, type: "ftp", identity: ["ftp", ftp.host, String(ftp.port), ftp.username], password: password,
+                                    name: name, parameters: parameters)
+        case let .webdav(webdav):
+            var parameters = ["url": webdav.url, "vendor": webdav.vendor.rawValue]
+            if !webdav.username.isEmpty { parameters["user"] = webdav.username }
+            return try await create(server, type: "webdav", identity: ["webdav", webdav.url, webdav.vendor.rawValue, webdav.username],
+                                    password: password, name: name, parameters: parameters)
+        }
     }
 
     /// Adds `server` to rclone's in-memory config as an smb remote, as Ludusavi's `rclone config create` does, and
@@ -73,6 +153,18 @@ public struct RemoteAccess: Sendable {
         return RemoteAccess(root: "\(name):\(path)")
     }
 
+    private static func create(_ server: SaveServer, type: String, identity: [String], password: String?, name: String?,
+                               parameters: [String: String]) async throws -> RemoteAccess {
+        let name = name ?? "vndegen-" + SHA256.hash(data: Data((identity + [password ?? ""]).joined(separator: "\n").utf8)).prefix(4)
+            .map { String(format: "%02x", $0) }.joined()
+        var parameters = parameters
+        if let password, !password.isEmpty { parameters["pass"] = password }
+        try await Rclone.call("config/create", RemoteConfig(name: name, type: type, parameters: parameters))
+        var path = server.path.replacingOccurrences(of: "\\", with: "/").trimmingCharacters(in: .whitespaces)
+        while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        return RemoteAccess(root: "\(name):\(path)")
+    }
+
     private struct RemoteConfig: Encodable {
         struct Options: Encodable {
             /// rclone obscures the password itself, as `rclone config create` does by default.
@@ -87,11 +179,12 @@ public struct RemoteAccess: Sendable {
     }
 }
 
-/// The SMB password. iPhone and iPad keep it in the Keychain, on this device only. The Mac keeps it in a file only this
+/// iPhone and iPad keep it in the Keychain, on this device only. The Mac keeps it in a file only this
 /// user can read: the login Keychain ties an item to the app's exact code signature, so every update of the ad-hoc
 /// signed app would ask for the user's password before a background backup.
-enum SMBPassword {
-    static func read(in directory: URL) throws -> String? {
+enum ServerPassword {
+    static func read(_ kind: CloudRemote.Kind, in directory: URL) throws -> String? {
+        let fileName = fileName(kind)
         #if os(macOS)
         do {
             return String(decoding: try Data(contentsOf: directory.appendingPathComponent(fileName)), as: UTF8.self)
@@ -101,12 +194,13 @@ enum SMBPassword {
             throw SaveSyncError.unreadable(directory.appendingPathComponent(fileName).path)
         }
         #else
-        return try Keychain.read(account: account).map { String(decoding: $0, as: UTF8.self) }
+        return try Keychain.read(account: fileName).map { String(decoding: $0, as: UTF8.self) }
         #endif
     }
 
     /// Keeps `password`, or deletes the kept one when nil.
-    static func save(_ password: String?, in directory: URL) throws {
+    static func save(_ password: String?, for kind: CloudRemote.Kind, in directory: URL) throws {
+        let fileName = fileName(kind)
         #if os(macOS)
         let url = directory.appendingPathComponent(fileName)
         guard let password else {
@@ -126,13 +220,12 @@ enum SMBPassword {
         close(fd)
         guard written == data.count, synced, rename(temporary.path, url.path) == 0 else { throw SaveSyncError.unreadable(url.path) }
         #else
-        try Keychain.delete(account: account)
-        if let password { try Keychain.add(Data(password.utf8), account: account) }
+        try Keychain.delete(account: fileName)
+        if let password { try Keychain.add(Data(password.utf8), account: fileName) }
         #endif
     }
 
-    private static let fileName = "smb-password"
-    private static let account = "smb-password"
+    private static func fileName(_ kind: CloudRemote.Kind) -> String { "\(kind.rawValue)-password" }
 }
 
 /// VNDegen 0.4.0 reached the store over SSH with a key of its own, which nothing uses any more.

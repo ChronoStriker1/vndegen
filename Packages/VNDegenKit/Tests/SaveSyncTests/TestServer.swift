@@ -13,12 +13,27 @@ let smbTest: (host: String, port: Int)? = {
 /// The password of the user `player` on the test share.
 let smbPassword = ProcessInfo.processInfo.environment["VNDEGEN_SMB_TEST_PASSWORD"]
 
+let ftpTest: (host: String, port: Int)? = {
+    guard let value = ProcessInfo.processInfo.environment["VNDEGEN_FTP_TEST"], let colon = value.lastIndex(of: ":"),
+          let port = Int(value[value.index(after: colon)...]) else { return nil }
+    return (String(value[..<colon]), port)
+}()
+
+let webdavTest = ProcessInfo.processInfo.environment["VNDEGEN_WEBDAV_TEST"]
+
+let serverTestPassword = ProcessInfo.processInfo.environment["VNDEGEN_SERVER_TEST_PASSWORD"]
+
 /// Where a test's store lives: a local folder through rclone's local backend, or a folder on the test share.
 enum StoreKind: String, CustomTestStringConvertible, Sendable {
-    case local, smb
+    case local, smb, ftp, webdav
 
     /// Every kind the machine running the tests can reach.
-    static var all: [StoreKind] { smbTest == nil ? [.local] : [.local, .smb] }
+    static var all: [StoreKind] {
+        [.local] + (smbTest == nil ? [] : [.smb]) + (ftpTest == nil || serverTestPassword == nil ? [] : [.ftp])
+            + (webdavTest == nil || serverTestPassword == nil ? [] : [.webdav])
+    }
+
+    static var loggedIn: [StoreKind] { all.filter { $0 == .ftp || $0 == .webdav } }
 
     var testDescription: String { rawValue }
 }
@@ -51,6 +66,40 @@ struct TestServer: Sendable {
             let server = TestServer(kind: kind, root: "\(name):\(path)", folder: nil, path: path)
             try await rc("operations/mkdir", ["fs": server.root, "remote": ""])
             return server
+        case .ftp, .webdav:
+            let id = UUID().uuidString
+            let name = "deck-" + id.prefix(8).lowercased()
+            let password = try #require(serverTestPassword)
+            let parameters: [String: String]
+            if kind == .ftp {
+                let ftp = try #require(ftpTest)
+                parameters = ["host": ftp.host, "port": String(ftp.port), "user": "player", "pass": password, "force_list_hidden": "true"]
+            } else {
+                parameters = ["url": try #require(webdavTest), "user": "player", "pass": password, "vendor": "other"]
+            }
+            try await rc("config/create", ["name": name, "type": kind.rawValue, "parameters": parameters, "opt": ["obscure": true, "nonInteractive": true]])
+            let path = "vndegen-tests/\(id)"
+            let server = TestServer(kind: kind, root: "\(name):\(path)", folder: nil, path: path)
+            try await rc("operations/mkdir", ["fs": server.root, "remote": ""])
+            return server
+        }
+    }
+
+    /// What the app's settings name for this store, reached on `port` instead of the test server's own when one is given.
+    func remote(port: Int? = nil) throws -> CloudRemote {
+        switch kind {
+        case .local, .smb:
+            let share = smbTest ?? (host: "server", port: SMBRemote.defaultPort)
+            return .smb(SMBRemote(host: share.host, port: port ?? share.port))
+        case .ftp:
+            let ftp = try #require(ftpTest)
+            return .ftp(FTPRemote(host: ftp.host, port: port ?? ftp.port, username: "player"))
+        case .webdav:
+            let text = try #require(webdavTest)
+            var url = try #require(URLComponents(string: text))
+            if let port { url.port = port }
+            let string = try #require(url.string)
+            return .webdav(WebDAVRemote(url: string, username: "player"))
         }
     }
 
@@ -69,7 +118,7 @@ struct TestServer: Sendable {
 
     /// Deletes the test's own folder on the share. A local folder stays with the other temporary files.
     func remove() async throws {
-        guard kind == .smb else { return }
+        guard kind != .local else { return }
         try await rc("operations/purge", ["fs": root, "remote": ""])
     }
 
@@ -231,4 +280,92 @@ final class SilentServer: @unchecked Sendable {
     }
 
     deinit { close(listener) }
+}
+
+final class CuttingProxy: @unchecked Sendable {
+    let port: Int
+    private let listener: Int32
+    private let target: Int
+    private let lock = NSLock()
+    private var marker: [UInt8]?
+    private var remaining = 0
+
+    init(to target: Int) throws {
+        struct Failed: Error {}
+        let listener = socket(AF_INET, SOCK_STREAM, 0)
+        var address = Self.loopback(port: 0)
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let bound = withUnsafeMutablePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { address in
+                bind(listener, address, length) == 0 && listen(listener, 16) == 0 && getsockname(listener, address, &length) == 0
+            }
+        }
+        guard listener >= 0, bound else { throw Failed() }
+        self.listener = listener
+        self.target = target
+        port = Int(UInt16(bigEndian: address.sin_port))
+        Thread.detachNewThread { [self] in acceptConnections() }
+    }
+
+    deinit { close(listener) }
+
+    func cut(whenClientSends marker: String, time occurrence: Int) {
+        lock.withLock {
+            self.marker = Array(marker.utf8)
+            remaining = occurrence
+        }
+    }
+
+    var armed: Bool { lock.withLock { marker != nil } }
+
+    private static func loopback(port: Int) -> sockaddr_in {
+        var address = sockaddr_in()
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        address.sin_port = UInt16(port).bigEndian
+        #if canImport(Darwin)
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        #endif
+        return address
+    }
+
+    private func acceptConnections() {
+        while true {
+            let client = accept(listener, nil, nil)
+            guard client >= 0 else { return }
+            let server = socket(AF_INET, SOCK_STREAM, 0)
+            var address = Self.loopback(port: target)
+            let connected = withUnsafePointer(to: &address) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(server, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0 }
+            }
+            guard connected else { close(client); close(server); continue }
+            Thread.detachNewThread { [self] in pump(from: client, to: server, watch: true) }
+            Thread.detachNewThread { [self] in pump(from: server, to: client, watch: false) }
+        }
+    }
+
+    private func pump(from source: Int32, to destination: Int32, watch: Bool) {
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while true {
+            let count = read(source, &buffer, buffer.count)
+            guard count > 0 else { break }
+            let chunk = buffer[..<count]
+            let cutsHere = watch && lock.withLock {
+                guard let marker, chunk.firstRange(of: marker) != nil else { return false }
+                remaining -= 1
+                guard remaining == 0 else { return false }
+                self.marker = nil
+                return true
+            }
+            var sent = 0
+            while sent < count {
+                let written = chunk.withUnsafeBytes { write(destination, $0.baseAddress! + sent, count - sent) }
+                guard written > 0 else { break }
+                sent += written
+            }
+            if cutsHere { break }
+        }
+        shutdown(source, SHUT_RDWR)
+        shutdown(destination, SHUT_RDWR)
+    }
 }

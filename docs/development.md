@@ -92,7 +92,7 @@ Packages/VNDegenKit/
   Sources/Lock/           Face ID, Touch ID, and passcode
   Sources/SaveSync/       Ludusavi backup and restore
   Sources/Rclone/         Swift calls into rclone's library
-  Rclone/                 VNDegen's build of rclone: the Go library with the SMB and local backends
+  Rclone/                 VNDegen's build of rclone: the Go library with the SMB, FTP, WebDAV and local backends
   Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
 Engines/RGSSRuntime/      the RGSS runtime's Ruby preludes, Ruby patches, Linux test host, and tools
 Engines/Artemis/          the vendored art3m1s-core engine and its save format tools; UPSTREAM.md lists every change

@@ -30,7 +30,7 @@ struct Setup {
     /// rebuilds a remote's config whenever it is created again. `appConnector` uses the app's own connector instead,
     /// which reads the kept password and names the remote from the login.
     init(saves: [String: String] = [:], metadata: GameMetadata? = nil, manifest: URL? = nil, otherGames: [String: String] = [:],
-         server shared: TestServer? = nil, login: Login = .guest, appConnector: Bool = false) async throws {
+         server shared: TestServer? = nil, login: Login = .guest, appConnector: Bool = false, port: Int? = nil) async throws {
         base = try temporaryDirectory()
         locations = try makeGame(in: base, saves: saves)
         library = LibraryStore(paths: LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support")),
@@ -50,10 +50,12 @@ struct Setup {
                                                                             remoteName: appConnector ? nil : "test-\(UUID().uuidString.prefix(8))"),
                                   manifest: manifest, configRetention: nil)
         let share = smbTest ?? (host: "server", port: SMBRemote.defaultPort)
-        switch login {
-        case .guest: try service.setServer(host: share.host, port: share.port, guest: true, username: "", password: "", path: server.path)
-        case let .password(password):
-            try service.setServer(host: share.host, port: share.port, guest: false, username: "player", password: password, path: server.path)
+        switch (server.kind, login) {
+        case (.ftp, _), (.webdav, _):
+            try service.setServer(server.remote(port: port), password: try #require(serverTestPassword), path: server.path)
+        case (_, .guest): try service.setServer(host: share.host, port: port ?? share.port, guest: true, username: "", password: "", path: server.path)
+        case let (_, .password(password)):
+            try service.setServer(host: share.host, port: port ?? share.port, guest: false, username: "player", password: password, path: server.path)
         }
         await service.testConnection()
         #expect(service.connection == .connected)
@@ -64,13 +66,16 @@ struct Setup {
     /// The local store as it is, or for SMB the app's own connector, which reads the kept password. The hooks sit around
     /// every rc call either way.
     static func connector(_ hooks: Hooks, _ server: TestServer, library: LibraryStore, remoteName: String? = nil) -> SaveSyncService.Connector {
-        let production = SaveSyncService.smbConnector(directory: library.paths.support.appendingPathComponent("SaveSync", isDirectory: true))
+        let production = SaveSyncService.serverConnector(directory: library.paths.support.appendingPathComponent("SaveSync", isDirectory: true))
         return { settings in
             try await hooks.connect {
                 switch server.kind {
                 case .local: return RemoteAccess(root: server.root)
                 case .smb:
                     if let remoteName { return try await RemoteAccess.smb(settings, password: smbPassword, name: remoteName) }
+                    return try await production(settings)
+                case .ftp, .webdav:
+                    if let remoteName { return try await RemoteAccess.connect(settings, password: serverTestPassword, name: remoteName) }
                     return try await production(settings)
                 }
             }
@@ -780,15 +785,20 @@ extension SaveSyncService {
 // MARK: - A stalled server
 
 @MainActor
-@Test(.timeLimit(.minutes(2))) func aStalledServerHoldsUpNothingAfterIt() async throws {
+@Test(.timeLimit(.minutes(2)), arguments: CloudRemote.Kind.allCases) func aStalledServerHoldsUpNothingAfterIt(_ kind: CloudRemote.Kind) async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
     let silent = try SilentServer()
     let idle = Duration.seconds(4), margin = Duration.seconds(12)
     setup.service.timeouts.rclone = RcloneLimits(connect: .seconds(4), idle: idle)
     // An operation limit far past the idle deadline, so only rclone's own deadline can end the call in time.
     setup.service.timeouts.operation = .seconds(100)
-    let stalled = SaveServer(remote: .smb(SMBRemote(host: "127.0.0.1", port: silent.port)), path: "games/Ludusavi")
-    func stall() async throws { setup.hooks.nextAccess = try await RemoteAccess.smb(stalled, password: nil) }
+    let remote: CloudRemote = switch kind {
+    case .smb: .smb(SMBRemote(host: "127.0.0.1", port: silent.port))
+    case .ftp: .ftp(FTPRemote(host: "127.0.0.1", port: silent.port, username: "player"))
+    case .webdav: .webdav(WebDAVRemote(url: "http://127.0.0.1:\(silent.port)", username: "player"))
+    }
+    let stalled = SaveServer(remote: remote, path: "games/Ludusavi")
+    func stall() async throws { setup.hooks.nextAccess = try await RemoteAccess.connect(stalled, password: kind == .smb ? nil : "secret") }
 
     // An operation on a share that never answers fails at the idle deadline, and the one queued behind it runs then.
     try await stall()
@@ -838,6 +848,46 @@ extension SaveSyncService {
         try player.service.setServer(host: share.host, port: share.port, guest: false, username: "player", password: "not the password", path: server.path)
         await player.service.testConnection()
         #expect(player.service.connection == .failed(SaveSyncError.loginRefused.localizedDescription))
+    }
+}
+
+@MainActor
+@Test(.enabled(if: !StoreKind.loggedIn.isEmpty), arguments: StoreKind.loggedIn) func aWrongPasswordIsRefusedAsOnTheShare(_ kind: StoreKind) async throws {
+    try await TestServer.with(kind) { server in
+        let player = try await Setup(saves: ["file1.rmmzsave": "one"], server: server, appConnector: true)
+        #expect(player.service.storedPassword() == serverTestPassword)
+        #expect(try await player.service.checkedBackUp(player.id).backup != nil)
+        try player.service.setServer(server.remote(), password: "not the password", path: server.path)
+        await player.service.testConnection()
+        #expect(player.service.connection == .failed(SaveSyncError.loginRefused.localizedDescription))
+    }
+}
+
+@MainActor
+@Test(.enabled(if: !StoreKind.loggedIn.isEmpty), arguments: StoreKind.loggedIn) func aConnectionCutMidUploadRecordsNothing(_ kind: StoreKind) async throws {
+    try await TestServer.with(kind) { server in
+        let target: Int? = switch try server.remote() {
+        case let .ftp(ftp): ftp.port
+        case let .webdav(webdav): URLComponents(string: webdav.url)?.port
+        case .smb: nil
+        }
+        let proxy = try CuttingProxy(to: try #require(target))
+        let setup = try await Setup(saves: ["file1.rmmzsave": "one", "global.rmmzsave": "g"], server: server, port: proxy.port)
+        _ = try await setup.service.checkedBackUp(setup.id)
+        let mapping = try await server.read(setup.mappingPath)
+        let folders = try await setup.serverFolders()
+
+        try write(["file1.rmmzsave": String(repeating: "two", count: 2_000_000), "global.rmmzsave": "g2"], to: setup.locations[0])
+        proxy.cut(whenClientSends: kind == .ftp ? "STOR " : "PUT ", time: 2)
+        await #expect(throws: (any Error).self) { try await setup.service.checkedBackUp(setup.id) }
+        #expect(!proxy.armed)
+        #expect(try await server.read(setup.mappingPath) == mapping)
+        #expect(try await setup.serverFolders().isSuperset(of: folders))
+        try await setup.expectStoreIsWhole(strays: true)
+
+        #expect(try await setup.service.checkedBackUp(setup.id).backup != nil)
+        #expect(try await setup.serverMapping().summaries.count == 2)
+        try await setup.expectStoreIsWhole(strays: true)
     }
 }
 

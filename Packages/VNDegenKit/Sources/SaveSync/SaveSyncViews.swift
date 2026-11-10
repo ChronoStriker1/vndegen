@@ -14,17 +14,26 @@ import AppKit
 @Observable
 public final class SaveSyncSettingsModel {
     enum Target: Hashable {
-        case host, port, guest, username, password, path, test, forget, matchRetention, fullBackups, differentialBackups
+        case kind, host, port, url, vendor, guest, username, password, path, test, forget, matchRetention, fullBackups, differentialBackups
         case autoBackup, checkBeforeLaunch
     }
 
     public let service: SaveSyncService
+    var kind: CloudRemote.Kind {
+        didSet {
+            guard kind != oldValue else { return }
+            if port == String(Self.defaultPort(oldValue)) { port = String(Self.defaultPort(kind)) }
+            password = service.storedPassword(for: kind) ?? ""
+        }
+    }
     var host: String
     var port: String
     /// Ludusavi's `guest` login, with no password. On for a new setup.
     var guest: Bool
     var username: String
     var password: String
+    var url: String
+    var vendor: WebDAVRemote.Vendor
     var path: String
     /// Why the details could not be saved, such as a Keychain error.
     var problem: String?
@@ -34,22 +43,61 @@ public final class SaveSyncSettingsModel {
 
     public init(service: SaveSyncService) {
         self.service = service
-        let smb: SMBRemote? = switch service.server?.remote {
-        case let .smb(smb)?: smb
-        case nil: nil
+        let remote = service.server?.remote
+        kind = remote?.kind ?? .smb
+        host = ""; port = String(SMBRemote.defaultPort); guest = true; username = ""; url = ""; vendor = .other
+        switch remote {
+        case let .smb(smb)?:
+            host = smb.host; port = String(smb.port); guest = smb.isGuest; username = smb.isGuest ? "" : smb.username
+        case let .ftp(ftp)?:
+            host = ftp.host; port = String(ftp.port); username = ftp.username
+        case let .webdav(webdav)?:
+            url = webdav.url; username = webdav.username; vendor = webdav.vendor
+        case nil:
+            break
         }
-        host = smb?.host ?? ""
-        port = String(smb?.port ?? SMBRemote.defaultPort)
-        guest = smb?.isGuest ?? true
-        username = smb.flatMap { $0.isGuest ? nil : $0.username } ?? ""
         password = service.storedPassword() ?? ""
         path = service.server?.path ?? ""
     }
 
-    var canTest: Bool { !host.isEmpty && !path.isEmpty && Int(port) != nil && (guest || !username.isEmpty) }
+    static func defaultPort(_ kind: CloudRemote.Kind) -> Int {
+        switch kind {
+        case .smb, .webdav: SMBRemote.defaultPort
+        case .ftp: FTPRemote.defaultPort
+        }
+    }
+
+    private var validPort: Bool { Int(port).map { (1...65535).contains($0) } ?? false }
+
+    private var validURL: Bool {
+        guard let components = URLComponents(string: url.trimmingCharacters(in: .whitespaces)) else { return false }
+        return ["http", "https"].contains(components.scheme?.lowercased()) && components.host?.isEmpty == false
+    }
+
+    var canTest: Bool {
+        guard !path.isEmpty else { return false }
+        return switch kind {
+        case .smb: !host.isEmpty && validPort && (guest || !username.isEmpty)
+        case .ftp: !host.isEmpty && validPort && !username.isEmpty
+        case .webdav: validURL
+        }
+    }
+
+    var remote: CloudRemote {
+        switch kind {
+        case .smb: .smb(SMBRemote(host: host, port: Int(port) ?? SMBRemote.defaultPort, username: guest ? SMBRemote.guest : username))
+        case .ftp: .ftp(FTPRemote(host: host, port: Int(port) ?? FTPRemote.defaultPort, username: username))
+        case .webdav: .webdav(WebDAVRemote(url: url, username: username, vendor: vendor))
+        }
+    }
 
     var rows: [Target] {
-        var rows: [Target] = [.host, .port, .guest] + (guest ? [] : [.username, .password]) + [.path, .test]
+        let login: [Target] = switch kind {
+        case .smb: [.host, .port, .guest] + (guest ? [] : [.username, .password])
+        case .ftp: [.host, .port, .username, .password]
+        case .webdav: [.url, .vendor, .username, .password]
+        }
+        var rows: [Target] = [.kind] + login + [.path, .test]
         if service.server != nil { rows.append(.forget) }
         if service.configRetention == nil {
             rows.append(.matchRetention)
@@ -66,6 +114,8 @@ public final class SaveSyncSettingsModel {
         case .left, .right:
             let step = button == .left ? -1 : 1
             switch focus.current(in: rows) {
+            case .kind?: kind = Self.step(kind, by: step)
+            case .vendor?: vendor = Self.step(vendor, by: step)
             case .fullBackups?: service.manualRetention?.full = min(255, max(1, (service.manualRetention?.full ?? 1) + step))
             case .differentialBackups?: service.manualRetention?.differential = min(255, max(0, (service.manualRetention?.differential ?? 0) + step))
             default: break
@@ -87,10 +137,19 @@ public final class SaveSyncSettingsModel {
         activate(target)
     }
 
+    private static func step<Value: CaseIterable & Equatable>(_ value: Value, by step: Int) -> Value {
+        let all = Array(Value.allCases)
+        let index = all.firstIndex(of: value) ?? 0
+        return all[(index + step + all.count) % all.count]
+    }
+
     private func activate(_ target: Target) {
         switch target {
+        case .kind: kind = Self.step(kind, by: 1)
+        case .vendor: vendor = Self.step(vendor, by: 1)
         case .host: type("Host", \.host)
         case .port: type("Port", \.port)
+        case .url: type("URL", \.url)
         case .username: type("Username", \.username)
         case .password: type("Password", \.password, secure: true)
         case .path: type("Path", \.path)
@@ -98,8 +157,7 @@ public final class SaveSyncSettingsModel {
         case .test:
             guard canTest, service.connection != .checking else { return }
             do {
-                try service.setServer(host: host, port: Int(port) ?? SMBRemote.defaultPort, guest: guest, username: username, password: password,
-                                      path: path)
+                try service.setServer(remote, password: password, path: path)
                 problem = nil
             } catch {
                 problem = error.localizedDescription
@@ -108,13 +166,23 @@ public final class SaveSyncSettingsModel {
             Task { await service.testConnection() }
         case .forget:
             service.forgetServer()
-            host = ""; port = String(SMBRemote.defaultPort); guest = true; username = ""; password = ""; path = ""
+            host = ""; port = String(Self.defaultPort(kind)); guest = true; username = ""; url = ""; vendor = .other; path = ""
+            password = service.storedPassword(for: kind) ?? ""
             problem = nil
         case .matchRetention: service.manualRetention = service.manualRetention == nil ? Retention(full: 1, differential: 1) : nil
         case .fullBackups: service.manualRetention?.full = min(255, (service.manualRetention?.full ?? 1) + 1)
         case .differentialBackups: service.manualRetention?.differential = min(255, (service.manualRetention?.differential ?? 0) + 1)
         case .autoBackup: service.autoBackup.toggle()
         case .checkBeforeLaunch: service.checkBeforeLaunch.toggle()
+        }
+    }
+
+    var footer: String {
+        let common = "VNDegen copies new backups to the server and never syncs up to it, so it deletes nothing another device wrote. The password stays on this device."
+        return switch kind {
+        case .smb: "Enter what Ludusavi's SMB cloud settings show. The path is the share, then the folder inside it, such as games/Ludusavi. " + common
+        case .ftp: "Enter what Ludusavi's FTP cloud settings show, and the path from its cloud settings. FTP sends your password and your saves unencrypted, so anyone on the network between you and the server can read them. " + common
+        case .webdav: "Enter what Ludusavi's WebDAV cloud settings show: the URL, the provider, your username and password, and the path from its cloud settings. " + common
         }
     }
 
@@ -152,13 +220,28 @@ public struct SaveSyncSettingsView: View {
                     }
                 }
                 Section {
-                    LabeledContent("Host") { field("nas.example", text: $model.host) }
-                        .focusRow(model.focus.isFocused(.host, in: rows), id: SaveSyncSettingsModel.Target.host)
-                    LabeledContent("Port") { field(String(SMBRemote.defaultPort), text: $model.port) }
-                        .focusRow(model.focus.isFocused(.port, in: rows), id: SaveSyncSettingsModel.Target.port)
-                    Toggle("Guest", isOn: Binding(get: { model.guest }, set: { _ in model.select(.guest) }))
-                        .focusRow(model.focus.isFocused(.guest, in: rows), id: SaveSyncSettingsModel.Target.guest)
-                    if !model.guest {
+                    Picker("Type", selection: $model.kind) {
+                        ForEach(CloudRemote.Kind.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .focusRow(model.focus.isFocused(.kind, in: rows), id: SaveSyncSettingsModel.Target.kind)
+                    if model.kind == .webdav {
+                        LabeledContent("URL") { field("https://cloud.example/remote.php/dav/files/you", text: $model.url) }
+                            .focusRow(model.focus.isFocused(.url, in: rows), id: SaveSyncSettingsModel.Target.url)
+                        Picker("Provider", selection: $model.vendor) {
+                            ForEach(WebDAVRemote.Vendor.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .focusRow(model.focus.isFocused(.vendor, in: rows), id: SaveSyncSettingsModel.Target.vendor)
+                    } else {
+                        LabeledContent("Host") { field("nas.example", text: $model.host) }
+                            .focusRow(model.focus.isFocused(.host, in: rows), id: SaveSyncSettingsModel.Target.host)
+                        LabeledContent("Port") { field(String(SaveSyncSettingsModel.defaultPort(model.kind)), text: $model.port) }
+                            .focusRow(model.focus.isFocused(.port, in: rows), id: SaveSyncSettingsModel.Target.port)
+                    }
+                    if model.kind == .smb {
+                        Toggle("Guest", isOn: Binding(get: { model.guest }, set: { _ in model.select(.guest) }))
+                            .focusRow(model.focus.isFocused(.guest, in: rows), id: SaveSyncSettingsModel.Target.guest)
+                    }
+                    if model.kind != .smb || !model.guest {
                         LabeledContent("Username") { field("username", text: $model.username) }
                             .focusRow(model.focus.isFocused(.username, in: rows), id: SaveSyncSettingsModel.Target.username)
                         LabeledContent("Password") {
@@ -168,7 +251,7 @@ public struct SaveSyncSettingsView: View {
                         }
                         .focusRow(model.focus.isFocused(.password, in: rows), id: SaveSyncSettingsModel.Target.password)
                     }
-                    LabeledContent("Path") { field("games/Ludusavi", text: $model.path) }
+                    LabeledContent("Path") { field(model.kind == .smb ? "games/Ludusavi" : "ludusavi-backup", text: $model.path) }
                         .focusRow(model.focus.isFocused(.path, in: rows), id: SaveSyncSettingsModel.Target.path)
                     connectionStatus
                     Button(service.connection == .checking ? "Connecting…" : "Test Connection", systemImage: "network") { model.select(.test) }
@@ -181,9 +264,9 @@ public struct SaveSyncSettingsView: View {
                             .focusRow(model.focus.isFocused(.forget, in: rows), id: SaveSyncSettingsModel.Target.forget)
                     }
                 } header: {
-                    Text("Ludusavi share")
+                    Text("Ludusavi server")
                 } footer: {
-                    Text("Enter what Ludusavi's SMB cloud settings show. The path is the share, then the folder inside it, such as games/Ludusavi. VNDegen copies new backups to the share and never syncs up to it, so it deletes nothing another device wrote. The password stays on this device.")
+                    Text(model.footer)
                 }
 
                 retention(rows)
@@ -554,7 +637,7 @@ public struct GameSavesView: View {
                 .foregroundStyle(.secondary)
             Text("No backups yet")
                 .font(.title3.weight(.semibold))
-            Text("Set up your Ludusavi share to restore and back up this game's saves.")
+            Text("Set up your Ludusavi server to restore and back up this game's saves.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -589,7 +672,7 @@ public struct GameSavesView: View {
                     locations
                 } else {
                     Section {
-                        Text(model.service.needsShare ? oldServerNote : "Set up your Ludusavi share in Settings to restore and back up this game's saves.")
+                        Text(model.service.needsShare ? oldServerNote : "Set up your Ludusavi server in Settings to restore and back up this game's saves.")
                             .foregroundStyle(.secondary)
                     }
                 }

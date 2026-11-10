@@ -2,6 +2,7 @@ import CryptoKit
 import EngineRenPy
 import EngineRPGMaker
 import Foundation
+@testable import Rclone
 import TestSupport
 import Testing
 import VNCore
@@ -659,7 +660,139 @@ private func freshLibrary() async throws -> (library: LibraryStore, directory: U
     #expect(!fm.fileExists(atPath: file.path))
     #expect(service.storedPassword() == nil)
 }
+
+@MainActor
+@Test func savingAnotherTypeLeavesTheSMBPasswordAlone() async throws {
+    let (library, directory) = try await freshLibrary()
+    let service = SaveSyncService(library: library, connector: nil, manifest: nil, configRetention: nil)
+    try service.setServer(host: "nas.example", port: 445, guest: false, username: "player", password: "secret", path: "games/Ludusavi")
+    let smb = directory.appendingPathComponent("smb-password")
+    func identity(_ url: URL) throws -> [String] {
+        let attributes = try fm.attributesOfItem(atPath: url.path)
+        return ["\(attributes[.systemFileNumber] ?? "")", "\(attributes[.modificationDate] ?? "")", try String(contentsOf: url, encoding: .utf8)]
+    }
+    let kept = try identity(smb)
+
+    try service.setServer(.ftp(FTPRemote(host: " ftp.example ", username: "player")), password: "ftp secret", path: "/ludusavi-backup")
+    #expect(try identity(smb) == kept)
+    #expect(service.storedPassword() == "ftp secret")
+    #expect((try fm.attributesOfItem(atPath: directory.appendingPathComponent("ftp-password").path)[.posixPermissions] as? Int) == 0o600)
+    try service.setServer(.webdav(WebDAVRemote(url: "https://cloud.example/dav", username: "player", vendor: .nextcloud)), password: "dav secret",
+                          path: "ludusavi-backup")
+    #expect(try identity(smb) == kept)
+    #expect(service.storedPassword() == "dav secret")
+    #expect(service.storedPassword(for: .smb) == "secret" && service.storedPassword(for: .ftp) == "ftp secret")
+
+    try service.setServer(host: "nas.example", port: 445, guest: false, username: "player", password: "secret", path: "games/Ludusavi")
+    #expect(try identity(smb) == kept)
+    #expect(service.server == SaveServer(remote: .smb(SMBRemote(host: "nas.example", username: "player")), path: "games/Ludusavi"))
+    #expect(service.storedPassword() == "secret")
+
+    service.forgetServer()
+    #expect(!fm.fileExists(atPath: smb.path))
+    #expect(service.storedPassword(for: .ftp) == "ftp secret" && service.storedPassword(for: .webdav) == "dav secret")
+}
 #endif
+
+@MainActor
+@Test func anSMBSetupSavedByTheReleasedAppReadsAndSavesUnchanged() async throws {
+    let (library, directory) = try await freshLibrary()
+    let released = try Data(contentsOf: fixtures.appendingPathComponent("settings-0.32.3.json"))
+    let settings = directory.appendingPathComponent("settings.json")
+    try released.write(to: settings)
+    func canonical(_ data: Data) throws -> Data {
+        try JSONSerialization.data(withJSONObject: JSONSerialization.jsonObject(with: data), options: [.sortedKeys])
+    }
+
+    let service = SaveSyncService(library: library, connector: nil, manifest: nil, configRetention: nil)
+    #expect(service.server == SaveServer(remote: .smb(SMBRemote(host: "nas.example", username: "player")), path: "games/Ludusavi"))
+    #expect(service.deviceID == "1a2b3c4d" && service.autoBackup && !service.checkBeforeLaunch)
+    #expect(try canonical(Data(contentsOf: settings)) == canonical(released))
+
+    let model = SaveSyncSettingsModel(service: service)
+    #expect(model.kind == .smb && model.host == "nas.example" && model.port == "445" && !model.guest && model.username == "player")
+    #expect(model.remote == service.server?.remote)
+    try service.setServer(model.remote, password: model.password, path: model.path)
+    #expect(try canonical(Data(contentsOf: settings)) == canonical(released))
+}
+
+@MainActor
+@Test func ftpAndWebDAVSettingsKeepWhatLudusaviAsksFor() async throws {
+    let (library, _) = try await freshLibrary()
+    let service = SaveSyncService(library: library, connector: nil, manifest: nil, configRetention: nil)
+    try service.setServer(.ftp(FTPRemote(host: " ftp.example ", port: 2121, username: " player ")), password: "secret", path: " /saves/ludusavi ")
+    let ftp = SaveServer(remote: .ftp(FTPRemote(host: "ftp.example", port: 2121, username: "player")), path: "/saves/ludusavi")
+    #expect(service.server == ftp)
+    #expect(SaveSyncService(library: library, connector: nil, manifest: nil, configRetention: nil).server == ftp)
+
+    let webdav = SaveServer(remote: .webdav(WebDAVRemote(url: "https://cloud.example/remote.php/dav/files/player", username: "player",
+                                                         vendor: .sharepointNTLM)), path: "ludusavi-backup")
+    try service.setServer(webdav.remote, password: "secret", path: webdav.path)
+    #expect(SaveSyncService(library: library, connector: nil, manifest: nil, configRetention: nil).server == webdav)
+    #expect(service.server?.remote.host == "cloud.example")
+    #expect(WebDAVRemote.Vendor.allCases.map(\.rawValue) == ["other", "nextcloud", "owncloud", "sharepoint", "sharepoint-ntlm"])
+}
+
+@Test func ftpAndWebDAVRemotesAreNamedFromTheirLogin() async throws {
+    let ftp = SaveServer(remote: .ftp(FTPRemote(host: "nas.example", username: "player")), path: "\\saves\\ludusavi\\")
+    let first = try await RemoteAccess.connect(ftp, password: "one")
+    #expect(first.root.hasPrefix("vndegen-") && first.root.hasSuffix(":/saves/ludusavi"))
+    #expect(try await RemoteAccess.connect(ftp, password: "one").root == first.root)
+    #expect(try await RemoteAccess.connect(ftp, password: "two").root != first.root)
+    let smb = SaveServer(remote: .smb(SMBRemote(host: "nas.example", port: 21, username: "player")), path: ftp.path)
+    #expect(try await RemoteAccess.connect(smb, password: "one").root.split(separator: ":").first != first.root.split(separator: ":").first)
+    #expect(try await RemoteAccess.connect(smb, password: "one").root == RemoteAccess.smb(smb, password: "one").root)
+
+    let webdav = SaveServer(remote: .webdav(WebDAVRemote(url: "https://cloud.example/dav", username: "player")), path: "/ludusavi-backup/")
+    let dav = try await RemoteAccess.connect(webdav, password: "one")
+    #expect(dav.root.hasSuffix(":/ludusavi-backup"))
+    var other = webdav
+    other.remote = .webdav(WebDAVRemote(url: "https://cloud.example/dav", username: "player", vendor: .owncloud))
+    #expect(try await RemoteAccess.connect(other, password: "one").root != dav.root)
+}
+
+@Test func ftpAndWebDAVFailuresGetTheMessagesSMBGives() {
+    func known(_ message: String) -> SaveSyncError? { SaveSyncError(RcloneError(method: "operations/list", status: 500, message: message)) }
+    #expect(known(#"NewFs: failed to make FTP connection to "127.0.0.1:2121": 530 "Incorrect password, not logged in""#) == .loginRefused)
+    #expect(known("read metadata failed: 401 Unauthorized: 401 Unauthorized") == .loginRefused)
+    #expect(known(#"NewFs: failed to make FTP connection to "127.0.0.1:2121": read tcp 127.0.0.1:1->127.0.0.1:2121: i/o timeout"#) == .timedOut)
+    #expect(known(#"read metadata failed: Propfind "http://127.0.0.1:1/x": net/http: timeout awaiting response headers"#) == .timedOut)
+    #expect(known(#"vndegen: the server refused to rename over an existing file: Move Rename failed: 550 "Cannot create a file""#) == .renameRefused)
+    #expect(known("dial tcp 127.0.0.1:1: connect: connection refused") == nil)
+}
+
+@MainActor
+@Test func theSettingsPageAsksForEachTypesFields() async throws {
+    let (library, _) = try await freshLibrary()
+    let service = SaveSyncService(library: library, connector: nil, manifest: nil, configRetention: nil)
+    try service.setServer(.ftp(FTPRemote(host: "ftp.example", username: "player")), password: "ftp secret", path: "ludusavi-backup")
+    try service.setServer(host: "nas.example", port: 445, guest: true, username: "", password: "", path: "games/Ludusavi")
+    let model = SaveSyncSettingsModel(service: service)
+    #expect(model.kind == .smb && model.rows.prefix(4) == [.kind, .host, .port, .guest])
+
+    model.kind = .ftp
+    #expect(model.port == "21" && model.password == "ftp secret")
+    #expect(model.rows.prefix(5) == [.kind, .host, .port, .username, .password])
+    #expect(!model.canTest)
+    model.username = "player"
+    #expect(model.canTest)
+    model.port = "70000"
+    #expect(!model.canTest)
+    model.port = "21"
+    #expect(model.remote == .ftp(FTPRemote(host: "nas.example", username: "player")))
+
+    model.kind = .webdav
+    #expect(model.password == "" && model.rows.prefix(5) == [.kind, .url, .vendor, .username, .password])
+    model.url = "cloud.example/dav"
+    #expect(!model.canTest)
+    model.url = "https://cloud.example/dav"
+    #expect(model.canTest)
+    model.select(.vendor)
+    #expect(model.vendor == .nextcloud)
+    #expect(model.remote == .webdav(WebDAVRemote(url: "https://cloud.example/dav", username: "player", vendor: .nextcloud)))
+    model.kind = .smb
+    #expect(model.port == "445")
+}
 
 /// A folder on a disk that keeps case: `VNDEGEN_TEST_DIR`, the case-sensitive volume `scripts/build.sh test` mounts, or
 /// the test folder where its disk keeps case, as on Linux. Nil where neither does, such as a Mac's own disk.

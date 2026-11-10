@@ -30,7 +30,7 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 - **Game commands.** Menus a game keeps in its window's menu bar, such as KiriKiri's, appear in the VNDegen menu. [Controls](docs/controls.md#game-commands)
 - **Cheats** for RPG Maker MV, MZ, XP, VX, and VX Ace, Wolf RPG Editor, and AliceSoft System 3 and 4: gold, items, encounters, game speed, variables with a find by value, and switches. Godot and Flash games get game speed. [Controls](docs/controls.md#cheats)
 - **Hidden games** behind Face ID, Touch ID, or a passcode. [Library](docs/library.md#hidden-games)
-- **Ludusavi saves.** Back up and restore through your Ludusavi SMB share, so saves move between VNDegen and your PCs. [Ludusavi](docs/ludusavi.md)
+- **Ludusavi saves.** Back up and restore through the SMB share, FTP server or WebDAV server your Ludusavi uses, so saves move between VNDegen and your PCs. [Ludusavi](docs/ludusavi.md)
 - **Windows fonts.** Games that ask for MS Gothic, Arial, and other Windows fonts get free fonts with the same metrics. [Fonts](docs/fonts.md)
 - **Movies and see-through clips.** Native engines decode their own movies, and RPG Maker MV and MZ clips with transparency are converted the first time they play. [Video](docs/video.md)
 - **Hardware rendering** through Metal, directly or through WebGL, OpenGL, or ANGLE. [Engines](docs/engines.md)
