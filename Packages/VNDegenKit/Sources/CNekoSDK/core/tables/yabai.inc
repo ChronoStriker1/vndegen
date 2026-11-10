@@ -13,7 +13,7 @@ textshift 1 -1
 # Config as the PC's 初期化 leaves it.
 default opacity 100
 default text 50
-textpoints text 0 156 50 17 100 0
+textpoints text 0 178 25 98 50 17 75 3 100 0
 autocurve auto 104 1.04 527 1
 autowithvoice
 default auto 50
