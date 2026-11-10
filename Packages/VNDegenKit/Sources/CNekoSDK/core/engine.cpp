@@ -3719,7 +3719,7 @@ bool Engine::composeTitleOpening(Canvas &out) {
         c.resize(out.w, out.h);
         c.clear();
         for (const Picture &p : screen_->pictures)
-            if (p.stage <= upTo) drawPicture(c, p.turn != 0 ? turned(p) : p, towardX, towardY);
+            if (p.stage <= upTo) drawPicture(c, p.turn != 0 || p.scroll != 0 || p.flip != 0 ? turned(p) : p, towardX, towardY);
         if (buttons)
             for (Button &b : screen_->buttons) drawButton(c, b, StateNormal);
     };
@@ -3810,7 +3810,7 @@ void Engine::composeScreen(Canvas &out) {
             drawPicture(out, faded, towardX, towardY);
         } else if ((p.tab < 0 || p.tab == galleryTab_) && shown(p)) {
             if (p.rise.empty()) {
-                drawPicture(out, p.turn != 0 ? turned(p) : p, towardX, towardY);
+                drawPicture(out, p.turn != 0 || p.scroll != 0 || p.flip != 0 ? turned(p) : p, towardX, towardY);
                 continue;
             }
             Picture risen = p;
@@ -3831,8 +3831,15 @@ void Engine::composeScreen(Canvas &out) {
     // entry above.
     bool helpLast = screen_->setting("helplast") != nullptr;
     const Button *helpOf = nullptr;
+    bool helpNow = false;
+    int helpNowX = 0, helpNowY = 0;
     auto drawButton = [&](Canvas &c, const Button &b, ButtonState state, bool withHelp = false) {
         bool helped = b.help && (withHelp || state == StateHover || state == StateSelectedHover);
+        if (helped) {
+            helpNow = true;
+            helpNowX = b.helpX;
+            helpNowY = b.helpY;
+        }
         if (helped && (helpLast || b.disc)) {
             Button shown = b;
             shown.help = nullptr;
@@ -3933,6 +3940,13 @@ void Engine::composeScreen(Canvas &out) {
     if (helpOf) {
         drawButtonDisc(out, *helpOf);
         drawButtonHelp(out, *helpOf);
+    }
+    if (screen_->flips && (helpNow != helpUp_ || (helpNow && (helpNowX != helpX_ || helpNowY != helpY_)))) {
+        if (helpNow && !helpUp_) helpFrom_ = clockMs_;
+        helpUp_ = helpNow;
+        helpX_ = helpNowX;
+        helpY_ = helpNowY;
+        helpChanged_ = true;
     }
     // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW [NAME]]`: a line of help shown while the pointer is over that part of the screen,
     // such as a settings group in Config, as the PC games show them. Test Game 84 keeps its lines as rows of one sheet.
@@ -4040,6 +4054,8 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 Picture Engine::turned(const Picture &p) const {
     Picture now = p;
     now.angle = p.turn * float(screenMs_) / 1000 * kPi / 180;
+    now.shift = p.scroll * float(screenMs_) / 1000;
+    if (p.flip != 0) now.angle = helpOver(p) ? p.flip * float(clockMs_ - helpFrom_) / 1000 * kPi / 180 : 0;
     return now;
 }
 
@@ -4976,7 +4992,8 @@ bool Engine::step(int ms) {
     if (screen_) {
         screenMs_ += ms;
         stepSprites();
-        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages") || screen_->turning) dirty_ = true;
+        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages") || screen_->turning || (screen_->flips && (helpUp_ || helpChanged_))) dirty_ = true;
+        helpChanged_ = false;
         // A gallery's character coming up after its tab opens.
         if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
         stepViewer(ms);

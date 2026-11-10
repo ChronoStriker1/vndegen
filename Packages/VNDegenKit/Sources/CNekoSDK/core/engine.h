@@ -314,6 +314,10 @@ private:
     bool hostTaps_ = false;
     int64_t clockMs_ = 0, discFrom_ = 0, discSeenAt_ = -1000000;
     bool discUp_ = false, discTurning_ = false;
+    bool helpUp_ = false, helpChanged_ = false;
+    int helpX_ = 0, helpY_ = 0;
+    int64_t helpFrom_ = 0;
+    bool helpOver(const Picture &p) const { return helpUp_ && helpX_ == p.x && helpY_ == p.y; }
     void drawDisc(Canvas &out, const ImageRef &picture, int x, int y, int cols, int rows, int column, int row, int axis, float speed);
     std::vector<std::pair<const Picture *, const Image *>> darkenedOver_;
     void drawButtonDisc(Canvas &out, const Button &b, int down = 0);

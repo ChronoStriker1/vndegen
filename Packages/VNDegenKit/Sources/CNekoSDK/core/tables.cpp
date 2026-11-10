@@ -69,6 +69,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\squaretest0") return kSquareWindowTest;
     if (folder == "vndegen\\cardtest") return kCardTest;
     if (folder == "vndegen\\viewerrests") return kViewerRestsTest;
+    if (folder == "vndegen\\movingpic") return kMovingPicTest;
     if (folder == "vndegen\\emptycards") {
         static const std::string table = std::string(kEmptyCardTest) + "emptycards 128\n";
         return table.c_str();
