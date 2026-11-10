@@ -243,6 +243,8 @@ Config's Message Window Transparency was set to 100, 60, 29 and 0 on the PC and 
 
 Its init.ini names a square picture (`obj\m000_000`), so it has the 4:3 frame. With the PC's Config set to 1280x960 on a display that tall and a save loaded, the top 720 rows of VNDegen's 1280x960 frame are the PC's to the pixel, and with `squarewindow 0` the window below is too, but for the text's edges and the wait mark as in 16:9. Without it the window sat two rows off.
 
+The log shows in the message window, a line back for each press of the window's up button, in yellow (init.ini's MsgLogColor). After three lines from a PC save and one and two presses, VNDegen's frames are the PC's but for the text's edges: the same line, the same colour, the same buttons lit.
+
 ### Scene replays in Test Games 83 and 86
 
 On both PCs a replay from the Scene screen plays its scripts and comes back to the Scene screen on the tab it was started from: the screen after the replay is the screen before it, pixel for pixel in 83 (a card of the first tab, and a card of the second tab, each skipped through with Ctrl) and but for 21 pixels in 86 (a card of the second tab). The file trace shows what each card read: 86's cards one script each (`se_00_02_02`, `se_02_01_01` and `se_01_02_02` for three cards), 83's fifth card `ep_02_12_00` alone, and 83's third card, a scene after a choice, the scene before the choice, the choice and the variant taken. Both tables set `replaykeeps`. Neither game has a second page of scenes in a tab, so the page wasn't seen.
