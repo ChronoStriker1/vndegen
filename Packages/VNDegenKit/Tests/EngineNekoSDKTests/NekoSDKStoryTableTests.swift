@@ -105,6 +105,25 @@ import TestSupport
         #expect(vnneko_debug_variable(again, 1, 13) == 1)
     }
 
+    @Test func aChoiceTakenAsItAppearsStillKeepsThePreviousChoice() throws {
+        let root = try game("storytestpc")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        for _ in 0..<400 where vnneko_debug_choice_count(e) <= 0 { steps(e, 1) }
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_debug_choose(e, 1)
+        steps(e, 30)
+        #expect(vnneko_debug_save(e, 4))
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytestpc/save")
+        let names = try FileManager.default.contentsOfDirectory(atPath: saves.path).map { $0.lowercased() }
+        #expect(names.contains("save004s.sav"), "\(names)")
+    }
+
     // One tap on the load question's Yes, over the place the loaded choice draws its first option: the tap loads, and the
     // choice it brings up waits for a tap of its own (set 1, Test Game 87 on an iPad).
     @Test func aTapAcrossALoadDoesntTakeTheChoice() throws {
@@ -151,7 +170,8 @@ import TestSupport
         let px = try #require(vnneko_frame(e, &w, &h, &changed))
         func red(_ x: Int, _ y: Int) -> UInt8 { px[(y * Int(w) + x) * 4] }
         #expect(red(1010, 110) == 120)
-        #expect(red(1010, 310) < 100)
+        #expect(red(1030, 130) < 100)
+        #expect(red(1060, 160) < 100)
         tap(640, 359)
         #expect(status(e).contains(" choice "), "\(status(e))")
         // A tap of its own takes the option under it, the second here, which leaves S 13 alone.

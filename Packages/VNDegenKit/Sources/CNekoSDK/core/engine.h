@@ -304,6 +304,8 @@ private:
         std::string side;
     };
     std::optional<PreviousChoice> previousChoice_;
+    std::optional<PreviousChoice> setAside_, setAsideChoice_;
+    bool resumeSetAside();
     bool previousChoiceDue_ = false;
     // The latest choice asked, as Test Games 82 and 83's saves keep it (SaveData::choiceColumns): its options, the sheet's
     // columns, and the cells shown, never cleared.
@@ -660,6 +662,8 @@ private:
     std::vector<std::vector<BulbStep>> bulbPatterns_;
     int bulbPattern_ = -1, bulbFrom_ = 255, bulbDrawn_ = 255;
     bool bulbSeen_ = false;
+    std::map<std::pair<const Image *, int>, std::pair<ImageRef, ImageRef>> darkened_;
+    ImageRef darkened(const ImageRef &image, int dark);
     int64_t bulbStart_ = 0;
     std::map<std::string, std::string> bulbDark_;
     void loadBulb();
