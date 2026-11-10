@@ -156,6 +156,7 @@ cellsize 40 30
 cellthumb 0 0
 button gtab0 obj\b.bmp 800 0 1 5 0
 button gtab1 obj\b.bmp 900 0 1 5 0
+button back obj\b.bmp 700 0 1 5 0
 )";
 
 const char kOutfitTest[] = R"(
