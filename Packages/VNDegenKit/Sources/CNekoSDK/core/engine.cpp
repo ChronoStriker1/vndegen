@@ -369,7 +369,7 @@ void Engine::openScreen(const std::string &name) {
         viewingImage_ = false;
     }
     darkened_.clear();
-    dragWidget_ = nullptr;
+    dragSetting_.clear();
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -409,7 +409,7 @@ void Engine::openScreen(const std::string &name) {
 
 void Engine::closeScreen() {
     darkened_.clear();
-    dragWidget_ = nullptr;
+    dragSetting_.clear();
     if (spriteScreen()) closeSprites();
     screen_ = nullptr;
     dirty_ = true;
@@ -1985,13 +1985,13 @@ bool Engine::startReplay(const GalleryEntry &scene) {
         setAside_ = PreviousChoice{story, sidecarText(story)};
         setAsideChoice_ = previousChoice_;
         setAsideResult_ = choiceResult_;
-        previousChoice_.reset();
-        askedCount_ = askedColumns_ = askedResult_ = 0;
-        askedCells_.clear();
-        choiceResult_ = 0;
-        choiceImage_.clear();
-        choiceMade_ = false;
     }
+    previousChoice_.reset();
+    askedCount_ = askedColumns_ = askedResult_ = 0;
+    askedCells_.clear();
+    choiceResult_ = 0;
+    choiceImage_.clear();
+    choiceMade_ = false;
     stopTrack();
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
@@ -2291,30 +2291,30 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
     };
     for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
-        if (dragging && &f != dragWidget_) continue;
+        if (dragging && (f.empty() || f[0] != dragSetting_)) continue;
         ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr;
         // A held press keeps following the finger along the bar, past its ends.
         int left = field(f, 2), top = field(f, 3);
         if (fill && y >= top && y < top + fill->h && x >= left - (dragging ? 40 : 0) && x < left + fill->w + (dragging ? 40 : 0)) {
             int from = f.size() >= 6 ? field(f, 5) : 0, scale = std::max(1, (f.size() >= 5 ? field(f, 4) : 100) - from);
             changeSetting(f[0], clampSetting(f[0], from + (x - left) * scale / std::max(1, fill->w - 1)));
-            dragWidget_ = &f;
+            dragSetting_ = f[0];
             return true;
         }
     }
     // A press on a knob's track, or a drag along it, puts the knob's middle under the pointer.
     for (auto [it, end] = lines("knob"); it != end; ++it) {
         const auto &f = it->second;
-        if (dragging && &f != dragWidget_) continue;
+        if (dragging && (f.empty() || f[0] != dragSetting_)) continue;
         ImageRef knob = f.size() >= 5 ? images_->get(f[1]) : nullptr;
+        if (!knob) continue;
         int x0 = field(f, 2), top = field(f, 3);
         double step = std::max(0.01, std::atof(f[4].c_str()));
-        if (!knob) continue;
         int left = x0 + int(std::lround(step * clampSetting(f[0], -(1 << 20)))), right = x0 + int(std::lround(step * clampSetting(f[0], 1 << 20))) + knob->w;
         if (y >= top && y < top + knob->h && x >= left - (dragging ? 40 : 0) && x < right + (dragging ? 40 : 0)) {
             int value = int(std::lround(double(x - x0 - knob->w / 2) / step));
             changeSetting(f[0], clampSetting(f[0], value));
-            dragWidget_ = &f;
+            dragSetting_ = f[0];
             return true;
         }
     }
@@ -3464,9 +3464,9 @@ void Engine::composeDialog(Canvas &out) {
     if (screen_) {
         bool over = false;
         std::vector<const Picture *> frames;
-        std::vector<const Image *> bright;
+        std::vector<std::pair<const Picture *, const Image *>> bright;
         for (const Picture &p : screen_->pictures)
-            if (p.overDim && p.image && (p.tab < 0 || p.tab == galleryTab_) && shown(p)) bright.push_back(p.image.get());
+            if (p.overDim && p.image && (p.tab < 0 || p.tab == galleryTab_) && shown(p)) bright.push_back({&p, p.image.get()});
         if (bright != darkenedOver_) {
             darkened_.clear();
             darkenedOver_ = bright;
@@ -5096,7 +5096,7 @@ void Engine::mouseMove(float x, float y) {
         }
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
-        else if (!viewingImage_ && dragWidget_) pressSettingsWidget(px, py, true);
+        else if (!viewingImage_ && !dragSetting_.empty()) pressSettingsWidget(px, py, true);
     }
 }
 
@@ -5104,14 +5104,14 @@ void Engine::mouseButton(int button, bool down) {
     // Each edge in the game's log, so a host's taps can be told from the log: one tap is one down and one up.
     log("pointer %s %d at %d,%d", down ? "down" : "up", button, pointerX_, pointerY_);
     if (button == 0) {
-        // The CG viewer's volume is kept when the slider's let go.
         if (!down && leftHeld_ && hostTaps_) mouseMove(mouseX_, mouseY_);
+        // The CG viewer's volume is kept when the slider's let go.
         if (!down && leftHeld_ && viewerDragging_) {
             viewerDragging_ = false;
             saveSettings();
         }
         leftHeld_ = down;
-        dragWidget_ = nullptr;
+        dragSetting_.clear();
     }
     // A click during the title's opening ends it and does nothing more.
     if (down && openingFrom_ >= 0 && screen_ && screen_->name == "title") {

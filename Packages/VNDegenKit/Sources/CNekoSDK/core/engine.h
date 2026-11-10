@@ -139,6 +139,7 @@ public:
     void mouseMove(float x, float y);
     void setHostTaps(bool on) { hostTaps_ = on; }
     int choiceResult() const { return choiceResult_; }
+    bool choiceKept() const { return choiceMade_ || !choiceImage_.empty(); }
     // For test hosts: the choice on screen, or -1, and picking one.
     int choiceCount() const { return waiting_ == Waiting::Choice ? choiceCount_ : -1; }
     void choose(int index);
@@ -308,12 +309,12 @@ private:
     std::optional<PreviousChoice> previousChoice_;
     std::optional<PreviousChoice> setAside_, setAsideChoice_;
     int setAsideResult_ = 0;
-    const std::vector<std::string> *dragWidget_ = nullptr;
+    std::string dragSetting_;
     bool hostTaps_ = false;
     int64_t clockMs_ = 0, discFrom_ = 0, discSeenAt_ = -1000000;
     bool discUp_ = false, discTurning_ = false;
     void drawDisc(Canvas &out, const ImageRef &picture, int x, int y, int cols, int rows, int column, int row, int axis, float speed);
-    std::vector<const Image *> darkenedOver_;
+    std::vector<std::pair<const Picture *, const Image *>> darkenedOver_;
     void drawButtonDisc(Canvas &out, const Button &b, int down = 0);
     bool discUpFor(const std::string &picture);
     ButtonState messageButtonState(const Button &b);
