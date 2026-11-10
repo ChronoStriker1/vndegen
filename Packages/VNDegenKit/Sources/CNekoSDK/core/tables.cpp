@@ -16,6 +16,7 @@ namespace {
 #include "tables/rinjin.inc"
 #include "tables/funbag2.inc"
 #include "tables/sideboob2.inc"
+#include "tables/mankitsu.inc"
 #include "tables/funbagfantasy1.inc"
 #include "tables/yabai.inc"
 #include "tables/storytest.inc"
@@ -43,6 +44,15 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\隣人に壊されていく俺の妻") return kRinjin;
     if (folder == "waffle\\funbagfantasy2") return kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return kSideboob2;
+    // Test Game 90 and its bonus story disc share every screen but the title and the story.
+    if (folder == "waffle\\漫喫ハプニング") {
+        static const std::string table = std::string(kMankitsuShared) + kMankitsuGame;
+        return table.c_str();
+    }
+    if (folder == "waffle\\漫喫ハプニング特典ストーリー") {
+        static const std::string table = std::string(kMankitsuShared) + kMankitsuBonus;
+        return table.c_str();
+    }
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
     if (folder == "waffle\\ヤバい！－復讐・闇サイト－") return kYabai1;
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpc") return kStoryTest;
