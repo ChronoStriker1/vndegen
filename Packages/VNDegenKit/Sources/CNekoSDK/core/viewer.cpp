@@ -75,6 +75,7 @@ void Engine::openViewer(size_t entry) {
     for (size_t i = 0; i < e.images.size(); i++)
         if (galleryImageSeen(e, i)) {
             viewPanelHidden_ = false;
+            viewPanelSeenAt_ = viewMs_;
             viewAuto_ = false;
             viewZoom_ = kZoomMin;
             viewMuted_ = false;
@@ -405,6 +406,7 @@ void Engine::pressViewer(int x, int y) {
         if (clicks) viewerAdvance();
         return;
     }
+    viewPanelSeenAt_ = viewMs_;
     dragViewerSlider(x, y);
     if (viewerDragging_) return;
     const auto *f = viewerButtonAt(x, y);
@@ -413,7 +415,10 @@ void Engine::pressViewer(int x, int y) {
         const auto *panel = screen_->setting("viewer");
         ImageRef art = panel->size() >= 3 ? images_->get((*panel)[0]) : nullptr;
         int left = number(*panel, 1), top = number(*panel, 2);
-        if (!art || x < left || y < top || x >= left + art->w || y >= top + art->h) viewerAdvance();
+        if (!art || x < left || y < top || x >= left + art->w || y >= top + art->h) {
+            viewerAdvance();
+            if (screen_ && screen_->setting("viewerrests")) viewPanelHidden_ = true;
+        }
         return;
     }
     if (!f || viewerButtonRow(*f, false) == kDisabled || viewerButtonRow(*f, false) < 0) return;
@@ -458,9 +463,23 @@ void Engine::viewerZoom(int notches) {
 }
 
 // Called each frame while a menu is up: the viewer's clock and slideshow.
+void Engine::viewerPointerMoved(int y) {
+    const auto *rests = screen_ ? screen_->setting("viewerrests") : nullptr;
+    if (!rests || rests->size() < 2 || !viewingImage_ || !viewerPanel()) return;
+    viewPanelSeenAt_ = viewMs_;
+    if (viewPanelHidden_ && y >= number(*rests, 1)) {
+        viewPanelHidden_ = false;
+        dirty_ = true;
+    }
+}
+
 void Engine::stepViewer(int ms) {
     viewMs_ += ms;
     if (!viewingImage_ || !viewerPanel()) return;
+    if (const auto *rests = screen_->setting("viewerrests"); rests && rests->size() >= 2 && !viewPanelHidden_ && !viewerDragging_ && viewMs_ - viewPanelSeenAt_ >= number(*rests, 0)) {
+        viewPanelHidden_ = true;
+        dirty_ = true;
+    }
     if (viewMovie_) {
         bool ended = false;
         ImageRef frame = viewMovie_->frame(double(viewMs_ - viewMovieFrom_) / 1000, ended);

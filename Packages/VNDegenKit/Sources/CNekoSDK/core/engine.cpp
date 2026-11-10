@@ -5094,6 +5094,7 @@ void Engine::mouseMove(float x, float y) {
             part->pointer(*partHost_, px, py);
             dirty_ = true;
         }
+    if (moved && screen_ && !dialogOpen_) viewerPointerMoved(py);
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
         else if (!viewingImage_ && !dragSetting_.empty()) pressSettingsWidget(px, py, true);
@@ -5156,6 +5157,7 @@ void Engine::mouseButton(int button, bool down) {
             // `viewerclicks`: it leaves the viewer while the panel shows (viewer.cpp).
             if (screen_->setting("viewerclicks") && !viewPanelHidden_) closeViewer();
             else viewPanelHidden_ = !viewPanelHidden_;
+            viewPanelSeenAt_ = viewMs_;
             dirty_ = true;
         } else if (screen_ && viewingImage_) {
             viewingImage_ = false;

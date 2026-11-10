@@ -12,12 +12,10 @@
 // fitted exactly on PC frames, and an anger mark at -20, -20 and 0.31 sits at 46, 47 from the origin, as these rules
 // give; its 41 pictures took 1.3 s, two frames each for parameter 16's 30 ms and not anime_bustup_cfg.ini's 16 (30 fps
 // recordings under Wine). The hop's pace wasn't settled (10 pixels came back over about 0.27 s where 10 frames would be 0.17), and
-// 130's parameters 3 to 5 (1, 1, 200 in a quarter of the loads, each still followed by a 132) show nothing; the one
-// face shake (145) isn't drawn.
+// 130's parameters 3 to 5 (1, 1, 200 in a quarter of the loads, each still followed by a 132) show nothing.
 //
 // Slides: 160 names two panel pictures (s1, s2), 162 starts bars of them sliding in from the left until they cover the
-// screen, 161 waits until they do, while the scene changes behind them. On the PC the bars' heights and speeds vary from slide to slide, as if random; these are drawn in the same
-// style over the times the recording shows (in over 0.6 s, out over 0.8 s), not the PC's own bars. Unconfirmed.
+// screen, 161 waits until they do, while the scene changes behind them. On the PC the bars' heights and speeds vary from slide to slide, as if random.
 //
 // The select screen, `open select` from the story table: ten half-weeks of four cards, each a character at a place, as
 // cfg\SelectPhase.ini lists them (top, left, right, bottom). A heroine's card at place -1 stands at the place her hearts
@@ -52,16 +50,20 @@ namespace {
 
 constexpr int kFaceX = 0, kFaceY = 512;
 constexpr int kFollowMs = 120;  // the second strip's lag behind the first, in and out
+constexpr int kCaptionInMs = 100, kCaptionBack = 15, kCaptionDrift = 30;
 
 constexpr int kTitleBottomShift = 152;
 constexpr int kTitleMs = 4333, kTitleFadeMs = 600, kTitleTrimSpeed = 240, kTitleTrimPeriod = 600;
 constexpr int kMenuTrimSpeed = 240;
-constexpr int kNewsX = 803, kNewsW = 414, kNewsSpeed = 120;
+constexpr int kNewsX = 803, kNewsW = 414, kNewsSpeed = 120, kNewsStart = 134;
 // The title's rising dots: how many, the strip they start along (the silhouettes' feet) and how far they rise.
-constexpr int kSparkles = 9, kSparkleX = 24, kSparkleW = 640, kSparkleFrom = 690, kSparkleRise = 340;
+constexpr int kSparkles = 14, kSmallSparkles = 9, kSparkleX = 24, kSparkleW = 640, kSparkleFrom = 666, kSparkleRise = 320;
+constexpr int kSparkleSlow = 37, kSparkleFast = 82;
+constexpr int kShakeDelayMs = 50, kShakeMs = 167, kShakeTurns = 10;
 // The lower row's liquid: how far and how long it rises as the row opens, and the gap in its drawing that makes the next
 // drawing a new opening.
 constexpr int kRowRise = 82, kRowRiseMs = 170, kRowGapMs = 100;
+constexpr int kBubbleCount = 60, kBubbleRise = 30, kBubbleLifeMs = 2070;
 constexpr int kWeekVar = 3000, kHalfVar = 3001, kHeartVar = 3010, kChapterVar = 10904, kEndingVar = 10906;
 constexpr int kPhases = 10, kMaxHearts = 4;
 constexpr int kHeartCap = 5;
@@ -221,15 +223,26 @@ public:
             return true;
         }
         case 145:
-            return true;  // a face shake, once in the game: not drawn
+            shakeFrom_ = host.nowMs() + kShakeDelayMs;
+            shakeBy_ = std::clamp(int(n.p[1]), 0, 200);
+            shakeSeed_ = uint32_t(n.id) * 2654435761u + uint32_t(shakeFrom_);
+            return true;
         case 160:
             panels_[0] = n.s[1];
             panels_[1] = n.s[2];
             holdMs_ = std::max(0, int(n.p[14]));
+            slideIn_ = std::clamp(int(n.p[4]), 1, 600);
+            slideOut_ = std::clamp(int(n.p[7]), 1, 600);
+            captionIn_ = std::clamp(int(n.p[5]), 0, 600);
+            captionStay_ = std::clamp(int(n.p[6]), 0, 6000);
+            caption_ = captionIn_ + captionStay_ > 0 ? n.s[3] : std::string();
+            captionCols_ = n.p[0] == 2 ? 2 : 1;
+            captionCol_ = std::clamp(int(n.p[2]), 0, captionCols_ - 1);
             return true;
         case 162: startSlide(host); return true;
         case 161:
             if (int left = int(slideFrom_ + coverMs() - host.nowMs()); left > 0) host.waitMs(left);
+            covered_ = slideFrom_ >= 0;
             return true;
         case 163:
             if (slideFrom_ >= 0)
@@ -240,6 +253,7 @@ public:
     }
 
     bool step(PartHost &host) override {
+        covering_ = slideFrom_ >= 0 && covered_ && host.nowMs() < outFrom_;
         if (menu_ == "title") return true;  // the backgrounds and the trim move
         // A menu's trims move while it's drawn: the frame after its last drawing is the last one asked for.
         if (std::exchange(frameDrawn_, false)) return true;
@@ -251,6 +265,7 @@ public:
             if (now < m.from + m.ms) fading = true;
         for (const auto &[slot, f] : shown_)
             if (f.flipCount > 1 && now - f.flipFrom < int64_t(f.flipCount) * f.flipTimes * f.flipMs) fading = true;
+        if (now < shakeFrom_ + kShakeMs || (shaking_ && now < shakeFrom_ + kShakeMs + 1000)) fading = true;
         bool sliding = slideFrom_ >= 0 && now - outFrom_ < uncoverMs();
         if (slideFrom_ >= 0 && !sliding) slideFrom_ = outFrom_ = -1;
         return fading || sliding;
@@ -279,6 +294,8 @@ public:
     }
 
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
+        bool tab = menu_.rfind("config", 0) == 0 && name.rfind("config", 0) == 0 && host.nowMs() == menuDrawnNow_;
+        if (!tab) menuFrom_ = host.screenMs();
         menu_ = name;
         if (name == "title") {
             titleFrom_ = host.screenMs();
@@ -521,13 +538,17 @@ public:
         }
     }
 
+    bool hidesScene() const override { return covering_; }
+
     void reset() override {
         loaded_.clear();
         shown_.clear();
         from_.clear();
         moves_.clear();
         fadeMs_ = 0;
+        shakeFrom_ = -1000000;
         slideFrom_ = outFrom_ = -1;
+        covering_ = covered_ = shaking_ = false;
         selecting_ = false;
         confirming_ = -1;
         pendingChapter_ = 0;
@@ -550,11 +571,11 @@ private:
     // A menu's trims along the top and bottom, under its cards and buttons, and the screen's name plate at 4, 6 (set 1,
     // fitted over the screen's paper on PC shots and a 30 fps recording, within 0.01 of 255): the top trim at y -36,
     // and at 0 on Save and Load, where the page buttons hang from it, moving left; the bottom one at y 662, moving
-    // right; both 8 pixels a frame of the recording, 240 a second. Where along their strips the trims start isn't
-    // measured.
+    // right; both 8 pixels a frame of the recording, 240 a second.
     void drawMenuTrims(PartHost &host, Canvas &out) {
         frameDrawn_ = true;
-        int moved = int(std::max<int64_t>(0, host.screenMs()) * kMenuTrimSpeed / 1000);
+        menuDrawnNow_ = host.nowMs();
+        int moved = int(std::max<int64_t>(0, host.screenMs() - menuFrom_) * kMenuTrimSpeed / 1000);
         if (ImageRef top = host.image("obj\\e004_000.bmp"))
             for (int x = -(moved % top->w); x < out.w; x += top->w) drawPart(out, *top, x, menuPlate() < 2 ? 0 : -36, 0, 0, top->w, top->h, 1);
         if (ImageRef bottom = host.image("obj\\e004_001.bmp"))
@@ -567,7 +588,7 @@ private:
     // strips, each repeating across the screen with its foot on the screen's bottom edge, the dark one under two
     // translucent ones, moving left 2, 6 and 10 pixels a frame of the recording (120, 360 and 600 a second); a frame
     // drawn so is within 1 of 255 of the PC's. It rises from the bottom edge in about a sixth of a second as the row
-    // opens; that rise is drawn evenly, which the PC's isn't quite. The PC's bubbles in it aren't drawn. It passes in
+    // opens; that rise is drawn evenly, which the PC's isn't quite. It passes in
     // front of the gauge's foot, as on the PC.
     void drawLiquid(PartHost &host, Canvas &out) {
         static const struct { const char *path; int speed; } kWaves[] = {{"obj\\h001_000.bmp", 120}, {"obj\\h001_001.bmp", 360}, {"obj\\h001_002.bmp", 600}};
@@ -581,6 +602,24 @@ private:
                 int moved = int(now * wave.speed / 1000 % strip->w);
                 for (int x = -moved; x < out.w; x += strip->w) drawPart(out, *strip, x, out.h - strip->h + sunk, 0, 0, strip->w, strip->h, 1);
             }
+        static const struct { const char *path; int speed, share; } kBubbles[] = {
+            {"obj\\h001_003.bmp", 157, 26}, {"obj\\h001_004.bmp", 125, 43}, {"obj\\h001_005.bmp", 95, 61}, {"obj\\h001_006.bmp", 66, 100}};
+        for (int k = 0; k < kBubbleCount; k++) {
+            int64_t at = now + int64_t(k) * 7919 % kBubbleLifeMs;
+            uint32_t turn = uint32_t(at / kBubbleLifeMs) * 2654435761u + uint32_t(k) * 40503u;
+            turn ^= turn >> 15;
+            turn *= 2246822519u;
+            turn ^= turn >> 13;
+            int kind = 0, pick = int(turn >> 20) % 100;
+            while (kind < 3 && pick >= kBubbles[kind].share) kind++;
+            ImageRef dot = host.image(kBubbles[kind].path);
+            if (!dot) continue;
+            float into = float(at % kBubbleLifeMs) / 1000;
+            float speed = float(kBubbles[kind].speed) * (0.75f + float(turn >> 8 & 255) / 255 * 0.5f);
+            float x = float(turn % uint32_t(out.w + 320)) - speed * into;
+            float y = float(out.h - 2) - float(dot->h) / 2 - float(kBubbleRise) * into;
+            drawPart(out, *dot, int(std::lround(x)), int(std::lround(y)) + sunk, 0, 0, dot->w, dot->h, 1);
+        }
     }
 
     void drawTitle(PartHost &host, Canvas &out) {
@@ -617,36 +656,36 @@ private:
     }
 
     // Light dots rising inside the silhouettes, drawn on the pink under the backgrounds, whose holes cut them to the
-    // silhouettes' shapes. In the PC's style and not its numbers (set 1, tracked in a 10 fps recording under Wine):
-    // about nine at a time, the seven sizes of d003, each rising about three times its width a second (the PC's small
-    // ones 26 to 38 pixels a second, its large ones 60 to 88) with a slight drift, at 30 to 70 percent. Where and when
-    // the PC starts each one isn't known, so they come round on fixed turns here.
+    // silhouettes' shapes.
     void drawSparkles(PartHost &host, Canvas &out, int64_t t) {
         for (int k = 0; k < kSparkles; k++) {
-            char path[32];
-            std::snprintf(path, sizeof path, "obj\\d003_%03d.bmp", k % 7);
-            ImageRef dot = host.image(path);
-            if (!dot) continue;
-            int speed = 3 * dot->w, turnMs = kSparkleRise * 1000 / speed;
+            bool small = k < kSmallSparkles;
+            uint32_t own = uint32_t(k + 1) * 2246822519u;
+            own ^= own >> 13;
+            int speed = (small ? kSparkleSlow : kSparkleFast) * (80 + int(own % 45)) / 100, turnMs = kSparkleRise * 1000 / speed;
             int64_t at = t + int64_t(k) * 7919 % turnMs;
             uint32_t turn = uint32_t(at / turnMs) * 2654435761u + uint32_t(k) * 40503u;
             turn ^= turn >> 15;
+            char path[32];
+            std::snprintf(path, sizeof path, "obj\\d003_%03d.bmp", small ? 5 + k % 2 : 2 + int((turn >> 24) % 3));
+            ImageRef dot = host.image(path);
+            if (!dot) continue;
             float into = float(at % turnMs) / 1000;
             int x = kSparkleX + int(turn % kSparkleW) + int((int(turn >> 8 & 31) - 15) * into * 0.6f);
-            float alpha = 0.3f + float(turn >> 16 & 255) / 255 * 0.4f;
-            drawPart(out, *dot, x, kSparkleFrom - int(into * speed), 0, 0, dot->w, dot->h, alpha);
+            float alpha = (small ? 0.45f : 0.3f) + float(turn >> 16 & 255) / 255 * (small ? 0.55f : 0.4f);
+            drawPart(out, *dot, x - dot->w / 2, kSparkleFrom - dot->h / 2 - int(into * speed), 0, 0, dot->w, dot->h, alpha);
         }
     }
 
     // The additional edition's Information box, from sys_2.pak (set 1, fitted on shots and a 30 fps recording of the
     // release's second exe under Wine): the box at 770, 57, and in its window, 414 wide from x 803, one line of text
     // at y 91 moving left 4 pixels a frame of the recording (120 a second) and coming round every 414, under the
-    // window's shade. Where along its round the text starts isn't measured.
+    // window's shade.
     void drawNews(PartHost &host, Canvas &out, int64_t t) {
         ImageRef box = host.image("sys_2\\obj\\d401_000.bmp"), text = host.image("sys_2\\obj\\d401_001.bmp");
         if (!box || !text) return;
         drawPart(out, *box, 770, 57, 0, 0, box->w, box->h, 1);
-        int moved = int(t * kNewsSpeed / 1000 % kNewsW);
+        int moved = int((t * kNewsSpeed / 1000 + kNewsStart) % kNewsW);
         for (int x = kNewsX + kNewsW - moved - kNewsW; x < kNewsX + kNewsW; x += kNewsW) {
             int from = std::max(x, kNewsX), to = std::min(x + text->w, kNewsX + kNewsW);
             if (to > from) drawPart(out, *text, from, 91, from - x, 0, to - from, text->h, 1);
@@ -696,10 +735,19 @@ private:
     void drawFaces(PartHost &host, Canvas &out) {
         int64_t now = host.nowMs();
         float t = fadeMs_ > 0 ? std::clamp(float(now - fadeFrom_) / float(fadeMs_), 0.0f, 1.0f) : 1.0f;
+        float shakeX = 0, shakeY = 0;
+        shaking_ = now >= shakeFrom_ && now < shakeFrom_ + kShakeMs;
+        if (shaking_) {
+            int turn = int((now - shakeFrom_) * kShakeTurns / kShakeMs), reach = shakeBy_ * (kShakeTurns - turn) / kShakeTurns;
+            uint32_t h = (shakeSeed_ + uint32_t(turn)) * 2246822519u;
+            h ^= h >> 15;
+            shakeX = float(int(h % uint32_t(2 * reach + 1)) - reach);
+            shakeY = float(int((h >> 12) % uint32_t(2 * reach + 1)) - reach);
+        }
         auto drawSet = [&](const std::map<int, Face> &set, float alpha) {
             if (alpha <= 0) return;
             for (const auto &[slot, f] : set) {
-                float x = float(kFaceX + f.x), y = float(kFaceY + f.y);
+                float x = float(kFaceX + f.x) + shakeX, y = float(kFaceY + f.y) + shakeY;
                 for (const FaceMove &m : moves_) {
                     if (m.slot != slot || now <= m.from) continue;
                     float p = m.ms > 0 ? std::min(1.0f, float(now - m.from) / float(m.ms)) : 1.0f;
@@ -751,15 +799,17 @@ private:
             Bar b;
             b.y = y;
             b.h = std::min(rnd(12, 64), host.height() - y);
-            b.inDelay = rnd(0, 200);
-            b.inMs = rnd(300, 400);
-            b.outDelay = rnd(0, 300);
-            b.outMs = rnd(350, 500);
+            int in = slideIn_ * 1000 / 60, away = slideOut_ * 1000 / 60;
+            b.inDelay = rnd(0, in * 30 / 100);
+            b.inMs = rnd(in * 40 / 100, in * 50 / 100);
+            b.outDelay = rnd(0, away * 30 / 100);
+            b.outMs = rnd(away * 50 / 100, away * 70 / 100);
             bars_.push_back(b);
             y += b.h;
         }
         slideFrom_ = host.nowMs();
-        outFrom_ = slideFrom_ + coverMs() + holdMs_;
+        covered_ = false;
+        outFrom_ = caption_.empty() ? slideFrom_ + coverMs() + holdMs_ : slideFrom_ + int64_t(slideIn_ + captionIn_ + captionStay_ + slideOut_) * 1000 / 60;
         host.redraw();
     }
 
@@ -799,6 +849,24 @@ private:
                 drawImage(out, *img, (left + right) / 2.0f, b.y + b.h / 2.0f, sx, sy, 0, 1);
             }
         }
+        ImageRef caption = caption_.empty() ? nullptr : host.image(caption_);
+        if (!caption) return;
+        int cw = caption->w / captionCols_;
+        int64_t t = now - slideFrom_, arrive = int64_t(slideIn_ + captionIn_) * 1000 / 60 + kCaptionInMs;
+        int64_t leave = arrive + int64_t(captionStay_) * 1000 / 60 - kCaptionInMs, away = int64_t(slideOut_) * 1000 / 60;
+        float rest = float(w - cw) / 2 - kCaptionBack, x = 0;
+        if (t < arrive - kCaptionInMs || t >= leave + away) return;
+        if (t < arrive) {
+            float u = 1 - float(arrive - t) / float(kCaptionInMs);
+            x = float(-cw) + (rest + float(cw)) * (1 - (1 - u) * (1 - u));
+        } else if (t < leave) {
+            float u = float(t - arrive) / float(std::max<int64_t>(1, leave - arrive));
+            x = rest + float(kCaptionDrift) * u * u;
+        } else {
+            float u = float(t - leave) / float(std::max<int64_t>(1, away));
+            x = rest + float(kCaptionDrift) + (float(w) - rest - float(kCaptionDrift)) * u * u;
+        }
+        drawPart(out, *caption, int(std::lround(x)), (host.height() - caption->h) / 2, captionCol_ * cw, 0, cw, caption->h, 1);
     }
 
     // The select screen.
@@ -941,7 +1009,7 @@ private:
 
     bool selecting_ = false, inisRead_ = false;
     int pendingChapter_ = 0, titleFirst_ = 0;
-    int64_t titleFrom_ = 0;
+    int64_t titleFrom_ = 0, menuFrom_ = 0, menuDrawnNow_ = -1;
     std::string menu_;
     bool frameDrawn_ = false;
     bool menuFrame_ = false, menuOver_ = false;
@@ -961,9 +1029,14 @@ private:
     int64_t fadeFrom_ = 0;
     int fadeMs_ = 0;
     std::string panels_[2];
+    std::string caption_;
+    int slideIn_ = 30, slideOut_ = 30, captionIn_ = 0, captionStay_ = 0, captionCols_ = 1, captionCol_ = 0;
     int holdMs_ = 0;
     std::vector<Bar> bars_;
-    int64_t slideFrom_ = -1, outFrom_ = -1;
+    int64_t slideFrom_ = -1, outFrom_ = -1, shakeFrom_ = -1000000;
+    int shakeBy_ = 0;
+    uint32_t shakeSeed_ = 0;
+    bool covering_ = false, covered_ = false, shaking_ = false;
     uint32_t slides_ = 0;
 };
 

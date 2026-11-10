@@ -224,6 +224,61 @@ import TestSupport
         #expect(pixel(e, 610, 610) != [0, 0, 250])
     }
 
+    @Test func aViewersBarRestsAndComesBackWithThePointer() throws {
+        var cfg = Data(count: 104_000)
+        cfg[48_000] = 1
+        cfg[48_004] = 1
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\viewerrests\n".utf8),
+            "cfg/cg_view.ini": Data("#p 0 obj\\t.bmp none\n0,cg\\a.bmp\n1,cg\\b.bmp\n##\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([
+                ("t.bmp", bmp(40, 30) { _, _ in [0, 0, 250] }),
+                ("p.bmp", bmp(1280, 100) { _, _ in [0, 250, 0] }),
+            ]),
+            "cg.pak": NekoSDKFlowFixture.archive([
+                ("a.bmp", bmp(1280, 720) { _, _ in [250, 0, 0] }),
+                ("b.bmp", bmp(1280, 720) { _, _ in [250, 0, 250] }),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/viewerrests/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try NekoSDKFlowFixture.packed(cfg).write(to: save.appendingPathComponent("cfg.sav"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        let bar: [UInt8] = [0, 250, 0], first: [UInt8] = [0, 0, 250], second: [UInt8] = [250, 0, 250]
+        func steps(_ n: Int) { for _ in 0..<n { _ = vnneko_step(e, 10) } }
+        func move(_ x: Int, _ y: Int) { vnneko_mouse_move(e, Float(x) / 1280, Float(y) / 720); steps(2) }
+        func press(_ button: Int32) { vnneko_mouse_button(e, button, true); vnneko_mouse_button(e, button, false); steps(2) }
+        #expect(vnneko_debug_press(e, "cg"))
+        steps(5)
+        move(120, 120)
+        press(0)
+        #expect(pixel(e, 10, 650) == bar)
+        #expect(pixel(e, 10, 300) == first)
+        steps(60)
+        #expect(pixel(e, 10, 650) == first)
+        move(640, 300)
+        #expect(pixel(e, 10, 650) == first)
+        move(640, 400)
+        #expect(pixel(e, 10, 650) == bar)
+        steps(60)
+        #expect(pixel(e, 10, 650) == first)
+        press(1)
+        #expect(pixel(e, 10, 650) == bar)
+        #expect(status().contains(" menu cg"))
+        move(640, 200)
+        press(0)
+        #expect(pixel(e, 10, 300) == second)
+        #expect(pixel(e, 10, 650) == second)
+        press(1)
+        #expect(pixel(e, 10, 650) == bar)
+        press(1)
+        #expect(pixel(e, 10, 300) != second)
+        #expect(pixel(e, 10, 650) != bar)
+    }
+
     // `pic FILE X Y turn DEGREES` turns a picture about its middle by the screen's clock, as Test Game 83's title turns
     // its lace circles: a bar 100 by 20 at 1100, 600 lies across at first, and stands upright a second later at 90 a second.
     @Test func aTitlePictureTurnsAboutItsMiddle() throws {
