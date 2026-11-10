@@ -249,6 +249,7 @@ public:
     }
 
     bool step(PartHost &host) override {
+        covering_ = slideFrom_ >= 0 && host.nowMs() >= slideFrom_ + coverMs() && host.nowMs() < outFrom_;
         if (menu_ == "title") return true;  // the backgrounds and the trim move
         // A menu's trims move while it's drawn: the frame after its last drawing is the last one asked for.
         if (std::exchange(frameDrawn_, false)) return true;
@@ -531,6 +532,8 @@ public:
         }
     }
 
+    bool hidesScene() const override { return covering_; }
+
     void reset() override {
         loaded_.clear();
         shown_.clear();
@@ -538,6 +541,7 @@ public:
         moves_.clear();
         fadeMs_ = 0;
         slideFrom_ = outFrom_ = -1;
+        covering_ = false;
         selecting_ = false;
         confirming_ = -1;
         pendingChapter_ = 0;
@@ -1012,6 +1016,7 @@ private:
     int holdMs_ = 0;
     std::vector<Bar> bars_;
     int64_t slideFrom_ = -1, outFrom_ = -1;
+    bool covering_ = false;
     uint32_t slides_ = 0;
 };
 
