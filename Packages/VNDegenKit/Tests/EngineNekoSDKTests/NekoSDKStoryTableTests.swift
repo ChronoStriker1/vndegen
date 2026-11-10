@@ -296,24 +296,105 @@ import TestSupport
         #expect(at(first, "scr\\c2.txt"), "\(status(first))")
         #expect(vnneko_debug_save(first, 1))
         #expect(vnneko_debug_save(first, 2))
+        #expect(vnneko_debug_save(first, 3))
         vnneko_stop(first)
-        let sidecar = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
-            .first { $0.lastPathComponent.lowercased() == "save002.vnd" })
-        let lines = try String(contentsOf: sidecar, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.contains { $0.hasPrefix("storytable ") })
-        try lines.map { $0.hasPrefix("storytable ") ? "storytable 1" : String($0) }.joined(separator: "\n")
-            .write(to: sidecar, atomically: true, encoding: .utf8)
-        for (slot, kept) in [(Int32(1), true), (2, false)] {
+        func elsewhere(_ slot: Int, table: String?) throws {
+            let name = "save00\(slot).vnd"
+            let url = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+                .first { $0.lastPathComponent.lowercased() == name })
+            let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+            #expect(lines.contains { $0.hasPrefix("storytable ") })
+            #expect(lines.contains("result 3"))
+            var out = lines.filter { !$0.hasPrefix("story ") }.map { table != nil && $0.hasPrefix("storytable ") ? "storytable \(table ?? "")" : String($0) }
+            out.insert("story story:main 0", at: 0)
+            try out.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        }
+        try elsewhere(2, table: "1")
+        try elsewhere(3, table: nil)
+        for (slot, there) in [(Int32(1), true), (2, true), (3, false)] {
             let e = try #require(NekoSDKFlowFixture.start(root, data: data))
             #expect(vnneko_debug_load(e, slot))
             steps(e, 3)
             #expect(at(e, "scr\\c2.txt"), "\(status(e))")
             click(e)
             steps(e, 200)
-            #expect(status(e).contains("part screen"), "\(status(e))")
-            #expect(vnneko_debug_variable(e, 1, 11) == (kept ? 0 : 1), "slot \(slot)")
+            #expect(status(e).contains("part screen") == there, "slot \(slot) \(status(e))")
+            if there { #expect(vnneko_debug_variable(e, 1, 11) == 0, "slot \(slot)") }
             vnneko_stop(e)
         }
+    }
+
+    @Test func aNodeThatIsNoPCNumberIsNotLookedUpAsOne() throws {
+        let root = try game("storynumber")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storynumber/save")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(first, 10)
+        #expect(at(first, "scr\\c2.txt"), "\(status(first))")
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        let sidecar = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save001.vnd" })
+        let lines = try String(contentsOf: sidecar, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+        #expect(lines.contains("storynumber 0"))
+        try lines.map { $0.hasPrefix("storytable ") ? "storytable 1" : String($0) }.joined(separator: "\n")
+            .write(to: sidecar, atomically: true, encoding: .utf8)
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_load(e, 1))
+        steps(e, 3)
+        #expect(at(e, "scr\\c2.txt"), "\(status(e))")
+        click(e)
+        steps(e, 100)
+        #expect(at(e, "scr\\e.txt"), "\(status(e))")
+        steps(e, 130)
+        for _ in 0..<10 where vnneko_debug_choice_count(e) <= 0 {
+            click(e)
+            steps(e, 20)
+        }
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        #expect(vnneko_debug_save(e, 3))
+        let asking = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save003.vnd" })
+        #expect(try String(contentsOf: asking, encoding: .utf8).split(separator: "\n").contains("storynumber 1"))
+
+        try lines.filter { !$0.hasPrefix("storynumber ") }.joined(separator: "\n").write(to: sidecar, atomically: true, encoding: .utf8)
+        let older = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(older) }
+        #expect(vnneko_debug_load(older, 1))
+        steps(older, 3)
+        #expect(vnneko_debug_save(older, 2))
+        let again = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save002.vnd" })
+        #expect(try String(contentsOf: again, encoding: .utf8).split(separator: "\n").contains("storynumber 0"))
+    }
+
+    @Test func anOlderSidecarsPCNumberIsKnownForOneWhenTheSaveIsMadeAgain() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/storytest/save")
+        func sidecar(_ slot: Int) throws -> URL {
+            try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+                .first { $0.lastPathComponent.lowercased() == "save00\(slot).vnd" })
+        }
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(first, 3)
+        click(first)
+        steps(first, 10)
+        #expect(at(first, "scr\\c2.txt"), "\(status(first))")
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        let lines = try String(contentsOf: try sidecar(1), encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+        #expect(lines.contains("storynumber 1"))
+        try lines.filter { !$0.hasPrefix("storynumber ") }.joined(separator: "\n").write(to: try sidecar(1), atomically: true, encoding: .utf8)
+        let older = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(older) }
+        #expect(vnneko_debug_load(older, 1))
+        steps(older, 3)
+        #expect(vnneko_debug_save(older, 2))
+        #expect(try String(contentsOf: try sidecar(2), encoding: .utf8).split(separator: "\n").contains("storynumber 1"))
     }
 
     @Test func theTablePlaysAndSavesKeepItsPlace() throws {
