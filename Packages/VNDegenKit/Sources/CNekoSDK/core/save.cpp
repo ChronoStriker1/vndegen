@@ -350,7 +350,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "vndegen\\layout94") return &kRinjin;
     // Test Game 90, its bonus release (a game of its own with the same screens: set 1's 14 PC saves of it are each
     // built again byte for byte), and the layout's test game under a folder of its own, with no menu table.
-    if (folder == "waffle\\漫喫ハプニング" || folder == "waffle\\漫喫ハプニング特典ストーリー" || folder == "vndegen\\layout90") return &kMankitsu;
+    if (folder == "waffle\\漫喫ハプニング" || folder == "waffle\\漫喫ハプニング特典ストーリー" || folder == "vndegen\\layout90" || folder == "vndegen\\windowlist") return &kMankitsu;
     return nullptr;
 }
 
@@ -424,8 +424,13 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     for (int k = 0; k < count && r.ok; k++) {
         SavedSprite s;
         if (older) r.skip(size_t(layout.olderRecordGap));
-        r.skip(1);
-        bool ordinary = r.u8() != 0;
+        uint8_t lead = r.u8();
+        uint8_t kind = r.u8();
+        if (&into != &out.sprites && (lead != 1 || kind > 1)) {
+            r.ok = false;
+            break;
+        }
+        bool ordinary = kind != 0;
         s.slot = r.i32();
         int number = r.i32();
         if (!ordinary) s.flipFrame = number;
@@ -571,9 +576,11 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     size_t afterStart = r.at;
     out.afterRecordsTail.clear();
     bool split = false;
+    size_t fixedEnd = afterStart + size_t(layout.afterSize);
     if (layout.afterListAt >= 0) {
         int listed = r.i32At(afterStart + size_t(layout.afterListAt));
         if (listed < 0 || listed > 2000) return false;
+        fixedEnd += size_t(listed) * 4;
         size_t countAt = afterStart + size_t(layout.afterListAt) + 4 + size_t(listed) * 4;
         size_t recordsAt = countAt + 4 + kWindowListHead;
         size_t fixed = size_t(layout.afterListAt) + 8 + kWindowListHead;
@@ -592,13 +599,12 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
                 r.ok = true;
             }
         }
-        if (!split) {
-            r.at = afterStart;
-            r.skip(size_t(layout.afterSize) + size_t(listed) * 4);
-        }
-    } else {
-        r.skip(size_t(layout.afterSize));
     }
+    if (!split) {
+        r.at = afterStart;
+        r.skip(fixedEnd - afterStart);
+    }
+    auto rest = [&]() -> bool {
     if (!r.ok) return false;
     if (!split) out.afterRecords.assign(plain.begin() + std::ptrdiff_t(afterStart), plain.begin() + std::ptrdiff_t(r.at));
     out.windowShown = r.u8() != 0;
@@ -653,6 +659,18 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         out.tailAfter.assign(plain.begin() + std::ptrdiff_t(r.at), plain.end());
     }
     return r.ok;
+    };
+    bool read = rest();
+    size_t tailBytes = out.tailBefore.size() + out.tailAfter.size() + (!older && layout.gtTail ? 8 : 0);
+    if (read && (!split || tailBytes == size_t(layout.tailSize))) return true;
+    if (!split) return false;
+    split = false;
+    out.windowSprites.clear();
+    out.afterRecordsTail.clear();
+    r.ok = true;
+    r.at = afterStart;
+    r.skip(fixedEnd - afterStart);
+    return rest();
 }
 
 std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
@@ -844,15 +862,14 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     }
 
     size_t head = layout.afterListAt >= 0 ? size_t(layout.afterListAt) + 8 + kWindowListHead : 0;
-    if (!d.afterRecords.empty() && d.windowSprites.empty()) {
-        w.b.insert(w.b.end(), d.afterRecords.begin(), d.afterRecords.end());
-        w.b.insert(w.b.end(), d.afterRecordsTail.begin(), d.afterRecordsTail.end());
-    } else if (!d.afterRecords.empty() && !d.afterRecordsTail.empty() && d.afterRecords.size() >= kWindowListHead + 4) {
+    if (!d.afterRecords.empty() && !d.afterRecordsTail.empty() && d.afterRecords.size() >= kWindowListHead + 4) {
         size_t block = w.b.size();
         w.b.insert(w.b.end(), d.afterRecords.begin(), d.afterRecords.end());
         w.setI32(block + d.afterRecords.size() - kWindowListHead - 4, int32_t(d.windowSprites.size()));
         for (size_t i = 0; i < d.windowSprites.size(); i++) record(d.windowSprites[i], false, i + 1 < d.windowSprites.size());
         w.b.insert(w.b.end(), d.afterRecordsTail.begin(), d.afterRecordsTail.end());
+    } else if (!d.afterRecords.empty() && d.windowSprites.empty()) {
+        w.b.insert(w.b.end(), d.afterRecords.begin(), d.afterRecords.end());
     } else if (!d.windowSprites.empty() && head > 0 && size_t(layout.afterSize) >= head) {
         std::vector<uint8_t> block(size_t(layout.afterSize));
         apply(layout.after, block.data());

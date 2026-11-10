@@ -26,7 +26,7 @@ import TestSupport
 
     private func game() throws -> URL {
         func button(_ name: String, _ x: Int) -> String {
-            (["#inner \(name)", "obj\\b.bmp", name == "Extension" ? "2" : "0", "\(x),600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]).joined(separator: "\n") + "\n##\n"
+            (["#inner \(name)", "obj\\b.bmp", name == "Ejaculation" ? "0" : "2", "\(x),600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]).joined(separator: "\n") + "\n##\n"
         }
         let line = NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 5, next: 0, s: [2: "x"])])
         func scene(_ name: String) -> Data {
@@ -40,7 +40,7 @@ import TestSupport
         }
         var files: [String: Data] = [
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\gttest\nFirstFlow\tflow\\t.txt\n".utf8),
-            "cfg/msg_button.ini": Data((button("Extension", 1000) + button("Ejaculation", 900)).utf8),
+            "cfg/msg_button.ini": Data((button("Extension", 1000) + button("Ejaculation", 900) + button("GOODTiming", 800)).utf8),
             "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", sheet())]),
             "flow/t.txt": NekoSDKFlowFixture.flow([
                 .init(op: 0, next: 2),
@@ -116,5 +116,37 @@ import TestSupport
         #expect(playing(again) == "scr\\s1.txt")
         click(again)
         #expect(playing(again) == "gt\\scr\\onex.txt")
+    }
+
+    @Test func extendDoesNothingWhileTheSwitchIsOff() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(playing(e) == "scr\\s1.txt")
+        #expect(vnneko_debug_press(e, "Extension"))
+        #expect(vnneko_debug_press(e, "GOODTiming"))
+        click(e)
+        #expect(playing(e) == "scr\\s1.txt")
+        click(e)
+        #expect(playing(e) == "scr\\s2.txt")
+    }
+
+    @Test func theSwitchTurnedOffEndsAnExtensionAtItsNextScript() throws {
+        let root = try game()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(playing(e) == "scr\\s1.txt")
+        #expect(vnneko_debug_press(e, "Extension"))
+        click(e)
+        #expect(playing(e) == "gt\\scr\\onex.txt")
+        click(e)
+        #expect(playing(e) == "gt\\scr\\oneA1.txt")
+        #expect(vnneko_debug_press(e, "GOODTiming"))
+        click(e)
+        #expect(playing(e) == "scr\\s1.txt")
+        click(e)
+        #expect(playing(e) == "scr\\s2.txt")
     }
 }

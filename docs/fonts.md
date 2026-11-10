@@ -21,6 +21,7 @@ module, and KiriKiri, RGSS, and the other native engines through `Engines/Shared
 | Courier New, Lucida Console | Liberation Mono | `LiberationMono-Regular.ttf`, `-Bold.ttf` | Liberation 2.1.5 release | SIL OFL 1.1 |
 | Tahoma, MS Shell Dlg 2 | DejaVu Sans Condensed | `DejaVuSansCondensed.ttf`, `-Bold.ttf` | DejaVu 2.37 release | Bitstream Vera license, DejaVu changes public domain |
 | Lucida Sans Unicode | Open Sans (closest, not a metric match) | `OpenSans-Regular.ttf` | Open Sans 3.003, googlefonts/opensans | SIL OFL 1.1 |
+| Calibri | Carlito (the same widths) | `Carlito-Regular.ttf` | Carlito 1.104, google/fonts | SIL OFL 1.1 |
 | Verdana | DejaVu Sans (closest, not a metric match) | `DejaVuSans.ttf` | DejaVu 2.37 release | Bitstream Vera license, DejaVu changes public domain |
 | MS Gothic, ＭＳ ゴシック | Ume Gothic | `ume-tgo4.ttf` | Ume font 670 | Ume font license |
 | MS PGothic, ＭＳ Ｐゴシック | Ume P Gothic | `ume-pgo4.ttf` | Ume font 670 | Ume font license |
@@ -50,6 +51,12 @@ Where each comes from:
   `bd7e37632246368c60fdcbd374dbf9bad11969b6`, version 3.003 (SHA-256
   `c53aceea2dcf5b4098099c0c4d0a061d17e178a049317b42a422b1a9f7f8eb59`), with the repository's `OFL.txt`. Regular only:
   the games that ask for Lucida Sans Unicode never ask for it bold.
+- Carlito: `ofl/carlito/Carlito-Regular.ttf` of github.com/google/fonts at commit
+  `605c9f29dd5770762bd7ee8ea8ac4ae7664b2b7b`, version 1.104 (SHA-256
+  `f6418f708baede9789daef5d458c0f53d2a888af9820e8062934e504fedc6595`), with that folder's `OFL.txt`. Its own
+  repository, github.com/googlefonts/carlito, keeps the sources and no built font. Carlito has Calibri's advance
+  widths, so text set in it breaks where Calibri's does. Regular only, 628 KB: Test Game 86 asks for Calibri plain
+  and italic, and the NekoSDK runtime draws no italics.
 - Source Han Sans: Adobe's 2.005R release on github.com/adobe-fonts/source-han-sans, pinned by SHA-256 in
   `FontPack.swift`. The download keeps Regular, Bold, and Adobe's `LICENSE.txt`. Proton builds its Microsoft YaHei,
   SimSun, and Malgun Gothic from the same fonts.
