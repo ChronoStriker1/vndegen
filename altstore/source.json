@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.32.3",
+          "buildVersion": "2212",
+          "date": "2026-11-10T14:06:49Z",
+          "localizedDescription": "A game that can't start now says why, back in the library.\n\n## Downloads\n\n- `VNDegen-0.32.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.32.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- A game that can't start says so when you're back in the library, with the reason when VNDegen knows it, such as a script file or `index.html` that's missing or can't be read (#70). Before, the library came back with no message, and a web game with a missing first page left you on a blank page.\n- NScripter: a script file that can't be read is named in the message. Before, an unreadable `0.txt` started an empty game.\n- Leaving a game before its engine has started no longer moves it to the front of Recently played (#72).\n- Unity on a Mac: if a game's settings can't be saved back after play, the message says that and why, where it used to say the game couldn't start (#71). Unity's own \"couldn't start\" screen is gone; it uses the library's message like every other engine.\n- Web games (RPG Maker MV and MZ, TyranoScript, Flash): once a game is running, a link to a page that doesn't exist keeps the current page. Before, it showed a blank page.\n\n## Known limits\n\n- KiriKiri gives no reason with its message, only that the game couldn't start.\n- A web game that fails early for a reason other than a missing first page shows the message without a reason.\n\n## What wasn't tested\n\n- No physical device was used.\n- The message was triggered by hand in the Mac app and on the iPad simulator with two games: an NScripter game whose script file couldn't be read, and a TyranoScript game with its `index.html` removed. The other engines' messages are covered by the library's automated test, not triggered by hand.\n- Leaving during start was tested automatically with an NScripter game and an RPG Maker MV game. The other engines' part is one line each and was checked by reading.\n- The Unity settings message was tested automatically with a folder that can't be written to, not with a real CrossOver bottle.\n- This release had one code review partway through and none of its final state.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.32.3/VNDegen-0.32.3.ipa",
+          "size": 124536949,
+          "sha256": "ad1de48630821e8821caa16573b9c9482bd8ee85f57c7d23bc030010d8d95554",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.32.2",
           "buildVersion": "2200",
           "date": "2026-11-10T13:01:54Z",
