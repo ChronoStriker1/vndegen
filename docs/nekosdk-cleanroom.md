@@ -236,6 +236,10 @@ The numbers after `@` are the PC's own, read from saves made scene by scene, for
 
 Unconfirmed: the prologue's first number, taken as 1 since its other four scenes hold 2 to 5; and that global 2 is what turns Start's two entries on, taken from Test Game 83. Its `cfg.sav` after one ending held globals 1, 2, 4, 23, 24, 30, 31, 35, 50 and 400.
 
+### Test Game 86's saves
+
+The PC's saves keep a CG in slot 102, as Test Game 82's do (`cg\h959b` in two saves at the second choice), so the table sets `layoutcgslot 102`: a VNDegen save made there holds the same record, the PC loads it to VNDegen's frame but for the text's edges, and the PC's save loaded in VNDegen stays the PC's above the window through the choice and two lines on. All 100 cards are ordinary saves, numbered 081 to 100 on pages 9 and 10 (`quickslots 101 100`). In the Mac app a PC save loads from the Load screen, and a save made from the control panel (`saveNNN.sav`, its `s` file and thumbnail) shows on the PC's Load screen with its date and chapter.
+
 ### Test Game 86's text
 
 Its text hook (`addons\text.dll`, observed only) asks Windows for Calibri at a height of 27, and at 108 for its fourfold anti-aliasing: Wine's font log, and a commented-out `MsgFont Calibri` in init.ini. A height of 27 is the cell, an em of about 22 pixels. The table sets Carlito, the face with Calibri's widths, at 22 with lines 32 apart (init.ini's size 27 and line interval 5). Against six PC lines, with Carlito standing in for Calibri in the Wine prefix, the text rows agree to a pixel and narration ends on the same column.

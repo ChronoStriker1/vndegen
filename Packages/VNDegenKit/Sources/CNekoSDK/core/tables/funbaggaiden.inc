@@ -417,6 +417,8 @@ textshift 0 -1
 twobyteadvance
 inneralways
 plateholds
+quickslots 101 100
+layoutcgslot 102
 squarewindow 0
 default opacity 100
 default text 50
