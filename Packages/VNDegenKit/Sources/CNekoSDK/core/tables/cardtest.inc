@@ -68,3 +68,17 @@ slots obj\c.bmp 60 99 510 119 5 2 1
 slotrows 5
 slotdigits obj\d.bmp 229 6 3 15
 )";
+
+const char kViewerRestsTest[] = R"(
+screen title
+button cg obj\none.bmp 0 0 1 1 0
+
+screen cg
+cell 100 100
+cellsize 60 50
+cellthumb 10 10
+viewer obj\p.bmp 0 620
+viewerclicks
+viewerrests 500 360
+viewerbutton return obj\t.bmp 900 650 1 0
+)";

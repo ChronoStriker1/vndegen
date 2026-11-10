@@ -24,11 +24,9 @@ default se 60
 default hse 60
 default voice 80
 default backvoice 80
-# Text and auto speed run 0 to 100 and start at 50, as its Config shows. Their pace isn't timed on 90's PC yet: Test
-# Game 87's, the same Config, stands in (unconfirmed).
 default text 50
 textfade 50
-textpoints text 0 184.9 10 153.7 25 101.8 40 52.6 50 17.6 60 4.9 75 2.6 90 1.5 100 0
+textpoints text 1 296 21 181 30 147 40 88.3 50 29.6 60 9.4 71 5.4 81 4.1 91 3.1 100 0
 default auto 50
 autocurve auto 104 1.04 527 1
 autowithvoice
@@ -390,6 +388,18 @@ const char kMankitsuGame[] = R"(
 # dashed card with its number; CG cards count the pictures seen.
 screen cg
 part mankitsu
+viewer obj\g000_000.bmp 0 616
+viewerclicks
+viewerrests 2400 360
+viewerauto 5000 0
+viewernumber index obj\g001_000.bmp 999 667 21 2
+viewernumber total obj\g001_001.bmp 1058 673 17 2
+viewerbutton replay obj\g004_000.bmp 605 665
+viewerbutton auto obj\g003_000.bmp 753 670 3 0
+viewerbutton nextcg obj\g003_000.bmp 827 670 3 1
+viewerbutton prevvar obj\g002_000.bmp 927 663 2 0
+viewerbutton nextvar obj\g002_000.bmp 1123 663 2 1
+viewerbutton return obj\g003_000.bmp 1191 670 3 2
 pic obj\f000_000.bmp 0 0
 pic obj\f001_000.bmp 0 400
 pic obj\f000_001.bmp 468 74
@@ -804,6 +814,18 @@ button music obj\d001_002.bmp 746 462 5 5 4 group extras help obj\d002_000.bmp 6
 # entries; the other four are greyed, as on its PC.
 screen cg
 part mankitsu
+viewer obj\g000_000.bmp 0 616
+viewerclicks
+viewerrests 2400 360
+viewerauto 5000 0
+viewernumber index obj\g001_000.bmp 999 667 21 2
+viewernumber total obj\g001_001.bmp 1058 673 17 2
+viewerbutton replay obj\g004_000.bmp 605 665
+viewerbutton auto obj\g003_000.bmp 753 670 3 0
+viewerbutton nextcg obj\g003_000.bmp 827 670 3 1
+viewerbutton prevvar obj\g002_000.bmp 927 663 2 0
+viewerbutton nextvar obj\g002_000.bmp 1123 663 2 1
+viewerbutton return obj\g003_000.bmp 1191 670 3 2
 pic obj\f000_000.bmp 0 0
 pic obj\f001_000.bmp 0 400
 pic obj\f000_001.bmp 468 74

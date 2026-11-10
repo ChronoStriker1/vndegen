@@ -533,6 +533,11 @@ private:
     // all of the entry's pictures, the panel hidden, the slideshow, zoom in hundredths, the entry's music and the art shown.
     size_t viewEntry_ = 0, viewImage_ = 0;
     bool viewPanelHidden_ = false, viewAuto_ = false, viewMuted_ = false, replayFromViewer_ = false;
+    int64_t viewPanelSeenAt_ = 0;
+    bool viewPanelJustShown_ = false;
+    void viewerPointerMoved(int y);
+    bool viewerRests() const;
+    bool onViewerPanel(int x, int y) const;
     // The Scene screen's tab and page as a replay began, for `replaykeeps`.
     int replayTab_ = 0, replayPage_ = -1;
     int64_t viewMs_ = 0, viewAutoFrom_ = 0;
