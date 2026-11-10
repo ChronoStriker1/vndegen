@@ -1794,10 +1794,13 @@ void Engine::composeTrackTime(Canvas &out) {
         std::string name = (*playing)[0];
         size_t dot = name.rfind('.');
         if (dot != std::string::npos && dot >= 3 && std::isdigit(uint8_t(name[dot - 1])) && std::isdigit(uint8_t(name[dot - 2])) && std::isdigit(uint8_t(name[dot - 3]))) {
+            int number = std::atoi(name.substr(dot - 3, 3).c_str()) + currentTrack_;
             char digits[8];
-            std::snprintf(digits, sizeof digits, "%03d", (std::atoi(name.substr(dot - 3, 3).c_str()) + currentTrack_) % 1000);
+            std::snprintf(digits, sizeof digits, "%03d", number % 1000);
             name.replace(dot - 3, 3, digits);
-            if (ImageRef picture = images_->get(name)) drawPart(out, *picture, field(*playing, 1), field(*playing, 2), 0, 0, picture->w, picture->h, 1);
+            if (ImageRef picture = number < 1000 ? images_->get(name) : nullptr) drawPart(out, *picture, field(*playing, 1), field(*playing, 2), 0, 0, picture->w, picture->h, 1);
+        } else {
+            warnOnce("playingpic needs a file with three digits before its extension: " + name);
         }
     }
     const auto *seek = screen_->setting("trackseek");
@@ -4254,7 +4257,7 @@ void Engine::runFlow(const Node &n) {
         }
         break;
     }
-    case 2:  // the end of the story, which goes back to the title, or with parameter 0 set the staff roll, then on
+    case 2:
         if (n.p[0] == 1) {
             flow.node = flow.script->node(n.next);
             startStaffRoll(flow.script->name.rfind("story:", 0) == 0 ? n.s[1] : "");
