@@ -347,7 +347,7 @@ private:
     // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
     // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
     struct GoodTiming {
-        bool active = false, extend = false, extending = false, ejaculating = false;
+        bool active = false, extending = false, ejaculating = false;
         std::shared_ptr<Script> main;
         int marker = 0, count = 0, group = -1, index = 0, played = 0, shownCount = 0;
         std::string config;

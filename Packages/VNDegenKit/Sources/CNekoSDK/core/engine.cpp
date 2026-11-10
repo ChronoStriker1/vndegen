@@ -77,7 +77,7 @@ const std::map<std::string, int> &defaultSettings() {
         {"mute_master", 0}, {"mute_bgm", 0}, {"mute_se", 0}, {"mute_voice", 0}, {"mute_hse", 0}, {"mute_backvoice", 0},
         // Whether a click that moves the text on stops its voice, as the PC games without the setting always do.
         {"voice_stop", 1},
-        {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60}, {"count_color", 1}, {"gt_off", 0}, {"express", 1}, {"bar_always", 0}, {"cg_anim", 1}, {"anim_manual", 0},
+        {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60}, {"count_color", 1}, {"gt_off", 0}, {"gt_extend", 0}, {"express", 1}, {"bar_always", 0}, {"cg_anim", 1}, {"anim_manual", 0},
         {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1}, {"confirm_back", 1}, {"confirm", 1},
         // Config's effects, waits, clicking past waits and the H scenes' camera work, as the PC starts them.
         {"effect", 1}, {"wait", 1}, {"waitskip", 0}, {"camera", 1}, {"tutorial", 1},
@@ -648,7 +648,10 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "Extension") {
-        if (gt_.active && !gt_.extending && !setting("gt_off")) gt_.extend = !gt_.extend;
+        if (gt_.active && !gt_.extending && !setting("gt_off")) {
+            changeSetting("gt_extend", setting("gt_extend") ? 0 : 1);
+            saveSettings();
+        }
         return;
     }
     if (action == "GOODTiming") {
@@ -2897,10 +2900,7 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
         askedColumns_ = askedResult_ = std::max(0, d.choiceColumns);
         askedCells_ = d.choiceCells;
     }
-    // The PC's saves don't hold Extend: two saves differing only in it match. It stays as it was across a load.
-    bool extendWas = gt_.extend;
     gt_ = {};
-    gt_.extend = extendWas;
     if (!d.gtConfig.empty() && readGtConfig(d.gtConfig) && d.gtState >= 0 && !d.gtScene.empty()) {
         gt_.main = loadScript(d.gtScene);
         if (gt_.main) {
@@ -3950,7 +3950,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         if (b.action == "Ejaculation" && (!gt_.active || setting("gt_off"))) return StateDisabled;
         if (b.action == "Extension") {
             if (!gt_.active || gt_.extending || setting("gt_off")) return StateDisabled;
-            on = gt_.extend;
+            on = setting("gt_extend") != 0;
         }
         if (b.action == "GOODTiming") on = setting("gt_off") != 0;
         // The down button has nowhere to go while the line in play shows, and is drawn disabled; with an older line in
@@ -5605,7 +5605,6 @@ void Engine::gtBegin(const Node &n) {
         return;
     }
     gt_.active = true;
-    gt_.extend = false;
     gt_.extending = false;
     gt_.ejaculating = false;
     gt_.main = scene_.script;
@@ -5623,7 +5622,7 @@ void Engine::gtReachMarker(const Node &) {
     gt_.shownCount = 0;
     dirty_ = true;
     if (!gt_.active) return;
-    if (!gt_.extend) {
+    if (!setting("gt_extend")) {
         gt_.active = false;
         return;
     }
@@ -5671,8 +5670,6 @@ bool Engine::gtBackToStory() {
     return true;
 }
 
-// A script of GOOD Timing's has ended. Groups play whole, and which comes next looks random on the PC, without one twice
-// running. Docs/engines.md lists that as a guess.
 bool Engine::gtNextScript() {
     if (gt_.ejaculating) return gtBackToStory();
     if (!gt_.extending) return false;
