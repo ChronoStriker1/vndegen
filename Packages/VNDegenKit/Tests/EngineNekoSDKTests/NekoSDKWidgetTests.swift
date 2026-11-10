@@ -302,7 +302,7 @@ import TestSupport
         #expect(vnneko_debug_jump(e, "flow\\t.txt", 0))
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
-        let place = { status().components(separatedBy: " ").prefix(2).joined(separator: " ") }
+        let place = { status().components(separatedBy: " ").prefix(2).joined(separator: " ").replacingOccurrences(of: "sys_1\\", with: "") }
         let before = place()
         #expect(vnneko_debug_press(e, "scene"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
