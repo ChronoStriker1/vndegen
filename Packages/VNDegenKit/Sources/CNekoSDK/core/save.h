@@ -32,6 +32,7 @@ struct SavedSprite {
     std::string animation;    // lines such as `relative_pos_x,-200,0,2400,linear`
     float endX = 0, endY = 0, endScaleX = 1, endScaleY = 1;
     int endAlpha = 256;
+    bool alphaRead256 = false, endAlphaRead256 = false;
     // The film noise's record: no picture, kind 4, and the window's size where the first record keeps the screen's.
     bool noise = false;
     // A splash effect's record (Test Game 88's 200 and 201): no picture, its droplet's picture named in the record, and
@@ -115,7 +116,8 @@ struct SaveData {
     int rootAlpha = 256;
     // As read from a PC save, kept so it's written back as it was: the screen record's raw parts, the block after the
     // records with its list of slots, and the tail after the scene's name around the fields the runtime reads.
-    std::vector<uint8_t> rootFixed, rootTail, afterRecords, tailBefore, tailAfter;
+    std::vector<uint8_t> rootFixed, rootTail, afterRecords, afterRecordsTail, tailBefore, tailAfter;
+    std::vector<SavedSprite> windowSprites;
     SavedText current;
     // The 24 bytes after the text on screen, whose meaning isn't known: zeros in most saves, kept as the PC wrote them.
     std::array<uint8_t, 24> afterText{};

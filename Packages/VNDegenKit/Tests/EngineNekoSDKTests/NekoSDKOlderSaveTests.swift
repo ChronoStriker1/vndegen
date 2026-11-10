@@ -246,8 +246,6 @@ import TestSupport
             let at = path.lowerBound - save.startIndex + 12 + place
             #expect(int32(save, at) == (folder == "layout90" ? 255 : 256), "\(folder)")
             for alpha in [Int32(512), 300, 255, 256, 100] {
-                // 90's layout holds 255 for a shown sprite and never 256, which it would write back as 255.
-                if folder == "layout90" && alpha == 256 { continue }
                 save.replaceSubrange((save.startIndex + at)..<(save.startIndex + at + 4), with: withUnsafeBytes(of: alpha.littleEndian, { Data($0) }))
                 var built = [UInt8](repeating: 0, count: save.count + 64)
                 let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\\(folder)", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
@@ -301,5 +299,59 @@ import TestSupport
         #expect(vnneko_debug_load(second, 1))
         for _ in 0..<3 { _ = vnneko_step(second, 16) }
         #expect(pixel(second, 194, 326) == [255, 0, 0])
+    }
+
+    @Test func aSaveWithASecondListOfRecordsReadsAndIsBuiltAgain() throws {
+        let root = try game("layout90")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(first, 16) }
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        let url = try file(data, "save001.sav", "layout90")
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: url))
+        let name = try #require(save.range(of: Data("sc\\r.bmp".utf8))).lowerBound
+        let record = (name - 14)..<(name - 14 + 452 + 8)
+        let block = record.upperBound - save.startIndex
+        #expect(int32(save, block + 2) == -1)
+        #expect(int32(save, block + 22) == 0)
+        #expect(int32(save, block + 26) == 0)
+        var second = save.subdata(in: record)
+        second.replaceSubrange((second.startIndex + 2)..<(second.startIndex + 6), with: withUnsafeBytes(of: Int32(2000).littleEndian, { Data($0) }))
+        save.replaceSubrange((save.startIndex + block + 26)..<(save.startIndex + block + 30), with: withUnsafeBytes(of: Int32(1).littleEndian, { Data($0) }))
+        save.insert(contentsOf: second, at: save.startIndex + block + 70)
+        var built = [UInt8](repeating: 0, count: save.count + 64)
+        let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout90", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+        #expect(size == save.count)
+        #expect(Data(built.prefix(size)) == save)
+        try NekoSDKFlowFixture.packed(save).write(to: url)
+        try? FileManager.default.removeItem(at: try file(data, "save001.vnd", "layout90"))
+        let again = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(again) }
+        #expect(vnneko_debug_load(again, 1))
+        for _ in 0..<3 { _ = vnneko_step(again, 16) }
+        #expect(pixel(again, 194, 326) == [255, 0, 0])
+    }
+
+    @Test func aChanceCountWithNoSecondListStillReadsAsBefore() throws {
+        let root = try game("layout90")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_save(e, 1))
+        vnneko_stop(e)
+        var save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file(data, "save001.sav", "layout90")))
+        let name = try #require(save.range(of: Data("sc\\r.bmp".utf8))).lowerBound
+        let block = name - 14 + 452 + 8 - save.startIndex
+        #expect(int32(save, block + 26) == 0)
+        for count in [Int32(1), 2, 64] {
+            save.replaceSubrange((save.startIndex + block + 26)..<(save.startIndex + block + 30), with: withUnsafeBytes(of: count.littleEndian, { Data($0) }))
+            var built = [UInt8](repeating: 0, count: save.count + 64)
+            let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\layout90", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+            #expect(size == save.count, "\(count)")
+            #expect(Data(built.prefix(size)) == save, "\(count)")
+        }
     }
 }
