@@ -29,6 +29,207 @@ size 96000
 tracks 92000
 nostring
 
+screen staffroll_a
+length 133900
+music bgm\BGM29.ogg
+pic bg\bg_b.bmp 0 0
+pic obj\n004_000.bmp 627 0 fadein 16300 3000 fadeout 30500 3000
+pic obj\n004_001.bmp 627 0 fadein 30500 3000 fadeout 43950 3000
+pic obj\n004_002.bmp 627 0 fadein 43950 3000 fadeout 57400 3000
+pic obj\n004_003.bmp 627 0 fadein 57400 3000 fadeout 70850 3000
+pic obj\n004_004.bmp 627 0 fadein 70850 3000 fadeout 84300 3000
+pic obj\n004_005.bmp 627 0 fadein 84300 3000 fadeout 97750 3000
+pic obj\n004_006.bmp 627 0 fadein 97750 3000 fadeout 111200 3000
+pic obj\n004_007.bmp 627 0 fadein 111200 3000
+pic obj\n000_000.bmp 0 0 fadein 16300 3000
+pic obj\d000_003.bmp 254 110 alpha 72 fadein 4200 800 fadeout 8000 2600
+pic obj\d000_003.bmp 254 110 fadein 8000 2600 fadeout 15200 2000
+pic obj\n001_041.bmp 133 254 1 1 0 0 fadein 20500 700 fadeout 24400 600
+pic obj\n001_042.bmp 133 164 1 8 0 0 fadein 27800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 209 1 8 0 1 fadein 28600 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 254 1 8 0 2 fadein 30100 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 299 1 8 0 3 fadein 30800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 344 1 8 0 4 fadein 31600 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 389 1 8 0 5 fadein 33100 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 434 1 8 0 6 fadein 33800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 479 1 8 0 7 fadein 35300 700 fadeout 38600 600
+pic obj\n001_043.bmp 133 164 1 5 0 0 fadein 42300 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 209 1 5 0 1 fadein 43900 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 254 1 5 0 2 fadein 44700 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 299 1 5 0 3 fadein 45500 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 344 1 5 0 4 fadein 47100 700 fadeout 50500 600
+pic obj\n001_044.bmp 133 164 1 4 0 0 fadein 54300 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 209 1 4 0 1 fadein 55100 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 254 1 4 0 2 fadein 56700 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 299 1 4 0 3 fadein 57500 700 fadeout 60900 600
+pic obj\n001_045.bmp 133 164 1 5 0 0 fadein 64600 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 254 1 5 0 1 fadein 65400 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 299 1 5 0 2 fadein 66200 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 344 1 5 0 3 fadein 67800 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 434 1 5 0 4 fadein 68600 700 fadeout 72100 600
+pic obj\n001_046.bmp 133 164 1 6 0 0 fadein 76000 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 254 1 6 0 1 fadein 76900 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 344 1 6 0 2 fadein 78500 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 389 1 6 0 3 fadein 78500 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 434 1 6 0 4 fadein 79300 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 479 1 6 0 5 fadein 79300 700 fadeout 83000 600
+pic obj\n001_047.bmp 133 164 1 7 0 0 fadein 86000 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 209 1 7 0 1 fadein 86800 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 254 1 7 0 2 fadein 87600 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 299 1 7 0 3 fadein 88500 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 344 1 7 0 4 fadein 88500 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 389 1 7 0 5 fadein 89300 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 434 1 7 0 6 fadein 89300 700 fadeout 92800 600
+pic obj\n001_048.bmp 133 164 1 5 0 0 fadein 96600 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 254 1 5 0 1 fadein 98200 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 344 1 5 0 2 fadein 99000 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 389 1 5 0 3 fadein 99800 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 434 1 5 0 4 fadein 100600 700 fadeout 104000 600
+pic obj\n001_049.bmp 133 164 1 4 0 0 fadein 108800 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 254 1 4 0 1 fadein 109600 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 344 1 4 0 2 fadein 110400 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 434 1 4 0 3 fadein 111300 700 fadeout 113900 600
+pic obj\n001_050.bmp 133 164 1 3 0 0 fadein 117900 700 fadeout 123900 600
+pic obj\n001_050.bmp 133 254 1 3 0 1 fadein 118700 700 fadeout 123900 600
+pic obj\n001_050.bmp 133 344 1 3 0 2 fadein 120300 700 fadeout 123900 600
+pic obj\n001_051.bmp 133 164 1 2 0 0 fadein 126200 700 fadeout 129800 600
+pic obj\n001_051.bmp 133 254 1 2 0 1 fadein 126200 700 fadeout 129800 600
+pic bg\bg_w.bmp 0 0 fadein 132300 1600
+
+screen staffroll_b
+length 133900
+music bgm\BGM29.ogg
+pic bg\bg_b.bmp 0 0
+pic obj\n003_000.bmp 627 0 fadein 16300 3000 fadeout 30500 3000
+pic obj\n003_001.bmp 627 0 fadein 30500 3000 fadeout 43950 3000
+pic obj\n003_002.bmp 627 0 fadein 43950 3000 fadeout 57400 3000
+pic obj\n003_003.bmp 627 0 fadein 57400 3000 fadeout 70850 3000
+pic obj\n003_004.bmp 627 0 fadein 70850 3000 fadeout 84300 3000
+pic obj\n003_005.bmp 627 0 fadein 84300 3000 fadeout 97750 3000
+pic obj\n003_006.bmp 627 0 fadein 97750 3000 fadeout 111200 3000
+pic obj\n003_007.bmp 627 0 fadein 111200 3000
+pic obj\n000_000.bmp 0 0 fadein 16300 3000
+pic obj\d000_003.bmp 254 110 alpha 72 fadein 4200 800 fadeout 8000 2600
+pic obj\d000_003.bmp 254 110 fadein 8000 2600 fadeout 15200 2000
+pic obj\n001_041.bmp 133 254 1 1 0 0 fadein 20500 700 fadeout 24400 600
+pic obj\n001_042.bmp 133 164 1 8 0 0 fadein 27800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 209 1 8 0 1 fadein 28600 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 254 1 8 0 2 fadein 30100 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 299 1 8 0 3 fadein 30800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 344 1 8 0 4 fadein 31600 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 389 1 8 0 5 fadein 33100 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 434 1 8 0 6 fadein 33800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 479 1 8 0 7 fadein 35300 700 fadeout 38600 600
+pic obj\n001_043.bmp 133 164 1 5 0 0 fadein 42300 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 209 1 5 0 1 fadein 43900 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 254 1 5 0 2 fadein 44700 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 299 1 5 0 3 fadein 45500 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 344 1 5 0 4 fadein 47100 700 fadeout 50500 600
+pic obj\n001_044.bmp 133 164 1 4 0 0 fadein 54300 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 209 1 4 0 1 fadein 55100 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 254 1 4 0 2 fadein 56700 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 299 1 4 0 3 fadein 57500 700 fadeout 60900 600
+pic obj\n001_045.bmp 133 164 1 5 0 0 fadein 64600 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 254 1 5 0 1 fadein 65400 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 299 1 5 0 2 fadein 66200 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 344 1 5 0 3 fadein 67800 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 434 1 5 0 4 fadein 68600 700 fadeout 72100 600
+pic obj\n001_046.bmp 133 164 1 6 0 0 fadein 76000 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 254 1 6 0 1 fadein 76900 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 344 1 6 0 2 fadein 78500 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 389 1 6 0 3 fadein 78500 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 434 1 6 0 4 fadein 79300 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 479 1 6 0 5 fadein 79300 700 fadeout 83000 600
+pic obj\n001_047.bmp 133 164 1 7 0 0 fadein 86000 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 209 1 7 0 1 fadein 86800 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 254 1 7 0 2 fadein 87600 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 299 1 7 0 3 fadein 88500 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 344 1 7 0 4 fadein 88500 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 389 1 7 0 5 fadein 89300 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 434 1 7 0 6 fadein 89300 700 fadeout 92800 600
+pic obj\n001_048.bmp 133 164 1 5 0 0 fadein 96600 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 254 1 5 0 1 fadein 98200 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 344 1 5 0 2 fadein 99000 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 389 1 5 0 3 fadein 99800 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 434 1 5 0 4 fadein 100600 700 fadeout 104000 600
+pic obj\n001_049.bmp 133 164 1 4 0 0 fadein 108800 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 254 1 4 0 1 fadein 109600 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 344 1 4 0 2 fadein 110400 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 434 1 4 0 3 fadein 111300 700 fadeout 113900 600
+pic obj\n001_050.bmp 133 164 1 3 0 0 fadein 117900 700 fadeout 123900 600
+pic obj\n001_050.bmp 133 254 1 3 0 1 fadein 118700 700 fadeout 123900 600
+pic obj\n001_050.bmp 133 344 1 3 0 2 fadein 120300 700 fadeout 123900 600
+pic obj\n001_051.bmp 133 164 1 2 0 0 fadein 126200 700 fadeout 129800 600
+pic obj\n001_051.bmp 133 254 1 2 0 1 fadein 126200 700 fadeout 129800 600
+pic bg\bg_w.bmp 0 0 fadein 132300 1600
+
+screen staffroll_c
+length 133900
+music bgm\BGM29.ogg
+pic bg\bg_b.bmp 0 0
+pic obj\n002_000.bmp 627 0 fadein 16300 3000 fadeout 30500 3000
+pic obj\n002_001.bmp 627 0 fadein 30500 3000 fadeout 43950 3000
+pic obj\n002_002.bmp 627 0 fadein 43950 3000 fadeout 57400 3000
+pic obj\n002_003.bmp 627 0 fadein 57400 3000 fadeout 70850 3000
+pic obj\n002_004.bmp 627 0 fadein 70850 3000 fadeout 84300 3000
+pic obj\n002_005.bmp 627 0 fadein 84300 3000 fadeout 97750 3000
+pic obj\n002_006.bmp 627 0 fadein 97750 3000 fadeout 111200 3000
+pic obj\n002_007.bmp 627 0 fadein 111200 3000
+pic obj\n000_000.bmp 0 0 fadein 16300 3000
+pic obj\d000_003.bmp 254 110 alpha 72 fadein 4200 800 fadeout 8000 2600
+pic obj\d000_003.bmp 254 110 fadein 8000 2600 fadeout 15200 2000
+pic obj\n001_041.bmp 133 254 1 1 0 0 fadein 20500 700 fadeout 24400 600
+pic obj\n001_042.bmp 133 164 1 8 0 0 fadein 27800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 209 1 8 0 1 fadein 28600 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 254 1 8 0 2 fadein 30100 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 299 1 8 0 3 fadein 30800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 344 1 8 0 4 fadein 31600 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 389 1 8 0 5 fadein 33100 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 434 1 8 0 6 fadein 33800 700 fadeout 38600 600
+pic obj\n001_042.bmp 133 479 1 8 0 7 fadein 35300 700 fadeout 38600 600
+pic obj\n001_043.bmp 133 164 1 5 0 0 fadein 42300 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 209 1 5 0 1 fadein 43900 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 254 1 5 0 2 fadein 44700 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 299 1 5 0 3 fadein 45500 700 fadeout 50500 600
+pic obj\n001_043.bmp 133 344 1 5 0 4 fadein 47100 700 fadeout 50500 600
+pic obj\n001_044.bmp 133 164 1 4 0 0 fadein 54300 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 209 1 4 0 1 fadein 55100 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 254 1 4 0 2 fadein 56700 700 fadeout 60900 600
+pic obj\n001_044.bmp 133 299 1 4 0 3 fadein 57500 700 fadeout 60900 600
+pic obj\n001_045.bmp 133 164 1 5 0 0 fadein 64600 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 254 1 5 0 1 fadein 65400 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 299 1 5 0 2 fadein 66200 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 344 1 5 0 3 fadein 67800 700 fadeout 72100 600
+pic obj\n001_045.bmp 133 434 1 5 0 4 fadein 68600 700 fadeout 72100 600
+pic obj\n001_046.bmp 133 164 1 6 0 0 fadein 76000 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 254 1 6 0 1 fadein 76900 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 344 1 6 0 2 fadein 78500 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 389 1 6 0 3 fadein 78500 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 434 1 6 0 4 fadein 79300 700 fadeout 83000 600
+pic obj\n001_046.bmp 133 479 1 6 0 5 fadein 79300 700 fadeout 83000 600
+pic obj\n001_047.bmp 133 164 1 7 0 0 fadein 86000 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 209 1 7 0 1 fadein 86800 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 254 1 7 0 2 fadein 87600 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 299 1 7 0 3 fadein 88500 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 344 1 7 0 4 fadein 88500 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 389 1 7 0 5 fadein 89300 700 fadeout 92800 600
+pic obj\n001_047.bmp 133 434 1 7 0 6 fadein 89300 700 fadeout 92800 600
+pic obj\n001_048.bmp 133 164 1 5 0 0 fadein 96600 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 254 1 5 0 1 fadein 98200 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 344 1 5 0 2 fadein 99000 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 389 1 5 0 3 fadein 99800 700 fadeout 104000 600
+pic obj\n001_048.bmp 133 434 1 5 0 4 fadein 100600 700 fadeout 104000 600
+pic obj\n001_049.bmp 133 164 1 4 0 0 fadein 108800 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 254 1 4 0 1 fadein 109600 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 344 1 4 0 2 fadein 110400 700 fadeout 113900 600
+pic obj\n001_049.bmp 133 434 1 4 0 3 fadein 111300 700 fadeout 113900 600
+pic obj\n001_050.bmp 133 164 1 3 0 0 fadein 117900 700 fadeout 123900 600
+pic obj\n001_050.bmp 133 254 1 3 0 1 fadein 118700 700 fadeout 123900 600
+pic obj\n001_050.bmp 133 344 1 3 0 2 fadein 120300 700 fadeout 123900 600
+pic obj\n001_051.bmp 133 164 1 2 0 0 fadein 126200 700 fadeout 129800 600
+pic obj\n001_051.bmp 133 254 1 2 0 1 fadein 126200 700 fadeout 129800 600
+pic bg\bg_w.bmp 0 0 fadein 132300 1600
+
 screen story
 flow prologue
 scene scr\se_00_00_00.txt @1
