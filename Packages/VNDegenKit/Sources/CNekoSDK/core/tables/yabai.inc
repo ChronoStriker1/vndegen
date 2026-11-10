@@ -704,7 +704,7 @@ set S 105 = 4
 chapter 4510
 label pick1
 set S 2060 = 1
-open vote 1 -> S 15140
+open vote 1 -> S 15122
 goto picked
 label vote2
 set S 1000 = 4600
@@ -712,7 +712,7 @@ set S 105 = 4
 chapter 4600
 label pick2
 set S 2060 = 1
-open vote 2 -> S 15140
+open vote 2 -> S 15122
 goto picked
 label vote3
 set S 1000 = 4700
@@ -720,7 +720,7 @@ set S 105 = 4
 chapter 4700
 label pick3
 set S 2060 = 1
-open vote 3 -> S 15140
+open vote 3 -> S 15122
 goto picked
 label vote4
 set S 1000 = 4800
@@ -728,7 +728,7 @@ set S 105 = 4
 chapter 4800
 label pick4
 set S 2060 = 1
-open vote 4 -> S 15140
+open vote 4 -> S 15122
 goto picked
 label vote5
 set S 1000 = 4900
@@ -736,7 +736,7 @@ set S 105 = 4
 chapter 4900
 label pick5
 set S 2060 = 1
-open vote 5 -> S 15140
+open vote 5 -> S 15122
 goto picked
 label pickresume
 # A PC save at a pick has none of VNDegen's own variables, which the tree reads: the hub's part takes them from the PC's.
@@ -861,8 +861,6 @@ set S 1000 = 622
 set S 105 = 4
 chapter 622
 end
-# The interrogation hub, last: its chapters are the questions' (1000 to 3999), a replay's from the tree, and in truth 5
-# each heroine's devil scene (910 Ayano, 920 Misuzu, 930 Rina), all handed over in S 1000.
 label hub
 open hub -> S 15120
 on 9 goto tree

@@ -97,8 +97,6 @@ public:
             host.finishScreen(0);
             return true;
         }
-        // `open ask N`: one of the PC's own questions on a band (1 the interrogation tutorial, 2 the vote's, 3 save
-        // before the ending), はい 1 and いいえ 0; 4 the ending's three ways, 0 to 2. Placed as on the PC (Wine).
         if (name == "staff") {
             staff_ = std::max(1, std::min(3, args.empty() ? 1 : args[0]));
             staffFrom_ = host.nowMs();
@@ -111,6 +109,8 @@ public:
             host.redraw();
             return true;
         }
+        // `open ask N`: one of the PC's own questions on a band (1 the interrogation tutorial, 2 the vote's, 3 save
+        // before the ending), はい 1 and いいえ 0; 4 the ending's three ways, 0 to 2. Placed as on the PC (Wine).
         if (name == "ask") {
             ask_ = args.empty() ? 1 : args[0];
             hoverAsk_ = -1;
@@ -137,11 +137,9 @@ public:
                 account(host, heroine, question);
         }
         host.setVariable(1, kPCMode, 2);
-        // Back from the tree: a replay plays at no cost; an ask is a question like a bubble's.
         int action = host.variable(1, kTreeAction), picked = host.variable(1, kTreeChapter);
         host.setVariable(1, kTreeAction, 0);
         host.setVariable(1, kTreeChapter, 0);
-        if (action == 1 && picked > 0) return finishWith(host, kPlay, picked);
         if (action == 2 && picked > 0) {
             int heroine = picked / 1000 - 1, question = picked % 10, stage = (picked % 100) / 10 + 1;
             bool here = heroine >= 0 && heroine < 3 && question < 3 && (picked % 1000) / 100 + 1 == truth(host) && stage == host.variable(1, kStage + heroine);
@@ -160,17 +158,30 @@ public:
             return finishWith(host, kTimeEvent, 0);
         }
         if (int shown = shownHeroine(host); host.variable(1, kStage + shown) > 3) host.setVariable(1, kShown, openFrom(host, shown));
+        bool anyLeft = false;
+        for (int h = 0; h < 3; h++)
+            for (int q = 0; q < 3; q++) anyLeft = anyLeft || (host.variable(1, kStage + h) <= 3 && !(asked(host, h) & (1 << q)));
+        if (!anyLeft) {
+            host.log("the hub has no question left to ask, and not every answer: its question files may be missing");
+            return finishWith(host, kTimeUp, 0);
+        }
         open_ = true;
         hoverQ_ = -1;
         bubblesFor_ = -1;
+        pointerSeen_ = false;
         host.redraw();
         return true;
     }
 
     // The bubbles move on the story's clock, so a menu over the hub holds them still.
     bool step(PartHost &host) override {
+        if (orphan_) {
+            orphan_ = false;
+            host.finishScreen(0);
+            return true;
+        }
         if (staff_) {
-            if (staffMs(host) >= staffEndMs()) {
+            if (steps_.empty() || staffMs(host) >= staffEndMs()) {
                 staff_ = 0;
                 host.finishScreen(0);
             }
@@ -336,22 +347,29 @@ public:
             std::string kind;
             int number = 0;
             words >> kind >> number;
-            if (kind == "hub") open_ = true;
-            if (kind == "ask" && number >= 1 && number <= 4) ask_ = number;
-            if (kind == "staff" && number >= 1 && number <= 3) {
+            if (kind == "hub") {
+                open_ = true;
+            } else if (kind == "ask" && number >= 1 && number <= 4) {
+                ask_ = number;
+            } else if (kind == "staff" && number >= 1 && number <= 3) {
                 int64_t ms = 0;
                 words >> ms;
                 staff_ = number;
                 staffResumeMs_ = std::max<int64_t>(0, ms);
+                staffLoaded_ = 0;
                 steps_.clear();
+            } else {
+                orphan_ = true;
             }
         }
         hoverAsk_ = hoverQ_ = -1;
+        pointerSeen_ = false;
     }
 
     void reset() override {
         open_ = false, ask_ = 0;
         staff_ = 0;
+        orphan_ = false;
         bubblesFor_ = -1;
         pictures_.clear();
     }
@@ -771,6 +789,7 @@ private:
         bool appended = false;
     };
     int staff_ = 0, staffLoaded_ = 0;
+    bool orphan_ = false;
     int64_t staffFrom_ = 0, staffResumeMs_ = -1, staffSeenMs_ = 0;
     std::vector<Post> posts_;
     std::vector<StaffStep> steps_;
@@ -794,7 +813,7 @@ private:
     }
 
     void loadStaff(PartHost &host) {
-        if (staffLoaded_ == staff_ && !steps_.empty()) return;
+        if (staffLoaded_ == staff_) return;
         staffLoaded_ = staff_;
         posts_.clear();
         steps_.clear();
@@ -872,8 +891,8 @@ private:
 
     void drawStaff(PartHost &host, Canvas &out) {
         int64_t ms = staffMs(host);
-        if (steps_.empty()) return;
         tintFrame(out, 0, 0, 0, 256);
+        if (steps_.empty()) return;
         put(host, out, "obj\\s000_002.bmp", kPageX, kPageY);
         size_t at = std::min(size_t(ms / kStaffStepMs), steps_.size() - 1);
         const StaffStep &step = steps_[at];
