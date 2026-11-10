@@ -5831,7 +5831,7 @@ std::string Engine::plainVariant(const std::string &path) const {
 }
 
 void Engine::applyArtSwitch() {
-    if (plainArt_.empty() && artVersions_.empty()) return;
+    if (plainArt_.empty() && artVersions_.empty() && outfitSetting_.empty()) return;
     bool changed = false;
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set)

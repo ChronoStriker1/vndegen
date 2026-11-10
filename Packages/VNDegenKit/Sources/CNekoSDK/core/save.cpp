@@ -350,7 +350,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "vndegen\\layout94") return &kRinjin;
     // Test Game 90, its bonus release (a game of its own with the same screens: set 1's 14 PC saves of it are each
     // built again byte for byte), and the layout's test game under a folder of its own, with no menu table.
-    if (folder == "waffle\\漫喫ハプニング" || folder == "waffle\\漫喫ハプニング特典ストーリー" || folder == "vndegen\\layout90" || folder == "vndegen\\windowlist") return &kMankitsu;
+    if (folder == "waffle\\漫喫ハプニング" || folder == "waffle\\漫喫ハプニング特典ストーリー" || folder == "vndegen\\layout90" || folder == "vndegen\\windowlist" || folder == "vndegen\\outfittest") return &kMankitsu;
     return nullptr;
 }
 
