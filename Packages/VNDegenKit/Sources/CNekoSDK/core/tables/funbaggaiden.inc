@@ -2,6 +2,7 @@ const char kFunbagGaiden[] = R"(
 screen title
 menustages
 startmenu 2
+pic obj\d000_002.bmp 0 0
 pic obj\d000_000.bmp 0 0
 pic obj\d000_004.bmp 461 672
 pic obj\d000_005.bmp 159 0 stage 1
@@ -9,7 +10,9 @@ pic obj\d001_000.bmp 397 506 stage 1
 pic obj\d000_003.bmp 240 17 stage 2
 button start obj\d002_000.bmp 486 408 6 5 0 stage 2
 button load obj\d002_000.bmp 486 448 6 5 1 stage 2
+button submenu:extra obj\d002_000.bmp 486 488 6 5 2 stage 2
 button config obj\d002_000.bmp 486 528 6 5 3 stage 2
+button websurvey obj\d002_000.bmp 486 568 6 5 4 stage 2
 button quit obj\d002_000.bmp 486 608 6 5 5 stage 2
 button start_prologue obj\d002_001.bmp 810 408 2 5 0 stage 2 group start
 button start_main obj\d002_001.bmp 810 448 2 5 1 stage 2 group start
