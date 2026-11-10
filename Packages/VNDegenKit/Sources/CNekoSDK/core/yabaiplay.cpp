@@ -320,6 +320,7 @@ public:
     // the plate up: both in their sheet's last row).
     int actionLit(const std::string &name) const override { return open_ && !ask_ && (name == "Auto" || name == "Skip") ? 2 : -1; }
     bool showsPlate() const override { return !staff_; }
+    bool coversFrame() const override { return !ask_; }
 
     std::string debugStatus() const override {
         if (staff_) return "staff " + std::to_string(staff_);

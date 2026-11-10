@@ -300,11 +300,12 @@ import TestSupport
         #expect(pixel(e, 5, 5) == [0, 255, 0])
     }
 
-    @Test(arguments: [true, false]) func theBulbFlickersBetweenAPicturesTwoLightings(on: Bool) throws {
+    @Test(arguments: [(true, [100, 10]), (false, [100, 10]), (true, [255, 10]), (true, [100, 12])]) func theBulbFlickersBetweenAPictureAndItsDarkerTwin(on: Bool, twin: [Int]) throws {
+        let blue = UInt8(twin[0])
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\layoutpairs\nFirstFlow\tflow\\t.txt\n".utf8),
             "cfg/light_info.ini": Data("#p 0\r\nlight,30,0\r\nwait,60\r\nlight,30,255\r\nwait,60\r\n##\r\n".utf8),
-            "bg.pak": NekoSDKFlowFixture.archive([("bg_000.bmp", bmp(10, 10, [0, 0, 255])), ("bg_001.bmp", bmp(10, 10, [255, 0, 0]))]),
+            "bg.pak": NekoSDKFlowFixture.archive([("bg_000.bmp", bmp(10, 10, [0, 0, 255])), ("bg_001.bmp", bmp(twin[1], 10, [blue, 0, 0]))]),
             "flow/t.txt": NekoSDKFlowFixture.flow([
                 .init(op: 0, next: 2),
                 .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
@@ -323,15 +324,15 @@ import TestSupport
         try Data("bulb \(on ? 1 : 0)\n".utf8).write(to: saves.appendingPathComponent("vndegen_settings.txt"))
         let e = try #require(NekoSDKFlowFixture.start(root, data: data))
         defer { vnneko_stop(e) }
-        let lit: [UInt8] = [255, 0, 0], dark: [UInt8] = [0, 0, 255]
+        let lit: [UInt8] = [255, 0, 0], dark: [UInt8] = [0, 0, blue], flickers = on && blue < 255 && twin[1] == 10
         func at(_ ms: Int) -> [UInt8] {
             for _ in 0..<(ms / 10) { _ = vnneko_step(e, 10) }
             return pixel(e, 5, 5)
         }
-        #expect(at(1000) == (on ? dark : lit))
+        #expect(at(1000) == (flickers ? dark : lit))
         #expect(at(1500) == lit)
-        #expect(at(1500) == (on ? dark : lit))
+        #expect(at(1500) == (flickers ? dark : lit))
         let middle = at(650)
-        #expect(on ? (middle != lit && middle != dark) : middle == lit)
+        #expect(flickers ? (middle != lit && middle != dark) : middle == lit)
     }
 }

@@ -659,12 +659,12 @@ private:
     };
     std::vector<std::vector<BulbStep>> bulbPatterns_;
     int bulbPattern_ = -1, bulbFrom_ = 255, bulbDrawn_ = 255;
+    bool bulbSeen_ = false;
     int64_t bulbStart_ = 0;
     std::map<std::string, std::string> bulbDark_;
-    std::map<std::tuple<const Image *, const Image *, int>, ImageRef> bulbBlends_;
     void loadBulb();
     int bulbLevel();
-    ImageRef bulbImage(const Sprite &s, ImageRef lit);
+    std::string bulbDark(const std::string &shown, const Image &lit);
     bool layoutSlotByP1_ = false;
     int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;
@@ -757,6 +757,7 @@ private:
         std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
         bool hasStoryTable = false;
         uint32_t storyTable = 0;
+        bool hasFlowNumbered = false, flowNumbered = true;
         bool hasResult = false;
         int result = 0;
         std::string screen;
@@ -769,6 +770,7 @@ private:
     };
     static uint32_t saveFingerprint(const SaveData &d);
     uint32_t storyTableHash() const;
+    bool storyPlaceNumbered(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);
     Sidecar parseSidecar(const SaveData &d, const std::string &text);
     void restoreSave(const SaveData &data, const Sidecar &side);
@@ -882,6 +884,7 @@ private:
     int page_ = 0;
     std::string returnTo_;
     int flowCallId_ = 0;
+    bool flowCallNumbered_ = false;
     std::string choiceImage_;
     // The frame behind the log with `keepwindow`: 1 for the window's picture alone, 2 with its buttons and the parts' layer.
     int windowArtOnly_ = 0;
@@ -930,6 +933,7 @@ private:
     // The message window.
     bool windowShown_ = false;
     int64_t windowShownAt_ = -100000;
+    int64_t windowDrawnAt_ = 0;
     ImageRef windowImage_, waitMark_;
     std::vector<ImageRef> bars_;
     std::vector<int> barY_;

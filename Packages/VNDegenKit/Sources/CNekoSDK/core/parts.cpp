@@ -56,6 +56,7 @@ public:
         if (layer == Layer::Menu) fill(out, 400, 400, 10, menuPresses_ ? 255 : 0, 0, menuPresses_ ? 0 : 255);
         if (layer == Layer::Screen && menuPresses_ >= 2) fill(out, 0, 0, 20, 0, 0, 255);
         if (layer == Layer::OverWindow && !windowPicture_.empty()) fill(out, 700, 300, 10, 0, 255, 0);
+        if (layer == Layer::Window && presses_ < needed_) fill(out, 800, 650, 10, 0, 255, 0);
     }
     bool command(PartHost &host, const Node &n) override {
         if (n.opcode == 9001) {
@@ -116,7 +117,8 @@ public:
             host.finishScreen(count);
             return true;
         }
-        if (name != "selftestwait") return false;
+        band_ = name == "selftestband";
+        if (name != "selftestwait" && !band_) return false;
         presses_ = 0;
         needed_ = count;
         return true;
@@ -140,8 +142,10 @@ public:
     void load(const std::vector<std::string> &lines) override {
         if (!lines.empty()) std::sscanf(lines[0].c_str(), "%d %d", &presses_, &needed_);
     }
+    bool coversFrame() const override { return !band_; }
     void reset() override {
         presses_ = needed_ = menuPresses_ = 0;
+        band_ = false;
         onMenu_ = false;
         onScene_ = false;
         heldPicture_.clear();
@@ -158,6 +162,7 @@ private:
     }
     static constexpr int kHeldKind = 15;
     int presses_ = 0, needed_ = 0, menuPresses_ = 0;
+    bool band_ = false;
     bool onMenu_ = false, onScene_ = false;
     static constexpr int kWindowSlot = 2000;
     std::string heldPicture_, windowPicture_;

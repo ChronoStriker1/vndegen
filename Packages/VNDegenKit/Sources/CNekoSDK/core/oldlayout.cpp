@@ -63,7 +63,6 @@ void Engine::loadOldLayout() {
 void Engine::loadBulb() {
     bulbPatterns_.clear();
     bulbDark_.clear();
-    bulbBlends_.clear();
     bulbPattern_ = -1;
     bulbFrom_ = bulbDrawn_ = 255;
     if (!layoutPairs_) return;
@@ -80,12 +79,12 @@ void Engine::loadBulb() {
             open = false;
         } else if (open) {
             int a = 0, b = 0;
-            if (std::sscanf(line.c_str(), "light,%d,%d", &a, &b) == 2) bulbPatterns_.back().push_back({std::max(0, a), std::clamp(b, 0, 255)});
-            else if (std::sscanf(line.c_str(), "wait,%d", &a) == 1) bulbPatterns_.back().push_back({std::max(0, a), -1});
+            if (std::sscanf(line.c_str(), "light,%d,%d", &a, &b) == 2) bulbPatterns_.back().push_back({std::clamp(a, 0, 36000), std::clamp(b, 0, 255)});
+            else if (std::sscanf(line.c_str(), "wait,%d", &a) == 1) bulbPatterns_.back().push_back({std::clamp(a, 0, 36000), -1});
         }
     }
     bulbPatterns_.erase(std::remove_if(bulbPatterns_.begin(), bulbPatterns_.end(), [](const std::vector<BulbStep> &p) {
-        int frames = 0;
+        int64_t frames = 0;
         for (const BulbStep &s : p) frames += s.frames;
         return frames <= 0;
     }), bulbPatterns_.end());
@@ -116,38 +115,29 @@ int Engine::bulbLevel() {
     return bulbFrom_;
 }
 
-ImageRef Engine::bulbImage(const Sprite &s, ImageRef lit) {
-    if (!layoutPairs_ || bulbPatterns_.empty() || !lit || s.path.empty()) return lit;
-    int level = bulbLevel();
-    if (level >= 255) return lit;
-    auto found = bulbDark_.find(s.path);
-    if (found == bulbDark_.end()) {
-        std::string name = normalizedPath(s.path), dark;
-        size_t dot = name.rfind('.');
-        int add = name.rfind("sc\\", 0) == 0 ? 10 : name.rfind("bg\\", 0) == 0 ? 1 : 0;
-        if (add && dot != std::string::npos && dot >= 3 && std::isdigit(uint8_t(name[dot - 1])) && std::isdigit(uint8_t(name[dot - 2])) && std::isdigit(uint8_t(name[dot - 3]))) {
-            int number = std::atoi(name.substr(dot - 3, 3).c_str()) + add;
-            char digits[8];
-            std::snprintf(digits, sizeof digits, "%03d", number % 1000);
-            std::string other = name;
-            other.replace(dot - 3, 3, digits);
-            if (number < 1000 && files_.exists(other)) dark = other;
-        }
-        found = bulbDark_.emplace(s.path, dark).first;
+std::string Engine::bulbDark(const std::string &shown, const Image &lit) {
+    if (!layoutPairs_ || bulbPatterns_.empty() || shown.empty()) return "";
+    auto found = bulbDark_.find(shown);
+    if (found != bulbDark_.end()) return found->second;
+    std::string name = normalizedPath(shown), dark;
+    size_t dot = name.rfind('.');
+    int add = name.rfind("sc\\", 0) == 0 ? 10 : name.rfind("bg\\", 0) == 0 ? 1 : 0;
+    if (add && dot != std::string::npos && dot >= 3 && std::isdigit(uint8_t(name[dot - 1])) && std::isdigit(uint8_t(name[dot - 2])) && std::isdigit(uint8_t(name[dot - 3]))) {
+        int number = std::atoi(name.substr(dot - 3, 3).c_str()) + add;
+        char digits[8];
+        std::snprintf(digits, sizeof digits, "%03d", number % 1000);
+        std::string other = name;
+        other.replace(dot - 3, 3, digits);
+        auto light = [](const Image &image) {
+            uint64_t sum = 0;
+            for (size_t i = 0; i + 3 < image.rgba.size(); i += 4) sum += uint64_t(image.rgba[i] + image.rgba[i + 1] + image.rgba[i + 2]) * image.rgba[i + 3];
+            return sum;
+        };
+        if (number < 1000 && files_.exists(other))
+            if (ImageRef candidate = images_->get(other); candidate && candidate->w == lit.w && candidate->h == lit.h && light(*candidate) * 8 <= light(lit) * 5) dark = other;
     }
-    if (found->second.empty()) return lit;
-    ImageRef dark = images_->get(found->second);
-    if (!dark || dark->w != lit->w || dark->h != lit->h) return lit;
-    if (level <= 0) return dark;
-    auto key = std::make_tuple(lit.get(), dark.get(), level / 8);
-    if (auto made = bulbBlends_.find(key); made != bulbBlends_.end()) return made->second;
-    auto mixed = std::make_shared<Image>(*dark);
-    int a = level / 8 * 8;
-    for (size_t i = 0; i < mixed->rgba.size(); i++) mixed->rgba[i] = uint8_t((dark->rgba[i] * (255 - a) + lit->rgba[i] * a + 127) / 255);
-    mixed->opaque = lit->opaque && dark->opaque;
-    if (bulbBlends_.size() > 96) bulbBlends_.clear();
-    bulbBlends_[key] = mixed;
-    return mixed;
+    bulbDark_[shown] = dark;
+    return dark;
 }
 
 // `layoutpairs` under `screen defaults`: the PC keeps each place's picture as two records, the slot's own and the slot
