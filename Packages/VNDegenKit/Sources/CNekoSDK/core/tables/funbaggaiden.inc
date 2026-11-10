@@ -116,6 +116,119 @@ pic obj\h000_008.bmp 411 92
 choicecolumns 2
 placefor 2 187 122 361 0
 
+screen config
+pic obj\a002_000.bmp 0 0
+pic obj\e003_000.bmp 1102 0
+pic obj\l000_003.bmp 1110 106
+pic obj\a002_001.bmp 0 0
+pic obj\h000_000.bmp 26 25
+pic obj\h001_000.bmp 22 94
+pic obj\h002_000.bmp 22 459
+pic obj\h003_000.bmp 558 94
+pic obj\h004_000.bmp 558 266
+button cfg_defaults obj\h005_000.bmp 490 44 3 5 0
+button cfg_undo obj\h005_000.bmp 640 44 3 5 1
+button cfg_apply obj\h005_000.bmp 790 44 3 5 2
+button back obj\e003_001.bmp 1116 44 1 5 0
+button nav_save obj\e003_002.bmp 1116 280 8 5 0
+button nav_load obj\e003_002.bmp 1116 330 8 5 1
+button nav_cg obj\e003_002.bmp 1116 380 8 5 2
+button nav_scene obj\e003_002.bmp 1116 430 8 5 3
+button nav_music obj\e003_002.bmp 1116 480 8 5 4
+button nav_config obj\e003_002.bmp 1116 530 8 5 5
+button nav_title obj\e003_002.bmp 1116 580 8 5 6
+button nav_quit obj\e003_002.bmp 1116 630 8 5 7
+radio screen 0 obj\h001_001.bmp 257 127 12 5 0
+radio screen 1 obj\h001_001.bmp 376 127 12 5 1
+pic obj\h001_001.bmp 257 155 12 5 2 4
+pic obj\h001_001.bmp 376 155 12 5 3 4
+pic obj\h001_001.bmp 211 183 12 5 4 4
+pic obj\h001_001.bmp 317 183 12 5 5 4
+pic obj\h001_001.bmp 423 183 12 5 6 4
+pic obj\h001_001.bmp 211 211 12 5 7 4
+pic obj\h001_001.bmp 317 211 12 5 8 4
+pic obj\h001_001.bmp 423 211 12 5 9 4
+radio effect 1 obj\h001_001.bmp 257 239 12 5 10
+radio effect 0 obj\h001_001.bmp 376 239 12 5 11
+radio wait 1 obj\h001_001.bmp 257 267 12 5 10
+radio wait 0 obj\h001_001.bmp 376 267 12 5 11
+slider opacity obj\h001_004.bmp 89 329
+pic obj\h001_003.bmp 85 325
+knob opacity obj\h001_002.bmp 77 321 4
+step opacity -1 obj\h001_005.bmp 60 320 2 5 0
+step opacity 1 obj\h001_005.bmp 500 320 2 5 1
+number opacity obj\h001_006.bmp 417 299 18 blank
+radio confirm_saveload 1 obj\h001_001.bmp 257 351 12 5 10
+radio confirm_saveload 0 obj\h001_001.bmp 376 351 12 5 11
+group confirm_saveload confirm_overwrite confirm_delete confirm_quick confirm_title confirm_exit
+radio tutorial 1 obj\h001_001.bmp 257 379 12 5 10
+radio tutorial 0 obj\h001_001.bmp 376 379 12 5 11
+pic obj\a001_003.bmp 112 407 1 5 0 4
+slider text obj\h001_004.bmp 89 526
+pic obj\h001_003.bmp 85 522
+knob text obj\h001_002.bmp 77 518 4
+step text -1 obj\h001_005.bmp 60 517 2 5 0
+step text 1 obj\h001_005.bmp 500 517 2 5 1
+number text obj\h001_006.bmp 417 496 18 blank
+slider auto obj\h001_004.bmp 89 582
+pic obj\h001_003.bmp 85 578
+knob auto obj\h001_002.bmp 77 574 4
+step auto -1 obj\h001_005.bmp 60 573 2 5 0
+step auto 1 obj\h001_005.bmp 500 573 2 5 1
+number auto obj\h001_006.bmp 417 552 18 blank
+range waittime 50 150
+slider waittime obj\h001_004.bmp 89 638
+pic obj\h001_003.bmp 85 634
+knob waittime obj\h001_002.bmp -123 630 4
+step waittime -1 obj\h001_005.bmp 60 629 2 5 0
+step waittime 1 obj\h001_005.bmp 500 629 2 5 1
+number waittime obj\h001_006.bmp 417 608 435 453
+radio skipall 0 obj\h003_001.bmp 793 127 9 5 0
+radio skipall 1 obj\h003_001.bmp 912 127 9 5 1
+radio rightclick 0 obj\h003_001.bmp 743 155 9 5 2
+radio rightclick 1 obj\h003_001.bmp 853 155 9 5 3
+radio rightclick 2 obj\h003_001.bmp 959 155 9 5 4
+radio rightclick 3 obj\h003_001.bmp 793 183 9 5 5
+radio rightclick 4 obj\h003_001.bmp 912 183 9 5 6
+radio deckey 0 obj\h003_001.bmp 793 211 9 5 7
+radio deckey 1 obj\h003_001.bmp 912 211 9 5 8
+slider bgm obj\h001_004.bmp 625 329
+pic obj\h001_003.bmp 621 325
+knob bgm obj\h001_002.bmp 613 321 4
+step bgm -1 obj\h001_005.bmp 596 320 2 5 0
+step bgm 1 obj\h001_005.bmp 1036 320 2 5 1
+number bgm obj\h001_006.bmp 953 299 18 blank
+slider se obj\h001_004.bmp 625 385
+pic obj\h001_003.bmp 621 381
+knob se obj\h001_002.bmp 613 377 4
+step se -1 obj\h001_005.bmp 596 376 2 5 0
+step se 1 obj\h001_005.bmp 1036 376 2 5 1
+number se obj\h001_006.bmp 953 355 18 blank
+slider voice obj\h001_004.bmp 625 441
+pic obj\h001_003.bmp 621 437
+knob voice obj\h001_002.bmp 613 433 4
+step voice -1 obj\h001_005.bmp 596 432 2 5 0
+step voice 1 obj\h001_005.bmp 1036 432 2 5 1
+number voice obj\h001_006.bmp 953 411 18 blank
+slider backvoice obj\h001_004.bmp 625 497
+pic obj\h001_003.bmp 621 493
+knob backvoice obj\h001_002.bmp 613 489 4
+step backvoice -1 obj\h001_005.bmp 596 488 2 5 0
+step backvoice 1 obj\h001_005.bmp 1036 488 2 5 1
+number backvoice obj\h001_006.bmp 953 467 18 blank
+radio mute_backvoice 0 obj\h001_001.bmp 793 519 12 5 10
+radio mute_backvoice 1 obj\h001_001.bmp 912 519 12 5 11
+radio voice_stop 1 obj\h001_001.bmp 793 547 12 5 10
+radio voice_stop 0 obj\h001_001.bmp 912 547 12 5 11
+pic obj\h004_001.bmp 893 298 1 5 0 4
+pic obj\h004_001.bmp 893 354 1 5 0 0
+pic obj\h004_001.bmp 893 410 1 5 0 0
+pic obj\h004_001.bmp 893 466 1 5 0 0
+pic obj\h004_002.bmp 747 575 6 5 2 0
+pic obj\h004_002.bmp 853 575 6 5 3 0
+pic obj\h004_002.bmp 959 575 6 5 4 0
+pic obj\h004_002.bmp 747 603 6 5 5 0
+
 screen defaults
 parts scroll particles
 colorkey 0 255 0
@@ -126,6 +239,13 @@ textshift 0 -1
 twobyteadvance
 inneralways
 default opacity 100
+default text 50
+default auto 50
+default bgm 80
+default se 60
+default voice 80
+default backvoice 80
+default skipall 1
 windowpic obj\l000_003.bmp 1063 489
 
 screen cfgsav
