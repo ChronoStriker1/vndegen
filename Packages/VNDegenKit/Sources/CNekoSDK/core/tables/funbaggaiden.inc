@@ -9,17 +9,17 @@ pic obj\d000_004.bmp 461 672
 pic obj\d000_005.bmp 159 0 stage 1
 pic obj\d001_000.bmp 397 506 stage 1
 pic obj\d000_003.bmp 240 17 stage 2
-button start obj\d002_000.bmp 486 408 6 5 0 stage 2 help obj\d003_000.bmp 486 248 6 1 0 0
-button load obj\d002_000.bmp 486 448 6 5 1 stage 2 help obj\d003_000.bmp 486 288 6 1 1 0
-button submenu:extra obj\d002_000.bmp 486 488 6 5 2 stage 2 help obj\d003_000.bmp 486 328 6 1 2 0
-button config obj\d002_000.bmp 486 528 6 5 3 stage 2 help obj\d003_000.bmp 486 368 6 1 3 0
-button websurvey obj\d002_000.bmp 486 568 6 5 4 stage 2 help obj\d003_000.bmp 486 408 6 1 4 0
-button quit obj\d002_000.bmp 486 608 6 5 5 stage 2 help obj\d003_000.bmp 486 448 6 1 5 0
-button start_prologue obj\d002_001.bmp 810 408 2 5 0 stage 2 group start help obj\d003_001.bmp 810 248 2 1 0 0
-button start_main obj\d002_001.bmp 810 448 2 5 1 stage 2 group start help obj\d003_001.bmp 810 288 2 1 1 0
-button cg obj\d002_002.bmp 810 488 3 5 0 stage 2 group extra help obj\d003_002.bmp 810 328 3 1 0 0
-button scene obj\d002_002.bmp 810 528 3 5 1 stage 2 group extra help obj\d003_002.bmp 810 368 3 1 1 0
-button music obj\d002_002.bmp 810 568 3 5 2 stage 2 group extra help obj\d003_002.bmp 810 408 3 1 2 0
+button start obj\d002_000.bmp 486 408 6 5 0 stage 2 help obj\d003_000.bmp 486 248 6 1 0 0 disc obj\l003_000.bmp 60
+button load obj\d002_000.bmp 486 448 6 5 1 stage 2 help obj\d003_000.bmp 486 288 6 1 1 0 disc obj\l003_000.bmp 60
+button submenu:extra obj\d002_000.bmp 486 488 6 5 2 stage 2 help obj\d003_000.bmp 486 328 6 1 2 0 disc obj\l003_000.bmp 60
+button config obj\d002_000.bmp 486 528 6 5 3 stage 2 help obj\d003_000.bmp 486 368 6 1 3 0 disc obj\l003_000.bmp 60
+button websurvey obj\d002_000.bmp 486 568 6 5 4 stage 2 help obj\d003_000.bmp 486 408 6 1 4 0 disc obj\l003_000.bmp 60
+button quit obj\d002_000.bmp 486 608 6 5 5 stage 2 help obj\d003_000.bmp 486 448 6 1 5 0 disc obj\l003_000.bmp 60
+button start_prologue obj\d002_001.bmp 810 408 2 5 0 stage 2 group start help obj\d003_001.bmp 810 248 2 1 0 0 disc obj\l003_000.bmp 60
+button start_main obj\d002_001.bmp 810 448 2 5 1 stage 2 group start help obj\d003_001.bmp 810 288 2 1 1 0 disc obj\l003_000.bmp 60
+button cg obj\d002_002.bmp 810 488 3 5 0 stage 2 group extra help obj\d003_002.bmp 810 328 3 1 0 0 disc obj\l003_000.bmp 60
+button scene obj\d002_002.bmp 810 528 3 5 1 stage 2 group extra help obj\d003_002.bmp 810 368 3 1 1 0 disc obj\l003_000.bmp 60
+button music obj\d002_002.bmp 810 568 3 5 2 stage 2 group extra help obj\d003_002.bmp 810 408 3 1 2 0 disc obj\l003_000.bmp 60
 
 screen start
 flow main
@@ -236,27 +236,27 @@ pic obj\h004_002.bmp 747 575 6 5 2 0
 pic obj\h004_002.bmp 853 575 6 5 3 0
 pic obj\h004_002.bmp 959 575 6 5 4 0
 pic obj\h004_002.bmp 747 603 6 5 5 0
-hovercols 257 127 479 151 obj\h006_000.bmp 24 8 8 0
-hovercols 257 155 479 179 obj\h006_000.bmp 24 35 8 1
-hovercols 211 183 526 235 obj\h006_000.bmp 24 63 8 2
-hovercols 257 239 479 263 obj\h006_000.bmp 24 119 8 3
-hovercols 257 267 479 291 obj\h006_000.bmp 24 147 8 4
-hovercols 60 317 540 345 obj\h006_000.bmp 24 175 8 5
-hovercols 257 351 479 375 obj\h006_000.bmp 24 231 8 6
-hovercols 257 379 479 403 obj\h006_000.bmp 24 259 8 7
-hovercols 60 514 540 542 obj\h006_001.bmp 24 373 3 0
-hovercols 60 570 540 598 obj\h006_001.bmp 24 429 3 1
-hovercols 60 626 540 654 obj\h006_001.bmp 24 485 3 2
-hovercols 793 127 1015 151 obj\h006_002.bmp 560 7 3 0
-hovercols 743 155 1062 207 obj\h006_002.bmp 560 35 3 1
-hovercols 793 211 1015 235 obj\h006_002.bmp 560 91 3 2
-hovercols 596 317 1076 345 obj\h006_003.bmp 560 177 7 0
-hovercols 596 373 1076 401 obj\h006_003.bmp 560 233 7 1
-hovercols 596 429 1076 457 obj\h006_003.bmp 560 289 7 2
-hovercols 596 485 1076 513 obj\h006_003.bmp 560 345 7 3
-hovercols 793 519 1015 543 obj\h006_003.bmp 560 373 7 4
-hovercols 793 547 1015 571 obj\h006_003.bmp 560 401 7 5
-hovercols 747 575 1062 627 obj\h006_003.bmp 560 429 7 6
+hovercols 257 127 479 151 obj\h006_000.bmp 24 8 8 0 disc obj\h006_004.bmp 60
+hovercols 257 155 479 179 obj\h006_000.bmp 24 35 8 1 disc obj\h006_004.bmp 60
+hovercols 211 183 526 235 obj\h006_000.bmp 24 63 8 2 disc obj\h006_004.bmp 60
+hovercols 257 239 479 263 obj\h006_000.bmp 24 119 8 3 disc obj\h006_004.bmp 60
+hovercols 257 267 479 291 obj\h006_000.bmp 24 147 8 4 disc obj\h006_004.bmp 60
+hovercols 60 317 540 345 obj\h006_000.bmp 24 175 8 5 disc obj\h006_004.bmp 60
+hovercols 257 351 479 375 obj\h006_000.bmp 24 231 8 6 disc obj\h006_004.bmp 60
+hovercols 257 379 479 403 obj\h006_000.bmp 24 259 8 7 disc obj\h006_004.bmp 60
+hovercols 60 514 540 542 obj\h006_001.bmp 24 373 3 0 disc obj\h006_004.bmp 60
+hovercols 60 570 540 598 obj\h006_001.bmp 24 429 3 1 disc obj\h006_004.bmp 60
+hovercols 60 626 540 654 obj\h006_001.bmp 24 485 3 2 disc obj\h006_004.bmp 60
+hovercols 793 127 1015 151 obj\h006_002.bmp 560 7 3 0 disc obj\h006_004.bmp 60
+hovercols 743 155 1062 207 obj\h006_002.bmp 560 35 3 1 disc obj\h006_004.bmp 60
+hovercols 793 211 1015 235 obj\h006_002.bmp 560 91 3 2 disc obj\h006_004.bmp 60
+hovercols 596 317 1076 345 obj\h006_003.bmp 560 177 7 0 disc obj\h006_004.bmp 60
+hovercols 596 373 1076 401 obj\h006_003.bmp 560 233 7 1 disc obj\h006_004.bmp 60
+hovercols 596 429 1076 457 obj\h006_003.bmp 560 289 7 2 disc obj\h006_004.bmp 60
+hovercols 596 485 1076 513 obj\h006_003.bmp 560 345 7 3 disc obj\h006_004.bmp 60
+hovercols 793 519 1015 543 obj\h006_003.bmp 560 373 7 4 disc obj\h006_004.bmp 60
+hovercols 793 547 1015 571 obj\h006_003.bmp 560 401 7 5 disc obj\h006_004.bmp 60
+hovercols 747 575 1062 627 obj\h006_003.bmp 560 429 7 6 disc obj\h006_004.bmp 60
 
 screen cg
 askerlit
@@ -395,14 +395,14 @@ button track18 obj\g001_019.bmp 701 242 1 5 0
 button track19 obj\g001_020.bmp 701 282 1 5 0
 button track20 obj\g001_021.bmp 701 322 1 5 0
 button track21 obj\g001_022.bmp 701 362 1 5 0
-button music_prev obj\g003_001.bmp 366 611 7 5 0 help obj\g005_000.bmp 272 451 7 1 0 0
-button music_play obj\g003_001.bmp 438 611 7 5 1 help obj\g005_000.bmp 344 451 7 1 1 0
-button music_pause obj\g003_001.bmp 510 611 7 5 2 help obj\g005_000.bmp 416 451 7 1 2 0
-button music_stop obj\g003_001.bmp 582 611 7 5 3 help obj\g005_000.bmp 488 451 7 1 3 0
-button music_next obj\g003_001.bmp 654 611 7 5 4 help obj\g005_000.bmp 560 451 7 1 4 0
-button music_repeat obj\g003_001.bmp 726 611 7 5 5 help obj\g005_000.bmp 632 451 7 1 5 0
-button music_shuffle obj\g003_001.bmp 798 611 7 5 6 help obj\g005_000.bmp 704 451 7 1 6 0
-hovercols 106 570 320 677 obj\g005_001.bmp 106 413 1 0
+button music_prev obj\g003_001.bmp 366 611 7 5 0 help obj\g005_000.bmp 272 451 7 1 0 0 disc obj\l003_000.bmp 60
+button music_play obj\g003_001.bmp 438 611 7 5 1 help obj\g005_000.bmp 344 451 7 1 1 0 disc obj\l003_000.bmp 60
+button music_pause obj\g003_001.bmp 510 611 7 5 2 help obj\g005_000.bmp 416 451 7 1 2 0 disc obj\l003_000.bmp 60
+button music_stop obj\g003_001.bmp 582 611 7 5 3 help obj\g005_000.bmp 488 451 7 1 3 0 disc obj\l003_000.bmp 60
+button music_next obj\g003_001.bmp 654 611 7 5 4 help obj\g005_000.bmp 560 451 7 1 4 0 disc obj\l003_000.bmp 60
+button music_repeat obj\g003_001.bmp 726 611 7 5 5 help obj\g005_000.bmp 632 451 7 1 5 0 disc obj\l003_000.bmp 60
+button music_shuffle obj\g003_001.bmp 798 611 7 5 6 help obj\g005_000.bmp 704 451 7 1 6 0 disc obj\l003_000.bmp 60
+hovercols 106 570 320 677 obj\g005_001.bmp 106 413 1 0 disc obj\l003_000.bmp 60
 
 screen log
 inwindow
@@ -416,6 +416,7 @@ textline 32
 textshift 0 -1
 twobyteadvance
 inneralways
+plateholds
 squarewindow 0
 default opacity 100
 default text 50
