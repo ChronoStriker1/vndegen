@@ -137,6 +137,7 @@ const char *vnneko_problem(VNNekoEngine *e) { return e->engine.problem(); }
 const char *vnneko_debug_status(VNNekoEngine *e) { return e->engine.debugStatus(); }
 bool vnneko_debug_waiting_for_click(VNNekoEngine *e) { return e->engine.waitingForClick(); }
 int vnneko_debug_text_count(VNNekoEngine *e) { return e->engine.textCount(); }
+int vnneko_debug_text_advance(VNNekoEngine *e, uint32_t codepoint) { return e->engine.debugTextAdvance(codepoint); }
 bool vnneko_debug_press(VNNekoEngine *e, const char *action) { return e->engine.pressAction(action); }
 int vnneko_debug_choice_count(VNNekoEngine *e) { return e->engine.choiceCount(); }
 void vnneko_debug_choose(VNNekoEngine *e, int index) { e->engine.choose(index); }

@@ -26,6 +26,8 @@ struct SaveLayout {
     int textTail = 16;  // the bytes of a text record after its strings
     int rootSizeAt = 0x11;  // where the first record holds the screen size
     int channels = 243;  // the sound channels saved
+    int soundTrailer = -1;
+    int twinKind = -1;
     // A sprite record's last block, after its animation's text: 164 bytes, or 137 in Test Game 90.
     int recordTail = 0x261 - 0x1BD;
     // The newer engine's byte before the sound channels, which Test Game 90's saves don't have.
@@ -148,6 +150,14 @@ const SaveLayout kFunbag1 = [] {
     l.olderRecord = 379;
     l.choiceFlag = ChoiceFlag::Never;
     l.previousChoice = true;
+    return l;
+}();
+const SaveLayout kFunbagGaiden = [] {
+    SaveLayout l = kFunbag1;
+    l.soundTrailer = 0;
+    l.channels = 124;
+    l.olderSoundGap = 1;
+    l.twinKind = 17;
     return l;
 }();
 const SaveLayout kSideboob2 = [] {
@@ -337,9 +347,10 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // And so do the save card and confession tree test games.
     if (folder == "vndegen\\cardtest" || folder == "vndegen\\treetest") return &kAlchemist;
     // And as Test Game 82 does, with a Previous Choice file beside each save.
-    if (folder == "vndegen\\storytestpc") return &kFunbag1;
+    if (folder == "vndegen\\storytestpc" || folder == "vndegen\\layout82") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy2") return &kFunbag2;
+    if (folder == "waffle\\funbagfantasygaiden" || folder == "vndegen\\layout86") return &kFunbagGaiden;
     // The older layout's test game saves as Test Game 83 does, under a folder of its own so it gets no menu table.
     if (folder == "vndegen\\layoutold" || folder == "vndegen\\partslot" || folder == "vndegen\\scrollsave") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
@@ -352,6 +363,10 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // built again byte for byte), and the layout's test game under a folder of its own, with no menu table.
     if (folder == "waffle\\漫喫ハプニング" || folder == "waffle\\漫喫ハプニング特典ストーリー" || folder == "vndegen\\layout90" || folder == "vndegen\\windowlist" || folder == "vndegen\\outfittest") return &kMankitsu;
     return nullptr;
+}
+
+bool twinRecord(const SaveLayout &layout, const SavedSprite &sprite) {
+    return layout.twinKind >= 0 && sprite.kind == layout.twinKind && !sprite.path.empty();
 }
 
 bool namesPictureTwice(const SaveLayout &layout) {
@@ -632,8 +647,9 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.volume = r.i32();
         s.pan = r.i32();
         s.seconds = r.f64();
-        s.trailer[0] = r.u8();
-        if (!older) s.trailer[1] = r.u8();
+        int trailer = layout.soundTrailer >= 0 ? layout.soundTrailer : older ? 1 : 2;
+        if (trailer >= 1) s.trailer[0] = r.u8();
+        if (trailer >= 2) s.trailer[1] = r.u8();
         // A channel with no sound can keep its volume and pan, which a save written back keeps too.
         if (!s.path.empty() || s.volume || s.pan || s.seconds != 0 || s.trailer[0] || s.trailer[1]) out.sounds.push_back(s);
     }
@@ -893,7 +909,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     if (!older && layout.byteBeforeSounds) w.zeros(1);
     std::map<int, const SavedSound *> byIndex;
     for (const SavedSound &s : d.sounds) byIndex[older && s.index >= 60 ? s.index - 60 + kOlderMusicChannels : s.index] = &s;
-    size_t trail = older ? 1 : 2;
+    size_t trail = layout.soundTrailer >= 0 ? size_t(layout.soundTrailer) : older ? 1 : 2;
     for (int i = 0; i < layout.channels; i++) {
         auto it = byIndex.find(i);
         if (it == byIndex.end()) {

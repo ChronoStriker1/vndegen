@@ -258,8 +258,23 @@ std::shared_ptr<Script> Engine::compileChapter(int number, bool complains) {
 }
 
 // The exact place VNDegen's lines beside its own save hold: each flow frame, the last result, and a part screen open.
+uint32_t Engine::storyTableHash() const {
+    uint32_t hash = 2166136261u;
+    auto table = screens_.find("story");
+    if (table == screens_.end()) return hash;
+    for (const auto &line : table->second.lines) {
+        for (const std::string &word : line) {
+            for (char c : word) hash = (hash ^ uint8_t(c)) * 16777619u;
+            hash = (hash ^ 0x20u) * 16777619u;
+        }
+        hash = (hash ^ 0x0Au) * 16777619u;
+    }
+    return hash;
+}
+
 bool Engine::restoreStoryPlace(const Sidecar &side, bool &atChoice) {
     if (side.story.empty()) return false;
+    if (side.hasStoryTable && side.storyTable != storyTableHash()) return false;
     std::vector<Frame> frames;
     for (const auto &[name, id] : side.story) {
         auto script = loadScript(name);
