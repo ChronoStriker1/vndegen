@@ -19,6 +19,7 @@ struct GlyphImage {
 // face: init.ini's MsgFont number. Thread safe; glyphs are cached.
 bool glyph(int face, uint32_t codepoint, int px, bool bold, GlyphImage &out);
 int fontAscent(int face, int px);
+int fontMissingAdvance(int face, int px);
 // Where the font pack is: its folder holding fonts.tsv. Call before drawing text.
 void setFontPackDir(const std::string &dir);
 

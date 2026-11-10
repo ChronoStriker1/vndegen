@@ -167,6 +167,8 @@ public:
     const char *debugStatus();
     bool waitingForClick() const { return waiting_ == Waiting::Click; }
     int textCount() const { return textCount_; }
+    int textAdvance(uint32_t cp, int own) const;
+    int debugTextAdvance(uint32_t cp) const;
     // A global (scope 0) or scenario variable (1) by its number, for tests.
     // Whether a sound still plays in this channel of music (kind 0), effects (1) or voices (2).
     bool soundPlaying(int kind, int channel);
@@ -704,6 +706,7 @@ private:
     void compose();
     void layoutText(const std::string &utf8Name, const std::string &utf8Text);
     void layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out);
+    bool twoByteAdvance_ = false;
     // init.ini's font types: 1 a shadow, 2 a thin frame, 9 both, 13 a wide frame, 17 a wider one.
     int frameWidth() const { return fontType_ == 17 ? 3 : fontType_ == 13 ? 2 : (fontType_ == 2 || fontType_ == 9) ? 1 : 0; }
     bool hasShadow() const { return fontType_ == 1 || fontType_ == 9; }

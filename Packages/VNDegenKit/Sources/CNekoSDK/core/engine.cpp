@@ -326,6 +326,7 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     loadGalleries();
     loadParts();
     loadOldLayout();
+    twoByteAdvance_ = defaultsHave("twobyteadvance");
     outfitSetting_.clear();
     outfitSwitch_.clear();
     if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
@@ -6895,6 +6896,36 @@ void Engine::drawMark(Canvas &out) {
     }
 }
 
+int Engine::debugTextAdvance(uint32_t cp) const {
+    if (!cp) return fontMissingAdvance(fontFace_, fontSize_);
+    GlyphImage g;
+    return glyph(fontFace_, cp, fontSize_, false, g) ? textAdvance(cp, g.advance) : -1;
+}
+
+int Engine::textAdvance(uint32_t cp, int own) const {
+    if (!twoByteAdvance_ || cp < 0x80) return own;
+    std::string utf8;
+    if (cp < 0x800) {
+        utf8 = {char(0xC0 | (cp >> 6)), char(0x80 | (cp & 0x3F))};
+    } else if (cp < 0x10000) {
+        utf8 = {char(0xE0 | (cp >> 12)), char(0x80 | ((cp >> 6) & 0x3F)), char(0x80 | (cp & 0x3F))};
+    } else {
+        return own;
+    }
+    std::string bytes = sjis::fromUtf8(utf8);
+    if (bytes.size() != 2) return own;
+    static const uint16_t kHigh[32] = {0x20AC, 0, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0, 0x017D, 0,
+                                       0, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0, 0x017E, 0x0178};
+    int missing = fontMissingAdvance(fontFace_, fontSize_), width = 0;
+    for (char c : bytes) {
+        auto b = uint8_t(c);
+        uint32_t single = b >= 0x80 && b < 0xA0 ? kHigh[b - 0x80] : b;
+        GlyphImage g;
+        width += single && glyph(fontFace_, single, fontSize_, false, g) ? g.advance : missing;
+    }
+    return width;
+}
+
 // Lays out a line or lines of UTF-8 from a pen position. `endsThere` lays a name out to end at x rather than start there.
 void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out) {
     int lineHeight = textLine_ > 0 ? textLine_ : fontSize_ + lineInterval_ + 4;
@@ -6925,7 +6956,7 @@ void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, st
         GlyphImage g;
         if (!glyph(fontFace_, cp, fontSize_, false, g)) continue;
         out.push_back({int(std::lround(penX)), penY, cp, italic});
-        penX += float(g.advance) + textGap_;
+        penX += float(textAdvance(cp, g.advance)) + textGap_;
         used += units;
     }
     if (endsThere) {

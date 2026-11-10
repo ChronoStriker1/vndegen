@@ -167,3 +167,8 @@ radio outfit 1 obj\b.bmp 200 100 1 5 0
 radio outfit 2 obj\b.bmp 300 100 1 5 0
 button back obj\b.bmp 400 100 1 5 0
 )";
+
+const char kTwoByteTest[] = R"(
+screen defaults
+twobyteadvance
+)";
