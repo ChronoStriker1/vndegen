@@ -215,7 +215,9 @@ Unconfirmed: the prologue's numbers, taken as 1 to 5 from the main line starting
 
 Its text hook (`addons\text.dll`, observed only) asks Windows for Calibri at a height of 27, and at 108 for its fourfold anti-aliasing: Wine's font log, and a commented-out `MsgFont Calibri` in init.ini. A height of 27 is the cell, an em of about 22 pixels. The table sets Carlito, the face with Calibri's widths, at 22 with lines 32 apart (init.ini's size 27 and line interval 5). Against six PC lines, with Carlito standing in for Calibri in the Wine prefix, the text rows agree to a pixel and narration ends on the same column.
 
-The scripts hold “ ” ‘ ’ ― and ♪ as two-byte Shift-JIS characters, and the PC's hook draws the glyph at the pen but advances by the two bytes read as single-byte characters: the face's missing-glyph width for the lead byte 81, plus the Latin letter the second byte is. Measured from ink columns, to about a pixel: “ advances 21.2 (rule 21.5, the glyph's own 9.2), ‘ 22.5 (22.1, own 5.5), ’ 18.5 (17.9, own 5.5), ― 19.9 (19.7, own 19.9). The runtime doesn't do this yet, so a spoken line's text sits 12 pixels left of the PC's after its opening quote. Not measured: ” and ♪, and what the PC draws for ♪, which Carlito lacks.
+The scripts hold “ ” ‘ ’ ― and ♪ as two-byte Shift-JIS characters, and the PC's hook draws the glyph at the pen but advances by the two bytes read as single-byte characters: the face's missing-glyph width for the lead byte 81, plus the Latin letter the second byte is. Measured from ink columns, to about a pixel: “ advances 21.2 (rule 21.5, the glyph's own 9.2), ‘ 22.5 (22.1, own 5.5), ’ 18.5 (17.9, own 5.5), ― 19.9 (19.7, own 19.9). The table turns this on with `twobyteadvance`, and with it every ink run of two PC lines holding “, ‘ and ’ falls within a pixel of the PC's. Not measured: ” and ♪, and what the PC draws for ♪, which Carlito lacks.
+
+The PC draws the message window at its own alpha (0.8 where the text sits) and shows its four round buttons all the time, so the table sets `default opacity 100` and `inneralways`. Played to a line, VNDegen's frame is the PC's above the window to the pixel, and in the window all but the text's edges and one thing: the PC draws `obj\l000_003` (156x156, an arrow emblem) at 1063,489 inside the window's round frame, which the tables can't place yet.
 
 ### Test Game 86's staff rolls
 
@@ -224,6 +226,18 @@ Each ending has a roll the exe draws itself. One was captured under Wine about e
 Fitted to the frames: black, the logo at 254,110 coming up from 4 seconds and gone by 17; the parchment and frame (`n000_000`) fading in from 16.3 over 3 seconds; the eight pictures at 627,0 under the frame's window, each fading out as the next fades in over 3 seconds, the first change at 30.5 seconds and one every 13.45 after; and white over the last 1.6 seconds. Each `n001` picture is a page of credits in rows 29 high. The PC draws a row at x 133 and y 164 plus 45 for each place down the parchment, some pages leaving places empty, a row about every second from 3 seconds after the page's picture is read, and clears the page half a second before the next. From 32 seconds on VNDegen's frames and the PC's differ by a mean of 0 to 3 levels at the same moment in the roll.
 
 Not built: the flame that writes each row and the quill beside it; rows fade in instead. The logo's rise is two straight fades fitted to six frames. Whether the roll can be skipped once seen wasn't tried.
+
+### Particles in Test Games 83 and 86
+
+Command 95's parameters 1, 2 and 7 are dots made, every so many milliseconds, and each dot's life in milliseconds. Test Game 86 shows it: under Wine, the dots of an emitter that a second command 95 replaced in its slot stayed on through an erase-all (22) and a screen update and were gone 2.5 seconds later, its parameter 7, and after command 96 the dots went out within 2 seconds, that emitter's parameter 7, across the screen update that followed. So the `particles` part makes dots on the emitter's timer from its start, none at first and a steady number after one life, and a stopped emitter's last dots live out their time, drawn over the scene once their slot is gone. A save keeps a running emitter's record and no dot.
+
+How many show is five eighths of what the rule gives (parameter 1 times parameter 7 over parameter 2). That matches Test Game 83's frames (39 to 51 dots in the top 423 rows on the PC, 48 to 56 in VNDegen) and puts Test Game 86's first scene in range (15 to 23 orange and 24 to 34 green blobs on the PC, 8 to 19 and 25 to 44 in VNDegen). A dot comes up at seven tenths of its brightness, is full by mid-life and goes out over its last tenth, from Test Game 83's tracked dots.
+
+Unconfirmed: why five eighths; the PC's orange dots in Test Game 86 are brighter than their picture's squares, which is how Test Game 83's green ones are added; what parameters 3, 4, 5, 8 and 9 do (3 is 50, 80 or 200 across emitters).
+
+### Test Game 86's coloured glasses
+
+init.ini names three frames for "coloured glasses" (`GlassesFrameName0` to `2`, `sys_3\obj\l004_000` to `_002`) and a darkness for the mode (`GlassesBlackAlpha` 208). Each picture record in a PC save has a twin of kind 17 in the slot 1001 higher: the same picture for most, and for some characters a `sys_3\sc\` picture with 100 added to its middle number (`sc\a400_001_n` and `sys_3\sc\a400_101_n`). In this copy `sys_3.pak` holds 560 pictures of one transparent pixel each and no `obj\l004` frames, and nothing in the message window or Config was found to turn a mode on, so the PC never shows the twins. VNDegen doesn't draw or make them, and the PC loads VNDegen's save of a line with two characters to the same frame as its own, pixel for pixel.
 
 ### The 4:3 frame
 

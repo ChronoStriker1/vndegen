@@ -23,6 +23,10 @@ colorkey 0 255 0
 textfont 9
 textsize 22
 textline 32
+textshift 0 -1
+twobyteadvance
+inneralways
+default opacity 100
 
 screen cfgsav
 size 96000
