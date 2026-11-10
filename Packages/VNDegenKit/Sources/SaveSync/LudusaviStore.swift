@@ -786,6 +786,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case commitUnconfirmed(String)
     case timedOut
     case loginRefused
+    case renameRefused
     case noStoreFolder(String)
     case engineUnsupported
     case outsideSaveFolder(String)
@@ -796,8 +797,8 @@ public enum SaveSyncError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .notSetUp: "Set up your Ludusavi share in Settings first."
-        case let .keychain(status): "The Keychain refused the share's password (status \(status))."
+        case .notSetUp: "Set up your Ludusavi server in Settings first."
+        case let .keychain(status): "The Keychain refused the server's password (status \(status))."
         case let .unreadable(path): "Can't read \(path)."
         case .noBackups: "Ludusavi has no backups for this game yet."
         case let .nothingToRestore(count): "None of the \(count) files in this backup are saves this game uses."
@@ -815,8 +816,10 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case let .commitUnconfirmed(reason):
             "The server did not confirm the new backup list (\(reason)), so VNDegen deleted nothing. Check the game's backups before you back up again."
         case .timedOut: "The server stopped answering, so VNDegen gave up. Try again."
-        case .loginRefused: "The share refused the username or password. Check them in Settings."
-        case let .noStoreFolder(path): "The share has no folder \(path). Enter the share, then the folder Ludusavi backs up to, such as games/Ludusavi."
+        case .loginRefused: "The server refused the username or password. Check them in Settings."
+        case .renameRefused:
+            "The server won't let VNDegen replace the game's backup list by renaming a file over it, so this backup was not added to the list. VNDegen can't back up to this server."
+        case let .noStoreFolder(path): "The server has no folder \(path). Enter the path from Ludusavi's cloud settings, such as games/Ludusavi."
         case .engineUnsupported: "Save sync does not support this game's engine yet."
         case let .gameFolderUnavailable(reason): "The game's folder can't be reached. \(reason)"
         case let .outsideSaveFolder(path): "\(path) leads outside the game's save folder. Nothing was changed."

@@ -187,7 +187,7 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     press(nav, .cancel)
     nav.activate(.settingsPage(.saves))
     let saves = nav.saveSettings
-    press(nav, .down, .confirm)
+    press(nav, .down, .down, .confirm)
     #expect(nav.keyboard != nil)
     // Closing the page under its keyboard, as a swipe does, drops the keyboard.
     nav.sheet = nil

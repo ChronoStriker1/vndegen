@@ -149,7 +149,7 @@ public final class SaveSyncService {
         self.directory = directory
         settings = (try? JSONDecoder().decode(Settings.self, from: Data(contentsOf: directory.appendingPathComponent("settings.json")))) ?? Settings()
         self.configRetention = configRetention
-        self.connector = connector ?? Self.smbConnector(directory: directory)
+        self.connector = connector ?? Self.serverConnector(directory: directory)
         manifestStore = manifest.map { ManifestStore(source: $0, directory: library.paths.support.appendingPathComponent("SaveSync", isDirectory: true)) }
         if settings.migrating {
             // Once, on the first start after 0.4.0: its SSH key goes, and so do the copy of the old store and the sync
@@ -166,10 +166,10 @@ public final class SaveSyncService {
 
     /// The share in `SaveServer`, with the password kept apart: in the Keychain on iPhone and iPad, in a file only this
     /// user can read on the Mac.
-    public static func smbConnector(directory: URL) -> Connector {
+    public static func serverConnector(directory: URL) -> Connector {
         { server in
-            guard case let .smb(smb) = server.remote else { throw SaveSyncError.notSetUp }
-            return try await RemoteAccess.smb(server, password: smb.isGuest ? nil : SMBPassword.read(in: directory))
+            if case let .smb(smb) = server.remote, smb.isGuest { return try await RemoteAccess.connect(server, password: nil) }
+            return try await RemoteAccess.connect(server, password: ServerPassword.read(server.remote.kind, in: directory))
         }
     }
 
@@ -239,17 +239,32 @@ public final class SaveSyncService {
 
     /// The share's password as kept on this device. Nil for a guest login or when none is kept.
     public func storedPassword() -> String? {
-        guard case let .smb(smb)? = settings.server?.remote, !smb.isGuest else { return nil }
-        return try? SMBPassword.read(in: directory)
+        guard let remote = settings.server?.remote else { return nil }
+        if case let .smb(smb) = remote, smb.isGuest { return nil }
+        return storedPassword(for: remote.kind)
+    }
+
+    public func storedPassword(for kind: CloudRemote.Kind) -> String? {
+        try? ServerPassword.read(kind, in: directory)
     }
 
     /// Saves the share's details, as Ludusavi's SMB remote and cloud path name them. A guest login keeps no password and
     /// deletes a kept one. Another host, port, or path forgets the copy of the old store.
     public func setServer(host: String, port: Int, guest: Bool, username: String, password: String, path: String) throws {
-        let remote = SMBRemote(host: host.trimmingCharacters(in: .whitespaces), port: port,
-                               username: guest ? SMBRemote.guest : username.trimmingCharacters(in: .whitespaces))
-        let server = SaveServer(remote: .smb(remote), path: path.trimmingCharacters(in: .whitespaces))
-        try SMBPassword.save(remote.isGuest ? nil : password, in: directory)
+        try setServer(.smb(SMBRemote(host: host, port: port, username: guest ? SMBRemote.guest : username)), password: password, path: path)
+    }
+
+    public func setServer(_ remote: CloudRemote, password: String, path: String) throws {
+        let trim = { (text: String) in text.trimmingCharacters(in: .whitespaces) }
+        let remote: CloudRemote = switch remote {
+        case let .smb(smb): .smb(SMBRemote(host: trim(smb.host), port: smb.port, username: trim(smb.username)))
+        case let .ftp(ftp): .ftp(FTPRemote(host: trim(ftp.host), port: ftp.port, username: trim(ftp.username)))
+        case let .webdav(webdav): .webdav(WebDAVRemote(url: trim(webdav.url), username: trim(webdav.username), vendor: webdav.vendor))
+        }
+        let server = SaveServer(remote: remote, path: trim(path))
+        let guest = if case let .smb(smb) = remote { smb.isGuest } else { false }
+        let kept = guest ? nil : password
+        if (try? ServerPassword.read(remote.kind, in: directory)) != kept { try ServerPassword.save(kept, for: remote.kind, in: directory) }
         let old = settings.server
         guard old != server else { return }
         settings.server = server
@@ -264,10 +279,11 @@ public final class SaveSyncService {
     }
 
     public func forgetServer() {
+        let forgotten = settings.server
         settings.server = nil
         settings.synced = [:]
         saveSettings()
-        try? SMBPassword.save(nil, in: directory)
+        if let kind = forgotten?.remote.kind { try? ServerPassword.save(nil, for: kind, in: directory) }
         try? FileManager.default.removeItem(at: mirror)
         storeGames = [:]
         foundGames = nil
@@ -278,6 +294,8 @@ public final class SaveSyncService {
     private static func store(_ server: SaveServer) -> String {
         switch server.remote {
         case let .smb(smb): "smb://\(smb.host):\(smb.port)/\(server.path)"
+        case let .ftp(ftp): "ftp://\(ftp.host):\(ftp.port)/\(server.path)"
+        case let .webdav(webdav): "webdav \(webdav.url) \(server.path)"
         }
     }
 
@@ -497,7 +515,7 @@ public final class SaveSyncService {
                 // VNDegen can't tell whether the rename happened, so it deletes nothing. Ludusavi prunes the folder if
                 // nothing lists it, and the next commit replaces the temporary file.
                 forget()
-                if error is CancellationError { throw error }
+                if error is CancellationError || error as? SaveSyncError == .renameRefused { throw error }
                 throw SaveSyncError.commitUnconfirmed(error.localizedDescription)
             }
             guard replaced else {

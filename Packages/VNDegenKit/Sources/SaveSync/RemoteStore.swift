@@ -244,10 +244,12 @@ extension SaveSyncError {
     /// The error a user can act on for an rclone failure, when there is one.
     init?(_ error: RcloneError) {
         let message = error.message.lowercased()
-        if message.contains("i/o timeout") || message.contains("deadline exceeded") {
+        if message.contains("i/o timeout") || message.contains("deadline exceeded") || message.contains("timeout awaiting response headers") {
             self = .timedOut
-        } else if message.contains("attempted logon is invalid") {
+        } else if message.contains("attempted logon is invalid") || message.contains(": 530 ") || message.contains("401 unauthorized") {
             self = .loginRefused
+        } else if message.contains("refused to rename over an existing file") {
+            self = .renameRefused
         } else {
             return nil
         }
