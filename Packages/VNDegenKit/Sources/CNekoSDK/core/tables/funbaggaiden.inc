@@ -2,6 +2,7 @@ const char kFunbagGaiden[] = R"(
 screen title
 menustages
 startmenu 2
+submenudim
 pic obj\d000_002.bmp 0 0
 pic obj\d000_000.bmp 0 0
 pic obj\d000_004.bmp 461 672
