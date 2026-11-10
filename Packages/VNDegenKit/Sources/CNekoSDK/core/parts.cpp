@@ -53,6 +53,7 @@ public:
         if (layer == Layer::MenuUnder) fill(out, 300, 300, 20, 0, 0, 255);
         if (layer == Layer::Menu) fill(out, 400, 400, 10, menuPresses_ ? 255 : 0, 0, menuPresses_ ? 0 : 255);
         if (layer == Layer::Screen && menuPresses_ >= 2) fill(out, 0, 0, 20, 0, 0, 255);
+        if (layer == Layer::OverWindow && !windowPicture_.empty()) fill(out, 700, 300, 10, 0, 255, 0);
     }
     bool command(PartHost &host, const Node &n) override {
         if (n.opcode == 9001) {
@@ -62,6 +63,11 @@ public:
         }
         if (n.opcode == 9002) {
             host.releaseSlot(n.p[0]);
+            return true;
+        }
+        if (n.opcode == 9003) {
+            windowPicture_ = n.s[1];
+            host.redraw();
             return true;
         }
         if (n.opcode != 9000) return false;
@@ -78,10 +84,19 @@ public:
                 s.names[0] = heldPicture_;
                 s.fixedBytes = {{53, {7, 0, 0, 0}}};
             }
+        if (!windowPicture_.empty()) {
+            SavedSprite window;
+            window.slot = kWindowSlot;
+            window.path = windowPicture_;
+            d.windowSprites.push_back(window);
+        }
     }
     void loadPC(const SaveData &d) override {
         for (const SavedSprite &s : d.sprites)
             if (s.kind == kHeldKind && s.path.empty() && s.rawFixed.size() > 53 && s.rawFixed[53] == 7) heldPicture_ = s.names[0];
+        windowPicture_.clear();
+        for (const SavedSprite &s : d.windowSprites)
+            if (s.slot == kWindowSlot) windowPicture_ = s.path;
     }
     std::vector<std::string> chapter(PartHost &, int number) override {
         return {"scr\\c" + std::to_string(number) + ".txt @" + std::to_string(100 + number)};
@@ -128,6 +143,7 @@ public:
         onMenu_ = false;
         onScene_ = false;
         heldPicture_.clear();
+        windowPicture_.clear();
     }
 
 private:
@@ -141,7 +157,8 @@ private:
     static constexpr int kHeldKind = 15;
     int presses_ = 0, needed_ = 0, menuPresses_ = 0;
     bool onMenu_ = false, onScene_ = false;
-    std::string heldPicture_;
+    static constexpr int kWindowSlot = 2000;
+    std::string heldPicture_, windowPicture_;
 };
 
 }  // namespace

@@ -41,8 +41,8 @@ struct FontSource {
 // official English releases ask for in place of them, and 8 for Verdana, which Test Game 82's program names for MsgFont 0
 // (set 2, from Wine's font log).
 const char *windowsFontName(int face) {
-    static const char *const names[] = {"MS Gothic", "MS PGothic", "MS Mincho", "MS PMincho", "MS UI Gothic", "Meiryo", "Meiryo UI", "Lucida Sans Unicode", "Verdana"};
-    return face >= 0 && face < 9 ? names[face] : names[0];
+    static const char *const names[] = {"MS Gothic", "MS PGothic", "MS Mincho", "MS PMincho", "MS UI Gothic", "Meiryo", "Meiryo UI", "Lucida Sans Unicode", "Verdana", "Calibri"};
+    return face >= 0 && face < 10 ? names[face] : names[0];
 }
 
 bool packFont(int face, FontSource &out) {
