@@ -16,6 +16,9 @@ button websurvey obj\d002_000.bmp 486 568 6 5 4 stage 2
 button quit obj\d002_000.bmp 486 608 6 5 5 stage 2
 button start_prologue obj\d002_001.bmp 810 408 2 5 0 stage 2 group start
 button start_main obj\d002_001.bmp 810 448 2 5 1 stage 2 group start
+button cg obj\d002_002.bmp 810 488 3 5 0 stage 2 group extra
+button scene obj\d002_002.bmp 810 528 3 5 1 stage 2 group extra
+button music obj\d002_002.bmp 810 568 3 5 2 stage 2 group extra
 
 screen start
 flow main
@@ -229,6 +232,144 @@ pic obj\h004_002.bmp 853 575 6 5 3 0
 pic obj\h004_002.bmp 959 575 6 5 4 0
 pic obj\h004_002.bmp 747 603 6 5 5 0
 
+screen cg
+pic obj\a002_000.bmp 0 0
+pic obj\a002_001.bmp 0 0
+pic obj\e003_000.bmp 1102 0
+pic obj\l000_003.bmp 1110 106
+pic obj\f000_000.bmp 26 25
+button page0 obj\f002_000.bmp 399 37 3 5 0
+button page1 obj\f002_000.bmp 459 37 3 5 1
+button page2 obj\f002_000.bmp 519 37 3 5 2
+button back obj\e003_001.bmp 1116 44 1 5 0
+button nav_save obj\e003_002.bmp 1116 280 8 5 0
+button nav_load obj\e003_002.bmp 1116 330 8 5 1
+button nav_cg obj\e003_002.bmp 1116 380 8 5 2
+button nav_scene obj\e003_002.bmp 1116 430 8 5 3
+button nav_music obj\e003_002.bmp 1116 480 8 5 4
+button nav_config obj\e003_002.bmp 1116 530 8 5 5
+button nav_title obj\e003_002.bmp 1116 580 8 5 6
+button nav_quit obj\e003_002.bmp 1116 630 8 5 7
+button gtab0 obj\f001_001.bmp 17 91 10 5 0
+button gtab1 obj\f001_001.bmp 17 151 10 5 1
+button gtab2 obj\f001_001.bmp 17 211 10 5 2
+button gtab3 obj\f001_001.bmp 17 271 10 5 3
+button gtab4 obj\f001_001.bmp 17 331 10 5 4
+button gtab5 obj\f001_001.bmp 17 391 10 5 5
+button gtab6 obj\f001_001.bmp 17 451 10 5 6
+button gtab7 obj\f001_001.bmp 17 511 10 5 7
+button gtab8 obj\f001_001.bmp 17 571 10 5 8
+gallerytabs 0
+cellsheet obj\f003_000.bmp
+cellsize 222 143
+cellthumb 34 20
+celldigits obj\f003_002.bmp 53 113 2 16
+cellcountstep 16
+cellcount obj\f003_002.bmp obj\f003_001.bmp 118 113 150 159 0
+cell 298 92
+cell 538 92
+cell 778 92
+cell 298 242
+cell 538 242
+cell 778 242
+cell 298 392
+cell 538 392
+cell 778 392
+
+screen scene
+pic obj\a002_000.bmp 0 0
+pic obj\e003_000.bmp 1102 0
+pic obj\l000_003.bmp 1110 106
+pic obj\a002_001.bmp 0 0
+pic obj\f000_001.bmp 26 25
+button page0 obj\f002_000.bmp 399 37 3 5 0
+button page1 obj\f002_000.bmp 459 37 3 5 1
+button page2 obj\f002_000.bmp 519 37 3 5 2
+button back obj\e003_001.bmp 1116 44 1 5 0
+button nav_save obj\e003_002.bmp 1116 280 8 5 0
+button nav_load obj\e003_002.bmp 1116 330 8 5 1
+button nav_cg obj\e003_002.bmp 1116 380 8 5 2
+button nav_scene obj\e003_002.bmp 1116 430 8 5 3
+button nav_music obj\e003_002.bmp 1116 480 8 5 4
+button nav_config obj\e003_002.bmp 1116 530 8 5 5
+button nav_title obj\e003_002.bmp 1116 580 8 5 6
+button nav_quit obj\e003_002.bmp 1116 630 8 5 7
+button gtab0 obj\f001_001.bmp 17 91 10 5 0
+button gtab1 obj\f001_001.bmp 17 151 10 5 1
+button gtab2 obj\f001_001.bmp 17 211 10 5 2
+button gtab3 obj\f001_001.bmp 17 271 10 5 3
+button gtab4 obj\f001_001.bmp 17 331 10 5 4
+button gtab5 obj\f001_001.bmp 17 391 10 5 5
+button gtab6 obj\f001_001.bmp 17 451 10 5 6
+button gtab7 obj\f001_001.bmp 17 511 10 5 7
+button gtab8 obj\f001_001.bmp 17 571 10 5 8
+gallerytabs 0
+cellhide
+cellsheet obj\f003_000.bmp
+cellsize 222 143
+cellthumb 34 20
+celldigits obj\f003_002.bmp 53 113 2 16
+cell 298 92
+cell 538 92
+cell 778 92
+cell 298 242
+cell 538 242
+cell 778 242
+cell 298 392
+cell 538 392
+cell 778 392
+
+screen music
+pic obj\a002_000.bmp 0 0
+pic obj\e003_000.bmp 1102 0
+pic obj\l000_003.bmp 1110 106
+pic obj\a002_001.bmp 0 0
+pic obj\g000_000.bmp 26 25
+pic obj\g001_000.bmp 119 101
+pic obj\g002_000.bmp 360 511
+pic obj\g003_000.bmp 343 575
+pic obj\g004_000.bmp 106 570
+slider music obj\g004_001.bmp 166 614
+knob music obj\g004_002.bmp 166 615 1
+button back obj\e003_001.bmp 1116 44 1 5 0
+button nav_save obj\e003_002.bmp 1116 280 8 5 0
+button nav_load obj\e003_002.bmp 1116 330 8 5 1
+button nav_cg obj\e003_002.bmp 1116 380 8 5 2
+button nav_scene obj\e003_002.bmp 1116 430 8 5 3
+button nav_music obj\e003_002.bmp 1116 480 8 5 4
+button nav_config obj\e003_002.bmp 1116 530 8 5 5
+button nav_title obj\e003_002.bmp 1116 580 8 5 6
+button nav_quit obj\e003_002.bmp 1116 630 8 5 7
+button track0 obj\g001_001.bmp 211 162 1 5 0
+button track1 obj\g001_002.bmp 211 202 1 5 0
+button track2 obj\g001_003.bmp 211 242 1 5 0
+button track3 obj\g001_004.bmp 211 282 1 5 0
+button track4 obj\g001_005.bmp 211 322 1 5 0
+button track5 obj\g001_006.bmp 211 362 1 5 0
+button track6 obj\g001_007.bmp 211 402 1 5 0
+button track7 obj\g001_008.bmp 211 442 1 5 0
+button track8 obj\g001_009.bmp 456 162 1 5 0
+button track9 obj\g001_010.bmp 456 202 1 5 0
+button track10 obj\g001_011.bmp 456 242 1 5 0
+button track11 obj\g001_012.bmp 456 282 1 5 0
+button track12 obj\g001_013.bmp 456 322 1 5 0
+button track13 obj\g001_014.bmp 456 362 1 5 0
+button track14 obj\g001_015.bmp 456 402 1 5 0
+button track15 obj\g001_016.bmp 456 442 1 5 0
+button track16 obj\g001_017.bmp 701 162 1 5 0
+button track17 obj\g001_018.bmp 701 202 1 5 0
+button track18 obj\g001_019.bmp 701 242 1 5 0
+button track19 obj\g001_020.bmp 701 282 1 5 0
+button track20 obj\g001_021.bmp 701 322 1 5 0
+button track21 obj\g001_022.bmp 701 362 1 5 0
+button music_prev obj\g003_001.bmp 366 611 7 5 0
+button music_play obj\g003_001.bmp 438 611 7 5 1
+button music_pause obj\g003_001.bmp 510 611 7 5 2
+button music_stop obj\g003_001.bmp 582 611 7 5 3
+button music_next obj\g003_001.bmp 654 611 7 5 4
+button music_repeat obj\g003_001.bmp 726 611 7 5 5
+button music_shuffle obj\g003_001.bmp 798 611 7 5 6
+
 screen defaults
 parts scroll particles
 colorkey 0 255 0
@@ -246,6 +387,7 @@ default se 60
 default voice 80
 default backvoice 80
 default skipall 1
+default music 100
 windowpic obj\l000_003.bmp 1063 489
 
 screen cfgsav
