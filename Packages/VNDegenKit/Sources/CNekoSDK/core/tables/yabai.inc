@@ -13,6 +13,7 @@ textshift 1 -1
 # Config as the PC's 初期化 leaves it.
 default opacity 100
 default text 50
+textpoints text 0 156 50 17 100 0
 default auto 50
 default bgm 60
 default se 60
@@ -640,6 +641,7 @@ flow main
 # S 2083 is 1 outside the truths, in the prologue and from the ending's start: a save in the prologue without it goes on
 # to the game over on the PC. The PC's save inside chapter 1 already holds truth 1's clock, so each truth starts before
 # its opening chapter.
+set G 46 = 1
 set S 2083 = 1
 set S 1000 = 0
 set S 105 = 4
@@ -651,6 +653,7 @@ jump mainstory
 flow mainstory
 resume S 105 == 2 at hub
 resume S 105 == 8 at pickresume
+set G 46 = 1
 set S 2083 = 0
 open hubstart 1
 set S 1000 = 1
