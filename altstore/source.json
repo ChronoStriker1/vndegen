@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.32.2",
+          "buildVersion": "2200",
+          "date": "2026-11-10T13:01:54Z",
+          "localizedDescription": "A question asked at a choice shows over the choice, and Auto waits longer on full-width text, as the PC games do.\n\n## Downloads\n\n- `VNDegen-0.32.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.32.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- NekoSDK, every game with choices: a question opened while a choice waits, such as the message window's Title or Previous Choice, is drawn over the choice, with the choice still showing under the question's dark. Before, the choice was drawn over the question, so its Yes and No couldn't be seen (#82).\n- Mankitsu Happening: Auto counts a full-width character as two when it works out how long a line stays up, as the PC does. Lines of ordinary Latin letters are unchanged.\n- Funbag Fantasy, Funbag Fantasy 2 and Funbag Fantasy: Sideboob Story: after loading a save made at a choice, stepping the message window's log back and forward shows the last line again.\n\n## Known limits\n\n- The Auto rule for full-width characters was measured on two lines of Mankitsu Happening's PC game, both made of Japanese punctuation. No line of kana or kanji was measured, and the other games' PCs weren't measured for it, so their Auto is unchanged.\n- On the PC, Auto's pause runs from when a line finished, so a line that has already stood long enough goes on the moment Auto is switched on. VNDegen counts from when Auto came on.\n- The question over a choice was compared with the PC in Funbag Fantasy 2 only.\n\n## What wasn't tested\n\n- No physical device was used.\n- The last commit, which limits the Auto rule to Mankitsu Happening, was tested but not read by a reviewer, and Mankitsu Happening wasn't run again with it.\n- These changes were run in the Linux test build only. The question over a choice was compared with Funbag Fantasy 2's PC game under Wine, frame for frame. Nothing was run in the Mac app or on a simulator.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.32.2/VNDegen-0.32.2.ipa",
+          "size": 124530764,
+          "sha256": "fd05797d712e777e8b5e55066aa227008ea343436ebb6d2afa440ab3fdb36ef5",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.32.1",
           "buildVersion": "2192",
           "date": "2026-11-10T12:27:50Z",
