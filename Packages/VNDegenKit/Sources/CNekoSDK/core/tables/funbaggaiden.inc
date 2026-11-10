@@ -20,6 +20,102 @@ button start_main obj\d002_001.bmp 810 448 2 5 1 stage 2 group start
 screen start
 flow main
 
+screen load
+pic obj\a103_000.bmp 0 0
+pic obj\e003_000.bmp 1102 0
+pic obj\l000_003.bmp 1110 106
+pic obj\a002_001.bmp 0 0
+pic obj\e000_001.bmp 26 25
+emptycards 80
+slots obj\e002_000.bmp 60 98 520 120 5 2 1
+slotthumb 34 11
+slotdigits obj\e002_001.bmp 297 6 3 16
+slotnew obj\e002_003.bmp 376 -9
+slotchaptervar obj\e002_004.bmp 260 62 4 5000
+datedigits obj\e002_001.bmp 0 0
+datefield year 268 26 16
+datefield month 352 26 16 blank
+datefield day 400 26 16 blank
+datefield hour 268 46 16 blank
+datefield minute 316 46 16 blank
+button page0 obj\e001_000.bmp 399 37 10 5 0
+button page1 obj\e001_000.bmp 459 37 10 5 1
+button page2 obj\e001_000.bmp 519 37 10 5 2
+button page3 obj\e001_000.bmp 579 37 10 5 3
+button page4 obj\e001_000.bmp 639 37 10 5 4
+button page5 obj\e001_000.bmp 699 37 10 5 5
+button page6 obj\e001_000.bmp 759 37 10 5 6
+button page7 obj\e001_000.bmp 819 37 10 5 7
+button page8 obj\e001_000.bmp 879 37 10 5 8
+button page9 obj\e001_000.bmp 939 37 10 5 9
+button back obj\e003_001.bmp 1116 44 1 5 0
+button nav_save obj\e003_002.bmp 1116 280 8 5 0
+button nav_load obj\e003_002.bmp 1116 330 8 5 1
+button nav_cg obj\e003_002.bmp 1116 380 8 5 2
+button nav_scene obj\e003_002.bmp 1116 430 8 5 3
+button nav_music obj\e003_002.bmp 1116 480 8 5 4
+button nav_config obj\e003_002.bmp 1116 530 8 5 5
+button nav_title obj\e003_002.bmp 1116 580 8 5 6
+button nav_quit obj\e003_002.bmp 1116 630 8 5 7
+
+screen save
+pic obj\a002_000.bmp 0 0
+pic obj\e003_000.bmp 1102 0
+pic obj\l000_003.bmp 1110 106
+pic obj\a002_001.bmp 0 0
+pic obj\e000_000.bmp 26 25
+slots obj\e002_000.bmp 60 98 520 120 5 2 1
+slotthumb 34 11
+slotdigits obj\e002_001.bmp 297 6 3 16
+slotnew obj\e002_003.bmp 376 -9
+slotchaptervar obj\e002_004.bmp 260 62 4 5000
+datedigits obj\e002_001.bmp 0 0
+datefield year 268 26 16
+datefield month 352 26 16 blank
+datefield day 400 26 16 blank
+datefield hour 268 46 16 blank
+datefield minute 316 46 16 blank
+button page0 obj\e001_000.bmp 399 37 10 5 0
+button page1 obj\e001_000.bmp 459 37 10 5 1
+button page2 obj\e001_000.bmp 519 37 10 5 2
+button page3 obj\e001_000.bmp 579 37 10 5 3
+button page4 obj\e001_000.bmp 639 37 10 5 4
+button page5 obj\e001_000.bmp 699 37 10 5 5
+button page6 obj\e001_000.bmp 759 37 10 5 6
+button page7 obj\e001_000.bmp 819 37 10 5 7
+button page8 obj\e001_000.bmp 879 37 10 5 8
+button page9 obj\e001_000.bmp 939 37 10 5 9
+button back obj\e003_001.bmp 1116 44 1 5 0
+button nav_save obj\e003_002.bmp 1116 280 8 5 0
+button nav_load obj\e003_002.bmp 1116 330 8 5 1
+button nav_cg obj\e003_002.bmp 1116 380 8 5 2
+button nav_scene obj\e003_002.bmp 1116 430 8 5 3
+button nav_music obj\e003_002.bmp 1116 480 8 5 4
+button nav_config obj\e003_002.bmp 1116 530 8 5 5
+button nav_title obj\e003_002.bmp 1116 580 8 5 6
+button nav_quit obj\e003_002.bmp 1116 630 8 5 7
+
+screen dialog
+dim 155
+pic obj\a003_000.bmp 311 75
+question obj\h000_009.bmp 402 78 6 0
+question obj\h000_009.bmp 402 78 6 1
+question obj\h000_009.bmp 402 78 6 2
+question obj\h000_009.bmp 402 78 6 2
+question obj\h000_009.bmp 402 78 6 0
+question obj\h000_009.bmp 402 78 6 1
+question obj\h000_009.bmp 402 78 6 4
+question obj\h000_009.bmp 402 78 6 3
+question obj\h000_009.bmp 402 78 6 5
+button yes obj\a003_002.bmp 361 188 2 5 0
+button no obj\a003_002.bmp 361 299 2 5 1
+
+screen choice
+pic obj\a003_000.bmp 311 75
+pic obj\h000_008.bmp 411 92
+choicecolumns 2
+placefor 2 187 122 361 0
+
 screen defaults
 parts scroll particles
 colorkey 0 255 0
@@ -30,6 +126,7 @@ textshift 0 -1
 twobyteadvance
 inneralways
 default opacity 100
+windowpic obj\l000_003.bmp 1063 489
 
 screen cfgsav
 size 96000
