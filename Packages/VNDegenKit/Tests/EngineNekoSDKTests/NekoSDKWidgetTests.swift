@@ -95,12 +95,19 @@ import TestSupport
         #expect(pixel(e, 103, 303) == green)
 
         // A press on the track puts the knob's middle under the pointer: 20 units, 6 pixels each, from 100.
+        #expect(pixel(e, 100, 505) != green)
         click(e, 100 + 6 * 20 + 5, 305)
         #expect(pixel(e, 223, 303) == green)
         #expect(pixel(e, 103, 303) != green)
+        #expect(pixel(e, 102, 505) == green)
+        #expect(pixel(e, 103, 505) != green)
         // At the track's end it stops at the range's 50.
         click(e, 100 + 6 * 50 + 4, 305)
         #expect(pixel(e, 100 + 6 * 50 + 3, 303) == green)
+        #expect(pixel(e, 109, 505) == green)
+        click(e, 100, 505)
+        #expect(pixel(e, 163, 303) == green)
+        #expect(pixel(e, 100, 505) != green)
     }
 
     // `submenudim hide`: the other buttons aren't drawn while the submenu is open, and still take no press.
@@ -254,6 +261,28 @@ import TestSupport
             for _ in 0..<90 { _ = vnneko_step(e, 16) }
             #expect(status().contains(" menu scene"), "\(status())")
         }
+    }
+
+    @Test func aReplayOfOneSceneEndsAtTheSceneScreen() throws {
+        let root = try game("widgettesttabs", [
+            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\k.txt,0,0\n".utf8),
+            "scr/k.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0, p: [0: 500])]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/widgettesttabs/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try Data("scr\\k.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_press(e, "scene"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        click(e, 320, 315)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("k.txt #"), "\(status())")
+        for _ in 0..<90 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu scene"), "\(status())")
     }
 
     @Test func anEmptyTabOpensWithoutTheKey() throws {

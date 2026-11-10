@@ -345,7 +345,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // The runtime's own story-table test game saves as The Alchemist does.
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestload" || folder == "vndegen\\storynumber") return &kAlchemist;
     // And so do the save card and confession tree test games.
-    if (folder == "vndegen\\cardtest" || folder == "vndegen\\treetest") return &kAlchemist;
+    if (folder == "vndegen\\cardtest" || folder == "vndegen\\treetest" || folder == "vndegen\\emptycards" || folder == "vndegen\\emptycardsnumber") return &kAlchemist;
     // And as Test Game 82 does, with a Previous Choice file beside each save.
     if (folder == "vndegen\\storytestpc" || folder == "vndegen\\layout82") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy") return &kFunbag1;

@@ -147,6 +147,11 @@ import TestSupport
             steps(e, 30)
         }
         tap(125, 125)
+        var w: Int32 = 0, h: Int32 = 0, changed = false
+        let px = try #require(vnneko_frame(e, &w, &h, &changed))
+        func red(_ x: Int, _ y: Int) -> UInt8 { px[(y * Int(w) + x) * 4] }
+        #expect(red(1010, 110) == 120)
+        #expect(red(1010, 310) < 100)
         tap(640, 359)
         #expect(status(e).contains(" choice "), "\(status(e))")
         // A tap of its own takes the option under it, the second here, which leaves S 13 alone.
