@@ -370,6 +370,12 @@ void Engine::openScreen(const std::string &name) {
     }
     darkened_.clear();
     dragSetting_.clear();
+    if (screen_ && screen_->name == "title" && name != "title") {
+        titleStage_ = menuStage_;
+        titleSubMenu_ = subMenu_;
+        titleKept_ = true;
+    }
+    bool backToTitle = name == "title" && screen_ && screen_->name != "title" && titleKept_;
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -381,6 +387,10 @@ void Engine::openScreen(const std::string &name) {
     page_ = 0;
     menuStage_ = screen_->setting("menustages") ? 1 : 2;
     subMenu_.clear();
+    if (backToTitle) {
+        menuStage_ = titleStage_;
+        subMenu_ = titleSubMenu_;
+    }
     // The drifting line art starts from a sketch picked at random, as the PC's does.
     driftFrom_ = screenMs_;
     galleryTabAt_ = screenMs_;
@@ -487,6 +497,7 @@ void Engine::endStory(const std::string &screen) {
 }
 
 void Engine::startStory() {
+    titleKept_ = false;
     setAside_.reset();
     setAsideChoice_.reset();
     stopTrack();
@@ -2798,6 +2809,7 @@ bool Engine::loadFromSlot(int slot) {
 }
 
 void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
+    titleKept_ = false;
     setAside_.reset();
     setAsideChoice_.reset();
     // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit, and the CG

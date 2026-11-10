@@ -95,6 +95,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\partplatetest") return kPartPlateTest;
     if (folder == "vndegen\\partbandtest") return kPartBandTest;
     if (folder == "vndegen\\disctest") return kDiscTest;
+    if (folder == "vndegen\\titlereturn") return kTitleReturnTest;
     if (folder == "vndegen\\musicvolume") return kMusicVolumeTest;
     if (folder == "vndegen\\plateholdstest") return kPlateHoldsTest;
     if (folder == "vndegen\\partplatebandtest") return kPartPlateBandTest;

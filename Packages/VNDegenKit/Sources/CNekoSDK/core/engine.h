@@ -626,7 +626,9 @@ private:
     // `menustages`: Test Game 94's title shows its art until a click brings up the menu, stage 2, and the right button
     // puts it away. A `submenu:NAME` button opens the buttons and pictures of that group beside it, and a group named
     // `PARENT/NAME` opens inside PARENT's.
-    int menuStage_ = 2;
+    int menuStage_ = 2, titleStage_ = 2;
+    std::string titleSubMenu_;
+    bool titleKept_ = false;
     std::string subMenu_;
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;
