@@ -43,7 +43,9 @@ class UnityExternalSession: EngineSession {
                 unityLog.error("\(self.launch.game.id.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 if !ending {
                     if !gameStarted { failedToStart = true }
-                    host.fail("\(launch.game.title) couldn't start. \(error.localizedDescription)")
+                    host.fail(gameStarted
+                        ? "\(launch.game.title)'s settings couldn't be saved back. \(error.localizedDescription)"
+                        : "\(launch.game.title) couldn't start. \(error.localizedDescription)")
                     return
                 }
             }
@@ -497,6 +499,8 @@ final class UnityHostView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    var message: String { label.stringValue }
 
     func setMessage(_ message: String, showsGame: Bool = false) {
         label.stringValue = message

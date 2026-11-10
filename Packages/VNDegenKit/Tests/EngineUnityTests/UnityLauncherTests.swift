@@ -309,4 +309,21 @@ import VNCore
         #expect(plugin.registrySave(folder: folder, dataDirectory: folder) == nil)
     }
 }
+@MainActor @Test func aSettingsErrorAfterPlaySaysSoRatherThanCouldntStart() async throws {
+    let folder = TestFolders.root.appendingPathComponent("unity-\(UUID().uuidString)", isDirectory: true)
+    let locked = folder.appendingPathComponent("Locked", isDirectory: true)
+    try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: locked.path)
+    defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path) }
+    let launch = GameLaunch(game: Game(id: GameID("Test Game"), title: "Test Game"), folder: folder, dataDirectory: folder) {}
+    let session = UnityExternalSession(launch, message: "")
+    session.start {
+        session.gameStarted = true
+        try Data("prefs".utf8).write(to: locked.appendingPathComponent("PlayerPrefs.reg"), options: .atomic)
+    }
+    await session.waitUntilStopped()
+    #expect(!session.failedToStart)
+    #expect(session.host.message.hasPrefix("Test Game's settings couldn't be saved back. "), "\(session.host.message)")
+    #expect(session.host.message.contains("PlayerPrefs.reg"), "\(session.host.message)")
+}
 #endif
