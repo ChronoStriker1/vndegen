@@ -267,6 +267,16 @@ An empty Load card is drawn at 80 of 256 and its number at 0.595 of full strengt
 
 On the Music screen a track's card pressed while nothing plays only chooses the track: its card lights, its title `obj\g002_0NN` shows at 360,511, Stop stays lit and Pause disabled, and Play starts it. Pressed while another plays, it plays at once. The table's `trackselects` and `playingpic` give the same but for the chosen track's title and the disabled Pause while stopped.
 
+### Test Game 86's Previous Choice and control panel
+
+The PC writes `saveNNNs.sav` beside each save, 180 bytes before any choice and 2.3 to 2.9 KB after one, and reads it at a load: a PC save past the first choice has the control panel's Previous Choice lit; pressed, it asks the question sheet's sixth cell, and Yes reads the choice's scene again (`se_01_04_03`, by the file trace) and shows the choice. A VNDegen save made past the same choice, with its own `s` file, loads on the PC at the same line with Previous Choice lit, and Yes gives the frame the PC's own save gives, but for the wait mark. A VNDegen save without the file loads too, with the button disabled. In VNDegen the PC's save returns to the same choice, the frame above the window the PC's to the pixel; in the window the PC still shows the scene's last line until a click and greys its Voice button, where VNDegen's window is empty with Voice lit.
+
+From a scene, the control panel's Load, then Scene Mode, a card played to its end and Return: the PC is back in the story where it was left, the same frame but for one round window button, having read the story's scene script again.
+
+The control panel rises on the PC when the pointer is at y 634 or lower, init.ini's MsgWinButtonPlateBottomPosY, and once up stays until the pointer is above y 561, MsgWinButtonPlatePosY (up with the pointer at 561, down at 558). VNDegen raises it from 561 down.
+
+msg_button.ini gives each message window button two help pictures where Test Game 83's gives one: a circle with its place, an axis (1 upright, 2 level, 3 through the screen) and a speed in thousandths of a degree a frame, then the text with its place and cell. The eight control panel buttons name `obj\l003_000` about axis 3 at 1000, and the four window buttons the emblem `obj\l000_003` at 1063,489 about axis 1 at 2000: the 60 and 120 degrees a second measured in the menus.
+
 ### Test Game 86's staff rolls
 
 Each ending has a roll the exe draws itself. One was captured under Wine about every 0.8 seconds with its file reads traced, and the other two traced: all three read `obj\n000_000`, eight pictures of one set (`n004` after the first choice's ending, `n003` after the third choice's first option, `n002` on the last route), the title's logo, `bgm\BGM29.ogg`, and then `obj\n001_041` to `_051` one at a time, at the same moments in each; the next scene is read 134 seconds in.
