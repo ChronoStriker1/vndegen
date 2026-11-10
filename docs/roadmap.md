@@ -91,11 +91,10 @@ New bugs get a GitHub issue and a line here.
 - [#70](https://github.com/ChronoStriker1/vndegen/issues/70) A game that can't start drops back to the library with no message.
 - [#71](https://github.com/ChronoStriker1/vndegen/issues/71) Unity: an error saving PlayerPrefs after play shows "couldn't start".
 - [#72](https://github.com/ChronoStriker1/vndegen/issues/72) Leaving a game while its engine is still starting counts as played.
-- [#82](https://github.com/ChronoStriker1/vndegen/issues/82) NekoSDK: a question opened at a choice is drawn under the choice in Funbag Fantasy 2, so the Yes and No can't be seen. With the NekoSDK lead.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- NekoSDK, on `feat/nekosdk-stage3`: every game is released, the last, Funbag Fantasy: Sideboob Story, in 0.32.0. What's left is the bug listed above and whether the PC counts a full-width character as two for Auto.
+- Nothing right now. NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. Next is item 1 below.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
