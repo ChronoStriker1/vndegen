@@ -370,6 +370,9 @@ button music_next obj\g003_001.bmp 654 611 7 5 4
 button music_repeat obj\g003_001.bmp 726 611 7 5 5
 button music_shuffle obj\g003_001.bmp 798 611 7 5 6
 
+screen log
+inwindow
+
 screen defaults
 parts scroll particles
 colorkey 0 255 0
