@@ -201,13 +201,25 @@ import TestSupport
         #expect(pixel(e, 610, 610) == [0, 250, 0])
         click(120, 120)
         #expect(pixel(e, 610, 610) == [0, 0, 250], "\(pixel(e, 610, 610))")
-        for _ in 0..<4 where pixel(e, 610, 610) != [0, 250, 0] {
-            click(610, 610)
-            #expect(status().contains(" menu cg"), "\(status())")
-        }
-        #expect(pixel(e, 610, 610) == [0, 250, 0])
         click(610, 610)
+        #expect(status().contains(" menu cg"), "\(status())")
+        #expect(pixel(e, 610, 610) == [250, 0, 250], "\(pixel(e, 610, 610))")
+        vnneko_mouse_button(e, 1, true)
+        vnneko_mouse_button(e, 1, false)
+        for _ in 0..<3 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu cg"), "\(status())")
+        #expect(pixel(e, 610, 610) == [0, 250, 0])
+        click(120, 120)
+        click(610, 610)
+        click(610, 610)
+        #expect(status().contains(" menu cg"), "\(status())")
+        #expect(pixel(e, 610, 610) == [0, 250, 0])
+        click(120, 120)
+        #expect(pixel(e, 610, 610) == [0, 0, 250])
+        #expect(vnneko_debug_press(e, "nav_scene"))
+        for _ in 0..<3 { _ = vnneko_step(e, 16) }
         #expect(status().contains(" menu scene"), "\(status())")
+        #expect(pixel(e, 610, 610) != [0, 0, 250])
     }
 
     // `pic FILE X Y turn DEGREES` turns a picture about its middle by the screen's clock, as Test Game 83's title turns
