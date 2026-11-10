@@ -408,6 +408,7 @@ textline 32
 textshift 0 -1
 twobyteadvance
 inneralways
+squarewindow 0
 default opacity 100
 default text 50
 default auto 50
