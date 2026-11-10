@@ -57,7 +57,7 @@ constexpr int kCaptionInMs = 100, kCaptionBack = 15, kCaptionDrift = 30;
 constexpr int kTitleBottomShift = 152;
 constexpr int kTitleMs = 4333, kTitleFadeMs = 600, kTitleTrimSpeed = 240, kTitleTrimPeriod = 600;
 constexpr int kMenuTrimSpeed = 240;
-constexpr int kNewsX = 803, kNewsW = 414, kNewsSpeed = 120;
+constexpr int kNewsX = 803, kNewsW = 414, kNewsSpeed = 120, kNewsStart = 134;
 // The title's rising dots: how many, the strip they start along (the silhouettes' feet) and how far they rise.
 constexpr int kSparkles = 9, kSparkleX = 24, kSparkleW = 640, kSparkleFrom = 690, kSparkleRise = 340;
 // The lower row's liquid: how far and how long it rises as the row opens, and the gap in its drawing that makes the next
@@ -288,6 +288,7 @@ public:
     }
 
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
+        if (menu_.rfind("config", 0) != 0 || name.rfind("config", 0) != 0) menuFrom_ = host.screenMs();
         menu_ = name;
         if (name == "title") {
             titleFrom_ = host.screenMs();
@@ -559,11 +560,10 @@ private:
     // A menu's trims along the top and bottom, under its cards and buttons, and the screen's name plate at 4, 6 (set 1,
     // fitted over the screen's paper on PC shots and a 30 fps recording, within 0.01 of 255): the top trim at y -36,
     // and at 0 on Save and Load, where the page buttons hang from it, moving left; the bottom one at y 662, moving
-    // right; both 8 pixels a frame of the recording, 240 a second. Where along their strips the trims start isn't
-    // measured.
+    // right; both 8 pixels a frame of the recording, 240 a second.
     void drawMenuTrims(PartHost &host, Canvas &out) {
         frameDrawn_ = true;
-        int moved = int(std::max<int64_t>(0, host.screenMs()) * kMenuTrimSpeed / 1000);
+        int moved = int(std::max<int64_t>(0, host.screenMs() - menuFrom_) * kMenuTrimSpeed / 1000);
         if (ImageRef top = host.image("obj\\e004_000.bmp"))
             for (int x = -(moved % top->w); x < out.w; x += top->w) drawPart(out, *top, x, menuPlate() < 2 ? 0 : -36, 0, 0, top->w, top->h, 1);
         if (ImageRef bottom = host.image("obj\\e004_001.bmp"))
@@ -668,12 +668,12 @@ private:
     // The additional edition's Information box, from sys_2.pak (set 1, fitted on shots and a 30 fps recording of the
     // release's second exe under Wine): the box at 770, 57, and in its window, 414 wide from x 803, one line of text
     // at y 91 moving left 4 pixels a frame of the recording (120 a second) and coming round every 414, under the
-    // window's shade. Where along its round the text starts isn't measured.
+    // window's shade.
     void drawNews(PartHost &host, Canvas &out, int64_t t) {
         ImageRef box = host.image("sys_2\\obj\\d401_000.bmp"), text = host.image("sys_2\\obj\\d401_001.bmp");
         if (!box || !text) return;
         drawPart(out, *box, 770, 57, 0, 0, box->w, box->h, 1);
-        int moved = int(t * kNewsSpeed / 1000 % kNewsW);
+        int moved = int((t * kNewsSpeed / 1000 + kNewsStart) % kNewsW);
         for (int x = kNewsX + kNewsW - moved - kNewsW; x < kNewsX + kNewsW; x += kNewsW) {
             int from = std::max(x, kNewsX), to = std::min(x + text->w, kNewsX + kNewsW);
             if (to > from) drawPart(out, *text, from, 91, from - x, 0, to - from, text->h, 1);
@@ -987,7 +987,7 @@ private:
 
     bool selecting_ = false, inisRead_ = false;
     int pendingChapter_ = 0, titleFirst_ = 0;
-    int64_t titleFrom_ = 0;
+    int64_t titleFrom_ = 0, menuFrom_ = 0;
     std::string menu_;
     bool frameDrawn_ = false;
     bool menuFrame_ = false, menuOver_ = false;
