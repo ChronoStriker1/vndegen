@@ -372,7 +372,6 @@ pic obj\h002_001.bmp 671 271 10 5 8 4
 pic obj\h002_001.bmp 785 271 10 5 9 0
 radio effect 1 obj\h002_002.bmp 557 307 2 5 0
 radio effect 0 obj\h002_002.bmp 671 307 2 5 1
-# 背景の電球演出, the flickering bulb some backgrounds have (cfg\light_info.ini); the flicker itself isn't drawn yet.
 radio bulb 1 obj\h002_002.bmp 557 343 2 5 0
 radio bulb 0 obj\h002_002.bmp 671 343 2 5 1
 # The PC draws this row's OFF 3 pixels lower than its ON.

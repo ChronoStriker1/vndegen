@@ -3,6 +3,7 @@
 // Command meanings come from the games' own data and the PC game under Wine; docs/nekosdk-cleanroom.md says which are
 // settled and which are readings still to be checked.
 #pragma once
+#include <tuple>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
@@ -653,6 +654,17 @@ private:
     std::vector<int> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
     bool layoutPairs_ = false;
     void clearLayoutSlot(int slot);
+    struct BulbStep {
+        int frames = 0, level = -1;
+    };
+    std::vector<std::vector<BulbStep>> bulbPatterns_;
+    int bulbPattern_ = -1, bulbFrom_ = 255, bulbDrawn_ = 255;
+    int64_t bulbStart_ = 0;
+    std::map<std::string, std::string> bulbDark_;
+    std::map<std::tuple<const Image *, const Image *, int>, ImageRef> bulbBlends_;
+    void loadBulb();
+    int bulbLevel();
+    ImageRef bulbImage(const Sprite &s, ImageRef lit);
     bool layoutSlotByP1_ = false;
     int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;
