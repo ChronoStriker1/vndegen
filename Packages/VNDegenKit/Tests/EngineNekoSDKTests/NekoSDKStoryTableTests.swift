@@ -86,8 +86,16 @@ import TestSupport
         // It names the scene whose end asked the choice, at its top, as the PC's do, though the jump started that scene.
         let previous = try NekoSDKFlowFixture.unpacked(Data(contentsOf: saves.appendingPathComponent("save004s.sav")))
         #expect(previous.range(of: Data("scr\\b.txt".utf8)) != nil)
+        #expect(!vnneko_debug_choice_line(e))
         #expect(vnneko_debug_press(e, "BackSelection"))
         steps(e, 5)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        #expect(vnneko_debug_choice_line(e))
+        vnneko_mouse_move(e, 10.0 / 1280, 10.0 / 720)
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        steps(e, 5)
+        #expect(!vnneko_debug_choice_line(e))
         #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
         vnneko_stop(e)
 

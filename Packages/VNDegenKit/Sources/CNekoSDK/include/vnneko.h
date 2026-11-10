@@ -141,6 +141,7 @@ void vnneko_debug_table_prefix(const char *text);
 void vnneko_debug_host_taps(VNNekoEngine *e, bool on);
 int vnneko_debug_choice_result(VNNekoEngine *e);
 bool vnneko_debug_choice_kept(VNNekoEngine *e);
+bool vnneko_debug_choice_line(VNNekoEngine *e);
 // For tests: saves to a slot, loads one, or turns a card's lock on or off, as the save and load screens do.
 bool vnneko_debug_save(VNNekoEngine *e, int slot);
 bool vnneko_debug_load(VNNekoEngine *e, int slot);

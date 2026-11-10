@@ -498,6 +498,7 @@ void Engine::endStory(const std::string &screen) {
 
 void Engine::startStory() {
     titleKept_ = false;
+    choiceLine_ = false;
     setAside_.reset();
     setAsideChoice_.reset();
     stopTrack();
@@ -2808,7 +2809,7 @@ bool Engine::loadFromSlot(int slot) {
     return true;
 }
 
-void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
+void Engine::restoreSave(const SaveData &d, const Sidecar &side, bool keepLine) {
     titleKept_ = false;
     setAside_.reset();
     setAsideChoice_.reset();
@@ -3041,8 +3042,10 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side) {
     }
     windowShown_ = d.windowShown;
     windowShownAt_ = -100000;
-    // The PC shows the choice in an empty window, with nothing to click through first.
-    layoutText(atChoice ? "" : sjis::toUtf8(d.current.name), atChoice ? "" : sjis::toUtf8(d.current.text));
+    choiceLine_ = atChoice && keepLine && !d.current.text.empty();
+    bool empty = atChoice && !choiceLine_;
+    layoutText(empty ? "" : sjis::toUtf8(d.current.name), empty ? "" : sjis::toUtf8(d.current.text));
+    if (choiceLine_) currentText_.voice.clear();
     textStart_ = now_;
     textDone_ = true;
     // A game part's screen saved open waits for its input again, as it was; a PC save at a table's `open` line opens it
@@ -4604,9 +4607,16 @@ void Engine::beginChoice(const Node &n) {
     log("choice %s, %d options", n.s[1].c_str(), choiceCount_);
 }
 
+void Engine::clearChoiceLine() {
+    choiceLine_ = false;
+    layoutText("", "");
+    dirty_ = true;
+}
+
 void Engine::choose(int index) {
     if (waiting_ != Waiting::Choice) return;
     if (previousChoiceDue_) notePreviousChoice();
+    choiceLine_ = false;
     choiceResult_ = index;
     askedResult_ = index;
     choiceMade_ = true;
@@ -5342,6 +5352,7 @@ void Engine::mouseButton(int button, bool down) {
     if (waiting_ == Waiting::Choice) {
         updateChoice();
         if (choiceHover_ >= 0) choose(choiceHover_);
+        else if (choiceLine_) clearChoiceLine();
         // And a left click away from the options, the first.
         else if (choiceSheet_ && choiceTable("mousechoice")) choose(0);
         return;
@@ -5640,7 +5651,7 @@ void Engine::returnToChoice() {
     if (!previousChoice_) return;
     openDialog(8, [this] {
         PreviousChoice back = *previousChoice_;
-        restoreSave(back.data, parseSidecar(back.data, back.side));
+        restoreSave(back.data, parseSidecar(back.data, back.side), true);
         previousChoice_ = back;
         log("returned to the choice at %s #%d", back.data.scene.c_str(), back.data.node);
     });
@@ -7146,7 +7157,8 @@ void Engine::markRect(int &x, int &y, int &w, int &h) const {
 }
 
 bool Engine::markShowing() const {
-    if (screen_ || logOpen_ || dialogOpen_ || windowHiddenByPlayer_ || windowArtOnly_ || !windowShown_ || !waitMark_ || waiting_ != Waiting::Click || !textDone_)
+    bool waits = waiting_ == Waiting::Click || (waiting_ == Waiting::Choice && choiceLine_);
+    if (screen_ || logOpen_ || dialogOpen_ || windowHiddenByPlayer_ || windowArtOnly_ || !windowShown_ || !waitMark_ || !waits || !textDone_)
         return false;
     // Not while an older line shows in the window, and not under a resting plate that has come up over it, as Test Game
     // 83's PC draws neither (set 3, shots under Wine): the mark is the window's, and the plate comes over the window.

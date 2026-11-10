@@ -139,6 +139,7 @@ public:
     void mouseMove(float x, float y);
     void setHostTaps(bool on) { hostTaps_ = on; }
     int choiceResult() const { return choiceResult_; }
+    bool choiceLine() const { return choiceLine_; }
     bool choiceKept() const { return choiceMade_ || !choiceImage_.empty(); }
     // For test hosts: the choice on screen, or -1, and picking one.
     int choiceCount() const { return waiting_ == Waiting::Choice ? choiceCount_ : -1; }
@@ -799,7 +800,9 @@ private:
     bool storyPlaceNumbered(const SaveData &d);
     Sidecar readSidecar(const SaveData &d, int slot);
     Sidecar parseSidecar(const SaveData &d, const std::string &text);
-    void restoreSave(const SaveData &data, const Sidecar &side);
+    void restoreSave(const SaveData &data, const Sidecar &side, bool keepLine = false);
+    void clearChoiceLine();
+    bool choiceLine_ = false;
     std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
     void loadPartsState(const SaveData &d, const Sidecar &side);
     bool restoreStoryPlace(const Sidecar &side, bool &atChoice);
