@@ -584,6 +584,8 @@ The panel's art, its buttons' places and their help lines were matched against s
 
 Ore o Hoshigaru Tsuma to Gibo's `cfg\change_texture_list.ini` lists each CG group with two flags instead of Haha Sannin to Ana Asobi's pairs of pictures: whether the group has a version with the protagonist see-through and one without pubic hair. The third number of a CG's name picks the version, 100 for the first, 1 for the second and 101 for both, so `cg_000_000_100_000_000.bmp` is `cg_000_000_000_000_000.bmp` with the protagonist see-through. Its CG viewer has a play and a mute button in place of one music button, and switches for the two versions, which change the picture at once and are the same settings as Config's. Their help lines are Config's, in `h004_004.bmp`. Its message window's picture reaches 721 pixels down, and the PC's screen stays 720.
 
+A game whose table gives its gallery no `viewer` line (Haha Sannin to Ana Asobi, Test Games 83, 87 and 90) shows a picture alone: a click anywhere goes to the entry's next picture and closes after the last, and the right button closes it. The gallery's own buttons aren't drawn then and take no click; they had, so a click where one lay ran it with the picture left drawn over the screen it opened. What those PCs do with a click on a picture beyond going on hasn't been measured.
+
 Horny Elves and a Moral Orc's `cg_view.ini` header has no type field, so its BGM comes third, and each picture line names its replay flow fourth. Its viewer's help comes up as speech bubbles, which fade in.
 
 Slider fills round to the nearest pixel: at 60, The Alchemist's 173-pixel music bar fills 104 and Yarinaoshi no Christmas's 161-pixel one 97.

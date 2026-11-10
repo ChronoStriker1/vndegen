@@ -364,6 +364,7 @@ void Engine::openScreen(const std::string &name) {
     else if (name == "title") returnTo_.clear();
     // Leaving the sprite gallery keeps its outfits and locks in cfg.sav and stops its music.
     if (spriteScreen() && name != "sprites") closeSprites();
+    if (screen_ != &it->second) viewingImage_ = false;
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -5059,15 +5060,15 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
             return;
         }
+        if (viewingImage_) {
+            if (++viewingIndex_ >= viewing_.size()) viewingImage_ = false;
+            dirty_ = true;
+            return;
+        }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
             if (!(action == "nav_save" && returnTo_ == "title") && !pageOff(action) && !pageStepOff(action) && !buttonOff(action)) runAction(action);
             if (dialogOpen_) dialogOpener_ = action;
-            return;
-        }
-        if (viewingImage_) {
-            if (++viewingIndex_ >= viewing_.size()) viewingImage_ = false;
-            dirty_ = true;
             return;
         }
         if (screen_->name.rfind("config", 0) == 0) {
