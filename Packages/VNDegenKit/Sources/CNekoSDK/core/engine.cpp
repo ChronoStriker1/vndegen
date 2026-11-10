@@ -432,6 +432,7 @@ bool Engine::resumeSetAside() {
     std::optional<PreviousChoice> choice = setAsideChoice_;
     int result = setAsideResult_;
     restoreSave(story.data, parseSidecar(story.data, story.side), setAsideLine_);
+    windowCleared_ = setAsideCleared_;
     previousChoice_ = choice;
     choiceResult_ = result;
     log("back to the story at %s #%d", story.data.scene.c_str(), story.data.node);
@@ -2009,6 +2010,7 @@ bool Engine::startReplay(const GalleryEntry &scene) {
         setAsideChoice_ = previousChoice_;
         setAsideResult_ = choiceResult_;
         setAsideLine_ = choiceLine_;
+        setAsideCleared_ = windowCleared_;
     }
     choiceLine_ = false;
     previousChoice_.reset();
@@ -2104,6 +2106,7 @@ void Engine::applySettings() {
     autoPerCharMs_ = -1;
     autoBaseMs_ = 0;
     autoWithVoice_ = false;
+    autoBytes_ = false;
     charFadeMs_ = kCharFadeMs;
     // `textcurve SETTING A B` and `autocurve SETTING A B` under `screen defaults`: a 0 to 100 slider's text speed as
     // A - B x value ms a character, and auto's pause after a line as that many ms for each of its characters, as Test
@@ -2136,6 +2139,7 @@ void Engine::applySettings() {
         }
         // Test Game 87 goes on at whichever ends later, the voice or the pause after the text (set 1, under Wine).
         autoWithVoice_ = defaults->second.setting("autowithvoice") != nullptr;
+        autoBytes_ = defaults->second.setting("autobytes") != nullptr;
     }
     if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
     applyArtSwitch();
@@ -5060,7 +5064,7 @@ bool Engine::step(int ms) {
     if (autoMode_ && waiting_ == Waiting::Click && textDone_ && !windowLog_) {
         bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
         int64_t units = 0;
-        for (const Glyph &g : textGlyphs_) units += g.codepoint < 0x80 || (g.codepoint >= 0xFF61 && g.codepoint <= 0xFF9F) ? 1 : 2;
+        for (const Glyph &g : textGlyphs_) units += !autoBytes_ || g.codepoint < 0x80 || (g.codepoint >= 0xFF61 && g.codepoint <= 0xFF9F) ? 1 : 2;
         int64_t pause = autoPerCharMs_ >= 0 ? autoBaseMs_ + autoPerCharMs_ * units : autoDelayMs_;
         if (autoWithVoice_) {
             if (autoReadyAt_ < 0) autoReadyAt_ = now_ + pause;

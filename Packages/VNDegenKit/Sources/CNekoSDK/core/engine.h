@@ -660,6 +660,7 @@ private:
     int autoBaseMs_ = 0;
     // `autowithvoice`: auto's pause runs alongside the voice, not after it.
     bool autoWithVoice_ = false;
+    bool autoBytes_ = false;
     // `inwindow` under `screen log`: the backlog shown a line at a time in the message window, as Test Game 83's (set 3).
     // windowLog_ is how many lines back is showing, 0 for the line in play.
     int windowLog_ = 0;
@@ -806,7 +807,7 @@ private:
     Sidecar parseSidecar(const SaveData &d, const std::string &text);
     void restoreSave(const SaveData &data, const Sidecar &side, bool keepLine = false);
     void clearChoiceLine();
-    bool choiceLine_ = false, windowCleared_ = false, setAsideLine_ = false;
+    bool choiceLine_ = false, windowCleared_ = false, setAsideLine_ = false, setAsideCleared_ = false;
     std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
     void loadPartsState(const SaveData &d, const Sidecar &side);
     bool restoreStoryPlace(const Sidecar &side, bool &atChoice);

@@ -109,7 +109,8 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\partbandtest") return kPartBandTest;
     if (folder == "vndegen\\disctest") return kDiscTest;
     if (folder == "vndegen\\titlereturn") return kTitleReturnTest;
-    if (folder == "vndegen\\autounits") return "\nscreen defaults\nautocurve auto 100 0 0 0\n";
+    if (folder == "vndegen\\autounits") return "\nscreen defaults\nautocurve auto 100 0 0 0\nautobytes\n";
+    if (folder == "vndegen\\autounitsplain") return "\nscreen defaults\nautocurve auto 100 0 0 0\n";
     if (folder == "vndegen\\titlereturnplain" || folder == "vndegen\\titlereturnopening") {
         static const std::string plain = [] {
             std::string table = kTitleReturnTest;

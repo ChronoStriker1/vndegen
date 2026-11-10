@@ -38,7 +38,9 @@ import TestSupport
         }
     }
 
-    @Test(arguments: ["\u{2026}\u{2026}\u{2026}\u{2026}\u{2026}\u{2026}", "abcdefghijkl"]) func autoCountsATwoByteCharacterTwice(line: String) throws {
+    @Test(arguments: [0, 1, 2]) func autoCountsATwoByteCharacterTwiceWithTheTablesWord(which: Int) throws {
+        let wide = "\u{2026}\u{2026}\u{2026}\u{2026}\u{2026}\u{2026}"
+        let line = which == 1 ? "abcdefghijkl" : wide, folder = which == 2 ? "autounitsplain" : "autounits", before = which == 2 ? 30 : 90
         let sheet = { () -> Data in
             let w = 50, h = 250, row = (w * 3 + 3) & ~3
             var d = Data("BM".utf8)
@@ -52,7 +54,7 @@ import TestSupport
         }()
         let under = ["#under Auto", "obj\\b.bmp", "2", "400,650", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
         let root = try NekoSDKFlowFixture.game([
-            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\autounits\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
             "cfg/msg_button.ini": Data((under.joined(separator: "\n") + "\n##\n").utf8),
             "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", sheet)]),
             "flow/t.txt": NekoSDKFlowFixture.flow([
@@ -73,7 +75,7 @@ import TestSupport
         for _ in 0..<100 { _ = vnneko_step(e, 10) }
         let first = vnneko_debug_text_count(e)
         #expect(vnneko_debug_press(e, "Auto"))
-        for _ in 0..<90 { _ = vnneko_step(e, 10) }
+        for _ in 0..<before { _ = vnneko_step(e, 10) }
         #expect(vnneko_debug_text_count(e) == first)
         for _ in 0..<50 { _ = vnneko_step(e, 10) }
         #expect(vnneko_debug_text_count(e) == first + 1)
