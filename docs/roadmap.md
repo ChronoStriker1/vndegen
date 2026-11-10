@@ -89,7 +89,8 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - A game that can't start says why back in the library (#70), leaving during start no longer counts as played (#72), and Unity's settings message (#71) (0.32.3).
 
 ## Bugs to fix
-New bugs get a GitHub issue and a line here. None are open.
+New bugs get a GitHub issue and a line here.
+- [#83](https://github.com/ChronoStriker1/vndegen/issues/83) Tests: a TyranoScript test fails when the build Mac is heavily loaded.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
