@@ -660,7 +660,9 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
     }
     return r.ok;
     };
-    if (rest()) return true;
+    bool read = rest();
+    size_t tailBytes = out.tailBefore.size() + out.tailAfter.size() + (!older && layout.gtTail ? 8 : 0);
+    if (read && (!split || tailBytes == size_t(layout.tailSize))) return true;
     if (!split) return false;
     split = false;
     out.windowSprites.clear();
