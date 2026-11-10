@@ -323,6 +323,39 @@ radio voice_stop 1 obj\j013_000.bmp 419 633 2 5 0
 radio voice_stop 0 obj\j013_000.bmp 533 633 2 5 1
 button tabvoices obj\j015_000.bmp 736 623 1 5 0
 
+screen configvoices
+cancel tab4
+pic obj\e000_003.bmp 0 0
+pic obj\e000_001.bmp 4 6 6 1 5 0
+pic obj\j002_000.bmp 435 34 4 5 0 0
+pic obj\j002_000.bmp 568 34 4 5 1 0
+pic obj\j002_000.bmp 701 34 4 5 2 0
+pic obj\j002_000.bmp 834 34 4 5 3 2
+pic obj\j000_000.bmp 992 120 3 5 0 0
+pic obj\j000_000.bmp 992 178 3 5 1 0
+pic obj\j000_000.bmp 992 236 3 5 2 0
+pic obj\j011_000.bmp 53 108
+pic obj\e001_000.bmp 1172 104 9 5 0 0
+pic obj\e001_000.bmp 1172 162 9 5 1 0
+pic obj\e001_000.bmp 1172 220 9 5 2 0
+pic obj\e001_000.bmp 1172 278 9 5 3 0
+pic obj\e001_000.bmp 1172 336 9 5 4 0
+pic obj\e001_000.bmp 1172 394 9 5 5 2
+pic obj\e001_000.bmp 1172 452 9 5 6 0
+pic obj\e001_000.bmp 1172 510 9 5 7 0
+pic obj\e001_000.bmp 1172 652 9 5 8 0
+pic obj\j017_002.bmp 0 0
+pic obj\j017_000.bmp 96 13
+check voice0 obj\j017_001.bmp 318 222 8 5 0 2 3 0 1
+check voice1 obj\j017_001.bmp 555 222 8 5 1 2 3 0 1
+check voice2 obj\j017_001.bmp 792 222 8 5 2 2 3 0 1
+check voice3 obj\j017_001.bmp 318 395 8 5 3 2 3 0 1
+check voice4 obj\j017_001.bmp 555 395 8 5 4 2 3 0 1
+check voice5 obj\j017_001.bmp 792 395 8 5 5 2 3 0 1
+check voice6 obj\j017_001.bmp 318 568 8 5 6 2 3 0 1
+check voice7 obj\j017_001.bmp 555 568 8 5 7 2 3 0 1
+button tab4 obj\k000_001.bmp 1135 22 1 5 0
+
 # The backlog, measured under Wine (set 1, each piece fitted on a PC shot): a rule each 166 pixels with the name and text
 # in yellow, a voiced line's button at the right, the scroll track and its thumb, the close button and four arrows, over
 # the scene and the whole message window, its buttons, gauge and face, dimmed.
@@ -633,12 +666,12 @@ scene scr\ep_002_003_000.txt @307
 scene scr\eye_catch1.txt @308
 scene scr\ep_002_004_000.txt @309
 scene scr\ep_002_004_001.txt @310
-scene scr\eye_catch1.txt
+scene scr\eye_catch1.txt @311
 # With Rei at two hearts or more: seen with her at two, and not at one or none.
 if S 3012 < 2 goto kururu5
 scene scr\ep_002_005_000.txt @351
 scene scr\ep_002_005_001.txt @352
-scene scr\eye_catch1.txt
+scene scr\eye_catch1.txt @353
 label kururu5
 scene scr\ep_002_006_000.txt @316
 scene scr\ep_002_006_001.txt @317
@@ -673,12 +706,12 @@ scene scr\eye_catch2.txt @408
 scene scr\ep_003_004_000.txt @409
 scene scr\ep_003_004_001.txt @410
 scene scr\ep_003_004_002.txt @411
-scene scr\eye_catch2.txt
+scene scr\eye_catch2.txt @412
 # With Kururu at two hearts or more: seen with her at two, and not at none.
 if S 3010 < 2 goto otona5
 scene scr\ep_003_005_000.txt @416
 scene scr\ep_003_005_001.txt @417
-scene scr\eye_catch2.txt
+scene scr\eye_catch2.txt @418
 label otona5
 scene scr\ep_003_006_000.txt @421
 scene scr\ep_003_006_001.txt @422
@@ -692,7 +725,7 @@ scene scr\ep_003_010_000.txt @429
 scene scr\eye_catch2.txt @430
 scene scr\ep_003_011_000.txt @431
 scene scr\ep_003_011_001.txt @432
-scene scr\eye_catch2.txt
+scene scr\eye_catch2.txt @433
 scene scr\ep_003_012_000.txt @600
 set G 81 = 1
 goto shared
@@ -709,7 +742,7 @@ scene scr\ep_004_003_001.txt @507
 if S 3011 < 2 goto rei4
 scene scr\ep_004_004_000.txt @511
 scene scr\ep_004_004_001.txt @512
-scene scr\eye_catch3.txt
+scene scr\eye_catch3.txt @513
 label rei4
 scene scr\ep_004_005_000.txt @516
 scene scr\ep_004_005_001.txt @517

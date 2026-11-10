@@ -132,6 +132,7 @@ struct Face {
     int64_t flipFrom = 0;
     float scale = 1;
     bool flipLoop = false, scaleAboutMiddle = true;
+    int flipTimes = 1;
     bool same(const Face &o) const { return path == o.path && x == o.x && y == o.y && flipCount == o.flipCount; }
 };
 
@@ -205,6 +206,7 @@ public:
             f.scale = n.p[4] > 0 ? float(n.p[4]) / 1000 : 1;
             f.scaleAboutMiddle = n.p[8] != 0;
             f.flipLoop = n.p[14] != 0;
+            f.flipTimes = f.flipLoop ? std::max(1, int(n.p[15])) : 1;
             auto it = flipbooks_.find(lower(n.s[1]));
             f.flipCount = it == flipbooks_.end() ? 1 : it->second.first;
             // Parameter 16's ms a picture, in whole frames of 60 a second: 30 ms held each of an anger mark's pictures two
@@ -244,7 +246,7 @@ public:
         for (const FaceMove &m : moves_)
             if (now < m.from + m.ms) fading = true;
         for (const auto &[slot, f] : shown_)
-            if (f.flipCount > 1 && (f.flipLoop || now - f.flipFrom < int64_t(f.flipCount) * f.flipMs)) fading = true;
+            if (f.flipCount > 1 && now - f.flipFrom < int64_t(f.flipCount) * f.flipTimes * f.flipMs) fading = true;
         bool sliding = slideFrom_ >= 0 && now - outFrom_ < uncoverMs();
         if (slideFrom_ >= 0 && !sliding) slideFrom_ = outFrom_ = -1;
         return fading || sliding;
@@ -252,11 +254,12 @@ public:
 
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
         if (layer == Layer::Menu && menu_ == "title") drawTitle(host, out);
+        if (layer == Layer::UnderWindow) menuFrame_ = false;
         if (layer == Layer::MenuUnder) menuFrame_ = true;
         if (layer == Layer::MenuUnder && framed()) drawMenuTrims(host, out);
         if (layer == Layer::Menu && framed()) put(host, out, "obj\\e000_001.bmp", 4, 6, 6, 1, menuPlate(), 0);
         if (layer == Layer::ButtonRow) drawLiquid(host, out);
-        if (layer == Layer::Window) {
+        if (layer == Layer::Window && !selecting_) {
             // The drink gauge at the window's right, a still picture on the PC at rest: msg_button.ini's `#openmenu` panel,
             // 94 left of the screen's right edge and 2 above the window's top (set 1, fitted on a PC shot).
             put(host, out, "obj\\h000_002.bmp", 1186, 510);
@@ -264,7 +267,9 @@ public:
         }
         if (layer == Layer::OverWindow) drawSlide(host, out);
         if (layer == Layer::Screen) {
-            menuOver_ = std::exchange(menuFrame_, false);
+            bool menu = std::exchange(menuFrame_, false);
+            menuOver_ = menu || menuAsked_ > 0;
+            menuAsked_ = menu ? 0 : std::max(0, menuAsked_ - 1);
             if (selecting_ && !menuOver_) drawSelect(host, out);
         }
     }
@@ -312,6 +317,8 @@ public:
             }
         for (int k = 0; k < 4; k++)
             if (sideRect(k).contains(x, y)) {
+                menuOver_ = true;
+                menuAsked_ = 2;
                 host.openMenu(kSideActions[k]);
                 return true;
             }
@@ -462,7 +469,7 @@ public:
         lines.push_back("card " + std::to_string(lastCard_));
         if (selecting_) lines.push_back("select");
         auto keep = [&](const char *word, int slot, const Face &f) {
-            if (f.flipCount && !f.flipLoop) return;
+            if (f.flipCount) return;
             std::ostringstream line;
             line << word << ' ' << slot << ' ' << f.x << ' ' << f.y << ' ' << int(std::lround(f.scale * 1000)) << ' ' << int(f.scaleAboutMiddle) << ' ' << f.flipCount << ' ' << f.flipMs << ' ' << int(f.flipLoop) << ' ' << f.path;
             lines.push_back(line.str());
@@ -519,6 +526,7 @@ public:
         pendingChapter_ = 0;
         lastCard_ = -1;
         menuFrame_ = menuOver_ = false;
+        menuAsked_ = 0;
         menu_.clear();
     }
 
@@ -696,7 +704,7 @@ private:
                 if (f.flipCount > 0) {
                     if (now < f.flipFrom) continue;
                     int64_t step = (now - f.flipFrom) / std::max(1, f.flipMs);
-                    if (!f.flipLoop && step >= f.flipCount) continue;  // played: nothing is left of it
+                    if (step >= int64_t(f.flipCount) * f.flipTimes) continue;  // played: nothing is left of it
                     path = flipPicture(f.path, int(step % f.flipCount));
                 }
                 ImageRef img = host.image(f.flipCount > 0 ? path : host.shownPath(path));
@@ -744,7 +752,7 @@ private:
             y += b.h;
         }
         slideFrom_ = host.nowMs();
-        outFrom_ = slideFrom_ + std::max(coverMs(), holdMs_);
+        outFrom_ = slideFrom_ + coverMs() + holdMs_;
         host.redraw();
     }
 
@@ -930,6 +938,7 @@ private:
     std::string menu_;
     bool frameDrawn_ = false;
     bool menuFrame_ = false, menuOver_ = false;
+    int menuAsked_ = 0;
     int lastCard_ = -1;
     bool rowDrawn_ = false;
     int64_t rowFrom_ = 0, rowSeen_ = -1000000;
