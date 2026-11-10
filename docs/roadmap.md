@@ -87,6 +87,7 @@ New bugs get a GitHub issue and a line here.
 - [#72](https://github.com/ChronoStriker1/vndegen/issues/72) Leaving a game while its engine is still starting counts as played.
 - [#73](https://github.com/ChronoStriker1/vndegen/issues/73) NekoSDK: a Scene replay ends at the title instead of the Scene screen in Funbag Fantasy 2. With the NekoSDK lead.
 - [#74](https://github.com/ChronoStriker1/vndegen/issues/74) NekoSDK: a Scene replay started from a menu over the story loses the story, and leaving the Scene screen lands on the title. With the NekoSDK lead.
+- [#75](https://github.com/ChronoStriker1/vndegen/issues/75) NekoSDK: a tap on a CG in the viewer can press a gallery button hidden under it, and the picture stays on screen. With the NekoSDK lead.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
