@@ -131,7 +131,13 @@ ImageRef Engine::bulbImage(const Sprite &s, ImageRef lit) {
             std::snprintf(digits, sizeof digits, "%03d", number % 1000);
             std::string other = name;
             other.replace(dot - 3, 3, digits);
-            if (number < 1000 && files_.exists(other)) dark = other;
+            auto light = [](const Image &image) {
+                uint64_t sum = 0;
+                for (size_t i = 0; i + 3 < image.rgba.size(); i += 4) sum += uint64_t(image.rgba[i] + image.rgba[i + 1] + image.rgba[i + 2]) * image.rgba[i + 3];
+                return sum;
+            };
+            if (number < 1000 && files_.exists(other))
+                if (ImageRef candidate = images_->get(other); candidate && candidate->w == lit->w && candidate->h == lit->h && light(*candidate) * 8 <= light(*lit) * 5) dark = other;
         }
         found = bulbDark_.emplace(s.path, dark).first;
     }
