@@ -63,6 +63,7 @@ constexpr int kSparkles = 9, kSparkleX = 24, kSparkleW = 640, kSparkleFrom = 690
 // The lower row's liquid: how far and how long it rises as the row opens, and the gap in its drawing that makes the next
 // drawing a new opening.
 constexpr int kRowRise = 82, kRowRiseMs = 170, kRowGapMs = 100;
+constexpr int kBubbleCount = 60, kBubbleRise = 30, kBubbleLifeMs = 2070;
 constexpr int kWeekVar = 3000, kHalfVar = 3001, kHeartVar = 3010, kChapterVar = 10904, kEndingVar = 10906;
 constexpr int kPhases = 10, kMaxHearts = 4;
 constexpr int kHeartCap = 5;
@@ -575,7 +576,7 @@ private:
     // strips, each repeating across the screen with its foot on the screen's bottom edge, the dark one under two
     // translucent ones, moving left 2, 6 and 10 pixels a frame of the recording (120, 360 and 600 a second); a frame
     // drawn so is within 1 of 255 of the PC's. It rises from the bottom edge in about a sixth of a second as the row
-    // opens; that rise is drawn evenly, which the PC's isn't quite. The PC's bubbles in it aren't drawn. It passes in
+    // opens; that rise is drawn evenly, which the PC's isn't quite. It passes in
     // front of the gauge's foot, as on the PC.
     void drawLiquid(PartHost &host, Canvas &out) {
         static const struct { const char *path; int speed; } kWaves[] = {{"obj\\h001_000.bmp", 120}, {"obj\\h001_001.bmp", 360}, {"obj\\h001_002.bmp", 600}};
@@ -589,6 +590,24 @@ private:
                 int moved = int(now * wave.speed / 1000 % strip->w);
                 for (int x = -moved; x < out.w; x += strip->w) drawPart(out, *strip, x, out.h - strip->h + sunk, 0, 0, strip->w, strip->h, 1);
             }
+        static const struct { const char *path; int speed, share; } kBubbles[] = {
+            {"obj\\h001_003.bmp", 157, 26}, {"obj\\h001_004.bmp", 125, 43}, {"obj\\h001_005.bmp", 95, 61}, {"obj\\h001_006.bmp", 66, 100}};
+        for (int k = 0; k < kBubbleCount; k++) {
+            int64_t at = now + int64_t(k) * 7919 % kBubbleLifeMs;
+            uint32_t turn = uint32_t(at / kBubbleLifeMs) * 2654435761u + uint32_t(k) * 40503u;
+            turn ^= turn >> 15;
+            turn *= 2246822519u;
+            turn ^= turn >> 13;
+            int kind = 0, pick = int(turn >> 20) % 100;
+            while (kind < 3 && pick >= kBubbles[kind].share) kind++;
+            ImageRef dot = host.image(kBubbles[kind].path);
+            if (!dot) continue;
+            float into = float(at % kBubbleLifeMs) / 1000;
+            float speed = float(kBubbles[kind].speed) * (0.75f + float(turn >> 8 & 255) / 255 * 0.5f);
+            float x = float(turn % uint32_t(out.w + 320)) - speed * into;
+            float y = float(out.h - 2) - float(dot->h) / 2 - float(kBubbleRise) * into;
+            drawPart(out, *dot, int(std::lround(x)), int(std::lround(y)) + sunk, 0, 0, dot->w, dot->h, 1);
+        }
     }
 
     void drawTitle(PartHost &host, Canvas &out) {
