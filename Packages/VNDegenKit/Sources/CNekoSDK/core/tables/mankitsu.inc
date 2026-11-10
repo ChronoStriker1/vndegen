@@ -49,6 +49,7 @@ routevar 10907
 layoutslotby p1
 layoutslots 200 300 400 500 600
 layoutx -512 -256 0 256 512
+outfitswitch outfit 000:003:004 001:002:003 002:003:004 003:001:002 004:001:002 005:001:002
 
 # Save and load, measured under Wine (set 1, each piece fitted on a PC shot): nine cards a page on ten pages, each a
 # save's number, thumbnail, its route by S 4000 (prologue, common, Kururu's, Otona's, Rei's, harem), the date and time at

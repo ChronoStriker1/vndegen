@@ -699,7 +699,7 @@ private:
                     if (!f.flipLoop && step >= f.flipCount) continue;  // played: nothing is left of it
                     path = flipPicture(f.path, int(step % f.flipCount));
                 }
-                ImageRef img = host.image(path);
+                ImageRef img = host.image(f.flipCount > 0 ? path : host.shownPath(path));
                 if (!img) continue;
                 if (f.scale == 1) {
                     drawPart(out, *img, int(std::lround(x)), int(std::lround(y)), 0, 0, img->w, img->h, alpha);
