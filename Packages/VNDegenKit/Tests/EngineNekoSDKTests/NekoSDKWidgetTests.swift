@@ -108,10 +108,16 @@ import TestSupport
         click(e, 100, 505)
         #expect(pixel(e, 163, 303) == green)
         #expect(pixel(e, 100, 505) != green)
-        click(e, 110, 405)
+        click(e, 102, 398)
         #expect(pixel(e, 163, 403) != green)
         click(e, 100 + 6 * 20 + 5, 405)
         #expect(pixel(e, 223, 403) == green)
+        click(e, 140, 420)
+        #expect(pixel(e, 217, 403) == green)
+        #expect(pixel(e, 163, 403) != green)
+        click(e, 140, 405)
+        #expect(pixel(e, 211, 403) == green)
+        #expect(pixel(e, 163, 403) != green)
     }
 
     // `submenudim hide`: the other buttons aren't drawn while the submenu is open, and still take no press.

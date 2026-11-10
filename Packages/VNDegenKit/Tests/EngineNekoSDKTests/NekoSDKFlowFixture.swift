@@ -52,7 +52,9 @@ enum NekoSDKFlowFixture {
         return gamePath.withCString { rootPath in
             dataDirPath.withCString { dataPath in
                 var launch = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: nil, fontDir: nil, movies: nil)
-                return vnneko_start(&launch)
+                let engine = vnneko_start(&launch)
+                if let engine { vnneko_debug_host_taps(engine, true) }
+                return engine
             }
         }
     }

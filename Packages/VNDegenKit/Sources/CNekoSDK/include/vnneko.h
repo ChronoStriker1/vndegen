@@ -138,6 +138,7 @@ int64_t vnneko_debug_file_size(const char *gameRoot, const char *path);
 bool vnneko_debug_saved_name(const char *gameRoot, const char *path, char *out, size_t size);
 // For measuring against the PC: table lines read ahead of each game's own, so their settings win. Call before vnneko_start.
 void vnneko_debug_table_prefix(const char *text);
+void vnneko_debug_host_taps(VNNekoEngine *e, bool on);
 // For tests: saves to a slot, loads one, or turns a card's lock on or off, as the save and load screens do.
 bool vnneko_debug_save(VNNekoEngine *e, int slot);
 bool vnneko_debug_load(VNNekoEngine *e, int slot);
