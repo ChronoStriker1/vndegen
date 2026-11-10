@@ -142,11 +142,13 @@ nonisolated public struct WebMenuCommand: Sendable, Equatable {
 /// Node's `fs`, the way its desktop build does.
 final class WebGameSession: NSObject, EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     static let bridgePrefix = "\u{1}vndegen:"
     static let messageName = "vndegen"
 
     let view: PlatformView
     private let webView: GameWebView
+    private let startURL: URL
     private let folder: GameFolder
     private let bridge: NodeBridge
     private let schemeHandler: GameSchemeHandler
@@ -202,6 +204,7 @@ final class WebGameSession: NSObject, EngineSession {
         Self.add(startScripts, to: configuration.userContentController)
         webView = GameWebView(frame: .zero, configuration: configuration)
         view = webView
+        startURL = URL(string: GameFolder.origin + game.startPage) ?? game.folder.indexURL
         super.init()
 
         configuration.userContentController.add(WeakMessageHandler(self), name: Self.messageName)
@@ -236,7 +239,7 @@ final class WebGameSession: NSObject, EngineSession {
         webView.allowsMagnification = false
         #endif
         log.notice("loading \(launch.game.title, privacy: .public) from \(launch.folder.path, privacy: .public)")
-        webView.load(URLRequest(url: URL(string: GameFolder.origin + game.startPage) ?? folder.indexURL))
+        webView.load(URLRequest(url: startURL))
         #if DEBUG
         startScriptIfRequested()
         #endif
@@ -398,6 +401,7 @@ final class WebGameSession: NSObject, EngineSession {
 
     func terminate() {
         guard stopping == nil else { return }
+        if webView.backForwardList.currentItem == nil { failedToStart = true }
         ended = true
         schemeHandler.cancel()
         #if DEBUG
@@ -487,6 +491,13 @@ final class WebGameSession: NSObject, EngineSession {
         ended = true
         let onExit = onExit
         Task { onExit() }
+    }
+
+    private func failToStart(reason: String?) {
+        guard !ended else { return }
+        failedToStart = true
+        startFailureReason = reason
+        quitFromGame()
     }
 
     private func openExternal(_ url: URL) {
@@ -587,7 +598,8 @@ extension WebGameSession: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
         log.error("navigation failed: \(error.localizedDescription, privacy: .public)")
         // No page has loaded yet, so the game never started.
-        if webView.backForwardList.currentItem == nil { failedToStart = true }
+        guard webView.backForwardList.currentItem == nil else { return }
+        failToStart(reason: (error as? URLError)?.code == .fileDoesNotExist ? "The game's \(startURL.path.drop { $0 == "/" }) is missing or can't be read." : nil)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {

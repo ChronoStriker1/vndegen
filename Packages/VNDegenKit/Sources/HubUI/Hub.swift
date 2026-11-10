@@ -114,12 +114,18 @@ public final class Hub {
 
     public func endSession() {
         guard case let .playing(id, session) = screen else { return }
+        let failedByItself = session.failedToStart
         // The player's input handler captures the session. The library attaches its own when it reappears.
         input.onEvent = nil
         session.terminate()
         if session.failedToStart {
             // A launch counts as played only once the game has started (#39).
             library.update(id) { [lastPlayedBefore] in $0.lastPlayedAt = lastPlayedBefore }
+            if failedByItself, let game = library.game(id) {
+                let title = game.isLocked && !lock.isUnlocked ? "The game" : game.title
+                launchError = ["\(title) couldn't start.", session.startFailureReason.flatMap(Self.sentence)]
+                    .compactMap(\.self).joined(separator: " ")
+            }
         } else if let start = sessionStart {
             library.update(id) { $0.playTime += Date.now.timeIntervalSince(start) }
         }
@@ -145,6 +151,12 @@ public final class Hub {
             await Self.wait(for: ended, atMost: Self.closingTimeout)
             closing.remove(id)
         }
+    }
+
+    static func sentence(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first, let last = trimmed.last else { return nil }
+        return first.uppercased() + trimmed.dropFirst() + (".!?".contains(last) ? "" : ".")
     }
 
     /// Returns when `work` finishes or `timeout` passes, whichever is first. A task group can't do this, because it

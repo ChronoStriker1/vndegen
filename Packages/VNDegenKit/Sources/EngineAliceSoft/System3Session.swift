@@ -18,6 +18,7 @@ nonisolated let system3Log = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// on the main thread and draws into a CPU frame that `FrameView` shows; its sound plays through `PCMAudioOutput`.
 final class System3Session: EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     let view: PlatformView
     private let frameView = FrameView()
     private let launch: GameLaunch
@@ -96,6 +97,7 @@ final class System3Session: EngineSession {
             let reason = String(decoding: problem.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             system3Log.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
             failedToStart = true
+            startFailureReason = reason
             finish(byGame: true)
             return
         }
@@ -277,6 +279,7 @@ final class System3Session: EngineSession {
 
     func terminate() {
         guard !stopped else { return }
+        if engine == nil { failedToStart = true }
         finish(byGame: false)
     }
 

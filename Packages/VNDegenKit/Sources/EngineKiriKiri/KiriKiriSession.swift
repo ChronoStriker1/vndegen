@@ -255,9 +255,11 @@ final class KiriKiriSession: EngineSession {
     func terminate() {
         switch state {
         case .waiting:
+            failedToStart = true
             stopped()
         case .starting:
             // A dialog the game shows while it starts closes as cancel, so the start returns and the game closes then.
+            failedToStart = true
             engine.requestQuit()
             state = .starting(cancelled: true)
         case .running:

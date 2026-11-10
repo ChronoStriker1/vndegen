@@ -14,28 +14,34 @@ bool Script::load(FileSystem &fs, std::string *error) {
     Bytes raw;
     std::string joined;
     // 0.txt takes priority over nscript.dat. Numbered files join in numeric order, 0.txt style or 00.txt style.
+    auto unreadable = [&](const std::string &name) {
+        if (error) *error = "The game's script file " + name + " can't be read.";
+        return false;
+    };
     auto joinNumbered = [&](bool twoDigit, const char *ext) {
-        bool any = false;
         for (int i = 0; i < 100; i++) {
             char name[16];
             snprintf(name, sizeof name, twoDigit ? "%02d.%s" : "%d.%s", i, ext);
-            if (!fs.read(name, raw)) continue;
-            any = true;
+            if (!fs.read(name, raw)) {
+                if (fs.exists(name)) return unreadable(name);
+                continue;
+            }
             joined.append(reinterpret_cast<const char *>(raw.data()), raw.size());
             if (!joined.empty() && joined.back() != '\n') joined += '\n';
         }
-        return any;
+        return true;
     };
     // Ponscripter's 0.utf comes first: such a game may also carry a 0.txt for other engines.
     if (fs.exists("0.utf")) {
-        joinNumbered(false, "utf");
+        if (!joinNumbered(false, "utf")) return false;
     } else if (fs.exists("00.utf")) {
-        joinNumbered(true, "utf");
+        if (!joinNumbered(true, "utf")) return false;
     } else if (fs.exists("0.txt")) {
-        joinNumbered(false, "txt");
+        if (!joinNumbered(false, "txt")) return false;
     } else if (fs.exists("00.txt")) {
-        joinNumbered(true, "txt");
-    } else if (fs.read("nscript.dat", raw)) {
+        if (!joinNumbered(true, "txt")) return false;
+    } else if (fs.exists("nscript.dat")) {
+        if (!fs.read("nscript.dat", raw)) return unreadable("nscript.dat");
         fromDat_ = true;
         joined.resize(raw.size());
         for (size_t i = 0; i < raw.size(); i++) joined[i] = char(raw[i] ^ 0x84);

@@ -173,7 +173,7 @@ let package = Package(
         // Where tests make their fixture folders. See TestFolders.
         .target(name: "TestSupport", path: "Tests/TestSupport"),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore", "TestSupport"], exclude: ["Fixtures"]),
-        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "FontPack", "CVNAlpha", "TestSupport"], exclude: ["Fixtures"]),
+        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "VNCore", "FontPack", "CVNAlpha", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime", "TestSupport"]),
         .testTarget(name: "EngineFlashTests", dependencies: ["EngineFlash", "WebRuntime", "FontPack", "TestSupport"]),
@@ -185,7 +185,7 @@ let package = Package(
         .testTarget(name: "GameInputTests", dependencies: ["GameInput", "TestSupport"]),
         .testTarget(name: "ControllerUITests", dependencies: ["ControllerUI", "VNCore"]),
         .testTarget(name: "LockTests", dependencies: ["Lock", "VNCore"]),
-        .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy", "TestSupport"]),
+        .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy", "EngineNScripter", "EngineRPGMaker", "TestSupport"]),
         .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "RegistryFile", "EngineRPGMaker", "EngineRenPy", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "RcloneTests", dependencies: ["Rclone", "CRclone", "TestSupport"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport", "TestSupport"], exclude: ["Fixtures"]),

@@ -13,6 +13,7 @@ let unityLog = Logger(subsystem: "VNDegen", category: "Unity")
 @MainActor
 class UnityExternalSession: EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     /// Set once the game's own process is running. An error after that, such as one saving its settings after it quit,
     /// ends a session that did play.
     var gameStarted = false
@@ -41,9 +42,11 @@ class UnityExternalSession: EngineSession {
                 try await body()
             } catch {
                 unityLog.error("\(self.launch.game.id.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                if !ending {
-                    if !gameStarted { failedToStart = true }
-                    host.fail("\(launch.game.title) couldn't start. \(error.localizedDescription)")
+                if !gameStarted {
+                    failedToStart = true
+                    startFailureReason = error.localizedDescription
+                } else if !ending {
+                    host.fail("\(launch.game.title)'s settings couldn't be saved back. \(error.localizedDescription)")
                     return
                 }
             }
@@ -456,8 +459,6 @@ final class UnityMacAppSession: UnityExternalSession {
 
 }
 
-/// What the hub window shows while its game runs in its own window: a line saying so and a button that brings the game
-/// back, or, when it couldn't start, why, with a button back to the library.
 final class UnityHostView: NSView {
     var onShowGame: (() -> Void)?
     var onBack: (() -> Void)?
@@ -497,6 +498,8 @@ final class UnityHostView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    var message: String { label.stringValue }
 
     func setMessage(_ message: String, showsGame: Bool = false) {
         label.stringValue = message

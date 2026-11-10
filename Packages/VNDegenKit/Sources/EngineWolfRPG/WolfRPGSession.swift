@@ -18,6 +18,7 @@ nonisolated let wolfRPGLog = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// game ending itself ends the session through `onExit`.
 final class WolfRPGSession: EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     let view: PlatformView
     private let frameView = FrameView()
     private let launch: GameLaunch
@@ -87,7 +88,8 @@ final class WolfRPGSession: EngineSession {
             }
         }
         guard let started else {
-            let reason = vnwolf_start_error().map { String(cString: $0) } ?? "unknown"
+            startFailureReason = vnwolf_start_error().map { String(cString: $0) }
+            let reason = startFailureReason ?? "unknown"
             wolfRPGLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
             failedToStart = true
             finish(byGame: true)
@@ -215,6 +217,7 @@ final class WolfRPGSession: EngineSession {
 
     func terminate() {
         guard !stopped else { return }
+        if engine == nil { failedToStart = true }
         finish(byGame: false)
     }
 
