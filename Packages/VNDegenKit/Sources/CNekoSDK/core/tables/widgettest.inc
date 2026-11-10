@@ -196,3 +196,15 @@ open selftestband 2 -> S 1
 open selftestwait 9 -> S 2
 end
 )";
+
+const char kPartPlateBandTest[] = R"(
+screen defaults
+parts selftest
+partplate
+
+screen story
+flow main
+scene scr\s.txt
+open selftestband 9 -> S 1
+end
+)";

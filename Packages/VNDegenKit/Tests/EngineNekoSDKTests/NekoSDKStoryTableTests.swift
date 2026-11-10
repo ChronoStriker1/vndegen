@@ -348,6 +348,16 @@ import TestSupport
         click(e)
         steps(e, 100)
         #expect(at(e, "scr\\e.txt"), "\(status(e))")
+
+        try lines.filter { !$0.hasPrefix("storynumber ") }.joined(separator: "\n").write(to: sidecar, atomically: true, encoding: .utf8)
+        let older = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(older) }
+        #expect(vnneko_debug_load(older, 1))
+        steps(older, 3)
+        #expect(vnneko_debug_save(older, 2))
+        let again = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save002.vnd" })
+        #expect(try String(contentsOf: again, encoding: .utf8).split(separator: "\n").contains("storynumber 0"))
     }
 
     @Test func theTablePlaysAndSavesKeepItsPlace() throws {
