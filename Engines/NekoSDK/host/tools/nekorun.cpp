@@ -68,13 +68,11 @@ int main(int argc, char **argv) {
             // one every half second, so a run can pick its way through such screens.
             std::string list = next();
             for (size_t at = 0; at < list.size();) {
-                int x = std::atoi(list.c_str() + at);
+                size_t end = list.find(',', at);
+                if (end == std::string::npos) end = list.size();
                 size_t colon = list.find(':', at);
-                if (colon == std::string::npos) break;
-                screenClicks.push_back({x, std::atoi(list.c_str() + colon + 1)});
-                at = list.find(',', colon);
-                if (at == std::string::npos) break;
-                at++;
+                if (colon != std::string::npos && colon < end) screenClicks.push_back({std::atoi(list.c_str() + at), std::atoi(list.c_str() + colon + 1)});
+                at = end + 1;
             }
         }
         else if (a == "--view") { viewW = float(std::atof(next())); viewH = float(std::atof(next())); }

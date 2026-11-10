@@ -226,10 +226,8 @@ public:
             if (int left = int(slideFrom_ + coverMs() - host.nowMs()); left > 0) host.waitMs(left);
             return true;
         case 163:
-            // The bars go no sooner than parameter 14 after they started (1000 in every slide), as the PC's left about a
-            // second after theirs came in; read so, unconfirmed.
-            outFrom_ = std::max(host.nowMs(), slideFrom_ + holdMs_);
-            host.waitMs(int(outFrom_ - host.nowMs()) + uncoverMs());
+            if (slideFrom_ >= 0)
+                if (int left = int(outFrom_ + uncoverMs() - host.nowMs()); left > 0) host.waitMs(left);
             return true;
         default: return false;
         }
@@ -247,15 +245,16 @@ public:
             if (now < m.from + m.ms) fading = true;
         for (const auto &[slot, f] : shown_)
             if (f.flipCount > 1 && (f.flipLoop || now - f.flipFrom < int64_t(f.flipCount) * f.flipMs)) fading = true;
-        bool sliding = slideFrom_ >= 0 && (outFrom_ < 0 || now - outFrom_ < uncoverMs());
-        if (outFrom_ >= 0 && now - outFrom_ >= uncoverMs()) slideFrom_ = outFrom_ = -1;
+        bool sliding = slideFrom_ >= 0 && now - outFrom_ < uncoverMs();
+        if (slideFrom_ >= 0 && !sliding) slideFrom_ = outFrom_ = -1;
         return fading || sliding;
     }
 
     void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
         if (layer == Layer::Menu && menu_ == "title") drawTitle(host, out);
-        if (layer == Layer::MenuUnder && menuPlate() >= 0) drawMenuTrims(host, out);
-        if (layer == Layer::Menu && menuPlate() >= 0) put(host, out, "obj\\e000_001.bmp", 4, 6, 6, 1, menuPlate(), 0);
+        if (layer == Layer::MenuUnder) menuFrame_ = true;
+        if (layer == Layer::MenuUnder && framed()) drawMenuTrims(host, out);
+        if (layer == Layer::Menu && framed()) put(host, out, "obj\\e000_001.bmp", 4, 6, 6, 1, menuPlate(), 0);
         if (layer == Layer::ButtonRow) drawLiquid(host, out);
         if (layer == Layer::Window) {
             // The drink gauge at the window's right, a still picture on the PC at rest: msg_button.ini's `#openmenu` panel,
@@ -264,7 +263,10 @@ public:
             drawFaces(host, out);
         }
         if (layer == Layer::OverWindow) drawSlide(host, out);
-        if (layer == Layer::Screen && selecting_) drawSelect(host, out);
+        if (layer == Layer::Screen) {
+            menuOver_ = std::exchange(menuFrame_, false);
+            if (selecting_ && !menuOver_) drawSelect(host, out);
+        }
     }
 
     bool openScreen(PartHost &host, const std::string &name, const std::vector<int> &args) override {
@@ -290,11 +292,12 @@ public:
     void pointer(PartHost &host, int x, int y) override {
         px_ = x;
         py_ = y;
-        if (selecting_) host.redraw();
+        if (selecting_ && !menuOver_) host.redraw();
     }
 
     bool press(PartHost &host, int x, int y, int button) override {
-        if (!selecting_) return false;
+        if (!selecting_ || menuOver_) return false;
+        readInis(host);
         host.redraw();
         if (confirming_ >= 0) {
             if (button == 0 && yesRect().contains(x, y)) return choose(host, confirming_);
@@ -317,7 +320,7 @@ public:
 
     // Controller focus: the four cards, the side buttons, and yes and no while asking.
     bool focusSpots(PartHost &, std::vector<std::pair<int, int>> &spots) override {
-        if (!selecting_) return false;
+        if (!selecting_ || menuOver_) return false;
         auto middle = [&](const Rect &r) { spots.push_back({r.x + r.w / 2, r.y + r.h / 2}); };
         if (confirming_ >= 0) {
             middle(yesRect());
@@ -333,6 +336,17 @@ public:
     // went on into the scenes of card 0 instead of opening the select screen (set 1, under Wine).
     void savePC(SaveData &d) const override {
         if (selecting_) d.flowActive = 6;
+        if (lastCard_ >= 0) d.lastChoice = lastCard_;
+        d.windowSprites.clear();
+        for (const auto &[slot, f] : shown_) {
+            if (f.flipCount || f.path.empty()) continue;
+            SavedSprite record;
+            record.slot = slot;
+            record.path = f.path;
+            record.x = float(kFaceX + f.x);
+            record.y = float(kFaceY + f.y);
+            d.windowSprites.push_back(record);
+        }
     }
 
     // A PC save in a pick's scenes holds no chapter number, only what the PC keeps: the half-week (S 3000 and 3001, still
@@ -341,6 +355,21 @@ public:
     // those here and played when the story asks for chapter 0, which is what such a save's S 10904 holds.
     void loadPC(const SaveData &d) override {
         pendingChapter_ = 0;
+        lastCard_ = d.lastChoice >= 0 && d.lastChoice <= 3 ? d.lastChoice : -1;
+        bool faces = false;
+        for (const SavedSprite &record : d.windowSprites) {
+            if (record.path.empty() || record.flipFrame >= 0) continue;
+            if (!faces) {
+                shown_.clear();
+                loaded_.clear();
+                faces = true;
+            }
+            Face f;
+            f.path = record.path;
+            f.x = int(record.x) - kFaceX;
+            f.y = int(record.y) - kFaceY;
+            shown_[record.slot] = loaded_[record.slot] = f;
+        }
         auto var = [&](int n) {
             auto it = d.variables.find(n);
             return it == d.variables.end() ? 0 : it->second;
@@ -351,10 +380,9 @@ public:
         int before = 0;
         if (cs.heroine >= 0) {
             int after = std::clamp(var(kHeartVar + cs.heroine), 0, kHeartCap);
-            bool late = after > kMaxHearts;
-            for (const char *scene : kLate[cs.heroine])
-                if (normalizedName(d.scene) == std::string("scr\\") + scene + ".txt") late = true;
-            before = late ? kMaxHearts : std::max(0, after - 1);
+            before = after > kMaxHearts ? kMaxHearts : std::max(0, after - 1);
+            for (int k = 0; k < 2; k++)
+                if (normalizedName(d.scene) == std::string("scr\\") + kLate[cs.heroine][k] + ".txt") before = kMaxHearts + k;
         }
         int ending = 0;
         if (ph == kPhases - 1)
@@ -404,7 +432,7 @@ public:
             addNumbered(kEvents[cs.heroine][hearts], first, end);
         } else {
             next = end;
-            add({kLate[cs.heroine][phase == kPhases - 1 ? 1 : 0]});
+            add({kLate[cs.heroine][std::clamp(hearts - kMaxHearts, 0, 1)]});
         }
         if (kCardNumber[phase]) next = kCardNumber[phase] + 1;
         // The last pick: the heroine's last event and two common scenes, or with none at four hearts 029 alone, after
@@ -431,19 +459,51 @@ public:
     }
 
     void save(std::vector<std::string> &lines) const override {
-        // `face SLOT X Y PATH`; a flipbook has played by the time a save can be made, and isn't kept.
-        for (const auto &[slot, f] : shown_)
-            if (!f.flipCount) lines.push_back("face " + std::to_string(slot) + " " + std::to_string(f.x) + " " + std::to_string(f.y) + " " + f.path);
+        lines.push_back("card " + std::to_string(lastCard_));
+        if (selecting_) lines.push_back("select");
+        auto keep = [&](const char *word, int slot, const Face &f) {
+            if (f.flipCount && !f.flipLoop) return;
+            std::ostringstream line;
+            line << word << ' ' << slot << ' ' << f.x << ' ' << f.y << ' ' << int(std::lround(f.scale * 1000)) << ' ' << int(f.scaleAboutMiddle) << ' ' << f.flipCount << ' ' << f.flipMs << ' ' << int(f.flipLoop) << ' ' << f.path;
+            lines.push_back(line.str());
+        };
+        for (const auto &[slot, f] : shown_) keep("shown", slot, f);
+        for (const auto &[slot, f] : loaded_) keep("loaded", slot, f);
     }
 
     void load(const std::vector<std::string> &lines) override {
-        reset();
+        if (lines.empty()) return;
+        loaded_.clear();
+        shown_.clear();
+        from_.clear();
+        moves_.clear();
+        fadeMs_ = 0;
+        selecting_ = false;
+        confirming_ = -1;
         for (const std::string &line : lines) {
             std::istringstream in(line);
             std::string word;
             Face f;
             int slot = 0;
-            if (in >> word >> slot >> f.x >> f.y >> f.path && word == "face") shown_[slot] = loaded_[slot] = f;
+            in >> word;
+            if (word == "select") {
+                selecting_ = true;
+            } else if (word == "card") {
+                in >> lastCard_;
+                if (lastCard_ < 0 || lastCard_ > 3) lastCard_ = -1;
+            } else if (word == "face") {
+                if (in >> slot >> f.x >> f.y >> f.path) shown_[slot] = loaded_[slot] = f;
+            } else if (word == "shown" || word == "loaded") {
+                int scale = 1000, about = 1, loop = 0;
+                if (in >> slot >> f.x >> f.y >> scale >> about >> f.flipCount >> f.flipMs >> loop >> f.path) {
+                    f.scale = float(scale) / 1000;
+                    f.scaleAboutMiddle = about != 0;
+                    f.flipLoop = loop != 0;
+                    f.flipCount = std::max(0, f.flipCount);
+                    f.flipMs = std::max(0, f.flipMs);
+                    (word == "shown" ? shown_ : loaded_)[slot] = f;
+                }
+            }
         }
     }
 
@@ -457,11 +517,14 @@ public:
         selecting_ = false;
         confirming_ = -1;
         pendingChapter_ = 0;
+        lastCard_ = -1;
+        menuFrame_ = menuOver_ = false;
         menu_.clear();
     }
 
 private:
     // The menus' shared frame: which name plate of obj\\e000_001 a table screen shows, or -1 for a screen without one.
+    bool framed() const { return menuPlate() >= 0 && menuPlate() != 2 && menuPlate() != 3; }
     int menuPlate() const {
         static const char *const kNames[] = {"save", "load", "cg", "scene", "music", "config"};
         for (int i = 0; i < 6; i++)
@@ -681,7 +744,7 @@ private:
             y += b.h;
         }
         slideFrom_ = host.nowMs();
-        outFrom_ = -1;
+        outFrom_ = slideFrom_ + std::max(coverMs(), holdMs_);
         host.redraw();
     }
 
@@ -714,7 +777,7 @@ private:
                 if (!img) continue;
                 // In, the strip's right edge runs from the screen's left to its right; out, its left edge does.
                 int64_t inMs = now - slideFrom_ - b.inDelay - (layer == 1 ? kFollowMs : 0);
-                int64_t outMs = outFrom_ < 0 ? -1 : now - outFrom_ - b.outDelay - (layer == 0 ? kFollowMs : 0);
+                int64_t outMs = now - outFrom_ - b.outDelay - (layer == 0 ? kFollowMs : 0);
                 int left = int(progress(outMs, b.outMs) * w), right = int(progress(inMs, b.inMs) * w);
                 if (right <= left) continue;
                 float sx = float(right - left) / float(img->w), sy = float(b.h) / float(img->h);
@@ -762,6 +825,7 @@ private:
                 if (hearts(host, heroine) >= kMaxHearts) ending = heroine + 1;
         host.setVariable(1, kChapterVar, chapterNumber(ph, c, h, ending));
         host.setVariable(1, kEndingVar, ending);
+        lastCard_ = c;
         selecting_ = false;
         confirming_ = -1;
         host.finishScreen(c);
@@ -813,6 +877,7 @@ private:
     }
 
     void drawSelect(PartHost &host, Canvas &out) {
+        readInis(host);
         int ph = phase(host);
         int hover = -1;
         if (confirming_ < 0)
@@ -864,6 +929,8 @@ private:
     int64_t titleFrom_ = 0;
     std::string menu_;
     bool frameDrawn_ = false;
+    bool menuFrame_ = false, menuOver_ = false;
+    int lastCard_ = -1;
     bool rowDrawn_ = false;
     int64_t rowFrom_ = 0, rowSeen_ = -1000000;
     int confirming_ = -1, px_ = -1, py_ = -1;
