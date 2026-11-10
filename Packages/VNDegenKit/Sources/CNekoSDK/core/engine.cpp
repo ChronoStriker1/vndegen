@@ -358,7 +358,7 @@ void Engine::openScreen(const std::string &name) {
     if (name.rfind("config", 0) != 0) testsPlayed_.clear();
     // Test Game 84's title opens with its art revealed in four tiles and its menu fading in, when the game starts or the
     // story returns to it. From another menu it's simply there.
-    openingFrom_ = name == "title" && !screen_ && it->second.setting("opening") ? screenMs_ : -1;
+    openingFrom_ = name == "title" && !screen_ && !backToTitle_ && it->second.setting("opening") ? screenMs_ : -1;
     if (fromStory) returnTo_.clear();
     else if (screen_ && screen_->name == "title") returnTo_ = "title";
     else if (name == "title") returnTo_.clear();
@@ -375,7 +375,7 @@ void Engine::openScreen(const std::string &name) {
         titleSubMenu_ = subMenu_;
         titleKept_ = true;
     }
-    bool backToTitle = name == "title" && titleKept_ && (backToTitle_ || (screen_ && screen_->name != "title"));
+    bool backToTitle = name == "title" && titleKept_ && backToTitle_ && it->second.setting("menustages");
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -430,7 +430,7 @@ bool Engine::resumeSetAside() {
     PreviousChoice story = *setAside_;
     std::optional<PreviousChoice> choice = setAsideChoice_;
     int result = setAsideResult_;
-    restoreSave(story.data, parseSidecar(story.data, story.side));
+    restoreSave(story.data, parseSidecar(story.data, story.side), setAsideLine_);
     previousChoice_ = choice;
     choiceResult_ = result;
     log("back to the story at %s #%d", story.data.scene.c_str(), story.data.node);
@@ -443,6 +443,7 @@ void Engine::endStory(const std::string &screen) {
         setAside_.reset();
         setAsideChoice_.reset();
     }
+    choiceLine_ = false;
     stopTrack();  // first, since a held player's fade would never finish
     stopKind(kKindBgm, 500);
     stopKind(kKindSe, 500);
@@ -783,7 +784,7 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "Voice") {
-        playVoiceAgain(currentText_.voice);
+        if (!choiceLine_) playVoiceAgain(currentText_.voice);
         return;
     }
     if (action == "QuickSave") {
@@ -893,7 +894,8 @@ void Engine::stepWindowLog(int lines) {
     if (to == windowLog_) return;
     windowLog_ = to;
     const SavedText &t = windowLog_ > 0 ? backlog_[size_t(windowLog_ - 1)] : currentText_;
-    layoutText(sjis::toUtf8(t.name), sjis::toUtf8(t.text));
+    bool cleared = windowLog_ == 0 && windowCleared_;
+    layoutText(cleared ? "" : sjis::toUtf8(t.name), cleared ? "" : sjis::toUtf8(t.text));
     textDone_ = true;
     dirty_ = true;
 }
@@ -2005,7 +2007,9 @@ bool Engine::startReplay(const GalleryEntry &scene) {
         setAside_ = PreviousChoice{story, sidecarText(story)};
         setAsideChoice_ = previousChoice_;
         setAsideResult_ = choiceResult_;
+        setAsideLine_ = choiceLine_;
     }
+    choiceLine_ = false;
     previousChoice_.reset();
     askedCount_ = askedColumns_ = askedResult_ = 0;
     askedCells_.clear();
@@ -3044,10 +3048,10 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side, bool keepLine) 
     }
     windowShown_ = d.windowShown;
     windowShownAt_ = -100000;
-    choiceLine_ = atChoice && keepLine && !d.current.text.empty();
+    choiceLine_ = atChoice && keepLine && defaultsHave("choicekeepsline") && !d.current.text.empty();
     bool empty = atChoice && !choiceLine_;
+    windowCleared_ = empty;
     layoutText(empty ? "" : sjis::toUtf8(d.current.name), empty ? "" : sjis::toUtf8(d.current.text));
-    if (choiceLine_) currentText_.voice.clear();
     textStart_ = now_;
     textDone_ = true;
     // A game part's screen saved open waits for its input again, as it was; a PC save at a table's `open` line opens it
@@ -4175,7 +4179,7 @@ ButtonState Engine::messageButtonState(const Button &b) {
     if (replayOff(b.action)) return StateDisabled;
     if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
     if (b.action == "BackSelection" && !previousChoice_) return StateDisabled;
-    if (b.action == "Voice" && currentText_.voice.empty()) return StateDisabled;
+    if (b.action == "Voice" && (choiceLine_ || currentText_.voice.empty())) return StateDisabled;
     // With the GT switch off, Ejaculate and Extend are disabled for the whole scene, as Test Game 88's PC draws them
     // (under Wine: their sheet's last row with it off, the first with it on, at every line through a scene).
     if (b.action == "Ejaculation" && (!gt_.active || setting("gt_off"))) return StateDisabled;
@@ -4627,6 +4631,7 @@ void Engine::beginChoice(const Node &n) {
 
 void Engine::clearChoiceLine() {
     choiceLine_ = false;
+    windowCleared_ = true;
     layoutText("", "");
     dirty_ = true;
 }
@@ -5370,8 +5375,8 @@ void Engine::mouseButton(int button, bool down) {
     }
     if (waiting_ == Waiting::Choice) {
         updateChoice();
-        if (choiceHover_ >= 0) choose(choiceHover_);
-        else if (choiceLine_) clearChoiceLine();
+        if (choiceLine_) clearChoiceLine();
+        else if (choiceHover_ >= 0) choose(choiceHover_);
         // And a left click away from the options, the first.
         else if (choiceSheet_ && choiceTable("mousechoice")) choose(0);
         return;
@@ -6712,6 +6717,7 @@ void Engine::showText(const Node &n) {
     }
     noteTextRead(n);
     currentText_ = {};
+    windowCleared_ = false;
     currentText_.tag = n.s[3].empty() ? -10 : 0;
     currentText_.name = n.s[1];
     currentText_.text = n.s[2];

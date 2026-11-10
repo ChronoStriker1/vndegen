@@ -419,6 +419,7 @@ textshift 0 -1
 twobyteadvance
 inneralways
 plateholds
+choicekeepsline
 quickslots 101 100
 layoutcgslot 102
 squarewindow 0

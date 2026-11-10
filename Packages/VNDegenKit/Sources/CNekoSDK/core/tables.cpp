@@ -57,7 +57,11 @@ const char *menuTable(const std::string &folder) {
     }
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
     if (folder == "waffle\\ヤバい！－復讐・闇サイト－") return kYabai1;
-    if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpc") return kStoryTest;
+    if (folder == "vndegen\\storytest") return kStoryTest;
+    if (folder == "vndegen\\storytestpc") {
+        static const std::string table = std::string(kStoryTest) + "\nscreen defaults\nchoicekeepsline\n";
+        return table.c_str();
+    }
     // The same story with a load screen and a question box, for a tap across a load (NekoSDKStoryTableTests).
     if (folder == "vndegen\\storytestload") {
         static const std::string table = std::string(kStoryTest) + kStoryLoadScreens;

@@ -806,7 +806,7 @@ private:
     Sidecar parseSidecar(const SaveData &d, const std::string &text);
     void restoreSave(const SaveData &data, const Sidecar &side, bool keepLine = false);
     void clearChoiceLine();
-    bool choiceLine_ = false;
+    bool choiceLine_ = false, windowCleared_ = false, setAsideLine_ = false;
     std::map<int, FlipModes> flipModesAt(const SaveData &d, const Sidecar &side);
     void loadPartsState(const SaveData &d, const Sidecar &side);
     bool restoreStoryPlace(const Sidecar &side, bool &atChoice);
