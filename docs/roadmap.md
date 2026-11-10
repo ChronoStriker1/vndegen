@@ -85,6 +85,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - NekoSDK: Mankitsu Happening's CG viewer bar, scene wipe captions and text speed, and Yabai!'s text speed across the slider (0.31.3).
 - NekoSDK: Funbag Fantasy: Sideboob Story, the fifteenth and last NekoSDK game (0.32.0).
 - NekoSDK: Return from a title menu goes back to the menu (#79), Funbag Fantasy 3 if's title opening no longer replays (#81), Sideboob Story's last line after Previous Choice (#80), and Mankitsu Happening's Auto speed (0.32.1).
+- NekoSDK: a question asked at a choice shows over the choice (#82), and Mankitsu Happening's Auto counts a full-width character as two (0.32.2).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
