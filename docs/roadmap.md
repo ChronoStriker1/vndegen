@@ -81,15 +81,15 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - NekoSDK: Yabai! -Fukushuu Yami Site-, with its interrogation hub, confession tree, votes, viewer comments and flickering bulb, GOOD Timing's Extend kept between scenes as on the PC, and Carlito for games that ask for Calibri (0.30.0).
 - NekoSDK: Mankitsu Happening, with its select screens, bonus stories and School Swimsuit DLC, a Scene replay that ends at the Scene screen (#73), and a tap on a CG that no longer presses a hidden gallery button (#75) (0.31.0).
 - NekoSDK: a Scene replay started from inside the story keeps the story (#74), and Yabai!'s thought lines, text speed and Auto pace (0.31.1).
+- NekoSDK: a tap on the arrow beside a Config slider steps it by one in every game (#77), and Funbag Fantasy 2's text and Auto at the PC's pace (#76) (0.31.2).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - [#70](https://github.com/ChronoStriker1/vndegen/issues/70) A game that can't start drops back to the library with no message.
 - [#71](https://github.com/ChronoStriker1/vndegen/issues/71) Unity: an error saving PlayerPrefs after play shows "couldn't start".
 - [#72](https://github.com/ChronoStriker1/vndegen/issues/72) Leaving a game while its engine is still starting counts as played.
-- [#76](https://github.com/ChronoStriker1/vndegen/issues/76) NekoSDK: Funbag Fantasy 2's text appears at once and Auto doesn't wait. Fixed on `feat/nekosdk-stage3`, for 0.31.2.
-- [#77](https://github.com/ChronoStriker1/vndegen/issues/77) NekoSDK: a click beside Config's wait-time knob jumps it to its lowest value in Funbag Fantasy 2. Fixed on `feat/nekosdk-stage3`, for 0.31.2.
-- [#78](https://github.com/ChronoStriker1/vndegen/issues/78) NekoSDK: a plain press on the Music screen's volume does nothing. Fixed on `feat/nekosdk-stage3`, for 0.31.2.
+- [#79](https://github.com/ChronoStriker1/vndegen/issues/79) NekoSDK: Return from a menu opened from the title shows the click prompt again in Funbag Fantasy 2, where the PC goes back to the title's menu. With the NekoSDK lead.
+- [#80](https://github.com/ChronoStriker1/vndegen/issues/80) NekoSDK: after Previous Choice the message window is empty, where the PC keeps the scene's last line. Measured on Funbag Fantasy: Sideboob Story; likely in Funbag Fantasy and Funbag Fantasy 2. With the NekoSDK lead.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
