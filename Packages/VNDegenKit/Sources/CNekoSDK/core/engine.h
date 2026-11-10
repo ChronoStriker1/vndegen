@@ -629,7 +629,7 @@ private:
     // `PARENT/NAME` opens inside PARENT's.
     int menuStage_ = 2, titleStage_ = 2;
     std::string titleSubMenu_;
-    bool titleKept_ = false;
+    bool titleKept_ = false, backToTitle_ = false;
     std::string subMenu_;
     bool submenuOpen(const std::string &name) const;
     bool dimmedBySubmenu(const Button &b) const;

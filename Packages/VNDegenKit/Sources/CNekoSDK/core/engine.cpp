@@ -375,7 +375,7 @@ void Engine::openScreen(const std::string &name) {
         titleSubMenu_ = subMenu_;
         titleKept_ = true;
     }
-    bool backToTitle = name == "title" && screen_ && screen_->name != "title" && titleKept_;
+    bool backToTitle = name == "title" && titleKept_ && (backToTitle_ || (screen_ && screen_->name != "title"));
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -839,7 +839,9 @@ void Engine::runAction(const std::string &action) {
         std::string to = returnTo_;
         closeScreen();
         if (to == "title" && resumeSetAside()) return;
+        backToTitle_ = to == "title";
         if (!to.empty()) openScreen(to);
+        backToTitle_ = false;
         return;
     }
     if (action.rfind("page", 0) == 0) {
