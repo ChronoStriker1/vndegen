@@ -17,8 +17,10 @@ This repo is edited on Linux; Apple builds run on a Mac over SSH. `scripts/remot
 ## Code
 Don't add comments to code. Leave the comments already there as they are. What a change is for goes in the commit message, and what a reader needs to know about a design goes in `docs/`.
 
-## Reviews
-Code review is by Codex `gpt-6.1-sol` (xhigh). Claude subagents run Opus 5.5 at medium or high only.
+## Reviews and subagents
+Code review is paused for now (maintainer, 2026-11-10): no review rounds, by Codex or by a Claude agent, until the maintainer asks for them again. When they resume, review is by Codex `gpt-6.1-sol` (xhigh).
+
+A thread that starts a subagent or a delegate runs it at low or medium reasoning effort. Claude subagents run Opus 5.5.
 
 ## Public repo
 The repo is public. Committed files and messages never contain LAN hostnames, IPs, NAS or home paths, or personal names. The build Mac's hostname lives in `~/.config/vndegen/mac-host`.
