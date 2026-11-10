@@ -5622,7 +5622,7 @@ void Engine::gtReachMarker(const Node &) {
     gt_.shownCount = 0;
     dirty_ = true;
     if (!gt_.active) return;
-    if (!setting("gt_extend")) {
+    if (!setting("gt_extend") || setting("gt_off")) {
         gt_.active = false;
         return;
     }

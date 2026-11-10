@@ -246,8 +246,6 @@ import TestSupport
             let at = path.lowerBound - save.startIndex + 12 + place
             #expect(int32(save, at) == (folder == "layout90" ? 255 : 256), "\(folder)")
             for alpha in [Int32(512), 300, 255, 256, 100] {
-                // 90's layout holds 255 for a shown sprite and never 256, which it would write back as 255.
-                if folder == "layout90" && alpha == 256 { continue }
                 save.replaceSubrange((save.startIndex + at)..<(save.startIndex + at + 4), with: withUnsafeBytes(of: alpha.littleEndian, { Data($0) }))
                 var built = [UInt8](repeating: 0, count: save.count + 64)
                 let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\\(folder)", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
