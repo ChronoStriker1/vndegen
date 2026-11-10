@@ -45,6 +45,7 @@ const KnownDuplicate kKnownDuplicates[] = {{"waffle\\alchemy", "scr\\ep_004_000_
 struct KnownLong {
     const char *game, *script;
     int id;
+    bool onPc = false;
 };
 const KnownLong kKnownLong[] = {
     {"waffle\\tmgb", "scr\\gt_018_001_003.txt", 8},
@@ -122,11 +123,12 @@ void checkMessages(const char *root, const Files &files, const std::string &key,
             }
             t.messages++;
             if (fits) continue;
-            bool known = false;
-            for (const KnownLong &k : kKnownLong) known = known || (key == normalizedPath(k.game) && path == normalizedPath(k.script) && n.id == k.id);
+            const KnownLong *known = nullptr;
+            for (const KnownLong &k : kKnownLong)
+                if (key == normalizedPath(k.game) && path == normalizedPath(k.script) && n.id == k.id) known = &k;
             if (known) {
                 t.knownLong++;
-                std::printf("  off the screen (known, not yet seen on the PC): %s #%d reaches %d, %d\n", path.c_str(), n.id, right, bottom);
+                std::printf("  off the screen (known, %s): %s #%d reaches %d, %d\n", known->onPc ? "as on the PC" : "not yet seen on the PC", path.c_str(), n.id, right, bottom);
                 continue;
             }
             if (++t.offScreen <= 10) std::printf("  off the screen: %s #%d reaches %d, %d\n", path.c_str(), n.id, right, bottom);

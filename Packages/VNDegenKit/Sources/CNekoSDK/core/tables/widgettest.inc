@@ -172,3 +172,14 @@ const char kTwoByteTest[] = R"(
 screen defaults
 twobyteadvance
 )";
+
+const char kPartPlateTest[] = R"(
+screen defaults
+parts selftest
+partplate
+
+screen story
+flow main
+open selftestwait 9 -> S 1
+end
+)";

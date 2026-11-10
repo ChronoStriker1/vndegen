@@ -5347,6 +5347,7 @@ std::string Engine::sidecarText(const SaveData &d) {
                     if (c.opcode == 3 && c.next == id) id = c.id;
             text += "story " + frame.script->name + " " + std::to_string(id) + "\n";
         }
+        text += "storytable " + std::to_string(storyTableHash()) + "\n";
         text += "result " + std::to_string(choiceResult_) + "\n";
         if (waiting_ == Waiting::Choice) text += "choice\n";
     }
@@ -5452,6 +5453,8 @@ Engine::Sidecar Engine::parseSidecar(const SaveData &d, const std::string &text)
             std::string script;
             int id = 0;
             if (words >> script >> id) side.story.push_back({script, id});
+        } else if (kind == "storytable") {
+            side.hasStoryTable = bool(words >> side.storyTable);
         } else if (kind == "result") {
             side.hasResult = bool(words >> side.result);
         } else if (kind == "screen") {

@@ -743,6 +743,8 @@ private:
         std::map<int, FlipModes> flips;
         std::map<std::string, std::vector<std::string>> parts;
         std::vector<std::pair<std::string, int>> story;  // each flow frame's script and node, bottom first
+        bool hasStoryTable = false;
+        uint32_t storyTable = 0;
         bool hasResult = false;
         int result = 0;
         std::string screen;
@@ -754,6 +756,7 @@ private:
         std::map<int, int> variables;
     };
     static uint32_t saveFingerprint(const SaveData &d);
+    uint32_t storyTableHash() const;
     Sidecar readSidecar(const SaveData &d, int slot);
     Sidecar parseSidecar(const SaveData &d, const std::string &text);
     void restoreSave(const SaveData &data, const Sidecar &side);
@@ -800,7 +803,7 @@ private:
     bool wantsSquare() const;
     void composeStrip();
     // The pointer's y as the message window's layer has it, which the 4:3 frame moves down.
-    int messagePointerY() const { return pointerY_ - (square_ ? squareShift_ : 0); }
+    int messagePointerY() const { return pointerY_ - (square_ && !partPlate() ? squareShift_ : 0); }
     bool dirty_ = true, frameChanged_ = false, markSaved_ = false;
     std::vector<uint8_t> underMark_;
     int64_t now_ = 0;
