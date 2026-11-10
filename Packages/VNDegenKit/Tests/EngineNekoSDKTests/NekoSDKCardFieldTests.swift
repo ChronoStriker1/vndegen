@@ -32,6 +32,29 @@ import TestSupport
         return [px[at], px[at + 1], px[at + 2]]
     }
 
+    @Test(arguments: ["emptycards", "emptycardsnumber"]) func anEmptyCardsNumberFadesWithItOnlyWhereTheTableSays(folder: String) throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\\(folder)\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([
+                ("c.bmp", bmp(482, 555) { _, _ in [200, 0, 0] }),
+                ("d.bmp", bmp(140, 20) { x, _ in [0, 0, UInt8(20 * (x / 14) + 10)] }),
+            ]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 0)]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_press(e, "load"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        let card = pixel(e, 60 + 100, 99 + 60), number = pixel(e, 60 + 259 + 7, 99 + 6 + 10)
+        #expect(card[2] > 60 && card[2] < 140, "\(card)")
+        if folder == "emptycards" {
+            #expect(number == [30, 0, 0], "\(number)")
+        } else {
+            #expect(number[0] > 5 && number[0] < 25 && number[2] > 20, "\(number)")
+        }
+    }
+
     @Test func aCardDrawsItsChapterDateFrameAndNumberWhereTheTableSays() throws {
         // The card is blue; each digit's red is 20 times it plus 10; each chapter cell's green is 60 times it plus 30.
         let root = try NekoSDKFlowFixture.game([

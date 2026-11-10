@@ -3137,14 +3137,14 @@ void Engine::composeSlots(Canvas &out) {
     // NEW marks the card saved to last, which the PC keeps in global 0: Test Game 94's held 2 and The Alchemist's 1, the
     // cards their screens marked, and Test Game 87 counts from 0.
     int newest = newCardSlot(layout_, variable(0, 0));
-    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10, int step = 0) {
+    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10, int step = 0, float opacity = 1) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / cells;
         if (step <= 0) step = w;
         for (int i = count - 1; i >= 0; i--) {
             int digit = value % 10;
             value /= 10;
-            drawPart(out, *sheetOfTen, x + i * step, y, digit * w, 0, w, sheetOfTen->h, 1);
+            drawPart(out, *sheetOfTen, x + i * step, y, digit * w, 0, w, sheetOfTen->h, opacity);
         }
         return x + count * step;
     };
@@ -3207,7 +3207,9 @@ void Engine::composeSlots(Canvas &out) {
             // `slotdigits SHEET X Y COUNT [STEP] [CELLS]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide
             // digits), from a sheet of CELLS, 10 when absent (13 for Test Game 96's, its date's marks after the digits).
             int numberCells = offset("slotdigits", 5) > 0 ? offset("slotdigits", 5) : 10;
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4));
+            const auto *faded = screen_->setting("emptycards");
+            bool numberFades = faded && faded->size() >= 2 && (*faded)[1] == "number";
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4), numberFades ? cardOpacity : 1);
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
