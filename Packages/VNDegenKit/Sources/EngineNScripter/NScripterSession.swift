@@ -200,6 +200,7 @@ final class NScripterSession: EngineSession {
 
     func terminate() {
         guard !stopped else { return }
+        if engine == nil { failedToStart = true }
         if let engine {
             vnns_request_quit(engine)
             vnns_step(engine, 0)

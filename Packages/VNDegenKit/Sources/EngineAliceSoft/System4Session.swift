@@ -308,6 +308,7 @@ final class System4Session: EngineSession {
 
     func terminate() {
         guard !stopped else { return }
+        if engine == nil { failedToStart = true }
         finish(byGame: false)
     }
 

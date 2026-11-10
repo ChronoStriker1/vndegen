@@ -185,7 +185,7 @@ let package = Package(
         .testTarget(name: "GameInputTests", dependencies: ["GameInput", "TestSupport"]),
         .testTarget(name: "ControllerUITests", dependencies: ["ControllerUI", "VNCore"]),
         .testTarget(name: "LockTests", dependencies: ["Lock", "VNCore"]),
-        .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy", "TestSupport"]),
+        .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy", "EngineNScripter", "EngineRPGMaker", "TestSupport"]),
         .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "RegistryFile", "EngineRPGMaker", "EngineRenPy", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "RcloneTests", dependencies: ["Rclone", "CRclone", "TestSupport"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport", "TestSupport"], exclude: ["Fixtures"]),

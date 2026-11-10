@@ -396,6 +396,7 @@ final class ArtemisSession: EngineSession {
     }
 
     func terminate() {
+        if runtime == nil, !stopped { failedToStart = true }
         finish()
     }
 

@@ -200,6 +200,7 @@ final class GodotSession: EngineSession {
     func terminate() {
         switch state {
         case .waiting:
+            failedToStart = true
             stopped()
         case .running:
             if paused { engine.setPaused(false) }

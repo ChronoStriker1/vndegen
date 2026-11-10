@@ -147,6 +147,7 @@ final class RenPySession: EngineSession {
     /// save to a new file and renames it into place, so even that cannot leave a half-written save.
     func terminate() {
         ending = true
+        if process.processIdentifier == 0 { failedToStart = true }
         guard process.isRunning else { return }
         let pid = process.processIdentifier
         if stopped {

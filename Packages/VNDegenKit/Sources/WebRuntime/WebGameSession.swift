@@ -398,6 +398,7 @@ final class WebGameSession: NSObject, EngineSession {
 
     func terminate() {
         guard stopping == nil else { return }
+        if webView.backForwardList.currentItem == nil { failedToStart = true }
         ended = true
         schemeHandler.cancel()
         #if DEBUG

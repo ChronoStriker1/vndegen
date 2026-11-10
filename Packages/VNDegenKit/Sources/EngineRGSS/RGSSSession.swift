@@ -286,6 +286,7 @@ final class RGSSSession: EngineSession {
     }
 
     func terminate() {
+        if !running, !stopped { failedToStart = true }
         if running {
             finish(byGame: false)
             RGSSPlugin.record(problem: nil, dataDirectory: launch.dataDirectory)

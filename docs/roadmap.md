@@ -91,7 +91,6 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 New bugs get a GitHub issue and a line here.
 - [#70](https://github.com/ChronoStriker1/vndegen/issues/70) A game that can't start drops back to the library with no message.
 - [#71](https://github.com/ChronoStriker1/vndegen/issues/71) Unity: an error saving PlayerPrefs after play shows "couldn't start".
-- [#72](https://github.com/ChronoStriker1/vndegen/issues/72) Leaving a game while its engine is still starting counts as played.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.

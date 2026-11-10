@@ -1,4 +1,6 @@
+import EngineNScripter
 import EngineRenPy
+import EngineRPGMaker
 import Foundation
 import TestSupport
 import GameInput
@@ -238,4 +240,31 @@ private struct StartingPlugin: EnginePlugin {
     sessions.made[2].launch.onExit()
     #expect(try #require(library.game(midway)?.lastPlayedAt) >= launched)
     #expect(try #require(library.game(midway)?.playTime) > 0)
+}
+
+@MainActor
+@Test func aGameLeftWhileItsEngineStartsDoesNotCountAsPlayed() async throws {
+    let base = TestFolders.root.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
+    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
+    let files = ["NScripter Game/nscript.dat": "", "MV Game/js/rpg_core.js": "",
+                 "MV Game/index.html": "<html><body></body></html>"]
+    for (path, text) in files {
+        let url = paths.gamesRoot.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(text.utf8).write(to: url)
+    }
+    let library = LibraryStore(paths: paths, engines: [NScripterPlugin(), RPGMakerPlugin(.mv)])
+    await library.refresh()
+    let hub = Hub(library: library, metadata: MetadataService(), input: InputHub(),
+                  lock: LockService(keychainService: "vndegen-tests-\(UUID().uuidString)", defaults: UserDefaults(suiteName: UUID().uuidString)!),
+                  saveSync: SaveSyncService(library: library))
+    let earlier = Date(timeIntervalSinceNow: -86_400)
+    for id in [GameID("NScripter Game"), GameID("MV Game")] {
+        library.update(id) { $0.lastPlayedAt = earlier }
+        hub.launch(id)
+        guard case .playing = hub.screen else { Issue.record("\(id.rawValue) didn't launch: \(hub.launchError ?? "")"); return }
+        hub.endSession()
+        #expect(library.game(id)?.lastPlayedAt == earlier, "\(id.rawValue)")
+        #expect(library.game(id)?.playTime == 0, "\(id.rawValue)")
+    }
 }
