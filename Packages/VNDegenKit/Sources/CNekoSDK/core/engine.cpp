@@ -5059,7 +5059,9 @@ bool Engine::step(int ms) {
     bool autoNext = false;
     if (autoMode_ && waiting_ == Waiting::Click && textDone_ && !windowLog_) {
         bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
-        int64_t pause = autoPerCharMs_ >= 0 ? autoBaseMs_ + autoPerCharMs_ * int64_t(textGlyphs_.size()) : autoDelayMs_;
+        int64_t units = 0;
+        for (const Glyph &g : textGlyphs_) units += g.codepoint < 0x80 || (g.codepoint >= 0xFF61 && g.codepoint <= 0xFF9F) ? 1 : 2;
+        int64_t pause = autoPerCharMs_ >= 0 ? autoBaseMs_ + autoPerCharMs_ * units : autoDelayMs_;
         if (autoWithVoice_) {
             if (autoReadyAt_ < 0) autoReadyAt_ = now_ + pause;
             else if (now_ >= autoReadyAt_ && !voiceGoing) autoNext = true;
@@ -7089,17 +7091,13 @@ void Engine::compose() {
             // A `dim` picture darkens the scene behind the choice, as Test Game 83's does to 0.138 (set 3).
             for (const Picture &p : table->second.pictures) {
                 if (p.dim && !p.underWindow) tintFrame(canvas_, 0, 0, 0, int(p.alpha * 256));
-                else if (!p.dim && !dialogOpen_) drawPicture(canvas_, p);
+                else if (!p.dim) drawPicture(canvas_, p);
             }
-            for (auto [line, end] = table->second.settings.equal_range("framefor"); line != end && !dialogOpen_; ++line)
+            for (auto [line, end] = table->second.settings.equal_range("framefor"); line != end; ++line)
                 if (line->second.size() >= 4 && field(line->second, 0) == choiceCount_)
                     if (ImageRef frame = images_->get(line->second[1])) drawPart(canvas_, *frame, field(line->second, 2), field(line->second, 3), 0, 0, frame->w, frame->h, 1);
-        } else if (choiceBack_ && !dialogOpen_) {
+        } else if (choiceBack_) {
             drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
-        }
-        if (dialogOpen_) {
-            composeDialog(canvas_);
-            return;
         }
         int cellW = choiceSheet_->w / choiceColumns(), cellH = choiceSheet_->h / 5, x, top, step, slant;
         choicePlace(x, top, step, slant);

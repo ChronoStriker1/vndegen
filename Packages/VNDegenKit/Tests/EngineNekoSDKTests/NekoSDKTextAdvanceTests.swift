@@ -38,6 +38,47 @@ import TestSupport
         }
     }
 
+    @Test(arguments: ["\u{2026}\u{2026}\u{2026}\u{2026}\u{2026}\u{2026}", "abcdefghijkl"]) func autoCountsATwoByteCharacterTwice(line: String) throws {
+        let sheet = { () -> Data in
+            let w = 50, h = 250, row = (w * 3 + 3) & ~3
+            var d = Data("BM".utf8)
+            func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+            put(UInt32(54 + row * h)); put(0); put(54)
+            put(40); put(UInt32(w)); put(UInt32(h))
+            d.append(contentsOf: [1, 0, 24, 0])
+            put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+            d.append(Data(repeating: 120, count: row * h))
+            return d
+        }()
+        let under = ["#under Auto", "obj\\b.bmp", "2", "400,650", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\autounits\nFirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/msg_button.ini": Data((under.joined(separator: "\n") + "\n##\n").utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("b.bmp", sheet)]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 5, next: 3, s: [2: line]),
+                .init(op: 5, next: 4, s: [2: "abcdefghijklmnopqrstuvwxyz"]),
+                .init(op: 5, next: 0, s: [2: "x"]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<100 { _ = vnneko_step(e, 10) }
+        let first = vnneko_debug_text_count(e)
+        #expect(vnneko_debug_press(e, "Auto"))
+        for _ in 0..<90 { _ = vnneko_step(e, 10) }
+        #expect(vnneko_debug_text_count(e) == first)
+        for _ in 0..<50 { _ = vnneko_step(e, 10) }
+        #expect(vnneko_debug_text_count(e) == first + 1)
+    }
+
     @Test func aWindowPictureShowsWithTheWindow() throws {
         func bmp(_ w: Int, _ h: Int, _ bgr: [UInt8]) -> Data {
             let row = (w * 3 + 3) & ~3
