@@ -266,6 +266,8 @@ On both PCs a replay from the Scene screen plays its scripts and comes back to t
 
 Seen on the PC while measuring other things. Apply Settings keeps the changes and leaves Config, to the title or the story it was opened from. A slider's knob drags, and its number follows the pointer (28 at a pointer 111 pixels along a 400 pixel track); the arrows at its ends move it by 1; a click on the track away from the knob moves it 10 toward the click, wherever on the track the click is (80 to 70, 70 to 60, and back to 70 and 80), and holding that click and moving does nothing more. On the title, with Extra's three entries open, the other main buttons are dimmed and Extra stays lit, a click on Settings does nothing, and a right click closes the entries. The table's `submenudim` gives the same: with it VNDegen's title is the PC's with the entries open and with them closed, but for two bands.
 
+Leaving a menu that was opened from the title, with Return, the PC comes back to the title's menu, and to Extra's entries still open if the menu was opened through them (seen from the Music and Load screens); only coming from the story does it show Click any mouse button again. VNDegen shows that first stage every time, one click more.
+
 The bands are `obj\d000_001` (1280x32, lace, its own alpha at most 0.24), drawn faintly across the title at y 361 and y 660 and moving: in shots a quarter of a second apart the upper one had gone 15 or 16 pixels to the right and the lower one the same to the left, 60 pixels a second, a pixel a frame. Not built: the tables have no picture that moves across.
 
 ### Test Game 86's hover helps and questions
