@@ -23,8 +23,10 @@ button music obj\d002_002.bmp 810 568 3 5 2 stage 2 group extra help obj\d003_00
 
 screen start
 flow main
+after 2
 
 screen load
+askerlit
 pic obj\a103_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
 pic obj\l000_003.bmp 1110 106
@@ -63,6 +65,7 @@ button nav_title obj\e003_002.bmp 1116 580 8 5 6 help obj\e004_001.bmp 1110 106 
 button nav_quit obj\e003_002.bmp 1116 630 8 5 7 help obj\e004_001.bmp 1110 106 8 1 7 0
 
 screen save
+askerlit
 pic obj\a002_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
 pic obj\l000_003.bmp 1110 106
@@ -121,6 +124,7 @@ choicecolumns 2
 placefor 2 187 122 361 0
 
 screen config
+askerlit
 pic obj\a002_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
 pic obj\l000_003.bmp 1110 106
@@ -255,6 +259,7 @@ hovercols 793 547 1015 571 obj\h006_003.bmp 560 401 7 5
 hovercols 747 575 1062 627 obj\h006_003.bmp 560 429 7 6
 
 screen cg
+askerlit
 pic obj\a002_000.bmp 0 0
 pic obj\a002_001.bmp 0 0
 pic obj\e003_000.bmp 1102 0
@@ -299,6 +304,7 @@ cell 538 392
 cell 778 392
 
 screen scene
+askerlit
 pic obj\a002_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
 pic obj\l000_003.bmp 1110 106
@@ -343,6 +349,8 @@ cell 538 392
 cell 778 392
 
 screen music
+askerlit
+nolithelp
 pic obj\a002_000.bmp 0 0
 pic obj\e003_000.bmp 1102 0
 pic obj\l000_003.bmp 1110 106
@@ -411,7 +419,10 @@ inneralways
 squarewindow 0
 default opacity 100
 default text 50
+textpoints text 0 184.9 10 153.7 25 101.8 40 52.6 50 17.6 60 4.9 75 2.6 90 1.5 100 0
 default auto 50
+autocurve auto 104 1.04 527 1
+autowithvoice
 default bgm 80
 default se 60
 default voice 80

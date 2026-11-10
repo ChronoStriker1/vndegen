@@ -73,7 +73,7 @@ public:
             if (!n.s[size_t(i)].empty()) names.push_back(n.s[size_t(i)]);
         int p[10];
         for (int i = 0; i < 10; i++) p[i] = n.p[i];
-        if (auto it = emitters_.find(n.p[0]); it != emitters_.end() && !it->second.pictures.empty()) {
+        if (auto it = emitters_.find(n.p[0]); it != emitters_.end() && !it->second.pictures.empty() && host.slotHeld(n.p[0])) {
             host.holdSlot(n.p[0], kEmitterKind);
             return true;
         }
@@ -86,7 +86,9 @@ public:
         // An emitter whose slot the scene has cleared is over.
         for (auto it = emitters_.begin(); it != emitters_.end();)
             it = host.slotHeld(it->first) ? std::next(it) : emitters_.erase(it);
-        return !emitters_.empty();
+        for (const auto &[slot, e] : emitters_)
+            if (!e.pictures.empty()) return true;
+        return false;
     }
 
     void drawSlot(PartHost &host, Canvas &out, int slot, float alpha) override {

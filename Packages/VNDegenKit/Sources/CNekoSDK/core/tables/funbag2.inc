@@ -34,6 +34,7 @@ button music obj\d000_005.bmp 514 547 5 5 4 stage 2 group extra help obj\d000_00
 # Start's Main Story starts the story table's flow of that name; Prologue starts its first.
 screen start
 flow story
+after 2
 
 screen load
 # The room behind the menus is one of the 15 the exe lists, picked afresh each time a screen opens, at 46 percent.
