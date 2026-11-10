@@ -662,8 +662,8 @@ private:
     std::vector<std::vector<BulbStep>> bulbPatterns_;
     int bulbPattern_ = -1, bulbFrom_ = 255, bulbDrawn_ = 255;
     bool bulbSeen_ = false;
-    std::map<std::pair<const Image *, int>, std::pair<ImageRef, ImageRef>> darkened_;
-    ImageRef darkened(const ImageRef &image, int dark);
+    std::map<std::pair<const Picture *, int>, std::pair<ImageRef, ImageRef>> darkened_;
+    ImageRef darkened(const Picture &p, const std::vector<const Picture *> &frames, int dark);
     int64_t bulbStart_ = 0;
     std::map<std::string, std::string> bulbDark_;
     void loadBulb();

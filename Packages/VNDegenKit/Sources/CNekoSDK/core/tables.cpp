@@ -82,7 +82,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\widgettest") return kWidgetTest;
     if (folder == "vndegen\\widgettesthide") return kWidgetTestHide;
     if (folder == "vndegen\\widgettestpart") return kWidgetTestPart;
-    if (folder == "vndegen\\widgettesttabs") return kWidgetTestTabs;
+    if (folder == "vndegen\\widgettesttabs" || folder == "vndegen\\widgettesttabspc") return kWidgetTestTabs;
     if (folder == "vndegen\\outfittest") return kOutfitTest;
     if (folder == "vndegen\\twobytetest") return kTwoByteTest;
     if (folder == "vndegen\\partplatetest") return kPartPlateTest;

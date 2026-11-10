@@ -368,6 +368,7 @@ void Engine::openScreen(const std::string &name) {
         if (viewerPanel()) closeViewer();
         viewingImage_ = false;
     }
+    if (screen_ != &it->second) darkened_.clear();
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -406,12 +407,12 @@ void Engine::openScreen(const std::string &name) {
 }
 
 void Engine::closeScreen() {
+    darkened_.clear();
     if (spriteScreen()) closeSprites();
     screen_ = nullptr;
     dirty_ = true;
 }
 
-// Back from the story to a menu, with its sound and sprites cleared.
 bool Engine::resumeSetAside() {
     if (!setAside_) return false;
     PreviousChoice story = *setAside_;
@@ -422,6 +423,7 @@ bool Engine::resumeSetAside() {
     return true;
 }
 
+// Back from the story to a menu, with its sound and sprites cleared.
 void Engine::endStory(const std::string &screen) {
     if (screen != "scene") {
         setAside_.reset();
@@ -1978,6 +1980,7 @@ bool Engine::startReplay(const GalleryEntry &scene) {
         SaveData story = captureSave();
         setAside_ = PreviousChoice{story, sidecarText(story)};
         setAsideChoice_ = previousChoice_;
+        previousChoice_.reset();
     }
     stopTrack();
     if (titleMusic_) {
@@ -3445,14 +3448,16 @@ void Engine::composeDialog(Canvas &out) {
     tintFrame(out, 0, 0, 0, dark);
     if (screen_) {
         bool over = false;
+        std::vector<const Picture *> frames;
         for (const Picture &p : screen_->pictures) {
             if (!p.image || (p.tab >= 0 && p.tab != galleryTab_) || !shown(p)) continue;
             if (p.overDim) {
                 drawPicture(out, p);
                 over = true;
+                frames.push_back(&p);
             } else if (over) {
                 Picture dimmed = p;
-                dimmed.image = darkened(p.image, dark);
+                dimmed.image = darkened(p, frames, dark);
                 drawPicture(out, dimmed);
             }
         }
@@ -3857,7 +3862,6 @@ void Engine::composeScreen(Canvas &out) {
             drawButton(out, b, StateSelected, true);
             continue;
         }
-        // Pause is drawn disabled with nothing playing, but not on a `trackselects` screen: Test Game 96's stays plain.
         const auto *selects = screen_->setting("trackselects");
         if (b.action == "music_pause" && !trackPlayer_ && (!selects || (!selects->empty() && (*selects)[0] == "pauseoff"))) state = StateDisabled;
         // The current page's button sits higher in Test Game 84.
@@ -3983,15 +3987,37 @@ Picture Engine::turned(const Picture &p) const {
     return now;
 }
 
-ImageRef Engine::darkened(const ImageRef &image, int dark) {
-    auto key = std::make_pair(image.get(), dark);
+ImageRef Engine::darkened(const Picture &p, const std::vector<const Picture *> &frames, int dark) {
+    auto cell = [](const Picture &q, int &sx, int &sy, int &w, int &h) {
+        if (q.partW > 0 && q.partH > 0) {
+            sx = q.partX, sy = q.partY, w = q.partW, h = q.partH;
+            return;
+        }
+        w = q.image->w / std::max(1, q.cols), h = q.image->h / std::max(1, q.rows);
+        sx = q.column * w, sy = q.row * h;
+    };
+    auto key = std::make_pair(&p, dark);
     if (auto made = darkened_.find(key); made != darkened_.end()) return made->second.second;
-    auto copy = std::make_shared<Image>(*image);
-    int keep = 256 - dark;
-    for (size_t i = 0; i + 3 < copy->rgba.size(); i += 4)
-        for (size_t c = 0; c < 3; c++) copy->rgba[i + c] = uint8_t((copy->rgba[i + c] * keep) >> 8);
-    if (darkened_.size() > 16) darkened_.clear();
-    darkened_[key] = {image, copy};
+    auto copy = std::make_shared<Image>(*p.image);
+    copy->opaque = false;
+    int keep = 256 - dark, sx, sy, w, h;
+    cell(p, sx, sy, w, h);
+    for (int y = std::max(0, sy); y < std::min(sy + h, copy->h); y++)
+        for (int x = std::max(0, sx); x < std::min(sx + w, copy->w); x++) {
+            uint8_t *px = &copy->rgba[(size_t(y) * size_t(copy->w) + size_t(x)) * 4];
+            int atX = p.x + x - sx, atY = p.y + y - sy, under = 0;
+            for (const Picture *f : frames) {
+                int fx, fy, fw, fh;
+                cell(*f, fx, fy, fw, fh);
+                int ix = atX - f->x, iy = atY - f->y;
+                if (ix < 0 || iy < 0 || ix >= fw || iy >= fh || fx + ix >= f->image->w || fy + iy >= f->image->h || fx + ix < 0 || fy + iy < 0) continue;
+                int alpha = int(float(f->image->rgba[(size_t(fy + iy) * size_t(f->image->w) + size_t(fx + ix)) * 4 + 3]) * std::clamp(f->alpha, 0.0f, 1.0f));
+                under = std::max(under, alpha);
+            }
+            for (int c = 0; c < 3; c++) px[c] = uint8_t((px[c] * keep) >> 8);
+            px[3] = uint8_t(px[3] * under / 255);
+        }
+    darkened_[key] = {p.image, copy};
     return copy;
 }
 
