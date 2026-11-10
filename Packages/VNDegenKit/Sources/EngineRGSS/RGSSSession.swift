@@ -15,6 +15,7 @@ nonisolated let rgssLog = Logger(subsystem: "com.chronostriker1.vndegen", catego
 /// RGSS games save only when the player saves, so the hub ends a game by stopping it.
 final class RGSSSession: EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     let view: PlatformView
     private let frameView = FrameView()
     private let launch: GameLaunch
@@ -103,6 +104,7 @@ final class RGSSSession: EngineSession {
         guard result == 0 else {
             rgssLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(Self.problem ?? "", privacy: .public)")
             failedToStart = true
+            startFailureReason = Self.problem
             running = true
             finish(byGame: true)
             return

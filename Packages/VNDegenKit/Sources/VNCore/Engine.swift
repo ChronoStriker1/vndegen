@@ -226,6 +226,7 @@ public protocol EngineSession: AnyObject {
     /// Set it before calling `onExit`, or in `terminate`, so the hub doesn't count the launch as played. The default is
     /// false.
     var failedToStart: Bool { get }
+    var startFailureReason: String? { get }
 }
 
 extension EngineSession {
@@ -235,6 +236,7 @@ extension EngineSession {
     public func chooseGameMenuItem(_ id: GameMenuItem.ID) {}
     public var cheats: (any CheatSession)? { nil }
     public var failedToStart: Bool { false }
+    public var startFailureReason: String? { nil }
 
     public func type(_ typed: TypedText) {
         for key in KeyboardKey.keys(typing: typed) {

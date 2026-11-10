@@ -167,6 +167,7 @@ private final class StartingSession: EngineSession {
     let view = PlatformView()
     let launch: GameLaunch
     var failedToStart = false
+    var startFailureReason: String?
 
     init(_ launch: GameLaunch) { self.launch = launch }
 
@@ -223,8 +224,11 @@ private struct StartingPlugin: EnginePlugin {
 
     hub.launch(failed)
     sessions.made[0].failedToStart = true
+    sessions.made[0].startFailureReason = "no 0.txt"
     sessions.made[0].launch.onExit()
     guard case .library = hub.screen else { Issue.record("the failed game is still on screen"); return }
+    #expect(hub.launchError == "Fails To Start couldn't start. No 0.txt.")
+    hub.launchError = nil
     #expect(library.game(failed)?.lastPlayedAt == earlier)
     #expect(library.game(failed)?.playTime == 0)
 
@@ -232,6 +236,7 @@ private struct StartingPlugin: EnginePlugin {
     hub.launch(quit)
     try await Task.sleep(for: .milliseconds(50))
     hub.endSession()
+    #expect(hub.launchError == nil)
     #expect(try #require(library.game(quit)?.lastPlayedAt) >= launched)
     #expect(try #require(library.game(quit)?.playTime) > 0)
 
@@ -264,7 +269,14 @@ private struct StartingPlugin: EnginePlugin {
         hub.launch(id)
         guard case .playing = hub.screen else { Issue.record("\(id.rawValue) didn't launch: \(hub.launchError ?? "")"); return }
         hub.endSession()
+        #expect(hub.launchError == nil, "\(id.rawValue)")
         #expect(library.game(id)?.lastPlayedAt == earlier, "\(id.rawValue)")
         #expect(library.game(id)?.playTime == 0, "\(id.rawValue)")
     }
+}
+
+@MainActor @Test func aStartFailureReasonReadsAsASentence() {
+    #expect(Hub.sentence("no game folder") == "No game folder.")
+    #expect(Hub.sentence("The game's Game.ini can't be read.") == "The game's Game.ini can't be read.")
+    #expect(Hub.sentence("  ") == nil)
 }

@@ -309,6 +309,7 @@ import VNCore
         #expect(plugin.registrySave(folder: folder, dataDirectory: folder) == nil)
     }
 }
+
 @MainActor @Test func aSettingsErrorAfterPlaySaysSoRatherThanCouldntStart() async throws {
     let folder = TestFolders.root.appendingPathComponent("unity-\(UUID().uuidString)", isDirectory: true)
     let locked = folder.appendingPathComponent("Locked", isDirectory: true)
@@ -325,5 +326,18 @@ import VNCore
     #expect(!session.failedToStart)
     #expect(session.host.message.hasPrefix("Test Game's settings couldn't be saved back. "), "\(session.host.message)")
     #expect(session.host.message.contains("PlayerPrefs.reg"), "\(session.host.message)")
+}
+
+@MainActor @Test func aGameThatCouldntStartEndsTheSessionWithTheReason() async throws {
+    let folder = TestFolders.root.appendingPathComponent("unity-\(UUID().uuidString)", isDirectory: true)
+    var exits = 0
+    let launch = GameLaunch(game: Game(id: GameID("Test Game"), title: "Test Game"), folder: folder, dataDirectory: folder) { exits += 1 }
+    let session = UnityExternalSession(launch, message: "Getting ready")
+    session.start { throw UnityCrossOverSession.Failure.tool("updating the bottle", 1) }
+    await session.waitUntilStopped()
+    #expect(session.failedToStart)
+    #expect(session.startFailureReason == "CrossOver stopped while updating the bottle (status 1).")
+    #expect(exits == 1)
+    #expect(session.host.message == "Getting ready")
 }
 #endif

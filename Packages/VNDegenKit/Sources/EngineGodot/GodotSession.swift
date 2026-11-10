@@ -18,6 +18,7 @@ nonisolated let godotLog = Logger(subsystem: "com.chronostriker1.vndegen", categ
 /// request its window's close button would send, and `waitUntilStopped()` returns once it has quit.
 final class GodotSession: EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     private enum State {
         case waiting
         case running
@@ -112,6 +113,7 @@ final class GodotSession: EngineSession {
             if result == 2 { Self.unusable.insert(paths.major) }
             godotLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(self.engine.lastProblem ?? "", privacy: .public)")
             failedToStart = true
+            startFailureReason = engine.lastProblem
             engine.stop()
             Self.engineInUse = false
             stopped()

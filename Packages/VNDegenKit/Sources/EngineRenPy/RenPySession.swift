@@ -11,6 +11,7 @@ import VNCore
 /// the game quits the way its own Quit button does, and `waitUntilStopped()` returns once it has.
 final class RenPySession: EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     let view: PlatformView
     private let process = Process()
     private let launch: GameLaunch
@@ -69,6 +70,7 @@ final class RenPySession: EngineSession {
             try process.run()
         } catch {
             failedToStart = true
+            startFailureReason = error.localizedDescription
             renPyLog.error("starting \(self.runtime.displayName, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
             // Called from a view update, which must not change the hub's screen itself.
             Task { [onExit = launch.onExit] in onExit() }

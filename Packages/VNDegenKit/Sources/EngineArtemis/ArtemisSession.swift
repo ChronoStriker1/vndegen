@@ -19,6 +19,7 @@ nonisolated let artemisLog = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// is on screen. The game quitting itself ends the session through `onExit`.
 final class ArtemisSession: EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     let view: PlatformView
     private let host: ArtemisHostView
     private let core: ArtemisCore
@@ -146,6 +147,7 @@ final class ArtemisSession: EngineSession {
     /// The game couldn't start.
     private func fail(_ reason: String) {
         failedToStart = true
+        startFailureReason = reason
         artemisLog.error("\(self.launch.game.id.rawValue, privacy: .public): \(reason, privacy: .public)")
         writeLog("[E] \(reason)")
         finish()
