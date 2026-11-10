@@ -52,8 +52,6 @@ std::map<std::string, std::string> parseKeys(const std::string &text) {
     return keys;
 }
 
-// The hub's variables, VNDegen's own, in a range 96's PC saves leave empty (theirs end at 14021, then 19999). The lead's
-// tree part reads the same numbers.
 enum : int {
     kTruth = 15100,      // 1..5
     kStage = 15101,      // + heroine: 1..3, 4 when she's done
@@ -160,7 +158,7 @@ public:
         if (int shown = shownHeroine(host); host.variable(1, kStage + shown) > 3) host.setVariable(1, kShown, openFrom(host, shown));
         bool anyLeft = false;
         for (int h = 0; h < 3; h++)
-            for (int q = 0; q < 3; q++) anyLeft = anyLeft || (host.variable(1, kStage + h) <= 3 && !(asked(host, h) & (1 << q)));
+            for (int q = 0; q < 3; q++) anyLeft = anyLeft || askable(host, h, q);
         if (!anyLeft) {
             host.log("the hub has no question left to ask, and not every answer: its question files may be missing");
             return finishWith(host, kTimeUp, 0);
@@ -181,7 +179,8 @@ public:
             return true;
         }
         if (staff_) {
-            if (steps_.empty() || staffMs(host) >= staffEndMs()) {
+            int64_t ms = staffMs(host);
+            if (steps_.empty() || ms >= staffEndMs()) {
                 staff_ = 0;
                 host.finishScreen(0);
             }
@@ -414,7 +413,8 @@ private:
     static bool inside(int x, int y, const int (&r)[4]) { return x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]; }
 
     bool askable(PartHost &host, int heroine, int q) {
-        return host.variable(1, kStage + heroine) <= 3 && !locked(host, heroine) && !(asked(host, heroine) & (1 << q));
+        int stage = host.variable(1, kStage + heroine);
+        return stage >= 1 && stage <= 3 && !locked(host, heroine) && !(asked(host, heroine) & (1 << q));
     }
 
     // Whether two bubbles' middles are nearer up and down than where they touch.
@@ -472,6 +472,7 @@ private:
         moveBubbles(host);
         for (int q = 2; q >= 0; q--) {
             const Bubble &b = bubbles_[q];
+            if (!bubblePicture(host, shown, std::min(3, std::max(1, host.variable(1, kStage + shown))), q, 0)) continue;
             if (std::fabs(float(x) - b.x) < float(b.w) / 2 - 20 && std::fabs(float(y) - b.y) < float(b.h) / 2 - 26) return askable(host, shown, q) ? q : -1;
         }
         return -1;
@@ -650,7 +651,7 @@ private:
         host.setVariable(1, kSolved, solved);
         // Truth 1's 12:00 scene has played once its clock is past noon, or at noon when it's the chapter last played.
         int last = host.variable(1, kPCChapter), hour = host.variable(1, kHour);
-        host.setVariable(1, kEventDone, t > 1 || hour > 12 || (hour == 12 && last == 50));
+        host.setVariable(1, kEventDone, t > 1 || hour >= 12);
         // Whom to show: the heroine of the question last asked in this truth, as the PC's hub opens on her (a PC save at
         // truth 3's hub after Ayano's question, loaded under Wine), else the truth's first; then on to an open stage.
         int shown = last >= 1000 && last < 4000 && (last % 1000) / 100 + 1 == t ? last / 1000 - 1 : std::max(0, std::min(2, firstShown(host, t)));

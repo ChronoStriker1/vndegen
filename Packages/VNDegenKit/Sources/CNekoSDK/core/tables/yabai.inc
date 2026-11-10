@@ -666,7 +666,6 @@ set S 105 = 4
 chapter 20
 goto t1
 label tut1
-set S 1000 = 10
 set S 105 = 11
 chapter 10
 label t1
@@ -703,6 +702,7 @@ set S 1000 = 4510
 set S 105 = 4
 chapter 4510
 label pick1
+open hubsync
 set S 2060 = 1
 open vote 1 -> S 15122
 goto picked
@@ -711,6 +711,7 @@ set S 1000 = 4600
 set S 105 = 4
 chapter 4600
 label pick2
+open hubsync
 set S 2060 = 1
 open vote 2 -> S 15122
 goto picked
@@ -719,6 +720,7 @@ set S 1000 = 4700
 set S 105 = 4
 chapter 4700
 label pick3
+open hubsync
 set S 2060 = 1
 open vote 3 -> S 15122
 goto picked
@@ -727,6 +729,7 @@ set S 1000 = 4800
 set S 105 = 4
 chapter 4800
 label pick4
+open hubsync
 set S 2060 = 1
 open vote 4 -> S 15122
 goto picked
@@ -735,6 +738,7 @@ set S 1000 = 4900
 set S 105 = 4
 chapter 4900
 label pick5
+open hubsync
 set S 2060 = 1
 open vote 5 -> S 15122
 goto picked
