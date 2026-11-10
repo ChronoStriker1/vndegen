@@ -493,10 +493,10 @@ final class WebGameSession: NSObject, EngineSession {
         Task { onExit() }
     }
 
-    private func failToStart(page: URL) {
+    private func failToStart(reason: String?) {
         guard !ended else { return }
         failedToStart = true
-        startFailureReason = "The game's \(page.path.drop { $0 == "/" }) is missing or can't be read."
+        startFailureReason = reason
         quitFromGame()
     }
 
@@ -595,20 +595,11 @@ extension WebGameSession: WKNavigationDelegate {
         }
     }
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
-                 decisionHandler: @escaping @MainActor (WKNavigationResponsePolicy) -> Void) {
-        guard navigationResponse.isForMainFrame, webView.backForwardList.currentItem == nil,
-              let response = navigationResponse.response as? HTTPURLResponse, response.statusCode >= 400 else {
-            return decisionHandler(.allow)
-        }
-        decisionHandler(.cancel)
-        failToStart(page: response.url ?? startURL)
-    }
-
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
         log.error("navigation failed: \(error.localizedDescription, privacy: .public)")
         // No page has loaded yet, so the game never started.
-        if webView.backForwardList.currentItem == nil { failToStart(page: startURL) }
+        guard webView.backForwardList.currentItem == nil else { return }
+        failToStart(reason: (error as? URLError)?.code == .fileDoesNotExist ? "The game's \(startURL.path.drop { $0 == "/" }) is missing or can't be read." : nil)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {

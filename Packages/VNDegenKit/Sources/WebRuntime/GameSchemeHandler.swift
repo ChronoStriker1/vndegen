@@ -89,6 +89,10 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
         guard !Task.isCancelled, let task = pending[serial] else { reads.removeValue(forKey: serial); return false }
         if response.status >= 400 {
             log.error("served \(response.status) for \(url.path, privacy: .public)")
+            if task.request.mainDocumentURL == url {
+                finish(serial, failing: URLError(.fileDoesNotExist))
+                return false
+            }
         }
         task.didReceive(HTTPURLResponse(url: url, statusCode: response.status, httpVersion: "HTTP/1.1", headerFields: response.headers)!)
         return true

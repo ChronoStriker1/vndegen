@@ -122,7 +122,8 @@ public final class Hub {
             // A launch counts as played only once the game has started (#39).
             library.update(id) { [lastPlayedBefore] in $0.lastPlayedAt = lastPlayedBefore }
             if failedByItself, let game = library.game(id) {
-                launchError = ["\(game.title) couldn't start.", session.startFailureReason.flatMap(Self.sentence)]
+                let title = game.isLocked && !lock.isUnlocked ? "The game" : game.title
+                launchError = ["\(title) couldn't start.", session.startFailureReason.flatMap(Self.sentence)]
                     .compactMap(\.self).joined(separator: " ")
             }
         } else if let start = sessionStart {

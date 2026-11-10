@@ -173,7 +173,7 @@ let package = Package(
         // Where tests make their fixture folders. See TestFolders.
         .target(name: "TestSupport", path: "Tests/TestSupport"),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore", "TestSupport"], exclude: ["Fixtures"]),
-        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "FontPack", "CVNAlpha", "TestSupport"], exclude: ["Fixtures"]),
+        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "VNCore", "FontPack", "CVNAlpha", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime", "TestSupport"]),
         .testTarget(name: "EngineFlashTests", dependencies: ["EngineFlash", "WebRuntime", "FontPack", "TestSupport"]),
