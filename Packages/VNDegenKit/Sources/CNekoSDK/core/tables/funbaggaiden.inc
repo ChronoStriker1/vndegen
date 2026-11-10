@@ -20,6 +20,9 @@ flow main
 screen defaults
 parts scroll particles
 colorkey 0 255 0
+textfont 9
+textsize 22
+textline 32
 
 screen cfgsav
 size 96000
