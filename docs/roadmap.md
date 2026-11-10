@@ -90,13 +90,11 @@ New bugs get a GitHub issue and a line here.
 - [#70](https://github.com/ChronoStriker1/vndegen/issues/70) A game that can't start drops back to the library with no message.
 - [#71](https://github.com/ChronoStriker1/vndegen/issues/71) Unity: an error saving PlayerPrefs after play shows "couldn't start".
 - [#72](https://github.com/ChronoStriker1/vndegen/issues/72) Leaving a game while its engine is still starting counts as played.
-- [#79](https://github.com/ChronoStriker1/vndegen/issues/79) NekoSDK: Return from a menu opened from the title shows the click prompt again in Funbag Fantasy 2, where the PC goes back to the title's menu. With the NekoSDK lead.
-- [#80](https://github.com/ChronoStriker1/vndegen/issues/80) NekoSDK: after Previous Choice the message window is empty, where the PC keeps the scene's last line. Funbag Fantasy: Sideboob Story only: Funbag Fantasy 2's PC shows an empty window too. Fixed on `feat/nekosdk-stage3`, for the next release.
-- [#81](https://github.com/ChronoStriker1/vndegen/issues/81) NekoSDK: Funbag Fantasy 3 if's title opening plays again after every Back from a menu. Fixed on `feat/nekosdk-stage3`, for the next release.
+- [#82](https://github.com/ChronoStriker1/vndegen/issues/82) NekoSDK: a question opened at a choice is drawn under the choice in Funbag Fantasy 2, so the Yes and No can't be seen. With the NekoSDK lead.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- NekoSDK, on `feat/nekosdk-stage3`: every game is released, the last, Funbag Fantasy: Sideboob Story, in 0.32.0. What's left is the bugs listed above, Mankitsu Happening's Auto speed, and a few of Sideboob Story's decorations.
+- NekoSDK, on `feat/nekosdk-stage3`: every game is released, the last, Funbag Fantasy: Sideboob Story, in 0.32.0. What's left is the bug listed above and whether the PC counts a full-width character as two for Auto.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
