@@ -30,7 +30,7 @@ pic obj\e003_000.bmp 1102 0
 pic obj\l000_003.bmp 1110 106
 pic obj\a002_001.bmp 0 0 overdim
 pic obj\e000_001.bmp 26 25
-emptycards 80
+emptycards 80 number 152
 slots obj\e002_000.bmp 60 98 520 120 5 2 1
 slotthumb 34 11
 slotdigits obj\e002_001.bmp 297 6 3 16
@@ -351,7 +351,7 @@ pic obj\g000_000.bmp 26 25
 pic obj\g001_000.bmp 119 101
 pic obj\g002_000.bmp 360 511
 playingpic obj\g002_001.bmp 360 511
-trackselects
+trackselects pauseoff
 pic obj\g003_000.bmp 343 575
 pic obj\g004_000.bmp 106 570
 slider music obj\g004_001.bmp 166 614
