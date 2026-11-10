@@ -87,6 +87,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - NekoSDK: Return from a title menu goes back to the menu (#79), Funbag Fantasy 3 if's title opening no longer replays (#81), Sideboob Story's last line after Previous Choice (#80), and Mankitsu Happening's Auto speed (0.32.1).
 - NekoSDK: a question asked at a choice shows over the choice (#82), and Mankitsu Happening's Auto counts a full-width character as two (0.32.2).
 - A game that can't start says why back in the library (#70), leaving during start no longer counts as played (#72), and Unity's settings message (#71) (0.32.3).
+- Save sync over FTP and WebDAV, with Ludusavi's settings for each, beside SMB (0.33.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
