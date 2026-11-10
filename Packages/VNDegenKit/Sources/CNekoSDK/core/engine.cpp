@@ -475,6 +475,7 @@ void Engine::endStory(const std::string &screen) {
     if (toViewer && viewEntry_ < galleryEntries().size() && viewImage_ < galleryEntries()[viewEntry_].images.size()) {
         closeViewer();
         viewerShow(viewEntry_, viewImage_);
+        viewPanelSeenAt_ = viewMs_;
     }
     // `replaykeeps` under `screen scene`: a replay comes back to the tab and page its card was on, as Test Game 96's PC
     // does (set 2, under Wine). Other games come back to the screen as it opens, which no one has measured on their PCs.
@@ -976,6 +977,11 @@ bool Engine::moveFocus(int dx, int dy) {
         for (int i = 0; i < choiceCount_; i++) spots.push_back({width_ / 2, top + i * step + cellH / 2});
     } else if (screen_ && viewingImage_) {
         // The CG viewer's panel, or nothing while it's hidden.
+        if (viewerRests()) {
+            if (viewPanelHidden_) dirty_ = true;
+            viewPanelHidden_ = false;
+            viewPanelSeenAt_ = viewMs_;
+        }
         if (viewerPanel())
             for (auto [x, y] : viewerSpots()) spots.push_back({x, y});
     } else if (screen_) {
@@ -5109,6 +5115,7 @@ void Engine::mouseButton(int button, bool down) {
         // The CG viewer's volume is kept when the slider's let go.
         if (!down && leftHeld_ && viewerDragging_) {
             viewerDragging_ = false;
+            viewPanelSeenAt_ = viewMs_;
             saveSettings();
         }
         leftHeld_ = down;

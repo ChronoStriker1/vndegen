@@ -402,6 +402,13 @@ std::vector<std::pair<int, int>> Engine::viewerSpots() const {
 
 void Engine::pressViewer(int x, int y) {
     bool clicks = screen_->setting("viewerclicks");
+    if (viewerRests() && (viewPanelHidden_ || viewPanelJustShown_) && onViewerPanel(x, y)) {
+        viewPanelHidden_ = false;
+        viewPanelJustShown_ = false;
+        viewPanelSeenAt_ = viewMs_;
+        dirty_ = true;
+        return;
+    }
     if (viewPanelHidden_) {
         if (clicks) viewerAdvance();
         return;
@@ -417,7 +424,7 @@ void Engine::pressViewer(int x, int y) {
         int left = number(*panel, 1), top = number(*panel, 2);
         if (!art || x < left || y < top || x >= left + art->w || y >= top + art->h) {
             viewerAdvance();
-            if (screen_ && screen_->setting("viewerrests")) viewPanelHidden_ = true;
+            if (viewerRests()) viewPanelHidden_ = true;
         }
         return;
     }
@@ -462,21 +469,35 @@ void Engine::viewerZoom(int notches) {
     dirty_ = true;
 }
 
-// Called each frame while a menu is up: the viewer's clock and slideshow.
-void Engine::viewerPointerMoved(int y) {
+bool Engine::viewerRests() const {
     const auto *rests = screen_ ? screen_->setting("viewerrests") : nullptr;
-    if (!rests || rests->size() < 2 || !viewingImage_ || !viewerPanel()) return;
+    return rests && rests->size() >= 2 && viewingImage_ && viewerPanel();
+}
+
+bool Engine::onViewerPanel(int x, int y) const {
+    const auto *panel = screen_->setting("viewer");
+    ImageRef art = panel && panel->size() >= 3 ? images_->get((*panel)[0]) : nullptr;
+    if (!art) return false;
+    int left = number(*panel, 1), top = number(*panel, 2);
+    return x >= left && y >= top && x < left + art->w && y < top + art->h;
+}
+
+void Engine::viewerPointerMoved(int y) {
+    if (!viewerRests()) return;
     viewPanelSeenAt_ = viewMs_;
-    if (viewPanelHidden_ && y >= number(*rests, 1)) {
+    if (viewPanelHidden_ && y >= number(*screen_->setting("viewerrests"), 1)) {
         viewPanelHidden_ = false;
+        viewPanelJustShown_ = true;
         dirty_ = true;
     }
 }
 
+// Called each frame while a menu is up: the viewer's clock and slideshow.
 void Engine::stepViewer(int ms) {
     viewMs_ += ms;
     if (!viewingImage_ || !viewerPanel()) return;
-    if (const auto *rests = screen_->setting("viewerrests"); rests && rests->size() >= 2 && !viewPanelHidden_ && !viewerDragging_ && viewMs_ - viewPanelSeenAt_ >= number(*rests, 0)) {
+    viewPanelJustShown_ = false;
+    if (viewerRests() && !viewPanelHidden_ && !viewerDragging_ && viewMs_ - viewPanelSeenAt_ >= number(*screen_->setting("viewerrests"), 0)) {
         viewPanelHidden_ = true;
         dirty_ = true;
     }

@@ -80,4 +80,5 @@ cellthumb 10 10
 viewer obj\p.bmp 0 620
 viewerclicks
 viewerrests 500 360
+viewerbutton return obj\t.bmp 900 650 1 0
 )";
