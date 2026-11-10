@@ -105,6 +105,61 @@ import TestSupport
         #expect(Array(g.px[dimAgain..<dimAgain + 3]) == [255, 0, 64])
     }
 
+    @Test func aPartsWindowPictureGoesThroughTheSavesSecondList() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\windowlist\nFirstFlow\tflow\\t.txt\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("red.bmp", bmp(1280, 720) { _ in [255, 0, 0] })]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 15, next: 3, p: [3: 100], s: [1: "obj\\red.bmp"]),
+                .init(op: 9003, next: 4, s: [1: "ac\\face.bmp"]),
+                .init(op: 9, next: 5),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data")
+        let saves = data.appendingPathComponent("AppData/Roaming/vndegen/windowlist/save")
+        func file(_ name: String) throws -> URL {
+            try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil).first { $0.lastPathComponent.lowercased() == name })
+        }
+        func square(_ e: OpaquePointer) -> [UInt8] {
+            let f = frame(e)
+            let at = (305 * f.w + 705) * 4
+            return [f.px[at], f.px[at + 1], f.px[at + 2]]
+        }
+        func listed(_ save: Data) throws -> Int32 {
+            let name = try #require(save.range(of: Data("ac\\face.bmp".utf8))).lowerBound
+            return save.subdata(in: (name - 12)..<(name - 8)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) }
+        }
+        let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        steps(first, 300)
+        #expect(square(first) == [0, 255, 0])
+        #expect(vnneko_debug_save(first, 1))
+        vnneko_stop(first)
+        let save = try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file("save001.sav")))
+        #expect(try listed(save) == 2000)
+        #expect(save.range(of: Data("obj\\red.bmp".utf8))!.lowerBound < save.range(of: Data("ac\\face.bmp".utf8))!.lowerBound)
+        var built = [UInt8](repeating: 0, count: save.count + 64)
+        let size = save.withUnsafeBytes { vnneko_debug_rebuild_save("vndegen\\windowlist", $0.bindMemory(to: UInt8.self).baseAddress, save.count, &built, built.count) }
+        #expect(size == save.count)
+        #expect(Data(built.prefix(size)) == save)
+
+        try FileManager.default.removeItem(at: try file("save001.vnd"))
+        let second = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(second) }
+        #expect(vnneko_debug_load(second, 1))
+        steps(second, 100)
+        #expect(square(second) == [0, 255, 0])
+        #expect(vnneko_debug_save(second, 2))
+        #expect(try listed(try NekoSDKFlowFixture.unpacked(Data(contentsOf: try file("save002.sav")))) == 2000)
+    }
+
     // PartHost::releaseSlot (the selftest part's command 9002): a held slot goes at the next screen update, as Test Game
     // 86's command 96 ends an emitter, and a save after it holds no record of the slot.
     @Test func aPartLetsItsSlotGo() throws {
