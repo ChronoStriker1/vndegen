@@ -2070,6 +2070,7 @@ void Engine::applyArtSet() {
     if (wanted == artShown_) return;
     artShown_ = wanted;
     images_->setArtSet(wanted);
+    bulbDark_.clear();
     for (Sprites *sprites : {&back_, &front_})
         for (auto &[slot, sprite] : *sprites)
             if (!sprite.path.empty() && !sprite.flipCount)
