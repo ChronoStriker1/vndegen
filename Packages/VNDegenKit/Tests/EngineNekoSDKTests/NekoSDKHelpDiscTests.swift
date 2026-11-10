@@ -52,6 +52,16 @@ import TestSupport
         #expect(pixel(e, 390, 310) != green)
         #expect(pixel(e, 350, 270) == green)
         vnneko_mouse_move(e, 0.9, 0.9)
+        steps(e, 1)
+        #expect(pixel(e, 350, 270) != green)
+        steps(e, 9)
+        vnneko_mouse_move(e, 10.0 / 1280, 110.0 / 720)
+        steps(e, 2)
+        #expect(pixel(e, 390, 310) != green)
+        #expect(pixel(e, 350, 270) == green)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        steps(e, 1)
+        #expect(pixel(e, 350, 270) != green)
         steps(e, 30)
         #expect(pixel(e, 350, 270) != green)
         vnneko_mouse_move(e, 10.0 / 1280, 110.0 / 720)
@@ -65,7 +75,7 @@ import TestSupport
                      "obj\\t.bmp", "1100,500", "1,1", "0,0", "1"]
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\twobytetest\nFirstFlow\tflow\\t.txt\n".utf8),
-            "cfg/msg_button.ini": Data(("#inner Config\n" + entry.joined(separator: "\n") + "\n##\n").utf8),
+            "cfg/msg_button.ini": Data(("#inner Config\n" + entry.joined(separator: "\n") + "\n##\n#inner Voice\n" + entry.joined(separator: "\n").replacingOccurrences(of: "900,650", with: "800,650") + "\n##\n").utf8),
             "obj.pak": NekoSDKFlowFixture.archive([
                 ("b.bmp", bmp(50, 250, [200, 200, 200])), ("e.bmp", bmp(20, 20, [0, 200, 0])), ("t.bmp", bmp(10, 10, [0, 0, 250])),
             ]),
@@ -94,6 +104,11 @@ import TestSupport
         steps(e, 5)
         #expect(pixel(e, 1002, 510) == green)
         #expect(pixel(e, 1105, 505) != red)
+        steps(e, 40)
+        vnneko_mouse_move(e, 810.0 / 1280, 660.0 / 720)
+        steps(e, 30)
+        #expect(pixel(e, 1002, 510) == green)
+        #expect(pixel(e, 1105, 505) != red)
     }
 
     @Test func aPlateAsWideAsTheScreenRisesFromItsRestAndHolds() throws {
@@ -117,7 +132,7 @@ import TestSupport
                 .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
                 .init(op: 2, next: 0),
             ]),
-            "scr/s.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 5, next: 0, s: [2: "x"])]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 5, next: 3, s: [2: "x"]), .init(op: 5, next: 0, s: [2: "y"])]),
         ])
         defer { try? FileManager.default.removeItem(at: root) }
         let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
@@ -136,5 +151,11 @@ import TestSupport
         #expect(at(650) == grey)
         #expect(at(600) != grey)
         #expect(at(650) != grey)
+        let place = { String(cString: vnneko_debug_status(e)).components(separatedBy: " ").prefix(2).joined(separator: " ") }
+        let before = place()
+        vnneko_mouse_button(e, 0, true)
+        vnneko_mouse_button(e, 0, false)
+        steps(e, 30)
+        #expect(place() != before, "\(place())")
     }
 }

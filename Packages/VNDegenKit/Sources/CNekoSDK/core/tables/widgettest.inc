@@ -16,6 +16,8 @@ screen config
 range rose 0 50
 knob rose obj\k.bmp 100 300 6
 slider rose obj\k.bmp 100 500 50 10
+range low 10 50
+knob low obj\k.bmp 100 400 6
 )";
 
 // The same title with `submenudim hide`: the other buttons go while a submenu is open (Test Game 83's); a colour key, a
@@ -212,9 +214,6 @@ end
 )";
 
 const char kDiscTest[] = R"(
-screen defaults
-windowpic obj\e.bmp 1000 500
-
 screen title
 button config obj\b.bmp 0 100 1 5 0 help obj\h.bmp 300 300 1 1 0 0 disc obj\bar.bmp 90
 )";
