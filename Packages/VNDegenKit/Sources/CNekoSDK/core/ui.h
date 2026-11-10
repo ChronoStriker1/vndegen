@@ -30,6 +30,9 @@ struct Button {
     std::string ifRead, unlessRead;
     ImageRef help;         // shown while hovered
     int helpX = 0, helpY = 0, helpCols = 1, helpRows = 1, helpColumn = 0, helpRow = 0;
+    ImageRef disc;
+    int discX = 0, discY = 0, discCols = 1, discRows = 1, discColumn = 0, discRow = 0, discAxis = 3;
+    float discSpeed = 0;
     int cellW() const { return sheet ? sheet->w / cols : 0; }
     int cellH() const { return sheet ? sheet->h / rows : 0; }
     bool contains(int px, int py) const { return px >= x && py >= y && px < x + cellW() && py < y + cellH(); }

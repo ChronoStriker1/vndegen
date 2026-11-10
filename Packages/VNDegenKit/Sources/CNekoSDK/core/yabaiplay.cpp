@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
+#include <random>
 #include <sstream>
 
 #include "font.h"
@@ -167,6 +168,8 @@ public:
         hoverQ_ = -1;
         bubblesFor_ = -1;
         pointerSeen_ = false;
+        moveBubbles(host);
+        refreshSpots(host);
         host.redraw();
         return true;
     }
@@ -189,6 +192,7 @@ public:
         if (!open_ || ask_) return false;
         moveBubbles(host);
         hover(host);
+        refreshSpots(host);
         return true;
     }
 
@@ -235,15 +239,8 @@ public:
         moveBubbles(host);
         int shown = shownHeroine(host);
         for (int q = 0; q < 3; q++) {
-            if (!askable(host, shown, q)) continue;
-            const Bubble &b = bubbles_[q];
-            static constexpr int kOffsets[9][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
-            for (const auto &offset : kOffsets) {
-                int x = int(b.x) + offset[0] * b.w / 4, y = int(b.y) + offset[1] * b.h / 5;
-                if (bubbleAt(host, x, y) != q) continue;
-                spots.push_back({x, y});
-                break;
-            }
+            int x = 0, y = 0;
+            if (pressPoint(host, shown, q, x, y)) spots.push_back({x, y});
         }
         for (int h = 0; h < 3; h++)
             if (host.variable(1, kStage + h) <= 3) spots.push_back({kTab[h][0] + kTab[h][2] / 2, kTab[h][1] + kTab[h][3] / 2});
@@ -287,6 +284,10 @@ public:
         // on the PC's hub). The sheet after it is the same frames with her eyes closed; when the PC uses it isn't measured.
         cell(host, out, "obj\\l006_00" + std::to_string(2 * shown) + ".bmp", 0, 0,
              525 * (3 * (truth(host) - 1) + std::min(3, std::max(1, stage)) - 1), 0, 525, 720);
+        if (stage <= 3) {
+            moveBubbles(host);
+            drawThoughts(host, out, shown, stage);
+        }
         put(host, out, "obj\\l001_000.bmp", 256, 21);
         put(host, out, "obj\\l005_000.bmp", 0, 592);
         put(host, out, "obj\\l004_001.bmp", 0, 667);  // 過去の自白内容を確認することが出来ます。
@@ -312,7 +313,7 @@ public:
             // glowing row 1 and the panel's lit row 1 (hover state, as seen on the PC).
             int state = bits & (1 << q) ? 4 : q == hoverQ_ ? 1 : 0;
             const Bubble &b = bubbles_[q];
-            float degrees = kRock * std::sin(2 * kPi * seconds / kRockSeconds[q] + kRockPhase[q]);
+            float degrees = kRock * std::sin(2 * kPi * seconds / kRockSeconds[q] + rockPhase_[q]);
             // The PC's tilt is measured anticlockwise; drawImage turns clockwise.
             if (ImageRef picture = bubblePicture(host, shown, stage, q, state))
                 drawImage(out, *picture, b.x, b.y, 1, 1, -degrees * kPi / 180, 1);
@@ -326,13 +327,12 @@ public:
     bool showsPlate() const override { return !staff_; }
     bool coversFrame() const override { return !ask_; }
 
-    // The hub's bubbles, each question's middle now, for headless play: `hub 598,279 896,286 834,465`.
     std::string debugStatus() const override {
         if (staff_) return "staff " + std::to_string(staff_);
         if (ask_) return "ask " + std::to_string(ask_);
         if (!open_) return {};
         std::string words = "hub";
-        for (const Bubble &b : bubbles_) words += " " + std::to_string(int(b.x)) + "," + std::to_string(int(b.y));
+        for (int q = 0; q < 3; q++) words += " " + std::to_string(spotX_[q]) + "," + std::to_string(spotY_[q]);
         return words;
     }
 
@@ -364,10 +364,12 @@ public:
         }
         hoverAsk_ = hoverQ_ = -1;
         pointerSeen_ = false;
+        for (int q = 0; q < 3; q++) spotX_[q] = spotY_[q] = -1;
     }
 
     void reset() override {
         open_ = false, ask_ = 0;
+        for (int q = 0; q < 3; q++) spotX_[q] = spotY_[q] = -1;
         staff_ = 0;
         orphan_ = false;
         bubblesFor_ = -1;
@@ -392,23 +394,17 @@ private:
     // The bubbles drift and rock. Tracked on the PC under Wine through 76 s of one hub, 300 frames (set 2):
     // - Each moves in a straight line at a steady speed and turns back at the edges of the area: its frame's top at 160,
     //   bottom at 600, right side at 1280, left side at 355.
-    // - Two bubbles turn each other back up or down where the gap between their middles crosses half their heights less
-    //   51, from either side, while their middles are nearer across than half their widths less about 60. Seen 8 times.
-    //   Nothing was seen to turn one back sideways but the area's edges.
     // - Each rocks 10 degrees either way as a sine, over 50.0, 19.3 and 26.1 s.
-    // The places, speeds and phases below are that hub's at the start of the 76 s. The PC starts each hub differently
-    // (another load of the same save began elsewhere), and how it picks them isn't known; there the first two bubbles
-    // slid sideways for 4 s before settling into the up-and-down lines kept here.
     struct Bubble {
         float x = 0, y = 0;    // its middle
         float vx = 0, vy = 0;  // pixels a second
         int w = 337, h = 202;  // its frame: 337 by 202, or 512 by 165 for a long question
     };
-    static constexpr float kStart[3][4] = {{598, 279, 0, -9.2f}, {896, 286, 0, -9.0f}, {834, 465, 10.33f, -6.0f}};
+    static constexpr float kBubbleSpeed = 12;
     static constexpr float kAreaLeft = 355, kAreaTop = 160, kAreaRight = 1280, kAreaBottom = 600;
     static constexpr float kTouchY = 51, kTouchX = 60;
     static constexpr float kPi = 3.14159265f, kRock = 10;
-    static constexpr float kRockSeconds[3] = {50.0f, 19.3f, 26.1f}, kRockPhase[3] = {-1.571f, 3.34f, 0.80f};
+    static constexpr float kRockSeconds[3] = {50.0f, 19.3f, 26.1f};
     static constexpr int kMoveMs = 16;
 
     static bool inside(int x, int y, const int (&r)[4]) { return x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]; }
@@ -418,9 +414,9 @@ private:
         return stage >= 1 && stage <= 3 && !locked(host, heroine) && !(asked(host, heroine) & (1 << q));
     }
 
-    // Whether two bubbles' middles are nearer up and down than where they touch.
-    bool near(int i, int j) const {
-        return std::fabs(bubbles_[i].y - bubbles_[j].y) < float(bubbles_[i].h + bubbles_[j].h) / 2 - kTouchY;
+    bool touch(int i, int j) const {
+        return std::fabs(bubbles_[i].y - bubbles_[j].y) < float(bubbles_[i].h + bubbles_[j].h) / 2 - kTouchY &&
+               std::fabs(bubbles_[i].x - bubbles_[j].x) < float(bubbles_[i].w + bubbles_[j].w) / 2 - kTouchX;
     }
 
     // The bubbles where the clock has them now, laid out afresh for another heroine, stage or truth.
@@ -432,13 +428,25 @@ private:
             bubblesFor_ = key;
             bubblesFrom_ = bubblesAt_ = now;
             pictures_.clear();
-            for (int q = 0; q < 3; q++) {
-                Bubble &b = bubbles_[q];
-                b = Bubble{kStart[q][0], kStart[q][1], kStart[q][2], kStart[q][3]};
-                if (ImageRef text = host.image(panel(host, shown, stage, q)); text && text->w > b.w) b.w = text->w, b.h = text->h / 5;
-                b.x = std::min(std::max(b.x, kAreaLeft + float(b.w) / 2), kAreaRight - float(b.w) / 2);
+            for (int attempt = 0; attempt < 40; attempt++) {
+                layoutSeed_ = mixed(chance_++ * 2654435761u + uint32_t(key) * 97u);
+                for (int q = 0; q < 3; q++) {
+                    Bubble &b = bubbles_[q];
+                    b = Bubble{};
+                    if (ImageRef text = host.image(panel(host, shown, stage, q)); text && text->w > b.w) b.w = text->w, b.h = text->h / 5;
+                    uint32_t seed = mixed(layoutSeed_ + uint32_t(q) * 7919u);
+                    auto unit = [&](uint32_t salt) { return float(mixed(seed + salt) % 10000) / 10000; };
+                    b.x = kAreaLeft + float(b.w) / 2 + unit(1) * (kAreaRight - kAreaLeft - float(b.w));
+                    b.y = kAreaTop + float(b.h) / 2 + unit(2) * (kAreaBottom - kAreaTop - float(b.h));
+                    float heading = unit(3) * 2 * kPi;
+                    b.vx = kBubbleSpeed * std::cos(heading), b.vy = kBubbleSpeed * std::sin(heading);
+                    rockPhase_[q] = unit(4) * 2 * kPi;
+                }
+                bool touching = false;
+                for (int pair = 0; pair < 3; pair++) touching = touching || touch(kPairs[pair][0], kPairs[pair][1]);
+                if (!touching) break;
             }
-            for (int pair = 0; pair < 3; pair++) wasNear_[pair] = near(kPairs[pair][0], kPairs[pair][1]), turned_[pair] = false;
+            for (int pair = 0; pair < 3; pair++) wasNear_[pair] = touch(kPairs[pair][0], kPairs[pair][1]);
         }
         // A long gap, such as the app waking, isn't caught up.
         if (now - bubblesAt_ > 2000 || now < bubblesAt_) bubblesAt_ = now;
@@ -447,16 +455,18 @@ private:
             for (Bubble &b : bubbles_) b.x += b.vx * dt, b.y += b.vy * dt;
             for (int pair = 0; pair < 3; pair++) {
                 Bubble &a = bubbles_[kPairs[pair][0]], &b = bubbles_[kPairs[pair][1]];
-                bool across = std::fabs(a.x - b.x) < float(a.w + b.w) / 2 - kTouchX;
-                bool isNear = near(kPairs[pair][0], kPairs[pair][1]);
-                // Turned back, the two return to the side of the line they came from, so what was stays as it was.
-                if (across && isNear != wasNear_[pair] && !turned_[pair]) {
-                    a.vy = -a.vy, b.vy = -b.vy;
-                    turned_[pair] = true;
-                } else {
-                    if (!across || turned_[pair]) wasNear_[pair] = isNear;
-                    turned_[pair] = false;
+                bool touching = touch(kPairs[pair][0], kPairs[pair][1]);
+                if (touching && !wasNear_[pair]) {
+                    float deepY = float(a.h + b.h) / 2 - kTouchY - std::fabs(a.y - b.y), deepX = float(a.w + b.w) / 2 - kTouchX - std::fabs(a.x - b.x);
+                    if (deepX < deepY) {
+                        float away = a.x < b.x ? -1.0f : 1.0f;
+                        a.vx = away * std::fabs(a.vx), b.vx = -away * std::fabs(b.vx);
+                    } else {
+                        float away = a.y < b.y ? -1.0f : 1.0f;
+                        a.vy = away * std::fabs(a.vy), b.vy = -away * std::fabs(b.vy);
+                    }
                 }
+                wasNear_[pair] = touching;
             }
             for (Bubble &b : bubbles_) {
                 if ((b.y - float(b.h) / 2 < kAreaTop && b.vy < 0) || (b.y + float(b.h) / 2 > kAreaBottom && b.vy > 0)) b.vy = -b.vy;
@@ -471,12 +481,32 @@ private:
         int shown = shownHeroine(host);
         if (host.variable(1, kStage + shown) > 3) return -1;
         moveBubbles(host);
-        for (int q = 2; q >= 0; q--) {
+        int nearest = -1;
+        float best = 0;
+        for (int q = 0; q < 3; q++) {
             const Bubble &b = bubbles_[q];
             if (!bubblePicture(host, shown, std::min(3, std::max(1, host.variable(1, kStage + shown))), q, 0)) continue;
-            if (std::fabs(float(x) - b.x) < float(b.w) / 2 - 20 && std::fabs(float(y) - b.y) < float(b.h) / 2 - 26) return askable(host, shown, q) ? q : -1;
+            float dx = std::fabs(float(x) - b.x) / (float(b.w) / 2 - 20), dy = std::fabs(float(y) - b.y) / (float(b.h) / 2 - 26);
+            float far = std::max(dx, dy);
+            if (far < 1 && (nearest < 0 || far < best)) nearest = q, best = far;
         }
-        return -1;
+        return nearest >= 0 && askable(host, shown, nearest) ? nearest : -1;
+    }
+
+    bool pressPoint(PartHost &host, int shown, int q, int &x, int &y) {
+        if (!askable(host, shown, q)) return false;
+        const Bubble &b = bubbles_[q];
+        static constexpr int kOffsets[9][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+        for (const auto &offset : kOffsets) {
+            x = int(b.x) + offset[0] * b.w / 4, y = int(b.y) + offset[1] * b.h / 5;
+            if (bubbleAt(host, x, y) == q) return true;
+        }
+        return false;
+    }
+
+    void refreshSpots(PartHost &host) {
+        for (int q = 0; q < 3; q++)
+            if (!pressPoint(host, shownHeroine(host), q, spotX_[q], spotY_[q])) spotX_[q] = spotY_[q] = -1;
     }
 
     void hover(PartHost &host) {
@@ -795,7 +825,8 @@ private:
     int64_t staffFrom_ = 0, staffResumeMs_ = -1, staffSeenMs_ = 0;
     std::vector<Post> posts_;
     std::vector<StaffStep> steps_;
-    static constexpr int kStaffStepMs = 4083, kStaffSlideMs = 250, kStaffTailMs = 3100, kStaffFadeMs = 4000, kStaffBlackMs = 1100;
+    static constexpr int kStaffStepMs = 4083, kStaffSlideMs = 250, kStaffFadeMs = 4000, kStaffBlackMs = 1100;
+    static constexpr int kStaffTailMs[3] = {3900, 3850, 3100};
     static constexpr int kPanelMs = 10000, kPanelFadeMs = 1667, kPanelHoldMs = 6000, kPanels = 11;
     static constexpr int kPageX = 42, kPageY = 98, kScanY = 34, kPanelX = 880, kPanelY = 96, kPageBottom = 670;
     static constexpr int kPostTop = 98, kPostLine = 27, kImageLines = 7, kHeadX = 106, kBodyX = 156;
@@ -810,8 +841,9 @@ private:
         staffSeenMs_ = std::max<int64_t>(0, host.nowMs() - staffFrom_);
         return staffSeenMs_;
     }
+    int staffTail() const { return kStaffTailMs[std::max(1, std::min(3, staff_)) - 1]; }
     int64_t staffEndMs() const {
-        return int64_t(std::max<size_t>(1, steps_.size()) - 1) * kStaffStepMs + kStaffTailMs + kStaffFadeMs + kStaffBlackMs;
+        return int64_t(std::max<size_t>(1, steps_.size()) - 1) * kStaffStepMs + staffTail() + kStaffFadeMs + kStaffBlackMs;
     }
 
     void loadStaff(PartHost &host) {
@@ -916,7 +948,7 @@ private:
         if (ImageRef image = host.image(name); image && shown > 0) drawPart(out, *image, kPanelX, kPanelY, 0, 0, image->w, image->h, shown * shown);
         put(host, out, "obj\\s000_000.bmp", 0, 0);
         put(host, out, "obj\\s000_001.bmp", kPageX, kScanY);
-        int64_t fadeFrom = int64_t(steps_.size() - 1) * kStaffStepMs + kStaffTailMs;
+        int64_t fadeFrom = int64_t(steps_.size() - 1) * kStaffStepMs + staffTail();
         if (ms > fadeFrom) tintFrame(out, 0, 0, 0, int(std::min<int64_t>(256, (ms - fadeFrom) * 256 / kStaffFadeMs)));
     }
     // The hub's bubbles: where they are, the clock they've been moved up to and the one their rocking counts from, what
@@ -926,12 +958,78 @@ private:
     std::array<Bubble, 3> bubbles_;
     int64_t bubblesAt_ = 0, bubblesFrom_ = 0;
     int bubblesFor_ = -1;
-    bool wasNear_[3] = {false, false, false}, turned_[3] = {false, false, false};
+    bool wasNear_[3] = {false, false, false};
+    uint32_t chance_ = std::random_device{}(), layoutSeed_ = 0;
+    float rockPhase_[3] = {0, 0, 0};
+    int spotX_[3] = {-1, -1, -1}, spotY_[3] = {-1, -1, -1};
     std::map<int, ImageRef> pictures_;
     int pointerX_ = 0, pointerY_ = 0;
     bool pointerSeen_ = false;
     bool loaded_ = false;
     bool questionsLoaded_ = false;
+    struct Thought {
+        int truth = 0, who = 0, stage = 0;
+        std::string picture;
+    };
+    bool thoughtsLoaded_ = false;
+    std::vector<Thought> thoughts_;
+    static constexpr int kThoughtEveryMs = 2400, kThoughtInMs = 500, kThoughtHoldMs = 2300, kThoughtOutMs = 1300;
+    static constexpr float kThoughtGrow = 0.34f, kThoughtShown = 0.8f;
+    static constexpr int kThoughtLeft = 400, kThoughtWide = 500, kThoughtTop = 165, kThoughtTall = 425;
+
+    void loadThoughts(PartHost &host) {
+        if (thoughtsLoaded_) return;
+        thoughtsLoaded_ = true;
+        auto bytes = host.read("cfg\\mind_syu.ini");
+        if (!bytes) return;
+        std::istringstream in(std::string(bytes->begin(), bytes->end()));
+        int truth = 0;
+        for (std::string line; std::getline(in, line);) {
+            if (size_t cut = line.find("//"); cut != std::string::npos) line.erase(cut);
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) line.pop_back();
+            if (line.rfind("#p", 0) == 0) truth = std::atoi(line.c_str() + 2) + 1;
+            size_t first = line.find(','), second = first == std::string::npos ? first : line.find(',', first + 1);
+            if (line.empty() || line[0] == '#' || second == std::string::npos) continue;
+            Thought thought;
+            thought.truth = truth;
+            thought.who = std::atoi(line.c_str());
+            thought.stage = std::atoi(line.c_str() + first + 1) + 1;
+            for (size_t c = second + 1; c < line.size(); c++)
+                if (!(line[c] == '\\' && c + 1 < line.size() && line[c + 1] == '\\')) thought.picture += line[c];
+            thoughts_.push_back(thought);
+        }
+    }
+
+    static uint32_t mixed(uint32_t value) {
+        value ^= value >> 16;
+        value *= 0x7feb352du;
+        value ^= value >> 15;
+        value *= 0x846ca68bu;
+        value ^= value >> 16;
+        return value;
+    }
+
+    void drawThoughts(PartHost &host, Canvas &out, int heroine, int stage) {
+        loadThoughts(host);
+        std::vector<const Thought *> pool;
+        for (const Thought &thought : thoughts_)
+            if (thought.truth == truth(host) && (thought.who == 0 || (thought.who == heroine + 1 && thought.stage == stage))) pool.push_back(&thought);
+        if (pool.empty()) return;
+        int64_t ms = std::max<int64_t>(0, host.nowMs() - bubblesFrom_);
+        const int life = kThoughtInMs + kThoughtHoldMs + kThoughtOutMs;
+        for (int64_t index = std::max<int64_t>(0, (ms - life) / kThoughtEveryMs); index * kThoughtEveryMs <= ms; index++) {
+            int64_t age = ms - index * kThoughtEveryMs;
+            if (age >= life) continue;
+            uint32_t seed = mixed(layoutSeed_ + uint32_t(index) * 40503u);
+            const Thought &thought = *pool[seed % pool.size()];
+            ImageRef image = host.image(thought.picture);
+            if (!image) continue;
+            float shown = age < kThoughtInMs ? float(age) / kThoughtInMs : age < kThoughtInMs + kThoughtHoldMs ? 1 : 1 - float(age - kThoughtInMs - kThoughtHoldMs) / kThoughtOutMs;
+            float scale = 1 + kThoughtGrow * float(age) / float(life);
+            float x = float(kThoughtLeft + int(mixed(seed + 1) % kThoughtWide)), y = float(kThoughtTop + int(mixed(seed + 2) % kThoughtTall));
+            drawImage(out, *image, x, y, scale, scale, 0, shown * kThoughtShown);
+        }
+    }
     std::map<int, std::vector<std::string>> chapters_;
     std::map<std::string, std::string> questions_;
 };

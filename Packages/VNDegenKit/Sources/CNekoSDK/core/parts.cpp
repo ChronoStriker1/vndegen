@@ -70,6 +70,10 @@ public:
             host.releaseSlot(n.p[0]);
             return true;
         }
+        if (n.opcode == 9004) {
+            hides_ = n.p[0] != 0;
+            return true;
+        }
         if (n.opcode == 9003) {
             windowPicture_ = n.s[1];
             host.redraw();
@@ -145,9 +149,11 @@ public:
         if (!lines.empty()) std::sscanf(lines[0].c_str(), "%d %d", &presses_, &needed_);
     }
     bool coversFrame() const override { return !band_; }
+    bool hidesScene() const override { return hides_; }
     void reset() override {
         presses_ = needed_ = menuPresses_ = 0;
         band_ = false;
+        hides_ = false;
         onMenu_ = false;
         onScene_ = false;
         heldPicture_.clear();
@@ -164,7 +170,7 @@ private:
     }
     static constexpr int kHeldKind = 15;
     int presses_ = 0, needed_ = 0, menuPresses_ = 0;
-    bool band_ = false;
+    bool band_ = false, hides_ = false;
     bool onMenu_ = false, onScene_ = false;
     static constexpr int kWindowSlot = 2000;
     std::string heldPicture_, windowPicture_;

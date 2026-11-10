@@ -302,6 +302,8 @@ import TestSupport
         #expect(vnneko_debug_jump(e, "flow\\t.txt", 0))
         for _ in 0..<10 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
+        let place = { status().components(separatedBy: " ").prefix(2).joined(separator: " ").replacingOccurrences(of: "sys_1\\", with: "") }
+        let before = place()
         #expect(vnneko_debug_press(e, "scene"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().contains(" menu scene"), "\(status())")
@@ -313,6 +315,50 @@ import TestSupport
         #expect(vnneko_debug_press(e, "back"))
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
+        #expect(place() == before, "\(status())")
+    }
+
+    @Test func aReplayInsideTheStoryKeepsThePreviousChoiceAside() throws {
+        let button = ["obj\\b.bmp", "1", "0,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try game("widgettesttabspc", [
+            "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\k.txt,0,0\n".utf8),
+            "cfg/msg_button.ini": Data(("#inner scene\n" + button.joined(separator: "\n") + "\n##\n").utf8),
+            "scr/k.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0, p: [0: 500])]),
+            "sys.pak": NekoSDKFlowFixture.archive([("c.bmp", bmp(50, 250) { _ in [200, 200, 200] })]),
+            "flow/c.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 3, next: 3, p: [0: 1, 1: 1], s: [1: "sys\\c.bmp"]),
+                .init(op: 1, next: 4, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = root.appendingPathComponent("data"), save = data.appendingPathComponent("AppData/Roaming/vndegen/widgettesttabspc/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try Data("scr\\k.txt\n".utf8).write(to: save.appendingPathComponent("vndegen_seen.txt"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: data))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        let files = { (try? FileManager.default.contentsOfDirectory(atPath: save.path).map { $0.lowercased() }) ?? [] }
+        #expect(vnneko_debug_jump(e, "flow\\c.txt", 0))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status())")
+        vnneko_debug_choose(e, 0)
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("s.txt #"), "\(status())")
+        #expect(vnneko_debug_press(e, "scene"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        click(e, 320, 315)
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("k.txt #"), "\(status())")
+        #expect(vnneko_debug_save(e, 5))
+        #expect(files().contains("save005.sav") && !files().contains("save005s.sav"), "\(files())")
+        for _ in 0..<90 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_press(e, "back"))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(status().contains("s.txt #") && !status().contains(" menu "), "\(status())")
+        #expect(vnneko_debug_save(e, 6))
+        #expect(files().contains("save006s.sav"), "\(files())")
     }
 
     @Test func anEmptyTabOpensWithoutTheKey() throws {
