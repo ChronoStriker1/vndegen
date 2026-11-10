@@ -3424,6 +3424,7 @@ void Engine::openDialog(int question, const std::function<void()> &yes) {
         return;
     }
     dialogOpen_ = true;
+    dialogOpener_.clear();
     dialogQuestion_ = question;
     dialogYes_ = yes;
     dialogNoAsk_ = false;
