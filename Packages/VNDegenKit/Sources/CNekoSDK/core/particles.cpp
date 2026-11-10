@@ -44,10 +44,7 @@ struct Emitter {
     std::vector<ImageRef> pictures;
     int p[10] = {};
     int64_t bornMs = 0;
-    int64_t stoppedMs = -1;
     std::vector<Dot> dots;
-
-    bool over(int64_t now) const { return stoppedMs >= 0 && now - stoppedMs >= std::clamp(p[7], 0, 30000); }
 };
 
 // A small generator of its own, so an emitter's dots come out the same on every run and every host.
@@ -64,10 +61,10 @@ class ParticlesPart : public GamePart {
 public:
     bool command(PartHost &host, const Node &n) override {
         if (n.opcode == 96) {
-            if (auto it = emitters_.find(n.p[0]); it != emitters_.end() && it->second.stoppedMs < 0)
-                it->second.stoppedMs = host.nowMs();
+            // Its slot is let go, and the emitter goes with it at the next screen update, as a picture command 17 takes
+            // away does: step() ends it once the slot is no longer held. Until then it draws, and a save still holds
+            // its record whole.
             host.releaseSlot(n.p[0]);
-            host.redraw();
             return true;
         }
         if (n.opcode != 95) return false;
@@ -76,40 +73,26 @@ public:
             if (!n.s[size_t(i)].empty()) names.push_back(n.s[size_t(i)]);
         int p[10];
         for (int i = 0; i < 10; i++) p[i] = n.p[i];
+        if (auto it = emitters_.find(n.p[0]); it != emitters_.end() && !it->second.pictures.empty()) {
+            host.holdSlot(n.p[0], kEmitterKind);
+            return true;
+        }
         start(host, n.p[0], names, p, host.nowMs());
         return true;
     }
 
     bool step(PartHost &host) override {
         if (!pending_.empty()) startPending(host);
-        int64_t now = host.nowMs();
-        for (auto it = emitters_.begin(); it != emitters_.end();) {
-            if (host.slotHeld(it->first)) {
-                ++it;
-                continue;
-            }
-            if (!it->second.pictures.empty()) retire(std::move(it->second), now);
-            it = emitters_.erase(it);
-        }
-        auto dead = std::remove_if(ending_.begin(), ending_.end(), [&](const Emitter &e) { return e.over(now); });
-        ending_.erase(dead, ending_.end());
-        return !emitters_.empty() || !ending_.empty();
+        // An emitter whose slot the scene has cleared is over.
+        for (auto it = emitters_.begin(); it != emitters_.end();)
+            it = host.slotHeld(it->first) ? std::next(it) : emitters_.erase(it);
+        return !emitters_.empty();
     }
 
     void drawSlot(PartHost &host, Canvas &out, int slot, float alpha) override {
         // With Config's Effects off the PC shows no dot at all; the emitter stays, and its record in a save.
         auto it = emitters_.find(slot);
-        if (it == emitters_.end() || alpha <= 0 || !host.effectsOn() || it->second.stoppedMs >= 0) return;
-        drawEmitter(host, out, it->second, alpha);
-    }
-
-    void draw(PartHost &host, Canvas &out, Layer layer, int, int) override {
-        if (layer != Layer::UnderWindow || !host.effectsOn()) return;
-        int64_t now = host.nowMs();
-        for (const auto &[slot, e] : emitters_)
-            if (e.stoppedMs >= 0 && !e.over(now)) drawEmitter(host, out, e, 1);
-        for (const Emitter &e : ending_)
-            if (!e.over(now)) drawEmitter(host, out, e, 1);
+        if (it != emitters_.end() && alpha > 0 && host.effectsOn()) drawEmitter(host, out, it->second, alpha);
     }
 
     // The PC's record of each emitter: the engine writes the slot's own, and this fills in the pictures and the
@@ -128,7 +111,6 @@ public:
     }
     void loadPC(const SaveData &d) override {
         emitters_.clear();
-        ending_.clear();
         pending_.clear();
         for (const SavedSprite &s : d.sprites) {
             if (s.kind != kEmitterKind || !s.path.empty() || s.rawFixed.size() < size_t(kAtP5) + 4) continue;
@@ -153,7 +135,6 @@ public:
 
     void reset() override {
         emitters_.clear();
-        ending_.clear();
         pending_.clear();
     }
 
@@ -238,8 +219,6 @@ private:
             d.glowPhase = random.between(0, kTwoPi);
             e.dots.push_back(d);
         }
-        if (auto old = emitters_.find(slot); old != emitters_.end() && !old->second.pictures.empty())
-            retire(std::move(old->second), now);
         // From a command the slot is taken now; after a load the engine has brought it back already.
         if (hold) host.holdSlot(slot, kEmitterKind);
         emitters_[slot] = std::move(e);
@@ -255,11 +234,6 @@ private:
             for (int c = 0; c < 3; c++) px[c] = uint8_t((px[c] * brightest + 127) / 255);
         }
         return out;
-    }
-
-    void retire(Emitter &&e, int64_t now) {
-        if (e.stoppedMs < 0) e.stoppedMs = now;
-        if (!e.over(now)) ending_.push_back(std::move(e));
     }
 
     void drawEmitter(PartHost &host, Canvas &out, const Emitter &e, float alpha) {
@@ -286,7 +260,6 @@ private:
     }
 
     std::map<int, Emitter> emitters_;
-    std::vector<Emitter> ending_;
     std::vector<Pending> pending_;
 };
 
