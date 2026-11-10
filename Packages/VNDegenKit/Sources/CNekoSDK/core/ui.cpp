@@ -93,6 +93,17 @@ void drawPicture(Canvas &out, const Picture &p, float towardX, float towardY) {
         drawImage(out, *p.image, float(p.x) + float(p.image->w) * 0.5f, float(p.y) + float(p.image->h) * 0.5f, 1, 1, p.angle, p.alpha);
         return;
     }
+    if (p.scroll != 0) {
+        int w = p.image->w, from = p.x + int(std::floor(std::fmod(p.shift, float(w))));
+        if (from > p.x) from -= w;
+        for (int x = from; x < out.w; x += w) drawPart(out, *p.image, x, p.y, 0, 0, w, p.image->h, p.alpha);
+        return;
+    }
+    if (p.flip != 0) {
+        float across = std::cos(p.angle);
+        if (std::abs(across) * float(p.image->w) >= 1) drawImage(out, *p.image, float(p.x) + float(p.image->w) * 0.5f, float(p.y) + float(p.image->h) * 0.5f, across, 1, 0, p.alpha);
+        return;
+    }
     if (p.followX != 0 || p.followY != 0) {
         drawShifted(out, *p.image, float(p.x) - p.followX * towardX, float(p.y) - p.followY * towardY, p.alpha);
         return;
@@ -172,6 +183,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 else if (key == "group") p.group = value;
                 else if (key == "blink") p.blinkMs = number(value);
                 else if (key == "turn") p.turn = std::strtof(value.c_str(), nullptr);
+                else if (key == "scroll") p.scroll = std::strtof(value.c_str(), nullptr);
+                else if (key == "flip") p.flip = std::strtof(value.c_str(), nullptr);
                 else if (key == "scale") scale = number(value);
                 else if (key == "rise") {
                     std::istringstream in(value);
@@ -224,7 +237,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 }
                 at += 2;
             }
-            if (p.turn != 0) screen->turning = true;
+            if (p.turn != 0 || p.scroll != 0) screen->turning = true;
+            if (p.flip != 0) screen->flips = true;
             if (scale > 0 && scale != 100) {
                 if (p.image) p.image = scaled(*p.image, scale);
                 for (ImageRef &variant : p.variants)

@@ -354,4 +354,51 @@ import TestSupport
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect((pixel(e, 320, 315) == [250, 0, 0]) == read)
     }
+
+    @Test func aTitlePictureMovesAcrossTiled() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\movingpic\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("band.bmp", bmp(100, 10) { x, _ in x < 50 ? [0, 0, 250] : [250, 0, 0] })]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        let red: [UInt8] = [250, 0, 0]
+        for _ in 0..<2 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 10, 305) == red)
+        #expect(pixel(e, 60, 305) != red)
+        for _ in 0..<29 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 10, 305) != red)
+        #expect(pixel(e, 60, 305) == red)
+        #expect(pixel(e, 1210, 305) != red)
+        #expect(pixel(e, 1250, 305) == red)
+    }
+
+    @Test func aPictureTurnsAboutItsUprightAxisWhileAHelpIsUpOverIt() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\movingpic\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([
+                ("bar.bmp", bmp(100, 20) { _, _ in [0, 250, 0] }), ("b.bmp", bmp(50, 250) { _, _ in [200, 200, 200] }),
+                ("h.bmp", bmp(10, 10) { _, _ in [0, 0, 250] }),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        let green: [UInt8] = [0, 250, 0]
+        for _ in 0..<30 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 690, 515) == green)
+        vnneko_mouse_move(e, 10.0 / 1280, 110.0 / 720)
+        _ = vnneko_step(e, 10)
+        #expect(pixel(e, 690, 515) == green)
+        #expect(pixel(e, 605, 505) == [250, 0, 0])
+        for _ in 0..<50 { _ = vnneko_step(e, 10) }
+        #expect(pixel(e, 690, 515) != green)
+        #expect(pixel(e, 650, 515) == green)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        _ = vnneko_step(e, 10)
+        _ = pixel(e, 0, 0)
+        _ = vnneko_step(e, 10)
+        #expect(pixel(e, 690, 515) == green)
+    }
 }

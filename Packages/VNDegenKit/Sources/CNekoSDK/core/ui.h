@@ -79,6 +79,8 @@ struct Picture {
     // way when negative), as the three lace circles of Test Game 83's title turn (set 3). `angle` is where it has got
     // to, in radians, set by the screen as it draws.
     float turn = 0, angle = 0;
+    float scroll = 0, shift = 0;
+    float flip = 0;
     // `scale PERCENT` draws the picture at that share of its size, with X and Y its new top left. Each pixel is the mean
     // of the area it covers, which is what Test Game 90's PC shows for its one half-size gallery picture (set 1: 0.19 of
     // 255 from a PC shot, against 0.27 for bilinear and 0.57 for nearest). The picture is shrunk once, as the table is read.
@@ -105,6 +107,7 @@ struct Screen {
     std::vector<Button> buttons;
     // Whether any of its pictures turns, so the screen is drawn again each frame.
     bool turning = false;
+    bool flips = false;
     // Other lines of the table, by their first word, for the parts each kind of screen draws for itself.
     std::multimap<std::string, std::vector<std::string>> settings;
     // The same lines in the order the table gives them, first word included, for a block read in order: the story.
