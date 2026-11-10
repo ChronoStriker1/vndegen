@@ -59,7 +59,8 @@ constexpr int kTitleMs = 4333, kTitleFadeMs = 600, kTitleTrimSpeed = 240, kTitle
 constexpr int kMenuTrimSpeed = 240;
 constexpr int kNewsX = 803, kNewsW = 414, kNewsSpeed = 120, kNewsStart = 134;
 // The title's rising dots: how many, the strip they start along (the silhouettes' feet) and how far they rise.
-constexpr int kSparkles = 9, kSparkleX = 24, kSparkleW = 640, kSparkleFrom = 690, kSparkleRise = 340;
+constexpr int kSparkles = 14, kSmallSparkles = 9, kSparkleX = 24, kSparkleW = 640, kSparkleFrom = 666, kSparkleRise = 320;
+constexpr int kSparkleSlow = 37, kSparkleFast = 82;
 // The lower row's liquid: how far and how long it rises as the row opens, and the gap in its drawing that makes the next
 // drawing a new opening.
 constexpr int kRowRise = 82, kRowRiseMs = 170, kRowGapMs = 100;
@@ -648,24 +649,24 @@ private:
     }
 
     // Light dots rising inside the silhouettes, drawn on the pink under the backgrounds, whose holes cut them to the
-    // silhouettes' shapes. In the PC's style and not its numbers (set 1, tracked in a 10 fps recording under Wine):
-    // about nine at a time, the seven sizes of d003, each rising about three times its width a second (the PC's small
-    // ones 26 to 38 pixels a second, its large ones 60 to 88) with a slight drift, at 30 to 70 percent. Where and when
-    // the PC starts each one isn't known, so they come round on fixed turns here.
+    // silhouettes' shapes.
     void drawSparkles(PartHost &host, Canvas &out, int64_t t) {
         for (int k = 0; k < kSparkles; k++) {
-            char path[32];
-            std::snprintf(path, sizeof path, "obj\\d003_%03d.bmp", k % 7);
-            ImageRef dot = host.image(path);
-            if (!dot) continue;
-            int speed = 3 * dot->w, turnMs = kSparkleRise * 1000 / speed;
+            bool small = k < kSmallSparkles;
+            uint32_t own = uint32_t(k + 1) * 2246822519u;
+            own ^= own >> 13;
+            int speed = (small ? kSparkleSlow : kSparkleFast) * (80 + int(own % 45)) / 100, turnMs = kSparkleRise * 1000 / speed;
             int64_t at = t + int64_t(k) * 7919 % turnMs;
             uint32_t turn = uint32_t(at / turnMs) * 2654435761u + uint32_t(k) * 40503u;
             turn ^= turn >> 15;
+            char path[32];
+            std::snprintf(path, sizeof path, "obj\\d003_%03d.bmp", small ? 5 + k % 2 : 2 + int((turn >> 24) % 3));
+            ImageRef dot = host.image(path);
+            if (!dot) continue;
             float into = float(at % turnMs) / 1000;
             int x = kSparkleX + int(turn % kSparkleW) + int((int(turn >> 8 & 31) - 15) * into * 0.6f);
-            float alpha = 0.3f + float(turn >> 16 & 255) / 255 * 0.4f;
-            drawPart(out, *dot, x, kSparkleFrom - int(into * speed), 0, 0, dot->w, dot->h, alpha);
+            float alpha = (small ? 0.45f : 0.3f) + float(turn >> 16 & 255) / 255 * (small ? 0.55f : 0.4f);
+            drawPart(out, *dot, x - dot->w / 2, kSparkleFrom - dot->h / 2 - int(into * speed), 0, 0, dot->w, dot->h, alpha);
         }
     }
 
