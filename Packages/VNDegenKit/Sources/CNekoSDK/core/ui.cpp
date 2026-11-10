@@ -93,9 +93,9 @@ void drawPicture(Canvas &out, const Picture &p, float towardX, float towardY) {
         drawImage(out, *p.image, float(p.x) + float(p.image->w) * 0.5f, float(p.y) + float(p.image->h) * 0.5f, 1, 1, p.angle, p.alpha);
         return;
     }
-    if (p.scroll != 0) {
-        int w = p.image->w, from = p.x + int(std::floor(std::fmod(p.shift, float(w))));
-        if (from > p.x) from -= w;
+    if (p.scroll != 0 && p.image->w > 0) {
+        int w = p.image->w, from = int(std::floor(std::fmod(float(p.x) + p.shift, float(w))));
+        if (from > 0) from -= w;
         for (int x = from; x < out.w; x += w) drawPart(out, *p.image, x, p.y, 0, 0, w, p.image->h, p.alpha);
         return;
     }

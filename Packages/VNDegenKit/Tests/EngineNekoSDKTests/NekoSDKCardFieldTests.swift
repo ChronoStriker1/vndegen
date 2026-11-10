@@ -367,7 +367,12 @@ import TestSupport
         for _ in 0..<2 { _ = vnneko_step(e, 16) }
         #expect(pixel(e, 10, 305) == red)
         #expect(pixel(e, 60, 305) != red)
+        #expect(pixel(e, 30, 405) == red)
+        #expect(pixel(e, 80, 405) != red)
+        #expect(pixel(e, 10, 505) != [0, 0, 0])
         for _ in 0..<29 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 30, 405) != red)
+        #expect(pixel(e, 80, 405) == red)
         #expect(pixel(e, 10, 305) != red)
         #expect(pixel(e, 60, 305) == red)
         #expect(pixel(e, 1210, 305) != red)

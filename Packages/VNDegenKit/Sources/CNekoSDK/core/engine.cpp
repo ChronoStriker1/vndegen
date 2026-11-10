@@ -370,6 +370,7 @@ void Engine::openScreen(const std::string &name) {
     }
     darkened_.clear();
     dragSetting_.clear();
+    helpUp_ = false;
     if (screen_ && screen_->name == "title" && name != "title") {
         titleStage_ = menuStage_;
         titleSubMenu_ = subMenu_;
@@ -431,6 +432,7 @@ bool Engine::resumeSetAside() {
     std::optional<PreviousChoice> choice = setAsideChoice_;
     int result = setAsideResult_;
     restoreSave(story.data, parseSidecar(story.data, story.side), setAsideLine_);
+    windowCleared_ = setAsideCleared_;
     previousChoice_ = choice;
     choiceResult_ = result;
     log("back to the story at %s #%d", story.data.scene.c_str(), story.data.node);
@@ -2008,6 +2010,7 @@ bool Engine::startReplay(const GalleryEntry &scene) {
         setAsideChoice_ = previousChoice_;
         setAsideResult_ = choiceResult_;
         setAsideLine_ = choiceLine_;
+        setAsideCleared_ = windowCleared_;
     }
     choiceLine_ = false;
     previousChoice_.reset();
@@ -2103,6 +2106,7 @@ void Engine::applySettings() {
     autoPerCharMs_ = -1;
     autoBaseMs_ = 0;
     autoWithVoice_ = false;
+    autoBytes_ = false;
     charFadeMs_ = kCharFadeMs;
     // `textcurve SETTING A B` and `autocurve SETTING A B` under `screen defaults`: a 0 to 100 slider's text speed as
     // A - B x value ms a character, and auto's pause after a line as that many ms for each of its characters, as Test
@@ -2135,6 +2139,7 @@ void Engine::applySettings() {
         }
         // Test Game 87 goes on at whichever ends later, the voice or the pause after the text (set 1, under Wine).
         autoWithVoice_ = defaults->second.setting("autowithvoice") != nullptr;
+        autoBytes_ = defaults->second.setting("autobytes") != nullptr;
     }
     if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
     applyArtSwitch();
@@ -3048,9 +3053,9 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side, bool keepLine) 
     }
     windowShown_ = d.windowShown;
     windowShownAt_ = -100000;
-    choiceLine_ = atChoice && keepLine && defaultsHave("choicekeepsline") && !d.current.text.empty();
+    choiceLine_ = atChoice && keepLine && defaultsHave("choicekeepsline") && d.windowShown && !d.current.text.empty();
     bool empty = atChoice && !choiceLine_;
-    windowCleared_ = empty;
+    windowCleared_ = false;
     layoutText(empty ? "" : sjis::toUtf8(d.current.name), empty ? "" : sjis::toUtf8(d.current.text));
     textStart_ = now_;
     textDone_ = true;
@@ -3946,7 +3951,7 @@ void Engine::composeScreen(Canvas &out) {
         drawButtonHelp(out, *helpOf);
     }
     if (screen_->flips && (helpNow != helpUp_ || (helpNow && (helpNowX != helpX_ || helpNowY != helpY_)))) {
-        if (helpNow && !helpUp_) helpFrom_ = clockMs_;
+        if (helpNow) helpFrom_ = clockMs_;
         helpUp_ = helpNow;
         helpX_ = helpNowX;
         helpY_ = helpNowY;
@@ -5058,7 +5063,9 @@ bool Engine::step(int ms) {
     bool autoNext = false;
     if (autoMode_ && waiting_ == Waiting::Click && textDone_ && !windowLog_) {
         bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
-        int64_t pause = autoPerCharMs_ >= 0 ? autoBaseMs_ + autoPerCharMs_ * int64_t(textGlyphs_.size()) : autoDelayMs_;
+        int64_t units = 0;
+        for (const Glyph &g : textGlyphs_) units += !autoBytes_ || g.codepoint < 0x80 || (g.codepoint >= 0xFF61 && g.codepoint <= 0xFF9F) ? 1 : 2;
+        int64_t pause = autoPerCharMs_ >= 0 ? autoBaseMs_ + autoPerCharMs_ * units : autoDelayMs_;
         if (autoWithVoice_) {
             if (autoReadyAt_ < 0) autoReadyAt_ = now_ + pause;
             else if (now_ >= autoReadyAt_ && !voiceGoing) autoNext = true;
@@ -7080,7 +7087,6 @@ void Engine::compose() {
     composeCameraPanel(canvas_);
     if (partScreen_) drawParts(canvas_, Layer::Screen);
     if (partPlate()) composeMessageButtons(canvas_);
-    if (dialogOpen_) composeDialog(canvas_);
 
     if (choiceSheet_ && choiceClosingFrom_ >= 0) composeChoice(canvas_);
     if (waiting_ == Waiting::Choice && choiceSheet_) {
@@ -7127,6 +7133,7 @@ void Engine::compose() {
             }
         }
     }
+    if (dialogOpen_) composeDialog(canvas_);
 }
 
 // A line of the table's choice screen, or null.

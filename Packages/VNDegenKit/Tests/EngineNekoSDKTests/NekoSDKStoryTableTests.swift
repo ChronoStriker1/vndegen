@@ -118,6 +118,79 @@ import TestSupport
         #expect(vnneko_debug_variable(again, 1, 13) == 1)
     }
 
+    @Test(arguments: [true, false]) func previousChoiceKeepsTheLineOnlyWithTheTablesWord(word: Bool) throws {
+        let button = ["obj\\n001_000.bmp", "1", "0,0", "1,2", "0,0", "0,1", "0,0", "0,0", "0,0", "none", "0,0", "1,1"]
+        let ini = "#inner BackSelection\n" + button.joined(separator: "\n") + "\n##\n"
+        let root = try game(word ? "storytestpc" : "storytestpcplain", ["cfg/msg_button.ini": Data(ini.utf8)])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_debug_choose(e, 1)
+        steps(e, 30)
+        #expect(vnneko_debug_press(e, "BackSelection"))
+        steps(e, 5)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        #expect(vnneko_debug_choice_line(e) == word)
+    }
+
+    @Test func aQuestionAskedWhileAChoiceWaitsDrawsOverTheChoice() throws {
+        func sheet(_ w: Int, _ h: Int, _ value: UInt8) -> Data {
+            let row = (w * 3 + 3) & ~3
+            var d = Data("BM".utf8)
+            func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+            put(UInt32(54 + row * h)); put(0); put(54)
+            put(40); put(UInt32(w)); put(UInt32(h))
+            d.append(contentsOf: [1, 0, 24, 0])
+            put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+            d.append(Data(repeating: value, count: row * h))
+            return d
+        }
+        let title = ["obj\\b.bmp", "1", "0,600", "1,5", "0,0", "0,1", "0,2", "0,3", "0,4", "none", "0,0", "1,1"]
+        let root = try game("storytestload", [
+            "obj.pak": NekoSDKFlowFixture.archive([("n001_000.bmp", sheet(200, 10, 200)), ("b.bmp", sheet(50, 250, 120))]),
+            "cfg/msg_button.ini": Data(("#inner Title\n" + title.joined(separator: "\n") + "\n##\n").utf8),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_mouse_move(e, 0.9, 0.1)
+        steps(e, 2)
+        func red(_ x: Int, _ y: Int) throws -> UInt8 {
+            var w: Int32 = 0, h: Int32 = 0, changed = false
+            let px = try #require(vnneko_frame(e, &w, &h, &changed))
+            return px[(y * Int(w) + x) * 4]
+        }
+        #expect(try red(640, 359) == 200)
+        #expect(try red(605, 359) == 200)
+        #expect(vnneko_debug_press(e, "Title"))
+        steps(e, 5)
+        #expect(try red(640, 359) == 120)
+        let under = try red(605, 359)
+        #expect(under >= 98 && under <= 102, "\(under)")
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_mouse_move(e, 640.0 / 1280, 525.0 / 720)
+        steps(e, 2)
+        vnneko_mouse_button(e, 0, true)
+        steps(e, 2)
+        vnneko_mouse_button(e, 0, false)
+        steps(e, 5)
+        vnneko_mouse_move(e, 0.9, 0.1)
+        steps(e, 2)
+        #expect(try red(640, 359) == 200)
+        #expect(try red(605, 359) == 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+    }
+
     @Test(arguments: [true, false]) func aChoicesDarkCanLieUnderTheMessageWindow(under: Bool) throws {
         let card = { () -> Data in
             let w = 50, h = 250, row = (w * 3 + 3) & ~3

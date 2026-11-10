@@ -498,6 +498,45 @@ import TestSupport
         #expect(pixel(e, 210, 10) == white)
     }
 
+    @Test func backToATitleWithoutStagesClosesItsSubmenu() throws {
+        let root = try game("titlereturnplain")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        click(e, 10, 10)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(pixel(e, 210, 10) == white)
+        click(e, 210, 10)
+        #expect(status().contains(" menu music"), "\(status())")
+        click(e, 710, 10)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        #expect(status().contains(" menu title"), "\(status())")
+        #expect(pixel(e, 10, 10) == white)
+        #expect(pixel(e, 210, 10) == [0, 0, 0])
+    }
+
+    @Test func aTitlesOpeningDoesntPlayAgainAfterBack() throws {
+        let root = try game("titlereturnopening")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        let status = { String(cString: vnneko_debug_status(e)) }
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 10, 10) != white)
+        for _ in 0..<150 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 10, 10) == white)
+        click(e, 10, 10)
+        click(e, 210, 10)
+        #expect(status().contains(" menu music"), "\(status())")
+        click(e, 710, 10)
+        vnneko_mouse_move(e, 0.9, 0.9)
+        for _ in 0..<2 { _ = vnneko_step(e, 16) }
+        #expect(status().contains(" menu title"), "\(status())")
+        #expect(pixel(e, 10, 10) == white)
+    }
+
     @Test func anEmptyTabOpensWithoutTheKey() throws {
         let root = try game("widgettesttabs", [
             "cfg/play_view2.ini": Data("0,obj\\k.bmp,-1,7,scr\\\\k.txt,0,0\n".utf8),
