@@ -803,7 +803,8 @@ private:
     int64_t staffFrom_ = 0, staffResumeMs_ = -1, staffSeenMs_ = 0;
     std::vector<Post> posts_;
     std::vector<StaffStep> steps_;
-    static constexpr int kStaffStepMs = 4083, kStaffSlideMs = 250, kStaffTailMs = 3100, kStaffFadeMs = 4000, kStaffBlackMs = 1100;
+    static constexpr int kStaffStepMs = 4083, kStaffSlideMs = 250, kStaffFadeMs = 4000, kStaffBlackMs = 1100;
+    static constexpr int kStaffTailMs[3] = {3900, 3850, 3100};
     static constexpr int kPanelMs = 10000, kPanelFadeMs = 1667, kPanelHoldMs = 6000, kPanels = 11;
     static constexpr int kPageX = 42, kPageY = 98, kScanY = 34, kPanelX = 880, kPanelY = 96, kPageBottom = 670;
     static constexpr int kPostTop = 98, kPostLine = 27, kImageLines = 7, kHeadX = 106, kBodyX = 156;
@@ -818,8 +819,9 @@ private:
         staffSeenMs_ = std::max<int64_t>(0, host.nowMs() - staffFrom_);
         return staffSeenMs_;
     }
+    int staffTail() const { return kStaffTailMs[std::max(1, std::min(3, staff_)) - 1]; }
     int64_t staffEndMs() const {
-        return int64_t(std::max<size_t>(1, steps_.size()) - 1) * kStaffStepMs + kStaffTailMs + kStaffFadeMs + kStaffBlackMs;
+        return int64_t(std::max<size_t>(1, steps_.size()) - 1) * kStaffStepMs + staffTail() + kStaffFadeMs + kStaffBlackMs;
     }
 
     void loadStaff(PartHost &host) {
@@ -924,7 +926,7 @@ private:
         if (ImageRef image = host.image(name); image && shown > 0) drawPart(out, *image, kPanelX, kPanelY, 0, 0, image->w, image->h, shown * shown);
         put(host, out, "obj\\s000_000.bmp", 0, 0);
         put(host, out, "obj\\s000_001.bmp", kPageX, kScanY);
-        int64_t fadeFrom = int64_t(steps_.size() - 1) * kStaffStepMs + kStaffTailMs;
+        int64_t fadeFrom = int64_t(steps_.size() - 1) * kStaffStepMs + staffTail();
         if (ms > fadeFrom) tintFrame(out, 0, 0, 0, int(std::min<int64_t>(256, (ms - fadeFrom) * 256 / kStaffFadeMs)));
     }
     // The hub's bubbles: where they are, the clock they've been moved up to and the one their rocking counts from, what

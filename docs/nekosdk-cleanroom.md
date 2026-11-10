@@ -216,12 +216,13 @@ Measured:
 - The CG viewer's panel, clicks and 5 s slideshow, the menus, the log and the Comment button's three looks, each against PC shots.
 
 Unconfirmed, kept as drawn:
-- Where the bubbles start and how fast: the PC differs from one hub to the next, and VNDegen always starts from one measured hub. Over long times the PC's first two bubbles also move sideways, which wasn't fitted.
+- How fast each bubble goes: three loads of one hub save on the PC began with the bubbles in different places, at different tilts and moving in different directions at 7 to 15 pixels a second, so the PC starts them by chance. VNDegen starts each anywhere in the area, in any direction and at any phase of its rock, all at 12 pixels a second.
+- The thought lines' places and pace. `cfg\mind_syu.ini` lists them by truth, heroine and stage (0 for all three heroines), and the PC reads it as the hub opens. A dozen lines tracked through 300 frames live about 4 s (in over 0.5 s to about 0.8 of their own alpha, held 2.3 s, out over 1.3 s), grow by about a third about their middle, start every 2 to 3 s and lie all over the area, under the bubbles and over the portrait. VNDegen picks the line and its place by chance within those figures.
 - The panels' fade is drawn as the square of its progress, fitted by eye to seven samples.
 - The roll's timing for the first two endings, taken to be the third's.
 - The log's and the roll's letters differ from the PC's at their edges; the roll uses the font pack's MS PGothic at 24, the log size 26.
 
-Not drawn: the pink thought lines that drift behind the hub's bubbles (one sample: in over 0.5 s, about 10 pixels a second for 2.3 s, out over 1.3 s; which line goes with which heroine and truth isn't known), the second portrait sheet (never shown in 76 s of hub nor under the pointer), and the bulb's flicker.
+Not drawn: the hub's second portrait sheet (never shown in 76 s of hub nor under the pointer).
 
 ### The 4:3 frame
 
