@@ -34,6 +34,7 @@ button music obj\d000_005.bmp 514 547 5 5 4 stage 2 group extra help obj\d000_00
 # Start's Main Story starts the story table's flow of that name; Prologue starts its first.
 screen start
 flow story
+after 2
 
 screen load
 # The room behind the menus is one of the 15 the exe lists, picked afresh each time a screen opens, at 46 percent.
@@ -132,7 +133,10 @@ colorkey 0 255 0
 # The PC draws the message window at its .alp as it is. Config's first-run values, as the PC shows them under Wine.
 default opacity 100
 default text 50
+textpoints text 0 184.9 10 153.7 25 101.8 40 52.6 50 17.6 60 4.9 75 2.6 90 1.5 100 0
 default auto 50
+autocurve auto 104 1.04 527 1
+autowithvoice
 default bgm 60
 default se 60
 default voice 80

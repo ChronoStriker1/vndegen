@@ -263,6 +263,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 }
                 if (w[i] == "disc" && i + 2 < w.size()) {
                     b.disc = image(w[i + 1]);
+                    b.discPath = normalizedPath(w[i + 1]);
                     b.discSpeed = std::strtof(w[i + 2].c_str(), nullptr);
                     b.discX = b.helpX;
                     b.discY = b.helpY;
@@ -305,8 +306,10 @@ MessageButtons parseMessageButtons(const std::vector<uint8_t> &ini, Images &imag
         // A patched file could give anything here, and drawing divides by these.
         if (b.cols <= 0 || b.rows <= 0 || b.column < 0 || b.column >= b.cols) return;
         size_t help = 9;
-        if (fields.size() >= 21 && fields[16].find('.') != std::string::npos) {
+        auto has = [&](size_t at, char c) { return fields[at].find(c) != std::string::npos; };
+        if (fields.size() >= 21 && has(16, '.') && has(10, ',') && has(17, ',') && !has(13, ',') && !has(14, ',') && !has(15, ',')) {
             b.disc = images.get(fields[9]);
+            b.discPath = normalizedPath(fields[9]);
             pair(fields[10], b.discX, b.discY);
             pair(fields[11], b.discCols, b.discRows);
             pair(fields[12], b.discColumn, b.discRow);
