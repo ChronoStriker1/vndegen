@@ -52,3 +52,17 @@ cellthumb 0 0
 screen config
 number opacity text 200 100 20 15 255 255 255 76 10 73
 )";
+
+const char kEmptyCardTest[] = R"(
+screen title
+button load obj\none.bmp 0 0 1 1 0
+button config obj\none.bmp 0 0 1 1 0
+button quit obj\none.bmp 0 0 1 1 0
+button cg obj\none.bmp 0 0 1 1 0
+button scene obj\none.bmp 0 0 1 1 0
+
+screen load
+slots obj\c.bmp 60 99 510 119 5 2 1
+slotrows 5
+slotdigits obj\d.bmp 229 6 3 15
+)";

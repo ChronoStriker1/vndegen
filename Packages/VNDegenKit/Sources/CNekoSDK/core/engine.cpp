@@ -1790,6 +1790,19 @@ void Engine::composeTrackTime(Canvas &out) {
         clock(at, field(*times, 1), field(*times, 2));
         clock(all, field(*times, 3), field(*times, 4));
     }
+    if (const auto *playing = screen_->setting("playingpic"); playing && playing->size() >= 3 && trackPlayer_ && currentTrack_ >= 0) {
+        std::string name = (*playing)[0];
+        size_t dot = name.rfind('.');
+        if (dot != std::string::npos && dot >= 3 && std::isdigit(uint8_t(name[dot - 1])) && std::isdigit(uint8_t(name[dot - 2])) && std::isdigit(uint8_t(name[dot - 3]))) {
+            int number = std::atoi(name.substr(dot - 3, 3).c_str()) + currentTrack_;
+            char digits[8];
+            std::snprintf(digits, sizeof digits, "%03d", number % 1000);
+            name.replace(dot - 3, 3, digits);
+            if (ImageRef picture = number < 1000 ? images_->get(name) : nullptr) drawPart(out, *picture, field(*playing, 1), field(*playing, 2), 0, 0, picture->w, picture->h, 1);
+        } else {
+            warnOnce("playingpic needs a file with three digits before its extension: " + name);
+        }
+    }
     const auto *seek = screen_->setting("trackseek");
     if (ImageRef fill = seek && seek->size() >= 3 && all > 0 ? images_->get((*seek)[0]) : nullptr) drawPart(out, *fill, field(*seek, 1), field(*seek, 2), 0, 0, int(fill->w * std::min(at, all) / all), fill->h, 1);
 }
@@ -2146,9 +2159,9 @@ void Engine::composeSettingsWidgets(Canvas &out) {
     // The PC rounds a fill to the nearest pixel: at 60, The Alchemist's 441-pixel opacity bar fills 265.
     for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
-        int scale = f.size() >= 5 ? std::max(1, field(f, 4)) : 100;
+        int from = f.size() >= 6 ? field(f, 5) : 0, scale = std::max(1, (f.size() >= 5 ? field(f, 4) : 100) - from);
         if (ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr)
-            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, (fill->w * setting(f[0]) + scale / 2) / scale, fill->h, 1);
+            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, std::clamp((fill->w * (setting(f[0]) - from) + scale / 2) / scale, 0, fill->w), fill->h, 1);
     }
     // `knob NAME SHEET X0 Y STEP`: a knob that sits STEP pixels further on for each unit, as Test Game 87's rose on its
     // track (set 1).
@@ -2242,8 +2255,8 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
         // A held press keeps following the finger along the bar, past its ends.
         int left = field(f, 2), top = field(f, 3);
         if (fill && y >= top && y < top + fill->h && x >= left - (dragging ? 40 : 0) && x < left + fill->w + (dragging ? 40 : 0)) {
-            int scale = f.size() >= 5 ? std::max(1, field(f, 4)) : 100;
-            changeSetting(f[0], clampSetting(f[0], (x - left) * scale / std::max(1, fill->w - 1)));
+            int from = f.size() >= 6 ? field(f, 5) : 0, scale = std::max(1, (f.size() >= 5 ? field(f, 4) : 100) - from);
+            changeSetting(f[0], clampSetting(f[0], from + (x - left) * scale / std::max(1, fill->w - 1)));
             return true;
         }
     }
@@ -3137,14 +3150,14 @@ void Engine::composeSlots(Canvas &out) {
     // NEW marks the card saved to last, which the PC keeps in global 0: Test Game 94's held 2 and The Alchemist's 1, the
     // cards their screens marked, and Test Game 87 counts from 0.
     int newest = newCardSlot(layout_, variable(0, 0));
-    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10, int step = 0) {
+    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10, int step = 0, float opacity = 1) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / cells;
         if (step <= 0) step = w;
         for (int i = count - 1; i >= 0; i--) {
             int digit = value % 10;
             value /= 10;
-            drawPart(out, *sheetOfTen, x + i * step, y, digit * w, 0, w, sheetOfTen->h, 1);
+            drawPart(out, *sheetOfTen, x + i * step, y, digit * w, 0, w, sheetOfTen->h, opacity);
         }
         return x + count * step;
     };
@@ -3207,7 +3220,9 @@ void Engine::composeSlots(Canvas &out) {
             // `slotdigits SHEET X Y COUNT [STEP] [CELLS]`: STEP apart, the cell width when absent (15 for Test Game 82's 14-wide
             // digits), from a sheet of CELLS, 10 when absent (13 for Test Game 96's, its date's marks after the digits).
             int numberCells = offset("slotdigits", 5) > 0 ? offset("slotdigits", 5) : 10;
-            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4));
+            const auto *faded = screen_->setting("emptycards");
+            bool numberFades = faded && faded->size() >= 2 && (*faded)[1] == "number";
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2), numberCells, offset("slotdigits", 4), numberFades ? cardOpacity : 1);
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -3397,6 +3412,9 @@ void Engine::composeDialog(Canvas &out) {
     // `dim N` of 256 darkens what's behind; Test Game 84's questions don't.
     const auto *dim = dialog.setting("dim");
     tintFrame(out, 0, 0, 0, dim && !dim->empty() ? field(*dim, 0) : 128);
+    if (screen_)
+        for (const Picture &p : screen_->pictures)
+            if (p.overDim && p.image && (p.tab < 0 || p.tab == galleryTab_) && shown(p)) drawPicture(out, p);
     // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, behind fixed art besides.
     // `question FILE X Y COLS COL`: a cell of a strip instead, drawn over the art, as Test Game 82's titles are seven
     // across one picture over the frame they name.
@@ -4239,7 +4257,7 @@ void Engine::runFlow(const Node &n) {
         }
         break;
     }
-    case 2:  // the end of the story, which goes back to the title, or with parameter 0 set the staff roll, then on
+    case 2:
         if (n.p[0] == 1) {
             flow.node = flow.script->node(n.next);
             startStaffRoll(flow.script->name.rfind("story:", 0) == 0 ? n.s[1] : "");
@@ -4247,7 +4265,8 @@ void Engine::runFlow(const Node &n) {
         }
         log("flow end: %s", sjis::toUtf8(n.s[0]).c_str());
         flow.node = nullptr;
-        if (screens_.count("title")) endStory("title");
+        if (replaying_) endStory("scene");
+        else if (screens_.count("title")) endStory("title");
         break;
     case 22:  // the end of a replay, which goes back to the scene gallery
         flow.node = nullptr;
@@ -6886,7 +6905,7 @@ void Engine::composeMessage(Canvas &out) {
     if (auto defaults = screens_.find("defaults"); defaults != screens_.end())
         for (auto [it, end] = defaults->second.settings.equal_range("windowpic"); it != end; ++it)
             if (it->second.size() >= 3)
-                if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2) + moved, 0, 0, picture->w, picture->h, windowOpacity_);
+                if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2) + moved, 0, 0, picture->w, picture->h, 1);
     if (windowArtOnly_ == 1) return;
     drawParts(out, Layer::Window);
     if (!windowArtOnly_) {
