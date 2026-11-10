@@ -79,6 +79,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - A failed launch no longer counts as played (#39), every line of a wrapped NScripter choice responds (#37), save sync keeps registry value names that differ only in Unicode form (#40), a short title is no longer matched to an obscure VNDB entry (#62), and the build script fixes (#38, #67, #69) (0.28.1).
 - NekoSDK: Funbag Fantasy 2, with its particles, fog and 100 save slots, and a fix for an animation saved on its fifth picture coming back as film noise (0.29.0).
 - NekoSDK: Yabai! -Fukushuu Yami Site-, with its interrogation hub, confession tree, votes, viewer comments and flickering bulb, GOOD Timing's Extend kept between scenes as on the PC, and Carlito for games that ask for Calibri (0.30.0).
+- NekoSDK: Mankitsu Happening, with its select screens, bonus stories and School Swimsuit DLC, a Scene replay that ends at the Scene screen (#73), and a tap on a CG that no longer presses a hidden gallery button (#75) (0.31.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
