@@ -364,6 +364,10 @@ void Engine::openScreen(const std::string &name) {
     else if (name == "title") returnTo_.clear();
     // Leaving the sprite gallery keeps its outfits and locks in cfg.sav and stops its music.
     if (spriteScreen() && name != "sprites") closeSprites();
+    if (viewingImage_ && screen_ != &it->second) {
+        if (viewerPanel()) closeViewer();
+        viewingImage_ = false;
+    }
     screen_ = &it->second;
     if (spriteScreen()) openSprites();
     if (const auto *line = screen_->setting("part"); line && !line->empty()) {
@@ -947,9 +951,10 @@ bool Engine::moveFocus(int dx, int dy) {
         int slant;
         choicePlace(x, top, step, slant);
         for (int i = 0; i < choiceCount_; i++) spots.push_back({width_ / 2, top + i * step + cellH / 2});
-    } else if (screen_ && viewingImage_ && viewerPanel()) {
+    } else if (screen_ && viewingImage_) {
         // The CG viewer's panel, or nothing while it's hidden.
-        for (auto [x, y] : viewerSpots()) spots.push_back({x, y});
+        if (viewerPanel())
+            for (auto [x, y] : viewerSpots()) spots.push_back({x, y});
     } else if (screen_) {
         addButtons(screen_->buttons);
         if (int perPage = cardsPerPage()) {
@@ -4919,7 +4924,7 @@ void Engine::mouseMove(float x, float y) {
         }
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
-        else pressSettingsWidget(px, py, true);
+        else if (!viewingImage_) pressSettingsWidget(px, py, true);
     }
 }
 
@@ -4977,6 +4982,9 @@ void Engine::mouseButton(int button, bool down) {
             // `viewerclicks`: it leaves the viewer while the panel shows (viewer.cpp).
             if (screen_->setting("viewerclicks") && !viewPanelHidden_) closeViewer();
             else viewPanelHidden_ = !viewPanelHidden_;
+            dirty_ = true;
+        } else if (screen_ && viewingImage_) {
+            viewingImage_ = false;
             dirty_ = true;
         } else if (screen_) {
             // `cancel ACTION` names what the right button does on a screen that isn't left with Back.
@@ -5059,15 +5067,15 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
             return;
         }
+        if (viewingImage_) {
+            if (++viewingIndex_ >= viewing_.size()) viewingImage_ = false;
+            dirty_ = true;
+            return;
+        }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
             if (!(action == "nav_save" && returnTo_ == "title") && !pageOff(action) && !pageStepOff(action) && !buttonOff(action)) runAction(action);
             if (dialogOpen_) dialogOpener_ = action;
-            return;
-        }
-        if (viewingImage_) {
-            if (++viewingIndex_ >= viewing_.size()) viewingImage_ = false;
-            dirty_ = true;
             return;
         }
         if (screen_->name.rfind("config", 0) == 0) {
