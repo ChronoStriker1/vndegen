@@ -8,7 +8,7 @@
 // (25) for a face slot, used only to move one, a nod or a hop: by parameters 0 and 1, after parameter 24 frames and over
 // parameter 25 (negative easing out), at 60 frames a second. 139 is the scene's flipbook (121) there, the emotion marks:
 // slot parameter 0 (3000), the unscaled picture's top left at parameters 2 and 3, scaled about its middle by parameters
-// 4 and 5 in thousandths, each picture shown for parameter 16 ms, and repeating with parameter 14. A face's place was
+// 4 and 5 in thousandths, each picture shown for parameter 16 ms. A face's place was
 // fitted exactly on PC frames, and an anger mark at -20, -20 and 0.31 sits at 46, 47 from the origin, as these rules
 // give; its 41 pictures took 1.3 s, two frames each for parameter 16's 30 ms and not anime_bustup_cfg.ini's 16 (30 fps
 // recordings under Wine). The hop's pace wasn't settled (10 pixels came back over about 0.27 s where 10 frames would be 0.17), and
@@ -16,13 +16,12 @@
 // face shake (145) isn't drawn.
 //
 // Slides: 160 names two panel pictures (s1, s2), 162 starts bars of them sliding in from the left until they cover the
-// screen, 161 waits until they do, while the scene changes behind them, and 163 slides them off to the right and waits
-// for that. On the PC the bars' heights and speeds vary from slide to slide, as if random; these are drawn in the same
+// screen, 161 waits until they do, while the scene changes behind them. On the PC the bars' heights and speeds vary from slide to slide, as if random; these are drawn in the same
 // style over the times the recording shows (in over 0.6 s, out over 0.8 s), not the PC's own bars. Unconfirmed.
 //
 // The select screen, `open select` from the story table: ten half-weeks of four cards, each a character at a place, as
 // cfg\SelectPhase.ini lists them (top, left, right, bottom). A heroine's card at place -1 stands at the place her hearts
-// reach in cfg\SelectChar.ini and plays her next event, which gives her a heart, up to four; the other cards play the
+// reach in cfg\SelectChar.ini and plays her next event, which gives her a heart; the other cards play the
 // scene the PC's exe lists for that half-week and card. Which scene plays was traced under Wine from runs down each
 // route and one skipping a heroine (set 1): events go by hearts, not by half-week. The screen's pieces were placed by
 // fitting PC shots, the cards exactly (within 0.03 of 255 over the card area). State is in the story variables the PC's
@@ -42,6 +41,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <map>
+#include <random>
 #include <sstream>
 
 #include "parts.h"
@@ -133,6 +133,7 @@ struct Face {
     float scale = 1;
     bool flipLoop = false, scaleAboutMiddle = true;
     int flipTimes = 1;
+    bool again = false;
     bool same(const Face &o) const { return path == o.path && x == o.x && y == o.y && flipCount == o.flipCount; }
 };
 
@@ -177,12 +178,14 @@ public:
             // picture two frames after a 500 ms update ended (one mark, so unconfirmed), and goes on through later ones.
             for (auto &[slot, f] : shown_) {
                 auto before = from_.find(slot);
-                bool fresh = before == from_.end() || !before->second.same(f);
+                bool fresh = f.again || before == from_.end() || !before->second.same(f);
+                f.again = false;
                 f.flipFrom = fresh ? fadeFrom_ + fadeMs_ / 2 : before->second.flipFrom;
                 // Its sound, in the effects channel after the scene's flipbooks' (180), so both can sound at once.
                 if (auto sound = flipSounds_.find(lower(f.path)); fresh && f.flipCount > 0 && sound != flipSounds_.end())
                     host.playSound(1, 181, sound->second.first, sound->second.second);
                 loaded_[slot].flipFrom = f.flipFrom;
+                loaded_[slot].again = false;
             }
             host.redraw();
             return true;
@@ -213,6 +216,7 @@ public:
             // frames on the PC.
             int ms = n.p[16] > 0 ? n.p[16] : it == flipbooks_.end() ? 16 : it->second.second;
             f.flipMs = std::max(1, (ms * 60 + 999) / 1000) * 1000 / 60;
+            f.again = true;
             loaded_[n.p[0]] = f;
             return true;
         }
@@ -278,7 +282,7 @@ public:
         menu_ = name;
         if (name == "title") {
             titleFrom_ = host.screenMs();
-            titleFirst_ = std::rand() % 9;
+            titleFirst_ = int(std::random_device{}() % 9);
             return true;
         }
         if (name != "select") return false;
@@ -317,8 +321,10 @@ public:
             }
         for (int k = 0; k < 4; k++)
             if (sideRect(k).contains(x, y)) {
-                menuOver_ = true;
-                menuAsked_ = 2;
+                if (k < 3) {
+                    menuOver_ = true;
+                    menuAsked_ = 2;
+                }
                 host.openMenu(kSideActions[k]);
                 return true;
             }
@@ -373,15 +379,16 @@ public:
             }
             Face f;
             f.path = record.path;
-            f.x = int(record.x) - kFaceX;
-            f.y = int(record.y) - kFaceY;
+            if (!std::isfinite(record.x) || !std::isfinite(record.y)) continue;
+            f.x = int(std::clamp(record.x, -8192.0f, 8192.0f)) - kFaceX;
+            f.y = int(std::clamp(record.y, -8192.0f, 8192.0f)) - kFaceY;
             shown_[record.slot] = loaded_[record.slot] = f;
         }
         auto var = [&](int n) {
             auto it = d.variables.find(n);
             return it == d.variables.end() ? 0 : it->second;
         };
-        int ph = 2 * var(kWeekVar) + var(kHalfVar), card = d.lastChoice;
+        int ph = 2 * std::clamp(var(kWeekVar), -1, kPhases) + std::clamp(var(kHalfVar), -1, kPhases), card = d.lastChoice;
         if (d.flowActive != 1 || ph < 0 || ph >= kPhases || card < 0 || card > 3) return;
         const CardScenes &cs = kCards[ph][card];
         int before = 0;
@@ -811,7 +818,7 @@ private:
         return out;
     }
 
-    int phase(PartHost &host) const { return std::clamp(2 * host.variable(1, kWeekVar) + host.variable(1, kHalfVar), 0, kPhases - 1); }
+    int phase(PartHost &host) const { return std::clamp(2 * std::clamp(host.variable(1, kWeekVar), 0, kPhases) + std::clamp(host.variable(1, kHalfVar), 0, kPhases), 0, kPhases - 1); }
     int hearts(PartHost &host, int heroine) const { return std::clamp(host.variable(1, kHeartVar + heroine), 0, kHeartCap); }
 
     // The place a card stands at: its own, or for a heroine at -1, the next in her SelectChar list.
