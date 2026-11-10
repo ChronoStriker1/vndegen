@@ -132,7 +132,10 @@ colorkey 0 255 0
 # The PC draws the message window at its .alp as it is. Config's first-run values, as the PC shows them under Wine.
 default opacity 100
 default text 50
+textpoints text 0 184.9 10 153.7 25 101.8 40 52.6 50 17.6 60 4.9 75 2.6 90 1.5 100 0
 default auto 50
+autocurve auto 104 1.04 527 1
+autowithvoice
 default bgm 60
 default se 60
 default voice 80
