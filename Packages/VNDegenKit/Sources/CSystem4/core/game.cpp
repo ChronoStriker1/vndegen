@@ -99,7 +99,10 @@ std::string codeFile(const std::string &root, const std::map<std::string, std::s
 
 // Later games (Test Game 56) draw their battles and maps in 3D with SealEngine, which this runtime doesn't run: the
 // game stops with a notice where a 3D scene starts (Game::stopAt3D). The game page says so before the player starts.
-std::string compatibilityNote(const Ain &ain) {
+std::string compatibilityNote(const Ain &ain, const std::string &codeFile) {
+    if (lower(fs::path(codeFile).stem().string()) == "evenicle")
+        return "This game can't run yet. It sets up its 3D field as it starts, and VNDegen doesn't run 3D yet, so "
+               "it stops before its title.";
     for (auto &lib : ain.libraries)
         if (lib.name == "SealEngine")
             return "The game's 3D scenes, such as its battles and maps, don't run yet. It stops with a message where "

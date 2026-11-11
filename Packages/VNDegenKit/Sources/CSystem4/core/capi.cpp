@@ -77,7 +77,7 @@ const char *vns4_compatibility_note(const char *gameRoot) {
         }
         s4::Ain ain;
         if (!ain.load(path).empty()) return nullptr;
-        note = s4::compatibilityNote(ain);
+        note = s4::compatibilityNote(ain, path);
         if (!ec) {
             std::lock_guard<std::mutex> lock(cache.mu);
             cache.byPath[path] = {size, time, note};

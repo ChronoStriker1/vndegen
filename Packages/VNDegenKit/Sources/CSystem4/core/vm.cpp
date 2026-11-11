@@ -731,7 +731,7 @@ void VM::run(size_t untilFrames) {
         case OP_SR_REFREF: { int32_t i = pop(), pg = pop(); push(var(pg, i)); push(0); break; }
         case OP_SH_SR_ASSIGN: { int32_t i = pop(), pg = pop(), dst = pop(); structAssign(dst, var(pg, i)); break; }
         case OP_NEW: { int32_t t = pop(); push(newStruct(t)); break; }
-        case OP_DELETE: decref(pop()); break;
+        case OP_DELETE: case OP_CHECKUDO: decref(pop()); break;
         case OP_SP_INC: incref(pop()); break;
         case OP_SP_DEC: decref(pop()); break;
         case OP_PUSHSTRUCTPAGE: push(fr.structPage); break;
@@ -906,6 +906,13 @@ void VM::run(size_t untilFrames) {
                 std::stable_sort(vals.begin(), vals.end());
             }
             if (Page *p = page(s)) p->v = std::move(vals);
+            break;
+        }
+        case OP_A_SORT_MEM: {
+            int32_t m = pop(), i = pop(), pg = pop();
+            Page *a = arrayAt(pg, i);
+            auto key = [&](int32_t e) { Page *p = page(e); return p && m >= 0 && size_t(m) < p->v.size() ? p->v[size_t(m)] : 0; };
+            std::stable_sort(a->v.begin(), a->v.end(), [&](int32_t x, int32_t y) { return key(x) < key(y); });
             break;
         }
         case OP_A_FIND: {
@@ -1099,10 +1106,18 @@ void VM::run(size_t untilFrames) {
             push(d && std::find(d->begin(), d->end(), std::make_pair(obj, fn)) != d->end());
             break;
         }
-        case OP_DG_ADD: {
+        case OP_DG_ADD: case OP_DG_ADD2: {
             int32_t fn = pop(), obj = pop(), dsl = pop();
             Delegate *d = delegate(dsl);
             if (d && std::find(d->begin(), d->end(), std::make_pair(obj, fn)) == d->end()) { incref(obj); d->push_back({obj, fn}); }
+            break;
+        }
+        case OP_DG_ERASE: {
+            int32_t fn = pop(), obj = pop(), dsl = pop();
+            Delegate *d = delegate(dsl);
+            if (!d) break;
+            auto it = std::find(d->begin(), d->end(), std::make_pair(obj, fn));
+            if (it != d->end()) { d->erase(it); decref(obj); }
             break;
         }
         case OP_DG_NEW_FROM_METHOD: { int32_t fn = pop(), obj = pop(); push(newDelegate(Delegate{{obj, fn}})); break; }
