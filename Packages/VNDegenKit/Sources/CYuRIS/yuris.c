@@ -10,6 +10,7 @@ static void free_all(YR *y) {
     free(y->tasks);
     yr_text_close(y);
     yr_save_close(y);
+    yr_snd_close(y);
     yr_gfx_close(y);
     yr_script_close(y);
     yr_fs_close(y);
@@ -51,6 +52,7 @@ VNY *vny_open(const VNYConfig *config, char *err, size_t errSize) {
         y->screen = yr_alloc(sizeof(uint32_t) * (size_t)y->width * (size_t)y->height);
         yr_gfx_open(y);
         yr_text_open(y);
+        yr_snd_open(y);
         ok = yr_vm_start(y);
     }
     if (!ok) {
@@ -124,8 +126,9 @@ void vny_key(VNY *v, int vk, bool down) {
 void vny_wheel(VNY *v, int notches) { ((YR *)v)->wheel += notches; }
 
 void vny_audio(VNY *v, float *out, int frames) {
-    (void)v;
-    memset(out, 0, sizeof(float) * 2 * (size_t)frames);
+    YR *y = (YR *)v;
+    if (y->paused) { memset(out, 0, sizeof(float) * 2 * (size_t)frames); return; }
+    yr_snd_mix(y, out, frames);
 }
 
 void vny_set_paused(VNY *v, bool paused) { ((YR *)v)->paused = paused; }

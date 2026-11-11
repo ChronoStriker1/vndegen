@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     cfg.audioRate = 44100;
     cfg.startTime = 1767225600;   // 2026-01-01
     int ms = 5000;
-    const char *final = NULL;
+    const char *final = NULL, *wavPath = NULL;
     Ev ev[256];
     int nev = 0;
     for (int i = 2; i < argc; i++) {
@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--log") && i + 1 < argc) cfg.logPath = argv[++i];
         else if (!strcmp(argv[i], "--time") && i + 1 < argc) cfg.startTime = atoll(argv[++i]);
         else if (!strcmp(argv[i], "--final") && i + 1 < argc) final = argv[++i];
+        else if (!strcmp(argv[i], "--wav") && i + 1 < argc) wavPath = argv[++i];
         else if (nev < 256) {
             Ev *e = &ev[nev];
             memset(e, 0, sizeof *e);
@@ -56,6 +57,11 @@ int main(int argc, char **argv) {
     VNY *g = vny_open(&cfg, err, sizeof err);
     if (!g) { fprintf(stderr, "open failed: %s\n", err); return 1; }
     int t = 0, frame = 16;
+    FILE *wav = wavPath ? fopen(wavPath, "wb") : NULL;
+    if (wav) { unsigned char h[44] = { 0 }; fwrite(h, 1, 44, wav); }
+    long wavFrames = 0;
+    double owed = 0;
+    float abuf[4096 * 2];
     bool alive = true;
     while (t < ms && alive) {
         for (int i = 0; i < nev; i++) {
@@ -71,6 +77,20 @@ int main(int argc, char **argv) {
             else if (!strcmp(e->kind, "shot")) shot(g, e->file);
         }
         alive = vny_frame(g, (uint32_t)frame);
+        owed += cfg.audioRate * frame / 1000.0;
+        while (owed >= 1) {
+            int n = owed > 4096 ? 4096 : (int)owed;
+            vny_audio(g, abuf, n);
+            owed -= n;
+            if (wav) {
+                for (int k = 0; k < n * 2; k++) {
+                    int v = (int)(abuf[k] * 32767);
+                    short sv = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+                    fwrite(&sv, 2, 1, wav);
+                }
+                wavFrames += n;
+            }
+        }
         // Clicks and key presses last two frames, as a quick press does.
         for (int i = 0; i < nev; i++) {
             Ev *e = &ev[i];
@@ -82,6 +102,20 @@ int main(int argc, char **argv) {
         t += frame;
     }
     if (final) shot(g, final);
+    if (wav) {
+        unsigned int data = (unsigned int)(wavFrames * 4), rate = (unsigned int)cfg.audioRate, br = rate * 4;
+        unsigned char h[44] = { 'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 16, 0, 0, 0, 1, 0, 2, 0 };
+        unsigned int riff = data + 36;
+        memcpy(h + 4, &riff, 4);
+        memcpy(h + 24, &rate, 4);
+        memcpy(h + 28, &br, 4);
+        h[32] = 4; h[34] = 16;
+        memcpy(h + 36, "data", 4);
+        memcpy(h + 40, &data, 4);
+        fseek(wav, 0, SEEK_SET);
+        fwrite(h, 1, 44, wav);
+        fclose(wav);
+    }
     const char *p = vny_problem(g);
     printf("ran %d ms, %s\n", t, alive ? "running" : "ended");
     if (p) printf("problem: %s\n", p);

@@ -172,6 +172,9 @@ int yr_cmd_cg(YCall *c, int id);        // CG, CGACT, CGEND, CGINFO
 int yr_cmd_sound(YCall *c, int id);     // SOUND, SOUNDEND, SOUNDINFO, MOVIE...
 int yr_cmd_task(YCall *c, int id);      // TASK, TASKEND, TASKINFO
 int yr_cmd_save(YCall *c, int id);
+void yr_snd_open(YR *y);
+void yr_snd_close(YR *y);
+void yr_snd_mix(YR *y, float *out, int frames);
 void yr_save_close(YR *y);
 
 char *yr_scriptpos_get(YR *y, YTask *t);

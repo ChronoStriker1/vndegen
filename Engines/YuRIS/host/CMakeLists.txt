@@ -14,11 +14,12 @@ set(RUNTIME ${CMAKE_CURRENT_SOURCE_DIR}/../../../Packages/VNDegenKit/Sources/CYu
 set(SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Shared)
 
 find_package(ZLIB REQUIRED)
+find_package(Threads REQUIRED)
 file(GLOB RUNTIME_SOURCES ${RUNTIME}/*.c)
 add_library(yuris STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c)
 target_include_directories(yuris PUBLIC ${RUNTIME} ${RUNTIME}/include ${SHARED})
 target_compile_options(yuris PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function)
-target_link_libraries(yuris PUBLIC ZLIB::ZLIB m)
+target_link_libraries(yuris PUBLIC ZLIB::ZLIB Threads::Threads m)
 
 add_executable(yrrun yrrun.c)
 target_link_libraries(yrrun PRIVATE yuris)
