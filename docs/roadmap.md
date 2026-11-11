@@ -91,6 +91,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Suggested controller layouts for RPG Maker MV and MZ games and Godot games, read from the game's own files and shown as "Suggested for this game" in the layout sheet (0.34.0).
 - Better default controller layouts: a new "Visual novel" layout for KiriKiri, NScripter, Artemis and AliceSoft games, "Mouse" for Flash, the A, S and D keys on RPG Maker XP, VX and VX Ace's spare buttons, and Control on RT for Wolf RPG (0.35.0).
 - Suggested controller layouts for Artemis and Wolf RPG Editor games, a fix for Wolf RPG's check of one specific key (#86), and a game page note that Evenicle can't run yet (0.36.0). NScripter was left out: its games gain nothing over the "Visual novel" layout.
+- Adding a game from its GOG installer (Inno Setup 5, with add-ons and `.bin` parts) or from an ISO disc image, unpacked without running the installer (0.37.0). Repacked installers, other installer kinds and other disc image formats are refused with a message.
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -98,20 +99,18 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Installing a game from its installer, on `feat/installers`. It starts with a survey of the library's installers and a plan; the approach is agreed with the maintainer before anything is built.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
 - VNDegen's own MIT runtimes replace the GPL ones. The clean-room RGSS runtime replaced mkxp-z in 0.12.0. NScripter and AliceSoft System 3 and System 4 are clean-room from the start, so VNDegen never ships ONScripter, xsystem35, or xsystem4. The clean-room runtimes are written from the game files and the engines' own documentation, never from GPL code. The original engines run under Wine only to settle open questions, such as the PC save format. With no GPL runtime left, the app is MIT for its own code plus permissive notices.
 - New engines use only permissive licenses: MIT, BSD, zlib, Apache-2.0, ISC, MPL-2.0, or public domain, and OFL-1.1 for fonts. One exception, agreed with the maintainer: NekoSDK's WMV movies use the LGPL FFmpeg the app already ships for KiriKiri, because Apple doesn't decode WMV and no permissive decoder is known. The KiriKiri framework exports a small decoder over it, `vnffmovie`, which the NekoSDK runtime finds at run time, so the app links FFmpeg once ([video.md](video.md#vnffmovie-wmv-through-the-apps-ffmpeg)).
-- The LGPL libraries linked statically today are item 2 under Next.
+- The LGPL libraries linked statically today are item 1 under Next.
 
 ## Next
 Reordered with the maintainer on 2026-11-09, to put quick wins first. Only work that isn't built yet is listed.
-1. Installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
-2. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, which NekoSDK also uses for WMV movies, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
-3. Last: save sync through the cloud types that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, with the same settings as Ludusavi.
+1. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, which NekoSDK also uses for WMV movies, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
+2. Last: save sync through the cloud types that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, with the same settings as Ludusavi.
 
 ## Set aside
 - Playing over AirPlay with the iPhone or iPad as the controller (#66), set aside by the maintainer on 2026-11-10. iOS gives an app a TV to draw a live game on only once the player has turned on Screen Mirroring or plugged in a cable. An AirPlay button inside the app carries sound and video files, not a live picture, and sending the game as live video would put seconds between a press and the picture. The maintainer wanted it to start from inside the app, so it stopped there. What was built worked on the simulator with Screen Mirroring or a cable: the game alone went to the TV and the device showed the controls. It was never merged, and its branch was removed at the maintainer's request.

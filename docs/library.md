@@ -26,7 +26,7 @@ VNDegen adds a game from its GOG installer, or from an ISO disc image, without r
 - **Deleting the installer.** "Delete installer after import" works as for archives: it's offered for installers in VNDegen's own folders, starts on for ones under Ready to import, and deletes every part of each installer that was unpacked.
 - **ISO disc images** unpack like archives. A disc that holds its game as plain files, such as Mizuiro, becomes a game folder.
 
-What VNDegen can't unpack, and says so when you choose it: other installer kinds (Inno Setup 6, NSIS, InstallShield, MSI, Setup Factory), repacks such as FitGirl and DODI, whose files are packed with tools that only run on Windows, installers protected with a password, and BIN/CUE, MDF/MDS, or UDF-only disc images. Install those on a computer and copy the game's folder instead.
+What VNDegen can't unpack, and says so when you choose it: other installer kinds (Inno Setup 6, NSIS, InstallShield, MSI, Setup Factory), repacked installers, whose files are packed with tools that only run on Windows, installers protected with a password, and BIN/CUE, MDF/MDS, or UDF-only disc images. Install those on a computer and copy the game's folder instead.
 
 ## Other folders
 
