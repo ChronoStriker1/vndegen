@@ -88,7 +88,7 @@ import VNCore
 @Test func rpgMakerPresetSendsTheKeysRPGMakerReads() {
     let preset = ButtonMapping.rpgMaker
     let codes: [ControlInput: Int] = [
-        .a: 13, .b: 27, .x: 16, .y: 88, .menu: 88, .l: 81, .r: 87,
+        .a: 13, .b: 27, .x: 16, .y: 88, .menu: 88, .l: 81, .r: 87, .l2: 65, .r2: 83, .view: 68,
         .up: 38, .down: 40, .left: 37, .right: 39, .leftStickUp: 38, .leftStickDown: 40, .leftStickLeft: 37, .leftStickRight: 39,
     ]
     for input in ControlInput.allCases {

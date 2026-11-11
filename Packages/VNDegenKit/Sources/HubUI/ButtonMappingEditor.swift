@@ -129,6 +129,7 @@ extension MouseStyle {
 extension ControllerLayout.ID {
     var systemImage: String {
         switch self {
+        case .visualNovel: "text.bubble"
         case .keyboardAndMouse: "desktopcomputer"
         case .mouse: "computermouse"
         case .rpgMaker: "keyboard"
@@ -659,10 +660,23 @@ struct ButtonMappingSheet: View {
         let suggestion = suggested
             ? "Suggested for this game puts keys this game's own files bind on buttons its engine leaves unused. Reset returns to it, and Xbox gamepad goes back to the engine's own buttons. "
             : ""
-        let start = suggestion + (defaultLayout == .keyboardAndMouse
-            ? "This game's engine reads no gamepad, so its games start with Keyboard and mouse, the layout of Steam's template of that name: the left stick is WASD, the right stick moves the pointer, RT and R3 click, LT right clicks, LB and RB turn the wheel, and the other buttons press keys. Mouse puts the pointer on both sticks and the mouse buttons on A and X."
-            : "Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad.")
+        let start = suggestion + Self.startingLayoutNote(defaultLayout)
         return start + " Picking a layout copies its buttons into this game, and changing a button changes only this game until you save it as a new layout. Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation, so a change here never stops a controller from working them. LB and RB jump between groups."
+    }
+
+    static func startingLayoutNote(_ defaultLayout: ButtonMapping) -> String {
+        switch ControllerLayout.builtIns.first(where: { $0.mapping == defaultLayout })?.id {
+        case .visualNovel:
+            "This game's engine reads no gamepad, so its games start with Visual novel: A presses Return, B right clicks, X holds Control, Y and Menu press Escape, LB turns the wheel up and RB down, the D-pad and left stick are the arrows, the right stick moves the pointer, RT and R3 click, and LT right clicks. Keyboard and mouse is the layout of Steam's template of that name."
+        case .keyboardAndMouse:
+            "This game's engine reads no gamepad, so its games start with Keyboard and mouse, the layout of Steam's template of that name: the left stick is WASD, the right stick moves the pointer, RT and R3 click, LT right clicks, LB and RB turn the wheel, and the other buttons press keys. Mouse puts the pointer on both sticks and the mouse buttons on A and X."
+        case .mouse:
+            "This game's engine reads no gamepad and its games are played with the mouse, so they start with Mouse: both sticks move the pointer, A and RT click, X and LT right click, LB and RB turn the wheel, B and Menu press Escape, and Y shows the keyboard. Keyboard and mouse puts keys on the other buttons."
+        case .rpgMaker:
+            "RPG Maker XP, VX, and VX Ace games start with RPG Maker controls, the keys RPG Maker reads: A is Return, B Escape, X Shift, Y and Menu X, LB Q, RB W, and LT, RT, and View the A, S, and D keys that games use for RPG Maker's X, Y, and Z buttons. The D-pad and left stick are the arrows."
+        default:
+            "Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad."
+        }
     }
 
     /// A button, or a whole stick, with what it does. A stick's row switches it between moving the pointer and being a

@@ -48,13 +48,11 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
         }
     }
 
-    /// The keys RPG Maker games read, as VNDegen sent them before it sent gamepad buttons. Return confirms in every RPG
-    /// Maker, where Z is the A button in XP. Escape and X both cancel and open the menu in all of them. Shift dashes,
-    /// and Q and W turn pages. The left stick moves like the D-pad. The other buttons stay gamepad buttons.
     public static let rpgMaker: ButtonMapping = {
         var mapping = ButtonMapping()
         let keys: [ControlInput: KeyboardKey] = [
             .a: .enter, .b: .escape, .x: .shift, .y: .x, .menu: .x, .l: .q, .r: .w,
+            .l2: .letter("A"), .r2: .letter("S"), .view: .letter("D"),
             .up: .arrowUp, .down: .arrowDown, .left: .arrowLeft, .right: .arrowRight,
             .leftStickUp: .arrowUp, .leftStickDown: .arrowDown, .leftStickLeft: .arrowLeft, .leftStickRight: .arrowRight,
         ]
@@ -62,10 +60,6 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
         return mapping
     }()
 
-    /// Steam's Keyboard and Mouse controller template, which engines with no gamepad support start with. LB and RB turn
-    /// the wheel down and up, LT right clicks and RT clicks, View is Tab and Menu Escape, the left stick is WASD and
-    /// pressing it is Shift, the right stick moves the pointer and pressing it clicks, the D-pad is 1 up, 2 right, 3 down,
-    /// and 4 left, and A, B, X, and Y are Space, E, R, and F.
     public static let keyboardAndMouse: ButtonMapping = {
         var mapping = ButtonMapping()
         let actions: [ControlInput: ControlAction] = [
@@ -75,6 +69,21 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
             .leftStickLeft: .key(.letter("A")), .leftStickRight: .key(.letter("D")),
             .up: .key(.digit(1)), .right: .key(.digit(2)), .down: .key(.digit(3)), .left: .key(.digit(4)),
             .a: .key(.space), .b: .key(.letter("E")), .x: .key(.letter("R")), .y: .key(.letter("F")),
+        ]
+        for (input, action) in actions { mapping.set(action, for: input) }
+        mapping.setStick(.right, movesPointer: true)
+        return mapping
+    }()
+
+    public static let visualNovel: ButtonMapping = {
+        var mapping = ButtonMapping()
+        let actions: [ControlInput: ControlAction] = [
+            .a: .key(.enter), .b: .click(.secondary), .x: .key(.control), .y: .key(.escape),
+            .l: .wheel(.up), .r: .wheel(.down), .l2: .click(.secondary), .r2: .click(.primary),
+            .view: .key(.tab), .menu: .key(.escape), .l3: .key(.shift), .r3: .click(.primary),
+            .up: .key(.arrowUp), .down: .key(.arrowDown), .left: .key(.arrowLeft), .right: .key(.arrowRight),
+            .leftStickUp: .key(.arrowUp), .leftStickDown: .key(.arrowDown),
+            .leftStickLeft: .key(.arrowLeft), .leftStickRight: .key(.arrowRight),
         ]
         for (input, action) in actions { mapping.set(action, for: input) }
         mapping.setStick(.right, movesPointer: true)
@@ -105,6 +114,9 @@ nonisolated extension ControlLayout {
         switch self {
         case .gamepad: ButtonMapping()
         case .keyboardAndMouse: .keyboardAndMouse
+        case .visualNovel: .visualNovel
+        case .mouse: .mouse
+        case .rpgMaker: .rpgMaker
         }
     }
 }
@@ -370,6 +382,7 @@ nonisolated extension KeyboardKey {
     static let escape = KeyboardKey(key: "Escape", code: "Escape", keyCode: 27)
     static let backspace = KeyboardKey(key: "Backspace", code: "Backspace", keyCode: 8)
     static let shift = KeyboardKey(key: "Shift", code: "ShiftLeft", keyCode: 16)
+    static let control = KeyboardKey(key: "Control", code: "ControlLeft", keyCode: 17)
     static let tab = KeyboardKey(key: "Tab", code: "Tab", keyCode: 9)
     static let space = KeyboardKey(key: " ", code: "Space", keyCode: 32)
     static let arrowUp = KeyboardKey(key: "ArrowUp", code: "ArrowUp", keyCode: 38)
@@ -395,7 +408,7 @@ nonisolated extension KeyboardKey {
         let digits = (0...9).map(digit)
         let named = [
             arrowUp, arrowDown, arrowLeft, arrowRight, enter, escape, space, shift,
-            KeyboardKey(key: "Control", code: "ControlLeft", keyCode: 17),
+            control,
             KeyboardKey(key: "Alt", code: "AltLeft", keyCode: 18),
             tab,
             backspace,

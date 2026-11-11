@@ -75,3 +75,7 @@ import VNCore
         #expect(AliceSoftPlugin.system3SaveName("C:/Panyon/FLOOR_12.MAP") == nil)
     }
 }
+
+@Test func aliceSoftGamesStartWithTheVisualNovelLayout() {
+    #expect(AliceSoftPlugin().defaultControls == .visualNovel)
+}

@@ -70,7 +70,7 @@ private func makePaths() throws -> LibraryPaths {
     try await prepared(layouts, library, ["Follows", "Changed"], version: 1)
     #expect(layouts.mapping(for: follows, in: library).action(for: .r2) == skip)
     #expect(layouts.shown(for: layouts.mapping(for: follows, in: library), game: follows, in: library)?.id == .suggested)
-    #expect(layouts.all(for: follows, in: library).map(\.id).prefix(2) == [.suggested, .keyboardAndMouse])
+    #expect(layouts.all(for: follows, in: library).map(\.id).prefix(2) == [.suggested, .visualNovel])
     #expect(layouts.all(for: follows, in: library).contains { $0.id == .gamepad })
     #expect(layouts.label(for: .r2, game: follows, in: library) == "Skip")
 

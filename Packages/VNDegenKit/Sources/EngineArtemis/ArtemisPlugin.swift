@@ -28,7 +28,7 @@ nonisolated public struct ArtemisPlugin: EnginePlugin {
 
     /// Artemis reads a mouse and keyboard and no gamepad. A click reads on and presses buttons, and the right click
     /// opens the game's menu.
-    public var defaultControls: ControlLayout { .keyboardAndMouse }
+    public var defaultControls: ControlLayout { .visualNovel }
 }
 
 nonisolated public enum ArtemisError: Error, LocalizedError {

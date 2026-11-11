@@ -129,7 +129,7 @@ Games marked Hide leave the library until it is unlocked with Face ID, Touch ID,
 
 ## Controls
 
-In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad, such as KiriKiri, TyranoScript, Flash, Artemis, AliceSoft, and NScripter, start with Steam's Keyboard and Mouse layout instead. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
+In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad start with a layout of keys and clicks instead: "Visual novel" for KiriKiri, NScripter, Artemis, and AliceSoft, "Mouse" for Flash, "RPG Maker controls" for RPG Maker XP, VX, and VX Ace, and Steam's Keyboard and Mouse layout for TyranoScript. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
 
 | In the library and the VNDegen menu | Controller | Keyboard |
 |---|---|---|

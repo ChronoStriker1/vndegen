@@ -118,7 +118,7 @@ private func buttons(_ name: String, _ library: LibraryStore) throws -> ButtonMa
     reopened.update(.mouse, mapping: mapping, in: library)
     reopened.rename(.mouse, to: "Renamed")
     reopened.delete(.mouse)
-    #expect(reopened.layout(.mouse) == ControllerLayout.builtIns[1])
+    #expect(reopened.layout(.mouse) == ControllerLayout.builtIns[2])
 
     reopened.delete(id)
     #expect(LayoutLibrary(paths: paths).saved.isEmpty)

@@ -26,7 +26,7 @@ nonisolated public struct NScripterPlugin: EnginePlugin {
     }
 
     /// NScripter reads the mouse and keyboard and no gamepad.
-    public var defaultControls: ControlLayout { .keyboardAndMouse }
+    public var defaultControls: ControlLayout { .visualNovel }
 }
 
 nonisolated public enum NScripterError: Error, LocalizedError {

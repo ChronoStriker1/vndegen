@@ -23,8 +23,8 @@ of the app; `docs/system3-cleanroom.md` lists where each part came from. It cove
   ones the library's games use, and CD effects 4 and 1001. CD 1001 moves the destination into the source's palette bank
   rather than copying the picture. The picture at the end is the plain copy, so saves don't depend on an effect.
 - Shows the games' number box (NI) over the game, with a keypad and steppers for touch and digits and arrows on a
-  keyboard. On a controller, up, down, left and right change the number by 1 and 10, and the D-pad does so under the
-  default Keyboard and mouse layout too. Return, Space, Confirm or A is OK, and Escape, a right click, Cancel or B cancels,
+  keyboard. On a controller, up, down, left and right change the number by 1 and 10, under the
+  default Visual novel layout and under Keyboard and mouse. Return, Space, Confirm or A is OK, and Escape, a right click, Cancel or B cancels,
   which gives RND 255 and leaves the variable alone, as on the PC. A number outside the range can't be accepted.
 - Text skip: Skip until choice, in Game commands, passes message waits until the next choice or left click, which turn
   it off, as the same item does in the PC exes' menu bars (文字送り in System 3.9). On System 3.9 that also passes IK 0 and
@@ -37,7 +37,7 @@ of the app; `docs/system3-cleanroom.md` lists where each part came from. It cove
 
 ## Controls
 
-The games read the keyboard and mouse. The default layout is Keyboard and mouse. Confirm sends Return, Cancel and Menu a
+The games read the keyboard and mouse. The default layout is Visual novel. Confirm sends Return, Cancel and Menu a
 right click, the arrows the arrow keys, and Dash holds Control.
 
 ## Testing on Linux

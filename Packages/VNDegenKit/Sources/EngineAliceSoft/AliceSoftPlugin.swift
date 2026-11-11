@@ -49,7 +49,7 @@ nonisolated public struct AliceSoftPlugin: EnginePlugin {
     }
 
     /// AliceSoft games read the keyboard and mouse only.
-    public var defaultControls: ControlLayout { .keyboardAndMouse }
+    public var defaultControls: ControlLayout { .visualNovel }
 }
 
 nonisolated public enum AliceSoftError: Error, LocalizedError {

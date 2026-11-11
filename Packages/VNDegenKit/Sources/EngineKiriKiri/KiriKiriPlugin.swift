@@ -28,7 +28,7 @@ nonisolated public struct KiriKiriPlugin: EnginePlugin {
 
     /// KiriKiri reads a mouse and keyboard and no gamepad, and KAG3 games are played with the mouse: a click reads on and
     /// presses buttons, the right click and the wheel hide the text and open the message history.
-    public var defaultControls: ControlLayout { .keyboardAndMouse }
+    public var defaultControls: ControlLayout { .visualNovel }
 
     /// Whether a game's frame or start is on the stack below the caller. Only the game's own modal window, such as its
     /// Yes/No dialog, runs the app's events there, and the game cannot close until the caller returns.

@@ -129,6 +129,19 @@ import VNCore
         #expect(router.releaseAll() == [.mouseButton(1, down: false)])
     }
 
+    @Test func rtHoldsControlAndTheOtherFreeButtonsDoNothing() {
+        var router = WolfRPGInputRouter(), keys = WolfRPGInputRouter()
+        let control = KeyboardKey(key: "Control", code: "ControlLeft", keyCode: 17)
+        let down = router.translate(.gamepad(.r2, pressed: true)) { $0 }
+        #expect(!down.isEmpty)
+        #expect(down == keys.translate(.key(control, pressed: true)) { $0 })
+        #expect(router.translate(.gamepad(.r2, pressed: false)) { $0 } == keys.translate(.key(control, pressed: false)) { $0 })
+        for input in [ControlInput.l2, .view, .l3, .r3] {
+            #expect(router.translate(.gamepad(input, pressed: true)) { $0 }.isEmpty)
+        }
+        #expect(WolfRPGPlugin().defaultControls == .gamepad)
+    }
+
     @Test func scrollingUpTurnsTheWheelAwayFromThePlayer() {
         var router = WolfRPGInputRouter()
         #expect(router.translate(.scroll(dy: -WolfRPGInputRouter.pointsPerNotch)) { $0 } == [.wheel(1)])

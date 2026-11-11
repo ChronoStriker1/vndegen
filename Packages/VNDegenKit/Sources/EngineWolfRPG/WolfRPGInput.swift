@@ -28,6 +28,8 @@ nonisolated struct WolfRPGInputRouter {
         switch event {
         case let .button(button, pressed):
             return control(button, pressed)
+        case let .gamepad(.r2, pressed):
+            return press(.key(Int32(VNWOLF_KEY_CTRL)), pressed)
         case let .gamepad(input, pressed):
             guard let button = input.virtualButton else { return [] }
             return control(button, pressed)
