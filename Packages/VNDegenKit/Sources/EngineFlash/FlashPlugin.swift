@@ -98,7 +98,7 @@ nonisolated public struct FlashPlugin: EnginePlugin {
     }
 
     /// Flash games are played with the mouse, and some with the keyboard. Flash Player read no gamepad.
-    public var defaultControls: ControlLayout { .keyboardAndMouse }
+    public var defaultControls: ControlLayout { .mouse }
 
     /// Where the page sees the files VNDegen ships for Flash: the host page, and Ruffle under `ruffle/`.
     static let hostPath = "/__vndegen/"

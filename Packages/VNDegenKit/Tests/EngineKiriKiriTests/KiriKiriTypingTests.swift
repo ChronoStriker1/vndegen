@@ -2,8 +2,8 @@ import Testing
 import VNCore
 @testable import EngineKiriKiri
 
-@Test func kiriKiriGamesStartWithTheKeyboardAndMouseLayout() {
-    #expect(KiriKiriPlugin().defaultControls == .keyboardAndMouse)
+@Test func kiriKiriGamesStartWithTheVisualNovelLayout() {
+    #expect(KiriKiriPlugin().defaultControls == .visualNovel)
 }
 
 @Test func typingReachesKiriKiriAsWindowsSendsIt() {

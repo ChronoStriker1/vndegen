@@ -65,7 +65,7 @@ private func activate(_ editor: ButtonMappingEditor, _ target: ButtonMappingEdit
     #expect(editor.picking == nil)
     #expect(editor.mapping.action(for: .a) == .nothing)
     #expect(editor.currentLayout == nil)
-    #expect(ControllerLayout.builtIns[2].mapping == .rpgMaker)
+    #expect(ControllerLayout.builtIns[3].mapping == .rpgMaker)
 
     // B on the keyboard saves nothing, and neither does a blank name.
     try activate(editor, .saveNew)

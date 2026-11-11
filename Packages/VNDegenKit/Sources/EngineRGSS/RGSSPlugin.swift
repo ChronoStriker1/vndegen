@@ -52,6 +52,8 @@ nonisolated public struct RGSSPlugin: EnginePlugin {
         return try RGSSSession(launch, paths: paths)
     }
 
+    public var defaultControls: ControlLayout { .rpgMaker }
+
     public func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage] {
         guard let layout = RGSSLayout(FolderProbe(scanning: folder)) else { return [] }
         return layout.rtps.compactMap(RGSSRuntimes.package(named:))

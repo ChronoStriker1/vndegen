@@ -99,8 +99,8 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(layout.root == "a" && layout.evidence == "a/nscript.dat")
 }
 
-@Test func nScripterGamesStartWithTheKeyboardAndMouseLayout() {
-    #expect(NScripterPlugin().defaultControls == .keyboardAndMouse)
+@Test func nScripterGamesStartWithTheVisualNovelLayout() {
+    #expect(NScripterPlugin().defaultControls == .visualNovel)
 }
 
 @Test func buttonsHoldKeysUntilTheLastRelease() {

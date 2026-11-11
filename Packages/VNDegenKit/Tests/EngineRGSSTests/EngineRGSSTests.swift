@@ -131,6 +131,15 @@ private let none: @Sendable (RuntimePackage) -> URL? = { _ in nil }
         #expect(router.translate(.button(.hub, pressed: true)).isEmpty)
     }
 
+    @Test func gamesStartWithRPGMakerControlsAndItsASAndDKeysReachTheGame() {
+        #expect(RGSSPlugin(.vxAce, runtimeFolder: none).defaultControls == .rpgMaker)
+        var router = RGSSInputRouter()
+        for letter in ["A", "S", "D"] {
+            let key = KeyboardKey(key: letter.lowercased(), code: "Key\(letter)", keyCode: Int(Character(letter).asciiValue!))
+            #expect(router.translate(.key(key, pressed: true)) == [.key(RetroKey.ascii(Character(letter.lowercased())), down: true)])
+        }
+    }
+
     @Test func aKeyHeldByTwoButtonsGoesUpWithTheLastRelease() {
         var router = RGSSInputRouter()
         let enter = KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)

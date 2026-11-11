@@ -99,7 +99,7 @@ draws what they use, following the picture page of the official manual:
 ## Controls
 
 Wolf RPG Editor reads gamepads, so the default layout is the gamepad: A confirms (Z), B and Menu cancel (X, which
-opens the menu in most games), the Dash button is the sub key (Shift), and the D-pad and left stick move. A keyboard
+opens the menu in most games), the Dash button is the sub key (Shift), RT holds Control, which many games read to skip messages, and the D-pad and left stick move. A keyboard
 works as on Windows: Z, Return or Space confirm, X or Escape cancel, Shift is sub, and the arrows or the number pad move.
 
 Event commands read the keyboard by Wolf's own key codes, 100 plus the key's DirectInput scan code. The mouse works through

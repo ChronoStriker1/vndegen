@@ -109,8 +109,7 @@ public protocol EnginePlugin: Sendable {
     /// engine-neutral actions, so VNDegen can convert those remaps. Nil means the Xbox button that sent `button` in the
     /// old standard layout, which is right for engines that read a gamepad or turn its buttons into the same keys.
     func legacyAction(for button: VirtualButton) -> ControlAction?
-    /// The button layout a game follows until the player changes it. Engines with no gamepad support use the keyboard
-    /// and mouse layout.
+    /// The button layout a game follows until the player changes it.
     var defaultControls: ControlLayout { get }
     var controlReaderVersion: Int { get }
     func suggestedControls(folder: URL) -> ControlSuggestion?

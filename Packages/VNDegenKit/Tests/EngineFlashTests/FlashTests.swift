@@ -306,3 +306,7 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     #expect(FlashPlugin.wrapsFlash(probe))
     #expect(!FlashPlugin.wrapsFlash(probe, budget: 10))
 }
+
+@Test func flashGamesStartWithTheMouseLayout() {
+    #expect(FlashPlugin().defaultControls == .mouse)
+}

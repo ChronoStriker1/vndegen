@@ -53,7 +53,7 @@ embeds: pausing suspends them, a projector's `quit` ends the session, and the se
 Input reaches Ruffle as it would from a PC mouse and keyboard. The session's pointer, from the touch Mouse mode and
 controllers, arrives as synthetic mouse events, which `flash.js` turns into pointer events on Ruffle's canvas. Ruffle
 reads keys only while it has focus, so the player takes focus again when the game resumes. Flash Player read no
-gamepad, so games start with the Keyboard and mouse layout.
+gamepad, and most games are played with the mouse, so games start with the Mouse layout.
 
 A movie's own right-click menu items, which an ActionScript 2 movie adds through `ContextMenu.customItems` and an
 ActionScript 3 movie through `ContextMenu.customItems` on a display object, appear in VNDegen's Game commands, since the

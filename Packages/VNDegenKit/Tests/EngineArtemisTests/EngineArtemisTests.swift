@@ -130,6 +130,19 @@ import VNCore
         #expect(ArtemisPrompt.button(for: .button(.confirm, pressed: false)) == nil)
     }
 
+    @Test func buttonsOfTheVisualNovelLayoutStandForButtons() {
+        #expect(ArtemisPlugin().defaultControls == .visualNovel)
+        #expect(ArtemisPrompt.button(for: key("Enter")) == .confirm)
+        #expect(ArtemisPrompt.button(for: .click(.secondary, pressed: true)) == .cancel)
+        #expect(ArtemisPrompt.button(for: .click(.secondary, pressed: false)) == nil)
+        #expect(ArtemisPrompt.button(for: key("ControlLeft")) == .dash)
+        #expect(ArtemisPrompt.button(for: key("Escape")) == .cancel)
+        #expect(ArtemisPrompt.button(for: key("ArrowUp")) == .up)
+        #expect(ArtemisPrompt.button(for: key("ArrowDown")) == .down)
+        #expect(ArtemisPrompt.button(for: key("ArrowLeft")) == .left)
+        #expect(ArtemisPrompt.button(for: key("ArrowRight")) == .right)
+    }
+
     @Test func aChoiceWithoutCancelStaysOnCancel() {
         var answers: [Bool] = []
         let prompt = ArtemisPrompt(title: "", message: "", cancels: false, text: nil) { accepted, _ in answers.append(accepted) }

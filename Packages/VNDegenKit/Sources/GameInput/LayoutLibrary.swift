@@ -5,7 +5,7 @@ import VNCore
 /// A layout the library offers: one of VNDegen's own, or one the player saved.
 nonisolated public struct ControllerLayout: Identifiable, Equatable, Sendable {
     public enum ID: Hashable, Sendable {
-        case keyboardAndMouse, mouse, rpgMaker, gamepad
+        case visualNovel, keyboardAndMouse, mouse, rpgMaker, gamepad
         case saved(UUID)
         case suggested
     }
@@ -15,6 +15,7 @@ nonisolated public struct ControllerLayout: Identifiable, Equatable, Sendable {
     public var mapping: ButtonMapping
 
     public static let builtIns = [
+        ControllerLayout(id: .visualNovel, name: "Visual novel", mapping: .visualNovel),
         ControllerLayout(id: .keyboardAndMouse, name: "Keyboard and mouse", mapping: .keyboardAndMouse),
         ControllerLayout(id: .mouse, name: "Mouse", mapping: .mouse),
         ControllerLayout(id: .rpgMaker, name: "RPG Maker controls", mapping: .rpgMaker),

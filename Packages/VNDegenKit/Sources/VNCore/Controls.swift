@@ -82,6 +82,9 @@ public enum ControlLayout: Sendable {
     case gamepad
     /// Steam's Keyboard and Mouse controller template, for engines with no gamepad support.
     case keyboardAndMouse
+    case visualNovel
+    case mouse
+    case rpgMaker
 }
 
 /// Typing on VNDegen's on-screen keyboard.
