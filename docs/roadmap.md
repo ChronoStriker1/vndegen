@@ -95,7 +95,7 @@ New bugs get a GitHub issue and a line here. None are open.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Nothing right now.
+- Better default controller layouts (item 1 under Next), on `feat/default-layouts`. Being planned: what today's defaults do in play in each engine, and the exact layout proposed for each. Nothing changes until the maintainer has seen the layouts.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
