@@ -54,20 +54,87 @@ static void fileinfo(YCall *c) {
     free(folder);
 }
 
+static void window(YCall *c) {
+    YR *y = c->y;
+    if (yc_int_or(c, "NO", 0) != 0) return;
+    char *cap = yc_str(c, "CAPTION");
+    if (cap) {
+        char *u = yr_to_utf8(y->enc, cap);
+        snprintf(y->title, sizeof y->title, "%s", u);
+        free(u);
+        free(cap);
+    }
+    i64 fs;
+    if (yc_int(c, "FULLSCREEN", &fs)) y->fullscreen = fs != 0;
+}
+
+static void windowinfo(YCall *c) {
+    YR *y = c->y;
+    YRef out;
+    if (!yc_ref(c, "LET", &out)) return;
+    i64 no = yc_int_or(c, "NO", 0);
+    YVal r = yv_int(0);
+    if (no != 0) r = yv_int(0);
+    else if (yc_int_or(c, "CAPTION", 0)) r = yv_str(y->title);
+    else if (yc_int_or(c, "SX", 0) || yc_int_or(c, "WSX", 0)) r = yv_int(y->width);
+    else if (yc_int_or(c, "SY", 0) || yc_int_or(c, "WSY", 0)) r = yv_int(y->height);
+    else if (yc_int_or(c, "FULLSCREEN", 0) || yc_int_or(c, "FULLSCREEN2", 0)) r = yv_int(y->fullscreen);
+    else if (yc_int_or(c, "EXIST", 0) || yc_int_or(c, "E", 0) || yc_int_or(c, "ACTIVE", 0)) r = yv_int(1);
+    else if (yc_int_or(c, "FULLSCREENBUTTON", 0)) r = yv_int(1);
+    yr_ref_set(y, c->t, &out, &r);
+    yv_free(&r);
+}
+
+static void fileact(YCall *c) {
+    YR *y = c->y;
+    if (yc_int_or(c, "DELETE", 0)) {
+        char *file = yc_str(c, "FILE");
+        char *path = file ? yr_save_path(y, file) : NULL;
+        if (path) remove(path);
+        free(path);
+        free(file);
+    } else if (yc_int_or(c, "CREATE", 0)) {
+        char *folder = yc_str(c, "FOLDER");
+        if (folder) yr_save_mkdir(y, folder);
+        free(folder);
+    } else if (yc_has(c, "ID")) {
+        yc_unknown(c, "FILEACT layer export");
+    }
+}
+
+static void set_result(YCall *c, YVal v) {
+    YRef out;
+    if (yc_ref(c, "LET", &out)) yr_ref_set(c->y, c->t, &out, &v);
+    yv_free(&v);
+}
+
 int yr_cmd_system(YCall *c, int id) {
     YR *y = c->y;
     switch (id) {
     case C_WAIT: return wait_cmd(c);
     case C_DIALOG: dialog(c); return YR_NEXT;
     case C_FILEINFO: fileinfo(c); return YR_NEXT;
+    case C_WINDOW: window(c); return YR_NEXT;
+    case C_WINDOWINFO: windowinfo(c); return YR_NEXT;
+    case C_FILEACT: fileact(c); return YR_NEXT;
+    case C_FPS: {
+        i64 f;
+        if (yc_int(c, "SET", &f) && f >= 1 && f <= 256) y->fps = (int)f;
+        return YR_NEXT;
+    }
+    case C_INPUT: case C_MOUSE: case C_SYSTEM: case C_ERROR: case C_DEBUGLIST: case C_EMOTE: case C_TRAY:
+    case C_WINDOWEND: case C_MENU: case C_MENUACT: case C_MENUEND:
+        return YR_NEXT;
+    case C_SYSTEMINFO: case C_PRODUCT: case C_EMOTEINFO: case C_MENUINFO: case C_REGINFO:
+        set_result(c, yv_int(0));
+        return YR_NEXT;
     case C_END:
         yr_log(y, "END\n");
         y->quit = true;
         return YR_STOP;
     default: {
-        static bool seen[C_COUNT];
-        if (id >= 0 && id < C_COUNT && !seen[id]) {
-            seen[id] = true;
+        if (id >= 0 && id < C_COUNT && !y->unknownSeen[id]) {
+            y->unknownSeen[id] = true;
             yc_unknown(c, "command");
         }
         return YR_NEXT;

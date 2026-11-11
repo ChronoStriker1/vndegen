@@ -16,7 +16,9 @@ struct YLayer {
     // Attributes
     bool e;
     int a;                // opacity, 0 to 256
-    int x, y, z;
+    int x, y;
+    double z;
+    i64 zi;
     int mode;             // blend mode, 0 normal
     int sx, sy;           // a set's clip size; 0 leaves the set unclipped
     int t, ta;            // transition progress and softness, with tid as the rule image

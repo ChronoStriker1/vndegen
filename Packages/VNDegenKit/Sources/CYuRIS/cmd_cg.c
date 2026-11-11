@@ -30,6 +30,31 @@ static bool inum(YCall *c, const char *key, int *field) {
 
 static bool dnum(YCall *c, const char *key, double *field) { return num(c, key, *field, field); }
 
+static void set_z(YCall *c, YLayer *l) {
+    const YArg *a = yc_arg(c, "Z");
+    if (!a || !a->size) return;
+    YVal v = yr_eval(c->y, c->t, a->data, a->size);
+    int op = a->type >> 8;
+    if (v.t == YT_INT && (op == 0 || l->z == (double)l->zi)) {
+        i64 x = v.i;
+        if (op == 1) x = l->zi + x;
+        else if (op == 2) x = l->zi - x;
+        else if (op == 3) x = l->zi * x;
+        else if (op == 4) x = x ? l->zi / x : l->zi;
+        l->zi = x;
+        l->z = (double)x;
+    } else {
+        double x = yv_as_flt(&v);
+        if (op == 1) x = l->z + x;
+        else if (op == 2) x = l->z - x;
+        else if (op == 3) x = l->z * x;
+        else if (op == 4) x = x != 0 ? l->z / x : l->z;
+        l->z = x;
+        l->zi = x >= 9.2e18 ? INT64_MAX : x <= -9.2e18 ? INT64_MIN : (i64)x;
+    }
+    yv_free(&v);
+}
+
 static void set_str(char **field, char *value) {
     free(*field);
     *field = value;
@@ -54,7 +79,7 @@ static int cg(YCall *c) {
     inum(c, "A", &l->a);
     inum(c, "X", &l->x);
     inum(c, "Y", &l->y);
-    inum(c, "Z", &l->z);
+    set_z(c, l);
     inum(c, "MODE", &l->mode);
     inum(c, "SX", &l->sx);
     inum(c, "SY", &l->sy);
@@ -111,7 +136,7 @@ static int cginfo(YCall *c) {
     else if (yc_int_or(c, "A", 0)) r = yv_int(l->a);
     else if (yc_int_or(c, "X", 0)) r = yv_int(l->x);
     else if (yc_int_or(c, "Y", 0)) r = yv_int(l->y);
-    else if (yc_int_or(c, "Z", 0)) r = yv_int(l->z);
+    else if (yc_int_or(c, "Z", 0)) r = l->z == (double)l->zi ? yv_int(l->zi) : yv_flt(l->z);
     else if (yc_int_or(c, "SX", 0)) r = yv_int(l->isSet ? l->sx : l->w);
     else if (yc_int_or(c, "SY", 0)) r = yv_int(l->isSet ? l->sy : l->h);
     else if (yc_int_or(c, "MODE", 0)) r = yv_int(l->mode);
@@ -128,9 +153,7 @@ static int cginfo(YCall *c) {
         int ox, oy;
         yr_layer_origin(l, &ox, &oy);
         int mx = (int)yc_int_or(c, "SET", y->mouseX) - ox, my = (int)yc_int_or(c, "SET2", y->mouseY) - oy;
-        bool shown = true;
-        for (const YLayer *p = l; p; p = p->parent) if (!p->e) shown = false;
-        if (!shown || l->isSet || mx < 0 || my < 0 || mx >= l->w || my >= l->h) r = yv_int(-1);
+        if (l->isSet || mx < 0 || my < 0 || mx >= l->w || my >= l->h) r = yv_int(-1);
         else {
             u32 p = pixel_at(l, mx, my);
             if (yc_int_or(c, "ONMOUSE", 0)) r = yv_int(rgb_of(p));
@@ -171,6 +194,7 @@ static void copy_attrs(YLayer *d, const YLayer *s) {
     d->x = s->x;
     d->y = s->y;
     d->z = s->z;
+    d->zi = s->zi;
     d->mode = s->mode;
     d->f = s->f;
     d->fx = s->fx; d->fy = s->fy; d->fbx = s->fbx; d->fby = s->fby; d->fcx = s->fcx; d->fcy = s->fcy;

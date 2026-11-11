@@ -25,3 +25,18 @@ bool yr_save_exists(YR *y, const char *name) {
     free(p);
     return ok;
 }
+
+void yr_save_mkdir(YR *y, const char *name) {
+    char *p = yr_save_path(y, name);
+    if (!p) return;
+    size_t n = strlen(p);
+    while (n > 1 && p[n - 1] == '/') p[--n] = 0;
+    for (char *s = p + 1; *s; s++) {
+        if (*s != '/') continue;
+        *s = 0;
+        mkdir(p, 0755);
+        *s = '/';
+    }
+    mkdir(p, 0755);
+    free(p);
+}

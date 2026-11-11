@@ -94,6 +94,8 @@ struct YR {
     i64 startUnix;
     bool paused, quit;
     int fps;
+    bool fullscreen;
+    bool unknownSeen[C_COUNT];
 
     // Input: per button code, frames held (positive) or released (negative), and press counts.
     int held[YR_CODE_COUNT];
@@ -172,6 +174,7 @@ int yr_cmd_task(YCall *c, int id);      // TASK, TASKEND, TASKINFO
 // Whether a file the game wrote (in the save folder) exists, by the game's name for it.
 bool yr_save_exists(YR *y, const char *name);
 char *yr_save_path(YR *y, const char *name);   // malloc'd host path inside the save folder, or NULL
+void yr_save_mkdir(YR *y, const char *name);
 
 // ---- input.c ----
 void yr_input_frame(YR *y);             // advances the held counters once per frame

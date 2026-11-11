@@ -329,6 +329,7 @@ static void draw_buffer(Target *dst, const uint32_t *src, int w, int h, int ox, 
 static int by_z(const void *a, const void *b) {
     const YLayer *x = *(YLayer *const *)a, *z = *(YLayer *const *)b;
     if (x->z != z->z) return x->z < z->z ? -1 : 1;
+    if (x->zi != z->zi) return x->zi < z->zi ? -1 : 1;
     return x->order < z->order ? -1 : x->order > z->order;
 }
 
@@ -405,7 +406,7 @@ void yr_gfx_present(YR *y) {
 }
 
 static void dump(YR *y, const YLayer *l, int depth) {
-    yr_log(y, "%*s%s%s z=%d e=%d a=%d x=%d y=%d size=%dx%d%s%s mode=%d\n", depth * 2, "", l->name, l->isSet ? "/" : "", l->z,
+    yr_log(y, "%*s%s%s z=%g e=%d a=%d x=%d y=%d size=%dx%d%s%s mode=%d\n", depth * 2, "", l->name, l->isSet ? "/" : "", l->z,
            l->e, l->a, l->x, l->y, l->isSet ? l->sx : l->w, l->isSet ? l->sy : l->h, l->file ? " file=" : "",
            l->file ? l->file : "", l->mode);
     for (int i = 0; i < l->nkids; i++) dump(y, l->kids[i], depth + 1);
