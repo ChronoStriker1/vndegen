@@ -29,6 +29,14 @@ nonisolated public struct ArtemisPlugin: EnginePlugin {
     /// Artemis reads a mouse and keyboard and no gamepad. A click reads on and presses buttons, and the right click
     /// opens the game's menu.
     public var defaultControls: ControlLayout { .visualNovel }
+
+    public var controlReaderVersion: Int { ArtemisControls.version }
+
+    public func suggestedControls(folder: URL) -> ControlSuggestion? {
+        guard let core = ArtemisCore.shared, let layout = ArtemisLayout(scanning: folder),
+              let files = ArtemisCore.Files(core: core, folder: folder, layout: layout) else { return nil }
+        return ArtemisControls.suggestion(files)
+    }
 }
 
 nonisolated public enum ArtemisError: Error, LocalizedError {

@@ -102,6 +102,8 @@ const char *vnwolf_debug_status(VNWolfEngine *e);
 // A sentence for the player about the most recent problem, such as a missing file, or NULL.
 const char *vnwolf_problem(VNWolfEngine *e);
 
+const char *vnwolf_key_checks(const char *gameRoot);
+
 #ifdef __cplusplus
 }
 #endif

@@ -857,11 +857,10 @@ bool Game::keyInput(Thread &t, const Command &c) {
             }
         }
     } else if (kind == 1) {
-        // Keyboard keys by Wolf's key code: one key, which reads 1 when down, or the first key down from the code given.
         const KeyCodes &codes = fresh ? input_.keysPressed : input_.keysHeld;
         int code = value(c.arg(2), t);
         if ((flags >> 8) & 0xF0) {
-            if (code >= 0 && code < kKeyCodeCount) v = heldTime ? keyHeldFrames_[code] : codes[code];
+            if (code >= 0 && code < kKeyCodeCount) v = heldTime ? keyHeldFrames_[code] : codes[code] ? code : 0;
         } else {
             for (int k = 100; k < kKeyCodeCount && !v; k++)
                 if (codes[k]) v = heldTime ? keyHeldFrames_[k] : k;
