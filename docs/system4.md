@@ -51,7 +51,7 @@ through the shared FrameHost module and maps the controls.
   stops finishing frames holds input back at most half a second per change. Pausing drops waiting input and lets go
   of every key and button the game holds. Confirm is Enter, cancel and the menu
   are the right mouse button, the arrows move, page up and down turn the wheel, dash is Ctrl, and the touch mouse
-  and touch gamepad send the same. The default layout is keyboard and mouse.
+  and touch gamepad send the same. The default layout is Visual novel.
 
 ## Development
 

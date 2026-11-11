@@ -89,13 +89,16 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - A game that can't start says why back in the library (#70), leaving during start no longer counts as played (#72), and Unity's settings message (#71) (0.32.3).
 - Save sync over FTP and WebDAV, with Ludusavi's settings for each, beside SMB (0.33.0).
 - Suggested controller layouts for RPG Maker MV and MZ games and Godot games, read from the game's own files and shown as "Suggested for this game" in the layout sheet (0.34.0).
+- Better default controller layouts: a new "Visual novel" layout for KiriKiri, NScripter, Artemis and AliceSoft games, "Mouse" for Flash, the A, S and D keys on RPG Maker XP, VX and VX Ace's spare buttons, and Control on RT for Wolf RPG (0.35.0).
 
 ## Bugs to fix
-New bugs get a GitHub issue and a line here. None are open.
+New bugs get a GitHub issue and a line here.
+- System 4: Evenicle stops at start with "unknown opcode 120 in T_PartsTypeGauge@SetGaugeType" (#84).
+- KiriKiri: Violated Hero stops after "OK, let's go inside." and no input moves it on (#85).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Better default controller layouts (item 1 under Next), on `feat/default-layouts`. Being planned: what today's defaults do in play in each engine, and the exact layout proposed for each. Nothing changes until the maintainer has seen the layouts.
+- Nothing right now.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
@@ -106,7 +109,7 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 
 ## Next
 Reordered with the maintainer on 2026-11-09, to put quick wins first. Only work that isn't built yet is listed.
-1. Better default layouts, now that suggested layouts has shipped. A survey of 167 games' files found buttons that do nothing under today's defaults: a visual novel layout for KiriKiri, NScripter, Artemis and AliceSoft games, the Mouse layout for Flash, RPG Maker XP, VX and VX Ace's X, Y and Z buttons, and Control for Wolf RPG. The exact layouts are agreed with the maintainer first, since they change what existing players have. Suggestions for Artemis, NScripter and Wolf RPG games may follow.
+1. Suggested layouts for more engines. Artemis and NScripter games give full key tables in their files, and Wolf RPG games name their keys but not what they do. Each is about a day, and "Visual novel" needs a set of buttons a suggestion may take (View, L3, R3 and LT were proposed). To be agreed with the maintainer first.
 2. Installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
 3. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, which NekoSDK also uses for WMV movies, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
 4. Last: save sync through the cloud types that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, with the same settings as Ludusavi.
