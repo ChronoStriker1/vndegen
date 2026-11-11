@@ -93,7 +93,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
-- System 4: Evenicle stops at start with "unknown opcode 120 in T_PartsTypeGauge@SetGaugeType" (#84).
+- System 4: Evenicle can't run yet: it sets up its 3D field with SealEngine before its title. The opcodes it stopped on now run, and its game page says it can't run (#84).
 - KiriKiri: Violated Hero stops after "OK, let's go inside." and no input moves it on (#85).
 
 ## In progress

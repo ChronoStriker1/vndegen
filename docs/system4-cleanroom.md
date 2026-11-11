@@ -8,7 +8,8 @@ port. This file lists where each part of the runtime came from, and what was unc
 ## Sources
 
 - **The games' own files**: the `.ain` code files, the `.ald` and `.afa` archives, the pictures, sounds and saves in
-  them. Test Games 19 (Rance 02), 46 (Sengoku Rance) and 56 (Rance IX).
+  them. Test Games 19 (Rance 02), 46 (Sengoku Rance) and 56 (Rance IX), and Evenicle's code file and the data in its
+  executable.
 - **AliceSoft's System 4.0 SDK** (`Sys42SDK_20041224.lzh`), a free download AliceSoft published for its user club in
   2004. Its terms allow unmodified redistribution; VNDegen redistributes none of it. The copy used came from a fan
   mirror archived on web.archive.org. Read for how the engine behaves:
@@ -72,6 +73,18 @@ port. This file lists where each part of the runtime came from, and what was unc
     a function-stack name, used only in error reporting; 232, which only Test Game 56 uses, pushes a local string
     onto a global array, like 226 (onto a local array) and 233 (onto a member), and its one use adds a name to a
     list when it isn't there yet.
+- Evenicle's code, the first to use them, settled more. ANDA, ORA and the string comparisons S_LT, S_GT, S_LTE and
+  S_GTE take no arguments, as XORA and S_NOTE do, and so do 120 CHECKUDO, 241, 243 and 247: with those counts every
+  function of its 14,595 decodes and every jump lands. CHECKUDO always follows the REF of a `<dummy>` local that holds
+  a method's returned reference, just before that local is assigned again, and the returned reference is the caller's
+  to release (the method returns it after `DUP SP_INC`), so CHECKUDO releases the old value as DELETE does. 241 takes
+  an array of structs, a member number and nothing else, where the same function sorts an int array with A_SORT, so
+  it sorts the structs by that member. 243 takes a delegate, an object and a method as DG_ADD does, and a delegate
+  cleared and given one method by DG_ADD gets three more by 243, so it adds too. 247 takes the same, inside a method
+  the delegate calls, just after the party member that method checks leaves the party, so it removes the method.
+  Evenicle's `main` also loops until `SystemService.GetSystemName` fills its string so that characters 5 and 6 are
+  the same digit and characters 5 and 6, 0, and 3 and 4 spell "558pg". The runtime returns `828pg55b349`, a string
+  in the data of Evenicle's executable that passes the check.
 - Heap model: pages (globals, a function's locals, a struct, an array) and strings in reference-counted slots whose
   numbers the code handles directly, as the SDK listings show (string variables hold slots, `SH_LOCALCREATE` makes a
   struct, references are page and index pairs and keep their page alive).

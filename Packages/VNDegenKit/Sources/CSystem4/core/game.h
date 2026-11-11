@@ -33,7 +33,7 @@ std::string codeFile(const std::string &root, const std::map<std::string, std::s
 // The file in dir whose name matches name in any case; empty when there is none.
 std::string findCaseless(const std::string &dir, const std::string &name);
 // What the game page says about how the game runs, such as the parts that don't yet; empty when there is nothing.
-std::string compatibilityNote(const Ain &ain);
+std::string compatibilityNote(const Ain &ain, const std::string &codeFile);
 
 class Game {
 public:

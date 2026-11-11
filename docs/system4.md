@@ -12,6 +12,7 @@ through the shared FrameHost module and maps the controls.
 | Rance 02 (Test Game 19) | Title, opening movie, play, camp menus, saves and loads. Saves move between VNDegen and the PC game in both directions. |
 | Sengoku Rance (Test Game 46) | Title, opening movie, story scenes, battles, the strategy map, saves and loads. Saves move between VNDegen and the PC game in both directions. |
 | Rance IX (Test Game 56) | Logos, warning, opening movie, title, the prologue's story scenes, saves and loads. Its battles and maps are 3D: at the first one, the chapter 1 map, the game stops with a message (see Known limits), and its game page says so beforehand. |
+| Evenicle | Doesn't run yet. It sets up its 3D field with SealEngine as it starts, before its title, so it stops with the 3D message at once, and its game page says it can't run yet. |
 
 ## What the runtime does
 
@@ -108,6 +109,9 @@ it waiting on the GPU rather than using the CPU, and pacing was the same both wa
 
 - Rance IX's 3D scenes (SealEngine and MarmotModelEngine), which include its battles and maps, don't run. The game
   stops with a message where the first one starts (in the first chapter); saves made before then load.
+- Evenicle needs SealEngine before its title, for its 3D field, and beyond it more than the runtime has: about 300
+  more PartsEngine functions, most of KiwiSoundEngine, ADVEngine and ReplaceText. Its code decodes fully, and its
+  check of `SystemService.GetSystemName` passes.
 - Rance IX's Flat animations (the Flash-like `.flat` files) aren't played: each reports itself finished at once, so
   the title screen has no logo animation. Numerals (numbers drawn from digit pictures), colour multiply and add on
   parts, and Parts_SetPartsConstructionSurfaceArea aren't drawn yet.
