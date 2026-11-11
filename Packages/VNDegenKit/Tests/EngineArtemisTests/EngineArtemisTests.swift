@@ -136,7 +136,7 @@ import VNCore
         #expect(ArtemisPrompt.button(for: .click(.secondary, pressed: true)) == .cancel)
         #expect(ArtemisPrompt.button(for: .click(.secondary, pressed: false)) == nil)
         #expect(ArtemisPrompt.button(for: key("ControlLeft")) == .dash)
-        #expect(ArtemisPrompt.button(for: key("Escape")) == .cancel)
+        #expect(ArtemisPrompt.button(for: key("Escape")) == .menu)
         #expect(ArtemisPrompt.button(for: key("ArrowUp")) == .up)
         #expect(ArtemisPrompt.button(for: key("ArrowDown")) == .down)
         #expect(ArtemisPrompt.button(for: key("ArrowLeft")) == .left)
@@ -167,7 +167,7 @@ import VNCore
     @Test func cancellingAKeyboardGivesNoText() {
         var answers: [(Bool, String?)] = []
         let prompt = ArtemisPrompt(title: "", message: "Name", cancels: true, text: "An") { answers.append(($0, $1)) }
-        prompt.handle(key("Escape"))
+        prompt.handle(.click(.secondary, pressed: true))
         #expect(answers.count == 1)
         #expect(answers[0].0 == false)
         #expect(answers[0].1 == nil)

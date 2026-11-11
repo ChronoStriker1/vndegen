@@ -77,7 +77,7 @@ final class ArtemisPrompt {
     }
 
     nonisolated private static let keyButtons: [String: VirtualButton] = [
-        "Enter": .confirm, "Space": .confirm, "Escape": .cancel, "KeyE": .cancel, "KeyR": .dash, "KeyF": .menu,
+        "Enter": .confirm, "Space": .confirm, "Escape": .menu, "KeyE": .cancel, "KeyR": .dash, "KeyF": .menu,
         "ControlLeft": .dash,
         "Digit1": .up, "Digit2": .right, "Digit3": .down, "Digit4": .left,
         "KeyW": .up, "KeyS": .down, "KeyA": .left, "KeyD": .right,
