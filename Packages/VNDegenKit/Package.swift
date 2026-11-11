@@ -22,6 +22,7 @@ let package = Package(
         .library(name: "EngineWolfRPG", targets: ["EngineWolfRPG"]),
         .library(name: "EngineAliceSoft", targets: ["EngineAliceSoft"]),
         .library(name: "EngineNekoSDK", targets: ["EngineNekoSDK"]),
+        .library(name: "EngineYuRIS", targets: ["EngineYuRIS"]),
         .library(name: "EngineUnity", targets: ["EngineUnity"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
@@ -143,6 +144,10 @@ let package = Package(
                              .linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
         .target(name: "EngineNekoSDK", dependencies: ["VNCore", "CNekoSDK", "FrameHost"], swiftSettings: mainActorByDefault),
+        .target(
+            name: "CYuRIS", dependencies: ["CVNFont"], exclude: ["third_party"],
+            cSettings: [.unsafeFlags(["-O2"])], linkerSettings: [.linkedLibrary("z")]),
+        .target(name: "EngineYuRIS", dependencies: ["VNCore", "CYuRIS", "FrameHost"], swiftSettings: mainActorByDefault),
         // Recognizes Unity games so their page can say why they can't run. It runs none (docs/unity.md).
         .target(name: "EngineUnity", dependencies: ["VNCore", "RegistryFile"], swiftSettings: mainActorByDefault),
         // Reads and writes regedit's .reg files and Ludusavi's registry data, for Unity's PlayerPrefs. Foundation only.
@@ -197,6 +202,7 @@ let package = Package(
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG", "TestSupport"]),
         .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),
         .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK", "CNekoSDK", "TestSupport"]),
+        .testTarget(name: "EngineYuRISTests", dependencies: ["EngineYuRIS"]),
         .testTarget(name: "EngineUnityTests", dependencies: ["EngineUnity", "RegistryFile", "TestSupport"]),
         .testTarget(name: "RegistryFileTests", dependencies: ["RegistryFile"], exclude: ["Fixtures"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack", "TestSupport"]),

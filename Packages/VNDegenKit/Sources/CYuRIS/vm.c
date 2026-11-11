@@ -125,6 +125,29 @@ static u32 chain_end(YR *y, YScript *s, u32 ip) {
     return ip;
 }
 
+static int do_ifjump(YCall *c, bool cont) {
+    YR *y = c->y;
+    YScript *s = c->s;
+    i64 lv = yc_int_or(c, "LV", 1);
+    if (lv < 1) lv = 1;
+    u32 ip = c->t->ip;
+    for (u32 i = ip; i-- > 0;) {
+        if (y->cmds[s->ins[i].cmd].id != C_IF) continue;
+        u32 end = i;
+        for (int guard = 0; guard < 100000; guard++) {
+            u32 next = s->ins[end].jump;
+            if (!next || next >= s->count) break;
+            end = next;
+            if (y->cmds[s->ins[end].cmd].id == C_IFEND) break;
+        }
+        if (end <= ip) continue;
+        if (--lv > 0) continue;
+        c->t->ip = cont ? i : end + 1;
+        return YR_JUMPED;
+    }
+    return YR_NEXT;
+}
+
 static int do_return(YCall *c) {
     YR *y = c->y;
     YTask *t = c->t;
@@ -286,6 +309,8 @@ static int exec(YR *y, YTask *t, YScript *s) {
         t->ip = chain_end(y, s, t->ip) + 1;
         return YR_JUMPED;
     case C_IFEND: return YR_NEXT;
+    case C_IFBREAK: return do_ifjump(&c, false);
+    case C_IFCONTINUE: return do_ifjump(&c, true);
     case C_LOOP: return do_loop(&c);
     case C_LOOPEND: return do_loopend(&c);
     case C_LOOPBREAK: return do_loopbreak(&c, false);

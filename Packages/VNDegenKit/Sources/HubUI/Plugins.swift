@@ -47,6 +47,8 @@ struct PluginInfo {
                                             license: "VNDegen, MIT"),
             EngineID("nekosdk"): PluginInfo(versions: "NekoSDK", runtime: "VNDegen's NekoSDK runtime, in C++",
                                             license: "VNDegen, MIT"),
+            EngineID("yuris"): PluginInfo(versions: "YU-RIS", runtime: "VNDegen's YU-RIS runtime, in C",
+                                          license: "VNDegen, MIT"),
             EngineID("alicesoft"): PluginInfo(versions: "AliceSoft System 3.0 to 3.9 and System 4",
                                               runtime: "VNDegen's System 3 runtime, in C, and System 4 runtime, in C++",
                                               license: "VNDegen, MIT"),
