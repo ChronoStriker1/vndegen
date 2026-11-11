@@ -1,4 +1,5 @@
 import Foundation
+import RuntimePackages
 import System
 import VNCore
 
@@ -10,6 +11,28 @@ nonisolated public struct ArchiveContents: Sendable, Equatable {
     /// The most space extraction may use: the listed data plus one file system block for each file and folder. Nil when
     /// a header leaves a file's size out, and then only the free-space reserve bounds extraction.
     var spaceLimit: Int64?
+    public internal(set) var installer: InstallerContents?
+
+    func includingAddOns(_ include: Bool) -> ArchiveContents {
+        guard var installer else { return self }
+        installer.includesAddOns = include
+        return ArchiveExtractor.contents(of: installer)
+    }
+}
+
+nonisolated public struct InstallerContents: Sendable, Equatable {
+    public let main: GameInstaller
+    public let addOns: [GameInstaller]
+    let mainVolumes: ArchiveSource.InstallerVolumes
+    let addOnVolumes: [ArchiveSource.InstallerVolumes]
+    public internal(set) var includesAddOns = true
+
+    public var title: String { main.title }
+    var folderName: String { InstallerName.folderName(for: main.title) }
+
+    var selected: [(game: GameInstaller, volumes: ArchiveSource.InstallerVolumes)] {
+        [(main, mainVolumes)] + (includesAddOns ? Array(zip(addOns, addOnVolumes)) : [])
+    }
 }
 
 nonisolated public struct ImportProgress: Sendable, Equatable {
@@ -29,6 +52,7 @@ nonisolated enum ArchiveExtractor {
     static let maxListedSize: Int64 = 1 << 50
 
     static func list(_ source: ArchiveSource) throws(ArchiveError) -> ArchiveContents {
+        if source.isInstaller { return try listInstallers(source) }
         let reader = try ArchiveReader(source.volumes, password: nil)
         var contents = ArchiveContents()
         var entries: Int64 = 0
@@ -47,6 +71,46 @@ nonisolated enum ArchiveExtractor {
         }
         if contents.isEncrypted, !reader.canDecrypt { throw .unsupportedEncryption }
         if everySizeListed { contents.spaceLimit = try addListed(entries * entryOverhead, to: contents.byteCount) }
+        return contents
+    }
+
+    private static func listInstallers(_ source: ArchiveSource) throws(ArchiveError) -> ArchiveContents {
+        var opened: [(game: GameInstaller, volumes: ArchiveSource.InstallerVolumes)] = []
+        for volumes in source.installers {
+            let (setup, slices) = source.installerVolumes(volumes)
+            do {
+                opened.append((try GameInstaller.open(setup: setup, slices: slices), volumes))
+            } catch {
+                if volumes.picked { throw .installer(error) }
+            }
+        }
+        let picked = opened.filter(\.volumes.picked)
+        let pickedMains = picked.filter { !$0.game.isAddOn }
+        guard pickedMains.count <= 1 else { throw .severalGames }
+        let roots = Set(picked.compactMap { $0.game.isAddOn ? $0.game.gog?.rootGameId : nil })
+        guard let main = pickedMains.first
+                ?? opened.first(where: { !$0.game.isAddOn && $0.game.gameID.map(roots.contains) == true }) else {
+            throw .addOnAlone(picked.first?.game.title ?? source.suggestedFolderName)
+        }
+        let addOns = opened.filter { $0.game.isAddOn && $0.game.gog?.rootGameId != nil && $0.game.gog?.rootGameId == main.game.gameID }
+        guard picked.allSatisfy({ item in item.volumes == main.volumes || addOns.contains { $0.volumes == item.volumes } }) else {
+            throw .severalGames
+        }
+        let installer = InstallerContents(main: main.game, addOns: addOns.map(\.game), mainVolumes: main.volumes,
+                                          addOnVolumes: addOns.map(\.volumes))
+        return contents(of: installer)
+    }
+
+    static func contents(of installer: InstallerContents) -> ArchiveContents {
+        var contents = ArchiveContents()
+        var entries: Int64 = 0
+        for (game, _) in installer.selected {
+            contents.fileCount += game.fileCount
+            contents.byteCount += game.byteCount
+            entries += Int64(game.fileCount + game.directoryCount)
+        }
+        contents.spaceLimit = contents.byteCount + entries * entryOverhead
+        contents.installer = installer
         return contents
     }
 
@@ -79,6 +143,9 @@ nonisolated enum ArchiveExtractor {
         _ source: ArchiveSource, password: String?, into folder: URL, total: ArchiveContents,
         reserve: Int64 = spaceReserve, progress report: (ImportProgress) -> Void
     ) throws -> ImportProgress {
+        if let installer = total.installer {
+            return try extract(installer, from: source, into: folder, total: total, reserve: reserve, progress: report)
+        }
         let reader = try ArchiveReader(source.volumes, password: password)
         let isZip = source.volumes.count == 1 && source.volumes[0].pathExtension.lowercased() == "zip"
         let deflate64 = isZip ? try Deflate64Entries(zip: source.volumes[0]) : nil
@@ -164,6 +231,46 @@ nonisolated enum ArchiveExtractor {
         return progress
     }
 
+    private static func extract(
+        _ installer: InstallerContents, from source: ArchiveSource, into folder: URL, total: ArchiveContents,
+        reserve: Int64, progress report: (ImportProgress) -> Void
+    ) throws -> ImportProgress {
+        var progress = ImportProgress(total: total)
+        var lastReport = ContinuousClock.now
+        var used: Int64 = 0
+        var usedSinceSpaceCheck: Int64 = 0
+        var lastSpaceCheck: ContinuousClock.Instant?
+        func use(_ bytes: Int64) throws {
+            used += bytes
+            if let limit = total.spaceLimit, used > limit { throw ArchiveError.largerThanListed }
+            usedSinceSpaceCheck += bytes
+            let now = ContinuousClock.now
+            if usedSinceSpaceCheck >= 64 << 20 || lastSpaceCheck.map({ now - $0 >= .milliseconds(250) }) ?? true {
+                if try freeSpace(on: folder) < reserve { throw ArchiveError.ranOutOfSpace }
+                usedSinceSpaceCheck = 0
+                lastSpaceCheck = now
+            }
+        }
+        for (game, volumes) in installer.selected {
+            try use(Int64(game.directoryCount) * entryOverhead)
+            let (setup, slices) = source.installerVolumes(volumes)
+            do {
+                try game.extract(setup: setup, slices: slices, into: folder) { bytes, finished in
+                    try use(Int64(bytes) + (finished ? entryOverhead : 0))
+                    progress.bytes += Int64(bytes)
+                    if finished { progress.files += 1 }
+                    if ContinuousClock.now - lastReport > .milliseconds(100) {
+                        report(progress)
+                        lastReport = .now
+                    }
+                }
+            } catch let error as GameInstallerError {
+                throw ArchiveError.installer(error)
+            }
+        }
+        return progress
+    }
+
     /// The folder that becomes the game: the archive's only top-level folder, or the whole extraction when the archive
     /// holds several items. macOS metadata folders don't count.
     static func gameRoot(in staging: URL) -> URL {
@@ -178,8 +285,11 @@ nonisolated enum ArchiveExtractor {
         let items = visibleItems(in: root)
         guard !items.contains(where: isDirectory) else { return nil }
         let archives = items.filter { VolumeName($0.lastPathComponent) != nil }
-        guard !archives.isEmpty else { return nil }
-        return try? ArchiveSource(picked: archives)
+        if !archives.isEmpty { return try? ArchiveSource(picked: archives) }
+        let setups = items.filter { InstallerName($0.lastPathComponent)?.isSetup == true && GameInstaller.isInstaller($0) }
+        guard !setups.isEmpty else { return nil }
+        let parts = items.filter { InstallerName($0.lastPathComponent)?.isSetup == false }
+        return try? ArchiveSource(picked: setups + parts)
     }
 
     private static func visibleItems(in folder: URL) -> [URL] {

@@ -10,8 +10,23 @@ Put each game in its own folder, named as you want it to appear. The folder name
 - **Mac.** Copy the game folders into `~/Games/VNDegen`. It sits outside `~/Documents` so iCloud Drive does not upload your games.
 - **From an archive.** Add game in the library unpacks a zip, RAR, or 7z into the library. You can also drag an archive from Files or Finder onto VNDegen, or open it in VNDegen from the Files Share menu or with Open With on a Mac.
 - **Archive copied into VNDegen's folder.** Copy a zip, RAR, or 7z into On My iPhone (or iPad), VNDegen, or its Games folder. On a Mac, copy it into `~/Games/VNDegen`. The library lists it under Ready to import, and its Import button opens the import with the archive chosen. "Delete archive after import" starts on for these archives. Use this when choosing an archive, dropping it, or opening it in VNDegen does nothing, which happens on some sideloaded installs.
+- **From an installer or a disc image.** See [Installers and disc images](#installers-and-disc-images).
 
 VNDegen rescans every library folder on launch, on pull to refresh, with Rescan in Settings, and when you return to the app.
+
+## Installers and disc images
+
+VNDegen adds a game from its GOG installer, or from an ISO disc image, without running anything. It reads the installer like an archive and unpacks only the game's files into the library. Add game takes the installer the same ways it takes an archive: Choose Archive, a drop, Open in VNDegen, or Ready to import.
+
+- **GOG installers** are `setup_<game>_<version>_(<number>).exe`, often with `-1.bin`, `-2.bin` parts beside it. Choose the `.exe`. On a Mac, and for files in VNDegen's own folder, VNDegen finds the `.bin` parts beside it. Elsewhere on an iPhone or iPad, choose the `.exe` and every `.bin` together. A missing part is named before anything is unpacked.
+- **Add-ons.** Many GOG games come with a second installer, such as an "unrated" one, that adds files to the main game. When the add-on sits beside the main installer, or you choose both, the import shows "Include" with the add-on's name, on by default, and puts both into one game folder. An add-on chosen on its own is refused: choose it together with the main installer.
+- **Inside an archive.** When an archive holds only an installer, such as a GOG download repacked as a RAR, VNDegen offers to unpack the game from it after extracting the archive. The installer and the game are both on the device until the import ends, so the space needed is about the installer's size plus the game's. The installer copy is deleted when the import ends.
+- **Names and languages.** The game folder is named after the game's GOG title. A multi-language installer unpacks the files for your device's language when it has them, otherwise its default language.
+- **What stays out.** Installer helpers, the uninstaller, GOG's support files, and redistributables such as DirectX are left out, and nothing is written to a registry. The games VNDegen runs don't need any of that.
+- **Deleting the installer.** "Delete installer after import" works as for archives: it's offered for installers in VNDegen's own folders, starts on for ones under Ready to import, and deletes every part of each installer that was unpacked.
+- **ISO disc images** unpack like archives. A disc that holds its game as plain files, such as Mizuiro, becomes a game folder.
+
+What VNDegen can't unpack, and says so when you choose it: other installer kinds (Inno Setup 6, NSIS, InstallShield, MSI, Setup Factory), repacks such as FitGirl and DODI, whose files are packed with tools that only run on Windows, installers protected with a password, and BIN/CUE, MDF/MDS, or UDF-only disc images. Install those on a computer and copy the game's folder instead.
 
 ## Other folders
 

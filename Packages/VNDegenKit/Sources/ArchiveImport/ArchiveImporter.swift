@@ -56,6 +56,10 @@ public final class ArchiveImporter {
     public private(set) var canDeleteArchive = false
     /// On by default for an archive the library lists under Ready to import, which the user copied in only to import it.
     public var deleteArchiveAfterImport = false
+    public var includeAddOns = true {
+        didSet { contents = contents?.includingAddOns(includeAddOns) }
+    }
+    public private(set) var nestedSource: ArchiveSource?
 
     /// The archive the user picked, which "Delete archive after import" removes, and each volume's identity when it was
     /// listed. A volume whose file changed since then is a different file and stays.
@@ -136,8 +140,9 @@ public final class ArchiveImporter {
             }
             picked = (source, contents, identities)
             self.source = source
+            includeAddOns = true
             self.contents = contents
-            folderName = source.suggestedFolderName
+            folderName = contents.installer?.folderName ?? source.suggestedFolderName
             // A copy is deleted anyway, and deleting it never frees the original's space.
             canDeleteArchive = source.volumes.allSatisfy { DroppedFiles.ownedCopy(of: $0) == nil && isInOwnFolders($0) }
             deleteArchiveAfterImport = canDeleteArchive && source.volumes.allSatisfy { LocalArchives.isListed($0, gamesRoot: gamesRoot) }
@@ -180,11 +185,17 @@ public final class ArchiveImporter {
     public func extractNested() {
         guard case .nested = step, let root = pendingRoot, let inner = ArchiveExtractor.nestedArchive(in: root) else { return }
         pendingRoot = nil
+        nestedSource = nil
         password = nil
         source = inner
         do {
+            includeAddOns = true
             contents = try ArchiveExtractor.list(inner)
-            startImport()
+            if contents?.installer?.addOns.isEmpty == false {
+                step = .reviewing
+            } else {
+                startImport()
+            }
         } catch {
             discardStagings()
             fail(error, returningTo: .reviewing)
@@ -195,6 +206,7 @@ public final class ArchiveImporter {
     public func keepNested() {
         guard case .nested = step, let root = pendingRoot else { return }
         pendingRoot = nil
+        nestedSource = nil
         finish(root)
     }
 
@@ -218,7 +230,9 @@ public final class ArchiveImporter {
         password = nil
         errorMessage = nil
         pendingRoot = nil
+        nestedSource = nil
         deleteArchiveAfterImport = false
+        includeAddOns = true
     }
 
     // MARK: Extraction
@@ -259,6 +273,7 @@ public final class ArchiveImporter {
                 let root = ArchiveExtractor.gameRoot(in: staging)
                 if let inner = ArchiveExtractor.nestedArchive(in: root) {
                     pendingRoot = root
+                    nestedSource = inner
                     step = .nested(fileName: inner.fileName)
                 } else {
                     finish(root)
@@ -298,7 +313,11 @@ public final class ArchiveImporter {
         discardStagings()
         var kept: [String] = []
         if deleteArchiveAfterImport, canDeleteArchive, let picked {
-            for (volume, identity) in zip(picked.source.volumes, picked.identities) {
+            let imported = picked.contents.installer.map { installer in
+                Set(([installer.mainVolumes] + (includeAddOns ? installer.addOnVolumes : [])).flatMap(\.indexes))
+            }
+            for (index, (volume, identity)) in zip(picked.source.volumes, picked.identities).enumerated()
+            where imported?.contains(index) ?? true {
                 if let identity, NSFileCoordinator.delete(volume, ifStill: identity) { continue }
                 importLog.notice("Kept \(volume.lastPathComponent, privacy: .public), which changed after it was chosen")
                 kept.append(volume.lastPathComponent)
@@ -317,7 +336,7 @@ public final class ArchiveImporter {
     private func restartFromPicked() {
         guard let picked else { return }
         source = picked.source
-        contents = picked.contents
+        contents = picked.contents.includingAddOns(includeAddOns)
         password = nil
         step = .reviewing
     }

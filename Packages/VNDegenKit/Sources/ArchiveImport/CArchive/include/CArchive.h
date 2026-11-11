@@ -32,6 +32,7 @@ int archive_read_support_format_zip_seekable(struct archive *);
 int archive_read_support_format_rar(struct archive *);
 int archive_read_support_format_rar5(struct archive *);
 int archive_read_support_format_7zip(struct archive *);
+int archive_read_support_format_iso9660(struct archive *);
 int archive_read_add_passphrase(struct archive *, const char *);
 int archive_read_open_filenames(struct archive *, const char **filenames, size_t block_size);
 int archive_read_next_header(struct archive *, struct archive_entry **);

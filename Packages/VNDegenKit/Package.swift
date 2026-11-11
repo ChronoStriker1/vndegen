@@ -164,14 +164,14 @@ let package = Package(
         .target(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
             linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
-        .target(name: "ArchiveImport", dependencies: ["CArchive", "ControllerUI", "VNCore"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
+        .target(name: "ArchiveImport", dependencies: ["CArchive", "ControllerUI", "VNCore", "RuntimePackages"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
         // Downloads, checks, and unpacks runtime packages such as the RPG Maker RTPs. CLzmaDec is the LZMA SDK's decoder,
         // which Inno Setup installers need.
         .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
         .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md", "LICENSE-innoextract.txt", "LICENSE-LZMA-SDK.txt"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         // Where tests make their fixture folders. See TestFolders.
-        .target(name: "TestSupport", path: "Tests/TestSupport"),
+        .target(name: "TestSupport", dependencies: ["CLzmaDec"], path: "Tests/TestSupport"),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "VNCore", "FontPack", "CVNAlpha", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime", "TestSupport"], exclude: ["Fixtures"]),
@@ -188,7 +188,7 @@ let package = Package(
         .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy", "EngineNScripter", "EngineRPGMaker", "TestSupport"]),
         .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "RegistryFile", "EngineRPGMaker", "EngineRenPy", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "RcloneTests", dependencies: ["Rclone", "CRclone", "TestSupport"]),
-        .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport", "TestSupport"], exclude: ["Fixtures"]),
+        .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport", "RuntimePackages", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages", "TestSupport"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS", "TestSupport"]),
         .testTarget(name: "EngineArtemisTests", dependencies: ["EngineArtemis", "TestSupport"]),

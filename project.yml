@@ -161,6 +161,10 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [public.zip-archive, com.rarlab.rar-archive, org.7-zip.7-zip-archive]
+          - CFBundleTypeName: Game installer or disc image
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [com.microsoft.windows-executable, public.iso-image]
         # iOS's built-in type list has no RAR or 7z type. A type another app exports wins over these.
         UTImportedTypeDeclarations:
           - UTTypeIdentifier: com.rarlab.rar-archive

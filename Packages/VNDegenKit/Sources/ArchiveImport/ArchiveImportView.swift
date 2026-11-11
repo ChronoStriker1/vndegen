@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import ControllerUI
+import RuntimePackages
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -15,7 +16,7 @@ public final class ArchiveImportModel {
     enum Control: Hashable {
         /// An archive already in VNDegen's folder, by its first volume.
         case localArchive(URL)
-        case chooseArchive, folderName, destination, deleteToggle, chooseAnother, startImport, passwordField, cancelPassword, unlock, cancelImport
+        case chooseArchive, folderName, destination, addOnToggle, deleteToggle, chooseAnother, startImport, passwordField, cancelPassword, unlock, cancelImport
         case keepNested, extractNested, importAnother, done
     }
 
@@ -103,7 +104,10 @@ public final class ArchiveImportModel {
         switch importer.step {
         case .choosing: return [[.chooseArchive]] + localArchives.map { [.localArchive($0.url)] }
         case .opening: return []
-        case .reviewing: return [[.folderName]] + (destinations.count > 1 ? [[.destination]] : []) + (importer.canDeleteArchive ? [[.deleteToggle]] : []) + [[.chooseAnother, .startImport]]
+        case .reviewing:
+            let addOns = importer.contents?.installer?.addOns.isEmpty == false
+            return [[.folderName]] + (destinations.count > 1 ? [[.destination]] : []) + (addOns ? [[.addOnToggle]] : [])
+                + (importer.canDeleteArchive ? [[.deleteToggle]] : []) + [[.chooseAnother, .startImport]]
         case .password: return [[.passwordField], [.cancelPassword, .unlock]]
         case .extracting: return [[.cancelImport]]
         case .nested: return [[.keepNested, .extractNested]]
@@ -185,6 +189,9 @@ public final class ArchiveImportModel {
             // A controller steps through the folders. Touch and the pointer use the menu instead.
             let index = destinations.firstIndex(of: destination) ?? 0
             destination = destinations[(index + 1) % destinations.count]
+            return
+        case .addOnToggle:
+            importer.includeAddOns.toggle()
             return
         case .deleteToggle:
             importer.deleteArchiveAfterImport.toggle()
@@ -336,8 +343,8 @@ public struct ArchiveDropTarget: View {
             Image(systemName: "archivebox")
                 .font(.system(size: 34, weight: .semibold))
                 .foregroundStyle(targeted ? ImportTheme.accent : ImportTheme.secondaryText)
-            Text("Drop a zip, RAR, or 7z archive").font(.system(size: 16, weight: .semibold))
-            Text("For a multi-part archive, drop all of its parts.")
+            Text("Drop an archive, an ISO, or a GOG installer").font(.system(size: 16, weight: .semibold))
+            Text("For a multi-part archive or installer, drop all of its parts.")
                 .font(.system(size: 13))
                 .foregroundStyle(ImportTheme.tertiaryText)
         }
@@ -415,6 +422,9 @@ private struct StepView: View {
             Text("Games are extracted into a library folder you choose after picking the archive, VNDegen's Games folder unless you add others in Settings. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
                 .font(.system(size: 13))
                 .foregroundStyle(ImportTheme.secondaryText)
+            Text("GOG installers work too: choose the .exe with its .bin parts. VNDegen never runs the installer. It unpacks the game's files from it, as from an archive. ISO disc images work the same way.")
+                .font(.system(size: 13))
+                .foregroundStyle(ImportTheme.secondaryText)
             #if os(iOS)
             Text("If Choose Archive does nothing, copy the archive into On My \(UIDevice.current.localizedModel), then VNDegen, in Files. The library lists it under Ready to import.")
                 .font(.system(size: 13))
@@ -435,14 +445,28 @@ private struct StepView: View {
     @ViewBuilder private var reviewing: some View {
         if let source = importer.source, let contents = importer.contents {
             Card {
-                Label(source.fileName, systemImage: "archivebox.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .lineLimit(2)
-                Text(summary(files: contents.fileCount, bytes: contents.byteCount)
-                     + (source.volumes.count > 1 ? ", \(source.volumes.count) parts" : "")
-                     + (contents.isEncrypted ? ", password protected" : ""))
-                    .font(.system(size: 14))
-                    .foregroundStyle(ImportTheme.secondaryText)
+                if let installer = contents.installer {
+                    Label(installer.title, systemImage: "shippingbox.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .lineLimit(2)
+                    Text("Installer \(source.fileName)")
+                        .font(.system(size: 14))
+                        .foregroundStyle(ImportTheme.secondaryText)
+                        .lineLimit(2)
+                    Text(summary(files: contents.fileCount, bytes: contents.byteCount)
+                         + (installer.main.languages.count > 1 ? ", \(installer.main.language ?? "")" : ""))
+                        .font(.system(size: 14))
+                        .foregroundStyle(ImportTheme.secondaryText)
+                } else {
+                    Label(source.fileName, systemImage: "archivebox.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .lineLimit(2)
+                    Text(summary(files: contents.fileCount, bytes: contents.byteCount)
+                         + (source.volumes.count > 1 ? ", \(source.volumes.count) parts" : "")
+                         + (contents.isEncrypted ? ", password protected" : ""))
+                        .font(.system(size: 14))
+                        .foregroundStyle(ImportTheme.secondaryText)
+                }
             }
         }
         VStack(alignment: .leading, spacing: 8) {
@@ -493,11 +517,33 @@ private struct StepView: View {
                     .foregroundStyle(ImportTheme.tertiaryText)
             }
         }
+        if let installer = importer.contents?.installer, !installer.addOns.isEmpty {
+            Toggle(isOn: $importer.includeAddOns) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Include \(installer.addOns.map(\.title).formatted(.list(type: .and)))")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("The add-on goes into the same game folder, over the main game's files.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(ImportTheme.tertiaryText)
+                }
+            }
+            .tint(ImportTheme.accent)
+            .padding(12)
+            .background {
+                let focused = model.isFocused(.addOnToggle)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(focused ? ImportTheme.accent.opacity(0.32) : .clear)
+                    .strokeBorder(focused ? .white : .clear, lineWidth: 2.5)
+            }
+            .padding(.horizontal, -12)
+            .id(ArchiveImportModel.Control.addOnToggle)
+        }
         if importer.canDeleteArchive {
+            let what = importer.source?.isInstaller == true ? "installer" : "archive"
             Toggle(isOn: $importer.deleteArchiveAfterImport) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Delete archive after import").font(.system(size: 15, weight: .semibold))
-                    Text("Frees the space the archive uses on this device.")
+                    Text("Delete \(what) after import").font(.system(size: 15, weight: .semibold))
+                    Text("Frees the space the \(what) uses on this device.")
                         .font(.system(size: 13))
                         .foregroundStyle(ImportTheme.tertiaryText)
                 }
@@ -589,12 +635,15 @@ private struct StepView: View {
     }
 
     private func nested(_ fileName: String) -> some View {
-        Group {
+        let installer = importer.nestedSource?.isInstaller == true
+        return Group {
             Card {
-                Label("This archive holds another archive", systemImage: "shippingbox.fill")
+                Label(installer ? "This archive holds an installer" : "This archive holds another archive", systemImage: "shippingbox.fill")
                     .font(.system(size: 17, weight: .bold))
                 Text(fileName).font(.system(size: 14, weight: .semibold)).lineLimit(2)
-                Text("Extract it too, so the game folder holds the game instead of a second archive?")
+                Text(installer
+                     ? "Unpack the game from it? VNDegen reads the game's files out of the installer without running it. Only the game is kept."
+                     : "Extract it too, so the game folder holds the game instead of a second archive?")
                     .font(.system(size: 14))
                     .foregroundStyle(ImportTheme.secondaryText)
             }
@@ -603,7 +652,7 @@ private struct StepView: View {
                     .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.keepNested)))
                     .id(ArchiveImportModel.Control.keepNested)
                 Spacer()
-                Button { model.select(.extractNested) } label: { Label("Extract", systemImage: "arrow.down.doc.fill") }
+                Button { model.select(.extractNested) } label: { Label(installer ? "Unpack" : "Extract", systemImage: "arrow.down.doc.fill") }
                     .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.extractNested)))
                     .keyboardShortcut(.defaultAction)
                     .id(ArchiveImportModel.Control.extractNested)

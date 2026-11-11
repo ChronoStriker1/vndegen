@@ -63,6 +63,47 @@ final class LZMA1Decoder: Decompressor {
     }
 }
 
+final class LZMA2Decoder: Decompressor {
+    private var state = CLzma2Dec()
+    private var started = false
+    private var finished = false
+    private let allocator = ISzAlloc(Alloc: { _, size in malloc(size) }, Free: { _, address in free(address) })
+
+    deinit {
+        withUnsafeMutablePointer(to: &state.decoder) { decoder in
+            withUnsafePointer(to: allocator) { LzmaDec_Free(decoder, $0) }
+        }
+    }
+
+    func decode(_ input: UnsafeRawBufferPointer, into output: UnsafeMutableRawBufferPointer) throws
+        -> (consumed: Int, produced: Int, ended: Bool) {
+        var consumed = 0
+        if !started {
+            guard let property = input.first else { return (0, 0, false) }
+            guard property <= 40 else { throw RuntimeInstallError.corrupt("bad LZMA2 properties") }
+            let result = withUnsafeMutablePointer(to: &state) { state in
+                withUnsafePointer(to: allocator) { Lzma2Dec_Allocate(state, property, $0) }
+            }
+            guard result == SZ_OK else { throw RuntimeInstallError.corrupt("LZMA2 dictionary allocation failed") }
+            withUnsafeMutablePointer(to: &state) { Lzma2Dec_Init($0) }
+            consumed = 1
+            started = true
+        }
+        guard !finished else { return (consumed, 0, true) }
+        var inSize = input.count - consumed
+        var outSize = output.count
+        var status = LZMA_STATUS_NOT_SPECIFIED
+        let result = withUnsafeMutablePointer(to: &state) { state in
+            Lzma2Dec_DecodeToBuf(state, output.baseAddress?.assumingMemoryBound(to: UInt8.self), &outSize,
+                                 input.baseAddress.map { ($0 + consumed).assumingMemoryBound(to: UInt8.self) }, &inSize,
+                                 LZMA_FINISH_ANY, &status)
+        }
+        guard result == SZ_OK else { throw RuntimeInstallError.corrupt("LZMA2 data error \(result)") }
+        finished = status == LZMA_STATUS_FINISHED_WITH_MARK
+        return (consumed + inSize, outSize, finished)
+    }
+}
+
 /// zlib streams with their zlib header, as Inno Setup writes them.
 final class ZlibDecoder: Decompressor {
     private var stream = z_stream()

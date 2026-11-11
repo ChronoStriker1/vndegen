@@ -61,7 +61,6 @@ public struct HubRootView: View {
             if phase == .active, case .library = hub.screen { Task { await hub.refreshLibrary() } }
         }
         .task { ArchiveImporter.discardStaleDropCopies() }
-        // An archive opened in VNDegen from Files, Finder, or a share sheet. The app declares zip, RAR, and 7z.
         .onOpenURL { url in
             if url.isFileURL { nav.openImport([url]) }
         }

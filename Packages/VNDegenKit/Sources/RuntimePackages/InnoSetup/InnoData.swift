@@ -64,11 +64,13 @@ final class InnoSliceReader {
     private let dataOffset: UInt64
     private let slicesPerDisk: Int
     private let baseNames: [String]
+    private let files: [URL]
     private var current: (index: Int, file: RandomAccessFile, end: UInt64)?
     private var position: UInt64 = 0
 
-    init(setup: RandomAccessFile, headers: InnoHeaders) {
+    init(setup: RandomAccessFile, headers: InnoHeaders, files: [URL] = []) {
         self.setup = setup
+        self.files = files
         dataOffset = headers.offsets.dataOffset
         slicesPerDisk = max(1, headers.slicesPerDisk)
         let setupName = setup.url.deletingPathExtension().lastPathComponent
@@ -97,6 +99,28 @@ final class InnoSliceReader {
         return read
     }
 
+    var isEmbedded: Bool { dataOffset != 0 }
+
+    private func names(slice: Int) -> [String] {
+        let suffix = slicesPerDisk == 1
+            ? "\(slice + 1)"
+            : "\(slice / slicesPerDisk + 1)\(Character(UnicodeScalar(UInt8(ascii: "a") + UInt8(slice % slicesPerDisk))))"
+        return baseNames.map { "\($0)-\(suffix).bin" }
+    }
+
+    func expectedName(slice: Int) -> String { names(slice: slice)[0] }
+
+    func locate(slice: Int) -> URL? {
+        let folder = setup.url.deletingLastPathComponent()
+        let names = names(slice: slice)
+        if let given = names.lazy.compactMap({ name in self.files.first { $0.lastPathComponent.lowercased() == name.lowercased() } }).first {
+            return given
+        }
+        let present = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        return names.lazy.compactMap { name in present.first { $0.lowercased() == name.lowercased() } }.first
+            .map { folder.appending(path: $0) }
+    }
+
     private func open(slice: Int) throws {
         if current?.index == slice { return }
         if dataOffset != 0 {
@@ -104,15 +128,11 @@ final class InnoSliceReader {
             current = (0, setup, setup.size)
             return
         }
-        let suffix = slicesPerDisk == 1
-            ? "\(slice + 1)"
-            : "\(slice / slicesPerDisk + 1)\(Character(UnicodeScalar(UInt8(ascii: "a") + UInt8(slice % slicesPerDisk))))"
-        let folder = setup.url.deletingLastPathComponent()
-        let names = baseNames.map { "\($0)-\(suffix).bin" }
-        let present = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
-        guard let name = names.lazy.compactMap({ name in present.first { $0.lowercased() == name.lowercased() } }).first
-        else { throw RuntimeInstallError.corrupt("missing data file \(names[0])") }
-        let file = try RandomAccessFile(url: folder.appending(path: name))
+        guard let url = locate(slice: slice) else {
+            throw RuntimeInstallError.corrupt("missing data file \(expectedName(slice: slice))")
+        }
+        let name = url.lastPathComponent
+        let file = try RandomAccessFile(url: url)
         var header = ByteReader(try file.read(at: 0, count: 12))
         let magic = Array(try header.take(8))
         guard magic == Array("idska16".utf8) + [0x1a] || magic == Array("idska32".utf8) + [0x1a] else {
@@ -147,7 +167,7 @@ final class InnoChunkStream {
         case .zlib: decoder = try ZlibDecoder()
         case .bzip2: decoder = try BZip2Decoder()
         case .lzma1: decoder = LZMA1Decoder()
-        case .lzma2: throw RuntimeInstallError.unsupportedInstaller("LZMA2 compression is not supported")
+        case .lzma2: decoder = LZMA2Decoder()
         }
     }
 

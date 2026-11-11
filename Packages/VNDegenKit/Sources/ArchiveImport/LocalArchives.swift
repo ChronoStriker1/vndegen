@@ -46,12 +46,23 @@ nonisolated public enum LocalArchives {
         let urls = (try? FileManager.default.contentsOfDirectory(
             at: folder, includingPropertiesForKeys: Array(keys), options: .skipsHiddenFiles)) ?? []
         var sets: [String: [(name: VolumeName, url: URL, size: Int64)]] = [:]
+        var setups: [String: (url: URL, size: Int64)] = [:]
+        var parts: [String: [Int64]] = [:]
         for url in urls {
-            guard let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
-                  let name = VolumeName(url.lastPathComponent) else { continue }
-            sets[name.set, default: []].append((name, url, Int64(values.fileSize ?? 0)))
+            guard let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true else { continue }
+            let size = Int64(values.fileSize ?? 0)
+            if let installer = InstallerName(url.lastPathComponent) {
+                if installer.isSetup { setups[installer.stem] = (url, size) } else { parts[installer.stem, default: []].append(size) }
+                continue
+            }
+            guard let name = VolumeName(url.lastPathComponent) else { continue }
+            sets[name.set, default: []].append((name, url, size))
         }
-        return sets.values.compactMap { volumes in
+        let installers = setups.map { stem, setup in
+            LocalArchive(url: setup.url, parts: 1 + (parts[stem]?.count ?? 0),
+                         byteCount: setup.size + (parts[stem] ?? []).reduce(0, +))
+        }
+        return installers + sets.values.compactMap { volumes in
             // A set whose first volume is missing can't be read, so it waits until the user copies that part in.
             guard let first = volumes.min(by: { $0.name.index < $1.name.index }),
                   first.name.index == first.name.kind.firstIndex else { return nil }

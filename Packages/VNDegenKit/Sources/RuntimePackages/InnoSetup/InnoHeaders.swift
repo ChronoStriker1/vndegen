@@ -278,6 +278,10 @@ struct InnoHeaders {
         let location: Int
         let deleteAfterInstall: Bool
         let isUninstaller: Bool
+        var languages = ""
+        var check = ""
+        var beforeInstall = ""
+        var afterInstall = ""
     }
 
     enum Checksum: Equatable {
@@ -295,6 +299,7 @@ struct InnoHeaders {
 
     struct DataEntry {
         let firstSlice: Int
+        var lastSlice = 0
         let chunkOffset: UInt64
         let chunkSize: UInt64
         let fileOffset: UInt64
@@ -307,6 +312,9 @@ struct InnoHeaders {
 
     let version: InnoVersion
     let offsets: InnoLoaderOffsets
+    let appName: String
+    let isGOG: Bool
+    let languages: [String]
     let baseFilename: String
     let slicesPerDisk: Int
     let licenseText: String?
@@ -325,9 +333,14 @@ struct InnoHeaders {
         let v = version
 
         // The setup header.
-        try reader.skipStrings(6)  // app name, versioned name, id, copyright, publisher, publisher URL
+        let appName = try reader.binaryString()
+        try reader.skipStrings(3)
+        let publisher = try reader.binaryString()
+        let publisherURL = try reader.binaryString()
         if v >= InnoVersion(5, 1, 13) { try reader.skipStrings(1) }  // support phone
-        try reader.skipStrings(5)  // support URL, updates URL, version, default dir name, default group name
+        let supportURL = try reader.binaryString()
+        let updatesURL = try reader.binaryString()
+        try reader.skipStrings(3)
         let baseFilename = try reader.binaryString()
         var license: ArraySlice<UInt8> = []
         if v < InnoVersion(5, 2, 5) {
@@ -400,8 +413,10 @@ struct InnoHeaders {
         // Languages. Non-unicode installers store text in the codepage of their languages.
         var codepages: [UInt32] = []
         var languageLicenses: [ArraySlice<UInt8>] = []
+        var languageNames: [ArraySlice<UInt8>] = []
         for _ in 0..<languageCount {
-            try reader.skipStrings(7)  // name, language name, four fonts, data
+            languageNames.append(try reader.binaryString())
+            try reader.skipStrings(6)
             languageLicenses.append(try reader.binaryString())
             try reader.skipStrings(2)  // info before, info after
             try reader.skip(4)  // language id
@@ -449,7 +464,11 @@ struct InnoHeaders {
             try reader.skipStrings(1)  // source
             let destination = text.decode(try reader.binaryString())
             try reader.skipStrings(v >= InnoVersion(5, 2, 5) ? 2 : 1)  // font name, strong assembly name
-            try reader.skipStrings(6)  // components, tasks, languages, check, after install, before install
+            try reader.skipStrings(2)
+            let languages = text.decode(try reader.binaryString())
+            let check = text.decode(try reader.binaryString())
+            let afterInstall = text.decode(try reader.binaryString())
+            let beforeInstall = text.decode(try reader.binaryString())
             try reader.skip(20)  // Windows versions
             let location = Int(try reader.u32())
             try reader.skip(4 + 8 + 2)  // attributes, external size, permission
@@ -460,7 +479,8 @@ struct InnoHeaders {
                     + [v >= InnoVersion(5, 2, 5)])
             let type = try reader.u8()
             files.append(File(destination: destination, location: location, deleteAfterInstall: flags[3],
-                              isUninstaller: type == 1))
+                              isUninstaller: type == 1, languages: languages, check: check,
+                              beforeInstall: beforeInstall, afterInstall: afterInstall))
         }
         // Icons, ini, registry, delete and run entries, then the wizard images, follow. Extraction needs none of them,
         // and the block's stored size says where the next block starts.
@@ -469,7 +489,7 @@ struct InnoHeaders {
         var dataEntries: [DataEntry] = []
         for _ in 0..<dataEntryCount {
             let firstSlice = Int(try dataReader.u32())
-            _ = try dataReader.u32()  // last slice
+            let lastSlice = Int(try dataReader.u32())
             let chunkOffset = UInt64(try dataReader.u32())
             let fileOffset = try dataReader.u64()
             let fileSize = try dataReader.u64()
@@ -483,12 +503,16 @@ struct InnoHeaders {
             let filter: ExecutableFilter = !flags[4] ? .noFilter
                 : v < InnoVersion(5, 2, 0) ? .v4108 : .v5200(flipHighByte: v >= InnoVersion(5, 3, 9))
             dataEntries.append(DataEntry(
-                firstSlice: firstSlice, chunkOffset: chunkOffset, chunkSize: chunkSize, fileOffset: fileOffset,
+                firstSlice: firstSlice, lastSlice: lastSlice, chunkOffset: chunkOffset, chunkSize: chunkSize, fileOffset: fileOffset,
                 fileSize: fileSize, checksum: checksum, compression: flags[7] ? compression : .stored,
                 encrypted: flags[6], filter: filter))
         }
         guard dataReader.isAtEnd else { throw RuntimeInstallError.corrupt("unexpected data after the data entries") }
 
+        self.appName = text.decode(appName)
+        self.isGOG = text.decode(publisher).localizedCaseInsensitiveContains("GOG.com")
+            || [publisherURL, supportURL, updatesURL].contains { text.decode($0).localizedCaseInsensitiveContains("www.gog.com") }
+        self.languages = languageNames.map(text.decode)
         self.baseFilename = text.decode(baseFilename)
         self.slicesPerDisk = slicesPerDisk
         self.directories = directories
