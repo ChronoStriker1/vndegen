@@ -26,7 +26,7 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 - **Touch, mouse and keyboard, and controllers** drive the hub and the games, with a library of controller layouts you can pick per game, edit, and add to, and a layout suggested from an RPG Maker MV, MZ, Godot, Artemis, or Wolf RPG Editor game's own files. [Controls](docs/controls.md)
 - **More than one games folder**, such as an external drive or a server, and archives unpack straight into the library. [Library](docs/library.md#adding-games)
 - **Game menu.** A long press, a right click, or X on a controller opens Play, Change artwork, Hide, Remove, and more. [Library](docs/library.md#the-game-menu)
-- **Remove engine files.** RPG Maker MV and MZ, TyranoScript, and Ren'Py games can drop the PC engine files they don't need in VNDegen, about 88 to 295 MB a game on average. The game won't run on a PC from that folder afterwards. [Library](docs/library.md#removing-engine-files)
+- **Remove engine files.** RPG Maker MV and MZ, TyranoScript, Visual Novel Maker, and Ren'Py games can drop the PC engine files they don't need in VNDegen, about 88 to 295 MB a game on average. The game won't run on a PC from that folder afterwards. [Library](docs/library.md#removing-engine-files)
 - **Game commands.** Menus a game keeps in its window's menu bar, such as KiriKiri's, appear in the VNDegen menu. [Controls](docs/controls.md#game-commands)
 - **Cheats** for RPG Maker MV, MZ, XP, VX, and VX Ace, Wolf RPG Editor, and AliceSoft System 3 and 4: gold, items, encounters, game speed, variables with a find by value, and switches. Godot and Flash games get game speed. [Controls](docs/controls.md#cheats)
 - **Hidden games** behind Face ID, Touch ID, or a passcode. [Library](docs/library.md#hidden-games)
@@ -73,6 +73,8 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 | Artemis | a `.pfs` archive or a `system.ini` | Mac, iPhone, iPad | [artemis.md](docs/artemis.md) |
 | Godot 3 and Godot 4 | a `.pck` file, or a pack inside the game's `.exe` | Mac with Apple silicon, iPhone, iPad | [godot.md](docs/godot.md) |
 | Flash (ActionScript 1, 2, and 3) | a projector `.exe`, a `.swf`, or an HTML page that launches movies | Mac, iPhone, iPad | [flash.md](docs/flash.md) |
+| Visual Novel Maker | `index.html` with `data/ENGINE.js` and `data/SCRIPTS.js`, also in NW.js and Electron builds | Mac, iPhone, iPad | [htmlvn.md](docs/htmlvn.md) |
+| Twine 1 and 2 | an HTML file holding the story, also in a Unity player's Embedded Browser pack | Mac, iPhone, iPad | [htmlvn.md](docs/htmlvn.md) |
 | NScripter and Ponscripter | `nscript.dat`, or `0.txt`, `00.txt` or Ponscripter's `0.utf` beside NScripter archives | Mac, iPhone, iPad | [nscripter.md](docs/nscripter.md) |
 | Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` | Mac, iPhone, iPad | [wolfrpg.md](docs/wolfrpg.md) |
 | AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` | Mac, iPhone, iPad | [system3.md](docs/system3.md) |
@@ -159,7 +161,7 @@ A controller's Home button, the touch gamepad's house button, the small menu but
 - [library.md](docs/library.md): adding games, library folders, layouts, hidden games, and metadata sources
 - [controls.md](docs/controls.md): control methods, controller layouts, a game's dialogs, and Game commands
 - [cheats.md](docs/cheats.md): what the Cheats page does in each engine
-- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits, with more in [rgss.md](docs/rgss.md), [artemis.md](docs/artemis.md), [wolfrpg.md](docs/wolfrpg.md), [system3.md](docs/system3.md), [system4.md](docs/system4.md), [nscripter.md](docs/nscripter.md), [godot.md](docs/godot.md), and [flash.md](docs/flash.md)
+- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits, with more in [rgss.md](docs/rgss.md), [artemis.md](docs/artemis.md), [wolfrpg.md](docs/wolfrpg.md), [system3.md](docs/system3.md), [system4.md](docs/system4.md), [nscripter.md](docs/nscripter.md), [godot.md](docs/godot.md), [flash.md](docs/flash.md), and [htmlvn.md](docs/htmlvn.md)
 - [video.md](docs/video.md): movie decoding and the see-through clip converter
 - [ludusavi.md](docs/ludusavi.md): setting up and using Ludusavi backups
 - [fonts.md](docs/fonts.md): the Windows font substitutes

@@ -17,6 +17,8 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Artemis](#artemis) | a `.pfs` archive, such as `root.pfs`, whose first bytes are `pf2`, `pf6`, or `pf8`, or a `system.ini` that names the script to boot, up to two folders down | Mac, iPhone, iPad |
 | [Godot 3 and Godot 4](#godot) | a `.pck` file, usually beside the game's `.exe`, or a pack inside the `.exe`, up to two folders down | Mac with Apple silicon, iPhone, iPad |
 | [Flash (ActionScript 1, 2, and 3)](#flash) | A Flash projector `.exe` with the movie appended, a `.swf` movie, or an HTML page that launches movies, up to four folders down | Mac, iPhone, iPad |
+| [Visual Novel Maker](#visual-novel-maker) | `index.html` with `data/ENGINE.js` and `data/SCRIPTS.js`, in an NW.js or Electron build or a web export, also inside up to two wrapper folders, as a likely match | Mac, iPhone, iPad |
+| [Twine 1 and 2](#twine) | an HTML file holding the story (`<tw-storydata>`, or Twine 1's `storeArea`), up to three folders down, or a Unity player's Embedded Browser pack holding one. Inside wrapper folders it's a likely match | Mac, iPhone, iPad |
 | [NScripter](#nscripter) | `nscript.dat`, or `0.txt` or `00.txt` (or Ponscripter's `0.utf`) beside an `.nsa`, `.ns2`, or `.sar` archive or NScripter's own files, up to two folders down | Mac, iPhone, iPad |
 | [Wolf RPG Editor 2 and 3](#wolf-rpg-editor) | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf`, up to two folders down. `Game.exe` or `GamePro.exe` beside it makes the match certain | Mac, iPhone, iPad |
 | [AliceSoft System 3.0 to 3.9](#alicesoft-system-3) | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT`, up to two folders down. `SYSTEM3.EXE` beside `ADISK.DAT` makes the match certain | Mac, iPhone, iPad |
@@ -118,6 +120,14 @@ Games that can't run say why on their page: games that need other GDExtension or
 ## Flash
 
 Flash games run in Ruffle, a Flash Player written in Rust, built for the web and run on the same WebKit host with WebGL. VNDegen plays a game's Windows projector (`Game.exe` with the movie appended) without unpacking it, a `.swf` movie, or a collection's own HTML menu page. Movies a game loads, and its saves, are named as they are beside the PC executable. Saves are the `.sol` files Flash Player writes, kept in the game's data folder by the movie that made them, so saves from Flash Player or Ruffle on a PC restore through Ludusavi and load. ActionScript 3 support in Ruffle is less complete than for ActionScript 1 and 2, so some AS3 games may stop or misbehave. [flash.md](flash.md) has the details. The Cheats page in the VNDegen menu runs Flash games at 2x or 4x speed.
+
+## Visual Novel Maker
+
+Visual Novel Maker games run on the same WebKit host, with the NW.js layer standing in for the NW.js or Electron build the game shipped in. Saves are the `.vndata` files the PC version writes beside `Game.exe`, so Ludusavi backups from a PC restore there, including saves a game kept in AppData. The page sees Chrome, as on the PC, so the engine asks for the Ogg Vorbis and WebM files the games ship, and Ogg Vorbis audio goes through VNDegen's in-page decoder. Live2D models and WebM movies play. Games start with the "Visual novel" layout, since the engine reads Return, Control, Space, and the mouse. [htmlvn.md](htmlvn.md) has the details and known limits.
+
+## Twine
+
+Twine stories run as the web pages they are, with Harlowe, SugarCube, and the other story formats. VNDegen finds the story in a loose HTML file, in an NW.js or Electron wrapper, or in a Unity player that shows it through Zen Fulcrum's Embedded Browser, whose packed pages it serves without unpacking them. A Unity player whose pack holds a story is a Twine game, not a Unity one. Saves, which Twine keeps in the browser's localStorage, stay in the game's data folder, so they move between VNDegen devices but not to a PC. Pages scroll by touch, and LB and RB turn the mouse wheel, which scrolls them. [htmlvn.md](htmlvn.md) has the details and known limits.
 
 ## NScripter
 

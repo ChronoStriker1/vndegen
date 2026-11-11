@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "EngineRPGMaker", targets: ["EngineRPGMaker"]),
         .library(name: "EngineTyrano", targets: ["EngineTyrano"]),
         .library(name: "EngineFlash", targets: ["EngineFlash"]),
+        .library(name: "EngineHTMLVN", targets: ["EngineHTMLVN"]),
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
         .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
         .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
@@ -71,6 +72,8 @@ let package = Package(
         .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "EngineFlash", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        // Visual Novel Maker and Twine, two HTML engines on the shared web host.
+        .target(name: "EngineHTMLVN", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // Support holds the Python launcher and the Ren'Py hook script that Ren'Py loads from disk.
         .target(name: "EngineRenPy", dependencies: ["VNCore", "CRenPy"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
         // Runs Ren'Py inside the app on iOS. Ren'Py's static libraries are linked by the app target, not here.
@@ -177,6 +180,7 @@ let package = Package(
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime", "TestSupport"]),
         .testTarget(name: "EngineFlashTests", dependencies: ["EngineFlash", "WebRuntime", "FontPack", "TestSupport"]),
+        .testTarget(name: "EngineHTMLVNTests", dependencies: ["EngineHTMLVN", "WebRuntime", "TestSupport"]),
         // RenPyCompat is built for the tests, which run it as a command.
         .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput", "RenPyCompat", "TestSupport"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
