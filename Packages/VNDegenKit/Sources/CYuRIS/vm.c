@@ -461,7 +461,13 @@ int yr_cmd_task(YCall *c, int id) {
         if (t) {
             i64 e;
             if (yc_int(c, "E", &e)) t->enabled = e != 0;
-            if (yc_has(c, "SCRIPTPOS")) yc_unknown(c, "TASK SCRIPTPOS");
+            char *pos = yc_str(c, "SCRIPTPOS");
+            if (pos) {
+                bool ok = yr_scriptpos_set(y, t, pos);
+                free(pos);
+                if (!ok) yr_log(y, "TASK: unreadable SCRIPTPOS\n");
+                else if (t == c->t) { free(tid); return YR_JUMPED; }
+            }
         }
         break;
     }
@@ -485,7 +491,8 @@ int yr_cmd_task(YCall *c, int id) {
         else if (yc_int_or(c, "LINE", 0) || yc_int_or(c, "LINE0", 0)) {
             YScript *s = yr_script(y, t->script);
             r = yv_int(s && t->ip < s->count ? s->ins[t->ip].line : 0);
-        } else yc_unknown(c, "TASKINFO form");
+        } else if (yc_int_or(c, "SCRIPTPOS", 0)) r = yv_str_own(yr_scriptpos_get(y, t));
+        else yc_unknown(c, "TASKINFO form");
         yr_ref_set(y, c->t, &out, &r);
         yv_free(&r);
         break;

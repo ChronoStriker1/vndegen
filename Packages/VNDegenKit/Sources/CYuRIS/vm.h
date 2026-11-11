@@ -174,6 +174,9 @@ int yr_cmd_task(YCall *c, int id);      // TASK, TASKEND, TASKINFO
 int yr_cmd_save(YCall *c, int id);
 void yr_save_close(YR *y);
 
+char *yr_scriptpos_get(YR *y, YTask *t);
+bool yr_scriptpos_set(YR *y, YTask *t, const char *pos);
+
 // ---- save.c ----
 // Whether a file the game wrote (in the save folder) exists, by the game's name for it.
 bool yr_save_exists(YR *y, const char *name);

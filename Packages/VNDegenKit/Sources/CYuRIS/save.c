@@ -28,7 +28,10 @@ struct YSaveState {
     RecList reserve;
     MemSlot *mems;
     int nmems;
+    bool embedMems;
 };
+
+enum { MEM_SLOTS = 500, MEM_DNO = 1024, MEM_ALL = 99999 };
 
 typedef struct LayerFormat {
     u32 version;
@@ -357,9 +360,7 @@ static char *sd_path(YR *y, const char *file) {
     return yr_save_path(y, name);
 }
 
-static bool write_file(YR *y, const char *file, const RecList *l) {
-    char *path = sd_path(y, file);
-    if (!path) return false;
+static Buf build_file(YR *y, const RecList *l) {
     Buf b = { 0 };
     put(&b, "YSSD", 4);
     put32(&b, file_version(y));
@@ -378,16 +379,19 @@ static bool write_file(YR *y, const char *file, const RecList *l) {
         head[5] = 1;
         head[6] = (u8)r->vid;
         head[7] = (u8)(r->vid >> 8);
-        if (r->kind == KIND_GROUP) {
+        if (r->kind == KIND_GROUP || r->dno == MEM_DNO) {
             memcpy(head + 8, &r->size, 4);
             u32 total = 0;
-            for (const u8 *p = r->data; p + 12 <= r->data + r->size; p += 12 + yr_le32(p + 4)) total += 12 + yr_le32(p + 8);
+            if (r->dno == MEM_DNO)
+                for (const u8 *p = r->data; p + 8 <= r->data + r->size; p += 8 + yr_le32(p + 4)) total += 8 + yr_le32(p);
+            else
+                for (const u8 *p = r->data; p + 12 <= r->data + r->size; p += 12 + yr_le32(p + 4)) total += 12 + yr_le32(p + 8);
             memcpy(head + 12, &total, 4);
             put(&b, head, 16);
             put(&b, r->data, r->size);
         } else {
             u32 clen;
-            u8 *z = pack(r->data, r->size, false, &clen);
+            u8 *z = pack(r->data, r->size, file_version(y) == 481 && r->kind != KIND_LAYER, &clen);
             memcpy(head + 8, &clen, 4);
             memcpy(head + 12, &r->size, 4);
             put(&b, head, 16);
@@ -395,6 +399,13 @@ static bool write_file(YR *y, const char *file, const RecList *l) {
             free(z);
         }
     }
+    return b;
+}
+
+static bool write_file(YR *y, const char *file, const RecList *l) {
+    char *path = sd_path(y, file);
+    if (!path) return false;
+    Buf b = build_file(y, l);
     char *slash = strrchr(path, '/');
     if (slash) {
         *slash = 0;
@@ -407,13 +418,7 @@ static bool write_file(YR *y, const char *file, const RecList *l) {
     return ok;
 }
 
-static bool read_file(YR *y, const char *file, RecList *out) {
-    char *path = sd_path(y, file);
-    if (!path) return false;
-    size_t size;
-    u8 *d = yr_read_file(path, &size);
-    free(path);
-    if (!d) return false;
+static bool parse_file(const u8 *d, size_t size, RecList *out) {
     bool ok = size >= 16 && !memcmp(d, "YSSD", 4);
     u32 slots = ok ? yr_le32(d + 12) : 0;
     if (ok && 16 + (size_t)slots * 4 > size) ok = false;
@@ -426,7 +431,7 @@ static bool read_file(YR *y, const char *file, RecList *out) {
         r->dno = yr_le32(d + off);
         r->kind = d[off + 4];
         r->vid = yr_le16(d + off + 6);
-        if (r->kind == KIND_GROUP) {
+        if (r->kind == KIND_GROUP || r->dno == MEM_DNO) {
             r->data = yr_alloc(clen ? clen : 1);
             memcpy(r->data, d + off + 16, clen);
             r->size = clen;
@@ -437,6 +442,17 @@ static bool read_file(YR *y, const char *file, RecList *out) {
             r->size = got;
         }
     }
+    return ok;
+}
+
+static bool read_file(YR *y, const char *file, RecList *out) {
+    char *path = sd_path(y, file);
+    if (!path) return false;
+    size_t size;
+    u8 *d = yr_read_file(path, &size);
+    free(path);
+    if (!d) return false;
+    bool ok = parse_file(d, size, out);
     free(d);
     return ok;
 }
@@ -451,6 +467,41 @@ static MemSlot *mem_slot(YR *y, i64 id, bool create) {
     memset(m, 0, sizeof *m);
     m->id = id;
     return m;
+}
+
+static Rec mems_record(YR *y) {
+    Buf b = { 0 };
+    for (i64 k = 0; k < MEM_SLOTS; k++) {
+        MemSlot *m = mem_slot(y, k, false);
+        if (!m || !m->list.n) { put32(&b, 0); put32(&b, 0); continue; }
+        Buf f = build_file(y, &m->list);
+        u32 clen;
+        u8 *z = pack(f.p, f.n, false, &clen);
+        put32(&b, (u32)f.n);
+        put32(&b, clen);
+        put(&b, z, clen);
+        free(z);
+        free(f.p);
+    }
+    Rec r = { MEM_DNO, KIND_VAR, 0, b.p, (u32)b.n };
+    return r;
+}
+
+static void restore_mems(YR *y, const Rec *r) {
+    const u8 *p = r->data, *end = r->data + r->size;
+    for (i64 k = 0; k < MEM_SLOTS && p + 8 <= end; k++) {
+        u32 ulen = yr_le32(p), clen = yr_le32(p + 4);
+        if (p + 8 + clen > end) break;
+        MemSlot *m = mem_slot(y, k, ulen != 0);
+        if (m) list_clear(&m->list);
+        if (ulen && m) {
+            u32 got;
+            u8 *raw = unpack(p + 8, clen, ulen, &got);
+            if (raw) parse_file(raw, got, &m->list);
+            free(raw);
+        }
+        p += 8 + clen;
+    }
 }
 
 int yr_cmd_save(YCall *c, int id) {
@@ -494,9 +545,18 @@ int yr_cmd_save(YCall *c, int id) {
             r->size = (u32)b.n;
         }
         i64 mem;
-        if (yc_int(c, "MEM", &mem)) list_copy(&mem_slot(y, mem, true)->list, &s->reserve);
+        if (yc_int(c, "MEM", &mem)) {
+            if (mem == MEM_ALL) s->embedMems = true;
+            else list_copy(&mem_slot(y, mem, true)->list, &s->reserve);
+        }
         char *file = yc_str(c, "FILE");
         if (file) {
+            if (s->embedMems) {
+                Rec *old = list_find(&s->reserve, MEM_DNO);
+                if (old) free(old->data);
+                *(old ? old : list_add(&s->reserve)) = mems_record(y);
+                s->embedMems = false;
+            }
             if (!write_file(y, file, &s->reserve)) yr_log(y, "SAVE: cannot write %s\n", file);
             list_clear(&s->reserve);
             free(file);
@@ -517,7 +577,11 @@ int yr_cmd_save(YCall *c, int id) {
     free(file);
     i64 dno = yc_int_or(c, "DNO", 0);
     Rec *r = list_find(src, (u32)dno);
-    if (r) {
+    if (r && r->dno == MEM_DNO && !yc_has(c, "MEM")) {
+        restore_mems(y, r);
+        YRef ref;
+        if (yc_ref(c, "LET", &ref)) { YVal one = yv_int(1); yr_ref_set(y, c->t, &ref, &one); }
+    } else if (r) {
         YRef ref;
         char *lid = yc_str(c, "ID");
         u8 cls, type;
