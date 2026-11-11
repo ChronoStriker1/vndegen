@@ -88,13 +88,14 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - NekoSDK: a question asked at a choice shows over the choice (#82), and Mankitsu Happening's Auto counts a full-width character as two (0.32.2).
 - A game that can't start says why back in the library (#70), leaving during start no longer counts as played (#72), and Unity's settings message (#71) (0.32.3).
 - Save sync over FTP and WebDAV, with Ludusavi's settings for each, beside SMB (0.33.0).
+- Suggested controller layouts for RPG Maker MV and MZ games and Godot games, read from the game's own files and shown as "Suggested for this game" in the layout sheet (0.34.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here. None are open.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Suggested controller layouts (item 1 under Next), on `feat/suggested-layouts`. Agreed with the maintainer on 2026-11-10: the first version reads RPG Maker MV and MZ games' plugins and Godot games' input maps, fills only buttons the engine's layout leaves free, and applies the suggestion quietly as "Suggested for this game" in the layout sheet, for games already in the library too unless the player changed their buttons.
+- Nothing right now.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
@@ -105,11 +106,10 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 
 ## Next
 Reordered with the maintainer on 2026-11-09, to put quick wins first. Only work that isn't built yet is listed.
-1. Suggested controller layouts, the part of the controller layout library that isn't built. On a game's first start, VNDegen reads the game's files for the controls it uses, such as its key bindings and whether it relies on the mouse, and proposes a layout that maps those keys, the mouse pointer, and mouse buttons to the controller, which the player can accept or change. Suggestions may be hard and costly.
-2. Better default layouts, after suggested layouts ships. A survey of 167 games' files found buttons that do nothing under today's defaults: a visual novel layout for KiriKiri, NScripter, Artemis and AliceSoft games, the Mouse layout for Flash, RPG Maker XP, VX and VX Ace's X, Y and Z buttons, and Control for Wolf RPG. The exact layouts are agreed with the maintainer first, since they change what existing players have. Suggestions for Artemis, NScripter and Wolf RPG games may follow.
-3. Installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
-4. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, which NekoSDK also uses for WMV movies, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
-5. Last: save sync through the cloud types that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, with the same settings as Ludusavi.
+1. Better default layouts, now that suggested layouts has shipped. A survey of 167 games' files found buttons that do nothing under today's defaults: a visual novel layout for KiriKiri, NScripter, Artemis and AliceSoft games, the Mouse layout for Flash, RPG Maker XP, VX and VX Ace's X, Y and Z buttons, and Control for Wolf RPG. The exact layouts are agreed with the maintainer first, since they change what existing players have. Suggestions for Artemis, NScripter and Wolf RPG games may follow.
+2. Installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
+3. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, which NekoSDK also uses for WMV movies, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
+4. Last: save sync through the cloud types that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, with the same settings as Ludusavi.
 
 ## Set aside
 - Playing over AirPlay with the iPhone or iPad as the controller (#66), set aside by the maintainer on 2026-11-10. iOS gives an app a TV to draw a live game on only once the player has turned on Screen Mirroring or plugged in a cable. An AirPlay button inside the app carries sound and video files, not a live picture, and sending the game as live video would put seconds between a press and the picture. The maintainer wanted it to start from inside the app, so it stopped there. What was built worked on the simulator with Screen Mirroring or a cable: the game alone went to the TV and the device showed the controls. It was never merged, and its branch was removed at the maintainer's request.
