@@ -89,6 +89,8 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
         self.init(volumes: volumes, suggestedFolderName: first.name.title, installers: installers)
     }
 
+    var setupNames: [String] { installers.map { volumes[$0.indexes[0]].lastPathComponent } }
+
     func installerVolumes(_ installer: InstallerVolumes) -> (setup: URL, slices: [URL]) {
         (volumes[installer.indexes[0]], installer.indexes.dropFirst().map { volumes[$0] })
     }

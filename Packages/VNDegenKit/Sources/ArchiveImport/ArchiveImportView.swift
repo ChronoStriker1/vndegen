@@ -259,7 +259,7 @@ public struct ArchiveImportView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Add game").font(.system(size: 22, weight: .heavy).width(.expanded))
-                    if let name = importer?.source?.fileName {
+                    if let name = importer?.displayFileName {
                         Text(name).font(.system(size: 14)).foregroundStyle(ImportTheme.secondaryText).lineLimit(1)
                     }
                 }
@@ -449,7 +449,7 @@ private struct StepView: View {
                     Label(installer.title, systemImage: "shippingbox.fill")
                         .font(.system(size: 16, weight: .semibold))
                         .lineLimit(2)
-                    Text("Installer \(source.fileName)")
+                    Text("Installer \(importer.displayFileName ?? source.fileName)")
                         .font(.system(size: 14))
                         .foregroundStyle(ImportTheme.secondaryText)
                         .lineLimit(2)
@@ -539,7 +539,7 @@ private struct StepView: View {
             .id(ArchiveImportModel.Control.addOnToggle)
         }
         if importer.canDeleteArchive {
-            let what = importer.source?.isInstaller == true ? "installer" : "archive"
+            let what = importer.pickedInstaller ? "installer" : "archive"
             Toggle(isOn: $importer.deleteArchiveAfterImport) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Delete \(what) after import").font(.system(size: 15, weight: .semibold))
@@ -640,7 +640,9 @@ private struct StepView: View {
             Card {
                 Label(installer ? "This archive holds an installer" : "This archive holds another archive", systemImage: "shippingbox.fill")
                     .font(.system(size: 17, weight: .bold))
-                Text(fileName).font(.system(size: 14, weight: .semibold)).lineLimit(2)
+                Text(installer ? importer.nestedSource?.setupNames.formatted(.list(type: .and)) ?? fileName : fileName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(4)
                 Text(installer
                      ? "Unpack the game from it? VNDegen reads the game's files out of the installer without running it. Only the game is kept."
                      : "Extract it too, so the game folder holds the game instead of a second archive?")

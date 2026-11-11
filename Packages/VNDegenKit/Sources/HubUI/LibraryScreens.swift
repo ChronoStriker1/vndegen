@@ -404,12 +404,12 @@ struct EmptyLibraryView: View {
     private var steps: [String] {
         #if os(macOS)
         ["Open the Games folder in Finder.",
-         "Copy each game into its own folder, for example Games/No Socks RPG. Or copy in a zip, RAR, or 7z archive.",
+         "Copy each game into its own folder, for example Games/No Socks RPG. Or copy in a zip, RAR, 7z, or ISO file, or a GOG installer.",
          "Come back here. VNDegen adds game folders and lists archives under Ready to import."]
         #else
         let device = UIDevice.current.localizedModel
         return ["Open the Files app and go to On My \(device), then VNDegen.",
-                "Copy each game folder into Games, for example Games/No Socks RPG. Or copy a zip, RAR, or 7z archive into VNDegen or Games.",
+                "Copy each game folder into Games, for example Games/No Socks RPG. Or copy a zip, RAR, 7z, or ISO file, or a GOG installer, into VNDegen or Games.",
                 "Come back here. VNDegen adds game folders and lists archives under Ready to import."]
         #endif
     }
@@ -449,7 +449,7 @@ struct EmptyLibraryView: View {
                         }
                     }
                     .padding(.top, 6)
-                    Text("Add game unpacks a zip, RAR, or 7z archive into the library.")
+                    Text("Add game unpacks a zip, RAR, 7z, or ISO file, or a GOG installer, into the library.")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.tertiaryText)
                 }

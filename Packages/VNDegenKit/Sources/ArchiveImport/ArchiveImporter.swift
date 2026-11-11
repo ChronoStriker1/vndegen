@@ -60,6 +60,13 @@ public final class ArchiveImporter {
         didSet { contents = contents?.includingAddOns(includeAddOns) }
     }
     public private(set) var nestedSource: ArchiveSource?
+    public var pickedInstaller: Bool { picked?.source.isInstaller == true }
+
+    public var displayFileName: String? {
+        guard let source else { return nil }
+        guard let installer = contents?.installer else { return source.fileName }
+        return source.installerVolumes(installer.mainVolumes).setup.lastPathComponent
+    }
 
     /// The archive the user picked, which "Delete archive after import" removes, and each volume's identity when it was
     /// listed. A volume whose file changed since then is a different file and stays.
