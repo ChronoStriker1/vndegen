@@ -23,13 +23,10 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
     /// The value to store on `Game.buttonMapping`, nil when nothing is remapped.
     public var stored: [ControlInput: ControlAction]? { overrides.isEmpty ? nil : overrides }
 
-    /// A game's mapping as `Game.buttonMapping` stores it, where nil follows the engine's default layout.
     public init(stored: [ControlInput: ControlAction]?, default layout: ButtonMapping) {
         self = stored.map { ButtonMapping($0) } ?? layout
     }
 
-    /// The value to store on `Game.buttonMapping` for a game whose engine defaults to `layout`: nil while the mapping is
-    /// that layout, so the game keeps following it, and otherwise every remap, even none.
     public func stored(default layout: ButtonMapping) -> [ControlInput: ControlAction]? {
         self == layout ? nil : overrides
     }
@@ -98,14 +95,8 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
         return mapping
     }()
 
-    /// The mapping a game follows until the player changes it, from its engine.
-    @MainActor public static func defaultLayout(for game: Game, in library: LibraryStore) -> ButtonMapping {
+    @MainActor public static func engineLayout(for game: Game, in library: LibraryStore) -> ButtonMapping {
         (library.plugin(for: game.engine)?.defaultControls ?? .gamepad).mapping
-    }
-
-    /// The mapping a game plays with.
-    @MainActor public init(for game: Game, in library: LibraryStore) {
-        self.init(stored: game.buttonMapping, default: Self.defaultLayout(for: game, in: library))
     }
 }
 

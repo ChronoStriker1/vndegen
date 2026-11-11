@@ -162,7 +162,7 @@ struct PlayerView: View {
 
     private var method: ControlMethod { game?.controlMethod ?? defaultMethod }
 
-    private var mapping: ButtonMapping { game.map { ButtonMapping(for: $0, in: hub.library) } ?? ButtonMapping() }
+    private var mapping: ButtonMapping { game.map { hub.layouts.mapping(for: $0, in: hub.library) } ?? ButtonMapping() }
 
     /// What touches do in the game under its control method. Nil for a game that reads touches itself, and on a Mac,
     /// which has no touch screen.

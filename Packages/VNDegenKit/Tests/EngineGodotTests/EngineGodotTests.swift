@@ -520,3 +520,173 @@ private func refusal(_ layout: GodotLayout, _ game: GameFolder) -> String? {
     cheats.apply(settings)
     #expect(speeds == [4])
 }
+
+private enum Event {
+    case key(Int), joyButton(Int), joyAxis(Int, Float), mouse(Int)
+}
+
+private func variantString(_ text: String, into bytes: inout Bytes) {
+    bytes.u32(UInt32(Data(text.utf8).count))
+    bytes.data.append(Data(text.utf8))
+    bytes.zeros((4 - Data(text.utf8).count % 4) % 4)
+}
+
+private func inputBinary(_ actions: [(String, [Event])], major: Int) -> Data {
+    let (object, dictionary, array): (UInt32, UInt32, UInt32) = major >= 4 ? (24, 27, 28) : (17, 18, 19)
+    var bytes = Bytes()
+    bytes.data.append(Data("ECFG".utf8))
+    bytes.u32(UInt32(actions.count))
+    for (name, events) in actions {
+        let key = "input/\(name)"
+        bytes.u32(UInt32(Data(key.utf8).count))
+        bytes.data.append(Data(key.utf8))
+        var value = Bytes()
+        value.u32(dictionary)
+        value.u32(2)
+        value.u32(4)
+        variantString("deadzone", into: &value)
+        value.u32(3)
+        value.data.append(contentsOf: withUnsafeBytes(of: Float(0.5).bitPattern.littleEndian, Array.init))
+        value.u32(4)
+        variantString("events", into: &value)
+        value.u32(array)
+        value.u32(UInt32(events.count))
+        for event in events {
+            value.u32(object)
+            let properties: [(String, UInt32, UInt32)]
+            switch event {
+            case let .key(code):
+                variantString("InputEventKey", into: &value)
+                properties = [(major >= 4 ? "keycode" : "scancode", 2, UInt32(code)), (major >= 4 ? "physical_keycode" : "physical_scancode", 2, 0),
+                              (major >= 4 ? "shift_pressed" : "shift", 1, 0)]
+            case let .joyButton(index):
+                variantString("InputEventJoypadButton", into: &value)
+                properties = [("button_index", 2, UInt32(index))]
+            case let .joyAxis(axis, sign):
+                variantString("InputEventJoypadMotion", into: &value)
+                properties = [("axis", 2, UInt32(axis)), ("axis_value", 3, sign.bitPattern)]
+            case let .mouse(index):
+                variantString("InputEventMouseButton", into: &value)
+                properties = [("button_index", 2, UInt32(index)), ("position", 5, 0)]
+            }
+            value.u32(UInt32(properties.count))
+            for (property, type, raw) in properties {
+                variantString(property, into: &value)
+                value.u32(type)
+                value.u32(raw)
+                if type == 5 { value.u32(0) }
+            }
+        }
+        bytes.u32(UInt32(value.data.count))
+        bytes.data.append(value.data)
+    }
+    return bytes.data
+}
+
+private let special4 = 1 << 22
+private let hadal: [(String, [Event])] = [
+    ("MOVEUP", [.key(special4 + 0x10), .key(87)]),
+    ("MOVEDOWN", [.key(special4 + 0x12), .key(83)]),
+    ("MOVELEFT", [.key(special4 + 0x0F), .key(65)]),
+    ("MOVERIGHT", [.key(special4 + 0x11), .key(68)]),
+    ("LEFTMOUSE", [.mouse(1)]),
+    ("RIGHTMOUSE", [.mouse(2)]),
+    ("SPACEBAR", [.key(32)]),
+    ("INVENTORY", [.key(73)]),
+    ("debug_spawn", [.key(80)]),
+]
+
+private func key(_ code: Int) -> ControlAction { .key(KeyboardKey(windowsKeyCode: code)!) }
+
+@Suite struct SuggestedControlsTests {
+    @Test func aGameWithNoJoypadBindingsGetsMovementOnTheDpadAndStick() throws {
+        let map = GodotControls.inputMap(inputBinary(hadal, major: 4), major: 4)
+        #expect(map.map(\.name) == hadal.map(\.0))
+        let suggestion = try #require(GodotControls.suggestion(map, major: 4))
+        #expect(suggestion.buttons[.up] == key(38) && suggestion.buttons[.leftStickUp] == key(38))
+        #expect(suggestion.buttons[.left] == key(37) && suggestion.buttons[.leftStickRight] == key(39))
+        #expect(suggestion.buttons[.a] == key(32))
+        #expect(suggestion.buttons[.r2] == .click(.primary) && suggestion.buttons[.l2] == .click(.secondary))
+        #expect(suggestion.buttons[.rightStickUp] == .mouseMove(.up) && suggestion.buttons[.rightStickLeft] == .mouseMove(.left))
+        #expect(suggestion.buttons[.x] == key(73))
+        #expect(suggestion.labels[.x] == "Inventory" && suggestion.labels[.up] == "Moveup")
+        #expect(!suggestion.buttons.values.contains(key(80)))
+        #expect(suggestion.buttons[.b] == nil)
+    }
+
+    @Test func aButtonAnActionReadsWithoutTheKeyIsLeftAlone() throws {
+        let map = GodotControls.inputMap(inputBinary([
+            ("ui_up", [.key(special4 + 0x10), .joyButton(11)]),
+            ("climb", [.joyButton(11)]),
+            ("MOVEUP", [.key(special4 + 0x10)]),
+        ], major: 4), major: 4)
+        let suggestion = try #require(GodotControls.suggestion(map, major: 4))
+        #expect(suggestion.buttons[.up] == nil)
+        #expect(suggestion.buttons[.leftStickUp] == key(38))
+    }
+
+    @Test func keysOnlyGoToButtonsTheGameLeavesFree() throws {
+        let map = GodotControls.inputMap(inputBinary([
+            ("jump", [.key(32), .joyButton(0)]),
+            ("dash", [.key(81)]),
+            ("run", [.key(special4 + 0x15)]),
+            ("pause", [.key(special4 + 0x01), .joyButton(6)]),
+            ("look", [.mouse(1)]),
+            ("aim", [.joyAxis(2, -1), .joyAxis(2, 1), .joyAxis(3, -1), .joyAxis(3, 1)]),
+        ], major: 4), major: 4)
+        let suggestion = try #require(GodotControls.suggestion(map, major: 4))
+        #expect(suggestion.buttons == [.x: key(81), .r: key(16)])
+        #expect(suggestion.labels == [.x: "Dash", .r: "Run"])
+    }
+
+    @Test func godot3NumbersItsButtonsAndKeysItsOwnWay() throws {
+        let special3 = 1 << 24
+        let map = GodotControls.inputMap(inputBinary([
+            ("ui_accept", [.key(90), .joyButton(0), .joyButton(1), .joyButton(2), .joyButton(3)]),
+            ("pages", [.joyButton(4), .joyButton(5), .joyButton(6), .joyButton(7)]),
+            ("save", [.key(special3 + 0x1C + 4)]),
+        ], major: 3), major: 3)
+        let suggestion = try #require(GodotControls.suggestion(map, major: 3))
+        #expect(suggestion.buttons == [.view: key(116)])
+    }
+
+    @Test func aGameBindingEveryButtonGetsNothing() {
+        let map = GodotControls.inputMap(inputBinary([
+            ("all", (0...14).map(Event.joyButton) + [.joyAxis(4, 1), .joyAxis(5, 1)]),
+            ("menu", [.key(77)]),
+        ], major: 4), major: 4)
+        #expect(GodotControls.suggestion(map, major: 4) == nil)
+    }
+
+    @Test func scriptsThatReadTheJoypadOrCantBeReadStopASuggestion() {
+        let text = Data("func _process(d):\n\tif Input.is_joy_button_pressed(0, JOY_BUTTON_A):\n\t\tpass\n".utf8)
+        #expect(GodotControls.readsJoypad(text) == true)
+        #expect(GodotControls.readsJoypad(Data("func _ready():\n\tpass\n".utf8)) == false)
+        let godot3 = Data("GDSC".utf8) + Data([13, 0, 0, 0]) + Data(repeating: 0, count: 8) + Data("get_joy_axis".utf8.map { $0 ^ 0xB6 })
+        #expect(GodotControls.readsJoypad(godot3) == true)
+        let godot4 = Data("GDSC".utf8) + Data([101, 0, 0, 0, 0, 0, 0, 0]) + Data("InputEventJoypadButton".utf8.flatMap { [$0 ^ 0xB6, 0xB6, 0xB6, 0xB6] })
+        #expect(GodotControls.readsJoypad(godot4) == true)
+        let compressed = Data("GDSC".utf8) + Data([100, 0, 0, 0, 0x48, 0xC2, 0, 0, 0x28, 0xB5, 0x2F, 0xFD])
+        #expect(GodotControls.readsJoypad(compressed) == nil)
+        let clean = GodotScript(name: "main.gd", offset: 0, size: 4, encrypted: false)
+        #expect(GodotControls.readsJoypad([], read: { _, _ in Data() }) == nil)
+        #expect(GodotControls.readsJoypad([GodotScript(name: "main.gde", offset: 0, size: 4, encrypted: false)], read: { _, _ in Data("pass".utf8) }) == nil)
+        #expect(GodotControls.readsJoypad([GodotScript(name: "main.gd", offset: 0, size: 4, encrypted: true)], read: { _, _ in Data("pass".utf8) }) == nil)
+        #expect(GodotControls.readsJoypad([clean], read: { _, _ in Data("pass".utf8) }) == false)
+    }
+
+    private func suggestion(scripts: [String: Data]) throws -> ControlSuggestion? {
+        let contents = ["project.binary": inputBinary(hadal, major: 4)].merging(scripts) { $1 }
+        let files = ["res://project.binary"] + scripts.keys.sorted().map { "res://\($0)" }
+        let game = try GameFolder(["game.pck": pack(format: 2, version: (4, 3, 0), files: files, contents: contents)])
+        return GodotPlugin().suggestedControls(folder: game.root)
+    }
+
+    @Test func thePluginReadsThePacksInputMapAndScripts() throws {
+        let clean = Data("extends Node\nfunc _input(e):\n\tif e.is_action_pressed(\"MOVEUP\"):\n\t\tpass\n".utf8)
+        #expect(try suggestion(scripts: ["player.gd": clean])?.buttons[.up] == key(38))
+        #expect(try suggestion(scripts: ["player.gd": clean, "pad.gd": Data("if event is InputEventJoypadMotion:\n".utf8)]) == nil)
+        #expect(try suggestion(scripts: [:]) == nil)
+        #expect(try suggestion(scripts: ["player.gdc": Data("GDSC".utf8) + Data([100, 0, 0, 0, 9, 0, 0, 0, 0x28, 0xB5, 0x2F, 0xFD])]) == nil)
+    }
+}
