@@ -17,13 +17,11 @@ nonisolated enum ArtemisControls {
     }
 
     static func suggestion(_ files: ArtemisCore.Files) -> ControlSuggestion? {
-        let text = { (path: String) in files.read(path).map { String(decoding: $0, as: UTF8.self) } }
-        return suggestion(listWindows: text("system/table/list_windows.tbl"), variables: text("system/adv/var.lua"))
+        files.read("system/table/list_windows.tbl").flatMap { suggestion(listWindows: String(decoding: $0, as: UTF8.self)) }
     }
 
-    static func suggestion(listWindows: String?, variables: String?) -> ControlSuggestion? {
-        let bindings = listWindows.map(advKeys).flatMap { $0.isEmpty ? nil : $0 } ?? variables.map(keyConfig) ?? []
-        return suggestion(bindings)
+    static func suggestion(listWindows: String) -> ControlSuggestion? {
+        suggestion(advKeys(listWindows))
     }
 
     static func suggestion(_ bindings: [KeyBinding]) -> ControlSuggestion? {
@@ -46,27 +44,5 @@ nonisolated enum ArtemisControls {
             guard let code = Int(match.1), code < 256, let role = match.2.firstMatch(of: /adv\s*=\s*"(\w+)"/)?.1 else { return nil }
             return KeyBinding(code: code, role: String(role))
         }
-    }
-
-    static func keyConfig(_ text: String) -> [KeyBinding] {
-        let code = text.split(whereSeparator: \.isNewline).map { line -> Substring in
-            line.firstRange(of: "--").map { line[..<$0.lowerBound] } ?? line
-        }.joined(separator: "\n")
-        func table(from start: String.Index?) -> Substring? {
-            guard let start else { return nil }
-            let rest = code[start...]
-            return rest[..<(rest.firstMatch(of: /\n\}/)?.range.lowerBound ?? rest.endIndex)]
-        }
-        let fixed = table(from: code.firstMatch(of: /keyconfig_keytable\s*=\s*\{/)?.range.upperBound).map { body in
-            body.matches(of: /(\w+)\s*=\s*\{\s*\d+\s*,\s*(\d+)\s*\}/).compactMap { match in
-                Int(match.2).map { KeyBinding(code: $0, role: String(match.1)) }
-            }
-        } ?? []
-        let shortcuts = table(from: code.firstMatch(of: /keyconfig_shortcut_table\s*=\s*\{/)?.range.upperBound).map { body in
-            body.matches(of: /\[(\d+)\]\s*=\s*"(\w+)"/).compactMap { match in
-                Int(match.1).map { KeyBinding(code: $0, role: String(match.2)) }
-            }
-        } ?? []
-        return fixed + shortcuts
     }
 }

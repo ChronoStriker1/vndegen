@@ -39,20 +39,13 @@ private let variables = """
     """
 
 @Test func aTblGamesRolesTheDPadDoesntReachGoOnTheFreeButtons() throws {
-    let suggestion = try #require(ArtemisControls.suggestion(listWindows: listWindows, variables: nil))
+    let suggestion = try #require(ArtemisControls.suggestion(listWindows: listWindows))
     #expect(suggestion.buttons == [.view: key(113), .l3: key(120), .r3: key(117), .l2: key(118)])
     #expect(suggestion.labels == [.view: "Auto", .l3: "Config", .r3: "Save", .l2: "Load"])
 }
 
-@Test func aVarLuaGameGetsItsFixedKeysAndCommentedLinesDontCount() throws {
-    let suggestion = try #require(ArtemisControls.suggestion(listWindows: nil, variables: variables))
-    #expect(suggestion.buttons == [.view: key(116), .l3: key(121), .r3: key(120), .l2: key(112)])
-    #expect(suggestion.labels == [.view: "Auto", .l3: "Quick save", .r3: "Quick load", .l2: "Config"])
-}
-
-@Test func theTableWinsOverVarLua() throws {
-    let suggestion = try #require(ArtemisControls.suggestion(listWindows: listWindows, variables: variables))
-    #expect(suggestion.buttons[.view] == key(113))
+@Test func aVarLuaKeyTableIsNotReadSinceItsScriptsLeaveTheShortcutsOff() {
+    #expect(ArtemisControls.suggestion(listWindows: variables) == nil)
 }
 
 @Test func aButtonWhoseKeyTheGameBindsStays() throws {
@@ -67,5 +60,5 @@ private let variables = """
         .init(code: 13, role: "CLICK"), .init(code: 37, role: "QSAVE"), .init(code: 121, role: "QSAVE"), .init(code: 17, role: "AUTO"),
         .init(code: 140, role: "AUTO"),
     ]) == nil)
-    #expect(ArtemisControls.suggestion(listWindows: "no keys here", variables: nil) == nil)
+    #expect(ArtemisControls.suggestion(listWindows: "no keys here") == nil)
 }
