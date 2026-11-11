@@ -30,3 +30,6 @@ if(SDL2_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/yrplay.c)
   target_link_libraries(yrplay PRIVATE yuris SDL2::SDL2)
   target_compile_definitions(yrplay PRIVATE YR_FONTS_DIR="${SHARED}/fonts")
 endif()
+
+add_executable(yrdis yrdis.c)
+target_link_libraries(yrdis PRIVATE yuris)

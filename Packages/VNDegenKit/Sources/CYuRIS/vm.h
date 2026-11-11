@@ -81,6 +81,7 @@ struct YR {
     int enc;                    // YR_SJIS or YR_UTF8, for strings in scripts
     YVar *vars;
     u32 varCount;
+    YVar **extraVars;
     YSysVar sys[1000];
 
     YTask **tasks;
@@ -116,6 +117,9 @@ struct YR {
     u32 serial;
     long watchVid;              // logs stores to this variable id, from YR_WATCH; -1 for none
     bool traceGosub;            // logs every GOSUB, from the YR_TRACE_GOSUB environment variable
+    int traceScript;
+    char *logCmds;
+    u32 traceFrom, traceTo;
     uint32_t *screen;           // RGBA, width x height
 };
 

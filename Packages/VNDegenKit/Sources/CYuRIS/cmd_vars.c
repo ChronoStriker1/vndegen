@@ -178,32 +178,30 @@ static int varact(YCall *c) {
         resize_1d(y, set.var, n);
         return YR_NEXT;
     }
-    if ((yc_int_or(c, "PUSH", 0) || yc_int_or(c, "POP", 0)) && set.var) {
-        bool push = yc_int_or(c, "PUSH", 0) != 0;
+    if ((yc_has(c, "PUSH") || yc_has(c, "POP")) && set.var) {
+        bool push = yc_has(c, "PUSH");
         YVar *v = set.var;
-        i64 pos = yc_int_or(c, "POS", 0);
+        i64 pos = yc_int_or(c, push ? "PUSH" : "POP", 0);
         i64 n = v->count;
+        if (pos < 0 || pos >= n) return YR_NEXT;
+        if (v->t == YT_STR) free(v->strs[push ? n - 1 : pos]);
         if (push) {
-            resize_1d(y, v, n + 1);
-            if (pos < 0 || pos > n) pos = n;
-            for (i64 i = n; i > pos; i--) {
+            for (i64 i = n - 1; i > pos; i--) {
                 if (v->t == YT_INT) v->ints[i] = v->ints[i - 1];
                 else if (v->t == YT_FLT) v->flts[i] = v->flts[i - 1];
-                else { v->strs[i] = v->strs[i - 1]; v->strs[i - 1] = NULL; }
+                else v->strs[i] = v->strs[i - 1];
             }
-            YVal zero = v->t == YT_STR ? yv_str("") : yv_int(0);
-            yr_var_set(v, (long)pos, &zero);
-            yv_free(&zero);
-        } else if (n > 0 && pos >= 0 && pos < n) {
-            if (v->t == YT_STR) free(v->strs[pos]);
+        } else {
             for (i64 i = pos; i < n - 1; i++) {
                 if (v->t == YT_INT) v->ints[i] = v->ints[i + 1];
                 else if (v->t == YT_FLT) v->flts[i] = v->flts[i + 1];
                 else v->strs[i] = v->strs[i + 1];
             }
-            if (v->t == YT_STR) v->strs[n - 1] = NULL;
-            resize_1d(y, v, n - 1);
         }
+        i64 clear = push ? pos : n - 1;
+        if (v->t == YT_INT) v->ints[clear] = 0;
+        else if (v->t == YT_FLT) v->flts[clear] = 0;
+        else v->strs[clear] = NULL;
         return YR_NEXT;
     }
     if (yc_int_or(c, "INIT", 0) && set.var) {

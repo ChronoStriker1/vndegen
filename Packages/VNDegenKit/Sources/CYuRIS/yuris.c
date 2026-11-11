@@ -17,6 +17,7 @@ static void free_all(YR *y) {
     for (int i = 0; i < 1000; i++) free(y->sysStrs[i]);
     free(y->screen);
     free(y->gameDir);
+    free(y->logCmds);
     free(y->saveDir);
     if (y->log) fclose(y->log);
     free(y);
@@ -31,6 +32,16 @@ VNY *vny_open(const VNYConfig *config, char *err, size_t errSize) {
     if (config->logPath) y->log = fopen(config->logPath, "a");
     y->fps = 60;
     y->traceGosub = getenv("YR_TRACE_GOSUB") != NULL;
+    y->traceScript = -1;
+    if (getenv("YR_LOG_CMDS")) {
+        size_t n = strlen(getenv("YR_LOG_CMDS"));
+        y->logCmds = yr_alloc(n + 3);
+        snprintf(y->logCmds, n + 3, ",%s,", getenv("YR_LOG_CMDS"));
+    }
+    if (getenv("YR_TRACE")) {
+        unsigned sc = 0, a = 0, b = 0xffffffffu;
+        if (sscanf(getenv("YR_TRACE"), "%u:%u-%u", &sc, &a, &b) >= 1) { y->traceScript = (int)sc; y->traceFrom = a; y->traceTo = b; }
+    }
     y->watchVid = getenv("YR_WATCH") ? strtol(getenv("YR_WATCH"), NULL, 0) : -1;
     bool ok = yr_fs_open(y) && yr_script_open(y);
     if (ok) {

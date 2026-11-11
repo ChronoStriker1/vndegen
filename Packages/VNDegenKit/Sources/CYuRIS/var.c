@@ -61,7 +61,9 @@ static void var_storage_free(YVar *v) {
 }
 
 void yr_var_declare(YR *y, YVar *v, u8 t, u8 ndim, const u32 *dims, const YVal *init) {
-    (void)y;
+    if (y && y->vars && v >= y->vars && v < y->vars + y->varCount && (long)(v - y->vars) == y->watchVid)
+        yr_log(y, "watch: var %ld (re)declared, task %s script %u ip %u\n", (long)(v - y->vars), y->cur ? y->cur->id : "-",
+               y->cur ? y->cur->script : 0, y->cur ? y->cur->ip : 0);
     var_storage_free(v);
     if (t < YT_INT || t > YT_STR) t = YT_INT;
     v->t = t;
@@ -136,7 +138,13 @@ void yr_var_set(YVar *v, long i, const YVal *val) {
     }
 }
 
-YVar *yr_var(YR *y, u32 id) { return id < y->varCount ? &y->vars[id] : NULL; }
+YVar *yr_var(YR *y, u32 id) {
+    if (id < y->varCount) return &y->vars[id];
+    if (id > 0xffff) return NULL;
+    if (!y->extraVars) y->extraVars = yr_alloc(sizeof(YVar *) * 0x10000);
+    if (!y->extraVars[id]) y->extraVars[id] = yr_alloc(sizeof(YVar));
+    return y->extraVars[id];
+}
 
 // Entries: scope, (a flag byte in newer versions), script, id, type, dimension count, dimensions, initial value.
 static bool parse(YR *y, const u8 *d, size_t size, bool flagByte, bool commit) {
@@ -236,4 +244,15 @@ void yr_vars_close(YR *y) {
     free(y->vars);
     y->vars = NULL;
     y->varCount = 0;
+    if (y->extraVars) {
+        for (u32 i = 0; i < 0x10000; i++) {
+            YVar *v = y->extraVars[i];
+            if (!v) continue;
+            var_storage_free(v);
+            yv_free(&v->init);
+            free(v);
+        }
+        free(y->extraVars);
+        y->extraVars = NULL;
+    }
 }

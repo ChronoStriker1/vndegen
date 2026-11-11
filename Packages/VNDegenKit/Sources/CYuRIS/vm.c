@@ -333,6 +333,27 @@ static void run_task(YR *y, YTask *t) {
             t->alive = false;
             break;
         }
+        bool traced = (int)t->script == y->traceScript && t->ip >= y->traceFrom && t->ip <= y->traceTo;
+        if (!traced && y->logCmds) {
+            char key[64];
+            snprintf(key, sizeof key, ",%s,", y->cmds[s->ins[t->ip].cmd].name);
+            traced = strstr(y->logCmds, key) != NULL;
+        }
+        if (traced) {
+            const YIns *in = &s->ins[t->ip];
+            yr_log(y, "cmd %s %u:%u %s[", t->id, t->script, t->ip, y->cmds[in->cmd].name);
+            for (int k = 0; k < in->argc; k++) {
+                const YArg *a = &s->args[in->arg + k];
+                if (!a->size || !(a->type & 0xff)) continue;
+                YVal v = yr_eval(y, t, a->data, a->size);
+                char *str = yv_as_str(&v), *u = yr_to_utf8(y->enc, str);
+                yr_log(y, "%s%s=%s", k ? " " : "", yr_arg_key(y, in, a), u);
+                free(u);
+                free(str);
+                yv_free(&v);
+            }
+            yr_log(y, "] f%llu loops=%d\n", (unsigned long long)y->frameNo, t->loopDepth);
+        }
         int r = exec(y, t, s);
         if (r == YR_NEXT) t->ip++;
         else if (r == YR_YIELD) { t->ip++; break; }
