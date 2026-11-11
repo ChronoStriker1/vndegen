@@ -1,7 +1,7 @@
 # Third-party code in RuntimePackages
 
-- `CLzmaDec/LzmaDec.c`, `LzmaDec.h`, `7zTypes.h`, `Precomp.h` and `Compiler.h` are from the LZMA SDK 25.01 by Igor Pavlov (https://www.7-zip.org/sdk.html), unmodified. The LZMA SDK is in the public domain.
-- `InnoSetup/InnoHeaders.swift`, `InnoSetup/InnoData.swift` and `InnoSetup/InnoSetupInstaller.swift` port the Inno Setup format handling of innoextract (https://github.com/dscharrer/innoextract) to Swift. innoextract is under the zlib license, reproduced below; each of those files keeps the notice too.
+- `CLzmaDec/LzmaDec.c`, `Lzma2Dec.c`, `LzmaDec.h`, `Lzma2Dec.h`, `7zTypes.h`, `Precomp.h` and `Compiler.h` are from the LZMA SDK 25.01 by Igor Pavlov (https://www.7-zip.org/sdk.html), unmodified. The LZMA SDK is in the public domain.
+- `InnoSetup/InnoHeaders.swift`, `InnoSetup/InnoData.swift` and `InnoSetup/InnoSetupInstaller.swift` port the Inno Setup format handling of innoextract (https://github.com/dscharrer/innoextract) to Swift, altered from the original. `InnoSetupInstaller.swift` also ports innoextract's GOG Galaxy file part handling (`src/cli/goggalaxy.cpp`): joining the parts named by `before_install` and `after_install`, and the language and architecture checks of `check_if_install`. innoextract is under the zlib license, reproduced below; each of those files keeps the notice too. `InnoSetup/GameInstaller.swift` is VNDegen's own.
 - The system's zlib, bzip2 and libarchive are linked, not vendored.
 
 ## innoextract

@@ -1,5 +1,6 @@
 import CArchive
 import Foundation
+import RuntimePackages
 
 nonisolated public enum ArchiveError: Error, Equatable, Sendable {
     case notAnArchive
@@ -18,10 +19,15 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
     /// Free space fell to the reserve while extracting, because something else on the device used it meanwhile or the
     /// archive did not list its sizes.
     case ranOutOfSpace
+    case mixedWithInstaller
+    case installerPartsOnly
+    case installer(GameInstallerError)
+    case addOnAlone(String)
+    case severalGames
 
     public var message: String {
         switch self {
-        case .notAnArchive: "Choose a zip, RAR, or 7z archive."
+        case .notAnArchive: "Choose a zip, RAR, 7z, or ISO file, or a GOG installer."
         case .severalArchives: "Choose one archive at a time. For a multi-part archive, choose all of its parts."
         case let .missingVolume(part): "Part \(part) of this archive is missing. Choose all of its parts together."
         case let .duplicateVolume(part): "Two files are part \(part) of this archive. Remove one of them and choose again."
@@ -34,6 +40,20 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
         case .impossibleSize: "The archive lists impossible file sizes. It is damaged or was made to fill the device."
         case .largerThanListed: "The archive holds more data than its file list says, so the import stopped. It is damaged or was made to fill the device."
         case .ranOutOfSpace: "The device is almost out of space, so the import stopped. Free up space and try again."
+        case .mixedWithInstaller: "Choose the installer's .exe and its .bin parts on their own, without other files."
+        case .installerPartsOnly: "Choose the installer's .exe file together with its .bin parts."
+        case let .addOnAlone(title): "\(title) is an add-on. Choose it together with the main game's installer."
+        case .severalGames: "Choose one game's installers at a time: the main installer, and its add-on if there is one."
+        case let .installer(error):
+            switch error {
+            case .notAnInstaller: "VNDegen can unpack GOG installers, which are made with Inno Setup, and ISO disc images. This file is another kind of installer or a game's own program. Install the game on a computer and copy its folder instead."
+            case let .unsupported(detail): "This installer is a kind VNDegen can't unpack (\(detail)). Install the game on a computer and copy its folder instead."
+            case .encrypted: "This installer is password-protected, which VNDegen can't unpack."
+            case .repack: "This is a repack. Its game files are packed with tools that only run on Windows, so VNDegen can't unpack them. Install it on a computer and copy the game's folder instead."
+            case .nothingToUnpack: "This installer holds no game files to unpack."
+            case let .missingPart(name): "\(name) is missing. Choose it together with the installer, or put it in the same folder."
+            case let .damaged(detail): "The installer is damaged (\(detail)). Download it again."
+            }
         }
     }
 }
@@ -59,6 +79,7 @@ nonisolated final class ArchiveReader {
         _ = archive_read_support_format_rar(archive)
         _ = archive_read_support_format_rar5(archive)
         _ = archive_read_support_format_7zip(archive)
+        _ = archive_read_support_format_iso9660(archive)
         if let password { _ = archive_read_add_passphrase(archive, password) }
 
         let paths = volumes.map { strdup($0.path) }

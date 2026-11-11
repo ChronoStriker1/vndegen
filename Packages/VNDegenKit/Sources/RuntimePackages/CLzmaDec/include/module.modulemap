@@ -2,6 +2,7 @@
 // zlib, bzip2 and libarchive, so Package.swift needs no linker settings for this target.
 module CLzmaDec {
     header "LzmaDec.h"
+    header "Lzma2Dec.h"
     header "RuntimePackagesSystem.h"
     link "z"
     link "bz2"

@@ -102,6 +102,7 @@ Put each game in its own folder, named as you want it to appear. The folder name
 - **iPhone and iPad.** In the Files app, open On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
 - **Mac.** Copy the game folders into `~/Games/VNDegen`, which sits outside `~/Documents` so iCloud Drive does not upload your games.
 - **Archives.** Add game in the library unpacks a zip, RAR, or 7z. You can also drop an archive on VNDegen or open it in VNDegen from Files or Finder.
+- **Installers and disc images.** Add game unpacks a game from its GOG installer, with any add-on beside it, or from an ISO disc image, without running the installer. [Library](docs/library.md#installers-and-disc-images)
 - **Other folders.** Settings, Library folders adds a folder of games from an external drive, a server, or elsewhere on the Mac.
 
 VNDegen rescans on launch, on pull to refresh, and when you return to the app. [docs/library.md](docs/library.md) covers archives VNDegen can't open directly, other folders, removing games, and more.
