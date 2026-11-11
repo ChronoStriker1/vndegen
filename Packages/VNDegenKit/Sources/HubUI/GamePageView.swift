@@ -22,6 +22,7 @@ struct GamePageView: View {
                             // Read off the main thread, as the engine section reads its note, since it can list the
                             // game's folder. It follows the engine choice and the engine's options.
                             .task(id: "\(game.engine?.rawValue ?? "")|\(nav.variantRevision)") {
+                                hub.layouts.prepareSuggestion(for: game, in: hub.library)
                                 let plugin = hub.library.plugin(for: game.engine)
                                 let folder = hub.library.folder(for: game.id), data = hub.library.paths.dataDirectory(for: game.id)
                                 playLabel = await Task.detached { [game] in plugin?.playLabel(for: game, folder: folder, dataDirectory: data) }.value
@@ -392,8 +393,8 @@ private struct ControlsSection: View {
     let game: Game
 
     var body: some View {
-        let mapping = ButtonMapping(for: game, in: hub.library)
-        let remapped = mapping.changes(from: ButtonMapping.defaultLayout(for: game, in: hub.library))
+        let mapping = hub.layouts.mapping(for: game, in: hub.library)
+        let remapped = mapping.changes(from: hub.layouts.defaultLayout(for: game, in: hub.library))
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Controls", systemImage: "gamecontroller")
             if nav.offersControlMethod(game.id) {
@@ -413,7 +414,7 @@ private struct ControlsSection: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Controller layout")
                         .font(.system(size: 17, weight: .bold))
-                    Text(hub.layouts.shown(for: mapping)?.name
+                    Text(hub.layouts.shown(for: mapping, game: game, in: hub.library)?.name
                          ?? (remapped == 1 ? "1 button remapped" : "\(remapped) buttons remapped"))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.secondaryText)

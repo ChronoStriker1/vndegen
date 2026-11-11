@@ -39,7 +39,7 @@ private func makeLibrary(_ paths: LibraryPaths, games: [String]) async throws ->
 
 @MainActor
 private func buttons(_ name: String, _ library: LibraryStore) throws -> ButtonMapping {
-    ButtonMapping(for: try #require(library.game(GameID(name))), in: library)
+    LayoutLibrary(paths: library.paths).mapping(for: try #require(library.game(GameID(name))), in: library)
 }
 
 @Test @MainActor func savedMappingsPlayTheSameAfterUpgrading() async throws {

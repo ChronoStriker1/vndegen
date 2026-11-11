@@ -22,6 +22,8 @@ nonisolated struct GodotPack: Equatable, Sendable {
     var files: [String]
     /// The project settings VNDegen reads, from the pack's `project.binary`: strings and booleans, by key.
     var settings: [String: Setting] = [:]
+    var input: [GodotAction] = []
+    var scripts: [GodotScript] = []
 
     enum Setting: Equatable, Sendable {
         case string(String)
@@ -185,6 +187,9 @@ nonisolated struct GodotPack: Equatable, Sendable {
                 encryptedFiles.append((name, fileBase &+ start, size))
             }
             if name == "project.binary" { project = (fileBase &+ start, size, encrypted) }
+            if [".gd", ".gdc", ".gde"].contains(where: name.lowercased().hasSuffix) {
+                pack.scripts.append(GodotScript(name: name, offset: fileBase &+ start, size: size, encrypted: encrypted))
+            }
             files.append(name)
         }
         pack.files = files
@@ -195,6 +200,7 @@ nonisolated struct GodotPack: Equatable, Sendable {
             let data = project.encrypted ? pack.encryptionKey.flatMap { decrypt(file, at: project.offset, key: $0) }
                 : file.read(at: project.offset, count: Int(project.size))
             pack.settings = data.map(settings) ?? [:]
+            pack.input = data.map { GodotControls.inputMap($0, major: major) } ?? []
         }
         return pack
     }

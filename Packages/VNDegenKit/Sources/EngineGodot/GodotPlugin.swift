@@ -44,6 +44,19 @@ nonisolated public struct GodotPlugin: EnginePlugin {
         return reason
     }
 
+    public var controlReaderVersion: Int { GodotControls.version }
+
+    public func suggestedControls(folder: URL) -> ControlSuggestion? {
+        guard let layout = GodotLayout(FolderProbe(scanning: folder)), !layout.usesDotNet,
+              let file = try? FileHandle(forReadingFrom: folder.appendingPathComponent(layout.pack)) else { return nil }
+        defer { try? file.close() }
+        let reads = GodotControls.readsJoypad(layout.header.scripts) { offset, count in
+            (try? file.seek(toOffset: offset)) != nil ? (try? file.read(upToCount: count)).flatMap { $0.count == count ? $0 : nil } : nil
+        }
+        guard reads == false else { return nil }
+        return GodotControls.suggestion(layout.header.input, major: layout.major)
+    }
+
     /// What a game needs from VNDegen's Godot beyond its pack, or why VNDegen can't run it.
     static func requirements(_ layout: GodotLayout, folder: URL) -> Result<GodotRequirements, GodotError> {
         let pack = layout.header

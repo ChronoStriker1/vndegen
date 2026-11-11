@@ -134,6 +134,7 @@ extension ControllerLayout.ID {
         case .rpgMaker: "keyboard"
         case .gamepad: "gamecontroller"
         case .saved: "person.crop.circle"
+        case .suggested: "wand.and.stars"
         }
     }
 }
@@ -152,7 +153,6 @@ final class ButtonMappingEditor: Identifiable {
         case apply(ControllerLayout.ID)
         /// Saves the game's buttons as a new layout.
         case saveNew
-        /// Puts back the layout the game's engine starts with.
         case reset
         /// Opens a saved layout, so changes go to it rather than the game.
         case edit(ControllerLayout.ID)
@@ -210,19 +210,28 @@ final class ButtonMappingEditor: Identifiable {
 
     var editedLayout: ControllerLayout? { editing.flatMap(layouts.layout) }
 
+    private var game: Game? { library.game(gameID) }
+
     private var gameMapping: ButtonMapping {
-        ButtonMapping(stored: library.game(gameID)?.buttonMapping, default: defaultLayout)
+        ButtonMapping(stored: game?.buttonMapping, default: defaultLayout)
     }
 
-    /// The layout the game shows, which the list marks.
-    var currentLayout: ControllerLayout? { layouts.shown(for: gameMapping) }
+    var allLayouts: [ControllerLayout] { layouts.all(for: game, in: library) }
 
-    /// What the button list marks as changed against: the Xbox layout in a saved layout, the engine's in a game.
+    /// The layout the game shows, which the list marks.
+    var currentLayout: ControllerLayout? { layouts.shown(for: gameMapping, game: game, in: library) }
+
     var baseline: ButtonMapping { editing == nil ? defaultLayout : ButtonMapping() }
 
-    /// What the game's engine starts its games with.
     var defaultLayout: ButtonMapping {
-        library.game(gameID).map { ButtonMapping.defaultLayout(for: $0, in: library) } ?? ButtonMapping()
+        game.map { layouts.defaultLayout(for: $0, in: library) } ?? ButtonMapping()
+    }
+
+    var hasSuggestion: Bool { game.map { layouts.suggestion(for: $0) != nil } ?? false }
+
+    func label(for input: ControlInput) -> String? {
+        guard editing == nil, let game else { return nil }
+        return layouts.label(for: input, game: game, in: library)
     }
 
     /// The button list's rows below the layouts: every button, with a row for each whole stick above its directions.
@@ -250,7 +259,7 @@ final class ButtonMappingEditor: Identifiable {
         if picking != nil { return Self.sections.map { Self.chunked($0.actions.map(Target.action), columns($0)) } }
         let buttons = Self.inputRows.map { [$0] }
         if editing != nil { return [[[.rename, .delete]], buttons] }
-        let layoutRows = !listsLayouts ? [] : layouts.all.map { layout -> [Target] in
+        let layoutRows = !listsLayouts ? [] : allLayouts.map { layout -> [Target] in
             if case .saved = layout.id { [.apply(layout.id), .edit(layout.id)] } else { [.apply(layout.id)] }
         }
         return [[[.layouts]] + layoutRows + [[.saveNew, .reset]], buttons]
@@ -381,15 +390,15 @@ final class ButtonMappingEditor: Identifiable {
         case .layouts:
             listsLayouts.toggle()
             // Opening moves to the layout the game shows, or the first one when its buttons match none.
-            let shown = currentLayout ?? layouts.all.first
+            let shown = currentLayout ?? allLayouts.first
             target = listsLayouts ? shown.map { Target.apply($0.id) } : .layouts
         case let .apply(id):
-            if let layout = layouts.layout(id) { save(layout.mapping) }
+            if let layout = layouts.layout(id, for: game, in: library) { save(layout.mapping) }
             listsLayouts = false
             target = .layouts
         case .saveNew:
             let mapping = gameMapping
-            guard layouts.shown(for: mapping) == nil else { return }
+            guard currentLayout == nil else { return }
             openKeyboard(title: "Layout name", text: "") { [weak self] name in
                 guard let self, layouts.add(name: name, mapping: mapping) != nil else { return }
                 target = .layouts
@@ -502,12 +511,12 @@ struct ButtonMappingSheet: View {
     private var layoutList: some View {
         let mapping = editor.mapping, defaultLayout = editor.defaultLayout
         let current = editor.currentLayout
-        let defaultName = editor.layouts.shown(for: defaultLayout)?.name ?? "the default"
+        let defaultName = editor.allLayouts.first { $0.mapping == defaultLayout }?.name ?? "the default"
         return VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: "Layout")
             layoutChooser(current)
             if editor.listsLayouts {
-                ForEach(editor.layouts.all) { layout in
+                ForEach(editor.allLayouts) { layout in
                     layoutRow(layout, current: layout.id == current?.id)
                 }
             }
@@ -522,7 +531,7 @@ struct ButtonMappingSheet: View {
             .padding(.vertical, 8)
             SectionLabel(text: "Buttons")
             buttonRows(mapping)
-            note(footnote(defaultLayout))
+            note(footnote(defaultLayout, suggested: editor.hasSuggestion))
         }
         .animation(Theme.focusAnimation, value: editor.focus)
     }
@@ -633,7 +642,7 @@ struct ButtonMappingSheet: View {
             switch target {
             case let .input(input):
                 row(target, name: input.title, action: mapping.action(for: input).title,
-                    controllersOnly: !input.isOnTouchGamepad,
+                    controllersOnly: !input.isOnTouchGamepad, suggested: editor.label(for: input),
                     changed: mapping.action(for: input) != baseline.action(for: input))
             case let .stick(stick):
                 let isStick = stick.directions.allSatisfy { mapping.action(for: $0) == .gamepad($0) }
@@ -646,17 +655,20 @@ struct ButtonMappingSheet: View {
         }
     }
 
-    private func footnote(_ defaultLayout: ButtonMapping) -> String {
-        let start = defaultLayout == .keyboardAndMouse
+    private func footnote(_ defaultLayout: ButtonMapping, suggested: Bool) -> String {
+        let suggestion = suggested
+            ? "Suggested for this game puts keys this game's own files bind on buttons its engine leaves unused. Reset returns to it, and Xbox gamepad goes back to the engine's own buttons. "
+            : ""
+        let start = suggestion + (defaultLayout == .keyboardAndMouse
             ? "This game's engine reads no gamepad, so its games start with Keyboard and mouse, the layout of Steam's template of that name: the left stick is WASD, the right stick moves the pointer, RT and R3 click, LT right clicks, LB and RB turn the wheel, and the other buttons press keys. Mouse puts the pointer on both sticks and the mouse buttons on A and X."
-            : "Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad."
+            : "Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad.")
         return start + " Picking a layout copies its buttons into this game, and changing a button changes only this game until you save it as a new layout. Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation, so a change here never stops a controller from working them. LB and RB jump between groups."
     }
 
     /// A button, or a whole stick, with what it does. A stick's row switches it between moving the pointer and being a
     /// stick, and says which it would become.
     private func row(_ target: ButtonMappingEditor.Target, name: String, action: String, controllersOnly: Bool,
-                     changed: Bool = false, detail: String? = nil) -> some View {
+                     suggested: String? = nil, changed: Bool = false, detail: String? = nil) -> some View {
         Button { editor.select(target) } label: {
             HStack(spacing: 14) {
                 // One width for every button, so the actions line up.
@@ -670,6 +682,9 @@ struct ButtonMappingSheet: View {
                     .overlay { Capsule(style: .circular).strokeBorder(Theme.stroke) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(action).font(.system(size: 16, weight: .semibold))
+                    if let suggested {
+                        Text(suggested).font(.system(size: 13)).foregroundStyle(Theme.secondaryText)
+                    }
                     if controllersOnly {
                         Text("Controllers only").font(.system(size: 13)).foregroundStyle(Theme.secondaryText)
                     }

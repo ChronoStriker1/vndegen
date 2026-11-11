@@ -94,6 +94,7 @@ public final class Hub {
                 : "VNDegen can't run \(plugin.descriptor.displayName) games on this device. The game's page says why."
             return
         }
+        layouts.prepareSuggestion(for: game, in: library)
         do {
             guard let launch = try library.makeLaunch(id, onExit: { [weak self] in self?.endSession() }) else { return }
             let session = try plugin.makeSession(launch)

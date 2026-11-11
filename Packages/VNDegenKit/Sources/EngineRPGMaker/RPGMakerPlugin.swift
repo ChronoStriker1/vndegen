@@ -121,6 +121,12 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
     public func legacyAction(for button: VirtualButton) -> ControlAction? {
         KeyStroke.key(for: button).map(ControlAction.key)
     }
+
+    public var controlReaderVersion: Int { RPGMakerControls.version }
+
+    public func suggestedControls(folder: URL) -> ControlSuggestion? {
+        RPGMakerControls.suggestion(GameFolder(rpgMakerGameAt: folder))
+    }
 }
 
 extension RPGMakerPlugin {
