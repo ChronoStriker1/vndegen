@@ -301,10 +301,9 @@ static void fx_mono(u32 *p, i64 t, i64 n) {
     *p = (*p & 0xff000000u) | v | v << 8 | v << 16;
 }
 
-static void merge(YLayer *src, YLayer *dst, bool bothAlpha) {
+static void merge(YLayer *src, YLayer *dst, bool bothAlpha, int ox, int oy) {
     // src goes on top of dst at src's position relative to dst; the result stays in dst.
     if (!src->px || !dst->px) return;
-    int ox = src->x - dst->x, oy = src->y - dst->y;
     int ka = src->a > 256 ? 256 : src->a;
     for (int Y = 0; Y < src->h; Y++) {
         int dy = Y + oy;
@@ -329,6 +328,39 @@ static void merge(YLayer *src, YLayer *dst, bool bothAlpha) {
         }
     }
     if (bothAlpha) dst->a = 256;
+}
+
+static void transition(YCall *c, YLayer *src) {
+    YR *y = c->y;
+    char *ruleId = yc_str(c, "ID2"), *outId = yc_str(c, "ID3");
+    YLayer *rule = ruleId ? yr_layer(y, ruleId, false, false) : NULL;
+    YLayer *out = outId ? yr_layer(y, outId, true, false) : NULL;
+    free(ruleId);
+    free(outId);
+    if (!out || out->isSet || out == src || src->isSet || !src->px) return;
+    int t = (int)yc_int_or(c, "SET", 256), w = src->w, h = src->h;
+    uint32_t *px = yr_alloc(sizeof(uint32_t) * (size_t)(w ? w : 1) * (size_t)(h ? h : 1));
+    bool useRule = rule && rule->px && rule->w > 0 && rule->h > 0 && !rule->isSet;
+    const int soft = 32;
+    for (int Y = 0; Y < h; Y++)
+        for (int X = 0; X < w; X++) {
+            u32 p = src->px[(size_t)Y * w + X];
+            int k = t >= 256 ? 256 : t <= 0 ? 0 : t;
+            if (useRule && t > 0 && t < 256) {
+                u32 q = rule->px[(size_t)(Y * rule->h / h) * rule->w + (size_t)(X * rule->w / w)];
+                int r = (int)((q & 0xff) * 77 + ((q >> 8) & 0xff) * 151 + ((q >> 16) & 0xff) * 28) >> 8;
+                int edge = t * (255 + soft) / 256;
+                k = (edge - r) * 256 / soft;
+                k = k < 0 ? 0 : k > 256 ? 256 : k;
+            }
+            u32 a = ((p >> 24) * (u32)k) >> 8;
+            px[(size_t)Y * w + X] = (p & 0xffffffu) | a << 24;
+        }
+    free(out->px);
+    out->px = px;
+    out->w = w;
+    out->h = h;
+    yr_layer_check_opaque(out);
 }
 
 static int cgact(YCall *c) {
@@ -374,6 +406,10 @@ static int cgact(YCall *c) {
             yr_layer_check_opaque(d);
             if (attrs && d != l) copy_attrs(d, l);
         } else free(px);
+        return YR_NEXT;
+    }
+    if (yc_int_or(c, "TRANSITION", 0)) {
+        transition(c, l);
         return YR_NEXT;
     }
     if (yc_int_or(c, "SWAP", 0) || yc_int_or(c, "SWAP2", 0)) {
@@ -433,7 +469,11 @@ static int cgact(YCall *c) {
     }
     if (yc_int_or(c, "MERGE", 0) || yc_int_or(c, "MERGE2", 0)) {
         YLayer *d = target(c, l);
-        if (d != l) { merge(l, d, yc_int_or(c, "MERGE2", 0) != 0); yr_layer_check_opaque(d); }
+        if (d != l) {
+            int ox = (int)yc_int_or(c, "X", l->x - d->x), oy = (int)yc_int_or(c, "Y", l->y - d->y);
+            merge(l, d, yc_int_or(c, "MERGE2", 0) != 0, ox, oy);
+            yr_layer_check_opaque(d);
+        }
         return YR_NEXT;
     }
     // Effects that work pixel by pixel, on the area, into ID2 when given.

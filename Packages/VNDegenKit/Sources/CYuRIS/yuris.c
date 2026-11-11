@@ -63,6 +63,15 @@ VNY *vny_open(const VNYConfig *config, char *err, size_t errSize) {
 void vny_close(VNY *v) {
     if (!v) return;
     if (getenv("YR_DUMP_LAYERS")) yr_gfx_dump((YR *)v);
+    if (getenv("YR_DUMP_TASKS")) {
+        YR *y = (YR *)v;
+        for (int i = 0; i < y->taskCount; i++) {
+            YTask *t = y->tasks[i];
+            yr_log(y, "task %s z=%d at %u:%u depth=%d loops=%d wait=%llu/%d enabled=%d\n", t->id, t->z, t->script, t->ip,
+                   t->depth, t->loopDepth, (unsigned long long)t->waitUntil, t->waitFrames, t->enabled);
+            for (int d = t->depth - 1; d >= 1; d--) yr_log(y, "  from %u:%u\n", t->frames[d].retScript, t->frames[d].retIp);
+        }
+    }
     free_all((YR *)v);
 }
 

@@ -350,6 +350,35 @@ static int math(YCall *c) {
     return YR_NEXT;
 }
 
+static double fget(const YVar *v, int i) { return v->t == YT_FLT && i < (int)v->count ? v->flts[i] : 0; }
+static i64 iget(const YVar *v, int i) { return v->t == YT_INT && i < (int)v->count ? v->ints[i] : 0; }
+
+static int math3d(YCall *c) {
+    YRef ri, rf;
+    if (!yc_ref(c, "INT", &ri) || !yc_ref(c, "FLT", &rf) || !ri.var || !rf.var || rf.var->t != YT_FLT || rf.var->count < 35)
+        return YR_NEXT;
+    const YVar *I = ri.var;
+    YVar *F = rf.var;
+    double x, y, zx, zy;
+    if (iget(I, 7)) {
+        zx = fget(F, 16);
+        zy = fget(F, 17);
+        x = fget(F, 13) - fget(F, 18) * zx / 100;
+        y = fget(F, 14) - fget(F, 19) * zy / 100;
+    } else {
+        double z = pow(2.0, (fget(F, 27) - (fget(F, 15) - fget(F, 5))) / 100.0);
+        zx = z * fget(F, 16);
+        zy = z * fget(F, 17);
+        x = (double)iget(I, 5) / 2 + fget(F, 6) + fget(F, 11) - fget(F, 3) + fget(F, 13) * z - fget(F, 18) * zx / 100;
+        y = (double)iget(I, 6) / 2 + fget(F, 7) + fget(F, 12) - fget(F, 4) + fget(F, 14) * z - fget(F, 19) * zy / 100;
+    }
+    F->flts[31] = x;
+    F->flts[32] = y;
+    F->flts[33] = zx;
+    F->flts[34] = zy;
+    return YR_NEXT;
+}
+
 static int labelinfo(YCall *c) {
     YRef out;
     char *name = yc_str(c, "#");
@@ -375,6 +404,7 @@ int yr_cmd_vars(YCall *c, int id) {
     case C_VARINFO: return varinfo(c);
     case C_MATH: return math(c);
     case C_LABELINFO: return labelinfo(c);
+    case C_MATH3D: return math3d(c);
     }
     return YR_NEXT;
 }

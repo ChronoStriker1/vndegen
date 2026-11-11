@@ -298,7 +298,7 @@ static int exec(YR *y, YTask *t, YScript *s) {
     case C_INT: case C_FLT: case C_STR: case C_VAR: case C_S_INT: case C_S_FLT: case C_S_STR: case C_S_VAR:
     case C_F_INT: case C_F_FLT: case C_F_STR: case C_F_VAR: case C_G_INT: case C_G_INT2: case C_G_INT3: case C_G_INT4:
     case C_G_FLT: case C_G_FLT2: case C_G_FLT3: case C_G_FLT4: case C_G_STR: case C_G_STR2: case C_G_STR3:
-    case C_G_STR4: case C_G_VAR: case C_LET: case C_VARACT: case C_VARINFO: case C_MATH: case C_LABELINFO:
+    case C_G_STR4: case C_G_VAR: case C_LET: case C_VARACT: case C_VARINFO: case C_MATH: case C_LABELINFO: case C_MATH3D:
         return yr_cmd_vars(&c, id);
     case C_TEXTOUT: case C_WORD: case C_RETURNCODE: case C_TEXT: case C_TEXTINFO: case C_FONT: case C_FONTINFO:
         return yr_cmd_text(&c, id);
