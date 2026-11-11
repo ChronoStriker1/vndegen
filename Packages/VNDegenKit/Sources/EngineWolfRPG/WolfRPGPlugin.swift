@@ -25,6 +25,13 @@ nonisolated public struct WolfRPGPlugin: EnginePlugin {
 
     /// Wolf RPG Editor reads gamepads itself: the first button confirms, the second cancels, the third is sub.
     public var defaultControls: ControlLayout { .gamepad }
+
+    public var controlReaderVersion: Int { WolfRPGControls.version }
+
+    public func suggestedControls(folder: URL) -> ControlSuggestion? {
+        guard let layout = WolfRPGLayout(scanning: folder) else { return nil }
+        return WolfRPGControls.suggestion(root: layout.url(in: folder))
+    }
 }
 
 nonisolated public enum WolfRPGError: Error, LocalizedError {

@@ -3,12 +3,15 @@
 
 #include "framepace.h"
 #include "game.h"
+#include "game_internal.h"
 #include "render.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <map>
 #include <memory>
+#include <optional>
+#include <stdexcept>
 #include <string>
 
 using namespace wolf;
@@ -265,6 +268,50 @@ bool vnwolf_cheat_set_variable(VNWolfEngine *e, int id, int value) { return e &&
 
 void vnwolf_cheat_walk_through_walls(VNWolfEngine *e, bool on) {
     if (e) e->game->setWalkThroughWalls(on);
+}
+
+const char *vnwolf_key_checks(const char *gameRoot) {
+    thread_local std::string out;
+    out.clear();
+    try {
+        GameFiles files(gameRoot ? gameRoot : "");
+        auto read = [&](const std::string &path, std::optional<BasicFile> kind) {
+            auto data = files.read(path);
+            if (!data) throw std::runtime_error("missing " + path);
+            if (kind) decryptBasicData(*data, *kind);
+            return *data;
+        };
+        auto scan = [&](const Commands &commands, const std::string &name) {
+            for (auto &c : commands) {
+                uint32_t flags = uint32_t(c.arg(1));
+                int code = c.arg(2);
+                if (c.code != 123 || ((flags >> 8) & 0x0F) != 1 || !((flags >> 8) & 0xF0) || code < 100 || code >= kKeyCodeCount)
+                    continue;
+                out += std::to_string(code) + "\t" + name + "\n";
+            }
+        };
+        auto game = parseGameDat(read("BasicData/Game.dat", BasicFile::GameDat));
+        for (auto &ce : parseCommonEvents(read("BasicData/CommonEvent.dat", BasicFile::CommonEvent))) scan(ce.commands, ce.name);
+        auto sdb = parseDatabase(read("BasicData/SysDataBase.project", std::nullopt), read("BasicData/SysDataBase.dat", std::nullopt),
+                                 game.encoding);
+        if (!sdb.types.empty()) {
+            auto &maps = sdb.types[SysMaps];
+            for (auto &row : maps.rows) {
+                if (maps.fieldKinds.empty() || !maps.isString(0) || maps.slot(0) >= row.strings.size()) continue;
+                auto data = files.read(row.strings[maps.slot(0)]);
+                if (!data) continue;
+                try {
+                    for (auto &event : parseMap(*data).events)
+                        for (auto &page : event.pages) scan(page.commands, "");
+                } catch (const std::exception &) {
+                }
+            }
+        }
+    } catch (const std::exception &) {
+        out.clear();
+        return nullptr;
+    }
+    return out.c_str();
 }
 
 }  // extern "C"

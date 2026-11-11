@@ -102,10 +102,12 @@ Wolf RPG Editor reads gamepads, so the default layout is the gamepad: A confirms
 opens the menu in most games), the Dash button is the sub key (Shift), RT holds Control, which many games read to skip messages, and the D-pad and left stick move. A keyboard
 works as on Windows: Z, Return or Space confirm, X or Escape cancel, Shift is sub, and the arrows or the number pad move.
 
-Event commands read the keyboard by Wolf's own key codes, 100 plus the key's DirectInput scan code. The mouse works through
+Event commands read the keyboard by Wolf's own key codes, 100 plus the key's DirectInput scan code. Key input on one key stores that key's code while it is down and 0 when it isn't, and games compare the result with the code. Up to and including 0.35.0 it stored 1, so those checks never fired (#86), such as MilkyQuest's Control skip. Key input from a code stores the first key down, by its code. The mouse works through
 the view: a pointer, a touch under the Touch and Touch mouse control methods, or a controller's pointer actions move it, and
 scrolling turns its wheel. A game reads it through key input, the variable command's "other" values, system variables 71
 and 72, and whether it is over a picture. System variable 73 lets it work messages and choices.
+
+VNDegen suggests a layout from the keys a game's events check one at a time. `vnwolf_key_checks` reads `CommonEvent.dat` and every map the system database lists, from loose files or `.wolf` archives, and returns each key input on one literal key with the name of its common event (empty for a map event). Under Xbox gamepad, Wolf's router gives LT, View, L3, R3, and the right stick nothing to do, so the keys go on View, LT, L3, and R3, and the right stick stays alone. Keys a button already sends are skipped (Z, X, Shift, Control, and the arrows), and so are function keys, right Control, and keys in events named for debugging or cheats. A key whose event's name is exactly one of a few standard names (`バックログ表示`, `【並】バックログ表示`, `ログ表示`, `メッセージ簡易ログ`, `メッセージウィンドウ消去`, `戦闘高速化`, `メッセージスキップ`, `【並】メッセージスキップ`, `文章スキップ`) gets that label and goes first. The rest follow in the files' order and show only the key. Six of the ten games read get one.
 
 When a game waits for typed text, the hub opens its keyboard on a touch device, and a hardware keyboard types directly.
 Return finishes and Backspace deletes. A controller's Confirm finishes and Cancel cancels. Touching the game brings back a keyboard the player hid.
