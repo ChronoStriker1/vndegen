@@ -90,15 +90,14 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Save sync over FTP and WebDAV, with Ludusavi's settings for each, beside SMB (0.33.0).
 - Suggested controller layouts for RPG Maker MV and MZ games and Godot games, read from the game's own files and shown as "Suggested for this game" in the layout sheet (0.34.0).
 - Better default controller layouts: a new "Visual novel" layout for KiriKiri, NScripter, Artemis and AliceSoft games, "Mouse" for Flash, the A, S and D keys on RPG Maker XP, VX and VX Ace's spare buttons, and Control on RT for Wolf RPG (0.35.0).
+- Suggested controller layouts for Artemis and Wolf RPG Editor games, a fix for Wolf RPG's check of one specific key (#86), and a game page note that Evenicle can't run yet (0.36.0). NScripter was left out: its games gain nothing over the "Visual novel" layout.
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
-- Wolf RPG: a check for one specific key never fires, so holding Control doesn't skip in MilkyQuest and Drain Dungeon (#86). Being fixed on `feat/suggested-layouts-2`.
 - KiriKiri: Violated Hero was seen to stop after "OK, let's go inside." with no input moving it on (#85). Six runs on 2026-11-11 didn't reproduce it, so it stays open until it is seen again and doesn't hold up other work.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Suggested layouts for Artemis, NScripter and Wolf RPG games, on `feat/suggested-layouts-2`. Agreed with the maintainer on 2026-11-11: in "Visual novel" a suggestion may replace View, L3, R3 and LT, in that order, and no other button.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
@@ -120,7 +119,7 @@ Reordered with the maintainer on 2026-11-09, to put quick wins first. Only work 
 The items of the 2026-10-25 plan that are done, kept for their decisions and notes. The Shipped list above has the releases.
 - A frame rate check of every engine plugin, limited to the games where it matters: games that aren't strictly visual novels, such as RPG Maker games, and visual novels with video, such as movies or animated clips. Text, still images and transitions don't need it. Each of those test games should reach the frame rate it targets, such as 60 fps for RPG Maker MV and MZ, and hold it on average through normal play, including scenes with heavy effects. Where a game falls short, find out whether VNDegen or the engine plugin causes it, or something on the test machine, and fix what is VNDegen's. Every new engine plugin gets the same check, on the same kinds of games, before it ships. Done on 2026-11-03, and [frame-rate.md](frame-rate.md) has the results. Its fixes shipped in 0.22.2.
 - NScripter, on VNDegen's own clean-room runtime. Shipped in 0.8.0.
-- A controller layout library, like Steam's controller layouts. Each game uses a layout from the library, and the player can pick another, edit it, or save their own. The library starts with VNDegen's built-in layouts, among them "Keyboard and mouse", copied from Steam's template of that name, which engines without gamepad support use by default unless an engine has a better standard layout. Shipped in 0.23.0: built-in layouts, picking one for a game, editing, and saving your own. Suggested layouts followed in 0.34.0 for RPG Maker MV and MZ and Godot, and more engines are under In progress.
+- A controller layout library, like Steam's controller layouts. Each game uses a layout from the library, and the player can pick another, edit it, or save their own. The library starts with VNDegen's built-in layouts, among them "Keyboard and mouse", copied from Steam's template of that name, which engines without gamepad support use by default unless an engine has a better standard layout. Shipped in 0.23.0: built-in layouts, picking one for a game, editing, and saving your own. Suggested layouts followed in 0.34.0 for RPG Maker MV and MZ and Godot, and in 0.36.0 for Artemis and Wolf RPG Editor, where a suggestion in "Visual novel" may replace only View, L3, R3 and LT (agreed with the maintainer on 2026-11-11).
 - AliceSoft System 3 and System 4, on VNDegen's own clean-room runtimes, including the oldest `SYSTEM3.EXE` games. System 3 shipped in 0.13.0 and System 4 in 0.15.0.
 - Artemis, on art3m1s-core (MPL-2.0). Shipped in 0.10.0.
 - Wolf RPG Editor, on VNDegen's own runtime. Shipped in 0.11.0.
