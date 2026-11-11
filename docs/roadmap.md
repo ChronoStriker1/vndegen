@@ -93,12 +93,10 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
-- System 4: Evenicle can't run yet: it sets up its 3D field with SealEngine before its title. The opcodes it stopped on now run, and its game page says it can't run (#84).
-- KiriKiri: Violated Hero stops after "OK, let's go inside." and no input moves it on (#85).
+- KiriKiri: Violated Hero was seen to stop after "OK, let's go inside." with no input moving it on (#85). Six runs on 2026-11-11 didn't reproduce it, so it stays open until it is seen again and doesn't hold up other work.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- The two open bugs, #84 and #85, on `fix/bug-batch-5`.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
@@ -137,6 +135,7 @@ The items of the 2026-10-25 plan that are done, kept for their decisions and not
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.
 
 ## Out of scope for now
+- 3D for AliceSoft System 4 games (SealEngine). Evenicle sets up its 3D field before its title, so it can't run, and Rance IX stops at its first battle or map. It is a whole 3D engine, 330 functions, and Evenicle needs about 300 more PartsEngine functions and most of its sound and story libraries besides. The maintainer left the call to the coordinator on 2026-11-11, who put it here: it is the largest single piece of work on the list and serves two games. The instructions Evenicle stopped on (#84) run, and its game page says it can't run yet. [system4.md](system4.md) has what is missing.
 - Apple TV. When it comes, the library gets a TV layout modeled on Steam Deck's home screen: the focused game's hero art fills the screen with one row of capsules along the top or the bottom edge, and swiping up on the hero art opens a card view of every game. It joins the iPhone and iPad layouts in `LibraryLayout` and is the TV's default.
 - iCloud saves.
 - GameMaker and the other general-purpose and custom engines in `docs/engine-survey.md` that are not listed under Next.
