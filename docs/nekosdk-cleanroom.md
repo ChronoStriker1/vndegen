@@ -21,7 +21,7 @@ and nothing copied or ported from GPL, LGPL or unlicensed code.
   or decompiled. Any disassembly needs the coordinator's approval first.
 - **VNDegen's own earlier code.** `audio`, `font` and `sjis` are adapted from the System 4 runtime. `stb_image` and
   `stb_vorbis` (public domain or MIT) are the same copies System 4 uses, and zlib (zlib license) unpacks archives.
-- **VNDegen's own feasibility test,** `docs/nekosdk.md` and its Python tools on branch `ws/nekosdk`.
+- **VNDegen's own feasibility test,** `docs/nekosdk.md` and its Python tools, kept under the tag `archive/ws-nekosdk`.
 
 The runtime's author opened none of the outside projects below.
 
