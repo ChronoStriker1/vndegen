@@ -93,6 +93,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
+- Wolf RPG: a check for one specific key never fires, so holding Control doesn't skip in MilkyQuest and Drain Dungeon (#86). Being fixed on `feat/suggested-layouts-2`.
 - KiriKiri: Violated Hero was seen to stop after "OK, let's go inside." with no input moving it on (#85). Six runs on 2026-11-11 didn't reproduce it, so it stays open until it is seen again and doesn't hold up other work.
 
 ## In progress
