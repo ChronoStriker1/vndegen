@@ -294,6 +294,7 @@ static int exec(YR *y, YTask *t, YScript *s) {
     case C_RETURN: case C_RETURNBREAK: return do_return(&c);
     case C_GO: return do_go(&c);
     case C_TASK: case C_TASKEND: case C_TASKINFO: return yr_cmd_task(&c, id);
+    case C_SAVE: case C_LOAD: case C_SAVEEND: return yr_cmd_save(&c, id);
     case C_LABEL: case C_PREP: case C__IFDEF: case C__IFNDEF: case C__IFEND: case C_MACRO: return YR_NEXT;
     case C_INT: case C_FLT: case C_STR: case C_VAR: case C_S_INT: case C_S_FLT: case C_S_STR: case C_S_VAR:
     case C_F_INT: case C_F_FLT: case C_F_STR: case C_F_VAR: case C_G_INT: case C_G_INT2: case C_G_INT3: case C_G_INT4:

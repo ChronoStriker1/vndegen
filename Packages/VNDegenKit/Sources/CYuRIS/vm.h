@@ -8,6 +8,7 @@ typedef struct YFS YFS;
 typedef struct YGfx YGfx;
 typedef struct YSnd YSnd;
 typedef struct YText YText;
+struct YSaveState;
 
 enum { YR_PARAMS = 17 };   // GOSUB and RETURN values 1 to 16; slot 0 unused
 
@@ -115,6 +116,7 @@ struct YR {
     YGfx *gfx;
     YSnd *snd;
     YText *txt;
+    struct YSaveState *save;
     int audioRate;
     u32 serial;
     long watchVid;              // logs stores to this variable id, from YR_WATCH; -1 for none
@@ -169,6 +171,8 @@ int yr_cmd_text(YCall *c, int id);      // _, WORD, RETURNCODE, TEXT, TEXTINFO, 
 int yr_cmd_cg(YCall *c, int id);        // CG, CGACT, CGEND, CGINFO
 int yr_cmd_sound(YCall *c, int id);     // SOUND, SOUNDEND, SOUNDINFO, MOVIE...
 int yr_cmd_task(YCall *c, int id);      // TASK, TASKEND, TASKINFO
+int yr_cmd_save(YCall *c, int id);
+void yr_save_close(YR *y);
 
 // ---- save.c ----
 // Whether a file the game wrote (in the save folder) exists, by the game's name for it.

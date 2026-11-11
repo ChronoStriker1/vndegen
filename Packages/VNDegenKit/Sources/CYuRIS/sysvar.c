@@ -149,9 +149,9 @@ YVal yr_sys_get(YR *y, YTask *t, const YSysVar *s, int n, const i64 *sub) {
     case S_RSTR: { YValues *p = results(t); return yv_str(p && p->s[idx] ? p->s[idx] : ""); }
     case S_RFLG: { YValues *p = results(t); return yv_int(p ? p->flag[idx] : 0); }
     case S_SYSTEM_PATH: case S_PROJECT_PATH: return yv_str(".\\");
-    case S_SAVE_PATH: return yv_str("savedata\\");
-    case S_APPDATA_PATH: return yv_str("C:\\Users\\user\\AppData\\Roaming\\");
-    case S_PERSONAL_PATH: return yv_str("C:\\Users\\user\\Documents\\");
+    case S_SAVE_PATH: return yv_str("save\\");
+    case S_APPDATA_PATH: return yv_str("C:\\Users\\user\\AppData\\Roaming");
+    case S_PERSONAL_PATH: return yv_str("C:\\Users\\user\\Documents");
     case S_SYSTEM_VERSION: return yv_int(y->scriptVersion);
     case S_SCREEN_COLOR: return yv_int(32);
     case S_SCREEN_SIZE_X: return yv_int(1920);

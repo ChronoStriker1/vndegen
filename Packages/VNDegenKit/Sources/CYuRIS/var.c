@@ -152,7 +152,7 @@ static bool parse(YR *y, const u8 *d, size_t size, bool flagByte, bool commit) {
     while (o < size) {
         size_t head = flagByte ? 8 : 7;
         if (o + head > size) return false;
-        u8 scope = d[o];
+        u8 scope = d[o], cls = flagByte ? d[o + 1] : 0;
         u16 script = yr_le16(d + o + (flagByte ? 2 : 1));
         u16 id = yr_le16(d + o + (flagByte ? 4 : 3));
         u8 t = d[o + head - 2], nd = d[o + head - 1];
@@ -186,6 +186,7 @@ static bool parse(YR *y, const u8 *d, size_t size, bool flagByte, bool commit) {
         if (commit && id < y->varCount) {
             YVar *v = &y->vars[id];
             v->scope = scope;
+            v->cls = cls;
             v->script = script;
             yv_free(&v->init);
             v->init = init;

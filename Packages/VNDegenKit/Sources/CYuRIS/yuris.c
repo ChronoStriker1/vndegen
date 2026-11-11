@@ -9,6 +9,7 @@ static void free_all(YR *y) {
     for (int i = 0; i < y->taskCount; i++) yr_task_free(y->tasks[i]);
     free(y->tasks);
     yr_text_close(y);
+    yr_save_close(y);
     yr_gfx_close(y);
     yr_script_close(y);
     yr_fs_close(y);

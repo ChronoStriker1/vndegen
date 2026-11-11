@@ -45,6 +45,9 @@ int yr_char_decode(int enc, const u8 *p, u32 *cp);  // as yr_char_len, with the 
 char *yr_to_utf8(int enc, const char *s);           // malloc'd
 int yr_sjis_decode(const u8 *p, u32 *cp);
 
+u8 *yr_snappy_decode(const u8 *src, size_t n, size_t *outLen);
+u8 *yr_snappy_encode(const u8 *src, size_t n, size_t *outLen);
+
 // ---- fs.c: .ypf archives and loose files ----
 typedef struct YFile { u8 *data; size_t size; } YFile;
 bool yr_fs_open(YR *y);
@@ -142,6 +145,7 @@ typedef struct YVar {
     u8 ndim;
     u8 scope;         // 1 global, 2 local or static, 3 file (newer engines)
     u8 declared;
+    u8 cls;
     u16 script;
     u32 dims[8];
     u32 count;        // elements; 1 for a scalar
