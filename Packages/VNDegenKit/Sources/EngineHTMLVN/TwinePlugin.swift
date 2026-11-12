@@ -44,7 +44,7 @@ nonisolated public struct TwinePlugin: EnginePlugin {
     }
 
     /// Twine stories are read with the mouse or by touch, and some games take keys.
-    public var defaultControls: ControlLayout { .keyboardAndMouse }
+    public var defaultControls: ControlLayout { .mouse }
 
     /// The page's URL path, each character a file name may hold that a URL path can't encoded.
     static func startPage(_ page: String) -> String {

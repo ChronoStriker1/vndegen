@@ -57,6 +57,8 @@ nonisolated public struct VisualNovelMakerPlugin: EnginePlugin {
     /// its menus take only the mouse.
     public var defaultControls: ControlLayout { .visualNovel }
 
+    public var defaultControlChanges: [ControlInput: ControlAction] { [.a: .click(.primary)] }
+
     public var listsEngineFiles: Bool { true }
 
     public func engineFileList(_ probe: FolderProbe) -> EngineFileList? {

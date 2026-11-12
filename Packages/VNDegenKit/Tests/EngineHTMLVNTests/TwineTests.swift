@@ -102,7 +102,7 @@ private func detect(_ root: URL) -> EngineMatch? { TwinePlugin().detect(FolderPr
 @Test func startPagesAreURLPaths() {
     #expect(TwinePlugin.startPage("index.html") == "/index.html")
     #expect(TwinePlugin.startPage("My Story #2?.html") == "/My%20Story%20%232%3F.html")
-    #expect(TwinePlugin().defaultControls == .keyboardAndMouse)
+    #expect(TwinePlugin().defaultControls == .mouse)
 }
 
 /// Embedded Browser's `browser_assets`, as `BinaryWriter` writes it.

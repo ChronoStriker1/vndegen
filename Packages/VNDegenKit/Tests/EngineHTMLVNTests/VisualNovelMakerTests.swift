@@ -95,6 +95,7 @@ private func detect(_ root: URL) -> EngineMatch? { VisualNovelMakerPlugin().dete
     #expect(VisualNovelMakerPlugin.buttonScript(.confirm, true) == "__vndegen.key('keydown', 'Enter', 'Enter', 13)")
     #expect(VisualNovelMakerPlugin.buttonScript(.cancel, true) == nil)
     #expect(VisualNovelMakerPlugin().defaultControls == .visualNovel)
+    #expect(VisualNovelMakerPlugin().defaultControlChanges == [.a: .click(.primary)])
 }
 
 @Test func anElectronBuildListsElectronAndKeepsTheGameAndSaves() throws {

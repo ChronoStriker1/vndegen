@@ -136,6 +136,7 @@ extension ControllerLayout.ID {
         case .gamepad: "gamecontroller"
         case .saved: "person.crop.circle"
         case .suggested: "wand.and.stars"
+        case .engine: "text.bubble"
         }
     }
 }
@@ -660,12 +661,14 @@ struct ButtonMappingSheet: View {
         let suggestion = suggested
             ? "Suggested for this game puts keys this game's own files bind on buttons its engine leaves unused. Reset returns to it, and Xbox gamepad goes back to the engine's own buttons. "
             : ""
-        let start = suggestion + Self.startingLayoutNote(defaultLayout)
+        let start = suggestion + Self.startingLayoutNote(defaultLayout, in: editor.allLayouts)
         return start + " Picking a layout copies its buttons into this game, and changing a button changes only this game until you save it as a new layout. Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation, so a change here never stops a controller from working them. LB and RB jump between groups."
     }
 
-    static func startingLayoutNote(_ defaultLayout: ButtonMapping) -> String {
-        switch ControllerLayout.builtIns.first(where: { $0.mapping == defaultLayout })?.id {
+    static func startingLayoutNote(_ defaultLayout: ButtonMapping, in layouts: [ControllerLayout] = ControllerLayout.builtIns) -> String {
+        switch layouts.first(where: { $0.mapping == defaultLayout })?.id {
+        case .engine:
+            "This game's engine reads no gamepad and reads on with a click, so its games start with Visual novel with A as a left click, which reads on and presses the button under the pointer. B right clicks, X holds Control, Y and Menu press Escape, LB turns the wheel up and RB down, the D-pad and left stick are the arrows, the right stick moves the pointer, RT and R3 click, and LT right clicks. Visual novel itself has A press Return."
         case .visualNovel:
             "This game's engine reads no gamepad, so its games start with Visual novel: A presses Return, B right clicks, X holds Control, Y and Menu press Escape, LB turns the wheel up and RB down, the D-pad and left stick are the arrows, the right stick moves the pointer, RT and R3 click, and LT right clicks. Keyboard and mouse is the layout of Steam's template of that name."
         case .keyboardAndMouse:
