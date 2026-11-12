@@ -25,7 +25,6 @@ during development. The plugin takes a folder as a YU-RIS game when it has a `ys
 `pac/`, or a `ysbin.ypf` there; some games ship without `yscfg.dat`, and the runtime reads the screen size from
 `ysbin/yscfg.ybn` anyway. `ysbin/` inside an archive holds the compiled project:
 
-
 - `ysc.ybn` (YSCM): the command table. Each command has a name and named keywords with type codes, so the bytecode
   refers to commands and keywords by index and the table says what they are. The table differs between engine
   versions (100 commands in 466, 119 in 481 and 488, 121 in 555), so the runtime dispatches by name, not by number.

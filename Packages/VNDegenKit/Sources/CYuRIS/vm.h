@@ -185,7 +185,7 @@ void yr_snd_mix(YR *y, float *out, int frames);
 void yr_snd_lock(YR *y, bool lock);
 int yr_cmd_movie(YCall *c, int id);
 void yr_movie_close(YR *y);
-bool yr_movie_draw(YR *y);
+bool yr_movie_draw(YR *y, bool *changed);
 void yr_movie_tick(YR *y, uint32_t ms);
 void yr_movie_mix(YR *y, float *out, int frames);
 void yr_save_close(YR *y);
