@@ -234,7 +234,12 @@ static void mix(YSnd *s, float *out, int frames, int rate) {
             v->bufAt = (int)((u32)v->pos - v->bufStart);
         }
     }
-    for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
+}
+
+void yr_snd_lock(YR *y, bool lock) {
+    if (!y->snd) return;
+    if (lock) pthread_mutex_lock(&y->snd->lock);
+    else pthread_mutex_unlock(&y->snd->lock);
 }
 
 void yr_snd_mix(YR *y, float *out, int frames) {
@@ -242,6 +247,8 @@ void yr_snd_mix(YR *y, float *out, int frames) {
     if (!s) { memset(out, 0, sizeof(float) * 2 * (size_t)frames); return; }
     pthread_mutex_lock(&s->lock);
     mix(s, out, frames, y->audioRate);
+    yr_movie_mix(y, out, frames);
+    for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
     pthread_mutex_unlock(&s->lock);
 }
 

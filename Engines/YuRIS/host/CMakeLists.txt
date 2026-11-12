@@ -15,11 +15,21 @@ set(SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Shared)
 
 find_package(ZLIB REQUIRED)
 find_package(Threads REQUIRED)
+set(LIBS ${SHARED}/third_party)
+file(GLOB VIDEO_SOURCES ${LIBS}/ogg/src/*.c ${LIBS}/theora/lib/*.c ${LIBS}/opus/celt/*.c ${LIBS}/opus/silk/*.c
+     ${LIBS}/opus/src/*.c)
+add_library(vnvideo STATIC ${SHARED}/vnvideo.c ${VIDEO_SOURCES})
+target_include_directories(vnvideo PUBLIC ${SHARED} PRIVATE ${LIBS}/ogg/include ${LIBS}/theora/include ${LIBS}/opus
+                           ${LIBS}/opus/include ${LIBS}/opus/celt ${LIBS}/opus/silk)
+target_compile_definitions(vnvideo PRIVATE HAVE_CONFIG_H)
+target_compile_options(vnvideo PRIVATE -O2 -w)
+target_link_libraries(vnvideo PUBLIC m pthread)
+
 file(GLOB RUNTIME_SOURCES ${RUNTIME}/*.c)
 add_library(yuris STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c)
 target_include_directories(yuris PUBLIC ${RUNTIME} ${RUNTIME}/include ${SHARED})
 target_compile_options(yuris PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function)
-target_link_libraries(yuris PUBLIC ZLIB::ZLIB Threads::Threads m)
+target_link_libraries(yuris PUBLIC vnvideo ZLIB::ZLIB Threads::Threads m)
 
 add_executable(yrrun yrrun.c)
 target_link_libraries(yrrun PRIVATE yuris)

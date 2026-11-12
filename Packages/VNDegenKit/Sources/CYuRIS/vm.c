@@ -330,7 +330,8 @@ static int exec(YR *y, YTask *t, YScript *s) {
         return yr_cmd_text(&c, id);
     case C_CG: case C_CGACT: case C_CGEND: case C_CGINFO:
         return yr_cmd_cg(&c, id);
-    case C_SOUND: case C_SOUNDEND: case C_SOUNDINFO: case C_MOVIE: case C_MOVIEEND: case C_MOVIEINFO: case C_MIDI:
+    case C_MOVIE: case C_MOVIEEND: case C_MOVIEINFO: return yr_cmd_movie(&c, id);
+    case C_SOUND: case C_SOUNDEND: case C_SOUNDINFO: case C_MIDI:
     case C_MIDIEND: case C_MIDIINFO: case C_CDDA: case C_YMV: case C_YMVEND: case C_YMVINFO:
         return yr_cmd_sound(&c, id);
     default:

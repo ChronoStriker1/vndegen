@@ -392,6 +392,10 @@ uint32_t *yr_render_set(YR *y, YLayer *set, int w, int h) {
 
 void yr_gfx_present(YR *y) {
     YGfx *g = y->gfx;
+    if (y->movie && yr_movie_draw(y)) {
+        y->serial++;
+        return;
+    }
     if (!g || !g->dirty) return;
     g->dirty = false;
     YLayer *w0 = yr_layer(y, ":/W0", false, true);

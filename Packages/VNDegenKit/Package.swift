@@ -145,7 +145,7 @@ let package = Package(
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
         .target(name: "EngineNekoSDK", dependencies: ["VNCore", "CNekoSDK", "FrameHost"], swiftSettings: mainActorByDefault),
         .target(
-            name: "CYuRIS", dependencies: ["CVNFont"], exclude: ["third_party"],
+            name: "CYuRIS", dependencies: ["CVNFont", "CVNVideo"], exclude: ["third_party"],
             cSettings: [.unsafeFlags(["-O2"])], linkerSettings: [.linkedLibrary("z")]),
         .target(name: "EngineYuRIS", dependencies: ["VNCore", "CYuRIS", "FrameHost"], swiftSettings: mainActorByDefault),
         // Recognizes Unity games so their page can say why they can't run. It runs none (docs/unity.md).

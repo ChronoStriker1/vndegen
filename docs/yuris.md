@@ -96,7 +96,7 @@ script and drawing time per frame.
 
 ## Known limits
 
-- MOVIE (MA☆KO HUNTER's MPEG-1 openings), YMV, FLASH, MIDI, CDDA and E-mote (EMOTE) aren't built yet. MOVIE ends at once.
+- YMV, FLASH, MIDI, CDDA and E-mote (EMOTE) aren't built. MOVIE plays MPEG-1 and Ogg Theora through the shared vnvideo decoder, scaled to its area without smoothing.
 - Engine 555 (Saimin Gakushū) needs TEXT[FILE=] and its PRODUCT commands 12, 22, 23, 51, 52, 10201, 10205 and 21000, which aren't built; PRODUCT 21 and 24 list a folder's files.
 - SOUND's PITCH is kept but not applied. Volume follows a square curve, close to the PC's but not measured.
 - CG masks (MID) aren't drawn. CGACT's ROTATION, DIFFUSION, WHIRLPOOL, RASTER and TRIM aren't built; none of the

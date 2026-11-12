@@ -10,6 +10,7 @@ static void free_all(YR *y) {
     free(y->tasks);
     yr_text_close(y);
     yr_save_close(y);
+    yr_movie_close(y);
     yr_snd_close(y);
     yr_gfx_close(y);
     yr_script_close(y);
@@ -93,6 +94,7 @@ bool vny_frame(VNY *v, uint32_t elapsedMs) {
     if (y->paused) return true;
     y->clock += elapsedMs;
     y->frameNo++;
+    yr_movie_tick(y, elapsedMs);
     if (y->profile) {
         struct timespec a, b, c;
         clock_gettime(CLOCK_MONOTONIC, &a);

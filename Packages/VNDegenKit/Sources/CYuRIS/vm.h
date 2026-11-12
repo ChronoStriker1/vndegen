@@ -8,6 +8,7 @@ typedef struct YFS YFS;
 typedef struct YGfx YGfx;
 typedef struct YSnd YSnd;
 typedef struct YText YText;
+typedef struct YMovie YMovie;
 struct YSaveState;
 
 enum { YR_PARAMS = 17 };   // GOSUB and RETURN values 1 to 16; slot 0 unused
@@ -119,6 +120,7 @@ struct YR {
     YSnd *snd;
     YText *txt;
     struct YSaveState *save;
+    YMovie *movie;
     int audioRate;
     u32 serial;
     long watchVid;              // logs stores to this variable id, from YR_WATCH; -1 for none
@@ -179,6 +181,12 @@ int yr_cmd_save(YCall *c, int id);
 void yr_snd_open(YR *y);
 void yr_snd_close(YR *y);
 void yr_snd_mix(YR *y, float *out, int frames);
+void yr_snd_lock(YR *y, bool lock);
+int yr_cmd_movie(YCall *c, int id);
+void yr_movie_close(YR *y);
+bool yr_movie_draw(YR *y);
+void yr_movie_tick(YR *y, uint32_t ms);
+void yr_movie_mix(YR *y, float *out, int frames);
 void yr_save_close(YR *y);
 
 u32 yr_save_version(YR *y);
