@@ -73,17 +73,17 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 | MA☆KO HUNTER | Title, story in English, the map, the opening movie with its sound, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. Its title and menu buttons are images in Japanese, as on the PC |
 | Saimin Seishidou -Secret Lesson- | Title, story in English, its brand movie, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. The English is compiled into the game's scripts; the `.trans` files beside the exe are the translator's project files, and the title and menu buttons are images in Japanese, as on the PC |
 | Tales of the Yokai Incident Inspectors | Title, story with Japanese text, choices, backlog, save and load, on Linux and an iPad simulator |
-| Saimin Gakushū: Secret Desire | Lists its story files, then stops: its engine (555) reads them with TEXT[FILE=] and parses them with undocumented PRODUCT commands |
+| Saimin Gakushū: Secret Desire | Language picker, title, story in English, choices, save and load, on Linux. PC saves move both ways. Its engine (555) reads the story's text files with TEXT[FILE=] and the game's own scripts parse them, with two PRODUCT helpers VNDegen builds to match the game's script versions |
 
 ## Saves
 
 Saves are the PC engine's `.sd` files in the game's `save` folder (`$_SAVE_PATH` is `save\`). A file starts with `YSSD`,
-a format number (192 for engine 0.466, 312 for 0.474 to 0.479, 480 for 0.488 and the 0.495 SDK, 481 for Another Way of
-Gettin' Paid's engine), the record count and a table of 1024 data numbers. Each record is a variable (type,
-dimensions, values), a layer image (the engine's own layer header, 1520 bytes in format 192, 1536 in 312 and
-1600 from 480 on, then BGRA pixels), or a group of
-global variables by class (`SAVE[DNO=n G_INT2=1]`; the class is the flag byte in `ysv.ybn`). Format 481 compresses
-variables with Snappy and images with zlib; the others use zlib throughout. Formats from 480 on store each variable's
+a format number (192 for engine 0.466, 312 for 0.474 to 0.479, 480 for 0.488, the 0.495 SDK and 555, 481 for Another
+Way of Gettin' Paid's engine), the record count and a table of 1024 data numbers. Each record is a variable (type,
+dimensions, values), a layer image (the engine's own layer header, 1520 bytes in format 192, 1536 in 312,
+1600 in 480 and 1680 in engine 555, then BGRA pixels), or a group of
+global variables by class (`SAVE[DNO=n G_INT2=1]`; the class is the flag byte in `ysv.ybn`). Engines 481 and 555
+compress variables with Snappy and images with zlib; the others use zlib throughout. Formats from 480 on store each variable's
 id. `SAVE[MEM=n]` keeps a log snapshot in memory, and `SAVE[MEM=99999]` writes all 500 snapshots into data number
 1024 of the next file, each an embedded save file.
 
@@ -92,7 +92,8 @@ letter pairs: the open IF blocks, the GOSUB frames with their return point, the 
 instruction and the script's file name. Formats 192 and 312 have a 16-bit GOSUB count and one more byte before the
 resume point.
 
-Checked under Wine, both ways: Another Way of Gettin' Paid (format 481), Saimin Seishidou (480), MA☆KO HUNTER (312)
+Checked under Wine, both ways: Saimin Gakushū (engine 555), Another Way of Gettin' Paid (481), Saimin Seishidou (480),
+MA☆KO HUNTER (312)
 and How to Raise Your Slime Girl (192). A slot
 saved by the original engine loads in VNDegen and play continues, and a slot VNDegen saved shows in the original's
 load screen with its thumbnail, loads and plays on.
@@ -107,7 +108,10 @@ script and drawing time per frame.
 ## Known limits
 
 - YMV, FLASH, MIDI, CDDA and E-mote (EMOTE) aren't built. MOVIE plays MPEG-1 and Ogg Theora through the shared vnvideo decoder, scaled to its area without smoothing.
-- Engine 555 (Saimin Gakushū) needs TEXT[FILE=] and its PRODUCT commands 12, 22, 23, 51, 52, 10201, 10205 and 21000, which aren't built; PRODUCT 21 and 24 list a folder's files.
+- PRODUCT 21 and 24 list a folder's files in archive order, 22 and 23 split and measure scenario lines, and 29 answers
+  that files are packed. The rest answer 0 or an empty string: 12 and 34 (save copies and folders), 51 and 52 (the
+  debug log), 80 and 81, 10201 and 10205 (typing a save comment, so a comment can't be typed), 20011 to 20014 (end
+  roll and window checks) and 21000.
 - SOUND's PITCH is kept but not applied. Volume follows a square curve, close to the PC's but not measured.
 - CG masks (MID) aren't drawn. CGACT's ROTATION, DIFFUSION, WHIRLPOOL, RASTER and TRIM aren't built; none of the
   running games uses them. Rule transitions use a fixed soft edge.
