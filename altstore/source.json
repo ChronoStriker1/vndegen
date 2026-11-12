@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.1",
+          "buildVersion": "2342",
+          "date": "2026-11-12T18:11:47Z",
+          "localizedDescription": "One YU-RIS fix, and the Mac app look that 0.38.0 to 0.41.0 went out without.\n\n## Downloads\n\n- `VNDegen-0.41.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- YU-RIS: a game whose `pac` folder sits deeper than the library looks is now recognised (#88). Saint Dorei Gakuen 2, imported from its archive, wasn't.\n\n## Checked in the Mac app\n\nThe Mac mini's screen was locked while YU-RIS, Visual Novel Maker and Twine were built, so most of their games shipped without a run in the Mac app. Twelve games have now been played there once each: found in the library, started, title, a new game, a few screens of story, a save, a quit, and a load of that save.\n\n- YU-RIS: MA☆KO HUNTER, Saimin Seishidou -Secret Lesson-, Tales of the Yokai Incident Inspectors, Saimin Gakushū: Secret Desire, Kaizou Shoujo, Mamono Musume no Yakata: Ningyo no Sho, Mamono Musume-tachi to no Rakuen: Slime & Scylla and Saint Dorei Gakuen 2.\n- Visual Novel Maker: Siren's Call.\n- Twine: Forgotten Fiction, EVISCERATETHISGIRL.COM (which never saves) and Asher.\n- Movies in two YU-RIS games played at the 30 frames a second they were made at, on a 60 Hz display. [docs/frame-rate.md](../frame-rate.md) has the numbers.\n\n## Known limits\n\n- Mac: the window has no title bar, so the close, minimise and zoom buttons sit over the top-left corner of a game that fills the window (#90). Full screen hides them.\n- Saint Dorei Gakuen 2: a long save comment is cut at the slot's right edge. The PC engine cuts it the same way.\n- Saimin Gakushū: a comment can't be typed on a save.\n- YU-RIS: YMV and Flash movies, MIDI, CD audio, E-mote, picture masks and a few picture effects aren't built, and a sound's pitch setting isn't applied.\n- Violated Hero was seen to stop partway through its opening (#85). It hasn't been reproduced since and is still open.\n\n## What wasn't tested\n\n- No physical device or hardware controller was used.\n- The Mac app was driven through its test hooks, not with real keys or clicks.\n- The 120 Hz pacing of YU-RIS games is still checked in the Linux test build only. The Mac used has a 60 Hz display.\n- The fix was checked in a unit test, on Linux, and in the Mac app. Nothing was run on a simulator for this release.\n- Not looked at on an iPhone.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.1/VNDegen-0.41.1.ipa",
+          "size": 126307727,
+          "sha256": "c1328c5884de54c0488e1c7601ef4154301b01da3571535e7a14e6dfc6446cb0",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.0",
           "buildVersion": "2334",
           "date": "2026-11-12T06:24:31Z",
