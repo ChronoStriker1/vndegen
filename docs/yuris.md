@@ -63,9 +63,9 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 |---|---|
 | Another Way of Gettin' Paid | Language picker, title, story with text, backgrounds, characters, music and voice, save and load. PC saves move both ways |
 | How to Raise Your Slime Girl | Title, story with Japanese text, music, save and load. PC saves move both ways |
-| MA☆KO HUNTER | Starts, waits in its opening splash |
-| Saimin Seishidou -Secret Lesson- | Starts, nothing draws: engine 488 needs a system variable table of its own |
-| Saimin Gakushū: Secret Desire | Ends at once |
+| MA☆KO HUNTER | Ethics notice, logo and title. Its English copy's menu labels show in Japanese |
+| Saimin Seishidou -Secret Lesson- | Title, in Japanese: its English text comes from a hook library beside the PC exe, which VNDegen doesn't load |
+| Saimin Gakushū: Secret Desire | Lists its story files, then stops: its engine (555) reads them with TEXT[FILE=] and parses them with undocumented PRODUCT commands |
 
 ## Saves
 
@@ -97,7 +97,7 @@ script and drawing time per frame.
 ## Known limits
 
 - MOVIE (MA☆KO HUNTER's MPEG-1 openings), YMV, FLASH, MIDI, CDDA and E-mote (EMOTE) aren't built yet. MOVIE ends at once.
-- Engine 488 (Saimin Seishidou) has no system variable table yet, and Saimin Gakushū ends at its start.
+- Engine 555 (Saimin Gakushū) needs TEXT[FILE=] and its PRODUCT commands 12, 22, 23, 51, 52, 10201, 10205 and 21000, which aren't built; PRODUCT 21 and 24 list a folder's files.
 - SOUND's PITCH is kept but not applied. Volume follows a square curve, close to the PC's but not measured.
 - CG masks (MID) aren't drawn. CGACT's ROTATION, DIFFUSION, WHIRLPOOL, RASTER and TRIM aren't built; none of the
   running games uses them. Rule transitions use a fixed soft edge.

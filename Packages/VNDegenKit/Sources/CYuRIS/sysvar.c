@@ -96,6 +96,10 @@ void yr_sysvars_init(YR *y, u32 version) {
         }
         if (id >= 0 && id < 1000) y->sys[id] = classify(best->names[i].name + 1);   // skip the sigil
     }
+    if (version >= 481 && y->sys[14].kind == S_OTHER && y->sys[15].kind == S_OTHER) {
+        y->sys[14] = (YSysVar){ S_LIST, 0 };
+        y->sys[15] = (YSysVar){ S_LISTNUM, 0 };
+    }
     yr_log(y, "system variables: table for versions %u to %u\n", best->minVersion, best->maxVersion);
 }
 
@@ -145,6 +149,11 @@ YVal yr_sys_get(YR *y, YTask *t, const YSysVar *s, int n, const i64 *sub) {
     case S_DEBUGMODE: return yv_int(0);
     case S_ARGC: return yv_int(0);
     case S_ARGV: return yv_str("");
+    case S_LISTNUM: return yv_int(y->argc);
+    case S_LIST: {
+        int i = n ? (int)sub[0] : 0;
+        return yv_str(i >= 0 && i < y->argc ? y->argv[i] : "");
+    }
     case S_LC: return yv_int(t && t->loopDepth ? t->loops[t->loopDepth - 1].lc : 0);
     case S_PINT: { YValues *p = params(t); return yv_int(p ? p->i[idx] : 0); }
     case S_PFLT: { YValues *p = params(t); return yv_flt(p ? p->f[idx] : 0); }

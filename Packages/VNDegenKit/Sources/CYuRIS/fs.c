@@ -292,3 +292,24 @@ bool yr_fs_exists(YR *y, const char *name, const char *const *exts) {
     YFile none = { 0 };
     return lookup(y, name, exts, &none, true);
 }
+
+static int by_name(const void *a, const void *b) { return strcmp(*(char *const *)a, *(char *const *)b); }
+
+int yr_fs_list(YR *y, const char *folder, char ***out) {
+    YFS *fs = y->fs;
+    char prefix[512];
+    yr_key(prefix, sizeof prefix, folder);
+    size_t n = strlen(prefix);
+    if (n && prefix[n - 1] != '/' && n + 1 < sizeof prefix) { prefix[n++] = '/'; prefix[n] = 0; }
+    char **list = NULL;
+    int count = 0;
+    for (u32 i = 0; fs && i < fs->cap; i++) {
+        const char *k = fs->table[i].key;
+        if (!k || strncmp(k, prefix, n) || strchr(k + n, '/') || !k[n]) continue;
+        list = yr_realloc(list, sizeof(char *) * (size_t)(count + 1));
+        list[count++] = yr_strdup(k);
+    }
+    if (count) qsort(list, (size_t)count, sizeof(char *), by_name);
+    *out = list;
+    return count;
+}

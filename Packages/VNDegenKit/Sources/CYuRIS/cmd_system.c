@@ -108,6 +108,36 @@ static void set_result(YCall *c, YVal v) {
     yv_free(&v);
 }
 
+static void set_argv(YR *y, char **list, int n) {
+    for (int i = 0; i < y->argc; i++) free(y->argv[i]);
+    free(y->argv);
+    y->argv = list;
+    y->argc = n;
+}
+
+static int product(YCall *c) {
+    YR *y = c->y;
+    i64 com = yc_int_or(c, "COM", 0);
+    if (com == 21 || com == 24) {
+        char *folder = yc_str(c, "PSTR");
+        char **list = NULL;
+        int n = folder ? yr_fs_list(y, folder, &list) : 0;
+        if (com == 21) {
+            size_t skip = strlen(folder ? folder : "");
+            for (int i = 0; i < n; i++) {
+                char *s = yr_strdup(list[i] + (strlen(list[i]) >= skip ? skip : 0));
+                free(list[i]);
+                list[i] = s;
+            }
+        }
+        set_argv(y, list, n);
+        free(folder);
+        return YR_NEXT;
+    }
+    set_result(c, yv_int(com == 29 ? 1 : 0));
+    return YR_NEXT;
+}
+
 int yr_cmd_system(YCall *c, int id) {
     YR *y = c->y;
     switch (id) {
@@ -125,7 +155,8 @@ int yr_cmd_system(YCall *c, int id) {
     case C_INPUT: case C_MOUSE: case C_SYSTEM: case C_ERROR: case C_DEBUGLIST: case C_EMOTE: case C_TRAY:
     case C_WINDOWEND: case C_MENU: case C_MENUACT: case C_MENUEND:
         return YR_NEXT;
-    case C_SYSTEMINFO: case C_PRODUCT: case C_EMOTEINFO: case C_MENUINFO: case C_REGINFO:
+    case C_PRODUCT: return product(c);
+    case C_SYSTEMINFO: case C_EMOTEINFO: case C_MENUINFO: case C_REGINFO:
         set_result(c, yv_int(0));
         return YR_NEXT;
     case C_END:

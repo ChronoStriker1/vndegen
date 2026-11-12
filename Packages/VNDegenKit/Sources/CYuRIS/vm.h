@@ -110,6 +110,8 @@ struct YR {
     // System variable storage that isn't per task.
     char *text, *textFlag;      // $_TEXT and $_TEXT_FLAG
     i64 menuCode;
+    char **argv;
+    int argc;
     i64 sysInts[1000];
     char *sysStrs[1000];
 

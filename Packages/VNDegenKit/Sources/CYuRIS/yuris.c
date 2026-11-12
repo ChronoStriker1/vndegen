@@ -17,6 +17,8 @@ static void free_all(YR *y) {
     free(y->text);
     free(y->textFlag);
     for (int i = 0; i < 1000; i++) free(y->sysStrs[i]);
+    for (int i = 0; i < y->argc; i++) free(y->argv[i]);
+    free(y->argv);
     free(y->screen);
     free(y->gameDir);
     free(y->logCmds);

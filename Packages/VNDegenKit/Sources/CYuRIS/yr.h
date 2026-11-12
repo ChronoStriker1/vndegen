@@ -57,6 +57,7 @@ void yr_fs_close(YR *y);
 bool yr_fs_read(YR *y, const char *name, const char *const *exts, YFile *out);
 bool yr_fs_exists(YR *y, const char *name, const char *const *exts);
 void yr_file_free(YFile *f);
+int yr_fs_list(YR *y, const char *folder, char ***out);
 
 // ---- script.c: ysc, yst, ysv, ysl, yst_list, yscf ----
 typedef struct YArg {
@@ -187,6 +188,7 @@ typedef enum YSys {
     S_MOUSENUM,
     S_CODE_MOUSE,
     S_PAD, S_PADNUM, S_CODE_PAD,
+    S_LIST, S_LISTNUM,
     S_OTHER
 } YSys;
 
