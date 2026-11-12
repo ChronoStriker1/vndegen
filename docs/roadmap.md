@@ -95,12 +95,11 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
-- YU-RIS: on the touch gamepad, LB's Wheel up doesn't open Another Way of Gettin' Paid's backlog on the iPad simulator, though a mouse wheel does in the Linux test build (#87). Found before the engine's first release, which waits for the fix.
 - KiriKiri: Violated Hero was seen to stop after "OK, let's go inside." with no input moving it on (#85). Six runs on 2026-11-11 didn't reproduce it, so it stays open until it is seen again and doesn't hold up other work.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- YU-RIS, on VNDegen's own clean-room runtime in C, MIT licensed, on branch `feat/yuris`. It is the largest group of library games that didn't run: 15 games, 32 GB. The first set is merged into `dev` and not released yet: Another Way of Gettin' Paid and one game on the oldest engine version reach their titles, play, save and load on Linux, the Mac app and the iPad simulator, and their saves move to and from a PC. Next: #87, then MA☆KO HUNTER, the two Saimin games and the other library games, in sets. [yuris.md](yuris.md) has the details.
+- YU-RIS, on VNDegen's own clean-room runtime in C, MIT licensed, on branch `feat/yuris`. It is the largest group of library games that didn't run: 15 games, 32 GB. The first set is merged into `dev` and not released yet: Another Way of Gettin' Paid and one game on the oldest engine version reach their titles, play, save and load on Linux, the Mac app and the iPad simulator, and their saves move to and from a PC. Next: MA☆KO HUNTER, the two Saimin games and the other library games, in sets. [yuris.md](yuris.md) has the details.
 - Visual Novel Maker and Twine, in the web view that RPG Maker MV and MZ and TyranoScript use, on branch `feat/htmlvn`. Work restarted on 2026-11-11 from the stopped `ws/htmlvn` branch, where both plugins are written and the checks in the Mac app and on the iPad simulator are still to do. 4 library games.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
