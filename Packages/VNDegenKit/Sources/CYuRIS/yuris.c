@@ -1,0 +1,162 @@
+// The public interface (vnyuris.h).
+#include "yr.h"
+#include "vm.h"
+#include "gfx.h"
+#include "text.h"
+#include <time.h>
+
+static void free_all(YR *y) {
+    for (int i = 0; i < y->taskCount; i++) yr_task_free(y->tasks[i]);
+    free(y->tasks);
+    yr_text_close(y);
+    yr_save_close(y);
+    yr_movie_close(y);
+    yr_snd_close(y);
+    yr_gfx_close(y);
+    yr_script_close(y);
+    yr_fs_close(y);
+    free(y->text);
+    free(y->textFlag);
+    for (int i = 0; i < 1000; i++) free(y->sysStrs[i]);
+    for (int i = 0; i < y->argc; i++) free(y->argv[i]);
+    free(y->argv);
+    free(y->screen);
+    free(y->gameDir);
+    free(y->logCmds);
+    free(y->saveDir);
+    if (y->log) fclose(y->log);
+    free(y);
+}
+
+VNY *vny_open(const VNYConfig *config, char *err, size_t errSize) {
+    YR *y = yr_alloc(sizeof(YR));
+    y->gameDir = yr_strdup(config->gameDir);
+    y->saveDir = yr_strdup(config->saveDir ? config->saveDir : config->gameDir);
+    y->audioRate = config->audioRate > 0 ? config->audioRate : 44100;
+    y->startUnix = config->startTime ? config->startTime : (i64)time(NULL);
+    if (config->logPath) y->log = fopen(config->logPath, "a");
+    y->fps = 60;
+    y->traceGosub = getenv("YR_TRACE_GOSUB") != NULL;
+    y->traceScript = -1;
+    y->profile = getenv("YR_PROFILE") != NULL;
+    if (getenv("YR_LOG_CMDS")) {
+        size_t n = strlen(getenv("YR_LOG_CMDS"));
+        y->logCmds = yr_alloc(n + 3);
+        snprintf(y->logCmds, n + 3, ",%s,", getenv("YR_LOG_CMDS"));
+    }
+    if (getenv("YR_TRACE")) {
+        unsigned sc = 0, a = 0, b = 0xffffffffu;
+        if (sscanf(getenv("YR_TRACE"), "%u:%u-%u", &sc, &a, &b) >= 1) { y->traceScript = (int)sc; y->traceFrom = a; y->traceTo = b; }
+    }
+    y->watchVid = getenv("YR_WATCH") ? strtol(getenv("YR_WATCH"), NULL, 0) : -1;
+    bool ok = yr_fs_open(y) && yr_script_open(y);
+    if (ok) {
+        yr_sysvars_init(y, y->scriptVersion);
+        yr_vars_init_strings(y);
+        y->screen = yr_alloc(sizeof(uint32_t) * (size_t)y->width * (size_t)y->height);
+        yr_gfx_open(y);
+        yr_text_open(y);
+        yr_snd_open(y);
+        ok = yr_vm_start(y);
+    }
+    if (!ok) {
+        if (err && errSize) snprintf(err, errSize, "%s", y->problem[0] ? y->problem : "not a YU-RIS game");
+        free_all(y);
+        return NULL;
+    }
+    return (VNY *)y;
+}
+
+void vny_close(VNY *v) {
+    if (!v) return;
+    if (getenv("YR_DUMP_LAYERS")) yr_gfx_dump((YR *)v);
+    if (((YR *)v)->profile) {
+        YR *y = (YR *)v;
+        yr_log(y, "profile: %llu frames, script %.2f ms, drawing %.2f ms per frame, worst %.2f ms\n",
+               (unsigned long long)y->frameNo, y->profVm / (double)(y->frameNo ? y->frameNo : 1),
+               y->profGfx / (double)(y->frameNo ? y->frameNo : 1), y->profWorst);
+    }
+    if (getenv("YR_DUMP_TASKS")) {
+        YR *y = (YR *)v;
+        for (int i = 0; i < y->taskCount; i++) {
+            YTask *t = y->tasks[i];
+            yr_log(y, "task %s z=%d at %u:%u depth=%d loops=%d wait=%llu/%d enabled=%d\n", t->id, t->z, t->script, t->ip,
+                   t->depth, t->loopDepth, (unsigned long long)t->waitUntil, t->waitFrames, t->enabled);
+            for (int d = t->depth - 1; d >= 1; d--) yr_log(y, "  from %u:%u\n", t->frames[d].retScript, t->frames[d].retIp);
+        }
+    }
+    free_all((YR *)v);
+}
+
+bool vny_frame(VNY *v, uint32_t elapsedMs) {
+    YR *y = (YR *)v;
+    if (y->quit) return false;
+    if (y->paused) return true;
+    y->clock += elapsedMs;
+    y->frameNo++;
+    yr_movie_tick(y, elapsedMs);
+    if (y->profile) {
+        struct timespec a, b, c;
+        clock_gettime(CLOCK_MONOTONIC, &a);
+        yr_vm_step(y);
+        clock_gettime(CLOCK_MONOTONIC, &b);
+        yr_gfx_present(y);
+        clock_gettime(CLOCK_MONOTONIC, &c);
+        double vm = (double)(b.tv_sec - a.tv_sec) * 1e3 + (double)(b.tv_nsec - a.tv_nsec) / 1e6;
+        double gx = (double)(c.tv_sec - b.tv_sec) * 1e3 + (double)(c.tv_nsec - b.tv_nsec) / 1e6;
+        y->profVm += vm;
+        y->profGfx += gx;
+        if (vm + gx > y->profWorst) y->profWorst = vm + gx;
+    } else {
+        yr_vm_step(y);
+        yr_gfx_present(y);
+    }
+    return !y->quit;
+}
+
+const uint32_t *vny_pixels(VNY *v, int *width, int *height) {
+    YR *y = (YR *)v;
+    *width = y->width;
+    *height = y->height;
+    return y->screen;
+}
+
+uint32_t vny_frame_serial(VNY *v) { return ((YR *)v)->serial; }
+
+void vny_mouse_move(VNY *v, int x, int y_) {
+    YR *y = (YR *)v;
+    y->mouseX = x;
+    y->mouseY = y_;
+}
+
+static void press(YR *y, int code, bool down) {
+    if (code <= 0 || code >= YR_CODE_COUNT) return;
+    if (down && !y->down[code]) { y->pressedThisFrame[code] = true; y->pressCount[code]++; }
+    y->down[code] = down;
+}
+
+void vny_mouse_button(VNY *v, int button, bool down) {
+    YR *y = (YR *)v;
+    int b = button == VNY_MOUSE_LEFT ? 0 : button == VNY_MOUSE_RIGHT ? 1 : 2;
+    press(y, yr_code_mouse(b), down);
+    if (down) y->lastMouse = yr_code_mouse(b);
+}
+
+void vny_key(VNY *v, int vk, bool down) {
+    YR *y = (YR *)v;
+    press(y, yr_code_for_vk(vk), down);
+    if (down) y->lastKey = yr_code_for_vk(vk);
+}
+
+void vny_wheel(VNY *v, int notches) { ((YR *)v)->wheel += notches; }
+
+void vny_audio(VNY *v, float *out, int frames) {
+    YR *y = (YR *)v;
+    if (y->paused) { memset(out, 0, sizeof(float) * 2 * (size_t)frames); return; }
+    yr_snd_mix(y, out, frames);
+}
+
+void vny_set_paused(VNY *v, bool paused) { ((YR *)v)->paused = paused; }
+void vny_request_quit(VNY *v) { ((YR *)v)->quit = true; }
+const char *vny_title(VNY *v) { return ((YR *)v)->title; }
+const char *vny_problem(VNY *v) { YR *y = (YR *)v; return y->problem[0] ? y->problem : NULL; }

@@ -22,6 +22,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [AliceSoft System 3.0 to 3.9](#alicesoft-system-3) | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT`, up to two folders down. `SYSTEM3.EXE` beside `ADISK.DAT` makes the match certain | Mac, iPhone, iPad |
 | [AliceSoft System 4](#alicesoft-system-4) | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe`, up to two folders down | Mac, iPhone, iPad |
 | [NekoSDK](#nekosdk) | `cfg.pak` beside `scr.pak`, up to two folders down | Mac, iPhone, iPad |
+| [YU-RIS](#yu-ris) | `yscfg.dat` beside `.ypf` archives or a `pac/` folder of them, up to two folders down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
@@ -161,6 +162,10 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - Funbag Fantasy: Sideboob Story plays its prologue and three chapters to its three endings, each with its staff roll, from a table traced from the PC game. It has the title, Config, the CG, Scene and Music screens, the log in its message window and Previous Choice, as on the PC. Its text is set in Carlito, which has the widths of the Calibri the PC asks for, so lines break where the PC's do. Saves move both ways with a PC copy. What differs from the PC: the disc under Config's three top buttons isn't drawn, and the title's two lace bands and the side panel's turning emblem are close to the PC's and not measured to the pixel. Auto was timed on the PC at its default setting only.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.
+
+## YU-RIS
+
+YU-RIS games run on VNDegen's own YU-RIS runtime, written in C for VNDegen from the YU-RIS SDK's manual, the games' files and the original engine run under Wine, MIT licensed like the rest of the app. No other runtime for YU-RIS exists. The games' menus, message windows and save screens are their own scripts (ERIS, the SDK's system scripts), so the runtime runs the commands they use and the games draw everything themselves. Saves are the PC engine's own `.sd` files in the game's `save` folder, as on Windows, so they move between VNDegen and a PC copy. [yuris.md](yuris.md) lists which games run and the known limits, and [yuris-cleanroom.md](yuris-cleanroom.md) where the runtime's knowledge came from.
 
 ## Unity
 

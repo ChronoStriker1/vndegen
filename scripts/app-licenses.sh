@@ -30,4 +30,5 @@ cp "$kit/Sources/CSystem3/third_party/LICENSE-dr_mp3.txt" "$out.part/dr_mp3 (Ali
 cp "$kit/Sources/CSystem4/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (System 4 images and Ogg).txt"
 cp "$kit/Sources/CSystem4/third_party/pl_mpeg/LICENSE" "$out.part/pl_mpeg (System 4 movies).txt"
 cp "$kit/Sources/CNekoSDK/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (NekoSDK images and Ogg).txt"
+cp "$kit/Sources/CYuRIS/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (YU-RIS images, text and Ogg).txt"
 rm -rf "$out" && mv "$out.part" "$out"
