@@ -96,13 +96,12 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - YU-RIS: MA☆KO HUNTER, Saimin Seishidou -Secret Lesson- and Tales of the Yokai Incident Inspectors, and games with no `yscfg.dat` recognised (0.39.0).
 - YU-RIS: Saimin Gakushū: Secret Desire on engine 555, and Kaizou Shoujo and Mamono Musume no Yakata: Ningyo no Sho on engine 473 (0.40.0).
 - YU-RIS: Mamono Musume-tachi to no Rakuen: Slime & Scylla on engine 406 and Saint Dorei Gakuen 2 on engine 479, YCG pictures, and loose files that replace archive entries (0.41.0). Nine YU-RIS games play.
+- YU-RIS: a game whose `pac` folder sits below the library listing is recognised (#88), and the twelve YU-RIS, Visual Novel Maker and Twine games that shipped without a Mac app run were played there (0.41.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - KiriKiri: Violated Hero was seen to stop after "OK, let's go inside." with no input moving it on (#85). Six runs on 2026-11-11 didn't reproduce it, so it stays open until it is seen again and doesn't hold up other work.
-- YU-RIS: Saint Dorei Gakuen 2's save comment is cut at the slot's right edge (#89). Not yet compared with the PC.
 - Mac: the window buttons sit over the top-left corner of a game that fills the window (#90). What it should do instead is the maintainer's choice.
-- Mac: a window resized just before quitting opened at its earlier size (#91). Seen through a test hook, not yet with a drag.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
