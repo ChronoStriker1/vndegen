@@ -29,6 +29,9 @@ final class YuRISSession: EngineSession {
     private var paused = false
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
+    #if DEBUG
+    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? YuRISFramePacing() : nil
+    #endif
 
     init(_ launch: GameLaunch, root: URL) {
         self.launch = launch
@@ -104,6 +107,10 @@ final class YuRISSession: EngineSession {
             return
         }
         let serial = vny_frame_serial(engine)
+        #if DEBUG
+        pacing?.note(tick: link.timestamp, presented: serial != shownSerial, stepEnd: CACurrentMediaTime(),
+                     target: link.targetTimestamp - link.timestamp)
+        #endif
         guard serial != shownSerial else { return }
         shownSerial = serial
         var w: Int32 = 0, h: Int32 = 0
@@ -157,6 +164,9 @@ final class YuRISSession: EngineSession {
         vny_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
         clock.reset()
+        #if DEBUG
+        pacing?.reset()
+        #endif
         if !paused { frameView.takeFocus() }
     }
 
