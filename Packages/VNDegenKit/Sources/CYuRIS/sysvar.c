@@ -87,8 +87,10 @@ void yr_sysvars_init(YR *y, u32 version) {
     }
     if (!best) best = &yr_sys_tables[yr_sys_table_count - 1];
     bool v488 = version >= 484 && version <= 489;
+    bool v406 = version < 466;
     for (int i = 0; i < best->count; i++) {
         int id = best->names[i].id;
+        if (v406) id = id < 48 ? id : id < 79 ? id - 16 : id < 86 ? id - 17 : id - 19;
         if (v488) {
             if ((id >= 57 && id <= 59) || (id >= 64 && id <= 70)) continue;
             if (id >= 60 && id <= 63) id -= 3;
