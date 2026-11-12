@@ -86,9 +86,15 @@ void yr_sysvars_init(YR *y, u32 version) {
         if (version >= t->minVersion && version <= t->maxVersion) { best = t; break; }
     }
     if (!best) best = &yr_sys_tables[yr_sys_table_count - 1];
+    bool v488 = version >= 484 && version <= 489;
     for (int i = 0; i < best->count; i++) {
-        u16 id = best->names[i].id;
-        if (id < 1000) y->sys[id] = classify(best->names[i].name + 1);   // skip the sigil
+        int id = best->names[i].id;
+        if (v488) {
+            if ((id >= 57 && id <= 59) || (id >= 64 && id <= 70)) continue;
+            if (id >= 60 && id <= 63) id -= 3;
+            else if (id >= 71) id -= 7;
+        }
+        if (id >= 0 && id < 1000) y->sys[id] = classify(best->names[i].name + 1);   // skip the sigil
     }
     yr_log(y, "system variables: table for versions %u to %u\n", best->minVersion, best->maxVersion);
 }

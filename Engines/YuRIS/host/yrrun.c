@@ -1,6 +1,6 @@
 // Runs a YU-RIS game headless for testing: replays scripted input and writes frames as PPM files.
 //   yrrun <gameDir> [--ms N] [--save DIR] [--log FILE] [--time UNIX] [--final FILE.ppm] [events...]
-// Events, by time in ms: T:key:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:wheel:N, T:shot:FILE.ppm
+// Events, by time in ms: T:key:VK, T:keydown:VK, T:keyup:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:wheel:N, T:shot:FILE.ppm
 // The game clock starts at --time, 2026-01-01 by default, so a run replays the same way.
 #include "vnyuris.h"
 #include "vnfont.h"
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < nev; i++) {
             Ev *e = &ev[i];
             if (e->t < t || e->t >= t + frame) continue;
-            if (!strcmp(e->kind, "key")) { vny_key(g, e->a, true); }
+            if (!strcmp(e->kind, "key") || !strcmp(e->kind, "keydown")) { vny_key(g, e->a, true); }
             else if (!strcmp(e->kind, "keyup")) { vny_key(g, e->a, false); }
             else if (!strcmp(e->kind, "click") || !strcmp(e->kind, "rclick")) {
                 vny_mouse_move(g, e->a, e->b);
