@@ -14,7 +14,8 @@ This file starts as the design checkpoint and becomes the engine notes as parts 
 | Saimin Seishidou -Secret Lesson- | English | 488 | `pac/*.ypf`, archive version 487 and 488 | |
 | Another Way of Gettin' Paid (GOG) | English and Chinese | 481 | `pac/*.ypf`, archive version 481 | Text in UTF-8, one `_` command per language |
 | Saimin Gakushū: Secret Desire (GOG) | English | 555 | `pac/*.ypf`, archive version 500 | Story text is `.txt` files in `sc.ypf` that the game's own scripts parse |
-| How to Raise Your Slime Girl | Japanese | 466 | `*.ypf` in the game folder, archive version 466 | Format coverage for the older engine |
+| How to Raise Your Slime Girl | Japanese | 466 | `*.ypf` in the game folder, archive version 466 | Set aside; was format coverage for the older engine |
+| Tales of the Yokai Incident Inspectors | Japanese | 466 | `*.ypf` in the game folder, archive version 466 | No `yscfg.dat`. The library's coverage for the older engine |
 
 Every test game is 1280x720. Their CGs are PNG, with BMP in the 466 game, and their sound is Ogg Vorbis.
 
@@ -68,9 +69,10 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 | Game | State |
 |---|---|
 | Another Way of Gettin' Paid | Language picker, title, story with text, backgrounds, characters, music and voice, backlog, Config, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways |
-| How to Raise Your Slime Girl | Title, story with Japanese text, choices, music, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways |
-| MA☆KO HUNTER | Ethics notice, logo and title. Its English copy's menu labels show in Japanese |
-| Saimin Seishidou -Secret Lesson- | Title, in Japanese: its English text comes from a hook library beside the PC exe, which VNDegen doesn't load |
+| How to Raise Your Slime Girl | Title, story with Japanese text, choices, music, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways. Set aside since |
+| MA☆KO HUNTER | Title, story in English, the map, the opening movie with its sound, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. Its title and menu buttons are images in Japanese, as on the PC |
+| Saimin Seishidou -Secret Lesson- | Title, story in English, its brand movie, backlog, save and load, on Linux and an iPad simulator. A VNDegen save loads in the PC exe. The English is compiled into the game's scripts; the `.trans` files beside the exe are the translator's project files, and the title and menu buttons are images in Japanese, as on the PC |
+| Tales of the Yokai Incident Inspectors | Title, story with Japanese text, choices, backlog, save and load, on Linux and an iPad simulator |
 | Saimin Gakushū: Secret Desire | Lists its story files, then stops: its engine (555) reads them with TEXT[FILE=] and parses them with undocumented PRODUCT commands |
 
 ## Saves
