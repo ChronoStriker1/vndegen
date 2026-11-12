@@ -45,11 +45,14 @@ typedef struct LayerFormat {
 
 static const u32 fields192[][2] = { { 80, 1 }, { 112, 0x1000000 }, { 120, 256 }, { 128, 0x11011130 }, { 476, 128 },
                                     { 480, 0x808080 } };
+static const u32 fields312[][2] = { { 80, 1 }, { 128, 0x1000100 }, { 136, 256 }, { 140, 0x10000 }, { 492, 128 },
+                                    { 496, 0x808080 } };
 static const u32 fields480[][2] = { { 80, 1 }, { 128, 0x1000100 }, { 132, 0x10000 }, { 136, 256 }, { 448, 10000 },
                                     { 456, 10000 }, { 516, 128 }, { 520, 0x808080 }, { 1568, 0x3f800000 },
                                     { 1572, 0x3f800000 }, { 1576, 0x3f800000 }, { 1580, 1 } };
 static const LayerFormat layerFormats[] = {
     { 192, 1520, 104, 108, fields192, 6 },
+    { 312, 1536, 120, 124, fields312, 6 },
     { 480, 1600, 120, 124, fields480, 12 },
 };
 
@@ -64,7 +67,7 @@ static u32 file_version(YR *y) {
 }
 
 static const LayerFormat *layer_format(u32 version) {
-    return version < 400 ? &layerFormats[0] : &layerFormats[1];
+    return version < 300 ? &layerFormats[0] : version < 400 ? &layerFormats[1] : &layerFormats[2];
 }
 
 static u8 *unpack(const u8 *z, u32 clen, u32 ulen, u32 *got) {

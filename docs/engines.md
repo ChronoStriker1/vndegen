@@ -24,7 +24,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [AliceSoft System 3.0 to 3.9](#alicesoft-system-3) | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT`, up to two folders down. `SYSTEM3.EXE` beside `ADISK.DAT` makes the match certain | Mac, iPhone, iPad |
 | [AliceSoft System 4](#alicesoft-system-4) | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe`, up to two folders down | Mac, iPhone, iPad |
 | [NekoSDK](#nekosdk) | `cfg.pak` beside `scr.pak`, up to two folders down | Mac, iPhone, iPad |
-| [YU-RIS](#yu-ris) | `yscfg.dat` beside `.ypf` archives or a `pac/` folder of them, up to two folders down | Mac, iPhone, iPad |
+| [YU-RIS](#yu-ris) | `yscfg.dat` beside `.ypf` archives or a `pac/` folder of them, or a `ysbin.ypf` there, up to two folders down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.

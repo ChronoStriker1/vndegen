@@ -9,8 +9,10 @@ struct YMovie {
     uint64_t size;
     vnvideo *video;
     vnvideo_info info;
-    bool shown, playing;
+    bool shown, playing, drawn;
     double clock;
+    int newFrames;
+    char name[256];
     int x, y, sx, sy, volume;
     float *buf;
     size_t bufCap;
@@ -41,6 +43,9 @@ static void movie_free(YMovie *m) {
 void yr_movie_close(YR *y) {
     YMovie *m = y->movie;
     if (!m) return;
+    if (m->clock > 0)
+        yr_log(y, "movie %s: %d new frames in %.0f ms, %.2f a second, made at %.2f\n", m->name, m->newFrames, m->clock,
+               m->newFrames * 1000.0 / m->clock, m->info.fps);
     yr_snd_lock(y, true);
     y->movie = NULL;
     yr_snd_lock(y, false);
@@ -74,6 +79,7 @@ static void load(YR *y, const char *name) {
     yr_movie_close(y);
     YMovie *m = yr_alloc(sizeof(YMovie));
     m->volume = 256;
+    snprintf(m->name, sizeof m->name, "%s", name);
     if (!open_source(y, name, &m->file, &m->mem, &m->size)) {
         yr_log(y, "MOVIE: file not found: %s\n", name);
         movie_free(m);
@@ -93,11 +99,16 @@ static void load(YR *y, const char *name) {
     yr_snd_lock(y, false);
 }
 
-bool yr_movie_draw(YR *y) {
+bool yr_movie_draw(YR *y, bool *changedOut) {
     YMovie *m = y->movie;
     if (!m || !m->shown) return false;
     int changed = 0;
     const uint8_t *px = m->playing ? vnvideo_frame(m->video, m->clock / 1000.0, &changed) : NULL;
+    if (changed) m->newFrames++;
+    *changedOut = changed || !m->drawn || y->gfx->dirty;
+    if (!*changedOut) return true;
+    m->drawn = true;
+    y->gfx->dirty = false;
     for (size_t i = 0; i < (size_t)y->width * (size_t)y->height; i++) y->screen[i] = 0xff000000u;
     if (!px) return true;
     int w = m->info.width, h = m->info.height;
