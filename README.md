@@ -145,7 +145,7 @@ In a game, every button from the touch gamepad or a real controller reaches the 
 | Previous and next page | LB and RB | Q and E, or Page Up and Page Down |
 | Open the VNDegen menu in a game | Home, and View while the menu is open | Backtick (`` ` ``) |
 
-A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. [docs/controls.md](docs/controls.md) has every layout, the controller layout sheet, and each engine's keys.
+A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. On a Mac, the window's close, minimise and zoom buttons hide while a game plays and show again while the menu is open. [docs/controls.md](docs/controls.md) has every layout, the controller layout sheet, and each engine's keys.
 
 <p align="center">
   <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">

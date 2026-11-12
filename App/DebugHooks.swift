@@ -185,6 +185,22 @@ enum DebugHooks {
                 }
             }
         }
+        var fullScreenToken: Int32 = 0
+        notify_register_dispatch("\(prefix).app.fullscreen", &fullScreenToken, .main) { _ in
+            MainActor.assumeIsolated { mainWindow?.toggleFullScreen(nil) }
+        }
+        var buttonsToken: Int32 = 0
+        notify_register_dispatch("\(prefix).app.windowbuttons", &buttonsToken, .main) { _ in
+            MainActor.assumeIsolated {
+                guard let window = mainWindow else { return }
+                let states = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].map {
+                    window.standardWindowButton($0).map { $0.isHidden ? "hidden" : "shown" } ?? "none"
+                }
+                let screen = if case let .playing(id, _) = hub.screen { "playing \(id.rawValue)" } else { "library" }
+                NSLog("WINDOWBUTTONS close=%@ minimise=%@ zoom=%@ fullScreen=%d screen=%@", states[0], states[1], states[2],
+                      window.styleMask.contains(.fullScreen), screen)
+            }
+        }
         var snapshotToken: Int32 = 0
         notify_register_dispatch("\(prefix).app.snapshot", &snapshotToken, .main) { _ in
             guard let path = UserDefaults.standard.string(forKey: "snapshot") else { return }
