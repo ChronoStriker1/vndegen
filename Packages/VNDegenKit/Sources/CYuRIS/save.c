@@ -45,6 +45,7 @@ typedef struct LayerFormat {
 
 static const u32 fields192[][2] = { { 80, 1 }, { 112, 0x1000000 }, { 120, 256 }, { 128, 0x11011130 }, { 476, 128 },
                                     { 480, 0x808080 } };
+static const u32 fields473[][2] = { { 80, 1 }, { 120, 0x1000000 }, { 128, 256 }, { 492, 128 }, { 496, 0x808080 } };
 static const u32 fields312[][2] = { { 80, 1 }, { 128, 0x1000100 }, { 136, 256 }, { 140, 0x10000 }, { 492, 128 },
                                     { 496, 0x808080 } };
 static const u32 fields480[][2] = { { 80, 1 }, { 128, 0x1000100 }, { 132, 0x10000 }, { 136, 256 }, { 448, 10000 },
@@ -57,6 +58,7 @@ static const LayerFormat layerFormats[] = {
     { 312, 1536, 120, 124, fields312, 6 },
     { 480, 1600, 120, 124, fields480, 12 },
     { 555, 1680, 136, 140, fields555, 10 },
+    { 473, 1536, 112, 116, fields473, 5 },
 };
 
 u32 yr_save_version(YR *y) { return file_version(y); }
@@ -74,6 +76,7 @@ static bool uses_snappy(YR *y) { return y->scriptVersion == 481 || y->scriptVers
 static const LayerFormat *layer_format(YR *y) {
     u32 version = file_version(y);
     if (y->scriptVersion >= 500) return &layerFormats[3];
+    if (version == 312 && y->scriptVersion < 474) return &layerFormats[4];
     return version < 300 ? &layerFormats[0] : version < 400 ? &layerFormats[1] : &layerFormats[2];
 }
 
