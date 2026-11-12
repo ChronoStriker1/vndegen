@@ -32,6 +32,20 @@ import VNCore
         #expect(YuRISLayout(probe(["yscfg.dat", "pac/deep/bn.ypf"])) == nil)
     }
 
+    @Test func findsArchivesInPacBelowTheListing() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "yuris-layout-\(UUID().uuidString)")
+        let game = folder.appending(path: "v1/Game")
+        try FileManager.default.createDirectory(at: game.appending(path: "pac"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data().write(to: game.appending(path: "yscfg.dat"))
+        try Data().write(to: game.appending(path: "pac/cg1.ypf"))
+        let layout = YuRISLayout(FolderProbe(scanning: folder))
+        #expect(layout?.root == "v1/Game")
+        #expect(layout?.evidence == "v1/Game/pac/cg1.ypf")
+        try FileManager.default.removeItem(at: game.appending(path: "pac/cg1.ypf"))
+        #expect(YuRISLayout(FolderProbe(scanning: folder)) == nil)
+    }
+
     @Test func savesAreSdFilesInTheSaveFolder() throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "yuris-layout-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder.appending(path: "pac"), withIntermediateDirectories: true)

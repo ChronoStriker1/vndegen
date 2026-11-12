@@ -16,7 +16,8 @@ nonisolated struct YuRISLayout: Equatable, Sendable {
             switch name {
             case "yscfg.dat" where parts.count <= 3:
                 let folder = folderParts.joined(separator: "/")
-                candidate = Self.firstArchive(in: folder, entries).map { YuRISLayout(root: folder, evidence: $0) }
+                candidate = (Self.firstArchive(in: folder, entries) ?? Self.archiveInUnlistedPac(in: folder, probe))
+                    .map { YuRISLayout(root: folder, evidence: $0) }
             case "ysbin.ypf":
                 if folderParts.last?.lowercased() == "pac" { folderParts.removeLast() }
                 guard folderParts.count <= 2 else { continue }
@@ -40,6 +41,14 @@ nonisolated struct YuRISLayout: Equatable, Sendable {
             let rest = lower.dropFirst(prefix.count)
             return !rest.contains("/") || (rest.hasPrefix("pac/") && !rest.dropFirst(4).contains("/"))
         }
+    }
+
+    private static func archiveInUnlistedPac(in folder: String, _ probe: FolderProbe) -> String? {
+        let prefix = folder.isEmpty ? "" : folder + "/"
+        guard let pac = probe.entries.first(where: { $0.hasPrefix(prefix) && $0.dropFirst(prefix.count).lowercased() == "pac" }),
+              let names = try? FileManager.default.contentsOfDirectory(atPath: probe.root.appendingPathComponent(pac).path)
+        else { return nil }
+        return names.sorted().first { $0.lowercased().hasSuffix(".ypf") }.map { "\(pac)/\($0)" }
     }
 
     private init(root: String, evidence: String) {
