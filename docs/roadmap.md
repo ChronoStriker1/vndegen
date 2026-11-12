@@ -100,7 +100,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- YU-RIS, on branch `feat/yuris`. Its first set shipped in 0.38.0. Next: MA☆KO HUNTER, the two Saimin games, a game on the oldest engine version with no `yscfg.dat`, and Saimin Seishidou's English from the Translator++ table that ships beside it, then the other library games in sets. 15 library games, 32 GB. [yuris.md](yuris.md) has what runs and what doesn't.
+- YU-RIS, on branch `feat/yuris`. Its first set shipped in 0.38.0. Next: MA☆KO HUNTER, the two Saimin games, a game on the oldest engine version with no `yscfg.dat`, then the other library games in sets. 15 library games, 32 GB. [yuris.md](yuris.md) has what runs and what doesn't.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
