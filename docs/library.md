@@ -46,16 +46,17 @@ Remove from library, in a game's menu or on its page, deletes the game's folder 
 
 ## Removing engine files
 
-RPG Maker MV and MZ, TyranoScript, and Ren'Py games ship PC engine files that VNDegen doesn't use. Remove engine files, in a game's menu or on its page, lists them with the space they take and asks before removing anything. An archive you import asks once, when the game it adds has any. The game keeps running in VNDegen, but it won't run on a PC from that folder afterwards.
+RPG Maker MV and MZ, TyranoScript, Visual Novel Maker, and Ren'Py games ship PC engine files that VNDegen doesn't use. Remove engine files, in a game's menu or on its page, lists them with the space they take and asks before removing anything. An archive you import asks once, when the game it adds has any. The game keeps running in VNDegen, but it won't run on a PC from that folder afterwards.
 
 | Engine | Average saved per game | What goes |
 |---|---|---|
 | RPG Maker MZ | 295 MB | NW.js |
 | RPG Maker MV | 148 MB | NW.js |
 | TyranoScript | 183 MB | NW.js or Electron |
+| Visual Novel Maker | 202 MB, one game | NW.js or Electron |
 | Ren'Py | 88 MB | The Windows, Linux, and Mac libraries in `lib/`, and the `.exe` and `.app` launchers |
 
-The averages come from the maintainer's library. Each plugin names exactly what it may remove, and anything else stays, including saves, the game's own data, and whatever a mod or a translation added, such as a picture or a settings file left in `lib/`. The exception is a program, Python, or certificate file a mod put in one of Ren'Py's `lib/` folders, which VNDegen can't tell from the engine's own. VNDegen loads nothing from those folders, so the game runs as before, but the mod's file is gone. An `.exe` under another name goes only when it's the one file of 30 MB or more beside the runtime's files. A game packed entirely inside its `.exe` isn't detected as these engines and offers nothing. Nothing is offered without the game's data on disk, and no `.exe` of 250 MB or more is offered. Known limit: a smaller `.exe` that holds more of the game than its loose files is treated as the runtime. No library game is laid out that way. An RPG Maker or TyranoScript game inside wrapper folders offers nothing either, so its runtime stays. The other engines list nothing, because VNDegen reads their `.exe` and `.dll` files or names to recognize or run a game, or because there is little to gain.
+The averages come from the maintainer's library. Each plugin names exactly what it may remove, and anything else stays, including saves, the game's own data, and whatever a mod or a translation added, such as a picture or a settings file left in `lib/`. The exception is a program, Python, or certificate file a mod put in one of Ren'Py's `lib/` folders, which VNDegen can't tell from the engine's own. VNDegen loads nothing from those folders, so the game runs as before, but the mod's file is gone. An `.exe` under another name goes only when it's the one file of 30 MB or more beside the runtime's files. A game packed entirely inside its `.exe` isn't detected as these engines and offers nothing. Nothing is offered without the game's data on disk, and no `.exe` of 250 MB or more is offered. Known limit: a smaller `.exe` that holds more of the game than its loose files is treated as the runtime. No library game is laid out that way. An RPG Maker, TyranoScript, or Visual Novel Maker game inside wrapper folders, or a Visual Novel Maker web export, offers nothing either, so its runtime stays. The other engines list nothing, because VNDegen reads their `.exe` and `.dll` files or names to recognize or run a game, or because there is little to gain.
 
 Where the files go depends on where the game is:
 

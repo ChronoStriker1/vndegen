@@ -8,7 +8,7 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 - Average and 1% low are frames a second. A range covers the windows of that run.
 - Each engine's numbers come from its own source:
   - RPG Maker MV and MZ and Flash: frames drawn to the canvas, from the DEBUG input script's `fps` step. "Engine" in a row is `Graphics.frameCount` per second, the game's own update rate.
-  - TyranoScript: new video frames from `requestVideoFrameCallback`, in a script in the input script's `js` step, because the `fps` step counts WebGL drawing and a Tyrano video has none.
+  - TyranoScript and Visual Novel Maker: new video frames from `requestVideoFrameCallback`, in a script in the input script's `js` step, because the `fps` step counts WebGL drawing and a Tyrano video has none.
   - Ren'Py: new movie frames from `renpy.display.video.get_movie_texture`, by a probe `.rpy` placed in a scratch copy of the game, because Ren'Py also redraws between them.
   - KiriKiri: display refreshes from `-frameMonitor`'s `KKFRAMES` line, and a movie's frames from the `movie:` lines in the game's log.
   - Godot: `-godotFrameLog`, without `-godotSnapshot`. The snapshot writes a PNG on the main thread every 2 s, which stalls the game for about 80 to 90 ms each time. It took Barely Working from 59.9 to 57.5 and Project Hadal from 59.4 to 56.9, with seconds alternating between 54 to 56 and 60 to 61 frames. The native runtimes log their own pacing with `-frameMonitor`.
@@ -60,6 +60,8 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | Mac app, MacBook | 30 | **28.6**, was 27.9 | 5.0, was 3.4 | 120 s | 2.9 | 11-03 | 972c708 |
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | Mac app, mini | 30 | **28.9** | 5.8 | 120 s | 2.8 | 11-03 | dcea258 |
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | iPad simulator | 30 | 29.7, froze at its first loop before | 14.1 | 120 s | 6.2 | 11-03 | 972c708 |
+| Visual Novel Maker | Siren's Call, 1280x720 VP9 splash movie, page at 60.1 | Mac app, mini, screen locked | 30 | 30.0 | 24.0 | 9.6 s, the whole movie | 34 | 11-11 | 84f4047 |
+| Visual Novel Maker | Siren's Call, 1280x720 VP9 splash movie, page at 60.1 | iPad simulator | 30 | 30.0 | 28.0 | 9.6 s, the whole movie | 36 | 11-11 | 84f4047 |
 | RGSS | Monster Girl Quest Paradox, walking in the village | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 13 | 11-04 | 2f48b68 |
 | RGSS | Monster Girl Quest Paradox, battle with 5 enemies | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 7.4 | 11-04 | 2f48b68 |
 | RGSS | Monster Girl Quest Paradox, walking in the village | iPad simulator | 60 | 58.5 to 60.0 | 15.0 to 60.0 | 80 s | 12 | 11-04 | 2f48b68 |

@@ -8,6 +8,7 @@ nonisolated public struct ControllerLayout: Identifiable, Equatable, Sendable {
         case visualNovel, keyboardAndMouse, mouse, rpgMaker, gamepad
         case saved(UUID)
         case suggested
+        case engine
     }
 
     public let id: ID
@@ -57,8 +58,14 @@ public final class LayoutLibrary {
     public func layout(_ id: ControllerLayout.ID) -> ControllerLayout? { all.first { $0.id == id } }
 
     public func all(for game: Game?, in library: LibraryStore) -> [ControllerLayout] {
-        guard let game, suggestion(for: game) != nil else { return all }
-        return [ControllerLayout(id: .suggested, name: "Suggested for this game", mapping: defaultLayout(for: game, in: library))] + all
+        guard let game else { return all }
+        if suggestion(for: game) != nil {
+            return [ControllerLayout(id: .suggested, name: "Suggested for this game", mapping: defaultLayout(for: game, in: library))] + all
+        }
+        guard let plugin = library.plugin(for: game.engine), !plugin.defaultControlChanges.isEmpty else { return all }
+        let base = ControllerLayout.builtIns.first { $0.mapping == plugin.defaultControls.mapping }?.name ?? "Engine layout"
+        return [ControllerLayout(id: .engine, name: "\(base) for \(plugin.descriptor.shortName)",
+                                 mapping: ButtonMapping.engineLayout(for: game, in: library))] + all
     }
 
     public func layout(_ id: ControllerLayout.ID, for game: Game?, in library: LibraryStore) -> ControllerLayout? {

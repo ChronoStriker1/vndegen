@@ -87,3 +87,41 @@ private struct VisualNovelEngine: EnginePlugin {
         #expect(layouts.defaultLayout(for: game, in: library) == .visualNovel, "\(name)")
     }
 }
+
+private struct ClickingEngine: EnginePlugin {
+    var descriptor: EngineDescriptor {
+        EngineDescriptor(id: EngineID("clicks"), displayName: "Clicks", shortName: "Clicks", platforms: Set(Platform.allCases))
+    }
+
+    func detect(_ probe: FolderProbe) -> EngineMatch? { nil }
+    @MainActor func makeSession(_ launch: GameLaunch) throws -> any EngineSession { throw CancellationError() }
+    var defaultControls: ControlLayout { .visualNovel }
+    var defaultControlChanges: [ControlInput: ControlAction] { [.a: .click(.primary)] }
+}
+
+@Test @MainActor func anEngineCanChangeButtonsOfItsStartingLayout() async throws {
+    let root = TestFolders.root.appending(path: "vndegen-engine-layout-\(UUID().uuidString)")
+    let paths = LibraryPaths(gamesRoot: root.appending(path: "Games"), support: root.appending(path: "Support"))
+    for name in ["Follows", "PickedVisualNovel"] {
+        try FileManager.default.createDirectory(at: paths.gamesRoot.appending(path: name), withIntermediateDirectories: true)
+    }
+    let library = LibraryStore(paths: paths, engines: [ClickingEngine()])
+    await library.refresh()
+    for name in ["Follows", "PickedVisualNovel"] { library.update(GameID(name)) { $0.engineOverride = EngineID("clicks") } }
+    let layouts = LayoutLibrary(paths: paths)
+    var expected = ButtonMapping.visualNovel
+    expected.set(.click(.primary), for: .a)
+
+    let follows = try #require(library.game(GameID("Follows")))
+    #expect(layouts.defaultLayout(for: follows, in: library) == expected)
+    #expect(layouts.mapping(for: follows, in: library) == expected)
+    let start = try #require(layouts.all(for: follows, in: library).first)
+    #expect(start.id == .engine && start.name == "Visual novel for Clicks" && start.mapping == expected)
+    #expect(layouts.shown(for: expected, game: follows, in: library)?.id == .engine)
+    #expect(layouts.all(for: follows, in: library).dropFirst().map(\.id) == layouts.all.map(\.id))
+
+    library.update(GameID("PickedVisualNovel")) { $0.buttonMapping = ButtonMapping.visualNovel.stored(default: expected) }
+    let picked = try #require(library.game(GameID("PickedVisualNovel")))
+    #expect(layouts.mapping(for: picked, in: library) == .visualNovel)
+    #expect(layouts.shown(for: .visualNovel, game: picked, in: library)?.id == .visualNovel)
+}
