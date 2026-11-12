@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.2",
+          "buildVersion": "2348",
+          "date": "2026-11-12T19:59:05Z",
+          "localizedDescription": "On the Mac, the window buttons no longer sit over a game.\n\n## Downloads\n\n- `VNDegen-0.41.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly. Nothing changes on iPhone and iPad in this release.\n\n## Fixes\n\n- Mac: the close, minimise and zoom buttons are hidden while a game plays (#90). The window has no title bar, so they used to sit over the top-left corner of a game that fills the window, such as a 1280x800 game or a Twine page. They show in the library, on a game's page, in Settings, and while the VNDegen menu is open over a game. Cmd-W, Cmd-M, the menu bar and full screen work as before.\n\n## Known limits\n\n- A Unity game that runs in CrossOver's window or its own Mac window keeps that window's own buttons.\n- Violated Hero was seen to stop partway through its opening (#85). It hasn't been reproduced since and is still open.\n\n## What wasn't tested\n\n- No physical device or hardware controller was used.\n- The Mac app was driven through its test hooks, not with real keys or clicks. Minimise and close were sent as the calls Cmd-M and Cmd-W make.\n- Two games were used: an RPG Maker MZ game in the hub's window and a Ren'Py game in its own window. The other engines share the same player view and weren't run one by one.\n- A game that fails to start was checked by reading the code, not by a run.\n- Nothing was run on a simulator: the change is Mac only, and the iOS build passes.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.2/VNDegen-0.41.2.ipa",
+          "size": 126307751,
+          "sha256": "69cac04250e1fe98029dd521c71c99881ee3bda78d47ca4d8ed9c42a4c7a8e74",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.1",
           "buildVersion": "2342",
           "date": "2026-11-12T18:11:47Z",
