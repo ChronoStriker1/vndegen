@@ -144,7 +144,7 @@ const YLabel *yr_label(YR *y, const char *name) {
     u32 h = label_hash(name) & (y->labelCap - 1);
     while (y->labelIndex[h] >= 0) {
         const YLabel *l = &y->labels[y->labelIndex[h]];
-        if (!strcasecmp(l->name, name)) return l;
+        if (!yr_name_ncmp(y->enc, l->name, name, SIZE_MAX)) return l;
         h = (h + 1) & (y->labelCap - 1);
     }
     return NULL;

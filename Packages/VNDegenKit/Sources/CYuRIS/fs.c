@@ -17,6 +17,7 @@ typedef struct YEntry {
     u8 packed;
     u32 size, csize;
     u64 offset;
+    u64 order;
 } YEntry;
 
 typedef struct YArchive { char *path; FILE *f; } YArchive;
@@ -51,7 +52,11 @@ static void put(YFS *fs, YEntry e) {
         free(old);
     }
     YEntry *s = slot(fs, e.key);
-    if (s->key) { free(s->key); fs->used--; }   // a later archive replaces the entry
+    if (s->key) {
+        e.order = s->order;
+        free(s->key);
+        fs->used--;
+    }
     *s = e;
     fs->used++;
 }
@@ -106,7 +111,7 @@ static bool scan(YFS *fs, u16 arc, const u8 *dir, size_t dirSize, u32 count, int
             for (int j = 0; j < n; j++) name[j] = (char)(p[5 + j] ^ key);
             name[n] = 0;
             yr_key(k, sizeof k, name);
-            YEntry e = { yr_strdup(k), arc, q[1], yr_le32(q + 2), yr_le32(q + 6), 0 };
+            YEntry e = { yr_strdup(k), arc, q[1], yr_le32(q + 2), yr_le32(q + 6), 0, (u64)arc << 32 | i };
             e.offset = tail == 12 ? yr_le64(q + 10) : yr_le32(q + 10);
             put(fs, e);
         }
@@ -293,7 +298,13 @@ bool yr_fs_exists(YR *y, const char *name, const char *const *exts) {
     return lookup(y, name, exts, &none, true);
 }
 
-static int by_name(const void *a, const void *b) { return strcmp(*(char *const *)a, *(char *const *)b); }
+typedef struct Listed { char *key; u64 order; } Listed;
+
+static int by_order(const void *a, const void *b) {
+    const Listed *x = a, *z = b;
+    if (x->order != z->order) return x->order < z->order ? -1 : 1;
+    return strcmp(x->key, z->key);
+}
 
 int yr_fs_list(YR *y, const char *folder, char ***out) {
     YFS *fs = y->fs;
@@ -301,15 +312,18 @@ int yr_fs_list(YR *y, const char *folder, char ***out) {
     yr_key(prefix, sizeof prefix, folder);
     size_t n = strlen(prefix);
     if (n && prefix[n - 1] != '/' && n + 1 < sizeof prefix) { prefix[n++] = '/'; prefix[n] = 0; }
-    char **list = NULL;
+    Listed *found = NULL;
     int count = 0;
     for (u32 i = 0; fs && i < fs->cap; i++) {
         const char *k = fs->table[i].key;
         if (!k || strncmp(k, prefix, n) || strchr(k + n, '/') || !k[n]) continue;
-        list = yr_realloc(list, sizeof(char *) * (size_t)(count + 1));
-        list[count++] = yr_strdup(k);
+        found = yr_realloc(found, sizeof(Listed) * (size_t)(count + 1));
+        found[count++] = (Listed){ yr_strdup(k), fs->table[i].order };
     }
-    if (count) qsort(list, (size_t)count, sizeof(char *), by_name);
+    if (count) qsort(found, (size_t)count, sizeof(Listed), by_order);
+    char **list = count ? yr_alloc(sizeof(char *) * (size_t)count) : NULL;
+    for (int i = 0; i < count; i++) list[i] = found[i].key;
+    free(found);
     *out = list;
     return count;
 }

@@ -50,10 +50,13 @@ static const u32 fields312[][2] = { { 80, 1 }, { 128, 0x1000100 }, { 136, 256 },
 static const u32 fields480[][2] = { { 80, 1 }, { 128, 0x1000100 }, { 132, 0x10000 }, { 136, 256 }, { 448, 10000 },
                                     { 456, 10000 }, { 516, 128 }, { 520, 0x808080 }, { 1568, 0x3f800000 },
                                     { 1572, 0x3f800000 }, { 1576, 0x3f800000 }, { 1580, 1 } };
+static const u32 fields555[][2] = { { 88, 1 }, { 128, 128 }, { 132, 0x808080 }, { 160, 1 }, { 164, 256 },
+                                    { 168, 0x1000000 }, { 552, 10000 }, { 560, 10000 }, { 620, 128 }, { 624, 0x808080 } };
 static const LayerFormat layerFormats[] = {
     { 192, 1520, 104, 108, fields192, 6 },
     { 312, 1536, 120, 124, fields312, 6 },
     { 480, 1600, 120, 124, fields480, 12 },
+    { 555, 1680, 136, 140, fields555, 10 },
 };
 
 u32 yr_save_version(YR *y) { return file_version(y); }
@@ -66,7 +69,11 @@ static u32 file_version(YR *y) {
     return 480;
 }
 
-static const LayerFormat *layer_format(u32 version) {
+static bool uses_snappy(YR *y) { return y->scriptVersion == 481 || y->scriptVersion >= 500; }
+
+static const LayerFormat *layer_format(YR *y) {
+    u32 version = file_version(y);
+    if (y->scriptVersion >= 500) return &layerFormats[3];
     return version < 300 ? &layerFormats[0] : version < 400 ? &layerFormats[1] : &layerFormats[2];
 }
 
@@ -278,7 +285,7 @@ static Buf group_payload(YR *y, u8 cls, u8 type) {
         if (v->scope != 1 || v->cls != cls || (v->t ? v->t : v->init.t) != type) continue;
         Buf part = var_payload(v, -1);
         u32 clen;
-        u8 *z = pack(part.p, part.n, file_version(y) == 481, &clen);
+        u8 *z = pack(part.p, part.n, uses_snappy(y), &clen);
         u16 vid = file_version(y) >= 480 ? (u16)id : 0;
         u8 head[12] = { KIND_VAR, 1, (u8)vid, (u8)(vid >> 8) };
         memcpy(head + 4, &(u32){ (u32)clen }, 4);
@@ -309,7 +316,7 @@ static void apply_group(YR *y, YTask *t, const u8 *d, u32 n, u32 onlyVid, YVar *
 
 static Buf layer_payload(YR *y, YLayer *l) {
     Buf b = { 0 };
-    const LayerFormat *f = layer_format(file_version(y));
+    const LayerFormat *f = layer_format(y);
     int w = 0, h = 0;
     bool owned = false;
     uint32_t *px = NULL;
@@ -327,6 +334,10 @@ static Buf layer_payload(YR *y, YLayer *l) {
     for (int i = 0; i < f->nfields; i++) memcpy(attr + f->fields[i][0], &f->fields[i][1], 4);
     memcpy(attr + f->wOff, &(u32){ (u32)w }, 4);
     memcpy(attr + f->hOff, &(u32){ (u32)h }, 4);
+    if (f->version == 555) {
+        memcpy(attr + 240, &(u32){ (u32)w }, 4);
+        memcpy(attr + 244, &(u32){ (u32)h }, 4);
+    }
     put32(&b, f->attrLen);
     put32(&b, (u32)w * (u32)h * 4);
     put(&b, attr, f->attrLen);
@@ -400,7 +411,7 @@ static Buf build_file(YR *y, const RecList *l) {
             put(&b, r->data, r->size);
         } else {
             u32 clen;
-            u8 *z = pack(r->data, r->size, file_version(y) == 481 && r->kind != KIND_LAYER, &clen);
+            u8 *z = pack(r->data, r->size, uses_snappy(y) && r->kind != KIND_LAYER, &clen);
             memcpy(head + 8, &clen, 4);
             memcpy(head + 12, &r->size, 4);
             put(&b, head, 16);
@@ -556,7 +567,10 @@ int yr_cmd_save(YCall *c, int id) {
         i64 mem;
         if (yc_int(c, "MEM", &mem)) {
             if (mem == MEM_ALL) s->embedMems = true;
-            else list_copy(&mem_slot(y, mem, true)->list, &s->reserve);
+            else {
+                list_copy(&mem_slot(y, mem, true)->list, &s->reserve);
+                list_clear(&s->reserve);
+            }
         }
         char *file = yc_str(c, "FILE");
         if (file) {

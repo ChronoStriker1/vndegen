@@ -61,9 +61,9 @@ void yr_snd_close(YR *y) {
     y->snd = NULL;
 }
 
-static Voice *find(YSnd *s, const char *id) {
+static Voice *find(YR *y, YSnd *s, const char *id) {
     for (int i = 0; i < s->n; i++)
-        if (!strcasecmp(s->v[i]->id, id)) return s->v[i];
+        if (!yr_name_ncmp(y->enc, s->v[i]->id, id, SIZE_MAX)) return s->v[i];
     return NULL;
 }
 
@@ -271,7 +271,7 @@ static int sound(YCall *c) {
     char *id = yc_str(c, "ID");
     if (!id) return YR_NEXT;
     pthread_mutex_lock(&s->lock);
-    Voice *v = find(s, id);
+    Voice *v = find(y, s, id);
     if (!v) v = add(s, id);
     free(id);
     char *file = yc_str(c, "FILE");
@@ -326,7 +326,7 @@ static int soundinfo(YCall *c) {
     if (!yc_ref(c, "LET", &out)) return YR_NEXT;
     char *id = yc_str(c, "ID");
     pthread_mutex_lock(&s->lock);
-    Voice *v = id ? find(s, id) : NULL;
+    Voice *v = id ? find(y, s, id) : NULL;
     free(id);
     YVal r = yv_int(0);
     if (yc_int_or(c, "EXIST", 0)) r = yv_int(v != NULL);
@@ -356,12 +356,13 @@ static int soundinfo(YCall *c) {
 }
 
 static int soundend(YCall *c) {
-    YSnd *s = c->y->snd;
+    YR *y = c->y;
+    YSnd *s = y->snd;
     char *id = yc_str(c, "ID");
     if (!id) return YR_NEXT;
     pthread_mutex_lock(&s->lock);
     for (int i = 0; i < s->n; i++)
-        if (!strcasecmp(s->v[i]->id, id)) {
+        if (!yr_name_ncmp(y->enc, s->v[i]->id, id, SIZE_MAX)) {
             voice_free(s->v[i]);
             memmove(&s->v[i], &s->v[i + 1], sizeof(Voice *) * (size_t)(s->n - i - 1));
             s->n--;

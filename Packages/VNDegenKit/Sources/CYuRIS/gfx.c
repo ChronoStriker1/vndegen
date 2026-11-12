@@ -76,9 +76,9 @@ void yr_gfx_close(YR *y) {
     y->gfx = NULL;
 }
 
-static YLayer *child(YLayer *p, const char *name, size_t n) {
+static YLayer *child(YR *y, YLayer *p, const char *name, size_t n) {
     for (int i = 0; i < p->nkids; i++)
-        if (strlen(p->kids[i]->name) == n && !strncasecmp(p->kids[i]->name, name, n)) return p->kids[i];
+        if (strlen(p->kids[i]->name) == n && !yr_name_ncmp(y->enc, p->kids[i]->name, name, n)) return p->kids[i];
     return NULL;
 }
 
@@ -98,7 +98,7 @@ YLayer *yr_layer(YR *y, const char *id, bool create, bool set) {
         bool last = !e || !e[1];
         if (n == 1 && p[0] == '.') { p += n; continue; }
         if (n == 2 && p[0] == '.' && p[1] == '.') { if (l->parent) l = l->parent; p += n; continue; }
-        YLayer *c = child(l, p, n);
+        YLayer *c = child(y, l, p, n);
         if (!c) {
             if (!create) return NULL;
             char name[256];
