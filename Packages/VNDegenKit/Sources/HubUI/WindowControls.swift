@@ -56,3 +56,47 @@ struct WindowControlsReader: UIViewRepresentable {
     }
 }
 #endif
+
+#if os(macOS)
+import AppKit
+
+struct WindowButtonsHider: NSViewRepresentable {
+    let hidden: Bool
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+
+    func updateNSView(_ probe: Probe, context: Context) { probe.hidesButtons = hidden }
+
+    final class Probe: NSView {
+        var hidesButtons = false {
+            didSet { apply() }
+        }
+        private weak var host: NSWindow?
+        private var observers: [any NSObjectProtocol] = []
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers = []
+            if let window {
+                host = window
+                observers = [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification].map {
+                    NotificationCenter.default.addObserver(forName: $0, object: window, queue: .main) { [weak self] _ in
+                        MainActor.assumeIsolated { self?.apply() }
+                    }
+                }
+            }
+            apply()
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        private func apply() {
+            let hides = hidesButtons && window != nil
+            for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                host?.standardWindowButton(kind)?.isHidden = hides
+            }
+        }
+    }
+}
+#endif

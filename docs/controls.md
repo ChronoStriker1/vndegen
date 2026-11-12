@@ -49,7 +49,7 @@ Some games ask for something through a dialog of their own, which VNDegen shows 
 
 A text field opens VNDegen's on-screen keyboard when you press A on it. A types the focused key, X deletes, LB toggles shift, RB switches to symbols, Y finishes, and B closes the keyboard without changes. In the controller layout sheet, LB and RB jump between groups, B steps back and then closes it, and Reset returns the game to its starting layout: Suggested for this game when it has one, and otherwise its engine's default layout. Remapping A or B never changes how the sheet or the VNDegen menu respond. Adding a game by controller lists the archives in VNDegen's own folder (On My iPhone or On My iPad, VNDegen, on iOS). The Files and Photos pickers need touch or a mouse, and say so on screen.
 
-A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out.
+A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. On a Mac, the window's close, minimise and zoom buttons hide while a game plays and show again while the VNDegen menu is open.
 
 ## Controller layouts
 

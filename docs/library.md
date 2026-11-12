@@ -81,7 +81,7 @@ The view button in the top bar steps the library through four layouts:
 
 iPhone starts on Header list, iPad on Capsule rows, and Mac on Featured, and each device remembers its choice.
 
-The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place. On iPad, VNDegen also runs in a window of its own, at any size iPadOS allows. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of its window controls.
+The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place. On iPad, VNDegen also runs in a window of its own, at any size iPadOS allows. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of its window controls. On a Mac, a game fills the whole window, so the close, minimise and zoom buttons hide while it plays and come back in the library, on game pages, in Settings, and while the VNDegen menu is open. Command-W, Command-M, the menu bar and full screen work as usual.
 
 ## The game menu
 

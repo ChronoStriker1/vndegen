@@ -115,6 +115,9 @@ struct PlayerView: View {
         .animation(.easeOut(duration: 0.2), value: isCovered)
         .animation(.easeOut(duration: 0.25), value: needsRotation)
         .background(.black)
+        #if os(macOS)
+        .background(WindowButtonsHider(hidden: !menu.isOpen))
+        #endif
         .sheet(item: $mappingEditor) { editor in
             ButtonMappingSheet(editor: editor) { mappingEditor = nil }
                 .sheetBesideSideCamera()
