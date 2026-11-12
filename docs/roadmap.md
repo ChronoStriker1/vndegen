@@ -93,6 +93,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Suggested controller layouts for Artemis and Wolf RPG Editor games, a fix for Wolf RPG's check of one specific key (#86), and a game page note that Evenicle can't run yet (0.36.0). NScripter was left out: its games gain nothing over the "Visual novel" layout.
 - Adding a game from its GOG installer (Inno Setup 5, with add-ons and `.bin` parts) or from an ISO disc image, unpacked without running the installer (0.37.0). Repacked installers, other installer kinds and other disc image formats are refused with a message.
 - YU-RIS, on VNDegen's own clean-room runtime, with Another Way of Gettin' Paid and PC saves both ways, and Visual Novel Maker and Twine in the web view (0.38.0). More YU-RIS games follow in sets.
+- YU-RIS: MA☆KO HUNTER, Saimin Seishidou -Secret Lesson- and Tales of the Yokai Incident Inspectors, and games with no `yscfg.dat` recognised (0.39.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -100,7 +101,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- YU-RIS, on branch `feat/yuris`. Its first set shipped in 0.38.0. Next: MA☆KO HUNTER, the two Saimin games, a game on the oldest engine version with no `yscfg.dat`, then the other library games in sets. 15 library games, 32 GB. [yuris.md](yuris.md) has what runs and what doesn't.
+- YU-RIS, on branch `feat/yuris`. Five games run: its first set shipped in 0.38.0 and three more in 0.39.0. Next: Saimin Gakushū: Secret Desire, whose engine version (555) reads its story differently, then the other library games in sets. 15 library games, 32 GB. [yuris.md](yuris.md) has what runs and what doesn't.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
