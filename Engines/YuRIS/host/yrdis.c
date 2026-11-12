@@ -126,7 +126,7 @@ static void dump_script(YR *y, u32 si, u32 from, u32 to) {
             } else e = expr(y, a->data, a->size);
             const char *opn[] = { "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=" };
             int op = a->type >> 8;
-            if (getenv("YRDIS_RAW")) printf("%s{k%u t%04x n%u o%ld}", k ? " " : "", a->key, a->type, a->size, (long)(a->data - (s->args[0].data)));
+            if (getenv("YRDIS_RAW")) printf("%s{k%u t%04x n%u o%ld op%c}", k ? " " : "", a->key, a->type, a->size, (long)(a->data - (s->args[0].data)), a->size ? a->data[0] : 0x3f);
             printf("%s%s%s%s", k ? " " : "", key, op < 9 ? opn[op] : "?=", e);
             free(e);
         }

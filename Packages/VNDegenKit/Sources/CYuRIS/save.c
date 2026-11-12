@@ -556,7 +556,10 @@ int yr_cmd_save(YCall *c, int id) {
         i64 mem;
         if (yc_int(c, "MEM", &mem)) {
             if (mem == MEM_ALL) s->embedMems = true;
-            else list_copy(&mem_slot(y, mem, true)->list, &s->reserve);
+            else {
+                list_copy(&mem_slot(y, mem, true)->list, &s->reserve);
+                list_clear(&s->reserve);
+            }
         }
         char *file = yc_str(c, "FILE");
         if (file) {
