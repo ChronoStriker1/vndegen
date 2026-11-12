@@ -45,6 +45,8 @@ typedef struct LayerFormat {
 
 static const u32 fields192[][2] = { { 80, 1 }, { 112, 0x1000000 }, { 120, 256 }, { 128, 0x11011130 }, { 476, 128 },
                                     { 480, 0x808080 } };
+static const u32 fields479[][2] = { { 80, 1 }, { 120, 0x1000100 }, { 128, 256 }, { 132, 0x10000 }, { 492, 128 },
+                                    { 496, 0x808080 } };
 static const u32 fields406[][2] = { { 576, 1 }, { 608, 0x1000000 }, { 616, 256 }, { 972, 128 }, { 976, 0x808080 } };
 static const u32 fields473[][2] = { { 80, 1 }, { 120, 0x1000000 }, { 128, 256 }, { 492, 128 }, { 496, 0x808080 } };
 static const u32 fields312[][2] = { { 80, 1 }, { 128, 0x1000100 }, { 136, 256 }, { 140, 0x10000 }, { 492, 128 },
@@ -61,6 +63,7 @@ static const LayerFormat layerFormats[] = {
     { 555, 1680, 136, 140, fields555, 10 },
     { 473, 1536, 112, 116, fields473, 5 },
     { 406, 992, 600, 604, fields406, 5 },
+    { 479, 1536, 112, 116, fields479, 6 },
 };
 
 u32 yr_save_version(YR *y) { return file_version(y); }
@@ -79,6 +82,7 @@ static const LayerFormat *layer_format(YR *y) {
     u32 version = file_version(y);
     if (y->scriptVersion >= 500) return &layerFormats[3];
     if (version == 312 && y->scriptVersion < 474) return &layerFormats[4];
+    if (version == 312 && y->scriptVersion > 474) return &layerFormats[6];
     if (y->scriptVersion < 466) return &layerFormats[5];
     return version < 300 ? &layerFormats[0] : version < 400 ? &layerFormats[1] : &layerFormats[2];
 }

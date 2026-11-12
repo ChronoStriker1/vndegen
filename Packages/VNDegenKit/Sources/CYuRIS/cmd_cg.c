@@ -143,7 +143,7 @@ static u32 pixel_at(const YLayer *l, int x, int y) {
     return l->px[(size_t)y * (size_t)l->w + (size_t)x];
 }
 
-static i64 rgb_of(u32 p) { return (i64)((p & 0xff) << 16 | (p & 0xff00) | ((p >> 16) & 0xff)); }
+static i64 rgb_of(u32 p) { return (p >> 24) ? (i64)((p & 0xff) << 16 | (p & 0xff00) | ((p >> 16) & 0xff)) : 0x808080; }
 
 static int cginfo(YCall *c) {
     YR *y = c->y;

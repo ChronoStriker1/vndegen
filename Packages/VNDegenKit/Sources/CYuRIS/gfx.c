@@ -1,5 +1,6 @@
 // CG layers and the compositor. Layers hold straight-alpha pixels; sets composite into premultiplied buffers.
 #include "gfx.h"
+#include <zlib.h>
 #include <math.h>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -128,6 +129,36 @@ void yr_layer_check_opaque(YLayer *l) {
 
 static const char *const imageExts[] = { ".png", ".bmp", ".jpg", ".gif", NULL };
 
+static unsigned char *ycg_decode(const u8 *d, size_t n, int *w, int *h) {
+    if (n < 32 || memcmp(d, "YCG", 4)) return NULL;
+    u32 width = yr_le32(d + 4), height = yr_le32(d + 8), method = yr_le32(d + 16), parts = yr_le32(d + 20);
+    size_t head = 24;
+    if (!width || !height || width > 16384 || height > 16384 || method != 1 || parts > 64 || head + 16 * parts > n)
+        return NULL;
+    size_t total = (size_t)width * height * 4;
+    unsigned char *px = malloc(total);
+    if (!px) return NULL;
+    size_t at = head + 16 * parts, filled = 0;
+    for (u32 i = 0; i < parts; i++) {
+        const u8 *e = d + head + 16 * i;
+        u32 ulen = yr_le32(e + 8), clen = yr_le32(e + 12);
+        if (at + clen > n || filled + ulen > total) { free(px); return NULL; }
+        uLongf got = ulen;
+        if (uncompress(px + filled, &got, d + at, clen) != Z_OK || got != ulen) { free(px); return NULL; }
+        filled += ulen;
+        at += clen;
+    }
+    if (filled != total) { free(px); return NULL; }
+    for (size_t i = 0; i < total; i += 4) {
+        unsigned char t = px[i];
+        px[i] = px[i + 2];
+        px[i + 2] = t;
+    }
+    *w = (int)width;
+    *h = (int)height;
+    return px;
+}
+
 bool yr_layer_load(YR *y, YLayer *l, const char *file) {
     if (!file || !*file) {
         // FILE="" makes a 1x1 black image.
@@ -144,7 +175,8 @@ bool yr_layer_load(YR *y, YLayer *l, const char *file) {
         return false;
     }
     int w, h, comp;
-    unsigned char *img = stbi_load_from_memory(f.data, (int)f.size, &w, &h, &comp, 4);
+    unsigned char *img = ycg_decode(f.data, f.size, &w, &h);
+    if (!img) img = stbi_load_from_memory(f.data, (int)f.size, &w, &h, &comp, 4);
     yr_file_free(&f);
     if (!img) {
         yr_log(y, "CG: cannot decode %s\n", file);
