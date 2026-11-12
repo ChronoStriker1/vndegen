@@ -111,6 +111,7 @@ public protocol EnginePlugin: Sendable {
     func legacyAction(for button: VirtualButton) -> ControlAction?
     /// The button layout a game follows until the player changes it.
     var defaultControls: ControlLayout { get }
+    var defaultControlChanges: [ControlInput: ControlAction] { get }
     var controlReaderVersion: Int { get }
     func suggestedControls(folder: URL) -> ControlSuggestion?
     /// True when `engineFileList` can name anything, so the game's page and menu offer to remove engine files.
@@ -135,6 +136,7 @@ extension EnginePlugin {
     public func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage] { [] }
     public func legacyAction(for button: VirtualButton) -> ControlAction? { nil }
     public var defaultControls: ControlLayout { .gamepad }
+    public var defaultControlChanges: [ControlInput: ControlAction] { [:] }
     public var controlReaderVersion: Int { 0 }
     public func suggestedControls(folder: URL) -> ControlSuggestion? { nil }
     public var listsEngineFiles: Bool { false }

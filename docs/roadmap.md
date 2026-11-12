@@ -92,6 +92,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Better default controller layouts: a new "Visual novel" layout for KiriKiri, NScripter, Artemis and AliceSoft games, "Mouse" for Flash, the A, S and D keys on RPG Maker XP, VX and VX Ace's spare buttons, and Control on RT for Wolf RPG (0.35.0).
 - Suggested controller layouts for Artemis and Wolf RPG Editor games, a fix for Wolf RPG's check of one specific key (#86), and a game page note that Evenicle can't run yet (0.36.0). NScripter was left out: its games gain nothing over the "Visual novel" layout.
 - Adding a game from its GOG installer (Inno Setup 5, with add-ons and `.bin` parts) or from an ISO disc image, unpacked without running the installer (0.37.0). Repacked installers, other installer kinds and other disc image formats are refused with a message.
+- YU-RIS, on VNDegen's own clean-room runtime, with Another Way of Gettin' Paid and PC saves both ways, and Visual Novel Maker and Twine in the web view (0.38.0). More YU-RIS games follow in sets.
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -99,8 +100,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- YU-RIS, on VNDegen's own clean-room runtime in C, MIT licensed, on branch `feat/yuris`. It is the largest group of library games that didn't run: 15 games, 32 GB. The first set is merged into `dev` and not released yet: Another Way of Gettin' Paid and one game on the oldest engine version reach their titles, play, save and load on Linux, the Mac app and the iPad simulator, and their saves move to and from a PC. Next: MA☆KO HUNTER, the two Saimin games and the other library games, in sets. [yuris.md](yuris.md) has the details.
-- Visual Novel Maker and Twine, in the web view that RPG Maker MV and MZ and TyranoScript use, on branch `feat/htmlvn`. Work restarted on 2026-11-11 from the stopped `ws/htmlvn` branch, where both plugins are written and the checks in the Mac app and on the iPad simulator are still to do. 4 library games.
+- YU-RIS, on branch `feat/yuris`. Its first set shipped in 0.38.0. Next: MA☆KO HUNTER, the two Saimin games, a game on the oldest engine version with no `yscfg.dat`, then the other library games in sets. 15 library games, 32 GB. [yuris.md](yuris.md) has what runs and what doesn't.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses

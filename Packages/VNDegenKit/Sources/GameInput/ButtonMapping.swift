@@ -105,7 +105,10 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
     }()
 
     @MainActor public static func engineLayout(for game: Game, in library: LibraryStore) -> ButtonMapping {
-        (library.plugin(for: game.engine)?.defaultControls ?? .gamepad).mapping
+        let plugin = library.plugin(for: game.engine)
+        var mapping = (plugin?.defaultControls ?? .gamepad).mapping
+        for (input, action) in plugin?.defaultControlChanges ?? [:] { mapping.set(action, for: input) }
+        return mapping
     }
 }
 
