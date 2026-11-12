@@ -122,6 +122,8 @@ struct YR {
     long watchVid;              // logs stores to this variable id, from YR_WATCH; -1 for none
     bool traceGosub;            // logs every GOSUB, from the YR_TRACE_GOSUB environment variable
     int traceScript;
+    bool profile;
+    double profVm, profGfx, profWorst;
     char *logCmds;
     u32 traceFrom, traceTo;
     uint32_t *screen;           // RGBA, width x height

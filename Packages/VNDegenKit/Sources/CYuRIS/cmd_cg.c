@@ -60,6 +60,13 @@ static void set_str(char **field, char *value) {
     *field = value;
 }
 
+static bool set_if_new(char **field, char *value) {
+    bool same = (*field ? *field : "")[0] == (value ? value : "")[0] && !strcmp(*field ? *field : "", value ? value : "");
+    if (same) { free(value); return false; }
+    set_str(field, value);
+    return true;
+}
+
 static int cg(YCall *c) {
     YR *y = c->y;
     char *id = yc_str(c, "ID");
@@ -69,7 +76,10 @@ static int cg(YCall *c) {
     bool set = n && id[n - 1] == '/';
     YLayer *l = yr_layer(y, id, true, set);
     if (!l) { free(id); return YR_NEXT; }
+    YLayer before = *l;
+    bool changed = false;
     if (hasFile && !l->isSet) {
+        changed = true;
         char *file = yc_str(c, "FILE");
         yr_layer_load(y, l, file ? file : "");
         free(file);
@@ -85,8 +95,8 @@ static int cg(YCall *c) {
     inum(c, "SY", &l->sy);
     inum(c, "T", &l->t);
     inum(c, "TA", &l->ta);
-    if (yc_has(c, "TID")) set_str(&l->tid, yc_str(c, "TID"));
-    if (yc_has(c, "MID")) set_str(&l->mid, yc_str(c, "MID"));
+    if (yc_has(c, "TID")) changed |= set_if_new(&l->tid, yc_str(c, "TID"));
+    if (yc_has(c, "MID")) changed |= set_if_new(&l->mid, yc_str(c, "MID"));
     double lint = (double)l->lint, lint2 = (double)l->lint2;
     if (num(c, "LINT", lint, &lint)) l->lint = (i64)lint;
     if (num(c, "LINT2", lint2, &lint2)) l->lint2 = (i64)lint2;
@@ -102,7 +112,12 @@ static int cg(YCall *c) {
     fset |= dnum(c, "FRY", &l->fry);
     fset |= dnum(c, "FRZ", &l->frz);
     if (fset && !yc_has(c, "F")) l->f = true;
-    y->gfx->dirty = true;
+    changed |= l->e != before.e || l->a != before.a || l->x != before.x || l->y != before.y || l->z != before.z ||
+               l->zi != before.zi || l->mode != before.mode || l->sx != before.sx || l->sy != before.sy || l->t != before.t ||
+               l->ta != before.ta || l->f != before.f || l->fx != before.fx ||
+               l->fy != before.fy || l->fbx != before.fbx || l->fby != before.fby || l->fcx != before.fcx ||
+               l->fcy != before.fcy || l->frx != before.frx || l->fry != before.fry || l->frz != before.frz;
+    if (changed) y->gfx->dirty = true;
     free(id);
     return YR_NEXT;
 }

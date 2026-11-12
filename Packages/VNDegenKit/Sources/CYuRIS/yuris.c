@@ -35,6 +35,7 @@ VNY *vny_open(const VNYConfig *config, char *err, size_t errSize) {
     y->fps = 60;
     y->traceGosub = getenv("YR_TRACE_GOSUB") != NULL;
     y->traceScript = -1;
+    y->profile = getenv("YR_PROFILE") != NULL;
     if (getenv("YR_LOG_CMDS")) {
         size_t n = strlen(getenv("YR_LOG_CMDS"));
         y->logCmds = yr_alloc(n + 3);
@@ -66,6 +67,12 @@ VNY *vny_open(const VNYConfig *config, char *err, size_t errSize) {
 void vny_close(VNY *v) {
     if (!v) return;
     if (getenv("YR_DUMP_LAYERS")) yr_gfx_dump((YR *)v);
+    if (((YR *)v)->profile) {
+        YR *y = (YR *)v;
+        yr_log(y, "profile: %llu frames, script %.2f ms, drawing %.2f ms per frame, worst %.2f ms\n",
+               (unsigned long long)y->frameNo, y->profVm / (double)(y->frameNo ? y->frameNo : 1),
+               y->profGfx / (double)(y->frameNo ? y->frameNo : 1), y->profWorst);
+    }
     if (getenv("YR_DUMP_TASKS")) {
         YR *y = (YR *)v;
         for (int i = 0; i < y->taskCount; i++) {
@@ -84,8 +91,22 @@ bool vny_frame(VNY *v, uint32_t elapsedMs) {
     if (y->paused) return true;
     y->clock += elapsedMs;
     y->frameNo++;
-    yr_vm_step(y);
-    yr_gfx_present(y);
+    if (y->profile) {
+        struct timespec a, b, c;
+        clock_gettime(CLOCK_MONOTONIC, &a);
+        yr_vm_step(y);
+        clock_gettime(CLOCK_MONOTONIC, &b);
+        yr_gfx_present(y);
+        clock_gettime(CLOCK_MONOTONIC, &c);
+        double vm = (double)(b.tv_sec - a.tv_sec) * 1e3 + (double)(b.tv_nsec - a.tv_nsec) / 1e6;
+        double gx = (double)(c.tv_sec - b.tv_sec) * 1e3 + (double)(c.tv_nsec - b.tv_nsec) / 1e6;
+        y->profVm += vm;
+        y->profGfx += gx;
+        if (vm + gx > y->profWorst) y->profWorst = vm + gx;
+    } else {
+        yr_vm_step(y);
+        yr_gfx_present(y);
+    }
     return !y->quit;
 }
 
