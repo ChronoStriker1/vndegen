@@ -73,7 +73,7 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 | MA☆KO HUNTER | Title, story in English, the map, the opening movie with its sound, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. Its title and menu buttons are images in Japanese, as on the PC |
 | Saimin Seishidou -Secret Lesson- | Title, story in English, its brand movie, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. The English is compiled into the game's scripts; the `.trans` files beside the exe are the translator's project files, and the title and menu buttons are images in Japanese, as on the PC |
 | Tales of the Yokai Incident Inspectors | Title, story with Japanese text, choices, backlog, save and load, on Linux and an iPad simulator |
-| Saimin Gakushū: Secret Desire | Language picker, title, story in English, choices, save and load, on Linux. PC saves move both ways. Its engine (555) reads the story's text files with TEXT[FILE=] and the game's own scripts parse them, with two PRODUCT helpers VNDegen builds to match the game's script versions |
+| Saimin Gakushū: Secret Desire | Language picker, title, brand movie, story in English, choices, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. Its engine (555) reads the story's text files with TEXT[FILE=] and the game's own scripts parse them, with two PRODUCT helpers VNDegen builds to match the game's script versions |
 
 ## Saves
 
