@@ -100,6 +100,11 @@ void yr_sysvars_init(YR *y, u32 version) {
         y->sys[14] = (YSysVar){ S_LIST, 0 };
         y->sys[15] = (YSysVar){ S_LISTNUM, 0 };
     }
+    if (version >= 481 && y->sys[127].kind == S_OTHER) y->sys[127] = (YSysVar){ S_CHR, 0 };
+    if (version >= 550) {
+        y->sys[50] = (YSysVar){ S_REF_INT, 0 };
+        y->sys[52] = (YSysVar){ S_REF_STR, 0 };
+    }
     yr_log(y, "system variables: table for versions %u to %u\n", best->minVersion, best->maxVersion);
 }
 
@@ -150,6 +155,13 @@ YVal yr_sys_get(YR *y, YTask *t, const YSysVar *s, int n, const i64 *sub) {
     case S_ARGC: return yv_int(0);
     case S_ARGV: return yv_str("");
     case S_LISTNUM: return yv_int(y->argc);
+    case S_REF_INT: case S_REF_STR: {
+        if (n < 1) return s->kind == S_REF_STR ? yv_str("") : yv_int(0);
+        YVar *v = yr_var(y, (u32)((u64)sub[0] >> 32));
+        long i = (long)(u32)sub[0] + (n >= 2 ? (long)sub[1] : 0);
+        if (!v || i < 0 || (u32)i >= v->count) return s->kind == S_REF_STR ? yv_str("") : yv_int(0);
+        return yr_var_get(v, i);
+    }
     case S_LIST: {
         int i = n ? (int)sub[0] : 0;
         return yv_str(i >= 0 && i < y->argc ? y->argv[i] : "");

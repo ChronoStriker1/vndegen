@@ -134,7 +134,13 @@ static int product(YCall *c) {
         free(folder);
         return YR_NEXT;
     }
-    set_result(c, yv_int(com == 29 ? 1 : 0));
+    if (com == 22) set_result(c, yv_int(yr_product_lex(c)));
+    else if (com == 23) set_result(c, yv_int(yr_product_lines(c)));
+    else {
+        YRef out;
+        bool text = yc_ref(c, "LET", &out) && out.var && out.var->t == YT_STR;
+        set_result(c, text ? yv_str("") : yv_int(com == 29 ? 1 : 0));
+    }
     return YR_NEXT;
 }
 

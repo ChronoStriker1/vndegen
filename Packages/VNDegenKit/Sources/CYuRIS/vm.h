@@ -96,6 +96,7 @@ struct YR {
     i64 startUnix;
     bool paused, quit;
     int fps;
+    bool lexComment;
     double stepCarry;
     bool fullscreen;
     bool unknownSeen[C_COUNT];
@@ -146,6 +147,7 @@ void yr_fail(YR *y, const char *fmt, ...);
 // ---- expr.c ----
 YVal yr_eval(YR *y, YTask *t, const u8 *p, u32 n);
 bool yr_lvalue(YR *y, YTask *t, const u8 *p, u32 n, YRef *out);
+i64 yr_ref_value(u32 vid, long index);
 YVal yr_ref_get(YR *y, YTask *t, const YRef *r);
 void yr_ref_set(YR *y, YTask *t, const YRef *r, const YVal *v);
 u8 yr_ref_type(YR *y, const YRef *r);
@@ -174,6 +176,8 @@ void yr_sys_set(YR *y, YTask *t, const YSysVar *s, int n, const i64 *sub, const 
 // ---- commands (cmd_*.c). Each returns YR_NEXT, YR_JUMPED, YR_YIELD or YR_STOP. ----
 int yr_cmd_vars(YCall *c, int id);      // INT, FLT, STR, S_*, F_*, G_*, LET, VARACT, VARINFO, MATH
 int yr_cmd_system(YCall *c, int id);    // WAIT, END, INPUT, MOUSE, FPS, SYSTEM, WINDOW, FILE*, SAVE, LOAD, ...
+int yr_product_lex(YCall *c);
+int yr_product_lines(YCall *c);
 int yr_cmd_text(YCall *c, int id);      // _, WORD, RETURNCODE, TEXT, TEXTINFO, FONT, FONTINFO
 int yr_cmd_cg(YCall *c, int id);        // CG, CGACT, CGEND, CGINFO
 int yr_cmd_sound(YCall *c, int id);     // SOUND, SOUNDEND, SOUNDINFO, MOVIE...

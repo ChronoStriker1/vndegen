@@ -87,7 +87,10 @@ static char *expr(YR *y, const u8 *p, u32 n) {
         if (t && sn < 256) st[sn++] = t;
         else free(t);
     }
-    while (nm) free(markName[--nm]);
+    for (int i = 0; i < nm; i++) {
+        if (marks[i] == sn && sn < 256) st[sn++] = markName[i];
+        else free(markName[i]);
+    }
     char *r = strdup("");
     for (int i = 0; i < sn; i++) {
         char *x = cat(r, i ? " ; " : "", st[i]);

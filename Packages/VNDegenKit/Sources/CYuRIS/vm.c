@@ -57,7 +57,7 @@ void yr_task_free(YTask *t) {
 
 YTask *yr_task_find(YR *y, const char *id) {
     for (int i = 0; i < y->taskCount; i++)
-        if (y->tasks[i]->alive && !strcasecmp(y->tasks[i]->id, id)) return y->tasks[i];
+        if (y->tasks[i]->alive && !yr_name_ncmp(y->enc, y->tasks[i]->id, id, SIZE_MAX)) return y->tasks[i];
     return NULL;
 }
 

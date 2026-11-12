@@ -43,6 +43,8 @@ enum { YR_SJIS = 0, YR_UTF8 = 1 };
 int yr_char_len(int enc, const u8 *p);              // bytes in the character at p (1 at a NUL)
 int yr_char_decode(int enc, const u8 *p, u32 *cp);  // as yr_char_len, with the Unicode code point
 char *yr_to_utf8(int enc, const char *s);           // malloc'd
+char *yr_from_utf8(int enc, const char *s);
+int yr_name_ncmp(int enc, const char *a, const char *b, size_t n);
 int yr_sjis_decode(const u8 *p, u32 *cp);
 
 u8 *yr_snappy_decode(const u8 *src, size_t n, size_t *outLen);
@@ -189,6 +191,7 @@ typedef enum YSys {
     S_CODE_MOUSE,
     S_PAD, S_PADNUM, S_CODE_PAD,
     S_LIST, S_LISTNUM,
+    S_REF_INT, S_REF_STR,
     S_OTHER
 } YSys;
 

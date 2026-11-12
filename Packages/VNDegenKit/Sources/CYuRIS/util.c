@@ -114,10 +114,34 @@ u32 yr_crc32(const u8 *data, size_t len) {
     return c ^ 0xffffffffu;
 }
 
+int yr_name_ncmp(int enc, const char *a, const char *b, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        u8 x = (u8)a[i], z = (u8)b[i];
+        if (enc == YR_SJIS && x == z && ((x >= 0x81 && x <= 0x9f) || (x >= 0xe0 && x <= 0xfc)) && x && i + 1 < n) {
+            i++;
+            if (a[i] != b[i]) return (u8)a[i] - (u8)b[i];
+            if (!a[i]) return 0;
+            continue;
+        }
+        if (x >= 'A' && x <= 'Z') x = (u8)(x - 'A' + 'a');
+        if (z >= 'A' && z <= 'Z') z = (u8)(z - 'A' + 'a');
+        if (x != z) return x - z;
+        if (!x) return 0;
+    }
+    return 0;
+}
+
 void yr_key(char *out, size_t size, const char *s) {
     size_t i = 0;
     for (; s[i] && i + 1 < size; i++) {
         char c = s[i];
+        u8 b = (u8)c;
+        if (((b >= 0x81 && b <= 0x9f) || (b >= 0xe0 && b <= 0xfc)) && s[i + 1] && i + 2 < size) {
+            out[i] = c;
+            i++;
+            out[i] = s[i];
+            continue;
+        }
         if (c == '\\') c = '/';
         else if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
         out[i] = c;
@@ -182,6 +206,38 @@ int yr_char_decode(int enc, const u8 *p, u32 *cp) {
 int yr_char_len(int enc, const u8 *p) {
     u32 cp;
     return yr_char_decode(enc, p, &cp);
+}
+
+static u16 *sjis_reverse;
+
+static void build_sjis_reverse(void) {
+    sjis_reverse = yr_alloc(sizeof(u16) * 0x10000);
+    for (int lead = 0; lead < 60; lead++) {
+        for (int t = 0; t < 189; t++) {
+            u16 cp = yr_sjis_table[lead * 189 + t];
+            if (!cp || sjis_reverse[cp]) continue;
+            int b1 = lead < 31 ? 0x81 + lead : 0xe0 + lead - 31;
+            sjis_reverse[cp] = (u16)(b1 << 8 | (0x40 + t));
+        }
+    }
+}
+
+char *yr_from_utf8(int enc, const char *s) {
+    if (enc == YR_UTF8) return yr_strdup(s);
+    if (!sjis_reverse) build_sjis_reverse();
+    size_t n = strlen(s);
+    char *out = yr_alloc(n * 2 + 1), *o = out;
+    const u8 *p = (const u8 *)s;
+    while (*p) {
+        u32 cp;
+        p += utf8_decode(p, &cp);
+        if (cp < 0x80) *o++ = (char)cp;
+        else if (cp >= 0xff61 && cp <= 0xff9f) *o++ = (char)(0xa1 + cp - 0xff61);
+        else if (cp < 0x10000 && sjis_reverse[cp]) { *o++ = (char)(sjis_reverse[cp] >> 8); *o++ = (char)(sjis_reverse[cp] & 0xff); }
+        else *o++ = '?';
+    }
+    *o = 0;
+    return out;
 }
 
 char *yr_to_utf8(int enc, const char *s) {

@@ -14,8 +14,13 @@ typedef struct Stack {
     int n;
     int marks[16];    // stack heights where open array references began
     u32 markVid[16];
+    bool markRef[16];
     int nmarks;
 } Stack;
+
+static bool is_ref(u8 sigil) { return sigil == '#' || sigil == '`'; }
+
+i64 yr_ref_value(u32 vid, long index) { return (i64)vid << 32 | (i64)(u32)index; }
 
 static void push(Stack *s, YVal v) {
     if (s->n < STACK) s->v[s->n++] = v;
@@ -130,12 +135,13 @@ static void run(YR *y, YTask *t, const u8 *p, u32 n, Stack *s) {
         }
         case 'M': push(s, yv_str_own(strip_quotes(d, len))); break;
         case 'H':
-            if (len >= 3) push(s, var_value(y, t, yr_le16(d + 1), 0, NULL));
+            if (len >= 3) push(s, is_ref(d[0]) ? yv_int(yr_ref_value(yr_le16(d + 1), 0)) : var_value(y, t, yr_le16(d + 1), 0, NULL));
             break;
         case 'V':
         case 'v':
             if (len >= 3 && s->nmarks < 16) {
                 s->marks[s->nmarks] = s->n;
+                s->markRef[s->nmarks] = is_ref(d[0]);
                 s->markVid[s->nmarks++] = yr_le16(d + 1);
             }
             break;
@@ -151,7 +157,13 @@ static void run(YR *y, YTask *t, const u8 *p, u32 n, Stack *s) {
                     yv_free(&s->v[i]);
                 }
                 s->n = base;
-                push(s, var_value(y, t, vid, k, sub));
+                if (s->markRef[s->nmarks]) {
+                    YVar *v = yr_var(y, vid);
+                    long index = v ? yr_var_index(v, k, sub) : -1;
+                    push(s, yv_int(yr_ref_value(vid, index < 0 ? 0 : index)));
+                } else {
+                    push(s, var_value(y, t, vid, k, sub));
+                }
             }
             break;
         case 'R': {
