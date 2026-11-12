@@ -61,8 +61,8 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 
 | Game | State |
 |---|---|
-| Another Way of Gettin' Paid | Language picker, title, story with text, backgrounds, characters, music and voice, save and load. PC saves move both ways |
-| How to Raise Your Slime Girl | Title, story with Japanese text, music, save and load. PC saves move both ways |
+| Another Way of Gettin' Paid | Language picker, title, story with text, backgrounds, characters, music and voice, backlog, Config, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways |
+| How to Raise Your Slime Girl | Title, story with Japanese text, choices, music, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways |
 | MA☆KO HUNTER | Ethics notice, logo and title. Its English copy's menu labels show in Japanese |
 | Saimin Seishidou -Secret Lesson- | Title, in Japanese: its English text comes from a hook library beside the PC exe, which VNDegen doesn't load |
 | Saimin Gakushū: Secret Desire | Lists its story files, then stops: its engine (555) reads them with TEXT[FILE=] and parses them with undocumented PRODUCT commands |
@@ -101,6 +101,7 @@ script and drawing time per frame.
 - SOUND's PITCH is kept but not applied. Volume follows a square curve, close to the PC's but not measured.
 - CG masks (MID) aren't drawn. CGACT's ROTATION, DIFFUSION, WHIRLPOOL, RASTER and TRIM aren't built; none of the
   running games uses them. Rule transitions use a fixed soft edge.
+- On the touch gamepad, LB's Wheel ↑ doesn't open Another Way of Gettin' Paid's backlog on an iPad simulator, though a mouse wheel does on Linux; its backlog button does.
 - WINDOW and WINDOWINFO answer for one window the size of the game; window position, menus and sub-windows aren't
   there. DIALOG answers as if its first button were pressed.
 - Layer images in saves use the 1520-byte header for formats 192 and 312 and the 1600-byte one from 480 on; format 312
