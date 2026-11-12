@@ -101,7 +101,6 @@ script and drawing time per frame.
 - SOUND's PITCH is kept but not applied. Volume follows a square curve, close to the PC's but not measured.
 - CG masks (MID) aren't drawn. CGACT's ROTATION, DIFFUSION, WHIRLPOOL, RASTER and TRIM aren't built; none of the
   running games uses them. Rule transitions use a fixed soft edge.
-- On the touch gamepad, LB's Wheel ↑ doesn't open Another Way of Gettin' Paid's backlog on an iPad simulator, though a mouse wheel does on Linux; its backlog button does.
 - WINDOW and WINDOWINFO answer for one window the size of the game; window position, menus and sub-windows aren't
   there. DIALOG answers as if its first button were pressed.
 - Layer images in saves use the 1520-byte header for formats 192 and 312 and the 1600-byte one from 480 on; format 312
