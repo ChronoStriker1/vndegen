@@ -18,6 +18,14 @@ import VNCore
         #expect(layout?.evidence == "Game/bgm.ypf")
     }
 
+    @Test func findsTheScriptArchiveWithoutAConfig() {
+        let layout = YuRISLayout(probe(["09 Game", "09 Game/ysbin.ypf", "09 Game/cg.ypf", "09 Game/game.exe"]))
+        #expect(layout?.root == "09 Game")
+        #expect(layout?.evidence == "09 Game/ysbin.ypf")
+        #expect(YuRISLayout(probe(["pac/YSBIN.YPF", "pac/cg.ypf"]))?.root == "")
+        #expect(YuRISLayout(probe(["a/b/c/ysbin.ypf"])) == nil)
+    }
+
     @Test func wantsTheConfigAndAnArchive() {
         #expect(YuRISLayout(probe(["yscfg.dat", "data.pak"])) == nil)
         #expect(YuRISLayout(probe(["pac/bn.ypf"])) == nil)
