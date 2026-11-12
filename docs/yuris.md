@@ -76,7 +76,8 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 Saves are the PC engine's `.sd` files in the game's `save` folder (`$_SAVE_PATH` is `save\`). A file starts with `YSSD`,
 a format number (192 for engine 0.466, 312 for 0.474 to 0.479, 480 for 0.488 and the 0.495 SDK, 481 for Another Way of
 Gettin' Paid's engine), the record count and a table of 1024 data numbers. Each record is a variable (type,
-dimensions, values), a layer image (the engine's own layer header, 1520 or 1600 bytes, then BGRA pixels), or a group of
+dimensions, values), a layer image (the engine's own layer header, 1520 bytes in format 192, 1536 in 312 and
+1600 from 480 on, then BGRA pixels), or a group of
 global variables by class (`SAVE[DNO=n G_INT2=1]`; the class is the flag byte in `ysv.ybn`). Format 481 compresses
 variables with Snappy and images with zlib; the others use zlib throughout. Formats from 480 on store each variable's
 id. `SAVE[MEM=n]` keeps a log snapshot in memory, and `SAVE[MEM=99999]` writes all 500 snapshots into data number
@@ -87,7 +88,8 @@ letter pairs: the open IF blocks, the GOSUB frames with their return point, the 
 instruction and the script's file name. Formats 192 and 312 have a 16-bit GOSUB count and one more byte before the
 resume point.
 
-Checked under Wine, both ways: Another Way of Gettin' Paid (format 481) and How to Raise Your Slime Girl (192). A slot
+Checked under Wine, both ways: Another Way of Gettin' Paid (format 481), MA☆KO HUNTER (312) and How to Raise Your
+Slime Girl (192). A slot
 saved by the original engine loads in VNDegen and play continues, and a slot VNDegen saved shows in the original's
 load screen with its thumbnail, loads and plays on.
 

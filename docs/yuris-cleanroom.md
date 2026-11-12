@@ -60,9 +60,10 @@ YPF-Manager, RxYuris or yu-ris-ext-ybn. This file lists where each part's knowle
   481 engine's Snappy records. `$_SAVE_PATH` and the other path variables were read the same way.
 - **Script positions.** TASKINFO SCRIPTPOS strings were saved by probe scripts at known instructions, inside IF
   blocks, loops and GOSUBs, under the three SDK engines, and the layout was fitted until every sample decoded.
-- **The games' engines under Wine.** Another Way of Gettin' Paid's and How to Raise Your Slime Girl's own `.exe` were
-  run in a private Wine prefix with no network, as black boxes, to compare screens, to make PC saves and to load
-  VNDegen's saves.
+- **The games' engines under Wine.** Another Way of Gettin' Paid's, MA☆KO HUNTER's and How to Raise Your Slime Girl's
+  own `.exe` were run in a private Wine prefix with no network, as black boxes, to compare screens, to make PC saves
+  and to load VNDegen's saves. MA☆KO HUNTER's engine rejected VNDegen's first save at the thumbnail layer, which is how
+  the 1536-byte layer header of format 312 was found.
 
 ## Open questions and how they were settled
 
