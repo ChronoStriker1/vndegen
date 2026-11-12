@@ -72,6 +72,8 @@ char *yr_scriptpos_get(YR *y, YTask *t) {
         emit_u32(&o, ifs[i]);
         emit_u32(&o, ends[i]);
     }
+    bool old = yr_save_version(y) < 400;
+    if (old) emit_byte(&o, (u32)(t->depth - 1) >> 8);
     emit_byte(&o, (u32)(t->depth - 1));
     for (int d = 1; d < t->depth; d++) {
         emit_byte(&o, d < 64 ? (u32)ifsAfter[d - 1] : 0);
@@ -88,8 +90,9 @@ char *yr_scriptpos_get(YR *y, YTask *t) {
         emit_u32(&o, (u32)l->lc);
         emit_u32(&o, (u32)l->count);
     }
+    if (old) emit_byte(&o, 0);
     emit_u32(&o, 0);
-    emit_u32(&o, t->ip);
+    emit_u32(&o, t == y->cur ? t->ip + 1 : t->ip);
     const char *name = t->script < y->scriptCount ? y->scripts[t->script].name : "";
     emit_u32(&o, (u32)strlen(name));
     emit(&o, name, strlen(name));
@@ -123,7 +126,9 @@ bool yr_scriptpos_set(YR *y, YTask *t, const char *pos) {
     In in = { (const u8 *)pos + 8, (const u8 *)pos + n, false };
     u32 nif = read_byte(&in);
     for (u32 i = 0; i < nif && !in.bad; i++) { read_byte(&in); read_u32(&in); read_u32(&in); }
+    bool old = yr_save_version(y) < 400;
     u32 nframes = read_byte(&in);
+    if (old) nframes = nframes << 8 | read_byte(&in);
     YFrame frames[256];
     for (u32 i = 0; i < nframes && i < 256 && !in.bad; i++) {
         memset(&frames[i], 0, sizeof frames[i]);
@@ -139,6 +144,7 @@ bool yr_scriptpos_set(YR *y, YTask *t, const char *pos) {
         u32 start = read_u32(&in), end = read_u32(&in), lc = read_u32(&in), count = read_u32(&in);
         loops[i] = (YLoop){ 0, start ? start - 1 : 0, end, (i64)(int32_t)count, (i64)lc };
     }
+    if (old) read_byte(&in);
     read_u32(&in);
     u32 ip = read_u32(&in), len = read_u32(&in);
     if (in.bad || nframes > 255 || nloops > 255 || in.p + len > in.end) return false;

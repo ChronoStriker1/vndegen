@@ -490,7 +490,7 @@ int yr_cmd_task(YCall *c, int id) {
             if (pos) {
                 bool ok = yr_scriptpos_set(y, t, pos);
                 free(pos);
-                if (!ok) yr_log(y, "TASK: unreadable SCRIPTPOS\n");
+                if (!ok) yr_log(y, "TASK: unreadable SCRIPTPOS (%zu bytes) %.120s\n", strlen(pos), strlen(pos) > 8 ? pos + 8 : pos);
                 else if (t == c->t) { free(tid); return YR_JUMPED; }
             }
         }

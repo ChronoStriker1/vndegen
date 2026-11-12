@@ -177,6 +177,7 @@ void yr_snd_close(YR *y);
 void yr_snd_mix(YR *y, float *out, int frames);
 void yr_save_close(YR *y);
 
+u32 yr_save_version(YR *y);
 char *yr_scriptpos_get(YR *y, YTask *t);
 bool yr_scriptpos_set(YR *y, YTask *t, const char *pos);
 

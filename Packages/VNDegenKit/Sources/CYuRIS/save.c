@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include <zlib.h>
 
+static u32 file_version(YR *y);
+
 enum { SLOTS = 1024, KIND_VAR = 0, KIND_LAYER = 1, KIND_GROUP = 2 };
 
 typedef struct Rec {
@@ -50,6 +52,8 @@ static const LayerFormat layerFormats[] = {
     { 192, 1520, 104, 108, fields192, 6 },
     { 480, 1600, 120, 124, fields480, 12 },
 };
+
+u32 yr_save_version(YR *y) { return file_version(y); }
 
 static u32 file_version(YR *y) {
     u32 v = y->scriptVersion;
@@ -272,7 +276,8 @@ static Buf group_payload(YR *y, u8 cls, u8 type) {
         Buf part = var_payload(v, -1);
         u32 clen;
         u8 *z = pack(part.p, part.n, file_version(y) == 481, &clen);
-        u8 head[12] = { KIND_VAR, 1, (u8)id, (u8)(id >> 8) };
+        u16 vid = file_version(y) >= 480 ? (u16)id : 0;
+        u8 head[12] = { KIND_VAR, 1, (u8)vid, (u8)(vid >> 8) };
         memcpy(head + 4, &(u32){ (u32)clen }, 4);
         memcpy(head + 8, &(u32){ (u32)part.n }, 4);
         put(&b, head, 12);
@@ -377,8 +382,9 @@ static Buf build_file(YR *y, const RecList *l) {
         memcpy(head, &r->dno, 4);
         head[4] = r->kind;
         head[5] = 1;
-        head[6] = (u8)r->vid;
-        head[7] = (u8)(r->vid >> 8);
+        u16 vid = file_version(y) >= 480 ? r->vid : 0;
+        head[6] = (u8)vid;
+        head[7] = (u8)(vid >> 8);
         if (r->kind == KIND_GROUP || r->dno == MEM_DNO) {
             memcpy(head + 8, &r->size, 4);
             u32 total = 0;
