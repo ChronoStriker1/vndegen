@@ -65,6 +65,14 @@ YPF-Manager, RxYuris or yu-ris-ext-ybn. This file lists where each part's knowle
   and to load VNDegen's saves. MA☆KO HUNTER's engine rejected VNDegen's first save at the thumbnail layer, which is how
   the 1536-byte layer header of format 312 was found; Saimin Gakushū's did the same for engine 555's 1680-byte header, and Kaizou Shoujo's crashed on
   engine 473's, which keeps the size where 474 doesn't.
+- **Engine 406.** Its system variable ids were mapped to 0.466's by aligning the same ERIS routines in a 406 game and a
+  466 game. Its 992-byte layer header was read from a save its own exe wrote.
+- **YCG images.** The header (`YCG\0`, size, method, a table of zlib parts with row ranges) was read from Saint Dorei
+  Gakuen 2's files and checked by decoding its sprites.
+- **Transparent pixels in CGINFO.** Probe scripts on the SDK 0.479 engine showed that COLOR, ONMOUSE and ONMOUSE3 read
+  a pixel with alpha 0 as RGB 0x808080 whatever its stored colour, and any other alpha as stored.
+- **Loose files over archives.** Saint Dorei Gakuen 2's own exe shows the English text of its loose `ysbin/` files over
+  the Japanese archives, so loose files take precedence.
 - **Engine 555's scenario helpers.** Saimin Gakushū ships its scenario lexer as script (`es.SCENARIO.LEXER`) beside
   the PRODUCT 22 call that replaces it, so PRODUCT 22 follows the script rule for rule. The meaning of `#` and the
   backquote before an array element, and of system variables 50 and 52, came from how the game's scripts use them.

@@ -18,6 +18,7 @@ typedef struct YEntry {
     u32 size, csize;
     u64 offset;
     u64 order;
+    char *loose;
 } YEntry;
 
 typedef struct YArchive { char *path; FILE *f; } YArchive;
@@ -55,6 +56,7 @@ static void put(YFS *fs, YEntry e) {
     if (s->key) {
         e.order = s->order;
         free(s->key);
+        free(s->loose);
         fs->used--;
     }
     *s = e;
@@ -111,7 +113,7 @@ static bool scan(YFS *fs, u16 arc, const u8 *dir, size_t dirSize, u32 count, int
             for (int j = 0; j < n; j++) name[j] = (char)(p[5 + j] ^ key);
             name[n] = 0;
             yr_key(k, sizeof k, name);
-            YEntry e = { yr_strdup(k), arc, q[1], yr_le32(q + 2), yr_le32(q + 6), 0, (u64)arc << 32 | i };
+            YEntry e = { yr_strdup(k), arc, q[1], yr_le32(q + 2), yr_le32(q + 6), 0, (u64)arc << 32 | i, NULL };
             e.offset = tail == 12 ? yr_le64(q + 10) : yr_le32(q + 10);
             put(fs, e);
         }
@@ -182,6 +184,39 @@ static void collect(const char *dir, char ***list, int *n) {
     closedir(d);
 }
 
+static YEntry *find_entry(YR *y, const char *key);
+
+static int override_loose(YR *y, const char *dir, const char *rel, int depth) {
+    DIR *d = opendir(dir);
+    if (!d) return 0;
+    int n = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (e->d_name[0] == '.') continue;
+        char *path = yr_path(dir, e->d_name);
+        char sub[1024];
+        snprintf(sub, sizeof sub, "%s%s%s", rel, *rel ? "/" : "", e->d_name);
+        struct stat st;
+        if (stat(path, &st) == 0) {
+            if (S_ISDIR(st.st_mode)) {
+                if (depth < 6 && strcasecmp(e->d_name, "save")) n += override_loose(y, path, sub, depth + 1);
+            } else if (S_ISREG(st.st_mode)) {
+                char key[1024];
+                yr_key(key, sizeof key, sub);
+                YEntry *hit = find_entry(y, key);
+                if (hit) {
+                    free(hit->loose);
+                    hit->loose = yr_strdup(path);
+                    n++;
+                }
+            }
+        }
+        free(path);
+    }
+    closedir(d);
+    return n;
+}
+
 bool yr_fs_open(YR *y) {
     y->fs = yr_alloc(sizeof(YFS));
     char **list = NULL;
@@ -192,6 +227,8 @@ bool yr_fs_open(YR *y) {
     qsort(list, (size_t)n, sizeof(char *), archive_order);
     for (int i = 0; i < n; i++) { add_archive(y, list[i]); free(list[i]); }
     free(list);
+    int loose = override_loose(y, y->gameDir, "", 0);
+    if (loose) yr_log(y, "loose files replace %d archive entries\n", loose);
     return true;
 }
 
@@ -200,7 +237,7 @@ void yr_fs_close(YR *y) {
     if (!fs) return;
     for (int i = 0; i < fs->arcCount; i++) { fclose(fs->arcs[i].f); free(fs->arcs[i].path); }
     free(fs->arcs);
-    for (u32 i = 0; i < fs->cap; i++) free(fs->table[i].key);
+    for (u32 i = 0; i < fs->cap; i++) { free(fs->table[i].key); free(fs->table[i].loose); }
     free(fs->table);
     free(fs);
     y->fs = NULL;
@@ -213,6 +250,10 @@ void yr_file_free(YFile *f) {
 }
 
 static bool read_entry(YR *y, const YEntry *e, YFile *out) {
+    if (e->loose) {
+        out->data = yr_read_file(e->loose, &out->size);
+        return out->data != NULL;
+    }
     YArchive *a = &y->fs->arcs[e->arc];
     u8 *raw = yr_alloc(e->csize + 1);
     if (fseeko(a->f, (off_t)e->offset, SEEK_SET) != 0 || fread(raw, 1, e->csize, a->f) != e->csize) {
@@ -237,7 +278,7 @@ static bool read_entry(YR *y, const YEntry *e, YFile *out) {
     return true;
 }
 
-static const YEntry *find_entry(YR *y, const char *key) {
+static YEntry *find_entry(YR *y, const char *key) {
     YFS *fs = y->fs;
     if (!fs->cap) return NULL;
     YEntry *s = slot(fs, key);
