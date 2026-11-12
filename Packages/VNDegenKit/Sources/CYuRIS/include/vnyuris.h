@@ -1,6 +1,6 @@
 // VNDegen's YU-RIS runtime. A clean-room implementation; docs/yuris-cleanroom.md lists its sources.
 //
-// The runtime has no threads and no platform code. The host calls vny_frame about 60 times a second, shows the frame
+// The runtime has no threads and no platform code. The host calls vny_frame, shows the frame
 // it returns, sends input, and pulls audio. All calls for one VNY must come from one thread, except vny_audio, which
 // may run on the audio thread. Text uses the shared Windows font pack (vnfont.h), which the host initializes.
 #ifndef VNYURIS_H

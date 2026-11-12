@@ -1,5 +1,5 @@
 // Runs a YU-RIS game headless for testing: replays scripted input and writes frames as PPM files.
-//   yrrun <gameDir> [--ms N] [--save DIR] [--log FILE] [--time UNIX] [--final FILE.ppm] [events...]
+//   yrrun <gameDir> [--ms N] [--hz N] [--save DIR] [--log FILE] [--time UNIX] [--final FILE.ppm] [events...]
 // Events, by time in ms: T:key:VK, T:keydown:VK, T:keyup:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:wheel:N, T:shot:FILE.ppm
 // The game clock starts at --time, 2026-01-01 by default, so a run replays the same way.
 #include "vnyuris.h"
@@ -30,12 +30,13 @@ int main(int argc, char **argv) {
     cfg.gameDir = argv[1];
     cfg.audioRate = 44100;
     cfg.startTime = 1767225600;   // 2026-01-01
-    int ms = 5000;
+    int ms = 5000, hz = 60;
     const char *final = NULL, *wavPath = NULL;
     Ev ev[256];
     int nev = 0;
     for (int i = 2; i < argc; i++) {
         if (!strcmp(argv[i], "--ms") && i + 1 < argc) ms = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--hz") && i + 1 < argc) hz = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--save") && i + 1 < argc) cfg.saveDir = argv[++i];
         else if (!strcmp(argv[i], "--log") && i + 1 < argc) cfg.logPath = argv[++i];
         else if (!strcmp(argv[i], "--time") && i + 1 < argc) cfg.startTime = atoll(argv[++i]);
@@ -57,6 +58,7 @@ int main(int argc, char **argv) {
     VNY *g = vny_open(&cfg, err, sizeof err);
     if (!g) { fprintf(stderr, "open failed: %s\n", err); return 1; }
     int t = 0, frame = 16;
+    long frameNo = 0;
     FILE *wav = wavPath ? fopen(wavPath, "wb") : NULL;
     if (wav) { unsigned char h[44] = { 0 }; fwrite(h, 1, 44, wav); }
     long wavFrames = 0;
@@ -64,6 +66,8 @@ int main(int argc, char **argv) {
     float abuf[4096 * 2];
     bool alive = true;
     while (t < ms && alive) {
+        frame = (int)((frameNo + 1) * 1000 / hz - frameNo * 1000 / hz);
+        frameNo++;
         for (int i = 0; i < nev; i++) {
             Ev *e = &ev[i];
             if (e->t < t || e->t >= t + frame) continue;

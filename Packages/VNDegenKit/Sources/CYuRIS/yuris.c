@@ -93,23 +93,31 @@ bool vny_frame(VNY *v, uint32_t elapsedMs) {
     if (y->quit) return false;
     if (y->paused) return true;
     y->clock += elapsedMs;
-    y->frameNo++;
     yr_movie_tick(y, elapsedMs);
-    if (y->profile) {
-        struct timespec a, b, c;
-        clock_gettime(CLOCK_MONOTONIC, &a);
+    double step = 1000.0 / y->fps;
+    y->stepCarry += elapsedMs;
+    int steps = (int)(y->stepCarry / step + 0.5);
+    if (steps > 4) {
+        steps = 4;
+        y->stepCarry = 0;
+    } else {
+        y->stepCarry -= steps * step;
+    }
+    struct timespec a, b, c;
+    if (y->profile) clock_gettime(CLOCK_MONOTONIC, &a);
+    for (int i = 0; i < steps && !y->quit; i++) {
+        y->frameNo++;
         yr_vm_step(y);
-        clock_gettime(CLOCK_MONOTONIC, &b);
-        yr_gfx_present(y);
+    }
+    if (y->profile) clock_gettime(CLOCK_MONOTONIC, &b);
+    yr_gfx_present(y);
+    if (y->profile) {
         clock_gettime(CLOCK_MONOTONIC, &c);
         double vm = (double)(b.tv_sec - a.tv_sec) * 1e3 + (double)(b.tv_nsec - a.tv_nsec) / 1e6;
         double gx = (double)(c.tv_sec - b.tv_sec) * 1e3 + (double)(c.tv_nsec - b.tv_nsec) / 1e6;
         y->profVm += vm;
         y->profGfx += gx;
         if (vm + gx > y->profWorst) y->profWorst = vm + gx;
-    } else {
-        yr_vm_step(y);
-        yr_gfx_present(y);
     }
     return !y->quit;
 }
