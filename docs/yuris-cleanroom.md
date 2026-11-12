@@ -61,9 +61,10 @@ YPF-Manager, RxYuris or yu-ris-ext-ybn. This file lists where each part's knowle
 - **Script positions.** TASKINFO SCRIPTPOS strings were saved by probe scripts at known instructions, inside IF
   blocks, loops and GOSUBs, under the three SDK engines, and the layout was fitted until every sample decoded.
 - **The games' engines under Wine.** Another Way of Gettin' Paid's, MA☆KO HUNTER's, Saimin Seishidou's, Saimin
-  Gakushū's and How to Raise Your Slime Girl's own `.exe` were run in a private Wine prefix with no network, as black boxes, to compare screens, to make PC saves
+  Gakushū's, Kaizou Shoujo's and How to Raise Your Slime Girl's own `.exe` were run in a private Wine prefix with no network, as black boxes, to compare screens, to make PC saves
   and to load VNDegen's saves. MA☆KO HUNTER's engine rejected VNDegen's first save at the thumbnail layer, which is how
-  the 1536-byte layer header of format 312 was found; Saimin Gakushū's did the same for engine 555's 1680-byte header.
+  the 1536-byte layer header of format 312 was found; Saimin Gakushū's did the same for engine 555's 1680-byte header, and Kaizou Shoujo's crashed on
+  engine 473's, which keeps the size where 474 doesn't.
 - **Engine 555's scenario helpers.** Saimin Gakushū ships its scenario lexer as script (`es.SCENARIO.LEXER`) beside
   the PRODUCT 22 call that replaces it, so PRODUCT 22 follows the script rule for rule. The meaning of `#` and the
   backquote before an array element, and of system variables 50 and 52, came from how the game's scripts use them.
