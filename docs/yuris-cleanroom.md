@@ -13,6 +13,7 @@ YPF-Manager, RxYuris or yu-ris-ext-ybn. This file lists where each part's knowle
 | The games' own files (`.ypf` archives, `ysbin/*.ybn`, CGs, sound, `yscfg.dat`) | The player's copies | Archive, script, variable and label layouts, read from the files |
 | The original engines run under Wine as black boxes | The games' engines and the SDK's engine | The save file format and command behaviour the manual leaves open |
 | GARbro, `ArcFormats/YuRis/ArcYPF.cs` and `ImageYCG.cs` (morkt/GARbro b09ee45, 2023-10-27) | MIT | The `.ypf` directory layout, its name-length swap table, and the YSTB XOR sections |
+| Snappy's format description (`format_description.txt` in google/snappy) | BSD 3-clause; its text only, no code | The compressed form of Another Way of Gettin' Paid's save records, recognized from their bytes; the runtime's decoder and encoder are written from the description |
 | YuRISTools, `YuRISLib/Package/YPF.cs`, `CheckSum.cs` and `YuRISLib/Script/*.cs` (fengberd/YuRISTools 0c5ac2d, 2021-06-04) | MIT | The YSCM, YSTB and YSER layouts, MurmurHash2 as the archive name hash, and the `M` string argument form |
 
 ## How each part was built
@@ -41,6 +42,27 @@ YPF-Manager, RxYuris or yu-ris-ext-ybn. This file lists where each part's knowle
   0xEFF0, 0xEFF2 and 0xEFF3 (ERIS `macro.yst`).
 - **Commands.** Keyword meanings come from the SDK manual (0.479 and 0.495 HTML). Undocumented CG keywords (FX, FBX,
   FCX, FRZ, F and others) were read from how ERIS's camera code sets them; LINT and BNO likewise.
+
+- **ERIS.** The games' menus are ERIS, the SDK's system scripts, shipped as source in the SDK. They were read to
+  learn what each command must do for them, such as VARACT PUSH and POP taking the array position as their value
+  (`es_Button.yst`, `ES_LogSet.yst`), CGINFO ONMOUSE testing a hidden layer, and the button tables' flow.
+- **MATH3D.** Undocumented; ERIS calls it for sprite placement. Measured with probe scripts under the 0.495 SDK engine
+  in Wine, 37 cases each changing one input, with the outputs saved by SAVE and read back: zoom is
+  2^((DEFZ - (z - camera z)) / 100) times the layer's base zoom, and the position follows from the window center, the
+  background and layer offsets, the camera and the scaled center. UI layers skip the camera. The formula reproduces
+  every case.
+- **CGACT TRANSITION** and **MERGE with X and Y.** From how ERIS's sprite and font code call them (`es_Sprite.yst`,
+  the games' `es_Font.yst`): TRANSITION shows ID through the rule image ID2 at progress SET into ID3, and MERGE places
+  the source at X and Y.
+- **Saves.** The `.sd` layout was read from files the engines wrote for probe scripts with known values (0.495, 0.479
+  and 0.466 SDK engines under Wine), and from the save files the test games' own engines wrote under Wine: record
+  table, variable records, layer records, grouped global variables, log snapshots under data number 1024, and the
+  481 engine's Snappy records. `$_SAVE_PATH` and the other path variables were read the same way.
+- **Script positions.** TASKINFO SCRIPTPOS strings were saved by probe scripts at known instructions, inside IF
+  blocks, loops and GOSUBs, under the three SDK engines, and the layout was fitted until every sample decoded.
+- **The games' engines under Wine.** Another Way of Gettin' Paid's and How to Raise Your Slime Girl's own `.exe` were
+  run in a private Wine prefix with no network, as black boxes, to compare screens, to make PC saves and to load
+  VNDegen's saves.
 
 ## Open questions and how they were settled
 

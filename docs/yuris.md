@@ -45,80 +45,63 @@ with the SDK. So a runtime that implements the commands runs the game's own menu
 
 ## Design
 
-The runtime follows the shape of the System 3 runtime, which works well with FrameHost:
-
 - `CYuRIS`, a C runtime with no threads and no platform code. Its interface, `include/vnyuris.h`, matches `vns3.h`:
   open a game folder, call `vny_frame` once per display refresh, read RGBA pixels and a frame serial, send Windows
   virtual keys and mouse events, pull float stereo audio on the audio thread, pause and quit.
-- `EngineYuRIS`, the Swift plugin: detection, a session on `FrameView` and `PCMAudioOutput`, input routing, save
-  locations, and the Keyboard and mouse layout, as `EngineAliceSoft` has.
-- `Engines/YuRIS/host`, a CMake build for Linux with a headless runner (scripted clicks and keys, frame dumps, save
-  and load) and an SDL player, used for most of the testing.
+- `EngineYuRIS`, the Swift plugin: detection, a session on `FrameView` and `PCMAudioOutput`, input routing as the System 3
+  plugin does, the game's `save` folder as its save location, and the Visual novel controller layout to start with.
+- `Engines/YuRIS/host`, a CMake build for Linux: `yrrun` runs a game headless with scripted clicks and keys, writes
+  frames and, with `--wav`, the sound it plays; `yrdis` disassembles a game's compiled scripts.
 
-Runtime parts:
+The runtime draws on the CPU into a 32-bit frame and redraws only when a layer changes. ERIS sends every button's
+attributes again each frame, so a CG command that changes nothing doesn't count. On the Linux host a frame of Another
+Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 
-| Part | What it covers |
+## What runs
+
+| Game | State |
 |---|---|
-| Files | `.ypf` archives of every layout the test games use, loose files, the engine's file priority, file name case through `casepath` |
-| Loader | YSCM, YSTB (with the per-game key), YSVR, YSLB, YSTL, YSCF |
-| VM | Expressions, INT, FLT and STR values and arrays up to 8 dimensions, global, local, system and per-call variables, IF, LOOP, GOSUB with parameters and return values, GO, labels, tasks with priorities, WAIT, macros as compiled |
-| Graphics | Layer tree with layer sets, Z order, position, scale, rotation, alpha, blend modes and clipping; PNG, JPEG and BMP through stb_image; the CGACT effects the test games use; screenshots for save thumbnails |
-| Text | FONT and TEXT through stb_truetype and the shared Windows font pack, Shift-JIS and UTF-8 strings, wrapping between English words |
-| Sound | SOUND with Ogg Vorbis (stb_vorbis) and WAV, volume, pan, fades and loops |
-| Movies | MOVIE for MA☆KO HUNTER's MPEG-1 files, through pl_mpeg as the NScripter runtime does |
-| Input | INPUT, MOUSE and the system variables for keys and the pointer |
-| Saves | SAVE and LOAD in the PC engine's file format, written where the PC version keeps them, checked against saves the original engine writes under Wine |
+| Another Way of Gettin' Paid | Language picker, title, story with text, backgrounds, characters, music and voice, save and load. PC saves move both ways |
+| How to Raise Your Slime Girl | Title, story with Japanese text, music, save and load. PC saves move both ways |
+| MA☆KO HUNTER | Starts, waits in its opening splash |
+| Saimin Seishidou -Secret Lesson- | Starts, nothing draws: engine 488 needs a system variable table of its own |
+| Saimin Gakushū: Secret Desire | Ends at once |
 
-Only commands and options the test games use get built. The rest are listed under Known limits.
+## Saves
 
-## Estimate
+Saves are the PC engine's `.sd` files in the game's `save` folder (`$_SAVE_PATH` is `save\`). A file starts with `YSSD`,
+a format number (192 for engine 0.466, 312 for 0.474 to 0.479, 480 for 0.488 and the 0.495 SDK, 481 for Another Way of
+Gettin' Paid's engine), the record count and a table of 1024 data numbers. Each record is a variable (type,
+dimensions, values), a layer image (the engine's own layer header, 1520 or 1600 bytes, then BGRA pixels), or a group of
+global variables by class (`SAVE[DNO=n G_INT2=1]`; the class is the flag byte in `ysv.ybn`). Format 481 compresses
+variables with Snappy and images with zlib; the others use zlib throughout. Formats from 480 on store each variable's
+id. `SAVE[MEM=n]` keeps a log snapshot in memory, and `SAVE[MEM=99999]` writes all 500 snapshots into data number
+1024 of the next file, each an embedded save file.
 
-Rough, for one developer working with the Linux host first:
+The script position ERIS saves (`TASKINFO SCRIPTPOS`) is the PC engine's string: an 8-byte prefix, then bytes as
+letter pairs: the open IF blocks, the GOSUB frames with their return point, the loops with their counters, the resume
+instruction and the script's file name. Formats 192 and 312 have a 16-bit GOSUB count and one more byte before the
+resume point.
 
-| Step | Time |
-|---|---|
-| Files, loader and a disassembler that reads every script of the 5 test games | 2 to 3 days |
-| VM, tasks and the commands the ERIS title screen needs | 1 to 2 weeks |
-| Graphics, text and sound to the title screens and first scenes | 1 to 2 weeks |
-| Saves in the PC format, checked under Wine | 3 to 5 days |
-| Movies, the remaining commands the games use, and per-game fixes | 1 to 2 weeks |
-| Swift plugin, Mac and iPad and iPhone builds, case check, frame rate check of the movies | 1 week |
+Checked under Wine, both ways: Another Way of Gettin' Paid (format 481) and How to Raise Your Slime Girl (192). A slot
+saved by the original engine loads in VNDegen and play continues, and a slot VNDegen saved shows in the original's
+load screen with its thumbnail, loads and plays on.
 
-That is 5 to 8 weeks in total. The biggest risk is CGACT, which has dozens of image effects; how many the games
-actually use decides a large part of the graphics time.
+## Debug switches
 
-## Status (2026-10-31, work in progress)
-
-Built so far, Linux host only, no Apple build yet:
-
-- `CYuRIS` reads every `.ypf` archive of the 5 test games, loads the compiled project (command table, scripts with
-  their key, variables with their initial values, labels, script list, config with screen size and window caption),
-  and detects UTF-8 games (Another Way of Gettin' Paid).
-- The script machine runs ERIS's startup code in 4 of the 5 games for 8 seconds without stopping: expressions,
-  variables and arrays, IF/ELSE/IFBLEND, LOOP, GOSUB and RETURN with parameters and results, GO, TASK, TASKEND and
-  TASKINFO, the variable commands (declarations, LET with compound operators, VARACT, VARINFO, MATH, LABELINFO),
-  text output into `$_TEXT` and `$_TEXT_FLAG`, DIALOG (logged), FILEINFO.
-- First versions of the CG layer tree and compositor, CG, CGEND, CGINFO, most CGACT forms, FONT, FONTINFO and
-  CGACT text drawing. Nothing shows on screen yet: the title screens stay black.
-- `Engines/YuRIS/host` builds the runtime and `yrrun`, a headless runner with scripted input and PPM screenshots.
-  Debug switches: `YR_TRACE_GOSUB=1` logs every GOSUB with its parameters, `YR_WATCH=<variable id>` logs every store
-  to one variable, `YR_DUMP_LAYERS=1` logs the layer tree at close.
-
-Where it stopped: tracing why ERIS's button setup (`es.BT.SET` in Another Way of Gettin' Paid) ends up with empty
-image paths and button names. The parameter table is filled correctly (watched with `YR_WATCH=1513`); the copy into
-the button tables at script 1, instructions 1102 to 1129, is the next thing to check.
-
-Next, in order:
-
-1. Fix the button-table bug above, then get the ERIS title screen of each game drawn.
-2. Z as a double: ERIS uses Z values such as 81312121000000000000, beyond 64-bit integers.
-3. SOUND (Ogg through stb_vorbis, already vendored), INPUT, MOUSE, WAIT timing, FPS.
-4. The 0.488 system-variable table for Saimin Seishidou (no SDK matches it; see the provenance file) and the
-   undocumented names (`$_CHR`, `@_DXMODE`, `@_KEYLAST` and others) for every version.
-5. SAVE, LOAD and TASKINFO SCRIPTPOS in the PC format, settled with the original engine under Wine.
-6. Saimin Gakushū: it ends at once with END; it reads its story from `.txt` files in `sc.ypf`.
-7. MA☆KO HUNTER's MPEG-1 movies through pl_mpeg; the Swift plugin, Mac and iOS builds, case check, frame rate.
+`YR_TRACE=script:from-to` logs each instruction in a range with its argument values; `YR_LOG_CMDS=CG,GOSUB` logs
+every use of the named commands; `YR_TRACE_GOSUB=1` logs calls with their parameters; `YR_WATCH=<id>` logs stores to
+one variable; `YR_DUMP_LAYERS=1` and `YR_DUMP_TASKS=1` log the layer tree and the tasks at close; `YR_PROFILE=1` logs
+script and drawing time per frame.
 
 ## Known limits
 
-Filled in as the runtime lands.
+- MOVIE (MA☆KO HUNTER's MPEG-1 openings), YMV, FLASH, MIDI, CDDA and E-mote (EMOTE) aren't built yet. MOVIE ends at once.
+- Engine 488 (Saimin Seishidou) has no system variable table yet, and Saimin Gakushū ends at its start.
+- SOUND's PITCH is kept but not applied. Volume follows a square curve, close to the PC's but not measured.
+- CG masks (MID) aren't drawn. CGACT's ROTATION, DIFFUSION, WHIRLPOOL, RASTER and TRIM aren't built; none of the
+  running games uses them. Rule transitions use a fixed soft edge.
+- WINDOW and WINDOWINFO answer for one window the size of the game; window position, menus and sub-windows aren't
+  there. DIALOG answers as if its first button were pressed.
+- Layer images in saves use the 1520-byte header for formats 192 and 312 and the 1600-byte one from 480 on; format 312
+  hasn't been checked against a PC save.
