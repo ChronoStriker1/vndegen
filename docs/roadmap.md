@@ -95,6 +95,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - YU-RIS, on VNDegen's own clean-room runtime, with Another Way of Gettin' Paid and PC saves both ways, and Visual Novel Maker and Twine in the web view (0.38.0). More YU-RIS games follow in sets.
 - YU-RIS: MA☆KO HUNTER, Saimin Seishidou -Secret Lesson- and Tales of the Yokai Incident Inspectors, and games with no `yscfg.dat` recognised (0.39.0).
 - YU-RIS: Saimin Gakushū: Secret Desire on engine 555, and Kaizou Shoujo and Mamono Musume no Yakata: Ningyo no Sho on engine 473 (0.40.0).
+- YU-RIS: Mamono Musume-tachi to no Rakuen: Slime & Scylla on engine 406 and Saint Dorei Gakuen 2 on engine 479, YCG pictures, and loose files that replace archive entries (0.41.0). Nine YU-RIS games play.
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -102,7 +103,6 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- YU-RIS, on branch `feat/yuris`. Eight games run, released in 0.38.0, 0.39.0 and 0.40.0. Next, the last set: the two games on engine 406, Saint Dorei Gakuen 3 (494, a changed text format) and Saint Dorei Gakuen 2 (an unpacked-looking copy). 15 library games, 32 GB; four are set aside as test games. [yuris.md](yuris.md) has what runs and what doesn't.
 - NekoSDK finished with 0.32.2, all fifteen games released. Its open points are in [nekosdk-cleanroom.md](nekosdk-cleanroom.md): Auto's full-width rule is measured on Mankitsu Happening only, and a few screens were compared with one PC game. 
 
 ## Licenses
@@ -134,6 +134,8 @@ The items of the 2026-10-25 plan that are done, kept for their decisions and not
 - Cleaning up a game's engine files. After a game is added, VNDegen offers to remove the bundled Windows engine files the game no longer needs to play in VNDegen, such as NW.js or Electron runtimes, Ren'Py's Windows and Linux libraries, and engine `.exe` and `.dll` files. Each engine plugin lists exactly which files it may remove. VNDegen shows the files and the space saved, and removes them only after the user confirms. Saves and the game's own data are never touched. Shipped in 0.22.0 for RPG Maker MV and MZ, TyranoScript, and Ren'Py. The other engines list nothing.
 - Cheats for games that aren't visual novels: quick cheats such as gold, items, encounters and game speed, plus a variable and switch editor, through each engine's own state, so saves stay in the PC format. Plan in `docs/cheats.md`. Done: RPG Maker MV and MZ in 0.14.0, XP, VX, VX Ace and Wolf RPG Editor in 0.15.0, Godot and Flash game speed in 0.16.0, and AliceSoft System 3 and 4 in 0.17.0.
 - What released engines still lacked, built only for the library games that need it: Artemis movies and screen effects (0.18.0), Wolf RPG Editor's newer data formats (0.19.0) and its mouse and text input (0.20.0), RPG Maker VX Ace movies and message boxes (0.19.0), and AliceSoft System 3's transitions (0.20.0). Their small fixes followed, through 0.21.1.
+- YU-RIS, on VNDegen's own clean-room runtime. Nine library games play, released from 0.38.0 to 0.41.0, with saves that move to and from a PC. The other six library games weren't tested. [yuris.md](yuris.md) has what runs and the known limits.
+- Visual Novel Maker and Twine, in the web view. Shipped in 0.38.0.
 
 ## Runtime packages
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.
