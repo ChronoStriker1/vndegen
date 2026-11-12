@@ -71,7 +71,7 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 | Another Way of Gettin' Paid | Language picker, title, story with text, backgrounds, characters, music and voice, backlog, Config, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways |
 | How to Raise Your Slime Girl | Title, story with Japanese text, choices, music, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways. Set aside since |
 | MA☆KO HUNTER | Title, story in English, the map, the opening movie with its sound, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. Its title and menu buttons are images in Japanese, as on the PC |
-| Saimin Seishidou -Secret Lesson- | Title, story in English, its brand movie, backlog, save and load, on Linux and an iPad simulator. A VNDegen save loads in the PC exe. The English is compiled into the game's scripts; the `.trans` files beside the exe are the translator's project files, and the title and menu buttons are images in Japanese, as on the PC |
+| Saimin Seishidou -Secret Lesson- | Title, story in English, its brand movie, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. The English is compiled into the game's scripts; the `.trans` files beside the exe are the translator's project files, and the title and menu buttons are images in Japanese, as on the PC |
 | Tales of the Yokai Incident Inspectors | Title, story with Japanese text, choices, backlog, save and load, on Linux and an iPad simulator |
 | Saimin Gakushū: Secret Desire | Lists its story files, then stops: its engine (555) reads them with TEXT[FILE=] and parses them with undocumented PRODUCT commands |
 
@@ -92,8 +92,8 @@ letter pairs: the open IF blocks, the GOSUB frames with their return point, the 
 instruction and the script's file name. Formats 192 and 312 have a 16-bit GOSUB count and one more byte before the
 resume point.
 
-Checked under Wine, both ways: Another Way of Gettin' Paid (format 481), MA☆KO HUNTER (312) and How to Raise Your
-Slime Girl (192). A slot
+Checked under Wine, both ways: Another Way of Gettin' Paid (format 481), Saimin Seishidou (480), MA☆KO HUNTER (312)
+and How to Raise Your Slime Girl (192). A slot
 saved by the original engine loads in VNDegen and play continues, and a slot VNDegen saved shows in the original's
 load screen with its thumbnail, loads and plays on.
 
