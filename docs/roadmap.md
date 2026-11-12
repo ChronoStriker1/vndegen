@@ -101,7 +101,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - KiriKiri: Violated Hero was seen to stop after "OK, let's go inside." with no input moving it on (#85). Six runs on 2026-11-11 didn't reproduce it, so it stays open until it is seen again and doesn't hold up other work.
-- Mac: the window buttons sit over the top-left corner of a game that fills the window (#90). What it should do instead is the maintainer's choice.
+- Mac: the window buttons sit over the top-left corner of a game that fills the window (#90). The maintainer chose to hide the buttons while a game plays; the fix is being made.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
