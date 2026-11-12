@@ -78,9 +78,11 @@ static int cg(YCall *c) {
     if (!l) { free(id); return YR_NEXT; }
     YLayer before = *l;
     bool changed = false;
+    bool blank = false;
     if (hasFile && !l->isSet) {
         changed = true;
         char *file = yc_str(c, "FILE");
+        blank = !file || !*file;
         yr_layer_load(y, l, file ? file : "");
         free(file);
     }
@@ -112,6 +114,11 @@ static int cg(YCall *c) {
     fset |= dnum(c, "FRY", &l->fry);
     fset |= dnum(c, "FRZ", &l->frz);
     if (fset && !yc_has(c, "F")) l->f = true;
+    if (blank && (yc_has(c, "SX") || yc_has(c, "SY")) && l->sx > 0 && l->sy > 0) {
+        yr_layer_pixels(l, l->sx, l->sy);
+        for (size_t i = 0; i < (size_t)l->sx * (size_t)l->sy; i++) l->px[i] = 0xff000000u;
+        l->opaque = true;
+    }
     changed |= l->e != before.e || l->a != before.a || l->x != before.x || l->y != before.y || l->z != before.z ||
                l->zi != before.zi || l->mode != before.mode || l->sx != before.sx || l->sy != before.sy || l->t != before.t ||
                l->ta != before.ta || l->f != before.f || l->fx != before.fx ||
