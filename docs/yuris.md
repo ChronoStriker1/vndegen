@@ -18,15 +18,19 @@ This file starts as the design checkpoint and becomes the engine notes as parts 
 | Tales of the Yokai Incident Inspectors | Japanese | 466 | `*.ypf` in the game folder, archive version 466 | No `yscfg.dat`. The library's coverage for the older engine |
 | Kaizou Shoujo: Robokko to no Ichaicha Seikatsu! | Japanese | 473 | `*.ypf` in the game folder, archive version 473 | 1024x768 |
 | Mamono Musume no Yakata Suiseikan Igyouroku: Ningyo no Sho | Japanese | 473 | `*.ypf` in the game folder, archive version 473 | 1024x768 |
+| Mamono Musume-tachi to no Rakuen: Slime & Scylla | Japanese | 406 | `*.ypf` in the game folder, archive version 406 | 800x600, no `yscfg.dat` |
+| Saint Dorei Gakuen 2 | English patch over Japanese | 479 | `pac/*.ypf`, with loose `ysbin/` and `cgsys/` files over them | 1280x800, YCG images |
 
-The test games are 1280x720 except the two on engine 473, which are 1024x768. Their CGs are PNG, with BMP in the 466 game, and their sound is Ogg Vorbis.
+The test games are 1280x720 except the two on engine 473 (1024x768), Slime & Scylla (800x600) and Saint Dorei Gakuen 2
+(1280x800). Their CGs are PNG, with BMP in the 466 games and YCG in Saint Dorei Gakuen 2, and their sound is Ogg Vorbis.
 
 ## How YU-RIS games are built
 
 A game is an `.exe` (the engine), usually a `yscfg.dat` of engine settings, and `.ypf` archives, or loose `data/` files
 during development. The plugin takes a folder as a YU-RIS game when it has a `yscfg.dat` and an archive beside it or in
 `pac/`, or a `ysbin.ypf` there; some games ship without `yscfg.dat`, and the runtime reads the screen size from
-`ysbin/yscfg.ybn` anyway. `ysbin/` inside an archive holds the compiled project:
+`ysbin/yscfg.ybn` anyway. A loose file with the same name as an archive entry replaces it, as on the PC, which is how
+Saint Dorei Gakuen 2's English patch is installed. `ysbin/` inside an archive holds the compiled project:
 
 - `ysc.ybn` (YSCM): the command table. Each command has a name and named keywords with type codes, so the bytecode
   refers to commands and keywords by index and the table says what they are. The table differs between engine
@@ -77,15 +81,17 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 | Tales of the Yokai Incident Inspectors | Title, story with Japanese text, choices, backlog, save and load, on Linux and an iPad simulator |
 | Kaizou Shoujo: Robokko to no Ichaicha Seikatsu! | Title, story with Japanese text, backlog, save and load, on Linux, also with every name's case swapped, and an iPad simulator. PC saves move both ways. Its ending movie (MPEG-1) wasn't reached |
 | Mamono Musume no Yakata Suiseikan Igyouroku: Ningyo no Sho | Title, story with Japanese text, save and load, on Linux. Its ending movie (MPEG-1) wasn't reached |
+| Mamono Musume-tachi to no Rakuen: Slime & Scylla | Title, story with Japanese text, choices, save and load, on Linux. PC saves move both ways |
+| Saint Dorei Gakuen 2 | Title and story in English, backlog, save and load, on Linux, also with every name's case swapped, and an iPad simulator. PC saves move both ways. The library copy lacks its opening and ending movies |
 | Saimin Gakushū: Secret Desire | Language picker, title, brand movie, story in English, choices, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. Its engine (555) reads the story's text files with TEXT[FILE=] and the game's own scripts parse them, with two PRODUCT helpers VNDegen builds to match the game's script versions |
 
 ## Saves
 
 Saves are the PC engine's `.sd` files in the game's `save` folder (`$_SAVE_PATH` is `save\`). A file starts with `YSSD`,
-a format number (192 for engine 0.466, 312 for 0.473 to 0.479, 480 for 0.488, the 0.495 SDK and 555, 481 for Another
+a format number (192 for engines 0.406 and 0.466, 312 for 0.473 to 0.479, 480 for 0.488, the 0.495 SDK and 555, 481 for Another
 Way of Gettin' Paid's engine), the record count and a table of 1024 data numbers. Each record is a variable (type,
-dimensions, values), a layer image (the engine's own layer header, 1520 bytes in format 192, 1536 in 312
-with the size at 112 in engine 473 and at 120 from 474, 1600 in 480 and 1680 in engine 555, then BGRA pixels), or a group of
+dimensions, values), a layer image (the engine's own layer header, 992 bytes in engine 406 and 1520 in 466 (format 192), 1536 in
+312 with the size at 112 in engines 473 and 479 and at 120 in 474, 1600 in 480 and 1680 in engine 555, then BGRA pixels), or a group of
 global variables by class (`SAVE[DNO=n G_INT2=1]`; the class is the flag byte in `ysv.ybn`). Engines 481 and 555
 compress variables with Snappy and images with zlib; the others use zlib throughout. Formats from 480 on store each variable's
 id. `SAVE[MEM=n]` keeps a log snapshot in memory, and `SAVE[MEM=99999]` writes all 500 snapshots into data number
@@ -97,7 +103,7 @@ instruction and the script's file name. Formats 192 and 312 have a 16-bit GOSUB 
 resume point.
 
 Checked under Wine, both ways: Saimin Gakushū (engine 555), Another Way of Gettin' Paid (481), Saimin Seishidou (480),
-MA☆KO HUNTER (474), Kaizou Shoujo (473)
+MA☆KO HUNTER (474), Saint Dorei Gakuen 2 (479), Kaizou Shoujo (473), Slime & Scylla (406)
 and How to Raise Your Slime Girl (192). A slot
 saved by the original engine loads in VNDegen and play continues, and a slot VNDegen saved shows in the original's
 load screen with its thumbnail, loads and plays on.
@@ -121,6 +127,5 @@ script and drawing time per frame.
   running games uses them. Rule transitions use a fixed soft edge.
 - WINDOW and WINDOWINFO answer for one window the size of the game; window position, menus and sub-windows aren't
   there. DIALOG answers as if its first button were pressed.
-- Not yet: Saint Dorei Gakuen 3 (engine 494) keeps its scripts in `pac/update1.ypf` and its story text in a WORD
-  argument form the reader doesn't decode yet. The library's Saint Dorei Gakuen 2 (479) has its scripts as loose files,
-  twice, without `ysv.ybn` or `yst_list.ybn`, which looks like an unpacked copy. Neither has been run.
+- Not run: Saint Dorei Gakuen 3 (engine 494), set aside on screening. It keeps its scripts in `pac/update1.ypf` and its
+  story text in a WORD argument form the disassembler doesn't decode.
