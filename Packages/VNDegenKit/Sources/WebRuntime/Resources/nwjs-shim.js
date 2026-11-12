@@ -635,9 +635,11 @@
     // the page goes back to the top.
     const editing = () => { const a = document.activeElement; return !!a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
     const unscroll = () => { if (!editing() && (window.scrollX || window.scrollY)) window.scrollTo(0, 0); };
-    window.addEventListener('scroll', unscroll);
-    document.addEventListener('focusout', () => setTimeout(unscroll, 0));
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', unscroll);
+    if (config.scrolling !== 'page') {
+        window.addEventListener('scroll', unscroll);
+        document.addEventListener('focusout', () => setTimeout(unscroll, 0));
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', unscroll);
+    }
 
     // Console and uncaught errors go to the app log, where scripts/sim.sh log can show them.
     function describe(value) {

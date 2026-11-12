@@ -59,7 +59,7 @@ exports, which keep saves in localStorage, get the per-game localStorage files T
 Visual Novel Maker reads the keyboard and the mouse. Its gamepad code waits for a `Gamepad` object that nothing sets,
 so it reads no gamepad. Games start with "Visual novel for VN Maker": "Visual novel" with A as a left click, which the
 plugin asks for through `EnginePlugin.defaultControlChanges`. A reads on and presses the button under the pointer, X holds
-Control to skip, the right stick moves the pointer, and LB and RB turn the wheel. Siren's Call reads on only with a
+Control, which skips in games that skip on it, the right stick moves the pointer, and LB and RB turn the wheel. Siren's Call reads on only with a
 click: its prologue waits for a mouse button by its own script, and in dialogue the engine gets Return (key code 13,
 its confirm key, at keydown and keyup) and the waiting message's handler runs, yet the line doesn't move on, since each
 line ends in the game's own `RocketEndOfMessage` event. VNDegen's key events carry what the engine reads, the key code
@@ -102,8 +102,9 @@ resolve inside it. Nothing is unpacked.
 The page runs as a plain browser page with no Node, whatever the wrapper was. Its localStorage, where Harlowe and
 SugarCube keep their saves, goes to per-game files in the app's data folder, as for TyranoScript browser builds. Twine
 pages scroll, unlike the other web engines' canvases, so `WebGameConfiguration.scrollsPage` lets the page scroll by
-touch on iPhone and iPad. A page script, `twine.js`, turns the mouse wheel VNDegen sends, which LB and RB turn, into
-scrolling.
+touch on iPhone and iPad, and tells the NW.js shim not to put the page back at the top, which it does for one-screen
+games after a text field scrolled them. A page script, `twine.js`, turns the mouse wheel VNDegen sends, which LB and RB
+turn, into scrolling.
 
 ### Saves
 
@@ -120,15 +121,19 @@ ignore. Both turn the wheel with LB and RB.
 
 ## Results
 
-Mac app, on the Mac mini at `0f81840`, with its screen locked, so through the DEBUG input script's taps and the app
-log, with `-ignoreOcclusion YES` (logs in `.audit/evidence/htmlvn/v2/mac-logs`):
+Checked at `84f4047`, with the scroll fix from the commit after it checked again on the iPad simulator.
+
+Mac app, on the Mac mini, with its screen locked all evening, so through the DEBUG input script's taps, the debug
+controller hooks and the app log, with `-ignoreOcclusion YES`, and no screenshots. Logs are in
+`.audit/evidence/htmlvn/v2/mac-logs`.
 
 - All four games are recognised as the right engine and start from the library. Asher is a certain Twine match from
   its Embedded Browser pack; the other three sit in wrapper folders and are likely matches.
 - Siren's Call: the content warning, the WebM splash, the main menu, a new game through its prologue to the first
   dialogue scene, a save to slot 1 through the game's own Save menu, and, after quitting and starting again, Load Game
   from the main menu back to the same line. The saves are `SaveGame_0.vndata`, `SaveGame_0_Header.vndata`,
-  `globalData.vndata` and `settings.vndata` beside `Game.exe`.
+  `globalData.vndata` and `settings.vndata` beside `Game.exe`. With the right stick of the debug controller on Load Game,
+  A opened the load menu.
 - Forgotten Fiction: the menu and three passages, a save to slot 1 in SugarCube's Saves dialog, and after quitting
   and starting again a load from the same dialog back to the same passage. The game removes SugarCube's UI bar, so
   the dialog was opened with `UI.saves()` from the input script; the Save and Load buttons were clicked.
@@ -136,8 +141,29 @@ log, with `-ignoreOcclusion YES` (logs in `.audit/evidence/htmlvn/v2/mac-logs`):
 - Asher: a new game, three passages, a save to slot A through its own Save passage, and after quitting and starting
   again Load Game, slot A and Resume Game back to the same passage.
 
+iPad simulator (iPad Pro 13-inch, current iOS), through the Device panel:
+
+- Siren's Call by touch: the main menu, Load Game and slot 1, which loaded the save made in the Mac app at its line.
+  On the touch gamepad A, shown as Left click, reads on in the prologue and in dialogue, and RT does too.
+- Forgotten Fiction by touch, and with the touch gamepad in both layouts tried for Twine.
+- Asher, in a window 1000 by 520 points (`-layoutSize`), so that its About page runs past the bottom: a swipe scrolls
+  the page, and RB and LB on the touch gamepad scroll it up and down. Before the fix above the page jumped back to the
+  top after every scroll.
+- Case check (`scripts/case-check.sh`) on all four games, with every file and folder name's case swapped on a
+  case-sensitive volume: Siren's Call reaches its title, loads the save stored as `sAVEgAME_0.VNDATA` and saves over
+  those files in place; Forgotten Fiction starts, its sprites and music load, and it saves and loads; EVISCERATETHISGIRL.COM
+  and Asher reach their title and first passage with their pictures. Names inside Asher's pack keep their case, as
+  for every archive.
+
+Frame rate: Siren's Call has no Live2D models (the engine loads Cubism, but its characters are still pictures), so its
+video is the 10-second VP9 splash. It plays at 30.0 fps, its rate, on the Mac app (1% low 24.0) and the iPad simulator
+(1% low 28.0), with the page at 60 fps. [frame-rate.md](frame-rate.md) has the rows.
+
 ## Known limits
 
+- Siren's Call reads on only with a mouse click. Its prologue waits for a mouse button by its own script, and in
+  dialogue neither Return nor Control (X, skip) moves it on, although the engine gets both keys: each line ends in the
+  game's own `RocketEndOfMessage` event. A left click on A works around it for the controller. Not compared with the PC.
 - A Visual Novel Maker Electron game set to keep its data in AppData stops at its first save, since `process.argv`
   holds no `--user-data-dir`. One set to internal storage can't save. No test game uses either.
 - SugarCube's "Save to disk" and "Load from disk" aren't wired.

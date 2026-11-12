@@ -337,6 +337,7 @@ final class WebGameSession: NSObject, EngineSession {
             config["runtime"] = "browser"
         }
         if game.storage != nil { config["storage"] = "files" }
+        if game.scrollsPage { config["scrolling"] = "page" }
         let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
         return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_CONFIG__", with: json)
     }
