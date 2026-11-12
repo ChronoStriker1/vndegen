@@ -39,19 +39,23 @@ Arguments are postfix expressions: a byte opcode, a 16-bit length and a payload,
 closes them), and operators (`+ - * / %`, comparisons, logic, unary minus).
 
 The engine runs the scripts as cooperative tasks. Each task runs until a wait or displayed text, then every other
-task runs, then the frame is drawn, about 60 times a second. The game's whole interface, from the title screen and
+task runs, then the frame is drawn, as many times a second as the game's `FPS` command asks, 60 unless it says
+otherwise. Waits and animations that count frames depend on that rate. The game's whole interface, from the title screen and
 message window to the save and load screens, is YU-RIS script, most of it ERIS, the system script library that ships
 with the SDK. So a runtime that implements the commands runs the game's own menus.
 
 ## Design
 
 - `CYuRIS`, a C runtime with no threads and no platform code. Its interface, `include/vnyuris.h`, matches `vns3.h`:
-  open a game folder, call `vny_frame` once per display refresh, read RGBA pixels and a frame serial, send Windows
-  virtual keys and mouse events, pull float stereo audio on the audio thread, pause and quit.
+  open a game folder, call `vny_frame` once per display refresh with the real milliseconds since the last, read RGBA
+  pixels and a frame serial, send Windows virtual keys and mouse events, pull float stereo audio on the audio thread,
+  pause and quit. `vny_frame` runs as many script steps as the game's frame rate fits into the time it is given,
+  carrying the remainder to the next call, so a 120 Hz display runs the game at the same speed as a 60 Hz one. Sound
+  plays from the audio thread and movies follow the milliseconds, so neither depends on the step rate.
 - `EngineYuRIS`, the Swift plugin: detection, a session on `FrameView` and `PCMAudioOutput`, input routing as the System 3
   plugin does, the game's `save` folder as its save location, and the Visual novel controller layout to start with.
 - `Engines/YuRIS/host`, a CMake build for Linux: `yrrun` runs a game headless with scripted clicks and keys, writes
-  frames and, with `--wav`, the sound it plays; `yrdis` disassembles a game's compiled scripts.
+  frames and, with `--wav`, the sound it plays, and with `--hz 120` passes time as a 120 Hz display would; `yrdis` disassembles a game's compiled scripts.
 
 The runtime draws on the CPU into a 32-bit frame and redraws only when a layer changes. ERIS sends every button's
 attributes again each frame, so a CG command that changes nothing doesn't count. On the Linux host a frame of Another
@@ -90,7 +94,7 @@ load screen with its thumbnail, loads and plays on.
 ## Debug switches
 
 `YR_TRACE=script:from-to` logs each instruction in a range with its argument values; `YR_LOG_CMDS=CG,GOSUB` logs
-every use of the named commands; `YR_TRACE_GOSUB=1` logs calls with their parameters; `YR_WATCH=<id>` logs stores to
+every use of the named commands with the step number and game time; `YR_TRACE_GOSUB=1` logs calls with their parameters; `YR_WATCH=<id>` logs stores to
 one variable; `YR_DUMP_LAYERS=1` and `YR_DUMP_TASKS=1` log the layer tree and the tasks at close; `YR_PROFILE=1` logs
 script and drawing time per frame.
 
@@ -101,7 +105,6 @@ script and drawing time per frame.
 - SOUND's PITCH is kept but not applied. Volume follows a square curve, close to the PC's but not measured.
 - CG masks (MID) aren't drawn. CGACT's ROTATION, DIFFUSION, WHIRLPOOL, RASTER and TRIM aren't built; none of the
   running games uses them. Rule transitions use a fixed soft edge.
-- On the touch gamepad, LB's Wheel ↑ doesn't open Another Way of Gettin' Paid's backlog on an iPad simulator, though a mouse wheel does on Linux; its backlog button does.
 - WINDOW and WINDOWINFO answer for one window the size of the game; window position, menus and sub-windows aren't
   there. DIALOG answers as if its first button were pressed.
 - Layer images in saves use the 1520-byte header for formats 192 and 312 and the 1600-byte one from 480 on; format 312

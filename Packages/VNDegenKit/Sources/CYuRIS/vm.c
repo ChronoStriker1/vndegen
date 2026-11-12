@@ -379,7 +379,7 @@ static void run_task(YR *y, YTask *t) {
                 free(str);
                 yv_free(&v);
             }
-            yr_log(y, "] f%llu loops=%d\n", (unsigned long long)y->frameNo, t->loopDepth);
+            yr_log(y, "] f%llu t%llu loops=%d\n", (unsigned long long)y->frameNo, (unsigned long long)y->clock, t->loopDepth);
         }
         int r = exec(y, t, s);
         if (r == YR_NEXT) t->ip++;

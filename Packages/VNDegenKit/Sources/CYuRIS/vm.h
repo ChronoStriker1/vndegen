@@ -96,6 +96,7 @@ struct YR {
     i64 startUnix;
     bool paused, quit;
     int fps;
+    double stepCarry;
     bool fullscreen;
     bool unknownSeen[C_COUNT];
 
