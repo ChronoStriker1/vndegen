@@ -141,6 +141,19 @@ controller hooks and the app log, with `-ignoreOcclusion YES`, and no screenshot
 - Asher: a new game, three passages, a save to slot A through its own Save passage, and after quitting and starting
   again Load Game, slot A and Resume Game back to the same passage.
 
+Mac app again on 2026-11-12, with the mini's screen unlocked, through the same hooks and with a capture of the app's
+window at each game's title and in its story, all looked at: every page draws, none black, stretched or cut off.
+
+- Siren's Call: on a first start, its "work of fiction" screen and the studio logo splash draw; the main menu, a new
+  game through the prologue and a choice to the first dialogue scene, a save to slot 1, the game's own Quit, and
+  after starting the app again Load Game back to the same line. Its music plays at the main menu.
+- Forgotten Fiction: its music starts on the first passage; a save and a load as before. Its pages fit the window at
+  any size, down to 800 by 450, so it has nothing to scroll.
+- EVISCERATETHISGIRL.COM: Play to its fifth passage, where its music starts. With the window at 1280 by 500, its About
+  page (770 high) scrolls down with LB and up with RB, to the bottom.
+- Asher: a save to slot A and, after starting the app again, Load Game, slot A and Resume Game back to the same
+  passage. It ships no sound. With the window at 1280 by 500, its About page (882 high) scrolls with LB and RB.
+
 iPad simulator (iPad Pro 13-inch, current iOS), through the Device panel:
 
 - Siren's Call by touch: the main menu, Load Game and slot 1, which loaded the save made in the Mac app at its line.

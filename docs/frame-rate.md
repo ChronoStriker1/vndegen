@@ -11,6 +11,7 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
   - TyranoScript and Visual Novel Maker: new video frames from `requestVideoFrameCallback`, in a script in the input script's `js` step, because the `fps` step counts WebGL drawing and a Tyrano video has none.
   - Ren'Py: new movie frames from `renpy.display.video.get_movie_texture`, by a probe `.rpy` placed in a scratch copy of the game, because Ren'Py also redraws between them.
   - KiriKiri: display refreshes from `-frameMonitor`'s `KKFRAMES` line, and a movie's frames from the `movie:` lines in the game's log.
+  - YU-RIS: display refreshes from `-frameMonitor`'s `YRFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/yuris.txt` when it ends.
   - Godot: `-godotFrameLog`, without `-godotSnapshot`. The snapshot writes a PNG on the main thread every 2 s, which stalls the game for about 80 to 90 ms each time. It took Barely Working from 59.9 to 57.5 and Project Hadal from 59.4 to 56.9, with seconds alternating between 54 to 56 and 60 to 61 frames. The native runtimes log their own pacing with `-frameMonitor`.
 - Load is the load average at the start of the run. The MacBook's runs had nothing else of ours running. The mini's simulator runs also had the simulator's own processes and agent-device's runner.
 - Reused rows come from earlier threads' records. They stand because no later change touched their drawing path. Commit is `not recorded` where the record gives none, and the same goes for load.
@@ -62,6 +63,7 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | iPad simulator | 30 | 29.7, froze at its first loop before | 14.1 | 120 s | 6.2 | 11-03 | 972c708 |
 | Visual Novel Maker | Siren's Call, 1280x720 VP9 splash movie, page at 60.1 | Mac app, mini, screen locked | 30 | 30.0 | 24.0 | 9.6 s, the whole movie | 34 | 11-11 | 84f4047 |
 | Visual Novel Maker | Siren's Call, 1280x720 VP9 splash movie, page at 60.1 | iPad simulator | 30 | 30.0 | 28.0 | 9.6 s, the whole movie | 36 | 11-11 | 84f4047 |
+| YU-RIS | Saimin Seishidou, `BRANDCALL11.mpg` brand movie, MPEG-1 | Mac app, mini | 30 movie, 60 display | movie 29.96, display 60.0 | display 60.0 | 12.7 s, the whole movie | 3.0 | 11-12 | 18bc5f85 |
 | RGSS | Monster Girl Quest Paradox, walking in the village | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 13 | 11-04 | 2f48b68 |
 | RGSS | Monster Girl Quest Paradox, battle with 5 enemies | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 7.4 | 11-04 | 2f48b68 |
 | RGSS | Monster Girl Quest Paradox, walking in the village | iPad simulator | 60 | 58.5 to 60.0 | 15.0 to 60.0 | 80 s | 12 | 11-04 | 2f48b68 |
@@ -107,6 +109,7 @@ On the MacBook's 120 Hz display a 60 fps game reads correctly: WebKit's page run
 - KiriKiri: Violated Hero IV's title needs clicks on buttons, and its battles weren't reached. A script plays the game's clip through the same plugin instead, and draws a clip frame each tick, 2 to 4 times the clip's 30 fps, so it asks more than the game does. It isn't the game's scene. The movie log gives frames shown and dropped but no 1% low, and the 5 s logo plays while the game is still loading: the display's own 1% low over that first 10 s window was 58.9 on the Mac and 20.8 on the simulator.
 - KiriKiri: Taimanin Kurenai's movies are plain 1024x768 MPEG-1 at 30 fps. A test script calls the game's own `sysmovie` for both, on a case-sensitive volume with the case of 39 names swapped, so play didn't reach them through the story. The movie log gives no 1% low. The Mac's display held 60.0 with a 1% low of 59.8 to 59.9 through both movies. The simulator run had no `-frameMonitor`. Other threads' work had the mini at a high load, and no frame dropped.
 - The MacBook's simulator rows started at a load of 11 to 30, while the simulator's test runner started.
+- YU-RIS on the Mac: the 10 s pacing window that holds only the movie gave 60.0 and a 1% low of 60.0. The window before it, the game's start with the archives opening and the movie's first seconds, gave 58.1 and 13.1 with a 193 ms step; the one after, the movie's end and the title loading, 59.3 and 25.0. The mini's 60 Hz display can't show the 120 Hz pacing. Saimin Gakushū's brand movie played at 29.88 on the same run of the app.
 
 ## Shortfalls and their causes
 

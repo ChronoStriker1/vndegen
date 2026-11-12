@@ -29,8 +29,10 @@ The test games are 1280x720 except the two on engine 473 (1024x768), Slime & Scy
 A game is an `.exe` (the engine), usually a `yscfg.dat` of engine settings, and `.ypf` archives, or loose `data/` files
 during development. The plugin takes a folder as a YU-RIS game when it has a `yscfg.dat` and an archive beside it or in
 `pac/`, or a `ysbin.ypf` there; some games ship without `yscfg.dat`, and the runtime reads the screen size from
-`ysbin/yscfg.ybn` anyway. A loose file with the same name as an archive entry replaces it, as on the PC, which is how
-Saint Dorei Gakuen 2's English patch is installed. `ysbin/` inside an archive holds the compiled project:
+`ysbin/yscfg.ybn` anyway. The game can sit up to two folders down, as an archive import leaves Saint Dorei Gakuen 2;
+its `pac/` is then past the library's three-level listing, so detection reads that folder on disk. A loose file with
+the same name as an archive entry replaces it, as on the PC, which is how Saint Dorei Gakuen 2's English patch is
+installed. `ysbin/` inside an archive holds the compiled project:
 
 - `ysc.ybn` (YSCM): the command table. Each command has a name and named keywords with type codes, so the bytecode
   refers to commands and keywords by index and the table says what they are. The table differs between engine
@@ -76,14 +78,14 @@ Way of Gettin' Paid's first scene takes 1.8 ms of script and 1.6 ms of drawing.
 |---|---|
 | Another Way of Gettin' Paid | Language picker, title, story with text, backgrounds, characters, music and voice, backlog, Config, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways |
 | How to Raise Your Slime Girl | Title, story with Japanese text, choices, music, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways. Set aside since |
-| MA☆KO HUNTER | Title, story in English, the map, the opening movie with its sound, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. Its title and menu buttons are images in Japanese, as on the PC |
-| Saimin Seishidou -Secret Lesson- | Title, story in English, its brand movie, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. The English is compiled into the game's scripts; the `.trans` files beside the exe are the translator's project files, and the title and menu buttons are images in Japanese, as on the PC |
-| Tales of the Yokai Incident Inspectors | Title, story with Japanese text, choices, backlog, save and load, on Linux and an iPad simulator |
-| Kaizou Shoujo: Robokko to no Ichaicha Seikatsu! | Title, story with Japanese text, backlog, save and load, on Linux, also with every name's case swapped, and an iPad simulator. PC saves move both ways. Its ending movie (MPEG-1) wasn't reached |
-| Mamono Musume no Yakata Suiseikan Igyouroku: Ningyo no Sho | Title, story with Japanese text, save and load, on Linux. Its ending movie (MPEG-1) wasn't reached |
-| Mamono Musume-tachi to no Rakuen: Slime & Scylla | Title, story with Japanese text, choices, save and load, on Linux. PC saves move both ways |
-| Saint Dorei Gakuen 2 | Title and story in English, backlog, save and load, on Linux, also with every name's case swapped, and an iPad simulator. PC saves move both ways. The library copy lacks its opening and ending movies |
-| Saimin Gakushū: Secret Desire | Language picker, title, brand movie, story in English, choices, backlog, save and load, on Linux and an iPad simulator. PC saves move both ways. Its engine (555) reads the story's text files with TEXT[FILE=] and the game's own scripts parse them, with two PRODUCT helpers VNDegen builds to match the game's script versions |
+| MA☆KO HUNTER | Title, story in English, the map, the opening movie with its sound, backlog, save and load, on Linux and an iPad simulator; title, story, save and load in the Mac app. PC saves move both ways. Its title and menu buttons are images in Japanese, as on the PC |
+| Saimin Seishidou -Secret Lesson- | Title, story in English, its brand movie, backlog, save and load, on Linux, the Mac app and an iPad simulator. PC saves move both ways. The English is compiled into the game's scripts; the `.trans` files beside the exe are the translator's project files, and the title and menu buttons are images in Japanese, as on the PC |
+| Tales of the Yokai Incident Inspectors | Title, story with Japanese text, choices, backlog, save and load, on Linux and an iPad simulator; title, story, save and load in the Mac app |
+| Kaizou Shoujo: Robokko to no Ichaicha Seikatsu! | Title, story with Japanese text, backlog, save and load, on Linux, also with every name's case swapped, and an iPad simulator; title, story, save and load in the Mac app. PC saves move both ways. Its ending movie (MPEG-1) wasn't reached |
+| Mamono Musume no Yakata Suiseikan Igyouroku: Ningyo no Sho | Title, story with Japanese text, save and load, on Linux and the Mac app. Its ending movie (MPEG-1) wasn't reached |
+| Mamono Musume-tachi to no Rakuen: Slime & Scylla | Title, story with Japanese text, choices, save and load, on Linux; title, story, save and load in the Mac app. PC saves move both ways |
+| Saint Dorei Gakuen 2 | Title and story in English, backlog, save and load, on Linux, also with every name's case swapped, and an iPad simulator; title, story, save and load in the Mac app. PC saves move both ways. The library copy lacks its opening and ending movies |
+| Saimin Gakushū: Secret Desire | Language picker, title, brand movie, story in English, choices, backlog, save and load, on Linux and an iPad simulator; imported from its GOG installers, title, story, save and load in the Mac app. PC saves move both ways. Its engine (555) reads the story's text files with TEXT[FILE=] and the game's own scripts parse them, with two PRODUCT helpers VNDegen builds to match the game's script versions |
 
 ## Saves
 
