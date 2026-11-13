@@ -25,6 +25,7 @@ struct listing {
     ino_t ino;
     struct timespec mtime;
     char **names;
+    char **folded;
     size_t count;
 };
 
@@ -37,11 +38,27 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static void release(struct listing *l) {
     for (size_t i = 0; i < l->count; i++) free(l->names[i]);
     free(l->names);
+    free(l->folded);
     free(l->dir);
     memset(l, 0, sizeof *l);
 }
 
 static int by_name(const void *a, const void *b) { return strcmp(*(char *const *)a, *(char *const *)b); }
+
+static int fold(int c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
+
+static int compare_folded(const char *a, const char *b) {
+    for (;; a++, b++) {
+        int x = fold((unsigned char)*a), y = fold((unsigned char)*b);
+        if (x != y || !x) return x - y;
+    }
+}
+
+static int by_folded_name(const void *a, const void *b) {
+    const char *x = *(char *const *)a, *y = *(char *const *)b;
+    int c = compare_folded(x, y);
+    return c ? c : strcmp(x, y);
+}
 
 // Reads `dir` into `l`. False when it can't be listed, as with a folder the sandbox hides.
 static int read_listing(struct listing *l, const char *dir, const struct stat *st) {
@@ -62,19 +79,43 @@ static int read_listing(struct listing *l, const char *dir, const struct stat *s
     }
     closedir(d);
     if (!names) return 0;
+    char **folded = malloc((count ? count : 1) * sizeof *folded);
+    if (!folded) {
+        for (size_t i = 0; i < count; i++) free(names[i]);
+        free(names);
+        return 0;
+    }
     qsort(names, count, sizeof *names, by_name);
-    *l = (struct listing){strdup(dir), st->st_dev, st->st_ino, MTIME(*st), names, count};
+    memcpy(folded, names, count * sizeof *names);
+    qsort(folded, count, sizeof *folded, by_folded_name);
+    *l = (struct listing){strdup(dir), st->st_dev, st->st_ino, MTIME(*st), names, folded, count};
     return 1;
 }
 
 static int same_time(struct timespec a, struct timespec b) { return a.tv_sec == b.tv_sec && a.tv_nsec == b.tv_nsec; }
 
-static int fold(int c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
+static int compare_exact_n(const char *entry, const char *name, size_t n) {
+    int c = strncmp(entry, name, n);
+    return c ? c : entry[n] != '\0';
+}
 
-static int equal_folded(const char *a, const char *b, size_t n) {
-    for (size_t i = 0; i < n; i++)
-        if (fold((unsigned char)a[i]) != fold((unsigned char)b[i])) return 0;
-    return 1;
+static int compare_folded_n(const char *entry, const char *name, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        int x = fold((unsigned char)entry[i]), y = fold((unsigned char)name[i]);
+        if (x != y || !x) return x - y;
+    }
+    return entry[n] != '\0';
+}
+
+static const char *first_match(char **sorted, size_t count, const char *name, size_t n,
+                               int (*compare)(const char *, const char *, size_t)) {
+    size_t low = 0, high = count;
+    while (low < high) {
+        size_t mid = low + (high - low) / 2;
+        if (compare(sorted[mid], name, n) < 0) low = mid + 1;
+        else high = mid;
+    }
+    return low < count && compare(sorted[low], name, n) == 0 ? sorted[low] : NULL;
 }
 
 // Looks up the `n` bytes at `name` in the listing of `dir` and overwrites them with the name on disk. Folding ASCII
@@ -100,11 +141,8 @@ static int match(const char *dir, const struct stat *st, char *name, size_t n) {
             return 0;
         }
     }
-    const char *found = NULL;
-    for (size_t i = 0; i < l->count && !found; i++)
-        if (strlen(l->names[i]) == n && !memcmp(l->names[i], name, n)) found = l->names[i];
-    for (size_t i = 0; i < l->count && !found; i++)
-        if (strlen(l->names[i]) == n && equal_folded(l->names[i], name, n)) found = l->names[i];
+    const char *found = first_match(l->names, l->count, name, n, compare_exact_n);
+    if (!found) found = first_match(l->folded, l->count, name, n, compare_folded_n);
     if (found) memcpy(name, found, n);
     pthread_mutex_unlock(&lock);
     return found != NULL;
