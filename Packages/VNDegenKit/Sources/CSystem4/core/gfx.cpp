@@ -52,6 +52,20 @@ void blit(uint8_t *dst, int dw, int dh, int dx, int dy, const uint8_t *src, int 
           int method, int brightness) {
     if (!src || rate <= 0) return;
     int x0 = std::max(0, dx), y0 = std::max(0, dy), x1 = std::min(dw, dx + sw), y1 = std::min(dh, dy + sh);
+    if (!srcAlpha && rate >= 255 && method == 0 && brightness == 255) {
+        for (int y = y0; y < y1; y++) {
+            const uint8_t *s = src + (size_t(y - dy) * sw + (x0 - dx)) * 4;
+            uint8_t *d = dst + (size_t(y) * dw + x0) * 4;
+            for (int x = x0; x < x1; x++, s += 4, d += 4) {
+                uint32_t sp, dp;
+                std::memcpy(&sp, s, 4);
+                std::memcpy(&dp, d, 4);
+                dp = (dp & 0xFF000000u) | (sp & 0x00FFFFFFu);
+                std::memcpy(d, &dp, 4);
+            }
+        }
+        return;
+    }
     for (int y = y0; y < y1; y++) {
         const uint8_t *s = src + (size_t(y - dy) * sw + (x0 - dx)) * 4;
         uint8_t *d = dst + (size_t(y) * dw + x0) * 4;
