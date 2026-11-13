@@ -122,6 +122,8 @@ void forRows(int rows, size_t pixels, const std::function<void(int, int)> &body)
 
 void drawPart(Canvas &dst, const Image &image, int x, int y, int partX, int partY, int partW, int partH, float alpha) {
     if (alpha <= 0) return;
+    if (partX < 0) { x -= partX; partW += partX; partX = 0; }
+    if (partY < 0) { y -= partY; partH += partY; partY = 0; }
     if (x < 0) { partX -= x; partW += x; x = 0; }
     if (y < 0) { partY -= y; partH += y; y = 0; }
     partW = std::min({partW, dst.w - x, image.w - partX});

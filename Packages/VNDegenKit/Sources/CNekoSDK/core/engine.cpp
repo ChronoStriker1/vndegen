@@ -4610,12 +4610,12 @@ void Engine::beginChoice(const Node &n) {
     }
     // A replay's choice gives no count. The one seen, in Test Game 84, has two options. A choice's count is parameter 0
     // and one in every game's flows; parameter 1 is it too in most, but 1 in Test Game 94's two-option choices.
-    choiceCount_ = n.opcode == 20 ? 2 : std::max(1, n.p[0] + 1);
+    choiceCount_ = n.opcode == 20 ? 2 : std::clamp(n.p[0], 0, kChoiceCountMax - 1) + 1;
     for (int r = 0; r < 4; r++) choiceRoutes_[size_t(r)] = n.opcode == 3 ? n.p[size_t(10 + r)] : -1;
     choiceCells_.clear();
     choiceClosingFrom_ = -1;
     if (n.opcode == 3)
-        for (int i = 0; i < std::min(n.p[kChoiceCells], int(kChoiceCellsMax)); i++) choiceCells_.push_back(n.p[size_t(kChoiceCells + 1 + i)]);
+        for (int i = 0; i < std::min(n.p[kChoiceCells], int(kChoiceCellsMax)); i++) choiceCells_.push_back(std::clamp(n.p[size_t(kChoiceCells + 1 + i)], 0, choiceColumns() - 1));
     choiceBack_ = images_->get(config_.text("ChoiceBackFilename", "obj\\n000_000.bmp"));
     choiceHover_ = -1;
     askedCount_ = choiceCount_;
@@ -4672,6 +4672,8 @@ void Engine::composeChoice(Canvas &out) {
     std::vector<std::pair<Image, std::pair<float, float>>> pieces;  // a piece's pixels and its middle
     auto crop = [](const Image &from, int x, int y, int w, int h) {
         Image part;
+        x = std::clamp(x, 0, from.w);
+        y = std::clamp(y, 0, from.h);
         part.w = std::max(0, std::min(w, from.w - x));
         part.h = std::max(0, std::min(h, from.h - y));
         part.opaque = from.opaque;

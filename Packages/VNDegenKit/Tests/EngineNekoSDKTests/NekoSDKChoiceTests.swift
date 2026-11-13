@@ -37,4 +37,25 @@ import TestSupport
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         #expect(vnneko_debug_choice_count(e) == 2)
     }
+
+    @Test func aDamagedChoiceStaysOnItsSheet() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("FirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/macrolist.ini": Data("#p Global\nGLB_A\t1000\n##\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("n001_000.bmp", bmp(20, 10))]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 3, next: 3, p: [0: Int32.max, 14: 2, 15: -3, 16: Int32.min], s: [1: "obj\\n001_000.bmp"]),
+                .init(op: 2, next: 0),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "flow\\t.txt", 0))
+        for _ in 0..<5 { _ = vnneko_step(e, 16) }
+        #expect(vnneko_debug_choice_count(e) == 32)
+        var w: Int32 = 0, h: Int32 = 0, changed = false
+        #expect(vnneko_frame(e, &w, &h, &changed) != nil)
+    }
 }

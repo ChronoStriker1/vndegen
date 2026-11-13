@@ -831,6 +831,7 @@ private:
     // A story table's choice's columns of its picture: how many at this parameter, then the columns.
     static constexpr int kChoiceCells = 14;
     static constexpr size_t kChoiceCellsMax = 5;
+    static constexpr int kChoiceCountMax = 32;
     Config config_;
     Audio audio_;
     FILE *log_ = nullptr;
