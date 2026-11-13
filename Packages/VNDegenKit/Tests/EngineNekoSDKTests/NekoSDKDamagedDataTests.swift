@@ -65,3 +65,23 @@ import TestSupport
         #expect(ContinuousClock.now - started < .seconds(2))
     }
 }
+
+extension NekoSDKDamagedDataTests {
+    @Test func anUnreadableCfgSavIsKeptAside() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\damaged\nFirstFlow\tflow\\t.txt\n".utf8),
+            "flow/t.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0)]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let save = root.appendingPathComponent("data/AppData/Roaming/vndegen/damaged/save")
+        try FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        let whole = NekoSDKFlowFixture.packed(Data(count: 48000))
+        let cut = whole.prefix(whole.count / 2)
+        try cut.write(to: save.appendingPathComponent("cfg.sav"))
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        vnneko_stop(e)
+        #expect(try Data(contentsOf: save.appendingPathComponent("cfg.sav.unreadable")) == cut)
+        #expect((try? Data(contentsOf: save.appendingPathComponent("cfg.sav"))) != cut)
+    }
+}

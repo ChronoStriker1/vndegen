@@ -611,6 +611,8 @@ private:
     // Global variables, in the PC's cfg.sav.
     void loadGlobals();
     void loadReadScripts();
+    void keepUnreadable(const char *name);
+    bool readScriptsFrom(const std::vector<uint8_t> &d);
     void saveGlobals();
     std::vector<uint8_t> configFile_;
 

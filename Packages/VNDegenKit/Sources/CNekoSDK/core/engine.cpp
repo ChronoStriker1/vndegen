@@ -1471,6 +1471,10 @@ void Engine::loadReadScripts() {
     auto packed = readWhole(saveDir_ + "/" + nameInFolder(saveDir_, "read.sav"));
     if (packed.empty()) return;
     auto d = unpackEntry(packed.data(), packed.size());
+    if (!readScriptsFrom(d)) keepUnreadable("read.sav");
+}
+
+bool Engine::readScriptsFrom(const std::vector<uint8_t> &d) {
     size_t pos = 0;
     auto next = [&](int32_t &v) {
         if (pos + 4 > d.size()) return false;
@@ -1479,12 +1483,12 @@ void Engine::loadReadScripts() {
         return true;
     };
     int32_t count = 0, length = 0, ranges = 0;
-    if (!next(count)) return;
+    if (!next(count)) return false;
     for (int32_t i = 0; i < count; i++) {
-        if (!next(length) || length <= 0 || pos + size_t(length) > d.size()) return;
+        if (!next(length) || length <= 0 || pos + size_t(length) > d.size()) return false;
         std::string name(reinterpret_cast<const char *>(&d[pos]), strnlen(reinterpret_cast<const char *>(&d[pos]), size_t(length)));
         pos += size_t(length);
-        if (!next(ranges) || ranges < 0 || pos + size_t(ranges) * 8 > d.size()) return;
+        if (!next(ranges) || ranges < 0 || pos + size_t(ranges) * 8 > d.size()) return false;
         // Each range, first and last node id, is text the PC has read, which Config's read-only skip passes; the list
         // ends (0, 0) then (-2, -2).
         auto &read = readNodes_[readKey(name)];
@@ -1498,6 +1502,19 @@ void Engine::loadReadScripts() {
                 for (int32_t id = first; id <= last; id++) read.insert(id);
         }
         if (!name.empty()) seen_[normalizedPath(name)] = true;
+    }
+    return true;
+}
+
+void Engine::keepUnreadable(const char *name) {
+    std::string path = saveDir_ + "/" + nameInFolder(saveDir_, name);
+    for (int i = 1; i <= 100; i++) {
+        std::string kept = std::string(name) + ".unreadable" + (i > 1 ? std::to_string(i) : "");
+        struct stat st;
+        if (lstat((saveDir_ + "/" + kept).c_str(), &st) == 0) continue;
+        if (std::rename(path.c_str(), (saveDir_ + "/" + kept).c_str()) == 0)
+            warnOnce(std::string(name) + " couldn't be read whole, so it was kept as " + kept + " and a new one started.");
+        return;
     }
 }
 
@@ -2405,6 +2422,7 @@ void Engine::loadGlobals() {
     configFile_ = unpackEntry(packed.data(), packed.size());
     if (configFile_.size() < 44000) {
         configFile_.clear();
+        keepUnreadable("cfg.sav");
         return;
     }
     // The sprite gallery's outfit and lock for each heroine, at 1212 and 1224 (Test Game 88 under Wine).
