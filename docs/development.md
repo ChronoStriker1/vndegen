@@ -13,7 +13,7 @@ scripts/build.sh ios-sim   # iOS simulator app in build/sim/Build/Products/Debug
 scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ```
 
-`scripts/build.sh test` also runs the file name lookups' unit tests on a case-sensitive disk image. It prints every failing Swift test with its message and each test target's summary, and keeps the whole `swift test` output in `build/swift-test.log`.
+`scripts/build.sh test` also runs the file name lookups' unit tests on a case-sensitive disk image. It prints every failing Swift test with its message and each test target's summary, and keeps the whole `swift test` output in `build/swift-test.log`. It exits non-zero when any test target's run failed, read from that log as well as from `swift test`'s status. A caller that pipes it, as `scripts/remote.sh scripts/build.sh test | tail`, gets the last command's status unless it sets `pipefail`.
 
 ### What a build makes first
 

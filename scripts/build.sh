@@ -119,7 +119,11 @@ case "${1:?destination}" in
     # On a Mac, Swift Testing marks a failure with an SF Symbols glyph that no pattern here can name, so it prints the
     # plain symbols swift_test_failures reads. The whole output stays in build/swift-test.log.
     (cd Packages/VNDegenKit && VNDEGEN_TEST_DIR="$case_run" SWT_SF_SYMBOLS_ENABLED=0 swift test 2>&1) | tee build/swift-test.log |
-      swift_test_failures ;;
+      swift_test_failures
+    if grep -qE '^✘ Test run with .* failed after|Executed [0-9]+ tests?, with [1-9][0-9]* failures?' build/swift-test.log; then
+      echo "error: tests failed, see build/swift-test.log" >&2
+      exit 1
+    fi ;;
   mac) xcb -destination 'platform=macOS' -derivedDataPath build/mac build ;;
   ios-sim) xcb -destination 'generic/platform=iOS Simulator' -derivedDataPath build/sim build ;;
   ipa)
