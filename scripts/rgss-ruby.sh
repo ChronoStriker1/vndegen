@@ -128,7 +128,7 @@ case "$platform" in
   apple)
     # Cross builds need a Ruby of the same version to run their build tools, so one is built for this Mac first.
     host=$work/host
-    if [ "$("$host/bin/ruby" -e 'print RUBY_VERSION' 2>/dev/null)" != "$version" ]; then
+    if [ "$("$host/bin/ruby" -rrbconfig -e 'print RUBY_VERSION, " ", RbConfig::CONFIG["prefix"]' 2>/dev/null)" != "$version $host" ]; then
       unpack "$work/host-src"
       # Only the build tools run on it, so it leaves out extensions that need libraries the Mac may lack.
       (cd "$work/host-src" && ./configure --prefix="$host" --disable-install-doc --disable-yjit \
