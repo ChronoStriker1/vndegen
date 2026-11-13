@@ -232,6 +232,20 @@ struct Setup {
     #expect(Set(setup.service.storeGames.keys) == ["Test Game [Deluxe]"])
 }
 
+@MainActor
+@Test func aNewServiceReadsItsCopyOfTheStoreOffTheMainActorAndWaitsForIt() async throws {
+    let title = "No Socks RPG: Deluxe Edition", folder = LudusaviMapping.escapeFolderName(title)
+    let setup = try await Setup(otherGames: [title: deckSave + "file1.rmmzsave"])
+    #expect(setup.service.match(for: setup.id)?.folder == folder)
+
+    let service = SaveSyncService(library: setup.library, connector: Setup.connector(setup.hooks, setup.server, library: setup.library),
+                                  manifest: nil, configRetention: nil)
+    #expect(service.storeGames.isEmpty)
+    #expect(try await service.backups(for: setup.id).count == 1)
+    #expect(service.storeGames == [folder: title])
+    #expect(service.match(for: setup.id)?.folder == folder)
+}
+
 // MARK: - Sync
 
 @MainActor

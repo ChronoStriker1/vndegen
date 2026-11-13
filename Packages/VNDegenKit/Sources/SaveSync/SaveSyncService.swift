@@ -115,6 +115,7 @@ public final class SaveSyncService {
     @ObservationIgnored private var manifest: ManifestIndex?
     @ObservationIgnored private var manifestRefresh: Task<Void, Never>?
     @ObservationIgnored private var steamLibrary: String?
+    @ObservationIgnored private var indexLoad: Task<Void, Never>?
     private var settings: Settings
     /// The last restore, undo, backup, or server read started. Each new one waits for it, so two never touch the same
     /// folders at once.
@@ -270,6 +271,7 @@ public final class SaveSyncService {
         guard old != server else { return }
         settings.server = server
         if old.map(Self.store) != Self.store(server) {
+            indexLoad?.cancel()
             settings.synced = [:]
             try? FileManager.default.removeItem(at: mirror)
             storeGames = [:]
@@ -284,6 +286,7 @@ public final class SaveSyncService {
         settings.server = nil
         settings.synced = [:]
         saveSettings()
+        indexLoad?.cancel()
         if let kind = forgotten?.remote.kind { try? ServerPassword.save(nil, for: kind, in: directory) }
         try? FileManager.default.removeItem(at: mirror)
         storeGames = [:]
@@ -336,15 +339,22 @@ public final class SaveSyncService {
     func manifestRefreshed() async { await manifestRefresh?.value }
 
     private func refreshIndex(_ server: SaveServer) async throws {
+        await indexLoad?.value
         let index = try await withStore(server) { store in try await store.refreshIndex() }
         apply(index)
     }
 
     private func loadIndexFromMirror() {
-        let folders = ((try? FileManager.default.contentsOfDirectory(atPath: mirror.path)) ?? []).filter {
-            FileManager.default.fileExists(atPath: mirror.appendingPathComponent($0).appendingPathComponent(LudusaviStore.mappingFile).path)
+        let mirror = mirror
+        indexLoad = Task {
+            let index = await Task.detached(priority: .userInitiated) {
+                let folders = ((try? FileManager.default.contentsOfDirectory(atPath: mirror.path)) ?? []).filter {
+                    FileManager.default.fileExists(atPath: mirror.appendingPathComponent($0).appendingPathComponent(LudusaviStore.mappingFile).path)
+                }
+                return StoreIndex(mirror: LudusaviStore(root: mirror), folders: folders)
+            }.value
+            if !Task.isCancelled { apply(index) }
         }
-        apply(StoreIndex(mirror: LudusaviStore(root: mirror), folders: folders))
         Task {
             if let manifestStore { manifest = await manifestStore.current() }
         }
@@ -389,6 +399,11 @@ public final class SaveSyncService {
         return GameMatch(folder: folder, title: game.title, source: .gameTitle, inStore: inStore(folder))
     }
 
+    private func loadedMatch(for id: GameID) async -> GameMatch? {
+        await indexLoad?.value
+        return match(for: id)
+    }
+
     private func storeFolder(titled title: String) -> String? {
         storeGames.first { $0.value == title }?.key ?? (storeGames[LudusaviMapping.escapeFolderName(title)] != nil ? LudusaviMapping.escapeFolderName(title) : nil)
     }
@@ -412,7 +427,7 @@ public final class SaveSyncService {
 
     /// The game's backups on the server, oldest first. Reads the game's mapping.yaml from the server.
     public func backups(for id: GameID) async throws -> [BackupSummary] {
-        guard let server = settings.server, let match = match(for: id) else { return [] }
+        guard let server = settings.server, let match = await loadedMatch(for: id) else { return [] }
         return try await withStore(server) { store in
             try await store.refreshGame(match.folder)
             return (try? store.local.mapping(match.folder).summaries) ?? []
@@ -421,14 +436,14 @@ public final class SaveSyncService {
 
     /// What restoring `backup` would change here. Reads only VNDegen's copy of the mapping, so call `backups` first.
     public func preview(_ id: GameID, backup: String) async throws -> RestorePreview {
-        guard let match = match(for: id) else { throw SaveSyncError.noBackups }
+        guard let match = await loadedMatch(for: id) else { throw SaveSyncError.noBackups }
         let locations = try saveLocations(id), registry = registrySave(id), store = LudusaviStore(root: mirror)
         return try await serialized { try store.preview(folder: match.folder, backup: backup, locations: locations, registry: registry) }
     }
 
     /// Restores `backup`, or the latest when nil. Brings the backup down from the server first.
     public func restore(_ id: GameID, backup: String?) async throws -> RestoreReport {
-        guard let server = settings.server, let match = match(for: id) else { throw SaveSyncError.notSetUp }
+        guard let server = settings.server, let match = await loadedMatch(for: id) else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id), registry = registrySave(id)
         let snapshot = snapshotURL(id)
         try FileManager.default.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -469,7 +484,7 @@ public final class SaveSyncService {
     /// No lock is shared with Ludusavi or other devices. VNDegen deletes on the server only this device's own new folder
     /// and temporary mapping, and only before its mapping goes up.
     public func backUp(_ id: GameID, judged: ServerRevision) async throws -> BackupReport {
-        guard let server = settings.server, let match = match(for: id), library.game(id) != nil else { throw SaveSyncError.notSetUp }
+        guard let server = settings.server, let match = await loadedMatch(for: id), library.game(id) != nil else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id), registry = registrySave(id)
         let retention = configRetention ?? manualRetention, os = Self.os, comment = Self.comment
         let pcFolders = pcFolders(id, match: match, locations: locations)
@@ -551,7 +566,7 @@ public final class SaveSyncService {
 
     /// `status`, with the server state it judged, for a backup that must start from that state.
     public func check(_ id: GameID) async throws -> SyncCheck {
-        guard let server = settings.server, let match = match(for: id) else { throw SaveSyncError.notSetUp }
+        guard let server = settings.server, let match = await loadedMatch(for: id) else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id), registry = registrySave(id), previous = settings.synced[id.rawValue].flatMap { $0.folder == match.folder ? $0 : nil }
         let (check, inSync) = try await withStore(server) { store -> (SyncCheck, SyncRecord?) in
             let revision = ServerRevision(mapping: try await store.refreshGame(match.folder))
