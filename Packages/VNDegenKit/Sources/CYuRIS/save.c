@@ -88,7 +88,7 @@ static const LayerFormat *layer_format(YR *y) {
 }
 
 static u8 *unpack(const u8 *z, u32 clen, u32 ulen, u32 *got) {
-    if (clen >= 2 && (z[0] & 0x0f) == 8 && ((z[0] << 8) | z[1]) % 31 == 0) {
+    if (clen >= 2 && (z[0] & 0x0f) == 8 && ((z[0] << 8) | z[1]) % 31 == 0 && ulen <= (u64)clen * 1032 + 64) {
         u8 *raw = yr_alloc(ulen ? ulen : 1);
         uLongf n = ulen;
         if (uncompress(raw, &n, z, clen) == Z_OK) { *got = (u32)n; return raw; }
@@ -313,7 +313,7 @@ static void apply_group(YR *y, YTask *t, const u8 *d, u32 n, u32 onlyVid, YVar *
     while (p + 12 <= end) {
         u16 vid = yr_le16(p + 2);
         u32 clen = yr_le32(p + 4), ulen = yr_le32(p + 8);
-        if (p + 12 + clen > end) break;
+        if (clen > (size_t)(end - p) - 12) break;
         if (!onlyVar || vid == onlyVid) {
             u32 got;
             u8 *raw = unpack(p + 12, clen, ulen, &got);
@@ -521,7 +521,7 @@ static void restore_mems(YR *y, const Rec *r) {
     const u8 *p = r->data, *end = r->data + r->size;
     for (i64 k = 0; k < MEM_SLOTS && p + 8 <= end; k++) {
         u32 ulen = yr_le32(p), clen = yr_le32(p + 4);
-        if (p + 8 + clen > end) break;
+        if (clen > (size_t)(end - p) - 8) break;
         MemSlot *m = mem_slot(y, k, ulen != 0);
         if (m) list_clear(&m->list);
         if (ulen && m) {

@@ -83,4 +83,28 @@ import TestSupport
         #expect(!result.opened)
         #expect(result.error.contains("ysc.ybn"))
     }
+
+    static func project(list: UInt32 = 1, labels: UInt32 = 0, scriptCount: UInt32 = 0) -> [String: Data] {
+        [
+            "ysbin/ysc.ybn": Data(Array("YSCM".utf8) + le(UInt32(0)) + le(UInt32(0)) + le(UInt32(0))),
+            "ysbin/yst_list.ybn": Data(Array("YSTL".utf8) + le(UInt32(0)) + le(list) + le(UInt32(0)) + le(UInt32(0)) + [UInt8](repeating: 0, count: 20)),
+            "ysbin/ysl.ybn": Data(Array("YSLB".utf8) + le(UInt32(0)) + le(labels) + [UInt8](repeating: 0, count: 1024)),
+            "ysbin/ysv.ybn": Data(Array("YSVR".utf8) + [UInt8](repeating: 0, count: 6)),
+            "ysbin/yst00000.ybn": Data(Array("YSTB".utf8) + [474, scriptCount, 4, 12, 0, 0, 0].flatMap { le(UInt32($0)) }
+                + [UInt8](repeating: 0, count: 16)),
+        ]
+    }
+
+    @Test func refusesProjectCountsLargerThanTheirFiles() throws {
+        let cases: [([String: Data], String)] = [
+            (Self.project(list: 0xFFFF_FFFF), "yst_list.ybn"),
+            (Self.project(labels: 0x7FFF_FFFF), "ysl.ybn"),
+            (Self.project(scriptCount: 0x4000_0001), "system_start.yst"),
+        ]
+        for (files, file) in cases {
+            let result = Self.open(try Self.game(files))
+            #expect(!result.opened)
+            #expect(result.error.contains(file))
+        }
+    }
 }

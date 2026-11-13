@@ -45,6 +45,7 @@ static bool load_commands(YR *y) {
     if (!read_ysbin(y, "ysc.ybn", &f)) return false;
     bool ok = f.size >= 16 && !memcmp(f.data, "YSCM", 4);
     u32 n = ok ? yr_le32(f.data + 8) : 0;
+    if (ok && n > (f.size - 16) / 2) { ok = false; n = 0; }
     const u8 *p = f.data + 16, *end = f.data + f.size;
     y->cmds = yr_alloc(sizeof(YCmdInfo) * (n ? n : 1));
     for (u32 i = 0; ok && i < n; i++) {
@@ -64,6 +65,14 @@ static bool load_commands(YR *y) {
         for (int id = 1; id < C_COUNT; id++)
             if (!strcmp(c->name, yr_cmd_names[id])) { c->id = id; break; }
     }
+    if (!ok)
+        for (u32 i = 0; i < n; i++) {
+            YCmdInfo *c = &y->cmds[i];
+            if (c->keys) for (int k = 0; k < c->keyCount; k++) free(c->keys[k]);
+            free(c->keys);
+            free(c->name);
+            *c = (YCmdInfo){ 0 };
+        }
     y->cmdCount = ok ? n : 0;
     yr_file_free(&f);
     return ok;
@@ -74,6 +83,7 @@ static bool load_list(YR *y) {
     if (!read_ysbin(y, "yst_list.ybn", &f)) return false;
     bool ok = f.size >= 12 && !memcmp(f.data, "YSTL", 4);
     u32 n = ok ? yr_le32(f.data + 8) : 0;
+    if (ok && n > (f.size - 12) / 20) { ok = false; n = 0; }
     // Each entry: index, name length, name, then a tail of 16 or 20 bytes depending on the version.
     int tail = 0;
     static const int tails[] = { 20, 16, 12, 24 };
@@ -115,6 +125,7 @@ static bool load_labels(YR *y) {
     if (!read_ysbin(y, "ysl.ybn", &f)) return false;
     bool ok = f.size >= 12 + 1024 && !memcmp(f.data, "YSLB", 4);
     u32 n = ok ? yr_le32(f.data + 8) : 0;
+    if (ok && n > (f.size - 12 - 1024) / 13) { ok = false; n = 0; }
     y->labels = yr_alloc(sizeof(YLabel) * (n ? n : 1));
     y->labelCap = 1;
     while (y->labelCap < n * 2) y->labelCap <<= 1;
@@ -134,6 +145,8 @@ static bool load_labels(YR *y) {
         while (y->labelIndex[h] >= 0) h = (h + 1) & (y->labelCap - 1);
         y->labelIndex[h] = (int)i;
     }
+    if (!ok)
+        for (u32 i = 0; i < n; i++) { free(y->labels[i].name); y->labels[i].name = NULL; }
     y->labelCount = ok ? n : 0;
     yr_file_free(&f);
     return ok;
@@ -253,7 +266,7 @@ YScript *yr_script(YR *y, u16 index) {
     if (f.size < 32 || memcmp(f.data, "YSTB", 4)) { yr_file_free(&f); return NULL; }
     u32 count = yr_le32(f.data + 8), code = yr_le32(f.data + 12), args = yr_le32(f.data + 16);
     u32 data = yr_le32(f.data + 20), lines = yr_le32(f.data + 24);
-    if (32 + (size_t)code + args + data + lines > f.size || code < count * 4) { yr_file_free(&f); return NULL; }
+    if (32 + (size_t)code + args + data + lines > f.size || code < (u64)count * 4) { yr_file_free(&f); return NULL; }
     decrypt(f.data, f.size, y->key);
     s->raw = f.data;
     s->count = count;
@@ -280,7 +293,7 @@ YScript *yr_script(YR *y, u16 index) {
         in->arg = next;
         if (next + in->argc > s->argCount) in->argc = (u8)(s->argCount - next);
         next += in->argc;
-        in->line = lines >= count * 4 ? yr_le32(datap + data + 4 * i) : 0;
+        in->line = lines >= (u64)count * 4 ? yr_le32(datap + data + 4 * i) : 0;
     }
     link_blocks(y, s);
     return s;
