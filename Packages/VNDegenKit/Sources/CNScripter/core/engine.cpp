@@ -40,8 +40,12 @@ const std::unordered_map<std::string, CommandFn> &commandTable() {
 // English translation patches that make NScripter break lines between words add a PE section named ".patch" to the
 // game's exe (two test games' patched engines do; their stock exes don't). Its presence turns on word wrap.
 static bool hasWordWrapPatch(const std::string &exePath) {
-    Bytes d;
-    if (!readFile(exePath, d) || d.size() < 0x40 || d[0] != 'M' || d[1] != 'Z') return false;
+    Bytes d(65536);
+    FILE *f = fopen(exePath.c_str(), "rb");
+    if (!f) return false;
+    d.resize(fread(d.data(), 1, d.size(), f));
+    fclose(f);
+    if (d.size() < 0x40 || d[0] != 'M' || d[1] != 'Z') return false;
     size_t pe = le32(&d[0x3C]);
     if (pe + 24 > d.size() || memcmp(&d[pe], "PE\0\0", 4) != 0) return false;
     size_t sections = le16(&d[pe + 6]), optional = le16(&d[pe + 20]);

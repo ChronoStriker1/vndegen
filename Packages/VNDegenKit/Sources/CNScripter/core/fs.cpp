@@ -30,10 +30,14 @@ void FileSystem::indexDir(const std::string &dir, const std::string &prefix) {
         std::string name = e->d_name;
         if (name == "." || name == "..") continue;
         std::string full = dir + "/" + name;
-        struct stat st;
-        if (stat(full.c_str(), &st) != 0) continue;
+        bool folder = e->d_type == DT_DIR;
+        if (e->d_type != DT_DIR && e->d_type != DT_REG) {
+            struct stat st;
+            if (stat(full.c_str(), &st) != 0) continue;
+            folder = S_ISDIR(st.st_mode);
+        }
         std::string rel = prefix.empty() ? name : prefix + "/" + name;
-        if (S_ISDIR(st.st_mode)) {
+        if (folder) {
             indexDir(full, rel);
         } else {
             std::string key = normalizePath(diskNameToSjis(rel));

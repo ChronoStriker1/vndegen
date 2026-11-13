@@ -1,7 +1,9 @@
 // Files, case-insensitive lookup, Shift-JIS, and logging.
 #include "s3.h"
 #include "s3_casepath.h"
+#include <sys/mman.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
 
@@ -34,6 +36,33 @@ u8 *s3_read_file(const char *path, size_t *size) {
     d[got] = 0;
     if (size) *size = got;
     return d;
+}
+
+static size_t mapped_length(size_t size) {
+    size_t page = (size_t)getpagesize();
+    return (size + page - 1) / page * page + page;
+}
+
+u8 *s3_map_file(const char *path, size_t *size) {
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return NULL;
+    struct stat st;
+    if (fstat(fd, &st) != 0 || st.st_size < 0) { close(fd); return NULL; }
+    size_t n = (size_t)st.st_size, length = mapped_length(n);
+    void *base = mmap(NULL, length, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (base == MAP_FAILED) { close(fd); return NULL; }
+    if (n && mmap(base, n, PROT_READ, MAP_PRIVATE | MAP_FIXED, fd, 0) == MAP_FAILED) {
+        munmap(base, length);
+        close(fd);
+        return NULL;
+    }
+    close(fd);
+    *size = n;
+    return base;
+}
+
+void s3_unmap_file(u8 *data, size_t size) {
+    if (data) munmap(data, mapped_length(size));
 }
 
 char *s3_path(const char *dir, const char *name) {

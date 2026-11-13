@@ -21,6 +21,8 @@ void *s3_alloc(size_t n);                      // zeroed, aborts on failure
 char *s3_strdup(const char *s);
 // Reads a whole file. Returns NULL when missing.
 u8 *s3_read_file(const char *path, size_t *size);
+u8 *s3_map_file(const char *path, size_t *size);
+void s3_unmap_file(u8 *data, size_t size);
 // Writes a whole file through a temporary beside it, so a failed write leaves the old file as it was.
 bool s3_write_file(const char *path, const void *data, size_t size);
 // Whether path, or the folder it would be made in, resolves (symlinks followed) to root or something inside it.

@@ -33,7 +33,7 @@ bool s3_archive_open(S3Archive *a, const char *dir, const char *prefix, char kin
         snprintf(name, sizeof name, "%s%c%c.ALD", prefix, kind, 'A' + v);
         char *path = s3_find_file(dir, name);
         if (!path) continue;
-        a->vol[v] = s3_read_file(path, &a->volSize[v]);
+        a->vol[v] = s3_map_file(path, &a->volSize[v]);
         free(path);
         if (a->vol[v]) a->disks = v + 1;
     }
@@ -61,7 +61,7 @@ bool s3_archive_open(S3Archive *a, const char *dir, const char *prefix, char kin
 }
 
 void s3_archive_close(S3Archive *a) {
-    for (int v = 0; v < 26; v++) free(a->vol[v]);
+    for (int v = 0; v < 26; v++) s3_unmap_file(a->vol[v], a->volSize[v]);
     free(a->mapDisk);
     free(a->mapIndex);
     memset(a, 0, sizeof *a);
@@ -82,7 +82,7 @@ bool s3_dat_open(S3Dat *a, const char *dir, const char *const *names, int count)
     for (int v = 0; v < count && v < 4; v++) {
         char *path = s3_find_file(dir, names[v]);
         if (!path) continue;
-        a->vol[v] = s3_read_file(path, &a->volSize[v]);
+        a->vol[v] = s3_map_file(path, &a->volSize[v]);
         free(path);
     }
     if (!a->vol[0]) return false;
@@ -120,6 +120,6 @@ bool s3_dat_get(const S3Dat *a, u32 n, S3Blob *out) {
 }
 
 void s3_dat_close(S3Dat *a) {
-    for (int v = 0; v < 4; v++) free(a->vol[v]);
+    for (int v = 0; v < 4; v++) s3_unmap_file(a->vol[v], a->volSize[v]);
     memset(a, 0, sizeof *a);
 }
