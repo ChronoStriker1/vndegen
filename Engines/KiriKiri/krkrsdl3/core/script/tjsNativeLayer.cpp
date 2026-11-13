@@ -425,7 +425,7 @@ tTJSNI_BaseLayer::tTJSNI_BaseLayer()
     AllocateDefaultImage();
 
     // interface to font object
-    Font = MainImage->GetFont(); // retrieve default font
+    Font = TVPGetDefaultFont(); // retrieve default font
     FontObject = NULL;
 }
 //---------------------------------------------------------------------------
