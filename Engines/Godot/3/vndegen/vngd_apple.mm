@@ -227,6 +227,8 @@ class OS_VNDegen3 : public OS_Unix {
 	}
 
 public:
+	void add_frame_delay(bool p_can_draw) override {}
+
 	OS_VNDegen3(const VNGDLaunch *p_launch) {
 		executable = String::utf8(p_launch->executable);
 		data_path = String::utf8(p_launch->dataDir);

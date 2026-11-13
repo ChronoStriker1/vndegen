@@ -49,7 +49,7 @@ typedef struct VNGDLaunch {
 // engine unable to start any game until the process starts again. Call vngd_stop afterwards even when it fails.
 VNGD_API int vngd_start(const VNGDLaunch *launch);
 
-// Runs one frame and draws it. Returns nonzero once the game has quit. Does nothing while paused.
+// Returns nonzero once the game has quit. Does nothing while paused.
 VNGD_API int vngd_iterate(void);
 
 // The layer changed size, in points, or moved to a screen with another scale.

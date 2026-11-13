@@ -33,6 +33,8 @@ public:
 	// itself, so alerts go to the log.
 	void alert(const String &p_alert, const String &p_title = "ALERT!") override { OS::alert(p_alert, p_title); }
 
+	void add_frame_delay(bool p_can_draw, bool p_wake_for_events) override {}
+
 	// A Windows font the game asks for by name, such as through a SystemFont, comes from VNDegen's substitutes first.
 	String get_system_font_path(const String &p_font_name, int p_weight = 400, int p_stretch = 100, bool p_italic = false) const override {
 		vnfont_match match;

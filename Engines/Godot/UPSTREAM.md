@@ -70,6 +70,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
   - `DisplayServerVNDegen`, which draws into the CAMetalLayer VNDegen hands it and takes all input through `vngd.h` (`display_server_vndegen.mm`).
   - The OS for each platform (`vngd_apple.mm`, and `vngd_linuxbsd.cpp` for testing on Linux). It gives games their `.exe` as the executable path and its folder as the place for `res://` paths the pack doesn't hold, and keeps `user://` where Windows does, under VNDegen's stand-in for `%APPDATA%`.
   - The key of an encrypted pack, which `vngd_start` copies into Godot's `script_encryption_key` for the game it starts.
+  - The frame cap. Godot holds a capped game to its rate by sleeping at the end of each frame, which would stop VNDegen's main thread with it. VNDegen's OS classes in both modules skip that sleep, and `vngd_iterate` instead returns at once, without running a frame, until the game's cap says the next one is due. The display link keeps calling it at the display's rate.
   - File and folder access that finds files outside the pack whatever case the game names them in, through `Engines/Shared/casepath.c` (`vngd_files.h`, also in the Godot 3 module).
   - The class names of the Epic Online Services extension, without the services, for the games that ship it (`vngd_eos.h`).
 - `3/vndegen/`: the Godot 3 module, with the same functions. Its OS draws with MetalANGLE on iPhone and iPad and with Apple's OpenGL on Mac, into two IOSurfaces a layer shows (`vngd_apple.mm`), and `vngd_x11.cpp` runs it on Linux for testing.

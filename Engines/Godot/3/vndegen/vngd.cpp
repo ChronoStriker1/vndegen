@@ -29,6 +29,7 @@ struct State {
 	bool setup = false;
 	bool started = false;
 	bool paused = false;
+	uint64_t next_frame = 0;
 	std::string problem;
 	Vector2 mouse = Vector2(-1, -1);
 	int buttons = 0;
@@ -36,6 +37,19 @@ struct State {
 
 State state;
 VNGDFrames frames;
+
+bool frame_due(int p_max_fps) {
+	if (p_max_fps <= 0) {
+		return true;
+	}
+	const uint64_t now = OS::get_singleton()->get_ticks_usec();
+	const uint64_t period = 1000000 / p_max_fps;
+	if (now + period / 4 < state.next_frame) {
+		return false;
+	}
+	state.next_frame = MAX(state.next_frame + period, now);
+	return true;
+}
 
 InputDefault *input() {
 	return static_cast<InputDefault *>(Input::get_singleton());
@@ -147,7 +161,7 @@ int vngd_iterate(void) {
 	if (!state.started) {
 		return 1;
 	}
-	if (state.paused) {
+	if (state.paused || !frame_due(Engine::get_singleton()->get_target_fps())) {
 		return 0;
 	}
 	vngd_platform_begin_frame();

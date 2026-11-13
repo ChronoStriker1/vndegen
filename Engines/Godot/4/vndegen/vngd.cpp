@@ -35,6 +35,7 @@ struct State {
 	bool setup = false;
 	bool started = false;
 	bool paused = false;
+	uint64_t next_frame = 0;
 	std::string problem;
 	Vector2 mouse = Vector2(-1, -1);
 	BitField<MouseButtonMask> buttons = MouseButtonMask::NONE;
@@ -92,6 +93,19 @@ void mouse_button(MouseButton p_button, bool p_down, double p_factor = 1.0) {
 
 void set_problem(const String &p_problem) {
 	state.problem = p_problem.utf8().get_data();
+}
+
+bool frame_due(int p_max_fps) {
+	if (p_max_fps <= 0) {
+		return true;
+	}
+	const uint64_t now = OS::get_singleton()->get_ticks_usec();
+	const uint64_t period = 1000000 / p_max_fps;
+	if (now + period / 4 < state.next_frame) {
+		return false;
+	}
+	state.next_frame = MAX(state.next_frame + period, now);
+	return true;
 }
 
 } // namespace
@@ -185,7 +199,7 @@ int vngd_iterate(void) {
 	if (!state.started) {
 		return 1;
 	}
-	if (state.paused) {
+	if (state.paused || !frame_due(Engine::get_singleton()->get_max_fps())) {
 		return 0;
 	}
 	DisplayServer::get_singleton()->process_events();
