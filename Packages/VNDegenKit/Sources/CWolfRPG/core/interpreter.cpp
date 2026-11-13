@@ -708,9 +708,12 @@ void Game::setString(Thread &t, const Command &c) {
             }
             std::error_code ec;
             std::filesystem::create_directories(path.parent_path(), ec);
-            std::ofstream file(path, std::ios::binary);
-            file << "\xEF\xBB\xBF" << cur;
-            if (!file) log("cannot write " + rhs);
+            std::string text = "\xEF\xBB\xBF" + cur;
+            try {
+                writeFileReplacing(path, text.data(), text.size());
+            } catch (const std::exception &) {
+                log("cannot write " + rhs);
+            }
             break;
         }
         case 0x07: {  // the files in a folder, one name a line; <<ERROR>> for a folder packed in an archive

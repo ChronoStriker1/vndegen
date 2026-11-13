@@ -13,7 +13,10 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <fcntl.h>
 #include <fstream>
+#include <unistd.h>
 #include <strings.h>
 
 #ifdef __APPLE__
@@ -208,6 +211,40 @@ std::shared_ptr<SaveFile> Game::readSave(const fs::path &path, std::string *erro
     }
 }
 
+void writeFileReplacing(const fs::path &path, const void *data, size_t size) {
+    // Written beside the slot and renamed over it, so a failed write leaves the old save as it was.
+    fs::path tmp = path;
+    tmp += ".tmp";
+    // Whatever is at the temporary name goes first, so a link left there can't send the write elsewhere.
+    fs::remove(tmp);
+    int fd = ::open(tmp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0644);
+    if (fd < 0) throw std::runtime_error("cannot write " + tmp.string() + ": " + std::strerror(errno));
+    const char *at = static_cast<const char *>(data);
+    size_t done = 0;
+    int failure = 0;
+    while (done < size) {
+        ssize_t n = ::write(fd, at + done, size - done);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) {
+            failure = n < 0 ? errno : ENOSPC;
+            break;
+        }
+        done += size_t(n);
+    }
+#ifdef __APPLE__
+    if (!failure && ::fcntl(fd, F_FULLFSYNC) == -1 && ::fsync(fd) != 0) failure = errno;
+#else
+    if (!failure && ::fsync(fd) != 0) failure = errno;
+#endif
+    if (::close(fd) != 0 && !failure) failure = errno;
+    if (failure) {
+        std::error_code ignored;
+        fs::remove(tmp, ignored);
+        throw std::runtime_error("cannot write " + tmp.string() + ": " + std::strerror(failure));
+    }
+    fs::rename(tmp, path);
+}
+
 bool Game::writeSave(const fs::path &path, const SaveFile &save, std::string *error) {
     if (path.empty()) {
         if (error) *error = "save file name outside the game folder";
@@ -216,17 +253,7 @@ bool Game::writeSave(const fs::path &path, const SaveFile &save, std::string *er
     try {
         std::vector<uint8_t> bytes = serializeSave(save);
         fs::create_directories(path.parent_path());
-        // Written beside the slot and renamed over it, so a failed write leaves the old save as it was.
-        fs::path tmp = path;
-        tmp += ".tmp";
-        // Whatever is at the temporary name goes first, so a link left there can't send the write elsewhere.
-        fs::remove(tmp);
-        {
-            std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-            out.write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size()));
-            if (!out) throw std::runtime_error("cannot write " + tmp.string());
-        }
-        fs::rename(tmp, path);
+        writeFileReplacing(path, bytes.data(), bytes.size());
         casepath_changed(path.string().c_str());
         return true;
     } catch (const std::exception &e) {

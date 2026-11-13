@@ -448,9 +448,11 @@ void Game::csvCommand(Thread &t, const Command &c) {
         }
         std::error_code ec;
         std::filesystem::create_directories(path.parent_path(), ec);
-        std::ofstream file(path, std::ios::binary);
-        file.write(out.data(), std::streamsize(out.size()));
-        if (!file) log("cannot write " + name);
+        try {
+            writeFileReplacing(path, out.data(), out.size());
+        } catch (const std::exception &) {
+            log("cannot write " + name);
+        }
         return;
     }
 
