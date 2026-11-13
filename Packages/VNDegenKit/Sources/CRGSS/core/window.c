@@ -20,21 +20,7 @@ static void stretch(Image *target, IRect clip, const Image *skin, IRect s, IRect
         draw_image_rect(target, clip_to(d, clip), skin, s, d.x, d.y, fx);
         return;
     }
-    IRect c = clip_to(d, clip);
-    // One row or column at a time, through the shared blitter, so effects stay in one place.
-    for (int y = c.y; y < c.y + c.h; y++) {
-        int sy = s.y + (y - d.y) * s.h / d.h;
-        for (int x = c.x; x < c.x + c.w;) {
-            int sx = s.x + (x - d.x) * s.w / d.w;
-            // Extend the run while consecutive screen pixels map to consecutive source pixels.
-            int run = 1;
-            while (x + run < c.x + c.w && s.x + (x + run - d.x) * s.w / d.w == sx + run) run++;
-            IRect src = {sx, sy, run, 1};
-            IRect one = {x, y, run, 1};
-            draw_image_rect(target, one, skin, src, x, y, fx);
-            x += run;
-        }
-    }
+    draw_image_scaled(target, clip, skin, s, d, fx);
 }
 
 // Draws part of the skin repeated across a screen rectangle, from its top left corner.

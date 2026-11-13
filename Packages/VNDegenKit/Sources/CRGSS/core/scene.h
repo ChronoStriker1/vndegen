@@ -122,6 +122,7 @@ typedef struct {
 } Effects;
 
 void draw_image_rect(Image *target, IRect clip, const Image *src, IRect srcRect, int dx, int dy, const Effects *fx);
+void draw_image_scaled(Image *target, IRect clip, const Image *src, IRect srcRect, IRect dstRect, const Effects *fx);
 void window_draw(Window *window, Image *target, IRect clip, int offsetX, int offsetY);
 void window_update(Window *window);
 // XP's tilemap draws in several layers at different z, so it lists them for the compositor.
