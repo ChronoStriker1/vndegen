@@ -47,8 +47,34 @@ end
 
 # Ruby 1.8 syntax today's Ruby rejects. `when 1: x` is `when 1 then x`.
 def rgss_compatible_source(code)
-  return code if $RGSS_VERSION == 3
-  code.gsub(/^(\s*when\s+[^\n#]*?[^:\s]):(?=[ \t]|$)/) { "#{$1} then" }
+  return code if $RGSS_VERSION == 3 || rgss_compiles?(code)
+  code.gsub(/^[ \t]*when[ \t][^\n]*/) { |line| rgss_when_then(line) }
+end
+
+def rgss_compiles?(code)
+  RubyVM::InstructionSequence.compile(code)
+  true
+rescue SyntaxError
+  false
+end
+
+def rgss_when_then(line)
+  quote = nil
+  index = line.index('when') + 4
+  while index < line.length
+    char = line[index]
+    if quote
+      if char == '\\' then index += 1
+      elsif char == quote then quote = nil
+      end
+    elsif char == '"' || char == "'" then quote = char
+    elsif char == '#' then return line
+    elsif char == ':' && line[index - 1] !~ /[:\s]/ && line[index + 1] != ':' && (line[index + 1].nil? || line[index + 1] =~ /[ \t\r]/)
+      return "#{line[0...index]} then#{line[index + 1..]}"
+    end
+    index += 1
+  end
+  line
 end
 
 # "Script 'Game_Map' line 42: NoMethodError occurred." and the message, as RGSS reports an error.
