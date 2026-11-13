@@ -32,15 +32,17 @@ import TestSupport
 
     private static func le<T: FixedWidthInteger>(_ v: T) -> [UInt8] { withUnsafeBytes(of: v.littleEndian, Array.init) }
 
+    private static func bytes(_ parts: [[UInt8]]) -> [UInt8] { parts.flatMap { $0 } }
+
     static func archive(name: String, size: UInt32, csize: UInt32, packed: Bool = false, payload: [UInt8]) -> Data {
         let nameBytes = Array(name.utf8)
         func entry(offset: UInt64) -> [UInt8] {
-            le(murmur2(nameBytes)) + [UInt8(nameBytes.count) ^ 0xff] + nameBytes + [0, packed ? 1 : 0]
-                + le(size) + le(csize) + le(offset) + le(UInt32(0))
+            bytes([le(murmur2(nameBytes)), [UInt8(nameBytes.count) ^ 0xff], nameBytes, [0, packed ? 1 : 0],
+                   le(size), le(csize), le(offset), le(UInt32(0))])
         }
         let dirSize = 32 + entry(offset: 0).count
-        let head = Array("YPF".utf8) + [0] + le(UInt32(500)) + le(UInt32(1)) + le(UInt32(dirSize)) + [UInt8](repeating: 0, count: 16)
-        return Data(head + entry(offset: UInt64(dirSize)) + payload)
+        let head = bytes([Array("YPF".utf8), [0], le(UInt32(500)), le(UInt32(1)), le(UInt32(dirSize)), [UInt8](repeating: 0, count: 16)])
+        return Data(bytes([head, entry(offset: UInt64(dirSize)), payload]))
     }
 
     static func game(_ files: [String: Data]) throws -> URL {
@@ -85,13 +87,13 @@ import TestSupport
     }
 
     static func project(list: UInt32 = 1, labels: UInt32 = 0, scriptCount: UInt32 = 0) -> [String: Data] {
-        [
-            "ysbin/ysc.ybn": Data(Array("YSCM".utf8) + le(UInt32(0)) + le(UInt32(0)) + le(UInt32(0))),
-            "ysbin/yst_list.ybn": Data(Array("YSTL".utf8) + le(UInt32(0)) + le(list) + le(UInt32(0)) + le(UInt32(0)) + [UInt8](repeating: 0, count: 20)),
-            "ysbin/ysl.ybn": Data(Array("YSLB".utf8) + le(UInt32(0)) + le(labels) + [UInt8](repeating: 0, count: 1024)),
-            "ysbin/ysv.ybn": Data(Array("YSVR".utf8) + [UInt8](repeating: 0, count: 6)),
-            "ysbin/yst00000.ybn": Data(Array("YSTB".utf8) + [474, scriptCount, 4, 12, 0, 0, 0].flatMap { le(UInt32($0)) }
-                + [UInt8](repeating: 0, count: 16)),
+        let words: [UInt32] = [474, scriptCount, 4, 12, 0, 0, 0]
+        return [
+            "ysbin/ysc.ybn": Data(bytes([Array("YSCM".utf8), le(UInt32(0)), le(UInt32(0)), le(UInt32(0))])),
+            "ysbin/yst_list.ybn": Data(bytes([Array("YSTL".utf8), le(UInt32(0)), le(list), le(UInt32(0)), le(UInt32(0)), [UInt8](repeating: 0, count: 20)])),
+            "ysbin/ysl.ybn": Data(bytes([Array("YSLB".utf8), le(UInt32(0)), le(labels), [UInt8](repeating: 0, count: 1024)])),
+            "ysbin/ysv.ybn": Data(bytes([Array("YSVR".utf8), [UInt8](repeating: 0, count: 6)])),
+            "ysbin/yst00000.ybn": Data(bytes([Array("YSTB".utf8), words.flatMap { le($0) }, [UInt8](repeating: 0, count: 16)])),
         ]
     }
 
