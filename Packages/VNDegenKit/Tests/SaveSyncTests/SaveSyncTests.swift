@@ -865,6 +865,25 @@ func restoreReplacesASaveThatDiffersOnlyInCase() throws {
     #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "pc"])
 }
 
+/// A device whose game writes `file1.rmmzsave` backs it up under the PC backup's `File1.rmmzsave`, so the backup holds
+/// one save and the PC's copy is replaced, not kept beside it.
+@Test func aBackupTakesThePathTheLatestBackupGaveTheSaveInAnotherCase() throws {
+    let base = TestFolders.root.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let pc = try makeGame(in: base.appendingPathComponent("pc"), saves: ["File1.rmmzsave": "pc"])
+    _ = try store.backUp(folder: nil, title: "Test Game 01", game: GameID("Test Game 01"), locations: pc, retention: nil,
+                         os: "windows", comment: nil)
+    let device = try makeGame(in: base.appendingPathComponent("device"), saves: ["file1.rmmzsave": "newer on the device"])
+    let report = try store.backUp(folder: nil, title: "Test Game 01", game: GameID("Test Game 01"), locations: device, retention: nil,
+                                  now: .now.addingTimeInterval(60), device: "dev1", os: "mac", comment: nil)
+    #expect(report.paths == [.latestBackup: 1])
+    let latest = try #require(try store.mapping("Test Game 01").effectiveFiles())
+    #expect(latest.count == 1)
+    #expect(latest.first?.key.hasSuffix("/File1.rmmzsave") == true)
+    #expect(latest.first?.value.entry == FileEntry(hash: sha1("newer on the device"), size: 19))
+}
+
 /// A backup made on a disk that keeps case can hold `File1.rmmzsave` and `file1.rmmzsave`. They are one save on a device
 /// that has one of them, and the one spelled as on disk restores.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"] != nil))

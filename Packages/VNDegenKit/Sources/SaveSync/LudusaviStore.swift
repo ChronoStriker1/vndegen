@@ -591,6 +591,7 @@ public struct LudusaviStore: Sendable {
     struct RecordedPaths {
         /// Location index to save path relative to the location to the chosen absolute path.
         private var chosen: [Int: [String: String]] = [:]
+        private var folded: [Int: [String: String]] = [:]
         /// Location index to the folder, with a trailing slash, that holds most of its saves.
         private(set) var commonFolder: [Int: String] = [:]
 
@@ -610,10 +611,17 @@ public struct LudusaviStore: Sendable {
                     (relative, candidates.min(by: first)! + relative)
                 })
                 commonFolder[index] = count.keys.min(by: first)
+                folded[index] = Dictionary(chosen[index, default: [:]].map { (Self.fold($0.key), $0.value) }) { a, b in min(a, b) }
             }
         }
 
-        func path(of relative: String, in location: Int) -> String? { chosen[location]?[relative] }
+        func path(of relative: String, in location: Int) -> String? {
+            chosen[location]?[relative] ?? folded[location]?[Self.fold(relative)]
+        }
+
+        private static func fold(_ relative: String) -> String {
+            relative.precomposedStringWithCanonicalMapping.folding(options: .caseInsensitive, locale: nil)
+        }
     }
 
     // MARK: Local files
