@@ -132,8 +132,7 @@ void destroy(vnffmovie *m) {
     delete m;
 }
 
-// Called with the lock held, which it drops while converting.
-void takeVideo(vnffmovie *m, std::unique_lock<std::mutex> &lock) {
+void takeVideo(vnffmovie *m) {
     AVFrame *f = m->decoded;
     double pts = seconds(m, f->best_effort_timestamp, m->videoIndex) + m->loopOffset;
     m->lastPts = std::max(m->lastPts, pts);
@@ -142,15 +141,14 @@ void takeVideo(vnffmovie *m, std::unique_lock<std::mutex> &lock) {
     Frame out;
     out.pts = pts;
     out.pixels.resize(size_t(m->info.width) * size_t(m->info.height) * 4);
-    lock.unlock();
     m->scaler = sws_getCachedContext(m->scaler, f->width, f->height, AVPixelFormat(f->format), m->info.width, m->info.height,
                                      AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
     // sws_scale reads four planes and strides whatever the format.
     uint8_t *planes[4] = {out.pixels.data(), nullptr, nullptr, nullptr};
     int strides[4] = {m->info.width * 4, 0, 0, 0};
     if (m->scaler) sws_scale(m->scaler, f->data, f->linesize, 0, f->height, planes, strides);
-    lock.lock();
-    m->frames.push_back(std::move(out));
+    std::lock_guard<std::mutex> lock(m->mutex);
+    if (!m->seekPending) m->frames.push_back(std::move(out));
 }
 
 void takeAudio(vnffmovie *m) {
@@ -170,6 +168,8 @@ void takeAudio(vnffmovie *m) {
     int got = swr_convert(m->resampler, out, outFrames, const_cast<const uint8_t **>(f->extended_data), f->nb_samples);
     if (got <= 0) return;
     size_t channels = size_t(m->info.audio_channels), rate = size_t(m->info.audio_rate);
+    std::lock_guard<std::mutex> lock(m->mutex);
+    if (m->seekPending) return;
     // Sound before a seek's target goes with the frames. Otherwise the packet goes where its timestamp says: after
     // silence over a gap, or without what overlaps the sound queued or already handed out.
     double tail = m->playClock + double(m->sound.size() / channels) / double(rate), skipTo = m->dropBefore;
@@ -193,11 +193,11 @@ void dropLateSound(vnffmovie *m) {
 
 // Sends a packet, or null to drain, and takes each frame that comes out. A decoder that refuses the packet until its
 // output is read gets it again.
-void decode(vnffmovie *m, AVCodecContext *context, AVPacket *packet, std::unique_lock<std::mutex> &lock) {
+void decode(vnffmovie *m, AVCodecContext *context, AVPacket *packet) {
     for (;;) {
         int sent = avcodec_send_packet(context, packet), received;
         while ((received = avcodec_receive_frame(context, m->decoded)) >= 0) {
-            if (context == m->video) takeVideo(m, lock);
+            if (context == m->video) takeVideo(m);
             else takeAudio(m);
             av_frame_unref(m->decoded);
         }
@@ -227,7 +227,11 @@ void run(vnffmovie *m) {
             m->loopOffset = 0;
             m->lastPts = 0;
             m->dropBefore = m->soundEnd = m->playClock = m->pictureTime = m->seekTarget;
-            if (!restart(m, m->seekTarget)) m->finished = true;
+            lock.unlock();
+            bool restarted = restart(m, m->dropBefore);
+            lock.lock();
+            if (!restarted) m->finished = true;
+            continue;
         }
         if (m->finished || m->frames.size() >= kMaxFrames || m->soundEnd - m->pictureTime > kSoundAhead) {
             m->wake.wait(lock);
@@ -235,29 +239,26 @@ void run(vnffmovie *m) {
         }
         lock.unlock();
         int result = av_read_frame(m->format, m->packet);
-        lock.lock();
-        if (m->seekPending) {
-            if (result >= 0) av_packet_unref(m->packet);
-            continue;
-        }
         if (result < 0) {
-            decode(m, m->video, nullptr, lock);
-            if (m->audio) decode(m, m->audio, nullptr, lock);
+            decode(m, m->video, nullptr);
+            if (m->audio) decode(m, m->audio, nullptr);
             // A read error ends the movie, as does a loop that can't start over or whose last pass showed nothing.
             bool atEnd = !m->format->pb->error && (result == AVERROR_EOF || avio_feof(m->format->pb));
-            if (atEnd && m->loop && m->passHadFrame) {
+            bool again = atEnd && m->loop && m->passHadFrame;
+            if (again) {
                 // The next pass carries on the clock from one frame after this pass's last.
                 m->loopOffset = m->lastPts + 1 / m->info.fps;
                 m->dropBefore = 0;
-                if (!restart(m, 0)) m->finished = true;
-            } else {
-                m->finished = true;
+                again = restart(m, 0);
             }
+            lock.lock();
+            if (!again) m->finished = true;
             continue;
         }
-        if (m->packet->stream_index == m->videoIndex) decode(m, m->video, m->packet, lock);
-        else if (m->packet->stream_index == m->audioIndex) decode(m, m->audio, m->packet, lock);
+        if (m->packet->stream_index == m->videoIndex) decode(m, m->video, m->packet);
+        else if (m->packet->stream_index == m->audioIndex) decode(m, m->audio, m->packet);
         av_packet_unref(m->packet);
+        lock.lock();
     }
 }
 
