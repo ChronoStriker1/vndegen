@@ -8,6 +8,9 @@
 #include <fstream>
 #include <string_view>
 #include <system_error>
+#include <cerrno>
+#include <fcntl.h>
+#include <unistd.h>
 #include <zlib.h>
 
 #include "s4_casepath.h"
@@ -81,16 +84,32 @@ bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xo
     uint32_t len = uint32_t(plain.size());
     std::memcpy(d.data() + 4, &len, 4);
     if (xorData) mtXor(d.data() + 8, cap, kGDSeed);
-    // Write beside the target, then rename, so a crash never leaves half a save.
+    return writeFile(path, d.data(), d.size());
+}
+
+bool writeFile(const std::string &path, const void *data, size_t size) {
+    if (path.empty()) return false;
     std::error_code ec;
     fs::create_directories(fs::path(path).parent_path(), ec);
     std::string tmp = path + ".tmp";
-    {
-        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
-        if (!f.write(reinterpret_cast<const char *>(d.data()), std::streamsize(d.size()))) return false;
+    int fd = ::open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    if (fd < 0) return false;
+    bool ok = true;
+    for (const char *p = static_cast<const char *>(data), *end = p + size; ok && p < end;) {
+        ssize_t n = ::write(fd, p, size_t(end - p));
+        if (n > 0) p += n;
+        else if (n < 0 && errno == EINTR) continue;
+        else ok = false;
     }
-    fs::rename(tmp, path, ec);
-    return !ec;
+#ifdef F_FULLFSYNC
+    if (ok && ::fcntl(fd, F_FULLFSYNC) != 0) ok = ::fsync(fd) == 0;
+#else
+    if (ok) ok = ::fsync(fd) == 0;
+#endif
+    if (::close(fd) != 0) ok = false;
+    if (ok) ok = ::rename(tmp.c_str(), path.c_str()) == 0;
+    if (!ok) ::unlink(tmp.c_str());
+    return ok;
 }
 
 namespace {

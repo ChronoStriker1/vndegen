@@ -62,10 +62,11 @@ struct MsgSkipState {
 // n/8, an assumption: the PC file had no bit set).
 void skipSave() {
     if (g_skip.file.empty()) return;
-    std::ofstream f(save::hostPath(*G().vm, g_skip.file, true), std::ios::binary);
     uint32_t n = uint32_t(G().vm->ain.messages.size());
-    f.write(reinterpret_cast<const char *>(&n), 4);
-    f.write(reinterpret_cast<const char *>(g_skip.flags.data()), std::streamsize(g_skip.flags.size()));
+    std::vector<uint8_t> d(4 + g_skip.flags.size());
+    std::memcpy(d.data(), &n, 4);
+    std::copy(g_skip.flags.begin(), g_skip.flags.end(), d.begin() + 4);
+    save::writeFile(save::hostPath(*G().vm, g_skip.file, true), d.data(), d.size());
 }
 S4_HLL(MsgSkip, Init) {
     g_skip.file = c.s(0);
@@ -188,9 +189,10 @@ struct PassSet { std::string file; std::set<int32_t> numbers; std::set<std::stri
 std::map<int, PassSet> g_pass;
 void passWrite(PassSet &p) {
     if (p.file.empty()) return;
-    std::ofstream f(save::hostPath(*G().vm, p.file, true), std::ios::binary);
-    for (int32_t n : p.numbers) f << "N" << n << "\n";
-    for (auto &t : p.texts) f << "T" << t << "\n";
+    std::string d;
+    for (int32_t n : p.numbers) d += "N" + std::to_string(n) + "\n";
+    for (auto &t : p.texts) d += "T" + t + "\n";
+    save::writeFile(save::hostPath(*G().vm, p.file, true), d.data(), d.size());
 }
 S4_HLL(PassRegister, SetFileName) {
     PassSet &p = g_pass[c.i(0)];

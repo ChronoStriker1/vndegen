@@ -1016,13 +1016,7 @@ void partsFunc(int id, FuncArgs a) {
                     small[(size_t(y) * tw + x) * 4 + k] = uint8_t(sum / (r * r));
                 }
         std::vector<uint8_t> qnt = encodeQNT(small.data(), tw, th);
-        bool ok = !path.empty() && !qnt.empty();
-        if (ok) {
-            std::error_code ec;
-            fs::create_directories(fs::path(path).parent_path(), ec);
-            std::ofstream f(path, std::ios::binary | std::ios::trunc);
-            ok = bool(f.write(reinterpret_cast<const char *>(qnt.data()), std::streamsize(qnt.size())));
-        }
+        bool ok = !qnt.empty() && save::writeFile(path, qnt.data(), qnt.size());
         // The save list shows it as "<save>" and the file's name.
         G().cgForgetNamed(name);
         G().cgForgetNamed("<save>" + name.substr(name.find_last_of("\\/") + 1));
