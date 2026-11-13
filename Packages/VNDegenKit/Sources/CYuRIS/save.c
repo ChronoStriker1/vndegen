@@ -1,5 +1,6 @@
 #include "yr.h"
 #include "vm.h"
+#include "yr_casepath.h"
 #include "gfx.h"
 #include <sys/stat.h>
 #include <zlib.h>
@@ -642,8 +643,10 @@ char *yr_save_path(YR *y, const char *name) {
     const char *rel = key;
     while (!strncmp(rel, "./", 2)) rel += 2;
     if (!strncasecmp(rel, "save/", 5)) rel += 5;
-    char *found = yr_find_file(y->saveDir, rel);
-    return found ? found : yr_path(y->saveDir, rel);
+    char *joined = yr_path(y->saveDir, rel), out[4096];
+    if (yr_casepath_resolve(joined, out, sizeof out) < 0) return joined;
+    free(joined);
+    return yr_strdup(out);
 }
 
 bool yr_save_exists(YR *y, const char *name) {
