@@ -403,6 +403,10 @@ static int ogg_open(vnvideo *v, vnvideo_info *info, char *error, size_t error_si
             info->audio_channels = channels;
         }
     }
+    if (s->has_audio_stream && !s->opus) {
+        ogg_stream_clear(&s->audio_stream);
+        s->has_audio_stream = 0;
+    }
     return 1;
 }
 
