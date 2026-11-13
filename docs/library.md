@@ -40,6 +40,10 @@ Two folders can each hold a game of the same name, even when the names differ on
 
 Known limit: on a Mac, if an added folder is moved and another folder is made at its old path, VNDegen finds the new one there, because macOS resolves a bookmark by path first. Remove that folder and add the right one.
 
+## What the library keeps
+
+`library.json`, in VNDegen's Application Support folder, keeps each game's artwork, play time, hidden flag, metadata, and settings, and `folders.json` the folders you added. A value VNDegen doesn't know, such as a button action or metadata source from a newer version, is dropped from that one game, which keeps everything else. A record that can't be read at all is written back unchanged. A file that isn't JSON at all is set aside beside it as `library.unreadable-<time>.json` or `folders.unreadable-<time>.json` and never overwritten, and one that exists but can't be read leaves the library unsaved until the next launch.
+
 ## Removing a game
 
 Remove from library, in a game's menu or on its page, deletes the game's folder after asking: on a Mac it goes to the Trash, and on iPhone and iPad it is deleted for good. Saves the game writes inside its own folder go with it. The saves VNDegen keeps in its own data folder for the game stay, and so do its artwork, play time, and settings, so copying the folder back restores it.

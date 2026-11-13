@@ -58,6 +58,8 @@ public final class LibraryStore {
     /// Why each added folder the last scan couldn't reach is unavailable. Its games stay in `games`.
     public private(set) var folderProblems: [LibraryFolderID: String] = [:]
     private var records: [GameID: Game] = [:]
+    @ObservationIgnored private var libraryFile: StoredList<Game>
+    @ObservationIgnored private var foldersFile: StoredList<LibraryFolder>
     /// Folders the player removed. Their games' records still name them.
     private var removed: [LibraryFolder] = []
     /// Where each added folder resolved to. A security scope opened there stays open from then until the player removes
@@ -79,8 +81,10 @@ public final class LibraryStore {
     public init(paths: LibraryPaths = .standard, engines: [any EnginePlugin]) {
         self.paths = paths
         self.engines = engines
-        records = (try? Self.load(paths.libraryFile)) ?? [:]
-        let saved = (try? Self.loadFolders(paths.foldersFile)) ?? []
+        libraryFile = StoredList(url: paths.libraryFile)
+        foldersFile = StoredList(url: paths.foldersFile)
+        records = Dictionary(libraryFile.load().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let saved = foldersFile.load()
         folders = saved.filter { $0.removedAt == nil }
         removed = saved.filter { $0.removedAt != nil }
     }
@@ -434,8 +438,7 @@ public final class LibraryStore {
 
     private func save() {
         do {
-            try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
-            try Self.encoder.encode(Array(records.values)).write(to: paths.libraryFile, options: .atomic)
+            try libraryFile.save(Array(records.values))
         } catch {
             assertionFailure("library save failed: \(error)")
         }
@@ -443,11 +446,55 @@ public final class LibraryStore {
 
     private func saveFolders() {
         do {
-            try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
-            try Self.encoder.encode(folders + removed).write(to: paths.foldersFile, options: .atomic)
+            try foldersFile.save(folders + removed)
         } catch {
             assertionFailure("library folders save failed: \(error)")
         }
+    }
+}
+
+struct StoredList<Element: Codable> {
+    let url: URL
+    private var unreadable: [Data] = []
+    private var writable = true
+
+    init(url: URL) { self.url = url }
+
+    mutating func load() -> [Element] {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            writable = !FileManager.default.fileExists(atPath: url.path)
+            return []
+        }
+        if let elements = try? Self.decoder.decode([Element].self, from: data) { return elements }
+        guard let items = try? JSONSerialization.jsonObject(with: data) as? [Any] else {
+            let aside = url.deletingPathExtension().appendingPathExtension("unreadable-\(Int(Date.now.timeIntervalSince1970)).json")
+            writable = (try? FileManager.default.moveItem(at: url, to: aside)) != nil
+            return []
+        }
+        var elements: [Element] = []
+        for item in items {
+            guard let raw = try? JSONSerialization.data(withJSONObject: item, options: .fragmentsAllowed) else { continue }
+            if let element = try? Self.decoder.decode(Element.self, from: raw) {
+                elements.append(element)
+            } else {
+                unreadable.append(raw)
+            }
+        }
+        return elements
+    }
+
+    func save(_ elements: [Element]) throws {
+        guard writable else { return }
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var data = try Self.encoder.encode(elements)
+        if !unreadable.isEmpty {
+            let encoded = elements.isEmpty ? [] : [data.dropFirst().dropLast()]
+            data = Data("[".utf8) + (unreadable + encoded).joined(separator: Data(",".utf8)) + Data("]".utf8)
+        }
+        try data.write(to: url, options: .atomic)
     }
 
     private static var encoder: JSONEncoder {
@@ -461,15 +508,6 @@ public final class LibraryStore {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
-    }
-
-    private static func load(_ url: URL) throws -> [GameID: Game] {
-        let games = try decoder.decode([Game].self, from: Data(contentsOf: url))
-        return Dictionary(games.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-    }
-
-    private static func loadFolders(_ url: URL) throws -> [LibraryFolder] {
-        try decoder.decode([LibraryFolder].self, from: Data(contentsOf: url))
     }
 }
 
