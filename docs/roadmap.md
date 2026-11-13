@@ -106,7 +106,7 @@ New bugs get a GitHub issue and a line here.
 - YU-RIS: a double-to-long conversion out of range in `var.c`, seen under UBSan (#171).
 - System 4: `VSFile` writes slot details in place, so a failed write leaves them unreadable (#173).
 - KiriKiri: `TVPTempBitmapHolder` never reaches refcount 0, so a small bitmap leaks once per process (#174).
-- Audit, partly fixed and still open: #104, #109, #121, #164, #166 and #169.
+- Audit, partly fixed and still open: #109, #121, #164, #166 and #169.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
