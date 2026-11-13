@@ -32,6 +32,7 @@
 #include "TVPColor.h"
 #include "TVPFont.h"
 #include "TVPTimer.h"
+#include "tjsNativeLayer.h"
 
 tTVPApplication* Application = NULL;
 static tTJSCriticalSection _NoMemCallBackCS;
@@ -229,6 +230,7 @@ void tTVPApplication::OnExit()
     TVPClearAllAutoPath();
     TVPClearAllWindows();
     krkrsdl3::TVPClearAllTexture();
+    TVPTempBitmapHolderReset();
     iTVPTexture2D::RecycleProcess();
     TVPResetFonts();
 }

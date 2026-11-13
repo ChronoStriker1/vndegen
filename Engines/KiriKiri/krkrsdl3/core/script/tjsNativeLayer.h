@@ -25,6 +25,7 @@ const tTVPBaseTexture& TVPGetInitialBitmap();
 //---------------------------------------------------------------------------
 void TVPTempBitmapHolderAddRef();
 void TVPTempBitmapHolderRelease();
+void TVPTempBitmapHolderReset();
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
