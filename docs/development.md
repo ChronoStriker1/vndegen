@@ -30,7 +30,7 @@ Each bundled runtime writes the license notices of the code it links into `build
 
 ### Building from another machine
 
-`scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
+`scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. Several arguments reach the command as they are, spaces and quotes included, and a single argument runs as a shell command line, such as `'make && make test'`. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
 
 ### Testing helpers
 

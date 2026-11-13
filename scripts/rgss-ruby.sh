@@ -20,9 +20,7 @@ url=https://cache.ruby-lang.org/pub/ruby/3.4/ruby-$version.tar.gz
 patches=("$root"/Engines/RGSSRuntime/patches/ruby-*.patch)
 jobs=${VNDEGEN_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}
 
-# What decides the result: the version, the configure options and the patches.
-options_list() { sed -n '/^options=(/,/)$/p' "$0"; }
-stamp=$( { echo "$version"; options_list; cat "${patches[@]}"; } | shasum -a 256 | cut -c1-16)-$platform
+stamp=$( { echo "$version"; cat "$0" "${patches[@]}"; } | shasum -a 256 | cut -c1-16)-$platform
 case "$platform" in
   apple) product=$root/Packages/VNDegenKit/build/RGSSRuby.xcframework ;;
   linux) product=$out/linux ;;

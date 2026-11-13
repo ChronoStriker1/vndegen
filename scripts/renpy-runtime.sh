@@ -21,13 +21,20 @@ cache=${VNDEGEN_RENPY_CACHE:-$HOME/Library/Caches/VNDegen/renpy-sdk}
 stamp=$(shasum -a 256 "$0" | cut -c1-16)
 notices=$(cd "$(dirname "$0")" && pwd)/licenses/renpy
 
+temps=()
+trap 'rm -rf ${temps[@]+"${temps[@]}"}' EXIT
+
 fetch() { # <file name> <sha256> <url>
   local file="$cache/$1"
-  echo "$2  $file" | shasum -a 256 -c --status 2>/dev/null && return
   mkdir -p "$cache"
-  curl -fsSL "$3" -o "$file.part"
-  echo "$2  $file.part" | shasum -a 256 -c --status || { echo "$1 checksum mismatch" >&2; exit 1; }
-  mv "$file.part" "$file"
+  exec 8>"$cache/.fetch.lock"
+  lockf 8
+  if ! echo "$2  $file" | shasum -a 256 -c --status 2>/dev/null; then
+    curl -fsSL "$3" -o "$file.part"
+    echo "$2  $file.part" | shasum -a 256 -c --status || { echo "$1 checksum mismatch" >&2; exit 1; }
+    mv "$file.part" "$file"
+  fi
+  exec 8>&-
 }
 
 install() { # <version> <sha256> <folder> <python line>
@@ -38,6 +45,7 @@ install() { # <version> <sha256> <folder> <python line>
   fetch "renpy-$version-sdk.tar.bz2" "$sum" "https://www.renpy.org/dl/$version/renpy-$version-sdk.tar.bz2"
   local work sdk
   work=$(mktemp -d)
+  temps+=("$work")
   sdk="$work/renpy-$version-sdk"
   tar -xjf "$tarball" -C "$work"
   # Copies keep their dates, so the SDK's compiled Python stays current and Python never recompiles inside the app.
@@ -76,6 +84,7 @@ install_ios() { # <version> <sha256>
   fetch "renpy-$version-renios.zip" "$sum" "https://www.renpy.org/dl/$version/renpy-$version-renios.zip"
   local work prebuilt config library libraries
   work=$(mktemp -d)
+  temps+=("$work")
   unzip -q "$cache/renpy-$version-renios.zip" 'renios/prototype/prebuilt/*' 'renios/prototype/Frameworks/*' -d "$work"
   prebuilt="$work/renios/prototype/prebuilt"
   # renios builds simulator libraries as debug and device libraries as release.
@@ -167,6 +176,7 @@ write_licenses() {
   [ "$(cat "$dest/.vndegen-runtime" 2>/dev/null)" = "$lstamp" ] && [ -d "$out" ] && return
   echo "Ren'Py notices -> $out"
   work=$(mktemp -d)
+  temps+=("$work")
   # The native library of each runtime, which links Ren'Py's libraries statically. On iOS that is Ren'Py 8's.
   case "$platform" in
     mac)
