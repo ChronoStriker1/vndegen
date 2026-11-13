@@ -2108,9 +2108,6 @@ void Engine::applySettings() {
     autoWithVoice_ = false;
     autoBytes_ = false;
     charFadeMs_ = kCharFadeMs;
-    // `textcurve SETTING A B` and `autocurve SETTING A B` under `screen defaults`: a 0 to 100 slider's text speed as
-    // A - B x value ms a character, and auto's pause after a line as that many ms for each of its characters, as Test
-    // Game 82's are (set 2, timed under Wine: 167 - 3v and 100 - v).
     if (auto defaults = screens_.find("defaults"); defaults != screens_.end()) {
         if (const auto *curve = defaults->second.setting("textcurve"); curve && curve->size() >= 3)
             charMs_ = std::max(0, field(*curve, 1) - field(*curve, 2) * setting((*curve)[0]));
@@ -2128,9 +2125,6 @@ void Engine::applySettings() {
         }
         // `textfade MS`: how long each character takes to fade in, under 50 ms in Test Game 87 (set 1, under Wine).
         if (const auto *fade = defaults->second.setting("textfade"); fade && !fade->empty()) charFadeMs_ = std::max(0, field(*fade, 0));
-        // `autocurve SETTING A B BASE BASESLOPE` adds BASE - BASESLOPE x value ms to the pause while it has any per character,
-        // as Test Game 87's does: 104 - 1.04v ms a character and about 527 - v ms more, and none at 100, where it goes on
-        // within a frame or two (set 1, 30 fps recordings under Wine at 0, 50, 75 and 100, within 33 to 90 ms rms).
         if (const auto *curve = defaults->second.setting("autocurve"); curve && curve->size() >= 3) {
             double v = setting((*curve)[0]);
             autoPerCharMs_ = std::max(0, int(std::lround(std::atof((*curve)[1].c_str()) - std::atof((*curve)[2].c_str()) * v)));

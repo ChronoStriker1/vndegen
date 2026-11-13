@@ -14,7 +14,8 @@ textshift 1 -1
 default opacity 100
 default text 50
 textpoints text 0 178 25 98 50 17 75 3 100 0
-autocurve auto 104 1.04 527 1
+autocurve auto 104 1.04 240 0
+autobytes
 autowithvoice
 default auto 50
 default bgm 60
