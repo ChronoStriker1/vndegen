@@ -97,7 +97,9 @@ game's data folder:
 The `.sol` bytes are the same on both sides. Ruffle names a shared object by the movie's URL, which percent-encodes a
 path such as `My Game/game.swf`, and the file here has the plain name, as Flash Player's does. Pages encode a path in
 different ways, so `flash-page.js` gives every key one encoding before it reaches storage, the one VNDegen gives movie
-URLs, and the save reads back under the key Ruffle asks for. A movie may also ask for a shorter local path, a folder
+URLs, and the save reads back under the key Ruffle asks for. Windows ignores case, so a launcher page or loader movie
+may name `Game.swf` when the disk has `game.swf`: a key whose local path matches a stored save's in any case, with the
+same name, reads and writes that save, so a save restored from the PC is found and one game keeps one set of saves. A movie may also ask for a shorter local path, a folder
 above it, and save there. A shared object's name with slashes in it starts with `#`, as in `game.swf/#saves/slot1.sol`.
 A folder of the local path that starts with `#` starts with `%23` on disk instead, so the two never meet, and a folder
 whose name already starts that way, `%23` or `%2523` and so on, gets one more `25`. Every other folder keeps its name. A backup's path maps to the movie in this game folder that the longest end
@@ -129,7 +131,8 @@ with the same host page and Ruffle build.
 
 The case check (`scripts/case-check.sh`) passed with all 14, every file and folder name's case swapped, on a
 case-sensitive volume: each reached its title and started on the iPad simulator and in the Mac app, with no file
-missed, and the 12 that save saved and loaded. Saves of a movie are named with the movie's path as the disk spells it.
+missed, and the 12 that save saved and loaded. Saves of a movie are named with the movie's path as the disk spells it
+when VNDegen starts the movie, and keep the spelling of the save already stored when a page names it in another case.
 
 Saves were checked by adding a value to each game's `.sol` file, starting the game again, and quitting: Ruffle wrote
 every file back with the value, so it had read it. The `.sol` files that four games ship from the PC loaded in the Mac

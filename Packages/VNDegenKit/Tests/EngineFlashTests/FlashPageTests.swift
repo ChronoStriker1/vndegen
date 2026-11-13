@@ -13,9 +13,11 @@ import WebKit
     private(set) var requests: [BridgeRequest] = []
     private var loaded: CheckedContinuation<Void, any Error>?
     private let origin: URL
+    private let stored: [String: String]
 
-    init(origin: URL, fileStorage: Bool = true) throws {
+    init(origin: URL, fileStorage: Bool = true, stored: [String: String] = [:]) throws {
         self.origin = origin
+        self.stored = stored
         let game = WebGameConfiguration(folder: GameFolder(root: TestFolders.root, webRoot: ""), appName: "test",
                                         runtime: .browser, storageDirectory: fileStorage ? TestFolders.root : nil,
                                         buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
@@ -84,7 +86,7 @@ import WebKit
         let json = String(prompt.dropFirst(WebGameSession.bridgePrefix.count))
         let request = try? JSONDecoder().decode(BridgeRequest.self, from: Data(json.utf8))
         if let request { requests.append(request) }
-        completionHandler((request == .storageLoad ? BridgeReply.value(.dictionary([:])) : BridgeReply.value(.null)).json)
+        completionHandler((request == .storageLoad ? BridgeReply.value(.dictionary(stored)) : BridgeReply.value(.null)).json)
     }
 }
 
@@ -124,6 +126,19 @@ import WebKit
     let sets = page.requests.compactMap { if case let .storageSet(key, _) = $0 { key } else { nil } }
     #expect(sets == ["localhost/Folder!/My%20Game/game.swf/save", "localhost/*%E6%89%93/game.swf/#Folder%21/slot", "other/Folder%21/game.swf/save"])
     #expect(try await page.run("return localStorage['localhost/Folder!/My Game/game.swf/save'] + localStorage['localhost/Folder%21/My%20Game/game.swf/save']") as? String == "aa")
+}
+
+@MainActor @Test func aMovieNamedInAnotherCaseFindsItsSave() async throws {
+    let page = try FlashPage(origin: URL(string: "https://localhost/")!, stored: ["localhost/My%20Game/game.swf/save": "old"])
+    try await page.load()
+    #expect(try await page.run("""
+        return [localStorage.getItem('localhost/my%20game/Game.swf/save'), localStorage['localhost/MY GAME/GAME.SWF/save'],
+                localStorage.getItem('localhost/My%20Game/game.swf/Save')].join(' ');
+        """) as? String == "old old ")
+    try await page.run("localStorage.setItem('localhost/my%20game/Game.swf/save', 'new'); localStorage.setItem('localhost/Other.swf/save', 'x');")
+    try await page.run("localStorage.setItem('localhost/other.swf/save', 'y');")
+    let sets = page.requests.compactMap { if case let .storageSet(key, _) = $0 { key } else { nil } }
+    #expect(sets == ["localhost/My%20Game/game.swf/save", "localhost/Other.swf/save", "localhost/Other.swf/save"])
 }
 
 @MainActor @Test func webKitsOwnStorageStillWorksThroughThePageScript() async throws {
