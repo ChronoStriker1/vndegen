@@ -74,3 +74,52 @@ import VNCore
     #expect(press(.cancel) == .cancel)
     #expect(entry.handle(.button(.confirm, pressed: false), expectedLength: 4) == .none)
 }
+
+@MainActor private func makeLock(guarded: Bool? = nil) -> (LockService, UserDefaults) {
+    let defaults = UserDefaults(suiteName: UUID().uuidString)!
+    defaults.set(false, forKey: "lock.biometricsEnabled")
+    if let guarded { defaults.set(guarded, forKey: "lock.guarded") }
+    return (LockService(keychainService: "vndegen-tests-\(UUID().uuidString)", defaults: defaults), defaults)
+}
+
+@MainActor @Test func aLibraryOnceGuardedNeverOffersANewPasscode() {
+    let (fresh, _) = makeLock()
+    let (guarded, _) = makeLock(guarded: true)
+    #expect(fresh.needsPasscodeSetup && !fresh.canUseDevicePasscode)
+    #expect(!guarded.needsPasscodeSetup && guarded.canUseDevicePasscode)
+    #expect(!guarded.hasPasscode)
+}
+
+@MainActor @Test func removingThePasscodeWithNothingElseLeavesTheLibraryUnguarded() {
+    let (lock, defaults) = makeLock(guarded: true)
+    lock.setPasscode(nil)
+    #expect(!defaults.bool(forKey: "lock.guarded"))
+    #expect(lock.needsPasscodeSetup)
+}
+
+@MainActor @Test func wrongPasscodesWaitLongerEachTimeAndTheWaitOutlivesARelaunch() {
+    #expect((1...4).allSatisfy { LockService.delay(afterFailures: $0) == nil })
+    #expect(LockService.delay(afterFailures: 5) == 30)
+    #expect(LockService.delay(afterFailures: 6) == 60)
+    #expect(LockService.delay(afterFailures: 20) == 15 * 60)
+
+    let (lock, defaults) = makeLock()
+    guard lock.setPasscode("1234") else { return }
+    for _ in 1...5 { #expect(!lock.unlock(passcode: "0000")) }
+    #expect(lock.isWaiting)
+    #expect(!lock.unlock(passcode: "1234"))
+    #expect(lock.rejection("Wrong passcode").hasPrefix("Too many tries."))
+    let relaunched = LockService(keychainService: "unused-\(UUID().uuidString)", defaults: defaults)
+    #expect(relaunched.isWaiting)
+    lock.setPasscode(nil)
+}
+
+@MainActor @Test func theRightPasscodeClearsTheCount() {
+    let (lock, defaults) = makeLock()
+    guard lock.setPasscode("1234") else { return }
+    for _ in 1...4 { #expect(!lock.unlock(passcode: "0000")) }
+    #expect(lock.unlock(passcode: "1234"))
+    #expect(defaults.integer(forKey: "lock.failures") == 0)
+    #expect(!lock.unlock(passcode: "0000") && !lock.isWaiting)
+    lock.setPasscode(nil)
+}

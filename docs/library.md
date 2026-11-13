@@ -99,6 +99,8 @@ A long press on a game in any library layout, a right click on a Mac, or X on a 
 
 Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 
+Once a passcode or Face ID or Touch ID guards the library, the unlock screen never offers to set a new passcode instead. When neither can be used at that moment, such as Touch ID on a MacBook with its lid closed, or a passcode the Keychain can't read yet, it asks for the device passcode or the Mac's password, and so does setting a passcode in Settings. After five wrong passcodes, each further try waits longer, from 30 seconds up to 15 minutes, also across relaunches.
+
 ## In-game orientation
 
 On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen. In a window, tiled or not, a game follows the window's shape. You can change the setting globally or per game: Landscape, Portrait, or Follow device.

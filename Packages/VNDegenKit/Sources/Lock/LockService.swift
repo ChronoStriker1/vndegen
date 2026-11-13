@@ -40,26 +40,49 @@ public final class LockService {
         didSet { defaults.set(biometricsEnabled, forKey: Self.biometricsKey) }
     }
     /// True when nothing could unlock the library yet, so the user must set a passcode before locking games.
-    public var needsPasscodeSetup: Bool { !hasPasscode && !canUseBiometrics }
+    public var needsPasscodeSetup: Bool { !hasPasscode && !canUseBiometrics && !isGuarded }
     public var canUseBiometrics: Bool { biometricsEnabled && biometry != .none }
+    public var canUseDevicePasscode: Bool { !hasPasscode && !canUseBiometrics && isGuarded }
+    public private(set) var retryAfter: Date?
 
     /// The keypad state UnlockView shows. It lives here because the hub calls `UnlockView.handle(_:)` on a view value it may
     /// have recreated, and every copy must reach the same keypad.
     let unlockEntry = PasscodeEntry()
 
     private static let biometricsKey = "lock.biometricsEnabled"
+    private static let guardedKey = "lock.guarded"
+    private static let failuresKey = "lock.failures"
+    private static let retryAfterKey = "lock.retryAfter"
     private let defaults: UserDefaults
     private let keychain: KeychainItem
     private var record: PasscodeRecord?
+    private var passcodeUnreadable = false
     private var authenticating = false
+    private var isGuarded: Bool { passcodeUnreadable || defaults.bool(forKey: Self.guardedKey) }
 
     public init(keychainService: String = KeychainService.named("com.chronostriker1.vndegen.lock"), defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.keychain = KeychainItem(service: keychainService, account: "passcode")
         biometricsEnabled = defaults.object(forKey: Self.biometricsKey) as? Bool ?? true
-        record = keychain.read().flatMap { try? JSONDecoder().decode(PasscodeRecord.self, from: $0) }
-        hasPasscode = record != nil
+        retryAfter = defaults.object(forKey: Self.retryAfterKey) as? Date
+        readPasscode()
         refreshBiometry()
+        if hasPasscode || canUseBiometrics { defaults.set(true, forKey: Self.guardedKey) }
+    }
+
+    private func readPasscode() {
+        do {
+            record = try keychain.read().flatMap { try? JSONDecoder().decode(PasscodeRecord.self, from: $0) }
+            passcodeUnreadable = false
+        } catch {
+            record = nil
+            passcodeUnreadable = true
+        }
+        hasPasscode = record != nil
+    }
+
+    private func setGuarded(_ guarded: Bool) {
+        defaults.set(guarded, forKey: Self.guardedKey)
     }
 
     /// Digits in the current passcode, so the keypad can submit as soon as the last one is typed.
@@ -67,6 +90,7 @@ public final class LockService {
 
     /// Re-reads what biometry the device offers. The views call it when they appear, since enrollment can change in Settings.
     public func refreshBiometry() {
+        if passcodeUnreadable { readPasscode() }
         let context = LAContext()
         var error: NSError?
         let available = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
@@ -88,6 +112,17 @@ public final class LockService {
     public func unlockWithBiometrics() async -> Bool {
         guard canUseBiometrics, !authenticating else { return isUnlocked }
         let ok = await authenticate(reason: "Show your hidden games.")
+        if ok {
+            isUnlocked = true
+            setGuarded(true)
+        }
+        return ok
+    }
+
+    /// The device passcode, or the Mac's password, for hidden games guarded by biometrics that can't be used right now.
+    public func unlockWithDevicePasscode() async -> Bool {
+        guard canUseDevicePasscode, !authenticating else { return isUnlocked }
+        let ok = await authenticate(reason: "Show your hidden games.")
         if ok { isUnlocked = true }
         return ok
     }
@@ -96,7 +131,7 @@ public final class LockService {
     /// change would let whoever holds the device in, so it asks for biometrics first, the same check that unlocks.
     /// With a passcode set, the passcode flows ask for the current one instead.
     public func authorizeCredentialChange() async -> Bool {
-        guard !hasPasscode, canUseBiometrics else { return true }
+        guard !hasPasscode, canUseBiometrics || isGuarded else { return true }
         guard !authenticating else { return false }
         return await authenticate(reason: "Change how your hidden games unlock.")
     }
@@ -106,8 +141,10 @@ public final class LockService {
     public func setBiometricsEnabled(_ enabled: Bool) async -> Bool {
         if enabled {
             biometricsEnabled = true
+            if canUseBiometrics { setGuarded(true) }
         } else if await authorizeCredentialChange() {
             biometricsEnabled = false
+            setGuarded(hasPasscode)
         }
         return biometricsEnabled
     }
@@ -124,9 +161,34 @@ public final class LockService {
     }
 
     public func unlock(passcode: String) -> Bool {
-        guard let record, record.matches(passcode) else { return false }
+        guard let record, !isWaiting else { return false }
+        guard record.matches(passcode) else {
+            let failures = defaults.integer(forKey: Self.failuresKey) + 1
+            defaults.set(failures, forKey: Self.failuresKey)
+            if let delay = Self.delay(afterFailures: failures) {
+                retryAfter = .now.addingTimeInterval(delay)
+                defaults.set(retryAfter, forKey: Self.retryAfterKey)
+            }
+            return false
+        }
+        defaults.removeObject(forKey: Self.failuresKey)
+        defaults.removeObject(forKey: Self.retryAfterKey)
+        retryAfter = nil
         isUnlocked = true
         return true
+    }
+
+    public var isWaiting: Bool { retryAfter.map { $0 > .now } ?? false }
+
+    public func rejection(_ message: String) -> String {
+        guard let wait = retryAfter?.timeIntervalSinceNow, wait > 0 else { return message }
+        let time = Duration.seconds(wait.rounded(.up)).formatted(.units(allowed: [.minutes, .seconds], width: .wide))
+        return "Too many tries. Try again in \(time)."
+    }
+
+    static func delay(afterFailures failures: Int) -> TimeInterval? {
+        guard failures >= 5 else { return nil }
+        return TimeInterval(min(30 << min(failures - 5, 5), 15 * 60))
     }
 
     /// Sets, replaces, or with nil removes the passcode. It does not check the current one, so callers that change or remove
@@ -137,12 +199,16 @@ public final class LockService {
             keychain.delete()
             record = nil
             hasPasscode = false
+            passcodeUnreadable = false
+            setGuarded(canUseBiometrics)
             return true
         }
         let new = PasscodeRecord(passcode: passcode)
         guard let data = try? JSONEncoder().encode(new), keychain.write(data) else { return false }
         record = new
         hasPasscode = true
+        passcodeUnreadable = false
+        setGuarded(true)
         return true
     }
 
@@ -199,12 +265,18 @@ nonisolated struct KeychainItem {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
     }
 
-    func read() -> Data? {
+    struct ReadError: Error {
+        let status: OSStatus
+    }
+
+    func read() throws -> Data? {
         var query = query
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else { throw ReadError(status: status) }
         return result as? Data
     }
 
