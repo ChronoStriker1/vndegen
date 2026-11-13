@@ -710,7 +710,7 @@ void Game::setString(Thread &t, const Command &c) {
             std::filesystem::create_directories(path.parent_path(), ec);
             std::string text = "\xEF\xBB\xBF" + cur;
             try {
-                writeFileReplacing(path, text.data(), text.size());
+                writeFileReplacing(path, text.data(), text.size(), false);
             } catch (const std::exception &) {
                 log("cannot write " + rhs);
             }

@@ -449,7 +449,7 @@ void Game::csvCommand(Thread &t, const Command &c) {
         std::error_code ec;
         std::filesystem::create_directories(path.parent_path(), ec);
         try {
-            writeFileReplacing(path, out.data(), out.size());
+            writeFileReplacing(path, out.data(), out.size(), false);
         } catch (const std::exception &) {
             log("cannot write " + name);
         }

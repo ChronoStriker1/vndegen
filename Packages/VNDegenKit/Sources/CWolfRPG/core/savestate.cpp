@@ -211,7 +211,7 @@ std::shared_ptr<SaveFile> Game::readSave(const fs::path &path, std::string *erro
     }
 }
 
-void writeFileReplacing(const fs::path &path, const void *data, size_t size) {
+void writeFileReplacing(const fs::path &path, const void *data, size_t size, bool sync) {
     // Written beside the slot and renamed over it, so a failed write leaves the old save as it was.
     fs::path tmp = path;
     tmp += ".tmp";
@@ -232,9 +232,9 @@ void writeFileReplacing(const fs::path &path, const void *data, size_t size) {
         done += size_t(n);
     }
 #ifdef __APPLE__
-    if (!failure && ::fcntl(fd, F_FULLFSYNC) == -1 && ::fsync(fd) != 0) failure = errno;
+    if (sync && !failure && ::fcntl(fd, F_FULLFSYNC) == -1 && ::fsync(fd) != 0) failure = errno;
 #else
-    if (!failure && ::fsync(fd) != 0) failure = errno;
+    if (sync && !failure && ::fsync(fd) != 0) failure = errno;
 #endif
     if (::close(fd) != 0 && !failure) failure = errno;
     if (failure) {
@@ -253,7 +253,7 @@ bool Game::writeSave(const fs::path &path, const SaveFile &save, std::string *er
     try {
         std::vector<uint8_t> bytes = serializeSave(save);
         fs::create_directories(path.parent_path());
-        writeFileReplacing(path, bytes.data(), bytes.size());
+        writeFileReplacing(path, bytes.data(), bytes.size(), true);
         casepath_changed(path.string().c_str());
         return true;
     } catch (const std::exception &e) {

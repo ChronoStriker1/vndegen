@@ -24,7 +24,7 @@ enum SysType {
 constexpr int32_t kMillion = 1000000;
 constexpr int kMaxXYImageSide = 4096;
 
-void writeFileReplacing(const std::filesystem::path &path, const void *data, size_t size);
+void writeFileReplacing(const std::filesystem::path &path, const void *data, size_t size, bool sync);
 
 // A facing on the number pad, 1 to 9; anything else from a game's data or a save faces down.
 inline int validDirection(int dir) { return dir >= 1 && dir <= 9 && dir != 5 ? dir : 2; }
