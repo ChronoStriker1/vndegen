@@ -911,3 +911,21 @@ extension SaveSyncService {
     await #expect(throws: SaveSyncError.noStoreFolder(setup.server.path)) { try await setup.service.checkedBackUp(setup.id) }
     #expect(!FileManager.default.fileExists(atPath: store.path))
 }
+
+@MainActor
+@Test func theSavesPageFollowsTheMirroredMapping() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    #expect(setup.service.locations(for: setup.id).first?.recorded == nil)
+    _ = try await setup.service.checkedBackUp(setup.id)
+    let recorded = try #require(setup.service.locations(for: setup.id).first?.recorded)
+    #expect(setup.service.locations(for: setup.id).first?.recorded == recorded)
+
+    let elsewhere = "/home/deck/elsewhere/NoSocksRPG/save/"
+    var mapping = LudusaviMapping(name: setup.game, drives: ["drive-0": ""])
+    mapping.backups = [FullBackup(name: "backup-1", when: Timestamp.epoch, os: "linux", locked: false,
+                                  files: [elsewhere + "file1.rmmzsave": FileEntry(hash: sha1("x"), size: 1)], registryHash: nil, children: [])]
+    try await setup.server.write(Data(mapping.yamlString().utf8), to: "\(setup.game)/mapping.yaml")
+    await setup.service.refresh()
+    #expect(recorded != elsewhere)
+    #expect(setup.service.locations(for: setup.id).first?.recorded == elsewhere)
+}
