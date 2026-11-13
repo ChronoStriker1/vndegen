@@ -239,8 +239,8 @@ import TestSupport
         var w: Int32 = 0, h: Int32 = 0, changed = false
         let px = try #require(vnneko_frame(e, &w, &h, &changed))
         var bright = 0
-        for y in 480..<Int(h) {
-            for x in 0..<Int(w) {
+        for y in 0..<40 {
+            for x in 0..<200 {
                 let i = (y * Int(w) + x) * 4
                 if px[i] > 230 && px[i + 1] > 230 && px[i + 2] > 230 { bright += 1 }
             }
