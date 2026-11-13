@@ -82,6 +82,44 @@ func tree(_ root: URL) throws -> [String: String] {
     #expect(try LudusaviMapping(yaml: text) == mapping)
 }
 
+private func mapping(listing names: [String], differential: Bool) -> String {
+    let indent = differential ? "          " : "      "
+    let files = names.map {
+        "\(indent)\"/home/deck/\($0)\":\n\(indent)  hash: da39a3ee5e6b4b0d3255bfef95601890afd80709\n\(indent)  size: 0"
+    }.joined(separator: "\n")
+    let backup = differential ? """
+        files: {}
+        children:
+          - name: backup-2
+            when: "2026-01-02T00:00:00Z"
+            files:
+    \(files)
+    """ : """
+        files:
+    \(files)
+        children: []
+    """
+    return """
+    name: Game
+    drives:
+      drive-0: ""
+    backups:
+      - name: backup-1
+        when: "2026-01-01T00:00:00Z"
+    \(backup)
+
+    """
+}
+
+@Test(arguments: [["save1.dat", "save1.dat"],
+                  ["セーブガ.dat".precomposedStringWithCanonicalMapping, "セーブガ.dat".decomposedStringWithCanonicalMapping]])
+func aMappingThatListsAFileTwiceIsUnreadableNotACrash(names: [String]) throws {
+    for differential in [false, true] {
+        #expect(try LudusaviMapping(yaml: mapping(listing: [names[0], "other.dat"], differential: differential)).backups.count == 1)
+        #expect(throws: YAMLError.self) { try LudusaviMapping(yaml: mapping(listing: names, differential: differential)) }
+    }
+}
+
 @Test func differentialRemovalsAndRegistryOverridesRoundTrip() throws {
     let text = """
     ---

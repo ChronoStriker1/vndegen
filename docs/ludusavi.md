@@ -47,6 +47,8 @@ Each game then finds its Ludusavi game by itself: by the Steam app ID in its met
 
 A backup from a Windows PC can hold registry data beside its files. VNDegen's own backups carry it forward, so Ludusavi on the PC still restores it from the latest backup. Unity games on a Mac that run through CrossOver keep their PlayerPrefs, often their settings and sometimes their progress, in the registry under `HKEY_CURRENT_USER\Software\<company>\<product>`. For those games alone, a restore applies that one key's values from the backup, and a backup writes them back into the backup's `registry.reg` as Ludusavi writes it, with every other key it holds unchanged. VNDegen never applies any other registry data.
 
+A game whose `mapping.yaml` lists one file twice, as a hand edit can, or under two names that differ only in Unicode normalization, as a Linux disk can hold, can't be read, and VNDegen leaves that game's backups alone. The other games sync as usual.
+
 Ludusavi on a PC that syncs its backup folder with rclone sees VNDegen's backups as changes in the cloud. When Ludusavi asks, choose to download them.
 
 Where each engine keeps its saves, and which saves Ludusavi's manifest covers, is in [engines.md](engines.md).
