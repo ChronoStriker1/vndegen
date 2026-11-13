@@ -66,7 +66,7 @@ import TestSupport
                 return game != nil
             }
         }
-        return (opened, String(cString: err))
+        return (opened, String(decoding: err.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self))
     }
 
     @Test func refusesAnArchiveEntryLargerThanTheArchive() throws {
