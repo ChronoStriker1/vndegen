@@ -163,7 +163,18 @@ nonisolated struct GodotPack: Equatable, Sendable {
             }
             cursor = 0
         } else {
-            entries = { file.read(at: $0, count: $1) }
+            var chunk = Data()
+            var chunkStart: UInt64 = 0
+            entries = { offset, count in
+                let relative = offset &- chunkStart
+                if offset < chunkStart || relative > UInt64(chunk.count) || UInt64(count) > UInt64(chunk.count) - relative {
+                    guard let read = file.read(at: offset, upTo: max(count, 1 << 18)), read.count >= count else { return nil }
+                    chunk = read
+                    chunkStart = offset
+                }
+                let start = chunk.startIndex + Int(offset - chunkStart)
+                return chunk.subdata(in: start..<(start + count))
+            }
         }
         let u32 = { entries($0, 4).map { $0.uint32(at: 0) } }
         let u64 = { entries($0, 8).map { $0.uint64(at: 0) } }
@@ -385,10 +396,14 @@ nonisolated extension GodotPack {
 
 nonisolated private extension FileHandle {
     func read(at offset: UInt64, count: Int) -> Data? {
-        // Offsets past Int64 can't be seeked to, and Foundation may trap on them.
-        guard offset <= UInt64(Int64.max), (try? seek(toOffset: offset)) != nil, let data = try? read(upToCount: count),
-              data.count == count else { return nil }
+        guard let data = read(at: offset, upTo: count), data.count == count else { return nil }
         return data
+    }
+
+    func read(at offset: UInt64, upTo count: Int) -> Data? {
+        // Offsets past Int64 can't be seeked to, and Foundation may trap on them.
+        guard offset <= UInt64(Int64.max), (try? seek(toOffset: offset)) != nil else { return nil }
+        return try? read(upToCount: count)
     }
 
     func readUInt16(at offset: UInt64) -> UInt16? { read(at: offset, count: 2).map { UInt16($0[$0.startIndex]) | UInt16($0[$0.startIndex + 1]) << 8 } }

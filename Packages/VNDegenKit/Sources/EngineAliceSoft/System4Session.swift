@@ -60,8 +60,16 @@ final class System4Session: EngineSession {
             // `C:/Games/Game/SaveData/00.asd` maps to `00.asd`: every file under the save folder.
             let parts = path.split(separator: "/").map(String.init)
             guard let at = parts.lastIndex(where: { $0.lowercased() == key }), at + 1 < parts.count else { return nil }
-            return parts[(at + 1)...].joined(separator: "/")
+            return insideFolder(parts[(at + 1)...].joined(separator: "/"))
         }]
+    }
+
+    nonisolated private static let windowsJapanese = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(
+        CFStringEncoding(CFStringEncodings.dosJapanese.rawValue)))
+
+    nonisolated private static func insideFolder(_ relative: String) -> String? {
+        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
+        return parts.isEmpty || parts.contains { ["", ".", ".."].contains($0) } ? nil : relative
     }
 
     /// The ini's SaveFolder, or SaveData.
@@ -69,10 +77,10 @@ final class System4Session: EngineSession {
         for ini in ["AliceStart.ini", "System40.ini"] {
             let url = FileCase.resolve(ini, in: root)
             guard let data = try? Data(contentsOf: url) else { continue }
-            let text = String(decoding: data, as: UTF8.self)
+            let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: windowsJapanese) ?? String(decoding: data, as: UTF8.self)
             for line in text.split(whereSeparator: \.isNewline) {
                 let parts = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-                guard parts.count == 2, parts[0] == "SaveFolder" else { continue }
+                guard parts.count == 2, parts[0].caseInsensitiveCompare("SaveFolder") == .orderedSame else { continue }
                 let value = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: "\""))
                 if !value.isEmpty { return value }
             }

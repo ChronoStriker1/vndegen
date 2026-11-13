@@ -61,19 +61,14 @@ const ExFile *ex() {
         Game &g = G();
         std::string code = codeFile(g.cfg.root, g.ini);
         fs::path want = fs::path(code).replace_extension(".ex");
-        std::error_code ec;
-        for (auto &e : fs::directory_iterator(want.parent_path(), ec)) {
-            std::string a = e.path().filename().string(), b = want.filename().string();
-            if (a.size() == b.size() && strcasecmp(a.c_str(), b.c_str()) == 0) {
-                auto f = std::make_unique<ExFile>();
-                std::string err;
-                if (f->load(e.path().string(), err)) {
-                    g_ex = std::move(f);
-                    for (auto &v : g_ex->entries()) number(v.get());
-                }
-                else g.log("MainEXFile: " + e.path().string() + ": " + err);
-                break;
+        if (std::string path = findCaseless(want.parent_path().string(), want.filename().string()); !path.empty()) {
+            auto f = std::make_unique<ExFile>();
+            std::string err;
+            if (f->load(path, err)) {
+                g_ex = std::move(f);
+                for (auto &v : g_ex->entries()) number(v.get());
             }
+            else g.log("MainEXFile: " + path + ": " + err);
         }
         if (!g_ex) g.log("MainEXFile: no .ex file beside " + code);
     }

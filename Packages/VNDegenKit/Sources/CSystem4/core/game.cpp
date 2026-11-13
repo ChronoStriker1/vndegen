@@ -9,6 +9,7 @@
 #include <fstream>
 
 #include "font.h"
+#include "s4_casepath.h"
 
 namespace fs = std::filesystem;
 
@@ -34,10 +35,10 @@ std::string lower(std::string s) {
 
 // The file in dir whose name matches name ignoring case, or "".
 std::string findCaseless(const std::string &dir, const std::string &name) {
-    std::error_code ec;
-    for (auto &e : fs::directory_iterator(dir, ec))
-        if (lower(e.path().filename().string()) == lower(name)) return e.path().string();
-    return {};
+    std::string path = dir + "/" + name, out(path.size() + 256, '\0');
+    if (s4_casepath_resolve(path.c_str(), out.data(), out.size()) != 1) return {};
+    out.resize(std::strlen(out.c_str()));
+    return out;
 }
 
 Game &game() { return *g_game; }
@@ -68,8 +69,8 @@ void Game::problem(const std::string &s) {
 }
 
 // The ini names the code file and the screen size. Both AliceStart.ini and System40.ini use "Key = value".
-std::map<std::string, std::string> readIni(const std::string &root) {
-    std::map<std::string, std::string> ini;
+Ini readIni(const std::string &root) {
+    Ini ini;
     std::string iniPath = findCaseless(root, "AliceStart.ini");
     if (iniPath.empty()) iniPath = findCaseless(root, "System40.ini");
     if (iniPath.empty()) return ini;
@@ -87,7 +88,7 @@ std::map<std::string, std::string> readIni(const std::string &root) {
     return ini;
 }
 
-std::string codeFile(const std::string &root, const std::map<std::string, std::string> &ini) {
+std::string codeFile(const std::string &root, const Ini &ini) {
     auto it = ini.find("CodeName");
     std::string path = it != ini.end() ? findCaseless(root, it->second) : std::string();
     if (!path.empty()) return path;

@@ -152,6 +152,12 @@ bool yr_scriptpos_set(YR *y, YTask *t, const char *pos) {
     for (u32 i = 0; i < y->scriptCount; i++)
         if (strlen(y->scripts[i].name) == len && !strncasecmp(y->scripts[i].name, (const char *)in.p, len)) { script = (int)i; break; }
     if (script < 0) return false;
+    for (u32 i = 0; i < nframes; i++) {
+        if (frames[i].retScript >= y->scriptCount) return false;
+        int floor = i ? frames[i - 1].loopBase : 0;
+        if (frames[i].loopBase < floor) frames[i].loopBase = floor;
+        if (frames[i].loopBase > (int)nloops) frames[i].loopBase = (int)nloops;
+    }
     while (t->depth > 1) {
         YFrame *f = &t->frames[--t->depth];
         for (int k = 0; k < YR_PARAMS; k++) { free(f->params.s[k]); free(f->results.s[k]); }

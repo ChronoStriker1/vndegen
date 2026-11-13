@@ -7,22 +7,19 @@
 #define STBTT_STATIC
 #include "third_party/stb_truetype.h"
 
-typedef struct YFont {
+struct YFont {
     char path[vnfont_path_max];
     int face;
     u8 *data;
     stbtt_fontinfo info;
     bool ok;
-} YFont;
+};
 
-enum { FONT_CACHE = 8 };
-static YFont fonts[FONT_CACHE];
-static int fontCount;
-
-static YFont *font_for(const char *path, int face) {
-    for (int i = 0; i < fontCount; i++) if (fonts[i].face == face && !strcmp(fonts[i].path, path)) return &fonts[i];
-    if (fontCount == FONT_CACHE) return fonts[0].ok ? &fonts[0] : NULL;
-    YFont *f = &fonts[fontCount++];
+static YFont *font_for(YText *t, const char *path, int face) {
+    for (int i = 0; i < t->fontCount; i++)
+        if (t->fonts[i]->face == face && !strcmp(t->fonts[i]->path, path)) return t->fonts[i];
+    t->fonts = yr_realloc(t->fonts, sizeof(YFont *) * (size_t)(t->fontCount + 1));
+    YFont *f = t->fonts[t->fontCount++] = yr_alloc(sizeof(YFont));
     snprintf(f->path, sizeof f->path, "%s", path);
     f->face = face;
     size_t size;
@@ -40,7 +37,7 @@ static YFont *slot_font(YR *y, const YFontSlot *s, bool *embolden) {
     if (!found) found = vnfont_resolve("MS Gothic", s->bold, 0, &m);
     if (!found) return NULL;
     *embolden = s->bold && m.embolden;
-    YFont *f = font_for(m.path, m.face);
+    YFont *f = font_for(y->txt, m.path, m.face);
     return f && f->ok ? f : NULL;
 }
 
@@ -57,6 +54,8 @@ void yr_text_open(YR *y) {
 void yr_text_close(YR *y) {
     if (!y->txt) return;
     for (int i = 0; i < YR_FONT_SLOTS; i++) free(y->txt->slots[i].name);
+    for (int i = 0; i < y->txt->fontCount; i++) { free(y->txt->fonts[i]->data); free(y->txt->fonts[i]); }
+    free(y->txt->fonts);
     free(y->txt);
     y->txt = NULL;
 }
@@ -167,8 +166,8 @@ int yr_cmd_font(YCall *c, int id) {
     if (id == C_FONT) {
         if (yc_has(c, "NAME")) { free(s->name); s->name = yc_str(c, "NAME"); }
         i64 v;
-        if (yc_int(c, "SX", &v)) s->sx = (int)v;
-        if (yc_int(c, "SY", &v)) s->sy = (int)v;
+        if (yc_int(c, "SX", &v)) s->sx = (int)(v < 0 ? 0 : v > 1024 ? 1024 : v);
+        if (yc_int(c, "SY", &v)) s->sy = (int)(v < 0 ? 0 : v > 1024 ? 1024 : v);
         if (yc_int(c, "COLOR", &v)) { s->color = v; if (!yc_has(c, "COLOR2")) s->color2 = v; }
         if (yc_int(c, "COLOR2", &v)) s->color2 = v;
         if (yc_int(c, "BOLD", &v)) s->bold = v != 0;

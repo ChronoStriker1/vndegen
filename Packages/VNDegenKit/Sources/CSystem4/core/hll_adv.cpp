@@ -32,10 +32,10 @@ struct CharProps {
 TextStyle styleOf(const CharProps &p) {
     TextStyle st;
     st.face = p.type;
-    st.size = p.size;
+    st.size = std::clamp(p.size, 0, 1024);
     st.r = p.r; st.g = p.g; st.b = p.b;
     st.boldWeight = p.bold;
-    st.edgeWeight = p.edge;
+    st.edgeWeight = p.edge >= 0 ? std::min(p.edge, 64.0f) : 0;
     st.er = p.er; st.eg = p.eg; st.eb = p.eb;
     return st;
 }
@@ -318,7 +318,9 @@ S4_HLL(StoatSpriteEngine, MultiSprite_Decode) {
     std::map<int32_t, std::pair<int, int>> owner;
     int kinds = in.u32();
     for (int kind = 0; kind < kinds && !in.bad; kind++) {
-        std::vector<int32_t> nums(size_t(std::max(0, in.u32())));
+        int32_t count = in.u32();
+        if (count < 0 || size_t(count) > (in.b.size() - in.i) / 4) { in.bad = true; break; }
+        std::vector<int32_t> nums(static_cast<size_t>(count));
         for (auto &n : nums) n = in.u32();
         int32_t nrec = in.u32();
         for (int32_t k = 0; k < nrec && !in.bad; k++) {

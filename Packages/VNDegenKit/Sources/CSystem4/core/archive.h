@@ -2,6 +2,7 @@
 // hold numbered pictures, sounds and music; AFA archives hold named files. A lookup returns the file's bytes.
 #pragma once
 #include <cstdint>
+#include <cstdio>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -19,13 +20,18 @@ struct ArchiveEntry {
 
 class Archive {
 public:
-    virtual ~Archive() = default;
+    virtual ~Archive();
     bool read(const ArchiveEntry &e, std::vector<uint8_t> &out);
     const std::vector<std::string> &paths() const { return paths_; }
 
 protected:
+    bool readAt(size_t file, uint64_t offset, size_t size, std::vector<uint8_t> &out);
     std::vector<std::string> paths_;
     std::mutex mutex_;
+
+private:
+    struct Open { FILE *f = nullptr; uint64_t length = 0; };
+    std::vector<Open> open_;
 };
 
 class AldArchive : public Archive {

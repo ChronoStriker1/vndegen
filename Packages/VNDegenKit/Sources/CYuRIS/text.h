@@ -14,8 +14,12 @@ typedef struct YFontSlot {
     int drawmode;
 } YFontSlot;
 
+typedef struct YFont YFont;
+
 struct YText {
     YFontSlot slots[YR_FONT_SLOTS];
+    YFont **fonts;
+    int fontCount;
     bool outputManual;    // TEXT[OUTPUTMODE=0]
     int wait;
 };

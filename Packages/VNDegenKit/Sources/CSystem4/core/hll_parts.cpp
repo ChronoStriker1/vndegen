@@ -188,6 +188,8 @@ void textSize(const State &s, int &w, int &h) {
     h = std::max(1, int(lines.size()) * s.font.size + (int(lines.size()) - 1) * s.lineSpace);
     if (s.areaW > 0) w = s.areaW;
     if (s.areaH > 0) h = s.areaH;
+    w = std::min(w, kMaxSide);
+    h = std::min(h, kMaxSide);
 }
 
 // The size a state shows at: its built picture, its CG, else its text.
@@ -349,21 +351,26 @@ int motionEnd() {
 void build(State &s) {
     Surface out;
     for (const Step &st : s.steps) {
+        if (st.w > kMaxSide || st.h > kMaxSide) continue;
         switch (st.kind) {
         case Step::Create:
         case Step::CreatePixelOnly:
             // A picture larger than any screen comes only from damaged data; it is skipped.
-            if (st.w < 0 || st.h < 0 || st.w > kMaxSide || st.h > kMaxSide) break;
+            if (st.w < 0 || st.h < 0) break;
             out.create(st.w, st.h, st.kind == Step::Create);
             if (st.kind == Step::Create) out.fill(0, 0, out.w, out.h, 0, 0, 0, 0);
             break;
         case Step::Fill: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, out.hasAlpha ? 255 : -1); break;
         case Step::FillAlpha: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, st.a); break;
         case Step::FillBlend: {
+            int x0 = std::max(0, st.x), y0 = std::max(0, st.y);
+            int x1 = int(std::min<int64_t>(out.w, int64_t(st.x) + std::max(0, st.w)));
+            int y1 = int(std::min<int64_t>(out.h, int64_t(st.y) + std::max(0, st.h)));
+            if (x1 <= x0 || y1 <= y0) break;
             Surface f;
-            f.create(std::max(0, st.w), std::max(0, st.h), true);
+            f.create(x1 - x0, y1 - y0, true);
             f.fill(0, 0, f.w, f.h, st.r, st.g, st.b, std::clamp(st.a, 0, 255));
-            if (out.w > 0) blit(out.px.data(), out.w, out.h, st.x, st.y, f.px.data(), f.w, f.h, true, 255, 0);
+            blit(out.px.data(), out.w, out.h, x0, y0, f.px.data(), f.w, f.h, true, 255, 0);
             break;
         }
         case Step::CopyCG:
@@ -771,6 +778,7 @@ bool getPart(const std::vector<int32_t> &in, size_t &i, int &n, Part &p) {
             !serial::getString(in, i, st.loopBase) || !take({&st.loopStart, &st.loopCount, &st.loopMs, &nsteps}) ||
             nsteps < 0 || size_t(nsteps) > in.size() - i)
             return false;
+        f.size = std::clamp(f.size, 0, 1024);
         st.hasText = hasText;
         f.boldWeight = bitsf(bold);
         f.edgeWeight = bitsf(edge);
@@ -1016,13 +1024,7 @@ void partsFunc(int id, FuncArgs a) {
                     small[(size_t(y) * tw + x) * 4 + k] = uint8_t(sum / (r * r));
                 }
         std::vector<uint8_t> qnt = encodeQNT(small.data(), tw, th);
-        bool ok = !path.empty() && !qnt.empty();
-        if (ok) {
-            std::error_code ec;
-            fs::create_directories(fs::path(path).parent_path(), ec);
-            std::ofstream f(path, std::ios::binary | std::ios::trunc);
-            ok = bool(f.write(reinterpret_cast<const char *>(qnt.data()), std::streamsize(qnt.size())));
-        }
+        bool ok = !qnt.empty() && save::writeFile(path, qnt.data(), qnt.size());
         // The save list shows it as "<save>" and the file's name.
         G().cgForgetNamed(name);
         G().cgForgetNamed("<save>" + name.substr(name.find_last_of("\\/") + 1));

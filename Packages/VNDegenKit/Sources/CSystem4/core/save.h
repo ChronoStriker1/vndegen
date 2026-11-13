@@ -20,9 +20,11 @@ void mtXor(uint8_t *p, size_t n, uint32_t seed);
 // The GD container: zlib, under a Mersenne Twister XOR for most VMs. Read takes either and returns the plain bytes.
 bool readGD(const std::string &path, std::vector<uint8_t> &plain);
 bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xorData);
+bool writeFile(const std::string &path, const void *data, size_t size);
 // The host path of a game path: CP932 to UTF-8, backslashes to slashes, matched case-insensitively. Empty for a path
 // outside the game and save folders.
 std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder);
+std::string gameFolderPath(VM &vm);
 
 }  // namespace save
 }  // namespace s4

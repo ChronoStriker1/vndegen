@@ -133,10 +133,11 @@ bool decodeQNT(const uint8_t *d, size_t n, Image &out) {
     uint32_t bpp = rd32(d + off + 16);
     uint32_t psize = rd32(d + off + 24), asize = rd32(d + off + 28);
     if (w <= 0 || h <= 0 || w > 16384 || h > 16384 || bpp != 24 || hdr + uint64_t(psize) + asize > n) return false;
-    out.w = w; out.h = h; out.x = x; out.y = y;
-    out.rgba.assign(size_t(w) * h * 4, 255);
     int W = (w + 1) & ~1, H = (h + 1) & ~1;
     size_t plane = size_t(W) * H;
+    if ((psize && plane * 3 > uint64_t(psize) * 1032 + 64) || (asize && size_t(W) * h > uint64_t(asize) * 1032 + 64)) return false;
+    out.w = w; out.h = h; out.x = x; out.y = y;
+    out.rgba.assign(size_t(w) * h * 4, 255);
     if (psize) {
         std::vector<uint8_t> px;
         if (!inflateTo(d + hdr, psize, px, plane * 3)) return false;

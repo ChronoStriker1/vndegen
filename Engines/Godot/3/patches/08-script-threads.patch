@@ -1,0 +1,79 @@
+--- a/core/bind/core_bind.cpp
++++ b/core/bind/core_bind.cpp
+@@ -2756,7 +2756,12 @@ void _Mutex::_bind_methods() {
+ 
+ ///////////////
+ 
++SafeNumeric<uint32_t> _Thread::running_count;
++
+ void _Thread::_start_func(void *ud) {
++	struct Running {
++		~Running() { running_count.decrement(); }
++	} counted;
+ 	Ref<_Thread> *tud = (Ref<_Thread> *)ud;
+ 	Ref<_Thread> t = *tud;
+ 	memdelete(tud);
+@@ -2868,11 +2873,23 @@ Error _Thread::start(Object *p_instance, const StringName &p_method, const Varia
+ 
+ 	Thread::Settings s;
+ 	s.priority = (Thread::Priority)p_priority;
++	running_count.increment();
+ 	thread.start(_start_func, ud, s);
+ 
+ 	return OK;
+ }
+ 
++bool _Thread::wait_for_running(uint64_t p_usec) {
++	const uint64_t end = OS::get_singleton()->get_ticks_usec() + p_usec;
++	while (running_count.get() > 0) {
++		if (OS::get_singleton()->get_ticks_usec() >= end) {
++			return false;
++		}
++		OS::get_singleton()->delay_usec(1000);
++	}
++	return true;
++}
++
+ String _Thread::get_id() const {
+ 	return itos(thread.get_id());
+ }
+--- a/core/bind/core_bind.h
++++ b/core/bind/core_bind.h
+@@ -739,6 +739,7 @@ protected:
+ 	ObjectID target_instance_id;
+ 	StringName target_method;
+ 	Thread thread;
++	static SafeNumeric<uint32_t> running_count;
+ 	static void _bind_methods();
+ 	static void _start_func(void *ud);
+ 
+@@ -757,6 +758,9 @@ public:
+ 	bool is_alive() const;
+ 	Variant wait_to_finish();
+ 
++	static uint32_t get_running_count() { return running_count.get(); }
++	static bool wait_for_running(uint64_t p_usec);
++
+ 	_Thread();
+ 	~_Thread();
+ };
+--- a/scene/main/scene_tree.cpp
++++ b/scene/main/scene_tree.cpp
+@@ -30,6 +30,7 @@
+ 
+ #include "scene_tree.h"
+ 
++#include "core/bind/core_bind.h"
+ #include "core/io/marshalls.h"
+ #include "core/io/resource_loader.h"
+ #include "core/message_queue.h"
+@@ -771,6 +772,9 @@ void SceneTree::finish() {
+ 	if (root) {
+ 		root->_set_tree(nullptr);
+ 		root->_propagate_after_exit_branch(true);
++		if (!_Thread::wait_for_running(2000000)) {
++			return;
++		}
+ 		memdelete(root); //delete root
+ 		root = nullptr;
+ 	}

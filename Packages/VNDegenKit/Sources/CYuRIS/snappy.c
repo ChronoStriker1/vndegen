@@ -7,6 +7,7 @@ u8 *yr_snappy_decode(const u8 *src, size_t n, size_t *outLen) {
         len |= (size_t)(b & 0x7f) << shift;
         if (!(b & 0x80)) break;
     }
+    if (len > n * 22) return NULL;
     u8 *out = yr_alloc(len ? len : 1);
     size_t w = 0;
     while (o < n && w < len) {

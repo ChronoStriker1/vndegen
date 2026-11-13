@@ -6,9 +6,14 @@
 #include <filesystem>
 #include <functional>
 #include <fstream>
+#include <string_view>
 #include <system_error>
+#include <cerrno>
+#include <fcntl.h>
+#include <unistd.h>
 #include <zlib.h>
 
+#include "s4_casepath.h"
 #include "sjis.h"
 #include "vm.h"
 
@@ -79,46 +84,55 @@ bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xo
     uint32_t len = uint32_t(plain.size());
     std::memcpy(d.data() + 4, &len, 4);
     if (xorData) mtXor(d.data() + 8, cap, kGDSeed);
+    return writeFile(path, d.data(), d.size());
+}
+
+bool writeFile(const std::string &path, const void *data, size_t size) {
+    if (path.empty()) return false;
     // Write beside the target, then rename, so a crash never leaves half a save.
     std::error_code ec;
     fs::create_directories(fs::path(path).parent_path(), ec);
     std::string tmp = path + ".tmp";
-    {
-        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
-        if (!f.write(reinterpret_cast<const char *>(d.data()), std::streamsize(d.size()))) return false;
+    int fd = ::open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    if (fd < 0) return false;
+    bool ok = true;
+    for (const char *p = static_cast<const char *>(data), *end = p + size; ok && p < end;) {
+        ssize_t n = ::write(fd, p, size_t(end - p));
+        if (n > 0) p += n;
+        else if (n < 0 && errno == EINTR) continue;
+        else ok = false;
     }
-    fs::rename(tmp, path, ec);
-    return !ec;
+    if (ok) ok = ::fsync(fd) == 0;
+    if (::close(fd) != 0) ok = false;
+    if (ok) ok = ::rename(tmp.c_str(), path.c_str()) == 0;
+    if (!ok) ::unlink(tmp.c_str());
+    return ok;
 }
 
 namespace {
 // The path with each part matched case-insensitively, as on Windows, so a save the PC wrote as FOO.ASD loads when
 // the game asks for foo.asd.
 std::string caseless(const fs::path &base, const std::string &rel) {
-    fs::path cur(base);
-    for (const auto &part : fs::path(rel)) {
-        std::string ps = part.string();
-        if (ps.empty() || ps == ".") continue;
-        fs::path exact = cur / ps;
-        std::error_code ec;
-        if (!fs::exists(exact, ec)) {
-            std::string low = ps;
-            for (char &ch : low) ch = char(std::tolower(static_cast<unsigned char>(ch)));
-            for (auto &e : fs::directory_iterator(cur, ec)) {
-                std::string n = e.path().filename().string();
-                for (char &ch : n) ch = char(std::tolower(static_cast<unsigned char>(ch)));
-                if (n == low) { exact = e.path(); break; }
-            }
-        }
-        cur = exact;
-    }
-    return cur.string();
+    std::string path = (base / rel).lexically_normal().string(), out(path.size() + 256, '\0');
+    if (s4_casepath_resolve(path.c_str(), out.data(), out.size()) < 0) return path;
+    out.resize(std::strlen(out.c_str()));
+    return out;
 }
 }  // namespace
+
+constexpr std::string_view kGameFolderStandIn = "/VNDegen/Game";
+
+std::string gameFolderPath(VM &vm) {
+    std::string cp932 = sjis::fromUtf8(vm.rootDir);
+    return sjis::toUtf8(cp932) == vm.rootDir ? cp932 : std::string(kGameFolderStandIn);
+}
 
 std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
     std::string p = sjis::toUtf8(name);
     for (char &c : p) if (c == '\\') c = '/';
+    if (p.starts_with(kGameFolderStandIn) && (p.size() == kGameFolderStandIn.size() || p[kGameFolderStandIn.size()] == '/') &&
+        gameFolderPath(vm) == kGameFolderStandIn)
+        p = vm.rootDir + p.substr(kGameFolderStandIn.size());
     // Game code only reaches its own folder and the save folder. An absolute path (the game folder, which
     // SystemService.GetGameFolderPath hands out) must lie in one of them, and a relative one may not climb out.
     // Anything else becomes an empty path, which every file operation fails on.
@@ -128,14 +142,16 @@ std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
     };
     if (!p.empty() && p[0] == '/') {
         fs::path abs = fs::path(p).lexically_normal();
-        return inside(abs, vm.rootDir) || inside(abs, vm.saveDir) ? abs.string() : std::string();
+        for (const std::string &base : { vm.saveDir, vm.rootDir })
+            if (inside(abs, base)) return caseless(base, abs.lexically_relative(fs::path(base).lexically_normal()).string());
+        return {};
     }
     fs::path relative = fs::path(p).lexically_normal();
     if (!relative.empty() && *relative.begin() == "..") return {};
     p = relative.string();
     // A path that starts with the save folder's name, as system.GetSaveFolderName returns it, is in the save folder.
     std::string first = p.substr(0, p.find('/'));
-    std::string lowFirst = first, lowSave = vm.saveFolderName;
+    std::string lowFirst = first, lowSave = sjis::toUtf8(vm.saveFolderName);
     for (char &ch : lowFirst) ch = char(std::tolower(static_cast<unsigned char>(ch)));
     for (char &ch : lowSave) ch = char(std::tolower(static_cast<unsigned char>(ch)));
     if (!lowSave.empty() && lowFirst == lowSave && first.size() < p.size()) return caseless(vm.saveDir, p.substr(first.size() + 1));

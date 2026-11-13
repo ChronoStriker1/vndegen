@@ -255,8 +255,8 @@ static int do_loop(YCall *c) {
     const YArg *set = yc_arg(c, "SET");
     if (set && set->size) count = yc_int_or(c, "SET", -1);
     if (count == 0) { t->ip = c->in->jump + 1; return YR_JUMPED; }
-    if (t->loopDepth == t->loopCap) {
-        t->loopCap = t->loopCap ? t->loopCap * 2 : 16;
+    if (t->loopDepth >= t->loopCap) {
+        while (t->loopDepth >= t->loopCap) t->loopCap = t->loopCap ? t->loopCap * 2 : 16;
         t->loops = yr_realloc(t->loops, sizeof(YLoop) * (size_t)t->loopCap);
     }
     t->loops[t->loopDepth++] = (YLoop){ t->script, t->ip, c->in->jump, count < 0 ? -1 : count, 1 };
