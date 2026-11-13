@@ -219,7 +219,9 @@ static int stream_read(Stream *s, float *out, int frames) {
     int got = 0;
     if (s->kind == KIND_MIDI) return vnmidi_player_render(s->midi, out, frames);
     int channels = s->channels > 8 ? 8 : s->channels;
+    int stride = s->kind == KIND_OGG ? channels : s->channels;
     if (frames > CHUNK) frames = CHUNK;
+    if (frames > CHUNK * 8 / stride) frames = CHUNK * 8 / stride;
     switch (s->kind) {
     case KIND_OGG: got = stb_vorbis_get_samples_float_interleaved(s->vorbis, channels, temp, frames * channels); break;
     case KIND_MP3: got = (int)drmp3_read_pcm_frames_f32(&s->mp3, (drmp3_uint64)frames, temp); break;
@@ -227,7 +229,7 @@ static int stream_read(Stream *s, float *out, int frames) {
     default: break;
     }
     for (int i = 0; i < got; i++) {
-        float l = temp[i * s->channels], r = s->channels > 1 ? temp[i * s->channels + 1] : l;
+        float l = temp[i * stride], r = stride > 1 ? temp[i * stride + 1] : l;
         out[i * 2] = l;
         out[i * 2 + 1] = r;
     }
