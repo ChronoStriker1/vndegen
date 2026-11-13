@@ -101,7 +101,7 @@ import VNCore
     #expect((1...4).allSatisfy { LockService.delay(afterFailures: $0) == nil })
     #expect(LockService.delay(afterFailures: 5) == 30)
     #expect(LockService.delay(afterFailures: 6) == 60)
-    #expect(LockService.delay(afterFailures: 20) == 15 * 60)
+    #expect(LockService.delay(afterFailures: 20) == 900)
 
     let (lock, defaults) = makeLock()
     guard lock.setPasscode("1234") else { return }
