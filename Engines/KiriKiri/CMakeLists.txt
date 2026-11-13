@@ -479,6 +479,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_executable(KiriKiriQueueTest EXCLUDE_FROM_ALL vndegen/queue_test.cpp vndegen/vnkk.mm)
     target_link_libraries(KiriKiriQueueTest PRIVATE kirikiri_engine)
 
+    add_executable(KiriKiriSplitTest EXCLUDE_FROM_ALL vndegen/split_test.cpp vndegen/vnkk.mm)
+    target_link_libraries(KiriKiriSplitTest PRIVATE kirikiri_engine)
+
     # Checks which script lines count as a test for a hidden menu bar. Built on demand, like KiriKiriCipherTest.
     add_executable(KiriKiriMenuBarScanTest EXCLUDE_FROM_ALL vndegen/menubar_scan_test.cpp vndegen/menubar_scan.cpp)
 
