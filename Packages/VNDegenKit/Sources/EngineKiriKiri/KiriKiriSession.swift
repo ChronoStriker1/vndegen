@@ -18,6 +18,7 @@ nonisolated let kiriKiriLog = Logger(subsystem: "com.chronostriker1.vndegen", ca
 /// saves, and `waitUntilStopped()` returns once it has.
 final class KiriKiriSession: EngineSession {
     private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     private enum State {
         /// Waiting for the view to be on screen.
         case waiting
@@ -109,6 +110,7 @@ final class KiriKiriSession: EngineSession {
         guard result == 0 else {
             kiriKiriLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start, see \(self.paths.log.path, privacy: .public)")
             failedToStart = true
+            startFailureReason = engine.problem().map { String(cString: $0) }
             engine.stop()
             Self.engineInUse = false
             stopped()
