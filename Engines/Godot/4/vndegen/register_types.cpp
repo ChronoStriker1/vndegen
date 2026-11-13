@@ -17,7 +17,6 @@ __attribute__((used)) static const void *vngd_functions[] = {
 	(const void *)&vngd_mouse_move,
 	(const void *)&vngd_mouse_button,
 	(const void *)&vngd_wheel,
-	(const void *)&vngd_touch,
 	(const void *)&vngd_joy_button,
 	(const void *)&vngd_joy_axis,
 	(const void *)&vngd_set_paused,

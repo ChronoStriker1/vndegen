@@ -21,6 +21,13 @@ nonisolated public enum LocalArchives {
         scan(folders(gamesRoot: gamesRoot))
     }
 
+    @concurrent
+    public static func listing(gamesRoot: URL) async -> [String] {
+        folders(gamesRoot: gamesRoot).flatMap { folder in
+            ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).map { folder.path + "/" + $0 }
+        }.sorted()
+    }
+
     /// Games, and on iPhone and iPad also the Documents folder that Files shows as VNDegen.
     static func folders(gamesRoot: URL) -> [URL] {
         #if os(iOS)

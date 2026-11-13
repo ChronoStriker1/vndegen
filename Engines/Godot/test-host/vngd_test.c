@@ -8,6 +8,7 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef VNGD_STATIC
@@ -15,6 +16,12 @@
 #else
 #define LOAD(name) typeof(&name) p_##name = dlsym(lib, #name); if (!p_##name) { fprintf(stderr, "missing %s\n", #name); return 2; }
 #endif
+
+static double now(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec + t.tv_nsec / 1e9;
+}
 
 int main(int argc, char **argv) {
     if (argc < 6) { fprintf(stderr, "usage: %s lib datadir frames pack exe...\n", argv[0]); return 2; }
@@ -28,6 +35,7 @@ int main(int argc, char **argv) {
     const char *hex = getenv("VNGD_TEST_KEY");
     for (int i = 0; hex && i < 32; i++) sscanf(hex + 2 * i, "%2hhx", &key[i]);
     const char *steam = getenv("VNGD_TEST_STEAM"), *eos = getenv("VNGD_TEST_EOS");
+    int failed = 0;
     for (int i = 4; i + 1 < argc; i += 2) {
         VNGDLaunch launch = { .pack = argv[i], .executable = argv[i + 1], .dataDir = argv[2], .renderingMethod = "gl_compatibility",
                               .steam = steam && *steam == '1', .epicOnlineServices = eos && *eos == '1', .encryptionKey = hex ? key : NULL };
@@ -38,18 +46,27 @@ int main(int argc, char **argv) {
             continue;
         }
         int frame = 0, quit = 0;
+        double slowest = 0;
         for (; frame < frames && !quit; frame++) {
+            double before = now();
             quit = p_vngd_iterate();
+            if (now() - before > slowest) slowest = now() - before;
             usleep(16000);
         }
         // Then ask it to close and give it two seconds.
         p_vngd_request_quit();
         int extra = 0;
         for (; !quit && extra < 120; extra++) {
+            double before = now();
             quit = p_vngd_iterate();
+            if (now() - before > slowest) slowest = now() - before;
             usleep(16000);
         }
-        fprintf(stderr, "=== ran %d frames, quit %s after %d more\n", frame, quit ? "yes" : "no", extra);
+        fprintf(stderr, "=== ran %d frames, quit %s after %d more, slowest vngd_iterate %.1f ms\n", frame, quit ? "yes" : "no", extra, slowest * 1000);
+        if (slowest > 1) {
+            fprintf(stderr, "=== FAIL: a frame blocked for over a second\n");
+            failed = 1;
+        }
         // With VNGD_SNAPSHOT set, the engine writes its frames there. Each run's last frame is kept beside it.
         const char *snapshot = getenv("VNGD_SNAPSHOT");
         if (snapshot) {
@@ -58,7 +75,7 @@ int main(int argc, char **argv) {
             rename(snapshot, kept);
         }
         p_vngd_stop();
-        fprintf(stderr, "=== stopped\n");
+        fprintf(stderr, "=== stopped%s%s\n", p_vngd_problem() ? ": " : "", p_vngd_problem() ? p_vngd_problem() : "");
     }
-    return 0;
+    return failed;
 }

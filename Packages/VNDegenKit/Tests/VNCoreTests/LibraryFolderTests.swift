@@ -260,6 +260,37 @@ private func setReachable(_ folder: URL, _ reachable: Bool) throws {
     #expect(library.game(GameID("game (External)"))?.folderName == "game")
 }
 
+@Test @MainActor func renamingAGameFolderOnlyInCaseKeepsItsRecord() async throws {
+    let scratch = Scratch()
+    let external = scratch.folder("External")
+    try scratch.addGame("my game", in: scratch.paths.gamesRoot)
+    try scratch.addGame("other game", in: external)
+    let library = scratch.library()
+    try await library.addFolder(external)
+    for id in ["my game", "other game"] {
+        library.update(GameID(id)) { $0.isLocked = true; $0.playTime = 3600 }
+    }
+    let fm = FileManager.default
+    try fm.moveItem(at: scratch.paths.gamesRoot.appendingPathComponent("my game"), to: scratch.paths.gamesRoot.appendingPathComponent("My Game"))
+    try fm.moveItem(at: external.appendingPathComponent("other game"), to: external.appendingPathComponent("Other Game"))
+
+    let reopened = scratch.library()
+    await reopened.refresh()
+    #expect(ids(reopened) == ["my game", "other game"])
+    for game in reopened.games { #expect(game.isLocked && game.playTime == 3600) }
+    #expect(reopened.game(GameID("my game"))?.folderName == "My Game")
+    #expect(reopened.folder(for: GameID("other game")).lastPathComponent == "Other Game")
+    #expect(reopened.gameID(named: "My Game", in: nil) == GameID("my game"))
+}
+
+@Test @MainActor func aFolderBesideItsCaseTwinGetsItsOwnRecord() {
+    var records = [GameID("Game"): Game(id: GameID("Game"))]
+    let listing = LibraryStore.Listing(folder: nil, root: URL(fileURLWithPath: "/Games"), names: ["game", "Game"], available: true, label: "VNDegen")
+    let placed = LibraryStore.place([listing], in: &records)
+    #expect(Set(placed.map(\.id.rawValue)) == ["Game", "game (VNDegen)"])
+    #expect(records[GameID("Game")]?.folderName == nil)
+}
+
 @Test @MainActor func aFolderAddedBackKeepsItsOwnRecordsWhenItsTwinIsGone() async throws {
     let scratch = Scratch()
     let fm = FileManager.default

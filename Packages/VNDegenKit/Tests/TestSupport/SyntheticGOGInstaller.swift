@@ -18,8 +18,22 @@ public enum SyntheticGOGInstaller {
         return .file("{app}\\goggame-\(gameId).info", Array(json.utf8))
     }
 
+    public struct Crafted: Sendable {
+        public var slicesPerDisk: UInt32 = 1
+        public var firstSlice: UInt32 = 0
+        public var lastSlice: UInt32 = 0
+        public var fileSize: UInt64?
+
+        public init(slicesPerDisk: UInt32 = 1, firstSlice: UInt32 = 0, lastSlice: UInt32 = 0, fileSize: UInt64? = nil) {
+            self.slicesPerDisk = slicesPerDisk
+            self.firstSlice = firstSlice
+            self.lastSlice = lastSlice
+            self.fileSize = fileSize
+        }
+    }
+
     public static func make(appName: String, publisher: String = "GOG.com", languages: [String] = ["en-US"],
-                            entries: [Entry], sliced: Bool = false, setupName: String = "setup") -> Built {
+                            entries: [Entry], sliced: Bool = false, setupName: String = "setup", crafted: Crafted = Crafted()) -> Built {
         var fileEntries: [(destination: String, location: Int, languages: String, check: String, before: String, after: String)] = []
         var payloads: [[UInt8]] = []
         for entry in entries {
@@ -51,7 +65,7 @@ public enum SyntheticGOGInstaller {
         header += le32(UInt32(languages.count)) + [0, 0, 0, 0, 0].flatMap(le32)
         header += le32(0) + le32(UInt32(fileEntries.count)) + le32(UInt32(payloads.count)) + zeros(7 * 4)
         header += zeros(20 + 8) + zeros(1)
-        header += zeros(20 + 8 + 8) + le32(1)
+        header += zeros(20 + 8 + 8) + le32(crafted.slicesPerDisk)
         header += zeros(5) + [4] + zeros(2) + zeros(2) + zeros(8)
         header += zeros(6)
         for language in languages {
@@ -67,7 +81,8 @@ public enum SyntheticGOGInstaller {
         var stream: [UInt8] = []
         var entriesBlock: [UInt8] = []
         for payload in payloads {
-            entriesBlock += le32(0) + le32(0) + le32(UInt32(chunkStart)) + le64(UInt64(stream.count)) + le64(UInt64(payload.count))
+            entriesBlock += le32(crafted.firstSlice) + le32(crafted.lastSlice) + le32(UInt32(chunkStart)) + le64(UInt64(stream.count))
+                + le64(crafted.fileSize ?? UInt64(payload.count))
             entriesBlock += le64(0)
             entriesBlock += Array(Insecure.SHA1.hash(data: payload)) + zeros(16) + [0x80, 0]
             stream += payload

@@ -58,7 +58,7 @@ public struct RegistryData: Equatable, Sendable {
     public mutating func setValues(_ values: [RegistryName: RegistryValue], of key: String) {
         let name = spelling(of: key) ?? Self.normalized(key)
         var merged: [RegistryName: RegistryValue] = [:]
-        for (valueName, value) in values.sortedByUTF8 { Self.insert(value, named: valueName, into: &merged) }
+        Self.insert(values, into: &merged)
         keys[name] = merged
     }
 
@@ -90,15 +90,19 @@ public struct RegistryData: Equatable, Sendable {
     mutating func add(_ values: [RegistryName: RegistryValue], to key: String) {
         let name = spelling(of: key) ?? Self.normalized(key)
         var merged = keys[name] ?? [:]
-        for (valueName, value) in values.sortedByUTF8 { Self.insert(value, named: valueName, into: &merged) }
+        Self.insert(values, into: &merged)
         keys[name] = merged
     }
 
     /// A later value replaces one whose name differs only in case, under the name first seen.
-    private static func insert(_ value: RegistryValue, named name: RegistryName, into values: inout [RegistryName: RegistryValue]) {
-        let lower = name.lowercased
-        let existing = values.keys.first { $0.lowercased == lower }
-        values[existing ?? name] = value
+    private static func insert(_ values: [RegistryName: RegistryValue], into merged: inout [RegistryName: RegistryValue]) {
+        var names = Dictionary(merged.keys.map { ($0.lowercased, $0) }, uniquingKeysWith: { first, _ in first })
+        for (name, value) in values.sortedByUTF8 {
+            let lower = name.lowercased
+            let kept = names[lower] ?? name
+            names[lower] = kept
+            merged[kept] = value
+        }
     }
 }
 

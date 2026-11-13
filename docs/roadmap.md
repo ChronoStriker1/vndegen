@@ -103,12 +103,8 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). High:
-  - Library: one record that doesn't decode wipes `library.json`, as installing an older release does (#93).
   - YU-RIS: a heap overflow from an archive entry's size (#152), and a write past the loop array from a saved script position (#153).
-  - Godot: after one frame-capped game, the next one freezes the app at its first frame (#158).
 - Audit, medium, by area:
-  - Hub, library and lock: #94, #95, #96, #97, #98.
-  - Save sync, import and scripts: #102, #103, #105, #108, and #170 (`build.sh test` exits 0 when a Swift Testing suite fails; found after the audit).
   - Web engines, Flash and Artemis: #110, #111, #112, #117.
   - Video: #124, #125, #126.
   - KiriKiri: #129, #130. NScripter: #132.
@@ -116,8 +112,7 @@ New bugs get a GitHub issue and a line here.
   - RGSS: #141, #142, #143, #144, #146, #162, #163.
   - Wolf RPG: #147, #148, #149, #150 (with System 4).
   - System 4 and YU-RIS: #154, #155, #167.
-  - Godot: #159, #160.
-- Audit, low: #99, #100, #101, #104, #106, #107, #109, #113, #114, #115, #116, #118 to #123, #127, #128, #131, #133 to #135, #139, #140, #145, #151, #156, #157, #161, #164 to #166, #168, #169.
+- Audit, low: #104 and #109 (both partly fixed), #113, #114, #115, #116, #118, #119, #121 to #123, #127, #128, #131, #133 to #135, #139, #140, #145, #151, #156, #157, #164 to #166, #168, #169.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.

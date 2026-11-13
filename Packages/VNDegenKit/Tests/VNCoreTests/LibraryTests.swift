@@ -123,6 +123,73 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
     #expect(game.isLocked && game.playTime == 60)
 }
 
+@Test @MainActor func valuesFromANewerVersionCostOnlyThemselves() async throws {
+    let paths = try makeTempLibrary()
+    try addGame("Secret Game", files: ["data.bin"], to: paths)
+    try addGame("Other Game", files: ["data.bin"], to: paths)
+    try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
+    try Data("""
+    [{"id": "Secret Game", "title": "My Secret Title", "artwork": {"capsule": "capsule-1.png", "banner": "banner-1.png"},
+      "isLocked": true, "addedAt": "2026-01-01T00:00:00Z", "lastPlayedAt": "2026-11-01T00:00:00Z", "playTime": 36000,
+      "orientation": "upsideDown", "controlMethod": "telepathy",
+      "buttonMapping": {"a": {"nothing": {}}, "b": {"teleport": {}}, "paddle1": {"nothing": {}}},
+      "metadata": {"title": "Secret", "developers": ["Studio"], "publishers": [], "genres": [],
+                   "refs": [{"source": "mobygames", "id": "1"}, {"source": "vndb", "id": "v2"}]}},
+     {"title": "No ID"},
+     {"id": "Other Game", "title": "Other Game", "artwork": {}, "isLocked": false, "addedAt": "2026-01-01T00:00:00Z",
+      "playTime": 0}]
+    """.utf8).write(to: paths.libraryFile)
+
+    let library = LibraryStore(paths: paths, engines: [])
+    await library.refresh()
+    let secret = try #require(library.game(GameID("Secret Game")))
+    #expect(secret.title == "My Secret Title" && secret.isLocked && secret.playTime == 36000)
+    #expect(secret.lastPlayedAt != nil && secret.artwork == [.capsule: "capsule-1.png"])
+    #expect(secret.orientation == nil && secret.controlMethod == nil)
+    #expect(secret.buttonMapping == [.a: .nothing])
+    #expect(secret.metadata?.title == "Secret" && secret.metadata?.developers == ["Studio"])
+    #expect(secret.metadata?.refs == [ExternalRef(source: .vndb, id: "v2")])
+    #expect(library.games.map(\.id.rawValue).sorted() == ["Other Game", "Secret Game"])
+
+    library.update(secret.id) { $0.playTime += 60 }
+    await library.flush()
+    let saved = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: paths.libraryFile)) as? [[String: Any]])
+    #expect(saved.contains { $0["id"] == nil && $0["title"] as? String == "No ID" })
+    #expect(LibraryStore(paths: paths, engines: []).game(secret.id)?.playTime == 36060)
+}
+
+@Test @MainActor func aScanThatChangesNothingWritesNothing() async throws {
+    let paths = try makeTempLibrary()
+    try addGame("Game", files: ["data.bin"], to: paths)
+    let library = LibraryStore(paths: paths, engines: [])
+    await library.refresh()
+    await library.flush()
+    #expect(FileManager.default.fileExists(atPath: paths.libraryFile.path))
+    try FileManager.default.removeItem(at: paths.libraryFile)
+    await library.refresh()
+    await library.flush()
+    #expect(!FileManager.default.fileExists(atPath: paths.libraryFile.path))
+    library.update(GameID("Game")) { $0.playTime = 1 }
+    library.update(GameID("Game")) { $0.playTime = 2 }
+    #expect(LibraryStore(paths: paths, engines: []).game(GameID("Game"))?.playTime == 2)
+}
+
+@Test @MainActor func aLibraryFileThatIsNotJSONIsSetAsideNotOverwritten() async throws {
+    let paths = try makeTempLibrary()
+    try addGame("Game", files: ["data.bin"], to: paths)
+    try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
+    let damaged = Data("[{\"id\": \"Game\", \"isLocked\": tr".utf8)
+    try damaged.write(to: paths.libraryFile)
+    try damaged.write(to: paths.foldersFile)
+
+    let library = LibraryStore(paths: paths, engines: [])
+    await library.refresh()
+    #expect(library.games.map(\.id.rawValue) == ["Game"])
+    let aside = try FileManager.default.contentsOfDirectory(atPath: paths.support.path).filter { $0.contains("unreadable") }
+    #expect(aside.count == 2)
+    for name in aside { #expect(try Data(contentsOf: paths.support.appendingPathComponent(name)) == damaged) }
+}
+
 @Test func controlMethodsSavedBeforeMouseStylesKeepTheirMeaning() throws {
     let saved = try JSONDecoder().decode([ControlMethod].self, from: Data(#"["touchGamepad", "touchMouse", "controllerOnly"]"#.utf8))
     #expect(saved == [.gamepad, .mouse(.cursor), .controller(mouse: .touch)])

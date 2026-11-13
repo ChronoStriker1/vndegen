@@ -13,7 +13,7 @@ scripts/build.sh ios-sim   # iOS simulator app in build/sim/Build/Products/Debug
 scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ```
 
-`scripts/build.sh test` also runs the file name lookups' unit tests on a case-sensitive disk image. It prints every failing Swift test with its message and each test target's summary, and keeps the whole `swift test` output in `build/swift-test.log`.
+`scripts/build.sh test` also runs the file name lookups' unit tests on a case-sensitive disk image. It prints every failing Swift test with its message and each test target's summary, and keeps the whole `swift test` output in `build/swift-test.log`. It exits non-zero when any test target's run failed, read from that log as well as from `swift test`'s status. A caller that pipes it, as `scripts/remote.sh scripts/build.sh test | tail`, gets the last command's status unless it sets `pipefail`.
 
 ### What a build makes first
 
@@ -30,7 +30,7 @@ Each bundled runtime writes the license notices of the code it links into `build
 
 ### Building from another machine
 
-`scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
+`scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. Several arguments reach the command as they are, spaces and quotes included, and a single argument runs as a shell command line, such as `'make && make test'`. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
 
 ### Testing helpers
 
@@ -46,7 +46,7 @@ A DEBUG build takes `-libraryRoot <folder>`, which points the app at a separate 
 
 ### Releases
 
-`scripts/release.sh <version>` publishes a new release from `main` to the [Releases](https://github.com/ChronoStriker1/vndegen/releases) page and adds it to the AltStore source. `scripts/check-public.sh` must pass first, and `release.sh` runs it. Each release's notes are in `releases/`. Packaged builds (`ipa` and `release`) delete the previous built app first, because Xcode keeps files in a built app that the project no longer makes. Compiled objects stay cached.
+`scripts/release.sh <version>` publishes a new release from `main` to the [Releases](https://github.com/ChronoStriker1/vndegen/releases) page and adds it to the AltStore source. `scripts/check-public.sh` must pass first, and `release.sh` runs it. `release.sh` refuses a checkout with changes or untracked files, because `remote.sh` sends the working tree to the Mac and the release would build files the tag doesn't hold. Each release's notes are in `releases/`. Packaged builds (`ipa` and `release`) delete the previous built app first, because Xcode keeps files in a built app that the project no longer makes. Compiled objects stay cached.
 
 ## Project layout
 

@@ -305,10 +305,13 @@ struct SettingsView: View {
         // The app's own Documents folder is On My iPhone or iPad, VNDegen, and the Files app's local storage is On My
         // iPhone or iPad. A drive or a server connected in Files lives under LiveFiles, in a folder named for its
         // provider and then the volume. Anything else shows its path.
-        // Symlinks resolved on both sides, since iOS reaches the app container as /var and as /private/var.
-        let full = url.resolvingSymlinksInPath().path
+        func plain(_ url: URL) -> String {
+            let path = url.standardizedFileURL.path
+            return path.hasPrefix("/private/") ? String(path.dropFirst("/private".count)) : path
+        }
+        let full = plain(url)
         let device = "On My \(UIDevice.current.localizedModel)"
-        let documents = URL.documentsDirectory.resolvingSymlinksInPath().path + "/"
+        let documents = plain(URL.documentsDirectory) + "/"
         func trail(_ rest: Substring) -> String { rest.split(separator: "/").joined(separator: " › ") }
         if full.hasPrefix(documents) { return "\(device) › VNDegen › " + trail(full.dropFirst(documents.count)) }
         if let range = full.range(of: "/File Provider Storage/") { return "\(device) › " + trail(full[range.upperBound...]) }

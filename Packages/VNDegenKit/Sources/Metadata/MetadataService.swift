@@ -63,6 +63,7 @@ public final class MetadataService {
     @ObservationIgnored private let credentials: any CredentialStore
     @ObservationIgnored private let keyless: [any MetadataProvider]
     private var providers: [any MetadataProvider] = []
+    @ObservationIgnored private var unmatched: [GameID: String] = [:]
 
     public convenience init() {
         self.init(credentials: KeychainCredentials(), http: .live())
@@ -119,8 +120,12 @@ public final class MetadataService {
     /// Finds a match by title and applies it, for games that have no metadata yet.
     /// Only a confident match is applied. Anything less waits for the user to pick.
     public func autoMatch(_ id: GameID, in library: LibraryStore) async {
-        guard let game = library.game(id), game.metadata == nil else { return }
-        guard let match = TitleMatch.confidentMatch(in: await search(game.title), for: game.title) else { return }
+        guard let game = library.game(id), game.metadata == nil, unmatched[id] != game.title else { return }
+        let found = await search(game.title)
+        guard let match = TitleMatch.confidentMatch(in: found, for: game.title) else {
+            if !found.isEmpty { unmatched[id] = game.title }
+            return
+        }
         do {
             try await apply(match, to: id, in: library)
         } catch {

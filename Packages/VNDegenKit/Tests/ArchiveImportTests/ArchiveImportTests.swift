@@ -273,6 +273,18 @@ func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
     #expect(bytesWritten(in: staging) <= 10_000)
 }
 
+@Test func aSevenZipNamedZipExtracts() throws {
+    let misnamed = try temporaryDirectory().appendingPathComponent("misnamed.zip")
+    var data = Data()
+    for part in 1...4 { data += try Data(contentsOf: fixtures.appendingPathComponent("split.7z.00\(part)")) }
+    try data.write(to: misnamed)
+    let source = try ArchiveSource(picked: [misnamed])
+    let listed = try ArchiveExtractor.list(source)
+    let staging = try temporaryDirectory()
+    let done = try ArchiveExtractor.extract(source, password: nil, into: staging, total: listed) { _ in }
+    #expect(done.files == listed.fileCount && done.files > 0)
+}
+
 @Test func countsEveryEntryAgainstTheListedSpace() throws {
     let source = try ArchiveSource(picked: [fixtures.appendingPathComponent("two-items.zip")])
     var listed = try ArchiveExtractor.list(source)

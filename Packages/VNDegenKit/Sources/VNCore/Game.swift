@@ -88,6 +88,19 @@ public struct GameMetadata: Codable, Hashable, Sendable {
         self.refs = refs
         self.screenshots = screenshots
     }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = container.lenient(String.self, forKey: .title)
+        summary = container.lenient(String.self, forKey: .summary)
+        developers = container.lenient([String].self, forKey: .developers) ?? []
+        publishers = container.lenient([String].self, forKey: .publishers) ?? []
+        releaseDate = container.lenient(String.self, forKey: .releaseDate)
+        genres = container.lenient([String].self, forKey: .genres) ?? []
+        rating = container.lenient(Double.self, forKey: .rating)
+        refs = container.lenient([Lossy<ExternalRef>].self, forKey: .refs)?.compactMap(\.value) ?? []
+        screenshots = container.lenient([Lossy<Screenshot>].self, forKey: .screenshots)?.compactMap(\.value)
+    }
 }
 
 /// How the interface is oriented while a game plays on iPhone and iPad.
@@ -138,5 +151,50 @@ public struct Game: Identifiable, Codable, Hashable, Sendable {
         self.addedAt = addedAt
         self.lastPlayedAt = nil
         self.playTime = 0
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(GameID.self, forKey: .id)
+        title = container.lenient(String.self, forKey: .title) ?? id.rawValue
+        detected = container.lenient(EngineMatch.self, forKey: .detected)
+        engineOverride = container.lenient(EngineID.self, forKey: .engineOverride)
+        metadata = container.lenient(GameMetadata.self, forKey: .metadata)
+        artwork = container.lenient([ArtworkSlot: String].self, forKey: .artwork)
+            ?? Self.known(container.lenient([String: Lossy<String>].self, forKey: .artwork), as: ArtworkSlot.self)
+            ?? [:]
+        isLocked = container.lenient(Bool.self, forKey: .isLocked) ?? false
+        addedAt = container.lenient(Date.self, forKey: .addedAt) ?? .now
+        lastPlayedAt = container.lenient(Date.self, forKey: .lastPlayedAt)
+        playTime = container.lenient(TimeInterval.self, forKey: .playTime) ?? 0
+        orientation = container.lenient(PlayOrientation.self, forKey: .orientation)
+        controlMethod = container.lenient(ControlMethod.self, forKey: .controlMethod)
+        buttonMapping = container.lenient([ControlInput: ControlAction].self, forKey: .buttonMapping)
+            ?? Self.known(container.lenient([String: Lossy<ControlAction>].self, forKey: .buttonMapping), as: ControlInput.self)
+        cheats = container.lenient(CheatSettings.self, forKey: .cheats)
+        libraryFolder = container.lenient(LibraryFolderID.self, forKey: .libraryFolder)
+        folderName = container.lenient(String.self, forKey: .folderName)
+    }
+
+    private static func known<Key: RawRepresentable<String> & Hashable, Value>(_ entries: [String: Lossy<Value>]?,
+                                                                               as _: Key.Type) -> [Key: Value]? {
+        guard let entries else { return nil }
+        return Dictionary(uniqueKeysWithValues: entries.compactMap { key, entry in
+            Key(rawValue: key).flatMap { key in entry.value.map { (key, $0) } }
+        })
+    }
+}
+
+struct Lossy<Value: Decodable>: Decodable {
+    let value: Value?
+
+    init(from decoder: any Decoder) throws {
+        value = try? decoder.singleValueContainer().decode(Value.self)
+    }
+}
+
+extension KeyedDecodingContainer {
+    func lenient<Value: Decodable>(_ type: Value.Type, forKey key: Key) -> Value? {
+        try? decodeIfPresent(type, forKey: key)
     }
 }

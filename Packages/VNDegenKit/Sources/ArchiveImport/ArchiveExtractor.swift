@@ -148,7 +148,7 @@ nonisolated enum ArchiveExtractor {
         }
         let reader = try ArchiveReader(source.volumes, password: password)
         let isZip = source.volumes.count == 1 && source.volumes[0].pathExtension.lowercased() == "zip"
-        let deflate64 = isZip ? try Deflate64Entries(zip: source.volumes[0]) : nil
+        let deflate64 = isZip ? try? Deflate64Entries(zip: source.volumes[0]) : nil
         let fm = FileManager.default
         var progress = ImportProgress(total: total)
         var lastReport = ContinuousClock.now

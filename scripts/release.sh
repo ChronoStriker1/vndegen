@@ -7,7 +7,7 @@ version=${1:?version, such as 0.1.0}
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 [ "$(git branch --show-current)" = main ] || { echo "check out main first" >&2; exit 2; }
-git diff --quiet && git diff --cached --quiet || { echo "commit or stash changes first" >&2; exit 2; }
+[ -z "$(git status --porcelain --untracked-files=normal)" ] || { git status --short >&2; echo "commit, stash, or remove these first" >&2; exit 2; }
 [ -f "docs/releases/$version.md" ] || { echo "write docs/releases/$version.md first" >&2; exit 2; }
 git fetch -q origin main
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "push main first" >&2; exit 2; }

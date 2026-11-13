@@ -188,8 +188,11 @@ final class ArtworkEditor {
 
     func loadCandidates() async {
         guard let game = hub.library.game(gameID) else { return }
+        let slot = slot
         loading = true
-        candidates = await hub.metadata.artworkCandidates(for: game, slot: slot)
+        let found = await hub.metadata.artworkCandidates(for: game, slot: slot)
+        guard !Task.isCancelled, slot == self.slot else { return }
+        candidates = found
         loading = false
     }
 
@@ -392,15 +395,19 @@ struct ArtworkEditorSheet: View {
     }
 
     private func importFile(_ result: Result<URL, any Error>, slot: ArtworkSlot) {
-        do {
-            let url = try result.get()
-            let scoped = url.startAccessingSecurityScopedResource()
-            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            let data = try Data(contentsOf: url)
-            try hub.library.setArtwork(data, fileExtension: url.pathExtension.isEmpty ? "png" : url.pathExtension, slot: slot, for: game.id)
-            editor.error = nil
-        } catch {
-            editor.error = "Couldn't import that file: \(error.localizedDescription)"
+        Task {
+            do {
+                let url = try result.get()
+                let data = try await Task.detached {
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    return try Data(contentsOf: url)
+                }.value
+                try hub.library.setArtwork(data, fileExtension: url.pathExtension.isEmpty ? "png" : url.pathExtension, slot: slot, for: game.id)
+                editor.error = nil
+            } catch {
+                editor.error = "Couldn't import that file: \(error.localizedDescription)"
+            }
         }
     }
 }
@@ -459,6 +466,7 @@ final class MetadataSearch {
     /// The keyboard a controller types the title on. Finishing it searches.
     private(set) var keyboard: OnScreenKeyboard?
     private let hub: Hub
+    private var latestSearch = 0
 
     init(hub: Hub, gameID: GameID) {
         self.hub = hub
@@ -468,8 +476,12 @@ final class MetadataSearch {
     func search() async {
         let title = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
+        latestSearch += 1
+        let number = latestSearch
         searching = true
-        results = await hub.metadata.search(title)
+        let found = await hub.metadata.search(title)
+        guard number == latestSearch else { return }
+        results = found
         searching = false
     }
 

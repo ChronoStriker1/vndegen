@@ -4,7 +4,7 @@ The library lists every game in VNDegen's games folders, with its artwork, and P
 
 ## Adding games
 
-Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game copied to several devices keeps its artwork and settings on each. The one exception is a game whose folder name a game in another library folder already has, described under [Other folders](#other-folders).
+Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game copied to several devices keeps its artwork and settings on each. Renaming a game's folder only in case, such as `my game` to `My Game`, keeps its record. The one exception is a game whose folder name a game in another library folder already has, described under [Other folders](#other-folders).
 
 - **iPhone and iPad.** Open the Files app, then On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
 - **Mac.** Copy the game folders into `~/Games/VNDegen`. It sits outside `~/Documents` so iCloud Drive does not upload your games.
@@ -12,7 +12,7 @@ Put each game in its own folder, named as you want it to appear. The folder name
 - **Archive copied into VNDegen's folder.** Copy a zip, RAR, or 7z into On My iPhone (or iPad), VNDegen, or its Games folder. On a Mac, copy it into `~/Games/VNDegen`. The library lists it under Ready to import, and its Import button opens the import with the archive chosen. "Delete archive after import" starts on for these archives. Use this when choosing an archive, dropping it, or opening it in VNDegen does nothing, which happens on some sideloaded installs.
 - **From an installer or a disc image.** See [Installers and disc images](#installers-and-disc-images).
 
-VNDegen rescans every library folder on launch, on pull to refresh, with Rescan in Settings, and when you return to the app.
+VNDegen rescans every library folder on launch, on pull to refresh, with Rescan in Settings, and when you return to the app from the background. Switching back to it otherwise, as after a Face ID prompt, Control Center, or another app on a Mac, rescans only when something was added to or removed from its own games folder meanwhile. A game with no confident metadata match is searched again only when its title changes or VNDegen restarts.
 
 ## Installers and disc images
 
@@ -39,6 +39,10 @@ A folder that can't be reached, such as an unplugged drive, keeps its games in t
 Two folders can each hold a game of the same name, even when the names differ only in case. The second one's library ID adds its folder's name, so each keeps its own artwork, saves, and settings, and that game's identity is local to the device.
 
 Known limit: on a Mac, if an added folder is moved and another folder is made at its old path, VNDegen finds the new one there, because macOS resolves a bookmark by path first. Remove that folder and add the right one.
+
+## What the library keeps
+
+`library.json`, in VNDegen's Application Support folder, keeps each game's artwork, play time, hidden flag, metadata, and settings, and `folders.json` the folders you added. A value VNDegen doesn't know, such as a button action or metadata source from a newer version, is dropped from that one game, which keeps everything else. A record that can't be read at all is written back unchanged. A file that isn't JSON at all is set aside beside it as `library.unreadable-<time>.json` or `folders.unreadable-<time>.json` and never overwritten, and one that exists but can't be read leaves the library unsaved until the next launch.
 
 ## Removing a game
 
@@ -94,6 +98,8 @@ A long press on a game in any library layout, a right click on a Mac, or X on a 
 ## Hidden games
 
 Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
+
+Once a passcode or Face ID or Touch ID guards the library, the unlock screen never offers to set a new passcode instead. When neither can be used at that moment, such as Touch ID on a MacBook with its lid closed, or a passcode the Keychain can't read yet, it asks for the device passcode or the Mac's password, and so does setting a passcode in Settings. After five wrong passcodes, each further try waits longer, from 30 seconds up to 15 minutes, also across relaunches.
 
 ## In-game orientation
 

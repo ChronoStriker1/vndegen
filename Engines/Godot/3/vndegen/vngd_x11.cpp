@@ -32,6 +32,8 @@ public:
 		ERR_PRINT(p_title + ": " + p_alert);
 	}
 
+	void add_frame_delay(bool p_can_draw) override {}
+
 protected:
 	void initialize_core() override {
 		OS_X11::initialize_core();

@@ -13,7 +13,6 @@ struct GodotEngine {
     let mouseMove: @convention(c) (Float, Float) -> Void
     let mouseButton: @convention(c) (Int32, Bool) -> Void
     let wheel: @convention(c) (Float) -> Void
-    let touch: @convention(c) (Int32, Int32, Float, Float) -> Void
     let joyButton: @convention(c) (Int32, Bool) -> Void
     let joyAxis: @convention(c) (Int32, Float) -> Void
     let setPaused: @convention(c) (Bool) -> Void
@@ -50,7 +49,6 @@ struct GodotEngine {
               let mouseMove: @convention(c) (Float, Float) -> Void = function("vngd_mouse_move"),
               let mouseButton: @convention(c) (Int32, Bool) -> Void = function("vngd_mouse_button"),
               let wheel: @convention(c) (Float) -> Void = function("vngd_wheel"),
-              let touch: @convention(c) (Int32, Int32, Float, Float) -> Void = function("vngd_touch"),
               let joyButton: @convention(c) (Int32, Bool) -> Void = function("vngd_joy_button"),
               let joyAxis: @convention(c) (Int32, Float) -> Void = function("vngd_joy_axis"),
               let setPaused: @convention(c) (Bool) -> Void = function("vngd_set_paused"),
@@ -60,7 +58,7 @@ struct GodotEngine {
               let problem: @convention(c) () -> UnsafePointer<CChar>? = function("vngd_problem")
         else { return nil }
         return GodotEngine(start: start, iterate: iterate, resize: resize, key: key, text: text, mouseMove: mouseMove,
-                           mouseButton: mouseButton, wheel: wheel, touch: touch, joyButton: joyButton, joyAxis: joyAxis,
+                           mouseButton: mouseButton, wheel: wheel, joyButton: joyButton, joyAxis: joyAxis,
                            setPaused: setPaused, setSpeed: setSpeed, requestQuit: requestQuit, stop: stop, problem: problem)
         #else
         return nil

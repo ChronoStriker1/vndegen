@@ -13,7 +13,7 @@ import AppKit
 nonisolated let godotLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "godot")
 
 /// A Godot game running in VNDegen's own process and drawn in `view`, so the hub's menu and touch controls sit over it.
-/// The engine runs one frame per display refresh on the main thread. The game starts once the view is on screen. The
+/// The game starts once the view is on screen. The
 /// game quitting itself ends the session through `onExit`. When the hub ends the session, the game gets the close
 /// request its window's close button would send, and `waitUntilStopped()` returns once it has quit.
 final class GodotSession: EngineSession {

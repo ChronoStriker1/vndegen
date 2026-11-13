@@ -190,23 +190,32 @@ public final class ArchiveImporter {
     }
 
     public func extractNested() {
-        guard case .nested = step, let root = pendingRoot, let inner = ArchiveExtractor.nestedArchive(in: root) else { return }
+        guard case .nested = step, task == nil, let inner = nestedSource else { return }
         pendingRoot = nil
         nestedSource = nil
         password = nil
         source = inner
-        do {
-            includeAddOns = true
-            contents = try ArchiveExtractor.list(inner)
-            if contents?.installer?.addOns.isEmpty == false {
-                step = .reviewing
-            } else {
-                startImport()
+        includeAddOns = true
+        step = .opening
+        let selection = selection
+        task = Task {
+            do {
+                let listed = try await Self.list(inner)
+                guard self.selection === selection, !Task.isCancelled else { return }
+                task = nil
+                contents = listed
+                if listed.installer?.addOns.isEmpty == false {
+                    step = .reviewing
+                } else {
+                    startImport()
+                }
+            } catch {
+                guard self.selection === selection, !Task.isCancelled else { return }
+                task = nil
+                discardStagings()
+                fail(error, returningTo: .reviewing)
+                restartFromPicked()
             }
-        } catch {
-            discardStagings()
-            fail(error, returningTo: .reviewing)
-            restartFromPicked()
         }
     }
 
@@ -276,9 +285,10 @@ public final class ArchiveImporter {
                 // Cancel can land after extraction's last check but before this runs. Nothing may be moved or deleted then.
                 try Task.checkCancellation()
                 progress = extracted
+                let (root, nested) = await Self.inspect(staging)
+                try Task.checkCancellation()
                 task = nil
-                let root = ArchiveExtractor.gameRoot(in: staging)
-                if let inner = ArchiveExtractor.nestedArchive(in: root) {
+                if let inner = nested {
                     pendingRoot = root
                     nestedSource = inner
                     step = .nested(fileName: inner.fileName)
@@ -389,6 +399,17 @@ public final class ArchiveImporter {
         return try source.coordinatedRead { granted in
             (granted, try ArchiveExtractor.list(granted), granted.volumes.map(FileIdentity.init(of:)))
         }
+    }
+
+    @concurrent
+    private static func list(_ source: ArchiveSource) async throws -> ArchiveContents {
+        try ArchiveExtractor.list(source)
+    }
+
+    @concurrent
+    private static func inspect(_ staging: URL) async -> (root: URL, nested: ArchiveSource?) {
+        let root = ArchiveExtractor.gameRoot(in: staging)
+        return (root, ArchiveExtractor.nestedArchive(in: root))
     }
 
     @concurrent

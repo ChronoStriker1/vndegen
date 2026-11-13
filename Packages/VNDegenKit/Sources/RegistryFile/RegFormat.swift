@@ -21,9 +21,11 @@ extension RegistryData {
         guard let format = scanner.header() else { throw ReadError.header }
         var current: String?
         var pending: [RegistryName: RegistryValue] = [:]
+        var pendingNames: [RegistryName: RegistryName] = [:]
         func flush() {
             if let current { add(pending, to: current) }
             pending = [:]
+            pendingNames = [:]
         }
         while !scanner.atEnd {
             switch scanner.element(format) {
@@ -41,8 +43,14 @@ extension RegistryData {
                 guard current != nil else { continue }
                 let name = RegistryName(text)
                 let lower = name.lowercased
-                let existing = pending.keys.first { $0.lowercased == lower }
-                if let value { pending[existing ?? name] = value } else if let existing { pending[existing] = nil }
+                let existing = pendingNames[lower]
+                if let value {
+                    pending[existing ?? name] = value
+                    pendingNames[lower] = existing ?? name
+                } else if let existing {
+                    pending[existing] = nil
+                    pendingNames[lower] = nil
+                }
             case .skip:
                 continue
             }

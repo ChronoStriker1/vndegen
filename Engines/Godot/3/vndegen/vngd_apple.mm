@@ -227,6 +227,8 @@ class OS_VNDegen3 : public OS_Unix {
 	}
 
 public:
+	void add_frame_delay(bool p_can_draw) override {}
+
 	OS_VNDegen3(const VNGDLaunch *p_launch) {
 		executable = String::utf8(p_launch->executable);
 		data_path = String::utf8(p_launch->dataDir);
@@ -353,7 +355,6 @@ public:
 
 	void delete_main_loop() override {
 		if (main_loop) {
-			main_loop->finish();
 			memdelete(main_loop);
 			main_loop = nullptr;
 		}
@@ -466,7 +467,9 @@ const char *vngd_platform_audio_driver() {
 }
 
 void vngd_platform_started() {}
-void vngd_platform_stopping() {}
+void vngd_platform_stopping() {
+	OS::get_singleton()->get_main_loop()->finish();
+}
 
 void vngd_platform_begin_frame() {
 	static_cast<OS_VNDegen3 *>(OS::get_singleton())->begin_frame();

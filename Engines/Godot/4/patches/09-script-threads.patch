@@ -1,0 +1,94 @@
+--- a/core/core_bind.cpp
++++ b/core/core_bind.cpp
+@@ -1451,7 +1451,12 @@ void Mutex::_bind_methods() {
+ 
+ ////// Thread //////
+ 
++SafeNumeric<uint32_t> Thread::running_count;
++
+ void Thread::_start_func(void *ud) {
++	struct Running {
++		~Running() { running_count.decrement(); }
++	} counted;
+ 	Ref<Thread> *tud = (Ref<Thread> *)ud;
+ 	Ref<Thread> t = *tud;
+ 	memdelete(tud);
+@@ -1508,6 +1513,7 @@ Error Thread::start(const Callable &p_callable, Priority p_priority) {
+ 
+ 	::Thread::Settings s;
+ 	s.priority = (::Thread::Priority)p_priority;
++	running_count.increment();
+ 	thread.start(_start_func, ud, s);
+ 
+ 	return OK;
+@@ -1543,6 +1549,17 @@ bool Thread::is_main_thread() {
+ 	return ::Thread::is_main_thread();
+ }
+ 
++bool Thread::wait_for_running(uint64_t p_usec) {
++	const uint64_t end = ::OS::get_singleton()->get_ticks_usec() + p_usec;
++	while (running_count.get() > 0) {
++		if (::OS::get_singleton()->get_ticks_usec() >= end) {
++			return false;
++		}
++		::OS::get_singleton()->delay_usec(1000);
++	}
++	return true;
++}
++
+ void Thread::_bind_methods() {
+ 	ClassDB::bind_method(D_METHOD("start", "callable", "priority"), &Thread::start, DEFVAL(PRIORITY_NORMAL));
+ 	ClassDB::bind_method(D_METHOD("get_id"), &Thread::get_id);
+--- a/core/core_bind.h
++++ b/core/core_bind.h
+@@ -503,6 +503,7 @@ protected:
+ 	SafeFlag running;
+ 	Callable target_callable;
+ 	::Thread thread;
++	static SafeNumeric<uint32_t> running_count;
+ 	static void _bind_methods();
+ 	static void _start_func(void *ud);
+ 
+@@ -522,6 +523,9 @@ public:
+ 
+ 	static void set_thread_safety_checks_enabled(bool p_enabled);
+ 	static bool is_main_thread();
++
++	static uint32_t get_running_count() { return running_count.get(); }
++	static bool wait_for_running(uint64_t p_usec);
+ };
+ 
+ namespace Special {
+--- a/core/object/worker_thread_pool.cpp
++++ b/core/object/worker_thread_pool.cpp
+@@ -854,6 +854,10 @@ void WorkerThreadPool::exit_languages_threads() {
+ 	while (runlevel_data.exit_languages.num_exited_threads != threads.size()) {
+ 		control_cond_var.wait(lock);
+ 	}
++
++	for (KeyValue<TaskID, Task *> &E : tasks) {
++		E.value->callable = Callable();
++	}
+ }
+ 
+ void WorkerThreadPool::finish() {
+--- a/scene/main/scene_tree.cpp
++++ b/scene/main/scene_tree.cpp
+@@ -34,6 +34,7 @@ STATIC_ASSERT_INCOMPLETE_TYPE(class, RenderingServer);
+ 
+ #include "core/config/engine.h"
+ #include "core/config/project_settings.h"
++#include "core/core_bind.h"
+ #include "core/input/input.h"
+ #include "core/io/image_loader.h"
+ #include "core/io/resource_loader.h"
+@@ -860,6 +861,9 @@ void SceneTree::finalize() {
+ 	if (root) {
+ 		root->_set_tree(nullptr);
+ 		root->_propagate_after_exit_tree();
++		if (!CoreBind::Thread::wait_for_running(2000000)) {
++			return;
++		}
+ 		memdelete(root); //delete root
+ 		root = nullptr;
+ 

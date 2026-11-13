@@ -5,6 +5,7 @@
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
+#include "core/core_bind.h"
 #include "core/input/input.h"
 #include "core/object/script_language.h"
 #include "core/os/os.h"
@@ -34,6 +35,7 @@ struct State {
 	bool setup = false;
 	bool started = false;
 	bool paused = false;
+	uint64_t next_frame = 0;
 	std::string problem;
 	Vector2 mouse = Vector2(-1, -1);
 	BitField<MouseButtonMask> buttons = MouseButtonMask::NONE;
@@ -44,8 +46,6 @@ struct State {
 State state;
 VNGDFrames frames;
 
-// A start that failed after setup's first phase leaves the engine half started, and Godot can't take that apart, so
-// Godot stays stopped until VNDegen is opened again. What it made is left in place, since its servers still use the OS.
 bool half_started = false;
 constexpr const char *half_started_problem = "Godot could not start this game. Open VNDegen again to play a Godot game.";
 
@@ -91,6 +91,19 @@ void mouse_button(MouseButton p_button, bool p_down, double p_factor = 1.0) {
 
 void set_problem(const String &p_problem) {
 	state.problem = p_problem.utf8().get_data();
+}
+
+bool frame_due(int p_max_fps) {
+	if (p_max_fps <= 0) {
+		return true;
+	}
+	const uint64_t now = OS::get_singleton()->get_ticks_usec();
+	const uint64_t period = 1000000 / p_max_fps;
+	if (now + period / 4 < state.next_frame) {
+		return false;
+	}
+	state.next_frame = MAX(state.next_frame + period, now);
+	return true;
 }
 
 } // namespace
@@ -143,12 +156,16 @@ int vngd_start(const VNGDLaunch *p_launch) {
 		set_problem("The game's files could not be loaded.");
 		return 1;
 	}
-	if (Main::setup2() != OK || Main::start() != EXIT_SUCCESS) {
+	if (Main::setup2() != OK) {
 		half_started = true;
 		set_problem(half_started_problem);
 		return 2;
 	}
 	state.setup = true;
+	if (Main::start() != EXIT_SUCCESS) {
+		set_problem("The game's files could not be loaded.");
+		return 1;
+	}
 	OS::get_singleton()->get_main_loop()->initialize();
 	state.started = true;
 	frames.start();
@@ -184,7 +201,7 @@ int vngd_iterate(void) {
 	if (!state.started) {
 		return 1;
 	}
-	if (state.paused) {
+	if (state.paused || !frame_due(Engine::get_singleton()->get_max_fps())) {
 		return 0;
 	}
 	DisplayServer::get_singleton()->process_events();
@@ -289,28 +306,6 @@ void vngd_wheel(float p_notches) {
 	mouse_button(button, false, factor);
 }
 
-void vngd_touch(int p_index, int p_phase, float p_x, float p_y) {
-	if (!state.started) {
-		return;
-	}
-	Vector2 position = window_point(p_x, p_y);
-	if (p_phase == 1) {
-		Ref<InputEventScreenDrag> event;
-		event.instantiate();
-		event->set_index(p_index);
-		event->set_position(position);
-		parse(event);
-		return;
-	}
-	Ref<InputEventScreenTouch> event;
-	event.instantiate();
-	event->set_index(p_index);
-	event->set_position(position);
-	event->set_pressed(p_phase == 0);
-	event->set_canceled(p_phase == 3);
-	parse(event);
-}
-
 void vngd_joy_button(int p_button, bool p_down) {
 	if (!state.started || p_button < VNGD_JOY_A || p_button > VNGD_JOY_DPAD_RIGHT) {
 		return;
@@ -364,6 +359,10 @@ void vngd_stop(void) {
 	if (state.started) {
 		frames.stop();
 		OS::get_singleton()->get_main_loop()->finalize();
+		if (CoreBind::Thread::get_running_count() > 0) {
+			ERR_PRINT("The game's threads still run after it quit, so Godot stays as it is.");
+			half_started = true;
+		}
 	}
 	if (half_started) {
 		state = State();

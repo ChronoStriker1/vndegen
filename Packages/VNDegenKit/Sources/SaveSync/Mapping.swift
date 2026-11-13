@@ -221,7 +221,7 @@ extension FullBackup {
         comment = node["comment"]?.string
         locked = node["locked"]?.string == "true"
         semantics = node["semantics"]
-        files = try Dictionary(uniqueKeysWithValues: (node["files"]?.entries ?? []).map { ($0.key, try FileEntry(yaml: $0.value)) })
+        files = try uniqueFiles((node["files"]?.entries ?? []).map { ($0.key, try FileEntry(yaml: $0.value)) })
         registryHash = node["registry"]?["hash"]?.string
         children = try (node["children"]?.items ?? []).map(DifferentialBackup.init(yaml:))
     }
@@ -244,7 +244,7 @@ extension DifferentialBackup {
         comment = node["comment"]?.string
         locked = node["locked"]?.string == "true"
         semantics = node["semantics"]
-        files = try Dictionary(uniqueKeysWithValues: (node["files"]?.entries ?? []).map { entry in
+        files = try uniqueFiles((node["files"]?.entries ?? []).map { entry in
             (entry.key, entry.value == .null ? Change.removed : .changed(try FileEntry(yaml: entry.value)))
         })
         registry = switch node["registry"] {
@@ -328,4 +328,12 @@ enum Timestamp {
     static func folderStamp(_ date: Date) -> String {
         date.formatted(Date.ISO8601FormatStyle(dateSeparator: .omitted, dateTimeSeparator: .standard, timeSeparator: .omitted))
     }
+}
+
+private func uniqueFiles<Value>(_ entries: [(String, Value)]) throws -> [String: Value] {
+    var files: [String: Value] = [:]
+    for (path, value) in entries where files.updateValue(value, forKey: path) != nil {
+        throw YAMLError(line: 0, reason: "\(path) is listed twice")
+    }
+    return files
 }

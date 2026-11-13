@@ -67,7 +67,10 @@ public struct GameInstaller: Sendable, Equatable {
             guard !outputs.isEmpty else { throw GameInstallerError.nothingToUnpack }
             if let missing = installer.missingSliceFile(for: outputs) { throw GameInstallerError.missingPart(missing) }
             let gog = try installer.headers.isGOG ? readGOGInfo(installer, outputs: outputs) : nil
-            let bytes = outputs.reduce(UInt64(0)) { $0 + installer.outputSize($1) }
+            let bytes = outputs.reduce(UInt64(0)) { total, output in
+                let (sum, overflow) = total.addingReportingOverflow(installer.outputSize(output))
+                return overflow ? .max : sum
+            }
             guard bytes < 1 << 50 else { throw GameInstallerError.damaged("impossible file sizes") }
             return GameInstaller(
                 appName: installer.headers.appName, gog: gog, languages: languages, language: language,
