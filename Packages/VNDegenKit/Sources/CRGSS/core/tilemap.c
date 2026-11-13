@@ -71,21 +71,23 @@ static int flags_of(const Tilemap *tm, int id) {
 }
 
 static const Image *sheet(const Tilemap *tm, int index) {
+    if (index < 0 || index >= (int)(sizeof tm->bitmaps / sizeof tm->bitmaps[0])) return NULL;
     Bitmap *b = tm->bitmaps[index];
     return b && !b->disposed ? &b->image : NULL;
 }
 
 // A part of a sheet onto the screen, clipped.
 static void put(Image *target, IRect clip, const Image *src, int sx, int sy, int w, int h, int dx, int dy) {
-    IRect area = {dx, dy, w, h};
-    int x0 = area.x > clip.x ? area.x : clip.x, y0 = area.y > clip.y ? area.y : clip.y;
-    int x1 = area.x + w < clip.x + clip.w ? area.x + w : clip.x + clip.w;
-    int y1 = area.y + h < clip.y + clip.h ? area.y + h : clip.y + clip.h;
+    int64_t cx1 = (int64_t)clip.x + clip.w, cy1 = (int64_t)clip.y + clip.h;
+    int64_t x0 = dx > clip.x ? dx : clip.x, y0 = dy > clip.y ? dy : clip.y;
+    int64_t x1 = (int64_t)dx + w < cx1 ? (int64_t)dx + w : cx1, y1 = (int64_t)dy + h < cy1 ? (int64_t)dy + h : cy1;
     if (x0 >= x1 || y0 >= y1) return;
-    draw_image_rect(target, (IRect){x0, y0, x1 - x0, y1 - y0}, src, (IRect){sx, sy, w, h}, dx, dy, &plain);
+    draw_image_rect(target, (IRect){(int)x0, (int)y0, (int)(x1 - x0), (int)(y1 - y0)}, src, (IRect){sx, sy, w, h}, dx, dy,
+                    &plain);
 }
 
 static void draw_normal(const Tilemap *tm, int id, Image *target, IRect clip, int dx, int dy) {
+    if (id >= 1024 && id < ID_A5) return;
     int set = id >= ID_A5 ? 4 : 5 + id / 256;
     const Image *src = sheet(tm, set);
     if (!src) return;

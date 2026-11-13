@@ -80,19 +80,53 @@ static void add_name(Face *face, char *name) {
     face->names[face->nameCount++] = name;
 }
 
+static bool font_fits(uint8_t *data, size_t size, int fontstart) {
+    if (fontstart < 0 || (size_t)fontstart + 12 > size) return false;
+    size_t count = ttUSHORT(data + fontstart + 4);
+    if ((size_t)fontstart + 12 + 16 * count > size) return false;
+    for (size_t i = 0; i < count; i++) {
+        uint8_t *record = data + fontstart + 12 + 16 * i;
+        if ((uint64_t)ttULONG(record + 8) + ttULONG(record + 12) > size) return false;
+    }
+    return true;
+}
+
+static uint32_t find_table(uint8_t *data, uint32_t fontstart, const char *tag, uint32_t *length) {
+    int count = ttUSHORT(data + fontstart + 4);
+    for (int i = 0; i < count; i++) {
+        uint8_t *record = data + fontstart + 12 + 16 * i;
+        if (!memcmp(record, tag, 4)) {
+            *length = ttULONG(record + 12);
+            return ttULONG(record + 8);
+        }
+    }
+    *length = 0;
+    return 0;
+}
+
+static int font_count(uint8_t *data, size_t size) {
+    if (size < 12) return 0;
+    int count = stbtt_GetNumberOfFonts(data);
+    if (!memcmp(data, "ttcf", 4) && count > 0 && (size_t)count > (size - 12) / 4) count = (int)((size - 12) / 4);
+    return count;
+}
+
 // Reads every family (1, 16) and full name (4) the face lists, in every language, Windows and Mac platforms.
 static void read_names(Face *face, const stbtt_fontinfo *info) {
     uint8_t *data = info->data;
-    uint32_t nameTable = stbtt__find_table(data, (uint32_t)info->fontstart, "name");
-    if (!nameTable) return;
-    int count = ttUSHORT(data + nameTable + 2);
-    int stringOffset = nameTable + ttUSHORT(data + nameTable + 4);
-    for (int i = 0; i < count; i++) {
+    uint32_t nameLength;
+    uint32_t nameTable = find_table(data, (uint32_t)info->fontstart, "name", &nameLength);
+    if (!nameTable || nameLength < 6) return;
+    uint32_t count = ttUSHORT(data + nameTable + 2);
+    uint32_t stringOffset = ttUSHORT(data + nameTable + 4);
+    if (count > (nameLength - 6) / 12) count = (nameLength - 6) / 12;
+    for (uint32_t i = 0; i < count; i++) {
         uint8_t *record = data + nameTable + 6 + 12 * i;
         int platform = ttUSHORT(record), nameID = ttUSHORT(record + 6);
         int length = ttUSHORT(record + 8), offset = ttUSHORT(record + 10);
         if (nameID != 1 && nameID != 4 && nameID != 16) continue;
-        uint8_t *string = data + stringOffset + offset;
+        if ((uint64_t)stringOffset + (uint32_t)offset + (uint32_t)length > nameLength) continue;
+        uint8_t *string = data + nameTable + stringOffset + offset;
         if (platform == 3 || platform == 0) add_name(face, utf16be_to_utf8(string, length));
         else if (platform == 1) {
             char *copy = malloc((size_t)length + 1);
@@ -103,8 +137,9 @@ static void read_names(Face *face, const stbtt_fontinfo *info) {
         }
     }
     // The style from the OS/2 table's selection flags, else from the head table's mac style.
-    uint32_t os2 = stbtt__find_table(data, (uint32_t)info->fontstart, "OS/2");
-    if (os2) {
+    uint32_t os2Length;
+    uint32_t os2 = find_table(data, (uint32_t)info->fontstart, "OS/2", &os2Length);
+    if (os2 && os2Length >= 64) {
         int selection = ttUSHORT(data + os2 + 62);
         face->bold = selection & 32;
         face->italic = selection & 1;
@@ -132,11 +167,11 @@ static void add_font_file(const char *path) {
     uint8_t *data;
     size_t size;
     if (!load_file(path, &data, &size)) return;
-    int count = stbtt_GetNumberOfFonts(data);
+    int count = font_count(data, size);
     for (int i = 0; i < count; i++) {
         stbtt_fontinfo info;
         int offset = stbtt_GetFontOffsetForIndex(data, i);
-        if (offset < 0 || !stbtt_InitFont(&info, data, offset)) continue;
+        if (!font_fits(data, size, offset) || !stbtt_InitFont(&info, data, offset)) continue;
         if (faceCount == faceCapacity) {
             faceCapacity = faceCapacity ? faceCapacity * 2 : 32;
             Face **grown = realloc(faces, sizeof(Face *) * (size_t)faceCapacity);
@@ -270,8 +305,8 @@ static bool load_face(Face *face) {
         face->broken = true;
         return false;
     }
-    int offset = stbtt_GetFontOffsetForIndex(face->data, face->index);
-    if (offset < 0 || !stbtt_InitFont(&face->info, face->data, offset)) {
+    int offset = face->index < font_count(face->data, face->size) ? stbtt_GetFontOffsetForIndex(face->data, face->index) : -1;
+    if (!font_fits(face->data, face->size, offset) || !stbtt_InitFont(&face->info, face->data, offset)) {
         face->broken = true;
         return false;
     }
@@ -327,8 +362,9 @@ static Metrics metrics(Face *face, int size) {
     int ascent, descent, gap;
     stbtt_GetFontVMetrics(&face->info, &ascent, &descent, &gap);
     int winAscent = 0, winDescent = 0;
-    uint32_t os2 = stbtt__find_table(face->info.data, (uint32_t)face->info.fontstart, "OS/2");
-    if (os2) {
+    uint32_t os2Length;
+    uint32_t os2 = find_table(face->info.data, (uint32_t)face->info.fontstart, "OS/2", &os2Length);
+    if (os2 && os2Length >= 78) {
         winAscent = ttUSHORT(face->info.data + os2 + 74);
         winDescent = ttUSHORT(face->info.data + os2 + 76);
     }

@@ -7,6 +7,8 @@ $VERBOSE = nil
 module RGSSBoot
   CONSTANTS = Object.constants(false)
   GLOBALS = global_variables
+  BUILT_IN_GLOBALS = %i[$DEBUG $VERBOSE $; $, $/ $\\ $stdout $stderr $stdin].to_h { |name| [name, eval(name.to_s)] }
+  ENCODINGS = [Encoding.default_external, Encoding.default_internal]
 
   def self.method_table(mod)
     table = {}
@@ -18,9 +20,11 @@ module RGSSBoot
   end
 
   METHODS = {}
+  MODULE_CONSTANTS = {}
   ObjectSpace.each_object(Module) do |mod|
     next if mod.singleton_class? || mod.name.nil? || mod == RGSSBoot
     METHODS[mod] = [method_table(mod), method_table(mod.singleton_class)]
+    MODULE_CONSTANTS[mod] = mod.constants(false) unless mod == Object
   end
   MAIN = TOPLEVEL_BINDING.receiver
   CLASS_VARIABLES = Object.class_variables
@@ -56,6 +60,19 @@ module RGSSBoot
       eval("#{name} = nil")
     rescue StandardError, SyntaxError
       nil
+    end
+    BUILT_IN_GLOBALS.each_key do |name|
+      eval("#{name} = RGSSBoot::BUILT_IN_GLOBALS[:#{name.to_s.inspect}]")
+    rescue StandardError, SyntaxError
+      nil
+    end
+    Encoding.default_external, Encoding.default_internal = ENCODINGS
+    MODULE_CONSTANTS.each do |mod, names|
+      (mod.constants(false) - names).each do |name|
+        mod.send(:remove_const, name)
+      rescue NameError
+        nil
+      end
     end
     (Object.class_variables - CLASS_VARIABLES).each { |name| Object.send(:remove_class_variable, name) }
     MAIN.instance_variables.each { |name| MAIN.remove_instance_variable(name) }

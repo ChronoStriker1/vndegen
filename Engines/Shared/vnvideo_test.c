@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 typedef struct {
     FILE *file;
@@ -98,6 +99,28 @@ static int play(const char *path, int loop, double limit, result *out, vnvideo_i
     return 1;
 }
 
+static int write_rate_zero_copy(const char *from, char *path, size_t path_size) {
+    FILE *in = fopen(from, "rb");
+    if (!in) return 0;
+    uint8_t data[1 << 16];
+    size_t size = fread(data, 1, sizeof data, in);
+    fclose(in);
+    int patched = 0;
+    for (size_t i = 0; !patched && i + 8 <= size; i++) {
+        if (memcmp(data + i, "\0\0\1\xB3", 4)) continue;
+        data[i + 7] &= 0xF0;
+        patched = 1;
+    }
+    const char *dir = getenv("TMPDIR");
+    snprintf(path, path_size, "%s/vnvideo-rate0-XXXXXX", dir && *dir ? dir : "/tmp");
+    int fd = mkstemp(path);
+    if (fd < 0) return 0;
+    FILE *out = fdopen(fd, "wb");
+    int ok = out && fwrite(data, 1, size, out) == size;
+    if (out) fclose(out);
+    return ok && patched;
+}
+
 static int near(int value, int expected) {
     return abs(value - expected) <= 8;
 }
@@ -115,6 +138,13 @@ static void builtin(const char *dir) {
     check(near(r.first[0], 192) && near(r.first[1], 32) && near(r.first[2], 64) && r.first[3] == 255, "MPEG-1 colors");
     check(r.sound > 0.08, "MP2 sound decoded");
     check(r.seconds < 1.2, "MPEG-1 ends after its last frame");
+
+    char rate_zero[1024];
+    check(write_rate_zero_copy(path, rate_zero, sizeof rate_zero), "MPEG-1 copy with frame rate code 0 written");
+    check(play(rate_zero, 0, 10, &r, &info), "MPEG-1 with frame rate code 0 opens");
+    check(fabs(info.fps - 30) < 0.01 && r.ended && r.frames >= 28 && r.seconds < 1.2,
+          "MPEG-1 with frame rate code 0 plays at 30 fps and ends");
+    unlink(rate_zero);
 
     snprintf(path, sizeof path, "%s/red-tone.ogv", dir);
     check(play(path, 0, 10, &r, &info), "Theora with Opus opens");

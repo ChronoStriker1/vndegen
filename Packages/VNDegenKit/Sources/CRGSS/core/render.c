@@ -146,19 +146,18 @@ static inline void put_plain(Pixel *dst, Pixel src, int alpha) {
 void draw_image_rect(Image *target, IRect clip, const Image *src, IRect sr, int dx, int dy, const Effects *fx) {
     if (fx->opacity <= 0 || (fx->flash && fx->flash->count > 0 && fx->flash->hide)) return;
     IRect clipped = irect_clip(sr, src->w, src->h);
-    dx += clipped.x - sr.x;
-    dy += clipped.y - sr.y;
+    int64_t ddx = (int64_t)dx + clipped.x - sr.x, ddy = (int64_t)dy + clipped.y - sr.y;
     sr = clipped;
-    IRect d = {dx, dy, sr.w, sr.h};
-    int x0 = d.x > clip.x ? d.x : clip.x, y0 = d.y > clip.y ? d.y : clip.y;
-    int x1 = d.x + d.w < clip.x + clip.w ? d.x + d.w : clip.x + clip.w;
-    int y1 = d.y + d.h < clip.y + clip.h ? d.y + d.h : clip.y + clip.h;
-    if (x0 >= x1 || y0 >= y1) return;
+    int64_t cx1 = (int64_t)clip.x + clip.w, cy1 = (int64_t)clip.y + clip.h;
+    int64_t lx0 = ddx > clip.x ? ddx : clip.x, ly0 = ddy > clip.y ? ddy : clip.y;
+    int64_t lx1 = ddx + sr.w < cx1 ? ddx + sr.w : cx1, ly1 = ddy + sr.h < cy1 ? ddy + sr.h : cy1;
+    if (lx0 >= lx1 || ly0 >= ly1) return;
+    int x0 = (int)lx0, y0 = (int)ly0, x1 = (int)lx1, y1 = (int)ly1;
     Shade s = shade_for(fx);
     int opacity = fx->opacity > 255 ? 255 : fx->opacity;
     bool plain = s.plain && fx->blendType == 0;
     for (int y = y0; y < y1; y++) {
-        const Pixel *in = src->px + (size_t)(sr.y + y - d.y) * src->w + sr.x - d.x;
+        const Pixel *in = src->px + (size_t)(sr.y + y - ddy) * src->w + sr.x - ddx;
         Pixel *out = target->px + (size_t)y * target->w;
         if (plain && opacity == 255) {
             for (int x = x0; x < x1; x++) put_plain(&out[x], in[x], px_a(in[x]));
@@ -173,7 +172,7 @@ void draw_image_rect(Image *target, IRect clip, const Image *src, IRect sr, int 
 // MARK: Sprites
 
 static void draw_sprite(Sprite *sp, Image *target, IRect clip, int offX, int offY) {
-    if (!sp->visible || !sp->bitmap || sp->bitmap->disposed || sp->opacity <= 0) return;
+    if (sp->disposed || !sp->visible || !sp->bitmap || sp->bitmap->disposed || sp->opacity <= 0) return;
     if (sp->flash.count > 0 && sp->flash.hide) return;
     const Image *img = &sp->bitmap->image;
     IRect sr = irect_clip(*sp->srcRect, img->w, img->h);
@@ -192,13 +191,10 @@ static void draw_sprite(Sprite *sp, Image *target, IRect clip, int offX, int off
         double right = left + sr.w * sp->zoomX, bottom = top + sr.h * sp->zoomY;
         if (sp->zoomX < 0) { double t = left; left = right; right = t; }
         if (sp->zoomY < 0) { double t = top; top = bottom; bottom = t; }
-        int x0 = (int)ceil(left - 0.5), x1 = (int)ceil(right - 0.5);
-        int y0 = (int)ceil(top - 0.5), y1 = (int)ceil(bottom - 0.5);
-        if (x0 < clip.x) x0 = clip.x;
-        if (y0 < clip.y) y0 = clip.y;
-        if (x1 > clip.x + clip.w) x1 = clip.x + clip.w;
-        if (y1 > clip.y + clip.h) y1 = clip.y + clip.h;
-        if (x1 <= x0 || y1 <= y0) return;
+        double fx0 = fmax(ceil(left - 0.5), clip.x), fx1 = fmin(ceil(right - 0.5), (double)clip.x + clip.w);
+        double fy0 = fmax(ceil(top - 0.5), clip.y), fy1 = fmin(ceil(bottom - 0.5), (double)clip.y + clip.h);
+        if (!(fx1 > fx0 && fy1 > fy0)) return;
+        int x0 = (int)fx0, x1 = (int)fx1, y0 = (int)fy0, y1 = (int)fy1;
         // The source column of each screen column, worked out once for the whole sprite.
         int columns[x1 - x0];
         for (int x = x0; x < x1; x++) {
@@ -238,11 +234,10 @@ static void draw_sprite(Sprite *sp, Image *target, IRect clip, int offX, int off
         minY = fmin(minY, sy);
         maxY = fmax(maxY, sy);
     }
-    int x0 = (int)floor(minX), x1 = (int)ceil(maxX), y0 = (int)floor(minY), y1 = (int)ceil(maxY);
-    if (x0 < clip.x) x0 = clip.x;
-    if (y0 < clip.y) y0 = clip.y;
-    if (x1 > clip.x + clip.w) x1 = clip.x + clip.w;
-    if (y1 > clip.y + clip.h) y1 = clip.y + clip.h;
+    double fx0 = fmax(floor(minX), clip.x), fx1 = fmin(ceil(maxX), (double)clip.x + clip.w);
+    double fy0 = fmax(floor(minY), clip.y), fy1 = fmin(ceil(maxY), (double)clip.y + clip.h);
+    if (!(fx1 > fx0 && fy1 > fy0)) return;
+    int x0 = (int)fx0, x1 = (int)fx1, y0 = (int)fy0, y1 = (int)fy1;
     for (int y = y0; y < y1; y++) {
         Pixel *out = target->px + (size_t)y * target->w;
         for (int x = x0; x < x1; x++) {
@@ -265,6 +260,12 @@ static void draw_sprite(Sprite *sp, Image *target, IRect clip, int offX, int off
 
 // MARK: Planes
 
+static int wrap_index(double v, int n) {
+    double m = fmod(v, n);
+    if (m < 0) m += n;
+    return (int)m;
+}
+
 static void draw_plane(Plane *pl, Image *target, IRect clip, int offX, int offY) {
     (void)offX;
     (void)offY;
@@ -273,17 +274,25 @@ static void draw_plane(Plane *pl, Image *target, IRect clip, int offX, int offY)
     if (img->w <= 0 || img->h <= 0 || pl->zoomX <= 0 || pl->zoomY <= 0) return;
     Effects fx = {pl->color, pl->tone, NULL, pl->opacity, pl->blendType};
     Shade s = shade_for(&fx);
+    if (clip.w <= 0 || clip.h <= 0) return;
     // The plane fills its viewport (or the screen) and repeats the bitmap from ox, oy.
+    int columns[clip.w];
+    for (int x = 0; x < clip.w; x++) columns[x] = wrap_index(floor((x + pl->ox * pl->zoomX) / pl->zoomX), img->w);
+    bool plain = s.plain && pl->blendType == 0;
     for (int y = clip.y; y < clip.y + clip.h; y++) {
-        int ly = (int)floor((y - clip.y + pl->oy * pl->zoomY) / pl->zoomY);
-        int sy = ((ly % img->h) + img->h) % img->h;
+        int sy = wrap_index(floor((y - clip.y + pl->oy * pl->zoomY) / pl->zoomY), img->h);
         const Pixel *row = img->px + (size_t)sy * img->w;
-        Pixel *out = target->px + (size_t)y * target->w;
-        for (int x = clip.x; x < clip.x + clip.w; x++) {
-            int lx = (int)floor((x - clip.x + pl->ox * pl->zoomX) / pl->zoomX);
-            int sx = ((lx % img->w) + img->w) % img->w;
-            Pixel p = row[sx];
-            put(&out[x], p, px_a(p) * pl->opacity / 255, &s, pl->blendType);
+        Pixel *out = target->px + (size_t)y * target->w + clip.x;
+        if (plain) {
+            for (int x = 0; x < clip.w; x++) {
+                Pixel p = row[columns[x]];
+                put_plain(&out[x], p, px_a(p) * pl->opacity / 255);
+            }
+        } else {
+            for (int x = 0; x < clip.w; x++) {
+                Pixel p = row[columns[x]];
+                put(&out[x], p, px_a(p) * pl->opacity / 255, &s, pl->blendType);
+            }
         }
     }
 }
@@ -348,13 +357,41 @@ static void order_sprites_by_y(Item *items, size_t count) {
 }
 
 static IRect intersect(IRect a, IRect b) {
-    int x0 = a.x > b.x ? a.x : b.x, y0 = a.y > b.y ? a.y : b.y;
-    int x1 = a.x + a.w < b.x + b.w ? a.x + a.w : b.x + b.w;
-    int y1 = a.y + a.h < b.y + b.h ? a.y + a.h : b.y + b.h;
-    IRect r = {x0, y0, x1 - x0, y1 - y0};
-    if (r.w < 0) r.w = 0;
-    if (r.h < 0) r.h = 0;
-    return r;
+    int64_t x0 = a.x > b.x ? a.x : b.x, y0 = a.y > b.y ? a.y : b.y;
+    int64_t ax1 = (int64_t)a.x + a.w, bx1 = (int64_t)b.x + b.w, ay1 = (int64_t)a.y + a.h, by1 = (int64_t)b.y + b.h;
+    int64_t x1 = ax1 < bx1 ? ax1 : bx1, y1 = ay1 < by1 ? ay1 : by1;
+    if (x1 < x0) x1 = x0;
+    if (y1 < y0) y1 = y0;
+    return (IRect){(int)x0, (int)y0, (int)(x1 - x0), (int)(y1 - y0)};
+}
+
+void draw_image_scaled(Image *target, IRect clip, const Image *src, IRect sr, IRect d, const Effects *fx) {
+    if (fx->opacity <= 0 || (fx->flash && fx->flash->count > 0 && fx->flash->hide)) return;
+    if (d.w <= 0 || d.h <= 0 || sr.w <= 0 || sr.h <= 0) return;
+    IRect c = intersect(d, clip);
+    if (c.w <= 0 || c.h <= 0) return;
+    int columns[c.w];
+    for (int x = 0; x < c.w; x++) {
+        int64_t sx = sr.x + ((int64_t)c.x + x - d.x) * sr.w / d.w;
+        columns[x] = sx >= 0 && sx < src->w ? (int)sx : -1;
+    }
+    Shade s = shade_for(fx);
+    int opacity = fx->opacity > 255 ? 255 : fx->opacity;
+    bool plain = s.plain && fx->blendType == 0;
+    for (int y = c.y; y < c.y + c.h; y++) {
+        int64_t sy = sr.y + ((int64_t)y - d.y) * sr.h / d.h;
+        if (sy < 0 || sy >= src->h) continue;
+        const Pixel *in = src->px + (size_t)sy * src->w;
+        Pixel *out = target->px + (size_t)y * target->w + c.x;
+        for (int x = 0; x < c.w; x++) {
+            int sx = columns[x];
+            if (sx < 0) continue;
+            Pixel p = in[sx];
+            if (plain && opacity == 255) put_plain(&out[x], p, px_a(p));
+            else if (plain) put_plain(&out[x], p, px_a(p) * opacity / 255);
+            else put(&out[x], p, px_a(p) * opacity / 255, &s, fx->blendType);
+        }
+    }
 }
 
 static void render_container(Container *c, Image *target, IRect clip, int offX, int offY) {

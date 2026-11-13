@@ -155,3 +155,32 @@ private final class ShimPage {
     try await page.run(touch("touchmove", 140))
     #expect(try await page.takeLog() == [])
 }
+
+@Test @MainActor func aHoveringPointerHoldsNoButtonAndEntersWhatItCrosses() async throws {
+    let page = try PageHarness(storage: false) { _ in .value(.null) }
+    try await page.load("""
+        <html><body style="margin:0">
+        <div id="a" style="position:absolute;left:0;top:0;width:400px;height:600px"><span id="a1" style="display:block;height:300px"></span></div>
+        <div id="b" style="position:absolute;left:400px;top:0;width:400px;height:600px"></div>
+        <script>
+        window.log = [];
+        for (const type of ['mouseover', 'mouseout', 'mouseenter', 'mouseleave']) {
+            for (const id of ['a', 'a1', 'b']) document.getElementById(id).addEventListener(type, (e) => { if (e.target.id === id) log.push(type + ' ' + id); });
+        }
+        document.addEventListener('mousemove', (e) => log.push('move ' + e.button + ' ' + e.buttons));
+        </script></body></html>
+        """)
+    try await page.run("""
+        __vndegen.pointer('moved', 0.25, 0.25, 0);
+        __vndegen.pointer('moved', 0.25, 0.75, 0);
+        __vndegen.click('began', 2);
+        __vndegen.pointer('moved', 0.75, 0.75, 0);
+        __vndegen.click('ended', 2);
+        """)
+    #expect(try await page.run("return log") as? [String] == [
+        "mouseover a1", "mouseenter a", "mouseenter a1", "move 0 0",
+        "mouseout a1", "mouseleave a1", "mouseover a", "move 0 0",
+        "move 2 2",
+        "mouseout a", "mouseleave a", "mouseover b", "mouseenter b", "move 2 2",
+    ])
+}

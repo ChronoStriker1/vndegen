@@ -106,13 +106,9 @@ New bugs get a GitHub issue and a line here.
 - YU-RIS: a double-to-long conversion out of range in `var.c`, seen under UBSan (#171).
 - System 4: `VSFile` writes slot details in place, so a failed write leaves them unreadable (#173).
 - Audit, medium, by area:
-  - Web engines, Flash and Artemis: #110, #111, #112, #117.
-  - Video: #124, #125, #126.
   - KiriKiri: #129, #130. NScripter: #132.
   - NekoSDK: #136, #137, #138.
-  - RGSS: #141, #142, #143, #144, #146, #162, #163.
-  - Wolf RPG: #147, #148, #149, #150 (System 4's half is fixed).
-- Audit, low: #104, #109 and #169 (partly fixed), #113, #114, #115, #116, #118, #119, #121, #123, #127, #128, #131, #133 to #135, #139, #140, #145, #151, #164 to #166.
+- Audit, low: #104, #109, #164, #166 and #169 (partly fixed), #118, #119, #121, #123, #128, #131, #133 to #135, #139, #140.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.

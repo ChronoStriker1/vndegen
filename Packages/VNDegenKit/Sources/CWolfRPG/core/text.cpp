@@ -9,6 +9,9 @@
 
 namespace wolf {
 
+constexpr int kMaxTextSize = 1024;
+constexpr int kMaxTextSide = 4096;
+
 namespace {
 
 uint32_t decodeUtf8(const std::string &s, size_t &i) {
@@ -218,14 +221,14 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
                 out.segments.push_back({t.value, x, x});
                 break;
             case TextToken::Color: color = game_.textColor(t.value); break;
-            case TextToken::Size: size = std::max(4, t.value); break;
+            case TextToken::Size: size = std::clamp(t.value, 4, kMaxTextSize); break;
             case TextToken::LineSpace: lineSpacing = t.value; break;
             case TextToken::Tighten: spacing = float(style.letterSpacing) - t.value / unit; break;
             case TextToken::Edge: edge = t.value != 0; break;
             case TextToken::EdgeColor: edgeColor = game_.textColor(t.value); break;
             case TextToken::Face: face = std::clamp(t.value, 0, 3); break;
             case TextToken::LineMax:
-                lineSize = std::max(lineSize, t.value);
+                lineSize = std::max(lineSize, std::min(t.value, kMaxTextSide));
                 height = std::max(height, lineTop + lineSize);
                 break;
             // \ax[n] also widens the text to n, which the standard systems use to right-align a later line.
@@ -273,7 +276,7 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
             default: break;
         }
     }
-    out.w = int(std::ceil(width));
+    out.w = int(std::min<double>(std::ceil(width), kMaxTextSide));
     out.h = height;
     out.chars = shown;
     return out;
@@ -297,7 +300,8 @@ TextBlock TextRenderer::render(const std::string &text, const TextStyle &style, 
         minY = std::min(minY, it.y);
         if (it.g) bottom = std::max(bottom, it.y + font(it.face).ascent(it.size) - it.g->top + it.g->h + 1);
     }
-    int w = std::max(1, l.w + pad * 2 + 2), h = std::max(1, bottom - minY + pad * 2);
+    int w = int(std::clamp<int64_t>(int64_t(l.w) + pad * 2 + 2, 1, kMaxTextSide));
+    int h = int(std::clamp<int64_t>(int64_t(bottom) - minY + pad * 2, 1, kMaxTextSide));
     block.bitmap = Bitmap(w, h);
     Canvas canvas(block.bitmap);
 

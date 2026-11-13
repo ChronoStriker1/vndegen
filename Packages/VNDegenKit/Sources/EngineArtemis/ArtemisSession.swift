@@ -226,7 +226,7 @@ final class ArtemisSession: EngineSession {
         case "dialog_show":
             showDialog(body)
         case "openbrowser":
-            if let link = body["url"] as? String, let url = URL(string: link) { open(url) }
+            if let url = Self.browserURL(body["url"] as? String) { askToOpen(url) }
         default:
             if name.hasPrefix("audio_") { audio.handle(name, body) }
         }
@@ -258,6 +258,25 @@ final class ArtemisSession: EngineSession {
             host.takeFocus()
             guard let runtime else { return }
             _ = core.api.runtime_submit_dialog!(runtime, accepted ? 1 : 0, text)
+        }
+        hidePrompt()
+        self.prompt = prompt
+        hostPromptView(prompt)
+    }
+
+    nonisolated static func browserURL(_ link: String?) -> URL? {
+        guard let link, let url = URL(string: link), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil
+        else { return nil }
+        return url
+    }
+
+    private func askToOpen(_ url: URL) {
+        let prompt = ArtemisPrompt(title: "Open this page in your browser?", message: url.absoluteString, cancels: true, text: nil) {
+            [weak self] accepted, _ in
+            guard let self else { return }
+            hidePrompt()
+            host.takeFocus()
+            if accepted { open(url) }
         }
         hidePrompt()
         self.prompt = prompt

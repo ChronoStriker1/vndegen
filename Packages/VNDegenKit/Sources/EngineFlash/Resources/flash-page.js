@@ -82,33 +82,46 @@
     };
     const encodePart = (part) => Array.from(part).map((c) => (keep(c) ? c : encodeURIComponent(c))).join('');
     const decodePart = (part) => { try { return decodeURIComponent(part); } catch (e) { return part; } };
-    const canonical = (key) => {
-        if (typeof key !== 'string' || !key.startsWith(host + '/')) return key;
+    const ours = (key) => typeof key === 'string' && key.startsWith(host + '/');
+    const split = (key) => {
         const parts = key.slice(host.length + 1).split('/');
         if (parts[0] === '' && parts.length >= 2) parts.shift();
         const marked = parts.findIndex((part) => part.startsWith('#'));
-        const split = marked >= 0 ? marked : parts.length - 1;
-        const path = parts.slice(0, split).map((part) => encodePart(decodePart(part)));
-        const name = parts.slice(split).join('/');
+        const at = marked >= 0 ? marked : parts.length - 1;
+        return { path: parts.slice(0, at).map((part) => encodePart(decodePart(part))), name: parts.slice(at).join('/') };
+    };
+    const canonical = (key) => {
+        if (!ours(key)) return key;
+        const { path, name } = split(key);
         return host + '/' + (path.length ? path.join('/') + '/' : '/') + name;
     };
-    const storage = window.localStorage;
+    const folded = (key) => {
+        const { path, name } = split(key);
+        return path.map(decodePart).join('/').toLowerCase() + '/' + name;
+    };
+    let storage = null;
+    try { storage = window.localStorage; } catch (e) {}
+    const stored = (key) => {
+        const wanted = canonical(key);
+        if (!ours(wanted) || storage.getItem(wanted) !== null) return wanted;
+        const target = folded(wanted);
+        return Object.keys(storage).find((other) => ours(other) && folded(other) === target) ?? wanted;
+    };
     if (storage) {
-        const methods = { getItem: (key) => storage.getItem(canonical(key)), setItem: (key, value) => storage.setItem(canonical(key), value),
-            removeItem: (key) => storage.removeItem(canonical(key)) };
-        const ours = (key) => typeof key === 'string' && key.startsWith(host + '/');
+        const methods = { getItem: (key) => storage.getItem(stored(key)), setItem: (key, value) => storage.setItem(stored(key), value),
+            removeItem: (key) => storage.removeItem(stored(key)) };
         Object.defineProperty(window, 'localStorage', { configurable: true, enumerable: true, value: new Proxy(storage, {
             get: (target, key) => {
                 if (key in methods) return methods[key];
                 // This page's keys always read through their one form, whatever form an older value has.
-                if (ours(key)) return target[canonical(key)];
+                if (ours(key)) return target[stored(key)];
                 // WebKit's own Storage methods need it as `this`, not the proxy.
                 const value = Reflect.get(target, key);
                 return typeof value === 'function' ? value.bind(target) : value;
             },
-            set: (target, key, value) => { target[canonical(key)] = value; return true; },
-            deleteProperty: (target, key) => { delete target[canonical(key)]; return true; },
-            has: (target, key) => canonical(key) in target,
+            set: (target, key, value) => { target[stored(key)] = value; return true; },
+            deleteProperty: (target, key) => { delete target[stored(key)]; return true; },
+            has: (target, key) => stored(key) in target,
         }) });
     }
 

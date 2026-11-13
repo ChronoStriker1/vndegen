@@ -21,9 +21,19 @@ public:
     BitmapPtr get(const std::string &path);
 
 private:
+    static constexpr size_t kBudget = size_t(256) << 20;
+    struct Entry {
+        BitmapPtr bitmap;
+        size_t bytes = 0;
+        uint64_t used = 0;
+    };
+    void evict(const std::string &keep);
+
     const GameFiles &files_;
     std::function<void(const std::string &)> log_;
-    std::map<std::string, BitmapPtr> images_;
+    std::map<std::string, Entry> images_;
+    size_t bytes_ = 0;
+    uint64_t clock_ = 0;
 };
 
 }  // namespace wolf

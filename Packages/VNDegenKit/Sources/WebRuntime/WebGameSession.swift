@@ -174,6 +174,8 @@ final class WebGameSession: NSObject, EngineSession {
     lazy var cheats: (any CheatSession)? = makeCheats?(self)
     private var ended = false
     private var paused = false
+    private var lastReload: ContinuousClock.Instant?
+    private var closeDialog: (() -> Void)?
     /// Ends once the page has had its last word after `terminate()` and the view is torn down.
     private var stopping: Task<Void, Never>?
     #if DEBUG
@@ -346,6 +348,7 @@ final class WebGameSession: NSObject, EngineSession {
     // MARK: EngineSession
 
     func send(_ event: ControllerEvent) {
+        guard closeDialog == nil else { return }
         switch event {
         case let .button(button, pressed):
             guard let script = buttonScript(button, pressed) else { return }
@@ -372,6 +375,7 @@ final class WebGameSession: NSObject, EngineSession {
 
     /// Text goes into the page's text field, as typing would put it there. A page with none gets key presses.
     func type(_ typed: TypedText) {
+        guard closeDialog == nil else { return }
         switch typed {
         case let .text(text): run("__vndegen.text('insert', \(Self.jsString(text)))")
         case .newline: run("__vndegen.text('newline', '')")
@@ -411,6 +415,8 @@ final class WebGameSession: NSObject, EngineSession {
 
     func terminate() {
         guard stopping == nil else { return }
+        let close = closeDialog
+        close?()
         if webView.backForwardList.currentItem == nil { failedToStart = true }
         ended = true
         schemeHandler.cancel()
@@ -565,23 +571,32 @@ extension WebGameSession: WKUIDelegate {
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (String?) -> Void) {
         guard prompt.hasPrefix(Self.bridgePrefix) else {
-            log.notice("prompt ignored: \(prompt, privacy: .public)")
-            completionHandler(nil)
-            return
+            return showDialog(prompt, kind: .prompt(defaultText: defaultText ?? "")) { accepted, text in
+                completionHandler(accepted ? text ?? "" : nil)
+            }
         }
         completionHandler(answerBridge(String(prompt.dropFirst(Self.bridgePrefix.count))))
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
                  completionHandler: @escaping @MainActor () -> Void) {
-        log.notice("alert: \(message, privacy: .public)")
-        completionHandler()
+        showDialog(message, kind: .alert) { _, _ in completionHandler() }
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
                  completionHandler: @escaping @MainActor (Bool) -> Void) {
-        log.notice("confirm answered no: \(message, privacy: .public)")
-        completionHandler(false)
+        showDialog(message, kind: .confirm) { accepted, _ in completionHandler(accepted) }
+    }
+
+    private func showDialog(_ message: String, kind: PageDialog.Kind, answer: @escaping @MainActor (Bool, String?) -> Void) {
+        log.notice("page dialog: \(message, privacy: .public)")
+        guard !ended, closeDialog == nil,
+              let close = PageDialog.show(message, kind: kind, over: view, done: { [weak self] accepted, text in
+                  self?.closeDialog = nil
+                  answer(accepted, text)
+              })
+        else { return answer(false, nil) }
+        closeDialog = close
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
@@ -597,12 +612,14 @@ extension WebGameSession: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { return decisionHandler(.cancel) }
-        if url.scheme == GameFolder.scheme || url.scheme == "about" {
-            decisionHandler(.allow)
-        } else {
-            openExternal(url)
-            decisionHandler(.cancel)
-        }
+        if url.scheme == GameFolder.scheme || url.scheme == "about" { return decisionHandler(.allow) }
+        if Self.leavesForBrowser(mainFrame: navigationAction.targetFrame?.isMainFrame,
+                                 clicked: navigationAction.navigationType == .linkActivated) { openExternal(url) }
+        decisionHandler(.cancel)
+    }
+
+    nonisolated static func leavesForBrowser(mainFrame: Bool?, clicked: Bool) -> Bool {
+        mainFrame != false || clicked
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
@@ -616,8 +633,21 @@ extension WebGameSession: WKNavigationDelegate {
         log.error("navigation failed: \(error.localizedDescription, privacy: .public)")
     }
 
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard paused else { return }
+        run("__vndegen.setPaused(true)")
+        webView.setAllMediaPlaybackSuspended(true, completionHandler: nil)
+    }
+
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        guard !ended else { return }
+        let now = ContinuousClock.now
+        if webView.backForwardList.currentItem == nil || lastReload.map({ now - $0 < .seconds(30) }) == true {
+            log.error("web content process died again as the game loaded, ending the game")
+            return failToStart(reason: "Its page crashed as it loaded, possibly from running out of memory")
+        }
         log.error("web content process died, reloading the game")
+        lastReload = now
         webView.reload()
     }
 }

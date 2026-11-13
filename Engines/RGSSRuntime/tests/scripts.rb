@@ -25,6 +25,15 @@ end
   end
 end
 
+check.call('XP and VX rewrite a when-colon but leave colons in strings alone') do
+  $RGSS_VERSION = 1
+  valid = "case 0\nwhen 0 then $test_when = \"Status: Normal\"\nend\n"
+  raise 'valid source changed' unless rgss_compatible_source(valid) == valid
+  old = "case 2\nwhen 1: $test_when = 'one: a'\nwhen \"b: \": $test_when = 'x'\nwhen 2: $test_when = \"two: b\"\nend\n"
+  eval(rgss_compatible_source(old))
+  raise "when-colon rewrite gave #{$test_when.inspect}" unless $test_when == 'two: b'
+end
+
 check.call('a BOM inside a script string stays intact') do
   $test_sections = [[0, 'String', Zlib::Deflate.deflate("$test_script_text = \"\uFEFFtext\"\n")]]
   rgss_run_scripts('unused')

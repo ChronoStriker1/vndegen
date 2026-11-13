@@ -589,7 +589,7 @@ void MovieDecoder::WriteAudio(AVFrame *frame, std::unique_lock<std::mutex> &lock
                      : dropBefore;
     int skip = 0;
     if (pts < dropBefore)
-        skip = std::min(count, (int)std::lround((dropBefore - pts) * info.audioRate));
+        skip = (int)std::lround(std::min((double)count, (dropBefore - pts) * info.audioRate));
     if (skip == count)
         return;
     sink->Write(pcm.data() + (size_t)skip * channels, count - skip, pts + skip / (double)info.audioRate);

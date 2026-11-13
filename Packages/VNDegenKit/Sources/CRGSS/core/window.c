@@ -5,13 +5,12 @@
 #include <stdlib.h>
 
 static IRect clip_to(IRect r, IRect clip) {
-    int x0 = r.x > clip.x ? r.x : clip.x, y0 = r.y > clip.y ? r.y : clip.y;
-    int x1 = r.x + r.w < clip.x + clip.w ? r.x + r.w : clip.x + clip.w;
-    int y1 = r.y + r.h < clip.y + clip.h ? r.y + r.h : clip.y + clip.h;
-    IRect out = {x0, y0, x1 - x0, y1 - y0};
-    if (out.w < 0) out.w = 0;
-    if (out.h < 0) out.h = 0;
-    return out;
+    int64_t x0 = r.x > clip.x ? r.x : clip.x, y0 = r.y > clip.y ? r.y : clip.y;
+    int64_t rx1 = (int64_t)r.x + r.w, cx1 = (int64_t)clip.x + clip.w, ry1 = (int64_t)r.y + r.h, cy1 = (int64_t)clip.y + clip.h;
+    int64_t x1 = rx1 < cx1 ? rx1 : cx1, y1 = ry1 < cy1 ? ry1 : cy1;
+    if (x1 < x0) x1 = x0;
+    if (y1 < y0) y1 = y0;
+    return (IRect){(int)x0, (int)y0, (int)(x1 - x0), (int)(y1 - y0)};
 }
 
 // Draws part of the skin into a screen rectangle, stretched to fill it.
@@ -21,21 +20,7 @@ static void stretch(Image *target, IRect clip, const Image *skin, IRect s, IRect
         draw_image_rect(target, clip_to(d, clip), skin, s, d.x, d.y, fx);
         return;
     }
-    IRect c = clip_to(d, clip);
-    // One row or column at a time, through the shared blitter, so effects stay in one place.
-    for (int y = c.y; y < c.y + c.h; y++) {
-        int sy = s.y + (y - d.y) * s.h / d.h;
-        for (int x = c.x; x < c.x + c.w;) {
-            int sx = s.x + (x - d.x) * s.w / d.w;
-            // Extend the run while consecutive screen pixels map to consecutive source pixels.
-            int run = 1;
-            while (x + run < c.x + c.w && s.x + (x + run - d.x) * s.w / d.w == sx + run) run++;
-            IRect src = {sx, sy, run, 1};
-            IRect one = {x, y, run, 1};
-            draw_image_rect(target, one, skin, src, x, y, fx);
-            x += run;
-        }
-    }
+    draw_image_scaled(target, clip, skin, s, d, fx);
 }
 
 // Draws part of the skin repeated across a screen rectangle, from its top left corner.

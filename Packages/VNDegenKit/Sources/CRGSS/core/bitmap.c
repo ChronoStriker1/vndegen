@@ -6,13 +6,14 @@
 #include <string.h>
 
 IRect irect_clip(IRect r, int w, int h) {
-    if (r.x < 0) { r.w += r.x; r.x = 0; }
-    if (r.y < 0) { r.h += r.y; r.y = 0; }
-    if (r.x + r.w > w) r.w = w - r.x;
-    if (r.y + r.h > h) r.h = h - r.y;
-    if (r.w < 0) r.w = 0;
-    if (r.h < 0) r.h = 0;
-    return r;
+    int64_t x0 = r.x, y0 = r.y, x1 = x0 + r.w, y1 = y0 + r.h;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > w) x1 = w;
+    if (y1 > h) y1 = h;
+    if (x1 < x0) x1 = x0;
+    if (y1 < y0) y1 = y0;
+    return (IRect){(int)x0, (int)y0, (int)(x1 - x0), (int)(y1 - y0)};
 }
 
 // Source over destination with straight alpha. `alpha` is the source pixel's alpha already scaled by the opacity.
@@ -35,18 +36,17 @@ void image_blt(Image *dst, int x, int y, const Image *src, IRect s, int opacity)
     if (opacity > 255) opacity = 255;
     // Clip the source rectangle to the source, then the destination.
     IRect clipped = irect_clip(s, src->w, src->h);
-    x += clipped.x - s.x;
-    y += clipped.y - s.y;
-    s = clipped;
-    if (x < 0) { s.x -= x; s.w += x; x = 0; }
-    if (y < 0) { s.y -= y; s.h += y; y = 0; }
-    if (x + s.w > dst->w) s.w = dst->w - x;
-    if (y + s.h > dst->h) s.h = dst->h - y;
-    if (s.w <= 0 || s.h <= 0) return;
-    for (int row = 0; row < s.h; row++) {
-        const Pixel *in = src->px + (size_t)(s.y + row) * src->w + s.x;
-        Pixel *out = dst->px + (size_t)(y + row) * dst->w + x;
-        for (int col = 0; col < s.w; col++) {
+    int64_t dx = (int64_t)x + clipped.x - s.x, dy = (int64_t)y + clipped.y - s.y;
+    int64_t sx = clipped.x, sy = clipped.y, w = clipped.w, h = clipped.h;
+    if (dx < 0) { sx -= dx; w += dx; dx = 0; }
+    if (dy < 0) { sy -= dy; h += dy; dy = 0; }
+    if (dx + w > dst->w) w = dst->w - dx;
+    if (dy + h > dst->h) h = dst->h - dy;
+    if (w <= 0 || h <= 0) return;
+    for (int64_t row = 0; row < h; row++) {
+        const Pixel *in = src->px + (size_t)(sy + row) * src->w + sx;
+        Pixel *out = dst->px + (size_t)(dy + row) * dst->w + dx;
+        for (int64_t col = 0; col < w; col++) {
             int a = px_a(in[col]) * opacity / 255;
             out[col] = blend_over(out[col], in[col], a);
         }
@@ -58,11 +58,11 @@ void image_stretch_blt(Image *dst, IRect d, const Image *src, IRect s, int opaci
     if (opacity > 255) opacity = 255;
     IRect clip = irect_clip(d, dst->w, dst->h);
     for (int y = clip.y; y < clip.y + clip.h; y++) {
-        int sy = s.y + (int)((int64_t)(y - d.y) * s.h / d.h);
+        int64_t sy = s.y + ((int64_t)y - d.y) * s.h / d.h;
         if (sy < 0 || sy >= src->h) continue;
         Pixel *out = dst->px + (size_t)y * dst->w;
         for (int x = clip.x; x < clip.x + clip.w; x++) {
-            int sx = s.x + (int)((int64_t)(x - d.x) * s.w / d.w);
+            int64_t sx = s.x + ((int64_t)x - d.x) * s.w / d.w;
             if (sx < 0 || sx >= src->w) continue;
             Pixel p = src->px[(size_t)sy * src->w + sx];
             out[x] = blend_over(out[x], p, px_a(p) * opacity / 255);
@@ -84,8 +84,8 @@ void image_gradient(Image *dst, IRect r, Pixel a, Pixel b, bool vertical) {
     if (span <= 0) return;
     for (int y = c.y; y < c.y + c.h; y++) {
         for (int x = c.x; x < c.x + c.w; x++) {
-            int t = vertical ? y - r.y : x - r.x;
-            int u = span > 1 ? t * 255 / (span - 1) : 0;
+            int64_t t = vertical ? (int64_t)y - r.y : (int64_t)x - r.x;
+            int u = span > 1 ? (int)((int64_t)t * 255 / (span - 1)) : 0;
             int v = 255 - u;
             dst->px[(size_t)y * dst->w + x] =
                 px_make((px_r(a) * v + px_r(b) * u) / 255, (px_g(a) * v + px_g(b) * u) / 255,

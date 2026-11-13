@@ -2213,7 +2213,7 @@ plm_packet_t *plm_demux_decode(plm_demux_t *self) {
 }
 
 double plm_demux_decode_time(plm_demux_t *self) {
-	int64_t clock = plm_buffer_read(self->buffer, 3) << 30;
+	int64_t clock = (int64_t)plm_buffer_read(self->buffer, 3) << 30;
 	plm_buffer_skip(self->buffer, 1);
 	clock |= plm_buffer_read(self->buffer, 15) << 15;
 	plm_buffer_skip(self->buffer, 1);
@@ -2967,6 +2967,9 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 
 	// Get frame rate
 	self->framerate = PLM_VIDEO_PICTURE_RATE[plm_buffer_read(self->buffer, 4)];
+	if (self->framerate <= 0) {
+		self->framerate = 30;
+	}
 
 	// Skip bit_rate, marker, buffer_size and constrained bit
 	plm_buffer_skip(self->buffer, 18 + 1 + 10 + 1);
@@ -3156,6 +3159,9 @@ void plm_video_decode_macroblock(plm_video_t *self) {
 		// previous row, not the previous macroblock
 		self->slice_begin = FALSE;
 		self->macroblock_address += increment;
+		if (self->macroblock_address < 0 || self->macroblock_address >= self->mb_size) {
+			return;
+		}
 	}
 	else {
 		if (self->macroblock_address + increment >= self->mb_size) {
@@ -3357,7 +3363,11 @@ void plm_video_process_macroblock(
 	unsigned int di = (self->mb_row * dw + self->mb_col) * block_size;
 	
 	unsigned int max_address = (dw * (self->mb_height * block_size - block_size + 1) - block_size);
-	if (si > max_address || di > max_address) {
+	unsigned int plane_size = dw * self->mb_height * block_size;
+	if (
+		si >= plane_size || di > max_address ||
+		si + (block_size - 1 + odd_v) * dw + block_size - 1 + odd_h >= plane_size
+	) {
 		return; // corrupt video
 	}
 
@@ -4026,7 +4036,7 @@ int plm_audio_decode_header(plm_audio_t *self) {
 	}
 
 	int bitrate_index = plm_buffer_read(self->buffer, 4) - 1;
-	if (bitrate_index > 13) {
+	if (bitrate_index < 0 || bitrate_index > 13) {
 		return 0;
 	}
 

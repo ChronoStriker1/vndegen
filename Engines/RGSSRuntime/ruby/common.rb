@@ -47,8 +47,34 @@ end
 
 # Ruby 1.8 syntax today's Ruby rejects. `when 1: x` is `when 1 then x`.
 def rgss_compatible_source(code)
-  return code if $RGSS_VERSION == 3
-  code.gsub(/^(\s*when\s+[^\n#]*?[^:\s]):(?=[ \t]|$)/) { "#{$1} then" }
+  return code if $RGSS_VERSION == 3 || rgss_compiles?(code)
+  code.gsub(/^[ \t]*when[ \t][^\n]*/) { |line| rgss_when_then(line) }
+end
+
+def rgss_compiles?(code)
+  RubyVM::InstructionSequence.compile(code)
+  true
+rescue SyntaxError
+  false
+end
+
+def rgss_when_then(line)
+  quote = nil
+  index = line.index('when') + 4
+  while index < line.length
+    char = line[index]
+    if quote
+      if char == '\\' then index += 1
+      elsif char == quote then quote = nil
+      end
+    elsif char == '"' || char == "'" then quote = char
+    elsif char == '#' then return line
+    elsif char == ':' && line[index - 1] !~ /[:\s]/ && line[index + 1] != ':' && (line[index + 1].nil? || line[index + 1] =~ /[ \t\r]/)
+      return "#{line[0...index]} then#{line[index + 1..]}"
+    end
+    index += 1
+  end
+  line
 end
 
 # "Script 'Game_Map' line 42: NoMethodError occurred." and the message, as RGSS reports an error.
@@ -118,12 +144,36 @@ module RGSSFiles
   def self.write_path(path)
     return path unless relative?(path)
     out = Kernel.rgss_game_path(path.tr('\\', '/'), true)
-    folder = File.dirname(out)
-    Dir.mkdir(folder) unless Dir.exist?(folder)
+    make_folders(File.dirname(out))
     out
   end
 
+  def self.make_folders(folder)
+    return if Dir.rgss_exist?(folder)
+    make_folders(File.dirname(folder))
+    Dir.rgss_mkdir(folder)
+  rescue Errno::EEXIST
+    nil
+  end
+
   def self.writing?(mode) = mode.is_a?(String) ? mode =~ /[wa+]/ : mode.is_a?(Integer) && (mode & (File::WRONLY | File::RDWR)) != 0
+
+  def self.updating?(mode)
+    return mode.start_with?('a') || (mode.start_with?('r') && mode.include?('+')) if mode.is_a?(String)
+    mode.is_a?(Integer) && (mode & (File::WRONLY | File::RDWR)) != 0 && (mode & File::TRUNC) == 0
+  end
+
+  def self.mode_of(rest, options) = rest.first.is_a?(String) || rest.first.is_a?(Integer) ? rest.first : options.fetch(:mode, 'r')
+
+  def self.open_path(path, mode)
+    return read_path(path) unless writing?(mode)
+    out = write_path(path)
+    if updating?(mode) && relative?(path) && !File.rgss_exist?(out)
+      shipped = read_path(path)
+      IO.copy_stream(shipped, out) if shipped != out && File.rgss_file?(shipped)
+    end
+    out
+  end
 
   # A glob pattern that matches whatever the case of each letter, since Dir.glob ignores File::FNM_CASEFOLD. Letters
   # inside brackets are left alone.
@@ -144,16 +194,28 @@ module RGSSFiles
     end
     names.uniq.sort
   end
+
+  def self.entries(path)
+    return nil unless relative?(path)
+    folder = path.tr('\\', '/').chomp('/')
+    folders = Kernel.rgss_game_dirs.uniq.flat_map { |dir| Dir.rgss_glob(File.join(dir, caseless(folder))) }
+    folders = folders.select { |found| File.rgss_directory?(found) }
+    folders.empty? ? nil : folders.flat_map { |found| Dir.rgss_entries(found) }.uniq
+  end
 end
 
 class << File
   alias_method :rgss_open, :open unless method_defined?(:rgss_open)
-  def open(path, mode = 'r', *rest, **options, &block)
-    path = RGSSFiles.writing?(mode) ? RGSSFiles.write_path(path) : RGSSFiles.read_path(path)
-    rgss_open(path, mode, *rest, **options, &block)
+  def open(path, *rest, **options, &block)
+    rgss_open(RGSSFiles.open_path(path, RGSSFiles.mode_of(rest, options)), *rest, **options, &block)
   end
 
-  %i[exist? file? directory? mtime size read binread readlines].each do |name|
+  alias_method :rgss_new, :new unless method_defined?(:rgss_new)
+  def new(path, *rest, **options, &block)
+    rgss_new(RGSSFiles.open_path(path, RGSSFiles.mode_of(rest, options)), *rest, **options, &block)
+  end
+
+  %i[exist? file? directory? mtime size read binread readlines size? zero? empty? readable? stat lstat atime ctime].each do |name|
     alias_method :"rgss_#{name}", name unless method_defined?(:"rgss_#{name}")
     define_method(name) { |path, *rest, **options| send(:"rgss_#{name}", RGSSFiles.read_path(path), *rest, **options) }
   end
@@ -167,9 +229,24 @@ class << File
   def rename(source, destination) = rgss_rename(RGSSFiles.write_path(source), RGSSFiles.write_path(destination))
 end
 
+class << IO
+  %i[read binread readlines foreach].each do |name|
+    alias_method :"rgss_io_#{name}", name unless method_defined?(:"rgss_io_#{name}")
+    define_method(name) { |path, *rest, **options, &block| send(:"rgss_io_#{name}", RGSSFiles.read_path(path), *rest, **options, &block) }
+  end
+
+  %i[write binwrite].each do |name|
+    alias_method :"rgss_io_#{name}", name unless method_defined?(:"rgss_io_#{name}")
+    define_method(name) do |path, data, *rest, **options|
+      mode = rest.empty? ? options.fetch(:mode, 'w') : 'r+'
+      send(:"rgss_io_#{name}", RGSSFiles.open_path(path, mode), data, *rest, **options)
+    end
+  end
+end
+
 module FileTest
   class << self
-    %i[exist? file? directory? size].each do |name|
+    %i[exist? file? directory? size size? zero? empty? readable?].each do |name|
       alias_method :"rgss_#{name}", name unless method_defined?(:"rgss_#{name}")
       define_method(name) { |path| send(:"rgss_#{name}", RGSSFiles.read_path(path)) }
     end
@@ -183,6 +260,34 @@ class << Dir
     block ? names.each(&block) : names
   end
   alias [] glob
+
+  alias_method :rgss_exist?, :exist? unless method_defined?(:rgss_exist?)
+  def exist?(path) = rgss_exist?(RGSSFiles.read_path(path))
+
+  alias_method :rgss_mkdir, :mkdir unless method_defined?(:rgss_mkdir)
+  def mkdir(path, *rest) = rgss_mkdir(RGSSFiles.write_path(path), *rest)
+
+  alias_method :rgss_rmdir, :rmdir unless method_defined?(:rgss_rmdir)
+  def rmdir(path) = rgss_rmdir(RGSSFiles.relative?(path) ? Kernel.rgss_game_path(path.tr('\\', '/'), true) : path)
+  alias delete rmdir
+  alias unlink rmdir
+
+  alias_method :rgss_entries, :entries unless method_defined?(:rgss_entries)
+  def entries(path, **options) = RGSSFiles.entries(path) || rgss_entries(path, **options)
+
+  def children(path, **options) = entries(path, **options) - ['.', '..']
+
+  def each_child(path, **options, &block)
+    return enum_for(:each_child, path, **options) unless block
+    children(path, **options).each(&block)
+    nil
+  end
+
+  def foreach(path, **options, &block)
+    return enum_for(:foreach, path, **options) unless block
+    entries(path, **options).each(&block)
+    nil
+  end
 end
 
 module Kernel

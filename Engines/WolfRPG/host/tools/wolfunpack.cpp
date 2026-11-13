@@ -5,6 +5,14 @@
 #include <filesystem>
 #include <fstream>
 
+static bool insideOutput(const std::filesystem::path &entry) {
+    std::filesystem::path normal = entry.lexically_normal();
+    if (normal.empty() || normal.has_root_path()) return false;
+    for (const auto &part : normal)
+        if (part == "..") return false;
+    return true;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage: wolfunpack <archive.wolf> [output folder]\n");
@@ -23,6 +31,11 @@ int main(int argc, char **argv) {
         auto data = a->read(p);
         if (!data) {
             std::printf("  FAILED %s\n", p.c_str());
+            failed++;
+            continue;
+        }
+        if (argc > 2 && !insideOutput(p)) {
+            std::printf("  SKIPPED %s, outside the output folder\n", p.c_str());
             failed++;
             continue;
         }

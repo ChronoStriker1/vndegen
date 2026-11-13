@@ -119,6 +119,10 @@ void Game::databaseCommand(Thread &t, const Command &c) {
         return;
     }
     if (row < 0 || field < 0 || field >= int(dt->fieldKinds.size())) return;
+    if (row >= kMaxDatabaseRows && row >= int(dt->rows.size())) {
+        if (read) writeVar(target, 0, t);
+        return;
+    }
     if (row >= int(dt->rows.size())) {
         if (read) {
             writeVar(target, 0, t);
@@ -395,6 +399,8 @@ XYImage resolveXYImage(const std::string &source, const Game &game) {
     }
     if (xsize > 0) out.w = xsize;
     if (ysize > 0) out.h = ysize;
+    out.w = std::min(out.w, kMaxXYImageSide);
+    out.h = std::min(out.h, kMaxXYImageSide);
     return out;
 }
 
@@ -442,9 +448,11 @@ void Game::csvCommand(Thread &t, const Command &c) {
         }
         std::error_code ec;
         std::filesystem::create_directories(path.parent_path(), ec);
-        std::ofstream file(path, std::ios::binary);
-        file.write(out.data(), std::streamsize(out.size()));
-        if (!file) log("cannot write " + name);
+        try {
+            writeFileReplacing(path, out.data(), out.size(), false);
+        } catch (const std::exception &) {
+            log("cannot write " + name);
+        }
         return;
     }
 
@@ -464,6 +472,7 @@ void Game::csvCommand(Thread &t, const Command &c) {
     for (size_t f = 0; f < dt.fieldKinds.size(); f++) (dt.isString(f) ? strings : numbers)++;
     // The first row names the fields. The rest fill the rows from firstRow, as many as the command says and the file has.
     for (int i = 0; i < count && size_t(i) + 1 < rows.size(); i++) {
+        if (int64_t(firstRow) + i >= std::max(kMaxDatabaseRows, int(dt.rows.size()))) break;
         int r = firstRow + i;
         while (int(dt.rows.size()) <= r) {
             DatabaseType::Row added;
@@ -566,6 +575,7 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
             }
             default: {  // tile tags
                 if (!map_ || x < 0 || y < 0 || x >= map_->width || y >= map_->height) break;
+                if (map_->tileset < 0 || size_t(map_->tileset) >= tilesets_.size()) break;
                 const auto &tags = tilesets_[map_->tileset].tags;
                 int layer = (info & 0x0F) == 0 ? -1 : (info & 0x0F) - 8;
                 if (layer < 0) {
@@ -1109,10 +1119,11 @@ void Game::chipCommand(Thread &t, const Command &c) {
     if (c.code == 242) {  // overwrite map tiles
         int layer = value(c.arg(0), t), x = value(c.arg(1), t), y = value(c.arg(2), t);
         int w = value(c.arg(3), t), h = value(c.arg(4), t), chip = value(c.arg(5), t);
-        for (int yy = y; yy < y + h; yy++)
-            for (int xx = x; xx < x + w; xx++)
-                if (layer >= 0 && layer < map_->layers && xx >= 0 && yy >= 0 && xx < map_->width && yy < map_->height)
-                    map_->tiles[(size_t(layer) * map_->width + xx) * map_->height + yy] = chip;
+        if (layer < 0 || layer >= map_->layers) return;
+        int64_t x0 = std::max<int64_t>(x, 0), x1 = std::min<int64_t>(int64_t(x) + w, map_->width);
+        int64_t y0 = std::max<int64_t>(y, 0), y1 = std::min<int64_t>(int64_t(y) + h, map_->height);
+        for (int64_t yy = y0; yy < y1; yy++)
+            for (int64_t xx = x0; xx < x1; xx++) map_->tiles[(size_t(layer) * map_->width + xx) * map_->height + yy] = chip;
         return;
     }
     if (c.code == 241) {  // use another tileset

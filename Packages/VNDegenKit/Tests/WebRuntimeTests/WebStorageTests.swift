@@ -130,3 +130,25 @@ import Testing
     #expect(throws: (any Error).self) { try storage.load() }
     #expect(throws: (any Error).self) { try storage.clear() }
 }
+
+@Test func storageSkipsAValueFileItCannotDecode() throws {
+    let base = TestFolders.root.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: base) }
+    let storage = WebStorage(directory: base)
+    try storage.set("save1", "kept")
+    try Data([0x7B, 0x22, 0xE3, 0x81]).write(to: base.appendingPathComponent(WebStorage.fileName(for: "save2")))
+    #expect(try storage.load() == ["save1": "kept"])
+}
+
+@MainActor @Test func pageWhoseStorageCannotLoadKeepsTheShimAndRefusesStorage() async throws {
+    let page = try PageHarness { request in
+        request == .storageLoad ? .failure(BridgeError(code: "EIO", message: "unreadable")) : .value(.null)
+    }
+    try await page.load("<html><body></body></html>")
+    let result = try await page.run("""
+        let name = null;
+        try { localStorage.setItem('k', 'v'); } catch (e) { name = e.name; }
+        return [typeof window.__vndegen, name];
+        """) as? [Any]
+    #expect(result?.first as? String == "object" && result?.last as? String == "SecurityError")
+}

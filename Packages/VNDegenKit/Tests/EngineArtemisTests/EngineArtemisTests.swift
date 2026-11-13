@@ -173,3 +173,15 @@ import VNCore
         #expect(answers[0].1 == nil)
     }
 }
+
+@Suite struct ArtemisBrowserLinkTests {
+    @Test func onlyWebPagesOpen() {
+        #expect(ArtemisSession.browserURL("https://example.com/news")?.host() == "example.com")
+        #expect(ArtemisSession.browserURL("HTTP://example.com") != nil)
+        for link in ["file:///System/Applications/Calculator.app", "shortcuts://run-shortcut?name=x", "tel:123", "x.command",
+                     "javascript:alert(1)", "https:///nohost", ""] {
+            #expect(ArtemisSession.browserURL(link) == nil, "\(link)")
+        }
+        #expect(ArtemisSession.browserURL(nil) == nil)
+    }
+}
