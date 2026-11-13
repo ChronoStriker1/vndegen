@@ -35,12 +35,14 @@ import WebKit
                                              buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
     let launch = GameLaunch(game: Game(id: GameID("Test Game"), title: "Test Game"), folder: root, dataDirectory: root) {}
     let session = try WebGameSession(launch: launch, configuration: configuration)
-    let page = try PageHarness(storage: false) { _ in .value(.null) }
-    try await page.load("<html><body></body></html>")
+    let webView = try #require(session.view as? WKWebView)
+    let deadline = ContinuousClock.now + .seconds(15)
+    while webView.backForwardList.currentItem == nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
+    try #require(webView.backForwardList.currentItem != nil)
 
-    session.webViewWebContentProcessDidTerminate(page.webView)
+    session.webViewWebContentProcessDidTerminate(webView)
     #expect(!session.failedToStart)
-    session.webViewWebContentProcessDidTerminate(page.webView)
+    session.webViewWebContentProcessDidTerminate(webView)
     #expect(session.failedToStart)
     #expect(session.startFailureReason == "Its page crashed as it loaded, possibly from running out of memory")
     session.terminate()
