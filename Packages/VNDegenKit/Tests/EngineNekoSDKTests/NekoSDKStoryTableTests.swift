@@ -224,6 +224,30 @@ import TestSupport
         #expect(under ? red == 120 : red >= 58 && red <= 62, "\(red)")
     }
 
+    @Test(arguments: [true, false]) func aTablesWordLeavesTheLineUndrawnWhileAChoiceWaits(hidden: Bool) throws {
+        let root = try game(hidden ? "storytesthide" : "storytest")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "scr\\b.txt", 3))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        vnneko_mouse_move(e, 0.9, 0.1)
+        steps(e, 2)
+        var w: Int32 = 0, h: Int32 = 0, changed = false
+        let px = try #require(vnneko_frame(e, &w, &h, &changed))
+        var bright = 0
+        for y in 0..<40 {
+            for x in 0..<200 {
+                let i = (y * Int(w) + x) * 4
+                if px[i] > 230 && px[i + 1] > 230 && px[i + 2] > 230 { bright += 1 }
+            }
+        }
+        #expect(hidden ? bright == 0 : bright > 0, "\(bright)")
+    }
+
     @Test func aChoiceTakenAsItAppearsStillKeepsThePreviousChoice() throws {
         let root = try game("storytestpc")
         defer { try? FileManager.default.removeItem(at: root) }

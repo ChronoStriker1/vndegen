@@ -645,11 +645,9 @@ voicejoint 32 0 1
 voicejoint 33 5 10
 voicejoint 34 4 5 6 7 8
 voicejoint 35 2 8
-# Config as the PC starts it, read from its first-run screens. Auto speed is 50 of 100 there too. Its pause, timed from
-# 30 fps recordings under Wine at 0, 50, 75 and 100: after the last character, 104 - 1.04v ms a character and about
-# 527 - v ms more (none at 100), alongside the voice, going on at whichever ends later. Looping sounds don't hold it.
 default auto 50
-autocurve auto 104 1.04 527 1
+autocurve auto 104 1.04 340 0
+autobytes
 autowithvoice
 default text 50
 # Text speed, the gap between characters: a 69-character line timed under Wine to fully shown at nine settings, less

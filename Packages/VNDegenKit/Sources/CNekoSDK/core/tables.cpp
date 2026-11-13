@@ -66,6 +66,10 @@ const char *menuTable(const std::string &folder) {
         static const std::string table = std::string(kStoryTest) + "\nscreen defaults\ninneralways\n\nscreen choice\npic dim 0 0 alpha 128\n";
         return table.c_str();
     }
+    if (folder == "vndegen\\storytesthide") {
+        static const std::string table = std::string(kStoryTest) + "\nscreen choice\nhidesline\n";
+        return table.c_str();
+    }
     if (folder == "vndegen\\storytestpc") {
         static const std::string table = std::string(kStoryTest) + "\nscreen defaults\nchoicekeepsline\n";
         return table.c_str();
@@ -111,6 +115,10 @@ const char *menuTable(const std::string &folder) {
     if (folder == "vndegen\\titlereturn") return kTitleReturnTest;
     if (folder == "vndegen\\autounits") return "\nscreen defaults\nautocurve auto 100 0 0 0\nautobytes\n";
     if (folder == "vndegen\\autounitsplain") return "\nscreen defaults\nautocurve auto 100 0 0 0\n";
+    if (folder == "vndegen\\titlereturnclosed") {
+        static const std::string closed = "\nscreen title\nbackclosessubmenu" + std::string(kTitleReturnTest).substr(13);
+        return closed.c_str();
+    }
     if (folder == "vndegen\\titlereturnplain" || folder == "vndegen\\titlereturnopening") {
         static const std::string plain = [] {
             std::string table = kTitleReturnTest;
