@@ -4,7 +4,7 @@ The library lists every game in VNDegen's games folders, with its artwork, and P
 
 ## Adding games
 
-Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game copied to several devices keeps its artwork and settings on each. The one exception is a game whose folder name a game in another library folder already has, described under [Other folders](#other-folders).
+Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game copied to several devices keeps its artwork and settings on each. Renaming a game's folder only in case, such as `my game` to `My Game`, keeps its record. The one exception is a game whose folder name a game in another library folder already has, described under [Other folders](#other-folders).
 
 - **iPhone and iPad.** Open the Files app, then On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
 - **Mac.** Copy the game folders into `~/Games/VNDegen`. It sits outside `~/Documents` so iCloud Drive does not upload your games.

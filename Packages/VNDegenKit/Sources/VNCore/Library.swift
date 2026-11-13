@@ -330,11 +330,28 @@ public final class LibraryStore {
         var claimed = Set<GameID>()
         var unplaced: [(Listing, String)] = []
         for listing in listings {
+            var missed: [String] = []
             for name in listing.names {
                 if let id = held[Key(folder: listing.folder, name: name)], !claimed.contains(id) {
                     claimed.insert(id)
                     placed.append(Placed(id: id, folder: listing.folder, url: listing.root.appendingPathComponent(name, isDirectory: true),
                                          available: listing.available))
+                } else {
+                    missed.append(name)
+                }
+            }
+            let present = Set(listing.names)
+            for name in missed {
+                let renamed = records.values.filter { game in
+                    let held = game.folderName ?? game.id.rawValue
+                    return game.libraryFolder == listing.folder && !claimed.contains(game.id) && !present.contains(held)
+                        && held.lowercased() == name.lowercased()
+                }.map(\.id).min { $0.rawValue < $1.rawValue }
+                if let renamed {
+                    records[renamed]?.folderName = renamed.rawValue == name ? nil : name
+                    claimed.insert(renamed)
+                    placed.append(Placed(id: renamed, folder: listing.folder,
+                                         url: listing.root.appendingPathComponent(name, isDirectory: true), available: listing.available))
                 } else if listing.available {
                     unplaced.append((listing, name))
                 }
