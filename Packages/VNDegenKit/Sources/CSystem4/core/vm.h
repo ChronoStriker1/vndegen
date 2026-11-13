@@ -93,11 +93,18 @@ struct HllState {
     static std::vector<void (*)()> &resets();
     struct Add { explicit Add(void (*fn)()) { resets().push_back(fn); } };
     static void resetAll() { for (auto fn : resets()) fn(); }
+    static std::vector<void (*)()> &finishes();
+    struct AddFinish { explicit AddFinish(void (*fn)()) { finishes().push_back(fn); } };
+    static void finishAll() { for (auto fn : finishes()) fn(); }
 };
 #define S4_HLL_RESET \
     static void hllReset(); \
     static s4::HllState::Add regHllReset_(hllReset); \
     static void hllReset()
+#define S4_HLL_FINISH \
+    static void hllFinish(); \
+    static s4::HllState::AddFinish regHllFinish_(hllFinish); \
+    static void hllFinish()
 #define S4_HLL(lib, fn) \
     static void hll_##lib##_##fn(s4::HllCall &c); \
     static s4::HllRegistry::Add reg_##lib##_##fn(#lib "." #fn, hll_##lib##_##fn); \

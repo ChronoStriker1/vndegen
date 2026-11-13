@@ -218,31 +218,49 @@ S4_HLL(PassRegister, ExistText) { c.retBool(g_pass[c.i(0)].texts.count(c.s(1)) >
 // byte and its data. Ints are type 1 with 4 bytes, strings type 3 ending in a NUL. Bytes (0) and floats (2, 4
 // bytes) follow the order of the Write calls; no test game writes them.
 std::fstream g_vs;
+struct VsOut {
+    bool open = false;
+    std::string path, data;
+};
+VsOut g_vsOut;
 enum VsType : char { kVsByte = 0, kVsInt = 1, kVsFloat = 2, kVsString = 3 };
 constexpr char kVsHeader[8] = {'V', 'S', 'F', 0, 0, 0, 0, 0};
+bool vsCommit() {
+    if (!g_vsOut.open) return true;
+    VsOut out = std::exchange(g_vsOut, {});
+    return save::writeFile(out.path, out.data.data(), out.data.size());
+}
 S4_HLL(VSFile, OpenForWrite) {
-    g_vs = std::fstream(save::hostPath(*G().vm, c.s(0), false), std::ios::out | std::ios::binary | std::ios::trunc);
-    if (g_vs.is_open()) g_vs.write(kVsHeader, sizeof kVsHeader);
-    c.retBool(g_vs.is_open() && bool(g_vs));
+    vsCommit();
+    g_vs.close();
+    std::string path = save::hostPath(*G().vm, c.s(0), false);
+    if (!path.empty()) g_vsOut = {true, path, std::string(kVsHeader, sizeof kVsHeader)};
+    c.retBool(g_vsOut.open);
 }
 S4_HLL(VSFile, OpenForRead) {
+    vsCommit();
     g_vs = std::fstream(save::hostPath(*G().vm, c.s(0), false), std::ios::in | std::ios::binary);
     char h[sizeof kVsHeader] = {};
     bool ok = g_vs.is_open() && g_vs.read(h, sizeof h) && std::memcmp(h, kVsHeader, 4) == 0;
     if (!ok) g_vs.close();
     c.retBool(ok);
 }
-S4_HLL(VSFile, Close) { g_vs.close(); c.retBool(true); }
-void vsWrite(VsType t, const void *data, size_t n) {
-    g_vs.put(t);
-    g_vs.write(static_cast<const char *>(data), std::streamsize(n));
+S4_HLL(VSFile, Close) {
+    g_vs.close();
+    c.retBool(vsCommit());
+}
+bool vsWrite(VsType t, const void *data, size_t n) {
+    if (!g_vsOut.open) return false;
+    g_vsOut.data += t;
+    g_vsOut.data.append(static_cast<const char *>(data), n);
+    return true;
 }
 // Reads a value's type byte; false when the next value is of another type.
 bool vsExpect(VsType t) { return g_vs.get() == t && bool(g_vs); }
-S4_HLL(VSFile, WriteByte) { char b = char(c.i(0)); vsWrite(kVsByte, &b, 1); c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, WriteInt) { int32_t v = c.i(0); vsWrite(kVsInt, &v, 4); c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, WriteFloat) { int32_t v = c.i(0); vsWrite(kVsFloat, &v, 4); c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, WriteString) { const std::string &s = c.s(0); vsWrite(kVsString, s.c_str(), s.size() + 1); c.retBool(bool(g_vs)); }
+S4_HLL(VSFile, WriteByte) { char b = char(c.i(0)); c.retBool(vsWrite(kVsByte, &b, 1)); }
+S4_HLL(VSFile, WriteInt) { int32_t v = c.i(0); c.retBool(vsWrite(kVsInt, &v, 4)); }
+S4_HLL(VSFile, WriteFloat) { int32_t v = c.i(0); c.retBool(vsWrite(kVsFloat, &v, 4)); }
+S4_HLL(VSFile, WriteString) { const std::string &s = c.s(0); c.retBool(vsWrite(kVsString, s.c_str(), s.size() + 1)); }
 S4_HLL(VSFile, ReadByte) {
     char b = 0;
     bool ok = vsExpect(kVsByte) && g_vs.read(&b, 1);
@@ -418,8 +436,11 @@ S4_HLL_RESET {
     g_hideCursor = false;
     g_pass.clear();
     g_vs.close();
+    g_vsOut = {};
     g_confirm.close();
 }
+
+S4_HLL_FINISH { vsCommit(); }
 
 }  // namespace
 }  // namespace s4

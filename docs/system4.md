@@ -44,7 +44,9 @@ through the shared FrameHost module and maps the controls.
   - the GD container around both (zlib, XORed for Sys43VM games),
   - the slot details VSFile writes, and the read-message file.
   The data the sprite engine hands the game to keep (backlog, back scenes, character sprites, MultiSprite) uses the
-  PC library's encodings. Each was checked against saves the PC games wrote under Wine.
+  PC library's encodings. Each was checked against saves the PC games wrote under Wine. Every save file is written
+  beside its target, synced and renamed into place, so a write that fails keeps the old file. VSFile keeps the values
+  a game writes until it closes the file, or until the game ends for a game that never does.
 - **File names.** Game paths match the disk whatever their case, through VNDegen's shared `casepath.c`, for
   relative paths and for absolute ones inside the game or save folder. `SystemService.GetGameFolderPath` hands the
   game its folder in CP932 when the conversion is lossless, and otherwise the stand-in `/VNDegen/Game`, which file
@@ -63,7 +65,8 @@ through the shared FrameHost module and maps the controls.
 The Linux test host in `Engines/System4/host` builds the runtime with CMake and a few tools:
 - `s4play`, which runs a game headless from a script of frame-numbered clicks, keys and screenshots;
 - `s4dis`, a disassembler (`--func`, `--op`, `--lib` for a library's signatures, `--struct`);
-- `s4cg` (pictures), `s4save` (save dumps and round trips), `s4movie`, `s4fnl` and `s4drawtest` (DrawGraph formulas).
+- `s4cg` (pictures), `s4save` (save dumps and round trips), `s4movie`, `s4fnl`, `s4drawtest` (DrawGraph formulas)
+  and `s4vsfiletest` (VSFile keeps old slot details when a write fails, and writes on game end).
 
 Environment variables turn on logs:
 - `S4_TRACE`: every call with its arguments.

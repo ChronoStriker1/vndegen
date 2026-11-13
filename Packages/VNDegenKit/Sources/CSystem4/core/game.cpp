@@ -209,6 +209,7 @@ void Game::vmMain() {
     } catch (const std::exception &e) {
         problem(std::string("runtime error: ") + e.what());
     }
+    HllState::finishAll();
     std::lock_guard<std::mutex> lock(mu_);
     ended = true;
     vmTurn_ = false;
