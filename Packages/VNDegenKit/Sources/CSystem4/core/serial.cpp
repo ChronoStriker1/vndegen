@@ -91,6 +91,9 @@ bool getValue(VM &vm, const std::vector<int32_t> &in, size_t &i, const Type &t, 
         if (i >= in.size() || in[i] < 0) return false;
         int32_t n = in[i++];
         Type et = elementOf(t);
+        bool empty = !et.array && et.base == T_STRUCT && size_t(et.structType) < vm.ain.structs.size() &&
+                     vm.ain.structs[size_t(et.structType)].members.empty();
+        if (!empty && size_t(n) > in.size() - i) return false;
         int32_t dims[1] = {0};
         if (!vm.page(target)) target = vm.newArray(t.base, t.structType, t.rank, dims, 1);
         int32_t arr = target;

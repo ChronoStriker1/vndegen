@@ -21,17 +21,27 @@ uint64_t fileLength(FILE *f) {
 bool plausibleInflate(uint64_t compressed, uint64_t plain) { return plain <= compressed * 1032 + 64; }
 }  // namespace
 
+Archive::~Archive() {
+    for (auto &o : open_) if (o.f) std::fclose(o.f);
+}
+
+bool Archive::readAt(size_t file, uint64_t offset, size_t size, std::vector<uint8_t> &out) {
+    if (file >= paths_.size()) return false;
+    if (open_.size() < paths_.size()) open_.resize(paths_.size());
+    Open &o = open_[file];
+    if (!o.f) {
+        o.f = std::fopen(paths_[file].c_str(), "rb");
+        if (!o.f) return false;
+        o.length = fileLength(o.f);
+    }
+    if (offset > o.length || size > o.length - offset) return false;
+    out.resize(size);
+    return fseeko(o.f, off_t(offset), SEEK_SET) == 0 && std::fread(out.data(), 1, size, o.f) == size;
+}
+
 bool Archive::read(const ArchiveEntry &e, std::vector<uint8_t> &out) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (e.file < 0 || size_t(e.file) >= paths_.size()) return false;
-    FILE *f = std::fopen(paths_[e.file].c_str(), "rb");
-    if (!f) return false;
-    uint64_t length = fileLength(f);
-    if (e.offset > length || e.size > length - e.offset) { std::fclose(f); return false; }
-    out.resize(e.size);
-    bool ok = fseeko(f, off_t(e.offset), SEEK_SET) == 0 && std::fread(out.data(), 1, e.size, f) == e.size;
-    std::fclose(f);
-    return ok;
+    return e.file >= 0 && readAt(size_t(e.file), e.offset, e.size, out);
 }
 
 // ALD layout, from the files: sector 0 starts a table of 3-byte sector numbers (sectors are 256 bytes). The first
@@ -59,31 +69,22 @@ std::unique_ptr<AldArchive> AldArchive::open(const std::string &first) {
         a->paths_.push_back(de.path().string());
     }
     (void)disk0;
-    auto readAt = [](FILE *f, uint64_t off, size_t n, std::vector<uint8_t> &out) {
-        uint64_t length = fileLength(f);
-        if (off > length || n > length - off) return false;
-        out.resize(n);
-        return fseeko(f, off_t(off), SEEK_SET) == 0 && std::fread(out.data(), 1, n, f) == n;
-    };
     auto t3 = [](const std::vector<uint8_t> &d, size_t i) { return uint32_t(d[i] | d[i + 1] << 8 | d[i + 2] << 16); };
     // Each disk's pointer table.
     std::map<int, std::vector<uint32_t>> ptrs;
     std::vector<uint8_t> map;
     for (auto &[disk, fi] : diskFile) {
-        FILE *f = std::fopen(a->paths_[fi].c_str(), "rb");
-        if (!f) continue;
         std::vector<uint8_t> head;
-        if (readAt(f, 0, 3, head)) {
+        if (a->readAt(size_t(fi), 0, 3, head)) {
             uint32_t tableSectors = t3(head, 0);
             std::vector<uint8_t> table;
-            if (tableSectors > 0 && readAt(f, 0, size_t(tableSectors) * 256, table)) {
+            if (tableSectors > 0 && a->readAt(size_t(fi), 0, size_t(tableSectors) * 256, table)) {
                 std::vector<uint32_t> v;
                 for (size_t i = 0; i + 2 < table.size(); i += 3) v.push_back(t3(table, i));
-                if (map.empty() && v.size() > 1 && v[1] > v[0]) readAt(f, uint64_t(v[0]) * 256, size_t(v[1] - v[0]) * 256, map);
+                if (map.empty() && v.size() > 1 && v[1] > v[0]) a->readAt(size_t(fi), uint64_t(v[0]) * 256, size_t(v[1] - v[0]) * 256, map);
                 ptrs[disk] = std::move(v);
             }
         }
-        std::fclose(f);
     }
     for (size_t k = 0; k + 2 < map.size(); k += 3) {
         int disk = map[k];
@@ -94,22 +95,19 @@ std::unique_ptr<AldArchive> AldArchive::open(const std::string &first) {
         ArchiveEntry e;
         e.file = diskFile[disk];
         uint64_t off = uint64_t(pt[idx]) * 256;
-        FILE *f = std::fopen(a->paths_[e.file].c_str(), "rb");
-        if (!f) continue;
         std::vector<uint8_t> h;
-        if (readAt(f, off, 16, h)) {
+        if (a->readAt(size_t(e.file), off, 16, h)) {
             uint32_t hs, size;
             std::memcpy(&hs, h.data(), 4);
             std::memcpy(&size, h.data() + 4, 4);
             std::vector<uint8_t> nm;
-            if (hs >= 16 && hs < 4096 && readAt(f, off + 16, hs - 16, nm)) {
+            if (hs >= 16 && hs < 4096 && a->readAt(size_t(e.file), off + 16, hs - 16, nm)) {
                 e.name.assign(reinterpret_cast<char *>(nm.data()), strnlen(reinterpret_cast<char *>(nm.data()), nm.size()));
                 e.offset = off + hs;
                 e.size = size;
                 a->entries_[int(k / 3) + 1] = e;
             }
         }
-        std::fclose(f);
     }
     return a;
 }
