@@ -865,8 +865,6 @@ func restoreReplacesASaveThatDiffersOnlyInCase() throws {
     #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "pc"])
 }
 
-/// A device whose game writes `file1.rmmzsave` backs it up under the PC backup's `File1.rmmzsave`, so the backup holds
-/// one save and the PC's copy is replaced, not kept beside it.
 @Test func aBackupTakesThePathTheLatestBackupGaveTheSaveInAnotherCase() throws {
     let base = TestFolders.root.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
     let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
