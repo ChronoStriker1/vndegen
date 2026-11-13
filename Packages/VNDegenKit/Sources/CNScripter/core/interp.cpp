@@ -1,5 +1,6 @@
 // Script parsing and control flow: the cursor, expressions, variables, conditions, and the run loop.
 #include <cctype>
+#include <climits>
 #include <cstdarg>
 #include <cstring>
 #include <stdexcept>
@@ -173,7 +174,7 @@ struct ExprParser {
     }
     int number() {
         long v = 0;
-        while (isdigit(uint8_t(peek()))) v = v * 10 + (t[e.cur_.pos++] - '0');
+        while (isdigit(uint8_t(peek()))) v = std::min<long>(v * 10 + (t[e.cur_.pos++] - '0'), INT_MAX);
         return int(v);
     }
     std::vector<int> subscripts() {

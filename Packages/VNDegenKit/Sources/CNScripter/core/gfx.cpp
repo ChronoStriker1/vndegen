@@ -100,6 +100,9 @@ void multiplyRect(Image &dst, int x, int y, int w, int h, uint32_t color) {
 bool decodeImage(const Bytes &data, Image &out, bool *hasAlpha) {
     int w, h, comp;
     if (data.empty()) return false;
+    if (!stbi_info_from_memory(data.data(), int(data.size()), &w, &h, &comp) || w > 16384 || h > 16384 ||
+        int64_t(w) * h > 32 * 1024 * 1024)
+        return false;
     unsigned char *pixels = stbi_load_from_memory(data.data(), int(data.size()), &w, &h, &comp, 4);
     if (!pixels) return false;
     out = Image(w, h);

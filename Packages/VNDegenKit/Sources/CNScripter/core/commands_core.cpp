@@ -222,8 +222,8 @@ void cmdArith(E &e, const std::string &name) {
         if (name == "add") e.strVar(v.index) += s;
         return;
     }
-    int rhs = e.readInt();
-    int cur = 0;
+    int64_t rhs = e.readInt();
+    int64_t cur = 0;
     if (v.kind == E::VarRef::Num) cur = e.getNumVar(v.index);
     else if (int *p = e.arrayElement(v.index, v.subs)) cur = *p;
     if (name == "add") cur += rhs;
@@ -231,7 +231,7 @@ void cmdArith(E &e, const std::string &name) {
     else if (name == "mul") cur *= rhs;
     else if (name == "div") cur = rhs ? cur / rhs : 0;
     else if (name == "mod") cur = rhs ? cur % rhs : 0;
-    e.setVar(v, cur);
+    e.setVar(v, int(cur));
 }
 
 void cmdIncDec(E &e, const std::string &name) {

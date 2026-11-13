@@ -1182,7 +1182,7 @@ void Engine::loadGlobals() {
             p += 4;
             size_t end = p;
             while (end < data.size() && data[end]) end++;
-            str_[i].assign(reinterpret_cast<const char *>(&data[p]), end - p);
+            str_[i].assign(reinterpret_cast<const char *>(data.data()) + p, end - p);
             p = end + 1;
         }
     }
