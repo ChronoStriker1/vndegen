@@ -353,6 +353,16 @@ private func refusal(_ layout: GodotLayout, _ game: GameFolder) -> String? {
         #expect(layout.header.userDirectory == "Godot/app_userdata/My- Game")
     }
 
+    @Test func aLongFileListIsReadWhole() throws {
+        let files = (0..<10_000).map { String(format: "res://assets/sprites/sprite_%05d.png.import", $0) } + ["res://project.binary"]
+        let settings = projectBinary([("application/config/name", "Long")])
+        let game = try GameFolder(["game.pck": pack(format: 2, version: (4, 3, 0), files: files, contents: ["project.binary": settings]),
+                                   "game.exe": Data()])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.header.files == files.map { String($0.dropFirst(6)) })
+        #expect(layout.header.settings["application/config/name"] == .string("Long"))
+    }
+
     @Test func aCustomUserFolder() throws {
         let settings = projectBinary([("application/config/name", "Game"), ("application/config/use_custom_user_dir", true),
                                       ("application/config/custom_user_dir_name", "Studio/Game")])
