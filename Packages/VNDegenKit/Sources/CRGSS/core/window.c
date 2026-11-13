@@ -5,13 +5,12 @@
 #include <stdlib.h>
 
 static IRect clip_to(IRect r, IRect clip) {
-    int x0 = r.x > clip.x ? r.x : clip.x, y0 = r.y > clip.y ? r.y : clip.y;
-    int x1 = r.x + r.w < clip.x + clip.w ? r.x + r.w : clip.x + clip.w;
-    int y1 = r.y + r.h < clip.y + clip.h ? r.y + r.h : clip.y + clip.h;
-    IRect out = {x0, y0, x1 - x0, y1 - y0};
-    if (out.w < 0) out.w = 0;
-    if (out.h < 0) out.h = 0;
-    return out;
+    int64_t x0 = r.x > clip.x ? r.x : clip.x, y0 = r.y > clip.y ? r.y : clip.y;
+    int64_t rx1 = (int64_t)r.x + r.w, cx1 = (int64_t)clip.x + clip.w, ry1 = (int64_t)r.y + r.h, cy1 = (int64_t)clip.y + clip.h;
+    int64_t x1 = rx1 < cx1 ? rx1 : cx1, y1 = ry1 < cy1 ? ry1 : cy1;
+    if (x1 < x0) x1 = x0;
+    if (y1 < y0) y1 = y0;
+    return (IRect){(int)x0, (int)y0, (int)(x1 - x0), (int)(y1 - y0)};
 }
 
 // Draws part of the skin into a screen rectangle, stretched to fill it.
