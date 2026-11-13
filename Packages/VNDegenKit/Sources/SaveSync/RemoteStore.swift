@@ -10,6 +10,7 @@ struct RemoteStore: Sendable {
     let limits: RcloneLimits
     /// The store's path as the user entered it, for messages.
     var path = ""
+    var group = ""
 
     var local: LudusaviStore { LudusaviStore(root: mirror) }
     private var root: String { access.root }
@@ -207,6 +208,17 @@ struct RemoteStore: Sendable {
         return try JSONDecoder().decode(Listing.self, from: reply).list
     }
 
+    struct Progress: Decodable, Equatable {
+        var bytes, checks, transfers, deletes, renames, listed, serverSideCopyBytes, serverSideMoveBytes: Int64?
+    }
+
+    static func progress(_ group: String) async -> Progress? {
+        guard let reply = try? await Rclone.call("core/stats", json: JSONSerialization.data(withJSONObject: ["group": group, "short": true])) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(Progress.self, from: reply)
+    }
+
     private func ignoringMissing(_ work: () async throws -> Void) async throws {
         do { try await work() } catch let error as RcloneError where error.status == 404 {}
     }
@@ -216,6 +228,7 @@ struct RemoteStore: Sendable {
     private func call(_ method: String, _ input: [String: Any], config: [String: Any] = [:]) async throws -> Data {
         var input = input
         input["_config"] = limits.config.merging(config) { _, new in new }
+        input["_group"] = group
         let data = try JSONSerialization.data(withJSONObject: input)
         do {
             return try await access.call(method, data)

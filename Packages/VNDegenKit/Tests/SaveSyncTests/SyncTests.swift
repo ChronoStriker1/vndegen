@@ -805,7 +805,7 @@ extension SaveSyncService {
     let idle = Duration.seconds(4), margin = Duration.seconds(12)
     setup.service.timeouts.rclone = RcloneLimits(connect: .seconds(4), idle: idle)
     // An operation limit far past the idle deadline, so only rclone's own deadline can end the call in time.
-    setup.service.timeouts.operation = .seconds(100)
+    setup.service.timeouts.stall = .seconds(100)
     let remote: CloudRemote = switch kind {
     case .smb: .smb(SMBRemote(host: "127.0.0.1", port: silent.port))
     case .ftp: .ftp(FTPRemote(host: "127.0.0.1", port: silent.port, username: "player"))
@@ -837,12 +837,29 @@ extension SaveSyncService {
 
     // The operation limit cancels the call, which then ends at rclone's next step or the idle deadline.
     try await stall()
-    setup.service.timeouts.operation = .seconds(1)
+    setup.service.timeouts.stall = .seconds(1)
     start = ContinuousClock.now
     await #expect(throws: SaveSyncError.timedOut) { try await setup.service.status(for: setup.id) }
     #expect(ContinuousClock.now - start < idle + margin)
-    setup.service.timeouts.operation = .seconds(100)
+    setup.service.timeouts.stall = .seconds(100)
     #expect(try await setup.service.status(for: setup.id) == .inSync)
+}
+
+@MainActor
+@Test(.timeLimit(.minutes(2))) func aSlowTransferThatKeepsMovingRunsPastTheStallLimit() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": String(repeating: "x", count: 1_500_000)])
+    let root = ":local,no_clone:" + setup.server.root
+    let service = SaveSyncService(library: setup.library, connector: { _ in
+        RemoteAccess(root: root) { method, input in
+            var object = try #require(try JSONSerialization.jsonObject(with: input) as? [String: Any])
+            object["_config"] = (object["_config"] as? [String: Any] ?? [:]).merging(["BwLimitFile": "256k"]) { _, slow in slow }
+            return try await Rclone.call(method, json: JSONSerialization.data(withJSONObject: object))
+        }
+    }, manifest: nil, configRetention: nil)
+    service.timeouts.stall = .seconds(2)
+    let start = ContinuousClock.now
+    #expect(try await service.checkedBackUp(setup.id).backup != nil)
+    #expect(ContinuousClock.now - start > .seconds(4))
 }
 
 // MARK: - SMB logins

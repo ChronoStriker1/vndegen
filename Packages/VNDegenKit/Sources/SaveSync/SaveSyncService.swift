@@ -121,7 +121,6 @@ public final class SaveSyncService {
     /// folders at once.
     @ObservationIgnored private var lastOperation: Task<Void, Never>?
     @ObservationIgnored private var mirroredMappings: [String: (date: Date?, size: Int?, mapping: LudusaviMapping)] = [:]
-    /// How long the check before launch waits, and how long one operation may keep its connection to the server.
     @ObservationIgnored var timeouts = Timeouts()
     /// The time new backups are named after. Tests set it.
     @ObservationIgnored var clock: @Sendable () -> Date = { .now }
@@ -130,7 +129,7 @@ public final class SaveSyncService {
 
     struct Timeouts: Sendable {
         var launchCheck: Duration = .seconds(6)
-        var operation: Duration = .seconds(180)
+        var stall: Duration = .seconds(60)
         /// rclone's, on every call.
         var rclone = RcloneLimits()
     }
@@ -680,18 +679,20 @@ public final class SaveSyncService {
 
     // MARK: Plumbing
 
-    /// Runs `work` with the store, after every operation started before it. When `timeouts.operation` passes or the
-    /// caller is cancelled, cancels the rclone call in progress. That call ends at rclone's next step, or a request
-    /// already sent when its answer is in or nothing arrives for the idle deadline, and the operation ends with it. The
-    /// operations after this one wait until then: a server that keeps trickling bytes can hold them longer.
     private func withStore<T: Sendable>(_ server: SaveServer, _ work: @escaping @Sendable (RemoteStore) async throws -> T) async throws -> T {
-        let connector = connector, mirror = mirror, limit = timeouts.operation, limits = timeouts.rclone
+        let connector = connector, mirror = mirror, stall = timeouts.stall, limits = timeouts.rclone
         return try await serialized {
+            let group = "vndegen-" + UUID().uuidString
             let job = Task {
-                try await work(RemoteStore(access: connector(server), mirror: mirror, limits: limits, path: server.path))
+                try await work(RemoteStore(access: connector(server), mirror: mirror, limits: limits, path: server.path, group: group))
             }
             let deadline = Task {
-                do { try await Task.sleep(for: limit) } catch { return false }
+                var progress = await RemoteStore.progress(group), since = ContinuousClock.now
+                while ContinuousClock.now - since < stall {
+                    do { try await Task.sleep(for: min(stall / 4, .seconds(5))) } catch { return false }
+                    let now = await RemoteStore.progress(group)
+                    if now != progress { progress = now; since = .now }
+                }
                 job.cancel()
                 return true
             }
