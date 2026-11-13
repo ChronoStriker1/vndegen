@@ -1,6 +1,9 @@
 import Foundation
 import Observation
 import Synchronization
+#if canImport(os)
+import os
+#endif
 
 /// Where the library lives on disk.
 public struct LibraryPaths: Sendable {
@@ -522,7 +525,9 @@ struct StoredList<Element: Codable & Sendable>: Sendable {
             do {
                 try write(elements)
             } catch {
-                assertionFailure("\(url.lastPathComponent) save failed: \(error)")
+                #if canImport(os)
+                Logger(subsystem: "com.chronostriker1.vndegen", category: "library").error("\(url.lastPathComponent, privacy: .public) save failed: \(error.localizedDescription, privacy: .public)")
+                #endif
             }
         }
     }
