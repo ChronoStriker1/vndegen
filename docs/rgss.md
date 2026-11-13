@@ -25,10 +25,14 @@ on Mac, iPhone and iPad. [rgss-cleanroom.md](rgss-cleanroom.md) says where each 
 
 ## Files and saves
 
-The game's folder is the working directory, as on PC. Reads look in the game's save folder in VNDegen's data
-directory, then the game folder, then its archive (`Game.rgssad`, `Game.rgss2a`, `Game.rgss3a`), then the RTPs Game.ini
-names, whatever case the game uses. Writes go to the save folder, and so do both names of a `File.rename`, so the game
-folder is never written to. Saves copied in with a PC game still load.
+On PC the game's folder is the working directory. VNDegen doesn't change the process's working directory; the Ruby
+preludes resolve the relative paths games use instead, for `File` and `IO` reads and writes, `File.new`, the `File` and
+`FileTest` predicates, and `Dir.glob`, `Dir.exist?`, `Dir.mkdir`, `Dir.rmdir` and `Dir.entries` and its relatives.
+Reads look in the game's save folder in VNDegen's data directory, then the game folder, then its archive
+(`Game.rgssad`, `Game.rgss2a`, `Game.rgss3a`), then the RTPs Game.ini names, whatever case the game uses. Writes go to
+the save folder, creating the folders they need, and so do both names of a `File.rename`, so the game folder is never
+written to. A file the game ships that it opens to update (`r+` or append) is copied into the save folder first. Folder
+listings combine the save folder and the game folder. Saves copied in with a PC game still load.
 
 Saves are the PC engine's format: Ruby's Marshal format, with XP's and VX's strings written without encodings as Ruby
 1.8 wrote them. PC saves from XP, VX and VX Ace load in VNDegen, and VNDegen's VX and VX Ace saves load in the PC engine.
