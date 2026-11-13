@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.3",
+          "buildVersion": "2352",
+          "date": "2026-11-13T01:17:16Z",
+          "localizedDescription": "Web games no longer offer their movies and sound to AirPlay on their own.\n\n## Downloads\n\n- `VNDegen-0.41.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- The web view that runs RPG Maker MV and MZ, TyranoScript, Visual Novel Maker, Twine and Flash games no longer allows AirPlay for a page's movies and sound. It was allowed by default, so iOS could send a game's movie to a TV apart from the rest of the picture. Playing on a TV is done with Screen Mirroring, which sends picture and sound together.\n- Nothing else in VNDegen or its engines asks for AirPlay.\n\n## Known limits\n\n- If an AirPlay speaker or TV is picked as the device's sound output in Control Center, iOS sends VNDegen's sound there, as it does for every app. An app can't refuse that.\n- Violated Hero was seen to stop partway through its opening (#85). It hasn't been reproduced since and is still open.\n\n## What wasn't tested\n\n- No AirPlay device was used. The check is the setting itself, the package tests, and the Mac and iOS builds.\n- No game was played for this release.\n- No physical device or hardware controller was used.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.3/VNDegen-0.41.3.ipa",
+          "size": 126307824,
+          "sha256": "3ceb081d86d14e3a779b001b6d1bbe8ff13bdc7146eb272e7a95e52c2ab7a5e0",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.2",
           "buildVersion": "2348",
           "date": "2026-11-12T19:59:05Z",
