@@ -152,9 +152,26 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
     #expect(library.games.map(\.id.rawValue).sorted() == ["Other Game", "Secret Game"])
 
     library.update(secret.id) { $0.playTime += 60 }
+    await library.flush()
     let saved = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: paths.libraryFile)) as? [[String: Any]])
     #expect(saved.contains { $0["id"] == nil && $0["title"] as? String == "No ID" })
     #expect(LibraryStore(paths: paths, engines: []).game(secret.id)?.playTime == 36060)
+}
+
+@Test @MainActor func aScanThatChangesNothingWritesNothing() async throws {
+    let paths = try makeTempLibrary()
+    try addGame("Game", files: ["data.bin"], to: paths)
+    let library = LibraryStore(paths: paths, engines: [])
+    await library.refresh()
+    await library.flush()
+    #expect(FileManager.default.fileExists(atPath: paths.libraryFile.path))
+    try FileManager.default.removeItem(at: paths.libraryFile)
+    await library.refresh()
+    await library.flush()
+    #expect(!FileManager.default.fileExists(atPath: paths.libraryFile.path))
+    library.update(GameID("Game")) { $0.playTime = 1 }
+    library.update(GameID("Game")) { $0.playTime = 2 }
+    #expect(LibraryStore(paths: paths, engines: []).game(GameID("Game"))?.playTime == 2)
 }
 
 @Test @MainActor func aLibraryFileThatIsNotJSONIsSetAsideNotOverwritten() async throws {

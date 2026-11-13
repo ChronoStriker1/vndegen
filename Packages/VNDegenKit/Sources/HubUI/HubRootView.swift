@@ -56,6 +56,7 @@ public struct HubRootView: View {
             if phase == .background {
                 nav.relock()
                 nav.discardInboxCopies()
+                Task { await hub.library.flush() }
             }
             // Picks up games and archives the user copied in with Files or Finder meanwhile.
             if phase == .active, case .library = hub.screen { Task { await hub.refreshLibrary() } }

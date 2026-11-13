@@ -180,5 +180,6 @@ public final class Hub {
     public func prepareToQuit() async {
         endSession()
         if let sessionEndWork { await Self.wait(for: sessionEndWork, atMost: Self.closingTimeout) }
+        await library.flush()
     }
 }
