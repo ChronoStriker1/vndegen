@@ -102,7 +102,6 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
-- KiriKiri: Violated Hero was seen to stop after "OK, let's go inside." with no input moving it on (#85). Six runs on 2026-11-11 didn't reproduce it, so it stays open until it is seen again and doesn't hold up other work.
 - KiriKiri: Violated Hero stops with "Not a function or invalid method/property type" at prologue line 57 (#92). krkrsdl3's `Array.split` splits UTF-8 strings on each byte of a non-ASCII delimiter, so the speaker's name comes out empty.
 
 ## In progress
