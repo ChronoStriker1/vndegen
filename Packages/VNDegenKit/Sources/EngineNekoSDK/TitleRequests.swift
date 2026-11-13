@@ -128,6 +128,7 @@ final class ManualController: PlatformViewController, WKNavigationDelegate {
     private let web: WKWebView = {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
+        configuration.allowsAirPlayForMediaPlayback = false
         return WKWebView(frame: .zero, configuration: configuration)
     }()
     // One rule a scheme: WebKit's rule patterns have no alternation.
