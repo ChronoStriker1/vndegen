@@ -31,6 +31,9 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
 - `06-simulator-blur.patch`: in the iOS Simulator only, builds the mipmaps of the 2D back buffer with `glGenerateMipmap` instead of Godot's Gaussian blur. The blur draws into one mip level of a texture while it samples the level above, and MetalANGLE aborts on that draw with a Metal pipeline that has no color format. Shaders that read a blurred screen look slightly different there.
 - `07-restart-setup.patch`: clears the pointers `Main::cleanup` frees, at the start of `Main::setup`, since a setup that fails frees whatever it finds set. A new OS also starts `OS::target_ticks`, the time a capped game's next frame is due, from 0. It is a static on the OS clock, which starts again at 0 with each OS, so the next capped game's first frame slept until its clock caught up with the last one's.
 - `08-copy-same-file.patch`: `DirAccess::copy` does nothing when the file on disk it would write is the file the source opened, compared by inode. VNDegen finds names whatever their case, so two spellings can name one file, and copying it onto itself would empty it. A file read from the pack never matches.
+- `09-script-threads.patch`: game work that outlives the game. On a PC the process ends right after Godot's cleanup, but VNDegen's carries on.
+  - The scripts' `Thread` class counts the threads still running their function. `SceneTree::finalize`, once the tree has exited, waits up to 2 seconds for them before it frees the nodes. If any still run, it leaves the tree as it is, and `vngd_stop` then leaves the whole engine in place, as after a start that failed halfway, so the thread never runs on freed memory. That Godot then refuses later games until VNDegen is opened again.
+  - `WorkerThreadPool::exit_languages_threads` lets go of the tasks' callables while the script languages still exist. A GDScript lambda the game added with `add_task` and never waited for was freed after GDScript was gone, and crashed.
 
 ## Patches to Godot 3 (`3/patches/`)
 
@@ -45,6 +48,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
 - `05-copy-same-file.patch`: the same check in `DirAccess::copy` as Godot 4's patch 08.
 - `06-user-time-scale.patch`: the speed a player picks, on top of the game's own time scale, as Godot 4's `Engine::set_user_time_scale`. The main loop runs that many times as many physics steps of the same length, up to that many times the usual 8 per frame, and scales each frame's time by it. `SpatialVelocityTracker`, which measures in physics steps, counts them at that rate, as Godot 4's does. `vngd_set_speed` sets it.
 - `07-angle-copy-screen.patch`: skips `glInvalidateFramebuffer` in `_copy_screen` on MetalANGLE builds. With it, a game whose Environment uses the Canvas background mode, such as Test Game 113, shows the canvas layers that go through the copy as black. The Mac build uses desktop OpenGL and never made the call.
+- `08-script-threads.patch`: the thread count and wait of Godot 4's patch 09, for Godot 3's `Thread` and `SceneTree::finish`. Godot 3 has no `WorkerThreadPool`.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|

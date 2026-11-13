@@ -5,6 +5,7 @@
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
+#include "core/core_bind.h"
 #include "core/input/input.h"
 #include "core/object/script_language.h"
 #include "core/os/os.h"
@@ -364,6 +365,10 @@ void vngd_stop(void) {
 	if (state.started) {
 		frames.stop();
 		OS::get_singleton()->get_main_loop()->finalize();
+		if (CoreBind::Thread::get_running_count() > 0) {
+			ERR_PRINT("The game's threads still run after it quit, so Godot stays as it is.");
+			half_started = true;
+		}
 	}
 	if (half_started) {
 		state = State();

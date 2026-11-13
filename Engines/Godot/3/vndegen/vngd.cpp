@@ -4,6 +4,7 @@
 #include "vngd_keys.h"
 #include "vngd_platform.h"
 
+#include "core/bind/core_bind.h"
 #include "core/engine.h"
 #include "core/io/image_loader.h"
 #include "core/os/input_event.h"
@@ -327,6 +328,10 @@ void vngd_stop(void) {
 	if (state.started) {
 		frames.stop();
 		vngd_platform_stopping();
+		if (_Thread::get_running_count() > 0) {
+			ERR_PRINT("The game's threads still run after it quit, so Godot stays as it is.");
+			half_started = true;
+		}
 	}
 	if (half_started) {
 		state = State();
