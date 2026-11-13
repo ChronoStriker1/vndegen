@@ -12,7 +12,7 @@ Put each game in its own folder, named as you want it to appear. The folder name
 - **Archive copied into VNDegen's folder.** Copy a zip, RAR, or 7z into On My iPhone (or iPad), VNDegen, or its Games folder. On a Mac, copy it into `~/Games/VNDegen`. The library lists it under Ready to import, and its Import button opens the import with the archive chosen. "Delete archive after import" starts on for these archives. Use this when choosing an archive, dropping it, or opening it in VNDegen does nothing, which happens on some sideloaded installs.
 - **From an installer or a disc image.** See [Installers and disc images](#installers-and-disc-images).
 
-VNDegen rescans every library folder on launch, on pull to refresh, with Rescan in Settings, and when you return to the app.
+VNDegen rescans every library folder on launch, on pull to refresh, with Rescan in Settings, and when you return to the app from the background. Switching back to it otherwise, as after a Face ID prompt, Control Center, or another app on a Mac, rescans only when something was added to or removed from its own games folder meanwhile. A game with no confident metadata match is searched again only when its title changes or VNDegen restarts.
 
 ## Installers and disc images
 

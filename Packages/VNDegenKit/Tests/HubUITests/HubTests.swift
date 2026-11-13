@@ -280,3 +280,32 @@ private struct StartingPlugin: EnginePlugin {
     #expect(Hub.sentence("The game's Game.ini can't be read.") == "The game's Game.ini can't be read.")
     #expect(Hub.sentence("  ") == nil)
 }
+
+@MainActor
+@Test func returningToTheAppRescansOnlyAfterTheBackgroundOrWhenItsFoldersChanged() async throws {
+    let base = TestFolders.root.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
+    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
+    let game = paths.gamesRoot.appendingPathComponent("Test Game")
+    try FileManager.default.createDirectory(at: game, withIntermediateDirectories: true)
+    let library = LibraryStore(paths: paths, engines: [SlowPlugin(sessions: Sessions())])
+    await library.refresh()
+    let id = GameID("Test Game")
+    library.update(id) { $0.metadata = GameMetadata() }
+    let hub = Hub(library: library, metadata: MetadataService(), input: InputHub(),
+                  lock: LockService(keychainService: "vndegen-tests-\(UUID().uuidString)", defaults: UserDefaults(suiteName: UUID().uuidString)!),
+                  saveSync: SaveSyncService(library: library))
+    await hub.refreshLibrary()
+
+    try Data().write(to: game.appendingPathComponent("slow.txt"))
+    await hub.returnToApp(fromBackground: false)
+    #expect(library.game(id)?.engine == nil)
+    await hub.returnToApp(fromBackground: true)
+    #expect(library.game(id)?.engine == EngineID("slow"))
+
+    try Data().write(to: game.appendingPathComponent("removed.txt"))
+    try FileManager.default.removeItem(at: game.appendingPathComponent("slow.txt"))
+    try Data("PK".utf8).write(to: paths.gamesRoot.appendingPathComponent("Another Game.zip"))
+    await hub.returnToApp(fromBackground: false)
+    #expect(library.game(id)?.engine == nil)
+    #expect(hub.localArchives.map(\.fileName) == ["Another Game.zip"])
+}
