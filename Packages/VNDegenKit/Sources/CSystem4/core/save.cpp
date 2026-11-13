@@ -89,6 +89,7 @@ bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xo
 
 bool writeFile(const std::string &path, const void *data, size_t size) {
     if (path.empty()) return false;
+    // Write beside the target, then rename, so a crash never leaves half a save.
     std::error_code ec;
     fs::create_directories(fs::path(path).parent_path(), ec);
     std::string tmp = path + ".tmp";
