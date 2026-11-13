@@ -92,7 +92,8 @@
         const name = parts.slice(split).join('/');
         return host + '/' + (path.length ? path.join('/') + '/' : '/') + name;
     };
-    const storage = window.localStorage;
+    let storage = null;
+    try { storage = window.localStorage; } catch (e) {}
     if (storage) {
         const methods = { getItem: (key) => storage.getItem(canonical(key)), setItem: (key, value) => storage.setItem(canonical(key), value),
             removeItem: (key) => storage.removeItem(canonical(key)) };

@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import VNCore
 
 /// Where a page's localStorage lives. The shim calls it before each change reaches the page, so every write is on disk
@@ -68,20 +69,28 @@ nonisolated public struct WebStorage: PageStorage {
         var items: [String: String] = [:]
         for name in names where name.hasSuffix(Self.suffix) {
             guard let key = String(name.dropLast(Self.suffix.count)).removingPercentEncoding else { continue }
-            let url = directory.appendingPathComponent(name), current = file(for: key)
-            if url.lastPathComponent != current.lastPathComponent {
-                if let currentDate = Self.modified(current) {
-                    guard let legacyDate = Self.modified(url), legacyDate > currentDate else {
-                        try FileManager.default.removeItem(at: url)
-                        continue
-                    }
-                    try FileManager.default.removeItem(at: current)
-                }
-                try FileManager.default.moveItem(at: url, to: current)
+            do {
+                guard let current = try adopt(name, key: key) else { continue }
+                items[key] = try String(contentsOf: current, encoding: .utf8)
+            } catch {
+                Self.log.error("Skipped localStorage file \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
-            items[key] = try String(contentsOf: current, encoding: .utf8)
         }
         return items
+    }
+
+    private func adopt(_ name: String, key: String) throws -> URL? {
+        let url = directory.appendingPathComponent(name), current = file(for: key)
+        guard url.lastPathComponent != current.lastPathComponent else { return current }
+        if let currentDate = Self.modified(current) {
+            guard let legacyDate = Self.modified(url), legacyDate > currentDate else {
+                try FileManager.default.removeItem(at: url)
+                return nil
+            }
+            try FileManager.default.removeItem(at: current)
+        }
+        try FileManager.default.moveItem(at: url, to: current)
+        return current
     }
 
     public func value(for key: String) throws -> String? {
@@ -108,6 +117,7 @@ nonisolated public struct WebStorage: PageStorage {
     }
 
     private static let suffix = ".value"
+    private static let log = Logger(subsystem: "com.chronostriker1.vndegen", category: "storage")
     private static let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_")
 
     private static func modified(_ url: URL) -> Date? {

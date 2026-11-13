@@ -430,8 +430,20 @@
     // own storage would share one origin among all games and write to disk at a time of its choosing. Memory changes
     // only after the disk does, so a failed write never leaves the page seeing less than is saved. A clear that fails
     // part way reloads what is left on disk.
+    let storageItems = null;
     if (config.storage) {
-        let items = new Map(Object.entries(call('storageLoad', {})));
+        try {
+            storageItems = new Map(Object.entries(call('storageLoad', {})));
+        } catch (e) {
+            post({ level: 'error', message: 'localStorage unavailable: ' + e.message });
+            Object.defineProperty(window, 'localStorage', {
+                get: () => { throw new DOMException('localStorage unavailable: ' + e.message, 'SecurityError'); },
+                configurable: true, enumerable: true,
+            });
+        }
+    }
+    if (storageItems) {
+        let items = storageItems;
         const storage = {
             get length() { return items.size; },
             key: (index) => { const keys = Array.from(items.keys()); return index < keys.length ? keys[index] : null; },
