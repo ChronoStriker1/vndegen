@@ -67,9 +67,6 @@ VNGD_API void vngd_mouse_move(float x, float y);
 VNGD_API void vngd_mouse_button(int button, bool down);
 // Wheel notches, positive turned away from the player.
 VNGD_API void vngd_wheel(float notches);
-// A finger on the screen: index tells fingers apart, phase 0 down, 1 moved, 2 up, 3 cancelled. Godot games receive
-// touches as touches, and as the mouse unless the game turned that off.
-VNGD_API void vngd_touch(int index, int phase, float x, float y);
 
 // The one controller VNDegen presents, an Xbox controller. Buttons use these numbers, axes run -1..1 (sticks, down and
 // right positive) and 0..1 (triggers).

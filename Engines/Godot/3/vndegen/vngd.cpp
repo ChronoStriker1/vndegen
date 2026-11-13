@@ -89,8 +89,6 @@ void notify(int p_notification) {
 	}
 }
 
-// A start that failed after setup's first phase leaves the engine half started, and Godot can't take that apart, so
-// Godot stays stopped until VNDegen is opened again. What it made is left in place, since its servers still use the OS.
 bool half_started = false;
 constexpr const char *half_started_problem = "Godot could not start this game. Open VNDegen again to play a Godot game.";
 
@@ -121,12 +119,16 @@ int vngd_start(const VNGDLaunch *p_launch) {
 		state.problem = "The game's files could not be loaded.";
 		return 1;
 	}
-	if (Main::setup2() != OK || !Main::start()) {
+	if (Main::setup2() != OK) {
 		half_started = true;
 		state.problem = half_started_problem;
 		return 2;
 	}
 	state.setup = true;
+	if (!Main::start()) {
+		state.problem = "The game's files could not be loaded.";
+		return 1;
+	}
 	vngd_platform_started();
 	state.started = true;
 	frames.start();
@@ -257,27 +259,6 @@ void vngd_wheel(float p_notches) {
 	int button = p_notches > 0 ? BUTTON_WHEEL_UP : BUTTON_WHEEL_DOWN;
 	mouse_button(button, true, Math::abs(p_notches));
 	mouse_button(button, false, Math::abs(p_notches));
-}
-
-void vngd_touch(int p_index, int p_phase, float p_x, float p_y) {
-	if (!state.started) {
-		return;
-	}
-	Vector2 position = window_point(p_x, p_y);
-	if (p_phase == 1) {
-		Ref<InputEventScreenDrag> event;
-		event.instance();
-		event->set_index(p_index);
-		event->set_position(position);
-		parse(event);
-		return;
-	}
-	Ref<InputEventScreenTouch> event;
-	event.instance();
-	event->set_index(p_index);
-	event->set_position(position);
-	event->set_pressed(p_phase == 0);
-	parse(event);
 }
 
 void vngd_joy_button(int p_button, bool p_down) {
