@@ -92,6 +92,7 @@ class Conversion {
     bool headers_only = false;
     vnalpha_control *control;
     int video_packets = 0, audio_packets = 0;
+    long long first_frame = 0, last_frame = 0, audio_end = 0;
     CMAudioFormatDescriptionRef audio_format = nullptr;
     AVAssetWriter *writer = nil;
     AVAssetWriterInput *input = nil;
@@ -185,11 +186,12 @@ class Conversion {
         if (sample) CFRelease(sample);
         CFRelease(block);
         check(accepted);
+        audio_end = std::max(audio_end, (cluster_time + relative) * scale - audio_delay + (skipped + count) * 1000000000LL / 48000);
     }
     void frame(Element block, Element additional) {
         long length = 0;
         auto track_number = mkvparser::ReadUInt(&reader, block.start, length);
-        if (track_number != video_track && track_number != audio_track) return;
+        if (track_number < 1 || (track_number != video_track && track_number != audio_track)) return;
         if (probing) {
             if (track_number == video_track) ++video_packets; else ++audio_packets;
             return;
@@ -250,6 +252,8 @@ class Conversion {
             withPresentationTime:CMTimeMake((cluster_time + relative) * scale, 1000000000)];
         CVPixelBufferRelease(buffer);
         check(accepted);
+        last_frame = (cluster_time + relative) * scale;
+        if (!result.frames) first_frame = last_frame;
         ++result.frames;
         if (--video_packets == 0) [input markAsFinished];
     }
@@ -353,6 +357,10 @@ public:
         probing = false;
         walk(0, size);
         result.duration = duration_ticks * scale / 1e9;
+        if (result.duration <= 0 && result.frames) {
+            double interval = result.frames > 1 ? double(last_frame - first_frame) / (result.frames - 1) : 0;
+            result.duration = std::max(last_frame + interval, double(audio_end)) / 1e9;
+        }
         if (!result.frames || result.duration <= 0) throw std::runtime_error("Missing frames or WebM duration");
         [writer endSessionAtSourceTime:CMTimeMakeWithSeconds(result.duration, 1000000000)];
         dispatch_semaphore_t done = dispatch_semaphore_create(0);
