@@ -494,6 +494,7 @@ private enum FakeEngine {
     nonisolated(unsafe) static var menuBarShown: Int32 = -1
     nonisolated(unsafe) static var menu: String?
     nonisolated(unsafe) static var clicked: [String] = []
+    nonisolated(unsafe) static var problem: String?
     /// Runs inside the next frame, as a native modal loop would.
     nonisolated(unsafe) static var duringFrame: (() -> Void)?
     /// Runs inside the start, as a dialog the game shows while it starts would.
@@ -508,6 +509,7 @@ private enum FakeEngine {
         menuBarShown = -1
         menu = nil
         clicked = []
+        problem = nil
         duringFrame = nil
         duringStart = nil
     }
@@ -555,7 +557,8 @@ private enum FakeEngine {
             menuClick: { id in
                 FakeEngine.clicked.append(String(cString: id!))
                 return true
-            })
+            },
+            problem: { FakeEngine.problem.map { UnsafePointer(strdup($0)!) } })
     }
 }
 
@@ -741,5 +744,15 @@ private enum FakeEngine {
         #expect(exits == 0)
         #expect(FakeEngine.calls == ["start", "stop"])
         #expect(!KiriKiriSession.engineInUse)
+    }
+
+    @Test func aGameThatFailsToStartSaysWhy() async throws {
+        let session = try session("Test Game 01")
+        FakeEngine.startResult = -1
+        FakeEngine.problem = "This game's archives use an encryption VNDegen can't read yet."
+        try #require(session.view as? KiriKiriHostView).onReady?()
+        #expect(await stops(session))
+        #expect(session.failedToStart)
+        #expect(session.startFailureReason == FakeEngine.problem)
     }
 }
