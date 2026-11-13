@@ -321,10 +321,10 @@ static int math(YCall *c) {
     yc_flt(c, "SET2", &b);
     YVal r;
     if (yc_int_or(c, "RND", 0)) {
-        i64 lo = (i64)a, hi = (i64)b;
+        i64 lo = yr_flt_to_int(a), hi = yr_flt_to_int(b);
         if (!yc_has(c, "SET2")) { hi = lo; lo = 0; }
         if (hi < lo) { i64 t = hi; hi = lo; lo = t; }
-        r = yv_int(lo + (i64)(rng() % (u64)(hi - lo + 1)));
+        r = yv_int((i64)((u64)lo + rng() % ((u64)hi - (u64)lo + 1)));
     } else {
         double x;
         if (yc_int_or(c, "SIN", 0)) x = sin(a);

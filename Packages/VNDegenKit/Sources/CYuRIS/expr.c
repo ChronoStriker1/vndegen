@@ -180,7 +180,7 @@ static void run(YR *y, YTask *t, const u8 *p, u32 n, Stack *s) {
         }
         case 'i': {
             YVal a = pop(s);
-            push(s, a.t == YT_FLT ? yv_int((i64)a.f) : yv_int(yv_as_int(&a)));
+            push(s, yv_int(yv_as_int(&a)));
             yv_free(&a);
             break;
         }

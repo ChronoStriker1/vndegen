@@ -138,6 +138,7 @@ YVal yv_flt(double f);
 YVal yv_str(const char *s);        // copies
 YVal yv_str_own(char *s);          // takes
 YVal yv_copy(const YVal *v);
+i64 yr_flt_to_int(double f);
 i64 yv_as_int(const YVal *v);
 double yv_as_flt(const YVal *v);
 // The value as a string, malloc'd: numbers in decimal.
