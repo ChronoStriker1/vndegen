@@ -26,7 +26,7 @@ nonisolated struct YuRISLayout: Equatable, Sendable {
                 continue
             }
             guard let candidate else { continue }
-            if let current = best, candidate.root.count >= current.root.count { continue }
+            if let current = best, candidate.root.split(separator: "/").count >= current.root.split(separator: "/").count { continue }
             best = candidate
         }
         guard let best else { return nil }

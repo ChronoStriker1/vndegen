@@ -12,14 +12,14 @@ nonisolated struct NekoSDKLayout: Equatable, Sendable {
 
     init?(_ probe: FolderProbe) {
         var best: NekoSDKLayout?
-        for entry in probe.entries {
+        for entry in probe.entries.sorted() {
             let parts = entry.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
             guard parts.last?.lowercased() == "cfg.pak", parts.count <= 3 else { continue }
             let folder = parts.dropLast().joined(separator: "/")
             let prefix = folder.isEmpty ? "" : folder.lowercased() + "/"
             guard probe.contains(prefix + "scr.pak") else { continue }
             let candidate = NekoSDKLayout(root: folder, evidence: entry, confidence: .certain)
-            if let current = best, candidate.root.count >= current.root.count { continue }
+            if let current = best, candidate.root.split(separator: "/").count >= current.root.split(separator: "/").count { continue }
             best = candidate
         }
         guard let best else { return nil }

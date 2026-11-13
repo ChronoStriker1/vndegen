@@ -49,7 +49,7 @@ nonisolated struct AliceSoftLayout: Equatable, Sendable {
             guard let candidate else { continue }
             if let current = best {
                 if candidate.confidence < current.confidence { continue }
-                if candidate.confidence == current.confidence, candidate.root.count >= current.root.count { continue }
+                if candidate.confidence == current.confidence, candidate.root.split(separator: "/").count >= current.root.split(separator: "/").count { continue }
             }
             best = candidate
         }

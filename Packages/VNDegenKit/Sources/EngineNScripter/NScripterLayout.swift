@@ -30,7 +30,7 @@ nonisolated struct NScripterLayout: Equatable, Sendable {
             // The most confident match wins, then the shallowest folder.
             if let current = best {
                 if candidate.confidence < current.confidence { continue }
-                if candidate.confidence == current.confidence, candidate.root.count >= current.root.count { continue }
+                if candidate.confidence == current.confidence, candidate.root.split(separator: "/").count >= current.root.split(separator: "/").count { continue }
             }
             best = candidate
         }

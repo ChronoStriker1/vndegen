@@ -92,6 +92,11 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(layout.root == "Game")
 }
 
+@Test func theShallowestFolderWinsWhateverItsNameLength() throws {
+    let layout = try #require(NScripterLayout(probe(["MainGameFolder/nscript.dat", "x/y/nscript.dat"])))
+    #expect(layout.root == "MainGameFolder")
+}
+
 /// Hash order would find the sorted first of these only 1 time in 26.
 @Test func aTieGoesToTheFirstInSortedOrder() throws {
     let roots = (UInt8(ascii: "a")...UInt8(ascii: "z")).map { String(UnicodeScalar($0)) }

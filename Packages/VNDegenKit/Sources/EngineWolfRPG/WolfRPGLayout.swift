@@ -59,7 +59,7 @@ nonisolated struct WolfRPGLayout: Equatable, Sendable {
             let candidate = WolfRPGLayout(root: folder, evidence: entry, confidence: hasExe ? .certain : .likely)
             if let current = best {
                 if candidate.confidence < current.confidence { continue }
-                if candidate.confidence == current.confidence, candidate.root.count >= current.root.count { continue }
+                if candidate.confidence == current.confidence, candidate.root.split(separator: "/").count >= current.root.split(separator: "/").count { continue }
             }
             best = candidate
         }
