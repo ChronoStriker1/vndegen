@@ -106,6 +106,11 @@ touch on iPhone and iPad, and tells the NW.js shim not to put the page back at t
 games after a text field scrolled them. A page script, `twine.js`, turns the mouse wheel VNDegen sends, which LB and RB
 turn, into scrolling.
 
+A page's `alert()`, `confirm()` and `prompt()`, which Harlowe before 3.2 uses for `(alert:)`, `(confirm:)` and
+`(prompt:)` and Twine 1 stories for a name, show as the system's alert, with a text field for `prompt()`, as NW.js
+and Electron show them on the PC. The game gets no input while one is open. Touch, the mouse and the keyboard answer
+it; a controller can't.
+
 ### Saves
 
 Twine games keep saves in the browser's localStorage. On the PC that is Chromium's LevelDB inside the wrapper's

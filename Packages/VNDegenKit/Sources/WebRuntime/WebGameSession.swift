@@ -175,6 +175,7 @@ final class WebGameSession: NSObject, EngineSession {
     private var ended = false
     private var paused = false
     private var lastReload: ContinuousClock.Instant?
+    private var closeDialog: (() -> Void)?
     /// Ends once the page has had its last word after `terminate()` and the view is torn down.
     private var stopping: Task<Void, Never>?
     #if DEBUG
@@ -347,6 +348,7 @@ final class WebGameSession: NSObject, EngineSession {
     // MARK: EngineSession
 
     func send(_ event: ControllerEvent) {
+        guard closeDialog == nil else { return }
         switch event {
         case let .button(button, pressed):
             guard let script = buttonScript(button, pressed) else { return }
@@ -373,6 +375,7 @@ final class WebGameSession: NSObject, EngineSession {
 
     /// Text goes into the page's text field, as typing would put it there. A page with none gets key presses.
     func type(_ typed: TypedText) {
+        guard closeDialog == nil else { return }
         switch typed {
         case let .text(text): run("__vndegen.text('insert', \(Self.jsString(text)))")
         case .newline: run("__vndegen.text('newline', '')")
@@ -412,6 +415,8 @@ final class WebGameSession: NSObject, EngineSession {
 
     func terminate() {
         guard stopping == nil else { return }
+        let close = closeDialog
+        close?()
         if webView.backForwardList.currentItem == nil { failedToStart = true }
         ended = true
         schemeHandler.cancel()
@@ -566,23 +571,32 @@ extension WebGameSession: WKUIDelegate {
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (String?) -> Void) {
         guard prompt.hasPrefix(Self.bridgePrefix) else {
-            log.notice("prompt ignored: \(prompt, privacy: .public)")
-            completionHandler(nil)
-            return
+            return showDialog(prompt, kind: .prompt(defaultText: defaultText ?? "")) { accepted, text in
+                completionHandler(accepted ? text ?? "" : nil)
+            }
         }
         completionHandler(answerBridge(String(prompt.dropFirst(Self.bridgePrefix.count))))
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
                  completionHandler: @escaping @MainActor () -> Void) {
-        log.notice("alert: \(message, privacy: .public)")
-        completionHandler()
+        showDialog(message, kind: .alert) { _, _ in completionHandler() }
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
                  completionHandler: @escaping @MainActor (Bool) -> Void) {
-        log.notice("confirm answered no: \(message, privacy: .public)")
-        completionHandler(false)
+        showDialog(message, kind: .confirm) { accepted, _ in completionHandler(accepted) }
+    }
+
+    private func showDialog(_ message: String, kind: PageDialog.Kind, answer: @escaping @MainActor (Bool, String?) -> Void) {
+        log.notice("page dialog: \(message, privacy: .public)")
+        guard !ended, closeDialog == nil,
+              let close = PageDialog.show(message, kind: kind, over: view, done: { [weak self] accepted, text in
+                  self?.closeDialog = nil
+                  answer(accepted, text)
+              })
+        else { return answer(false, nil) }
+        closeDialog = close
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
