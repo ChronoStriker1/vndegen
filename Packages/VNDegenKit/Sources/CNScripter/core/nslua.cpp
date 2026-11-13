@@ -410,6 +410,66 @@ NSFN(nsNotEmulated) {
     return 0;
 }
 
+int loadText(lua_State *L, const char *text, size_t size, const char *name) {
+    if (size > 0 && text[0] == LUA_SIGNATURE[0]) {
+        lua_pushfstring(L, "%s: precompiled Lua isn't loaded", name);
+        return LUA_ERRSYNTAX;
+    }
+    return luaL_loadbuffer(L, text, size, name);
+}
+
+int loadedOrError(lua_State *L, int status) {
+    if (status == 0) return 1;
+    lua_pushnil(L);
+    lua_insert(L, -2);
+    return 2;
+}
+
+int luaLoadstring(lua_State *L) {
+    size_t size;
+    const char *text = luaL_checklstring(L, 1, &size);
+    const char *name = luaL_optstring(L, 2, text);
+    return loadedOrError(L, loadText(L, text, size, name));
+}
+
+int luaLoad(lua_State *L) {
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+    const char *name = luaL_optstring(L, 2, "=(load)");
+    lua_settop(L, 2);
+    luaL_Buffer pieces;
+    luaL_buffinit(L, &pieces);
+    for (;;) {
+        lua_pushvalue(L, 1);
+        lua_call(L, 0, 1);
+        if (lua_isnil(L, -1)) {
+            lua_pop(L, 1);
+            break;
+        }
+        if (!lua_isstring(L, -1)) return luaL_error(L, "reader function must return a string");
+        if (lua_objlen(L, -1) == 0) {
+            lua_pop(L, 1);
+            break;
+        }
+        luaL_addvalue(&pieces);
+    }
+    luaL_pushresult(&pieces);
+    size_t size;
+    const char *text = lua_tolstring(L, -1, &size);
+    return loadedOrError(L, loadText(L, text, size, name));
+}
+
+constexpr auto kLuaHardLimit = kLuaBudget + std::chrono::seconds(2);
+const char kEngineKey = 0;
+
+void luaWatch(lua_State *L, lua_Debug *) {
+    lua_pushlightuserdata(L, const_cast<char *>(&kEngineKey));
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    Engine &e = *static_cast<Engine *>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+    if (e.inLua_ && std::chrono::steady_clock::now() - e.luaCallStart_ > kLuaHardLimit)
+        luaL_error(L, "a Lua function ran for %d s without returning, so it was stopped", int(kLuaHardLimit.count()));
+}
+
 NSFN(nlDofile) {
     Engine &e = engineOf(L);
     const char *name = luaL_checkstring(L, 1);
@@ -418,7 +478,7 @@ NSFN(nlDofile) {
     {
         Bytes data;
         if (!e.fs_.read(name, data)) status = -1;
-        else status = luaL_loadbuffer(L, reinterpret_cast<const char *>(data.data()), data.size(), name);
+        else status = loadText(L, reinterpret_cast<const char *>(data.data()), data.size(), name);
     }
     if (status < 0) return luaL_error(L, "NL_dofile: %s not found", name);
     if (status != 0) return lua_error(L);
@@ -508,6 +568,16 @@ void Engine::luaStart() {
         lua_pushnil(L);
         lua_setglobal(L, name);
     }
+    lua_register(L, "load", luaLoad);
+    lua_register(L, "loadstring", luaLoadstring);
+    lua_getglobal(L, "string");
+    lua_pushnil(L);
+    lua_setfield(L, -2, "dump");
+    lua_pop(L, 1);
+    lua_pushlightuserdata(L, const_cast<char *>(&kEngineKey));
+    lua_pushlightuserdata(L, this);
+    lua_rawset(L, LUA_REGISTRYINDEX);
+    lua_sethook(L, luaWatch, LUA_MASKCOUNT, 100000);
     for (auto &f : kFunctions) {
         lua_pushlightuserdata(L, this);
         lua_pushcclosure(L, f.fn, 1);
@@ -521,7 +591,7 @@ void Engine::luaStart() {
     luaReturn_ = cur_;
     LuaCall call(*this);
     logf("system.lua: running it (NSLua)");
-    int status = luaL_loadbuffer(L, reinterpret_cast<const char *>(src.data()), src.size(), "system.lua");
+    int status = loadText(L, reinterpret_cast<const char *>(src.data()), src.size(), "system.lua");
     src = Bytes();  // nothing of ours may be alive across a Lua error, which longjmps past destructors
     if (status != 0 || lua_pcall(L, 0, 0, 0) != 0) report(L, "system.lua");
 }

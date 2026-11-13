@@ -295,8 +295,10 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`
   don't show a dialog. A game's Lua gets the base, table, string and math libraries only: no `io`, `os`, `package`
   or `debug`, and no `dofile`, `loadfile` or `require`, so a script reads files only through `NL_dofile` and the
-  engine's commands. Lua runs on the game thread, so `NSSleep` sleeps for at most 10 ms, and a function that polls
-  `NSDoEvents` for more than 3 seconds is told to return. `NSGoto`, `NSGosub` and `NSReturn` are refused inside a
+  engine's commands. Only Lua source is loaded: `system.lua`, `NL_dofile`, `load` and `loadstring` refuse precompiled
+  chunks and `string.dump` is gone, since Lua 5.1 doesn't check bytecode well enough to keep a script inside these
+  limits. Lua runs on the game thread, so `NSSleep` sleeps for at most 10 ms, a function that polls `NSDoEvents` for
+  more than 3 seconds is told to return, and one still running after 5 seconds is stopped with a Lua error. `NSGoto`, `NSGosub` and `NSReturn` are refused inside a
   statement `NSExec` runs, as the DLL's notes forbid.
 - Of `MSpDraw.dll`, the messages the test games send are emulated: `draw`, `set` and `clear`. `stop`, `move`,
   `hide`, `disp`, `getphase`, `drawTo` and the program mode its manual describes aren't.

@@ -301,6 +301,25 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(caption.hasSuffix(" 1 1 a:b yes"))
 }
 
+@Test func luaLoadsOnlySourceAndStopsAnEndlessLoop() throws {
+    let lua = """
+    NSExec("luasub spin") NSExec("luasub report")
+    local bin = loadstring("\\27Lua\\81\\0")
+    local i, parts = 0, {"return ", "7"}
+    local text = load(function() i = i + 1 return parts[i] end)
+    NSSetIntValue(30, (bin == nil and string.dump == nil and loadstring("return 6")() == 6 and text() == 7) and 1 or 0)
+    function NSCOM_spin() while true do end end
+    function NSCOM_report() NSSetStrValue(1, "lua" .. NSGetIntValue(30)) end
+    """
+    let script = ";mode400\n*define\ngame\n*start\nspin\nreport\ncaption $1\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: ["system.lua": Data(lua.utf8)])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    let started = ContinuousClock.now
+    #expect(vnns_step(engine, 16))
+    #expect(ContinuousClock.now - started < .seconds(15))
+    #expect(String(cString: vnns_caption(engine)) == "lua1")
+}
+
 /// NSTimer never goes back, across the time system.lua takes to load and across frames.
 @Test func luaTimerIsMonotonic() throws {
     let lua = """
