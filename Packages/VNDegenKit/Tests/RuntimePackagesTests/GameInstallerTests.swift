@@ -99,6 +99,22 @@ private let entries: [SyntheticGOGInstaller.Entry] = [
         }
     }
 
+    @Test(arguments: [
+        SyntheticGOGInstaller.Crafted(slicesPerDisk: 200, firstSlice: 180, lastSlice: 180),
+        SyntheticGOGInstaller.Crafted(fileSize: 1 << 63),
+        SyntheticGOGInstaller.Crafted(lastSlice: .max),
+    ])
+    func refusesImpossibleHeaderValues(crafted: SyntheticGOGInstaller.Crafted) throws {
+        let built = SyntheticGOGInstaller.make(appName: "Test", entries: [.file("{app}\\a.dat", Array("a".utf8))],
+                                               sliced: true, crafted: crafted)
+        let (setup, slices) = try write(built, named: "setup", in: try folder())
+        #expect {
+            try GameInstaller.open(setup: setup, slices: slices)
+        } throws: { error in
+            if case GameInstallerError.damaged = error { true } else { false }
+        }
+    }
+
     @Test func refusesADamagedPart() throws {
         let work = try folder()
         var data = SyntheticGOGInstaller.make(appName: "Test", entries: entries).setup

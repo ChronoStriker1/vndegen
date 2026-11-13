@@ -381,6 +381,7 @@ struct InnoHeaders {
         try reader.skip(8)  // password salt
         try reader.skip(8)  // extra disk space
         let slicesPerDisk = Int(try reader.u32())
+        guard slicesPerDisk <= 26 else { throw RuntimeInstallError.corrupt("\(slicesPerDisk) slices per disk") }
         try reader.skip(1 + 1 + 1 + 1 + 1)  // uninstall log mode, dir exists warning, privileges, language dialog, detection
         let compression: Compression
         switch try reader.u8() {
@@ -494,6 +495,9 @@ struct InnoHeaders {
             let fileOffset = try dataReader.u64()
             let fileSize = try dataReader.u64()
             let chunkSize = try dataReader.u64()
+            guard firstSlice < 1 << 16, lastSlice < 1 << 16, fileSize < 1 << 50, chunkSize < 1 << 50, fileOffset < 1 << 50 else {
+                throw RuntimeInstallError.corrupt("impossible data entry")
+            }
             let checksum: Checksum = v >= InnoVersion(5, 3, 9)
                 ? .sha1(Array(try dataReader.take(20))) : .md5(Array(try dataReader.take(16)))
             try dataReader.skip(8 + 8)  // timestamp, file version

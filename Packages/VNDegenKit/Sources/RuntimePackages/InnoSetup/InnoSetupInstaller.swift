@@ -96,7 +96,10 @@ struct InnoSetupInstaller {
     }
 
     func outputSize(_ output: Output) -> UInt64 {
-        output.parts.reduce(0) { $0 + ($1.inflatedSize ?? headers.dataEntries[$1.location].fileSize) }
+        output.parts.reduce(0) { total, part in
+            let (sum, overflow) = total.addingReportingOverflow(part.inflatedSize ?? headers.dataEntries[part.location].fileSize)
+            return overflow ? .max : sum
+        }
     }
 
     var gogLanguages: [String] {
