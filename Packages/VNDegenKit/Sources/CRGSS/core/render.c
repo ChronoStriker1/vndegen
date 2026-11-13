@@ -172,7 +172,7 @@ void draw_image_rect(Image *target, IRect clip, const Image *src, IRect sr, int 
 // MARK: Sprites
 
 static void draw_sprite(Sprite *sp, Image *target, IRect clip, int offX, int offY) {
-    if (!sp->visible || !sp->bitmap || sp->bitmap->disposed || sp->opacity <= 0) return;
+    if (sp->disposed || !sp->visible || !sp->bitmap || sp->bitmap->disposed || sp->opacity <= 0) return;
     if (sp->flash.count > 0 && sp->flash.hide) return;
     const Image *img = &sp->bitmap->image;
     IRect sr = irect_clip(*sp->srcRect, img->w, img->h);

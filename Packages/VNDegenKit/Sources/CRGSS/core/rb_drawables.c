@@ -122,8 +122,8 @@ static VALUE viewport_update(VALUE self) {
 static VALUE viewport_get_rect(VALUE self) { return get_viewport(self)->rect; }
 static VALUE viewport_put_rect(VALUE self, VALUE r) {
     RbViewport *v = get_viewport(self);
-    v->rect = r;
     v->v.rect = &rgss_rect(r)->r;
+    v->rect = r;
     return r;
 }
 static VALUE viewport_get_color(VALUE self) { return get_viewport(self)->color; }
@@ -265,6 +265,7 @@ static VALUE sprite_put_viewport(VALUE self, VALUE v) {
     drawable_detach(&s->s.d);
     s->s.viewport = viewport_arg(v);
     s->viewport = v;
+    if (s->s.disposed) return v;
     uint64_t serial = s->s.d.serial;
     drawable_attach(&s->s.d, DRAW_SPRITE, s->s.viewport);
     s->s.d.serial = serial;
@@ -529,6 +530,7 @@ static VALUE window_put_viewport(VALUE self, VALUE v) {
     drawable_detach(&w->w.d);
     w->w.viewport = viewport_arg(v);
     w->viewport = v;
+    if (w->w.disposed) return v;
     uint64_t serial = w->w.d.serial;
     drawable_attach(&w->w.d, DRAW_WINDOW, w->w.viewport);
     w->w.d.serial = serial;

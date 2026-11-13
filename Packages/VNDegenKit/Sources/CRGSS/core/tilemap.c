@@ -71,6 +71,7 @@ static int flags_of(const Tilemap *tm, int id) {
 }
 
 static const Image *sheet(const Tilemap *tm, int index) {
+    if (index < 0 || index >= (int)(sizeof tm->bitmaps / sizeof tm->bitmaps[0])) return NULL;
     Bitmap *b = tm->bitmaps[index];
     return b && !b->disposed ? &b->image : NULL;
 }
@@ -86,6 +87,7 @@ static void put(Image *target, IRect clip, const Image *src, int sx, int sy, int
 }
 
 static void draw_normal(const Tilemap *tm, int id, Image *target, IRect clip, int dx, int dy) {
+    if (id >= 1024 && id < ID_A5) return;
     int set = id >= ID_A5 ? 4 : 5 + id / 256;
     const Image *src = sheet(tm, set);
     if (!src) return;
