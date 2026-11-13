@@ -597,12 +597,13 @@ extension WebGameSession: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { return decisionHandler(.cancel) }
-        if url.scheme == GameFolder.scheme || url.scheme == "about" {
-            decisionHandler(.allow)
-        } else {
-            openExternal(url)
-            decisionHandler(.cancel)
-        }
+        if url.scheme == GameFolder.scheme || url.scheme == "about" { return decisionHandler(.allow) }
+        if Self.leavesForBrowser(navigationAction) { openExternal(url) }
+        decisionHandler(.cancel)
+    }
+
+    static func leavesForBrowser(_ action: WKNavigationAction) -> Bool {
+        action.targetFrame?.isMainFrame != false || action.navigationType == .linkActivated
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {

@@ -183,3 +183,6 @@ video is the 10-second VP9 splash. It plays at 30.0 fps, its rate, on the Mac ap
 - Twine saves don't reach a PC.
 - Pictures a story loads from the web, such as Asher's title decoration, don't show, since games don't reach the
   network.
+- For the same reason, a frame inside a passage that shows a web page, such as an embedded YouTube player, stays
+  empty. Only the page itself leaving for a website, or the player clicking a link inside such a frame, opens the
+  browser.
