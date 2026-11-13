@@ -166,8 +166,8 @@ int yr_cmd_font(YCall *c, int id) {
     if (id == C_FONT) {
         if (yc_has(c, "NAME")) { free(s->name); s->name = yc_str(c, "NAME"); }
         i64 v;
-        if (yc_int(c, "SX", &v)) s->sx = (int)v;
-        if (yc_int(c, "SY", &v)) s->sy = (int)v;
+        if (yc_int(c, "SX", &v)) s->sx = (int)(v < 0 ? 0 : v > 1024 ? 1024 : v);
+        if (yc_int(c, "SY", &v)) s->sy = (int)(v < 0 ? 0 : v > 1024 ? 1024 : v);
         if (yc_int(c, "COLOR", &v)) { s->color = v; if (!yc_has(c, "COLOR2")) s->color2 = v; }
         if (yc_int(c, "COLOR2", &v)) s->color2 = v;
         if (yc_int(c, "BOLD", &v)) s->bold = v != 0;

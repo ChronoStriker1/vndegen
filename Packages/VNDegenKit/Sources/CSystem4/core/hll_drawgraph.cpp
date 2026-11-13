@@ -7,9 +7,11 @@
 // from a copy taken before the call.
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <numbers>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "game.h"
@@ -68,10 +70,12 @@ Src source(int sp, const Surface *dst) {
 
 template <class F>
 void eachPair(Surface &d, int dx, int dy, const Src &s, int sx, int sy, int w, int h, bool flipX, bool flipY, F f) {
-    for (int y = 0; y < h; y++) {
+    int ylo = int(std::max<int64_t>(0, -int64_t(dy))), yhi = int(std::min<int64_t>(h, int64_t(d.h) - dy));
+    int xlo = int(std::max<int64_t>(0, -int64_t(dx))), xhi = int(std::min<int64_t>(w, int64_t(d.w) - dx));
+    for (int y = ylo; y < yhi; y++) {
         int ty = dy + y, fy = sy + (flipY ? h - 1 - y : y);
         if (ty < 0 || ty >= d.h || fy < 0 || fy >= s.h) continue;
-        for (int x = 0; x < w; x++) {
+        for (int x = xlo; x < xhi; x++) {
             int tx = dx + x, fx = sx + (flipX ? w - 1 - x : x);
             if (tx < 0 || tx >= d.w || fx < 0 || fx >= s.w) continue;
             f(d.at(tx, ty), s.at(fx, fy), s.a(fx, fy));
@@ -484,20 +488,28 @@ void blurOp(HllCall &c, bool across, bool alpha) {
     Src s = source(c.i(3), d);
     if (!s) return;
     int dx = c.i(1), dy = c.i(2), sx = c.i(4), sy = c.i(5), w = c.i(6), h = c.i(7), r = std::max(0, c.i(8));
-    int x0 = std::max(0, sx), y0 = std::max(0, sy), x1 = std::min(s.w, sx + w), y1 = std::min(s.h, sy + h);
+    int x0 = std::max(0, sx), y0 = std::max(0, sy);
+    int x1 = int(std::min<int64_t>(s.w, int64_t(sx) + w)), y1 = int(std::min<int64_t>(s.h, int64_t(sy) + h));
     if (x0 >= x1 || y0 >= y1) return;
     if (alpha) needAlpha(*d);
-    int n = 2 * r + 1;
-    for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++) {
+    int64_t n = 2 * int64_t(r) + 1;
+    int xlo = int(std::max<int64_t>({0, -int64_t(dx), int64_t(x0) - sx})), xhi = int(std::min<int64_t>({w, int64_t(d->w) - dx, int64_t(x1) - sx}));
+    int ylo = int(std::max<int64_t>({0, -int64_t(dy), int64_t(y0) - sy})), yhi = int(std::min<int64_t>({h, int64_t(d->h) - dy, int64_t(y1) - sy}));
+    for (int y = ylo; y < yhi; y++)
+        for (int x = xlo; x < xhi; x++) {
             int tx = dx + x, ty = dy + y, fx = sx + x, fy = sy + y;
-            if (tx < 0 || ty < 0 || tx >= d->w || ty >= d->h || fx < x0 || fy < y0 || fx >= x1 || fy >= y1) continue;
-            int sum[4] = {};
-            for (int k = -r; k <= r; k++) {
-                int u = across ? std::clamp(fx + k, x0, x1 - 1) : fx, v = across ? fy : std::clamp(fy + k, y0, y1 - 1);
-                for (int ch = 0; ch < 3; ch++) sum[ch] += s.at(u, v)[ch];
-                sum[3] += s.a(u, v);
-            }
+            int64_t sum[4] = {};
+            auto add = [&](int u, int v, int64_t times) {
+                for (int ch = 0; ch < 3; ch++) sum[ch] += s.at(u, v)[ch] * times;
+                sum[3] += s.a(u, v) * times;
+            };
+            int at = across ? fx : fy, lo = across ? x0 : y0, hi = across ? x1 - 1 : y1 - 1;
+            int64_t from = int64_t(at) - r, to = int64_t(at) + r;
+            int64_t below = std::max<int64_t>(0, lo - from), above = std::max<int64_t>(0, to - hi);
+            if (below) add(across ? lo : fx, across ? fy : lo, below);
+            if (above) add(across ? hi : fx, across ? fy : hi, above);
+            for (int64_t k = std::max<int64_t>(from, lo); k <= std::min<int64_t>(to, hi); k++)
+                add(across ? int(k) : fx, across ? fy : int(k), 1);
             uint8_t *p = d->at(tx, ty);
             if (alpha) p[3] = uint8_t((sum[3] + n / 2) / n);
             else for (int ch = 0; ch < 3; ch++) p[ch] = uint8_t((sum[ch] + n / 2) / n);
@@ -514,11 +526,30 @@ template <class F> void line(HllCall &c, bool writesAlpha, F f) {
     Surface *d = surf(c.i(0));
     if (!d) return;
     if (writesAlpha) needAlpha(*d);
-    int x0 = c.i(1), y0 = c.i(2), x1 = c.i(3), y1 = c.i(4);
-    int n = std::max(std::abs(x1 - x0), std::abs(y1 - y0));
-    for (int k = 0; k <= n; k++) {
-        int x = n ? x0 + (x1 - x0) * k / n : x0, y = n ? y0 + (y1 - y0) * k / n : y0;
-        if (x >= 0 && y >= 0 && x < d->w && y < d->h) f(d->at(x, y));
+    int64_t x0 = c.i(1), y0 = c.i(2), dx = c.i(3) - x0, dy = c.i(4) - y0;
+    int64_t n = std::max(std::abs(dx), std::abs(dy));
+    auto at = [n](int64_t a0, int64_t d, int64_t k) { return n ? a0 + int64_t(__int128(d) * k / n) : a0; };
+    auto firstTrue = [](int64_t lo, int64_t hi, auto pred) {
+        while (lo <= hi) {
+            int64_t m = lo + (hi - lo) / 2;
+            if (pred(m)) hi = m - 1;
+            else lo = m + 1;
+        }
+        return lo;
+    };
+    int64_t kLo = 0, kHi = n;
+    for (auto [a0, d, limit] : {std::tuple<int64_t, int64_t, int64_t>{x0, dx, d->w}, {y0, dy, d->h}}) {
+        if (d >= 0) {
+            kLo = std::max(kLo, firstTrue(0, n, [&](int64_t k) { return at(a0, d, k) >= 0; }));
+            kHi = std::min(kHi, firstTrue(0, n, [&](int64_t k) { return at(a0, d, k) >= limit; }) - 1);
+        } else {
+            kLo = std::max(kLo, firstTrue(0, n, [&](int64_t k) { return at(a0, d, k) < limit; }));
+            kHi = std::min(kHi, firstTrue(0, n, [&](int64_t k) { return at(a0, d, k) < 0; }) - 1);
+        }
+    }
+    for (int64_t k = kLo; k <= kHi; k++) {
+        int64_t x = at(x0, dx, k), y = at(y0, dy, k);
+        if (x >= 0 && y >= 0 && x < d->w && y < d->h) f(d->at(int(x), int(y)));
     }
 }
 S4_HLL(DrawGraph, DrawLine) {
