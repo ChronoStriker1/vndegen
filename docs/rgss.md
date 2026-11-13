@@ -15,7 +15,8 @@ on Mac, iPhone and iPad. [rgss-cleanroom.md](rgss-cleanroom.md) says where each 
   patches in `Engines/RGSSRuntime/patches` restore Ruby 1.8 and 1.9 behavior games need.
 - `Engines/RGSSRuntime/ruby` holds the Ruby VNDegen adds to every game: the RPG module of each version, Ruby 1.8
   and 1.9 compatibility, relative file paths, and the Win32API emulation. `tools/embed.py` turns them into
-  `CRGSS/core/prelude.c`.
+  `CRGSS/core/prelude.c`, and `build.sh test` fails when the checked-in file doesn't match them
+  (`embed.py --check`).
 - `rgss_run_scripts` in `common.rb` loads the game's script sections. A section's leading UTF-8 byte order mark is
   skipped, because Ruby 3.4 rejects one before `=begin`, and `$RGSS_SCRIPTS` keeps each section's ID, name, compressed
   bytes and source, as scripts that read their own sections expect. A script error names its section, line and Ruby's
