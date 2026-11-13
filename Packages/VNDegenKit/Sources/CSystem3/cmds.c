@@ -384,18 +384,23 @@ static void cmd_C(S3 *s) {
         int sx = a[0].v, sy = a[1].v, sw = a[2].v, sh = a[3].v, dx = a[4].v, dy = a[5].v, dw = a[6].v, dh = a[7].v, m = a[8].v;
         if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
         size_t px = s->dib.depth == 8 ? 1 : 4;
-        u8 *tmp = s3_alloc((size_t)dw * dh * px);
-        for (int j = 0; j < dh; j++) for (int i = 0; i < dw; i++) {
-            int si = sx + (m & 2 ? dw - 1 - i : i) * sw / dw, sj = sy + (m & 1 ? dh - 1 - j : j) * sh / dh;
+        int i0 = dx < 0 ? -dx : 0, j0 = dy < 0 ? -dy : 0;
+        int i1 = dw < s->dib.w - dx ? dw : s->dib.w - dx, j1 = dh < s->dib.h - dy ? dh : s->dib.h - dy;
+        if (i0 >= i1 || j0 >= j1) return;
+        int cw = i1 - i0;
+        u8 *tmp = s3_alloc((size_t)cw * (size_t)(j1 - j0) * px);
+        for (int j = j0; j < j1; j++) for (int i = i0; i < i1; i++) {
+            int si = sx + (int)((int64_t)(m & 2 ? dw - 1 - i : i) * sw / dw), sj = sy + (int)((int64_t)(m & 1 ? dh - 1 - j : j) * sh / dh);
             if (si < 0 || sj < 0 || si >= s->dib.w || sj >= s->dib.h) continue;
-            if (px == 1) tmp[j * dw + i] = s->dib.p8[(size_t)sj * s->dib.w + si];
-            else ((u32 *)tmp)[j * dw + i] = s->dib.p32[(size_t)sj * s->dib.w + si];
+            size_t t = (size_t)(j - j0) * cw + (size_t)(i - i0);
+            if (px == 1) tmp[t] = s->dib.p8[(size_t)sj * s->dib.w + si];
+            else ((u32 *)tmp)[t] = s->dib.p32[(size_t)sj * s->dib.w + si];
         }
-        for (int j = 0; j < dh; j++) for (int i = 0; i < dw; i++) {
+        for (int j = j0; j < j1; j++) for (int i = i0; i < i1; i++) {
             int x = dx + i, y = dy + j;
-            if (x < 0 || y < 0 || x >= s->dib.w || y >= s->dib.h) continue;
-            if (px == 1) s->dib.p8[(size_t)y * s->dib.w + x] = tmp[j * dw + i];
-            else s->dib.p32[(size_t)y * s->dib.w + x] = ((u32 *)tmp)[j * dw + i];
+            size_t t = (size_t)(j - j0) * cw + (size_t)(i - i0);
+            if (px == 1) s->dib.p8[(size_t)y * s->dib.w + x] = tmp[t];
+            else s->dib.p32[(size_t)y * s->dib.w + x] = ((u32 *)tmp)[t];
         }
         free(tmp);
         s3_mark_dirty(s);
@@ -951,7 +956,7 @@ static void cmd_W(S3 *s) {
     int k = s3_byte(s);
     Arg a[4];
     switch (k) {
-    case 'V': args(s, "eeee", a); s->viewX = a[0].v; s->viewY = a[1].v; s->viewW = a[2].v; s->viewH = a[3].v; s3_mark_dirty(s); return;
+    case 'V': args(s, "eeee", a); if (a[2].v > 4096 || a[3].v > 4096) return; s->viewX = a[0].v; s->viewY = a[1].v; s->viewW = a[2].v; s->viewH = a[3].v; s3_mark_dirty(s); return;
     case 'W': args(s, "eee", a); s3_gfx_init(s, a[0].v, a[1].v, a[2].v); return;
     case 'X': args(s, "eeee", a); s->flip = true; s3_mark_dirty(s); return;
     case 'Z': { int sub = s3_byte(s); args(s, "e", a); s->flip = a[0].v != 0; if (sub == 0) s3_mark_dirty(s); return; }

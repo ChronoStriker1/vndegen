@@ -119,7 +119,7 @@ void s3_unitmap_command(S3 *s, int k, const u16 *a, const S3LV *lv) {
     case 'C': { // VC layers, origin x, y, width, height, unit width, height
         s3_unitmap_free(s);
         int layers = a[0] < LAYERS ? a[0] : LAYERS, w = a[3], h = a[4];
-        if (layers <= 0 || w <= 0 || h <= 0 || (size_t)w * h > 4u << 20) { s3_var_set(s, 0, 0); return; }
+        if (layers <= 0 || w <= 0 || h <= 0 || (size_t)w * h * layers > 4u << 20) { s3_var_set(s, 0, 0); return; }
         m = s->unitMap = s3_alloc(sizeof *m);
         m->layers = layers; m->w = w; m->h = h;
         m->originX = a[1]; m->originY = a[2]; m->unitW = a[5]; m->unitH = a[6];
@@ -160,8 +160,8 @@ void s3_unitmap_command(S3 *s, int k, const u16 *a, const S3LV *lv) {
     case 'T': { // VT: copies a rectangle between planes
         u16 *src = plane(s, a[0], a[1]), *dst = plane(s, a[6], a[7]);
         if (!src || !dst) return;
-        int w = a[4], h = a[5];
-        u16 *tmp = s3_alloc(sizeof(u16) * (size_t)(w * h + 1));
+        int w = a[4] < m->w ? a[4] : m->w, h = a[5] < m->h ? a[5] : m->h;
+        u16 *tmp = s3_alloc(sizeof(u16) * ((size_t)w * h + 1));
         for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) if (inside(m, a[2] + i, a[3] + j)) tmp[j * w + i] = src[(a[3] + j) * m->w + a[2] + i];
         for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) if (inside(m, a[8] + i, a[9] + j)) { dst[(a[9] + j) * m->w + a[8] + i] = tmp[j * w + i]; if (a[7] == 1) mark(m, a[8] + i, a[9] + j); }
         free(tmp);

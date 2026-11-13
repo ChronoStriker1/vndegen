@@ -50,11 +50,13 @@ bool s3_ain_open(S3Ain *ain, const char *path) {
             }
         } else if (!memcmp(tag, "VARI", 4)) {
             ain->varCount = count;
+            free(ain->varNames);
             ain->varNames = s3_alloc(sizeof(char *) * (count + 1));
             for (u32 i = 0; i < count; i++)
                 if (!take_str(d, n, &p, (const char **)&ain->varNames[i])) return true;
         } else if (!memcmp(tag, "MSGI", 4)) {
             ain->msgCount = count;
+            free(ain->msgs);
             ain->msgs = s3_alloc(sizeof(char *) * (count + 1));
             for (u32 i = 0; i < count; i++)
                 if (!take_str(d, n, &p, &ain->msgs[i])) { ain->msgCount = i; return true; }

@@ -232,6 +232,7 @@ static bool decode_bmp(const u8 *d, size_t size, S3Image *img) {
     int w = (int)s3_le32(d + 18), h = (int)s3_le32(d + 22);
     int bpp = s3_le16(d + 28);
     bool flip = h > 0;
+    if (h < -8192) return false;
     if (h < 0) h = -h;
     if (w <= 0 || h <= 0 || w > 8192 || h > 8192 || s3_le32(d + 30) != 0) return false;
     img->w = w; img->h = h;

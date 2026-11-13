@@ -83,7 +83,7 @@ void s3_var_ref(S3 *s, int c, S3LV *lv) {
         lv->var = (u16)n;
         return;
     }
-    lv->var = (u16)((c - 0xc0) << 8 | s3_byte(s));
+    lv->var = (u16)((unsigned)(c - 0xc0) << 8 | (unsigned)s3_byte(s));
 }
 
 static u16 sat(long v) { return v < 0 ? 0 : v > 65535 ? 65535 : (u16)v; }
