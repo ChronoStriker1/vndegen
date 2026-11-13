@@ -1,5 +1,9 @@
 import Foundation
 import Observation
+import Synchronization
+#if canImport(os)
+import os
+#endif
 
 /// Where the library lives on disk.
 public struct LibraryPaths: Sendable {
@@ -58,6 +62,8 @@ public final class LibraryStore {
     /// Why each added folder the last scan couldn't reach is unavailable. Its games stay in `games`.
     public private(set) var folderProblems: [LibraryFolderID: String] = [:]
     private var records: [GameID: Game] = [:]
+    @ObservationIgnored private var libraryFile: StoredList<Game>
+    @ObservationIgnored private var foldersFile: StoredList<LibraryFolder>
     /// Folders the player removed. Their games' records still name them.
     private var removed: [LibraryFolder] = []
     /// Where each added folder resolved to. A security scope opened there stays open from then until the player removes
@@ -79,8 +85,10 @@ public final class LibraryStore {
     public init(paths: LibraryPaths = .standard, engines: [any EnginePlugin]) {
         self.paths = paths
         self.engines = engines
-        records = (try? Self.load(paths.libraryFile)) ?? [:]
-        let saved = (try? Self.loadFolders(paths.foldersFile)) ?? []
+        libraryFile = StoredList(url: paths.libraryFile)
+        foldersFile = StoredList(url: paths.foldersFile)
+        records = Dictionary(libraryFile.load().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let saved = foldersFile.load()
         folders = saved.filter { $0.removedAt == nil }
         removed = saved.filter { $0.removedAt != nil }
     }
@@ -124,6 +132,10 @@ public final class LibraryStore {
         records.values.first { $0.libraryFolder == folder && ($0.folderName ?? $0.id.rawValue) == name }?.id
     }
 
+    public func flush() async {
+        await StoredFiles.flush()
+    }
+
     /// Rescans every library folder and re-runs detection on every present game. Rescans run one after another.
     public func refresh() async {
         let previous = refreshing
@@ -134,9 +146,15 @@ public final class LibraryStore {
 
     /// Adds a games folder the player picked. On iPhone and iPad, `url` is the picker's security-scoped URL.
     public func addFolder(_ url: URL) async throws {
-        let candidate = Self.realPath(url)
-        for existing in [paths.gamesRoot] + folders.map(\.url) {
-            let other = Self.realPath(existing)
+        let roots = [paths.gamesRoot] + folders.map(\.url), gone = removed
+        let (candidate, real, earlierID) = await Task.detached {
+            let candidate = Self.realPath(url)
+            let earlier = gone.first { folder in
+                Self.realPath(folder.url) == candidate || (try? FolderAccess.resolve(folder.bookmark)).map { Self.realPath($0.url) } == candidate
+            }
+            return (candidate, roots.map(Self.realPath), earlier?.id)
+        }.value
+        for (existing, other) in zip(roots, real) {
             if candidate == other || candidate.hasPrefix(other + "/") || other.hasPrefix(candidate + "/") {
                 throw LibraryFolderError(message: existing == paths.gamesRoot
                     ? "That folder is VNDegen's own games folder, or overlaps it."
@@ -153,9 +171,7 @@ public final class LibraryStore {
         }
         // A folder removed before comes back as itself, so its games find their records by name in it, even when it was
         // moved or renamed meanwhile, which its bookmark follows.
-        let earlier = removed.firstIndex { folder in
-            Self.realPath(folder.url) == candidate || (try? FolderAccess.resolve(folder.bookmark)).map { Self.realPath($0.url) } == candidate
-        }
+        let earlier = earlierID.flatMap { id in removed.firstIndex { $0.id == id } }
         var folder = LibraryFolder(url: url, bookmark: bookmark)
         if let earlier {
             folder = LibraryFolder(id: removed[earlier].id, url: url, bookmark: bookmark, lastSeen: removed[earlier].lastSeen)
@@ -248,6 +264,7 @@ public final class LibraryStore {
     }
 
     private func scan() async {
+        let recordsBefore = records, foldersBefore = folders
         let gamesRoot = paths.gamesRoot
         let builtIn = await Task.detached {
             try? FileManager.default.createDirectory(at: gamesRoot, withIntermediateDirectories: true)
@@ -297,8 +314,8 @@ public final class LibraryStore {
         }
         for (id, match) in matches { records[id]?.detected = match }
         games = placed.compactMap { records[$0.id] }.sorted(by: Self.libraryOrder)
-        save()
-        saveFolders()
+        if records != recordsBefore { save() }
+        if folders != foldersBefore { saveFolders() }
     }
 
     /// A game a scan placed in the library.
@@ -326,11 +343,28 @@ public final class LibraryStore {
         var claimed = Set<GameID>()
         var unplaced: [(Listing, String)] = []
         for listing in listings {
+            var missed: [String] = []
             for name in listing.names {
                 if let id = held[Key(folder: listing.folder, name: name)], !claimed.contains(id) {
                     claimed.insert(id)
                     placed.append(Placed(id: id, folder: listing.folder, url: listing.root.appendingPathComponent(name, isDirectory: true),
                                          available: listing.available))
+                } else {
+                    missed.append(name)
+                }
+            }
+            let present = Set(listing.names)
+            for name in missed {
+                let renamed = records.values.filter { game in
+                    let held = game.folderName ?? game.id.rawValue
+                    return game.libraryFolder == listing.folder && !claimed.contains(game.id) && !present.contains(held)
+                        && held.lowercased() == name.lowercased()
+                }.map(\.id).min { $0.rawValue < $1.rawValue }
+                if let renamed {
+                    records[renamed]?.folderName = renamed.rawValue == name ? nil : name
+                    claimed.insert(renamed)
+                    placed.append(Placed(id: renamed, folder: listing.folder,
+                                         url: listing.root.appendingPathComponent(name, isDirectory: true), available: listing.available))
                 } else if listing.available {
                     unplaced.append((listing, name))
                 }
@@ -421,7 +455,7 @@ public final class LibraryStore {
         return nil
     }
 
-    private static func realPath(_ url: URL) -> String { url.standardizedFileURL.resolvingSymlinksInPath().path }
+    private nonisolated static func realPath(_ url: URL) -> String { url.standardizedFileURL.resolvingSymlinksInPath().path }
 
     private static func libraryOrder(_ a: Game, _ b: Game) -> Bool {
         switch (a.lastPlayedAt, b.lastPlayedAt) {
@@ -433,21 +467,83 @@ public final class LibraryStore {
     }
 
     private func save() {
-        do {
-            try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
-            try Self.encoder.encode(Array(records.values)).write(to: paths.libraryFile, options: .atomic)
-        } catch {
-            assertionFailure("library save failed: \(error)")
-        }
+        libraryFile.save(Array(records.values))
     }
 
     private func saveFolders() {
+        foldersFile.save(folders + removed)
+    }
+}
+
+enum StoredFiles {
+    static let writer = DispatchQueue(label: "VNDegen library files", qos: .utility)
+
+    static func flush() async {
+        await withCheckedContinuation { continuation in writer.async { continuation.resume() } }
+    }
+}
+
+struct StoredList<Element: Codable & Sendable>: Sendable {
+    let url: URL
+    private var unreadable: [Data] = []
+    private var writable = true
+    private let pending = Pending()
+
+    private final class Pending: Sendable {
+        let latest = Mutex<[Element]?>(nil)
+    }
+
+    init(url: URL) { self.url = url }
+
+    mutating func load() -> [Element] {
+        StoredFiles.writer.sync {}
+        let data: Data
         do {
-            try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
-            try Self.encoder.encode(folders + removed).write(to: paths.foldersFile, options: .atomic)
+            data = try Data(contentsOf: url)
         } catch {
-            assertionFailure("library folders save failed: \(error)")
+            writable = !FileManager.default.fileExists(atPath: url.path)
+            return []
         }
+        if let elements = try? Self.decoder.decode([Element].self, from: data) { return elements }
+        guard let items = try? JSONSerialization.jsonObject(with: data) as? [Any] else {
+            let aside = url.deletingPathExtension().appendingPathExtension("unreadable-\(Int(Date.now.timeIntervalSince1970)).json")
+            writable = (try? FileManager.default.moveItem(at: url, to: aside)) != nil
+            return []
+        }
+        var elements: [Element] = []
+        for item in items {
+            guard let raw = try? JSONSerialization.data(withJSONObject: item, options: .fragmentsAllowed) else { continue }
+            if let element = try? Self.decoder.decode(Element.self, from: raw) {
+                elements.append(element)
+            } else {
+                unreadable.append(raw)
+            }
+        }
+        return elements
+    }
+
+    func save(_ elements: [Element]) {
+        guard writable, pending.latest.withLock({ latest in defer { latest = elements }; return latest == nil }) else { return }
+        StoredFiles.writer.async { [self] in
+            guard let elements = pending.latest.withLock({ latest in defer { latest = nil }; return latest }) else { return }
+            do {
+                try write(elements)
+            } catch {
+                #if canImport(os)
+                Logger(subsystem: "com.chronostriker1.vndegen", category: "library").error("\(url.lastPathComponent, privacy: .public) save failed: \(error.localizedDescription, privacy: .public)")
+                #endif
+            }
+        }
+    }
+
+    private func write(_ elements: [Element]) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var data = try Self.encoder.encode(elements)
+        if !unreadable.isEmpty {
+            let encoded = elements.isEmpty ? [] : [data.dropFirst().dropLast()]
+            data = Data("[".utf8) + (unreadable + encoded).joined(separator: Data(",".utf8)) + Data("]".utf8)
+        }
+        try data.write(to: url, options: .atomic)
     }
 
     private static var encoder: JSONEncoder {
@@ -461,15 +557,6 @@ public final class LibraryStore {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
-    }
-
-    private static func load(_ url: URL) throws -> [GameID: Game] {
-        let games = try decoder.decode([Game].self, from: Data(contentsOf: url))
-        return Dictionary(games.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-    }
-
-    private static func loadFolders(_ url: URL) throws -> [LibraryFolder] {
-        try decoder.decode([LibraryFolder].self, from: Data(contentsOf: url))
     }
 }
 

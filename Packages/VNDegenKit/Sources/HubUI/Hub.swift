@@ -33,6 +33,7 @@ public final class Hub {
     /// The running game's last played time before this launch, put back if the game fails to start.
     @ObservationIgnored private var lastPlayedBefore: Date?
     @ObservationIgnored private var matching: Task<Void, Never>?
+    @ObservationIgnored private var ownFolders: [String]?
     /// The automatic backups that closed sessions started, chained so the last one finishes after all the others.
     @ObservationIgnored private var sessionEndWork: Task<Void, Never>?
 
@@ -51,10 +52,16 @@ public final class Hub {
     /// Rescans the games folder and the archives beside it, then looks up metadata for games that have none, without
     /// holding up the caller.
     public func refreshLibrary() async {
+        ownFolders = await LocalArchives.listing(gamesRoot: library.paths.gamesRoot)
         async let archives = LocalArchives.find(gamesRoot: library.paths.gamesRoot)
         await library.refresh()
         localArchives = await archives
         matchMetadata()
+    }
+
+    public func returnToApp(fromBackground: Bool) async {
+        if !fromBackground, await LocalArchives.listing(gamesRoot: library.paths.gamesRoot) == ownFolders { return }
+        await refreshLibrary()
     }
 
     /// Adds a games folder the player picked, then looks up metadata for its games.
@@ -180,5 +187,6 @@ public final class Hub {
     public func prepareToQuit() async {
         endSession()
         if let sessionEndWork { await Self.wait(for: sessionEndWork, atMost: Self.closingTimeout) }
+        await library.flush()
     }
 }

@@ -80,7 +80,7 @@ public final class LockSettingsModel {
             entry.message = nil
         case let .retry(message):
             entry.flow = flow
-            entry.reject(message)
+            entry.reject(lock.rejection(message))
         case let .finished(passcode):
             if lock.setPasscode(passcode) {
                 closeFlow()

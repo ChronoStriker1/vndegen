@@ -47,7 +47,7 @@ public struct UnlockView: View {
             entry.flow = lock.needsPasscodeSetup ? PasscodeFlow(.create) : nil
         }
         .task {
-            guard entry.flow == nil, lock.canUseBiometrics else { return }
+            guard entry.flow == nil, lock.canUseBiometrics || lock.canUseDevicePasscode else { return }
             await tryBiometrics()
         }
     }
@@ -55,7 +55,7 @@ public struct UnlockView: View {
     /// Gamepad and keyboard input while the view is shown. X, the controller's dash button, tries Face ID or Touch ID again.
     public func handle(_ event: ControllerEvent) {
         if case .button(.dash, pressed: true) = event {
-            if entry.flow == nil, lock.canUseBiometrics { Task { await tryBiometrics() } }
+            if entry.flow == nil, lock.canUseBiometrics || lock.canUseDevicePasscode { Task { await tryBiometrics() } }
             return
         }
         switch entry.handle(event, expectedLength: expectedLength) {
@@ -95,12 +95,16 @@ public struct UnlockView: View {
             } else if lock.hasPasscode {
                 PasscodeKeypad(entry: entry, title: "Enter passcode", expectedLength: expectedLength, keySize: keySize, onSubmit: submit)
             }
-            if entry.flow == nil, lock.canUseBiometrics {
+            if entry.flow == nil, lock.canUseBiometrics || lock.canUseDevicePasscode {
                 Button {
                     Task { await tryBiometrics() }
                 } label: {
                     HStack(spacing: 8) {
-                        Label("Use \(lock.biometry.name)", systemImage: lock.biometry.symbol)
+                        if lock.canUseBiometrics {
+                            Label("Use \(lock.biometry.name)", systemImage: lock.biometry.symbol)
+                        } else {
+                            Label(Platform.current == .macOS ? "Use your Mac password" : "Use device passcode", systemImage: "key.fill")
+                        }
                         if entry.showsFocus {
                             // The controller button that does the same.
                             Text("X")
@@ -127,12 +131,17 @@ public struct UnlockView: View {
     }
 
     private func tryBiometrics() async {
-        if await lock.unlockWithBiometrics() { finish(true) }
+        let unlocked = lock.canUseBiometrics ? await lock.unlockWithBiometrics() : await lock.unlockWithDevicePasscode()
+        if unlocked { finish(true) }
+    }
+
+    private func reject(_ message: String) {
+        entry.reject(lock.rejection(message))
     }
 
     private func submit(_ code: String) {
         guard var flow = entry.flow else {
-            if lock.unlock(passcode: code) { finish(true) } else { entry.reject("Wrong passcode") }
+            if lock.unlock(passcode: code) { finish(true) } else { reject("Wrong passcode") }
             return
         }
         switch flow.submit(code, isCurrent: lock.unlock(passcode:)) {
@@ -141,7 +150,7 @@ public struct UnlockView: View {
             entry.message = nil
         case let .retry(message):
             entry.flow = flow
-            entry.reject(message)
+            reject(message)
         case let .finished(passcode):
             if let passcode, lock.setPasscode(passcode), lock.unlock(passcode: passcode) {
                 finish(true)

@@ -9,6 +9,7 @@ public struct HubRootView: View {
     // Owned here so the route and focus survive size changes, such as folding an iPhone Duo, and play sessions.
     @State private var nav: Navigator
     @Environment(\.scenePhase) private var scenePhase
+    @State private var backgrounded = false
     @State private var windowControls = WindowControlsInsets()
 
     public init(hub: Hub) {
@@ -54,11 +55,17 @@ public struct HubRootView: View {
         .background(Theme.background)
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {
+                backgrounded = true
                 nav.relock()
                 nav.discardInboxCopies()
+                Task { await hub.library.flush() }
             }
             // Picks up games and archives the user copied in with Files or Finder meanwhile.
-            if phase == .active, case .library = hub.screen { Task { await hub.refreshLibrary() } }
+            if phase == .active, case .library = hub.screen {
+                let fromBackground = backgrounded
+                backgrounded = false
+                Task { await hub.returnToApp(fromBackground: fromBackground) }
+            }
         }
         .task { ArchiveImporter.discardStaleDropCopies() }
         .onOpenURL { url in

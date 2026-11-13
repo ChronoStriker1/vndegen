@@ -226,6 +226,32 @@ private func storedURL(_ slot: ArtworkSlot, _ id: GameID, _ library: LibraryStor
     #expect(library.game(GameID("Socks"))?.artwork.isEmpty == true)
 }
 
+@Test func theResponseMemoKeepsAtMostItsCapacity() async {
+    let memo = ResponseMemo()
+    for index in 0..<(ResponseMemo.capacity + 50) {
+        await memo.store(HTTP.Response(status: 200, data: Data(), mimeType: nil), for: "\(index)")
+    }
+    #expect(await memo.count == ResponseMemo.capacity)
+    #expect(await memo.lookup("\(ResponseMemo.capacity + 49)") != nil)
+}
+
+@Test @MainActor func aTitleWithNoConfidentMatchIsSearchedOnceUntilItChanges() async throws {
+    let network = StubNetwork()
+    let service = MetadataService(credentials: MemoryCredentials(), http: network.http)
+    let library = try await makeLibrary(["Socks"])
+    let id = GameID("Socks")
+
+    await service.autoMatch(id, in: library)
+    let searched = network.requests(to: "api.vndb.org").count
+    #expect(searched > 0)
+    await service.autoMatch(id, in: library)
+    #expect(network.requests(to: "api.vndb.org").count == searched)
+
+    library.update(id) { $0.title = "Socks Again" }
+    await service.autoMatch(id, in: library)
+    #expect(network.requests(to: "api.vndb.org").count > searched)
+}
+
 @Test @MainActor func artworkCandidatesComeFromEverySourceThatKnowsTheGame() async throws {
     let network = StubNetwork()
     let service = MetadataService(credentials: MemoryCredentials([.steamGridDBKey: StubNetwork.steamGridDBKey]), http: network.http)

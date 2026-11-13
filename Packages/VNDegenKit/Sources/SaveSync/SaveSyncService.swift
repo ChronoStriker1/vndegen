@@ -119,6 +119,7 @@ public final class SaveSyncService {
     /// The last restore, undo, backup, or server read started. Each new one waits for it, so two never touch the same
     /// folders at once.
     @ObservationIgnored private var lastOperation: Task<Void, Never>?
+    @ObservationIgnored private var mirroredMappings: [String: (date: Date?, size: Int?, mapping: LudusaviMapping)] = [:]
     /// How long the check before launch waits, and how long one operation may keep its connection to the server.
     @ObservationIgnored var timeouts = Timeouts()
     /// The time new backups are named after. Tests set it.
@@ -630,9 +631,21 @@ public final class SaveSyncService {
     /// Where the game keeps saves here, and where its latest backup recorded them.
     public func locations(for id: GameID) -> [SaveLocationInfo] {
         guard let locations = try? saveLocations(id) else { return [] }
-        let latest = match(for: id).flatMap { try? LudusaviStore(root: mirror).mapping($0.folder).effectiveFiles() } ?? [:]
+        let latest = match(for: id).flatMap { mirroredMapping($0.folder)?.effectiveFiles() } ?? [:]
         let recorded = LudusaviStore.RecordedPaths(latest.keys, locations: locations)
         return locations.indices.map { SaveLocationInfo(device: locations[$0].directory.path, recorded: recorded.commonFolder[$0]) }
+    }
+
+    private func mirroredMapping(_ folder: String) -> LudusaviMapping? {
+        let url = mirror.appendingPathComponent(folder).appendingPathComponent(LudusaviStore.mappingFile)
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
+        guard let values = try? url.resourceValues(forKeys: keys) else { return nil }
+        if let cached = mirroredMappings[folder], cached.date == values.contentModificationDate, cached.size == values.fileSize {
+            return cached.mapping
+        }
+        guard let mapping = try? LudusaviStore(root: mirror).mapping(folder) else { return nil }
+        mirroredMappings[folder] = (values.contentModificationDate, values.fileSize, mapping)
+        return mapping
     }
 
     /// The manifest's save rules for the game's Ludusavi title.
