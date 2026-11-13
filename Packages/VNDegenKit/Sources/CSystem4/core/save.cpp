@@ -101,11 +101,7 @@ bool writeFile(const std::string &path, const void *data, size_t size) {
         else if (n < 0 && errno == EINTR) continue;
         else ok = false;
     }
-#ifdef F_FULLFSYNC
-    if (ok && ::fcntl(fd, F_FULLFSYNC) != 0) ok = ::fsync(fd) == 0;
-#else
     if (ok) ok = ::fsync(fd) == 0;
-#endif
     if (::close(fd) != 0) ok = false;
     if (ok) ok = ::rename(tmp.c_str(), path.c_str()) == 0;
     if (!ok) ::unlink(tmp.c_str());
