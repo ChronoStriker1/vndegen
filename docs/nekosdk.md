@@ -120,7 +120,7 @@ The proposed handling is for the plugin to play `movie/<name>.mp4` (H.264 and AA
 
 ### Saves
 
-Each game saves to `%APPDATA%\<UserDataDirectory>`, a folder named in `init.ini`, in files `save\save%03d.sav` with a `save%03d.bmp` thumbnail, `save\cfg.sav`, `save\read.sav` (the scripts read to their end), and `play_view.sav` (a save's layout, not unlocks). Ludusavi paths can be computed from `init.ini`.
+Each game saves to `%APPDATA%\<UserDataDirectory>`, a folder named in `init.ini`, in files `save\save%03d.sav` with a `save%03d.bmp` thumbnail, `save\cfg.sav`, `save\read.sav` (the scripts read to their end), and `play_view.sav` (a save's layout, not unlocks). Ludusavi paths can be computed from `init.ini`. VNDegen runs a game whose `UserDataDirectory` has a `.` or `..` part, a leading separator or a drive letter without saves, so it never writes outside the game's data folder. A `cfg.sav` or `read.sav` that won't read whole is renamed to `cfg.sav.unreadable` or `read.sav.unreadable` (numbered when one is already there) before a new one is written, so a PC's unlocks and read marks in a damaged file aren't lost.
 
 This test had no PC saves. The runtime's work has since made them under Wine and worked out the format, so saves move between VNDegen and the PC in both directions. `docs/nekosdk-cleanroom.md` has the format.
 

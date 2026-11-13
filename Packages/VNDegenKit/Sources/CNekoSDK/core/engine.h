@@ -35,6 +35,7 @@ public:
     void parse(const std::vector<uint8_t> &data);
     std::string text(const std::string &key, const std::string &fallback = "") const;
     int number(const std::string &key, int fallback = 0) const;
+    std::optional<std::string> saveFolder() const;
 
 private:
     std::unordered_map<std::string, std::string> values_;

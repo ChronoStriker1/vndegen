@@ -1,7 +1,9 @@
 import CNekoSDK
+import EngineNekoSDK
 import Foundation
 import Testing
 import TestSupport
+import VNCore
 
 @Suite struct NekoSDKDamagedDataTests {
     private func bmp(_ w: Int, _ h: Int) -> Data {
@@ -83,5 +85,31 @@ extension NekoSDKDamagedDataTests {
         vnneko_stop(e)
         #expect(try Data(contentsOf: save.appendingPathComponent("cfg.sav.unreadable")) == cut)
         #expect((try? Data(contentsOf: save.appendingPathComponent("cfg.sav"))) != cut)
+    }
+}
+
+extension NekoSDKDamagedDataTests {
+    private func saveFolder(_ name: String) throws -> (URL, [SaveLocation]) {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg.pak": NekoSDKFlowFixture.archive([("init.ini", Data("UserDataDirectory\t\(name)\nFirstFlow\tflow\\t.txt\n".utf8))]),
+            "scr.pak": NekoSDKFlowFixture.archive([]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([.init(op: 0, next: 2), .init(op: 2, next: 0)]),
+        ])
+        return (root, NekoSDKPlugin().saveLocations(folder: root, dataDirectory: root.appendingPathComponent("data")))
+    }
+
+    @Test func savesStayInTheDataFolder() throws {
+        let (inside, kept) = try saveFolder("vndegen\\inside")
+        defer { try? FileManager.default.removeItem(at: inside) }
+        #expect(kept.map(\.directory.lastPathComponent) == ["save"])
+        #expect(kept.first?.directory.path.hasSuffix("data/AppData/Roaming/vndegen/inside/save") == true)
+
+        let (outside, none) = try saveFolder("..\\..\\..\\escaped")
+        defer { try? FileManager.default.removeItem(at: outside) }
+        #expect(none.isEmpty)
+        let e = try #require(NekoSDKFlowFixture.start(outside, data: outside.appendingPathComponent("data")))
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        vnneko_stop(e)
+        #expect(!FileManager.default.fileExists(atPath: outside.appendingPathComponent("escaped").path))
     }
 }

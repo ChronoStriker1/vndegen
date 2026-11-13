@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <string>
 
 #include "engine.h"
@@ -59,18 +60,17 @@ void vnneko_mouse_move(VNNekoEngine *e, float x, float y) { e->engine.mouseMove(
 void vnneko_mouse_button(VNNekoEngine *e, int button, bool down) { e->engine.mouseButton(button, down); }
 void vnneko_mouse_wheel(VNNekoEngine *e, int notches) { e->engine.mouseWheel(notches); }
 bool vnneko_move_focus(VNNekoEngine *e, int dx, int dy) { return e->engine.moveFocus(dx, dy); }
-const char *vnneko_user_data_directory(const char *gameRoot) {
-    static std::string answer;
-    answer.clear();
+bool vnneko_user_data_directory(const char *gameRoot, char *out, size_t size) {
     neko::Files files;
-    if (!files.open(gameRoot)) return nullptr;
+    if (!files.open(gameRoot)) return false;
     neko::Bytes init = files.read("cfg\\init.ini");
-    if (!init) return nullptr;
+    if (!init) return false;
     neko::Config config;
     config.parse(*init);
-    answer = config.text("UserDataDirectory");
-    std::replace(answer.begin(), answer.end(), '\\', '/');
-    return answer.c_str();
+    auto folder = config.saveFolder();
+    if (!folder || folder->size() >= size) return false;
+    std::memcpy(out, folder->c_str(), folder->size() + 1);
+    return true;
 }
 bool vnneko_is_supported(const char *gameRoot) {
     neko::Files files;

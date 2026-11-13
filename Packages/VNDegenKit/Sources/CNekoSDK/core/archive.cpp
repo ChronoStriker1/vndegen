@@ -104,7 +104,7 @@ std::vector<uint8_t> unpackEntry(const uint8_t *data, size_t size) {
     }
     uint32_t plain = rd32(data + size - 4);
     // A file bigger than this is damage: no archive entry in the library comes near it.
-    if (plain > (1u << 30)) return out;
+    if (plain > (1u << 30) || uint64_t(plain) > uint64_t(size - 4) * 1032) return out;
     out.resize(plain);
     z_stream z{};
     if (inflateInit(&z) != Z_OK) return {};

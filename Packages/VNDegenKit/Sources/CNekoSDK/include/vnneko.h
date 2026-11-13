@@ -74,9 +74,7 @@ void vnneko_mouse_wheel(VNNekoEngine *e, int notches);
 // Moves the pointer to the nearest control in that direction, for a controller or arrow keys. False when this screen has no
 // controls to move between, so the host can treat the press as something else.
 bool vnneko_move_focus(VNNekoEngine *e, int dx, int dy);
-// The folder its init.ini names for saves, with forward slashes, such as waffle/alchemy. NULL when it can't be read. Valid until
-// the next call.
-const char *vnneko_user_data_directory(const char *gameRoot);
+bool vnneko_user_data_directory(const char *gameRoot, char *out, size_t size);
 // Whether VNDegen has this game's menu table yet.
 bool vnneko_is_supported(const char *gameRoot);
 // Runs through text and waits for as long as it's on, as holding Ctrl does.

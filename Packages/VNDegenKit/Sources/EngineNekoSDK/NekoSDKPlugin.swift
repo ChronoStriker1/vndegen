@@ -38,8 +38,11 @@ nonisolated public struct NekoSDKPlugin: EnginePlugin {
     /// Windows keeps a NekoSDK game's saves in AppData\\Roaming under the folder its init.ini names, and the runtime uses the
     /// same path under the game's data folder, so a backup from Windows restores into the folder the game reads.
     public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
-        guard let layout = NekoSDKLayout(FolderProbe(scanning: folder)),
-              let name = vnneko_user_data_directory(layout.url(in: folder).path).map({ String(cString: $0) }), !name.isEmpty else { return [] }
+        guard let layout = NekoSDKLayout(FolderProbe(scanning: folder)) else { return [] }
+        var buffer = [CChar](repeating: 0, count: 1024)
+        guard vnneko_user_data_directory(layout.url(in: folder).path, &buffer, buffer.count) else { return [] }
+        let name = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        guard !name.isEmpty else { return [] }
         let directory = dataDirectory.appending(path: "AppData/Roaming/\(name)/save", directoryHint: .isDirectory)
         let suffix = "/\(name.lowercased())/save/"
         return [SaveLocation(directory: directory) { path in

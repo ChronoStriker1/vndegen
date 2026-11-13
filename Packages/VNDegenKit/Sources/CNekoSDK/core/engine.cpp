@@ -145,6 +145,19 @@ int Config::number(const std::string &key, int fallback) const {
     return it == values_.end() ? fallback : std::atoi(it->second.c_str());
 }
 
+std::optional<std::string> Config::saveFolder() const {
+    std::string relative = text("UserDataDirectory");
+    std::replace(relative.begin(), relative.end(), '\\', '/');
+    if (relative.rfind('/', 0) == 0 || relative.find(':') != std::string::npos) return std::nullopt;
+    for (size_t at = 0; at <= relative.size();) {
+        size_t end = std::min(relative.find('/', at), relative.size());
+        std::string part = relative.substr(at, end - at);
+        if (part == "." || part == "..") return std::nullopt;
+        at = end + 1;
+    }
+    return relative;
+}
+
 // MARK: Start and stop
 
 Engine::~Engine() {
@@ -257,9 +270,8 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     thumbH_ = config_.number("SaveSmallImageSizeH", 90);
     // Where Windows keeps them, under the data folder, so a backup from a PC restores to the same place.
     if (!dataDir.empty()) {
-        std::string relative = config_.text("UserDataDirectory");
-        std::replace(relative.begin(), relative.end(), '\\', '/');
-        saveDir_ = matchCase(dataDir, "AppData/Roaming/" + relative + "/save");
+        if (auto relative = config_.saveFolder()) saveDir_ = matchCase(dataDir, "AppData/Roaming/" + *relative + "/save");
+        else log("UserDataDirectory %s leaves the data folder, so the game runs without saves", config_.text("UserDataDirectory").c_str());
     }
     if (folder_ == "waffle\\x2019_retry") {
         bars_ = {images_->get("obj\\l000_000.bmp"), images_->get("obj\\l000_001.bmp")};
