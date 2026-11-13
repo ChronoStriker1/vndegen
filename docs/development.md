@@ -46,7 +46,7 @@ A DEBUG build takes `-libraryRoot <folder>`, which points the app at a separate 
 
 ### Releases
 
-`scripts/release.sh <version>` publishes a new release from `main` to the [Releases](https://github.com/ChronoStriker1/vndegen/releases) page and adds it to the AltStore source. `scripts/check-public.sh` must pass first, and `release.sh` runs it. Each release's notes are in `releases/`. Packaged builds (`ipa` and `release`) delete the previous built app first, because Xcode keeps files in a built app that the project no longer makes. Compiled objects stay cached.
+`scripts/release.sh <version>` publishes a new release from `main` to the [Releases](https://github.com/ChronoStriker1/vndegen/releases) page and adds it to the AltStore source. `scripts/check-public.sh` must pass first, and `release.sh` runs it. `release.sh` refuses a checkout with changes or untracked files, because `remote.sh` sends the working tree to the Mac and the release would build files the tag doesn't hold. Each release's notes are in `releases/`. Packaged builds (`ipa` and `release`) delete the previous built app first, because Xcode keeps files in a built app that the project no longer makes. Compiled objects stay cached.
 
 ## Project layout
 
