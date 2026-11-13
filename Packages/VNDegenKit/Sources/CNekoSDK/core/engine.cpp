@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <cerrno>
+#include <chrono>
 #include <ctime>
 #include <iterator>
 #include <sstream>
@@ -4412,7 +4413,8 @@ void Engine::advance() {
 
 void Engine::run() {
     // Bounded so a script that loops without waiting can't hang the app. No library script comes near it in one step.
-    for (int guard = 0; guard < 200000; guard++) {
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+    for (int guard = 0; guard < 200000 && std::chrono::steady_clock::now() < deadline; guard++) {
         if (waiting_ != Waiting::None || screen_) return;
         if (scene_.node) {
             const Node &n = *scene_.node;

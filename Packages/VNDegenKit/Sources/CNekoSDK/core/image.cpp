@@ -173,7 +173,7 @@ namespace {
 
 // Three passes of a box blur each way, which is close to a Gaussian.
 void boxBlur(Image &image, int radius) {
-    int w = image.w, h = image.h, r = std::max(1, radius);
+    int w = image.w, h = image.h, r = std::clamp(radius, 1, std::max({w, h, 1}));
     std::vector<uint8_t> line(size_t(std::max(w, h)) * 4);
     auto run = [&](uint8_t *start, int count, ptrdiff_t stride) {
         int sum[4] = {0, 0, 0, 0};
