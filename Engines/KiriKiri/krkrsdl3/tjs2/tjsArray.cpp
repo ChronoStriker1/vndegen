@@ -73,6 +73,29 @@ static bool IsNumber(const tjs_char* str, tjs_int& result)
     return false;
 }
 //---------------------------------------------------------------------------
+static tjs_int TJSSplitCharLength(const tjs_char* s)
+{
+    tjs_int len = (tjs_int)utf8_char_len(s);
+    if (len == 0)
+        return 1;
+    for (tjs_int i = 1; i < len; i++)
+        if (!s[i])
+            return i;
+    return len;
+}
+//---------------------------------------------------------------------------
+static bool TJSIsSplitDelimiter(const tjs_char* delim, const tjs_char* ch, tjs_int len)
+{
+    while (*delim)
+    {
+        tjs_int dlen = TJSSplitCharLength(delim);
+        if (dlen == len && !memcmp(delim, ch, len))
+            return true;
+        delim += dlen;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
 // tTJSStringAppender
@@ -550,19 +573,20 @@ tTJSArrayClass::tTJSArrayClass() : tTJSNativeClass(TJS_N("Array"))
         const tjs_char* sstart = s;
         while (*s)
         {
-            if (TJS_strchr(delim, *s) != NULL)
+            tjs_int len = TJSSplitCharLength(s);
+            if (TJSIsSplitDelimiter(delim, s, len))
             {
                 // delimiter found
                 if (!purgeempty || (purgeempty && (s - sstart) != 0))
                 {
                     ni->Items.push_back(tTJSString(sstart, (int)(s - sstart)));
                 }
-                s++;
+                s += len;
                 sstart = s;
             }
             else
             {
-                s++;
+                s += len;
             }
         }
 
