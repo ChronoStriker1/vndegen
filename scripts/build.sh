@@ -81,6 +81,7 @@ swift_test_failures() {
 
 case "${1:?destination}" in
   test)
+    python3 Engines/RGSSRuntime/tools/embed.py --check
     # The shared font lookup the native engines compile, against the bundled table.
     mkdir -p build && fonts_run=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-fonts.XXXXXX")
     cc -std=c11 -Wall -Wextra -Werror -o build/vnfont_test Engines/Shared/vnfont.c Engines/Shared/vnfont_test.c

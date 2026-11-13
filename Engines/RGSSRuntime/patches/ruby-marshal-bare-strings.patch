@@ -15,3 +15,14 @@
      if (rb_enc_capable(obj)) {
          int encidx = rb_enc_get_index(obj);
          rb_encoding *enc = 0;
+@@ -1597,6 +1602,10 @@
+                      rb_enc_name(rb_enc_from_index(idx)), s);
+         }
+     }
++    else if (rb_marshal_rgss_bare_strings && !rb_enc_str_asciionly_p(s)) {
++        rb_enc_associate_index(s, rb_utf8_encindex());
++        if (is_broken_string(s)) rb_enc_associate_index(s, rb_ascii8bit_encindex());
++    }
+ 
+     return s;
+ }

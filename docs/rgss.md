@@ -15,23 +15,31 @@ on Mac, iPhone and iPad. [rgss-cleanroom.md](rgss-cleanroom.md) says where each 
   patches in `Engines/RGSSRuntime/patches` restore Ruby 1.8 and 1.9 behavior games need.
 - `Engines/RGSSRuntime/ruby` holds the Ruby VNDegen adds to every game: the RPG module of each version, Ruby 1.8
   and 1.9 compatibility, relative file paths, and the Win32API emulation. `tools/embed.py` turns them into
-  `CRGSS/core/prelude.c`.
+  `CRGSS/core/prelude.c`, and `build.sh test` fails when the checked-in file doesn't match them
+  (`embed.py --check`).
 - `rgss_run_scripts` in `common.rb` loads the game's script sections. A section's leading UTF-8 byte order mark is
   skipped, because Ruby 3.4 rejects one before `=begin`, and `$RGSS_SCRIPTS` keeps each section's ID, name, compressed
   bytes and source, as scripts that read their own sections expect. A script error names its section, line and Ruby's
   message, and text that isn't valid UTF-8 can't break that report.
 - Ruby starts once per process. Between games, the runtime removes everything the last game added: its classes,
-  constants and globals, its threads, and its changes to Ruby's own classes.
+  constants and globals, its threads, its changes to Ruby's own classes and the constants it added to them, and puts
+  back Ruby's built-in globals (`$DEBUG`, `$VERBOSE`, `$;`, `$,`, `$/`, `$\`, the standard streams) and the default
+  encodings.
 
 ## Files and saves
 
-The game's folder is the working directory, as on PC. Reads look in the game's save folder in VNDegen's data
-directory, then the game folder, then its archive (`Game.rgssad`, `Game.rgss2a`, `Game.rgss3a`), then the RTPs Game.ini
-names, whatever case the game uses. Writes go to the save folder, and so do both names of a `File.rename`, so the game
-folder is never written to. Saves copied in with a PC game still load.
+On PC the game's folder is the working directory. VNDegen doesn't change the process's working directory; the Ruby
+preludes resolve the relative paths games use instead, for `File` and `IO` reads and writes, `File.new`, the `File` and
+`FileTest` predicates, and `Dir.glob`, `Dir.exist?`, `Dir.mkdir`, `Dir.rmdir` and `Dir.entries` and its relatives.
+Reads look in the game's save folder in VNDegen's data directory, then the game folder, then its archive
+(`Game.rgssad`, `Game.rgss2a`, `Game.rgss3a`), then the RTPs Game.ini names, whatever case the game uses. Writes go to
+the save folder, creating the folders they need, and so do both names of a `File.rename`, so the game folder is never
+written to. A file the game ships that it opens to update (`r+` or append) is copied into the save folder first. Folder
+listings combine the save folder and the game folder. Saves copied in with a PC game still load.
 
-Saves are the PC engine's format: Ruby's Marshal format, with XP's and VX's strings written without encodings as Ruby
-1.8 wrote them. PC saves from XP, VX and VX Ace load in VNDegen, and VNDegen's VX and VX Ace saves load in the PC engine.
+Saves are the PC engine's format: Ruby's Marshal format, with XP's and VX's strings and symbols written without
+encodings as Ruby 1.8 wrote them. Loading tags them UTF-8 where their bytes are valid UTF-8, so the instance variables
+and symbols a game's scripts name in Japanese match after a save and load. PC saves from XP, VX and VX Ace load in VNDegen, and VNDegen's VX and VX Ace saves load in the PC engine.
 XP (Test Game 37) and VX Ace (Test Game 14) saves made through the PC engines' menus under Wine were loaded through
 Continue in the Linux host. Both resumed at the saved map, position and direction, with matching scenes in screenshots.
 

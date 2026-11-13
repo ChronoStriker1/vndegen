@@ -301,7 +301,10 @@ static void table_resize_to(Table *t, int dims, int xs, int ys, int zs) {
     if (xs < 0) xs = 0;
     if (ys < 1) ys = 1;
     if (zs < 1) zs = 1;
-    size_t count = (size_t)xs * ys * zs;
+    size_t count;
+    if (__builtin_mul_overflow((size_t)xs, (size_t)ys, &count) || __builtin_mul_overflow(count, (size_t)zs, &count) ||
+        count > (size_t)1 << 28)
+        rb_raise(rb_eRangeError, "Table of %d x %d x %d is too large", xs, ys, zs);
     int16_t *data = ruby_xcalloc(count ? count : 1, sizeof(int16_t));
     for (int z = 0; z < zs && z < t->zs; z++)
         for (int y = 0; y < ys && y < t->ys; y++)
