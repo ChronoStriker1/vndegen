@@ -9,6 +9,7 @@
 #include <fstream>
 
 #include "font.h"
+#include "s4_casepath.h"
 
 namespace fs = std::filesystem;
 
@@ -34,10 +35,10 @@ std::string lower(std::string s) {
 
 // The file in dir whose name matches name ignoring case, or "".
 std::string findCaseless(const std::string &dir, const std::string &name) {
-    std::error_code ec;
-    for (auto &e : fs::directory_iterator(dir, ec))
-        if (lower(e.path().filename().string()) == lower(name)) return e.path().string();
-    return {};
+    std::string path = dir + "/" + name, out(path.size() + 256, '\0');
+    if (s4_casepath_resolve(path.c_str(), out.data(), out.size()) != 1) return {};
+    out.resize(std::strlen(out.c_str()));
+    return out;
 }
 
 Game &game() { return *g_game; }

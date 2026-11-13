@@ -45,6 +45,10 @@ through the shared FrameHost module and maps the controls.
   - the slot details VSFile writes, and the read-message file.
   The data the sprite engine hands the game to keep (backlog, back scenes, character sprites, MultiSprite) uses the
   PC library's encodings. Each was checked against saves the PC games wrote under Wine.
+- **File names.** Game paths match the disk whatever their case, through VNDegen's shared `casepath.c`, for
+  relative paths and for absolute ones inside the game or save folder. `SystemService.GetGameFolderPath` hands the
+  game its folder in CP932 when the conversion is lossless, and otherwise the stand-in `/VNDegen/Game`, which file
+  calls map back to the game folder, so paths built on it still work for folder names CP932 can't spell.
 - **Input.** The runtime takes Windows virtual-key codes and mouse positions. The games only take a click on a
   button the pointer has rested on, and read the keyboard and mouse once a frame, so the session paces input: a
   touch's press waits until the game has finished three frames with the pointer there, each key or button change

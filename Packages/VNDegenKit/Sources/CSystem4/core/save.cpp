@@ -6,9 +6,11 @@
 #include <filesystem>
 #include <functional>
 #include <fstream>
+#include <string_view>
 #include <system_error>
 #include <zlib.h>
 
+#include "s4_casepath.h"
 #include "sjis.h"
 #include "vm.h"
 
@@ -95,30 +97,26 @@ namespace {
 // The path with each part matched case-insensitively, as on Windows, so a save the PC wrote as FOO.ASD loads when
 // the game asks for foo.asd.
 std::string caseless(const fs::path &base, const std::string &rel) {
-    fs::path cur(base);
-    for (const auto &part : fs::path(rel)) {
-        std::string ps = part.string();
-        if (ps.empty() || ps == ".") continue;
-        fs::path exact = cur / ps;
-        std::error_code ec;
-        if (!fs::exists(exact, ec)) {
-            std::string low = ps;
-            for (char &ch : low) ch = char(std::tolower(static_cast<unsigned char>(ch)));
-            for (auto &e : fs::directory_iterator(cur, ec)) {
-                std::string n = e.path().filename().string();
-                for (char &ch : n) ch = char(std::tolower(static_cast<unsigned char>(ch)));
-                if (n == low) { exact = e.path(); break; }
-            }
-        }
-        cur = exact;
-    }
-    return cur.string();
+    std::string path = (base / rel).lexically_normal().string(), out(path.size() + 256, '\0');
+    if (s4_casepath_resolve(path.c_str(), out.data(), out.size()) < 0) return path;
+    out.resize(std::strlen(out.c_str()));
+    return out;
 }
 }  // namespace
+
+constexpr std::string_view kGameFolderStandIn = "/VNDegen/Game";
+
+std::string gameFolderPath(VM &vm) {
+    std::string cp932 = sjis::fromUtf8(vm.rootDir);
+    return sjis::toUtf8(cp932) == vm.rootDir ? cp932 : std::string(kGameFolderStandIn);
+}
 
 std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
     std::string p = sjis::toUtf8(name);
     for (char &c : p) if (c == '\\') c = '/';
+    if (p.starts_with(kGameFolderStandIn) && (p.size() == kGameFolderStandIn.size() || p[kGameFolderStandIn.size()] == '/') &&
+        gameFolderPath(vm) == kGameFolderStandIn)
+        p = vm.rootDir + p.substr(kGameFolderStandIn.size());
     // Game code only reaches its own folder and the save folder. An absolute path (the game folder, which
     // SystemService.GetGameFolderPath hands out) must lie in one of them, and a relative one may not climb out.
     // Anything else becomes an empty path, which every file operation fails on.
@@ -128,7 +126,9 @@ std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
     };
     if (!p.empty() && p[0] == '/') {
         fs::path abs = fs::path(p).lexically_normal();
-        return inside(abs, vm.rootDir) || inside(abs, vm.saveDir) ? abs.string() : std::string();
+        for (const std::string &base : { vm.saveDir, vm.rootDir })
+            if (inside(abs, base)) return caseless(base, abs.lexically_relative(fs::path(base).lexically_normal()).string());
+        return {};
     }
     fs::path relative = fs::path(p).lexically_normal();
     if (!relative.empty() && *relative.begin() == "..") return {};

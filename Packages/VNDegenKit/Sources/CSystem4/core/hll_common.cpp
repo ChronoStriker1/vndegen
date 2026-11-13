@@ -159,7 +159,7 @@ S4_HLL(SystemService, SetMouseCursorConfig) { g_cursorConfig[c.i(0)] = c.i(1); c
 S4_HLL(SystemService, GetMouseCursorConfig) { c.ref(1) = g_cursorConfig[c.i(0)]; c.retBool(true); }
 S4_HLL(SystemService, RunProgram) { c.retBool(false); }
 S4_HLL(SystemService, IsOpenedMutex) { c.retBool(false); }
-S4_HLL(SystemService, GetGameFolderPath) { c.refS(0) = sjis::fromUtf8(G().cfg.root); }
+S4_HLL(SystemService, GetGameFolderPath) { c.refS(0) = save::gameFolderPath(*G().vm); }
 S4_HLL(SystemService, RestrainScreensaver) {}
 
 // ---- OutputLog: debug logs ----

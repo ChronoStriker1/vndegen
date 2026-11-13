@@ -23,6 +23,7 @@ bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xo
 // The host path of a game path: CP932 to UTF-8, backslashes to slashes, matched case-insensitively. Empty for a path
 // outside the game and save folders.
 std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder);
+std::string gameFolderPath(VM &vm);
 
 }  // namespace save
 }  // namespace s4
