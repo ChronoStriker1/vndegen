@@ -174,6 +174,7 @@ final class WebGameSession: NSObject, EngineSession {
     lazy var cheats: (any CheatSession)? = makeCheats?(self)
     private var ended = false
     private var paused = false
+    private var lastReload: ContinuousClock.Instant?
     /// Ends once the page has had its last word after `terminate()` and the view is torn down.
     private var stopping: Task<Void, Never>?
     #if DEBUG
@@ -617,8 +618,21 @@ extension WebGameSession: WKNavigationDelegate {
         log.error("navigation failed: \(error.localizedDescription, privacy: .public)")
     }
 
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard paused else { return }
+        run("__vndegen.setPaused(true)")
+        webView.setAllMediaPlaybackSuspended(true, completionHandler: nil)
+    }
+
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        guard !ended else { return }
+        let now = ContinuousClock.now
+        if webView.backForwardList.currentItem == nil || lastReload.map({ now - $0 < .seconds(30) }) == true {
+            log.error("web content process died again as the game loaded, ending the game")
+            return failToStart(reason: "Its page crashed as it loaded, possibly from running out of memory")
+        }
         log.error("web content process died, reloading the game")
+        lastReload = now
         webView.reload()
     }
 }
