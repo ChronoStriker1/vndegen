@@ -369,7 +369,7 @@ Database parseDatabase(std::span<const uint8_t> project, std::span<const uint8_t
         }
         // A type with no fields stores no bytes a row, so only a fixed cap bounds its row count.
         uint32_t rows = numbers + strings ? dp.r.count((numbers + strings) * 4) : dp.r.u32();
-        if (rows > 100000) throw FormatError("database type with " + std::to_string(rows) + " rows");
+        if (rows > kMaxDatabaseRows) throw FormatError("database type with " + std::to_string(rows) + " rows");
         t.rows.resize(rows);
         for (auto &row : t.rows) {
             for (size_t i = 0; i < numbers; i++) row.numbers.push_back(dp.r.s32());

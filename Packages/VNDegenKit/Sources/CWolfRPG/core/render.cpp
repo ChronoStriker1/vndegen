@@ -352,7 +352,7 @@ void Renderer::draw(Bitmap &frame) {
     std::erase_if(pictureImages_, [&](auto &kv) { return !game_.pictures().count(kv.first); });
     for (auto &[n, p] : game_.pictures()) drawPicture(canvas, n, p);
 
-    int shake = int(std::lround(game_.shake().offset));
+    int shake = int(std::clamp<long>(std::lround(game_.shake().offset), -w, w));
     if (shake) {
         // Shake moves the whole picture sideways; the uncovered edge shows black.
         for (int y = 0; y < h; y++) {
