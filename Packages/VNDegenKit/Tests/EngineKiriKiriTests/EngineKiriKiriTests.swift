@@ -304,6 +304,10 @@ private func realPath(_ path: String) throws -> String {
     #expect(KiriKiriPlugin.configuredDataPath(gameRoot: ambiguous) == nil)
     let lone = try folder(["Game.EXE": Data(), "Game.cf": Data("datapath=save".utf8)])
     #expect(KiriKiriPlugin.configuredDataPath(gameRoot: lone) == "save")
+    let upper = try folder(["GAME.EXE": Data(), "GAME.CF": Data("datapath=upper".utf8)])
+    #expect(KiriKiriPlugin.configuredDataPath(gameRoot: upper) == "upper")
+    let mixed = try folder(["Game.exe": Data(), "game.cf": Data("datapath=mixed".utf8)])
+    #expect(KiriKiriPlugin.configuredDataPath(gameRoot: mixed) == "mixed")
 }
 
 @Test func readsTJSStringLiterals() {

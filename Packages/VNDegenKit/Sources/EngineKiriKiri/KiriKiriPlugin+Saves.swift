@@ -120,9 +120,9 @@ extension KiriKiriPlugin {
             name.lowercased().hasSuffix(ext) && name.count > ext.count ? String(name.lowercased().dropLast(ext.count)) : nil
         }
         let exes = names.filter { stem($0, ".exe") != nil }.sorted()
-        let configs = Set(names.compactMap { stem($0, ".cf") })
-        guard let exe = exes.first(where: { stem($0, ".exe").map(configs.contains) == true }) ?? (exes.count == 1 ? exes[0] : nil),
-              let contents = try? Data(contentsOf: gameRoot.appendingPathComponent(String(exe.dropLast(4)) + ".cf"))
+        let configs = names.filter { stem($0, ".cf") != nil }.sorted()
+        guard let config = exes.lazy.compactMap({ exe in configs.first { stem($0, ".cf") == stem(exe, ".exe") } }).first,
+              let contents = try? Data(contentsOf: gameRoot.appendingPathComponent(config))
         else { return nil }
         // A CRLF line end is one Character, so splitting on "\n" alone would leave a Windows file one line.
         for line in String(decoding: contents, as: UTF8.self).split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {

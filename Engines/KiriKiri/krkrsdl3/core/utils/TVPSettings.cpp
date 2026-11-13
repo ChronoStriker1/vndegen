@@ -267,7 +267,7 @@ static void TVPDetectRender()
 
 // System.exeName is the game's .exe on Windows, and games look for files beside it, such as
 // <exe>.cf. A folder can hold tools too, so the .exe that has a .cf wins, then a lone .exe.
-static ttstr TVPFindGameExe(const ttstr& dir)
+static ttstr TVPFindGameExe(const ttstr& dir, ttstr& config)
 {
     auto stem = [](std::string name, const char* ext)
     {
@@ -289,12 +289,17 @@ static ttstr TVPFindGameExe(const ttstr& dir)
                               if (!stem(file, ".exe").empty())
                                   exes.push_back(file);
                               else if (!stem(file, ".cf").empty())
-                                  configs.push_back(stem(file, ".cf"));
+                                  configs.push_back(file);
                           });
     std::sort(exes.begin(), exes.end());
+    std::sort(configs.begin(), configs.end());
     for (const std::string& exe : exes)
-        if (std::find(configs.begin(), configs.end(), stem(exe, ".exe")) != configs.end())
-            return dir + ttstr(exe);
+        for (const std::string& cf : configs)
+            if (stem(cf, ".cf") == stem(exe, ".exe"))
+            {
+                config = dir + ttstr(cf);
+                return dir + ttstr(exe);
+            }
     return exes.size() == 1 ? dir + ttstr(exes.front()) : ttstr();
 }
 
@@ -328,11 +333,9 @@ static bool TVPConfigOptionIgnored(const ttstr& option)
 
 // A game's <exe>.cf holds options as on Windows: a NAME="VALUE" line each, the value a TJS
 // string, and comments starting with ';'. They rank below the command line.
-static void TVPReadConfigFileOptions(const ttstr& exe)
+static void TVPReadConfigFileOptions(const ttstr& config)
 {
-    std::string path = exe.AsStdString();
-    path.replace(path.size() - 4, 4, ".cf");
-    std::ifstream file(path);
+    std::ifstream file(config.AsStdString());
     if (!file)
         return;
     ttstr applied, ignored;
@@ -365,7 +368,7 @@ static void TVPReadUserConfigOptions(const ttstr& exe, const ttstr& dataFolder)
     std::string name = exe.AsStdString();
     name = name.substr(name.rfind('/') + 1);
     name.replace(name.size() - 4, 4, ".cfu");
-    std::ifstream file(dataFolder.AsStdString() + name);
+    std::ifstream file(TVPGetLocallyAccessibleName(dataFolder + ttstr(name)).AsStdString());
     std::string line;
     while (std::getline(file, line))
     {
@@ -500,9 +503,10 @@ bool TVPParseArguments(int argc, char* argv[])
         TVPNativeProjectDir = ttstr(gameRoot);
         if (TVPNativeProjectDir.GetLastChar() != TJS_N('/'))
             TVPNativeProjectDir += TJS_N("/");
-        TVPNativeGameExe = TVPFindGameExe(TVPNativeProjectDir);
-        if (!TVPNativeGameExe.IsEmpty())
-            TVPReadConfigFileOptions(TVPNativeGameExe);
+        ttstr config;
+        TVPNativeGameExe = TVPFindGameExe(TVPNativeProjectDir, config);
+        if (!config.IsEmpty())
+            TVPReadConfigFileOptions(config);
     }
     else if (TVPCheckExistentLocalFolder(TVPNativeProjectData))
     {
@@ -538,7 +542,7 @@ bool TVPParseArguments(int argc, char* argv[])
     TVPNativeDataPath = TVPGetLocallyAccessibleName(TVPDataPath);
     TVPAddImportantLog(TVPFormatMessage("(info) Savedata path : %1", TVPDataPath));
     if (!TVPNativeGameExe.IsEmpty())
-        TVPReadUserConfigOptions(TVPNativeGameExe, TVPNativeDataPath);
+        TVPReadUserConfigOptions(TVPNativeGameExe, TVPDataPath);
     // VNDegen never changes the screen's resolution. Games read this to tell whether their zoom options apply.
     TVPSetCommandLine(TJS_N("-fsres"), TJS_N("nochange"));
 
