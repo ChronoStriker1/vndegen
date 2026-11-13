@@ -69,8 +69,8 @@ void Game::problem(const std::string &s) {
 }
 
 // The ini names the code file and the screen size. Both AliceStart.ini and System40.ini use "Key = value".
-std::map<std::string, std::string> readIni(const std::string &root) {
-    std::map<std::string, std::string> ini;
+Ini readIni(const std::string &root) {
+    Ini ini;
     std::string iniPath = findCaseless(root, "AliceStart.ini");
     if (iniPath.empty()) iniPath = findCaseless(root, "System40.ini");
     if (iniPath.empty()) return ini;
@@ -88,7 +88,7 @@ std::map<std::string, std::string> readIni(const std::string &root) {
     return ini;
 }
 
-std::string codeFile(const std::string &root, const std::map<std::string, std::string> &ini) {
+std::string codeFile(const std::string &root, const Ini &ini) {
     auto it = ini.find("CodeName");
     std::string path = it != ini.end() ? findCaseless(root, it->second) : std::string();
     if (!path.empty()) return path;

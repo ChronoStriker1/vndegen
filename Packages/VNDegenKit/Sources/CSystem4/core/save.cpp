@@ -154,7 +154,7 @@ std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
     p = relative.string();
     // A path that starts with the save folder's name, as system.GetSaveFolderName returns it, is in the save folder.
     std::string first = p.substr(0, p.find('/'));
-    std::string lowFirst = first, lowSave = vm.saveFolderName;
+    std::string lowFirst = first, lowSave = sjis::toUtf8(vm.saveFolderName);
     for (char &ch : lowFirst) ch = char(std::tolower(static_cast<unsigned char>(ch)));
     for (char &ch : lowSave) ch = char(std::tolower(static_cast<unsigned char>(ch)));
     if (!lowSave.empty() && lowFirst == lowSave && first.size() < p.size()) return caseless(vm.saveDir, p.substr(first.size() + 1));

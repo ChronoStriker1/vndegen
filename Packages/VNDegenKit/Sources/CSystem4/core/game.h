@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <strings.h>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -28,8 +29,12 @@ struct GameConfig {
     std::string fontsDir;    // VNDegen's Windows font pack (fonts.tsv), may be empty
 };
 
-std::map<std::string, std::string> readIni(const std::string &root);
-std::string codeFile(const std::string &root, const std::map<std::string, std::string> &ini);
+struct IniKeyLess {
+    bool operator()(const std::string &a, const std::string &b) const { return strcasecmp(a.c_str(), b.c_str()) < 0; }
+};
+using Ini = std::map<std::string, std::string, IniKeyLess>;
+Ini readIni(const std::string &root);
+std::string codeFile(const std::string &root, const Ini &ini);
 // The file in dir whose name matches name in any case; empty when there is none.
 std::string findCaseless(const std::string &dir, const std::string &name);
 // What the game page says about how the game runs, such as the parts that don't yet; empty when there is nothing.
@@ -64,7 +69,7 @@ public:
     GameConfig cfg;
     std::unique_ptr<VM> vm;
     int screenW = 800, screenH = 600;
-    std::map<std::string, std::string> ini;  // AliceStart.ini or System40.ini, keys and raw values
+    Ini ini;  // AliceStart.ini or System40.ini, keys and raw values
     std::unique_ptr<AldArchive> cgArchive, waveArchive, bgmArchive;
     // Later games (Test Game 56) keep pictures by name in <stem>CG.afa, and load more archives through AFAFactory.
     std::unique_ptr<AfaArchive> cgAfa;
