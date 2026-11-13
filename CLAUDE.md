@@ -21,7 +21,7 @@ Don't add comments to code. Leave the comments already there as they are. What a
 ## Reviews and subagents
 Code review is paused for now (maintainer, 2026-11-10): no review rounds, by Codex or by a Claude agent, until the maintainer asks for them again. When they resume, review is by Codex `gpt-6.1-sol` (xhigh).
 
-A thread that starts a subagent or a delegate runs it at low or medium reasoning effort. Claude subagents run Opus 5.5.
+A thread that starts a subagent or a delegate picks the reasoning effort the task needs. Claude subagents run Opus 5.5.
 
 ## Public repo
 The repo is public. Committed files and messages never contain LAN hostnames, IPs, NAS or home paths, or personal names. The build Mac's hostname lives in `~/.config/vndegen/mac-host`.
