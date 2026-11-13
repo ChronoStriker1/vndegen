@@ -58,8 +58,7 @@ final class YuRISSession: EngineSession {
         let logURL = launch.dataDirectory.appendingPathComponent("logs/yuris.txt")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? Data().write(to: logURL)
-        let existing = (try? FileManager.default.contentsOfDirectory(atPath: root.path))?.first { $0.lowercased() == "save" }
-        let saveURL = root.appending(path: existing ?? "save", directoryHint: .isDirectory)
+        let saveURL = FileCase.resolve("save", in: root)
         let rate = 44100.0
         var problem = [CChar](repeating: 0, count: 512)
         let started: OpaquePointer? = root.path.withCString { rootPath in

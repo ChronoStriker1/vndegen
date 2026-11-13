@@ -25,8 +25,7 @@ nonisolated public struct YuRISPlugin: EnginePlugin {
     public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
         guard let layout = YuRISLayout(FolderProbe(scanning: folder)) else { return [] }
         let root = layout.url(in: folder)
-        let existing = (try? FileManager.default.contentsOfDirectory(atPath: root.path))?.first { $0.lowercased() == "save" }
-        let directory = root.appending(path: existing ?? "save", directoryHint: .isDirectory)
+        let directory = FileCase.resolve("save", in: root)
         return [SaveLocation(directory: directory) { path in
             guard let name = path.split(separator: "/").last.map(String.init), name.lowercased().hasSuffix(".sd") else { return nil }
             return name
