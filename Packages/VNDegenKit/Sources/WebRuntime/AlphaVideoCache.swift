@@ -18,6 +18,7 @@ public actor AlphaVideoCache {
     private var cleaned = false
     /// Clips already logged as having no alpha, so their repeated range requests don't log again.
     private var opaqueLogged = Set<String>()
+    private let converter = AlphaVideoConverter()
 
     public func clear() throws {
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
@@ -25,7 +26,7 @@ public actor AlphaVideoCache {
         opaqueLogged.removeAll()
     }
 
-    private func directory() throws {
+    private func directory() throws -> URL {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         var directory = root, values = URLResourceValues()
         values.isExcludedFromBackup = true
@@ -35,6 +36,19 @@ public actor AlphaVideoCache {
                 where file.pathExtension == "part" { try FileManager.default.removeItem(at: file) }
             cleaned = true
         }
+        return root
+    }
+
+    private func noteOpaque(_ clip: String) -> Bool {
+        opaqueLogged.insert(clip).inserted
+    }
+
+    fileprivate func store(_ partial: URL, as cached: URL) throws {
+        guard !FileManager.default.fileExists(atPath: cached.path) else { return }
+        let size = try partial.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard size <= Self.limit else { throw CocoaError(.fileWriteOutOfSpace) }
+        try evict(adding: size)
+        try FileManager.default.moveItem(at: partial, to: cached)
     }
 
     private func evict(adding bytes: Int) throws {
@@ -53,11 +67,11 @@ public actor AlphaVideoCache {
 
     /// The converted movie, nil for a WebM without alpha, which is served as it is. Fails rather than serve an alpha
     /// WebM unconverted, because WebKit draws its transparent parts opaque, often white over the whole scene.
-    func response(folder: GameFolder, path: String, method: String, range: String?,
-                  cancellation: AlphaVideoCancellation, log: Logger) throws -> FileResponse? {
+    nonisolated func response(folder: GameFolder, path: String, method: String, range: String?,
+                              cancellation: AlphaVideoCancellation, log: Logger) async throws -> FileResponse? {
         do {
-            return try convertedResponse(folder: folder, path: path, method: method, range: range,
-                                         cancellation: cancellation, log: log)
+            return try await convertedResponse(folder: folder, path: path, method: method, range: range,
+                                               cancellation: cancellation, log: log)
         } catch {
             if !(error is CancellationError) && !Task.isCancelled {
                 log.error("alpha video \(path, privacy: .public) not served: \(error.localizedDescription, privacy: .public)")
@@ -66,9 +80,8 @@ public actor AlphaVideoCache {
         }
     }
 
-    // This actor runs the synchronous converter on its executor, serially and off the main thread.
-    private func convertedResponse(folder: GameFolder, path: String, method: String, range: String?,
-                                   cancellation: AlphaVideoCancellation, log: Logger) throws -> FileResponse? {
+    private nonisolated func convertedResponse(folder: GameFolder, path: String, method: String, range: String?,
+                                               cancellation: AlphaVideoCancellation, log: Logger) async throws -> FileResponse? {
         try Task.checkCancellation()
         guard path.lowercased().hasSuffix(".webm"), let (handle, base, _, name) = folder.open(servedPath: path), base == 0 else { return nil }
         defer { try? handle.close() }
@@ -78,7 +91,7 @@ public actor AlphaVideoCache {
         switch vnalpha_inspect(source, &error, Int32(error.count)) {
         case 1: break
         case 0:
-            if opaqueLogged.insert(folder.root.path + "\u{0}" + path).inserted {
+            if await noteOpaque(folder.root.path + "\u{0}" + path) {
                 log.notice("alpha video \(name, privacy: .public): no alpha track, served as WebM")
             }
             return nil
@@ -91,21 +104,9 @@ public actor AlphaVideoCache {
         guard fstat(handle.fileDescriptor, &info) == 0 else { throw CocoaError(.fileReadUnknown) }
         let identity = "\(info.st_dev):\(info.st_ino):\(info.st_size):\(info.st_mtimespec.tv_sec):\(info.st_mtimespec.tv_nsec)"
         let key = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
-        try directory()
-        let cached = root.appendingPathComponent(key + ".mov")
+        let cached = try await directory().appendingPathComponent(key + ".mov")
         if !FileManager.default.fileExists(atPath: cached.path) {
-            let partial = root.appendingPathComponent(UUID().uuidString + ".part")
-            defer { try? FileManager.default.removeItem(at: partial) }
-            var result = vnalpha_result()
-            let status = vnalpha_convert(source, partial.path, cancellation.native, &result, &error, Int32(error.count))
-            let detail = status == 0 ? "complete" : String(decoding: error.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
-            log.notice("alpha video \(name, privacy: .public): clip \(result.duration) s, conversion \(result.seconds) s, process peak \(result.peak_bytes / 1048576) MiB, \(detail, privacy: .public)")
-            guard status == 0 else { throw CocoaError(.fileReadCorruptFile) }
-            try Task.checkCancellation()
-            let size = try partial.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            guard size <= Self.limit else { throw CocoaError(.fileWriteOutOfSpace) }
-            try evict(adding: size)
-            try FileManager.default.moveItem(at: partial, to: cached)
+            try await converter.convert(source, to: cached, name: name, cancellation: cancellation, log: log, cache: self)
         }
         try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: cached.path)
         let output = try FileHandle(forReadingFrom: cached)
@@ -114,5 +115,23 @@ public actor AlphaVideoCache {
         response.headers["X-VNDegen-Alpha"] = "1"
         response.headers["Cache-Control"] = "no-store"
         return response
+    }
+}
+
+private actor AlphaVideoConverter {
+    func convert(_ source: Int32, to cached: URL, name: String, cancellation: AlphaVideoCancellation, log: Logger,
+                 cache: AlphaVideoCache) async throws {
+        try Task.checkCancellation()
+        guard !FileManager.default.fileExists(atPath: cached.path) else { return }
+        let partial = cached.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".part")
+        defer { try? FileManager.default.removeItem(at: partial) }
+        var result = vnalpha_result()
+        var error = [CChar](repeating: 0, count: 512)
+        let status = vnalpha_convert(source, partial.path, cancellation.native, &result, &error, Int32(error.count))
+        let detail = status == 0 ? "complete" : String(decoding: error.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        log.notice("alpha video \(name, privacy: .public): clip \(result.duration) s, conversion \(result.seconds) s, process peak \(result.peak_bytes / 1048576) MiB, \(detail, privacy: .public)")
+        guard status == 0 else { throw CocoaError(.fileReadCorruptFile) }
+        try Task.checkCancellation()
+        try await cache.store(partial, as: cached)
     }
 }
