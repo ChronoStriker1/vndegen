@@ -130,7 +130,14 @@ module VNDegenCheats
         # XP's battles and events add experience through exp=.
         wrap(Game_Actor, :exp=) do |set, value|
           gained = value - @exp
-          set.(gained > 0 ? @exp + gained * VNDegenCheats.setting('experienceRate') : value)
+          next set.(value) if Thread.current[:vndegen_setting_level] || gained <= 0
+          set.(@exp + gained * VNDegenCheats.setting('experienceRate'))
+        end
+        wrap(Game_Actor, :level=) do |set, value|
+          Thread.current[:vndegen_setting_level] = true
+          set.(value)
+        ensure
+          Thread.current[:vndegen_setting_level] = false
         end
       end
     end

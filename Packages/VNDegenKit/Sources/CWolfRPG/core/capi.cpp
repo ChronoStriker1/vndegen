@@ -105,29 +105,34 @@ VNWolfEngine *vnwolf_start(const VNWolfLaunch *launch) {
     if (launch->logPath) e->log = std::fopen(launch->logPath, "a");
     FILE *log = e->log ? e->log : stderr;
     VNWolfEngine *raw = e.get();
-    e->game = std::make_unique<Game>(launch->gameRoot);
-    e->game->log = [log, raw](const std::string &line) {
-        std::fprintf(log, "%s\n", line.c_str());
-        std::fflush(log);
-        if (line.starts_with("missing") || line.starts_with("cannot")) raw->problem = line;
-    };
-    if (launch->soundFontPath)
-        e->game->setSoundFont(launch->soundFontPath, launch->fallbackSoundFontPath ? launch->fallbackSoundFontPath : "");
-    std::string error;
-    if (!e->game->load(&error)) {
-        gStartError = error;
+    try {
+        e->game = std::make_unique<Game>(launch->gameRoot);
+        e->game->log = [log, raw](const std::string &line) {
+            std::fprintf(log, "%s\n", line.c_str());
+            std::fflush(log);
+            if (line.starts_with("missing") || line.starts_with("cannot")) raw->problem = line;
+        };
+        if (launch->soundFontPath)
+            e->game->setSoundFont(launch->soundFontPath, launch->fallbackSoundFontPath ? launch->fallbackSoundFontPath : "");
+        std::string error;
+        if (!e->game->load(&error)) {
+            gStartError = error;
+            if (e->log) std::fclose(e->log);
+            return nullptr;
+        }
+        e->renderer = std::make_unique<Renderer>(*e->game);
+        e->renderer->draw(e->frame);
+        return e.release();
+    } catch (const std::exception &error) {
+        gStartError = error.what();
         if (e->log) std::fclose(e->log);
         return nullptr;
     }
-    e->renderer = std::make_unique<Renderer>(*e->game);
-    e->renderer->draw(e->frame);
-    return e.release();
 }
 
 const char *vnwolf_start_error(void) { return gStartError.empty() ? nullptr : gStartError.c_str(); }
 
-bool vnwolf_step(VNWolfEngine *e, int ms) {
-    if (!e || e->paused) return !e || !e->game->quitRequested();
+static bool step(VNWolfEngine *e, int ms) {
     // At most four of the game's own frames per step, so a stall doesn't make the game race to catch up.
     int frames = e->pace.advance(ms, 1000.0 / e->game->gameDat().fps(), e->speed, 4 * e->speed);
     for (int i = 0; i < frames; i++) {
@@ -153,6 +158,17 @@ bool vnwolf_step(VNWolfEngine *e, int ms) {
         e->advanced = true;
     }
     return true;
+}
+
+bool vnwolf_step(VNWolfEngine *e, int ms) {
+    if (!e || e->paused) return !e || !e->game->quitRequested();
+    try {
+        return step(e, ms);
+    } catch (const std::exception &error) {
+        e->problem = std::string("the game stopped: ") + error.what();
+        e->game->log(e->problem);
+        return false;
+    }
 }
 
 const uint8_t *vnwolf_frame(VNWolfEngine *e, int *width, int *height, bool *changed) {

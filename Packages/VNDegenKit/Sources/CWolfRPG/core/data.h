@@ -75,6 +75,8 @@ struct GameDat {
     int fps() const { return settings.size() > 4 && settings[4] == 30 ? 30 : 60; }
 };
 
+constexpr int kMaxDatabaseRows = 100000;
+
 struct DatabaseType {
     std::string name;
     std::vector<std::string> fieldNames;
