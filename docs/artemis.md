@@ -38,6 +38,8 @@ VNDegen suggests a layout for an Artemis game from `system/table/list_windows.tb
 
 A game's own dialog shows as a sheet over the game. Touch or the mouse answers it, and so do Confirm or Return for OK and Cancel or Escape for Cancel. A dialog that asks for text, such as the name entry in Test Game 06, Test Game 76, and Test Game 77, opens the controller keyboard, whose A types, X deletes, and Y finishes. Its field takes a hardware keyboard, and on iPhone and iPad a tap on the field brings up the system keyboard, for characters the controller keyboard doesn't have. A dialog reads the arrow keys of the Visual novel layout, and the Keyboard and mouse layout's D-pad keys, as directions. A right click cancels it, Control deletes on its keyboard, and Escape from a button finishes the keyboard, as Y does, while the Escape key itself cancels. When that D-pad became up 1, right 2, down 3, left 4, a saved mapping with exactly the old order, up 1, down 2, left 3, right 4, moved to the new one once, so its directions still work in dialogs. Any other digits on the D-pad, including the old order set again later, move by these keys.
 
+A script's `[openbrowser]` link opens only an http or https page, and only after the player answers OK in the same kind of dialog, which shows the address. Any other link, such as a file, an app or another app's scheme, is ignored, since a game script is untrusted data.
+
 ## Known limits
 
 VNDegen builds only what its test games need to reach their title, play, save, and load. These are left out, with the test games that hit them:
