@@ -108,7 +108,7 @@ New bugs get a GitHub issue and a line here.
   - Godot: after one frame-capped game, the next one freezes the app at its first frame (#158).
 - Audit, medium, by area:
   - Hub, library and lock: #94, #95, #96, #97, #98.
-  - Save sync, import and scripts: #102, #103, #105, #108.
+  - Save sync, import and scripts: #102, #103, #105, #108, and #170 (`build.sh test` exits 0 when a Swift Testing suite fails; found after the audit).
   - Web engines, Flash and Artemis: #110, #111, #112, #117.
   - Video: #124, #125, #126.
   - KiriKiri: #129, #130. NScripter: #132.
