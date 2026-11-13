@@ -98,6 +98,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - YU-RIS: Mamono Musume-tachi to no Rakuen: Slime & Scylla on engine 406 and Saint Dorei Gakuen 2 on engine 479, YCG pictures, and loose files that replace archive entries (0.41.0). Nine YU-RIS games play.
 - YU-RIS: a game whose `pac` folder sits below the library listing is recognised (#88), and the twelve YU-RIS, Visual Novel Maker and Twine games that shipped without a Mac app run were played there (0.41.1).
 - Mac: the close, minimise and zoom buttons are hidden while a game plays and show with the VNDegen menu open (#90, 0.41.2).
+- The web view no longer allows AirPlay for a game's movies and sound; a TV is reached with Screen Mirroring (0.41.3).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
