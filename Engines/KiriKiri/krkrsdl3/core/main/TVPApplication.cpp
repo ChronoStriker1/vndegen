@@ -230,6 +230,7 @@ void tTVPApplication::OnExit()
     TVPClearAllWindows();
     krkrsdl3::TVPClearAllTexture();
     iTVPTexture2D::RecycleProcess();
+    TVPResetFonts();
 }
 
 void tTVPApplication::LoadImageRequest(class iTJSDispatch2* owner,

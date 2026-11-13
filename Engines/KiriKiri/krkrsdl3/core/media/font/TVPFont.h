@@ -41,4 +41,5 @@ extern tTJSHashTable<ttstr, TVPFontNamePathInfo, tTVPttstrHash> TVPFontNames;
 bool TVPFontExists(const ttstr& name);
 ttstr TVPGetBeingFont(ttstr fonts);
 void TVPCreateDefaultFont();
+void TVPResetFonts();
 const tTVPFont& TVPGetDefaultFont();

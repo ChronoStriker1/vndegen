@@ -476,9 +476,9 @@ ttstr TVPGetBeingFont(ttstr fonts)
     }
 }
 
+static bool TVPDefaultLOGFONTCreated = false;
 void TVPCreateDefaultFont()
 {
-    static bool TVPDefaultLOGFONTCreated = false;
     if (TVPDefaultLOGFONTCreated)
         return;
     TVPDefaultLOGFONTCreated = true;
@@ -491,4 +491,18 @@ void TVPCreateDefaultFont()
 const tTVPFont& TVPGetDefaultFont()
 {
     return TVPDefaultFont;
+}
+
+extern void TVPUninitializeFontRasterizers();
+extern void TVPClearFontCache();
+void TVPResetFonts()
+{
+    TVPUninitializeFontRasterizers();
+    TVPClearFontCache();
+    TVPFontNames.Clear();
+    TVPDefaultFontName.Clear();
+    TVPGlyphFallbackFontName.Clear();
+    TVPDefaultIsBundledFallback = false;
+    TVPFontNamesInit = false;
+    TVPDefaultLOGFONTCreated = false;
 }
