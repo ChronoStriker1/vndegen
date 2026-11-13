@@ -5,6 +5,7 @@
 const char kRinjin[] = R"(
 screen title
 menustages
+backclosessubmenu
 # The art is the one GLB_TITLE_BG (55) numbers until an ending (51 to 54) is reached, then any of the four at random.
 pic obj\d000_000.bmp 0 0 more obj\d000_001.bmp,obj\d000_002.bmp,obj\d000_003.bmp pickby 55 randomif 51,52,53,54
 pic obj\d002_000.bmp 0 0
@@ -549,7 +550,8 @@ button noask obj\i001_000.bmp 498 429 1 5 0
 # button's by the first and the right button's by the second, which take them. Once an ending is reached each option
 # names the routes that take it, red for one cleared.
 screen choice
-pic dim 0 0 alpha 162
+hidesline
+pic dim 0 0 alpha 150 underwindow
 pic obj\n000_000.bmp 483 107
 pic obj\b003_000.bmp 393 192 2 1 0 0
 pic obj\b003_000.bmp 393 305 2 1 1 0

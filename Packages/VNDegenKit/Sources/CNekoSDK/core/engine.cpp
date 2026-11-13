@@ -390,7 +390,7 @@ void Engine::openScreen(const std::string &name) {
     subMenu_.clear();
     if (backToTitle) {
         menuStage_ = titleStage_;
-        subMenu_ = titleSubMenu_;
+        if (!screen_->setting("backclosessubmenu")) subMenu_ = titleSubMenu_;
     }
     // The drifting line art starts from a sketch picked at random, as the PC's does.
     driftFrom_ = screenMs_;
@@ -7162,7 +7162,10 @@ void Engine::composeMessage(Canvas &out) {
                 if (ImageRef picture = images_->get(it->second[0]); picture && !discUpFor(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2) + moved, 0, 0, picture->w, picture->h, 1);
     if (windowArtOnly_ == 1) return;
     drawParts(out, Layer::Window);
-    if (!windowArtOnly_) {
+    bool lineHidden = false;
+    if (waiting_ == Waiting::Choice && choiceSheet_ && !choiceLine_)
+        if (auto choice = screens_.find("choice"); choice != screens_.end()) lineHidden = choice->second.setting("hidesline") != nullptr;
+    if (!windowArtOnly_ && !lineHidden) {
         drawGlyphRun(out);
         composeGtCount(out);
     }
