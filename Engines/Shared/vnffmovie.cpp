@@ -69,6 +69,7 @@ struct vnffmovie {
     // The movie time of the next decoded sound, from the last timestamp plus the sound since: WMA stamps only a packet's
     // first frame. Below 0 when no timestamp has come since a seek or loop.
     double audioClock = 0;
+    double audioShift = 0;
     std::deque<Frame> frames;
     std::deque<float> sound;
     Frame shown;
@@ -153,7 +154,7 @@ void takeVideo(vnffmovie *m) {
 
 void takeAudio(vnffmovie *m) {
     AVFrame *f = m->decoded;
-    if (f->best_effort_timestamp != AV_NOPTS_VALUE) m->audioClock = seconds(m, f->best_effort_timestamp, m->audioIndex) + m->loopOffset;
+    if (f->best_effort_timestamp != AV_NOPTS_VALUE) m->audioClock = seconds(m, f->best_effort_timestamp, m->audioIndex) + m->loopOffset - m->audioShift;
     else if (m->audioClock < 0) {
         // After a seek, sound with no time yet can't be placed; a new pass carries on from the sound before.
         if (m->dropBefore > 0) return;
@@ -173,6 +174,11 @@ void takeAudio(vnffmovie *m) {
     // Sound before a seek's target goes with the frames. Otherwise the packet goes where its timestamp says: after
     // silence over a gap, or without what overlaps the sound queued or already handed out.
     double tail = m->playClock + double(m->sound.size() / channels) / double(rate), skipTo = m->dropBefore;
+    if (pts > tail + kSoundAhead) {
+        m->audioShift += pts - tail;
+        m->audioClock -= pts - tail;
+        pts = tail;
+    }
     if (pts > tail + kSoundSlack) m->sound.insert(m->sound.end(), size_t((pts - tail) * double(rate)) * channels, 0.0f);
     else if (pts < tail - kSoundSlack) skipTo = std::max(skipTo, tail);
     size_t skip = pts < skipTo ? std::min(size_t(got), size_t((skipTo - pts) * double(rate))) : 0;
@@ -212,6 +218,7 @@ bool restart(vnffmovie *m, double target) {
     if (m->audio) avcodec_flush_buffers(m->audio);
     m->passHadFrame = false;
     m->audioClock = -1;
+    m->audioShift = 0;
     return true;
 }
 
