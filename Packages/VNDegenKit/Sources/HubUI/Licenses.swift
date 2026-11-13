@@ -36,10 +36,16 @@ struct ThirdPartyLicense: Identifiable {
     let text: String
     var id: String { name }
 
+    init(name: String, text: String) {
+        self.name = name
+        self.text = text
+        reflowed = Self.reflow(text)
+    }
+
     /// The text with each paragraph's hard line breaks joined, so it wraps to the screen rather than breaking twice
     /// on a narrow one. A line joins the one before when it carries on at the same or a deeper indent. Blank lines,
     /// list items, and rules such as "=====" keep their breaks. The words are unchanged.
-    var reflowed: String { Self.reflow(text) }
+    let reflowed: String
 
     nonisolated static func reflow(_ text: String) -> String {
         var result = ""
@@ -70,7 +76,7 @@ struct ThirdPartyLicense: Identifiable {
             || marker.count == 1 && line.dropFirst().first.map { ".)".contains($0) } == true
     }
 
-    static var bundled: [ThirdPartyLicense] {
+    static let bundled: [ThirdPartyLicense] = {
         guard let folder = Bundle.main.url(forResource: "Licenses", withExtension: nil),
               let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
         else { return [] }
@@ -81,5 +87,5 @@ struct ThirdPartyLicense: Identifiable {
                     ThirdPartyLicense(name: file.deletingPathExtension().lastPathComponent, text: $0)
                 }
             }
-    }
+    }()
 }

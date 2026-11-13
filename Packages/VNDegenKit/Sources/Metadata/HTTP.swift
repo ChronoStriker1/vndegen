@@ -98,6 +98,7 @@ extension URLRequest {
 
 actor ResponseMemo {
     private static let lifetime: TimeInterval = 30 * 60
+    static let capacity = 256
     private var entries: [String: (response: HTTP.Response, expires: Date)] = [:]
 
     static func key(_ request: URLRequest) -> String {
@@ -111,8 +112,17 @@ actor ResponseMemo {
         return entry.response
     }
 
+    var count: Int { entries.count }
+
     func store(_ response: HTTP.Response, for key: String) {
-        entries[key] = (response, Date.now.addingTimeInterval(Self.lifetime))
+        let now = Date.now
+        if entries[key] == nil, entries.count >= Self.capacity {
+            entries = entries.filter { $0.value.expires > now }
+            if entries.count >= Self.capacity, let soonest = entries.min(by: { $0.value.expires < $1.value.expires })?.key {
+                entries[soonest] = nil
+            }
+        }
+        entries[key] = (response, now.addingTimeInterval(Self.lifetime))
     }
 }
 

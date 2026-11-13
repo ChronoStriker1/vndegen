@@ -146,9 +146,15 @@ public final class LibraryStore {
 
     /// Adds a games folder the player picked. On iPhone and iPad, `url` is the picker's security-scoped URL.
     public func addFolder(_ url: URL) async throws {
-        let candidate = Self.realPath(url)
-        for existing in [paths.gamesRoot] + folders.map(\.url) {
-            let other = Self.realPath(existing)
+        let roots = [paths.gamesRoot] + folders.map(\.url), gone = removed
+        let (candidate, real, earlierID) = await Task.detached {
+            let candidate = Self.realPath(url)
+            let earlier = gone.first { folder in
+                Self.realPath(folder.url) == candidate || (try? FolderAccess.resolve(folder.bookmark)).map { Self.realPath($0.url) } == candidate
+            }
+            return (candidate, roots.map(Self.realPath), earlier?.id)
+        }.value
+        for (existing, other) in zip(roots, real) {
             if candidate == other || candidate.hasPrefix(other + "/") || other.hasPrefix(candidate + "/") {
                 throw LibraryFolderError(message: existing == paths.gamesRoot
                     ? "That folder is VNDegen's own games folder, or overlaps it."
@@ -165,9 +171,7 @@ public final class LibraryStore {
         }
         // A folder removed before comes back as itself, so its games find their records by name in it, even when it was
         // moved or renamed meanwhile, which its bookmark follows.
-        let earlier = removed.firstIndex { folder in
-            Self.realPath(folder.url) == candidate || (try? FolderAccess.resolve(folder.bookmark)).map { Self.realPath($0.url) } == candidate
-        }
+        let earlier = earlierID.flatMap { id in removed.firstIndex { $0.id == id } }
         var folder = LibraryFolder(url: url, bookmark: bookmark)
         if let earlier {
             folder = LibraryFolder(id: removed[earlier].id, url: url, bookmark: bookmark, lastSeen: removed[earlier].lastSeen)
@@ -451,7 +455,7 @@ public final class LibraryStore {
         return nil
     }
 
-    private static func realPath(_ url: URL) -> String { url.standardizedFileURL.resolvingSymlinksInPath().path }
+    private nonisolated static func realPath(_ url: URL) -> String { url.standardizedFileURL.resolvingSymlinksInPath().path }
 
     private static func libraryOrder(_ a: Game, _ b: Game) -> Bool {
         switch (a.lastPlayedAt, b.lastPlayedAt) {
