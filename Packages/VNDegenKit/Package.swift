@@ -206,7 +206,7 @@ let package = Package(
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG", "TestSupport"]),
         .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),
         .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK", "CNekoSDK", "TestSupport"]),
-        .testTarget(name: "EngineYuRISTests", dependencies: ["EngineYuRIS"]),
+        .testTarget(name: "EngineYuRISTests", dependencies: ["EngineYuRIS", "CYuRIS", "TestSupport"]),
         .testTarget(name: "EngineUnityTests", dependencies: ["EngineUnity", "RegistryFile", "TestSupport"]),
         .testTarget(name: "RegistryFileTests", dependencies: ["RegistryFile"], exclude: ["Fixtures"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack", "TestSupport"]),

@@ -21,7 +21,7 @@ typedef struct YEntry {
     char *loose;
 } YEntry;
 
-typedef struct YArchive { char *path; FILE *f; } YArchive;
+typedef struct YArchive { char *path; FILE *f; u64 size; } YArchive;
 
 struct YFS {
     YArchive *arcs;
@@ -152,7 +152,8 @@ static bool add_archive(YR *y, const char *path) {
         return false;
     }
     fs->arcs = yr_realloc(fs->arcs, sizeof(YArchive) * (size_t)(fs->arcCount + 1));
-    fs->arcs[fs->arcCount++] = (YArchive){ yr_strdup(path), f };
+    off_t end = fseeko(f, 0, SEEK_END) == 0 ? ftello(f) : -1;
+    fs->arcs[fs->arcCount++] = (YArchive){ yr_strdup(path), f, end > 0 ? (u64)end : 0 };
     yr_log(y, "archive %s: %u entries\n", path, count);
     return true;
 }
@@ -255,7 +256,9 @@ static bool read_entry(YR *y, const YEntry *e, YFile *out) {
         return out->data != NULL;
     }
     YArchive *a = &y->fs->arcs[e->arc];
-    u8 *raw = yr_alloc(e->csize + 1);
+    if (e->offset > a->size || e->csize > a->size - e->offset) return false;
+    if (e->packed && e->size > (u64)e->csize * 1032 + 64) return false;
+    u8 *raw = yr_alloc((size_t)e->csize + 1);
     if (fseeko(a->f, (off_t)e->offset, SEEK_SET) != 0 || fread(raw, 1, e->csize, a->f) != e->csize) {
         free(raw);
         return false;
