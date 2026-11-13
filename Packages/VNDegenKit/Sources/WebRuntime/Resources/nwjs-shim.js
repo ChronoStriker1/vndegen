@@ -684,11 +684,39 @@
     const pointerX = () => (lastX === null ? window.innerWidth / 2 : lastX);
     const pointerY = () => (lastY === null ? window.innerHeight / 2 : lastY);
 
+    let hovered = null;
+    const ancestors = (element) => {
+        const chain = [];
+        for (let node = element; node; node = node.parentElement) chain.push(node);
+        return chain;
+    };
+    function hover(element, init) {
+        if (element === hovered) return;
+        const previous = hovered && hovered.isConnected ? hovered : null;
+        hovered = element;
+        const quiet = { ...init, bubbles: false, cancelable: false };
+        if (previous) {
+            previous.dispatchEvent(new MouseEvent('mouseout', { ...init, relatedTarget: element }));
+            for (const node of ancestors(previous).filter((node) => !node.contains(element))) {
+                node.dispatchEvent(new MouseEvent('mouseleave', { ...quiet, relatedTarget: element }));
+            }
+        }
+        element.dispatchEvent(new MouseEvent('mouseover', { ...init, relatedTarget: previous }));
+        for (const node of ancestors(element).filter((node) => !previous || !node.contains(previous)).reverse()) {
+            node.dispatchEvent(new MouseEvent('mouseenter', { ...quiet, relatedTarget: previous }));
+        }
+    }
+
+    let held = 0;
+    const buttonBit = (button) => (button === 2 ? 2 : 1);
     function dispatchPointer(phase, x, y, button) {
         lastX = x; lastY = y;
-        const down = phase === 'began' || phase === 'moved';
-        const init = { clientX: x, clientY: y, screenX: x, screenY: y, button: button, buttons: down ? (button === 2 ? 2 : 1) : 0, bubbles: true, cancelable: true, view: window };
+        if (phase === 'began') held |= buttonBit(button);
+        else if (phase !== 'moved') held &= ~buttonBit(button);
+        const shown = phase !== 'moved' || held === 0 ? button : (held & 1 ? 0 : 2);
+        const init = { clientX: x, clientY: y, screenX: x, screenY: y, button: shown, buttons: held, bubbles: true, cancelable: true, view: window };
         const element = document.elementFromPoint(x, y) || target();
+        hover(element, init);
         if (phase === 'began') element.dispatchEvent(new MouseEvent('mousemove', init));
         element.dispatchEvent(new MouseEvent({ began: 'mousedown', moved: 'mousemove', ended: 'mouseup', cancelled: 'mouseup' }[phase], init));
         if (phase === 'ended' && button === 0) element.dispatchEvent(new MouseEvent('click', init));
@@ -703,7 +731,9 @@
         const touch = event.changedTouches[0];
         if (!touch) return;
         const init = { clientX: touch.clientX, clientY: touch.clientY, screenX: touch.screenX, screenY: touch.screenY, bubbles: true, cancelable: true, view: window };
-        (document.elementFromPoint(touch.clientX, touch.clientY) || target()).dispatchEvent(new MouseEvent('mousemove', init));
+        const element = document.elementFromPoint(touch.clientX, touch.clientY) || target();
+        hover(element, init);
+        element.dispatchEvent(new MouseEvent('mousemove', init));
     };
     window.addEventListener('touchstart', moveMouseToTouch, { capture: true, passive: true });
 
