@@ -271,7 +271,7 @@ void tTVPXP3Archive::Init(tTJSBinaryStream* st, tjs_int64 off, bool normalizeNam
                         break;
                     if (!memcmp(indexdata + pos, "eliF", 4) && csize >= 6)
                     {
-                        tjs_int len = ReadI16FromMem(indexdata + pos + 16);
+                        tjs_int len = (tjs_uint16)ReadI16FromMem(indexdata + pos + 16);
                         if (6 + (tjs_uint64)len * 2 <= csize)
                             pending = TVPStringFromBMPUnicode(
                                 (const tjs_uint16*)(indexdata + pos + 18), len);
@@ -304,13 +304,17 @@ void tTVPXP3Archive::Init(tTJSBinaryStream* st, tjs_int64 off, bool normalizeNam
 
                 // read info sub-chunk
                 tArchiveItem item;
+                if (ch_info_size < 22)
+                    TVPThrowExceptionMessage(TVPReadError);
                 tjs_uint32 flags = ReadI32FromMem(indexdata + ch_info_start + 0);
                 if (!TVPAllowExtractProtectedStorage && (flags & TVP_XP3_FILE_PROTECTED))
                     TVPThrowExceptionMessage(TVPSpecifiedStorageHadBeenProtected);
                 item.OrgSize = ReadI64FromMem(indexdata + ch_info_start + 4);
                 item.ArcSize = ReadI64FromMem(indexdata + ch_info_start + 12);
 
-                tjs_int len = ReadI16FromMem(indexdata + ch_info_start + 20);
+                tjs_int len = (tjs_uint16)ReadI16FromMem(indexdata + ch_info_start + 20);
+                if (22 + (tjs_uint64)len * 2 > ch_info_size)
+                    TVPThrowExceptionMessage(TVPReadError);
                 ttstr name = TVPStringFromBMPUnicode(
                     (const tjs_uint16*)(indexdata + ch_info_start + 22), len);
                 item.Name = name;
