@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.6",
+          "buildVersion": "2489",
+          "date": "2026-11-14T07:33:14Z",
+          "localizedDescription": "Rance 02 resume saves load again, and two KiriKiri fixes.\n\n## Downloads\n\n- `VNDegen-0.41.6-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.6.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- System 4: Rance 02 resume saves load again (#175). An engine bug damaged every resume save the game made. Resume saves made with earlier versions can't be recovered.\n- KiriKiri: a game that reads a pixel's color gets red and blue in the right order (#177).\n- KiriKiri: playing several games in one session no longer keeps each finished game's images in memory (#176).\n\n## What wasn't tested\n\n- No physical device was used. Checks were the package tests, the Mac and iOS builds, and runs outside the app with memory checking: Rance 02 saving and loading a resume, a Sengoku Rance start, and several KiriKiri games in one session.\n- These fixes were not run in the Mac app or on an iPhone or iPad simulator.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.6/VNDegen-0.41.6.ipa",
+          "size": 126397733,
+          "sha256": "7eedad85ae3f632ccb9c0db9a8383c9a2dbafaf41a130fab00588a508fad471f",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.5",
           "buildVersion": "2481",
           "date": "2026-11-14T00:55:52Z",
