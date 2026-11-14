@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.5",
+          "buildVersion": "2481",
+          "date": "2026-11-14T00:55:52Z",
+          "localizedDescription": "Fixes for save sync on a large or slow server, and three engine fixes left over from the code review.\n\n## Downloads\n\n- `VNDegen-0.41.5-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.5.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\nSave sync:\n- Save sync no longer slows the app's start with a large Ludusavi store: it reads its copy of the store in the background (#104).\n- A backup or restore over a slow connection is no longer cut off after 3 minutes. It continues while data is moving, and gives up only when nothing has moved for a minute (#104).\n\nEngines:\n- YU-RIS: a number too large for an integer now converts as it does on the PC, instead of giving an undefined result (#171).\n- System 4: save slot details are written whole, so a failed write keeps the old ones (#173).\n- KiriKiri: a small image the engine kept for the whole session is now freed when a game ends (#174).\n\n## Known limits\n\n- A server that keeps sending data very slowly can now hold up save sync for as long as it keeps sending.\n- A Rance 02 resume save made at Camp may not load in a new session (#175). This is older than this release and is being looked at.\n- KiriKiri still keeps some of a game's objects after it ends, about 14 MB per game played in one session (#176).\n\n## What wasn't tested\n\n- No physical device was used. Checks were the package tests, the Mac and iOS builds, and Linux test hosts with memory and undefined-behavior checking.\n- Save sync was tried in the Mac app against a local WebDAV server with 300 games. The one-minute limit was tested against a local store only, not real SMB, FTP or WebDAV servers or a slow network.\n- The YU-RIS, System 4 and KiriKiri fixes were run with real games outside the app (Tales of the Yokai Incident Inspectors, Rance 02, and KiriKiri restarts), not in the Mac app.\n- No iPhone or iPad simulator was used, since nothing changed input or layout.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.5/VNDegen-0.41.5.ipa",
+          "size": 126393416,
+          "sha256": "b12e5086cd5cd37df3b2884422360a14e2273cc4041f1d0eea63dda759bd6f44",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.4",
           "buildVersion": "2468",
           "date": "2026-11-13T23:21:53Z",
