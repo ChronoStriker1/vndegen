@@ -151,7 +151,8 @@ tjs_uint32 iTVPBaseBitmap::GetPoint(tjs_int x, tjs_int y) const
     if (x < 0 || y < 0 || x >= (tjs_int)GetWidth() || y >= (tjs_int)GetHeight())
         TVPThrowExceptionMessage(TVPOutOfRectangle);
 
-    return Bitmap->GetPoint(x, y);
+    tjs_uint32 value = Bitmap->GetPoint(x, y);
+    return Is32BPP() ? TVP_REVRGB(value) : value;
 }
 //---------------------------------------------------------------------------
 bool iTVPBaseBitmap::SetPoint(tjs_int x, tjs_int y, tjs_uint32 value)

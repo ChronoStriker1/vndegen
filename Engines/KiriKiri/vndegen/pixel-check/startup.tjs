@@ -1,0 +1,28 @@
+var failed = 0;
+function check(what, got, want)
+{
+    if (got != want) failed++;
+    Debug.message("check: %s 0x%06X, want 0x%06X".sprintf(what, got, want));
+}
+var win = new Window();
+win.setInnerSize(320, 240);
+win.visible = true;
+var base = new Layer(win, null);
+base.setImageSize(320, 240);
+base.setSize(320, 240);
+base.fillRect(0, 0, 320, 240, 0xff204080);
+base.visible = true;
+check("fillRect", base.getMainPixel(100, 100), 0x204080);
+check("fillRect mask", base.getMaskPixel(100, 100), 0xff);
+base.setMainPixel(5, 5, 0x123456);
+check("setMainPixel", base.getMainPixel(5, 5), 0x123456);
+var img = new Layer(win, base);
+img.loadImages("swatch.png");
+check("loadImages", img.getMainPixel(2, 2), 0x204080);
+var bmp = new Bitmap();
+bmp.load("swatch.png");
+check("Bitmap.load", bmp.getPixel(2, 2), 0x204080);
+bmp.setPixel(1, 1, 0x336699);
+check("Bitmap.setPixel", bmp.getPixel(1, 1), 0x336699);
+Debug.message("check: %d failed".sprintf(failed));
+Debug.message("pixel check done");
