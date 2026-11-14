@@ -187,6 +187,9 @@ tTJS::tTJS()
 //---------------------------------------------------------------------------
 tTJS::~tTJS()
 {
+    if (TJSEngineCount == 1)
+        TJSInvalidateObjectHeap();
+
 #ifndef TJS_NO_REGEXP
     TJSReleaseRegex();
 #endif

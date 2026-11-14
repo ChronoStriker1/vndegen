@@ -34,6 +34,20 @@ void TJSClearObjectHeap()
     _allTJSObjects.deleteAll();
     _tjsForceShutdown = false;
 }
+void TJSInvalidateObjectHeap()
+{
+    _allTJSObjects.forEach([](tTJSCustomObject* obj) {
+        obj->AddRef();
+        try
+        {
+            obj->Invalidate(0, nullptr, nullptr, obj);
+        }
+        catch (...)
+        {
+        }
+        obj->Release();
+    });
+}
 
 //---------------------------------------------------------------------------
 // utility functions

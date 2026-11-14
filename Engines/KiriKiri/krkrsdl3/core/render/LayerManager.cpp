@@ -72,7 +72,8 @@ void tTVPLayerManager::RegisterSelfToWindow()
 //---------------------------------------------------------------------------
 void tTVPLayerManager::UnregisterSelfFromWindow()
 {
-    LayerTreeOwner->UnregisterLayerManager(this);
+    if (LayerTreeOwner)
+        LayerTreeOwner->UnregisterLayerManager(this);
 }
 
 void tTVPLayerManager::SetHoldAlpha(bool b)
@@ -697,7 +698,8 @@ void tTVPLayerManager::ReleaseCapture()
             lay->Owner->Release();
         // release TJS object
 
-        LayerTreeOwner->ReleaseMouseCapture(this);
+        if (LayerTreeOwner)
+            LayerTreeOwner->ReleaseMouseCapture(this);
     }
 }
 //---------------------------------------------------------------------------

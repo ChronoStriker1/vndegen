@@ -24,6 +24,7 @@ namespace TJS
 //---------------------------------------------------------------------------
 extern void TJSCompactObjectHeap();
 extern void TJSClearObjectHeap();
+extern void TJSInvalidateObjectHeap();
 
 //---------------------------------------------------------------------------
 // utility functions

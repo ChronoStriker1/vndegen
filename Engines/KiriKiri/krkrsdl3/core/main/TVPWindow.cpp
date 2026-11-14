@@ -93,6 +93,8 @@ TVPWindow::~TVPWindow()
     // queued events would reach the next game.
     TVPCancelInputEvents(this);
     TVPRemoveWindowUpdate(this);
+    for (iTVPLayerManager* manager : LayerManagers)
+        static_cast<tTVPLayerManager*>(manager)->SetLayerTreeOwner(nullptr);
 
     // 解除绘制设备对本窗口的引用（D3D 等析构时不再触碰本窗口；
     // 设备只经 SetDrawDeviceObject 被引用，析构必然先于本窗口发生）
@@ -1087,12 +1089,14 @@ bool TVPWindow::WaitForVBlank(tjs_int* in_vblank, tjs_int* delayed)
 //---------------------------------------------------------------------------
 void TVPWindow::RegisterLayerManager(iTVPLayerManager* manager)
 {
+    LayerManagers.push_back(manager);
     if (DrawDevice)
         DrawDevice->AddLayerManager(manager);
 }
 //---------------------------------------------------------------------------
 void TVPWindow::UnregisterLayerManager(iTVPLayerManager* manager)
 {
+    LayerManagers.erase(std::remove(LayerManagers.begin(), LayerManagers.end(), manager), LayerManagers.end());
     if (DrawDevice)
         DrawDevice->RemoveLayerManager(manager);
 }

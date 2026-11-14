@@ -479,6 +479,7 @@ public:
     ttstr GetShortDescriptionWithClassName() const;
 
     tTJSScriptBlock* GetBlock() const { return Block; }
+    void DetachBlock() { Block = nullptr; }
 
 #ifdef ENABLE_DEBUGGER
     ttstr GetClassName() const;

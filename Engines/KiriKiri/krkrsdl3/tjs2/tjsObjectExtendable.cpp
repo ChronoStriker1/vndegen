@@ -140,7 +140,7 @@ tjs_error tTJSExtendableObject::Invalidate(tjs_uint32 flag,
     {
         hr = SuperClass->Invalidate(flag, membername, hint, objthis);
     }
-    if (membername == NULL)
+    if (membername == NULL && SuperClass != NULL)
     {
         SuperClass->Invalidate(flag, membername, hint, objthis);
     }

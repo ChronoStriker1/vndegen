@@ -356,6 +356,7 @@ public: // iTVPLayerTreeOwner（LayerManager -> LTO，全部转发给 DrawDevice
     void ResetImeMode(iTVPLayerManager* manager) override;
 
 private:
+    std::vector<iTVPLayerManager*> LayerManagers;
     void ResetDrawSprite();
     void RecalcPaintBox();
     bool OnCloseQuery();

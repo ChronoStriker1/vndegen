@@ -464,7 +464,8 @@ void tTJSInterCodeContext::Finalize(void)
         DataArea = NULL;
     }
 
-    Block->Remove(this);
+    if (Block)
+        Block->Remove(this);
 
     if (ContextType != ctTopLevel && Block)
         Block->Release();

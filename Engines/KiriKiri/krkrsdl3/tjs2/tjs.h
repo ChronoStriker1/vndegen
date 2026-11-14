@@ -309,6 +309,23 @@ public:
         FreeSlots.push_back(idx);
     }
 
+    template<typename F>
+    void forEach(F f)
+    {
+        for (size_t i = 0;; i++)
+        {
+            T* obj;
+            {
+                std::lock_guard<std::mutex> lock(Lock);
+                if (i >= Slots.size())
+                    break;
+                obj = Slots[i];
+            }
+            if (obj)
+                f(obj);
+        }
+    }
+
     // Deletes every object still registered. Deleting one object may delete others, which
     // unregister as usual, so each slot is read again just before its object is deleted.
     void deleteAll()

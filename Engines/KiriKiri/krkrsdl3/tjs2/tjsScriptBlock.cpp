@@ -86,6 +86,9 @@ tTJSScriptBlock::~tTJSScriptBlock()
         ContextStack.top()->Release();
         ContextStack.pop();
     }
+    for (tTJSInterCodeContext* context : InterCodeContextList)
+        context->DetachBlock();
+    InterCodeContextList.clear();
 
     Owner->RemoveScriptBlock(this);
 
