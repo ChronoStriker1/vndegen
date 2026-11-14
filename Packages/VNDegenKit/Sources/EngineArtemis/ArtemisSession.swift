@@ -1,5 +1,6 @@
 import CArtemis
 import FontPack
+import FrameHost
 import Foundation
 import Metal
 import OSLog
@@ -34,7 +35,7 @@ final class ArtemisSession: EngineSession {
     private var runtime: OpaquePointer?
     private var stage = CGSize(width: 1280, height: 720)
     private var router = ArtemisInputRouter()
-    private var displayLink: CADisplayLink?
+    private let displayLink = DisplayLinkDriver()
     private var lastFrame: CFTimeInterval?
     private var carry = 0.0
     private var paused = false
@@ -125,14 +126,7 @@ final class ArtemisSession: EngineSession {
         artemisLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
         if paused { audio.setPaused(true) }
         host.takeFocus()
-        let target = FrameTarget(self)
-        #if canImport(UIKit)
-        let link = CADisplayLink(target: target, selector: #selector(FrameTarget.step))
-        #else
-        let link = host.displayLink(target: target, selector: #selector(FrameTarget.step))
-        #endif
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        displayLink.start(in: host) { [weak self] link in self?.step(link) }
     }
 
     /// The core draws text in the fonts a game ships. A face the game ships no font file for, such as a Windows font
@@ -154,8 +148,8 @@ final class ArtemisSession: EngineSession {
         launch.onExit()
     }
 
-    func step() {
-        guard let runtime, let link = displayLink, !paused else { return }
+    private func step(_ link: CADisplayLink) {
+        guard let runtime, !paused else { return }
         let now = link.timestamp
         let elapsed = lastFrame.map { min((now - $0) * 1000, 100) } ?? 16
         lastFrame = now
@@ -424,8 +418,7 @@ final class ArtemisSession: EngineSession {
     private func finish() {
         guard !stopped else { return }
         stopped = true
-        displayLink?.invalidate()
-        displayLink = nil
+        displayLink.stop()
         movies.stopAll()
         audio.stopAll()
         if let runtime {
@@ -439,15 +432,4 @@ final class ArtemisSession: EngineSession {
         Self.engineInUse = false
         artemisLog.info("\(self.launch.game.id.rawValue, privacy: .public) stopped")
     }
-}
-
-/// A display link keeps its target, so the session sits behind a weak link to avoid a cycle.
-private final class FrameTarget: NSObject {
-    private weak var session: ArtemisSession?
-
-    init(_ session: ArtemisSession) {
-        self.session = session
-    }
-
-    @objc func step() { session?.step() }
 }

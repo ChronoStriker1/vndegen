@@ -27,10 +27,10 @@ final class RGSSSession: EngineSession {
     private var router = RGSSInputRouter()
     /// Hardware keys down, to tell a key's repeats from its first press.
     private var keyboardHeld: Set<UInt32> = []
-    private var displayLink: CADisplayLink?
+    private let displayLink = DisplayLinkDriver()
     private var lastFrame: CFTimeInterval?
     #if DEBUG
-    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing() : nil
+    private let pacing = FramePacing(tag: "RGSSFRAMES", rate: .drawnFrames)
     #endif
     /// When each key the game holds went down, and the releases held back for `shortestPress`.
     private var pressedAt: [UInt32: ContinuousClock.Instant] = [:]
@@ -119,17 +119,10 @@ final class RGSSSession: EngineSession {
         audio?.start()
         if paused { setPaused(true) }
         frameView.takeFocus()
-        let target = FrameTarget(self)
-        #if canImport(UIKit)
-        let link = CADisplayLink(target: target, selector: #selector(FrameTarget.step))
-        #else
-        let link = frameView.displayLink(target: target, selector: #selector(FrameTarget.step))
-        #endif
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        displayLink.start(in: frameView) { [weak self] link in self?.step(link) }
     }
 
-    fileprivate func step(_ link: CADisplayLink) {
+    private func step(_ link: CADisplayLink) {
         guard running else { return }
         let now = link.timestamp
         let seconds = lastFrame.map { now - $0 } ?? 1.0 / 60
@@ -145,7 +138,7 @@ final class RGSSSession: EngineSession {
             frameView.present(pixels, width: Int(width), height: Int(height))
         }
         #if DEBUG
-        pacing?.note(tick: now, presented: changed, stepEnd: CACurrentMediaTime())
+        pacing?.note(link, presented: changed, target: Double(vnrgss_frame_rate()))
         #endif
     }
 
@@ -213,8 +206,7 @@ final class RGSSSession: EngineSession {
         guard running else { return }
         running = false
         stopped = true
-        displayLink?.invalidate()
-        displayLink = nil
+        displayLink.stop()
         closeMessageView()
         heldReleases.values.forEach { $0.cancel() }
         heldReleases = [:]
@@ -296,49 +288,3 @@ final class RGSSSession: EngineSession {
         stopped = true
     }
 }
-
-/// A display link keeps its target, so the session sits behind a weak link to avoid a cycle.
-private final class FrameTarget: NSObject {
-    private weak var session: RGSSSession?
-
-    init(_ session: RGSSSession) {
-        self.session = session
-    }
-
-    @objc func step(_ link: CADisplayLink) { session?.step(link) }
-}
-
-#if DEBUG
-/// With `-frameMonitor YES`, logs the game's frame rate every 10 seconds ("RGSSFRAMES" in the app log): frames the
-/// game drew per second on average and over the slowest 1% of them, display link ticks per second, and the slowest step.
-private final class FramePacing {
-    private var start: CFTimeInterval?
-    private var lastPresented: CFTimeInterval?
-    private var gaps: [Double] = []
-    private var ticks = 0
-    private var worstStep = 0.0
-
-    func note(tick: CFTimeInterval, presented: Bool, stepEnd: CFTimeInterval) {
-        guard let start else {
-            self.start = tick
-            return
-        }
-        ticks += 1
-        worstStep = max(worstStep, stepEnd - tick)
-        if presented {
-            if let lastPresented { gaps.append(tick - lastPresented) }
-            lastPresented = tick
-        }
-        let elapsed = tick - start
-        guard elapsed >= 10 else { return }
-        let slowest = gaps.sorted(by: >).prefix(max(1, gaps.count / 100))
-        let low = slowest.isEmpty ? 0 : Double(slowest.count) / slowest.reduce(0, +)
-        NSLog("RGSSFRAMES seconds=%.1f average=%.1f low1=%.1f ticks=%.1f worstStep=%.1fms target=%d", elapsed,
-              Double(gaps.count) / elapsed, low, Double(ticks) / elapsed, worstStep * 1000, Int(vnrgss_frame_rate()))
-        self.start = tick
-        gaps.removeAll(keepingCapacity: true)
-        ticks = 0
-        worstStep = 0
-    }
-}
-#endif

@@ -55,7 +55,8 @@ App/                      app entry point, icons, Info.plist
 Packages/VNDegenKit/
   Sources/VNCore/         shared types: games, the library, the engine plugin contract, input events
   Sources/WebRuntime/     shared host for HTML5 engines: WebKit view, game file serving, Node and NW.js layer
-  Sources/FrameHost/      shows CPU-drawn engine frames through Metal and plays their PCM audio
+  Sources/FrameHost/      shows CPU-drawn engine frames through Metal and plays their PCM audio, and holds the display
+                          link driver, -frameMonitor pacing log and session skeleton the native runtimes share
   Sources/EngineRPGMaker/ RPG Maker MV and MZ: detection, key mapping, save locations
   Sources/EngineTyrano/   TyranoScript: detection, Electron app.asar reading, save handling, controller mapping
   Sources/EngineRenPy/    Ren'Py: detection, runtime choice, the macOS helper process, the iOS in-app session, and the in-game hook
@@ -130,6 +131,8 @@ An engine that looks fonts up by Windows name resolves them with `vnfont_resolve
 An engine that plays MIDI music uses vnmidi from `Engines/Shared/vnmidi.h`. It compiles `vnmidi.c`, or depends on the `CVNMidi` package target, and loads the General MIDI SoundFont from `MIDISoundFont.url`, the player's from Settings or the bundled one, with `MIDISoundFont.fallbackURL` through `vnmidi_font_load_fallback`. See [midi.md](midi.md).
 
 An engine that plays movies uses vnvideo from `Engines/Shared/vnvideo.h`, through the `CVNVideo` package target, for MPEG-1 and for Ogg Theora with Opus sound. See [video.md](video.md).
+
+An engine whose runtime runs in VNDegen's process and draws its frames on the CPU, as the NScripter, System 3, System 4, NekoSDK, Wolf RPG and YU-RIS runtimes do, builds its session on `FrameDriver` in FrameHost. The driver owns the `FrameView` and the runtime's engine pointer, plays the sound the runtime mixes, steps it once per display refresh with the whole milliseconds that passed (`MillisecondClock`), and holds the start failure, pause, stop and quit logic those sessions share. The session gives it the runtime's pause and close calls, and keeps its input, its frame step and anything else of its own. Every session that steps on the display link, the GPU engines' too, starts it through `DisplayLinkDriver`. A display link keeps its target, so the session's step closure holds the session weakly. In a DEBUG build launched with `-frameMonitor YES`, `FramePacing` logs each session's pacing every 10 seconds under its own tag, such as `S3FRAMES` or `KKFRAMES`: display link ticks per second on average and over the slowest 1%, frames drawn when the session reports them, the slowest step, and the target. RGSS's line counts the frames the game drew instead of the ticks, since an RGSS game draws at its own frame rate, often below the display's.
 
 ### File name case
 

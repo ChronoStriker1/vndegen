@@ -81,7 +81,7 @@ let package = Package(
         .target(name: "CRenPy"),
         // The KiriKiri engine's C interface. The engine itself is a framework the app embeds, found at run time.
         .target(name: "CKiriKiri"),
-        .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri", "FontPack"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
         // VNDegen's own RGSS runtime for RPG Maker XP, VX and VX Ace, in C, with vnrgss.h as its C interface. It runs
         // games' scripts on MRI Ruby, which scripts/rgss-ruby.sh builds into build/RGSSRuby.xcframework (not in git;
         // scripts/build.sh makes it). third_party holds stb and dr_libs, which the runtime's sources include directly.
@@ -95,7 +95,7 @@ let package = Package(
         .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS", "FrameHost", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // The Godot engines' C interface. The engines are frameworks the app embeds, opened at run time.
         .target(name: "CGodot"),
-        .target(name: "EngineGodot", dependencies: ["VNCore", "CGodot", "FontPack"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineGodot", dependencies: ["VNCore", "CGodot", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
         // VNDegen's own NScripter runtime, in C++, with vnns.h as its C interface. third_party holds stb_image,
         // stb_vorbis and pl_mpeg, which the runtime's sources include directly rather than compile on their own.
         .target(
@@ -158,7 +158,7 @@ let package = Package(
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
-        .target(name: "EngineArtemis", dependencies: ["VNCore", "ControllerUI", "CArtemis", "CVNVideo", "FontPack"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineArtemis", dependencies: ["VNCore", "ControllerUI", "CArtemis", "CVNVideo", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),

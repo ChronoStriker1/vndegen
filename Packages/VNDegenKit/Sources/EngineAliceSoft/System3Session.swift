@@ -17,31 +17,23 @@ nonisolated let system3Log = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// A System 3 game running on VNDegen's runtime (CSystem3) in this process. The runtime steps once per display refresh
 /// on the main thread and draws into a CPU frame that `FrameView` shows; its sound plays through `PCMAudioOutput`.
 final class System3Session: EngineSession {
-    private(set) var failedToStart = false
-    private(set) var startFailureReason: String?
+    var failedToStart: Bool { driver.failedToStart }
+    var startFailureReason: String? { driver.startFailureReason }
     let view: PlatformView
-    private let frameView = FrameView()
+    private let driver: FrameDriver
+    private var frameView: FrameView { driver.view }
+    private var engine: OpaquePointer? { driver.engine }
     private let launch: GameLaunch
     private let root: URL
-    private var engine: OpaquePointer?
-    private var audio: PCMAudioOutput?
-    private var displayLink: CADisplayLink?
-    private var clock = MillisecondClock()
     private var router = System3InputRouter()
     private var frameSize = CGSize(width: 640, height: 480)
     private var shownSerial: UInt32 = .max
-    private var paused = false
-    #if DEBUG
-    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing(tag: "S3FRAMES") : nil
-    #endif
     private var numberBox: System3NumberBox?
     private var numberView: PlatformView?
     #if canImport(UIKit)
     private var numberController: UIHostingController<System3NumberBoxView>?
     #endif
     private var pointerLocation: CGPoint?
-    private var stopped = false
-    private var stopWaiters: [CheckedContinuation<Void, Never>] = []
     private lazy var system3Cheats = System3Cheats { [weak self] in self?.engine }
     var cheats: (any CheatSession)? { system3Cheats }
     private static let textSkipItem = "textSkip"
@@ -49,7 +41,15 @@ final class System3Session: EngineSession {
     init(_ launch: GameLaunch, root: URL) {
         self.launch = launch
         self.root = root
-        view = frameView
+        let id = launch.game.id.rawValue
+        driver = FrameDriver(pacingTag: "S3FRAMES", setPaused: { vns3_set_paused($0, $1) }, close: { engine in
+            if let problem = vns3_problem(engine) {
+                system3Log.error("\(id, privacy: .public) stopped: \(String(cString: problem), privacy: .public)")
+            }
+            vns3_close(engine)
+        }, onExit: launch.onExit)
+        view = driver.view
+        driver.willFinish = { [weak self] in self?.closeNumberBox() }
         frameView.filter = .nearest
         frameView.onReady = { [weak self] in self?.start() }
         frameView.onPointer = { [weak self] event in
@@ -68,7 +68,7 @@ final class System3Session: EngineSession {
     }
 
     private func start() {
-        guard engine == nil, !stopped else { return }
+        guard driver.canStart else { return }
         let logURL = launch.dataDirectory.appendingPathComponent("logs/system3.txt")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? Data().write(to: logURL)
@@ -96,41 +96,25 @@ final class System3Session: EngineSession {
         guard let started else {
             let reason = String(decoding: problem.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             system3Log.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
-            failedToStart = true
-            startFailureReason = reason
-            finish(byGame: true)
+            driver.failToStart(reason)
             return
         }
-        engine = started
         system3Log.info("started \(self.launch.game.id.rawValue, privacy: .public)")
+        driver.run(started, sampleRate: rate, audio: { vns3_audio($0, $1, $2) }) { [weak self] engine, ms, link in
+            self?.step(engine, ms, link)
+        }
         system3Cheats.apply(launch.game.cheats ?? CheatSettings())
-        let box = EngineBox(started)
-        audio = PCMAudioOutput(sampleRate: rate) { out, frames in vns3_audio(box.engine, out, Int32(frames)) }
-        audio?.start()
-        if paused { setPaused(true) }
-        frameView.takeFocus()
-        #if canImport(UIKit)
-        let link = CADisplayLink(target: FrameTarget(self), selector: #selector(FrameTarget.step(_:)))
-        #else
-        let link = frameView.displayLink(target: FrameTarget(self), selector: #selector(FrameTarget.step(_:)))
-        #endif
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        if driver.paused { setPaused(true) }
     }
 
-    fileprivate func step(_ link: CADisplayLink) {
-        guard let engine else { return }
-        let now = link.timestamp
-        let ms = clock.tick(at: now)
-        guard !paused else { return }
+    private func step(_ engine: OpaquePointer, _ ms: Int, _ link: CADisplayLink) {
         if !vns3_frame(engine, UInt32(min(max(ms, 0), 100))) {
-            finish(byGame: true)
+            driver.finish(byGame: true)
             return
         }
         let serial = vns3_frame_serial(engine)
         #if DEBUG
-        pacing?.note(tick: now, presented: serial != shownSerial, stepEnd: CACurrentMediaTime(),
-                     target: link.targetTimestamp - link.timestamp)
+        driver.pacing?.note(link, presented: serial != shownSerial)
         #endif
         if numberBox == nil { showNumberBoxIfAsked() }
         guard serial != shownSerial else { return }
@@ -235,26 +219,6 @@ final class System3Session: EngineSession {
         }
     }
 
-    private func finish(byGame: Bool) {
-        closeNumberBox()
-        displayLink?.invalidate()
-        displayLink = nil
-        audio?.stop()
-        audio = nil
-        if let engine {
-            if let problem = vns3_problem(engine) {
-                system3Log.error("\(self.launch.game.id.rawValue, privacy: .public) stopped: \(String(cString: problem), privacy: .public)")
-            }
-            vns3_close(engine)
-            self.engine = nil
-        }
-        stopped = true
-        let waiters = stopWaiters
-        stopWaiters = []
-        waiters.forEach { $0.resume() }
-        if byGame { launch.onExit() }
-    }
-
     // MARK: EngineSession
 
     func send(_ event: ControllerEvent) {
@@ -265,22 +229,13 @@ final class System3Session: EngineSession {
     }
 
     func setPaused(_ paused: Bool) {
-        self.paused = paused
-        guard let engine else { return }
-        if paused { deliver(router.releaseAll()) }
-        vns3_set_paused(engine, paused)
-        if paused { audio?.pause() } else { audio?.resume() }
-        clock.reset()
-        #if DEBUG
-        pacing?.reset()
-        #endif
-        if !paused { frameView.takeFocus() }
+        driver.setPaused(paused) { _ in
+            if paused { deliver(router.releaseAll()) }
+        }
     }
 
     func terminate() {
-        guard !stopped else { return }
-        if engine == nil { failedToStart = true }
-        finish(byGame: false)
+        driver.terminate()
     }
 
     func type(_ typed: TypedText) {
@@ -297,30 +252,16 @@ final class System3Session: EngineSession {
     /// The PC engines keep this in the window's menu bar: 文字送り on System 3.9, Skip until choice in the English
     /// System 3.0 exes. It turns itself off at the next choice or left click, so the menu asks the runtime each time.
     func gameMenu() async -> [GameMenuItem] {
-        guard let engine, !stopped else { return [] }
+        guard let engine, !driver.stopped else { return [] }
         return [GameMenuItem(id: Self.textSkipItem, title: "Skip until choice", isChecked: vns3_text_skip(engine))]
     }
 
     func chooseGameMenuItem(_ id: GameMenuItem.ID) {
-        guard let engine, !stopped, id == Self.textSkipItem else { return }
+        guard let engine, !driver.stopped, id == Self.textSkipItem else { return }
         vns3_set_text_skip(engine, !vns3_text_skip(engine))
     }
 
     func waitUntilStopped() async {
-        if stopped { return }
-        await withCheckedContinuation { stopWaiters.append($0) }
+        await driver.waitUntilStopped()
     }
-}
-
-/// The engine pointer, handed to the audio thread. vns3_audio is safe to call there.
-nonisolated private final class EngineBox: @unchecked Sendable {
-    let engine: OpaquePointer
-    init(_ engine: OpaquePointer) { self.engine = engine }
-}
-
-/// A display link keeps its target, so the session sits behind a weak reference to avoid a cycle.
-private final class FrameTarget: NSObject {
-    private weak var session: System3Session?
-    init(_ session: System3Session) { self.session = session }
-    @objc func step(_ link: CADisplayLink) { session?.step(link) }
 }

@@ -16,29 +16,28 @@ nonisolated let nekoSDKLog = Logger(subsystem: "com.chronostriker1.vndegen", cat
 /// thread and draws into a CPU frame that `FrameView` shows; its sound plays through `PCMAudioOutput`. The game ending
 /// itself ends the session through `onExit`.
 final class NekoSDKSession: EngineSession {
-    private(set) var failedToStart = false
-    private(set) var startFailureReason: String?
+    var failedToStart: Bool { driver.failedToStart }
+    var startFailureReason: String? { driver.startFailureReason }
     let view: PlatformView
-    private let frameView = FrameView()
+    private let driver: FrameDriver
+    private var frameView: FrameView { driver.view }
+    private var engine: OpaquePointer? { driver.engine }
     private let launch: GameLaunch
     private let root: URL
-    private var engine: OpaquePointer?
-    private var audio: PCMAudioOutput?
-    private var displayLink: CADisplayLink?
-    private var clock = MillisecondClock()
-    #if DEBUG
-    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing(tag: "NEKOFRAMES") : nil
-    #endif
     private var scrolledNotches = 0.0
     private var scrolledPoints = 0.0
-    private var paused = false
-    private var stopped = false
-    private var stopWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(_ launch: GameLaunch, root: URL) {
         self.launch = launch
         self.root = root
-        view = frameView
+        let id = launch.game.id.rawValue
+        driver = FrameDriver(pacingTag: "NEKOFRAMES", setPaused: { vnneko_set_paused($0, $1) }, close: { engine in
+            if let problem = vnneko_problem(engine) {
+                nekoSDKLog.error("\(id, privacy: .public) stopped: \(String(cString: problem), privacy: .public)")
+            }
+            vnneko_stop(engine)
+        }, onExit: launch.onExit)
+        view = driver.view
         frameView.onReady = { [weak self] in self?.start() }
         frameView.onPointer = { [weak self] event in self?.pointer(event, at: event.location) }
         frameView.onScroll = { [weak self] notches in
@@ -65,6 +64,8 @@ final class NekoSDKSession: EngineSession {
                 MainActor.assumeIsolated { self?.setInactive(false) }
             },
         ]
+        driver.holdsRuntime = { [weak self] engine in self?.inactive == true && vnneko_pauses_when_inactive(engine) }
+        driver.willFinish = { [weak self] in self?.stopObservingActivity() }
     }
 
     private var activityObservers: [NSObjectProtocol] = []
@@ -73,15 +74,16 @@ final class NekoSDKSession: EngineSession {
     /// Pauses the runtime while the app is inactive, when Config asks for it. The hub's own pause, `paused`, wins.
     private func setInactive(_ inactive: Bool) {
         self.inactive = inactive
-        guard let engine, !paused else { return }
-        let stop = inactive && vnneko_pauses_when_inactive(engine)
-        vnneko_set_paused(engine, stop)
-        if stop { audio?.pause() } else { audio?.resume() }
-        clock.reset()
+        driver.holdChanged()
+    }
+
+    private func stopObservingActivity() {
+        activityObservers.forEach(NotificationCenter.default.removeObserver)
+        activityObservers = []
     }
 
     private func start() {
-        guard engine == nil, !stopped else { return }
+        guard driver.canStart else { return }
         let logURL = launch.dataDirectory.appendingPathComponent("logs/nekosdk.txt")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? Data().write(to: logURL)
@@ -102,40 +104,25 @@ final class NekoSDKSession: EngineSession {
             }
         }
         guard let started else {
-            startFailureReason = vnneko_start_error().map { String(cString: $0) }
-            let reason = startFailureReason ?? "unknown"
-            nekoSDKLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
-            failedToStart = true
-            finish(byGame: true)
+            let reason = vnneko_start_error().map { String(cString: $0) }
+            nekoSDKLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason ?? "unknown", privacy: .public)")
+            driver.failToStart(reason)
             return
         }
-        engine = started
         nekoSDKLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
-        let box = EngineBox(started)
-        audio = PCMAudioOutput { out, frames in vnneko_audio_render(box.engine, out, Int32(frames)) }
-        audio?.start()
-        if paused { setPaused(true) }
-        frameView.takeFocus()
-        #if canImport(UIKit)
-        let link = CADisplayLink(target: FrameTarget(self), selector: #selector(FrameTarget.step(_:)))
-        #else
-        let link = frameView.displayLink(target: FrameTarget(self), selector: #selector(FrameTarget.step(_:)))
-        #endif
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        driver.run(started, audio: { vnneko_audio_render($0, $1, $2) }) { [weak self] engine, ms, link in
+            self?.step(engine, ms, link)
+        }
+        if driver.paused { setPaused(true) }
     }
 
-    fileprivate func step(_ link: CADisplayLink) {
-        guard let engine else { return }
-        let now = link.timestamp
-        let ms = clock.tick(at: now)
-        guard !paused, !(inactive && vnneko_pauses_when_inactive(engine)) else { return }
+    private func step(_ engine: OpaquePointer, _ ms: Int, _ link: CADisplayLink) {
         #if DEBUG
         let began = CACurrentMediaTime()
         #endif
         syncWindow(engine)
         if !vnneko_step(engine, Int32(min(max(ms, 0), 100))) {
-            finish(byGame: true)
+            driver.finish(byGame: true)
             return
         }
         askForCommentIfWanted(engine)
@@ -146,9 +133,7 @@ final class NekoSDKSession: EngineSession {
             frameView.present(pixels, width: Int(w), height: Int(h))
         }
         #if DEBUG
-        let ended = CACurrentMediaTime()
-        pacing?.note(tick: now, presented: changed, stepEnd: ended, target: link.targetTimestamp - link.timestamp, workTime: ended - began,
-                     progress: "text=\(vnneko_debug_text_count(engine))")
+        driver.pacing?.note(link, presented: changed, began: began, progress: "text=\(vnneko_debug_text_count(engine))")
         #endif
     }
 
@@ -199,27 +184,6 @@ final class NekoSDKSession: EngineSession {
         case .ended, .cancelled: vnneko_mouse_button(engine, button, false)
         case .moved: break
         }
-    }
-
-    private func finish(byGame: Bool) {
-        activityObservers.forEach(NotificationCenter.default.removeObserver)
-        activityObservers = []
-        displayLink?.invalidate()
-        displayLink = nil
-        audio?.stop()
-        audio = nil
-        if let engine {
-            if let problem = vnneko_problem(engine) {
-                nekoSDKLog.error("\(self.launch.game.id.rawValue, privacy: .public) stopped: \(String(cString: problem), privacy: .public)")
-            }
-            vnneko_stop(engine)
-            self.engine = nil
-        }
-        stopped = true
-        let waiters = stopWaiters
-        stopWaiters = []
-        waiters.forEach { $0.resume() }
-        if byGame { launch.onExit() }
     }
 
     // MARK: EngineSession
@@ -310,37 +274,14 @@ final class NekoSDKSession: EngineSession {
     }
 
     func setPaused(_ paused: Bool) {
-        self.paused = paused
-        guard let engine else { return }
-        // Back from the hub's pause, the runtime stays stopped while the app is inactive, if Config asks for that.
-        let stop = paused || (inactive && vnneko_pauses_when_inactive(engine))
-        vnneko_set_paused(engine, stop)
-        if stop { audio?.pause() } else { audio?.resume() }
-        clock.reset()
-        if !paused { frameView.takeFocus() }
+        driver.setPaused(paused)
     }
 
     func terminate() {
-        guard !stopped else { return }
-        if engine == nil { failedToStart = true }
-        finish(byGame: false)
+        driver.terminate()
     }
 
     func waitUntilStopped() async {
-        if stopped { return }
-        await withCheckedContinuation { stopWaiters.append($0) }
+        await driver.waitUntilStopped()
     }
-}
-
-/// The engine pointer, handed to the audio thread. vnneko_audio_render is safe to call there.
-nonisolated private final class EngineBox: @unchecked Sendable {
-    let engine: OpaquePointer
-    init(_ engine: OpaquePointer) { self.engine = engine }
-}
-
-/// A display link keeps its target, so the session sits behind a weak reference to avoid a cycle.
-private final class FrameTarget: NSObject {
-    private weak var session: NekoSDKSession?
-    init(_ session: NekoSDKSession) { self.session = session }
-    @objc func step(_ link: CADisplayLink) { session?.step(link) }
 }

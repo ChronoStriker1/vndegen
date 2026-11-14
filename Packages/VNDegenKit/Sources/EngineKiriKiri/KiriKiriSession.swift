@@ -1,4 +1,5 @@
 import CKiriKiri
+import FrameHost
 import Foundation
 import OSLog
 import QuartzCore
@@ -48,7 +49,10 @@ final class KiriKiriSession: EngineSession {
     private(set) static var inFrame = false
     private var paused = false
     private var router = KiriKiriInputRouter()
-    private var displayLink: CADisplayLink?
+    private let displayLink = DisplayLinkDriver()
+    #if DEBUG
+    private let pacing = FramePacing(tag: "KKFRAMES")
+    #endif
     private var quitTimer: Timer?
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
     /// When each key the game holds went down, and the releases held back for `shortestPress`.
@@ -127,14 +131,12 @@ final class KiriKiriSession: EngineSession {
         if cancelled { return terminate() }
         if paused { engine.setPaused(true) }
         host.takeFocus()
-        let target = FrameTarget(self)
-        #if canImport(UIKit)
-        let link = CADisplayLink(target: target, selector: #selector(FrameTarget.step))
-        #else
-        let link = host.displayLink(target: target, selector: #selector(FrameTarget.step))
-        #endif
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        displayLink.start(in: host) { [weak self] link in
+            self?.step()
+            #if DEBUG
+            self?.pacing?.note(link)
+            #endif
+        }
     }
 
     func step() {
@@ -168,8 +170,7 @@ final class KiriKiriSession: EngineSession {
 
     private func finish() {
         let quitByGame = if case .running = state { true } else { false }
-        displayLink?.invalidate()
-        displayLink = nil
+        displayLink.stop()
         quitTimer?.invalidate()
         quitTimer = nil
         recordMenuBar()
@@ -269,8 +270,7 @@ final class KiriKiriSession: EngineSession {
             state = .quitting(since: .now)
             // The hub takes the view off screen, which would stop a display link tied to it. The timer keeps the
             // session alive until the game has closed.
-            displayLink?.invalidate()
-            displayLink = nil
+            displayLink.stop()
             let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { _ in
                 MainActor.assumeIsolated { self.step() }
             }
@@ -305,55 +305,6 @@ final class KiriKiriSession: EngineSession {
         await withCheckedContinuation { stopWaiters.append($0) }
     }
 }
-
-/// A display link keeps its target, so the session sits behind a weak link to avoid a cycle.
-private final class FrameTarget: NSObject {
-    private weak var session: KiriKiriSession?
-
-    init(_ session: KiriKiriSession) {
-        self.session = session
-    }
-
-    #if DEBUG
-    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing() : nil
-    #endif
-
-    @objc func step(_ link: CADisplayLink) {
-        session?.step()
-        #if DEBUG
-        pacing?.note(tick: link.timestamp, stepEnd: CACurrentMediaTime(), target: link.targetTimestamp - link.timestamp)
-        #endif
-    }
-}
-
-#if DEBUG
-/// With `-frameMonitor YES`, logs the engine's pacing every 10 seconds ("KKFRAMES" in the app log): display link ticks
-/// per second on average and over the slowest 1% of ticks, and the slowest step. The engine runs one frame per tick.
-private final class FramePacing {
-    private var last: CFTimeInterval?
-    private var start: CFTimeInterval = 0
-    private var intervals: [Double] = []
-    private var worstStep = 0.0
-
-    func note(tick: CFTimeInterval, stepEnd: CFTimeInterval, target: CFTimeInterval) {
-        defer { last = tick }
-        guard let last else {
-            start = tick
-            return
-        }
-        intervals.append(tick - last)
-        worstStep = max(worstStep, stepEnd - tick)
-        guard tick - start >= 10 else { return }
-        let slowest = intervals.sorted(by: >).prefix(max(1, intervals.count / 100))
-        let low = Double(slowest.count) / slowest.reduce(0, +)
-        NSLog("KKFRAMES seconds=%.1f average=%.1f low1=%.1f worstStep=%.1fms target=%.1f", tick - start,
-              Double(intervals.count) / (tick - start), low, worstStep * 1000, 1 / target)
-        intervals.removeAll(keepingCapacity: true)
-        worstStep = 0
-        start = tick
-    }
-}
-#endif
 
 /// The files a launch hands the engine. The game's data directory holds the engine's log and stands in for the
 /// Windows AppData and Documents folders.

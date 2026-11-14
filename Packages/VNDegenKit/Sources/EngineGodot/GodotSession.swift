@@ -1,5 +1,6 @@
 import CGodot
 import FontPack
+import FrameHost
 import Foundation
 import OSLog
 import QuartzCore
@@ -38,7 +39,7 @@ final class GodotSession: EngineSession {
     /// The Cheats page's game speed.
     private var speed: Int
     private var router = GodotInputRouter()
-    private var displayLink: CADisplayLink?
+    private let displayLink = DisplayLinkDriver()
     private var quitTimer: Timer?
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -125,14 +126,7 @@ final class GodotSession: EngineSession {
         engine.setSpeed(Int32(speed))
         if paused { engine.setPaused(true) }
         host.takeFocus()
-        let target = FrameTarget(self)
-        #if canImport(UIKit)
-        let link = CADisplayLink(target: target, selector: #selector(FrameTarget.step))
-        #else
-        let link = host.displayLink(target: target, selector: #selector(FrameTarget.step))
-        #endif
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        displayLink.start(in: host) { [weak self] _ in self?.step() }
     }
 
     fileprivate func step() {
@@ -148,8 +142,7 @@ final class GodotSession: EngineSession {
 
     private func finish() {
         let quitByGame = if case .running = state { true } else { false }
-        displayLink?.invalidate()
-        displayLink = nil
+        displayLink.stop()
         quitTimer?.invalidate()
         quitTimer = nil
         engine.stop()
@@ -209,8 +202,7 @@ final class GodotSession: EngineSession {
             engine.requestQuit()
             state = .quitting(since: .now)
             // The hub takes the view off screen, which would stop a display link tied to it.
-            displayLink?.invalidate()
-            displayLink = nil
+            displayLink.stop()
             let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { _ in
                 MainActor.assumeIsolated { self.step() }
             }
@@ -225,17 +217,6 @@ final class GodotSession: EngineSession {
         if case .stopped = state { return }
         await withCheckedContinuation { stopWaiters.append($0) }
     }
-}
-
-/// A display link keeps its target, so the session sits behind a weak link to avoid a cycle.
-private final class FrameTarget: NSObject {
-    private weak var session: GodotSession?
-
-    init(_ session: GodotSession) {
-        self.session = session
-    }
-
-    @objc func step() { session?.step() }
 }
 
 /// The files a launch hands the engine. The game's data directory stands in for the Windows AppData folder, where
