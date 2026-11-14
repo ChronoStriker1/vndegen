@@ -48,17 +48,17 @@ nonisolated public struct ArtemisLayout: Equatable, Sendable {
     /// The shallowest folder with a base archive wins, then the shallowest with an unpacked `system.ini`.
     public init?(_ probe: FolderProbe) {
         // Copies made on a Mac can hold AppleDouble files such as `._root.pfs` beside the real ones.
-        let files = probe.entries.filter { !Self.name($0).hasPrefix("._") }
+        let files = probe.entries.filter { !FolderProbe.name($0).hasPrefix("._") }
         let byDepth = { (a: String, b: String) in (a.split(separator: "/").count, a) < (b.split(separator: "/").count, b) }
         for archive in files.filter({ $0.lowercased().hasSuffix(".pfs") }).sorted(by: byDepth) {
             guard let magic = probe.read(archive, limit: 3), let text = String(data: magic, encoding: .ascii),
                   let version = ArchiveVersion(rawValue: text) else { continue }
-            self.init(root: Self.parent(archive), data: .archive(archive, version: version))
+            self.init(root: FolderProbe.parent(archive), data: .archive(archive, version: version))
             return
         }
-        for ini in files.filter({ Self.name($0).lowercased() == "system.ini" }).sorted(by: byDepth) {
+        for ini in files.filter({ FolderProbe.name($0).lowercased() == "system.ini" }).sorted(by: byDepth) {
             guard let contents = probe.read(ini, limit: 64 << 10), Self.namesBoot(contents) else { continue }
-            self.init(root: Self.parent(ini), data: .folder)
+            self.init(root: FolderProbe.parent(ini), data: .folder)
             return
         }
         return nil
@@ -71,14 +71,5 @@ nonisolated public struct ArtemisLayout: Equatable, Sendable {
             let setting = line.split(separator: "=", maxSplits: 1)
             return setting.count == 2 && setting[0].trimmingCharacters(in: .whitespaces).uppercased() == "BOOT"
         }
-    }
-
-    static func name(_ path: String) -> String {
-        path.split(separator: "/").last.map(String.init) ?? path
-    }
-
-    static func parent(_ path: String) -> String {
-        guard let slash = path.lastIndex(of: "/") else { return "" }
-        return String(path[..<slash])
     }
 }

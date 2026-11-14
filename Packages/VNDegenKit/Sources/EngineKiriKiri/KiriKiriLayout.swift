@@ -52,7 +52,7 @@ nonisolated public struct KiriKiriLayout: Equatable, Sendable {
         }
         var entries = probe.entries
         for folder in probe.entries.sorted() where folder.split(separator: "/").count == 3 {
-            if Self.name(folder).lowercased() == "data" {
+            if FolderProbe.name(folder).lowercased() == "data" {
                 if let script = startup(in: folder) { entries.insert(script) }
                 continue
             }
@@ -71,11 +71,11 @@ nonisolated public struct KiriKiriLayout: Equatable, Sendable {
     /// The shallowest root wins. Within a root, `data.xp3` wins over `data/`, which wins over an embedded archive.
     public init?(_ probe: FolderProbe) {
         // Copies made on a Mac can hold AppleDouble files such as `._data.xp3` beside the real ones.
-        let files = probe.entries.filter { !Self.name($0).hasPrefix("._") }
+        let files = probe.entries.filter { !FolderProbe.name($0).hasPrefix("._") }
         let roots = Set(files.compactMap { entry -> String? in
             let lower = entry.lowercased()
-            if Self.name(lower) == "data.xp3" || lower.hasSuffix(".exe") { return Self.parent(entry) }
-            if lower == "data/startup.tjs" || lower.hasSuffix("/data/startup.tjs") { return Self.parent(Self.parent(entry)) }
+            if FolderProbe.name(lower) == "data.xp3" || lower.hasSuffix(".exe") { return FolderProbe.parent(entry) }
+            if lower == "data/startup.tjs" || lower.hasSuffix("/data/startup.tjs") { return FolderProbe.parent(FolderProbe.parent(entry)) }
             return nil
         })
         let ordered = roots.sorted { ($0.split(separator: "/").count, $0) < ($1.split(separator: "/").count, $1) }
@@ -89,10 +89,10 @@ nonisolated public struct KiriKiriLayout: Equatable, Sendable {
     }
 
     private static func projectData(root: String, files: Set<String>, probe: FolderProbe) -> ProjectData? {
-        let children = files.filter { parent($0) == root }.sorted()
-        if let archive = children.first(where: { name($0).lowercased() == "data.xp3" }) { return .archive(archive) }
+        let children = files.filter { FolderProbe.parent($0) == root }.sorted()
+        if let archive = children.first(where: { FolderProbe.name($0).lowercased() == "data.xp3" }) { return .archive(archive) }
         let startup = (root.isEmpty ? "data/startup.tjs" : "\(root)/data/startup.tjs").lowercased()
-        if let script = files.first(where: { $0.lowercased() == startup }) { return .folder(parent(script)) }
+        if let script = files.first(where: { $0.lowercased() == startup }) { return .folder(FolderProbe.parent(script)) }
 
         let executables = children.filter { $0.lowercased().hasSuffix(".exe") }
         guard !executables.isEmpty,
@@ -107,13 +107,4 @@ nonisolated public struct KiriKiriLayout: Equatable, Sendable {
 
     /// Every XP3 archive starts with these bytes.
     static let xp3Magic = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x67, 0x01])
-
-    private static func name(_ path: String) -> String {
-        path.split(separator: "/").last.map(String.init) ?? path
-    }
-
-    private static func parent(_ path: String) -> String {
-        guard let slash = path.lastIndex(of: "/") else { return "" }
-        return String(path[..<slash])
-    }
 }

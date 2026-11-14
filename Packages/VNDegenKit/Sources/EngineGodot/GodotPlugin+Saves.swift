@@ -13,7 +13,7 @@ extension GodotPlugin {
         let directory = FileCase.resolve(userDirectory, in: Self.appDataDirectory(dataDirectory))
         let local = directory.standardizedFileURL.path + "/"
         return [SaveLocation(directory: directory) { path in
-            if path.hasPrefix(local) { return Self.insideFolder(String(path.dropFirst(local.count))) }
+            if path.hasPrefix(local) { return SaveLocation.insideFolder(String(path.dropFirst(local.count))) }
             return Self.userDataRelativePath(path, userDirectory: userDirectory)
         }]
     }
@@ -29,16 +29,9 @@ extension GodotPlugin {
             let wanted = prefix + user
             guard wanted.count < lower.count else { continue }
             for start in 0...(lower.count - wanted.count - 1) where Array(lower[start..<(start + wanted.count)]) == wanted {
-                return insideFolder(parts[(start + wanted.count)...].joined(separator: "/"))
+                return SaveLocation.insideFolder(parts[(start + wanted.count)...].joined(separator: "/"))
             }
         }
         return nil
-    }
-
-    /// Nil for a path that names no file or could leave its folder, such as `../save.json`. A backup's paths come from
-    /// another machine, and restore writes each file at the path this returns.
-    nonisolated static func insideFolder(_ relative: String) -> String? {
-        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
-        return parts.isEmpty || parts.contains { ["", ".", ".."].contains($0) } ? nil : relative
     }
 }

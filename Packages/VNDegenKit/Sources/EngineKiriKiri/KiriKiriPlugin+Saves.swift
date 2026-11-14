@@ -192,7 +192,7 @@ extension KiriKiriPlugin {
         guard lower.count > wanted.count,
               let start = (0...(lower.count - wanted.count)).last(where: { Array(lower[$0..<($0 + wanted.count)]) == wanted })
         else { return nil }
-        return insideFolder(parts[(start + wanted.count)...].joined(separator: "/"))
+        return SaveLocation.insideFolder(parts[(start + wanted.count)...].joined(separator: "/"))
     }
 
     /// `C:/Users/<user>/AppData/Roaming/<rest>` on Windows and `.../drive_c/users/steamuser/AppData/Roaming/<rest>` in
@@ -211,7 +211,7 @@ extension KiriKiriPlugin {
     /// the paths `ownUserFolderPath` does.
     nonisolated private static func userFolderLocation(_ directory: URL, rule: @escaping @Sendable (String) -> String?) -> SaveLocation {
         SaveLocation(directory: directory) { path in
-            ownUserFolderPath(path, directory: directory).map(insideFolder) ?? rule(path)
+            ownUserFolderPath(path, directory: directory).map(SaveLocation.insideFolder) ?? rule(path)
         }
     }
 
@@ -221,10 +221,7 @@ extension KiriKiriPlugin {
     nonisolated private static func ownUserFolderPath(_ path: String, directory: URL) -> String? {
         let local = directory.standardizedFileURL.path + "/"
         if path.hasPrefix(local) { return String(path.dropFirst(local.count)) }
-        let parts = path.split(separator: "/", omittingEmptySubsequences: false)
-        let root = parts.dropFirst().first == "VNDegen" ? 1 : parts.firstIndex(of: "GameData")
-        guard let root, parts.count > root + 3, parts[root + 2] == directory.lastPathComponent else { return nil }
-        return parts[(root + 3)...].joined(separator: "/")
+        return SaveLocation.portableRelativePath(path, folder: directory.lastPathComponent)
     }
 
     /// The rest of `path` after `users/<user>/` and one of `folders`, compared without case.
@@ -234,15 +231,8 @@ extension KiriKiriPlugin {
         guard let users = lower.firstIndex(of: "users") else { return nil }
         let start = users + 2
         for folder in folders where lower.count > start + folder.count && Array(lower[start..<(start + folder.count)]) == folder {
-            return insideFolder(parts[(start + folder.count)...].joined(separator: "/"))
+            return SaveLocation.insideFolder(parts[(start + folder.count)...].joined(separator: "/"))
         }
         return nil
-    }
-
-    /// Nil for a path that names no file or could leave its folder, such as `../library.json`. A backup's paths come
-    /// from another machine, and restore writes each file at the path this returns.
-    nonisolated private static func insideFolder(_ relative: String) -> String? {
-        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
-        return parts.contains { ["", ".", ".."].contains($0) } ? nil : relative
     }
 }

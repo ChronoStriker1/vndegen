@@ -10,30 +10,13 @@ extension RenPyPlugin {
         let local = saves.standardizedFileURL.path + "/"
         return [SaveLocation(directory: saves) { path in
             let relative = path.hasPrefix(local) ? String(path.dropFirst(local.count))
-                : Self.vndegenSaveRelativePath(path) ?? Self.userSaveRelativePath(path) ?? Self.gameSaveRelativePath(path)
-            return relative.flatMap(Self.insideSaveFolder)
+                : SaveLocation.portableRelativePath(path, folder: "saves") ?? Self.userSaveRelativePath(path) ?? Self.gameSaveRelativePath(path)
+            return relative.flatMap(SaveLocation.insideFolder)
         }]
     }
 
     nonisolated static func savesDirectory(_ dataDirectory: URL) -> URL {
         dataDirectory.appendingPathComponent("saves", isDirectory: true)
-    }
-
-    /// Nil for a path that names no file or could leave the save folder, such as `../library.json`. A backup's paths
-    /// come from another machine, and restore writes each file at the path this returns.
-    nonisolated static func insideSaveFolder(_ relative: String) -> String? {
-        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
-        return parts.contains { ["", ".", ".."].contains($0) } ? nil : relative
-    }
-
-    /// `/VNDegen/<game>/saves/1-1-LT1.save` maps to `1-1-LT1.save`. It is the path a first backup records, the same
-    /// on every device. `.../GameData/<game>/saves/1-1-LT1.save`, the data directory of any VNDegen install, maps the
-    /// same way, which covers backups made before VNDegen recorded the portable path.
-    nonisolated static func vndegenSaveRelativePath(_ path: String) -> String? {
-        let parts = path.split(separator: "/")
-        let root = parts.first == "VNDegen" ? 0 : parts.firstIndex(of: "GameData")
-        guard let root, parts.count - root >= 4, parts[root + 2] == "saves" else { return nil }
-        return parts[(root + 3)...].joined(separator: "/")
     }
 
     /// `C:/Users/x/AppData/Roaming/RenPy/Game-1505403882/1-1-LT1.save` (Windows), `~/Library/RenPy/...` (macOS) and

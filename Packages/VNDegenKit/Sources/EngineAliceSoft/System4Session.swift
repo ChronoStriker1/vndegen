@@ -53,17 +53,12 @@ final class System4Session: EngineSession {
             // `C:/Games/Game/SaveData/00.asd` maps to `00.asd`: every file under the save folder.
             let parts = path.split(separator: "/").map(String.init)
             guard let at = parts.lastIndex(where: { $0.lowercased() == key }), at + 1 < parts.count else { return nil }
-            return insideFolder(parts[(at + 1)...].joined(separator: "/"))
+            return SaveLocation.insideFolder(parts[(at + 1)...].joined(separator: "/"))
         }]
     }
 
     nonisolated private static let windowsJapanese = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(
         CFStringEncoding(CFStringEncodings.dosJapanese.rawValue)))
-
-    nonisolated private static func insideFolder(_ relative: String) -> String? {
-        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
-        return parts.isEmpty || parts.contains { ["", ".", ".."].contains($0) } ? nil : relative
-    }
 
     /// The ini's SaveFolder, or SaveData.
     nonisolated static func saveFolderName(_ root: URL) -> String {

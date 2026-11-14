@@ -52,6 +52,15 @@ public struct FolderProbe: Sendable {
         return (values?[.size] as? NSNumber)?.int64Value
     }
 
+    public static func name(_ path: String) -> String {
+        path.split(separator: "/").last.map(String.init) ?? path
+    }
+
+    public static func parent(_ path: String) -> String {
+        guard let slash = path.lastIndex(of: "/") else { return "" }
+        return String(path[..<slash])
+    }
+
     /// Reads up to `limit` bytes of a file in the folder.
     public func read(_ path: String, limit: Int = 1 << 20) -> Data? {
         let actual = entries.first { $0.lowercased() == path.lowercased() } ?? path

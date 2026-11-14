@@ -22,15 +22,15 @@ nonisolated public struct GodotLayout: Equatable, Sendable {
     /// executable beside it wins over one that isn't.
     public init?(_ probe: FolderProbe) {
         // Copies made on a Mac can hold AppleDouble files such as `._game.pck` beside the real ones.
-        let files = probe.entries.filter { !Self.name($0).hasPrefix("._") }
+        let files = probe.entries.filter { !FolderProbe.name($0).hasPrefix("._") }
         guard let found = Self.find(probe, files: files) else { return nil }
         self = found
-        let root = Self.parent(executable).lowercased()
+        let root = FolderProbe.parent(executable).lowercased()
         usesDotNet = files.contains { path in
             let lower = path.lowercased()
-            guard ["godotsharp.dll", "godotsharp", "mono"].contains(Self.name(lower)) else { return false }
-            let data = Self.parent(lower)
-            return Self.name(data).hasPrefix("data_") && Self.parent(data) == root
+            guard ["godotsharp.dll", "godotsharp", "mono"].contains(FolderProbe.name(lower)) else { return false }
+            let data = FolderProbe.parent(lower)
+            return FolderProbe.name(data).hasPrefix("data_") && FolderProbe.parent(data) == root
         }
     }
 
@@ -40,12 +40,12 @@ nonisolated public struct GodotLayout: Equatable, Sendable {
         let depth = { (path: String) in path.split(separator: "/").count }
 
         for pck in packs.sorted(by: { (depth($0), $0) < (depth($1), $1) }) {
-            let folder = Self.parent(pck)
-            let base = Self.name(pck).dropLast(4).lowercased()
-            let siblings = executables.filter { Self.parent($0) == folder }.sorted()
-            let executable = siblings.first { Self.name($0).dropLast(4).lowercased() == base }
+            let folder = FolderProbe.parent(pck)
+            let base = FolderProbe.name(pck).dropLast(4).lowercased()
+            let siblings = executables.filter { FolderProbe.parent($0) == folder }.sorted()
+            let executable = siblings.first { FolderProbe.name($0).dropLast(4).lowercased() == base }
                 ?? siblings.first { !$0.lowercased().contains("loader") && !$0.lowercased().contains("console") }
-                ?? (folder.isEmpty ? "" : "\(folder)/") + Self.name(pck).dropLast(4) + ".exe"
+                ?? (folder.isEmpty ? "" : "\(folder)/") + FolderProbe.name(pck).dropLast(4) + ".exe"
             guard let header = GodotPack(contentsOf: probe.root.appendingPathComponent(pck),
                                          executable: probe.root.appendingPathComponent(executable)) else { continue }
             return GodotLayout(pack: pck, executable: executable, header: header)
@@ -63,14 +63,5 @@ nonisolated public struct GodotLayout: Equatable, Sendable {
         self.pack = pack
         self.executable = executable
         self.header = header
-    }
-
-    static func name(_ path: String) -> String {
-        path.split(separator: "/").last.map(String.init) ?? path
-    }
-
-    static func parent(_ path: String) -> String {
-        guard let slash = path.lastIndex(of: "/") else { return "" }
-        return String(path[..<slash])
     }
 }

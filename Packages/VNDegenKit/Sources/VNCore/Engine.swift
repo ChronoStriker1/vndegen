@@ -184,6 +184,18 @@ public struct SaveLocation: Sendable {
         self.directory = directory
         self.relativePath = relativePath
     }
+
+    public static func insideFolder(_ relative: String) -> String? {
+        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
+        return parts.contains { ["", ".", ".."].contains($0) } ? nil : relative
+    }
+
+    public static func portableRelativePath(_ path: String, folder: String) -> String? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+        let root = parts.dropFirst().first == "VNDegen" ? 1 : parts.firstIndex(of: "GameData")
+        guard let root, parts.count > root + 3, parts[root + 2] == folder else { return nil }
+        return parts[(root + 3)...].joined(separator: "/")
+    }
 }
 
 /// Registry values a game keeps on Windows, such as a Unity game's PlayerPrefs.

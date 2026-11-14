@@ -68,7 +68,7 @@ nonisolated public struct GodotPlugin: EnginePlugin {
         }
         var requirements = GodotRequirements()
         var libraries: [String] = []
-        for library in pack.nativeLibraries.map(GodotLayout.name) {
+        for library in pack.nativeLibraries.map(FolderProbe.name) {
             switch library.lowercased() {
             case "godotsteam.gdextension": requirements.steam = true
             case "eosg.gdextension": requirements.epicOnlineServices = true
