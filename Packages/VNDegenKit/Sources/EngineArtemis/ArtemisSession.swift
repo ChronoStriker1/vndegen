@@ -36,8 +36,7 @@ final class ArtemisSession: EngineSession {
     private var stage = CGSize(width: 1280, height: 720)
     private var router = ArtemisInputRouter()
     private let displayLink = DisplayLinkDriver()
-    private var lastFrame: CFTimeInterval?
-    private var carry = 0.0
+    private var clock = MillisecondClock()
     private var paused = false
     private var stopped = false
     /// The last pointer position, in stage pixels, where a click lands.
@@ -151,11 +150,7 @@ final class ArtemisSession: EngineSession {
     private func step(_ link: CADisplayLink) {
         guard let runtime, !paused else { return }
         let now = link.timestamp
-        let elapsed = lastFrame.map { min((now - $0) * 1000, 100) } ?? 16
-        lastFrame = now
-        let total = elapsed + carry
-        let delta = UInt32(total)
-        carry = total - Double(delta)
+        let delta = UInt32(min(clock.tick(at: now), 100))
         // New movie frames reach the core before it draws.
         let ended = movies.advance(Double(delta), runtime: runtime, at: now)
         _ = core.api.runtime_advance_and_present!(runtime, delta)
@@ -390,7 +385,7 @@ final class ArtemisSession: EngineSession {
         // The hub's menu takes the keyboard, so the game would never see those keys come up.
         if paused { router.releaseAll().forEach(deliver) }
         audio.setPaused(paused)
-        lastFrame = nil
+        clock.reset()
         movies.paused()
         if let runtime { core.api.runtime_notify_lifecycle!(runtime, paused ? 1 : 2) }
         // The dialog leaves the screen while the hub's menu is up, since its text field would keep the keyboard and take
