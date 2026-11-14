@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.7",
+          "buildVersion": "2503",
+          "date": "2026-11-14T20:37:18Z",
+          "localizedDescription": "Wolf RPG Editor fixes for iPhone and iPad, a few new keys on the Mac, and shared code behind every native engine.\n\n## Downloads\n\n- `VNDegen-0.41.7-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.7.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\nWolf RPG Editor:\n- Milky Quest's witch shows her face again over the first map, instead of a square of map tiles. A picture shown again keeps the opacity and other settings the game asks to keep (#179).\n- On iPhone and iPad, a tap picks from a game's title menu and choices and moves its messages along, even in games that don't turn on mouse input. The PC ignores a click there; touch has no other way in, so VNDegen differs on purpose (#178).\n\nKeys on the Mac:\n- RPG Maker XP, VX and VX Ace games read the keypad's / * - + . = keys.\n- NScripter, Wolf RPG Editor and System 4 text entry accepts the keypad's operator keys.\n- Godot games see the keypad's Clear key as Num Lock.\n\nOther:\n- Ren'Py ignores save-backup paths that are badly formed. VNDegen and Ludusavi never write them.\n- The native engines now share one frame driver, frame-timing log, key table and save-path code (#121). Games should behave as before.\n\n## What wasn't tested\n\n- No physical device or real keyboard was used: key presses and taps went through VNDegen's test hooks. The new keypad keys are covered by tests, not tried in a running game.\n- One game per engine was started, paused, resumed and quit in the Mac app. Wolf RPG and RPG Maker held 60 frames a second on their title screens and Milky Quest's first map; RPG Maker's village and battle scenes weren't measured.\n- Wolf RPG taps were checked on an iPad simulator, not on an iPhone or with an iPad trackpad. Milky Quest wasn't compared with the PC, because its game won't start under Wine here.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.7/VNDegen-0.41.7.ipa",
+          "size": 126376499,
+          "sha256": "ba9beba4ddab495fb3ad0754d64b24989e422b0c927abb7b3846c54fcae01e54",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.6",
           "buildVersion": "2489",
           "date": "2026-11-14T07:33:14Z",
