@@ -103,7 +103,11 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
-- Audit, partly fixed and still open: #109, #121, #164, #166 and #169.
+- Audit, partly fixed and still open: #109, #164, #166 and #169.
+- Wolf RPG on iOS: a tap on the title menu does nothing; touches only reopen the text keyboard (#178).
+- Wolf RPG on iPad: in MilkyQuest a square of map tiles covers the bust picture over the first map (#179).
+- Mac: `-autolaunch` on a library made at the previous launch stays on the library (#180).
+- `scripts/sim.sh` creates simulators on iOS 27.0 while 27.1 is installed (#181).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
