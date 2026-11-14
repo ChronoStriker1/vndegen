@@ -35,6 +35,9 @@ if [ -z "$harness" ] && [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp
   exit 0
 fi
 
+mkdir -p "$cache"
+exec 9>"$vcpkg.lock"
+lockf 9
 if [ ! -x "$vcpkg/vcpkg" ]; then
   rm -rf "$vcpkg.part"
   git clone --quiet https://github.com/microsoft/vcpkg "$vcpkg.part"
@@ -42,6 +45,7 @@ if [ ! -x "$vcpkg/vcpkg" ]; then
   rm -rf "$vcpkg" && mv "$vcpkg.part" "$vcpkg"
 fi
 git -C "$vcpkg" cat-file -e "$baseline^{commit}" 2>/dev/null || git -C "$vcpkg" fetch --quiet origin
+exec 9>&-
 
 work="$dest/.build"
 configure_and_build() { # <name> <triplet> <targets> [cmake args...]

@@ -53,13 +53,18 @@ trap 'rm -rf "$lock"' EXIT
 
 # fetch <repo> <commit> <folder>: a clean checkout of one commit, kept in the cache.
 fetch() {
-  [ -f "$3/.vndegen-commit" ] && [ "$(cat "$3/.vndegen-commit")" = "$2" ] && return
-  rm -rf "$3.part" && mkdir -p "$3.part"
-  git -C "$3.part" init --quiet
-  git -C "$3.part" fetch --quiet --depth 1 "$1" "$2"
-  git -C "$3.part" checkout --quiet FETCH_HEAD
-  echo "$2" > "$3.part/.vndegen-commit"
-  rm -rf "$3" && mv "$3.part" "$3"
+  mkdir -p "$(dirname "$3")"
+  exec 8>"$3.lock"
+  lockf 8
+  if ! { [ -f "$3/.vndegen-commit" ] && [ "$(cat "$3/.vndegen-commit")" = "$2" ]; }; then
+    rm -rf "$3.part" && mkdir -p "$3.part"
+    git -C "$3.part" init --quiet
+    git -C "$3.part" fetch --quiet --depth 1 "$1" "$2"
+    git -C "$3.part" checkout --quiet FETCH_HEAD
+    echo "$2" > "$3.part/.vndegen-commit"
+    rm -rf "$3" && mv "$3.part" "$3"
+  fi
+  exec 8>&-
 }
 
 # SCons runs from a venv that every build folder shares, and builds run SCons without a lock. So a venv, once made, is
