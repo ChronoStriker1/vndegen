@@ -1040,7 +1040,9 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     if (exec == 3) return;  // reset delays: the runtime runs every picture command at once, so none wait
 
     bool show = exec == 0;
-    if (!show && !pictures_.count(number)) return;  // moving a picture that isn't shown does nothing
+    auto existing = pictures_.find(number);
+    if (!show && existing == pictures_.end()) return;  // moving a picture that isn't shown does nothing
+    bool shown = existing != pictures_.end() && !existing->second.erasing;
     Picture &p = pictures_[number];
     double oldX = p.x.value(), oldY = p.y.value();
     // A field of -1,000,000 leaves the picture's current value as it is.
@@ -1111,10 +1113,18 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
             fresh.imageH = size[1];
         }
         fresh.anchor = anchor >> 4;
-        fresh.opacity.set(0, 0);
-        fresh.zoomX.set(100, 0);
-        fresh.zoomY.set(100, 0);
-        for (Tween *tw : {&fresh.r, &fresh.g, &fresh.b}) tw->set(100, 0);
+        if (shown) {
+            fresh.blend = p.blend;
+            fresh.pattern = p.pattern;
+            for (auto [to, from] : {std::pair{&fresh.opacity, &p.opacity}, {&fresh.zoomX, &p.zoomX}, {&fresh.zoomY, &p.zoomY},
+                                    {&fresh.angle, &p.angle}, {&fresh.r, &p.r}, {&fresh.g, &p.g}, {&fresh.b, &p.b}})
+                to->set(from->to, 0);
+        } else {
+            fresh.opacity.set(0, 0);
+            fresh.zoomX.set(100, 0);
+            fresh.zoomY.set(100, 0);
+            for (Tween *tw : {&fresh.r, &fresh.g, &fresh.b}) tw->set(100, 0);
+        }
         p = fresh;
         p.x.set(field(7, 0) + (relative ? oldX : 0), 0);
         p.y.set(field(8, 0) + (relative ? oldY : 0), 0);

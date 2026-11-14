@@ -193,7 +193,9 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 - Pictures numbered 100,000 and above draw below the message window, not above it. Only Test Game 02's debug tool
   uses such numbers.
 - Game.dat's picture behaviour setting (Ver1 or Ver2) isn't read: showing a picture that is already shown starts it
-  afresh, and `\space` counts whole pixels in every game.
+  afresh, and `\space` counts whole pixels in every game. Its opacity, zoom, angle, colour, pattern and blend mode
+  stay as they were where the command says to keep them: Milky Quest changes the witch's expression by showing her face
+  picture again with its opacity kept, and up to 0.41.6 the face vanished and the map showed through her bust (#179).
 - System variable 115, the engine version the standard systems read, is set to 2.24 for Shift-JIS games and 3.28 for
   UTF-8 ones, since no Game.dat field is known to hold the real one.
 - The picture flash effect tints a picture toward its colour and leaves it there instead of returning to normal.
