@@ -186,7 +186,11 @@ struct VNDegenApp: App {
                 await hub.refreshLibrary()
                 // `-autolaunch "<folder name>"` starts a game directly, for testing.
                 if let name = UserDefaults.standard.string(forKey: "autolaunch") {
-                    hub.launch(GameID(name))
+                    let id = GameID(name)
+                    if hub.library.game(id) == nil {
+                        NSLog("AUTOLAUNCH no game has the ID %@", name)
+                    }
+                    hub.launch(id)
                 }
                 #if DEBUG
                 await DebugHooks.playInput(hub)
