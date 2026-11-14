@@ -103,9 +103,6 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
-- System 4: a Rance 02 resume save made at Camp won't load in a new process ("the resume save is damaged") (#175).
-- KiriKiri: a game's script-held Layer, Bitmap and Window objects are not destroyed when the engine stops, about 14 MB per game (#176).
-- KiriKiri: `getMainPixel` after `fillRect` reads red and blue swapped and alpha 0, not yet investigated (#177).
 - Audit, partly fixed and still open: #109, #121, #164, #166 and #169.
 
 ## In progress
