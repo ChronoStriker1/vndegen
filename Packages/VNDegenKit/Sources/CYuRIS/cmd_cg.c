@@ -100,8 +100,8 @@ static int cg(YCall *c) {
     if (yc_has(c, "TID")) changed |= set_if_new(&l->tid, yc_str(c, "TID"));
     if (yc_has(c, "MID")) changed |= set_if_new(&l->mid, yc_str(c, "MID"));
     double lint = (double)l->lint, lint2 = (double)l->lint2;
-    if (num(c, "LINT", lint, &lint)) l->lint = (i64)lint;
-    if (num(c, "LINT2", lint2, &lint2)) l->lint2 = (i64)lint2;
+    if (num(c, "LINT", lint, &lint)) l->lint = yr_flt_to_int(lint);
+    if (num(c, "LINT2", lint2, &lint2)) l->lint2 = yr_flt_to_int(lint2);
     if (yc_has(c, "F")) l->f = yc_int_or(c, "F", 0) != 0;
     bool fset = false;
     fset |= dnum(c, "FX", &l->fx);

@@ -177,6 +177,12 @@ public:
         }
     }
 
+    static void Reset()
+    {
+        delete TVPTempBitmapHolder;
+        TVPTempBitmapHolder = NULL;
+    }
+
     static const tTVPBaseTexture* Get() { return TVPTempBitmapHolder->Bitmap; }
 
     static tTVPBaseTexture* GetTemp(tjs_uint w, tjs_uint h, bool fit = false)
@@ -221,6 +227,11 @@ void TVPTempBitmapHolderAddRef()
 void TVPTempBitmapHolderRelease()
 {
     tTVPTempBitmapHolder::Release();
+}
+//---------------------------------------------------------------------------
+void TVPTempBitmapHolderReset()
+{
+    tTVPTempBitmapHolder::Reset();
 }
 //---------------------------------------------------------------------------
 

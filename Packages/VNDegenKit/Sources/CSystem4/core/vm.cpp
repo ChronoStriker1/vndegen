@@ -54,6 +54,11 @@ std::vector<void (*)()> &HllState::resets() {
     return r;
 }
 
+std::vector<void (*)()> &HllState::finishes() {
+    static std::vector<void (*)()> f;
+    return f;
+}
+
 std::unordered_map<std::string, HllImpl> &HllRegistry::table() {
     static std::unordered_map<std::string, HllImpl> t;
     return t;

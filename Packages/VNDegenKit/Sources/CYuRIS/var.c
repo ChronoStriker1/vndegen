@@ -21,10 +21,14 @@ YVal yv_copy(const YVal *v) {
     return c;
 }
 
+i64 yr_flt_to_int(double f) {
+    return f >= -0x1p63 && f < 0x1p63 ? (i64)f : INT64_MIN;
+}
+
 i64 yv_as_int(const YVal *v) {
     switch (v->t) {
     case YT_INT: return v->i;
-    case YT_FLT: return (i64)v->f;
+    case YT_FLT: return yr_flt_to_int(v->f);
     case YT_STR: return v->s ? strtoll(v->s, NULL, 0) : 0;
     default: return 0;
     }
