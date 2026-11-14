@@ -1,3 +1,4 @@
+import FrameHost
 import QuartzCore
 import VNCore
 #if canImport(UIKit)
@@ -189,25 +190,10 @@ final class ArtemisHostView: NSView {
         onEvent?(.pointer(PointerEvent(phase: phase, location: location, button: button)))
     }
 
-    private static func virtualKey(_ keyCode: UInt16) -> Int32? {
-        usages[keyCode].flatMap { VirtualKey.forUsage(Int($0)) }
+    static func virtualKey(_ keyCode: UInt16) -> Int32? {
+        MacKeyCodes.hidUsage(keyCode).flatMap(VirtualKey.forUsage)
     }
 
-    /// USB HID usages for macOS virtual key codes (`kVK_*` in Carbon's Events.h), as KiriKiri's view maps them.
-    private static let usages: [UInt16: Int32] = [
-        0x00: 4, 0x0B: 5, 0x08: 6, 0x02: 7, 0x0E: 8, 0x03: 9, 0x05: 10, 0x04: 11, 0x22: 12, 0x26: 13, 0x28: 14,
-        0x25: 15, 0x2E: 16, 0x2D: 17, 0x1F: 18, 0x23: 19, 0x0C: 20, 0x0F: 21, 0x01: 22, 0x11: 23, 0x20: 24, 0x09: 25,
-        0x0D: 26, 0x07: 27, 0x10: 28, 0x06: 29, // A to Z
-        0x12: 30, 0x13: 31, 0x14: 32, 0x15: 33, 0x17: 34, 0x16: 35, 0x1A: 36, 0x1C: 37, 0x19: 38, 0x1D: 39, // 1 to 0
-        0x24: 40, 0x35: 41, 0x33: 42, 0x30: 43, 0x31: 44, // Return, Escape, Delete, Tab, Space
-        0x7A: 58, 0x78: 59, 0x63: 60, 0x76: 61, 0x60: 62, 0x61: 63, 0x62: 64, 0x64: 65, 0x65: 66, 0x6D: 67, 0x67: 68,
-        0x6F: 69, // F1 to F12
-        0x72: 73, 0x73: 74, 0x74: 75, 0x75: 76, 0x77: 77, 0x79: 78, // Help as Insert, Home, Page Up, forward delete, End, Page Down
-        0x7C: 79, 0x7B: 80, 0x7D: 81, 0x7E: 82, // arrows
-        0x4B: 84, 0x43: 85, 0x4E: 86, 0x45: 87, 0x4C: 88, 0x53: 89, 0x54: 90, 0x55: 91, 0x56: 92, 0x57: 93,
-        0x58: 94, 0x59: 95, 0x5B: 96, 0x5C: 97, 0x52: 98, 0x41: 99, // keypad
-        0x3B: 224, 0x38: 225, 0x3A: 226, 0x3E: 228, 0x3C: 229, 0x3D: 230, // Control, Shift, Option, left then right
-    ]
 }
 #endif
 

@@ -189,7 +189,7 @@ let package = Package(
         // RenPyCompat is built for the tests, which run it as a command.
         .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput", "RenPyCompat", "TestSupport"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
-        .testTarget(name: "EngineKiriKiriTests", dependencies: ["EngineKiriKiri", "GameInput", "HubUI", "TestSupport"], exclude: ["Fixtures"]),
+        .testTarget(name: "EngineKiriKiriTests", dependencies: ["EngineKiriKiri", "FrameHost", "GameInput", "HubUI", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "MetadataTests", dependencies: ["Metadata", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput", "TestSupport"]),
         .testTarget(name: "ControllerUITests", dependencies: ["ControllerUI", "VNCore"]),
@@ -200,8 +200,8 @@ let package = Package(
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport", "RuntimePackages", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages", "TestSupport"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS", "TestSupport"]),
-        .testTarget(name: "EngineArtemisTests", dependencies: ["EngineArtemis", "TestSupport"]),
-        .testTarget(name: "EngineGodotTests", dependencies: ["EngineGodot", "TestSupport"]),
+        .testTarget(name: "EngineArtemisTests", dependencies: ["EngineArtemis", "FrameHost", "TestSupport"]),
+        .testTarget(name: "EngineGodotTests", dependencies: ["EngineGodot", "FrameHost", "TestSupport"]),
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG", "TestSupport"]),
         .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),

@@ -1,4 +1,5 @@
 import Foundation
+import FrameHost
 import TestSupport
 import Testing
 import VNCore
@@ -185,3 +186,11 @@ import VNCore
         #expect(ArtemisSession.browserURL(nil) == nil)
     }
 }
+
+#if os(macOS)
+@MainActor @Test func mapsMacKeyCodesAsTheOtherEnginesDo() {
+    for keyCode in UInt16(0)...0x7F {
+        #expect(ArtemisHostView.virtualKey(keyCode) == MacKeyCodes.hidUsage(keyCode).flatMap(VirtualKey.forUsage))
+    }
+}
+#endif

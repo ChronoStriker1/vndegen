@@ -1,4 +1,5 @@
 import Foundation
+import FrameHost
 import TestSupport
 import Testing
 import GameInput
@@ -458,13 +459,14 @@ private func realPath(_ path: String) throws -> String {
 
 #if os(macOS)
 @MainActor @Test func mapsMacKeyCodesToScancodes() {
-    let table = KiriKiriHostView.scancodes
-    #expect(table[0x00] == 4) // A
-    #expect(table[0x24] == SDLScancode.return)
-    #expect(table[0x35] == SDLScancode.escape)
-    #expect(table[0x3B] == SDLScancode.leftControl)
-    #expect(table[0x7E] == SDLScancode.up)
-    #expect(Set(table.values).count == table.count)
+    #expect(KiriKiriHostView.scancode(0x00) == 4) // A
+    #expect(KiriKiriHostView.scancode(0x24) == SDLScancode.return)
+    #expect(KiriKiriHostView.scancode(0x35) == SDLScancode.escape)
+    #expect(KiriKiriHostView.scancode(0x3B) == SDLScancode.leftControl)
+    #expect(KiriKiriHostView.scancode(0x7E) == SDLScancode.up)
+    for keyCode in UInt16(0)...0x7F {
+        #expect(KiriKiriHostView.scancode(keyCode) == MacKeyCodes.hidUsage(keyCode).map(Int32.init))
+    }
 }
 #endif
 

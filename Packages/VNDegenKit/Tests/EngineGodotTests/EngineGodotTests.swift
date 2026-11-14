@@ -1,6 +1,7 @@
 import CommonCrypto
 import CryptoKit
 import Foundation
+import FrameHost
 import TestSupport
 import Testing
 import VNCore
@@ -700,3 +701,11 @@ private func key(_ code: Int) -> ControlAction { .key(KeyboardKey(windowsKeyCode
         #expect(try suggestion(scripts: ["player.gdc": Data("GDSC".utf8) + Data([100, 0, 0, 0, 9, 0, 0, 0, 0x28, 0xB5, 0x2F, 0xFD])]) == nil)
     }
 }
+
+#if os(macOS)
+@Test func mapsMacKeyCodesAsTheOtherEnginesDoExceptTheBacktick() {
+    for keyCode in UInt16(0)...0x7F {
+        #expect(GodotHostView.usage(keyCode) == (keyCode == 0x32 ? nil : MacKeyCodes.hidUsage(keyCode)))
+    }
+}
+#endif

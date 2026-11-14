@@ -284,19 +284,19 @@ public final class FrameView: FrameHostBaseView {
     }
 
     override public func keyDown(with event: NSEvent) {
-        guard let usage = Self.hidUsages[event.keyCode] else { return }
+        guard let usage = MacKeyCodes.hidUsage(event.keyCode) else { return }
         onKey?(usage, true, event.modifierFlags.contains(.command) ? nil : event.characters)
     }
 
     override public func keyUp(with event: NSEvent) {
-        guard let usage = Self.hidUsages[event.keyCode] else { return }
+        guard let usage = MacKeyCodes.hidUsage(event.keyCode) else { return }
         onKey?(usage, false, nil)
     }
 
     private var heldModifiers: Set<UInt16> = []
 
     override public func flagsChanged(with event: NSEvent) {
-        guard let usage = Self.hidUsages[event.keyCode], usage != 57 else { return }  // not Caps Lock
+        guard let usage = MacKeyCodes.hidUsage(event.keyCode), usage != 57 else { return }  // not Caps Lock
         let pressed = heldModifiers.insert(event.keyCode).inserted
         if !pressed { heldModifiers.remove(event.keyCode) }
         onKey?(usage, pressed, nil)
@@ -306,24 +306,5 @@ public final class FrameView: FrameHostBaseView {
         let point = convert(event.locationInWindow, from: nil)
         onPointer?(PointerEvent(phase: phase, location: framePoint(point), button: button))
     }
-
-    /// USB HID usages for macOS virtual key codes (`kVK_*` in Carbon's Events.h).
-    nonisolated static let hidUsages: [UInt16: Int] = [
-        0x00: 4, 0x0B: 5, 0x08: 6, 0x02: 7, 0x0E: 8, 0x03: 9, 0x05: 10, 0x04: 11, 0x22: 12, 0x26: 13, 0x28: 14,
-        0x25: 15, 0x2E: 16, 0x2D: 17, 0x1F: 18, 0x23: 19, 0x0C: 20, 0x0F: 21, 0x01: 22, 0x11: 23, 0x20: 24, 0x09: 25,
-        0x0D: 26, 0x07: 27, 0x10: 28, 0x06: 29, // A to Z
-        0x12: 30, 0x13: 31, 0x14: 32, 0x15: 33, 0x17: 34, 0x16: 35, 0x1A: 36, 0x1C: 37, 0x19: 38, 0x1D: 39, // 1 to 0
-        0x24: 40, 0x35: 41, 0x33: 42, 0x30: 43, 0x31: 44, // Return, Escape, Delete, Tab, Space
-        0x1B: 45, 0x18: 46, 0x21: 47, 0x1E: 48, 0x2A: 49, 0x29: 51, 0x27: 52, 0x32: 53, 0x2B: 54, 0x2F: 55, 0x2C: 56,
-        0x0A: 100,
-        0x39: 57, // Caps Lock
-        0x7A: 58, 0x78: 59, 0x63: 60, 0x76: 61, 0x60: 62, 0x61: 63, 0x62: 64, 0x64: 65, 0x65: 66, 0x6D: 67, 0x67: 68,
-        0x6F: 69, // F1 to F12
-        0x72: 73, 0x73: 74, 0x74: 75, 0x75: 76, 0x77: 77, 0x79: 78, // Insert (Help), Home, Page Up, Delete, End, Page Down
-        0x7C: 79, 0x7B: 80, 0x7D: 81, 0x7E: 82, // arrows
-        0x53: 89, 0x54: 90, 0x55: 91, 0x56: 92, 0x57: 93, 0x58: 94, 0x59: 95, 0x5B: 96, 0x5C: 97, // keypad 1 to 9
-        0x52: 98, 0x4C: 88, // keypad 0 and Enter
-        0x3B: 224, 0x38: 225, 0x3A: 226, 0x37: 227, 0x3E: 228, 0x3C: 229, 0x3D: 230, 0x36: 231, // modifiers
-    ]
     #endif
 }
