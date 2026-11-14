@@ -73,6 +73,11 @@ port. This file lists where each part of the runtime came from, and what was unc
     a function-stack name, used only in error reporting; 232, which only Test Game 56 uses, pushes a local string
     onto a global array, like 226 (onto a local array) and 233 (onto a member), and its one use adds a name to a
     list when it isn't there yet.
+- 121 A_REF copies the array whose slot is on the stack and pushes the copy. Every use in Test Game 19 follows the
+  `SH_LOCALREF` of an array local and feeds an array parameter, the same shape as SR_REF2 before a struct parameter,
+  and the callee owns and releases its arguments. Until 2026-11-13 it was taken to do nothing, so a callee freed its
+  caller's array and the slot was reused while the caller still held it; Test Game 19's resume saves then held an
+  array of structs with a string in it and wouldn't load (#175).
 - Evenicle's code, the first to use them, settled more. ANDA, ORA and the string comparisons S_LT, S_GT, S_LTE and
   S_GTE take no arguments, as XORA and S_NOTE do, and so do 120 CHECKUDO, 241, 243 and 247: with those counts every
   function of its 14,595 decodes and every jump lands. CHECKUDO always follows the REF of a `<dummy>` local that holds

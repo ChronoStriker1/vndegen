@@ -858,7 +858,7 @@ void VM::run(size_t untilFrames) {
             push(done);
             break;
         }
-        case OP_A_REF: break;
+        case OP_A_REF: push(copyPage(pop())); break;
         case OP_A_PUSHBACK: {
             int32_t v = pop(), i = pop(), pg = pop();
             arrayAt(pg, i)->v.push_back(v);
