@@ -5,6 +5,7 @@
 //   wolfplay <game folder> --every 20:confirm --hold 500-560:left   (press every 20 frames, until frame U with 20:confirm:U; hold a key)
 //   wolfplay <game folder> --map 3,10,7 --frames 2 --shot 1:map.png   (map id, hero x, y; skips the title)
 //   wolfplay <game folder> --mouse 200:640,480 --click 210:640,480   (move the pointer, or move and left click)
+//   wolfplay <game folder> --tap 210:640,480   (a left click from a touch, as the iOS session sends it)
 //   wolfplay <game folder> --type 300:Ann --key 310:128   (types text into a text entry, then presses Enter)
 //   wolfplay <game folder> --draw 1000-2000   (draws every frame in that range and reports the time per frame)
 //   wolfplay <game folder> --pics 200   (lists the pictures shown at that frame)
@@ -47,7 +48,7 @@ int main(int argc, char **argv) {
     std::multimap<int, uint32_t> presses;
     std::vector<std::tuple<int, uint32_t, int>> repeats;  // press a key every N frames, until a frame
     std::vector<std::tuple<int, int, uint32_t>> holds;  // hold a key from one frame to another
-    struct MouseAt { int x, y; uint32_t button; };
+    struct MouseAt { int x, y; uint32_t button; bool touch = false; };
     std::multimap<int, MouseAt> mouse;
     std::multimap<int, int> wheels, keyCodes;
     std::set<int> picLists;
@@ -75,10 +76,11 @@ int main(int argc, char **argv) {
             }
             repeats.emplace_back(std::max(1, std::atoi(val.c_str())), keyNamed(key), until);
         }
-        else if ((opt == "--mouse" || opt == "--click" || opt == "--rclick") && colon != std::string::npos) {
+        else if ((opt == "--mouse" || opt == "--click" || opt == "--rclick" || opt == "--tap") && colon != std::string::npos) {
             int x = 0, y = 0;
             std::sscanf(val.c_str() + colon + 1, "%d,%d", &x, &y);
-            mouse.emplace(std::atoi(val.c_str()), MouseAt{x, y, opt == "--click" ? MouseLeft : opt == "--rclick" ? MouseRight : 0u});
+            uint32_t button = opt == "--click" || opt == "--tap" ? MouseLeft : opt == "--rclick" ? MouseRight : 0u;
+            mouse.emplace(std::atoi(val.c_str()), MouseAt{x, y, button, opt == "--tap"});
         }
         else if (opt == "--type" && colon != std::string::npos) typed.emplace(std::atoi(val.c_str()), val.substr(colon + 1));
         else if (opt == "--draw") std::sscanf(val.c_str(), "%d-%d", &drawFrom, &drawTo);
@@ -123,6 +125,7 @@ int main(int argc, char **argv) {
                 mouseY = it->second.y;
                 in.mouseHeld |= it->second.button;
                 in.mousePressed |= it->second.button;
+                in.touched |= it->second.touch;
             }
             in.mouseX = mouseX;
             in.mouseY = mouseY;

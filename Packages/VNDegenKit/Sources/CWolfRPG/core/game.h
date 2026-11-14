@@ -50,6 +50,7 @@ struct Input {
     KeyCodes keysHeld, keysPressed;
     int mouseX = 0, mouseY = 0;  // in the game's pixels
     uint32_t mouseHeld = 0, mousePressed = 0;
+    bool touched = false;
     int wheel = 0;  // notches this frame, positive away from the player
 };
 

@@ -107,6 +107,13 @@ the view: a pointer, a touch under the Touch and Touch mouse control methods, or
 scrolling turns its wheel. A game reads it through key input, the variable command's "other" values, system variables 71
 and 72, and whether it is over a picture. System variable 73 lets it work messages and choices.
 
+On iPhone and iPad, a tap on the game works the engine's own choices and messages even when a game leaves system
+variable 73 off, which the PC doesn't do: there a click on such a game's choice does nothing, and the player uses the
+keyboard. A touch screen has no keyboard, and without this a player under the Mouse control method, or under Automatic
+with a controller connected, couldn't pick from Milky Quest's title menu (#178). The game still gets the click as
+before, a click from a Mac's mouse or a controller's pointer works as on the PC, and a game that turns the mouse off
+with command 126 turns this off too.
+
 VNDegen suggests a layout from the keys a game's events check one at a time. `vnwolf_key_checks` reads `CommonEvent.dat` and every map the system database lists, from loose files or `.wolf` archives, and returns each key input on one literal key with the name of its common event (empty for a map event). Under Xbox gamepad, Wolf's router gives LT, View, L3, R3, and the right stick nothing to do, so the keys go on View, LT, L3, and R3, and the right stick stays alone. Keys a button already sends are skipped (Z, X, Shift, Control, and the arrows), and so are function keys, right Control, and keys in events named for debugging or cheats. A key whose event's name is exactly one of a few standard names (`バックログ表示`, `【並】バックログ表示`, `ログ表示`, `メッセージ簡易ログ`, `メッセージウィンドウ消去`, `戦闘高速化`, `メッセージスキップ`, `【並】メッセージスキップ`, `文章スキップ`) gets that label and goes first. The rest follow in the files' order and show only the key. Six of the ten games read get one.
 
 When a game waits for typed text, the hub opens its keyboard on a touch device, and a hardware keyboard types directly.

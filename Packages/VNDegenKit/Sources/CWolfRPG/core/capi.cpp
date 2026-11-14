@@ -30,6 +30,7 @@ struct VNWolfEngine {
     KeyCodes codesPressed;        // the same by Wolf key code
     float mouseX = 0, mouseY = 0;  // normalized over the frame
     uint32_t mouseHeld = 0, mousePressed = 0;
+    bool touched = false;
     int wheel = 0;
     std::string status, problem;
 };
@@ -145,10 +146,12 @@ static bool step(VNWolfEngine *e, int ms) {
         in.mouseY = std::clamp(int(e->mouseY * e->game->screenHeight()), 0, e->game->screenHeight() - 1);
         in.mouseHeld = e->mouseHeld | e->mousePressed;
         in.mousePressed = e->mousePressed;
+        in.touched = e->touched;
         in.wheel = e->wheel;
         e->pressed = 0;
         e->codesPressed.reset();
         e->mousePressed = 0;
+        e->touched = false;
         e->wheel = 0;
         e->game->update(in);
         if (e->game->quitRequested()) return false;
@@ -226,6 +229,12 @@ void vnwolf_mouse_wheel(VNWolfEngine *e, int notches) {
     if (e) e->wheel += notches;
 }
 
+void vnwolf_touch_button(VNWolfEngine *e, bool down) {
+    if (!e) return;
+    if (down && !(e->mouseHeld & 1u)) e->touched = true;
+    vnwolf_mouse_button(e, 0, down);
+}
+
 void vnwolf_set_paused(VNWolfEngine *e, bool paused) {
     if (!e) return;
     e->paused = paused;
@@ -233,6 +242,7 @@ void vnwolf_set_paused(VNWolfEngine *e, bool paused) {
     e->pressed = 0;
     e->codesPressed.reset();
     e->mouseHeld = e->mousePressed = 0;
+    e->touched = false;
     e->wheel = 0;
     e->pace = {};
     if (Audio *a = e->game->audio()) {

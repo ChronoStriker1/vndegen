@@ -70,6 +70,7 @@ bool vnwolf_wants_text(VNWolfEngine *e);
 void vnwolf_mouse_move(VNWolfEngine *e, float x, float y);
 void vnwolf_mouse_button(VNWolfEngine *e, int button, bool down);
 void vnwolf_mouse_wheel(VNWolfEngine *e, int notches);
+void vnwolf_touch_button(VNWolfEngine *e, bool down);
 
 // Stops the clock and sound. vnwolf_step does nothing while paused.
 void vnwolf_set_paused(VNWolfEngine *e, bool paused);

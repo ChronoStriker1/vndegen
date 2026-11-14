@@ -661,7 +661,7 @@ void Game::update(const Input &input) {
     }
 
     // System variable 73 lets a click work the game's messages and choices.
-    bool mouseText = system_.size() > 73 && system_[73] == 1;
+    bool mouseText = (system_.size() > 73 && system_[73] == 1) || (input_.touched && (input_.mousePressed & MouseLeft));
     // Choices take the keys while they are open.
     if (choice_.active && !choice_.visible.empty()) {
         int n = int(choice_.visible.size());

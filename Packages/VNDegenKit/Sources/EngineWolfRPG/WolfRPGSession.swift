@@ -46,7 +46,7 @@ final class WolfRPGSession: EngineSession {
         frameView.onPointer = { [weak self] event in
             guard let self else { return }
             if event.phase == .began { reopenKeyboardIfTyping() }
-            deliver(router.pointer(event, at: event.location))
+            deliver(router.pointer(event, at: event.location), touch: Platform.current == .iOS)
         }
         frameView.onScroll = { [weak self] notches in
             guard let self else { return }
@@ -127,11 +127,12 @@ final class WolfRPGSession: EngineSession {
         NotificationCenter.default.post(name: .gameWantsKeyboard, object: self, userInfo: ["wants": true])
     }
 
-    private func deliver(_ inputs: [WolfRPGInput]) {
+    private func deliver(_ inputs: [WolfRPGInput], touch: Bool = false) {
         guard let engine else { return }
         for input in inputs {
             switch input {
             case let .key(code, down): vnwolf_key(engine, code, down)
+            case let .mouseButton(0, down) where touch: vnwolf_touch_button(engine, down)
             case let .mouseButton(button, down): vnwolf_mouse_button(engine, button, down)
             case let .mouseMove(point): vnwolf_mouse_move(engine, Float(point.x), Float(point.y))
             case let .wheel(notches): vnwolf_mouse_wheel(engine, Int32(notches))
