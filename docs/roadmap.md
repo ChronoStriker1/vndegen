@@ -103,8 +103,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
-- Audit, partly fixed and still open: #109, #164, #166 and #169.
-- Mac: `-autolaunch` with a name that isn't a game's ID stays on the library without a message (#182).
+- Audit, partly fixed and still open: #164, #166 and #169.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
