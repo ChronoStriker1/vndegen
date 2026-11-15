@@ -35,7 +35,7 @@ The port adds the rest of the configure line: `--enable-pic --disable-doc --enab
 
 With FFmpeg and the player, the iOS device framework grew from 11.0 MB to 16.7 MB.
 
-The NekoSDK runtime uses this FFmpeg too, through `vnffmovie`, which the framework exports, so the app has one copy of it. FFmpeg is linked statically. LGPL 2.1 allows that when the recipient can relink the program against a modified library, which VNDegen's public source permits. The app must show FFmpeg's LGPL notice alongside the krkrsdl3 license.
+FFmpeg is a framework of its own, `FFmpeg.framework`, so a changed FFmpeg can replace it, as the LGPL asks ([docs/relinking.md](../../docs/relinking.md)). `CMakeLists.txt` links vcpkg's static FFmpeg libraries whole into it, exports their public interface (`vndegen/ffmpeg.exports`: every `av*`, `sws*` and `swr*` symbol), and links KiriKiri.framework against it. `scripts/kirikiri-engine.sh` makes `FFmpeg.xcframework` beside `KiriKiri.xcframework`, and the app embeds both. The test executables, `KiriKiriHelper` among them, still link FFmpeg statically. The NekoSDK runtime uses this FFmpeg too, through `vnffmovie`, which KiriKiri.framework exports, so the app has one copy of it. The app must show FFmpeg's LGPL notice alongside the krkrsdl3 license.
 
 ## Left out
 

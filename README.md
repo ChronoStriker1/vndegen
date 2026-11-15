@@ -171,4 +171,4 @@ A controller's Home button, the touch gamepad's house button, the small menu but
 
 ## License
 
-VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL. Settings, Licenses lists the license of every third-party component in the app, and where to get the source. This is not legal advice.
+VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL. Settings, Licenses lists the license of every third-party component in the app, and where to get the source. The LGPL libraries are in frameworks of their own, and [docs/relinking.md](docs/relinking.md) says how to replace one; each release attaches their exact source. This is not legal advice.

@@ -39,7 +39,7 @@ The Swift package links vnvideo through the `CVNVideo` target. `scripts/build.sh
 
 ## vnffmovie: WMV through the app's FFmpeg
 
-NekoSDK games' movies are WMV in ASF, which neither vnvideo nor Apple's frameworks decode. `Engines/Shared/vnffmovie.[h,cpp]` decodes them with FFmpeg, the LGPL copy the app already ships for KiriKiri, whose build includes the ASF demuxer and the WMV and WMA decoders (`Engines/KiriKiri/UPSTREAM.md`). It's compiled into the KiriKiri framework and exported from it, so the app links FFmpeg once and the NekoSDK runtime never links it at all. The KiriKiri engine doesn't call it, and its own movie player is unchanged.
+NekoSDK games' movies are WMV in ASF, which neither vnvideo nor Apple's frameworks decode. `Engines/Shared/vnffmovie.[h,cpp]` decodes them with FFmpeg, the LGPL copy the app already ships for KiriKiri, whose build includes the ASF demuxer and the WMV and WMA decoders (`Engines/KiriKiri/UPSTREAM.md`). FFmpeg is `FFmpeg.framework`, which a changed FFmpeg can replace ([relinking.md](relinking.md)). vnffmovie is compiled into the KiriKiri framework, which links FFmpeg.framework, and exported from it, so the app has FFmpeg once and the NekoSDK runtime never links it at all. The KiriKiri engine doesn't call it, and its own movie player is unchanged.
 
 Its interface is five C functions, with no part of KiriKiri in them: `vnffmovie_open` takes a read callback, as `vnvideo_open` does, and gives the picture's size and frame rate, the duration, and the sound's rate and channels; `vnffmovie_frame` gives the frame due at the host's clock as RGBA, whether it changed, and whether the movie has ended; `vnffmovie_audio` hands out the sound as interleaved floats, safe on an audio thread; `vnffmovie_seek` decodes again from a time; `vnffmovie_close` stops the decode thread. A looping movie starts over at its end with its clock running on.
 
@@ -50,5 +50,3 @@ In a NekoSDK game, the runtime stops reading a movie's sound while the story's c
 The NekoSDK runtime finds the five functions with `dlsym` (`vnneko_find_movies`), as the app finds the KiriKiri engine's own, and EngineNekoSDK hands them to the runtime at start. When the framework or a function is missing, the app logs it, each movie is logged and left out, and the game goes on. The Linux test host builds the same file against the system's FFmpeg, and `vnffmovie_test <movie>` plays a movie against the wall clock, taking its sound as an audio device would, and prints what came out.
 
 Known limit: after a seek, ASF sound stored ahead of the keyframe the seek lands on is lost, so a little sound after the seek point is missing.
-
-When the LGPL libraries move into replaceable frameworks (the roadmap's App Store item), vnffmovie goes with FFmpeg, and the runtimes that use it are unaffected.

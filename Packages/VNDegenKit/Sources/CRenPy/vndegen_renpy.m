@@ -7,13 +7,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// From Ren'Py's static libraries, which the app target links. librenpy registers Ren'Py's compiled modules with Python.
 extern void init_librenpy(void);
 extern int Py_IsInitialized(void);
 extern void Py_InitializeEx(int install_signal_handlers);
 extern int PyRun_SimpleString(const char *code);
 extern void SDL_SetMainReady(void);
-extern void SDL_iPhoneSetEventPump(int enabled);
+extern void vndegen_SDL_iPhoneSetEventPump(int enabled);
 extern void SDL_OnApplicationWillResignActive(void);
 extern void SDL_OnApplicationDidEnterBackground(void);
 extern void SDL_OnApplicationWillEnterForeground(void);
@@ -86,9 +85,9 @@ int vndegen_renpy_run(const char *home, const char *code) {
         Py_InitializeEx(0);
     }
     // SDL runs the main run loop each time Ren'Py reads events, which keeps UIKit and the hub responsive.
-    SDL_iPhoneSetEventPump(1);
+    vndegen_SDL_iPhoneSetEventPump(1);
     int status = PyRun_SimpleString(code);
-    SDL_iPhoneSetEventPump(0);
+    vndegen_SDL_iPhoneSetEventPump(0);
     return status;
 }
 
