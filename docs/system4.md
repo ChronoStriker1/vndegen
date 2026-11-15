@@ -66,8 +66,10 @@ The Linux test host in `Engines/System4/host` builds the runtime with CMake and 
 - `s4play`, which runs a game headless from a script of frame-numbered clicks, keys and screenshots;
 - `s4dis`, a disassembler (`--func`, `--op`, `--lib` for a library's signatures, `--struct`);
 - `s4cg` (pictures), `s4save` (save dumps and round trips), `s4movie`, `s4fnl`, `s4drawtest` (DrawGraph formulas)
-  `s4vsfiletest` (VSFile keeps old slot details when a write fails, and writes on game end) and `s4vmtest`
-  (instructions run on synthetic code: an array passed by value stays the caller's).
+  `s4vsfiletest` (VSFile keeps old slot details when a write fails, and writes on game end), `s4vmtest`
+  (instructions run on synthetic code: an array passed by value stays the caller's), `s4charspritetest`
+  (CharSprite gives out the lowest free handle and saves only up to the highest live one, and a PC save's handles
+  load where they were) and `s4passtest` (PassRegister writes its file only when a value is added or removed).
 
 Environment variables turn on logs:
 - `S4_TRACE`: every call with its arguments.

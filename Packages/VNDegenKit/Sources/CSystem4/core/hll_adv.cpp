@@ -375,7 +375,6 @@ struct CharSpr {
     CharProps props;
 };
 std::map<int, CharSpr> g_chars;
-int g_nextCharHandle = 1;
 
 CharProps propsFrom(Page *p) {
     CharProps cp;
@@ -390,7 +389,11 @@ CharProps propsFrom(Page *p) {
 }
 
 S4_HLL(StoatSpriteEngine, CharSpriteManager_CreateHandle) {
-    int h = g_nextCharHandle++;
+    int h = 1;
+    for (const auto &[k, cs] : g_chars) {
+        if (k > h) break;
+        if (k == h) h++;
+    }
     g_chars[h].sprite = g_nextInternal++;
     c.retInt(h);
 }
@@ -419,17 +422,14 @@ void drawChar(CharSpr &cs) {
     s.x = x; s.y = y; s.z = z; s.show = show;
     s.blendRate = cs.alpha;
 }
-// The saved form, as the PC writes it: "CSM", version 0, the number of handles ever made, then for each handle 0
-// when it is free, or 1, the character, the CASCharSpriteProperty struct's fields (type, size, colour RGBA, bold and
-// edge weights as float bits, edge colour RGBA), x, y, z, alpha rate, shown, and the engine's sprite number. The PC
-// numbered those sprites 2000 plus the handle.
 constexpr int kCharSpriteBase = 2000;
 S4_HLL(StoatSpriteEngine, CharSpriteManager_Save) {
     std::vector<int32_t> out;
     serial::putTag(out, "CSM");
     out.push_back(0);
-    out.push_back(g_nextCharHandle);
-    for (int h = 0; h < g_nextCharHandle; h++) {
+    int count = g_chars.empty() ? 1 : g_chars.rbegin()->first + 1;
+    out.push_back(count);
+    for (int h = 0; h < count; h++) {
         auto it = g_chars.find(h);
         if (it == g_chars.end()) { out.push_back(0); continue; }
         const CharSpr &cs = it->second;
@@ -488,7 +488,6 @@ S4_HLL(StoatSpriteEngine, CharSpriteManager_Load) {
         drawChar(cs);
         s.show = v[16] != 0;
     }
-    g_nextCharHandle = std::max(n, 1);
     c.retBool(true);
 }
 S4_HLL(StoatSpriteEngine, CharSprite_Release) {
@@ -776,7 +775,6 @@ S4_HLL_RESET {
     g_multiOrder.clear();
     g_messageFrameShown = true;
     g_chars.clear();
-    g_nextCharHandle = 1;
     g_log.clear();
     g_logEnabled = true;
     g_scenes = {};

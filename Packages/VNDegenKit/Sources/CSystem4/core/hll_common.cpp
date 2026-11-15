@@ -205,11 +205,19 @@ S4_HLL(PassRegister, SetFileName) {
     }
     c.retBool(true);
 }
-S4_HLL(PassRegister, RegistNumber) { auto &p = g_pass[c.i(0)]; p.numbers.insert(c.i(1)); passWrite(p); c.retBool(true); }
-S4_HLL(PassRegister, RegistText) { auto &p = g_pass[c.i(0)]; p.texts.insert(c.s(1)); passWrite(p); c.retBool(true); }
-S4_HLL(PassRegister, UnregistNumber) { auto &p = g_pass[c.i(0)]; p.numbers.erase(c.i(1)); passWrite(p); c.retBool(true); }
-S4_HLL(PassRegister, UnregistText) { auto &p = g_pass[c.i(0)]; p.texts.erase(c.s(1)); passWrite(p); c.retBool(true); }
-S4_HLL(PassRegister, UnregistAll) { auto &p = g_pass[c.i(0)]; p.numbers.clear(); p.texts.clear(); passWrite(p); c.retBool(true); }
+S4_HLL(PassRegister, RegistNumber) { auto &p = g_pass[c.i(0)]; if (p.numbers.insert(c.i(1)).second) passWrite(p); c.retBool(true); }
+S4_HLL(PassRegister, RegistText) { auto &p = g_pass[c.i(0)]; if (p.texts.insert(c.s(1)).second) passWrite(p); c.retBool(true); }
+S4_HLL(PassRegister, UnregistNumber) { auto &p = g_pass[c.i(0)]; if (p.numbers.erase(c.i(1))) passWrite(p); c.retBool(true); }
+S4_HLL(PassRegister, UnregistText) { auto &p = g_pass[c.i(0)]; if (p.texts.erase(c.s(1))) passWrite(p); c.retBool(true); }
+S4_HLL(PassRegister, UnregistAll) {
+    auto &p = g_pass[c.i(0)];
+    if (!p.numbers.empty() || !p.texts.empty()) {
+        p.numbers.clear();
+        p.texts.clear();
+        passWrite(p);
+    }
+    c.retBool(true);
+}
 S4_HLL(PassRegister, ExistNumber) { c.retBool(g_pass[c.i(0)].numbers.count(c.i(1)) > 0); }
 S4_HLL(PassRegister, ExistText) { c.retBool(g_pass[c.i(0)].texts.count(c.s(1)) > 0); }
 

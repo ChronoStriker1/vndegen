@@ -195,6 +195,14 @@ its saves. Their layouts were read from the arrays in the PC save:
 - Values (`serial.cpp`): an int or bool is itself, a string its bytes one per element and a NUL, a struct its members
   in order, an array its length and elements. The backlog ("ADL"), the back scenes ("ADS") and the character sprites
   ("CSM") are built from these, each after a tag and a version 0.
+- The character sprites ("CSM") are a slot count, then for each slot 0 when it is free, or 1, the character, the
+  CASCharSpriteProperty struct's fields (type, size, colour RGBA, bold and edge weights as float bits, edge colour
+  RGBA), x, y, z, alpha rate, shown, and the engine's sprite number, which VNDegen writes as 2000 plus the handle and
+  ignores on load (the PC wrote 2000 and 2001 for handles 33 and 34). Test Game 19 makes a handle for each character of its menu, backlog and message text, about 700 a
+  minute, and releases them again. Its PC copy under Wine (2026-11-14) gives out low free handles again: after 8 menu
+  round trips its save still had 620 slots, with only handles 33 and 34 live, and after loading a VNDegen save of 35
+  slots it saved 118. So the PC's count is the size its handle table has grown to, not every handle ever made.
+  VNDegen gives out the lowest free handle, from 1, and saves up to its highest live one; saves move both ways.
 - MultiSprite ("MST") is a byte stream copied into the ints four bytes at a time. The kind and order of its fields
   came from the routine that writes it (see Sources); the values were checked against the PC save.
 
