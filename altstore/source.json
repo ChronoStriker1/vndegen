@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.8",
+          "buildVersion": "2516",
+          "date": "2026-11-15T02:45:29Z",
+          "localizedDescription": "NekoSDK games match their PC versions more closely: movies, sound levels, flashes and choices.\n\n## Downloads\n\n- `VNDegen-0.41.8-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.8.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\nNekoSDK:\n- Sound effects, music and voices play as loud as on the PC, at every volume setting. Quiet effects were too loud before, and sounds placed left or right are now as far apart as on the PC.\n- Flashes fade in, hold and fade out as on the PC. Flashes the PC doesn't show no longer show.\n- In games that keep their story in script files, the message window is empty while a choice waits, as on the PC.\n- One animated game plays its camera-angle versions of a scene's movies unless manual animation control is on in Config, as its PC does. A save made during one of those movies loads with the movie on the PC too.\n- One game's movies are no longer drawn 10% too large.\n\nOther:\n- Two Mac builds started at the same time no longer break each other's downloads (#109). This only matters when building VNDegen yourself.\n- Mac, debug builds only: `-autolaunch` with a name that matches no game logs the name it couldn't find (#182).\n\n## What wasn't tested\n\n- No physical device was used. Each NekoSDK fix was compared with the PC game running under Wine on Linux, where the PC game has no frame cap, so flash and animation times were compared as ratios.\n- The NekoSDK fixes were looked at in the Mac app. No iPhone or iPad simulator was used, since nothing changed layout or input.\n- Choices were checked in three games that keep their story in script files, not in every such game.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.8/VNDegen-0.41.8.ipa",
+          "size": 126383547,
+          "sha256": "f4c44565106100f33a8d25bde14ff6ac9edbc84a495449a7cd238d72e3e8e632",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.7",
           "buildVersion": "2503",
           "date": "2026-11-14T20:37:18Z",
