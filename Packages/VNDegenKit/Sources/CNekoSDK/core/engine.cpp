@@ -4853,8 +4853,10 @@ void Engine::runScene(const Node &n) {
         stopChannel(kKindVoice, p[0], p[1]);
         break;
     case 50:  // flash: a colour over the screen that fades out
-        if (!setting("effect")) break;
-        flashMs_ = std::max(1, p[0]);
+        if (!setting("effect") || !p[10]) break;
+        flashInMs_ = std::max(0, p[5]);
+        flashHoldMs_ = std::max(0, p[0]);
+        flashMs_ = std::max(1, flashInMs_ + flashHoldMs_ + std::max(0, p[7]));
         flashR_ = p[1];
         flashG_ = p[2];
         flashB_ = p[3];
@@ -7139,8 +7141,11 @@ void Engine::compose() {
 
     if (flashMs_) {
         int elapsed = int(now_ - flashStart_);
+        int outMs = flashMs_ - flashInMs_ - flashHoldMs_, fading = elapsed - flashInMs_ - flashHoldMs_;
         if (elapsed >= flashMs_) flashMs_ = 0;
-        else tintFrame(canvas_, flashR_, flashG_, flashB_, 256 - elapsed * 256 / flashMs_);
+        else if (elapsed < flashInMs_) tintFrame(canvas_, flashR_, flashG_, flashB_, elapsed * 256 / flashInMs_);
+        else if (fading < 0) tintFrame(canvas_, flashR_, flashG_, flashB_, 256);
+        else tintFrame(canvas_, flashR_, flashG_, flashB_, 256 - fading * 256 / std::max(1, outMs));
     }
 
     for (size_t i = 0; i < bars_.size(); i++)

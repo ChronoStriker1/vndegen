@@ -28,8 +28,13 @@ import TestSupport
         let sound = "se\\t.wav"
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("FirstFlow\tflow\\t.txt\n".utf8),
-            "se/t.wav": steadyWave(seconds: 2),
+            "se.pak": NekoSDKFlowFixture.archive([("t.wav", steadyWave(seconds: 2))]),
             "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
                 .init(op: 0, next: 2),
                 .init(op: 35, next: 3, p: [1: 100, 2: 50, 4: 1], s: [1: sound]),
                 .init(op: 2, next: 4, p: [0: 500]),
@@ -45,8 +50,8 @@ import TestSupport
         for _ in 0..<5 { _ = vnneko_step(e, 16) }
         let source: Float = 0.5, group = pow(Float(0.8), 1.661), half = pow(Float(0.5), 1.661)
         let panned = levels(e)
-        #expect(abs(panned.left - source * group) < 0.005, "\(panned)")
-        #expect(abs(panned.right - source * group * half) < 0.005, "\(panned)")
+        #expect(abs(panned.left - source * group * half) < 0.005, "\(panned)")
+        #expect(abs(panned.right - source * group) < 0.005, "\(panned)")
         for _ in 0..<40 { _ = vnneko_step(e, 16) }
         let quiet = levels(e)
         #expect(abs(quiet.left - source * group * half) < 0.005, "\(quiet)")

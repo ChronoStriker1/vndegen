@@ -417,7 +417,15 @@ Measured under Wine on 2026-11-14 on Test Game 89's PC, with a scene script of V
 - `pos:` is pan, from -100 (left) to 100 (right), by the same law on the far side: the near side stays whole and the far one is (1 - |pos|/100)^1.661 of it. At 10, 20, 30, 40, 50, 60, 80 and 90 either way the far side was 1.5, 3.2, 5.2, 7.4, 10.0, 13.3, 23.3 and 33.3 dB down, and silent at 100. A street ambience of Test Game 89's own at `pos:-50` was 10.0 dB louder on the left in the PC's ordinary play. The runtime applied pan straight (6 dB at 50); it now uses the law for both, and `NekoSDKSoundLevelTests` checks its mix against it; its recording of the same script, under the title's music, put the far side 3.3, 7.0, 13.1 and 22 dB down at 20, 40, 60 and 80.
 - Command 39 moves a sound's pan over its parameter 2 in milliseconds: -100 to 100 over 3000 went from left to right over 3 seconds, as the runtime does.
 - `loop:0` repeats until the sound is stopped (a 0.3 second blip ran 4.5 seconds, to its stop), and `loop:2` plays twice, as the runtime has it.
-- A wait of VNDegen's own, command 2 with `[ウエイト]` and `time:` in its text as the editor writes them, ran far short in that script on the PC, so the beat came from clicks; why wasn't looked into. How a fade (`tm:`) moves along the law wasn't measured.
+- A wait of VNDegen's own ran far short in that script on the PC, so the beat came from clicks: under Xvfb the PC runs uncapped and counts waits in frames (below). How a fade (`tm:`) moves along the law wasn't measured.
+
+## Flashes and named animations' lengths
+
+Measured under Wine on 2026-11-14 with the same kind of scene script of VNDegen's own on Test Game 89's PC, recorded at 30 frames a second, and on Test Game 92's PC with its own flash. Under Xvfb the PC draws with no frame cap, about 400 frames a second, so everything it counts in frames ran fast, and only ratios were read:
+
+- Named animations (command 19) count their lengths in the same unit as a timed change's parameter 25, frames at the game's `FPS`: a move of 400 pixels over 60 took the same 0.15 seconds by command 25 and by command 19, and over 240 the same 0.63 seconds by either, four times as long. The runtime already counts frames.
+- A flash (command 50) fades in over parameter 5, holds its colour at full for parameter 0, then fades out over parameter 7, each in milliseconds, straight lines; with parameter 7 at 0 it ends at once, and with 5 at 0 it starts at full. Held 1000 and faded out over 3000, the PC's red stood for 6 frames and then fell evenly over 17. Parameters 4 and 6, which the games set to 1 beside 5 and 7, made no difference, nor did 8 and 9 (4 and 800 in Test Game 97's one flash). Parameter 10 at 0 shows no flash at all, on Test Game 89's PC and on Test Game 92's for its own flash in `ep_000_006_100` (200, faded in and out over 150, parameter 10 at 0), while 1, 100, 500, 999, 1000, 2500, 5000 and 10000 all showed the colour at full. The runtime had faded every flash out over parameter 0 alone and shown those with 10 at 0; it now does as the PC does, so Test Game 92's four flashes with 10 at 0 aren't shown, and Test Game 89's red flashes of 100 held and 200 faded in last 500 ms rather than 100.
+- Command 2 waits and the flash's milliseconds ran about 4.4 times fast under Xvfb, the same rate as the frame counts, so the PC counts them in frames at its `FPS` too; at 60 frames a second that is the milliseconds the runtime uses.
 
 ## Test Game 92's animation switches
 
@@ -707,9 +715,7 @@ Test Game 92's movies come with its `sys_5` patch, the animation edition: only t
 ## Readings not yet checked
 
 - Parameter 20 of opcode 18 is a blur that parameter 21 turns on: the PC game draws sharp with 20 alone. The radius is a fit to one frame's sharpness.
-- The flash's parameters 4 to 10, and motion blur's strength.
-- Named animations (opcode 19): their lengths are taken as frames, because a save holds a timed change written in the same
-  text form. A recording that reached them was too coarse to confirm it.
+- Motion blur's strength.
 - What a load's parameter 0 means. A load keeps the slot's position and scale.
 
 ## Games with their story in the exe

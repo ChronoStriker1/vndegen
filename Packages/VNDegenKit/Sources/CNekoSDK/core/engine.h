@@ -906,7 +906,7 @@ private:
     // A shake that goes on until it's stopped: the amplitudes in pixels and periods in ms each way.
     bool shakeSustained_ = false;
     float shakeAmpX_ = 0, shakeAmpY_ = 0, shakePeriodX_ = 1, shakePeriodY_ = 1;
-    int flashMs_ = 0, flashR_ = 0, flashG_ = 0, flashB_ = 0;
+    int flashMs_ = 0, flashInMs_ = 0, flashHoldMs_ = 0, flashR_ = 0, flashG_ = 0, flashB_ = 0;
     // The film noise as drawn: the crop of its frame for one step of its random places, kept until the step changes.
     void drawNoise(Canvas &out, const Sprite &s);
     ImageRef noiseCrop_;
