@@ -101,6 +101,21 @@ targets:
           for binary in "${binaries[@]}"; do
             codesign --verify --strict "$binary" || { echo "error: $binary is missing or not signed" >&2; exit 1; }
           done
+      - name: Thin MetalANGLE
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          [ "$PLATFORM_NAME" != macosx ] || exit 0
+          framework="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/MetalANGLE.framework"
+          binary="$framework/MetalANGLE"
+          if ! lipo -info "$binary" | grep -q '^Non-fat'; then
+            lipo "$binary" -thin arm64 -output "$binary"
+          fi
+          /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion $IPHONEOS_DEPLOYMENT_TARGET" "$framework/Info.plist"
+          codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$framework"
+          codesign --verify --strict "$framework" || { echo "error: $framework is not signed" >&2; exit 1; }
+          [ "$(lipo -archs "$binary")" = arm64 ] || { echo "error: $binary is not arm64 only" >&2; exit 1; }
       # Godot games run on the Godot frameworks, which scripts/godot-engine.sh builds into build/godot and does nothing
       # when they are up to date. They are arm64 only, and EngineGodot opens the one a game needs at run time, so they
       # are copied in rather than linked.

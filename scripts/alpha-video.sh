@@ -12,30 +12,15 @@ if [ "$platform" = bundle ]; then
   mkdir -p build/alpha/{universal-mac,universal-sim}
   lipo -create build/alpha/{mac,mac-x86}/vpx/libvpx.a -output build/alpha/universal-mac/libvpx.a
   lipo -create build/alpha/{ios-sim,sim-x86}/vpx/libvpx.a -output build/alpha/universal-sim/libvpx.a
-  for pair in mac:universal-mac sim:universal-sim ios:ios/vpx; do
-    framework="$root/build/alpha/frameworks/${pair%:*}/VPX.framework"
-    python3 -c 'import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)' "$framework"
-    contents="$framework"
-    info="$framework/Info.plist"
-    if [ "${pair%:*}" = mac ]; then
-      contents="$framework/Versions/A"
-      info="$contents/Resources/Info.plist"
-      mkdir -p "$contents/Resources"
-      ln -s A "$framework/Versions/Current"
-      for entry in VPX Headers Modules Resources; do ln -s "Versions/Current/$entry" "$framework/$entry"; done
-    fi
-    mkdir -p "$contents/Headers/vpx" "$contents/Modules"
-    cp "build/alpha/${pair#*:}/libvpx.a" "$contents/VPX"
-    cp Engines/Shared/third_party/libvpx/vpx/*.h "$contents/Headers/vpx/"
-    printf '#include "vpx/vpx_decoder.h"\n#include "vpx/vp8dx.h"\n' > "$contents/Headers/VPX.h"
-    echo 'framework module VPX { umbrella header "VPX.h" export * }' > "$contents/Modules/module.modulemap"
-    python3 -c 'import plistlib,sys; plistlib.dump(dict(CFBundleExecutable="VPX", CFBundleIdentifier="org.webm.vpx", CFBundlePackageType="FMWK", CFBundleVersion="1.15.2"), open(sys.argv[1], "wb"))' "$info"
-  done
+  headers="$root/build/alpha/headers"
+  python3 -c 'import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)' "$headers"
+  mkdir -p "$headers/vpx"
+  cp Engines/Shared/third_party/libvpx/vpx/*.h "$headers/vpx/"
   python3 -c 'import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)' "$product"
   xcodebuild -create-xcframework -output "$product" \
-    -framework "$root/build/alpha/frameworks/ios/VPX.framework" \
-    -framework "$root/build/alpha/frameworks/sim/VPX.framework" \
-    -framework "$root/build/alpha/frameworks/mac/VPX.framework" >/dev/null
+    -library "$root/build/alpha/ios/vpx/libvpx.a" -headers "$headers" \
+    -library "$root/build/alpha/universal-sim/libvpx.a" -headers "$headers" \
+    -library "$root/build/alpha/universal-mac/libvpx.a" -headers "$headers" >/dev/null
   echo "$stamp" > "$product/.stamp"
   exit 0
 fi
