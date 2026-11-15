@@ -84,6 +84,7 @@ struct Sprite {
     // A movie playing as the picture, and the story time it started at.
     std::shared_ptr<Movie> movie;
     int64_t movieFrom = 0;
+    bool movieLoops = false;
     int64_t flipBegun = 0;
     bool flipLoop = false, flipReverse = false;
     // Command 121's parameters 15 and 16, which saves keep for the PC.
@@ -227,6 +228,8 @@ private:
     const Screen *staffRollLayers_ = nullptr;
     int64_t staffRollFrom_ = 0;
     std::shared_ptr<Movie> openMovie(const std::string &path, bool loop);
+    std::string cameraMovie(const std::string &path) const;
+    void swapCameraMovies();
     void stepMovies();
     void stopMovieSound();
     VNNekoMovies movies_{};

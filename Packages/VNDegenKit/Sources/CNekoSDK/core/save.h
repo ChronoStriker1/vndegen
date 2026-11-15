@@ -43,6 +43,7 @@ struct SavedSprite {
     int flipRepeat = -1, flipReverse = 0, flipStep = 0, flipParam15 = 0;
     bool flipPlaying = true;
     bool splash = false;
+    bool movie = false;
     std::string splashImage;
     std::array<int, 12> splashNumbers{};
     // The record's fixed part and its last 164 bytes as a PC save holds them, kept so the save is written back as it

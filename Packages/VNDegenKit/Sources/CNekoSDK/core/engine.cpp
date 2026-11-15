@@ -2129,6 +2129,7 @@ void Engine::applySettings() {
     audio_.setGroupVolume(3, setting("music") * master / 100);
     audio_.setGroupVolume(kMutedVoices, 0);
     applyVoiceChoices();
+    swapCameraMovies();
     static const int kCharMs[] = {40, 20, 8, 0};
     charMs_ = kCharMs[std::clamp(setting("text"), 0, 3)];
     static const int kAutoPercent[] = {200, 100, 50, 0};
@@ -2648,6 +2649,7 @@ SaveData Engine::captureSave() {
         out.nextPath = !s.noise && layout_ && namesPictureTwice(*layout_) ? s.path : "";
         out.noise = s.noise;
         out.kind = s.kind;
+        out.movie = s.movie != nullptr;
         if (s.flipCount > 0) {
             out.flipFrame = s.flipShown;
             out.flipRepeat = s.flipLoop ? 1 : 0;
@@ -2945,8 +2947,11 @@ void Engine::restoreSave(const SaveData &d, const Sidecar &side, bool keepLine) 
         s.kind = saved.kind;
         // A movie starts again from its beginning. Whether it looped isn't known from the save, and the library's
         // looping ones are backgrounds, so it loops.
-        if (normalizedPath(saved.path).rfind("movie\\", 0) == 0 && (s.movie = openMovie(saved.path, true))) {
+        std::string shownMovie = cameraMovie(saved.path);
+        if (normalizedPath(saved.path).rfind("movie\\", 0) == 0 && (s.movie = openMovie(shownMovie, true))) {
+            s.path = shownMovie;
             s.movieFrom = now_;
+            s.movieLoops = true;
             bool ended = false;
             s.image = s.movie->frame(0, ended);
         } else {
@@ -6323,16 +6328,51 @@ std::shared_ptr<Movie> Engine::openMovie(const std::string &path, bool loop) {
     return movie;
 }
 
+std::string Engine::cameraMovie(const std::string &path) const {
+    auto defaults = screens_.find("defaults");
+    if (defaults == screens_.end() || !defaults->second.setting("cameramovies")) return path;
+    bool manual = setting("anim_manual") != 0;
+    const std::string from = manual ? "_camera" : "_hard", to = manual ? "_hard" : "_camera";
+    std::string lowered = path;
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    size_t at = lowered.rfind(from);
+    if (at == std::string::npos || lowered.find('\\', at) != std::string::npos) return path;
+    std::string swapped = path.substr(0, at) + to + path.substr(at + from.size());
+    std::string file = swapped;
+    if (!files_.exists(file) && file.size() > 4 && normalizedPath(file.substr(file.size() - 4)) == ".wmv") file.resize(file.size() - 4);
+    return files_.exists(file) ? swapped : path;
+}
+
+void Engine::swapCameraMovies() {
+    for (Sprites *sprites : {&front_, &back_})
+        for (auto &[slot, s] : *sprites) {
+            if (!s.movie) continue;
+            std::string shown = cameraMovie(s.path);
+            if (shown == s.path) continue;
+            auto movie = openMovie(shown, s.movieLoops);
+            if (!movie) continue;
+            log("movie %s in slot %d in place of %s", shown.c_str(), slot, s.path.c_str());
+            s.path = shown;
+            s.movie = movie;
+            s.movieFrom = now_;
+            bool ended = false;
+            s.image = movie->frame(0, ended);
+            dirty_ = true;
+        }
+}
+
 // Parameter 3 is the slot and 9 says the movie loops. It sits at the top left, as an image with nothing placing it does.
 void Engine::loadMovie(const Node &n) {
-    auto movie = openMovie(n.s[1], n.p[9] != 0);
+    std::string path = cameraMovie(n.s[1]);
+    auto movie = openMovie(path, n.p[9] != 0);
     if (!movie) return;
-    log("movie %s in slot %d%s", n.s[1].c_str(), n.p[3], n.p[9] ? ", looping" : "");
+    log("movie %s in slot %d%s", path.c_str(), n.p[3], n.p[9] ? ", looping" : "");
     Sprite &s = back_[n.p[3]];
     s = Sprite{};
-    s.path = n.s[1];
+    s.path = path;
     s.movie = movie;
     s.movieFrom = now_;
+    s.movieLoops = n.p[9] != 0;
     bool ended = false;
     s.image = movie->frame(0, ended);
 }

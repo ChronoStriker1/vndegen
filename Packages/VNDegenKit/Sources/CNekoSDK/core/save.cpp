@@ -179,6 +179,7 @@ constexpr int kSplashNameAt = 201;
 constexpr size_t kTailFlipReverse = 97, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipParam15 = 104,
                  kTailFlipStep = 108, kTailFlipHundred = 120;
 constexpr int kNoiseKind = 4;
+constexpr int kMovieKind = 13;
 constexpr int kNoiseSlot = 10000;
 constexpr size_t kWindowListHead = 40;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
@@ -449,6 +450,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.slot = r.i32();
         int number = r.i32();
         if (!ordinary) s.flipFrame = number;
+        s.movie = ordinary && !older && number == kMovieKind;
         s.path = r.str();
         s.nextPath = r.str();
         if (!ordinary && number == kNoiseKind && s.slot == kNoiseSlot && s.path.empty()) {
@@ -738,7 +740,7 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.u8(s.flipFrame >= 0 || s.noise ? 0 : 1);
         w.i32(root ? -999999 : s.slot);
         // A splash's record is kind 25, as Test Game 88's saves have it.
-        w.i32(root ? 3 : s.noise ? kNoiseKind : s.splash ? 25 : s.flipFrame >= 0 ? s.flipFrame : older ? s.kind : 0);
+        w.i32(root ? 3 : s.noise ? kNoiseKind : s.splash ? 25 : s.movie ? kMovieKind : s.flipFrame >= 0 ? s.flipFrame : older ? s.kind : 0);
         w.str(s.path);
         w.str(s.nextPath);
         if (older) {

@@ -616,6 +616,7 @@ animbuttons sys_5\obj\l010_001.bmp 1240 674 635 596
 animdigits sys_5\obj\l010_002.bmp 1239 1252 1261 570
 animhelp sys_5\obj\l010_004.bmp 862 508
 animzoom 100 250 5
+cameramovies
 # Version info, the PC's message box, as it shows for the copy measured under Wine; which installed parts each bonus
 # line needs isn't known.
 versionline 【俺を欲しがる二人の母アニメ追加版】
