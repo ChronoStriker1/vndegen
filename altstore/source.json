@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.11",
+          "buildVersion": "2541",
+          "date": "2026-11-15T23:40:13Z",
+          "localizedDescription": "Groundwork for an App Store release: the iPhone and iPad app is about 3 MB smaller.\n\n## Downloads\n\n- `VNDegen-0.41.11-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.11.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.41.11-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Changes\n\n- iPhone and iPad: MetalANGLE, which Ren'Py and Godot 3 draw through, now ships for 64-bit devices only, with the app's minimum iOS version, and signed. It was 10 MB larger, with code for 32-bit devices that iOS 18 can't run.\n- iPhone, iPad and Mac: the app no longer carries an empty VPX framework. The WebM decoder for alpha movies was already inside the app.\n- The IPA is 124.6 MB, down from 127.7 MB.\n\n## What wasn't tested\n\n- No physical device was used. A Ren'Py game, a Godot 3 game and an RPG Maker MV alpha movie were checked on an iPad simulator, and the alpha movie in the Mac app.\n- Apple's App Store validation, which needs a developer account.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.11/VNDegen-0.41.11.ipa",
+          "size": 124636224,
+          "sha256": "1a335c82447dc63573b53e5b8b059e1024720233b9eeaff244ac24ff41e97651",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.10",
           "buildVersion": "2535",
           "date": "2026-11-15T15:43:25Z",
