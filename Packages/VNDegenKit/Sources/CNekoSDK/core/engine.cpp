@@ -7237,8 +7237,11 @@ void Engine::composeMessage(Canvas &out) {
     if (windowArtOnly_ == 1) return;
     drawParts(out, Layer::Window);
     bool lineHidden = false;
-    if (waiting_ == Waiting::Choice && choiceSheet_ && !choiceLine_)
-        if (auto choice = screens_.find("choice"); choice != screens_.end()) lineHidden = choice->second.setting("hidesline") != nullptr;
+    if (waiting_ == Waiting::Choice && choiceSheet_ && !choiceLine_) {
+        const std::string flow = stack_.empty() || !stack_.back().script ? std::string() : stack_.back().script->name;
+        lineHidden = !flow.empty() && flow.rfind("story:", 0) != 0 && flow.rfind("chapter:", 0) != 0;
+        if (auto choice = screens_.find("choice"); choice != screens_.end() && choice->second.setting("hidesline")) lineHidden = true;
+    }
     if (!windowArtOnly_ && !lineHidden) {
         drawGlyphRun(out);
         composeGtCount(out);

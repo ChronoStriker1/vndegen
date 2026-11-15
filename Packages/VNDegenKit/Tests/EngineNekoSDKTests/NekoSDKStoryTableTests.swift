@@ -234,6 +234,33 @@ import TestSupport
         click(e)
         steps(e, 200)
         #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        let bright = try lineBrightness(e)
+        #expect(hidden ? bright == 0 : bright > 0, "\(bright)")
+    }
+
+    @Test func aFlowScriptsChoiceLeavesTheLineUndrawn() throws {
+        let root = try game("storytest", ["flow/t.txt": NekoSDKFlowFixture.flow([
+            .init(op: 0, next: 2),
+            .init(op: 1, next: 3, s: [1: "scr\\b.txt"]),
+            .init(op: 3, next: 4, p: [0: 1], s: [1: "obj\\n001_000.bmp"]),
+            .init(op: 2, next: 0),
+        ])])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        #expect(vnneko_debug_jump(e, "flow\\t.txt", 0))
+        steps(e, 200)
+        click(e)
+        steps(e, 200)
+        #expect(try lineBrightness(e) > 0)
+        click(e)
+        steps(e, 200)
+        #expect(vnneko_debug_choice_count(e) == 2, "\(status(e))")
+        let bright = try lineBrightness(e)
+        #expect(bright == 0, "\(bright)")
+    }
+
+    private func lineBrightness(_ e: OpaquePointer) throws -> Int {
         vnneko_mouse_move(e, 0.9, 0.1)
         steps(e, 2)
         var w: Int32 = 0, h: Int32 = 0, changed = false
@@ -245,7 +272,7 @@ import TestSupport
                 if px[i] > 230 && px[i + 1] > 230 && px[i + 2] > 230 { bright += 1 }
             }
         }
-        #expect(hidden ? bright == 0 : bright > 0, "\(bright)")
+        return bright
     }
 
     @Test func aChoiceTakenAsItAppearsStillKeepsThePreviousChoice() throws {

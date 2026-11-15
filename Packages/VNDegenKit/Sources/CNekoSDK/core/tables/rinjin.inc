@@ -550,7 +550,6 @@ button noask obj\i001_000.bmp 498 429 1 5 0
 # button's by the first and the right button's by the second, which take them. Once an ending is reached each option
 # names the routes that take it, red for one cleared.
 screen choice
-hidesline
 pic dim 0 0 alpha 150 underwindow
 pic obj\n000_000.bmp 483 107
 pic obj\b003_000.bmp 393 192 2 1 0 0
