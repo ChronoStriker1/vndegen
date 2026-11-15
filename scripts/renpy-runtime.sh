@@ -5,7 +5,7 @@
 #   scripts/renpy-runtime.sh build/renpy
 #   scripts/renpy-runtime.sh build/renpy ios
 # The ios argument installs <dest>/8 and, in <dest>/ios, the native side of Ren'Py 8 for iPhone and iPad from Ren'Py's
-# renios package: RenPyRuntime.xcframework, one static library per platform made of renios's prebuilt libraries, and
+# renios package: RenPyRuntime.xcframework, and
 # MetalANGLE.xcframework. iOS runs Ren'Py 7 games on Ren'Py 8, so it needs no Ren'Py 7 runtime.
 # The build phase in project.yml runs this, then copies the result into the app. Downloads are checked against the
 # SHA-256 sums below and cached in ~/Library/Caches/VNDegen/renpy-sdk. A runtime already installed by this version of
@@ -20,6 +20,7 @@ platform=${2:-mac}
 cache=${VNDEGEN_RENPY_CACHE:-$HOME/Library/Caches/VNDegen/renpy-sdk}
 stamp=$(shasum -a 256 "$0" | cut -c1-16)
 notices=$(cd "$(dirname "$0")" && pwd)/licenses/renpy
+lgpl="$(dirname "$notices")/How VNDegen meets the LGPL.txt"
 
 temps=()
 trap 'rm -rf ${temps[@]+"${temps[@]}"}' EXIT
@@ -77,9 +78,57 @@ EOF
 ios_libraries=(renpy python3.12 assimp avformat avcodec swscale swresample avutil SDL2_image SDL2 avif aom yuv turbojpeg
   png16 webp harfbuzz brotlidec brotlicommon fribidi freetype ffi ssl crypto lzma bz2 z)
 
+ios_entry_points=(init_librenpy Py_IsInitialized Py_InitializeEx PyRun_SimpleString SDL_SetMainReady SDL_iPhoneSetEventPump
+  SDL_OnApplicationWillResignActive SDL_OnApplicationDidEnterBackground SDL_OnApplicationWillEnterForeground
+  SDL_OnApplicationDidBecomeActive SDL_GL_GetCurrentWindow SDL_GetWindowWMInfo)
+
+ios_system_frameworks=(Foundation UIKit CoreGraphics Metal IOSurface AudioToolbox AVFoundation CoreMotion CoreHaptics
+  GameController ImageIO QuartzCore CoreServices OpenGLES)
+
+framework_plist() { # <name>
+  cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$1</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.chronostriker1.vndegen.$1</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$1</string>
+	<key>CFBundlePackageType</key>
+	<string>FMWK</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>MinimumOSVersion</key>
+	<string>18.0</string>
+</dict>
+</plist>
+EOF
+}
+
+link_framework() { # <archive> <sdk> <clang target> <MetalANGLE slice> <framework folder>
+  local framework=$5/RenPyRuntime.framework symbol flags=()
+  for symbol in "${ios_entry_points[@]}"; do flags+=("-Wl,-u,_$symbol"); done
+  for symbol in "${ios_system_frameworks[@]}"; do flags+=(-framework "$symbol"); done
+  mkdir -p "$framework"
+  xcrun --sdk "$2" clang -target "$3" -isysroot "$(xcrun --sdk "$2" --show-sdk-path)" -dynamiclib "${flags[@]}" "$1" \
+    -F "$4" -framework MetalANGLE -lc++ -Wl,-dead_strip -Wl,-alias,_SDL_iPhoneSetEventPump,_vndegen_SDL_iPhoneSetEventPump \
+    -install_name @rpath/RenPyRuntime.framework/RenPyRuntime \
+    -o "$framework/RenPyRuntime"
+  framework_plist RenPyRuntime > "$framework/Info.plist"
+}
+
 install_ios() { # <version> <sha256>
   local version=$1 sum=$2 out="$dest/ios"
-  [ "$(cat "$out/.vndegen-runtime" 2>/dev/null)" = "$version $stamp" ] && return
+  [ -z "${VNDEGEN_RENIOS_LIBRARIES:-}" ] && [ "$(cat "$out/.vndegen-runtime" 2>/dev/null)" = "$version $stamp" ] && return
   echo "Ren'Py $version renios -> $out"
   fetch "renpy-$version-renios.zip" "$sum" "https://www.renpy.org/dl/$version/renpy-$version-renios.zip"
   local work prebuilt config library libraries
@@ -87,6 +136,7 @@ install_ios() { # <version> <sha256>
   temps+=("$work")
   unzip -q "$cache/renpy-$version-renios.zip" 'renios/prototype/prebuilt/*' 'renios/prototype/Frameworks/*' -d "$work"
   prebuilt="$work/renios/prototype/prebuilt"
+  [ -z "${VNDEGEN_RENIOS_LIBRARIES:-}" ] || cp -R "$VNDEGEN_RENIOS_LIBRARIES"/. "$prebuilt"/
   # renios builds simulator libraries as debug and device libraries as release.
   for config in debug release; do
     libraries=()
@@ -97,10 +147,14 @@ install_ios() { # <version> <sha256>
     mkdir -p "$work/$config"
     libtool -static -no_warning_for_no_symbols -o "$work/$config/libRenPyRuntime.a" "${libraries[@]}"
   done
+  local angle="$work/renios/prototype/Frameworks/MetalANGLE.xcframework"
+  link_framework "$work/release/libRenPyRuntime.a" iphoneos arm64-apple-ios18.0 "$angle/ios-arm64_armv7" "$work/device"
+  link_framework "$work/debug/libRenPyRuntime.a" iphonesimulator arm64-apple-ios18.0-simulator \
+    "$angle/ios-arm64_i386_x86_64-simulator" "$work/simulator"
   rm -rf "$out.part" && mkdir -p "$out.part"
-  xcodebuild -create-xcframework -library "$work/release/libRenPyRuntime.a" -library "$work/debug/libRenPyRuntime.a" \
-    -output "$out.part/RenPyRuntime.xcframework" >/dev/null
-  cp -Rp "$work/renios/prototype/Frameworks/MetalANGLE.xcframework" "$out.part/"
+  xcodebuild -create-xcframework -framework "$work/device/RenPyRuntime.framework" \
+    -framework "$work/simulator/RenPyRuntime.framework" -output "$out.part/RenPyRuntime.xcframework" >/dev/null
+  cp -Rp "$angle" "$out.part/"
   rm -rf "$work"
   echo "$version $stamp" > "$out.part/.vndegen-runtime"
   rm -rf "$out" && mv "$out.part" "$out"
@@ -116,7 +170,6 @@ notice_table() {
   cat <<'EOF'
 Ren'Py|8|copy LICENSE.txt|renpy
 Ren'Py 7|7|copy LICENSE.txt
-How VNDegen meets the LGPL|*|sym ^_avcodec_open2$
 Python 3.12|8|sym ^_Py_Initialize$|python3.12
 Python 2.7|7|sym ^_Py_Initialize$
 SDL2|*|sym ^_SDL_Init$|SDL2
@@ -172,7 +225,7 @@ EOF
 write_licenses() {
   local out="$dest/licenses" lstamp runtimes work r name scope evidence libraries kind arg target library
   # The stamp's name keeps it out of the app, since the build phase's copy skips files named .vndegen-runtime.
-  lstamp="$platform $(cat "$0" "$notices"/* | shasum -a 256 | cut -c1-16)"
+  lstamp="$platform $(cat "$0" "$notices"/* "$lgpl" | shasum -a 256 | cut -c1-16)"
   [ "$(cat "$dest/.vndegen-runtime" 2>/dev/null)" = "$lstamp" ] && [ -d "$out" ] && return
   echo "Ren'Py notices -> $out"
   work=$(mktemp -d)
@@ -185,7 +238,7 @@ write_licenses() {
       nm -arch arm64 -U -j "$dest/7/lib/py2-mac-universal/librenpython.dylib" > "$work/7.symbols" ;;
     ios)
       runtimes="8 ios"
-      nm -arch arm64 -U -j "$dest/ios/RenPyRuntime.xcframework/ios-arm64/libRenPyRuntime.a" > "$work/8.symbols" ;;
+      nm -arch arm64 -U -j "$dest/ios/RenPyRuntime.xcframework/ios-arm64/RenPyRuntime.framework/RenPyRuntime" > "$work/8.symbols" ;;
   esac
   rm -rf "$out.part" && mkdir -p "$out.part"
   while IFS='|' read -r name scope evidence libraries; do
@@ -216,6 +269,7 @@ write_licenses() {
       [ -n "$name" ] && [ -f "$work/written $name" ] || { echo "no notice covers renios's lib$library.a" >&2; exit 1; }
     done
   fi
+  cp "$lgpl" "$out.part/"
   rm -rf "$work" "$out"
   mv "$out.part" "$out"
   echo "$lstamp" > "$dest/.vndegen-runtime"

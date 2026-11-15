@@ -1,0 +1,38 @@
+How VNDegen meets the GNU LGPL
+
+This is the VNDegen maintainers' reading of the GNU Lesser General Public License version 2.1. It is not legal
+advice.
+
+VNDegen includes these libraries under the GNU LGPL version 2.1 or later. Their notices are in this list under their
+own names.
+
+- FFmpeg 4.3.1, GNU FriBidi 1.0.7, and the parts of pygame_sdl2 taken from Pygame (alphablit.c and surface.h), in
+  Ren'Py, which runs Ren'Py games.
+- chardet 5.2.0 (Ren'Py 8) and 3.0.4 (Ren'Py 7), in Ren'Py's Python library.
+- FFmpeg 8.1.2, which plays KiriKiri and NekoSDK movies.
+
+The LGPL lets a program include such a library if the people who receive the program can change the library and use
+their changed version with the program. VNDegen keeps each of them in a separate library or file that the app loads
+when it runs, and that a changed version can replace:
+
+- FFmpeg 8.1.2 is FFmpeg.framework, in the app's Frameworks folder (Contents/Frameworks on the Mac). The KiriKiri
+  engine, KiriKiri.framework, uses it through its public interface, and so does the NekoSDK runtime, through the
+  movie decoder KiriKiri.framework exports.
+- On iPhone and iPad, Ren'Py's native libraries, FFmpeg 4.3.1, FriBidi and Pygame's code among them, are
+  RenPyRuntime.framework, in the app's Frameworks folder.
+- On the Mac, they are librenpython.dylib, Ren'Py's own build, in Contents/Resources/RenPy/8/lib/py3-mac-universal and
+  Contents/Resources/RenPy/7/lib/py2-mac-universal.
+- chardet is Python bytecode in the chardet folder of each Ren'Py runtime's lib folder.
+
+docs/relinking.md in VNDegen's source says how to build a changed copy of each library, put it into the app, and sign
+the app again.
+
+VNDegen is free software under the MIT license. Its complete source, including the scripts that build these libraries
+into the app, is public at https://github.com/ChronoStriker1/vndegen. Each release there also has a file named
+VNDegen-<version>-LGPL-sources.tar with the exact source of every library above, and the address and SHA-256 checksum
+of Ren'Py's prebuilt iOS libraries, which RenPyRuntime.framework is linked from.
+
+Written offer. For at least three years after we last distribute a version of VNDegen, we will give anyone who asks a
+copy of the complete corresponding source code of the LGPL libraries in that version, and of the files needed to
+relink them, for no more than the cost of making and sending the copy. Ask through the issue tracker at
+https://github.com/ChronoStriker1/vndegen/issues.

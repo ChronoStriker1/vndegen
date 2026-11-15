@@ -59,7 +59,7 @@ targets:
       # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
       # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
       - framework: build/renpy/ios/RenPyRuntime.xcframework
-        embed: false
+        embed: true
         platformFilter: iOS
       - framework: build/renpy/ios/MetalANGLE.xcframework
         platformFilter: iOS
@@ -212,6 +212,5 @@ targets:
         EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
         # The macOS app keeps embedded frameworks in Contents/Frameworks, not beside the executable as on iOS.
         LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]: ["$(inherited)", "@executable_path/../Frameworks"]
-        # What Ren'Py's static libraries need from the system, as in renios's own Xcode project.
         "OTHER_LDFLAGS[sdk=macosx*]": "$(inherited) -lc++ -Wl,-u,_art3m1s_get_api_v1 -framework Metal -framework QuartzCore -framework IOSurface"
         "OTHER_LDFLAGS[sdk=iphone*]": "$(inherited) -lc++ -Wl,-u,_art3m1s_get_api_v1 -framework Metal -framework IOSurface -framework AudioToolbox -framework AVFoundation -framework CoreMotion -framework CoreHaptics -framework GameController -framework ImageIO -framework QuartzCore -framework CoreServices"
