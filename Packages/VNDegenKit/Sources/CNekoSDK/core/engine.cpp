@@ -6996,6 +6996,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
             continue;
         }
         SpriteView v = view(s);
+        if (s.movie) v.scaleX = v.scaleY = 1;
         float dx = slot < shakeLock_ ? shakeX : 0, dy = slot < shakeLock_ ? shakeY : 0;
         // About an eighth of the amount as a radius gives the sharpness of the PC game's footage.
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
