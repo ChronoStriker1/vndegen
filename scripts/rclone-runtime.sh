@@ -13,7 +13,7 @@ src=Packages/VNDegenKit/Rclone
 out=Packages/VNDegenKit/build/CRclone.xcframework
 licenses=build/rclone/licenses
 # go.mod and go.sum pin every module, and rclone.go's imports pick which ones link, so these decide the notices too.
-stamp=$( { cat "$self" "$src/go.mod" "$src/go.sum" "$src/rclone.go" "$src/include/"*; go version; } | shasum -a 256 | cut -c1-16)
+stamp=$( { cat "$self" "$src/go.mod" "$src/go.sum" "$src/rclone.go" "$src/include/"* "$src/sddl/"*; go version; } | shasum -a 256 | cut -c1-16)
 current() { [ "$(cat "$1" 2>/dev/null)" = "$stamp" ]; }
 targets=(ios/arm64 ios/amd64 darwin/arm64 darwin/amd64)
 
@@ -52,8 +52,8 @@ write_licenses() {
   local target module version dir file files name goroot
   for target in "${targets[@]}"; do
     (cd "$src" && CGO_ENABLED=1 GOOS=${target%/*} GOARCH=${target#*/} \
-      go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}}|{{.Version}}|{{.Dir}}{{end}}{{end}}' .)
-  done | sort -u > "$work/modules"
+      go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}}|{{.Version}}|{{.Dir}}|{{with .Replace}}{{if not .Version}}local{{end}}{{end}}{{end}}{{end}}' .)
+  done | sort -u | grep -v '|local$' | sed 's/|$//' > "$work/modules"
   [ -s "$work/modules" ] || { echo "go list found no modules in $src" >&2; exit 1; }
   rm -rf "$licenses.part" && mkdir -p "$licenses.part"
   while IFS='|' read -r module version dir; do
