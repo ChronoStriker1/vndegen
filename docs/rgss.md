@@ -105,10 +105,12 @@ says and as RGSS3 under Wine showed. Every library game's scripts call them, mos
 The emulation covers what the test games call: FindWindow, GetSystemMetrics, SystemParametersInfo,
 GetWindowRect, GetClientRect, MoveWindow, SetWindowPos, ShowWindow, UpdateWindow, SetWindowLong, GetWindowText,
 GetForegroundWindow, SetForegroundWindow, SendInput, GetDC, ReleaseDC, FillRect, CreateSolidBrush, DeleteObject,
-CreateWindowEx, GetAsyncKeyState, GetKeyState, GetPrivateProfileString, GetPrivateProfileInt,
-WritePrivateProfileString, MultiByteToWideChar, WideCharToMultiByte, AllocConsole, SetConsoleTitle, GetTickCount.
-Window calls act on one window the size of the screen. Settings a game writes to its ini last until it ends. Any
-other call logs once and returns 0.
+CreateWindowEx, GetAsyncKeyState, GetKeyState, GetCursorPos, ScreenToClient, ClientToScreen, SetCursorPos,
+GetPrivateProfileString, GetPrivateProfileInt, WritePrivateProfileString, MultiByteToWideChar, WideCharToMultiByte,
+AllocConsole, SetConsoleTitle, GetTickCount. Window calls act on one window the size of the screen. GetCursorPos gives
+the pointer in game pixels, from the mouse, a trackpad, the touch mouse or a controller's mouse mode, so Dragon Maid's
+Erotic Notepad picks the menu item under the pointer. Settings a game writes to its ini last until it
+ends. Any other call logs once and returns 0.
 
 Monster Girl Quest Paradox also calls `WFExit.dll` to catch closing the window and F12, and GDI+ to write a picture of
 the screen beside each save. Neither is emulated, so those calls log once and return 0.

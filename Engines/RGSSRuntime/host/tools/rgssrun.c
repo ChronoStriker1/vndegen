@@ -20,8 +20,9 @@
 
 typedef struct {
     long frame;
-    int kind; // 0 down, 1 up, 2 shot, 3 eval, 4 ruby, 5 rubyfile
+    int kind;
     unsigned key;
+    float x, y;
     char file[1024];
 } Command;
 
@@ -67,6 +68,13 @@ static void read_script(const char *path) {
         } else if (!strcmp(verb, "shot")) {
             c.kind = 2;
             snprintf(c.file, sizeof c.file, "%s", arg);
+            add(c);
+        } else if (!strcmp(verb, "move")) {
+            c.kind = 6;
+            if (sscanf(line, "%*s %*s %f %f", &c.x, &c.y) == 2) add(c);
+        } else if (!strcmp(verb, "mousedown") || !strcmp(verb, "mouseup")) {
+            c.kind = !strcmp(verb, "mousedown") ? 7 : 8;
+            c.key = (unsigned)atoi(arg);
             add(c);
         } else if (!strcmp(verb, "tap")) {
             c.key = key_named(arg);
@@ -192,6 +200,8 @@ static int run(int argc, char **argv) {
             if (commands[i].kind == 2) save_frame(commands[i].file);
             else if (commands[i].kind == 3) host_test_eval(commands[i].file);
             else if (commands[i].kind == 4 || commands[i].kind == 5) queue_ruby(frame, commands[i].file, commands[i].kind == 5);
+            else if (commands[i].kind == 6) vnrgss_mouse_move(commands[i].x, commands[i].y);
+            else if (commands[i].kind == 7 || commands[i].kind == 8) vnrgss_mouse_button((int)commands[i].key, commands[i].kind == 7);
             else vnrgss_key(commands[i].key, commands[i].kind == 0);
         }
         if (!host_test_step(20000)) break;

@@ -107,6 +107,13 @@ class Win32API
   def w32_GetAsyncKeyState(vk) = key_down?(vk) ? -32_768 : 0
   def w32_GetKeyState(vk) = key_down?(vk) ? -127 : 0
 
+  def w32_GetCursorPos(buffer)
+    width, height = screen_size
+    x, y = Input.rgss_mouse_pos
+    put(buffer, [(x * width).floor.clamp(0, width - 1), (y * height).floor.clamp(0, height - 1)].pack('l2'))
+    1
+  end
+
   # Game.ini settings. Reads come from the game's file; writes last until the game ends.
   def w32_GetPrivateProfileString(section, key, default, buffer, size, file)
     value = profile_value(section, key, file) || default.to_s

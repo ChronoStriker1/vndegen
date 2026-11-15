@@ -548,6 +548,11 @@ static VALUE input_mouse_down(VALUE self, VALUE button) {
     return b >= 0 && b < 3 && input.mouse[b] ? Qtrue : Qfalse;
 }
 
+static VALUE input_mouse_pos(VALUE self) {
+    (void)self;
+    return rb_assoc_new(DBL2NUM(input.mouseX), DBL2NUM(input.mouseY));
+}
+
 // MARK: Audio
 
 static void play_track(AudioTrack track, int argc, VALUE *argv, bool positional) {
@@ -736,6 +741,7 @@ void rgss_define_modules(void) {
     rb_define_module_function(in, "dir8", input_dir8, 0);
     rb_define_module_function(in, "rgss_key_down?", input_key_down, 1);
     rb_define_module_function(in, "rgss_mouse_down?", input_mouse_down, 1);
+    rb_define_module_function(in, "rgss_mouse_pos", input_mouse_pos, 0);
     static const struct { const char *name; int number; } constants[] = {
         {"DOWN", B_DOWN}, {"LEFT", B_LEFT}, {"RIGHT", B_RIGHT}, {"UP", B_UP}, {"A", B_A}, {"B", B_B}, {"C", B_C},
         {"X", B_X}, {"Y", B_Y}, {"Z", B_Z}, {"L", B_L}, {"R", B_R}, {"SHIFT", B_SHIFT}, {"CTRL", B_CTRL},

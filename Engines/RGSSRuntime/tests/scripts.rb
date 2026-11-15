@@ -96,4 +96,19 @@ check.call('runtime errors name their script section') do
   end
 end
 
+check.call('GetCursorPos writes the pointer in game pixels, inside the screen') do
+  require_relative '../ruby/win32api'
+  Object.const_set(:Graphics, Module.new) unless defined?(Graphics)
+  Graphics.define_singleton_method(:width) { 640 }
+  Graphics.define_singleton_method(:height) { 480 }
+  Object.const_set(:Input, Module.new) unless defined?(Input)
+  get = Win32API.new('user32', 'GetCursorPos', 'p', 'i')
+  {[0.65, 0.775] => [416, 372], [0.0, 0.0] => [0, 0], [1.0, 1.0] => [639, 479], [-0.2, 1.5] => [0, 479]}.each do |pos, want|
+    Input.define_singleton_method(:rgss_mouse_pos) { pos }
+    buffer = "\0" * 8
+    raise "returned #{get.call(buffer)}" unless get.call(buffer) == 1
+    raise "#{pos} gave #{buffer.unpack('l2')}, want #{want}" unless buffer.unpack('l2') == want
+  end
+end
+
 abort "#{failures.length} failed checks" unless failures.empty?
