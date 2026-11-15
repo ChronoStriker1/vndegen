@@ -4,12 +4,15 @@ The app's Licenses page lists every text file its build collects from `build/*/l
 its own:
 
 - `scripts/rclone-runtime.sh` writes `build/rclone/licenses/` from Go's module cache: rclone's license, the Go standard
-  library's, and those of every module `go list -deps` reports for the library's targets.
+  library's, and those of every module `go list -deps` reports for the library's targets, except modules replaced by a
+  folder in the repository, which are VNDegen's own code: `Rclone/sddl`, the stub that stands in for the LGPL-3.0
+  `github.com/cloudsoda/sddl`.
 - `scripts/renpy-runtime.sh` writes `build/renpy/licenses/` from the texts in `renpy/`, choosing each by evidence in
   the runtimes it installed: a symbol in Ren'Py's native library or a file in the runtime. It copies Ren'Py's own
   `LICENSE.txt` and the font licenses from the runtime itself.
-- `scripts/kirikiri-engine.sh` writes `build/kirikiri/licenses/`: krkrsdl3's license, the Android Open Source Project's
-  Apache-2.0 text for the bundled fallback font and the velocity tracker, and each vcpkg dependency's `copyright` file.
+- `scripts/kirikiri-engine.sh` writes `build/kirikiri/licenses/` for KiriKiri.framework and FFmpeg.framework:
+  krkrsdl3's license, the Android Open Source Project's Apache-2.0 text for the bundled fallback font and the velocity
+  tracker, and each vcpkg dependency's `copyright` file.
 - `scripts/rgss-ruby.sh` writes `build/rgss/licenses/`: Ruby's BSD license and its LEGAL file, and the texts in
   `Engines/RGSSRuntime/licenses/` for the code VNDegen's RGSS runtime vendors (stb, dr_libs) and the tile tables it
   takes from RPG Maker MV's corescript.
@@ -59,7 +62,9 @@ files, unchanged. They match Ren'Py 8.5.3.26051504 and 7.8.7.25031702, whose lib
 Notices for code a library carries from other projects go in that library's file. To find such code, look for its
 symbols in the built binaries (`nm`), as was done for the files above.
 
-`How VNDegen meets the LGPL.txt` is VNDegen's own.
+`How VNDegen meets the LGPL.txt`, in this folder, is VNDegen's own. It covers every LGPL library in the app, not only
+Ren'Py's, and `scripts/renpy-runtime.sh` copies it into the Ren'Py notices, since a Ren'Py runtime ships on every
+platform. [docs/relinking.md](../../docs/relinking.md) is its long form.
 
 When Ren'Py's version changes, check renpy-build's tag for changed library versions, and update a text when its
 license or copyright lines changed. The notice table in `scripts/renpy-runtime.sh` fails the build when a library

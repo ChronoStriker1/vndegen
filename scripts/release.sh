@@ -31,6 +31,7 @@ scripts/remote.sh scripts/build.sh release "$version" "$build_number"
 out="build/release/$version"
 rm -rf "$out" && mkdir -p "$out"
 scp -q "chronostriker1@$host:$remote_dir/build/release/*" "$out/"
+scripts/lgpl-sources.sh "$version" "$out"
 (cd "$out" && sha256sum -- * > SHA256SUMS)
 
 git tag -a "v$version" -m "VNDegen $version"
