@@ -117,7 +117,7 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 
 ## Next
 Reordered with the maintainer on 2026-11-09, to put quick wins first. Only work that isn't built yet is listed.
-1. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, which NekoSDK also uses for WMV movies, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
+1. Before any App Store release: the LGPL libraries now sit in replaceable frameworks, with their source attached to each release (2026-11-15, see Licenses above). Left: the questions for a lawyer at the end of [relinking.md](relinking.md); renios's `MetalANGLE.framework` still carries an armv7 slice and MinimumOSVersion 9.0, which App Store validation may flag; and `VPX.framework` is an empty stub, since libvpx links into the main executable.
 2. Last: save sync through the cloud types that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, with the same settings as Ludusavi.
 
 ## Set aside
