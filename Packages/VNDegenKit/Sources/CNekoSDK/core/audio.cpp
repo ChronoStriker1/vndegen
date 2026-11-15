@@ -16,6 +16,10 @@ namespace neko {
 namespace {
 constexpr int kRate = 44100;
 constexpr int kMaxChannels = 8;  // Player::next reads one frame into a 16-float buffer
+float loudness(float level) {
+    static const float kExponent = float(0.5 / std::log10(2.0));
+    return level <= 0 ? 0 : std::pow(std::min(level, 1.0f), kExponent);
+}
 
 uint32_t rd32(const uint8_t *p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 uint16_t rd16(const uint8_t *p) { uint16_t v; std::memcpy(&v, p, 2); return v; }
@@ -290,7 +294,7 @@ void Audio::renderMix(float *out, int frames) {
         Player &p = *pp;
         if (!p.playing || p.paused) continue;
         auto gv = groupVolume_.find(p.group);
-        float group = gv == groupVolume_.end() ? 1.0f : gv->second / 100.0f;
+        float group = gv == groupVolume_.end() ? 1.0f : loudness(gv->second / 100.0f);
         for (int i = 0; i < frames; i++) {
             if (p.fadeLen > 0) {
                 p.fadePos++;
@@ -308,16 +312,16 @@ void Audio::renderMix(float *out, int frames) {
                 p.pan = p.panFrom + (p.panTo - p.panFrom) * float(p.panPos) / float(p.panLen);
                 if (p.panPos >= p.panLen) p.panLen = 0;
             }
-            float v = p.volume * group;
-            out[i * 2] += l * v * std::min(1.0f, 1.0f - p.pan);
-            out[i * 2 + 1] += r * v * std::min(1.0f, 1.0f + p.pan);
+            float v = loudness(p.volume) * group;
+            out[i * 2] += l * v * loudness(1.0f - p.pan);
+            out[i * 2 + 1] += r * v * loudness(1.0f + p.pan);
         }
     }
     if (stream_) {
         streamBuf_.resize(size_t(frames) * 2);
         int got = stream_(streamBuf_.data(), frames);
         auto gv = groupVolume_.find(streamGroup_);
-        float v = streamVolume_ * (gv == groupVolume_.end() ? 1.0f : gv->second / 100.0f);
+        float v = loudness(streamVolume_) * (gv == groupVolume_.end() ? 1.0f : loudness(gv->second / 100.0f));
         for (int i = 0; i < got * 2; i++) out[i] += streamBuf_[i] * v;
     }
     for (int i = 0; i < frames * 2; i++) out[i] = std::clamp(out[i], -1.0f, 1.0f);

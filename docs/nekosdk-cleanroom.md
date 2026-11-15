@@ -409,6 +409,16 @@ The titles' Version info is a Windows message box: the game's name in brackets, 
 bonus content, of which each copy measured shows its own. Manual opens the game's `manual\index.html`, a patch's
 first, and the web survey the page its `webアンケート.url` names, both in a browser on the PC.
 
+## Sound levels and pan
+
+Measured under Wine on 2026-11-14 on Test Game 89's PC, with a scene script of VNDegen's own in a `scr` folder beside its archives (a 1 kHz tone of its own in an `se` folder, played by commands 30, 35 and 41 with a line of text after each, clicked on a beat) and the PC's sound recorded from a null PulseAudio sink, each channel's level read at the tone's frequency:
+
+- A command's `vol:` and Config's sliders follow one law, 10 dB a halving: a level of v of 100 plays at (v/100)^1.661, 10 log2(v/100) dB. Sound effects at 80, 60, 40, 20 and 50 came out 3.2, 7.4, 13.3, 23.3 and 10.0 dB below 100, music and voices at 50 the same 10.0, and Config's sound effects at 40 against its music at 80 10.05 dB lower. The runtime had scaled all of them straight, so a quiet effect played too loud: a `vol:20` one 9 dB too loud.
+- `pos:` is pan, from -100 (left) to 100 (right), by the same law on the far side: the near side stays whole and the far one is (1 - |pos|/100)^1.661 of it. At 10, 20, 30, 40, 50, 60, 80 and 90 either way the far side was 1.5, 3.2, 5.2, 7.4, 10.0, 13.3, 23.3 and 33.3 dB down, and silent at 100. A street ambience of Test Game 89's own at `pos:-50` was 10.0 dB louder on the left in the PC's ordinary play. The runtime applied pan straight (6 dB at 50); it now uses the law for both, and `NekoSDKSoundLevelTests` checks its mix against it; its recording of the same script, under the title's music, put the far side 3.3, 7.0, 13.1 and 22 dB down at 20, 40, 60 and 80.
+- Command 39 moves a sound's pan over its parameter 2 in milliseconds: -100 to 100 over 3000 went from left to right over 3 seconds, as the runtime does.
+- `loop:0` repeats until the sound is stopped (a 0.3 second blip ran 4.5 seconds, to its stop), and `loop:2` plays twice, as the runtime has it.
+- A wait of VNDegen's own, command 2 with `[ウエイト]` and `time:` in its text as the editor writes them, ran far short in that script on the PC, so the beat came from clicks; why wasn't looked into. How a fade (`tm:`) moves along the law wasn't measured.
+
 ## Test Game 92's animation switches
 
 Config's 「CGのアニメーション切り替え」 ("turns some H scenes' CGs into animation", its help says) changed nothing on the PC
@@ -700,8 +710,6 @@ Test Game 92's movies come with its `sys_5` patch, the animation edition: only t
 - The flash's parameters 4 to 10, and motion blur's strength.
 - Named animations (opcode 19): their lengths are taken as frames, because a save holds a timed change written in the same
   text form. A recording that reached them was too coarse to confirm it.
-- `loop:0` repeating for ever is read from a street ambience and from `loop:1` on one-shot effects.
-- `pos:` on sound commands isn't applied. Its values look like pan.
 - What a load's parameter 0 means. A load keeps the slot's position and scale.
 
 ## Games with their story in the exe
