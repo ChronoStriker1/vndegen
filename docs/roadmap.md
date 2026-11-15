@@ -107,7 +107,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- App Store frameworks (started 2026-11-15): MetalANGLE carries an armv7 slice and MinimumOSVersion 9.0, and VPX.framework is an empty stub. NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
+- Nothing right now. NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
@@ -117,7 +117,7 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 
 ## Next
 Reordered with the maintainer on 2026-11-09, to put quick wins first. Only work that isn't built yet is listed.
-1. Before any App Store release: the LGPL libraries now sit in replaceable frameworks, with their source attached to each release (2026-11-15, see Licenses above). Left: the questions for a lawyer at the end of [relinking.md](relinking.md); renios's `MetalANGLE.framework` still carries an armv7 slice and MinimumOSVersion 9.0, which App Store validation may flag; and `VPX.framework` is an empty stub, since libvpx links into the main executable.
+1. Before any App Store release: the LGPL libraries sit in replaceable frameworks, with their source attached to each release, and the iOS app ships MetalANGLE for arm64 only with the app's minimum iOS version (2026-11-15, see Licenses above). Left: the questions for a lawyer at the end of [relinking.md](relinking.md), and Apple's own validation, which needs an App Store Connect account. Smaller points it may raise: the iOS FFmpeg, KiriKiri and RenPyRuntime frameworks have no `CFBundleSupportedPlatforms`, MetalANGLE's binary still names iOS 9.0 and the iOS 14.4 SDK, and the Mac Godot frameworks are shallow bundles, which matters only for the Mac App Store or notarization.
 2. Last: save sync through the cloud types that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, with the same settings as Ludusavi.
 
 ## Set aside
