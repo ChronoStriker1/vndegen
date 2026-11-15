@@ -18,7 +18,8 @@ sources=(
   "ffmpeg-n8.1.2.tar.gz|9fd092511605bbebafe095ea6d38d9e40f34d12f7386e1258372df8be0576eb7|https://github.com/ffmpeg/ffmpeg/archive/n8.1.2.tar.gz|FFmpeg 8.1.2, in the KiriKiri engine's FFmpeg.framework, as vcpkg fetches it"
 )
 
-work=$(mktemp -d)
+mkdir -p "$root/build"
+work=$(mktemp -d "$root/build/lgpl-sources.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 folder="VNDegen-$version-LGPL-sources"
 mkdir -p "$cache" "$work/$folder" "$out"
