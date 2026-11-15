@@ -408,7 +408,6 @@ target_link_libraries(kirikiri_engine PUBLIC
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
     plutovg::plutovg
-    ${FFMPEG_LIBRARIES}
     "-framework Foundation"
     "-framework CoreGraphics"
     "-framework QuartzCore"
@@ -435,13 +434,37 @@ else()
     set(KIRIKIRI_MINIMUM_OS_KEY LSMinimumSystemVersion)
 endif()
 
+set(KIRIKIRI_FFMPEG_ARCHIVES ${FFMPEG_LIBRARIES})
+list(FILTER KIRIKIRI_FFMPEG_ARCHIVES INCLUDE REGEX "\\.a$")
+set(KIRIKIRI_FFMPEG_DEPENDENCIES ${FFMPEG_LIBRARIES})
+list(FILTER KIRIKIRI_FFMPEG_DEPENDENCIES EXCLUDE REGEX "\\.a$")
+add_library(kirikiri_ffmpeg_static INTERFACE)
+target_link_libraries(kirikiri_ffmpeg_static INTERFACE ${FFMPEG_LIBRARIES})
+
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/ffmpeg_framework.c "")
+add_library(FFmpeg SHARED ${CMAKE_CURRENT_BINARY_DIR}/ffmpeg_framework.c)
+target_link_libraries(FFmpeg PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${KIRIKIRI_FFMPEG_ARCHIVES}>" ${KIRIKIRI_FFMPEG_DEPENDENCIES})
+set_target_properties(FFmpeg PROPERTIES
+    FRAMEWORK TRUE
+    MACOSX_FRAMEWORK_IDENTIFIER com.chronostriker1.vndegen.FFmpeg
+    MACOSX_FRAMEWORK_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/vndegen/FFmpeg-Info.plist
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH ""
+)
+target_link_options(FFmpeg PRIVATE
+    -Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/vndegen/ffmpeg.exports
+    -Wl,-dead_strip
+)
+
 add_library(KiriKiri SHARED vndegen/vnkk.mm ${KIRIKIRI_API}/vnkk.h)
-target_link_libraries(KiriKiri PRIVATE kirikiri_engine)
+target_link_libraries(KiriKiri PRIVATE kirikiri_engine FFmpeg)
 set_target_properties(KiriKiri PROPERTIES
     FRAMEWORK TRUE
     PUBLIC_HEADER ${KIRIKIRI_API}/vnkk.h
     MACOSX_FRAMEWORK_IDENTIFIER com.chronostriker1.vndegen.KiriKiri
     MACOSX_FRAMEWORK_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/vndegen/Info.plist
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH ""
 )
 # Only the C API is visible. SDL3 and the rest stay private, so they cannot clash with another
 # copy of SDL in the same app.
@@ -460,7 +483,7 @@ add_custom_command(TARGET KiriKiri POST_BUILD
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_executable(KiriKiriHelper vndegen/helper_main.cpp vndegen/vnkk.mm)
-    target_link_libraries(KiriKiriHelper PRIVATE kirikiri_engine)
+    target_link_libraries(KiriKiriHelper PRIVATE kirikiri_engine kirikiri_ffmpeg_static)
     target_link_options(KiriKiriHelper PRIVATE -Wl,-dead_strip)
     add_custom_command(TARGET KiriKiriHelper POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${KIRIKIRI_FONT} $<TARGET_FILE_DIR:KiriKiriHelper>/Res/DroidSansFallback.ttf)
@@ -469,25 +492,25 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     #   cmake --build build/kirikiri/.build/mac --target KiriKiriCipherTest
     #   build/kirikiri/.build/mac/KiriKiriCipherTest
     add_executable(KiriKiriCipherTest EXCLUDE_FROM_ALL vndegen/cipher_test.cpp vndegen/vnkk.mm)
-    target_link_libraries(KiriKiriCipherTest PRIVATE kirikiri_engine)
+    target_link_libraries(KiriKiriCipherTest PRIVATE kirikiri_engine kirikiri_ffmpeg_static)
 
     # Decodes movies with the engine's movie decoder. Built on demand, like KiriKiriCipherTest.
     add_executable(KiriKiriMovieTest EXCLUDE_FROM_ALL vndegen/movie_test.cpp vndegen/vnkk.mm)
-    target_link_libraries(KiriKiriMovieTest PRIVATE kirikiri_engine)
+    target_link_libraries(KiriKiriMovieTest PRIVATE kirikiri_engine kirikiri_ffmpeg_static)
 
     # Checks the native event queues. Built on demand, like KiriKiriCipherTest.
     add_executable(KiriKiriQueueTest EXCLUDE_FROM_ALL vndegen/queue_test.cpp vndegen/vnkk.mm)
-    target_link_libraries(KiriKiriQueueTest PRIVATE kirikiri_engine)
+    target_link_libraries(KiriKiriQueueTest PRIVATE kirikiri_engine kirikiri_ffmpeg_static)
 
     add_executable(KiriKiriSplitTest EXCLUDE_FROM_ALL vndegen/split_test.cpp vndegen/vnkk.mm)
-    target_link_libraries(KiriKiriSplitTest PRIVATE kirikiri_engine)
+    target_link_libraries(KiriKiriSplitTest PRIVATE kirikiri_engine kirikiri_ffmpeg_static)
 
     # Checks which script lines count as a test for a hidden menu bar. Built on demand, like KiriKiriCipherTest.
     add_executable(KiriKiriMenuBarScanTest EXCLUDE_FROM_ALL vndegen/menubar_scan_test.cpp vndegen/menubar_scan.cpp)
 
     add_executable(KiriKiriRestart EXCLUDE_FROM_ALL vndegen/restart_main.mm vndegen/vnkk.mm)
     set_source_files_properties(vndegen/restart_main.mm PROPERTIES COMPILE_OPTIONS -fobjc-arc)
-    target_link_libraries(KiriKiriRestart PRIVATE kirikiri_engine)
+    target_link_libraries(KiriKiriRestart PRIVATE kirikiri_engine kirikiri_ffmpeg_static)
     add_custom_command(TARGET KiriKiriRestart POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${KIRIKIRI_FONT} $<TARGET_FILE_DIR:KiriKiriRestart>/Res/DroidSansFallback.ttf)
 endif()

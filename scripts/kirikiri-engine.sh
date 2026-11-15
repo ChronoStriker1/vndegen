@@ -79,11 +79,12 @@ configure_and_build ios arm64-ios KiriKiri -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_S
 configure_and_build ios-sim arm64-ios-simulator KiriKiri -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphonesimulator
 
 # One macOS framework holding both architectures.
-universal="$work/mac-universal/KiriKiri.framework"
 rm -rf "$work/mac-universal" && mkdir -p "$work/mac-universal"
-ditto "$work/mac/KiriKiri.framework" "$universal"
-lipo -create "$work/mac/KiriKiri.framework/Versions/A/KiriKiri" "$work/mac-x86_64/KiriKiri.framework/Versions/A/KiriKiri" \
-  -output "$universal/Versions/A/KiriKiri"
+for framework in KiriKiri FFmpeg; do
+  ditto "$work/mac/$framework.framework" "$work/mac-universal/$framework.framework"
+  lipo -create "$work/mac/$framework.framework/Versions/A/$framework" "$work/mac-x86_64/$framework.framework/Versions/A/$framework" \
+    -output "$work/mac-universal/$framework.framework/Versions/A/$framework"
+done
 
 rm -rf "$dest/mac" "$dest/ios" "$dest/licenses"
 mkdir -p "$dest/mac/Res" "$dest/ios" "$dest/licenses"
@@ -94,7 +95,9 @@ for copyright in "$work/ios/vcpkg_installed/arm64-ios/share"/*/copyright; do
 done
 cp -p "$work/mac/KiriKiriHelper" "$dest/mac/"
 cp -p "$work/mac/Res/DroidSansFallback.ttf" "$dest/mac/Res/"
-xcodebuild -create-xcframework -framework "$work/ios/KiriKiri.framework" -framework "$work/ios-sim/KiriKiri.framework" \
-  -framework "$universal" -output "$dest/ios/KiriKiri.xcframework" >/dev/null
+for framework in KiriKiri FFmpeg; do
+  xcodebuild -create-xcframework -framework "$work/ios/$framework.framework" -framework "$work/ios-sim/$framework.framework" \
+    -framework "$work/mac-universal/$framework.framework" -output "$dest/ios/$framework.xcframework" >/dev/null
+done
 echo "$stamp" > "$dest/.vndegen-engine"
 echo "KiriKiri engine built in $dest in $(($(date +%s) - start)) s"
