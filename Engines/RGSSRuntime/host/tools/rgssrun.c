@@ -100,6 +100,15 @@ static void save_frame(const char *path) {
     if (!image_write_png(&image, path)) fprintf(stderr, "could not write %s\n", path);
 }
 
+static void print_pixel(long frame, int x, int y) {
+    int w, h;
+    bool changed;
+    const uint8_t *pixels = vnrgss_frame(&w, &h, &changed);
+    if (!pixels || !changed || x >= w || y >= h) return;
+    Pixel p = ((const Pixel *)pixels)[(size_t)y * w + x];
+    printf("pixel %ld: %d %d %d\n", frame, px_r(p), px_g(p), px_b(p));
+}
+
 static int run(int argc, char **argv);
 
 // Ruby queued through vnrgss_run_ruby, as the app's cheats queue it, and printed once the game has run it.
@@ -164,6 +173,7 @@ static int run(int argc, char **argv) {
     const char *rtps[4];
     int rtpCount = 0;
     long frames = 600;
+    int pixelX = -1, pixelY = -1;
     for (int i = 1; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!strcmp(a, "--ini") && v) ini = argv[++i];
@@ -173,6 +183,7 @@ static int run(int argc, char **argv) {
         else if (!strcmp(a, "--frames") && v) frames = atol(argv[++i]);
         else if (!strcmp(a, "--script") && v) read_script(argv[++i]);
         else if (!strcmp(a, "--audio") && v) audioPath = argv[++i];
+        else if (!strcmp(a, "--pixel") && v) sscanf(argv[++i], "%d,%d", &pixelX, &pixelY);
         else if (!strcmp(a, "--shot") && v) {
             Command c = {.kind = 2};
             sscanf(argv[++i], "%ld:%1023s", &c.frame, c.file);
@@ -212,6 +223,7 @@ static int run(int argc, char **argv) {
             vnrgss_dismiss_message();
         }
         print_ruby_results();
+        if (pixelX >= 0) print_pixel(frame, pixelX, pixelY);
         // A 60 Hz frame's worth of sound, which also keeps the mixer's decoders exercised.
         float pcm[735 * 2];
         vnrgss_audio_render(pcm, 735);

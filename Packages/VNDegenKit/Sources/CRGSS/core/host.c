@@ -21,7 +21,7 @@ static bool threadMade;
 
 static struct {
     HostLaunch launch;
-    bool startPending, running, ended, stopRequested, paused;
+    bool startPending, running, ended, stopRequested, paused, waiting;
     int granted;   // frames the game may still draw
     double carry;  // the part of a frame not yet granted
     int frameRate;
@@ -173,7 +173,9 @@ bool host_wait_frame_locked(void) {
     for (;;) {
         if (!S.stopRequested) run_requests_locked();
         if (S.granted > 0 || S.stopRequested) break;
+        S.waiting = true;
         pthread_cond_wait(&cond, &lock);
+        S.waiting = false;
     }
     if (S.stopRequested) return false;
     S.granted--;
@@ -545,7 +547,7 @@ bool host_test_step(int timeoutMs) {
         deadline.tv_sec++;
         deadline.tv_nsec -= 1000000000L;
     }
-    while (S.serial == before && S.running && !S.ended && !S.message) {
+    while ((S.serial == before || !S.waiting) && S.running && !S.ended && !S.message) {
         if (pthread_cond_timedwait(&cond, &lock, &deadline) == ETIMEDOUT) break;
     }
     bool alive = S.running && !S.ended;

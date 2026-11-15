@@ -73,6 +73,27 @@ another thread's iPhone simulator running on the same Mac mini:
 The runtime's log gives each frame's cost every 600 frames ("timing:"): on the iPad simulator a VX map takes about
 0.7 ms in the game's scripts and 1.9 ms to compose. Simulator timing isn't iPad timing.
 
+## Brightness and transitions
+
+VX and VX Ace follow these rules, measured by running small test games of VNDegen's own through the PC's `Game.exe`
+under Wine. XP has no brightness.
+
+- `Graphics.freeze` keeps the picture as it is shown, darkened by the brightness at that moment. While the screen is
+  frozen, changing the brightness, `Graphics.fadeout` included, doesn't change what's shown.
+- `Graphics.transition` after a freeze sets the brightness to 255, whatever its duration, and blends from the frozen
+  picture to the new one at full brightness. Without a freeze it does nothing and leaves the brightness as it was.
+- `Graphics.snap_to_bitmap` draws the scene, not the frozen picture, at the current brightness. At brightness 0 the
+  bitmap is fully transparent.
+- A brightness `b` below 255 scales each color channel by `b / 256`.
+
+So a scene that follows `Graphics.fadeout` with only a transition fades in from black, as Dragon Maid's Erotic
+Notepad's recollection screen does on PC, over a black background, because the title's snapshot was taken at
+brightness 0.
+
+`ruby Engines/RGSSRuntime/tests/transition.rb build/rgss/host/rgssrun` checks these rules on the Linux host for VX and
+VX Ace. rgssrun's `--pixel X,Y` prints that pixel of every new frame. rgssrun grants the game its next frame only once
+the game waits for it, so a frame number in a script names the same frame on every run.
+
 ## Movies
 
 VX Ace's Play Movie command (`Graphics.play_movie`) plays Ogg Theora movies through VNDegen's shared movie decoder

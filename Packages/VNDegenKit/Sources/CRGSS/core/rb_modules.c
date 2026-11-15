@@ -67,19 +67,26 @@ static void ensure_screen(void) {
     image_alloc(&shown, rgss_screen_w, rgss_screen_h);
 }
 
+static void dim(const Image *from, Image *to) {
+    size_t n = (size_t)from->w * from->h;
+    for (size_t i = 0; i < n; i++) {
+        Pixel p = from->px[i];
+        to->px[i] = px_make(px_r(p) * brightness / 256, px_g(p) * brightness / 256, px_b(p) * brightness / 256, 255);
+    }
+}
+
+static void hand_over(const Image *frame) {
+    rgss_frame_count++;
+    if (!host_present(frame)) stop_game();
+}
+
 // Hands `frame` to the host at the current brightness and waits for the next frame.
 static void present(const Image *frame) {
-    const Image *out = frame;
     if (brightness < 255) {
-        size_t n = (size_t)frame->w * frame->h;
-        for (size_t i = 0; i < n; i++) {
-            Pixel p = frame->px[i];
-            shown.px[i] = px_make(px_r(p) * brightness / 255, px_g(p) * brightness / 255, px_b(p) * brightness / 255, 255);
-        }
-        out = &shown;
+        dim(frame, &shown);
+        frame = &shown;
     }
-    rgss_frame_count++;
-    if (!host_present(out)) stop_game();
+    hand_over(frame);
 }
 
 // Where a frame's time goes, logged every 600 frames: the game's scripts between two Graphics.update calls, the
@@ -164,7 +171,7 @@ static void update_frame(void) {
     }
     double start = now_ms();
     if (isFrozen) {
-        present(&frozen);
+        hand_over(&frozen);
         return;
     }
     scene_render(&screen);
@@ -213,6 +220,7 @@ static VALUE graphics_freeze(VALUE self) {
     image_free(&frozen);
     image_alloc(&frozen, screen.w, screen.h);
     scene_render(&frozen);
+    if (brightness < 255) dim(&frozen, &frozen);
     isFrozen = true;
     return Qnil;
 }
@@ -227,6 +235,7 @@ static VALUE graphics_transition(int argc, VALUE *argv, VALUE self) {
     int vague = argc > 2 ? NUM2INT(argv[2]) : 40;
     ensure_screen();
     if (!isFrozen) return Qnil;
+    brightness = 255;
     scene_render(&screen);
     Image mask = {0};
     if (!NIL_P(file) && RSTRING_LEN(StringValue(file)) > 0) {
@@ -271,6 +280,8 @@ static VALUE graphics_snap_to_bitmap(VALUE self) {
     Image snap;
     image_alloc(&snap, screen.w, screen.h);
     scene_render(&snap);
+    if (brightness == 0) memset(snap.px, 0, (size_t)snap.w * snap.h * sizeof(Pixel));
+    else if (brightness < 255) dim(&snap, &snap);
     return rgss_bitmap_wrap_image(snap);
 }
 
