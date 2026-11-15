@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.41.10",
+          "buildVersion": "2535",
+          "date": "2026-11-15T15:43:25Z",
+          "localizedDescription": "Dragon Maid's Erotic Notepad's recollection screen shows again.\n\n## Downloads\n\n- `VNDegen-0.41.10-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.41.10.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.41.10-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixes\n\n- RPG Maker VX and VX Ace: a screen that comes after a fade-out and opens with only a transition now fades in as on the PC, instead of staying black. Dragon Maid's Erotic Notepad's recollection screen is one.\n- RPG Maker VX and VX Ace: screen snapshots taken during a fade are dark, as on the PC.\n\n## What wasn't tested\n\n- No physical device was used. The fix was compared with the PC games under Wine and looked at in the Mac app. No iPhone or iPad simulator was used, since nothing changed layout or input.\n- RPG Maker XP games, whose code path didn't change.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.41.10/VNDegen-0.41.10.ipa",
+          "size": 127722307,
+          "sha256": "9e2f8475934108469e63ac29f215a40b62a5585f8379f3d665bde2900e695ad4",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.41.9",
           "buildVersion": "2529",
           "date": "2026-11-15T14:32:00Z",
