@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
             static std::string lastWait;
             if (std::string(std::getenv("NEKORUN_TRACE")) == "clicks" && status.find(" click ") != std::string::npos && status.substr(0, status.find(" t=")) != lastWait) {
                 lastWait = status.substr(0, status.find(" t="));
-                std::printf("waits %s\n", lastWait.c_str());
+                std::printf("waits %s at %d ms\n", lastWait.c_str(), elapsed);
             }
             lastScript = script;
         }
