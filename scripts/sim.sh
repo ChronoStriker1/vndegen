@@ -20,7 +20,10 @@ udid() { xcrun simctl list devices -j | python3 -c "import json,sys; n=sys.argv[
 case "${1:?command}" in
   boot)
     id=$(udid)
-    [ -n "$id" ] || id=$(xcrun simctl create "$full" "com.apple.CoreSimulator.SimDeviceType.$type")
+    if [ -z "$id" ]; then
+      id=$(xcrun simctl create "$full" "com.apple.CoreSimulator.SimDeviceType.$type")
+      if command -v simslim >/dev/null; then simslim on "$id" --except search >&2; fi
+    fi
     xcrun simctl bootstatus "$id" -b >/dev/null
     echo "$id" ;;
   install) xcrun simctl install "$(udid)" build/sim/Build/Products/Debug-iphonesimulator/VNDegen.app ;;
