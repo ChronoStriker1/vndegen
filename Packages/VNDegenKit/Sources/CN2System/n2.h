@@ -285,7 +285,7 @@ struct Obj {
     // OBJ_CHOICE
     int mouseState, lastMouseState;
     bool pressed;
-    Obj *focusNext[4];
+    char *focusName[4];
     // OBJ_SCROLLBAR
     int sbX1, sbY1, sbX2, sbY2;
     double sbValue;
@@ -455,6 +455,7 @@ void obj_screen_pos(Obj *o, double *x, double *y);
 // Buttons (obj.c): hover and press states of CreateChoice objects, run each frame.
 void buttons_update(N2 *n);
 bool obj_state_visible(Obj *o);
+void obj_set_focus(N2 *n, const char *from, const char *to, int dir);
 void n2_forget_obj(N2 *n, Obj *o);
 bool n2_skip_active(N2 *n);
 

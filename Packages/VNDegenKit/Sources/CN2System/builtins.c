@@ -620,7 +620,9 @@ static bool bi_SetShade(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
 }
 
 static bool bi_SetNextFocus(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
-    // Keyboard focus between buttons. VNDegen drives buttons with the pointer, which every input method moves.
+    static const char *dirs[4] = {"LEFT", "UP", "RIGHT", "DOWN"};
+    for (int d = 0; d < 4; d++)
+        if (aconst(a, argc, 2, dirs[d])) obj_set_focus(n, astr(a, argc, 0), astr(a, argc, 1), d);
     return false;
 }
 

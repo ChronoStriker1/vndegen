@@ -109,6 +109,7 @@ void obj_destroy(N2 *n, Obj *o) {
     free(o->alias);
     free(o->createCall);
     free(o->procTarget);
+    for (int i = 0; i < 4; i++) free(o->focusName[i]);
     free(o);
     n->dirty = true;
 }
@@ -410,7 +411,76 @@ static void update_choice(N2 *n, Obj *o, bool *consumed) {
     }
 }
 
+static Obj *choice_of(Obj *o) {
+    while (o && o->kind != OBJ_CHOICE) o = o->parent;
+    return o;
+}
+
+void obj_set_focus(N2 *n, const char *from, const char *to, int dir) {
+    Obj *a = choice_of(obj_find(n, from)), *b = choice_of(obj_find(n, to));
+    if (!a || !b || dir < 0 || dir > 3) return;
+    free(a->focusName[dir]);
+    a->focusName[dir] = n2_strdup(b->name);
+}
+
+static bool choice_shown(Obj *c) {
+    if (c->erased || c->unclickable) return false;
+    Obj *usual = state_node(c, "MouseUsual");
+    if (!usual) return false;
+    for (int i = 0; i < usual->childCount; i++)
+        if (usual->children[i]->opacity > 0 && !usual->children[i]->erased) return true;
+    return false;
+}
+
+static Obj *find_choice(Obj *o, const char *name, bool hovered) {
+    for (int i = 0; i < o->childCount; i++) {
+        Obj *c = o->children[i];
+        if (c->kind == OBJ_CHOICE && choice_shown(c) &&
+            (name ? n2_streq_ci(c->name, name) : !hovered || c->mouseState != MOUSE_USUAL))
+            return c;
+        Obj *f = find_choice(c, name, hovered);
+        if (f) return f;
+    }
+    return NULL;
+}
+
+static void point_at(N2 *n, Obj *c) {
+    Obj *usual = state_node(c, "MouseUsual");
+    double x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    bool any = false;
+    bounds_of(usual ? usual : c, &x0, &y0, &x1, &y1, &any);
+    if (!any) return;
+    n->mouseX = (int)((x0 + x1) / 2);
+    n->mouseY = (int)((y0 + y1) / 2);
+}
+
+static void keyboard_focus(N2 *n) {
+    static const int keys[4] = {0x25, 0x26, 0x27, 0x28};
+    Obj *roots[2] = {&n->sysRoot, &n->root};
+    bool sys = n->system && n->system->wait != WAIT_DONE;
+    for (int d = 0; d < 4; d++) {
+        if (!n->keyPressed[keys[d]]) continue;
+        Obj *root = sys ? roots[0] : roots[1];
+        Obj *cur = find_choice(root, NULL, true);
+        Obj *next = NULL;
+        if (cur && cur->focusName[d]) next = find_choice(root, cur->focusName[d], false);
+        else if (!cur) next = find_choice(root, NULL, false);
+        if (!next && !cur) continue;
+        if (next) point_at(n, next);
+        n->keyPressed[keys[d]] = false;
+    }
+    if (n->keyPressed[0x0d]) {
+        Obj *cur = find_choice(sys ? roots[0] : roots[1], NULL, true);
+        if (cur && hit(cur, n->mouseX, n->mouseY)) {
+            n->keyPressed[0x0d] = false;
+            n->mousePressed[VNN2_MOUSE_LEFT] = true;
+            n->mouseReleased[VNN2_MOUSE_LEFT] = true;
+        }
+    }
+}
+
 void buttons_update(N2 *n) {
+    keyboard_focus(n);
     // Presses stay recorded until a select pass reads them or the next click, so a quick click is never lost.
     if (n->mousePressed[VNN2_MOUSE_LEFT]) map_free(&n->pressedButtons, NULL);
     bool consumed = false;
