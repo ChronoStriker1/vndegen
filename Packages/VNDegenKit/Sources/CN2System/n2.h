@@ -62,12 +62,16 @@ void map_free(Map *m, void (*freeValue)(void *));
 typedef struct NpaEntry {
     char *name;  // UTF-8, '/' separated, as stored (case kept)
     u32 offset, size, unpackedSize;
+    u32 nameLen;
+    u8 nameSum;
 } NpaEntry;
 
 typedef struct Npa {
     char *path;
     FILE *file;
     bool compressed;
+    const struct NpaScheme *scheme;
+    i32 arcKey;
     NpaEntry *entries;
     int count;
     Map index;  // lowercased name to entry
