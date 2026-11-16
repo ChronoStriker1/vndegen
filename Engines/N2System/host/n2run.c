@@ -14,10 +14,40 @@
 
 static void write_png(const char *path, const uint32_t *px, int w, int h);
 
+static FILE *wav;
+static long wavFrames;
+static float audio[2048];
+
+static int step(VNN2 *n) {
+    int alive = vnn2_frame(n, 16);
+    vnn2_audio(n, audio, 705);
+    if (wav) {
+        int16_t s[1410];
+        for (int i = 0; i < 1410; i++) {
+            float v = audio[i] * 32767.0f;
+            s[i] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+        }
+        fwrite(s, sizeof s, 1, wav);
+        wavFrames += 705;
+    }
+    return alive;
+}
+
 static int run(VNN2 *n, int ms) {
     for (int t = 0; t < ms; t += 16)
-        if (!vnn2_frame(n, 16)) return 0;
+        if (!step(n)) return 0;
     return 1;
+}
+
+static void wav_header(FILE *f, long frames) {
+    uint32_t data = (uint32_t)(frames * 4);
+    uint8_t h[44] = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 16, 0, 0, 0, 1, 0, 2, 0,
+                     0x44, 0xac, 0, 0, 0x10, 0xb1, 2, 0, 4, 0, 16, 0, 'd', 'a', 't', 'a'};
+    uint32_t riff = data + 36;
+    memcpy(h + 4, &riff, 4);
+    fseek(f, 0, SEEK_SET);
+    fwrite(h, 1, 40, f);
+    fwrite(&data, 4, 1, f);
 }
 
 int main(int argc, char **argv) {
@@ -39,16 +69,16 @@ int main(int argc, char **argv) {
         fprintf(stderr, "open failed: %s\n", err);
         return 1;
     }
-    float audio[2048];
+    char wavPath[1024];
+    snprintf(wavPath, sizeof wavPath, "%s/audio.wav", argv[3]);
+    wav = fopen(wavPath, "wb");
+    if (wav) wav_header(wav, 0);
     int alive = 1;
     for (int i = 4; i < argc && alive; i++) {
         const char *c = argv[i];
         int x, y, k;
         if (sscanf(c, "wait:%d", &k) == 1) {
-            for (int t = 0; t < k && alive; t += 16) {
-                alive = vnn2_frame(n, 16);
-                vnn2_audio(n, audio, 705);
-            }
+            for (int t = 0; t < k && alive; t += 16) alive = step(n);
         } else if (sscanf(c, "click:%d,%d", &x, &y) == 2) {
             vnn2_mouse_move(n, x, y);
             alive = run(n, 32);
@@ -91,6 +121,10 @@ int main(int argc, char **argv) {
     }
     if (!alive) printf("game ended: %s\n", vnn2_problem(n) ? vnn2_problem(n) : "normally");
     vnn2_close(n);
+    if (wav) {
+        wav_header(wav, wavFrames);
+        fclose(wav);
+    }
     return 0;
 }
 

@@ -95,6 +95,7 @@ void fs_free(N2Fs *fs);
 // the archive named by the first component. Case and slash direction are ignored.
 u8 *fs_read(N2Fs *fs, const char *path, size_t *size);
 bool fs_exists(N2Fs *fs, const char *path);
+char *fs_loose_path(N2Fs *fs, const char *path);
 
 // ---- values ----
 
@@ -302,6 +303,7 @@ enum {
     WAIT_FRAME,    // one frame
     WAIT_TEXTSEG,  // text thread: until the typewriter shows its segment
     WAIT_SOUND,
+    WAIT_MOVIE,
     WAIT_DONE,     // the thread has ended
 };
 
@@ -399,6 +401,8 @@ struct VNN2 {
     char *outlineMode;
     // sound
     struct Mixer *mixer;
+    struct Movie *movie;
+    int audioRate;
     long long startTime;
     int rngState;
     Map pressedButtons;  // button name to (void *)1 for the current select pass
@@ -488,6 +492,17 @@ void voice_play(N2 *n, const char *path);
 void voice_stop(N2 *n);
 bool voice_playing(N2 *n);
 void mixer_update(N2 *n);
+struct Channel *mixer_stream_open(N2 *n);
+int mixer_stream_queued(N2 *n, struct Channel *c);
+void mixer_stream_write(N2 *n, struct Channel *c, const float *stereo, int frames, float gain);
+u64 mixer_stream_played(N2 *n, struct Channel *c);
+void mixer_stream_close(N2 *n, struct Channel *c);
+double sound_kind_volume(N2 *n, int kind);
+bool movie_play(N2 *n, const char *path, bool skippable);
+void movie_update(N2 *n, u32 elapsedMs, bool skip);
+bool movie_draw(N2 *n);
+bool movie_active(N2 *n);
+void movie_stop(N2 *n);
 void mixer_render(struct Mixer *m, float *out, int frames);
 
 Image *img_blur(Image *src, int radius);

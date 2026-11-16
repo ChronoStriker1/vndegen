@@ -762,6 +762,17 @@ static bool bi_SetScrollbar(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
 
 static bool bi_noop(N2 *n, Thread *t, Value *a, int argc, Value *ret) { return false; }
 
+static bool bi_FileExists(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
+    *ret = v_bool(fs_exists(&n->fs, astr(a, argc, 0)));
+    return false;
+}
+
+static bool bi_MoviePlay(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
+    if (!movie_play(n, astr(a, argc, 0), argc < 2 || abool(a, argc, 1))) return false;
+    t->wait = WAIT_MOVIE;
+    return true;
+}
+
 static bool bi_true(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
     *ret = v_bool(true);
     return false;
@@ -1035,7 +1046,8 @@ static const struct {
     {"VariableValue", bi_VariableValue}, {"ModuleFileName", bi_ModuleFileName}, {"Conquest", bi_Conquest},
     {"ClearScore", bi_ClearScore}, {"SetShortcut", bi_SetShortcut}, {"Reset", bi_Reset}, {"Exit", bi_Exit},
     {"System", bi_noop}, {"Message", bi_Message}, {"EnableDirect3DHAL", bi_true}, {"MoveCursor", bi_MoveCursor},
-    {"CursorPosition", bi_CursorPosition}, {"VoiceReset", bi_noop}, {"ShowRecChapterName", bi_noop},
+    {"CursorPosition", bi_CursorPosition}, {"FileExists", bi_FileExists}, {"MoviePlay", bi_MoviePlay},
+    {"AssocArray", bi_noop}, {"SetEnableBacklog", bi_noop}, {"VoiceReset", bi_noop}, {"ShowRecChapterName", bi_noop},
 };
 
 BuiltinFn builtin_find(const char *name) {

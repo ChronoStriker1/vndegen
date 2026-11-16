@@ -269,7 +269,8 @@ VNN2 *vnn2_open(const VNN2Config *config, char *err, size_t errSize) {
     }
     n->curRoot = &n->root;
     n->pendingLoad = -1;
-    n->mixer = mixer_new(config->audioRate > 0 ? config->audioRate : 44100);
+    n->audioRate = config->audioRate > 0 ? config->audioRate : 44100;
+    n->mixer = mixer_new(n->audioRate);
 
     const char *face = n2_ini(n, "フォント", "face"), *size = n2_ini(n, "フォント", "size");
     snprintf(n->fontFace, sizeof n->fontFace, "%s", face ? face : "MS Gothic");
@@ -314,6 +315,7 @@ void vnn2_close(VNN2 *n) {
         free(roots[i]->children);
         free(roots[i]->name);
     }
+    movie_stop(n);
     sound_release_globals(n);
     for (int i = 0; i < n->threadCount; i++) thread_free(n->threads[i]);
     free(n->threads);
@@ -559,6 +561,7 @@ void n2_reset(N2 *n, bool restartMain) {
             n->threads[i--] = n->threads[--n->threadCount];
         }
     }
+    movie_stop(n);
     thread_kill(n, n->main);
     if (n->system) thread_kill(n, n->system);
     voice_stop(n);
@@ -595,6 +598,10 @@ bool vnn2_frame(VNN2 *n, uint32_t elapsedMs) {
         n->dirty = true;
     }
 
+    if (movie_active(n)) {
+        movie_update(n, elapsedMs, advance || n->keyPressed[0x1b] || n->mousePressed[VNN2_MOUSE_RIGHT]);
+        advance = n->anyPress = false;
+    }
     update_objs(n, &n->root);
     update_objs(n, &n->sysRoot);
     backlog_input(n);

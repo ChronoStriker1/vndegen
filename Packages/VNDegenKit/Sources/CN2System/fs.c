@@ -55,6 +55,16 @@ void fs_free(N2Fs *fs) {
     memset(fs, 0, sizeof *fs);
 }
 
+char *fs_loose_path(N2Fs *fs, const char *path) {
+    char *rel = norm(path);
+    char *full = n2_fmt("%s/%s", fs->gameDir, rel);
+    free(rel);
+    char real[4096];
+    bool found = casepath_resolve(full, real, sizeof real) == 1;
+    free(full);
+    return found ? n2_strdup(real) : NULL;
+}
+
 static u8 *read_loose(N2Fs *fs, const char *rel, size_t *size) {
     char *path = n2_fmt("%s/%s", fs->gameDir, rel);
     char real[4096];

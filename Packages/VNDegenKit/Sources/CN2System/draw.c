@@ -221,7 +221,7 @@ void n2_render_to(N2 *n, u32 *dst) {
 
 void n2_render(N2 *n) {
     if (!n->dirty) return;
-    n2_render_to(n, n->screen);
+    if (!movie_draw(n)) n2_render_to(n, n->screen);
     n->dirty = false;
     n->frameSerial++;
 }

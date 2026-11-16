@@ -40,6 +40,8 @@
 #define AHEAD 12000      // frames decoded ahead each update
 #define MAX_CHANNELS 48
 
+static double kind_volume(N2 *n, int kind);
+
 typedef struct Channel {
     float ring[RING * 2];
     int head, tail;  // ring positions in frames; written by the game thread, read by the audio thread
@@ -209,6 +211,37 @@ u32 sound_position_ms(Sound *s) {
     if (!s || !s->ch || !s->srcRate) return 0;
     return (u32)(s->ch->played * 1000 / 44100);
 }
+
+double sound_kind_volume(N2 *n, int kind) { return kind_volume(n, kind); }
+
+struct Channel *mixer_stream_open(N2 *n) { return channel_new(n->mixer); }
+
+int mixer_stream_queued(N2 *n, struct Channel *c) {
+    pthread_mutex_lock(&n->mixer->lock);
+    int used = (c->head - c->tail + RING) % RING;
+    pthread_mutex_unlock(&n->mixer->lock);
+    return used;
+}
+
+void mixer_stream_write(N2 *n, struct Channel *c, const float *stereo, int frames, float gain) {
+    pthread_mutex_lock(&n->mixer->lock);
+    c->target = gain;
+    for (int i = 0; i < frames && (c->head + 1) % RING != c->tail; i++) {
+        c->ring[c->head * 2] = stereo[i * 2];
+        c->ring[c->head * 2 + 1] = stereo[i * 2 + 1];
+        c->head = (c->head + 1) % RING;
+    }
+    pthread_mutex_unlock(&n->mixer->lock);
+}
+
+u64 mixer_stream_played(N2 *n, struct Channel *c) {
+    pthread_mutex_lock(&n->mixer->lock);
+    u64 p = c->played;
+    pthread_mutex_unlock(&n->mixer->lock);
+    return p;
+}
+
+void mixer_stream_close(N2 *n, struct Channel *c) { channel_free(n->mixer, c); }
 
 static double kind_volume(N2 *n, int kind) {
     static const char *vars[] = {"#SYSTEM_sound_volume_bgm", "#SYSTEM_sound_volume_se", "#SYSTEM_sound_volume_voice"};
