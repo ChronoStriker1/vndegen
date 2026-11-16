@@ -18,6 +18,24 @@ static MISSING_CONFIGURED_FONTS_LOGGED: OnceLock<Mutex<HashSet<String>>> = OnceL
 // substitute once, before the first game starts, through `set_default_font`.
 static DEFAULT_FONT: OnceLock<(&'static [u8], String)> = OnceLock::new();
 
+static HOST_FONTS: Mutex<Vec<(String, PathBuf, u32)>> = Mutex::new(Vec::new());
+
+pub fn add_host_font(name: &str, path: PathBuf, face_index: u32) {
+    let normalized = normalize_font_name_for_match(name.trim_start_matches('@'));
+    if let Ok(mut fonts) = HOST_FONTS.lock() {
+        fonts.retain(|(known, _, _)| *known != normalized);
+        fonts.push((normalized, path, face_index));
+    }
+}
+
+fn host_font(normalized: &str) -> Option<(PathBuf, u32)> {
+    let fonts = HOST_FONTS.lock().ok()?;
+    fonts
+        .iter()
+        .find(|(name, _, _)| name == normalized)
+        .map(|(_, path, face)| (path.clone(), *face))
+}
+
 /// Sets the font used in place of MS PGothic and of faces no game or system font provides. Only the first call takes
 /// effect. Returns whether `bytes` became the default font.
 pub fn set_default_font(bytes: Vec<u8>, source: String) -> bool {
@@ -251,6 +269,12 @@ impl FontCache {
                 if self.load_named_from_font_dir(dir, &normalized) {
                     return true;
                 }
+            }
+            if let Some((path, face)) = host_font(&normalized)
+                && let Some((data, _)) = font_file_face(&path, "")
+                && self.install_font_face(&path, data, face)
+            {
+                return true;
             }
             if font_name_matches_embedded_default(requested_name.trim_start_matches('@'))
                 && self.try_load_embedded_default_font()

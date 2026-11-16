@@ -103,6 +103,9 @@ struct Args {
 
     #[arg(long)]
     language_pack: Option<String>,
+
+    #[arg(long)]
+    font_table: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -4741,6 +4744,15 @@ fn main() -> Result<()> {
     if let Some(font) = &args.font {
         let bytes = std::fs::read(font).with_context(|| format!("read {}", font.display()))?;
         siglus_scene_vm::text_render::set_default_font(bytes, font.display().to_string());
+    }
+    if let Some(table) = &args.font_table {
+        let folder = table.parent().unwrap_or(Path::new("."));
+        for line in std::fs::read_to_string(table)?.lines().filter(|line| !line.starts_with('#')) {
+            let fields: Vec<&str> = line.split('\t').collect();
+            if let [name, "regular", file, face] = fields[..] {
+                siglus_scene_vm::text_render::add_host_font(name, folder.join(file), face.parse().unwrap_or(0));
+            }
+        }
     }
     if let Some(code) = &args.language {
         siglus_scene_vm::resource::set_language(code, args.language_pack.as_deref().unwrap_or(""));
