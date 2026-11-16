@@ -1,0 +1,12 @@
+# Stands in for siglus_rs's WMV and WMA decoder (crates/na_wmv_player), which is LGPL and which VNDegen leaves out.
+# It has the types siglus_scene_vm names, and every decoder fails to open, so a .wmv movie counts as unplayable.
+[package]
+name = "wmv-decoder"
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+workspace = "../siglus_rs"
+
+[lib]
+name = "wmv_decoder"
+path = "src/lib.rs"

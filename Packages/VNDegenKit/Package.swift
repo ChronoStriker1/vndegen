@@ -17,6 +17,7 @@ let package = Package(
         .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
         .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
         .library(name: "EngineArtemis", targets: ["EngineArtemis"]),
+        .library(name: "EngineSiglus", targets: ["EngineSiglus"]),
         .library(name: "EngineGodot", targets: ["EngineGodot"]),
         .library(name: "EngineNScripter", targets: ["EngineNScripter"]),
         .library(name: "FrameHost", targets: ["FrameHost"]),
@@ -159,6 +160,10 @@ let package = Package(
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
         .target(name: "EngineArtemis", dependencies: ["VNCore", "ControllerUI", "CArtemis", "CVNVideo", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
+        // SiglusEngine and RealLive games on siglus_rs, through VNDegen's C interface in CSiglus (vnsiglus.h). The engine
+        // itself is the VNSiglus framework the app embeds, found at run time.
+        .target(name: "CSiglus"),
+        .target(name: "EngineSiglus", dependencies: ["VNCore", "CSiglus", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
@@ -201,6 +206,7 @@ let package = Package(
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages", "TestSupport"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS", "TestSupport"]),
         .testTarget(name: "EngineArtemisTests", dependencies: ["EngineArtemis", "FrameHost", "TestSupport"]),
+        .testTarget(name: "EngineSiglusTests", dependencies: ["EngineSiglus", "TestSupport"]),
         .testTarget(name: "EngineGodotTests", dependencies: ["EngineGodot", "FrameHost", "TestSupport"]),
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter", "TestSupport"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG", "TestSupport"]),
