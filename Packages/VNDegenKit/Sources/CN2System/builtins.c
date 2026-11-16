@@ -880,12 +880,19 @@ static bool bi_String(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
             spec[k++] = conv;
             spec[k] = 0;
             snprintf(out, sizeof out, spec, (long long)anum(a, argc, ai++));
+            buf_str(&b, out);
+        } else if (k == 1) {
+            buf_str(&b, astr(a, argc, ai++));
         } else {
             spec[k++] = 's';
             spec[k] = 0;
-            snprintf(out, sizeof out, spec, astr(a, argc, ai++));
+            const char *arg = astr(a, argc, ai++);
+            size_t cap = strlen(arg) + 4096;
+            char *big = n2_alloc(cap);
+            snprintf(big, cap, spec, arg);
+            buf_str(&b, big);
+            free(big);
         }
-        buf_str(&b, out);
     }
     buf_u8(&b, 0);
     *ret = v_str((char *)b.data);

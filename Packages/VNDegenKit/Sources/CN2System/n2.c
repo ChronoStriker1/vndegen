@@ -287,6 +287,7 @@ VNN2 *vnn2_open(const VNN2Config *config, char *err, size_t errSize) {
 
     load_globals(n);
     set_defaults(n);
+    set_str(n, "#SYSTEM_save_path", n->saveDir);
 
     const char *start = n2_ini(n, "スクリプト", "start");
     Script *s = n2_load_script(n, start ? start : "nss/boot.nss");

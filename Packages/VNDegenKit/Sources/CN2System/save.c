@@ -13,6 +13,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <zlib.h>
@@ -128,11 +129,22 @@ u8 *npsf_read(const char *path, size_t *size) {
 // Script paths into the save folder: "#SYSTEM_save_path/0001/date.npf" or a relative "0001/date.npf".
 static char *save_path(N2 *n, const char *path) {
     size_t sl = strlen(n->saveDir);
-    char *p;
-    if (strncmp(path, n->saveDir, sl) == 0) p = n2_strdup(path);
-    else p = n2_fmt("%s/%s", n->saveDir, path);
-    for (char *q = p; *q; q++)
+    if (strncmp(path, n->saveDir, sl) == 0) return n2_strdup(path);
+    char *rel = n2_strdup(path);
+    for (char *q = rel; *q; q++)
         if (*q == '\\') *q = '/';
+    const char *tail = rel;
+    bool absolute = rel[0] == '/' || (rel[0] && rel[1] == ':');
+    if (absolute) {
+        const char *base = strrchr(n->saveDir, '/');
+        char *marker = n2_fmt("/%s/", base ? base + 1 : n->saveDir);
+        const char *hit = NULL;
+        for (const char *q = rel; (q = strcasestr(q, marker)); q++) hit = q;
+        tail = hit ? hit + strlen(marker) : strrchr(rel, '/') ? strrchr(rel, '/') + 1 : rel;
+        free(marker);
+    }
+    char *p = n2_fmt("%s/%s", n->saveDir, tail);
+    free(rel);
     return p;
 }
 
