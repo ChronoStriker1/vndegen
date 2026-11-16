@@ -2997,7 +2997,8 @@ fn msgbk_add_text(ctx: &mut CommandContext, s: &str) {
     let Some(st) = msgbk_state_mut(ctx) else {
         return;
     };
-    st.add_msg(s, s, scn_no, line_no);
+    let s = s.replace("\t ", ", ");
+    st.add_msg(&s, &s, scn_no, line_no);
 }
 
 fn msgbk_add_name(ctx: &mut CommandContext, s: &str) {
@@ -13580,7 +13581,7 @@ fn mwnd_add_msg_check(m: &MwndState, new_line_flag: bool) -> bool {
 }
 
 pub(crate) fn mwnd_shown_name(m: &MwndState, name: &str) -> String {
-    if m.name_disp_mode == 2 { String::new() } else { name.to_string() }
+    if m.name_disp_mode == 2 { String::new() } else { name.replace("\t ", ", ") }
 }
 
 fn mwnd_resolved_color_nos(ctx: &CommandContext, m: &MwndState) -> (i64, i64, i64) {
@@ -14004,6 +14005,7 @@ fn mwnd_text_tokens(text: &str) -> Vec<MwndTextToken> {
             }
         }
         let end = chars.get(i + 1).map(|v| v.0).unwrap_or(text.len());
+        let ch = if ch == '\t' && chars.get(i + 1).is_some_and(|next| next.1 == ' ') { ',' } else { ch };
         out.push(MwndTextToken {
             moji_type: 0,
             code: ch as i32,

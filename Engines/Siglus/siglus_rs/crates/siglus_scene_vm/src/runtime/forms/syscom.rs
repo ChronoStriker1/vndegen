@@ -3560,12 +3560,12 @@ fn slot_str(slot: &SaveSlotState, op: i32) -> String {
             // auto-savepoint replaced it after PRINT. Display the retained page
             // text in that case, without rewriting the user's save file.
             if slot.message.is_empty() {
-                slot.full_message.clone()
+                slot.full_message.replace("\t ", ", ")
             } else {
-                slot.message.clone()
+                slot.message.replace("\t ", ", ")
             }
         }
-        GET_SAVE_FULL_MESSAGE | GET_QUICK_SAVE_FULL_MESSAGE => slot.full_message.clone(),
+        GET_SAVE_FULL_MESSAGE | GET_QUICK_SAVE_FULL_MESSAGE => slot.full_message.replace("\t ", ", "),
         GET_SAVE_COMMENT | GET_QUICK_SAVE_COMMENT => slot.comment.clone(),
         GET_SAVE_APPEND_DIR | GET_QUICK_SAVE_APPEND_DIR => slot.append_dir.clone(),
         GET_SAVE_APPEND_NAME | GET_QUICK_SAVE_APPEND_NAME => slot.append_name.clone(),
