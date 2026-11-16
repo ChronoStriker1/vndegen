@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 typedef struct Entry {
     char *text;
@@ -239,4 +240,79 @@ void backlog_draw(N2 *n, Obj *o) {
         }
     }
     img_unref(speaker);
+}
+
+Buf backlog_save(N2 *n, bool dropLast) {
+    struct Backlog *b = bl(n);
+    Buf units = {0};
+    int count = dropLast && b->count ? b->count - 1 : b->count;
+    for (int i = 0; i < count; i++) {
+        Buf line = {0};
+        if (b->entries[i].voice) {
+            buf_u8(&line, 0x10);
+            buf_u8(&line, 0x11);
+            buf_u8(&line, 0x11);
+            const char *v = b->entries[i].voice;
+            buf_str(&line, v);
+            size_t vl = strlen(v);
+            if (vl < 4 || strcasecmp(v + vl - 4, ".ogg") != 0) buf_str(&line, ".ogg");
+            buf_u8(&line, 0x10);
+        }
+        size_t sl;
+        char *s = n2_utf8_to_sjis(b->entries[i].text, &sl);
+        buf_put(&line, s, sl);
+        free(s);
+        buf_u8(&line, '\n');
+        for (size_t k = 0; k < line.len; k++) {
+            u8 u[2] = {line.data[k], 0};
+            buf_put(&units, u, 2);
+        }
+        buf_free(&line);
+    }
+    Buf out = {0};
+    buf_str(&out, "NPSB");
+    buf_u32(&out, 0xf1f2b5c5u);
+    buf_u32(&out, (u32)(20 + units.len));
+    buf_u32(&out, (u32)count);
+    buf_u32(&out, (u32)count);
+    buf_put(&out, units.data, units.len);
+    buf_free(&units);
+    return out;
+}
+
+void backlog_load(N2 *n, const u8 *d, size_t size) {
+    backlog_clear(n);
+    if (size < 20 || memcmp(d, "NPSB", 4) != 0) return;
+    size_t count = (size - 20) / 2;
+    u8 *bytes = n2_alloc(count + 1);
+    for (size_t i = 0; i < count; i++) bytes[i] = d[20 + i * 2];
+    char *voice = NULL;
+    Buf text = {0};
+    for (size_t i = 0; i <= count; i++) {
+        u8 c = i < count ? bytes[i] : '\n';
+        if (c == 0x10 && i + 1 < count && bytes[i + 1] == 0x11) {
+            size_t j = i + 2;
+            while (j < count && bytes[j] != 0x11) j++;
+            size_t v0 = j + 1, v1 = v0;
+            while (v1 < count && bytes[v1] != 0x10) v1++;
+            if (!voice && v1 > v0) voice = n2_sjis_to_utf8(bytes + v0, v1 - v0, NULL);
+            i = v1;
+            continue;
+        }
+        if (c == '\n') {
+            if (text.len) {
+                char *u = n2_sjis_to_utf8(text.data, text.len, NULL);
+                backlog_add(n, u, voice);
+                free(u);
+            }
+            text.len = 0;
+            free(voice);
+            voice = NULL;
+            continue;
+        }
+        buf_u8(&text, c == '\r' ? ' ' : c);
+    }
+    buf_free(&text);
+    free(voice);
+    free(bytes);
 }

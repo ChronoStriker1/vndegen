@@ -44,6 +44,9 @@ typedef struct P {
     size_t errSize;
     bool failed;
     int line;
+    int prevEnd;
+    int lastClose;
+    int stmtKind, stmtLoopStart;
 } P;
 
 static bool is_lead(u8 c) { return (c >= 0x81 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfc); }
@@ -101,6 +104,7 @@ static bool at_line_start(P *p, int pos) {
 }
 
 static void next(P *p) {
+    p->prevEnd = p->tok.end;
     free(p->tok.text);
     memset(&p->tok, 0, sizeof p->tok);
     skip_trivia(p);
@@ -440,6 +444,7 @@ static void statement(P *p);
 static void block(P *p) {
     if (!accept(p, "[")) expect(p, "{");  // "}else[" in extra_cglibrary.nss opens a block too
     while (!p->failed && !is(p, "}") && p->tok.kind != T_EOF) statement(p);
+    p->lastClose = p->tok.pos;
     expect(p, "}");
 }
 
@@ -543,7 +548,32 @@ static void assignment_or_expr(P *p) {
     if (!accept(p, ";")) accept(p, ":");
 }
 
+static void statement_body(P *p);
+
 static void statement(P *p) {
+    if (p->failed) return;
+    Chunk *c = p->chunk;
+    if (!c) {
+        statement_body(p);
+        return;
+    }
+    if (c->stmtCount == c->stmtCap) {
+        c->stmtCap = c->stmtCap ? c->stmtCap * 2 : 32;
+        c->stmts = n2_grow(c->stmts, sizeof(Stmt) * (size_t)c->stmtCap);
+    }
+    int at = c->stmtCount++;
+    c->stmts[at] = (Stmt){.src = p->tok.pos, .ip = c->codeLen};
+    p->stmtKind = STMT_PLAIN;
+    statement_body(p);
+    if (p->chunk != c) return;
+    Stmt *st = &c->stmts[at];
+    st->srcEnd = p->prevEnd;
+    st->ipEnd = c->codeLen;
+    if (st->kind == STMT_PLAIN) st->kind = p->stmtKind;
+    p->stmtKind = STMT_PLAIN;
+}
+
+static void statement_body(P *p) {
     if (p->failed) return;
     Tok *t = &p->tok;
     if (is(p, "{") || is(p, "[")) {
@@ -586,6 +616,8 @@ static void statement(P *p) {
         return;
     }
     if (is_kw(p, "while")) {
+        int kwEnd = p->tok.end;
+        int at = p->chunk->stmtCount - 1;
         next(p);
         int start = p->chunk->codeLen;
         expect(p, "(");
@@ -598,9 +630,16 @@ static void statement(P *p) {
         emit(p, OP_JMP, start);
         patch(p, jz, p->chunk->codeLen);
         pop_loop(p, &l, p->chunk->codeLen);
+        if (at >= 0) {
+            p->chunk->stmts[at].kind = STMT_WHILE;
+            p->chunk->stmts[at].loopStart = kwEnd;
+            p->chunk->stmts[at].loopClose = p->lastClose;
+        }
         return;
     }
     if (is_kw(p, "select")) {
+        int kwEnd = p->tok.end;
+        int at = p->chunk->stmtCount - 1;
         next(p);
         int start = emit(p, OP_SELECT_BEGIN, 0);
         Loop l;
@@ -608,6 +647,11 @@ static void statement(P *p) {
         block(p);
         emit(p, OP_SELECT_END, start);
         pop_loop(p, &l, p->chunk->codeLen);
+        if (at >= 0) {
+            p->chunk->stmts[at].kind = STMT_SELECT;
+            p->chunk->stmts[at].loopStart = kwEnd;
+            p->chunk->stmts[at].loopClose = p->lastClose;
+        }
         return;
     }
     if (is_kw(p, "case")) {
@@ -658,6 +702,7 @@ static void statement(P *p) {
         emit(p, OP_CALL_CHAPTER, 0);
         free(path);
         accept(p, ";");
+        p->stmtKind = STMT_CALL_SCENE;
         return;
     }
     if (is_kw(p, "call_scene")) {
@@ -673,6 +718,7 @@ static void statement(P *p) {
         }
         emit(p, OP_CALL_SCENE, 0);
         accept(p, ";");
+        p->stmtKind = STMT_CALL_SCENE;
         return;
     }
     assignment_or_expr(p);
@@ -791,6 +837,7 @@ static void declaration(P *p, int kind) {
         }
         expect(p, ")");
     }
+    c->body = p->tok.pos + 1;
     block(p);
     emit(p, OP_NULL, 0);
     emit(p, OP_RET, 0);
@@ -839,6 +886,7 @@ static void chunk_free(Chunk *c) {
     free(c->params);
     free(c->code);
     free(c->srcpos);
+    free(c->stmts);
     for (int i = 0; i < c->constCount; i++) v_free(&c->consts[i]);
     free(c->consts);
     free(c);

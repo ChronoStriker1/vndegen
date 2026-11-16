@@ -339,7 +339,7 @@ static void write_thumbnail(N2 *n, const char *path, int w, int h) {
 
 bool save_exists(N2 *n, int slot) {
     char *dir = slot_dir(n, slot);
-    char *path = n2_fmt("%s/val.npf", dir);
+    char *path = n2_fmt("%s/script.npf", dir);
     struct stat st;
     bool ok = stat(path, &st) == 0;
     free(path);
@@ -364,53 +364,77 @@ void save_delete(N2 *n, int slot) {
     free(dir);
 }
 
+static bool write_slot_file(N2 *n, const char *dir, const char *name, Buf *b) {
+    char *path = n2_fmt("%s/%s", dir, name);
+    bool ok = b->len && npsf_write(path, b->data, b->len);
+    if (!ok) n2_log(n, "can't write %s", path);
+    free(path);
+    buf_free(b);
+    return ok;
+}
+
 bool save_slot(N2 *n, int slot) {
     char *dir = slot_dir(n, slot);
     mkdir_p(dir);
-    Buf vars = write_vars(n, '$', "NPSL");
-    char *path = n2_fmt("%s/val.npf", dir);
-    bool ok = npsf_write(path, vars.data, vars.len);
-    free(path);
-    buf_free(&vars);
-    Buf state = slot_state_write(n);
-    path = n2_fmt("%s/vndegen.npf", dir);
-    ok = npsf_write(path, state.data, state.len) && ok;
-    free(path);
-    buf_free(&state);
-    if (slot != 0 && slot != 9999) {
-        Value *tw = var_get(n, "#SYSTEM_save_thumbnail_width"), *th = var_get(n, "#SYSTEM_save_thumbnail_height");
-        int w = tw ? (int)v_tonum(tw) : 100, h = th ? (int)v_tonum(th) : 75;
-        if (w <= 0 || w > 800) w = 100;
-        if (h <= 0 || h > 600) h = 75;
-        char *rel = n2_fmt("%04d/thum.npf", slot);
-        write_thumbnail(n, rel, w, h);
-        free(rel);
+    int procs = 0;
+    Buf script = slot_script_write(n, &procs);
+    bool ok = script.len > 0;
+    if (ok) {
+        Buf frames = frames_save(n, procs);
+        Buf log = backlog_save(n, false);
+        Buf vars = write_vars(n, '$', "NPSL");
+        ok = write_slot_file(n, dir, "script.npf", &script);
+        ok = write_slot_file(n, dir, "frames.npf", &frames) && ok;
+        ok = write_slot_file(n, dir, "bklg.npf", &log) && ok;
+        ok = write_slot_file(n, dir, "val.npf", &vars) && ok;
+    } else {
+        buf_free(&script);
     }
+    Value *tw = var_get(n, "#SYSTEM_save_thumbnail_width"), *th = var_get(n, "#SYSTEM_save_thumbnail_height");
+    int w = tw ? (int)v_tonum(tw) : 100, h = th ? (int)v_tonum(th) : 75;
+    if (w <= 0 || w > 800) w = 100;
+    if (h <= 0 || h > 600) h = 75;
+    char *rel = n2_fmt("%04d/thum.npf", slot);
+    write_thumbnail(n, rel, w, h);
+    free(rel);
     save_globals(n);
     free(dir);
     n2_log(n, "saved slot %d: %s", slot, ok ? "ok" : "failed");
     return ok;
 }
 
+static u8 *read_slot_file(const char *dir, const char *name, size_t *size) {
+    char *path = n2_fmt("%s/%s", dir, name);
+    u8 *d = npsf_read(path, size);
+    free(path);
+    return d;
+}
+
 bool load_slot(N2 *n, int slot) {
     char *dir = slot_dir(n, slot);
-    char *path = n2_fmt("%s/vndegen.npf", dir);
-    size_t size;
-    u8 *state = npsf_read(path, &size);
-    free(path);
-    path = n2_fmt("%s/val.npf", dir);
-    size_t vsize;
-    u8 *vars = npsf_read(path, &vsize);
-    free(path);
+    size_t ss = 0, fs = 0, bs = 0, vs = 0;
+    u8 *script = read_slot_file(dir, "script.npf", &ss);
+    u8 *frames = read_slot_file(dir, "frames.npf", &fs);
+    u8 *log = read_slot_file(dir, "bklg.npf", &bs);
+    u8 *vars = read_slot_file(dir, "val.npf", &vs);
     free(dir);
     bool ok = false;
-    if (state && vars && vsize >= 4 && memcmp(vars, "NPSL", 4) == 0) {
-        ok = slot_state_read(n, state, size, vars, vsize);
+    if (script && frames && vars && vs >= 4 && memcmp(vars, "NPSL", 4) == 0) {
+        n2_reset(n, false);
+        read_vars(n, vars, vs);
+        bool hadText = false;
+        frames_load(n, frames, fs, &hadText);
+        if (log) backlog_load(n, log, bs);
+        ok = slot_script_read(n, script, ss, hadText);
+        if (!ok) n2_log(n, "slot %d: its script state couldn't be restored", slot);
     } else {
-        n2_log(n, "slot %d has no state VNDegen can load", slot);
+        n2_log(n, "slot %d is missing files", slot);
     }
-    free(state);
+    free(script);
+    free(frames);
+    free(log);
     free(vars);
+    if (!ok) n2_reset(n, true);
     return ok;
 }
 

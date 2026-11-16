@@ -168,10 +168,22 @@ typedef struct Script Script;
 
 enum { CHUNK_FUNCTION, CHUNK_CHAPTER, CHUNK_SCENE, CHUNK_TEXT };
 
+enum { STMT_PLAIN, STMT_CALL_SCENE, STMT_WHILE, STMT_SELECT };
+
+typedef struct Stmt {
+    i32 src, srcEnd;
+    i32 ip, ipEnd;
+    i32 loopStart, loopClose;
+    int kind;
+} Stmt;
+
 struct Chunk {
     int kind;
     char *name;
     Script *script;
+    i32 body;
+    Stmt *stmts;
+    int stmtCount, stmtCap;
     char **params;
     int paramCount;
     u32 *code;
@@ -517,6 +529,25 @@ void backlog_set_scrollbar(N2 *n, Obj *bar, Obj *log);
 void backlog_add(N2 *n, const char *text, const char *voice);
 void backlog_clear(N2 *n);
 int backlog_count(N2 *n);
+Buf backlog_save(N2 *n, bool dropLast);
+void backlog_load(N2 *n, const u8 *d, size_t size);
+
+// The PC engine's script scanner (scan.c): one record per chapter, scene, cut and function declaration and per
+// inline {code} in a text block, in the order the PC engine makes them, which script.npf depends on.
+enum { SCAN_CHAPTER = 1, SCAN_SCENE = 2, SCAN_CUT = 4, SCAN_FUNCTION = 8, SCAN_INLINE = 10 };
+
+typedef struct ScanRecord {
+    int kind;
+    int slot;
+    int decl, base, end;
+    char *name;
+    char *params[16];
+    bool paramQuoted[16];
+    int paramCount;
+} ScanRecord;
+
+ScanRecord *scan_process(u8 **texts, const size_t *lens, int fileCount, int *count);
+void scan_free(ScanRecord *recs, int count);
 
 // Saves (save.c)
 Image *save_read_thumbnail(N2 *n, const char *path);
@@ -524,8 +555,12 @@ u8 *save_read_file(N2 *n, const char *path, size_t *size);
 void save_write_file(N2 *n, const char *path, const u8 *data, size_t size);
 bool conquest_read(N2 *n, const char *file, const char *scene);
 void conquest_mark(N2 *n, Script *s, TextBlock *b);
-Buf slot_state_write(N2 *n);
-bool slot_state_read(N2 *n, const u8 *state, size_t size, const u8 *vars, size_t vsize);
+Buf slot_script_write(N2 *n, int *procCount);
+bool slot_script_read(N2 *n, const u8 *d, size_t size, bool rewindText);
+u32 slot_proc_serial(int proc);
+bool frames_load(N2 *n, const u8 *d, size_t size, bool *hadText);
+Buf frames_save(N2 *n, int procCount);
+bool n2_run_snippet(N2 *n, const char *sjisCode);
 void slot_read_vars(N2 *n, const u8 *d, size_t size);
 void n2_reset(N2 *n, bool restartMain);
 
