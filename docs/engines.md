@@ -15,6 +15,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [RPG Maker XP, VX, and VX Ace](#rpg-maker-xp-vx-and-vx-ace) | `Game.ini` beside `Game.rgssad`, `Game.rgss2a`, or `Game.rgss3a`, or beside `Data/Scripts.rxdata`, `.rvdata`, or `.rvdata2`, also one or two folders down | Mac, iPhone, iPad |
 | [KiriKiri 2 and KiriKiri Z](#kirikiri) | `data.xp3`, a `data/` folder holding `startup.tjs`, or an archive appended to the game's `.exe`, beside the `.exe` and up to two folders down, or three when the folder holds little else | Mac, iPhone, iPad |
 | [Artemis](#artemis) | a `.pfs` archive, such as `root.pfs`, whose first bytes are `pf2`, `pf6`, or `pf8`, or a `system.ini` that names the script to boot, up to two folders down | Mac, iPhone, iPad |
+| [SiglusEngine](#siglusengine) | `Scene.pck` or `Gameexe.dat`, in the copied folder or one folder down | Mac, iPhone, iPad |
 | [Godot 3 and Godot 4](#godot) | a `.pck` file, usually beside the game's `.exe`, or a pack inside the `.exe`, up to two folders down | Mac with Apple silicon, iPhone, iPad |
 | [Flash (ActionScript 1, 2, and 3)](#flash) | A Flash projector `.exe` with the movie appended, a `.swf` movie, or an HTML page that launches movies, up to four folders down | Mac, iPhone, iPad |
 | [Visual Novel Maker](#visual-novel-maker) | `index.html` with `data/ENGINE.js` and `data/SCRIPTS.js`, in an NW.js or Electron build or a web export, also inside up to two wrapper folders, as a likely match | Mac, iPhone, iPad |
@@ -109,6 +110,10 @@ Known limits:
 ## Artemis
 
 Artemis games run on art3m1s-core, an open-source Rust reimplementation of the Artemis engine, built into the app with Lua 5.1 and no JIT. The game draws inside VNDegen's window through the core's Metal renderer, so the VNDegen menu and touch controls work as for the other engines. Saves are the PC engine's own files, in both of the versions it writes, so a save made in VNDegen loads in the PC version at the same page and the other way round. They go to the game's data folder, under the folder name the PC version uses in AppData or beside the game, so Ludusavi backups from Windows restore there. Pages break where the PC version breaks them. Movies play, MPEG-1 and Ogg Theora, fullscreen and on layers, and HLSL screen effects compile to Metal. Known limits: in games that ship bitmap fonts (`.rft`) only ASCII comes from those fonts, with MS Gothic for the rest. [artemis.md](artemis.md) has the details.
+
+## SiglusEngine
+
+SiglusEngine games run on siglus_rs, an open-source Rust reimplementation of the engine, built into the app as the VNSiglus framework and drawn through wgpu's Metal backend. The game runs in the player's first preferred language it ships (planetarian HD ships seven), English when none matches. Saves are the PC engine's own files in the PC's folder beside the game, `savedata/` or `savedata_en/` and so on by language, so Ludusavi moves them both ways; a slot saved in VNDegen can crash the PC version when loaded there, which the game page's backup warning says. `.omv` movies play through siglus_rs, and `.wmv` movies through the app's FFmpeg. English text wraps by word. RealLive, which siglus_rs also runs, isn't in this build. [siglus.md](siglus.md) has the details.
 
 ## Godot
 

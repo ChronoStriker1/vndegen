@@ -71,6 +71,7 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 | RPG Maker XP, VX, and VX Ace | `Game.ini` beside a `Game.rgss*` archive or `Data/Scripts.*` | Mac, iPhone, iPad | [rgss.md](docs/rgss.md) |
 | KiriKiri 2 and KiriKiri Z | `data.xp3`, `data/startup.tjs`, or an archive in the `.exe` | Mac, iPhone, iPad | [engines.md](docs/engines.md#kirikiri) |
 | Artemis | a `.pfs` archive or a `system.ini` | Mac, iPhone, iPad | [artemis.md](docs/artemis.md) |
+| SiglusEngine | `Scene.pck` or `Gameexe.dat` | Mac, iPhone, iPad | [siglus.md](docs/siglus.md) |
 | Godot 3 and Godot 4 | a `.pck` file, or a pack inside the game's `.exe` | Mac with Apple silicon, iPhone, iPad | [godot.md](docs/godot.md) |
 | Flash (ActionScript 1, 2, and 3) | a projector `.exe`, a `.swf`, or an HTML page that launches movies | Mac, iPhone, iPad | [flash.md](docs/flash.md) |
 | Visual Novel Maker | `index.html` with `data/ENGINE.js` and `data/SCRIPTS.js`, also in NW.js and Electron builds | Mac, iPhone, iPad | [htmlvn.md](docs/htmlvn.md) |
@@ -133,7 +134,7 @@ Games marked Hide leave the library until it is unlocked with Face ID, Touch ID,
 
 ## Controls
 
-In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad start with a layout of keys and clicks instead: "Visual novel" for KiriKiri, NScripter, Artemis, and AliceSoft, "Mouse" for Flash, "RPG Maker controls" for RPG Maker XP, VX, and VX Ace, and Steam's Keyboard and Mouse layout for TyranoScript. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
+In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad start with a layout of keys and clicks instead: "Visual novel" for KiriKiri, NScripter, Artemis, SiglusEngine, and AliceSoft, "Mouse" for Flash, "RPG Maker controls" for RPG Maker XP, VX, and VX Ace, and Steam's Keyboard and Mouse layout for TyranoScript. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
 
 | In the library and the VNDegen menu | Controller | Keyboard |
 |---|---|---|
@@ -162,7 +163,7 @@ A controller's Home button, the touch gamepad's house button, the small menu but
 - [library.md](docs/library.md): adding games, library folders, layouts, hidden games, and metadata sources
 - [controls.md](docs/controls.md): control methods, controller layouts, a game's dialogs, and Game commands
 - [cheats.md](docs/cheats.md): what the Cheats page does in each engine
-- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits, with more in [rgss.md](docs/rgss.md), [artemis.md](docs/artemis.md), [wolfrpg.md](docs/wolfrpg.md), [system3.md](docs/system3.md), [system4.md](docs/system4.md), [nscripter.md](docs/nscripter.md), [godot.md](docs/godot.md), [flash.md](docs/flash.md), and [htmlvn.md](docs/htmlvn.md)
+- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits, with more in [rgss.md](docs/rgss.md), [artemis.md](docs/artemis.md), [siglus.md](docs/siglus.md), [wolfrpg.md](docs/wolfrpg.md), [system3.md](docs/system3.md), [system4.md](docs/system4.md), [nscripter.md](docs/nscripter.md), [godot.md](docs/godot.md), [flash.md](docs/flash.md), and [htmlvn.md](docs/htmlvn.md)
 - [video.md](docs/video.md): movie decoding and the see-through clip converter
 - [ludusavi.md](docs/ludusavi.md): setting up and using Ludusavi backups
 - [fonts.md](docs/fonts.md): the Windows font substitutes

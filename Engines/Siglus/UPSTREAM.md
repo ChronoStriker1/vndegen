@@ -1,6 +1,6 @@
 # SiglusEngine and RealLive engine upstream
 
-VNDegen runs SiglusEngine and RealLive games on siglus_rs, a Rust reimplementation of VisualArt's engines, behind a C interface of VNDegen's own.
+VNDegen runs SiglusEngine games on siglus_rs, a Rust reimplementation of VisualArt's engines, behind a C interface of VNDegen's own. RealLive is built only with `vnsiglus`'s `reallive` feature, which the app leaves off.
 
 ## Sources
 
@@ -33,7 +33,7 @@ siglus_rs is under MPL-2.0 (`siglus_rs/LICENSE-MPL-2.0`), a file-level copyleft:
 
 ## Building for Apple platforms
 
-`scripts/siglus-engine.sh build/siglus` builds `vnsiglus` as a dynamic library for iOS devices, the iOS simulator, and macOS (arm64 and x86_64), and wraps it as `build/siglus/VNSiglus.xcframework`. The app links and embeds the framework, and `EngineSiglus` finds `vnsiglus_get_api_v1` in it at run time.
+`scripts/siglus-engine.sh build/siglus` builds `vnsiglus`, without its `reallive` feature, as a dynamic library for iOS devices, the iOS simulator, and macOS (arm64 and x86_64), and wraps it as `build/siglus/VNSiglus.xcframework`. The app links and embeds the framework, and `EngineSiglus` finds `vnsiglus_get_api_v1` in it at run time.
 
 - A framework rather than a static library: the Artemis engine is a Rust static library too, and two in one binary define the same standard-library symbols. The framework's two-level namespace keeps its copy to itself.
 - `siglus_scene_vm` is built without its default `desktop` feature, so on macOS it takes the path upstream's iOS host takes, with VNDegen's view instead of a winit window.
@@ -42,7 +42,7 @@ siglus_rs is under MPL-2.0 (`siglus_rs/LICENSE-MPL-2.0`), a file-level copyleft:
 - Set `IPHONEOS_DEPLOYMENT_TARGET` and `MACOSX_DEPLOYMENT_TARGET` to the app's deployment targets. The script rebuilds a target from clean when its deployment target changes.
 - The Rust toolchain is pinned to 1.99.1, with the `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, and `x86_64-apple-darwin` targets.
 
-On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's interface and the file layer. `cargo run --release -p vnsiglus --bin vnsiglus-run -- <game> <saves> <frames> <out.png> [font]` runs a RealLive game headless through the same C table the app calls, pressing Return every two seconds, and writes its last frame. SiglusEngine needs a view, and `cargo build --release -p siglus_scene_vm -p reallive --features reallive/desktop-player --bins` builds upstream's desktop players, `siglus_engine` and `reallive_player`, for running a game there.
+On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's interface and the file layer, and `--features reallive` adds RealLive. `cargo run --release -p vnsiglus --features reallive --bin vnsiglus-run -- <game> <saves> <frames> <out.png> [font]` runs a RealLive game headless through the same C table the app calls, pressing Return every two seconds, and writes its last frame. SiglusEngine needs a view, and `cargo build --release -p siglus_scene_vm -p reallive --features reallive/desktop-player --bins` builds upstream's desktop players, `siglus_engine` and `reallive_player`, for running a game there. `siglus_engine` takes `--language` and `--language-pack` (such as `EN EN`), `--font` for its dialogs' default font, and `--font-table` with VNDegen's `fonts.tsv`. `pump_host::run_game` runs the same `SiglusHost` the app drives, in a window.
 
 ## VNDegen's changes to siglus_rs
 
@@ -54,3 +54,12 @@ On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's in
 - Find RealLive's files whatever case the game uses: `game_fs` looks a path up as written, then matches each missing name against its folder's listing without regard to case, for reads, writes, existence checks and listings. A write to a name that exists in another case replaces that file.
 - Write SiglusEngine saves to the save folder and file names as they are on disk (`original_save::save_dir`, `existing_spelling`), so a `SaveData/` folder a PC backup restored on a case-sensitive disk is the one the engine uses, rather than a second `savedata/` beside it.
 - Let the host mute both engines (`AudioHub::set_muted`, `Sound::set_muted`) while VNDegen's menu is open.
+- Run a game in the language the host picks (`resource::set_language`): `Scene{pack}.pck` and `Gameexe{pack}.dat`, saves and thumbnails in `savedata_{pack}`, the EXE key cache keyed by pack, and `GET_LANGUAGE` answered with the code.
+- Wrap Latin words whole in the message window and the backlog.
+- Show no speaker name when the window's `NAME_DISP_MODE` is 2.
+- Show a tab followed by a space as a comma in message text, names, the backlog and save descriptions (planetarian HD's English text).
+- English confirmation texts when the language isn't Japanese and the Gameexe has none.
+- Resolve Windows font names through substitutes the host registers (`text_render::add_host_font`).
+- Let a stage object's movie leave the right-click menu working: the menu waits only while the global MOV player plays.
+- Write `config.sav` in the version the game's engine reads: the existing file's, else the one for the game's `.exe` build.
+- Play `.wmv` movies through a decoder the host provides (`movie::set_host_movie_api`, vnffmovie's interface); VNDegen passes the app's FFmpeg through vnffmovie.
