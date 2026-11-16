@@ -107,7 +107,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- N2System (Nitroplus), restarted 2026-11-16 from the work parked on 2026-10-31 (tag `archive/ws-n2system`). First it checks whether Sonicomi, the library's other Nitroplus game, runs on the same engine.
+- N2System (Nitroplus), restarted 2026-11-16 from the work parked on 2026-10-31 (tag `archive/ws-n2system`), on branch `feat/n2system`, with Hanachirasu (English, 2018) as the test game. Its title screen draws on Linux. The library's Sonicomi turned out to be Nitroplus's later 3D Diesel engine.
 - SiglusEngine, on siglus_rs, restarted 2026-11-16 from the work parked on 2026-10-31 (tag `archive/ws-siglus`), with planetarian HD and Harmonia as test games. RealLive waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
