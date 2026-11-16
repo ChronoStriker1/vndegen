@@ -10,13 +10,32 @@ use std::ptr::{NonNull, null, null_mut};
 use std::sync::Mutex;
 
 use anyhow::{Context, Result, anyhow, bail};
-use reallive::engine::{Engine, EngineOptions};
-use reallive::input::{Button, InputEvent, Key};
 use siglus_scene_vm::host::{SiglusHost, SiglusHostConfig};
 use siglus_scene_vm::render::Renderer;
 use siglus_scene_vm::runtime::input::{VmKey, VmMouseButton};
 
 mod keys;
+#[cfg(feature = "reallive")]
+mod reallive_api;
+#[cfg(feature = "reallive")]
+use reallive_api::*;
+
+#[cfg(not(feature = "reallive"))]
+pub enum RealLiveGame {}
+
+#[cfg(feature = "reallive")]
+macro_rules! reallive_fn {
+    ($name:ident) => {
+        Some($name)
+    };
+}
+
+#[cfg(not(feature = "reallive"))]
+macro_rules! reallive_fn {
+    ($name:ident) => {
+        None
+    };
+}
 
 pub type MessageBoxFn =
     unsafe extern "C" fn(context: *mut c_void, request: u64, kind: i32, title: *const c_char, message: *const c_char);
@@ -50,17 +69,19 @@ pub struct ApiV1 {
     pub siglus_set_message_box: unsafe extern "C" fn(*mut SiglusGame, Option<MessageBoxFn>, *mut c_void),
     pub siglus_answer: unsafe extern "C" fn(*mut SiglusGame, u64, i64),
     pub siglus_destroy: unsafe extern "C" fn(*mut SiglusGame),
-    pub reallive_open: unsafe extern "C" fn(*const c_char, *const c_char, *mut *mut c_char) -> *mut RealLiveGame,
-    pub reallive_step: unsafe extern "C" fn(*mut RealLiveGame, u32) -> i32,
-    pub reallive_frame: unsafe extern "C" fn(*const RealLiveGame, *mut u32, *mut u32) -> *const u8,
-    pub reallive_pointer: unsafe extern "C" fn(*mut RealLiveGame, i32, i32),
-    pub reallive_button: unsafe extern "C" fn(*mut RealLiveGame, i32, i32),
-    pub reallive_wheel: unsafe extern "C" fn(*mut RealLiveGame, i32),
-    pub reallive_key: unsafe extern "C" fn(*mut RealLiveGame, i32, i32),
-    pub reallive_text: unsafe extern "C" fn(*mut RealLiveGame, *const c_char),
-    pub reallive_cursor_visible: unsafe extern "C" fn(*const RealLiveGame) -> i32,
-    pub reallive_set_paused: unsafe extern "C" fn(*mut RealLiveGame, i32),
-    pub reallive_close: unsafe extern "C" fn(*mut RealLiveGame),
+    pub reallive_open: Option<unsafe extern "C" fn(*const c_char, *const c_char, *mut *mut c_char) -> *mut RealLiveGame>,
+    pub reallive_step: Option<unsafe extern "C" fn(*mut RealLiveGame, u32) -> i32>,
+    pub reallive_frame: Option<unsafe extern "C" fn(*const RealLiveGame, *mut u32, *mut u32) -> *const u8>,
+    pub reallive_pointer: Option<unsafe extern "C" fn(*mut RealLiveGame, i32, i32)>,
+    pub reallive_button: Option<unsafe extern "C" fn(*mut RealLiveGame, i32, i32)>,
+    pub reallive_wheel: Option<unsafe extern "C" fn(*mut RealLiveGame, i32)>,
+    pub reallive_key: Option<unsafe extern "C" fn(*mut RealLiveGame, i32, i32)>,
+    pub reallive_text: Option<unsafe extern "C" fn(*mut RealLiveGame, *const c_char)>,
+    pub reallive_cursor_visible: Option<unsafe extern "C" fn(*const RealLiveGame) -> i32>,
+    pub reallive_set_paused: Option<unsafe extern "C" fn(*mut RealLiveGame, i32)>,
+    pub reallive_close: Option<unsafe extern "C" fn(*mut RealLiveGame)>,
+    pub set_language: unsafe extern "C" fn(*const c_char, *const c_char),
+    pub add_font: unsafe extern "C" fn(*const c_char, *const c_char, u32),
 }
 
 static API: ApiV1 = ApiV1 {
@@ -82,17 +103,19 @@ static API: ApiV1 = ApiV1 {
     siglus_set_message_box,
     siglus_answer,
     siglus_destroy,
-    reallive_open,
-    reallive_step,
-    reallive_frame,
-    reallive_pointer,
-    reallive_button,
-    reallive_wheel,
-    reallive_key,
-    reallive_text,
-    reallive_cursor_visible,
-    reallive_set_paused,
-    reallive_close,
+    reallive_open: reallive_fn!(reallive_open),
+    reallive_step: reallive_fn!(reallive_step),
+    reallive_frame: reallive_fn!(reallive_frame),
+    reallive_pointer: reallive_fn!(reallive_pointer),
+    reallive_button: reallive_fn!(reallive_button),
+    reallive_wheel: reallive_fn!(reallive_wheel),
+    reallive_key: reallive_fn!(reallive_key),
+    reallive_text: reallive_fn!(reallive_text),
+    reallive_cursor_visible: reallive_fn!(reallive_cursor_visible),
+    reallive_set_paused: reallive_fn!(reallive_set_paused),
+    reallive_close: reallive_fn!(reallive_close),
+    set_language,
+    add_font,
 };
 
 #[unsafe(no_mangle)]
@@ -170,9 +193,20 @@ unsafe extern "C" fn set_log_file(path: *const c_char) {
 unsafe extern "C" fn set_default_font(path: *const c_char) -> i32 {
     let Some(path) = (unsafe { text(path) }) else { return 0 };
     let Ok(bytes) = std::fs::read(&path) else { return 0 };
-    // RealLive finds fonts the host registers.
+    #[cfg(feature = "reallive")]
     game_fs::add_host_font(bytes.clone());
     i32::from(siglus_scene_vm::text_render::set_default_font(bytes, path))
+}
+
+unsafe extern "C" fn set_language(code: *const c_char, pack: *const c_char) {
+    let (Some(code), pack) = (unsafe { text(code) }, unsafe { text(pack) }.unwrap_or_default()) else { return };
+    siglus_scene_vm::resource::set_language(&code, &pack);
+}
+
+unsafe extern "C" fn add_font(name: *const c_char, path: *const c_char, face: u32) {
+    if let (Some(name), Some(path)) = (unsafe { text(name) }, unsafe { text(path) }) {
+        siglus_scene_vm::text_render::add_host_font(&name, PathBuf::from(path), face);
+    }
 }
 
 // MARK: SiglusEngine
@@ -415,140 +449,6 @@ unsafe extern "C" fn siglus_destroy(game: *mut SiglusGame) {
     game.save_global();
 }
 
-// MARK: RealLive
-
-pub struct RealLiveGame {
-    engine: Engine,
-    frame: Vec<u8>,
-    size: (u32, u32),
-    ended: bool,
-}
-
-unsafe extern "C" fn reallive_open(root: *const c_char, saves: *const c_char, error: *mut *mut c_char) -> *mut RealLiveGame {
-    let opened = match (unsafe { text(root) }, unsafe { text(saves) }) {
-        (Some(root), Some(saves)) => open_reallive(Path::new(&root), PathBuf::from(saves)),
-        _ => Err(anyhow!("no game or save folder")),
-    };
-    match opened {
-        Ok(game) => Box::into_raw(Box::new(game)),
-        Err(failure) => {
-            report(error, &failure);
-            null_mut()
-        }
-    }
-}
-
-fn open_reallive(root: &Path, saves: PathBuf) -> Result<RealLiveGame> {
-    let mut options = EngineOptions::new(root);
-    options.save_dir = Some(saves);
-    let engine = Engine::open(options).context("the game could not start")?;
-    let size = (engine.machine.sys.gfx.width.max(1) as u32, engine.machine.sys.gfx.height.max(1) as u32);
-    Ok(RealLiveGame { engine, frame: vec![0; size.0 as usize * size.1 as usize * 4], size, ended: false })
-}
-
-impl RealLiveGame {
-    fn end(&mut self) {
-        if !self.ended {
-            self.save_global();
-            self.ended = true;
-        }
-    }
-
-    fn save_global(&mut self) {
-        if let Err(failure) = reallive::save::save_global(&self.engine.machine) {
-            log::error!("RealLive's global data wasn't saved: {failure:#}");
-        }
-    }
-}
-
-unsafe fn reallive<'a>(game: *mut RealLiveGame) -> Option<&'a mut RealLiveGame> {
-    unsafe { game.as_mut() }
-}
-
-unsafe extern "C" fn reallive_step(game: *mut RealLiveGame, elapsed_ms: u32) -> i32 {
-    let Some(game) = (unsafe { reallive(game) }) else { return FAILED };
-    if game.ended {
-        return ENDED;
-    }
-    game.engine.tick(u64::from(elapsed_ms));
-    for failure in game.engine.machine.diagnostics.errors.drain(..) {
-        log::warn!("RealLive: {failure}");
-    }
-    if game.engine.finished() {
-        game.end();
-        return ENDED;
-    }
-    let surface = game.engine.render();
-    game.size = (surface.width.max(1) as u32, surface.height.max(1) as u32);
-    game.frame = surface.rgba;
-    RUNNING
-}
-
-unsafe extern "C" fn reallive_frame(game: *const RealLiveGame, width: *mut u32, height: *mut u32) -> *const u8 {
-    let Some(game) = (unsafe { game.as_ref() }) else { return null() };
-    if let Some(width) = unsafe { width.as_mut() } {
-        *width = game.size.0;
-    }
-    if let Some(height) = unsafe { height.as_mut() } {
-        *height = game.size.1;
-    }
-    game.frame.as_ptr()
-}
-
-unsafe extern "C" fn reallive_pointer(game: *mut RealLiveGame, x: i32, y: i32) {
-    if let Some(game) = unsafe { reallive(game) } {
-        game.engine.machine.sys.input.mouse = (x, y);
-    }
-}
-
-unsafe extern "C" fn reallive_button(game: *mut RealLiveGame, button: i32, down: i32) {
-    let Some(game) = (unsafe { reallive(game) }) else { return };
-    let button = match button {
-        0 => Button::Left,
-        1 => Button::Right,
-        _ => return,
-    };
-    game.engine.input(if down != 0 { InputEvent::Press(button) } else { InputEvent::Release(button) });
-}
-
-unsafe extern "C" fn reallive_wheel(game: *mut RealLiveGame, notches: i32) {
-    let Some(game) = (unsafe { reallive(game) }) else { return };
-    let button = if notches > 0 { Button::WheelUp } else { Button::WheelDown };
-    for _ in 0..notches.unsigned_abs().min(16) {
-        game.engine.input(InputEvent::Press(button));
-    }
-}
-
-unsafe extern "C" fn reallive_key(game: *mut RealLiveGame, virtual_key: i32, down: i32) {
-    let Some(game) = (unsafe { reallive(game) }) else { return };
-    let Some(key) = keys::reallive(virtual_key) else { return };
-    game.engine.input(if down != 0 { InputEvent::KeyDown(key) } else { InputEvent::KeyUp(key) });
-}
-
-unsafe extern "C" fn reallive_text(game: *mut RealLiveGame, typed: *const c_char) {
-    if let (Some(game), Some(typed)) = (unsafe { reallive(game) }, unsafe { text(typed) }) {
-        game.engine.input(InputEvent::Text(typed));
-    }
-}
-
-unsafe extern "C" fn reallive_cursor_visible(game: *const RealLiveGame) -> i32 {
-    unsafe { game.as_ref() }.map_or(1, |game| i32::from(game.engine.machine.sys.cursor_visible))
-}
-
-unsafe extern "C" fn reallive_set_paused(game: *mut RealLiveGame, paused: i32) {
-    let Some(game) = (unsafe { reallive(game) }) else { return };
-    if paused != 0 {
-        game.save_global();
-    }
-    game.engine.machine.sys.sound.set_muted(paused != 0);
-}
-
-unsafe extern "C" fn reallive_close(game: *mut RealLiveGame) {
-    if !game.is_null() {
-        unsafe { Box::from_raw(game) }.end();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -565,18 +465,12 @@ mod tests {
     fn table_has_every_function() {
         let api = unsafe { &*vnsiglus_get_api_v1() };
         assert_eq!(api.struct_size as usize, size_of::<ApiV1>());
-        // 28 functions after the size, each one pointer wide.
-        assert_eq!(size_of::<ApiV1>(), 8 + 28 * size_of::<usize>());
+        assert_eq!(size_of::<ApiV1>(), 8 + 30 * size_of::<usize>());
     }
 
     #[test]
     fn missing_games_report_errors() {
-        let mut error = null_mut();
         let root = CString::new("/nonexistent/vnsiglus").unwrap();
-        let game = unsafe { reallive_open(root.as_ptr(), root.as_ptr(), &mut error) };
-        assert!(game.is_null());
-        assert!(!error.is_null());
-        unsafe { string_free(error) };
         let mut error = null_mut();
         let game = unsafe { siglus_create(VIEW_APPKIT, null_mut(), 1, 1, 1.0, root.as_ptr(), &mut error) };
         assert!(game.is_null());

@@ -16,10 +16,17 @@ log.workspace = true
 pollster.workspace = true
 raw-window-handle = "0.6"
 siglus_scene_vm = { path = "../siglus_rs/crates/siglus_scene_vm", default-features = false }
-reallive = { path = "../siglus_rs/crates/reallive" }
-game_fs = { path = "../siglus_rs/crates/game_fs" }
+reallive = { path = "../siglus_rs/crates/reallive", optional = true }
+game_fs = { path = "../siglus_rs/crates/game_fs", optional = true }
 # The Linux test host writes frames as PNG.
 image.workspace = true
+
+[features]
+reallive = ["dep:reallive", "dep:game_fs"]
+
+[[bin]]
+name = "vnsiglus-run"
+required-features = ["reallive"]
 
 [lints]
 workspace = true

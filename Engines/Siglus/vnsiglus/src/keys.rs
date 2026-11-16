@@ -1,5 +1,6 @@
 //! Windows virtual-key codes, which VNDegen sends, as each engine's keys.
 
+#[cfg(feature = "reallive")]
 use reallive::input::Key;
 use siglus_scene_vm::runtime::input::VmKey;
 
@@ -28,6 +29,7 @@ pub fn siglus(virtual_key: i32) -> Option<VmKey> {
     })
 }
 
+#[cfg(feature = "reallive")]
 pub fn reallive(virtual_key: i32) -> Option<Key> {
     Some(match virtual_key {
         0x08 => Key::Backspace,
@@ -64,6 +66,11 @@ mod tests {
         assert_eq!(siglus(0x7B), Some(VmKey::F(12)));
         assert_eq!(siglus(0xA2), Some(VmKey::Control));
         assert_eq!(siglus(0x07), None);
+    }
+
+    #[cfg(feature = "reallive")]
+    #[test]
+    fn reallive_keys_map_by_virtual_key() {
         assert_eq!(reallive(0x11), Some(Key::Ctrl));
         assert_eq!(reallive(0x21), Some(Key::PageUp));
         assert_eq!(reallive(0x41), Some(Key::Char('a')));

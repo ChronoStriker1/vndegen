@@ -41,7 +41,7 @@ typedef struct VNSiglusApiV1 {
     int32_t (*set_default_font)(const char *path);
 
     // SiglusEngine. `view` is a UIView whose layer is a CAMetalLayer, or an NSView backed by one, `width` and `height`
-    // its size in pixels and `scale` its pixels per point. The game reads and writes `savedata/` in `root`, as on a PC.
+    // its size in pixels and `scale` its pixels per point.
     // Returns NULL and an error message on failure.
     VNSiglusGame *(*siglus_create)(int32_t view_kind, void *view, uint32_t width, uint32_t height, double scale,
                                    const char *root, char **error);
@@ -85,6 +85,9 @@ typedef struct VNSiglusApiV1 {
     void (*reallive_set_paused)(VNRealLiveGame *game, int32_t paused);
     // Saves the game's global data and ends it.
     void (*reallive_close)(VNRealLiveGame *game);
+
+    void (*set_language)(const char *code, const char *pack);
+    void (*add_font)(const char *name, const char *path, uint32_t face);
 } VNSiglusApiV1;
 
 typedef const VNSiglusApiV1 *(*VNSiglusGetApiV1Fn)(void);
