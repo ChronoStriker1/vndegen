@@ -204,6 +204,35 @@ unsafe extern "C" fn siglus_create(
     }
 }
 
+unsafe extern "C" {
+    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+}
+
+#[cfg(target_vendor = "apple")]
+const RTLD_DEFAULT: *mut c_void = -2isize as *mut c_void;
+#[cfg(not(target_vendor = "apple"))]
+const RTLD_DEFAULT: *mut c_void = null_mut();
+
+fn find_movie_decoder() -> Option<siglus_scene_vm::movie::HostMovieApi> {
+    let find = |name: &CStr| NonNull::new(unsafe { dlsym(RTLD_DEFAULT, name.as_ptr()) });
+    let (open, frame, audio, seek, close) = (
+        find(c"vnffmovie_open")?,
+        find(c"vnffmovie_frame")?,
+        find(c"vnffmovie_audio")?,
+        find(c"vnffmovie_seek")?,
+        find(c"vnffmovie_close")?,
+    );
+    unsafe {
+        Some(siglus_scene_vm::movie::HostMovieApi {
+            open: std::mem::transmute(open.as_ptr()),
+            frame: std::mem::transmute(frame.as_ptr()),
+            audio: std::mem::transmute(audio.as_ptr()),
+            seek: std::mem::transmute(seek.as_ptr()),
+            close: std::mem::transmute(close.as_ptr()),
+        })
+    }
+}
+
 unsafe fn create_siglus(
     view_kind: i32,
     view: *mut c_void,
@@ -217,6 +246,10 @@ unsafe fn create_siglus(
         UiKitWindowHandle,
     };
     let view = NonNull::new(view).ok_or_else(|| anyhow!("no view"))?;
+    match find_movie_decoder() {
+        Some(decoder) => siglus_scene_vm::movie::set_host_movie_api(decoder),
+        None => log::warn!("vnffmovie is missing, so .wmv movies won't play"),
+    }
     let (display, window) = match view_kind {
         VIEW_UIKIT => (
             RawDisplayHandle::UiKit(UiKitDisplayHandle::new()),
