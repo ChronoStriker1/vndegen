@@ -2409,7 +2409,7 @@ fn font_path_priority(path: &Path) -> (u8, u8, String) {
 }
 
 fn project_font_dirs(project_dir: &Path) -> Vec<PathBuf> {
-    let mut dirs = vec![project_dir.join("font"), project_dir.join("fonts")];
+    let mut dirs = vec![project_dir.join("font"), project_dir.join("fonts"), project_dir.join("dat")];
     if let Ok(exe) = std::env::current_exe()
         && let Some(exe_dir) = exe.parent()
     {
