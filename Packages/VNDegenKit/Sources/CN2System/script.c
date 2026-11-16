@@ -550,7 +550,7 @@ static void statement(P *p) {
         block(p);
         return;
     }
-    if (accept(p, ";") || accept(p, ":") || accept(p, ")")) return;  // stray terminators the PC engine tolerates
+    if (accept(p, ";") || accept(p, ":") || accept(p, ")") || accept(p, ",")) return;  // stray terminators the PC engine tolerates
     if (is(p, "*") && p->pos < p->len && p->src[p->pos] == '/') {
         // An unmatched "*/".
         p->pos++;

@@ -88,10 +88,9 @@ bool thread_call(N2 *n, Thread *t, Chunk *c, Value *args, int argc) {
 
 static void call_chapter(N2 *n, Thread *t, const char *path, const char *name) {
     Script *s = n2_load_script(n, path);
-    if (!s) return;
-    Chunk *c = script_find(s, CHUNK_CHAPTER, name ? name : "main");
+    Chunk *c = s ? script_find(s, CHUNK_CHAPTER, name ? name : "main") : NULL;
     if (!c) {
-        n2_log(n, "no chapter %s in %s", name ? name : "main", path);
+        n2_fail(n, "The game's script has no chapter %s in %s.", name ? name : "main", path);
         return;
     }
     push_frame(t, c, NULL, 0, false);
@@ -117,7 +116,7 @@ static void call_scene(N2 *n, Thread *t, const char *spec) {
     Chunk *c = s ? script_find(s, CHUNK_SCENE, name) : NULL;
     if (!c && s) c = script_find(s, CHUNK_CHAPTER, name);
     if (!c) {
-        n2_log(n, "no scene %s", spec);
+        n2_fail(n, "The game's script has no scene %s.", spec);
         return;
     }
     push_frame(t, c, NULL, 0, false);
