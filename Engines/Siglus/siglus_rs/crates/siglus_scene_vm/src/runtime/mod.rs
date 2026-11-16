@@ -5480,6 +5480,10 @@ impl CommandContext {
         ch.is_ascii() || matches!(ch as u32, 0xFF61..=0xFF9F)
     }
 
+    fn msg_back_is_word_moji(ch: char) -> bool {
+        Self::msg_back_is_hankaku(ch) && !ch.is_ascii_whitespace() && !ch.is_ascii_control()
+    }
+
     fn msg_back_is_kinsoku_moji(ch: char) -> bool {
         matches!(
             ch,
@@ -5573,6 +5577,7 @@ impl CommandContext {
         let mut indent_moji = '\0';
         let mut indent_cnt = 0i32;
         let mut line_head = true;
+        let chars: Vec<char> = text.chars().collect();
 
         let clear_indent = |indent_pos: &mut i32, indent_moji: &mut char, indent_cnt: &mut i32| {
             *indent_pos = 0;
@@ -5584,7 +5589,22 @@ impl CommandContext {
             *y = (*y).saturating_add(line_step);
         };
 
-        for ch in text.chars() {
+        for (index, &ch) in chars.iter().enumerate() {
+            if !line_head
+                && Self::msg_back_is_word_moji(ch)
+                && index > 0
+                && chars[index - 1] == ' '
+            {
+                let word: i32 = chars[index..]
+                    .iter()
+                    .take_while(|&&next| Self::msg_back_is_word_moji(next))
+                    .map(|_| (moji_size / 2).max(1).saturating_add(space_x))
+                    .sum();
+                if x.saturating_add(word) > msg_w {
+                    new_line_indent(&mut x, &mut y, indent_pos);
+                    line_head = true;
+                }
+            }
             if ch == '\r' {
                 continue;
             }

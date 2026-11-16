@@ -14012,6 +14012,30 @@ fn mwnd_text_tokens(text: &str) -> Vec<MwndTextToken> {
     out
 }
 
+fn mwnd_is_word_moji(token: &MwndTextToken) -> bool {
+    token.moji_type == 0 && is_hankaku_moji(token.ch) && !token.ch.is_ascii_whitespace() && !token.ch.is_ascii_control()
+}
+
+fn mwnd_starts_word(m: &MwndState, tokens: &[MwndTextToken], index: usize) -> bool {
+    if !mwnd_is_word_moji(&tokens[index]) {
+        return false;
+    }
+    let previous = match index.checked_sub(1) {
+        Some(previous) => Some(tokens[previous].ch),
+        None => m.glyphs.last().map(|glyph| glyph.ch),
+    };
+    previous.is_some_and(|ch| ch == ' ' || ch == '\u{3000}')
+}
+
+fn mwnd_word_extent(m: &MwndState, tokens: &[MwndTextToken], space_x: i64) -> i64 {
+    let size = mwnd_current_moji_size(m);
+    tokens
+        .iter()
+        .take_while(|token| mwnd_is_word_moji(token))
+        .map(|_| (size / 2).max(1).saturating_add(space_x).max(1))
+        .sum()
+}
+
 /// Direct translation of C_elm_mwnd_msg::add_msg_sub for both horizontal and
 /// vertical writing. Returns the unconsumed suffix from the first token that
 /// cannot fit.
@@ -14024,7 +14048,7 @@ fn mwnd_append_styled_text(ctx: &CommandContext, m: &mut MwndState, text: &str) 
     let (space_x, _) = m.moji_space.unwrap_or((-1, 10));
     let def_size = m.default_moji_size.max(1);
 
-    for token in tokens {
+    for (index, &token) in tokens.iter().enumerate() {
         let ch = token.ch;
         if token.moji_type == 0 && ch == '\r' {
             continue;
@@ -14054,8 +14078,12 @@ fn mwnd_append_styled_text(ctx: &CommandContext, m: &mut MwndState, text: &str) 
         let force_wrap = axis.saturating_add(check) > axis_max.saturating_add(def_size);
         let soft_wrap = axis.saturating_add(check) > axis_max
             && !(token.moji_type == 0 && is_mwnd_kinsoku_moji(ch));
+        let word_wrap = !m.vertical_writing
+            && !m.line_head
+            && mwnd_starts_word(m, &tokens, index)
+            && axis.saturating_add(mwnd_word_extent(m, &tokens[index..], space_x)) > axis_max;
         let mut auto_indent = false;
-        if force_wrap || soft_wrap {
+        if force_wrap || soft_wrap || word_wrap {
             mwnd_new_line_indent_state(m);
             auto_indent = true;
         }

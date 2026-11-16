@@ -1708,6 +1708,10 @@ struct MwndPlacedChar {
     cell_w: i32,
 }
 
+fn is_word_char(ch: char) -> bool {
+    is_hankaku(ch) && !ch.is_ascii_whitespace() && !ch.is_ascii_control()
+}
+
 fn layout_mwnd_text(
     text: &str,
     font_cell: i32,
@@ -1725,8 +1729,24 @@ fn layout_mwnd_text(
     let mut y = 0i32;
     let mut indent_x = 0i32;
     let mut line_head = true;
+    let chars: Vec<char> = text.chars().collect();
 
-    for ch in text.chars() {
+    for (index, &ch) in chars.iter().enumerate() {
+        if x > 0 && is_word_char(ch) && index > 0 && chars[index - 1] == ' ' {
+            let word: i32 = chars[index..]
+                .iter()
+                .take_while(|&&next| is_word_char(next))
+                .map(|_| (half_cell_w + space_x).max(1))
+                .sum();
+            if x + word > max_w {
+                x = indent_x;
+                y += line_h;
+                line_head = true;
+                if y >= max_h {
+                    break;
+                }
+            }
+        }
         match ch {
             '\r' => continue,
             '\n' => {
