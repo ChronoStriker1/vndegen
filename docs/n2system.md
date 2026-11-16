@@ -2,13 +2,13 @@
 
 VNDegen's own clean-room runtime for Nitroplus's N2System ("NitroplusSystem2.0"), written in C and MIT licensed. `docs/n2system-cleanroom.md` lists the sources for each part.
 
-Status: in progress on `feat/n2system`. This file is the engine's notes: what runs, how, and the known limits.
+This file is the engine's notes: what runs, how, and the known limits.
 
 ## Games
 
 | Game | Engine | State |
 |---|---|---|
-| Hanachirasu (English release, `hanachirasu.exe`, `version1.00`) | N2System, the build Nitroplus made for the English Steins;Gate release, with commands the port added | Title, story with text, voices, music and sound, choices, the opening movie, the right-click menu, backlog, Config, Hide Text, Auto, Skip and Return to Title, by mouse and keyboard, in the Linux runner. save and load in the PC engine's format, both ways with the PC engine under Wine |
+| Hanachirasu (English release, `hanachirasu.exe`, `version1.00`) | N2System, in the build of the English STEINS;GATE release, as the port's own script comments say, with commands the port added | Title, story with text, voices, music and sound, choices, the opening movie, the right-click menu, backlog, Config, Hide Text, Auto, Skip and Return to Title, save and load, by mouse, keyboard, touch and the touch gamepad. Checked in the Linux runner, the Mac app and an iPad simulator, also with every file name's case swapped. Saves move both ways with the PC engine (checked under Wine: a PC slot loads in VNDegen, and a VNDegen slot loads in the PC engine with its music) |
 | Sonicomi | Nitroplus's later "Diesel" engine on the Mware middleware: Squirrel scripts, Direct3D 9 3D models, `.npk` archives with AES | Not N2System. Out of scope |
 | The Song of Saya | N2System | Not a test game. The save container format was first worked out from it in 2026-10 |
 
@@ -75,10 +75,11 @@ Libraries: stb_image, stb_vorbis and stb_truetype (public domain or MIT), pl_mpe
 
 ## Known limits
 
-Filled in as the work lands.
-
 - Only Hanachirasu's archive key is known. Another encrypted N2System game needs its own table, recovered the same way from its files.
 - `AssocArray` and `SetEnableBacklog` do nothing.
+- Toggle Fullscreen in the right-click menu sets the game's `#SYSTEM_window_full`, which VNDegen doesn't act on; the app's own window controls set the window.
+- Text is set in the shared Tahoma substitute (`docs/fonts.md`), so a long line can wrap at a different word than on the PC.
+- Only Hanachirasu has been played. Other N2System games may call commands it doesn't, and those log as unknown functions.
 - A loaded slot starts its text block again from the beginning, on the PC engine too when VNDegen saved it. After loading a slot the PC engine saved, the lines of that block it had already shown appear twice in the backlog.
 - `common\cqst.npf` (read text for skip) isn't shared with the PC engine.
 - Pixel dumps of images changed at run time (`images\NNNN_MMMM.npf`) aren't read or written; no Hanachirasu scene was seen to make one.
