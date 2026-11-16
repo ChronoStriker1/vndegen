@@ -176,6 +176,23 @@ impl GanState {
         Ok(())
     }
 
+    pub(crate) fn write_original_work(&self, writer: &mut crate::original_save::OriginalStreamWriter) {
+        writer.push_i32(self.now_time);
+        writer.push_i32(self.anm_set_no);
+        writer.push_i32(self.next_anm_set_no);
+        for flag in [
+            self.anm_start,
+            self.anm_pause,
+            self.anm_loop_flag,
+            self.anm_real_time_flag,
+            self.next_anm_flag,
+            self.next_anm_loop_flag,
+            self.next_anm_real_time_flag,
+        ] {
+            writer.push_bool(flag);
+        }
+    }
+
     pub(crate) fn read_original_work(
         &mut self,
         reader: &mut crate::original_save::OriginalStreamReader<'_>,

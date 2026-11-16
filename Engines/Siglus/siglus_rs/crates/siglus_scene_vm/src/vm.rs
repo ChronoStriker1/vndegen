@@ -8557,7 +8557,7 @@ impl<'a> SceneVm<'a> {
             .unwrap_or(&[])
     }
 
-    fn build_cpp_local_data_pod(&self) -> Vec<u8> {
+    fn build_cpp_local_data_pod(&self, legacy: bool) -> Vec<u8> {
         let mut out = Vec::with_capacity(356);
         let script = &self.ctx.globals.script;
         let syscom = &self.ctx.globals.syscom;
@@ -8608,11 +8608,13 @@ impl<'a> SceneVm<'a> {
 
         push_bool(&mut out, script.msg_back_off);
         push_bool(&mut out, script.msg_back_disp_off);
-        while out.len() % 4 != 0 {
-            out.push(0);
+        if !legacy {
+            while out.len() % 4 != 0 {
+                out.push(0);
+            }
+            push_i32(&mut out, script.font_bold);
+            push_i32(&mut out, script.font_shadow);
         }
-        push_i32(&mut out, script.font_bold);
-        push_i32(&mut out, script.font_shadow);
 
         push_bool(&mut out, script.cursor_disp_off);
         push_bool(&mut out, script.cursor_move_by_key_disable);
@@ -8635,7 +8637,7 @@ impl<'a> SceneVm<'a> {
         while out.len() % 4 != 0 {
             out.push(0);
         }
-        debug_assert_eq!(out.len(), 356);
+        debug_assert_eq!(out.len(), if legacy { 344 } else { 356 });
         out
     }
 
@@ -9603,6 +9605,9 @@ impl<'a> SceneVm<'a> {
             self.write_cpp_frame_action(w, fa)
         });
         w.push_str(obj.gan_file.as_deref().unwrap_or(""));
+        if w.legacy {
+            obj.gan.write_original_work(w);
+        }
         w.push_extend_items(&obj.runtime.child_objects, |w, child| {
             self.write_cpp_object(w, child)
         });
@@ -10080,9 +10085,10 @@ impl<'a> SceneVm<'a> {
         &self,
         w: &mut crate::original_save::OriginalStreamWriter,
         m: &runtime::globals::MwndState,
-        name_waku: bool,
+        name_waku_no: Option<i64>,
     ) {
-        w.push_i32(Self::save_i32(m.msg_waku_no.unwrap_or(0)));
+        let name_waku = name_waku_no.is_some();
+        w.push_i32(Self::save_i32(name_waku_no.unwrap_or_else(|| m.msg_waku_no.unwrap_or(0))));
         w.push_str(if name_waku { "" } else { &m.waku_file });
         w.push_str(if name_waku { "" } else { &m.filter_file });
         let margin = if name_waku {
@@ -10330,6 +10336,7 @@ impl<'a> SceneVm<'a> {
         &self,
         w: &mut crate::original_save::OriginalStreamWriter,
         m: &runtime::globals::MwndState,
+        mwnd_idx: usize,
     ) {
         // C_elm_mwnd::PARAM (43 consecutive i32 fields).
         let (window_x, window_y) = m.window_pos.unwrap_or((0, 0));
@@ -10409,9 +10416,10 @@ impl<'a> SceneVm<'a> {
         }
         let active = Self::active_mwnd_message_page(m);
         Self::write_cpp_mwnd_message(w, m, &active);
-        self.write_cpp_mwnd_waku(w, m, false);
+        self.write_cpp_mwnd_waku(w, m, None);
         Self::write_cpp_mwnd_name(w, m);
-        self.write_cpp_mwnd_waku(w, m, true);
+        let name_waku_no = self.ctx.tables.mwnd_templates.get(mwnd_idx).map_or(-1, |t| t.name_waku_no);
+        self.write_cpp_mwnd_waku(w, m, Some(name_waku_no));
         Self::write_cpp_mwnd_selection(w, m);
     }
 
@@ -11029,7 +11037,11 @@ impl<'a> SceneVm<'a> {
             .unwrap_or(&empty_quakes);
         w.push_fixed_items(groups, |w, g| self.write_cpp_group(w, g));
         w.push_fixed_items(objects, |w, obj| self.write_cpp_object(w, obj));
-        w.push_fixed_items(mwnds, |w, m| self.write_cpp_mwnd(w, m));
+        let mut mwnd_idx = 0usize;
+        w.push_fixed_items(mwnds, |w, m| {
+            self.write_cpp_mwnd(w, m, mwnd_idx);
+            mwnd_idx += 1;
+        });
         let btn_select = if stage_idx == 1 {
             Some(&self.ctx.globals.selbtn)
         } else {
@@ -11426,7 +11438,9 @@ impl<'a> SceneVm<'a> {
             w.push_i32(Self::save_i32(entry.scn_no));
             w.push_i32(Self::save_i32(entry.line_no));
             w.push_tid_zero();
-            w.push_bool(entry.save_id_check_flag);
+            if !w.legacy {
+                w.push_bool(entry.save_id_check_flag);
+            }
         }
         w.push_i32(msgbk.history_start_pos as i32);
         w.push_i32(msgbk.history_last_pos as i32);
@@ -11972,6 +11986,10 @@ impl<'a> SceneVm<'a> {
 
     fn build_original_local_stream(&self) -> Vec<u8> {
         let mut w = crate::original_save::OriginalStreamWriter::new();
+        w.legacy = self
+            .ctx
+            .legacy_local_save
+            .unwrap_or_else(|| crate::resource::native_local_save_legacy(&self.ctx.project_dir));
         let scene_name = self.current_scene_name.as_deref().unwrap_or("");
         let flag_cnt = self.local_flag_count();
         use crate::runtime::forms::codes;
@@ -12004,8 +12022,10 @@ impl<'a> SceneVm<'a> {
                     .unwrap_or(false),
             );
         }
-        w.push_str(&self.ctx.globals.script.font_name);
-        w.push_raw(&self.build_cpp_local_data_pod());
+        if !w.legacy {
+            w.push_str(&self.ctx.globals.script.font_name);
+        }
+        w.push_raw(&self.build_cpp_local_data_pod(w.legacy));
 
         w.push_i32(self.int_stack.len() as i32);
         for v in &self.int_stack {
@@ -12261,6 +12281,7 @@ impl<'a> SceneVm<'a> {
                 }
             }
             rd.detect_local_layout()?;
+            self.ctx.legacy_local_save = Some(rd.layout == NativeLocalLayout::Legacy);
             let has_font = rd.layout == NativeLocalLayout::Current;
             self.ctx.globals.script.font_name = if has_font {
                 rd.string()?

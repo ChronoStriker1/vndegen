@@ -1037,6 +1037,10 @@ pub fn native_config_save_minor(project_dir: &Path) -> i32 {
     }
 }
 
+pub fn native_local_save_legacy(project_dir: &Path) -> bool {
+    native_config_save_minor(project_dir) < 3
+}
+
 fn native_engine_build(project_dir: &Path) -> Option<u32> {
     let entries = fs::read_dir(project_dir).ok()?;
     entries

@@ -504,6 +504,7 @@ fn read_envelope(
 
 pub struct OriginalStreamWriter {
     data: Vec<u8>,
+    pub(crate) legacy: bool,
 }
 
 impl Default for OriginalStreamWriter {
@@ -514,7 +515,7 @@ impl Default for OriginalStreamWriter {
 
 impl OriginalStreamWriter {
     pub fn new() -> Self {
-        Self { data: Vec::new() }
+        Self { data: Vec::new(), legacy: false }
     }
 
     pub fn into_inner(self) -> Vec<u8> {

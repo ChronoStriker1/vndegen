@@ -549,6 +549,7 @@ pub struct CommandContext {
     /// reads from here so the saved stream reflects the savepoint, not the live
     /// menu/UI state when the user picks a slot.
     pub local_save_snapshot: Option<LocalSaveSnapshot>,
+    pub legacy_local_save: Option<bool>,
 
     /// Set when the engine wants the next safe boundary (post-command, pre-next-step)
     /// to (re)build `local_save_snapshot`. Mirrors C++ `tnm_msg_proc_start_msg_block`
@@ -1583,6 +1584,7 @@ impl CommandContext {
             pending_scene_restart: None,
             runtime_load_completed: false,
             local_save_snapshot: None,
+            legacy_local_save: None,
             pending_auto_savepoint: false,
             pending_sel_point_result: None,
             frame_clock_last: None,
