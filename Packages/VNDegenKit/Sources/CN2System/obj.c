@@ -371,6 +371,16 @@ static void start_state_children(N2 *n, Obj *node) {
     }
 }
 
+static void show_state_children(Obj *node) {
+    if (!node) return;
+    for (int i = 0; i < node->childCount; i++) {
+        Obj *c = node->children[i];
+        if (c->kind == OBJ_PROCESS || c->kind == OBJ_SOUND) continue;
+        c->anims[ANIM_FADE].active = false;
+        c->opacity = 1000;
+    }
+}
+
 static void update_choice(N2 *n, Obj *o, bool *consumed) {
     for (int i = 0; i < o->childCount; i++) update_choice(n, o->children[i], consumed);
     if (o->kind != OBJ_CHOICE || o->erased) return;
@@ -390,6 +400,8 @@ static void update_choice(N2 *n, Obj *o, bool *consumed) {
         state = MOUSE_USUAL;
     }
     if (state != o->mouseState) {
+        if (state == MOUSE_OVER) show_state_children(state_node(o, "MouseOver"));
+        if (state == MOUSE_CLICK) show_state_children(state_node(o, "MouseClick"));
         if (state == MOUSE_OVER && o->mouseState == MOUSE_USUAL) start_state_children(n, state_node(o, "MouseOver"));
         if (state == MOUSE_USUAL && o->mouseState != MOUSE_USUAL) start_state_children(n, state_node(o, "MouseLeave"));
         if (state == MOUSE_CLICK) start_state_children(n, state_node(o, "MouseClick"));

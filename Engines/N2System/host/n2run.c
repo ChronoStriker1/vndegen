@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "n2.h"
 #include "vnfont.h"
 #include "vnn2.h"
 
@@ -37,6 +38,16 @@ static int run(VNN2 *n, int ms) {
     for (int t = 0; t < ms; t += 16)
         if (!step(n)) return 0;
     return 1;
+}
+
+static void dump(FILE *f, Obj *o, int depth) {
+    for (int i = 0; i < o->childCount; i++) {
+        Obj *c = o->children[i];
+        fprintf(f, "%*s%s kind=%d prio=%d xy=%.0f,%.0f wh=%d,%d op=%.0f img=%s ms=%d%s\n", depth * 2, "", c->name, c->kind,
+                c->prio, c->x, c->y, c->w, c->h, c->opacity, c->image ? "y" : "n", c->mouseState,
+                c->disused ? " disused" : "");
+        dump(f, c, depth + 1);
+    }
 }
 
 static void wav_header(FILE *f, long frames) {
@@ -110,6 +121,22 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "wheel:%d", &k) == 1) {
             vnn2_wheel(n, k);
             alive = run(n, 32);
+        } else if (strncmp(c, "set:", 4) == 0 && strchr(c, '=')) {
+            const char *eq = strchr(c, '=');
+            char name[256];
+            snprintf(name, sizeof name, "%.*s", (int)(eq - c - 4), c + 4);
+            Value v = v_num(atof(eq + 1));
+            var_set(n, name, &v);
+        } else if (strncmp(c, "tree:", 5) == 0) {
+            char path[1024];
+            snprintf(path, sizeof path, "%s/%s.txt", argv[3], c + 5);
+            FILE *f = fopen(path, "w");
+            if (f) {
+                dump(f, &n->root, 0);
+                fprintf(f, "-- system\n");
+                dump(f, &n->sysRoot, 0);
+                fclose(f);
+            }
         } else if (strncmp(c, "shot:", 5) == 0) {
             int w, h;
             const uint32_t *px = vnn2_pixels(n, &w, &h);
