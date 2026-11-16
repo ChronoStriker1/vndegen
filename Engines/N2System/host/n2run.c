@@ -97,6 +97,11 @@ int main(int argc, char **argv) {
             alive = alive && run(n, 48);
             vnn2_mouse_button(n, VNN2_MOUSE_LEFT, 0);
             alive = alive && run(n, 32);
+        } else if (sscanf(c, "tap:%d,%d", &x, &y) == 2) {
+            vnn2_mouse_move(n, x, y);
+            vnn2_mouse_button(n, VNN2_MOUSE_LEFT, 1);
+            vnn2_mouse_button(n, VNN2_MOUSE_LEFT, 0);
+            alive = run(n, 64);
         } else if (sscanf(c, "rclick:%d,%d", &x, &y) == 2) {
             vnn2_mouse_move(n, x, y);
             vnn2_mouse_button(n, VNN2_MOUSE_RIGHT, 1);

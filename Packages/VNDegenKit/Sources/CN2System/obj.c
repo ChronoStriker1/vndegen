@@ -485,7 +485,11 @@ static void keyboard_focus(N2 *n) {
 
 void buttons_update(N2 *n) {
     keyboard_focus(n);
-    if (n->mousePressed[VNN2_MOUSE_LEFT]) n->clickSpent = false;
+    if (n->mousePressed[VNN2_MOUSE_LEFT]) {
+        n->clickSpent = false;
+        Thread *front = n->system && n->system->wait != WAIT_DONE ? n->system : n->main;
+        if (front && front->wait == WAIT_KEY && !front->paused) n->clickSpent = true;
+    }
     // Presses stay recorded until a select pass reads them or the next click, so a quick click is never lost.
     if (n->mousePressed[VNN2_MOUSE_LEFT]) map_free(&n->pressedButtons, NULL);
     bool consumed = false;
