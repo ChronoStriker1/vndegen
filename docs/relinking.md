@@ -55,8 +55,8 @@ against its pinned SHA-256 and caching it in `~/.cache/vndegen/lgpl-sources`.
 
 ## Putting a changed library into the app
 
-On iPhone and iPad, a copy installed from the App Store can't be changed: the store encrypts and signs it. A changed
-library goes into the IPA from VNDegen's GitHub releases, which isn't encrypted, or into an app you build yourself.
+On iPhone and iPad, a changed library goes into the IPA from VNDegen's GitHub releases, which isn't encrypted, or into
+an app you build yourself.
 Unzip the IPA, replace the framework in `Payload/VNDegen.app/Frameworks/`, zip `Payload` again, and install it with
 AltStore, SideStore or Sideloadly, which sign it with your own certificate. `scripts/build.sh ipa` builds the whole
 IPA from source instead.
@@ -111,16 +111,3 @@ folder. Sign it and the app again as above.
 chardet is Python bytecode. Compile a changed copy with the matching Python (3.12 for Ren'Py 8, 2.7 for Ren'Py 7) and
 replace the `chardet` folder in the runtime's `lib/python3.12` or `lib/python2.7` folder, then sign the app again. On
 iPhone and iPad, that folder is `Payload/VNDegen.app/RenPy/8/lib/python3.12/chardet` in the IPA.
-
-## Open questions
-
-These need a lawyer, not this page:
-
-- Whether distributing through the App Store, under Apple's usage rules, adds "further restrictions" that section 10
-  of the LGPL 2.1 forbids. The FSF argued this for the GPL in 2011, when VLC left the App Store. For the LGPL it is
-  common practice and hasn't been tested.
-- Whether the written offer and the release asset on GitHub meet sections 4 and 6(d), which ask for the source to be
-  available "from the same place" as the binary, when the binary comes from the App Store.
-- Whether, for a paid App Store release, relinking a framework from public object code, as for Ren'Py's runtime on
-  iPhone and iPad and on the Mac, is enough, or whether each LGPL library must be a library of its own, as FFmpeg 8.1.2
-  is.
