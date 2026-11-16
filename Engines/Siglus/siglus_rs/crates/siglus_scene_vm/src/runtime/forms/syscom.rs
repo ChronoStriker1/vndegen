@@ -1562,13 +1562,21 @@ pub fn apply_config_dialog_state(
 
 pub fn write_config_save(ctx: &CommandContext) {
     let cfg = config_state_for_save(ctx);
+    let minor = original_save::existing_config_save_minor(&ctx.project_dir)
+        .filter(|minor| (2..=4).contains(minor))
+        .unwrap_or_else(|| crate::resource::native_config_save_minor(&ctx.project_dir));
+    let full_screen_layout = minor >= 3 || gameexe_unquoted_owned(ctx, "GAMEID") == "planetarian [HD Edition]";
     let mut stream = original_save::OriginalStreamWriter::new();
     stream.push_i32(cfg.screen_size_mode as i32);
-    stream.push_i32(cfg.screen_size_mode_window as i32);
+    if full_screen_layout {
+        stream.push_i32(cfg.screen_size_mode_window as i32);
+    }
     stream.push_i32(cfg.screen_size_scale.0 as i32);
     stream.push_i32(cfg.screen_size_scale.1 as i32);
-    stream.push_i32(cfg.screen_size_free.0 as i32);
-    stream.push_i32(cfg.screen_size_free.1 as i32);
+    if full_screen_layout {
+        stream.push_i32(cfg.screen_size_free.0 as i32);
+        stream.push_i32(cfg.screen_size_free.1 as i32);
+    }
     stream.push_bool(cfg.fullscreen_change_resolution);
     stream.push_i32(cfg.fullscreen_display_cnt as i32);
     stream.push_i32(cfg.fullscreen_display_no as i32);
@@ -1645,10 +1653,12 @@ pub fn write_config_save(ctx: &CommandContext) {
     stream.push_str(&cfg.editor_path);
     stream.push_str(&cfg.koe_path);
     stream.push_str(&cfg.koe_tool_path);
-    stream.push_bool(cfg.joypad_swap_ab);
-    stream.push_bool(cfg.joypad_swap_xy);
+    if minor >= 4 {
+        stream.push_bool(cfg.joypad_swap_ab);
+        stream.push_bool(cfg.joypad_swap_xy);
+    }
 
-    if let Err(err) = original_save::write_config_save_file(&ctx.project_dir, &stream.into_inner())
+    if let Err(err) = original_save::write_config_save_file(&ctx.project_dir, minor, &stream.into_inner())
     {
         log::error!("[SG_SAVE] failed to write config.sav: {err:#}");
     }

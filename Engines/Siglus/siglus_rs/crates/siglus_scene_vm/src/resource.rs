@@ -1020,6 +1020,40 @@ pub fn language_pack() -> String {
         .unwrap_or_default()
 }
 
+pub fn native_config_save_minor(project_dir: &Path) -> i32 {
+    static BUILDS: std::sync::Mutex<Option<HashMap<PathBuf, Option<u32>>>> = std::sync::Mutex::new(None);
+    let build = {
+        let mut builds = BUILDS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        *builds
+            .get_or_insert_with(HashMap::new)
+            .entry(project_dir.to_path_buf())
+            .or_insert_with(|| native_engine_build(project_dir))
+    };
+    match build {
+        Some(build) if build >= 141 => 4,
+        Some(build) if build >= 133 => 3,
+        Some(_) => 2,
+        None => 4,
+    }
+}
+
+fn native_engine_build(project_dir: &Path) -> Option<u32> {
+    let entries = fs::read_dir(project_dir).ok()?;
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("exe")))
+        .find_map(|path| {
+            let bytes = fs::read(&path).ok()?;
+            let at = bytes.windows(4).position(|window| window == [0xbd, 0x04, 0xef, 0xfe])?;
+            let word = |offset: usize| -> Option<u32> {
+                Some(u32::from_le_bytes(bytes.get(at + offset..at + offset + 4)?.try_into().ok()?))
+            };
+            let (major_minor, build_revision) = (word(8)?, word(12)?);
+            (major_minor == 0x0001_0001).then_some(build_revision >> 16)
+        })
+}
+
 pub fn find_scene_pck_path(project_dir: &Path) -> Result<PathBuf> {
     let append = initial_select_ini_append(project_dir);
     find_scene_pck_path_for_append(project_dir, &append.dir)

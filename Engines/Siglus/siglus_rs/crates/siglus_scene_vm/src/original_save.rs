@@ -1345,11 +1345,11 @@ pub fn read_read_save_file(project_dir: &Path) -> Result<Vec<(String, Vec<u8>)>>
     Ok(rows)
 }
 
-pub fn write_config_save_file(project_dir: &Path, config_stream: &[u8]) -> Result<()> {
+pub fn write_config_save_file(project_dir: &Path, minor_version: i32, config_stream: &[u8]) -> Result<()> {
     let packed = pack_buffer(config_stream);
     let header = OriginalConfigSaveHeader {
         major_version: 1,
-        minor_version: 4,
+        minor_version,
         config_data_size: packed.len() as i32,
     };
     let path = save_dir(project_dir).join("config.sav");
@@ -1363,6 +1363,12 @@ pub fn write_config_save_file(project_dir: &Path, config_stream: &[u8]) -> Resul
     fs::write(&path, out).with_context(|| format!("write config save file {}", path.display()))?;
     crate::resource::invalidate_game_path_cache(&path);
     Ok(())
+}
+
+pub fn existing_config_save_minor(project_dir: &Path) -> Option<i32> {
+    let data = crate::resource::read_file_bytes(&save_dir(project_dir).join("config.sav")).ok()?;
+    let header = OriginalConfigSaveHeader::from_bytes(data.get(..CONFIG_SAVE_HEADER_SIZE)?).ok()?;
+    (header.major_version == 1).then_some(header.minor_version)
 }
 
 pub fn read_config_save_file(project_dir: &Path) -> Result<(OriginalConfigSaveHeader, Vec<u8>)> {
