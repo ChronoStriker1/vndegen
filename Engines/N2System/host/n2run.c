@@ -127,6 +127,10 @@ int main(int argc, char **argv) {
             snprintf(name, sizeof name, "%.*s", (int)(eq - c - 4), c + 4);
             Value v = v_num(atof(eq + 1));
             var_set(n, name, &v);
+        } else if (strncmp(c, "print:", 6) == 0) {
+            Value *v = var_get(n, c + 6);
+            char tmp[256];
+            printf("%s = %s\n", c + 6, v ? v_tostr(v, tmp, sizeof tmp) : "(unset)");
         } else if (strncmp(c, "tree:", 5) == 0) {
             char path[1024];
             snprintf(path, sizeof path, "%s/%s.txt", argv[3], c + 5);

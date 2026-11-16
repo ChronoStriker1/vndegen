@@ -13,7 +13,7 @@
 // ---- arguments ----
 
 static const Value *arg(Value *a, int argc, int i) {
-    static Value none = {V_NULL};
+    static Value none = {.t = V_NULL};
     return i < argc ? &a[i] : &none;
 }
 

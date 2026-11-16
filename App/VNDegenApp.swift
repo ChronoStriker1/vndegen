@@ -12,6 +12,7 @@ import EngineGodot
 import EngineNScripter
 import EngineNekoSDK
 import EngineYuRIS
+import EngineN2System
 import EngineUnity
 import EngineWolfRPG
 import EngineAliceSoft
@@ -41,6 +42,7 @@ let engines: [any EnginePlugin] = {
         AliceSoftPlugin(),
         NekoSDKPlugin(),
         YuRISPlugin(),
+        N2SystemPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)
