@@ -31,4 +31,5 @@ cp "$kit/Sources/CSystem4/third_party/LICENSE-stb.txt" "$out.part/stb_image and 
 cp "$kit/Sources/CSystem4/third_party/pl_mpeg/LICENSE" "$out.part/pl_mpeg (System 4 movies).txt"
 cp "$kit/Sources/CNekoSDK/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (NekoSDK images and Ogg).txt"
 cp "$kit/Sources/CYuRIS/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (YU-RIS images, text and Ogg).txt"
+cp "$kit/Sources/CN2System/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (N2System images, text and Ogg).txt"
 rm -rf "$out" && mv "$out.part" "$out"
