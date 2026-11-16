@@ -397,3 +397,39 @@ void mixer_render(struct Mixer *m, float *out, int frames) {
     pthread_mutex_unlock(&m->lock);
     for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
 }
+
+void sound_get_state(N2 *n, Sound *s, SoundState *st) {
+    memset(st, 0, sizeof *st);
+    st->kind = s->kind;
+    st->playing = s->playing;
+    st->loop = s->loop;
+    st->volume = s->vol;
+    int bpf = (s->srcChannels > 1 ? 2 : 1) * 2;
+    st->loopStart = s->loopStart * (u32)bpf;
+    st->loopEnd = s->loopEnd * (u32)bpf;
+    if (s->playing && s->dec) {
+        int pos = stb_vorbis_get_sample_offset(s->dec);
+        int queued = 0;
+        if (s->ch) {
+            pthread_mutex_lock(&n->mixer->lock);
+            queued = (s->ch->head - s->ch->tail + RING) % RING;
+            pthread_mutex_unlock(&n->mixer->lock);
+        }
+        pos -= (int)(queued * (double)s->srcRate / n->mixer->rate);
+        if (pos < 0) pos = 0;
+        st->position = (u32)pos * (u32)bpf;
+    }
+}
+
+void sound_set_state(N2 *n, Sound *s, const SoundState *st) {
+    s->vol = st->volume;
+    s->loop = st->loop;
+    int bpf = (s->srcChannels > 1 ? 2 : 1) * 2;
+    if (st->loopStart || st->loopEnd) {
+        s->loopStart = st->loopStart / (u32)bpf;
+        s->loopEnd = st->loopEnd / (u32)bpf;
+    }
+    if (!st->playing) return;
+    sound_play(n, s);
+    if (s->dec && st->position) stb_vorbis_seek(s->dec, st->position / (u32)bpf);
+}

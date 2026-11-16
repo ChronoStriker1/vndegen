@@ -384,6 +384,28 @@ void vnn2_audio(VNN2 *n, float *out, int frames) {
 
 // ---- system scripts started by keys ----
 
+char *n2_scene_path(N2 *n, int *proc) {
+    Thread *t = n->main;
+    int first = 0, level = 0;
+    for (int f = 0; t && f < t->fp; f++) {
+        if (t->frames[f].chunk->kind == CHUNK_CHAPTER) {
+            if (f > 0) level++;
+            first = f;
+        }
+    }
+    *proc = level;
+    Buf b = {0};
+    if (n->curThread == t) {
+        for (int f = first; t && f < t->fp; f++) {
+            if (t->frames[f].chunk->kind != CHUNK_SCENE) continue;
+            if (b.len) buf_u8(&b, '/');
+            buf_str(&b, t->frames[f].chunk->name);
+        }
+    }
+    buf_u8(&b, 0);
+    return (char *)b.data;
+}
+
 bool n2_skip_active(N2 *n) {
     Value *s = var_get(n, "$SYSTEM_skip");
     if (s && v_truthy(s)) return true;
@@ -622,7 +644,9 @@ bool vnn2_frame(VNN2 *n, uint32_t elapsedMs) {
                 resolve_wait(n, t, advance && pass == 0 && (t == n->main || t == n->system), pass == 0);
             if (t->wait == WAIT_NONE && t->fp > 0) {
                 n->curRoot = t->ctx ? t->ctx : &n->root;
+                n->curThread = t;
                 thread_run(n, t);
+                n->curThread = NULL;
                 n->curRoot = &n->root;
                 moved = true;
             }

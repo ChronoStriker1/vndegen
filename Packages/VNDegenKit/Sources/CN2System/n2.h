@@ -276,6 +276,8 @@ struct Obj {
     int childCount, childCap;
     u32 serial;   // creation order, ties in priority
     char *createCall;  // the creating call as text, which frames.npf keeps
+    char *scenePath;
+    int proc;
     int prio;
     double x, y;
     bool centerX, centerY;  // "Center" and "Middle" coordinates
@@ -426,6 +428,7 @@ struct VNN2 {
     u32 varOrder;
     Obj sysRoot;         // objects of system scripts, apart from the game's
     Obj *curRoot;        // the object tree of the running thread
+    Thread *curThread;
 };
 
 void n2_log(N2 *n, const char *fmt, ...);
@@ -470,6 +473,7 @@ void buttons_update(N2 *n);
 bool obj_state_visible(Obj *o);
 void obj_set_focus(N2 *n, const char *from, const char *to, int dir);
 void n2_forget_obj(N2 *n, Obj *o);
+char *n2_scene_path(N2 *n, int *proc);
 bool n2_skip_active(N2 *n);
 
 // Rendering (draw.c)
@@ -500,6 +504,14 @@ void sound_set_volume(N2 *n, Sound *s, double volume, u32 durationMs);
 void sound_set_loop(N2 *n, Sound *s, bool loop);
 void sound_set_loop_points(N2 *n, Sound *s, u32 startMs, u32 endMs);
 bool sound_playing(Sound *s);
+typedef struct SoundState {
+    int kind;
+    bool playing, loop;
+    double volume;
+    u32 position, loopStart, loopEnd;
+} SoundState;
+void sound_get_state(N2 *n, Sound *s, SoundState *st);
+void sound_set_state(N2 *n, Sound *s, const SoundState *st);
 u32 sound_duration_ms(Sound *s);
 u32 sound_position_ms(Sound *s);
 void voice_play(N2 *n, const char *path);

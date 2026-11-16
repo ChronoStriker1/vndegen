@@ -83,6 +83,7 @@ Obj *obj_create(N2 *n, const char *path, int kind, int prio) {
     Obj *old = find_child(parent, name);
     if (old) obj_destroy(n, old);
     Obj *o = new_obj(n, parent, name, kind, prio);
+    o->scenePath = n2_scene_path(n, &o->proc);
     free(copy);
     n->dirty = true;
     return o;
@@ -108,6 +109,7 @@ void obj_destroy(N2 *n, Obj *o) {
     free(o->name);
     free(o->alias);
     free(o->createCall);
+    free(o->scenePath);
     free(o->procTarget);
     for (int i = 0; i < 4; i++) free(o->focusName[i]);
     free(o);

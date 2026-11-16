@@ -667,7 +667,11 @@ static bool bi_SetFont(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
     return false;
 }
 
-static bool bi_LoadFont(N2 *n, Thread *t, Value *a, int argc, Value *ret) { return false; }
+static bool bi_LoadFont(N2 *n, Thread *t, Value *a, int argc, Value *ret) {
+    Obj *o = obj_create(n, astr(a, argc, 0), OBJ_NAME, 0);
+    remember_call(o, "LoadFont", a, argc);
+    return false;
+}
 
 // ---- sound ----
 
