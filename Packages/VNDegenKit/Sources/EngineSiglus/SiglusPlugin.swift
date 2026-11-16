@@ -29,7 +29,7 @@ nonisolated public struct SiglusPlugin: EnginePlugin {
 
     /// SiglusEngine games read a mouse and keyboard. A click reads on and presses buttons, and the right click opens
     /// the game's menu.
-    public var defaultControls: ControlLayout { .keyboardAndMouse }
+    public var defaultControls: ControlLayout { .visualNovel }
 }
 
 /// RealLive games, run on siglus_rs inside VNDegen's process. The engine draws each frame on the CPU, and FrameHost
@@ -54,7 +54,7 @@ nonisolated public struct RealLivePlugin: EnginePlugin {
     }
 
     /// RealLive games read a mouse and keyboard, as SiglusEngine games do.
-    public var defaultControls: ControlLayout { .keyboardAndMouse }
+    public var defaultControls: ControlLayout { .visualNovel }
 }
 
 nonisolated public enum SiglusError: Error, LocalizedError {

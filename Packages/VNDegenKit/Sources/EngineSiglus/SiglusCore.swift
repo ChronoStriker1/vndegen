@@ -1,5 +1,6 @@
 import CSiglus
 import Darwin
+import FontPack
 import Foundation
 
 /// The C table VNDegen's interface to siglus_rs exports (`vnsiglus.h`), found at run time in the VNSiglus framework
@@ -18,10 +19,14 @@ nonisolated struct SiglusCore: @unchecked Sendable {
     }()
 
     /// Sets the engines' log file and the font that stands in for MS PGothic, the font pack's substitute.
-    func prepare(log: URL, font: URL?) {
+    func prepare(log: URL, font: URL?, language: SiglusLanguage, fonts: [FontPack.Entry]) {
         api.set_log_file!(log.path)
         if let font, !Self.fontSet {
             Self.fontSet = api.set_default_font!(font.path) == 1
+        }
+        api.set_language!(language.code, language.pack)
+        for entry in fonts where !entry.match.bold && !entry.match.italic {
+            api.add_font!(entry.name, entry.match.file.path, UInt32(entry.match.face))
         }
     }
 

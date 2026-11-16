@@ -2,13 +2,12 @@ import Foundation
 import VNCore
 
 extension SiglusPlugin {
-    /// SiglusEngine keeps its saves in `savedata/` in the game's folder, as on a PC, in the PC engine's own format, so
-    /// Ludusavi moves them between VNDegen and a PC.
     nonisolated public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
         guard let layout = SiglusLayout(scanning: folder), layout.engine == .siglus else { return [] }
-        // The folder as it is on disk, matched without regard to case as the engine matches it.
-        let directory = FileCase.resolve("savedata", in: layout.url(in: folder))
-        return [SaveLocation(directory: directory) { path in Self.saveRelativePath(path, folder: "savedata") }]
+        let root = layout.url(in: folder)
+        let saveFolder = SiglusLanguage.choose(root: root).saveFolder
+        let directory = FileCase.resolve(saveFolder, in: root)
+        return [SaveLocation(directory: directory) { path in Self.saveRelativePath(path, folder: saveFolder) }]
     }
 
     /// The part of a path after its last `folder` component, matched ignoring case as Windows does. Nil for a file

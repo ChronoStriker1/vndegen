@@ -1,5 +1,6 @@
 import CSiglus
 import FontPack
+import FrameHost
 import Foundation
 import OSLog
 import QuartzCore
@@ -16,6 +17,8 @@ nonisolated let siglusLog = Logger(subsystem: "com.chronostriker1.vndegen", cate
 /// hub's menu and touch controls sit over it. The engine runs one frame per display refresh on the main thread. The
 /// game starts once the view is on screen, and the game quitting itself ends the session through `onExit`.
 final class SiglusSession: EngineSession {
+    private(set) var failedToStart = false
+    private(set) var startFailureReason: String?
     let view: PlatformView
     private let host = SiglusHostView()
     private let core: SiglusCore
@@ -24,8 +27,11 @@ final class SiglusSession: EngineSession {
     private var game: OpaquePointer?
     private var screen = CGSize(width: 1280, height: 720)
     private var router = SiglusInputRouter()
-    private var displayLink: CADisplayLink?
-    private var lastFrame: CFTimeInterval?
+    private let displayLink = DisplayLinkDriver()
+    private var clock = MillisecondClock()
+    #if DEBUG
+    private let pacing = FramePacing(tag: "SIGLUSFRAMES")
+    #endif
     private var paused = false
     private var stopped = false
     /// The game's message box while one is open.
@@ -51,7 +57,8 @@ final class SiglusSession: EngineSession {
         let logURL = launch.dataDirectory.appending(path: "logs/siglus.txt")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? Data().write(to: logURL)
-        core.prepare(log: logURL, font: FontPack.resolve("MS PGothic")?.file)
+        core.prepare(log: logURL, font: FontPack.resolve("MS PGothic")?.file, language: SiglusLanguage.choose(root: root),
+                     fonts: FontPack.entries)
         #if canImport(UIKit)
         let kind = Int32(VNSIGLUS_VIEW_UIKIT)
         #else
@@ -75,17 +82,14 @@ final class SiglusSession: EngineSession {
         siglusLog.info("started \(self.launch.game.id.rawValue, privacy: .public), \(width)x\(height)")
         if paused { core.api.siglus_set_paused!(created, 1) }
         host.takeFocus()
-        let target = FrameTarget(self)
-        #if canImport(UIKit)
-        let link = CADisplayLink(target: target, selector: #selector(FrameTarget.step))
-        #else
-        let link = host.displayLink(target: target, selector: #selector(FrameTarget.step))
-        #endif
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        displayLink.start(in: host) { [weak self] link in self?.step(link) }
     }
 
     private func fail(_ reason: String) {
+        if game == nil {
+            failedToStart = true
+            startFailureReason = reason
+        }
         siglusLog.error("\(self.launch.game.id.rawValue, privacy: .public): \(reason, privacy: .public)")
         finish()
         launch.onExit()
@@ -97,12 +101,15 @@ final class SiglusSession: EngineSession {
         core.api.siglus_resize!(game, size.width, size.height, size.scale)
     }
 
-    fileprivate func step() {
-        guard let game, let link = displayLink, !paused else { return }
-        let now = link.timestamp
-        let elapsed = lastFrame.map { min(max((now - $0) * 1000, 1), 100) } ?? 16
-        lastFrame = now
-        switch Int(core.api.siglus_step!(game, UInt32(elapsed.rounded()))) {
+    private func step(_ link: CADisplayLink) {
+        guard let game, !paused else { return }
+        let elapsed = min(max(clock.tick(at: link.timestamp), 1), 100)
+        defer {
+            #if DEBUG
+            pacing?.note(link)
+            #endif
+        }
+        switch Int(core.api.siglus_step!(game, UInt32(elapsed))) {
         case VNSIGLUS_RUNNING: break
         case VNSIGLUS_ENDED:
             finish()
@@ -213,20 +220,23 @@ final class SiglusSession: EngineSession {
         self.paused = paused
         // The hub's menu takes the keyboard, so the game would never see those keys come up.
         if paused { router.releaseAll().forEach(deliver) }
-        lastFrame = nil
+        clock.reset()
+        #if DEBUG
+        pacing?.reset()
+        #endif
         if let game { core.api.siglus_set_paused!(game, paused ? 1 : 0) }
         if !paused { host.takeFocus() }
     }
 
     func terminate() {
+        if game == nil, !stopped { failedToStart = true }
         finish()
     }
 
     private func finish() {
         guard !stopped else { return }
         stopped = true
-        displayLink?.invalidate()
-        displayLink = nil
+        displayLink.stop()
         if let game {
             core.api.siglus_set_message_box!(game, nil, nil)
             core.api.siglus_destroy!(game)
@@ -263,15 +273,4 @@ struct SiglusPrompt {
         default: break
         }
     }
-}
-
-/// A display link keeps its target, so the session sits behind a weak link to avoid a cycle.
-private final class FrameTarget: NSObject {
-    private weak var session: SiglusSession?
-
-    init(_ session: SiglusSession) {
-        self.session = session
-    }
-
-    @objc func step() { session?.step() }
 }

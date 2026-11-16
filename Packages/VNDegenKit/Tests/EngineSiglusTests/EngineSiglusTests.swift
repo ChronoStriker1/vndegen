@@ -87,6 +87,35 @@ private let seen = Data([0x00, 0x00, 0x00, 0x00, 0x40, 0x9c, 0x00, 0x00])
     }
 }
 
+@Suite struct SiglusLanguageTests {
+    private let planetarian = ["Scene.pck", "SceneDE.pck", "SceneEN.pck", "SceneES.pck", "SceneFR.pck", "SceneZH.pck",
+                               "SceneZHTW.pck", "Gameexe.dat", "GameexeEN.dat"]
+    private let harmonia = ["Scene.pck", "SceneZH.pck", "Gameexe.dat", "GameexeZH.dat"]
+
+    @Test func picksTheFirstPreferredLanguageTheGameShips() {
+        #expect(SiglusLanguage.choose(files: planetarian, preferred: ["en-US"]) == SiglusLanguage(code: "EN", pack: "EN"))
+        #expect(SiglusLanguage.choose(files: planetarian, preferred: ["ko-KR", "de-DE", "en-US"]) == SiglusLanguage(code: "DE", pack: "DE"))
+        #expect(SiglusLanguage.choose(files: planetarian, preferred: ["ja-JP"]) == SiglusLanguage(code: "JP", pack: ""))
+        #expect(SiglusLanguage.choose(files: planetarian, preferred: ["zh-Hant-TW"]) == SiglusLanguage(code: "ZHTW", pack: "ZHTW"))
+        #expect(SiglusLanguage.choose(files: planetarian, preferred: ["zh-Hans-CN"]) == SiglusLanguage(code: "ZH", pack: "ZH"))
+    }
+
+    @Test func fallsBackToEnglishNeverChinese() {
+        #expect(SiglusLanguage.choose(files: planetarian, preferred: ["ko-KR", "it-IT"]) == SiglusLanguage(code: "EN", pack: "EN"))
+        #expect(SiglusLanguage.choose(files: harmonia, preferred: ["ja-JP"]) == SiglusLanguage(code: "EN", pack: ""))
+        #expect(SiglusLanguage.choose(files: harmonia, preferred: ["en-GB"]) == SiglusLanguage(code: "EN", pack: ""))
+        #expect(SiglusLanguage.choose(files: ["Scene.pck", "Gameexe.dat"], preferred: ["en-US"]) == SiglusLanguage(code: "JP", pack: ""))
+    }
+
+    @Test func savesFollowTheLanguageAsOnThePC() {
+        #expect(SiglusLanguage(code: "EN", pack: "EN").saveFolder == "savedata_en")
+        #expect(SiglusLanguage(code: "EN", pack: "").saveFolder == "savedata")
+        #expect(SiglusLanguage.packSuffix("scenezhtw.PCK") == "ZHTW")
+        #expect(SiglusLanguage.packSuffix("Scene.pck") == nil)
+        #expect(SiglusLanguage.packSuffix("Scene_old.pck") == nil)
+    }
+}
+
 @Suite struct SiglusInputTests {
     @Test func buttonsPressTheGamesKeys() {
         var router = SiglusInputRouter()

@@ -34,7 +34,6 @@ let engines: [any EnginePlugin] = {
         KiriKiriPlugin(),
         ArtemisPlugin(),
         SiglusPlugin(),
-        RealLivePlugin(),
         GodotPlugin(),
         FlashPlugin(),
         VisualNovelMakerPlugin(),
