@@ -209,13 +209,15 @@ void n2_render_to(N2 *n, u32 *dst) {
     u32 *saved = n->screen;
     n->screen = dst;
     for (int i = 0; i < N2_W * N2_H; i++) dst[i] = 0xff000000u;
-    DrawList l = {0};
     bool hidden = flag(n, "$SYSTEM_text_erase");
-    gather(n, &n->root, &l, hidden);
-    gather(n, &n->sysRoot, &l, false);
-    qsort(l.items, (size_t)l.count, sizeof(Obj *), by_prio);
-    for (int i = 0; i < l.count; i++) draw_obj(n, l.items[i]);
-    free(l.items);
+    Obj *roots[2] = {&n->root, &n->sysRoot};
+    for (int r = 0; r < 2; r++) {
+        DrawList l = {0};
+        gather(n, roots[r], &l, r == 0 && hidden);
+        qsort(l.items, (size_t)l.count, sizeof(Obj *), by_prio);
+        for (int i = 0; i < l.count; i++) draw_obj(n, l.items[i]);
+        free(l.items);
+    }
     n->screen = saved;
 }
 
