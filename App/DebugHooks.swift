@@ -67,7 +67,10 @@ enum DebugHooks {
         #if canImport(UIKit)
         if UserDefaults.standard.string(forKey: "forceOrientation") == "landscape",
            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { @Sendable error in
+                NSLog("FORCEORIENT refused, so rotate the simulator instead, as with agent-device orientation landscape-left: %@",
+                      error.localizedDescription)
+            }
         }
         if let size = launchWindowSize { pinWindow(to: size) }
         #endif

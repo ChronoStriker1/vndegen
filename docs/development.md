@@ -32,6 +32,8 @@ Each bundled runtime writes the license notices of the code it links into `build
 
 `scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. Several arguments reach the command as they are, spaces and quotes included, and a single argument runs as a shell command line, such as `'make && make test'`. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it. When [simslim](https://github.com/MobAI-App/simslim) is on the PATH, `sim.sh boot` slims a simulator it creates with `simslim on --except search`, before its first boot. The slim simulator runs about 90 processes and 1.2 GB with a game open instead of about 250 and 3 GB, and the setting survives later shutdowns and boots. The `search` services stay on because without them the Files picker opens on a Recents view that fails to load. Simulators that already exist are left as they are, and `simslim off <udid>` makes one stock again.
 
+The DEBUG launch argument `-forceOrientation landscape` asks the scene to turn to landscape. iPadOS 26 and later refuse that request for an app that supports multitasking, as VNDegen does, so on an iPad simulator the app stays as it is and logs "FORCEORIENT refused" with the reason. Rotate an iPad simulator from outside the app instead, such as with agent-device's `orientation landscape-left`. A game then locks in landscape as it does when a real iPad is turned.
+
 ### Testing helpers
 
 - `scripts/renpy-compat.sh <folder>` boots every Ren'Py game in a folder and prints which runtime each got and whether it reached its main menu.
