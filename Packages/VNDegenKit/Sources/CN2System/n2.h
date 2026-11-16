@@ -404,6 +404,7 @@ struct VNN2 {
     int wheel;
     bool anyPress;     // a click or key that advances text this frame
     bool clickOnButton;  // this frame's click landed on a button
+    bool clickSpent;
     // text
     struct Font *font;
     char fontFace[64];
@@ -566,7 +567,7 @@ void n2_reset(N2 *n, bool restartMain);
 
 // Drawing helpers (draw.c)
 void n2_blit(N2 *n, Obj *o, const Image *img, double x, double y, u32 alpha);
-void n2_render_to(N2 *n, u32 *dst);
+void n2_render_to(N2 *n, u32 *dst, bool gameOnly);
 void backlog_draw(N2 *n, Obj *o);
 void backlog_input(N2 *n);
 void backlog_bar_request(N2 *n, Obj *bar, const char *act);

@@ -302,7 +302,7 @@ Image *save_read_thumbnail(N2 *n, const char *path) {
 
 static void write_thumbnail(N2 *n, const char *path, int w, int h) {
     u32 *screen = n2_alloc(sizeof(u32) * N2_W * N2_H);
-    n2_render_to(n, screen);
+    n2_render_to(n, screen, true);
     Buf b = {0};
     buf_str(&b, "NPSI");
     buf_u32(&b, NPS_TAG);

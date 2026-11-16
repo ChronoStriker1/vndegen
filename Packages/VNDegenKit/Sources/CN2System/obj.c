@@ -391,8 +391,10 @@ static void update_choice(N2 *n, Obj *o, bool *consumed) {
         if (n->mousePressed[VNN2_MOUSE_LEFT] && !*consumed) state = MOUSE_CLICK;
         else if (state != MOUSE_CLICK) state = MOUSE_OVER;
         if (state == MOUSE_CLICK && n->mouseReleased[VNN2_MOUSE_LEFT] && !*consumed) {
-            map_set(&n->pressedButtons, o->name, (void *)1);
-            if (o->alias) map_set(&n->pressedButtons, o->alias, (void *)1);
+            if (!n->clickSpent) {
+                map_set(&n->pressedButtons, o->name, (void *)1);
+                if (o->alias) map_set(&n->pressedButtons, o->alias, (void *)1);
+            }
             *consumed = true;
             state = MOUSE_OVER;
         }
@@ -481,6 +483,7 @@ static void keyboard_focus(N2 *n) {
 
 void buttons_update(N2 *n) {
     keyboard_focus(n);
+    if (n->mousePressed[VNN2_MOUSE_LEFT]) n->clickSpent = false;
     // Presses stay recorded until a select pass reads them or the next click, so a quick click is never lost.
     if (n->mousePressed[VNN2_MOUSE_LEFT]) map_free(&n->pressedButtons, NULL);
     bool consumed = false;

@@ -491,7 +491,10 @@ static void resolve_wait(N2 *n, Thread *t, bool advance, bool firstPass) {
         if ((i32)(n->now - t->waitUntil) >= 0) t->wait = WAIT_NONE;
         break;
     case WAIT_KEY:
-        if (advance || n2_skip_active(n) || (t->waitUntil && (i32)(n->now - t->waitUntil) >= 0)) t->wait = WAIT_NONE;
+        if (advance || n2_skip_active(n) || (t->waitUntil && (i32)(n->now - t->waitUntil) >= 0)) {
+            if (advance && n->mousePressed[VNN2_MOUSE_LEFT]) n->clickSpent = true;
+            t->wait = WAIT_NONE;
+        }
         break;
     case WAIT_FRAME:
         if (firstPass) t->wait = WAIT_NONE;

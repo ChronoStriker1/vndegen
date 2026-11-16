@@ -205,13 +205,13 @@ static void draw_obj(N2 *n, Obj *o) {
     }
 }
 
-void n2_render_to(N2 *n, u32 *dst) {
+void n2_render_to(N2 *n, u32 *dst, bool gameOnly) {
     u32 *saved = n->screen;
     n->screen = dst;
     for (int i = 0; i < N2_W * N2_H; i++) dst[i] = 0xff000000u;
     bool hidden = flag(n, "$SYSTEM_text_erase");
     Obj *roots[2] = {&n->root, &n->sysRoot};
-    for (int r = 0; r < 2; r++) {
+    for (int r = 0; r < (gameOnly ? 1 : 2); r++) {
         DrawList l = {0};
         gather(n, roots[r], &l, r == 0 && hidden);
         qsort(l.items, (size_t)l.count, sizeof(Obj *), by_prio);
@@ -223,7 +223,7 @@ void n2_render_to(N2 *n, u32 *dst) {
 
 void n2_render(N2 *n) {
     if (!n->dirty) return;
-    if (!movie_draw(n)) n2_render_to(n, n->screen);
+    if (!movie_draw(n)) n2_render_to(n, n->screen, false);
     n->dirty = false;
     n->frameSerial++;
 }
