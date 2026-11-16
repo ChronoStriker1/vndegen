@@ -20,6 +20,7 @@ Observed from the game files and from `hanachirasu.exe` running under Wine.
 - `nss.npa` holds the scripts as plain-text NSS source in Shift-JIS, not compiled bytecode. The engine parses them at run time.
 - `cg.npa` and `data.npa` hold JPEG and PNG images. `sound.npa` and `voice.npa` hold Ogg Vorbis. Hanachirasu's movies are loose MPEG-1 files (video 800x608 at 29.97 fps, MPEG-1 Layer II sound at 48 kHz) in `movie/`.
 - The screen is 800x600.
+- NSS numbers are integers: `/` between whole numbers truncates, so `$PLAY_TIME/3600` gives whole hours.
 - NSS is a C-like language: `chapter`, `scene` and `function` declarations, `#include`, `if`/`else`, `while`, `switch`, `select` with `case` labels that name buttons, `call_chapter`, `call_scene`, `return`, `break`, `continue`. `$name` variables are global to the game and saved with each slot. `#name` variables persist across all saves. Function parameters are the only locals. `@` before a number makes a coordinate relative. A string literal that names a variable or parameter reads that variable.
 - `<PRE @box>[name] ... </PRE>` blocks hold the text. Inside them, `<voice>`, `<K>` and `<k>` key waits, `<I>`, `<FONT>`, `{code}` runs at that point of the typewriter, and `&` escapes the punctuation after it.
 - About 80 built-in functions drive a tree of named objects (textures, colors, windows, text, choices, sounds, processes) with priorities, aliases and wildcard paths such as `@box*img` and `@box09/*`. `Fade`, `Move`, `Zoom`, `Rotate`, `Shake` and `DrawTransition` animate them over time with ease curves.
@@ -50,7 +51,8 @@ The PC engine writes to `%APPDATA%\Nitroplus\<system.ini name>\<system.ini versi
 VNDegen reads and writes these files as the PC engine does, so slots move both ways:
 - A slot saved while text shows continues at that text block's `<PRE`, which runs the block again from its start, and no text object is written; the PC engine loads such a slot the same way. Loading a PC slot that holds a text object does the same.
 - Objects are restored by running their creation call again, then applying the saved state. A running animation is given its end value.
-- `$SYSTEM_present_process` holds the name of the running function or scene, as on the PC, because each scene copies it into the variable `LoadText` reads its script from. Function parameters are also global variables, as on the PC.
+- `$SYSTEM_present_process` holds the name of the running function or scene, as on the PC, because each scene copies it into the variable `LoadText` reads its script from. Function parameters are also global variables, as on the PC, and `$SYSTEM_last_text` holds the last line shown, which the save screen keeps as the slot's comment.
+- Loading a slot replaces every `$` variable, and restores each object's alias, scene path and owner process from its record, so a slot saved after a load is as complete as the first.
 - A sound faded or set to volume 0 stops, as on the PC.
 - `common\cqst.npf` isn't read or written; VNDegen keeps its own record of read text for skip.
 
