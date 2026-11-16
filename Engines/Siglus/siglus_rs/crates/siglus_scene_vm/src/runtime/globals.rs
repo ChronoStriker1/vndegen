@@ -352,7 +352,7 @@ impl Default for SystemRuntimeState {
         Self {
             active_flag: true,
             debug_flag: false,
-            language_code: std::env::var("SIGLUS_LANGUAGE").unwrap_or_else(|_| "JP".to_string()),
+            language_code: crate::resource::language_code(),
             debug_logs: Vec::new(),
             dummy_checks: HashSet::default(),
             bench_dialogs: Vec::new(),

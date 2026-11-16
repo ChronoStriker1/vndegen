@@ -91,6 +91,9 @@ fn load_gameexe_config(project_dir: &Path) -> Option<GameexeConfig> {
 }
 
 fn find_gameexe_path(project_dir: &Path) -> Option<std::path::PathBuf> {
+    if let Ok(path) = crate::resource::find_initial_gameexe_path(project_dir) {
+        return Some(path);
+    }
     for name in GAMEEXE_CANDIDATES {
         let p = project_dir.join(name);
         if let Some(path) = crate::resource::resolve_game_file(&p).ok().flatten() {

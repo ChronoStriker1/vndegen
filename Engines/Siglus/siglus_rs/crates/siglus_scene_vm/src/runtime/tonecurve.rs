@@ -121,6 +121,9 @@ fn load_gameexe_config(project_dir: &Path) -> Option<GameexeConfig> {
 }
 
 fn find_gameexe_path(project_dir: &Path) -> Option<PathBuf> {
+    if let Ok(path) = crate::resource::find_initial_gameexe_path(project_dir) {
+        return Some(path);
+    }
     const CANDIDATES: &[&str] = &[
         "Gameexe.dat",
         "Gameexe.ini",

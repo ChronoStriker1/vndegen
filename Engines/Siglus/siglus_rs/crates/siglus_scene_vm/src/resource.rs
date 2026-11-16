@@ -634,7 +634,7 @@ fn cache_project_exe_key(project_dir: &Path, key: Option<[u8; 16]>) -> Option<[u
     let mut cache = project_exe_key_cache()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    cache.insert(project_dir.to_path_buf(), key);
+    cache.insert(project_dir.join(language_pack()), key);
     key
 }
 
@@ -643,7 +643,7 @@ fn cached_project_exe_key(project_dir: &Path) -> Option<Option<[u8; 16]>> {
     let cache = project_exe_key_cache()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    cache.get(project_dir).copied()
+    cache.get(&project_dir.join(language_pack())).copied()
 }
 
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
@@ -960,6 +960,13 @@ pub fn find_scene_pck_path_for_append(project_dir: &Path, append_dir: &str) -> R
     if !append_dir.is_empty() {
         base = base.join(append_dir);
     }
+    let pack = language_pack();
+    if append_dir.is_empty() && !pack.is_empty() {
+        let localized = base.join(format!("Scene{pack}.pck"));
+        if let Some(path) = resolve_windows_case_insensitive_file(&localized)? {
+            return Ok(path);
+        }
+    }
     let candidate = base.join("Scene.pck");
     if let Some(path) = resolve_windows_case_insensitive_file(&candidate)? {
         return Ok(path);
@@ -980,6 +987,37 @@ pub fn find_scene_pck_path_for_append(project_dir: &Path, append_dir: &str) -> R
         append_dir,
         project_dir.display()
     )
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LanguagePack {
+    pub code: String,
+    pub pack: String,
+}
+
+static LANGUAGE: std::sync::RwLock<Option<LanguagePack>> = std::sync::RwLock::new(None);
+
+pub fn set_language(code: &str, pack: &str) {
+    let language = LanguagePack { code: code.to_string(), pack: pack.to_string() };
+    *LANGUAGE.write().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(language);
+}
+
+pub fn language_code() -> String {
+    LANGUAGE
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .as_ref()
+        .map(|language| language.code.clone())
+        .unwrap_or_else(|| std::env::var("SIGLUS_LANGUAGE").unwrap_or_else(|_| "JP".to_string()))
+}
+
+pub fn language_pack() -> String {
+    LANGUAGE
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .as_ref()
+        .map(|language| language.pack.clone())
+        .unwrap_or_default()
 }
 
 pub fn find_scene_pck_path(project_dir: &Path) -> Result<PathBuf> {
@@ -1019,6 +1057,15 @@ pub fn find_initial_gameexe_path(project_dir: &Path) -> Result<PathBuf> {
     let mut base = project_dir.to_path_buf();
     if !append.dir.is_empty() {
         base = base.join(&append.dir);
+    }
+    let pack = language_pack();
+    if !pack.is_empty() {
+        for extension in ["dat", "ini"] {
+            let localized = base.join(format!("Gameexe{pack}.{extension}"));
+            if let Some(path) = resolve_windows_case_insensitive_file(&localized)? {
+                return Ok(path);
+            }
+        }
     }
     for name in GAMEEXE_CANDIDATES {
         let candidate = base.join(name);

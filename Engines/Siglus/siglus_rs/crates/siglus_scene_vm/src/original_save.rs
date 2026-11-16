@@ -981,7 +981,9 @@ impl<'a> OriginalStreamReader<'a> {
 /// VNDegen: the save folder as it is on disk, so a `SaveData` folder a PC backup restored on a disk that doesn't ignore
 /// case is the one the engine reads and writes, rather than a second `savedata` beside it.
 pub fn save_dir(project_dir: &Path) -> PathBuf {
-    existing_spelling(project_dir.join("savedata"))
+    let pack = crate::resource::language_pack();
+    let folder = if pack.is_empty() { "savedata".to_string() } else { format!("savedata_{}", pack.to_lowercase()) };
+    existing_spelling(project_dir.join(folder))
 }
 
 /// VNDegen: `path` as it is on disk when it exists in another case, else `path` itself, so a save replaces a file

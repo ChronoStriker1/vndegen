@@ -94,6 +94,15 @@ struct Args {
     /// Pause at startup.
     #[arg(long, default_value_t = false)]
     paused: bool,
+
+    #[arg(long)]
+    font: Option<PathBuf>,
+
+    #[arg(long)]
+    language: Option<String>,
+
+    #[arg(long)]
+    language_pack: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -4740,6 +4749,13 @@ fn main() -> Result<()> {
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("error"))
         .try_init();
     let args = Args::parse();
+    if let Some(font) = &args.font {
+        let bytes = std::fs::read(font).with_context(|| format!("read {}", font.display()))?;
+        siglus_scene_vm::text_render::set_default_font(bytes, font.display().to_string());
+    }
+    if let Some(code) = &args.language {
+        siglus_scene_vm::resource::set_language(code, args.language_pack.as_deref().unwrap_or(""));
+    }
     // Frame capture must use the renderer attached during `can_create_surfaces`; the old
     // exit-after-capture shortcut constructed only a VM and could never own a
     // GPU FrameCaptureBackend.
