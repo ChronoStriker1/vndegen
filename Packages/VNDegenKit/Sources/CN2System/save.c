@@ -377,11 +377,12 @@ bool save_slot(N2 *n, int slot) {
     char *dir = slot_dir(n, slot);
     mkdir_p(dir);
     int procs = 0;
-    Buf script = slot_script_write(n, &procs);
+    bool rewound = false;
+    Buf script = slot_script_write(n, &procs, &rewound);
     bool ok = script.len > 0;
     if (ok) {
         Buf frames = frames_save(n, procs);
-        Buf log = backlog_save(n, false);
+        Buf log = backlog_save(n, rewound);
         Buf vars = write_vars(n, '$', "NPSL");
         ok = write_slot_file(n, dir, "script.npf", &script);
         ok = write_slot_file(n, dir, "frames.npf", &frames) && ok;

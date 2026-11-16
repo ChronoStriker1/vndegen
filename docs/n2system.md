@@ -8,7 +8,7 @@ Status: in progress on `feat/n2system`. This file is the engine's notes: what ru
 
 | Game | Engine | State |
 |---|---|---|
-| Hanachirasu (English release, `hanachirasu.exe`, `version1.00`) | N2System, the build Nitroplus made for the English Steins;Gate release, with commands the port added | Title, story with text, voices, music and sound, choices, the opening movie, the right-click menu, backlog, Config, Hide Text, Auto, Skip and Return to Title, by mouse and keyboard, in the Linux runner. Saves are being made PC-compatible |
+| Hanachirasu (English release, `hanachirasu.exe`, `version1.00`) | N2System, the build Nitroplus made for the English Steins;Gate release, with commands the port added | Title, story with text, voices, music and sound, choices, the opening movie, the right-click menu, backlog, Config, Hide Text, Auto, Skip and Return to Title, by mouse and keyboard, in the Linux runner. save and load in the PC engine's format, both ways with the PC engine under Wine |
 | Sonicomi | Nitroplus's later "Diesel" engine on the Mware middleware: Squirrel scripts, Direct3D 9 3D models, `.npk` archives with AES | Not N2System. Out of scope |
 | The Song of Saya | N2System | Not a test game. The save container format was first worked out from it in 2026-10 |
 
@@ -43,7 +43,16 @@ The PC engine writes to `%APPDATA%\Nitroplus\<system.ini name>\<system.ini versi
 - `common\val.npf`: the `#` variables. `common\cqst.npf`: which text each script has shown, for skip.
 - `NNNN\` per slot (`0000`, which the scripts save on their own, one per save screen slot from `0001`, and `9999` for "return to previous choice"): `val.npf` (the `$` variables), `script.npf` (each process: the full source of every loaded script plus its execution state), `frames.npf` (each object: its creation call and its state), `bklg.npf` (backlog), `thum.npf` (thumbnail), and `date.npf`, `cmt.npf`, `tm.npf`, which the save screen script writes itself.
 - Every `.npf` is an `NPSF` container: a 16-byte header (magic, unpacked size, two flags), a zlib stream, and the first 4096 bytes mapped through a 256-byte table after adding a key byte derived from the file name. Variables are fixed 1024-byte `NPSG` records.
-- `script.npf` (`NPSS`) holds, per process, each loaded script's name and full source, then fixed-size records of the engine's in-memory call frames, including heap pointers. The field-by-field layout is being worked out against saves the PC engine makes under Wine.
+- `script.npf` (`NPSS`) holds, per process (one per `call_chapter` level), each loaded script's name and full source, a 7-number process header, then one record per `chapter`, `scene`, `cut` and `function` declaration and per inline `{code}` in a text block, in the order the PC engine's scanner finds them. The file has no record count: the loader scans the saved text again and pairs records by position, so the order must be exact. A function's record is also its only activation. The live call chain is in the records: state (1 running, 2 waiting on a callee), the return record, and byte offsets from the body's opening brace: where to continue, the innermost `while` (the byte after the keyword and the body's closing brace) and the active `select`. The running record continues at the start of its statement, which runs again; a caller continues just after its call's `;`, or after the line for `call_scene` and `call_chapter`. Pointers in the file are only identifiers for relinking.
+- `frames.npf` holds one 0x7800-byte record per object in creation order: the owner process, the creation call as source text (variables replaced by their values, literal words such as `BGM` left bare), the scene path it was created under, its own name, path and alias, 17 core values (lock, disused, hideable, clickable, priority, x, y and others), then optional blocks: the window, the texture (opacity as 0-255, zoom, rotation, render mode and derived geometry), images, text glyph tables, running animations, and the sound (state, loop, volume, frequency, pan, the play position in bytes of decoded audio, fades, loop points). The PC engine re-runs the creation call in the owner process, then applies the rest; a playing sound resumes at its position.
+- `bklg.npf` (`NPSB`) is the backlog as one Shift-JIS byte per 16-bit unit, with voice markers, `\n` ending each paragraph and `\r` at soft wraps. `common\cqst.npf` holds a read flag per source byte of each script.
+
+VNDegen reads and writes these files as the PC engine does, so slots move both ways:
+- A slot saved while text shows continues at that text block's `<PRE`, which runs the block again from its start, and no text object is written; the PC engine loads such a slot the same way. Loading a PC slot that holds a text object does the same.
+- Objects are restored by running their creation call again, then applying the saved state. A running animation is given its end value.
+- `$SYSTEM_present_process` holds the name of the running function or scene, as on the PC, because each scene copies it into the variable `LoadText` reads its script from. Function parameters are also global variables, as on the PC.
+- A sound faded or set to volume 0 stops, as on the PC.
+- `common\cqst.npf` isn't read or written; VNDegen keeps its own record of read text for skip.
 
 In the app the save folder is `AppData/Roaming/Nitroplus/<name>/<version>` in the game's data directory, so a backup's Windows paths map onto it.
 
@@ -58,7 +67,7 @@ The runtime follows the System 3 runtime's shape: C with no threads of its own a
 - `text.c`: markup, line breaking, glyphs from stb_truetype with the font from the shared font pack (`vnfont_resolve("Tahoma")`), outlines, typewriter speed and key-wait icons.
 - `snd.c`: Ogg Vorbis through stb_vorbis, BGM, SE and voice channels with volumes, loops and fades, and a stream channel for movie sound, mixed into the pull callback.
 - `movie.c`: MPEG-1 movies through the shared `vnvideo` decoder (pl_mpeg). The picture follows the sound actually played.
-- `save.c`: `NPSF` containers, `NPSG` variables, and the slot files above.
+- `save.c`: `NPSF` containers, `NPSG` and `NPSL` variables, thumbnails and the slot files. `scan.c`: the PC engine's script scanner, which gives the record order. `slot.c`: `script.npf` to and from the main thread's frames, through each chunk's body offset and statement table. `frames.c`: `frames.npf` to and from the object tree. `backlog.c`: `bklg.npf`.
 - `Engines/N2System/host`: Linux test tools on CMake. `n2run` runs a game headless with scripted input (`wait`, `click`, `rclick`, `move`, `clicks`, `key`, `wheel`, `set:NAME=NUMBER`, `print:NAME`, `tree:NAME`, `shot:NAME`) and writes PNG frames and the sound it played as `audio.wav`. `n2play` is an SDL2 player.
 - `EngineN2System` in Swift: detection (`system.npa` beside `nss.npa`, up to two folders down), the session on FrameHost and the shared frame driver, input with the "Visual novel" controller layout, and the save location above.
 
@@ -70,3 +79,6 @@ Filled in as the work lands.
 
 - Only Hanachirasu's archive key is known. Another encrypted N2System game needs its own table, recovered the same way from its files.
 - `AssocArray` and `SetEnableBacklog` do nothing.
+- A loaded slot starts its text block again from the beginning, on the PC engine too when VNDegen saved it. After loading a slot the PC engine saved, the lines of that block it had already shown appear twice in the backlog.
+- `common\cqst.npf` (read text for skip) isn't shared with the PC engine.
+- Pixel dumps of images changed at run time (`images\NNNN_MMMM.npf`) aren't read or written; no Hanachirasu scene was seen to make one.

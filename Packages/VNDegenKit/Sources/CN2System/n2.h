@@ -488,6 +488,7 @@ void text_free(TextObj *t);
 void text_update(N2 *n, Obj *o);   // typewriter
 bool text_segment_done(TextObj *t);
 bool text_finished(TextObj *t);
+bool text_logged(TextObj *t);
 void text_draw(N2 *n, Obj *o, u32 *dst, int dx, int dy, double opacity);
 void text_start_block(N2 *n, Obj *o, TextBlock *b, Script *s, int w, int h, int letterSpacing, int lineSpacing);
 void text_append(N2 *n, TextObj *t, const char *markup);
@@ -569,7 +570,7 @@ u8 *save_read_file(N2 *n, const char *path, size_t *size);
 void save_write_file(N2 *n, const char *path, const u8 *data, size_t size);
 bool conquest_read(N2 *n, const char *file, const char *scene);
 void conquest_mark(N2 *n, Script *s, TextBlock *b);
-Buf slot_script_write(N2 *n, int *procCount);
+Buf slot_script_write(N2 *n, int *procCount, bool *dropLastLog);
 bool slot_script_read(N2 *n, const u8 *d, size_t size, bool rewindText);
 u32 slot_proc_serial(int proc);
 bool frames_load(N2 *n, const u8 *d, size_t size, bool *hadText);

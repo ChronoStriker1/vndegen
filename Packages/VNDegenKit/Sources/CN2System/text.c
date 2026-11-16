@@ -471,6 +471,8 @@ bool text_segment_done(TextObj *t) {
     return t->visible >= t->count && t->state == TS_TYPING;
 }
 
+bool text_logged(TextObj *t) { return t->logged; }
+
 bool text_finished(TextObj *t) {
     return t->state == TS_DONE;
 }

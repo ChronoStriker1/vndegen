@@ -119,13 +119,14 @@ static char *pc_file_name(const Script *s) {
     return name;
 }
 
-static bool text_shown(N2 *n, Obj *o, const char *name) {
+static Obj *text_shown(N2 *n, Obj *o, const char *name) {
     for (int i = 0; i < o->childCount; i++) {
         Obj *c = o->children[i];
-        if (c->kind == OBJ_TEXT && c->text && !c->erased && n2_streq_ci(c->name, name)) return true;
-        if (text_shown(n, c, name)) return true;
+        if (c->kind == OBJ_TEXT && c->text && !c->erased && n2_streq_ci(c->name, name)) return c;
+        Obj *found = text_shown(n, c, name);
+        if (found) return found;
     }
-    return false;
+    return NULL;
 }
 
 static u32 rec_id(int proc, int rec) { return 0x01000000u + ((u32)proc << 16) + (u32)rec + 1; }
@@ -133,13 +134,15 @@ static u32 proc_id(int proc) { return 0x00e00000u + (u32)proc * 0x100 + 0x10; }
 
 u32 slot_proc_serial(int proc) { return 0x2000u + (u32)proc * 0x111; }
 
-Buf slot_script_write(N2 *n, int *procCount) {
+Buf slot_script_write(N2 *n, int *procCount, bool *dropLastLog) {
     Buf b = {0};
     Thread *t = n->main;
     *procCount = 0;
+    *dropLastLog = false;
     if (!t || t->fp == 0) return b;
     int top = t->fp - 1, runSrc = -1;
-    if (n->activeBlock && n->activeBlockScript && text_shown(n, &n->root, n->activeBlock->name)) {
+    Obj *shown = n->activeBlock && n->activeBlockScript ? text_shown(n, &n->root, n->activeBlock->name) : NULL;
+    if (shown) {
         for (int f = t->fp - 1; f >= 0; f--) {
             Chunk *c = t->frames[f].chunk;
             if (c->script != n->activeBlockScript) continue;
@@ -147,6 +150,7 @@ Buf slot_script_write(N2 *n, int *procCount) {
                 c->stmts[stmt_starting(c, n->activeBlock->srcpos)].src == n->activeBlock->srcpos) {
                 top = f;
                 runSrc = n->activeBlock->srcpos;
+                *dropLastLog = text_logged(shown->text);
                 break;
             }
         }
