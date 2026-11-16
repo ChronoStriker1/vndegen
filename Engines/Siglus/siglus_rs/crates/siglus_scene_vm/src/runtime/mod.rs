@@ -3881,7 +3881,7 @@ impl CommandContext {
         if self.excall_state.ex_call_flag {
             return false;
         }
-        if self.movie.current().is_some() {
+        if self.globals.mov.playing {
             return false;
         }
         self.globals.syscom.read_skip.onoff = false;
