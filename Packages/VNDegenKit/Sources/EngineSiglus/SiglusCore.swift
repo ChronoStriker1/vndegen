@@ -19,12 +19,12 @@ nonisolated struct SiglusCore: @unchecked Sendable {
     }()
 
     /// Sets the engines' log file and the font that stands in for MS PGothic, the font pack's substitute.
-    func prepare(log: URL, font: URL?, language: SiglusLanguage, fonts: [FontPack.Entry]) {
+    func prepare(log: URL, font: URL?, language: SiglusLanguage? = nil, fonts: [FontPack.Entry] = []) {
         api.set_log_file!(log.path)
         if let font, !Self.fontSet {
             Self.fontSet = api.set_default_font!(font.path) == 1
         }
-        api.set_language!(language.code, language.pack)
+        if let language { api.set_language!(language.code, language.pack) }
         for entry in fonts where !entry.match.bold && !entry.match.italic {
             api.add_font!(entry.name, entry.match.file.path, UInt32(entry.match.face))
         }
