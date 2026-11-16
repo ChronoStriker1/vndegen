@@ -1095,18 +1095,7 @@ impl SiglusHost {
                 "WARNINGINFO.RETURNMENU_WARNING_STR",
             ],
         };
-        let default = match kind {
-            SyscomPendingProcKind::EndGame => "終了してもよろしいですか？",
-            SyscomPendingProcKind::ReturnToSel => "前の選択肢に戻ってもよろしいですか？",
-            SyscomPendingProcKind::RestartScene => "途中から始めてもよろしいですか？",
-            SyscomPendingProcKind::Save | SyscomPendingProcKind::QuickSave => {
-                "セーブデータを上書きしてもよろしいですか？"
-            }
-            SyscomPendingProcKind::Load | SyscomPendingProcKind::QuickLoad => {
-                "セーブデータをロードしてもよろしいですか？"
-            }
-            _ => "タイトルに戻ってもよろしいですか？",
-        };
+        let default = crate::host::default_warning_text(kind);
         let cfg = self.vm.ctx.tables.gameexe.as_ref();
         keys.iter()
             .find_map(|key| cfg.and_then(|c| c.get_unquoted(key)))
@@ -1125,7 +1114,7 @@ impl SiglusHost {
         .find_map(|key| cfg.and_then(|c| c.get_unquoted(key)))
         .filter(|s| !s.is_empty())
         .map(str::to_string)
-        .unwrap_or_else(|| "タイトルに戻ってもよろしいですか？".to_string())
+        .unwrap_or_else(|| crate::host::default_warning_text(SyscomPendingProcKind::ReturnToMenu).to_string())
     }
 
     fn load_wipe_params(&self) -> (i32, i32) {
@@ -1822,4 +1811,24 @@ pub fn parse_bool_exit(result: Result<bool>, context: &str) -> i32 {
 
 pub fn default_frame_interval_ms(dt_ms: u32) -> u32 {
     if dt_ms == 0 { FRAME_INTERVAL_MS } else { dt_ms }
+}
+
+pub fn default_warning_text(kind: SyscomPendingProcKind) -> &'static str {
+    let japanese = crate::resource::language_code() == "JP";
+    match (kind, japanese) {
+        (SyscomPendingProcKind::EndGame, true) => "終了してもよろしいですか？",
+        (SyscomPendingProcKind::EndGame, false) => "Are you sure you want to exit the game?",
+        (SyscomPendingProcKind::ReturnToSel, true) => "前の選択肢に戻ってもよろしいですか？",
+        (SyscomPendingProcKind::ReturnToSel, false) => "Are you sure you want to back to the latest choice?",
+        (SyscomPendingProcKind::RestartScene, true) => "途中から始めてもよろしいですか？",
+        (SyscomPendingProcKind::RestartScene, false) => "Are you sure you want to start sequel to the game?",
+        (SyscomPendingProcKind::Save | SyscomPendingProcKind::QuickSave, true) => "セーブデータを上書きしてもよろしいですか？",
+        (SyscomPendingProcKind::Save, false) => "Are you sure you want to save now data?",
+        (SyscomPendingProcKind::QuickSave, false) => "Are you sure you want to quick save?",
+        (SyscomPendingProcKind::Load | SyscomPendingProcKind::QuickLoad, true) => "セーブデータをロードしてもよろしいですか？",
+        (SyscomPendingProcKind::Load, false) => "Are you sure you want to load this data?",
+        (SyscomPendingProcKind::QuickLoad, false) => "Are you sure you want to quick load?",
+        (_, true) => "タイトルに戻ってもよろしいですか？",
+        (_, false) => "Are you sure you want to return to the title screen?",
+    }
 }

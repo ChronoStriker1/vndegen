@@ -2401,18 +2401,7 @@ impl App {
                 "WARNINGINFO.RETURNMENU_WARNING_STR",
             ],
         };
-        let default = match kind {
-            SyscomPendingProcKind::EndGame => "終了してもよろしいですか？",
-            SyscomPendingProcKind::ReturnToSel => "前の選択肢に戻ってもよろしいですか？",
-            SyscomPendingProcKind::RestartScene => "途中から始めてもよろしいですか？",
-            SyscomPendingProcKind::Save | SyscomPendingProcKind::QuickSave => {
-                "セーブデータを上書きしてもよろしいですか？"
-            }
-            SyscomPendingProcKind::Load | SyscomPendingProcKind::QuickLoad => {
-                "セーブデータをロードしてもよろしいですか？"
-            }
-            _ => "タイトルに戻ってもよろしいですか？",
-        };
+        let default = siglus_scene_vm::host::default_warning_text(kind);
         let cfg = vm.ctx.tables.gameexe.as_ref();
         keys.iter()
             .find_map(|key| cfg.and_then(|c| c.get_unquoted(key)))
@@ -2431,7 +2420,7 @@ impl App {
         .find_map(|key| cfg.and_then(|c| c.get_unquoted(key)))
         .filter(|s| !s.is_empty())
         .map(str::to_string)
-        .unwrap_or_else(|| "タイトルに戻ってもよろしいですか？".to_string())
+        .unwrap_or_else(|| siglus_scene_vm::host::default_warning_text(SyscomPendingProcKind::ReturnToMenu).to_string())
     }
 
     fn load_wipe_params(vm: &SceneVm<'static>) -> (i32, i32) {
