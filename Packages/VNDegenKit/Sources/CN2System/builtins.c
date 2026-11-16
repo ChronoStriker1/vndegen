@@ -115,7 +115,9 @@ static void remember_call(Obj *o, const char *fn, Value *a, int argc) {
     for (int i = 0; i < argc; i++) {
         char tmp[64];
         if (i) buf_u8(&b, ',');
-        if (a[i].t == V_STR) {
+        if (a[i].t == V_STR && a[i].bare) {
+            buf_str(&b, a[i].s->s);
+        } else if (a[i].t == V_STR) {
             buf_u8(&b, '"');
             buf_str(&b, a[i].s->s);
             buf_u8(&b, '"');

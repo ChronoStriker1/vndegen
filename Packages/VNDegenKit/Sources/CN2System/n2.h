@@ -110,6 +110,7 @@ enum { V_NULL, V_NUM, V_STR, V_BOOL };
 typedef struct Value {
     u8 t;
     u8 delta;  // an '@' coordinate, relative to the current value
+    u8 bare;
     double n;  // V_NUM and V_BOOL
     Str *s;    // V_STR
 } Value;

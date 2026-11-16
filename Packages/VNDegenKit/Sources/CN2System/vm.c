@@ -62,8 +62,15 @@ static Value pop(Thread *t) {
     return t->stack[--t->sp];
 }
 
+static void set_present(N2 *n, Chunk *c) {
+    if (!c || c->kind == CHUNK_TEXT) return;
+    Value v = v_str(c->name);
+    var_set(n, "$SYSTEM_present_process", &v);
+    v_free(&v);
+}
+
 // Pushes a frame for c. pushResult says whether OP_RET leaves the return value for the caller.
-static bool push_frame(Thread *t, Chunk *c, Value *args, int argc, bool pushResult) {
+static bool push_frame(N2 *n, Thread *t, Chunk *c, Value *args, int argc, bool pushResult) {
     if (t->fp > 512) return false;
     if (t->fp == t->frameCap) {
         t->frameCap = t->frameCap ? t->frameCap * 2 : 16;
@@ -74,14 +81,18 @@ static bool push_frame(Thread *t, Chunk *c, Value *args, int argc, bool pushResu
     f->chunk = c;
     f->paramCount = c->paramCount;
     f->params = n2_alloc(sizeof(Value) * (size_t)(c->paramCount ? c->paramCount : 1));
-    for (int i = 0; i < c->paramCount && i < argc; i++) f->params[i] = v_copy(&args[i]);
+    for (int i = 0; i < c->paramCount && i < argc; i++) {
+        f->params[i] = v_copy(&args[i]);
+        if (c->params[i][0] == '$') var_set(n, c->params[i], &args[i]);
+    }
     f->stackBase = t->sp;
     f->pushes = pushResult;
+    set_present(n, c);
     return true;
 }
 
 bool thread_call(N2 *n, Thread *t, Chunk *c, Value *args, int argc) {
-    if (!push_frame(t, c, args, argc, false)) return false;
+    if (!push_frame(n, t, c, args, argc, false)) return false;
     if (t->wait == WAIT_DONE) t->wait = WAIT_NONE;
     return true;
 }
@@ -93,7 +104,7 @@ static void call_chapter(N2 *n, Thread *t, const char *path, const char *name) {
         n2_fail(n, "The game's script has no chapter %s in %s.", name ? name : "main", path);
         return;
     }
-    push_frame(t, c, NULL, 0, false);
+    push_frame(n, t, c, NULL, 0, false);
 }
 
 static void call_scene(N2 *n, Thread *t, const char *spec) {
@@ -119,7 +130,7 @@ static void call_scene(N2 *n, Thread *t, const char *spec) {
         n2_fail(n, "The game's script has no scene %s.", spec);
         return;
     }
-    push_frame(t, c, NULL, 0, false);
+    push_frame(n, t, c, NULL, 0, false);
 }
 
 static Value arith(int op, Value a, Value b) {
@@ -300,7 +311,7 @@ void thread_run(N2 *n, Thread *t) {
             Value *args = &t->stack[t->sp - argc];
             Chunk *fn = n2_find_function(n, name);
             if (fn) {
-                if (!push_frame(t, fn, args, argc, true)) {
+                if (!push_frame(n, t, fn, args, argc, true)) {
                     n2_fail(n, "the scripts called functions too deeply (%s)", name);
                     break;
                 }
@@ -340,6 +351,7 @@ void thread_run(N2 *n, Thread *t) {
             }
             frame_free(done);
             t->fp--;
+            if (t->fp > 0) set_present(n, t->frames[t->fp - 1].chunk);
             if (pushes) vm_push(t, r);
             else v_free(&r);
             if (t->fp == 0) t->wait = WAIT_DONE;

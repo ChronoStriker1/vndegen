@@ -190,7 +190,10 @@ void sound_set_volume(N2 *n, Sound *s, double volume, u32 durationMs) {
     s->fadeTo = volume;
     s->fadeStart = n->now;
     s->fadeDur = durationMs;
-    if (!durationMs) s->vol = volume;
+    if (!durationMs) {
+        s->vol = volume;
+        if (volume <= 0 && s->playing) sound_stop(n, s);
+    }
 }
 
 void sound_set_loop(N2 *n, Sound *s, bool loop) { s->loop = loop; }
@@ -312,6 +315,10 @@ static void update_sound(N2 *n, Sound *s) {
         if (el >= s->fadeDur) {
             s->vol = s->fadeTo;
             s->fadeDur = 0;
+            if (s->vol <= 0) {
+                sound_stop(n, s);
+                return;
+            }
         } else {
             s->vol = s->fadeFrom + (s->fadeTo - s->fadeFrom) * (double)el / s->fadeDur;
         }

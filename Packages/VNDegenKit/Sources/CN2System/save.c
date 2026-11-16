@@ -203,10 +203,10 @@ static Buf write_vars(N2 *n, char sigil, const char *magic) {
         size_t nl;
         char *name = n2_utf8_to_sjis(refs[i].name, &nl);
         if (nl > 500) nl = 500;
-        rec[0] = v->t == V_STR ? 1 : v->t == V_NUM ? 2 : 0;
+        rec[0] = v->t == V_STR ? 1 : v->t == V_NUM || v->t == V_BOOL ? 2 : 0;
         memcpy(rec + 1, name, nl);
         size_t at = 1 + nl + 1 + 3;
-        double d = v->t == V_STR ? 0 : v->n;
+        double d = v->t == V_BOOL ? (v_truthy(v) ? 1 : 0) : v->t == V_NUM ? v->n : 0;
         memcpy(rec + at, &d, 8);
         at += 8;
         if (v->t == V_STR) {

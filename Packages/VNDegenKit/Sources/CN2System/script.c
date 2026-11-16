@@ -230,7 +230,7 @@ static void patch(P *p, int at, int target) {
 static int add_const(Chunk *c, Value v) {
     for (int i = 0; i < c->constCount; i++) {
         Value *k = &c->consts[i];
-        if (k->t == v.t && k->delta == v.delta &&
+        if (k->t == v.t && k->delta == v.delta && k->bare == v.bare &&
             ((v.t == V_STR && strcmp(k->s->s, v.s->s) == 0) || (v.t != V_STR && k->n == v.n))) {
             v_free(&v);
             return i;
@@ -357,7 +357,9 @@ static void primary(P *p) {
             emit(p, OP_FALSE, 0);
         } else {
             // A bare word is a constant such as Hideable, AxlDxl or a button name.
-            emit(p, OP_CONST, str_const(p, name));
+            Value bare = v_str(name);
+            bare.bare = 1;
+            emit(p, OP_CONST, add_const(p->chunk, bare));
         }
         free(name);
         return;
