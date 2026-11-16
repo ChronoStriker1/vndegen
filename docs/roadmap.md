@@ -107,7 +107,9 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Nothing right now. NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
+- N2System (Nitroplus), restarted 2026-11-16 from the work parked on 2026-10-31 (tag `archive/ws-n2system`). First it checks whether Sonicomi, the library's other Nitroplus game, runs on the same engine.
+- SiglusEngine and RealLive, on siglus_rs (tag `archive/ws-siglus`): waits for a test game, since the library has none. Candidates on Steam, in English: planetarian HD, Summer Pockets, Rewrite+ or Harmonia (SiglusEngine), and Planetarian Steam Edition, CLANNAD or Tomoyo After (RealLive). Not Summer Pockets REFLECTION BLUE, Harmonia Full HD Edition or planetarian ~Snow Globe~, which are Luca System.
+- NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
 VNDegen stays free to distribute, through its GitHub releases. It won't go on the App Store (maintainer, 2026-11-16). Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
@@ -116,10 +118,16 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 - The LGPL libraries are each in a library or file of their own, which a changed copy can replace, as the LGPL asks: FFmpeg 8.1.2 is `FFmpeg.framework`, Ren'Py's iOS libraries (FFmpeg 4.3.1, FriBidi and Pygame's blitter) are `RenPyRuntime.framework`, the Mac's are Ren'Py's `librenpython.dylib`, and chardet is Python bytecode. rclone's one LGPL-3.0 module, `github.com/cloudsoda/sddl`, which its SMB code imports and never uses, is replaced by a stub of VNDegen's own. Each release carries the libraries' exact source as `VNDegen-<version>-LGPL-sources.tar`. [relinking.md](relinking.md) has the steps.
 
 ## Next
-Nothing planned right now.
+Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the two that reuse an engine VNDegen has first, then the rest by number of games. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
+1. RPG Maker MV and MZ games packed into one Enigma Virtual Box exe (3 games). The MV/MZ plugin plays them once they're unpacked, so this is an unpacker in the app.
+2. Construct (1 game), which exports HTML5 and should run in the web view.
+3. Tmr-Hiro ADV System (5 games).
+4. SystemAoi (3 games).
+5. Smile Game Builder (3 games), whose player is .NET.
+6. Ikura GDL (2 games) and IPAC (2 games).
+7. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
 
 ## Set aside
-- SiglusEngine/RealLive (on siglus_rs) and N2System, started 2026-10-31 and parked: the library has no Siglus or RealLive game and one N2System game. Their work is kept as the tags `archive/ws-siglus` and `archive/ws-n2system`.
 - Save sync through the cloud services that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, set aside by the maintainer on 2026-11-16. A plan was written first: Google's and Microsoft's terms don't allow shipping rclone's own client IDs, so OneDrive and Dropbox would need VNDegen's own app registrations and Google Drive and Box each user's own client ID. Nothing was built.
 - An App Store release, ruled out by the maintainer on 2026-11-16. The groundwork that was done stays: the LGPL libraries in replaceable frameworks with their source on each release, and MetalANGLE for arm64 only.
 - Playing over AirPlay with the iPhone or iPad as the controller (#66), set aside by the maintainer on 2026-11-10. iOS gives an app a TV to draw a live game on only once the player has turned on Screen Mirroring or plugged in a cable. An AirPlay button inside the app carries sound and video files, not a live picture, and sending the game as live video would put seconds between a press and the picture. The maintainer wanted it to start from inside the app, so it stopped there. What was built worked on the simulator with Screen Mirroring or a cable: the game alone went to the TV and the device showed the controls. It was never merged, and its branch was removed at the maintainer's request. VNDegen doesn't use AirPlay itself: nothing in the app or its engines asks for it, and from 0.41.3 the web view no longer offers a game's movie or sound to an AirPlay device on its own. With Screen Mirroring on, picture and sound go to the TV together, as iOS sends them.
