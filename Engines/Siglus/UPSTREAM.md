@@ -57,7 +57,7 @@ On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's in
 - Run a game in the language the host picks (`resource::set_language`): `Scene{pack}.pck` and `Gameexe{pack}.dat`, saves and thumbnails in `savedata_{pack}`, the EXE key cache keyed by pack, and `GET_LANGUAGE` answered with the code.
 - Wrap Latin words whole in the message window and the backlog.
 - Show no speaker name when the window's `NAME_DISP_MODE` is 2.
-- Show a tab followed by a space as a comma in message text, names, the backlog and save descriptions (planetarian HD's English text).
+- Show a tab before a space or between two digits as a comma in message text, names, the backlog and save descriptions (planetarian HD's English text).
 - English confirmation texts when the language isn't Japanese and the Gameexe has none.
 - Resolve Windows font names through substitutes the host registers (`text_render::add_host_font`).
 - Let a stage object's movie leave the right-click menu working: the menu waits only while the global MOV player plays.

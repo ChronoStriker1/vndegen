@@ -31,7 +31,7 @@ Text is drawn in the game's own font when it ships one (planetarian HD's `NotoSa
 Changes for the English releases, beyond the original engine's layout:
 
 - Latin words wrap whole, in the message window and the backlog, where the original breaks lines by character cells.
-- planetarian HD's English text stores most commas as a tab before the space (1,941 tabs and 4 real commas, where the German, Spanish and French texts have about 2,000 commas and no tabs). A tab followed by a space shows as a comma in messages, names, the backlog and save descriptions. A tab used any other way is left alone.
+- planetarian HD's English text stores most commas as a tab: before a space (1,918 times) or between digits as a thousands separator (20 times), with 4 real commas, where the German, Spanish and French texts have about 2,000 commas and no tabs. A tab before a space or between two digits shows as a comma in messages, names, the backlog and save descriptions. A tab used any other way is left alone.
 - A message window whose Gameexe sets `NAME_DISP_MODE` 2 shows no speaker name, as both test games expect; planetarian's English script still names Yumemi in Japanese for its voice table.
 - Confirmations the game's Gameexe doesn't word, such as loading a save, use the engine's English texts when the language isn't Japanese.
 

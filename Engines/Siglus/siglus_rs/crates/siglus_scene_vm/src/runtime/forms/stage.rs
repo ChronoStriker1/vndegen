@@ -2997,7 +2997,7 @@ fn msgbk_add_text(ctx: &mut CommandContext, s: &str) {
     let Some(st) = msgbk_state_mut(ctx) else {
         return;
     };
-    let s = s.replace("\t ", ", ");
+    let s = tab_commas(s);
     st.add_msg(&s, &s, scn_no, line_no);
 }
 
@@ -13581,7 +13581,22 @@ fn mwnd_add_msg_check(m: &MwndState, new_line_flag: bool) -> bool {
 }
 
 pub(crate) fn mwnd_shown_name(m: &MwndState, name: &str) -> String {
-    if m.name_disp_mode == 2 { String::new() } else { name.replace("\t ", ", ") }
+    if m.name_disp_mode == 2 { String::new() } else { tab_commas(name) }
+}
+
+pub(crate) fn tab_commas(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    chars
+        .iter()
+        .enumerate()
+        .map(|(i, &ch)| {
+            let previous = i.checked_sub(1).map(|p| chars[p]);
+            let next = chars.get(i + 1).copied();
+            let comma = next == Some(' ')
+                || previous.is_some_and(|c| c.is_ascii_digit()) && next.is_some_and(|c| c.is_ascii_digit());
+            if ch == '\t' && comma { ',' } else { ch }
+        })
+        .collect()
 }
 
 fn mwnd_resolved_color_nos(ctx: &CommandContext, m: &MwndState) -> (i64, i64, i64) {
@@ -14005,7 +14020,6 @@ fn mwnd_text_tokens(text: &str) -> Vec<MwndTextToken> {
             }
         }
         let end = chars.get(i + 1).map(|v| v.0).unwrap_or(text.len());
-        let ch = if ch == '\t' && chars.get(i + 1).is_some_and(|next| next.1 == ' ') { ',' } else { ch };
         out.push(MwndTextToken {
             moji_type: 0,
             code: ch as i32,
@@ -14049,6 +14063,8 @@ fn mwnd_append_styled_text(ctx: &CommandContext, m: &mut MwndState, text: &str) 
     if text.is_empty() {
         return String::new();
     }
+    let shown = tab_commas(text);
+    let text = shown.as_str();
     let tokens = mwnd_text_tokens(text);
     let (max_w, max_h) = mwnd_message_extent(m);
     let (space_x, _) = m.moji_space.unwrap_or((-1, 10));
@@ -15929,5 +15945,18 @@ pub fn dispatch(ctx: &mut CommandContext, args: &[Value]) -> Result<bool> {
             }
             Ok(true)
         }
+    }
+}
+
+#[cfg(test)]
+mod tab_comma_tests {
+    use super::tab_commas;
+
+    #[test]
+    fn tabs_written_for_commas_show_as_commas() {
+        assert_eq!(tab_commas("ceiling\t it was"), "ceiling, it was");
+        assert_eq!(tab_commas("the 2\t497\t288th customer"), "the 2,497,288th customer");
+        assert_eq!(tab_commas("Name\tValue"), "Name\tValue");
+        assert_eq!(tab_commas("fade?'\t'Is"), "fade?'\t'Is");
     }
 }
