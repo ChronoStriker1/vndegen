@@ -103,7 +103,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
-- Audit, partly fixed and still open: #164 (RGSS part 3 waits on the RPG Maker help files, which the library doesn't have).
+- Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
@@ -119,6 +119,7 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 Nothing planned right now.
 
 ## Set aside
+- SiglusEngine/RealLive (on siglus_rs) and N2System, started 2026-10-31 and parked: the library has no Siglus or RealLive game and one N2System game. Their work is kept as the tags `archive/ws-siglus` and `archive/ws-n2system`.
 - Save sync through the cloud services that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, set aside by the maintainer on 2026-11-16. A plan was written first: Google's and Microsoft's terms don't allow shipping rclone's own client IDs, so OneDrive and Dropbox would need VNDegen's own app registrations and Google Drive and Box each user's own client ID. Nothing was built.
 - An App Store release, ruled out by the maintainer on 2026-11-16. The groundwork that was done stays: the LGPL libraries in replaceable frameworks with their source on each release, and MetalANGLE for arm64 only.
 - Playing over AirPlay with the iPhone or iPad as the controller (#66), set aside by the maintainer on 2026-11-10. iOS gives an app a TV to draw a live game on only once the player has turned on Screen Mirroring or plugged in a cable. An AirPlay button inside the app carries sound and video files, not a live picture, and sending the game as live video would put seconds between a press and the picture. The maintainer wanted it to start from inside the app, so it stopped there. What was built worked on the simulator with Screen Mirroring or a cable: the game alone went to the TV and the device showed the controls. It was never merged, and its branch was removed at the maintainer's request. VNDegen doesn't use AirPlay itself: nothing in the app or its engines asks for it, and from 0.41.3 the web view no longer offers a game's movie or sound to an AirPlay device on its own. With Screen Mirroring on, picture and sound go to the TV together, as iOS sends them.
