@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "n2.h"
 #include "vnfont.h"
@@ -20,6 +21,7 @@ static long wavFrames;
 static float audio[2048];
 
 static int step(VNN2 *n) {
+    if (n->movie) usleep(16000);
     int alive = vnn2_frame(n, 16);
     vnn2_audio(n, audio, 705);
     if (wav) {

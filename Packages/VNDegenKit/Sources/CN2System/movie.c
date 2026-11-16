@@ -19,6 +19,8 @@ struct Movie {
     size_t bufCap;
     size_t have;
     bool started;
+    int newFrames;
+    char *name;
 };
 
 static int64_t read_movie(void *user, uint64_t offset, void *buffer, size_t length) {
@@ -34,6 +36,10 @@ static int64_t read_movie(void *user, uint64_t offset, void *buffer, size_t leng
 }
 
 static void movie_free(N2 *n, struct Movie *m) {
+    if (m->clock > 0 && m->name)
+        n2_log(n, "movie %s: %d new frames in %.0f ms, %.2f a second, made at %.2f", m->name, m->newFrames,
+               m->clock * 1000, m->newFrames / m->clock, m->info.fps);
+    free(m->name);
     if (m->video) vnvideo_close(m->video);
     if (m->ch) mixer_stream_close(n, m->ch);
     if (m->file) fclose(m->file);
@@ -57,6 +63,7 @@ bool movie_play(N2 *n, const char *path, bool skippable) {
     movie_stop(n);
     struct Movie *m = n2_alloc(sizeof *m);
     m->skippable = skippable;
+    m->name = n2_strdup(path);
     char *real = fs_loose_path(&n->fs, path);
     if (real) {
         m->file = fopen(real, "rb");
@@ -150,6 +157,7 @@ bool movie_draw(N2 *n) {
     if (!m) return false;
     int changed = 0;
     const u8 *px = vnvideo_frame(m->video, movie_time(n, m), &changed);
+    if (changed) m->newFrames++;
     if (!px) {
         for (int i = 0; i < N2_W * N2_H; i++) n->screen[i] = 0xff000000u;
         return true;
