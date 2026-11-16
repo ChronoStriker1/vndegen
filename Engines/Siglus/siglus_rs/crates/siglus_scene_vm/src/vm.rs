@@ -273,6 +273,7 @@ struct CallFrame {
     /// execution. Original C++ saves do not serialize this field; loaded frames
     /// keep it as None and use the caller-frame continuation.
     return_override: Option<(usize, i32)>,
+    return_override_scene: Option<usize>,
     excall_proc: bool,
     frame_action_proc: bool,
     arg_cnt: usize,
@@ -753,6 +754,7 @@ impl<'a> SceneVm<'a> {
             return_line_no: -1,
             ret_form,
             return_override: None,
+            return_override_scene: None,
             excall_proc,
             frame_action_proc,
             arg_cnt,
@@ -788,6 +790,7 @@ impl<'a> SceneVm<'a> {
         frame.return_line_no = -1;
         frame.ret_form = ret_form;
         frame.return_override = None;
+        frame.return_override_scene = None;
         frame.excall_proc = excall_proc;
         frame.frame_action_proc = frame_action_proc;
         frame.arg_cnt = arg_cnt;
@@ -813,6 +816,7 @@ impl<'a> SceneVm<'a> {
     fn recycle_call_frame(&mut self, mut frame: CallFrame) {
         frame.user_props.clear();
         frame.return_override = None;
+        frame.return_override_scene = None;
         frame.delayed_ret_form = None;
         // C_elm_call_list::sub_call() keeps the slot allocated and add_call()
         // reinitializes it on the next call. Keep the Rust frame allocated too
@@ -957,6 +961,7 @@ impl<'a> SceneVm<'a> {
             return_line_no: -1,
             ret_form: cfg.fm_void,
             return_override: None,
+            return_override_scene: None,
             excall_proc: false,
             frame_action_proc: false,
             arg_cnt: 0,
@@ -1017,6 +1022,7 @@ impl<'a> SceneVm<'a> {
             return_line_no: -1,
             ret_form: cfg.fm_void,
             return_override: None,
+            return_override_scene: None,
             excall_proc: false,
             frame_action_proc: false,
             arg_cnt: 0,
@@ -1882,6 +1888,7 @@ impl<'a> SceneVm<'a> {
         );
         call_frame.call_type = 3;
         call_frame.return_override = Some((return_pc, ret_form));
+        call_frame.return_override_scene = self.current_scene_no;
         self.call_stack.push(call_frame);
         self.stream.set_prg_cntr(offset)?;
 
@@ -2597,6 +2604,7 @@ impl<'a> SceneVm<'a> {
         );
         call_frame.call_type = 3;
         call_frame.return_override = Some((return_pc, ret_form));
+        call_frame.return_override_scene = self.current_scene_no;
         self.call_stack.push(call_frame);
         self.stream.set_prg_cntr(offset)?;
         if excall_proc {
@@ -4447,6 +4455,7 @@ impl<'a> SceneVm<'a> {
                 );
                 callee.call_type = 1;
                 callee.return_override = Some((return_pc, self.cfg.fm_int));
+                callee.return_override_scene = self.current_scene_no;
                 self.call_stack.push(callee);
 
                 self.stream.jump_to_label(label_no.max(0) as usize)?;
@@ -4482,6 +4491,7 @@ impl<'a> SceneVm<'a> {
                 );
                 callee.call_type = 1;
                 callee.return_override = Some((return_pc, self.cfg.fm_str));
+                callee.return_override_scene = self.current_scene_no;
                 self.call_stack.push(callee);
 
                 self.stream.jump_to_label(label_no.max(0) as usize)?;
@@ -9142,6 +9152,7 @@ impl<'a> SceneVm<'a> {
             return_line_no: line_no,
             ret_form,
             return_override: None,
+            return_override_scene: None,
             excall_proc: false,
             // C_elm_call::save() does not persist excall_flag or
             // frame_action_flag. Do not reinterpret USER_CMD as frame_action.
@@ -12783,6 +12794,17 @@ impl<'a> SceneVm<'a> {
         let (return_pc, ret_form) = callee
             .return_override
             .unwrap_or((caller.return_pc, caller.ret_form));
+        let return_scene = if callee.return_override.is_some() {
+            callee.return_override_scene
+        } else {
+            caller.return_scene_no
+        };
+        let return_line_no = caller.return_line_no;
+        if let Some(scene_no) = return_scene
+            && self.current_scene_no != Some(scene_no)
+        {
+            self.restore_return_scene(scene_no, return_line_no)?;
+        }
         if self.runtime_options.trace_call_return_pc {
             eprintln!(
                 "[SG_CALL_PC] return depth={} pc=0x{:x} ret_form={} override={:?} args={:?}",
@@ -12903,6 +12925,26 @@ impl<'a> SceneVm<'a> {
             z_no,
             self.stream.get_prg_cntr()
         );
+        Ok(())
+    }
+
+    fn restore_return_scene(&mut self, scene_no: usize, line_no: i32) -> Result<()> {
+        let stream = self.cached_scene_stream(scene_no)?;
+        let scene_name = self
+            .scene_pck_cache
+            .as_ref()
+            .and_then(|pck| pck.find_scene_name(scene_no))
+            .map(ToOwned::to_owned);
+        self.stash_current_scene_user_props();
+        self.user_cmd_names = stream.scn_cmd_name_map.clone();
+        self.stream = stream;
+        self.current_scene_no = Some(scene_no);
+        self.activate_scene_user_prop_scope(scene_no);
+        self.current_scene_name = scene_name.clone();
+        self.current_line_no = line_no;
+        self.ctx.current_scene_no = Some(scene_no as i64);
+        self.ctx.current_scene_name = scene_name;
+        self.ctx.current_line_no = line_no as i64;
         Ok(())
     }
 
@@ -15852,6 +15894,7 @@ mod call_frame_save_metadata_tests {
             return_line_no: -1,
             ret_form,
             return_override,
+            return_override_scene: None,
             excall_proc: false,
             frame_action_proc: false,
             arg_cnt: 0,
@@ -15913,6 +15956,7 @@ mod call_frame_save_metadata_tests {
             return_line_no: 2605,
             ret_form: vm.cfg.fm_void,
             return_override: None,
+            return_override_scene: None,
             excall_proc: false,
             frame_action_proc: false,
             arg_cnt: 0,
