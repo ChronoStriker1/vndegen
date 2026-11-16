@@ -63,3 +63,4 @@ On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's in
 - Let a stage object's movie leave the right-click menu working: the menu waits only while the global MOV player plays.
 - Write `config.sav` in the version the game's engine reads: the existing file's, else the one for the game's `.exe` build.
 - Play `.wmv` movies through a decoder the host provides (`movie::set_host_movie_api`, vnffmovie's interface); VNDegen passes the app's FFmpeg through vnffmovie.
+- Look for a game's fonts in `dat/` too, where the Gameexe's `#FONT_FILE` fonts are.
