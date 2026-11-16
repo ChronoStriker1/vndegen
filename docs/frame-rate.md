@@ -12,6 +12,7 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
   - Ren'Py: new movie frames from `renpy.display.video.get_movie_texture`, by a probe `.rpy` placed in a scratch copy of the game, because Ren'Py also redraws between them.
   - KiriKiri: display refreshes from `-frameMonitor`'s `KKFRAMES` line, and a movie's frames from the `movie:` lines in the game's log.
   - YU-RIS: display refreshes from `-frameMonitor`'s `YRFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/yuris.txt` when it ends.
+  - N2System: display refreshes from `-frameMonitor`'s `N2FRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/n2system.txt` when it ends.
   - Godot: `-godotFrameLog`, without `-godotSnapshot`. The snapshot writes a PNG on the main thread every 2 s, which stalls the game for about 80 to 90 ms each time. It took Barely Working from 59.9 to 57.5 and Project Hadal from 59.4 to 56.9, with seconds alternating between 54 to 56 and 60 to 61 frames. The native runtimes log their own pacing with `-frameMonitor`.
 - Load is the load average at the start of the run. The MacBook's runs had nothing else of ours running. The mini's simulator runs also had the simulator's own processes and agent-device's runner.
 - Reused rows come from earlier threads' records. They stand because no later change touched their drawing path. Commit is `not recorded` where the record gives none, and the same goes for load.
@@ -64,6 +65,8 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | Visual Novel Maker | Siren's Call, 1280x720 VP9 splash movie, page at 60.1 | Mac app, mini, screen locked | 30 | 30.0 | 24.0 | 9.6 s, the whole movie | 34 | 11-11 | 84f4047 |
 | Visual Novel Maker | Siren's Call, 1280x720 VP9 splash movie, page at 60.1 | iPad simulator | 30 | 30.0 | 28.0 | 9.6 s, the whole movie | 36 | 11-11 | 84f4047 |
 | YU-RIS | Saimin Seishidou, `BRANDCALL11.mpg` brand movie, MPEG-1 | Mac app, mini | 30 movie, 60 display | movie 29.96, display 60.0 | display 60.0 | 12.7 s, the whole movie | 3.0 | 11-12 | 18bc5f85 |
+| N2System | Hanachirasu, `op.mpg` opening movie, MPEG-1 800x608 | Mac app, mini | 29.97 movie, 60 display | 2908 of 2908 frames, movie 29.96, display 60.0 | display 59.9 to 60.0 | 97 s, the whole movie | 5.7 | 11-16 | 046736bd |
+| N2System | Hanachirasu, `op.mpg` opening movie, MPEG-1 800x608 | iPad simulator | 29.97 movie, 60 display | 2908 of 2908 frames, movie 29.96, display 60.0 | display 60.0 | 97 s, the whole movie | 5.6 | 11-16 | 8a13b71a |
 | RGSS | Monster Girl Quest Paradox, walking in the village | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 13 | 11-04 | 2f48b68 |
 | RGSS | Monster Girl Quest Paradox, battle with 5 enemies | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 7.4 | 11-04 | 2f48b68 |
 | RGSS | Monster Girl Quest Paradox, walking in the village | iPad simulator | 60 | 58.5 to 60.0 | 15.0 to 60.0 | 80 s | 12 | 11-04 | 2f48b68 |
@@ -177,5 +180,7 @@ Known limits:
 - Monster Girl Quest Paradox now reaches play, after the script loading fixes in [rgss.md](rgss.md). Its battle rows use the game's largest troop, five Angel Soldiers, started by a script from a village save and held open for the timing, because the game ends that fight after about 45 s. The 15.0 low is one window of 8, and the rest are 50 or higher. No build ran during these four runs, and other threads' iPad simulators or Mac app were open during some of them.
 
 ## Found along the way
+
+- N2System first redrew a playing movie on every display refresh. On the iPad simulator that took up to 19 ms a step, and Hanachirasu's opening movie showed 2877 of its 2908 frames with the display at 52. Drawing only the frames the decoder hands over gave 2908 of 2908 and a display at 60.0 (8a13b71a).
 
 - Taimanin Kurenai's two movies play. The earlier `unknown encryption in video.xp3` message was a false warning: both movies are plain MPEG-1 files whose checksums match. Only an incomplete warning entry fit the encryption check's byte budget, and its made-up checksum caused the message. VNDegen now leaves such incomplete evidence unclassified instead of reporting unsupported encryption.
