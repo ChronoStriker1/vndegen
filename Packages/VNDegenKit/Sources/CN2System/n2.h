@@ -439,6 +439,7 @@ const char *n2_ini(N2 *n, const char *section, const char *key);
 // Variables
 Value *var_get(N2 *n, const char *name);  // NULL when unset
 void var_set(N2 *n, const char *name, const Value *v);  // copies
+void vars_clear_slot(N2 *n);
 Arr *arr_get(N2 *n, const char *name, bool create);
 
 // Scripts and threads
@@ -547,8 +548,6 @@ int backlog_count(N2 *n);
 Buf backlog_save(N2 *n, bool dropLast);
 void backlog_load(N2 *n, const u8 *d, size_t size);
 
-// The PC engine's script scanner (scan.c): one record per chapter, scene, cut and function declaration and per
-// inline {code} in a text block, in the order the PC engine makes them, which script.npf depends on.
 enum { SCAN_CHAPTER = 1, SCAN_SCENE = 2, SCAN_CUT = 4, SCAN_FUNCTION = 8, SCAN_INLINE = 10 };
 
 typedef struct ScanRecord {

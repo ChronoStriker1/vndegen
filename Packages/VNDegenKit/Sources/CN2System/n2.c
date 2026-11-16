@@ -107,6 +107,15 @@ static void var_free(void *p) {
     free(v);
 }
 
+void vars_clear_slot(N2 *n) {
+    for (int i = 0; i < n->vars.cap; i++) {
+        MapEntry *e = &n->vars.entries[i];
+        if (!e->key || !e->value || e->key[0] != '$') continue;
+        var_free(e->value);
+        e->value = NULL;
+    }
+}
+
 static void arr_free(void *p) {
     Arr *a = p;
     for (int i = 0; i < a->count; i++) v_free(&a->items[i]);

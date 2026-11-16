@@ -434,6 +434,7 @@ bool load_slot(N2 *n, int slot) {
     bool ok = false;
     if (script && frames && vars && vs >= 4 && memcmp(vars, "NPSL", 4) == 0) {
         n2_reset(n, false);
+        vars_clear_slot(n);
         read_vars(n, vars, vs);
         bool hadText = false;
         frames_load(n, frames, fs, &hadText);

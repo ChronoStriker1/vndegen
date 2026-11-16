@@ -492,6 +492,16 @@ static void log_block(N2 *n, TextObj *t) {
     t->logged = true;
     buf_u8(&t->log, 0);
     backlog_add(n, (char *)t->log.data, t->voice);
+    const char *text = (const char *)t->log.data;
+    const char *last = text, *end = text + strlen(text);
+    while (end > text && (end[-1] == '\n' || end[-1] == ' ')) end--;
+    for (const char *p = text; p < end; p++)
+        if (*p == '\n') last = p + 1;
+    char *line = n2_strndup(last, (size_t)(end - last));
+    Value v = v_str(line);
+    var_set(n, "$SYSTEM_last_text", &v);
+    v_free(&v);
+    free(line);
     t->log.len--;
 }
 

@@ -544,6 +544,8 @@ static void apply_state(N2 *n, Obj *o, Reader *R) {
 
 bool frames_load(N2 *n, const u8 *d, size_t size, bool *hadText) {
     *hadText = false;
+    u32 owners[64];
+    int ownerCount = 0;
     if (size < 16 || memcmp(d, "NPSF", 4) != 0) return false;
     u32 count = rd32(d + 12);
     if (16 + (size_t)count * FRAME_REC > size) return false;
@@ -555,7 +557,12 @@ bool frames_load(N2 *n, const u8 *d, size_t size, bool *hadText) {
             if (!str_at(r, &o)) continue;
         }
         const char *call = str_at(r, &o);
-        if (!call || !str_at(r, &o) || !str_at(r, &o) || !str_at(r, &o) || !str_at(r, &o)) continue;
+        const char *path = NULL, *alias = NULL;
+        if (!call || !str_at(r, &o) || !str_at(r, &o) || !(path = str_at(r, &o)) || !(alias = str_at(r, &o))) continue;
+        u32 owner = rd32(r);
+        int proc = 0;
+        while (proc < ownerCount && owners[proc] != owner) proc++;
+        if (proc == ownerCount && ownerCount < 64) owners[ownerCount++] = owner;
         if (o + 72 > FRAME_REC) continue;
         const u8 *core = r + o;
         if (call_is(call, "LoadText") || call_is(call, "CreateText")) {
@@ -576,6 +583,16 @@ bool frames_load(N2 *n, const u8 *d, size_t size, bool *hadText) {
         made->x = (i32)rd32(core + 4 + 11 * 4);
         made->y = (i32)rd32(core + 4 + 12 * 4);
         made->centerX = made->centerY = false;
+        made->proc = proc;
+        if (alias[0]) {
+            char *u = n2_sjis_to_utf8((const u8 *)alias, strlen(alias), NULL);
+            obj_set_alias(n, made, u);
+            free(u);
+        }
+        if (made->parent == &n->root) {
+            free(made->scenePath);
+            made->scenePath = n2_sjis_to_utf8((const u8 *)path, strlen(path), NULL);
+        }
         Reader R = {r, o + 72, false};
         apply_state(n, made, &R);
         if (R.bad) n2_log(n, "load: %s has state VNDegen doesn't read", call);

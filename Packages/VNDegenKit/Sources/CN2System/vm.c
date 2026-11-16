@@ -150,7 +150,10 @@ static Value arith(int op, Value a, Value b) {
         case OP_ADD: z = x + y; break;
         case OP_SUB: z = x - y; break;
         case OP_MUL: z = x * y; break;
-        case OP_DIV: z = y != 0 ? x / y : 0; break;
+        case OP_DIV:
+            z = y != 0 ? x / y : 0;
+            if (x == trunc(x) && y == trunc(y)) z = trunc(z);
+            break;
         case OP_MOD: z = y != 0 ? fmod(x, y) : 0; break;
         }
         r = v_num(z);
