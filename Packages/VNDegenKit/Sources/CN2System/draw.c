@@ -222,8 +222,14 @@ void n2_render_to(N2 *n, u32 *dst, bool gameOnly) {
 }
 
 void n2_render(N2 *n) {
+    int movie = movie_draw(n);
+    if (movie >= 0) {
+        if (movie) n->frameSerial++;
+        n->dirty = false;
+        return;
+    }
     if (!n->dirty) return;
-    if (!movie_draw(n)) n2_render_to(n, n->screen, false);
+    n2_render_to(n, n->screen, false);
     n->dirty = false;
     n->frameSerial++;
 }

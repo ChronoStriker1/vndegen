@@ -18,7 +18,7 @@ struct Movie {
     float *buf;
     size_t bufCap;
     size_t have;
-    bool started;
+    bool started, blanked;
     int newFrames;
     char *name;
 };
@@ -149,19 +149,21 @@ void movie_update(N2 *n, u32 elapsedMs, bool skip) {
         movie_stop(n);
         return;
     }
-    n->dirty = true;
 }
 
-bool movie_draw(N2 *n) {
+int movie_draw(N2 *n) {
     struct Movie *m = n->movie;
-    if (!m) return false;
+    if (!m) return -1;
     int changed = 0;
     const u8 *px = vnvideo_frame(m->video, movie_time(n, m), &changed);
     if (changed) m->newFrames++;
     if (!px) {
+        if (m->blanked) return 0;
+        m->blanked = true;
         for (int i = 0; i < N2_W * N2_H; i++) n->screen[i] = 0xff000000u;
-        return true;
+        return 1;
     }
+    if (m->started && !changed) return 0;
     m->started = true;
     int w = m->info.width, h = m->info.height;
     for (int y = 0; y < N2_H; y++) {
@@ -173,5 +175,5 @@ bool movie_draw(N2 *n) {
             dst[x] = (u32)p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | 0xff000000u;
         }
     }
-    return true;
+    return 1;
 }

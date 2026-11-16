@@ -528,7 +528,7 @@ void mixer_stream_close(N2 *n, struct Channel *c);
 double sound_kind_volume(N2 *n, int kind);
 bool movie_play(N2 *n, const char *path, bool skippable);
 void movie_update(N2 *n, u32 elapsedMs, bool skip);
-bool movie_draw(N2 *n);
+int movie_draw(N2 *n);
 bool movie_active(N2 *n);
 void movie_stop(N2 *n);
 void mixer_render(struct Mixer *m, float *out, int frames);
