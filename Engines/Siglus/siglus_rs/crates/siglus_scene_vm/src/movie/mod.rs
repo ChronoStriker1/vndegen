@@ -21,6 +21,13 @@ use kira::sound::streaming::{
 };
 
 use crate::assets::RgbaImage;
+
+#[cfg(not(target_arch = "wasm32"))]
+mod host_movie;
+#[cfg(not(target_arch = "wasm32"))]
+pub use host_movie::{HostMovieApi, HostMovieInfo, ReadFn, set_host_movie_api};
+#[cfg(not(target_arch = "wasm32"))]
+use host_movie::{HostMovie, HostMovieAudioDecoder};
 use crate::audio::{AudioHub, TrackKind};
 
 const MPEG2_HEADER_PROBE_BYTES: usize = 256 * 1024;
@@ -286,6 +293,15 @@ impl Drop for WmvStreamState {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+struct HostStreamState {
+    movie: Arc<HostMovie>,
+    audio: Option<MovieAudio>,
+    frame: Option<Arc<RgbaImage>>,
+    frame_idx: usize,
+    last_timer_ms: u64,
+}
+
 struct WmvAudioTask {
     rx: Receiver<Result<Option<MovieAudio>, String>>,
     cancel: Arc<AtomicBool>,
@@ -376,6 +392,8 @@ pub struct MovieManager {
     wmv_audio_tasks: HashMap<PathBuf, WmvAudioTask>,
     wmv_streams: HashMap<PathBuf, WmvStreamState>,
     omv_streams: HashMap<PathBuf, OmvStreamState>,
+    #[cfg(not(target_arch = "wasm32"))]
+    host_streams: HashMap<PathBuf, HostStreamState>,
     playbacks: HashMap<u64, MoviePlayback>,
     next_playback_id: u64,
     /// Resolved movie paths keyed by (append_dir, file_name). The per-frame
@@ -552,6 +570,8 @@ impl MovieManager {
             wmv_audio_tasks: HashMap::new(),
             wmv_streams: HashMap::new(),
             omv_streams: HashMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            host_streams: HashMap::new(),
             playbacks: HashMap::new(),
             next_playback_id: 1,
             path_cache: HashMap::new(),
@@ -583,6 +603,8 @@ impl MovieManager {
         self.wmv_streams.clear();
         self.wmv_audio_tasks.clear();
         self.omv_streams.clear();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.host_streams.clear();
         #[cfg(target_os = "vita")]
         {
             // The desktop cache favors replay latency. On Vita, retaining
@@ -1032,12 +1054,74 @@ impl MovieManager {
         (audio, true)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn poll_host_stream_frame_for_path(
+        &mut self,
+        path: PathBuf,
+        timer_ms: u64,
+        loop_flag: bool,
+    ) -> Result<Option<MovieStreamFrame>> {
+        let restart = self
+            .host_streams
+            .get(&path)
+            .is_some_and(|state| timer_ms.saturating_add(100) < state.last_timer_ms);
+        if !self.host_streams.contains_key(&path) {
+            let movie = HostMovie::open(&path, loop_flag)?;
+            let audio = (movie.info.audio_rate > 0 && movie.info.audio_channels > 0).then(|| MovieAudio {
+                samples: Arc::new(Vec::new()),
+                mpeg_stream: None,
+                wmv_stream: None,
+                host_stream: Some((movie.clone(), loop_flag)),
+                channels: movie.info.audio_channels as u16,
+                sample_rate: movie.info.audio_rate as u32,
+                start_ms: 0,
+                duration_ms: movie.duration_ms(),
+            });
+            self.host_streams.insert(
+                path.clone(),
+                HostStreamState { movie, audio, frame: None, frame_idx: 0, last_timer_ms: timer_ms },
+            );
+        }
+        let state = self.host_streams.get_mut(&path).expect("host stream state exists");
+        if restart {
+            state.movie.seek(timer_ms);
+        }
+        state.last_timer_ms = timer_ms;
+        let (fresh, _ended) = state.movie.frame(timer_ms);
+        let decoded_now = fresh.is_some();
+        if let Some(frame) = fresh {
+            state.frame = Some(Arc::new(frame));
+            state.frame_idx += 1;
+        }
+        let Some(frame) = state.frame.clone() else {
+            return Ok(None);
+        };
+        let total_ms = state.movie.duration_ms();
+        let info = state.movie.info;
+        Ok(Some(MovieStreamFrame {
+            frame,
+            frame_idx: state.frame_idx,
+            fps: (info.fps > 0.0).then_some(info.fps as f32),
+            total_ms,
+            audio: state.audio.clone(),
+            audio_ready: true,
+            decoded_now,
+            frame_idx_is_decode_order: false,
+            clamped_timer_ms: loop_flag.then(|| total_ms.filter(|total| *total > 0).map_or(timer_ms, |total| timer_ms % total)),
+            source_size: Some((info.width.max(1) as u32, info.height.max(1) as u32)),
+        }))
+    }
+
     fn poll_wmv_stream_frame_for_path(
         &mut self,
         path: PathBuf,
         timer_ms: u64,
         loop_flag: bool,
     ) -> Result<Option<MovieStreamFrame>> {
+        #[cfg(not(target_arch = "wasm32"))]
+        if host_movie::available() {
+            return self.poll_host_stream_frame_for_path(path, timer_ms, loop_flag);
+        }
         let (audio, audio_ready) = self.poll_wmv_audio_for_path(path.as_path());
         if !self.wmv_streams.contains_key(&path) {
             let state = spawn_wmv_stream_state(path.clone(), audio.clone(), timer_ms)?;
@@ -1435,7 +1519,17 @@ impl MovieManager {
         // `track.samples` from the browser VFS. Native keeps compressed MPEG
         // and ASF/WMA audio bounded and incremental.
         #[cfg(not(target_arch = "wasm32"))]
-        let (handle, timeline_base_ms) = if let Some(stream) = track.mpeg_stream.as_ref() {
+        let (handle, timeline_base_ms) = if let Some((movie, looping)) = track.host_stream.as_ref() {
+            let decoder = HostMovieAudioDecoder::new(movie.clone(), *looping);
+            let mut data = StreamingSoundData::from_decoder(decoder);
+            if !*looping && local_offset_ms > 0 {
+                data = data.start_position(local_offset_ms as f64 / 1000.0);
+            }
+            (
+                MoviePlaybackHandle::Streaming(audio.play_streaming(TrackKind::Mov, data)?),
+                track.start_ms,
+            )
+        } else if let Some(stream) = track.mpeg_stream.as_ref() {
             let decoder = MpegMovieAudioDecoder::new(stream.clone(), track.sample_rate)?;
             let mut data = StreamingSoundData::from_decoder(decoder)
                 .start_position(local_offset_ms as f64 / 1000.0);
@@ -2257,6 +2351,18 @@ fn is_wmv_extension(ext: &str) -> bool {
 }
 
 fn probe_wmv_movie_info(path: &Path) -> Result<MovieInfo> {
+    #[cfg(not(target_arch = "wasm32"))]
+    if host_movie::available() {
+        let movie = HostMovie::open(path, false)?;
+        return Ok(MovieInfo {
+            path: path.to_path_buf(),
+            width: (movie.info.width > 0).then_some(movie.info.width as u32),
+            height: (movie.info.height > 0).then_some(movie.info.height as u32),
+            fps: (movie.info.fps > 0.0).then_some(movie.info.fps as f32),
+            decoded_frames: None,
+            audio_duration_ms: movie.duration_ms(),
+        });
+    }
     #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
     let decoder = {
         let bytes = read_movie_bytes(path)?;
@@ -3207,6 +3313,8 @@ pub struct MovieAudio {
     /// Present for native ASF/WMA playback. The compressed stream is decoded
     /// incrementally by Kira rather than materializing the entire soundtrack.
     pub wmv_stream: Option<WmvStreamAudio>,
+    #[cfg(not(target_arch = "wasm32"))]
+    host_stream: Option<(Arc<HostMovie>, bool)>,
     pub channels: u16,
     pub sample_rate: u32,
     pub start_ms: u64,
@@ -4180,6 +4288,8 @@ fn build_movie_audio_from_parts(
                 samples: Arc::new(audio_samples),
                 mpeg_stream: None,
                 wmv_stream: None,
+                #[cfg(not(target_arch = "wasm32"))]
+                host_stream: None,
                 channels,
                 sample_rate,
                 start_ms: 0,
@@ -4290,6 +4400,10 @@ fn probe_wmv_first_video_pts_ms(path: &Path) -> Result<Option<u64>> {
 }
 
 fn decode_wmv_preview_frame(path: &Path) -> Result<Arc<RgbaImage>> {
+    #[cfg(not(target_arch = "wasm32"))]
+    if host_movie::available() {
+        return Ok(Arc::new(HostMovie::open(path, false)?.first_frame()?));
+    }
     #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
     let mut decoder = {
         let bytes = read_movie_bytes(path)?;
@@ -4517,6 +4631,8 @@ fn decode_wmv_audio_full_from_reader<R: Read + Seek>(
         samples: Arc::new(samples),
         mpeg_stream: None,
         wmv_stream: None,
+        #[cfg(not(target_arch = "wasm32"))]
+        host_stream: None,
         channels,
         sample_rate,
         start_ms: 0,
@@ -4588,6 +4704,8 @@ fn decode_wmv_audio_for_path(path: &Path, cancel: &AtomicBool) -> Result<Option<
     Ok(Some(MovieAudio {
         samples: Arc::new(Vec::new()),
         mpeg_stream: None,
+        #[cfg(not(target_arch = "wasm32"))]
+        host_stream: None,
         wmv_stream: Some(WmvStreamAudio {
             path: Arc::new(path.to_path_buf()),
             num_frames,
@@ -4740,6 +4858,8 @@ fn quick_probe_mpeg2_stream_audio(path: &Path, cancel: &AtomicBool) -> Result<Op
             transport_stream,
         }),
         wmv_stream: None,
+        #[cfg(not(target_arch = "wasm32"))]
+        host_stream: None,
         channels: head.channels,
         sample_rate: head.sample_rate,
         start_ms: 0,
@@ -4809,6 +4929,8 @@ fn decode_mpeg2_audio_full_probe_or_static(
                 transport_stream: is_transport_stream_prefix(&prefix),
             }),
             wmv_stream: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            host_stream: None,
             channels: info.channels,
             sample_rate: info.sample_rate,
             start_ms: 0,
@@ -5003,6 +5125,8 @@ fn build_mpeg2_audio_timeline(
         samples: Arc::new(samples),
         mpeg_stream: None,
         wmv_stream: None,
+        #[cfg(not(target_arch = "wasm32"))]
+        host_stream: None,
         channels,
         sample_rate,
         start_ms: 0,
@@ -5196,6 +5320,8 @@ fn decode_omv_audio(tf: &mut siglus_omv_decoder::TheoraFile) -> Result<Option<Mo
         samples: Arc::new(samples_i16),
         mpeg_stream: None,
         wmv_stream: None,
+        #[cfg(not(target_arch = "wasm32"))]
+        host_stream: None,
         channels: channels_u16,
         sample_rate: sample_rate_u32,
         start_ms: 0,
