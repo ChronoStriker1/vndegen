@@ -99,6 +99,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - YU-RIS: a game whose `pac` folder sits below the library listing is recognised (#88), and the twelve YU-RIS, Visual Novel Maker and Twine games that shipped without a Mac app run were played there (0.41.1).
 - Mac: the close, minimise and zoom buttons are hidden while a game plays and show with the VNDegen menu open (#90, 0.41.2).
 - The web view no longer allows AirPlay for a game's movies and sound; a TV is reached with Screen Mirroring (0.41.3).
+- N2System (Nitroplus), on VNDegen's own clean-room runtime, with the English release of Hanachirasu and PC saves both ways (0.42.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -107,7 +108,6 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- N2System (Nitroplus), restarted 2026-11-16 from the work parked on 2026-10-31 (tag `archive/ws-n2system`), on branch `feat/n2system`, with Hanachirasu (English, 2018) as the test game. Its title screen draws on Linux. The library's Sonicomi turned out to be Nitroplus's later 3D Diesel engine.
 - SiglusEngine, on siglus_rs, restarted 2026-11-16 from the work parked on 2026-10-31 (tag `archive/ws-siglus`), with planetarian HD and Harmonia as test games. RealLive waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
@@ -149,6 +149,7 @@ The items of the 2026-10-25 plan that are done, kept for their decisions and not
 - What released engines still lacked, built only for the library games that need it: Artemis movies and screen effects (0.18.0), Wolf RPG Editor's newer data formats (0.19.0) and its mouse and text input (0.20.0), RPG Maker VX Ace movies and message boxes (0.19.0), and AliceSoft System 3's transitions (0.20.0). Their small fixes followed, through 0.21.1.
 - YU-RIS, on VNDegen's own clean-room runtime. Nine library games play, released from 0.38.0 to 0.41.0, with saves that move to and from a PC. The other six library games weren't tested. [yuris.md](yuris.md) has what runs and the known limits.
 - Visual Novel Maker and Twine, in the web view. Shipped in 0.38.0.
+- N2System (Nitroplus), on VNDegen's own clean-room runtime, with Hanachirasu, released in 0.42.0 with saves that move to and from a PC. The library's Sonicomi is Nitroplus's later 3D Diesel engine and isn't a target. [n2system.md](n2system.md) has what runs and the known limits.
 
 ## Runtime packages
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.
