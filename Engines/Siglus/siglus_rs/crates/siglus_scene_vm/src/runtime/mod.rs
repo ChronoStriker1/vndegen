@@ -7610,7 +7610,7 @@ impl CommandContext {
                         slide_enabled: m.slide_msg,
                         slide_time: m.slide_time,
                         vertical_writing: m.vertical_writing,
-                        name_text: m.name_text.clone(),
+                        name_text: forms::stage::mwnd_shown_name(m, &m.name_text),
                         name_extend_type: m.name_extend_type,
                         name_window_align: m.name_window_align,
                         name_window_pos: m.name_window_pos,

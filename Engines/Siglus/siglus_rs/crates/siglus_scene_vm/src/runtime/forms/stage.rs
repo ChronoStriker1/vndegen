@@ -13579,6 +13579,10 @@ fn mwnd_add_msg_check(m: &MwndState, new_line_flag: bool) -> bool {
     }
 }
 
+pub(crate) fn mwnd_shown_name(m: &MwndState, name: &str) -> String {
+    if m.name_disp_mode == 2 { String::new() } else { name.to_string() }
+}
+
 fn mwnd_resolved_color_nos(ctx: &CommandContext, m: &MwndState) -> (i64, i64, i64) {
     let use_chara = ctx.globals.syscom.original_config.message_chrcolor_flag;
     let moji = m
@@ -14502,10 +14506,11 @@ pub fn cd_name_current_mwnd(ctx: &mut CommandContext, name: &str) -> bool {
             m.chara_fuchi_color = resolved_name.fuchi_color_no;
             super::syscom::reveal_config_voice_name(ctx, &display_name);
             m.name_text = display_name.clone();
-            mwnd_rebuild_name_glyphs(ctx, m, mwnd_idx, &display_name);
-            ctx.ui.set_name(display_name.clone());
-            if !display_name.is_empty() {
-                msgbk_add_name(ctx, &display_name);
+            let shown_name = mwnd_shown_name(m, &display_name);
+            mwnd_rebuild_name_glyphs(ctx, m, mwnd_idx, &shown_name);
+            ctx.ui.set_name(shown_name.clone());
+            if !shown_name.is_empty() {
+                msgbk_add_name(ctx, &shown_name);
             }
         }
         true
@@ -14964,10 +14969,11 @@ fn dispatch_mwnd_item_op(
             m.chara_fuchi_color = resolved_name.fuchi_color_no;
             super::syscom::reveal_config_voice_name(ctx, &display_name);
             m.name_text = display_name.clone();
-            mwnd_rebuild_name_glyphs(ctx, m, mwnd_idx, &display_name);
-            ctx.ui.set_name(display_name.clone());
-            if !display_name.is_empty() {
-                msgbk_add_name(ctx, &display_name);
+            let shown_name = mwnd_shown_name(m, &display_name);
+            mwnd_rebuild_name_glyphs(ctx, m, mwnd_idx, &shown_name);
+            ctx.ui.set_name(shown_name.clone());
+            if !shown_name.is_empty() {
+                msgbk_add_name(ctx, &shown_name);
             }
             push_ok(ctx, ret_form);
             true
