@@ -122,7 +122,9 @@ void msg_draw(TH *t) {
     int npx = ini_int(s, "MESSAGEWINDOW", "NP_DRAW_POS_X", tx);
     int lineTop = wy + ty + next - 16;
     if (t->msgName) text_draw(t, t->screen, t->W, t->H, t->msgName, wx + npx, lineTop - next, size, color, true, -1);
+    int brackets = ini_int(s, "MESSAGEWINDOW", "TEXT_BRACKETS_H", 1);
     int x0 = wx + tx + (t->msgName ? 0 : front * size);
+    int xc = t->msgName ? wx + tx + brackets * size : x0;
     int x = x0, y = lineTop, shown = 0;
     int limit = t->msgShown;
     int right = t->W - tx;
@@ -131,7 +133,7 @@ void msg_draw(TH *t) {
         if (*p == '\n') {
             p++;
             shown++;
-            x = x0 + (t->msgName ? size : 0);
+            x = xc;
             y += next;
             continue;
         }
@@ -141,7 +143,7 @@ void msg_draw(TH *t) {
         memcpy(ch, p, (size_t)len);
         int w = text_width(t, ch, size);
         if (x + w > right) {
-            x = x0 + (t->msgName ? size : 0);
+            x = xc;
             y += next;
         }
         x = text_draw(t, t->screen, t->W, t->H, ch, x, y, size, color, true, -1);
