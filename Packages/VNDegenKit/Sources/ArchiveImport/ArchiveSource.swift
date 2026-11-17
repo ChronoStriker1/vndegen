@@ -6,6 +6,7 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
     /// The archive's file name without its extension or part suffix, offered as the game's folder name.
     public let suggestedFolderName: String
     let installers: [InstallerVolumes]
+    public internal(set) var isPackedGame = false
 
     struct InstallerVolumes: Sendable, Hashable {
         let indexes: [Int]
@@ -99,7 +100,9 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
     /// move, replace, or evict a volume meanwhile. `body` gets the source at the URLs the coordinator handed out.
     func coordinatedRead<T>(_ body: (ArchiveSource) throws -> T) throws -> T {
         try NSFileCoordinator.read(volumes) {
-            try body(ArchiveSource(volumes: $0, suggestedFolderName: suggestedFolderName, installers: installers))
+            var granted = ArchiveSource(volumes: $0, suggestedFolderName: suggestedFolderName, installers: installers)
+            granted.isPackedGame = isPackedGame
+            return try body(granted)
         }
     }
 

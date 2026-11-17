@@ -27,6 +27,14 @@ public struct EngineFileList: Sendable {
         self.folders = Set(folders.map { $0.lowercased() })
     }
 
+    public func lists(file path: String, size: Int64) -> Bool {
+        let lower = path.lowercased()
+        let base = root.isEmpty ? "" : root.lowercased() + "/"
+        guard lower.hasPrefix(base) else { return false }
+        let relative = String(lower.dropFirst(base.count))
+        return folders.contains { relative.hasPrefix($0 + "/") } || names(file: relative, size: size)
+    }
+
     func names(file path: String, size: Int64) -> Bool {
         if files.contains(path) { return true }
         if let least = filesOfAtLeast[path], size >= least { return true }

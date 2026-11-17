@@ -35,6 +35,8 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, `util`, or `nw.gui` keep working. The layer also means saves land where the PC version puts them, in `save/` beside `index.html` (`www/save/*.rpgsave` for MV, `save/*.rmmzsave` for MZ), and encrypted images and audio, Effekseer effects, and WebM movies all work.
 
+Some MV and MZ games ship as one `.exe` made with Enigma Virtual Box, which holds the whole NW.js folder. VNDegen unpacks the game from it on import, alone or from the archive it came in, and leaves out the NW.js files, so it runs as any other MV or MZ game. The packed PC game saves to `www/save` beside its `.exe`, which is where VNDegen saves too. [library.md](library.md#installers-and-disc-images) has the details.
+
 WebKit can't decode Ogg Vorbis, so MZ uses the decoder it ships with, and MV games that ship only Ogg audio, as most do, play it through VNDegen's own Ogg decoder, the one TyranoScript uses.
 
 Up to 0.13.0, MV games on the community core (`rpg_managers.js` "community-1.3b") saved to the game's top-level `save/` in VNDegen, because the layer lacked the `fs.rmdirSync` that core uses to test `www/`. The first launch of such a game after updating moves those saves into `www/save/` and adds them to the game's slot index there, unless a slot is in both folders or the move would hide a save, in which case both folders stay. Early MV cores, such as 1.2.0, save to the game's top-level `save/`, as they do on the PC.

@@ -422,7 +422,7 @@ private struct StepView: View {
             Text("Games are extracted into a library folder you choose after picking the archive, VNDegen's Games folder unless you add others in Settings. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
                 .font(.system(size: 13))
                 .foregroundStyle(ImportTheme.secondaryText)
-            Text("GOG installers work too: choose the .exe with its .bin parts. VNDegen never runs the installer. It unpacks the game's files from it, as from an archive. ISO disc images work the same way.")
+            Text("GOG installers work too: choose the .exe with its .bin parts. VNDegen never runs the installer. It unpacks the game's files from it, as from an archive. ISO disc images, and RPG Maker games packed into one .exe, work the same way.")
                 .font(.system(size: 13))
                 .foregroundStyle(ImportTheme.secondaryText)
             #if os(iOS)
@@ -455,6 +455,17 @@ private struct StepView: View {
                         .lineLimit(2)
                     Text(summary(files: contents.fileCount, bytes: contents.byteCount)
                          + (installer.main.languages.count > 1 ? ", \(installer.main.language ?? "")" : ""))
+                        .font(.system(size: 14))
+                        .foregroundStyle(ImportTheme.secondaryText)
+                } else if contents.isPackedGame {
+                    Label(contents.packedGameTitle ?? source.fileName, systemImage: "shippingbox.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .lineLimit(2)
+                    Text("Packed game \(source.fileName)")
+                        .font(.system(size: 14))
+                        .foregroundStyle(ImportTheme.secondaryText)
+                        .lineLimit(2)
+                    Text(summary(files: contents.fileCount, bytes: contents.byteCount))
                         .font(.system(size: 14))
                         .foregroundStyle(ImportTheme.secondaryText)
                 } else {
@@ -539,7 +550,7 @@ private struct StepView: View {
             .id(ArchiveImportModel.Control.addOnToggle)
         }
         if importer.canDeleteArchive {
-            let what = importer.pickedInstaller ? "installer" : "archive"
+            let what = importer.pickedPackedGame ? ".exe" : importer.pickedInstaller ? "installer" : "archive"
             Toggle(isOn: $importer.deleteArchiveAfterImport) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Delete \(what) after import").font(.system(size: 15, weight: .semibold))
@@ -635,15 +646,19 @@ private struct StepView: View {
     }
 
     private func nested(_ fileName: String) -> some View {
+        let packed = importer.nestedSource?.isPackedGame == true
         let installer = importer.nestedSource?.isInstaller == true
         return Group {
             Card {
-                Label(installer ? "This archive holds an installer" : "This archive holds another archive", systemImage: "shippingbox.fill")
+                Label(packed ? "This archive holds a game packed into one .exe"
+                      : installer ? "This archive holds an installer" : "This archive holds another archive", systemImage: "shippingbox.fill")
                     .font(.system(size: 17, weight: .bold))
                 Text(installer ? importer.nestedSource?.setupNames.formatted(.list(type: .and)) ?? fileName : fileName)
                     .font(.system(size: 14, weight: .semibold))
                     .lineLimit(4)
-                Text(installer
+                Text(packed
+                     ? "Unpack the game from it? VNDegen reads the game's files out of the .exe without running it. The archive's other files, such as saves, stay, and the .exe is deleted."
+                     : installer
                      ? "Unpack the game from it? VNDegen reads the game's files out of the installer without running it. Only the game is kept."
                      : "Extract it too, so the game folder holds the game instead of a second archive?")
                     .font(.system(size: 14))

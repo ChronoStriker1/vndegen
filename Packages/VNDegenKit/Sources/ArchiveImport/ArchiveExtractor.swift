@@ -2,6 +2,7 @@ import Foundation
 import RuntimePackages
 import System
 import VNCore
+import WebRuntime
 
 /// What a listing pass finds in an archive. Listing reads headers only, so it is fast even for large archives.
 nonisolated public struct ArchiveContents: Sendable, Equatable {
@@ -12,6 +13,10 @@ nonisolated public struct ArchiveContents: Sendable, Equatable {
     /// a header leaves a file's size out, and then only the free-space reserve bounds extraction.
     var spaceLimit: Int64?
     public internal(set) var installer: InstallerContents?
+    var pack: EnigmaPack?
+
+    public var isPackedGame: Bool { pack != nil }
+    public var packedGameTitle: String? { pack?.title }
 
     func includingAddOns(_ include: Bool) -> ArchiveContents {
         guard var installer else { return self }
@@ -52,6 +57,9 @@ nonisolated enum ArchiveExtractor {
     static let maxListedSize: Int64 = 1 << 50
 
     static func list(_ source: ArchiveSource) throws(ArchiveError) -> ArchiveContents {
+        if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, EnigmaPack.isPack(source.volumes[0]) {
+            return try listPack(source.volumes[0])
+        }
         if source.isInstaller { return try listInstallers(source) }
         let reader = try ArchiveReader(source.volumes, password: nil)
         var contents = ArchiveContents()
@@ -101,6 +109,26 @@ nonisolated enum ArchiveExtractor {
         return contents(of: installer)
     }
 
+    private static func listPack(_ exe: URL) throws(ArchiveError) -> ArchiveContents {
+        let whole: EnigmaPack
+        do {
+            whole = try EnigmaPack(exe)
+        } catch {
+            throw .packedGame(error)
+        }
+        let probe = FolderProbe(root: URL(filePath: "/var/empty", directoryHint: .isDirectory),
+                                entries: Set(whole.files.map(\.path) + whole.directories))
+        let pack = DesktopRuntimeFiles.nwjs(probe).map { runtime in whole.keeping { !runtime.lists(file: $0.path, size: $0.size) } } ?? whole
+        guard !pack.files.isEmpty else { throw .packedGame(.notAPack) }
+        guard !pack.files.contains(where: \.isCompressed) else { throw .packedGame(.compressed) }
+        var contents = ArchiveContents()
+        for file in pack.files { contents.byteCount = try addListed(file.size, to: contents.byteCount) }
+        contents.fileCount = pack.files.count
+        contents.spaceLimit = try addListed(Int64(pack.files.count + pack.directories.count) * entryOverhead, to: contents.byteCount)
+        contents.pack = pack
+        return contents
+    }
+
     static func contents(of installer: InstallerContents) -> ArchiveContents {
         var contents = ArchiveContents()
         var entries: Int64 = 0
@@ -128,7 +156,7 @@ nonisolated enum ArchiveExtractor {
         if needed > available { throw ArchiveError.notEnoughSpace(needed: needed, available: available) }
     }
 
-    private static func freeSpace(on folder: URL) throws -> Int64 {
+    static func freeSpace(on folder: URL) throws -> Int64 {
         var folder = folder
         // A URL caches resource values, and this one changes while extraction writes.
         folder.removeAllCachedResourceValues()
@@ -146,6 +174,9 @@ nonisolated enum ArchiveExtractor {
         if let installer = total.installer {
             return try extract(installer, from: source, into: folder, total: total, reserve: reserve, progress: report)
         }
+        if let pack = total.pack {
+            return try extract(pack, from: source.volumes[0], into: folder, total: total, reserve: reserve, progress: report)
+        }
         let reader = try ArchiveReader(source.volumes, password: password)
         let isZip = source.volumes.count == 1 && source.volumes[0].pathExtension.lowercased() == "zip"
         let deflate64 = isZip ? try? Deflate64Entries(zip: source.volumes[0]) : nil
@@ -157,23 +188,8 @@ nonisolated enum ArchiveExtractor {
         /// Each file written so far, by its path in lowercase. Extraction starts in an empty folder, so these are all its
         /// files, and reading them here keeps a folder's listing from being read again after every file.
         var files: [String: URL] = [:]
-        var used: Int64 = 0
-        var usedSinceSpaceCheck: Int64 = 0
-        var lastSpaceCheck: ContinuousClock.Instant?
-
-        /// Counts space before it is used. Free space is checked every 64 MB or quarter second, so neither large files
-        /// nor many small ones can use up the reserve between checks.
-        func use(_ bytes: Int64) throws {
-            used += bytes
-            if let limit = total.spaceLimit, used > limit { throw ArchiveError.largerThanListed }
-            usedSinceSpaceCheck += bytes
-            let now = ContinuousClock.now
-            if usedSinceSpaceCheck >= 64 << 20 || lastSpaceCheck.map({ now - $0 >= .milliseconds(250) }) ?? true {
-                if try freeSpace(on: folder) < reserve { throw ArchiveError.ranOutOfSpace }
-                usedSinceSpaceCheck = 0
-                lastSpaceCheck = now
-            }
-        }
+        var meter = SpaceMeter(limit: total.spaceLimit, folder: folder, reserve: reserve)
+        func use(_ bytes: Int64) throws { try meter.use(bytes) }
 
         while let entry = try reader.next() {
             try Task.checkCancellation()
@@ -237,20 +253,8 @@ nonisolated enum ArchiveExtractor {
     ) throws -> ImportProgress {
         var progress = ImportProgress(total: total)
         var lastReport = ContinuousClock.now
-        var used: Int64 = 0
-        var usedSinceSpaceCheck: Int64 = 0
-        var lastSpaceCheck: ContinuousClock.Instant?
-        func use(_ bytes: Int64) throws {
-            used += bytes
-            if let limit = total.spaceLimit, used > limit { throw ArchiveError.largerThanListed }
-            usedSinceSpaceCheck += bytes
-            let now = ContinuousClock.now
-            if usedSinceSpaceCheck >= 64 << 20 || lastSpaceCheck.map({ now - $0 >= .milliseconds(250) }) ?? true {
-                if try freeSpace(on: folder) < reserve { throw ArchiveError.ranOutOfSpace }
-                usedSinceSpaceCheck = 0
-                lastSpaceCheck = now
-            }
-        }
+        var meter = SpaceMeter(limit: total.spaceLimit, folder: folder, reserve: reserve)
+        func use(_ bytes: Int64) throws { try meter.use(bytes) }
         for (game, volumes) in installer.selected {
             try use(Int64(game.directoryCount) * entryOverhead)
             let (setup, slices) = source.installerVolumes(volumes)
@@ -271,6 +275,44 @@ nonisolated enum ArchiveExtractor {
         return progress
     }
 
+    private static func extract(
+        _ pack: EnigmaPack, from exe: URL, into folder: URL, total: ArchiveContents,
+        reserve: Int64, progress report: (ImportProgress) -> Void
+    ) throws -> ImportProgress {
+        var progress = ImportProgress(total: total)
+        var lastReport = ContinuousClock.now
+        var meter = SpaceMeter(limit: total.spaceLimit, folder: folder, reserve: reserve)
+        let fm = FileManager.default
+        for directory in pack.directories {
+            try meter.use(entryOverhead)
+            try fm.createDirectory(at: FileCase.resolve(directory, in: folder), withIntermediateDirectories: true)
+        }
+        let handle = try FileHandle(forReadingFrom: exe)
+        defer { try? handle.close() }
+        for entry in pack.files {
+            try Task.checkCancellation()
+            try meter.use(entryOverhead)
+            let url = FileCase.resolve(entry.path, in: folder)
+            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let file = try FileDescriptor.open(
+                FilePath(url.path), .writeOnly, options: [.create, .truncate],
+                permissions: [.ownerReadWrite, .groupRead, .otherRead])
+            defer { try? file.close() }
+            try pack.copy(entry, from: handle) { block in
+                try Task.checkCancellation()
+                try meter.use(Int64(block.count))
+                _ = try file.writeAll(block)
+                progress.bytes += Int64(block.count)
+                if ContinuousClock.now - lastReport > .milliseconds(100) {
+                    report(progress)
+                    lastReport = .now
+                }
+            }
+            progress.files += 1
+        }
+        return progress
+    }
+
     /// The folder that becomes the game: the archive's only top-level folder, or the whole extraction when the archive
     /// holds several items. macOS metadata folders don't count.
     static func gameRoot(in staging: URL) -> URL {
@@ -283,13 +325,20 @@ nonisolated enum ArchiveExtractor {
     /// split into volumes, next to any loose files such as a readme or a web link.
     static func nestedArchive(in root: URL) -> ArchiveSource? {
         let items = visibleItems(in: root)
-        guard !items.contains(where: isDirectory) else { return nil }
-        let archives = items.filter { VolumeName($0.lastPathComponent) != nil }
-        if !archives.isEmpty { return try? ArchiveSource(picked: archives) }
-        let setups = items.filter { InstallerName($0.lastPathComponent)?.isSetup == true && GameInstaller.isInstaller($0) }
-        guard !setups.isEmpty else { return nil }
-        let parts = items.filter { InstallerName($0.lastPathComponent)?.isSetup == false }
-        return try? ArchiveSource(picked: setups + parts)
+        if !items.contains(where: isDirectory) {
+            let archives = items.filter { VolumeName($0.lastPathComponent) != nil }
+            if !archives.isEmpty { return try? ArchiveSource(picked: archives) }
+            let setups = items.filter { InstallerName($0.lastPathComponent)?.isSetup == true && GameInstaller.isInstaller($0) }
+            if !setups.isEmpty {
+                let parts = items.filter { InstallerName($0.lastPathComponent)?.isSetup == false }
+                return try? ArchiveSource(picked: setups + parts)
+            }
+        }
+        let executables = items.filter { $0.pathExtension.lowercased() == "exe" && !isDirectory($0) }
+        guard executables.count == 1, EnigmaPack.isPack(executables[0]),
+              var source = try? ArchiveSource(picked: executables) else { return nil }
+        source.isPackedGame = true
+        return source
     }
 
     private static func visibleItems(in folder: URL) -> [URL] {
@@ -299,5 +348,34 @@ nonisolated enum ArchiveExtractor {
 
     private static func isDirectory(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+    }
+}
+
+nonisolated private struct SpaceMeter {
+    let limit: Int64?
+    let folder: URL
+    let reserve: Int64
+    private var used: Int64 = 0
+    private var usedSinceSpaceCheck: Int64 = 0
+    private var lastSpaceCheck: ContinuousClock.Instant?
+
+    init(limit: Int64?, folder: URL, reserve: Int64) {
+        self.limit = limit
+        self.folder = folder
+        self.reserve = reserve
+    }
+
+    /// Counts space before it is used. Free space is checked every 64 MB or quarter second, so neither large files
+    /// nor many small ones can use up the reserve between checks.
+    mutating func use(_ bytes: Int64) throws {
+        used += bytes
+        if let limit, used > limit { throw ArchiveError.largerThanListed }
+        usedSinceSpaceCheck += bytes
+        let now = ContinuousClock.now
+        if usedSinceSpaceCheck >= 64 << 20 || lastSpaceCheck.map({ now - $0 >= .milliseconds(250) }) ?? true {
+            if try ArchiveExtractor.freeSpace(on: folder) < reserve { throw ArchiveError.ranOutOfSpace }
+            usedSinceSpaceCheck = 0
+            lastSpaceCheck = now
+        }
     }
 }

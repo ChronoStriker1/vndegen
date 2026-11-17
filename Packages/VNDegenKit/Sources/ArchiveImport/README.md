@@ -52,3 +52,16 @@ The space check and the extraction limits work as for archives, with sizes from 
 `GameInstaller` keeps only `{app}` files and GOG Galaxy files, and leaves out `{tmp}`, `{commonappdata}`, `__redist`, the uninstaller, and files whose GOG check names another language or a 32-bit build only. It refuses setups that unpack their data with ISDone or unarc (repacked installers), encrypted setups, Inno Setup 6 and other versions outside 5.x, and executables that aren't Inno Setup. It was compared file for file with innoextract 1.9 on the library's GOG installers: Revenge of the Orcs with its unrated add-on, Forbidden Ward (`-1.bin`), Two Beasts Or Not To Beast! (20,973 files), Sacrifice Villains unrated (`-1.bin` and `-2.bin`, 6.9 GB), and La-Mulana (LZMA2, an older GOG layout).
 
 ISO 9660 images, with Joliet names, are read by the system libarchive like any other archive.
+
+## Games packed into one .exe
+
+Some RPG Maker MV games ship as one Enigma Virtual Box `.exe`: NW.js's own `Game.exe` with the game's whole folder appended in two extra PE sections. `EnigmaPack` reads that folder without running anything. The layout was worked out from the library's three such games and checked against the format notes of evbunpack (Apache-2.0, read only, no code taken):
+
+- The section named `.enigma1` holds, within its first 4 KB, a 64-byte header: `EVB\0`, a 32-bit header size of 64, a layout number at offset 20, and at offset 48 the pack's total size counted from the header. Layout 3 (2019 to 2024 builds) keeps a file table and then every file's data in table order. Layout 1 (2017) puts each file's data right after its record.
+- A main record follows the header: the table size (layout 3) and the number of top-level folders. Each record is a 16-byte head (a size used by layout 1, an id, a parent id, a child count), a UTF-16 name ending in two zero bytes, and a type: 3 for a folder, 2 for a file. A layout 3 folder has 25 more bytes and a file 53, with its size at offset 2 and its stored size at offset 49. A layout 1 record ends with a 49-byte block holding the size at offset 2 and the stored size at offset 41. Folders list their children depth first.
+- `%DEFAULT FOLDER%` is the folder beside the `.exe`. Other top-level folders stand for Windows folders and are skipped.
+- A file whose stored size differs from its size is compressed (aPLib, in Enigma's own chunking). None of the library's games compress, so such packs are refused.
+
+A pack is accepted only when its records add up to the total its header gives, so a variant this reader doesn't know is refused rather than unpacked wrong. All three library games (two layout 3, one layout 1) and evbunpack's ten test packs (2017 to 2024, x86 and x64) read this way, and the unpacked files matched a separate scratch reader byte for byte.
+
+When a pack holds NW.js (`nw.pak`), the files `DesktopRuntimeFiles.nwjs` lists are left out, the same ones Remove engine files would offer. A picked `.exe` that is a pack is listed this way instead of as an installer. An archive whose extraction holds exactly one `.exe` at its top that is a pack gets the nested prompt. Accepting unpacks the game into that same folder, beside the archive's readme and `www/save`, and deletes the `.exe`.

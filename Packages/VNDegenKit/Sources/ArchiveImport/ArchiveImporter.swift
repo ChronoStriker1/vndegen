@@ -61,6 +61,7 @@ public final class ArchiveImporter {
     }
     public private(set) var nestedSource: ArchiveSource?
     public var pickedInstaller: Bool { picked?.source.isInstaller == true }
+    public var pickedPackedGame: Bool { picked?.contents.isPackedGame == true }
 
     public var displayFileName: String? {
         guard let source else { return nil }
@@ -77,6 +78,7 @@ public final class ArchiveImporter {
     private var stagings: [URL] = []
     /// The outer extraction's game folder while the nested offer is showing.
     private var pendingRoot: URL?
+    private var unpackRoot: URL?
     private var password: String?
     private var task: Task<Void, Never>?
     private var started: ContinuousClock.Instant?
@@ -149,7 +151,9 @@ public final class ArchiveImporter {
             self.source = source
             includeAddOns = true
             self.contents = contents
-            folderName = contents.installer?.folderName ?? source.suggestedFolderName
+            folderName = contents.installer?.folderName
+                ?? contents.packedGameTitle.map(InstallerName.folderName(for:))
+                ?? source.suggestedFolderName
             // A copy is deleted anyway, and deleting it never frees the original's space.
             canDeleteArchive = source.volumes.allSatisfy { DroppedFiles.ownedCopy(of: $0) == nil && isInOwnFolders($0) }
             deleteArchiveAfterImport = canDeleteArchive && source.volumes.allSatisfy { LocalArchives.isListed($0, gamesRoot: gamesRoot) }
@@ -191,6 +195,7 @@ public final class ArchiveImporter {
 
     public func extractNested() {
         guard case .nested = step, task == nil, let inner = nestedSource else { return }
+        unpackRoot = inner.isPackedGame ? pendingRoot : nil
         pendingRoot = nil
         nestedSource = nil
         password = nil
@@ -212,6 +217,7 @@ public final class ArchiveImporter {
             } catch {
                 guard self.selection === selection, !Task.isCancelled else { return }
                 task = nil
+                unpackRoot = nil
                 discardStagings()
                 fail(error, returningTo: .reviewing)
                 restartFromPicked()
@@ -246,6 +252,7 @@ public final class ArchiveImporter {
         password = nil
         errorMessage = nil
         pendingRoot = nil
+        unpackRoot = nil
         nestedSource = nil
         deleteArchiveAfterImport = false
         includeAddOns = true
@@ -259,9 +266,12 @@ public final class ArchiveImporter {
         progress = ImportProgress(total: contents)
         if stagings.isEmpty { started = .now }
         step = .extracting
-        let staging = stagingParent.appendingPathComponent(UUID().uuidString, isDirectory: true).standardizedFileURL
-        stagings.append(staging)
-        Self.liveStagings.insert(staging)
+        let target = unpackRoot
+        let staging = target ?? stagingParent.appendingPathComponent(UUID().uuidString, isDirectory: true).standardizedFileURL
+        if target == nil {
+            stagings.append(staging)
+            Self.liveStagings.insert(staging)
+        }
         let password = password
         let destination = destination, gamesRoot = gamesRoot
         task = Task {
@@ -285,6 +295,13 @@ public final class ArchiveImporter {
                 // Cancel can land after extraction's last check but before this runs. Nothing may be moved or deleted then.
                 try Task.checkCancellation()
                 progress = extracted
+                if target != nil {
+                    try FileManager.default.removeItem(at: source.volumes[0])
+                    task = nil
+                    unpackRoot = nil
+                    finish(staging)
+                    return
+                }
                 let (root, nested) = await Self.inspect(staging)
                 try Task.checkCancellation()
                 task = nil
@@ -300,6 +317,7 @@ public final class ArchiveImporter {
                 Self.liveStagings.remove(staging)
                 guard self.selection === selection else { return }
                 task = nil
+                unpackRoot = nil
                 stagings.removeAll { $0 == staging }
                 switch error {
                 case ArchiveError.wrongPassword:

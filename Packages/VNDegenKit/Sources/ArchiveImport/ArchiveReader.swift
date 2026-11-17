@@ -24,6 +24,7 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
     case installer(GameInstallerError)
     case addOnAlone(String)
     case severalGames
+    case packedGame(EnigmaPack.Failure)
 
     public var message: String {
         switch self {
@@ -44,9 +45,16 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
         case .installerPartsOnly: "Choose the installer's .exe file together with its .bin parts."
         case let .addOnAlone(title): "\(title) is an add-on. Choose it together with the main game's installer."
         case .severalGames: "Choose one game's installers at a time: the main installer, and its add-on if there is one."
+        case let .packedGame(error):
+            switch error {
+            case .notAPack: "This .exe holds no packed game."
+            case .compressed: "This game is packed into its .exe with compression, which VNDegen can't unpack. Copy an unpacked copy of the game's folder instead."
+            case let .unsupported(detail): "This .exe is packed in a way VNDegen doesn't know (\(detail)). Copy an unpacked copy of the game's folder instead."
+            case let .damaged(detail): "The game packed in this .exe can't be read (\(detail)). Download it again."
+            }
         case let .installer(error):
             switch error {
-            case .notAnInstaller: "VNDegen can unpack GOG installers, which are made with Inno Setup, and ISO disc images. This file is another kind of installer or a game's own program. Install the game on a computer and copy its folder instead."
+            case .notAnInstaller: "VNDegen can unpack GOG installers, which are made with Inno Setup, games packed into one .exe with Enigma Virtual Box, and ISO disc images. This file is another kind of installer or a game's own program. Install the game on a computer and copy its folder instead."
             case let .unsupported(detail): "This installer is a kind VNDegen can't unpack (\(detail)). Install the game on a computer and copy its folder instead."
             case .encrypted: "This installer is password-protected, which VNDegen can't unpack."
             case .repack: "This is a repack. Its game files are packed with tools that only run on Windows, so VNDegen can't unpack them. Install it on a computer and copy the game's folder instead."
