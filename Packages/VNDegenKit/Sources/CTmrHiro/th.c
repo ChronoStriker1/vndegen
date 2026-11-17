@@ -120,6 +120,7 @@ void vnth_close(VNTH *v) {
     store_close(&t->store);
     free(t->system000);
     free(t->readMarks);
+    free(t->galleryMarks);
     free(t->title);
     free(t->gameDir);
     free(t->saveDir);

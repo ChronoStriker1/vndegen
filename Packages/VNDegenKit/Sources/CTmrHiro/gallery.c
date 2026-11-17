@@ -12,7 +12,13 @@ static int var_index(TH *t, const char *section, const char *name) {
 
 static u8 *flag_byte(TH *t, int base, int index) {
     if (index < 0 || index >= 2000) return NULL;
-    if (t->system000 && (size_t)(base + index) < t->system000Size) return &t->system000[base + index];
+    if (t->system000 && (size_t)(base + index) < t->system000Size) {
+        if (t->galleryMarks && t->galleryMarks[(base == SYS_HSC_BASE ? 0 : 2048) + index] && !t->system000[base + index]) {
+            t->system000[base + index] = 1;
+            t->systemDirty = true;
+        }
+        return &t->system000[base + index];
+    }
     if (!t->galleryMarks) t->galleryMarks = th_alloc(4096);
     return &t->galleryMarks[(base == SYS_HSC_BASE ? 0 : 2048) + index];
 }
@@ -199,6 +205,4 @@ void gallery_draw(TH *t) {
 void gallery_free(TH *t) {
     for (int i = 0; i < t->galCount; i++) free(t->gal[i].list);
     t->galCount = 0;
-    free(t->galleryMarks);
-    t->galleryMarks = NULL;
 }

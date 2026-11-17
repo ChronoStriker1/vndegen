@@ -229,6 +229,7 @@ static int step(TH *t) {
             snprintf(t->mapSheet, sizeof t->mapSheet, "%s", c ? c : "");
             t->mapMode = b[0];
             t->savePc = t->pc - 1;
+            if (!t->replayDepth) save_auto(t);
             t->mapCount = 0;
             t->mapAnimCount = 0;
             return 1;

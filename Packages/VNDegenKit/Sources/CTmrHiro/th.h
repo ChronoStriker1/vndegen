@@ -376,6 +376,7 @@ void gallery_mark_cg(TH *t, const char *name);
 void gallery_mark_scene(TH *t, const char *name);
 
 bool save_slot(TH *t, int slot);
+void save_auto(TH *t);
 bool load_slot(TH *t, int slot);
 bool save_exists(TH *t, int slot);
 void save_system(TH *t);

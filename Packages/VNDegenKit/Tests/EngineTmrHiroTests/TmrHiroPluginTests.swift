@@ -32,6 +32,7 @@ import VNCore
         #expect(TmrHiroPlugin.saveName("C:/Games/OIDEYO/save/savedata.000") == "savedata.000")
         #expect(TmrHiroPlugin.saveName("C:\\Games\\OIDEYO\\save\\savedata.101") == "savedata.101")
         #expect(TmrHiroPlugin.saveName("/x/save/savedata999.bmp") == "savedata999.bmp")
+        #expect(TmrHiroPlugin.saveName("/x/save/vndegen-marks.bin") == "vndegen-marks.bin")
         #expect(TmrHiroPlugin.saveName("/x/save/savedata.1") == nil)
         #expect(TmrHiroPlugin.saveName("/x/save/ss/SS_000.bmp") == nil)
         #expect(TmrHiroPlugin.saveName("/x/srp.pac") == nil)

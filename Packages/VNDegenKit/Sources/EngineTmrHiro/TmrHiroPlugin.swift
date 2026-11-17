@@ -33,6 +33,7 @@ nonisolated public struct TmrHiroPlugin: EnginePlugin {
     nonisolated static func saveName(_ path: String) -> String? {
         guard let name = path.replacingOccurrences(of: "\\", with: "/").split(separator: "/").last.map(String.init) else { return nil }
         let lower = name.lowercased()
+        if lower == "vndegen-marks.bin" { return name }
         guard lower.hasPrefix("savedata") else { return nil }
         let rest = lower.dropFirst("savedata".count)
         let digits: Substring

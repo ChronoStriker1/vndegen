@@ -1,5 +1,6 @@
 #include "th.h"
 
+#include <sys/stat.h>
 #include <time.h>
 
 enum {
@@ -211,6 +212,27 @@ bool save_slot(TH *t, int slot) {
     return ok;
 }
 
+void save_auto(TH *t) {
+    int pick = -1;
+    time_t oldest = 0;
+    for (int slot = 101; slot <= 110; slot++) {
+        char *p = slot_path(t, slot);
+        char real[2048];
+        struct stat st;
+        bool exists = th_path_resolve(p, real, sizeof real) == 1 && stat(real, &st) == 0;
+        free(p);
+        if (!exists) {
+            pick = slot;
+            break;
+        }
+        if (pick < 0 || st.st_mtime < oldest) {
+            pick = slot;
+            oldest = st.st_mtime;
+        }
+    }
+    if (pick > 0) save_slot(t, pick);
+}
+
 bool load_slot(TH *t, int slot) {
     char *path = slot_path(t, slot);
     size_t size;
@@ -283,25 +305,87 @@ bool load_slot(TH *t, int slot) {
 
 enum { SYS_READ_BASE = 7512, SYS_READ_STRIDE = 1024 };
 
+static const char sideMagic[8] = {'V', 'N', 'T', 'H', 'M', 'K', '0', '1'};
+
+static void load_sidecar(TH *t) {
+    char *path = th_fmt("%s/vndegen-marks.bin", t->saveDir);
+    size_t size;
+    u8 *d = th_read_file(path, &size);
+    free(path);
+    if (!d || size < 16 || memcmp(d, sideMagic, 8)) {
+        free(d);
+        return;
+    }
+    u32 scenes = rd32(d + 8), flags = rd32(d + 12);
+    size_t pos = 16;
+    for (u32 i = 0; i < scenes && pos + 2 + 1024 <= size; i++, pos += 2 + 1024) {
+        int id = rd16(d + pos);
+        for (int k = 0; k < 1024; k++)
+            for (int b = 0; b < 8; b++)
+                if (d[pos + 2 + k] >> b & 1) read_flag(t, id, k * 8 + b, true);
+    }
+    if (pos + flags <= size && flags == 4096) {
+        if (!t->galleryMarks) t->galleryMarks = th_alloc(4096);
+        for (u32 k = 0; k < flags; k++) t->galleryMarks[k] |= d[pos + k];
+    }
+    free(d);
+}
+
+static void save_sidecar(TH *t) {
+    if (!t->readMarks && !t->galleryMarks) return;
+    u32 scenes = 0;
+    if (t->readMarks)
+        for (int id = 0; id < 4096; id++)
+            for (int k = 0; k < 1024; k++)
+                if (t->readMarks[(size_t)id * 1024 + k]) {
+                    scenes++;
+                    break;
+                }
+    size_t size = 16 + (size_t)scenes * 1026 + 4096;
+    u8 *d = th_alloc(size);
+    memcpy(d, sideMagic, 8);
+    wr32(d + 8, scenes);
+    wr32(d + 12, 4096);
+    size_t pos = 16;
+    if (t->readMarks)
+        for (int id = 0; id < 4096; id++) {
+            const u8 *m = t->readMarks + (size_t)id * 1024;
+            bool any = false;
+            for (int k = 0; k < 1024 && !any; k++) any = m[k] != 0;
+            if (!any) continue;
+            wr16(d + pos, (u16)id);
+            memcpy(d + pos + 2, m, 1024);
+            pos += 1026;
+        }
+    if (t->galleryMarks) memcpy(d + pos, t->galleryMarks, 4096);
+    char *path = th_fmt("%s/vndegen-marks.bin", t->saveDir);
+    th_write_file(path, d, size);
+    free(path);
+    free(d);
+}
+
 void load_system(TH *t) {
     char *path = th_fmt("%s/savedata.000", t->saveDir);
     size_t size;
     u8 *d = th_read_file(path, &size);
     free(path);
-    if (!d || size < SYS_READ_BASE + SYS_READ_STRIDE) {
+    if (d && size >= SYS_READ_BASE + SYS_READ_STRIDE) {
+        free(t->system000);
+        t->system000 = d;
+        t->system000Size = size;
+    } else {
         free(d);
-        return;
     }
-    free(t->system000);
-    t->system000 = d;
-    t->system000Size = size;
+    load_sidecar(t);
 }
 
 void save_system(TH *t) {
-    if (!t->system000 || !t->systemDirty) return;
-    char *path = th_fmt("%s/savedata.000", t->saveDir);
-    if (th_write_file(path, t->system000, t->system000Size)) t->systemDirty = false;
-    free(path);
+    if (t->system000 && t->systemDirty) {
+        char *path = th_fmt("%s/savedata.000", t->saveDir);
+        if (th_write_file(path, t->system000, t->system000Size)) t->systemDirty = false;
+        free(path);
+    }
+    if (!t->system000) save_sidecar(t);
 }
 
 bool read_flag(TH *t, int sceneId, int rec, bool mark) {
