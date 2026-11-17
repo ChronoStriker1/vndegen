@@ -102,15 +102,16 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - N2System (Nitroplus), on VNDegen's own clean-room runtime, with the English release of Hanachirasu and PC saves both ways (0.42.0).
 - SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, the player's preferred language, word wrap for English, and `.wmv` movies through the app's FFmpeg (0.43.0). PC saves load in VNDegen; saves made in VNDegen can crash the PC version.
 - RPG Maker MV and MZ games packed into one Enigma Virtual Box exe are unpacked on import, without running the exe, with the library's three such games (0.44.0).
+- Construct 3, in the web view, with Transpile Girl Rescue Operation! (0.45.0). Its saves stay in VNDegen, as Twine's do.
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
+- #183: on iPhone and iPad in Touch or Automatic mode, VNDegen's menu button covers a game's own top-right button, such as Transpile Girl Rescue Operation!'s gear.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Construct (Next, item 1), started 2026-11-17 on branch `feat/construct`, with Transpile Girl Rescue Operation! as the test game, in the web view.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
@@ -122,13 +123,12 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 - The LGPL libraries are each in a library or file of their own, which a changed copy can replace, as the LGPL asks: FFmpeg 8.1.2 is `FFmpeg.framework`, Ren'Py's iOS libraries (FFmpeg 4.3.1, FriBidi and Pygame's blitter) are `RenPyRuntime.framework`, the Mac's are Ren'Py's `librenpython.dylib`, and chardet is Python bytecode. rclone's one LGPL-3.0 module, `github.com/cloudsoda/sddl`, which its SMB code imports and never uses, is replaced by a stub of VNDegen's own. Each release carries the libraries' exact source as `VNDegen-<version>-LGPL-sources.tar`. [relinking.md](relinking.md) has the steps.
 
 ## Next
-Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the one that reuses an engine VNDegen has first, then the rest by number of games. The Enigma Virtual Box unpacker for packed RPG Maker MV and MZ games, first on this list, shipped in 0.44.0. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
-1. Construct (1 game), which exports HTML5 and should run in the web view.
-2. Tmr-Hiro ADV System (5 games).
-3. SystemAoi (3 games).
-4. Smile Game Builder (3 games), whose player is .NET.
-5. Ikura GDL (2 games) and IPAC (2 games).
-6. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
+Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the two that reuse an engine VNDegen has came first and shipped, the Enigma Virtual Box unpacker for packed RPG Maker MV and MZ games in 0.44.0 and Construct in 0.45.0. The rest follow by number of games. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
+1. Tmr-Hiro ADV System (5 games).
+2. SystemAoi (3 games).
+3. Smile Game Builder (3 games), whose player is .NET.
+4. Ikura GDL (2 games) and IPAC (2 games).
+5. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
 
 ## Set aside
 - Save sync through the cloud services that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, set aside by the maintainer on 2026-11-16. A plan was written first: Google's and Microsoft's terms don't allow shipping rclone's own client IDs, so OneDrive and Dropbox would need VNDegen's own app registrations and Google Drive and Box each user's own client ID. Nothing was built.
