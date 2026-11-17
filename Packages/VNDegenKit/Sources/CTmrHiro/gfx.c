@@ -247,8 +247,16 @@ void gfx_begin_transition(TH *t, int kind) {
     t->transActive = kind != 0;
     t->transKind = kind;
     t->transStart = t->now;
-    t->transDur = kind == 0 ? 0 : (u32)(kind * 250 > 3000 ? 3000 : kind * 250);
-    if (kind == 1) t->transDur = 500;
+    switch (kind) {
+    case 0: t->transDur = 0; break;
+    case 1: t->transDur = 500; break;
+    case 2: t->transDur = 2000; break;
+    case 6: t->transDur = 1500; break;
+    case 8: t->transDur = 500; break;
+    case 10: t->transDur = 1000; break;
+    case 0x20: t->transDur = 1000; break;
+    default: t->transDur = 500; break;
+    }
     t->sceneDirty = true;
 }
 
@@ -299,7 +307,7 @@ void gfx_set_sprites(TH *t, const char *list, int trans) {
     free(copy);
     for (int i = 0; i < t->sprCount; i++) {
         t->spr[i].x = sprite_offset(t, i, t->sprCount);
-        t->spr[i].layer = TH_MAX_SPRITES - t->sprCount + i;
+        t->spr[i].layer = t->sprCount == 1 ? 5 : t->sprCount == 2 ? 6 + i : t->sprCount == 3 ? 5 + i : TH_MAX_SPRITES - t->sprCount + i;
     }
     t->sceneDirty = true;
 }
