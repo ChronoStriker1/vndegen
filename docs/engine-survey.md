@@ -131,6 +131,8 @@ These have library games but no open-source runtime. Each would need a reimpleme
 | SRPG Studio | 1 | None found |
 | RPG Maker MV/MZ packed in one exe | 3 | Works with the MV/MZ plugin once the user unpacks the Enigma Virtual Box exe on a PC |
 
+Checked 2026-11-17: the three packed exes are Futanari Remedies, Treasure Hunter Koo and the Ancient King, and Succubus Nemu's Kissy Cummy Sexpedition Log, each an uncompressed Enigma Virtual Box pack of an NW.js RPG Maker MV game. Succubus Farm, counted here before, is two GOG installers of a plain MV game. The tables above keep the counts of 2026-10-31.
+
 Two popular engines have good runtimes but no library games, so nothing can be tested now. siglus_rs (MPL-2.0, Rust, wgpu) runs SiglusEngine, RealLive, AVG32 and UK2 and publishes `SiglusLauncher.ipa` and macOS app bundles. ethornell-rs (BGI/Ethornell, wgpu) publishes macOS and iOS builds but has no license file, so it cannot be reused without the author's permission.
 
 ### License note
