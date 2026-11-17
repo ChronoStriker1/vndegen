@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.44.0",
+          "buildVersion": "2633",
+          "date": "2026-11-17T18:10:48Z",
+          "localizedDescription": "RPG Maker MV and MZ games that ship as one packed .exe can be added.\n\n## Downloads\n\n- `VNDegen-0.44.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.44.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.44.0-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- Add game unpacks RPG Maker MV and MZ games packed into one Enigma Virtual Box `.exe`, on its own or inside a zip, RAR or 7z. VNDegen reads the game out of the `.exe` without running it, as it does for GOG installers, and leaves out the PC-only NW.js files. The `.exe` is deleted when the import ends.\n- When the game comes in an archive, the archive's other files, such as a readme and the `www/save` folder with the PC's saves, stay in the game's folder.\n- Saves stay in the game's `www/save` folder, where the PC version keeps them, so they move both ways with a PC copy.\n- Tested with Treasure Hunter Koo and the Ancient King, Futanari Remedies and Succubus Nemu's Kissy Cummy Sexpedition Log.\n\n## Known limits\n\n- A pack that uses Enigma's file compression is refused with a message. No library game uses it.\n- A packed game whose runtime files aren't named like NW.js's is unpacked with them; Remove engine files on the game's page then offers to remove them.\n\n## What wasn't tested\n\n- No physical device was used. The three packed games were each played on an iPad simulator: title, a new game, a few screens, a save, quitting, starting again and loading.\n- The Mac mini's screen was locked for the Mac app checks. There, all three games and Succubus Farm (from its GOG installers) were added, recognised as RPG Maker MV and started, but nobody looked at them playing.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.44.0/VNDegen-0.44.0.ipa",
+          "size": 130411575,
+          "sha256": "3da8260e1546f4252302366d353ec09bf56cbf9ae14c4b47556e762b62097e82",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.43.0",
           "buildVersion": "2626",
           "date": "2026-11-17T01:33:41Z",
