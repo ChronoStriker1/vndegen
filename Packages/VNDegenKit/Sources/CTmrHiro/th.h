@@ -287,6 +287,7 @@ struct TH {
     int textSpeed, autoSpeed;
     u32 winStat;
     bool winBaseDraw;
+    bool readColor;
 
     int mx, my;
     bool lDown, rDown;
@@ -300,6 +301,8 @@ struct TH {
     u32 rng;
     u8 *system000;
     size_t system000Size;
+    bool systemDirty;
+    u8 *readMarks;
 };
 
 void gfx_init(TH *t);
@@ -348,5 +351,6 @@ bool load_slot(TH *t, int slot);
 bool save_exists(TH *t, int slot);
 void save_system(TH *t);
 void load_system(TH *t);
+bool read_flag(TH *t, int sceneId, int rec, bool mark);
 
 #endif

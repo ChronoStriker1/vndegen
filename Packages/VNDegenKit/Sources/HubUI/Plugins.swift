@@ -58,6 +58,8 @@ struct PluginInfo {
                                           license: "VNDegen, MIT"),
             EngineID("n2system"): PluginInfo(versions: "Nitroplus N2System", runtime: "VNDegen's N2System runtime, in C",
                                              license: "VNDegen, MIT"),
+            EngineID("tmrhiro"): PluginInfo(versions: "Tmr-Hiro ADV System", runtime: "VNDegen's Tmr-Hiro runtime, in C",
+                                            license: "VNDegen, MIT"),
             EngineID("alicesoft"): PluginInfo(versions: "AliceSoft System 3.0 to 3.9 and System 4",
                                               runtime: "VNDegen's System 3 runtime, in C, and System 4 runtime, in C++",
                                               license: "VNDegen, MIT"),

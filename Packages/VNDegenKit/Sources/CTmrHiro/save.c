@@ -206,6 +206,7 @@ bool save_slot(TH *t, int slot) {
     free(path);
     free(d);
     if (ok) write_thumb(t, slot);
+    save_system(t);
     th_log(t, "save %03d %s at %s:%d", slot, ok ? "written" : "failed", t->sc->name, resume);
     return ok;
 }
@@ -280,6 +281,45 @@ bool load_slot(TH *t, int slot) {
     return true;
 }
 
-void save_system(TH *t) { (void)t; }
+enum { SYS_READ_BASE = 7512, SYS_READ_STRIDE = 1024 };
 
-void load_system(TH *t) { (void)t; }
+void load_system(TH *t) {
+    char *path = th_fmt("%s/savedata.000", t->saveDir);
+    size_t size;
+    u8 *d = th_read_file(path, &size);
+    free(path);
+    if (!d || size < SYS_READ_BASE + SYS_READ_STRIDE) {
+        free(d);
+        return;
+    }
+    free(t->system000);
+    t->system000 = d;
+    t->system000Size = size;
+}
+
+void save_system(TH *t) {
+    if (!t->system000 || !t->systemDirty) return;
+    char *path = th_fmt("%s/savedata.000", t->saveDir);
+    if (th_write_file(path, t->system000, t->system000Size)) t->systemDirty = false;
+    free(path);
+}
+
+bool read_flag(TH *t, int sceneId, int rec, bool mark) {
+    size_t off = SYS_READ_BASE + (size_t)SYS_READ_STRIDE * (size_t)sceneId + (size_t)rec / 8;
+    u8 bit = (u8)(1u << (rec % 8));
+    bool was;
+    if (t->system000 && off < t->system000Size) {
+        was = t->system000[off] & bit;
+        if (mark && !was) {
+            t->system000[off] |= bit;
+            t->systemDirty = true;
+        }
+        return was;
+    }
+    if (sceneId < 0 || sceneId >= 4096 || rec < 0 || rec >= 8192) return false;
+    if (!t->readMarks) t->readMarks = th_alloc((size_t)4096 * 1024);
+    size_t k = (size_t)sceneId * 1024 + (size_t)rec / 8;
+    was = t->readMarks[k] & bit;
+    if (mark) t->readMarks[k] |= bit;
+    return was;
+}

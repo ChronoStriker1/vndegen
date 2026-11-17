@@ -62,6 +62,7 @@ void msg_show(TH *t, int kind, const char *body) {
     t->msgText = expanded;
     free(copy);
     t->msgKind = kind;
+    t->msgRead = read_flag(t, t->sceneId, t->savePc, true);
     t->msgStart = t->now;
     t->msgChars = text_count(t->msgText);
     t->msgShown = text_speed_ms(t) == 0 || t->skipMode ? t->msgChars : 0;
@@ -117,7 +118,7 @@ void msg_draw(TH *t) {
     int tx = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_POS_X", 100), ty = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_POS_Y", 20);
     int next = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_NEXT", size + 8);
     int front = ini_int(s, "MESSAGEWINDOW", "TEXT_FRONT_H", 0);
-    u32 color = parse_rgb(ini_get(s, "MESSAGEWINDOW", "TEXT_COLOR"), 0xffffff) | 0xff000000u;
+    u32 color = parse_rgb(ini_get(s, "MESSAGEWINDOW", t->msgRead && t->readColor ? "TEXT_READ_COLOR" : "TEXT_COLOR"), 0xffffff) | 0xff000000u;
     int npx = ini_int(s, "MESSAGEWINDOW", "NP_DRAW_POS_X", tx);
     int lineTop = wy + ty + next - 16;
     if (t->msgName) text_draw(t, t->screen, t->W, t->H, t->msgName, wx + npx, lineTop - next, size, color, true, -1);

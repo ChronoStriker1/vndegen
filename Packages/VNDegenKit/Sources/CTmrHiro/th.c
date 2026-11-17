@@ -79,6 +79,7 @@ VNTH *vnth_open(const VNTHConfig *cfg, char *err, size_t errSize) {
     const char *ws = ini_get(&t->sys, "SYSTEM", "SYS_DEF_WINDOW_STAT");
     t->winStat = ws ? (u32)strtoul(ws, NULL, 16) : 0x80000000u;
     t->winBaseDraw = ini_int(&t->sys, "SYSTEM", "SYS_DEF_WINDOW_BASE_DRAW", 1) != 0;
+    t->readColor = ini_int(&t->sys, "SYSTEM", "SYS_DEF_READ_TEXT_COLOR", 1) != 0;
     t->mixer = mixer_new(t->audioRate);
     th_mkdirs(t->saveDir);
     gfx_init(t);
@@ -117,6 +118,7 @@ void vnth_close(VNTH *v) {
     ini_free(&t->charaView);
     store_close(&t->store);
     free(t->system000);
+    free(t->readMarks);
     free(t->title);
     free(t->gameDir);
     free(t->saveDir);
@@ -156,6 +158,10 @@ static void update_text(TH *t) {
             t->dirty = true;
         }
         return;
+    }
+    if (t->skipMode && !t->msgRead && !ini_int(&t->sys, "SYSTEM", "SYS_DEF_SKIP", 0)) {
+        t->skipMode = false;
+        t->dirty = true;
     }
     if (t->skipMode || t->keyDown[0x11]) {
         t->msgShown = t->msgChars;
