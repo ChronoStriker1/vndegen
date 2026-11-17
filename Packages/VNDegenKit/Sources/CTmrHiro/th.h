@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "th_names.h"
 #include "vntmrhiro.h"
 
 typedef uint8_t u8;
