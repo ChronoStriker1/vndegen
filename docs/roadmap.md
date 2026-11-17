@@ -100,6 +100,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Mac: the close, minimise and zoom buttons are hidden while a game plays and show with the VNDegen menu open (#90, 0.41.2).
 - The web view no longer allows AirPlay for a game's movies and sound; a TV is reached with Screen Mirroring (0.41.3).
 - N2System (Nitroplus), on VNDegen's own clean-room runtime, with the English release of Hanachirasu and PC saves both ways (0.42.0).
+- SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, the player's preferred language, word wrap for English, and `.wmv` movies through the app's FFmpeg (0.43.0). PC saves load in VNDegen; saves made in VNDegen can crash the PC version.
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -108,13 +109,14 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- SiglusEngine, on siglus_rs, restarted 2026-11-16 from the work parked on 2026-10-31 (tag `archive/ws-siglus`), with planetarian HD and Harmonia as test games. RealLive waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam.
+- RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
+- SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
 VNDegen stays free to distribute, through its GitHub releases. It won't go on the App Store (maintainer, 2026-11-16). Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
 - VNDegen's own MIT runtimes replace the GPL ones. The clean-room RGSS runtime replaced mkxp-z in 0.12.0. NScripter and AliceSoft System 3 and System 4 are clean-room from the start, so VNDegen never ships ONScripter, xsystem35, or xsystem4. The clean-room runtimes are written from the game files and the engines' own documentation, never from GPL code. The original engines run under Wine only to settle open questions, such as the PC save format. With no GPL runtime left, the app is MIT for its own code plus permissive notices.
-- New engines use only permissive licenses: MIT, BSD, zlib, Apache-2.0, ISC, MPL-2.0, or public domain, and OFL-1.1 for fonts. One exception, agreed with the maintainer: NekoSDK's WMV movies use the LGPL FFmpeg the app already ships for KiriKiri, because Apple doesn't decode WMV and no permissive decoder is known. The KiriKiri framework exports a small decoder over it, `vnffmovie`, which the NekoSDK runtime finds at run time, so the app links FFmpeg once ([video.md](video.md#vnffmovie-wmv-through-the-apps-ffmpeg)).
+- New engines use only permissive licenses: MIT, BSD, zlib, Apache-2.0, ISC, MPL-2.0, or public domain, and OFL-1.1 for fonts. One exception, agreed with the maintainer: NekoSDK's and SiglusEngine's WMV movies use the LGPL FFmpeg the app already ships for KiriKiri, because Apple doesn't decode WMV and no permissive decoder is known. The KiriKiri framework exports a small decoder over it, `vnffmovie`, which the NekoSDK and SiglusEngine runtimes find at run time, so the app links FFmpeg once ([video.md](video.md#vnffmovie-wmv-through-the-apps-ffmpeg)).
 - The LGPL libraries are each in a library or file of their own, which a changed copy can replace, as the LGPL asks: FFmpeg 8.1.2 is `FFmpeg.framework`, Ren'Py's iOS libraries (FFmpeg 4.3.1, FriBidi and Pygame's blitter) are `RenPyRuntime.framework`, the Mac's are Ren'Py's `librenpython.dylib`, and chardet is Python bytecode. rclone's one LGPL-3.0 module, `github.com/cloudsoda/sddl`, which its SMB code imports and never uses, is replaced by a stub of VNDegen's own. Each release carries the libraries' exact source as `VNDegen-<version>-LGPL-sources.tar`. [relinking.md](relinking.md) has the steps.
 
 ## Next
@@ -149,6 +151,7 @@ The items of the 2026-10-25 plan that are done, kept for their decisions and not
 - What released engines still lacked, built only for the library games that need it: Artemis movies and screen effects (0.18.0), Wolf RPG Editor's newer data formats (0.19.0) and its mouse and text input (0.20.0), RPG Maker VX Ace movies and message boxes (0.19.0), and AliceSoft System 3's transitions (0.20.0). Their small fixes followed, through 0.21.1.
 - YU-RIS, on VNDegen's own clean-room runtime. Nine library games play, released from 0.38.0 to 0.41.0, with saves that move to and from a PC. The other six library games weren't tested. [yuris.md](yuris.md) has what runs and the known limits.
 - Visual Novel Maker and Twine, in the web view. Shipped in 0.38.0.
+- SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, released in 0.43.0. siglus_rs's LGPL WMV decoder, its embedded font and its unlicensed DLL ports are left out. [siglus.md](siglus.md) has what runs and the known limits.
 - N2System (Nitroplus), on VNDegen's own clean-room runtime, with Hanachirasu, released in 0.42.0 with saves that move to and from a PC. The library's Sonicomi is Nitroplus's later 3D Diesel engine and isn't a target. [n2system.md](n2system.md) has what runs and the known limits.
 
 ## Runtime packages
