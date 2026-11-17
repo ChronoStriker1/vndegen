@@ -103,6 +103,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, the player's preferred language, word wrap for English, and `.wmv` movies through the app's FFmpeg (0.43.0). PC saves load in VNDegen; saves made in VNDegen can crash the PC version.
 - RPG Maker MV and MZ games packed into one Enigma Virtual Box exe are unpacked on import, without running the exe, with the library's three such games (0.44.0).
 - Construct 3, in the web view, with Transpile Girl Rescue Operation! (0.45.0). Its saves stay in VNDegen, as Twine's do.
+- Tmr-Hiro ADV System, on VNDegen's own clean-room runtime, with the English release of Welcome to the Mizuryuu kei land and PC saves both ways (0.46.0). More Tmr-Hiro games follow in sets.
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -112,7 +113,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Tmr-Hiro ADV System (Next, item 1), started 2026-11-17 on branch `feat/tmrhiro`, on a clean-room runtime of VNDegen's own. All five library games passed the content check and share one engine family in three builds. The first release is Welcome to the Mizuryuu kei land, whose title screen draws on Linux, in about 6 to 7 more working days; the other four follow in sets, about 7 to 9 days more.
+- Tmr-Hiro ADV System (Next, item 1), started 2026-11-17 on branch `feat/tmrhiro`, on a clean-room runtime of VNDegen's own. All five library games passed the content check and share one engine family in three builds. Welcome to the Mizuryuu kei land shipped in 0.46.0. The other four follow in sets, Kyonyuu Elf Oyako Saimin next, about 7 to 9 working days for all four.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
