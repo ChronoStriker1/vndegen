@@ -2,7 +2,7 @@
 
 VNDegen runs VisualArt's SiglusEngine games on siglus_rs, an open-source Rust reimplementation of the engine (https://github.com/xmoezzz/siglus_rs, MPL-2.0), built as the VNSiglus framework the app embeds. The game draws inside VNDegen's window through wgpu's Metal backend, so the VNDegen menu and touch controls work as for the other engines. `Engines/Siglus/UPSTREAM.md` lists the pinned commit, the licenses, how the engine is built, and every change VNDegen made to it.
 
-Tested with planetarian HD (SiglusEngine 1.1.132) and Harmonia (1.1.108), both the English Steam releases.
+Tested with planetarian HD (SiglusEngine 1.1.132) and Harmonia (1.1.108), both the English Steam releases, in the Mac app and on the iPad and iPhone simulators: title, a new game, the story, saving, quitting, and loading after a restart, by touch, the touch gamepad, and on a case-sensitive disk.
 
 ## Games
 
@@ -22,7 +22,7 @@ Checked against Harmonia's own engine under Wine:
 
 - PC to VNDegen: slots, `global.sav`, `read.sav` and `config.sav` load, and the story resumes where it was saved. Saving a just-loaded PC slot again gives the same data byte for byte.
 - VNDegen to PC: `global.sav` and `read.sav` load. `config.sav` is written in the version the game's engine reads: the version of the one already there, or for a new one the version that goes with the game's `.exe` (1.2 up to build 132, 1.3 from 133, 1.4 from 141). Harmonia's engine refuses to start with any other version.
-- A slot saved in VNDegen can crash the PC version when loaded there: it reports an image file with no name and quits. See Known limits.
+- A slot saved in VNDegen is written in the layout the game's engine reads, so the PC version loads one from a playthrough VNDegen started and resumes the scene, but then draws no message text. A slot saved after loading a PC slot crashes the PC version. See Known limits.
 
 ## Text
 
@@ -47,7 +47,7 @@ While VNDegen's menu is open the game stops and its sound is muted. Kira 0.9 can
 
 ## Known limits
 
-- A slot saved in VNDegen can crash the PC version when loaded there; the PC reports an image file with no name. Slots saved on the PC load in VNDegen, and `global.sav`, `read.sav` and `config.sav` move both ways. The game page's backup warning says so.
+- A slot saved in VNDegen can crash the PC version when loaded there, or load without its message text. Slots saved on the PC load in VNDegen, and `global.sav`, `read.sav` and `config.sav` move both ways. The backup warning in the game's Saves sheet says so.
 - The language follows the system's preferred languages; there is no per-game choice.
 - Sound keeps playing, muted, while VNDegen's menu is open.
 - SiglusEngine games read a gamepad on the PC. VNDegen sends them keys and clicks instead, so a game's own gamepad prompts don't show.
