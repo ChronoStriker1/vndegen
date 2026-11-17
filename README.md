@@ -76,6 +76,7 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 | Flash (ActionScript 1, 2, and 3) | a projector `.exe`, a `.swf`, or an HTML page that launches movies | Mac, iPhone, iPad | [flash.md](docs/flash.md) |
 | Visual Novel Maker | `index.html` with `data/ENGINE.js` and `data/SCRIPTS.js`, also in NW.js and Electron builds | Mac, iPhone, iPad | [htmlvn.md](docs/htmlvn.md) |
 | Twine 1 and 2 | an HTML file holding the story, also in a Unity player's Embedded Browser pack | Mac, iPhone, iPad | [htmlvn.md](docs/htmlvn.md) |
+| Construct 3 | `index.html`, `data.json` and `scripts/c3runtime.js`, also in Windows WebView2 builds | Mac, iPhone, iPad | [construct.md](docs/construct.md) |
 | NScripter and Ponscripter | `nscript.dat`, or `0.txt`, `00.txt` or Ponscripter's `0.utf` beside NScripter archives | Mac, iPhone, iPad | [nscripter.md](docs/nscripter.md) |
 | Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` | Mac, iPhone, iPad | [wolfrpg.md](docs/wolfrpg.md) |
 | AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` | Mac, iPhone, iPad | [system3.md](docs/system3.md) |

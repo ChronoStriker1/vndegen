@@ -65,6 +65,9 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | iPad simulator | 30 | 29.7, froze at its first loop before | 14.1 | 120 s | 6.2 | 11-03 | 972c708 |
 | Visual Novel Maker | Siren's Call, 1280x720 VP9 splash movie, page at 60.1 | Mac app, mini, screen locked | 30 | 30.0 | 24.0 | 9.6 s, the whole movie | 34 | 11-11 | 84f4047 |
 | Visual Novel Maker | Siren's Call, 1280x720 VP9 splash movie, page at 60.1 | iPad simulator | 30 | 30.0 | 28.0 | 9.6 s, the whole movie | 36 | 11-11 | 84f4047 |
+| Construct | Transpile Girl Rescue Operation!, Main screen, animated Spine figure | Mac app, mini | 60 | 60.0 drawn, Construct 60.0 ticks | 50.0 | 30 s | 6.8 | 11-17 | 1a62af57 |
+| Construct | Transpile Girl Rescue Operation!, popcorn minigame | Mac app, mini | 60 | 60.0 drawn | 50.0 | 30 s | 4.3 | 11-17 | 1a62af57 |
+| Construct | Transpile Girl Rescue Operation!, popcorn minigame | iPad simulator | 60 | 59.9 drawn, display 60 with no hitches | 47.6 | 30 s | 5.9 | 11-17 | 1a62af57 |
 | YU-RIS | Saimin Seishidou, `BRANDCALL11.mpg` brand movie, MPEG-1 | Mac app, mini | 30 movie, 60 display | movie 29.96, display 60.0 | display 60.0 | 12.7 s, the whole movie | 3.0 | 11-12 | 18bc5f85 |
 | N2System | Hanachirasu, `op.mpg` opening movie, MPEG-1 800x608 | Mac app, mini | 29.97 movie, 60 display | 2908 of 2908 frames, movie 29.96, display 60.0 | display 59.9 to 60.0 | 97 s, the whole movie | 5.7 | 11-16 | 046736bd |
 | N2System | Hanachirasu, `op.mpg` opening movie, MPEG-1 800x608 | iPad simulator | 29.97 movie, 60 display | 2908 of 2908 frames, movie 29.96, display 60.0 | display 60.0 | 97 s, the whole movie | 5.6 | 11-16 | 8a13b71a |

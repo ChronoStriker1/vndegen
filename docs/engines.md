@@ -20,6 +20,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Flash (ActionScript 1, 2, and 3)](#flash) | A Flash projector `.exe` with the movie appended, a `.swf` movie, or an HTML page that launches movies, up to four folders down | Mac, iPhone, iPad |
 | [Visual Novel Maker](#visual-novel-maker) | `index.html` with `data/ENGINE.js` and `data/SCRIPTS.js`, in an NW.js or Electron build or a web export, also inside up to two wrapper folders, as a likely match | Mac, iPhone, iPad |
 | [Twine 1 and 2](#twine) | an HTML file holding the story (`<tw-storydata>`, or Twine 1's `storeArea`), up to three folders down, or a Unity player's Embedded Browser pack holding one. Inside wrapper folders it's a likely match | Mac, iPhone, iPad |
+| [Construct 3](#construct) | `index.html`, `data.json` and `scripts/c3runtime.js`, in `www/` beside a Windows WebView2 wrapper or at the top of an HTML5 export, also inside up to two wrapper folders, as a likely match | Mac, iPhone, iPad |
 | [NScripter](#nscripter) | `nscript.dat`, or `0.txt` or `00.txt` (or Ponscripter's `0.utf`) beside an `.nsa`, `.ns2`, or `.sar` archive or NScripter's own files, up to two folders down | Mac, iPhone, iPad |
 | [Wolf RPG Editor 2 and 3](#wolf-rpg-editor) | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf`, up to two folders down. `Game.exe` or `GamePro.exe` beside it makes the match certain | Mac, iPhone, iPad |
 | [AliceSoft System 3.0 to 3.9](#alicesoft-system-3) | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT`, up to two folders down. `SYSTEM3.EXE` beside `ADISK.DAT` makes the match certain | Mac, iPhone, iPad |
@@ -137,6 +138,10 @@ Visual Novel Maker games run on the same WebKit host, with the NW.js layer stand
 ## Twine
 
 Twine stories run as the web pages they are, with Harlowe, SugarCube, and the other story formats. VNDegen finds the story in a loose HTML file, in an NW.js or Electron wrapper, or in a Unity player that shows it through Zen Fulcrum's Embedded Browser, whose packed pages it serves without unpacking them. A Unity player whose pack holds a story is a Twine game, not a Unity one. Saves, which Twine keeps in the browser's localStorage, stay in the game's data folder, so they move between VNDegen devices but not to a PC. Pages scroll by touch, and games start with the "Mouse" layout, where A clicks a link and LB and RB turn the mouse wheel, which scrolls the page. [htmlvn.md](htmlvn.md) has the details and known limits.
+
+## Construct
+
+Construct 3 games run on the same WebKit host as a plain browser page, with the game's own Construct runtime. A page script runs the engine in the page rather than in a worker, stands in for the Windows WebView2 wrapper with no extensions, so Steamworks reports itself unavailable, and keeps Construct's storage, its saves among them, in the game's data folder. Saves move between VNDegen devices but not to a PC, where they sit in the WebView2 profile's IndexedDB. Sounds load when first played rather than all before the title, which takes the test game from about 19 s to 2 s to its title on a Mac and from about 3 GB to 0.8 GB of web content memory on an iPad simulator. A finger acts as the mouse, since Construct's Mouse object ignores touches, and games start with "Visual novel" with A as a left click. [construct.md](construct.md) has the details and known limits.
 
 ## NScripter
 

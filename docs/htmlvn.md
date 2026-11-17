@@ -2,7 +2,7 @@
 
 Visual Novel Maker (Degica) and Twine games are HTML and JavaScript. VNDegen runs them on the WebKit host that RPG
 Maker MV and MZ, TyranoScript and Flash use, with the game's own scripts. Both engines live in the `EngineHTMLVN`
-module, as two plugins with their own engine IDs, `visualnovelmaker` and `twine`. Nothing new runs outside the web view,
+module, as two plugins with their own engine IDs, `visualnovelmaker` and `twine`. Construct games share the module; [construct.md](construct.md) covers them. Nothing new runs outside the web view,
 so they work on Mac, iPhone and iPad. Dorian Engine has no Windows releases and isn't covered.
 
 ## Test games
