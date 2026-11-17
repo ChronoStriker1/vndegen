@@ -39,6 +39,7 @@ let engines: [any EnginePlugin] = {
         FlashPlugin(),
         VisualNovelMakerPlugin(),
         TwinePlugin(),
+        ConstructPlugin(),
         NScripterPlugin(),
         WolfRPGPlugin(),
         AliceSoftPlugin(),

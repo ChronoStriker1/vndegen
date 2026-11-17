@@ -43,6 +43,8 @@ struct PluginInfo {
                                                      license: "VNDegen, MIT"),
             EngineID("twine"): PluginInfo(versions: "Twine 1 and 2, with Harlowe, SugarCube, and other story formats",
                                           runtime: "The story's own page in WebKit", license: "VNDegen, MIT"),
+            EngineID("construct"): PluginInfo(versions: "Construct 3, Windows WebView2 and HTML5 exports",
+                                              runtime: "The game's own Construct runtime in WebKit", license: "VNDegen, MIT"),
             EngineID("flash"): PluginInfo(versions: "Flash, ActionScript 1, 2, and 3", runtime: "Ruffle, in WebKit with WebGL",
                                           license: "Ruffle, MIT or Apache 2.0"),
             EngineID("nscripter"): PluginInfo(versions: "NScripter, with NSLua, and Ponscripter",
