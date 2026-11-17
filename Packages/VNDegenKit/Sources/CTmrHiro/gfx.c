@@ -202,13 +202,13 @@ void gfx_close(TH *t) {
     free(t->prevBuf);
 }
 
-static int sprite_center(TH *t, int i, int n) {
-    int left = ini_int(&t->sys, "GAMESYSTEM", "CHARA_SPR_LEFT", -300);
-    int right = ini_int(&t->sys, "GAMESYSTEM", "CHARA_SPR_RIGHT", 300);
-    int c = t->W / 2;
-    if (n <= 1) return c;
-    if (n == 2) return c + (i == 0 ? left : right);
-    return c + left + (right - left) * i / (n - 1);
+static float sprite_offset(TH *t, int i, int n) {
+    float left = (float)ini_int(&t->sys, "GAMESYSTEM", "CHARA_SPR_LEFT", -300);
+    float right = (float)ini_int(&t->sys, "GAMESYSTEM", "CHARA_SPR_RIGHT", 300);
+    if (n <= 1) return 0;
+    if (n == 2) return i == 0 ? left : right;
+    if (n == 3) return i == 0 ? 0 : i == 1 ? left : right;
+    return left + (right - left) * (float)i / (float)(n - 1);
 }
 
 static void render_scene(TH *t) {
@@ -230,8 +230,8 @@ static void render_scene(TH *t) {
     for (int i = 0; i < t->sprCount; i++) {
         Sprite *s = &t->spr[i];
         if (!s->img) continue;
-        float cx = (float)sprite_center(t, i, t->sprCount);
-        float cy = (float)(s->dy + plus) + s->img->ch / 2.0f;
+        float cx = t->W / 2.0f + s->x;
+        float cy = s->y + (float)plus + s->img->ch / 2.0f;
         float x0 = cx - s->img->cw * s->sx / 2.0f, y0 = cy - s->img->ch * s->sy / 2.0f;
         blit_scaled(d, t->W, t->H, s->img, (int)lroundf(x0), (int)lroundf(y0), s->sx, s->sy, 255);
     }
@@ -291,12 +291,16 @@ void gfx_set_sprites(TH *t, const char *list, int trans) {
             }
         Sprite *s = &t->spr[t->sprCount++];
         snprintf(s->name, sizeof s->name, "%s", f[0]);
-        s->dy = f[1] ? atoi(f[1]) : 0;
+        s->y = f[1] ? (float)atof(f[1]) : 0;
         s->sx = f[2] ? (float)atof(f[2]) : 1.0f;
         s->sy = f[3] ? (float)atof(f[3]) : s->sx;
         s->img = image_get(t, f[0]);
     }
     free(copy);
+    for (int i = 0; i < t->sprCount; i++) {
+        t->spr[i].x = sprite_offset(t, i, t->sprCount);
+        t->spr[i].layer = TH_MAX_SPRITES - t->sprCount + i;
+    }
     t->sceneDirty = true;
 }
 

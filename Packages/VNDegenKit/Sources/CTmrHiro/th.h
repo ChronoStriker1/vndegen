@@ -144,7 +144,8 @@ void snd_close(TH *t);
 typedef struct Sprite {
     char name[96];
     Image *img;
-    int dy;
+    int layer;
+    float x, y;
     float sx, sy;
 } Sprite;
 
@@ -227,6 +228,8 @@ struct TH {
     int pc;
     Frame stack[TH_STACK];
     int sp;
+    int savePc;
+    char bgmName[64];
     i32 vars[6][TH_VARS];
     int sceneId;
     char sceneTitle[256];

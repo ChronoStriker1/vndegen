@@ -86,6 +86,7 @@ VNTH *vnth_open(const VNTHConfig *cfg, char *err, size_t errSize) {
     load_system(t);
     th_log(t, "opened %s (%dx%d)", t->title, t->W, t->H);
     t->hover = -1;
+    t->savePc = -1;
     vm_start(t, "start", NULL);
     t->dirty = true;
     t->sceneDirty = true;

@@ -138,6 +138,7 @@ static void sound_cmd(TH *t, const Rec *r, int ch, int kind, bool loop) {
     const char *name = (const char *)r->body + 4;
     if (r->len < 5 || !*name) return;
     if (t->skipMode && (ch == CH_SE || ch == CH_VOICE)) return;
+    if (ch == CH_BGM) snprintf(t->bgmName, sizeof t->bgmName, "%s", name);
     snd_play(t, ch, kind, name, loop, ch == CH_BGM ? (int)rd16(r->body) : 0);
 }
 
@@ -154,6 +155,7 @@ static int step(TH *t) {
     const char *s = (const char *)b;
     switch (r->cls) {
     case 0x00:
+        t->savePc = t->pc - 1;
         msg_show(t, r->op, s);
         return 0;
     case 0x10:
@@ -181,6 +183,7 @@ static int step(TH *t) {
             if (r->len >= 8 && cond(t, b)) vm_goto(t, NULL, s + 8);
             return 1;
         case 0x14:
+            t->savePc = t->pc - 1;
             parse_choice(t, r);
             t->hover = -1;
             begin_wait(t, W_CHOICE, 0);
@@ -220,6 +223,7 @@ static int step(TH *t) {
             snprintf(t->mapBase, sizeof t->mapBase, "%s", a ? a : "");
             snprintf(t->mapSheet, sizeof t->mapSheet, "%s", c ? c : "");
             t->mapMode = b[0];
+            t->savePc = t->pc - 1;
             t->mapCount = 0;
             t->mapAnimCount = 0;
             return 1;
@@ -351,8 +355,8 @@ static int step(TH *t) {
     case 0x30:
         switch (r->op) {
         case 0x00: sound_cmd(t, r, CH_BGM, PAC_BGM, true); return 1;
-        case 0x01: snd_stop(t, CH_BGM, 0); return 1;
-        case 0x02: snd_stop(t, CH_BGM, r->len >= 2 ? rd16(b) : 0); return 1;
+        case 0x01: snd_stop(t, CH_BGM, 0); t->bgmName[0] = 0; return 1;
+        case 0x02: snd_stop(t, CH_BGM, r->len >= 2 ? rd16(b) : 0); t->bgmName[0] = 0; return 1;
         case 0xc8: sound_cmd(t, r, CH_SE, PAC_SE, false); return 1;
         case 0xca: snd_stop(t, CH_SE, 0); return 1;
         case 0x12c: sound_cmd(t, r, CH_SEH1, PAC_SE, true); return 1;
