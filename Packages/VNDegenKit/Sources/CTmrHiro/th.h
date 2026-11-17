@@ -282,6 +282,8 @@ struct TH {
     bool menuBlocked, skipBlocked, saveBlocked;
     int sysVol[4];
     int textSpeed, autoSpeed;
+    u32 winStat;
+    bool winBaseDraw;
 
     int mx, my;
     bool lDown, rDown;
@@ -332,6 +334,7 @@ void ui_update(TH *t);
 void ui_draw(TH *t);
 void ui_open(TH *t, int mode);
 void ui_close(TH *t);
+void ui_free(TH *t);
 bool ui_bar_update(TH *t);
 void ui_bar_draw(TH *t);
 void buttons_update(TH *t);

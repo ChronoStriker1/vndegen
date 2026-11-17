@@ -49,9 +49,10 @@ void buttons_update(TH *t) {
         t->hover = -1;
         for (int i = 0; i < t->mapCount; i++)
             if (t->maps[i].kind == 0x20 && inside(t->mx, t->my, t->maps[i].x, t->maps[i].y, t->maps[i].w, t->maps[i].h)) t->hover = i;
+        if (t->hover != old && t->hover >= 0 && t->maps[t->hover].voice[0])
+            snd_play(t, CH_SYSVOICE, PAC_VOICE, t->maps[t->hover].voice, false, 0);
         if (t->click && t->hover >= 0) {
             MapButton *m = &t->maps[t->hover];
-            if (m->voice[0]) snd_play(t, CH_SYSVOICE, PAC_VOICE, m->voice, false, 0);
             char label[64];
             snprintf(label, sizeof label, "%s", m->label);
             if (label[0]) choose_label(t, label);

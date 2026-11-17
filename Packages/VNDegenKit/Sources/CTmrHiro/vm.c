@@ -231,16 +231,15 @@ static int step(TH *t) {
             m->kind = b[0];
             m->x = (i16)rd16(b + 2);
             m->y = (i16)rd16(b + 4);
-            m->w = rd16(b + 6);
-            m->h = rd16(b + 8);
-            if (r->len >= 26) {
-                m->sx = rd16(b + 10);
-                m->sy = rd16(b + 12);
-                m->hx = rd16(b + 18);
-                m->hy = rd16(b + 20);
-                const char *tail = s + 26;
+            m->sx = rd16(b + 6);
+            m->sy = rd16(b + 8);
+            m->w = rd16(b + 10);
+            m->h = rd16(b + 12);
+            m->hx = m->sx;
+            m->hy = m->sy + m->h;
+            if (m->kind == 0x20 && r->len > 26) {
                 char tmp[192];
-                snprintf(tmp, sizeof tmp, "%s", r->len > 26 ? tail : "");
+                snprintf(tmp, sizeof tmp, "%s", s + 26);
                 char *c1 = strchr(tmp, ',');
                 if (c1) {
                     *c1 = 0;

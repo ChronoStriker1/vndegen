@@ -76,6 +76,9 @@ VNTH *vnth_open(const VNTHConfig *cfg, char *err, size_t errSize) {
     for (int i = 0; i < 4; i++) t->sysVol[i] = vol[i];
     t->textSpeed = ini_int(&t->sys, "SYSTEM", "SYS_DEF_TEXTSPEED", 6);
     t->autoSpeed = ini_int(&t->sys, "SYSTEM", "SYS_DEF_AUTOSPEED", 6);
+    const char *ws = ini_get(&t->sys, "SYSTEM", "SYS_DEF_WINDOW_STAT");
+    t->winStat = ws ? (u32)strtoul(ws, NULL, 16) : 0x80000000u;
+    t->winBaseDraw = ini_int(&t->sys, "SYSTEM", "SYS_DEF_WINDOW_BASE_DRAW", 1) != 0;
     t->mixer = mixer_new(t->audioRate);
     th_mkdirs(t->saveDir);
     gfx_init(t);
@@ -93,6 +96,7 @@ void vnth_close(VNTH *v) {
     TH *t = (TH *)v;
     if (!t) return;
     save_system(t);
+    ui_free(t);
     snd_close(t);
     gfx_close(t);
     text_close(t);
@@ -130,7 +134,16 @@ static void update_text(TH *t) {
             t->dirty = true;
         }
     }
+    if (t->wheel > 0 && t->backlogCount > 0) {
+        ui_open(t, UI_BACKLOG);
+        return;
+    }
     bool advance = t->click || t->keyPress[0x0d] || t->keyPress[0x20] || t->wheel < 0;
+    if (advance && (t->autoMode || t->skipMode)) {
+        t->autoMode = t->skipMode = false;
+        t->dirty = true;
+        return;
+    }
     if (t->rclick) {
         t->winHidden = !t->winHidden;
         t->dirty = true;

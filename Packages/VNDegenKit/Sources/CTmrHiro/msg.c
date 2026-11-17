@@ -108,7 +108,11 @@ void msg_draw(TH *t) {
     const Ini *s = &t->sys;
     int wx = ini_int(s, "MESSAGEWINDOW", "MW_DRAW_POS_X", 0), wy = ini_int(s, "MESSAGEWINDOW", "MW_DRAW_POS_Y", t->H - 200);
     Image *base = image_get(t, "sys_window_base");
-    if (base) blit(t->screen, t->W, t->H, base, wx, wy, 255);
+    if (base && t->winBaseDraw) {
+        u32 stat = t->winStat;
+        u32 rgba = (stat >> 16 & 0xff) | (stat & 0xff00) | (stat & 0xff) << 16 | (stat >> 24) << 24;
+        fill_rect(t->screen, t->W, t->H, wx + base->x, wy + base->y, base->w, base->h, rgba);
+    }
     int size = ini_int(s, "MESSAGEWINDOW", "TEXT_FONT", 24);
     int tx = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_POS_X", 100), ty = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_POS_Y", 20);
     int next = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_NEXT", size + 8);
