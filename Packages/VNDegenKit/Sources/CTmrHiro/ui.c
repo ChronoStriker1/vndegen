@@ -245,18 +245,40 @@ static BarItem *bar_item(TH *t, int i) {
 bool ui_bar_update(TH *t) {
     UI *u = ui_get(t);
     int shown = 0;
+    int topH = ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_01", 64);
+    int botH = ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_02", 64);
+    bool hasBottom = ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_BUTTON_TYPE_02", 1) != 0;
     if (bars_allowed(t)) {
-        if (t->my < 64) shown = 1;
-        else if (t->my >= t->H - 64 && t->wait == W_TEXT) shown = 2;
+        if (t->my < topH) shown = 1;
+        else if (hasBottom && t->my >= t->H - botH && t->wait == W_TEXT) shown = 2;
     }
     int hover = -1;
     if (shown)
         for (int i = 0; i < BAR_COUNT; i++) {
             BarItem *b = bar_item(t, i);
             if (!b->on || b->bar != shown || !bar_visible(t, i)) continue;
-            int by = shown == 1 ? 0 : t->H - 64;
+            int by = shown == 1 ? 0 : t->H - botH;
             if (inside(t->mx, t->my, b->x, by + b->y, b->w, b->h)) hover = i;
         }
+    if (!shown && (t->wait == W_TEXT || t->wait == W_CHOICE) && !t->winHidden && !t->menuBlocked && t->uiMode == UI_NONE) {
+        int wy = ini_int(&t->sys, "MESSAGEWINDOW", "MW_DRAW_POS_Y", 0);
+        int wx = ini_int(&t->sys, "MESSAGEWINDOW", "MW_DRAW_POS_X", 0);
+        for (int i = 0; i < BAR_COUNT; i++) {
+            BarItem *b = &u->bars[i];
+            if (b->on && b->bar == 0 && b->w && bar_visible(t, i) && inside(t->mx, t->my, wx + b->x, wy + b->y, b->w, b->h)) hover = 100 + i;
+        }
+    }
+    if (hover >= 100) {
+        if (hover != u->barHover) t->dirty = true;
+        u->barShown = 0;
+        u->barHover = hover;
+        if (t->click) {
+            bar_action(t, hover - 100);
+            t->dirty = true;
+            return true;
+        }
+        return false;
+    }
     if (shown != u->barShown || hover != u->barHover) t->dirty = true;
     u->barShown = shown;
     u->barHover = hover;
@@ -281,8 +303,20 @@ void ui_bar_draw(TH *t) {
         int mx = ini_int(&t->sys, "MESSAGE", "MES_POS_X", 450), my = ini_int(&t->sys, "MESSAGE", "MES_POS_Y", 267);
         if (m) blit(t->screen, t->W, t->H, m, mx, my, 255);
     }
+    if ((t->wait == W_TEXT || t->wait == W_CHOICE) && !t->winHidden && t->winVisible && t->uiMode == UI_NONE) {
+        Image *sheet = image_get(t, "sys_window_button");
+        int wy = ini_int(&t->sys, "MESSAGEWINDOW", "MW_DRAW_POS_Y", 0);
+        int wx = ini_int(&t->sys, "MESSAGEWINDOW", "MW_DRAW_POS_X", 0);
+        for (int i = 0; sheet && i < BAR_COUNT; i++) {
+            BarItem *b = &u->bars[i];
+            if (!b->on || b->bar != 0 || !b->w || !bar_visible(t, i)) continue;
+            int row = u->barHover == 100 + i ? 1 : 0;
+            if ((i == BAR_AUTO && t->autoMode) || (i == BAR_SKIP && t->skipMode)) row = 2;
+            blit_part(t->screen, t->W, t->H, sheet, b->sx, b->sy + row * b->h, b->w, b->h, wx + b->x, wy + b->y, 255);
+        }
+    }
     if (!u->barShown || !bars_allowed(t)) return;
-    int by = u->barShown == 1 ? 0 : t->H - 64;
+    int by = u->barShown == 1 ? 0 : t->H - ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_02", 64);
     Image *bg = image_get(t, u->barShown == 1 ? "sys_window_menu_a" : "sys_window_menu_b");
     if (!bg) bg = image_get(t, "sys_window_menu");
     if (bg) blit(t->screen, t->W, t->H, bg, 0, by, 255);
@@ -403,7 +437,7 @@ static void draw_saveload(TH *t, bool save) {
     ini_ints(&t->sys, sec, key, rp, 6);
     for (int p = 0; p < pp[6]; p++) {
         int row = u->page == p ? 1 : u->hover == 20 + p ? 1 : 0;
-        blit_part(t->screen, t->W, t->H, sheet, pp[2] + p * pp[9], pp[3] + row * pp[5], pp[4], pp[5], pp[0] + p * pp[9], pp[1], 255);
+        blit_part(t->screen, t->W, t->H, sheet, pp[2] + p * (pp[11] ? pp[11] : pp[9]), pp[3] + row * pp[5], pp[4], pp[5], pp[0] + p * pp[9], pp[1], 255);
     }
     if (ap[4]) blit_part(t->screen, t->W, t->H, sheet, ap[2], ap[3] + (u->page == 10 || u->hover == 30 ? ap[5] : 0), ap[4], ap[5], ap[0], ap[1], 255);
     if (dp[4]) blit_part(t->screen, t->W, t->H, sheet, dp[2], dp[3] + (u->hover == 31 ? dp[5] : 0), dp[4], dp[5], dp[0], dp[1], 255);

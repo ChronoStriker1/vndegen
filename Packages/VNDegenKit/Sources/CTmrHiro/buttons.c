@@ -17,8 +17,9 @@ static void choice_rect(TH *t, int i, int *x, int *y, int *w, int *h) {
     *h = ini_int(&t->sys, "SELECT", "SELECT_HEIGHT", 60);
     int top = ini_int(&t->sys, "SELECT", "SELECT_POSY", 200);
     int ny = ini_int(&t->sys, "SELECT", "SELECT_NEXT_Y", 8), nx = ini_int(&t->sys, "SELECT", "SELECT_NEXT_X", 0);
+    int total = t->choiceCount * *h + (t->choiceCount - 1) * ny;
     *x = (t->W - *w) / 2 + nx * i;
-    *y = top + (*h + ny) * i;
+    *y = top - *h / 2 - total / 2 + (*h + ny) * i;
 }
 
 static int key_step(TH *t) {

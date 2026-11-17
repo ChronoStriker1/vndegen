@@ -26,6 +26,35 @@ static char *expand_newlines(const char *s) {
     return out;
 }
 
+static char *expand_names(TH *t, const char *s) {
+    static const char *const tokens[] = {"\x81\x90\x83\xbf", "\x81\x90\x83\xc0", "\x81\x90\x83\xc1", "\x81\x90\x83\xc2", "\x81\x90\x83\xc3"};
+    size_t cap = strlen(s) * 4 + 64, n = 0;
+    char *out = th_alloc(cap);
+    for (const char *p = s; *p;) {
+        int hit = -1;
+        for (int k = 0; k < 5; k++)
+            if (!strncmp(p, tokens[k], 4)) hit = k;
+        if (hit >= 0) {
+            char key[24];
+            snprintf(key, sizeof key, "PLAYER_NAME%02d", hit + 1);
+            const char *name = ini_get(&t->sys, "GAMESYSTEM", key);
+            if (!name) name = "";
+            size_t len = strlen(name);
+            if (n + len + 8 > cap) out = th_realloc(out, cap = cap * 2 + len);
+            memcpy(out + n, name, len);
+            n += len;
+            p += 4;
+            continue;
+        }
+        if (n + 8 > cap) out = th_realloc(out, cap *= 2);
+        bool lead = ((u8)*p >= 0x81 && (u8)*p <= 0x9f) || ((u8)*p >= 0xe0 && (u8)*p <= 0xfc);
+        out[n++] = *p++;
+        if (lead && *p) out[n++] = *p++;
+    }
+    out[n] = 0;
+    return out;
+}
+
 static int text_speed_ms(TH *t) { return t->textSpeed >= 9 ? 0 : (9 - t->textSpeed) * 8; }
 
 void msg_show(TH *t, int kind, const char *body) {
@@ -34,7 +63,7 @@ void msg_show(TH *t, int kind, const char *body) {
     t->msgName = NULL;
     t->msgText = NULL;
     t->msgVoice[0] = 0;
-    char *copy = th_strdup(body);
+    char *copy = expand_names(t, body);
     char *text = copy;
     if (kind != 0) {
         char *comma = strchr(copy, ',');
@@ -110,18 +139,39 @@ void msg_draw(TH *t) {
     int wx = ini_int(s, "MESSAGEWINDOW", "MW_DRAW_POS_X", 0), wy = ini_int(s, "MESSAGEWINDOW", "MW_DRAW_POS_Y", t->H - 200);
     Image *base = image_get(t, "sys_window_base");
     if (base && t->winBaseDraw) {
-        u32 stat = t->winStat;
-        u32 rgba = (stat >> 16 & 0xff) | (stat & 0xff00) | (stat & 0xff) << 16 | (stat >> 24) << 24;
-        fill_rect(t->screen, t->W, t->H, wx + base->x, wy + base->y, base->w, base->h, rgba);
+        u32 stat = t->winStat, sa = stat >> 24;
+        u32 rgb = (stat >> 16 & 0xff) | (stat & 0xff00) | (stat & 0xff) << 16;
+        for (int y = 0; y < base->h; y++) {
+            int dy = wy + base->y + y;
+            if (dy < 0 || dy >= t->H) continue;
+            for (int x = 0; x < base->w; x++) {
+                int dx = wx + base->x + x;
+                if (dx < 0 || dx >= t->W) continue;
+                u32 a = (base->px[(size_t)y * base->w + x] >> 24) * sa / 255;
+                if (!a) continue;
+                u32 *d = &t->screen[(size_t)dy * t->W + dx];
+                u32 ia = 255 - a;
+                u32 r = ((rgb & 0xff) * a + (*d & 0xff) * ia) / 255;
+                u32 g = (((rgb >> 8) & 0xff) * a + ((*d >> 8) & 0xff) * ia) / 255;
+                u32 bl = (((rgb >> 16) & 0xff) * a + ((*d >> 16) & 0xff) * ia) / 255;
+                *d = r | g << 8 | bl << 16 | 0xff000000u;
+            }
+        }
+    }
+    if (ini_int(s, "MESSAGEWINDOW", "MW_FRAM_DRAW", 0)) {
+        Image *frame = image_get(t, "sys_window_frame");
+        if (frame && frame->w > 1 && frame->h > 1) blit(t->screen, t->W, t->H, frame, wx, wy + ini_int(s, "MESSAGEWINDOW", "MW_DRAW_HEIGHT", 0) - frame->ch, 255);
     }
     int size = ini_int(s, "MESSAGEWINDOW", "TEXT_FONT", 24);
     int tx = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_POS_X", 100), ty = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_POS_Y", 20);
-    int next = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_NEXT", size + 8);
+    int rubi = ini_int(s, "MESSAGEWINDOW", "RUBI_FONT_HEIGHT", 0);
+    int next = ini_int(s, "MESSAGEWINDOW", "TEXT_DRAW_NEXT", size + 8) + (rubi ? rubi + 1 : 0);
     int front = ini_int(s, "MESSAGEWINDOW", "TEXT_FRONT_H", 0);
     u32 color = parse_rgb(ini_get(s, "MESSAGEWINDOW", t->msgRead && t->readColor ? "TEXT_READ_COLOR" : "TEXT_COLOR"), 0xffffff) | 0xff000000u;
     int npx = ini_int(s, "MESSAGEWINDOW", "NP_DRAW_POS_X", tx);
-    int lineTop = wy + ty + next - 16;
-    if (t->msgName) text_draw(t, t->screen, t->W, t->H, t->msgName, wx + npx, lineTop - next, size, color, true, -1);
+    int npy = ini_int(s, "MESSAGEWINDOW", "NP_DRAW_POS_Y", 0);
+    int lineTop = wy + ty + (rubi ? rubi + 1 : 0);
+    if (t->msgName) text_draw(t, t->screen, t->W, t->H, t->msgName, wx + npx, wy + npy + 4, size, color, true, -1);
     int brackets = ini_int(s, "MESSAGEWINDOW", "TEXT_BRACKETS_H", 1);
     int x0 = wx + tx + (t->msgName ? 0 : front * size);
     int xc = t->msgName ? wx + tx + brackets * size : x0;

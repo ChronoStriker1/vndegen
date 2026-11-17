@@ -284,15 +284,20 @@ void gfx_clear_sprites(TH *t, int trans) {
 
 void gfx_set_sprites(TH *t, const char *list, int trans) {
     gfx_begin_transition(t, trans);
-    t->sprCount = 0;
     char *copy = th_strdup(list);
+    char *items[TH_MAX_SPRITES];
+    int slots = 0;
     char *save = NULL;
-    for (char *item = strtok_r(copy, ",", &save); item && t->sprCount < TH_MAX_SPRITES; item = strtok_r(NULL, ",", &save)) {
+    for (char *item = strtok_r(copy, ",", &save); item && slots < TH_MAX_SPRITES; item = strtok_r(NULL, ",", &save)) {
         while (*item == ' ') item++;
-        if (!*item) continue;
-        char *f[4] = {item, NULL, NULL, NULL};
+        if (*item) items[slots++] = item;
+    }
+    t->sprCount = 0;
+    for (int i = 0; i < slots; i++) {
+        if (!strcmp(items[i], "-")) continue;
+        char *f[4] = {items[i], NULL, NULL, NULL};
         int k = 1;
-        for (char *p = item; *p && k < 4; p++)
+        for (char *p = items[i]; *p && k < 4; p++)
             if (*p == '/') {
                 *p = 0;
                 f[k++] = p + 1;
@@ -303,12 +308,10 @@ void gfx_set_sprites(TH *t, const char *list, int trans) {
         s->sx = f[2] ? (float)atof(f[2]) : 1.0f;
         s->sy = f[3] ? (float)atof(f[3]) : s->sx;
         s->img = image_get(t, f[0]);
+        s->x = sprite_offset(t, i, slots);
+        s->layer = slots == 1 ? 5 : slots == 2 ? 6 + i : slots == 3 ? 5 + i : TH_MAX_SPRITES - slots + i;
     }
     free(copy);
-    for (int i = 0; i < t->sprCount; i++) {
-        t->spr[i].x = sprite_offset(t, i, t->sprCount);
-        t->spr[i].layer = t->sprCount == 1 ? 5 : t->sprCount == 2 ? 6 + i : t->sprCount == 3 ? 5 + i : TH_MAX_SPRITES - t->sprCount + i;
-    }
     t->sceneDirty = true;
 }
 

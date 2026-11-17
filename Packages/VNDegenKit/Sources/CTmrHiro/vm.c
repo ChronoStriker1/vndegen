@@ -51,6 +51,7 @@ void vm_goto(TH *t, const char *scene, const char *label) {
     t->sc = s;
     snprintf(t->scene, sizeof t->scene, "%s", s->name);
     t->pc = pc;
+    t->jumped = true;
 }
 
 void vm_start(TH *t, const char *scene, const char *label) {
@@ -144,7 +145,10 @@ static void sound_cmd(TH *t, const Rec *r, int ch, int kind, bool loop) {
     if (r->len < 5 || !*name) return;
     if (t->skipMode && (ch == CH_SE || ch == CH_VOICE)) return;
     if (ch == CH_BGM) snprintf(t->bgmName, sizeof t->bgmName, "%s", name);
-    snd_play(t, ch, kind, name, loop, ch == CH_BGM ? (int)rd16(r->body) : 0);
+    char full[96];
+    size_t n = strlen(name);
+    snprintf(full, sizeof full, "%s%s", name, n && name[n - 1] == '_' ? "A" : "");
+    snd_play(t, ch, kind, full, loop, ch == CH_BGM ? (int)rd16(r->body) : 0);
 }
 
 static int step(TH *t) {
@@ -155,11 +159,26 @@ static int step(TH *t) {
         }
         return 1;
     }
-    Rec *r = &t->sc->recs[t->pc++];
+    bool jumped = t->jumped;
+    t->jumped = false;
+    bool loaded = t->justLoaded;
+    t->justLoaded = false;
+    Rec *r = &t->sc->recs[t->pc];
+    bool building = r->cls == 0x10 && (r->op == 0x01 || r->op == 0x04 || r->op == 0x34 || (r->op == 0x00 && (jumped || !t->mapLastActive)));
+    if (t->mapBuilding && t->mapCount && !building) {
+        t->mapBuilding = false;
+        t->hover = -1;
+        t->sceneDirty = true;
+        begin_wait(t, W_MAP, 0);
+        return 0;
+    }
+    t->pc++;
+    t->justLoaded = loaded;
     const u8 *b = r->body;
     const char *s = (const char *)b;
     switch (r->cls) {
     case 0x00:
+        if (r->op == 0x14 || r->op == 0x50 || r->op == 0x51) return 1;
         t->savePc = t->pc - 1;
         msg_show(t, r->op, s);
         return 0;
@@ -189,6 +208,7 @@ static int step(TH *t) {
             return 1;
         case 0x14:
             t->savePc = t->pc - 1;
+            if (!t->replayDepth && !t->justLoaded) save_auto(t);
             parse_choice(t, r);
             t->hover = -1;
             begin_wait(t, W_CHOICE, 0);
@@ -228,8 +248,9 @@ static int step(TH *t) {
             snprintf(t->mapBase, sizeof t->mapBase, "%s", a ? a : "");
             snprintf(t->mapSheet, sizeof t->mapSheet, "%s", c ? c : "");
             t->mapMode = b[0];
+            t->mapBuilding = true;
             t->savePc = t->pc - 1;
-            if (!t->replayDepth) save_auto(t);
+            if (!t->replayDepth && !t->justLoaded) save_auto(t);
             t->mapCount = 0;
             t->mapAnimCount = 0;
             return 1;
@@ -247,6 +268,7 @@ static int step(TH *t) {
             m->h = rd16(b + 12);
             m->hx = m->sx;
             m->hy = m->sy + m->h;
+            t->mapLastActive = m->kind == 0x20;
             if (m->kind == 0x20 && r->len > 26) {
                 char tmp[192];
                 snprintf(tmp, sizeof tmp, "%s", s + 26);
@@ -257,12 +279,6 @@ static int step(TH *t) {
                     snprintf(m->label, sizeof m->label, "%s", c2 ? c2 + 1 : "");
                 }
                 snprintf(m->voice, sizeof m->voice, "%s", tmp);
-            }
-            if (t->pc < t->sc->count && !(t->sc->recs[t->pc].cls == 0x10 && t->sc->recs[t->pc].op == 0x34)) {
-                t->hover = -1;
-                t->sceneDirty = true;
-                begin_wait(t, W_MAP, 0);
-                return 0;
             }
             return 1;
         }
@@ -374,7 +390,8 @@ static int step(TH *t) {
             snd_stop(t, CH_SEH2, 0);
             snd_stop(t, CH_SEH3, 0);
             return 1;
-        case 0x191: sound_cmd(t, r, CH_SEHV, PAC_SE, true); return 1;
+        case 0x191:
+        case 0x196: sound_cmd(t, r, CH_SEHV, PAC_SE, true); return 1;
         case 0x192: snd_stop(t, CH_SEHV, 0); return 1;
         case 0x64:
             if (r->len > 0 && !t->skipMode) snd_play(t, CH_SYSVOICE, PAC_VOICE, s, false, 0);
