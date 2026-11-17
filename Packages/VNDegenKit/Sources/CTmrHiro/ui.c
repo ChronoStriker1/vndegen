@@ -64,7 +64,6 @@ static UI *ui_get(TH *t) {
         if (ini_ints(&t->sys, "MESSAGEWINDOW", key, v, 8) >= 8) u->bars[i] = (BarItem){v[0] != 0, v[1], v[2], v[3], v[4], v[5], v[6], v[7]};
     }
     u->bars[BAR_VOICE].on = false;
-    u->bars[BAR_SCENE_BACK].on = false;
     const IniSection *s = ini_section(&t->sys, "SYSTEM");
     for (int i = 0; s && i < s->count && u->partCount < 96; i++) {
         const IniLine *l = &s->lines[i];
@@ -75,7 +74,7 @@ static UI *ui_get(TH *t) {
         char *f[24];
         int n = 0;
         for (char *p = strtok(tmp, ","); p && n < 24; p = strtok(NULL, ",")) f[n++] = p;
-        if (n < 16 || atoi(f[0]) == 0 && page < 98) continue;
+        if (n < 16 || (atoi(f[0]) == 0 && page < 98)) continue;
         SysPart *p = &u->parts[u->partCount];
         p->page = page;
         snprintf(p->id, sizeof p->id, "%s", f[1]);
@@ -179,6 +178,26 @@ static void quick_save(TH *t) {
     if (save_slot(t, 999)) u->toastUntil = t->now + 1200;
 }
 
+static bool bar_visible(TH *t, int i) {
+    if (i == BAR_VOICE) return false;
+    if (i == BAR_SCENE_BACK) return t->replayDepth > 0;
+    if (t->replayDepth > 0 && (i == BAR_SAVE || i == BAR_LOAD || i == BAR_QSAVE || i == BAR_QLOAD || i == BAR_TITLE)) return false;
+    return true;
+}
+
+static void end_replay(TH *t) {
+    for (int c = 0; c < CH_COUNT; c++) snd_stop(t, c, 0);
+    t->sp = t->replayDepth - 1;
+    t->replayDepth = 0;
+    t->wait = W_NONE;
+    t->winVisible = false;
+    t->navi = NULL;
+    gfx_set_bg(t, "bl", 0);
+    gfx_finish_transition(t);
+    vm_goto(t, t->replayScene, NULL);
+    t->pc = t->galLoopPc;
+}
+
 static void bar_action(TH *t, int item) {
     UI *u = ui_get(t);
     switch (item) {
@@ -198,6 +217,7 @@ static void bar_action(TH *t, int item) {
         break;
     case BAR_TITLE: open_msg(t, MSG_TITLE, 0); break;
     case BAR_EXIT: open_msg(t, MSG_QUIT, 0); break;
+    case BAR_SCENE_BACK: end_replay(t); break;
     default: break;
     }
     (void)u;
@@ -216,7 +236,7 @@ bool ui_bar_update(TH *t) {
     if (shown)
         for (int i = 0; i < BAR_COUNT; i++) {
             BarItem *b = &u->bars[i];
-            if (!b->on || b->bar != shown) continue;
+            if (!b->on || b->bar != shown || !bar_visible(t, i)) continue;
             int by = shown == 1 ? 0 : t->H - 64;
             if (inside(t->mx, t->my, b->x, by + b->y, b->w, b->h)) hover = i;
         }
@@ -253,7 +273,7 @@ void ui_bar_draw(TH *t) {
     if (!sheet) return;
     for (int i = 0; i < BAR_COUNT; i++) {
         BarItem *b = &u->bars[i];
-        if (!b->on || b->bar != u->barShown) continue;
+        if (!b->on || b->bar != u->barShown || !bar_visible(t, i)) continue;
         int row = i == u->barHover ? 1 : 0;
         if ((i == BAR_AUTO && t->autoMode) || (i == BAR_SKIP && t->skipMode)) row = 2;
         blit_part(t->screen, t->W, t->H, sheet, b->sx, b->sy + row * b->h, b->w, b->h, b->x, by + b->y, 255);

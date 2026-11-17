@@ -99,6 +99,7 @@ void vnth_close(VNTH *v) {
     if (!t) return;
     save_system(t);
     ui_free(t);
+    gallery_free(t);
     snd_close(t);
     gfx_close(t);
     text_close(t);
@@ -215,6 +216,8 @@ bool vnth_frame(VNTH *v, uint32_t elapsedMs) {
         case W_BUTTONS:
         case W_CHOICE:
         case W_MAP: buttons_update(t); break;
+        case W_GALLERY:
+        case W_CGVIEW: gallery_update(t); break;
         default: break;
         }
     }
@@ -226,6 +229,7 @@ bool vnth_frame(VNTH *v, uint32_t elapsedMs) {
     }
     vm_run(t);
     t->click = t->rclick = false;
+    t->mouseMoved = false;
     t->wheel = 0;
     memset(t->keyPress, 0, sizeof t->keyPress);
     if (t->quit) return false;
@@ -249,7 +253,10 @@ uint32_t vnth_frame_serial(VNTH *v) { return ((TH *)v)->serial; }
 
 void vnth_mouse_move(VNTH *v, int x, int y) {
     TH *t = (TH *)v;
-    if (x != t->mx || y != t->my) t->dirty = true;
+    if (x != t->mx || y != t->my) {
+        t->dirty = true;
+        t->mouseMoved = true;
+    }
     t->mx = x;
     t->my = y;
 }

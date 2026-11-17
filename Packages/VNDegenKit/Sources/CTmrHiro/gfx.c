@@ -332,6 +332,7 @@ void gfx_compose(TH *t) {
     if (!t->transActive) {
         msg_draw(t);
         buttons_draw(t);
+        gallery_draw(t);
         ui_bar_draw(t);
         ui_draw(t);
     }

@@ -169,6 +169,11 @@ typedef struct MapButton {
     int kind;
 } MapButton;
 
+typedef struct GalItem {
+    int type, x1, y1, x2, y2;
+    char *list;
+} GalItem;
+
 typedef struct BacklogEntry {
     char *name;
     char *text;
@@ -185,6 +190,8 @@ enum {
     W_MAP,
     W_QUIT,
     W_FLASH,
+    W_GALLERY,
+    W_CGVIEW,
 };
 
 enum { UI_NONE, UI_SAVE, UI_LOAD, UI_SYSTEM, UI_BACKLOG, UI_CONFIRM, UI_GALLERY };
@@ -277,6 +284,19 @@ struct TH {
     struct { char name[64]; int x0, y0, x1, y1; u32 start, dur; int kind; } mapAnim[8];
     int mapAnimCount;
 
+    GalItem gal[48];
+    int galCount;
+    char galNodata[64], galIncomplete[64], galBase[64], galOn[64];
+    int galLoopPc;
+    char viewList[64][32];
+    int viewCount, viewIndex;
+    Image *viewImg;
+    bool galleryAll;
+    u8 *galleryMarks;
+    int replayDepth;
+    char replayScene[64];
+    int replayPc;
+
     BacklogEntry *backlog;
     int backlogCount;
 
@@ -290,6 +310,7 @@ struct TH {
     bool readColor;
 
     int mx, my;
+    bool mouseMoved;
     bool lDown, rDown;
     bool click, rclick;
     int wheel;
@@ -345,6 +366,14 @@ bool ui_bar_update(TH *t);
 void ui_bar_draw(TH *t);
 void buttons_update(TH *t);
 void buttons_draw(TH *t);
+
+void gallery_page(TH *t, const u8 *b, int len);
+void gallery_item(TH *t, const u8 *b, int len);
+void gallery_update(TH *t);
+void gallery_draw(TH *t);
+void gallery_free(TH *t);
+void gallery_mark_cg(TH *t, const char *name);
+void gallery_mark_scene(TH *t, const char *name);
 
 bool save_slot(TH *t, int slot);
 bool load_slot(TH *t, int slot);

@@ -44,6 +44,10 @@ void vm_goto(TH *t, const char *scene, const char *label) {
             pc = 0;
         }
     }
+    if (t->sc != s) {
+        th_log(t, "scene %s%s%s", s->name, label && *label ? " at " : "", label && *label ? label : "");
+        gallery_mark_scene(t, s->name);
+    }
     t->sc = s;
     snprintf(t->scene, sizeof t->scene, "%s", s->name);
     t->pc = pc;
@@ -61,6 +65,7 @@ static bool vm_return(TH *t) {
         return false;
     }
     t->sp--;
+    if (t->replayDepth && t->sp < t->replayDepth) t->replayDepth = 0;
     Scene *s = scene_load(t, t->stack[t->sp].scene);
     if (!s) return false;
     t->sc = s;
@@ -268,6 +273,7 @@ static int step(TH *t) {
         switch (r->op) {
         case 0x00:
             if (r->len < 3) return 1;
+            if (!strncmp(s + 2, "fm_", 3)) gallery_mark_cg(t, s + 2);
             gfx_set_bg(t, s + 2, t->skipMode ? 0 : rd16(b));
             if (t->transActive) {
                 begin_wait(t, W_TRANS, 0);
@@ -392,6 +398,22 @@ static int step(TH *t) {
         case 0x2b:
             t->menuBlocked = r->len > 0 && b[0];
             return 1;
+        case 0x3c:
+            gallery_page(t, b, r->len);
+            return 1;
+        case 0x46:
+            gallery_item(t, b, r->len);
+            if (t->pc < t->sc->count && !(t->sc->recs[t->pc].cls == 0x40 && t->sc->recs[t->pc].op == 0x46)) {
+                t->galLoopPc = t->pc;
+                t->hover = -1;
+                begin_wait(t, W_GALLERY, 0);
+                t->sceneDirty = true;
+                return 0;
+            }
+            return 1;
+        case 0x3e:
+            th_log(t, "character viewer is not supported");
+            return 1;
         case 0x28:
         case 0x29:
         case 0x2a:
@@ -406,6 +428,9 @@ static int step(TH *t) {
         case 0x00: return 1;
         case 0x01:
             if (r->len >= 6) set_var(t, b);
+            return 1;
+        case 0x03:
+            t->galleryAll = r->len > 0 && b[0];
             return 1;
         case 0x14:
             t->sceneId = r->len >= 2 ? rd16(b) : 0;

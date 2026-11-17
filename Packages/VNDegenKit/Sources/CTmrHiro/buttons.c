@@ -21,13 +21,35 @@ static void choice_rect(TH *t, int i, int *x, int *y, int *w, int *h) {
     *y = top + (*h + ny) * i;
 }
 
+static int key_step(TH *t) {
+    if (t->keyPress[0x25] || t->keyPress[0x26]) return -1;
+    if (t->keyPress[0x27] || t->keyPress[0x28]) return 1;
+    return 0;
+}
+
+static int nav(TH *t, int hover, int count, bool (*usable)(TH *, int)) {
+    int step = key_step(t);
+    if (!step || count <= 0) return hover;
+    int h = hover;
+    for (int k = 0; k < count; k++) {
+        h = h < 0 ? (step > 0 ? 0 : count - 1) : (h + step + count) % count;
+        if (!usable || usable(t, h)) return h;
+    }
+    return hover;
+}
+
+static bool map_usable(TH *t, int i) { return t->maps[i].kind == 0x20; }
+
 void buttons_update(TH *t) {
     int old = t->hover;
+    bool enter = t->keyPress[0x0d] || t->keyPress[0x20];
     if (t->wait == W_BUTTONS) {
         t->hover = -1;
         for (int i = 0; i < t->buttonCount; i++)
             if (inside(t->mx, t->my, t->buttons[i].x, t->buttons[i].y, t->buttons[i].w, t->buttons[i].h)) t->hover = i;
-        if (t->click && t->hover >= 0) {
+        if (t->hover < 0 && old >= 0 && !t->mouseMoved) t->hover = old;
+        t->hover = nav(t, t->hover, t->buttonCount, NULL);
+        if ((t->click || enter) && t->hover >= 0) {
             char label[64];
             snprintf(label, sizeof label, "%s", t->buttons[t->hover].label);
             choose_label(t, label);
@@ -39,7 +61,9 @@ void buttons_update(TH *t) {
             choice_rect(t, i, &x, &y, &w, &h);
             if (inside(t->mx, t->my, x, y, w, h)) t->hover = i;
         }
-        if (t->click && t->hover >= 0) {
+        if (t->hover < 0 && old >= 0 && !t->mouseMoved) t->hover = old;
+        t->hover = nav(t, t->hover, t->choiceCount, NULL);
+        if ((t->click || enter) && t->hover >= 0) {
             char label[64];
             snprintf(label, sizeof label, "%s", t->choices[t->hover].label);
             for (int i = 0; i < t->choiceCount; i++) free(t->choices[i].text);
@@ -49,9 +73,11 @@ void buttons_update(TH *t) {
         t->hover = -1;
         for (int i = 0; i < t->mapCount; i++)
             if (t->maps[i].kind == 0x20 && inside(t->mx, t->my, t->maps[i].x, t->maps[i].y, t->maps[i].w, t->maps[i].h)) t->hover = i;
+        if (t->hover < 0 && old >= 0 && !t->mouseMoved) t->hover = old;
+        t->hover = nav(t, t->hover, t->mapCount, map_usable);
         if (t->hover != old && t->hover >= 0 && t->maps[t->hover].voice[0])
             snd_play(t, CH_SYSVOICE, PAC_VOICE, t->maps[t->hover].voice, false, 0);
-        if (t->click && t->hover >= 0) {
+        if ((t->click || enter) && t->hover >= 0) {
             MapButton *m = &t->maps[t->hover];
             char label[64];
             snprintf(label, sizeof label, "%s", m->label);
