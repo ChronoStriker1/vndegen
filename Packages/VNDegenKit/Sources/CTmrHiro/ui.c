@@ -106,7 +106,11 @@ static UI *ui_get(TH *t) {
         else if (!strcmp(p->id, "S_WS_MODE")) u->values[i] = 2;
         else if (!strcmp(p->id, "S_NS_MODE")) u->values[i] = -1;
         else if (!strcmp(p->id, "S_WINDOW_STAT")) u->values[i] = (int)(t->winStat >> 24 | (t->winStat >> 16 & 0xff) << 8 | (t->winStat >> 8 & 0xff) << 16 | (t->winStat & 0xff) << 24);
-        else if (!strcmp(p->id, "S_SOUND_VOLUME")) u->values[i] = t->sysVol[0] * 255 / 100 | (t->sysVol[1] * 255 / 100) << 8 | (t->sysVol[2] * 255 / 100) << 16 | (t->sysVol[3] * 255 / 100) << 24;
+        else if (!strcmp(p->id, "S_SOUND_VOLUME")) {
+            u32 packed = 0;
+            for (int k = 0; k < 4; k++) packed |= (u32)(t->sysVol[k] * 255 / 100) << (k * 8);
+            u->values[i] = (int)packed;
+        }
         else if (!strcmp(p->id, "S_MES_CONFIRM")) u->values[i] = 0xff;
         else if (!strcmp(p->id, "S_SOUND")) u->values[i] = 0xff;
         else if (!strcmp(p->id, "S_ECSTACY_NAVI")) u->values[i] = 1;

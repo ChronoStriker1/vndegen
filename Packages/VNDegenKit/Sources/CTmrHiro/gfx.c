@@ -165,7 +165,7 @@ Image *image_get(TH *t, const char *name) {
 }
 
 static bool in_use(TH *t, Image *im) {
-    if (im == t->bg || im == t->navi || im == t->pan.img) return true;
+    if (im == t->bg || im == t->navi || im == t->pan.img || im == t->viewImg) return true;
     for (int i = 0; i < t->sprCount; i++)
         if (t->spr[i].img == im) return true;
     return false;
