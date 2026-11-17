@@ -1,0 +1,436 @@
+#include "th.h"
+
+static i32 *var_ref(TH *t, int kind, int index) {
+    if (kind < 0 || kind > 5 || index < 0 || index >= TH_VARS) return NULL;
+    return &t->vars[kind][index];
+}
+
+static u32 rnd(TH *t) {
+    t->rng = t->rng * 1103515245u + 12345u;
+    return t->rng >> 16;
+}
+
+static void fail(TH *t, const char *msg) {
+    snprintf(t->problem, sizeof t->problem, "%s", msg);
+    th_log(t, "problem: %s", msg);
+    t->quit = true;
+}
+
+bool vm_call(TH *t, const char *scene, const char *label) {
+    if (t->sp >= TH_STACK) {
+        fail(t, "script call stack overflow");
+        return false;
+    }
+    if (t->sc) {
+        snprintf(t->stack[t->sp].scene, sizeof t->stack[t->sp].scene, "%s", t->sc->name);
+        t->stack[t->sp].pc = t->pc;
+        t->sp++;
+    }
+    vm_goto(t, scene, label);
+    return true;
+}
+
+void vm_goto(TH *t, const char *scene, const char *label) {
+    Scene *s = scene && *scene ? scene_load(t, scene) : t->sc;
+    if (!s) {
+        th_log(t, "goto: no scene %s", scene ? scene : "");
+        return;
+    }
+    int pc = 0;
+    if (label && *label) {
+        pc = scene_label(s, label);
+        if (pc < 0) {
+            th_log(t, "goto: no label %s in %s", label, s->name);
+            pc = 0;
+        }
+    }
+    t->sc = s;
+    snprintf(t->scene, sizeof t->scene, "%s", s->name);
+    t->pc = pc;
+}
+
+void vm_start(TH *t, const char *scene, const char *label) {
+    t->sp = 0;
+    t->sc = NULL;
+    vm_goto(t, scene, label);
+}
+
+static bool vm_return(TH *t) {
+    if (t->sp == 0) {
+        th_log(t, "return with an empty stack in %s", t->sc ? t->sc->name : "?");
+        return false;
+    }
+    t->sp--;
+    Scene *s = scene_load(t, t->stack[t->sp].scene);
+    if (!s) return false;
+    t->sc = s;
+    snprintf(t->scene, sizeof t->scene, "%s", s->name);
+    t->pc = t->stack[t->sp].pc;
+    return true;
+}
+
+static void split_scene_label(const char *s, char *scene, size_t ss, char *label, size_t ls) {
+    const char *comma = strchr(s, ',');
+    if (comma) {
+        snprintf(scene, ss, "%.*s", (int)(comma - s), s);
+        snprintf(label, ls, "%s", comma + 1);
+    } else {
+        snprintf(scene, ss, "%s", s);
+        label[0] = 0;
+    }
+}
+
+static bool cond(TH *t, const u8 *b) {
+    int op = b[0], kind = b[1], index = rdbe16(b + 2), value = (i16)rdbe16(b + 4);
+    i32 *v = var_ref(t, kind, index);
+    i32 x = v ? *v : 0;
+    switch (op) {
+    case 0: return x == value;
+    case 1: return x != value;
+    case 2: return x > value;
+    case 3: return x < value;
+    case 4: return x >= value;
+    case 5: return x <= value;
+    default: th_log(t, "cond op %d", op); return false;
+    }
+}
+
+static void set_var(TH *t, const u8 *b) {
+    int op = b[0], kind = b[1], index = rdbe16(b + 2), value = (i16)rdbe16(b + 4);
+    i32 *v = var_ref(t, kind, index);
+    if (!v) return;
+    switch (op) {
+    case 0: *v = value; break;
+    case 1: *v += value; break;
+    case 2: *v -= value; break;
+    default: th_log(t, "set op %d", op); *v = value; break;
+    }
+}
+
+static void begin_wait(TH *t, int kind, u32 ms) {
+    t->wait = kind;
+    t->waitUntil = t->now + ms;
+}
+
+static void parse_choice(TH *t, const Rec *r) {
+    t->choiceCount = 0;
+    int count = r->len > 2 ? r->body[2] : 0;
+    const char *p = (const char *)r->body + 3;
+    for (int i = 0; i < count && t->choiceCount < 8 && *p; i++) {
+        while (*p == ' ') p++;
+        if (*p) p++;
+        const char *end = strchr(p, ' ');
+        size_t n = end ? (size_t)(end - p) : strlen(p);
+        char *item = th_alloc(n + 1);
+        memcpy(item, p, n);
+        char *comma = strrchr(item, ',');
+        Choice *c = &t->choices[t->choiceCount++];
+        if (comma) {
+            *comma = 0;
+            snprintf(c->label, sizeof c->label, "%s", comma + 1);
+        }
+        c->text = item;
+        p += n;
+    }
+}
+
+static void sound_cmd(TH *t, const Rec *r, int ch, int kind, bool loop) {
+    const char *name = (const char *)r->body + 4;
+    if (r->len < 5 || !*name) return;
+    if (t->skipMode && (ch == CH_SE || ch == CH_VOICE)) return;
+    snd_play(t, ch, kind, name, loop, ch == CH_BGM ? (int)rd16(r->body) : 0);
+}
+
+static int step(TH *t) {
+    if (!t->sc || t->pc >= t->sc->count) {
+        if (!vm_return(t)) {
+            fail(t, "the script ended");
+            return 0;
+        }
+        return 1;
+    }
+    Rec *r = &t->sc->recs[t->pc++];
+    const u8 *b = r->body;
+    const char *s = (const char *)b;
+    switch (r->cls) {
+    case 0x00:
+        msg_show(t, r->op, s);
+        return 0;
+    case 0x10:
+        switch (r->op) {
+        case 0x00: return 1;
+        case 0x01: {
+            if (r->len < 2) return 1;
+            if (b[1] == 2) vm_goto(t, s + 2, NULL);
+            else vm_goto(t, NULL, s + 2);
+            return 1;
+        }
+        case 0x02: {
+            char scene[64], label[64];
+            split_scene_label(s + 2, scene, sizeof scene, label, sizeof label);
+            vm_call(t, scene, label);
+            return 1;
+        }
+        case 0x03:
+            if (!vm_return(t)) {
+                fail(t, "the script ended");
+                return 0;
+            }
+            return 1;
+        case 0x04:
+            if (r->len >= 8 && cond(t, b)) vm_goto(t, NULL, s + 8);
+            return 1;
+        case 0x14:
+            parse_choice(t, r);
+            t->hover = -1;
+            begin_wait(t, W_CHOICE, 0);
+            return 0;
+        case 0x28:
+            t->buttonCount = 0;
+            t->mapCount = 0;
+            return 1;
+        case 0x29: {
+            const char *list = s + 4;
+            const char *comma = strchr(list, ',');
+            snprintf(t->buttonImg, sizeof t->buttonImg, "%.*s", comma ? (int)(comma - list) : (int)strlen(list), list);
+            snprintf(t->buttonImgOn, sizeof t->buttonImgOn, "%s", comma ? comma + 1 : "");
+            t->buttonCount = 0;
+            return 1;
+        }
+        case 0x32: {
+            if (t->buttonCount >= 32 || r->len < 8) return 1;
+            Button *bt = &t->buttons[t->buttonCount++];
+            bt->x = rd16(b);
+            bt->y = rd16(b + 2);
+            bt->w = rd16(b + 4);
+            bt->h = rd16(b + 6);
+            snprintf(bt->label, sizeof bt->label, "%s", s + 8);
+            if (t->pc < t->sc->count && !(t->sc->recs[t->pc].cls == 0x10 && t->sc->recs[t->pc].op == 0x32)) {
+                t->hover = -1;
+                begin_wait(t, W_BUTTONS, 0);
+                return 0;
+            }
+            return 1;
+        }
+        case 0x2b: {
+            const char *list = s + 4;
+            char tmp[192];
+            snprintf(tmp, sizeof tmp, "%s", list);
+            char *a = strtok(tmp, ","), *bb = a ? strtok(NULL, ",") : NULL, *c = bb ? strtok(NULL, ",") : NULL;
+            snprintf(t->mapBase, sizeof t->mapBase, "%s", a ? a : "");
+            snprintf(t->mapSheet, sizeof t->mapSheet, "%s", c ? c : "");
+            t->mapMode = b[0];
+            t->mapCount = 0;
+            t->mapAnimCount = 0;
+            return 1;
+        }
+        case 0x34: {
+            if (t->mapCount >= 16 || r->len < 14) return 1;
+            MapButton *m = &t->maps[t->mapCount++];
+            memset(m, 0, sizeof *m);
+            m->kind = b[0];
+            m->x = (i16)rd16(b + 2);
+            m->y = (i16)rd16(b + 4);
+            m->w = rd16(b + 6);
+            m->h = rd16(b + 8);
+            if (r->len >= 26) {
+                m->sx = rd16(b + 10);
+                m->sy = rd16(b + 12);
+                m->hx = rd16(b + 18);
+                m->hy = rd16(b + 20);
+                const char *tail = s + 26;
+                char tmp[192];
+                snprintf(tmp, sizeof tmp, "%s", r->len > 26 ? tail : "");
+                char *c1 = strchr(tmp, ',');
+                if (c1) {
+                    *c1 = 0;
+                    char *c2 = strchr(c1 + 1, ',');
+                    snprintf(m->label, sizeof m->label, "%s", c2 ? c2 + 1 : "");
+                }
+                snprintf(m->voice, sizeof m->voice, "%s", tmp);
+            }
+            if (t->pc < t->sc->count && !(t->sc->recs[t->pc].cls == 0x10 && t->sc->recs[t->pc].op == 0x34)) {
+                t->hover = -1;
+                t->sceneDirty = true;
+                begin_wait(t, W_MAP, 0);
+                return 0;
+            }
+            return 1;
+        }
+        default:
+            th_log(t, "%s:%d unhandled flow op %04x", t->sc->name, t->pc - 1, r->op);
+            return 1;
+        }
+    case 0x20:
+        switch (r->op) {
+        case 0x00:
+            if (r->len < 3) return 1;
+            gfx_set_bg(t, s + 2, t->skipMode ? 0 : rd16(b));
+            if (t->transActive) {
+                begin_wait(t, W_TRANS, 0);
+                return 0;
+            }
+            return 1;
+        case 0x08: {
+            if (r->len < 13) return 1;
+            const char *name = s + 12;
+            Image *im = image_get(t, name);
+            if (!im) return 1;
+            gfx_begin_transition(t, 1);
+            t->pan.active = true;
+            t->pan.img = im;
+            t->pan.fromY = 0;
+            t->pan.toY = t->H - im->ch;
+            t->pan.start = t->now;
+            t->pan.dur = (u32)(-(i16)rd16(b + 4)) * 20;
+            t->bg = NULL;
+            snprintf(t->bgName, sizeof t->bgName, "%s", name);
+            t->sprCount = 0;
+            if (b[11] == 'w' && !t->skipMode) {
+                begin_wait(t, W_TIME, t->pan.dur);
+                t->waitSkippable = true;
+                return 0;
+            }
+            return 1;
+        }
+        case 0xc8:
+            gfx_clear_sprites(t, t->skipMode ? 0 : (r->len >= 2 ? rd16(b) : 0));
+            if (t->transActive) {
+                begin_wait(t, W_TRANS, 0);
+                return 0;
+            }
+            return 1;
+        case 0xcb: {
+            if (r->len < 4) return 1;
+            gfx_set_sprites(t, s + 3, t->skipMode ? 0 : rd16(b));
+            if (t->transActive) {
+                begin_wait(t, W_TRANS, 0);
+                return 0;
+            }
+            return 1;
+        }
+        case 0x6e: {
+            if (r->len < 27) return 1;
+            gfx_set_sprites(t, s + 26, t->skipMode ? 0 : rd16(b));
+            if (t->transActive) {
+                begin_wait(t, W_TRANS, 0);
+                return 0;
+            }
+            return 1;
+        }
+        case 0x190:
+        case 0x191:
+            if (r->len < 10 || t->skipMode) return 1;
+            t->flashColor = (u32)b[0] | (u32)b[1] << 8 | (u32)b[2] << 16;
+            t->flashStart = t->now;
+            t->flashDur = (u32)rd16(b + 6) * 4;
+            begin_wait(t, W_FLASH, t->flashDur);
+            return 0;
+        case 0x1fe: {
+            const char *name = r->len > 1 ? s + 1 : "";
+            if (!*name || !strcmp(name, "-")) {
+                t->navi = NULL;
+                t->naviName[0] = 0;
+            } else {
+                snprintf(t->naviName, sizeof t->naviName, "%s", name);
+                t->navi = image_get(t, name);
+            }
+            t->sceneDirty = true;
+            return 1;
+        }
+        case 0x66:
+        case 0x68:
+        case 0x69:
+        case 0x19a:
+        case 0x1f5:
+        case 0x1f7:
+            return 1;
+        default:
+            th_log(t, "%s:%d unhandled graphics op %04x", t->sc->name, t->pc - 1, r->op);
+            return 1;
+        }
+    case 0x30:
+        switch (r->op) {
+        case 0x00: sound_cmd(t, r, CH_BGM, PAC_BGM, true); return 1;
+        case 0x01: snd_stop(t, CH_BGM, 0); return 1;
+        case 0x02: snd_stop(t, CH_BGM, r->len >= 2 ? rd16(b) : 0); return 1;
+        case 0xc8: sound_cmd(t, r, CH_SE, PAC_SE, false); return 1;
+        case 0xca: snd_stop(t, CH_SE, 0); return 1;
+        case 0x12c: sound_cmd(t, r, CH_SEH1, PAC_SE, true); return 1;
+        case 0x12d: sound_cmd(t, r, CH_SEH2, PAC_SE, true); return 1;
+        case 0x130: sound_cmd(t, r, CH_SEH3, PAC_SE, false); return 1;
+        case 0x12e:
+            snd_stop(t, CH_SEH1, 0);
+            snd_stop(t, CH_SEH2, 0);
+            snd_stop(t, CH_SEH3, 0);
+            return 1;
+        case 0x191: sound_cmd(t, r, CH_SEHV, PAC_SE, true); return 1;
+        case 0x192: snd_stop(t, CH_SEHV, 0); return 1;
+        case 0x64:
+            if (r->len > 0 && !t->skipMode) snd_play(t, CH_SYSVOICE, PAC_VOICE, s, false, 0);
+            return 1;
+        case 0x65: snd_stop(t, CH_SYSVOICE, 0); return 1;
+        case 0x384: snd_stop(t, CH_VOICE, 0); return 1;
+        default:
+            th_log(t, "%s:%d unhandled sound op %04x", t->sc->name, t->pc - 1, r->op);
+            return 1;
+        }
+    case 0x40:
+        switch (r->op) {
+        case 0x00:
+            t->quit = true;
+            return 0;
+        case 0x15:
+            ui_open(t, UI_LOAD);
+            return 0;
+        case 0x17:
+            th_log(t, "open URL %s (ignored)", s);
+            return 1;
+        case 0x2b:
+            t->menuBlocked = r->len > 0 && b[0];
+            return 1;
+        case 0x28:
+        case 0x29:
+        case 0x2a:
+        case 0x2c:
+            return 1;
+        default:
+            th_log(t, "%s:%d unhandled system op %04x", t->sc->name, t->pc - 1, r->op);
+            return 1;
+        }
+    case 0x50:
+        switch (r->op) {
+        case 0x00: return 1;
+        case 0x01:
+            if (r->len >= 6) set_var(t, b);
+            return 1;
+        case 0x14:
+            t->sceneId = r->len >= 2 ? rd16(b) : 0;
+            return 1;
+        case 0x15:
+            snprintf(t->sceneTitle, sizeof t->sceneTitle, "%s", s);
+            return 1;
+        case 0x1e: {
+            int n = r->len >= 2 ? rd16(b) : 1;
+            t->vars[2][0] = n > 0 ? (i32)(rnd(t) % (u32)n) : 0;
+            return 1;
+        }
+        case 0x28:
+            if (t->skipMode) return 1;
+            begin_wait(t, W_TIME, r->len >= 4 ? rd32(b) : 0);
+            t->waitSkippable = true;
+            return 0;
+        default:
+            th_log(t, "%s:%d unhandled scene op %04x", t->sc->name, t->pc - 1, r->op);
+            return 1;
+        }
+    default:
+        th_log(t, "%s:%d unknown record %04x:%04x", t->sc->name, t->pc - 1, r->cls, r->op);
+        return 1;
+    }
+}
+
+void vm_run(TH *t) {
+    for (int guard = 0; guard < 100000 && !t->quit && t->wait == W_NONE && t->uiMode == UI_NONE; guard++)
+        if (!step(t)) break;
+}
