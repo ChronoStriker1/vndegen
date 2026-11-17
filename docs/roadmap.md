@@ -112,7 +112,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Tmr-Hiro ADV System (Next, item 1), started 2026-11-17 on branch `feat/tmrhiro`, on a clean-room runtime of VNDegen's own. All five library games passed the content check and share one engine family in three builds. The first release is Welcome to the Mizuryuu kei land, in about 6 to 8 working days; the other four follow in sets, about 7 to 9 days more.
+- Tmr-Hiro ADV System (Next, item 1), started 2026-11-17 on branch `feat/tmrhiro`, on a clean-room runtime of VNDegen's own. All five library games passed the content check and share one engine family in three builds. The first release is Welcome to the Mizuryuu kei land, whose title screen draws on Linux, in about 6 to 7 more working days; the other four follow in sets, about 7 to 9 days more.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
