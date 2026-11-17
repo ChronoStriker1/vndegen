@@ -381,6 +381,7 @@ bool load_slot(TH *t, int slot);
 bool save_exists(TH *t, int slot);
 void save_system(TH *t);
 void load_system(TH *t);
+void system_settings_changed(TH *t);
 bool read_flag(TH *t, int sceneId, int rec, bool mark);
 
 #endif

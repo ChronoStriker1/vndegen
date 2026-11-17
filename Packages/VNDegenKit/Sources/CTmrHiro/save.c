@@ -373,10 +373,25 @@ void load_system(TH *t) {
         free(t->system000);
         t->system000 = d;
         t->system000Size = size;
+        if (d[276] <= 9) t->textSpeed = d[276];
+        if (d[286] <= 9) t->autoSpeed = d[286];
+        t->winStat = (t->winStat & 0x00ffffffu) | (u32)d[306] << 24;
+        for (int i = 0; i < 4; i++)
+            if (d[411 + i] <= 100) t->sysVol[i] = d[411 + i];
     } else {
         free(d);
     }
     load_sidecar(t);
+}
+
+void system_settings_changed(TH *t) {
+    if (!t->system000) return;
+    u8 *d = t->system000;
+    d[276] = (u8)t->textSpeed;
+    d[286] = (u8)t->autoSpeed;
+    d[306] = (u8)(t->winStat >> 24);
+    for (int i = 0; i < 4; i++) d[411 + i] = (u8)t->sysVol[i];
+    t->systemDirty = true;
 }
 
 void save_system(TH *t) {

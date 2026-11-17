@@ -674,6 +674,7 @@ static void apply_part(TH *t, int pi) {
         for (int i = 0; i < 4; i++) t->sysVol[i] = ((v >> (i * 8)) & 0xff) * 100 / 255;
         snd_update(t);
     }
+    system_settings_changed(t);
 }
 
 static void update_system(TH *t) {
