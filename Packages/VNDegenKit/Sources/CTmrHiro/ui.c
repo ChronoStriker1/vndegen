@@ -26,6 +26,7 @@ enum { SW_GROUP, SW_SLIDE, SW_ONE, SW_PUSH };
 
 struct UI {
     BarItem bars[BAR_COUNT];
+    BarItem mapBars[BAR_COUNT];
     int barShown;
     int barHover;
     int pressed;
@@ -62,6 +63,9 @@ static UI *ui_get(TH *t) {
         snprintf(key, sizeof key, "TWB_%s", barKeys[i]);
         int v[8] = {0};
         if (ini_ints(&t->sys, "MESSAGEWINDOW", key, v, 8) >= 8) u->bars[i] = (BarItem){v[0] != 0, v[1], v[2], v[3], v[4], v[5], v[6], v[7]};
+        snprintf(key, sizeof key, "MMB_%s", barKeys[i]);
+        int m[7] = {0};
+        if (ini_ints(&t->sys, "MAPMENU", key, m, 7) >= 7) u->mapBars[i] = (BarItem){m[0] != 0, 1, m[1], m[2], m[3], m[4], m[5], m[6]};
     }
     u->bars[BAR_VOICE].on = false;
     const IniSection *s = ini_section(&t->sys, "SYSTEM");
@@ -223,19 +227,28 @@ static void bar_action(TH *t, int item) {
     (void)u;
 }
 
-static bool bars_allowed(TH *t) { return t->wait == W_TEXT && !t->menuBlocked && !t->winHidden && t->uiMode == UI_NONE; }
+static bool bars_allowed(TH *t) {
+    if (t->menuBlocked || t->uiMode != UI_NONE) return false;
+    if (t->wait == W_TEXT) return !t->winHidden;
+    return t->wait == W_CHOICE || t->wait == W_MAP;
+}
+
+static BarItem *bar_item(TH *t, int i) {
+    UI *u = ui_get(t);
+    return t->wait == W_MAP ? &u->mapBars[i] : &u->bars[i];
+}
 
 bool ui_bar_update(TH *t) {
     UI *u = ui_get(t);
     int shown = 0;
     if (bars_allowed(t)) {
         if (t->my < 64) shown = 1;
-        else if (t->my >= t->H - 64) shown = 2;
+        else if (t->my >= t->H - 64 && t->wait == W_TEXT) shown = 2;
     }
     int hover = -1;
     if (shown)
         for (int i = 0; i < BAR_COUNT; i++) {
-            BarItem *b = &u->bars[i];
+            BarItem *b = bar_item(t, i);
             if (!b->on || b->bar != shown || !bar_visible(t, i)) continue;
             int by = shown == 1 ? 0 : t->H - 64;
             if (inside(t->mx, t->my, b->x, by + b->y, b->w, b->h)) hover = i;
@@ -272,7 +285,7 @@ void ui_bar_draw(TH *t) {
     Image *sheet = image_get(t, "sys_window_button");
     if (!sheet) return;
     for (int i = 0; i < BAR_COUNT; i++) {
-        BarItem *b = &u->bars[i];
+        BarItem *b = bar_item(t, i);
         if (!b->on || b->bar != u->barShown || !bar_visible(t, i)) continue;
         int row = i == u->barHover ? 1 : 0;
         if ((i == BAR_AUTO && t->autoMode) || (i == BAR_SKIP && t->skipMode)) row = 2;
