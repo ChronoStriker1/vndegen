@@ -111,12 +111,12 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Tmr-Hiro: Spooky Pregnant School: The Conception, with its clock, items, status screen and roulette, and The Quickening's routes follow the player's choices (#186) (0.50.0). All five library Tmr-Hiro games play.
 - IPAC, on VNDegen's own clean-room runtime, with Mamono Musume to no Seikatsu: Lamia no Baai, the library's one IPAC game, and PC saves and settings both ways (0.51.0).
 - Ikura GDL, on VNDegen's own clean-room runtime, with the English Lightning Warrior Raidy, its 3D dungeon and battles, and PC saves both ways, and BIN/CUE disc images in the import (0.52.0). Ikura GDL and IPAC are done: the library's other game of each was left out after the content check.
+- The menu button in games can be dragged to any corner, and each game remembers it, so it no longer covers a game's own corner button (#183) (0.52.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
-- #183: on iPhone and iPad in Touch or Automatic mode, VNDegen's menu button covers a game's own top-right button, such as Transpile Girl Rescue Operation!'s gear. Being fixed on branch `fix/183-menu-button` (started 2026-11-18): the button can be dragged to any corner, and each game remembers where it was put.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
