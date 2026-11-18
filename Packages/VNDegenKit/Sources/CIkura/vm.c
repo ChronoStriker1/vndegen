@@ -1,0 +1,277 @@
+#include "ikura.h"
+
+#define MAX_STEPS 200000
+
+u32 ik_value(IK *t, u32 raw) {
+    if (raw & 0x80000000u) {
+        u32 i = raw & 0x7fffffffu;
+        return i < (u32)t->varCount ? (u32)t->vars[i] : 0;
+    }
+    return raw;
+}
+
+static i32 *var_at(IK *t, u32 i) { return i < (u32)t->varCount ? &t->vars[i] : NULL; }
+
+void vm_start(IK *t, const char *script) {
+    Script *s = script_load(t, script);
+    if (!s) {
+        snprintf(t->problem, sizeof t->problem, "The script %s is missing.", script);
+        ik_log(t, "%s", t->problem);
+        t->wait = W_QUIT;
+        return;
+    }
+    t->sc = s;
+    t->pc = 0;
+}
+
+static void goto_label(IK *t, u32 label) {
+    if (label >= (u32)t->sc->labelCount) {
+        ik_log(t, "%s: label %u out of range", t->sc->name, label);
+        return;
+    }
+    t->pc = t->sc->labels[label];
+}
+
+static void push(IK *t) {
+    if (t->sp >= IK_STACK) {
+        ik_log(t, "call stack full");
+        return;
+    }
+    t->stack[t->sp++] = (Frame){t->sc, t->pc};
+}
+
+static void pop(IK *t) {
+    if (t->sp <= 0) {
+        ik_log(t, "return with an empty stack");
+        t->wait = W_QUIT;
+        return;
+    }
+    Frame f = t->stack[--t->sp];
+    t->sc = f.sc;
+    t->pc = f.pc;
+}
+
+static i32 apply(int op, i32 acc, i32 v) {
+    switch (op) {
+    case 0: return acc + v;
+    case 1: return acc - v;
+    case 2: return acc * v;
+    case 3: return v ? acc / v : 0;
+    case 4: return v ? acc % v : 0;
+    default: return acc;
+    }
+}
+
+static void expr(IK *t, const u8 *a, int n) {
+    if (n < 3) return;
+    i32 acc = 0;
+    int i = 2;
+    while (i + 5 <= n && a[i] != 5) {
+        acc = apply(a[i], acc, (i32)ik_value(t, rd32(a + i + 1)));
+        i += 5;
+    }
+    i32 *v = var_at(t, rd16(a));
+    if (v) *v = acc;
+}
+
+static bool compare(int op, i32 a, i32 b) {
+    switch (op) {
+    case 0: return a == b;
+    case 1: return a != b;
+    case 2: return a < b;
+    case 3: return a >= b;
+    case 4: return a > b;
+    case 5: return a <= b;
+    default: return false;
+    }
+}
+
+static void cond(IK *t, const u8 *a, int n) {
+    int i = 0;
+    bool result = true;
+    for (;;) {
+        if (i + 10 > n) return;
+        bool c = compare(a[i + 4], (i32)ik_value(t, rd32(a + i)), (i32)ik_value(t, rd32(a + i + 5)));
+        result = result && c;
+        int conj = a[i + 9];
+        i += 10;
+        if (conj != 2) break;
+    }
+    if (i + 2 <= n && result) goto_label(t, rd16(a + i));
+}
+
+static Layer *layer(IK *t, u32 id) {
+    id = ik_value(t, id);
+    if (id >= (u32)t->layerCount) {
+        ik_log(t, "layer %u out of range", id);
+        return NULL;
+    }
+    return &t->layers[id];
+}
+
+static void load_image(IK *t, int slot, const char *name) {
+    if (slot < 0 || slot >= t->imageCount) return;
+    image_free(t->images[slot]);
+    t->images[slot] = NULL;
+    size_t n;
+    u8 *d = store_load(&t->store, AR_GRP, name, &n);
+    if (!d) {
+        ik_log(t, "missing picture %s", name);
+        return;
+    }
+    t->images[slot] = image_decode(d, n);
+    free(d);
+    if (!t->images[slot]) ik_log(t, "can't decode %s", name);
+}
+
+static void resize(IK *t, int which, int n) {
+    if (n <= 0 || n > 100000) return;
+    if (which == 0) {
+        t->vars = ik_realloc(t->vars, sizeof(i32) * (size_t)n);
+        if (n > t->varCount) memset(t->vars + t->varCount, 0, sizeof(i32) * (size_t)(n - t->varCount));
+        t->varCount = n;
+    } else if (which == 1) {
+        for (int i = n; i < t->imageCount; i++) image_free(t->images[i]);
+        t->images = ik_realloc(t->images, sizeof(Image *) * (size_t)n);
+        if (n > t->imageCount) memset(t->images + t->imageCount, 0, sizeof(Image *) * (size_t)(n - t->imageCount));
+        t->imageCount = n;
+    } else {
+        t->layers = ik_realloc(t->layers, sizeof(Layer) * (size_t)n);
+        if (n > t->layerCount) memset(t->layers + t->layerCount, 0, sizeof(Layer) * (size_t)(n - t->layerCount));
+        t->layerCount = n;
+    }
+}
+
+static void exec(IK *t, u16 op, const u8 *a, int n) {
+    Layer *l;
+    switch (op) {
+    case 0x0000: t->wait = W_QUIT; break;
+    case 0x0001: vm_start(t, (const char *)a); break;
+    case 0x0002: push(t); vm_start(t, (const char *)a); break;
+    case 0x0003: pop(t); break;
+    case 0x0004: goto_label(t, rd16(a)); break;
+    case 0x0005: push(t); goto_label(t, rd16(a)); break;
+    case 0x0006: pop(t); break;
+    case 0x0007: {
+        u32 v = ik_value(t, rd32(a)), count = rd32(a + 4);
+        if (v < count && 8 + (int)v * 2 + 2 <= n) goto_label(t, rd16(a + 8 + v * 2));
+        break;
+    }
+    case 0x0009: break;
+    case 0x000a: if (gfx_animating(t)) t->wait = W_ANIM; break;
+    case 0x000b:
+        t->wait = W_TIME;
+        t->waitUntil = t->now + ik_value(t, rd32(a));
+        break;
+    case 0x0100: resize(t, 1, rd16(a)); break;
+    case 0x0101: load_image(t, rd16(a), (const char *)a + 2); break;
+    case 0x0102: {
+        int s = rd16(a);
+        if (s >= 0 && s < t->imageCount) {
+            image_free(t->images[s]);
+            t->images[s] = NULL;
+        }
+        break;
+    }
+    case 0x0200: resize(t, 2, rd16(a)); break;
+    case 0x0202:
+        if ((l = layer(t, rd32(a)))) {
+            memset(l, 0, sizeof *l);
+            l->made = true;
+            l->w = (int)ik_value(t, rd32(a + 4));
+            l->h = (int)ik_value(t, rd32(a + 8));
+            l->img = -1;
+        }
+        break;
+    case 0x0203:
+        if ((l = layer(t, rd32(a)))) {
+            l->x = (int)ik_value(t, rd32(a + 4));
+            l->y = (int)ik_value(t, rd32(a + 8));
+            l->move.on = false;
+        }
+        break;
+    case 0x0205:
+        if ((l = layer(t, rd32(a)))) l->mode = (int)ik_value(t, rd32(a + 4));
+        break;
+    case 0x0206: break;
+    case 0x0207:
+        if ((l = layer(t, rd32(a)))) {
+            l->img = (int)ik_value(t, rd32(a + 4));
+            l->sx = (int)ik_value(t, rd32(a + 8));
+            l->sy = (int)ik_value(t, rd32(a + 12));
+        }
+        break;
+    case 0x0208: break;
+    case 0x020b:
+        if ((l = layer(t, rd32(a)))) {
+            u32 ms = ik_value(t, rd32(a + 4));
+            for (int k = 0; k < 4; k++) {
+                l->fade.from[k] = (int)ik_value(t, rd32(a + 8 + 4 * k));
+                l->fade.to[k] = (int)ik_value(t, rd32(a + 24 + 4 * k));
+            }
+            l->fade.start = t->now;
+            l->fade.dur = ms;
+            l->fade.on = true;
+            memcpy(l->argb, ms ? l->fade.from : l->fade.to, sizeof l->argb);
+        }
+        break;
+    case 0x020c:
+        if ((l = layer(t, rd32(a)))) {
+            l->move.from[0] = l->x;
+            l->move.from[1] = l->y;
+            l->move.to[0] = (int)ik_value(t, rd32(a + 8));
+            l->move.to[1] = (int)ik_value(t, rd32(a + 12));
+            l->move.start = t->now;
+            l->move.dur = ik_value(t, rd32(a + 4));
+            l->move.on = true;
+        }
+        break;
+    case 0x0400: resize(t, 0, rd16(a)); break;
+    case 0x0401: {
+        i32 *v = var_at(t, rd32(a));
+        if (v) *v = (i32)ik_value(t, rd32(a + 4));
+        break;
+    }
+    case 0x0402: {
+        i32 *v = var_at(t, rd32(a));
+        if (v) (*v)++;
+        break;
+    }
+    case 0x0403: {
+        i32 *v = var_at(t, rd32(a));
+        if (v) (*v)--;
+        break;
+    }
+    case 0x0404: expr(t, a, n); break;
+    case 0x0407: cond(t, a, n); break;
+    default:
+        if (t->trace) ik_log(t, "%s:%x op %04x not handled", t->sc->name, t->pc, op);
+        break;
+    }
+}
+
+void vm_run(IK *t) {
+    int steps = 0;
+    while (t->wait == W_NONE && t->sc && !t->quit) {
+        if (++steps > MAX_STEPS) {
+            ik_log(t, "%s ran %d steps without waiting", t->sc->name, MAX_STEPS);
+            return;
+        }
+        if (t->pc + 4 > t->sc->codeSize) {
+            ik_log(t, "%s ended", t->sc->name);
+            t->wait = W_QUIT;
+            return;
+        }
+        const u8 *p = t->sc->code + t->pc;
+        u16 op = rd16(p), len = rd16(p + 2);
+        if (len < 4 || t->pc + len > t->sc->codeSize) {
+            ik_log(t, "%s: bad instruction at %x", t->sc->name, t->pc);
+            t->wait = W_QUIT;
+            return;
+        }
+        t->pc += len;
+        if (t->trace) ik_log(t, "%s:%x %04x", t->sc->name, t->pc - len, op);
+        exec(t, op, p + 4, len - 4);
+        t->dirty = true;
+    }
+}
