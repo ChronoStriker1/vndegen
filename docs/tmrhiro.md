@@ -80,7 +80,8 @@ the same files there:
 - The character viewer in the EXTRA menu does nothing.
 - The mouse wheel opens the backlog. The PC engine's default, rewinding the scene, isn't there.
 - The system screen shows the screen mode and resolution settings; they do nothing, since the app sets the window.
-- Transitions are crossfades. The PC engine's mosaic and wipe transitions aren't drawn.
+- Transitions are crossfades. The PC engine's mosaic and wipe transitions aren't drawn, including the wipe kind that
+  background record 0x0001 names.
 - The map's slide animations are skipped.
 - Kyonyuu Elf Oyako Saimin's name entry screen isn't shown; the protagonist keeps the name `_system` gives him
   (Ingwill), as on the PC when the name is left as it is.

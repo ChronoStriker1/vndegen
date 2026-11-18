@@ -290,14 +290,17 @@ static int step(TH *t) {
     case 0x20:
         switch (r->op) {
         case 0x00:
-            if (r->len < 3) return 1;
-            if (!strncmp(s + 2, "fm_", 3)) gallery_mark_cg(t, s + 2);
-            gfx_set_bg(t, s + 2, t->skipMode ? 0 : rd16(b));
+        case 0x01: {
+            int at = r->op == 0x01 ? 3 : 2;
+            if (r->len < at + 1) return 1;
+            if (!strncmp(s + at, "fm_", 3)) gallery_mark_cg(t, s + at);
+            gfx_set_bg(t, s + at, t->skipMode ? 0 : rd16(b));
             if (t->transActive) {
                 begin_wait(t, W_TRANS, 0);
                 return 0;
             }
             return 1;
+        }
         case 0x08: {
             if (r->len < 13) return 1;
             const char *name = s + 12;

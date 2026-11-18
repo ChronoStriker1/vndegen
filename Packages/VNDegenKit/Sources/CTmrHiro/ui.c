@@ -591,7 +591,7 @@ static void draw_backlog(TH *t) {
         int ey = y + k * next + (nameDy < 0 ? -nameDy : 0);
         if (e->name) text_draw(t, t->screen, t->W, t->H, e->name, x, ey + nameDy, size, 0xffffffffu, true, -1);
         int front = ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_FRONT_H", 0), brackets = ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_BRACKETS_H", 1);
-        int right = t->W - ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_DRAW_POS_X", 100);
+        int right = t->W - 40;
         int x0 = e->name ? x : x + front * size, xc = e->name ? x + brackets * size : x0;
         int lx = x0, ly = ey;
         for (const u8 *p = (const u8 *)e->text; *p;) {
