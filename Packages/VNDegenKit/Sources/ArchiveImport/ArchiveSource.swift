@@ -52,7 +52,6 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
         self.init(volumes: order.map { volumes[$0]! }, suggestedFolderName: first.1.stem, installers: [])
     }
 
-    /// A CD image: the cue sheet followed by the BIN file it names, picked with it or found beside it.
     private init(cue: URL, picked urls: [URL]) throws(ArchiveError) {
         guard let sheet = CueSheet.read(cue) else { throw .unreadable("\(cue.lastPathComponent) names no data track VNDegen can read.") }
         let others = urls.filter { $0 != cue }

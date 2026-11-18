@@ -1,6 +1,5 @@
 import Foundation
 
-/// The data track of a CD image's cue sheet: the BIN file it names and how its sectors hold the 2048-byte data.
 nonisolated struct CueSheet: Equatable, Sendable {
     var binName: String
     var sectorSize: Int32

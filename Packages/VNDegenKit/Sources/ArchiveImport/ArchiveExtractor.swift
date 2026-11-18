@@ -321,8 +321,6 @@ nonisolated enum ArchiveExtractor {
         return discGameFolder(items) ?? staging
     }
 
-    /// A CD that starts its installer from `autorun.inf` and keeps the game in one folder holding a program, beside
-    /// extras such as trailers. The disc's own setup and autorun programs stay out.
     static func discGameFolder(_ items: [URL]) -> URL? {
         func isProgram(_ url: URL) -> Bool { !isDirectory(url) && url.pathExtension.lowercased() == "exe" }
         guard items.contains(where: { $0.lastPathComponent.lowercased() == "autorun.inf" }),
