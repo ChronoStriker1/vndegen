@@ -57,6 +57,7 @@ void vnikura_close(VNIkura *n) {
     gfx_close(t);
     msg_close(t);
     text_close(t);
+    for (int i = 0; i < 4; i++) free(t->savedEnabled[i]);
     free(t->flags);
     for (int i = 0; i < t->scriptCount; i++) script_free(t->scripts[i]);
     free(t->scripts);

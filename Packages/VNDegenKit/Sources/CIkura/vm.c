@@ -42,8 +42,7 @@ static void push(IK *t) {
 
 static void pop(IK *t) {
     if (t->sp <= 0) {
-        ik_log(t, "return with an empty stack");
-        t->wait = W_QUIT;
+        ik_log(t, "%s: return with an empty stack", t->sc->name);
         return;
     }
     Frame f = t->stack[--t->sp];
@@ -97,10 +96,10 @@ static bool compare(int op, i32 a, i32 b) {
     switch (op) {
     case 0: return a == b;
     case 1: return a != b;
-    case 2: return a < b;
+    case 2: return a <= b;
     case 3: return a > b;
     case 4: return a >= b;
-    case 5: return a <= b;
+    case 5: return a < b;
     default: return false;
     }
 }
@@ -365,20 +364,81 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         }
         break;
     case 0x020c:
-        if ((l = layer(t, rd32(a)))) {
-            l->move.from[0] = l->x;
-            l->move.from[1] = l->y;
-            l->move.to[0] = (int)ik_value(t, rd32(a + 8));
-            l->move.to[1] = (int)ik_value(t, rd32(a + 12));
-            l->move.start = t->now;
-            l->move.dur = ik_value(t, rd32(a + 4));
-            l->move.on = true;
+        if ((l = layer(t, rd32(a))))
+            layer_move(t, l, (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)));
+        break;
+    case 0x0211:
+        if ((l = layer(t, rd32(a))))
+            layer_move(t, l, (int)ik_value(t, rd32(a + 4)), l->x + (int)ik_value(t, rd32(a + 8)), l->y + (int)ik_value(t, rd32(a + 12)));
+        break;
+    case 0x020f: {
+        i32 *v = var_at(t, rd32(a + 4));
+        if ((l = layer(t, rd32(a))) && v) *v = l->shown && l->made;
+        break;
+    }
+    case 0x0210:
+        if ((l = layer(t, rd32(a))) && n >= 24) {
+            u32 ms = ik_value(t, rd32(a + 4));
+            for (int k = 0; k < 4; k++) {
+                l->fade.from[k] = l->argb[k];
+                l->fade.to[k] = (int)ik_value(t, rd32(a + 8 + 4 * k));
+            }
+            l->fade.start = t->now;
+            l->fade.dur = ms;
+            l->fade.on = true;
+            l->shown = true;
+            if (!ms) memcpy(l->argb, l->fade.to, sizeof l->argb);
         }
+        break;
+    case 0x0201:
+    case 0x020e:
+    case 0x000d:
+    case 0x0700:
+    case 0x0705:
+    case 0x0711: break;
+    case 0x0704: {
+        u32 key = ik_value(t, rd32(a)), id = rd32(a + 4);
+        if (key < 256) t->keyButton[key] = id == IK_CANCEL ? -1 : (int)id + 1;
+        break;
+    }
+    case 0x070a: {
+        Button *b = button(t, rd32(a));
+        if (b && n >= 36)
+            b->tip = (ButtonTip){true, (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)),
+                                 (int)ik_value(t, rd32(a + 16)), (int)ik_value(t, rd32(a + 20)), (int)ik_value(t, rd32(a + 24)),
+                                 (int)ik_value(t, rd32(a + 28)), (int)ik_value(t, rd32(a + 32))};
+        break;
+    }
+    case 0x070c: {
+        u32 slot = ik_value(t, rd32(a)) & 3;
+        if (!t->savedEnabled[slot]) t->savedEnabled[slot] = ik_alloc(sizeof(bool) * IK_BUTTONS);
+        for (int k = 0; k < IK_BUTTONS; k++) {
+            t->savedEnabled[slot][k] = t->buttons[k].enabled;
+            t->buttons[k].enabled = false;
+        }
+        break;
+    }
+    case 0x070d: {
+        u32 slot = ik_value(t, rd32(a)) & 3;
+        if (!t->savedEnabled[slot]) break;
+        for (int k = 0; k < IK_BUTTONS; k++)
+            if (t->buttons[k].made) t->buttons[k].enabled = t->savedEnabled[slot][k];
+        break;
+    }
+    case 0x0912: {
+        i32 *v = var_at(t, rd32(a + 4));
+        if (v) *v = 0;
+        break;
+    }
+    case 0x0913:
+        if (ik_value(t, rd32(a)) == 0) t->skipMode = (int)ik_value(t, rd32(a + 4));
+        else t->autoMode = (int)ik_value(t, rd32(a + 4));
         break;
     case 0x0701: {
         Button *b = button(t, rd32(a));
         if (!b) break;
         memset(b, 0, sizeof *b);
+        if (rd32(a + 4) == IK_CANCEL) break;
         b->made = true;
         b->layer = (int)ik_value(t, rd32(a + 8));
         b->x = (int)ik_value(t, rd32(a + 12));

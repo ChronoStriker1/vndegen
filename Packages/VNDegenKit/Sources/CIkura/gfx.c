@@ -47,6 +47,20 @@ void gfx_update(IK *t) {
     }
 }
 
+void layer_move(IK *t, Layer *l, int ms, int x, int y) {
+    l->move.from[0] = l->x;
+    l->move.from[1] = l->y;
+    l->move.to[0] = x;
+    l->move.to[1] = y;
+    l->move.start = t->now;
+    l->move.dur = (u32)(ms > 0 ? ms : 0);
+    l->move.on = ms > 0;
+    if (ms <= 0) {
+        l->x = x;
+        l->y = y;
+    }
+}
+
 bool gfx_animating(IK *t) {
     for (int i = 0; i < t->layerCount; i++)
         if (t->layers[i].made && (t->layers[i].fade.on || t->layers[i].move.on)) return true;
@@ -198,6 +212,11 @@ void gfx_compose(IK *t) {
                 gfx_blit(t, fullColour, s->img, s->sx, s->sy, b->w, b->h, l->x + b->x, l->y + b->y);
             }
         }
+        if (live && t->hover >= 0) {
+            ButtonTip *tip = &t->buttons[t->hover].tip;
+            if (tip->on && tip->layer == i && t->buttons[t->hover].enabled)
+                gfx_blit(t, fullColour, tip->img, tip->sx, tip->sy, tip->w, tip->h, l->x + tip->x, l->y + tip->y);
+        }
         msg_draw(t, i);
     }
     t->serial++;
@@ -235,5 +254,20 @@ void buttons_input(IK *t) {
     } else if (t->rclick && t->cancelBound) {
         t->rclick = false;
         vm_branch(t, t->cancelSc, t->cancelLabel, t->cancelCall);
+    } else {
+        for (int k = 0; k < 256; k++) {
+            if (!t->keyPress[k] || !t->keyButton[k]) continue;
+            int id = t->keyButton[k] - 1;
+            if (id == -2 && t->cancelBound) {
+                t->keyPress[k] = false;
+                vm_branch(t, t->cancelSc, t->cancelLabel, t->cancelCall);
+                break;
+            }
+            if (id >= 0 && id < IK_BUTTONS && t->buttons[id].made && t->buttons[id].enabled && t->buttons[id].bound) {
+                t->keyPress[k] = false;
+                vm_branch(t, t->buttons[id].sc, t->buttons[id].label, t->buttons[id].call);
+                break;
+            }
+        }
     }
 }

@@ -101,10 +101,16 @@ typedef struct ButtonState {
     int img, sx, sy;
 } ButtonState;
 
+typedef struct ButtonTip {
+    bool on;
+    int layer, x, y, w, h, img, sx, sy;
+} ButtonTip;
+
 typedef struct Button {
     bool made, shown, enabled;
     int layer, x, y, w, h;
     ButtonState state[4];
+    ButtonTip tip;
     int label;
     bool bound, call;
     Script *sc;
@@ -228,6 +234,9 @@ struct IK {
     int cancelLabel;
     bool cancelBound, cancelCall;
     Script *cancelSc;
+    bool *savedEnabled[4];
+    int keyButton[256];
+    int skipMode, autoMode;
     u8 *flags;
     int flagCount;
     Font fonts[IK_FONTS];
@@ -260,6 +269,7 @@ void image_blit(Image *dst, const Image *src, int sx, int sy, int w, int h, int 
 Image *layer_surface(IK *t, Layer *l);
 void layer_restore(IK *t, Layer *l, int x, int y, int w, int h);
 void gfx_blit(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0);
+void layer_move(IK *t, Layer *l, int ms, int x, int y);
 void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0, u32 minAlpha);
 int button_at(IK *t, int x, int y);
 void buttons_input(IK *t);
