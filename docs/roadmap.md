@@ -118,7 +118,6 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- SystemAoi (Next, item 1), started 2026-11-18 on branch `feat/systemaoi`: the content check and survey of the three Bunny Black games come first.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
@@ -131,10 +130,9 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 
 ## Next
 Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the two that reuse an engine VNDegen has came first and shipped, the Enigma Virtual Box unpacker for packed RPG Maker MV and MZ games in 0.44.0 and Construct in 0.45.0. The rest follow by number of games. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
-1. SystemAoi (3 games).
-2. Smile Game Builder (3 games), whose player is .NET.
-3. Ikura GDL (2 games) and IPAC (2 games).
-4. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
+1. Smile Game Builder (3 games), whose player is .NET.
+2. Ikura GDL (2 games) and IPAC (2 games).
+3. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
 
 ## Set aside
 - Save sync through the cloud services that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, set aside by the maintainer on 2026-11-16. A plan was written first: Google's and Microsoft's terms don't allow shipping rclone's own client IDs, so OneDrive and Dropbox would need VNDegen's own app registrations and Google Drive and Box each user's own client ID. Nothing was built.
@@ -159,6 +157,7 @@ The items of the 2026-10-25 plan that are done, kept for their decisions and not
 - YU-RIS, on VNDegen's own clean-room runtime. Nine library games play, released from 0.38.0 to 0.41.0, with saves that move to and from a PC. The other six library games weren't tested. [yuris.md](yuris.md) has what runs and the known limits.
 - Visual Novel Maker and Twine, in the web view. Shipped in 0.38.0.
 - SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, released in 0.43.0. siglus_rs's LGPL WMV decoder, its embedded font and its unlicensed DLL ports are left out. [siglus.md](siglus.md) has what runs and the known limits.
+- SystemAoi was taken off the plan on 2026-11-18: its three library games, Bunny Black 1 to 3, were left out after the content check, so it has no test game. A runtime would also need a Direct3D 9 dungeon renderer and WMV movies.
 - Tmr-Hiro ADV System, on VNDegen's own clean-room runtime, with all five library games, released from 0.46.0 to 0.50.0 with saves that move to and from a PC. [tmrhiro.md](tmrhiro.md) has what runs and the known limits.
 - N2System (Nitroplus), on VNDegen's own clean-room runtime, with Hanachirasu, released in 0.42.0 with saves that move to and from a PC. The library's Sonicomi is Nitroplus's later 3D Diesel engine and isn't a target. [n2system.md](n2system.md) has what runs and the known limits.
 

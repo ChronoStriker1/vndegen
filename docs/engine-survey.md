@@ -124,7 +124,7 @@ These have library games but no open-source runtime. Each would need a reimpleme
 | NekoSDK | 16 | 45 GB. Third largest VN group. No runtime or reimplementation found |
 | YU-RIS | 15 | Only tools exist (yuri decompiler, YuRISTools, YPF tools) |
 | Tmr-Hiro ADV System | 5 | None found |
-| SystemAoi | 3 | None found |
+| SystemAoi | 3 | None found. All three games were left out after the content check (2026-11-18), so it has no test game |
 | Smile Game Builder | 3 | .NET player (`SharpKmyCore.dll`). None found |
 | Ikura GDL, IPAC, EAGLS, Bruns, FFD, ExHibit, Eushully AGE, N2System | 1 or 2 each | None found |
 | System-NNN | 1 | The author published source at tinyan/SystemNNN with no license file. It is built on DirectX (`nyanDirectXLib`) |
