@@ -27,6 +27,20 @@ enum {
 
 typedef enum { FORMAT_MPEG, FORMAT_OGG } format_t;
 
+enum { MP3_BUFFER = 16 * 1024 };
+
+typedef struct mp3_state {
+    struct vnvideo *video;
+    uint64_t position;
+    plm_demux_t *demux;
+    drmp3dec decoder;
+    uint8_t bytes[MP3_BUFFER];
+    size_t length;
+    int ended;
+    float pcm[DRMP3_MAX_SAMPLES_PER_FRAME];
+    float stereo[DRMP3_MAX_SAMPLES_PER_FRAME];
+} mp3_state;
+
 typedef struct ogg_state {
     ogg_sync_state sync;
     ogg_stream_state video_stream, audio_stream;
@@ -52,6 +66,7 @@ struct vnvideo {
     vnvideo_info info;
 
     plm_t *plm;
+    mp3_state *mp3;
     ogg_state ogg;
 
     // Decode thread side: time decoded so far in this pass, and the clock offset of earlier passes of a loop.
@@ -117,6 +132,32 @@ static void buffer_seek(plm_buffer_t *buffer, size_t offset, void *user) {
 static size_t buffer_tell(plm_buffer_t *buffer, void *user) {
     (void)buffer;
     return (size_t)((vnvideo *)user)->position;
+}
+
+static void mp3_buffer_load(plm_buffer_t *buffer, void *user) {
+    mp3_state *m = user;
+    vnvideo *v = m->video;
+    if (buffer->discard_read_bytes) plm_buffer_discard_read_bytes(buffer);
+    size_t length = buffer->capacity - buffer->length;
+    if (m->position >= v->size) length = 0;
+    else if (length > v->size - m->position) length = (size_t)(v->size - m->position);
+    int64_t got = length ? v->read(v->user, m->position, buffer->bytes + buffer->length, length) : 0;
+    if (got > 0) {
+        buffer->length += (size_t)got;
+        m->position += (uint64_t)got;
+    } else {
+        buffer->has_ended = 1;
+    }
+}
+
+static void mp3_buffer_seek(plm_buffer_t *buffer, size_t offset, void *user) {
+    (void)buffer;
+    ((mp3_state *)user)->position = offset;
+}
+
+static size_t mp3_buffer_tell(plm_buffer_t *buffer, void *user) {
+    (void)buffer;
+    return (size_t)((mp3_state *)user)->position;
 }
 
 // MARK: Pixels
@@ -217,9 +258,85 @@ static int pad_sound(vnvideo *v) {
 
 // MARK: MPEG-1
 
+static int mp3_fill(mp3_state *m) {
+    while (!m->ended && m->length < MP3_BUFFER / 2) {
+        plm_packet_t *packet = plm_demux_decode(m->demux);
+        if (!packet) {
+            m->ended = 1;
+            break;
+        }
+        if (packet->type != PLM_DEMUX_PACKET_AUDIO_1) continue;
+        size_t take = packet->length < MP3_BUFFER - m->length ? packet->length : MP3_BUFFER - m->length;
+        memcpy(m->bytes + m->length, packet->data, take);
+        m->length += take;
+    }
+    return m->length > 0;
+}
+
+static int mp3_decode(mp3_state *m, drmp3dec_frame_info *info) {
+    for (;;) {
+        mp3_fill(m);
+        if (!m->length) return 0;
+        int samples = drmp3dec_decode_frame(&m->decoder, m->bytes, (int)m->length, m->pcm, info);
+        size_t used = (size_t)info->frame_bytes;
+        if (used > m->length) used = m->length;
+        if (!used && m->ended) {
+            m->length = 0;
+            return 0;
+        }
+        memmove(m->bytes, m->bytes + used, m->length - used);
+        m->length -= used;
+        if (samples > 0) return samples;
+        if (!used) return 0;
+    }
+}
+
+static void mp3_rewind(mp3_state *m) {
+    plm_demux_rewind(m->demux);
+    drmp3dec_init(&m->decoder);
+    m->length = 0;
+    m->ended = 0;
+}
+
+static int mpeg_layer3(vnvideo *v) {
+    mp3_state *m = calloc(1, sizeof *m);
+    if (!m) return 0;
+    m->video = v;
+    plm_buffer_t *buffer = plm_buffer_create_with_callbacks(mp3_buffer_load, mp3_buffer_seek, mp3_buffer_tell, (size_t)v->size, m);
+    m->demux = buffer ? plm_demux_create(buffer, 1) : NULL;
+    if (!m->demux) {
+        free(m);
+        return 0;
+    }
+    drmp3dec_init(&m->decoder);
+    mp3_fill(m);
+    int layer3 = 0;
+    for (size_t i = 0; i + 1 < m->length; i++)
+        if (m->bytes[i] == 0xFF && (m->bytes[i + 1] & 0xE0) == 0xE0) {
+            layer3 = ((m->bytes[i + 1] >> 1) & 3) == 1;
+            break;
+        }
+    drmp3dec_frame_info info;
+    if (!layer3 || mp3_decode(m, &info) <= 0 || info.sample_rate <= 0) {
+        plm_demux_destroy(m->demux);
+        free(m);
+        return 0;
+    }
+    mp3_rewind(m);
+    v->mp3 = m;
+    v->info.audio_rate = info.sample_rate;
+    v->info.audio_channels = 2;
+    return 1;
+}
+
 static int mpeg_open(vnvideo *v) {
     plm_buffer_t *buffer = plm_buffer_create_with_callbacks(buffer_load, buffer_seek, buffer_tell, (size_t)v->size, v);
     v->plm = plm_create_with_buffer(buffer, 1);
+    if (v->plm && plm_get_num_audio_streams(v->plm) > 0 && mpeg_layer3(v)) {
+        plm_set_audio_enabled(v->plm, 0);
+        if (v->plm->audio_decoder) plm_audio_destroy(v->plm->audio_decoder);
+        v->plm->audio_decoder = NULL;
+    }
     // The system header's stream counts. plm_probe, which scans packets instead, misses the video stream behind a
     // callback buffer.
     if (!v->plm || !plm_has_headers(v->plm) || plm_get_num_video_streams(v->plm) == 0) return 0;
@@ -227,12 +344,12 @@ static int mpeg_open(vnvideo *v) {
     v->info.width = plm_get_width(v->plm);
     v->info.height = plm_get_height(v->plm);
     v->info.fps = plm_get_framerate(v->plm);
-    if (plm_get_num_audio_streams(v->plm) > 0) {
+    if (!v->mp3 && plm_get_num_audio_streams(v->plm) > 0) {
         plm_set_audio_enabled(v->plm, 1);
         plm_set_audio_stream(v->plm, 0);
         v->info.audio_rate = plm_get_samplerate(v->plm);
         v->info.audio_channels = 2;
-    } else {
+    } else if (!v->mp3) {
         plm_set_audio_enabled(v->plm, 0);
     }
     return v->info.width > 0 && v->info.height > 0;
@@ -242,6 +359,20 @@ static int mpeg_open(vnvideo *v) {
 static int mpeg_step(vnvideo *v) {
     if (isfinite(v->audio_time) && v->audio_time <= v->video_time) {
         if (v->sound_ended) return pad_sound(v);
+        if (v->mp3) {
+            drmp3dec_frame_info info;
+            int frames = mp3_decode(v->mp3, &info);
+            if (frames > 0) {
+                const float *pcm = v->mp3->pcm;
+                if (info.channels == 1) {
+                    for (int i = 0; i < frames; i++) v->mp3->stereo[i * 2] = v->mp3->stereo[i * 2 + 1] = pcm[i];
+                    pcm = v->mp3->stereo;
+                }
+                return push_audio(v, pcm, (size_t)frames);
+            }
+            v->sound_ended = 1;
+            return 1;
+        }
         plm_samples_t *samples = plm_decode_audio(v->plm);
         if (samples) return push_audio(v, samples->interleaved, samples->count);
         v->sound_ended = 1;
@@ -265,6 +396,7 @@ static int mpeg_step(vnvideo *v) {
 
 static void mpeg_rewind(vnvideo *v) {
     plm_rewind(v->plm);
+    if (v->mp3) mp3_rewind(v->mp3);
 }
 
 // MARK: Ogg Theora and Opus
@@ -511,6 +643,10 @@ static void *decode_thread(void *argument) {
 
 static void destroy(vnvideo *v) {
     if (v->plm) plm_destroy(v->plm);
+    if (v->mp3) {
+        plm_demux_destroy(v->mp3->demux);
+        free(v->mp3);
+    }
     if (v->format == FORMAT_OGG) ogg_close_streams(&v->ogg);
     for (int i = 0; i < FRAME_SLOTS; i++) free(v->slots[i]);
     free(v->current);

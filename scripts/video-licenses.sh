@@ -8,6 +8,7 @@ lib=Engines/Shared/third_party
 out=build/video/licenses
 rm -rf "$out.part" && mkdir -p "$out.part"
 cp "$lib/pl_mpeg/LICENSE.txt" "$out.part/pl_mpeg (movies).txt"
+cp "$lib/dr_mp3/LICENSE.txt" "$out.part/dr_mp3 (movie MP3 sound).txt"
 cp "$lib/ogg/COPYING" "$out.part/libogg 1.3.6 (movies).txt"
 cat "$lib/theora/COPYING" "$lib/theora/LICENSE" > "$out.part/libtheora 1.2.0 (movies).txt"
 cp "$lib/opus/COPYING" "$out.part/libopus 1.5.2 (movie sound).txt"

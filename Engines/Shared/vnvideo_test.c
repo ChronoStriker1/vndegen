@@ -146,6 +146,22 @@ static void builtin(const char *dir) {
           "MPEG-1 with frame rate code 0 plays at 30 fps and ends");
     unlink(rate_zero);
 
+    snprintf(path, sizeof path, "%s/red-tone-mp3.mpg", dir);
+    check(play(path, 0, 10, &r, &info), "MPEG-1 with MP3 opens");
+    check(info.width == 96 && info.height == 64 && fabs(info.fps - 30) < 0.01, "MPEG-1 with MP3 size and rate");
+    check(info.audio_rate == 48000 && info.audio_channels == 2, "MP3 sound format");
+    check(r.frames >= 28 && r.frames <= 30, "MPEG-1 with MP3 frame count");
+    check(near(r.first[0], 192) && near(r.first[1], 32) && near(r.first[2], 64), "MPEG-1 with MP3 colors");
+    check(r.sound > 0.08, "MP3 sound decoded");
+    check(r.ended && r.seconds >= 0.95 && r.seconds < 1.2, "MPEG-1 with MP3 ends with its sound");
+    snprintf(path, sizeof path, "%s/red-tone-mp3-mono.mpg", dir);
+    check(play(path, 0, 10, &r, &info), "MPEG-1 with mono MP3 opens");
+    check(info.audio_rate == 44100 && info.audio_channels == 2, "mono MP3 is played as stereo");
+    check(r.sound > 0.08, "mono MP3 sound decoded");
+    snprintf(path, sizeof path, "%s/red-tone-mp3.mpg", dir);
+    check(play(path, 1, 2.5, &r, &info), "looping MPEG-1 with MP3 opens");
+    check(r.frames >= 60 && r.sound > 0.08, "looping MPEG-1 with MP3 runs on with sound");
+
     snprintf(path, sizeof path, "%s/red-tone.ogv", dir);
     check(play(path, 0, 10, &r, &info), "Theora with Opus opens");
     check(info.width == 96 && info.height == 64 && fabs(info.fps - 30) < 0.01, "Theora size and rate");

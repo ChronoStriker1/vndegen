@@ -141,3 +141,9 @@
 #define PLM_NO_STDIO
 #define PL_MPEG_IMPLEMENTATION
 #include "pl_mpeg/pl_mpeg.h"
+
+#define DR_MP3_IMPLEMENTATION
+#define DR_MP3_FLOAT_OUTPUT
+#define DR_MP3_NO_STDIO
+#define DRMP3_API static
+#include "dr_mp3/dr_mp3.h"
