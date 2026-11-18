@@ -19,6 +19,10 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
     /// Groups picked files into one archive. Picking a single volume also pulls in its sibling volumes when the folder
     /// can be listed, which works on macOS and for files already in the app's container.
     public init(picked urls: [URL]) throws(ArchiveError) {
+        if let cue = urls.first(where: { $0.pathExtension.lowercased() == "cue" }) {
+            try self.init(cue: cue, picked: urls)
+            return
+        }
         if urls.contains(where: { InstallerName($0.lastPathComponent) != nil }) {
             try self.init(installers: urls)
             return
@@ -46,6 +50,26 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
             throw .missingVolume(missing)
         }
         self.init(volumes: order.map { volumes[$0]! }, suggestedFolderName: first.1.stem, installers: [])
+    }
+
+    /// A CD image: the cue sheet followed by the BIN file it names, picked with it or found beside it.
+    private init(cue: URL, picked urls: [URL]) throws(ArchiveError) {
+        guard let sheet = CueSheet.read(cue) else { throw .unreadable("\(cue.lastPathComponent) names no data track VNDegen can read.") }
+        let others = urls.filter { $0 != cue }
+        let named = others.first { $0.lastPathComponent.caseInsensitiveCompare(sheet.binName) == .orderedSame }
+        guard others.count == (named == nil ? 0 : 1) else { throw .severalArchives }
+        var bin = named
+        if bin == nil {
+            let folder = cue.deletingLastPathComponent()
+            let siblings = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+            bin = siblings.first { $0.lastPathComponent.caseInsensitiveCompare(sheet.binName) == .orderedSame }
+        }
+        guard let bin else { throw .missingDiscImage(sheet.binName) }
+        self.init(volumes: [cue, bin], suggestedFolderName: cue.deletingPathExtension().lastPathComponent, installers: [])
+    }
+
+    var cueSheet: CueSheet? {
+        volumes.count == 2 && volumes[0].pathExtension.lowercased() == "cue" ? CueSheet.read(volumes[0]) : nil
     }
 
     private init(volumes: [URL], suggestedFolderName: String, installers: [InstallerVolumes]) {
@@ -210,7 +234,7 @@ nonisolated struct VolumeName: Equatable {
             self.init(fileName, stem: match.1, kind: .rarOldStyle, index: 0)
         } else if let match = fileName.wholeMatch(of: /(.+)\.(zip|7z)\.(\d{3})/.ignoresCase()) {
             self.init(fileName, stem: match.1, kind: .split, index: Int(match.3)!, format: match.2)
-        } else if let match = fileName.wholeMatch(of: /(.+)\.(?:zip|7z|iso)/.ignoresCase()) {
+        } else if let match = fileName.wholeMatch(of: /(.+)\.(?:zip|7z|iso|cue)/.ignoresCase()) {
             self.init(fileName, stem: match.1, kind: .single, index: 0)
         } else {
             return nil
