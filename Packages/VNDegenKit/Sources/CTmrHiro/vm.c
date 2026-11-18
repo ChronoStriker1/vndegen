@@ -41,6 +41,7 @@ void vm_goto(TH *t, const char *scene, const char *label) {
         pc = scene_label(s, label);
         if (pc < 0) {
             th_log(t, "goto: no label %s in %s", label, s->name);
+            if (s == t->sc) return;
             pc = 0;
         }
     }
