@@ -58,6 +58,7 @@ void vnikura_close(VNIkura *n) {
 }
 
 static void tick(IK *t) {
+    buttons_input(t);
     gfx_update(t);
     switch (t->wait) {
     case W_TIME:

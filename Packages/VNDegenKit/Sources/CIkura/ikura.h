@@ -95,6 +95,21 @@ typedef struct Layer {
     Anim fade, move;
 } Layer;
 
+typedef struct ButtonState {
+    int img, sx, sy;
+} ButtonState;
+
+typedef struct Button {
+    bool made, shown, enabled;
+    int layer, x, y, w, h;
+    ButtonState state[4];
+    int label;
+    bool bound;
+} Button;
+
+#define IK_BUTTONS 512
+#define IK_CANCEL 0x7fffffff
+
 typedef struct Frame {
     Script *sc;
     u32 pc;
@@ -133,6 +148,10 @@ struct IK {
     int imageCount;
     Layer *layers;
     int layerCount;
+    Button *buttons;
+    int hover, pressed;
+    int cancelLabel;
+    bool cancelBound;
 
     int mx, my;
     bool lDown, rDown, click, rclick;
@@ -149,5 +168,7 @@ void gfx_close(IK *t);
 void gfx_update(IK *t);
 bool gfx_animating(IK *t);
 void gfx_compose(IK *t);
+int button_at(IK *t, int x, int y);
+void buttons_input(IK *t);
 
 #endif

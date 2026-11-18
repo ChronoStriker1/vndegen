@@ -1,6 +1,8 @@
 #include "ikura.h"
 
 void gfx_init(IK *t) {
+    t->buttons = ik_alloc(sizeof(Button) * IK_BUTTONS);
+    t->hover = t->pressed = -1;
     t->screen = ik_alloc(sizeof(u32) * (size_t)t->W * (size_t)t->H);
     for (int i = 0; i < t->W * t->H; i++) t->screen[i] = 0xff000000u;
 }
@@ -10,6 +12,7 @@ void gfx_close(IK *t) {
     for (int i = 0; i < t->imageCount; i++) image_free(t->images[i]);
     free(t->images);
     free(t->layers);
+    free(t->buttons);
 }
 
 static void step(Anim *a, u32 now, int *out, int n) {
@@ -47,21 +50,22 @@ bool gfx_animating(IK *t) {
     return false;
 }
 
-static void draw_layer(IK *t, const Layer *l) {
-    if (l->img < 0 || l->img >= t->imageCount || !t->images[l->img] || l->argb[0] <= 0) return;
-    const Image *im = t->images[l->img];
-    u32 ca = (u32)clampi(l->argb[0], 0, 255), cr = (u32)clampi(l->argb[1], 0, 255), cg = (u32)clampi(l->argb[2], 0, 255),
-        cb = (u32)clampi(l->argb[3], 0, 255);
-    int w = l->w, h = l->h;
-    if (l->sx + w > im->w) w = im->w - l->sx;
-    if (l->sy + h > im->h) h = im->h - l->sy;
+static const int fullColour[4] = {255, 255, 255, 255};
+
+static void draw_part(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0) {
+    if (img < 0 || img >= t->imageCount || !t->images[img] || argb[0] <= 0) return;
+    const Image *im = t->images[img];
+    u32 ca = (u32)clampi(argb[0], 0, 255), cr = (u32)clampi(argb[1], 0, 255), cg = (u32)clampi(argb[2], 0, 255),
+        cb = (u32)clampi(argb[3], 0, 255);
+    if (sx + w > im->w) w = im->w - sx;
+    if (sy + h > im->h) h = im->h - sy;
     for (int y = 0; y < h; y++) {
-        int dy = l->y + y, syy = l->sy + y;
+        int dy = y0 + y, syy = sy + y;
         if (dy < 0 || dy >= t->H || syy < 0) continue;
         const u32 *srow = im->px + (size_t)syy * im->w;
         u32 *drow = t->screen + (size_t)dy * t->W;
         for (int x = 0; x < w; x++) {
-            int dx = l->x + x, sxx = l->sx + x;
+            int dx = x0 + x, sxx = sx + x;
             if (dx < 0 || dx >= t->W || sxx < 0) continue;
             u32 s = srow[sxx];
             u32 a = (s >> 24) * ca / 255;
@@ -74,9 +78,63 @@ static void draw_layer(IK *t, const Layer *l) {
     }
 }
 
+static int button_state(IK *t, int id, const Button *b) {
+    if (!b->enabled) return 3;
+    if (id == t->pressed && id == t->hover) return 2;
+    if (id == t->hover) return 1;
+    return 0;
+}
+
 void gfx_compose(IK *t) {
     for (int i = 0; i < t->W * t->H; i++) t->screen[i] = 0xff000000u;
-    for (int i = 0; i < t->layerCount; i++)
-        if (t->layers[i].made) draw_layer(t, &t->layers[i]);
+    for (int i = 0; i < t->layerCount; i++) {
+        Layer *l = &t->layers[i];
+        if (!l->made) continue;
+        draw_part(t, l->argb, l->img, l->sx, l->sy, l->w, l->h, l->x, l->y);
+        if (!l->mode) continue;
+        for (int k = 0; k < IK_BUTTONS; k++) {
+            Button *b = &t->buttons[k];
+            if (!b->made || !b->shown || b->layer != i) continue;
+            ButtonState *s = &b->state[button_state(t, k, b)];
+            draw_part(t, fullColour, s->img, s->sx, s->sy, b->w, b->h, l->x + b->x, l->y + b->y);
+        }
+    }
     t->serial++;
+}
+
+int button_at(IK *t, int x, int y) {
+    for (int k = IK_BUTTONS - 1; k >= 0; k--) {
+        Button *b = &t->buttons[k];
+        if (!b->made || !b->shown || b->layer < 0 || b->layer >= t->layerCount) continue;
+        Layer *l = &t->layers[b->layer];
+        if (!l->made || !l->mode) continue;
+        int bx = l->x + b->x, by = l->y + b->y;
+        if (x >= bx && y >= by && x < bx + b->w && y < by + b->h) return k;
+    }
+    return -1;
+}
+
+void buttons_input(IK *t) {
+    int h = button_at(t, t->mx, t->my);
+    if (h != t->hover) {
+        t->hover = h;
+        t->dirty = true;
+    }
+    if (t->lDown && t->pressed < 0 && h >= 0) t->pressed = h;
+    if (!t->lDown && t->pressed >= 0) {
+        t->dirty = true;
+        t->pressed = -1;
+    }
+    if (t->wait != W_INPUT) return;
+    if (t->click && h >= 0 && t->buttons[h].enabled && t->buttons[h].bound) {
+        t->click = false;
+        t->wait = W_NONE;
+        ik_log(t, "button %d chose label %d", h, t->buttons[h].label);
+        t->pc = t->sc->labels[t->buttons[h].label];
+        t->dirty = true;
+    } else if (t->rclick && t->cancelBound) {
+        t->rclick = false;
+        t->wait = W_NONE;
+        t->pc = t->sc->labels[t->cancelLabel];
+    }
 }

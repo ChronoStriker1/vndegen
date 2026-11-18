@@ -109,6 +109,15 @@ static Layer *layer(IK *t, u32 id) {
     return &t->layers[id];
 }
 
+static Button *button(IK *t, u32 id) {
+    id = ik_value(t, id);
+    if (id >= IK_BUTTONS) {
+        ik_log(t, "button %u out of range", id);
+        return NULL;
+    }
+    return &t->buttons[id];
+}
+
 static void load_image(IK *t, int slot, const char *name) {
     if (slot < 0 || slot >= t->imageCount) return;
     image_free(t->images[slot]);
@@ -226,6 +235,46 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             l->move.on = true;
         }
         break;
+    case 0x0701: {
+        Button *b = button(t, rd32(a));
+        if (!b) break;
+        memset(b, 0, sizeof *b);
+        b->made = true;
+        b->layer = (int)ik_value(t, rd32(a + 8));
+        b->x = (int)ik_value(t, rd32(a + 12));
+        b->y = (int)ik_value(t, rd32(a + 16));
+        b->w = (int)ik_value(t, rd32(a + 20));
+        b->h = (int)ik_value(t, rd32(a + 24));
+        b->enabled = true;
+        b->shown = true;
+        break;
+    }
+    case 0x0702: {
+        u32 id = rd32(a);
+        if (id == IK_CANCEL) {
+            t->cancelLabel = rd16(a + 4);
+            t->cancelBound = true;
+            break;
+        }
+        Button *b = button(t, id);
+        if (!b) break;
+        b->label = rd16(a + 4);
+        b->bound = true;
+        break;
+    }
+    case 0x0703: {
+        Button *b = button(t, rd32(a));
+        if (b) b->enabled = ik_value(t, rd32(a + 4)) != 0;
+        break;
+    }
+    case 0x0706: t->wait = W_INPUT; break;
+    case 0x0709: {
+        Button *b = button(t, rd32(a));
+        u32 st = ik_value(t, rd32(a + 4));
+        if (!b || st > 3) break;
+        b->state[st] = (ButtonState){(int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)), (int)ik_value(t, rd32(a + 16))};
+        break;
+    }
     case 0x0400: resize(t, 0, rd16(a)); break;
     case 0x0401: {
         i32 *v = var_at(t, rd32(a));
