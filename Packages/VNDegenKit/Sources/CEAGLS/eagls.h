@@ -185,6 +185,7 @@ typedef struct Thread {
     int frames;
     u32 until;
     int msgOff;
+    bool waited, backYield;
 } Thread;
 
 #define EG_PLANES 32

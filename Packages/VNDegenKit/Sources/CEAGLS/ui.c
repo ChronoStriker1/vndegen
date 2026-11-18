@@ -728,8 +728,19 @@ static void bra_draw(EG *e, u32 *dst) {
     if (u->hover == 60) draw_masked(dst, e->W, e->H, u->bra.hover, u->bra.mask, 60, 0, 0);
 }
 
+static void edit_draw(EG *e, u32 *dst) {
+    int *r = e->editRect;
+    int h = r[3] - r[1];
+    int size = h > 44 ? 40 : h - 4;
+    if (size < 12) size = 12;
+    fill_rect(dst, e->W, e->H, r[0], r[1], r[2] - r[0], h, 0xff000000u);
+    int x = text_draw(e, dst, e->W, e->H, e->editBuf, r[0] + 8, r[1] + (h - size) / 2, size, 0, 0xffffffffu, false);
+    if ((e->now / 500) % 2 == 0) fill_rect(dst, e->W, e->H, x + 1, r[1] + (h - size) / 2, 2, size, 0xffffffffu);
+}
+
 void ui_draw(EG *e, u32 *dst) {
     UI *u = e->ui;
+    if (e->editing) edit_draw(e, dst);
     switch (e->uiMode) {
     case UI_SAVE:
     case UI_LOAD: draw_saveload(e, dst); break;

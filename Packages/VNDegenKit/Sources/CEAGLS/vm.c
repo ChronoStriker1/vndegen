@@ -334,7 +334,17 @@ static void run_thread(EG *e, Thread *t) {
         case I_NOP:
             if (t->pc >= t->sc->count) thread_return(e, t);
             break;
-        case I_JMP: t->pc = in->target; break;
+        case I_JMP:
+            t->pc = in->target;
+            if (in->n == 1) {
+                if (!t->waited) {
+                    t->wait = W_FRAMES;
+                    t->frames = 1;
+                    t->backYield = true;
+                }
+                t->waited = false;
+            }
+            break;
         case I_IF:
             if (!eval(e, in->args, in->argc)) t->pc = in->target;
             break;
@@ -384,6 +394,8 @@ void vm_run(EG *e) {
         if (t->wait != W_NONE) continue;
         e->cur = t;
         run_thread(e, t);
+        if (t->wait != W_NONE && !t->backYield) t->waited = true;
+        t->backYield = false;
         e->cur = NULL;
     }
 }

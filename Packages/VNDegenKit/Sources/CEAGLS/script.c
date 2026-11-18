@@ -262,6 +262,7 @@ static void parse_block_end(Parser *ps) {
     if (b.kind == B_LOOP) {
         Ins *j = emit(ps, I_JMP);
         j->target = b.top;
+        j->n = 1;
         ps->sc->ins[b.ins].target = ps->sc->count;
         for (int i = 0; i < b.breakCount; i++) ps->sc->ins[b.breaks[i]].target = ps->sc->count;
         free(b.breaks);
@@ -318,7 +319,10 @@ static void parse_statement(Parser *ps) {
                 struct Block *lp = innermost_loop(ps);
                 if (lp) {
                     Ins *j = emit(ps, I_JMP);
-                    if (n == 125) j->target = lp->top;
+                    if (n == 125) {
+                        j->target = lp->top;
+                        j->n = 1;
+                    }
                     else {
                         lp->breaks = eg_realloc(lp->breaks, sizeof(int) * (size_t)(lp->breakCount + 1));
                         lp->breaks[lp->breakCount++] = ps->sc->count - 1;
