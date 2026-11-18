@@ -1,0 +1,315 @@
+#include "eagls.h"
+
+#include <pthread.h>
+
+#define DR_WAV_IMPLEMENTATION
+#define DR_WAV_NO_STDIO
+#define DRWAV_API static
+#define DRWAV_PRIVATE static
+#include "third_party/dr_wav.h"
+
+#include "eg_vorbis_names.h"
+#define STB_VORBIS_NO_STDIO
+#define STB_VORBIS_NO_PUSHDATA_API
+#include "third_party/stb_vorbis.c"
+#undef L
+#undef C
+#undef R
+
+typedef struct Voice {
+    FILE *file;
+    u8 *data;
+    drwav wav;
+    bool isWav;
+    stb_vorbis *ogg;
+    int channels, rate;
+    double step, pos;
+    int16_t cur[2], next[2];
+    bool primed, loop, done;
+    float gain, target, delta;
+    bool stopAtZero;
+    int16_t buf[4096];
+    int bufLen, bufPos;
+} Voice;
+
+struct Mixer {
+    int rate;
+    pthread_mutex_t lock;
+    Voice *v[EG_CHANNELS];
+    float chanVol[EG_CHANNELS];
+    Movie *movie;
+    float movieVol;
+};
+
+Mixer *mixer_new(int rate) {
+    Mixer *m = eg_alloc(sizeof *m);
+    m->rate = rate;
+    for (int i = 0; i < EG_CHANNELS; i++) m->chanVol[i] = 1;
+    m->movieVol = 1;
+    pthread_mutex_init(&m->lock, NULL);
+    return m;
+}
+
+static void voice_free(Voice *v) {
+    if (!v) return;
+    if (v->isWav) drwav_uninit(&v->wav);
+    if (v->ogg) stb_vorbis_close(v->ogg);
+    if (v->file) fclose(v->file);
+    free(v->data);
+    free(v);
+}
+
+void mixer_free(Mixer *m) {
+    if (!m) return;
+    for (int i = 0; i < EG_CHANNELS; i++) voice_free(m->v[i]);
+    pthread_mutex_destroy(&m->lock);
+    free(m);
+}
+
+void mixer_set_movie(Mixer *m, Movie *mv, int channel) {
+    (void)channel;
+    pthread_mutex_lock(&m->lock);
+    m->movie = mv;
+    pthread_mutex_unlock(&m->lock);
+}
+
+static bool refill(Voice *v) {
+    v->bufPos = 0;
+    v->bufLen = 0;
+    for (int attempt = 0; attempt < 2; attempt++) {
+        if (v->isWav) {
+            int16_t tmp[4096];
+            drwav_uint64 want = 2048 / (drwav_uint64)(v->channels > 0 ? v->channels : 1);
+            if (want > 2048) want = 2048;
+            drwav_uint64 got = drwav_read_pcm_frames_s16(&v->wav, want, tmp);
+            for (drwav_uint64 i = 0; i < got; i++) {
+                v->buf[i * 2] = tmp[i * (drwav_uint64)v->channels];
+                v->buf[i * 2 + 1] = v->channels > 1 ? tmp[i * (drwav_uint64)v->channels + 1] : tmp[i * (drwav_uint64)v->channels];
+            }
+            v->bufLen = (int)got;
+        } else if (v->ogg) {
+            int got = stb_vorbis_get_samples_short_interleaved(v->ogg, 2, v->buf, 4096);
+            v->bufLen = got;
+        }
+        if (v->bufLen > 0) return true;
+        if (!v->loop) return false;
+        if (v->isWav) drwav_seek_to_pcm_frame(&v->wav, 0);
+        else if (v->ogg) stb_vorbis_seek_start(v->ogg);
+    }
+    return false;
+}
+
+static bool read_frame(Voice *v, int16_t out[2]) {
+    if (v->bufPos >= v->bufLen && !refill(v)) return false;
+    out[0] = v->buf[v->bufPos * 2];
+    out[1] = v->buf[v->bufPos * 2 + 1];
+    v->bufPos++;
+    return true;
+}
+
+void mixer_mix(Mixer *m, float *out, int frames, bool paused) {
+    memset(out, 0, sizeof(float) * (size_t)frames * 2);
+    if (!m || paused) return;
+    pthread_mutex_lock(&m->lock);
+    for (int c = 0; c < EG_CHANNELS; c++) {
+        Voice *v = m->v[c];
+        if (!v || v->done) continue;
+        if (!v->primed) {
+            if (!read_frame(v, v->cur) || !read_frame(v, v->next)) {
+                v->done = true;
+                continue;
+            }
+            v->primed = true;
+        }
+        float vol = m->chanVol[c];
+        for (int i = 0; i < frames; i++) {
+            if (v->gain != v->target) {
+                v->gain += v->delta;
+                if ((v->delta > 0 && v->gain >= v->target) || (v->delta < 0 && v->gain <= v->target) || v->delta == 0) v->gain = v->target;
+                if (v->gain <= 0 && v->stopAtZero) {
+                    v->done = true;
+                    break;
+                }
+            }
+            float f = (float)v->pos, g = v->gain * vol / 32768.0f;
+            out[i * 2] += ((float)v->cur[0] + ((float)v->next[0] - (float)v->cur[0]) * f) * g;
+            out[i * 2 + 1] += ((float)v->cur[1] + ((float)v->next[1] - (float)v->cur[1]) * f) * g;
+            v->pos += v->step;
+            while (v->pos >= 1.0) {
+                v->pos -= 1.0;
+                v->cur[0] = v->next[0];
+                v->cur[1] = v->next[1];
+                if (!read_frame(v, v->next)) {
+                    v->done = true;
+                    break;
+                }
+            }
+            if (v->done) break;
+        }
+    }
+    if (m->movie) movie_mix(m->movie, out, frames, m->movieVol, m->rate);
+    pthread_mutex_unlock(&m->lock);
+    for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
+}
+
+static size_t file_read(void *user, void *buf, size_t n) { return fread(buf, 1, n, (FILE *)user); }
+
+static drwav_bool32 file_seek(void *user, int offset, drwav_seek_origin origin) {
+    int whence = origin == DRWAV_SEEK_SET ? SEEK_SET : origin == DRWAV_SEEK_END ? SEEK_END : SEEK_CUR;
+    return fseek((FILE *)user, offset, whence) == 0;
+}
+
+static drwav_bool32 file_tell(void *user, drwav_int64 *pos) {
+    long p = ftell((FILE *)user);
+    if (p < 0) return DRWAV_FALSE;
+    *pos = p;
+    return DRWAV_TRUE;
+}
+
+static Voice *voice_wav_file(EG *e, const char *path) {
+    char real[2048];
+    if (eg_path_resolve(path, real, sizeof real) < 0) return NULL;
+    Voice *v = eg_alloc(sizeof *v);
+    v->file = fopen(real, "rb");
+    if (!v->file || !drwav_init(&v->wav, file_read, file_seek, file_tell, v->file, NULL)) {
+        eg_log(e, "can't open sound %s", path);
+        if (v->file) fclose(v->file);
+        free(v);
+        return NULL;
+    }
+    v->isWav = true;
+    v->channels = v->wav.channels;
+    v->rate = (int)v->wav.sampleRate;
+    return v;
+}
+
+static Voice *voice_memory(EG *e, u8 *data, size_t size, const char *name) {
+    Voice *v = eg_alloc(sizeof *v);
+    v->data = data;
+    if (size >= 4 && !memcmp(data, "OggS", 4)) {
+        int err = 0;
+        v->ogg = stb_vorbis_open_memory(data, (int)size, &err, NULL);
+        if (!v->ogg) {
+            eg_log(e, "can't decode sound %s", name);
+            voice_free(v);
+            return NULL;
+        }
+        stb_vorbis_info info = stb_vorbis_get_info(v->ogg);
+        v->channels = 2;
+        v->rate = (int)info.sample_rate;
+        return v;
+    }
+    if (!drwav_init_memory(&v->wav, data, size, NULL)) {
+        eg_log(e, "can't decode sound %s", name);
+        voice_free(v);
+        return NULL;
+    }
+    v->isWav = true;
+    v->channels = v->wav.channels;
+    v->rate = (int)v->wav.sampleRate;
+    return v;
+}
+
+static Voice *voice_find(EG *e, const char *name) {
+    char rel[512];
+    if (strchr(name, '\\') || strchr(name, '/')) {
+        snprintf(rel, sizeof rel, "%s", name);
+        for (char *p = rel; *p; p++)
+            if (*p == '\\') *p = '/';
+        static const char *exts[] = {".wav", ".ogg"};
+        for (int i = 0; i < 2; i++) {
+            char path[2048];
+            snprintf(path, sizeof path, "%s/%s%s", e->dataDir, rel, exts[i]);
+            if (!eg_file_exists(path)) continue;
+            if (i == 0) return voice_wav_file(e, path);
+            size_t n;
+            u8 *d = eg_read_file(path, &n);
+            return d ? voice_memory(e, d, n, name) : NULL;
+        }
+        const char *base = strrchr(rel, '/') + 1;
+        name = base;
+    }
+    static const char *exts[] = {".ogg", ".wav", ""};
+    Pak *p = &e->pak[PK_WAVE];
+    for (int pass = 0; pass < 2; pass++)
+        for (int i = 0; i < 3; i++) {
+            char buf[256];
+            if (pass == 0) snprintf(buf, sizeof buf, "%s%s", name, exts[i]);
+            else snprintf(buf, sizeof buf, "haku_%s%s", name, exts[i]);
+            const PakEntry *pe = pak_find(p, buf);
+            if (!pe) continue;
+            size_t n;
+            u8 *d = pak_read(p, pe, &n);
+            return d ? voice_memory(e, d, n, name) : NULL;
+        }
+    return NULL;
+}
+
+static float channel_volume(EG *e, int ch) {
+    int v = ch <= 1 ? e->volBgm : ch == 6 ? e->volVoice : e->volSe;
+    return (float)v / 100.0f * (float)e->volMaster / 100.0f;
+}
+
+void snd_volumes(EG *e) {
+    if (!e->mixer) return;
+    pthread_mutex_lock(&e->mixer->lock);
+    for (int c = 0; c < EG_CHANNELS; c++) e->mixer->chanVol[c] = channel_volume(e, c);
+    e->mixer->movieVol = (float)e->volMaster / 100.0f;
+    pthread_mutex_unlock(&e->mixer->lock);
+}
+
+static void fade_out(EG *e, Voice *v, int ms) {
+    if (!v) return;
+    if (ms <= 0) {
+        v->done = true;
+        return;
+    }
+    v->target = 0;
+    v->stopAtZero = true;
+    v->delta = -v->gain / ((float)ms * (float)e->audioRate / 1000.0f);
+}
+
+void snd_play(EG *e, const char *name, int mode, int ch, int fadeMs) {
+    if (ch < 0 || ch >= EG_CHANNELS || !e->mixer) return;
+    Mixer *m = e->mixer;
+    if (mode == 3 || mode == 4 || !name || !*name || !strcmp(name, "0") || !strcmp(name, "NULL")) {
+        pthread_mutex_lock(&m->lock);
+        if (mode == 4) {
+            for (int c = 0; c <= 1; c++) fade_out(e, m->v[c], fadeMs);
+        } else fade_out(e, m->v[ch], fadeMs);
+        pthread_mutex_unlock(&m->lock);
+        return;
+    }
+    Voice *v = voice_find(e, name);
+    if (!v) {
+        eg_log(e, "missing sound %s", name);
+        return;
+    }
+    v->loop = mode == 1 || mode == 6;
+    v->step = (double)v->rate / (double)e->audioRate;
+    v->gain = fadeMs > 0 ? 0 : 1;
+    v->target = 1;
+    v->delta = fadeMs > 0 ? 1.0f / ((float)fadeMs * (float)e->audioRate / 1000.0f) : 0;
+    pthread_mutex_lock(&m->lock);
+    Voice *old = m->v[ch];
+    m->v[ch] = v;
+    m->chanVol[ch] = channel_volume(e, ch);
+    pthread_mutex_unlock(&m->lock);
+    voice_free(old);
+}
+
+void snd_stop_all(EG *e) {
+    if (!e->mixer) return;
+    pthread_mutex_lock(&e->mixer->lock);
+    for (int c = 0; c < EG_CHANNELS; c++)
+        if (e->mixer->v[c]) e->mixer->v[c]->done = true;
+    pthread_mutex_unlock(&e->mixer->lock);
+}
+
+bool snd_playing(EG *e, int ch) {
+    if (!e->mixer || ch < 0 || ch >= EG_CHANNELS) return false;
+    pthread_mutex_lock(&e->mixer->lock);
+    bool r = e->mixer->v[ch] && !e->mixer->v[ch]->done;
+    pthread_mutex_unlock(&e->mixer->lock);
+    return r;
+}
