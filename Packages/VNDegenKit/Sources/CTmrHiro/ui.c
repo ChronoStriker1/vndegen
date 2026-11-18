@@ -54,6 +54,13 @@ struct UI {
 
 static bool inside(int x, int y, int rx, int ry, int rw, int rh) { return x >= rx && y >= ry && x < rx + rw && y < ry + rh; }
 
+static const char *map_menu(TH *t) { return ini_section(&t->sys, "MAPMENU03") ? "MAPMENU03" : "MAPMENU"; }
+
+static int map_menu_type(TH *t) {
+    if (ini_section(&t->sys, "MAPMENU03")) return ini_int(&t->sys, "MAPMENU03", "MODE_MENU_TYPE01", 1);
+    return ini_int(&t->sys, "MAPMENU", "MODE_MENU_TYPE", 1);
+}
+
 static UI *ui_get(TH *t) {
     if (t->ui) return t->ui;
     UI *u = t->ui = th_alloc(sizeof *u);
@@ -69,7 +76,7 @@ static UI *ui_get(TH *t) {
         if (ini_ints(&t->sys, "MESSAGEWINDOW", key, v, 8) >= 8) u->bars[i] = (BarItem){v[0] != 0, v[1], v[2], v[3], v[4], v[5], v[6], v[7]};
         snprintf(key, sizeof key, "MMB_%s", barKeys[i]);
         int m[7] = {0};
-        if (ini_ints(&t->sys, "MAPMENU", key, m, 7) >= 7) u->mapBars[i] = (BarItem){m[0] != 0, 1, m[1], m[2], m[3], m[4], m[5], m[6]};
+        if (ini_ints(&t->sys, map_menu(t), key, m, 7) >= 7) u->mapBars[i] = (BarItem){m[0] != 0, 1, m[1], m[2], m[3], m[4], m[5], m[6]};
     }
     u->bars[BAR_VOICE].on = false;
     const IniSection *s = ini_section(&t->sys, "SYSTEM");
@@ -239,7 +246,8 @@ static void bar_action(TH *t, int item) {
 static bool bars_allowed(TH *t) {
     if (t->menuBlocked || t->uiMode != UI_NONE) return false;
     if (t->wait == W_TEXT) return !t->winHidden;
-    return t->wait == W_CHOICE || t->wait == W_MAP;
+    if (t->wait == W_MAP) return map_menu_type(t) == 1;
+    return t->wait == W_CHOICE;
 }
 
 static BarItem *bar_item(TH *t, int i) {
@@ -254,7 +262,8 @@ static int bar_type(TH *t, int bar) {
 }
 
 static int bar_height(TH *t, int bar) {
-    if (t->wait == W_MAP) return ini_int(&t->sys, "MAPMENU", "MMB_HEIGHT", 64);
+    if (t->wait == W_MAP)
+        return ini_int(&t->sys, map_menu(t), ini_section(&t->sys, "MAPMENU03") ? "MMB_HEIGHT01" : "MMB_HEIGHT", 64);
     if (bar == 1) return ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_01", ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT", 64));
     return ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_02", 64);
 }

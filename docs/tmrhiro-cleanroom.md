@@ -46,5 +46,9 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   the scene number record on all 1,724 scenes that have one across the five games.
 - Quickening's route map jumps to a label its scene doesn't have; VNDegen carries on at the next record, which only
   builds an empty placeholder button, so the map looks the same either way.
+- The map bar: the 2017 and later builds take it from `[MAPMENU03]`, not `[MAPMENU]`. Welcome to the Mizuryuu kei
+  land's PC engine shows the `[MAPMENU03]` items (no quit button, which only `[MAPMENU]` has), and Quickening's, whose
+  `MODE_MENU_TYPE01` is 2, shows no map bar at all, on its character maps and select maps alike, as with its side bar in
+  the story. VNDegen shows the map bar only for type 1.
 - `c04a_name`, `SEH_V_09_I01_A` to `I03_A` are named by Welcome to the Mizuryuu kei land's scripts but are in none of its
   archives, so the PC engine plays nothing there either.
