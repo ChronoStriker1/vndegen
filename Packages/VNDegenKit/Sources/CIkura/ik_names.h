@@ -27,6 +27,7 @@
 #define msg_close ik_msg_close
 #define msg_draw ik_msg_draw
 #define msg_exec ik_msg_exec
+#define msg_stop_modes ik_msg_stop_modes
 #define msg_tick ik_msg_tick
 #define save_close ik_save_close
 #define save_exec ik_save_exec
