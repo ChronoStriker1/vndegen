@@ -341,10 +341,12 @@ void gfx_compose(TH *t) {
         fill_rect(t->screen, t->W, t->H, 0, 0, t->W, t->H, (t->flashColor & 0xffffff) | (u32)a << 24);
     }
     if (!t->transActive) {
-        msg_draw(t);
-        buttons_draw(t);
-        gallery_draw(t);
-        ui_bar_draw(t);
+        if (t->uiMode == UI_NONE || t->uiMode == UI_CONFIRM) {
+            msg_draw(t);
+            buttons_draw(t);
+            gallery_draw(t);
+            ui_bar_draw(t);
+        }
         ui_draw(t);
     }
     t->serial++;

@@ -590,11 +590,14 @@ static void draw_backlog(TH *t) {
         BacklogEntry *e = &t->backlog[u->backTop + k];
         int ey = y + k * next + (nameDy < 0 ? -nameDy : 0);
         if (e->name) text_draw(t, t->screen, t->W, t->H, e->name, x, ey + nameDy, size, 0xffffffffu, true, -1);
-        int lx = x, ly = ey;
+        int front = ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_FRONT_H", 0), brackets = ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_BRACKETS_H", 1);
+        int right = t->W - ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_DRAW_POS_X", 100);
+        int x0 = e->name ? x : x + front * size, xc = e->name ? x + brackets * size : x0;
+        int lx = x0, ly = ey;
         for (const u8 *p = (const u8 *)e->text; *p;) {
             if (*p == '\n') {
                 p++;
-                lx = x;
+                lx = xc;
                 ly += line;
                 continue;
             }
@@ -603,8 +606,8 @@ static void draw_backlog(TH *t) {
             char ch[3] = {0};
             memcpy(ch, p, (size_t)len);
             int w = text_width(t, ch, size);
-            if (lx + w > t->W - 160) {
-                lx = x;
+            if (lx + w > right) {
+                lx = xc;
                 ly += line;
             }
             lx = text_draw(t, t->screen, t->W, t->H, ch, lx, ly, size, 0xffffffffu, true, -1);
@@ -619,8 +622,8 @@ static void draw_backlog(TH *t) {
     int sp[8] = {0};
     ini_ints(&t->sys, "BACKLOG", "BACKLOG_SCROLL", sp, 8);
     if (sheet && sp[4]) {
-        blit_part(t->screen, t->W, t->H, sheet, 0, 0 + (u->hover == 201 ? sp[5] : 0), sp[4], sp[5], sp[0], sp[1], 255);
-        blit_part(t->screen, t->W, t->H, sheet, sp[4], 0 + (u->hover == 202 ? sp[5] : 0), sp[4], sp[5], sp[0], sp[1] + sp[7], 255);
+        blit_part(t->screen, t->W, t->H, sheet, sp[2], sp[3] + (u->hover == 201 ? sp[5] : 0), sp[4], sp[5], sp[0], sp[1], 255);
+        blit_part(t->screen, t->W, t->H, sheet, sp[2] + sp[4], sp[3] + (u->hover == 202 ? sp[5] : 0), sp[4], sp[5], sp[0], sp[1] + sp[7], 255);
     }
     int sl[8] = {0};
     ini_ints(&t->sys, "BACKLOG", "BACKLOG_SLIDE", sl, 8);
