@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.52.1",
+          "buildVersion": "2770",
+          "date": "2026-11-18T23:05:26Z",
+          "localizedDescription": "A fix for the menu button in games: it can now be moved out of the way.\n\n## Downloads\n\n- `VNDegen-0.52.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.52.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.52.1-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixes\n\n- The small VNDegen menu button in games can be dragged to any corner, so it no longer covers a game's own button there, such as Transpile Girl Rescue Operation!'s gear. A tap still opens the menu. Each game remembers its corner. With VoiceOver, the button's \"Move to next corner\" action moves it (#183).\n\n## What wasn't tested\n\n- No physical device was used. The button was dragged by touch on an iPad simulator with Transpile Girl Rescue Operation!, where the gear then opened the game's options, and the corner came back after the app restarted. On an iPhone simulator, a bottom corner was checked to stay clear of the Home indicator.\n- On the Mac, the button was moved and pressed through the accessibility interface, not dragged with a real mouse. VoiceOver itself wasn't turned on.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.52.1/VNDegen-0.52.1.ipa",
+          "size": 130773572,
+          "sha256": "75f7ff8affe192f5ef609150a8c56703d3ec0aed81add93f8666ac9582e2533c",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.52.0",
           "buildVersion": "2761",
           "date": "2026-11-18T22:08:57Z",
