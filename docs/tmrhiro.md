@@ -11,7 +11,7 @@ games use it.
 | Game | Engine build | Archives | Notes |
 |---|---|---|---|
 | Welcome to the Mizuryuu kei land~ A Naughty theme park with your family! | 2017-06 | `*.pac`, GRD pictures packed with Huffman and LZ77 | English in `srp_2.pac`. Plays through both routes |
-| Kyonyuu Elf Oyako Saimin | 2018-11 | the same | English in `srp_2.pac`. Not yet checked |
+| Kyonyuu Elf Oyako Saimin | 2018-11 | the same | English in `srp_2.pac`. Plays through every route to its ending |
 | Kyonyuu Hitozuma Onna Kyoushi Saimin | 2014-12 | GRD pictures packed with RLE | English in `srp.pac`. Not yet checked |
 | Spooky Pregnant School: The Quickening | 2018-11 | the same as Elf, plus `movie/*.mpg` | English in `srp_3.pac`. MPEG-1 movies with MP3 sound. Not yet checked |
 | Spooky Pregnant School: The Conception | 2016-03 | GRD pictures packed with RLE, in a `DATA` folder | English in `srp_2.pac`. Not yet checked |
@@ -33,9 +33,10 @@ two folders down.
   the body at its own rectangle, as `_charafilemacro` lists.
 - Music is raw 44.1 kHz 16-bit stereo PCM behind a 9-byte header; sound effects and voices are Ogg Vorbis.
 - Scripts: each scene is a list of records, each a size, a 16-bit class and a 16-bit opcode, and a body whose bytes have
-  their nibbles swapped. Class 0x00 is text (`Name,Text,Voice`), 0x10 flow (labels, jumps, calls, conditions, title
+  their nibbles swapped when the scene starts with its scene number record; scenes an English patch adds can be stored
+  plain. Class 0x00 is text (`Name,Text,Voice`), 0x10 flow (labels, jumps, calls, conditions, title
   buttons, choices, the map), 0x20 pictures, 0x30 sound, 0x40 interface and the gallery, 0x50 scene state and
-  variables. `start` is the first scene.
+  variables. `start` is the first scene. `＄α` to `＄ε` in text stand for the names `PLAYER_NAME01` to `05` in `_system`.
 - `srp.pac` also holds `_system` (screen size, the message window, and the position and source rectangle of every part of
   the built-in screens), `_filemacro` and `_charafilemacro` (picture names made of a base and parts), `_var` (the CG and
   scene lists of the gallery) and `_charaview`.
@@ -50,9 +51,10 @@ The PC engine keeps everything in the game folder's `save/`: `savedata.NNN` slot
 `savedataNNN.bmp` thumbnail, and `savedata.000` for settings, read marks and gallery flags. VNDegen reads and writes
 the same files there:
 
-- Slots 001 to 100 are the ten save pages, 101 to 110 the auto saves the engine writes on entering the map, and 999 the
-  quick save. A slot is a fixed layout: the time, the scene title, the call frames (scene, record, scene number), the
-  picture layers and their transforms, and the sound channels, around the engine's default object state. A slot from
+- Slots 001 to 100 are the ten save pages, 101 to 110 the auto saves the engine writes on entering a map or a choice,
+  and 999 the quick save. A slot is a fixed layout: the time, the scene title, the script variables, the call frames
+  (scene, record, scene number), the picture layers and their transforms, and the sound channels, around the engine's
+  default object state. A slot from
   the PC engine under Wine loads in VNDegen, and a slot from VNDegen loads in the PC engine.
 - Read marks (a bit per record in a block per scene) and the gallery's seen CGs and scenes are read from
   `savedata.000` and written back into it in place. When a game has never run on the PC and has no `savedata.000`,
@@ -61,9 +63,11 @@ the same files there:
 ## What runs
 
 - The attention and logo screens, brand and title voices, the title pan and the title buttons.
-- The protagonist map, both routes to their endings and the staff roll, choices, sprites, event CGs, flashes, the
-  ecstasy navigator, eyecatches, music, sound loops and voices.
-- The message window with read text in its own colour, the top and bottom button bars (save, load, system, title, quit,
+- Welcome to the Mizuryuu kei land: the protagonist map, both routes to their endings and the staff roll.
+- Kyonyuu Elf Oyako Saimin: the route maps, each character's route through the endings and the staff roll.
+- Choices, sprites, event CGs, flashes, the ecstasy navigator, eyecatches, music, sound loops and voices.
+- The message window with read text in its own colour, buttons inside it where a game places them there, the top and
+  bottom button bars (save, load, system, title, quit,
   quick save and load, backlog, auto, skip and hide), right click to hide the window, the wheel for the backlog.
 - Save, load, auto save pages, the backlog with voice replay, the system screen's settings that change play (text and
   auto speed, the window's colour, opacity and base, the volumes), confirm dialogs.
@@ -78,6 +82,8 @@ the same files there:
 - The system screen shows the screen mode and resolution settings; they do nothing, since the app sets the window.
 - Transitions are crossfades. The PC engine's mosaic and wipe transitions aren't drawn.
 - The map's slide animations are skipped.
+- Kyonyuu Elf Oyako Saimin's name entry screen isn't shown; the protagonist keeps the name `_system` gives him
+  (Ingwill), as on the PC when the name is left as it is.
 - VNDegen doesn't create `savedata.000` itself. Text and auto speed, the window's opacity and the volumes go into it when
   the PC engine has written one; otherwise they last until the game closes. The system screen's other settings last
   until the game closes either way.
