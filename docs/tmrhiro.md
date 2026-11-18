@@ -13,7 +13,7 @@ games use it.
 | Welcome to the Mizuryuu kei land~ A Naughty theme park with your family! | 2017-06 | `*.pac`, GRD pictures packed with Huffman and LZ77 | English in `srp_2.pac`. Plays through both routes |
 | Kyonyuu Elf Oyako Saimin | 2018-11 | the same | English in `srp_2.pac`. Plays through every route to its ending |
 | Kyonyuu Hitozuma Onna Kyoushi Saimin | 2014-12 | GRD pictures packed with RLE | English in `srp.pac`. Plays through the route select and days to an ending |
-| Spooky Pregnant School: The Quickening | 2018-11 | the same as Elf, plus `movie/*.mpg` | English in `srp_3.pac`. MPEG-1 movies with MP3 sound. Not yet checked |
+| Spooky Pregnant School: The Quickening | 2018-11 | the same as Elf, plus `movie/*.mpg` | English in `srp_3.pac`. MPEG-1 movies with MP3 sound. Plays through the prologue, the route maps and the routes |
 | Spooky Pregnant School: The Conception | 2016-03 | GRD pictures packed with RLE, in a `DATA` folder | English in `srp_2.pac`. Not yet checked |
 
 All five are 1280x720.
@@ -67,12 +67,19 @@ the same files there:
 - Welcome to the Mizuryuu kei land: the protagonist map, both routes to their endings and the staff roll.
 - Kyonyuu Elf Oyako Saimin: the route maps, each character's route through the endings and the staff roll.
 - Kyonyuu Hitozuma Onna Kyoushi Saimin: the route select, the days and an ending through the staff roll.
+- Spooky Pregnant School: The Quickening: the opening choices, the digest of the first game, the prologue, the route
+  maps and the routes, with the game's movies.
+- Movies in the game's `movie` folder (MPEG-1 with MP3 or MP2 sound) through the shared vnvideo decoder. A click skips
+  one, as on the PC.
+- Picture layers over the scene with their move, scale and fade (record 0x006e with a picture that isn't a character),
+  background pans and zooms (0x000c), and the sepia, grey and negative background effects (record 0x0001).
 - Choices, sprites, event CGs, flashes, the ecstasy navigator, eyecatches, music, sound loops and voices.
 - The message window with read text in its own colour, buttons inside it where a game places them there, the top and
-  bottom button bars (save, load, system, title, quit,
+  bottom button bars as each game's `TEXT_BUTTON_TYPE` places them (save, load, system, title, quit,
   quick save and load, backlog, auto, skip and hide), right click to hide the window, the wheel for the backlog.
 - Save, load, auto save pages, the backlog with voice replay, the system screen's settings that change play (text and
-  auto speed, the window's colour, opacity and base, the volumes), confirm dialogs.
+  auto speed, the window's colour, opacity and base, the volumes, and each character's voice on or off and its
+  volume), confirm dialogs.
 - The EXTRA menu: CG gallery, scene replay, music room, and the 100% and 0% switches.
 - Text uses the shared MS Gothic substitute (Ume Gothic), at the fixed cell widths MS Gothic has.
 - Arrow keys and Enter work the title, choices and the map, so a controller does too.
@@ -82,8 +89,7 @@ the same files there:
 - The character viewer in the EXTRA menu does nothing.
 - The mouse wheel opens the backlog. The PC engine's default, rewinding the scene, isn't there.
 - The system screen shows the screen mode and resolution settings; they do nothing, since the app sets the window.
-- Transitions are crossfades. The PC engine's mosaic and wipe transitions aren't drawn, including the wipe kind that
-  background record 0x0001 names.
+- Transitions are crossfades. The PC engine's mosaic and wipe transitions aren't drawn.
 - The map's slide animations are skipped.
 - Name entry isn't shown. In Kyonyuu Elf Oyako Saimin the protagonist keeps the name `_system` gives him (Ingwill).
   Kyonyuu Hitozuma Onna Kyoushi Saimin's PC engine opens a Windows dialog with two name fields at the start; VNDegen
@@ -93,6 +99,9 @@ the same files there:
   starts written over as text). The PC engine skips them without showing anything, and so does VNDegen; the lines and
   pictures they held are missing on both.
 - The H voice loops that name three variants (record 0x0193) play the first one.
-- VNDegen doesn't create `savedata.000` itself. Text and auto speed, the window's opacity and the volumes go into it when
-  the PC engine has written one; otherwise they last until the game closes. The system screen's other settings last
+- Spooky Pregnant School: The Quickening asks at the start whether to read the save data of the first game. The PC
+  engine then opens a Windows folder picker; VNDegen doesn't read the other game's saves and goes
+  on to the game's own question about starting without them.
+- VNDegen doesn't create `savedata.000` itself. Text and auto speed, the window's opacity, the volumes and the
+  characters' voice settings go into it when the PC engine has written one; otherwise they last until the game closes. The system screen's other settings last
   until the game closes either way.

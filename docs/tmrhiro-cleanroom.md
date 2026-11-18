@@ -16,6 +16,9 @@ observable behaviour under Wine. No GPL, LGPL or unlicensed code was read; none 
 | Message window | PC screenshots under Wine: the window band's colour and opacity, the name and text positions, the cell widths and the read text colour. |
 | Slot saves | Saves the PC engine wrote under Wine at different points, compared byte by byte; then VNDegen's saves loaded in the PC engine, and hybrids of the two, to see what the engine needs. The exe was not disassembled; four values in a save were looked up in its data section to learn that they are vtable pointers, which the engine doesn't need back. |
 | `savedata.000` | The PC engine's file before and after reading lines, seeing CGs and entering a scene. |
+| Voice settings per character | `[CHARACTER]` in `_system` read as data, and the PC engine's `savedata.000` diffed before and after changing them on its voice page. |
+| Picture effects and layers | PC screenshots under Wine at the same records, fitted channel by channel: sepia is the grey average plus 40 red and 30 green, negative inverts each channel. |
+| Movies | The shared vnvideo decoder (pl_mpeg and dr_mp3); the movie folder and the skip on click from the PC engine under Wine. |
 
 ## Libraries
 
@@ -38,5 +41,10 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   a damaged one to the record after it.
 - The 2014 slot size and defaults: a PC save from Hitozuma under Wine, diffed against VNDegen's, then VNDegen's loaded
   in the PC engine. Read marks and gallery flags in `savedata.000` sit at the same offsets as in the 2017 build.
+- Scenes stored without their scene number record (Quickening's route scenes, Conception's views) are told apart
+  by their call and jump records, whose first two bytes are 1 to 3 plain or 0x10 to 0x30 swapped. The test agrees with
+  the scene number record on all 1,724 scenes that have one across the five games.
+- Quickening's route map jumps to a label its scene doesn't have; VNDegen carries on at the next record, which only
+  builds an empty placeholder button, so the map looks the same either way.
 - `c04a_name`, `SEH_V_09_I01_A` to `I03_A` are named by Welcome to the Mizuryuu kei land's scripts but are in none of its
   archives, so the PC engine plays nothing there either.
