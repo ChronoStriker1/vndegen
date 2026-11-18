@@ -33,6 +33,7 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
     t->W = 800;
     t->H = 600;
     gfx_init(t);
+    snd_init(t);
     t->msg.layer = -1;
     t->msg.name = -1;
     t->msg.msPerChar = 50;
@@ -49,6 +50,7 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
 void vnikura_close(VNIkura *n) {
     IK *t = (IK *)n;
     if (!t) return;
+    snd_close(t);
     gfx_close(t);
     msg_close(t);
     text_close(t);
@@ -73,6 +75,9 @@ static void tick(IK *t) {
         break;
     case W_ANIM:
         if (!gfx_animating(t)) t->wait = W_NONE;
+        break;
+    case W_VOICE:
+        if (!snd_voice_playing(t) || t->click) t->wait = W_NONE;
         break;
     case W_QUIT: t->quit = true; break;
     default: break;
@@ -142,10 +147,7 @@ void vnikura_key(VNIkura *n, int vk, bool down) {
 
 void vnikura_wheel(VNIkura *n, int notches) { ((IK *)n)->wheel += notches; }
 
-void vnikura_audio(VNIkura *n, float *out, int frames) {
-    (void)n;
-    memset(out, 0, sizeof(float) * (size_t)frames * 2);
-}
+void vnikura_audio(VNIkura *n, float *out, int frames) { snd_mix((IK *)n, out, frames); }
 
 void vnikura_set_paused(VNIkura *n, bool paused) { ((IK *)n)->paused = paused; }
 

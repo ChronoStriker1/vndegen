@@ -112,7 +112,12 @@ static void run_tags(IK *t) {
         }
         case 0x13:
             if (left < 13) goto bad;
-            if (t->trace) ik_log(t, "voice %.12s", (const char *)p + 1);
+            {
+                char name[13];
+                memcpy(name, p + 1, 12);
+                name[12] = 0;
+                snd_voice(t, name);
+            }
             m->tagPos += 13;
             break;
         case 0xff: {
@@ -156,6 +161,7 @@ void msg_tick(IK *t) {
         t->click = false;
         m->cursor = false;
         m->tagPos++;
+        snd_voice_stop(t);
         t->dirty = true;
     }
     run_tags(t);

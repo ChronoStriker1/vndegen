@@ -290,6 +290,15 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         }
         break;
     case 0x000c: break;
+    case 0x0500: break;
+    case 0x0501: snd_se_load(t, (int)ik_value(t, rd32(a)), name_arg(a + 4, n - 4)); break;
+    case 0x0502: snd_se_stop(t, (int)ik_value(t, rd32(a))); break;
+    case 0x0503: snd_se_play(t, (int)ik_value(t, rd32(a)), n >= 8 && ik_value(t, rd32(a + 4)) != 0); break;
+    case 0x0506: snd_voice(t, name_arg(a, n)); break;
+    case 0x0507: snd_voice_stop(t); break;
+    case 0x0508: t->wait = W_VOICE; break;
+    case 0x0600: snd_bgm(t, name_arg(a, n < 12 ? n : 12), n >= 16 && ik_value(t, rd32(a + 12)) != 0); break;
+    case 0x0602: snd_bgm_fade(t, (int)ik_value(t, rd32(a))); break;
     case 0x020b:
         if ((l = layer(t, rd32(a)))) {
             u32 ms = ik_value(t, rd32(a + 4));

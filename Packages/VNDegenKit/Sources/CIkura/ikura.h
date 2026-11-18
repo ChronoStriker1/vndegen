@@ -158,7 +158,17 @@ typedef struct MsgWin {
 
 #define IK_STACK 32
 
-enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_MSG, W_QUIT };
+enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_MSG, W_VOICE, W_QUIT };
+
+#define IK_SLOTS 16
+#define IK_DEFAULT_VOLUME 128
+enum { CH_BGM, CH_VOICE, CH_SE, IK_CHANNELS = CH_SE + IK_SLOTS };
+
+typedef struct Mixer Mixer;
+
+typedef struct SeSlot {
+    char name[16];
+} SeSlot;
 
 struct IK {
     char *gameDir, *saveDir;
@@ -198,6 +208,9 @@ struct IK {
     int flagCount;
     Font fonts[IK_FONTS];
     MsgWin msg;
+    Mixer *mixer;
+    SeSlot slots[IK_SLOTS];
+    char bgmName[16];
 
     int mx, my;
     bool lDown, rDown, click, rclick;
@@ -227,5 +240,17 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n);
 void msg_tick(IK *t);
 void msg_draw(IK *t, int layer);
 void msg_close(IK *t);
+void snd_init(IK *t);
+void snd_close(IK *t);
+void snd_se_load(IK *t, int slot, const char *name);
+void snd_se_play(IK *t, int slot, bool loop);
+void snd_se_stop(IK *t, int slot);
+void snd_voice(IK *t, const char *name);
+void snd_voice_stop(IK *t);
+bool snd_voice_playing(IK *t);
+void snd_bgm(IK *t, const char *name, bool loop);
+void snd_bgm_fade(IK *t, int ms);
+void snd_mix(IK *t, float *out, int frames);
+void snd_volume(IK *t, int ch, int v);
 
 #endif
