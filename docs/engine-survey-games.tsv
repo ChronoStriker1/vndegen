@@ -255,8 +255,8 @@ Life as a Caretaker in Another World ~Putting a Bratty, Busty Elf in Her Place~	
 LIFE IS PARADISE (Deluxe Edition)	rpg-maker-family	RPG Maker VX Ace		Life is Paradise [RJ094661] (E)/Life is Paradise!/Data/Actors.rvdata2	399	archived
 Lifeguard Holic	general-engine	Unity		Lifeguard Holic/Lifeguard Holic_Data/il2cpp_data/	1503	archived; IL2CPP; Naninovel
 Lightning Warrior Raidy	vn-engine	Ikura GDL		VNDB release engine field	824	installed; engine from VNDB release engine field
-Lightning Warrior Raidy II_ Temple of Desire	vn-engine	Ikura GDL		VNDB release engine field	684	archived; engine from VNDB release engine field
-Lightning Warrior Raidy III	unknown	unknown			3960	archived; no known signature; main exe Lightning Warrior Raidy III/Raidy III setup.exe
+Lightning Warrior Raidy II_ Temple of Desire	vn-engine	Ikura GDL		VNDB release engine field	684	archived; engine from VNDB release engine field; left out after the content check (2026-11-18)
+Lightning Warrior Raidy III	vn-engine	Ikura GDL			3960	archived; no known signature; main exe Lightning Warrior Raidy III/Raidy III setup.exe; Ikura GDL by its file list (loose GRP/*.GGP, SNR/*.SNR, ZMZ), inside a Setup Factory installer VNDegen can't unpack (2026-11-18)
 Lilipalace (English Ver.)	vn-engine	NScripter		Lilipalace - RE228152(E)/RE228152 - Lilipalace/nscript.dat	195	archived
 Lilitales	vn-engine	NScripter		Lilitales/00.ns2	591	archived; .ns2 archives, Lua plugin (nslua.dll)
 Lilith in Nightmare!	unknown	unknown			1189	archived; no known signature; main exe éΦéΦé╖éóé±é╚éóé╞é▀éáver1/game.exe
@@ -290,7 +290,7 @@ Mama's Secret Parent Teacher Conference	rpg-maker-family	RPG Maker MV		mamakon/w
 Mamatoto ~a record of war~	vn-engine	AliceSoft System 3	3.9	System39.ain	186	installed
 Mamono Musume no Sodatekata_ Lamia & Harpy	vn-engine	YU-RIS		12 魔物娘の育て方 ～ラミア＆ハーピー～ パッケージ版/11 魔物娘の育て方 ～ラミア＆ハーピー～ パッケージ版/bgm.ypf	955	archived
 Mamono Musume no Yakata Suiseikan Igyouroku_ Ningyo no Sho	vn-engine	YU-RIS		06 魔物娘の館 彗星館異形録～人魚の章～/bgm.ypf	892	archived
-Mamono Musume to no Seikatsu_ Alraune no Baai	vn-engine	IPAC		same series and file layout as the VNDB-confirmed Lamia title	568	archived; engine from same series and file layout as the VNDB-confirmed Lamia title
+Mamono Musume to no Seikatsu_ Alraune no Baai	vn-engine	IPAC		same series and file layout as the VNDB-confirmed Lamia title	568	archived; engine from same series and file layout as the VNDB-confirmed Lamia title; left out after the content check (2026-11-18)
 Mamono Musume to no Seikatsu_ Lamia no Baai	vn-engine	IPAC		VNDB release engine field	394	archived; engine from VNDB release engine field
 Mamono Musume-tachi to no Rakuen_ Kumo to Tori to Hitotsume to	vn-engine	YU-RIS		04 魔物娘たちとの楽園～蜘蛛と鳥と◎（ひとつめ）と～/bgm.ypf	1706	archived
 Mamono Musume-tachi to no Rakuen_ Slime & Scylla	vn-engine	YU-RIS		03 魔物娘たちとの楽園～スライム&スキュラ～/bgm.ypf	1267	archived

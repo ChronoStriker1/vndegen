@@ -118,7 +118,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Ikura GDL and IPAC (Next, item 1), started 2026-11-18 on branch `feat/ikura-ipac`: the content check and survey of both engines' games come first.
+- Ikura GDL and IPAC (Next, item 1), started 2026-11-18 on branch `feat/ikura-ipac`, each on a clean-room runtime of VNDegen's own. One game of each passed the content check. IPAC comes first, with Mamono Musume to no Seikatsu: Lamia no Baai (Japanese, a pure visual novel), in about 3 to 4 working days. Then Ikura GDL with the English Lightning Warrior Raidy, a dungeon RPG with a 3D grid view, in about 7 to 10 more, with BIN/CUE disc images added to the import.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
