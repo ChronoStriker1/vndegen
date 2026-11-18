@@ -52,7 +52,7 @@ bool gfx_animating(IK *t) {
 
 static const int fullColour[4] = {255, 255, 255, 255};
 
-static void draw_part(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0) {
+void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0, u32 minAlpha) {
     if (img < 0 || img >= t->imageCount || !t->images[img] || argb[0] <= 0) return;
     const Image *im = t->images[img];
     u32 ca = (u32)clampi(argb[0], 0, 255), cr = (u32)clampi(argb[1], 0, 255), cg = (u32)clampi(argb[2], 0, 255),
@@ -68,12 +68,32 @@ static void draw_part(IK *t, const int argb[4], int img, int sx, int sy, int w, 
             int dx = x0 + x, sxx = sx + x;
             if (dx < 0 || dx >= t->W || sxx < 0) continue;
             u32 s = srow[sxx];
+            if ((s >> 24) < minAlpha) continue;
             u32 a = (s >> 24) * ca / 255;
             if (!a) continue;
             u32 r = (s & 0xff) * cr / 255, g = ((s >> 8) & 0xff) * cg / 255, b = ((s >> 16) & 0xff) * cb / 255;
             u32 d = drow[dx], ia = 255 - a;
             drow[dx] = ((r * a + (d & 0xff) * ia) / 255) | (((g * a + ((d >> 8) & 0xff) * ia) / 255) << 8) |
                        (((b * a + ((d >> 16) & 0xff) * ia) / 255) << 16) | 0xff000000u;
+        }
+    }
+}
+
+void gfx_blit(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0) {
+    gfx_blit_min(t, argb, img, sx, sy, w, h, x0, y0, 0);
+}
+
+static void fill(IK *t, const Layer *l) {
+    u32 a = (u32)clampi(l->argb[0], 0, 255);
+    if (!a) return;
+    u32 r = (u32)clampi(l->argb[1], 0, 255), g = (u32)clampi(l->argb[2], 0, 255), b = (u32)clampi(l->argb[3], 0, 255);
+    int x0 = clampi(l->x, 0, t->W), y0 = clampi(l->y, 0, t->H), x1 = clampi(l->x + l->w, 0, t->W), y1 = clampi(l->y + l->h, 0, t->H);
+    for (int y = y0; y < y1; y++) {
+        u32 *row = t->screen + (size_t)y * t->W;
+        for (int x = x0; x < x1; x++) {
+            u32 d = row[x], ia = 255 - a;
+            row[x] = ((r * a + (d & 0xff) * ia) / 255) | (((g * a + ((d >> 8) & 0xff) * ia) / 255) << 8) |
+                     (((b * a + ((d >> 16) & 0xff) * ia) / 255) << 16) | 0xff000000u;
         }
     }
 }
@@ -90,14 +110,17 @@ void gfx_compose(IK *t) {
     for (int i = 0; i < t->layerCount; i++) {
         Layer *l = &t->layers[i];
         if (!l->made) continue;
-        draw_part(t, l->argb, l->img, l->sx, l->sy, l->w, l->h, l->x, l->y);
-        if (!l->mode) continue;
-        for (int k = 0; k < IK_BUTTONS; k++) {
-            Button *b = &t->buttons[k];
-            if (!b->made || !b->shown || b->layer != i) continue;
-            ButtonState *s = &b->state[button_state(t, k, b)];
-            draw_part(t, fullColour, s->img, s->sx, s->sy, b->w, b->h, l->x + b->x, l->y + b->y);
+        if (l->img >= 0) gfx_blit(t, l->argb, l->img, l->sx, l->sy, l->w, l->h, l->x, l->y);
+        else fill(t, l);
+        if (l->mode) {
+            for (int k = 0; k < IK_BUTTONS; k++) {
+                Button *b = &t->buttons[k];
+                if (!b->made || !b->shown || b->layer != i) continue;
+                ButtonState *s = &b->state[button_state(t, k, b)];
+                gfx_blit(t, fullColour, s->img, s->sx, s->sy, b->w, b->h, l->x + b->x, l->y + b->y);
+            }
         }
+        msg_draw(t, i);
     }
     t->serial++;
 }
@@ -125,16 +148,14 @@ void buttons_input(IK *t) {
         t->dirty = true;
         t->pressed = -1;
     }
-    if (t->wait != W_INPUT) return;
+    if (t->wait != W_INPUT && t->wait != W_MSG) return;
     if (t->click && h >= 0 && t->buttons[h].enabled && t->buttons[h].bound) {
+        Button *b = &t->buttons[h];
         t->click = false;
-        t->wait = W_NONE;
-        ik_log(t, "button %d chose label %d", h, t->buttons[h].label);
-        t->pc = t->sc->labels[t->buttons[h].label];
-        t->dirty = true;
+        ik_log(t, "button %d chose label %d", h, b->label);
+        vm_branch(t, b->sc, b->label, b->call);
     } else if (t->rclick && t->cancelBound) {
         t->rclick = false;
-        t->wait = W_NONE;
-        t->pc = t->sc->labels[t->cancelLabel];
+        vm_branch(t, t->cancelSc, t->cancelLabel, t->cancelCall);
     }
 }

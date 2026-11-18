@@ -33,6 +33,9 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
     t->W = 800;
     t->H = 600;
     gfx_init(t);
+    t->msg.layer = -1;
+    t->msg.name = -1;
+    t->msg.msPerChar = 50;
     vm_start(t, "START.SNR");
     if (!t->sc) {
         if (err) snprintf(err, errSize, "%s", t->problem);
@@ -47,6 +50,9 @@ void vnikura_close(VNIkura *n) {
     IK *t = (IK *)n;
     if (!t) return;
     gfx_close(t);
+    msg_close(t);
+    text_close(t);
+    free(t->flags);
     for (int i = 0; i < t->scriptCount; i++) script_free(t->scripts[i]);
     free(t->scripts);
     free(t->vars);
@@ -60,6 +66,7 @@ void vnikura_close(VNIkura *n) {
 static void tick(IK *t) {
     buttons_input(t);
     gfx_update(t);
+    msg_tick(t);
     switch (t->wait) {
     case W_TIME:
         if ((i32)(t->now - t->waitUntil) >= 0) t->wait = W_NONE;

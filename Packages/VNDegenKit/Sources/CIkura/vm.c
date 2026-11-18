@@ -7,7 +7,7 @@ u32 ik_value(IK *t, u32 raw) {
         u32 i = raw & 0x7fffffffu;
         return i < (u32)t->varCount ? (u32)t->vars[i] : 0;
     }
-    return raw;
+    return raw & 0x40000000u ? raw | 0x80000000u : raw;
 }
 
 static i32 *var_at(IK *t, u32 i) { return i < (u32)t->varCount ? &t->vars[i] : NULL; }
@@ -37,7 +37,7 @@ static void push(IK *t) {
         ik_log(t, "call stack full");
         return;
     }
-    t->stack[t->sp++] = (Frame){t->sc, t->pc};
+    t->stack[t->sp++] = (Frame){t->sc, t->pc, t->wait == W_MSG};
 }
 
 static void pop(IK *t) {
@@ -49,6 +49,25 @@ static void pop(IK *t) {
     Frame f = t->stack[--t->sp];
     t->sc = f.sc;
     t->pc = f.pc;
+    if (f.resumeMsg && t->msg.tags) t->wait = W_MSG;
+}
+
+void vm_branch(IK *t, Script *sc, int label, bool call) {
+    if (!sc) return;
+    if (call) push(t);
+    else t->msg.tags = NULL;
+    t->sc = sc;
+    t->wait = W_NONE;
+    goto_label(t, (u32)label);
+    t->dirty = true;
+}
+
+static bool flag(IK *t, u32 i) { return i < (u32)t->flagCount * 8 && (t->flags[i >> 3] >> (i & 7) & 1); }
+
+static void set_flag(IK *t, u32 i, bool on) {
+    if (i >= (u32)t->flagCount * 8) return;
+    if (on) t->flags[i >> 3] |= (u8)(1 << (i & 7));
+    else t->flags[i >> 3] &= (u8)~(1 << (i & 7));
 }
 
 static i32 apply(int op, i32 acc, i32 v) {
@@ -151,12 +170,23 @@ static void resize(IK *t, int which, int n) {
     }
 }
 
+static const char *name_arg(const u8 *a, int n) {
+    static char buf[64];
+    int k = 0;
+    while (k < n && k < 63 && a[k]) {
+        buf[k] = (char)a[k];
+        k++;
+    }
+    buf[k] = 0;
+    return buf;
+}
+
 static void exec(IK *t, u16 op, const u8 *a, int n) {
     Layer *l;
     switch (op) {
     case 0x0000: t->wait = W_QUIT; break;
-    case 0x0001: vm_start(t, (const char *)a); break;
-    case 0x0002: push(t); vm_start(t, (const char *)a); break;
+    case 0x0001: vm_start(t, name_arg(a, n)); break;
+    case 0x0002: push(t); vm_start(t, name_arg(a, n)); break;
     case 0x0003: pop(t); break;
     case 0x0004: goto_label(t, rd16(a)); break;
     case 0x0005: push(t); goto_label(t, rd16(a)); break;
@@ -173,7 +203,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         t->waitUntil = t->now + ik_value(t, rd32(a));
         break;
     case 0x0100: resize(t, 1, rd16(a)); break;
-    case 0x0101: load_image(t, rd16(a), (const char *)a + 2); break;
+    case 0x0101: load_image(t, rd16(a), name_arg(a + 2, n - 2)); break;
     case 0x0102: {
         int s = rd16(a);
         if (s >= 0 && s < t->imageCount) {
@@ -202,6 +232,22 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0205:
         if ((l = layer(t, rd32(a)))) l->mode = (int)ik_value(t, rd32(a + 4));
         break;
+    case 0x0204:
+        if ((l = layer(t, rd32(a))) && n >= 36) {
+            int x0 = 1 << 30, y0 = 1 << 30, x1 = -(1 << 30), y1 = -(1 << 30);
+            for (int k = 0; k < 4; k++) {
+                int x = (int)ik_value(t, rd32(a + 4 + 8 * k)), y = (int)ik_value(t, rd32(a + 8 + 8 * k));
+                if (x < x0) x0 = x;
+                if (y < y0) y0 = y;
+                if (x > x1) x1 = x;
+                if (y > y1) y1 = y;
+            }
+            l->x = x0;
+            l->y = y0;
+            l->w = x1 - x0;
+            l->h = y1 - y0;
+        }
+        break;
     case 0x0206: break;
     case 0x0207:
         if ((l = layer(t, rd32(a)))) {
@@ -211,6 +257,39 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         }
         break;
     case 0x0208: break;
+    case 0x020a:
+        if (n >= 3 && 3 + a[1] + 16 <= n) {
+            char name[64];
+            int len = a[1] < 63 ? a[1] : 63;
+            memcpy(name, a + 3, (size_t)len);
+            name[len] = 0;
+            const u8 *q = a + 3 + a[1];
+            font_set(t, a[0], name, (int)ik_value(t, rd32(q)), (int)ik_value(t, rd32(q + 4)), ik_value(t, rd32(q + 8)) != 0);
+        }
+        break;
+    case 0x0300: {
+        int c = ((int)rd16(a) + 7) / 8;
+        t->flags = ik_realloc(t->flags, (size_t)c + 1);
+        memset(t->flags, 0, (size_t)c + 1);
+        t->flagCount = c;
+        break;
+    }
+    case 0x0301: set_flag(t, ik_value(t, rd32(a)), true); break;
+    case 0x0302: set_flag(t, ik_value(t, rd32(a)), false); break;
+    case 0x0305:
+        for (u32 i = ik_value(t, rd32(a)), e = ik_value(t, rd32(a + 4)); i <= e && i < (u32)t->flagCount * 8; i++) set_flag(t, i, false);
+        break;
+    case 0x0307:
+        if (flag(t, ik_value(t, rd32(a)))) goto_label(t, rd16(a + 4));
+        break;
+    case 0x0405:
+        if (n >= 12) {
+            u32 e = ik_value(t, rd32(a + 4));
+            i32 v = (i32)ik_value(t, rd32(a + 8));
+            for (u32 i = ik_value(t, rd32(a)); i <= e && i < (u32)t->varCount; i++) t->vars[i] = v;
+        }
+        break;
+    case 0x000c: break;
     case 0x020b:
         if ((l = layer(t, rd32(a)))) {
             u32 ms = ik_value(t, rd32(a + 4));
@@ -251,15 +330,20 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     }
     case 0x0702: {
         u32 id = rd32(a);
+        bool call = n >= 10 && rd32(a + 6) != 0;
         if (id == IK_CANCEL) {
             t->cancelLabel = rd16(a + 4);
             t->cancelBound = true;
+            t->cancelCall = call;
+            t->cancelSc = t->sc;
             break;
         }
         Button *b = button(t, id);
         if (!b) break;
         b->label = rd16(a + 4);
         b->bound = true;
+        b->call = call;
+        b->sc = t->sc;
         break;
     }
     case 0x0703: {
@@ -294,6 +378,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0404: expr(t, a, n); break;
     case 0x0407: cond(t, a, n); break;
     default:
+        if ((op >> 8) == 0x09 && msg_exec(t, op, a, n)) break;
         if (t->trace) ik_log(t, "%s:%x op %04x not handled", t->sc->name, t->pc, op);
         break;
     }

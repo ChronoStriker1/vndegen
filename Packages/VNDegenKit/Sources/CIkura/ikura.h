@@ -104,7 +104,8 @@ typedef struct Button {
     int layer, x, y, w, h;
     ButtonState state[4];
     int label;
-    bool bound;
+    bool bound, call;
+    Script *sc;
 } Button;
 
 #define IK_BUTTONS 512
@@ -113,11 +114,51 @@ typedef struct Button {
 typedef struct Frame {
     Script *sc;
     u32 pc;
+    bool resumeMsg;
 } Frame;
+
+typedef struct Glyph Glyph;
+
+typedef struct Font {
+    bool ok;
+    int size, shadow, ascent;
+    float scale;
+    u8 *data;
+    void *info;
+    Glyph *glyphs;
+    int count, cap;
+} Font;
+
+#define IK_FONTS 4
+
+typedef struct MsgChar {
+    u32 cp;
+    int x, y;
+} MsgChar;
+
+typedef struct MsgWin {
+    int layer, x, y, right, bottom, pitch;
+    int nameLayer, nameX, nameY, nameW, nameH, nameImg, nameCount;
+    int nameSrc[32][2];
+    int curLayer, curX, curY, curW, curH, curImg, curFrames;
+    int curSrc[16][2];
+    int font;
+    u32 colour, shadow;
+    bool shown;
+    MsgChar *chars;
+    int count, cap, revealed;
+    int penX, penY;
+    int name;
+    const u8 *tags;
+    int tagLen, tagPos;
+    u32 revealAt, cursorAt;
+    bool cursor;
+    int msPerChar;
+} MsgWin;
 
 #define IK_STACK 32
 
-enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_QUIT };
+enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_MSG, W_QUIT };
 
 struct IK {
     char *gameDir, *saveDir;
@@ -151,7 +192,12 @@ struct IK {
     Button *buttons;
     int hover, pressed;
     int cancelLabel;
-    bool cancelBound;
+    bool cancelBound, cancelCall;
+    Script *cancelSc;
+    u8 *flags;
+    int flagCount;
+    Font fonts[IK_FONTS];
+    MsgWin msg;
 
     int mx, my;
     bool lDown, rDown, click, rclick;
@@ -168,7 +214,18 @@ void gfx_close(IK *t);
 void gfx_update(IK *t);
 bool gfx_animating(IK *t);
 void gfx_compose(IK *t);
+void gfx_blit(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0);
+void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0, u32 minAlpha);
 int button_at(IK *t, int x, int y);
 void buttons_input(IK *t);
+void vm_branch(IK *t, Script *sc, int label, bool call);
+void text_close(IK *t);
+void font_set(IK *t, int slot, const char *name, int size, int shadow, bool bold);
+int text_advance(IK *t, int slot, u32 cp);
+void text_draw(IK *t, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]);
+bool msg_exec(IK *t, u16 op, const u8 *a, int n);
+void msg_tick(IK *t);
+void msg_draw(IK *t, int layer);
+void msg_close(IK *t);
 
 #endif
