@@ -1,5 +1,6 @@
 #include "th.h"
 
+#include <math.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -223,6 +224,23 @@ bool save_slot(TH *t, int slot) {
             wr16(x + 80, (u16)s->img->ch);
         }
     }
+    for (int i = 0; i < t->overlayCount; i++) {
+        Overlay *o = &t->overlay[i];
+        int layer = o->layer + 5;
+        if (layer < 11 || layer >= LAYER_COUNT || !o->img) continue;
+        put_str(d + OFF_LAYERS + LAYER_SIZE * layer, 32, o->name);
+        u8 *x = d + OFF_XFORM + XFORM_SIZE * layer;
+        put_f32(x, (float)o->x1);
+        put_f32(x + 4, (float)o->y1);
+        put_f32(x + 24, o->s1x / 100.0f);
+        put_f32(x + 28, o->s1y / 100.0f);
+        for (int k = 0; k < 6; k++) put_f32(x + 32 + k * 4, 1.0f);
+        wr16(x + 76, (u16)o->img->cw);
+        wr16(x + 80, (u16)o->img->ch);
+        static const int sixteens[] = {84, 86, 96, 98, 102};
+        for (int k = 0; k < 5; k++) wr16(x + sixteens[k], 16);
+        wr16(x + 124, (u16)o->dur);
+    }
     put_str(d + OFF_CHANNELS + 20, 64, t->bgmName);
     if (t->msgVoice[0]) put_str(d + OFF_CHANNELS + CHANNEL_SIZE + 20, 64, t->msgVoice);
     char *path = slot_path(t, slot);
@@ -303,6 +321,19 @@ bool load_slot(TH *t, int slot) {
         get_str(d + OFF_LAYERS + LAYER_SIZE * layer, 32, nm, sizeof nm);
         if (!nm[0]) continue;
         const u8 *x = d + OFF_XFORM + XFORM_SIZE * layer;
+        if (layer >= 11) {
+            Image *im = image_get(t, nm);
+            if (!im || t->overlayCount >= (int)(sizeof t->overlay / sizeof t->overlay[0])) continue;
+            int px = (int)lroundf(get_f32(x)), py = (int)lroundf(get_f32(x + 4));
+            int sx = (int)lroundf(get_f32(x + 24) * 100), sy = (int)lroundf(get_f32(x + 28) * 100);
+            if (sx <= 0) sx = 100;
+            if (sy <= 0) sy = 100;
+            Overlay *o = &t->overlay[t->overlayCount++];
+            u32 dur = rd16(x + 124);
+            *o = (Overlay){layer - 5, im, px, py, px, py, sx, sy, sx, sy, 1000, 1000, t->now - dur, dur, ""};
+            snprintf(o->name, sizeof o->name, "%s", nm);
+            continue;
+        }
         Sprite *s = &t->spr[t->sprCount++];
         snprintf(s->name, sizeof s->name, "%s", nm);
         s->layer = layer;

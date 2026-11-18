@@ -165,6 +165,7 @@ typedef struct Overlay {
     int s0x, s0y, s1x, s1y;
     int a0, a1;
     u32 start, dur;
+    char name[48];
 } Overlay;
 
 typedef struct Button {

@@ -344,7 +344,8 @@ void gfx_set_overlay(TH *t, const u8 *b, const char *name) {
     t->overlayCount++;
     t->overlay[at] = (Overlay){layer, im, (i16)rd16(b + 4), (i16)rd16(b + 6), (i16)rd16(b + 8), (i16)rd16(b + 10),
                                rd16(b + 12), rd16(b + 14), rd16(b + 16), rd16(b + 18), rd16(b + 20), rd16(b + 22),
-                               t->now, rd16(b + 24)};
+                               t->now, rd16(b + 24), ""};
+    snprintf(t->overlay[at].name, sizeof t->overlay[at].name, "%s", name);
     t->sceneDirty = true;
 }
 
