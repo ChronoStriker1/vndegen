@@ -14,7 +14,7 @@ games use it.
 | Kyonyuu Elf Oyako Saimin | 2018-11 | the same | English in `srp_2.pac`. Plays through every route to its ending |
 | Kyonyuu Hitozuma Onna Kyoushi Saimin | 2014-12 | GRD pictures packed with RLE | English in `srp.pac`. Plays through the route select and days to an ending |
 | Spooky Pregnant School: The Quickening | 2018-11 | the same as Elf, plus `movie/*.mpg` | English in `srp_3.pac`. MPEG-1 movies with MP3 sound. Plays through the prologue, the route maps and the routes |
-| Spooky Pregnant School: The Conception | 2016-03 | GRD pictures packed with RLE, in a `DATA` folder | English in `srp_2.pac`. Not yet checked |
+| Spooky Pregnant School: The Conception | 2016-03 | GRD pictures packed with RLE, in a `DATA` folder | English in `srp_2.pac`. Plays from a new game through the three chapters' maps, items and roulettes to the ending |
 
 All five are 1280x720.
 
@@ -93,6 +93,8 @@ the same files there:
 - Kyonyuu Hitozuma Onna Kyoushi Saimin: the route select, the days and an ending through the staff roll.
 - Spooky Pregnant School: The Quickening: the opening choices, the digest of the first game, the prologue, the route
   maps and the routes, with the game's movies.
+- Spooky Pregnant School: The Conception: the prologue, the item tutorial, the chapter maps with the clock, gauge and
+  item and status buttons, the item, status and roulette screens, and the ending.
 - Movies in the game's `movie` folder (MPEG-1 with MP3 or MP2 sound) through the shared vnvideo decoder. A click skips
   one, as on the PC.
 - Picture layers over the scene with their move, scale and fade (record 0x006e with a picture that isn't a character),
@@ -125,9 +127,10 @@ the same files there:
 - Spooky Pregnant School: The Quickening's black route calls a scene, `0526_K2_0040_000`, that none of its archives
   hold, and one voice line, `C04a11020002`, is stored with a trailing space in its name. The PC engine passes the call
   by and plays nothing for that line, and so does VNDegen.
-- Spooky Pregnant School: The Conception names a sound effect, `SE_b01_0206`, that `se.pac` doesn't hold (it stops at
-  0205), and one line of Shin's in `N0_0100_014` names its voice `00300001` without a character prefix. Neither is in
-  the game's archives, so nothing plays there, on the PC either.
+- Spooky Pregnant School: The Conception names sounds its archives don't hold: `SE_b01_0206` (`se.pac` stops at 0205),
+  `SEH_F_18_L01_A2` (the archive has `_A`), `SEH_F_26_H02_A`, `SEH_V_18_Y01_A` to `Y03_A`, `SEH_V_27_X01_A` and
+  `X02_A`, the voices `C06a03430002` and `0003`, and one line of Shin's in `N0_0100_014` whose voice `00300001` has no
+  character prefix. Nothing plays for them.
 - The H voice loops that name three variants (record 0x0193) play the first one.
 - Spooky Pregnant School: The Conception's item tutorial (`N1_0031_011`) repeats its line until stamina reaches 100,
   and the way on is to drink Dr. Eri's stamina drink from the "use items" button over the text, twice. The PC engine
