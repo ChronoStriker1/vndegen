@@ -386,13 +386,16 @@ void gfx_clear_overlay(TH *t, int layer) {
 void gfx_set_overlay(TH *t, const u8 *b, const char *name) {
     int layer = b[2];
     Image *im = image_get(t, name);
-    gfx_clear_overlay(t, layer);
-    if (!im) return;
-    int at = t->overlayCount;
-    while (at > 0 && t->overlay[at - 1].layer > layer) at--;
-    if (t->overlayCount == (int)(sizeof t->overlay / sizeof t->overlay[0])) return;
-    memmove(&t->overlay[at + 1], &t->overlay[at], sizeof(Overlay) * (size_t)(t->overlayCount - at));
-    t->overlayCount++;
+    if (!im) {
+        gfx_clear_overlay(t, layer);
+        return;
+    }
+    int at = 0;
+    while (at < t->overlayCount && t->overlay[at].layer != layer) at++;
+    if (at == t->overlayCount) {
+        if (t->overlayCount == (int)(sizeof t->overlay / sizeof t->overlay[0])) return;
+        t->overlayCount++;
+    }
     t->overlay[at] = (Overlay){layer, im, (i16)rd16(b + 4), (i16)rd16(b + 6), (i16)rd16(b + 8), (i16)rd16(b + 10),
                                rd16(b + 12), rd16(b + 14), rd16(b + 16), rd16(b + 18), rd16(b + 20), rd16(b + 22),
                                t->now, rd16(b + 24), ""};
