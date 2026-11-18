@@ -79,6 +79,8 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   same indexes in the flag bytes at offset 656. The same rule explains a PC quirk: after the status screen the map is
   rebuilt from its first label, which sets var3[0] and var3[1] to 0, so the item and status buttons are gone until the
   next map; VNDegen does the same.
+- Conception's map 09 jumps to `LABEL03_03`, which neither its English nor its Japanese script has. A PC slot edited
+  to reach that jump shows the same map as VNDegen, which carries on at the next record.
 - Overlay order: on Conception's status screen the dark band (layer 4) is set before the five silhouettes (layers 0 to
   3 and 5), and the PC draws all five over it.
 - The roulette: recorded at 30 fps under Wine and the needle's angle measured in each frame. It rests at the top, a
