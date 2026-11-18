@@ -50,5 +50,9 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   land's PC engine shows the `[MAPMENU03]` items (no quit button, which only `[MAPMENU]` has), and Quickening's, whose
   `MODE_MENU_TYPE01` is 2, shows no map bar at all, on its character maps and select maps alike, as with its side bar in
   the story. VNDegen shows the map bar only for type 1.
+- Quickening's missing scene and its voice stored as `C04a11020002 `: a VNDegen save loaded in the PC engine just
+  before each. The PC goes from the scene before the missing call to the map after it without a message, and at the
+  voice line it reads nothing from `vic.pac` (seen with strace on its reads; it reads the voices on the lines either
+  side).
 - `c04a_name`, `SEH_V_09_I01_A` to `I03_A` are named by Welcome to the Mizuryuu kei land's scripts but are in none of its
   archives, so the PC engine plays nothing there either.

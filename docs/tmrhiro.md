@@ -99,8 +99,8 @@ the same files there:
   starts written over as text). The PC engine skips them without showing anything, and so does VNDegen; the lines and
   pictures they held are missing on both.
 - Spooky Pregnant School: The Quickening's black route calls a scene, `0526_K2_0040_000`, that none of its archives
-  hold; VNDegen passes the call by. One voice line, `C04a11020002`, is stored with a trailing space in its name and
-  doesn't play. What the PC engine does at either wasn't checked.
+  hold, and one voice line, `C04a11020002`, is stored with a trailing space in its name. The PC engine passes the call
+  by and plays nothing for that line, and so does VNDegen.
 - The H voice loops that name three variants (record 0x0193) play the first one.
 - Spooky Pregnant School: The Quickening asks at the start whether to read the save data of the first game. The PC
   engine then opens a Windows folder picker; VNDegen doesn't read the other game's saves and goes
