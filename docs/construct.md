@@ -128,9 +128,6 @@ The game was also run on Linux in Playwright's WebKit and Chromium with the same
   exports are detected but would miss the `nw` object their export type expects.
 - Saves don't reach a PC.
 - Wrapper extensions such as Steamworks are unavailable, so Steam achievements and overlays do nothing.
-- VNDegen's menu button sits over most of Transpile Girl's gear button in the top right corner when the touch
-  gamepad is hidden, so a tap opens the game's Options only on the gear's left edge. With the touch gamepad showing,
-  the menu button moves and the gear takes a tap anywhere.
 - Pressing Space or clicking again and again while a scene fades can leave Transpile Girl waiting for its own
   "Transition End" signal, which never comes, so the story stops on that line. Two of the game's waits are left
   pending. The same input does the same in Chromium, the engine of its PC wrapper, so it is the game's. It took

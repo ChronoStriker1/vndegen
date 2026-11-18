@@ -81,22 +81,8 @@ struct PlayerView: View {
             } else if overlayMode?.hasOverlay != true {
                 // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
                 // users get back to the menu.
-                Button(action: menuButton) {
-                    // The same house as the touch controls' Home button, which opens the same menu.
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .frame(width: 42, height: 42)
-                        .background(.ultraThinMaterial, in: .circle)
-                        .overlay { Circle().strokeBorder(.white.opacity(0.25)) }
-                        .opacity(0.8)
-                        .frame(width: 48, height: 48)
-                        .contentShape(.circle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("VNDegen menu")
-                .padding(10)
-                .padding(.trailing, metrics.topClearance(.trailing))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                MenuButton(corner: game?.menuButtonCorner ?? .standard, metrics: metrics, action: menuButton,
+                           move: setMenuButtonCorner)
             }
             if isCovered {
                 // Recreated when the app becomes active, so the Face ID prompt starts in the foreground rather than
@@ -358,6 +344,11 @@ struct PlayerView: View {
         guard let id = game?.id else { return }
         hub.library.update(id) { $0.controlMethod = method }
         if !menu.items(for: method).contains(menu.focus) { menu.focus = .method }
+    }
+
+    private func setMenuButtonCorner(_ corner: MenuButtonCorner) {
+        guard let id = game?.id else { return }
+        hub.library.update(id) { $0.menuButtonCorner = corner }
     }
 
     private func openMapping() {

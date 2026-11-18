@@ -106,13 +106,14 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
     let id = GameID("No Socks RPG")
     let old = try #require(library.game(id))
     #expect(old.isLocked && old.orientation == .portrait)
-    #expect(old.controlMethod == nil && old.buttonMapping == nil)
+    #expect(old.controlMethod == nil && old.buttonMapping == nil && old.menuButtonCorner == nil)
 
     let escape = KeyboardKey(key: "Escape", code: "Escape", keyCode: 27)
     let mapping: [ControlInput: ControlAction] = [.y: .key(escape), .r2: .click(.secondary), .x: .nothing, .a: .button(.cancel)]
     library.update(id) {
         $0.controlMethod = .controller(mouse: .cursor)
         $0.buttonMapping = mapping
+        $0.menuButtonCorner = .bottomLeading
     }
 
     let reopened = LibraryStore(paths: paths, engines: plugins)
@@ -120,6 +121,7 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
     let game = try #require(reopened.game(id))
     #expect(game.controlMethod == .controller(mouse: .cursor))
     #expect(game.buttonMapping == mapping)
+    #expect(game.menuButtonCorner == .bottomLeading)
     #expect(game.isLocked && game.playTime == 60)
 }
 
@@ -131,7 +133,7 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
     try Data("""
     [{"id": "Secret Game", "title": "My Secret Title", "artwork": {"capsule": "capsule-1.png", "banner": "banner-1.png"},
       "isLocked": true, "addedAt": "2026-01-01T00:00:00Z", "lastPlayedAt": "2026-11-01T00:00:00Z", "playTime": 36000,
-      "orientation": "upsideDown", "controlMethod": "telepathy",
+      "orientation": "upsideDown", "controlMethod": "telepathy", "menuButtonCorner": "middle",
       "buttonMapping": {"a": {"nothing": {}}, "b": {"teleport": {}}, "paddle1": {"nothing": {}}},
       "metadata": {"title": "Secret", "developers": ["Studio"], "publishers": [], "genres": [],
                    "refs": [{"source": "mobygames", "id": "1"}, {"source": "vndb", "id": "v2"}]}},
@@ -145,7 +147,7 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
     let secret = try #require(library.game(GameID("Secret Game")))
     #expect(secret.title == "My Secret Title" && secret.isLocked && secret.playTime == 36000)
     #expect(secret.lastPlayedAt != nil && secret.artwork == [.capsule: "capsule-1.png"])
-    #expect(secret.orientation == nil && secret.controlMethod == nil)
+    #expect(secret.orientation == nil && secret.controlMethod == nil && secret.menuButtonCorner == nil)
     #expect(secret.buttonMapping == [.a: .nothing])
     #expect(secret.metadata?.title == "Secret" && secret.metadata?.developers == ["Studio"])
     #expect(secret.metadata?.refs == [ExternalRef(source: .vndb, id: "v2")])
