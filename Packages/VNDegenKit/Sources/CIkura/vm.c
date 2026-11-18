@@ -425,9 +425,20 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x070b: {
         Button *b = button(t, rd32(a));
         if (b) {
-            b->type = 3;
+            if (b->type == 1) b->type = 3;
             b->var = (int)rd32(a + 4);
         }
+        break;
+    }
+    case 0x070e: {
+        Button *b = button(t, rd32(a));
+        if (b) b->max = (int)ik_value(t, rd32(a + 4));
+        break;
+    }
+    case 0x070f: {
+        Button *b = button(t, rd32(a));
+        if (b) b->value = (int)ik_value(t, rd32(a + 4));
+        t->dirty = true;
         break;
     }
     case 0x0710:
@@ -468,9 +479,10 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     }
     case 0x070c: {
         u32 slot = ik_value(t, rd32(a)) & 3;
-        if (!t->savedEnabled[slot]) t->savedEnabled[slot] = ik_alloc(sizeof(bool) * IK_BUTTONS);
+        if (!t->savedEnabled[slot]) t->savedEnabled[slot] = ik_alloc(IK_BUTTONS);
         for (int k = 0; k < IK_BUTTONS; k++) {
-            t->savedEnabled[slot][k] = t->buttons[k].enabled;
+            t->savedEnabled[slot][k] = t->buttons[k].mode;
+            t->buttons[k].mode = 0;
             t->buttons[k].enabled = false;
         }
         break;
@@ -479,7 +491,10 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         u32 slot = ik_value(t, rd32(a)) & 3;
         if (!t->savedEnabled[slot]) break;
         for (int k = 0; k < IK_BUTTONS; k++)
-            if (t->buttons[k].made) t->buttons[k].enabled = t->savedEnabled[slot][k];
+            if (t->buttons[k].made) {
+                t->buttons[k].mode = t->savedEnabled[slot][k];
+                t->buttons[k].enabled = t->buttons[k].mode != 0;
+            }
         break;
     }
     case 0x0912: {
@@ -505,6 +520,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         b->w = (int)ik_value(t, rd32(a + 20));
         b->h = (int)ik_value(t, rd32(a + 24));
         b->enabled = true;
+        b->mode = 1;
         b->shown = true;
         break;
     }
@@ -528,7 +544,10 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     }
     case 0x0703: {
         Button *b = button(t, rd32(a));
-        if (b) b->enabled = ik_value(t, rd32(a + 4)) != 0;
+        if (b) {
+            b->mode = (u8)clampi((int)ik_value(t, rd32(a + 4)), 0, 2);
+            b->enabled = b->mode != 0;
+        }
         break;
     }
     case 0x0706: t->wait = W_INPUT; break;

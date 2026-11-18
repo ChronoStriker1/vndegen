@@ -181,6 +181,7 @@ static void fill(IK *t, const Layer *l) {
 
 static int button_state(IK *t, int id, const Button *b) {
     if (!b->enabled) return 3;
+    if (b->mode == 2) return 2;
     if (id == t->pressed && id == t->hover) return 2;
     if (id == t->hover) return 1;
     return 0;
@@ -210,6 +211,13 @@ void gfx_compose(IK *t) {
             for (int k = 0; k < IK_BUTTONS; k++) {
                 Button *b = &t->buttons[k];
                 if (!b->made || !b->shown || b->layer != i) continue;
+                if (b->type == 4) {
+                    ButtonState *bg = &b->state[b->enabled ? 0 : 3], *fg = &b->state[k == t->hover ? 2 : 1];
+                    gfx_blit(t, fullColour, bg->img, bg->sx, bg->sy, b->w, b->h, l->x + b->x, l->y + b->y);
+                    int fw = b->max > 0 ? b->w * clampi(b->value, 0, b->max) / b->max : 0;
+                    if (b->enabled) gfx_blit(t, fullColour, fg->img, fg->sx, fg->sy, fw, b->h, l->x + b->x, l->y + b->y);
+                    continue;
+                }
                 ButtonState *s = &b->state[button_state(t, k, b)];
                 gfx_blit(t, fullColour, s->img, s->sx, s->sy, b->w, b->h, l->x + b->x, l->y + b->y);
             }
@@ -251,6 +259,11 @@ void buttons_input(IK *t) {
     if (t->click && h >= 0 && t->buttons[h].enabled && t->buttons[h].bound) {
         Button *b = &t->buttons[h];
         t->click = false;
+        if (b->type == 4 && b->w > 0) {
+            Layer *bl = &t->layers[b->layer];
+            b->value = clampi((t->mx - bl->x - b->x) * b->max / b->w, 0, b->max);
+            if (b->var >= 0 && b->var < t->varCount) t->vars[b->var] = b->value;
+        }
         ik_log(t, "button %d chose label %d", h, b->label);
         vm_branch(t, b->sc, b->label, b->call);
     } else if (t->rclick && t->cancelBound) {

@@ -304,7 +304,7 @@ static void put_button(Buf *b, const Button *bt) {
     put32(b, (u32)bt->y);
     put32(b, (u32)(bt->x + bt->w));
     put32(b, (u32)(bt->y + bt->h));
-    put32(b, bt->enabled ? 1 : 0);
+    put32(b, bt->mode);
     putname(b, bt->bound && bt->sc ? bt->sc->name : NULL);
     put32(b, bt->bound ? (u32)bt->label : 0xffffffffu);
     put32(b, bt->call ? 1 : 0);
@@ -316,7 +316,7 @@ static void put_button(Buf *b, const Button *bt) {
         put32(b, (u32)bt->state[k].sy);
     }
     put(b, bt->stateFlag, 4);
-    if (bt->type == 3) put32(b, (u32)bt->var);
+    if (bt->type == 3 || bt->type == 4) put32(b, (u32)bt->var);
 }
 
 static void get_button(IK *t, Rd *r, Button *bt, u32 type) {
@@ -329,7 +329,8 @@ static void get_button(IK *t, Rd *r, Button *bt, u32 type) {
     bt->y = (int)get32(r);
     bt->w = (int)get32(r) - bt->x;
     bt->h = (int)get32(r) - bt->y;
-    bt->enabled = get32(r) != 0;
+    bt->mode = (u8)get32(r);
+    bt->enabled = bt->mode != 0;
     char name[16];
     getname(r, name);
     u32 label = get32(r);
@@ -345,7 +346,7 @@ static void get_button(IK *t, Rd *r, Button *bt, u32 type) {
         memcpy(bt->stateFlag, r->p + r->at, 4);
         r->at += 4;
     } else r->bad = true;
-    bt->var = type == 3 ? (int)get32(r) : -1;
+    bt->var = type == 3 || type == 4 ? (int)get32(r) : -1;
     if (name[0] && label != 0xffffffffu) {
         bt->sc = script_load(t, name);
         bt->label = (int)label;

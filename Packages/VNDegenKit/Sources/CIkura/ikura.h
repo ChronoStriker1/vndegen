@@ -115,7 +115,8 @@ typedef struct Button {
     int type, layer, x, y, w, h;
     ButtonState state[4];
     u8 stateFlag[4];
-    int var;
+    u8 mode;
+    int var, max, value;
     u32 raw[7];
     ButtonTip tip;
     int label;
@@ -262,7 +263,7 @@ struct IK {
     int textCount;
     char (*imageNames)[16];
     SaveFile save;
-    bool *savedEnabled[4];
+    u8 *savedEnabled[4];
     int keyButton[256];
     int skipMode, autoMode;
     u8 *flags;
