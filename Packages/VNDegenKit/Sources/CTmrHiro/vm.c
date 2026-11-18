@@ -396,7 +396,19 @@ static int step(TH *t) {
             return 1;
         case 0x191:
         case 0x196: sound_cmd(t, r, CH_SEHV, PAC_SE, true); return 1;
-        case 0x192: snd_stop(t, CH_SEHV, 0); return 1;
+        case 0x192:
+            for (int c = CH_SEHV; c <= CH_SEHV4; c++) snd_stop(t, c, 0);
+            return 1;
+        case 0x193: {
+            if (r->len < 1 || t->skipMode) return 1;
+            char first[96];
+            snprintf(first, sizeof first, "%.*s", (int)strcspn(s, ","), s);
+            int who = 0;
+            const char *v = strstr(first, "_V_");
+            if (v) who = atoi(v + 3) - 1;
+            snd_play(t, CH_SEHV + clampi(who, 0, 3), PAC_SE, first, true, 0);
+            return 1;
+        }
         case 0x64:
             if (r->len > 0 && !t->skipMode) snd_play(t, CH_SYSVOICE, PAC_VOICE, s, false, 0);
             return 1;

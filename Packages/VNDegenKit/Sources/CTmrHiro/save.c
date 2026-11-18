@@ -5,6 +5,7 @@
 
 enum {
     SLOT_SIZE = 43121,
+    SLOT_SIZE_2014 = 34767,
     OFF_TIME = 0,
     OFF_TITLE = 16,
     TITLE_LEN = 128,
@@ -60,6 +61,24 @@ static char *slot_path(TH *t, int slot) { return th_fmt("%s/savedata.%03d", t->s
 static void put_ones(u8 *d, int off, int count) {
     for (int i = 0; i < count; i++) put_f32(d + off + i * 4, 1.0f);
 }
+
+static void slot_defaults_2014(u8 *d) {
+    static const struct { int off, step, n; } ones[] = {
+        {25374, 128, 4}, {25898, 128, 20}, {29294, 128, 4}, {29818, 128, 1}, {29946, 128, 19},
+    };
+    for (size_t i = 0; i < sizeof ones / sizeof ones[0]; i++)
+        for (int k = 0; k < ones[i].n; k++) put_ones(d, ones[i].off + k * ones[i].step, 8);
+    wr32(d + 34695, 0x14);
+    wr32(d + 34699, 0xffffffffu);
+    wr32(d + 34707, 0xffffffffu);
+    static const u32 order[10] = {4, 3, 2, 1, 0, 5, 6, 7, 8, 9};
+    for (int i = 0; i < 10; i++) wr32(d + 34727 + i * 4, order[i]);
+    static const int chans[6][3] = {{1, 4, -2251}, {1, 1, -501}, {1, 0, -1001}, {1, 0, -1001}, {1, 0, -1001}, {1, 1, -1001}};
+    for (int c = 0; c < 6; c++)
+        for (int k = 0; k < 3; k++) wr32(d + 24262 + c * 212 + k * 4, (u32)chans[c][k]);
+}
+
+static int slot_size(TH *t) { return ini_section(&t->sys, "INHERITSAVE") ? SLOT_SIZE : SLOT_SIZE_2014; }
 
 static void slot_defaults(u8 *d) {
     static const struct { int off, count, step, n; } ones[] = {
@@ -148,8 +167,10 @@ static void write_thumb(TH *t, int slot) {
 
 bool save_slot(TH *t, int slot) {
     if (!t->sc) return false;
+    int size = slot_size(t);
     u8 *d = th_alloc(SLOT_SIZE);
-    slot_defaults(d);
+    if (size == SLOT_SIZE) slot_defaults(d);
+    else slot_defaults_2014(d);
     time_t now = time(NULL);
     struct tm tm;
     localtime_r(&now, &tm);
@@ -205,7 +226,7 @@ bool save_slot(TH *t, int slot) {
     put_str(d + OFF_CHANNELS + 20, 64, t->bgmName);
     if (t->msgVoice[0]) put_str(d + OFF_CHANNELS + CHANNEL_SIZE + 20, 64, t->msgVoice);
     char *path = slot_path(t, slot);
-    bool ok = th_write_file(path, d, SLOT_SIZE);
+    bool ok = th_write_file(path, d, (size_t)size);
     free(path);
     free(d);
     if (ok) write_thumb(t, slot);
@@ -240,7 +261,7 @@ bool load_slot(TH *t, int slot) {
     size_t size;
     u8 *d = th_read_file(path, &size);
     free(path);
-    if (!d || size < SLOT_SIZE) {
+    if (!d || size < SLOT_SIZE_2014) {
         free(d);
         th_log(t, "load %03d: no save", slot);
         return false;

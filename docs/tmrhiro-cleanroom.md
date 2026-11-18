@@ -34,5 +34,9 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   PC engine picks wasn't settled.
 - Slot flags at offset 656: all 1 at a map, some 0 inside scenes, in both games. VNDegen keeps a loaded slot's flags
   and writes all 1 for a new game. The PC engine loads either.
+- Hitozuma's damaged records: stepped through one line at a time under Wine; the PC engine goes from the record before
+  a damaged one to the record after it.
+- The 2014 slot size and defaults: a PC save from Hitozuma under Wine, diffed against VNDegen's, then VNDegen's loaded
+  in the PC engine. Read marks and gallery flags in `savedata.000` sit at the same offsets as in the 2017 build.
 - `c04a_name`, `SEH_V_09_I01_A` to `I03_A` are named by Welcome to the Mizuryuu kei land's scripts but are in none of its
   archives, so the PC engine plays nothing there either.

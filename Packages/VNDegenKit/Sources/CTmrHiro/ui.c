@@ -249,9 +249,11 @@ static BarItem *bar_item(TH *t, int i) {
 bool ui_bar_update(TH *t) {
     UI *u = ui_get(t);
     int shown = 0;
-    int topH = ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_01", 64);
+    int topH = ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_01", ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT", 64));
     int botH = ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_02", 64);
-    bool hasBottom = ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_BUTTON_TYPE_02", 1) != 0;
+    bool hasBottom = false;
+    for (int i = 0; i < BAR_COUNT; i++)
+        if (u->bars[i].on && u->bars[i].bar == 2) hasBottom = true;
     if (bars_allowed(t)) {
         if (t->my < topH) shown = 1;
         else if (hasBottom && t->my >= t->H - botH && t->wait == W_TEXT) shown = 2;

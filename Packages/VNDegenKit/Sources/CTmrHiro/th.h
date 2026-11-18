@@ -133,7 +133,7 @@ Mixer *mixer_new(int rate);
 void mixer_free(Mixer *m);
 void mixer_mix(Mixer *m, float *out, int frames, bool paused);
 
-enum { CH_BGM, CH_SE, CH_SEH1, CH_SEH2, CH_SEH3, CH_SEHV, CH_VOICE, CH_SYSVOICE, CH_COUNT };
+enum { CH_BGM, CH_SE, CH_SEH1, CH_SEH2, CH_SEH3, CH_SEHV, CH_SEHV2, CH_SEHV3, CH_SEHV4, CH_VOICE, CH_SYSVOICE, CH_COUNT };
 enum { VOL_MASTER, VOL_BGM, VOL_SE, VOL_VOICE };
 
 void snd_play(TH *t, int ch, int kind, const char *name, bool loop, int fadeMs);

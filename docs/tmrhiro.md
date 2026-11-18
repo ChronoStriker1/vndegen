@@ -12,7 +12,7 @@ games use it.
 |---|---|---|---|
 | Welcome to the Mizuryuu kei land~ A Naughty theme park with your family! | 2017-06 | `*.pac`, GRD pictures packed with Huffman and LZ77 | English in `srp_2.pac`. Plays through both routes |
 | Kyonyuu Elf Oyako Saimin | 2018-11 | the same | English in `srp_2.pac`. Plays through every route to its ending |
-| Kyonyuu Hitozuma Onna Kyoushi Saimin | 2014-12 | GRD pictures packed with RLE | English in `srp.pac`. Not yet checked |
+| Kyonyuu Hitozuma Onna Kyoushi Saimin | 2014-12 | GRD pictures packed with RLE | English in `srp.pac`. Plays through the route select and days to an ending |
 | Spooky Pregnant School: The Quickening | 2018-11 | the same as Elf, plus `movie/*.mpg` | English in `srp_3.pac`. MPEG-1 movies with MP3 sound. Not yet checked |
 | Spooky Pregnant School: The Conception | 2016-03 | GRD pictures packed with RLE, in a `DATA` folder | English in `srp_2.pac`. Not yet checked |
 
@@ -52,7 +52,8 @@ The PC engine keeps everything in the game folder's `save/`: `savedata.NNN` slot
 the same files there:
 
 - Slots 001 to 100 are the ten save pages, 101 to 110 the auto saves the engine writes on entering a map or a choice,
-  and 999 the quick save. A slot is a fixed layout: the time, the scene title, the script variables, the call frames
+  and 999 the quick save. The 2016 to 2018 engine builds write 43,121-byte slots; the 2014 build (Hitozuma), whose
+  settings have no `[INHERITSAVE]` section, writes the same layout cut off at 34,767 bytes. A slot is a fixed layout: the time, the scene title, the script variables, the call frames
   (scene, record, scene number), the picture layers and their transforms, and the sound channels, around the engine's
   default object state. A slot from
   the PC engine under Wine loads in VNDegen, and a slot from VNDegen loads in the PC engine.
@@ -65,6 +66,7 @@ the same files there:
 - The attention and logo screens, brand and title voices, the title pan and the title buttons.
 - Welcome to the Mizuryuu kei land: the protagonist map, both routes to their endings and the staff roll.
 - Kyonyuu Elf Oyako Saimin: the route maps, each character's route through the endings and the staff roll.
+- Kyonyuu Hitozuma Onna Kyoushi Saimin: the route select, the days and an ending through the staff roll.
 - Choices, sprites, event CGs, flashes, the ecstasy navigator, eyecatches, music, sound loops and voices.
 - The message window with read text in its own colour, buttons inside it where a game places them there, the top and
   bottom button bars (save, load, system, title, quit,
@@ -83,8 +85,14 @@ the same files there:
 - Transitions are crossfades. The PC engine's mosaic and wipe transitions aren't drawn, including the wipe kind that
   background record 0x0001 names.
 - The map's slide animations are skipped.
-- Kyonyuu Elf Oyako Saimin's name entry screen isn't shown; the protagonist keeps the name `_system` gives him
-  (Ingwill), as on the PC when the name is left as it is.
+- Name entry isn't shown. In Kyonyuu Elf Oyako Saimin the protagonist keeps the name `_system` gives him (Ingwill).
+  Kyonyuu Hitozuma Onna Kyoushi Saimin's PC engine opens a Windows dialog with two name fields at the start; VNDegen
+  goes on as if its 決定 button were pressed with the default names. The English text of both games is the same either
+  way, since Hitozuma's patch writes the name (Wataru) into the lines.
+- Kyonyuu Hitozuma Onna Kyoushi Saimin's English patch damaged 86 script records (dialogue, CG changes and sound
+  starts written over as text). The PC engine skips them without showing anything, and so does VNDegen; the lines and
+  pictures they held are missing on both.
+- The H voice loops that name three variants (record 0x0193) play the first one.
 - VNDegen doesn't create `savedata.000` itself. Text and auto speed, the window's opacity and the volumes go into it when
   the PC engine has written one; otherwise they last until the game closes. The system screen's other settings last
   until the game closes either way.

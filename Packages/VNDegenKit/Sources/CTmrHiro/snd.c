@@ -141,7 +141,7 @@ static void install(TH *t, int ch, Voice *v) {
 
 static float channel_volume(TH *t, int ch) {
     int master = t->sysVol[VOL_MASTER];
-    int part = ch == CH_BGM ? t->sysVol[VOL_BGM] : (ch == CH_VOICE || ch == CH_SYSVOICE || ch == CH_SEHV) ? t->sysVol[VOL_VOICE] : t->sysVol[VOL_SE];
+    int part = ch == CH_BGM ? t->sysVol[VOL_BGM] : (ch == CH_VOICE || ch == CH_SYSVOICE || (ch >= CH_SEHV && ch <= CH_SEHV4)) ? t->sysVol[VOL_VOICE] : t->sysVol[VOL_SE];
     return (float)master / 100.0f * (float)part / 100.0f;
 }
 
