@@ -1,5 +1,7 @@
 #include "ikura.h"
 
+#include <math.h>
+
 void gfx_init(IK *t) {
     t->buttons = ik_alloc(sizeof(Button) * IK_BUTTONS);
     t->hover = t->pressed = -1;
@@ -120,6 +122,32 @@ void gfx_blit(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, i
     gfx_blit_min(t, argb, img, sx, sy, w, h, x0, y0, 0);
 }
 
+static void rotated(IK *t, const Layer *l) {
+    if (l->img >= t->imageCount || !t->images[l->img]) return;
+    const Image *im = t->images[l->img];
+    float c = cosf(l->rot), s = sinf(l->rot), hx = (float)l->w / 2, hy = (float)l->h / 2;
+    u32 ca = (u32)clampi(l->argb[0], 0, 255);
+    for (int y = 0; y < l->h; y++) {
+        int dy = l->y + y;
+        if (dy < 0 || dy >= t->H) continue;
+        for (int x = 0; x < l->w; x++) {
+            int dx = l->x + x;
+            if (dx < 0 || dx >= t->W) continue;
+            float ox = (float)x + 0.5f - hx, oy = (float)y + 0.5f - hy;
+            int sx = (int)floorf(ox * c + oy * s + hx), sy = (int)floorf(-ox * s + oy * c + hy);
+            if (sx < 0 || sy < 0 || sx >= l->w || sy >= l->h) continue;
+            sx += l->sx;
+            sy += l->sy;
+            if (sx < 0 || sy < 0 || sx >= im->w || sy >= im->h) continue;
+            u32 p = im->px[(size_t)sy * im->w + sx], a = (p >> 24) * ca / 255;
+            if (!a) continue;
+            u32 *o = &t->screen[(size_t)dy * t->W + dx], d = *o, ia = 255 - a;
+            *o = (((p & 0xff) * a + (d & 0xff) * ia) / 255) | ((((p >> 8) & 0xff) * a + ((d >> 8) & 0xff) * ia) / 255) << 8 |
+                 ((((p >> 16) & 0xff) * a + ((d >> 16) & 0xff) * ia) / 255) << 16 | 0xff000000u;
+        }
+    }
+}
+
 static void fill(IK *t, const Layer *l) {
     u32 a = (u32)clampi(l->argb[0], 0, 255);
     if (!a) return;
@@ -151,11 +179,13 @@ bool buttons_live(const IK *t) { return t->wait == W_INPUT || t->wait == W_MSG; 
 
 void gfx_compose(IK *t) {
     for (int i = 0; i < t->W * t->H; i++) t->screen[i] = 0xff000000u;
+    dun_render(t);
     bool live = buttons_live(t);
     for (int i = 0; i < t->layerCount; i++) {
         Layer *l = &t->layers[i];
         if (!layer_drawn(t, i)) continue;
-        if (l->surf) {
+        if (l->rot != 0 && !l->surf && l->img >= 0) rotated(t, l);
+        else if (l->surf) {
             Image screen = {t->W, t->H, t->screen};
             image_blit(&screen, l->surf, 0, 0, l->w, l->h, l->x, l->y, l->argb, 0, false);
         } else if (l->img >= 0) gfx_blit(t, l->argb, l->img, l->sx, l->sy, l->w, l->h, l->x, l->y);

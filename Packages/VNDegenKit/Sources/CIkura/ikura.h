@@ -93,6 +93,7 @@ typedef struct Layer {
     int argb[4];
     bool shown, ready, fill;
     Image *surf;
+    float rot;
     Anim fade, move;
 } Layer;
 
@@ -167,6 +168,28 @@ enum { CH_BGM, CH_VOICE, CH_SE, IK_CHANNELS = CH_SE + IK_SLOTS };
 
 typedef struct Mixer Mixer;
 
+#define IK_MAX_W 1024
+
+typedef struct Column {
+    float wz, lat2, u, dx, dz;
+    int kind, top, bot;
+} Column;
+
+typedef struct Dungeon {
+    u8 map[81 * 81];
+    bool loaded, on, animating, lutReady;
+    Image *tex[4];
+    int x, y, dir;
+    float fromYaw, toYaw, fromX, fromZ;
+    u32 animStart;
+    int compass, marker, mapX, mapY, cellW, cellH;
+    u16 light[4096];
+    u32 *view;
+    Column cols[IK_MAX_W];
+    bool stale;
+    float viewYaw, viewX, viewZ;
+} Dungeon;
+
 typedef struct SeSlot {
     char name[16];
 } SeSlot;
@@ -213,6 +236,7 @@ struct IK {
     SeSlot slots[IK_SLOTS];
     char bgmName[16];
     u32 rng;
+    Dungeon dun;
 
     int mx, my;
     bool lDown, rDown, click, rclick;
@@ -260,5 +284,9 @@ void snd_bgm(IK *t, const char *name, bool loop);
 void snd_bgm_fade(IK *t, int ms);
 void snd_mix(IK *t, float *out, int frames);
 void snd_volume(IK *t, int ch, int v);
+bool dun_exec(IK *t, u16 op, const u8 *a, int n);
+void dun_render(IK *t);
+void dun_update(IK *t);
+void dun_close(IK *t);
 
 #endif

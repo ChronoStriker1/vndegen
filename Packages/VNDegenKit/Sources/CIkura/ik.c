@@ -38,6 +38,7 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
     t->msg.name = -1;
     t->msg.msPerChar = 50;
     t->rng = (u32)cfg->startTime | 1;
+    t->dun.compass = t->dun.marker = -1;
     vm_start(t, "START.SNR");
     if (!t->sc) {
         if (err) snprintf(err, errSize, "%s", t->problem);
@@ -52,6 +53,7 @@ void vnikura_close(VNIkura *n) {
     IK *t = (IK *)n;
     if (!t) return;
     snd_close(t);
+    dun_close(t);
     gfx_close(t);
     msg_close(t);
     text_close(t);
@@ -69,13 +71,14 @@ void vnikura_close(VNIkura *n) {
 static void tick(IK *t) {
     buttons_input(t);
     gfx_update(t);
+    dun_update(t);
     msg_tick(t);
     switch (t->wait) {
     case W_TIME:
         if ((i32)(t->now - t->waitUntil) >= 0) t->wait = W_NONE;
         break;
     case W_ANIM:
-        if (!gfx_animating(t)) t->wait = W_NONE;
+        if (!gfx_animating(t) && !t->dun.animating) t->wait = W_NONE;
         break;
     case W_VOICE:
         if (!snd_voice_playing(t) || t->click) t->wait = W_NONE;

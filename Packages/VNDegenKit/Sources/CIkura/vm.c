@@ -440,6 +440,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0407: cond(t, a, n); break;
     default:
         if ((op >> 8) == 0x09 && msg_exec(t, op, a, n)) break;
+        if ((op >> 8) == 0x08 && dun_exec(t, op, a, n)) break;
         if (t->trace) ik_log(t, "%s:%x op %04x not handled", t->sc->name, t->pc, op);
         break;
     }
