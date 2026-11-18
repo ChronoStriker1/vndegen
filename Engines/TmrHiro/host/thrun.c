@@ -123,7 +123,13 @@ int main(int argc, char **argv) {
                 if (t->wait == W_CHOICE && t->choiceCount) {
                     int w = ini_int(&t->sys, "SELECT", "SELECT_WIDTH", 800), h = ini_int(&t->sys, "SELECT", "SELECT_HEIGHT", 60);
                     int top = ini_int(&t->sys, "SELECT", "SELECT_POSY", 200), ny = ini_int(&t->sys, "SELECT", "SELECT_NEXT_Y", 8);
-                    int i = x % t->choiceCount, total = t->choiceCount * h + (t->choiceCount - 1) * ny;
+                    char ck[160];
+                    snprintf(ck, sizeof ck, "%s:%d", t->scene, t->pc);
+                    int u = 0;
+                    while (u < usedCount && strcmp(used[u].key, ck)) u++;
+                    if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", ck);
+                    int seen = u < 512 ? used[u].n++ : 0;
+                    int i = (x + seen) % t->choiceCount, total = t->choiceCount * h + (t->choiceCount - 1) * ny;
                     cx = t->W / 2;
                     cy = top - h / 2 - total / 2 + (h + ny) * i + h / 2;
                     (void)w;

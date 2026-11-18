@@ -17,6 +17,7 @@ struct Movie {
     size_t bufCap, have;
     bool started, blanked;
     double opened;
+    int newFrames;
 };
 
 static int64_t read_movie(void *user, uint64_t offset, void *buffer, size_t length) {
@@ -43,6 +44,9 @@ static void movie_free(Movie *m) {
 void movie_stop(TH *t) {
     Movie *m = t->movie;
     if (!m) return;
+    if (m->clock > 0)
+        th_log(t, "movie %s: %d new frames in %.0f ms, %.2f a second, made at %.2f", m->name, m->newFrames, m->clock * 1000,
+               m->newFrames / m->clock, m->info.fps);
     mixer_set_movie(t->mixer, NULL);
     t->movie = NULL;
     movie_free(m);
@@ -150,6 +154,7 @@ bool movie_draw(TH *t) {
         }
         return true;
     }
+    if (changed) m->newFrames++;
     if (m->started && !changed) return true;
     m->started = true;
     int w = m->info.width, h = m->info.height;
