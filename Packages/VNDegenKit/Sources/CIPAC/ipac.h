@@ -253,6 +253,7 @@ struct IP {
     char viewerBase[96];
     int viewerIndex;
     u8 *sys;
+    bool sysDirty;
 
     char ruleName[96];
     int speed;

@@ -131,9 +131,7 @@ int main(int argc, char **argv) {
             for (int j = 0; j < k && alive; j++) {
                 if (t->wait == W_CHOICE) {
                     int pick = preferUsed < preferCount ? prefer[preferUsed++] : 1;
-                    t->choiceHover = pick - 1;
-                    t->click = true;
-                    alive = run(n, 32);
+                    alive = press(n, 300, 156 + 12 + 28 * (pick - 1) + 14, VNIPAC_MOUSE_LEFT);
                     continue;
                 }
                 alive = press(n, 400, 300, VNIPAC_MOUSE_LEFT) && run(n, x);
@@ -149,6 +147,18 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "var:F%d", &k) == 1) printf("F%d=%d\n", k, ((IP *)n)->vf[k]);
         else if (sscanf(c, "var:W%d", &k) == 1) printf("W%d=%d\n", k, ((IP *)n)->vw[k]);
         else if (!strcmp(c, "state")) print_state((IP *)n);
+        else if (!strcmp(c, "skip")) ((IP *)n)->skipMode = true;
+        else if (sscanf(c, "play:%d", &k) == 1) {
+            IP *t = (IP *)n;
+            for (int j = 0; j < k && alive; j++) {
+                if (t->wait == W_CHOICE) {
+                    int pick = preferUsed < preferCount ? prefer[preferUsed++] : 1;
+                    alive = press(n, 300, 156 + 12 + 28 * (pick - 1) + 14, VNIPAC_MOUSE_LEFT);
+                    continue;
+                }
+                alive = run(n, 16);
+            }
+        }
         else if (!strncmp(c, "shot:", 5)) {
             int w, h;
             const uint32_t *px = vnipac_pixels(n, &w, &h);

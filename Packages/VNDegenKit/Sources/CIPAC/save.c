@@ -320,6 +320,7 @@ void save_system(IP *t) {
     char *p = sys_path(t);
     ip_mkdirs(t->saveDir);
     if (!ip_write_file(p, t->sys, SYS_SIZE)) ip_log(t, "can't write %s", p);
+    else t->sysDirty = false;
     free(p);
 }
 
@@ -334,6 +335,7 @@ void cg_mark(IP *t, const char *name) {
         VListItem *v = &t->vlist[i];
         if (!ip_ieq(v->img, name) || v->page < 1 || v->page > 32 || v->slot < 1 || v->slot > 64) continue;
         t->sys[O_CGSEEN + (v->page - 1) * 8 + (v->slot - 1) / 8] |= (u8)(1 << ((v->slot - 1) % 8));
+        t->sysDirty = true;
     }
 }
 
@@ -345,4 +347,5 @@ bool scene_seen(IP *t, int n) {
 void scene_mark(IP *t, int n) {
     if (!t->sys || n < 1 || n > 64) return;
     t->sys[O_SCENESEEN + (n - 1) / 8] |= (u8)(1 << ((n - 1) % 8));
+    t->sysDirty = true;
 }

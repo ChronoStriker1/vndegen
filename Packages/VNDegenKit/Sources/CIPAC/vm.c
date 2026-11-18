@@ -93,6 +93,7 @@ static void set_var(IP *t, const char *e) {
     case '%': if (b) n %= b; break;
     default: ip_log(t, "unknown SET %s", e); break;
     }
+    if (*v != (n & 0xff) && (l[0] == 'W' || l[0] == 'w')) t->sysDirty = true;
     *v = n & 0xff;
 }
 
@@ -127,6 +128,7 @@ void vm_start(IP *t, const char *script, const char *label) {
 
 static void jump(IP *t, const char *target) {
     t->inGame = strncmp(target, "TITLE", 5) != 0;
+    if (!t->inGame && t->sysDirty) save_system(t);
     char script[128], label[128] = "";
     const char *colon = strchr(target, ':');
     if (colon) {

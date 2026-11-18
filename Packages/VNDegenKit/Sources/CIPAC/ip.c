@@ -114,6 +114,7 @@ VNIPAC *vnipac_open(const VNIPACConfig *cfg, char *err, size_t errSize) {
 void vnipac_close(VNIPAC *n) {
     IP *t = (IP *)n;
     if (!t) return;
+    if (t->sysDirty) save_system(t);
     mixer_free(t->mixer);
     ui_free(t);
     msg_clear(t);
@@ -169,6 +170,7 @@ void game_to_title(IP *t) {
     gfx_apply_now(t);
     t->inGame = false;
     t->wait = W_NONE;
+    if (t->sysDirty) save_system(t);
     vm_start(t, "TITLE", NULL);
 }
 
