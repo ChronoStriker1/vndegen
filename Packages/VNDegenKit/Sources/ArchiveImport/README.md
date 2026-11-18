@@ -51,7 +51,7 @@ The space check and the extraction limits work as for archives, with sizes from 
 
 `GameInstaller` keeps only `{app}` files and GOG Galaxy files, and leaves out `{tmp}`, `{commonappdata}`, `__redist`, the uninstaller, and files whose GOG check names another language or a 32-bit build only. It refuses setups that unpack their data with ISDone or unarc (repacked installers), encrypted setups, Inno Setup 6 and other versions outside 5.x, and executables that aren't Inno Setup. It was compared file for file with innoextract 1.9 on the library's GOG installers: Revenge of the Orcs with its unrated add-on, Forbidden Ward (`-1.bin`), Two Beasts Or Not To Beast! (20,973 files), Sacrifice Villains unrated (`-1.bin` and `-2.bin`, 6.9 GB), and La-Mulana (LZMA2, an older GOG layout).
 
-ISO 9660 images, with Joliet names, are read by the system libarchive like any other archive.
+ISO 9660 images, with Joliet names, are read by the system libarchive like any other archive. A BIN/CUE image goes through the same reader: `CueSheet` reads the cue's first data track (MODE1/2352, MODE2/2352, MODE2/2336 or MODE1/2048), and `CArchive/raw_sectors.c` hands libarchive each sector's 2048 bytes of data through its read, skip and seek callbacks. When a disc's top level holds `autorun.inf`, only setup or autorun programs, and one folder with a program in it, `ArchiveExtractor.gameRoot` takes that folder as the game. `disc.bin` and `disc.cue` in the test fixtures are such a CD, made by `make-fixtures.sh` with `hdiutil`.
 
 ## Games packed into one .exe
 

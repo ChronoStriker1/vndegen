@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-rm -f *.zip *.7z *.7z.0*
+rm -f *.zip *.7z *.7z.0* disc.bin disc.cue
 
 # Text whose exact bytes the tests rebuild: "line 1\n" through "line 20000\n".
 lines() { python3 -c 'import sys; sys.stdout.write("".join(f"line {i}\n" for i in range(1, 20001)))'; }
@@ -53,4 +53,25 @@ mkdir -p "$work/two/folder" && echo b > "$work/two/folder/b.txt"
 mkdir -p "$work/Split Game"
 lines > "$work/Split Game/lines.txt"
 (cd "$work" && 7zz a -t7z -mx=0 -v64k "$OLDPWD/split.7z" "Split Game" >/dev/null)
+# A CD image as BIN/CUE: one MODE1/2352 data track holding an ISO 9660 disc with an installer at its root, the game in
+# its own folder, and an extras folder, as a game shipped on a CD-ROM. Each 2048-byte sector gets a 16-byte sync and
+# header in front and 288 bytes of zeros where the EDC and ECC go.
+mkdir -p "$work/disc/GAME" "$work/disc/EXTRA"
+printf '[autorun]\r\nopen=SETUP.EXE\r\n' > "$work/disc/AUTORUN.INF"
+echo setup > "$work/disc/SETUP.EXE"
+echo game > "$work/disc/GAME/GAME.EXE"
+lines > "$work/lines.txt" && head -c 20000 "$work/lines.txt" > "$work/disc/GAME/lines.txt"
+echo movie > "$work/disc/EXTRA/MOVIE.MPG"
+hdiutil makehybrid -quiet -iso -joliet -o "$work/disc.iso" "$work/disc"
+python3 - "$work/disc.iso" <<'PY'
+import sys
+iso = open(sys.argv[1], "rb").read()
+out = bytearray()
+for n in range(len(iso) // 2048):
+    lba = n + 150
+    msf = bytes(int(str(v), 16) for v in (lba // 4500, lba // 75 % 60, lba % 75))
+    out += b"\x00" + b"\xff" * 10 + b"\x00" + msf + b"\x01" + iso[n * 2048:(n + 1) * 2048] + bytes(288)
+open("disc.bin", "wb").write(out)
+open("disc.cue", "w").write('FILE "disc.bin" BINARY\r\n  TRACK 01 MODE1/2352\r\n    INDEX 01 00:00:00\r\n')
+PY
 ls -l
