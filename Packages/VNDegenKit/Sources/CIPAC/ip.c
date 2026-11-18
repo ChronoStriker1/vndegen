@@ -99,8 +99,8 @@ VNIPAC *vnipac_open(const VNIPACConfig *cfg, char *err, size_t errSize) {
     text_init(t);
     ui_init(t);
     t->mixer = mixer_new(t->audioRate);
-    snd_volumes(t);
     load_system(t);
+    snd_volumes(t);
     vm_start(t, "seenINIT", NULL);
     if (!t->sc) {
         if (err) snprintf(err, errSize, "%s", t->problem);

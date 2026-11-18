@@ -33,4 +33,6 @@ cp "$kit/Sources/CNekoSDK/third_party/LICENSE-stb.txt" "$out.part/stb_image and 
 cp "$kit/Sources/CYuRIS/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (YU-RIS images, text and Ogg).txt"
 cp "$kit/Sources/CN2System/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (N2System images, text and Ogg).txt"
 cp "$kit/Sources/CTmrHiro/third_party/LICENSE-stb.txt" "$out.part/stb_truetype and stb_vorbis (Tmr-Hiro text and Ogg).txt"
+cp "$kit/Sources/CIPAC/third_party/LICENSE-stb.txt" "$out.part/stb_truetype (IPAC text).txt"
+cp "$kit/Sources/CIPAC/third_party/LICENSE-dr_libs.txt" "$out.part/dr_wav (IPAC MS ADPCM sound).txt"
 rm -rf "$out" && mv "$out.part" "$out"

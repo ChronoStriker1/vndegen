@@ -309,14 +309,44 @@ void load_system(IP *t) {
         memcpy(d, head, 8);
         memset(d + 8, 0xff, 16);
         memset(d + 24, 1, 16);
+        d[0x28] = 0x80;
+        d[0x2a] = 1;
+        d[0x2c] = 0x80;
+        d[0x2e] = 180;
     }
     t->sys = d;
     for (int i = 0; i < IP_VARS && O_FLAGS + i < O_CGSEEN; i++) t->vw[i] = d[O_FLAGS + i];
+    t->voiceOn = d[0x01] != 0;
+    t->bgmOn = d[0x02] != 0;
+    t->seOn = d[0x03] != 0;
+    t->volBgm = d[0x05];
+    t->volSe = d[0x06];
+    t->volVoice = d[0x07];
+    t->speedSlider = d[0x28];
+    t->skipUnread = d[0x2a] != 0;
+    t->autoMode = d[0x2b] != 0;
+    t->autoSlider = d[0x2c];
+    t->voiceWait = d[0x2d] != 0;
+    if (d[0x2e]) t->winAlpha = d[0x2e];
+    t->textSpeed = 32 - t->speedSlider * 32 / 255;
 }
 
 void save_system(IP *t) {
     if (!t->sys) load_system(t);
-    for (int i = 0; i < IP_VARS && O_FLAGS + i < O_CGSEEN; i++) t->sys[O_FLAGS + i] = (u8)t->vw[i];
+    u8 *d = t->sys;
+    for (int i = 0; i < IP_VARS && O_FLAGS + i < O_CGSEEN; i++) d[O_FLAGS + i] = (u8)t->vw[i];
+    d[0x01] = t->voiceOn;
+    d[0x02] = t->bgmOn;
+    d[0x03] = t->seOn;
+    d[0x05] = (u8)t->volBgm;
+    d[0x06] = (u8)t->volSe;
+    d[0x07] = (u8)t->volVoice;
+    d[0x28] = (u8)t->speedSlider;
+    d[0x2a] = t->skipUnread;
+    d[0x2b] = t->autoMode ? 0x80 : 0;
+    d[0x2c] = (u8)t->autoSlider;
+    d[0x2d] = t->voiceOn && t->voiceWait;
+    d[0x2e] = (u8)t->winAlpha;
     char *p = sys_path(t);
     ip_mkdirs(t->saveDir);
     if (!ip_write_file(p, t->sys, SYS_SIZE)) ip_log(t, "can't write %s", p);

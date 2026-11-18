@@ -29,6 +29,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [YU-RIS](#yu-ris) | `yscfg.dat` beside `.ypf` archives or a `pac/` folder of them, or a `ysbin.ypf` there, up to two folders down | Mac, iPhone, iPad |
 | [Nitroplus N2System](#nitroplus-n2system) | `system.npa` beside `nss.npa`, up to two folders down | Mac, iPhone, iPad |
 | [Tmr-Hiro ADV System](#tmr-hiro-adv-system) | `srp.pac` beside `Agrd.pac`, up to two folders down | Mac, iPhone, iPad |
+| [IPAC](#ipac) | `DATA/Scr.PAK` beside `DATA/Parts.PAK`, up to one folder down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
@@ -198,6 +199,10 @@ N2System games, such as the English release of Hanachirasu, run on VNDegen's own
 ## Tmr-Hiro ADV System
 
 Tmr-Hiro ADV System games, such as the English release of Welcome to the Mizuryuu kei land, run on VNDegen's own Tmr-Hiro runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed format readers and the original engine run under Wine, MIT licensed like the rest of the app. The engine draws its title buttons, message window, button bars, save, load and system screens, backlog and gallery from parts in the game's own archives, placed by its settings, and the runtime draws them the same way. Saves are the PC engine's own files in the game's `save` folder, so they move between VNDegen and a PC copy of the game. [tmrhiro.md](tmrhiro.md) lists which games run and the known limits, and [tmrhiro-cleanroom.md](tmrhiro-cleanroom.md) where the runtime's knowledge came from.
+
+## IPAC
+
+IPAC games, such as Mamono Musume to no Seikatsu: Lamia no Baai, run on VNDegen's own IPAC runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed format readers and the original engine run under Wine, MIT licensed like the rest of the app. The engine's message window, save and load pages, configuration and backlog are drawn from the sheets in the game's `Parts.PAK`, with the buttons the sheets' colour maps mark, and the title and gallery are the game's own scripts. Saves are the PC engine's own files in `Documents/<brand>/<title>/` under the game's data directory, so they move between VNDegen and a PC copy of the game. [ipac.md](ipac.md) lists which games run and the known limits, and [ipac-cleanroom.md](ipac-cleanroom.md) where the runtime's knowledge came from.
 
 ## Unity
 
