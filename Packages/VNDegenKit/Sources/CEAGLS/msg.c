@@ -2,14 +2,14 @@
 
 typedef struct Cell {
     char ch[3];
-    int x, y, size;
+    int x, y, size, spacing;
     u32 color;
 } Cell;
 
 static Cell *cells;
 static int cellCount, cellCap;
 
-static void add_cell(const u8 *p, int len, int x, int y, int size, u32 color) {
+static void add_cell(const u8 *p, int len, int x, int y, int size, int spacing, u32 color) {
     if (cellCount == cellCap) {
         cellCap = cellCap ? cellCap * 2 : 256;
         cells = eg_realloc(cells, sizeof(Cell) * (size_t)cellCap);
@@ -20,14 +20,17 @@ static void add_cell(const u8 *p, int len, int x, int y, int size, u32 color) {
     c->x = x;
     c->y = y;
     c->size = size;
+    c->spacing = spacing;
     c->color = color;
 }
 
 static const Font *font_at(EG *e, int i) {
-    static const Font def = {16, false, 21, 2};
+    static const Font def = {21, false, 2, 6};
     if (i < 0 || i >= 16 || !e->fonts[i].size) return &def;
     return &e->fonts[i];
 }
+
+#define TEXT_COLOR 0xffc0c0c0u
 
 static void layout(EG *e) {
     cellCount = 0;
@@ -35,13 +38,13 @@ static void layout(EG *e) {
     int x0 = e->winRect[4], y0 = e->winRect[5], x1 = e->winRect[6];
     if (x1 <= x0) x1 = x0 + 600;
     const Font *f = font_at(e, 0);
-    int size = f->size, line = f->pitch > 0 ? f->pitch : size + 4;
-    u32 color = 0xffffffffu;
-    int x = x0, y = y0;
+    int size = f->size, spacing = f->spacing, line = f->size + f->lineGap;
+    u32 color = e->textWhite ? 0xffffffffu : TEXT_COLOR;
+    int fx = x0 * 8, y = y0;
     const u8 *p = (const u8 *)e->text;
     while (*p) {
         if (*p == '(' && (p[1] == 'e' || p[1] == 'E') && p[2] == ')') {
-            x = x0;
+            fx = x0 * 8;
             y += line;
             p += 3;
             continue;
@@ -53,6 +56,7 @@ static void layout(EG *e) {
             if (*q == ')') {
                 f = font_at(e, k);
                 size = f->size;
+                spacing = f->spacing;
                 p = q + 1;
                 continue;
             }
@@ -72,13 +76,13 @@ static void layout(EG *e) {
         int len = eg_sjis_len(p);
         u32 cp;
         eg_sjis_decode(p, &cp);
-        int w = cp < 0x80 || (cp >= 0xff61 && cp <= 0xff9f) ? size / 2 : size;
-        if (x + w > x1 && x > x0) {
-            x = x0;
+        int adv = text_advance(cp, size, spacing);
+        if (fx + adv > x1 * 8 && fx > x0 * 8) {
+            fx = x0 * 8;
             y += line;
         }
-        add_cell(p, len, x, y, size, color);
-        x += w;
+        add_cell(p, len, fx / 8, y, size, spacing, color);
+        fx += adv;
         p += len;
     }
 }
@@ -158,17 +162,16 @@ void msg_draw(EG *e, u32 *dst) {
     int alpha = e->mesAlpha;
     Image *win = e->mesImg[0];
     if (win) blit(dst, e->W, e->H, win, e->winRect[0], e->winRect[1], alpha);
-    if (e->speaker) {
+    if (e->speaker && e->th[0].wait != W_CHOICE) {
         const Font *f = font_at(e, 1);
-        int x = e->nameRect[4], y = e->nameRect[5], w = e->nameRect[6] - e->nameRect[4];
-        int tw = text_width(e->speaker, f->size);
-        int dx = w > tw ? (w - tw) / 2 : 0;
-        text_draw(e, dst, e->W, e->H, e->speaker, x + dx, y, f->size, 0xffffffffu, -1);
+        int x0 = e->nameRect[0], y0 = e->nameRect[1], x1 = e->nameRect[2], y1 = e->nameRect[3];
+        int tw = text_width(e->speaker, f->size, f->spacing);
+        text_draw(e, dst, e->W, e->H, e->speaker, (x0 + x1 - tw) / 2, (y0 + y1 - f->size) / 2, f->size, f->spacing, 0xffffffffu, false);
     }
     int shown = e->textShown < cellCount ? e->textShown : cellCount;
     for (int i = 0; i < shown; i++) {
         Cell *c = &cells[i];
-        text_draw(e, dst, e->W, e->H, c->ch, c->x, c->y, c->size, c->color, -1);
+        text_draw(e, dst, e->W, e->H, c->ch, c->x, c->y, c->size, c->spacing, c->color, true);
     }
     if (e->text && shown >= cellCount && e->th[0].wait == W_TEXT && e->mesImg[3]) {
         int r[9] = {0};
@@ -228,6 +231,6 @@ void choice_draw(EG *e, u32 *dst) {
         int x = hov ? c->hx : c->x, y = hov ? c->hy : c->y;
         if (im) blit_part(dst, e->W, e->H, im, hov ? c->hsx : c->sx, hov ? c->hsy : c->sy, c->w, c->h, x, y, 255);
         const Font *f = font_at(e, 0);
-        text_draw(e, dst, e->W, e->H, c->text, x + (hov ? c->htx : c->tx), y + (hov ? c->hty : c->ty), f->size, 0xffffffffu, -1);
+        text_draw(e, dst, e->W, e->H, c->text, x + (hov ? c->htx : c->tx), y + (hov ? c->hty : c->ty), f->size, f->spacing, e->textWhite ? 0xffffffffu : TEXT_COLOR, true);
     }
 }

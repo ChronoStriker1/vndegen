@@ -246,6 +246,7 @@ static Voice *voice_find(EG *e, const char *name) {
 }
 
 static float channel_volume(EG *e, int ch) {
+    if (e->mute) return 0;
     int v = ch <= 1 ? e->volBgm : ch == 6 ? e->volVoice : e->volSe;
     return (float)v / 100.0f * (float)e->volMaster / 100.0f;
 }
@@ -254,7 +255,7 @@ void snd_volumes(EG *e) {
     if (!e->mixer) return;
     pthread_mutex_lock(&e->mixer->lock);
     for (int c = 0; c < EG_CHANNELS; c++) e->mixer->chanVol[c] = channel_volume(e, c);
-    e->mixer->movieVol = (float)e->volMaster / 100.0f;
+    e->mixer->movieVol = e->mute ? 0 : (float)e->volMovie / 100.0f * (float)e->volMaster / 100.0f;
     pthread_mutex_unlock(&e->mixer->lock);
 }
 
@@ -271,6 +272,12 @@ static void fade_out(EG *e, Voice *v, int ms) {
 
 void snd_play(EG *e, const char *name, int mode, int ch, int fadeMs) {
     if (ch < 0 || ch >= EG_CHANNELS || !e->mixer) return;
+    if (ch <= 1) {
+        bool stop = mode == 3 || mode == 4 || !name || !*name || !strcmp(name, "0") || !strcmp(name, "NULL");
+        if (mode == 4) e->bgmName[0][0] = e->bgmName[1][0] = 0;
+        snprintf(e->bgmName[ch], sizeof e->bgmName[ch], "%s", stop ? "" : name);
+        e->bgmLoop[ch] = mode == 1 || mode == 6;
+    }
     Mixer *m = e->mixer;
     if (mode == 3 || mode == 4 || !name || !*name || !strcmp(name, "0") || !strcmp(name, "NULL")) {
         pthread_mutex_lock(&m->lock);

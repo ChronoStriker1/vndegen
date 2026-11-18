@@ -14,6 +14,7 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
+typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
@@ -86,7 +87,6 @@ Image *image_copy(const Image *im);
 void image_free(Image *im);
 Image *bmp_decode(const u8 *data, size_t size);
 Image *eg_image_load(EG *e, const char *name);
-u8 *lzss_decode(const u8 *src, size_t n, size_t *outLen);
 
 enum { A_NUM, A_STR, A_VAR, A_WORD, A_OP };
 
@@ -103,6 +103,7 @@ enum { I_CALL, I_TEXT, I_NAME, I_ASSIGN, I_IF, I_JMP, I_LOOP, I_NOP };
 typedef struct Ins {
     u8 op;
     int line;
+    int off;
     int n;
     int target;
     Arg *args;
@@ -127,6 +128,7 @@ typedef struct Script {
 Script *script_parse(const char *name, const u8 *data, size_t size);
 void script_free(Script *s);
 int script_label(const Script *s, const char *label);
+int script_at_offset(const Script *s, int off);
 u8 *script_decrypt(const u8 *data, size_t size, size_t *textSize);
 
 typedef struct Val {
@@ -182,7 +184,7 @@ typedef struct Thread {
     int wait;
     int frames;
     u32 until;
-    char *file;
+    int msgOff;
 } Thread;
 
 #define EG_PLANES 32
@@ -224,7 +226,7 @@ bool movie_any(EG *e);
 typedef struct Font {
     int size;
     bool bold;
-    int pitch;
+    int spacing;
     int lineGap;
 } Font;
 
@@ -244,7 +246,14 @@ typedef struct ChoiceBox {
     char *text;
 } ChoiceBox;
 
-enum { UI_NONE, UI_MENU, UI_SAVE, UI_LOAD, UI_CONFIG, UI_LOG, UI_CG, UI_SCENE, UI_SOUND, UI_CONFIRM, UI_EXTRA };
+enum { UI_NONE, UI_SAVE, UI_LOAD, UI_CONFIG, UI_LOG, UI_MSGBOX, UI_ANIM, UI_BRA, UI_CG, UI_SCENE, UI_SOUND };
+
+typedef struct SlotInfo {
+    bool used;
+    int year, month, day, hour, minute, second;
+    long long stamp;
+    char text[256];
+} SlotInfo;
 
 typedef struct UI UI;
 
@@ -330,7 +339,18 @@ struct EG {
     Mixer *mixer;
     int audioRate;
     Movie *movies[4];
-    int volMaster, volBgm, volSe, volVoice;
+    int volMaster, volBgm, volSe, volVoice, volMovie;
+    int textSpeedSlider, autoSpeed, textWhite, mute, skipUnread, autoWaitVoice;
+    Image *thumb;
+    u8 *prevBlock;
+    char bgmName[2][64];
+    int bgmLoop[2];
+    bool scriptUi, scriptUiDone;
+    bool lPress;
+    bool editing;
+    char editBuf[64];
+    int editMax;
+    int editRect[4];
 
     int uiMode;
     UI *ui;
@@ -363,8 +383,9 @@ void blit_scaled(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int 
 void fill_rect(u32 *dst, int dw, int dh, int x, int y, int w, int h, u32 rgba);
 
 void text_init(EG *e);
-int text_draw(EG *e, u32 *dst, int dw, int dh, const char *sjis, int x, int y, int size, u32 color, int maxChars);
-int text_width(const char *sjis, int size);
+int text_advance(u32 cp, int size, int spacing);
+int text_draw(EG *e, u32 *dst, int dw, int dh, const char *sjis, int x, int y, int size, int spacing, u32 color, bool outline);
+int text_width(const char *sjis, int size, int spacing);
 
 void msg_show(EG *e, int id, const char *text);
 void msg_name(EG *e, const char *name, const char *voice);
@@ -404,7 +425,19 @@ void win_draw(EG *e, u32 *dst);
 bool save_slot(EG *e, int slot);
 bool load_slot(EG *e, int slot);
 bool save_exists(EG *e, int slot);
+bool save_info(EG *e, int slot, SlotInfo *info, Image **thumb);
+void save_delete(EG *e, int slot);
+void save_capture_thumb(EG *e);
 void global_load(EG *e);
 void global_save(EG *e);
+void config_load(EG *e);
+void config_save(EG *e);
+void game_to_title(EG *e);
+void ui_open_title_load(EG *e);
+void ui_message_box(EG *e, int kind);
+void ui_slots_changed(EG *e);
+void ui_notice(EG *e, const char *text);
+u8 *lzss_pack(const u8 *src, size_t n, size_t *outLen);
+u8 *lzss_unpack(const u8 *src, size_t n, size_t outLen);
 
 #endif

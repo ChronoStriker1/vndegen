@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "eagls.h"
 #include "vnfont.h"
@@ -15,6 +16,7 @@ static int prefer[64];
 static int preferCount, preferUsed;
 
 static int step(VNEAGLS *n) {
+    if (movie_any((EG *)n)) usleep(16000);
     int alive = vneagls_frame(n, 16);
     vneagls_audio(n, audio, 705);
     if (wav) {
@@ -145,6 +147,16 @@ int main(int argc, char **argv) {
             char name[128];
             int val;
             if (sscanf(c + 4, "%127[^=]=%d", name, &val) == 2) var_at(var_get(&t->vars, name, true), 0)->i = val;
+        }
+        else if (sscanf(c, "untiltext:%d", &k) == 1) {
+            EG *t = (EG *)n;
+            for (int j = 0; j < 5000 && alive && !(t->th[0].wait == W_TEXT && t->textId == k); j++) {
+                if (t->th[0].wait == W_CHOICE) {
+                    int pick = preferUsed < preferCount ? prefer[preferUsed++] : 1;
+                    alive = press(n, 400, choice_y(t, pick), VNEAGLS_MOUSE_LEFT);
+                } else if (t->th[0].wait == W_TEXT) alive = press(n, 400, 300, VNEAGLS_MOUSE_LEFT);
+                else alive = run(n, 16);
+            }
         }
         else if (!strcmp(c, "state")) print_state((EG *)n);
         else if (!strcmp(c, "skip")) var_at(var_get(&((EG *)n)->vars, ":SkipFlg", true), 0)->i = 1;

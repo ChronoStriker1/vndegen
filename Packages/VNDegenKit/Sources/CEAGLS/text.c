@@ -64,55 +64,67 @@ static Glyph *glyph(u32 cp, int size) {
     return g;
 }
 
-int text_width(const char *sjis, int size) {
+int text_advance(u32 cp, int size, int spacing) {
+    int full = size * 8 + spacing * 10;
+    return half_width(cp) ? full / 2 : full;
+}
+
+int text_width(const char *sjis, int size, int spacing) {
     int w = 0;
     for (const u8 *p = (const u8 *)sjis; *p;) {
         u32 cp;
         p += eg_sjis_decode(p, &cp);
-        w += half_width(cp) ? size / 2 : size;
+        w += text_advance(cp, size, spacing);
     }
-    return w;
+    return w / 8;
 }
 
 static void put_glyph(u32 *dst, int dw, int dh, Glyph *g, int ox, int oy, u32 color) {
-    u32 ca = color >> 24;
-    if (!ca) ca = 255;
     for (int j = 0; j < g->h; j++) {
         int y = oy + j;
         if (y < 0 || y >= dh) continue;
         for (int i = 0; i < g->w; i++) {
             int x = ox + i;
             if (x < 0 || x >= dw) continue;
-            u32 a = (u32)g->bm[(size_t)j * g->w + i] * ca / 255;
-            if (!a) continue;
-            u32 *d = &dst[(size_t)y * dw + x];
-            u32 ia = 255 - a;
-            u32 r = ((color & 0xff) * a + (*d & 0xff) * ia) / 255;
-            u32 gg = (((color >> 8) & 0xff) * a + ((*d >> 8) & 0xff) * ia) / 255;
-            u32 b = (((color >> 16) & 0xff) * a + ((*d >> 16) & 0xff) * ia) / 255;
-            *d = r | gg << 8 | b << 16 | 0xff000000u;
+            if (g->bm[(size_t)j * g->w + i] < 128) continue;
+            dst[(size_t)y * dw + x] = color | 0xff000000u;
         }
     }
 }
 
-int text_draw(EG *e, u32 *dst, int dw, int dh, const char *sjis, int x, int y, int size, u32 color, int maxChars) {
+static void put_outline(u32 *dst, int dw, int dh, Glyph *g, int ox, int oy) {
+    for (int j = -1; j <= g->h; j++)
+        for (int i = -1; i <= g->w; i++) {
+            int x = ox + i, y = oy + j;
+            if (x < 0 || y < 0 || x >= dw || y >= dh) continue;
+            bool on = false;
+            for (int b = -1; b <= 1 && !on; b++)
+                for (int a = -1; a <= 1 && !on; a++) {
+                    int gi = i + a, gj = j + b;
+                    if (gi >= 0 && gj >= 0 && gi < g->w && gj < g->h && g->bm[(size_t)gj * g->w + gi] >= 128) on = true;
+                }
+            if (on) dst[(size_t)y * dw + x] = 0xff010101u;
+        }
+}
+
+int text_draw(EG *e, u32 *dst, int dw, int dh, const char *sjis, int x, int y, int size, int spacing, u32 color, bool outline) {
     if (!font.ok) text_init(e);
     if (!font.ok) return x;
     float sc = stbtt_ScaleForMappingEmToPixels(&font.info, (float)size);
-    int baseline = y + (int)lroundf(size * 0.86f);
-    int n = 0;
-    for (const u8 *p = (const u8 *)sjis; *p && (maxChars < 0 || n < maxChars); n++) {
+    int ascent, descent, gap;
+    stbtt_GetFontVMetrics(&font.info, &ascent, &descent, &gap);
+    int baseline = y + (int)lroundf((float)ascent * sc);
+    int fx = x * 8;
+    for (const u8 *p = (const u8 *)sjis; *p;) {
         u32 cp;
         p += eg_sjis_decode(p, &cp);
-        int cell = half_width(cp) ? size / 2 : size;
         Glyph *g = glyph(cp, size);
         if (g->bm) {
-            int adv, lsb;
-            stbtt_GetCodepointHMetrics(&font.info, (int)cp, &adv, &lsb);
-            int gx = x + (cell - (int)lroundf(adv * sc)) / 2 + g->x0;
+            int gx = fx / 8 + g->x0;
+            if (outline) put_outline(dst, dw, dh, g, gx, baseline + g->y0);
             put_glyph(dst, dw, dh, g, gx, baseline + g->y0, color);
         }
-        x += cell;
+        fx += text_advance(cp, size, spacing);
     }
-    return x;
+    return fx / 8;
 }

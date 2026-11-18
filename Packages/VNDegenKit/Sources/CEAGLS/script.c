@@ -21,6 +21,7 @@ u8 *script_decrypt(const u8 *data, size_t size, size_t *textSize) {
 
 typedef struct Parser {
     Script *sc;
+    const u8 *base, *stmt;
     const u8 *p, *end;
     int line;
     struct Block {
@@ -50,6 +51,7 @@ static Ins *emit(Parser *ps, int op) {
     memset(in, 0, sizeof *in);
     in->op = (u8)op;
     in->line = ps->line;
+    in->off = (int)(ps->stmt - ps->base);
     in->target = -1;
     return in;
 }
@@ -404,6 +406,8 @@ Script *script_parse(const char *name, const u8 *data, size_t size) {
     Parser ps;
     memset(&ps, 0, sizeof ps);
     ps.sc = s;
+    ps.base = data;
+    ps.stmt = data;
     ps.p = data;
     ps.end = data + size;
     ps.line = 1;
@@ -411,6 +415,7 @@ Script *script_parse(const char *name, const u8 *data, size_t size) {
         skip_ws(&ps);
         if (ps.p >= ps.end) break;
         const u8 *before = ps.p;
+        ps.stmt = ps.p;
         parse_statement(&ps);
         if (ps.p == before) ps.p++;
     }
@@ -450,4 +455,10 @@ int script_label(const Script *s, const char *label) {
     for (int i = 0; i < s->labelCount; i++)
         if (eg_ieq(s->labels[i].name, label)) return s->labels[i].ins;
     return -1;
+}
+
+int script_at_offset(const Script *s, int off) {
+    for (int i = 0; i < s->count; i++)
+        if (s->ins[i].off >= off) return i;
+    return s->count - 1;
 }

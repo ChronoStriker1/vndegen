@@ -4,7 +4,7 @@
 
 static u32 hash_var(const char *s) {
     u32 h = 2166136261u;
-    for (; *s; s++) h = (h ^ (u8)*s) * 16777619u;
+    for (; *s; s++) h = (h ^ (u8)tolower((u8)*s)) * 16777619u;
     return h;
 }
 
@@ -26,7 +26,7 @@ Var *var_find(VarTable *t, const char *name) {
     u32 h = hash_var(name) & (u32)(t->hashSize - 1);
     while (t->hash[h] >= 0) {
         Var *v = &t->vars[t->hash[h]];
-        if (!strcmp(v->name, name)) return v;
+        if (eg_ieq(v->name, name)) return v;
         h = (h + 1) & (u32)(t->hashSize - 1);
     }
     return NULL;
@@ -343,6 +343,7 @@ static void run_thread(EG *e, Thread *t) {
             break;
         case I_ASSIGN: vm_set_int(e, &in->var, eval(e, in->args, in->argc)); break;
         case I_TEXT:
+            t->msgOff = t->pc >= 2 && t->sc->ins[t->pc - 2].op == I_NAME ? t->sc->ins[t->pc - 2].off : in->off;
             msg_show(e, in->n, in->s);
             t->wait = W_TEXT;
             break;

@@ -87,6 +87,35 @@ static void layer_draw(EG *e, const Ins *in, bool full) {
     if (now) gfx_present(e);
 }
 
+static void screen(EG *e, Thread *t, int mode) {
+    if (mode == UI_SAVE) save_capture_thumb(e);
+    ui_open(e, mode);
+    e->scriptUi = true;
+    e->scriptUiDone = false;
+    t->wait = W_UI;
+}
+
+static void name_field(EG *e, const Ins *in) {
+    int p = I(e, in, 0);
+    if (p < 0 || p >= EG_PLANES) return;
+    int x0 = I(e, in, 1), y0 = I(e, in, 2), x1 = I(e, in, 3), y1 = I(e, in, 4);
+    if (!e->plane[p]) {
+        e->plane[p] = image_new(e->W, e->H);
+        e->plane[p]->alpha = true;
+        snprintf(e->planeName[p], sizeof e->planeName[p], "%s", "");
+    }
+    Image *im = e->plane[p];
+    for (int y = y0; y < y1 && y < im->h; y++)
+        for (int x = x0; x < x1 && x < im->w; x++) im->px[(size_t)y * im->w + x] = 0;
+    const char *s = S(e, in, 12);
+    int fi = I(e, in, 11);
+    const Font *f = fi >= 0 && fi < 16 && e->fonts[fi].size ? &e->fonts[fi] : &e->fonts[0];
+    int size = f->size > 0 ? f->size : 21;
+    int tw = text_width(s, size, f->spacing);
+    u32 color = (u32)clampi(I(e, in, 5), 0, 255) | (u32)clampi(I(e, in, 6), 0, 255) << 8 | (u32)clampi(I(e, in, 7), 0, 255) << 16;
+    text_draw(e, im->px, im->w, im->h, s, (x0 + x1 - tw) / 2, (y0 + y1 - size) / 2, size, f->spacing, color, true);
+}
+
 static void wait_frames(Thread *t, int n) {
     if (n <= 0) n = 1;
     t->wait = W_FRAMES;
@@ -121,7 +150,6 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
         break;
     }
     case 8: gfx_copy_mask(e, I(e, in, 0), I(e, in, 1), I(e, in, 2), I(e, in, 3), I(e, in, 4), I(e, in, 5), I(e, in, 6), I(e, in, 7), I(e, in, 8), I(e, in, 9)); break;
-    case 12: break;
     case 18: gfx_layer_reset(e, I(e, in, 0)); break;
     case 19: layer_draw(e, in, true); break;
     case 20: layer_draw(e, in, false); break;
@@ -173,7 +201,6 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
         t->wait = W_TIME;
         t->until = e->now + (u32)I(e, in, 0);
         break;
-    case 49: break;
     case 50: {
         Var *v = var_get(&e->vars, N(e, in, 0), true);
         v->str = I(e, in, 1) == 1;
@@ -276,10 +303,10 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
     case 150: {
         int i = I(e, in, 0);
         if (i < 0 || i >= 16) break;
-        e->fonts[i].size = I(e, in, 1);
+        e->fonts[i].size = I(e, in, 3);
         e->fonts[i].bold = I(e, in, 2) != 0;
-        e->fonts[i].pitch = I(e, in, 3);
-        e->fonts[i].lineGap = I(e, in, 4);
+        e->fonts[i].spacing = I(e, in, 4);
+        e->fonts[i].lineGap = I(e, in, 5);
         break;
     }
     case 151: {
@@ -290,6 +317,50 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
         break;
     }
     case 157: msg_clear(e); break;
+    case 136:
+        screen(e, t, UI_SAVE);
+        break;
+    case 137:
+        if (I(e, in, 0) == 0) {
+            ui_open_title_load(e);
+            e->scriptUi = true;
+            e->scriptUiDone = false;
+            t->wait = W_UI;
+        } else screen(e, t, UI_LOAD);
+        break;
+    case 146: screen(e, t, UI_CONFIG); break;
+    case 147:
+        if (in->argc > 0) screen(e, t, UI_CONFIG);
+        break;
+    case 135:
+        ui_message_box(e, 2);
+        e->scriptUi = true;
+        e->scriptUiDone = false;
+        t->wait = W_UI;
+        break;
+    case 90: break;
+    case 91: {
+        for (int i = 0; i < 4; i++) e->editRect[i] = I(e, in, i);
+        const char *v = S(e, in, 15);
+        snprintf(e->editBuf, sizeof e->editBuf, "%s", v);
+        e->editMax = I(e, in, 16) > 0 ? I(e, in, 16) : 10;
+        e->editing = true;
+        break;
+    }
+    case 92:
+        set_int(e, in, 0, e->editing ? 1 : 0);
+        break;
+    case 93: set_str(e, N(e, in, 0), e->editBuf); break;
+    case 159: name_field(e, in); break;
+    case 12:
+    case 49:
+    case 75:
+    case 134:
+    case 138:
+    case 140:
+    case 141:
+    case 149:
+    case 171: break;
     default: unknown(e, in); break;
     }
 }

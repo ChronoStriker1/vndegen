@@ -99,8 +99,11 @@ VNEAGLS *vneagls_open(const VNEAGLSConfig *cfg, char *err, size_t errSize) {
     ini_ints(&e->ini, "ScreenYsize", &size[1], 1);
     e->W = size[0] > 0 ? size[0] : 800;
     e->H = size[1] > 0 ? size[1] : 600;
+    e->textSpeedSlider = 50;
     e->textSpeed = 20;
-    e->volMaster = e->volBgm = e->volSe = e->volVoice = 100;
+    e->autoSpeed = 50;
+    e->autoWaitVoice = 1;
+    e->volMaster = e->volBgm = e->volSe = e->volVoice = e->volMovie = 100;
     e->mesAlpha = 255;
     gfx_init(e);
     text_init(e);
@@ -121,8 +124,9 @@ VNEAGLS *vneagls_open(const VNEAGLSConfig *cfg, char *err, size_t errSize) {
 void vneagls_close(VNEAGLS *n) {
     EG *e = (EG *)n;
     if (!e) return;
-    if (e->globalDirty) global_save(e);
+    if (e->ui) config_save(e);
     movie_close_all(e);
+    image_free(e->thumb);
     mixer_free(e->mixer);
     ui_free(e);
     msg_clear(e);
@@ -173,6 +177,7 @@ static void text_wait(EG *e) {
     if (t->wait != W_TEXT) return;
     msg_update(e);
     bool skip = sysvar(e, ":SkipFlg") || e->keyDown[0x11];
+    if (e->editing) return;
     if (skip) {
         msg_reveal(e);
         advance(e);
@@ -186,13 +191,67 @@ static void text_wait(EG *e) {
         return;
     }
     if (sysvar(e, ":AutoFlg") && msg_complete(e)) {
-        if (snd_playing(e, 6)) return;
-        if (!e->autoAt) e->autoAt = e->now + 1500;
+        if (e->autoWaitVoice && snd_playing(e, 6)) return;
+        if (!e->autoAt) e->autoAt = e->now + 500 + (u32)(100 - e->autoSpeed) * 70;
         if ((i32)(e->now - e->autoAt) >= 0) advance(e);
     }
 }
 
+void game_to_title(EG *e) {
+    snd_stop_all(e);
+    movie_close_all(e);
+    msg_clear(e);
+    e->bgmName[0][0] = e->bgmName[1][0] = 0;
+    e->choiceCount = 0;
+    e->winHidden = false;
+    e->editing = false;
+    e->uiMode = UI_NONE;
+    e->scriptUi = false;
+    for (int i = 1; i < EG_THREADS; i++) e->th[i].active = false;
+    Thread *t = &e->th[0];
+    t->sp = 0;
+    t->wait = W_NONE;
+    vm_goto(e, t, "TitleGame.dat", "TitleGame");
+    config_save(e);
+}
+
+static void edit_key(EG *e, int vk) {
+    size_t n = strlen(e->editBuf);
+    if (vk == 0x0d) {
+        e->editing = false;
+        return;
+    }
+    if (vk == 0x08) {
+        if (n) {
+            size_t k = 0, last = 0;
+            while (k < n) {
+                last = k;
+                k += (size_t)eg_sjis_len((const u8 *)e->editBuf + k);
+            }
+            e->editBuf[last] = 0;
+        }
+        return;
+    }
+    char c = 0;
+    if (vk >= 'A' && vk <= 'Z') c = (char)(e->keyDown[0x10] ? vk : vk + 32);
+    else if (vk >= '0' && vk <= '9') c = (char)vk;
+    else if (vk == 0x20) c = ' ';
+    if (!c || (int)n >= e->editMax || n + 1 >= sizeof e->editBuf) return;
+    e->editBuf[n] = c;
+    e->editBuf[n + 1] = 0;
+}
+
 static void tick(EG *e) {
+    if (e->scriptUi && e->scriptUiDone) {
+        e->scriptUi = false;
+        if (e->th[0].wait == W_UI) e->th[0].wait = W_NONE;
+    }
+    if (e->editing) {
+        for (int k = 0; k < 256; k++)
+            if (e->keyPress[k]) edit_key(e, k);
+        if (e->click && e->mx >= e->editRect[0] && e->mx < e->editRect[2] && e->my >= e->editRect[1] && e->my < e->editRect[3]) e->editing = false;
+        e->click = false;
+    }
     if (e->uiMode != UI_NONE) ui_update(e);
     else {
         win_update(e);
@@ -213,6 +272,7 @@ static void tick(EG *e) {
     movie_update(e);
     e->click = false;
     e->rclick = false;
+    e->lPress = false;
     e->wheel = 0;
     memset(e->keyPress, 0, sizeof e->keyPress);
 }
@@ -257,6 +317,7 @@ void vneagls_mouse_button(VNEAGLS *n, int button, bool down) {
     EG *e = (EG *)n;
     if (button == VNEAGLS_MOUSE_LEFT) {
         if (e->lDown && !down) e->click = true;
+        if (!e->lDown && down) e->lPress = true;
         e->lDown = down;
     } else if (button == VNEAGLS_MOUSE_RIGHT) {
         if (e->rDown && !down) e->rclick = true;
@@ -269,6 +330,7 @@ void vneagls_key(VNEAGLS *n, int vk, bool down) {
     if (vk < 0 || vk > 255) return;
     if (down && !e->keyDown[vk]) e->keyPress[vk] = true;
     e->keyDown[vk] = down;
+    if (e->editing) return;
     if (down && (vk == 0x0d || vk == 0x20)) e->click = true;
     if (down && vk == 0x1b) e->rclick = true;
 }
