@@ -30,7 +30,8 @@ Image *image_decode(const u8 *d, size_t n) {
         u32 off = rd32(d + 0x14), sz = rd32(d + 0x18);
         if ((size_t)off + sz > n) return NULL;
         png = ik_alloc(sz);
-        for (u32 i = 0; i < sz; i++) png[i] = d[off + i] ^ key[i & 7];
+        for (u32 i = 0; i < sz; i += 8)
+            for (u32 k = 0; k < 8 && i + k < sz; k++) png[i + k] = d[off + i + k] ^ key[k];
         src = png;
         len = sz;
     }
