@@ -42,7 +42,9 @@ static int nav(TH *t, int hover, int count, bool (*usable)(TH *, int)) {
 }
 
 bool map_place(TH *t, const MapButton *m, int *x, int *y) {
+    if (m->form == MAP_SLOT) return false;
     if (m->form != MAP_ITEM) {
+        if (t->mapMode == 1 && m->index < 100 && !t->vars[3][m->index]) return false;
         *x = m->x;
         *y = m->y;
         return true;

@@ -178,7 +178,7 @@ bool save_slot(TH *t, int slot) {
     u16 st[8] = {(u16)(tm.tm_year + 1900), (u16)(tm.tm_mon + 1), (u16)tm.tm_wday, (u16)tm.tm_mday, (u16)tm.tm_hour, (u16)tm.tm_min, (u16)tm.tm_sec, 0};
     for (int i = 0; i < 8; i++) wr16(d + OFF_TIME + i * 2, st[i]);
     put_str(d + OFF_TITLE, TITLE_LEN, t->sceneTitle);
-    memcpy(d + OFF_FLAGS, t->slotFlags, FLAGS_LEN);
+    for (int i = 0; i < FLAGS_LEN; i++) d[OFF_FLAGS + i] = (u8)t->vars[3][i];
     for (int i = 0; i < VARS_LEN; i++) d[OFF_VARS + i] = (u8)t->vars[2][i];
     int resume = t->savePc >= 0 ? t->savePc : t->pc;
     int depth = t->sp < FRAME_MAX - 1 ? t->sp : FRAME_MAX - 1;
@@ -295,7 +295,7 @@ bool load_slot(TH *t, int slot) {
         return false;
     }
     for (int c = 0; c < CH_COUNT; c++) snd_stop(t, c, 0);
-    memcpy(t->slotFlags, d + OFF_FLAGS, FLAGS_LEN);
+    for (int i = 0; i < FLAGS_LEN; i++) t->vars[3][i] = d[OFF_FLAGS + i];
     memset(t->vars[2], 0, sizeof t->vars[2]);
     for (int i = 0; i < VARS_LEN; i++) t->vars[2][i] = d[OFF_VARS + i];
     t->mapBuilding = false;

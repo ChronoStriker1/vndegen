@@ -90,7 +90,7 @@ VNTH *vnth_open(const VNTHConfig *cfg, char *err, size_t errSize) {
     th_log(t, "opened %s (%dx%d)", t->title, t->W, t->H);
     t->hover = -1;
     t->savePc = -1;
-    memset(t->slotFlags, 1, sizeof t->slotFlags);
+    for (int i = 0; i < 100; i++) t->vars[3][i] = 1;
     vm_start(t, "start", NULL);
     t->dirty = true;
     t->sceneDirty = true;

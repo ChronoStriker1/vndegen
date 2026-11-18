@@ -231,6 +231,7 @@ static int step(TH *t) {
         case 0x28:
             t->buttonCount = 0;
             t->mapCount = 0;
+            for (int i = 0; i < 100; i++) t->vars[3][i] = 1;
             return 1;
         case 0x05:
             if (r->len >= 6 && cond(t, b) && !vm_return(t)) {
@@ -343,6 +344,7 @@ static int step(TH *t) {
             return 1;
         }
         case 0x34: {
+            int index = t->mapRecs++;
             if (r->len >= 3 && b[0] == 0x10 && b[1] == 0x30) {
                 snprintf(t->mapCancel, sizeof t->mapCancel, "%s", s + 2);
                 return 1;
@@ -351,6 +353,7 @@ static int step(TH *t) {
             MapButton *m = &t->maps[t->mapCount++];
             memset(m, 0, sizeof *m);
             m->kind = b[0];
+            m->index = index;
             m->x = (i16)rd16(b + 2);
             m->y = (i16)rd16(b + 4);
             m->sx = rd16(b + 6);

@@ -273,7 +273,6 @@ struct TH {
     int savePc;
     char bgmName[64];
     i32 vars[6][TH_VARS];
-    u8 slotFlags[100];
     int sceneId;
     char sceneTitle[256];
     int wait;
