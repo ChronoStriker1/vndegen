@@ -10,12 +10,22 @@ endif()
 set(RUNTIME ${CMAKE_CURRENT_SOURCE_DIR}/../../../Packages/VNDegenKit/Sources/CTmrHiro)
 set(SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Shared)
 
+set(LIBS ${SHARED}/third_party)
+file(GLOB VIDEO_SOURCES ${LIBS}/ogg/src/*.c ${LIBS}/theora/lib/*.c ${LIBS}/opus/celt/*.c ${LIBS}/opus/silk/*.c
+     ${LIBS}/opus/src/*.c)
+add_library(vnvideo STATIC ${SHARED}/vnvideo.c ${VIDEO_SOURCES})
+target_include_directories(vnvideo PUBLIC ${SHARED} PRIVATE ${LIBS}/ogg/include ${LIBS}/theora/include ${LIBS}/opus
+                           ${LIBS}/opus/include ${LIBS}/opus/celt ${LIBS}/opus/silk)
+target_compile_definitions(vnvideo PRIVATE HAVE_CONFIG_H)
+target_compile_options(vnvideo PRIVATE -O2 -w)
+target_link_libraries(vnvideo PUBLIC m pthread)
+
 file(GLOB RUNTIME_SOURCES ${RUNTIME}/*.c)
 add_library(tmrhiro STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c)
 target_include_directories(tmrhiro PUBLIC ${RUNTIME} ${RUNTIME}/include ${SHARED})
 target_compile_options(tmrhiro PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function)
 target_compile_definitions(tmrhiro PRIVATE _GNU_SOURCE)
-target_link_libraries(tmrhiro PUBLIC m pthread)
+target_link_libraries(tmrhiro PUBLIC vnvideo m pthread)
 
 add_executable(thrun thrun.c)
 target_link_libraries(thrun PRIVATE tmrhiro)

@@ -15,12 +15,15 @@
 #define gallery_page th_gallery_page
 #define gallery_update th_gallery_update
 #define gfx_begin_transition th_gfx_begin_transition
+#define gfx_clear_overlay th_gfx_clear_overlay
 #define gfx_clear_sprites th_gfx_clear_sprites
 #define gfx_close th_gfx_close
 #define gfx_compose th_gfx_compose
 #define gfx_finish_transition th_gfx_finish_transition
 #define gfx_init th_gfx_init
+#define gfx_overlays_moving th_gfx_overlays_moving
 #define gfx_set_bg th_gfx_set_bg
+#define gfx_set_overlay th_gfx_set_overlay
 #define gfx_set_sprites th_gfx_set_sprites
 #define gfx_transition_done th_gfx_transition_done
 #define grd_decode th_grd_decode
@@ -30,6 +33,7 @@
 #define image_get th_image_get
 #define image_load th_image_load
 #define image_new th_image_new
+#define image_try th_image_try
 #define ini_free th_ini_free
 #define ini_get th_ini_get
 #define ini_int th_ini_int
@@ -41,6 +45,12 @@
 #define mixer_free th_mixer_free
 #define mixer_mix th_mixer_mix
 #define mixer_new th_mixer_new
+#define mixer_set_movie th_mixer_set_movie
+#define movie_draw th_movie_draw
+#define movie_mix th_movie_mix
+#define movie_play th_movie_play
+#define movie_stop th_movie_stop
+#define movie_update th_movie_update
 #define msg_advance th_msg_advance
 #define msg_complete th_msg_complete
 #define msg_draw th_msg_draw

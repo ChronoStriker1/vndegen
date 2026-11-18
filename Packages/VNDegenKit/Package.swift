@@ -158,7 +158,7 @@ let package = Package(
             name: "CN2System", dependencies: ["CVNFont", "CVNVideo"], exclude: ["third_party"],
             cSettings: [.unsafeFlags(["-O2"])], linkerSettings: [.linkedLibrary("z")]),
         .target(name: "EngineN2System", dependencies: ["VNCore", "CN2System", "FrameHost"], swiftSettings: mainActorByDefault),
-        .target(name: "CTmrHiro", dependencies: ["CVNFont"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
+        .target(name: "CTmrHiro", dependencies: ["CVNFont", "CVNVideo"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineTmrHiro", dependencies: ["VNCore", "CTmrHiro", "FrameHost"], swiftSettings: mainActorByDefault),
         // Recognizes Unity games so their page can say why they can't run. It runs none (docs/unity.md).
         .target(name: "EngineUnity", dependencies: ["VNCore", "RegistryFile"], swiftSettings: mainActorByDefault),

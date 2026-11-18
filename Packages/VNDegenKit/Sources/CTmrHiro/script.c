@@ -1,5 +1,23 @@
 #include "th.h"
 
+static bool looks_swapped(const u8 *d, size_t size) {
+    if (size >= 10 && rd16(d + 4) == 6 && rd32(d + 6) == 0x140050u) return true;
+    int plain = 0, swapped = 0;
+    u32 count = rd32(d);
+    size_t pos = 4;
+    for (u32 i = 0; i < count && pos + 8 <= size; i++) {
+        u16 len = rd16(d + pos);
+        if (len < 4 || pos + 2 + len > size) break;
+        if (len >= 6 && rd16(d + pos + 2) == 0x10 && (rd16(d + pos + 4) == 1 || rd16(d + pos + 4) == 2)) {
+            u8 a = d[pos + 6], b = d[pos + 7];
+            if (a >= 1 && a <= 3 && b >= 1 && b <= 3) plain++;
+            if ((a == 0x10 || a == 0x20 || a == 0x30) && (b == 0x10 || b == 0x20 || b == 0x30)) swapped++;
+        }
+        pos += 2 + len;
+    }
+    return swapped > plain;
+}
+
 static Scene *parse(const char *name, const u8 *d, size_t size) {
     if (size < 4) return NULL;
     u32 count = rd32(d);
@@ -7,7 +25,7 @@ static Scene *parse(const char *name, const u8 *d, size_t size) {
     Scene *s = th_alloc(sizeof *s);
     s->name = th_strdup(name);
     s->recs = th_alloc(sizeof(Rec) * (count ? count : 1));
-    bool swapped = size >= 10 && rd16(d + 4) == 6 && rd32(d + 6) == 0x140050u;
+    bool swapped = looks_swapped(d, size);
     size_t pos = 4;
     for (u32 i = 0; i < count && pos + 6 <= size; i++) {
         u16 len = rd16(d + pos);
@@ -35,6 +53,7 @@ void scene_free(Scene *s) {
 }
 
 Scene *scene_load(TH *t, const char *name) {
+    while (*name == ' ') name++;
     for (int i = 0; i < t->sceneCount; i++)
         if (th_ieq(t->scenes[i]->name, name)) return t->scenes[i];
     size_t size;

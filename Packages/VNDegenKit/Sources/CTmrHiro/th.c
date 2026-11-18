@@ -101,6 +101,7 @@ void vnth_close(VNTH *v) {
     save_system(t);
     ui_free(t);
     gallery_free(t);
+    movie_stop(t);
     snd_close(t);
     gfx_close(t);
     text_close(t);
@@ -220,6 +221,7 @@ bool vnth_frame(VNTH *v, uint32_t elapsedMs) {
         case W_MAP: buttons_update(t); break;
         case W_GALLERY:
         case W_CGVIEW: gallery_update(t); break;
+        case W_MOVIE: movie_update(t, elapsedMs > 100 ? 100 : elapsedMs); break;
         default: break;
         }
     }
@@ -235,9 +237,12 @@ bool vnth_frame(VNTH *v, uint32_t elapsedMs) {
     t->wheel = 0;
     memset(t->keyPress, 0, sizeof t->keyPress);
     if (t->quit) return false;
+    if (t->overlayCount && gfx_overlays_moving(t)) t->sceneDirty = true;
     bool animating = t->transActive || t->pan.active || (t->flashDur && t->now - t->flashStart < t->flashDur + 100) ||
                      (t->wait == W_TEXT) || t->dirty || t->sceneDirty;
-    if (animating) {
+    if (t->movie) {
+        movie_draw(t);
+    } else if (animating) {
         gfx_compose(t);
         t->dirty = false;
     }

@@ -246,24 +246,39 @@ static BarItem *bar_item(TH *t, int i) {
     return t->wait == W_MAP ? &u->mapBars[i] : &u->bars[i];
 }
 
+static int bar_type(TH *t, int bar) {
+    if (t->wait == W_MAP) return bar == 1 ? 2 : 0;
+    if (bar == 1) return ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_BUTTON_TYPE_01", ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_BUTTON_TYPE", 2));
+    return ini_int(&t->sys, "MESSAGEWINDOW", "TEXT_BUTTON_TYPE_02", 0);
+}
+
+static int bar_height(TH *t, int bar) {
+    if (t->wait == W_MAP) return ini_int(&t->sys, "MAPMENU", "MMB_HEIGHT", 64);
+    if (bar == 1) return ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_01", ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT", 64));
+    return ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_02", 64);
+}
+
+static int bar_top(TH *t, int bar) { return bar_type(t, bar) == 4 ? t->H - bar_height(t, bar) : 0; }
+
+static bool bar_has_items(TH *t, int bar) {
+    for (int i = 0; i < BAR_COUNT; i++)
+        if (bar_item(t, i)->on && bar_item(t, i)->bar == bar) return true;
+    return false;
+}
+
 bool ui_bar_update(TH *t) {
     UI *u = ui_get(t);
     int shown = 0;
-    int topH = ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_01", ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT", 64));
-    int botH = ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_02", 64);
-    bool hasBottom = false;
-    for (int i = 0; i < BAR_COUNT; i++)
-        if (u->bars[i].on && u->bars[i].bar == 2) hasBottom = true;
     if (bars_allowed(t)) {
-        if (t->my < topH) shown = 1;
-        else if (hasBottom && t->my >= t->H - botH && t->wait == W_TEXT) shown = 2;
+        if (bar_type(t, 1) == 2 && t->my < bar_height(t, 1) && bar_has_items(t, 1)) shown = 1;
+        else if (bar_type(t, 2) == 4 && t->my >= t->H - bar_height(t, 2) && t->wait == W_TEXT && bar_has_items(t, 2)) shown = 2;
     }
     int hover = -1;
     if (shown)
         for (int i = 0; i < BAR_COUNT; i++) {
             BarItem *b = bar_item(t, i);
             if (!b->on || b->bar != shown || !bar_visible(t, i)) continue;
-            int by = shown == 1 ? 0 : t->H - botH;
+            int by = bar_top(t, shown);
             if (inside(t->mx, t->my, b->x, by + b->y, b->w, b->h)) hover = i;
         }
     if (!shown && (t->wait == W_TEXT || t->wait == W_CHOICE) && !t->winHidden && !t->menuBlocked && t->uiMode == UI_NONE) {
@@ -322,8 +337,15 @@ void ui_bar_draw(TH *t) {
         }
     }
     if (!u->barShown || !bars_allowed(t)) return;
-    int by = u->barShown == 1 ? 0 : t->H - ini_int(&t->sys, "MESSAGEWINDOW", "TWM_HEIGHT_02", 64);
-    Image *bg = image_get(t, u->barShown == 1 ? "sys_window_menu_a" : "sys_window_menu_b");
+    int by = bar_top(t, u->barShown);
+    const char *ab = u->barShown == 1 ? "a" : "b";
+    char name[40];
+    snprintf(name, sizeof name, "sys_window_menu_%s", ab);
+    Image *bg = image_try(t, name);
+    if (!bg && t->wait != W_MAP) {
+        snprintf(name, sizeof name, "sys_window_menu_%s01", ab);
+        bg = image_try(t, name);
+    }
     if (!bg) bg = image_get(t, "sys_window_menu");
     if (bg) blit(t->screen, t->W, t->H, bg, 0, by, 255);
     Image *sheet = image_get(t, "sys_window_button");

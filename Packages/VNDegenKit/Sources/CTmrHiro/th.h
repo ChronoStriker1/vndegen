@@ -87,6 +87,7 @@ Image *image_copy(const Image *im);
 Image *grd_decode(const u8 *data, size_t size);
 Image *image_load(TH *t, const char *name);
 Image *image_get(TH *t, const char *name);
+Image *image_try(TH *t, const char *name);
 void image_cache_trim(TH *t);
 
 typedef struct IniLine {
@@ -129,9 +130,11 @@ int scene_label(const Scene *s, const char *label);
 void scene_free(Scene *s);
 
 typedef struct Mixer Mixer;
+typedef struct Movie Movie;
 Mixer *mixer_new(int rate);
 void mixer_free(Mixer *m);
 void mixer_mix(Mixer *m, float *out, int frames, bool paused);
+void mixer_set_movie(Mixer *m, Movie *movie);
 
 enum { CH_BGM, CH_SE, CH_SEH1, CH_SEH2, CH_SEH3, CH_SEHV, CH_SEHV2, CH_SEHV3, CH_SEHV4, CH_VOICE, CH_SYSVOICE, CH_COUNT };
 enum { VOL_MASTER, VOL_BGM, VOL_SE, VOL_VOICE };
@@ -141,6 +144,11 @@ void snd_stop(TH *t, int ch, int fadeMs);
 bool snd_playing(TH *t, int ch);
 void snd_update(TH *t);
 void snd_close(TH *t);
+bool movie_play(TH *t, const char *name);
+void movie_stop(TH *t);
+void movie_mix(Movie *m, float *out, int frames, float vol, int rate);
+void movie_update(TH *t, u32 elapsedMs);
+bool movie_draw(TH *t);
 
 typedef struct Sprite {
     char name[96];
@@ -149,6 +157,15 @@ typedef struct Sprite {
     float x, y;
     float sx, sy;
 } Sprite;
+
+typedef struct Overlay {
+    int layer;
+    Image *img;
+    int x0, y0, x1, y1;
+    int s0x, s0y, s1x, s1y;
+    int a0, a1;
+    u32 start, dur;
+} Overlay;
 
 typedef struct Button {
     int x, y, w, h;
@@ -193,6 +210,7 @@ enum {
     W_FLASH,
     W_GALLERY,
     W_CGVIEW,
+    W_MOVIE,
 };
 
 enum { UI_NONE, UI_SAVE, UI_LOAD, UI_SYSTEM, UI_BACKLOG, UI_CONFIRM, UI_GALLERY };
@@ -250,6 +268,9 @@ struct TH {
     Image *bg;
     Sprite spr[TH_MAX_SPRITES];
     int sprCount;
+    Overlay overlay[8];
+    int overlayCount;
+    int bgEffect;
     Image *navi;
     char naviName[64];
     bool transActive;
@@ -320,6 +341,7 @@ struct TH {
     bool keyDown[256], keyPress[256];
 
     Mixer *mixer;
+    Movie *movie;
     int audioRate;
 
     u32 rng;
@@ -334,6 +356,9 @@ void gfx_close(TH *t);
 void gfx_compose(TH *t);
 void gfx_set_bg(TH *t, const char *name, int trans);
 void gfx_set_sprites(TH *t, const char *list, int trans);
+void gfx_set_overlay(TH *t, const u8 *b, const char *name);
+void gfx_clear_overlay(TH *t, int layer);
+bool gfx_overlays_moving(TH *t);
 void gfx_clear_sprites(TH *t, int trans);
 void gfx_begin_transition(TH *t, int kind);
 bool gfx_transition_done(TH *t);

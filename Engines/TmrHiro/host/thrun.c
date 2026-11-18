@@ -14,6 +14,7 @@ static long wavFrames;
 static float audio[2048];
 
 static int step(VNTH *n) {
+    if (((TH *)n)->movie) usleep(16000);
     int alive = vnth_frame(n, 16);
     vnth_audio(n, audio, 705);
     if (wav) {
@@ -115,6 +116,7 @@ int main(int argc, char **argv) {
             sscanf(c + 5, "%63[^,],%63s", scene, label);
             vm_start((TH *)n, scene, label[0] ? label : NULL);
             ((TH *)n)->wait = W_NONE;
+            ((TH *)n)->menuBlocked = false;
         } else if (strncmp(c, "state", 5) == 0) {
             TH *t = (TH *)n;
             printf("scene=%s pc=%d wait=%d bg=%s sprites=%d ui=%d\n", t->scene, t->pc, t->wait, t->bgName, t->sprCount, t->uiMode);

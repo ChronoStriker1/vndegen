@@ -56,6 +56,7 @@ void vm_goto(TH *t, const char *scene, const char *label) {
 
 void vm_start(TH *t, const char *scene, const char *label) {
     t->sp = 0;
+    t->overlayCount = 0;
     t->sc = NULL;
     vm_goto(t, scene, label);
 }
@@ -290,11 +291,13 @@ static int step(TH *t) {
     case 0x20:
         switch (r->op) {
         case 0x00:
-        case 0x01: {
+        case 0x01:
+        case 0x02: {
             int at = r->op == 0x01 ? 3 : 2;
             if (r->len < at + 1) return 1;
             if (!strncmp(s + at, "fm_", 3)) gallery_mark_cg(t, s + at);
             gfx_set_bg(t, s + at, t->skipMode ? 0 : rd16(b));
+            if (r->op == 0x01) t->bgEffect = b[2];
             if (t->transActive) {
                 begin_wait(t, W_TRANS, 0);
                 return 0;
@@ -316,6 +319,7 @@ static int step(TH *t) {
             t->bg = NULL;
             snprintf(t->bgName, sizeof t->bgName, "%s", name);
             t->sprCount = 0;
+            t->bgEffect = 0;
             if (b[11] == 'w' && !t->skipMode) {
                 begin_wait(t, W_TIME, t->pan.dur);
                 t->waitSkippable = true;
@@ -341,7 +345,12 @@ static int step(TH *t) {
         }
         case 0x6e: {
             if (r->len < 27) return 1;
-            gfx_set_sprites(t, s + 26, t->skipMode ? 0 : rd16(b));
+            const char *name = s + 26;
+            if (strncmp(name, "fm_C", 4) && !(name[0] == 'C' && name[1] >= '0' && name[1] <= '9') && strcmp(name, "-")) {
+                gfx_set_overlay(t, b, name);
+                return 1;
+            }
+            gfx_set_sprites(t, name, t->skipMode ? 0 : rd16(b));
             if (t->transActive) {
                 begin_wait(t, W_TRANS, 0);
                 return 0;
@@ -368,12 +377,22 @@ static int step(TH *t) {
             t->sceneDirty = true;
             return 1;
         }
+        case 0x12c:
+            if (r->len < 4 || t->skipMode) return 1;
+            if (!movie_play(t, s + 3)) return 1;
+            begin_wait(t, W_MOVIE, 0);
+            return 0;
+        case 0x1f6:
+            if (r->len >= 1) gfx_clear_overlay(t, b[0]);
+            return 1;
+        case 0x1f7:
+            gfx_clear_overlay(t, -1);
+            return 1;
         case 0x66:
         case 0x68:
         case 0x69:
         case 0x19a:
         case 0x1f5:
-        case 0x1f7:
             return 1;
         default:
             th_log(t, "%s:%d unhandled graphics op %04x", t->sc->name, t->pc - 1, r->op);
@@ -426,6 +445,8 @@ static int step(TH *t) {
         case 0x15:
             ui_open(t, UI_LOAD);
             return 0;
+        case 0x19:
+            return 1;
         case 0x17:
             th_log(t, "open URL %s (ignored)", s);
             return 1;

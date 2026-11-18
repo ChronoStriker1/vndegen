@@ -297,6 +297,7 @@ bool load_slot(TH *t, int slot) {
     gfx_set_bg(t, bg[0] ? bg : "bl", 0);
     gfx_finish_transition(t);
     t->sprCount = 0;
+    t->overlayCount = 0;
     for (int layer = 1; layer < LAYER_COUNT && t->sprCount < TH_MAX_SPRITES; layer++) {
         char nm[64];
         get_str(d + OFF_LAYERS + LAYER_SIZE * layer, 32, nm, sizeof nm);

@@ -26,6 +26,7 @@ struct Mixer {
     pthread_mutex_t lock;
     Voice *v[CH_COUNT];
     float chanVol[CH_COUNT];
+    Movie *movie;
 };
 
 Mixer *mixer_new(int rate) {
@@ -79,8 +80,15 @@ void mixer_mix(Mixer *m, float *out, int frames, bool paused) {
             v->pos++;
         }
     }
+    if (m->movie) movie_mix(m->movie, out, frames, m->chanVol[CH_BGM], m->rate);
     pthread_mutex_unlock(&m->lock);
     for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
+}
+
+void mixer_set_movie(Mixer *m, Movie *movie) {
+    pthread_mutex_lock(&m->lock);
+    m->movie = movie;
+    pthread_mutex_unlock(&m->lock);
 }
 
 static int16_t *resample(const int16_t *src, size_t frames, int channels, int srcRate, int rate, size_t *outFrames) {

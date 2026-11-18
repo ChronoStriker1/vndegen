@@ -147,24 +147,28 @@ Image *compose_named(TH *t, const char *spec, bool chara) {
     return out;
 }
 
-Image *image_get(TH *t, const char *name) {
+static Image *image_lookup(TH *t, const char *name, bool quiet) {
     for (int i = 0; i < t->cacheCount; i++)
         if (!strcmp(t->cache[i].name, name)) {
             t->cache[i].used = ++t->cacheTick;
             return t->cache[i].img;
         }
     Image *im = compose_named(t, name, strncmp(name, "fm_C", 4) == 0);
-    if (!im) {
-        th_log(t, "missing image %s", name);
-        return NULL;
-    }
+    if (!im && !quiet) th_log(t, "missing image %s", name);
     if (t->cacheCount >= CACHE_MAX) image_cache_trim(t);
     t->cache = th_realloc(t->cache, sizeof *t->cache * (size_t)(t->cacheCount + 1));
     t->cache[t->cacheCount++] = (struct CacheEntry){th_strdup(name), im, ++t->cacheTick};
     return im;
 }
 
+Image *image_get(TH *t, const char *name) { return image_lookup(t, name, false); }
+
+Image *image_try(TH *t, const char *name) { return image_lookup(t, name, true); }
+
 static bool in_use(TH *t, Image *im) {
+    if (!im) return false;
+    for (int i = 0; i < t->overlayCount; i++)
+        if (t->overlay[i].img == im) return true;
     if (im == t->bg || im == t->navi || im == t->pan.img || im == t->viewImg) return true;
     for (int i = 0; i < t->sprCount; i++)
         if (t->spr[i].img == im) return true;
@@ -226,6 +230,22 @@ static void render_scene(TH *t) {
         int y = t->pan.fromY + (int)lroundf((float)(t->pan.toY - t->pan.fromY) * k);
         blit(d, t->W, t->H, t->pan.img, 0, y, 255);
     }
+    if (t->bgEffect >= 1 && t->bgEffect <= 3) {
+        for (size_t i = 0; i < n; i++) {
+            u32 c = d[i], r = c & 0xff, g = c >> 8 & 0xff, b = c >> 16 & 0xff;
+            if (t->bgEffect == 3) {
+                r = 255 - r, g = 255 - g, b = 255 - b;
+            } else {
+                u32 y = (r + g + b) / 3;
+                r = g = b = y;
+                if (t->bgEffect == 1) {
+                    r = y + 40 > 255 ? 255 : y + 40;
+                    g = y + 30 > 255 ? 255 : y + 30;
+                }
+            }
+            d[i] = r | g << 8 | b << 16 | 0xff000000u;
+        }
+    }
     int plus = ini_int(&t->sys, "GAMESYSTEM", "CHARA_SPR_PLUS_Y", 0);
     for (int i = 0; i < t->sprCount; i++) {
         Sprite *s = &t->spr[i];
@@ -234,6 +254,18 @@ static void render_scene(TH *t) {
         float cy = s->y + (float)plus + s->img->ch / 2.0f;
         float x0 = cx - s->img->cw * s->sx / 2.0f, y0 = cy - s->img->ch * s->sy / 2.0f;
         blit_scaled(d, t->W, t->H, s->img, (int)lroundf(x0), (int)lroundf(y0), s->sx, s->sy, 255);
+    }
+    for (int i = 0; i < t->overlayCount; i++) {
+        Overlay *o = &t->overlay[i];
+        u32 el = t->now - o->start;
+        float k = o->dur && el < o->dur ? (float)el / (float)o->dur : 1.0f;
+        float x = o->x0 + (o->x1 - o->x0) * k, y = o->y0 + (o->y1 - o->y0) * k;
+        float sx = (o->s0x + (o->s1x - o->s0x) * k) / 100.0f, sy = (o->s0y + (o->s1y - o->s0y) * k) / 100.0f;
+        int a = (int)lroundf((o->a0 + (o->a1 - o->a0) * k) * 255.0f / 1000.0f);
+        if (a <= 0) continue;
+        if (a > 255) a = 255;
+        float left = x + o->img->cw * (1 - sx) / 2, top = y + o->img->ch * (1 - sy) / 2;
+        blit_scaled(d, t->W, t->H, o->img, (int)lroundf(left), (int)lroundf(top), sx, sy, a);
     }
     if (t->navi) {
         int st[4] = {0};
@@ -272,6 +304,7 @@ void gfx_set_bg(TH *t, const char *name, int trans) {
     snprintf(t->bgName, sizeof t->bgName, "%s", name);
     t->bg = NULL;
     t->sprCount = 0;
+    t->bgEffect = 0;
     if (strcmp(name, "bl") && strcmp(name, "wh")) t->bg = image_get(t, name);
     t->sceneDirty = true;
 }
@@ -280,6 +313,36 @@ void gfx_clear_sprites(TH *t, int trans) {
     gfx_begin_transition(t, trans);
     t->sprCount = 0;
     t->sceneDirty = true;
+}
+
+void gfx_clear_overlay(TH *t, int layer) {
+    int k = 0;
+    for (int i = 0; i < t->overlayCount; i++)
+        if (layer >= 0 && t->overlay[i].layer != layer) t->overlay[k++] = t->overlay[i];
+    if (k != t->overlayCount) t->sceneDirty = true;
+    t->overlayCount = k;
+}
+
+void gfx_set_overlay(TH *t, const u8 *b, const char *name) {
+    int layer = b[2];
+    Image *im = image_get(t, name);
+    gfx_clear_overlay(t, layer);
+    if (!im) return;
+    int at = t->overlayCount;
+    while (at > 0 && t->overlay[at - 1].layer > layer) at--;
+    if (t->overlayCount == (int)(sizeof t->overlay / sizeof t->overlay[0])) return;
+    memmove(&t->overlay[at + 1], &t->overlay[at], sizeof(Overlay) * (size_t)(t->overlayCount - at));
+    t->overlayCount++;
+    t->overlay[at] = (Overlay){layer, im, (i16)rd16(b + 4), (i16)rd16(b + 6), (i16)rd16(b + 8), (i16)rd16(b + 10),
+                               rd16(b + 12), rd16(b + 14), rd16(b + 16), rd16(b + 18), rd16(b + 20), rd16(b + 22),
+                               t->now, rd16(b + 24)};
+    t->sceneDirty = true;
+}
+
+bool gfx_overlays_moving(TH *t) {
+    for (int i = 0; i < t->overlayCount; i++)
+        if (t->now - t->overlay[i].start <= t->overlay[i].dur) return true;
+    return false;
 }
 
 void gfx_set_sprites(TH *t, const char *list, int trans) {
