@@ -164,7 +164,7 @@ static int step(TH *t) {
     bool jumped = t->jumped;
     t->jumped = false;
     Rec *r = &t->sc->recs[t->pc];
-    bool building = r->cls == 0x10 && (r->op == 0x01 || r->op == 0x04 || r->op == 0x34 || (r->op == 0x00 && (jumped || !t->mapLastActive)));
+    bool building = r->cls == 0x10 && (r->op == 0x01 || r->op == 0x04 || r->op == 0x33 || r->op == 0x34 || (r->op == 0x00 && (jumped || !t->mapLastActive)));
     bool anyActive = false;
     for (int i = 0; i < t->mapCount; i++)
         if (t->maps[i].kind == 0x20) anyActive = true;
@@ -244,18 +244,39 @@ static int step(TH *t) {
             return 1;
         }
         case 0x2b: {
-            const char *list = s + 4;
-            char tmp[192];
-            snprintf(tmp, sizeof tmp, "%s", list);
-            char *a = strtok(tmp, ","), *bb = a ? strtok(NULL, ",") : NULL, *c = bb ? strtok(NULL, ",") : NULL;
-            snprintf(t->mapBase, sizeof t->mapBase, "%s", a ? a : "");
-            snprintf(t->mapSheet, sizeof t->mapSheet, "%s", c ? c : "");
+            char f[3][64] = {{0}};
+            const char *p = s + 4;
+            for (int k = 0; k < 3 && p; k++) {
+                const char *comma = strchr(p, ',');
+                snprintf(f[k], sizeof f[k], "%.*s", comma ? (int)(comma - p) : (int)strlen(p), p);
+                p = comma ? comma + 1 : NULL;
+            }
+            snprintf(t->mapBg, sizeof t->mapBg, "%s", f[0]);
+            snprintf(t->mapBase, sizeof t->mapBase, "%s", strcmp(f[1], "0000") ? f[1] : "");
+            snprintf(t->mapSheet, sizeof t->mapSheet, "%s", f[2]);
             t->mapMode = b[0];
             t->mapBuilding = true;
             t->savePc = t->pc - 1;
             if (!t->replayDepth) save_auto(t);
             t->mapCount = 0;
             t->mapAnimCount = 0;
+            return 1;
+        }
+        case 0x33: {
+            if (t->mapCount >= 16 || r->len < 19) return 1;
+            MapButton *m = &t->maps[t->mapCount++];
+            memset(m, 0, sizeof *m);
+            m->kind = 0x20;
+            m->x = (i16)rd16(b + 2);
+            m->y = (i16)rd16(b + 4);
+            m->sx = rd16(b + 6);
+            m->sy = rd16(b + 8);
+            m->w = rd16(b + 10);
+            m->h = rd16(b + 12);
+            m->hx = m->sx + (i16)rd16(b + 14);
+            m->hy = m->sy + (i16)rd16(b + 16);
+            snprintf(m->label, sizeof m->label, "%s", s + 18);
+            t->mapLastActive = true;
             return 1;
         }
         case 0x34: {

@@ -110,8 +110,10 @@ void buttons_draw(TH *t) {
                       0xffffffffu, true, -1);
         }
     } else if (t->wait == W_MAP) {
+        Image *bg = t->mapBg[0] ? image_get(t, t->mapBg) : NULL;
         Image *base = t->mapBase[0] ? image_get(t, t->mapBase) : NULL;
         Image *sheet = t->mapSheet[0] ? image_get(t, t->mapSheet) : NULL;
+        if (bg) blit(t->screen, t->W, t->H, bg, 0, 0, 255);
         if (base) blit(t->screen, t->W, t->H, base, 0, 0, 255);
         for (int i = 0; i < t->mapCount; i++) {
             MapButton *m = &t->maps[i];
