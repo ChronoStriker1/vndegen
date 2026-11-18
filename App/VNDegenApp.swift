@@ -15,6 +15,7 @@ import EngineNekoSDK
 import EngineYuRIS
 import EngineN2System
 import EngineTmrHiro
+import EngineIPAC
 import EngineUnity
 import EngineWolfRPG
 import EngineAliceSoft
@@ -48,6 +49,7 @@ let engines: [any EnginePlugin] = {
         YuRISPlugin(),
         N2SystemPlugin(),
         TmrHiroPlugin(),
+        IPACPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)

@@ -36,6 +36,11 @@ static i32 value(IP *t, const char *s) {
     i32 *v = var_ref(t, s);
     if (v) return *v;
     if (ip_ieq(s, "CLK")) return (i32)t->clk;
+    if (ip_ieq(s, "RCLK")) {
+        bool r = t->rclick;
+        t->rclick = false;
+        return r ? 1 : 0;
+    }
     if (s[0] == 'x' || s[0] == 'X') return (i32)strtoul(s + 1, NULL, 16);
     return (i32)strtol(s, NULL, 10);
 }
@@ -65,6 +70,7 @@ static bool cond(IP *t, const char *e) {
     if (!strcmp(op, ">")) return a > b;
     if (!strcmp(op, "<=")) return a <= b;
     if (!strcmp(op, ">=")) return a >= b;
+    if (!strcmp(op, "&")) return (a & b) != 0;
     ip_log(t, "unknown condition %s", e);
     return false;
 }
@@ -77,16 +83,17 @@ static void set_var(IP *t, const char *e) {
         ip_log(t, "SET on unknown variable %s", l);
         return;
     }
-    i32 b = value(t, r);
+    i32 b = value(t, r), n = *v;
     switch (op[0]) {
-    case '=': *v = b; break;
-    case '+': *v += b; break;
-    case '-': *v -= b; break;
-    case '*': *v *= b; break;
-    case '/': if (b) *v /= b; break;
-    case '%': if (b) *v %= b; break;
+    case '=': n = b; break;
+    case '+': n += b; break;
+    case '-': n -= b; break;
+    case '*': n *= b; break;
+    case '/': if (b) n /= b; break;
+    case '%': if (b) n %= b; break;
     default: ip_log(t, "unknown SET %s", e); break;
     }
+    *v = n & 0xff;
 }
 
 static void skip_block(IP *t) {
@@ -167,6 +174,20 @@ static void obj_load(IP *t, const char *a) {
     o->img = image_get(t, PK_PARTS, name);
     snprintf(o->name, sizeof o->name, "%s", name);
     o->alpha = 255;
+    o->frame = 0;
+    o->animFrames = 0;
+    size_t len;
+    u8 *d = store_load(&t->store, PK_PARTS, name, ".IAN", &len);
+    if (d && len >= 16 && !memcmp(d, "IANM", 4)) {
+        int frames = (int)rd32(d + 4) + 1;
+        if (frames > IP_ANIM) frames = IP_ANIM;
+        for (int k = 0; k < frames && 16 + (size_t)k * 160 + 24 <= len; k++) {
+            o->animX[k] = (i16)rd32(d + 16 + (size_t)k * 160 + 16);
+            o->animY[k] = (i16)rd32(d + 16 + (size_t)k * 160 + 20);
+            o->animFrames = k + 1;
+        }
+    }
+    free(d);
 }
 
 static void config_add(IP *t, const char *a) {
@@ -176,7 +197,7 @@ static void config_add(IP *t, const char *a) {
     a = word(a, item, sizeof item);
     int v[6] = {0};
     args_int(a, v, 6);
-    t->config[t->configCount++] = (typeof(t->config[0])){ip_strdup(menu), ip_strdup(item), v[0], v[1], v[2], v[3], v[4], v[5]};
+    t->config[t->configCount++] = (ConfigItem){ip_strdup(menu), ip_strdup(item), v[0], v[1], v[2], v[3], v[4], v[5]};
 }
 
 static void cmd(IP *t, const char *s) {
@@ -302,10 +323,58 @@ static void cmd(IP *t, const char *s) {
         a = word(a, p, sizeof p);
         a = word(a, sl, sizeof sl);
         word(a, img, sizeof img);
-        if (t->vlistCount < 256) t->vlist[t->vlistCount++] = (typeof(t->vlist[0])){atoi(p), atoi(sl), ip_strdup(img)};
+        if (t->vlistCount < 256) t->vlist[t->vlistCount++] = (VListItem){atoi(p), atoi(sl), ip_strdup(img)};
     } else if (!strcmp(name, "LAYERMODE")) {
         args_int(a, v, 1);
         t->layerMode = v[0];
+        if (!v[0]) {
+            image_free(t->viewer);
+            t->viewer = NULL;
+        }
+        t->dirty = true;
+    } else if (!strcmp(name, "VCHECK")) {
+        char pg[16], var[16];
+        a = word(a, pg, sizeof pg);
+        word(a, var, sizeof var);
+        if (!cg_seen(t, atoi(pg), value(t, var))) skip_block(t);
+    } else if (!strcmp(name, "SCHECK")) {
+        char var[16];
+        word(a, var, sizeof var);
+        if (!scene_seen(t, value(t, var))) skip_block(t);
+    } else if (!strcmp(name, "SCENE")) {
+        args_int(a, v, 1);
+        scene_mark(t, v[0]);
+    } else if (!strcmp(name, "WORKBG")) {
+        char nm[96];
+        word(a, nm, sizeof nm);
+        image_free(t->work);
+        t->work = image_load(t, PK_BG, nm);
+    } else if (!strcmp(name, "OBJ_ANIME")) {
+        char n[16], var[16];
+        a = word(a, n, sizeof n);
+        word(a, var, sizeof var);
+        int i = atoi(n);
+        if (i >= 0 && i < IP_OBJS) t->obj[i].frame = value(t, var);
+    } else if (!strcmp(name, "OBJ_DRAWW")) {
+        args_int(a, v, 4);
+        Obj *o = v[0] >= 0 && v[0] < IP_OBJS ? &t->obj[v[0]] : NULL;
+        int fx, fy, fw, fh, dx, dy;
+        if (o && o->img && t->work && frame_rect(o->img, o->animFrames, o->frame, &fx, &fy, &fw, &fh) && anim_pos(t, o, &dx, &dy))
+            blit_part(t->work->px, t->work->w, t->work->h, o->img, fx, fy, fw, fh, dx + v[1], dy + v[2], clampi(v[3], 0, 255));
+    } else if (!strcmp(name, "CHANGEW")) {
+        if (t->work) {
+            gfx_set_bg(t, "");
+            image_free(t->workBg);
+            t->workBg = t->work;
+            t->work = NULL;
+            t->bg = t->workBg;
+            gfx_apply_now(t);
+        }
+    } else if (!strcmp(name, "BG_VISUAL")) {
+        char pg[16], var[16];
+        a = word(a, pg, sizeof pg);
+        word(a, var, sizeof var);
+        viewer_open(t, atoi(pg), value(t, var));
     } else if (!strcmp(name, "TITLE") || !strcmp(name, "DEBUGFILE") || !strcmp(name, "LABEL") || !strcmp(name, "PID") ||
                !strcmp(name, "VOICECHR") || !strcmp(name, "NAMECOLOR") || !strcmp(name, "SAVE_ID") || !strcmp(name, "URL") ||
                !strcmp(name, "MOVIE")) {
@@ -359,12 +428,17 @@ void vm_run(IP *t) {
                 vm_start(t, "TITLE", NULL);
                 continue;
             }
-            ip_log(t, "script %s ended", t->sc->name);
+            ip_log(t, "script %s ended at %d of %d, last line %d", t->sc->name, t->pc, t->sc->count, t->sc->count ? t->sc->st[t->sc->count - 1].line : 0);
             t->wait = W_QUIT;
             t->quit = true;
             return;
         }
         Stmt *st = &t->sc->st[t->pc++];
+        if (t->trace) {
+            char *u = ip_sjis_to_utf8(st->s);
+            ip_log(t, "%d:%d %s", st->line, st->kind, u);
+            free(u);
+        }
         if (t->pendingText && st->kind != S_TEXT) {
             t->pc--;
             msg_show(t);
@@ -386,6 +460,7 @@ void vm_run(IP *t) {
             jump(t, st->s);
             break;
         case S_BG:
+            cg_mark(t, st->s);
             msg_clear(t);
             gfx_set_bg(t, st->s);
             t->wait = W_TRANS;

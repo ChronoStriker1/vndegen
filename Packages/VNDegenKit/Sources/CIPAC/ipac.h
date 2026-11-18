@@ -136,8 +136,13 @@ bool snd_voice_playing(IP *t);
 void snd_sys(IP *t, int number);
 void snd_volumes(IP *t);
 
+#define IP_ANIM 64
+
 typedef struct Obj {
     Image *img;
+    int frame;
+    int animFrames;
+    i16 animX[IP_ANIM], animY[IP_ANIM];
     char name[96];
     int x, y, alpha;
     bool vis;
@@ -186,6 +191,16 @@ typedef struct LogEntry {
 
 typedef struct UI UI;
 
+typedef struct VListItem {
+    int page, slot;
+    char *img;
+} VListItem;
+
+typedef struct ConfigItem {
+    char *menu, *item;
+    int x, y, w, h, bx, by;
+} ConfigItem;
+
 struct IP {
     char *gameDir, *saveDir;
     FILE *log;
@@ -205,6 +220,7 @@ struct IP {
     u32 now;
     double clockMs, tickAcc;
     bool paused, quit;
+    bool trace;
 
     struct CacheEntry { int kind; char *name; Image *img; u32 used; } *cache;
     int cacheCount;
@@ -231,6 +247,12 @@ struct IP {
     Image *clickMap;
     char clickName[96];
     int layerMode;
+    Image *work;
+    Image *workBg;
+    Image *viewer;
+    char viewerBase[96];
+    int viewerIndex;
+    u8 *sys;
 
     char ruleName[96];
     int speed;
@@ -276,9 +298,9 @@ struct IP {
     int volBgm, volSe, volVoice;
     bool bgmOn, seOn, voiceOn;
     char sceneName[128];
-    struct { int page, slot; char *img; } vlist[256];
+    VListItem vlist[256];
     int vlistCount;
-    struct { char *menu, *item; int x, y, w, h, bx, by; } config[96];
+    ConfigItem config[96];
     int configCount;
 
     int mx, my;
@@ -352,6 +374,14 @@ bool save_slot(IP *t, int slot);
 bool load_slot(IP *t, int slot);
 bool save_exists(IP *t, int slot);
 void save_system(IP *t);
+bool cg_seen(IP *t, int page, int slot);
+void cg_mark(IP *t, const char *name);
+bool scene_seen(IP *t, int n);
+void scene_mark(IP *t, int n);
+bool frame_rect(Image *im, int frames, int k, int *x, int *y, int *w, int *h);
+bool anim_pos(IP *t, const Obj *o, int *x, int *y);
+void viewer_open(IP *t, int page, int slot);
+void viewer_next(IP *t);
 void load_system(IP *t);
 
 #endif

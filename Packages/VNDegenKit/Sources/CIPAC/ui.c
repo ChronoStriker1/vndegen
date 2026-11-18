@@ -381,7 +381,6 @@ static void log_draw(IP *t) {
     int y = 34;
     for (int i = u->logTop; i < t->logCount && y < 580; i++) {
         LogEntry *e = &t->logs[i];
-        int lines = 0;
         char *joined = e->name ? ip_fmt("%s%s", e->name, e->text) : ip_fmt("%s", e->text);
         int n;
         u32 *cps = text_decode(joined, &n);
@@ -398,7 +397,6 @@ static void log_draw(IP *t) {
             if (ruby) continue;
             if (cp == '\n' || x > 740) {
                 y += 27;
-                lines++;
                 x = 68;
                 if (cp == '\n') continue;
             }

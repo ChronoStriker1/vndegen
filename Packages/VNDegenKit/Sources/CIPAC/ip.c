@@ -74,6 +74,7 @@ VNIPAC *vnipac_open(const VNIPACConfig *cfg, char *err, size_t errSize) {
     t->audioRate = cfg->audioRate > 0 ? cfg->audioRate : 44100;
     t->startTime = cfg->startTime ? cfg->startTime : (long long)time(NULL);
     t->rng = (u32)t->startTime;
+    t->trace = getenv("IPAC_TRACE") != NULL;
     if (!store_open(&t->store, t->gameDir, err, errSize)) {
         if (t->log) fclose(t->log);
         free(t->gameDir);
@@ -129,6 +130,7 @@ void vnipac_close(VNIPAC *n) {
         free(t->config[i].item);
     }
     gfx_close(t);
+    free(t->sys);
     text_close();
     for (int i = 0; i < t->scriptCount; i++) script_free(t->scripts[i]);
     free(t->scripts);
@@ -217,6 +219,11 @@ static void auto_advance(IP *t) {
 static void handle_input(IP *t) {
     if (t->uiMode != UI_NONE) {
         ui_update(t);
+        return;
+    }
+    if (t->viewer && t->layerMode && t->click) {
+        t->click = false;
+        viewer_next(t);
         return;
     }
     if (t->rclick && t->wait == W_TEXT) {

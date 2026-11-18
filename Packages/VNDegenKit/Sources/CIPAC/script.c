@@ -79,7 +79,8 @@ Script *script_parse(const char *name, const u8 *data, size_t size) {
             continue;
         }
         u8 c = (u8)*b;
-        if (c == '#' || c == '{' || c == '}' || (isdigit(c) && memchr(b, '{', (size_t)(e - b)))) {
+        bool braces = memchr(b, '{', (size_t)(e - b)) || memchr(b, '}', (size_t)(e - b));
+        if (c == '#' || c == '{' || c == '}' || ((isdigit(c) || c == '<') && braces)) {
             split_braces(s, line, b, comment_at(b, e));
         } else if (c == ':') {
             const char *z = comment_at(b, e);

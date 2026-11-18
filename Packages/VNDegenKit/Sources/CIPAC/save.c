@@ -291,6 +291,9 @@ bool load_slot(IP *t, int slot) {
     return true;
 }
 
+#define O_CGSEEN 0x9a2
+#define O_SCENESEEN 0xa22
+
 static char *sys_path(IP *t) { return ip_fmt("%s/_SYSDAT.DAT", t->saveDir); }
 
 void load_system(IP *t) {
@@ -298,18 +301,7 @@ void load_system(IP *t) {
     size_t n;
     u8 *d = ip_read_file(p, &n);
     free(p);
-    if (!d || n < O_FLAGS + IP_VARS) {
-        free(d);
-        return;
-    }
-    for (int i = 0; i < IP_VARS; i++) t->vw[i] = d[O_FLAGS + i];
-    free(d);
-}
-
-void save_system(IP *t) {
-    char *p = sys_path(t);
-    size_t n;
-    u8 *d = ip_read_file(p, &n);
+    free(t->sys);
     if (!d || n != SYS_SIZE) {
         free(d);
         d = ip_alloc(SYS_SIZE);
@@ -317,11 +309,40 @@ void save_system(IP *t) {
         memcpy(d, head, 8);
         memset(d + 8, 0xff, 16);
         memset(d + 24, 1, 16);
-        n = SYS_SIZE;
     }
-    for (int i = 0; i < IP_VARS; i++) d[O_FLAGS + i] = (u8)t->vw[i];
+    t->sys = d;
+    for (int i = 0; i < IP_VARS && O_FLAGS + i < O_CGSEEN; i++) t->vw[i] = d[O_FLAGS + i];
+}
+
+void save_system(IP *t) {
+    if (!t->sys) load_system(t);
+    for (int i = 0; i < IP_VARS && O_FLAGS + i < O_CGSEEN; i++) t->sys[O_FLAGS + i] = (u8)t->vw[i];
+    char *p = sys_path(t);
     ip_mkdirs(t->saveDir);
-    if (!ip_write_file(p, d, n)) ip_log(t, "can't write %s", p);
-    free(d);
+    if (!ip_write_file(p, t->sys, SYS_SIZE)) ip_log(t, "can't write %s", p);
     free(p);
+}
+
+bool cg_seen(IP *t, int page, int slot) {
+    if (!t->sys || page < 1 || page > 32 || slot < 1 || slot > 64) return false;
+    return t->sys[O_CGSEEN + (page - 1) * 8 + (slot - 1) / 8] >> ((slot - 1) % 8) & 1;
+}
+
+void cg_mark(IP *t, const char *name) {
+    if (!t->sys) return;
+    for (int i = 0; i < t->vlistCount; i++) {
+        VListItem *v = &t->vlist[i];
+        if (!ip_ieq(v->img, name) || v->page < 1 || v->page > 32 || v->slot < 1 || v->slot > 64) continue;
+        t->sys[O_CGSEEN + (v->page - 1) * 8 + (v->slot - 1) / 8] |= (u8)(1 << ((v->slot - 1) % 8));
+    }
+}
+
+bool scene_seen(IP *t, int n) {
+    if (!t->sys || n < 1 || n > 64) return false;
+    return t->sys[O_SCENESEEN + (n - 1) / 8] >> ((n - 1) % 8) & 1;
+}
+
+void scene_mark(IP *t, int n) {
+    if (!t->sys || n < 1 || n > 64) return;
+    t->sys[O_SCENESEEN + (n - 1) / 8] |= (u8)(1 << ((n - 1) % 8));
 }

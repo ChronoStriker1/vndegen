@@ -74,6 +74,9 @@ void gfx_close(IP *t) {
     free(t->scene);
     free(t->prev);
     free(t->shakeBuf);
+    image_free(t->work);
+    image_free(t->workBg);
+    image_free(t->viewer);
     for (int i = 0; i < t->cacheCount; i++) {
         image_free(t->cache[i].img);
         free(t->cache[i].name);
@@ -219,6 +222,7 @@ void gfx_compose(IP *t) {
     }
     msg_draw(t);
     choice_draw(t);
+    if (t->viewer && t->layerMode) blit(t->screen, t->W, t->H, t->viewer, 0, 0, 255);
     ui_draw(t);
     if (t->shakeDur && t->now - t->shakeStart < t->shakeDur) {
         u32 el = t->now - t->shakeStart;
@@ -233,4 +237,101 @@ void gfx_compose(IP *t) {
             }
     }
     t->serial++;
+}
+
+bool anim_pos(IP *t, const Obj *o, int *x, int *y) {
+    (void)t;
+    int k = o->frame;
+    if (k < 0 || k >= o->animFrames) return false;
+    *x = o->x + o->animX[k];
+    *y = o->y + o->animY[k];
+    return true;
+}
+
+bool frame_rect(Image *im, int frames, int k, int *x, int *y, int *w, int *h) {
+    if (!im || k < 0) return false;
+    if (frames > 0 && im->h >= im->w * 2) {
+        int fh = im->h / frames;
+        if (k >= frames || fh <= 0) return false;
+        *x = 0;
+        *y = k * fh;
+        *w = im->w;
+        *h = fh;
+        return true;
+    }
+    int found = 0;
+    for (int y0 = 0; y0 < im->h;) {
+        bool any = false;
+        for (int i = 0; i < im->w && !any; i++) any = im->px[(size_t)y0 * im->w + i] >> 24;
+        if (!any) {
+            y0++;
+            continue;
+        }
+        int y1 = y0;
+        for (;;) {
+            bool row = false;
+            if (y1 < im->h)
+                for (int i = 0; i < im->w && !row; i++) row = im->px[(size_t)y1 * im->w + i] >> 24;
+            if (!row) break;
+            y1++;
+        }
+        for (int x0 = 0; x0 < im->w;) {
+            bool col = false;
+            for (int j = y0; j < y1 && !col; j++) col = im->px[(size_t)j * im->w + x0] >> 24;
+            if (!col) {
+                x0++;
+                continue;
+            }
+            int x1 = x0;
+            for (;;) {
+                bool c = false;
+                if (x1 < im->w)
+                    for (int j = y0; j < y1 && !c; j++) c = im->px[(size_t)j * im->w + x1] >> 24;
+                if (!c) break;
+                x1++;
+            }
+            if (found++ == k) {
+                *x = x0;
+                *y = y0;
+                *w = x1 - x0;
+                *h = y1 - y0;
+                return true;
+            }
+            x0 = x1;
+        }
+        y0 = y1;
+    }
+    return false;
+}
+
+static bool viewer_load(IP *t) {
+    char name[128];
+    int i = t->viewerIndex;
+    if (i == 0) snprintf(name, sizeof name, "%s", t->viewerBase);
+    else if (i <= 20) snprintf(name, sizeof name, "%s_%d", t->viewerBase, i);
+    else snprintf(name, sizeof name, "%s%c", t->viewerBase, 'a' + (i - 21));
+    if (!store_has(&t->store, PK_BG, name, ".IES")) return false;
+    image_free(t->viewer);
+    t->viewer = image_load(t, PK_BG, name);
+    t->dirty = true;
+    return t->viewer != NULL;
+}
+
+void viewer_open(IP *t, int page, int slot) {
+    for (int i = 0; i < t->vlistCount; i++)
+        if (t->vlist[i].page == page && t->vlist[i].slot == slot) {
+            snprintf(t->viewerBase, sizeof t->viewerBase, "%s", t->vlist[i].img);
+            t->viewerIndex = 0;
+            viewer_load(t);
+            return;
+        }
+    ip_log(t, "BG_VISUAL %d %d is not in the CG list", page, slot);
+}
+
+void viewer_next(IP *t) {
+    if (!t->viewer) return;
+    for (int tries = 0; tries < 26; tries++) {
+        t->viewerIndex = (t->viewerIndex + 1) % 26;
+        if (viewer_load(t)) return;
+    }
 }
