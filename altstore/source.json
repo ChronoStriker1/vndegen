@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.48.0",
+          "buildVersion": "2675",
+          "date": "2026-11-18T01:17:00Z",
+          "localizedDescription": "A third Tmr-Hiro game: Kyonyuu Hitozuma Onna Kyoushi Saimin.\n\n## Downloads\n\n- `VNDegen-0.48.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.48.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.48.0-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- **Kyonyuu Hitozuma Onna Kyoushi Saimin** plays, in English, from the route select through the days to its endings, with its title, choices, message window, backlog, saving and loading.\n- Its saves move both ways with a PC copy. It is the only game on the 2014 engine build, whose save files are smaller, and VNDegen writes them in that size.\n- [docs/tmrhiro.md](../tmrhiro.md) has the details.\n\n## Known limits\n\n- Kyonyuu Hitozuma Onna Kyoushi Saimin's name entry box isn't shown. The default names are used, as on the PC when they're left as they are; the English text uses them throughout.\n- The English patch damaged 86 of the game's script lines, some of them dialogue and some picture or sound changes. They are skipped, as the PC skips them, so those lines don't show and the scene keeps its previous picture.\n- The other Tmr-Hiro limits from 0.46.0 and 0.47.0 still apply.\n- Two library Tmr-Hiro games, Spooky Pregnant School: The Quickening and The Conception, follow in later releases.\n\n## What wasn't tested\n\n- No physical device was used. The game was played in the Linux test build, the Mac app and an iPad simulator, by touch and with the touch gamepad, and also with every file name's case swapped.\n- Auto-play reached one ending. The EXTRA gallery and the route select weren't compared with the PC. Sound wasn't listened to.\n- Saves were exchanged with the original engine under Wine both ways. The two earlier Tmr-Hiro games were played again to their staff rolls in the Linux test build.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.48.0/VNDegen-0.48.0.ipa",
+          "size": 130530088,
+          "sha256": "a6832eefc4ea8a37b1ce02341c121227af0158692f9f014b6b5654db8e2978c3",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.47.0",
           "buildVersion": "2670",
           "date": "2026-11-18T00:39:42Z",
