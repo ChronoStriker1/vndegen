@@ -283,7 +283,7 @@ struct TH {
     int mapCount;
     char mapBase[64], mapSheet[64];
     int mapMode;
-    bool mapBuilding, jumped, mapLastActive, justLoaded;
+    bool mapBuilding, jumped, mapLastActive;
     struct { char name[64]; int x0, y0, x1, y1; u32 start, dur; int kind; } mapAnim[8];
     int mapAnimCount;
 

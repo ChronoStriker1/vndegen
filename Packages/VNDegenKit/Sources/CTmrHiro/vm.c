@@ -161,11 +161,13 @@ static int step(TH *t) {
     }
     bool jumped = t->jumped;
     t->jumped = false;
-    bool loaded = t->justLoaded;
-    t->justLoaded = false;
     Rec *r = &t->sc->recs[t->pc];
     bool building = r->cls == 0x10 && (r->op == 0x01 || r->op == 0x04 || r->op == 0x34 || (r->op == 0x00 && (jumped || !t->mapLastActive)));
-    if (t->mapBuilding && t->mapCount && !building) {
+    bool anyActive = false;
+    for (int i = 0; i < t->mapCount; i++)
+        if (t->maps[i].kind == 0x20) anyActive = true;
+    if (t->mapBuilding && !building && !anyActive) t->mapBuilding = false;
+    if (t->mapBuilding && anyActive && !building) {
         t->mapBuilding = false;
         t->hover = -1;
         t->sceneDirty = true;
@@ -173,7 +175,6 @@ static int step(TH *t) {
         return 0;
     }
     t->pc++;
-    t->justLoaded = loaded;
     const u8 *b = r->body;
     const char *s = (const char *)b;
     switch (r->cls) {
@@ -208,7 +209,7 @@ static int step(TH *t) {
             return 1;
         case 0x14:
             t->savePc = t->pc - 1;
-            if (!t->replayDepth && !t->justLoaded) save_auto(t);
+            if (!t->replayDepth) save_auto(t);
             parse_choice(t, r);
             t->hover = -1;
             begin_wait(t, W_CHOICE, 0);
@@ -250,7 +251,7 @@ static int step(TH *t) {
             t->mapMode = b[0];
             t->mapBuilding = true;
             t->savePc = t->pc - 1;
-            if (!t->replayDepth && !t->justLoaded) save_auto(t);
+            if (!t->replayDepth) save_auto(t);
             t->mapCount = 0;
             t->mapAnimCount = 0;
             return 1;

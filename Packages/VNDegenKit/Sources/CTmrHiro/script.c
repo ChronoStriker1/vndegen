@@ -7,6 +7,7 @@ static Scene *parse(const char *name, const u8 *d, size_t size) {
     Scene *s = th_alloc(sizeof *s);
     s->name = th_strdup(name);
     s->recs = th_alloc(sizeof(Rec) * (count ? count : 1));
+    bool swapped = size >= 10 && rd16(d + 4) == 6 && rd32(d + 6) == 0x140050u;
     size_t pos = 4;
     for (u32 i = 0; i < count && pos + 6 <= size; i++) {
         u16 len = rd16(d + pos);
@@ -18,7 +19,7 @@ static Scene *parse(const char *name, const u8 *d, size_t size) {
         r->body = th_alloc((size_t)r->len + 1);
         for (int k = 0; k < r->len; k++) {
             u8 b = d[pos + 6 + k];
-            r->body[k] = (u8)(b >> 4 | b << 4);
+            r->body[k] = swapped ? (u8)(b >> 4 | b << 4) : b;
         }
         pos += 2 + len;
     }

@@ -1,5 +1,8 @@
 #include "th.h"
 
+#include <sys/stat.h>
+#include <time.h>
+
 enum { MSG_QUIT = 1, MSG_TITLE, MSG_OVERWRITE, MSG_LOAD, MSG_DELETE, MSG_QSAVED };
 
 enum {
@@ -46,6 +49,7 @@ struct UI {
     Image *thumbs[10];
     int thumbPage;
     char slotText[10][3][96];
+    int newestSlot;
 };
 
 static bool inside(int x, int y, int rx, int ry, int rw, int rh) { return x >= rx && y >= ry && x < rx + rw && y < ry + rh; }
@@ -388,6 +392,18 @@ static void refresh_slots(TH *t, const char *sec) {
         free(s);
     }
     u->thumbPage = u->page;
+    u->newestSlot = -1;
+    time_t best = 0;
+    for (int n = 1; n <= 110; n++) {
+        char *path = th_fmt("%s/savedata.%03d", t->saveDir, n);
+        char real[2048];
+        struct stat st;
+        if (th_path_resolve(path, real, sizeof real) == 1 && stat(real, &st) == 0 && st.st_mtime >= best) {
+            best = st.st_mtime;
+            u->newestSlot = n;
+        }
+        free(path);
+    }
     (void)sec;
 }
 
@@ -410,21 +426,21 @@ static void draw_saveload(TH *t, bool save) {
     ini_ints(&t->sys, sec, key, th, 2);
     snprintf(key, sizeof key, "%s_B_NEW_POS", sec);
     ini_ints(&t->sys, sec, key, nw, 6);
-    int newest = -1;
     for (int i = 0; i < 10; i++) {
         int x, y, w, h;
         slot_geom(t, sec, i, &x, &y, &w, &h);
         int row = u->hover == i ? 1 : 0;
         blit_part(t->screen, t->W, t->H, sheet, v[2], v[3] + row * h, w, h, x, y, 255);
         if (u->thumbs[i]) blit(t->screen, t->W, t->H, u->thumbs[i], x + th[0], y + th[1], 255);
+        if (nw[4] && save_number(u, i) == u->newestSlot)
+            blit_part(t->screen, t->W, t->H, sheet, nw[2], nw[3], nw[4], nw[5], x + nw[0], y + nw[1], 255);
         int size = tp[2] > 0 ? tp[2] / 2 + 2 : 12;
         char label[32];
-        snprintf(label, sizeof label, "No.%03d", u->page == 10 ? i + 1 : u->page * 10 + i + 1);
+        snprintf(label, sizeof label, "No.%03d", save_number(u, i));
         text_draw(t, t->screen, t->W, t->H, label, x + tp[0], y + tp[1] + 4, size, 0xffe0e0e0u, false, -1);
         text_draw(t, t->screen, t->W, t->H, u->slotText[i][0][0] ? u->slotText[i][0] : "----/--/-- --:--", x + tp[0] + 10,
                   y + tp[1] + 24, size, 0xffe0e0e0u, false, -1);
-        if (u->slotText[i][1][0]) text_draw(t, t->screen, t->W, t->H, u->slotText[i][1], x + tp[0] - 40, y + tp[1] + 50, 16, 0xffffffffu, false, -1);
-        (void)newest;
+        if (u->slotText[i][1][0]) text_draw(t, t->screen, t->W, t->H, u->slotText[i][1], x + tp[0] + 10, y + tp[1] + 44, size, 0xffe0e0e0u, false, -1);
     }
     int pp[17] = {0}, ap[6] = {0}, dp[6] = {0}, rp[6] = {0};
     snprintf(key, sizeof key, "%s_PAGE_POS", sec);
