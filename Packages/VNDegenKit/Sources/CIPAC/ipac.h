@@ -68,6 +68,7 @@ void store_close(Store *s);
 u8 *store_load(Store *s, int kind, const char *name, const char *ext, size_t *size);
 bool store_has(Store *s, int kind, const char *name, const char *ext);
 u8 *lzss_decode(const u8 *src, size_t n, size_t outLen);
+u8 *lzss_encode(const u8 *src, size_t n, size_t *outLen);
 
 typedef struct Image {
     int w, h;
@@ -101,6 +102,7 @@ enum {
 typedef struct Stmt {
     u8 kind;
     int line;
+    int off;
     char *s;
 } Stmt;
 
@@ -108,6 +110,7 @@ typedef struct Script {
     char *name;
     Stmt *st;
     int count, cap;
+    int parseOff;
 } Script;
 
 Script *script_parse(const char *name, const u8 *data, size_t size);
@@ -243,9 +246,13 @@ struct IP {
     char *msgName;
     u32 *msgText;
     int msgLen;
+    char *msgRaw;
     int msgShown;
     u32 msgStart;
     char voice[32];
+    int msgOff, msgLine;
+    char msgVoice[32];
+    int pendOff, pendLine;
     char pendingName[96];
     char *pendingText;
     bool autoMode, skipMode;

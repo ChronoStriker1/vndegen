@@ -236,3 +236,58 @@ bool store_has(Store *s, int kind, const char *name, const char *ext) {
     free(u);
     return ip_file_exists(path);
 }
+
+u8 *lzss_encode(const u8 *src, size_t n, size_t *outLen) {
+    size_t cap = n + n / 8 + 16, o = 0;
+    u8 *out = ip_alloc(cap);
+    enum { HASH = 1 << 15, CHAIN = 24, MAXLEN = 18, WIN = 4096 - MAXLEN };
+    int *head = ip_alloc(sizeof(int) * HASH), *prev = ip_alloc(sizeof(int) * (n + 1));
+    for (int i = 0; i < HASH; i++) head[i] = -1;
+    size_t i = 0;
+    while (i < n) {
+        size_t flagPos = o++;
+        u8 flags = 0;
+        for (int b = 0; b < 8 && i < n; b++) {
+            int bestLen = 0;
+            size_t bestPos = 0;
+            if (i + 3 <= n) {
+                u32 h = ((u32)src[i] << 10 ^ (u32)src[i + 1] << 5 ^ src[i + 2]) & (HASH - 1);
+                int c = head[h], tries = 0;
+                while (c >= 0 && tries++ < CHAIN && i - (size_t)c <= WIN) {
+                    int len = 0;
+                    while (len < MAXLEN && i + len < n && src[c + len] == src[i + len]) len++;
+                    if (len > bestLen) {
+                        bestLen = len;
+                        bestPos = (size_t)c;
+                        if (len == MAXLEN) break;
+                    }
+                    c = prev[c];
+                }
+            }
+            int adv = bestLen >= 3 ? bestLen : 1;
+            if (bestLen >= 3) {
+                int ring = (int)((0xfee + bestPos) & 0xfff);
+                out[o++] = (u8)(ring & 0xff);
+                out[o++] = (u8)((ring >> 4 & 0xf0) | (bestLen - 3));
+            } else {
+                flags |= (u8)(1 << b);
+                out[o++] = src[i];
+            }
+            for (int k = 0; k < adv; k++, i++)
+                if (i + 3 <= n) {
+                    u32 h = ((u32)src[i] << 10 ^ (u32)src[i + 1] << 5 ^ src[i + 2]) & (HASH - 1);
+                    prev[i] = head[h];
+                    head[h] = (int)i;
+                }
+        }
+        out[flagPos] = flags;
+        if (o + 32 > cap) {
+            cap *= 2;
+            out = ip_realloc(out, cap);
+        }
+    }
+    free(head);
+    free(prev);
+    *outLen = o;
+    return out;
+}

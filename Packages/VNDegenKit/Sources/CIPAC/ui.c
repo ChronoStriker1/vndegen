@@ -117,7 +117,7 @@ static void draw_slots(IP *t) {
     UI *u = t->ui;
     blit_part(t->screen, t->W, t->H, u->sheet, 0, 0, 800, 600, 0, 0, 255);
     for (int i = 0; i < SLOTS_PER_PAGE; i++) {
-        int slot = u->page * SLOTS_PER_PAGE + i;
+        int slot = u->page * SLOTS_PER_PAGE + (i % 2) * 10 + i / 2;
         Rect r = slot_rect(t, i);
         if (i == u->hover && !u->confirm) fill_rect(t->screen, t->W, t->H, r.x, r.y + 1, r.w, r.h, 0xff7e41d7u);
         if (slot == QUICK_SLOT) blit_part(t->screen, t->W, t->H, u->sheet, 0, 600, 251, 38, r.x, r.y + 1, 255);
@@ -209,7 +209,7 @@ static void slots_update(IP *t) {
         return;
     }
     if (hover < 0) return;
-    int slot = u->page * SLOTS_PER_PAGE + hover;
+    int slot = u->page * SLOTS_PER_PAGE + (hover % 2) * 10 + hover / 2;
     if (t->uiMode == UI_LOAD && !save_exists(t, slot)) return;
     u->slot = slot;
     u->confirm = 1;

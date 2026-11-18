@@ -398,9 +398,17 @@ void vm_run(IP *t) {
             snprintf(t->voice, sizeof t->voice, "%s", st->s);
             break;
         case S_NAME:
+            if (!t->pendingText && !t->pendingName[0]) {
+                t->pendOff = st->off;
+                t->pendLine = st->line - 1;
+            }
             snprintf(t->pendingName, sizeof t->pendingName, "%s", st->s);
             break;
         case S_TEXT:
+            if (!t->pendingText && !t->pendingName[0]) {
+                t->pendOff = st->off;
+                t->pendLine = st->line - 1;
+            }
             if (t->pendingText) {
                 char *j = ip_fmt("%s\n%s", t->pendingText, st->s);
                 free(t->pendingText);

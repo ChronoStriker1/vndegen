@@ -9,7 +9,7 @@ static void add(Script *s, int kind, int line, const char *b, size_t n) {
     }
     char *str = ip_alloc(n + 1);
     memcpy(str, b, n);
-    s->st[s->count++] = (Stmt){(u8)kind, line, str};
+    s->st[s->count++] = (Stmt){(u8)kind, line, s->parseOff, str};
 }
 
 static bool is_space(u8 c) { return c == ' ' || c == '\t'; }
@@ -64,6 +64,7 @@ Script *script_parse(const char *name, const u8 *data, size_t size) {
     while (p < end) {
         const char *nl = memchr(p, '\n', (size_t)(end - p));
         const char *b = p, *e = nl ? nl : end;
+        s->parseOff = (int)(p - (const char *)data);
         p = nl ? nl + 1 : end;
         line++;
         trim(&b, &e);
@@ -106,6 +107,7 @@ Script *script_parse(const char *name, const u8 *data, size_t size) {
             add(s, S_TEXT, line, b, (size_t)(e - b));
         }
     }
+    s->parseOff = (int)size;
     add(s, S_BLANK, line + 1, "", 0);
     return s;
 }

@@ -71,6 +71,8 @@ static void win_load(IP *t) {
 void msg_clear(IP *t) {
     free(t->msgText);
     t->msgText = NULL;
+    free(t->msgRaw);
+    t->msgRaw = NULL;
     free(t->msgName);
     t->msgName = NULL;
     t->msgLen = t->msgShown = 0;
@@ -93,11 +95,14 @@ static void log_add(IP *t) {
 
 void msg_show(IP *t) {
     win_load(t);
+    t->msgOff = t->pendOff;
+    t->msgLine = t->pendLine;
+    snprintf(t->msgVoice, sizeof t->msgVoice, "%s", t->voice);
     log_add(t);
     msg_clear(t);
     t->msgName = t->pendingName[0] ? ip_strdup(t->pendingName) : NULL;
     t->msgText = text_decode(t->pendingText, &t->msgLen);
-    free(t->pendingText);
+    t->msgRaw = t->pendingText;
     t->pendingText = NULL;
     t->pendingName[0] = 0;
     if (t->voice[0]) {
