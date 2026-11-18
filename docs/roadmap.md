@@ -115,7 +115,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
-- #183: on iPhone and iPad in Touch or Automatic mode, VNDegen's menu button covers a game's own top-right button, such as Transpile Girl Rescue Operation!'s gear.
+- #183: on iPhone and iPad in Touch or Automatic mode, VNDegen's menu button covers a game's own top-right button, such as Transpile Girl Rescue Operation!'s gear. Being fixed on branch `fix/183-menu-button` (started 2026-11-18): the button can be dragged to any corner, and each game remembers where it was put.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
