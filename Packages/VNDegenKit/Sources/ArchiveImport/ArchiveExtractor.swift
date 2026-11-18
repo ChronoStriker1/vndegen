@@ -61,7 +61,7 @@ nonisolated enum ArchiveExtractor {
             return try listPack(source.volumes[0])
         }
         if source.isInstaller { return try listInstallers(source) }
-        let reader = try ArchiveReader(source.volumes, password: nil)
+        let reader = try ArchiveReader(source.volumes, password: nil, cue: source.cueSheet)
         var contents = ArchiveContents()
         var entries: Int64 = 0
         var everySizeListed = true
@@ -177,7 +177,7 @@ nonisolated enum ArchiveExtractor {
         if let pack = total.pack {
             return try extract(pack, from: source.volumes[0], into: folder, total: total, reserve: reserve, progress: report)
         }
-        let reader = try ArchiveReader(source.volumes, password: password)
+        let reader = try ArchiveReader(source.volumes, password: password, cue: source.cueSheet)
         let isZip = source.volumes.count == 1 && source.volumes[0].pathExtension.lowercased() == "zip"
         let deflate64 = isZip ? try? Deflate64Entries(zip: source.volumes[0]) : nil
         let fm = FileManager.default
@@ -313,12 +313,21 @@ nonisolated enum ArchiveExtractor {
         return progress
     }
 
-    /// The folder that becomes the game: the archive's only top-level folder, or the whole extraction when the archive
-    /// holds several items. macOS metadata folders don't count.
+    /// The folder that becomes the game: the archive's only top-level folder, a CD's game folder, or the whole extraction
+    /// when the archive holds several items. macOS metadata folders don't count.
     static func gameRoot(in staging: URL) -> URL {
         let items = visibleItems(in: staging)
         if items.count == 1, isDirectory(items[0]) { return items[0] }
-        return staging
+        return discGameFolder(items) ?? staging
+    }
+
+    static func discGameFolder(_ items: [URL]) -> URL? {
+        func isProgram(_ url: URL) -> Bool { !isDirectory(url) && url.pathExtension.lowercased() == "exe" }
+        guard items.contains(where: { $0.lastPathComponent.lowercased() == "autorun.inf" }),
+              items.filter(isProgram).allSatisfy({ $0.lastPathComponent.lowercased().contains(/setup|install|autorun/) })
+        else { return nil }
+        let games = items.filter { isDirectory($0) && visibleItems(in: $0).contains(where: isProgram) }
+        return games.count == 1 ? games[0] : nil
     }
 
     /// The archive inside `root` when that is all the extraction produced: no subfolders and one archive, possibly

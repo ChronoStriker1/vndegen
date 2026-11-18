@@ -370,7 +370,7 @@ This covers every engine in the library and every engine in either VNDB top 25. 
 | YU-RIS | None. Only tools | | | | | 15 library games |
 | NekoSDK | None found | | | | | 16 library games |
 | Wolf RPG Editor | None. Only format tools | | | | | 23 library games |
-| System-NNN | Author's source at tinyan/SystemNNN, no license file, DirectX | | | | | 1 library game |
+| System-NNN | Author's source at tinyan/SystemNNN, no license file, DirectX | | | | | 1 library game, left out after the content check (2026-11-18) |
 | NeXAS | None. Only tools | | | | | Not in library |
 | Shiina Rio, Malie, MAGES. Engine, ADV Player HD, Luca System | None found | | | | | Not in library |
 | CatSystem2 | None usable. FelineSystem2 is an inactive remake (last push 2023) | | | | | Not in library |

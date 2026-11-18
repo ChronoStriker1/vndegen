@@ -40,6 +40,20 @@ int archive_read_data_block(struct archive *, const void **buffer, size_t *size,
 int archive_read_format_capabilities(struct archive *);
 const char *archive_error_string(struct archive *);
 
+typedef ssize_t archive_read_callback(struct archive *, void *client, const void **buffer);
+typedef int64_t archive_skip_callback(struct archive *, void *client, int64_t request);
+typedef int64_t archive_seek_callback(struct archive *, void *client, int64_t offset, int whence);
+typedef int archive_close_callback(struct archive *, void *client);
+int archive_read_set_read_callback(struct archive *, archive_read_callback *);
+int archive_read_set_skip_callback(struct archive *, archive_skip_callback *);
+int archive_read_set_seek_callback(struct archive *, archive_seek_callback *);
+int archive_read_set_close_callback(struct archive *, archive_close_callback *);
+int archive_read_set_callback_data(struct archive *, void *);
+int archive_read_open1(struct archive *);
+void archive_set_error(struct archive *, int code, const char *fmt, ...);
+
+int carchive_open_raw_sectors(struct archive *, const char *path, int sector_size, int data_offset);
+
 const char *archive_entry_pathname(struct archive_entry *);
 const char *archive_entry_pathname_utf8(struct archive_entry *);
 mode_t archive_entry_filetype(struct archive_entry *);
