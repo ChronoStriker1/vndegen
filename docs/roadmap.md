@@ -113,6 +113,7 @@ New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
 - #183: on iPhone and iPad in Touch or Automatic mode, VNDegen's menu button covers a game's own top-right button, such as Transpile Girl Rescue Operation!'s gear.
+- #185: Spooky Pregnant School: The Quickening has no side menu in 0.49.0, so its save and load pages can't be opened during the story; quick save and load work. Fixed on `feat/tmrhiro`, for 0.49.1.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
