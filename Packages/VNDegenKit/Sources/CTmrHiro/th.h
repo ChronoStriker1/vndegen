@@ -126,7 +126,7 @@ typedef struct Scene {
 } Scene;
 
 Scene *scene_load(TH *t, const char *name);
-int scene_label(const Scene *s, const char *label);
+int scene_label(const Scene *s, const char *label, int from);
 void scene_free(Scene *s);
 
 typedef struct Mixer Mixer;

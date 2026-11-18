@@ -73,8 +73,11 @@ Scene *scene_load(TH *t, const char *name) {
     return s;
 }
 
-int scene_label(const Scene *s, const char *label) {
-    for (int i = 0; i < s->count; i++)
+int scene_label(const Scene *s, const char *label, int from) {
+    if (from < 0 || from > s->count) from = 0;
+    for (int k = 0; k < s->count; k++) {
+        int i = (from + k) % s->count;
         if (s->recs[i].cls == 0x10 && s->recs[i].op == 0 && !strcmp((const char *)s->recs[i].body, label)) return i;
+    }
     return -1;
 }
