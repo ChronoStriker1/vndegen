@@ -326,6 +326,7 @@ bool ui_bar_update(TH *t) {
         }
         return false;
     }
+    bool appeared = shown == 1 && u->barShown != 1 && bar_type(t, 1) == 3;
     if (shown != u->barShown || hover != u->barHover) t->dirty = true;
     u->barShown = shown;
     u->barHover = hover;
@@ -334,6 +335,7 @@ bool ui_bar_update(TH *t) {
         t->dirty = true;
     }
     if (!shown) return false;
+    if (t->click && appeared) return true;
     if (t->click && hover >= 0) {
         bar_action(t, hover);
         t->dirty = true;
