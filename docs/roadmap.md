@@ -112,10 +112,11 @@ New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
 - #183: on iPhone and iPad in Touch or Automatic mode, VNDegen's menu button covers a game's own top-right button, such as Transpile Girl Rescue Operation!'s gear.
+- #184: Tmr-Hiro's system screen shows no buttons or sliders in Kyonyuu Elf Oyako Saimin and Kyonyuu Hitozuma Onna Kyoushi Saimin (0.47.0, 0.48.0). Fixed on `feat/tmrhiro`; it ships with The Quickening.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Tmr-Hiro ADV System (Next, item 1), started 2026-11-17 on branch `feat/tmrhiro`, on a clean-room runtime of VNDegen's own. All five library games passed the content check and share one engine family in three builds. Welcome to the Mizuryuu kei land shipped in 0.46.0, Kyonyuu Elf Oyako Saimin in 0.47.0 and Kyonyuu Hitozuma Onna Kyoushi Saimin in 0.48.0. Spooky Pregnant School: The Quickening is next, with its MPEG-1 movies' MP3 sound, then The Conception.
+- Tmr-Hiro ADV System (Next, item 1), started 2026-11-17 on branch `feat/tmrhiro`, on a clean-room runtime of VNDegen's own. All five library games passed the content check and share one engine family in three builds. Welcome to the Mizuryuu kei land shipped in 0.46.0, Kyonyuu Elf Oyako Saimin in 0.47.0 and Kyonyuu Hitozuma Onna Kyoushi Saimin in 0.48.0. Spooky Pregnant School: The Quickening is next: its movies play with their MP3 sound, and its effects, layers and system pages match the PC; whole-route play and the app checks remain. Then The Conception.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
