@@ -12,6 +12,8 @@ static void write_png(const char *path, const uint32_t *px, int w, int h);
 static FILE *wav;
 static struct { char key[160]; int n; } used[512];
 static int usedCount;
+static char lastLine[160];
+static int lineRepeats;
 static long wavFrames;
 static float audio[2048];
 
@@ -136,11 +138,12 @@ int main(int argc, char **argv) {
                 } else if (t->wait == W_TEXT && t->mini[0].defined && t->mini[0].shown) {
                     char ck[160];
                     snprintf(ck, sizeof ck, "%s:%d", t->scene, t->savePc);
-                    int u = 0;
-                    while (u < usedCount && strcmp(used[u].key, ck)) u++;
-                    if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", ck);
-                    if (u < 512 && ++used[u].n > 3) {
-                        used[u].n = 0;
+                    if (strcmp(ck, lastLine)) {
+                        snprintf(lastLine, sizeof lastLine, "%s", ck);
+                        lineRepeats = 0;
+                    }
+                    if (++lineRepeats > 6) {
+                        lineRepeats = 0;
                         cx = t->mini[0].x + t->mini[0].w / 2;
                         cy = t->mini[0].y + t->mini[0].h / 2;
                     }

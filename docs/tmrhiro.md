@@ -37,9 +37,32 @@ two folders down.
   plain. Class 0x00 is text (`Name,Text,Voice`), 0x10 flow (labels, jumps, calls, conditions, title
   buttons, choices, the map), 0x20 pictures, 0x30 sound, 0x40 interface and the gallery, 0x50 scene state and
   variables. `start` is the first scene. `＄α` to `＄ε` in text stand for the names `PLAYER_NAME01` to `05` in `_system`.
+- A condition (0x0004) or assignment (0x5001) record holds an operator, the variable's kind and a one-byte index, and a
+  value. When the byte before the index is non-zero it names a variable kind, and the value is that kind's index, as in
+  `var2[0x6f] = var2[0x74]` or `var2[7] < var2[8]`.
 - `srp.pac` also holds `_system` (screen size, the message window, and the position and source rectangle of every part of
   the built-in screens), `_filemacro` and `_charafilemacro` (picture names made of a base and parts), `_var` (the CG and
   scene lists of the gallery) and `_charaview`.
+
+Spooky Pregnant School: The Conception adds systems the other games don't use:
+
+- A clock picture over the story (0x01f4 names it, 0x01f5 shows or hides it) and a stamina gauge on the map (0x01ff
+  turns it on, the map's kind 0x30 element places it and fills its bar from `glo040`, var2[40]).
+- Two buttons over the text, "use items" and the status orb, from `sys_window_button` (0x50ca and 0x50cc define them,
+  0x50cb and 0x50cd show them). They call `miniscenario2` and `miniscenario3`, which return to the same line.
+- Map buttons it shows or hides through var3: in a map whose header (0x002b) starts with 1, the k-th element record
+  after the header (0x0033 or 0x0034) is hidden while var3[k] is 0. Clearing the buttons (0x0028) sets var3 to 1, and
+  the maps then hide the characters already visited. var3[0] to var3[99] are the 100 flag bytes of a save slot.
+- Item screens built as maps: a 0x0033 record of form 0x10/0x10 is slot N's position, and one of form 0x21 is an item
+  button with a hover card and sounds, shown in the slot that var3 at its index holds. The scripts fill var3 from the
+  item slots var2[0x6f] to var2[0x73] and the count in var2[0x6e]. A 0x0034 record of kind 0x10/0x30 names the
+  right-click label.
+- Screen captures used as backgrounds: 0x0385 N captures the scene (without the message window) as `capdataN`, and
+  choosing a map button captures the map, without the hover card, as `capdata001`.
+- A roulette (0x005e) set up by `_roulette_select`: a click starts the needle, a later click slows it to a stop, and
+  its angle in percent of a turn goes to var2[0], which the script turns into a stamina cost.
+- Picture layers (0x006e) stack in the order they are first set, their x counts from a canvas centred on the screen,
+  and a background record clears them.
 
 The engine draws its own title buttons, message window, button bars, choices, save and load pages, backlog, system
 screen, confirm dialogs and gallery from parts in `Agrd.pac`, placed by `_system`. VNDegen draws them the same way, so
@@ -102,6 +125,11 @@ the same files there:
   hold, and one voice line, `C04a11020002`, is stored with a trailing space in its name. The PC engine passes the call
   by and plays nothing for that line, and so does VNDegen.
 - The H voice loops that name three variants (record 0x0193) play the first one.
+- Spooky Pregnant School: The Conception's item tutorial (`N1_0031_011`) repeats its line until stamina reaches 100,
+  and the way on is to drink Dr. Eri's stamina drink from the "use items" button over the text, twice. The PC engine
+  under Wine never responds to that button while text is shown, in the English or the Japanese script, so the tutorial
+  loops there. VNDegen does what the script means: a click on the button over the text opens the item screen, as the
+  same button does on the map.
 - Spooky Pregnant School: The Quickening asks at the start whether to read the save data of the first game. The PC
   engine then opens a Windows folder picker; VNDegen doesn't read the other game's saves and goes
   on to the game's own question about starting without them.
