@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ip_names.h"
 #include "vnipac.h"
 
 typedef uint8_t u8;
