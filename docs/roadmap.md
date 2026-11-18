@@ -120,7 +120,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- EAGLS, System-NNN, ExHibit and Bruns (Next, item 1, the visual novel engines), started 2026-11-18 on branch `feat/vn-four`, each on a clean-room runtime of VNDegen's own, with one library game each, one engine per release. The content check and survey come first.
+- EAGLS and ExHibit (Next, item 1, the visual novel engines), started 2026-11-18 on branch `feat/vn-four`, each on a clean-room runtime of VNDegen's own, one engine per release. EAGLS comes first, with the English Oppai no Ouja 48 (plain-text scripts, 800x600, MPEG-1 movies), in about 8 to 12 working hours. Then ExHibit with Succubus Sessions: Mami Mamiya's Sweet Slice of Hell (1920x1080, encrypted scripts and its own delta animations), in about 12 to 16 more. System-NNN's and Bruns's only library games, Princess X and Orc Kingdom, were left out after the content check, so those engines wait for other games.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
@@ -133,7 +133,7 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 
 ## Next
 Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the two that reuse an engine VNDegen has came first and shipped, the Enigma Virtual Box unpacker for packed RPG Maker MV and MZ games in 0.44.0 and Construct in 0.45.0. The rest follow by number of games. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
-1. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
+1. One game each: ExHibit, EAGLS, FFD, Eushully AGE and SRPG Studio. System-NNN and Bruns are off the list for now: their one library game each was left out after the content check on 2026-11-18.
 
 ## Set aside
 - Smile Game Builder, set aside on 2026-11-18. Two of its three library games were left out after the content check, and the one left, Princess Colette's Great Adventure, is Japanese only. Its games are 3D, so a runtime of VNDegen's own would need a 3D renderer, FBX models and a battle system, about 4 to 6 weeks for that one game. Running the games' own .NET player would need its native graphics library rewritten, which the clean-room rule doesn't allow. It comes back if the library gains more Smile Game Builder games, especially English ones.

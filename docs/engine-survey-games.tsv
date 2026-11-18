@@ -393,7 +393,7 @@ Oppaidius Desert Island!	vn-engine	Ren'Py	<=7.3 (py2)	Oppaidius Desert Island!/g
 Oppaidius Summer Trouble!	vn-engine	Ren'Py	<=7.3 (py2)	Oppaidius/game/assets.rpa	347	archived; ships macOS .app; Ren'Py Mac libs present; Ren'Py Linux libs present
 Oppaidius Tropical Cruise!	vn-engine	Ren'Py	<=7.3 (py2)	OppaidiusTC-1.2.5-win/game/assets.rpa	392	archived
 Oral Sex Brothel 2_ The Older Sisters Who Reverse-Rape a Virgin Shota with Fellatio ♡	general-engine	Unity		Oral Sex Brothel 2 - The Older Sisters Who Reverse-Rape a Virgin Shota with Fellatio/OralSexShop2_v1.1.0_Win/OralSexShop2_Data/Managed/	530	archived; Mono
-Orc Kingdom_ Monmusu Breeder King	vn-engine	Bruns		RJ124179/binary/bruns.exe	854	archived
+Orc Kingdom_ Monmusu Breeder King	vn-engine	Bruns		RJ124179/binary/bruns.exe	854	archived; left out after the content check (2026-11-18)
 Orction	unknown	unknown			24	archived; no known signature; main exe Orction ver.04-01-2018 [English]/Game.exe
 Ore o Hoshigaru Futari no Haha	vn-engine	NekoSDK		セーブデータフォルダを開く.exe	5469	archived; engine from VNDB release engine field
 Ore o Hoshigaru Tsuma to Gibo	vn-engine	NekoSDK		セーブデータフォルダを開く.exe	4154	archived; inferred from .pak plus save-folder launcher, the pattern of VNDB-confirmed NekoSDK titles
@@ -414,7 +414,7 @@ President Yukino	unknown	unknown			1090	archived; GOG offline installer, not unp
 Primal Empire Tycoon	general-engine	Unity		Primal Empire Tycoon V0.5/GameAssembly.dll	806	archived; IL2CPP
 Prince of Suburbia - Part 1	vn-engine	Ren'Py	8.x (py3)	Prince of Suburbia - Part One/game/sounds.rpa	1576	archived; Ren'Py Linux libs present; Ren'Py macOS libs present; SOVEREIGN.dll beside the exe
 Princess Ilyana_ Night of Falling Grace	general-engine	GameCreator (HTML)		Princess Ilyana Night of Falling Grace-Steam/nw.dll	1112	archived; index.html credits GameCreator; NW.js wrapper; checked 2026-10-26
-Princess X_ My Fiancee is a Monster Girl!_	vn-engine	System-NNN		VNDB release engine field	1988	archived; engine from VNDB release engine field
+Princess X_ My Fiancee is a Monster Girl!_	vn-engine	System-NNN		VNDB release engine field	1988	archived; engine from VNDB release engine field; left out after the content check (2026-11-18)
 Princesses Never Lose!	rpg-maker-family	RPG Maker MV		Princesses Never Lose!/www/js/rpg_core.js	1694	archived; encrypted assets; NW.js wrapper
 Prison Academia	vn-engine	Artemis		root.pfs	3182	archived
 Prison Battleship 3_ Brainwashing Route of Boiling Sand	vn-engine	KiriKiri		Kangoku Senkan 3 - English Patch v2.0/data.xp3	1134	archived
