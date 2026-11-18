@@ -291,13 +291,14 @@ static int step(TH *t) {
             if (!t->replayDepth) save_auto(t);
             t->mapCount = 0;
             t->mapRecs = 0;
+            t->mapLimit = r->len >= 4 ? rd16(b + 2) : 0;
             t->mapCancel[0] = 0;
             t->mapAnimCount = 0;
             return 1;
         }
         case 0x33: {
             int index = t->mapRecs++;
-            if (t->mapCount >= 72 || r->len < 19) return 1;
+            if (t->mapCount >= 72 || r->len < 19 || (t->mapLimit && index >= t->mapLimit)) return 1;
             MapButton *m = &t->maps[t->mapCount++];
             memset(m, 0, sizeof *m);
             m->index = index;
@@ -349,7 +350,7 @@ static int step(TH *t) {
                 snprintf(t->mapCancel, sizeof t->mapCancel, "%s", s + 2);
                 return 1;
             }
-            if (t->mapCount >= 72 || r->len < 14) return 1;
+            if (t->mapCount >= 72 || r->len < 14 || (t->mapLimit && index >= t->mapLimit)) return 1;
             MapButton *m = &t->maps[t->mapCount++];
             memset(m, 0, sizeof *m);
             m->kind = b[0];
@@ -516,7 +517,6 @@ static int step(TH *t) {
             t->sceneDirty = true;
             return 1;
         case 0x1ff:
-            t->gaugeOn = r->len > 0 && b[0];
             return 1;
         case 0x385:
             if (r->len >= 2) gfx_capture(t, rd16(b));

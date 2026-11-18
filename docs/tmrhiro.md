@@ -46,8 +46,9 @@ two folders down.
 
 Spooky Pregnant School: The Conception adds systems the other games don't use:
 
-- A clock picture over the story (0x01f4 names it, 0x01f5 shows or hides it) and a stamina gauge on the map (0x01ff
-  turns it on, the map's kind 0x30 element places it and fills its bar from `glo040`, var2[40]).
+- A clock picture over the story (0x01f4 names it, 0x01f5 shows or hides it) and a stamina gauge on the map (the map's
+  kind 0x30 element places it and fills its bar from `glo040`, var2[40]). A map header (0x002b) gives its element
+  count, and elements past it aren't used; the early maps count their elements without the gauge, so they show none.
 - Two buttons over the text, "use items" and the status orb, from `sys_window_button` (0x50ca and 0x50cc define them,
   0x50cb and 0x50cd show them). They call `miniscenario2` and `miniscenario3`, which return to the same line.
 - Map buttons it shows or hides through var3: in a map whose header (0x002b) starts with 1, the k-th element record
@@ -133,6 +134,11 @@ the same files there:
   under Wine never responds to that button while text is shown, in the English or the Japanese script, so the tutorial
   loops there. VNDegen does what the script means: a click on the button over the text opens the item screen, as the
   same button does on the map.
+- Spooky Pregnant School: The Conception's chapter 3 can lock itself: map 11 lets the player visit two of its three
+  characters, and if the one left out is the one var2[0x17] follows, map 13 keeps rebuilding with no button for her
+  once the others are done. The PC engine does the same from the same state. Loading an earlier save gets out of it.
+- A Conception save made while the clock picture is up comes back without it until the script draws it again. The PC
+  slot holds the picture's name at offset 29198, but which bytes say it is shown isn't settled.
 - Spooky Pregnant School: The Quickening asks at the start whether to read the save data of the first game. The PC
   engine then opens a Windows folder picker; VNDegen doesn't read the other game's saves and goes
   on to the game's own question about starting without them.

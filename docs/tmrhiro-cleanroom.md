@@ -81,6 +81,11 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   next map; VNDegen does the same.
 - Conception's map 09 jumps to `LABEL03_03`, which neither its English nor its Japanese script has. A PC slot edited
   to reach that jump shows the same map as VNDegen, which carries on at the next record.
+- Condition operator 3 is `<`: a PC slot edited to resume at map 13's build test with every progress variable at 0
+  builds the map, and with each one above its threshold the map ends. The same state as a VNDegen auto save locked map
+  13 on the PC as in VNDegen.
+- The map element count: the PC shows the gauge on maps 07, 09 and 13, whose header counts it, and not on map 01,
+  whose header counts one element fewer than it has; a save loaded at map 13 shows it without record 0x01ff running.
 - Overlay order: on Conception's status screen the dark band (layer 4) is set before the five silhouettes (layers 0 to
   3 and 5), and the PC draws all five over it.
 - The roulette: recorded at 30 fps under Wine and the needle's angle measured in each frame. It rests at the top, a

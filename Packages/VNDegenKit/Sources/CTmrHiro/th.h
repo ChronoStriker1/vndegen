@@ -320,10 +320,10 @@ struct TH {
     int choiceCount;
     MapButton maps[72];
     int mapCount;
-    int mapRecs;
+    int mapRecs, mapLimit;
     char mapCancel[64];
     char hudName[64];
-    bool hudOn, gaugeOn;
+    bool hudOn;
     MiniButton mini[2];
     int miniHover;
     struct { int id; Image *img; } caps[6];

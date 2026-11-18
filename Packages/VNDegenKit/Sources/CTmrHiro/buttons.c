@@ -173,7 +173,6 @@ void map_draw(TH *t, u32 *dst, bool card) {
             int x, y;
             if (!sheet || !m->w || !m->h || m->form == MAP_SLOT || !map_place(t, m, &x, &y)) continue;
             if (m->form == MAP_GAUGE) {
-                if (!t->gaugeOn) continue;
                 blit_part(dst, t->W, t->H, sheet, m->sx, m->sy, m->w, m->h, x, y, 255);
                 const char *v = m->var[0] == '$' ? m->var + 1 : m->var;
                 int value = 0;
