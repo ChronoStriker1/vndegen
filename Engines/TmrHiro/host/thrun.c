@@ -133,10 +133,22 @@ int main(int argc, char **argv) {
                     cx = t->W / 2;
                     cy = top - h / 2 - total / 2 + (h + ny) * i + h / 2;
                     (void)w;
+                } else if (t->wait == W_TEXT && t->mini[0].defined && t->mini[0].shown) {
+                    char ck[160];
+                    snprintf(ck, sizeof ck, "%s:%d", t->scene, t->savePc);
+                    int u = 0;
+                    while (u < usedCount && strcmp(used[u].key, ck)) u++;
+                    if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", ck);
+                    if (u < 512 && ++used[u].n > 3) {
+                        used[u].n = 0;
+                        cx = t->mini[0].x + t->mini[0].w / 2;
+                        cy = t->mini[0].y + t->mini[0].h / 2;
+                    }
                 } else if (t->wait == W_MAP) {
                     int act[16], na = 0;
-                    for (int i = 0; i < t->mapCount; i++)
-                        if (t->maps[i].kind == 0x20) act[na++] = i;
+                    int px, py;
+                    for (int i = 0; i < t->mapCount && na < 16; i++)
+                        if (t->maps[i].kind == 0x20 && t->maps[i].form != MAP_SLOT && map_place(t, &t->maps[i], &px, &py)) act[na++] = i;
                     if (na) {
                         int best = act[x % na], bestUse = 1 << 30;
                         for (int q = 0; q < na; q++) {
@@ -154,8 +166,9 @@ int main(int argc, char **argv) {
                         if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", key);
                         if (u < 512) used[u].n++;
                         MapButton *b = &t->maps[best];
-                        cx = b->x + b->w / 2;
-                        cy = b->y + b->h / 2;
+                        map_place(t, b, &px, &py);
+                        cx = px + b->w / 2;
+                        cy = py + b->h / 2;
                     }
                 }
                 vnth_mouse_move(n, cx, cy);
@@ -180,6 +193,9 @@ int main(int argc, char **argv) {
             if (label[0] == '#') ((TH *)n)->pc = atoi(label + 1);
             ((TH *)n)->wait = W_NONE;
             ((TH *)n)->menuBlocked = false;
+        } else if (sscanf(c, "var:%d,%d", &k, &x) == 2) {
+            TH *t = (TH *)n;
+            printf("var%d[%d]=%d\n", k, x, k >= 0 && k < 6 && x >= 0 && x < TH_VARS ? t->vars[k][x] : 0);
         } else if (strncmp(c, "state", 5) == 0) {
             TH *t = (TH *)n;
             printf("scene=%s pc=%d wait=%d bg=%s sprites=%d ui=%d\n", t->scene, t->pc, t->wait, t->bgName, t->sprCount, t->uiMode);

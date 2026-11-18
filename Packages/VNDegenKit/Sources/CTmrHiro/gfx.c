@@ -4,6 +4,8 @@
 
 #define CACHE_MAX 40
 
+static void render_scene(TH *t);
+
 static inline u32 over(u32 d, u32 s, int alpha) {
     u32 a = (s >> 24) * (u32)alpha / 255;
     if (a == 0) return d;
@@ -148,6 +150,13 @@ Image *compose_named(TH *t, const char *spec, bool chara) {
 }
 
 static Image *image_lookup(TH *t, const char *name, bool quiet) {
+    if (!strncmp(name, "capdata", 7)) {
+        int id = atoi(name + 7);
+        for (int i = 0; i < t->capCount; i++)
+            if (t->caps[i].id == id) return t->caps[i].img;
+        if (!quiet) th_log(t, "no capture %s", name);
+        return NULL;
+    }
     for (int i = 0; i < t->cacheCount; i++)
         if (!strcmp(t->cache[i].name, name)) {
             t->cache[i].used = ++t->cacheTick;
@@ -195,7 +204,44 @@ void gfx_init(TH *t) {
     for (size_t i = 0; i < n; i++) t->screen[i] = t->sceneBuf[i] = t->prevBuf[i] = 0xff000000u;
 }
 
+void gfx_capture(TH *t, int id) {
+    if (t->sceneDirty) {
+        render_scene(t);
+        t->sceneDirty = false;
+    }
+    int i = 0;
+    while (i < t->capCount && t->caps[i].id != id) i++;
+    if (i == t->capCount) {
+        if (t->capCount == (int)(sizeof t->caps / sizeof t->caps[0])) return;
+        t->caps[i].id = id;
+        t->caps[i].img = image_new(t->W, t->H, 0, 0, t->W, t->H);
+        t->capCount++;
+    }
+    Image *im = t->caps[i].img;
+    memcpy(im->px, t->sceneBuf, (size_t)t->W * (size_t)t->H * 4);
+    im->opaque = true;
+}
+
+void blit_rotated(u32 *dst, int dw, int dh, const Image *im, int cx, int cy, float degrees) {
+    float a = degrees * 3.14159265f / 180.0f, c = cosf(a), s = sinf(a);
+    float hw = im->cw / 2.0f, hh = im->ch / 2.0f;
+    int r = (int)ceilf(sqrtf(hw * hw + hh * hh));
+    for (int y = cy - r; y <= cy + r; y++) {
+        if (y < 0 || y >= dh) continue;
+        for (int x = cx - r; x <= cx + r; x++) {
+            if (x < 0 || x >= dw) continue;
+            float dx = x - cx + 0.5f, dy = y - cy + 0.5f;
+            int u = (int)floorf(dx * c + dy * s + hw) - im->x, v = (int)floorf(-dx * s + dy * c + hh) - im->y;
+            if (u < 0 || v < 0 || u >= im->w || v >= im->h) continue;
+            u32 p = im->px[(size_t)v * (size_t)im->w + (size_t)u];
+            int al = (int)(p >> 24);
+            if (al) dst[(size_t)y * (size_t)dw + (size_t)x] = over(dst[(size_t)y * (size_t)dw + (size_t)x], p, 255);
+        }
+    }
+}
+
 void gfx_close(TH *t) {
+    for (int i = 0; i < t->capCount; i++) image_free(t->caps[i].img);
     for (int i = 0; i < t->cacheCount; i++) {
         image_free(t->cache[i].img);
         free(t->cache[i].name);
@@ -267,7 +313,7 @@ static void render_scene(TH *t) {
         Overlay *o = &t->overlay[i];
         u32 el = t->now - o->start;
         float k = o->dur && el < o->dur ? (float)el / (float)o->dur : 1.0f;
-        float x = o->x0 + (o->x1 - o->x0) * k, y = o->y0 + (o->y1 - o->y0) * k;
+        float x = o->x0 + (o->x1 - o->x0) * k + (t->W - o->img->cw) / 2.0f, y = o->y0 + (o->y1 - o->y0) * k;
         float sx = (o->s0x + (o->s1x - o->s0x) * k) / 100.0f, sy = (o->s0y + (o->s1y - o->s0y) * k) / 100.0f;
         int a = (int)lroundf((o->a0 + (o->a1 - o->a0) * k) * 255.0f / 1000.0f);
         if (a <= 0) continue;
@@ -280,6 +326,11 @@ static void render_scene(TH *t) {
         ini_ints(&t->sys, "MESSAGEWINDOW", "ECSTACY_NAVI_STAT", st, 4);
         blit(d, t->W, t->H, t->navi, st[0], st[1], 255);
     }
+    if (t->hudOn && t->hudName[0]) {
+        Image *hud = image_get(t, t->hudName);
+        if (hud) blit(d, t->W, t->H, hud, 0, 0, 255);
+    }
+    mini_draw(t, d);
 }
 
 void gfx_begin_transition(TH *t, int kind) {

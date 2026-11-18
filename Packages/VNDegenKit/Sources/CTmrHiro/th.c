@@ -66,7 +66,9 @@ VNTH *vnth_open(const VNTHConfig *cfg, char *err, size_t errSize) {
     load_ini(&t->store, &t->fileMacro, "_filemacro");
     load_ini(&t->store, &t->charaMacro, "_charafilemacro");
     load_ini(&t->store, &t->varIni, "_var");
+    load_ini(&t->store, &t->rouletteIni, "_roulette_select");
     load_ini(&t->store, &t->charaView, "_charaview");
+    t->miniHover = -1;
     const char *g = ini_get(&t->sys, "GAMESYSTEM", "GAME_TITLE");
     t->title = th_sjis_to_utf8(g ? g : "Tmr-Hiro ADV");
     t->W = ini_int(&t->sys, "GAMESYSTEM", "DEF_WINDOW_WIDTH", 1280);
@@ -118,6 +120,7 @@ void vnth_close(VNTH *v) {
     ini_free(&t->fileMacro);
     ini_free(&t->charaMacro);
     ini_free(&t->varIni);
+    ini_free(&t->rouletteIni);
     ini_free(&t->charaView);
     store_close(&t->store);
     free(t->system000);
@@ -192,7 +195,7 @@ bool vnth_frame(VNTH *v, uint32_t elapsedMs) {
     t->now += elapsedMs > 100 ? 100 : elapsedMs;
     if (t->uiMode != UI_NONE) {
         ui_update(t);
-    } else if (!ui_bar_update(t)) {
+    } else if (!ui_bar_update(t) && !mini_update(t)) {
         switch (t->wait) {
         case W_TIME:
             if (t->now >= t->waitUntil || (t->waitSkippable && (t->click || t->keyDown[0x11]))) {
@@ -222,6 +225,7 @@ bool vnth_frame(VNTH *v, uint32_t elapsedMs) {
         case W_GALLERY:
         case W_CGVIEW: gallery_update(t); break;
         case W_MOVIE: movie_update(t, elapsedMs > 100 ? 100 : elapsedMs); break;
+        case W_ROULETTE: roulette_update(t); break;
         default: break;
         }
     }
