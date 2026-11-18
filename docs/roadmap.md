@@ -105,6 +105,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Construct 3, in the web view, with Transpile Girl Rescue Operation! (0.45.0). Its saves stay in VNDegen, as Twine's do.
 - Tmr-Hiro ADV System, on VNDegen's own clean-room runtime, with the English release of Welcome to the Mizuryuu kei land and PC saves both ways (0.46.0). More Tmr-Hiro games follow in sets.
 - Tmr-Hiro: Kyonyuu Elf Oyako Saimin in English, the first game on the 2018 engine build (0.47.0).
+- Tmr-Hiro: Kyonyuu Hitozuma Onna Kyoushi Saimin in English, on the 2014 engine build (0.48.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -114,7 +115,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Tmr-Hiro ADV System (Next, item 1), started 2026-11-17 on branch `feat/tmrhiro`, on a clean-room runtime of VNDegen's own. All five library games passed the content check and share one engine family in three builds. Welcome to the Mizuryuu kei land shipped in 0.46.0 and Kyonyuu Elf Oyako Saimin in 0.47.0. The other three follow in sets: Kyonyuu Hitozuma Onna Kyoushi Saimin next, then Spooky Pregnant School: The Quickening and The Conception.
+- Tmr-Hiro ADV System (Next, item 1), started 2026-11-17 on branch `feat/tmrhiro`, on a clean-room runtime of VNDegen's own. All five library games passed the content check and share one engine family in three builds. Welcome to the Mizuryuu kei land shipped in 0.46.0, Kyonyuu Elf Oyako Saimin in 0.47.0 and Kyonyuu Hitozuma Onna Kyoushi Saimin in 0.48.0. Spooky Pregnant School: The Quickening is next, with its MPEG-1 movies' MP3 sound, then The Conception.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
