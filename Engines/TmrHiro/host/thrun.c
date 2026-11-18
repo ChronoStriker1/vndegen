@@ -12,6 +12,8 @@ static void write_png(const char *path, const uint32_t *px, int w, int h);
 static FILE *wav;
 static struct { char key[160]; int n; } used[512];
 static int usedCount;
+static char prefer[16][64];
+static int preferCount;
 static char lastLine[160];
 static int lineRepeats;
 static long wavFrames;
@@ -132,6 +134,9 @@ int main(int argc, char **argv) {
                     if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", ck);
                     int seen = u < 512 ? used[u].n++ : 0;
                     int i = (x + seen) % t->choiceCount, total = t->choiceCount * h + (t->choiceCount - 1) * ny;
+                    for (int c = 0; c < t->choiceCount; c++)
+                        for (int q = 0; q < preferCount; q++)
+                            if (!strcmp(t->choices[c].label, prefer[q])) i = c;
                     cx = t->W / 2;
                     cy = top - h / 2 - total / 2 + (h + ny) * i + h / 2;
                     (void)w;
@@ -168,6 +173,9 @@ int main(int argc, char **argv) {
                         while (u < usedCount && strcmp(used[u].key, key)) u++;
                         if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", key);
                         if (u < 512) used[u].n++;
+                        for (int q2 = 0; q2 < na; q2++)
+                            for (int q = 0; q < preferCount; q++)
+                                if (!strcmp(t->maps[act[q2]].label, prefer[q])) best = act[q2];
                         MapButton *b = &t->maps[best];
                         map_place(t, b, &px, &py);
                         cx = px + b->w / 2;
@@ -196,6 +204,8 @@ int main(int argc, char **argv) {
             if (label[0] == '#') ((TH *)n)->pc = atoi(label + 1);
             ((TH *)n)->wait = W_NONE;
             ((TH *)n)->menuBlocked = false;
+        } else if (strncmp(c, "prefer:", 7) == 0) {
+            if (preferCount < 16) snprintf(prefer[preferCount++], 64, "%s", c + 7);
         } else if (sscanf(c, "var:%d,%d", &k, &x) == 2) {
             TH *t = (TH *)n;
             printf("var%d[%d]=%d\n", k, x, k >= 0 && k < 6 && x >= 0 && x < TH_VARS ? t->vars[k][x] : 0);
