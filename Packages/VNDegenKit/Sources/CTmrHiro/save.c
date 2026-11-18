@@ -299,6 +299,8 @@ bool load_slot(TH *t, int slot) {
     memset(t->vars[2], 0, sizeof t->vars[2]);
     for (int i = 0; i < VARS_LEN; i++) t->vars[2][i] = d[OFF_VARS + i];
     t->mapBuilding = false;
+    t->hudOn = t->gaugeOn = t->roulette.shown = false;
+    t->mini[0].shown = t->mini[1].shown = false;
     t->sp = 0;
     for (int k = depth < FRAME_MAX - 1 ? depth : FRAME_MAX - 1; k >= 1; k--) {
         const u8 *g = d + OFF_FRAMES + FRAME_SIZE * k;

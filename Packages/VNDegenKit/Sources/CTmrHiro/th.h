@@ -328,7 +328,7 @@ struct TH {
     int miniHover;
     struct { int id; Image *img; } caps[6];
     int capCount;
-    struct { bool stopped; float angle; u32 start, stopAt; int speed; char needle[64], wheel[64]; int nx, ny; char stopSe[32]; } roulette;
+    struct { bool shown; int phase; float angle, from; u32 at, wait; char needle[64], wheel[64], startSe[32], loopSe[32], stopSe[32]; int nx, ny; } roulette;
     char mapBg[64], mapBase[64], mapSheet[64];
     int mapMode;
     bool mapBuilding, jumped, mapLastActive;

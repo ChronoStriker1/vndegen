@@ -158,7 +158,7 @@ void buttons_draw(TH *t) {
     } else if (t->wait == W_MAP) {
         map_draw(t, t->screen, true);
     }
-    if (t->wait == W_ROULETTE) roulette_draw(t);
+    if (t->roulette.shown) roulette_draw(t);
 }
 
 void map_draw(TH *t, u32 *dst, bool card) {
@@ -227,39 +227,59 @@ void mini_draw(TH *t, u32 *dst) {
     }
 }
 
+static void ini_copy(TH *t, const char *section, const char *key, char *out, size_t size) {
+    const char *v = ini_get(&t->rouletteIni, section, key);
+    snprintf(out, size, "%s", v ? v : "");
+}
+
 void roulette_start(TH *t, const char *section) {
     memset(&t->roulette, 0, sizeof t->roulette);
-    snprintf(t->roulette.wheel, sizeof t->roulette.wheel, "%s", ini_get(&t->rouletteIni, section, "G_Roulette01") ? ini_get(&t->rouletteIni, section, "G_Roulette01") : "");
-    snprintf(t->roulette.needle, sizeof t->roulette.needle, "%s", ini_get(&t->rouletteIni, section, "G_Roulette02") ? ini_get(&t->rouletteIni, section, "G_Roulette02") : "");
-    const char *stop = ini_get(&t->rouletteIni, section, "RouletteStopSE");
-    snprintf(t->roulette.stopSe, sizeof t->roulette.stopSe, "%s", stop ? stop : "");
+    ini_copy(t, section, "G_Roulette01", t->roulette.wheel, sizeof t->roulette.wheel);
+    ini_copy(t, section, "G_Roulette02", t->roulette.needle, sizeof t->roulette.needle);
+    ini_copy(t, section, "RouletteStartSE", t->roulette.startSe, sizeof t->roulette.startSe);
+    ini_copy(t, section, "RouletteME", t->roulette.loopSe, sizeof t->roulette.loopSe);
+    ini_copy(t, section, "RouletteStopSE", t->roulette.stopSe, sizeof t->roulette.stopSe);
     int pos[2] = {0};
     ini_ints(&t->rouletteIni, section, "G_Roulette_Pos", pos, 2);
     t->roulette.nx = pos[0];
     t->roulette.ny = pos[1];
-    t->roulette.speed = ini_int(&t->rouletteIni, section, "RouletSpeed", 10);
-    t->roulette.start = t->now;
-    t->roulette.stopAt = t->now + (u32)ini_int(&t->rouletteIni, section, "ClickStartWait", 1500);
-    const char *start = ini_get(&t->rouletteIni, section, "RouletteStartSE");
-    if (start) snd_play(t, CH_SE, PAC_SE, start, false, 0);
+    t->roulette.wait = (u32)ini_int(&t->rouletteIni, section, "ClickStartWait", 1500);
+    t->roulette.shown = true;
     t->sceneDirty = true;
 }
 
+enum { SPIN_SPEED = 1080, STOP_MS = 2700, STOP_SPEED = 1013 };
+
 void roulette_update(TH *t) {
-    if (!t->roulette.stopped) {
-        t->roulette.angle = fmodf((float)(t->now - t->roulette.start) * (float)t->roulette.speed * 0.06f, 360.0f);
+    bool click = t->click || t->keyPress[0x0d] || t->keyPress[0x20];
+    u32 el = t->now - t->roulette.at;
+    switch (t->roulette.phase) {
+    case 0:
+        if (!click) return;
+        t->roulette.phase = 1;
+        t->roulette.at = t->now;
+        if (t->roulette.startSe[0]) snd_play(t, CH_SE, PAC_SE, t->roulette.startSe, false, 0);
+        if (t->roulette.loopSe[0]) snd_play(t, CH_SEH3, PAC_SE, t->roulette.loopSe, true, 0);
+        return;
+    case 1:
+        t->roulette.angle = fmodf(t->roulette.from + (float)el * SPIN_SPEED / 1000.0f, 360.0f);
         t->dirty = true;
-        if ((t->click || t->keyPress[0x0d] || t->keyPress[0x20]) && t->now >= t->roulette.stopAt) {
-            t->roulette.stopped = true;
-            t->roulette.stopAt = t->now + 1000;
-            if (t->roulette.stopSe[0]) snd_play(t, CH_SE, PAC_SE, t->roulette.stopSe, false, 0);
-            t->vars[2][0] = clampi((int)(t->roulette.angle * 100.0f / 360.0f), 0, 99);
+        if (click && el >= t->roulette.wait) {
+            t->roulette.phase = 2;
+            t->roulette.from = t->roulette.angle;
+            t->roulette.at = t->now;
         }
         return;
-    }
-    if (t->now >= t->roulette.stopAt) {
+    default: {
+        float s = (float)(el < STOP_MS ? el : STOP_MS) / 1000.0f, T = STOP_MS / 1000.0f;
+        t->roulette.angle = fmodf(t->roulette.from + STOP_SPEED * (s - s * s * s / (3 * T * T)), 360.0f);
+        t->dirty = true;
+        if (el < STOP_MS) return;
+        snd_stop(t, CH_SEH3, 0);
+        if (t->roulette.stopSe[0]) snd_play(t, CH_SE, PAC_SE, t->roulette.stopSe, false, 0);
+        t->vars[2][0] = clampi((int)(t->roulette.angle * 100.0f / 360.0f), 0, 99);
         t->wait = W_NONE;
-        t->sceneDirty = true;
+    }
     }
 }
 

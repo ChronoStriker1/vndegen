@@ -401,6 +401,7 @@ static int step(TH *t) {
             if (!strncmp(s + at, "fm_", 3)) gallery_mark_cg(t, s + at);
             gfx_set_bg(t, s + at, t->skipMode ? 0 : rd16(b));
             gfx_clear_overlay(t, -1);
+            t->roulette.shown = false;
             if (r->op == 0x01) t->bgEffect = b[2];
             if (t->transActive) {
                 begin_wait(t, W_TRANS, 0);
