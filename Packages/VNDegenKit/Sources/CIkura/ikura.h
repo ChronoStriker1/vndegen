@@ -265,7 +265,8 @@ struct IK {
     SaveFile save;
     u8 *savedEnabled[4];
     int keyButton[256];
-    int skipMode, autoMode;
+    int skipMode, autoMode, modeButton[2], lastToggle;
+    u32 autoAt;
     u8 *flags;
     int flagCount;
     Font fonts[IK_FONTS];
@@ -313,6 +314,7 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n);
 void msg_tick(IK *t);
 void msg_draw(IK *t, int layer);
 void msg_close(IK *t);
+void msg_stop_modes(IK *t);
 void snd_init(IK *t);
 void snd_close(IK *t);
 void snd_se_load(IK *t, int slot, const char *name);

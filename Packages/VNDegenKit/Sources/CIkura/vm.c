@@ -499,13 +499,18 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     }
     case 0x0912: {
         i32 *v = var_at(t, rd32(a + 4));
-        if (v) *v = 0;
+        if (v) *v = ik_value(t, rd32(a)) ? t->skipMode : t->autoMode;
         break;
     }
-    case 0x0913:
-        if (ik_value(t, rd32(a)) == 0) t->skipMode = (int)ik_value(t, rd32(a + 4));
-        else t->autoMode = (int)ik_value(t, rd32(a + 4));
+    case 0x0913: {
+        int which = ik_value(t, rd32(a)) ? 1 : 0, on = ik_value(t, rd32(a + 4)) != 0;
+        if (which) t->skipMode = on;
+        else t->autoMode = on;
+        if (t->lastToggle >= 0) t->modeButton[which] = t->lastToggle;
+        t->lastToggle = -1;
+        t->autoAt = 0;
         break;
+    }
     case 0x0701: {
         Button *b = button(t, rd32(a));
         if (!b) break;

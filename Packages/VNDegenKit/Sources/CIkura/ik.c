@@ -40,8 +40,11 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
     t->rng = (u32)cfg->startTime | 1;
     t->dun.compass = t->dun.marker = -1;
     t->buttonCount = 80;
+    t->modeButton[0] = t->modeButton[1] = t->lastToggle = -1;
     for (int i = 0; i < 64; i++) t->settings[i] = i == 0 ? 1000 : i == 1 ? 1 : i == 3 || i == 4 ? 500 : i == 6 || i == 8 || i == 10 ? 128 : i >= 11 && i <= 36 ? 1 : 0;
     vm_start(t, "START.SNR");
+    t->resumeSc = t->sc;
+    t->resumeLabel = -1;
     if (!t->sc) {
         if (err) snprintf(err, errSize, "%s", t->problem);
         vnikura_close((VNIkura *)t);
@@ -91,6 +94,9 @@ static void tick(IK *t) {
         if (!snd_voice_playing(t) || t->click) t->wait = W_NONE;
         break;
     case W_QUIT: t->quit = true; break;
+    case W_INPUT:
+        if (t->skipMode) msg_stop_modes(t);
+        break;
     default: break;
     }
     vm_run(t);

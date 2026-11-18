@@ -259,6 +259,12 @@ void buttons_input(IK *t) {
     if (t->click && h >= 0 && t->buttons[h].enabled && t->buttons[h].bound) {
         Button *b = &t->buttons[h];
         t->click = false;
+        if (b->type == 3) {
+            int on = b->mode != 2;
+            b->mode = on ? 2 : 1;
+            if (b->var >= 0 && b->var < t->varCount) t->vars[b->var] = on;
+            t->lastToggle = h;
+        }
         if (b->type == 4 && b->w > 0) {
             Layer *bl = &t->layers[b->layer];
             b->value = clampi((t->mx - bl->x - b->x) * b->max / b->w, 0, b->max);

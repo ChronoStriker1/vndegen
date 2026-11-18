@@ -125,7 +125,7 @@ static void run_tags(IK *t) {
         }
         case 0x13:
             if (left < 13) goto bad;
-            {
+            if (!t->skipMode) {
                 char name[13];
                 memcpy(name, p + 1, 12);
                 name[12] = 0;
@@ -151,9 +151,30 @@ bad:
     finish(t);
 }
 
+static void stop_mode(IK *t, int which) {
+    if (which) t->skipMode = 0;
+    else t->autoMode = 0;
+    int b = t->modeButton[which];
+    if (b >= 0 && b < IK_BUTTONS && t->buttons[b].made && t->buttons[b].mode == 2) t->buttons[b].mode = 1;
+    t->dirty = true;
+}
+
+void msg_stop_modes(IK *t) {
+    if (t->skipMode) stop_mode(t, 1);
+    if (t->autoMode) stop_mode(t, 0);
+}
+
 void msg_tick(IK *t) {
     MsgWin *m = &t->msg;
     if (t->wait != W_MSG || !m->tags) return;
+    if ((t->skipMode || t->autoMode) && (t->click || t->rclick)) {
+        msg_stop_modes(t);
+        t->click = false;
+    }
+    if (t->skipMode && m->revealed < m->count) {
+        m->revealed = m->count;
+        t->dirty = true;
+    }
     if (m->revealed < m->count) {
         if (t->click) {
             t->click = false;
@@ -170,7 +191,14 @@ void msg_tick(IK *t) {
     }
     if (m->cursor) {
         if ((t->now - m->cursorAt) / CURSOR_MS != (t->now - 17 - m->cursorAt) / CURSOR_MS) t->dirty = true;
-        if (!t->click) return;
+        bool go = t->click;
+        if (t->skipMode) go = true;
+        else if (t->autoMode && !snd_voice_playing(t)) {
+            if (!t->autoAt) t->autoAt = t->now + (u32)clampi(t->settings[3], 0, 1000) * 2u;
+            go = (i32)(t->now - t->autoAt) >= 0;
+        }
+        if (!go) return;
+        t->autoAt = 0;
         t->click = false;
         m->cursor = false;
         m->tagPos++;
