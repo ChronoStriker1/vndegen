@@ -118,7 +118,6 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Smile Game Builder (Next, item 1), started 2026-11-18 on branch `feat/smilegame`: the content check, the survey and the choice between a runtime of VNDegen's own and running the games' .NET code come first.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
@@ -131,11 +130,11 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 
 ## Next
 Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the two that reuse an engine VNDegen has came first and shipped, the Enigma Virtual Box unpacker for packed RPG Maker MV and MZ games in 0.44.0 and Construct in 0.45.0. The rest follow by number of games. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
-1. Smile Game Builder (3 games), whose player is .NET.
-2. Ikura GDL (2 games) and IPAC (2 games).
-3. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
+1. Ikura GDL (2 games) and IPAC (2 games).
+2. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
 
 ## Set aside
+- Smile Game Builder, set aside on 2026-11-18. Two of its three library games were left out after the content check, and the one left, Princess Colette's Great Adventure, is Japanese only. Its games are 3D, so a runtime of VNDegen's own would need a 3D renderer, FBX models and a battle system, about 4 to 6 weeks for that one game. Running the games' own .NET player would need its native graphics library rewritten, which the clean-room rule doesn't allow. It comes back if the library gains more Smile Game Builder games, especially English ones.
 - Save sync through the cloud services that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, set aside by the maintainer on 2026-11-16. A plan was written first: Google's and Microsoft's terms don't allow shipping rclone's own client IDs, so OneDrive and Dropbox would need VNDegen's own app registrations and Google Drive and Box each user's own client ID. Nothing was built.
 - An App Store release, ruled out by the maintainer on 2026-11-16. The groundwork that was done stays: the LGPL libraries in replaceable frameworks with their source on each release, and MetalANGLE for arm64 only.
 - Playing over AirPlay with the iPhone or iPad as the controller (#66), set aside by the maintainer on 2026-11-10. iOS gives an app a TV to draw a live game on only once the player has turned on Screen Mirroring or plugged in a cable. An AirPlay button inside the app carries sound and video files, not a live picture, and sending the game as live video would put seconds between a press and the picture. The maintainer wanted it to start from inside the app, so it stopped there. What was built worked on the simulator with Screen Mirroring or a cable: the game alone went to the TV and the device showed the controls. It was never merged, and its branch was removed at the maintainer's request. VNDegen doesn't use AirPlay itself: nothing in the app or its engines asks for it, and from 0.41.3 the web view no longer offers a game's movie or sound to an AirPlay device on its own. With Screen Mirroring on, picture and sound go to the TV together, as iOS sends them.

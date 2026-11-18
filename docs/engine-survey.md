@@ -125,7 +125,7 @@ These have library games but no open-source runtime. Each would need a reimpleme
 | YU-RIS | 15 | Only tools exist (yuri decompiler, YuRISTools, YPF tools) |
 | Tmr-Hiro ADV System | 5 | None found |
 | SystemAoi | 3 | None found. All three games were left out after the content check (2026-11-18), so it has no test game |
-| Smile Game Builder | 3 | .NET player (`SharpKmyCore.dll`). None found |
+| Smile Game Builder | 3 | .NET player (`SharpKmyCore.dll`). None found. Two games were left out after the content check (2026-11-18); the one left, Princess Colette's Great Adventure, is Japanese only, so it is set aside |
 | Ikura GDL, IPAC, EAGLS, Bruns, FFD, ExHibit, Eushully AGE, N2System | 1 or 2 each | None found |
 | System-NNN | 1 | The author published source at tinyan/SystemNNN with no license file. It is built on DirectX (`nyanDirectXLib`) |
 | SRPG Studio | 1 | None found |
