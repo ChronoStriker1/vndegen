@@ -139,8 +139,8 @@ import VNCore
         #expect(at(0x10) == 3)
         let slot = at(0x14 + 4 * 3)
         #expect(slot == 0x500)
-        #expect(at(slot) == 37044)
-        #expect(data.count == 0x500 + 37044)
+        #expect(at(slot) == 33196)
+        #expect(data.count == 0x500 + 33196)
         #expect(at(slot + 0x10c) == 112 && at(slot + 0x110) == 84)
         let state = slot + 0x6f54
         #expect(Array(data[state..<state + 9]) == Array("START.SNR".utf8))
@@ -150,5 +150,6 @@ import VNCore
         #expect(at(state + 0x884) == 14)
         #expect(at(state + 0x930) == 29)
         #expect(at(state + 0x10e8) == 80)
+        #expect(at(state + 0x1118) == 0xffffffff)
     }
 }
