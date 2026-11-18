@@ -13,6 +13,8 @@ static u32 abgr(IK *t, const u8 *p) {
 
 static void clear(MsgWin *m) {
     m->count = m->revealed = 0;
+    m->rawLen = 0;
+    if (m->raw) m->raw[0] = 0;
     m->penX = m->x;
     m->penY = m->y;
     m->name = -1;
@@ -57,7 +59,18 @@ static void layout(IK *t, const u32 *cps, int n) {
     }
 }
 
+static void add_raw(MsgWin *m, const u8 *s, int len) {
+    if (m->rawLen + len + 1 > m->rawCap) {
+        m->rawCap = (m->rawLen + len + 1) * 2;
+        m->raw = ik_realloc(m->raw, (size_t)m->rawCap);
+    }
+    memcpy(m->raw + m->rawLen, s, (size_t)len);
+    m->rawLen += len;
+    m->raw[m->rawLen] = 0;
+}
+
 static void add_text(IK *t, const u8 *s, int len) {
+    add_raw(&t->msg, s, len);
     u32 *cps = ik_alloc(sizeof(u32) * (size_t)(len + 1));
     int n = 0;
     for (int i = 0; i < len;) {
@@ -231,7 +244,7 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
         t->wait = W_MSG;
         run_tags(t);
         break;
-    case 0x0910:
+    case 0x0910: t->msgMode = val(t, a); break;
     case 0x0911:
     case 0x090d:
     case 0x090e:
@@ -270,4 +283,6 @@ void msg_draw(IK *t, int layer) {
 void msg_close(IK *t) {
     free(t->msg.chars);
     t->msg.chars = NULL;
+    free(t->msg.raw);
+    t->msg.raw = NULL;
 }

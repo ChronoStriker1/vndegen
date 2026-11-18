@@ -191,6 +191,7 @@ void snd_bgm(IK *t, const char *name, bool loop) {
     pthread_mutex_unlock(&t->mixer->lock);
     if (same) return;
     snprintf(t->bgmName, sizeof t->bgmName, "%s", name);
+    t->bgmLoop = loop;
     play(t, CH_BGM, AR_BGM, name, loop);
 }
 

@@ -39,6 +39,8 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
     t->msg.msPerChar = 50;
     t->rng = (u32)cfg->startTime | 1;
     t->dun.compass = t->dun.marker = -1;
+    t->buttonCount = 80;
+    for (int i = 0; i < 64; i++) t->settings[i] = i == 0 ? 1000 : i == 1 ? 1 : i == 3 || i == 4 ? 500 : i == 6 || i == 8 || i == 10 ? 128 : i >= 11 && i <= 36 ? 1 : 0;
     vm_start(t, "START.SNR");
     if (!t->sc) {
         if (err) snprintf(err, errSize, "%s", t->problem);
@@ -58,6 +60,10 @@ void vnikura_close(VNIkura *n) {
     msg_close(t);
     text_close(t);
     for (int i = 0; i < 4; i++) free(t->savedEnabled[i]);
+    save_close(t);
+    for (int i = 0; i < t->textCount; i++) free(t->texts[i]);
+    free(t->texts);
+    free(t->imageNames);
     free(t->flags);
     for (int i = 0; i < t->scriptCount; i++) script_free(t->scripts[i]);
     free(t->scripts);

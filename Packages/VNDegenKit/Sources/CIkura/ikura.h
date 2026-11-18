@@ -15,6 +15,7 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int32_t i32;
+typedef int16_t i16;
 typedef int64_t i64;
 
 typedef struct IK IK;
@@ -73,6 +74,7 @@ typedef struct Script {
     size_t size;
     u32 *labels;
     int labelCount;
+    i16 *labelAt;
     const u8 *code;
     u32 codeSize;
 } Script;
@@ -91,7 +93,9 @@ typedef struct Layer {
     int w, h, x, y;
     int img, sx, sy;
     int argb[4];
-    bool shown, ready, fill;
+    bool shown, ready, fill, textured, quad;
+    int tw, th;
+    u32 fillArgb;
     Image *surf;
     float rot;
     Anim fade, move;
@@ -108,8 +112,11 @@ typedef struct ButtonTip {
 
 typedef struct Button {
     bool made, shown, enabled;
-    int layer, x, y, w, h;
+    int type, layer, x, y, w, h;
     ButtonState state[4];
+    u8 stateFlag[4];
+    int var;
+    u32 raw[7];
     ButtonTip tip;
     int label;
     bool bound, call;
@@ -162,6 +169,8 @@ typedef struct MsgWin {
     u32 revealAt, cursorAt;
     bool cursor;
     int msPerChar;
+    char *raw;
+    int rawLen, rawCap;
 } MsgWin;
 
 #define IK_STACK 32
@@ -173,6 +182,14 @@ enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_MSG, W_VOICE, W_QUIT };
 enum { CH_BGM, CH_VOICE, CH_SE, IK_CHANNELS = CH_SE + IK_SLOTS };
 
 typedef struct Mixer Mixer;
+
+typedef struct SaveFile {
+    char *path;
+    int slots;
+    u8 *snap;
+    size_t snapSize;
+    bool haveSnap;
+} SaveFile;
 
 #define IK_MAX_W 1024
 
@@ -234,6 +251,17 @@ struct IK {
     int cancelLabel;
     bool cancelBound, cancelCall;
     Script *cancelSc;
+    Script *wheelSc;
+    int wheelLabel, wheelVar;
+    bool wheelCall, wheelBound;
+    Script *resumeSc;
+    int resumeLabel;
+    int msgMode;
+    i32 settings[64];
+    char **texts;
+    int textCount;
+    char (*imageNames)[16];
+    SaveFile save;
     bool *savedEnabled[4];
     int keyButton[256];
     int skipMode, autoMode;
@@ -244,6 +272,8 @@ struct IK {
     Mixer *mixer;
     SeSlot slots[IK_SLOTS];
     char bgmName[16];
+    bool bgmLoop;
+    int buttonCount;
     u32 rng;
     Dungeon dun;
 
@@ -294,6 +324,13 @@ void snd_bgm(IK *t, const char *name, bool loop);
 void snd_bgm_fade(IK *t, int ms);
 void snd_mix(IK *t, float *out, int frames);
 void snd_volume(IK *t, int ch, int v);
+bool save_exec(IK *t, u16 op, const u8 *a, int n);
+bool text_exec(IK *t, u16 op, const u8 *a, int n);
+void save_close(IK *t);
+void settings_apply(IK *t);
+void text_draw_on(IK *t, Image *dst, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]);
+void vm_set_text(IK *t, int slot, const char *s, int len);
+void image_load(IK *t, int slot, const char *name);
 bool dun_exec(IK *t, u16 op, const u8 *a, int n);
 void dun_render(IK *t);
 void dun_update(IK *t);

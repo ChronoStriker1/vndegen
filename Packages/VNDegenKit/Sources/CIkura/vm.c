@@ -136,10 +136,11 @@ static Button *button(IK *t, u32 id) {
     return &t->buttons[id];
 }
 
-static void load_image(IK *t, int slot, const char *name) {
+void image_load(IK *t, int slot, const char *name) {
     if (slot < 0 || slot >= t->imageCount) return;
     image_free(t->images[slot]);
     t->images[slot] = NULL;
+    snprintf(t->imageNames[slot], sizeof t->imageNames[slot], "%s", name);
     size_t n;
     u8 *d = store_load(&t->store, AR_GRP, name, &n);
     if (!d) {
@@ -160,7 +161,11 @@ static void resize(IK *t, int which, int n) {
     } else if (which == 1) {
         for (int i = n; i < t->imageCount; i++) image_free(t->images[i]);
         t->images = ik_realloc(t->images, sizeof(Image *) * (size_t)n);
-        if (n > t->imageCount) memset(t->images + t->imageCount, 0, sizeof(Image *) * (size_t)(n - t->imageCount));
+        t->imageNames = ik_realloc(t->imageNames, sizeof(*t->imageNames) * (size_t)n);
+        if (n > t->imageCount) {
+            memset(t->images + t->imageCount, 0, sizeof(Image *) * (size_t)(n - t->imageCount));
+            memset(t->imageNames + t->imageCount, 0, sizeof(*t->imageNames) * (size_t)(n - t->imageCount));
+        }
         t->imageCount = n;
     } else {
         t->layers = ik_realloc(t->layers, sizeof(Layer) * (size_t)n);
@@ -184,7 +189,13 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     Layer *l;
     switch (op) {
     case 0x0000: t->wait = W_QUIT; break;
-    case 0x0001: vm_start(t, name_arg(a, n)); break;
+    case 0x0001:
+        vm_start(t, name_arg(a, n));
+        if (!t->sp) {
+            t->resumeSc = t->sc;
+            t->resumeLabel = -1;
+        }
+        break;
     case 0x0002: push(t); vm_start(t, name_arg(a, n)); break;
     case 0x0003: pop(t); break;
     case 0x0004: goto_label(t, rd16(a)); break;
@@ -202,12 +213,13 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         t->waitUntil = t->now + ik_value(t, rd32(a));
         break;
     case 0x0100: resize(t, 1, rd16(a)); break;
-    case 0x0101: load_image(t, rd16(a), name_arg(a + 2, n - 2)); break;
+    case 0x0101: image_load(t, rd16(a), name_arg(a + 2, n - 2)); break;
     case 0x0102: {
         int s = rd16(a);
         if (s >= 0 && s < t->imageCount) {
             image_free(t->images[s]);
             t->images[s] = NULL;
+            t->imageNames[s][0] = 0;
         }
         break;
     }
@@ -217,9 +229,10 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             image_free(l->surf);
             memset(l, 0, sizeof *l);
             l->made = true;
-            l->w = (int)ik_value(t, rd32(a + 4));
-            l->h = (int)ik_value(t, rd32(a + 8));
+            l->w = l->tw = (int)ik_value(t, rd32(a + 4));
+            l->h = l->th = (int)ik_value(t, rd32(a + 8));
             l->img = -1;
+            l->textured = true;
             for (int k = 0; k < 4; k++) l->argb[k] = 255;
         }
         break;
@@ -247,12 +260,14 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             l->y = y0;
             l->w = x1 - x0;
             l->h = y1 - y0;
+            l->quad = true;
         }
         break;
     case 0x0206:
         if ((l = layer(t, rd32(a))) && n >= 20) {
-            for (int k = 0; k < 4; k++) l->argb[k] = (int)ik_value(t, rd32(a + 4 + 4 * k));
-            l->fade.on = false;
+            u32 c = 0;
+            for (int k = 0; k < 4; k++) c = c << 8 | (u32)clampi((int)ik_value(t, rd32(a + 4 + 4 * k)), 0, 255);
+            l->fillArgb = c;
             l->fill = true;
         }
         break;
@@ -276,13 +291,25 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
                           (int)ik_value(t, rd32(a + 16)));
         break;
     case 0x0103:
-        if (n >= 32 && (l = layer(t, rd32(a + 4)))) {
+    case 0x0104:
+    case 0x0105:
+    case 0x0106:
+        if (n >= 32) {
             int src = (int)ik_value(t, rd32(a));
+            if (src < 0 || src >= t->imageCount || !t->images[src]) break;
+            Image *dst = NULL;
+            if (op <= 0x0104) {
+                if ((l = layer(t, rd32(a + 4)))) dst = layer_surface(t, l);
+            } else {
+                int di = (int)ik_value(t, rd32(a + 4));
+                if (di >= 0 && di < t->imageCount) dst = t->images[di];
+            }
             static const int white[4] = {255, 255, 255, 255};
-            if (src >= 0 && src < t->imageCount && t->images[src])
-                image_blit(layer_surface(t, l), t->images[src], (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)),
+            if (dst)
+                image_blit(dst, t->images[src], (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)),
                            (int)ik_value(t, rd32(a + 24)), (int)ik_value(t, rd32(a + 28)), (int)ik_value(t, rd32(a + 16)),
-                           (int)ik_value(t, rd32(a + 20)), white, 0, false);
+                           (int)ik_value(t, rd32(a + 20)), white, 0, op == 0x0104 || op == 0x0106);
+            t->dirty = true;
         }
         break;
     case 0x0107: {
@@ -292,6 +319,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             int w = (int)ik_value(t, rd32(a + 4)), h = (int)ik_value(t, rd32(a + 8));
             t->images[slot] = image_new(w, h);
             memset(t->images[slot]->px, 0, sizeof(u32) * (size_t)w * (size_t)h);
+            t->imageNames[slot][0] = 0;
         }
         break;
     }
@@ -390,10 +418,39 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             if (!ms) memcpy(l->argb, l->fade.to, sizeof l->argb);
         }
         break;
-    case 0x0201:
     case 0x020e:
+        if ((l = layer(t, rd32(a)))) l->textured = ik_value(t, rd32(a + 4)) != 0;
+        break;
+    case 0x0700: t->buttonCount = clampi((int)ik_value(t, rd32(a)), 0, IK_BUTTONS); break;
+    case 0x070b: {
+        Button *b = button(t, rd32(a));
+        if (b) {
+            b->type = 3;
+            b->var = (int)rd32(a + 4);
+        }
+        break;
+    }
+    case 0x0710:
+        t->wheelVar = (int)rd32(a);
+        t->wheelLabel = rd16(a + 4);
+        t->wheelCall = n >= 10 && rd32(a + 6) != 0;
+        t->wheelSc = t->sc;
+        t->wheelBound = true;
+        break;
+    case 0x0409: {
+        i32 *v = var_at(t, rd32(a));
+        u32 i = ik_value(t, rd32(a + 4));
+        if (v) *v = i < 64 ? t->settings[i] : 0;
+        break;
+    }
+    case 0x040a: {
+        u32 i = ik_value(t, rd32(a + 4));
+        if (i < 64) t->settings[i] = (i32)ik_value(t, rd32(a));
+        settings_apply(t);
+        break;
+    }
+    case 0x0201:
     case 0x000d:
-    case 0x0700:
     case 0x0705:
     case 0x0711: break;
     case 0x0704: {
@@ -440,6 +497,8 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         memset(b, 0, sizeof *b);
         if (rd32(a + 4) == IK_CANCEL) break;
         b->made = true;
+        b->type = (int)ik_value(t, rd32(a + 4));
+        b->var = -1;
         b->layer = (int)ik_value(t, rd32(a + 8));
         b->x = (int)ik_value(t, rd32(a + 12));
         b->y = (int)ik_value(t, rd32(a + 16));
@@ -478,6 +537,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         u32 st = ik_value(t, rd32(a + 4));
         if (!b || st > 3) break;
         b->state[st] = (ButtonState){(int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)), (int)ik_value(t, rd32(a + 16))};
+        if (n >= 24) b->stateFlag[st] = (u8)ik_value(t, rd32(a + 20));
         break;
     }
     case 0x0400: resize(t, 0, rd16(a)); break;
@@ -501,6 +561,8 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     default:
         if ((op >> 8) == 0x09 && msg_exec(t, op, a, n)) break;
         if ((op >> 8) == 0x08 && dun_exec(t, op, a, n)) break;
+        if ((op >> 8) == 0x0a && save_exec(t, op, a, n)) break;
+        if ((op >> 8) == 0x0b && text_exec(t, op, a, n)) break;
         if (t->trace) ik_log(t, "%s:%x op %04x not handled", t->sc->name, t->pc, op);
         break;
     }
@@ -525,9 +587,106 @@ void vm_run(IK *t) {
             t->wait = W_QUIT;
             return;
         }
+        if (!t->sp && t->sc->labelAt[t->pc] >= 0) {
+            t->resumeSc = t->sc;
+            t->resumeLabel = t->sc->labelAt[t->pc];
+        }
         t->pc += len;
         if (t->trace) ik_log(t, "%s:%x %04x", t->sc->name, t->pc - len, op);
         exec(t, op, p + 4, len - 4);
         t->dirty = true;
     }
+}
+
+void vm_set_text(IK *t, int slot, const char *s, int len) {
+    if (slot < 0 || slot >= t->textCount) return;
+    free(t->texts[slot]);
+    t->texts[slot] = ik_alloc((size_t)len + 1);
+    memcpy(t->texts[slot], s, (size_t)len);
+    t->texts[slot][len] = 0;
+}
+
+static void layer_text(IK *t, int slot, const u8 *a, bool toImage) {
+    Image *s = NULL;
+    if (toImage) {
+        int i = (int)ik_value(t, rd32(a + 4));
+        if (i >= 0 && i < t->imageCount) s = t->images[i];
+    } else {
+        Layer *l = layer(t, rd32(a + 4));
+        if (l) s = layer_surface(t, l);
+    }
+    if (!s || slot < 0 || slot >= t->textCount || !t->texts[slot]) return;
+    int x = (int)ik_value(t, rd32(a + 8)), y = (int)ik_value(t, rd32(a + 12)), w = (int)ik_value(t, rd32(a + 16)),
+        h = (int)ik_value(t, rd32(a + 20)), pitch = (int)ik_value(t, rd32(a + 24)), font = (int)ik_value(t, rd32(a + 28)) & (IK_FONTS - 1);
+    u32 colour = 0, shadow = 0;
+    for (int k = 0; k < 4; k++) colour = colour << 8 | (u32)clampi((int)ik_value(t, rd32(a + 32 + 4 * k)), 0, 255);
+    for (int k = 0; k < 4; k++) shadow = shadow << 8 | (u32)clampi((int)ik_value(t, rd32(a + 48 + 4 * k)), 0, 255);
+    colour = (colour & 0xff000000u) | (colour & 0xff) << 16 | (colour & 0xff00) | (colour >> 16 & 0xff);
+    shadow = (shadow & 0xff000000u) | (shadow & 0xff) << 16 | (shadow & 0xff00) | (shadow >> 16 & 0xff);
+    int clip[4] = {x, y, x + w, y + h};
+    const u8 *p = (const u8 *)t->texts[slot];
+    int penX = x, penY = y;
+    while (*p) {
+        u32 cp;
+        int k = ik_sjis_decode(p, &cp);
+        if (k <= 0) k = 1;
+        if (cp == '\n') {
+            penX = x;
+            penY += pitch;
+            p += k;
+            continue;
+        }
+        int wordW = 0;
+        const u8 *q = p;
+        for (bool first = true; *q; first = false) {
+            u32 c2;
+            int k2 = ik_sjis_decode(q, &c2);
+            if (k2 <= 0) k2 = 1;
+            if (!first && (c2 == ' ' || c2 >= 0x80 || c2 == '\n')) break;
+            wordW += text_advance(t, font, c2);
+            q += k2;
+            if (c2 >= 0x80) break;
+        }
+        if (penX + wordW > x + w && penX > x) {
+            penX = x;
+            penY += pitch;
+        }
+        while (p < q) {
+            u32 c3;
+            int k3 = ik_sjis_decode(p, &c3);
+            if (k3 <= 0) k3 = 1;
+            text_draw_on(t, s, font, c3, penX, penY, colour, shadow, clip);
+            penX += text_advance(t, font, c3);
+            p += k3;
+        }
+    }
+    t->dirty = true;
+}
+
+bool text_exec(IK *t, u16 op, const u8 *a, int n) {
+    switch (op) {
+    case 0x0b00: {
+        int c = clampi((int)ik_value(t, rd32(a)), 0, 4096);
+        for (int i = c; i < t->textCount; i++) free(t->texts[i]);
+        t->texts = ik_realloc(t->texts, sizeof(char *) * (size_t)(c ? c : 1));
+        for (int i = t->textCount; i < c; i++) t->texts[i] = NULL;
+        t->textCount = c;
+        break;
+    }
+    case 0x0b01:
+        if (n >= 64) layer_text(t, (int)ik_value(t, rd32(a)), a, false);
+        break;
+    case 0x0b02:
+        if (n >= 64) layer_text(t, (int)ik_value(t, rd32(a)), a, true);
+        break;
+    case 0x0b03:
+        if (n >= 6) {
+            int len = rd16(a + 4);
+            if (6 + len > n) len = n - 6;
+            vm_set_text(t, (int)ik_value(t, rd32(a)), (const char *)a + 6, len);
+        }
+        break;
+    default: return false;
+    }
+    return true;
 }

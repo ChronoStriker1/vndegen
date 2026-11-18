@@ -23,6 +23,10 @@ Script *script_load(IK *t, const char *name) {
     for (int i = 0; i < s->labelCount; i++) s->labels[i] = rd32(d + 16 + 4 * i);
     s->code = d + 16 + labelBytes;
     s->codeSize = codeSize;
+    s->labelAt = ik_alloc(sizeof(i16) * (size_t)(codeSize + 1));
+    for (u32 i = 0; i <= codeSize; i++) s->labelAt[i] = -1;
+    for (int i = s->labelCount - 1; i >= 0; i--)
+        if (s->labels[i] <= codeSize) s->labelAt[s->labels[i]] = (i16)i;
     t->scripts = ik_realloc(t->scripts, sizeof(Script *) * (size_t)(t->scriptCount + 1));
     t->scripts[t->scriptCount++] = s;
     return s;
@@ -31,6 +35,7 @@ Script *script_load(IK *t, const char *name) {
 void script_free(Script *s) {
     if (!s) return;
     free(s->labels);
+    free(s->labelAt);
     free(s->data);
     free(s);
 }

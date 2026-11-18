@@ -83,30 +83,42 @@ int text_advance(IK *t, int slot, u32 cp) {
     return f->ok ? glyph(f, cp)->adv : 0;
 }
 
-static void put(IK *t, const Glyph *g, int x, int y, u32 argb, const int clip[4]) {
+static void put(Image *dst, const Glyph *g, int x, int y, u32 argb, const int clip[4]) {
     u32 ca = argb >> 24, cr = (argb >> 16) & 0xff, cg = (argb >> 8) & 0xff, cb = argb & 0xff;
     for (int j = 0; j < g->h; j++) {
         int py = y + g->y0 + j;
-        if (py < clip[1] || py >= clip[3] || py < 0 || py >= t->H) continue;
-        u32 *row = t->screen + (size_t)py * t->W;
+        if (py < clip[1] || py >= clip[3] || py < 0 || py >= dst->h) continue;
+        u32 *row = dst->px + (size_t)py * dst->w;
         for (int i = 0; i < g->w; i++) {
             int px = x + g->x0 + i;
-            if (px < clip[0] || px >= clip[2] || px < 0 || px >= t->W) continue;
+            if (px < clip[0] || px >= clip[2] || px < 0 || px >= dst->w) continue;
             u32 a = g->bm[j * g->w + i] * ca / 255;
             if (!a) continue;
-            u32 d = row[px], ia = 255 - a;
-            row[px] = ((cr * a + (d & 0xff) * ia) / 255) | (((cg * a + ((d >> 8) & 0xff) * ia) / 255) << 8) |
-                      (((cb * a + ((d >> 16) & 0xff) * ia) / 255) << 16) | 0xff000000u;
+            u32 d = row[px], da = d >> 24;
+            if (da == 255) {
+                u32 ia = 255 - a;
+                row[px] = ((cr * a + (d & 0xff) * ia) / 255) | (((cg * a + ((d >> 8) & 0xff) * ia) / 255) << 8) |
+                          (((cb * a + ((d >> 16) & 0xff) * ia) / 255) << 16) | 0xff000000u;
+            } else {
+                u32 w = da * (255 - a) / 255, oa = a + w;
+                row[px] = (cr * a + (d & 0xff) * w) / oa | ((cg * a + ((d >> 8) & 0xff) * w) / oa) << 8 |
+                          ((cb * a + ((d >> 16) & 0xff) * w) / oa) << 16 | oa << 24;
+            }
         }
     }
 }
 
-void text_draw(IK *t, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]) {
+void text_draw_on(IK *t, Image *dst, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]) {
     Font *f = &t->fonts[slot & (IK_FONTS - 1)];
     if (!f->ok || cp == ' ') return;
     Glyph *g = glyph(f, cp);
     if (!g->bm) return;
     int by = y + f->ascent;
-    if (f->shadow && shadow >> 24) put(t, g, x + f->shadow, by + f->shadow, shadow, clip);
-    put(t, g, x, by, colour, clip);
+    if (f->shadow && shadow >> 24) put(dst, g, x + f->shadow, by + f->shadow, shadow, clip);
+    put(dst, g, x, by, colour, clip);
+}
+
+void text_draw(IK *t, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]) {
+    Image screen = {t->W, t->H, t->screen};
+    text_draw_on(t, &screen, slot, cp, x, y, colour, shadow, clip);
 }

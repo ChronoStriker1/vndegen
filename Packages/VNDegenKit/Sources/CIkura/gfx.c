@@ -163,9 +163,11 @@ static void rotated(IK *t, const Layer *l) {
 }
 
 static void fill(IK *t, const Layer *l) {
-    u32 a = (u32)clampi(l->argb[0], 0, 255);
+    u32 a = (u32)clampi(l->argb[0], 0, 255) * (l->fillArgb >> 24) / 255;
     if (!a) return;
-    u32 r = (u32)clampi(l->argb[1], 0, 255), g = (u32)clampi(l->argb[2], 0, 255), b = (u32)clampi(l->argb[3], 0, 255);
+    u32 r = (u32)clampi(l->argb[1], 0, 255) * (l->fillArgb >> 16 & 0xff) / 255,
+        g = (u32)clampi(l->argb[2], 0, 255) * (l->fillArgb >> 8 & 0xff) / 255,
+        b = (u32)clampi(l->argb[3], 0, 255) * (l->fillArgb & 0xff) / 255;
     int x0 = clampi(l->x, 0, t->W), y0 = clampi(l->y, 0, t->H), x1 = clampi(l->x + l->w, 0, t->W), y1 = clampi(l->y + l->h, 0, t->H);
     for (int y = y0; y < y1; y++) {
         u32 *row = t->screen + (size_t)y * t->W;
