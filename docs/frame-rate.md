@@ -13,6 +13,7 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
   - KiriKiri: display refreshes from `-frameMonitor`'s `KKFRAMES` line, and a movie's frames from the `movie:` lines in the game's log.
   - YU-RIS: display refreshes from `-frameMonitor`'s `YRFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/yuris.txt` when it ends.
   - N2System: display refreshes from `-frameMonitor`'s `N2FRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/n2system.txt` when it ends.
+  - Tmr-Hiro: display refreshes from `-frameMonitor`'s `THFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/tmrhiro.txt` when it ends.
   - SiglusEngine: engine steps from `-frameMonitor`'s `SIGLUSFRAMES` line, 10 s windows. A `.wmv` movie's picture changes at the movie's rate inside them.
   - Godot: `-godotFrameLog`, without `-godotSnapshot`. The snapshot writes a PNG on the main thread every 2 s, which stalls the game for about 80 to 90 ms each time. It took Barely Working from 59.9 to 57.5 and Project Hadal from 59.4 to 56.9, with seconds alternating between 54 to 56 and 60 to 61 frames. The native runtimes log their own pacing with `-frameMonitor`.
 - Load is the load average at the start of the run. The MacBook's runs had nothing else of ours running. The mini's simulator runs also had the simulator's own processes and agent-device's runner.
@@ -71,6 +72,8 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | YU-RIS | Saimin Seishidou, `BRANDCALL11.mpg` brand movie, MPEG-1 | Mac app, mini | 30 movie, 60 display | movie 29.96, display 60.0 | display 60.0 | 12.7 s, the whole movie | 3.0 | 11-12 | 18bc5f85 |
 | N2System | Hanachirasu, `op.mpg` opening movie, MPEG-1 800x608 | Mac app, mini | 29.97 movie, 60 display | 2908 of 2908 frames, movie 29.96, display 60.0 | display 59.9 to 60.0 | 97 s, the whole movie | 5.7 | 11-16 | 046736bd |
 | N2System | Hanachirasu, `op.mpg` opening movie, MPEG-1 800x608 | iPad simulator | 29.97 movie, 60 display | 2908 of 2908 frames, movie 29.96, display 60.0 | display 60.0 | 97 s, the whole movie | 5.6 | 11-16 | 8a13b71a |
+| Tmr-Hiro | Spooky Pregnant School: The Quickening, `movie01.mpg` opening movie, MPEG-1 1280x720 with MP3 sound | Mac app, mini | 30 movie, 60 display | 1050 of 1050 frames, movie 29.90, display 60.0 | display 60.0 | 35 s, the whole movie | 2.8 | 11-17 | afc71103 |
+| Tmr-Hiro | Spooky Pregnant School: The Quickening, `movie01.mpg` opening movie, MPEG-1 1280x720 with MP3 sound | iPad simulator | 30 movie, 60 display | 1050 of 1050 frames, movie 29.89, display 59.9 to 60.0 | display 50.0 to 60.0 | 35 s, the whole movie | 4.8 | 11-17 | 2921a2fb |
 | SiglusEngine | planetarian HD, `.wmv` opening movie | Mac app, mini | 60 | 60.0 | 48 to 60 | about 65 s, the whole movie | 3.8 to 5.6 | 11-16 | not recorded |
 | SiglusEngine | planetarian HD, `.wmv` opening movie | iPad simulator | 60 | 59.8 to 60.0 | 42.9 to 60.0 | about 65 s, the whole movie | 9.3 | 11-16 | 35a1bca0 |
 | RGSS | Monster Girl Quest Paradox, walking in the village | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 13 | 11-04 | 2f48b68 |

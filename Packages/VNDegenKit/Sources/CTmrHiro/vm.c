@@ -21,6 +21,10 @@ bool vm_call(TH *t, const char *scene, const char *label) {
         fail(t, "script call stack overflow");
         return false;
     }
+    if (scene && *scene && !scene_load(t, scene)) {
+        th_log(t, "call: no scene %s, passed by", scene);
+        return true;
+    }
     if (t->sc) {
         snprintf(t->stack[t->sp].scene, sizeof t->stack[t->sp].scene, "%s", t->sc->name);
         t->stack[t->sp].pc = t->pc;
