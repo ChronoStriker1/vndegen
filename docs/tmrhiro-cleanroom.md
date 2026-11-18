@@ -86,6 +86,10 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   13 on the PC as in VNDegen.
 - The map element count: the PC shows the gauge on maps 07, 09 and 13, whose header counts it, and not on map 01,
   whose header counts one element fewer than it has; a save loaded at map 13 shows it without record 0x01ff running.
+- Labels match exactly: map 11 ends its item and status branches with a jump to `map11`, but its label is `MAP11`. On
+  the PC, cancelling the item screen there goes on to the status screen, the record after the jump, as VNDegen does.
+- Record 0x1007, just before the ending's jump back to `start`, is taken to clear the call stack; the jump itself
+  doesn't depend on it, so it wasn't checked on the PC.
 - Overlay order: on Conception's status screen the dark band (layer 4) is set before the five silhouettes (layers 0 to
   3 and 5), and the PC draws all five over it.
 - The roulette: recorded at 30 fps under Wine and the needle's angle measured in each frame. It rests at the top, a

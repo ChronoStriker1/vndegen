@@ -247,6 +247,9 @@ static int step(TH *t) {
             return 1;
         case 0x37:
             return 1;
+        case 0x07:
+            t->sp = 0;
+            return 1;
         case 0x5e:
             roulette_start(t, s);
             begin_wait(t, W_ROULETTE, 0);
@@ -591,6 +594,9 @@ static int step(TH *t) {
             return 1;
         case 0x17:
             th_log(t, "open URL %s (ignored)", s);
+            return 1;
+        case 0x18:
+            th_log(t, "inherit save page (not supported)");
             return 1;
         case 0x2b:
             t->menuBlocked = r->len > 0 && b[0];

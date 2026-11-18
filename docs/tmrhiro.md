@@ -137,6 +137,10 @@ the same files there:
 - Spooky Pregnant School: The Conception's chapter 3 can lock itself: map 11 lets the player visit two of its three
   characters, and if the one left out is the one var2[0x17] follows, map 13 keeps rebuilding with no button for her
   once the others are done. The PC engine does the same from the same state. Loading an earlier save gets out of it.
+- Spooky Pregnant School: The Conception's ending offers to write a carry-over save (record 0x4018). The PC engine opens
+  an "INHERIT SAVE" page and writes `save/inheritdata.NNN`, which The Quickening's PC engine can read. VNDegen doesn't
+  open that page and doesn't read the file in The Quickening, so choosing it shows the question again; returning to the
+  title works.
 - A Conception save made while the clock picture is up comes back without it until the script draws it again. The PC
   slot holds the picture's name at offset 29198, but which bytes say it is shown isn't settled.
 - Spooky Pregnant School: The Quickening asks at the start whether to read the save data of the first game. The PC
