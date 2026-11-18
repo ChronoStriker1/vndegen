@@ -92,9 +92,16 @@ static void split_scene_label(const char *s, char *scene, size_t ss, char *label
     }
 }
 
+static i32 operand(TH *t, const u8 *b) {
+    if (!b[2]) return (i16)rdbe16(b + 4);
+    i32 *v = var_ref(t, b[2], rdbe16(b + 4));
+    return v ? *v : 0;
+}
+
 static bool cond(TH *t, const u8 *b) {
-    int op = b[0], kind = b[1], index = rdbe16(b + 2), value = (i16)rdbe16(b + 4);
-    i32 *v = var_ref(t, kind, index);
+    int op = b[0];
+    i32 value = operand(t, b);
+    i32 *v = var_ref(t, b[1], b[3]);
     i32 x = v ? *v : 0;
     switch (op) {
     case 0: return x == value;
@@ -108,8 +115,9 @@ static bool cond(TH *t, const u8 *b) {
 }
 
 static void set_var(TH *t, const u8 *b) {
-    int op = b[0], kind = b[1], index = rdbe16(b + 2), value = (i16)rdbe16(b + 4);
-    i32 *v = var_ref(t, kind, index);
+    int op = b[0];
+    i32 value = operand(t, b);
+    i32 *v = var_ref(t, b[1], b[3]);
     if (!v) return;
     switch (op) {
     case 0: *v = value; break;
