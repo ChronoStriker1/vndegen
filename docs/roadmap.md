@@ -110,6 +110,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Tmr-Hiro: The Quickening's side menu is back (#185), and long lines wrap where the PC wraps them (0.49.1).
 - Tmr-Hiro: Spooky Pregnant School: The Conception, with its clock, items, status screen and roulette, and The Quickening's routes follow the player's choices (#186) (0.50.0). All five library Tmr-Hiro games play.
 - IPAC, on VNDegen's own clean-room runtime, with Mamono Musume to no Seikatsu: Lamia no Baai, the library's one IPAC game, and PC saves and settings both ways (0.51.0).
+- Ikura GDL, on VNDegen's own clean-room runtime, with the English Lightning Warrior Raidy, its 3D dungeon and battles, and PC saves both ways, and BIN/CUE disc images in the import (0.52.0). Ikura GDL and IPAC are done: the library's other game of each was left out after the content check.
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -119,7 +120,6 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Ikura GDL and IPAC (Next, item 1), started 2026-11-18 on branch `feat/ikura-ipac`, each on a clean-room runtime of VNDegen's own. IPAC shipped in 0.51.0. Ikura GDL is next, with the English Lightning Warrior Raidy, a dungeon RPG with a 3D grid view, and BIN/CUE disc images added to the import. Its runtime, PC saves and plugin are built; the iPad simulator and Mac app checks come next.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
@@ -132,8 +132,7 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 
 ## Next
 Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the two that reuse an engine VNDegen has came first and shipped, the Enigma Virtual Box unpacker for packed RPG Maker MV and MZ games in 0.44.0 and Construct in 0.45.0. The rest follow by number of games. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
-1. Ikura GDL (2 games) and IPAC (2 games).
-2. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
+1. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
 
 ## Set aside
 - Smile Game Builder, set aside on 2026-11-18. Two of its three library games were left out after the content check, and the one left, Princess Colette's Great Adventure, is Japanese only. Its games are 3D, so a runtime of VNDegen's own would need a 3D renderer, FBX models and a battle system, about 4 to 6 weeks for that one game. Running the games' own .NET player would need its native graphics library rewritten, which the clean-room rule doesn't allow. It comes back if the library gains more Smile Game Builder games, especially English ones.
@@ -143,6 +142,7 @@ Engines with games in the library that VNDegen doesn't run yet, from the [engine
 
 ## Finished from the plan
 The items of the 2026-10-25 plan that are done, kept for their decisions and notes. The Shipped list above has the releases.
+- Ikura GDL and IPAC, each on VNDegen's own clean-room runtime: IPAC with Mamono Musume to no Seikatsu: Lamia no Baai in 0.51.0, Ikura GDL with Lightning Warrior Raidy and BIN/CUE import in 0.52.0. Raidy II and Alraune were left out after the content check on 2026-11-18. [ikura.md](ikura.md) and [ipac.md](ipac.md) have what runs and the known limits.
 - A frame rate check of every engine plugin, limited to the games where it matters: games that aren't strictly visual novels, such as RPG Maker games, and visual novels with video, such as movies or animated clips. Text, still images and transitions don't need it. Each of those test games should reach the frame rate it targets, such as 60 fps for RPG Maker MV and MZ, and hold it on average through normal play, including scenes with heavy effects. Where a game falls short, find out whether VNDegen or the engine plugin causes it, or something on the test machine, and fix what is VNDegen's. Every new engine plugin gets the same check, on the same kinds of games, before it ships. Done on 2026-11-03, and [frame-rate.md](frame-rate.md) has the results. Its fixes shipped in 0.22.2.
 - NScripter, on VNDegen's own clean-room runtime. Shipped in 0.8.0.
 - A controller layout library, like Steam's controller layouts. Each game uses a layout from the library, and the player can pick another, edit it, or save their own. The library starts with VNDegen's built-in layouts, among them "Keyboard and mouse", copied from Steam's template of that name, which engines without gamepad support use by default unless an engine has a better standard layout. Shipped in 0.23.0: built-in layouts, picking one for a game, editing, and saving your own. Suggested layouts followed in 0.34.0 for RPG Maker MV and MZ and Godot, and in 0.36.0 for Artemis and Wolf RPG Editor, where a suggestion in "Visual novel" may replace only View, L3, R3 and LT (agreed with the maintainer on 2026-11-11).
