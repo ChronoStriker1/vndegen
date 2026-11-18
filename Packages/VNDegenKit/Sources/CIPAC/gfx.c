@@ -48,14 +48,16 @@ void blit(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha) 
     blit_part(dst, dw, dh, im, 0, 0, im->w, im->h, dx, dy, alpha);
 }
 
-static int sprite_x(int pos) { return pos == SP_L ? -200 : pos == SP_R ? 200 : 0; }
+#define MOVE_MS 533
+
+int gfx_slot_x(int slot) { return slot == SP_L ? -200 : slot == SP_R ? 200 : 0; }
 
 static void render_scene(IP *t) {
     size_t n = (size_t)t->W * (size_t)t->H;
     for (size_t i = 0; i < n; i++) t->scene[i] = 0xff000000u;
     if (t->bg) blit(t->scene, t->W, t->H, t->bg, -t->bgX, -t->bgY, 255);
     for (int i = 0; i < SP_COUNT; i++)
-        if (t->spr[i].img) blit(t->scene, t->W, t->H, t->spr[i].img, sprite_x(i), 0, 255);
+        if (t->spr[i].img) blit(t->scene, t->W, t->H, t->spr[i].img, t->spr[i].x, 0, 255);
 }
 
 void gfx_init(IP *t) {
@@ -90,10 +92,12 @@ void gfx_set_bg(IP *t, const char *name) {
     snapshot(t);
     snprintf(t->bgName, sizeof t->bgName, "%s", name);
     t->bg = image_get(t, PK_BG, name);
-    for (int i = 0; i < SP_COUNT; i++) {
-        t->spr[i].img = NULL;
-        t->spr[i].name[0] = 0;
-    }
+}
+
+void gfx_apply_now(IP *t) {
+    t->snapped = false;
+    render_scene(t);
+    t->dirty = true;
 }
 
 void gfx_set_sprite(IP *t, int pos, const char *name) {
@@ -106,6 +110,29 @@ void gfx_set_sprite(IP *t, int pos, const char *name) {
     }
     snprintf(s->name, sizeof s->name, "%s", name);
     s->img = image_get(t, PK_CHR, name);
+    s->x = gfx_slot_x(pos);
+    s->moving = false;
+}
+
+bool gfx_move_sprite(IP *t, int from, int toward) {
+    if (from == toward || !t->spr[from].img) return false;
+    int to = toward > from ? from + 1 : from - 1;
+    if (t->transActive) gfx_finish_transition(t);
+    Sprite moved = t->spr[from];
+    memset(&t->spr[from], 0, sizeof t->spr[from]);
+    if (t->spr[to].img) ip_log(t, "sprite move into an occupied slot %d", to);
+    moved.fromX = moved.x;
+    moved.toX = gfx_slot_x(to);
+    moved.moveStart = t->now;
+    moved.moving = true;
+    t->spr[to] = moved;
+    return true;
+}
+
+bool gfx_moving(IP *t) {
+    for (int i = 0; i < SP_COUNT; i++)
+        if (t->spr[i].moving) return true;
+    return false;
 }
 
 void gfx_begin_transition(IP *t) {
@@ -143,6 +170,21 @@ void gfx_update(IP *t) {
             t->dirty = true;
         }
     }
+    bool moved = false;
+    for (int i = 0; i < SP_COUNT; i++) {
+        Sprite *sp = &t->spr[i];
+        if (!sp->moving) continue;
+        u32 el = t->now - sp->moveStart;
+        if (el >= MOVE_MS) {
+            sp->x = sp->toX;
+            sp->moving = false;
+        } else sp->x = sp->fromX + (sp->toX - sp->fromX) * (int)el / MOVE_MS;
+        moved = true;
+    }
+    if (moved && !t->transActive) {
+        render_scene(t);
+        t->dirty = true;
+    }
     if (t->transActive) t->dirty = true;
     if (t->shakeDur && t->now - t->shakeStart < t->shakeDur) t->dirty = true;
 }
@@ -176,10 +218,11 @@ void gfx_compose(IP *t) {
         if (o->img && o->vis) blit(t->screen, t->W, t->H, o->img, o->x, o->y, o->alpha);
     }
     msg_draw(t);
+    choice_draw(t);
     ui_draw(t);
     if (t->shakeDur && t->now - t->shakeStart < t->shakeDur) {
         u32 el = t->now - t->shakeStart;
-        int dx = (el / 33) % 2 ? t->shakeX : -t->shakeX, dy = (el / 33) % 2 ? -t->shakeY : t->shakeY;
+        int ph = (int)(el / 33) % 2, dx = ph ? t->shakeX : -t->shakeX, dy = ph ? -t->shakeY : t->shakeY;
         if (!t->shakeBuf) t->shakeBuf = ip_alloc(sizeof(u32) * (size_t)t->W * (size_t)t->H);
         u32 *tmp = t->shakeBuf;
         memcpy(tmp, t->screen, sizeof(u32) * (size_t)t->W * (size_t)t->H);

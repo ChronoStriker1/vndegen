@@ -112,10 +112,8 @@ int text_width(const u32 *cps, int n, int pitch) {
 
 void text_line(u32 *dst, int dw, int dh, const u32 *cps, int n, int x, int y, int size, int pitch, u32 color, u32 shadow) {
     for (int i = 0; i < n; i++) {
-        int adv = text_wide(cps[i]) ? pitch : pitch / 2;
-        int gx = x + (adv - (text_wide(cps[i]) ? size : size / 2)) / 2;
-        text_glyph(dst, dw, dh, cps[i], gx, y, size, color, shadow);
-        x += adv;
+        text_glyph(dst, dw, dh, cps[i], x, y, size, color, shadow);
+        x += text_wide(cps[i]) ? pitch : pitch / 2;
     }
 }
 

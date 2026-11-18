@@ -119,6 +119,7 @@ void vm_start(IP *t, const char *script, const char *label) {
 }
 
 static void jump(IP *t, const char *target) {
+    t->inGame = strncmp(target, "TITLE", 5) != 0;
     char script[128], label[128] = "";
     const char *colon = strchr(target, ':');
     if (colon) {
@@ -253,7 +254,7 @@ static void cmd(IP *t, const char *s) {
         else snd_se(t, v[0]);
     } else if (!strcmp(name, "MENU")) {
         args_int(a, v, 1);
-        t->menuEnabled = v[0] == 0;
+        t->menuEnabled = v[0] != 0;
     } else if (!strcmp(name, "MODE")) {
         args_int(a, v, 2);
         if (v[0] == 1) ui_open(t, UI_LOAD);
@@ -274,7 +275,7 @@ static void cmd(IP *t, const char *s) {
         t->shakeX = v[0];
         t->shakeY = v[1];
         t->shakeStart = t->now;
-        t->shakeDur = 500;
+        t->shakeDur = 183;
     } else if (!strcmp(name, "SCENE_NAME")) {
         snprintf(t->sceneName, sizeof t->sceneName, "%s", a);
     } else if (!strcmp(name, "BG_POS")) {
@@ -315,31 +316,39 @@ static void cmd(IP *t, const char *s) {
     }
 }
 
+static int slot_of(char c) {
+    switch (c) {
+    case 'L': case 'K': return SP_L;
+    case 'C': case 'X': return SP_C;
+    case 'R': case 'E': return SP_R;
+    default: return -1;
+    }
+}
+
 static void sprite(IP *t, const char *s) {
-    char pos = s[0];
+    char cmd = s[0];
     const char *arg = skip_ws(s + 1);
-    int p = pos == 'L' ? SP_L : pos == 'R' ? SP_R : pos == 'C' ? SP_C : -1;
-    if (pos == 'X') {
-        if (!strcmp(arg, "!")) {
-            for (int i = 0; i < SP_COUNT; i++) gfx_set_sprite(t, i, NULL);
-        } else gfx_set_sprite(t, SP_C, arg);
-        t->wait = W_TRANS;
-        gfx_begin_transition(t);
-        return;
-    }
+    int p = slot_of(cmd);
     if (p < 0) {
-        ip_log(t, "sprite command %c not handled", pos);
+        ip_log(t, "sprite command %c not handled", cmd);
         return;
     }
-    if (strlen(arg) == 1 && strchr("LCR", arg[0])) return;
+    if (strlen(arg) == 1 && slot_of(arg[0]) >= 0 && (arg[0] == 'L' || arg[0] == 'C' || arg[0] == 'R')) {
+        if (gfx_move_sprite(t, slot_of(arg[0]), p)) t->wait = W_MOVE;
+        return;
+    }
     gfx_set_sprite(t, p, strcmp(arg, "!") ? arg : NULL);
+    if (cmd == 'X' || cmd == 'K' || cmd == 'E') {
+        gfx_apply_now(t);
+        return;
+    }
     t->wait = W_TRANS;
     gfx_begin_transition(t);
 }
 
 void vm_run(IP *t) {
     int steps = 0;
-    while (t->wait == W_NONE && t->sc && !t->quit) {
+    while (t->wait == W_NONE && t->sc && !t->quit && t->uiMode == UI_NONE) {
         if (++steps > MAX_STEPS) {
             ip_log(t, "script %s ran %d steps without waiting", t->sc->name, MAX_STEPS);
             t->wait = W_FRAME;

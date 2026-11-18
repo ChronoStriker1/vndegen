@@ -149,8 +149,9 @@ enum { SP_L, SP_C, SP_R, SP_COUNT };
 typedef struct Sprite {
     Image *img;
     char name[96];
-    int pos;
-    float x;
+    int x, fromX, toX;
+    u32 moveStart;
+    bool moving;
 } Sprite;
 
 enum {
@@ -159,6 +160,7 @@ enum {
     W_TIME,
     W_TEXT,
     W_TRANS,
+    W_MOVE,
     W_CHOICE,
     W_QUIT,
 };
@@ -249,6 +251,7 @@ struct IP {
     bool autoMode, skipMode;
     u32 autoAt;
     int fontSize, pitch;
+    int winAlpha;
     bool menuEnabled;
 
     Choice choices[IP_CHOICES];
@@ -261,6 +264,8 @@ struct IP {
     int uiMode;
     UI *ui;
     int textSpeed, autoSpeed;
+    int speedSlider, autoSlider;
+    bool skipUnread, voiceWait, inGame;
     int volBgm, volSe, volVoice;
     bool bgmOn, seOn, voiceOn;
     char sceneName[128];
@@ -289,6 +294,10 @@ bool gfx_transition_done(IP *t);
 void gfx_finish_transition(IP *t);
 void gfx_set_bg(IP *t, const char *name);
 void gfx_set_sprite(IP *t, int pos, const char *name);
+void gfx_apply_now(IP *t);
+bool gfx_move_sprite(IP *t, int from, int toward);
+bool gfx_moving(IP *t);
+int gfx_slot_x(int slot);
 void gfx_update(IP *t);
 u32 gfx_click_at(IP *t, int x, int y);
 void blit(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha);
@@ -314,6 +323,8 @@ void msg_update(IP *t);
 void msg_reveal(IP *t);
 int msg_button_at(IP *t, int x, int y);
 void msg_reset(void);
+void choice_update(IP *t);
+void choice_draw(IP *t);
 
 void ui_init(IP *t);
 void ui_free(IP *t);
@@ -323,6 +334,13 @@ void ui_open(IP *t, int mode);
 bool ui_window_update(IP *t);
 void ui_window_draw(IP *t);
 
+typedef struct SlotInfo {
+    char scene[128];
+    int month, day, hour, minute;
+} SlotInfo;
+
+bool save_info(IP *t, int slot, SlotInfo *info);
+void game_to_title(IP *t);
 bool save_slot(IP *t, int slot);
 bool load_slot(IP *t, int slot);
 bool save_exists(IP *t, int slot);

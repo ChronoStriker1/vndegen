@@ -87,8 +87,11 @@ VNIPAC *vnipac_open(const VNIPACConfig *cfg, char *err, size_t errSize) {
     t->H = 600;
     t->fontSize = 16;
     t->pitch = 24;
-    t->textSpeed = 1;
-    t->volBgm = t->volSe = t->volVoice = 255;
+    t->winAlpha = 179;
+    t->speedSlider = t->autoSlider = 128;
+    t->textSpeed = 16;
+    t->skipUnread = true;
+    t->volBgm = t->volSe = t->volVoice = 128;
     t->bgmOn = t->seOn = t->voiceOn = true;
     t->menuEnabled = true;
     gfx_init(t);
@@ -143,6 +146,74 @@ static void advance_text(IP *t) {
     t->wait = W_NONE;
 }
 
+void game_to_title(IP *t) {
+    snd_bgm_stop(t, 0);
+    snd_se_stop(t);
+    snd_voice_stop(t);
+    msg_clear(t);
+    free(t->pendingText);
+    t->pendingText = NULL;
+    t->pendingName[0] = 0;
+    t->winOpen = false;
+    t->choiceCount = 0;
+    t->autoMode = t->skipMode = false;
+    memset(t->spr, 0, sizeof t->spr);
+    memset(t->obj, 0, sizeof t->obj);
+    t->bg = NULL;
+    t->bgName[0] = 0;
+    t->clickMap = NULL;
+    t->ruleName[0] = 0;
+    t->speed = 4;
+    gfx_apply_now(t);
+    t->inGame = false;
+    t->wait = W_NONE;
+    vm_start(t, "TITLE", NULL);
+}
+
+static void window_button(IP *t, int id) {
+    switch (id) {
+    case 0x6c: ui_open(t, UI_SAVE); break;
+    case 0x6d: ui_open(t, UI_LOAD); break;
+    case 0x69: save_slot(t, 99); break;
+    case 0x6a:
+        if (save_exists(t, 99)) load_slot(t, 99);
+        break;
+    case 0x65: t->skipMode = !t->skipMode; break;
+    case 0x68:
+        t->autoMode = !t->autoMode;
+        t->autoAt = 0;
+        break;
+    case 0x6b:
+        if (t->logCount && t->logs[t->logCount - 1].voice[0]) snd_voice(t, t->logs[t->logCount - 1].voice);
+        break;
+    case 0x6e: ui_open(t, UI_CONFIG); break;
+    case 0x66: ui_open(t, UI_LOG); break;
+    default: break;
+    }
+    t->dirty = true;
+}
+
+static bool skipping(IP *t) { return (t->skipMode || t->keyDown[0x11]) && t->skipUnread; }
+
+static void auto_advance(IP *t) {
+    if (t->wait != W_TEXT) return;
+    if (skipping(t)) {
+        msg_reveal(t);
+        advance_text(t);
+        return;
+    }
+    if (!t->autoMode || !msg_complete(t)) {
+        t->autoAt = 0;
+        return;
+    }
+    if (t->voiceWait && snd_voice_playing(t)) return;
+    if (!t->autoAt) t->autoAt = t->now + 500 + (u32)(255 - t->autoSlider) * 12 + (u32)t->msgLen * 20;
+    if ((i32)(t->now - t->autoAt) >= 0) {
+        t->autoAt = 0;
+        advance_text(t);
+    }
+}
+
 static void handle_input(IP *t) {
     if (t->uiMode != UI_NONE) {
         ui_update(t);
@@ -160,17 +231,27 @@ static void handle_input(IP *t) {
         t->dirty = true;
         return;
     }
+    if (t->wait == W_TEXT && t->wheel > 0 && t->menuEnabled) {
+        t->wheel = 0;
+        ui_open(t, UI_LOG);
+        return;
+    }
     if (t->wait == W_TEXT && t->click) {
         t->click = false;
-        int b = msg_button_at(t, t->mx, t->my);
-        if (b) {
-            ip_log(t, "window button %02x", b);
+        int b = t->menuEnabled ? msg_button_at(t, t->mx, t->my) : 0;
+        if (b && b != 0x64) {
+            window_button(t, b);
             return;
+        }
+        if (t->skipMode || t->autoMode) {
+            t->skipMode = t->autoMode = false;
+            t->dirty = true;
         }
         if (!msg_complete(t)) msg_reveal(t);
         else advance_text(t);
         return;
     }
+    if (t->wait == W_CHOICE) choice_update(t);
     if (t->wait == W_CHOICE && t->click) {
         t->click = false;
         if (t->choiceHover >= 0) {
@@ -193,7 +274,13 @@ static void tick(IP *t) {
     case W_TRANS:
         if (gfx_transition_done(t)) t->wait = W_NONE;
         break;
-    case W_TEXT: msg_update(t); break;
+    case W_MOVE:
+        if (!gfx_moving(t)) t->wait = W_NONE;
+        break;
+    case W_TEXT:
+        msg_update(t);
+        if (t->uiMode == UI_NONE) auto_advance(t);
+        break;
     default: break;
     }
     if (t->uiMode == UI_NONE) vm_run(t);
