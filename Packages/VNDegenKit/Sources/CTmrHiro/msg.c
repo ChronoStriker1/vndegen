@@ -177,7 +177,9 @@ void msg_draw(TH *t) {
     int xc = t->msgName ? wx + tx + brackets * size : x0;
     int x = x0, y = lineTop, shown = 0;
     int limit = t->msgShown;
-    int right = t->W - tx;
+    int cells = ini_int(s, "MESSAGEWINDOW", "TEXT_MAX", 0);
+    int right = cells > 0 ? wx + tx + (t->msgName ? size : front * size) + cells * (size / 2) : t->W - tx;
+    if (right > t->W) right = t->W;
     const u8 *p = (const u8 *)t->msgText;
     while (*p && shown < limit) {
         if (*p == '\n') {
@@ -192,7 +194,8 @@ void msg_draw(TH *t) {
         char ch[3] = {0};
         memcpy(ch, p, (size_t)len);
         int w = text_width(t, ch, size);
-        if (x + w > right) {
+        bool hangs = cp == 0x3001 || cp == 0x3002 || cp == 0xff0c || cp == 0xff0e || cp == 0x300d || cp == 0x300f || cp == 0xff09;
+        if (x + w > right && !hangs) {
             x = xc;
             y += next;
         }

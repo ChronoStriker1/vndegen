@@ -176,7 +176,8 @@ int main(int argc, char **argv) {
         } else if (strncmp(c, "goto:", 5) == 0) {
             char scene[64] = {0}, label[64] = {0};
             sscanf(c + 5, "%63[^,],%63s", scene, label);
-            vm_start((TH *)n, scene, label[0] ? label : NULL);
+            vm_start((TH *)n, scene, label[0] && label[0] != '#' ? label : NULL);
+            if (label[0] == '#') ((TH *)n)->pc = atoi(label + 1);
             ((TH *)n)->wait = W_NONE;
             ((TH *)n)->menuBlocked = false;
         } else if (strncmp(c, "state", 5) == 0) {

@@ -54,5 +54,9 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   before each. The PC goes from the scene before the missing call to the map after it without a message, and at the
   voice line it reads nothing from `vic.pac` (seen with strace on its reads; it reads the voices on the lines either
   side).
+- Line wrapping: a line holds `TEXT_MAX` half-width cells, counted from the narration indent, or for a spoken line
+  from just after its opening bracket, and never past the window. A comma, full stop or closing bracket that would start
+  a line stays at the end of the one before. Measured on the PC under Wine on long lines in Quickening (68 cells,
+  spoken) and Conception (62 cells, narration and spoken).
 - `c04a_name`, `SEH_V_09_I01_A` to `I03_A` are named by Welcome to the Mizuryuu kei land's scripts but are in none of its
   archives, so the PC engine plays nothing there either.
