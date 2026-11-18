@@ -98,8 +98,8 @@ static bool compare(int op, i32 a, i32 b) {
     case 0: return a == b;
     case 1: return a != b;
     case 2: return a < b;
-    case 3: return a >= b;
-    case 4: return a > b;
+    case 3: return a > b;
+    case 4: return a >= b;
     case 5: return a <= b;
     default: return false;
     }
@@ -215,11 +215,13 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0200: resize(t, 2, rd16(a)); break;
     case 0x0202:
         if ((l = layer(t, rd32(a)))) {
+            image_free(l->surf);
             memset(l, 0, sizeof *l);
             l->made = true;
             l->w = (int)ik_value(t, rd32(a + 4));
             l->h = (int)ik_value(t, rd32(a + 8));
             l->img = -1;
+            for (int k = 0; k < 4; k++) l->argb[k] = 255;
         }
         break;
     case 0x0203:
@@ -230,7 +232,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         }
         break;
     case 0x0205:
-        if ((l = layer(t, rd32(a)))) l->mode = (int)ik_value(t, rd32(a + 4));
+        if ((l = layer(t, rd32(a)))) l->shown = ik_value(t, rd32(a + 4)) != 0;
         break;
     case 0x0204:
         if ((l = layer(t, rd32(a))) && n >= 36) {
@@ -248,7 +250,13 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             l->h = y1 - y0;
         }
         break;
-    case 0x0206: break;
+    case 0x0206:
+        if ((l = layer(t, rd32(a))) && n >= 20) {
+            for (int k = 0; k < 4; k++) l->argb[k] = (int)ik_value(t, rd32(a + 4 + 4 * k));
+            l->fade.on = false;
+            l->fill = true;
+        }
+        break;
     case 0x0207:
         if ((l = layer(t, rd32(a)))) {
             l->img = (int)ik_value(t, rd32(a + 4));
@@ -256,7 +264,38 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             l->sy = (int)ik_value(t, rd32(a + 12));
         }
         break;
-    case 0x0208: break;
+    case 0x0208:
+        if ((l = layer(t, rd32(a)))) {
+            l->ready = true;
+            image_free(l->surf);
+            l->surf = NULL;
+        }
+        break;
+    case 0x0209:
+        if ((l = layer(t, rd32(a))) && n >= 20)
+            layer_restore(t, l, (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)),
+                          (int)ik_value(t, rd32(a + 16)));
+        break;
+    case 0x0103:
+        if (n >= 32 && (l = layer(t, rd32(a + 4)))) {
+            int src = (int)ik_value(t, rd32(a));
+            static const int white[4] = {255, 255, 255, 255};
+            if (src >= 0 && src < t->imageCount && t->images[src])
+                image_blit(layer_surface(t, l), t->images[src], (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)),
+                           (int)ik_value(t, rd32(a + 24)), (int)ik_value(t, rd32(a + 28)), (int)ik_value(t, rd32(a + 16)),
+                           (int)ik_value(t, rd32(a + 20)), white, 0, false);
+        }
+        break;
+    case 0x0107: {
+        int slot = (int)ik_value(t, rd32(a));
+        if (slot >= 0 && slot < t->imageCount && n >= 12) {
+            image_free(t->images[slot]);
+            int w = (int)ik_value(t, rd32(a + 4)), h = (int)ik_value(t, rd32(a + 8));
+            t->images[slot] = image_new(w, h);
+            memset(t->images[slot]->px, 0, sizeof(u32) * (size_t)w * (size_t)h);
+        }
+        break;
+    }
     case 0x020a:
         if (n >= 3 && 3 + a[1] + 16 <= n) {
             char name[64];
@@ -282,6 +321,18 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0307:
         if (flag(t, ik_value(t, rd32(a)))) goto_label(t, rd16(a + 4));
         break;
+    case 0x0308:
+        if (!flag(t, ik_value(t, rd32(a)))) goto_label(t, rd16(a + 4));
+        break;
+    case 0x0408: {
+        i32 *v = var_at(t, rd32(a));
+        i32 m = (i32)ik_value(t, rd32(a + 4));
+        t->rng ^= t->rng << 13;
+        t->rng ^= t->rng >> 17;
+        t->rng ^= t->rng << 5;
+        if (v) *v = m > 0 ? (i32)(t->rng % (u32)m) : 0;
+        break;
+    }
     case 0x0405:
         if (n >= 12) {
             u32 e = ik_value(t, rd32(a + 4));
@@ -309,6 +360,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             l->fade.start = t->now;
             l->fade.dur = ms;
             l->fade.on = true;
+            l->shown = true;
             memcpy(l->argb, ms ? l->fade.from : l->fade.to, sizeof l->argb);
         }
         break;

@@ -37,6 +37,7 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
     t->msg.layer = -1;
     t->msg.name = -1;
     t->msg.msPerChar = 50;
+    t->rng = (u32)cfg->startTime | 1;
     vm_start(t, "START.SNR");
     if (!t->sc) {
         if (err) snprintf(err, errSize, "%s", t->problem);

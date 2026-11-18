@@ -91,7 +91,8 @@ typedef struct Layer {
     int w, h, x, y;
     int img, sx, sy;
     int argb[4];
-    int mode;
+    bool shown, ready, fill;
+    Image *surf;
     Anim fade, move;
 } Layer;
 
@@ -211,6 +212,7 @@ struct IK {
     Mixer *mixer;
     SeSlot slots[IK_SLOTS];
     char bgmName[16];
+    u32 rng;
 
     int mx, my;
     bool lDown, rDown, click, rclick;
@@ -227,6 +229,12 @@ void gfx_close(IK *t);
 void gfx_update(IK *t);
 bool gfx_animating(IK *t);
 void gfx_compose(IK *t);
+bool layer_drawn(const IK *t, int i);
+bool buttons_live(const IK *t);
+void image_blit(Image *dst, const Image *src, int sx, int sy, int w, int h, int x0, int y0, const int argb[4], u32 minAlpha,
+                bool copy);
+Image *layer_surface(IK *t, Layer *l);
+void layer_restore(IK *t, Layer *l, int x, int y, int w, int h);
 void gfx_blit(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0);
 void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0, u32 minAlpha);
 int button_at(IK *t, int x, int y);

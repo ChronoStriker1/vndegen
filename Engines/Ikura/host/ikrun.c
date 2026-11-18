@@ -7,6 +7,8 @@
 #include "vnikura.h"
 
 static void write_png(const char *path, const uint32_t *px, int w, int h);
+static int press(VNIkura *n, int x, int y, int button);
+static int run(VNIkura *n, int ms);
 
 static FILE *wav;
 static long wavFrames;
@@ -53,8 +55,68 @@ static int press(VNIkura *n, int x, int y, int button) {
     return alive && run(n, 32);
 }
 
+static int prefer[256];
+static int preferCount, preferUsed;
+
 static void print_state(IK *t) {
-    printf("script=%s pc=%x wait=%d sp=%d\n", t->sc ? t->sc->name : "-", t->pc, t->wait, t->sp);
+    printf("script=%s pc=%x wait=%d sp=%d text=", t->sc ? t->sc->name : "-", t->pc, t->wait, t->sp);
+    for (int i = 0; i < t->msg.revealed; i++) putchar(t->msg.chars[i].cp < 0x80 ? (int)t->msg.chars[i].cp : '?');
+    putchar('\n');
+}
+
+static int choice_button(IK *t, int pick) {
+    int seen = 0;
+    for (int k = 0; k < IK_BUTTONS; k++) {
+        Button *b = &t->buttons[k];
+        if (!b->made || !b->shown || !b->enabled || !b->bound || b->layer < 0 || b->layer >= t->layerCount) continue;
+        if (!layer_drawn(t, b->layer) || b->layer == t->msg.layer) continue;
+        if (++seen == pick) return k;
+    }
+    return -1;
+}
+
+static struct {
+    const void *sc;
+    u32 pc;
+    int visits;
+} seen[512];
+static int seenCount;
+
+static int rotate(IK *t) {
+    int total = 0;
+    while (choice_button(t, total + 1) >= 0) total++;
+    if (!total) return 1;
+    for (int i = 0; i < seenCount; i++)
+        if (seen[i].sc == t->sc && seen[i].pc == t->pc) return 1 + seen[i].visits++ % total;
+    if (seenCount < 512) seen[seenCount++] = (typeof(seen[0])){t->sc, t->pc, 1};
+    return 1;
+}
+
+static int autoplay(VNIkura *n, int steps, int ms, int every, const char *out) {
+    IK *t = (IK *)n;
+    int alive = 1;
+    for (int j = 0; j < steps && alive; j++) {
+        if (t->wait == W_INPUT) {
+            int pick = preferUsed < preferCount ? prefer[preferUsed++] : rotate(t);
+            int k = choice_button(t, pick);
+            if (k < 0) k = choice_button(t, 1);
+            if (k >= 0) {
+                Button *b = &t->buttons[k];
+                Layer *l = &t->layers[b->layer];
+                printf("choice %d -> button %d\n", pick, k);
+                alive = press(n, l->x + b->x + b->w / 2, l->y + b->y + b->h / 2, VNIKURA_MOUSE_LEFT) && run(n, ms);
+            } else alive = run(n, ms);
+        } else alive = press(n, 400, 200, VNIKURA_MOUSE_LEFT) && run(n, ms);
+        if (every > 0 && j % every == 0) {
+            int w, h;
+            const uint32_t *px = vnikura_pixels(n, &w, &h);
+            char path[1024];
+            snprintf(path, sizeof path, "%s/auto%05d.png", out, j);
+            write_png(path, px, w, h);
+            print_state(t);
+        }
+    }
+    return alive;
 }
 
 int main(int argc, char **argv) {
@@ -99,7 +161,10 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "wheel:%d", &k) == 1) {
             vnikura_wheel(n, k);
             alive = run(n, 32);
-        } else if (sscanf(c, "var:%d", &k) == 1) printf("var%d=%d\n", k, k < ((IK *)n)->varCount ? ((IK *)n)->vars[k] : 0);
+        } else if (sscanf(c, "prefer:%d", &k) == 1) {
+            if (preferCount < 256) prefer[preferCount++] = k;
+        } else if (sscanf(c, "auto:%d,%d,%d", &k, &x, &y) == 3) alive = autoplay(n, k, x, y, argv[3]);
+        else if (sscanf(c, "var:%d", &k) == 1) printf("var%d=%d\n", k, k < ((IK *)n)->varCount ? ((IK *)n)->vars[k] : 0);
         else if (!strcmp(c, "state")) print_state((IK *)n);
         else if (!strncmp(c, "shot:", 5)) {
             int w, h;

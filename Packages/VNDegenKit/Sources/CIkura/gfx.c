@@ -11,6 +11,7 @@ void gfx_close(IK *t) {
     free(t->screen);
     for (int i = 0; i < t->imageCount; i++) image_free(t->images[i]);
     free(t->images);
+    for (int i = 0; i < t->layerCount; i++) image_free(t->layers[i].surf);
     free(t->layers);
     free(t->buttons);
 }
@@ -52,31 +53,67 @@ bool gfx_animating(IK *t) {
 
 static const int fullColour[4] = {255, 255, 255, 255};
 
-void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0, u32 minAlpha) {
-    if (img < 0 || img >= t->imageCount || !t->images[img] || argb[0] <= 0) return;
-    const Image *im = t->images[img];
+static inline u32 over(u32 d, u32 r, u32 g, u32 b, u32 a) {
+    u32 da = d >> 24;
+    if (a == 255 || !da) return r | g << 8 | b << 16 | a << 24;
+    u32 ia = 255 - a, w = da * ia / 255, oa = a + w;
+    return (r * a + (d & 0xff) * w) / oa | ((g * a + ((d >> 8) & 0xff) * w) / oa) << 8 |
+           ((b * a + ((d >> 16) & 0xff) * w) / oa) << 16 | oa << 24;
+}
+
+void image_blit(Image *dst, const Image *src, int sx, int sy, int w, int h, int x0, int y0, const int argb[4], u32 minAlpha,
+                bool copy) {
+    if (!dst || !src) return;
     u32 ca = (u32)clampi(argb[0], 0, 255), cr = (u32)clampi(argb[1], 0, 255), cg = (u32)clampi(argb[2], 0, 255),
         cb = (u32)clampi(argb[3], 0, 255);
-    if (sx + w > im->w) w = im->w - sx;
-    if (sy + h > im->h) h = im->h - sy;
+    if (!copy && !ca) return;
+    if (sx + w > src->w) w = src->w - sx;
+    if (sy + h > src->h) h = src->h - sy;
     for (int y = 0; y < h; y++) {
         int dy = y0 + y, syy = sy + y;
-        if (dy < 0 || dy >= t->H || syy < 0) continue;
-        const u32 *srow = im->px + (size_t)syy * im->w;
-        u32 *drow = t->screen + (size_t)dy * t->W;
+        if (dy < 0 || dy >= dst->h || syy < 0) continue;
+        const u32 *srow = src->px + (size_t)syy * src->w;
+        u32 *drow = dst->px + (size_t)dy * dst->w;
         for (int x = 0; x < w; x++) {
             int dx = x0 + x, sxx = sx + x;
-            if (dx < 0 || dx >= t->W || sxx < 0) continue;
-            u32 s = srow[sxx];
-            if ((s >> 24) < minAlpha) continue;
-            u32 a = (s >> 24) * ca / 255;
+            if (dx < 0 || dx >= dst->w || sxx < 0) continue;
+            u32 p = srow[sxx];
+            if (copy) {
+                drow[dx] = p;
+                continue;
+            }
+            if ((p >> 24) < minAlpha) continue;
+            u32 a = (p >> 24) * ca / 255;
             if (!a) continue;
-            u32 r = (s & 0xff) * cr / 255, g = ((s >> 8) & 0xff) * cg / 255, b = ((s >> 16) & 0xff) * cb / 255;
-            u32 d = drow[dx], ia = 255 - a;
-            drow[dx] = ((r * a + (d & 0xff) * ia) / 255) | (((g * a + ((d >> 8) & 0xff) * ia) / 255) << 8) |
-                       (((b * a + ((d >> 16) & 0xff) * ia) / 255) << 16) | 0xff000000u;
+            drow[dx] = over(drow[dx], (p & 0xff) * cr / 255, ((p >> 8) & 0xff) * cg / 255, ((p >> 16) & 0xff) * cb / 255, a);
         }
     }
+}
+
+void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0, u32 minAlpha) {
+    if (img < 0 || img >= t->imageCount || !t->images[img]) return;
+    Image screen = {t->W, t->H, t->screen};
+    image_blit(&screen, t->images[img], sx, sy, w, h, x0, y0, argb, minAlpha, false);
+}
+
+Image *layer_surface(IK *t, Layer *l) {
+    if (l->surf) return l->surf;
+    l->surf = image_new(l->w, l->h);
+    memset(l->surf->px, 0, sizeof(u32) * (size_t)l->w * (size_t)l->h);
+    if (l->img >= 0 && l->img < t->imageCount && t->images[l->img])
+        image_blit(l->surf, t->images[l->img], l->sx, l->sy, l->w, l->h, 0, 0, fullColour, 0, true);
+    return l->surf;
+}
+
+void layer_restore(IK *t, Layer *l, int x, int y, int w, int h) {
+    Image *s = layer_surface(t, l);
+    for (int j = y; j < y + h; j++) {
+        if (j < 0 || j >= s->h) continue;
+        for (int i = x; i < x + w; i++)
+            if (i >= 0 && i < s->w) s->px[(size_t)j * s->w + i] = 0;
+    }
+    if (l->img >= 0 && l->img < t->imageCount && t->images[l->img])
+        image_blit(s, t->images[l->img], l->sx + x, l->sy + y, w, h, x, y, fullColour, 0, true);
 }
 
 void gfx_blit(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0) {
@@ -105,14 +142,25 @@ static int button_state(IK *t, int id, const Button *b) {
     return 0;
 }
 
+bool layer_drawn(const IK *t, int i) {
+    const Layer *l = &t->layers[i];
+    return l->made && l->ready && l->shown;
+}
+
+bool buttons_live(const IK *t) { return t->wait == W_INPUT || t->wait == W_MSG; }
+
 void gfx_compose(IK *t) {
     for (int i = 0; i < t->W * t->H; i++) t->screen[i] = 0xff000000u;
+    bool live = buttons_live(t);
     for (int i = 0; i < t->layerCount; i++) {
         Layer *l = &t->layers[i];
-        if (!l->made) continue;
-        if (l->img >= 0) gfx_blit(t, l->argb, l->img, l->sx, l->sy, l->w, l->h, l->x, l->y);
-        else fill(t, l);
-        if (l->mode) {
+        if (!layer_drawn(t, i)) continue;
+        if (l->surf) {
+            Image screen = {t->W, t->H, t->screen};
+            image_blit(&screen, l->surf, 0, 0, l->w, l->h, l->x, l->y, l->argb, 0, false);
+        } else if (l->img >= 0) gfx_blit(t, l->argb, l->img, l->sx, l->sy, l->w, l->h, l->x, l->y);
+        else if (l->fill) fill(t, l);
+        if (live) {
             for (int k = 0; k < IK_BUTTONS; k++) {
                 Button *b = &t->buttons[k];
                 if (!b->made || !b->shown || b->layer != i) continue;
@@ -129,8 +177,8 @@ int button_at(IK *t, int x, int y) {
     for (int k = IK_BUTTONS - 1; k >= 0; k--) {
         Button *b = &t->buttons[k];
         if (!b->made || !b->shown || b->layer < 0 || b->layer >= t->layerCount) continue;
+        if (!layer_drawn(t, b->layer)) continue;
         Layer *l = &t->layers[b->layer];
-        if (!l->made || !l->mode) continue;
         int bx = l->x + b->x, by = l->y + b->y;
         if (x >= bx && y >= by && x < bx + b->w && y < by + b->h) return k;
     }

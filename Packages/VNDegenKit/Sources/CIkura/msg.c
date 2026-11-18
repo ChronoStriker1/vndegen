@@ -167,17 +167,6 @@ void msg_tick(IK *t) {
     run_tags(t);
 }
 
-static void show(IK *t, bool on) {
-    MsgWin *m = &t->msg;
-    m->shown = on;
-    if (m->layer >= 0 && m->layer < t->layerCount) {
-        Layer *l = &t->layers[m->layer];
-        for (int k = 0; k < 4; k++) l->argb[k] = on ? 255 : 0;
-        l->fade.on = false;
-    }
-    t->dirty = true;
-}
-
 bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
     MsgWin *m = &t->msg;
     switch (op) {
@@ -242,17 +231,17 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
         t->wait = W_MSG;
         run_tags(t);
         break;
-    case 0x090d: show(t, true); break;
-    case 0x090e: show(t, false); break;
+    case 0x0910:
+    case 0x0911:
+    case 0x090d:
+    case 0x090e:
     case 0x0905:
     case 0x0906:
     case 0x0907:
     case 0x0909:
     case 0x090a:
     case 0x090b:
-    case 0x090c:
-    case 0x0910:
-    case 0x0911: break;
+    case 0x090c: break;
     default: return false;
     }
     return true;
