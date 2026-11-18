@@ -271,6 +271,9 @@ struct TH {
     Overlay overlay[8];
     int overlayCount;
     int bgEffect;
+    struct { char prefix[16]; bool on; int vol; } chars[16];
+    int charCount;
+    struct { bool on; int x0, y0, x1, y1, s0x, s0y, s1x, s1y; u32 start, dur; } bgMove;
     Image *navi;
     char naviName[64];
     bool transActive;
@@ -359,6 +362,7 @@ void gfx_set_sprites(TH *t, const char *list, int trans);
 void gfx_set_overlay(TH *t, const u8 *b, const char *name);
 void gfx_clear_overlay(TH *t, int layer);
 bool gfx_overlays_moving(TH *t);
+void gfx_move_bg(TH *t, const u8 *b, const char *name);
 void gfx_clear_sprites(TH *t, int trans);
 void gfx_begin_transition(TH *t, int kind);
 bool gfx_transition_done(TH *t);
@@ -410,6 +414,7 @@ bool save_exists(TH *t, int slot);
 void save_system(TH *t);
 void load_system(TH *t);
 void system_settings_changed(TH *t);
+float voice_scale(TH *t, const char *name);
 bool read_flag(TH *t, int sceneId, int rec, bool mark);
 
 #endif

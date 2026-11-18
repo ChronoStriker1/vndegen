@@ -19,7 +19,7 @@ typedef struct BarItem {
 } BarItem;
 
 typedef struct SysPart {
-    int page;
+    int page, sheet;
     char id[48];
     int type;
     int x, y, sx, sy, w, h, count, cols, rows, dx, dy, sdx, sdy, ex[4];
@@ -82,9 +82,10 @@ static UI *ui_get(TH *t) {
         char *f[24];
         int n = 0;
         for (char *p = strtok(tmp, ","); p && n < 24; p = strtok(NULL, ",")) f[n++] = p;
-        if (n < 16 || (atoi(f[0]) == 0 && page < 98)) continue;
+        if (n < 16) continue;
         SysPart *p = &u->parts[u->partCount];
         p->page = page;
+        p->sheet = atoi(f[0]);
         snprintf(p->id, sizeof p->id, "%s", f[1]);
         p->type = !strcmp(f[2], "SW_SLIDE") ? SW_SLIDE : !strcmp(f[2], "SW_ONE") ? SW_ONE : !strcmp(f[2], "SW_PUSH") ? SW_PUSH : SW_GROUP;
         int *v = &p->x;
@@ -718,20 +719,26 @@ static bool item_selected(UI *u, int pi, int i) {
     return v == i;
 }
 
+static void chara_layout(TH *t, int sw[13], int pv[11]) {
+    memset(sw, 0, sizeof(int) * 13);
+    memset(pv, 0, sizeof(int) * 11);
+    ini_ints(&t->sys, "CHARACTER", "PLAY_SWITCH", sw, 13);
+    ini_ints(&t->sys, "CHARACTER", "PLAY_VOLUME", pv, 11);
+}
+
 static void draw_system(TH *t) {
     UI *u = ui_get(t);
     char name[32];
     snprintf(name, sizeof name, "sys_system_base_%02d", u->sysPage + 1);
     Image *base = image_get(t, name);
     if (base) blit(t->screen, t->W, t->H, base, 0, 0, 255);
-    Image *nav = image_get(t, "sys_system_button_01");
-    Image *sheet = image_get(t, "sys_system_button_02");
+    Image *sheets[2] = {image_get(t, "sys_system_button_01"), image_get(t, "sys_system_button_02")};
     for (int pi = 0; pi < u->partCount; pi++) {
         SysPart *p = &u->parts[pi];
         if (p->page == 98) continue;
         bool navPart = p->page == 99;
         if (!navPart && p->page != u->sysPage + 1) continue;
-        Image *src = navPart ? nav : sheet;
+        Image *src = sheets[p->sheet == 1];
         if (!src) continue;
         if (p->type == SW_SLIDE) {
             for (int i = 0; i < p->count; i++) {
@@ -739,11 +746,31 @@ static void draw_system(TH *t) {
                 int range = p->ex[2] ? p->ex[2] : 336;
                 int val = (u->values[pi] >> (i * 8)) & 0xff;
                 int kx = x + range * val / 255;
-                blit_part(t->screen, t->W, t->H, sheet, p->sx, p->sy + (u->dragPart == pi && u->dragIndex == i ? p->h : 0), 12, p->h, kx - 6, y, 255);
+                blit_part(t->screen, t->W, t->H, src, p->sx, p->sy + (u->dragPart == pi && u->dragIndex == i ? p->h : 0), 12, p->h, kx - 6, y, 255);
             }
             continue;
         }
-        if (p->type == SW_PUSH) continue;
+        if (p->type == SW_PUSH) {
+            if (strcmp(p->id, "S_CHARASET")) continue;
+            int sw[13], pv[11];
+            chara_layout(t, sw, pv);
+            Image *swSheet = sheets[sw[1] == 1], *pvSheet = sheets[pv[1] == 1];
+            for (int i = 0; i < p->count && i < t->charCount; i++) {
+                int x, y, sx, sy;
+                part_item(p, i, &x, &y, &sx, &sy);
+                for (int k = 0; swSheet && sw[0] && k < 2; k++) {
+                    int row = t->chars[i].on == (k == 1) ? 2 : u->hover == 4000 + i * 2 + k ? 1 : 0;
+                    blit_part(t->screen, t->W, t->H, swSheet, sw[5] + k * sw[11], sw[6] + k * sw[12] + row * sw[8], sw[7], sw[8],
+                              x + sw[3] + k * sw[9], y + sw[4] + k * sw[10], 255);
+                }
+                if (pvSheet && pv[0]) {
+                    int drag = u->dragPart == -2 && u->dragIndex == i;
+                    blit_part(t->screen, t->W, t->H, pvSheet, pv[5], pv[6] + (drag ? pv[8] : 0), pv[7], pv[8],
+                              x + pv[3] + pv[9] * t->chars[i].vol / 100, y + pv[4], 255);
+                }
+            }
+            continue;
+        }
         for (int i = 0; i < p->count; i++) {
             int x, y, sx, sy;
             part_item(p, i, &x, &y, &sx, &sy);
@@ -784,11 +811,55 @@ static void update_system(TH *t) {
             if (inside(t->mx, t->my, x, y, p->w, p->h)) hover = pi * 32 + i;
         }
     }
+    int sw[13], pv[11];
+    chara_layout(t, sw, pv);
+    SysPart *cs = NULL;
+    for (int pi = 0; pi < u->partCount; pi++)
+        if (!strcmp(u->parts[pi].id, "S_CHARASET") && u->parts[pi].page == u->sysPage + 1) cs = &u->parts[pi];
+    for (int i = 0; cs && i < cs->count && i < t->charCount; i++) {
+        int x, y, sx, sy;
+        part_item(cs, i, &x, &y, &sx, &sy);
+        for (int k = 0; sw[0] && k < 2; k++)
+            if (inside(t->mx, t->my, x + sw[3] + k * sw[9], y + sw[4] + k * sw[10], sw[7], sw[8])) hover = 4000 + i * 2 + k;
+    }
     if (hover != u->hover) t->dirty = true;
     u->hover = hover;
     if (t->rclick || t->keyPress[0x1b]) {
         ui_close(t);
         return;
+    }
+    if (u->dragPart == -2) {
+        if (!t->lDown) {
+            u->dragPart = -1;
+            t->dirty = true;
+            return;
+        }
+        int x, y, sx, sy;
+        part_item(cs, u->dragIndex, &x, &y, &sx, &sy);
+        int range = pv[9] ? pv[9] : 336;
+        t->chars[u->dragIndex].vol = clampi((t->mx - x - pv[3] - pv[7] / 2) * 100 / range, 0, 100);
+        system_settings_changed(t);
+        t->dirty = true;
+        return;
+    }
+    if (t->click && hover >= 4000) {
+        int i = (hover - 4000) / 2;
+        t->chars[i].on = (hover - 4000) % 2 == 1;
+        system_settings_changed(t);
+        t->dirty = true;
+        return;
+    }
+    if (t->click && hover < 0 && cs && pv[0]) {
+        int range = pv[9] ? pv[9] : 336;
+        for (int i = 0; i < cs->count && i < t->charCount; i++) {
+            int x, y, sx, sy;
+            part_item(cs, i, &x, &y, &sx, &sy);
+            if (inside(t->mx, t->my, x + pv[3] - 4, y + pv[4], range + pv[7] + 8, pv[8])) {
+                u->dragPart = -2;
+                u->dragIndex = i;
+            }
+        }
+        if (u->dragPart == -2) return;
     }
     if (t->click && hover < 0) {
         for (int pi = 0; pi < u->partCount; pi++) {

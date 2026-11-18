@@ -238,6 +238,7 @@ bool vnth_frame(VNTH *v, uint32_t elapsedMs) {
     memset(t->keyPress, 0, sizeof t->keyPress);
     if (t->quit) return false;
     if (t->overlayCount && gfx_overlays_moving(t)) t->sceneDirty = true;
+    if (t->bgMove.on && t->now - t->bgMove.start <= t->bgMove.dur) t->sceneDirty = true;
     bool animating = t->transActive || t->pan.active || (t->flashDur && t->now - t->flashStart < t->flashDur + 100) ||
                      (t->wait == W_TEXT) || t->dirty || t->sceneDirty;
     if (t->movie) {

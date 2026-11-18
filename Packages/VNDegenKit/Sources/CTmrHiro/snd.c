@@ -16,7 +16,7 @@ typedef struct Voice {
     size_t frames;
     size_t pos;
     bool loop;
-    float gain, target, step;
+    float gain, target, step, scale;
     bool stopAtZero;
     bool done;
 } Voice;
@@ -74,7 +74,7 @@ void mixer_mix(Mixer *m, float *out, int frames, bool paused) {
                     break;
                 }
             }
-            float g = v->gain * vol / 32768.0f;
+            float g = v->gain * v->scale * vol / 32768.0f;
             out[i * 2] += v->pcm[v->pos * 2] * g;
             out[i * 2 + 1] += v->pcm[v->pos * 2 + 1] * g;
             v->pos++;
@@ -161,6 +161,7 @@ void snd_play(TH *t, int ch, int kind, const char *name, bool loop, int fadeMs) 
     }
     v->loop = loop;
     v->target = 1;
+    v->scale = kind == PAC_VOICE ? voice_scale(t, name) : 1.0f;
     if (fadeMs > 0) {
         v->gain = 0;
         v->step = 1.0f / ((float)fadeMs * (float)t->audioRate / 1000.0f);

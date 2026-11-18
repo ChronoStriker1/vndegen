@@ -21,6 +21,7 @@
 #define gfx_compose th_gfx_compose
 #define gfx_finish_transition th_gfx_finish_transition
 #define gfx_init th_gfx_init
+#define gfx_move_bg th_gfx_move_bg
 #define gfx_overlays_moving th_gfx_overlays_moving
 #define gfx_set_bg th_gfx_set_bg
 #define gfx_set_overlay th_gfx_set_overlay
@@ -90,3 +91,4 @@
 #define vm_goto th_vm_goto
 #define vm_run th_vm_run
 #define vm_start th_vm_start
+#define voice_scale th_voice_scale

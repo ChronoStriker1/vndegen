@@ -10,6 +10,8 @@
 static void write_png(const char *path, const uint32_t *px, int w, int h);
 
 static FILE *wav;
+static struct { char key[160]; int n; } used[512];
+static int usedCount;
 static long wavFrames;
 static float audio[2048];
 
@@ -72,7 +74,7 @@ int main(int argc, char **argv) {
     int alive = 1;
     for (int i = 4; i < argc && alive; i++) {
         const char *c = argv[i];
-        int x, y, k;
+        int x, y, k, j0;
         if (sscanf(c, "wait:%d", &k) == 1) {
             for (int t = 0; t < k && alive; t += 16) alive = step(n);
         } else if (sscanf(c, "click:%d,%d", &x, &y) == 2) {
@@ -93,6 +95,17 @@ int main(int argc, char **argv) {
             alive = run(n, 48);
             vnth_mouse_button(n, VNTH_MOUSE_RIGHT, 0);
             alive = alive && run(n, 32);
+        } else if (sscanf(c, "drag:%d,%d,%d,%d", &x, &y, &k, &j0) == 4) {
+            vnth_mouse_move(n, x, y);
+            alive = run(n, 32);
+            vnth_mouse_button(n, VNTH_MOUSE_LEFT, 1);
+            alive = alive && run(n, 32);
+            for (int s2 = 1; s2 <= 8 && alive; s2++) {
+                vnth_mouse_move(n, x + (k - x) * s2 / 8, y + (j0 - y) * s2 / 8);
+                alive = run(n, 32);
+            }
+            vnth_mouse_button(n, VNTH_MOUSE_LEFT, 0);
+            alive = alive && run(n, 32);
         } else if (sscanf(c, "move:%d,%d", &x, &y) == 2) {
             vnth_mouse_move(n, x, y);
             alive = run(n, 32);
@@ -102,6 +115,49 @@ int main(int argc, char **argv) {
                 alive = run(n, 32);
                 vnth_mouse_button(n, VNTH_MOUSE_LEFT, 0);
                 alive = alive && run(n, x);
+            }
+        } else if (sscanf(c, "auto:%d,%d", &k, &x) == 2) {
+            TH *t = (TH *)n;
+            for (int j = 0; j < k && alive; j++) {
+                int cx = 640, cy = 360;
+                if (t->wait == W_CHOICE && t->choiceCount) {
+                    int w = ini_int(&t->sys, "SELECT", "SELECT_WIDTH", 800), h = ini_int(&t->sys, "SELECT", "SELECT_HEIGHT", 60);
+                    int top = ini_int(&t->sys, "SELECT", "SELECT_POSY", 200), ny = ini_int(&t->sys, "SELECT", "SELECT_NEXT_Y", 8);
+                    int i = x % t->choiceCount, total = t->choiceCount * h + (t->choiceCount - 1) * ny;
+                    cx = t->W / 2;
+                    cy = top - h / 2 - total / 2 + (h + ny) * i + h / 2;
+                    (void)w;
+                } else if (t->wait == W_MAP) {
+                    int act[16], na = 0;
+                    for (int i = 0; i < t->mapCount; i++)
+                        if (t->maps[i].kind == 0x20) act[na++] = i;
+                    if (na) {
+                        int best = act[x % na], bestUse = 1 << 30;
+                        for (int q = 0; q < na; q++) {
+                            int use = 0;
+                            char key[160];
+                            snprintf(key, sizeof key, "%s/%s", t->scene, t->maps[act[(q + x) % na]].label);
+                            for (int u = 0; u < usedCount; u++)
+                                if (!strcmp(used[u].key, key)) use = used[u].n;
+                            if (use < bestUse) bestUse = use, best = act[(q + x) % na];
+                        }
+                        char key[160];
+                        snprintf(key, sizeof key, "%s/%s", t->scene, t->maps[best].label);
+                        int u = 0;
+                        while (u < usedCount && strcmp(used[u].key, key)) u++;
+                        if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", key);
+                        if (u < 512) used[u].n++;
+                        MapButton *b = &t->maps[best];
+                        cx = b->x + b->w / 2;
+                        cy = b->y + b->h / 2;
+                    }
+                }
+                vnth_mouse_move(n, cx, cy);
+                alive = run(n, 32);
+                vnth_mouse_button(n, VNTH_MOUSE_LEFT, 1);
+                alive = alive && run(n, 32);
+                vnth_mouse_button(n, VNTH_MOUSE_LEFT, 0);
+                alive = alive && run(n, 150);
             }
         } else if (sscanf(c, "key:%i", &k) == 1) {
             vnth_key(n, k, 1);

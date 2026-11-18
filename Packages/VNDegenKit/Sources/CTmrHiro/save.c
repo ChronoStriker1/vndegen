@@ -331,7 +331,7 @@ bool load_slot(TH *t, int slot) {
     return true;
 }
 
-enum { SYS_READ_BASE = 7512, SYS_READ_STRIDE = 1024 };
+enum { SYS_READ_BASE = 7512, SYS_READ_STRIDE = 1024, SYS_CHARS = 2057176, SYS_CHAR_SIZE = 64 };
 
 static const char sideMagic[8] = {'V', 'N', 'T', 'H', 'M', 'K', '0', '1'};
 
@@ -392,7 +392,36 @@ static void save_sidecar(TH *t) {
     free(d);
 }
 
+static void chars_init(TH *t) {
+    int max = ini_int(&t->sys, "CHARACTER", "CHR_MAX", 0);
+    t->charCount = 0;
+    for (int i = 1; i <= max && t->charCount < 16; i++) {
+        char key[32];
+        snprintf(key, sizeof key, "CHR_PARAM_%02d", i);
+        const char *v = ini_get(&t->sys, "CHARACTER", key);
+        const char *c1 = v ? strchr(v, ',') : NULL;
+        if (!c1) continue;
+        const char *c2 = strchr(c1 + 1, ',');
+        size_t n = c2 ? (size_t)(c2 - c1 - 1) : strlen(c1 + 1);
+        if (n >= sizeof t->chars[0].prefix) n = sizeof t->chars[0].prefix - 1;
+        int k = t->charCount++;
+        memcpy(t->chars[k].prefix, c1 + 1, n);
+        t->chars[k].prefix[n] = 0;
+        t->chars[k].on = true;
+        t->chars[k].vol = c2 ? clampi(atoi(c2 + 1), 0, 100) : 100;
+    }
+}
+
+float voice_scale(TH *t, const char *name) {
+    for (int i = 0; i < t->charCount; i++) {
+        size_t n = strlen(t->chars[i].prefix);
+        if (n && !strncmp(name, t->chars[i].prefix, n)) return t->chars[i].on ? t->chars[i].vol / 100.0f : 0.0f;
+    }
+    return 1.0f;
+}
+
 void load_system(TH *t) {
+    chars_init(t);
     char *path = th_fmt("%s/savedata.000", t->saveDir);
     size_t size;
     u8 *d = th_read_file(path, &size);
@@ -406,6 +435,13 @@ void load_system(TH *t) {
         t->winStat = (t->winStat & 0x00ffffffu) | (u32)d[306] << 24;
         for (int i = 0; i < 4; i++)
             if (d[411 + i] <= 100) t->sysVol[i] = d[411 + i];
+        for (int i = 0; i < t->charCount; i++) {
+            size_t off = SYS_CHARS + (size_t)SYS_CHAR_SIZE * (size_t)i;
+            if (off + SYS_CHAR_SIZE > size || memcmp(d + off + 32, t->chars[i].prefix, strlen(t->chars[i].prefix) + 1)) continue;
+            u32 on = rd32(d + off + 56), vol = rd32(d + off + 60);
+            if (on <= 1) t->chars[i].on = on;
+            if (vol <= 100) t->chars[i].vol = (int)vol;
+        }
     } else {
         free(d);
     }
@@ -419,6 +455,12 @@ void system_settings_changed(TH *t) {
     d[286] = (u8)t->autoSpeed;
     d[306] = (u8)(t->winStat >> 24);
     for (int i = 0; i < 4; i++) d[411 + i] = (u8)t->sysVol[i];
+    for (int i = 0; i < t->charCount; i++) {
+        size_t off = SYS_CHARS + (size_t)SYS_CHAR_SIZE * (size_t)i;
+        if (off + SYS_CHAR_SIZE > t->system000Size || memcmp(d + off + 32, t->chars[i].prefix, strlen(t->chars[i].prefix) + 1)) continue;
+        wr32(d + off + 56, t->chars[i].on);
+        wr32(d + off + 60, (u32)t->chars[i].vol);
+    }
     t->systemDirty = true;
 }
 

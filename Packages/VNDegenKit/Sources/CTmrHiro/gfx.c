@@ -221,14 +221,31 @@ static void render_scene(TH *t) {
     for (size_t i = 0; i < n; i++) d[i] = 0xff000000u;
     if (!strcmp(t->bgName, "wh")) {
         for (size_t i = 0; i < n; i++) d[i] = 0xffffffffu;
+    } else if (t->bg && t->bgMove.on) {
+        u32 el = t->now - t->bgMove.start;
+        float k = t->bgMove.dur && el < t->bgMove.dur ? (float)el / (float)t->bgMove.dur : 1.0f;
+        float x = t->bgMove.x0 + (t->bgMove.x1 - t->bgMove.x0) * k, y = t->bgMove.y0 + (t->bgMove.y1 - t->bgMove.y0) * k;
+        float sx = (t->bgMove.s0x + (t->bgMove.s1x - t->bgMove.s0x) * k) / 100.0f;
+        float sy = (t->bgMove.s0y + (t->bgMove.s1y - t->bgMove.s0y) * k) / 100.0f;
+        float left = x + t->bg->cw * (1 - sx) / 2, top = y + t->bg->ch * (1 - sy) / 2;
+        blit_scaled(d, t->W, t->H, t->bg, (int)lroundf(left), (int)lroundf(top), sx, sy, 255);
     } else if (t->bg) {
-        blit(d, t->W, t->H, t->bg, (t->W - t->bg->cw) / 2, (t->H - t->bg->ch) / 2, 255);
+        blit(d, t->W, t->H, t->bg, t->bg->cw > t->W ? 0 : (t->W - t->bg->cw) / 2, t->bg->ch > t->H ? 0 : (t->H - t->bg->ch) / 2, 255);
     }
     if (t->pan.active && t->pan.img) {
         u32 el = t->now - t->pan.start;
         float k = t->pan.dur ? (el >= t->pan.dur ? 1.0f : (float)el / (float)t->pan.dur) : 1.0f;
         int y = t->pan.fromY + (int)lroundf((float)(t->pan.toY - t->pan.fromY) * k);
         blit(d, t->W, t->H, t->pan.img, 0, y, 255);
+    }
+    int plus = ini_int(&t->sys, "GAMESYSTEM", "CHARA_SPR_PLUS_Y", 0);
+    for (int i = 0; i < t->sprCount; i++) {
+        Sprite *s = &t->spr[i];
+        if (!s->img) continue;
+        float cx = t->W / 2.0f + s->x;
+        float cy = s->y + (float)plus + s->img->ch / 2.0f;
+        float x0 = cx - s->img->cw * s->sx / 2.0f, y0 = cy - s->img->ch * s->sy / 2.0f;
+        blit_scaled(d, t->W, t->H, s->img, (int)lroundf(x0), (int)lroundf(y0), s->sx, s->sy, 255);
     }
     if (t->bgEffect >= 1 && t->bgEffect <= 3) {
         for (size_t i = 0; i < n; i++) {
@@ -245,15 +262,6 @@ static void render_scene(TH *t) {
             }
             d[i] = r | g << 8 | b << 16 | 0xff000000u;
         }
-    }
-    int plus = ini_int(&t->sys, "GAMESYSTEM", "CHARA_SPR_PLUS_Y", 0);
-    for (int i = 0; i < t->sprCount; i++) {
-        Sprite *s = &t->spr[i];
-        if (!s->img) continue;
-        float cx = t->W / 2.0f + s->x;
-        float cy = s->y + (float)plus + s->img->ch / 2.0f;
-        float x0 = cx - s->img->cw * s->sx / 2.0f, y0 = cy - s->img->ch * s->sy / 2.0f;
-        blit_scaled(d, t->W, t->H, s->img, (int)lroundf(x0), (int)lroundf(y0), s->sx, s->sy, 255);
     }
     for (int i = 0; i < t->overlayCount; i++) {
         Overlay *o = &t->overlay[i];
@@ -305,6 +313,7 @@ void gfx_set_bg(TH *t, const char *name, int trans) {
     t->bg = NULL;
     t->sprCount = 0;
     t->bgEffect = 0;
+    t->bgMove.on = false;
     if (strcmp(name, "bl") && strcmp(name, "wh")) t->bg = image_get(t, name);
     t->sceneDirty = true;
 }
@@ -336,6 +345,22 @@ void gfx_set_overlay(TH *t, const u8 *b, const char *name) {
     t->overlay[at] = (Overlay){layer, im, (i16)rd16(b + 4), (i16)rd16(b + 6), (i16)rd16(b + 8), (i16)rd16(b + 10),
                                rd16(b + 12), rd16(b + 14), rd16(b + 16), rd16(b + 18), rd16(b + 20), rd16(b + 22),
                                t->now, rd16(b + 24)};
+    t->sceneDirty = true;
+}
+
+void gfx_move_bg(TH *t, const u8 *b, const char *name) {
+    if (strcmp(t->bgName, name)) gfx_set_bg(t, name, t->skipMode ? 0 : rd16(b));
+    t->bgMove.on = true;
+    t->bgMove.x0 = (i16)rd16(b + 3);
+    t->bgMove.y0 = (i16)rd16(b + 5);
+    t->bgMove.x1 = (i16)rd16(b + 7);
+    t->bgMove.y1 = (i16)rd16(b + 9);
+    t->bgMove.s0x = rd16(b + 11);
+    t->bgMove.s0y = rd16(b + 13);
+    t->bgMove.s1x = rd16(b + 15);
+    t->bgMove.s1y = rd16(b + 17);
+    t->bgMove.dur = t->skipMode ? 0 : rd16(b + 19);
+    t->bgMove.start = t->now;
     t->sceneDirty = true;
 }
 

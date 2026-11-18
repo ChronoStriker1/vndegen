@@ -320,6 +320,7 @@ static int step(TH *t) {
             snprintf(t->bgName, sizeof t->bgName, "%s", name);
             t->sprCount = 0;
             t->bgEffect = 0;
+            t->bgMove.on = false;
             if (b[11] == 'w' && !t->skipMode) {
                 begin_wait(t, W_TIME, t->pan.dur);
                 t->waitSkippable = true;
@@ -382,6 +383,25 @@ static int step(TH *t) {
             if (!movie_play(t, s + 3)) return 1;
             begin_wait(t, W_MOVIE, 0);
             return 0;
+        case 0x0c:
+            if (r->len < 22) return 1;
+            gfx_move_bg(t, b, s + 21);
+            if (t->transActive) {
+                begin_wait(t, W_TRANS, 0);
+                return 0;
+            }
+            return 1;
+        case 0x6b: {
+            if (r->len < 24) return 1;
+            char spec[160];
+            snprintf(spec, sizeof spec, "%s/%d/%.2f/%.2f", s + 23, (i16)rd16(b + 11), rd16(b + 13) / 100.0, rd16(b + 15) / 100.0);
+            gfx_set_sprites(t, spec, t->skipMode ? 0 : rd16(b));
+            if (t->transActive) {
+                begin_wait(t, W_TRANS, 0);
+                return 0;
+            }
+            return 1;
+        }
         case 0x1f6:
             if (r->len >= 1) gfx_clear_overlay(t, b[0]);
             return 1;
@@ -404,6 +424,7 @@ static int step(TH *t) {
         case 0x01: snd_stop(t, CH_BGM, 0); t->bgmName[0] = 0; return 1;
         case 0x02: snd_stop(t, CH_BGM, r->len >= 2 ? rd16(b) : 0); t->bgmName[0] = 0; return 1;
         case 0xc8: sound_cmd(t, r, CH_SE, PAC_SE, false); return 1;
+        case 0xc9: sound_cmd(t, r, CH_SE, PAC_SE, true); return 1;
         case 0xca: snd_stop(t, CH_SE, 0); return 1;
         case 0x12c: sound_cmd(t, r, CH_SEH1, PAC_SE, true); return 1;
         case 0x12d: sound_cmd(t, r, CH_SEH2, PAC_SE, true); return 1;
@@ -487,6 +508,14 @@ static int step(TH *t) {
         case 0x03:
             t->galleryAll = r->len > 0 && b[0];
             return 1;
+        case 0x04:
+            if (r->len > 1) gallery_mark_scene(t, s + 1);
+            return 1;
+        case 0x37:
+            if (t->skipMode) return 1;
+            begin_wait(t, W_TIME, 0x7fffffff);
+            t->waitSkippable = true;
+            return 0;
         case 0x14:
             t->sceneId = r->len >= 2 ? rd16(b) : 0;
             return 1;
