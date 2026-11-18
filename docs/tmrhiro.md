@@ -75,7 +75,7 @@ the same files there:
   background pans and zooms (0x000c), and the sepia, grey and negative background effects (record 0x0001).
 - Choices, sprites, event CGs, flashes, the ecstasy navigator, eyecatches, music, sound loops and voices.
 - The message window with read text in its own colour, buttons inside it where a game places them there, the top and
-  bottom button bars as each game's `TEXT_BUTTON_TYPE` places them (save, load, system, title, quit,
+  bottom button bars and the right-edge side menu, as each game's `TEXT_BUTTON_TYPE` places them (save, load, system, title, quit,
   quick save and load, backlog, auto, skip and hide), right click to hide the window, the wheel for the backlog.
 - Save, load, auto save pages, the backlog with voice replay, the system screen's settings that change play (text and
   auto speed, the window's colour, opacity and base, the volumes, and each character's voice on or off and its

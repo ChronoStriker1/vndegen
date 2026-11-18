@@ -270,6 +270,20 @@ static int bar_height(TH *t, int bar) {
 
 static int bar_top(TH *t, int bar) { return bar_type(t, bar) == 4 ? t->H - bar_height(t, bar) : 0; }
 
+static int bar_left(TH *t, int bar) {
+    if (bar_type(t, bar) != 3) return 0;
+    return t->W - ini_int(&t->sys, "MESSAGEWINDOW", "TWM_WIDTH_01", 126);
+}
+
+static int side_reach(TH *t) {
+    int left = bar_left(t, 1);
+    for (int i = 0; i < BAR_COUNT; i++) {
+        BarItem *b = bar_item(t, i);
+        if (b->on && b->bar == 1 && bar_left(t, 1) + b->x < left) left = bar_left(t, 1) + b->x;
+    }
+    return left;
+}
+
 static bool bar_has_items(TH *t, int bar) {
     for (int i = 0; i < BAR_COUNT; i++)
         if (bar_item(t, i)->on && bar_item(t, i)->bar == bar) return true;
@@ -281,6 +295,8 @@ bool ui_bar_update(TH *t) {
     int shown = 0;
     if (bars_allowed(t)) {
         if (bar_type(t, 1) == 2 && t->my < bar_height(t, 1) && bar_has_items(t, 1)) shown = 1;
+        else if (bar_type(t, 1) == 3 && t->wait != W_MAP && bar_has_items(t, 1) &&
+                 (t->mx >= bar_left(t, 1) || (u->barShown == 1 && t->mx >= side_reach(t)))) shown = 1;
         else if (bar_type(t, 2) == 4 && t->my >= t->H - bar_height(t, 2) && t->wait == W_TEXT && bar_has_items(t, 2)) shown = 2;
     }
     int hover = -1;
@@ -288,8 +304,8 @@ bool ui_bar_update(TH *t) {
         for (int i = 0; i < BAR_COUNT; i++) {
             BarItem *b = bar_item(t, i);
             if (!b->on || b->bar != shown || !bar_visible(t, i)) continue;
-            int by = bar_top(t, shown);
-            if (inside(t->mx, t->my, b->x, by + b->y, b->w, b->h)) hover = i;
+            int by = bar_top(t, shown), bx = bar_left(t, shown);
+            if (inside(t->mx, t->my, bx + b->x, by + b->y, b->w, b->h)) hover = i;
         }
     if (!shown && (t->wait == W_TEXT || t->wait == W_CHOICE) && !t->winHidden && !t->menuBlocked && t->uiMode == UI_NONE) {
         int wy = ini_int(&t->sys, "MESSAGEWINDOW", "MW_DRAW_POS_Y", 0);
@@ -347,7 +363,7 @@ void ui_bar_draw(TH *t) {
         }
     }
     if (!u->barShown || !bars_allowed(t)) return;
-    int by = bar_top(t, u->barShown);
+    int by = bar_top(t, u->barShown), bx = bar_left(t, u->barShown);
     const char *ab = u->barShown == 1 ? "a" : "b";
     char name[40];
     snprintf(name, sizeof name, "sys_window_menu_%s", ab);
@@ -357,7 +373,7 @@ void ui_bar_draw(TH *t) {
         bg = image_try(t, name);
     }
     if (!bg) bg = image_get(t, "sys_window_menu");
-    if (bg) blit(t->screen, t->W, t->H, bg, 0, by, 255);
+    if (bg) blit(t->screen, t->W, t->H, bg, bx, by, 255);
     Image *sheet = image_get(t, "sys_window_button");
     if (!sheet) return;
     for (int i = 0; i < BAR_COUNT; i++) {
@@ -365,7 +381,7 @@ void ui_bar_draw(TH *t) {
         if (!b->on || b->bar != u->barShown || !bar_visible(t, i)) continue;
         int row = i == u->barHover ? 1 : 0;
         if ((i == BAR_AUTO && t->autoMode) || (i == BAR_SKIP && t->skipMode)) row = 2;
-        blit_part(t->screen, t->W, t->H, sheet, b->sx, b->sy + row * b->h, b->w, b->h, b->x, by + b->y, 255);
+        blit_part(t->screen, t->W, t->H, sheet, b->sx, b->sy + row * b->h, b->w, b->h, bx + b->x, by + b->y, 255);
     }
 }
 
