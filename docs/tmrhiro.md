@@ -124,6 +124,9 @@ the same files there:
 - Spooky Pregnant School: The Quickening's black route calls a scene, `0526_K2_0040_000`, that none of its archives
   hold, and one voice line, `C04a11020002`, is stored with a trailing space in its name. The PC engine passes the call
   by and plays nothing for that line, and so does VNDegen.
+- Spooky Pregnant School: The Conception names a sound effect, `SE_b01_0206`, that `se.pac` doesn't hold (it stops at
+  0205), and one line of Shin's in `N0_0100_014` names its voice `00300001` without a character prefix. Neither is in
+  the game's archives, so nothing plays there, on the PC either.
 - The H voice loops that name three variants (record 0x0193) play the first one.
 - Spooky Pregnant School: The Conception's item tutorial (`N1_0031_011`) repeats its line until stamina reaches 100,
   and the way on is to drink Dr. Eri's stamina drink from the "use items" button over the text, twice. The PC engine
