@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.47.0",
+          "buildVersion": "2670",
+          "date": "2026-11-18T00:39:42Z",
+          "localizedDescription": "A second Tmr-Hiro game: Kyonyuu Elf Oyako Saimin.\n\n## Downloads\n\n- `VNDegen-0.47.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.47.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.47.0-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- **Kyonyuu Elf Oyako Saimin** plays, in English, through every route to its endings: its title, the route maps, choices, the message window and its buttons, backlog, saving and loading.\n- Its saves move both ways with a PC copy, as for Welcome to the Mizuryuu kei land. It is the first game on the 2018 engine build.\n- [docs/tmrhiro.md](../tmrhiro.md) has the details.\n\n## Fixes\n\n- Tmr-Hiro: choices sit where the PC puts them.\n- Tmr-Hiro: the backlog is drawn as on the PC, without the message window under it.\n- Tmr-Hiro: the save pages mark the newest save NEW, and auto saves are made at choices as well as on the map, as the PC does.\n\n## Known limits\n\n- Kyonyuu Elf Oyako Saimin's name entry screen isn't shown. The hero keeps the name Ingwill, as on the PC when it's left as is.\n- Tmr-Hiro: background wipes are crossfades, as the other transitions are.\n- Some of Kyonyuu Elf Oyako Saimin's sounds come in two versions, and VNDegen always plays one of them. Which one the PC picks isn't known yet.\n- The other Tmr-Hiro limits from 0.46.0 still apply: the EXTRA menu's character viewer does nothing, the mouse wheel opens the backlog, and without the PC's `savedata.000` some settings last only until the game closes.\n- Three library Tmr-Hiro games follow in later releases.\n\n## What wasn't tested\n\n- No physical device was used. The game was played in the Linux test build, the Mac app and an iPad simulator, by touch and with the touch gamepad, and also with every file name's case swapped.\n- Auto-play reached one ending and entered the others without watching them. The EXTRA gallery and the sound settings page weren't opened. Sound wasn't listened to.\n- Saves were exchanged with the original engine under Wine both ways. Welcome to the Mizuryuu kei land was played again through both routes in the Linux test build.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.47.0/VNDegen-0.47.0.ipa",
+          "size": 130528049,
+          "sha256": "8aa6f4f74bb7c2eb4ea941e5d86872378d1ada95c2a6fdb6a89b04ee5787222c",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.46.0",
           "buildVersion": "2661",
           "date": "2026-11-17T22:54:53Z",
