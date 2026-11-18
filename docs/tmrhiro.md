@@ -14,7 +14,7 @@ games use it.
 | Kyonyuu Elf Oyako Saimin | 2018-11 | the same | English in `srp_2.pac`. Plays through every route to its ending |
 | Kyonyuu Hitozuma Onna Kyoushi Saimin | 2014-12 | GRD pictures packed with RLE | English in `srp.pac`. Plays through the route select and days to an ending |
 | Spooky Pregnant School: The Quickening | 2018-11 | the same as Elf, plus `movie/*.mpg` | English in `srp_3.pac`. MPEG-1 movies with MP3 sound. Plays through the prologue, the route maps and the routes |
-| Spooky Pregnant School: The Conception | 2016-03 | GRD pictures packed with RLE, in a `DATA` folder | English in `srp_2.pac`. Not yet checked |
+| Spooky Pregnant School: The Conception | 2016-03 | GRD pictures packed with RLE, in a `DATA` folder | English in `srp_2.pac`. Plays from a new game through the three chapters' maps, items and roulettes to the ending |
 
 All five are 1280x720.
 
@@ -37,9 +37,33 @@ two folders down.
   plain. Class 0x00 is text (`Name,Text,Voice`), 0x10 flow (labels, jumps, calls, conditions, title
   buttons, choices, the map), 0x20 pictures, 0x30 sound, 0x40 interface and the gallery, 0x50 scene state and
   variables. `start` is the first scene. `＄α` to `＄ε` in text stand for the names `PLAYER_NAME01` to `05` in `_system`.
+- A condition (0x0004) or assignment (0x5001) record holds an operator, the variable's kind and a one-byte index, and a
+  value. When the byte before the index is non-zero it names a variable kind, and the value is that kind's index, as in
+  `var2[0x6f] = var2[0x74]` or `var2[7] < var2[8]`.
 - `srp.pac` also holds `_system` (screen size, the message window, and the position and source rectangle of every part of
   the built-in screens), `_filemacro` and `_charafilemacro` (picture names made of a base and parts), `_var` (the CG and
   scene lists of the gallery) and `_charaview`.
+
+Spooky Pregnant School: The Conception adds systems the other games don't use:
+
+- A clock picture over the story (0x01f4 names it, 0x01f5 shows or hides it) and a stamina gauge on the map (the map's
+  kind 0x30 element places it and fills its bar from `glo040`, var2[40]). A map header (0x002b) gives its element
+  count, and elements past it aren't used; the early maps count their elements without the gauge, so they show none.
+- Two buttons over the text, "use items" and the status orb, from `sys_window_button` (0x50ca and 0x50cc define them,
+  0x50cb and 0x50cd show them). They call `miniscenario2` and `miniscenario3`, which return to the same line.
+- Map buttons it shows or hides through var3: in a map whose header (0x002b) starts with 1, the k-th element record
+  after the header (0x0033 or 0x0034) is hidden while var3[k] is 0. Clearing the buttons (0x0028) sets var3 to 1, and
+  the maps then hide the characters already visited. var3[0] to var3[99] are the 100 flag bytes of a save slot.
+- Item screens built as maps: a 0x0033 record of form 0x10/0x10 is slot N's position, and one of form 0x21 is an item
+  button with a hover card and sounds, shown in the slot that var3 at its index holds. The scripts fill var3 from the
+  item slots var2[0x6f] to var2[0x73] and the count in var2[0x6e]. A 0x0034 record of kind 0x10/0x30 names the
+  right-click label.
+- Screen captures used as backgrounds: 0x0385 N captures the scene (without the message window) as `capdataN`, and
+  choosing a map button captures the map, without the hover card, as `capdata001`.
+- A roulette (0x005e) set up by `_roulette_select`: a click starts the needle, a later click slows it to a stop, and
+  its angle in percent of a turn goes to var2[0], which the script turns into a stamina cost.
+- Picture layers (0x006e) stack in the order they are first set, their x counts from a canvas centred on the screen,
+  and a background record clears them.
 
 The engine draws its own title buttons, message window, button bars, choices, save and load pages, backlog, system
 screen, confirm dialogs and gallery from parts in `Agrd.pac`, placed by `_system`. VNDegen draws them the same way, so
@@ -69,6 +93,8 @@ the same files there:
 - Kyonyuu Hitozuma Onna Kyoushi Saimin: the route select, the days and an ending through the staff roll.
 - Spooky Pregnant School: The Quickening: the opening choices, the digest of the first game, the prologue, the route
   maps and the routes, with the game's movies.
+- Spooky Pregnant School: The Conception: the prologue, the item tutorial, the chapter maps with the clock, gauge and
+  item and status buttons, the item, status and roulette screens, and the ending.
 - Movies in the game's `movie` folder (MPEG-1 with MP3 or MP2 sound) through the shared vnvideo decoder. A click skips
   one, as on the PC.
 - Picture layers over the scene with their move, scale and fade (record 0x006e with a picture that isn't a character),
@@ -101,7 +127,25 @@ the same files there:
 - Spooky Pregnant School: The Quickening's black route calls a scene, `0526_K2_0040_000`, that none of its archives
   hold, and one voice line, `C04a11020002`, is stored with a trailing space in its name. The PC engine passes the call
   by and plays nothing for that line, and so does VNDegen.
+- Spooky Pregnant School: The Conception names sounds its archives don't hold: `SE_b01_0206` (`se.pac` stops at 0205),
+  `SEH_F_18_L01_A2` (the archive has `_A`), `SEH_F_26_H02_A`, `SEH_V_18_Y01_A` to `Y03_A`, `SEH_V_27_X01_A` and
+  `X02_A`, the voices `C06a03430002` and `0003`, and one line of Shin's in `N0_0100_014` whose voice `00300001` has no
+  character prefix. Nothing plays for them.
 - The H voice loops that name three variants (record 0x0193) play the first one.
+- Spooky Pregnant School: The Conception's item tutorial (`N1_0031_011`) repeats its line until stamina reaches 100,
+  and the way on is to drink Dr. Eri's stamina drink from the "use items" button over the text, twice. The PC engine
+  under Wine never responds to that button while text is shown, in the English or the Japanese script, so the tutorial
+  loops there. VNDegen does what the script means: a click on the button over the text opens the item screen, as the
+  same button does on the map.
+- Spooky Pregnant School: The Conception's chapter 3 can lock itself: map 11 lets the player visit two of its three
+  characters, and if the one left out is the one var2[0x17] follows, map 13 keeps rebuilding with no button for her
+  once the others are done. The PC engine does the same from the same state. Loading an earlier save gets out of it.
+- Spooky Pregnant School: The Conception's ending offers to write a carry-over save (record 0x4018). The PC engine opens
+  an "INHERIT SAVE" page and writes `save/inheritdata.NNN`, which The Quickening's PC engine can read. VNDegen doesn't
+  open that page and doesn't read the file in The Quickening, so choosing it shows the question again; returning to the
+  title works.
+- A Conception save made while the clock picture is up comes back without it until the script draws it again. The PC
+  slot holds the picture's name at offset 29198, but which bytes say it is shown isn't settled.
 - Spooky Pregnant School: The Quickening asks at the start whether to read the save data of the first game. The PC
   engine then opens a Windows folder picker; VNDegen doesn't read the other game's saves and goes
   on to the game's own question about starting without them.

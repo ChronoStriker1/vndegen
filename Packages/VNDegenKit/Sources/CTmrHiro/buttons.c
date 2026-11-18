@@ -1,5 +1,7 @@
 #include "th.h"
 
+#include <math.h>
+
 static bool inside(int x, int y, int rx, int ry, int rw, int rh) { return x >= rx && y >= ry && x < rx + rw && y < ry + rh; }
 
 static void choose_label(TH *t, const char *label) {
@@ -39,7 +41,40 @@ static int nav(TH *t, int hover, int count, bool (*usable)(TH *, int)) {
     return hover;
 }
 
-static bool map_usable(TH *t, int i) { return t->maps[i].kind == 0x20; }
+bool map_place(TH *t, const MapButton *m, int *x, int *y) {
+    if (m->form == MAP_SLOT) return false;
+    if (m->form != MAP_ITEM) {
+        if (t->mapMode == 1 && m->index < 100 && !t->vars[3][m->index]) return false;
+        *x = m->x;
+        *y = m->y;
+        return true;
+    }
+    int slot = t->vars[3][m->index];
+    if (!slot) return false;
+    for (int i = 0; i < t->mapCount; i++)
+        if (t->maps[i].form == MAP_SLOT && t->maps[i].index == slot) {
+            *x = t->maps[i].x;
+            *y = t->maps[i].y;
+            return true;
+        }
+    return false;
+}
+
+static bool map_usable(TH *t, int i) {
+    int x, y;
+    return t->maps[i].kind == 0x20 && t->maps[i].form != MAP_SLOT && map_place(t, &t->maps[i], &x, &y);
+}
+
+static bool map_hit(TH *t, int i) {
+    int x, y;
+    return map_usable(t, i) && map_place(t, &t->maps[i], &x, &y) && inside(t->mx, t->my, x, y, t->maps[i].w, t->maps[i].h);
+}
+
+static void map_sound(TH *t, const char *name) {
+    if (!name[0]) return;
+    if (!strncmp(name, "se_", 3) || !strncmp(name, "SE_", 3)) snd_play(t, CH_SE, PAC_SE, name, false, 0);
+    else snd_play(t, CH_SYSVOICE, PAC_VOICE, name, false, 0);
+}
 
 void buttons_update(TH *t) {
     int old = t->hover;
@@ -71,18 +106,29 @@ void buttons_update(TH *t) {
             choose_label(t, label);
         }
     } else if (t->wait == W_MAP) {
+        if (t->rclick && t->mapCancel[0]) {
+            char label[64];
+            snprintf(label, sizeof label, "%s", t->mapCancel);
+            choose_label(t, label);
+            return;
+        }
         t->hover = -1;
         for (int i = 0; i < t->mapCount; i++)
-            if (t->maps[i].kind == 0x20 && inside(t->mx, t->my, t->maps[i].x, t->maps[i].y, t->maps[i].w, t->maps[i].h)) t->hover = i;
+            if (map_hit(t, i)) t->hover = i;
         if (t->hover < 0 && old >= 0 && !t->mouseMoved) t->hover = old;
         t->hover = nav(t, t->hover, t->mapCount, map_usable);
-        if (t->hover != old && t->hover >= 0 && t->maps[t->hover].voice[0])
-            snd_play(t, CH_SYSVOICE, PAC_VOICE, t->maps[t->hover].voice, false, 0);
+        if (t->hover != old && t->hover >= 0) map_sound(t, t->maps[t->hover].form == MAP_ITEM ? t->maps[t->hover].hoverSe : t->maps[t->hover].voice);
         if ((t->click || enter) && t->hover >= 0) {
             MapButton *m = &t->maps[t->hover];
             char label[64];
             snprintf(label, sizeof label, "%s", m->label);
-            if (label[0]) choose_label(t, label);
+            if (label[0]) {
+                map_sound(t, m->clickSe);
+                gfx_capture(t, 1);
+                Image *cap = image_get(t, "capdata001");
+                if (cap) map_draw(t, cap->px, false);
+                choose_label(t, label);
+            }
         }
     }
     if (old != t->hover) t->dirty = true;
@@ -110,16 +156,135 @@ void buttons_draw(TH *t) {
                       0xffffffffu, true, -1);
         }
     } else if (t->wait == W_MAP) {
+        map_draw(t, t->screen, true);
+    }
+    if (t->roulette.shown) roulette_draw(t);
+}
+
+void map_draw(TH *t, u32 *dst, bool card) {
+    {
         Image *bg = t->mapBg[0] ? image_get(t, t->mapBg) : NULL;
         Image *base = t->mapBase[0] ? image_get(t, t->mapBase) : NULL;
         Image *sheet = t->mapSheet[0] ? image_get(t, t->mapSheet) : NULL;
-        if (bg) blit(t->screen, t->W, t->H, bg, 0, 0, 255);
-        if (base) blit(t->screen, t->W, t->H, base, 0, 0, 255);
+        if (bg) blit(dst, t->W, t->H, bg, 0, 0, 255);
+        if (base) blit(dst, t->W, t->H, base, 0, 0, 255);
         for (int i = 0; i < t->mapCount; i++) {
             MapButton *m = &t->maps[i];
-            if (!sheet || !m->w || !m->h) continue;
+            int x, y;
+            if (!sheet || !m->w || !m->h || m->form == MAP_SLOT || !map_place(t, m, &x, &y)) continue;
+            if (m->form == MAP_GAUGE) {
+                blit_part(dst, t->W, t->H, sheet, m->sx, m->sy, m->w, m->h, x, y, 255);
+                const char *v = m->var[0] == '$' ? m->var + 1 : m->var;
+                int value = 0;
+                if (!strncmp(v, "glo", 3)) value = clampi(t->vars[2][clampi(atoi(v + 3), 0, TH_VARS - 1)], 0, 100);
+                blit_part(dst, t->W, t->H, sheet, m->bsx, m->bsy, m->bw * value / 100, m->bh, m->bx, m->by, 255);
+                continue;
+            }
             bool hot = i == t->hover;
-            blit_part(t->screen, t->W, t->H, sheet, hot ? m->hx : m->sx, hot ? m->hy : m->sy, m->w, m->h, m->x, m->y, 255);
+            blit_part(dst, t->W, t->H, sheet, hot ? m->hx : m->sx, hot ? m->hy : m->sy, m->w, m->h, x, y, 255);
+        }
+        if (card && t->hover >= 0 && t->maps[t->hover].form == MAP_ITEM && t->maps[t->hover].pic[0]) {
+            Image *pic = image_get(t, t->maps[t->hover].pic);
+            if (pic) blit(dst, t->W, t->H, pic, t->maps[t->hover].picX, 0, 255);
         }
     }
+}
+
+static bool mini_clickable(TH *t) {
+    return t->wait == W_TEXT && t->uiMode == UI_NONE && !t->winHidden && !t->menuBlocked && !t->autoMode && !t->skipMode;
+}
+
+bool mini_update(TH *t) {
+    int hover = -1;
+    if (mini_clickable(t))
+        for (int i = 0; i < 2; i++) {
+            MiniButton *m = &t->mini[i];
+            if (m->defined && m->shown && inside(t->mx, t->my, m->x, m->y, m->w, m->h)) hover = i;
+        }
+    if (hover != t->miniHover) {
+        t->miniHover = hover;
+        t->sceneDirty = true;
+    }
+    if (hover < 0 || !t->click) return false;
+    t->miniHover = -1;
+    t->sceneDirty = true;
+    t->wait = W_NONE;
+    t->pc = t->savePc;
+    snd_stop(t, CH_VOICE, 0);
+    vm_call(t, hover ? "miniscenario3" : "miniscenario2", NULL);
+    return true;
+}
+
+void mini_draw(TH *t, u32 *dst) {
+    Image *sheet = NULL;
+    for (int i = 0; i < 2; i++) {
+        MiniButton *m = &t->mini[i];
+        if (!m->defined || !m->shown) continue;
+        if (!sheet) sheet = image_get(t, "sys_window_button");
+        if (!sheet) return;
+        blit_part(dst, t->W, t->H, sheet, m->sx, m->sy + (i == t->miniHover ? m->h : 0), m->w, m->h, m->x, m->y, 255);
+    }
+}
+
+static void ini_copy(TH *t, const char *section, const char *key, char *out, size_t size) {
+    const char *v = ini_get(&t->rouletteIni, section, key);
+    snprintf(out, size, "%s", v ? v : "");
+}
+
+void roulette_start(TH *t, const char *section) {
+    memset(&t->roulette, 0, sizeof t->roulette);
+    ini_copy(t, section, "G_Roulette01", t->roulette.wheel, sizeof t->roulette.wheel);
+    ini_copy(t, section, "G_Roulette02", t->roulette.needle, sizeof t->roulette.needle);
+    ini_copy(t, section, "RouletteStartSE", t->roulette.startSe, sizeof t->roulette.startSe);
+    ini_copy(t, section, "RouletteME", t->roulette.loopSe, sizeof t->roulette.loopSe);
+    ini_copy(t, section, "RouletteStopSE", t->roulette.stopSe, sizeof t->roulette.stopSe);
+    int pos[2] = {0};
+    ini_ints(&t->rouletteIni, section, "G_Roulette_Pos", pos, 2);
+    t->roulette.nx = pos[0];
+    t->roulette.ny = pos[1];
+    t->roulette.wait = (u32)ini_int(&t->rouletteIni, section, "ClickStartWait", 1500);
+    t->roulette.shown = true;
+    t->sceneDirty = true;
+}
+
+enum { SPIN_SPEED = 1080, STOP_MS = 2700, STOP_SPEED = 1013 };
+
+void roulette_update(TH *t) {
+    bool click = t->click || t->keyPress[0x0d] || t->keyPress[0x20];
+    u32 el = t->now - t->roulette.at;
+    switch (t->roulette.phase) {
+    case 0:
+        if (!click) return;
+        t->roulette.phase = 1;
+        t->roulette.at = t->now;
+        if (t->roulette.startSe[0]) snd_play(t, CH_SE, PAC_SE, t->roulette.startSe, false, 0);
+        if (t->roulette.loopSe[0]) snd_play(t, CH_SEH3, PAC_SE, t->roulette.loopSe, true, 0);
+        return;
+    case 1:
+        t->roulette.angle = fmodf(t->roulette.from + (float)el * SPIN_SPEED / 1000.0f, 360.0f);
+        t->dirty = true;
+        if (click && el >= t->roulette.wait) {
+            t->roulette.phase = 2;
+            t->roulette.from = t->roulette.angle;
+            t->roulette.at = t->now;
+        }
+        return;
+    default: {
+        float s = (float)(el < STOP_MS ? el : STOP_MS) / 1000.0f, T = STOP_MS / 1000.0f;
+        t->roulette.angle = fmodf(t->roulette.from + STOP_SPEED * (s - s * s * s / (3 * T * T)), 360.0f);
+        t->dirty = true;
+        if (el < STOP_MS) return;
+        snd_stop(t, CH_SEH3, 0);
+        if (t->roulette.stopSe[0]) snd_play(t, CH_SE, PAC_SE, t->roulette.stopSe, false, 0);
+        t->vars[2][0] = clampi((int)(t->roulette.angle * 100.0f / 360.0f), 0, 99);
+        t->wait = W_NONE;
+    }
+    }
+}
+
+void roulette_draw(TH *t) {
+    Image *wheel = t->roulette.wheel[0] ? image_get(t, t->roulette.wheel) : NULL;
+    Image *needle = t->roulette.needle[0] ? image_get(t, t->roulette.needle) : NULL;
+    if (wheel) blit(t->screen, t->W, t->H, wheel, 0, 0, 255);
+    if (needle) blit_rotated(t->screen, t->W, t->H, needle, t->roulette.nx + needle->cw / 2, t->roulette.ny + needle->ch / 2, t->roulette.angle);
 }

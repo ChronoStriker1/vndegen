@@ -180,13 +180,27 @@ typedef struct Choice {
     char label[64];
 } Choice;
 
+enum { MAP_PLAIN, MAP_SLOT, MAP_ITEM, MAP_STATIC, MAP_GAUGE };
+
 typedef struct MapButton {
     int x, y, w, h;
     int sx, sy, hx, hy;
     char voice[64];
     char label[64];
     int kind;
+    int form;
+    int index;
+    char pic[64];
+    int picX;
+    char hoverSe[64], clickSe[64];
+    int bx, by, bsx, bsy, bw, bh;
+    char var[16];
 } MapButton;
+
+typedef struct MiniButton {
+    bool defined, shown;
+    int x, y, sx, sy, w, h;
+} MiniButton;
 
 typedef struct GalItem {
     int type, x1, y1, x2, y2;
@@ -212,6 +226,7 @@ enum {
     W_GALLERY,
     W_CGVIEW,
     W_MOVIE,
+    W_ROULETTE,
 };
 
 enum { UI_NONE, UI_SAVE, UI_LOAD, UI_SYSTEM, UI_BACKLOG, UI_CONFIRM, UI_GALLERY };
@@ -234,7 +249,7 @@ struct TH {
     char *title;
     long long startTime;
     Store store;
-    Ini sys, fileMacro, charaMacro, varIni, charaView;
+    Ini sys, fileMacro, charaMacro, varIni, charaView, rouletteIni;
     int W, H;
     u32 *screen;
     u32 *sceneBuf;
@@ -258,7 +273,6 @@ struct TH {
     int savePc;
     char bgmName[64];
     i32 vars[6][TH_VARS];
-    u8 slotFlags[100];
     int sceneId;
     char sceneTitle[256];
     int wait;
@@ -304,8 +318,17 @@ struct TH {
     int hover;
     Choice choices[8];
     int choiceCount;
-    MapButton maps[16];
+    MapButton maps[72];
     int mapCount;
+    int mapRecs, mapLimit;
+    char mapCancel[64];
+    char hudName[64];
+    bool hudOn;
+    MiniButton mini[2];
+    int miniHover;
+    struct { int id; Image *img; } caps[6];
+    int capCount;
+    struct { bool shown; int phase; float angle, from; u32 at, wait; char needle[64], wheel[64], startSe[32], loopSe[32], stopSe[32]; int nx, ny; } roulette;
     char mapBg[64], mapBase[64], mapSheet[64];
     int mapMode;
     bool mapBuilding, jumped, mapLastActive;
@@ -399,6 +422,15 @@ bool ui_bar_update(TH *t);
 void ui_bar_draw(TH *t);
 void buttons_update(TH *t);
 void buttons_draw(TH *t);
+bool map_place(TH *t, const MapButton *m, int *x, int *y);
+bool mini_update(TH *t);
+void mini_draw(TH *t, u32 *dst);
+void roulette_start(TH *t, const char *section);
+void roulette_update(TH *t);
+void roulette_draw(TH *t);
+void gfx_capture(TH *t, int id);
+void map_draw(TH *t, u32 *dst, bool card);
+void blit_rotated(u32 *dst, int dw, int dh, const Image *im, int cx, int cy, float degrees);
 
 void gallery_page(TH *t, const u8 *b, int len);
 void gallery_item(TH *t, const u8 *b, int len);

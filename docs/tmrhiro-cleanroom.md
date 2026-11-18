@@ -64,3 +64,42 @@ stb_truetype and stb_vorbis (public domain or MIT), the shared `vnfont` and `cas
   spoken) and Conception (62 cells, narration and spoken).
 - `c04a_name`, `SEH_V_09_I01_A` to `I03_A` are named by Welcome to the Mizuryuu kei land's scripts but are in none of its
   archives, so the PC engine plays nothing there either.
+- Conception's item tutorial: the PC engine under Wine, loaded at the tutorial's line. Hovering the "use items" button
+  shows no highlight. A click on it while the line is shown, while the line is still typing, during the one-second wait
+  right after the script moves the pointer onto it (timed from the pointer moving), with the side menu open, with the
+  message window hidden, with the game window at the screen's origin, and with the Japanese script (the English
+  `srp_2.pac` moved aside) only advanced the line or brought the window back. The English patch also dropped two
+  records before the tutorial's text that stop auto and skip; they don't change the loop.
+- Conception's item screens: the slot rule from `UseItem00`, whose 55 0x0033 records match var3[0] to var3[54], and a
+  PC slot with its item bytes (var2 at offset 400) edited to hold two items, loaded under Wine: the items sit in slots 1
+  and 2 and the hover card is drawn at x 318, top 273. The confirm screen shows the capture without the hover card and
+  the script's own card 35 pixels lower.
+- var3 and the slot flags: a PC slot edited to resume at map 07 with chosen visit flags. The PC showed exactly the
+  character buttons whose var3 the script left at 1, and the auto save it wrote there held the script's zeros at the
+  same indexes in the flag bytes at offset 656. The same rule explains a PC quirk: after the status screen the map is
+  rebuilt from its first label, which sets var3[0] and var3[1] to 0, so the item and status buttons are gone until the
+  next map; VNDegen does the same.
+- Conception's map 09 jumps to `LABEL03_03`, which neither its English nor its Japanese script has. A PC slot edited
+  to reach that jump shows the same map as VNDegen, which carries on at the next record.
+- Condition operator 3 is `<`: a PC slot edited to resume at map 13's build test with every progress variable at 0
+  builds the map, and with each one above its threshold the map ends. The same state as a VNDegen auto save locked map
+  13 on the PC as in VNDegen.
+- The map element count: the PC shows the gauge on maps 07, 09 and 13, whose header counts it, and not on map 01,
+  whose header counts one element fewer than it has; a save loaded at map 13 shows it without record 0x01ff running.
+- Labels match exactly: map 11 ends its item and status branches with a jump to `map11`, but its label is `MAP11`. On
+  the PC, cancelling the item screen there goes on to the status screen, the record after the jump, as VNDegen does.
+- Record 0x1007, just before the ending's jump back to `start`, is taken to clear the call stack; the jump itself
+  doesn't depend on it, so it wasn't checked on the PC.
+- Overlay order: on Conception's status screen the dark band (layer 4) is set before the five silhouettes (layers 0 to
+  3 and 5), and the PC draws all five over it.
+- The roulette: recorded at 30 fps under Wine and the needle's angle measured in each frame. It rests at the top, a
+  click starts it at 1080 degrees a second, and a click after `ClickStartWait` slows it to a stop over about 2.7
+  seconds and a little over five turns.
+- Overlay positions: Conception's take-item card (644 pixels wide, x 0) is centred on the PC and its slot icons (90
+  wide, x -72 to 296) land on the slots at 523 to 891, so an overlay's x counts from the centred canvas, as a sprite's
+  does. Every overlay in the other four games is 1280 wide, so they draw as before.
+- After `TakeItem00` the PC shows the map without the item bar the script drew as overlays; its next record sets the
+  background, so a background record clears the overlays. None of the other games sets a background while an overlay is
+  on.
+- Captures: the PC writes `capdata200.cap`, a 1280x720 BMP, into `save/`; it holds the scene with the buttons over it
+  and without the message window.

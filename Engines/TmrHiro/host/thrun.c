@@ -12,6 +12,10 @@ static void write_png(const char *path, const uint32_t *px, int w, int h);
 static FILE *wav;
 static struct { char key[160]; int n; } used[512];
 static int usedCount;
+static char prefer[16][64];
+static int preferCount;
+static char lastLine[160];
+static int lineRepeats;
 static long wavFrames;
 static float audio[2048];
 
@@ -130,13 +134,29 @@ int main(int argc, char **argv) {
                     if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", ck);
                     int seen = u < 512 ? used[u].n++ : 0;
                     int i = (x + seen) % t->choiceCount, total = t->choiceCount * h + (t->choiceCount - 1) * ny;
+                    for (int c = 0; c < t->choiceCount; c++)
+                        for (int q = 0; q < preferCount; q++)
+                            if (!strcmp(t->choices[c].label, prefer[q])) i = c;
                     cx = t->W / 2;
                     cy = top - h / 2 - total / 2 + (h + ny) * i + h / 2;
                     (void)w;
+                } else if (t->wait == W_TEXT && t->mini[0].defined && t->mini[0].shown) {
+                    char ck[160];
+                    snprintf(ck, sizeof ck, "%s:%d", t->scene, t->savePc);
+                    if (strcmp(ck, lastLine)) {
+                        snprintf(lastLine, sizeof lastLine, "%s", ck);
+                        lineRepeats = 0;
+                    }
+                    if (++lineRepeats > 6) {
+                        lineRepeats = 0;
+                        cx = t->mini[0].x + t->mini[0].w / 2;
+                        cy = t->mini[0].y + t->mini[0].h / 2;
+                    }
                 } else if (t->wait == W_MAP) {
                     int act[16], na = 0;
-                    for (int i = 0; i < t->mapCount; i++)
-                        if (t->maps[i].kind == 0x20) act[na++] = i;
+                    int px, py;
+                    for (int i = 0; i < t->mapCount && na < 16; i++)
+                        if (t->maps[i].kind == 0x20 && t->maps[i].form != MAP_SLOT && map_place(t, &t->maps[i], &px, &py)) act[na++] = i;
                     if (na) {
                         int best = act[x % na], bestUse = 1 << 30;
                         for (int q = 0; q < na; q++) {
@@ -153,9 +173,13 @@ int main(int argc, char **argv) {
                         while (u < usedCount && strcmp(used[u].key, key)) u++;
                         if (u == usedCount && usedCount < 512) snprintf(used[usedCount++].key, 160, "%s", key);
                         if (u < 512) used[u].n++;
+                        for (int q2 = 0; q2 < na; q2++)
+                            for (int q = 0; q < preferCount; q++)
+                                if (!strcmp(t->maps[act[q2]].label, prefer[q])) best = act[q2];
                         MapButton *b = &t->maps[best];
-                        cx = b->x + b->w / 2;
-                        cy = b->y + b->h / 2;
+                        map_place(t, b, &px, &py);
+                        cx = px + b->w / 2;
+                        cy = py + b->h / 2;
                     }
                 }
                 vnth_mouse_move(n, cx, cy);
@@ -180,6 +204,11 @@ int main(int argc, char **argv) {
             if (label[0] == '#') ((TH *)n)->pc = atoi(label + 1);
             ((TH *)n)->wait = W_NONE;
             ((TH *)n)->menuBlocked = false;
+        } else if (strncmp(c, "prefer:", 7) == 0) {
+            if (preferCount < 16) snprintf(prefer[preferCount++], 64, "%s", c + 7);
+        } else if (sscanf(c, "var:%d,%d", &k, &x) == 2) {
+            TH *t = (TH *)n;
+            printf("var%d[%d]=%d\n", k, x, k >= 0 && k < 6 && x >= 0 && x < TH_VARS ? t->vars[k][x] : 0);
         } else if (strncmp(c, "state", 5) == 0) {
             TH *t = (TH *)n;
             printf("scene=%s pc=%d wait=%d bg=%s sprites=%d ui=%d\n", t->scene, t->pc, t->wait, t->bgName, t->sprCount, t->uiMode);

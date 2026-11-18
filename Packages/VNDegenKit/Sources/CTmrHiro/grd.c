@@ -118,6 +118,7 @@ static void lz(const u8 *src, size_t size, u8 *dst, size_t n) {
 Image *grd_decode(const u8 *data, size_t size) {
     if (size < 32) return NULL;
     int kind = data[0], pack = data[1];
+    if (pack == 0xf0 && size == 32) return image_new(1, 1, 0, 0, 0, 0);
     if ((kind != 1 && kind != 2) || (pack != 1 && pack != 0xa1 && pack != 0xa2)) return NULL;
     int cw = rd16(data + 2), ch = rd16(data + 4), bpp = rd16(data + 6);
     int l = rd16(data + 8), r = rd16(data + 10), t = rd16(data + 12), b = rd16(data + 14);

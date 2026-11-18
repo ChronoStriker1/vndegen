@@ -92,9 +92,16 @@ static void split_scene_label(const char *s, char *scene, size_t ss, char *label
     }
 }
 
+static i32 operand(TH *t, const u8 *b) {
+    if (!b[2]) return (i16)rdbe16(b + 4);
+    i32 *v = var_ref(t, b[2], rdbe16(b + 4));
+    return v ? *v : 0;
+}
+
 static bool cond(TH *t, const u8 *b) {
-    int op = b[0], kind = b[1], index = rdbe16(b + 2), value = (i16)rdbe16(b + 4);
-    i32 *v = var_ref(t, kind, index);
+    int op = b[0];
+    i32 value = operand(t, b);
+    i32 *v = var_ref(t, b[1], b[3]);
     i32 x = v ? *v : 0;
     switch (op) {
     case 0: return x == value;
@@ -108,8 +115,9 @@ static bool cond(TH *t, const u8 *b) {
 }
 
 static void set_var(TH *t, const u8 *b) {
-    int op = b[0], kind = b[1], index = rdbe16(b + 2), value = (i16)rdbe16(b + 4);
-    i32 *v = var_ref(t, kind, index);
+    int op = b[0];
+    i32 value = operand(t, b);
+    i32 *v = var_ref(t, b[1], b[3]);
     if (!v) return;
     switch (op) {
     case 0: *v = value; break;
@@ -223,7 +231,29 @@ static int step(TH *t) {
         case 0x28:
             t->buttonCount = 0;
             t->mapCount = 0;
+            for (int i = 0; i < 100; i++) t->vars[3][i] = 1;
             return 1;
+        case 0x05:
+            if (r->len >= 6 && cond(t, b) && !vm_return(t)) {
+                fail(t, "the script ended");
+                return 0;
+            }
+            return 1;
+        case 0x08:
+            if (!vm_return(t)) {
+                fail(t, "the script ended");
+                return 0;
+            }
+            return 1;
+        case 0x37:
+            return 1;
+        case 0x07:
+            t->sp = 0;
+            return 1;
+        case 0x5e:
+            roulette_start(t, s);
+            begin_wait(t, W_ROULETTE, 0);
+            return 0;
         case 0x29: {
             const char *list = s + 4;
             const char *comma = strchr(list, ',');
@@ -263,14 +293,49 @@ static int step(TH *t) {
             t->savePc = t->pc - 1;
             if (!t->replayDepth) save_auto(t);
             t->mapCount = 0;
+            t->mapRecs = 0;
+            t->mapLimit = r->len >= 4 ? rd16(b + 2) : 0;
+            t->mapCancel[0] = 0;
             t->mapAnimCount = 0;
             return 1;
         }
         case 0x33: {
-            if (t->mapCount >= 16 || r->len < 19) return 1;
+            int index = t->mapRecs++;
+            if (t->mapCount >= 72 || r->len < 19 || (t->mapLimit && index >= t->mapLimit)) return 1;
             MapButton *m = &t->maps[t->mapCount++];
             memset(m, 0, sizeof *m);
+            m->index = index;
+            t->mapLastActive = true;
+            if (b[0] == 0x10 && b[1] == 0x10) {
+                m->form = MAP_SLOT;
+                m->index = rd16(b + 2);
+                m->x = (i16)rd16(b + 4);
+                m->y = (i16)rd16(b + 6);
+                return 1;
+            }
             m->kind = 0x20;
+            if (b[0] == 0x21) {
+                m->form = MAP_ITEM;
+                m->sx = rd16(b + 2);
+                m->sy = rd16(b + 4);
+                m->w = rd16(b + 6);
+                m->h = rd16(b + 8);
+                m->hx = m->sx + rd16(b + 10);
+                m->hy = m->sy + rd16(b + 12);
+                m->picX = (i16)rd16(b + 14);
+                char f[5][64] = {{0}};
+                const char *p = s + 18;
+                for (int k = 0; k < 5 && p; k++) {
+                    const char *comma = strchr(p, ',');
+                    snprintf(f[k], sizeof f[k], "%.*s", comma ? (int)(comma - p) : (int)strlen(p), p);
+                    p = comma ? comma + 1 : NULL;
+                }
+                snprintf(m->pic, sizeof m->pic, "%s", f[0]);
+                snprintf(m->hoverSe, sizeof m->hoverSe, "%s", f[1]);
+                snprintf(m->clickSe, sizeof m->clickSe, "%s", f[3]);
+                snprintf(m->label, sizeof m->label, "%s", f[4]);
+                return 1;
+            }
             m->x = (i16)rd16(b + 2);
             m->y = (i16)rd16(b + 4);
             m->sx = rd16(b + 6);
@@ -280,14 +345,19 @@ static int step(TH *t) {
             m->hx = m->sx + (i16)rd16(b + 14);
             m->hy = m->sy + (i16)rd16(b + 16);
             snprintf(m->label, sizeof m->label, "%s", s + 18);
-            t->mapLastActive = true;
             return 1;
         }
         case 0x34: {
-            if (t->mapCount >= 16 || r->len < 14) return 1;
+            int index = t->mapRecs++;
+            if (r->len >= 3 && b[0] == 0x10 && b[1] == 0x30) {
+                snprintf(t->mapCancel, sizeof t->mapCancel, "%s", s + 2);
+                return 1;
+            }
+            if (t->mapCount >= 72 || r->len < 14 || (t->mapLimit && index >= t->mapLimit)) return 1;
             MapButton *m = &t->maps[t->mapCount++];
             memset(m, 0, sizeof *m);
             m->kind = b[0];
+            m->index = index;
             m->x = (i16)rd16(b + 2);
             m->y = (i16)rd16(b + 4);
             m->sx = rd16(b + 6);
@@ -296,7 +366,18 @@ static int step(TH *t) {
             m->h = rd16(b + 12);
             m->hx = m->sx;
             m->hy = m->sy + m->h;
+            m->form = m->kind == 0x10 ? MAP_STATIC : MAP_PLAIN;
             t->mapLastActive = m->kind == 0x20;
+            if (m->kind == 0x30 && r->len > 28) {
+                m->form = MAP_GAUGE;
+                m->bx = m->x + (i16)rd16(b + 14);
+                m->by = m->y + (i16)rd16(b + 16);
+                m->bsx = rd16(b + 18);
+                m->bsy = rd16(b + 20);
+                m->bw = rd16(b + 22);
+                m->bh = rd16(b + 24);
+                snprintf(m->var, sizeof m->var, "%s", s + 28);
+            }
             if (m->kind == 0x20 && r->len > 26) {
                 char tmp[192];
                 snprintf(tmp, sizeof tmp, "%s", s + 26);
@@ -323,6 +404,8 @@ static int step(TH *t) {
             if (r->len < at + 1) return 1;
             if (!strncmp(s + at, "fm_", 3)) gallery_mark_cg(t, s + at);
             gfx_set_bg(t, s + at, t->skipMode ? 0 : rd16(b));
+            gfx_clear_overlay(t, -1);
+            t->roulette.shown = false;
             if (r->op == 0x01) t->bgEffect = b[2];
             if (t->transActive) {
                 begin_wait(t, W_TRANS, 0);
@@ -428,6 +511,22 @@ static int step(TH *t) {
             }
             return 1;
         }
+        case 0x1f4:
+            snprintf(t->hudName, sizeof t->hudName, "%s", s);
+            t->sceneDirty = true;
+            return 1;
+        case 0x1f5:
+            t->hudOn = r->len > 0 && b[0];
+            t->sceneDirty = true;
+            return 1;
+        case 0x1ff:
+            return 1;
+        case 0x385:
+            if (r->len >= 2) gfx_capture(t, rd16(b));
+            return 1;
+        case 0x200:
+            t->dirty = true;
+            return 1;
         case 0x1f6:
             if (r->len >= 1) gfx_clear_overlay(t, b[0]);
             return 1;
@@ -438,7 +537,6 @@ static int step(TH *t) {
         case 0x68:
         case 0x69:
         case 0x19a:
-        case 0x1f5:
             return 1;
         default:
             th_log(t, "%s:%d unhandled graphics op %04x", t->sc->name, t->pc - 1, r->op);
@@ -496,6 +594,9 @@ static int step(TH *t) {
             return 1;
         case 0x17:
             th_log(t, "open URL %s (ignored)", s);
+            return 1;
+        case 0x18:
+            th_log(t, "inherit save page (not supported)");
             return 1;
         case 0x2b:
             t->menuBlocked = r->len > 0 && b[0];
@@ -558,6 +659,30 @@ static int step(TH *t) {
             begin_wait(t, W_TIME, r->len >= 4 ? rd32(b) : 0);
             t->waitSkippable = true;
             return 0;
+        case 0x29:
+            if (t->skipMode) return 1;
+            begin_wait(t, W_TIME, r->len >= 4 ? rd32(b) : 0);
+            return 0;
+        case 0xca:
+        case 0xcc:
+            if (r->len >= 12) {
+                MiniButton *m = &t->mini[r->op == 0xcc];
+                m->defined = true;
+                m->x = (i16)rd16(b);
+                m->y = (i16)rd16(b + 2);
+                m->sx = rd16(b + 4);
+                m->sy = rd16(b + 6);
+                m->w = rd16(b + 8);
+                m->h = rd16(b + 10);
+            }
+            return 1;
+        case 0xcb:
+        case 0xcd:
+            t->mini[r->op == 0xcd].shown = r->len > 0 && b[0];
+            t->sceneDirty = true;
+            return 1;
+        case 0x12c:
+            return 1;
         default:
             th_log(t, "%s:%d unhandled scene op %04x", t->sc->name, t->pc - 1, r->op);
             return 1;
