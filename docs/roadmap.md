@@ -115,6 +115,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - EAGLS, on VNDegen's own clean-room runtime, with the English Oppai no Ouja 48 (0.53.0). PC saves load in VNDegen; saves made in VNDegen don't load on the PC yet.
 - ExHibit, on VNDegen's own clean-room runtime, with Succubus Sessions: Mami Mamiya's Sweet Slice of Hell and PC saves both ways (0.54.0).
 - BISHOP BSX, on VNDegen's own clean-room runtime, with Mesu Kyoushi ~Injoku no Kyoushitsu~ Immoral Edition and PC saves both ways (0.55.0).
+- EAGLS's CG View and Scene View, and saves made in VNDegen loading in the PC game (0.55.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -123,7 +124,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- EAGLS and ExHibit follow-ups (Next, item 1), on branch `feat/vn-four` (maintainer, 2026-11-19), each as its own patch release: EAGLS's CG and Scene View galleries and saves made in VNDegen loading on the PC, then ExHibit's Extra menu (CG gallery, music room, scene replay). EAGLS shipped in 0.53.0 and ExHibit in 0.54.0. System-NNN's and Bruns's only library games, Princess X and Orc Kingdom, were left out after the content check, so those engines wait for other games.
+- ExHibit's Extra menu (CG gallery, music room, scene replay), then Bruns with Orc Kingdom (Next, item 1), on branch `feat/vn-four`. The EAGLS follow-ups shipped in 0.55.1.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
