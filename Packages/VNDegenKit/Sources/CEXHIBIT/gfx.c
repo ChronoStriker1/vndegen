@@ -459,7 +459,57 @@ static void draw_bb(EX *e, u32 *dst, Billboard *b) {
     blit(dst, EX_W, EX_H, b->img, b->x, b->y, a);
 }
 
+static void box_pass(const u32 *src, u32 *dst, int w, int h, int r, bool horiz) {
+    int n = horiz ? w : h, lines = horiz ? h : w;
+    for (int l = 0; l < lines; l++) {
+        u32 sum[4] = {0};
+        int cnt = 0;
+        for (int k = -r; k <= r; k++) {
+            int i = k < 0 ? 0 : k >= n ? n - 1 : k;
+            u32 p = horiz ? src[(size_t)l * (size_t)w + (size_t)i] : src[(size_t)i * (size_t)w + (size_t)l];
+            for (int c = 0; c < 4; c++) sum[c] += p >> (c * 8) & 0xff;
+            cnt++;
+        }
+        for (int i = 0; i < n; i++) {
+            u32 out = 0;
+            for (int c = 0; c < 4; c++) out |= (sum[c] / (u32)cnt) << (c * 8);
+            if (horiz) dst[(size_t)l * (size_t)w + (size_t)i] = out;
+            else dst[(size_t)i * (size_t)w + (size_t)l] = out;
+            int a = i - r < 0 ? 0 : i - r, b = i + r + 1 >= n ? n - 1 : i + r + 1;
+            u32 pa = horiz ? src[(size_t)l * (size_t)w + (size_t)a] : src[(size_t)a * (size_t)w + (size_t)l];
+            u32 pb = horiz ? src[(size_t)l * (size_t)w + (size_t)b] : src[(size_t)b * (size_t)w + (size_t)l];
+            for (int c = 0; c < 4; c++) sum[c] = sum[c] - (pa >> (c * 8) & 0xff) + (pb >> (c * 8) & 0xff);
+        }
+    }
+}
+
+static Image *blurred(EX *e) {
+    if (!e->cg || e->focus <= 0) return e->cg;
+    if (e->cgBlur && e->cgBlurSrc == e->cg && e->cgBlurLevel == e->focus) return e->cgBlur;
+    image_free(e->cgBlur);
+    Image *im = image_new(e->cg->w, e->cg->h);
+    u32 *tmp = ex_alloc(sizeof(u32) * (size_t)im->w * (size_t)im->h);
+    memcpy(im->px, e->cg->px, sizeof(u32) * (size_t)im->w * (size_t)im->h);
+    for (int k = 0; k < 2; k++) {
+        box_pass(im->px, tmp, im->w, im->h, e->focus * 2, true);
+        box_pass(tmp, im->px, im->w, im->h, e->focus * 2, false);
+    }
+    free(tmp);
+    im->alpha = e->cg->alpha;
+    e->cgBlur = im;
+    e->cgBlurSrc = e->cg;
+    e->cgBlurLevel = e->focus;
+    return im;
+}
+
+void gfx_focus(EX *e, char *args) {
+    char *f[10];
+    int n = split_csv(args, f, 10);
+    e->focus = n > 3 ? field_int(f[3]) : 0;
+}
+
 static void draw_cg(EX *e, u32 *dst, Image *cg, u32 color, Camera *c, int alpha) {
+    if (cg && cg == e->cg) cg = blurred(e);
     if (alpha >= 255) {
         u32 col = color | 0xff000000u;
         for (size_t i = 0; i < (size_t)EX_W * EX_H; i++) dst[i] = col;

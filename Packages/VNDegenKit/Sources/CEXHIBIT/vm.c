@@ -361,6 +361,10 @@ static bool exec(EX *e, Op *op) {
         char *f[4];
         int n = split_csv(s0, f, 4);
         if (n > 1 && !vm_cond(e, f[1])) break;
+        if (!rld_get(e, f[0])) {
+            ex_log(e, "no scenario %s", f[0]);
+            break;
+        }
         vm_goto_script(e, f[0]);
         return true;
     }
@@ -428,7 +432,9 @@ static bool exec(EX *e, Op *op) {
     case 50: {
         char *f[4];
         split_csv(s0, f, 4);
-        snd_play_music(e, field_int(f[0]), field_int(f[1]));
+        int track = field_int(f[0]);
+        if (track >= 1000000) track = *reg_ref(e, 'R', track - 1000000);
+        snd_play_music(e, track, field_int(f[1]));
         break;
     }
     case 51:
@@ -554,6 +560,11 @@ static bool exec(EX *e, Op *op) {
             int n = split_csv(s0, f, 4);
             if (n > 1) portrait_def(e, field_int(f[0]), field_int(f[1]));
         }
+        break;
+    case 263:
+        gfx_focus(e, s0);
+        break;
+    case 78:
         break;
     case 252:
         portrait_draw_cmd(e, s0);

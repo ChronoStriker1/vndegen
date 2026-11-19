@@ -12,6 +12,7 @@ for the one place where the engine's code was read, what was looked at and what 
 | Script encryption | `resident.dll`'s script read path, read with Ghidra as described below |
 | Script commands | The game's own scripts, the command names in `resident.dll`'s debug strings (a table of `CMD_` names in opcode order), and the original under Wine as a black box |
 | Music encryption | `resident.dll`'s Ogg Vorbis open path, read with Ghidra as described below |
+| Emotion icons (`.dlt`) | The header and frame loop of `resident.dll`'s DLT decoder, read with Ghidra as described below; not implemented |
 
 ## The script read path in `resident.dll`
 
@@ -65,3 +66,20 @@ Where the key and the count are set was not read: that lies outside the open pat
 stop there. Both come from the files instead. The first plain word of an Ogg file is always `OggS`, so a file's key is
 its first word rotated left by 2, XORed with `OggS`. The count is 128 words: with it every music file's first pages
 pass their Ogg CRC checks, and with any other count from 16 to 1024 they don't. All 21 files open this way.
+
+## The emotion icons (`.dlt`)
+
+The emotion icons that MANPU attaches to characters (sweat drops, exclamation marks) are `.dlt` animations under
+`res/g/ch/mp`. They are compressed and no permissive source describes them. The coordinator approved a minimal look at
+the read and decode path, with the same rules as above. Only these were read: the decoder's constructor, the routine
+that checks a file's header, and the routine that advances to the next frame. Nothing was copied. What was learned:
+
+- The first 32 bytes are a header: a version (0x103), the frame width and height, the frame count, a format word,
+  the frame time in milliseconds, a zero, and the signature `DLT` followed by a zero byte.
+- Each frame is a record whose type selects how it is applied. Most frames are deltas against the previous frame,
+  with an optional separate alpha plane, and some types mark loops and key frames.
+- The frame data isn't unpacked by the decoder itself. It calls a decompressor object through a virtual method, and
+  that object is chosen elsewhere at run time. The deltas are then applied by several separate blitting routines.
+
+Following the decompressor and the blitters would mean reading a good deal more of the engine for a decorative
+effect, so the reading stopped there. The runtime doesn't draw these icons; the scenes play the same without them.

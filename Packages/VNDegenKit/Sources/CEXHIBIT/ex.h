@@ -300,7 +300,9 @@ typedef struct EX {
     int autoMs;
     int windowAlpha;
     char *bootEntry;
-    Image *cgPrev;
+    Image *cgPrev, *cgBlur;
+    const Image *cgBlurSrc;
+    int focus, cgBlurLevel;
     u32 cgPrevColor;
     Camera camPrev;
     i32 Q[16], L[128], F[64];
@@ -373,6 +375,7 @@ float anim_value(EX *e, Anim *a, float cur);
 void anim_start(EX *e, Anim *a, float from, float to, int ms, int ease);
 
 void gfx_frame(EX *e);
+void gfx_focus(EX *e, char *args);
 void gfx_camera(EX *e, float x, float y, float w, float h, int ms, int ease);
 void gfx_move(EX *e, char *args);
 void gfx_fade(EX *e, char *args);

@@ -18,6 +18,7 @@ import EngineTmrHiro
 import EngineIPAC
 import EngineIkura
 import EngineEAGLS
+import EngineExHibit
 import EngineUnity
 import EngineWolfRPG
 import EngineAliceSoft
@@ -54,6 +55,7 @@ let engines: [any EnginePlugin] = {
         IPACPlugin(),
         IkuraPlugin(),
         EAGLSPlugin(),
+        ExHibitPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)

@@ -128,6 +128,7 @@ void vnexhibit_close(VNExHibit *n) {
         }
     image_free(e->cg);
     image_free(e->cgPrev);
+    image_free(e->cgBlur);
     msg_free(e);
     chara_free(e);
     text_free(e);
