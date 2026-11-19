@@ -56,10 +56,11 @@ void bx_msg_init(BX *b) {
     b->nameColor = bx_cfg_color(c, "message window", "name color", 0xffffffffu);
     b->textColor = 0xffffffffu;
     b->fontH = bx_cfg_int(c, "default font", "height", 20);
-    b->fontSize = b->fontH;
+    int points = bx_cfg_int(c, "default font", "size", 14);
+    b->fontSize = b->sc->minor >= 1 ? (points * 10 + 3) / 7 : b->fontH;
     b->fontW = bx_cfg_int(c, "default font", "width", 0);
     b->lineH = b->sc->minor >= 1 ? b->fontH : b->fontH + 4;
-    b->textDY = b->sc->minor >= 1 ? b->fontH - bx_cfg_int(c, "default font", "size", b->fontH) : 0;
+    b->textDY = b->sc->minor >= 1 ? b->fontSize - points : 0;
     b->fontBold = bx_cfg_int(c, "default font", "weight", 400) >= 700;
     b->lines = bx_cfg_int(c, "default font", "number of lines", 3);
     b->edge = bx_cfg_int(c, "default font", "edge", 1);

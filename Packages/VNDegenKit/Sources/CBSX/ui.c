@@ -371,6 +371,18 @@ void bx_ui_draw(BX *b, u32 *dst) {
     if (!menu_context(b) || b->transActive) return;
     bool menu = inMenu || b->menuVisible;
     if (menu && b->menuBase) bx_blit(dst, b->W, b->H, b->menuBase, b->menuX, b->menuY, 255);
+    if (menu) {
+        struct {
+            const char *key;
+            bool on;
+        } lamps[] = {{"autoex pos", b->autoMode}, {"cut-in pos", b->cutIn}, {"hold pos", b->menuVisible}};
+        for (int i = 0; i < 3 && b->lamp; i++) {
+            int p[2] = {0, 0};
+            int h = b->lamp->h / 2;
+            if (bx_cfg_ints(&b->cfg, "game menu", lamps[i].key, p, 2) == 2)
+                bx_blit_part(dst, b->W, b->H, b->lamp, 0, lamps[i].on ? h : 0, b->lamp->w, h, b->menuX + p[0], b->menuY + p[1], 255);
+        }
+    }
     for (int i = 0; i < b->buttonCount; i++) {
         if (!button_enabled(b, &b->buttons[i]) && !always_shown(&b->buttons[i])) continue;
         if (!menu && !always_shown(&b->buttons[i])) continue;
@@ -380,16 +392,6 @@ void bx_ui_draw(BX *b, u32 *dst) {
         draw_item(b, dst, &it, map_disabled(b, &b->buttons[i]) ? 3 : i == b->buttonHover ? 1 : on ? 2 : 0, b->menuX, b->menuY);
     }
     if (!menu) return;
-    struct {
-        const char *key;
-        bool on;
-    } lamps[] = {{"autoex pos", b->autoMode}, {"cut-in pos", b->cutIn}, {"hold pos", b->menuVisible}};
-    for (int i = 0; i < 3 && b->lamp; i++) {
-        int p[2] = {0, 0};
-        int h = b->lamp->h / 2;
-        if (bx_cfg_ints(&b->cfg, "game menu", lamps[i].key, p, 2) == 2)
-            bx_blit_part(dst, b->W, b->H, b->lamp, 0, lamps[i].on ? h : 0, b->lamp->w, h, b->menuX + p[0], b->menuY + p[1], 255);
-    }
     draw_date(b, dst, "game menu", 0, 0);
 }
 
