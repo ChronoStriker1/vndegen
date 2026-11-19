@@ -350,7 +350,8 @@ struct BX {
     int phaseBack;
     int phaseResult;
 
-    Image *menuBase;
+    Image *menuBase, *lamp, *infoWno, *infoWday;
+    bool cutIn;
     int menuX, menuY;
     int menuShow[4];
     bool menuVisible;
