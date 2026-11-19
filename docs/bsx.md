@@ -11,7 +11,9 @@ other runtime, decompiler or format write-up for the engine exists.
 |---|---|---|
 | Mesu Kyoushi ~Injoku no Kyoushitsu~ Immoral Edition (English machine translation, `mkiedl.exe`) | BSXScript 3.0, 800x600 | Boot logos, title, opening and new game, the week's mornings, special class, the map, the target cards, events, choices, eyecatches, voices, music, ambience and effects, the message window and its menu bar, STRIP and VIEW, Save and Load, quick save and load, auto saves, backlog, settings, the item screen |
 
-Not yet: Mesu Kyoushi 2 (BSXScript 3.0), 3 (3.3, with Lua) and 4 (3.1, with MPEG movies).
+| Mesu Kyoushi 2 ~Injuu no Rasen~ Immoral Edition (English machine translation, `mk2iedl.exe`) | BSXScript 3.0, 800x600 | Title, story to an ending in the headless runner, events with faces and overlays, Save and Load both ways with the PC |
+
+Not yet: Mesu Kyoushi 3 (3.3, with Lua) and 4 (3.1, with MPEG movies).
 
 ## How the games are built
 
@@ -58,13 +60,15 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
 `save/no-01` (quick save) and `save/common.dat` in the game folder. VNDegen uses the same files:
 
 - A slot is a 32-character id, a 120x90 thumbnail, the slot header (date, time, day, time slot, the current text with
-  its speaker), the play head (the mode, 7 on the map), the program counter after the current message, the call
+  its speaker), the play head (the mode, 7 on the map, then each character's wear record: a count, and per character
+  its max wear plus one and that many bytes, from `bsxx.cfg`), the program counter after the current message, the call
   frames (return address and the caller's label), locals, globals, the last 50 message positions, the music, and the
-  pictures on screen (kind, name, position, opacity).
+  pictures on screen (kind, name, position, parts, opacity; an overlay's record ends with 29 more bytes).
 - The id is the same in every save of a game and is checked on load. It is read from the game's `save/` folder; the
   four Mesu Kyoushi games' ids are also built in.
-- `common.dat` holds the PC's settings, a byte per choice taken, a byte per message read, and the museum's records.
-  VNDegen updates the choice and read bytes and leaves the rest as the PC wrote it.
+- `common.dat` holds the PC's settings (with the same wear records), a byte per choice taken, a byte per message read,
+  and the museum's records. VNDegen finds the choice and read tables by their counts, updates them, and leaves the rest
+  as the PC wrote it.
 - A save the original made under Wine loads in VNDegen, and a save VNDegen made loads in the original with its
   pictures.
 
