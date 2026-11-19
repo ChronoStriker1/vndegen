@@ -197,3 +197,20 @@ int text_wrap_sjis(EX *e, u32 *dst, const char *sjis, int x, int top, int width,
     free(cps);
     return line + 1;
 }
+
+int text_block_width(EX *e, const char *sjis, int size) {
+    int n;
+    u32 *cps = decode_sjis(sjis, &n);
+    int best = 0, w = 0;
+    for (int i = 0; i < n; i++) {
+        if (cps[i] == '\n') {
+            if (w > best) best = w;
+            w = 0;
+            continue;
+        }
+        w += text_advance(e, cps[i], size);
+    }
+    if (w > best) best = w;
+    free(cps);
+    return best;
+}

@@ -187,6 +187,15 @@ typedef struct Ctrl {
     int value;
 } Ctrl;
 
+#define EX_BUBBLES 8
+
+typedef struct Bubble {
+    Image *mask;
+    int x, y, alpha;
+    u32 color, edge;
+    char *text;
+} Bubble;
+
 typedef struct Msg {
     MsgFrame frames[EX_FRAMES];
     int frame;
@@ -208,6 +217,9 @@ typedef struct Msg {
     int ctrlCount, ctrlHover;
     struct Ctrl *dragging;
     u32 doneAt;
+    Bubble bubbles[EX_BUBBLES];
+    int bubbleCount;
+    bool bubbleMode;
 } Msg;
 
 typedef struct CharaDef {
@@ -303,6 +315,7 @@ typedef struct EX {
     Image *cgPrev, *cgBlur;
     const Image *cgBlurSrc;
     int focus, cgBlurLevel;
+    bool fadeoutPending;
     u32 cgPrevColor;
     Camera camPrev;
     i32 Q[16], L[128], F[64];
@@ -376,6 +389,8 @@ void anim_start(EX *e, Anim *a, float from, float to, int ms, int ease);
 
 void gfx_frame(EX *e);
 void gfx_focus(EX *e, char *args);
+int gfx_fadeout(EX *e, char *args);
+void fadeout_finish(EX *e);
 void gfx_camera(EX *e, float x, float y, float w, float h, int ms, int ease);
 void gfx_move(EX *e, char *args);
 void gfx_fade(EX *e, char *args);
@@ -426,6 +441,8 @@ void msg_finish(EX *e);
 void msg_tick(EX *e);
 void msg_flush_embedded(EX *e);
 void msg_draw(EX *e, u32 *dst);
+void msg_clear_bubbles(EX *e);
+int text_block_width(EX *e, const char *sjis, int size);
 bool msg_input(EX *e);
 void snd_apply_volumes(EX *e);
 void vm_exec_embedded(EX *e, Embedded *b);

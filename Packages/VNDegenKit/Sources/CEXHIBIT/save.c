@@ -116,6 +116,7 @@ void state_reset(EX *e) {
     }
     memset(e->tracks, 0, sizeof e->tracks);
     e->focus = 0;
+    msg_clear_bubbles(e);
     view_destroy(e);
     msg_clear(e);
     image_free(e->cgPrev);

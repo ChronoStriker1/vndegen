@@ -502,6 +502,52 @@ static Image *blurred(EX *e) {
     return im;
 }
 
+#define FADEOUT_ID 100000
+
+int gfx_fadeout(EX *e, char *args) {
+    char *f[8];
+    int n = split_csv(args, f, 8);
+    int ms = n > 2 ? field_int(f[2]) : 0;
+    u32 color = n > 4 ? bgr((u32)field_int(f[4])) : 0;
+    Billboard *b = bb_find(e, FADEOUT_ID, false);
+    if (b) bb_clear(b);
+    b = bb_find(e, FADEOUT_ID, true);
+    if (!b) return 0;
+    b->kind = 1;
+    b->color = color;
+    e->fadeoutPending = true;
+    if (ms <= 0 || e->skipping || e->ctrlHeld) {
+        b->a = 255;
+        fadeout_finish(e);
+        return 0;
+    }
+    b->a = 0;
+    anim_start(e, &b->alpha, 0, 255, ms, 0);
+    return ms;
+}
+
+void fadeout_finish(EX *e) {
+    if (!e->fadeoutPending) return;
+    e->fadeoutPending = false;
+    Billboard *ov = bb_find(e, FADEOUT_ID, false);
+    u32 color = ov ? ov->color : 0;
+    for (int i = 0; i < EX_BILLBOARDS; i++)
+        if (e->bb[i].used) bb_clear(&e->bb[i]);
+    chara_leave_all(e, 0);
+    for (int i = 0; i < 4; i++) {
+        image_free(e->portraits[i].img);
+        memset(&e->portraits[i], 0, sizeof e->portraits[i]);
+    }
+    memset(e->tracks, 0, sizeof e->tracks);
+    e->focus = 0;
+    msg_clear_bubbles(e);
+    msg_clear(e);
+    gfx_draw_cg(e, -1, 0);
+    e->cgColor = color | 0xff000000u;
+    e->cgId = (int)(0x80000000u | bgr(color));
+    gfx_camera(e, 0, 0, EX_W, EX_H, 0, 0);
+}
+
 void gfx_focus(EX *e, char *args) {
     char *f[10];
     int n = split_csv(args, f, 10);
@@ -575,6 +621,10 @@ void gfx_frame(EX *e) {
         if (b->mx.active) b->x = (int)anim_value(e, &b->mx, (float)b->x);
         if (b->my.active) b->y = (int)anim_value(e, &b->my, (float)b->y);
         if (b->removing && !b->alpha.active) bb_clear(b);
+    }
+    if (e->fadeoutPending) {
+        Billboard *ov = bb_find(e, FADEOUT_ID, false);
+        if (!ov || !ov->alpha.active) fadeout_finish(e);
     }
     compose(e, e->screen, -1);
     e->serial++;

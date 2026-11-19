@@ -3,6 +3,8 @@
 #define TEXT_PAD 10
 #define NAME_PAD 12
 #define WAIT_FRAME_MS 150
+#define BUBBLE_SIZE 27
+#define BUBBLE_LINE 32
 
 static void style_parse(TextStyle *t, char **f, int pitch, int size, int color, int shadow) {
     t->pitch = field_int(f[pitch]);
@@ -133,6 +135,7 @@ void msg_free(EX *e) {
         image_free(m->ctrls[i].tip);
     }
     image_free(m->waitImg);
+    msg_clear_bubbles(e);
     free(m->chars);
     free(m->name);
     for (int i = 0; i < m->embCount; i++) free(m->emb[i].str);
@@ -274,6 +277,45 @@ static void parse_embedded(EX *e, char **s, int ns) {
     }
 }
 
+static void bubble_free(Bubble *b) {
+    image_free(b->mask);
+    free(b->text);
+    memset(b, 0, sizeof *b);
+}
+
+void msg_clear_bubbles(EX *e) {
+    for (int i = 0; i < e->msg.bubbleCount; i++) bubble_free(&e->msg.bubbles[i]);
+    e->msg.bubbleCount = 0;
+}
+
+static bool bubble_add(EX *e, const char *spec, const char *text, int who) {
+    if (strncmp(spec, "258,", 4)) return false;
+    char *buf = ex_strdup(spec);
+    char *f[24];
+    int n = split_csv(buf, f, 24);
+    if (n < 13) {
+        free(buf);
+        return false;
+    }
+    int ax = field_int(f[7]), ay = field_int(f[8]), file = field_int(f[12]);
+    Msg *m = &e->msg;
+    if (m->bubbleCount >= EX_BUBBLES) bubble_free(&m->bubbles[0]), memmove(&m->bubbles[0], &m->bubbles[1], sizeof(Bubble) * (EX_BUBBLES - 1)), m->bubbleCount--;
+    Bubble *b = &m->bubbles[m->bubbleCount++];
+    memset(b, 0, sizeof *b);
+    char rel[64];
+    snprintf(rel, sizeof rel, "res/g/ch/fd/%04d.gyu", file);
+    b->mask = image_load(e, rel);
+    int h = b->mask ? b->mask->h : 120;
+    b->x = ay * 16 / 9;
+    b->y = 1071 - ax * 9 / 16 - h / 2;
+    b->alpha = field_int(f[5]) > 0 ? field_int(f[5]) : 204;
+    b->color = who == 3 ? 0x8c281eu : 0x281ed2u;
+    b->edge = colorref((u32)field_int(f[4]));
+    b->text = ex_strdup(text);
+    free(buf);
+    return true;
+}
+
 void msg_start(EX *e, Op *op) {
     Msg *m = &e->msg;
     if (!m->emb) m->emb = ex_alloc(sizeof(Embedded) * EX_EMBEDDED);
@@ -295,6 +337,7 @@ void msg_start(EX *e, Op *op) {
     free(cps);
     free(it);
     parse_embedded(e, op->s + 2, op->ns > 2 ? op->ns - 2 : 0);
+    m->bubbleMode = op->ns > 2 && bubble_add(e, op->s[2], text, who);
     m->visible = 0;
     m->start = e->now;
     m->active = true;
@@ -366,12 +409,49 @@ void msg_draw(EX *e, u32 *dst) {
     if (m->fade.active) m->a = anim_value(e, &m->fade, m->a);
     if (m->tempFade.active) m->tempA = anim_value(e, &m->tempFade, m->tempA);
     int alpha = (int)(m->a * m->tempA / 255.0f);
+    int balpha = m->userHidden ? 0 : 255;
     if (m->userHidden) alpha = 0;
-    if (alpha <= 0) return;
     MsgFrame *f = frame(e);
-    if (f->img) blit(dst, EX_W, EX_H, f->img, f->x, f->y, alpha * e->windowAlpha / 255);
-    if (m->ctrlShown) draw_ctrls(e, dst, alpha);
-    if (!m->active) return;
+    for (int i = 0; i < m->bubbleCount && balpha > 0; i++) {
+        Bubble *b = &m->bubbles[i];
+        if (b->mask) {
+            const Image *k = b->mask;
+            for (int y = 0; y < k->h; y++) {
+                int sy = b->y + y;
+                if (sy < 0 || sy >= EX_H) continue;
+                for (int x = 0; x < k->w; x++) {
+                    int sx = b->x + x;
+                    if (sx < 0 || sx >= EX_W) continue;
+                    u32 v = k->px[(size_t)y * (size_t)k->w + (size_t)x] & 0xff;
+                    if (!v) continue;
+                    bool edge = false;
+                    for (int dy = -2; dy <= 2 && !edge; dy++)
+                        for (int dx = -2; dx <= 2 && !edge; dx++) {
+                            int nx = x + dx, ny = y + dy;
+                            if (dx * dx + dy * dy > 4) continue;
+                            if (nx < 0 || ny < 0 || nx >= k->w || ny >= k->h || !(k->px[(size_t)ny * (size_t)k->w + (size_t)nx] & 0xff)) edge = true;
+                        }
+                    u32 col = edge ? b->edge : (v > 230 ? 230 : v) * 0x010101u;
+                    u32 a = edge ? 200 : (u32)b->alpha;
+                    u32 *d = &dst[(size_t)sy * EX_W + (size_t)sx];
+                    u32 dp = *d, ia = 255 - a;
+                    u32 r = ((col & 0xff) * a + (dp & 0xff) * ia) / 255, g = ((col >> 8 & 0xff) * a + (dp >> 8 & 0xff) * ia) / 255, bl = ((col >> 16 & 0xff) * a + (dp >> 16 & 0xff) * ia) / 255;
+                    *d = r | g << 8 | bl << 16 | 0xff000000u;
+                }
+            }
+        }
+        int w = b->mask ? b->mask->w : 600, h = b->mask ? b->mask->h : 120;
+        int lines = text_wrap_sjis(e, NULL, b->text, 0, 0, 4000, BUBBLE_LINE, BUBBLE_SIZE, 0, 0, 0, 8);
+        int widest = text_block_width(e, b->text, BUBBLE_SIZE);
+        int top = b->y + (h - lines * BUBBLE_LINE) / 2;
+        text_wrap_sjis(e, dst, b->text, b->x + (w - widest) / 2, top, 4000, BUBBLE_LINE, BUBBLE_SIZE, b->color, 0, balpha, 8);
+    }
+    if (m->ctrlShown && !m->userHidden) draw_ctrls(e, dst, 255);
+    if (alpha <= 0) return;
+    if (!m->bubbleMode || !m->active) {
+        if (f->img) blit(dst, EX_W, EX_H, f->img, f->x, f->y, alpha * e->windowAlpha / 255);
+    }
+    if (!m->active || m->bubbleMode) return;
     if (m->nameLen) {
         TextStyle *st = &f->name;
         int size = st->size > 0 ? st->size : 32;

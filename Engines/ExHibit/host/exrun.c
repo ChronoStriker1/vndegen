@@ -31,7 +31,9 @@ static int press(VNExHibit *n, int x, int y, int button) {
 }
 
 static void print_state(EX *e) {
-    printf("script=%s pc=%d wait=%d sp=%d view=%d result=%d\n", e->sc ? e->sc->name : "-", e->pc, e->wait, e->sp, e->view.shown, e->view.result);
+    printf("script=%s pc=%d wait=%d sp=%d view=%d result=%d text=%d cg=%d focus=%d bubbles=%d bubbleMode=%d\n", e->sc ? e->sc->name : "-", e->pc, e->wait, e->sp, e->view.shown, e->view.result, e->msg.textId, e->cgId, e->focus, e->msg.bubbleCount, e->msg.bubbleMode);
+    for (int i = 0; i < EX_BILLBOARDS; i++)
+        if (e->bb[i].used) printf("  bb %d kind %d a %.0f y %d\n", e->bb[i].id, e->bb[i].kind, e->bb[i].a, e->bb[i].y);
 }
 
 int main(int argc, char **argv) {

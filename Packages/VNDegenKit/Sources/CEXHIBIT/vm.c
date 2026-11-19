@@ -333,7 +333,9 @@ static bool exec(EX *e, Op *op) {
     case 195:
     case 249:
     case 250:
+        break;
     case 269:
+        msg_clear_bubbles(e);
         break;
     case 5: {
         char *f[8];
@@ -565,6 +567,10 @@ static bool exec(EX *e, Op *op) {
         gfx_focus(e, s0);
         break;
     case 78:
+        if (gfx_fadeout(e, s0) > 0) {
+            e->wait = W_FADE;
+            return false;
+        }
         break;
     case 252:
         portrait_draw_cmd(e, s0);
