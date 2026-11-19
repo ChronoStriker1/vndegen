@@ -60,6 +60,103 @@ New test picks for the shipped engines, smallest first where the variant allows.
 | Godot | Train45 | 1790 | Installed, pack inside the 1.6 GB exe, GodotSteam extension |
 | AliceSoft System 4 | Evenicle | 1555 | System 4 with `.afa` CG archives |
 
+## Second survey (2026-11-19)
+
+The first survey left 84 folders with engine `unknown`. This pass opened what it could not: GOG installers (`innoextract`), RAR and 7z archives inside archives, ISO and BIN/CUE disc images, self-extracting and packed `.exe` files, and the PE headers, version resources, imports and strings of exes with no known signature. No game was run. The TSV rows say what each finding rests on, and their notes end with "second survey 2026-11-19".
+
+- 76 of the 84 now have an engine.
+- 27 of those are on engines VNDegen already runs, and 49 on engines it doesn't.
+- 6 stay unknown, and 2 were left out without being opened (Loli Succu_ Cucu ~Easygoing Sex Around~ and Size Fetish One x Shota Battle 2 - Female Mutant VS Crossdressing Soldier).
+
+| Engine | Games | Size (GB) | VNDegen |
+|---|---:|---:|---|
+| RPG Maker MV, including 4 packed in one `.exe` | 8 | 7.5 | Runs |
+| Wolf RPG Editor | 3 | 2.5 | Runs |
+| Godot | 3 | 0.4 | Runs Godot 3 and 4, not the one Godot 2 game |
+| RPG Maker VX Ace | 2 | 3.1 | Runs |
+| KiriKiri | 2 | 4.6 | Runs |
+| YU-RIS | 2 | 8.8 | Runs |
+| NekoSDK | 2 | 7.0 | Runs |
+| Tmr-Hiro ADV System | 2 | 4.3 | Runs |
+| RPG Maker MZ, Ikura GDL, Flash, Construct 3 | 1 each | 2.3 total | Runs |
+| Custom native code | 11 | 2.4 | Not a target |
+| Clickteam Fusion | 7 | 3.0 | Not a target |
+| Unity | 5 | 5.0 | Not a target |
+| BISHOP BSX | 4 | 14.4 | New, see below |
+| ANIM engine | 4 | 10.4 | New, see below |
+| DxLib (custom) | 4 | 3.0 | Not a target |
+| Unreal | 2 | 15.7 | Not a target |
+| Action Editor 4 | 2 | 0.5 | New, see below |
+| Light.vn, PJADV | 1 each | 2.6 total | New, see below |
+| GameMaker 8.1, HSP, Pixel Game Maker MV, OpenFL (Haxe), ACTkool, Shooting Game Builder, 2D Fighter Maker 2nd | 1 each | 1.0 total | Not a target |
+| Unknown | 6 | 45.7 | |
+
+### New test games for engines VNDegen runs
+
+"Standard" means the layout matches what the plugin already detects, so the game should just work. The others need something first.
+
+| Engine | Game folder | Size (MB) | Layout |
+|---|---|---:|---|
+| RPG Maker MV | Demon Slayer Shion | 1885 | Standard. GOG installer, NW.js, encrypted assets |
+| RPG Maker MV | Yokai Busters | 1738 | Standard. GOG installer, encrypted assets |
+| RPG Maker MV | Kamikaze Kommittee Ouka 2 | 443 | Standard. GOG installer inside a RAR, encrypted assets |
+| RPG Maker MV | Despite cheating you are corrupted and reverse r_ped in this rougelike-like game | 268 | Standard once unpacked. The game is in a RAR inside the outer RAR, under `hontai/` |
+| RPG Maker MV, packed | Tamamao ~Jailbreak the Demon Queen~ | 532 | Enigma Virtual Box `.exe`, which the import unpacks unless its file compression is on |
+| RPG Maker MV, packed | たままお1.5 ～忘れられしメカモンの逆襲～ | 729 | Enigma Virtual Box `.exe` |
+| RPG Maker MV, packed | Succubus Puttel | 706 | Enigma Virtual Box `.exe` |
+| RPG Maker MV, packed | Lilith in Nightmare! | 1189 | Enigma Virtual Box `.exe` around NW.js 0.36.2, 1.3 GB |
+| RPG Maker MZ | The Titjob Apparition of the Midnight School | 277 | Unusual. An electron-builder NSIS installer, which the import can't unpack, holding the game in `resources/app.asar` under `project/`. The MZ detection doesn't look inside `app.asar` |
+| RPG Maker VX Ace | Dark Elf Historia | 2720 | Standard. GOG installer inside a RAR, `Game.rgss3a` |
+| RPG Maker VX Ace | Succubus Hunt! | 394 | Unusual. The game is inside an IExpress (CAB) self-extracting `.exe`, which the import doesn't unpack |
+| Wolf RPG Editor | President Yukino | 1090 | Standard. GOG installer, `Data/*.wolf`, Wolf 2.21 |
+| Wolf RPG Editor | The Succubus of the Forest and a Doctor | 86 | Standard. `Data.wolf`, in a RAR inside the outer RAR |
+| Wolf RPG Editor | Demon Queen Melissa | 1334 | Standard. GOG installer, Wolf 2.23. Not a test game |
+| Godot 3 | Yu Crossing Animals | 173 | Standard. GOG installer, Godot 3.4.5, `.pck` beside the `.exe`, no GDNative libraries |
+| Godot 4 | Life as a Caretaker in Another World ~Putting a Bratty, Busty Elf in Her Place~ | 182 | Standard. Godot 4.7.1, pack in the `.exe`'s `pck` section |
+| KiriKiri | St. Yariman's Former Sluts ~Mega MILF Edition~ | 1465 | Standard. GOG installer, KiriKiri 2.32, `data.xp3`, the common plugins (KAGParser, addFont, extrans, layerExSave, menu, wuvorbis) |
+| KiriKiri | Tenioha! feat. Mami | 3098 | Mostly standard. KiriKiri Z 1.4.0.8 with `k2compat`, `.tpm` plugins including `krdstheora` (Theora video) and `DrawDeviceForSteam.dll`, and a 2.6 GB `patch.xp3` |
+| YU-RIS | Sacrifice Villains | 7001 | Standard. GOG installer, YU-RIS 0.481, one `.ypf` of 5.7 GB |
+| YU-RIS | Holy Maid Academy | 1751 | Standard. GOG installer, YU-RIS 0.491 |
+| NekoSDK | Eden's Ritter - Paladins of Ecstasy | 3186 | Standard. `cfg.pak` beside `scr.pak`, NekoGameSDK4th |
+| NekoSDK | Eden's Ritter 1_2 - Priestess of Pleasure | 3814 | Standard. `cfg.pak` beside `scr.pak` |
+| Tmr-Hiro ADV System | Hypnosis of Busty Female Officer _There's No Way I'd Follow Orders from Someone Like You_ | 1262 | Standard. `srp.pac` beside `Agrd.pac` |
+| Tmr-Hiro ADV System | Welcome to the Lewd Elf Forest! | 3054 | Unusual. An ISO in a RAR whose `GameData/` has every archive except `srp.pac`. Its `uninst.exe` lists `srp.pac` to `srp_6.pac`, so the installer or the DLsite-signed launcher at the disc's root provides the scripts |
+| Ikura GDL | Jewel Knights Crusaders | 1122 | Unusual. A 2004 build: `SM2MPX10` archives named `ISF` (scripts as `.ISF`) and `GGD` (pictures), not `SNR` and `GRP`, so detection misses it and the script format may differ from Raidy's. BIN/CUE, with a SafeDisc exe and a crack exe on the disc |
+| Flash | Treasure Hunter Eriru | 656 | Standard. Flash Player 11.4 projector with the movie appended |
+| Construct 3 | Dungeon Vixens_ A Tale of Temptation | 191 | Unusual. GOG installer of an NW.js 0.89 build with the game zipped in `package.nw`, not the WebView2 or HTML5 layouts the plugin knows. Uses the greenworks Steam module |
+
+### New engines
+
+Ranked by library games. Only BISHOP BSX and the ANIM engine are visual novel engines with more than one library game.
+
+| Engine | Games (GB) | Runtimes and format notes | Game logic | Work |
+|---|---:|---|---|---|
+| Clickteam Fusion 2.5 | 7 (3.0) | Anaconda, an open MMF2 runtime, is GPL or commercial. NebulaFD (MIT) and CTFAK (AGPL-3.0, ended) are decompilers. Chowdren is a commercial converter | Event sheets in the packed data, run by the runtime, plus native extension DLLs | Months. Action games, not a target |
+| BISHOP BSX | 4 (14.4) | No runtime, decompiler or format notes found. GARbro (MIT) reads the `.bsa` (`BSArc`) archives | Compiled BSXScript 3.0 to 3.3 in one `bsxx.dat`, with a text `bsxx.cfg`. Pictures in `.bsa`, Ogg audio, MPEG movies | About 3 to 4 weeks, in the style of the Tmr-Hiro and EAGLS runtimes |
+| ANIM engine | 4 (10.4) | No runtime found. `.gax` pictures and `.eog` audio (a `CRM` header in front of Ogg) are undocumented. Characters are E-mote (`psbpack.dat` and M2's closed `emotedriver.dll`). FreeMote documents PSB, but parts of it are CC BY-NC-SA, which isn't usable | Compiled scenario files (`*_sce.dat`, `*_define.dat`) for the story, but the E-mote characters have to be played back too | 6 to 8 weeks, half of it E-mote playback. The games date from 2022 to 2025, so more may come |
+| Action Editor 4 | 2 (0.5) | No runtime. A third-party project reads version 10.20 files (license not checked) | Binary stage (`.stg4`) and database files run by the native player | Weeks. Action games, not a target |
+| Light.vn | 1 (2.3) | Closed engine, free to use with credit. No open runtime | Plain-text scripts and plugin scripts, but a large engine with 3D models and Tiled maps | Months for one game. Not worth it now |
+| PJADV | 1 (0.3) | The exe names itself "2XT - Pencil Adventure Engine" 4.5. GARbro (MIT) reads Pajamas' `GAMEDAT PACK` archives | Compiled scenario in the `.dat` archives | 2 to 3 weeks for one game |
+
+Other engines found, all outside VNDegen's target: Unity (5 games, including VenusBlood -BRAVE- and Summer Clover, a Naninovel game), Unreal 4 and 5, GameMaker 8.1, HSP, Pixel Game Maker MV, OpenFL (Haxe compiled to native code), ACTkool, Shooting Game Builder, 2D Fighter Maker 2nd, DxLib, and custom native code (Direct3D 9, Direct3D 11, OpenGL and DirectDraw players, and a PyInstaller Python game). Devil of Heaven and Saintess of Baptism is Godot 2.2, which would need a third Godot runtime for one game.
+
+### Not visual novels or RPGs
+
+These aren't port candidates.
+- Console ports: Metal Gear Solid Master Collection_ Volume 1, Metal Gear Solid Master Collection_ Volume 2, Azure Striker Gunvolt Trilogy Enhanced_ Additional Mode - Azure Striker Gunvolt GX.
+- Action, shooting and fighting games on game makers: -SACRED- and Ethereal LegioN (Action Editor 4), Forest of the Blue Skin (ACTkool), THE SHOKUSHOO (Shooting Game Builder), Fairy Fighting (2D Fighter Maker 2nd), Slave Princess Sarah (Pixel Game Maker MV), Eroico (GameMaker 8.1), and the Clickteam Fusion games: the three Monster Fighter Boy Ashita games, Orction, Wolf's Dungeon, Succubus_ The Six Spells and Sexy GIRLS HUNT.
+- Platformers: La-Mulana, La-Mulana (2005), La-Mulana 2.
+- Others: Chronos Gate (3D action), Metal Orange EX Windows Ver. (shooter), Furry Aim Trainer (Unreal 4 shooter), Final Fantasy Resonance (Unreal 5), Sexual Violation x Tower Defense_ RPG to Save the Fantasy World by Inseminating Sex (Unity tower defense), Anthro Heat (VR), Forbidden Solitaire (card game).
+
+### Still unknown
+
+- Anthro Heat: a UDF disc image whose game is in a FreeArc archive, which needs FreeArc to list.
+- Forbidden Solitaire: the scene installer is custom and its data file is encrypted.
+- Azure Striker Gunvolt Trilogy Enhanced_ Additional Mode - Azure Striker Gunvolt GX and the two Metal Gear Solid collections: over 8 GB with no engine in their file lists, so not opened.
+- プリンセスディフェンダー ～精霊姫エルトリーゼの物語～: the `.rar` has no archive signature anywhere and reads as random bytes, so it is encrypted or damaged.
+
+Two archives still can't be fully extracted. Summer Clover's 7z is truncated (35 MB of about 4.5 GB), but its readable start decodes to a Unity 2020.3.48f1 Naninovel game. VenusBlood -BRAVE-'s outer 7z has data errors and the RAR inside it is truncated; the surviving installer lists a Unity game.
+
 ## Summary
 
 The library has 521 folders and 684.5 GB (637.5 GiB). Signatures identify the engine for 446 folders. 75 stay unknown.
@@ -232,7 +329,7 @@ These are outside VNDegen's target and are not in the port order.
 
 ## Unidentified folders
 
-75 folders have no known engine.
+75 folders have no known engine. The second survey (2026-11-19, above) names most of these and of the later additions.
 - 13 are GOG offline installers (`setup_*_(nnnnn).exe`). Installer contents cannot be listed.
 - 9 contain a second archive or an ISO inside the outer archive. Listing stopped at the outer layer.
 - 2 are disc images (`.bin` and `.cue`, or `.iso` and `.mds`).
