@@ -232,6 +232,7 @@ void bx_ui_init(BX *b) {
     if (wn && bx_cfg_field(wn, 0, name, sizeof name) > 0) b->infoWno = own(b, name);
     if (wd && bx_cfg_field(wd, 0, name, sizeof name) > 0) b->infoWday = own(b, name);
     b->menuVisible = true;
+    b->menuLayer = b->infoLayer = true;
     b->cutIn = true;
     for (int i = 0; i < c->count && b->buttonCount < 24; i++) {
         if (strcmp(c->sec[i], "system button")) continue;
@@ -265,6 +266,7 @@ void bx_ui_free(BX *b) {
     bx_image_free(b->msgFrame);
     bx_image_free(b->msgName);
     bx_image_free(b->unagashi);
+    bx_image_free(b->xCounter);
     bx_image_free(b->choiceItem[0]);
     bx_image_free(b->choiceItem[1]);
     bx_image_free(b->choiceItem[2]);
@@ -475,6 +477,9 @@ void bx_system(BX *b, const char *cmd) {
     if (!strcmp(cmd, "title")) bx_phase_start(b, PH_TITLE);
     else if (!strcmp(cmd, "map")) bx_phase_start(b, PH_MAP);
     else if (!strcmp(cmd, "custom map")) bx_phase_start(b, PH_CUSTOM_MAP);
+    else if (!strcmp(cmd, "op") || !strcmp(cmd, "staffroll")) {
+        if (bx_movie_play(b, cmd)) b->th.wait = W_MOVIE;
+    }
     else if (!strcmp(cmd, "random bg")) random_bg(b);
     else if (sscanf(cmd, "is animeted %63s , %d", var, &level) == 2) {
         int v = bx_var_by_name(b, var);
@@ -482,7 +487,8 @@ void bx_system(BX *b, const char *cmd) {
     }
     else if (!strcmp(cmd, "@title") || !strcmp(cmd, "@end")) {
         bx_snd_stop(b, CH_BGM, 500);
-        bx_snd_stop(b, CH_BGS, 0);
+        bx_snd_loop_stop(b, CH_BGS, NULL, 0);
+        bx_snd_loop_stop(b, CH_VOICE2, NULL, 0);
         b->bgmName[0] = 0;
         memset(&b->scene, 0, sizeof b->scene);
         bx_transition(b, 0, 0, NULL);

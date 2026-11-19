@@ -8,13 +8,28 @@ static char *trim(char *s) {
     return s;
 }
 
+static bool utf8_text(const u8 *s, size_t n) {
+    for (size_t i = 0; i < n;) {
+        u8 c = s[i];
+        int len = c < 0x80 ? 1 : (c & 0xe0) == 0xc0 ? 2 : (c & 0xf0) == 0xe0 ? 3 : (c & 0xf8) == 0xf0 ? 4 : 0;
+        if (!len || i + (size_t)len > n) return false;
+        for (int k = 1; k < len; k++)
+            if ((s[i + (size_t)k] & 0xc0) != 0x80) return false;
+        i += (size_t)len;
+    }
+    return true;
+}
+
 bool bx_cfg_parse(Cfg *c, const u8 *data, size_t size) {
     memset(c, 0, sizeof *c);
     if (!data) return false;
     char *text = bx_alloc(size + 1);
     memcpy(text, data, size);
-    char *utf = bx_sjis_to_utf8(text);
-    free(text);
+    char *utf = text;
+    if (!utf8_text(data, size)) {
+        utf = bx_sjis_to_utf8(text);
+        free(text);
+    }
     char section[128] = "";
     for (char *line = utf; line && *line;) {
         char *next = strchr(line, '\n');

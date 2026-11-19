@@ -81,16 +81,17 @@ static void message(BX *b, const u8 *p, int *len) {
     int flag = p[1];
     u32 msg = rd32(p + 2);
     int name = -1;
-    const char *voice = NULL;
+    const char *voice = NULL, *voice2 = NULL;
     *len = 6;
     if (flag >= 1) {
         name = (int)rd32(p + 6);
         *len = 10;
     }
     if (flag >= 2) {
-        Val v = {(u8)rd32(p + 10), (i32)rd32(p + 14)};
-        voice = v.str ? val_str(b, v) : NULL;
-        *len = 18;
+        u32 n = rd32(p + 10);
+        if (n > 0) voice = val_str(b, (Val){1, (i32)rd32(p + 14)});
+        if (n > 1) voice2 = val_str(b, (Val){1, (i32)rd32(p + 18)});
+        *len = 14 + 4 * (int)n;
     }
     if (flag > 2) bx_log(b, "message flag %d", flag);
     const char *text = msg < (u32)b->sc->msgCount ? b->sc->msgs[msg] : "";
@@ -106,6 +107,7 @@ static void message(BX *b, const u8 *p, int *len) {
     bool unread = !bx_msg_read(b, msg);
     if (unread && b->skipMode && !b->set.skipUnread && b->common) b->skipMode = false;
     bx_msg_show(b, speaker, text, voice);
+    bx_voice_play(b, CH_VOICE2, voice2);
     bx_mark_read(b, msg);
     b->th.wait = W_TEXT;
 }
@@ -203,6 +205,16 @@ static bool step(BX *b) {
     case 0x34:
         t->pc += 5;
         bx_choice_begin(b);
+        return true;
+    case 0x3e: {
+        u32 n = rd32(p + 1);
+        for (u32 i = 0; i < n && i < 2; i++) bx_voice_play(b, i ? CH_VOICE2 : CH_VOICE, val_str(b, (Val){1, (i32)rd32(p + 5 + 4 * i)}));
+        t->pc += 5 + 4 * n;
+        return true;
+    }
+    case 0x41:
+        t->pc++;
+        bx_log(b, "host call %s", bx_arg_str(b, 1));
         return true;
     case 0x36:
     case 0x38:

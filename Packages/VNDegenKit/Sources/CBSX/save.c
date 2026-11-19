@@ -441,8 +441,10 @@ bool bx_load_slot(BX *b, int slot) {
         b->bgmName[0] = 0;
         bx_snd_stop(b, CH_BGM, 300);
     }
-    bx_snd_stop(b, CH_BGS, 0);
+    bx_snd_loop_stop(b, CH_BGS, NULL, 0);
+    bx_snd_loop_stop(b, CH_VOICE2, NULL, 0);
     bx_snd_stop(b, CH_VOICE, 0);
+    bx_snd_stop(b, CH_VOICE2, 0);
     bx_msg_clear(b);
     b->winShown = true;
     b->winHidden = false;

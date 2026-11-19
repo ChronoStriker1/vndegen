@@ -219,7 +219,7 @@ Obj *bx_obj_put(BX *b, int kind, int id, const char *name, int x, int y) {
     Scene *s = &b->scene;
     if (kind == OK_BG) {
         for (int i = 0; i < BX_OBJS; i++)
-            if (s->obj[i].used && s->obj[i].kind != OK_OBJ) s->obj[i].used = false;
+            s->obj[i].used = false;
         b->stripLevel = 0;
         b->viewLevel = 0;
     }
@@ -457,6 +457,32 @@ void bx_flash(BX *b, int r, int g, int bl, int ticks) {
     b->flashDur = (u32)(ticks > 0 ? ticks : 1) * 100;
 }
 
+void bx_shake(BX *b, int x, int y) {
+    b->shakeX = x;
+    b->shakeY = y;
+    b->shakeStart = b->now;
+}
+
+#define SHAKE_MS 400
+
+static void shake_frame(BX *b) {
+    u32 t = b->now - b->shakeStart;
+    if (t >= SHAKE_MS || b->skipMode) {
+        b->shakeX = b->shakeY = 0;
+        return;
+    }
+    int left = SHAKE_MS - (int)t, sign = (t / 33) % 2 ? -1 : 1;
+    int dx = sign * b->shakeX * left / SHAKE_MS, dy = sign * b->shakeY * left / SHAKE_MS;
+    for (int y = 0; y < b->H; y++) {
+        int sy = y - dy;
+        u32 *row = b->screen + (size_t)y * b->W;
+        for (int x = 0; x < b->W; x++) {
+            int sx = x - dx;
+            row[x] = sx >= 0 && sx < b->W && sy >= 0 && sy < b->H ? b->front[(size_t)sy * b->W + sx] : 0xff000000u;
+        }
+    }
+}
+
 static void trans_frame(BX *b) {
     u32 t = b->now - b->transStart;
     size_t n = (size_t)b->W * (size_t)b->H;
@@ -488,12 +514,17 @@ static void trans_frame(BX *b) {
 
 void bx_gfx_frame(BX *b) {
     size_t n = (size_t)b->W * (size_t)b->H;
+    if (bx_movie_draw(b, b->screen)) {
+        b->serial++;
+        return;
+    }
     if (b->transActive) trans_frame(b);
     else if (b->shownDirty) {
         bx_compose(b, &b->shown, b->front);
         b->shownDirty = false;
     }
     memcpy(b->screen, b->front, n * 4);
+    if (b->shakeX || b->shakeY) shake_frame(b);
     if (b->flashDur) {
         u32 t = b->now - b->flashStart;
         if (t >= b->flashDur) b->flashDur = 0;

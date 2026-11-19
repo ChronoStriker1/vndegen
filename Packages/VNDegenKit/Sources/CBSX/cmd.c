@@ -15,7 +15,13 @@ static const char *bgm_name(const char *s, bool *loop) {
     return s;
 }
 
+static const char *voice_key(const char *name, char *key) {
+    snprintf(key, 3, "%s", name);
+    return key;
+}
+
 void bx_cmd(BX *b, int op) {
+    char key[4];
     const char *s1 = bx_arg_str(b, 1), *s2 = bx_arg_str(b, 2), *s3 = bx_arg_str(b, 3);
     i32 a1 = bx_arg_int(b, 1), a2 = bx_arg_int(b, 2), a3 = bx_arg_int(b, 3), a4 = bx_arg_int(b, 4), a5 = bx_arg_int(b, 5);
     if (b->trace) bx_log(b, "cmd %02x %d|%s %d|%s %d|%s %d %d", op, a1, s1, a2, s2, a3, s3, a4, a5);
@@ -49,6 +55,8 @@ void bx_cmd(BX *b, int op) {
         break;
     case 0x26:
         if (a1 == 0) b->winShown = a2 != 0;
+        else if (a1 == 1) b->menuLayer = a2 != 0;
+        else if (a1 == 2) b->infoLayer = a2 != 0;
         break;
     case 0x27:
         bx_transition(b, a1, a2, NULL);
@@ -57,6 +65,9 @@ void bx_cmd(BX *b, int op) {
     case 0x28:
         bx_transition(b, a1, a2, s3);
         if (b->transActive) b->th.wait = W_TRANS;
+        break;
+    case 0x2a:
+        bx_shake(b, a1, a2);
         break;
     case 0x2b:
         bx_flash(b, a1, a2, a3, a4);
@@ -76,14 +87,16 @@ void bx_cmd(BX *b, int op) {
         bx_snd_stop(b, CH_BGM, a1 * 100);
         break;
     case 0x2e:
-        bx_snd_play(b, CH_BGS, RX_BGS, s1, true, 0);
+        bx_snd_loop(b, CH_BGS, s1, bx_res_find(&b->arc, RX_BGS, s1) ? RX_BGS : RX_SE, s1);
         break;
     case 0x2f:
-        bx_snd_stop(b, CH_BGS, 0);
+        bx_snd_loop_stop(b, CH_BGS, s1, 0);
+        break;
+    case 0x30:
+        if (s1 && bx_res_find(&b->arc, RX_VOICE, s1)) bx_snd_loop(b, CH_VOICE2, voice_key(s1, key), RX_VOICE, s1);
         break;
     case 0x31:
-        bx_snd_stop(b, CH_SE, 0);
-        bx_snd_stop(b, CH_SE2, 0);
+        bx_snd_loop_stop(b, CH_VOICE2, s1 ? voice_key(s1, key) : NULL, 0);
         break;
     case 0x32:
         bx_snd_play(b, a2 ? CH_SE2 : CH_SE, RX_SE, s1, false, 0);

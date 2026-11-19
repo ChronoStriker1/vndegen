@@ -106,17 +106,33 @@ static int answer(VNBSX *n) {
     return press(n, x, y, VNBSX_MOUSE_LEFT);
 }
 
+static int cardPick;
+
+static int card_rank(const char *name) {
+    if (strncmp(name, "icon_ch", 7)) return 0;
+    if (strstr(name, "_EV") || strstr(name, "_EX") || strstr(name, "_SP")) return 2;
+    return 1;
+}
+
 static int card_xy(BX *b, int *x, int *y) {
+    Obj *best[BX_OBJS];
+    int n = 0, rank = -1;
     for (int i = 0; i < BX_OBJS; i++) {
         Obj *o = &b->shown.obj[i];
-        if (!o->used || o->kind != OK_OBJ) continue;
-        Image *im = bx_image_load(b, o->name);
-        if (!im) continue;
-        *x = im->x + o->x + o->kx + im->w / 2;
-        *y = im->y + o->y + o->ky + im->h / 4;
-        return 1;
+        if (!o->used || o->kind != OK_OBJ || !bx_image_load(b, o->name)) continue;
+        int r = card_rank(o->name);
+        if (r > rank) {
+            rank = r;
+            n = 0;
+        }
+        if (r == rank) best[n++] = o;
     }
-    return 0;
+    if (!n) return 0;
+    Obj *o = best[cardPick++ % n];
+    Image *im = bx_image_load(b, o->name);
+    *x = im->x + o->x + o->kx + im->w / 2;
+    *y = im->y + o->y + o->ky + im->h / 4;
+    return 1;
 }
 
 static int autoplay(VNBSX *n, int steps, int pace) {
@@ -263,6 +279,9 @@ int main(int argc, char **argv) {
                 int v = bx_var_by_name(b, name);
                 if (v >= 0) b->globals[v] = (Val){0, val};
             }
+        } else if (!strncmp(c, "system:", 7)) {
+            bx_system(b, c + 7);
+            alive = run(n, 16);
         } else if (!strcmp(c, "state")) print_state(b);
         else if (!strcmp(c, "mapstate")) print_map(b);
         else if (!strcmp(c, "skip")) b->skipMode = true;

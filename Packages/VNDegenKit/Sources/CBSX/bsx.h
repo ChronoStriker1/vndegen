@@ -141,6 +141,7 @@ enum {
     W_CLICK,
     W_SOUND,
     W_ANIM,
+    W_MOVIE,
 };
 
 #define BX_STACK 128
@@ -201,11 +202,22 @@ typedef struct Mixer Mixer;
 Mixer *bx_mixer_new(int rate);
 void bx_mixer_free(Mixer *m);
 void bx_mixer_mix(Mixer *m, float *out, int frames, bool paused);
+void bx_mixer_lock(Mixer *m, bool lock);
+float bx_mixer_volume(Mixer *m, int ch);
 
-enum { CH_BGM, CH_BGS, CH_SE, CH_SE2, CH_VOICE, CH_SYS, CH_COUNT };
+typedef struct Movie Movie;
+bool bx_movie_play(BX *b, const char *name);
+void bx_movie_stop(BX *b);
+bool bx_movie_update(BX *b);
+bool bx_movie_draw(BX *b, u32 *dst);
+void bx_movie_mix(BX *b, float *out, int frames, float vol);
+
+enum { CH_BGM, CH_BGS, CH_SE, CH_SE2, CH_VOICE, CH_SYS, CH_VOICE2, CH_COUNT };
 
 void bx_snd_play(BX *b, int ch, int ix, const char *name, bool loop, int fadeMs);
 void bx_snd_stop(BX *b, int ch, int fadeMs);
+void bx_snd_loop(BX *b, int ch, const char *key, int ix, const char *name);
+void bx_snd_loop_stop(BX *b, int ch, const char *key, int fadeMs);
 bool bx_snd_playing(BX *b, int ch);
 void bx_snd_volumes(BX *b);
 
@@ -246,6 +258,7 @@ typedef struct Settings {
     int attenuation;
     int skipUnread, ceaseSkip, noEffects;
     int voiceMask, voiceMode, autoSelect;
+    int xCount;
 } Settings;
 
 struct BX {
@@ -288,6 +301,8 @@ struct BX {
     bool transActive;
     u32 flashColor;
     u32 flashStart, flashDur;
+    int shakeX, shakeY;
+    u32 shakeStart;
 
     struct {
         char *key;
@@ -307,7 +322,7 @@ struct BX {
     int fontSize, fontW, fontH, lines, edge, shadow;
     bool fontBold;
     int msgSpeed;
-    bool winShown, winHidden;
+    bool winShown, winHidden, menuLayer, infoLayer;
     char *speaker;
     char *text;
     char *voice;
@@ -317,7 +332,8 @@ struct BX {
     bool textDone;
     bool skipMode, autoMode;
     u32 autoAt;
-    Image *unagashi;
+    Image *unagashi, *xCounter;
+    int xFrames, xPos[2];
     int unaX, unaY, unaW, unaH, unaFrames, unaSpeed;
     LogEntry *logs;
     int logCount;
@@ -369,6 +385,7 @@ struct BX {
     bool keyDown[256], keyPress[256];
 
     Mixer *mixer;
+    Movie *movie;
     int audioRate;
     int volMaster, volBgm, volSe, volVoice, volBgs;
     char bgmName[64];
@@ -395,6 +412,7 @@ void bx_obj_remove(BX *b, Obj *o);
 void bx_obj_face(BX *b, Obj *o, const char *name);
 void bx_transition(BX *b, int type, int ticks, const char *mask);
 void bx_flash(BX *b, int r, int g, int bl, int ticks);
+void bx_shake(BX *b, int x, int y);
 void bx_gfx_frame(BX *b);
 void bx_compose(BX *b, const Scene *s, u32 *dst);
 void bx_anim_update(BX *b);
@@ -410,6 +428,7 @@ int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *utf8, int x, int y
 
 void bx_msg_init(BX *b);
 void bx_msg_show(BX *b, const char *name, const char *text, const char *voice);
+void bx_voice_play(BX *b, int ch, const char *voice);
 void bx_msg_update(BX *b);
 void bx_msg_draw(BX *b, u32 *dst);
 bool bx_msg_complete(BX *b);
