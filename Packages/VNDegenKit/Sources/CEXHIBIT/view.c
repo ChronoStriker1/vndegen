@@ -154,11 +154,11 @@ void view_input(EX *e) {
     if (!v->active) return;
     if (e->lPress && hit) {
         e->lPress = false;
-        if (hit->action[0] == 51) v->result = hit->id;
-        else {
-            ex_log(e, "menu action %d", hit->action[0]);
-            v->result = hit->id;
+        if (hit->action[0] != 51 && hit->action[0] != 0) {
+            ui_open(e, hit->action[0]);
+            return;
         }
+        v->result = hit->id;
         *reg_ref(e, 'R', v->resultReg) = v->result;
         v->active = false;
     } else if (e->rPress) {

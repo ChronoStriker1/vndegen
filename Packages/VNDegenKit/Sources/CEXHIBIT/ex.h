@@ -64,7 +64,8 @@ typedef struct Anim {
 
 typedef struct Billboard {
     bool used;
-    int id, kind;
+    int id, kind, srcId;
+    char *srcFile;
     Image *img;
     bool ownImg;
     u32 color;
@@ -104,6 +105,29 @@ typedef struct View {
 } View;
 
 typedef struct Mixer Mixer;
+
+#define EX_SLOTS 110
+#define EX_HISTORY 512
+
+typedef struct SlotInfo {
+    bool used, thumbLoaded;
+    long long time;
+    char *memo;
+    Image *thumb;
+} SlotInfo;
+
+typedef struct SavePoint {
+    Script *sc;
+    int pc, sp;
+    Frame stack[64];
+} SavePoint;
+
+typedef struct HistEntry {
+    char *name, *text;
+    int voice;
+} HistEntry;
+
+typedef struct Ui Ui;
 
 #define EX_CHANNELS 8
 #define EX_BILLBOARDS 64
@@ -249,6 +273,16 @@ typedef struct EX {
     void *fonts;
     char *fontFile;
     int textMs;
+    SavePoint savePoint;
+    int cgId, musicTrack, loopId, envId;
+    u32 *saveShot;
+    char *memo;
+    SlotInfo slots[EX_SLOTS];
+    HistEntry history[EX_HISTORY];
+    int histCount, histHead;
+    Ui *ui;
+    char *sysmenuSpec;
+    int lastPage;
     bool skipping, autoMode, muted, ctrlHeld;
     int pendingAction;
     int autoMs;
@@ -397,7 +431,32 @@ void portrait_def(EX *e, int slot, int z);
 void portrait_draw_cmd(EX *e, char *args);
 void portrait_clear(EX *e, char *args);
 void portrait_draw(EX *e, u32 *dst, int z);
-void snd_play_voice(EX *e, int id);
+bool snd_play_voice(EX *e, int id);
+
+char *save_state(EX *e, size_t *len);
+bool load_state(EX *e, const char *data, size_t len);
+u8 *gyu_encode(const u32 *px, int w, int h, size_t *outLen);
+bool save_slot(EX *e, int slot);
+bool load_slot(EX *e, int slot);
+Image *slot_thumb(EX *e, int slot);
+void slots_write_index(EX *e);
+void slots_read_index(EX *e);
+void slots_free(EX *e);
+void gfx_set_cg(EX *e, int id, u32 color);
+void gfx_restore_billboard(EX *e, const int *v, const char *file);
+void chara_restore(EX *e, const int *v);
+void history_add(EX *e, const char *name, const char *text, int voice);
+void history_free(EX *e);
+void state_reset(EX *e);
+void reset_for_title(EX *e);
+
+bool ui_open(EX *e, int action);
+bool ui_active(EX *e);
+void ui_input(EX *e);
+void ui_draw(EX *e, u32 *dst);
+void ui_close(EX *e);
+void text_draw_sjis(EX *e, u32 *dst, const char *sjis, int x, int baseline, int size, u32 color, u32 shadow, int alpha);
+int text_wrap_sjis(EX *e, u32 *dst, const char *sjis, int x, int top, int width, int lineH, int size, u32 color, u32 shadow, int alpha, int maxLines);
 
 void blit_scaled(u32 *dst, int dw, int dh, const Image *src, float sx, float sy, float sw, float sh, float dx, float dy, float dwid, float dhei, int alpha);
 void blit(u32 *dst, int dw, int dh, const Image *src, int x, int y, int alpha);

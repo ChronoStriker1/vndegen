@@ -145,6 +145,7 @@ void chara_move(EX *e, int chara, int pos, int ms, int kind) {
 }
 
 void chara_leave(EX *e, int chara, int ms) {
+    if (chara < 0) return;
     Actor *a = actor(e, chara, false);
     if (!a) return;
     if (ms <= 0) {
@@ -252,4 +253,17 @@ void portrait_draw(EX *e, u32 *dst, int z) {
         if (!p->used || !p->img || e->portraitZ[i] != z) continue;
         blit(dst, EX_W, EX_H, p->img, p->x, p->y, 255);
     }
+}
+
+void chara_restore(EX *e, const int *v) {
+    Actor *a = actor(e, v[0], true);
+    if (!a) return;
+    a->pose = v[1];
+    a->face = v[2];
+    a->img = compose(e, v[0], v[1], v[2]);
+    a->x = (float)v[3];
+    a->y = (float)v[4];
+    a->a = (float)v[5];
+    a->order = v[6];
+    if (v[6] > e->actorOrder) e->actorOrder = v[6];
 }

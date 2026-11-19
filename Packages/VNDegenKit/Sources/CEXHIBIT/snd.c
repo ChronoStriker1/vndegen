@@ -289,6 +289,7 @@ void snd_play_file(EX *e, const char *rel, int ch) {
 }
 
 void snd_play_id(EX *e, int id, int ch, bool loop, int fadeMs) {
+    if (ch == EX_CH_LOOP) e->loopId = id;
     char rel[64];
     snprintf(rel, sizeof rel, "res/s/e/%03d.wav", id);
     Voice *v = voice_open(e, rel);
@@ -303,19 +304,21 @@ void snd_play_id(EX *e, int id, int ch, bool loop, int fadeMs) {
     start(e, v, ch, loop, fadeMs);
 }
 
-void snd_play_voice(EX *e, int id) {
+bool snd_play_voice(EX *e, int id) {
     char rel[64];
     snprintf(rel, sizeof rel, "res/s/v/%02d/%05d.v", id / 1000, id);
     char *path = ex_game_path(e, rel);
     bool ok = ex_file_exists(path);
     free(path);
-    if (!ok) return;
+    if (!ok) return false;
     Voice *v = voice_open(e, rel);
     if (v) start(e, v, EX_CH_VOICE, false, 0);
+    return v != NULL;
 }
 
 void snd_play_env(EX *e, int id, int volume) {
     (void)volume;
+    e->envId = id;
     char rel[64];
     snprintf(rel, sizeof rel, "res/s/v/%02d/%05d.v", id / 1000, id);
     Voice *v = voice_open(e, rel);
@@ -327,6 +330,7 @@ void snd_play_env(EX *e, int id, int volume) {
 }
 
 void snd_play_music(EX *e, int track, int fadeMs) {
+    e->musicTrack = track;
     char rel[64];
     snprintf(rel, sizeof rel, "res/s/m/m%02d.ogg", track);
     Voice *v = voice_open(e, rel);
@@ -338,6 +342,9 @@ void snd_play_music(EX *e, int track, int fadeMs) {
 }
 
 void snd_stop(EX *e, int ch, int fadeMs) {
+    if (ch == EX_CH_MUSIC) e->musicTrack = -1;
+    if (ch == EX_CH_LOOP) e->loopId = -1;
+    if (ch == EX_CH_ENV) e->envId = -1;
     if (!e->mixer || ch < 0 || ch >= EX_CHANNELS) return;
     pthread_mutex_lock(&e->mixer->lock);
     fade_out(e, e->mixer->v[ch], fadeMs);

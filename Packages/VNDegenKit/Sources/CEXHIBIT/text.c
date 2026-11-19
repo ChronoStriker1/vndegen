@@ -129,3 +129,71 @@ int text_width(EX *e, const u32 *cps, int n, int size) {
     for (int i = 0; i < n; i++) w += text_advance(e, cps[i], size);
     return w;
 }
+
+static u32 *decode_sjis(const char *sjis, int *n) {
+    size_t len = strlen(sjis);
+    u32 *out = ex_alloc(sizeof(u32) * (len + 1));
+    int k = 0;
+    for (const u8 *p = (const u8 *)sjis; *p;) {
+        if (p[0] == '{' && p[1] == 'I' && p[2] == ':' && p[3] && p[4] == '}') {
+            p += 5;
+            continue;
+        }
+        if (*p == '\r') {
+            p++;
+            continue;
+        }
+        u32 cp;
+        p += ex_sjis_decode(p, &cp);
+        out[k++] = cp;
+    }
+    *n = k;
+    return out;
+}
+
+static void draw_cp(EX *e, u32 *dst, u32 cp, int x, int baseline, int size, u32 color, u32 shadow, int alpha) {
+    if (shadow) text_glyph(e, dst, EX_W, EX_H, cp, x + 2, baseline + 2, size, shadow & 0xffffff, alpha, false);
+    text_glyph(e, dst, EX_W, EX_H, cp, x, baseline, size, color, alpha, false);
+}
+
+void text_draw_sjis(EX *e, u32 *dst, const char *sjis, int x, int baseline, int size, u32 color, u32 shadow, int alpha) {
+    int n;
+    u32 *cps = decode_sjis(sjis, &n);
+    for (int i = 0; i < n; i++) {
+        draw_cp(e, dst, cps[i], x, baseline, size, color, shadow, alpha);
+        x += text_advance(e, cps[i], size);
+    }
+    free(cps);
+}
+
+int text_wrap_sjis(EX *e, u32 *dst, const char *sjis, int x, int top, int width, int lineH, int size, u32 color, u32 shadow, int alpha, int maxLines) {
+    int n;
+    u32 *cps = decode_sjis(sjis, &n);
+    int line = 0, cx = x;
+    int baseline = top + text_ascent(e, size);
+    for (int i = 0; i < n && line < maxLines;) {
+        if (cps[i] == '\n') {
+            line++;
+            cx = x;
+            i++;
+            continue;
+        }
+        int j = i, w = 0;
+        while (j < n && cps[j] != ' ' && cps[j] != '\n') w += text_advance(e, cps[j++], size);
+        if (cx > x && cx + w > x + width) {
+            line++;
+            cx = x;
+            if (line >= maxLines) break;
+        }
+        for (; i < j; i++) {
+            if (dst) draw_cp(e, dst, cps[i], cx, baseline + line * lineH, size, color, shadow, alpha);
+            cx += text_advance(e, cps[i], size);
+        }
+        if (i < n && cps[i] == ' ') {
+            if (cx > x) cx += text_advance(e, ' ', size);
+            i++;
+        }
+    }
+    free(cps);
+    return line + 1;
+}

@@ -33,6 +33,8 @@ float anim_value(EX *e, Anim *a, float cur) {
     return a->from + (a->to - a->from) * ease((float)t / (float)a->dur, a->ease);
 }
 
+static Billboard *bb_find(EX *e, int id, bool create);
+
 static Image *cg_image(EX *e, int id) {
     char rel[64];
     snprintf(rel, sizeof rel, "res/g/ev/%02d/%04d.gyu", id / 100, id);
@@ -87,11 +89,36 @@ void gfx_draw_cg(EX *e, int id, int ms) {
     }
     e->cg = NULL;
     e->cgColor = 0xff000000u;
+    e->cgId = id;
     if (id < 0) {
         e->cgColor = bgr((u32)id & 0xffffff) | 0xff000000u;
         return;
     }
     e->cg = cg_image(e, id);
+}
+
+void gfx_set_cg(EX *e, int id, u32 color) {
+    gfx_draw_cg(e, id, 0);
+    if (id < 0) e->cgColor = color | 0xff000000u;
+}
+
+void gfx_restore_billboard(EX *e, const int *v, const char *file) {
+    Billboard *b = bb_find(e, v[0], true);
+    if (!b) return;
+    b->kind = v[1];
+    b->srcId = v[2];
+    b->color = (u32)v[3];
+    b->x = v[4];
+    b->y = v[5];
+    b->w = v[6];
+    b->h = v[7];
+    b->a = (float)v[8];
+    if (b->kind == 0) b->img = cg_image(e, b->srcId);
+    else if (b->kind == 2 && file && *file) {
+        b->img = image_load(e, file);
+        b->srcFile = ex_strdup(file);
+    }
+    b->ownImg = true;
 }
 
 static Billboard *bb_find(EX *e, int id, bool create) {
@@ -111,6 +138,7 @@ static Billboard *bb_find(EX *e, int id, bool create) {
 static void bb_clear(Billboard *b) {
     if (b->ownImg) image_free(b->img);
     image_free(b->mask);
+    free(b->srcFile);
     memset(b, 0, sizeof *b);
 }
 
@@ -133,7 +161,8 @@ int gfx_billboard(EX *e, char *args) {
     int ms = field_int(f[8]), flags = field_int(f[9]);
     switch (kind) {
     case 0:
-        b->img = cg_image(e, field_int(f[2]));
+        b->srcId = field_int(f[2]);
+        b->img = cg_image(e, b->srcId);
         b->ownImg = true;
         break;
     case 1:
@@ -141,6 +170,7 @@ int gfx_billboard(EX *e, char *args) {
         break;
     case 2:
         b->img = n > 20 ? image_load(e, f[20]) : NULL;
+        b->srcFile = n > 20 ? ex_strdup(f[20]) : NULL;
         b->ownImg = true;
         break;
     case 3:
@@ -199,9 +229,11 @@ int gfx_faceup(EX *e, char *args) {
     if (strchr(src, '.') || strchr(src, '\\')) {
         b->kind = 2;
         b->img = image_load(e, src);
+        b->srcFile = ex_strdup(src);
     } else {
         b->kind = 0;
-        b->img = cg_image(e, field_int(src));
+        b->srcId = field_int(src);
+        b->img = cg_image(e, b->srcId);
     }
     b->ownImg = true;
     int ms = field_int(f[24]);
@@ -465,6 +497,7 @@ static void compose(EX *e, u32 *dst, int below) {
     if (below >= 0) return;
     msg_draw(e, dst);
     for (int z = 0; z < 4; z++) portrait_draw(e, dst, e->portraitZ[z]);
+    ui_draw(e, dst);
 }
 
 static void snapshot(EX *e, Billboard *self) {

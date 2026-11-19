@@ -86,6 +86,9 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     e->msg.ctrlHover = -1;
     e->windowAlpha = 128;
     e->autoMs = 1500;
+    e->musicTrack = e->loopId = e->envId = -1;
+    e->L[10] = 1;
+    slots_read_index(e);
     e->cam.w = EX_W;
     e->cam.h = EX_H;
     ex_log(e, "opened %s", e->gameDir);
@@ -96,6 +99,12 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     else {
         vm_goto_script(e, e->bootEntry);
         free(e->bootEntry);
+    ui_close(e);
+    slots_free(e);
+    history_free(e);
+    free(e->memo);
+    free(e->saveShot);
+    free(e->sysmenuSpec);
         e->bootEntry = NULL;
     }
     if (!e->sc) {
@@ -123,6 +132,12 @@ void vnexhibit_close(VNExHibit *n) {
     text_free(e);
     free(e->fontFile);
     free(e->bootEntry);
+    ui_close(e);
+    slots_free(e);
+    history_free(e);
+    free(e->memo);
+    free(e->saveShot);
+    free(e->sysmenuSpec);
     rld_free_all(e);
     if (e->log) fclose(e->log);
     free(e->R);
@@ -137,18 +152,45 @@ void vnexhibit_close(VNExHibit *n) {
 }
 
 static void tick(EX *e) {
+    bool anySave = false;
+    for (int i = 0; i < EX_SLOTS && !anySave; i++) anySave = e->slots[i].used;
+    e->Q[0] = anySave;
+    if (e->ui) {
+        ui_input(e);
+        e->lPress = e->rPress = false;
+        return;
+    }
     view_input(e);
+    if (e->ui) {
+        e->lPress = e->rPress = false;
+        return;
+    }
     if (!e->view.active) msg_input(e);
-    if (e->wait == W_TEXT || e->msg.userHidden) {
-        if (e->rPress && !e->view.active) {
-            e->msg.userHidden = !e->msg.userHidden;
+    if (e->pendingAction) {
+        int a = e->pendingAction;
+        e->pendingAction = 0;
+        ui_open(e, a);
+        if (e->ui) return;
+    }
+    if (e->msg.userHidden) {
+        if (e->lPress || e->rPress || e->wheel) e->msg.userHidden = false;
+        e->lPress = e->rPress = false;
+        e->wheel = 0;
+        return;
+    }
+    if (e->wait == W_TEXT && !e->view.active) {
+        if (e->rPress) {
             e->rPress = false;
+            ui_open(e, 135);
+            if (e->ui) return;
         }
-        if (e->msg.userHidden && e->lPress) {
-            e->msg.userHidden = false;
-            e->lPress = false;
+        if (e->wheel > 0) {
+            e->wheel = 0;
+            ui_open(e, 105);
+            if (e->ui) return;
         }
     }
+    e->wheel = 0;
     vm_run(e);
     e->lPress = false;
     e->rPress = false;

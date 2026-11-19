@@ -389,6 +389,10 @@ static bool exec(EX *e, Op *op) {
         ret(e);
         return true;
     case 28:
+        e->savePoint.sc = e->sc;
+        e->savePoint.pc = e->pc;
+        e->savePoint.sp = e->sp;
+        memcpy(e->savePoint.stack, e->stack, sizeof(Frame) * (size_t)e->sp);
         msg_start(e, op);
         e->wait = W_TEXT;
         e->pc++;

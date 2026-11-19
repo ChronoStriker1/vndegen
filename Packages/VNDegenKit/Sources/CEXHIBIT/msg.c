@@ -76,6 +76,7 @@ void msg_wait_mark(EX *e, char *args) {
 }
 
 void msg_ctrl_define(EX *e, char *args) {
+    char *raw = ex_strdup(args);
     char *f[40];
     int n = split_csv(args, f, 40);
     if (n < 7) return;
@@ -110,12 +111,17 @@ void msg_ctrl_define(EX *e, char *args) {
         image_free(plain);
         if (n > 29) {
             c->action = field_int(f[12]);
+            if (c->action == 135 && !e->sysmenuSpec) {
+                e->sysmenuSpec = raw;
+                raw = NULL;
+            }
             c->action2 = field_int(f[19]);
             c->tipX = field_int(f[27]);
             c->tipY = field_int(f[28]);
             c->tip = image_load(e, f[29]);
         }
     }
+    free(raw);
 }
 
 void msg_free(EX *e) {
@@ -295,7 +301,11 @@ void msg_start(EX *e, Op *op) {
     m->textId = op->nv > 1 ? op->v[1] : -1;
     m->speaker = who;
     snd_stop(e, EX_CH_VOICE, 0);
-    if (m->textId >= 0 && chara_voiced(e, who)) snd_play_voice(e, m->textId);
+    bool voiced = m->textId >= 0 && chara_voiced(e, who) && snd_play_voice(e, m->textId);
+    const char *shown = strcmp(name, "*") ? name : chara_name(e, who);
+    history_add(e, shown, text, voiced ? m->textId : -1);
+    free(e->memo);
+    e->memo = ex_strdup(text);
 }
 
 bool msg_typing(EX *e) {
@@ -456,4 +466,27 @@ bool msg_input(EX *e) {
         return true;
     }
     return false;
+}
+
+void history_add(EX *e, const char *name, const char *text, int voice) {
+    int slot = (e->histHead + e->histCount) % EX_HISTORY;
+    if (e->histCount == EX_HISTORY) {
+        slot = e->histHead;
+        e->histHead = (e->histHead + 1) % EX_HISTORY;
+    } else e->histCount++;
+    HistEntry *h = &e->history[slot];
+    free(h->name);
+    free(h->text);
+    h->name = name ? ex_strdup(name) : NULL;
+    h->text = ex_strdup(text ? text : "");
+    h->voice = voice;
+}
+
+void history_free(EX *e) {
+    for (int i = 0; i < EX_HISTORY; i++) {
+        free(e->history[i].name);
+        free(e->history[i].text);
+    }
+    memset(e->history, 0, sizeof e->history);
+    e->histCount = e->histHead = 0;
 }
