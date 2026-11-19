@@ -29,7 +29,8 @@ The source files are unmodified except pl_mpeg's header, which carries the patch
     subband, requantises them as ISO 11172-3 gives, `2^nb / (2^nb - 1) * (s + 2^(1 - nb))`, and hands each group of
     three to the synthesis filterbank, which is factored out of `plm_audio_decode_frame` unchanged as
     `plm_audio_synthesize`. A Layer I frame yields 384 samples, so `samples.count` and the decoded-sample clock follow
-    the frame. Layer II decodes to the same bytes as before. NScripter's and System 4's copies don't have this change.
+    the frame. Layer II decodes to the same bytes as before, and Layer III still goes to dr_mp3, checked on movies of
+    AGE, BSX (MK3 and MK4), EAGLS, YU-RIS, N2System, Tmr-Hiro and Artemis. NScripter's and System 4's copies don't have this change.
   NScripter's identical copy (`Packages/VNDegenKit/Sources/CNScripter/third_party/pl_mpeg.h`) and System 4's (`Packages/VNDegenKit/Sources/CSystem4/third_party/pl_mpeg/pl_mpeg.h`, which also has its own Layer II quantizer fix) carry the same patch.
 - dr_mp3: the unmodified header, the same copy NScripter, System 3, Wolf RPG Editor and RGSS vendor, with its license as `LICENSE.txt`. `third_party/vnvideo_libs.h` compiles it with static functions and float output, for MPEG-1 movies whose sound is Layer III.
 - libogg: `framing.c`, `bitwise.c`, and their headers. `include/ogg/config_types.h` is VNDegen's, with the types libogg's configure writes for platforms that have `stdint.h`.
