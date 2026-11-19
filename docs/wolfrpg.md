@@ -65,6 +65,10 @@ Up to 0.54 the runtime started it only once per page activation, so The Succubus
 autorun event calls its main loop (opening, interval, stages) by a variable, stayed black after its opening, and Two
 Beasts' title ignored keyboard confirm. `Engines/WolfRPG/host/autorun_test.cpp` checks the rule.
 
+A map event whose pages' conditions all fail isn't on the map, so a move route given to it ends at once, and an event
+waiting for that route goes on. Before, the route stayed pending, and President Yukino's prologue, which waits for a
+route on an event its map hides, stayed black after the move to the town.
+
 Common events and strings can read a text file. As on the PC, the runtime takes UTF-8 with or without a byte order mark,
 and otherwise Shift-JIS: The Clumsy Witch Seris is a UTF-8 game that keeps its scene text in Shift-JIS. Reading a string
 variable as a number gives the number its text starts with, which Two Beasts counts on for its script labels. A choice

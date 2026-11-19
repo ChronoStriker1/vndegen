@@ -307,7 +307,10 @@ void Game::updateCharacters() {
     updateActor(hero_, true);
     for (auto &p : party_) updateActor(p, false);
     for (auto &e : events_) {
-        if (e.page < 0) continue;
+        if (e.page < 0) {
+            e.actor.route = nullptr;
+            continue;
+        }
         autonomousMove(e);
         updateActor(e.actor, false);
     }
