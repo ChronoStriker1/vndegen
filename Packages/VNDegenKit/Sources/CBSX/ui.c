@@ -77,6 +77,7 @@ void bx_phase_end(BX *b) {
 
 void bx_phase_reset(BX *b) {
     bx_config_free(b);
+    bx_status_free(b);
     bx_data_free(b);
     bx_log_free(b);
     bx_map_free(b);
@@ -151,6 +152,10 @@ static void title_pick(BX *b, const char *key) {
 }
 
 void bx_phase_update(BX *b) {
+    if (b->phase == PH_STATUS) {
+        bx_status_update(b);
+        return;
+    }
     if (b->phase == PH_CONFIG) {
         bx_config_update(b);
         return;
@@ -184,6 +189,10 @@ void bx_phase_update(BX *b) {
 }
 
 void bx_phase_draw(BX *b, u32 *dst) {
+    if (b->phase == PH_STATUS) {
+        bx_status_draw(b, dst);
+        return;
+    }
     if (b->phase == PH_CONFIG) {
         bx_config_draw(b, dst);
         return;
@@ -236,6 +245,7 @@ void bx_ui_init(BX *b) {
 void bx_ui_free(BX *b) {
     phase_free(b);
     bx_config_free(b);
+    bx_status_free(b);
     bx_data_free(b);
     bx_log_free(b);
     bx_map_free(b);
@@ -302,6 +312,7 @@ static void button_press(BX *b, const char *key) {
     } else if (!strcmp(key, "quick load")) bx_load_slot(b, -1);
     else if (!strcmp(key, "log")) bx_log_open(b);
     else if (!strcmp(key, "config")) bx_config_open(b);
+    else if (!strcmp(key, "status")) bx_status_open(b);
     else if (!strcmp(key, "save")) bx_open_data(b, true);
     else if (!strcmp(key, "load")) bx_open_data(b, false);
     else bx_log(b, "menu button %s isn't available yet", key);

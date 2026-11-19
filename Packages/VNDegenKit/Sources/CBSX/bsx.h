@@ -230,13 +230,14 @@ typedef struct Button {
     int group;
 } Button;
 
-enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG };
+enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG, PH_STATUS };
 
 typedef struct Phase Phase;
 typedef struct MapPhase MapPhase;
 typedef struct DataPhase DataPhase;
 typedef struct LogPhase LogPhase;
 typedef struct ConfigPhase ConfigPhase;
+typedef struct StatusPhase StatusPhase;
 
 typedef struct Settings {
     int textSpeed, autoSpeed;
@@ -339,6 +340,7 @@ struct BX {
     DataPhase *data;
     LogPhase *logp;
     ConfigPhase *config;
+    StatusPhase *status;
     Settings set;
     int phaseBack;
     int phaseResult;
@@ -445,6 +447,11 @@ bool bx_log_open(BX *b);
 void bx_log_update(BX *b);
 void bx_log_draw(BX *b, u32 *dst);
 void bx_log_free(BX *b);
+
+bool bx_status_open(BX *b);
+void bx_status_update(BX *b);
+void bx_status_draw(BX *b, u32 *dst);
+void bx_status_free(BX *b);
 
 bool bx_config_open(BX *b);
 void bx_config_update(BX *b);
