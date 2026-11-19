@@ -14,7 +14,8 @@ struct Movie {
     float *buf;
     size_t bufCap, have;
     u32 lastNow;
-    bool ended;
+    char name[64];
+    int newFrames;
 };
 
 static int64_t read_movie(void *user, uint64_t offset, void *buffer, size_t length) {
@@ -36,6 +37,9 @@ static void movie_free(Movie *m) {
 void bx_movie_stop(BX *b) {
     Movie *m = b->movie;
     if (!m) return;
+    if (m->clock > 0)
+        bx_log(b, "movie %s: %d new frames in %.0f ms, %.2f a second, made at %.2f", m->name, m->newFrames, m->clock * 1000,
+               m->newFrames / m->clock, m->info.fps);
     bx_mixer_lock(b->mixer, true);
     b->movie = NULL;
     bx_mixer_lock(b->mixer, false);
@@ -52,6 +56,7 @@ bool bx_movie_play(BX *b, const char *name) {
         return false;
     }
     Movie *m = bx_alloc(sizeof *m);
+    snprintf(m->name, sizeof m->name, "%s", name);
     m->file = fopen(real, "rb");
     if (!m->file || fseeko(m->file, 0, SEEK_END) != 0) {
         movie_free(m);
@@ -131,6 +136,7 @@ bool bx_movie_draw(BX *b, u32 *dst) {
     if (!m) return false;
     int changed = 0;
     const u8 *px = vnvideo_frame(m->video, movie_time(b, m), &changed);
+    if (px && changed) m->newFrames++;
     size_t n = (size_t)b->W * (size_t)b->H;
     if (!px) {
         for (size_t i = 0; i < n; i++) dst[i] = 0xff000000u;
