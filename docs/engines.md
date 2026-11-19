@@ -31,6 +31,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Tmr-Hiro ADV System](#tmr-hiro-adv-system) | `srp.pac` beside `Agrd.pac`, up to two folders down | Mac, iPhone, iPad |
 | [IPAC](#ipac) | `DATA/Scr.PAK` beside `DATA/Parts.PAK`, up to one folder down | Mac, iPhone, iPad |
 | [Ikura GDL](#ikura-gdl) | Extensionless `SNR` beside `GRP`, up to two folders down | Mac, iPhone, iPad |
+| [EAGLS](#eagls) | `Script/SCPACK.idx` beside `CG/CGPACK.idx`, up to one folder down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
@@ -209,6 +210,11 @@ IPAC games, such as Mamono Musume to no Seikatsu: Lamia no Baai, run on VNDegen'
 ## Ikura GDL
 
 Ikura GDL games, such as Lightning Warrior Raidy, run on VNDegen's own Ikura runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed format readers and the original engine run under Wine, MIT licensed like the rest of the app. The title, menus, battles and map are the game's own scripts; the first-person dungeon view is drawn by the runtime at the PC's geometry. Saves are the PC engine's own `RAIDYUS.SAV` in the game folder, so they move between VNDegen and a PC copy of the game. [ikura.md](ikura.md) lists which games run and the known limits, and [ikura-cleanroom.md](ikura-cleanroom.md) where the runtime's knowledge came from.
+
+
+## EAGLS
+
+EAGLS games, such as Oppai no Ouja 48, run on VNDegen's own EAGLS runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive reader and the original engine run under Wine, MIT licensed like the rest of the app. The game's scripts run the title, story and screens they draw themselves; the message window, Save and Load pages, backlog and settings, which the PC engine draws itself, are drawn from the game's sheets and click maps. Saves are the PC engine's own `Save/SaveN.sav` in the game folder: the PC's saves load in VNDegen, and VNDegen's show on the PC but don't load there yet. [eagls.md](eagls.md) lists which games run and the known limits, and [eagls-cleanroom.md](eagls-cleanroom.md) where the runtime's knowledge came from.
 
 ## Unity
 

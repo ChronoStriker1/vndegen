@@ -166,7 +166,7 @@ int eg_sjis_len(const u8 *p) {
 
 bool eg_file_exists(const char *path) {
     char real[2048];
-    return eg_path_resolve(path, real, sizeof real) >= 0;
+    return eg_path_resolve(path, real, sizeof real) > 0;
 }
 
 void eg_log(EG *e, const char *fmt, ...) {

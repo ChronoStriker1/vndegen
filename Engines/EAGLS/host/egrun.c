@@ -158,6 +158,43 @@ int main(int argc, char **argv) {
                 else alive = run(n, 16);
             }
         }
+        else if (sscanf(c, "skipall:%d", &k) == 1) {
+            EG *t = (EG *)n;
+            const char *last = NULL;
+            for (int j = 0; j < k && alive; j++) {
+                var_at(var_get(&t->vars, ":SkipFlg", true), 0)->i = 1;
+                if (t->th[0].sc && t->th[0].sc->name != last) {
+                    last = t->th[0].sc->name;
+                    printf("frame %d in %s\n", j, last);
+                    fflush(stdout);
+                }
+                if (t->th[0].wait == W_CHOICE) {
+                    int pick = preferUsed < preferCount ? prefer[preferUsed++] : 1;
+                    alive = press(n, 400, choice_y(t, pick), VNEAGLS_MOUSE_LEFT);
+                } else if (t->editing) {
+                    vneagls_key(n, 0x0d, 1);
+                    vneagls_key(n, 0x0d, 0);
+                    alive = run(n, 16);
+                } else if (j % 30 == 29) {
+                    const char *sn = t->th[0].sc ? t->th[0].sc->name : "";
+                    if (!strcmp(sn, "00Name.dat")) alive = press(n, 726, 529, VNEAGLS_MOUSE_LEFT);
+                    else if (!strcmp(sn, "00NameOK.dat")) alive = press(n, 292, 298, VNEAGLS_MOUSE_LEFT);
+                    else alive = press(n, 400, 300, VNEAGLS_MOUSE_LEFT);
+                } else alive = run(n, 16);
+            }
+        }
+        else if (!strncmp(c, "movie:", 6)) {
+            EG *t = (EG *)n;
+            movie_open(t, 0, c + 6, 20);
+            movie_play(t, 0, false);
+            int j = 0;
+            for (; j < 20000 && alive && movie_state(t, 0) != 2; j++) {
+                alive = run(n, 16);
+                if (j % 300 == 0) printf("movie frame %d state %d\n", j, movie_state(t, 0));
+            }
+            printf("movie done after %d frames\n", j);
+            movie_stop(t, 0);
+        }
         else if (!strcmp(c, "state")) print_state((EG *)n);
         else if (!strcmp(c, "skip")) var_at(var_get(&((EG *)n)->vars, ":SkipFlg", true), 0)->i = 1;
         else if (sscanf(c, "play:%d", &k) == 1) {

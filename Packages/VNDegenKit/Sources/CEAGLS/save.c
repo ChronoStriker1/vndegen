@@ -670,13 +670,19 @@ void config_save(EG *e) {
     for (int i = 0; i < e->vars.count; i++) {
         Var *v = &e->vars.vars[i];
         if (v->name[0] != ':' && v->name[0] != '@') continue;
+        bool any = false;
         for (int k = 0; k < v->n; k++) {
             if (v->v[k].s) {
                 char *u = eg_sjis_to_utf8(v->v[k].s);
                 PUT("%s[%d]=\"%s\"\n", v->name, k, u);
                 free(u);
-            } else if (v->v[k].i) PUT("%s[%d]=%d\n", v->name, k, v->v[k].i);
+                any = true;
+            } else if (v->v[k].i) {
+                PUT("%s[%d]=%d\n", v->name, k, v->v[k].i);
+                any = true;
+            }
         }
+        if (!any) PUT("%s[0]=0\n", v->name);
     }
 #undef PUT
     char dir[2048];
@@ -689,6 +695,49 @@ void config_save(EG *e) {
     e->globalDirty = false;
 }
 
-void global_load(EG *e) { config_load(e); }
+#define GLOBAL_BLOCK 0x10B0C8
+#define GLOBAL_INTS 1228
+
+static void import_pc_globals(EG *e) {
+    char path[2048];
+    snprintf(path, sizeof path, "%s/Save/GlobalSave.sav", e->saveDir);
+    size_t n;
+    u8 *d = eg_read_file(path, &n);
+    if (!d || n < 134 || memcmp(d, banner, 20)) {
+        free(d);
+        return;
+    }
+    u32 na = rd32(d + 128);
+    if ((size_t)132 + na + 1 > n) {
+        free(d);
+        return;
+    }
+    u32 seed;
+    eg_rand_seed(&seed, (i32)(int8_t)d[132 + na]);
+    xor_stream(d + 132, na, &seed);
+    u8 *g = lzss_unpack(d + 132, na, GLOBAL_BLOCK);
+    free(d);
+    int count = 0;
+    for (int s = 0; s < INT_SLOTS; s++) {
+        const u8 *r = g + GLOBAL_INTS + (size_t)s * INT_REC;
+        if (!r[0] || r[1] != '@') continue;
+        char name[68];
+        snprintf(name, sizeof name, "%s", (const char *)r + 1);
+        Var *v = var_get(&e->vars, name, true);
+        for (int k = 0; k < 100; k++) {
+            i32 x = (i32)rd32(r + 68 + k * 4);
+            if (x) var_at(v, k)->i = x;
+        }
+        var_at(v, 0);
+        count++;
+    }
+    free(g);
+    eg_log(e, "read %d globals from the PC's GlobalSave.sav", count);
+}
+
+void global_load(EG *e) {
+    config_load(e);
+    import_pc_globals(e);
+}
 
 void global_save(EG *e) { config_save(e); }
