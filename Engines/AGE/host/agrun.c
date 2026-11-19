@@ -11,8 +11,13 @@ static void write_png(const char *path, const uint32_t *px, int w, int h);
 static float audio[2048];
 
 static int step(VNAge *n) {
-    if (((AG *)n)->wait == W_MOVIE) usleep(16000);
+    int skip = 0;
+    if (((AG *)n)->wait == W_MOVIE) {
+        if (getenv("AG_MOVIES")) usleep(16000);
+        else { vnage_key(n, 0x0d, 1); skip = 1; }
+    }
     int alive = vnage_frame(n, 16);
+    if (skip) vnage_key(n, 0x0d, 0);
     vnage_audio(n, audio, 705);
     return alive;
 }
