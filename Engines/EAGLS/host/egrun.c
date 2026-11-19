@@ -207,7 +207,11 @@ int main(int argc, char **argv) {
             printf("movie done after %d frames\n", j);
             movie_stop(t, 0);
         }
-        else if (!strcmp(c, "state")) print_state((EG *)n);
+        else if (sscanf(c, "save:%d", &k) == 1) printf("save %d: %d\n", k, save_slot((EG *)n, k));
+        else if (sscanf(c, "load:%d", &k) == 1) {
+            printf("load %d: %d\n", k, load_slot((EG *)n, k));
+            alive = run(n, 1000);
+        } else if (!strcmp(c, "state")) print_state((EG *)n);
         else if (!strcmp(c, "skip")) var_at(var_get(&((EG *)n)->vars, ":SkipFlg", true), 0)->i = 1;
         else if (sscanf(c, "play:%d", &k) == 1) {
             EG *t = (EG *)n;

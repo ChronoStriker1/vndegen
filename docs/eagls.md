@@ -59,6 +59,9 @@ uses the same folder:
 - VNDegen reads the original's slots: they list in VNDegen's Load screen with their thumbnails and load on the same
   message with the variables, background, characters, window and music.
 - VNDegen writes the same container with the fields above, followed by its own exact state, which the PC ignores.
+  Each layer's record goes in the PC's per-layer block (0x5E00 bytes from 0x9B580; the background's record twice,
+  with its picture size, and a character's in a second table as well), the fonts from the script's `150` definitions,
+  the backlog ring's header and counters, and the name plate's fixed geometry. The PC fills in its own handles.
 - `@` globals (seen CGs and scenes) are read from the PC's `GlobalSave.sav`. VNDegen keeps its settings and the `@`
   and `:` variables in `Save/VNDegen.cfg`, and its quick save in `Save/VNDegenQuick.sav`.
 
@@ -89,9 +92,9 @@ Games start on the "Visual novel" controller layout.
 
 ## Known limits
 
-- A slot saved in VNDegen shows in the PC game's Load screen, but loading it there crashes the PC game: the PC needs
-  internal fields of its state block that VNDegen doesn't write yet. The PC's own saves are unaffected, and they load
-  in VNDegen.
+- A slot saved in VNDegen loads in the PC game on the same line, with the background, characters, window and text.
+  When the speaker's name came from an earlier line (`#Name` before several messages), the PC game shows the line
+  without its name plate.
 - The title's locked "?????" bonus and the window's Oppai Gallery and Oppai View buttons, which the story turns on
   once the scouter is found, do nothing: they are screens built into the game's exe.
 - In Scene View a scene's choices are the player's to make, as in the story.

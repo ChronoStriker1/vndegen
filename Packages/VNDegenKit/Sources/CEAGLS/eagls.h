@@ -226,6 +226,7 @@ void movie_close_all(EG *e);
 bool movie_any(EG *e);
 
 typedef struct Font {
+    int em;
     int size;
     bool bold;
     int spacing;

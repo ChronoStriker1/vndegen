@@ -303,6 +303,7 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
     case 150: {
         int i = I(e, in, 0);
         if (i < 0 || i >= 16) break;
+        e->fonts[i].em = I(e, in, 1);
         e->fonts[i].size = I(e, in, 3);
         e->fonts[i].bold = I(e, in, 2) != 0;
         e->fonts[i].spacing = I(e, in, 4);
