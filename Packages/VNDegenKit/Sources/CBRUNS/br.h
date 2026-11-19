@@ -177,7 +177,7 @@ typedef struct MsgCfg {
 
 typedef struct Glyph {
     u8 c[2];
-    int x, y;
+    int x, y, size;
     u32 color;
 } Glyph;
 
@@ -191,6 +191,8 @@ typedef struct Msg {
     u32 lastReveal, waitStart;
     Image *layer;
     char *raw;
+    bool unread;
+    int rubyX, rubyLine;
 } Msg;
 
 typedef struct Choice {
@@ -218,6 +220,8 @@ typedef struct Layer {
     i32 v[LP_COUNT], from[LP_COUNT];
     u32 start, dur;
     int ease, easeDir;
+    u32 shakeStart, shakeDur;
+    int shakeX, shakeY;
 } Layer;
 
 typedef struct Pic {
@@ -480,3 +484,11 @@ void choice_start(BR *e, Node *call);
 void choice_tick(BR *e);
 void choice_draw(BR *e, u32 *dst);
 void choice_free(BR *e);
+void cfg_apply(BR *e);
+bool stream_done(Stream *s, u32 now);
+void stream_restart(Stream *s, u32 now);
+void pics_activate(BR *e, int a, int b);
+void pics_delete(BR *e, int a, int b);
+void pic_stream_restart(BR *e, int no);
+void layer_order(BR *e, int no, int order);
+void layer_shake(BR *e, int no, int ms, int ax, int ay);

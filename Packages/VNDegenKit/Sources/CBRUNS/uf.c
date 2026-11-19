@@ -85,7 +85,32 @@ bool uf_call(BR *e, int id, Node *call) {
     case 1014: layers_clear_pics(e, A(e, call, 1)); return true;
     case 1015: layers_freeze(e); return true;
     case 1016: layers_visible(e, A(e, call, 2), A(e, call, 3) != 0); return true;
-    case 1020: return true;
+    case 1020:
+        if (A(e, call, 0) == 2) pics_activate(e, A(e, call, 1), A(e, call, 2));
+        return true;
+    case 1009: pics_delete(e, A(e, call, 0), A(e, call, 0)); return true;
+    case 1018: pics_delete(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 1010: pic_stream_restart(e, A(e, call, 1)); return true;
+    case 1012: layer_order(e, A(e, call, 1), A(e, call, 2)); return true;
+    case 1013: layer_shake(e, A(e, call, 2), A(e, call, 4), A(e, call, 7), A(e, call, 8)); return true;
+    case 2125:
+        if ((o = obj_get(e, OBJ_BTN, A(e, call, 0)))) o->hidden = A(e, call, 1) == 0;
+        return true;
+    case 2015:
+    case 2023:
+    case 2026:
+    case 2040:
+    case 2042:
+    case 2051:
+    case 2070:
+    case 2101:
+    case 2103:
+    case 4002:
+    case 8001:
+    case 8002:
+        return true;
+    case 5100: e->reflag = (i32)(e->rng ^ e->now); return true;
+    case 5201: e->rng = (u32)A(e, call, 0) * 2654435761u + 1; return true;
     case 5200: {
         int n = A(e, call, 0);
         e->rng = e->rng * 1103515245u + 12345u;
@@ -181,6 +206,7 @@ bool uf_call(BR *e, int id, Node *call) {
         if (f >= 0 && f < BR_FLAGS && e->flag[f] != A(e, call, 1)) {
             e->flag[f] = A(e, call, 1);
             e->sysDirty = true;
+            if (f >= 256 && f < 400) cfg_apply(e);
         }
         return true;
     }
@@ -246,6 +272,10 @@ bool uf_call(BR *e, int id, Node *call) {
         return true;
     case 5005: sys_format_time(e, A(e, call, 0), A(e, call, 1)); return true;
     case 7001: e->reflag = 0; return true;
+    case 6005:
+    case 6009: return true;
+    case 6006: e->reflag = 0; return true;
+    case 6010: e->reflag = 0; return true;
     case 7002: return true;
     default: unknown(e, id); return true;
     }

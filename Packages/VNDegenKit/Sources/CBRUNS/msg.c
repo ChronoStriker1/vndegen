@@ -56,6 +56,7 @@ static void page_reset(BR *e) {
     m->color = color_code(e, 20);
     if (m->layer) memset(m->layer->px, 0, sizeof(u32) * (size_t)m->layer->w * m->layer->h);
     m->drawn = 0;
+    m->unread = false;
     free(m->raw);
     m->raw = NULL;
 }
@@ -95,7 +96,34 @@ static void put_glyph(BR *e, const u8 *p) {
     g->x = m->cx;
     g->y = m->line * line_height(c) + c->ruby;
     g->color = m->color;
+    g->size = 0;
     m->cx += w;
+}
+
+static void put_ruby(BR *e, const u8 *r, size_t n) {
+    Msg *m = &e->msg;
+    MsgCfg *c = msg_cfg(e, m->win);
+    int rs = c->ruby > 0 ? c->ruby : 12;
+    int width = 0;
+    for (size_t i = 0; i < n;) {
+        width += font_char_width(r + i, rs);
+        i += (size_t)br_sjis_len(r + i);
+    }
+    int baseW = m->cx - m->rubyX;
+    if (m->line != m->rubyLine) baseW = width;
+    int x = m->rubyX + (baseW - width) / 2;
+    int y = m->rubyLine * line_height(c);
+    for (size_t i = 0; i < n && m->count < BR_MSG_GLYPHS;) {
+        Glyph *g = &m->g[m->count++];
+        g->c[0] = r[i];
+        g->c[1] = r[i] >= 0x80 ? r[i + 1] : 0;
+        g->x = x;
+        g->y = y;
+        g->color = 0xffffffu;
+        g->size = rs;
+        x += font_char_width(r + i, rs);
+        i += (size_t)br_sjis_len(r + i);
+    }
 }
 
 void msg_append(BR *e, const char *s) {
@@ -127,6 +155,19 @@ void msg_append(BR *e, const char *s) {
                 continue;
             }
         }
+        if (p[0] == '&' && p[1] == 'R' && p[2] == 'A') {
+            m->rubyX = m->cx;
+            m->rubyLine = m->line;
+            p += 3;
+            continue;
+        }
+        if (p[0] == '&' && p[1] == 'R' && p[2] == 'S') {
+            const u8 *r = p + 3, *end = (const u8 *)strstr((const char *)r, "&RT");
+            if (!end) end = r + strlen((const char *)r);
+            put_ruby(e, r, (size_t)(end - r));
+            p = *end ? end + 3 : end;
+            continue;
+        }
         if (p[0] < 0x20) {
             p++;
             continue;
@@ -144,7 +185,11 @@ void msg_send(BR *e, Node *call) {
     if (a->t == N_STR) {
         msg_append(e, a->s);
         if (!e->systemMode) history_add(e, a->s);
-        if (e->sp && call->n > 2) seen_text(e, e->stack[e->sp - 1].sc->num, sx_int(call->k[2], 0));
+        if (e->sp && call->n > 2 && !e->systemMode) {
+            int sc = e->stack[e->sp - 1].sc->num, line = sx_int(call->k[2], 0);
+            if (!seen_text_has(e, sc, line)) e->msg.unread = true;
+            seen_text(e, sc, line);
+        }
         return;
     }
     if (sx_sym(a, "clear")) {
@@ -162,9 +207,9 @@ void msg_send(BR *e, Node *call) {
 
 static int speed_ms(BR *e) {
     MsgCfg *c = msg_cfg(e, e->msg.win);
-    int s = e->textSpeed;
-    if (s < 0 || s > 2) s = 1;
-    return c->speed[s];
+    int s = e->flag[256];
+    if (s <= 0 || s > 3) return 0;
+    return c->speed[s - 1];
 }
 
 static void reveal(BR *e) {
@@ -207,7 +252,8 @@ void msg_update(BR *e) {
 static void draw_glyph_layer(BR *e, Image *L, Glyph *g, MsgCfg *c) {
     u8 code[3] = {g->c[0], g->c[1], 0};
     int edgeW = c->edgeOn ? 1 : 0;
-    font_draw_layer(e, L, code, g->x + 4, g->y + 4, c->size, g->color, c->edge, edgeW);
+    if (g->size) font_draw_layer(e, L, code, g->x + 4, g->y + 4, g->size, g->color, 0x5a5a5au, 1);
+    else font_draw_layer(e, L, code, g->x + 4, g->y + 4, c->size, g->color, c->edge, edgeW);
 }
 
 void msg_draw(BR *e, u32 *dst) {

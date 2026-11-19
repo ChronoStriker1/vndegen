@@ -70,7 +70,13 @@ int main(int argc, char **argv) {
             vnbruns_key(n, k, 0);
             alive = alive && run(n, 32);
         } else if (!strcmp(c, "state")) print_state((BR *)n);
-        else if (sscanf(c, "wheel:%d", &k) == 1) {
+        else if (sscanf(c, "skip:%d", &k) == 1) {
+            vnbruns_key(n, 0x11, 1);
+            alive = run(n, k);
+            vnbruns_key(n, 0x11, 0);
+        } else if (sscanf(c, "clicks:%d,%d", &x, &y) == 2) {
+            for (int i = 0; i < x && alive; i++) alive = press(n, 640, 360, VNBRUNS_MOUSE_LEFT) && run(n, y);
+        } else if (sscanf(c, "wheel:%d", &k) == 1) {
             vnbruns_wheel(n, k);
             alive = run(n, 64);
         } else if (!strcmp(c, "peak")) {

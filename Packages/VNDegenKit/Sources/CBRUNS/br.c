@@ -96,6 +96,7 @@ VNBruns *vnbruns_open(const VNBrunsConfig *cfg, char *err, size_t errSize) {
     }
     br_log(e, "opened %s", e->gameDir);
     sys_load(e);
+    cfg_apply(e);
     e->systemMode = true;
     vm_start(e, e->cfg.initialScript);
     if (!e->sp) {
@@ -134,6 +135,7 @@ void vnbruns_close(VNBruns *n) {
 }
 
 static void tick(BR *e) {
+    if (e->skipMode && e->flag[257] == 1 && e->msg.unread && e->wait == W_TEXT) e->skipMode = false;
     e->skipping = e->ctrlHeld || e->skipMode;
     msg_update(e);
     if (menu_input(e)) e->lPress = false;

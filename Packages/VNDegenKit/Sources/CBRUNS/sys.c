@@ -102,3 +102,15 @@ void sys_title(BR *e) {
     e->nextSystem = true;
     e->sp = 0;
 }
+
+void cfg_apply(BR *e) {
+    static const int autoConst[4] = {0, 10, 11, 12};
+    int a = e->flag[260];
+    Node *consts = sx_find(e->cfg.root, ":flag-constants");
+    e->autoMs = a > 0 && a < 4 ? sx_int(sx_cdr_value(sx_assoc(consts, autoConst[a])), 3000) : 3000;
+    for (int k = 0; k < 3; k++) {
+        int mute = e->flag[266 + k * 2], v = e->flag[267 + k * 2];
+        e->vol[k] = mute ? 0 : v * 100 / 9;
+    }
+    snd_apply_volumes(e);
+}

@@ -76,7 +76,16 @@ static void split(Entry *en, const char *text) {
             memcpy(lineColor, color, sizeof color);
             continue;
         }
-        if ((p[0] == '$' || p[0] == '#' || p[0] == '&') && p[1] && p[1] < 0x80) {
+        if (p[0] == '&' && p[1] == 'R' && p[2] == 'S') {
+            const char *end = strstr((const char *)p, "&RT");
+            p = end ? (const u8 *)end + 3 : p + strlen((const char *)p);
+            continue;
+        }
+        if (p[0] == '&' && p[1] == 'R' && (p[2] == 'A' || p[2] == 'T')) {
+            p += 3;
+            continue;
+        }
+        if ((p[0] == '$' || p[0] == '#') && p[1] && p[1] < 0x80) {
             if (p[0] == '$') {
                 color[0] = '$';
                 color[1] = (char)p[1];

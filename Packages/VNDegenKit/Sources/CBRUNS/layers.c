@@ -126,7 +126,7 @@ int layers_load(BR *e, int layer, int no, Node *src, int type, int numsel) {
     const char *path = src && src->t == N_STR ? src->s : NULL;
     int url = src && src->t == N_INT ? src->i : -1;
     pic_new(e, layer, no, url, path, type, numsel);
-    l->pic = no;
+    if (l->pic < 0 || !pic_find(e, l->pic)) l->pic = no;
     return 0;
 }
 
@@ -211,6 +211,13 @@ static void draw_layer(BR *e, u32 *dst, Layer *l) {
     float px = align & 0x100 ? dw : align & 0x200 ? dw / 2 : 0;
     float py = align & 0x400 ? dh : align & 0x800 ? dh / 2 : 0;
     float x = rx + cur(e, l, LP_IX) - px, y = ry + cur(e, l, LP_IY) - py;
+    if (l->shakeDur && e->now < l->shakeStart + l->shakeDur) {
+        u32 t = e->now - l->shakeStart;
+        float k = 1.0f - (float)t / (float)l->shakeDur;
+        int phase = (int)(t / 33);
+        x += (float)((phase & 1) ? l->shakeX : -l->shakeX) * k;
+        y += (float)((phase & 2) ? l->shakeY : -l->shakeY) * k;
+    }
     int a = (int)cur(e, l, LP_A), r = (int)cur(e, l, LP_R), g = (int)cur(e, l, LP_G), b = (int)cur(e, l, LP_B);
     if (a <= 0) return;
     int ox = (int)(x + 0.5f), oy = (int)(y + 0.5f), ow = (int)(dw + 0.5f), oh = (int)(dh + 0.5f);
@@ -265,4 +272,47 @@ void layers_transition(BR *e, int type, int ms) {
     e->transFrom = from;
     e->transStart = e->now;
     e->transDur = (u32)ms;
+}
+
+void pics_activate(BR *e, int a, int b) {
+    if (b < a) b = a;
+    for (int i = 0; i < e->picCount; i++) {
+        Pic *p = e->pics[i];
+        if (p->no < a || p->no > b) continue;
+        Layer *l = layer_find(e, p->layer);
+        if (l) l->pic = p->no;
+        if (p->stream) stream_restart(p->stream, e->now);
+    }
+}
+
+void pics_delete(BR *e, int a, int b) {
+    if (b < a) b = a;
+    for (int i = e->picCount - 1; i >= 0; i--) {
+        Pic *p = e->pics[i];
+        if (p->no < a || p->no > b) continue;
+        Layer *l = layer_find(e, p->layer);
+        if (l && l->pic == p->no) l->pic = -1;
+        pic_remove(e, i);
+    }
+}
+
+void pic_stream_restart(BR *e, int no) {
+    Pic *p = pic_find(e, no);
+    if (p && p->stream) stream_restart(p->stream, e->now);
+}
+
+void layer_order(BR *e, int no, int order) {
+    Layer *l = layer_find(e, no);
+    if (!l) return;
+    l->order = order;
+    layers_sort(e);
+}
+
+void layer_shake(BR *e, int no, int ms, int ax, int ay) {
+    Layer *l = layer_find(e, no);
+    if (!l) return;
+    l->shakeStart = e->now;
+    l->shakeDur = (u32)(ms > 0 ? ms : 0);
+    l->shakeX = ax;
+    l->shakeY = ay;
 }
