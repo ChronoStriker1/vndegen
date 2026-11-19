@@ -128,6 +128,9 @@ typedef struct HistEntry {
 } HistEntry;
 
 typedef struct Ui Ui;
+typedef struct Extra Extra;
+#define EX_SEEN_CG 10000
+#define EX_SEEN_SCENES 64
 
 #define EX_CFG_FLAGS 24
 
@@ -303,6 +306,9 @@ typedef struct EX {
     HistEntry history[EX_HISTORY];
     int histCount, histHead;
     Ui *ui;
+    Extra *extra;
+    u8 seenCg[EX_SEEN_CG / 8];
+    u8 seenScene[EX_SEEN_SCENES];
     Config cfg;
     int volLoop, volEnv, volUi, voiceChara;
     char *sysmenuSpec;
@@ -493,6 +499,14 @@ void state_reset(EX *e);
 void reset_for_title(EX *e);
 
 bool ui_open(EX *e, int action);
+void extra_open(EX *e, int tab);
+bool extra_active(EX *e);
+void extra_free(EX *e);
+void extra_input(EX *e);
+void extra_draw(EX *e, u32 *dst);
+void extra_load(EX *e);
+void extra_mark_cg(EX *e, int id);
+void extra_mark_scene(EX *e, int n);
 void cfg_apply(EX *e);
 void cfg_defaults(EX *e);
 void cfg_load(EX *e);
