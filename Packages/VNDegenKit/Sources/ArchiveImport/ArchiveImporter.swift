@@ -426,8 +426,7 @@ public final class ArchiveImporter {
 
     @concurrent
     private static func inspect(_ staging: URL) async -> (root: URL, nested: ArchiveSource?) {
-        let root = ArchiveExtractor.gameRoot(in: staging)
-        return (root, ArchiveExtractor.nestedArchive(in: root))
+        ArchiveExtractor.nestedGame(in: ArchiveExtractor.gameRoot(in: staging))
     }
 
     @concurrent
