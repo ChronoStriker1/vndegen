@@ -237,7 +237,12 @@ static Voice *voice_open(EX *e, const char *rel) {
 
 static float channel_volume(EX *e, int ch) {
     if (e->muted) return 0;
-    int v = ch == EX_CH_MUSIC ? e->volBgm : ch == EX_CH_VOICE || ch == EX_CH_ENV ? e->volVoice : e->volSe;
+    if (ch == EX_CH_VOICE) {
+        int k = e->voiceChara >= 4 && e->voiceChara <= 7 ? e->voiceChara - 4 : 4;
+        if (e->cfg.charMute[k]) return 0;
+        return (float)e->volVoice / 100.0f * (float)e->cfg.charVol[k] / 70.0f * (float)e->volMaster / 100.0f;
+    }
+    int v = ch == EX_CH_MUSIC ? e->volBgm : ch == EX_CH_VOICE ? e->volVoice : ch == EX_CH_ENV ? e->volEnv : ch == EX_CH_LOOP ? e->volLoop : ch == EX_CH_UI ? e->volUi : e->volSe;
     return (float)v / 100.0f * (float)e->volMaster / 100.0f;
 }
 

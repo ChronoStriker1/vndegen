@@ -301,6 +301,7 @@ void msg_start(EX *e, Op *op) {
     m->textId = op->nv > 1 ? op->v[1] : -1;
     m->speaker = who;
     snd_stop(e, EX_CH_VOICE, 0);
+    e->voiceChara = who;
     bool voiced = m->textId >= 0 && chara_voiced(e, who) && snd_play_voice(e, m->textId);
     const char *shown = strcmp(name, "*") ? name : chara_name(e, who);
     history_add(e, shown, text, voiced ? m->textId : -1);

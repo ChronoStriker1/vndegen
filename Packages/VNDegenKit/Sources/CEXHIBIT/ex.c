@@ -89,6 +89,7 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     e->musicTrack = e->loopId = e->envId = -1;
     e->L[10] = 1;
     slots_read_index(e);
+    cfg_load(e);
     e->cam.w = EX_W;
     e->cam.h = EX_H;
     ex_log(e, "opened %s", e->gameDir);

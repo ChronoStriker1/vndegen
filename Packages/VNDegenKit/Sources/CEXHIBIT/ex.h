@@ -129,6 +129,16 @@ typedef struct HistEntry {
 
 typedef struct Ui Ui;
 
+#define EX_CFG_FLAGS 24
+
+typedef struct Config {
+    int windowT, textSpeed, autoSpeed;
+    int vol[6], charVol[5];
+    bool mute[6], charMute[5];
+    int flagId[EX_CFG_FLAGS];
+    bool flag[EX_CFG_FLAGS];
+} Config;
+
 #define EX_CHANNELS 8
 #define EX_BILLBOARDS 64
 #define EX_FRAMES 16
@@ -281,6 +291,8 @@ typedef struct EX {
     HistEntry history[EX_HISTORY];
     int histCount, histHead;
     Ui *ui;
+    Config cfg;
+    int volLoop, volEnv, volUi, voiceChara;
     char *sysmenuSpec;
     int lastPage;
     bool skipping, autoMode, muted, ctrlHeld;
@@ -451,6 +463,10 @@ void state_reset(EX *e);
 void reset_for_title(EX *e);
 
 bool ui_open(EX *e, int action);
+void cfg_apply(EX *e);
+void cfg_defaults(EX *e);
+void cfg_load(EX *e);
+void cfg_save(EX *e);
 bool ui_active(EX *e);
 void ui_input(EX *e);
 void ui_draw(EX *e, u32 *dst);
