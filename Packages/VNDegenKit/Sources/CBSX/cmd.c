@@ -54,7 +54,7 @@ void bx_cmd(BX *b, int op) {
         b->nextBlend = a1;
         break;
     case 0x26:
-        if (a1 == 0) b->winShown = a2 != 0;
+        if (a1 == 0) b->winShown = b->winLayer = a2 != 0;
         else if (a1 == 1) b->menuLayer = a2 != 0;
         else if (a1 == 2) b->infoLayer = a2 != 0;
         break;

@@ -326,7 +326,7 @@ struct BX {
     int fontSize, fontW, fontH, lineH, textDY, lines, edge, shadow;
     bool fontBold;
     int msgSpeed;
-    bool winShown, winHidden, menuLayer, infoLayer;
+    bool winShown, winHidden, winLayer, menuLayer, infoLayer;
     char *speaker;
     char *text;
     char *voice;

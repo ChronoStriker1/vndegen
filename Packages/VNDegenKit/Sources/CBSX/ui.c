@@ -234,7 +234,7 @@ void bx_ui_init(BX *b) {
     memcpy(b->menuShow, show, sizeof show);
     b->lamp = own(b, bx_cfg_get(c, "game menu", "hold icon"));
     b->menuVisible = true;
-    b->menuLayer = true;
+    b->winLayer = b->menuLayer = true;
     b->cutIn = true;
     for (int i = 0; i < c->count && b->buttonCount < 24; i++) {
         if (strcmp(c->sec[i], "system button")) continue;

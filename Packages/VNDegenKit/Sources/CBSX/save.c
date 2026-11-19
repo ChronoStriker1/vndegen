@@ -251,7 +251,7 @@ bool bx_save_slot(BX *b, int slot) {
     put32(&buf, (u32)s->varCount);
     for (int i = 0; i < s->varCount; i++) put32(&buf, (u32)b->globals[i].v);
     put32(&buf, b->msgPc);
-    put32(&buf, (u32)(b->histCount % HIST));
+    put32(&buf, s->minor >= 1 ? (u32)(b->histCount % HIST) : 0);
     put32(&buf, (u32)b->histCount);
     for (int i = 0; i < HIST; i++) put32(&buf, i < b->histCount ? b->hist[i] : 0xffffffffu);
     put32(&buf, 0);
@@ -276,7 +276,7 @@ bool bx_save_slot(BX *b, int slot) {
     }
     put8(&buf, 0xff);
     u8 tail[27] = {0};
-    tail[3] = !b->winShown;
+    tail[3] = !b->winLayer;
     tail[7] = !b->menuLayer;
     tail[11] = !b->infoLayer;
     put(&buf, tail, sizeof tail);
@@ -469,7 +469,7 @@ bool bx_load_slot(BX *b, int slot) {
     bx_snd_stop(b, CH_VOICE, 0);
     bx_snd_stop(b, CH_VOICE2, 0);
     bx_msg_clear(b);
-    b->winShown = !tail[3];
+    b->winShown = b->winLayer = !tail[3];
     b->menuLayer = !tail[7];
     b->infoLayer = !tail[11];
     b->winHidden = false;

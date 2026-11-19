@@ -38,5 +38,9 @@ Things that were unsure and how they were settled:
   full-screen.
 - The save tail: three flags at bytes 3, 7 and 11 match the window, menu bar and information window layers that `26`
   hides (all clear in a scene, window and information window set on Mesu Kyoushi 4's map).
+- The word after the message position: Mesu Kyoushi 4's saves hold the history ring's write position there, Mesu
+  Kyoushi 1's hold 0, so 3.0 saves keep writing 0.
+- The window flag in the tail follows the script's `26 0`, not the window a phase hides: Mesu Kyoushi 1's map save
+  keeps it clear.
 - The 3.1 text placement: the original's glyph rows sit 6 px lower and 20 px apart against VNDegen's 24 px, with a size
   of 14 and a height of 20.
