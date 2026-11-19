@@ -354,7 +354,7 @@ void bx_ui_draw(BX *b, u32 *dst) {
     bool menu = inMenu || b->menuVisible;
     if (menu && b->menuBase) bx_blit(dst, b->W, b->H, b->menuBase, b->menuX, b->menuY, 255);
     for (int i = 0; i < b->buttonCount; i++) {
-        if (!button_enabled(b, &b->buttons[i])) continue;
+        if (!button_enabled(b, &b->buttons[i]) && !always_shown(&b->buttons[i])) continue;
         if (!menu && !always_shown(&b->buttons[i])) continue;
         Item it = button_item(&b->buttons[i]);
         bool on = (!strcmp(b->buttons[i].key, "skip") && b->skipMode) || (!strcmp(b->buttons[i].key, "auto ex") && b->autoMode);
