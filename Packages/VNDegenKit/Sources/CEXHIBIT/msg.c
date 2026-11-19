@@ -387,6 +387,8 @@ static void draw_string(EX *e, u32 *dst, const TextStyle *st, const PlacedChar *
     text_glyph(e, dst, EX_W, EX_H, c->cp, c->x, baseline, st->size, st->color, alpha, c->italic);
 }
 
+static int knob_w(const Image *k) { return k ? (k->w >= 2 * k->h ? k->w / 2 : k->w) : 0; }
+
 static void draw_ctrls(EX *e, u32 *dst, int alpha) {
     Msg *m = &e->msg;
     for (int i = 0; i < m->ctrlCount; i++) {
@@ -394,7 +396,7 @@ static void draw_ctrls(EX *e, u32 *dst, int alpha) {
         if (!c->img) continue;
         if (c->slider) {
             blit(dst, EX_W, EX_H, c->img, c->x, c->y, alpha);
-            if (c->knob) blit(dst, EX_W, EX_H, c->knob, c->x + (c->img->w - c->knob->w) * c->value / 255, c->y, alpha);
+            if (c->knob) blit_part(dst, EX_W, EX_H, c->knob, m->dragging == c ? knob_w(c->knob) % c->knob->w : 0, 0, knob_w(c->knob), c->knob->h, c->x + (c->img->w - knob_w(c->knob)) * c->value / 255, c->y, alpha);
             continue;
         }
         int w = c->img->w / c->states;
@@ -526,8 +528,8 @@ bool msg_input(EX *e) {
         Ctrl *c = m->dragging;
         if (!e->lDown) m->dragging = NULL;
         else {
-            int span = c->img->w - (c->knob ? c->knob->w : 0);
-            int v = span > 0 ? (e->mouseX - c->x - (c->knob ? c->knob->w / 2 : 0)) * 255 / span : 0;
+            int span = c->img->w - knob_w(c->knob);
+            int v = span > 0 ? (e->mouseX - c->x - knob_w(c->knob) / 2) * 255 / span : 0;
             c->value = v < 0 ? 0 : v > 255 ? 255 : v;
             e->windowAlpha = c->value;
         }
