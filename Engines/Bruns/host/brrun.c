@@ -41,7 +41,7 @@ static void print_state(BR *e) {
     for (int i = 0; i < e->layerCount; i++) {
         Layer *l = e->layers[i];
         Pic *p = l->pic >= 0 ? pic_find(e, l->pic) : NULL;
-        if (p) printf("  layer %d vis %d pic %d url %d type %d a %d x %d y %d sw %d\n", l->no, l->visible, l->pic, p->url, p->type, l->v[LP_A], l->v[LP_IX], l->v[LP_IY], l->v[LP_SWITCH]);
+        if (p) printf("  layer %d vis %d pic %d url %d type %d a %d x %d y %d sw %d img %dx%d\n", l->no, l->visible, l->pic, p->url, p->type, l->v[LP_A], l->v[LP_IX], l->v[LP_IY], l->v[LP_SWITCH], p->img ? p->img->w : -1, p->img ? p->img->h : -1);
     }
 }
 

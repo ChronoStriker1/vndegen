@@ -131,7 +131,6 @@ int layers_load(BR *e, int layer, int no, Node *src, int type, int numsel) {
     const char *path = src && src->t == N_STR ? src->s : NULL;
     int url = src && src->t == N_INT ? src->i : -1;
     pic_new(e, layer, no, url, path, type, numsel);
-    if (l->pic < 0 || !pic_find(e, l->pic)) l->pic = no;
     return 0;
 }
 
