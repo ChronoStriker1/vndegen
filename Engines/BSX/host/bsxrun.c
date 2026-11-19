@@ -279,6 +279,11 @@ int main(int argc, char **argv) {
                 int v = bx_var_by_name(b, name);
                 if (v >= 0) b->globals[v] = (Val){0, val};
             }
+        } else if (!strncmp(c, "pc:", 3)) {
+            bx_phase_end(b);
+            b->th.sp = 0;
+            b->th.wait = W_NONE;
+            b->th.pc = (u32)strtoul(c + 3, NULL, 16);
         } else if (!strncmp(c, "system:", 7)) {
             bx_system(b, c + 7);
             alive = run(n, 16);

@@ -294,6 +294,7 @@ struct BX {
     int nextBlend;
     int objHover;
     bool shownDirty;
+    int eyeShown[BX_OBJS];
     u32 *to;
     int transType;
     u32 transStart, transDur;
@@ -307,19 +308,20 @@ struct BX {
     struct {
         char *key;
         Image *img;
-    } cache[24];
+        u32 used;
+    } cache[32];
     struct {
         char *name;
         Anim anim;
     } anims[16];
     int animCount;
-    int cacheNext;
+    u32 cacheClock;
 
     Image *msgBase, *msgFrame, *msgName;
     int msgX, msgY, msgH;
     int nameRect[4], textRect[4];
     u32 nameColor, textColor, bgColor;
-    int fontSize, fontW, fontH, lines, edge, shadow;
+    int fontSize, fontW, fontH, lineH, textDY, lines, edge, shadow;
     bool fontBold;
     int msgSpeed;
     bool winShown, winHidden, menuLayer, infoLayer;
@@ -367,7 +369,7 @@ struct BX {
     int phaseBack;
     int phaseResult;
 
-    Image *menuBase, *lamp, *infoWno, *infoWday;
+    Image *menuBase, *lamp;
     bool cutIn;
     int menuX, menuY;
     int menuShow[4];
@@ -377,6 +379,7 @@ struct BX {
     int buttonHover;
     bool dressEnabled, viewEnabled;
     int stripLevel, viewLevel;
+    bool viewButtons;
 
     int mx, my;
     bool lDown, rDown;
@@ -414,6 +417,8 @@ void bx_transition(BX *b, int type, int ticks, const char *mask);
 void bx_flash(BX *b, int r, int g, int bl, int ticks);
 void bx_shake(BX *b, int x, int y);
 void bx_gfx_frame(BX *b);
+int bx_eye_frame(BX *b, const Obj *o);
+int bx_view_level(BX *b);
 void bx_compose(BX *b, const Scene *s, u32 *dst);
 void bx_anim_update(BX *b);
 bool bx_obj_move(BX *b, int id, int x, int y, int ms);
@@ -443,6 +448,7 @@ void bx_ui_init(BX *b);
 void bx_ui_free(BX *b);
 void bx_ui_update(BX *b);
 void bx_ui_draw(BX *b, u32 *dst);
+void bx_info_draw(BX *b, u32 *dst);
 void bx_phase_start(BX *b, int phase);
 void bx_phase_update(BX *b);
 void bx_phase_draw(BX *b, u32 *dst);
@@ -461,6 +467,7 @@ void bx_autosave(BX *b);
 bool bx_load_slot(BX *b, int slot);
 bool bx_save_exists(BX *b, int slot);
 void bx_save_capture_thumb(BX *b);
+void bx_thumb_size(BX *b, int *w, int *h);
 char *bx_save_path(BX *b, int slot);
 
 bool bx_map_start(BX *b);

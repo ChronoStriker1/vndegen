@@ -94,18 +94,20 @@ static void slot_info(BX *b, DataPhase *d, int slot) {
     size_t n;
     u8 *f = bx_read_file(path, &n);
     free(path);
-    if (!f || n < 36 + 120 * 90 * 4 + 592) {
+    int tw, th;
+    bx_thumb_size(b, &tw, &th);
+    if (!f || n < 36 + (size_t)tw * th * 4 + 592 || rd32(f + 32) != (u32)(tw * th * 4 + 592)) {
         free(f);
         return;
     }
     c->exists = true;
-    c->thumb = bx_image_new(120, 90);
-    for (int y = 0; y < 90; y++)
-        for (int x = 0; x < 120; x++) {
-            const u8 *p = f + 36 + ((size_t)(89 - y) * 120 + x) * 4;
-            c->thumb->px[(size_t)y * 120 + x] = (u32)p[2] | (u32)p[1] << 8 | (u32)p[0] << 16 | 0xff000000u;
+    c->thumb = bx_image_new(tw, th);
+    for (int y = 0; y < th; y++)
+        for (int x = 0; x < tw; x++) {
+            const u8 *p = f + 36 + ((size_t)(th - 1 - y) * tw + x) * 4;
+            c->thumb->px[(size_t)y * tw + x] = (u32)p[2] | (u32)p[1] << 8 | (u32)p[0] << 16 | 0xff000000u;
         }
-    const u8 *info = f + 36 + 120 * 90 * 4;
+    const u8 *info = f + 36 + (size_t)tw * th * 4;
     char *date = bx_utf16_to_utf8(info, 16), *clock = bx_utf16_to_utf8(info + 32, 16);
     snprintf(c->date, sizeof c->date, "%s", date);
     snprintf(c->clock, sizeof c->clock, "%s", clock);
@@ -263,10 +265,12 @@ static void do_save(BX *b, int slot) {
     reorder(b, d);
 }
 
-static int slot_at(DataPhase *d, int x, int y) {
+static int slot_at(BX *b, DataPhase *d, int x, int y) {
     for (int i = 0; i < d->perPage; i++) {
         int sx = d->slotPos[i][0], sy = d->slotPos[i][1];
-        if (x >= sx && y >= sy && x < sx + 120 && y < sy + 90) return d->page * d->perPage + i;
+        int tw, th;
+        bx_thumb_size(b, &tw, &th);
+        if (x >= sx && y >= sy && x < sx + tw && y < sy + th) return d->page * d->perPage + i;
     }
     return -1;
 }
@@ -286,7 +290,7 @@ void bx_data_update(BX *b) {
         }
         return;
     }
-    int idx = slot_at(d, b->mx, b->my);
+    int idx = slot_at(b, d, b->mx, b->my);
     d->hover = idx >= 0 && idx < d->cacheCount ? slot_no(d, idx) : -1;
     if (b->rclick) {
         b->rclick = false;

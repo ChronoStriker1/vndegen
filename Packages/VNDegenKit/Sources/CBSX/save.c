@@ -3,8 +3,6 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#define THUMB_W 120
-#define THUMB_H 90
 #define SLOT_INFO 592
 #define HIST 50
 
@@ -97,13 +95,27 @@ bool bx_save_exists(BX *b, int slot) {
     return r;
 }
 
+void bx_thumb_size(BX *b, int *w, int *h) {
+    const char *r = bx_cfg_get(&b->cfg, "main window", "thumbnail ratio");
+    double ratio = r ? atof(r) : 0.15;
+    if (ratio < 0.01 || ratio > 0.5) ratio = 0.15;
+    *w = (int)(b->W * ratio);
+    *h = (int)(b->H * ratio);
+}
+
 void bx_save_capture_thumb(BX *b) {
-    if (!b->thumb) b->thumb = bx_image_new(THUMB_W, THUMB_H);
-    for (int y = 0; y < THUMB_H; y++)
-        for (int x = 0; x < THUMB_W; x++) {
+    int tw, th;
+    bx_thumb_size(b, &tw, &th);
+    if (b->thumb && (b->thumb->w != tw || b->thumb->h != th)) {
+        bx_image_free(b->thumb);
+        b->thumb = NULL;
+    }
+    if (!b->thumb) b->thumb = bx_image_new(tw, th);
+    for (int y = 0; y < th; y++)
+        for (int x = 0; x < tw; x++) {
             u32 r = 0, g = 0, bl = 0;
-            int sx0 = x * b->W / THUMB_W, sx1 = (x + 1) * b->W / THUMB_W;
-            int sy0 = y * b->H / THUMB_H, sy1 = (y + 1) * b->H / THUMB_H;
+            int sx0 = x * b->W / tw, sx1 = (x + 1) * b->W / tw;
+            int sy0 = y * b->H / th, sy1 = (y + 1) * b->H / th;
             int n = 0;
             for (int sy = sy0; sy < sy1; sy++)
                 for (int sx = sx0; sx < sx1; sx++) {
@@ -114,7 +126,7 @@ void bx_save_capture_thumb(BX *b) {
                     n++;
                 }
             if (!n) n = 1;
-            b->thumb->px[(size_t)y * THUMB_W + x] = (r / n) | (g / n) << 8 | (bl / n) << 16 | 0xff000000u;
+            b->thumb->px[(size_t)y * tw + x] = (r / n) | (g / n) << 8 | (bl / n) << 16 | 0xff000000u;
         }
 }
 
@@ -139,7 +151,7 @@ static void put_wears(BX *b, Buf *buf) {
     }
 }
 
-static void put_obj(Buf *buf, const char *name, int kind, int x, int y, int parts, int alpha) {
+static void put_obj(BX *b, Buf *buf, const char *name, int kind, int x, int y, int parts, int alpha) {
     put8(buf, (u8)kind);
     zeros(buf, 12);
     put_wide_counted(buf, name);
@@ -148,8 +160,8 @@ static void put_obj(Buf *buf, const char *name, int kind, int x, int y, int part
     put32(buf, (u32)x);
     put32(buf, (u32)y);
     zeros(buf, 16);
-    put32(buf, 800);
-    put32(buf, 600);
+    put32(buf, (u32)b->W);
+    put32(buf, (u32)b->H);
     put32(buf, 0);
     put32(buf, 1);
     put32(buf, (u32)parts);
@@ -183,11 +195,12 @@ bool bx_save_slot(BX *b, int slot) {
     char id[33];
     snprintf(id, sizeof id, "%s", b->saveId[0] ? b->saveId : "00000000000000000000000000000000");
     put(&buf, id, 32);
-    put32(&buf, THUMB_W * THUMB_H * 4 + SLOT_INFO);
     if (!b->thumb) bx_save_capture_thumb(b);
-    for (int y = THUMB_H - 1; y >= 0; y--)
-        for (int x = 0; x < THUMB_W; x++) {
-            u32 p = b->thumb->px[(size_t)y * THUMB_W + x];
+    int tw = b->thumb->w, th = b->thumb->h;
+    put32(&buf, (u32)(tw * th * 4 + SLOT_INFO));
+    for (int y = th - 1; y >= 0; y--)
+        for (int x = 0; x < tw; x++) {
+            u32 p = b->thumb->px[(size_t)y * tw + x];
             u8 px[4] = {(u8)(p >> 16), (u8)(p >> 8), (u8)p, 0xff};
             put(&buf, px, 4);
         }
@@ -254,11 +267,12 @@ bool bx_save_slot(BX *b, int slot) {
     for (int i = 0; i < count; i++) {
         const Obj *o = list[i];
         int parts = o->kind == OK_BG ? (overlays ? 2 : 0) : 2;
-        put_obj(&buf, o->name, o->kind, o->x, o->y, parts, o->alpha);
-        if (o->kind == OK_BG && o->face[0]) put_obj(&buf, o->face, OK_OVERLAY, 0, 0, 2, 255);
+        put_obj(b, &buf, o->name, o->kind, o->x, o->y, parts, o->alpha);
+        if (o->kind == OK_BG && o->face[0]) put_obj(b, &buf, o->face, OK_OVERLAY, 0, 0, 2, 255);
     }
     put8(&buf, 0xff);
-    static const u8 tail[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    u8 tail[27] = {0};
+    tail[11] = s->minor == 0;
     put(&buf, tail, sizeof tail);
     char *path = bx_save_path(b, slot);
     char dir[2048];
@@ -341,9 +355,8 @@ bool bx_load_slot(BX *b, int slot) {
     }
     Rd r = {d, n, 32, false};
     u32 info = get32(&r);
-    size_t infoStart = r.p + THUMB_W * THUMB_H * 4;
     skip(&r, info);
-    if (r.bad || infoStart + SLOT_INFO > n) {
+    if (r.bad || info < SLOT_INFO) {
         bx_log(b, "%s is too short", path);
         free(d);
         free(path);

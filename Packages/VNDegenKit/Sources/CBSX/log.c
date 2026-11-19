@@ -10,7 +10,7 @@ struct LogPhase {
     int lines, left, width;
     u32 back, voiceColor;
     LogBtn bar, up, down;
-    Image *icon;
+    Image *icon, *base, *frame;
     int hoverEntry;
     int rows[16][2];
 };
@@ -49,6 +49,8 @@ void bx_log_free(BX *b) {
     bx_image_free(l->up.img);
     bx_image_free(l->down.img);
     bx_image_free(l->icon);
+    bx_image_free(l->base);
+    bx_image_free(l->frame);
     free(l);
     b->logp = NULL;
 }
@@ -69,6 +71,8 @@ bool bx_log_open(BX *b) {
     log_btn(b, "up button", &l->up);
     log_btn(b, "down button", &l->down);
     l->icon = own(b, bx_cfg_get(&b->cfg, "log screen", "voice icon"));
+    l->base = own(b, bx_cfg_get(&b->cfg, "log screen", "base"));
+    l->frame = own(b, bx_cfg_get(&b->cfg, "log screen", "voice frame"));
     l->top = max_top(b, l);
     l->hoverEntry = -1;
     b->phaseBack = b->phase;
@@ -174,8 +178,9 @@ static int wrap_lines(BX *b, const char *text, int width, char out[][256], int m
 void bx_log_draw(BX *b, u32 *dst) {
     LogPhase *l = b->logp;
     if (!l) return;
-    bx_fill(dst, b->W, b->H, 0, 0, b->W, b->H, l->back);
-    int lineH = b->fontH + 4;
+    if (l->base) bx_blit(dst, b->W, b->H, l->base, 0, 0, 255);
+    else bx_fill(dst, b->W, b->H, 0, 0, b->W, b->H, l->back);
+    int lineH = b->lineH;
     int y = 24;
     for (int i = 0; i < l->lines; i++) {
         int e = l->top + i;
@@ -187,7 +192,10 @@ void bx_log_draw(BX *b, u32 *dst) {
         int h = (n + (le->name ? 1 : 0)) * lineH + 8;
         l->rows[i][0] = y;
         l->rows[i][1] = y + h;
-        if (le->voice && e == l->hoverEntry) bx_fill(dst, b->W, b->H, l->left - 40, y - 2, l->width + 44, h, l->voiceColor);
+        if (le->voice && e == l->hoverEntry) {
+            if (l->frame) bx_blit(dst, b->W, b->H, l->frame, 0, y - 4, 255);
+            else bx_fill(dst, b->W, b->H, l->left - 40, y - 2, l->width + 44, h, l->voiceColor);
+        }
         if (le->voice && l->icon) bx_blit(dst, b->W, b->H, l->icon, l->left - 36, y, 255);
         int ty = y;
         if (le->name) {

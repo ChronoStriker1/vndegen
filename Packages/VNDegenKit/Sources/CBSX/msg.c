@@ -58,6 +58,8 @@ void bx_msg_init(BX *b) {
     b->fontH = bx_cfg_int(c, "default font", "height", 20);
     b->fontSize = b->fontH;
     b->fontW = bx_cfg_int(c, "default font", "width", 0);
+    b->lineH = b->sc->minor >= 1 ? b->fontH : b->fontH + 4;
+    b->textDY = b->sc->minor >= 1 ? b->fontH - bx_cfg_int(c, "default font", "size", b->fontH) : 0;
     b->fontBold = bx_cfg_int(c, "default font", "weight", 400) >= 700;
     b->lines = bx_cfg_int(c, "default font", "number of lines", 3);
     b->edge = bx_cfg_int(c, "default font", "edge", 1);
@@ -240,12 +242,13 @@ void bx_msg_draw(BX *b, u32 *dst) {
     if (!b->winShown || b->winHidden || b->transActive) return;
     if (b->msgBase) tint(dst, b->W, b->H, b->msgBase, b->msgX + b->msgBase->x, b->msgY + b->msgBase->y, b->bgColor);
     if (b->msgFrame) bx_blit(dst, b->W, b->H, b->msgFrame, b->msgX + b->msgFrame->x, b->msgY + b->msgFrame->y, 255);
+    bx_info_draw(b, dst);
     if (!b->text) return;
     if (b->speaker && *b->speaker && b->msgName) bx_blit(dst, b->W, b->H, b->msgName, b->msgX + b->msgName->x, b->msgY + b->msgName->y, 255);
     if (b->speaker && *b->speaker)
-        bx_text_draw(b, dst, b->W, b->H, b->speaker, b->msgX + b->nameRect[0], b->msgY + b->nameRect[1], b->fontSize, b->fontW, b->nameColor, b->edge, b->shadow);
-    int lineH = b->fontH + 4;
-    int x = b->msgX + b->textRect[0], y = b->msgY + b->textRect[1];
+        bx_text_draw(b, dst, b->W, b->H, b->speaker, b->msgX + b->nameRect[0], b->msgY + b->nameRect[1] + b->textDY, b->fontSize, b->fontW, b->nameColor, b->edge, b->shadow);
+    int lineH = b->lineH;
+    int x = b->msgX + b->textRect[0], y = b->msgY + b->textRect[1] + b->textDY;
     char line[1024];
     size_t ln = 0;
     int count = 0;
