@@ -155,6 +155,20 @@ bool vm_cond(EX *e, const char *cond) {
 }
 
 void vm_goto_script(EX *e, const char *name) {
+    static const char *const extraNames[] = {"extra", "cgMode", "replay", "musicMode", "exitReplay"};
+    for (int i = 0; i < 5; i++)
+        if (ex_ieq(name, extraNames[i])) {
+            int tab = i == 0 ? (e->R[1281] == 2 ? 2 : e->R[1281] == 3 ? 1 : 0) : i == 1 ? 0 : i == 3 ? 2 : 1;
+            if (i == 4) {
+                reset_for_title(e);
+                e->R[1020] = 0;
+            }
+            snd_play_music(e, e->R[1289] > 0 ? e->R[1289] : 8, 300);
+            extra_open(e, tab);
+            e->wait = W_NONE;
+            ex_log(e, "extra %s", name);
+            return;
+        }
     Script *sc = rld_get(e, name);
     if (!sc) {
         snprintf(e->problem, sizeof e->problem, "missing script %s", name);
@@ -383,7 +397,12 @@ static bool exec(EX *e, Op *op) {
     case 66:
     case 70:
     case 71:
-    case 189:
+    case 189: {
+        char *f[4];
+        int n = split_csv(s0, f, 4);
+        if (n >= 3 && field_int(f[0]) == 2) extra_mark_scene(e, field_int(f[2]));
+        break;
+    }
     case 192:
     case 193:
     case 195:
@@ -688,7 +707,7 @@ void vm_run(EX *e) {
             break;
         }
         e->wait = W_NONE;
-        if (!e->sc) return;
+        if (!e->sc || e->extra) return;
         if (e->pc >= e->sc->count) {
             if (e->sp) {
                 ret(e);

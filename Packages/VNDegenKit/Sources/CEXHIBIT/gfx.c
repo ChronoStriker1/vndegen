@@ -95,6 +95,7 @@ void gfx_draw_cg(EX *e, int id, int ms) {
         return;
     }
     e->cg = cg_image(e, id);
+    extra_mark_cg(e, id);
 }
 
 void gfx_set_cg(EX *e, int id, u32 color) {
@@ -163,6 +164,7 @@ int gfx_billboard(EX *e, char *args) {
     case 0:
         b->srcId = field_int(f[2]);
         b->img = cg_image(e, b->srcId);
+        extra_mark_cg(e, b->srcId);
         b->ownImg = true;
         break;
     case 1:
@@ -234,6 +236,7 @@ int gfx_faceup(EX *e, char *args) {
         b->kind = 0;
         b->srcId = field_int(src);
         b->img = cg_image(e, b->srcId);
+        extra_mark_cg(e, b->srcId);
     }
     b->ownImg = true;
     int ms = field_int(f[24]);
@@ -594,6 +597,7 @@ static void compose(EX *e, u32 *dst, int below) {
     msg_draw(e, dst);
     for (int z = 0; z < 4; z++) portrait_draw(e, dst, e->portraitZ[z]);
     ui_draw(e, dst);
+    extra_draw(e, dst);
 }
 
 static void snapshot(EX *e, Billboard *self) {

@@ -89,6 +89,8 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     e->musicTrack = e->loopId = e->envId = -1;
     slots_read_index(e);
     cfg_load(e);
+    extra_load(e);
+    e->L[10] = 1;
     e->cam.w = EX_W;
     e->cam.h = EX_H;
     ex_log(e, "opened %s", e->gameDir);
@@ -100,6 +102,7 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
         vm_goto_script(e, e->bootEntry);
         free(e->bootEntry);
     ui_close(e);
+    extra_free(e);
     slots_free(e);
     history_free(e);
     free(e->memo);
@@ -158,6 +161,12 @@ static void tick(EX *e) {
     bool anySave = false;
     for (int i = 0; i < EX_SLOTS && !anySave; i++) anySave = e->slots[i].used;
     e->Q[0] = anySave;
+    if (e->extra) {
+        extra_input(e);
+        e->lPress = e->rPress = false;
+        e->wheel = 0;
+        return;
+    }
     if (e->ui) {
         ui_input(e);
         e->lPress = e->rPress = false;
