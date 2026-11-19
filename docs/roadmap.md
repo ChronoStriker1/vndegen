@@ -116,6 +116,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - ExHibit, on VNDegen's own clean-room runtime, with Succubus Sessions: Mami Mamiya's Sweet Slice of Hell and PC saves both ways (0.54.0).
 - BISHOP BSX, on VNDegen's own clean-room runtime, with Mesu Kyoushi ~Injoku no Kyoushitsu~ Immoral Edition and PC saves both ways (0.55.0).
 - EAGLS's CG View and Scene View, and saves made in VNDegen loading in the PC game (0.55.1).
+- Mesu Kyoushi 2 ~Injuu no Rasen~ on BISHOP BSX (0.55.2).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -139,7 +140,7 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the two that reuse an engine VNDegen has came first and shipped, the Enigma Virtual Box unpacker for packed RPG Maker MV and MZ games in 0.44.0 and Construct in 0.45.0. The rest follow by number of games. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
 1. One game each: ExHibit and EAGLS shipped (0.53.0 and 0.54.0); their follow-ups are in progress. The content rule changed on 2026-11-19 (maintainer): a game is left out only when a character is clearly a child in a sexual context, not when the check is unsure. So Bruns, with Orc Kingdom, comes back after the EAGLS and ExHibit follow-ups, and Kamidori Alchemy Meister (Eushully AGE) passed the check again (item 4). System-NNN, FFD and SRPG Studio stay off the list: their one game each was left out for clearly child-like characters. Lightning Warrior Raidy II (Ikura GDL) is back as a second Ikura game, and Sacred (Smile Game Builder) and Bunny Black 3 (SystemAoi) are back as candidates for their set-aside engines.
 2. New test games for the engines VNDegen runs, from the second engine survey (2026-11-19): 27 library games, checked from import to a save and a load, with fixes for the ones that need a new import layout or detection. Started 2026-11-19 on branch `feat/new-test-games`.
-3. BISHOP BSX, on a clean-room runtime of VNDegen's own, on branch `feat/bsx`. Mesu Kyoushi ~Injoku no Kyoushitsu~ shipped in 0.55.0. Next are Mesu Kyoushi 2, whose story and saves already work and which needs its Mac, iPad and case checks (a patch), then 4 (1 to 2 days) and 3 (2 to 3), each its own release. The museum screen is a follow-up. Mesu Kyoushi 3 also needs Lua modules that sit inside its packed exe, which may block it.
+3. BISHOP BSX, on a clean-room runtime of VNDegen's own, on branch `feat/bsx`. Mesu Kyoushi ~Injoku no Kyoushitsu~ shipped in 0.55.0. Mesu Kyoushi 2 followed in 0.55.2. Next are 4 (1 to 2 days) and 3 (2 to 3), each its own release. The museum screen is a follow-up. Mesu Kyoushi 3 also needs Lua modules that sit inside its packed exe, which may block it.
 4. Eushully AGE with Kamidori Alchemy Meister, which passed the content check again: about 8 to 12 weeks for one game, since its whole game logic, battle map included, is in undocumented compiled scripts. On hold for the maintainer's decision; the survey is in branch `feat/age`'s notes.
 5. The ANIM engine (4 games, 6 to 8 weeks, half of it for E-mote character playback) and PJADV (1 game, 2 to 3 weeks), by the second survey.
 
