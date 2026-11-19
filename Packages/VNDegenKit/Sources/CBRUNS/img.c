@@ -195,11 +195,18 @@ void blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int
     for (int y = 0; y < sh; y++) {
         const u32 *s = im->px + (size_t)(sy + y) * im->w + sx;
         u32 *d = dst + (size_t)(dy + y) * dw + dx;
-        for (int x = 0; x < sw; x++) {
-            u32 p = s[x];
-            int a = (int)(p >> 24) * alpha / 255;
-            d[x] = mix(d[x], p, a);
-        }
+        if (alpha >= 255) {
+            for (int x = 0; x < sw; x++) {
+                u32 p = s[x];
+                u32 pa = p >> 24;
+                if (pa == 255) d[x] = p;
+                else if (pa) d[x] = mix(d[x], p, (int)pa);
+            }
+        } else
+            for (int x = 0; x < sw; x++) {
+                u32 p = s[x];
+                if (p >> 24) d[x] = mix(d[x], p, (int)(p >> 24) * alpha / 255);
+            }
     }
 }
 
