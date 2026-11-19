@@ -152,7 +152,7 @@ typedef struct Obj {
     int hoverEvent;
     bool disabled, hidden, hover, pressed, hasColor;
     u32 color;
-    int fontSize;
+    int fontSize, w, h;
     char *text;
 } Obj;
 
@@ -192,6 +192,13 @@ typedef struct Msg {
     Image *layer;
     char *raw;
 } Msg;
+
+typedef struct Choice {
+    bool active;
+    char *item[8];
+    int index[8];
+    int count, hover;
+} Choice;
 
 typedef struct Menu {
     bool show, autohide, enable, pinned, open;
@@ -234,7 +241,7 @@ typedef struct Cfg {
     int initialScript, titleScript;
 } Cfg;
 
-enum { W_NONE, W_TIME, W_CLICK, W_EVENT, W_FADE, W_TEXT, W_DIALOG, W_END };
+enum { W_NONE, W_TIME, W_CLICK, W_EVENT, W_FADE, W_TEXT, W_DIALOG, W_END, W_CHOICE };
 
 typedef struct BR {
     char *gameDir, *saveDir;
@@ -300,6 +307,10 @@ typedef struct BR {
     u32 sysSavedAt;
     Menu menu;
     int savedWait;
+    int keyEvent;
+    Choice choice;
+    struct History *hist;
+    int voiceCh, voiceId;
     u32 rng;
     u32 eventStart;
 } BR;
@@ -459,3 +470,13 @@ void menu_draw(BR *e, u32 *dst);
 void menu_builtin(BR *e, int id, int a, int b);
 void snd_se_click(BR *e);
 void image_bbox(Image *im, int *x0, int *y0, int *x1, int *y1);
+u32 color_code(BR *e, int idx);
+int history_height(BR *e);
+int history_layout(BR *e, int scroll, int view, int textBase, int voiceBase, int count, int textX, int topY, int voiceX);
+int history_voice(BR *e, int idx, int *ch);
+void history_free(BR *e);
+void history_voice_mark(BR *e, int ch, int num);
+void choice_start(BR *e, Node *call);
+void choice_tick(BR *e);
+void choice_draw(BR *e, u32 *dst);
+void choice_free(BR *e);

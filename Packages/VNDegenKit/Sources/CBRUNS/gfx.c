@@ -41,6 +41,7 @@ Obj *obj_create(BR *e, int kind, int id, int parts, int layer, int x, int y, int
     o->alpha = alpha;
     o->flag = flag;
     o->event = -1;
+    o->hoverEvent = -1;
     o->order = ++e->objOrder;
     e->obj[kind][id] = o;
     return o;
@@ -96,7 +97,8 @@ static void obj_draw(BR *e, u32 *dst, Obj *o) {
     }
     Image *im = obj_image(e, o, p);
     if (!im) return;
-    blit(dst, BR_W, BR_H, im, 0, 0, -1, -1, o->x, o->y, o->alpha);
+    if (o->w > 0 && o->h > 0) blit_scaled(dst, BR_W, BR_H, im, 0, 0, im->w, im->h, o->x, o->y, o->w, o->h, o->alpha);
+    else blit(dst, BR_W, BR_H, im, 0, 0, -1, -1, o->x, o->y, o->alpha);
     image_free(im);
 }
 
@@ -160,6 +162,7 @@ void gfx_frame(BR *e) {
     int n = obj_sorted(e, list, 4096);
     for (int i = 0; i < n; i++) obj_draw(e, dst, list[i]);
     msg_draw(e, dst);
+    choice_draw(e, dst);
     menu_draw(e, dst);
     int oa = (int)anim_value(e, &e->overlay);
     if (oa > 0) fill_rect(dst, BR_W, BR_H, 0, 0, BR_W, BR_H, e->overlayColor, oa);

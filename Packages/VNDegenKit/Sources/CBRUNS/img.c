@@ -138,6 +138,13 @@ Image *image_url(BR *e, Node *url) {
     if (url->t == N_INT) return image_parts(e, url->i);
     const char *s = sx_str(url);
     if (!s) return NULL;
+    if (s[0] == '#') {
+        int r = 0, g = 0, b = 0;
+        sscanf(s + 1, "%d,%d,%d", &r, &g, &b);
+        Image *im = image_new(1, 1);
+        im->px[0] = (u32)r | (u32)g << 8 | (u32)b << 16 | 0xff000000u;
+        return im;
+    }
     char rel[256];
     snprintf(rel, sizeof rel, "%s", s);
     for (char *c = rel; *c; c++)

@@ -129,7 +129,14 @@ void font_draw_char(BR *e, u32 *dst, int dw, int dh, const u8 *p, int x, int y, 
 }
 
 void font_draw(BR *e, u32 *dst, int dw, int dh, const char *sjis, int x, int y, int size, u32 color, u32 edge, int edgeW, int alpha) {
+    u32 base = color;
     for (const u8 *p = (const u8 *)sjis; *p;) {
+        if ((p[0] == '$' || p[0] == '#' || p[0] == '&') && p[1] && p[1] < 0x80) {
+            if (p[0] == '$' && p[1] >= 'A' && p[1] <= 'K') color = color_code(e, 10 + (p[1] - 'A'));
+            else if (p[0] == '$' && p[1] == 'N') color = base;
+            p += 2;
+            continue;
+        }
         font_draw_char(e, dst, dw, dh, p, x, y, size, color, edge, edgeW, alpha);
         x += font_char_width(p, size);
         p += br_sjis_len(p);

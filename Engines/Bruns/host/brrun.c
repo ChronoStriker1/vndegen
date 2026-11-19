@@ -70,7 +70,10 @@ int main(int argc, char **argv) {
             vnbruns_key(n, k, 0);
             alive = alive && run(n, 32);
         } else if (!strcmp(c, "state")) print_state((BR *)n);
-        else if (!strcmp(c, "peak")) {
+        else if (sscanf(c, "wheel:%d", &k) == 1) {
+            vnbruns_wheel(n, k);
+            alive = run(n, 64);
+        } else if (!strcmp(c, "peak")) {
             printf("audio peak %.3f\n", peak);
             peak = 0;
         }

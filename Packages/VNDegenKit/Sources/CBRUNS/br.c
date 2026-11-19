@@ -118,6 +118,8 @@ void vnbruns_close(VNBruns *n) {
     parts_free_all(e);
     font_free(e);
     msg_free(e);
+    history_free(e);
+    choice_free(e);
     mixer_free(e->mixer);
     image_cache_clear();
     sx_free(e->cfg.root);
@@ -138,6 +140,9 @@ static void tick(BR *e) {
     if (!e->systemMode && e->wait == W_TEXT && e->rPress) {
         e->rPress = false;
         sys_call(e, 9007);
+    } else if (!e->systemMode && e->wait == W_TEXT && e->wheel > 0) {
+        e->wheel = 0;
+        sys_call(e, 9004);
     }
     uf_tick(e);
     vm_run(e);
@@ -193,6 +198,7 @@ void vnbruns_key(VNBruns *n, int vk, bool down) {
     if (vk == 0x11) {
         e->ctrlHeld = down;
     }
+    e->keyEvent = 65536 + vk * 4 + (down ? 0 : 1);
     if (!down) return;
     if (vk == 0x0d || vk == 0x20) e->lPress = true;
     if (vk == 0x1b) e->rPress = true;

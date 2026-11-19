@@ -41,7 +41,7 @@ static MsgCfg *msg_cfg(BR *e, int id) {
     return c;
 }
 
-static u32 color_code(BR *e, int idx) {
+u32 color_code(BR *e, int idx) {
     Node *t = sx_find(e->cfg.root, ":color-table");
     Node *c = sx_cdr_value(sx_assoc(t, idx));
     if (!c || c->t != N_LIST || c->n < 3) return 0xffffffu;
@@ -143,12 +143,12 @@ void msg_send(BR *e, Node *call) {
     if (!a) return;
     if (a->t == N_STR) {
         msg_append(e, a->s);
-        history_add(e, a->s);
+        if (!e->systemMode) history_add(e, a->s);
         if (e->sp && call->n > 2) seen_text(e, e->stack[e->sp - 1].sc->num, sx_int(call->k[2], 0));
         return;
     }
     if (sx_sym(a, "clear")) {
-        history_page(e);
+        if (!e->systemMode) history_page(e);
         page_reset(e);
         return;
     }

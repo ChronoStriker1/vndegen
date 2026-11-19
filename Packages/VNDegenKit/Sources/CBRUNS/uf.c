@@ -106,7 +106,10 @@ bool uf_call(BR *e, int id, Node *call) {
     }
     case 3024: {
         int ch = A(e, call, 0);
-        if (ch >= 0 && ch < 10) snd_voice(e, ch, e->voiceNum[ch]);
+        if (ch >= 0 && ch < 10) {
+            snd_voice(e, ch, e->voiceNum[ch]);
+            if (!e->systemMode) history_voice_mark(e, ch, e->voiceNum[ch]);
+        }
         return true;
     }
     case 2000: {
@@ -121,6 +124,7 @@ bool uf_call(BR *e, int id, Node *call) {
     case 2043:
     case 2044: menu_builtin(e, id, A(e, call, 0), A(e, call, 1)); return true;
     case 2080: e->reflag = 1; return true;
+    case 2031: choice_start(e, call); return true;
     case 2050: obj_clear(e, OBJ_IMG); return true;
     case 2120: obj_clear(e, OBJ_BTN); return true;
     case 2053:
@@ -145,7 +149,10 @@ bool uf_call(BR *e, int id, Node *call) {
         return true;
     case 2061:
     case 2131:
-        if ((o = obj_get(e, id == 2061 ? OBJ_IMG : OBJ_BTN, A(e, call, 0)))) o->event = A(e, call, 2);
+        if ((o = obj_get(e, id == 2061 ? OBJ_IMG : OBJ_BTN, A(e, call, 0)))) {
+            if (A(e, call, 1) == 1) o->hoverEvent = A(e, call, 2);
+            else o->event = A(e, call, 2);
+        }
         return true;
     case 2063:
     case 2133:
@@ -216,6 +223,27 @@ bool uf_call(BR *e, int id, Node *call) {
     case 4204: e->reflag = save_slot(e, QUICK_SLOT, ""); return true;
     case 4205: e->reflag = sys_load_slot(e, -1); return true;
     case 4300: return true;
+    case 4316: e->reflag = history_height(e); return true;
+    case 4322: e->reflag = history_layout(e, A(e, call, 0), A(e, call, 1), A(e, call, 2), A(e, call, 3), A(e, call, 4), A(e, call, 5), A(e, call, 6), A(e, call, 7)); return true;
+    case 4312: {
+        int ch;
+        history_voice(e, A(e, call, 0), &ch);
+        e->reflag = ch;
+        return true;
+    }
+    case 4313: {
+        int ch;
+        e->reflag = history_voice(e, A(e, call, 0), &ch);
+        return true;
+    }
+    case 4314: e->reflag = 100; return true;
+    case 3022: return true;
+    case 2127:
+        if ((o = obj_get(e, OBJ_BTN, A(e, call, 0)))) {
+            o->w = A(e, call, 1);
+            o->h = A(e, call, 2);
+        }
+        return true;
     case 5005: sys_format_time(e, A(e, call, 0), A(e, call, 1)); return true;
     case 7001: e->reflag = 0; return true;
     case 7002: return true;
@@ -240,27 +268,32 @@ static Obj *hit_button(BR *e) {
     int n = obj_sorted(e, list, 4096);
     for (int i = n - 1; i >= 0; i--) {
         Obj *o = list[i];
-        if (o->event < 0 || o->disabled) continue;
+        if ((o->event < 0 && o->hoverEvent < 0) || o->disabled) continue;
         if (obj_hit(e, o, e->mouseX, e->mouseY)) return o;
     }
     return NULL;
 }
 
-static void update_hover(BR *e, bool active) {
+static Obj *update_hover(BR *e, bool active) {
     Obj *h = active ? hit_button(e) : NULL;
+    Obj *entered = NULL;
     for (int k = 0; k < OBJ_KINDS; k++)
         for (int i = 0; i < BR_OBJS; i++) {
             Obj *o = e->obj[k][i];
             if (!o) continue;
             bool hv = o == h;
-            if (hv && !o->hover) snd_se_hover(e);
+            if (hv && !o->hover) {
+                snd_se_hover(e);
+                entered = o;
+            }
             o->hover = hv;
             o->pressed = hv && e->lDown;
         }
+    return entered;
 }
 
 void uf_tick(BR *e) {
-    update_hover(e, e->wait == W_EVENT && (e->eventMode & 4));
+    Obj *entered = update_hover(e, e->wait == W_EVENT && (e->eventMode & 4));
     switch (e->wait) {
     case W_TIME:
         if (e->now >= e->waitUntil) e->wait = W_NONE;
@@ -271,11 +304,29 @@ void uf_tick(BR *e) {
     case W_EVENT: {
         if (e->eventMode & 4 && e->lPress) {
             Obj *o = hit_button(e);
-            if (o) {
+            if (o && o->event >= 0) {
                 e->reflag = o->event;
                 e->wait = W_NONE;
                 break;
             }
+        }
+        if (e->eventMode & 4 && entered && entered->hoverEvent >= 0) {
+            e->reflag = entered->hoverEvent;
+            e->wait = W_NONE;
+            break;
+        }
+        if (e->eventMode & 0x4000 && e->keyEvent) {
+            e->reflag = e->keyEvent;
+            e->keyEvent = 0;
+            e->wait = W_NONE;
+            break;
+        }
+        if (e->eventMode & 0x2000 && (e->rPress || e->wheel)) {
+            e->reflag = e->rPress ? 131072 + 33 : 131072 + ((e->wheel > 0 ? 255 : 1) << 8) + 8;
+            e->rPress = false;
+            e->wheel = 0;
+            e->wait = W_NONE;
+            break;
         }
         if (e->eventMode & 1 && (e->lPress || e->rPress)) {
             e->reflag = 0;
@@ -289,6 +340,7 @@ void uf_tick(BR *e) {
         break;
     }
     case W_TEXT: msg_tick(e); break;
+    case W_CHOICE: choice_tick(e); break;
     default: break;
     }
 }
