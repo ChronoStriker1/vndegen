@@ -340,7 +340,7 @@ static void button_press(BX *b, const char *key) {
 static bool always_shown(const Button *bt) { return !strcmp(bt->key, "simple view") || !strcmp(bt->key, "simple strip"); }
 
 static bool menu_context(BX *b) {
-    if (b->phase == PH_CUSTOM_MAP) return b->menuLayer && !b->transActive;
+    if (b->phase == PH_CUSTOM_MAP) return b->menuLayer && !b->transActive && !bx_cfg_section(&b->cfg, "map phase");
     return b->phase == PH_NONE && b->winShown && !b->winHidden && b->menuLayer && b->th.wait == W_TEXT;
 }
 
