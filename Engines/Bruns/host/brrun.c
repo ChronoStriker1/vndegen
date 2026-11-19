@@ -37,7 +37,12 @@ static int press(VNBruns *n, int x, int y, int button) {
 
 static void print_state(BR *e) {
     Frame *f = e->sp ? &e->stack[e->sp - 1] : NULL;
-    printf("script=%d sub=%d pc=%d sp=%d wait=%d system=%d reflag=%d\n", f ? f->sc->num : -1, f ? f->u->id : -1, f ? f->pc : -1, e->sp, e->wait, e->systemMode, e->reflag);
+    printf("script=%d sub=%d pc=%d sp=%d wait=%d system=%d reflag=%d frozen=%d\n", f ? f->sc->num : -1, f ? f->u->id : -1, f ? f->pc : -1, e->sp, e->wait, e->systemMode, e->reflag, e->frozen);
+    for (int i = 0; i < e->layerCount; i++) {
+        Layer *l = e->layers[i];
+        Pic *p = l->pic >= 0 ? pic_find(e, l->pic) : NULL;
+        if (p) printf("  layer %d vis %d pic %d url %d type %d a %d x %d y %d sw %d\n", l->no, l->visible, l->pic, p->url, p->type, l->v[LP_A], l->v[LP_IX], l->v[LP_IY], l->v[LP_SWITCH]);
+    }
 }
 
 int main(int argc, char **argv) {
@@ -76,6 +81,27 @@ int main(int argc, char **argv) {
             vnbruns_key(n, 0x11, 0);
         } else if (sscanf(c, "clicks:%d,%d", &x, &y) == 2) {
             for (int i = 0; i < x && alive; i++) alive = press(n, 640, 360, VNBRUNS_MOUSE_LEFT) && run(n, y);
+        } else if (sscanf(c, "monkey:%d,%d", &x, &y) == 2) {
+            unsigned r = (unsigned)y;
+            for (int i = 0; i < x && alive; i++) {
+                r = r * 1103515245u + 12345u;
+                int mx = (int)(r >> 8) % 1280;
+                r = r * 1103515245u + 12345u;
+                int my = (int)(r >> 8) % 720;
+                r = r * 1103515245u + 12345u;
+                int kind = (int)(r >> 8) % 20;
+                if (kind == 0) alive = press(n, mx, my, VNBRUNS_MOUSE_RIGHT);
+                else alive = press(n, mx, my, VNBRUNS_MOUSE_LEFT);
+                alive = alive && run(n, 250);
+                if (i % 200 == 199) {
+                    char path[1024];
+                    int w, h;
+                    const uint32_t *px = vnbruns_pixels(n, &w, &h);
+                    snprintf(path, sizeof path, "%s/m%05d.png", argv[3], i);
+                    write_png(path, px, w, h);
+                    print_state((BR *)n);
+                }
+            }
         } else if (sscanf(c, "wheel:%d", &k) == 1) {
             vnbruns_wheel(n, k);
             alive = run(n, 64);

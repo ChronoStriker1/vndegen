@@ -122,6 +122,7 @@ void image_cache_clear(void) {
 }
 
 Image *image_storage(BR *e, int num) {
+    if (e->sysRoot && num >= 0) view_flag_set(e, 1, num, true);
     char rel[128];
     snprintf(rel, sizeof rel, "%s/%08d.png", e->cfg.imageDir, num);
     return image_load(e, rel);

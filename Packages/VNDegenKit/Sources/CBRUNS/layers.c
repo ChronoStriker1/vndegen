@@ -257,10 +257,26 @@ void layers_draw(BR *e, u32 *dst) {
 }
 
 void layers_freeze(BR *e) {
-    if (e->frozen) return;
-    image_free(e->frozenImg);
-    e->frozenImg = snapshot(e);
-    e->frozen = true;
+    if (!e->frozen) {
+        image_free(e->frozenImg);
+        e->frozenImg = snapshot(e);
+        e->frozen = true;
+    }
+    layers_reset(e);
+}
+
+void layers_delete(BR *e, int a, int b) {
+    if (b < a) b = a;
+    for (int i = e->layerCount - 1; i >= 0; i--) {
+        Layer *l = e->layers[i];
+        if (l->no < a || l->no > b) continue;
+        for (int k = e->picCount - 1; k >= 0; k--)
+            if (e->pics[k]->layer == l->no) pic_remove(e, k);
+        free(l->tmCursor);
+        free(l);
+        memmove(&e->layers[i], &e->layers[i + 1], sizeof(Layer *) * (size_t)(e->layerCount - i - 1));
+        e->layerCount--;
+    }
 }
 
 void layers_transition(BR *e, int type, int ms) {

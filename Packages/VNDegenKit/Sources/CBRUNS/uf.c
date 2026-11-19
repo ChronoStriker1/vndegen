@@ -95,13 +95,29 @@ bool uf_call(BR *e, int id, Node *call) {
     case 1045: e->reflag = touch_last_pos(e, A(e, call, 1)); return true;
     case 1046: touch_cursor(e, A(e, call, 1), A(e, call, 2), S(e, call, 3)); return true;
     case 1009: pics_delete(e, A(e, call, 0), A(e, call, 0)); return true;
-    case 1018: pics_delete(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 1018: layers_delete(e, A(e, call, 0), A(e, call, 1)); return true;
     case 1010: pic_stream_restart(e, A(e, call, 1)); return true;
     case 1012: layer_order(e, A(e, call, 1), A(e, call, 2)); return true;
     case 1013: layer_shake(e, A(e, call, 2), A(e, call, 4), A(e, call, 7), A(e, call, 8)); return true;
     case 2125:
         if ((o = obj_get(e, OBJ_BTN, A(e, call, 0)))) o->hidden = A(e, call, 1) == 0;
         return true;
+    case 4100: str_set(e, A(e, call, 0), S(e, call, 1)); return true;
+    case 4130: e->reflag = view_flag(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 4131: view_flag_set(e, A(e, call, 0), A(e, call, 1), A(e, call, 2) != 0); return true;
+    case 2055:
+        if ((o = obj_get(e, OBJ_IMG, A(e, call, 0)))) o->hidden = A(e, call, 1) == 0;
+        return true;
+    case 4401:
+    case 4411:
+    case 4421:
+    case 4430:
+        e->reflag = 0;
+        return true;
+    case 1001:
+    case 1017:
+    case 2064:
+    case 4302:
     case 2015:
     case 2023:
     case 2026:
@@ -146,6 +162,8 @@ bool uf_call(BR *e, int id, Node *call) {
     case 2000: {
         int img = A(e, call, 0), ms = A(e, call, 6), mode = A(e, call, 7);
         bg_set(e, img, A(e, call, 5) ? ms : 0);
+        int sx = A(e, call, 1), sy = A(e, call, 2);
+        bg_pan(e, sx < 0 ? 0 : sx, sx < 0 ? 0 : sy, 0);
         if (mode == 2 && ms > 0) e->wait = W_FADE;
         return true;
     }
@@ -192,7 +210,14 @@ bool uf_call(BR *e, int id, Node *call) {
             o->text = br_strdup(S(e, call, 1));
         }
         return true;
+    case 2002: {
+        int ms = A(e, call, 4) == 201 ? A(e, call, 5) : 0;
+        bg_pan(e, A(e, call, 0), A(e, call, 1), ms);
+        if (A(e, call, 6) == 2 && ms > 0) e->wait = W_FADE;
+        return true;
+    }
     case 2150: overlay_set(e, 0, 0, 0); return true;
+    case 2071:
     case 2151: {
         u32 rgb = (u32)A(e, call, 0) | (u32)A(e, call, 1) << 8 | (u32)A(e, call, 2) << 16;
         int ms = A(e, call, 4);
@@ -245,7 +270,9 @@ bool uf_call(BR *e, int id, Node *call) {
         str_set(e, A(e, call, 0), buf);
         return true;
     }
-    case 6000: e->quit = true; return true;
+    case 6000:
+        if (!getenv("BRUNS_NOQUIT")) e->quit = true;
+        return true;
     case 6002: sys_game_start(e, A(e, call, 0), A(e, call, 1)); return true;
     case 6007: sys_title(e); return true;
     case 4200: sys_info(e, A(e, call, 0), A(e, call, 1), A(e, call, 2), A(e, call, 3)); return true;

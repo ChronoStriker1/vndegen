@@ -124,7 +124,7 @@ void bg_set(BR *e, int num, int ms) {
     e->bgPrev = NULL;
     if (ms > 0) {
         e->bgPrev = image_new(BR_W, BR_H);
-        if (e->bg) blit(e->bgPrev->px, BR_W, BR_H, e->bg, 0, 0, -1, -1, 0, 0, 255);
+        if (e->bg) blit(e->bgPrev->px, BR_W, BR_H, e->bg, (int)anim_value(e, &e->bgPanX), (int)anim_value(e, &e->bgPanY), BR_W, BR_H, 0, 0, 255);
         else
             for (int i = 0; i < BR_W * BR_H; i++) e->bgPrev->px[i] = 0;
     }
@@ -134,7 +134,12 @@ void bg_set(BR *e, int num, int ms) {
     anim_set(e, &e->bgFade, 0, 255, ms);
 }
 
-bool bg_busy(BR *e) { return anim_busy(e, &e->bgFade); }
+bool bg_busy(BR *e) { return anim_busy(e, &e->bgFade) || anim_busy(e, &e->bgPanX) || anim_busy(e, &e->bgPanY); }
+
+void bg_pan(BR *e, int x, int y, int ms) {
+    anim_set(e, &e->bgPanX, anim_value(e, &e->bgPanX), (float)x, ms);
+    anim_set(e, &e->bgPanY, anim_value(e, &e->bgPanY), (float)y, ms);
+}
 
 void overlay_set(BR *e, u32 rgb, int alpha, int ms) {
     float cur = anim_value(e, &e->overlay);
@@ -150,13 +155,13 @@ void gfx_frame(BR *e) {
     layers_draw(e, dst);
     if (e->bgPrev && bg_busy(e)) {
         blit(dst, BR_W, BR_H, e->bgPrev, 0, 0, -1, -1, 0, 0, 255);
-        blit(dst, BR_W, BR_H, e->bg, 0, 0, -1, -1, 0, 0, (int)anim_value(e, &e->bgFade));
+        blit(dst, BR_W, BR_H, e->bg, (int)anim_value(e, &e->bgPanX), (int)anim_value(e, &e->bgPanY), BR_W, BR_H, 0, 0, (int)anim_value(e, &e->bgFade));
     } else {
         if (e->bgPrev) {
             image_free(e->bgPrev);
             e->bgPrev = NULL;
         }
-        blit(dst, BR_W, BR_H, e->bg, 0, 0, -1, -1, 0, 0, 255);
+        blit(dst, BR_W, BR_H, e->bg, (int)anim_value(e, &e->bgPanX), (int)anim_value(e, &e->bgPanY), BR_W, BR_H, 0, 0, 255);
     }
     static Obj *list[4096];
     int n = obj_sorted(e, list, 4096);

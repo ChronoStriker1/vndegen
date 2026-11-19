@@ -289,7 +289,7 @@ typedef struct BR {
     int objOrder;
     Image *bg, *bgPrev;
     int bgNum;
-    Anim bgFade;
+    Anim bgFade, bgPanX, bgPanY;
     Anim overlay;
     u32 overlayColor;
     int event;
@@ -507,3 +507,7 @@ void touch_auto(BR *e, int no, int mode);
 int touch_take(BR *e, int no);
 int touch_last_pos(BR *e, int no);
 void touch_tick(BR *e);
+bool view_flag(BR *e, int cat, int idx);
+void view_flag_set(BR *e, int cat, int idx, bool on);
+void bg_pan(BR *e, int x, int y, int ms);
+void layers_delete(BR *e, int a, int b);

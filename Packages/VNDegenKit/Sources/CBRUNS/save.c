@@ -603,3 +603,38 @@ bool seen_text_has(BR *e, int script, int line) {
         if (row->k[i]->i == line) return true;
     return false;
 }
+
+static Node *view_row(BR *e, int key, bool create) {
+    Node *rv = ensure(e->sysRoot, "resource-view-flag");
+    Node *row = sx_assoc(rv, key);
+    if (!row && create) {
+        row = add(rv, nl());
+        add(row, ni(key));
+    }
+    return row;
+}
+
+bool view_flag(BR *e, int cat, int idx) {
+    Node *row = view_row(e, cat, false);
+    for (int i = 1; row && i < row->n; i++)
+        if (row->k[i]->t == N_INT && row->k[i]->i == idx) return true;
+    return false;
+}
+
+void view_flag_set(BR *e, int cat, int idx, bool on) {
+    Node *row = view_row(e, cat, true);
+    for (int i = 1; i < row->n; i++)
+        if (row->k[i]->t == N_INT && row->k[i]->i == idx) {
+            if (!on) {
+                sx_free(row->k[i]);
+                memmove(&row->k[i], &row->k[i + 1], sizeof(Node *) * (size_t)(row->n - i - 1));
+                row->n--;
+                e->sysDirty = true;
+            }
+            return;
+        }
+    if (on) {
+        add(row, ni(idx));
+        e->sysDirty = true;
+    }
+}
