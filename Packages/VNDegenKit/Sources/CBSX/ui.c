@@ -267,7 +267,30 @@ static bool button_enabled(BX *b, const Button *bt) {
     return true;
 }
 
+static bool any_bustup(BX *b, bool closeUp) {
+    for (int i = 0; i < BX_OBJS; i++) {
+        Obj *o = &b->shown.obj[i];
+        if (o->used && o->kind == OK_CHAR && (!closeUp || (strlen(o->name) == 12 && (o->name[4] == 'u' || o->name[4] == 'U')))) return true;
+    }
+    return false;
+}
+
 static void button_press(BX *b, const char *key) {
+    if (!strcmp(key, "simple strip")) {
+        int table[8] = {0}, n = bx_cfg_ints(&b->cfg, "system button", "simple strip table", table, 8);
+        if (n > 0 && any_bustup(b, false)) {
+            b->stripLevel = (b->stripLevel + 1) % n;
+            b->shownDirty = true;
+        }
+        return;
+    }
+    if (!strcmp(key, "simple view")) {
+        if (any_bustup(b, true)) {
+            b->viewLevel = b->viewLevel % 3 + 1;
+            b->shownDirty = true;
+        }
+        return;
+    }
     if (!strcmp(key, "skip")) b->skipMode = !b->skipMode;
     else if (!strcmp(key, "auto ex")) b->autoMode = !b->autoMode;
     else if (!strcmp(key, "voice")) {
@@ -284,12 +307,16 @@ static void button_press(BX *b, const char *key) {
     else bx_log(b, "menu button %s isn't available yet", key);
 }
 
+static bool always_shown(const Button *bt) { return !strcmp(bt->key, "simple view") || !strcmp(bt->key, "simple strip"); }
+
 void bx_ui_update(BX *b) {
     b->buttonHover = -1;
     bool inMenu = b->mx >= b->menuShow[0] && b->mx < b->menuShow[0] + b->menuShow[2] && b->my >= b->menuShow[1] && b->my < b->menuShow[1] + b->menuShow[3];
-    bool shown = b->winShown && !b->winHidden && (inMenu || b->menuVisible) && b->th.wait == W_TEXT;
-    if (!shown) return;
+    bool window = b->winShown && !b->winHidden && b->th.wait == W_TEXT;
+    bool shown = window && (inMenu || b->menuVisible);
+    if (!window) return;
     for (int i = 0; i < b->buttonCount; i++) {
+        if (!shown && !always_shown(&b->buttons[i])) continue;
         Item it = button_item(&b->buttons[i]);
         if (button_enabled(b, &b->buttons[i]) && inside(&it, b->mx, b->my, b->menuX, b->menuY)) b->buttonHover = i;
     }
@@ -302,10 +329,12 @@ void bx_ui_update(BX *b) {
 
 void bx_ui_draw(BX *b, u32 *dst) {
     bool inMenu = b->mx >= b->menuShow[0] && b->mx < b->menuShow[0] + b->menuShow[2] && b->my >= b->menuShow[1] && b->my < b->menuShow[1] + b->menuShow[3];
-    if (!b->winShown || b->winHidden || b->transActive || b->th.wait != W_TEXT || !(inMenu || b->menuVisible)) return;
-    if (b->menuBase) bx_blit(dst, b->W, b->H, b->menuBase, b->menuX, b->menuY, 255);
+    if (!b->winShown || b->winHidden || b->transActive || b->th.wait != W_TEXT) return;
+    bool menu = inMenu || b->menuVisible;
+    if (menu && b->menuBase) bx_blit(dst, b->W, b->H, b->menuBase, b->menuX, b->menuY, 255);
     for (int i = 0; i < b->buttonCount; i++) {
         if (!button_enabled(b, &b->buttons[i])) continue;
+        if (!menu && !always_shown(&b->buttons[i])) continue;
         Item it = button_item(&b->buttons[i]);
         bool on = (!strcmp(b->buttons[i].key, "skip") && b->skipMode) || (!strcmp(b->buttons[i].key, "auto ex") && b->autoMode);
         draw_item(b, dst, &it, i == b->buttonHover ? 1 : on ? 2 : 0, b->menuX, b->menuY);

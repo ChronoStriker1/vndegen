@@ -110,14 +110,45 @@ static Image *face_image(BX *b, const char *name) {
     return NULL;
 }
 
+static void stripped(BX *b, const char *name, char *out) {
+    snprintf(out, 64, "%s", name);
+    if (!b->stripLevel || strlen(name) != 12) return;
+    int table[8] = {0}, n = bx_cfg_ints(&b->cfg, "system button", "simple strip table", table, 8);
+    if (b->stripLevel >= n) return;
+    char alt[64], body[64], face[64];
+    snprintf(alt, sizeof alt, "%s", name);
+    for (int wear = clampi(table[b->stripLevel], 0, 9); wear > name[5] - '0'; wear--) {
+        alt[5] = (char)('0' + wear);
+        if (bustup_parts(alt, body, face) && bx_res_find(&b->arc, RX_GFX, body)) {
+            snprintf(out, 64, "%s", alt);
+            return;
+        }
+    }
+}
+
+static int view_offset(BX *b, const char *name) {
+    if (!b->viewLevel || strlen(name) != 12 || (name[4] != 'u' && name[4] != 'U')) return 0;
+    char key[64];
+    snprintf(key, sizeof key, "fixed position%.2s%c", name + 2, name[9]);
+    int pos[3] = {0, 0, 0};
+    if (bx_cfg_ints(&b->cfg, "free-sight screen", key, pos, 3) < 3) bx_cfg_ints(&b->cfg, "free-sight screen", "fixed position", pos, 3);
+    int v = pos[clampi(b->viewLevel - 1, 0, 2)];
+    return v ? -(v - b->H) : 0;
+}
+
 static void draw_obj(BX *b, const Obj *o, u32 *dst) {
     char body[64], face[64];
     int x = o->x + o->kx, y = o->y + o->ky, a = o->alpha;
     if (a <= 0) return;
     if (o->kind == OK_CHAR && bustup_parts(o->name, body, face)) {
+        char shown[64];
+        stripped(b, o->name, shown);
+        bustup_parts(shown, body, face);
+        y += view_offset(b, o->name);
         Image *im = bx_image_load(b, body);
         if (im) bx_blit(dst, b->W, b->H, im, im->x + x, im->y + y, a);
-        Image *f = face_image(b, o->name);
+        Image *f = face_image(b, shown);
+        if (!f) f = face_image(b, o->name);
         if (f) bx_blit(dst, b->W, b->H, f, f->x + x, f->y + y, a);
         return;
     }
@@ -186,9 +217,12 @@ Obj *bx_obj_by_id(BX *b, int id) { return find_id(&b->scene, id); }
 Obj *bx_obj_put(BX *b, int kind, int id, const char *name, int x, int y) {
     (void)id;
     Scene *s = &b->scene;
-    if (kind == OK_BG)
+    if (kind == OK_BG) {
         for (int i = 0; i < BX_OBJS; i++)
             if (s->obj[i].used && s->obj[i].kind != OK_OBJ) s->obj[i].used = false;
+        b->stripLevel = 0;
+        b->viewLevel = 0;
+    }
     Obj *o = find_named(s, kind, name);
     int keepId = o ? o->id : 0;
     if (!o)

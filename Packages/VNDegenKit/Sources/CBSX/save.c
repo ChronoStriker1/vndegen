@@ -413,6 +413,10 @@ bool bx_load_slot(BX *b, int slot) {
     b->transActive = false;
     bx_transition(b, 0, 0, NULL);
     b->shownDirty = true;
+    b->stripLevel = b->viewLevel = 0;
+    bool bust = false;
+    for (int i = 0; i < BX_OBJS; i++) bust |= b->scene.obj[i].used && b->scene.obj[i].kind == OK_CHAR;
+    b->dressEnabled = b->viewEnabled = bust;
     if ((i32)bgm > 0 && bgm < (u32)b->sc->strCount) {
         b->bgmIndex = (int)bgm;
         snprintf(b->bgmName, sizeof b->bgmName, "%s", b->sc->strs[bgm]);

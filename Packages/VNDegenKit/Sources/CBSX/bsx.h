@@ -351,6 +351,7 @@ struct BX {
     int buttonCount;
     int buttonHover;
     bool dressEnabled, viewEnabled;
+    int stripLevel, viewLevel;
 
     int mx, my;
     bool lDown, rDown;
