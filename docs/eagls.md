@@ -27,7 +27,7 @@ voices and effects), `MOVIE/` and `Save/`. The plugin takes a folder as an EAGLS
 - Scripts (`.dat`) have a 3600-byte label table, then Shift-JIS source text with every second byte XORed with
   `EAGLS_SYSTEM` picked by `rand`, seeded from the file's last byte. The text is compiled when a file is first used:
   - `$label`, `&N"text"` (a message, which waits for a click and replaces the last one), `#Name` or `#Name=voice` (the
-    speaker and the voice for the next message), `(e)` is a line break.
+    speaker and the voice for the next message only; a message without its own name line shows no name plate), `(e)` is a line break.
   - `N(args)`: one of about 70 numbered commands. Arguments are numbers, quoted strings, `TRUE`/`FALSE`, and variables;
     a quoted string that starts with `_`, `@` or `:` names a string variable.
   - `_X=a,b,+,` assigns a reverse Polish expression (`+ - * / %`, `=` equal, `!` not equal, `> <`, `&`, `|`).
@@ -59,12 +59,16 @@ uses the same folder:
 - VNDegen reads the original's slots: they list in VNDegen's Load screen with their thumbnails and load on the same
   message with the variables, background, characters, window and music.
 - VNDegen writes the same container with the fields above, followed by its own exact state, which the PC ignores.
+  VNDegen's slots load in the PC game on the same line, with the background, characters, window, name and text.
+  Each layer's record goes in the PC's per-layer block (0x5E00 bytes from 0x9B580; the background's record twice,
+  with its picture size, and a character's in a second table as well), the fonts from the script's `150` definitions,
+  the backlog ring's header and counters, and the name plate's fixed geometry. The PC fills in its own handles.
 - `@` globals (seen CGs and scenes) are read from the PC's `GlobalSave.sav`. VNDegen keeps its settings and the `@`
   and `:` variables in `Save/VNDegen.cfg`, and its quick save in `Save/VNDegenQuick.sav`.
 
 ## What runs
 
-- The logos, the title with its hover buttons, New Game, Load Game, Soundtrack, Settings and Exit Game.
+- The logos, the title with its hover buttons, New Game, Load Game, CG View, Scene View, Soundtrack, Settings and Exit Game.
 - The prologue movie, backgrounds, characters, emotes, transitions with mask pictures, shaking.
 - Messages with the PC's layout, speaker plates, voices, the wait cursor, click to finish or advance, right click to
   hide the window, the wheel to open the backlog, Ctrl to skip.
@@ -73,6 +77,13 @@ uses the same folder:
 - Save and Load pages with ten pages of eight slots, thumbnails, the NEW mark, Save Confirm and Load Delete, and the
   confirm dialogs; the backlog with speaker names, its scroll bar and voice buttons; name entry; choices.
 - The map that picks the next heroine, from the game's own scripts and click maps.
+- CG View: five pages of the game's own sheets (`CGMode1-N`, its `C` thumbnails, `S` highlights and `CGModeMask`). A
+  slot shows its thumbnail once any of its pictures has been seen (`@xa01`, `@xa01r1` and so on). Clicking it shows
+  each seen version full screen in turn; the tall group pictures show their top, then their bottom.
+- Scene View: four pages (`SCMode1-N`), one slot per scene, shown once `@Reco_<scene>` is set. Clicking a slot plays
+  the scene from its `$Reco_<scene>` label with `:SCENEFLG` set; the scene's closing `140()` returns to `TitleSC.dat`'s
+  `$SceneStart`, which opens the page again. The slot order isn't in the scripts: it was read off the thumbnail sheets
+  by matching each thumbnail against the game's pictures.
 - Soundtrack: the ten tracks, play, stop, previous, next and the volume bar, at the PC's places, drawn opaque as the PC draws
   them.
 - Settings: VNDegen draws a dialog with the PC dialog's Text and Sound options (text speed, auto speed, white text,
@@ -82,11 +93,9 @@ Games start on the "Visual novel" controller layout.
 
 ## Known limits
 
-- A slot saved in VNDegen shows in the PC game's Load screen, but loading it there crashes the PC game: the PC needs
-  internal fields of its state block that VNDegen doesn't write yet. The PC's own saves are unaffected, and they load
-  in VNDegen.
-- The title's CG View, Scene View and the locked "?????" bonus, and the window's Oppai Gallery and Oppai
-  View buttons, do nothing: their slot lists are compiled into the game's exe.
+- The title's locked "?????" bonus and the window's Oppai Gallery and Oppai View buttons, which the story turns on
+  once the scouter is found, do nothing: they are screens built into the game's exe.
+- In Scene View a scene's choices are the player's to make, as in the story.
 - The champion brassiere page shows every brassiere as not found.
 - Transitions other than crossfades and mask wipes (`4` with effects 3, 5, 8 and 10) are drawn as crossfades.
 - The settings dialog's Screen, System, Info and Machine tabs aren't there; full screen is the app's.

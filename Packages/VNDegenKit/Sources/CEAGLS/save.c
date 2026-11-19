@@ -13,7 +13,16 @@
 #define STR_REC 320
 #define STR_MAX 0x79800
 #define PLANE_NAMES 0xA5884
-#define LAYER_BG 0xA7184
+#define FONTS 0x79800
+#define FONT_REC 0x170
+#define HIST_RING 0xA0E58
+#define NAME_PLATE 0x146AAC
+#define PC_LAYER0 0x9B580
+#define PC_LAYER_SIZE 0x5E00
+#define PC_LAYERS 24
+#define PC_LAYER_COPY 0x3BC40
+#define PC_LAYER_SIZES 0x413C
+#define LAYER_BG (PC_LAYER0 + 2 * PC_LAYER_SIZE + 4)
 #define THREAD_POS 0x12EC70
 #define THREAD_POS2 0x12ED3C
 #define THREAD_FRAME 0x12DC68
@@ -222,16 +231,58 @@ static void write_thumb(EG *e, u8 *b) {
     }
 }
 
+static void write_fonts(EG *e, u8 *b) {
+    static const char face[] = "\x82\x6c\x82\x72\x20\x83\x53\x83\x56\x83\x62\x83\x4e";
+    for (int i = 0; i < 16; i++) {
+        const Font *f = &e->fonts[i];
+        if (!f->em && !f->size) continue;
+        u8 *r = b + FONTS + (size_t)i * FONT_REC;
+        int em = f->em > 0 ? f->em : f->size;
+        i32 head[11] = {0x3ff00000, f->bold ? 700 : 500, 0, em, (em * 3 + 8) / 16, (em * 18 + 8) / 16, (em * 22 + 8) / 16,
+                        f->spacing, f->size, f->lineGap, (em * 19 + 8) / 16};
+        for (int k = 0; k < 11; k++) wr32(r + 12 + k * 4, (u32)head[k]);
+        memcpy(r + 56, face, sizeof face - 1);
+        static const struct { int at; i32 v; } tail[] = {{22, 0x28}, {24, 0x12}, {30, 1}, {34, 1}, {41, 1}, {42, 0xff}, {43, 1}, {44, 0xff}, {45, 1},
+                                                         {50, 0xc8}, {51, 0xc8}, {52, 0x28}, {53, 0xc8}, {54, 0xc8}, {80, 0x28}, {81, 0xc8}, {82, 0xc8}, {85, 0xac44}};
+        for (size_t k = 0; k < sizeof tail / sizeof *tail; k++) wr32(r + tail[k].at * 4, (u32)tail[k].v);
+    }
+}
+
+static void write_history_ring(u8 *b) {
+    wr32(b + HIST_RING, 0xffffff);
+    wr32(b + HIST_RING + 8, 0xc0c0c0);
+    wr32(b + HIST_RING + 16 + 500 * 24, 500);
+    wr32(b + HIST_RING + 16 + 500 * 24 + 4, 1);
+}
+
 static void build_block(EG *e, u8 *b) {
     memset(b, 0, BLOCK);
     put_time(b);
     write_vars(e, b);
+    write_fonts(e, b);
+    write_history_ring(b);
     for (int p = 0; p < EG_PLANES && p < 32; p++)
         if (e->planeName[p][0]) snprintf((char *)b + PLANE_NAMES + p * 64, 64, "%s", e->planeName[p]);
-    Layer *bg = &e->layer[2];
-    if (bg->vis) {
-        i32 r[11] = {bg->plane, bg->dx, bg->dy, (i32)((u32)bg->dw | (u32)bg->dh << 16), bg->sx, bg->sy, (i32)((u32)bg->sw | (u32)bg->sh << 16), 0, 0, 0, bg->alpha};
-        for (int i = 0; i < 11; i++) wr32(b + LAYER_BG + i * 4, (u32)r[i]);
+    for (int l = 2; l < EG_PLANES && l < PC_LAYERS; l++) {
+        Layer *ly = &e->layer[l];
+        if (!ly->vis) continue;
+        u8 *base = b + PC_LAYER0 + (size_t)l * PC_LAYER_SIZE;
+        i32 wh = (i32)((u32)ly->dw | (u32)ly->dh << 16), swh = (i32)((u32)ly->sw | (u32)ly->sh << 16);
+        if (l == 2) {
+            i32 r[11] = {ly->plane, ly->dx, ly->dy, wh, ly->sx, ly->sy, swh, 0, 0, 0, ly->alpha};
+            for (int i = 0; i < 11; i++) {
+                wr32(base + 4 + i * 4, (u32)r[i]);
+                wr32(base + 48 + i * 4, (u32)r[i]);
+            }
+            i32 sz[6] = {ly->dw, ly->dh, 0, 0, ly->sw, ly->sh};
+            for (int i = 0; i < 6; i++) wr32(base + PC_LAYER_SIZES + i * 4, (u32)sz[i]);
+        } else {
+            i32 r[12] = {1, ly->plane, ly->dx, ly->dy, wh, ly->sx, ly->sy, swh, ly->alpha, 0, 0, 65535};
+            for (int i = 0; i < 12; i++) {
+                wr32(base + 4 + i * 4, (u32)r[i]);
+                wr32(base + PC_LAYER_COPY + 4 + i * 4, (u32)r[i]);
+            }
+        }
     }
     const char *file;
     int off = msg_offset(&e->th[0], &file);
@@ -252,16 +303,18 @@ static void build_block(EG *e, u8 *b) {
             snprintf((char *)b + MES_PARTS + i * 32, 31, "%s", e->mesName[i]);
         }
     for (int i = 0; i < 6; i++) b[0x14674C + i] = 4;
-    wr32(b + 0x146770, 200);
+    if (e->speaker && e->speaker[0]) b[0x14674D] = 1;
     wr32(b + 0x146774, 200);
+    wr32(b + 0x146778, 200);
     for (int i = 0; i < 12; i++) wr32(b + 0x146794 + i * 4, (u32)e->winRect[i]);
     wr32(b + 0x146AA4, (u32)e->mesAlpha);
-    for (int i = 0; i < 16; i++) wr32(b + 0x146AAC + i * 4, (u32)e->nameRect[i]);
-    wr32(b + 0x146AEC, (u32)(e->mesMode != 0));
+    static const i32 plate[15] = {453, 181, 500, 12, 464, 129, 488, 0, 451, 181, 500, 0, 400, 183, 200};
+    for (int i = 0; i < 15; i++) wr32(b + NAME_PLATE + i * 4, (u32)plate[i]);
+    wr32(b + NAME_PLATE + 60, (u32)(e->mesMode != 0));
     if (e->speaker) {
         char nm[160];
         snprintf(nm, sizeof nm, e->nameFmt[0] ? e->nameFmt[0] : "%s", e->speaker);
-        snprintf((char *)b + 0x146AF0, 96, "%s", nm);
+        snprintf((char *)b + NAME_PLATE + 64, 92, "%s", nm[0] == '(' ? nm + 1 : nm);
     }
     b[TEXT_BUF] = 1;
     snprintf((char *)b + TEXT_BUF + 1, 256, "%s", e->text ? e->text : "");
@@ -565,7 +618,7 @@ static void restore_scene(EG *e, const u8 *b, const u8 *t, size_t tn) {
         const char *name = (const char *)b + SOUND_NAMES + c * 64;
         if (name[0] && strcmp(name, "0")) snd_play(e, name, 1, c, 0);
     }
-    const char *nm = (const char *)b + 0x146AF0;
+    const char *nm = (const char *)b + NAME_PLATE + 64;
     while (*nm == '(') {
         const char *close = strchr(nm, ')');
         if (!close) break;
