@@ -23,6 +23,14 @@
 #define chara_update ex_chara_update
 #define chara_voiced ex_chara_voiced
 #define colorref ex_colorref
+#define extra_active ex_extra_active
+#define extra_draw ex_extra_draw
+#define extra_free ex_extra_free
+#define extra_input ex_extra_input
+#define extra_load ex_extra_load
+#define extra_mark_cg ex_extra_mark_cg
+#define extra_mark_scene ex_extra_mark_scene
+#define extra_open ex_extra_open
 #define fadeout_finish ex_fadeout_finish
 #define field_int ex_field_int
 #define fill ex_fill
@@ -52,6 +60,7 @@
 #define mixer_mix ex_mixer_mix
 #define mixer_new ex_mixer_new
 #define msg_clear ex_msg_clear
+#define msg_clear_bubbles ex_msg_clear_bubbles
 #define msg_ctrl_define ex_msg_ctrl_define
 #define msg_define ex_msg_define
 #define msg_draw ex_msg_draw
@@ -102,6 +111,7 @@
 #define state_reset ex_state_reset
 #define text_advance ex_text_advance
 #define text_ascent ex_text_ascent
+#define text_block_width ex_text_block_width
 #define text_descent ex_text_descent
 #define text_draw_sjis ex_text_draw_sjis
 #define text_free ex_text_free
