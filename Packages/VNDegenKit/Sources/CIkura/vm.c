@@ -174,6 +174,74 @@ static void resize(IK *t, int which, int n) {
     }
 }
 
+static const Cell *cell_at(IK *t, int img, int c) {
+    if (c < 0) c = -c;
+    if (img < 0 || img >= t->imageCount || !t->images[img]) return NULL;
+    Image *im = t->images[img];
+    if (c >= im->cellCount) return NULL;
+    return &im->cells[c];
+}
+
+static void layer_reset(IK *t, Layer *l, int w, int h) {
+    image_free(l->surf);
+    memset(l, 0, sizeof *l);
+    l->made = true;
+    l->w = l->tw = w;
+    l->h = l->th = h;
+    l->img = -1;
+    l->textured = true;
+    for (int k = 0; k < 4; k++) l->argb[k] = 255;
+}
+
+static void draw_cell(IK *t, const u8 *a, bool toImage, bool copy) {
+    int src = (int)ik_value(t, rd32(a)), c = (int)ik_value(t, rd32(a + 4));
+    const Cell *ce = cell_at(t, src, c);
+    if (!ce) return;
+    Image *dst = NULL;
+    if (toImage) {
+        int di = (int)ik_value(t, rd32(a + 8));
+        if (di >= 0 && di < t->imageCount) dst = t->images[di];
+    } else {
+        Layer *l = layer(t, rd32(a + 8));
+        if (l) dst = layer_surface(t, l);
+    }
+    int x = (int)ik_value(t, rd32(a + 12)), y = (int)ik_value(t, rd32(a + 16));
+    if (c < 0) {
+        x += ce->dx;
+        y += ce->dy;
+    }
+    static const int white[4] = {255, 255, 255, 255};
+    image_blit(dst, t->images[src], ce->sx, ce->sy, ce->w, ce->h, x, y, white, 0, copy);
+    t->dirty = true;
+}
+
+static void cell_button(IK *t, u32 id, int type, int lay, int x, int y, bool place, int img, const u8 *cells, int mode) {
+    Button *b = button(t, id);
+    if (!b) return;
+    memset(b, 0, sizeof *b);
+    b->made = true;
+    b->type = type;
+    b->var = -1;
+    b->layer = lay;
+    for (int k = 0; k < 4; k++) {
+        const Cell *ce = cell_at(t, img, (int)ik_value(t, rd32(cells + 4 * k)));
+        b->state[k] = ce ? (ButtonState){img, ce->sx, ce->sy} : (ButtonState){-1, 0, 0};
+        if (ce && !b->w) {
+            b->w = ce->w;
+            b->h = ce->h;
+            if (!place) {
+                x = ce->dx;
+                y = ce->dy;
+            }
+        }
+    }
+    b->x = x;
+    b->y = y;
+    b->mode = (u8)clampi(mode, 0, 2);
+    b->enabled = b->mode != 0;
+    b->shown = true;
+}
+
 static const char *name_arg(const u8 *a, int n) {
     static char buf[64];
     int k = 0;
@@ -206,6 +274,14 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         if (v < count && 8 + (int)v * 2 + 2 <= n) goto_label(t, rd16(a + 8 + v * 2));
         break;
     }
+    case 0x0008: {
+        u32 v = ik_value(t, rd32(a)), count = rd32(a + 4);
+        if (v < count && 8 + (int)v * 2 + 2 <= n) {
+            push(t);
+            goto_label(t, rd16(a + 8 + v * 2));
+        }
+        break;
+    }
     case 0x0009: break;
     case 0x000a: if (gfx_animating(t)) t->wait = W_ANIM; break;
     case 0x000b:
@@ -214,6 +290,25 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     case 0x0100: resize(t, 1, rd16(a)); break;
     case 0x0101: image_load(t, rd16(a), name_arg(a + 2, n - 2)); break;
+    case 0x0108: {
+        int slot = (int)ik_value(t, rd32(a)), ts = (int)ik_value(t, rd32(a + 4));
+        if (ts >= 0 && ts < t->textCount && t->texts[ts]) image_load(t, slot, t->texts[ts]);
+        break;
+    }
+    case 0x0109:
+        for (int i = (int)ik_value(t, rd32(a)), e = (int)ik_value(t, rd32(a + 4)); i <= e && i < t->imageCount; i++) {
+            if (i < 0) continue;
+            image_free(t->images[i]);
+            t->images[i] = NULL;
+            t->imageNames[i][0] = 0;
+        }
+        break;
+    case 0x010a:
+    case 0x010b:
+    case 0x010c:
+    case 0x010d:
+        if (n >= 20) draw_cell(t, a, op >= 0x010c, op == 0x010b || op == 0x010d);
+        break;
     case 0x0102: {
         int s = rd16(a);
         if (s >= 0 && s < t->imageCount) {
@@ -225,16 +320,62 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     }
     case 0x0200: resize(t, 2, rd16(a)); break;
     case 0x0202:
-        if ((l = layer(t, rd32(a)))) {
-            image_free(l->surf);
-            memset(l, 0, sizeof *l);
-            l->made = true;
-            l->w = l->tw = (int)ik_value(t, rd32(a + 4));
-            l->h = l->th = (int)ik_value(t, rd32(a + 8));
-            l->img = -1;
-            l->textured = true;
-            for (int k = 0; k < 4; k++) l->argb[k] = 255;
+        if ((l = layer(t, rd32(a)))) layer_reset(t, l, (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)));
+        break;
+    case 0x0212: {
+        u32 i = ik_value(t, rd32(a)), j = ik_value(t, rd32(a + 4));
+        if (i < (u32)t->layerCount && j < (u32)t->layerCount && i != j) {
+            Layer tmp = t->layers[i];
+            t->layers[i] = t->layers[j];
+            t->layers[j] = tmp;
         }
+        break;
+    }
+    case 0x0213: {
+        bool on = ik_value(t, rd32(a + 8)) != 0;
+        for (u32 i = ik_value(t, rd32(a)), e = ik_value(t, rd32(a + 4)); i <= e && i < (u32)t->layerCount; i++)
+            if (t->layers[i].made) t->layers[i].shown = on;
+        break;
+    }
+    case 0x0214:
+        if ((l = layer(t, rd32(a))) && n >= 32) {
+            layer_reset(t, l, (int)ik_value(t, rd32(a + 12)), (int)ik_value(t, rd32(a + 16)));
+            l->x = (int)ik_value(t, rd32(a + 4));
+            l->y = (int)ik_value(t, rd32(a + 8));
+            l->img = (int)ik_value(t, rd32(a + 20));
+            l->sx = (int)ik_value(t, rd32(a + 24));
+            l->sy = (int)ik_value(t, rd32(a + 28));
+            l->ready = true;
+        }
+        break;
+    case 0x0215:
+        if ((l = layer(t, rd32(a))) && n >= 20) {
+            int img = (int)ik_value(t, rd32(a + 12));
+            const Cell *ce = cell_at(t, img, (int)ik_value(t, rd32(a + 16)));
+            layer_reset(t, l, ce ? ce->w : 0, ce ? ce->h : 0);
+            l->x = (int)ik_value(t, rd32(a + 4));
+            l->y = (int)ik_value(t, rd32(a + 8));
+            l->img = img;
+            l->sx = ce ? ce->sx : 0;
+            l->sy = ce ? ce->sy : 0;
+            l->ready = true;
+        }
+        break;
+    case 0x0216:
+        if ((l = layer(t, rd32(a))) && n >= 36) {
+            layer_reset(t, l, (int)ik_value(t, rd32(a + 12)), (int)ik_value(t, rd32(a + 16)));
+            l->x = (int)ik_value(t, rd32(a + 4));
+            l->y = (int)ik_value(t, rd32(a + 8));
+            u32 c = 0;
+            for (int k = 0; k < 4; k++) c = c << 8 | (u32)clampi((int)ik_value(t, rd32(a + 20 + 4 * k)), 0, 255);
+            l->fillArgb = c;
+            l->fill = true;
+            l->ready = true;
+        }
+        break;
+    case 0x0217:
+    case 0x0218:
+        if ((l = layer(t, rd32(a))) && n >= 6 && (l->made && l->shown) == (op == 0x0217)) goto_label(t, rd16(a + 4));
         break;
     case 0x0203:
         if ((l = layer(t, rd32(a)))) {
@@ -347,6 +488,10 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     case 0x0307:
         if (flag(t, ik_value(t, rd32(a)))) goto_label(t, rd16(a + 4));
+        break;
+    case 0x0309:
+        for (u32 i = 0, src = ik_value(t, rd32(a)), dst = ik_value(t, rd32(a + 4)), c = ik_value(t, rd32(a + 8)); i < c && i < 0x10000; i++)
+            set_flag(t, dst + i, flag(t, src + i));
         break;
     case 0x0308:
         if (!flag(t, ik_value(t, rd32(a)))) goto_label(t, rd16(a + 4));
@@ -556,6 +701,56 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     }
     case 0x0706: t->wait = W_INPUT; break;
+    case 0x0716:
+        if (n >= 36)
+            cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), 0, 0, false, (int)ik_value(t, rd32(a + 8)), a + 12,
+                        (int)ik_value(t, rd32(a + 32)));
+        break;
+    case 0x0717:
+        if (n >= 44)
+            cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)), true,
+                        (int)ik_value(t, rd32(a + 16)), a + 20, (int)ik_value(t, rd32(a + 40)));
+        break;
+    case 0x071f:
+        if (n >= 40)
+            cell_button(t, rd32(a), (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), 0, 0, false, (int)ik_value(t, rd32(a + 12)),
+                        a + 16, (int)ik_value(t, rd32(a + 36)));
+        break;
+    case 0x0719: {
+        int m = clampi((int)ik_value(t, rd32(a + 8)), 0, 2);
+        for (int i = (int)ik_value(t, rd32(a)), e = (int)ik_value(t, rd32(a + 4)); i <= e && i < IK_BUTTONS; i++) {
+            if (i < 0 || !t->buttons[i].made) continue;
+            t->buttons[i].mode = (u8)m;
+            t->buttons[i].enabled = m != 0;
+        }
+        break;
+    }
+    case 0x071c:
+        for (int i = (int)ik_value(t, rd32(a)), e = (int)ik_value(t, rd32(a + 4)); i <= e && i < IK_BUTTONS; i++)
+            if (i >= 0) memset(&t->buttons[i], 0, sizeof t->buttons[i]);
+        break;
+    case 0x071d: {
+        Button *b = button(t, rd32(a));
+        u32 st = ik_value(t, rd32(a + 4));
+        if (!b || st > 3 || n < 16) break;
+        int img = (int)ik_value(t, rd32(a + 8));
+        const Cell *ce = cell_at(t, img, (int)ik_value(t, rd32(a + 12)));
+        b->state[st] = ce ? (ButtonState){img, ce->sx, ce->sy} : (ButtonState){-1, 0, 0};
+        if (n >= 20) b->stateFlag[st] = (u8)ik_value(t, rd32(a + 16));
+        t->dirty = true;
+        break;
+    }
+    case 0x0722: {
+        Button *b = button(t, rd32(a));
+        if (!b || n < 28) break;
+        int img = (int)ik_value(t, rd32(a + 20));
+        const Cell *ce = cell_at(t, img, (int)ik_value(t, rd32(a + 24)));
+        if (ce)
+            b->tip = (ButtonTip){true, (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)), (int)ik_value(t, rd32(a + 16)),
+                                 ce->w, ce->h, img, ce->sx, ce->sy};
+        else b->tip.on = false;
+        break;
+    }
     case 0x0709: {
         Button *b = button(t, rd32(a));
         u32 st = ik_value(t, rd32(a + 4));
@@ -581,6 +776,17 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     }
     case 0x0404: expr(t, a, n); break;
+    case 0x040b: {
+        i32 *v = var_at(t, rd32(a)), *src = var_at(t, ik_value(t, rd32(a + 4)));
+        if (v) *v = src ? *src : 0;
+        break;
+    }
+    case 0x040d: {
+        u32 dst = ik_value(t, rd32(a)), src = ik_value(t, rd32(a + 4)), c = ik_value(t, rd32(a + 8));
+        if (dst < (u32)t->varCount && src < (u32)t->varCount && c <= (u32)t->varCount - dst && c <= (u32)t->varCount - src)
+            memmove(t->vars + dst, t->vars + src, sizeof(i32) * c);
+        break;
+    }
     case 0x0407: cond(t, a, n); break;
     default:
         if ((op >> 8) == 0x09 && msg_exec(t, op, a, n)) break;

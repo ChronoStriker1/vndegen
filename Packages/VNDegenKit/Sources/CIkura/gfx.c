@@ -108,7 +108,7 @@ void image_blit(Image *dst, const Image *src, int sx, int sy, int w, int h, int 
 
 void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0, u32 minAlpha) {
     if (img < 0 || img >= t->imageCount || !t->images[img]) return;
-    Image screen = {t->W, t->H, t->screen};
+    Image screen = {.w = t->W, .h = t->H, .px = t->screen};
     image_blit(&screen, t->images[img], sx, sy, w, h, x0, y0, argb, minAlpha, false);
 }
 
@@ -203,7 +203,7 @@ void gfx_compose(IK *t) {
         if (!layer_drawn(t, i)) continue;
         if (l->rot != 0 && !l->surf && l->img >= 0) rotated(t, l);
         else if (l->surf) {
-            Image screen = {t->W, t->H, t->screen};
+            Image screen = {.w = t->W, .h = t->H, .px = t->screen};
             image_blit(&screen, l->surf, 0, 0, l->w, l->h, l->x, l->y, l->argb, 0, false);
         } else if (l->img >= 0) gfx_blit(t, l->argb, l->img, l->sx, l->sy, l->w, l->h, l->x, l->y);
         else if (l->fill) fill(t, l);

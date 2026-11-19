@@ -59,9 +59,15 @@ bool store_open(Store *s, const char *gameDir, char *err, size_t errSize);
 void store_close(Store *s);
 u8 *store_load(Store *s, int kind, const char *name, size_t *size);
 
+typedef struct Cell {
+    int dx, dy, sx, sy, w, h;
+} Cell;
+
 typedef struct Image {
     int w, h;
     u32 *px;
+    Cell *cells;
+    int cellCount;
 } Image;
 
 Image *image_new(int w, int h);
@@ -136,7 +142,7 @@ typedef struct Frame {
 typedef struct Glyph Glyph;
 
 typedef struct Font {
-    bool ok;
+    bool ok, embolden;
     int size, shadow, ascent;
     float scale;
     u8 *data;

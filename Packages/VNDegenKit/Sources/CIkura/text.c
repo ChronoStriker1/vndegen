@@ -30,7 +30,10 @@ void font_set(IK *t, int slot, const char *name, int size, int shadow, bool bold
     f->size = size;
     f->shadow = shadow;
     vnfont_match m;
-    if (!vnfont_resolve(name, bold, 0, &m) && !vnfont_resolve("Times New Roman", bold, 0, &m)) {
+    char *utf8 = ik_sjis_to_utf8(name);
+    bool found = vnfont_resolve(utf8, bold, 0, &m) || vnfont_resolve("Times New Roman", bold, 0, &m);
+    free(utf8);
+    if (!found) {
         ik_log(t, "no substitute for %s", name);
         return;
     }
@@ -44,6 +47,7 @@ void font_set(IK *t, int slot, const char *name, int size, int shadow, bool bold
         return;
     }
     f->scale = stbtt_ScaleForMappingEmToPixels(info, (float)size);
+    f->embolden = m.embolden != 0;
     int asc, desc, gap;
     stbtt_GetFontVMetrics(info, &asc, &desc, &gap);
     f->ascent = (int)((float)asc * f->scale + 0.5f);
@@ -74,7 +78,19 @@ static Glyph *glyph(Font *f, u32 cp) {
     if (g->w > 0 && g->h > 0) {
         g->bm = ik_alloc((size_t)g->w * (size_t)g->h);
         stbtt_MakeCodepointBitmap(info, g->bm, g->w, g->h, g->w, f->scale, f->scale, (int)cp);
+        if (f->embolden) {
+            u8 *wide = ik_alloc((size_t)(g->w + 1) * (size_t)g->h);
+            for (int y = 0; y < g->h; y++)
+                for (int x = 0; x <= g->w; x++) {
+                    u8 l = x > 0 ? g->bm[y * g->w + x - 1] : 0, r = x < g->w ? g->bm[y * g->w + x] : 0;
+                    wide[y * (g->w + 1) + x] = l > r ? l : r;
+                }
+            free(g->bm);
+            g->bm = wide;
+            g->w++;
+        }
     }
+    if (f->embolden) g->adv++;
     return g;
 }
 
@@ -119,6 +135,6 @@ void text_draw_on(IK *t, Image *dst, int slot, u32 cp, int x, int y, u32 colour,
 }
 
 void text_draw(IK *t, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]) {
-    Image screen = {t->W, t->H, t->screen};
+    Image screen = {.w = t->W, .h = t->H, .px = t->screen};
     text_draw_on(t, &screen, slot, cp, x, y, colour, shadow, clip);
 }

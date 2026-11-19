@@ -74,9 +74,16 @@ u8 *store_load(Store *s, int kind, const char *name, size_t *size) {
     char key[64];
     snprintf(key, sizeof key, "%s", name);
     ik_lower(key);
-    for (int i = 0; i < s->counts[kind]; i++) {
-        MpxEntry *e = &s->entries[kind][i];
-        if (strcmp(e->name, key)) continue;
+    size_t keyLen = strlen(key);
+    bool bare = !strchr(key, '.');
+    MpxEntry *e = NULL;
+    for (int i = 0; i < s->counts[kind] && !e; i++)
+        if (!strcmp(s->entries[kind][i].name, key)) e = &s->entries[kind][i];
+    for (int i = 0; i < s->counts[kind] && !e && bare; i++) {
+        MpxEntry *c = &s->entries[kind][i];
+        if (!strncmp(c->name, key, keyLen) && c->name[keyLen] == '.') e = c;
+    }
+    if (e) {
         FILE *f = s->files[e->file];
         u8 *d = ik_alloc((size_t)e->size + 1);
         if (fseek(f, (long)e->offset, SEEK_SET) || fread(d, 1, e->size, f) != e->size) {
