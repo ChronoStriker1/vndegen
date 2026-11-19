@@ -405,8 +405,6 @@ static void log_draw(EG *e, u32 *dst) {
         const Font *f = &e->fonts[0];
         int size = f->size > 0 ? f->size : 21;
         LogEntry *l = &e->logs[idx];
-        char *saved = e->text;
-        (void)saved;
         int fx = r[0] * 8, y = r[1];
         for (const u8 *p = (const u8 *)l->text; *p;) {
             if (*p == '(' && (p[1] == 'e' || p[1] == 'E') && p[2] == ')') {
@@ -454,11 +452,11 @@ static void log_update(EG *e) {
     int c = mask_color(u->hist.mask, e->mx, e->my);
     if (c != u->logHover && c) sound(e, "SYS_OV");
     u->logHover = c;
-    if (e->wheel) {
-        u->logTop = clampi(u->logTop - e->wheel, 0, maxTop);
-        if (e->wheel < 0 && u->logTop >= maxTop && e->wheel < -0) {
-        }
+    if (e->wheel < 0 && u->logTop >= maxTop) {
+        close_ui(e);
+        return;
     }
+    if (e->wheel) u->logTop = clampi(u->logTop - e->wheel, 0, maxTop);
     if (e->rclick) {
         close_ui(e);
         return;

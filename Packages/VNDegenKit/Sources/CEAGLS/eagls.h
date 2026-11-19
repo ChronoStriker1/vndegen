@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "eg_names.h"
 #include "vneagls.h"
 
 typedef uint8_t u8;
