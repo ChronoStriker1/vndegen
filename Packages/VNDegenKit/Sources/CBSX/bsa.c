@@ -215,27 +215,35 @@ static u8 *read_entry(Archives *a, const BsaEntry *e, size_t *size) {
     return d;
 }
 
-u8 *bx_res_read(Archives *a, int ix, const char *name, size_t *size) {
+static const BsaEntry *resolve(Archives *a, int ix, const char *name) {
     char cur[128];
     snprintf(cur, sizeof cur, "%s", name);
     for (int hop = 0; hop < 8; hop++) {
         const BsaEntry *e = bx_res_find(a, ix, cur);
         if (!e) return NULL;
         size_t l = strlen(e->name);
-        if (l > 5 && bx_ieq(e->name + l - 5, ".link")) {
-            size_t n;
-            u8 *d = read_entry(a, e, &n);
-            if (!d) return NULL;
-            size_t k = 0;
-            while (k < n && k + 1 < sizeof cur && d[k] && d[k] != '\r' && d[k] != '\n') {
-                cur[k] = (char)d[k];
-                k++;
-            }
-            cur[k] = 0;
-            free(d);
-            continue;
+        if (!(l > 5 && bx_ieq(e->name + l - 5, ".link"))) return e;
+        size_t n;
+        u8 *d = read_entry(a, e, &n);
+        if (!d) return NULL;
+        size_t k = 0;
+        while (k < n && k + 1 < sizeof cur && d[k] && d[k] != '\r' && d[k] != '\n') {
+            cur[k] = (char)d[k];
+            k++;
         }
-        return read_entry(a, e, size);
+        cur[k] = 0;
+        free(d);
     }
     return NULL;
+}
+
+u8 *bx_res_read(Archives *a, int ix, const char *name, size_t *size) {
+    const BsaEntry *e = resolve(a, ix, name);
+    return e ? read_entry(a, e, size) : NULL;
+}
+
+bool bx_res_head(Archives *a, int ix, const char *name, u8 *out, size_t n) {
+    const BsaEntry *e = resolve(a, ix, name);
+    FILE *f = e ? a->f[e->arc] : NULL;
+    return f && e->size >= n && !fseek(f, (long)e->offset, SEEK_SET) && fread(out, 1, n, f) == n;
 }

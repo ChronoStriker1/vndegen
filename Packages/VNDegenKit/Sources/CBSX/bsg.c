@@ -224,8 +224,11 @@ Image *bx_bsg_decode(const u8 *d, size_t n) {
 }
 
 Image *bx_image_load(BX *b, const char *name) {
-    for (int i = 0; i < 24; i++)
-        if (b->cache[i].key && bx_ieq(b->cache[i].key, name)) return b->cache[i].img;
+    for (int i = 0; i < 32; i++)
+        if (b->cache[i].key && bx_ieq(b->cache[i].key, name)) {
+            b->cache[i].used = ++b->cacheClock;
+            return b->cache[i].img;
+        }
     size_t n;
     char base[128];
     snprintf(base, sizeof base, "%s", name);
@@ -244,25 +247,21 @@ Image *bx_image_load(BX *b, const char *name) {
         im = bx_image_new(b->W, b->H);
         u32 c = bx_ieq(name, "white") ? 0xffffffffu : 0xff000000u;
         for (size_t i = 0; i < (size_t)b->W * b->H; i++) im->px[i] = c;
-    } else {
-        bx_log(b, "missing picture %s", name);
-        return NULL;
-    }
-    if (!im) {
-        bx_log(b, "can't decode picture %s", name);
-        return NULL;
-    }
-    int slot = b->cacheNext;
-    b->cacheNext = (b->cacheNext + 1) % 24;
+    } else bx_log(b, "missing picture %s", name);
+    if (!im && d) bx_log(b, "can't decode picture %s", name);
+    int slot = 0;
+    for (int i = 1; i < 32; i++)
+        if (b->cache[i].used < b->cache[slot].used) slot = i;
     free(b->cache[slot].key);
     bx_image_free(b->cache[slot].img);
     b->cache[slot].key = bx_strdup(name);
     b->cache[slot].img = im;
+    b->cache[slot].used = ++b->cacheClock;
     return im;
 }
 
 void bx_image_cache_clear(BX *b) {
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < 32; i++) {
         free(b->cache[i].key);
         bx_image_free(b->cache[i].img);
         b->cache[i].key = NULL;

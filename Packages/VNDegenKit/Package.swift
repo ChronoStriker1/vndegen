@@ -172,7 +172,7 @@ let package = Package(
         .target(name: "EngineIkura", dependencies: ["VNCore", "CIkura", "FrameHost"], swiftSettings: mainActorByDefault),
         .target(name: "CEAGLS", dependencies: ["CVNFont", "CVNVideo"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineEAGLS", dependencies: ["VNCore", "CEAGLS", "FrameHost"], swiftSettings: mainActorByDefault),
-        .target(name: "CBSX", dependencies: ["CVNFont"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
+        .target(name: "CBSX", dependencies: ["CVNFont", "CVNVideo"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineBSX", dependencies: ["VNCore", "CBSX", "FrameHost"], swiftSettings: mainActorByDefault),
         .target(name: "CEXHIBIT", exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineExHibit", dependencies: ["VNCore", "CEXHIBIT", "FrameHost"], swiftSettings: mainActorByDefault),

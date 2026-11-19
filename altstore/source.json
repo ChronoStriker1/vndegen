@@ -49,6 +49,26 @@
       },
       "versions": [
         {
+          "version": "0.55.4",
+          "buildVersion": "2869",
+          "date": "2026-11-19T22:07:52Z",
+          "localizedDescription": "A third BISHOP BSX game: Mesu Kyoushi 4 ~Kegasareta Kyoudan~.\n\n## Downloads\n\n- `VNDegen-0.55.4-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.55.4.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.55.4-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- Mesu Kyoushi 4 ~Kegasareta Kyoudan~, in its English machine translation, runs on the BSX runtime: the opening and staff-roll movies, the school map, events and choices, lines voiced by two characters and looping voices, blinking faces and bust-ups tinted to the scene, the FACE, BUST and HIP views, the backlog and settings.\n- Save and Load use the PC's own files, so saves move between VNDegen and a PC copy both ways, including the map's auto-save.\n\n## Known limits\n\n- The museum isn't there yet.\n- The STRIP button (the dress screen) does nothing.\n- The settings screen lacks BGM SELECT, the per-character voice details and the BGV volume.\n- The save slots show the weekday without the day number.\n- A space the translation puts after 「 is drawn; the PC drops it.\n- Settings are VNDegen's own, not the PC's.\n\n## What wasn't tested\n\n- No physical device was used, and no iPhone simulator was used for this game. A play reached an ending, the staff roll and the title in the Linux test build. The Mac app and an iPad simulator were checked from the title through a save and loading it after a restart, and the iPad also with every file name's case swapped.\n- The opening movie showed all of its frames on the Mac and the iPad simulator.\n- Saves were exchanged with the original engine under Wine both ways.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.55.4/VNDegen-0.55.4.ipa",
+          "size": 131152614,
+          "sha256": "14eac16a3ef8a3480b982c6708cf814df85b5ba552142bbb38177e60b9816f36",
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "0.55.3",
+          "buildVersion": "2853",
+          "date": "2026-11-19T20:40:16Z",
+          "localizedDescription": "ExHibit's Extra menu for Succubus Sessions: Mami Mamiya's Sweet Slice of Hell, with the CG gallery, scene replay and music room.\n\n## Downloads\n\n- `VNDegen-0.55.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.55.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.55.3-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- The title's Extra now opens, with the CG, Scene and Music pages drawn from the game's own pictures and laid out as on the PC.\n- CG: a group opens once one of its pictures has been shown, and the viewer steps through all of the group's pictures. On a touch screen, a tap on the bottom strip brings back a hidden viewer bar.\n- Scene: a scene opens once it has been played through in the story. A replay plays the scene and returns to the Scene page.\n- Music: all 21 tracks, with a volume bar.\n\n## Known limits\n\n- Extra counts only what was seen in VNDegen. What a PC copy has seen isn't read.\n- The CG viewer has no Full Screen or Original buttons.\n- Return to title from the system menu doesn't ask first, as the PC does.\n\n## What wasn't tested\n\n- No physical device was used. Extra was checked in the Linux test build, the Mac app and an iPad simulator by touch.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.55.3/VNDegen-0.55.3.ipa",
+          "size": 131141010,
+          "sha256": "1aa734aef00975d975fb44b821858bde9126bf8a02ebf379543c98c22e3760c5",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.55.2",
           "buildVersion": "2843",
           "date": "2026-11-19T20:20:09Z",

@@ -68,6 +68,37 @@ void bx_blit_multiply(u32 *dst, int dw, int dh, const Image *im, int dx, int dy,
     }
 }
 
+static int blend_channel(char mode, int s, int c) {
+    switch (mode) {
+    case '*': return s * c / 255;
+    case '+': return s + c > 255 ? 255 : s + c;
+    case '-': return s - c < 0 ? 0 : s - c;
+    case '^': return c >= 255 ? 255 : clampi(s * 255 / (255 - c), 0, 255);
+    case '/': return c <= 0 ? 0 : 255 - clampi((255 - s) * 255 / c, 0, 255);
+    case '&': return s + c - 255 < 0 ? 0 : s + c - 255;
+    default: return s;
+    }
+}
+
+static void blit_tinted(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha, char mode, u32 color) {
+    u32 strength = color >> 24;
+    for (int y = 0; y < im->h; y++) {
+        int py = dy + y;
+        if (py < 0 || py >= dh) continue;
+        for (int x = 0; x < im->w; x++) {
+            int px = dx + x;
+            if (px < 0 || px >= dw) continue;
+            u32 s = im->px[(size_t)y * im->w + x];
+            u32 a = (s >> 24) * (u32)alpha / 255;
+            if (!a) continue;
+            u32 t = 0;
+            for (int k = 0; k < 24; k += 8) t |= (u32)blend_channel(mode, (int)(s >> k & 0xff), (int)(color >> (16 - k) & 0xff)) << k;
+            u32 *d = &dst[(size_t)py * dw + px];
+            *d = mix(*d, mix(s, t, strength) & 0xffffff, a);
+        }
+    }
+}
+
 void bx_blit(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha) {
     if (im) bx_blit_part(dst, dw, dh, im, 0, 0, im->w, im->h, dx, dy, alpha);
 }
@@ -98,16 +129,26 @@ static int char_id(const char *name) {
     return 0;
 }
 
-static Image *face_image(BX *b, const char *name) {
-    char body[64], face[64];
-    if (!bustup_parts(name, body, face)) return NULL;
-    if (bx_res_find(&b->arc, RX_GFX, face)) return bx_image_load(b, face);
-    char alt[64];
-    snprintf(alt, sizeof alt, "%.6s001%c%.2s", name, name[9], name + 10);
-    if (bx_res_find(&b->arc, RX_GFX, alt)) return bx_image_load(b, alt);
-    snprintf(alt, sizeof alt, "%.5s0001%c%.2s", name, name[9], name + 10);
-    if (bx_res_find(&b->arc, RX_GFX, alt)) return bx_image_load(b, alt);
-    return NULL;
+static bool face_name(BX *b, const char *name, char *out) {
+    char body[64];
+    if (!bustup_parts(name, body, out)) return false;
+    if (bx_res_find(&b->arc, RX_GFX, out)) return true;
+    snprintf(out, 64, "%.6s001%c%.2s", name, name[9], name + 10);
+    if (bx_res_find(&b->arc, RX_GFX, out)) return true;
+    snprintf(out, 64, "%.5s0001%c%.2s", name, name[9], name + 10);
+    return bx_res_find(&b->arc, RX_GFX, out) != NULL;
+}
+
+int bx_eye_frame(BX *b, const Obj *o) {
+    int pattern = bx_cfg_int(&b->cfg, "bustup setting", "eye pattern", 0);
+    if (pattern < 2) return -1;
+    char *end;
+    const char *iv = bx_cfg_get(&b->cfg, "bustup setting", "eye anime interval");
+    u32 cycle = (u32)((iv ? strtod(iv, &end) : 30.0) * 100.0);
+    if (cycle < 1000) cycle = 1000;
+    u32 t = (b->now + (u32)o->charNo * 1733u) % cycle;
+    u32 step = 60;
+    return t < step * (u32)(pattern - 1) ? 1 + (int)(t / step) : 0;
 }
 
 static void stripped(BX *b, const char *name, char *out) {
@@ -126,17 +167,19 @@ static void stripped(BX *b, const char *name, char *out) {
     }
 }
 
+int bx_view_level(BX *b) { return b->viewLevel ? b->viewLevel : b->viewButtons ? 1 : 0; }
+
 static int view_offset(BX *b, const char *name) {
-    if (!b->viewLevel || strlen(name) != 12 || (name[4] != 'u' && name[4] != 'U')) return 0;
+    if (!bx_view_level(b) || strlen(name) != 12 || (name[4] != 'u' && name[4] != 'U')) return 0;
     char key[64];
     snprintf(key, sizeof key, "fixed position%.2s%c", name + 2, name[9]);
     int pos[3] = {0, 0, 0};
     if (bx_cfg_ints(&b->cfg, "free-sight screen", key, pos, 3) < 3) bx_cfg_ints(&b->cfg, "free-sight screen", "fixed position", pos, 3);
-    int v = pos[clampi(b->viewLevel - 1, 0, 2)];
+    int v = pos[clampi(bx_view_level(b) - 1, 0, 2)];
     return v ? -(v - b->H) : 0;
 }
 
-static void draw_obj(BX *b, const Obj *o, u32 *dst) {
+static void draw_obj(BX *b, const Obj *o, u32 *dst, const char *tint) {
     char body[64], face[64];
     int x = o->x + o->kx, y = o->y + o->ky, a = o->alpha;
     if (a <= 0) return;
@@ -145,11 +188,31 @@ static void draw_obj(BX *b, const Obj *o, u32 *dst) {
         stripped(b, o->name, shown);
         bustup_parts(shown, body, face);
         y += view_offset(b, o->name);
-        Image *im = bx_image_load(b, body);
-        if (im) bx_blit(dst, b->W, b->H, im, im->x + x, im->y + y, a);
-        Image *f = face_image(b, shown);
-        if (!f) f = face_image(b, o->name);
-        if (f) bx_blit(dst, b->W, b->H, f, f->x + x, f->y + y, a);
+        char fn[64], part[80];
+        bool hasFace = face_name(b, shown, fn) || face_name(b, o->name, fn);
+        int eye = hasFace ? bx_eye_frame(b, o) : -1;
+        Image *eyes = NULL;
+        u8 head[0x12];
+        if (eye >= 0 && bx_res_head(&b->arc, RX_GFX, fn, head, sizeof head) && !memcmp(head, "BSS-Composition", 15) && head[0x11] >= 2) {
+            snprintf(part, sizeof part, "%s#1", fn);
+            eyes = bx_image_load(b, part);
+            snprintf(part, sizeof part, "%s#0", fn);
+        } else snprintf(part, sizeof part, "%s", fn);
+        u32 color = tint ? (u32)strtoul(tint + 1, NULL, 0) : 0;
+        int pattern = bx_cfg_int(&b->cfg, "bustup setting", "eye pattern", 1);
+        Image *parts[3] = {bx_image_load(b, body), hasFace ? bx_image_load(b, part) : NULL, eyes};
+        for (int i = 0; i < 3; i++) {
+            if (!parts[i]) continue;
+            Image *im = parts[i], frame;
+            if (i == 2) {
+                frame = *im;
+                frame.h = im->h / pattern;
+                frame.px = im->px + (size_t)clampi(eye, 0, pattern - 1) * (size_t)frame.h * (size_t)im->w;
+                im = &frame;
+            }
+            if (color >> 24) blit_tinted(dst, b->W, b->H, im, im->x + x, im->y + y, a, tint[0], color);
+            else bx_blit(dst, b->W, b->H, im, im->x + x, im->y + y, a);
+        }
         return;
     }
     Image *im = bx_image_load(b, o->name);
@@ -182,7 +245,9 @@ void bx_compose(BX *b, const Scene *s, u32 *dst) {
     for (int i = 0; i < BX_OBJS; i++)
         if (s->obj[i].used) list[count++] = &s->obj[i];
     qsort(list, (size_t)count, sizeof *list, order_cmp);
-    for (int i = 0; i < count; i++) draw_obj(b, list[i], dst);
+    const char *tint = count && list[0]->kind == OK_BG ? bx_cfg_get(&b->cfg, "bu color adjustment", list[0]->name) : NULL;
+    if (tint && !strchr("*+-^/&", tint[0])) tint = NULL;
+    for (int i = 0; i < count; i++) draw_obj(b, list[i], dst, tint);
 }
 
 static bool numbered(int kind) { return kind != OK_BG; }
@@ -219,7 +284,7 @@ Obj *bx_obj_put(BX *b, int kind, int id, const char *name, int x, int y) {
     Scene *s = &b->scene;
     if (kind == OK_BG) {
         for (int i = 0; i < BX_OBJS; i++)
-            if (s->obj[i].used && s->obj[i].kind != OK_OBJ) s->obj[i].used = false;
+            s->obj[i].used = false;
         b->stripLevel = 0;
         b->viewLevel = 0;
     }
@@ -457,6 +522,39 @@ void bx_flash(BX *b, int r, int g, int bl, int ticks) {
     b->flashDur = (u32)(ticks > 0 ? ticks : 1) * 100;
 }
 
+void bx_shake(BX *b, int x, int y) {
+    b->shakeX = x;
+    b->shakeY = y;
+    b->shakeStart = b->now;
+}
+
+#define SHAKE_MS 500
+
+static int shake_offset(u32 seed, int amp) {
+    int range = amp * 3 / 2;
+    if (range <= 0) return 0;
+    seed = seed * 2654435761u ^ seed >> 13;
+    return (int)(seed % (u32)(2 * range + 1)) - range;
+}
+
+static void shake_frame(BX *b) {
+    u32 t = b->now - b->shakeStart;
+    if (t >= SHAKE_MS || b->skipMode) {
+        b->shakeX = b->shakeY = 0;
+        return;
+    }
+    u32 step = (b->now / 33) * 2;
+    int dx = shake_offset(step, b->shakeX), dy = shake_offset(step + 1, b->shakeY);
+    for (int y = 0; y < b->H; y++) {
+        int sy = y - dy;
+        u32 *row = b->screen + (size_t)y * b->W;
+        for (int x = 0; x < b->W; x++) {
+            int sx = x - dx;
+            row[x] = sx >= 0 && sx < b->W && sy >= 0 && sy < b->H ? b->front[(size_t)sy * b->W + sx] : 0xff000000u;
+        }
+    }
+}
+
 static void trans_frame(BX *b) {
     u32 t = b->now - b->transStart;
     size_t n = (size_t)b->W * (size_t)b->H;
@@ -488,12 +586,25 @@ static void trans_frame(BX *b) {
 
 void bx_gfx_frame(BX *b) {
     size_t n = (size_t)b->W * (size_t)b->H;
+    if (bx_movie_draw(b, b->screen)) {
+        b->serial++;
+        return;
+    }
+    for (int i = 0; i < BX_OBJS && !b->transActive; i++) {
+        const Obj *o = &b->shown.obj[i];
+        int e = o->used && o->kind == OK_CHAR ? bx_eye_frame(b, o) : -1;
+        if (e != b->eyeShown[i]) {
+            b->eyeShown[i] = e;
+            b->shownDirty = true;
+        }
+    }
     if (b->transActive) trans_frame(b);
     else if (b->shownDirty) {
         bx_compose(b, &b->shown, b->front);
         b->shownDirty = false;
     }
     memcpy(b->screen, b->front, n * 4);
+    if (b->shakeX || b->shakeY) shake_frame(b);
     if (b->flashDur) {
         u32 t = b->now - b->flashStart;
         if (t >= b->flashDur) b->flashDur = 0;
