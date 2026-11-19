@@ -375,6 +375,10 @@ static void layout_clear(AG *g, i32 li) {
 }
 
 static int op_reset(AG *g) {
+    Frame *f = &g->fr[g->top];
+    f->t1 = script_table_index(f->sc->t1, f->sc->t1Count, f->pc);
+    readtext_mark(g, f->sc->id, f->t1, f->sc->t1Count);
+    for (int i = 0; i < AG_SURFACES; i++) memcpy(g->gfx.surf[i].snap, g->gfx.surf[i].rec, sizeof g->gfx.surf[i].rec);
     i32 li = layout_index(g, arg_i(g, 1));
     if (li < 0 || li > 9) return OP_NEXT;
     layout_clear(g, li);

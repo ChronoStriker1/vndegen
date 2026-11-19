@@ -7,6 +7,7 @@ void vm_register_all(void) {
     snd_register();
     text_register();
     movie_register();
+    save_register();
 }
 
 VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
@@ -27,6 +28,7 @@ VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
     input_init(g);
     snd_init(g, cfg->audioRate);
     text_init(g);
+    save_init(g);
     if (!vm_init(g)) {
         snprintf(err, errSize, "%s", g->problem ? g->problem : "the root script can't be loaded");
         vnage_close(g);
@@ -37,6 +39,8 @@ VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
 
 void vnage_close(VNAge *g) {
     if (!g) return;
+    if (g->saveDir && g->gi) save_profile_write(g);
+    save_close(g);
     vm_close(g);
     free(g->timed);
     movie_stop_all(g);

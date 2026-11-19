@@ -331,12 +331,31 @@ static int op_sfx_load(AG *g) {
     i32 ch = arg_i(g, 2);
     Voice *v = load_id(g, (u32)arg_i(g, 1));
     if (v) set_voice(g, ch, v);
+    if (v && ch >= 0 && ch < 10) g->snd.sfxRes[ch] = arg_i(g, 1);
     return OP_NEXT;
 }
 
 static int op_sfx_start(AG *g) { start(g, arg_i(g, 1), false); return OP_NEXT; }
 static int op_sfx_loop(AG *g) { start(g, arg_i(g, 1), true); return OP_NEXT; }
-static int op_sfx_release(AG *g) { set_voice(g, arg_i(g, 1), NULL); return OP_NEXT; }
+static int op_sfx_release(AG *g) {
+    i32 ch = arg_i(g, 1);
+    set_voice(g, ch, NULL);
+    if (ch >= 0 && ch < 10) g->snd.sfxRes[ch] = 0;
+    return OP_NEXT;
+}
+
+void snd_restore(AG *g, i32 bgm, const i32 *sfx) {
+    for (int c = 0; c < AG_CHANNELS; c++) set_voice(g, c, NULL);
+    g->snd.bgm = 0;
+    if (bgm > 0) bgm_play(g, bgm, true, true);
+    for (int c = 0; c < 10; c++) {
+        g->snd.sfxRes[c] = 0;
+        if (sfx[c] > 0) {
+            Voice *v = load_id(g, (u32)sfx[c]);
+            if (v) { set_voice(g, c, v); g->snd.sfxRes[c] = sfx[c]; }
+        }
+    }
+}
 
 static int op_sfx_schedule(AG *g) {
     i32 ch = arg_i(g, 1);

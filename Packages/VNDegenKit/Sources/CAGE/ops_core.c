@@ -71,6 +71,7 @@ static int op_exit(AG *g) { return vm_frame_exit(g); }
 static int op_call_script(AG *g) {
     u32 id = (u32)arg_i(g, 1);
     Frame *f = cur(g);
+    f->t2 = script_table_index(f->sc->t2, f->sc->t2Count, f->pc);
     f->pc += g->insLen;
     if (!vm_call_script(g, id)) return OP_HALT;
     return OP_STAY;
@@ -587,7 +588,6 @@ void ops_core_register(void) {
     (void)op_mark_frame;
     vm_register(0x6, op_preload);
     vm_register(0x8, op_call_preloaded);
-    vm_register(0xae, op_restore_continue);
     vm_register(0x7b, op_co_handlers);
     vm_register(0x199, op_co_yield);
     vm_register(0x7c, op_co_resume);

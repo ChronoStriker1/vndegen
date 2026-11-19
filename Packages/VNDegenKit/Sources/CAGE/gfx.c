@@ -74,6 +74,7 @@ static void obj_init(Obj *o, i32 handle) {
 
 void gfx_init(AG *g) {
     Gfx *x = &g->gfx;
+    for (int i = 0; i < AG_SURFACES; i++) { x->surf[i].rec[0] = x->surf[i].snap[0] = -1; x->surf[i].res = -1; }
     x->target = 1000;
     x->background = 0xff000000u;
     x->tileEdge = 128;
@@ -154,6 +155,11 @@ void gfx_set_surface(AG *g, i32 slot, Image *im, i32 res, bool created) {
     s->im = im;
     s->res = res;
     s->created = created;
+    if (created) { s->rec[0] = -1; s->rec[4] = 1; }
+}
+
+static void surf_drawn(AG *g, i32 slot) {
+    if (slot >= 0 && slot < AG_SURFACES) g->gfx.surf[slot].rec[4] = 1;
 }
 
 static float chan_t(Gfx *x, Obj *o, Chan *c, bool *done) {
@@ -591,14 +597,26 @@ static Image *load_agf(AG *g, i32 res, i32 key) {
 static int op_load_surface(AG *g) {
     i32 res = arg_i(g, 1), slot = arg_i(g, 2), key = arg_i(g, 3);
     Image *im = load_agf(g, res, key);
-    if (im) gfx_set_surface(g, slot, im, res, false);
+    if (im) {
+        gfx_set_surface(g, slot, im, res, false);
+        Surface *s = &g->gfx.surf[slot];
+        s->rec[0] = res;
+        s->rec[1] = key < 0 ? 0 : (i32)(0xff000000u | (u32)key);
+        s->rec[4] = 0;
+    }
     return OP_NEXT;
 }
 
 static int op_load_raw_surface(AG *g) {
     i32 res = arg_i(g, 1), slot = arg_i(g, 2), key = arg_i(g, 3);
     Image *im = load_agf(g, res, key);
-    if (im) gfx_set_surface(g, slot, im, -1, false);
+    if (im) {
+        gfx_set_surface(g, slot, im, -1, false);
+        Surface *s = &g->gfx.surf[slot];
+        s->rec[0] = -1;
+        s->rec[1] = key < 0 ? 0 : (i32)(0xff000000u | (u32)key);
+        s->rec[4] = 0;
+    }
     return OP_NEXT;
 }
 
@@ -610,6 +628,7 @@ static int op_release_surface(AG *g) {
         g->gfx.surf[slot].im = NULL;
         g->gfx.surf[slot].res = -1;
         g->gfx.surf[slot].created = false;
+        g->gfx.surf[slot].rec[0] = -1;
     }
     return OP_NEXT;
 }
@@ -621,6 +640,7 @@ static int op_release_transient(AG *g) {
         g->gfx.surf[s].im = NULL;
         g->gfx.surf[s].res = -1;
         g->gfx.surf[s].created = false;
+        g->gfx.surf[s].rec[0] = -1;
     }
     return OP_NEXT;
 }
@@ -973,6 +993,7 @@ static int op_fill_rect(AG *g) {
     if (!im) return OP_NEXT;
     i32 x0 = arg_i(g, 2), y0 = arg_i(g, 3), w = arg_i(g, 4), h = arg_i(g, 5), a = arg_i(g, 6), rgb = arg_i(g, 7);
     u32 c = resolve_color(0, a, rgb);
+    surf_drawn(g, arg_i(g, 1));
     for (i32 y = y0 < 0 ? 0 : y0; y < y0 + h && y < im->h; y++)
         for (i32 x = x0 < 0 ? 0 : x0; x < x0 + w && x < im->w; x++) im->px[(size_t)y * (size_t)im->w + (size_t)x] = c;
     return OP_NEXT;
@@ -993,6 +1014,7 @@ static void copy_rect(Image *s, Image *d, int sx, int sy, int w, int h, int dx, 
 static int op_copy_rect(AG *g) {
     Image *s = gfx_surface(g, arg_i(g, 1)), *d = gfx_surface(g, arg_i(g, 2));
     if (s && d) copy_rect(s, d, arg_i(g, 3), arg_i(g, 4), arg_i(g, 5), arg_i(g, 6), arg_i(g, 7), arg_i(g, 8));
+    surf_drawn(g, arg_i(g, 2));
     return OP_NEXT;
 }
 
@@ -1002,6 +1024,7 @@ static int op_scale_copy(AG *g) {
     i32 sx = arg_i(g, 3), sy = arg_i(g, 4), sw = arg_i(g, 5), sh = arg_i(g, 6);
     i32 dx = arg_i(g, 7), dy = arg_i(g, 8), dw = arg_i(g, 9), dh = arg_i(g, 10);
     if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return OP_NEXT;
+    surf_drawn(g, arg_i(g, 2));
     for (i32 y = 0; y < dh; y++) {
         i32 ty = dy + y;
         if (ty < 0 || ty >= d->h) continue;
@@ -1033,13 +1056,21 @@ static int op_sample_time(AG *g) { gfx_tick(g); return OP_NEXT; }
 static int op_tile_edge(AG *g) { g->gfx.tileEdge = arg_i(g, 1); return OP_NEXT; }
 
 static int op_surface_flags(AG *g) {
-    i32 s = arg_i(g, 1);
-    if (s >= 0 && s < AG_SURFACES) g->gfx.surf[s].flags = (u32)arg_i(g, 2);
+    i32 s = arg_i(g, 1), f = arg_i(g, 2);
+    if (s < 0 || s >= AG_SURFACES) return OP_NEXT;
+    Surface *x = &g->gfx.surf[s];
+    x->flags = (u32)f;
+    x->rec[2] = x->snap[2] = f & 1;
+    x->rec[3] = x->snap[3] = (f >> 1) & 1;
     return OP_NEXT;
 }
 
 static int op_script_entry(AG *g) {
-    for (int s = 0; s < AG_SURFACES; s++) g->gfx.surf[s].flags = 0;
+    for (int s = 0; s < AG_SURFACES; s++) {
+        Surface *x = &g->gfx.surf[s];
+        x->flags = 0;
+        x->rec[2] = x->rec[3] = x->snap[2] = x->snap[3] = 0;
+    }
     return OP_NEXT;
 }
 
@@ -1300,4 +1331,130 @@ void gfx_register(void) {
     vm_register(0x25, op_crossfade);
     vm_register(0x27, op_strips);
     vm_register(0x28, op_stagger);
+}
+
+static u32 swap_rb(u32 c) { return (c & 0xff00ff00u) | (c >> 16 & 255) | (c & 255) << 16; }
+
+static void put_f(u8 *r, int o, float v) { memcpy(r + o, &v, 4); }
+static float get_f(const u8 *r, int o) { float v; memcpy(&v, r + o, 4); return v; }
+static void put_m(u8 *r, int o, M4 m) { memcpy(r + o, m.m, 64); }
+static M4 get_m(const u8 *r, int o) { M4 m; memcpy(m.m, r + o, 64); return m; }
+static void put_v(u8 *r, int o, Vec3 v) { put_f(r, o, v.x); put_f(r, o + 4, v.y); put_f(r, o + 8, v.z); }
+static Vec3 get_v(const u8 *r, int o) { return v3(get_f(r, o), get_f(r, o + 4), get_f(r, o + 8)); }
+
+void gfx_obj_record(const Obj *o, u8 *r) {
+    memset(r, 0, 0x2e4);
+    u32 flags = o->visible ? 1 : 0;
+    if (o->cColor.on || o->cScale.on || o->cRot.on || o->cTrans.on || o->cCell.on) flags |= 2;
+    bool cyc = false;
+    for (int k = 0; k < 5; k++) if (o->cycPeriod[k] > 0) cyc = true;
+    if (cyc) flags |= 4;
+    wr32(r, flags);
+    wr32(r + 4, (u32)o->slot);
+    wr32(r + 8, (u32)o->sl);
+    wr32(r + 0xc, (u32)o->st);
+    wr32(r + 0x10, (u32)o->sr);
+    wr32(r + 0x14, (u32)o->sb);
+    put_v(r, 0x18, o->anchor);
+    put_v(r, 0x24, o->pos);
+    wr32(r + 0x30, (u32)o->mode);
+    wr32(r + 0x34, o->started ? o->start : 0);
+    const Chan *ch[5] = { &o->cColor, &o->cScale, &o->cRot, &o->cTrans, &o->cCell };
+    for (int k = 0; k < 5; k++) {
+        wr32(r + 0x38 + k * 4, ch[k]->on ? (u32)ch[k]->delay : 0);
+        wr32(r + 0x4c + k * 4, ch[k]->on ? (u32)ch[k]->dur : 0);
+    }
+    wr32(r + 0x60, swap_rb(o->color));
+    wr32(r + 0x64, o->cColor.on ? swap_rb(o->colorTo) : 0xffffffffu);
+    put_m(r, 0x6c, m_scale(o->scale));
+    put_m(r, 0xac, m_scale(o->cScale.on ? o->scaleTo : o->scale));
+    put_m(r, 0xec, m_rot(o->rotAxis, o->rotAngle));
+    put_m(r, 0x12c, m_rot(o->cRot.on ? o->rotAxisTo : o->rotAxis, o->cRot.on ? o->rotTo : o->rotAngle));
+    put_m(r, 0x16c, m_trans(o->trans.x, o->trans.y, o->trans.z));
+    put_m(r, 0x1ac, m_trans(o->transTo.x, o->transTo.y, o->transTo.z));
+    put_v(r, 0x1ec, o->rotAxis);
+    put_v(r, 0x1f8, o->rotAxisTo);
+    put_f(r, 0x204, o->rotAngle);
+    put_f(r, 0x208, o->cRot.on ? o->rotTo : o->rotAngle);
+    for (int k = 0; k < 5; k++) {
+        wr32(r + 0x20c + k * 4, o->cycStarted[k] ? o->cycStart[k] : 0);
+        wr32(r + 0x220 + k * 4, (u32)o->cycPeriod[k]);
+    }
+    wr32(r + 0x234, (u32)o->cellFlags);
+    wr32(r + 0x238, (u32)(o->cCell.on || o->cellFrames ? o->cellFrames : o->loopFrames));
+    wr32(r + 0x23c, (u32)(o->cCell.on || o->cellFrames ? o->cellCols : o->loopCols));
+    wr32(r + 0x240, o->cycPeriod[0] > 0 ? swap_rb(o->cycColor) : 0xffffffffu);
+    put_v(r, 0x244, o->cycAxis);
+    put_m(r, 0x250, m_scale(o->cycPeriod[1] > 0 ? o->cycScale : v3(1, 1, 1)));
+    put_m(r, 0x290, o->cycPeriod[3] > 0 ? m_trans(o->cycTrans.x, o->cycTrans.y, o->cycTrans.z) : m_ident());
+    wr32(r + 0x2d0, o->detached);
+    put_v(r, 0x2d4, o->rotAxis);
+    put_f(r, 0x2e0, o->rotAngle * 3.14159265f / 180.0f);
+}
+
+void gfx_record_obj(const u8 *r, Obj *o, i32 handle) {
+    obj_init(o, handle);
+    u32 flags = rd32(r);
+    o->visible = flags & 1;
+    o->slot = (i32)rd32(r + 4);
+    o->sl = (i32)rd32(r + 8);
+    o->st = (i32)rd32(r + 0xc);
+    o->sr = (i32)rd32(r + 0x10);
+    o->sb = (i32)rd32(r + 0x14);
+    o->anchor = get_v(r, 0x18);
+    o->pos = get_v(r, 0x24);
+    o->mode = (int)rd32(r + 0x30);
+    o->color = swap_rb(rd32(r + 0x60));
+    o->live = true;
+    M4 sc = get_m(r, 0x6c), st = get_m(r, 0xac), tc = get_m(r, 0x16c), tt = get_m(r, 0x1ac);
+    o->scale = v3(sc.m[0][0], sc.m[1][1], sc.m[2][2]);
+    o->scaleTo = v3(st.m[0][0], st.m[1][1], st.m[2][2]);
+    o->trans = v3(tc.m[3][0], tc.m[3][1], tc.m[3][2]);
+    o->transTo = v3(tt.m[3][0], tt.m[3][1], tt.m[3][2]);
+    o->rotAxis = get_v(r, 0x1ec);
+    o->rotAxisTo = get_v(r, 0x1f8);
+    o->rotAngle = get_f(r, 0x204);
+    o->rotTo = get_f(r, 0x208);
+    if (o->rotAxis.x == 0 && o->rotAxis.y == 0 && o->rotAxis.z == 0) o->rotAxis = v3(0, 0, 1);
+    if (o->rotAxisTo.x == 0 && o->rotAxisTo.y == 0 && o->rotAxisTo.z == 0) o->rotAxisTo = o->rotAxis;
+    Chan *ch[5] = { &o->cColor, &o->cScale, &o->cRot, &o->cTrans, &o->cCell };
+    u32 target = rd32(r + 0x64);
+    for (int k = 0; k < 5; k++) {
+        ch[k]->delay = (i32)rd32(r + 0x38 + k * 4);
+        ch[k]->dur = (i32)rd32(r + 0x4c + k * 4);
+    }
+    if (flags & 2) {
+        if (target != 0xffffffffu) { o->cColor.on = true; o->colorFrom = o->color; o->colorTo = swap_rb(target); }
+        if (o->scaleTo.x != o->scale.x || o->scaleTo.y != o->scale.y) { o->cScale.on = true; o->scaleFrom = o->scale; }
+        if (o->rotTo != o->rotAngle) { o->cRot.on = true; o->rotFrom = o->rotAngle; }
+        if (o->transTo.x != o->trans.x || o->transTo.y != o->trans.y || o->transTo.z != o->trans.z) { o->cTrans.on = true; o->transFrom = o->trans; }
+        if (o->cCell.dur > 0) o->cCell.on = true;
+    } else {
+        o->scaleTo = o->scale;
+        o->transTo = o->trans;
+        o->rotTo = o->rotAngle;
+    }
+    for (int k = 0; k < 5; k++) o->cycPeriod[k] = (flags & 4) ? (i32)rd32(r + 0x220 + k * 4) : 0;
+    o->cellFlags = (i32)rd32(r + 0x234);
+    if (o->cCell.on) { o->cellFrames = (i32)rd32(r + 0x238); o->cellCols = (i32)rd32(r + 0x23c); }
+    o->loopFrames = (i32)rd32(r + 0x238);
+    o->loopCols = (i32)rd32(r + 0x23c);
+    o->cycColor = swap_rb(rd32(r + 0x240));
+    o->cycAxis = get_v(r, 0x244);
+    M4 cs = get_m(r, 0x250), ct = get_m(r, 0x290);
+    o->cycScale = v3(cs.m[0][0], cs.m[1][1], cs.m[2][2]);
+    o->cycTrans = v3(ct.m[3][0], ct.m[3][1], ct.m[3][2]);
+    o->detached = rd32(r + 0x2d0);
+}
+
+void gfx_restore_objects(AG *g, const u8 *recs, const i32 *handles, int n, i32 rfirst, i32 rcount, const u8 *range) {
+    Gfx *x = &g->gfx;
+    objs_clear(x);
+    for (int i = 0; i < n; i++) {
+        Obj *o = gfx_obj(g, handles[i], true);
+        gfx_record_obj(recs + (size_t)i * 0x2e4, o, handles[i]);
+    }
+    x->rangeFirst = rfirst;
+    x->rangeCount = rcount;
+    gfx_record_obj(range, &x->range, 0);
 }

@@ -105,6 +105,8 @@ static bool load_catalog(Store *s, const char *path, bool append, char *err, siz
     Catalog *c = &s->cat[sel];
     size_t end = 0;
     bool ok = parse_directory(c, idx, got, &end);
+    if (ok) s->seen[sel] = ag_alloc((size_t)c->count + 1);
+    if (!append) memcpy(s->gameId, d + 8, sizeof s->gameId - 1);
     if (ok && !append) {
         for (int i = 0; i < 6; i++) {
             s->bankSaved[i] = rd32(d + 0xf0 + i * 4);
@@ -171,6 +173,7 @@ void store_close(Store *s) {
         free(k->arcs);
         free(k->files);
         free(k->e);
+        free(s->seen[c]);
     }
     for (int i = 0; i < s->settingCount; i++) {
         free(s->settings[i].key);
@@ -237,6 +240,7 @@ u8 *store_read(Store *s, u32 id, size_t *size) {
     u8 *d = read_loose(s, e->name, &sz);
     if (!d) d = read_archived(s, &s->cat[(i32)id >> 24], e, &sz);
     if (d && size) *size = sz;
+    if (d && s->seen[(i32)id >> 24]) s->seen[(i32)id >> 24][id & 0xffffff] = 1;
     return d;
 }
 

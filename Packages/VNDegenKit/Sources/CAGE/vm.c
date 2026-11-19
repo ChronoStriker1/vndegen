@@ -209,6 +209,7 @@ static bool frame_load(AG *g, Frame *f, u32 id) {
     f->active = true;
     f->launchReturn = 0;
     f->preload = -1;
+    f->t1 = f->t2 = -1;
     f->handlerA = f->handlerB = 0xffffffffu;
     return true;
 }
@@ -302,7 +303,14 @@ void vm_close(AG *g) {
     free(g->gi);
 }
 
+bool vm_load_root(AG *g, u32 id) {
+    for (int i = 0; i < AG_FRAMES; i++) frame_free(&g->fr[i]);
+    g->top = 0;
+    return frame_load(g, &g->fr[0], id);
+}
+
 int vm_frame_exit(AG *g) {
+    if (g->top == 0 && g->restorePending) return vm_restore_step(g);
     if (g->top == 0) {
         ag_log(g, "root script ended");
         g->halted = true;

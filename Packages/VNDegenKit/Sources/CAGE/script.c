@@ -14,11 +14,10 @@ Script *script_load(Store *st, u32 id, char *err, size_t errSize) {
     s->w = ag_alloc(sizeof(u32) * (s->count + 16));
     for (u32 i = 0; i < s->count; i++) s->w[i] = rd32(d + 0x3c + i * 4);
     s->codeEnd = s->hdr[8] < s->count ? s->hdr[8] : s->count;
-    u32 t1 = s->hdr[8], n1 = s->hdr[7];
-    if (t1 + n1 <= s->count) {
-        s->t1 = s->w + t1;
-        s->t1Count = n1;
-    }
+    u32 t1 = s->hdr[8], n1 = s->hdr[7], t2 = s->hdr[10], n2 = s->hdr[9], t3 = s->hdr[12], n3 = s->hdr[11];
+    if (t1 + n1 <= s->count) { s->t1 = s->w + t1; s->t1Count = n1; }
+    if (t2 + n2 <= s->count) { s->t2 = s->w + t2; s->t2Count = n2; }
+    if (t3 + n3 <= s->count) { s->t3 = s->w + t3; s->t3Count = n3; }
     free(d);
     return s;
 }
@@ -44,4 +43,11 @@ const char *script_string(const Script *s, u32 off) {
     }
     o[n] = 0;
     return o;
+}
+
+i32 script_table_index(const u32 *t, u32 n, u32 pc) {
+    if (!t) return -1;
+    for (u32 i = 0; i < n; i++)
+        if (t[i] == pc) return (i32)i;
+    return -1;
 }

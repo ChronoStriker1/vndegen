@@ -72,6 +72,8 @@ typedef struct Store {
     int patchCount;
     char **looseNames;
     int looseCount;
+    u8 *seen[256];
+    char gameId[0xe8];
 } Store;
 
 bool store_open(Store *s, const char *dir, char *err, size_t errSize);
@@ -98,9 +100,11 @@ typedef struct Script {
     u32 *w;
     u32 count;
     u32 codeEnd;
-    u32 *t1;
-    u32 t1Count;
+    u32 *t1, *t2, *t3;
+    u32 t1Count, t2Count, t3Count;
 } Script;
+
+i32 script_table_index(const u32 *t, u32 n, u32 pc);
 
 Script *script_load(Store *st, u32 id, char *err, size_t errSize);
 void script_free(Script *s);
@@ -135,6 +139,7 @@ typedef struct Frame {
     u32 handlerA, handlerB;
     int launchReturn;
     int preload;
+    i32 t1, t2;
 } Frame;
 
 enum { OP_NEXT, OP_JUMP, OP_WAIT, OP_HALT, OP_STAY };
@@ -188,6 +193,7 @@ void vm_call_local(AG *g, u32 pc);
 void vm_callback(AG *g, u32 pc);
 int vm_frame_exit(AG *g);
 bool vm_init(AG *g);
+bool vm_load_root(AG *g, u32 id);
 bool vm_preload(AG *g, u32 id, int slot);
 bool vm_call_preloaded(AG *g, int slot);
 void vm_close(AG *g);
@@ -211,6 +217,8 @@ typedef struct Surface {
     bool created;
     u32 flags;
     void *movie;
+    i32 rec[5];
+    i32 snap[5];
 } Surface;
 
 typedef struct Chan {
@@ -297,6 +305,9 @@ void gfx_reset(AG *g);
 void gfx_register(void);
 Obj *gfx_obj(AG *g, i32 handle, bool create);
 void gfx_erase(AG *g, i32 handle);
+void gfx_obj_record(const Obj *o, u8 *r);
+void gfx_record_obj(const u8 *r, Obj *o, i32 handle);
+void gfx_restore_objects(AG *g, const u8 *recs, const i32 *handles, int n, i32 rfirst, i32 rcount, const u8 *range);
 void gfx_render(AG *g, i32 target, i32 first, i32 count);
 void gfx_tick(AG *g);
 bool gfx_busy(AG *g);
@@ -375,8 +386,11 @@ typedef struct Sound {
     i32 voiceDelay;
     u32 voiceDelayAt;
     i32 lastVoice;
+    i32 sfxRes[10];
     bool paused;
 } Sound;
+
+void snd_restore(AG *g, i32 bgm, const i32 *sfx);
 
 void snd_init(AG *g, int rate);
 void snd_close(AG *g);
@@ -428,6 +442,7 @@ typedef struct Text {
     i32 tabStyle[11][7];
 } Text;
 
+void readtext_mark(AG *g, u32 script, i32 index, u32 count);
 void text_init(AG *g);
 void text_close(AG *g);
 void text_register(void);
@@ -451,7 +466,35 @@ typedef struct TimedEntry {
     u32 ontime, catchup;
 } TimedEntry;
 
+typedef struct SavedFrame {
+    u32 id;
+    i32 t1, t2;
+    i32 nret;
+    i32 ret[256];
+} SavedFrame;
+
+typedef struct ReadText {
+    u32 id;
+    u32 count;
+    u8 *flags;
+} ReadText;
+
+void save_register(void);
+void save_init(AG *g);
+void save_close(AG *g);
+void save_profile_write(AG *g);
+int vm_restore_step(AG *g);
+
 struct VNAge {
+    SavedFrame *restore;
+    int nrestore;
+    bool restoring;
+    bool restorePending;
+    ReadText *rt;
+    int nrt, crt;
+    u64 playBase;
+    u32 playStart;
+    long long wallStart;
     TimedEntry *timed;
     int ntimed, ctimed, timedCursor;
     u32 timedStart;
