@@ -316,6 +316,7 @@ static u8 *build_trailer(EG *e, size_t *len) {
         trailer_str(&p, &n, &cap, e->bgmName[c]);
         trailer_i32(&p, &n, &cap, e->bgmLoop[c]);
     }
+    trailer_str(&p, &n, &cap, e->speaker ? e->speaker : "");
     *len = n;
     return p;
 }
@@ -532,6 +533,9 @@ static void restore_scene(EG *e, const u8 *b, const u8 *t, size_t tn) {
             int loop = rdi(t, tn, &at);
             if (name[0] && strcmp(name, "0")) snd_play(e, name, loop ? 1 : 0, c, 0);
         }
+        char speaker[160];
+        rds(t, tn, &at, speaker, sizeof speaker);
+        if (speaker[0]) msg_name(e, speaker, NULL);
         return;
     }
     e->th[0].sp = 0;
@@ -561,6 +565,17 @@ static void restore_scene(EG *e, const u8 *b, const u8 *t, size_t tn) {
         const char *name = (const char *)b + SOUND_NAMES + c * 64;
         if (name[0] && strcmp(name, "0")) snd_play(e, name, 1, c, 0);
     }
+    const char *nm = (const char *)b + 0x146AF0;
+    while (*nm == '(') {
+        const char *close = strchr(nm, ')');
+        if (!close) break;
+        nm = close + 1;
+    }
+    char speaker[160];
+    snprintf(speaker, sizeof speaker, "%s", nm);
+    size_t l = strlen(speaker);
+    while (l >= 2 && (u8)speaker[l - 2] == 0x81 && (u8)speaker[l - 1] == 0x40) speaker[l -= 2] = 0;
+    if (speaker[0]) msg_name(e, speaker, NULL);
 }
 
 bool load_slot(EG *e, int slot) {
