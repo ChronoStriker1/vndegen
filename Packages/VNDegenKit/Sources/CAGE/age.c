@@ -4,6 +4,8 @@ void vm_register_all(void) {
     ops_core_register();
     gfx_register();
     input_register();
+    snd_register();
+    text_register();
 }
 
 VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
@@ -22,6 +24,8 @@ VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
     snprintf(g->title, sizeof g->title, "Eushully AGE");
     gfx_init(g);
     input_init(g);
+    snd_init(g, cfg->audioRate);
+    text_init(g);
     if (!vm_init(g)) {
         snprintf(err, errSize, "%s", g->problem ? g->problem : "the root script can't be loaded");
         vnage_close(g);
@@ -34,6 +38,8 @@ void vnage_close(VNAge *g) {
     if (!g) return;
     vm_close(g);
     gfx_close(g);
+    snd_close(g);
+    text_close(g);
     store_close(&g->st);
     free(g->screen);
     free(g->gameDir);
@@ -58,6 +64,8 @@ static void service(AG *g) {
     if (g->wait == W_SLEEP && (i32)(g->now - g->waitUntil) >= 0) g->wait = W_NONE;
     if (g->wait == W_YIELD && !gfx_busy(g)) g->wait = W_NONE;
     if (g->wait == W_FRAME) g->wait = W_NONE;
+    if (g->wait == W_TRANS && (gfx_transition_done(g) || (g->in.clicks & 1) || (g->in.pressed & 0x10))) { gfx_transition_finish(g); g->wait = W_NONE; }
+    if (g->wait == W_TEXT || g->wait == W_INPUT || g->wait == W_HIDDEN) input_service(g);
 }
 
 bool vnage_frame(VNAge *g, uint32_t elapsedMs) {
@@ -67,13 +75,17 @@ bool vnage_frame(VNAge *g, uint32_t elapsedMs) {
         if (g->wait == W_SLEEP && (i32)(g->waitUntil - g->now) > 0 && (i32)(g->waitUntil - end) < 0) step = g->waitUntil - g->now;
         g->now += step;
         gfx_tick(g);
+        snd_tick(g);
+        text_tick(g);
         service(g);
         vm_run(g, 500000);
         if (g->halted || g->quit || g->now == end) break;
     }
     g->now = end;
     gfx_tick(g);
-    gfx_render(g, 1000, 0, -1);
+    text_tick(g);
+    if (!gfx_transition_frame(g) && !g->gfx.hold) gfx_render(g, 1000, 0, -1);
+    input_end_frame(g);
     return !g->halted && !g->quit;
 }
 
@@ -86,14 +98,22 @@ const uint32_t *vnage_pixels(VNAge *g, int *w, int *h) {
 uint32_t vnage_frame_serial(VNAge *g) { return g->frameSerial; }
 void vnage_mouse_move(VNAge *g, int x, int y) { g->in.mx = x; g->in.my = y; }
 void vnage_mouse_button(VNAge *g, int button, bool down) {
-    u32 bit = button == VNAGE_MOUSE_LEFT ? 1 : button == VNAGE_MOUSE_RIGHT ? 2 : 0;
-    if (down) { g->in.buttons |= bit; g->in.clicks |= bit; }
-    else g->in.buttons &= ~bit;
+    int b = button == VNAGE_MOUSE_LEFT ? 0 : button == VNAGE_MOUSE_RIGHT ? 1 : -1;
+    if (b < 0) return;
+    if (down) {
+        g->in.buttons |= 1u << b;
+        g->in.clicks |= 1u << b;
+        g->in.pressed |= 1u << ((g->in.mouseSlot[b] + 4) & 31);
+    } else g->in.buttons &= ~(1u << b);
 }
-void vnage_key(VNAge *g, int vk, bool down) { if (vk >= 0 && vk < 256) g->in.keys[vk] = down; }
+void vnage_key(VNAge *g, int vk, bool down) {
+    if (vk < 0 || vk >= 256) return;
+    if (down && !g->in.keys[vk] && g->in.keyAction[vk] < 32) g->in.pressed |= 1u << g->in.keyAction[vk];
+    g->in.keys[vk] = down;
+}
 void vnage_wheel(VNAge *g, int notches) { g->in.wheel += notches * 120; }
-void vnage_audio(VNAge *g, float *out, int frames) { (void)g; memset(out, 0, sizeof(float) * 2 * (size_t)frames); }
-void vnage_set_paused(VNAge *g, bool paused) { (void)g; (void)paused; }
+void vnage_audio(VNAge *g, float *out, int frames) { mixer_mix(g->snd.mixer, out, frames, g->snd.paused); }
+void vnage_set_paused(VNAge *g, bool paused) { g->snd.paused = paused; }
 void vnage_request_quit(VNAge *g) { g->quit = true; }
 const char *vnage_title(VNAge *g) { return g->title; }
 const char *vnage_problem(VNAge *g) { return g->problem; }

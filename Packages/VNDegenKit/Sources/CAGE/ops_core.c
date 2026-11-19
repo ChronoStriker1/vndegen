@@ -372,6 +372,108 @@ static int op_sort(AG *g) {
 
 static int op_mark_frame(AG *g) { (void)g; return OP_NEXT; }
 
+static int op_preload(AG *g) {
+    if (!vm_preload(g, (u32)arg_i(g, 1), arg_i(g, 2))) return OP_HALT;
+    return OP_NEXT;
+}
+
+static int op_call_preloaded(AG *g) {
+    i32 slot = arg_i(g, 1);
+    cur(g)->pc += g->insLen;
+    if (!vm_call_preloaded(g, slot)) return OP_HALT;
+    return OP_STAY;
+}
+
+static ProfInt *pint(AG *g, u32 cell, bool create) {
+    for (int i = 0; i < g->npint; i++) if (g->pint[i].cell == cell) return &g->pint[i];
+    if (!create) return NULL;
+    if (g->npint >= g->cpint) { g->cpint = g->cpint ? g->cpint * 2 : 256; g->pint = ag_realloc(g->pint, sizeof(ProfInt) * (size_t)g->cpint); }
+    ProfInt *p = &g->pint[g->npint++];
+    p->cell = cell;
+    p->v = 0;
+    return p;
+}
+
+static ProfStr *pstr(AG *g, u32 cell, bool create) {
+    for (int i = 0; i < g->npstr; i++) if (g->pstr[i].cell == cell) return &g->pstr[i];
+    if (!create) return NULL;
+    if (g->npstr >= g->cpstr) { g->cpstr = g->cpstr ? g->cpstr * 2 : 64; g->pstr = ag_realloc(g->pstr, sizeof(ProfStr) * (size_t)g->cpstr); }
+    ProfStr *p = &g->pstr[g->npstr++];
+    p->cell = cell;
+    p->v = NULL;
+    return p;
+}
+
+static int op_prof_store(AG *g) {
+    Ref r;
+    if (!arg_addr(g, 1, &r) || r.bank != BANK_GINT) return OP_NEXT;
+    pint(g, (u32)r.index, true)->v = *ref_int(g, r);
+    return OP_NEXT;
+}
+
+static int op_prof_load(AG *g) {
+    Ref r;
+    if (!arg_addr(g, 1, &r) || r.bank != BANK_GINT) return OP_NEXT;
+    ProfInt *p = pint(g, (u32)r.index, false);
+    *ref_int(g, r) = p ? p->v : 0;
+    return OP_NEXT;
+}
+
+static int op_prof_store_s(AG *g) {
+    Ref r;
+    if (!arg_addr(g, 1, &r) || r.bank != BANK_GSTR) return OP_NEXT;
+    ProfStr *p = pstr(g, (u32)r.index, true);
+    free(p->v);
+    Str *s = ref_str(g, r);
+    p->v = ag_strdup(s->s ? s->s : "");
+    return OP_NEXT;
+}
+
+static int op_prof_load_s(AG *g) {
+    Ref r;
+    if (!arg_addr(g, 1, &r) || r.bank != BANK_GSTR) return OP_NEXT;
+    ProfStr *p = pstr(g, (u32)r.index, false);
+    str_set(ref_str(g, r), p && p->v ? p->v : "");
+    return OP_NEXT;
+}
+
+static int op_restore_continue(AG *g) { (void)g; return OP_NEXT; }
+
+static int op_co_handlers(AG *g) {
+    Frame *f = cur(g);
+    f->handlerA = (u32)arg_i(g, 1);
+    f->handlerB = (u32)arg_i(g, 2);
+    return OP_NEXT;
+}
+
+static int op_co_yield(AG *g) {
+    Frame *f = cur(g);
+    if (g->coState == 0 && f->handlerA != 0xffffffffu) { co_enter(g, g->top, f->handlerA, f->pc + g->insLen, 1); return OP_JUMP; }
+    if (f->handlerB != 0xffffffffu) { co_enter(g, g->top, f->handlerB, f->pc + g->insLen, 3); return OP_JUMP; }
+    return OP_NEXT;
+}
+
+static int op_co_resume(AG *g) {
+    Frame *f = cur(g);
+    if (g->coState == 1) {
+        f->pc = g->coResume;
+        g->coState = 2;
+        g->wait = W_HIDDEN;
+        g->in.hit = -1;
+        return OP_STAY;
+    }
+    if (g->coState == 3) {
+        f->pc = g->coResume;
+        g->coState = 0;
+        g->in.hit = -1;
+        return OP_JUMP;
+    }
+    vm_problem(g, "coroutine resume outside a yield");
+    return OP_NEXT;
+}
+
+static int op_save_mark(AG *g) { g->saveFrame = g->top; return OP_NEXT; }
+
 void ops_core_register(void) {
     vm_register(0x1, op_exit_request);
     vm_register(0x2, op_exit);
@@ -434,4 +536,15 @@ void ops_core_register(void) {
     vm_register(0x2c5, op_byte_len);
     vm_register(0x2d8, op_fill);
     (void)op_mark_frame;
+    vm_register(0x6, op_preload);
+    vm_register(0x8, op_call_preloaded);
+    vm_register(0xae, op_restore_continue);
+    vm_register(0x7b, op_co_handlers);
+    vm_register(0x199, op_co_yield);
+    vm_register(0x7c, op_co_resume);
+    vm_register(0x1ad, op_save_mark);
+    vm_register(0x1a2, op_prof_store);
+    vm_register(0x1a3, op_prof_load);
+    vm_register(0x1a9, op_prof_store_s);
+    vm_register(0x1aa, op_prof_load_s);
 }

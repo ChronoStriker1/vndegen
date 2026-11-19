@@ -134,6 +134,7 @@ typedef struct Frame {
     bool active;
     u32 handlerA, handlerB;
     int launchReturn;
+    int preload;
 } Frame;
 
 enum { OP_NEXT, OP_JUMP, OP_WAIT, OP_HALT, OP_STAY };
@@ -145,6 +146,11 @@ enum {
     W_SLEEP,
     W_YIELD,
     W_FRAME,
+    W_TEXT,
+    W_INPUT,
+    W_MOVIE,
+    W_TRANS,
+    W_HIDDEN,
 } ;
 
 typedef struct Switch {
@@ -159,6 +165,8 @@ typedef struct Queue {
 } Queue;
 
 void vm_register(int op, OpFn fn);
+void vm_register_draw(int op, OpFn fn);
+bool vm_draws(u32 op);
 void vm_register_all(void);
 void ops_core_register(void);
 
@@ -179,6 +187,8 @@ void vm_call_local(AG *g, u32 pc);
 void vm_callback(AG *g, u32 pc);
 int vm_frame_exit(AG *g);
 bool vm_init(AG *g);
+bool vm_preload(AG *g, u32 id, int slot);
+bool vm_call_preloaded(AG *g, int slot);
 void vm_close(AG *g);
 void vm_run(AG *g, int budget);
 void vm_reset_root(AG *g);
@@ -250,7 +260,16 @@ typedef struct Gfx {
     u32 serviceFlags;
     bool forceComplete;
     i32 tileEdge;
+    bool hold;
+    int trKind;
+    Image *trA, *trB;
+    u32 trStart;
+    i32 trStep, trInterval, trDiv, trMode;
 } Gfx;
+
+bool gfx_transition_done(AG *g);
+bool gfx_transition_frame(AG *g);
+void gfx_transition_finish(AG *g);
 
 void gfx_init(AG *g);
 void gfx_close(AG *g);
@@ -294,14 +313,129 @@ typedef struct Input {
     int nhot;
     bool hotArmed;
     u32 clicks;
-    bool skip, autoMode, readSkip;
+    u32 pressed;
+    u32 prevMask;
+    int hit, hovered;
+    int lastMx, lastMy;
+    u32 waitStart;
+    bool skip, autoMode, readSkip, skipSuspended;
 } Input;
+
+void input_service(AG *g);
+void co_enter(AG *g, int fi, u32 handler, u32 resume, int state);
+void input_end_frame(AG *g);
 
 void input_init(AG *g);
 void input_register(void);
 u32 input_mask(AG *g);
 
+#define AG_CHANNELS 13
+
+typedef struct Mixer Mixer;
+Mixer *mixer_new(int rate);
+void mixer_free(Mixer *m);
+void mixer_mix(Mixer *m, float *out, int frames, bool paused);
+
+typedef struct Sound {
+    Mixer *mixer;
+    int rate;
+    i32 vol[5];
+    bool route[5];
+    i32 bgm;
+    float bgmLevel, bgmFrom, bgmTo;
+    u32 bgmFadeStart, bgmFadeDur;
+    bool bgmFading;
+    bool muteNext;
+    u32 duckFlags;
+    i32 sfxDelayCh[10];
+    u32 sfxDelayAt[10];
+    i32 sfxDelayMode[10];
+    i32 voiceDelay;
+    u32 voiceDelayAt;
+    i32 lastVoice;
+    bool paused;
+} Sound;
+
+void snd_init(AG *g, int rate);
+void snd_close(AG *g);
+void snd_register(void);
+void snd_tick(AG *g);
+void snd_movie(AG *g, void *video);
+
+typedef struct GlyphRec {
+    i32 chain, l, t, r, b;
+} GlyphRec;
+
+typedef struct Layout {
+    bool defined;
+    i32 w, h, ox, oy;
+    i32 boundR, boundB;
+    i32 resetX, resetY;
+    i32 cx, cy;
+    GlyphRec *rec;
+    int nrec, cap;
+    i32 first, capacity;
+    int shown;
+    u32 nextAt;
+    i32 indHandle;
+    i32 indX, indY, indSurf, indSX, indSY, indW, indH, indCols, indFrames, indPeriod;
+    bool indConfigured;
+} Layout;
+
+typedef struct HistLine {
+    char *text;
+    i32 voice;
+    i32 layout;
+    bool boundary;
+} HistLine;
+
+typedef struct Text {
+    char face[64];
+    i32 size, bold, color, effColor, effMode, effX, effY, leading, rubySize, delay, aspect;
+    i32 cur;
+    Layout lay[10];
+    bool waitIndicator, followLast;
+    bool indActive;
+    int indLayout;
+    u32 indStart;
+    bool recording;
+    HistLine *hist;
+    int nhist, histCap;
+    i32 winAlpha;
+    i32 autoTime[2];
+    i32 tabStyle[11][7];
+} Text;
+
+void text_init(AG *g);
+void text_close(AG *g);
+void text_register(void);
+bool text_revealing(AG *g);
+void text_finish(AG *g);
+void text_tick(AG *g);
+void text_draw_string(AG *g, Image *im, int x, int y, const char *s);
+
+typedef struct ProfInt {
+    u32 cell;
+    i32 v;
+} ProfInt;
+
+typedef struct ProfStr {
+    u32 cell;
+    char *v;
+} ProfStr;
+
 struct VNAge {
+    int coState;
+    u32 coResume;
+    int coFrame;
+    int saveFrame;
+    Frame pre[AG_FRAMES];
+    ProfInt *pint;
+    int npint, cpint;
+    ProfStr *pstr;
+    int npstr, cpstr;
+    Text text;
+    Sound snd;
     Input in;
     Gfx gfx;
     FILE *log;
@@ -321,6 +455,8 @@ struct VNAge {
     int launchCount, launchHead;
     int wait;
     u32 waitUntil;
+    u32 waitPc;
+    int waitFrame;
     u32 now;
     u64 steps;
     bool halted, quit;
@@ -329,6 +465,7 @@ struct VNAge {
     Switch sw;
     Queue q[11];
     Queue stk[11];
+    u8 trace[0x400];
     u32 opSeen[0x400];
     u32 opMissing[0x400];
     u32 frameSerial;

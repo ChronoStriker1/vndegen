@@ -541,7 +541,7 @@ static int op_color(AG *g) {
     Obj *o = gfx_obj(g, arg_i(g, 1), true);
     o->mode = arg_i(g, 2);
     o->color = resolve_color(o->color, arg_i(g, 3), arg_i(g, 4));
-    o->cColor.on = false;
+    if (o->cColor.on) o->colorFrom = o->color;
     if (o->visible) o->live = true;
     return OP_NEXT;
 }
@@ -942,64 +942,197 @@ static int op_yield(AG *g) {
 static int op_tick_presentation(AG *g) { (void)g; return OP_NEXT; }
 static int op_nop(AG *g) { (void)g; return OP_NEXT; }
 
+enum { TR_NONE, TR_CROSS, TR_TO_BLACK, TR_TO_WHITE, TR_FROM_BLACK, TR_STRIPS, TR_STAGGER };
+
+static Image *snapshot(AG *g, i32 slot) {
+    Image *s = slot >= 0 ? gfx_surface(g, slot) : NULL;
+    Image *im = image_new(g->width, g->height);
+    if (s) {
+        for (int y = 0; y < g->height && y < s->h; y++)
+            for (int x = 0; x < g->width && x < s->w; x++) im->px[(size_t)y * (size_t)g->width + (size_t)x] = s->px[(size_t)y * (size_t)s->w + (size_t)x] | 0xff000000u;
+    } else memcpy(im->px, g->screen, sizeof(u32) * (size_t)g->width * (size_t)g->height);
+    return im;
+}
+
+static int begin(AG *g, int kind, Image *a, Image *b, i32 arg) {
+    Gfx *x = &g->gfx;
+    image_free(x->trA);
+    image_free(x->trB);
+    x->trKind = kind;
+    x->trA = a;
+    x->trB = b;
+    x->trStart = g->now;
+    if (arg <= 64) { x->trStep = 16; x->trInterval = arg; }
+    else { x->trStep = 1; x->trInterval = arg / 16; }
+    if (x->trInterval < 1) x->trInterval = 1;
+    if (g->in.skip) { gfx_transition_finish(g); return OP_NEXT; }
+    g->wait = W_TRANS;
+    return OP_WAIT;
+}
+
+static i32 tr_total(Gfx *x) {
+    if (x->trKind == TR_STRIPS || x->trKind == TR_STAGGER) {
+        bool vert = x->trMode == 4 || x->trMode == 5 || x->trMode == 8 || x->trMode == 9;
+        i32 thick = x->trDiv > 0 ? ((vert ? 1024 : 576) / x->trDiv) : 1;
+        i32 steps = x->trKind == TR_STAGGER ? x->trDiv - 1 + thick : thick;
+        return steps * x->trInterval;
+    }
+    return (256 / x->trStep) * x->trInterval;
+}
+
+bool gfx_transition_done(AG *g) {
+    Gfx *x = &g->gfx;
+    if (x->trKind == TR_NONE) return true;
+    return (i32)(g->now - x->trStart) >= tr_total(x);
+}
+
+static void tr_draw(AG *g, i32 el) {
+    Gfx *x = &g->gfx;
+    int W = g->width, H = g->height;
+    u32 *o = g->screen;
+    if (x->trKind == TR_STRIPS || x->trKind == TR_STAGGER) {
+        i32 step = x->trInterval > 0 ? el / x->trInterval : 0;
+        int m = x->trMode;
+        bool vert = m == 4 || m == 5 || m == 8 || m == 9;
+        bool rev = m == 5 || m == 7 || m == 9 || m == 11;
+        int len = vert ? W : H;
+        int thick = x->trDiv > 0 ? len / x->trDiv : len;
+        if (thick < 1) thick = 1;
+        for (int y = 0; y < H; y++)
+            for (int xx = 0; xx < W; xx++) {
+                int p = vert ? xx : y;
+                if (rev) p = len - 1 - p;
+                int strip = p / thick, within = p % thick;
+                i32 shown = x->trKind == TR_STAGGER ? step - strip : step;
+                size_t i = (size_t)y * (size_t)W + (size_t)xx;
+                o[i] = within < shown ? x->trB->px[i] : x->trA->px[i];
+            }
+        return;
+    }
+    i32 acc = x->trInterval > 0 ? (el / x->trInterval) * x->trStep : 256;
+    if (acc > 256) acc = 256;
+    for (size_t i = 0; i < (size_t)W * (size_t)H; i++) {
+        u32 a = x->trA->px[i], b = x->trB ? x->trB->px[i] : (x->trKind == TR_TO_WHITE ? 0xffffffffu : 0xff000000u);
+        u32 r = 0;
+        for (int k = 0; k < 24; k += 8) {
+            int ca = (int)(a >> k & 255), cb = (int)(b >> k & 255);
+            r |= (u32)(ca + (cb - ca) * acc / 256) << k;
+        }
+        o[i] = r | 0xff000000u;
+    }
+}
+
+void gfx_transition_finish(AG *g) {
+    Gfx *x = &g->gfx;
+    if (x->trKind == TR_NONE) return;
+    tr_draw(g, 0x3fffffff);
+    image_free(x->trA);
+    image_free(x->trB);
+    x->trA = x->trB = NULL;
+    x->trKind = TR_NONE;
+    x->hold = true;
+    g->frameSerial++;
+}
+
+bool gfx_transition_frame(AG *g) {
+    Gfx *x = &g->gfx;
+    if (x->trKind == TR_NONE) return false;
+    tr_draw(g, (i32)(g->now - x->trStart));
+    g->frameSerial++;
+    return true;
+}
+
+static int op_crossfade(AG *g) { return begin(g, TR_CROSS, snapshot(g, arg_i(g, 1)), snapshot(g, arg_i(g, 2)), arg_i(g, 3)); }
+static int op_from_black(AG *g) {
+    Image *b = snapshot(g, arg_i(g, 1)), *a = image_new(g->width, g->height);
+    for (int i = 0; i < g->width * g->height; i++) a->px[i] = 0xff000000u;
+    return begin(g, TR_FROM_BLACK, a, b, arg_i(g, 2));
+}
+static int op_to_black(AG *g) { return begin(g, TR_TO_BLACK, snapshot(g, arg_i(g, 1)), NULL, arg_i(g, 2)); }
+static int op_to_white(AG *g) { return begin(g, TR_TO_WHITE, snapshot(g, arg_i(g, 1)), NULL, arg_i(g, 2)); }
+
+static int strips(AG *g, int kind, int base) {
+    i32 sel = arg_i(g, 4), div = arg_i(g, 3);
+    if (sel < 0 || sel > 3 || div <= 0) {
+        if (div <= 0) { Image *b = snapshot(g, arg_i(g, 1)); memcpy(g->screen, b->px, sizeof(u32) * (size_t)g->width * (size_t)g->height); image_free(b); g->gfx.hold = true; }
+        return OP_NEXT;
+    }
+    Gfx *x = &g->gfx;
+    x->trMode = base + sel;
+    x->trDiv = div;
+    int r = begin(g, kind, snapshot(g, -1), snapshot(g, arg_i(g, 1)), 0);
+    x->trStep = 1;
+    x->trInterval = arg_i(g, 2) > 0 ? arg_i(g, 2) : 1;
+    return r;
+}
+
+static int op_strips(AG *g) { return strips(g, TR_STRIPS, 4); }
+static int op_stagger(AG *g) { return strips(g, TR_STAGGER, 8); }
+
 void gfx_register(void) {
-    vm_register(0x1f6, op_clear_objects);
-    vm_register(0x1f7, op_erase);
-    vm_register(0x1f8, op_create_surface);
-    vm_register(0x1f9, op_load_surface);
-    vm_register(0x1fa, op_release_surface);
-    vm_register(0x1fb, op_bind);
-    vm_register(0x1fd, op_scale_now);
-    vm_register(0x1fe, op_rot_now);
-    vm_register(0x1ff, op_trans_now);
-    vm_register(0x202, op_color_anim);
-    vm_register(0x203, op_color);
-    vm_register(0x207, op_copy_rect);
+    vm_register_draw(0x1f6, op_clear_objects);
+    vm_register_draw(0x1f7, op_erase);
+    vm_register_draw(0x1f8, op_create_surface);
+    vm_register_draw(0x1f9, op_load_surface);
+    vm_register_draw(0x1fa, op_release_surface);
+    vm_register_draw(0x1fb, op_bind);
+    vm_register_draw(0x1fd, op_scale_now);
+    vm_register_draw(0x1fe, op_rot_now);
+    vm_register_draw(0x1ff, op_trans_now);
+    vm_register_draw(0x202, op_color_anim);
+    vm_register_draw(0x203, op_color);
+    vm_register_draw(0x207, op_copy_rect);
     vm_register(0x208, op_texture_size);
-    vm_register(0x20b, op_fill_rect);
-    vm_register(0x20c, op_present);
+    vm_register_draw(0x20b, op_fill_rect);
+    vm_register_draw(0x20c, op_present);
     vm_register(0x20d, op_target);
-    vm_register(0x20e, op_clear_target);
-    vm_register(0x214, op_swap);
+    vm_register_draw(0x20e, op_clear_target);
+    vm_register_draw(0x214, op_swap);
     vm_register(0x215, op_query_slot);
     vm_register(0x216, op_query_res);
-    vm_register(0x217, op_set_anchor);
+    vm_register_draw(0x217, op_set_anchor);
     vm_register(0x218, op_get_anchor);
-    vm_register(0x219, op_set_pos);
+    vm_register_draw(0x219, op_set_pos);
     vm_register(0x21a, op_get_pos);
     vm_register(0x21b, op_tick_presentation);
-    vm_register(0x21c, op_yield);
-    vm_register(0x21d, op_clone);
-    vm_register(0x21e, op_scale_to);
-    vm_register(0x21f, op_rot_to);
-    vm_register(0x220, op_trans_to);
-    vm_register(0x222, op_present_range);
+    vm_register_draw(0x21c, op_yield);
+    vm_register_draw(0x21d, op_clone);
+    vm_register_draw(0x21e, op_scale_to);
+    vm_register_draw(0x21f, op_rot_to);
+    vm_register_draw(0x220, op_trans_to);
+    vm_register_draw(0x222, op_present_range);
     vm_register(0x224, op_nop);
     vm_register(0x227, op_query_rot);
     vm_register(0x228, op_query_trans);
-    vm_register(0x229, op_range);
-    vm_register(0x22a, op_range_scale_now);
-    vm_register(0x22c, op_range_trans_now);
-    vm_register(0x22d, op_range_scale_to);
-    vm_register(0x22e, op_range_rot_to);
-    vm_register(0x22f, op_range_trans_to);
-    vm_register(0x230, op_cyc_reset);
-    vm_register(0x231, op_cyc_cells);
-    vm_register(0x232, op_cyc_color);
-    vm_register(0x233, op_cyc_scale);
-    vm_register(0x234, op_cyc_rot);
-    vm_register(0x235, op_cyc_trans);
-    vm_register(0x238, op_anim_clock);
-    vm_register(0x239, op_cells);
+    vm_register_draw(0x229, op_range);
+    vm_register_draw(0x22a, op_range_scale_now);
+    vm_register_draw(0x22c, op_range_trans_now);
+    vm_register_draw(0x22d, op_range_scale_to);
+    vm_register_draw(0x22e, op_range_rot_to);
+    vm_register_draw(0x22f, op_range_trans_to);
+    vm_register_draw(0x230, op_cyc_reset);
+    vm_register_draw(0x231, op_cyc_cells);
+    vm_register_draw(0x232, op_cyc_color);
+    vm_register_draw(0x233, op_cyc_scale);
+    vm_register_draw(0x234, op_cyc_rot);
+    vm_register_draw(0x235, op_cyc_trans);
+    vm_register_draw(0x238, op_anim_clock);
+    vm_register_draw(0x239, op_cells);
     vm_register(0x23c, op_sample_time);
-    vm_register(0x23d, op_release_transient);
-    vm_register(0x242, op_detached);
-    vm_register(0x243, op_anim_reset);
-    vm_register(0x248, op_tile_edge);
-    vm_register(0x249, op_load_raw_surface);
-    vm_register(0x24e, op_service_flags);
-    vm_register(0x258, op_surface_flags);
-    vm_register(0x259, op_script_entry);
-    vm_register(0x25a, op_background);
-    vm_register(0x32, op_scale_copy);
+    vm_register_draw(0x23d, op_release_transient);
+    vm_register_draw(0x242, op_detached);
+    vm_register_draw(0x243, op_anim_reset);
+    vm_register_draw(0x248, op_tile_edge);
+    vm_register_draw(0x249, op_load_raw_surface);
+    vm_register_draw(0x24e, op_service_flags);
+    vm_register_draw(0x258, op_surface_flags);
+    vm_register_draw(0x259, op_script_entry);
+    vm_register_draw(0x25a, op_background);
+    vm_register_draw(0x32, op_scale_copy);
+    vm_register(0x21, op_from_black);
+    vm_register(0x22, op_to_black);
+    vm_register(0x24, op_to_white);
+    vm_register(0x25, op_crossfade);
+    vm_register(0x27, op_strips);
+    vm_register(0x28, op_stagger);
 }

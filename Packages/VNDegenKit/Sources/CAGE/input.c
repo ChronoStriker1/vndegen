@@ -14,7 +14,146 @@ void input_init(AG *g) {
     for (int i = 0; i < 32; i++) { in->joy[i] = 0xffffffffu; in->joyButton[i] = -1; }
     in->mouseTarget = 0xffffffffu;
     in->mouseOwner = -1;
+    in->hit = in->hovered = -1;
+    in->lastMx = in->lastMy = -100000;
 }
+
+static void hit_test(AG *g) {
+    Input *in = &g->in;
+    in->hit = -1;
+    for (int i = 0; i < in->nhot; i++) {
+        Hotspot *h = &in->hot[i];
+        if (in->mx >= h->x && in->mx <= h->x + h->w && in->my >= h->y && in->my <= h->y + h->h) { in->hit = i; break; }
+    }
+}
+
+static void wait_callback(AG *g, u32 target) {
+    Frame *f = &g->fr[g->waitFrame];
+    g->wait = W_NONE;
+    f->pc = g->waitPc;
+    int top = g->top;
+    g->top = g->waitFrame;
+    vm_callback(g, target);
+    g->top = top;
+}
+
+void co_enter(AG *g, int fi, u32 handler, u32 resume, int state) {
+    Frame *f = &g->fr[fi];
+    g->coState = state;
+    g->coResume = resume;
+    g->coFrame = fi;
+    f->pc = handler;
+}
+
+static void advance(AG *g) {
+    g->wait = W_NONE;
+    g->text.indActive = false;
+    Layout *L = &g->text.lay[g->text.indLayout];
+    if (L->indHandle >= 0) {
+        Obj *o = gfx_obj(g, L->indHandle, false);
+        if (o) o->visible = false;
+    }
+}
+
+void input_service(AG *g) {
+    Input *in = &g->in;
+    if (in->mx != in->lastMx || in->my != in->lastMy) {
+        in->lastMx = in->mx;
+        in->lastMy = in->my;
+        hit_test(g);
+    }
+    u32 mask = input_mask(g);
+    bool ff = (in->skip && !in->skipSuspended) || (mask & 0x40);
+    if (g->wait == W_TEXT) {
+        if (ff || (in->pressed & 0x10) || (in->clicks & 1)) {
+            text_finish(g);
+            in->pressed &= ~0x10u;
+            in->clicks &= ~1u;
+        }
+        if (!text_revealing(g)) g->wait = W_NONE;
+        return;
+    }
+    if (g->wait == W_HIDDEN) {
+        if (in->pressed || in->clicks || in->wheel) {
+            Frame *f = &g->fr[g->top];
+            in->pressed = 0;
+            in->clicks = 0;
+            g->wait = W_NONE;
+            if (f->handlerB != 0xffffffffu) co_enter(g, g->top, f->handlerB, f->pc, 3);
+            else g->coState = 0;
+        }
+        return;
+    }
+    if (g->wait != W_INPUT) return;
+    if (ff) { advance(g); return; }
+    if ((in->pressed & 0x20) && g->coState == 0) {
+        Frame *f = &g->fr[g->waitFrame];
+        if (f->handlerA != 0xffffffffu && g->waitFrame == g->top) {
+            in->pressed &= ~0x20u;
+            g->wait = W_NONE;
+            co_enter(g, g->waitFrame, f->handlerA, g->waitPc, 1);
+            return;
+        }
+    }
+    if (in->hotArmed) {
+        if (in->hovered != in->hit) {
+            if (in->hovered >= 0) {
+                u32 t = in->hot[in->hovered].leave;
+                in->hovered = -1;
+                if (t != 0xffffffffu) { wait_callback(g, t); return; }
+            } else {
+                in->hovered = in->hit;
+                u32 t = in->hit >= 0 ? in->hot[in->hit].enter : 0xffffffffu;
+                if (t != 0xffffffffu) { wait_callback(g, t); return; }
+            }
+        }
+        for (int i = 0; i < in->nhot; i++) {
+            Hotspot *h = &in->hot[i];
+            if (h->action >= 0 && h->action < 32 && (in->pressed & (1u << h->action)) && h->click != 0xffffffffu) {
+                in->pressed &= ~(1u << h->action);
+                if (h->action == ((in->mouseSlot[0] + 4) & 31)) in->clicks &= ~1u;
+                wait_callback(g, h->click);
+                return;
+            }
+        }
+        if ((in->clicks & 1) && in->hit >= 0 && in->hot[in->hit].click != 0xffffffffu) {
+            in->clicks &= ~1u;
+            in->pressed &= ~0x10u;
+            wait_callback(g, in->hot[in->hit].click);
+            return;
+        }
+    }
+    if ((in->clicks & 1) || (in->pressed & 0x10)) {
+        in->clicks &= ~1u;
+        in->pressed &= ~0x10u;
+        advance(g);
+        return;
+    }
+    if (in->autoMode && !g->snd.mixer) return;
+    if (in->autoMode) {
+        u32 wait = (u32)g->text.autoTime[1];
+        if ((i32)(g->now - in->waitStart) >= (i32)wait) advance(g);
+    }
+}
+
+void input_end_frame(AG *g) {
+    Input *in = &g->in;
+    in->pressed = 0;
+    in->clicks = 0;
+    in->prevMask = input_mask(g);
+}
+
+static int op_skip_set(AG *g) { g->in.skip = arg_i(g, 1) != 0; return OP_NEXT; }
+static int op_skip_get(AG *g) { arg_set_i(g, 1, g->in.skip); return OP_NEXT; }
+static int op_skip_active(AG *g) { arg_set_i(g, 1, (g->in.skip && !g->in.skipSuspended) || (input_mask(g) & 0x40) ? 1 : 0); return OP_NEXT; }
+static int op_read_skip_set(AG *g) { g->in.readSkip = arg_i(g, 1) != 0; return OP_NEXT; }
+static int op_read_skip_get(AG *g) { arg_set_i(g, 1, g->in.readSkip); return OP_NEXT; }
+static int op_read_skip_state(AG *g) { arg_set_i(g, 1, 0); return OP_NEXT; }
+static int op_auto_set(AG *g) { g->in.autoMode = arg_i(g, 1) != 0; return OP_NEXT; }
+static int op_auto_get(AG *g) { arg_set_i(g, 1, g->in.autoMode); return OP_NEXT; }
+static int op_skip_suspend(AG *g) { g->in.skipSuspended = true; return OP_NEXT; }
+static int op_skip_resume(AG *g) { g->in.skipSuspended = false; return OP_NEXT; }
+static int op_skip_reset(AG *g) { (void)g; return OP_NEXT; }
 
 u32 input_mask(AG *g) {
     Input *in = &g->in;
@@ -151,23 +290,17 @@ static int op_hit_rect(AG *g) {
     i32 idx = arg_i(g, 1), px = arg_i(g, 3), py = arg_i(g, 4), n = arg_i(g, 8);
     Ref ref, rects, xo, yo;
     if (!arg_addr(g, 2, &ref) || !arg_addr(g, 5, &rects) || !arg_addr(g, 6, &xo) || !arg_addr(g, 7, &yo)) return OP_NEXT;
-    (void)ref;
+    i32 q[4];
+    for (int k = 0; k < 4; k++) { Ref c = ref; c.index += k; q[k] = *ref_int(g, c); }
+    i32 pl = px + q[0], pr = px + q[1], pt = py + q[2], pb = py + q[3];
     for (i32 i = idx + 1; i < n; i++) {
-        Ref r = rects;
-        r.index += i * 4;
-        i32 x = *ref_int(g, r), y, w, h;
-        r.index++;
-        y = *ref_int(g, r);
-        r.index++;
-        w = *ref_int(g, r);
-        r.index++;
-        h = *ref_int(g, r);
+        i32 r[4];
+        for (int k = 0; k < 4; k++) { Ref c = rects; c.index += i * 4 + k; r[k] = *ref_int(g, c); }
         Ref a = xo, b = yo;
         a.index += i;
         b.index += i;
-        x += *ref_int(g, a);
-        y += *ref_int(g, b);
-        if (px >= x && px <= x + w && py >= y && py <= y + h) { arg_set_i(g, 1, i); return OP_NEXT; }
+        i32 ox = *ref_int(g, a), oy = *ref_int(g, b);
+        if (pl <= r[1] + ox && pr >= r[0] + ox && pt <= r[3] + oy && pb >= r[2] + oy) { arg_set_i(g, 1, i); return OP_NEXT; }
     }
     arg_set_i(g, 1, -1);
     return OP_NEXT;
@@ -193,6 +326,7 @@ static int op_point_in_poly(AG *g) {
 
 static int op_hot_register(AG *g) {
     Input *in = &g->in;
+    in->hit = -1;
     if (in->nhot >= 100) return OP_NEXT;
     Hotspot *h = &in->hot[in->nhot++];
     memset(h, 0, sizeof *h);
@@ -211,10 +345,12 @@ static int op_hot_register(AG *g) {
 static int op_hot_cancel(AG *g) {
     g->in.nhot = 0;
     g->in.hotArmed = false;
+    g->in.hit = g->in.hovered = -1;
     return OP_NEXT;
 }
 
 static int op_hot_arm(AG *g) {
+    if (!g->in.hotArmed) hit_test(g);
     g->in.hotArmed = true;
     return OP_NEXT;
 }
@@ -253,4 +389,16 @@ void input_register(void) {
     vm_register(0x10d, op_wheel);
     vm_register(0x12e, op_hit_rect);
     vm_register(0x147, op_point_in_poly);
+    vm_register(0x88, op_skip_set);
+    vm_register(0x19a, op_skip_get);
+    vm_register(0x1c7, op_skip_active);
+    vm_register(0x1ca, op_read_skip_set);
+    vm_register(0x1cb, op_read_skip_get);
+    vm_register(0x1cc, op_read_skip_state);
+    vm_register(0x1b6, op_auto_get);
+    vm_register(0x1b7, op_auto_set);
+    vm_register(0x19b, op_skip_suspend);
+    vm_register(0x19c, op_skip_resume);
+    vm_register(0x101, op_skip_reset);
+    vm_register(0xfa, op_skip_reset);
 }

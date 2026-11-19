@@ -6,7 +6,11 @@
 extern const u8 ag_oplen[0x400];
 static OpFn ops[0x400];
 
+static u8 drawsOp[0x400];
+
 void vm_register(int op, OpFn fn) { ops[op] = fn; }
+void vm_register_draw(int op, OpFn fn) { ops[op] = fn; drawsOp[op] = 1; }
+bool vm_draws(u32 op) { return op < 0x400 && drawsOp[op]; }
 
 void vm_problem(AG *g, const char *fmt, ...) {
     char buf[1024];
@@ -204,6 +208,27 @@ static bool frame_load(AG *g, Frame *f, u32 id) {
     f->lsr = ag_alloc(sizeof(Ref) * f->nlsr);
     f->active = true;
     f->launchReturn = 0;
+    f->preload = -1;
+    f->handlerA = f->handlerB = 0xffffffffu;
+    return true;
+}
+
+bool vm_preload(AG *g, u32 id, int slot) {
+    if (slot < 0 || slot >= AG_FRAMES) return false;
+    return frame_load(g, &g->pre[slot], id);
+}
+
+bool vm_call_preloaded(AG *g, int slot) {
+    if (slot < 0 || slot >= AG_FRAMES || !g->pre[slot].sc) { vm_problem(g, "preloaded slot %d is empty", slot); return false; }
+    if (g->top + 1 >= AG_FRAMES - 3) { vm_problem(g, "script calls nest too deep"); return false; }
+    Frame *f = &g->fr[g->top + 1];
+    frame_free(f);
+    *f = g->pre[slot];
+    memset(&g->pre[slot], 0, sizeof g->pre[slot]);
+    f->pc = 0;
+    f->rsp = 0;
+    f->preload = slot;
+    g->top++;
     return true;
 }
 
@@ -245,7 +270,7 @@ static void banks_clear(AG *g) {
 }
 
 void vm_reset_root(AG *g) {
-    for (int i = 0; i < AG_FRAMES; i++) frame_free(&g->fr[i]);
+    for (int i = 0; i < AG_FRAMES; i++) { frame_free(&g->fr[i]); frame_free(&g->pre[i]); }
     banks_clear(g);
     g->top = 0;
     g->wait = W_NONE;
@@ -254,6 +279,14 @@ void vm_reset_root(AG *g) {
 }
 
 bool vm_init(AG *g) {
+    const char *tr = getenv("AG_TRACE");
+    for (const char *p = tr; p && *p;) {
+        char *e;
+        long v = strtol(p, &e, 16);
+        if (e == p) break;
+        if (v >= 0 && v < 0x400) g->trace[v] = 1;
+        p = *e ? e + 1 : e;
+    }
     banks_alloc(g);
     g->initialRun = true;
     g->rng = 1;
@@ -263,7 +296,7 @@ bool vm_init(AG *g) {
 }
 
 void vm_close(AG *g) {
-    for (int i = 0; i < AG_FRAMES; i++) frame_free(&g->fr[i]);
+    for (int i = 0; i < AG_FRAMES; i++) { frame_free(&g->fr[i]); frame_free(&g->pre[i]); }
     if (g->gs) for (u32 i = 0; i < g->ngs; i++) free(g->gs[i].s);
     free(g->gs);
     free(g->gi);
@@ -276,7 +309,11 @@ int vm_frame_exit(AG *g) {
         return OP_HALT;
     }
     bool launched = g->fr[g->top].launchReturn;
-    frame_free(&g->fr[g->top]);
+    Frame *f = &g->fr[g->top];
+    if (f->preload >= 0 && f->preload < AG_FRAMES) {
+        g->pre[f->preload] = *f;
+        memset(f, 0, sizeof *f);
+    } else frame_free(f);
     g->top--;
     if (launched && g->launchHead < g->launchCount) {
         u32 id = g->launch[g->launchHead++];
@@ -305,6 +342,17 @@ void vm_run(AG *g, int budget) {
         u32 len = 2u * ag_oplen[op] - 1;
         g->insLen = len;
         g->opSeen[op]++;
+        if (g->trace[op]) {
+            char b[512];
+            int n = snprintf(b, sizeof b, "op %#x %s@%#x:", op, f->sc->name, f->pc);
+            for (u32 a = 0; a + 1 < len && n < 480; a += 2) {
+                u32 t = g->ins[a], v = g->ins[a + 1];
+                int idx = (int)a / 2 + 1;
+                if (t == 2) n += snprintf(b + n, sizeof b - (size_t)n, " \"%.40s\"", script_string(f->sc, v));
+                else n += snprintf(b + n, sizeof b - (size_t)n, " %d", arg_i(g, idx));
+            }
+            ag_log(g, "%s", b);
+        }
         int r;
         if (ops[op]) r = ops[op](g);
         else {
@@ -312,6 +360,8 @@ void vm_run(AG *g, int budget) {
             r = OP_NEXT;
         }
         g->steps++;
+        if (drawsOp[op]) g->gfx.hold = false;
+        if (r == OP_WAIT) { g->waitPc = g->fr[fi].pc; g->waitFrame = fi; }
         if (r == OP_NEXT || r == OP_WAIT) g->fr[fi].pc += len;
         else if (r == OP_HALT) g->halted = true;
     }
