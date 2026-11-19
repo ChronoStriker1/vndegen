@@ -55,6 +55,19 @@ import VNCore
         #expect(String(decoding: problem.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self) == "No Bruns game was found in this folder.")
     }
 
+    @Test func productReadsTheNamesFromTheConfig() throws {
+        let root = TestFolders.root.appending(path: "bruns-probe-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root.appending(path: "binary"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: root.appending(path: "scene"), withIntermediateDirectories: true)
+        try Data([0]).write(to: root.appending(path: "binary/bruns.exe"))
+        try Data([0]).write(to: root.appending(path: "scene/brs009000.bso"))
+        try Data("(:product-info\r\n  (:author-name . \"Studio\")\r\n  (:product-name . \"Game\"))\r\n(:window (:window-title \"Title\"))\r\n".utf8).write(to: root.appending(path: "ams.cfg"))
+        #expect(BrunsPlugin.product(root) == BrunsPlugin.Product(author: "Studio", name: "Game"))
+        var title = [CChar](repeating: 0, count: 64)
+        #expect(vnbruns_probe(root.path, &title, title.count))
+        #expect(String(decoding: title.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self) == "Title")
+    }
+
     @Test func productNeedsAGame() {
         var author = [CChar](repeating: 0, count: 64)
         var name = [CChar](repeating: 0, count: 64)

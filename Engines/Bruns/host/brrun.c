@@ -102,6 +102,11 @@ int main(int argc, char **argv) {
                     print_state((BR *)n);
                 }
             }
+        } else if (sscanf(c, "jump:%d", &k) == 1) {
+            BR *e = (BR *)n;
+            e->wait = W_NONE;
+            vm_jump(e, k);
+            alive = run(n, 100);
         } else if (sscanf(c, "wheel:%d", &k) == 1) {
             vnbruns_wheel(n, k);
             alive = run(n, 64);

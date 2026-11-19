@@ -55,23 +55,27 @@ static bool has_game(const char *dir) {
 bool vnbruns_probe(const char *gameDir, char *title, size_t titleSize) {
     if (!has_game(gameDir)) return false;
     if (title && titleSize) {
-        BR tmp = {0};
-        tmp.gameDir = (char *)gameDir;
-        cfg_load(&tmp);
-        char *u = br_sjis_to_utf8(tmp.title);
+        BR *tmp = br_alloc(sizeof *tmp);
+        tmp->gameDir = (char *)gameDir;
+        cfg_load(tmp);
+        char *u = br_sjis_to_utf8(tmp->title);
         snprintf(title, titleSize, "%s", u);
         free(u);
-        sx_free(tmp.cfg.root);
+        sx_free(tmp->cfg.root);
+        free(tmp);
     }
     return true;
 }
 
 bool vnbruns_product(const char *gameDir, char *author, size_t authorSize, char *product, size_t productSize) {
     if (!has_game(gameDir)) return false;
-    BR tmp = {0};
-    tmp.gameDir = (char *)gameDir;
-    if (!cfg_load(&tmp)) return false;
-    Node *info = sx_find(tmp.cfg.root, ":product-info");
+    BR *tmp = br_alloc(sizeof *tmp);
+    tmp->gameDir = (char *)gameDir;
+    if (!cfg_load(tmp)) {
+        free(tmp);
+        return false;
+    }
+    Node *info = sx_find(tmp->cfg.root, ":product-info");
     const char *a = cfg_text(info, ":author-name", ""), *p = cfg_text(info, ":product-name", "");
     char *ua = br_sjis_to_utf8(a), *up = br_sjis_to_utf8(p);
     snprintf(author, authorSize, "%s", ua);
@@ -79,7 +83,8 @@ bool vnbruns_product(const char *gameDir, char *author, size_t authorSize, char 
     bool ok = *ua && *up;
     free(ua);
     free(up);
-    sx_free(tmp.cfg.root);
+    sx_free(tmp->cfg.root);
+    free(tmp);
     return ok;
 }
 
