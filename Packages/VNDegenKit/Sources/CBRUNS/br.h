@@ -222,6 +222,11 @@ typedef struct Layer {
     int ease, easeDir;
     u32 shakeStart, shakeDur;
     int shakeX, shakeY;
+    int tmParts, tmRegion, tmCursorMode;
+    int tmBase[8];
+    bool tmHas[8];
+    char *tmCursor;
+    int amMode, amEvent, amPos;
 } Layer;
 
 typedef struct Pic {
@@ -492,3 +497,13 @@ void pics_delete(BR *e, int a, int b);
 void pic_stream_restart(BR *e, int no);
 void layer_order(BR *e, int no, int order);
 void layer_shake(BR *e, int no, int ms, int ax, int ay);
+void touch_attach(BR *e, int no, int parts);
+void touch_base(BR *e, int no, int mode, int base);
+void touch_cursor(BR *e, int no, int mode, const char *path);
+int touch_poll(BR *e, int no);
+int touch_position(BR *e);
+bool touch_event(BR *e, int *out);
+void touch_auto(BR *e, int no, int mode);
+int touch_take(BR *e, int no);
+int touch_last_pos(BR *e, int no);
+void touch_tick(BR *e);

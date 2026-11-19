@@ -204,10 +204,13 @@ static Node *layer_node(BR *e, Layer *l) {
     Node *n = nl();
     add(n, ni(l->no));
     sub(n, "hitTestAMMap");
-    kvi(n, "hitTestAMMode", 0);
-    sub(n, "hitTestAutoCursorMap");
-    sub(n, "hitTestEventNo");
-    kvi(n, "hitTestParts", -1);
+    kvi(n, "hitTestAMMode", l->amMode);
+    Node *cm = sub(n, "hitTestAutoCursorMap");
+    if (l->tmCursor) pair(cm, ni(l->tmCursorMode), ns(l->tmCursor));
+    Node *evn = sub(n, "hitTestEventNo");
+    for (int m = 0; m < 8; m++)
+        if (l->tmHas[m]) pair(evn, ni(m), ni(l->tmBase[m]));
+    kvi(n, "hitTestParts", l->tmParts);
     kvb(n, "maskSALoop", true);
     kvi(n, "maskSACtrl", -1);
     kvi(n, "maskPictureEdge", 1);
@@ -242,6 +245,22 @@ static void layer_from(BR *e, Node *n) {
     l->group = geti(n, "groupNo", -1);
     l->visible = getb(n, "visible", true);
     l->pic = geti(n, "mainPictureNo", -1);
+    l->tmParts = geti(n, "hitTestParts", -1);
+    l->amMode = geti(n, "hitTestAMMode", 0);
+    Node *evn = sx_find(n, "hitTestEventNo");
+    for (int i = 1; evn && i < evn->n; i++) {
+        int m = sx_int(evn->k[i]->k[0], -1);
+        if (m >= 0 && m < 8) {
+            l->tmHas[m] = true;
+            l->tmBase[m] = sx_int(sx_cdr_value(evn->k[i]), 0);
+        }
+    }
+    Node *cm = sx_find(n, "hitTestAutoCursorMap");
+    if (cm && cm->n > 1) {
+        free(l->tmCursor);
+        l->tmCursorMode = sx_int(cm->k[1]->k[0], 0);
+        l->tmCursor = br_strdup(sx_str(sx_cdr_value(cm->k[1])) ? sx_str(sx_cdr_value(cm->k[1])) : "");
+    }
     Node *m = sx_find(n, "motionParams");
     static const struct {
         const char *k;

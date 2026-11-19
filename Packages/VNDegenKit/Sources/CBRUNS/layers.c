@@ -42,6 +42,8 @@ Layer *layer_new(BR *e, int no, int mode) {
     l->group = -1;
     l->visible = true;
     l->pic = -1;
+    l->tmParts = -1;
+    l->tmRegion = -2;
     memcpy(l->v, defaults, sizeof l->v);
     memcpy(l->from, defaults, sizeof l->from);
     e->layers[e->layerCount++] = l;
@@ -70,7 +72,10 @@ void layers_clear_pics(BR *e, int layer) {
 }
 
 void layers_reset(BR *e) {
-    for (int i = 0; i < e->layerCount; i++) free(e->layers[i]);
+    for (int i = 0; i < e->layerCount; i++) {
+        free(e->layers[i]->tmCursor);
+        free(e->layers[i]);
+    }
     for (int i = 0; i < e->picCount; i++) pic_free(e->pics[i]);
     e->layerCount = e->picCount = 0;
 }

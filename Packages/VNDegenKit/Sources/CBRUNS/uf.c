@@ -88,6 +88,12 @@ bool uf_call(BR *e, int id, Node *call) {
     case 1020:
         if (A(e, call, 0) == 2) pics_activate(e, A(e, call, 1), A(e, call, 2));
         return true;
+    case 1040: touch_attach(e, A(e, call, 1), A(e, call, 2)); return true;
+    case 1041: touch_base(e, A(e, call, 1), A(e, call, 2), A(e, call, 3)); return true;
+    case 1043: touch_auto(e, A(e, call, 1), A(e, call, 2)); return true;
+    case 1044: e->reflag = touch_take(e, A(e, call, 1)); return true;
+    case 1045: e->reflag = touch_last_pos(e, A(e, call, 1)); return true;
+    case 1046: touch_cursor(e, A(e, call, 1), A(e, call, 2), S(e, call, 3)); return true;
     case 1009: pics_delete(e, A(e, call, 0), A(e, call, 0)); return true;
     case 1018: pics_delete(e, A(e, call, 0), A(e, call, 1)); return true;
     case 1010: pic_stream_restart(e, A(e, call, 1)); return true;
@@ -323,6 +329,7 @@ static Obj *update_hover(BR *e, bool active) {
 }
 
 void uf_tick(BR *e) {
+    touch_tick(e);
     Obj *entered = update_hover(e, e->wait == W_EVENT && (e->eventMode & 4));
     switch (e->wait) {
     case W_TIME:
@@ -342,6 +349,12 @@ void uf_tick(BR *e) {
         }
         if (e->eventMode & 4 && entered && entered->hoverEvent >= 0) {
             e->reflag = entered->hoverEvent;
+            e->wait = W_NONE;
+            break;
+        }
+        int tev;
+        if (e->eventMode & 0x10000 && touch_event(e, &tev)) {
+            e->reflag = tev;
             e->wait = W_NONE;
             break;
         }

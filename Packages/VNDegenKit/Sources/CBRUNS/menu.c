@@ -44,7 +44,7 @@ static Image *bg(BR *e) {
     return u ? image_url(e, u) : NULL;
 }
 
-bool menu_allowed(BR *e) { return !e->systemMode && e->wait == W_TEXT && (e->menu.show || e->menu.pinned); }
+bool menu_allowed(BR *e) { return !e->systemMode && (e->wait == W_TEXT || (e->wait == W_EVENT && (e->eventMode & 0x10000))) && (e->menu.show || e->menu.pinned); }
 
 static bool hit_item(BR *e, MenuItem *it, int ox) {
     Parts *p = parts_get(e, it->parts);
@@ -78,7 +78,7 @@ static void run_event(BR *e, const char *ev) {
 }
 
 void menu_event(BR *e, const char *ev) {
-    if (!e->systemMode && e->wait == W_TEXT) run_event(e, ev);
+    if (menu_allowed(e)) run_event(e, ev);
 }
 
 bool menu_input(BR *e) {
