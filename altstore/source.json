@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.55.1",
+          "buildVersion": "2839",
+          "date": "2026-11-19T20:07:24Z",
+          "localizedDescription": "EAGLS updates for Oppai no Ouja 48: the CG and Scene galleries work, and saves made in VNDegen load in the PC game.\n\n## Downloads\n\n- `VNDegen-0.55.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.55.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.55.1-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- The title's CG View and Scene View work, drawn from the game's own pages. A slot opens once its picture or scene has been seen. In CG View, clicking a slot steps through each version you've seen, and in Scene View a scene plays and then returns to the grid.\n\n## Fixes\n\n- A slot saved in VNDegen now loads in the PC game, with the same picture, characters, window, name and text as the PC's own save at that line. Before, loading it crashed the PC game.\n- A speaker's name now shows only on the message right after it is set, as on the PC. Before, it stayed on the messages that followed.\n\n## Known limits\n\n- The Oppai Gallery (the title's bonus button and the window button) and Oppai View do nothing.\n- The Champion Bra page shows every bra as not found.\n- A few transition effects are drawn as crossfades.\n- The settings show only their Text and Sound tabs.\n- The name is typed only from a hardware keyboard; without one, the default name stays.\n- Scenes and CGs seen in VNDegen don't show as seen on the PC.\n\n## What wasn't tested\n\n- No physical device was used. The galleries were checked in the Linux test build, the Mac app and an iPad simulator by touch, with the game's bundled fully unlocked data.\n- Saves made in VNDegen were loaded in the original engine under Wine at two lines, one with a name and one without.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.55.1/VNDegen-0.55.1.ipa",
+          "size": 131136091,
+          "sha256": "97b64367cfdf86d4730a4fdae61933b946e247a5bac57466d3c02970f989ffad",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.55.0",
           "buildVersion": "2829",
           "date": "2026-11-19T20:02:00Z",
