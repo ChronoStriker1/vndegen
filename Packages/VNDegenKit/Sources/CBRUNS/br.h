@@ -1,0 +1,304 @@
+#pragma once
+
+#include "vnbruns.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef int32_t i32;
+typedef int64_t i64;
+
+#define BR_W 1280
+#define BR_H 720
+#define BR_WORDS 262144
+#define BR_FLAGS 4096
+#define BR_STACK 64
+#define BR_LOCALS 64
+#define BR_STRINGS 16384
+#define BR_SCRIPTS 10000
+
+enum { N_INT, N_STR, N_SYM, N_LIST };
+
+enum {
+    A_NONE,
+    A_DEFINE_SET,
+    A_DEFINE_SUB,
+    A_CALL_SUB,
+    A_CALL_FAR,
+    A_JUMP,
+    A_RETURN,
+    A_LABEL,
+    A_GOTO,
+    A_IF,
+    A_EVAL,
+    A_EVAL_NOEFFECT,
+    A_SWITCH,
+    A_SEND_STRING,
+    A_CALL_USER_FUNC,
+    A_ASSIGN_WORD,
+    A_ASSIGN_LOCAL,
+    A_ASSIGN_ACC,
+    A_ASSIGN_REFLAG,
+    A_IDREF_WORD,
+    A_IDREF_LOCAL,
+    A_IDREF_ACC,
+    A_IDREF_REFLAG,
+    A_PRE_INCR_WORD,
+    A_PRE_INCR_LOCAL,
+    A_PRE_INCR_ACC,
+    A_PRE_DECR_WORD,
+    A_PRE_DECR_LOCAL,
+    A_PRE_DECR_ACC,
+    A_ADD,
+    A_SUB,
+    A_MUL,
+    A_DIV,
+    A_MOD,
+    A_EQ,
+    A_NE,
+    A_LT,
+    A_LE,
+    A_GT,
+    A_GE,
+    A_LAND,
+    A_LOR,
+    A_BAND,
+    A_BOR,
+    A_BXOR,
+    A_SHL,
+    A_SHR,
+    A_NOT,
+    A_NEG,
+    A_THREE_OP,
+    A_COUNT
+};
+
+typedef struct Node {
+    u8 t, op;
+    int n;
+    i32 i;
+    char *s;
+    struct Node **k;
+} Node;
+
+typedef struct Unit {
+    int id, locals;
+    Node **st;
+    int count;
+    int *labelId, *labelPc;
+    int labels;
+} Unit;
+
+typedef struct Script {
+    int num;
+    Node *root;
+    Unit set;
+    Unit *subs;
+    int subCount;
+} Script;
+
+typedef struct Frame {
+    Script *sc;
+    Unit *u;
+    int pc;
+    i32 local[BR_LOCALS];
+} Frame;
+
+typedef struct Image {
+    int w, h;
+    u32 *px;
+    int refs;
+} Image;
+
+typedef struct FontSheet {
+    bool tried;
+    int w, h;
+    u8 *px;
+} FontSheet;
+
+enum { P_IMAGE, P_BUTTON, P_TEXT, P_ANIM, P_TOUCHMAP };
+
+#define BR_PARTS 20000
+#define BR_OBJS 10000
+#define BR_ANIM_FRAMES 64
+
+typedef struct Parts {
+    int id, type;
+    Node *def;
+    Node *pic[4];
+    int fontSize;
+    u32 color;
+    char *text;
+    Node *frame[BR_ANIM_FRAMES];
+    int frameMs[BR_ANIM_FRAMES];
+    int frames;
+    Node *map;
+} Parts;
+
+enum { OBJ_IMG, OBJ_BTN, OBJ_KINDS };
+
+typedef struct Obj {
+    int kind, id, parts, layer, x, y, z, alpha, flag;
+    int event, order;
+    bool disabled, hidden, hover, pressed, hasColor;
+    u32 color;
+    int fontSize;
+    char *text;
+} Obj;
+
+typedef struct Anim {
+    float from, to;
+    u32 start, dur;
+} Anim;
+
+typedef struct Cfg {
+    Node *root;
+    char scriptDir[64], scriptBase[32], scriptExt[16];
+    int scriptDigits;
+    char imageDir[64], partsDir[64], partsBase[32], musicDir[64], musicBase[32], effectDir[64], effectBase[32], voiceDir[64];
+    int partsDigits, musicDigits, effectDigits, voiceDigits, voiceSceneDigits;
+    int initialScript;
+} Cfg;
+
+enum { W_NONE, W_TIME, W_CLICK, W_EVENT, W_FADE, W_TEXT, W_DIALOG, W_END };
+
+typedef struct BR {
+    char *gameDir, *saveDir;
+    FILE *log;
+    bool trace;
+    Cfg cfg;
+    Script *scripts[BR_SCRIPTS];
+    bool scriptMissing[BR_SCRIPTS];
+    i32 *word;
+    i32 flag[BR_FLAGS];
+    i32 acc, reflag, cond;
+    char *str[BR_STRINGS];
+    Frame stack[BR_STACK];
+    int sp;
+    bool systemMode, nextSystem;
+    int nextScript;
+    int wait;
+    u32 waitUntil;
+    int waitArg;
+    u32 now;
+    u32 tickAcc;
+    u32 serial;
+    bool paused, quit, ended;
+    char problem[512];
+    char title[256];
+    u32 *screen;
+    int mouseX, mouseY;
+    bool lDown, lPress, rPress, ctrlHeld;
+    int wheel;
+    int audioRate;
+    u8 *unknownSeen;
+    FontSheet font[2][4];
+    Parts *parts[BR_PARTS];
+    bool partsMissing[BR_PARTS];
+    Obj *obj[OBJ_KINDS][BR_OBJS];
+    int objOrder;
+    Image *bg, *bgPrev;
+    int bgNum;
+    Anim bgFade;
+    Anim overlay;
+    u32 overlayColor;
+    int event;
+    int eventMode, eventTimeout, eventFlag;
+    u32 eventStart;
+} BR;
+
+void *br_alloc(size_t n);
+void *br_realloc(void *p, size_t n);
+char *br_strdup(const char *s);
+char *br_fmt(const char *fmt, ...);
+u8 *br_read_file(const char *path, size_t *size);
+bool br_write_file(const char *path, const void *data, size_t size);
+bool br_mkdirs(const char *dir);
+bool br_file_exists(const char *path);
+int br_sjis_decode(const u8 *p, u32 *cp);
+int br_sjis_len(const u8 *p);
+char *br_sjis_to_utf8(const char *s);
+char *br_utf8_to_sjis(const char *s);
+void br_log(BR *e, const char *fmt, ...);
+char *br_game_path(BR *e, const char *rel);
+
+u8 *br_eenc_decode(const u8 *d, size_t n, size_t *outLen);
+u8 *br_eenc_encode(const u8 *d, size_t n, bool compress, size_t *outLen);
+u8 *br_read_game(BR *e, const char *rel, size_t *size);
+
+Node *sx_parse(const char *text, size_t len);
+void sx_free(Node *n);
+Node *sx_find(Node *list, const char *key);
+Node *sx_assoc(Node *list, i32 key);
+Node *sx_cdr_value(Node *pair);
+bool sx_sym(const Node *n, const char *name);
+int sx_int(const Node *n, int dflt);
+const char *sx_str(const Node *n);
+
+Script *script_get(BR *e, int num);
+void script_free_all(BR *e);
+Unit *script_sub(Script *sc, int id);
+int unit_label(Unit *u, int id);
+
+void vm_start(BR *e, int script);
+void vm_jump(BR *e, int script);
+void vm_run(BR *e);
+i32 vm_eval(BR *e, Node *n);
+i32 *vm_word(BR *e, i32 idx);
+
+bool uf_call(BR *e, int id, Node *call);
+void uf_string(BR *e, Node *call);
+void uf_tick(BR *e);
+void gfx_frame(BR *e);
+
+Image *image_new(int w, int h);
+void image_free(Image *im);
+Image *image_decode(const u8 *d, size_t n);
+u8 *image_decode_gray(const u8 *d, size_t n, int *w, int *h);
+Image *image_load(BR *e, const char *rel);
+void image_cache_clear(void);
+Image *image_storage(BR *e, int num);
+Image *image_parts(BR *e, int num);
+Image *image_url(BR *e, Node *url);
+void blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int alpha);
+void blit_scaled(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int w, int h, int alpha);
+void fill_rect(u32 *dst, int dw, int dh, int x, int y, int w, int h, u32 color, int alpha);
+
+int font_char_width(const u8 *p, int size);
+int font_text_width(const char *sjis, int size);
+void font_draw_char(BR *e, u32 *dst, int dw, int dh, const u8 *p, int x, int y, int size, u32 color, u32 edge, int edgeW, int alpha);
+void font_draw(BR *e, u32 *dst, int dw, int dh, const char *sjis, int x, int y, int size, u32 color, u32 edge, int edgeW, int alpha);
+void font_free(BR *e);
+
+Parts *parts_get(BR *e, int id);
+void parts_free_all(BR *e);
+Image *parts_image(BR *e, Parts *p, int state, u32 now);
+
+float anim_value(BR *e, Anim *a);
+void anim_set(BR *e, Anim *a, float from, float to, int ms);
+bool anim_busy(BR *e, Anim *a);
+Obj *obj_get(BR *e, int kind, int id);
+Obj *obj_create(BR *e, int kind, int id, int parts, int layer, int x, int y, int z, int alpha, int flag);
+void obj_delete(BR *e, int kind, int id);
+void obj_clear(BR *e, int kind);
+bool obj_hit(BR *e, Obj *o, int mx, int my);
+int obj_sorted(BR *e, Obj **out, int max);
+void bg_set(BR *e, int num, int ms);
+bool bg_busy(BR *e);
+void overlay_set(BR *e, u32 rgb, int alpha, int ms);
+bool overlay_busy(BR *e);
+void gfx_free(BR *e);
+void layers_draw(BR *e, u32 *dst);
+void msg_draw(BR *e, u32 *dst);
+const char *str_get(BR *e, int id);
+void str_set(BR *e, int id, const char *s);
+bool layers_busy(BR *e);
+void msg_send(BR *e, Node *call);
+void msg_tick(BR *e);
+void snd_se_hover(BR *e);
