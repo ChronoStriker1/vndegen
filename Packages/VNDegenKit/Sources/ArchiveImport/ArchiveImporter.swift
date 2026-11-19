@@ -306,7 +306,8 @@ public final class ArchiveImporter {
                     finish(staging)
                     return
                 }
-                let (root, nested) = await Self.inspect(staging)
+                let (root, nested): (URL, ArchiveSource?) = source.isInstaller
+                    ? (ArchiveExtractor.gameRoot(in: staging), nil) : await Self.inspect(staging)
                 try Task.checkCancellation()
                 task = nil
                 if let inner = nested {
