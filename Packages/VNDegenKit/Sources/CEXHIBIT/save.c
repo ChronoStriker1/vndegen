@@ -282,28 +282,26 @@ u8 *gyu_encode(const u32 *px, int w, int h, size_t *outLen) {
 static char *slot_path(EX *e, int slot, const char *ext) { return ex_fmt("%s/vndegen/slot%03d.%s", e->saveDir, slot, ext); }
 
 bool save_slot(EX *e, int slot) {
+    if (slot < 0 || slot >= EX_SLOTS) return false;
+    ex_mkdirs(e->saveDir);
+    long long now = (long long)time(NULL);
+    u32 *thumb = ex_alloc(sizeof(u32) * 320 * 180);
+    thumb_scale(e->saveShot ? e->saveShot : e->screen, thumb, 320, 180);
+    bool ok = pc_save_write(e, slot, now, thumb);
+    free(thumb);
+    if (!ok) return false;
     size_t n;
     char *data = save_state(e, &n);
     char *dir = ex_fmt("%s/vndegen", e->saveDir);
     ex_mkdirs(dir);
     free(dir);
     char *path = slot_path(e, slot, "sav");
-    bool ok = ex_write_file(path, data, n);
+    ex_write_file(path, data, n);
     free(path);
     free(data);
-    if (!ok) return false;
-    u32 *thumb = ex_alloc(sizeof(u32) * 320 * 180);
-    thumb_scale(e->saveShot ? e->saveShot : e->screen, thumb, 320, 180);
-    size_t gl;
-    u8 *g = gyu_encode(thumb, 320, 180, &gl);
-    free(thumb);
-    path = slot_path(e, slot, "gyu");
-    ex_write_file(path, g, gl);
-    free(path);
-    free(g);
     SlotInfo *si = &e->slots[slot];
     si->used = true;
-    si->time = (long long)time(NULL);
+    si->time = now;
     image_free(si->thumb);
     si->thumb = NULL;
     si->thumbLoaded = false;
@@ -313,14 +311,33 @@ bool save_slot(EX *e, int slot) {
     return true;
 }
 
+static bool sidecar_matches(const char *data, size_t n, const char *script, int pc) {
+    const char *line = memchr(data, '\n', n);
+    if (!line || strncmp(line + 1, "script ", 7)) return false;
+    char want[300];
+    snprintf(want, sizeof want, "script %s %d\n", script, pc);
+    return (size_t)(data + n - (line + 1)) > strlen(want) && !strncmp(line + 1, want, strlen(want));
+}
+
 bool load_slot(EX *e, int slot) {
+    if (slot < 0 || slot >= EX_SLOTS) return false;
+    char script[256];
+    i32 *regs = NULL;
+    int count = 0;
+    if (!pc_save_read(e, slot, script, sizeof script, &regs, &count)) return false;
+    int target = count > 5 ? regs[5] + 1 : 0;
     char *path = slot_path(e, slot, "sav");
     size_t n;
     u8 *d = ex_read_file(path, &n);
     free(path);
-    if (!d) return false;
-    bool ok = load_state(e, (const char *)d, n);
+    bool ok;
+    if (d && sidecar_matches((const char *)d, n, script, target)) ok = load_state(e, (const char *)d, n);
+    else {
+        ok = replay_to(e, script, target, regs, count);
+        if (!ok) ex_log(e, "can't replay %s to %d", script, target);
+    }
     free(d);
+    free(regs);
     return ok;
 }
 
@@ -328,14 +345,7 @@ Image *slot_thumb(EX *e, int slot) {
     SlotInfo *si = &e->slots[slot];
     if (!si->thumbLoaded) {
         si->thumbLoaded = true;
-        char *path = slot_path(e, slot, "gyu");
-        size_t n;
-        u8 *d = ex_read_file(path, &n);
-        free(path);
-        if (d) {
-            si->thumb = gyu_decode(d, n);
-            free(d);
-        }
+        si->thumb = pc_slot_thumb(e, slot);
     }
     return si->thumb;
 }
@@ -357,6 +367,11 @@ void slots_write_index(EX *e) {
 }
 
 void slots_read_index(EX *e) {
+    for (int i = 0; i < EX_SLOTS; i++) {
+        SlotInfo *si = &e->slots[i];
+        si->time = pc_slot_time(e, i);
+        si->used = si->time != 0;
+    }
     char *path = ex_fmt("%s/vndegen/slots.txt", e->saveDir);
     size_t n;
     char *d = (char *)ex_read_file(path, &n);
@@ -369,12 +384,10 @@ void slots_read_index(EX *e) {
         if (!strncmp(line, "EXHIBIT", 7)) continue;
         char *p = line;
         int slot = (int)get_int(&p);
-        if (slot < 0 || slot >= EX_SLOTS) continue;
-        SlotInfo *si = &e->slots[slot];
-        si->used = true;
-        si->time = strtoll(p, &p, 10);
-        free(si->memo);
-        si->memo = ex_strdup(get_str(&p));
+        if (slot < 0 || slot >= EX_SLOTS || !e->slots[slot].used) continue;
+        strtoll(p, &p, 10);
+        free(e->slots[slot].memo);
+        e->slots[slot].memo = ex_strdup(get_str(&p));
     }
     free(text);
 }

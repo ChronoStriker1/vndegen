@@ -105,6 +105,7 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     free(e->memo);
     free(e->saveShot);
     free(e->sysmenuSpec);
+    free(e->blockR);
         e->bootEntry = NULL;
     }
     if (!e->sc) {
@@ -139,6 +140,7 @@ void vnexhibit_close(VNExHibit *n) {
     free(e->memo);
     free(e->saveShot);
     free(e->sysmenuSpec);
+    free(e->blockR);
     rld_free_all(e);
     if (e->log) fclose(e->log);
     free(e->R);

@@ -315,6 +315,11 @@ typedef struct EX {
     Image *cgPrev, *cgBlur;
     const Image *cgBlurSrc;
     int focus, cgBlurLevel;
+    i32 *blockR;
+    int blockCg, blockPc;
+    Script *blockSc;
+    bool replaying;
+    int replayTarget, replayBlock;
     bool fadeoutPending;
     u32 cgPrevColor;
     Camera camPrev;
@@ -466,6 +471,11 @@ void portrait_draw(EX *e, u32 *dst, int z);
 bool snd_play_voice(EX *e, int id);
 
 char *save_state(EX *e, size_t *len);
+bool pc_save_write(EX *e, int slot, long long when, const u32 *shot);
+bool pc_save_read(EX *e, int slot, char *script, size_t scriptSize, i32 **regs, int *count);
+long long pc_slot_time(EX *e, int slot);
+Image *pc_slot_thumb(EX *e, int slot);
+bool replay_to(EX *e, const char *script, int target, const i32 *regs, int count);
 bool load_state(EX *e, const char *data, size_t len);
 u8 *gyu_encode(const u32 *px, int w, int h, size_t *outLen);
 bool save_slot(EX *e, int slot);

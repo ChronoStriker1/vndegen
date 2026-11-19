@@ -308,8 +308,64 @@ void vm_exec_embedded(EX *e, Embedded *b) {
     }
 }
 
+static bool replay_filter(EX *e, Op *op) {
+    if (e->sp == 0 && e->pc >= e->replayTarget) {
+        e->replaying = false;
+        e->skipping = false;
+        snd_stop(e, EX_CH_SE, 0);
+        return false;
+    }
+    switch (op->op) {
+    case 6:
+    case 8:
+        return e->sp == 0 && e->pc < e->replayBlock;
+    case 13:
+    case 56:
+    case 58:
+        return true;
+    case 28:
+        msg_start(e, op);
+        msg_finish(e);
+        snd_stop(e, EX_CH_VOICE, 0);
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool replay_to(EX *e, const char *script, int target, const i32 *regs, int count) {
+    Script *sc = rld_get(e, script);
+    if (!sc || target < 0 || target > sc->count) return false;
+    reset_for_title(e);
+    ui_close(e);
+    for (int i = 148; i < count && i < e->nR; i++) e->R[i] = regs[i];
+    e->replayBlock = 0;
+    for (int i = 0; i < target; i++)
+        if (sc->ops[i].op == 5) e->replayBlock = i;
+    e->sc = sc;
+    e->pc = 0;
+    e->sp = 0;
+    e->wait = W_NONE;
+    e->ended = false;
+    e->replaying = true;
+    e->replayTarget = target;
+    e->skipping = true;
+    msg_show(e, true, 0);
+    for (int k = 0; k < 64 && e->replaying && !e->ended; k++) {
+        e->now += 16;
+        vm_run(e);
+    }
+    e->replaying = false;
+    e->skipping = false;
+    return !e->ended;
+}
+
 static bool exec(EX *e, Op *op) {
     char buf[8192];
+    if (e->replaying && replay_filter(e, op)) {
+        e->pc++;
+        return true;
+    }
     char *s0 = NULL;
     if (op->ns) {
         snprintf(buf, sizeof buf, "%s", op->s[0]);
@@ -338,6 +394,13 @@ static bool exec(EX *e, Op *op) {
         msg_clear_bubbles(e);
         break;
     case 5: {
+        if (e->sp == 0 && !e->replaying) {
+            if (!e->blockR) e->blockR = ex_alloc(sizeof(i32) * (size_t)e->nR);
+            memcpy(e->blockR, e->R, sizeof(i32) * (size_t)e->nR);
+            e->blockCg = e->cgId;
+            e->blockPc = e->pc;
+            e->blockSc = e->sc;
+        }
         char *f[8];
         int n = split_csv(s0, f, 8);
         const char *cond = n > 3 ? f[3] : "*";
