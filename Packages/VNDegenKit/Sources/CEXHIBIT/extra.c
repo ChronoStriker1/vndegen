@@ -387,12 +387,13 @@ void extra_input(EX *e) {
     if (!x) return;
     if (x->view) {
         Group *g = &x->groups[x->viewGroup];
-        bool onBar = !x->barHidden && e->mouseY >= EX_H - 80;
+        bool onBar = e->mouseY >= EX_H - 80;
         if (e->rPress) x->barHidden = !x->barHidden;
         else if (e->lPress && onBar && e->mouseX >= EX_W - 300) {
             image_free(x->view);
             x->view = NULL;
-        } else if (e->lPress) {
+        } else if (e->lPress && onBar && x->barHidden) x->barHidden = false;
+        else if (e->lPress) {
             if (++x->viewIdx >= g->count) {
                 image_free(x->view);
                 x->view = NULL;
