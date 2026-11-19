@@ -795,6 +795,8 @@ void ui_update(EG *e) {
         break;
     }
     case UI_SOUND: sound_update(e); break;
+    case UI_CG:
+    case UI_SCENE: gallery_update(e); break;
     case UI_BRA: {
         int c = mask_color(u->bra.mask, e->mx, e->my);
         if (c != u->hover && c) sound(e, "SYS_OV");
@@ -845,6 +847,8 @@ void ui_draw(EG *e, u32 *dst) {
     case UI_ANIM: anim_draw(e, dst); break;
     case UI_BRA: bra_draw(e, dst); break;
     case UI_SOUND: sound_draw(e, dst); break;
+    case UI_CG:
+    case UI_SCENE: gallery_draw(e, dst); break;
     default: break;
     }
     if (u->noticeUntil && (i32)(e->now - u->noticeUntil) < 0) {

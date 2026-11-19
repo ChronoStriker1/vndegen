@@ -215,7 +215,7 @@ Ikura GDL games, such as Lightning Warrior Raidy, run on VNDegen's own Ikura run
 
 ## EAGLS
 
-EAGLS games, such as Oppai no Ouja 48, run on VNDegen's own EAGLS runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive reader and the original engine run under Wine, MIT licensed like the rest of the app. The game's scripts run the title, story and screens they draw themselves; the message window, Save and Load pages, backlog and settings, which the PC engine draws itself, are drawn from the game's sheets and click maps. Saves are the PC engine's own `Save/SaveN.sav` in the game folder: the PC's saves load in VNDegen, and VNDegen's show on the PC but don't load there yet. [eagls.md](eagls.md) lists which games run and the known limits, and [eagls-cleanroom.md](eagls-cleanroom.md) where the runtime's knowledge came from.
+EAGLS games, such as Oppai no Ouja 48, run on VNDegen's own EAGLS runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive reader and the original engine run under Wine, MIT licensed like the rest of the app. The game's scripts run the title, story and screens they draw themselves; the message window, Save and Load pages, backlog, settings, CG View and Scene View, which the PC engine draws itself, are drawn from the game's sheets and click maps. Saves are the PC engine's own `Save/SaveN.sav` in the game folder: the PC's saves load in VNDegen, and VNDegen's show on the PC but don't load there yet. [eagls.md](eagls.md) lists which games run and the known limits, and [eagls-cleanroom.md](eagls-cleanroom.md) where the runtime's knowledge came from.
 
 ## ExHibit
 

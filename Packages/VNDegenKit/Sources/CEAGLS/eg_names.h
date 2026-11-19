@@ -111,3 +111,8 @@
 #define vm_str eg_vm_str
 #define win_draw eg_win_draw
 #define win_update eg_win_update
+#define gallery_draw eg_gallery_draw
+#define gallery_free eg_gallery_free
+#define gallery_open eg_gallery_open
+#define gallery_scene_end eg_gallery_scene_end
+#define gallery_update eg_gallery_update

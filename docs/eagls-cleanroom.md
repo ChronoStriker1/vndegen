@@ -17,6 +17,7 @@ derives from no GPL or LGPL code. Its sources:
 | Sound | dr_wav (public domain or MIT-0) streaming the music from the loose WAVs, stb_vorbis (public domain or MIT) for voices |
 | Movies | VNDegen's shared `vnvideo` on pl_mpeg (MIT) |
 | Text | stb_truetype (public domain or MIT) with the shared Windows font substitutes (`docs/fonts.md`) |
+| CG View and Scene View | The game's sheets and masks, its scripts (`TitleSC.dat`, `00Control.dat`'s `RecoFlag`, each scene's `$Reco_` label), its `GlobalSave.sav`, and the original under Wine as a black box. The order of the slots, which the exe builds in code, came from matching each thumbnail in the sheets against the game's pictures |
 | File name case | `Engines/Shared/casepath.c`, VNDegen's own |
 
 The exe was otherwise only run. Its strings were read for file names and the trace options, and its save and load file
