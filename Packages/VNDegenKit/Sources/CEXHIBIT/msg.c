@@ -76,8 +76,8 @@ void msg_wait_mark(EX *e, char *args) {
 }
 
 void msg_ctrl_define(EX *e, char *args) {
-    char *f[16];
-    int n = split_csv(args, f, 16);
+    char *f[40];
+    int n = split_csv(args, f, 40);
     if (n < 7) return;
     if (e->msg.ctrlCount >= EX_CTRLS) return;
     Ctrl *c = &e->msg.ctrls[e->msg.ctrlCount++];
@@ -95,14 +95,25 @@ void msg_ctrl_define(EX *e, char *args) {
         }
         c->img = image_load(e, f[3]);
         c->slider = true;
-        c->value = 128;
+        c->value = e->windowAlpha;
         c->states = 1;
     } else {
+        Image *plain = image_load(e, f[3]);
         c->img = image_load(e, f[6]);
-        c->states = c->img && c->img->h > 0 && c->img->w >= c->img->h * 3 ? 3 : 1;
+        c->states = c->img && plain && plain->w > 0 ? c->img->w / plain->w : 1;
+        if (c->states < 1) c->states = 1;
         if (!c->img) {
-            c->img = image_load(e, f[3]);
+            c->img = plain;
+            plain = NULL;
             c->states = 1;
+        }
+        image_free(plain);
+        if (n > 29) {
+            c->action = field_int(f[12]);
+            c->action2 = field_int(f[19]);
+            c->tipX = field_int(f[27]);
+            c->tipY = field_int(f[28]);
+            c->tip = image_load(e, f[29]);
         }
     }
 }
@@ -113,10 +124,12 @@ void msg_free(EX *e) {
     for (int i = 0; i < m->ctrlCount; i++) {
         image_free(m->ctrls[i].img);
         image_free(m->ctrls[i].knob);
+        image_free(m->ctrls[i].tip);
     }
     image_free(m->waitImg);
     free(m->chars);
     free(m->name);
+    for (int i = 0; i < m->embCount; i++) free(m->emb[i].str);
     free(m->emb);
     memset(m, 0, sizeof *m);
 }
@@ -224,33 +237,34 @@ static void layout(EX *e, const u32 *cps, const bool *it, int n) {
 
 static void parse_embedded(EX *e, char **s, int ns) {
     Msg *m = &e->msg;
+    for (int i = 0; i < m->embCount; i++) free(m->emb[i].str);
     m->embCount = m->embNext = 0;
-    for (int si = 0; si < ns; si++) {
-        char *copy = ex_strdup(s[si]);
-        char *f[256];
-        int n = split_csv(copy, f, 256);
-        int i = 0;
-        if (n > 0 && field_int(f[0]) == 258) {
-            free(copy);
-            continue;
+    for (int si = 0; si < ns && m->embCount < EX_EMBEDDED; si++) {
+        const char *p = s[si];
+        if (si == 0) {
+            if (strncmp(p, "1,", 2)) continue;
+            p += 2;
         }
-        if (si == 0 && n > 1 && field_int(f[0]) == 1 && field_int(f[1]) == 2) i = 1;
-        while (i + 8 <= n && field_int(f[i]) == 2) {
-            int op = field_int(f[i + 1]), nv = field_int(f[i + 2]), nstr = field_int(f[i + 3]);
-            int at = field_int(f[i + 5]);
-            i += 8;
-            if (nv < 0 || i + nv > n || m->embCount >= EX_EMBEDDED) break;
-            Embedded *b = &m->emb[m->embCount++];
-            memset(b, 0, sizeof *b);
-            b->op = op;
-            b->at = at;
-            b->nv = nv > 16 ? 16 : nv;
-            for (int k = 0; k < nv; k++)
-                if (k < 16) b->v[k] = field_int(f[i + k]);
-            i += nv;
-            i += nstr;
+        int head[8];
+        int k = 0;
+        for (; k < 8 && *p; k++) {
+            head[k] = (int)strtol(p, NULL, 10);
+            const char *c = strchr(p, ',');
+            p = c ? c + 1 : p + strlen(p);
         }
-        free(copy);
+        if (k < 8 || head[0] != 2) continue;
+        Embedded *b = &m->emb[m->embCount++];
+        memset(b, 0, sizeof *b);
+        b->op = head[1];
+        b->at = head[5];
+        int nv = head[2];
+        for (int j = 0; j < nv && *p; j++) {
+            if (j < 16) b->v[j] = (i32)strtol(p, NULL, 10);
+            const char *c = strchr(p, ',');
+            p = c ? c + 1 : p + strlen(p);
+        }
+        b->nv = nv > 16 ? 16 : nv;
+        if (head[3] > 0 && *p) b->str = ex_strdup(p);
     }
 }
 
@@ -292,6 +306,7 @@ bool msg_typing(EX *e) {
 void msg_finish(EX *e) {
     Msg *m = &e->msg;
     m->visible = m->count;
+    m->doneAt = e->now;
 }
 
 void msg_tick(EX *e) {
@@ -299,9 +314,10 @@ void msg_tick(EX *e) {
     if (!m->active) return;
     u32 t = e->now - m->start;
     if (m->visible < m->count) {
-        int speed = e->textMs > 0 ? e->textMs : 0;
+        int speed = e->textMs > 0 && !e->skipping && !e->ctrlHeld ? e->textMs : 0;
         int v = speed ? (int)(t / (u32)speed) : m->count;
         m->visible = v > m->count ? m->count : v;
+        if (m->visible >= m->count) m->doneAt = e->now;
     }
     while (m->embNext < m->embCount && (u32)m->emb[m->embNext].at <= t) vm_exec_embedded(e, &m->emb[m->embNext++]);
 }
@@ -328,8 +344,9 @@ static void draw_ctrls(EX *e, u32 *dst, int alpha) {
             continue;
         }
         int w = c->img->w / c->states;
-        int state = c->states > 1 && m->ctrlHover == c->id ? 1 : 0;
+        int state = (c->on && c->states >= 6 ? 3 : 0) + (c->states > 1 && m->ctrlHover == c->id ? 1 : 0);
         blit_part(dst, EX_W, EX_H, c->img, state * w, 0, w, c->img->h, c->x, c->y, alpha);
+        if (m->ctrlHover == c->id && c->tip) blit(dst, EX_W, EX_H, c->tip, c->x + c->tipX, c->y + c->tipY, alpha);
     }
 }
 
@@ -341,7 +358,7 @@ void msg_draw(EX *e, u32 *dst) {
     if (m->userHidden) alpha = 0;
     if (alpha <= 0) return;
     MsgFrame *f = frame(e);
-    if (f->img) blit(dst, EX_W, EX_H, f->img, f->x, f->y, alpha);
+    if (f->img) blit(dst, EX_W, EX_H, f->img, f->x, f->y, alpha * e->windowAlpha / 255);
     if (m->ctrlShown) draw_ctrls(e, dst, alpha);
     if (!m->active) return;
     if (m->nameLen) {
@@ -366,4 +383,77 @@ void msg_draw(EX *e, u32 *dst) {
         int k = (int)((e->now / WAIT_FRAME_MS) % (u32)m->waitFrames);
         blit_part(dst, EX_W, EX_H, m->waitImg, k * fw, 0, fw, m->waitImg->h, m->waitX, m->waitY, alpha);
     }
+}
+
+static bool ctrl_hit(EX *e, Ctrl *c) {
+    if (!c->img) return false;
+    int w = c->slider ? c->img->w : c->img->w / c->states, h = c->img->h;
+    return e->mouseX >= c->x && e->mouseX < c->x + w && e->mouseY >= c->y && e->mouseY < c->y + h;
+}
+
+static void ctrl_action(EX *e, Ctrl *c) {
+    Msg *m = &e->msg;
+    switch (c->action) {
+    case 259:
+        if (m->textId >= 0) snd_play_voice(e, m->textId);
+        break;
+    case 143:
+        e->autoMode = !e->autoMode;
+        e->skipping = false;
+        break;
+    case 144:
+        e->skipping = !e->skipping;
+        e->autoMode = false;
+        break;
+    case 268:
+        e->muted = !e->muted;
+        snd_apply_volumes(e);
+        break;
+    case 162:
+        m->userHidden = true;
+        break;
+    default:
+        e->pendingAction = c->action;
+        break;
+    }
+}
+
+bool msg_input(EX *e) {
+    Msg *m = &e->msg;
+    int prev = m->ctrlHover;
+    m->ctrlHover = -1;
+    bool visible = m->ctrlShown && !m->userHidden && m->a * m->tempA > 0;
+    if (!visible) {
+        m->dragging = NULL;
+        return false;
+    }
+    for (int i = 0; i < m->ctrlCount; i++) {
+        Ctrl *c = &m->ctrls[i];
+        c->on = (c->action == 143 && e->autoMode) || (c->action == 144 && e->skipping) || (c->action == 268 && e->muted);
+    }
+    if (m->dragging) {
+        Ctrl *c = m->dragging;
+        if (!e->lDown) m->dragging = NULL;
+        else {
+            int span = c->img->w - (c->knob ? c->knob->w : 0);
+            int v = span > 0 ? (e->mouseX - c->x - (c->knob ? c->knob->w / 2 : 0)) * 255 / span : 0;
+            c->value = v < 0 ? 0 : v > 255 ? 255 : v;
+            e->windowAlpha = c->value;
+        }
+        e->lPress = false;
+        return true;
+    }
+    for (int i = 0; i < m->ctrlCount; i++) {
+        Ctrl *c = &m->ctrls[i];
+        if (!ctrl_hit(e, c)) continue;
+        m->ctrlHover = c->id;
+        (void)prev;
+        if (e->lPress) {
+            e->lPress = false;
+            if (c->slider) m->dragging = c;
+            else ctrl_action(e, c);
+        }
+        return true;
+    }
+    return false;
 }

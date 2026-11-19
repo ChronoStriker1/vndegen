@@ -136,8 +136,8 @@ static long ex_or(Parser *ps) {
     long v = ex_and(ps);
     for (;;) {
         skip_ws(ps);
-        if (*ps->p != '|') return v;
-        ps->p += ps->p[1] == '|' ? 2 : 1;
+        if (*ps->p != '|' && *ps->p != ';') return v;
+        ps->p += ps->p[0] == '|' && ps->p[1] == '|' ? 2 : 1;
         long r = ex_and(ps);
         v = v || r;
     }
@@ -281,6 +281,11 @@ void vm_exec_embedded(EX *e, Embedded *b) {
     op.op = (u16)b->op;
     op.nv = (u8)b->nv;
     op.v = b->v;
+    char *strs[1] = {b->str};
+    op.s = strs;
+    op.ns = b->str ? 1 : 0;
+    char buf[1024];
+    if (b->str) snprintf(buf, sizeof buf, "%s", b->str);
     switch (b->op) {
     case 37:
     case 38:
@@ -291,6 +296,11 @@ void vm_exec_embedded(EX *e, Embedded *b) {
         break;
     case 74:
         draw(e, b->v, b->nv);
+        break;
+    case 100:
+        if (b->str) gfx_move(e, buf);
+        break;
+    case 101:
         break;
     default:
         ex_log(e, "embedded op %d", b->op);
@@ -349,7 +359,8 @@ static bool exec(EX *e, Op *op) {
         return false;
     case 17: {
         char *f[4];
-        split_csv(s0, f, 4);
+        int n = split_csv(s0, f, 4);
+        if (n > 1 && !vm_cond(e, f[1])) break;
         vm_goto_script(e, f[0]);
         return true;
     }
@@ -364,7 +375,8 @@ static bool exec(EX *e, Op *op) {
         break;
     case 22: {
         char *f[4];
-        split_csv(s0, f, 4);
+        int n = split_csv(s0, f, 4);
+        if (n > 1 && !vm_cond(e, f[1])) break;
         call(e, field_int(f[0]));
         return true;
     }
@@ -564,10 +576,10 @@ void vm_run(EX *e) {
     for (int guard = 0; guard < 20000 && !e->ended; guard++) {
         switch (e->wait) {
         case W_TIME:
-            if ((i32)(e->now - e->waitUntil) < 0) return;
+            if ((i32)(e->now - e->waitUntil) < 0 && !e->skipping && !e->ctrlHeld) return;
             break;
         case W_CLICK:
-            if ((i32)(e->now - e->waitUntil) < 0 && !advance_click(e)) return;
+            if ((i32)(e->now - e->waitUntil) < 0 && !advance_click(e) && !e->skipping && !e->ctrlHeld) return;
             break;
         case W_FADE:
             if (gfx_busy(e) || chara_busy(e)) return;
@@ -581,7 +593,11 @@ void vm_run(EX *e) {
                 if (advance_click(e)) msg_finish(e);
                 return;
             }
-            if (!advance_click(e) && !e->skipping) return;
+            if (!advance_click(e) && !e->skipping && !e->ctrlHeld) {
+                if (!e->autoMode || snd_playing(e, EX_CH_VOICE)) return;
+                if ((i32)(e->now - e->msg.doneAt) < e->autoMs) return;
+            }
+            if (!e->autoMode) snd_stop(e, EX_CH_VOICE, 0);
             msg_flush_embedded(e);
             break;
         default:

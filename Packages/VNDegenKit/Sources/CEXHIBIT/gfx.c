@@ -14,6 +14,7 @@ static float ease(float t, int kind) {
 }
 
 void anim_start(EX *e, Anim *a, float from, float to, int ms, int kind) {
+    if (e->skipping || e->ctrlHeld) ms = 0;
     a->from = from;
     a->to = to;
     a->start = e->now;
@@ -226,7 +227,18 @@ bool gfx_busy(EX *e) {
         Layer *l = &e->view.layers[i];
         if (l->mx.active || l->my.active || l->fade.active) return true;
     }
+    for (int i = 0; i < EX_TRACKS; i++)
+        if (e->tracks[i].used) return true;
     return e->cgFade.active || cam_busy(&e->cam) || chara_busy(e);
+}
+
+static bool target_moving(EX *e, int id) {
+    Billboard *b = bb_find(e, id, false);
+    if (b) return b->mx.active || b->my.active;
+    Actor *a = chara_actor(e, id);
+    if (a) return a->mx.active || a->my.active;
+    Layer *l = view_layer(e, id);
+    return l && (l->mx.active || l->my.active);
 }
 
 static void move_target(EX *e, int id, float x, float y, int ms, int kind, bool rel) {
@@ -270,12 +282,71 @@ static void move_target(EX *e, int id, float x, float y, int ms, int kind, bool 
     }
 }
 
+static void track_add(EX *e, int id, char *spec) {
+    int tok[128], nt = 0;
+    for (char *p = spec; p && *p && nt < 128;) {
+        tok[nt++] = (int)strtol(p, NULL, 10);
+        char *dot = strchr(p, '.');
+        p = dot ? dot + 1 : NULL;
+    }
+    if (nt < 3) return;
+    Track *t = NULL;
+    for (int i = 0; i < EX_TRACKS; i++)
+        if (!e->tracks[i].used || e->tracks[i].id == id) {
+            t = &e->tracks[i];
+            break;
+        }
+    if (!t) return;
+    memset(t, 0, sizeof *t);
+    t->id = id;
+    int i = 3, loopAt = -1;
+    while (i < nt && t->count < EX_STEPS) {
+        if (tok[i] == 3 && i + 4 < nt) {
+            t->steps[t->count++] = (Step){tok[i + 1], tok[i + 2], tok[i + 3], tok[i + 4]};
+            i += 5;
+        } else if (tok[i] == 5) {
+            loopAt = t->count;
+            i++;
+        } else if (tok[i] == 6 && i + 1 < nt) {
+            int reps = tok[i + 1], body = t->count - (loopAt < 0 ? 0 : loopAt);
+            for (int r = 0; r < reps && body > 0; r++)
+                for (int k = 0; k < body && t->count < EX_STEPS; k++) t->steps[t->count++] = t->steps[loopAt + k];
+            loopAt = -1;
+            i += 2;
+        } else i++;
+    }
+    t->used = t->count > 0;
+    t->next = 0;
+}
+
+static void tracks_update(EX *e) {
+    for (int i = 0; i < EX_TRACKS; i++) {
+        Track *t = &e->tracks[i];
+        if (!t->used || t->running) {
+            if (t->used && t->running && !target_moving(e, t->id)) t->running = false;
+            if (!t->used || t->running) continue;
+        }
+        if (t->next >= t->count) {
+            t->used = false;
+            continue;
+        }
+        Step *st = &t->steps[t->next++];
+        move_target(e, t->id, (float)st->dx, (float)st->dy, st->ms, st->ease, true);
+        t->running = st->ms > 0;
+    }
+}
+
 void gfx_move(EX *e, char *args) {
     char *f[40];
     int n = split_csv(args, f, 40);
     if (n < 4) return;
     int ms = field_int(f[1]);
-    if (ms < 0) return;
+    if (ms < 0) {
+        for (int i = 2; i + 1 < n; i += 2)
+            if (field_int(f[i]) >= 0 && strchr(f[i + 1], '.')) track_add(e, field_int(f[i]), f[i + 1]);
+        tracks_update(e);
+        return;
+    }
     bool rel = field_int(f[3]) != 0;
     for (int i = 4; i + 3 < n; i += 4) {
         int id = field_int(f[i]);
@@ -407,6 +478,8 @@ static void snapshot(EX *e, Billboard *self) {
 
 void gfx_frame(EX *e) {
     cam_update(e, &e->cam);
+    chara_update(e);
+    tracks_update(e);
     if (e->cgPrev && !e->cgFade.active) {
         image_free(e->cgPrev);
         e->cgPrev = NULL;

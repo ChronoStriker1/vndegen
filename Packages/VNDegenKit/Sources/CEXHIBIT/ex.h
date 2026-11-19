@@ -141,12 +141,15 @@ typedef struct PlacedChar {
 typedef struct Embedded {
     int op, at, nv;
     i32 v[16];
+    char *str;
 } Embedded;
 
 typedef struct Ctrl {
     int id, x, y, states;
-    Image *img, *knob;
-    bool slider;
+    Image *img, *knob, *tip;
+    int tipX, tipY;
+    int action, action2;
+    bool slider, on;
     int value;
 } Ctrl;
 
@@ -169,6 +172,8 @@ typedef struct Msg {
     int waitX, waitY, waitFrames;
     Ctrl ctrls[EX_CTRLS];
     int ctrlCount, ctrlHover;
+    struct Ctrl *dragging;
+    u32 doneAt;
 } Msg;
 
 typedef struct CharaDef {
@@ -196,6 +201,19 @@ typedef struct Portrait {
     Image *img;
 } Portrait;
 
+#define EX_TRACKS 8
+#define EX_STEPS 32
+
+typedef struct Step {
+    int ms, dx, dy, ease;
+} Step;
+
+typedef struct Track {
+    bool used, running;
+    int id, count, next;
+    Step steps[EX_STEPS];
+} Track;
+
 typedef struct Camera {
     float x, y, w, h;
     Anim ax, ay, aw, ah;
@@ -219,6 +237,7 @@ typedef struct EX {
     View view;
     Msg msg;
     Camera cam;
+    Track tracks[EX_TRACKS];
     CharaDef *defs;
     int defCount;
     Person people[EX_PEOPLE];
@@ -230,7 +249,10 @@ typedef struct EX {
     void *fonts;
     char *fontFile;
     int textMs;
-    bool skipping;
+    bool skipping, autoMode, muted, ctrlHeld;
+    int pendingAction;
+    int autoMs;
+    int windowAlpha;
     char *bootEntry;
     Image *cgPrev;
     u32 cgPrevColor;
@@ -355,6 +377,8 @@ void msg_finish(EX *e);
 void msg_tick(EX *e);
 void msg_flush_embedded(EX *e);
 void msg_draw(EX *e, u32 *dst);
+bool msg_input(EX *e);
+void snd_apply_volumes(EX *e);
 void vm_exec_embedded(EX *e, Embedded *b);
 
 void chara_create(EX *e, char *args);
@@ -366,6 +390,7 @@ void chara_leave(EX *e, int id, int ms);
 void chara_leave_all(EX *e, int ms);
 Actor *chara_actor(EX *e, int layer);
 void chara_draw(EX *e, u32 *dst);
+void chara_update(EX *e);
 bool chara_busy(EX *e);
 void chara_free(EX *e);
 void portrait_def(EX *e, int slot, int z);

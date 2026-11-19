@@ -236,8 +236,17 @@ static Voice *voice_open(EX *e, const char *rel) {
 }
 
 static float channel_volume(EX *e, int ch) {
+    if (e->muted) return 0;
     int v = ch == EX_CH_MUSIC ? e->volBgm : ch == EX_CH_VOICE || ch == EX_CH_ENV ? e->volVoice : e->volSe;
     return (float)v / 100.0f * (float)e->volMaster / 100.0f;
+}
+
+void snd_apply_volumes(EX *e) {
+    Mixer *m = e->mixer;
+    if (!m) return;
+    pthread_mutex_lock(&m->lock);
+    for (int ch = 0; ch < EX_CHANNELS; ch++) m->chanVol[ch] = channel_volume(e, ch);
+    pthread_mutex_unlock(&m->lock);
 }
 
 static void fade_out(EX *e, Voice *v, int ms) {

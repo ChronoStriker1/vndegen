@@ -100,7 +100,7 @@ Image *gyu_decode(const u8 *d, size_t n) {
     u32 key = rd32(d + 8);
     int bpp = (int)rd32(d + 12), w = (int)rd32(d + 16), h = (int)rd32(d + 20);
     size_t ds = rd32(d + 24), als = rd32(d + 28), ps = rd32(d + 32);
-    if (w <= 0 || h <= 0 || w > 8192 || h > 8192 || (bpp != 8 && bpp != 24 && bpp != 32)) return NULL;
+    if (w <= 0 || h <= 0 || w > 65536 || h > 65536 || (size_t)w * (size_t)h > (size_t)1 << 26 || (bpp != 8 && bpp != 24 && bpp != 32)) return NULL;
     size_t o = 0x24;
     const u8 *pal = NULL;
     if (ps) {

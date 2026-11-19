@@ -83,6 +83,9 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     e->mixer = mixer_new(e->audioRate);
     e->textMs = 20;
     e->msg.tempA = 255;
+    e->msg.ctrlHover = -1;
+    e->windowAlpha = 128;
+    e->autoMs = 1500;
     e->cam.w = EX_W;
     e->cam.h = EX_H;
     ex_log(e, "opened %s", e->gameDir);
@@ -135,6 +138,7 @@ void vnexhibit_close(VNExHibit *n) {
 
 static void tick(EX *e) {
     view_input(e);
+    if (!e->view.active) msg_input(e);
     if (e->wait == W_TEXT || e->msg.userHidden) {
         if (e->rPress && !e->view.active) {
             e->msg.userHidden = !e->msg.userHidden;
@@ -192,6 +196,7 @@ void vnexhibit_mouse_button(VNExHibit *n, int button, bool down) {
 
 void vnexhibit_key(VNExHibit *n, int vk, bool down) {
     EX *e = (EX *)n;
+    if (vk == 0x11) e->ctrlHeld = down;
     if (!down) return;
     if (vk == 0x0d || vk == 0x20) e->lPress = true;
     if (vk == 0x1b) e->rPress = true;

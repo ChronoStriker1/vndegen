@@ -53,7 +53,20 @@ int main(int argc, char **argv) {
         const char *c = argv[i];
         int x, y, k;
         if (sscanf(c, "wait:%d", &k) == 1) alive = run(n, k);
-        else if (sscanf(c, "click:%d,%d", &x, &y) == 2) alive = press(n, x, y, VNEXHIBIT_MOUSE_LEFT);
+        else if (sscanf(c, "skipto:%d", &k) == 1) {
+            EX *e = (EX *)n;
+            e->skipping = true;
+            for (int guard = 0; guard < 200000 && alive && e->msg.textId != k && !e->view.active; guard++) alive = run(n, 16);
+            e->skipping = false;
+            alive = alive && run(n, 1000);
+        } else if (sscanf(c, "upto:%d", &k) == 1) {
+            EX *e = (EX *)n;
+            for (int guard = 0; guard < 4000 && alive && e->msg.textId != k; guard++) {
+                alive = press(n, 900, 500, VNEXHIBIT_MOUSE_LEFT);
+                for (int t = 0; t < 60 && alive && e->wait != W_TEXT; t++) alive = run(n, 16);
+            }
+            alive = alive && run(n, 2000);
+        } else if (sscanf(c, "click:%d,%d", &x, &y) == 2) alive = press(n, x, y, VNEXHIBIT_MOUSE_LEFT);
         else if (sscanf(c, "rclick:%d,%d", &x, &y) == 2) alive = press(n, x, y, VNEXHIBIT_MOUSE_RIGHT);
         else if (sscanf(c, "move:%d,%d", &x, &y) == 2) {
             vnexhibit_mouse_move(n, x, y);

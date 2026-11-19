@@ -1,7 +1,7 @@
 #include "ex.h"
 
 #define KEEP -12345
-#define CHARA_SCALE 1.5f
+#define CHARA_BASE 860
 
 void chara_create(EX *e, char *args) {
     char *f[8];
@@ -168,20 +168,21 @@ bool chara_busy(EX *e) {
     return false;
 }
 
-void chara_draw(EX *e, u32 *dst) {
-    int idx[EX_ACTORS], n = 0;
+void chara_update(EX *e) {
     for (int i = 0; i < EX_ACTORS; i++) {
         Actor *a = &e->actors[i];
         if (!a->used) continue;
         if (a->fade.active) a->a = anim_value(e, &a->fade, a->a);
         if (a->mx.active) a->x = anim_value(e, &a->mx, a->x);
         if (a->my.active) a->y = anim_value(e, &a->my, a->y);
-        if (a->leaving && !a->fade.active) {
-            actor_free(a);
-            continue;
-        }
-        idx[n++] = i;
+        if (a->leaving && !a->fade.active) actor_free(a);
     }
+}
+
+void chara_draw(EX *e, u32 *dst) {
+    int idx[EX_ACTORS], n = 0;
+    for (int i = 0; i < EX_ACTORS; i++)
+        if (e->actors[i].used) idx[n++] = i;
     for (int i = 1; i < n; i++)
         for (int j = i; j > 0 && e->actors[idx[j]].order < e->actors[idx[j - 1]].order; j--) {
             int t = idx[j];
@@ -192,10 +193,9 @@ void chara_draw(EX *e, u32 *dst) {
         Actor *a = &e->actors[idx[k]];
         if (!a->img || a->a <= 0) continue;
         CharaDef *d = def(e, a->chara, a->pose);
-        float s = CHARA_SCALE;
-        float w = (float)a->img->w * s, h = (float)a->img->h * s;
-        float left = a->x - w / 2 + (d ? (float)d->ox * s : 0);
-        float top = (float)EX_H - (d ? (float)d->oy * s : h) + a->y;
+        float w = (float)a->img->w, h = (float)a->img->h;
+        float left = a->x - (float)(a->img->w / 2) + (d ? (float)d->ox : 0);
+        float top = (float)CHARA_BASE - (d ? (float)d->oy : h - EX_H + CHARA_BASE) + a->y;
         Camera *c = &e->cam;
         float k = c->w > 0 ? (float)EX_W / c->w : 1;
         blit_scaled(dst, EX_W, EX_H, a->img, 0, 0, (float)a->img->w, (float)a->img->h, (left - c->x) * k, (top - c->y) * k, w * k, h * k, (int)a->a);
