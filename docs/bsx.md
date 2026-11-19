@@ -11,8 +11,9 @@ other runtime, decompiler or format write-up for the engine exists.
 |---|---|---|
 | Mesu Kyoushi ~Injoku no Kyoushitsu~ Immoral Edition (English machine translation, `mkiedl.exe`) | BSXScript 3.0, 800x600 | Boot logos, title, opening and new game, the week's mornings, special class, the map, the target cards, events, choices, eyecatches, voices, music, ambience and effects, the message window and its menu bar, STRIP and VIEW, Save and Load, quick save and load, auto saves, backlog, settings, the item screen |
 | Mesu Kyoushi 2 ~Injuu no Rasen~ Immoral Edition (English machine translation, `mk2iedl.exe`) | BSXScript 3.0, 800x600 | Title, story to an ending in the headless runner, events with faces and overlays, Save and Load both ways with the PC, the Mac app, iPad touch and gamepad, a case-sensitive library |
+| Mesu Kyoushi 4 ~Kegasareta Kyoudan~ (English machine translation, `mk4.exe`) | BSXScript 3.1, 1024x768 | Title, the opening and staff roll movies, story to an ending in the headless runner, the map, events, Save and Load both ways with the PC (scenes, event pictures, close-ups and the map), the Mac app, iPad touch and gamepad, a case-sensitive library |
 
-Not yet: Mesu Kyoushi 3 (3.3, with Lua) and 4 (3.1, with MPEG movies).
+Not yet: Mesu Kyoushi 3 (3.3, with Lua).
 
 ## How the games are built
 
@@ -53,16 +54,42 @@ folder as a BSX game when `bsxx.dat` sits beside `bsxx.cfg` and a `Graphics*.bsa
 - `bsxx.cfg` lays out every engine screen: the message window, the menu bar, choices, the title, the map, the target
   cards, Save and Load, the slot viewer, settings, backlog, the item screen and the museum.
 
+## BSXScript 3.1
+
+Mesu Kyoushi 4 changes these from 3.0:
+
+- A message's voice is a count and that many voice names, so a line can be voiced by two characters. `3e` plays
+  voices the same way without a message. `41` calls a named function of the exe (`InitBeginTimeParameters()`); the
+  runtime logs it and goes on.
+- `30` and `31` start and stop a character's looping voice, and `2e` and `2f` start and stop looping effects by name,
+  several at once. `2a` shakes the screen: a new random offset of up to one and a half times its arguments every frame
+  for half a second. `26` also switches the menu bar (1) and the information window (2), which hides during event
+  pictures. The `op` and `staffroll` system commands play `movie/op.mpg` and `movie/staffroll.mpg` (MPEG-1 with MP2
+  sound, through the shared `vnvideo`); a click skips them.
+- `bsxx.cfg` is UTF-8 (the translators' copy) and the runtime reads either encoding. Faces are a face part and a strip
+  of eye frames (`eye pattern`), drawn one frame at a time with a blink every `eye anime interval`. `[bu color
+  adjustment]` tints bust-ups over a named background: `*` multiply, `+` add, `-` subtract, `^` colour dodge, `/`
+  colour burn and `&` linear burn, with an alpha for the strength. The message window is one tinted picture, the date
+  sits in its own information window, the window counts down to ejaculation from `#x_count`, and text is placed one
+  font height apart, lowered by the height less the size.
+- The map is the custom map, drawn by the script: kind-160 icons whose `[button object]` values go to `#select_value`.
+  The menu bar shows on it with SKIP and VOICE disabled, and it auto saves as it opens. FACE, BUST and HIP pick VIEW's
+  three positions, FACE by default.
+
 ## Saves
 
 The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when the map opens and at choices),
 `save/no-01` (quick save) and `save/common.dat` in the game folder. VNDegen uses the same files:
 
-- A slot is a 32-character id, a 120x90 thumbnail, the slot header (date, time, day, time slot, the current text with
+- A slot is a 32-character id, a thumbnail (the screen times the cfg's `thumbnail ratio`: 120x90, or 128x96 for
+  Mesu Kyoushi 4), the slot header (date, time, day, time slot, the current text with
   its speaker), the play head (the mode, 7 on the map, then each character's wear record: a count, and per character
   its max wear plus one and that many bytes, from `bsxx.cfg`), the program counter after the current message, the call
   frames (return address and the caller's label), locals, globals, the last 50 message positions, the music, and the
-  pictures on screen (kind, name, position, parts, opacity; an overlay's record ends with 29 more bytes).
+  pictures on screen (kind, name, position, the picture's own size from its file, its frames, parts, opacity; an
+  overlay's record ends with 29 more bytes). A background has two parts only with a face on it. After the list come
+  three flags for a hidden window, menu bar and information window. The mode is 1, 7 on the map phase, or 9 on a
+  custom map that is the game's map.
 - The id is the same in every save of a game and is checked on load. It is read from the game's `save/` folder; the
   four Mesu Kyoushi games' ids are also built in.
 - `common.dat` holds the PC's settings (with the same wear records), a byte per choice taken, a byte per message read,
@@ -74,6 +101,9 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
 ## Known limits
 
 - The museum (BGM, CG, scene replay and bust-up viewer) isn't there yet. Its title button does nothing.
+- Mesu Kyoushi 4's dress screen (STRIP) isn't there; the button does nothing. Its settings screen lacks BGM SELECT,
+  the per-character voice details and the BGV volume, and the slot viewer shows the weekday without the day number.
+- The space a translation puts after `「` is drawn; Mesu Kyoushi 4's PC drops it.
 - Settings are VNDegen's own `save/vndegen.cfg`, not the PC's settings in `common.dat`. The full-screen, effect detail
   and auto-select options are shown but do nothing.
 - The cut-in and voice replay modes aren't there; a voice plays once.
@@ -81,5 +111,4 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
 - `ActionType2` (before the staff roll) is ignored.
 - A game without any save to take its id from, other than the four Mesu Kyoushi games, writes saves the PC engine
   refuses.
-- BSXScript 3.1 and 3.3 games (Mesu Kyoushi 4 and 3) are untested: their movies, Mesu Kyoushi 3's Lua screens and
-  1024x768 and 1366x768 layouts.
+- BSXScript 3.3 (Mesu Kyoushi 3) is untested: its Lua screens and 1366x768 layout.
