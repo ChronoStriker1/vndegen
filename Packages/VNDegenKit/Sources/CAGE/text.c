@@ -498,8 +498,8 @@ void text_render_records(AG *g, i32 li, int first, bool reflow, i32 flags, i32 c
             L->cx = r->d[1];
             L->cy = r->d[2];
             t->size = r->d[9] > 0 ? r->d[9] : ss;
-            t->color = (i32)((u32)r->d[5] >> 16 & 255 | ((u32)r->d[5] & 0xff00) | ((u32)r->d[5] & 255) << 16);
-            t->effColor = (i32)((u32)r->d[6] >> 16 & 255 | ((u32)r->d[6] & 0xff00) | ((u32)r->d[6] & 255) << 16);
+            t->color = (i32)(((u32)r->d[5] >> 16 & 255) | ((u32)r->d[5] & 0xff00) | ((u32)r->d[5] & 255) << 16);
+            t->effColor = (i32)(((u32)r->d[6] >> 16 & 255) | ((u32)r->d[6] & 0xff00) | ((u32)r->d[6] & 255) << 16);
         }
         if (flags & 2) { t->color = col; t->effColor = eff; }
         show_into(g, li, r->text ? r->text : "", false, false);

@@ -4,7 +4,6 @@
 #include <sys/types.h>
 
 typedef struct Movie {
-    u8 *mem;
     FILE *file;
     u64 base, size;
     vnvideo *video;
@@ -21,7 +20,6 @@ static int64_t read_movie(void *user, uint64_t offset, void *buffer, size_t leng
     Movie *m = user;
     if (offset >= m->size) return 0;
     if (length > m->size - offset) length = (size_t)(m->size - offset);
-    if (m->mem) { memcpy(buffer, m->mem + offset, length); return (int64_t)length; }
     if (fseeko(m->file, (off_t)(m->base + offset), SEEK_SET) != 0) return -1;
     return (int64_t)fread(buffer, 1, length, m->file);
 }
@@ -31,27 +29,9 @@ static void movie_free(AG *g, Movie *m) {
     if (m->video) snd_movie(g, m->video, false);
     if (m->video) vnvideo_close(m->video);
     if (m->file) fclose(m->file);
-    free(m->mem);
     free(m);
 }
 
-static void strip_audio(u8 *d, size_t n) {
-    size_t i = 0;
-    while (i + 4 <= n) {
-        if (d[i] != 0 || d[i + 1] != 0 || d[i + 2] != 1) { i++; continue; }
-        u8 id = d[i + 3];
-        if (id == 0xb9) break;
-        if (id == 0xba) { i += (d[i + 4] & 0xc0) == 0x40 ? 14 + (d[i + 13] & 7) : 12; continue; }
-        if (i + 6 > n) break;
-        size_t len = (size_t)d[i + 4] << 8 | d[i + 5];
-        if (id == 0xbb && i + 12 <= n) {
-            d[i + 9] &= 0x03;
-            for (size_t k = i + 12; k + 3 <= i + 6 + len && k + 3 <= n; k += 3)
-                if (d[k] >= 0xc0 && d[k] <= 0xdf) d[k] = 0xbe;
-        } else if (id >= 0xc0 && id <= 0xdf) d[i + 3] = 0xbe;
-        i += 6 + len;
-    }
-}
 
 void movie_stop(AG *g, i32 slot) {
     if (slot < 0 || slot >= AG_SURFACES) return;
@@ -100,14 +80,6 @@ bool movie_play(AG *g, u32 id, i32 slot, i32 delay, i32 posMs, bool modal) {
     if (!open_entry(g, m, id)) { ag_log(g, "movie %#x can't be opened", id); movie_free(g, m); return false; }
     char err[256] = "";
     m->video = vnvideo_open(read_movie, m, m->size, 0, err, sizeof err);
-    if (!m->video && m->size < (64u << 20)) {
-        m->mem = ag_alloc((size_t)m->size + 4);
-        if (fseeko(m->file, (off_t)m->base, SEEK_SET) == 0 && fread(m->mem, 1, (size_t)m->size, m->file) == m->size) {
-            strip_audio(m->mem, (size_t)m->size);
-            m->video = vnvideo_open(read_movie, m, m->size, 0, err, sizeof err);
-            if (m->video) ag_log(g, "movie %#x plays without its sound", id);
-        }
-    }
     if (!m->video) { ag_log(g, "movie %#x can't be played: %s", id, err); movie_free(g, m); return false; }
     vnvideo_get_info(m->video, &m->info);
     m->startAt = g->now + (u32)(delay > 0 ? delay : 0);

@@ -52,7 +52,8 @@ down.
 - **Input.** Logical actions from keys, mouse buttons and the wheel as the game maps them, the mouse and joystick
   callbacks, hotspots with enter, leave and click callbacks and bound keys, and the text wait's click, skip and auto.
 - **Sound.** Thirteen channels (effects, music on 11, voices on 12), fades, delayed starts, routes and volumes.
-- **Movies.** Through the shared MPEG-1 decoder, modal (logos and opening) or into a surface (cut-ins).
+- **Movies.** Through the shared MPEG-1 decoder, modal (logos and opening) or into a surface (cut-ins); the shared
+  pl_mpeg decodes the cut-ins' Layer I sound (`Engines/Shared/UPSTREAM.md`).
 - **History.** The native backlog records, its navigation and the History screen's renderer.
 
 ## Saves
@@ -83,7 +84,6 @@ original.
 
 ## Known limits
 
-- The battle cut-ins with MPEG-1 Layer I sound play without it until the shared decoder reads Layer I.
 - The menu bar, the AGERC dialogs (version, settings, exit) and the developer menus are not there.
 - Text is drawn with the shared substitute fonts through stb_truetype, so glyph shapes and some advances differ
   slightly from Windows GDI's.

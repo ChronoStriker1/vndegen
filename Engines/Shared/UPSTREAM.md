@@ -23,6 +23,13 @@ The source files are unmodified except pl_mpeg's header, which carries the patch
   - `plm_audio_decode_header`: a Layer II header with bitrate index 0 (free format) is rejected. Upstream read `PLM_AUDIO_BIT_RATE[-1]`.
   - `plm_video_decode_sequence_header`: a frame rate code of 0 or a reserved code plays at 30 fps. Upstream reported 0 fps, so frame times were infinite and the movie never ended.
   - `plm_demux_decode_time`: the clock's top three bits are shifted as a 64-bit value, not an `int`, which overflowed.
+  - MPEG-1 Layer I sound, which upstream rejects (Eushully AGE's battle cut-ins carry it). `plm_audio_decode_header`
+    accepts Layer I with its own bitrate table and frame size, `(12 * bitrate / sample rate + padding) * 4` bytes;
+    `plm_audio_decode_frame_layer_i` reads the 4-bit allocations, the 6-bit scale factors and the 12 samples per
+    subband, requantises them as ISO 11172-3 gives, `2^nb / (2^nb - 1) * (s + 2^(1 - nb))`, and hands each group of
+    three to the synthesis filterbank, which is factored out of `plm_audio_decode_frame` unchanged as
+    `plm_audio_synthesize`. A Layer I frame yields 384 samples, so `samples.count` and the decoded-sample clock follow
+    the frame. Layer II decodes to the same bytes as before. NScripter's and System 4's copies don't have this change.
   NScripter's identical copy (`Packages/VNDegenKit/Sources/CNScripter/third_party/pl_mpeg.h`) and System 4's (`Packages/VNDegenKit/Sources/CSystem4/third_party/pl_mpeg/pl_mpeg.h`, which also has its own Layer II quantizer fix) carry the same patch.
 - dr_mp3: the unmodified header, the same copy NScripter, System 3, Wolf RPG Editor and RGSS vendor, with its license as `LICENSE.txt`. `third_party/vnvideo_libs.h` compiles it with static functions and float output, for MPEG-1 movies whose sound is Layer III.
 - libogg: `framing.c`, `bitwise.c`, and their headers. `include/ogg/config_types.h` is VNDegen's, with the types libogg's configure writes for platforms that have `stdint.h`.
