@@ -78,6 +78,7 @@ typedef struct Image {
 Image *bx_image_new(int w, int h);
 void bx_image_free(Image *im);
 Image *bx_bsg_decode(const u8 *data, size_t size);
+Image *bx_bsg_part(const u8 *data, size_t size, int index);
 Image *bx_image_load(BX *b, const char *name);
 void bx_image_cache_clear(BX *b);
 
@@ -214,6 +215,7 @@ typedef struct Button {
 enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_SAVE, PH_LOAD, PH_CONFIG, PH_LOG };
 
 typedef struct Phase Phase;
+typedef struct MapPhase MapPhase;
 
 struct BX {
     char *gameDir, *saveDir;
@@ -259,7 +261,7 @@ struct BX {
     } cache[24];
     int cacheNext;
 
-    Image *msgBase;
+    Image *msgBase, *msgFrame, *msgName;
     int msgX, msgY, msgH;
     int nameRect[4], textRect[4];
     u32 nameColor, textColor, bgColor;
@@ -288,6 +290,7 @@ struct BX {
 
     int phase;
     Phase *ph;
+    MapPhase *map;
     int phaseResult;
 
     Image *menuBase;
@@ -338,8 +341,8 @@ void bx_blit_part(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int
 void bx_fill(u32 *dst, int dw, int dh, int x, int y, int w, int h, u32 rgba);
 
 void bx_text_init(BX *b);
-int bx_text_width(const char *utf8, int size);
-int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *utf8, int x, int y, int size, u32 color, int edge, int shadow);
+int bx_text_width(const char *utf8, int size, int width);
+int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *utf8, int x, int y, int size, int width, u32 color, int edge, int shadow);
 
 void bx_msg_init(BX *b);
 void bx_msg_show(BX *b, const char *name, const char *text, const char *voice);
@@ -362,5 +365,11 @@ void bx_phase_update(BX *b);
 void bx_phase_draw(BX *b, u32 *dst);
 void bx_phase_end(BX *b);
 void bx_system(BX *b, const char *cmd);
+
+bool bx_map_start(BX *b);
+void bx_map_update(BX *b);
+void bx_map_draw(BX *b, u32 *dst);
+void bx_map_free(BX *b);
+int bx_map_hover(BX *b);
 
 #endif

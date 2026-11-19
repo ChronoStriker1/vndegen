@@ -176,6 +176,18 @@ static void over(Image *dst, const Image *src) {
     }
 }
 
+Image *bx_bsg_part(const u8 *d, size_t n, int index) {
+    if (n < 0x20 || memcmp(d, "BSS-Composition", 15)) return index == 0 ? bx_bsg_decode(d, n) : NULL;
+    size_t cur = 0x20;
+    for (int i = 0; i < d[0x11]; i++) {
+        Part p;
+        if (!part_header(d, n, cur, &p)) return NULL;
+        if (i == index) return decode_part(d, n, &p);
+        cur += 0x40 + p.dataSize;
+    }
+    return NULL;
+}
+
 Image *bx_bsg_decode(const u8 *d, size_t n) {
     if (n >= 0x20 && !memcmp(d, "BSS-Composition", 15)) {
         int count = d[0x11];
@@ -215,13 +227,27 @@ Image *bx_image_load(BX *b, const char *name) {
     for (int i = 0; i < 24; i++)
         if (b->cache[i].key && bx_ieq(b->cache[i].key, name)) return b->cache[i].img;
     size_t n;
-    u8 *d = bx_res_read(&b->arc, RX_GFX, name, &n);
-    if (!d) {
+    char base[128];
+    snprintf(base, sizeof base, "%s", name);
+    char *hash = strchr(base, '#');
+    int part = -1;
+    if (hash) {
+        part = atoi(hash + 1);
+        *hash = 0;
+    }
+    u8 *d = bx_res_read(&b->arc, RX_GFX, base, &n);
+    Image *im = NULL;
+    if (d) {
+        im = part >= 0 ? bx_bsg_part(d, n, part) : bx_bsg_decode(d, n);
+        free(d);
+    } else if (bx_ieq(name, "black") || bx_ieq(name, "white")) {
+        im = bx_image_new(b->W, b->H);
+        u32 c = bx_ieq(name, "white") ? 0xffffffffu : 0xff000000u;
+        for (size_t i = 0; i < (size_t)b->W * b->H; i++) im->px[i] = c;
+    } else {
         bx_log(b, "missing picture %s", name);
         return NULL;
     }
-    Image *im = bx_bsg_decode(d, n);
-    free(d);
     if (!im) {
         bx_log(b, "can't decode picture %s", name);
         return NULL;

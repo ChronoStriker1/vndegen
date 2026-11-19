@@ -7,7 +7,7 @@
 
 typedef struct Glyph {
     u32 cp;
-    int size;
+    int size, width;
     int x0, y0, w, h, adv;
     u8 *bm;
 } Glyph;
@@ -38,7 +38,7 @@ void bx_text_init(BX *b) {
     if (!font.ok) bx_log(b, "can't read font %s", m.path);
 }
 
-static u32 gkey(u32 cp, int size) { return cp * 31u + (u32)size; }
+static u32 gkey(u32 cp, int size, int width) { return (cp * 31u + (u32)size) * 17u + (u32)width; }
 
 static void rehash(void) {
     free(font.hash);
@@ -47,18 +47,20 @@ static void rehash(void) {
     font.hash = bx_alloc(sizeof(int) * (size_t)font.hashSize);
     for (int i = 0; i < font.hashSize; i++) font.hash[i] = -1;
     for (int i = 0; i < font.count; i++) {
-        u32 h = gkey(font.glyphs[i].cp, font.glyphs[i].size) & (u32)(font.hashSize - 1);
+        u32 h = gkey(font.glyphs[i].cp, font.glyphs[i].size, font.glyphs[i].width) & (u32)(font.hashSize - 1);
         while (font.hash[h] >= 0) h = (h + 1) & (u32)(font.hashSize - 1);
         font.hash[h] = i;
     }
 }
 
-static Glyph *glyph(u32 cp, int size) {
+static bool half_width(u32 cp) { return cp < 0x2e80 || (cp >= 0xff61 && cp <= 0xff9f); }
+
+static Glyph *glyph(u32 cp, int size, int width) {
     if (font.hashSize) {
-        u32 h = gkey(cp, size) & (u32)(font.hashSize - 1);
+        u32 h = gkey(cp, size, width) & (u32)(font.hashSize - 1);
         while (font.hash[h] >= 0) {
             Glyph *g = &font.glyphs[font.hash[h]];
-            if (g->cp == cp && g->size == size) return g;
+            if (g->cp == cp && g->size == size && g->width == width) return g;
             h = (h + 1) & (u32)(font.hashSize - 1);
         }
     }
@@ -70,25 +72,31 @@ static Glyph *glyph(u32 cp, int size) {
     memset(g, 0, sizeof *g);
     g->cp = cp;
     g->size = size;
+    g->width = width;
     if (font.ok) {
-        float sc = stbtt_ScaleForPixelHeight(&font.info, (float)size);
+        float sc = stbtt_ScaleForPixelHeight(&font.info, (float)size), sx = sc;
         int adv, lsb;
         stbtt_GetCodepointHMetrics(&font.info, (int)cp, &adv, &lsb);
-        g->adv = (int)(adv * sc + 0.5f);
+        if (width > 0) {
+            int zero, zl;
+            stbtt_GetCodepointHMetrics(&font.info, '0', &zero, &zl);
+            if (zero > 0) sx = (float)width / (float)zero;
+        }
+        g->adv = width > 0 ? (half_width(cp) ? width : width * 2) : (int)(adv * sc + 0.5f);
         int x0, y0, x1, y1;
-        stbtt_GetCodepointBitmapBox(&font.info, (int)cp, sc, sc, &x0, &y0, &x1, &y1);
+        stbtt_GetCodepointBitmapBox(&font.info, (int)cp, sx, sc, &x0, &y0, &x1, &y1);
         g->x0 = x0;
         g->y0 = y0;
         g->w = x1 - x0;
         g->h = y1 - y0;
         if (g->w > 0 && g->h > 0) {
             g->bm = bx_alloc((size_t)g->w * (size_t)g->h);
-            stbtt_MakeCodepointBitmap(&font.info, g->bm, g->w, g->h, g->w, sc, sc, (int)cp);
+            stbtt_MakeCodepointBitmap(&font.info, g->bm, g->w, g->h, g->w, sx, sc, (int)cp);
         }
     } else g->adv = size / 2;
     if (font.count * 2 > font.hashSize) rehash();
     else {
-        u32 h = gkey(cp, size) & (u32)(font.hashSize - 1);
+        u32 h = gkey(cp, size, width) & (u32)(font.hashSize - 1);
         while (font.hash[h] >= 0) h = (h + 1) & (u32)(font.hashSize - 1);
         font.hash[h] = font.count - 1;
     }
@@ -103,13 +111,13 @@ static int ascent(int size) {
     return (int)(a * sc + 0.5f);
 }
 
-int bx_text_width(const char *s, int size) {
+int bx_text_width(const char *s, int size, int width) {
     int w = 0;
     while (*s) {
         u32 cp;
         s += bx_utf8_decode(s, &cp);
         if (cp == '\n') continue;
-        w += glyph(cp, size)->adv;
+        w += glyph(cp, size, width)->adv;
     }
     return w;
 }
@@ -133,7 +141,7 @@ static void put_glyph(u32 *dst, int dw, int dh, const Glyph *g, int x, int y, u3
     }
 }
 
-int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *s, int x, int y, int size, u32 color, int edge, int shadow) {
+int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *s, int x, int y, int size, int width, u32 color, int edge, int shadow) {
     (void)b;
     int base = y + ascent(size);
     int cx = x;
@@ -142,7 +150,7 @@ int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *s, int x, int y, i
         u32 cp;
         s += bx_utf8_decode(s, &cp);
         if (cp == '\n') continue;
-        Glyph *g = glyph(cp, size);
+        Glyph *g = glyph(cp, size, width);
         if (g->bm) {
             int gx = cx + g->x0, gy = base + g->y0;
             if (shadow) put_glyph(dst, dw, dh, g, gx + shadow, gy + shadow, (dark & 0xff000000u) / 2 & 0xff000000u);

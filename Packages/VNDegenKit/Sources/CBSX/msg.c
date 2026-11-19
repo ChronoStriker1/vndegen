@@ -6,14 +6,46 @@ static void four(BX *b, const char *sec, const char *key, int *out, int d0, int 
     memcpy(out, v, sizeof v);
 }
 
+static Image *owned(BX *b, const char *name) {
+    Image *im = bx_image_load(b, name);
+    if (!im) return NULL;
+    Image *c = bx_image_new(im->w, im->h);
+    c->x = im->x;
+    c->y = im->y;
+    memcpy(c->px, im->px, sizeof(u32) * (size_t)im->w * (size_t)im->h);
+    return c;
+}
+
+static void tint(u32 *dst, int dw, int dh, const Image *mask, int dx, int dy, u32 color) {
+    u32 ca = color >> 24;
+    for (int y = 0; y < mask->h; y++) {
+        int py = dy + y;
+        if (py < 0 || py >= dh) continue;
+        for (int x = 0; x < mask->w; x++) {
+            int px = dx + x;
+            if (px < 0 || px >= dw) continue;
+            u32 a = (mask->px[(size_t)y * mask->w + x] >> 24) * ca / 255;
+            if (!a) continue;
+            u32 *d = &dst[(size_t)py * dw + px];
+            u32 ia = 255 - a;
+            u32 rb = ((color & 0xff00ff) * a + (*d & 0xff00ff) * ia) >> 8 & 0xff00ff;
+            u32 g = ((color & 0x00ff00) * a + (*d & 0x00ff00) * ia) >> 8 & 0x00ff00;
+            *d = rb | g | 0xff000000u;
+        }
+    }
+}
+
 void bx_msg_init(BX *b) {
     const Cfg *c = &b->cfg;
     const char *base = bx_cfg_get(c, "message window", "base window");
-    b->msgBase = base ? bx_image_load(b, base) : NULL;
-    if (b->msgBase) {
-        Image *copy = bx_image_new(b->msgBase->w, b->msgBase->h);
-        memcpy(copy->px, b->msgBase->px, sizeof(u32) * (size_t)copy->w * (size_t)copy->h);
-        b->msgBase = copy;
+    if (base) {
+        char part[96];
+        snprintf(part, sizeof part, "%s#0", base);
+        b->msgBase = owned(b, part);
+        snprintf(part, sizeof part, "%s#1", base);
+        b->msgFrame = owned(b, part);
+        snprintf(part, sizeof part, "%s#2", base);
+        b->msgName = owned(b, part);
     }
     int pos[2] = {0, b->H - 136};
     bx_cfg_ints(c, "message window", "base pos", pos, 2);
@@ -26,6 +58,7 @@ void bx_msg_init(BX *b) {
     b->bgColor = bx_cfg_color(c, "message window", "bg color", 0);
     b->fontH = bx_cfg_int(c, "default font", "height", 20);
     b->fontSize = b->fontH;
+    b->fontW = bx_cfg_int(c, "default font", "width", 0);
     b->lines = bx_cfg_int(c, "default font", "number of lines", 3);
     b->edge = bx_cfg_int(c, "default font", "edge", 1);
     b->shadow = bx_cfg_int(c, "default font", "shadow", 0);
@@ -112,7 +145,7 @@ static char *wrap(BX *b, const char *text) {
         size_t wl = (size_t)(w - p) < sizeof word - 1 ? (size_t)(w - p) : sizeof word - 1;
         memcpy(word, p, wl);
         word[wl] = 0;
-        int ww = bx_text_width(word, b->fontSize);
+        int ww = bx_text_width(word, b->fontSize, b->fontW);
         if (lineW + ww > maxW && lineW > 0 && word[0] != ' ') {
             while (o && out[o - 1] == ' ') o--;
             out[o++] = '\n';
@@ -176,10 +209,12 @@ void bx_msg_reveal(BX *b) {
 
 void bx_msg_draw(BX *b, u32 *dst) {
     if (!b->winShown || b->winHidden || b->transActive) return;
-    if (b->msgBase) bx_blit(dst, b->W, b->H, b->msgBase, b->msgX, b->msgY, 255);
+    if (b->msgBase) tint(dst, b->W, b->H, b->msgBase, b->msgX + b->msgBase->x, b->msgY + b->msgBase->y, b->bgColor);
+    if (b->msgFrame) bx_blit(dst, b->W, b->H, b->msgFrame, b->msgX + b->msgFrame->x, b->msgY + b->msgFrame->y, 255);
     if (!b->text) return;
+    if (b->speaker && *b->speaker && b->msgName) bx_blit(dst, b->W, b->H, b->msgName, b->msgX + b->msgName->x, b->msgY + b->msgName->y, 255);
     if (b->speaker && *b->speaker)
-        bx_text_draw(b, dst, b->W, b->H, b->speaker, b->msgX + b->nameRect[0], b->msgY + b->nameRect[1], b->fontSize, b->nameColor, b->edge, b->shadow);
+        bx_text_draw(b, dst, b->W, b->H, b->speaker, b->msgX + b->nameRect[0], b->msgY + b->nameRect[1], b->fontSize, b->fontW, b->nameColor, b->edge, b->shadow);
     int lineH = b->lines > 0 ? b->textRect[3] / b->lines : b->fontH;
     if (lineH < b->fontH) lineH = b->fontH;
     int x = b->msgX + b->textRect[0], y = b->msgY + b->textRect[1];
@@ -191,7 +226,7 @@ void bx_msg_draw(BX *b, u32 *dst) {
         int len = *p ? bx_utf8_decode(p, &cp) : 0;
         if (!*p || cp == '\n' || count == b->textShown) {
             line[ln] = 0;
-            bx_text_draw(b, dst, b->W, b->H, line, x, y, b->fontSize, b->textColor, b->edge, b->shadow);
+            bx_text_draw(b, dst, b->W, b->H, line, x, y, b->fontSize, b->fontW, b->textColor, b->edge, b->shadow);
             ln = 0;
             y += lineH;
             if (!*p || count == b->textShown) break;
@@ -270,7 +305,7 @@ void bx_choice_draw(BX *b, u32 *dst) {
         if (im) bx_blit(dst, b->W, b->H, im, c->x, c->y, 255);
         else bx_fill(dst, b->W, b->H, c->x, c->y, c->w, c->h, 0xa0000000u);
         const char *t = c->msg >= 0 && c->msg < b->sc->msgCount ? b->sc->msgs[c->msg] : "";
-        int tw = bx_text_width(t, b->fontSize);
-        bx_text_draw(b, dst, b->W, b->H, t, c->x + tp[0] - tw / 2, c->y + tp[1], b->fontSize, i == b->choiceHover ? hover : normal, b->edge, b->shadow);
+        int tw = bx_text_width(t, b->fontSize, b->fontW);
+        bx_text_draw(b, dst, b->W, b->H, t, c->x + tp[0] - tw / 2, c->y + tp[1], b->fontSize, b->fontW, i == b->choiceHover ? hover : normal, b->edge, b->shadow);
     }
 }

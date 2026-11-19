@@ -80,6 +80,19 @@ static void print_state(BX *b) {
            b->th.wait, b->phase, b->choiceCount, b->bgmName, objs, b->speaker ? b->speaker : "", b->text ? b->text : "");
 }
 
+static void print_map(BX *b) {
+    int hit[16] = {0};
+    static const int pts[][2] = {{408, 488}, {424, 456}, {440, 392}, {472, 320}, {256, 224}, {248, 176}, {240, 128}, {112, 32}, {688, 16}, {744, 216}};
+    for (int i = 0; i < 10; i++) {
+        vnbsx_mouse_move((VNBSX *)b, pts[i][0], pts[i][1]);
+        bx_map_update(b);
+        hit[i] = bx_map_hover(b);
+    }
+    printf("map hover ids at place points:");
+    for (int i = 0; i < 10; i++) printf(" %d", hit[i]);
+    printf("\n");
+}
+
 static int choice_xy(BX *b, int pick, int *x) {
     Choice *c = &b->choice[pick - 1 < 0 ? 0 : pick - 1 >= b->choiceCount ? b->choiceCount - 1 : pick - 1];
     *x = c->x + c->w / 2;
@@ -174,6 +187,7 @@ int main(int argc, char **argv) {
                 if (v >= 0) b->globals[v] = (Val){0, val};
             }
         } else if (!strcmp(c, "state")) print_state(b);
+        else if (!strcmp(c, "mapstate")) print_map(b);
         else if (!strcmp(c, "skip")) b->skipMode = true;
         else if (!strcmp(c, "noskip")) b->skipMode = false;
         else if (sscanf(c, "play:%d", &k) == 1) {

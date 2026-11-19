@@ -90,6 +90,7 @@ void bx_phase_start(BX *b, int phase) {
     bx_msg_clear(b);
     b->winShown = false;
     if (phase == PH_TITLE) title_start(b);
+    else if (phase == PH_MAP && !bx_map_start(b)) bx_phase_end(b);
 }
 
 static void title_pick(BX *b, const char *key) {
@@ -113,6 +114,10 @@ static void title_pick(BX *b, const char *key) {
 }
 
 void bx_phase_update(BX *b) {
+    if (b->phase == PH_MAP) {
+        bx_map_update(b);
+        return;
+    }
     Phase *p = b->ph;
     if (!p) return;
     p->hover = -1;
@@ -126,6 +131,10 @@ void bx_phase_update(BX *b) {
 }
 
 void bx_phase_draw(BX *b, u32 *dst) {
+    if (b->phase == PH_MAP) {
+        bx_map_draw(b, dst);
+        return;
+    }
     Phase *p = b->ph;
     if (!p) return;
     if (p->base) bx_blit(dst, b->W, b->H, p->base, p->base->x, p->base->y, 255);
@@ -160,9 +169,12 @@ void bx_ui_init(BX *b) {
 
 void bx_ui_free(BX *b) {
     phase_free(b);
+    bx_map_free(b);
     bx_image_free(b->menuBase);
     for (int i = 0; i < b->buttonCount; i++) bx_image_free(b->buttons[i].img);
     bx_image_free(b->msgBase);
+    bx_image_free(b->msgFrame);
+    bx_image_free(b->msgName);
     bx_image_free(b->unagashi);
     bx_image_free(b->choiceItem[0]);
     bx_image_free(b->choiceItem[1]);
@@ -223,7 +235,14 @@ void bx_ui_draw(BX *b, u32 *dst) {
 }
 
 void bx_system(BX *b, const char *cmd) {
+    char var[64];
+    int level;
     if (!strcmp(cmd, "title")) bx_phase_start(b, PH_TITLE);
+    else if (!strcmp(cmd, "map")) bx_phase_start(b, PH_MAP);
+    else if (sscanf(cmd, "is animeted %63s , %d", var, &level) == 2) {
+        int v = bx_var_by_name(b, var);
+        if (v >= 0) b->globals[v] = (Val){0, !b->skipMode};
+    }
     else if (!strcmp(cmd, "@end")) {
         int l = bx_script_label(b->sc, "boot_logo");
         b->th.sp = 0;
