@@ -243,7 +243,7 @@ static void draw_lines(EG *e, u32 *dst, const char *s, int x0, int y0, int x1, i
             fx = x0 * 8;
             y += line;
         }
-        if (y + size > y1 + line) break;
+        if (y + size > y1) break;
         char ch[3] = {0};
         memcpy(ch, p, (size_t)len);
         text_draw(e, dst, e->W, e->H, ch, fx / 8, y, size, spacing, color, false);

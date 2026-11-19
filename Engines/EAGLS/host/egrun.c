@@ -161,7 +161,13 @@ int main(int argc, char **argv) {
         else if (sscanf(c, "skipall:%d", &k) == 1) {
             EG *t = (EG *)n;
             const char *last = NULL;
+            int stop = -1;
+            sscanf(c, "skipall:%*d,%d", &stop);
             for (int j = 0; j < k && alive; j++) {
+                if (stop >= 0 && t->th[0].wait == W_TEXT && t->textId == stop) {
+                    var_at(var_get(&t->vars, ":SkipFlg", true), 0)->i = 0;
+                    break;
+                }
                 var_at(var_get(&t->vars, ":SkipFlg", true), 0)->i = 1;
                 if (t->th[0].sc && t->th[0].sc->name != last) {
                     last = t->th[0].sc->name;
