@@ -74,13 +74,16 @@ map both ways.
 - **Profile.** `SAVE.DAT` keeps the cells the scripts store (slot titles, settings), the unlock tables of every
   resource opened (the CG and scene galleries read these), and `RT.DAT` the read flags per script message.
 
+`SYS4REG.INI` keeps the PC engine's 44 keys in its own order. VNDegen reads and writes the sound volumes and routes,
+the message speed, window transparency, Auto times and read-text skip there, and leaves the other keys as it found
+them; without a file it starts from the engine's registered defaults.
+
 A slot the original wrote under Wine loads in VNDegen at the same point, and a slot VNDegen wrote loads in the
 original.
 
 ## Known limits
 
 - The battle cut-ins with MPEG-1 Layer I sound play without it until the shared decoder reads Layer I.
-- `SYS4REG.INI` is not read or written; the message speed and window transparency start at the engine's defaults.
 - The menu bar, the AGERC dialogs (version, settings, exit) and the developer menus are not there.
 - Text is drawn with the shared substitute fonts through stb_truetype, so glyph shapes and some advances differ
   slightly from Windows GDI's.

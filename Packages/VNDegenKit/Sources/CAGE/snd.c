@@ -185,6 +185,8 @@ static Voice *voice_memory(u8 *data, size_t size) {
     return v;
 }
 
+static void apply_gains(AG *g);
+
 static float bp_gain(i32 bp) {
     if (bp <= 0) return 0;
     if (bp >= 10000) return 1;
@@ -192,6 +194,8 @@ static float bp_gain(i32 bp) {
 }
 
 static int route_of(int ch) { return ch == 11 ? 1 : ch == 12 ? 3 : 2; }
+
+void snd_apply(AG *g) { apply_gains(g); }
 
 static void apply_gains(AG *g) {
     Sound *s = &g->snd;
@@ -437,7 +441,7 @@ static int op_vol_get(AG *g) {
 
 static int op_vol_set(AG *g) {
     i32 c = arg_i(g, 1);
-    if (c >= 0 && c < 5) g->snd.vol[c] = arg_i(g, 2);
+    if (c >= 0 && c < 5) { g->snd.vol[c] = arg_i(g, 2); g->snd.volSet[c] = true; }
     apply_gains(g);
     return OP_NEXT;
 }

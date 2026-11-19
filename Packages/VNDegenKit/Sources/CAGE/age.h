@@ -374,6 +374,7 @@ typedef struct Sound {
     Mixer *mixer;
     int rate;
     i32 vol[5];
+    bool volSet[5];
     bool route[5];
     i32 bgm;
     float bgmLevel, bgmFrom, bgmTo;
@@ -502,7 +503,20 @@ void save_close(AG *g);
 void save_profile_write(AG *g);
 int vm_restore_step(AG *g);
 
+typedef struct IniLine {
+    char *section;
+    char *key;
+    char *value;
+} IniLine;
+
+void settings_load(AG *g);
+void settings_save(AG *g);
+void settings_close(AG *g);
+void snd_apply(AG *g);
+
 struct VNAge {
+    IniLine *ini;
+    int nini;
     SavedFrame *restore;
     int nrestore;
     bool restoring;

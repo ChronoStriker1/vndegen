@@ -105,3 +105,7 @@
 #define vm_reset_root ag_vm_reset_root
 #define vm_restore_step ag_vm_restore_step
 #define vm_run ag_vm_run
+#define settings_close ag_settings_close
+#define settings_load ag_settings_load
+#define settings_save ag_settings_save
+#define snd_apply ag_snd_apply
