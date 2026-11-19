@@ -16,6 +16,7 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
   - Tmr-Hiro: display refreshes from `-frameMonitor`'s `THFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/tmrhiro.txt` when it ends.
   - EAGLS: display refreshes from `-frameMonitor`'s `EGFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/eagls.txt` when the script stops it.
   - BSX: display refreshes from `-frameMonitor`'s `BXFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/bsx.txt` when it stops.
+  - Bruns: display refreshes from `-frameMonitor`'s `BRFRAMES` line. The runtime steps the game every 16 ms of display time, as the PC engine's 60 fps does.
   - SiglusEngine: engine steps from `-frameMonitor`'s `SIGLUSFRAMES` line, 10 s windows. A `.wmv` movie's picture changes at the movie's rate inside them.
   - Godot: `-godotFrameLog`, without `-godotSnapshot`. The snapshot writes a PNG on the main thread every 2 s, which stalls the game for about 80 to 90 ms each time. It took Barely Working from 59.9 to 57.5 and Project Hadal from 59.4 to 56.9, with seconds alternating between 54 to 56 and 60 to 61 frames. The native runtimes log their own pacing with `-frameMonitor`.
 - Load is the load average at the start of the run. The MacBook's runs had nothing else of ours running. The mini's simulator runs also had the simulator's own processes and agent-device's runner.
@@ -84,6 +85,8 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | BSX | Mesu Kyoushi 4, `op.mpg` opening movie, MPEG-1 1024x768 with MP2 sound, from a save made just before it | iPad simulator | 30 movie, 60 display | 4015 of 4015 frames, movie 29.96, display 60.0 | display 60.0 | 134 s, the whole movie | 3.5 | 11-19 | 7d79e102 |
 | BSX | Mesu Kyoushi 3, `op.mpg` opening movie at boot, MPEG-1 1366x768 with MP2 sound at 48 kHz | Mac app, mini | 30 movie, 60 display | 2748 frames in 91.8 s, movie 29.95, display 60.0 | display 59.9 to 60.0 | 92 s, the whole movie | 7.2, two other threads' apps open | 11-19 | 26e6b68f |
 | BSX | Mesu Kyoushi 3, `op.mpg` opening movie at boot, MPEG-1 1366x768 with MP2 sound at 48 kHz | iPad simulator | 30 movie, 60 display | 2748 frames in 91.7 s, movie 29.96, display 60.0 | display 60.0 | 92 s, the whole movie | 6.9 | 11-19 | 26e6b68f |
+| Bruns | Orc Kingdom, the first forest dungeon: walking, encounters and battles, from a PC save at the main room | Mac app, mini | 60 | 58.9 to 60.0 | 18.7 to 60.0 | 100 s | 6.3 to 14.9 | 11-19 | 70af8073 |
+| Bruns | Orc Kingdom, the first forest dungeon: walking, encounters and battles, from a PC save at the main room | iPad simulator | 60 | 56.7 to 58.6 | 16.3 to 29.5 | 140 s | 30 to 56 | 11-19 | 0774b96c |
 | SiglusEngine | planetarian HD, `.wmv` opening movie | Mac app, mini | 60 | 60.0 | 48 to 60 | about 65 s, the whole movie | 3.8 to 5.6 | 11-16 | not recorded |
 | SiglusEngine | planetarian HD, `.wmv` opening movie | iPad simulator | 60 | 59.8 to 60.0 | 42.9 to 60.0 | about 65 s, the whole movie | 9.3 | 11-16 | 35a1bca0 |
 | RGSS | Monster Girl Quest Paradox, walking in the village | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 13 | 11-04 | 2f48b68 |
@@ -134,6 +137,10 @@ On the MacBook's 120 Hz display a 60 fps game reads correctly: WebKit's page run
 - YU-RIS on the Mac: the 10 s pacing window that holds only the movie gave 60.0 and a 1% low of 60.0. The window before it, the game's start with the archives opening and the movie's first seconds, gave 58.1 and 13.1 with a 193 ms step; the one after, the movie's end and the title loading, 59.3 and 25.0. The mini's 60 Hz display can't show the 120 Hz pacing. Saimin Gakushū's brand movie played at 29.88 on the same run of the app.
 
 ## Shortfalls and their causes
+
+### Orc Kingdom (Bruns) on the iPad simulator
+
+The dungeon held 56.7 to 58.6 on the mini's simulator with the mini at a load of 30 to 56 from other threads' builds. The title, which barely changes, gave 56.4 to 57.0 at a load of 53 on the same build, so the shortfall is the loaded machine rather than the dungeon's drawing. The runtime composites every frame on the CPU; copying opaque pixels instead of blending them (0774b96c) took a Linux frame in the dungeon to about 1 ms. The 1% lows below 30 and the steps over 100 ms on both platforms fall when a scene loads its pictures, entering the world map and the dungeon. A run on an idle mini would settle the simulator number.
 
 ### No Socks RPG on the iPad simulator and the mini's Mac app
 

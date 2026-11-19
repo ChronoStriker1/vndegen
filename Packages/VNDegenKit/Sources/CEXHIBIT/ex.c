@@ -101,14 +101,6 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     else {
         vm_goto_script(e, e->bootEntry);
         free(e->bootEntry);
-    ui_close(e);
-    extra_free(e);
-    slots_free(e);
-    history_free(e);
-    free(e->memo);
-    free(e->saveShot);
-    free(e->sysmenuSpec);
-    free(e->blockR);
         e->bootEntry = NULL;
     }
     if (!e->sc) {

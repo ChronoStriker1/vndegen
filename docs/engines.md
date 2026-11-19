@@ -33,6 +33,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Ikura GDL](#ikura-gdl) | Extensionless `SNR` beside `GRP`, up to two folders down | Mac, iPhone, iPad |
 | [EAGLS](#eagls) | `Script/SCPACK.idx` beside `CG/CGPACK.idx`, up to one folder down | Mac, iPhone, iPad |
 | [ExHibit](#exhibit) | `ExHIBIT.ini` beside `resident.dll` and `rld/start.rld`, up to one folder down | Mac, iPhone, iPad |
+| [Bruns](#bruns) | `ams.cfg` beside `binary/bruns.exe` and `scene/brs009000.bso`, up to one folder down | Mac, iPhone, iPad |
 | [BISHOP BSX](#bishop-bsx) | `bsxx.dat` beside `bsxx.cfg` and a `Graphics*.bsa` archive, up to one folder down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
@@ -221,6 +222,10 @@ EAGLS games, such as Oppai no Ouja 48, run on VNDegen's own EAGLS runtime, writt
 ## ExHibit
 
 ExHibit games, such as Succubus Sessions: Mami Mamiya's Sweet Slice of Hell, run on VNDegen's own ExHibit runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed picture reader, a prose write-up of the script container, three minimal readings of the engine approved for the purpose, and the original engine run under Wine, MIT licensed like the rest of the app. The game's scripts run the logos, title and story; the message window, control bar, system menu, Save and Load, backlog and config pages are drawn from the game's layout files. Saves are the PC engine's own `userdata/uN` files in the game folder and load both ways. The emotion icons aren't drawn. [exhibit.md](exhibit.md) lists which games run and the known limits, and [exhibit-cleanroom.md](exhibit-cleanroom.md) where the runtime's knowledge came from.
+
+## Bruns
+
+Bruns games, such as Orc Kingdom: Monmusu Breeder King, run on VNDegen's own Bruns runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed notes on the file encryption and the audio, and the original engine run under Wine, MIT licensed like the rest of the app. The game's scripts run everything: the title, the story, the strategy screens, dungeons and battles, and the Save, Load, config and backlog screens; the engine adds the message windows, choices and the right-side menubar from `ams.cfg`. Saves are the PC engine's own `bruns-system.dat`, under `AppData/Roaming` in the game's data folder as on Windows, and load both ways. Flow mode isn't there. [bruns.md](bruns.md) lists which games run and the known limits, and [bruns-cleanroom.md](bruns-cleanroom.md) where the runtime's knowledge came from.
 
 ## BISHOP BSX
 
