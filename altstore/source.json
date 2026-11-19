@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.55.3",
+          "buildVersion": "2853",
+          "date": "2026-11-19T20:40:16Z",
+          "localizedDescription": "ExHibit's Extra menu for Succubus Sessions: Mami Mamiya's Sweet Slice of Hell, with the CG gallery, scene replay and music room.\n\n## Downloads\n\n- `VNDegen-0.55.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.55.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.55.3-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- The title's Extra now opens, with the CG, Scene and Music pages drawn from the game's own pictures and laid out as on the PC.\n- CG: a group opens once one of its pictures has been shown, and the viewer steps through all of the group's pictures. On a touch screen, a tap on the bottom strip brings back a hidden viewer bar.\n- Scene: a scene opens once it has been played through in the story. A replay plays the scene and returns to the Scene page.\n- Music: all 21 tracks, with a volume bar.\n\n## Known limits\n\n- Extra counts only what was seen in VNDegen. What a PC copy has seen isn't read.\n- The CG viewer has no Full Screen or Original buttons.\n- Return to title from the system menu doesn't ask first, as the PC does.\n\n## What wasn't tested\n\n- No physical device was used. Extra was checked in the Linux test build, the Mac app and an iPad simulator by touch.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.55.3/VNDegen-0.55.3.ipa",
+          "size": 131141010,
+          "sha256": "1aa734aef00975d975fb44b821858bde9126bf8a02ebf379543c98c22e3760c5",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.55.2",
           "buildVersion": "2843",
           "date": "2026-11-19T20:20:09Z",
