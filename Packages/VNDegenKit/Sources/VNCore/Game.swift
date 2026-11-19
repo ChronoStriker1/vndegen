@@ -108,6 +108,10 @@ public enum PlayOrientation: String, Codable, CaseIterable, Sendable {
     case landscape, portrait, followDevice
 }
 
+public enum MenuButtonCorner: String, Codable, CaseIterable, Sendable {
+    case topLeading, topTrailing, bottomLeading, bottomTrailing
+}
+
 public struct Game: Identifiable, Codable, Hashable, Sendable {
     public let id: GameID
     /// Display title. Starts as the folder name. The user or metadata can change it.
@@ -127,6 +131,7 @@ public struct Game: Identifiable, Codable, Hashable, Sendable {
     public var orientation: PlayOrientation?
     /// Overrides the app's control method setting for this game. Nil follows the setting.
     public var controlMethod: ControlMethod?
+    public var menuButtonCorner: MenuButtonCorner?
     /// Buttons the player remapped for this game, each against the Xbox layout, where every button sends its own Xbox
     /// button. Buttons missing here keep that layout. Nil follows the engine's default layout instead, so an empty
     /// mapping is the plain Xbox layout in an engine whose default is another.
@@ -169,6 +174,7 @@ public struct Game: Identifiable, Codable, Hashable, Sendable {
         playTime = container.lenient(TimeInterval.self, forKey: .playTime) ?? 0
         orientation = container.lenient(PlayOrientation.self, forKey: .orientation)
         controlMethod = container.lenient(ControlMethod.self, forKey: .controlMethod)
+        menuButtonCorner = container.lenient(MenuButtonCorner.self, forKey: .menuButtonCorner)
         buttonMapping = container.lenient([ControlInput: ControlAction].self, forKey: .buttonMapping)
             ?? Self.known(container.lenient([String: Lossy<ControlAction>].self, forKey: .buttonMapping), as: ControlInput.self)
         cheats = container.lenient(CheatSettings.self, forKey: .cheats)

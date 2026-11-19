@@ -111,15 +111,16 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Tmr-Hiro: Spooky Pregnant School: The Conception, with its clock, items, status screen and roulette, and The Quickening's routes follow the player's choices (#186) (0.50.0). All five library Tmr-Hiro games play.
 - IPAC, on VNDegen's own clean-room runtime, with Mamono Musume to no Seikatsu: Lamia no Baai, the library's one IPAC game, and PC saves and settings both ways (0.51.0).
 - Ikura GDL, on VNDegen's own clean-room runtime, with the English Lightning Warrior Raidy, its 3D dungeon and battles, and PC saves both ways, and BIN/CUE disc images in the import (0.52.0). Ikura GDL and IPAC are done: the library's other game of each was left out after the content check.
+- The menu button in games can be dragged to any corner, and each game remembers it, so it no longer covers a game's own corner button (#183) (0.52.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
-- #183: on iPhone and iPad in Touch or Automatic mode, VNDegen's menu button covers a game's own top-right button, such as Transpile Girl Rescue Operation!'s gear. Being fixed on branch `fix/183-menu-button` (started 2026-11-18): the button can be dragged to any corner, and each game remembers where it was put.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
+- EAGLS and ExHibit (Next, item 1, the visual novel engines), started 2026-11-18 on branch `feat/vn-four`, each on a clean-room runtime of VNDegen's own, one engine per release. EAGLS comes first, with the English Oppai no Ouja 48 (plain-text scripts, 800x600, MPEG-1 movies), whose title screen draws on Linux, in about 10 to 14 more working hours; its own save, settings, backlog and gallery screens are rebuilt from the game's images. Its first release loads PC saves; saves made in VNDegen show on the PC but don't load there yet, which comes back after the release. Then ExHibit with Succubus Sessions: Mami Mamiya's Sweet Slice of Hell (1920x1080, encrypted scripts and its own delta animations), in about 12 to 16 more. System-NNN's and Bruns's only library games, Princess X and Orc Kingdom, were left out after the content check, so those engines wait for other games.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
@@ -132,7 +133,7 @@ VNDegen stays free to distribute, through its GitHub releases. It won't go on th
 
 ## Next
 Engines with games in the library that VNDegen doesn't run yet, from the [engine survey](engine-survey.md) of 2026-10-31 (maintainer, 2026-11-16): the two that reuse an engine VNDegen has came first and shipped, the Enigma Virtual Box unpacker for packed RPG Maker MV and MZ games in 0.44.0 and Construct in 0.45.0. The rest follow by number of games. None of the rest has an open-source runtime, so each would be a clean-room runtime of VNDegen's own.
-1. One game each: ExHibit, System-NNN, EAGLS, Bruns, FFD, Eushully AGE and SRPG Studio.
+1. One game each: ExHibit, EAGLS, FFD, Eushully AGE and SRPG Studio. System-NNN and Bruns are off the list for now: their one library game each was left out after the content check on 2026-11-18.
 
 ## Set aside
 - Smile Game Builder, set aside on 2026-11-18. Two of its three library games were left out after the content check, and the one left, Princess Colette's Great Adventure, is Japanese only. Its games are 3D, so a runtime of VNDegen's own would need a 3D renderer, FBX models and a battle system, about 4 to 6 weeks for that one game. Running the games' own .NET player would need its native graphics library rewritten, which the clean-room rule doesn't allow. It comes back if the library gains more Smile Game Builder games, especially English ones.

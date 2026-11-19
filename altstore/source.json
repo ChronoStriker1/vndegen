@@ -49,6 +49,26 @@
       },
       "versions": [
         {
+          "version": "0.52.1",
+          "buildVersion": "2770",
+          "date": "2026-11-18T23:05:26Z",
+          "localizedDescription": "A fix for the menu button in games: it can now be moved out of the way.\n\n## Downloads\n\n- `VNDegen-0.52.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.52.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.52.1-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixes\n\n- The small VNDegen menu button in games can be dragged to any corner, so it no longer covers a game's own button there, such as Transpile Girl Rescue Operation!'s gear. A tap still opens the menu. Each game remembers its corner. With VoiceOver, the button's \"Move to next corner\" action moves it (#183).\n\n## What wasn't tested\n\n- No physical device was used. The button was dragged by touch on an iPad simulator with Transpile Girl Rescue Operation!, where the gear then opened the game's options, and the corner came back after the app restarted. On an iPhone simulator, a bottom corner was checked to stay clear of the Home indicator.\n- On the Mac, the button was moved and pressed through the accessibility interface, not dragged with a real mouse. VoiceOver itself wasn't turned on.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.52.1/VNDegen-0.52.1.ipa",
+          "size": 130773572,
+          "sha256": "75f7ff8affe192f5ef609150a8c56703d3ec0aed81add93f8666ac9582e2533c",
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "0.52.0",
+          "buildVersion": "2761",
+          "date": "2026-11-18T22:08:57Z",
+          "localizedDescription": "A new engine: Ikura GDL, on VNDegen's own runtime, with the English Lightning Warrior Raidy. Games on CD images in BIN/CUE form can now be imported.\n\n## Downloads\n\n- `VNDegen-0.52.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.52.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.52.0-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- **Ikura GDL**, on VNDegen's own runtime, written in C and MIT licensed, on Mac, iPhone and iPad. The first game is the English release of Lightning Warrior Raidy: its title, intro and story with voices, music and sound, choices, the 3D dungeon with its map, compass and events, the item, equipment and status menus, and battles.\n- The game's own message window and its buttons, Skip and Auto, save and load pages and options page are drawn from its own parts, so they look as on the PC.\n- Ikura GDL saves are the PC engine's own file in the game folder. A save made on a PC loads in VNDegen on the same screen, and a save made in VNDegen loads on the PC.\n- **BIN/CUE disc images** can be imported: choose the `.cue` (on an iPhone or iPad outside VNDegen's own folder, choose the `.bin` too). A CD that starts an installer and keeps the game in one folder, as Raidy's does, becomes a game of just that folder. [docs/library.md](../library.md) has the details.\n- [docs/ikura.md](../ikura.md) has the details of the engine.\n\n## Known limits\n\n- Ikura GDL has no backlog yet: the window's Log button and the mouse wheel do nothing.\n- Read marks aren't kept, so Skip skips all text.\n- The effect speed setting doesn't shorten fades.\n- The 3D view's lighting and texture filtering are close to the PC's, not identical.\n\n## What wasn't tested\n\n- No physical device was used. The game was played in the Linux test build, the Mac app and an iPad simulator.\n- In the Mac app and the iPad simulator it was checked from the title through the story into the dungeon, with saves in the story and in the dungeon, quitting, and loading them again. A dungeon save made on the iPad loaded on the Mac.\n- Saves were exchanged with the original engine under Wine both ways.\n- Sound wasn't listened to on the Mac or iPad.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.52.0/VNDegen-0.52.0.ipa",
+          "size": 130764100,
+          "sha256": "eb0a419bab9c543ce4678250c47c805f3cd12d689a4d46209aa7f921d0b3bbb2",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.51.0",
           "buildVersion": "2740",
           "date": "2026-11-18T21:48:17Z",
