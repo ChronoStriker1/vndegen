@@ -71,7 +71,7 @@ uses the same folder:
 - The window's wheel: settings, log, hide, skip, auto, quick save, quick load, and the system menu (save, load,
   animation settings, champion brassiere page, return to title, exit).
 - Save and Load pages with ten pages of eight slots, thumbnails, the NEW mark, Save Confirm and Load Delete, and the
-  confirm dialogs; the backlog with its scroll bar and voice buttons; name entry; choices.
+  confirm dialogs; the backlog with speaker names, its scroll bar and voice buttons; name entry; choices.
 - The map that picks the next heroine, from the game's own scripts and click maps.
 - Soundtrack: the ten tracks, play, stop, previous, next and the volume bar, at the PC's places, drawn opaque as the PC draws
   them.
