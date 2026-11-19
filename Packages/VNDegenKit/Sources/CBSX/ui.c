@@ -211,6 +211,10 @@ static void button_press(BX *b, const char *key) {
     else if (!strcmp(key, "voice")) {
         if (b->voice) bx_snd_play(b, CH_VOICE, RX_VOICE, b->voice, false, 0);
     } else if (!strcmp(key, "hold menu")) b->menuVisible = !b->menuVisible;
+    else if (!strcmp(key, "quick save")) {
+        bx_save_capture_thumb(b);
+        bx_save_slot(b, -1);
+    } else if (!strcmp(key, "quick load")) bx_load_slot(b, -1);
     else bx_log(b, "menu button %s isn't available yet", key);
 }
 

@@ -193,6 +193,12 @@ int main(int argc, char **argv) {
                 }
                 alive = press(n, 400, 200, VNBSX_MOUSE_LEFT) && run(n, x);
             }
+        } else if (sscanf(c, "save:%d", &k) == 1) {
+            bx_save_capture_thumb(b);
+            printf("save %d: %s\n", k, bx_save_slot(b, k) ? "ok" : "failed");
+        } else if (sscanf(c, "load:%d", &k) == 1) {
+            printf("load %d: %s\n", k, bx_load_slot(b, k) ? "ok" : "failed");
+            alive = run(n, 100);
         } else if (sscanf(c, "autoplay:%d,%d", &k, &x) == 2) {
             alive = autoplay(n, k, x);
         } else if (sscanf(c, "untilmsg:%d", &k) == 1) {

@@ -151,7 +151,9 @@ enum {
 typedef struct Thread {
     u32 pc;
     u32 stack[BX_STACK];
+    u32 frameLabel[BX_STACK];
     int sp;
+    int curLabel;
     int wait;
     u32 until;
     int skipLabel;
@@ -238,6 +240,7 @@ struct BX {
     FILE *log;
     char problem[512];
     char *title;
+    char saveId[33];
     long long startTime;
     bool trace;
 
@@ -304,6 +307,14 @@ struct BX {
     int unaX, unaY, unaW, unaH, unaFrames, unaSpeed;
     LogEntry *logs;
     int logCount;
+
+    u32 msgPc;
+    u32 hist[50];
+    int histCount;
+    int msgsShown;
+    int bgsIndex;
+    int bgmIndex;
+    Image *thumb;
 
     Choice choice[16];
     int choiceCount;
@@ -392,6 +403,12 @@ void bx_phase_update(BX *b);
 void bx_phase_draw(BX *b, u32 *dst);
 void bx_phase_end(BX *b);
 void bx_system(BX *b, const char *cmd);
+
+bool bx_save_slot(BX *b, int slot);
+bool bx_load_slot(BX *b, int slot);
+bool bx_save_exists(BX *b, int slot);
+void bx_save_capture_thumb(BX *b);
+char *bx_save_path(BX *b, int slot);
 
 bool bx_map_start(BX *b);
 void bx_map_update(BX *b);

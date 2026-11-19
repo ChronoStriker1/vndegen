@@ -66,6 +66,7 @@ void bx_vm_goto(BX *b, int label) {
         return;
     }
     b->th.halted = false;
+    b->th.curLabel = label;
     jump(b, b->sc->labels[label]);
 }
 
@@ -95,6 +96,13 @@ static void message(BX *b, const u8 *p, int *len) {
     const char *text = msg < (u32)b->sc->msgCount ? b->sc->msgs[msg] : "";
     const char *speaker = name >= 0 && name < b->sc->charCount ? b->sc->chars[name] : NULL;
     if (b->trace) bx_log(b, "msg %u %s: %s", msg, speaker ? speaker : "", text);
+    b->msgPc = b->th.pc;
+    if (b->histCount == 50) {
+        memmove(b->hist, b->hist + 1, sizeof(u32) * 49);
+        b->histCount--;
+    }
+    b->hist[b->histCount++] = b->th.pc;
+    b->msgsShown++;
     bx_msg_show(b, speaker, text, voice);
     b->th.wait = W_TEXT;
 }
@@ -145,6 +153,7 @@ static bool step(BX *b) {
             t->halted = true;
             return false;
         }
+        t->frameLabel[t->sp] = (u32)t->curLabel;
         t->stack[t->sp++] = t->pc + 5;
         bx_vm_goto(b, (int)rd32(p + 1));
         return true;
@@ -155,6 +164,7 @@ static bool step(BX *b) {
             return false;
         }
         t->pc = t->stack[--t->sp];
+        t->curLabel = (int)t->frameLabel[t->sp];
         return true;
     case 0x12: {
         Val *dst = bx_var_ref(b, p[6], (i32)rd32(p + 8));
@@ -192,7 +202,10 @@ static bool step(BX *b) {
         return true;
     case 0x36:
     case 0x38:
-        if (op == 0x38 && (int)rd32(p + 1) == t->skipLabel) t->skipLabel = -1;
+        if (op == 0x38) {
+            if ((int)rd32(p + 1) == t->skipLabel) t->skipLabel = -1;
+            t->curLabel = (int)rd32(p + 1);
+        }
         t->pc += 5;
         return true;
     default:

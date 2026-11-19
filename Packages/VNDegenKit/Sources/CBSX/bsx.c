@@ -31,6 +31,46 @@ static char *find_game_dir(const char *gameDir) {
     return found;
 }
 
+static bool hex_id(const u8 *d, size_t n) {
+    if (n < 32) return false;
+    for (int i = 0; i < 32; i++)
+        if (!((d[i] >= '0' && d[i] <= '9') || (d[i] >= 'a' && d[i] <= 'f'))) return false;
+    return true;
+}
+
+static void find_save_id(BX *b) {
+    static const char *files[] = {"common.dat", "no-01", "no000", "no015"};
+    for (int i = 0; i < 4; i++) {
+        char path[2048];
+        snprintf(path, sizeof path, "%s/save/%s", b->saveDir, files[i]);
+        size_t n;
+        u8 *d = bx_read_file(path, &n);
+        if (!d) {
+            snprintf(path, sizeof path, "%s/save/%s", b->gameDir, files[i]);
+            d = bx_read_file(path, &n);
+        }
+        bool ok = d && hex_id(d, n);
+        if (ok) memcpy(b->saveId, d, 32);
+        free(d);
+        if (ok) return;
+    }
+    static const char *known[][2] = {{"MKIEDL@BISHOP", "ee0732d311f15480cd6877c1557f682c"},
+                                     {"MK2IEDL@BISHOP", "be8b3a08df96f11b4d0745bd4253dbdc"},
+                                     {"MK4@BISHOP", "1b5ab07b7a199b7ae35af245e0374b6c"}};
+    char path[2048];
+    snprintf(path, sizeof path, "%s/bsxx.ini", b->gameDir);
+    size_t n;
+    u8 *d = bx_read_file(path, &n);
+    size_t len = 0;
+    while (d && len + 1 < n && (d[len] || d[len + 1])) len += 2;
+    char *product = d ? bx_utf16_to_utf8(d, len / 2) : bx_strdup("");
+    free(d);
+    for (size_t i = 0; i < sizeof known / sizeof *known; i++)
+        if (!strcmp(product, known[i][0])) memcpy(b->saveId, known[i][1], 32);
+    if (!b->saveId[0]) bx_log(b, "no save id for %s; the PC engine won't load these saves", product);
+    free(product);
+}
+
 static char *read_title(const char *dir) {
     char path[2048];
     snprintf(path, sizeof path, "%s/bsxx.ini", dir);
@@ -93,6 +133,7 @@ VNBSX *vnbsx_open(const VNBSXConfig *cfg, char *err, size_t errSize) {
     b->W = bx_cfg_int(&b->cfg, "main window", "width", 800);
     b->H = bx_cfg_int(&b->cfg, "main window", "height", 600);
     b->title = read_title(b->gameDir);
+    find_save_id(b);
     if (!b->title) b->title = bx_strdup("");
     b->volMaster = b->volBgm = b->volSe = b->volVoice = b->volBgs = 100;
     bx_gfx_init(b);
@@ -186,6 +227,10 @@ static void tick(BX *b) {
             b->click = false;
             b->winHidden = false;
         }
+        if (t->wait == W_TEXT && b->keyPress[0x70]) {
+            bx_save_capture_thumb(b);
+            bx_save_slot(b, -1);
+        } else if (t->wait == W_TEXT && b->keyPress[0x71]) bx_load_slot(b, -1);
         switch (t->wait) {
         case W_TEXT:
             text_wait(b);
