@@ -178,7 +178,7 @@ func readsBothPackLayouts(legacy: Bool) throws {
     #expect(result.folderName == "Pack Quest")
     #expect(tree(games.appendingPathComponent("Pack Quest")) == [
         "package.json", "readme.txt", "www", "www/data", "www/data/System.json", "www/index.html", "www/js",
-        "www/js/rpg_core.js",
+        "www/js/rpg_core.js", "www/save",
     ])
     #expect(tree(games.appendingPathComponent(".importing")).isEmpty)
 }

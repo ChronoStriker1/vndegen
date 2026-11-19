@@ -195,6 +195,7 @@ public final class ArchiveImporter {
 
     public func extractNested() {
         guard case .nested = step, task == nil, let inner = nestedSource else { return }
+        let archiveName = source?.suggestedFolderName
         unpackRoot = inner.isPackedGame ? pendingRoot : nil
         pendingRoot = nil
         nestedSource = nil
@@ -209,6 +210,9 @@ public final class ArchiveImporter {
                 guard self.selection === selection, !Task.isCancelled else { return }
                 task = nil
                 contents = listed
+                if let installer = listed.installer, folderName == archiveName {
+                    folderName = installer.folderName
+                }
                 if listed.installer?.addOns.isEmpty == false {
                     step = .reviewing
                 } else {
