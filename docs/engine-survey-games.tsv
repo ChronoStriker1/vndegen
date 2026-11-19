@@ -1,5 +1,5 @@
 folder	category	engine	version	evidence	size_mb	notes
--SACRED-	unknown	unknown			427	archived; nested archive or installer: RJ132648-Ver16.12.21/RJ132648/セイナルモノヘ20161220/CGフォルダ/CG01.zip
+-SACRED-	general-engine	Action Editor 4		セイナルモノヘ20161220/data/stg4/*.stg4 stage files, data/database/*.dat, KeyConfig.exe and System.ini beside seinarumonohe.exe, Vox.dll	427	archived; 2D action game maker; CG01.zip in CGフォルダ is a bonus image archive; VNDegen doesn't run this engine; second survey 2026-11-19
 A Nerd who has sex with girls in _Another world_ has  become a HERO	rpg-maker-family	RPG Maker MV		A Nerd Who Has Sex With Girls in Another World Has Become a HERO [RJ31322] (E)/EnglishVer/www/js/rpg_core.js	457	archived; encrypted assets; NW.js wrapper
 A New Game (English Version)	rpg-maker-family	RPG Maker VX Ace		New Project_eng/New Project_v2.18/Game.rgss3a	129	archived
 A World of Lewdness Everywhere ~Plain Girl’s Part-Time Job Diary~	general-engine	GameCreator (HTML)		どこでもHな世界～地味子のバイト日記～/nw_elf.dll	1491	archived; script.js and asset/assetList.json in an NW.js wrapper; checked 2026-10-26
@@ -13,17 +13,17 @@ ANGEL QUEST_ Holy St. Azuria	rpg-maker-family	Wolf RPG Editor		[!]ANGEL QUEST -H
 Animahjong  X	vn-engine	Ren'Py	8.x (py3)	Animahjong X Perfect/game/amx_a.rpyc	115	archived; Ren'Py Linux libs present
 Another Story of Fallen Maidens II_ Lescatie Infiltration Report	rpg-maker-family	RPG Maker VX Ace		Game.rgss3a	396	archived
 Another Way of Gettin' Paid	vn-engine	YU-RIS		VNDB release engine field	1316	installed; engine from VNDB release engine field
-Anthro Heat	unknown	unknown			5032	installed; disc image, contents not listable without extraction
+Anthro Heat	unknown	unknown			5032	installed; scene disc image (UDF) holding setup.exe (UPX-packed, not Inno Setup) and SKIDROW.bin, a FreeArc archive (ArC header) whose file list can't be read without FreeArc; a VR sandbox, not a VN or RPG; second survey 2026-11-19
 Aphrodite's Bathhouse	general-engine	NW.js (packed package.nw)		Aphrodites Bathhouse/package.nw	136	archived
 Aria's War Chronicle	rpg-maker-family	Wolf RPG Editor		Aria's War Chronicle [RJ196713] ~ Ver.1.3/Data.wolf	1266	archived
 Aristocunts	vn-engine	Ren'Py	<=7.3 (py2)	aristocunts/game/archive.rpa	636	archived; Ren'Py Linux libs present
 Arrival of the Goddess	general-engine	Unity		AOTG_v1_051_x64/UnityPlayer.dll	917	archived; Mono; Naninovel
 Attack it! Devil legion	general-engine	Unity		Attack it! Devil legion [RJ254303] (E)/Devil Legion v1.21/DevilLegion_Data/Managed/	124	archived; Mono
-Azure Striker Gunvolt Trilogy Enhanced_ Additional Mode - Azure Striker Gunvolt GX	unknown	unknown			9206	archived; disc image, contents not listable without extraction; multi-part scene archive
+Azure Striker Gunvolt Trilogy Enhanced_ Additional Mode - Azure Striker Gunvolt GX	unknown	unknown			9206	archived; over 8 GB; the first of 61 RAR volumes holds a scene ISO with SETUP.exe, a 9.8 GB SETUP.bin and a steam_api64.dll crack, not opened further; Inti Creates action game port, not a VN or RPG; second survey 2026-11-19
 Barely Working	general-engine	Godot		barely_working.pck	112	archived
 Bible Black -La Noche de Walpurgis- Ren'Py Remake	vn-engine	Ren'Py	8.x (py3)	BibleBlackRenpy-1.14-pc/game/audio.rpa	541	archived; Ren'Py Linux libs present
-Bifrost's Brothel Of Mamono	unknown	unknown			367	archived; no known signature; main exe Club Bifrost/Bifrost.exe
-Bifrost's Brothel Of Mamono Plus	unknown	unknown			407	archived; no known signature; main exe ビフレストの魔物娼館 Ver1.02a/ビフレストの魔物娼館.exe
+Bifrost's Brothel Of Mamono	custom	custom		Club Bifrost/archive (AHFS header), Bifrost.exe imports opengl32/glew32	367	archived; OpenGL native code; management sim; text scripts in AHFS archive; VNDegen doesn't run this engine; second survey 2026-11-19
+Bifrost's Brothel Of Mamono Plus	custom	custom		ビフレストの魔物娼館 Ver1.02a/archive_plus (AHFS header)	407	archived; OpenGL native code; same engine as Bifrost's Brothel Of Mamono; VNDegen doesn't run this engine; second survey 2026-11-19
 Big Dick at the Beach	vn-engine	Ren'Py	<=7.3 (py2)	big_dick_beach-1.2.6-pc/game/archive.rpa	262	archived; Ren'Py Linux libs present
 Big-Breasted Married Teacher ~Shameful School Training~	vn-engine	KiriKiri		data.xp3	134	installed
 Bikini Tits	vn-engine	KiriKiri		Bikini_Tits/Bikini Tits/data.xp3	692	archived
@@ -56,7 +56,7 @@ Catherine Classic	custom	custom		public knowledge, not verified from files (Atlu
 Certified Mother Fucker	vn-engine	Ren'Py	8.x (py3)	Certified Mother Fucker/renpy/	1616	archived; Ren'Py Linux libs present
 Chona	general-engine	Unity		Chona_x64_v1_11/UnityPlayer.dll	245	archived; Mono; Naninovel
 Christa & Tonyo	general-engine	Unity		CNT_x64_v1_101/UnityPlayer.dll	242	archived; Mono; Naninovel
-Chronos Gate	unknown	unknown			25	archived; no known signature; main exe RJ163050 - Chronos Gate ver1.11/ChronosGate.exe
+Chronos Gate	custom	custom		ChronosGate.exe imports d3d9/d3dx9_42; Archive/*.dat	25	archived; Direct3D 9 native code; 3D action game; VNDegen doesn't run this engine; second survey 2026-11-19
 Chronos_ The Floating Prison Ship	vn-engine	KiriKiri		Hyouryuu Kangoku Chronos/data.xp3	393	archived
 Cleopatra Is Here!_ ~A Steamy Modern Sex Life with an Ancient Queen~	vn-engine	KiriKiri		Cleopatra Has Arrived v1.0.0 EN/AfterInit2.tjs	1445	archived
 Cloud Meadow	general-engine	Unity		public knowledge, not verified from files	1229	installed; engine from public knowledge, not verified from files
@@ -73,7 +73,7 @@ Cuckies & Cream_ Maids for Milking	vn-engine	Ren'Py	8.x (py3)	Cuckies & Cream Ma
 Cuckold my brother's wife	vn-engine	KiriKiri		scenario.xp3	3047	archived
 Cult Of The Serpent_ Cuck Or Be Cucked	vn-engine	KiriKiri		Kagachi-Sama, I Will Comfort You - Remaster/data.xp3	1282	archived
 Cunning Little Girl in a Tight Spot	general-engine	Flash		sub/end_love.swf	13	installed
-Dark Elf Historia	unknown	unknown			2720	archived; GOG offline installer, not unpacked; nested archive or installer: setup_dark_elf_historia_1.0.0_(71868).exe
+Dark Elf Historia	rpg-maker-family	RPG Maker VX Ace	RGSS 3.0.1	Game.ini beside Game.rgss3a and System/RGSS301.dll, in GOG installer	2720	archived; the unrated installer's Game.rgss3a is 1.07 GiB, the rated one 126 MiB; Extra.zip bonus archive; VNDegen runs this engine; second survey 2026-11-19
 Dark Sphere	rpg-maker-family	RPG Maker VX Ace		RJ176026  - DARK SPHERE ~Dark Elf and Labyrinth Land~ v1.1.0/Data/Actors.rvdata2	169	archived
 Dark Succubus	general-engine	Unity		Dark Succubus/UnityPlayer.dll	2045	archived; Mono
 DDinosaur with Double D's	general-engine	Unity		DDinosaur with Double Ds/DDinosaur_Data/Managed/	1868	archived; Mono
@@ -84,16 +84,16 @@ Demon Angel SAKURA vol.2_ The Spirits of Hell	general-engine	Unity		Demon Angel 
 Demon Angel SAKURA vol.3_ The Gate of Passport	general-engine	Unity		Demon Angel SAKURA vol.3 -The Gate of Passport-/Matenshi3_1010/Matenshi3_1010/Matenshi_3_1010_Data/Managed/Assembly-CSharp.dll	378	archived; Mono
 Demon Angel SAKURA vol.4_ The World of SAKURA	general-engine	Unity		Demon Angel SAKURA vol.4 -The World of SAKURA- Ver.2.0.0.0/Matenshi_4_2000_Data/Managed/Assembly-CSharp.dll	750	archived; Mono
 Demon General Kirsten	rpg-maker-family	RPG Maker MV		Battle Demon Kirsten/www/js/rpg_core.js	939	archived; encrypted assets; NW.js wrapper
-Demon Queen Melissa	unknown	unknown			1334	archived; GOG offline installer, not unpacked; nested archive or installer: setup_demon_queen_melissa_v8_(en_1.02_cn_1.04)_(61948).exe
-Demon Slayer Shion	unknown	unknown			1885	installed; GOG offline installer, not unpacked
+Demon Queen Melissa	rpg-maker-family	Wolf RPG Editor	2.23	Data/*.wolf (24 archives) beside Game.exe (SilverSecond, ver2.23), in GOG installer	1334	archived; VNDegen runs this engine; second survey 2026-11-19
+Demon Slayer Shion	rpg-maker-family	RPG Maker MV		www/js/rpg_core.js in GOG installer	1885	installed; NW.js, encrypted assets (.rpgmvp), Kadokawa build; VNDegen runs this engine; second survey 2026-11-19
 Demon Wants Have Fun!	general-engine	Unity		Demon Wants Have Fun (E)/Demon wants have fun_Data/Managed/	17	archived; Mono
 Demon's GunPlay 2	rpg-maker-family	RPG Maker VX Ace		Demon's GunPlay 2/Game.rgss3a	1093	archived
 Demonherd Dungeon	rpg-maker-family	RPG Maker MV		Demonherd Dungeon/www/js/rpg_core.js	2388	archived; encrypted assets; NW.js wrapper
 Demonic Nation Florehades ~Get Married with Women in the Demonic Realm!~	rpg-maker-family	Wolf RPG Editor		Demon World Country Frel Hades [RJ214761]/Data/BasicData/	136	archived
 Depraved!! Bunny Sex Life	general-engine	Unity		Depraved Bunny Sex Life/UnityPlayer.dll	386	archived; Mono
 Desire Dungeon	vn-engine	NScripter		DesireDungeon(E)/0.txt	191	archived
-Despite cheating you are corrupted and reverse r_ped in this rougelike-like game	unknown	unknown			268	archived; nested archive or installer: (同人ゲーム) [2018-09-28][RJ233126][RR研究会] チートモードで圧倒的有利なのに状態異常や誘惑で堕とされて逆レイプされるローグライクライク.rar
-Devil of Heaven and Saintess of Baptism	unknown	unknown			71	archived; no known signature; main exe Devil of Heaven and Saintess of Baptism RJ201866/GAME-RJ201866/Devil of Heaven and Saintess of Baptism/32bit_天空の魔神とはじまりの聖女.exe
+Despite cheating you are corrupted and reverse r_ped in this rougelike-like game	rpg-maker-family	RPG Maker MV		inner RAR: hontai/www/js/rpg_core.js	268	archived; NW.js, encrypted assets (.rpgmvp); game is in a RAR inside the outer RAR; VNDegen runs this engine; second survey 2026-11-19
+Devil of Heaven and Saintess of Baptism	general-engine	Godot	2.2	data.pck (GDPC header: pack format 0, Godot 2.2.0) beside 32bit_ and 64bit_ exes whose version resource reads Godot Engine 2.2.0	71	archived; VNDegen runs Godot 3 and 4, not Godot 2; second survey 2026-11-19
 DiabolicaL ModifieD WifE ~She Wishes to Become Your Favorite Breasts~	vn-engine	KiriKiri		startup.tjs	2382	archived
 Didnapper 2	rpg-maker-family	RPG Maker MV		Didnapper 2/www/js/rpg_core.js	1852	archived; encrypted assets; NW.js wrapper
 Dissolute Daydream	general-engine	Unity		G-RJ235158-v1.01/RJ235158/Dissolute Daydream/Dissolute Daydream_Data/globalgamemanagers	42	archived; Mono
@@ -101,37 +101,37 @@ DOGoddess Inseminating SEX	general-engine	Unity		DOGoddess Inseminating SEX/1606
 Domination Quest_ Kuro & the Naughty Monster Girls	general-engine	Unity		kuro_v136/kuro_Data/globalgamemanagers	653	archived; Mono
 Doom 64	custom	custom		public knowledge, not verified from files (Nightdive KEX)	87	installed; engine from public knowledge, not verified from files (Nightdive KEX)
 Doom Eternal	general-engine	id Tech		idTechLauncher.exe	43715	installed
-Double Date Dilemma	unknown	unknown			4153	installed; no known signature; same .gax and emotedriver.dll layout as the unidentified group in the first survey; MOGraSystem/MOSceSystem classes in exe, .gax images, .eog audio, aisai_*.dat scripts, E-mote (emotedriver.dll); Steam patch over JP data
+Double Date Dilemma	vn-engine	ANIM engine		DDD.exe version resource "ANIM", OriginalFilename aisai.exe; cg/*.gax, aisai_*.dat, emotedriver.dll, cg\psbpack.dat	4153	installed; E-mote (emotedriver.dll); Steam patch over JP data; VNDegen doesn't run this engine; second survey 2026-11-19
 Dragon Bride	general-engine	Flash		EK26130/RE076472/data/battle.swf	69	archived; ships macOS .app
 Dragon Maid's Erotic Notepad_ I Do NOT Accept Any H Requests!	rpg-maker-family	RPG Maker VX Ace		Dragon Maid's Erotic Notepad - I do NOT accept any H requests! -RJ214335/RJ214335/Game.rgss3a	297	archived
 DRAGON WAND'ER	rpg-maker-family	RPG Maker VX Ace		DRAGON WAND'ER/Game.rgss3a	127	archived
 Drain Dungeon [English Ver.]	rpg-maker-family	Wolf RPG Editor		Drain Dungeon [English Ver.]/Data.wolf	123	archived
 Dreamin' Wisteria ～ヤンデレ淫魔のおっぱい搾精7日間～	rpg-maker-family	RPG Maker MZ		DreaminWisteria_eng_Ver1.03/js/rmmz_core.js	622	archived; encrypted assets; NW.js wrapper
 Driven Affairs	vn-engine	Ren'Py	8.x (py3)	Driven_Affairs-v0.9.1-pc/game/archive.rpa	2357	archived; Ren'Py Linux libs present
-Dungeon Town EX ~The Holy Birthday of Succubi~	unknown	unknown			1635	archived; nested archive or installer: ダンジョンタウンEX2_0_2_7/エクストラステージ即挑戦可能データ.zip
-Dungeon Vixens_ A Tale of Temptation	unknown	unknown			191	installed; GOG offline installer, not unpacked
+Dungeon Town EX ~The Holy Birthday of Succubi~	custom	DxLib (custom)		dungeon_town.exe strings name DxLib sources; bgm.dat and other .dat archives	1635	archived; the RAR now extracts with unrar; エクストラステージ即挑戦可能データ.zip holds save files; VNDegen doesn't run this engine; second survey 2026-11-19
+Dungeon Vixens_ A Tale of Temptation	general-engine	Construct 3		package.nw holds scripts/c3runtime.js and data.json, beside DungeonVixens.exe (NW.js 0.89.0), in GOG installer	191	installed; game packed in package.nw (a zip); greenworks Steam module; VNDegen runs this engine; second survey 2026-11-19
 Dungeons & Furry	general-engine	Unreal		0.2507.2/Windows/Engine/Binaries/Win64	4230	installed
 Dungeons And Cat	general-engine	Unity		Dungeons And Cat/Dungeons And Cat_Data/Managed/	663	archived; Mono
 Dusk City	general-engine	Unity		Dusk City/UnityPlayer.dll	590	archived; IL2CPP
 ECHIDNA WARS DX	general-engine	HSP		Echidna Wars DX [ENG-JAP]/hspda.dll	46	archived
-Eden's Ritter - Paladins of Ecstasy	unknown	unknown			3186	archived; no known signature; main exe Edens Ritter Paladins of Ecstasy/er_paladins.exe
-Eden's Ritter 1_2 - Priestess of Pleasure	unknown	unknown			3814	archived; no known signature; main exe er_priestess.exe
+Eden's Ritter - Paladins of Ecstasy	vn-engine	NekoSDK	NekoGameSDK4th	cfg.pak beside scr.pak and other .pak archives; er_paladins.exe has NekoGameSDK4th classes with Squirrel bindings	3186	archived; English release; anime.pak holds animation; VNDegen runs this engine; second survey 2026-11-19
+Eden's Ritter 1_2 - Priestess of Pleasure	vn-engine	NekoSDK	NekoGameSDK4th	cfg.pak beside scr.pak and other .pak archives, er_priestess.exe	3814	archived; VNDegen runs this engine; second survey 2026-11-19
 Eileen ~Counterattack of the Futanari Demon Lord~	rpg-maker-family	RPG Maker MV		Eileen ~Counterattack of the Futanari Demon Lord~1.12 [RJ301497]/www/js/rpg_core.js	717	archived; encrypted assets; NW.js wrapper
 Eileen ~The Curse of the Futanari Succubus~	rpg-maker-family	RPG Maker MV		Eileen ~The Curse of Futanari Succubus~ tl v2.0/www/js/rpg_core.js	742	archived; encrypted assets; NW.js wrapper
-Eiyu_Senki - The World Conquest	vn-engine	FFD		VNDB release engine field	2868	installed; engine from VNDB release engine field
+Eiyu_Senki - The World Conquest	vn-engine	FFD		VNDB release engine field	2868	installed; engine from VNDB release engine field; left out after the content check (2026-11-19)
 Endless Sex with a Mysterious Older Girl in the Countryside!!	general-engine	Unity		Endless Sex with a Mysterious Older Girl in the Countryside!!/KemonoOneesan_Windows (uncensored)/CountrysideKemonoOneesan_Data/Managed/	214	archived; Mono
 Eroded Twins - The Downfall of the Empire	rpg-maker-family	RPG Maker MZ		ErodedTwins/js/rmmz_core.js	4082	archived; encrypted assets; NW.js wrapper
 Eroded_ Twins - The Fall of the Duchy	rpg-maker-family	RPG Maker MZ		Eroded: Twins - The Fall of the Duchy v1.03/js/rmmz_core.js	1874	archived; encrypted assets; NW.js wrapper
-Eroico	unknown	unknown			107	archived; no known signature; main exe Eroico Ver.8.1 [English]/Eroico_Re.exe
+Eroico	general-engine	GameMaker	8.1	Eroico_Re.exe is the Delphi GameMaker 8.1 runner (strings "GameMaker G8.1", Runner_Form, GM8 data magic 1234321) with the game data appended	107	archived; action game; VNDegen doesn't run this engine; second survey 2026-11-19
 Escape Dungeon 2	general-engine	Unity		Escape Dungeon 2/UnityPlayer.dll	2371	archived; Mono; SOVEREIGN.dll beside the exe
 Escape From Zombie U_reloaded	general-engine	Unreal		Escape From Zombie Ureloaded/WindowsNoEditor/Engine/Binaries/ThirdParty	1999	archived; SOVEREIGN.dll beside the exe
-Ethereal LegioN	unknown	unknown			21	archived; nested archive or installer: Ethreal Legion 1.73/Ethereal LegioN製品版 Ver1.73/OMAKE/OMAKE.zip
+Ethereal LegioN	general-engine	Action Editor 4		data/stg4/*.stg4, data/database, KeyConfig.exe, Vox.dll beside Ethereal LegioN.exe	21	archived; same layout as -SACRED-; OMAKE/OMAKE.zip is password protected; VNDegen doesn't run this engine; second survey 2026-11-19
 Evenicle	vn-engine	AliceSoft System 4		Evenicle/Evenicle.ain	1555	archived
 Evil Female Combatant Quest 2 ~An RPG Where You Get Defeated and Made to Cum by Lewd Combatants~	rpg-maker-family	RPG Maker MZ		Evil Female Combatant Quest 2/js/rmmz_core.js	269	archived; encrypted assets; NW.js wrapper
 Evil Female Combatant Quest ~An RPG Where You Get Defeated and Made to Cum by Lewd Combatants~	rpg-maker-family	RPG Maker MZ		Evil Female Combatant Quest/js/rmmz_core.js	249	archived; encrypted assets; NW.js wrapper
 Exorcist Evangeline -The Engraved Lewd Crest-	rpg-maker-family	RPG Maker MV		Exorcist Evangeline - The Engraved Lewd Crest/www/js/rpg_core.js	2263	archived; encrypted assets; NW.js wrapper
 Exorcist Reina_ The Mysterious Yoma Organization	rpg-maker-family	RPG Maker MV		Exorcist Reina - The Mysterious Yoma Organization/www/js/rpg_core.js	149	archived; encrypted assets; NW.js wrapper
-Fairy Fighting	unknown	unknown			75	archived; no known signature; main exe FairyFighting/FairyFighting.exe
+Fairy Fighting	general-engine	2D Fighter Maker 2nd		FairyFighting.exe version resource "2D格闘ツクール2nd." (Enterbrain 2001); *.player/*.stage with 2DKGT2G header	75	archived; fighting game; VNDegen doesn't run this engine; second survey 2026-11-19
 Fallen Adventurer Anna	rpg-maker-family	RPG Maker MZ		072Project_Fallen Adventurer Anna/js/rmmz_core.js	659	archived; encrypted assets; NW.js wrapper
 Fallen Kunoichi ~Netorare Hidden Village~	rpg-maker-family	RPG Maker MZ		Fallen Kunoichi ~Netorare Hidden Village~1.1.4/js/rmmz_core.js	2027	archived; NW.js wrapper
 Fallen Shinobi SS.	general-engine	Unity		Shinobi-SteamGG.NET/UnityPlayer.dll	1695	archived; Mono
@@ -139,16 +139,16 @@ Fantasy Tavern Sextet -Vol.1 New World Days-	vn-engine	Artemis		モザイク�
 Fantasy Tavern Sextet -Vol.2 Adventurer's Days-	vn-engine	Artemis		VNDB release engine field	1526	archived; engine from VNDB release engine field
 Fantasy Tavern Sextet -Vol.3 Postlude Days-	vn-engine	Artemis		VNDB release engine field	1999	archived; engine from VNDB release engine field
 FEMBOY FUTA HOUSE	general-engine	Unity		Femboy Futa House_Data/Managed/	6458	archived; Mono; Naninovel
-Final Fantasy Resonance	unknown	unknown			13846	installed; Linux self-extracting installer
+Final Fantasy Resonance	general-engine	Unreal	5	FFRS/Content/Paks/*.utoc and *.ucas, FFRS-Win64-Shipping.exe, Engine/Plugins/NNE	13846	installed; Windows build in a Wine (umu) Linux repack, YAD installer with a tar.zst payload; VNDegen doesn't run this engine; second survey 2026-11-19
 Five Nights with Maids	rpg-maker-family	RPG Maker MZ		Five Nights with Maids/js/rmmz_core.js	350	archived; NW.js wrapper; SOVEREIGN.dll beside the exe
 Flower Witch	general-engine	GameMaker		flowerwitch/data.win	130	archived
 Flowerfairy	general-engine	GameMaker		Flowerfairy/flowerfairy_eng/data.win	199	archived
 Flying Ace of the Monmusu Park	rpg-maker-family	RPG Maker MV		monmusuParkVol2_win/www/js/rpg_core.js	560	archived; NW.js wrapper
 Flying Princess_ Inter Breed	general-engine	Unity		Flying Princess Inter Breed [RE154397] (E)/tobihime_Data/Managed/	175	archived; Mono
-Forbidden Solitaire	unknown	unknown			1092	archived; disc image, contents not listable without extraction; multi-part scene archive
+Forbidden Solitaire	unknown	unknown			1092	archived; scene ISO rebuilt from all 21 RAR volumes: SETUP.exe is a custom installer, not Inno Setup, and SETUP.bin is encrypted; the crack holds a 32-bit steam_api.dll for Steam app 3414580; a solitaire card game, not a VN or RPG; second survey 2026-11-19
 Forbidden Ward_ Raunchy Recovery Plan	vn-engine	KiriKiri		VNDB release engine field	1628	installed; engine from VNDB release engine field
 Forest of Maha and Dachura	rpg-maker-family	RPG Maker MV		マハとダチュラの森ver1.02/www/js/rpg_core.js	408	archived; encrypted assets; NW.js wrapper
-Forest of the Blue Skin	unknown	unknown			110	archived; no known signature; main exe FOBS_A_ver1.20/FOBS_A_ver1.20.exe
+Forest of the Blue Skin	general-engine	ACTkool		FOBS_A_ver1.20.actbin (ACTKOOL_FILEHEAD header)	110	archived; action game; VNDegen doesn't run this engine; second survey 2026-11-19
 Fox Sex Farm	general-engine	Unity		Fox Sex Farm/UnityPlayer.dll	1127	archived; Mono
 Funbag Fantasy	vn-engine	NekoSDK		[160909] [MangaGamer] Funbag Fantasy [English]/Open Save Folder.exe	995	archived; engine from VNDB release engine field
 Funbag Fantasy 2	vn-engine	NekoSDK		Funbag Fantasy 2/Open Save Folder.exe	3263	archived; engine from VNDB release engine field
@@ -156,7 +156,7 @@ Funbag Fantasy 3if	vn-engine	NekoSDK		same series and .pak layout as the VNDB-co
 Funbag Fantasy 4	vn-engine	NekoSDK		FunbagFantasy4/Open Save Folder.exe	3630	archived; inferred from .pak plus save-folder launcher, the pattern of VNDB-confirmed NekoSDK titles
 Funbag Fantasy_ Sideboob Story	vn-engine	NekoSDK		Funbag Fantasy - Sideboob Story [Waffle][MangaGamer]/Open Save Directory.exe	1425	archived; engine from VNDB release engine field
 Funbag Fantasy_ Sideboob Story 2	vn-engine	NekoSDK		VNDB release engine field	2828	archived; engine from VNDB release engine field
-Furry Aim Trainer	unknown	unknown			1811	archived; disc image, contents not listable without extraction; multi-part scene archive
+Furry Aim Trainer	general-engine	Unreal	4	Crack/Engine/Binaries/ThirdParty/Steamworks/Steamv151 in the release ISO	1811	archived; shooter; VNDegen doesn't run this engine; second survey 2026-11-19
 Furry Arena [18+]	general-engine	Unity		Furry Arena [18+]/UnityPlayer.dll	1088	archived; Mono; SOVEREIGN.dll beside the exe
 Furry Boss 💼	vn-engine	Ren'Py	8.x (py3)	Furry Boss/game/gui.rpyc	370	archived; SOVEREIGN.dll beside the exe
 Furry Love	general-engine	Unity		Furry Love/UnityPlayer.dll	689	archived; Mono; SOVEREIGN.dll beside the exe
@@ -173,12 +173,12 @@ Ghost Girl Ghussy_ XXXL Edition	vn-engine	Ren'Py	8.x (py3)	Ghost Girl Ghussy XXX
 Girls! Girls! Girls!_	general-engine	Unity		Girls! Girls! Girls!/UnityPlayer.dll	1049	archived; Mono; Naninovel; SOVEREIGN.dll beside the exe
 Give an imp a chance!	vn-engine	Ren'Py	<=7.3 (py2)	Give An Imp A Chance/renpy/	250	archived; ships macOS .app; Ren'Py Mac libs present; Ren'Py Linux libs present
 Goblin Nest	general-engine	GameMaker		Goblin Nest/data.win	35	archived
-Goblin Walker	unknown	unknown			676	archived; no known signature; main exe âSâuâèâôâEâHü[âJü[1.52/âSâuâèâôâEâHü[âJü[.exe
+Goblin Walker	custom	custom		ゴブリンウォーカー.exe imports d3d9 and embeds Lua 5.3 (CGobScriptAction, GOB_VERSION); data.pac	676	archived; Direct3D 9 native code with Lua 5.3 scripts; action RPG; VNDegen doesn't run this engine; second survey 2026-11-19
 Gooning for the Baddie Boss	vn-engine	Ren'Py	8.x (py3)	game/archive.rpa	837	archived; Ren'Py Linux libs present
 Gran Ende II	rpg-maker-family	RPG Maker VX Ace		GranEnde 2 - RJ212283/Game.rgss3a	187	archived
 Hachishaku	general-engine	Unreal		Hachishaku/Engine/Binaries/ThirdParty	3659	archived; SOVEREIGN.dll beside the exe
 Haha Sannin to Ana Asobi	vn-engine	NekoSDK		セーブデータフォルダを開く.exe	3608	archived; inferred from .pak plus save-folder launcher, the pattern of VNDB-confirmed NekoSDK titles
-Hakoniwa Explorer Plus	unknown	unknown			159	archived; no known signature; main exe Hakoniwa.Explorer.Plus/Hakoniwa Explorer Plus/Game.exe
+Hakoniwa Explorer Plus	general-engine	HSP		Game.exe overlay starts with DPMX (HSP's packed data), HSP strings	159	archived; VNDegen doesn't run this engine; second survey 2026-11-19
 Happy Island Fantasy	general-engine	Unity		Happy Island Fantasy/UnityPlayer.dll	6852	archived; Mono; SOVEREIGN.dll beside the exe
 Haramimura_ When a Wife Becomes a Villager	vn-engine	KiriKiri		data.xp3	167	archived
 HARDCODED	general-engine	Godot		hardcoded.pck	244	archived
@@ -186,7 +186,7 @@ Harem Inn	vn-engine	Ren'Py	8.x (py3)	harem-inn-1.4-pc/game/archive.rpa	957	archi
 Haydee 2	custom	custom		Haydee 2/SteamGame.exe	942	archived; no known engine signature; single exe with PhysX 3 and D3D11, data in Packs/ and Maps/
 Hazumi and the Pregnation	rpg-maker-family	RPG Maker MV		Hazumi and the Pregnation/PPLSS/www/js/rpg_core.js	478	archived; NW.js wrapper; SOVEREIGN.dll beside the exe
 HENTAI CAVEMAN	rpg-maker-family	RPG Maker MV		HENTAI CAVEMAN/www/js/rpg_core.js	743	archived; NW.js wrapper
-HENTAI EATER	unknown	unknown			528	archived; archive error: bsdtar: Error exit delayed from previous errors | bsdtar: RAR solid archive support unavailable
+HENTAI EATER	custom	DxLib (custom)		エロイーター.exe strings name DxLib sources (DxArchive_.cpp, DxGraphics.cpp); DATA.tec and DATA2.tec archives	528	archived; the solid RAR now extracts with unrar; VNDegen doesn't run this engine; second survey 2026-11-19
 Hentai Rabbit Hood	rpg-maker-family	Wolf RPG Editor		English Hentai Rabbit Hood 2026-09-18/Data/BasicData/	89	archived
 Her New Memory - Hentai Simulator	vn-engine	Ren'Py	<=7.3 (py2)	Her New Memory/game/hnm.rpa	1148	archived; SOVEREIGN.dll beside the exe
 Heroine Conquest	general-engine	GameMaker		data.win	25	archived
@@ -195,7 +195,7 @@ Holding Hands	rpg-maker-family	RPG Maker MZ		Holding Hands ENG V2/js/rmmz_core.j
 Hole Dweller	general-engine	GameMaker		data.win	35	installed
 Hollow Knight	general-engine	Unity		public knowledge, not verified from files	1438	installed; engine from public knowledge, not verified from files
 Hollow Knight_ Silksong	general-engine	Unity		public knowledge, not verified from files	2522	installed; engine from public knowledge, not verified from files
-Holy Maid Academy	unknown	unknown			1751	archived; GOG offline installer, not unpacked; nested archive or installer: setup_holy_maid_academy_1.0.0a_(72343).exe
+Holy Maid Academy	vn-engine	YU-RIS	0.491	yscfg.dat beside pac/*.ypf, Holy_Maid_Academy.exe version resource "YU-RIS Script Engine 0, 491", in GOG installer	1751	archived; VNDegen runs this engine; second survey 2026-11-19
 Holy Monster Girl Festival!! ~It's a Festival, Everyone Gather Round!~	vn-engine	YU-RIS		08 聖もんむすFestival！！ ～お祭りだよ全員集合！～/bgm.ypf	2493	archived
 Holy Mother Of God	rpg-maker-family	RPG Maker MV		www/js/rpg_core.js	576	archived; encrypted assets; NW.js wrapper
 HoneyCome come come party	general-engine	Unity		public knowledge, not verified from files	4899	installed; engine from public knowledge, not verified from files
@@ -203,11 +203,11 @@ Horny Elves and a Moral Orc	vn-engine	NekoSDK		Lustful Elves and a Moral Orc/Ope
 Horny Ladies at the Members-Only Pool After Dark	general-engine	Unity		HornyPool/HornyPool/HornyPool_Data/data.unity3d	759	archived; Mono
 Hospital Seduction	general-engine	Unity		Hospital Seduction/Hospital Seduction_Data/il2cpp_data/	95	archived; IL2CPP
 Hotel Tales	general-engine	Unity		Hotel Tales/UnityPlayer.dll	5649	archived; Mono; Naninovel; SOVEREIGN.dll beside the exe
-House of Lust	unknown	unknown			45	archived; GOG offline installer, not unpacked; nested archive or installer: setup_house_of_lust_1.0_(73162).exe
+House of Lust	general-engine	Unity	2021.3.0f1	UnityPlayer.dll "Unity Version 2021.3.0f1", _Data/il2cpp_data (IL2CPP), in GOG installer	45	archived; VNDegen doesn't run this engine; second survey 2026-11-19
 How to Discipline a Shoplifting Girl	general-engine	Flash		Mika-chan2.swf	22	installed
 How to Raise Your Slime Girl	vn-engine	YU-RIS		10 スライム娘の育て方/bgm.ypf	903	archived
 Hypno Mama	vn-engine	Ren'Py	7.4+ (py2)	Hypno Mama/game/archive.rpa	734	archived; Ren'Py Linux libs present
-Hypnosis of Busty Female Officer _There's No Way I'd Follow Orders from Someone Like You_	unknown	unknown			1262	archived; no known signature; main exe Hypnosis of Busty Female Officer Final/巨乳女士官洗脳催眠_DL版.exe
+Hypnosis of Busty Female Officer _There's No Way I'd Follow Orders from Someone Like You_	vn-engine	Tmr-Hiro ADV System		srp.pac beside Agrd.pac to Dgrd.pac and sse.pac; exe strings "-ADV GAME ENGINE SYSTEM-", version resource AGE_System	1262	archived; standard layout; VNDegen runs this engine; second survey 2026-11-19
 I Am Motherfucker	vn-engine	Ren'Py	8.x (py3)	I Am Motherfucker/game/archive.rpa	1595	archived; Ren'Py Linux libs present
 I Became my Punk Son's Fake Girlfriend	vn-engine	TyranoScript		I Became MPSG/I_Became_my_Punk_Sons_Fake_Girlfriend_tyrano_data.sav	3811	archived; Electron, game in resources/app.asar; engine inferred from Tyrano save file names; SOVEREIGN.dll beside the exe
 I fell in love with the the Demon Queen... But now I have to share her___	rpg-maker-family	RPG Maker MZ		DQGame(V0.3.6_With_Walkthrough)/DQGame/js/rmmz_core.js	3716	archived; NW.js wrapper
@@ -221,12 +221,12 @@ Insect Angels	rpg-maker-family	RPG Maker MV		怪虫戦隊インセクトエン�
 Introducing An Apprentice Incubus	rpg-maker-family	Wolf RPG Editor		RJ203431 [+蟹] 淫魔みならい(♂)はじめました/Data.wolf	572	archived
 Isekai Revitalizer	vn-engine	KiriKiri		data.xp3	1532	installed
 Island of Penance	rpg-maker-family	RPG Maker VX Ace		Game.rgss3a	1388	archived
-Jewel Knights Crusaders	unknown	unknown			1122	installed; disc image
+Jewel Knights Crusaders	vn-engine	Ikura GDL	2004 build	disc 1 (BIN/CUE): JEWELUS.EXE (ZROCOOL, G-Collections 2004) beside SM2MPX10 archives ISF, GGD, se, voice, wmsc, data	1122	installed; older layout: scripts are .ISF in ISF and pictures in GGD, not SNR and GRP, so VNDegen's detection misses it; SafeDisc on the disc exe, crack exe in crack/; VNDegen runs this engine; second survey 2026-11-19
 Journey of Depravity	rpg-maker-family	Wolf RPG Editor		Journey of Depravity [RJ259461]/Data.wolf	97	archived
 Kaeru nyo Panyon	vn-engine	AliceSoft System 3	3.9	System39.ain	116	installed
 Kaizou Shoujo_ Robokko to no Ichaicha Seikatsu!	vn-engine	YU-RIS		07 改造少女 ～ロボっ娘とのいちゃいちゃ性活！～/bgm.ypf	854	archived
-Kamidori Alchemy Meister	vn-engine	Eushully AGE		Kamidori Alchemy Meister [Fuwanovel] -English-/$1$AE000AA.AGF	5372	installed+archive
-Kamikaze Kommittee Ouka 2	unknown	unknown			443	archived; GOG offline installer, not unpacked; nested archive or installer: setup_kamikaze_kommittee_ouka_2_unrated_v2_(en_1.05_cn_1.06)_(54072).exe
+Kamidori Alchemy Meister	vn-engine	Eushully AGE		Kamidori Alchemy Meister [Fuwanovel] -English-/$1$AE000AA.AGF	5372	installed+archive; left out after the content check (2026-11-19)
+Kamikaze Kommittee Ouka 2	rpg-maker-family	RPG Maker MV		www/js/rpg_core.js beside Kadokawa NW.js Game.exe, in GOG installer	443	archived; NW.js, encrypted assets; VNDegen runs this engine; second survey 2026-11-19
 Kangoku Senkan 2 ~Yousai Toshi no Sennou Kaizou~	vn-engine	KiriKiri		data.xp3	1170	archived
 Kangoku Senkan Premium Box	vn-engine	KiriKiri		Kangoku Senkan Premium Box/data.xp3	1778	archived
 Karen, Daughter of Martial Arts Plutocrat	general-engine	Flash		sub/fera.swf	31	installed
@@ -241,9 +241,9 @@ Kudo’s Kuppa	vn-engine	KiriKiri		Kudo’s Kuppa/data.xp3	1495	archived
 Kurenkisho Quolta Amadeus EG	rpg-maker-family	RPG Maker MV		Kurenkisho Quolta Amadeus EG RJ280540 v1.08/www/js/rpg_core.js	447	archived; NW.js wrapper
 Kyonyuu Elf Oyako Saimin	vn-engine	Tmr-Hiro ADV System		Kyonyuu Elf Oyako saimin/Agrd.pac	2851	archived; engine from VNDB release engine field
 Kyonyuu Hitozuma Onna Kyoushi Saimin - Keitai Appli de Sex Chuudoku!	vn-engine	Tmr-Hiro ADV System		Kyonyuu Hitozuma Onna Kyoushi Saimin - Keitai Appli de Sex Chuudoku!/Agrd.pac	1916	archived; inferred from .pac plus uninst.exe, the pattern of VNDB-confirmed Tmr-Hiro titles
-La-Mulana	unknown	unknown			210	installed; no known signature; main exe setup_la-mulana_2.1.0.12.exe
-La-Mulana (2005)	unknown	unknown			7	archived; no known signature; main exe LA-MULANA/lamulana.exe
-La-Mulana 2	unknown	unknown			1049	installed; GOG offline installer, not unpacked
+La-Mulana	custom	custom	1.6.6.1	app/LaMulanaWin.exe version resource (ASTERIZM, NIGORO), data/anime/*.mdd	210	installed; Direct3D 9 native code; action platformer, GOG installer; VNDegen doesn't run this engine; second survey 2026-11-19
+La-Mulana (2005)	custom	custom		LA-MULANA/lamulana.exe version resource (d-system), imports ddraw/dsound	7	archived; DirectDraw native code; freeware action platformer; VNDegen doesn't run this engine; second survey 2026-11-19
+La-Mulana 2	general-engine	Unity	2017.2.2p2	LaMulana2.exe version resource "Unity Version 2017.2.2p2", Lamulana2_Data/Managed (Mono)	1049	installed; action platformer, GOG installer; VNDegen doesn't run this engine; second survey 2026-11-19
 Lamashtu_ The Fall	vn-engine	Ren'Py	8.x (py3)	Lamashtu-1.00-pc/game/audio.rpa	683	archived; Ren'Py Linux libs present
 Lapiness Sapphire ~Ten Dimensions of Carnality~	rpg-maker-family	RPG Maker MZ		Lapiness Sapphire ~Ten Dimensions of Carnality~/js/rmmz_core.js	676	archived; encrypted assets; NW.js wrapper
 Laura's secret diary	general-engine	Unity		Laura's Secret Diary/UnityPlayer.dll	277	archived; Mono
@@ -251,7 +251,7 @@ Legend Of The River Queen ~Waterfall Maiden~	rpg-maker-family	Wolf RPG Editor		G
 Lewdest Labyrinth	general-engine	Unity		Lewdest Labyrinth/LewdestLabyrinth_Data/Managed/	73	archived; Mono
 Libido Estates	vn-engine	TyranoScript		色情團地 Libido Estates/resources/app/tyrano/audio/silent.mp3	2595	archived; Electron wrapper
 License to Breed	vn-engine	Ren'Py	8.x (py3)	License to Breed/game/archive.rpa	1924	archived; Ren'Py Linux libs present
-Life as a Caretaker in Another World ~Putting a Bratty, Busty Elf in Her Place~	unknown	unknown			182	archived; no known signature; main exe Isekai_Gurashi_Demo1.exe
+Life as a Caretaker in Another World ~Putting a Bratty, Busty Elf in Her Place~	general-engine	Godot	4.7.1	Isekai_Gurashi_Demo1.exe holds the pack in its pck section; GDPC header reads pack format 4, Godot 4.7.1	182	archived; demo build; VNDegen runs this engine; second survey 2026-11-19
 LIFE IS PARADISE (Deluxe Edition)	rpg-maker-family	RPG Maker VX Ace		Life is Paradise [RJ094661] (E)/Life is Paradise!/Data/Actors.rvdata2	399	archived
 Lifeguard Holic	general-engine	Unity		Lifeguard Holic/Lifeguard Holic_Data/il2cpp_data/	1503	archived; IL2CPP; Naninovel
 Lightning Warrior Raidy	vn-engine	Ikura GDL		VNDB release engine field	824	installed; engine from VNDB release engine field
@@ -259,16 +259,16 @@ Lightning Warrior Raidy II_ Temple of Desire	vn-engine	Ikura GDL		VNDB release e
 Lightning Warrior Raidy III	vn-engine	Ikura GDL			3960	archived; no known signature; main exe Lightning Warrior Raidy III/Raidy III setup.exe; Ikura GDL by its file list (loose GRP/*.GGP, SNR/*.SNR, ZMZ), inside a Setup Factory installer VNDegen can't unpack (2026-11-18)
 Lilipalace (English Ver.)	vn-engine	NScripter		Lilipalace - RE228152(E)/RE228152 - Lilipalace/nscript.dat	195	archived
 Lilitales	vn-engine	NScripter		Lilitales/00.ns2	591	archived; .ns2 archives, Lua plugin (nslua.dll)
-Lilith in Nightmare!	unknown	unknown			1189	archived; no known signature; main exe éΦéΦé╖éóé±é╚éóé╞é▀éáver1/game.exe
+Lilith in Nightmare!	rpg-maker-family	RPG Maker MV/MZ (packed exe)	MV	game.exe has .enigma1/.enigma2 sections (Enigma Virtual Box) around NW.js 0.36.2, embedded file table names rpg_core.js and package.nw	1189	archived; NW.js MV game packed in one exe; VNDegen runs this engine; second survey 2026-11-19
 Lillian's Adventure -The Sage's Tower and the Great Cave Labyrinth-	general-engine	Unity		Lillian's Adventure [RJ297090] (E)/Lillian/Lillian_Data/Managed/	245	archived; Mono
 Listaria – A Success Story of Grabbing Everything – Rank, Territory, and Women	rpg-maker-family	RPG Maker MV		Listaria_v26.08.02/www/js/rpg_core.js	891	archived; encrypted assets; NW.js wrapper
 Little Princess	custom	custom		VB6JP.DLL (Visual Basic 6)	1	installed; engine from VB6JP.DLL (Visual Basic 6)
 Livestream 2_ Escape from Togaezuka Happy Place	general-engine	Unity		Livestream 2 Escape from Togaezuka Happy Place/UnityPlayer.dll	771	archived; Mono; SOVEREIGN.dll beside the exe
 Livestream_ Escape from Hotel Izanami	general-engine	Unity		Livestream Escape from Hotel Izanami/UnityPlayer.dll	449	archived; Mono
 Living with the Absolute Bustiest College Girl!	rpg-maker-family	RPG Maker MV		I Live with the JK with the biggest boobs in school/www/js/rpg_core.js	1315	archived; NW.js wrapper
-Loli Succu_ Cucu ~Easygoing Sex Around~	unknown	unknown			56	archived; nested archive or installer: 171011-RJ199430/(同人ゲーム) [2017-10-11][RJ199430][紳士の酒場] ロリサキュ★キュキュ ～気ままにおさんぽえっち～.rar
+Loli Succu_ Cucu ~Easygoing Sex Around~	unknown	unknown			56	archived; left out
 Loop Queen-Escape Dungeon 3	general-engine	Unity		UnityPlayer.dll	2112	archived; Mono
-Lover of Mirror Image	unknown	unknown			80	archived; no known signature; main exe Lover of Mirror Image/Lover of Mirror Image BGM‚È‚µ.exe
+Lover of Mirror Image	custom	custom		Data/Skeleton.dll (d3d9) beside Data/Pack*.dat; exes import d3dx9_40	80	archived; Direct3D 9 native code; same circle layout as What a Wonderful Day!!; VNDegen doesn't run this engine; second survey 2026-11-19
 Lovey-Dovey Lockdown	rpg-maker-family	RPG Maker MV		LoveyDovey Lockdown/js/rpg_core.js	1802	archived; encrypted assets; NW.js wrapper; SOVEREIGN.dll beside the exe
 Luna in the Tavern	general-engine	Electron (custom HTML)		Luna-in-the-Tavern-WINDOWS/resources/app/	556	archived; index.html loads its content from a website; checked 2026-10-26
 Luna in the Tavern_ Animated	general-engine	Electron (custom HTML)		Luna-In-The-Tavern-Animated-v0.5-WINDOWS/resources/app/	759	archived; custom app in resources/app; checked 2026-10-26
@@ -302,15 +302,15 @@ MA☆KO HUNTER	vn-engine	YU-RIS		MAKO Hunter/pac/bn.ypf	3712	archived
 Mecha Girl Adventure	rpg-maker-family	RPG Maker VX		Game.rgss2a	21	archived
 MEGABOOBS 🔞	general-engine	Unity		MEGABOOBS-1.0/MEGABOOBS_Data/Managed/	825	archived; Mono
 Meido no Oyado (House of Maids)	rpg-maker-family	Wolf RPG Editor		Meido no Oyado (House of Maids) RJ153062/[sugar star]Meido no Oyado (House of Maids)(Ver.1.03)/Data/BasicData.wolf	102	archived
-Mesu Kyoushi 2 ~Injuu no Rasen~	unknown	unknown			3784	archived; no known signature; main exe MK2IEDL/boot.exe
-Mesu Kyoushi 3 ~Inetsu no Gakusha~ Immoral Edition	unknown	unknown			3885	archived; nested archive or installer: Mesu Kyoushi 3 ~Inetsu no Gakusha~ [Immoral Edition] [Final] ENG MTL/setup.exe
-Mesu Kyoushi 4 ~Kegasareta Kyoudan~	unknown	unknown			3348	archived; no known signature; main exe Mesu Kyoushi 4/boot.exe
-Mesu Kyoushi ~Injoku no Kyoushitsu~	unknown	unknown			3336	archived; no known signature; main exe Mesu Kyoushi ~Injoku no Kyoushitsu~ ENG [MTL]/boot.exe
+Mesu Kyoushi 2 ~Injuu no Rasen~	vn-engine	BISHOP BSX	BSXScript 3.0	MK2IEDL/bsxx.dat (BSXScript 3.0 header), *.bsa (BSArc), Canvas.dll	3784	archived; VNDegen doesn't run this engine; second survey 2026-11-19
+Mesu Kyoushi 3 ~Inetsu no Gakusha~ Immoral Edition	vn-engine	BISHOP BSX	BSXScript 3.3	bsxx.dat (BSXScript 3.3 header), *.bsa (BSArc)	3885	archived; nested setup.exe is BISHOP's installer; VNDegen doesn't run this engine; second survey 2026-11-19
+Mesu Kyoushi 4 ~Kegasareta Kyoudan~	vn-engine	BISHOP BSX	BSXScript 3.1	Mesu Kyoushi 4/bsxx.dat (BSXScript 3.1 header), *.bsa	3348	archived; VNDegen doesn't run this engine; second survey 2026-11-19
+Mesu Kyoushi ~Injoku no Kyoushitsu~	vn-engine	BISHOP BSX	BSXScript 3.0	bsxx.dat (BSXScript 3.0 header) beside *.bsa (BSArc) and mkiedl.exe (BISHOP)	3336	archived; VNDegen doesn't run this engine; second survey 2026-11-19
 Metal Gear Rising_ Revengeance	custom	custom		public knowledge, not verified from files (PlatinumGames in-house)	25705	archived; engine from public knowledge, not verified from files (PlatinumGames in-house); multi-part scene archive
-Metal Gear Solid Master Collection_ Volume 1	unknown	unknown			11897	archived; disc image, contents not listable without extraction; multi-part scene archive
-Metal Gear Solid Master Collection_ Volume 2	unknown	unknown			18024	archived; disc image, contents not listable without extraction; multi-part scene archive
+Metal Gear Solid Master Collection_ Volume 1	unknown	unknown			11897	archived; over 8 GB; Konami console port collection, not opened; second survey 2026-11-19
+Metal Gear Solid Master Collection_ Volume 2	unknown	unknown			18024	archived; over 8 GB; Konami console port collection, not opened; second survey 2026-11-19
 Metal Gear Solid V_ The Phantom Pain	custom	custom		public knowledge, not verified from files (Fox Engine)	28112	archived; engine from public knowledge, not verified from files (Fox Engine)
-Metal Orange EX Windows Ver.	unknown	unknown			277	archived; no known signature; main exe Metal Orange EX/moe_ver1.00/MOE_Win.exe
+Metal Orange EX Windows Ver.	custom	custom		MOE_Win.exe imports d3d11/d3dx11_43; *.PACK	277	archived; Direct3D 11 native code; shooter; VNDegen doesn't run this engine; second survey 2026-11-19
 Milf Diary, I am Trying to Impregnate My Mom	vn-engine	TyranoScript		Milf Diary_I am Trying to Impregnate My Mom/Milf_Diary_I_am_Trying_to_Impregnate_My_Mom_tyrano_data.sav	3397	archived; Electron, game in resources/app.asar; engine inferred from Tyrano save file names; SOVEREIGN.dll beside the exe
 Milfy’s Lewd Trap Training~Tentacles × Aphrodisiacs × Bondage Squeeze!~	general-engine	Unity		牛娘米露菲的淫欲陷阱調教～觸手×媚藥×拘束 絕頂榨取！～/UnityPlayer.dll	289	archived; Mono
 Milking Farm	rpg-maker-family	RPG Maker MV		Milking Farm [RJ273000] (E)/www/js/rpg_core.js	612	archived; encrypted assets; NW.js wrapper
@@ -332,9 +332,9 @@ Money Troubles	vn-engine	Ren'Py	8.x (py3)	MoneyTroubles-0.2-pc/game/archive.rpa	
 Monmusu Conquered World	rpg-maker-family	RPG Maker MV		Monmusu Conquered World [English]/www/js/rpg_core.js	1604	archived; encrypted assets; NW.js wrapper
 Mono Quest [ENG Ver.]	rpg-maker-family	RPG Maker MV		ものくえすと/www/js/rpg_core.js	289	archived; encrypted assets; NW.js wrapper
 Monolighter	general-engine	Unity		monolighter_v0.2/monolighter_v0.2_Data/globalgamemanagers	163	archived; Mono
-Monster Fighter Boy Ashita ~Battle at Oni-Castle~	unknown	unknown			229	installed+archive; おまけ.zip is password protected
-Monster Fighter Boy Ashita ~Final Battle - Tenjiku Level~	unknown	unknown			571	installed+archive; おまけ３.zip is password protected
-Monster Fighter Boy Ashita ~Sky Castle - Almagarden~	unknown	unknown			392	installed+archive; おまけ２.zip is password protected
+Monster Fighter Boy Ashita ~Battle at Oni-Castle~	general-engine	Clickteam Fusion	2.5	keyconfig.exe version resource "MMF2/CF2.5用キーコンフィグ"; main exe is Clickteam-packed (see notes)	229	installed+archive; action game; おまけ.zip password protected; VNDegen doesn't run this engine; second survey 2026-11-19
+Monster Fighter Boy Ashita ~Final Battle - Tenjiku Level~	general-engine	Clickteam Fusion	2.5	keyconfig.exe version resource "MMF2/CF2.5用キーコンフィグ"	571	installed+archive; action game; おまけ３.zip password protected; VNDegen doesn't run this engine; second survey 2026-11-19
+Monster Fighter Boy Ashita ~Sky Castle - Almagarden~	general-engine	Clickteam Fusion	2.5	keyconfig.exe version resource "MMF2/CF2.5用キーコンフィグ"	392	installed+archive; action game; おまけ２.zip password protected; VNDegen doesn't run this engine; second survey 2026-11-19
 Monster Girl Dreams	vn-engine	Ren'Py	<=7.3 (py2)	MonGirlDreams-Alpha-v23.4a-pc/game/gamecode/LoadDatabase.rpyc	514	archived; Ren'Py Linux libs present
 Monster Girl Encyclopedia RPG	rpg-maker-family	RPG Maker VX Ace		Monster Girl Encyclopedia RPG Demo (E)/MGERPG_Eng/Game.rgss3a	270	archived
 Monster Girl Island	general-engine	Unity		MGI 0.44.3/MGI_Data/globalgamemanagers	2547	archived; Mono
@@ -343,7 +343,7 @@ Monster Girl Labyrinth	rpg-maker-family	RPG Maker MV		Demon Girls Labyrinth [RJ2
 Monster Girl Quest 1-3	vn-engine	NScripter		MGQ Parts 1-3 100% Translated/nscript.dat	2040	archived
 Monster Girl Quest 3D! (Demo 2)	general-engine	GZDoom		gzdoom.pk3	19	archived
 Monster Girl Quest_ Paradox	rpg-maker-family	RPG Maker VX Ace		Data/Actors.rvdata2	3720	archived
-Monster Party	unknown	unknown			31	archived; no known signature; main exe MonsterParty 1.01/MonsterParty.exe
+Monster Party	custom	custom		MonsterParty.exe version resource (azcat 2014), imports d3d9/d3dx9_42; Archive/*.dat	31	archived; Direct3D 9 native code; same author and layout as Chronos Gate; VNDegen doesn't run this engine; second survey 2026-11-19
 Mother Daughter Pleasure Pets	vn-engine	Ren'Py	<=7.3 (py2)	MotherDaughterPP/lib/linux-i686/lib/python2.7/renpy/	761	archived; Ren'Py Mac libs present; Ren'Py Linux libs present
 Mother×Me×Aunt_ A Forbidden, Erotic Life with Mature Women	vn-engine	KiriKiri		Mother×Me×Aunt/bgm.xp3	637	archived
 Motto! Haramase! Honoo no Oppai Isekai Oppai Bunny Gakuen!	vn-engine	KiriKiri		Motto! Haramase! Honoo no Oppai Isekai Oppai Bunny Gakuen! + Append/data.xp3	11056	archived
@@ -362,7 +362,7 @@ My Oppai Mommy Makes Me Want To Spill All Of My Company Secrets	vn-engine	Ren'Py
 My Protogen Engineer ⚙️	vn-engine	Ren'Py	8.x (py3)	MyProtogenEngineer-1.0-R18-pc/MyProtogenEngineer-1.0-pc/game/custom_screens.rpyc	355	archived; Ren'Py Linux libs present
 My Slow Life with the Princess Knight and Her Devoted Handmaiden	vn-engine	Artemis		My Slow Life with the Princess Knight and Her Devoted Handmaiden/SlowLife.pfs	4325	archived
 My Summer Vacation Spent on A Gal., My Summer Vacation Spent Showering Gyarus With Gifts	rpg-maker-family	RPG Maker MZ		My Summer Vacation Spent Showering Gyarus With Gifts/js/rmmz_core.js	363	archived; encrypted assets; NW.js wrapper
-My Unique Reincarnation Skill 'Magical Sword' Makes Every Busty Girl Yield to Orgasm!	unknown	unknown			3410	archived; no known signature; main exe My Unique Reincarnation Skill 'Magical Sword' Makes Every Busty Girl Yield to Orgasm!/DirectX/directx_Jun2010_redist.exe
+My Unique Reincarnation Skill 'Magical Sword' Makes Every Busty Girl Yield to Orgasm!	vn-engine	ANIM engine		mgsw.exe version resource "Anim Copyright (C) 2025"; *.gax images, *.eog audio, emotedriver.dll, *.pck	3410	archived; same engine as Double Date Dilemma; VNDegen doesn't run this engine; second survey 2026-11-19
 MY]R (English Ver.)	rpg-maker-family	RPG Maker VX Ace		MY]R_eng v1.14/Project01/Game.rgss3a	78	archived
 Mysterious Abandoned Building	general-engine	Pixel Game Maker MV		Resources/data/info.json	405	archived
 Naedoko Demon's Ground	rpg-maker-family	RPG Maker VX Ace		Naedoko Demon's Ground 1.12 -RJ165659/Naedoko Demon's Ground 1.12/Data/Actors.rvdata2	517	archived
@@ -372,7 +372,7 @@ NATURAL CORDE	vn-engine	KiriKiri		NATURAL CORDE-v1.01/data.xp3	701	archived
 Nejicomi Complete Collection	general-engine	Unity		ネジ込みシミュレーター/NejiSim1_1.0.4/UnityPlayer.dll	7060	archived; Mono
 NejicomiSimulator TMA02	general-engine	Unity		NejiSimTma02/UnityPlayer.dll	356	archived; Mono; SOVEREIGN.dll beside the exe
 Netorare Milf Natsuko (41)_ Mama's Sukebe Hentai Sex With A Young Man	vn-engine	KiriKiri		Netorare Jukubo Natsuko 41/data/kkde/kkde_init.tjs	679	archived
-Neverwood	unknown	unknown			45	archived; no known signature; main exe Neverwood/Neverwood.exe with loose Data/, Sprites/, Sounds/
+Neverwood	custom	custom		Neverwood.exe PyInstaller strings ("Failed to extract script from archive", PYI_PATH_MAX), zlib archive appended; loose Data/, Sprites/, Sounds/	45	archived; Python game packed with PyInstaller; VNDegen doesn't run this engine; second survey 2026-11-19
 Niplheim's Hunter - Branded Azel	rpg-maker-family	Wolf RPG Editor		Data/SE.wolf	457	installed
 Nitz's Debt	general-engine	Godot		nitz_debt.pck	37	archived
 Noja Lolikko - Lil Kohaku's Search for a Husband	rpg-maker-family	RPG Maker VX Ace		Noja Lolikko - Lil Kohaku's Search for a Husband [RJ168334](E)/Data/Actors.rvdata2	52	archived
@@ -394,15 +394,15 @@ Oppaidius Summer Trouble!	vn-engine	Ren'Py	<=7.3 (py2)	Oppaidius/game/assets.rpa
 Oppaidius Tropical Cruise!	vn-engine	Ren'Py	<=7.3 (py2)	OppaidiusTC-1.2.5-win/game/assets.rpa	392	archived
 Oral Sex Brothel 2_ The Older Sisters Who Reverse-Rape a Virgin Shota with Fellatio ♡	general-engine	Unity		Oral Sex Brothel 2 - The Older Sisters Who Reverse-Rape a Virgin Shota with Fellatio/OralSexShop2_v1.1.0_Win/OralSexShop2_Data/Managed/	530	archived; Mono
 Orc Kingdom_ Monmusu Breeder King	vn-engine	Bruns		RJ124179/binary/bruns.exe	854	archived; left out after the content check (2026-11-18)
-Orction	unknown	unknown			24	archived; no known signature; main exe Orction ver.04-01-2018 [English]/Game.exe
+Orction	general-engine	Clickteam Fusion		Game.exe overlay starts with Clickteam's pack header (77777777 49874712)	24	archived; VNDegen doesn't run this engine; second survey 2026-11-19
 Ore o Hoshigaru Futari no Haha	vn-engine	NekoSDK		セーブデータフォルダを開く.exe	5469	archived; engine from VNDB release engine field
 Ore o Hoshigaru Tsuma to Gibo	vn-engine	NekoSDK		セーブデータフォルダを開く.exe	4154	archived; inferred from .pak plus save-folder launcher, the pattern of VNDB-confirmed NekoSDK titles
 Overthrow The Great Demoness!	general-engine	Flash		[RJ247971] 打倒！超魔王様/打倒！超魔王様（Flash版）/sub/cou1.swf	463	archived
 Overthrow! The Demon Queen	general-engine	Flash		overthrow.swf	39	installed
 Parade Buster	rpg-maker-family	Wolf RPG Editor		Parade Buster Ver.1.4 (Partial E)/Data/BasicData/	307	archived
-Paradise Cleaning!- Tutor X Hypnosis -	unknown	unknown			311	archived; no known signature; main exe Paradise Cleaning!- Tutor X Hypnosis -/Cleaner.exe
+Paradise Cleaning!- Tutor X Hypnosis -	vn-engine	PJADV	2XT 4.5	Cleaner.exe version resource: OriginalFilename PJADV.exe, ProductName "2XT - Pencil Adventure Engine" 4.5 (PajamasEX / Production PENCIL); archive.dat, graphic.dat, voice.dat and other .dat archives	311	archived; Steam build (steam_api.dll); VNDegen doesn't run this engine; second survey 2026-11-19
 Part-Time Witch	general-engine	Unity		PartTime Witch/UnityPlayer.dll	352	archived; Mono; SOVEREIGN.dll beside the exe
-PASSION MORTALE!完成版	unknown	unknown			645	archived; no known signature; main exe PASSION MORTALE!/PASSION MORTALE!_完成版.exe
+PASSION MORTALE!完成版	custom	DxLib (custom)		PASSION MORTALE!_完成版.exe strings name DxLib sources; Data/sound.dat	645	archived; same circle layout as THEIR HAPPIEST HOUR; VNDegen doesn't run this engine; second survey 2026-11-19
 Peeping Office Worker	general-engine	Unity		BOXMAN [1.0]/UnityPlayer.dll	2977	installed; Mono; Naninovel
 PENIBAN QUEST_ Sacrifice to Domina	rpg-maker-family	RPG Maker VX Ace		Peniban Quest - RJ150370/Data/Actors.rvdata2	370	archived
 Pet Shota Hero and the Succubus Castle	general-engine	Unity		ÄöéóîóùEÄ╥é╞ûéëñé╠ÅΘ/GameAssembly.dll	177	archived; IL2CPP
@@ -410,7 +410,7 @@ Pet's Privileges	rpg-maker-family	RPG Maker MV		Pet’s Privileges/www/js/rpg_co
 Pirate Booty and the Bukkake Buccaneer	vn-engine	Ren'Py	<=7.3 (py2)	PirateBootyBukkakeBuccaneer/game/archive.rpa	941	archived; Ren'Py Linux libs present
 Planet Lust	custom	custom		lust_script.dll with SDL2	173	archived; engine from lust_script.dll with SDL2
 Pocket Gal Hunter	rpg-maker-family	Wolf RPG Editor		Pocket Gal Hunter (E)/ポケットギャルハンターver1.12/Data/BasicData/	150	archived
-President Yukino	unknown	unknown			1090	archived; GOG offline installer, not unpacked; nested archive or installer: setup_president_yukino_v1_(59266).exe
+President Yukino	rpg-maker-family	Wolf RPG Editor	2.21	Data/*.wolf (18 archives) beside Game.exe (SilverSecond, ver2.21), in GOG installer	1090	archived; VNDegen runs this engine; second survey 2026-11-19
 Primal Empire Tycoon	general-engine	Unity		Primal Empire Tycoon V0.5/GameAssembly.dll	806	archived; IL2CPP
 Prince of Suburbia - Part 1	vn-engine	Ren'Py	8.x (py3)	Prince of Suburbia - Part One/game/sounds.rpa	1576	archived; Ren'Py Linux libs present; Ren'Py macOS libs present; SOVEREIGN.dll beside the exe
 Princess Ilyana_ Night of Falling Grace	general-engine	GameCreator (HTML)		Princess Ilyana Night of Falling Grace-Steam/nw.dll	1112	archived; index.html credits GameCreator; NW.js wrapper; checked 2026-10-26
@@ -452,7 +452,7 @@ Royal Ladies Sold Into Slavery ~Queen & Princess Corrupted Into Sluts~	vn-engine
 Run Eros	rpg-maker-family	RPG Maker MZ		Run Eros Ver1.02 RE01005807/js/rmmz_core.js	498	archived; encrypted assets; NW.js wrapper
 Run for Virgin ~Complete the Mission and Stop the Release of Semen!~	rpg-maker-family	RPG Maker MZ		Run for Virgin/js/rmmz_core.js	262	archived; encrypted assets; NW.js wrapper
 Sabbat of the Witch	vn-engine	KiriKiri		Sabbat of the Witch/bgm.xp3	3673	archived; SOVEREIGN.dll beside the exe
-Sacrifice Villains	unknown	unknown			7001	installed; GOG installer
+Sacrifice Villains	vn-engine	YU-RIS	0.481	yscfg.dat beside pac/*.ypf in the unrated GOG installer; sacrifice_villains.exe version resource "YU-RIS Script Engine 0, 481"	7001	installed; GOG installer; one 5.66 GiB update1.ypf; VNDegen runs this engine; second survey 2026-11-19
 Saimin Gakushū_ Secret Desire	vn-engine	YU-RIS		VNDB release engine field	1330	archived; engine from VNDB release engine field
 Saimin Seishidou -Secret Lesson-	vn-engine	YU-RIS		Saimin Seishidou Secret Lesson/pac/bgm.ypf	4257	archived
 Saint Dorei Gakuen 2	vn-engine	YU-RIS		v28875/(18禁ゲーム) [210226] [Liquid（リキッド）] 聖奴隷学園２ + Tokuten Voice/pac/cg1.ypf	4034	archived
@@ -480,8 +480,8 @@ Sex-Pop Demon Hunters	general-engine	Unity		UnityPlayer.dll	9312	installed; Mono
 Sexcalibur_ Knights of the Pound Table	vn-engine	Ren'Py	8.x (py3)	Sexcalibur Knights of the Pound Table/game/archive.rpa	1591	archived; Ren'Py Linux libs present
 SEXOPHOBIA 🔞	general-engine	Unity		UnityPlayer.dll	1761	installed; Mono
 Sexual Sealing Dungeon_ Eronest	general-engine	Godot		[Ryuugames] RY-3332860_fix/封淫洞窟エロネスト/data/.gdignore	365	archived
-Sexual Violation x Tower Defense_ RPG to Save the Fantasy World by Inseminating Sex	unknown	unknown			275	archived; nested archive or installer: (同人ゲーム) [2018-09-25][RJ226905][サークル暇乞い] 陵辱×タワーディフェンス 種付け中出し雌奴隷化で異世界救済RPG (Ver.1.02).rar
-Sexy GIRLS HUNT	unknown	unknown			1606	archived; no known signature; main exe Sexy GIRLS HUNT [RJ156085] (E)/Sexy GIRLS HUNT.exe
+Sexual Violation x Tower Defense_ RPG to Save the Fantasy World by Inseminating Sex	general-engine	Unity	5.6.1f1	inner RAR: Game.exe version resource "Unity Version 5.6.1f1", Game_Data/Managed (Mono)	275	archived; tower defense; game is in a RAR inside the outer RAR; VNDegen doesn't run this engine; second survey 2026-11-19
+Sexy GIRLS HUNT	general-engine	Clickteam Fusion		Sexy GIRLS HUNT.exe overlay starts with Clickteam's pack header (PAME/PAMU)	1606	archived; Sexy_Data/game.ini beside it; VNDegen doesn't run this engine; second survey 2026-11-19
 Shogun Princess Christianne	general-engine	Flash		SPC.swf	27	installed
 Shota-loving Succubus and the Breast-fucking Perv Women	rpg-maker-family	RPG Maker MV		Shota-Loving Succubus and The Paizuri Sluts/www/js/rpg_core.js	174	archived; encrypted assets; NW.js wrapper
 Shotacon Quest -My Penis Is Targeted!-	rpg-maker-family	RPG Maker MV		Shotacon Quest -My Penis Is Targeted!-/Game/www/js/rpg_core.js	945	installed+archive; NW.js wrapper
@@ -490,10 +490,10 @@ SiNiSistar	general-engine	Unity		SiNiSistar/SiNiSistar_Data/globalgamemanagers	3
 SiNiSistar 2	general-engine	Unity		SiNiSistar2_v1_3_1/WIN/SiNiSistar2_Data/globalgamemanagers	5082	archived; ships macOS .app; IL2CPP
 Sisters x Lovers	vn-engine	KiriKiri		Sisters x Lovers/data.xp3	1152	archived
 Sisters Z Hypnosis	vn-engine	KiriKiri		anezme/char01.xp3	5579	archived
-Size Fetish One x Shota Battle 2 - Female Mutant VS Crossdressing Soldier	unknown	unknown			21	archived; no known signature; main exe Size Fetish One x Shota Battle 2(E)/kaijin_eng/stage1_2/kaijin1.exe
+Size Fetish One x Shota Battle 2 - Female Mutant VS Crossdressing Soldier	unknown	unknown			21	archived; left out
 Slave Matrix	custom	custom		2DGAMELIB.dll	35	archived; engine from 2DGAMELIB.dll
 Slave Princess Elnea	rpg-maker-family	RPG Maker MZ		Slave Princess Elnea/js/rmmz_core.js	2315	archived
-Slave Princess Sarah	unknown	unknown			237	archived; GOG installer
+Slave Princess Sarah	general-engine	Pixel Game Maker MV	1.0.5.2	player.exe version resource "Pixel Game Maker MV player 1.0.5.2", libcocos2d.dll, mozjs-33.dll, in GOG installer	237	archived; action game; VNDegen doesn't run this engine; second survey 2026-11-19
 Slimy Sextet	vn-engine	Ren'Py	8.x (py3)	Slimy Sextet/game/demo.rpa	1002	archived; SOVEREIGN.dll beside the exe
 Sloppy Fields	general-engine	GameMaker		Sloppy Fields/data.win	56	installed
 Smilers Den Deluxxx	general-engine	Unity		Smilers Den Deluxxx_Data/globalgamemanagers	275	archived; Mono
@@ -508,10 +508,10 @@ Spooky Milk Life	general-engine	Unity		UnityPlayer.dll	4624	installed; IL2CPP
 Spooky Pregnant School_ The Conception	vn-engine	Tmr-Hiro ADV System		VNDB release engine field	2378	archived; engine from VNDB release engine field
 Spooky Pregnant School_ The Quickening	vn-engine	Tmr-Hiro ADV System		Spooky Pregnant School The Quickening [Final]/Agrd.pac	2635	archived; engine from VNDB release engine field
 SpunkStock_ Music Festival	general-engine	Unity		SpunkStock Music Festival/UnityPlayer.dll	280	archived; Mono; SOVEREIGN.dll beside the exe
-St. Yariman's Former Sluts ~Mega MILF Edition~	unknown	unknown			1465	installed; GOG offline installer, not unpacked
+St. Yariman's Former Sluts ~Mega MILF Edition~	vn-engine	KiriKiri	2.32.2.426	data.xp3 beside Yariman.exe (TVP(KIRIKIRI) 2 core 2.32.2.426), in GOG installer	1465	installed; plugins KAGParser, addFont, extrans, layerExSave, menu, wuvorbis; VNDegen runs this engine; second survey 2026-11-19
 Stealing Mother from the Deadbeat Dad She Can’t Leave_ Pursued, Loved, and Taken Away	vn-engine	KiriKiri		Stealing My Mother Away/bgm.xp3	438	archived
-Stepmother Loves Her Son 2 – Mommy Yuna Will Teach You Everything	unknown	unknown			1463	archived; no known signature; main exe MamaHaha2/DirectX/directx_Jun2010_redist.exe
-Stepmother Loves Her Son! ~You Can Let Mommy Spoil You… Mama Rinko’s Naughty Caretaking~	unknown	unknown			1366	archived; no known signature; main exe MamaHaha-Eng/DirectX/directx_Jun2010_redist.exe
+Stepmother Loves Her Son 2 – Mommy Yuna Will Teach You Everything	vn-engine	ANIM engine		mamahaha2-nodrm.exe version resource "Anim Copyright (C) 2024"; cg/*.gax, cg/psbpack.dat, voice/mamahaha2_wave.pck, emotedriver.dll	1463	archived; E-mote; VNDegen doesn't run this engine; second survey 2026-11-19
+Stepmother Loves Her Son! ~You Can Let Mommy Spoil You… Mama Rinko’s Naughty Caretaking~	vn-engine	ANIM engine		mamahaha.exe version resource "Anim Copyright (C) 2024"; cg/*.gax, cg/psbpack.dat, emotedriver.dll	1366	archived; E-mote; VNDegen doesn't run this engine; second survey 2026-11-19
 Straight Through the Maze - Save Captured Elves with H	rpg-maker-family	RPG Maker VX Ace		直進迷宮ver1.01/Game.rgss3a	424	archived
 Stranger Maidens Please Protect Me!	general-engine	Unity		Stranger Maidens Please Protect Me/Stranger Maidens_Data/Managed/	1771	archived; Mono; Naninovel
 Stripjong - Super Real Mahjong Venus Returns	general-engine	Unity		SRMR/UnityPlayer.dll	1733	archived; IL2CPP; SOVEREIGN.dll beside the exe
@@ -522,23 +522,23 @@ Succubus Covenant Generation One_ The Cursed Forest	rpg-maker-family	RPG Maker M
 SUCCUBUS DREAMER_ The Small Guardian of Dreams	rpg-maker-family	RPG Maker MV		Succubus Dreamer [RJ206962] (MTL E)/www/js/rpg_core.js	541	archived; encrypted assets; NW.js wrapper
 Succubus Family – The Semen-Draining Contract and the Boy Who Was Taken In	rpg-maker-family	RPG Maker MZ		Succubus Family ENG DEEPL/js/rmmz_core.js	1100	archived; NW.js wrapper
 Succubus Farm	rpg-maker-family	RPG Maker MV		two GOG Inno Setup 5.6.2 installers (main game and unrated add-on) of a plain MV game	704	archived; GOG installers, not a packed exe (checked 2026-11-17)
-Succubus Hunt!	unknown	unknown			394	archived; no known signature; main exe Succubus Hunt! [RJ200657] Ver.1.180101/Succubus Hunt!/SH_v180101.exe
+Succubus Hunt!	rpg-maker-family	RPG Maker VX Ace	RGSS 3.0.1	SH_v180101.exe is an IExpress (CAB) self-extractor holding Game.ini, Game.rgss3a and System/RGSS301.dll	394	archived; game sits inside a self-extracting CAB exe, which VNDegen doesn't unpack; VNDegen runs this engine; second survey 2026-11-19
 Succubus in Wonderland	rpg-maker-family	RPG Maker MV		Succubus in Wonderland/www/js/rpg_core.js	673	archived; NW.js wrapper
 Succubus Nemu's Kissy Cummy Sexpedition Log	rpg-maker-family	RPG Maker MV/MZ (packed exe)		Enigma Virtual Box exe (2017 inline layout) holding an NW.js RPG Maker MV game	524	archived; engine checked 2026-11-17
 Succubus Prison	rpg-maker-family	Wolf RPG Editor		Succubus Prison ~House of Lewd Demons~ Ver.2.10+VP (E)/Succ Prison/sys/Data/BalloonLight.wolf	1603	archived
-Succubus Puttel	unknown	unknown			706	archived; no known signature; main exe Succubus Puttel [RJ265677]/Game.exe
+Succubus Puttel	rpg-maker-family	RPG Maker MV/MZ (packed exe)	MV	Game.exe has .enigma1/.enigma2 sections (Enigma Virtual Box) and an embedded file table naming rpg_core.js	706	archived; NW.js MV game packed in one exe; VNDegen runs this engine; second survey 2026-11-19
 Succubus Reborn	general-engine	Unity		SuccubusReborn_Supporter_20210325d/Succubus Reborn_Data/Managed/	313	archived; Mono
-Succubus Senki	rpg-maker-family	SRPG Studio		Succubus Senki English Plus Additional Voices/data.dts	436	archived
+Succubus Senki	rpg-maker-family	SRPG Studio		Succubus Senki English Plus Additional Voices/data.dts	436	archived; left out after the content check (2026-11-19)
 Succubus Sessions_ Mami Mamiya's Sweet Slice of Hell	vn-engine	ExHibit		VNDB release engine field	2568	installed; engine from VNDB release engine field
 Succubus Showdown	general-engine	Unity		SuccubusShowdown/GameAssembly.dll	218	archived; IL2CPP
 Succubus x Saint ~Succubus' Feast and Saint's Ecstasy~	rpg-maker-family	RPG Maker MV		Succubus ü~ Saint ü`ê·ûéé╠ëâé╞É╣Åùé╠û@ëxü` Ver.1.26/www/js/rpg_core.js	516	archived; encrypted assets; NW.js wrapper
-Succubus_ The Six Spells	unknown	unknown			88	archived; no known signature; main exe 6_succubusu_E_1.00/6_succubusu_E_1.00.exe
+Succubus_ The Six Spells	general-engine	Clickteam Fusion		6_succubusu_E_1.00.exe overlay starts with Clickteam's pack header (PAME/PAMU)	88	archived; VNDegen doesn't run this engine; second survey 2026-11-19
 Succumate	rpg-maker-family	RPG Maker MV		Succumate【1.00】/www/js/rpg_core.js	829	archived; encrypted assets; NW.js wrapper
-Succuquest	unknown	unknown			185	archived; no known signature; main exe Succuquest Game/Succuquest Game.exe
+Succuquest	general-engine	OpenFL (Haxe)		Succuquest Game/lime.ndll beside the exe, manifest/default.json, assets/data/*.scn	185	archived; VNDegen doesn't run this engine; second survey 2026-11-19
 Sucker for Love_ Crush Landing	general-engine	GameMaker		Sucker for Love Crush Landing/data.win	1359	archived; SOVEREIGN.dll beside the exe
 Sucker for Love_ Date to Die For	general-engine	GameMaker		Sucker for Love Date to Die For/data.win	1668	archived; SOVEREIGN.dll beside the exe
 Sucker for Love_ First Date	general-engine	GameMaker		Sucker for Love/data.win	885	archived
-Summer Clover	unknown	unknown			35	installed; no known signature
+Summer Clover	general-engine	Unity	2020.3.48f1	the readable start of the truncated 7z decodes (LZMA2) to Unity files: Elringus.Naninovel.Runtime.dll, Assembly-CSharp.dll, version strings 2020.3.48f1	35	installed; Naninovel; Mono (no il2cpp files seen); the 7z is still truncated (35 MB of about 4.5 GB), so the game can't be extracted; VNDegen doesn't run this engine; second survey 2026-11-19
 Summer Days in the Joyful Countryside	vn-engine	KiriKiri		data.xp3	851	installed
 Summer For You	general-engine	Unity		Summer For You/UnityPlayer.dll	1078	archived; Mono; SOVEREIGN.dll beside the exe
 Summer Holiday Memories with the Ladies Special	rpg-maker-family	RPG Maker MV		Summer Holiday Memories with the Ladies Special/www/js/rpg_core.js	283	archived; NW.js wrapper
@@ -559,13 +559,13 @@ Taimanin Kurenai	vn-engine	KiriKiri		Taimanin Kurenai/data.xp3	873	archived
 Take Me To The Dungeon!!	general-engine	Unity		Take Me To The Dungeon!!/UnityPlayer.dll	2006	archived; IL2CPP; SOVEREIGN.dll beside the exe
 Tales of Boinboin	rpg-maker-family	RPG Maker VX Ace		Mega Milk Story - RJ105810 (E)/Data/Actors.rvdata2	344	archived
 Tales of the Yokai Incident Inspectors	vn-engine	YU-RIS		09  妖怪事件改方（あらためがた）の小噺/bgm.ypf	754	archived
-Tamamao ~Jailbreak the Demon Queen~	unknown	unknown			532	archived; no known signature; main exe たままおver1.05/tamamao105.exe
+Tamamao ~Jailbreak the Demon Queen~	rpg-maker-family	RPG Maker MV/MZ (packed exe)	MV	tamamao105.exe has .enigma1/.enigma2 sections (Enigma Virtual Box) and an embedded file table naming www/js/rpg_core.js and package.nw	532	archived; NW.js MV game packed in one exe; VNDegen runs this engine; second survey 2026-11-19
 Tamer Vale	general-engine	Unity		Tamer Vale v1.7.1/Tamer Vale/UnityPlayer.dll	977	installed+archive; Mono
 Tanned Girl Natsuki_ Haramase Village and the Five Shrines	rpg-maker-family	RPG Maker MV		Game/www/js/rpg_core.js	1179	archived; NW.js wrapper
 Tavern, Inn, and the Halberd	general-engine	Unity		Tavern, Inn, and the Halberd/Tavern, Inn, and the Halberd/GameAssembly.dll	432	archived; IL2CPP
 Teaching a Frustrated Streetwalking Sugar-Baby Brat Gyaru Her Place_ A Depraved Master-and-Servant Romance	rpg-maker-family	RPG Maker MV		Teaching a Frustrated Streetwalking Sugar-Baby Brat Gyaru Her Place/www/js/rpg_core.js	584	archived; NW.js wrapper
 Tenants of the Dead	general-engine	Unity		BOXMAN_V1_1_x64/UnityPlayer.dll	790	archived; Mono; Naninovel
-Tenioha! feat. Mami	unknown	unknown			3098	archived; GOG offline installer, not unpacked; nested archive or installer: setup_tenioha_feat._mami_unrated_1.0.0_(72824).exe
+Tenioha! feat. Mami	vn-engine	KiriKiri	Z 1.4.0.8	data.xp3 and patch.xp3 beside tenioha_mami.exe (TVP(KIRIKIRI) Z core 1.4.0.8), in GOG installer	3098	archived; k2compat scripts, plugin/*.tpm (KAGParser, extrans, extrans2, fstat, krdstheora, krmovie, menu) and DrawDeviceForSteam.dll; patch.xp3 is 2.62 GiB in the unrated installer; VNDegen runs this engine; second survey 2026-11-19
 Tensei Brave	general-engine	Unity		Tensei Brave-Cracked/Tensei Brave_Data/Managed/	5754	archived; Mono
 The Adventure of Monster Tamer	rpg-maker-family	RPG Maker MV		The Adventure of Monster Tamer-RJ206375/GAME-RJ206375/www/js/rpg_core.js	1023	archived; encrypted assets; NW.js wrapper
 The Alchemist & His Battle-Scarred Homunculus	vn-engine	NekoSDK		The Alchemist & His Battle-Scarred Homunculus (Steam)/Open Save Folder.exe	1912	archived; inferred from .pak plus save-folder launcher, the pattern of VNDB-confirmed NekoSDK titles
@@ -601,17 +601,17 @@ The Queen Who Adopted a Goblin	general-engine	Unity		The_Queen_v1.0_Win64_EN/Uni
 The Rural Homecoming	general-engine	Unity		The_Rural_Homecoming_v1.0_64bit/UnityPlayer.dll	119	archived; Mono; Naninovel
 The Rural Homecoming 2	general-engine	Unity		RH2-Win64-Release/UnityPlayer.dll	334	archived; Mono; Naninovel
 The Ship of Servitude [Japanese Ver.]	rpg-maker-family	RPG Maker MV		The Ship of Servitute [RJ234689] (E)/www/js/rpg_core.js	423	archived; encrypted assets; NW.js wrapper
-THE SHOKUSHOO	unknown	unknown			93	archived; no known signature; main exe THE SHOKUSHOO/KeyConfig.exe
+THE SHOKUSHOO	general-engine	Shooting Game Builder		KeyConfig.exe version resource "ShootingGameBuilderのコンフィグ設定用支援ツール"	93	archived; shoot 'em up; VNDegen doesn't run this engine; second survey 2026-11-19
 The Strongest Married Heroine Gets NTRed!	vn-engine	KiriKiri		The Strongest Married Heroine Gets NTRed! [Final]/cv.xp3	613	archived
-The Succubus of the Forest and a Doctor	unknown	unknown			86	archived; nested archive or installer: G-RJ218302/(同人ゲーム) [2018-01-31][RJ218302][ふらむそふと] 森の淫魔とお医者さん.rar
+The Succubus of the Forest and a Doctor	rpg-maker-family	Wolf RPG Editor		inner RAR: Data.wolf beside Game.exe (WOLF RPGエディター, SilverSecond)	86	archived; game is in a RAR inside the outer RAR; VNDegen runs this engine; second survey 2026-11-19
 The Three Charms	rpg-maker-family	RPG Maker VX Ace		üyEnglishüzThe Three Charms/Game.rgss3a	475	archived
 The Three Charms R - The Twelve Monster Girls of Mahoroba	rpg-maker-family	RPG Maker VX Ace		The Three Charms R - The Twelve Monster Girls of Mahoroba/Game.rgss3a	739	archived
-The Titjob Apparition of the Midnight School	unknown	unknown			277	archived; no known signature; main exe midnightschool1.01/midnightschool.exe
+The Titjob Apparition of the Midnight School	rpg-maker-family	RPG Maker MZ		midnightschool.exe is an electron-builder NSIS installer; its app-64.7z holds resources/app.asar with project/js/rmmz_core.js	277	archived; game sits in app.asar inside an NSIS installer; VNDegen runs this engine; second survey 2026-11-19
 The Well Keeper	general-engine	Unity		WELLKEEPER_V1_02_x64/UnityPlayer.dll	198	archived; Mono; Naninovel
 The Witch's Disciples	rpg-maker-family	RPG Maker MV		The Witch's Disciples/www/js/rpg_core.js	1118	archived; encrypted assets; NW.js wrapper
 The World A Robot Girl Dream Of	rpg-maker-family	RPG Maker VX Ace		The World A Robot Girl Dreamt Of v3.2 (Partial E v8)/RJ169029/Save01.rvdata2	2880	archived
 The Wreck of the Spaceship Todoroki	rpg-maker-family	RPG Maker MV		Shipwrecked Spaceship Todoroki (v1.03) (ENG)/難破宇宙船トドロキ号/www/js/rpg_core.js	1344	archived; encrypted assets; NW.js wrapper
-THEIR HAPPIEST HOUR	unknown	unknown			162	archived; no known signature; main exe THEIR HAPPIEST HOUR.exe
+THEIR HAPPIEST HOUR	custom	DxLib (custom)		THEIR HAPPIEST HOUR.exe strings name DxLib sources; Data/sound.dat	162	archived; VNDegen doesn't run this engine; second survey 2026-11-19
 Three Succubi Who Love Me	rpg-maker-family	RPG Maker MZ		ボクのことが大好きな３人のサキュバスさんたち/js/rmmz_core.js	949	archived; encrypted assets; NW.js wrapper
 Time to Impregnate! Wife-cucking Harem Life	vn-engine	KiriKiri		¢sé▄é╣üIÉlì╚ÉQÄµéΦânü[âîâÇÉ½èê/SETUP/data.xp3	560	archived
 To the Wives Who Were Heroes	vn-engine	KiriKiri		To the Wives Who Were Heroes/data.xp3	3715	archived
@@ -621,7 +621,7 @@ Toushin Toshi II	vn-engine	AliceSoft System 3	3.9	System39.ain	184	installed
 Train45	general-engine	Godot		libgodotsteam.windows.template_release.x86_64.dll	1790	installed+archive
 Transpile Girl Rescue Operation!	general-engine	Construct		Transpile Girl Rescue Operation! [v2024.03.03]/www/Scripts/c3runtime.js	486	archived
 Treasure chest Corps-結界を維持するため、魔物を退治した	general-engine	Unity		Treasure Chest Corps (E)/Treasure chest Corps-結界を維持するため、魔物を退治した_Data/Managed/	194	archived; Mono
-Treasure Hunter Eriru	unknown	unknown			656	archived; no known signature; main exe Treasure Hunter Eriru/トレジャーハンターエリルVer1_00.exe
+Treasure Hunter Eriru	general-engine	Flash	Flash Player 11.4 projector	トレジャーハンターエリルVer1_00.exe version resource "Adobe Flash Player 11.4 r402", projector footer (56 34 12 FA) at the end	656	archived; movie appended to the projector exe; VNDegen runs this engine; second survey 2026-11-19
 Treasure Hunter Koo and the Ancient King	rpg-maker-family	RPG Maker MV/MZ (packed exe)		www/save/config.rpgsave	654	archived
 Trials of interspecies Sisters~Erotic exchange with Humans~	rpg-maker-family	RPG Maker MV		The Trial of the Interracial Sister/www/js/rpg_core.js	1835	archived; encrypted assets; NW.js wrapper
 Trinity Dungeon ~The Succubus, the Girls and the Lewd Labyrinth~	rpg-maker-family	RPG Maker MV		Trinity Dungeon [RJ224974] (E)/www/js/rpg_core.js	1545	archived; encrypted assets; NW.js wrapper
@@ -634,10 +634,10 @@ Umineko When They Cry_ Answer Arcs	vn-engine	Ponscripter		Umineko When They Cry 
 Umineko When They Cry_ Question Arcs	vn-engine	Ponscripter		Umineko When They Cry - Question Arcs/0.utf	2770	archived
 Umineko_ Golden Fantasia	custom	custom		Umineko Golden Fantasia/Ougon.exe	2297	archived; no known engine signature; data in FILES/*.LZR
 Undercity of Sin	rpg-maker-family	RPG Maker MV		www/js/rpg_core.js	2087	installed; encrypted assets; NW.js wrapper
-Unison_corD	unknown	unknown			2255	archived; no known signature; main exe Unison_corD_1.06_EN/Unison_corD_EN.exe
+Unison_corD	vn-engine	Light.vn		Unison_corD_EN.exe strings "Light.vn (Soul Engine)" and lvn:: classes; Data/plugins/lvn_message, Data/plugins/lvui, Data/scripts/*.txt, Config/Commands.xml and *.xshd, exe imports libGLESv2/libEGL and BugTrap.dll	2255	archived; RPG with Tiled maps (Data/maps/*.tmj); VNDegen doesn't run this engine; second survey 2026-11-19
 Usashitsuke ~Bunny Discipline~	general-engine	Flash		Usasituke - Onion Tail/EK25846/RJ048302/dat/call.swf	111	archived; ships macOS .app
 Vampire Notes	rpg-maker-family	RPG Maker VX Ace		Vampire Notes V.1.1/Data/Actors.rvdata2	395	archived
-VenusBlood -BRAVE-	unknown	unknown			3617	archived; nested archive or installer: [171027] [Dual Tail] VenusBlood -BRAVE- + Update/(FN輸入) (18禁ゲーム) [171027] [Dual Tail] VenusBlood -BRAVE- (iso+mds+rr3).rar
+VenusBlood -BRAVE-	general-engine	Unity		inner RAR holds TD14_VBB.ISO; its Inno Setup installer lists app/VBB.exe and app/VBB_Data/Managed/Assembly-CSharp.dll (Mono)	3617	archived; the outer 7z has data errors and the inner RAR is truncated; Inno listing read from the surviving setup.exe; VNDegen doesn't run this engine; second survey 2026-11-19
 VenusBlood FRONTIER International	vn-engine	KiriKiri		VenusBlood -FRONTIER- International (E)/character.xp3	3124	archived
 Village Destroyed By Monster Girls 3	rpg-maker-family	RPG Maker MZ		Village_Destroyed_By_Monster_Girls_3/Village_Destroyed_By_Monster_Girls/js/rmmz_core.js	378	archived; encrypted assets; NW.js wrapper
 Village of Lamias ~Squeezed in Harem of Serpent Girls~	rpg-maker-family	RPG Maker MV		ラミアの里 ～ラミアはぁれむで搾られて～ [RJ226998]/www/js/rpg_core.js	267	archived; encrypted assets; NW.js wrapper
@@ -650,40 +650,40 @@ Violated Hero_ I Wanted to Chivalrously Save the World	vn-engine	KiriKiri		Viola
 Vitamin Quest	rpg-maker-family	RPG Maker VX		RJ096241 - Vitamin Quest/Data/Actors.rvdata	134	archived
 Warding Witches	general-engine	Godot		Warding Witches/libgodotsteam.windows.template_release.x86_64.dll	167	archived
 Welcome to Paradise Island	vn-engine	TyranoScript		Welcome to Paradise Island/resources/app/tyrano/audio/silent.mp3	885	archived; Electron wrapper
-Welcome to the Lewd Elf Forest!	unknown	unknown			3054	archived; disc image
+Welcome to the Lewd Elf Forest!	vn-engine	Tmr-Hiro ADV System		disc image (ISO in RAR): GameData/Agrd.pac to Dgrd.pac, mus.pac, se.pac, vic.pac beside GameData/ようこそスケベエルフの森へ.exe (AGE_System) and uninst.exe (H.Tamura)	3054	archived; srp.pac is not on the disc; uninst.exe lists GameData/srp.pac to srp_6.pac, so the installer or the DLsite-signed launcher at the disc root (31 MB, v8) provides the scripts; not playable from the disc files alone; VNDegen runs this engine; second survey 2026-11-19
 Welcome to the Mizuryuu kei land~ A Naughty theme park with your family!	vn-engine	Tmr-Hiro ADV System		OIDEYO/Agrd.pac	902	archived; inferred from .pac plus uninst.exe, the pattern of VNDB-confirmed Tmr-Hiro titles
 Welcome to the Monmusu Park	rpg-maker-family	RPG Maker MV		monmusuPark_windows/www/js/rpg_core.js	1534	archived; NW.js wrapper
 Welcome to the Village of Busty Blondes!	rpg-maker-family	RPG Maker MZ		welcome_to_the_village_of_busty_blondes_v1.03/js/rmmz_core.js	456	archived; NW.js wrapper
-What a Wonderful Day!! 完成版	unknown	unknown			291	archived; no known signature; main exe What a Wonderful Day!! 完成版/GalleryMode!!.exe
+What a Wonderful Day!! 完成版	custom	custom		Data/Skeleton.dll (d3d9) beside Data/*.dat	291	archived; Direct3D 9 native code; same Skeleton.dll layout as Lover of Mirror Image; VNDegen doesn't run this engine; second survey 2026-11-19
 Whispered Promises ~ 14 Days of Love with Anna	rpg-maker-family	RPG Maker MV		Whispered Promises ~ 14 Days of Love with Anna [Final]/www/js/rpg_core.js	673	archived; encrypted assets; NW.js wrapper
 With a VTuber Girl	general-engine	Unity		With a VTuber Girl-v1.0.2s/NejiSimTma03_Data/Managed/	184	archived; Mono
 With the Devilish Her…	general-engine	Unity		korean/UnityPlayer.dll	32927	installed; Mono
 Wolf Girl With You	general-engine	Flash		Wolf Girl With You 1.0.0.6/Content/movie/liru_bath_ud1.swf	1607	archived
-Wolf's Dungeon	unknown	unknown			66	archived; no known signature; main exe Wolf'sDungeon.exe
+Wolf's Dungeon	general-engine	Clickteam Fusion		Wolf'sDungeon.exe overlay starts with Clickteam's pack header (77777777 49874712)	66	archived; VNDegen doesn't run this engine; second survey 2026-11-19
 Wolfenstein 3D	custom	custom		public knowledge, not verified from files (original DOS engine)	17	archived; engine from public knowledge, not verified from files (original DOS engine)
 Womanizing Private Tutor's Cuckoldry Report ~Slutty & Busty Mother & Daughter~	vn-engine	KiriKiri		Womanizing Private Tutor's Cuckoldry Report ~Slutty & Busty Mother & Daughter~/data.xp3	1167	archived
 Yabai! -Fukushuu Yami Site-	vn-engine	NekoSDK		Yabai_-Fukushuu_Yami/セーブデータフォルダを開く.exe	1841	archived; inferred from .pak plus save-folder launcher, the pattern of VNDB-confirmed NekoSDK titles
 Yakuza Rogue EX_ Officer Ayukawa Hikaru	general-engine	Unity		Yakuza Rogue EX Officer Ayukawa Hikaru/UnityPlayer.dll	1187	archived; IL2CPP; SOVEREIGN.dll beside the exe
 Yarimono	rpg-maker-family	RPG Maker MV		Yarisutemesubuta v4.00/data/www/js/rpg_core.js	3498	archived; encrypted assets; NW.js wrapper
 Yarinaoshi no Christmas	vn-engine	NekoSDK		Yarinaoshi no Christmas/セーブデータフォルダを開く.exe	1150	archived; engine from VNDB release engine field
-Yokai Busters	unknown	unknown			1738	installed; GOG offline installer, not unpacked
+Yokai Busters	rpg-maker-family	RPG Maker MV		www/js/rpg_core.js in GOG installer	1738	installed; NW.js, encrypted assets (.rpgmvp), Kadokawa build; VNDegen runs this engine; second survey 2026-11-19
 You Can't Corrupt Me! ~Tale of a Naive Elven Swordswoman~ SS	rpg-maker-family	RPG Maker MV		NaiveElvenSwordswoman/www/js/rpg_core.js	589	archived; NW.js wrapper
 Youmaen_ The Magic Academy of Loli Succubi	rpg-maker-family	Wolf RPG Editor		[Toki Nokogiri] Youmaen - The Magic Academy of Loli Succubi/sys/Data/BasicData.wolf	1328	archived
 Your Mom	general-engine	Unity		Your Mom/UnityPlayer.dll	895	archived; Mono; SOVEREIGN.dll beside the exe
 Your Sweet House ~Succubus Mama & Eldritch Mansion~	rpg-maker-family	RPG Maker MV		Your Sweet House ～Succubus Mama [RJ233706] (E)/ゆあ・すいーと・はうす～サキュバスと異界の館～/www/js/rpg_core.js	933	archived; encrypted assets; NW.js wrapper
 Ys_ The Oath in Felghana	custom	custom		public knowledge, not verified from files (Falcom in-house)	1825	archived; engine from public knowledge, not verified from files (Falcom in-house)
-Yu Crossing Animals	unknown	unknown			173	archived; GOG offline installer, not unpacked; nested archive or installer: setup_yu_crossing_animals_1.0_(65656).exe
+Yu Crossing Animals	general-engine	Godot	3.4.5	Yu Crossing Animals.pck beside Yu Crossing Animals.exe (Godot Engine 3.4.5 version resource), in GOG installer	173	archived; plain layout, no GDNative libraries; VNDegen runs this engine; second survey 2026-11-19
 Yuka_ Scattered Shards of the Yokai	rpg-maker-family	RPG Maker MV		Yuka_-_Scattered_Shards_of_the_Yokai_ENG R1/Yuka - Scattered Shards of the Yokai/www/js/rpg_core.js	859	archived; encrypted assets; NW.js wrapper
 YUME-SAME	rpg-maker-family	Wolf RPG Editor		YUMESAME/Data/BasicData/CDataBase.dat	1827	archived
 Yumei Club	rpg-maker-family	Wolf RPG Editor		Yumei Club/幽冥倶楽部/Data/BasicData/	62	archived
 Yuuka's Manor	rpg-maker-family	RPG Maker MV		Yuuka's Mansion (v.30-05-2022_MOD2)/www/js/rpg_core.js	756	archived; NW.js wrapper
 Zombies & Utopia	rpg-maker-family	RPG Maker MZ		Zombies & Utopia/js/rmmz_core.js	189	archived; encrypted assets; NW.js wrapper
 いたずら淫魔と願いの塔	rpg-maker-family	RPG Maker VX		Succubus Tower 2 [RJ210637] (E)/Data/Actors.rvdata	433	archived
-たままお1.5 ～忘れられしメカモンの逆襲～	unknown	unknown			729	archived; no known signature; main exe GAME-RJ206092/たままお一転後ver1.00/tamamao15.exe
+たままお1.5 ～忘れられしメカモンの逆襲～	rpg-maker-family	RPG Maker MV/MZ (packed exe)	MV	tamamao15.exe has .enigma1/.enigma2 sections (Enigma Virtual Box) and an embedded file table naming rpg_core.js	729	archived; NW.js MV game packed in one exe; VNDegen runs this engine; second survey 2026-11-19
 サキュバスの籠 -  町外れで薬草を採る最中、淫魔に辻取りされて精液ペット♂にされました	rpg-maker-family	RPG Maker VX Ace		RE201762/RE201762/Game.rgss3a	238	archived
 サキュバステイマー 白猫シャーロットとひよっこ魔法使い	rpg-maker-family	RPG Maker VX		succubus tamer ver4.1_translated/Data/Actors.rvdata	835	archived
 セイクリッド～砕かれた光の冠～	rpg-maker-family	Smile Game Builder		RJ197460 170517/セイクリッド～砕かれた光の冠～ver1.04/data.sgbpack	311	archived; left out after the content check (2026-11-18)
 パンドラの森 ～ソウセイの淫魔と堕落の牧場～	rpg-maker-family	RPG Maker MV		Pandora's Forest [RJ240327]/パンドラの森 ～ソウセイの淫魔と堕落の牧場～Ver1.06/www/js/rpg_core.js	523	archived; encrypted assets; NW.js wrapper
-プリンセスディフェンダー ～精霊姫エルトリーゼの物語～	unknown	unknown			407	installed; no known signature
+プリンセスディフェンダー ～精霊姫エルトリーゼの物語～	unknown	unknown			407	installed; the .rar has no archive signature anywhere in its 407 MB and its bytes look random (entropy 8.0), so it is encrypted or damaged; it is the only file in the folder; second survey 2026-11-19
 人外娘生態録	vn-engine	TyranoScript		人外娘生態録 [RJ226139]/tyrano/	926	archived; NW.js wrapper
 堕落乙女異聞―堕ちたる勇者と真実の魔剣―	rpg-maker-family	RPG Maker VX Ace		Another Story of Fallen Maidens/Game.rgss3a	401	archived
