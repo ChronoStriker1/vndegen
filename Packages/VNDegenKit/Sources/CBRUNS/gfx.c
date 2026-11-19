@@ -77,7 +77,9 @@ bool obj_hit(BR *e, Obj *o, int mx, int my) {
     }
     Image *im = parts_image(e, p, 0, e->now);
     if (!im) return false;
-    bool hit = mx >= o->x && my >= o->y && mx < o->x + im->w && my < o->y + im->h && (im->px[(size_t)(my - o->y) * im->w + (mx - o->x)] >> 24) > 0;
+    int x0, y0, x1, y1;
+    image_bbox(im, &x0, &y0, &x1, &y1);
+    bool hit = mx >= o->x + x0 && my >= o->y + y0 && mx < o->x + x1 && my < o->y + y1;
     image_free(im);
     return hit;
 }
@@ -101,7 +103,7 @@ static void obj_draw(BR *e, u32 *dst, Obj *o) {
 static int obj_cmp(const void *a, const void *b) {
     const Obj *x = *(Obj *const *)a, *y = *(Obj *const *)b;
     if (x->layer != y->layer) return x->layer - y->layer;
-    if (x->z != y->z) return x->z - y->z;
+    if (x->z != y->z) return y->z - x->z;
     if (x->kind != y->kind) return x->kind - y->kind;
     return x->order - y->order;
 }
@@ -122,7 +124,7 @@ void bg_set(BR *e, int num, int ms) {
         e->bgPrev = image_new(BR_W, BR_H);
         if (e->bg) blit(e->bgPrev->px, BR_W, BR_H, e->bg, 0, 0, -1, -1, 0, 0, 255);
         else
-            for (int i = 0; i < BR_W * BR_H; i++) e->bgPrev->px[i] = 0xff000000u;
+            for (int i = 0; i < BR_W * BR_H; i++) e->bgPrev->px[i] = 0;
     }
     image_free(e->bg);
     e->bg = num >= 0 ? image_storage(e, num) : NULL;
@@ -143,6 +145,7 @@ bool overlay_busy(BR *e) { return anim_busy(e, &e->overlay); }
 void gfx_frame(BR *e) {
     u32 *dst = e->screen;
     for (int i = 0; i < BR_W * BR_H; i++) dst[i] = 0xff000000u;
+    layers_draw(e, dst);
     if (e->bgPrev && bg_busy(e)) {
         blit(dst, BR_W, BR_H, e->bgPrev, 0, 0, -1, -1, 0, 0, 255);
         blit(dst, BR_W, BR_H, e->bg, 0, 0, -1, -1, 0, 0, (int)anim_value(e, &e->bgFade));
@@ -153,11 +156,11 @@ void gfx_frame(BR *e) {
         }
         blit(dst, BR_W, BR_H, e->bg, 0, 0, -1, -1, 0, 0, 255);
     }
-    layers_draw(e, dst);
     static Obj *list[4096];
     int n = obj_sorted(e, list, 4096);
     for (int i = 0; i < n; i++) obj_draw(e, dst, list[i]);
     msg_draw(e, dst);
+    menu_draw(e, dst);
     int oa = (int)anim_value(e, &e->overlay);
     if (oa > 0) fill_rect(dst, BR_W, BR_H, 0, 0, BR_W, BR_H, e->overlayColor, oa);
     e->serial++;

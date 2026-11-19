@@ -184,12 +184,5 @@ void vm_run(BR *e) {
 
 static void script_end(BR *e) {
     if (e->trace) br_log(e, "script stack empty");
-    if (e->nextScript >= 0) {
-        int n = e->nextScript;
-        e->nextScript = -1;
-        e->systemMode = e->nextSystem;
-        vm_start(e, n);
-        return;
-    }
-    e->ended = true;
+    sys_return(e);
 }

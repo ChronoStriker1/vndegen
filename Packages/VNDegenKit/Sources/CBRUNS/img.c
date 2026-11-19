@@ -243,3 +243,27 @@ void blit_tinted(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int 
         }
     }
 }
+
+void image_bbox(Image *im, int *x0, int *y0, int *x1, int *y1) {
+    if (!im->boxed) {
+        int a = im->w, b = im->h, c = 0, d = 0;
+        for (int y = 0; y < im->h; y++)
+            for (int x = 0; x < im->w; x++)
+                if (im->px[(size_t)y * im->w + x] >> 24) {
+                    if (x < a) a = x;
+                    if (y < b) b = y;
+                    if (x + 1 > c) c = x + 1;
+                    if (y + 1 > d) d = y + 1;
+                }
+        if (c <= a || d <= b) a = b = c = d = 0;
+        im->bx0 = a;
+        im->by0 = b;
+        im->bx1 = c;
+        im->by1 = d;
+        im->boxed = true;
+    }
+    *x0 = im->bx0;
+    *y0 = im->by0;
+    *x1 = im->bx1;
+    *y1 = im->by1;
+}

@@ -235,8 +235,14 @@ void snd_voice(BR *e, int slot, int num) {
 
 void snd_se_hover(BR *e) {}
 
+void snd_se_click(BR *e) {}
+
 void snd_volume(BR *e, int ch, int vol, int ms) {
     if (ch < 0 || ch >= BR_CHANNELS) return;
     e->chanGain[ch] = (float)vol / 100.0f;
     snd_apply_volumes(e);
+}
+
+void snd_stop_voices(BR *e) {
+    for (int i = CH_VOICE; i < BR_CHANNELS; i++) snd_stop(e, i, 0);
 }

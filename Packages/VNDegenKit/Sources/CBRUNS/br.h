@@ -22,6 +22,7 @@ typedef int64_t i64;
 #define BR_LOCALS 64
 #define BR_STRINGS 16384
 #define BR_SCRIPTS 10000
+#define QUICK_SLOT 100
 
 enum { N_INT, N_STR, N_SYM, N_LIST };
 
@@ -114,6 +115,8 @@ typedef struct Image {
     int w, h;
     u32 *px;
     int refs;
+    bool boxed;
+    int bx0, by0, bx1, by1;
 } Image;
 
 typedef struct FontSheet {
@@ -146,6 +149,7 @@ enum { OBJ_IMG, OBJ_BTN, OBJ_KINDS };
 typedef struct Obj {
     int kind, id, parts, layer, x, y, z, alpha, flag;
     int event, order;
+    int hoverEvent;
     bool disabled, hidden, hover, pressed, hasColor;
     u32 color;
     int fontSize;
@@ -186,7 +190,14 @@ typedef struct Msg {
     u32 color;
     u32 lastReveal, waitStart;
     Image *layer;
+    char *raw;
 } Msg;
+
+typedef struct Menu {
+    bool show, autohide, enable, pinned, open;
+    int hover;
+    bool off[32];
+} Menu;
 
 enum {
     LP_SWITCH = 8, LP_IX, LP_IY, LP_IW, LP_IH, LP_TX, LP_TY, LP_TW, LP_TH,
@@ -220,7 +231,7 @@ typedef struct Cfg {
     int scriptDigits;
     char imageDir[64], partsDir[64], partsBase[32], musicDir[64], musicBase[32], effectDir[64], effectBase[32], voiceDir[64];
     int partsDigits, musicDigits, effectDigits, voiceDigits, voiceSceneDigits;
-    int initialScript;
+    int initialScript, titleScript;
 } Cfg;
 
 enum { W_NONE, W_TIME, W_CLICK, W_EVENT, W_FADE, W_TEXT, W_DIALOG, W_END };
@@ -276,7 +287,7 @@ typedef struct BR {
     bool frozen;
     Msg msg;
     MsgCfg msgCfg[BR_MSGWIN];
-    bool skipping, autoMode, wheelDown, msgHidden;
+    bool skipping, skipMode, autoMode, wheelDown, msgHidden;
     int textSpeed, autoMs;
     Mixer *mixer;
     int music[4];
@@ -284,6 +295,11 @@ typedef struct BR {
     int vol[3], volMaster;
     float chanGain[BR_CHANNELS];
     int voiceNum[10];
+    Node *sysRoot, *gameSnap, *loadedState;
+    bool sysDirty, slotShotDirty;
+    u32 sysSavedAt;
+    Menu menu;
+    int savedWait;
     u32 rng;
     u32 eventStart;
 } BR;
@@ -414,3 +430,32 @@ void snd_music(BR *e, int slot, int track, int fadeMs);
 void snd_se(BR *e, int slot, int num);
 void snd_voice(BR *e, int slot, int num);
 void snd_volume(BR *e, int ch, int vol, int ms);
+char *sx_print(Node *n, size_t *len);
+Node *sx_copy(const Node *n);
+void sys_load(BR *e);
+bool sys_save(BR *e);
+void sys_mark_dirty(BR *e);
+Node *state_capture(BR *e, bool globals);
+bool state_apply(BR *e, Node *st, bool globals);
+bool save_slot(BR *e, int slot, const char *comment);
+Node *slot_info(BR *e, int slot);
+Node *slot_state(BR *e, int slot);
+void slot_state_release(Node *st);
+bool slot_comment(BR *e, int slot, const char *comment);
+void seen_text(BR *e, int script, int line);
+bool seen_text_has(BR *e, int script, int line);
+void sys_call(BR *e, int script);
+void sys_return(BR *e);
+void sys_game_start(BR *e, int script, int sub);
+bool sys_info(BR *e, int slot, int wA, int wB, int sC);
+bool sys_load_slot(BR *e, int slot);
+void sys_format_time(BR *e, int dst, i32 when);
+void sys_title(BR *e);
+void snd_stop_voices(BR *e);
+bool menu_allowed(BR *e);
+void menu_event(BR *e, const char *ev);
+bool menu_input(BR *e);
+void menu_draw(BR *e, u32 *dst);
+void menu_builtin(BR *e, int id, int a, int b);
+void snd_se_click(BR *e);
+void image_bbox(Image *im, int *x0, int *y0, int *x1, int *y1);

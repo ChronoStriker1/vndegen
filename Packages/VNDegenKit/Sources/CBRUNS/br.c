@@ -36,6 +36,7 @@ static bool cfg_load(BR *e) {
     c->voiceSceneDigits = cfg_num(res, ":voice-scene-num-digits", 1);
     Node *consts = sx_find(c->root, ":flag-constants");
     c->initialScript = sx_int(sx_cdr_value(sx_assoc(consts, 1)), 9000);
+    c->titleScript = 9000;
     Node *win = sx_find(c->root, ":window");
     const char *t = cfg_text(win, ":window-title", "");
     snprintf(e->title, sizeof e->title, "%s", t);
@@ -79,7 +80,7 @@ VNBruns *vnbruns_open(const VNBrunsConfig *cfg, char *err, size_t errSize) {
     e->word = br_alloc(sizeof(i32) * BR_WORDS);
     e->screen = br_alloc(sizeof(u32) * BR_W * BR_H);
     e->unknownSeen = br_alloc(10000);
-    e->nextScript = -1;
+    e->nextScript = -2;
     e->rng = (u32)cfg->startTime;
     e->textSpeed = 1;
     e->mixer = mixer_new();
@@ -94,6 +95,7 @@ VNBruns *vnbruns_open(const VNBrunsConfig *cfg, char *err, size_t errSize) {
         return NULL;
     }
     br_log(e, "opened %s", e->gameDir);
+    sys_load(e);
     e->systemMode = true;
     vm_start(e, e->cfg.initialScript);
     if (!e->sp) {
@@ -107,6 +109,10 @@ VNBruns *vnbruns_open(const VNBrunsConfig *cfg, char *err, size_t errSize) {
 void vnbruns_close(VNBruns *n) {
     BR *e = (BR *)n;
     if (!e) return;
+    if (e->sysDirty) sys_save(e);
+    sx_free(e->sysRoot);
+    sx_free(e->gameSnap);
+    sx_free(e->loadedState);
     script_free_all(e);
     gfx_free(e);
     parts_free_all(e);
@@ -126,9 +132,19 @@ void vnbruns_close(VNBruns *n) {
 }
 
 static void tick(BR *e) {
+    e->skipping = e->ctrlHeld || e->skipMode;
     msg_update(e);
+    if (menu_input(e)) e->lPress = false;
+    if (!e->systemMode && e->wait == W_TEXT && e->rPress) {
+        e->rPress = false;
+        sys_call(e, 9007);
+    }
     uf_tick(e);
     vm_run(e);
+    if (e->sysDirty && e->now - e->sysSavedAt > 2000) {
+        sys_save(e);
+        e->sysSavedAt = e->now;
+    }
     e->lPress = e->rPress = false;
     e->wheel = 0;
 }
@@ -176,7 +192,6 @@ void vnbruns_key(VNBruns *n, int vk, bool down) {
     BR *e = (BR *)n;
     if (vk == 0x11) {
         e->ctrlHeld = down;
-        e->skipping = down;
     }
     if (!down) return;
     if (vk == 0x0d || vk == 0x20) e->lPress = true;

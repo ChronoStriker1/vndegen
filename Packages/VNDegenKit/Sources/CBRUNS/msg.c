@@ -56,6 +56,8 @@ static void page_reset(BR *e) {
     m->color = color_code(e, 20);
     if (m->layer) memset(m->layer->px, 0, sizeof(u32) * (size_t)m->layer->w * m->layer->h);
     m->drawn = 0;
+    free(m->raw);
+    m->raw = NULL;
 }
 
 void msg_select(BR *e, int id) {
@@ -98,6 +100,9 @@ static void put_glyph(BR *e, const u8 *p) {
 
 void msg_append(BR *e, const char *s) {
     Msg *m = &e->msg;
+    char *raw = br_fmt("%s%s", m->raw ? m->raw : "", s);
+    free(m->raw);
+    m->raw = raw;
     if (!m->layer) msg_select(e, m->win);
     for (const u8 *p = (const u8 *)s; *p;) {
         if ((p[0] == '$' || p[0] == '#') && p[1]) {
@@ -139,6 +144,7 @@ void msg_send(BR *e, Node *call) {
     if (a->t == N_STR) {
         msg_append(e, a->s);
         history_add(e, a->s);
+        if (e->sp && call->n > 2) seen_text(e, e->stack[e->sp - 1].sc->num, sx_int(call->k[2], 0));
         return;
     }
     if (sx_sym(a, "clear")) {
@@ -231,6 +237,8 @@ void msg_draw(BR *e, u32 *dst) {
 }
 
 void msg_free(BR *e) {
+    free(e->msg.raw);
+    e->msg.raw = NULL;
     image_free(e->msg.layer);
     e->msg.layer = NULL;
 }

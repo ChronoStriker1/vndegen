@@ -61,11 +61,6 @@ static void event_wait(BR *e, int mask, int timeout, int flag) {
     e->reflag = 0;
 }
 
-static void game_start(BR *e, int script, int sub) {
-    e->nextScript = script;
-    e->nextSystem = false;
-    e->sp = 0;
-}
 
 bool uf_call(BR *e, int id, Node *call) {
     trace_call(e, id, call);
@@ -123,6 +118,9 @@ bool uf_call(BR *e, int id, Node *call) {
     case 2020: msg_select(e, A(e, call, 0)); return true;
     case 2021: msg_show(e, A(e, call, 0) != 0); return true;
     case 2022: msg_append(e, str_get(e, A(e, call, 0))); return true;
+    case 2043:
+    case 2044: menu_builtin(e, id, A(e, call, 0), A(e, call, 1)); return true;
+    case 2080: e->reflag = 1; return true;
     case 2050: obj_clear(e, OBJ_IMG); return true;
     case 2120: obj_clear(e, OBJ_BTN); return true;
     case 2053:
@@ -173,7 +171,10 @@ bool uf_call(BR *e, int id, Node *call) {
     }
     case 4111: {
         int f = A(e, call, 0);
-        if (f >= 0 && f < BR_FLAGS) e->flag[f] = A(e, call, 1);
+        if (f >= 0 && f < BR_FLAGS && e->flag[f] != A(e, call, 1)) {
+            e->flag[f] = A(e, call, 1);
+            e->sysDirty = true;
+        }
         return true;
     }
     case 5003: {
@@ -198,12 +199,25 @@ bool uf_call(BR *e, int id, Node *call) {
     }
     case 5004: {
         char buf[32];
-        snprintf(buf, sizeof buf, "%d", A(e, call, 1));
+        int width = A(e, call, 2), pad = A(e, call, 3);
+        if (width > 0 && pad) snprintf(buf, sizeof buf, "%0*d", width, A(e, call, 1));
+        else if (width > 0) snprintf(buf, sizeof buf, "%*d", width, A(e, call, 1));
+        else snprintf(buf, sizeof buf, "%d", A(e, call, 1));
         str_set(e, A(e, call, 0), buf);
         return true;
     }
     case 6000: e->quit = true; return true;
-    case 6002: game_start(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 6002: sys_game_start(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 6007: sys_title(e); return true;
+    case 4200: sys_info(e, A(e, call, 0), A(e, call, 1), A(e, call, 2), A(e, call, 3)); return true;
+    case 4201: e->reflag = save_slot(e, A(e, call, 0), S(e, call, 3)); return true;
+    case 4202: e->reflag = sys_load_slot(e, A(e, call, 0)); return true;
+    case 4203: e->reflag = slot_comment(e, A(e, call, 0), S(e, call, 1)); return true;
+    case 4204: e->reflag = save_slot(e, QUICK_SLOT, ""); return true;
+    case 4205: e->reflag = sys_load_slot(e, -1); return true;
+    case 4300: return true;
+    case 5005: sys_format_time(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 7001: e->reflag = 0; return true;
     case 7002: return true;
     default: unknown(e, id); return true;
     }
