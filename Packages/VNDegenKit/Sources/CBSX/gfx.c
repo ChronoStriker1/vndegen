@@ -49,6 +49,25 @@ void bx_blit_part(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int
     }
 }
 
+void bx_blit_multiply(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha) {
+    if (!im || alpha <= 0) return;
+    for (int y = 0; y < im->h; y++) {
+        int py = dy + y;
+        if (py < 0 || py >= dh) continue;
+        for (int x = 0; x < im->w; x++) {
+            int px = dx + x;
+            if (px < 0 || px >= dw) continue;
+            u32 s = im->px[(size_t)y * im->w + x];
+            u32 a = (s >> 24) * (u32)alpha / 255;
+            if (!a) continue;
+            u32 *d = &dst[(size_t)py * dw + px];
+            u32 m = 0xff000000u;
+            for (int k = 0; k < 24; k += 8) m |= (((*d >> k) & 0xff) * ((s >> k) & 0xff) / 255) << k;
+            *d = mix(*d, m & 0xffffff, a);
+        }
+    }
+}
+
 void bx_blit(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha) {
     if (im) bx_blit_part(dst, dw, dh, im, 0, 0, im->w, im->h, dx, dy, alpha);
 }
@@ -93,18 +112,26 @@ static Image *face_image(BX *b, const char *name) {
 
 static void draw_obj(BX *b, const Obj *o, u32 *dst) {
     char body[64], face[64];
+    int x = o->x + o->kx, y = o->y + o->ky, a = o->alpha;
+    if (a <= 0) return;
     if (o->kind == OK_CHAR && bustup_parts(o->name, body, face)) {
         Image *im = bx_image_load(b, body);
-        if (im) bx_blit(dst, b->W, b->H, im, im->x + o->x, im->y + o->y, 255);
+        if (im) bx_blit(dst, b->W, b->H, im, im->x + x, im->y + y, a);
         Image *f = face_image(b, o->name);
-        if (f) bx_blit(dst, b->W, b->H, f, f->x + o->x, f->y + o->y, 255);
+        if (f) bx_blit(dst, b->W, b->H, f, f->x + x, f->y + y, a);
         return;
     }
     Image *im = bx_image_load(b, o->name);
-    if (im) bx_blit(dst, b->W, b->H, im, im->x + o->x, im->y + o->y, 255);
+    if (im && o->kind == OK_OBJ && bx_cfg_get(&b->cfg, "button object", o->name)) {
+        int h = im->h / 2;
+        bx_blit_part(dst, b->W, b->H, im, 0, o->id == b->objHover ? h : 0, im->w, h, im->x + x, im->y + y, a);
+        return;
+    }
+    if (im && o->blend == 1) bx_blit_multiply(dst, b->W, b->H, im, im->x + x, im->y + y, a);
+    else if (im) bx_blit(dst, b->W, b->H, im, im->x + x, im->y + y, a);
     if (o->face[0]) {
         Image *f = bx_image_load(b, o->face);
-        if (f) bx_blit(dst, b->W, b->H, f, f->x + o->x, f->y + o->y, 255);
+        if (f) bx_blit(dst, b->W, b->H, f, f->x + x, f->y + y, a);
     }
 }
 
@@ -127,25 +154,43 @@ void bx_compose(BX *b, const Scene *s, u32 *dst) {
     for (int i = 0; i < count; i++) draw_obj(b, list[i], dst);
 }
 
-static Obj *find_in(Scene *s, int kind, int id, const char *name) {
+static bool numbered(int kind) { return kind != OK_BG; }
+
+static Obj *find_named(Scene *s, int kind, const char *name) {
+    int no = kind == OK_CHAR ? char_id(name) : 0;
     for (int i = 0; i < BX_OBJS; i++) {
         Obj *o = &s->obj[i];
         if (!o->used || o->kind != kind) continue;
-        if (kind == OK_OVERLAY || kind == OK_OBJ ? bx_ieq(o->name, name) : o->id == id) return o;
+        if (kind == OK_BG) return o;
+        if (kind == OK_CHAR ? o->charNo == no : bx_ieq(o->name, name)) return o;
     }
     return NULL;
 }
 
-Obj *bx_obj_find(BX *b, int kind, int id) { return find_in(&b->scene, kind, id, ""); }
+static Obj *find_id(Scene *s, int id) {
+    for (int i = 0; i < BX_OBJS; i++)
+        if (s->obj[i].used && numbered(s->obj[i].kind) && s->obj[i].id == id) return &s->obj[i];
+    return NULL;
+}
+
+Obj *bx_obj_find(BX *b, int kind, int id) {
+    for (int i = 0; i < BX_OBJS; i++) {
+        Obj *o = &b->scene.obj[i];
+        if (o->used && o->kind == kind && (kind == OK_BG || o->id == id)) return o;
+    }
+    return NULL;
+}
+
+Obj *bx_obj_by_id(BX *b, int id) { return find_id(&b->scene, id); }
 
 Obj *bx_obj_put(BX *b, int kind, int id, const char *name, int x, int y) {
+    (void)id;
     Scene *s = &b->scene;
-    if (kind == OK_BG) {
+    if (kind == OK_BG)
         for (int i = 0; i < BX_OBJS; i++)
             if (s->obj[i].used && s->obj[i].kind != OK_OBJ) s->obj[i].used = false;
-    }
-    if (kind == OK_CHAR) id = char_id(name);
-    Obj *o = find_in(s, kind, id, name);
+    Obj *o = find_named(s, kind, name);
+    int keepId = o ? o->id : 0;
     if (!o)
         for (int i = 0; i < BX_OBJS && !o; i++)
             if (!s->obj[i].used) o = &s->obj[i];
@@ -153,10 +198,18 @@ Obj *bx_obj_put(BX *b, int kind, int id, const char *name, int x, int y) {
         bx_log(b, "too many pictures on screen");
         return NULL;
     }
+    if (numbered(kind) && !keepId) {
+        keepId = 1;
+        while (find_id(s, keepId)) keepId++;
+    }
     memset(o, 0, sizeof *o);
     o->used = true;
     o->kind = kind;
-    o->id = id;
+    o->id = keepId;
+    o->charNo = kind == OK_CHAR ? char_id(name) : 0;
+    o->alpha = 255;
+    o->blend = b->nextBlend;
+    b->nextBlend = 0;
     snprintf(o->name, sizeof o->name, "%s", name);
     o->x = x;
     o->y = y;
@@ -174,11 +227,11 @@ void bx_obj_face(BX *b, Obj *o, const char *name) {
     if (o) snprintf(o->face, sizeof o->face, "%s", name);
 }
 
-bool bx_obj_move(BX *b, int kind, int id, int x, int y, int ms) {
+bool bx_obj_move(BX *b, int id, int x, int y, int ms) {
     bool any = false;
     Scene *scenes[2] = {&b->scene, &b->shown};
     for (int k = 0; k < 2; k++) {
-        Obj *o = find_in(scenes[k], kind, id, "");
+        Obj *o = find_id(scenes[k], id);
         if (!o) continue;
         any = true;
         o->ax0 = o->x;
@@ -197,12 +250,134 @@ bool bx_obj_move(BX *b, int kind, int id, int x, int y, int ms) {
     return any;
 }
 
+static int attr(const char *tag, const char *name, int *a, int *bb) {
+    char key[32];
+    snprintf(key, sizeof key, "%s=\"", name);
+    const char *p = strstr(tag, key);
+    if (!p) return 0;
+    p += strlen(key);
+    char *e;
+    *a = (int)strtol(p, &e, 10);
+    if (bb) {
+        while (*e == ' ') e++;
+        *bb = (int)strtol(e, NULL, 10);
+    }
+    return 1;
+}
+
+static Anim *anim_get(BX *b, const char *name) {
+    for (int i = 0; i < b->animCount; i++)
+        if (bx_ieq(b->anims[i].name, name)) return &b->anims[i].anim;
+    if (b->animCount >= 16) return NULL;
+    char file[96];
+    snprintf(file, sizeof file, "%s.txt", name);
+    size_t n;
+    u8 *d = bx_res_read(&b->arc, RX_DEF, file, &n);
+    if (!d) {
+        bx_log(b, "no animation %s", name);
+        return NULL;
+    }
+    Anim *a = &b->anims[b->animCount].anim;
+    memset(a, 0, sizeof *a);
+    b->anims[b->animCount++].name = bx_strdup(name);
+    const char *s = (const char *)d;
+    const char *layer = strstr(s, "<layer");
+    a->fps = 60;
+    if (layer) {
+        attr(layer, "fps", &a->fps, NULL);
+        attr(layer, "begin", &a->begin, NULL);
+        attr(layer, "end", &a->end, NULL);
+        a->keep = strstr(layer, "takeover=\"true\"") == NULL;
+    }
+    int lastX = 0, lastY = 0, lastO = 100;
+    for (const char *f = strstr(s, "<frame"); f; f = strstr(f + 1, "<frame")) {
+        a->frames = bx_realloc(a->frames, sizeof(KeyFrame) * (size_t)(a->count + 1));
+        KeyFrame *k = &a->frames[a->count++];
+        k->no = 0;
+        attr(f, "no", &k->no, NULL);
+        if (!attr(f, "pos", &k->x, &k->y)) {
+            k->x = lastX;
+            k->y = lastY;
+        }
+        if (!attr(f, "opacity", &k->opacity, NULL)) k->opacity = lastO;
+        lastX = k->x;
+        lastY = k->y;
+        lastO = k->opacity;
+    }
+    free(d);
+    if (a->fps <= 0) a->fps = 60;
+    return a;
+}
+
+void bx_obj_keyframes(BX *b, int id, const char *spec) {
+    char name[64];
+    snprintf(name, sizeof name, "%s", spec);
+    char *comma = strchr(name, ',');
+    int delay = 0;
+    if (comma) {
+        delay = atoi(comma + 1);
+        *comma = 0;
+    }
+    Anim *a = anim_get(b, name);
+    if (!a || !a->count) return;
+    Scene *scenes[2] = {&b->scene, &b->shown};
+    for (int k = 0; k < 2; k++) {
+        Obj *o = find_id(scenes[k], id);
+        if (!o) continue;
+        o->key = a;
+        o->keyDelay = delay;
+        o->animStart = b->now;
+        o->kx = a->frames[0].x;
+        o->ky = a->frames[0].y;
+        o->alpha = a->frames[0].opacity * 255 / 100;
+    }
+    b->shownDirty = true;
+}
+
+static bool keyframe_step(BX *b, Obj *o) {
+    Anim *a = o->key;
+    int frame = (int)((u64)(b->now - o->animStart) * (u64)a->fps / 1000) - o->keyDelay;
+    int last = a->frames[a->count - 1].no;
+    if (frame < 0) frame = 0;
+    if (frame >= last) {
+        KeyFrame *k = &a->frames[a->count - 1];
+        o->kx = k->x;
+        o->ky = k->y;
+        o->alpha = k->opacity * 255 / 100;
+        o->key = NULL;
+        if (o->alpha <= 0 && !a->keep) o->used = false;
+        return false;
+    }
+    int i = 0;
+    while (i + 1 < a->count && a->frames[i + 1].no <= frame) i++;
+    KeyFrame *k0 = &a->frames[i], *k1 = i + 1 < a->count ? &a->frames[i + 1] : k0;
+    int span = k1->no - k0->no;
+    int t = span > 0 ? (frame - k0->no) * 256 / span : 0;
+    o->kx = k0->x + (k1->x - k0->x) * t / 256;
+    o->ky = k0->y + (k1->y - k0->y) * t / 256;
+    o->alpha = (k0->opacity + (k1->opacity - k0->opacity) * t / 256) * 255 / 100;
+    return true;
+}
+
+bool bx_anim_busy(BX *b) {
+    for (int i = 0; i < BX_OBJS; i++) {
+        Obj *o = &b->shown.obj[i];
+        if (o->used && (o->anim || o->key)) return true;
+    }
+    return false;
+}
+
 void bx_anim_update(BX *b) {
     Scene *scenes[2] = {&b->scene, &b->shown};
     for (int k = 0; k < 2; k++)
         for (int i = 0; i < BX_OBJS; i++) {
             Obj *o = &scenes[k]->obj[i];
-            if (!o->used || !o->anim) continue;
+            if (!o->used) continue;
+            if (o->key) {
+                keyframe_step(b, o);
+                b->shownDirty = true;
+            }
+            if (!o->anim) continue;
             u32 t = b->now - o->animStart;
             if (t >= o->animDur) {
                 o->x = o->ax1;

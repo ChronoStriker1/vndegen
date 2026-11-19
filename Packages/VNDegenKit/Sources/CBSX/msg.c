@@ -88,13 +88,11 @@ void bx_msg_init(BX *b) {
             b->choiceItem[0] = bx_image_new(im->w, im->h);
             memcpy(b->choiceItem[0]->px, im->px, sizeof(u32) * (size_t)im->w * (size_t)im->h);
         }
-        char hit[80];
-        snprintf(hit, sizeof hit, "%s_hit", item);
-        im = bx_image_load(b, hit);
-        if (im) {
-            b->choiceItem[1] = bx_image_new(im->w, im->h);
-            memcpy(b->choiceItem[1]->px, im->px, sizeof(u32) * (size_t)im->w * (size_t)im->h);
-        }
+        char part[80];
+        snprintf(part, sizeof part, "%s_head", item);
+        b->choiceItem[1] = owned(b, part);
+        snprintf(part, sizeof part, "%s_foot", item);
+        b->choiceItem[2] = owned(b, part);
     }
     b->choiceDatum = bx_cfg_int(c, "select window", "vertical datum line", b->H / 2);
 }
@@ -256,10 +254,11 @@ void bx_choice_begin(BX *b) {
         return;
     }
     Image *item = b->choiceItem[0];
-    int w = item ? item->w : 520, h = item ? item->h : 36;
+    int w = item ? item->w : 520, h = item ? item->h / 2 : 32;
     int gap = bx_cfg_int(&b->cfg, "select window", "design0 interval", 0);
-    int total = b->choiceCount * h + (b->choiceCount - 1) * gap;
-    int y = b->choiceDatum - total / 2;
+    int head = b->choiceItem[1] ? b->choiceItem[1]->h : 0, foot = b->choiceItem[2] ? b->choiceItem[2]->h : 0;
+    int total = head + b->choiceCount * h + (b->choiceCount - 1) * gap + foot;
+    int y = b->choiceDatum - total / 2 + head;
     for (int i = 0; i < b->choiceCount; i++) {
         Choice *c = &b->choice[i];
         c->w = w;
@@ -299,10 +298,15 @@ void bx_choice_draw(BX *b, u32 *dst) {
     bx_cfg_ints(&b->cfg, "select window", "design0 text pos", tp, 2);
     u32 normal = bx_cfg_color(&b->cfg, "select window", "design0 default color", 0xffffffffu);
     u32 hover = bx_cfg_color(&b->cfg, "select window", "design0 select color", 0xff8844ffu);
+    Image *item = b->choiceItem[0];
+    if (b->choiceCount && b->choiceItem[1]) bx_blit(dst, b->W, b->H, b->choiceItem[1], b->choice[0].x, b->choice[0].y - b->choiceItem[1]->h, 255);
+    if (b->choiceCount && b->choiceItem[2]) {
+        Choice *last = &b->choice[b->choiceCount - 1];
+        bx_blit(dst, b->W, b->H, b->choiceItem[2], last->x, last->y + last->h, 255);
+    }
     for (int i = 0; i < b->choiceCount; i++) {
         Choice *c = &b->choice[i];
-        Image *im = b->choiceItem[i == b->choiceHover && b->choiceItem[1] ? 1 : 0];
-        if (im) bx_blit(dst, b->W, b->H, im, c->x, c->y, 255);
+        if (item) bx_blit_part(dst, b->W, b->H, item, 0, i == b->choiceHover ? c->h : 0, c->w, c->h, c->x, c->y, 255);
         else bx_fill(dst, b->W, b->H, c->x, c->y, c->w, c->h, 0xa0000000u);
         const char *t = c->msg >= 0 && c->msg < b->sc->msgCount ? b->sc->msgs[c->msg] : "";
         int tw = bx_text_width(t, b->fontSize, b->fontW);

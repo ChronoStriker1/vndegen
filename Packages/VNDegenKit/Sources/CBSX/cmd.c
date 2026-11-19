@@ -28,22 +28,24 @@ void bx_cmd(BX *b, int op) {
         bx_obj_put(b, a2, 0, s1, a3, a4);
         break;
     case 0x21: {
-        Obj *o = bx_obj_find(b, a1 == 1 ? OK_BG : OK_CHAR, a1 == 1 ? 0 : a1);
+        Obj *bg = bx_obj_find(b, OK_BG, 0);
+        Obj *o = bg && !strncmp(bg->name, s2, strlen(bg->name)) ? bg : bx_obj_by_id(b, a1);
+        if (!o) o = bg;
         if (o) bx_obj_face(b, o, s2);
         else bx_log(b, "face %s for missing layer %d", s2, a1);
         break;
     }
     case 0x22: {
-        Obj *o = bx_obj_find(b, OK_CHAR, a1);
+        Obj *o = bx_obj_by_id(b, a1);
         if (o) bx_obj_remove(b, o);
         break;
     }
     case 0x23:
-        if (bx_arg(b, 3).str) bx_log(b, "animation %s on %d not supported", s3, a1);
-        else if (!bx_obj_move(b, OK_CHAR, a1, a4, a5, a3 * 100)) bx_log(b, "move of missing character %d", a1);
+        if (bx_arg(b, 3).str) bx_obj_keyframes(b, a1, s3);
+        else if (!bx_obj_move(b, a1, a4, a5, a3 * 100)) bx_log(b, "move of missing picture %d", a1);
         break;
     case 0x24:
-        bx_log(b, "cmd 24 %d %d %d", a1, a2, a3);
+        b->nextBlend = a1;
         break;
     case 0x26:
         if (a1 == 0) b->winShown = a2 != 0;
@@ -89,6 +91,9 @@ void bx_cmd(BX *b, int op) {
     case 0x35:
         if (a1 == 0) wait_ms(b, (u32)a2 * 100);
         else if (a1 == 1 && !b->skipMode) b->th.wait = W_CLICK;
+        else if (a1 == 2) {
+            if (bx_anim_busy(b)) b->th.wait = W_ANIM;
+        }
         else bx_log(b, "wait %d %d", a1, a2);
         break;
     case 0x37:

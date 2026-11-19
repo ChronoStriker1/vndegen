@@ -331,7 +331,7 @@ void bx_map_update(BX *b) {
     if (m->next.img) {
         int lx = b->mx - m->next.x, ly = b->my - m->next.y;
         int h = m->next.img->h / m->next.frames;
-        if (lx >= 0 && ly >= 0 && lx < m->next.img->w && ly < h) m->hoverNext = !m->nextHit || hit_at(m->nextHit, lx, ly) != 255;
+        if (lx >= 0 && ly >= 0 && lx < m->next.img->w && ly < h) m->hoverNext = (m->next.img->px[(size_t)ly * m->next.img->w + lx] >> 24) != 0;
     }
     if (m->lockedPlace) {
         for (int i = 0; i < m->iconCount; i++) {

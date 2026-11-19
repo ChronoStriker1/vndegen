@@ -162,9 +162,20 @@ enum { OK_BG = 1, OK_OVERLAY = 2, OK_CHAR = 3, OK_OBJ = 160 };
 
 #define BX_OBJS 64
 
+typedef struct KeyFrame {
+    int no, x, y, opacity;
+} KeyFrame;
+
+typedef struct Anim {
+    KeyFrame *frames;
+    int count;
+    int fps, begin, end;
+    bool keep;
+} Anim;
+
 typedef struct Obj {
     bool used;
-    int kind, id;
+    int kind, id, charNo;
     char name[64];
     char face[64];
     int x, y;
@@ -172,6 +183,11 @@ typedef struct Obj {
     int anim;
     int ax0, ay0, ax1, ay1;
     u32 animStart, animDur;
+    int alpha;
+    int blend;
+    Anim *key;
+    int keyDelay;
+    int kx, ky;
 } Obj;
 
 typedef struct Scene {
@@ -246,6 +262,8 @@ struct BX {
     u32 rng;
 
     Scene scene, shown;
+    int nextBlend;
+    int objHover;
     bool shownDirty;
     u32 *to;
     int transType;
@@ -259,6 +277,11 @@ struct BX {
         char *key;
         Image *img;
     } cache[24];
+    struct {
+        char *name;
+        Anim anim;
+    } anims[16];
+    int animCount;
     int cacheNext;
 
     Image *msgBase, *msgFrame, *msgName;
@@ -285,7 +308,7 @@ struct BX {
     Choice choice[16];
     int choiceCount;
     int choiceHover;
-    Image *choiceItem[2];
+    Image *choiceItem[3];
     int choiceDatum;
 
     int phase;
@@ -327,6 +350,9 @@ void bx_cmd(BX *b, int op);
 void bx_gfx_init(BX *b);
 void bx_gfx_close(BX *b);
 Obj *bx_obj_find(BX *b, int kind, int id);
+Obj *bx_obj_by_id(BX *b, int id);
+void bx_obj_keyframes(BX *b, int id, const char *spec);
+bool bx_anim_busy(BX *b);
 Obj *bx_obj_put(BX *b, int kind, int id, const char *name, int x, int y);
 void bx_obj_remove(BX *b, Obj *o);
 void bx_obj_face(BX *b, Obj *o, const char *name);
@@ -335,8 +361,9 @@ void bx_flash(BX *b, int r, int g, int bl, int ticks);
 void bx_gfx_frame(BX *b);
 void bx_compose(BX *b, const Scene *s, u32 *dst);
 void bx_anim_update(BX *b);
-bool bx_obj_move(BX *b, int kind, int id, int x, int y, int ms);
+bool bx_obj_move(BX *b, int id, int x, int y, int ms);
 void bx_blit(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha);
+void bx_blit_multiply(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha);
 void bx_blit_part(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int w, int h, int dx, int dy, int alpha);
 void bx_fill(u32 *dst, int dw, int dh, int x, int y, int w, int h, u32 rgba);
 

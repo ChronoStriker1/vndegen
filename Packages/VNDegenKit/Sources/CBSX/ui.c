@@ -42,6 +42,8 @@ static bool button_spec(BX *b, const char *sec, const char *key, Item *it) {
     return true;
 }
 
+static void custom_map_update(BX *b);
+
 static void draw_item(BX *b, u32 *dst, const Item *it, int frame, int ox, int oy) {
     if (!it->img) return;
     if (frame >= it->frames) frame = it->frames - 1;
@@ -114,6 +116,10 @@ static void title_pick(BX *b, const char *key) {
 }
 
 void bx_phase_update(BX *b) {
+    if (b->phase == PH_CUSTOM_MAP) {
+        custom_map_update(b);
+        return;
+    }
     if (b->phase == PH_MAP) {
         bx_map_update(b);
         return;
@@ -131,6 +137,7 @@ void bx_phase_update(BX *b) {
 }
 
 void bx_phase_draw(BX *b, u32 *dst) {
+    if (b->phase == PH_CUSTOM_MAP) return;
     if (b->phase == PH_MAP) {
         bx_map_draw(b, dst);
         return;
@@ -178,6 +185,7 @@ void bx_ui_free(BX *b) {
     bx_image_free(b->unagashi);
     bx_image_free(b->choiceItem[0]);
     bx_image_free(b->choiceItem[1]);
+    bx_image_free(b->choiceItem[2]);
 }
 
 static Item button_item(const Button *bt) {
@@ -234,11 +242,88 @@ void bx_ui_draw(BX *b, u32 *dst) {
     }
 }
 
+static bool bg_name(const char *s) {
+    if (strlen(s) != 8 || (s[0] != 'g' && s[0] != 'G') || (s[1] != 'b' && s[1] != 'B')) return false;
+    for (int i = 2; i < 7; i++)
+        if (s[i] < '0' || s[i] > '9') return false;
+    return s[7] >= 'a' && s[7] <= 'z';
+}
+
+static void random_bg(BX *b) {
+    ResIndex *x = &b->arc.ix[RX_GFX];
+    int count = 0;
+    char key[64];
+    for (int i = 0; i < x->count; i++) {
+        const char *base = strrchr(x->e[i].name, '/');
+        snprintf(key, sizeof key, "%s", base ? base + 1 : x->e[i].name);
+        char *dot = strchr(key, '.');
+        if (dot) *dot = 0;
+        count += bg_name(key);
+    }
+    if (!count) return;
+    b->rng = b->rng * 1103515245u + 12345u;
+    int pick = (int)((b->rng >> 8) % (u32)count);
+    for (int i = 0; i < x->count; i++) {
+        const char *base = strrchr(x->e[i].name, '/');
+        snprintf(key, sizeof key, "%s", base ? base + 1 : x->e[i].name);
+        char *dot = strchr(key, '.');
+        if (dot) *dot = 0;
+        if (bg_name(key) && pick-- == 0) {
+            bx_obj_put(b, OK_BG, 0, key, 0, 0);
+            return;
+        }
+    }
+}
+
+static int object_hit(BX *b) {
+    int best = -1, bestSeq = -1;
+    for (int i = 0; i < BX_OBJS; i++) {
+        Obj *o = &b->shown.obj[i];
+        if (!o->used || o->kind != OK_OBJ) continue;
+        Image *im = bx_image_load(b, o->name);
+        if (!im) continue;
+        int fh = bx_cfg_get(&b->cfg, "button object", o->name) ? im->h / 2 : im->h;
+        int lx = b->mx - (im->x + o->x + o->kx), ly = b->my - (im->y + o->y + o->ky);
+        if (lx < 0 || ly < 0 || lx >= im->w || ly >= fh) continue;
+        if (!(im->px[(size_t)ly * im->w + lx] >> 24)) continue;
+        if (o->seq > bestSeq) {
+            best = i;
+            bestSeq = o->seq;
+        }
+    }
+    return best;
+}
+
+static void custom_map_update(BX *b) {
+    int hit = object_hit(b);
+    int hover = hit >= 0 ? b->shown.obj[hit].id : 0;
+    if (hover != b->objHover) {
+        b->objHover = hover;
+        b->shownDirty = true;
+    }
+    if (!b->click || hit < 0) return;
+    b->click = false;
+    Obj *o = &b->shown.obj[hit];
+    const char *res = bx_cfg_get(&b->cfg, "custom map phase", "result");
+    const char *sel = bx_cfg_get(&b->cfg, "custom map phase", "select object");
+    int value = bx_cfg_int(&b->cfg, "button object", o->name, o->id);
+    int v = res ? bx_var_by_name(b, res) : -1;
+    if (v >= 0) b->globals[v] = (Val){0, value};
+    v = sel ? bx_var_by_name(b, sel) : -1;
+    if (v >= 0) b->globals[v] = (Val){0, o->id};
+    bx_snd_play(b, CH_SYS, RX_SYS, "done", false, 0);
+    b->objHover = 0;
+    b->shownDirty = true;
+    bx_phase_end(b);
+}
+
 void bx_system(BX *b, const char *cmd) {
     char var[64];
     int level;
     if (!strcmp(cmd, "title")) bx_phase_start(b, PH_TITLE);
     else if (!strcmp(cmd, "map")) bx_phase_start(b, PH_MAP);
+    else if (!strcmp(cmd, "custom map")) bx_phase_start(b, PH_CUSTOM_MAP);
+    else if (!strcmp(cmd, "random bg")) random_bg(b);
     else if (sscanf(cmd, "is animeted %63s , %d", var, &level) == 2) {
         int v = bx_var_by_name(b, var);
         if (v >= 0) b->globals[v] = (Val){0, !b->skipMode};

@@ -201,6 +201,9 @@ static void tick(BX *b) {
             if (b->click && skip_to_label(b)) b->click = false;
             else if (!b->transActive) t->wait = W_NONE;
             break;
+        case W_ANIM:
+            if (!bx_anim_busy(b) || b->skipMode) t->wait = W_NONE;
+            break;
         case W_CLICK:
             if (b->click || b->skipMode) {
                 b->click = false;
