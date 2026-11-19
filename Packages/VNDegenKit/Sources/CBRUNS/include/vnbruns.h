@@ -23,6 +23,7 @@ VNBruns *vnbruns_open(const VNBrunsConfig *config, char *err, size_t errSize);
 void vnbruns_close(VNBruns *br);
 
 bool vnbruns_probe(const char *gameDir, char *title, size_t titleSize);
+bool vnbruns_product(const char *gameDir, char *author, size_t authorSize, char *product, size_t productSize);
 
 bool vnbruns_frame(VNBruns *br, uint32_t elapsedMs);
 const uint32_t *vnbruns_pixels(VNBruns *br, int *width, int *height);

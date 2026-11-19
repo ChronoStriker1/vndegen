@@ -1,5 +1,6 @@
 #pragma once
 
+#include "br_names.h"
 #include "vnbruns.h"
 
 #include <stdbool.h>

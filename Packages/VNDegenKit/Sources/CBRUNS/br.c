@@ -66,6 +66,23 @@ bool vnbruns_probe(const char *gameDir, char *title, size_t titleSize) {
     return true;
 }
 
+bool vnbruns_product(const char *gameDir, char *author, size_t authorSize, char *product, size_t productSize) {
+    if (!has_game(gameDir)) return false;
+    BR tmp = {0};
+    tmp.gameDir = (char *)gameDir;
+    if (!cfg_load(&tmp)) return false;
+    Node *info = sx_find(tmp.cfg.root, ":product-info");
+    const char *a = cfg_text(info, ":author-name", ""), *p = cfg_text(info, ":product-name", "");
+    char *ua = br_sjis_to_utf8(a), *up = br_sjis_to_utf8(p);
+    snprintf(author, authorSize, "%s", ua);
+    snprintf(product, productSize, "%s", up);
+    bool ok = *ua && *up;
+    free(ua);
+    free(up);
+    sx_free(tmp.cfg.root);
+    return ok;
+}
+
 VNBruns *vnbruns_open(const VNBrunsConfig *cfg, char *err, size_t errSize) {
     if (!cfg || !cfg->gameDir || !has_game(cfg->gameDir)) {
         if (err && errSize) snprintf(err, errSize, "No Bruns game was found in this folder.");
