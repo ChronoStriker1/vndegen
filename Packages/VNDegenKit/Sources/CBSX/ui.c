@@ -183,7 +183,7 @@ void bx_phase_update(BX *b) {
         if (inside(&p->items[i], b->mx, b->my, 0, 0)) p->hover = i;
     if (b->click && p->hover >= 0) {
         b->click = false;
-        bx_snd_play(b, CH_SYS, RX_SYS, "click", false, 0);
+        bx_snd_play(b, CH_SYS, RX_SYS, "check", false, 0);
         if (b->phase == PH_TITLE) title_pick(b, p->items[p->hover].key);
     }
 }
@@ -333,7 +333,7 @@ void bx_ui_update(BX *b) {
     }
     if (b->click && b->buttonHover >= 0) {
         b->click = false;
-        bx_snd_play(b, CH_SYS, RX_SYS, "click", false, 0);
+        bx_snd_play(b, CH_SYS, RX_SYS, "check", false, 0);
         button_press(b, b->buttons[b->buttonHover].key);
     }
 }
@@ -438,7 +438,7 @@ void bx_system(BX *b, const char *cmd) {
         int v = bx_var_by_name(b, var);
         if (v >= 0) b->globals[v] = (Val){0, !b->skipMode};
     }
-    else if (!strcmp(cmd, "@title")) {
+    else if (!strcmp(cmd, "@title") || !strcmp(cmd, "@end")) {
         bx_snd_stop(b, CH_BGM, 500);
         bx_snd_stop(b, CH_BGS, 0);
         b->bgmName[0] = 0;
@@ -448,12 +448,7 @@ void bx_system(BX *b, const char *cmd) {
         b->choiceCount = 0;
         b->th.sp = 0;
         b->th.wait = W_NONE;
-        int l = bx_script_label(b->sc, "title");
-        bx_vm_goto(b, l >= 0 ? l : 0);
-    } else if (!strcmp(cmd, "@end")) {
-        int l = bx_script_label(b->sc, "boot_logo");
-        b->th.sp = 0;
-        b->th.wait = W_NONE;
+        int l = bx_script_label(b->sc, cmd[1] == 't' ? "title" : "boot_logo");
         bx_vm_goto(b, l >= 0 ? l : 0);
     } else if (!strcmp(cmd, "dress_on")) b->dressEnabled = true;
     else if (!strcmp(cmd, "dress_off")) b->dressEnabled = false;

@@ -49,7 +49,6 @@ void bx_cmd(BX *b, int op) {
         break;
     case 0x26:
         if (a1 == 0) b->winShown = a2 != 0;
-        else bx_log(b, "cmd 26 %d %d", a1, a2);
         break;
     case 0x27:
         bx_transition(b, a1, a2, NULL);

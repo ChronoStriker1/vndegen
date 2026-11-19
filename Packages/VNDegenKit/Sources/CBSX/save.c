@@ -118,16 +118,26 @@ void bx_save_capture_thumb(BX *b) {
         }
 }
 
-static const u8 headTail[] = {
-    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00,
-};
 
 static int mode_of(BX *b) { return b->phase == PH_MAP ? 7 : 1; }
+
+static void put_wears(BX *b, Buf *buf) {
+    int n = 0;
+    while (n < 32) {
+        char key[32];
+        snprintf(key, sizeof key, "ch%d max wear no", n + 1);
+        if (!bx_cfg_get(&b->cfg, "bustup setting", key)) break;
+        n++;
+    }
+    put32(buf, (u32)n);
+    for (int i = 0; i < n; i++) {
+        char key[32];
+        snprintf(key, sizeof key, "ch%d max wear no", i + 1);
+        int w = clampi(bx_cfg_int(&b->cfg, "bustup setting", key, 0), 0, 255) + 1;
+        put32(buf, (u32)w);
+        zeros(buf, (size_t)w);
+    }
+}
 
 static void put_obj(Buf *buf, const char *name, int kind, int x, int y, int parts, int alpha) {
     put8(buf, (u8)kind);
@@ -197,7 +207,10 @@ bool bx_save_slot(BX *b, int slot) {
     put32(&buf, (u32)(b->startTime & 0xffffffff));
     zeros(&buf, 8);
     put32(&buf, (u32)mode_of(b));
-    put(&buf, headTail + 4, sizeof headTail - 4);
+    put32(&buf, 0);
+    put32(&buf, 1);
+    zeros(&buf, 9);
+    put_wears(b, &buf);
     u32 cap = s->hdr[0] ? s->hdr[0] : 1024;
     put32(&buf, b->th.pc);
     put32(&buf, (u32)(b->th.sp * 2));
@@ -338,7 +351,9 @@ bool bx_load_slot(BX *b, int slot) {
     }
     skip(&r, 0x24);
     int mode = (int)get32(&r);
-    skip(&r, 0x7f - 0x28);
+    skip(&r, 4 + 4 + 9);
+    u32 chars = get32(&r);
+    for (u32 i = 0; i < chars && i < 64 && !r.bad; i++) skip(&r, get32(&r));
     u32 pc = get32(&r);
     u32 depth = get32(&r);
     u32 cap = get32(&r);
@@ -479,11 +494,13 @@ void bx_common_load(BX *b) {
     size_t n;
     u8 *d = bx_read_file(path, &n);
     if (!d) return;
-    size_t p = 0x98;
-    u32 choices = p + 4 <= n ? rd32(d + p) : 0;
-    size_t q = p + 4 + choices;
-    u32 msgs = q + 4 <= n ? rd32(d + q) : 0;
-    if (choices != b->sc->hdr[2] || msgs != (u32)b->sc->msgCount || q + 4 + msgs > n) {
+    u32 choices = b->sc->hdr[2], msgs = (u32)b->sc->msgCount;
+    size_t p = 0x20, q = 0;
+    for (; p + 8 + choices <= n && p < 0x1000; p++) {
+        q = p + 4 + choices;
+        if (rd32(d + p) == choices && q + 4 + msgs <= n && rd32(d + q) == msgs) break;
+    }
+    if (p + 8 + choices > n || p >= 0x1000) {
         bx_log(b, "common.dat doesn't match this script (%u choices, %u messages)", choices, msgs);
         free(d);
         return;

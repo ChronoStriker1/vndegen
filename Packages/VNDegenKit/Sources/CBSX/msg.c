@@ -185,7 +185,7 @@ void bx_msg_show(BX *b, const char *name, const char *text, const char *voice) {
     b->winShown = true;
     b->winHidden = false;
     b->autoAt = 0;
-    if (voice && voice_allowed(b, voice)) bx_snd_play(b, CH_VOICE, RX_VOICE, voice, false, 0);
+    if (voice && bx_res_find(&b->arc, RX_VOICE, voice) && voice_allowed(b, voice)) bx_snd_play(b, CH_VOICE, RX_VOICE, voice, false, 0);
     if (b->logCount == 512) {
         free(b->logs[0].name);
         free(b->logs[0].text);
