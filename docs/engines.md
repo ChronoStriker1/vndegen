@@ -33,6 +33,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Ikura GDL](#ikura-gdl) | Extensionless `SNR` beside `GRP`, up to two folders down | Mac, iPhone, iPad |
 | [EAGLS](#eagls) | `Script/SCPACK.idx` beside `CG/CGPACK.idx`, up to one folder down | Mac, iPhone, iPad |
 | [ExHibit](#exhibit) | `ExHIBIT.ini` beside `resident.dll` and `rld/start.rld`, up to one folder down | Mac, iPhone, iPad |
+| [BISHOP BSX](#bishop-bsx) | `bsxx.dat` beside `bsxx.cfg` and a `Graphics*.bsa` archive, up to one folder down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
@@ -220,6 +221,10 @@ EAGLS games, such as Oppai no Ouja 48, run on VNDegen's own EAGLS runtime, writt
 ## ExHibit
 
 ExHibit games, such as Succubus Sessions: Mami Mamiya's Sweet Slice of Hell, run on VNDegen's own ExHibit runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed picture reader, a prose write-up of the script container, three minimal readings of the engine approved for the purpose, and the original engine run under Wine, MIT licensed like the rest of the app. The game's scripts run the logos, title and story; the message window, control bar, system menu, Save and Load, backlog and config pages are drawn from the game's layout files. Saves are the PC engine's own `userdata/uN` files in the game folder and load both ways. The emotion icons and the Extra menu aren't there yet. [exhibit.md](exhibit.md) lists which games run and the known limits, and [exhibit-cleanroom.md](exhibit-cleanroom.md) where the runtime's knowledge came from.
+
+## BISHOP BSX
+
+BISHOP's BSXX games, such as Mesu Kyoushi ~Injoku no Kyoushitsu~, run on VNDegen's own BSX runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive and picture readers and the original engine run under Wine, MIT licensed like the rest of the app. The compiled script runs the story, the day loop and the scenes; the message window, menu bar, choices, title, map, target cards, Save and Load, backlog, settings, item screen and the STRIP and VIEW switches, which the PC engine draws itself, are drawn from the game's `bsxx.cfg` and pictures. Saves are the PC engine's own `save/noNNN`, `save/no-01` and `save/common.dat` in the game folder, and load both ways. The museum isn't there yet. [bsx.md](bsx.md) lists which games run and the known limits, and [bsx-cleanroom.md](bsx-cleanroom.md) where the runtime's knowledge came from.
 
 ## Unity
 
