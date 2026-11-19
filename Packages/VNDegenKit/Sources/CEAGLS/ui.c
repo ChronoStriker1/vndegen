@@ -402,28 +402,43 @@ static void log_draw(EG *e, u32 *dst) {
         int r[4];
         snprintf(key, sizeof key, "HistoryMesWnd%d", k + 1);
         if (ini_ints(&e->ini, key, r, 4) != 4) continue;
-        const Font *f = &e->fonts[0];
-        int size = f->size > 0 ? f->size : 21;
+        const Font *f = msg_font(e, 0);
+        int size = f->size, spacing = f->spacing, line = f->size + f->lineGap;
+        u32 color = 0xffc0c0c0u;
         LogEntry *l = &e->logs[idx];
+        int nr[4];
+        snprintf(key, sizeof key, "HistoryMesNameChar%d", k + 1);
+        if (l->name && ini_ints(&e->ini, key, nr, 4) == 4) {
+            const Font *nf = msg_font(e, 1);
+            int tw = text_width(l->name, nf->size, nf->spacing);
+            text_draw(e, dst, W, H, l->name, (nr[0] + nr[2] - tw) / 2, (nr[1] + nr[3] - nf->size) / 2, nf->size, nf->spacing, 0xffffffffu, false);
+        }
         int fx = r[0] * 8, y = r[1];
         for (const u8 *p = (const u8 *)l->text; *p;) {
             if (*p == '(' && (p[1] == 'e' || p[1] == 'E') && p[2] == ')') {
                 fx = r[0] * 8;
-                y += size + (f->size > 0 ? f->lineGap : 6);
+                y += line;
                 p += 3;
+                continue;
+            }
+            int tag = msg_tag(e, p, &f, &color);
+            if (tag) {
+                size = f->size;
+                spacing = f->spacing;
+                p += tag;
                 continue;
             }
             int len = eg_sjis_len(p);
             u32 cp;
             eg_sjis_decode(p, &cp);
-            int adv = text_advance(cp, size, f->spacing);
+            int adv = text_advance(cp, size, spacing);
             if (fx + adv > r[2] * 8 && fx > r[0] * 8) {
                 fx = r[0] * 8;
-                y += size + f->lineGap;
+                y += line;
             }
             char ch[3] = {0};
             memcpy(ch, p, (size_t)len);
-            text_draw(e, dst, W, H, ch, fx / 8, y, size, f->spacing, 0xffc0c0c0u, true);
+            text_draw(e, dst, W, H, ch, fx / 8, y, size, spacing, color, true);
             fx += adv;
             p += len;
         }

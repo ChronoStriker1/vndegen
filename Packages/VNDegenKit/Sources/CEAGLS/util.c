@@ -57,7 +57,9 @@ u8 *eg_read_file(const char *path, size_t *size) {
 
 bool eg_mkdirs(const char *dir) {
     char buf[2048];
-    snprintf(buf, sizeof buf, "%s", dir);
+    int found = eg_path_resolve(dir, buf, sizeof buf);
+    if (found < 0) return false;
+    if (found > 0) return true;
     for (char *p = buf + 1; *p; p++) {
         if (*p != '/') continue;
         *p = 0;

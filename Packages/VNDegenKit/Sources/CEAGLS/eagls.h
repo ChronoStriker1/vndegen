@@ -391,6 +391,8 @@ int text_width(const char *sjis, int size, int spacing);
 
 void msg_show(EG *e, int id, const char *text);
 void msg_name(EG *e, const char *name, const char *voice);
+int msg_tag(EG *e, const u8 *p, const Font **f, u32 *color);
+const Font *msg_font(EG *e, int i);
 void msg_clear(EG *e);
 void msg_update(EG *e);
 void msg_draw(EG *e, u32 *dst);

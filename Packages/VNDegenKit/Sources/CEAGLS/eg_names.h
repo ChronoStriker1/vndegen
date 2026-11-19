@@ -57,6 +57,8 @@
 #define msg_name eg_msg_name
 #define msg_reveal eg_msg_reveal
 #define msg_show eg_msg_show
+#define msg_tag eg_msg_tag
+#define msg_font eg_msg_font
 #define msg_update eg_msg_update
 #define msg_window_parts eg_msg_window_parts
 #define pak_close eg_pak_close

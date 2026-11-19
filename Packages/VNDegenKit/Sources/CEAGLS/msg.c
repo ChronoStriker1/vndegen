@@ -24,7 +24,7 @@ static void add_cell(const u8 *p, int len, int x, int y, int size, int spacing, 
     c->color = color;
 }
 
-static const Font *font_at(EG *e, int i) {
+const Font *msg_font(EG *e, int i) {
     static const Font def = {21, false, 2, 6};
     if (i < 0 || i >= 16 || !e->fonts[i].size) return &def;
     return &e->fonts[i];
@@ -32,12 +32,33 @@ static const Font *font_at(EG *e, int i) {
 
 #define TEXT_COLOR 0xffc0c0c0u
 
+int msg_tag(EG *e, const u8 *p, const Font **f, u32 *color) {
+    if (*p != '(' || p[2] != '=') return 0;
+    const u8 *q = p + 3;
+    if (p[1] == 'F') {
+        int k = 0;
+        while (*q >= '0' && *q <= '9') k = k * 10 + (*q++ - '0');
+        if (*q != ')') return 0;
+        *f = msg_font(e, k);
+        return (int)(q + 1 - p);
+    }
+    if (p[1] == 'C') {
+        int r = 0, g = 0, b = 0;
+        if (sscanf((const char *)q, "%d,%d,%d", &r, &g, &b) != 3) return 0;
+        while (*q && *q != ')') q++;
+        if (*q != ')') return 0;
+        *color = (u32)clampi(r, 0, 255) | (u32)clampi(g, 0, 255) << 8 | (u32)clampi(b, 0, 255) << 16 | 0xff000000u;
+        return (int)(q + 1 - p);
+    }
+    return 0;
+}
+
 static void layout(EG *e) {
     cellCount = 0;
     if (!e->text) return;
     int x0 = e->winRect[4], y0 = e->winRect[5], x1 = e->winRect[6];
     if (x1 <= x0) x1 = x0 + 600;
-    const Font *f = font_at(e, 0);
+    const Font *f = msg_font(e, 0);
     int size = f->size, spacing = f->spacing, line = f->size + f->lineGap;
     u32 color = e->textWhite ? 0xffffffffu : TEXT_COLOR;
     int fx = x0 * 8, y = y0;
@@ -49,29 +70,12 @@ static void layout(EG *e) {
             p += 3;
             continue;
         }
-        if (*p == '(' && p[1] == 'F' && p[2] == '=') {
-            const u8 *q = p + 3;
-            int k = 0;
-            while (*q >= '0' && *q <= '9') k = k * 10 + (*q++ - '0');
-            if (*q == ')') {
-                f = font_at(e, k);
-                size = f->size;
-                spacing = f->spacing;
-                p = q + 1;
-                continue;
-            }
-        }
-        if (*p == '(' && p[1] == 'C' && p[2] == '=') {
-            int r = 0, g = 0, b = 0;
-            const u8 *q = p + 3;
-            if (sscanf((const char *)q, "%d,%d,%d", &r, &g, &b) == 3) {
-                while (*q && *q != ')') q++;
-                if (*q == ')') {
-                    color = (u32)clampi(r, 0, 255) | (u32)clampi(g, 0, 255) << 8 | (u32)clampi(b, 0, 255) << 16 | 0xff000000u;
-                    p = q + 1;
-                    continue;
-                }
-            }
+        int tag = msg_tag(e, p, &f, &color);
+        if (tag) {
+            size = f->size;
+            spacing = f->spacing;
+            p += tag;
+            continue;
         }
         int len = eg_sjis_len(p);
         u32 cp;
@@ -163,7 +167,7 @@ void msg_draw(EG *e, u32 *dst) {
     Image *win = e->mesImg[0];
     if (win) blit(dst, e->W, e->H, win, e->winRect[0], e->winRect[1], alpha);
     if (e->speaker && e->th[0].wait != W_CHOICE) {
-        const Font *f = font_at(e, 1);
+        const Font *f = msg_font(e, 1);
         int x0 = e->nameRect[0], y0 = e->nameRect[1], x1 = e->nameRect[2], y1 = e->nameRect[3];
         int tw = text_width(e->speaker, f->size, f->spacing);
         text_draw(e, dst, e->W, e->H, e->speaker, (x0 + x1 - tw) / 2, (y0 + y1 - f->size) / 2, f->size, f->spacing, 0xffffffffu, false);
@@ -230,7 +234,7 @@ void choice_draw(EG *e, u32 *dst) {
         Image *im = pl >= 0 && pl < EG_PLANES ? e->plane[pl] : NULL;
         int x = hov ? c->hx : c->x, y = hov ? c->hy : c->y;
         if (im) blit_part(dst, e->W, e->H, im, hov ? c->hsx : c->sx, hov ? c->hsy : c->sy, c->w, c->h, x, y, 255);
-        const Font *f = font_at(e, 0);
+        const Font *f = msg_font(e, 0);
         text_draw(e, dst, e->W, e->H, c->text, x + (hov ? c->htx : c->tx), y + (hov ? c->hty : c->ty), f->size, f->spacing, e->textWhite ? 0xffffffffu : TEXT_COLOR, true);
     }
 }
