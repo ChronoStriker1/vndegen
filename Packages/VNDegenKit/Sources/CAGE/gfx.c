@@ -265,20 +265,23 @@ static M4 range_matrix(Gfx *x) {
     return obj_matrix(x, o, &c);
 }
 
+static inline int div255(int x) { return (x + 1 + (x >> 8)) >> 8; }
+
 static inline u32 blend_px(u32 d, u32 s, int mode, u32 mod, bool live, bool offscreen) {
+    if (!(s >> 24) && mode != 2) return d;
     int sa = (int)(s >> 24);
     int mr = (int)(mod & 255), mg = (int)(mod >> 8 & 255), mb = (int)(mod >> 16 & 255), ma = (int)(mod >> 24);
-    int r = (int)(s & 255) * mr / 255, gg = (int)(s >> 8 & 255) * mg / 255, b = (int)(s >> 16 & 255) * mb / 255;
-    if (mode != 0 || live) sa = sa * ma / 255;
+    int r = div255((int)(s & 255) * mr), gg = div255((int)(s >> 8 & 255) * mg), b = div255((int)(s >> 16 & 255) * mb);
+    if (mode != 0 || live) sa = div255(sa * ma);
     int dr = (int)(d & 255), dg = (int)(d >> 8 & 255), db = (int)(d >> 16 & 255), da = (int)(d >> 24);
     if (mode == 1 || mode == 3) {
         if (mode == 1) {
-            dr += r * sa / 255; dg += gg * sa / 255; db += b * sa / 255;
+            dr += div255(r * sa); dg += div255(gg * sa); db += div255(b * sa);
             if (dr > 255) dr = 255;
             if (dg > 255) dg = 255;
             if (db > 255) db = 255;
         } else {
-            dr -= r * sa / 255; dg -= gg * sa / 255; db -= b * sa / 255;
+            dr -= div255(r * sa); dg -= div255(gg * sa); db -= div255(b * sa);
             if (dr < 0) dr = 0;
             if (dg < 0) dg = 0;
             if (db < 0) db = 0;
@@ -295,10 +298,33 @@ static inline u32 blend_px(u32 d, u32 s, int mode, u32 mod, bool live, bool offs
         int orr = (r * sa + dr * da * ia / 255) / oa, og = (gg * sa + dg * da * ia / 255) / oa, ob = (b * sa + db * da * ia / 255) / oa;
         return (u32)orr | (u32)og << 8 | (u32)ob << 16 | (u32)oa << 24;
     }
-    dr = (r * sa + dr * ia) / 255;
-    dg = (gg * sa + dg * ia) / 255;
-    db = (b * sa + db * ia) / 255;
+    dr = div255(r * sa + dr * ia);
+    dg = div255(gg * sa + dg * ia);
+    db = div255(b * sa + db * ia);
     return (u32)dr | (u32)dg << 8 | (u32)db << 16 | 0xff000000u;
+}
+
+static inline u32 sample_fixed(const Image *im, i32 u, i32 v, int l, int t, int r, int b) {
+    u -= 32768;
+    v -= 32768;
+    int x0 = u >> 16, y0 = v >> 16;
+    u32 fx = (u32)(u >> 8) & 255, fy = (u32)(v >> 8) & 255;
+    int x1 = x0 + 1, y1 = y0 + 1;
+    if (x0 < l) x0 = l;
+    if (x1 < l) x1 = l;
+    if (x0 >= r) x0 = r - 1;
+    if (x1 >= r) x1 = r - 1;
+    if (y0 < t) y0 = t;
+    if (y1 < t) y1 = t;
+    if (y0 >= b) y0 = b - 1;
+    if (y1 >= b) y1 = b - 1;
+    const u32 *row0 = im->px + (size_t)y0 * (size_t)im->w, *row1 = im->px + (size_t)y1 * (size_t)im->w;
+    u32 c00 = row0[x0], c01 = row0[x1], c10 = row1[x0], c11 = row1[x1];
+    if (c00 == c01 && c00 == c10 && c00 == c11) return c00;
+    u32 w00 = (256 - fx) * (256 - fy) >> 8, w01 = fx * (256 - fy) >> 8, w10 = (256 - fx) * fy >> 8, w11 = fx * fy >> 8;
+    u32 rb = ((c00 & 0x00ff00ffu) * w00 + (c01 & 0x00ff00ffu) * w01 + (c10 & 0x00ff00ffu) * w10 + (c11 & 0x00ff00ffu) * w11);
+    u32 ag = (((c00 >> 8) & 0x00ff00ffu) * w00 + ((c01 >> 8) & 0x00ff00ffu) * w01 + ((c10 >> 8) & 0x00ff00ffu) * w10 + ((c11 >> 8) & 0x00ff00ffu) * w11);
+    return ((rb >> 8) & 0x00ff00ffu) | (ag & 0xff00ff00u);
 }
 
 static u32 sample_bilinear(const Image *im, float u, float v, int l, int t, int r, int b) {
@@ -389,16 +415,38 @@ static void draw_obj(AG *g, Image *dst, Obj *o, bool offscreen, bool useRange, M
     if (x1 > dst->w) x1 = dst->w;
     if (y1 > dst->h) y1 = dst->h;
     bool scaled = fabsf(fabsf(det) - 1) > 1e-3f || fabsf(b) > 1e-4f || fabsf(c) > 1e-4f;
+    float uw = (float)(sr - sl), vh = (float)(sb - st);
+    i32 dux = (i32)(ia * 65536.0f), dvx = (i32)(ib * 65536.0f);
     for (int yy = y0; yy < y1; yy++) {
         u32 *dp = dst->px + (size_t)yy * (size_t)dst->w;
-        for (int xx = x0; xx < x1; xx++) {
-            float X = (float)xx + 0.5f - tx, Y = (float)yy + 0.5f - ty;
-            float u = X * ia + Y * ic - offx, v = X * ib + Y * id - offy;
-            if (u < 0 || v < 0 || u >= (float)(sr - sl) || v >= (float)(sb - st)) continue;
-            u32 s;
-            if (scaled) s = sample_bilinear(src, u + (float)sl, v + (float)st, sl, st, sr, sb);
-            else s = src->px[(size_t)(st + (int)v) * (size_t)src->w + (size_t)(sl + (int)u)];
-            dp[xx] = blend_px(dp[xx], s, mode, mod, live, offscreen);
+        float Y = (float)yy + 0.5f - ty;
+        float X0 = (float)x0 + 0.5f - tx;
+        float u0 = X0 * ia + Y * ic - offx, v0 = X0 * ib + Y * id - offy;
+        float lo = (float)x0, hi = (float)x1;
+        if (fabsf(ia) > 1e-9f) {
+            float a1 = (float)x0 + (0 - u0) / ia, a2 = (float)x0 + (uw - u0) / ia;
+            if (a1 > a2) { float t2 = a1; a1 = a2; a2 = t2; }
+            if (a1 > lo) lo = a1;
+            if (a2 < hi) hi = a2;
+        } else if (u0 < 0 || u0 >= uw) continue;
+        if (fabsf(ib) > 1e-9f) {
+            float a1 = (float)x0 + (0 - v0) / ib, a2 = (float)x0 + (vh - v0) / ib;
+            if (a1 > a2) { float t2 = a1; a1 = a2; a2 = t2; }
+            if (a1 > lo) lo = a1;
+            if (a2 < hi) hi = a2;
+        } else if (v0 < 0 || v0 >= vh) continue;
+        int xs = (int)floorf(lo), xe = (int)ceilf(hi);
+        if (xs < x0) xs = x0;
+        if (xe > x1) xe = x1;
+        float us = u0 + (float)(xs - x0) * ia, vs = v0 + (float)(xs - x0) * ib;
+        i32 fu = (i32)((us + (float)sl) * 65536.0f), fv = (i32)((vs + (float)st) * 65536.0f);
+        i32 ul = sl << 16, ur = sr << 16, vt = st << 16, vb = sb << 16;
+        for (int xx = xs; xx < xe; xx++, fu += dux, fv += dvx) {
+            if (fu < ul || fu >= ur || fv < vt || fv >= vb) continue;
+            u32 px;
+            if (scaled) px = sample_fixed(src, fu, fv, sl, st, sr, sb);
+            else px = src->px[(size_t)(fv >> 16) * (size_t)src->w + (size_t)(fu >> 16)];
+            dp[xx] = blend_px(dp[xx], px, mode, mod, live, offscreen);
         }
     }
 }

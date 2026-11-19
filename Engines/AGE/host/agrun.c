@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "age.h"
 #include "vnfont.h"
@@ -101,6 +102,17 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "poke:%x,%d", &x, &y) == 2) {
             AG *g = (AG *)n;
             if ((unsigned)x < g->ngi) g->gi[x] = y;
+        } else if (sscanf(c, "bench:%d", &k) == 1) {
+            struct timespec a, b;
+            clock_gettime(CLOCK_MONOTONIC, &a);
+            for (int f = 0; f < k && alive; f++) {
+                alive = vnage_frame(n, 16);
+                int w, h;
+                vnage_pixels(n, &w, &h);
+            }
+            clock_gettime(CLOCK_MONOTONIC, &b);
+            double ms = ((double)(b.tv_sec - a.tv_sec) * 1000.0 + (double)(b.tv_nsec - a.tv_nsec) / 1e6) / (k > 0 ? k : 1);
+            printf("bench %d frames, %.2f ms per frame\n", k, ms);
         } else if (sscanf(c, "wheel:%d", &k) == 1) {
             vnage_wheel(n, k);
             alive = run(n, 64);
