@@ -105,6 +105,9 @@ VNBruns *vnbruns_open(const VNBrunsConfig *cfg, char *err, size_t errSize) {
     e->nextScript = -2;
     e->rng = (u32)cfg->startTime;
     e->textSpeed = 1;
+    e->menu.show = true;
+    e->menu.autohide = true;
+    e->menu.rclick = true;
     e->mixer = mixer_new();
     e->volMaster = 100;
     for (int i = 0; i < 3; i++) e->vol[i] = 100;
@@ -161,7 +164,7 @@ static void tick(BR *e) {
     e->skipping = e->ctrlHeld || e->skipMode;
     msg_update(e);
     if (menu_input(e)) e->lPress = false;
-    if (!e->systemMode && e->wait == W_TEXT && e->rPress) {
+    if (!e->systemMode && e->wait == W_TEXT && e->rPress && e->menu.rclick) {
         e->rPress = false;
         sys_call(e, 9007);
     } else if (!e->systemMode && e->wait == W_TEXT && e->wheel > 0) {

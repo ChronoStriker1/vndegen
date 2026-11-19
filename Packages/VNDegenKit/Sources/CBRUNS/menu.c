@@ -133,12 +133,10 @@ void menu_draw(BR *e, u32 *dst) {
 
 void menu_builtin(BR *e, int id, int a, int b) {
     if (id == 2043) {
-        if (a == 0) e->menu.show = b != 0;
+        if (a == 0) e->menu.rclick = b != 0;
         else {
-            e->menu.autohide = b != 0;
+            e->menu.show = b != 0;
             e->menu.pinned = false;
         }
-    } else if (id == 2044) {
-        if (a == 1) e->menu.pinned = b != 0;
-    }
+    } else if (id == 2044 && a == 1) e->menu.pinned = b != 0;
 }

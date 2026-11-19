@@ -204,7 +204,7 @@ typedef struct Choice {
 } Choice;
 
 typedef struct Menu {
-    bool show, autohide, enable, pinned, open;
+    bool show, autohide, enable, pinned, open, rclick;
     int hover;
     bool off[32];
 } Menu;
