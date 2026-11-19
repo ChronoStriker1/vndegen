@@ -358,6 +358,7 @@ struct EG {
 
     int uiMode;
     UI *ui;
+    bool nameFresh;
     Gallery *gallery;
     int menuHover;
     int winHover;

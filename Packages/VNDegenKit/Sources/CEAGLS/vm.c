@@ -354,10 +354,15 @@ static void run_thread(EG *e, Thread *t) {
         case I_ASSIGN: vm_set_int(e, &in->var, eval(e, in->args, in->argc)); break;
         case I_TEXT:
             t->msgOff = t->pc >= 2 && t->sc->ins[t->pc - 2].op == I_NAME ? t->sc->ins[t->pc - 2].off : in->off;
+            if (!e->nameFresh) msg_name(e, NULL, NULL);
             msg_show(e, in->n, in->s);
+            e->nameFresh = false;
             t->wait = W_TEXT;
             break;
-        case I_NAME: msg_name(e, in->s, in->s2); break;
+        case I_NAME:
+            msg_name(e, in->s, in->s2);
+            e->nameFresh = true;
+            break;
         case I_CALL:
             if (in->n == 43) {
                 thread_return(e, t);
