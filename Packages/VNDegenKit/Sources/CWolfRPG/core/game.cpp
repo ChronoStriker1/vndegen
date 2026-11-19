@@ -586,6 +586,16 @@ int Game::activePage(const MapEventState &e, const Thread &ctx) {
     return -1;
 }
 
+int firstAutorun(const std::deque<MapEventState> &events) {
+    for (size_t i = 0; i < events.size(); i++) {
+        auto &e = events[i];
+        if (e.page < 0) continue;
+        auto &pg = e.data->pages[e.page];
+        if (pg.trigger == 1 && pg.commands.size() > 1) return int(i);
+    }
+    return -1;
+}
+
 void Game::refreshPages() {
     for (size_t i = 0; i < events_.size(); i++) {
         Thread ctx;
@@ -594,7 +604,6 @@ void Game::refreshPages() {
         if (page != events_[i].page) {
             auto &e = events_[i];
             e.page = page;
-            e.ranAutorun = false;
             e.pageChanged = true;
             Actor &a = e.actor;
             Character &c = a.chara;
@@ -699,19 +708,11 @@ void Game::update(const Input &input) {
         input_.pressed &= ~(KeyConfirm | KeyCancel);
     }
 
-    // Autorun map events start once per page activation, one at a time, ahead of anything else.
     if (threads_.empty()) {
-        for (size_t i = 0; i < events_.size(); i++) {
-            auto &e = events_[i];
-            if (e.page < 0 || e.ranAutorun) continue;
-            auto &pg = e.data->pages[e.page];
-            if (pg.trigger == 1 && pg.commands.size() > 1) {
-                e.ranAutorun = true;
-                Thread t;
-                startPage(int(i), t);
-                threads_.push_back(std::move(t));
-                break;
-            }
+        if (int i = firstAutorun(events_); i >= 0) {
+            Thread t;
+            startPage(i, t);
+            threads_.push_back(std::move(t));
         }
     }
     // An event that starts on touching the hero also starts while the hero stands on it. The manual's specification

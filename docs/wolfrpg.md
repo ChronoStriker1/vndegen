@@ -59,6 +59,12 @@ Battles and menus are common events in each game's own data, so they need nothin
 and export (command 251), row copying and sorting (252), Wolf RPG Editor 3's XY arrays (255 and 257), and the string
 command's typed text, regular expressions, file export and hidden codes.
 
+An autorun map event (trigger 1) starts again each time its run ends, for as long as its page is the active one, as Wolf
+RPG Editor's 自動実行 does. A game stops one by erasing the event or by changing a condition so another page takes over.
+Up to 0.54 the runtime started it only once per page activation, so The Succubus of the Forest and a Doctor, whose one
+autorun event calls its main loop (opening, interval, stages) by a variable, stayed black after its opening, and Two
+Beasts' title ignored keyboard confirm. `Engines/WolfRPG/host/autorun_test.cpp` checks the rule.
+
 Common events and strings can read a text file. As on the PC, the runtime takes UTF-8 with or without a byte order mark,
 and otherwise Shift-JIS: The Clumsy Witch Seris is a UTF-8 game that keeps its scene text in Shift-JIS. Reading a string
 variable as a number gives the number its text starts with, which Two Beasts counts on for its script labels. A choice
