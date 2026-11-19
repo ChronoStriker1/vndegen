@@ -305,6 +305,7 @@ struct BX {
     int nameRect[4], textRect[4];
     u32 nameColor, textColor, bgColor;
     int fontSize, fontW, fontH, lines, edge, shadow;
+    bool fontBold;
     int msgSpeed;
     bool winShown, winHidden;
     char *speaker;

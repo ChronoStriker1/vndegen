@@ -58,6 +58,7 @@ void bx_msg_init(BX *b) {
     b->fontH = bx_cfg_int(c, "default font", "height", 20);
     b->fontSize = b->fontH;
     b->fontW = bx_cfg_int(c, "default font", "width", 0);
+    b->fontBold = bx_cfg_int(c, "default font", "weight", 400) >= 700;
     b->lines = bx_cfg_int(c, "default font", "number of lines", 3);
     b->edge = bx_cfg_int(c, "default font", "edge", 1);
     b->shadow = bx_cfg_int(c, "default font", "shadow", 0);
@@ -115,7 +116,8 @@ static int glyph_count(const char *s) {
 }
 
 static char *wrap(BX *b, const char *text) {
-    int maxW = b->textRect[2];
+    int length = bx_cfg_int(&b->cfg, "default font", "line length", 0);
+    int maxW = length > 0 && b->fontW > 0 ? length * b->fontW : b->textRect[2];
     size_t n = strlen(text);
     char *out = bx_alloc(n * 2 + 8);
     size_t o = 0;
@@ -226,8 +228,7 @@ void bx_msg_draw(BX *b, u32 *dst) {
     if (b->speaker && *b->speaker && b->msgName) bx_blit(dst, b->W, b->H, b->msgName, b->msgX + b->msgName->x, b->msgY + b->msgName->y, 255);
     if (b->speaker && *b->speaker)
         bx_text_draw(b, dst, b->W, b->H, b->speaker, b->msgX + b->nameRect[0], b->msgY + b->nameRect[1], b->fontSize, b->fontW, b->nameColor, b->edge, b->shadow);
-    int lineH = b->lines > 0 ? b->textRect[3] / b->lines : b->fontH;
-    if (lineH < b->fontH) lineH = b->fontH;
+    int lineH = b->fontH + 4;
     int x = b->msgX + b->textRect[0], y = b->msgY + b->textRect[1];
     char line[1024];
     size_t ln = 0;

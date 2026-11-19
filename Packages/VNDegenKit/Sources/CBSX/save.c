@@ -156,6 +156,12 @@ static void put_obj(Buf *buf, const char *name, int kind, int x, int y, int part
     put32(buf, (u32)clampi(alpha, 0, 255));
     put32(buf, 0x3f800000u);
     zeros(buf, 20);
+    if (kind == OK_OVERLAY) {
+        zeros(buf, 17);
+        put32(buf, 0x7fffffffu);
+        put32(buf, 0xffffffffu);
+        put32(buf, 0);
+    }
 }
 
 static int obj_order(const void *pa, const void *pb) {
@@ -243,19 +249,13 @@ bool bx_save_slot(BX *b, int slot) {
     for (int i = 0; i < BX_OBJS; i++)
         if (b->scene.obj[i].used) list[count++] = &b->scene.obj[i];
     qsort(list, (size_t)count, sizeof *list, obj_order);
+    bool overlays = false;
+    for (int i = 0; i < count; i++) overlays |= list[i]->kind == OK_OVERLAY || (list[i]->kind == OK_BG && list[i]->face[0]);
     for (int i = 0; i < count; i++) {
         const Obj *o = list[i];
-        bool face = o->kind == OK_BG && o->face[0];
-        put_obj(&buf, o->name, o->kind, o->x, o->y, o->kind == OK_CHAR || face ? 2 : 0, o->alpha);
-        if (face) {
-            put_obj(&buf, o->face, OK_OVERLAY, 0, 0, 2, 255);
-            put8(&buf, 0);
-            zeros(&buf, 12);
-            put32(&buf, 0);
-            put32(&buf, 0x7fffffffu);
-            put32(&buf, 0xffffffffu);
-            put32(&buf, 0);
-        }
+        int parts = o->kind == OK_BG ? (overlays ? 2 : 0) : 2;
+        put_obj(&buf, o->name, o->kind, o->x, o->y, parts, o->alpha);
+        if (o->kind == OK_BG && o->face[0]) put_obj(&buf, o->face, OK_OVERLAY, 0, 0, 2, 255);
     }
     put8(&buf, 0xff);
     static const u8 tail[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -393,15 +393,15 @@ bool bx_load_slot(BX *b, int slot) {
         if (kind == 0xff) break;
         skip(&r, 12);
         char *name = get_wide(&r);
-        if (!*name) {
-            skip(&r, 12);
-            free(name);
-            continue;
-        }
         i32 x = (i32)get32(&r), y = (i32)get32(&r);
         skip(&r, 24 + 20);
         u8 alpha = get8(&r);
         skip(&r, 3 + 4 + 20);
+        if (kind == OK_OVERLAY) skip(&r, 29);
+        if (!*name) {
+            free(name);
+            continue;
+        }
         if (kind == OK_OVERLAY && last && last->kind == OK_BG && !strncmp(name, last->name, strlen(last->name))) bx_obj_face(b, last, name);
         else {
             last = bx_obj_put(b, kind, 0, name, x, y);

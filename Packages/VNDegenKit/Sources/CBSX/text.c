@@ -142,7 +142,6 @@ static void put_glyph(u32 *dst, int dw, int dh, const Glyph *g, int x, int y, u3
 }
 
 int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *s, int x, int y, int size, int width, u32 color, int edge, int shadow) {
-    (void)b;
     int base = y + ascent(size);
     int cx = x;
     u32 dark = (color & 0xff000000u) | 0x000000;
@@ -154,10 +153,12 @@ int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *s, int x, int y, i
         if (g->bm) {
             int gx = cx + g->x0, gy = base + g->y0;
             if (shadow) put_glyph(dst, dw, dh, g, gx + shadow, gy + shadow, (dark & 0xff000000u) / 2 & 0xff000000u);
+            int bold = b && b->fontBold && edge >= 0 ? 1 : 0;
             for (int oy = -edge; oy <= edge; oy++)
-                for (int ox = -edge; ox <= edge; ox++)
+                for (int ox = -edge; ox <= edge + bold; ox++)
                     if (ox || oy) put_glyph(dst, dw, dh, g, gx + ox, gy + oy, dark);
             put_glyph(dst, dw, dh, g, gx, gy, color);
+            if (bold) put_glyph(dst, dw, dh, g, gx + 1, gy, color);
         }
         cx += g->adv;
     }
