@@ -32,6 +32,7 @@ import VNCore
         #expect(BSXPlugin.saveName("/x/save/no000") == "no000")
         #expect(BSXPlugin.saveName("/x/save/no-01") == "no-01")
         #expect(BSXPlugin.saveName("/x/save/common.dat") == "common.dat")
+        #expect(BSXPlugin.saveName("/x/save/vndegen.cfg") == "vndegen.cfg")
         #expect(BSXPlugin.saveName("/x/save/no15") == nil)
         #expect(BSXPlugin.saveName("/x/save/no0151") == nil)
         #expect(BSXPlugin.saveName("/x/save/notes.txt") == nil)

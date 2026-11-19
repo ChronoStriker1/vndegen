@@ -253,6 +253,7 @@ bool bx_save_slot(BX *b, int slot) {
     bx_mkdirs(dir);
     bool ok = bx_write_file(path, buf.d, buf.n);
     bx_log(b, "%s %s (%zu bytes)", ok ? "saved" : "can't save", path, buf.n);
+    bx_common_save(b);
     free(path);
     free(buf.d);
     return ok;
@@ -467,4 +468,51 @@ void bx_autosave(BX *b) {
     }
     bx_save_capture_thumb(b);
     bx_save_slot(b, pick);
+}
+
+void bx_common_load(BX *b) {
+    free(b->common);
+    b->common = NULL;
+    b->commonSize = 0;
+    char path[2048];
+    snprintf(path, sizeof path, "%s/save/common.dat", b->saveDir);
+    size_t n;
+    u8 *d = bx_read_file(path, &n);
+    if (!d) return;
+    size_t p = 0x98;
+    u32 choices = p + 4 <= n ? rd32(d + p) : 0;
+    size_t q = p + 4 + choices;
+    u32 msgs = q + 4 <= n ? rd32(d + q) : 0;
+    if (choices != b->sc->hdr[2] || msgs != (u32)b->sc->msgCount || q + 4 + msgs > n) {
+        bx_log(b, "common.dat doesn't match this script (%u choices, %u messages)", choices, msgs);
+        free(d);
+        return;
+    }
+    b->common = d;
+    b->commonSize = n;
+    b->choiceFlags = p + 4;
+    b->readFlags = q + 4;
+}
+
+void bx_common_save(BX *b) {
+    if (!b->common || !b->commonDirty) return;
+    char path[2048];
+    snprintf(path, sizeof path, "%s/save/common.dat", b->saveDir);
+    if (bx_write_file(path, b->common, b->commonSize)) b->commonDirty = false;
+}
+
+bool bx_msg_read(BX *b, u32 msg) { return b->common && msg < (u32)b->sc->msgCount && b->common[b->readFlags + msg]; }
+
+void bx_mark_read(BX *b, u32 msg) {
+    if (!b->common || msg >= (u32)b->sc->msgCount || b->common[b->readFlags + msg]) return;
+    b->common[b->readFlags + msg] = 1;
+    b->commonDirty = true;
+}
+
+bool bx_choice_seen(BX *b, int id) { return b->common && id >= 0 && (u32)id < b->sc->hdr[2] && b->common[b->choiceFlags + (size_t)id]; }
+
+void bx_mark_choice(BX *b, int id) {
+    if (!b->common || id < 0 || (u32)id >= b->sc->hdr[2] || b->common[b->choiceFlags + (size_t)id]) return;
+    b->common[b->choiceFlags + (size_t)id] = 1;
+    b->commonDirty = true;
 }

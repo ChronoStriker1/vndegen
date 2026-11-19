@@ -300,6 +300,7 @@ void bx_choice_update(BX *b) {
     if (b->click && b->choiceHover >= 0) {
         b->click = false;
         int label = b->choice[b->choiceHover].label;
+        bx_mark_choice(b, b->choice[b->choiceHover].id);
         b->choiceCount = 0;
         b->th.wait = W_NONE;
         bx_vm_goto(b, label);
@@ -312,6 +313,7 @@ void bx_choice_draw(BX *b, u32 *dst) {
     bx_cfg_ints(&b->cfg, "select window", "design0 text pos", tp, 2);
     u32 normal = bx_cfg_color(&b->cfg, "select window", "design0 default color", 0xffffffffu);
     u32 hover = bx_cfg_color(&b->cfg, "select window", "design0 select color", 0xff8844ffu);
+    u32 already = bx_cfg_color(&b->cfg, "select window", "design0 already color", normal);
     Image *item = b->choiceItem[0];
     if (b->choiceCount && b->choiceItem[1]) bx_blit(dst, b->W, b->H, b->choiceItem[1], b->choice[0].x, b->choice[0].y - b->choiceItem[1]->h, 255);
     if (b->choiceCount && b->choiceItem[2]) {
@@ -324,6 +326,6 @@ void bx_choice_draw(BX *b, u32 *dst) {
         else bx_fill(dst, b->W, b->H, c->x, c->y, c->w, c->h, 0xa0000000u);
         const char *t = c->msg >= 0 && c->msg < b->sc->msgCount ? b->sc->msgs[c->msg] : "";
         int tw = bx_text_width(t, b->fontSize, b->fontW);
-        bx_text_draw(b, dst, b->W, b->H, t, c->x + tp[0] - tw / 2, c->y + tp[1], b->fontSize, b->fontW, i == b->choiceHover ? hover : normal, b->edge, b->shadow);
+        bx_text_draw(b, dst, b->W, b->H, t, c->x + tp[0] - tw / 2, c->y + tp[1], b->fontSize, b->fontW, i == b->choiceHover ? hover : bx_choice_seen(b, c->id) ? already : normal, b->edge, b->shadow);
     }
 }

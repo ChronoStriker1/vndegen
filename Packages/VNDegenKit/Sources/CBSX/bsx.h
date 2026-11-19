@@ -216,6 +216,7 @@ typedef struct LogEntry {
 } LogEntry;
 
 typedef struct Choice {
+    int id;
     int label;
     int msg;
     int design;
@@ -342,6 +343,10 @@ struct BX {
     ConfigPhase *config;
     StatusPhase *status;
     Settings set;
+    u8 *common;
+    size_t commonSize;
+    size_t choiceFlags, readFlags;
+    bool commonDirty;
     int phaseBack;
     int phaseResult;
 
@@ -425,6 +430,12 @@ void bx_phase_reset(BX *b);
 void bx_system(BX *b, const char *cmd);
 
 bool bx_save_slot(BX *b, int slot);
+void bx_common_load(BX *b);
+void bx_common_save(BX *b);
+bool bx_msg_read(BX *b, u32 msg);
+void bx_mark_read(BX *b, u32 msg);
+bool bx_choice_seen(BX *b, int id);
+void bx_mark_choice(BX *b, int id);
 void bx_autosave(BX *b);
 bool bx_load_slot(BX *b, int slot);
 bool bx_save_exists(BX *b, int slot);

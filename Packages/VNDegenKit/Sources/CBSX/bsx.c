@@ -141,6 +141,7 @@ VNBSX *vnbsx_open(const VNBSXConfig *cfg, char *err, size_t errSize) {
     bx_ui_init(b);
     b->mixer = bx_mixer_new(b->audioRate);
     bx_settings_load(b);
+    bx_common_load(b);
     bx_vm_init(b);
     bx_log(b, "opened %s, %s, %d labels, %d messages", b->gameDir, b->sc->version, b->sc->labelCount, b->sc->msgCount);
     return (VNBSX *)b;
@@ -149,6 +150,8 @@ VNBSX *vnbsx_open(const VNBSXConfig *cfg, char *err, size_t errSize) {
 void vnbsx_close(VNBSX *n) {
     BX *b = (BX *)n;
     if (!b) return;
+    if (b->sc) bx_common_save(b);
+    free(b->common);
     bx_mixer_free(b->mixer);
     bx_ui_free(b);
     bx_msg_clear(b);

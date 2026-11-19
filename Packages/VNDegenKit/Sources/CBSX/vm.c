@@ -103,7 +103,10 @@ static void message(BX *b, const u8 *p, int *len) {
     }
     b->hist[b->histCount++] = b->th.pc;
     b->msgsShown++;
+    bool unread = !bx_msg_read(b, msg);
+    if (unread && b->skipMode && !b->set.skipUnread && b->common) b->skipMode = false;
     bx_msg_show(b, speaker, text, voice);
+    bx_mark_read(b, msg);
     b->th.wait = W_TEXT;
 }
 
@@ -190,6 +193,7 @@ static bool step(BX *b) {
         if (b->choiceCount < 16) {
             Choice *c = &b->choice[b->choiceCount++];
             memset(c, 0, sizeof *c);
+            c->id = (int)rd32(p + 1);
             c->label = (int)rd32(p + 5);
             c->msg = (int)rd32(p + 9);
             c->design = bx_arg_int(b, 1);

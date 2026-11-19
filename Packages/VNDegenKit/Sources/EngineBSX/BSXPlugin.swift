@@ -34,7 +34,7 @@ nonisolated public struct BSXPlugin: EnginePlugin {
     nonisolated static func saveName(_ path: String) -> String? {
         guard let name = path.replacingOccurrences(of: "\\", with: "/").split(separator: "/").last.map(String.init) else { return nil }
         let lower = name.lowercased()
-        if lower == "common.dat" { return name }
+        if lower == "common.dat" || lower == "vndegen.cfg" { return name }
         guard lower.hasPrefix("no") else { return nil }
         let rest = lower.dropFirst(2)
         if rest.count == 3, rest.allSatisfy(\.isNumber) { return name }
