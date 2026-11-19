@@ -130,6 +130,7 @@ Obj *gfx_obj(AG *g, i32 h, bool create) {
     return o;
 }
 
+void gfx_erase(AG *g, i32 h);
 static void obj_erase(Gfx *x, i32 h) {
     bool found;
     int i = find(x, h, &found);
@@ -138,6 +139,8 @@ static void obj_erase(Gfx *x, i32 h) {
     memmove(x->obj + i, x->obj + i + 1, sizeof(Obj *) * (size_t)(x->nobj - i - 1));
     x->nobj--;
 }
+
+void gfx_erase(AG *g, i32 h) { obj_erase(&g->gfx, h); }
 
 Image *gfx_surface(AG *g, i32 slot) {
     if (slot < 0 || slot >= AG_SURFACES) return NULL;
@@ -394,6 +397,82 @@ static void draw_obj(AG *g, Image *dst, Obj *o, bool offscreen, bool useRange, M
     }
 }
 
+static float cmd_t(Gfx *x, Cmd *c, bool *done) {
+    if (!c->started) { c->start = x->frameNow; c->started = true; }
+    i32 el = (i32)(x->frameNow - c->start) - c->delay;
+    *done = x->forceComplete || el >= c->dur;
+    if (*done) return 1;
+    if (el <= 0) return 0;
+    return (float)el / (float)c->dur;
+}
+
+static bool in_cmd_range(Gfx *x, i32 h) {
+    for (int i = 0; i < AG_CMDS; i++) {
+        Cmd *c = &x->cmd[i];
+        if (!c->on) continue;
+        if (h >= c->a0 && h < c->a0 + c->an) return true;
+        if (c->type != 3 && h >= c->b0 && h < c->b0 + c->bn) return true;
+    }
+    return false;
+}
+
+static void draw_range(AG *g, Image *dst, i32 first, i32 count, bool offscreen, M4 rm) {
+    Gfx *x = &g->gfx;
+    for (int i = 0; i < x->nobj; i++) {
+        Obj *o = x->obj[i];
+        if (o->handle < first || o->handle >= first + count) continue;
+        bool inRange = x->rangeCount > 0 && o->handle >= x->rangeFirst && o->handle < x->rangeFirst + x->rangeCount;
+        draw_obj(g, dst, o, offscreen, inRange, rm);
+    }
+}
+
+static void run_cmds(AG *g, M4 rm) {
+    Gfx *x = &g->gfx;
+    for (int i = 0; i < AG_CMDS; i++) {
+        Cmd *c = &x->cmd[i];
+        if (!c->on || c->type == 3) continue;
+        Image *t = gfx_surface(g, c->target);
+        bool done;
+        float f = cmd_t(x, c, &done);
+        if (t) {
+            memset(t->px, 0, sizeof(u32) * (size_t)t->w * (size_t)t->h);
+            draw_range(g, t, c->a0, c->an, true, rm);
+            Image *b = image_new(t->w, t->h);
+            draw_range(g, b, c->b0, c->bn, true, rm);
+            int k = (int)(f * 256);
+            for (int p = 0; p < t->w * t->h; p++) {
+                u32 sb = b->px[p], d = t->px[p];
+                int ba = (int)(sb >> 24) * k / 256;
+                if (!ba) continue;
+                int da = (int)(d >> 24), ia = 255 - ba;
+                int oa = ba + da * ia / 255;
+                u32 o = 0;
+                for (int s2 = 0; s2 < 24; s2 += 8) {
+                    int cs = (int)(sb >> s2 & 255), cd = (int)(d >> s2 & 255);
+                    o |= (u32)(oa ? (cs * ba + cd * da * ia / 255) / oa : 0) << s2;
+                }
+                t->px[p] = o | (u32)oa << 24;
+            }
+            image_free(b);
+        }
+        if (done) c->on = false;
+    }
+}
+
+static void flush_blur(AG *g, Image *dst, bool offscreen, M4 rm, i32 upto) {
+    Gfx *x = &g->gfx;
+    for (int i = 0; i < AG_CMDS; i++) {
+        Cmd *c = &x->cmd[i];
+        if (!c->on || c->type != 3 || c->drawn || c->key > upto) continue;
+        c->drawn = true;
+        bool done;
+        cmd_t(x, c, &done);
+        c->on = false;
+        draw_range(g, dst, c->a0, c->an, offscreen, rm);
+        c->on = !done;
+    }
+}
+
 void gfx_render(AG *g, i32 target, i32 first, i32 count) {
     Gfx *x = &g->gfx;
     Image screen = { g->width, g->height, g->screen };
@@ -406,12 +485,21 @@ void gfx_render(AG *g, i32 target, i32 first, i32 count) {
     }
     M4 rm = m_ident();
     if (x->rangeCount > 0) rm = range_matrix(x);
+    if (count < 0) {
+        run_cmds(g, rm);
+        for (int i = 0; i < AG_CMDS; i++) x->cmd[i].drawn = false;
+    }
     for (int i = 0; i < x->nobj; i++) {
         Obj *o = x->obj[i];
         if (count >= 0 && (o->handle < first || o->handle >= first + count)) continue;
+        if (count < 0) {
+            flush_blur(g, dst, offscreen, rm, o->handle);
+            if (in_cmd_range(x, o->handle)) continue;
+        }
         bool inRange = x->rangeCount > 0 && o->handle >= x->rangeFirst && o->handle < x->rangeFirst + x->rangeCount;
         draw_obj(g, dst, o, offscreen, inRange, rm);
     }
+    if (count < 0) flush_blur(g, dst, offscreen, rm, 0x7fffffff);
     if (!offscreen) g->frameSerial++;
 }
 
@@ -426,9 +514,22 @@ bool gfx_busy(AG *g) {
     for (int i = 0; i < x->nobj; i++) {
         Obj *o = x->obj[i];
         if (o->detached & 1) continue;
-        if (o->cColor.on || o->cScale.on || o->cRot.on || o->cTrans.on || o->cCell.on) return true;
+        if (o->cColor.on || o->cScale.on || o->cRot.on || o->cTrans.on || o->cCell.on) {
+            obj_sample(x, o);
+            if (o->cColor.on || o->cScale.on || o->cRot.on || o->cTrans.on || o->cCell.on) return true;
+        }
+    }
+    for (int i = 0; i < AG_CMDS; i++) {
+        Cmd *c = &x->cmd[i];
+        if (!c->on) continue;
+        bool done;
+        cmd_t(x, c, &done);
+        if (!done) return true;
+        if (c->type == 3) c->on = false;
+        else { int w, h; g->needRender = true; vnage_pixels(g, &w, &h); }
     }
     Obj *r = &x->range;
+    obj_sample(x, r);
     return r->cColor.on || r->cScale.on || r->cRot.on || r->cTrans.on;
 }
 
@@ -438,6 +539,11 @@ void gfx_complete(AG *g) {
     x->forceComplete = true;
     for (int i = 0; i < x->nobj; i++) obj_sample(x, x->obj[i]);
     obj_sample(x, &x->range);
+    for (int i = 0; i < AG_CMDS; i++)
+        if (x->cmd[i].on) {
+            if (x->cmd[i].type == 3) x->cmd[i].on = false;
+            else { M4 rm = m_ident(); run_cmds(g, rm); }
+        }
     x->forceComplete = false;
     x->animDur = 0;
     x->animStarted = false;
@@ -498,6 +604,7 @@ static int op_load_raw_surface(AG *g) {
 
 static int op_release_surface(AG *g) {
     i32 slot = arg_i(g, 1);
+    movie_stop(g, slot);
     if (slot >= 0 && slot < AG_SURFACES) {
         image_free(g->gfx.surf[slot].im);
         g->gfx.surf[slot].im = NULL;
@@ -509,6 +616,7 @@ static int op_release_surface(AG *g) {
 
 static int op_release_transient(AG *g) {
     for (int s = 42; s < 1000; s++) {
+        movie_stop(g, s);
         image_free(g->gfx.surf[s].im);
         g->gfx.surf[s].im = NULL;
         g->gfx.surf[s].res = -1;
@@ -850,6 +958,7 @@ static int op_clear_target(AG *g) {
 }
 
 static int op_present(AG *g) {
+    if (g->gfx.target >= 1000 || g->gfx.target < 0) { g->needRender = true; return OP_NEXT; }
     gfx_render(g, g->gfx.target, 0, -1);
     return OP_NEXT;
 }
@@ -940,6 +1049,53 @@ static int op_yield(AG *g) {
 }
 
 static int op_tick_presentation(AG *g) { (void)g; return OP_NEXT; }
+
+static Cmd *cmd_slot(AG *g, i32 key) {
+    Gfx *x = &g->gfx;
+    Cmd *free_ = NULL;
+    for (int i = 0; i < AG_CMDS; i++) {
+        if (x->cmd[i].on && x->cmd[i].key == key) return &x->cmd[i];
+        if (!x->cmd[i].on && !free_) free_ = &x->cmd[i];
+    }
+    return free_ ? free_ : &x->cmd[0];
+}
+
+static int queue_cmd(AG *g, int type, i32 key, i32 target, i32 a0, i32 an, i32 b0, i32 bn, i32 delay, i32 dur) {
+    Cmd *c = cmd_slot(g, key);
+    memset(c, 0, sizeof *c);
+    c->on = true;
+    c->type = type;
+    c->key = key;
+    c->target = target;
+    c->a0 = a0;
+    c->an = an;
+    c->b0 = b0;
+    c->bn = bn;
+    c->delay = delay;
+    c->dur = dur;
+    return OP_NEXT;
+}
+
+static int op_cmd_alpha(AG *g) {
+    return queue_cmd(g, 0, arg_i(g, 1), arg_i(g, 2), arg_i(g, 3), arg_i(g, 4), arg_i(g, 5), arg_i(g, 6), arg_i(g, 7), arg_i(g, 8));
+}
+
+static int op_cmd_pattern(AG *g) {
+    return queue_cmd(g, 2, arg_i(g, 1), arg_i(g, 2), arg_i(g, 3), arg_i(g, 4), arg_i(g, 5), arg_i(g, 6), arg_i(g, 9), arg_i(g, 10));
+}
+
+static int op_cmd_dirblur(AG *g) {
+    return queue_cmd(g, 3, arg_i(g, 1), arg_i(g, 2), arg_i(g, 3), arg_i(g, 4), 0, 0, arg_i(g, 9), arg_i(g, 10));
+}
+
+static int op_cmd_radblur(AG *g) {
+    return queue_cmd(g, 3, arg_i(g, 1), arg_i(g, 2), arg_i(g, 3), arg_i(g, 4), 0, 0, arg_i(g, 11), arg_i(g, 12));
+}
+
+static int op_cmd_clear(AG *g) {
+    for (int i = 0; i < AG_CMDS; i++) g->gfx.cmd[i].on = false;
+    return OP_NEXT;
+}
 static int op_nop(AG *g) { (void)g; return OP_NEXT; }
 
 enum { TR_NONE, TR_CROSS, TR_TO_BLACK, TR_TO_WHITE, TR_FROM_BLACK, TR_STRIPS, TR_STAGGER };
@@ -950,7 +1106,11 @@ static Image *snapshot(AG *g, i32 slot) {
     if (s) {
         for (int y = 0; y < g->height && y < s->h; y++)
             for (int x = 0; x < g->width && x < s->w; x++) im->px[(size_t)y * (size_t)g->width + (size_t)x] = s->px[(size_t)y * (size_t)s->w + (size_t)x] | 0xff000000u;
-    } else memcpy(im->px, g->screen, sizeof(u32) * (size_t)g->width * (size_t)g->height);
+    } else {
+        int w, h;
+        vnage_pixels(g, &w, &h);
+        memcpy(im->px, g->screen, sizeof(u32) * (size_t)g->width * (size_t)g->height);
+    }
     return im;
 }
 
@@ -1101,7 +1261,7 @@ void gfx_register(void) {
     vm_register_draw(0x21f, op_rot_to);
     vm_register_draw(0x220, op_trans_to);
     vm_register_draw(0x222, op_present_range);
-    vm_register(0x224, op_nop);
+    vm_register_draw(0x224, op_cmd_clear);
     vm_register(0x227, op_query_rot);
     vm_register(0x228, op_query_trans);
     vm_register_draw(0x229, op_range);
@@ -1129,6 +1289,11 @@ void gfx_register(void) {
     vm_register_draw(0x259, op_script_entry);
     vm_register_draw(0x25a, op_background);
     vm_register_draw(0x32, op_scale_copy);
+    vm_register_draw(0x223, op_cmd_alpha);
+    vm_register_draw(0x24f, op_cmd_pattern);
+    vm_register_draw(0x250, op_cmd_dirblur);
+    vm_register_draw(0x251, op_cmd_radblur);
+    vm_register(0xd9, op_nop);
     vm_register(0x21, op_from_black);
     vm_register(0x22, op_to_black);
     vm_register(0x24, op_to_white);

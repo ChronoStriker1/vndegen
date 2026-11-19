@@ -6,6 +6,7 @@ void vm_register_all(void) {
     input_register();
     snd_register();
     text_register();
+    movie_register();
 }
 
 VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
@@ -37,6 +38,7 @@ VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
 void vnage_close(VNAge *g) {
     if (!g) return;
     vm_close(g);
+    movie_stop_all(g);
     gfx_close(g);
     snd_close(g);
     text_close(g);
@@ -64,6 +66,10 @@ static void service(AG *g) {
     if (g->wait == W_SLEEP && (i32)(g->now - g->waitUntil) >= 0) g->wait = W_NONE;
     if (g->wait == W_YIELD && !gfx_busy(g)) g->wait = W_NONE;
     if (g->wait == W_FRAME) g->wait = W_NONE;
+    if (g->wait == W_MOVIE) {
+        if ((g->in.clicks & 1) || (g->in.pressed & 0x10) || g->in.skip) movie_modal_skip(g);
+        if (movie_modal_done(g)) g->wait = W_NONE;
+    }
     if (g->wait == W_TRANS && (gfx_transition_done(g) || (g->in.clicks & 1) || (g->in.pressed & 0x10))) { gfx_transition_finish(g); g->wait = W_NONE; }
     if (g->wait == W_TEXT || g->wait == W_INPUT || g->wait == W_HIDDEN) input_service(g);
 }
@@ -77,6 +83,7 @@ bool vnage_frame(VNAge *g, uint32_t elapsedMs) {
         gfx_tick(g);
         snd_tick(g);
         text_tick(g);
+        movie_tick(g);
         service(g);
         vm_run(g, 500000);
         if (g->halted || g->quit || g->now == end) break;
@@ -84,12 +91,19 @@ bool vnage_frame(VNAge *g, uint32_t elapsedMs) {
     g->now = end;
     gfx_tick(g);
     text_tick(g);
-    if (!gfx_transition_frame(g) && !g->gfx.hold) gfx_render(g, 1000, 0, -1);
+    g->needRender = true;
+    g->frameSerial++;
     input_end_frame(g);
     return !g->halted && !g->quit;
 }
 
 const uint32_t *vnage_pixels(VNAge *g, int *w, int *h) {
+    if (g->needRender) {
+        g->needRender = false;
+        u32 serial = g->frameSerial;
+        if (!gfx_transition_frame(g) && !g->gfx.hold) gfx_render(g, 1000, 0, -1);
+        g->frameSerial = serial;
+    }
     *w = g->width;
     *h = g->height;
     return g->screen;

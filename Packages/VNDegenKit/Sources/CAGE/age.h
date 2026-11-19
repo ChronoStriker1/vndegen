@@ -245,7 +245,19 @@ typedef struct Obj {
     bool cellHidden;
 } Obj;
 
+typedef struct Cmd {
+    bool on;
+    int type;
+    i32 key, target, a0, an, b0, bn, delay, dur;
+    u32 start;
+    bool started;
+    bool drawn;
+} Cmd;
+
+#define AG_CMDS 32
+
 typedef struct Gfx {
+    Cmd cmd[AG_CMDS];
     Surface surf[AG_SURFACES];
     Obj **obj;
     int nobj, cap;
@@ -271,11 +283,18 @@ bool gfx_transition_done(AG *g);
 bool gfx_transition_frame(AG *g);
 void gfx_transition_finish(AG *g);
 
+void movie_register(void);
+void movie_tick(AG *g);
+void movie_stop(AG *g, i32 slot);
+void movie_stop_all(AG *g);
+bool movie_modal_done(AG *g);
+void movie_modal_skip(AG *g);
 void gfx_init(AG *g);
 void gfx_close(AG *g);
 void gfx_reset(AG *g);
 void gfx_register(void);
 Obj *gfx_obj(AG *g, i32 handle, bool create);
+void gfx_erase(AG *g, i32 handle);
 void gfx_render(AG *g, i32 target, i32 first, i32 count);
 void gfx_tick(AG *g);
 bool gfx_busy(AG *g);
@@ -469,6 +488,7 @@ struct VNAge {
     u32 opSeen[0x400];
     u32 opMissing[0x400];
     u32 frameSerial;
+    bool needRender;
     int width, height;
     u32 *screen;
     u32 rng;

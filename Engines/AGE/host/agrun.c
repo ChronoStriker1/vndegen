@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "age.h"
 #include "vnfont.h"
@@ -10,6 +11,7 @@ static void write_png(const char *path, const uint32_t *px, int w, int h);
 static float audio[2048];
 
 static int step(VNAge *n) {
+    if (((AG *)n)->wait == W_MOVIE) usleep(16000);
     int alive = vnage_frame(n, 16);
     vnage_audio(n, audio, 705);
     return alive;
@@ -37,8 +39,10 @@ static void print_state(AG *g) {
     for (int i = 0; i < g->gfx.nobj; i++) {
         Obj *o = g->gfx.obj[i];
         Image *im = gfx_surface(g, o->slot);
-        printf("  obj %#x vis=%d slot=%d(%dx%d) src=%d,%d-%d,%d pos=%.0f,%.0f mode=%d color=%08x live=%d\n", o->handle, o->visible, o->slot, im ? im->w : 0, im ? im->h : 0, o->sl, o->st, o->sr, o->sb, o->pos.x, o->pos.y, o->mode, o->color, o->live);
+        printf("  obj %#x on=%d%d%d%d%d anim=%u vis=%d slot=%d(%dx%d) src=%d,%d-%d,%d pos=%.0f,%.0f mode=%d color=%08x live=%d\n", o->handle, o->cColor.on, o->cScale.on, o->cRot.on, o->cTrans.on, o->cCell.on, g->gfx.animDur, o->visible, o->slot, im ? im->w : 0, im ? im->h : 0, o->sl, o->st, o->sr, o->sb, o->pos.x, o->pos.y, o->mode, o->color, o->live);
     }
+    printf("  frameNow=%u\n", g->gfx.frameNow);
+    for (int i = 0; i < g->gfx.nobj; i++) { Obj *o = g->gfx.obj[i]; if (o->cColor.on) printf("  busy %#x start=%u started=%d delay=%d dur=%d\n", o->handle, o->start, o->started, o->cColor.delay, o->cColor.dur); }
     int missing = 0;
     for (int op = 0; op < 0x400; op++)
         if (g->opMissing[op]) { printf("  missing %#x x%u\n", op, g->opMissing[op]); missing++; }
@@ -66,7 +70,17 @@ int main(int argc, char **argv) {
         const char *c = argv[i];
         int x, y, k;
         if (sscanf(c, "wait:%d", &k) == 1) alive = run(n, k);
-        else if (sscanf(c, "click:%d,%d", &x, &y) == 2) alive = press(n, x, y, VNAGE_MOUSE_LEFT);
+        else if (sscanf(c, "pages:%d", &k) == 1) {
+            AG *g = (AG *)n;
+            int done = 0;
+            for (int guard = 0; guard < k * 400 && alive && done < k; guard++) {
+                if (g->wait == W_INPUT) {
+                    alive = press(n, 1000, 20, VNAGE_MOUSE_LEFT);
+                    done++;
+                } else alive = run(n, 16);
+            }
+            printf("pages %d done %d\n", k, done);
+        } else if (sscanf(c, "click:%d,%d", &x, &y) == 2) alive = press(n, x, y, VNAGE_MOUSE_LEFT);
         else if (sscanf(c, "rclick:%d,%d", &x, &y) == 2) alive = press(n, x, y, VNAGE_MOUSE_RIGHT);
         else if (sscanf(c, "move:%d,%d", &x, &y) == 2) {
             vnage_mouse_move(n, x, y);

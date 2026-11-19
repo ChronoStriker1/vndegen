@@ -634,8 +634,8 @@ static int op_numeric_style(AG *g) {
     if (i < 0 || i > 10) return OP_NEXT;
     i32 *s = g->text.tabStyle[i];
     for (int k = 0; k < 5; k++) s[k] = arg_i(g, k + 2);
-    s[5] = s[3];
-    s[6] = s[3];
+    s[5] = 0;
+    s[6] = 0;
     return OP_NEXT;
 }
 
@@ -650,25 +650,34 @@ static int op_numeric_style2(AG *g) {
 static int op_numeric_glyphs(AG *g) {
     i32 base = arg_i(g, 1), st = arg_i(g, 2), v = arg_i(g, 3), x = arg_i(g, 4), y = arg_i(g, 5), cap = arg_i(g, 6);
     i32 flags = arg_i(g, 7);
-    if (st < 0 || st > 10) return OP_NEXT;
+    if (st < 0 || st > 10 || cap <= 0) return OP_NEXT;
     i32 *s = g->text.tabStyle[st];
+    for (int i = 0; i < cap; i++) {
+        Obj *o = gfx_obj(g, base + i, false);
+        if (o) { i32 h = o->handle; Obj *q = o; (void)q; gfx_erase(g, h); }
+    }
     char a[32];
     snprintf(a, sizeof a, "%d", v < 0 ? -v : v);
     int n = (int)strlen(a);
-    for (int i = 0; i < cap; i++) {
-        Obj *o = gfx_obj(g, base + i, false);
-        if (o) o->visible = false;
+    if ((flags & 1) && n < cap) {
+        char b[32];
+        int pad = cap - n;
+        for (int i = 0; i < pad; i++) b[i] = '0';
+        memcpy(b + pad, a, (size_t)n + 1);
+        memcpy(a, b, sizeof b);
+        n = cap;
     }
-    int start = (flags & 1) ? cap - n : 0;
-    for (int i = 0; i < n && i < cap; i++) {
+    if (n > cap) { memmove(a, a + (n - cap), (size_t)cap + 1); n = cap; }
+    int start = (flags & 4) ? 0 : (flags & 2) ? (cap - n) / 2 : cap - n;
+    for (int i = 0; i < n; i++) {
         Obj *o = gfx_obj(g, base + i, true);
         int d = a[i] - '0';
         o->slot = s[0];
-        o->sl = s[1] + d * s[5];
+        o->sl = s[1] + d * (s[3] + s[5]);
         o->st = s[2];
         o->sr = o->sl + s[3];
         o->sb = o->st + s[4];
-        o->pos.x = (float)(x + (start + i) * s[6]);
+        o->pos.x = (float)(x + (start + i) * (s[3] + s[6]));
         o->pos.y = (float)y;
         o->visible = true;
         o->live = false;
