@@ -68,6 +68,7 @@ bool bx_archives_open(Archives *a, const char *dir);
 void bx_archives_close(Archives *a);
 const BsaEntry *bx_res_find(Archives *a, int ix, const char *name);
 u8 *bx_res_read(Archives *a, int ix, const char *name, size_t *size);
+bool bx_res_head(Archives *a, int ix, const char *name, u8 *out, size_t n);
 
 typedef struct Image {
     int w, h;
@@ -118,6 +119,7 @@ typedef struct Cfg {
 bool bx_cfg_parse(Cfg *c, const u8 *data, size_t size);
 void bx_cfg_free(Cfg *c);
 const char *bx_cfg_get(const Cfg *c, const char *sec, const char *key);
+bool bx_cfg_section(const Cfg *c, const char *sec);
 int bx_cfg_ints(const Cfg *c, const char *sec, const char *key, int *out, int max);
 int bx_cfg_int(const Cfg *c, const char *sec, const char *key, int def);
 u32 bx_cfg_color(const Cfg *c, const char *sec, const char *key, u32 def);

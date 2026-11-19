@@ -120,7 +120,7 @@ void bx_phase_start(BX *b, int phase) {
     else if (phase == PH_MAP) {
         if (bx_map_start(b)) bx_autosave(b);
         else bx_phase_end(b);
-    }
+    } else if (phase == PH_CUSTOM_MAP && !bx_cfg_section(&b->cfg, "map phase")) bx_autosave(b);
 }
 
 static void title_pick(BX *b, const char *key) {
@@ -169,7 +169,8 @@ void bx_phase_update(BX *b) {
         return;
     }
     if (b->phase == PH_CUSTOM_MAP) {
-        custom_map_update(b);
+        bx_ui_update(b);
+        if (b->phase == PH_CUSTOM_MAP) custom_map_update(b);
         return;
     }
     if (b->phase == PH_MAP) {
@@ -205,7 +206,10 @@ void bx_phase_draw(BX *b, u32 *dst) {
         bx_data_draw(b, dst);
         return;
     }
-    if (b->phase == PH_CUSTOM_MAP) return;
+    if (b->phase == PH_CUSTOM_MAP) {
+        bx_ui_draw(b, dst);
+        return;
+    }
     if (b->phase == PH_MAP) {
         bx_map_draw(b, dst);
         return;
@@ -230,7 +234,7 @@ void bx_ui_init(BX *b) {
     memcpy(b->menuShow, show, sizeof show);
     b->lamp = own(b, bx_cfg_get(c, "game menu", "hold icon"));
     b->menuVisible = true;
-    b->menuLayer = b->infoLayer = true;
+    b->menuLayer = true;
     b->cutIn = true;
     for (int i = 0; i < c->count && b->buttonCount < 24; i++) {
         if (strcmp(c->sec[i], "system button")) continue;
@@ -335,14 +339,21 @@ static void button_press(BX *b, const char *key) {
 
 static bool always_shown(const Button *bt) { return !strcmp(bt->key, "simple view") || !strcmp(bt->key, "simple strip"); }
 
+static bool menu_context(BX *b) {
+    if (b->phase == PH_CUSTOM_MAP) return b->menuLayer && !b->transActive;
+    return b->phase == PH_NONE && b->winShown && !b->winHidden && b->menuLayer && b->th.wait == W_TEXT;
+}
+
+static bool map_disabled(BX *b, const Button *bt) { return b->phase == PH_CUSTOM_MAP && (!strcmp(bt->key, "skip") || !strcmp(bt->key, "voice")); }
+
 void bx_ui_update(BX *b) {
     b->buttonHover = -1;
     bool inMenu = b->mx >= b->menuShow[0] && b->mx < b->menuShow[0] + b->menuShow[2] && b->my >= b->menuShow[1] && b->my < b->menuShow[1] + b->menuShow[3];
-    bool window = b->winShown && !b->winHidden && b->th.wait == W_TEXT;
-    bool shown = window && (inMenu || b->menuVisible);
-    if (!window) return;
+    if (!menu_context(b)) return;
+    bool shown = inMenu || b->menuVisible;
     for (int i = 0; i < b->buttonCount; i++) {
         if (!shown && !always_shown(&b->buttons[i])) continue;
+        if (map_disabled(b, &b->buttons[i])) continue;
         Item it = button_item(&b->buttons[i]);
         if (button_enabled(b, &b->buttons[i]) && inside(&it, b->mx, b->my, b->menuX, b->menuY)) b->buttonHover = i;
     }
@@ -357,7 +368,7 @@ static void draw_date(BX *b, u32 *dst, const char *sec, int ox, int oy);
 
 void bx_ui_draw(BX *b, u32 *dst) {
     bool inMenu = b->mx >= b->menuShow[0] && b->mx < b->menuShow[0] + b->menuShow[2] && b->my >= b->menuShow[1] && b->my < b->menuShow[1] + b->menuShow[3];
-    if (!b->winShown || b->winHidden || b->transActive || b->th.wait != W_TEXT) return;
+    if (!menu_context(b) || b->transActive) return;
     bool menu = inMenu || b->menuVisible;
     if (menu && b->menuBase) bx_blit(dst, b->W, b->H, b->menuBase, b->menuX, b->menuY, 255);
     for (int i = 0; i < b->buttonCount; i++) {
@@ -366,7 +377,7 @@ void bx_ui_draw(BX *b, u32 *dst) {
         Item it = button_item(&b->buttons[i]);
         bool on = (!strcmp(b->buttons[i].key, "skip") && b->skipMode) || (!strcmp(b->buttons[i].key, "auto ex") && b->autoMode) ||
                   (view_button(b->buttons[i].key) && bx_view_level(b) == view_button(b->buttons[i].key));
-        draw_item(b, dst, &it, i == b->buttonHover ? 1 : on ? 2 : 0, b->menuX, b->menuY);
+        draw_item(b, dst, &it, map_disabled(b, &b->buttons[i]) ? 3 : i == b->buttonHover ? 1 : on ? 2 : 0, b->menuX, b->menuY);
     }
     if (!menu) return;
     struct {

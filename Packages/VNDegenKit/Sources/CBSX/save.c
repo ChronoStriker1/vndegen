@@ -131,7 +131,7 @@ void bx_save_capture_thumb(BX *b) {
 }
 
 
-static int mode_of(BX *b) { return b->phase == PH_MAP ? 7 : 1; }
+static int mode_of(BX *b) { return b->phase == PH_MAP ? 7 : b->phase == PH_CUSTOM_MAP ? 9 : 1; }
 
 static void put_wears(BX *b, Buf *buf) {
     int n = 0;
@@ -152,6 +152,12 @@ static void put_wears(BX *b, Buf *buf) {
 }
 
 static void put_obj(BX *b, Buf *buf, const char *name, int kind, int x, int y, int parts, int alpha) {
+    u8 head[0x1a];
+    int w = b->W, h = b->H, frames = kind == OK_OBJ && bx_cfg_get(&b->cfg, "button object", name) ? 2 : 1;
+    if (kind != OK_BG && kind != OK_CHAR && bx_res_head(&b->arc, RX_GFX, name, head, sizeof head)) {
+        w = rd16(head + 0x16);
+        h = rd16(head + 0x18) / frames;
+    }
     put8(buf, (u8)kind);
     zeros(buf, 12);
     put_wide_counted(buf, name);
@@ -160,10 +166,10 @@ static void put_obj(BX *b, Buf *buf, const char *name, int kind, int x, int y, i
     put32(buf, (u32)x);
     put32(buf, (u32)y);
     zeros(buf, 16);
-    put32(buf, (u32)b->W);
-    put32(buf, (u32)b->H);
+    put32(buf, (u32)w);
+    put32(buf, (u32)h);
     put32(buf, 0);
-    put32(buf, 1);
+    put32(buf, (u32)frames);
     put32(buf, (u32)parts);
     put32(buf, (u32)clampi(alpha, 0, 255));
     put32(buf, 0x3f800000u);
@@ -245,7 +251,7 @@ bool bx_save_slot(BX *b, int slot) {
     put32(&buf, (u32)s->varCount);
     for (int i = 0; i < s->varCount; i++) put32(&buf, (u32)b->globals[i].v);
     put32(&buf, b->msgPc);
-    put32(&buf, 0);
+    put32(&buf, (u32)(b->histCount % HIST));
     put32(&buf, (u32)b->histCount);
     for (int i = 0; i < HIST; i++) put32(&buf, i < b->histCount ? b->hist[i] : 0xffffffffu);
     put32(&buf, 0);
@@ -262,17 +268,17 @@ bool bx_save_slot(BX *b, int slot) {
     for (int i = 0; i < BX_OBJS; i++)
         if (b->scene.obj[i].used) list[count++] = &b->scene.obj[i];
     qsort(list, (size_t)count, sizeof *list, obj_order);
-    bool overlays = false;
-    for (int i = 0; i < count; i++) overlays |= list[i]->kind == OK_OVERLAY || (list[i]->kind == OK_BG && list[i]->face[0]);
     for (int i = 0; i < count; i++) {
         const Obj *o = list[i];
-        int parts = o->kind == OK_BG ? (overlays ? 2 : 0) : 2;
+        int parts = o->kind == OK_BG ? (o->face[0] ? 2 : 0) : 2;
         put_obj(b, &buf, o->name, o->kind, o->x, o->y, parts, o->alpha);
         if (o->kind == OK_BG && o->face[0]) put_obj(b, &buf, o->face, OK_OVERLAY, 0, 0, 2, 255);
     }
     put8(&buf, 0xff);
     u8 tail[27] = {0};
-    tail[11] = s->minor == 0;
+    tail[3] = !b->winShown;
+    tail[7] = !b->menuLayer;
+    tail[11] = !b->infoLayer;
     put(&buf, tail, sizeof tail);
     char *path = bx_save_path(b, slot);
     char dir[2048];
@@ -383,10 +389,11 @@ bool bx_load_slot(BX *b, int slot) {
     i32 *globals = bx_alloc(sizeof(i32) * (nglob ? nglob : 1));
     for (u32 i = 0; i < nglob && !r.bad; i++) globals[i] = (i32)get32(&r);
     u32 msgPc = get32(&r);
-    get32(&r);
+    u32 histPos = get32(&r) % HIST;
     u32 histCount = get32(&r);
-    u32 hist[HIST];
-    for (int i = 0; i < HIST; i++) hist[i] = get32(&r);
+    u32 ring[HIST], hist[HIST];
+    for (int i = 0; i < HIST; i++) ring[i] = get32(&r);
+    for (int i = 0; i < HIST; i++) hist[i] = histCount >= HIST ? ring[(histPos + (u32)i) % HIST] : ring[i];
     skip(&r, 14);
     u32 bgm = get32(&r);
     skip(&r, 12 + 4 + 13);
@@ -411,6 +418,7 @@ bool bx_load_slot(BX *b, int slot) {
         u8 alpha = get8(&r);
         skip(&r, 3 + 4 + 20);
         if (kind == OK_OVERLAY) skip(&r, 29);
+        if (r.bad) break;
         if (!*name) {
             free(name);
             continue;
@@ -422,6 +430,8 @@ bool bx_load_slot(BX *b, int slot) {
         }
         free(name);
     }
+    u8 tail[27] = {0};
+    if (!r.bad && r.p + sizeof tail <= r.n) memcpy(tail, r.d + r.p, sizeof tail);
     for (int i = 0; i < b->sc->varCount; i++) b->globals[i] = (Val){0, globals[i]};
     for (int i = 0; i < BX_LOCALS; i++) b->locals[i] = (Val){0, locals[i]};
     b->th.sp = 0;
@@ -459,11 +469,13 @@ bool bx_load_slot(BX *b, int slot) {
     bx_snd_stop(b, CH_VOICE, 0);
     bx_snd_stop(b, CH_VOICE2, 0);
     bx_msg_clear(b);
-    b->winShown = true;
+    b->winShown = !tail[3];
+    b->menuLayer = !tail[7];
+    b->infoLayer = !tail[11];
     b->winHidden = false;
-    if (mode == 7) {
+    if (mode == 7 || mode == 9) {
         b->th.wait = W_NONE;
-        bx_phase_start(b, PH_MAP);
+        bx_phase_start(b, mode == 7 ? PH_MAP : PH_CUSTOM_MAP);
     } else if (msgPc < b->sc->codeSize && b->sc->code[msgPc] == 0x1d) {
         show_message_at(b, msgPc);
         b->th.wait = W_TEXT;

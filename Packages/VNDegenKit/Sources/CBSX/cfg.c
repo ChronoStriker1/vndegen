@@ -186,3 +186,9 @@ u32 bx_cfg_color(const Cfg *c, const char *sec, const char *key, u32 def) {
     u32 argb = (u32)strtoul(v, NULL, 0);
     return (argb & 0xff00ff00u) | (argb >> 16 & 0xff) | (argb & 0xff) << 16;
 }
+
+bool bx_cfg_section(const Cfg *c, const char *sec) {
+    for (int i = 0; i < c->count; i++)
+        if (!strcmp(c->sec[i], sec)) return true;
+    return false;
+}
