@@ -126,7 +126,7 @@ New bugs get a GitHub issue and a line here.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Bruns with Orc Kingdom (Next, item 1), on branch `feat/vn-four`. The EAGLS follow-ups shipped in 0.55.1 and ExHibit's Extra menu in 0.55.3.
+- Bruns with Orc Kingdom: Monmusu Breeder King (Next, item 1), on branch `feat/vn-four`, about 6 to 8 days (stage 0 done 2026-11-19). The story side is the easy part; most of the time goes to the breeding sim's unnamed engine calls, its battles and menus. The EAGLS follow-ups shipped in 0.55.1 and ExHibit's Extra menu in 0.55.3.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
