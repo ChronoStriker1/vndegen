@@ -182,13 +182,14 @@ typedef struct MsgWin {
 
 #define IK_STACK 32
 
-enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_MSG, W_VOICE, W_QUIT };
+enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_MSG, W_VOICE, W_MOVIE, W_QUIT };
 
 #define IK_SLOTS 16
 #define IK_DEFAULT_VOLUME 128
 enum { CH_BGM, CH_VOICE, CH_SE, IK_CHANNELS = CH_SE + IK_SLOTS };
 
 typedef struct Mixer Mixer;
+typedef struct Movie Movie;
 
 typedef struct SaveFile {
     char *path;
@@ -284,6 +285,7 @@ struct IK {
     int buttonCount;
     u32 rng;
     Dungeon dun;
+    Movie *movie;
 
     int mx, my;
     bool lDown, rDown, click, rclick;
@@ -344,5 +346,11 @@ bool dun_exec(IK *t, u16 op, const u8 *a, int n);
 void dun_render(IK *t);
 void dun_update(IK *t);
 void dun_close(IK *t);
+bool movie_play(IK *t, const char *name, int x, int y, int w, int h, bool skippable);
+void movie_stop(IK *t);
+void movie_update(IK *t, double elapsedMs);
+void movie_draw(IK *t);
+void movie_mix(Movie *m, float *out, int frames, float vol, int rate);
+void snd_set_movie(IK *t, Movie *m);
 
 #endif

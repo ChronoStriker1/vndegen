@@ -58,3 +58,9 @@
 #define vm_run ik_vm_run
 #define vm_set_text ik_vm_set_text
 #define vm_start ik_vm_start
+#define movie_draw ik_movie_draw
+#define movie_mix ik_movie_mix
+#define movie_play ik_movie_play
+#define movie_stop ik_movie_stop
+#define movie_update ik_movie_update
+#define snd_set_movie ik_snd_set_movie

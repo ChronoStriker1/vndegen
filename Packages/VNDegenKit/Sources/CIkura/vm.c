@@ -517,6 +517,14 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0501: snd_se_load(t, (int)ik_value(t, rd32(a)), name_arg(a + 4, n - 4)); break;
     case 0x0502: snd_se_stop(t, (int)ik_value(t, rd32(a))); break;
     case 0x0503: snd_se_play(t, (int)ik_value(t, rd32(a)), n >= 8 && ik_value(t, rd32(a + 4)) != 0); break;
+    case 0x050b:
+        if (n >= 16) {
+            int slot = (int)ik_value(t, rd32(a));
+            snd_se_load(t, slot, name_arg(a + 4, 12));
+            snd_se_play(t, slot, n >= 20 && ik_value(t, rd32(a + 16)) != 0);
+        }
+        break;
+    case 0x0601: snd_bgm_fade(t, 0); break;
     case 0x0506: snd_voice(t, name_arg(a, n)); break;
     case 0x0507: snd_voice_stop(t); break;
     case 0x0508: t->wait = W_VOICE; break;
@@ -605,6 +613,28 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         settings_apply(t);
         break;
     }
+    case 0x071a:
+    case 0x071b: {
+        int which = op == 0x071a, id = (int)ik_value(t, rd32(a));
+        Button *b = button(t, (u32)id);
+        if (!b) break;
+        t->modeButton[which] = id;
+        bool on = which ? t->skipMode : t->autoMode;
+        b->mode = n >= 8 && !ik_value(t, rd32(a + 4)) ? 0 : on ? 2 : 1;
+        b->enabled = b->mode != 0;
+        break;
+    }
+    case 0x0e00:
+        if (n >= 40 && movie_play(t, name_arg(a + 4, 12), (int)ik_value(t, rd32(a + 16)), (int)ik_value(t, rd32(a + 20)),
+                                  (int)ik_value(t, rd32(a + 24)), (int)ik_value(t, rd32(a + 28)), ik_value(t, rd32(a + 36)) != 0))
+            t->wait = W_MOVIE;
+        break;
+    case 0x0010:
+    case 0x0011:
+    case 0x0f00:
+    case 0x0f01:
+    case 0x0f03:
+    case 0x0f04:
     case 0x0201:
     case 0x000d:
     case 0x0705:

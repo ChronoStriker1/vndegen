@@ -229,6 +229,7 @@ void gfx_compose(IK *t) {
         }
         msg_draw(t, i);
     }
+    movie_draw(t);
     t->serial++;
 }
 

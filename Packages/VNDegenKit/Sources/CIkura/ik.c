@@ -57,6 +57,7 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
 void vnikura_close(VNIkura *n) {
     IK *t = (IK *)n;
     if (!t) return;
+    movie_stop(t);
     snd_close(t);
     dun_close(t);
     gfx_close(t);
@@ -83,6 +84,7 @@ static void tick(IK *t) {
     gfx_update(t);
     dun_update(t);
     msg_tick(t);
+    movie_update(t, TICK_MS);
     switch (t->wait) {
     case W_TIME:
         if ((i32)(t->now - t->waitUntil) >= 0) t->wait = W_NONE;
@@ -92,6 +94,9 @@ static void tick(IK *t) {
         break;
     case W_VOICE:
         if (!snd_voice_playing(t) || t->click) t->wait = W_NONE;
+        break;
+    case W_MOVIE:
+        if (!t->movie) t->wait = W_NONE;
         break;
     case W_QUIT: t->quit = true; break;
     case W_INPUT:

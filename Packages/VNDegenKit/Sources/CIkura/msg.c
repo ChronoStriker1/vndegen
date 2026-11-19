@@ -273,6 +273,11 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
         run_tags(t);
         break;
     case 0x0910: t->msgMode = val(t, a); break;
+    case 0x0916:
+        clear(m);
+        m->tags = NULL;
+        t->dirty = true;
+        break;
     case 0x0911:
     case 0x090d:
     case 0x090e:

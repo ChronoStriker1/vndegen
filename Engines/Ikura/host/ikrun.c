@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "ikura.h"
 #include "vnfont.h"
@@ -15,6 +16,7 @@ static long wavFrames;
 static float audio[2048];
 
 static int step(VNIkura *n) {
+    if (((IK *)n)->movie) usleep(16000);
     int alive = vnikura_frame(n, 16);
     vnikura_audio(n, audio, 705);
     if (wav) {
