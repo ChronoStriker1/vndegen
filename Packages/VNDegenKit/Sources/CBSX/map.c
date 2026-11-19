@@ -407,3 +407,10 @@ void bx_map_draw(BX *b, u32 *dst) {
 }
 
 int bx_map_hover(BX *b) { return b->map ? (b->map->lockedPlace ? b->map->lockedPlace : b->map->hoverPlace) : -1; }
+
+bool bx_map_choose(BX *b, int index) {
+    MapPhase *m = b->map;
+    if (!m || index < 0 || index >= m->iconCount) return false;
+    finish(b, m->icons[index].entry);
+    return true;
+}

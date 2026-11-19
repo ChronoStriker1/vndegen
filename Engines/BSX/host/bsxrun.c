@@ -113,7 +113,7 @@ static int card_xy(BX *b, int *x, int *y) {
         Image *im = bx_image_load(b, o->name);
         if (!im) continue;
         *x = im->x + o->x + o->kx + im->w / 2;
-        *y = im->y + o->y + o->ky + im->h / 2;
+        *y = im->y + o->y + o->ky + im->h / 4;
         return 1;
     }
     return 0;
@@ -136,6 +136,37 @@ static int autoplay(VNBSX *n, int steps, int pace) {
         else if (b->th.wait == W_CHOICE) alive = answer(n);
         else if (b->th.wait == W_TEXT || b->th.wait == W_CLICK) alive = press(n, 400, 200, VNBSX_MOUSE_LEFT) && run(n, pace);
         else alive = run(n, 50);
+    }
+    return alive;
+}
+
+static int skipplay(VNBSX *n, int steps, int pickIcons) {
+    BX *b = (BX *)n;
+    int alive = 1;
+    int nt[2] = {448, 528};
+    const char *v = bx_cfg_get(&b->cfg, "map phase", "next time");
+    char f[64];
+    if (v && bx_cfg_field(v, 2, f, sizeof f) > 0) nt[0] = bx_eval(f, NULL);
+    if (v && bx_cfg_field(v, 3, f, sizeof f) > 0) nt[1] = bx_eval(f, NULL);
+    b->set.skipUnread = 1;
+    const char *last = "";
+    for (int j = 0; j < steps && alive; j++) {
+        int x, y;
+        b->skipMode = true;
+        const char *l = label_at(b, b->th.pc);
+        if (strcmp(l, last)) {
+            printf("step %d label %s\n", j, l);
+            last = l;
+        }
+        if (b->phase == PH_MAP) {
+            if (pickIcons && bx_map_choose(b, j % 3)) alive = run(n, 16);
+            else alive = press(n, nt[0] + 52, nt[1] + 32, VNBSX_MOUSE_LEFT);
+        } else if (b->phase == PH_CUSTOM_MAP) alive = card_xy(b, &x, &y) ? press(n, x, y, VNBSX_MOUSE_LEFT) : run(n, 100);
+        else if (b->phase == PH_TITLE) {
+            printf("back at the title after %d steps\n", j);
+            break;
+        } else if (b->th.wait == W_CHOICE) alive = answer(n);
+        else alive = run(n, 16);
     }
     return alive;
 }
@@ -199,6 +230,10 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "load:%d", &k) == 1) {
             printf("load %d: %s\n", k, bx_load_slot(b, k) ? "ok" : "failed");
             alive = run(n, 100);
+        } else if (sscanf(c, "skipplay:%d,%d", &k, &x) == 2) {
+            alive = skipplay(n, k, x);
+        } else if (sscanf(c, "skipplay:%d", &k) == 1) {
+            alive = skipplay(n, k, 0);
         } else if (sscanf(c, "autoplay:%d,%d", &k, &x) == 2) {
             alive = autoplay(n, k, x);
         } else if (sscanf(c, "untilmsg:%d", &k) == 1) {

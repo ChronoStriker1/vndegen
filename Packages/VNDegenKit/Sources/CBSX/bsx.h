@@ -447,6 +447,7 @@ void bx_map_update(BX *b);
 void bx_map_draw(BX *b, u32 *dst);
 void bx_map_free(BX *b);
 int bx_map_hover(BX *b);
+bool bx_map_choose(BX *b, int index);
 
 void bx_data_open(BX *b, bool save);
 void bx_data_update(BX *b);

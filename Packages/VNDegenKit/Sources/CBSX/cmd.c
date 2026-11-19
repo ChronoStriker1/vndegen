@@ -91,8 +91,9 @@ void bx_cmd(BX *b, int op) {
         break;
     case 0x35:
         if (a1 == 0) wait_ms(b, (u32)a2 * 100);
-        else if (a1 == 1 && !b->skipMode) b->th.wait = W_CLICK;
-        else if (a1 == 2) {
+        else if (a1 == 1) {
+            if (!b->skipMode) b->th.wait = W_CLICK;
+        } else if (a1 == 2) {
             if (bx_anim_busy(b)) b->th.wait = W_ANIM;
         }
         else bx_log(b, "wait %d %d", a1, a2);
