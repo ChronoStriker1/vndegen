@@ -1045,7 +1045,8 @@ static int op_background(AG *g) {
 }
 
 static int op_anim_clock(AG *g) {
-    g->gfx.animDur = (u32)arg_i(g, 1);
+    i32 d = arg_i(g, 1);
+    g->gfx.animDur = d > 0 ? (u32)d : 0;
     g->gfx.animStarted = false;
     return OP_NEXT;
 }

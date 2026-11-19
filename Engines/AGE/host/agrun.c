@@ -46,7 +46,8 @@ static void print_state(AG *g) {
         Image *im = gfx_surface(g, o->slot);
         printf("  obj %#x on=%d%d%d%d%d anim=%u vis=%d slot=%d(%dx%d) src=%d,%d-%d,%d pos=%.0f,%.0f mode=%d color=%08x live=%d\n", o->handle, o->cColor.on, o->cScale.on, o->cRot.on, o->cTrans.on, o->cCell.on, g->gfx.animDur, o->visible, o->slot, im ? im->w : 0, im ? im->h : 0, o->sl, o->st, o->sr, o->sb, o->pos.x, o->pos.y, o->mode, o->color, o->live);
     }
-    printf("  frameNow=%u\n", g->gfx.frameNow);
+    printf("  frameNow=%u animDur=%u animStart=%u started=%d svc=%#x busy=%d\n", g->gfx.frameNow, g->gfx.animDur, g->gfx.animStart, g->gfx.animStarted, g->gfx.serviceFlags, gfx_busy(g));
+    for (int i = 0; i < AG_CMDS; i++) if (g->gfx.cmd[i].on) printf("  cmd %d type %d key %d delay %d dur %d started %d start %u\n", i, g->gfx.cmd[i].type, g->gfx.cmd[i].key, g->gfx.cmd[i].delay, g->gfx.cmd[i].dur, g->gfx.cmd[i].started, g->gfx.cmd[i].start);
     for (int i = 0; i < g->gfx.nobj; i++) { Obj *o = g->gfx.obj[i]; if (o->cColor.on) printf("  busy %#x start=%u started=%d delay=%d dur=%d\n", o->handle, o->start, o->started, o->cColor.delay, o->cColor.dur); }
     movie_debug(g, stdout);
     int missing = 0;
@@ -97,6 +98,12 @@ int main(int argc, char **argv) {
                 } else alive = run(n, 16);
             }
             printf("pages %d done %d\n", k, done);
+        } else if (sscanf(c, "poke:%x,%d", &x, &y) == 2) {
+            AG *g = (AG *)n;
+            if ((unsigned)x < g->ngi) g->gi[x] = y;
+        } else if (sscanf(c, "peek:%x", &x) == 1) {
+            AG *g = (AG *)n;
+            printf("G[%#x] = %d\n", x, (unsigned)x < g->ngi ? g->gi[x] : 0);
         } else if (sscanf(c, "click:%d,%d", &x, &y) == 2) alive = press(n, x, y, VNAGE_MOUSE_LEFT);
         else if (sscanf(c, "rclick:%d,%d", &x, &y) == 2) alive = press(n, x, y, VNAGE_MOUSE_RIGHT);
         else if (sscanf(c, "move:%d,%d", &x, &y) == 2) {
