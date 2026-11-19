@@ -192,7 +192,8 @@ static void draw_obj(BX *b, const Obj *o, u32 *dst, const char *tint) {
         bool hasFace = face_name(b, shown, fn) || face_name(b, o->name, fn);
         int eye = hasFace ? bx_eye_frame(b, o) : -1;
         Image *eyes = NULL;
-        if (eye >= 0) {
+        u8 head[0x12];
+        if (eye >= 0 && bx_res_head(&b->arc, RX_GFX, fn, head, sizeof head) && !memcmp(head, "BSS-Composition", 15) && head[0x11] >= 2) {
             snprintf(part, sizeof part, "%s#1", fn);
             eyes = bx_image_load(b, part);
             snprintf(part, sizeof part, "%s#0", fn);

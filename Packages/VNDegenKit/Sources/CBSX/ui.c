@@ -530,6 +530,8 @@ void bx_system(BX *b, const char *cmd) {
         b->th.sp = 0;
         b->th.wait = W_NONE;
         int l = bx_script_label(b->sc, cmd[1] == 't' ? "title" : "boot_logo");
+        if (l < 0) l = bx_script_label(b->sc, "boot");
+        if (l < 0) l = bx_script_label(b->sc, "title");
         bx_vm_goto(b, l >= 0 ? l : 0);
     } else if (!strcmp(cmd, "dress_on")) b->dressEnabled = true;
     else if (!strcmp(cmd, "dress_off")) b->dressEnabled = false;
