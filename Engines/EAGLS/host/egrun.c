@@ -179,7 +179,13 @@ int main(int argc, char **argv) {
                     const char *sn = t->th[0].sc ? t->th[0].sc->name : "";
                     if (!strcmp(sn, "00Name.dat")) alive = press(n, 726, 529, VNEAGLS_MOUSE_LEFT);
                     else if (!strcmp(sn, "00NameOK.dat")) alive = press(n, 292, 298, VNEAGLS_MOUSE_LEFT);
-                    else alive = press(n, 400, 300, VNEAGLS_MOUSE_LEFT);
+                    else if (!strncmp(sn, "00", 2)) {
+                        static const int pts[][2] = {{220, 110}, {350, 110}, {90, 250}, {220, 250}, {350, 250}, {480, 250},
+                                                     {70, 390}, {200, 390}, {330, 390}, {460, 390}, {292, 298}, {542, 298}};
+                        static int pi;
+                        int *p = (int *)pts[pi++ % 12];
+                        alive = press(n, p[0], p[1], VNEAGLS_MOUSE_LEFT);
+                    } else alive = press(n, 400, 300, VNEAGLS_MOUSE_LEFT);
                 } else alive = run(n, 16);
             }
         }

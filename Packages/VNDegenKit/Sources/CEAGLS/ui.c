@@ -12,7 +12,8 @@ enum { MB_NONE, MB_TITLE, MB_EXIT };
 struct UI {
     Sheet win;
     Sheet save, load, loadT, check, hist;
-    Sheet option, bra;
+    Sheet option, bra, bgm;
+    int track;
     int saveMode;
     bool fromTitle;
     int page;
@@ -677,6 +678,86 @@ static void option_draw(EG *e, u32 *dst, Sheet *s, int hover) {
     if (hover) draw_masked(dst, e->W, e->H, s->hover, s->mask, hover, 0, 0);
 }
 
+static const Rect soundTracks[10] = {{24, 72, 373, 63},  {24, 172, 373, 64},  {24, 271, 373, 63},  {24, 370, 373, 63},  {24, 470, 373, 64},
+                                     {405, 52, 373, 63}, {405, 152, 373, 63}, {405, 254, 373, 63}, {405, 353, 373, 63}, {405, 452, 373, 63}};
+static const Rect soundButtons[7] = {{487, 555, 39, 43}, {545, 555, 39, 43}, {604, 555, 39, 43}, {663, 555, 39, 43}, {732, 554, 60, 43}, {11, 566, 23, 23}, {418, 566, 23, 22}};
+static const Rect soundBar = {43, 570, 365, 15};
+
+static void sound_play_track(EG *e, int i) {
+    UI *u = e->ui;
+    u->track = i;
+    char name[32];
+    snprintf(name, sizeof name, "WAVE\\%02d", i + 1);
+    snd_play(e, name, 1, 0, 0);
+}
+
+static int sound_hit(EG *e) {
+    for (int i = 0; i < 10; i++)
+        if (in_rect(soundTracks[i], e->mx, e->my)) return i + 1;
+    for (int i = 0; i < 7; i++)
+        if (in_rect(soundButtons[i], e->mx, e->my)) return 20 + i;
+    if (in_rect(soundBar, e->mx, e->my)) return 30;
+    return 0;
+}
+
+static void sound_update(EG *e) {
+    UI *u = e->ui;
+    int h = sound_hit(e);
+    if (h != u->hover && h) sound(e, "SYS_OV");
+    u->hover = h;
+    if (e->lDown && h == 30) {
+        e->volBgm = clampi((e->mx - soundBar.x) * 100 / soundBar.w, 0, 100);
+        snd_volumes(e);
+    }
+    if (e->rclick) {
+        snd_play(e, "0", 3, 0, 0);
+        close_ui(e);
+        return;
+    }
+    if (!e->click || !h) return;
+    if (h >= 1 && h <= 10) sound_play_track(e, h - 1);
+    else if (h == 20) sound_play_track(e, u->track);
+    else if (h == 21) snd_play(e, "0", 3, 0, 0);
+    else if (h == 22) sound_play_track(e, (u->track + 9) % 10);
+    else if (h == 23) sound_play_track(e, (u->track + 1) % 10);
+    else if (h == 24) {
+        sound(e, "SYS_OK");
+        snd_play(e, "0", 3, 0, 0);
+        config_save(e);
+        close_ui(e);
+    } else if (h == 25 || h == 26) {
+        e->volBgm = clampi(e->volBgm + (h == 25 ? -10 : 10), 0, 100);
+        snd_volumes(e);
+    }
+}
+
+static void sound_draw(EG *e, u32 *dst) {
+    UI *u = e->ui;
+    blit(dst, e->W, e->H, u->bgm.base, 0, 0, 255);
+    Image *c = u->bgm.hover;
+    Rect cur = soundTracks[u->track];
+    blit_part(dst, e->W, e->H, c, cur.x, cur.y, cur.w, cur.h, cur.x, cur.y, 255);
+    if (u->hover >= 1 && u->hover <= 10) {
+        Rect r = soundTracks[u->hover - 1];
+        blit_part(dst, e->W, e->H, c, r.x, r.y, r.w, r.h, r.x, r.y, 255);
+    } else if (u->hover >= 20 && u->hover <= 26) {
+        Rect r = soundButtons[u->hover - 20];
+        blit_part(dst, e->W, e->H, c, r.x, r.y, r.w, r.h, r.x, r.y, 255);
+    }
+    int w = soundBar.w * e->volBgm / 100;
+    blit_part(dst, e->W, e->H, c, soundBar.x, soundBar.y, w, soundBar.h, soundBar.x, soundBar.y, 255);
+}
+
+void ui_open_sound(EG *e) {
+    UI *u = e->ui;
+    sheet_load(e, &u->bgm, "BGMMode");
+    if (u->bgm.base) u->bgm.base->alpha = false;
+    if (u->bgm.hover) u->bgm.hover->alpha = false;
+    u->hover = 0;
+    u->track = 0;
+    e->uiMode = UI_SOUND;
+}
+
 void ui_update(EG *e) {
     UI *u = e->ui;
     switch (e->uiMode) {
@@ -700,6 +781,7 @@ void ui_update(EG *e) {
         }
         break;
     }
+    case UI_SOUND: sound_update(e); break;
     case UI_BRA: {
         int c = mask_color(u->bra.mask, e->mx, e->my);
         if (c != u->hover && c) sound(e, "SYS_OV");
@@ -749,6 +831,7 @@ void ui_draw(EG *e, u32 *dst) {
     case UI_MSGBOX: mb_draw(e, dst); break;
     case UI_ANIM: anim_draw(e, dst); break;
     case UI_BRA: bra_draw(e, dst); break;
+    case UI_SOUND: sound_draw(e, dst); break;
     default: break;
     }
     if (u->noticeUntil && (i32)(e->now - u->noticeUntil) < 0) {

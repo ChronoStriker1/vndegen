@@ -435,6 +435,7 @@ void config_load(EG *e);
 void config_save(EG *e);
 void game_to_title(EG *e);
 void ui_open_title_load(EG *e);
+void ui_open_sound(EG *e);
 void ui_message_box(EG *e, int kind);
 void ui_slots_changed(EG *e);
 void ui_notice(EG *e, const char *text);

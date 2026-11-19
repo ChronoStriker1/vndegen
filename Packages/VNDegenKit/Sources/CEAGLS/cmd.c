@@ -329,6 +329,12 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
         } else screen(e, t, UI_LOAD);
         break;
     case 146: screen(e, t, UI_CONFIG); break;
+    case 130:
+        ui_open_sound(e);
+        e->scriptUi = true;
+        e->scriptUiDone = false;
+        t->wait = W_UI;
+        break;
     case 147:
         if (in->argc > 0) screen(e, t, UI_CONFIG);
         break;

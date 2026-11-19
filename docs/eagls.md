@@ -64,7 +64,7 @@ uses the same folder:
 
 ## What runs
 
-- The logos, the title with its hover buttons, New Game, Load Game, Settings and Exit Game.
+- The logos, the title with its hover buttons, New Game, Load Game, Soundtrack, Settings and Exit Game.
 - The prologue movie, backgrounds, characters, emotes, transitions with mask pictures, shaking.
 - Messages with the PC's layout, speaker plates, voices, the wait cursor, click to finish or advance, right click to
   hide the window, the wheel to open the backlog, Ctrl to skip.
@@ -72,6 +72,9 @@ uses the same folder:
   animation settings, champion brassiere page, return to title, exit).
 - Save and Load pages with ten pages of eight slots, thumbnails, the NEW mark, Save Confirm and Load Delete, and the
   confirm dialogs; the backlog with its scroll bar and voice buttons; name entry; choices.
+- The map that picks the next heroine, from the game's own scripts and click maps.
+- Soundtrack: the ten tracks, play, stop, previous, next and the volume bar, at the PC's places, drawn opaque as the PC draws
+  them.
 - Settings: VNDegen draws a dialog with the PC dialog's Text and Sound options (text speed, auto speed, white text,
   skip unread, wait for voices in auto, volumes and mute), standing in for the PC's Windows property sheet.
 
@@ -82,7 +85,7 @@ Games start on the "Visual novel" controller layout.
 - A slot saved in VNDegen shows in the PC game's Load screen, but loading it there crashes the PC game: the PC needs
   internal fields of its state block that VNDegen doesn't write yet. The PC's own saves are unaffected, and they load
   in VNDegen.
-- The title's CG View, Scene View, Soundtrack and the locked "?????" bonus, and the window's Oppai Gallery and Oppai
+- The title's CG View, Scene View and the locked "?????" bonus, and the window's Oppai Gallery and Oppai
   View buttons, do nothing: their slot lists are compiled into the game's exe.
 - The champion brassiere page shows every brassiere as not found.
 - Transitions other than crossfades and mask wipes (`4` with effects 3, 5, 8 and 10) are drawn as crossfades.
