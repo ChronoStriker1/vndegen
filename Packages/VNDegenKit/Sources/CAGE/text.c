@@ -517,11 +517,60 @@ static int op_show(AG *g) {
     return OP_NEXT;
 }
 
+static void ruby_over(AG *g, i32 li, i32 rowL, i32 rowT, i32 rowR, const char *ruby) {
+    Layout *L = &g->text.lay[li];
+    Image *im = gfx_surface(g, 0x14 + li);
+    Text *t = &g->text;
+    Font *f = font_load("ＭＳ ゴシック", 0);
+    if (!f || !*ruby) return;
+    int rs = t->rubySize > 0 ? t->rubySize : 8;
+    int asc = font_ascent(f, rs);
+    int n = (int)strlen(ruby);
+    int width = 0;
+    for (const u8 *q = (const u8 *)ruby; *q;) {
+        u32 cp;
+        q += ag_sjis_decode(q, &cp);
+        Mask m;
+        glyph_mask(f, cp, rs, false, &m);
+        width += m.adv;
+        free(m.c);
+    }
+    int diff = (rowR - rowL) - width;
+    int gap = 0, over = 0;
+    if (diff > 0) gap = diff / ((n + 3) >> 1);
+    else over = -(diff / 2);
+    int x = rowL - over + gap, y = rowT - rs;
+    for (const u8 *q = (const u8 *)ruby; *q;) {
+        u32 cp;
+        int len = ag_sjis_decode(q, &cp);
+        q += len;
+        Mask m;
+        glyph_mask(f, cp, rs, false, &m);
+        if (m.c && im) blit_mask(im, &m, x + m.x0, y + asc + m.y0, rgb_of(t->color));
+        GlyphRec r = { 1, x, y, x + m.adv, y + rs };
+        rec_push(L, r);
+        x += m.adv + (len == 1 ? gap / 2 : gap);
+        free(m.c);
+    }
+}
+
 static int op_ruby(AG *g) {
+    i32 li = layout_index(g, arg_i(g, 1));
+    if (li < 1 || li > 9) return OP_NEXT;
+    Layout *L = &g->text.lay[li];
+    i32 x0 = L->cx, y0 = L->cy;
+    char *ruby = ag_strdup(arg_s(g, 3));
     show(g, arg_i(g, 1), arg_s(g, 2));
+    if (L->cy == y0 && L->nrec > 0) {
+        L->rec[L->nrec - 1].chain = 1;
+        ruby_over(g, li, x0, y0, L->cx, ruby);
+        if (L->nrec > 0) L->rec[L->nrec - 1].chain = 0;
+    }
+    free(ruby);
     if (text_revealing(g)) { g->wait = W_TEXT; return OP_WAIT; }
     return OP_NEXT;
 }
+
 
 static int op_newline(AG *g) {
     Layout *L = layout(g, arg_i(g, 1));
