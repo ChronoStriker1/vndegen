@@ -71,7 +71,7 @@ bool uf_call(BR *e, int id, Node *call) {
     trace_call(e, id, call);
     Obj *o;
     switch (id) {
-    case 1000: layers_create(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 1000: layer_new(e, A(e, call, 0), A(e, call, 1)); return true;
     case 1006: {
         i32 v[31];
         int n = call->n - 2 < 31 ? call->n - 2 : 31;
@@ -80,14 +80,14 @@ bool uf_call(BR *e, int id, Node *call) {
         return true;
     }
     case 1007: layers_transition(e, A(e, call, 2), A(e, call, 3)); return true;
-    case 1008:
-        e->reflag = layers_load(e, A(e, call, 0), A(e, call, 1), call->n > 4 && call->k[4]->t == N_STR ? call->k[4] : NULL, A(e, call, 3), A(e, call, 4));
-        if (call->n > 4 && call->k[4]->t != N_STR) {
-            Node tmp = {.t = N_INT, .i = A(e, call, 2)};
-            e->reflag = layers_load(e, A(e, call, 0), A(e, call, 1), &tmp, A(e, call, 3), A(e, call, 4));
-        }
+    case 1008: {
+        Node tmp = {.t = N_INT};
+        Node *src = call->n > 4 && call->k[4]->t == N_STR ? call->k[4] : &tmp;
+        if (src == &tmp) tmp.i = A(e, call, 2);
+        e->reflag = layers_load(e, A(e, call, 0), A(e, call, 1), src, A(e, call, 3), A(e, call, 4));
         return true;
-    case 1014: layers_clear_children(e, A(e, call, 1)); return true;
+    }
+    case 1014: layers_clear_pics(e, A(e, call, 1)); return true;
     case 1015: layers_freeze(e); return true;
     case 1016: layers_visible(e, A(e, call, 2), A(e, call, 3) != 0); return true;
     case 1020: return true;

@@ -75,9 +75,22 @@ static inline void put(u32 *d, u32 color, int a) {
 
 static int sample(const u8 *px, int stride, int cell, int cw, int size, int x, int y) {
     if (x < 0 || y < 0) return 0;
-    int sx = x * cell / size, sy = y * cell / size;
-    if (sx >= cw || sy >= cell) return 0;
-    return px[(size_t)sy * stride + sx];
+    int x0 = x * cell / size, x1 = (x + 1) * cell / size, y0 = y * cell / size, y1 = (y + 1) * cell / size;
+    if (x1 <= x0) x1 = x0 + 1;
+    if (y1 <= y0) y1 = y0 + 1;
+    if (x0 >= cw || y0 >= cell) return 0;
+    if (x1 > cw) x1 = cw;
+    if (y1 > cell) y1 = cell;
+    int sum = 0, n = 0, mx = 0;
+    for (int sy = y0; sy < y1; sy++)
+        for (int sx = x0; sx < x1; sx++) {
+            int v = px[(size_t)sy * stride + sx];
+            sum += v;
+            if (v > mx) mx = v;
+            n++;
+        }
+    int avg = sum / n;
+    return (avg * 3 + mx) / 4;
 }
 
 void font_draw_char(BR *e, u32 *dst, int dw, int dh, const u8 *p, int x, int y, int size, u32 color, u32 edge, int edgeW, int alpha) {

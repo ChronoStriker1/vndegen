@@ -188,15 +188,26 @@ typedef struct Msg {
     Image *layer;
 } Msg;
 
-typedef struct LNode {
-    int id, parent;
-    Image *img;
-    Stream *stream;
-    i32 v[13], from[13];
+enum {
+    LP_SWITCH = 8, LP_IX, LP_IY, LP_IW, LP_IH, LP_TX, LP_TY, LP_TW, LP_TH,
+    LP_MSYS, LP_MSWITCH, LP_MIX, LP_MIY, LP_MIW, LP_MIH, LP_MTX, LP_MTY, LP_MTW, LP_MTH,
+    LP_R, LP_G, LP_B, LP_A, LP_COUNT
+};
+
+typedef struct Layer {
+    int no, order, mode, group, pic;
+    bool visible;
+    i32 v[LP_COUNT], from[LP_COUNT];
     u32 start, dur;
     int ease, easeDir;
-    bool visible;
-} LNode;
+} Layer;
+
+typedef struct Pic {
+    int no, layer, url, type, numsel;
+    char *path;
+    Image *img;
+    Stream *stream;
+} Pic;
 
 typedef struct Anim {
     float from, to;
@@ -256,8 +267,10 @@ typedef struct BR {
     u32 overlayColor;
     int event;
     int eventMode, eventTimeout, eventFlag;
-    LNode **nodes;
-    int nodeCount, nodeCap;
+    Layer **layers;
+    int layerCount, layerCap;
+    Pic **pics;
+    int picCount, picCap;
     Image *transFrom, *frozenImg;
     u32 transStart, transDur;
     bool frozen;
@@ -365,10 +378,15 @@ void msg_send(BR *e, Node *call);
 void msg_tick(BR *e);
 void snd_se_hover(BR *e);
 void blit_tinted(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int w, int h, int alpha, u32 tint);
-void layers_clear_children(BR *e, int parent);
+Layer *layer_find(BR *e, int no);
+Pic *pic_find(BR *e, int no);
+void layers_sort(BR *e);
+Layer *layer_new(BR *e, int no, int mode);
+void layers_clear_pics(BR *e, int layer);
+void pic_reload(BR *e, Pic *p);
+Pic *pic_new(BR *e, int layer, int no, int url, const char *path, int type, int numsel);
 void layers_reset(BR *e);
 void layers_free(BR *e);
-void layers_create(BR *e, int id, int parent);
 int layers_load(BR *e, int parent, int child, Node *src, int mode, int loop);
 void layers_visible(BR *e, int id, bool on);
 void layers_set(BR *e, int id, const i32 *a, int count);
