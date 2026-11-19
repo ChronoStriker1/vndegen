@@ -101,6 +101,9 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "poke:%x,%d", &x, &y) == 2) {
             AG *g = (AG *)n;
             if ((unsigned)x < g->ngi) g->gi[x] = y;
+        } else if (sscanf(c, "wheel:%d", &k) == 1) {
+            vnage_wheel(n, k);
+            alive = run(n, 64);
         } else if (sscanf(c, "peek:%x", &x) == 1) {
             AG *g = (AG *)n;
             printf("G[%#x] = %d\n", x, (unsigned)x < g->ngi ? g->gi[x] : 0);

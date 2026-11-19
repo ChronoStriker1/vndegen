@@ -418,12 +418,16 @@ typedef struct Layout {
     bool indConfigured;
 } Layout;
 
-typedef struct HistLine {
+typedef struct HistRec {
+    i32 d[11];
     char *text;
-    i32 voice;
-    i32 layout;
-    bool boundary;
-} HistLine;
+} HistRec;
+
+typedef struct HistEntry {
+    i32 layout, first;
+} HistEntry;
+
+enum { HF_GROUP = 1, HF_FILTERED = 2, HF_BREAK = 8, HF_META = 0x20000000, HF_VOICE = 0x40000000 };
 
 typedef struct Text {
     char face[64];
@@ -435,14 +439,26 @@ typedef struct Text {
     int indLayout;
     u32 indStart;
     bool recording;
-    HistLine *hist;
-    int nhist, histCap;
+    HistRec *rec;
+    int nrec, crec;
+    HistEntry *ent;
+    int nent, cent;
+    int anchor, navOff;
+    bool armGroup;
     i32 winAlpha;
     i32 autoTime[2];
     i32 tabStyle[11][7];
 } Text;
 
 void readtext_mark(AG *g, u32 script, i32 index, u32 count);
+void hist_text(AG *g, i32 layout, i32 l, i32 t, i32 r, i32 b, const char *s);
+void hist_break(AG *g, i32 layout);
+void hist_voice(AG *g, i32 id, i32 variant);
+void hist_boundary(AG *g, i32 layout);
+void hist_clear(AG *g);
+void hist_drop_last_group(AG *g);
+void history_register(void);
+void text_render_records(AG *g, i32 li, int first, bool reflow, i32 flags, i32 col, i32 eff);
 void text_init(AG *g);
 void text_close(AG *g);
 void text_register(void);

@@ -395,6 +395,7 @@ static int op_bgm_current(AG *g) { arg_set_i(g, 1, g->snd.bgm); return OP_NEXT; 
 static int op_voice(AG *g) {
     Sound *s = &g->snd;
     s->lastVoice = arg_i(g, 1);
+    hist_voice(g, s->lastVoice, 0);
     if (g->in.skip) return OP_NEXT;
     Voice *v = load_id(g, (u32)s->lastVoice);
     apply_gains(g);
@@ -404,6 +405,7 @@ static int op_voice(AG *g) {
 }
 
 static int op_voice_history(AG *g) {
+    hist_voice(g, arg_i(g, 1), 1);
     Voice *v = load_id(g, (u32)arg_i(g, 1));
     if (v) { set_voice(g, 12, v); start(g, 12, false); }
     return OP_NEXT;

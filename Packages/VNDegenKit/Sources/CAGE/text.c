@@ -248,22 +248,9 @@ void text_init(AG *g) {
 void text_close(AG *g) {
     Text *t = &g->text;
     for (int i = 0; i < 10; i++) free(t->lay[i].rec);
-    for (int i = 0; i < t->nhist; i++) free(t->hist[i].text);
-    free(t->hist);
-}
-
-static void hist_add(AG *g, const char *s, i32 layoutSlot, bool boundary) {
-    Text *t = &g->text;
-    if (!t->recording) return;
-    if (t->nhist >= t->histCap) {
-        t->histCap = t->histCap ? t->histCap * 2 : 256;
-        t->hist = ag_realloc(t->hist, sizeof(HistLine) * (size_t)t->histCap);
-    }
-    HistLine *h = &t->hist[t->nhist++];
-    h->text = s ? ag_strdup(s) : NULL;
-    h->voice = g->snd.lastVoice;
-    h->layout = layoutSlot;
-    h->boundary = boundary;
+    hist_clear(g);
+    free(t->rec);
+    free(t->ent);
 }
 
 static void rec_push(Layout *L, GlyphRec r) {
@@ -361,6 +348,7 @@ static int op_define(AG *g) {
     L->ox = arg_i(g, 4);
     L->oy = arg_i(g, 5);
     if (L->w > 0 && L->h > 0) gfx_set_surface(g, 0x14 + li, image_new(L->w, L->h), -1, true);
+    hist_boundary(g, li);
     return OP_NEXT;
 }
 
@@ -382,7 +370,7 @@ static int op_reset(AG *g) {
     i32 li = layout_index(g, arg_i(g, 1));
     if (li < 0 || li > 9) return OP_NEXT;
     layout_clear(g, li);
-    hist_add(g, NULL, li, true);
+    hist_boundary(g, li);
     if (li == g->text.indLayout) indicator_stop(g);
     return OP_NEXT;
 }
@@ -440,37 +428,87 @@ static int op_ind_grid(AG *g) {
     return OP_NEXT;
 }
 
-static void show(AG *g, i32 slot, const char *s) {
-    i32 li = layout_index(g, slot);
-    if (li < 1 || li > 9) return;
+static void show_into(AG *g, i32 li, const char *s, bool record, bool wrap) {
     Layout *L = &g->text.lay[li];
     Image *im = gfx_surface(g, 0x14 + li);
     Pen p;
     if (!pen_init(g, &p)) return;
     Text *t = &g->text;
     bool start = L->shown >= L->nrec;
+    char row[1024];
+    int rn = 0;
+    i32 rowL = L->cx, rowT = L->cy;
     for (const u8 *q = (const u8 *)s; *q;) {
         int a;
         u32 cp;
-        ag_sjis_decode(q, &cp);
+        int len = ag_sjis_decode(q, &cp);
         glyph(g, &p, NULL, q, 0, 0, false, &a);
         int b = L->cy + t->size + (t->effMode ? t->effY : 0);
-        if (L->cy + t->size > L->boundB && L->boundB != 0x7fffffff) break;
-        if (L->cx + a > L->boundR && L->boundR != 0x7fffffff && !closing_class(cp)) {
+        if (wrap && L->cy + t->size > L->boundB && L->boundB != 0x7fffffff) break;
+        if (wrap && L->cx + a > L->boundR && L->boundR != 0x7fffffff && !closing_class(cp)) {
+            if (record && rn) { row[rn] = 0; hist_text(g, li, rowL, rowT, L->cx, rowT + t->size, row); }
+            if (record) hist_break(g, li);
+            rn = 0;
             L->cx = L->resetX;
             L->cy += t->size + t->leading;
+            rowL = L->cx;
+            rowT = L->cy;
             b = L->cy + t->size + (t->effMode ? t->effY : 0);
         }
+        if (rn + len < (int)sizeof row - 1) { memcpy(row + rn, q, (size_t)len); rn += len; }
         q += glyph(g, &p, im, q, L->cx, L->cy, true, &a);
         GlyphRec r = { 0, L->cx, L->cy, L->cx + a, b };
         rec_push(L, r);
         L->cx += a;
     }
+    if (record && rn) { row[rn] = 0; hist_text(g, li, rowL, rowT, L->cx, rowT + t->size, row); }
     if (start) L->nextAt = g->now;
-    hist_add(g, s, li, false);
-    if (t->delay <= 0 || g->in.skip) {
+    if (t->delay <= 0 || g->in.skip || !record) {
         while (L->shown < L->nrec && L->shown < L->capacity) publish(g, li, L->shown++);
     }
+}
+
+static void show(AG *g, i32 slot, const char *s) {
+    i32 li = layout_index(g, slot);
+    if (li < 1 || li > 9) return;
+    show_into(g, li, s, true, true);
+}
+
+void text_render_records(AG *g, i32 li, int first, bool reflow, i32 flags, i32 col, i32 eff) {
+    Text *t = &g->text;
+    if (li < 1 || li > 9 || first < 0 || first >= t->nrec) return;
+    Layout *L = &t->lay[li];
+    i32 sc = t->color, se = t->effColor, ss = t->size;
+    bool rec = t->recording;
+    t->recording = false;
+    if (!reflow) {
+        for (i32 h = L->first; h < L->first + L->capacity; h++) gfx_erase(g, h);
+        layout_clear(g, li);
+    }
+    for (int i = first; i < t->nrec; i++) {
+        HistRec *r = &t->rec[i];
+        if (i > first && (r->d[10] & HF_GROUP)) break;
+        if ((r->d[10] & HF_FILTERED) && !(flags & 1)) continue;
+        if (r->d[10] & (HF_META | HF_VOICE)) continue;
+        if (r->d[10] & HF_BREAK) {
+            if (reflow) { L->cx = L->resetX; L->cy += t->size + t->leading; }
+            continue;
+        }
+        if (!reflow) {
+            L->cx = r->d[1];
+            L->cy = r->d[2];
+            t->size = r->d[9] > 0 ? r->d[9] : ss;
+            t->color = (i32)((u32)r->d[5] >> 16 & 255 | ((u32)r->d[5] & 0xff00) | ((u32)r->d[5] & 255) << 16);
+            t->effColor = (i32)((u32)r->d[6] >> 16 & 255 | ((u32)r->d[6] & 0xff00) | ((u32)r->d[6] & 255) << 16);
+        }
+        if (flags & 2) { t->color = col; t->effColor = eff; }
+        show_into(g, li, r->text ? r->text : "", false, false);
+        t->color = sc;
+        t->effColor = se;
+        t->size = ss;
+    }
+    if (flags & 4) for (i32 h = L->first; h < L->first + L->capacity; h++) { Obj *o = gfx_obj(g, h, false); if (o) o->visible = false; }
+    t->recording = rec;
 }
 
 static int op_show(AG *g) {
@@ -488,6 +526,7 @@ static int op_ruby(AG *g) {
 static int op_newline(AG *g) {
     Layout *L = layout(g, arg_i(g, 1));
     if (!L) return OP_NEXT;
+    hist_break(g, layout_index(g, arg_i(g, 1)));
     L->cx = L->resetX;
     L->cy += g->text.size + g->text.leading;
     return OP_NEXT;
@@ -604,38 +643,10 @@ static int op_font_name(AG *g) {
     return OP_NEXT;
 }
 
-static int op_hist_clear(AG *g) {
-    Text *t = &g->text;
-    for (int i = 0; i < t->nhist; i++) free(t->hist[i].text);
-    t->nhist = 0;
-    return OP_NEXT;
-}
 
-static int op_hist_meta(AG *g) { (void)g; return OP_NEXT; }
 
-static int op_hist_find(AG *g) {
-    arg_set_i(g, 1, 0);
-    return OP_NEXT;
-}
 
-static int op_hist_step(AG *g) {
-    arg_set_i(g, 1, -1);
-    arg_set_i(g, 2, -1);
-    return OP_NEXT;
-}
 
-static int op_hist_pair(AG *g) {
-    arg_set_i(g, 1, -1);
-    arg_set_i(g, 2, -1);
-    return OP_NEXT;
-}
-
-static int op_redraw_query(AG *g) {
-    arg_set_i(g, 1, -1);
-    arg_set_i(g, 2, -1);
-    arg_set_i(g, 3, -1);
-    return OP_NEXT;
-}
 
 static int op_nop(AG *g) { (void)g; return OP_NEXT; }
 
@@ -721,9 +732,6 @@ void text_register(void) {
     vm_register_draw(0x7a, op_cursor);
     vm_register(0x7f, op_get_delay);
     vm_register_draw(0x80, op_current);
-    vm_register(0x82, op_nop);
-    vm_register(0x83, op_redraw_query);
-    vm_register_draw(0x85, op_hist_clear);
     vm_register_draw(0x8b, op_leading);
     vm_register(0x131, op_win_alpha_get);
     vm_register_draw(0x13a, op_numeric_style);
@@ -740,11 +748,6 @@ void text_register(void) {
     vm_register_draw(0x1bb, op_recording);
     vm_register_draw(0x1c1, op_bounds);
     vm_register_draw(0x1ce, op_ind_enable);
-    vm_register(0x1d0, op_hist_step);
-    vm_register(0x1d1, op_nop);
-    vm_register(0x1d2, op_hist_meta);
-    vm_register(0x1d3, op_hist_find);
-    vm_register(0x1d4, op_hist_pair);
     vm_register_draw(0x204, op_draw_string);
     vm_register_draw(0x205, op_draw_int);
     vm_register_draw(0x20a, op_publish);

@@ -248,16 +248,76 @@ static void strings_blob(Buf *b, AG *g, u32 count) {
     free(s.d);
 }
 
-static void history_tail(Buf *t) {
+static void history_tail(AG *g, Buf *t) {
+    Text *x = &g->text;
     Buf h = { 0 };
-    b32(&h, 0);
-    b32(&h, 0);
-    b32(&h, 0);
+    b32(&h, (u32)x->nent);
+    for (int i = 0; i < x->nent; i++) { b32(&h, (u32)x->ent[i].layout); b32(&h, (u32)x->ent[i].first); }
+    b32(&h, (u32)x->nrec);
+    for (int i = 0; i < x->nrec; i++)
+        for (int k = 0; k < 11; k++) b32(&h, (u32)x->rec[i].d[k]);
+    Buf s = { 0 };
+    for (int i = 0; i < x->nrec; i++) put_cstr(&s, x->rec[i].text ? x->rec[i].text : "");
+    while (s.n & 3) bzero_(&s, 1);
+    b32(&h, (u32)(s.n / 4));
+    for (size_t i = 0; i < s.n; i++) s.d[i] = (u8)~s.d[i];
+    bput(&h, s.d, s.n);
+    free(s.d);
+    size_t pn = 0;
+    u8 *packed = lzss_pack(h.d, h.n, &pn);
     b32(t, (u32)h.n);
     b32(t, (u32)h.n);
-    b32(t, (u32)h.n);
-    bput(t, h.d, h.n);
+    if (pn < h.n) { b32(t, (u32)pn); bput(t, packed, pn); }
+    else { b32(t, (u32)h.n); bput(t, h.d, h.n); }
+    free(packed);
     free(h.d);
+}
+
+static void history_load(AG *g, const u8 *tail, size_t tn) {
+    hist_clear(g);
+    if (tn < 12) return;
+    u32 len = rd32(tail), stored = rd32(tail + 8);
+    if (12 + (size_t)stored > tn || len > (64u << 20)) return;
+    u8 *h = ag_alloc((size_t)len + 4);
+    if (stored == len) memcpy(h, tail + 12, len);
+    else ag_lzss(tail + 12, stored, h, len);
+    Text *x = &g->text;
+    size_t q = 0;
+    u32 ne = len >= 4 ? rd32(h) : 0;
+    q = 4;
+    if (q + (size_t)ne * 8 > len) { free(h); return; }
+    x->cent = (int)ne + 64;
+    x->ent = ag_realloc(x->ent, sizeof(HistEntry) * (size_t)x->cent);
+    for (u32 i = 0; i < ne; i++) { x->ent[i].layout = (i32)rd32(h + q); x->ent[i].first = (i32)rd32(h + q + 4); q += 8; }
+    x->nent = (int)ne;
+    x->anchor = ne ? (int)ne - 1 : 0;
+    u32 nr = q + 4 <= len ? rd32(h + q) : 0;
+    q += 4;
+    if (q + (size_t)nr * 44 + 4 > len) { x->nent = 0; free(h); return; }
+    x->crec = (int)nr + 256;
+    x->rec = ag_realloc(x->rec, sizeof(HistRec) * (size_t)x->crec);
+    for (u32 i = 0; i < nr; i++) {
+        for (int k = 0; k < 11; k++) x->rec[i].d[k] = (i32)rd32(h + q + k * 4);
+        x->rec[i].text = NULL;
+        q += 44;
+    }
+    x->nrec = (int)nr;
+    u32 sdw = rd32(h + q);
+    q += 4;
+    if (q + (size_t)sdw * 4 <= len) {
+        u8 *sb = h + q;
+        for (size_t i = 0; i < (size_t)sdw * 4; i++) sb[i] = (u8)~sb[i];
+        const char *s = (const char *)sb, *e = s + (size_t)sdw * 4;
+        for (u32 i = 0; i < nr && s < e; i++) {
+            size_t l = strnlen(s, (size_t)(e - s));
+            char *v = ag_alloc(l + 1);
+            memcpy(v, s, l);
+            x->rec[i].text = v;
+            s += l + 1;
+        }
+    }
+    free(h);
+    hist_drop_last_group(g);
 }
 
 static bool numbered_write(AG *g, int slot) {
@@ -309,7 +369,7 @@ static bool numbered_write(AG *g, int slot) {
     wr32(rec + 0x68, 1);
     bput(&b, rec, sizeof rec);
     Buf tail = { 0 };
-    history_tail(&tail);
+    history_tail(g, &tail);
     char name[32];
     snprintf(name, sizeof name, "SAVE%02d.DAT", slot);
     char *p = save_path(g, name);
@@ -329,9 +389,10 @@ static bool numbered_read(AG *g, int slot) {
     u8 *tail = NULL, hdr[0x124];
     u8 *b = container_read(g, p, &n, &tail, &tn, hdr);
     free(p);
+    if (!b) { free(tail); return false; }
+    if ((i32)rd32(hdr + 0x11c) != 3) { free(b); free(tail); return false; }
+    history_load(g, tail, tn);
     free(tail);
-    if (!b) return false;
-    if ((i32)rd32(hdr + 0x11c) != 3) { free(b); return false; }
     size_t q = 0;
 #define NEED(k) if (q + (k) > n) goto bad
     NEED(12);

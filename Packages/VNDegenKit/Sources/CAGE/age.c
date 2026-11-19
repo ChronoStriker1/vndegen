@@ -8,6 +8,7 @@ void vm_register_all(void) {
     text_register();
     movie_register();
     save_register();
+    history_register();
 }
 
 VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
@@ -132,7 +133,14 @@ void vnage_key(VNAge *g, int vk, bool down) {
     if (down && !g->in.keys[vk] && g->in.keyAction[vk] < 32) g->in.pressed |= 1u << g->in.keyAction[vk];
     g->in.keys[vk] = down;
 }
-void vnage_wheel(VNAge *g, int notches) { g->in.wheel += notches * 120; }
+void vnage_wheel(VNAge *g, int notches) {
+    if ((g->wait == W_INPUT || g->wait == W_TEXT) && notches) {
+        const char *k = store_setting(&g->st, notches > 0 ? "WHEELKEYUP" : "WHEELKEYDOWN");
+        int a = k ? atoi(k) : -1;
+        if (a >= 0 && a < 32) { g->in.pressed |= 1u << a; return; }
+    }
+    g->in.wheel += notches * 120;
+}
 void vnage_audio(VNAge *g, float *out, int frames) { mixer_mix(g->snd.mixer, out, frames, g->snd.paused); }
 void vnage_set_paused(VNAge *g, bool paused) { g->snd.paused = paused; }
 void vnage_request_quit(VNAge *g) { g->quit = true; }
