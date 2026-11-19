@@ -199,6 +199,23 @@ static Voice *voice_memory(EX *e, u8 *data, size_t size, const char *name) {
     return v;
 }
 
+static void ogg_unlock(u8 *d, size_t n) {
+    static const int rot[8] = {2, 15, 7, 11, 1, 15, 23, 3};
+    if (n < 512 || !memcmp(d, "OggS", 4)) return;
+    u32 w0 = (u32)d[0] | (u32)d[1] << 8 | (u32)d[2] << 16 | (u32)d[3] << 24;
+    u32 key = (w0 << 2 | w0 >> 30) ^ 0x5367674fu;
+    for (int i = 0; i < 128; i++) {
+        u8 *p = d + 4 * i;
+        u32 w = (u32)p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24;
+        int r = rot[i & 7];
+        w = (w << r | w >> (32 - r)) ^ key;
+        p[0] = (u8)w;
+        p[1] = (u8)(w >> 8);
+        p[2] = (u8)(w >> 16);
+        p[3] = (u8)(w >> 24);
+    }
+}
+
 static Voice *voice_open(EX *e, const char *rel) {
     char *path = ex_game_path(e, rel);
     Voice *v = NULL;
@@ -208,7 +225,10 @@ static Voice *voice_open(EX *e, const char *rel) {
         else {
             size_t sz;
             u8 *d = ex_read_file(path, &sz);
-            if (d) v = voice_memory(e, d, sz, rel);
+            if (d) {
+                ogg_unlock(d, sz);
+                v = voice_memory(e, d, sz, rel);
+            }
         }
     }
     free(path);

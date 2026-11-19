@@ -10,7 +10,8 @@ for the one place where the engine's code was read, what was looked at and what 
 | Pictures (`.gyu`) | GARbro `ArcFormats/ExHibit/ImageGYU.cs` (MIT): the header, the key, the ten byte swaps from a Mersenne Twister with the old 69069 seeding (GARbro `MersenneTwister.cs`, MIT), LZSS or GYU's bit-coded LZ, the separate alpha plane |
 | Script container (`.rld`) | The jialiang/shirogane-analysis write-up (a README only, read as prose, no code): the `\0DLR` header and each command's packed word of opcode, number count and string count. This game's files are version 3 and encrypted, which the write-up doesn't cover; see below |
 | Script encryption | `resident.dll`'s script read path, read with Ghidra as described below |
-| Script commands | The game's own scripts, and the original under Wine as a black box |
+| Script commands | The game's own scripts, the command names in `resident.dll`'s debug strings (a table of `CMD_` names in opcode order), and the original under Wine as a black box |
+| Music encryption | `resident.dll`'s Ogg Vorbis open path, read with Ghidra as described below |
 
 ## The script read path in `resident.dll`
 
@@ -34,8 +35,9 @@ instruction listing was copied; what was learned is this:
 - `cmdDefCryptKey` fills other tables from a list of numbers in a script command; it doesn't set the script keys.
 
 Checked against the files: `def.rld` decrypts with the fixed key into commands that parse to the end of the file. In
-every script the 256 bytes from offset 16 to the commands at offset 272 are zeros once decrypted. The file holds one
-more command than its header's count, a call to `defChara`, so the reader parses to the end of the file.
+every script the 256 bytes from offset 16 to the commands at offset 272 are zeros once decrypted, apart from the first
+few words of scene scripts, which name their library. `def.rld` holds one more command than its header's count, a call
+to `defChara`, so the reader parses to the end of the file.
 
 ## The other scripts' key
 
@@ -46,3 +48,20 @@ otherwise searches all 2^32 keys for one whose generator output matches word 5, 
 about 1.5 seconds on eight threads and runs once: the key is kept in the game's data folder. For this game it finds
 0x5E8C3301, which decrypts all 76 other scripts so that each parses to its end. Scene scripts' first header word is 1
 and their next bytes name the library script whose functions they call.
+
+## The music read path in `resident.dll`
+
+The music files (`res/s/m/*.ogg`) don't start with an Ogg page, while voices and effects are plain. The coordinator
+approved the same minimal look at how the engine opens and decrypts an `.ogg`. Only these were read: the Vorbis
+decoder's open function, the two functions that feed file bytes to libogg, the decoder's virtual method that the open
+function calls on the first block, and the decoder's vtable to find that method. Nothing was copied. What was learned:
+
+- When the decoder opens a file it reads the first 4096 bytes into libogg's buffer and, if the decoder has a key, calls
+  a decrypt method on them as 32-bit words. Later reads are passed through as they are.
+- The decrypt method takes each little-endian word, rotates it left by 2, 15, 7, 11, 1, 15, 23 and 3 bits in turn (the
+  pattern repeats every eight words), and XORs the 32-bit key. It stops after a word count kept in the decoder.
+
+Where the key and the count are set was not read: that lies outside the open path, and the coordinator's rule was to
+stop there. Both come from the files instead. The first plain word of an Ogg file is always `OggS`, so a file's key is
+its first word rotated left by 2, XORed with `OggS`. The count is 128 words: with it every music file's first pages
+pass their Ogg CRC checks, and with any other count from 16 to 1024 they don't. All 21 files open this way.
