@@ -527,7 +527,14 @@ void bx_shake(BX *b, int x, int y) {
     b->shakeStart = b->now;
 }
 
-#define SHAKE_MS 400
+#define SHAKE_MS 500
+
+static int shake_offset(u32 seed, int amp) {
+    int range = amp * 3 / 2;
+    if (range <= 0) return 0;
+    seed = seed * 2654435761u ^ seed >> 13;
+    return (int)(seed % (u32)(2 * range + 1)) - range;
+}
 
 static void shake_frame(BX *b) {
     u32 t = b->now - b->shakeStart;
@@ -535,8 +542,8 @@ static void shake_frame(BX *b) {
         b->shakeX = b->shakeY = 0;
         return;
     }
-    int left = SHAKE_MS - (int)t, sign = (t / 33) % 2 ? -1 : 1;
-    int dx = sign * b->shakeX * left / SHAKE_MS, dy = sign * b->shakeY * left / SHAKE_MS;
+    u32 step = (b->now / 33) * 2;
+    int dx = shake_offset(step, b->shakeX), dy = shake_offset(step + 1, b->shakeY);
     for (int y = 0; y < b->H; y++) {
         int sy = y - dy;
         u32 *row = b->screen + (size_t)y * b->W;

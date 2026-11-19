@@ -2,7 +2,7 @@
 
 #include <sys/stat.h>
 
-#define SLOTS_MAX 15
+#define SLOTS_MAX 32
 #define PAGES_MAX 20
 
 typedef struct Btn {
@@ -246,7 +246,7 @@ void bx_data_open(BX *b, bool save) {
     d->cacheCount = d->pages * d->perPage;
     d->cache = bx_alloc(sizeof(SlotCache) * (size_t)d->cacheCount);
     d->order = bx_alloc(sizeof(int) * (size_t)d->cacheCount);
-    d->page = save && d->first >= d->perPage ? d->first / d->perPage : 0;
+    d->page = 0;
     d->hover = -1;
     d->confirmSlot = -1;
     reorder(b, d);
@@ -433,7 +433,7 @@ void bx_data_draw(BX *b, u32 *dst) {
         int x = d->slotPos[i][0], y = d->slotPos[i][1];
         if (c->exists && c->thumb) bx_blit(dst, b->W, b->H, c->thumb, x, y, 255);
         else if (d->empty) bx_blit(dst, b->W, b->H, d->empty, x, y, 255);
-        if (slot < d->first && d->save && d->autoOnly) bx_blit(dst, b->W, b->H, d->autoOnly, x, y, 255);
+        if (slot < d->first && d->save && d->autoOnly && c->exists) bx_blit(dst, b->W, b->H, d->autoOnly, x, y, 255);
         if (slot == d->hover && d->frame) bx_blit(dst, b->W, b->H, d->frame, x + d->frameOff[0], y + d->frameOff[1], 255);
     }
     if (d->hover >= 0) draw_info(b, d, dst, d->hover);
