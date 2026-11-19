@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ag_names.h"
 #include "vnage.h"
 
 typedef uint8_t u8;

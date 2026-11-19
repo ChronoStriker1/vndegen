@@ -32,6 +32,7 @@ let package = Package(
         .library(name: "EngineEAGLS", targets: ["EngineEAGLS"]),
         .library(name: "EngineBSX", targets: ["EngineBSX"]),
         .library(name: "EngineExHibit", targets: ["EngineExHibit"]),
+        .library(name: "EngineAGE", targets: ["EngineAGE"]),
         .library(name: "EngineUnity", targets: ["EngineUnity"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
@@ -175,6 +176,8 @@ let package = Package(
         .target(name: "EngineBSX", dependencies: ["VNCore", "CBSX", "FrameHost"], swiftSettings: mainActorByDefault),
         .target(name: "CEXHIBIT", exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineExHibit", dependencies: ["VNCore", "CEXHIBIT", "FrameHost"], swiftSettings: mainActorByDefault),
+        .target(name: "CAGE", dependencies: ["CVNFont", "CVNVideo"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
+        .target(name: "EngineAGE", dependencies: ["VNCore", "CAGE", "FrameHost"], swiftSettings: mainActorByDefault),
         // Recognizes Unity games so their page can say why they can't run. It runs none (docs/unity.md).
         .target(name: "EngineUnity", dependencies: ["VNCore", "RegistryFile"], swiftSettings: mainActorByDefault),
         // Reads and writes regedit's .reg files and Ludusavi's registry data, for Unity's PlayerPrefs. Foundation only.
@@ -243,6 +246,7 @@ let package = Package(
         .testTarget(name: "EngineEAGLSTests", dependencies: ["EngineEAGLS", "CEAGLS", "TestSupport"]),
         .testTarget(name: "EngineBSXTests", dependencies: ["EngineBSX", "CBSX", "TestSupport"]),
         .testTarget(name: "EngineExHibitTests", dependencies: ["EngineExHibit", "CEXHIBIT", "TestSupport"]),
+        .testTarget(name: "EngineAGETests", dependencies: ["EngineAGE", "CAGE", "TestSupport"]),
         .testTarget(name: "EngineUnityTests", dependencies: ["EngineUnity", "RegistryFile", "TestSupport"]),
         .testTarget(name: "RegistryFileTests", dependencies: ["RegistryFile"], exclude: ["Fixtures"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack", "TestSupport"]),

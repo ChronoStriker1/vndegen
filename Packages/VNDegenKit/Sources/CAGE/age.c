@@ -24,7 +24,7 @@ VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
     if (sy && atoi(sy) > 0) g->height = atoi(sy);
     g->screen = ag_alloc(sizeof(u32) * (size_t)g->width * (size_t)g->height);
     for (int i = 0; i < g->width * g->height; i++) g->screen[i] = 0xff000000u;
-    snprintf(g->title, sizeof g->title, "Eushully AGE");
+    vnage_probe(cfg->gameDir, g->title, sizeof g->title);
     gfx_init(g);
     input_init(g);
     snd_init(g, cfg->audioRate);
@@ -62,9 +62,15 @@ bool vnage_probe(const char *gameDir, char *title, size_t titleSize) {
     size_t n = 0;
     u8 *d = ag_read_file(p, &n);
     free(p);
-    bool ok = d && n > 8 && !memcmp(d, "S4IC", 4);
+    bool ok = d && n > 0x134 && !memcmp(d, "S4IC", 4);
+    if (ok && title && titleSize) {
+        char id[0xe9] = { 0 };
+        memcpy(id, d + 8, 0xe8);
+        char *u = ag_sjis_to_utf8(id);
+        snprintf(title, titleSize, "%s", *u ? u : "Eushully AGE");
+        free(u);
+    }
     free(d);
-    if (ok && title && titleSize) snprintf(title, titleSize, "Eushully AGE");
     return ok;
 }
 
