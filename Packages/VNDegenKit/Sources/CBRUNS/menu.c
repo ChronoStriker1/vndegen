@@ -91,8 +91,14 @@ bool menu_input(BR *e) {
     int h = b ? b->h : BR_H;
     image_free(b);
     bool inBar = e->mouseX >= ox && e->mouseY < h;
-    if (e->mouseX >= BR_W - sensor(e)) e->menu.open = true;
-    else if (!inBar) e->menu.open = false;
+    if (e->mouseX >= BR_W - sensor(e)) {
+        bool wasClosed = !e->menu.open && !e->menu.pinned && e->menu.autohide;
+        e->menu.open = true;
+        if (wasClosed && e->lPress) {
+            e->lPress = false;
+            return true;
+        }
+    } else if (!inBar) e->menu.open = false;
     bool visible = e->menu.pinned || !e->menu.autohide || e->menu.open;
     if (!visible) return false;
     MenuItem it[16];
