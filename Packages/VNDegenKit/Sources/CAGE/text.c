@@ -546,24 +546,42 @@ static int op_draw_string(AG *g) {
 static int op_draw_int(AG *g) {
     Image *im = gfx_surface(g, arg_i(g, 1));
     if (!im) return OP_NEXT;
-    i32 v = arg_i(g, 4), width = arg_i(g, 5), flags = arg_i(g, 6);
-    char a[32], b[64];
-    snprintf(a, sizeof a, "%d", v);
-    int n = (int)strlen(a);
-    int pad = width > n ? width - n : 0;
-    char fill = (flags & 1) ? '0' : ' ';
+    i32 x = arg_i(g, 2), y = arg_i(g, 3), v = arg_i(g, 4), width = arg_i(g, 5), flags = arg_i(g, 6);
+    char digits[32], out[64];
+    snprintf(digits, sizeof digits, "%lld", (long long)(v < 0 ? -(i64)v : v));
+    char sign = 0;
+    if (v < 0) sign = '-';
+    else if (v > 0 && (flags & 8)) sign = '+';
+    else if (v == 0 && (flags & 16)) sign = '+';
+    if (v == 0 && (flags & 32)) { snprintf(digits, sizeof digits, "-"); sign = 0; }
+    int n = (int)strlen(digits) + (sign ? 1 : 0);
     int o = 0;
-    for (int i = 0; i < pad && o < 60; i++) b[o++] = fill;
-    memcpy(b + o, a, (size_t)n + 1);
-    char wide[128];
-    int k = 0;
-    for (const char *q = b; *q && k < 120; q++) {
-        u16 w2 = *q == ' ' ? 0x8140 : *q == '-' ? 0x817c : (u16)(0x824f + (*q - '0'));
-        wide[k++] = (char)(w2 >> 8);
-        wide[k++] = (char)(w2 & 255);
+    if (sign) out[o++] = sign;
+    if ((flags & 1) && n < width) {
+        for (int i = 0; i < width - n; i++) out[o++] = '0';
+        n = width;
     }
-    wide[k] = 0;
-    text_draw_string(g, im, arg_i(g, 2), arg_i(g, 3), wide);
+    snprintf(out + o, sizeof out - (size_t)o, "%s", digits);
+    int omitted = width > n ? width - n : 0;
+    Text *t = &g->text;
+    int full = t->size + (t->bold ? 1 : 0);
+    bool ascii = (flags & 0x10000) != 0;
+    int cell = ascii ? full / 2 : full;
+    if (flags & 4) {
+    } else if (flags & 2) x += omitted * cell / 2;
+    else x += omitted * cell;
+    if (ascii) text_draw_string(g, im, x, y, out);
+    else {
+        char wide[128];
+        int k = 0;
+        for (const char *q = out; *q && k < 120; q++) {
+            u16 w2 = *q == '-' ? 0x817c : *q == '+' ? 0x817b : (u16)(0x824f + (*q - '0'));
+            wide[k++] = (char)(w2 >> 8);
+            wide[k++] = (char)(w2 & 255);
+        }
+        wide[k] = 0;
+        text_draw_string(g, im, x, y, wide);
+    }
     return OP_NEXT;
 }
 

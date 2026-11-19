@@ -26,7 +26,7 @@ static int64_t read_movie(void *user, uint64_t offset, void *buffer, size_t leng
 
 static void movie_free(AG *g, Movie *m) {
     if (!m) return;
-    if (m->audio) snd_movie(g, NULL);
+    if (m->video) snd_movie(g, m->video, false);
     if (m->video) vnvideo_close(m->video);
     if (m->file) fclose(m->file);
     free(m);
@@ -86,12 +86,8 @@ bool movie_play(AG *g, u32 id, i32 slot, i32 delay, i32 posMs, bool modal) {
     m->modal = modal;
     if (!gfx_surface(g, slot)) gfx_set_surface(g, slot, image_new(m->info.width, m->info.height), -1, true);
     if (m->info.audio_rate > 0) {
-        for (int i = 0; i < AG_SURFACES; i++) {
-            Movie *o = g->gfx.surf[i].movie;
-            if (o && o->audio) o->audio = false;
-        }
         m->audio = true;
-        snd_movie(g, m->video);
+        snd_movie(g, m->video, true);
     }
     g->gfx.surf[slot].movie = m;
     return true;
@@ -124,7 +120,7 @@ void movie_tick(AG *g) {
         if (px && changed && im) blit_frame(im, px, m->info.width, m->info.height);
         if (vnvideo_ended(m->video, t)) {
             m->ended = true;
-            if (m->audio) { snd_movie(g, NULL); m->audio = false; }
+            if (m->audio) { snd_movie(g, m->video, false); m->audio = false; }
         }
     }
 }
@@ -142,7 +138,7 @@ void movie_modal_skip(AG *g) {
         Movie *m = g->gfx.surf[i].movie;
         if (m && m->modal && !m->ended) {
             m->ended = true;
-            if (m->audio) { snd_movie(g, NULL); m->audio = false; }
+            if (m->audio) { snd_movie(g, m->video, false); m->audio = false; }
         }
     }
 }
@@ -184,6 +180,14 @@ static int op_rate(AG *g) {
     Movie *m = movie_at(g, arg_i(g, 1));
     if (m && arg_i(g, 2) > 0) m->rate = arg_i(g, 2) / 100.0;
     return OP_NEXT;
+}
+
+void movie_debug(AG *g, FILE *o) {
+    for (int i = 0; i < AG_SURFACES; i++) {
+        Movie *m = g->gfx.surf[i].movie;
+        if (!m) continue;
+        fprintf(o, "  movie slot %d started=%d ended=%d clock=%.2f audio=%d atime=%.2f rate=%.2f size=%dx%d err=%s\n", i, m->started, m->ended, m->clock, m->audio, m->audio ? vnvideo_audio_time(m->video) : 0, m->rate, m->info.width, m->info.height, vnvideo_error(m->video) ? vnvideo_error(m->video) : "-");
+    }
 }
 
 void movie_register(void) {

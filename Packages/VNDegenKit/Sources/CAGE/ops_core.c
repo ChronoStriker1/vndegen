@@ -474,6 +474,55 @@ static int op_co_resume(AG *g) {
 
 static int op_save_mark(AG *g) { g->saveFrame = g->top; return OP_NEXT; }
 
+static int op_timed_begin(AG *g) {
+    g->ntimed = 0;
+    g->timedCursor = 0;
+    g->timedRunning = false;
+    return OP_NEXT;
+}
+
+static int op_timed_append(AG *g) {
+    i32 iv = arg_i(g, 1), n = arg_i(g, 2);
+    u32 on = (u32)arg_i(g, 3), cu = (u32)arg_i(g, 4);
+    u32 at = g->ntimed ? g->timed[g->ntimed - 1].at : 0;
+    for (i32 i = 0; i < n; i++) {
+        if (g->ntimed >= g->ctimed) { g->ctimed = g->ctimed ? g->ctimed * 2 : 64; g->timed = ag_realloc(g->timed, sizeof(TimedEntry) * (size_t)g->ctimed); }
+        at += (u32)(iv > 0 ? iv : 0);
+        g->timed[g->ntimed].at = at;
+        g->timed[g->ntimed].ontime = on;
+        g->timed[g->ntimed].catchup = cu;
+        g->ntimed++;
+    }
+    return OP_NEXT;
+}
+
+static int op_timed_run(AG *g) {
+    if (!g->timedRunning) {
+        g->timedRunning = true;
+        g->timedCursor = 0;
+        g->timedStart = vm_now(g);
+    }
+    if (g->timedCursor >= g->ntimed - 1) {
+        g->timedRunning = false;
+        g->ntimed = 0;
+        g->timedCursor = 0;
+        return OP_NEXT;
+    }
+    TimedEntry *e = &g->timed[g->timedCursor];
+    u32 el = vm_now(g) - g->timedStart;
+    if (el < e->at && !g->in.skip) {
+        g->wait = W_TIMED;
+        g->waitUntil = g->timedStart + e->at;
+        return OP_STAY;
+    }
+    bool late = el >= g->timed[g->timedCursor + 1].at;
+    u32 target = late ? e->catchup : e->ontime;
+    g->timedCursor++;
+    if (target == 0xffffffffu) return OP_STAY;
+    vm_callback(g, target);
+    return OP_JUMP;
+}
+
 void ops_core_register(void) {
     vm_register(0x1, op_exit_request);
     vm_register(0x2, op_exit);
@@ -543,6 +592,9 @@ void ops_core_register(void) {
     vm_register(0x199, op_co_yield);
     vm_register(0x7c, op_co_resume);
     vm_register(0x1ad, op_save_mark);
+    vm_register(0xd3, op_timed_begin);
+    vm_register(0xd4, op_timed_append);
+    vm_register(0xd5, op_timed_run);
     vm_register(0x1a2, op_prof_store);
     vm_register(0x1a3, op_prof_load);
     vm_register(0x1a9, op_prof_store_s);

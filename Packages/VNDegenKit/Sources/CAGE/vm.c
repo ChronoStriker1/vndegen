@@ -348,7 +348,7 @@ void vm_run(AG *g, int budget) {
             for (u32 a = 0; a + 1 < len && n < 480; a += 2) {
                 u32 t = g->ins[a], v = g->ins[a + 1];
                 int idx = (int)a / 2 + 1;
-                if (t == 2) n += snprintf(b + n, sizeof b - (size_t)n, " \"%.40s\"", script_string(f->sc, v));
+                if (t == 2 || t == 5 || t == 0xb || t == 0xe) n += snprintf(b + n, sizeof b - (size_t)n, " \"%.40s\"", t == 2 ? script_string(f->sc, v) : arg_s(g, idx));
                 else n += snprintf(b + n, sizeof b - (size_t)n, " %d", arg_i(g, idx));
             }
             ag_log(g, "%s", b);

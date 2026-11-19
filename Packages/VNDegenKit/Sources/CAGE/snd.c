@@ -38,7 +38,7 @@ struct Mixer {
     pthread_mutex_t lock;
     Voice *v[AG_CHANNELS];
     float gain[AG_CHANNELS];
-    vnvideo *movie;
+    vnvideo *movie[8];
     float movieGain;
 };
 
@@ -133,30 +133,32 @@ void mixer_mix(Mixer *m, float *out, int frames, bool paused) {
             if (v->done) break;
         }
     }
-    if (m->movie) {
+    for (int mv = 0; mv < 8; mv++) {
+        vnvideo *video = m->movie[mv];
+        if (!video) continue;
         vnvideo_info info;
-        vnvideo_get_info(m->movie, &info);
-        if (info.audio_rate > 0) {
-            float tmp[4096];
-            int left = frames, at = 0;
-            double step = (double)info.audio_rate / (double)m->rate;
-            while (left > 0) {
-                int n = left > 1024 ? 1024 : left;
-                size_t want = (size_t)((double)n * step) + 1;
-                if (want > 2048) want = 2048;
-                size_t got = vnvideo_read_audio(m->movie, tmp, want);
-                if (!got) break;
-                int ch = info.audio_channels > 1 ? 2 : 1;
-                for (int i = 0; i < n; i++) {
-                    size_t k = (size_t)((double)i * step);
-                    if (k >= got) break;
-                    float l = tmp[k * (size_t)ch], r = ch > 1 ? tmp[k * (size_t)ch + 1] : l;
-                    out[(at + i) * 2] += l * m->movieGain;
-                    out[(at + i) * 2 + 1] += r * m->movieGain;
-                }
-                left -= n;
-                at += n;
+        vnvideo_get_info(video, &info);
+        if (info.audio_rate <= 0) continue;
+        float tmp[4096];
+        int left = frames, at = 0;
+        double step = (double)info.audio_rate / (double)m->rate;
+        int ch = info.audio_channels > 1 ? 2 : 1;
+        while (left > 0) {
+            int n = left > 1024 ? 1024 : left;
+            size_t want = (size_t)((double)n * step);
+            if (want < 1) want = 1;
+            if (want > (size_t)(4096 / ch)) want = (size_t)(4096 / ch);
+            size_t got = vnvideo_read_audio(video, tmp, want);
+            if (!got) break;
+            for (int i = 0; i < n; i++) {
+                size_t k = (size_t)((double)i * step);
+                if (k >= got) break;
+                float l = tmp[k * (size_t)ch], r = ch > 1 ? tmp[k * (size_t)ch + 1] : l;
+                out[(at + i) * 2] += l * m->movieGain;
+                out[(at + i) * 2 + 1] += r * m->movieGain;
             }
+            left -= n;
+            at += n;
         }
     }
     pthread_mutex_unlock(&m->lock);
@@ -223,11 +225,15 @@ void snd_close(AG *g) {
     g->snd.mixer = NULL;
 }
 
-void snd_movie(AG *g, void *video) {
+void snd_movie(AG *g, void *video, bool add) {
     Mixer *m = g->snd.mixer;
     if (!m) return;
     pthread_mutex_lock(&m->lock);
-    m->movie = video;
+    for (int i = 0; i < 8; i++)
+        if (m->movie[i] == video) m->movie[i] = NULL;
+    if (add)
+        for (int i = 0; i < 8; i++)
+            if (!m->movie[i]) { m->movie[i] = video; break; }
     pthread_mutex_unlock(&m->lock);
 }
 

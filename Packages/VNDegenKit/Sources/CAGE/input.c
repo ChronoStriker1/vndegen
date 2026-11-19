@@ -268,7 +268,8 @@ static int op_cursor_set(AG *g) {
 }
 
 static int op_buttons(AG *g) {
-    arg_set_i(g, 1, (i32)g->in.buttons);
+    arg_set_i(g, 1, (i32)(g->in.buttons | g->in.latch));
+    g->in.latch = 0;
     return OP_NEXT;
 }
 

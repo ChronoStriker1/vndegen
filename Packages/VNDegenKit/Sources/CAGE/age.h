@@ -151,6 +151,7 @@ enum {
     W_MOVIE,
     W_TRANS,
     W_HIDDEN,
+    W_TIMED,
 } ;
 
 typedef struct Switch {
@@ -284,6 +285,7 @@ bool gfx_transition_frame(AG *g);
 void gfx_transition_finish(AG *g);
 
 void movie_register(void);
+void movie_debug(AG *g, FILE *o);
 void movie_tick(AG *g);
 void movie_stop(AG *g, i32 slot);
 void movie_stop_all(AG *g);
@@ -314,6 +316,7 @@ typedef struct Input {
     int mx, my;
     u32 buttons;
     u32 buttonsPrev;
+    u32 latch;
     int wheel;
     u8 keys[256];
     u8 keyAction[256];
@@ -379,7 +382,7 @@ void snd_init(AG *g, int rate);
 void snd_close(AG *g);
 void snd_register(void);
 void snd_tick(AG *g);
-void snd_movie(AG *g, void *video);
+void snd_movie(AG *g, void *video, bool add);
 
 typedef struct GlyphRec {
     i32 chain, l, t, r, b;
@@ -443,7 +446,16 @@ typedef struct ProfStr {
     char *v;
 } ProfStr;
 
+typedef struct TimedEntry {
+    u32 at;
+    u32 ontime, catchup;
+} TimedEntry;
+
 struct VNAge {
+    TimedEntry *timed;
+    int ntimed, ctimed, timedCursor;
+    u32 timedStart;
+    bool timedRunning;
     int coState;
     u32 coResume;
     int coFrame;

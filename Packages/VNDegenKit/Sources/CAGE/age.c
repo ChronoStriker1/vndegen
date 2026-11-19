@@ -38,6 +38,7 @@ VNAge *vnage_open(const VNAgeConfig *cfg, char *err, size_t errSize) {
 void vnage_close(VNAge *g) {
     if (!g) return;
     vm_close(g);
+    free(g->timed);
     movie_stop_all(g);
     gfx_close(g);
     snd_close(g);
@@ -66,6 +67,7 @@ static void service(AG *g) {
     if (g->wait == W_SLEEP && (i32)(g->now - g->waitUntil) >= 0) g->wait = W_NONE;
     if (g->wait == W_YIELD && !gfx_busy(g)) g->wait = W_NONE;
     if (g->wait == W_FRAME) g->wait = W_NONE;
+    if (g->wait == W_TIMED && (i32)(g->now - g->waitUntil) >= 0) g->wait = W_NONE;
     if (g->wait == W_MOVIE) {
         if ((g->in.clicks & 1) || (g->in.pressed & 0x10) || g->in.skip) movie_modal_skip(g);
         if (movie_modal_done(g)) g->wait = W_NONE;
@@ -78,7 +80,7 @@ bool vnage_frame(VNAge *g, uint32_t elapsedMs) {
     u32 end = g->now + elapsedMs;
     for (int guard = 0; guard < 64; guard++) {
         u32 step = end - g->now;
-        if (g->wait == W_SLEEP && (i32)(g->waitUntil - g->now) > 0 && (i32)(g->waitUntil - end) < 0) step = g->waitUntil - g->now;
+        if ((g->wait == W_SLEEP || g->wait == W_TIMED) && (i32)(g->waitUntil - g->now) > 0 && (i32)(g->waitUntil - end) < 0) step = g->waitUntil - g->now;
         g->now += step;
         gfx_tick(g);
         snd_tick(g);
@@ -117,6 +119,7 @@ void vnage_mouse_button(VNAge *g, int button, bool down) {
     if (down) {
         g->in.buttons |= 1u << b;
         g->in.clicks |= 1u << b;
+        g->in.latch |= 1u << b;
         g->in.pressed |= 1u << ((g->in.mouseSlot[b] + 4) & 31);
     } else g->in.buttons &= ~(1u << b);
 }

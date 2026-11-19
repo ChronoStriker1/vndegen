@@ -48,6 +48,7 @@ static void print_state(AG *g) {
     }
     printf("  frameNow=%u\n", g->gfx.frameNow);
     for (int i = 0; i < g->gfx.nobj; i++) { Obj *o = g->gfx.obj[i]; if (o->cColor.on) printf("  busy %#x start=%u started=%d delay=%d dur=%d\n", o->handle, o->start, o->started, o->cColor.delay, o->cColor.dur); }
+    movie_debug(g, stdout);
     int missing = 0;
     for (int op = 0; op < 0x400; op++)
         if (g->opMissing[op]) { printf("  missing %#x x%u\n", op, g->opMissing[op]); missing++; }
@@ -71,8 +72,19 @@ int main(int argc, char **argv) {
         return 1;
     }
     int alive = 1;
-    for (int i = 4; i < argc && alive; i++) {
-        const char *c = argv[i];
+    char line[1024];
+    FILE *in = NULL;
+    for (int i = 4; alive; i++) {
+        const char *c;
+        if (i < argc && strcmp(argv[i], "-")) c = argv[i];
+        else if (i < argc || in) {
+            if (!in) { in = stdin; i--; }
+            else i--;
+            if (!fgets(line, sizeof line, in)) break;
+            line[strcspn(line, "\r\n")] = 0;
+            if (!line[0]) continue;
+            c = line;
+        } else break;
         int x, y, k;
         if (sscanf(c, "wait:%d", &k) == 1) alive = run(n, k);
         else if (sscanf(c, "pages:%d", &k) == 1) {
@@ -80,7 +92,7 @@ int main(int argc, char **argv) {
             int done = 0;
             for (int guard = 0; guard < k * 400 && alive && done < k; guard++) {
                 if (g->wait == W_INPUT) {
-                    alive = press(n, 1000, 20, VNAGE_MOUSE_LEFT);
+                    alive = press(n, 20, 300, VNAGE_MOUSE_LEFT);
                     done++;
                 } else alive = run(n, 16);
             }
@@ -115,6 +127,7 @@ int main(int argc, char **argv) {
                     write_png(path, px, w, h);
                 }
         } else fprintf(stderr, "unknown command %s\n", c);
+        if (in) { printf("ok %s\n", c); fflush(stdout); }
     }
     if (!alive) printf("game ended: %s\n", vnage_problem(n) ? vnage_problem(n) : "normally");
     print_state((AG *)n);
