@@ -135,13 +135,12 @@ VNBSX *vnbsx_open(const VNBSXConfig *cfg, char *err, size_t errSize) {
     b->title = read_title(b->gameDir);
     find_save_id(b);
     if (!b->title) b->title = bx_strdup("");
-    b->volMaster = b->volBgm = b->volSe = b->volVoice = b->volBgs = 100;
     bx_gfx_init(b);
     bx_text_init(b);
     bx_msg_init(b);
     bx_ui_init(b);
     b->mixer = bx_mixer_new(b->audioRate);
-    bx_snd_volumes(b);
+    bx_settings_load(b);
     bx_vm_init(b);
     bx_log(b, "opened %s, %s, %d labels, %d messages", b->gameDir, b->sc->version, b->sc->labelCount, b->sc->msgCount);
     return (VNBSX *)b;
@@ -208,7 +207,7 @@ static void text_wait(BX *b) {
     }
     if (b->autoMode && bx_msg_complete(b)) {
         if (bx_snd_playing(b, CH_VOICE)) return;
-        if (!b->autoAt) b->autoAt = b->now + 1500;
+        if (!b->autoAt) b->autoAt = b->now + 500 + (u32)(100 - clampi(b->set.autoSpeed, 0, 100)) * 30;
         if ((i32)(b->now - b->autoAt) >= 0) advance(b);
     }
 }
@@ -227,7 +226,9 @@ static void tick(BX *b) {
             b->click = false;
             b->winHidden = false;
         }
-        if (t->wait == W_TEXT && b->keyPress[0x70]) {
+        if (t->wait == W_TEXT && (b->wheel > 0 || b->keyPress[0x21]) && bx_log_open(b)) {
+            b->wheel = 0;
+        } else if (t->wait == W_TEXT && b->keyPress[0x70]) {
             bx_save_capture_thumb(b);
             bx_save_slot(b, -1);
         } else if (t->wait == W_TEXT && b->keyPress[0x71]) bx_load_slot(b, -1);
@@ -258,6 +259,11 @@ static void tick(BX *b) {
         default:
             break;
         }
+    }
+    if (b->phase == PH_NONE && b->th.wait == W_TEXT && b->wheel < 0) {
+        b->click = true;
+        b->wheel = 0;
+        text_wait(b);
     }
     if (b->phase == PH_NONE) bx_vm_run(b);
     if (b->th.halted && !b->problem[0]) snprintf(b->problem, sizeof b->problem, "the script stopped");

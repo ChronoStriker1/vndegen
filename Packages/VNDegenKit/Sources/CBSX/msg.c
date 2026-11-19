@@ -55,14 +55,12 @@ void bx_msg_init(BX *b) {
     four(b, "message window", "text", b->textRect, 128, 40, 480, 72);
     b->nameColor = bx_cfg_color(c, "message window", "name color", 0xffffffffu);
     b->textColor = 0xffffffffu;
-    b->bgColor = bx_cfg_color(c, "message window", "bg color", 0);
     b->fontH = bx_cfg_int(c, "default font", "height", 20);
     b->fontSize = b->fontH;
     b->fontW = bx_cfg_int(c, "default font", "width", 0);
     b->lines = bx_cfg_int(c, "default font", "number of lines", 3);
     b->edge = bx_cfg_int(c, "default font", "edge", 1);
     b->shadow = bx_cfg_int(c, "default font", "shadow", 0);
-    b->msgSpeed = 30;
     const char *una = bx_cfg_get(c, "message window", "unagashi icon");
     if (una) {
         Image *u = bx_image_load(b, una);
@@ -160,6 +158,21 @@ static char *wrap(BX *b, const char *text) {
     return out;
 }
 
+static bool voice_allowed(BX *b, const char *voice) {
+    int mask = bx_cfg_int(&b->cfg, "config screen", "voice ex mask", 0x40);
+    for (int i = 1; i < 64; i++) {
+        char key[32];
+        snprintf(key, sizeof key, "voice%02d", i);
+        const char *sig = bx_cfg_get(&b->cfg, "config screen", key);
+        if (!sig) continue;
+        if (strncmp(voice, sig, strlen(sig))) continue;
+        snprintf(key, sizeof key, "voice%02d mask", i);
+        mask = bx_cfg_int(&b->cfg, "config screen", key, mask);
+        break;
+    }
+    return (mask & b->set.voiceMask) != 0;
+}
+
 void bx_msg_show(BX *b, const char *name, const char *text, const char *voice) {
     bx_msg_clear(b);
     b->speaker = name ? bx_strdup(name) : NULL;
@@ -172,7 +185,7 @@ void bx_msg_show(BX *b, const char *name, const char *text, const char *voice) {
     b->winShown = true;
     b->winHidden = false;
     b->autoAt = 0;
-    if (voice) bx_snd_play(b, CH_VOICE, RX_VOICE, voice, false, 0);
+    if (voice && voice_allowed(b, voice)) bx_snd_play(b, CH_VOICE, RX_VOICE, voice, false, 0);
     if (b->logCount == 512) {
         free(b->logs[0].name);
         free(b->logs[0].text);
@@ -268,6 +281,7 @@ void bx_choice_begin(BX *b) {
     }
     b->choiceHover = -1;
     b->th.wait = W_CHOICE;
+    bx_autosave(b);
 }
 
 void bx_choice_update(BX *b) {

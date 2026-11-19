@@ -76,7 +76,9 @@ void bx_phase_end(BX *b) {
 }
 
 void bx_phase_reset(BX *b) {
+    bx_config_free(b);
     bx_data_free(b);
+    bx_log_free(b);
     bx_map_free(b);
     phase_free(b);
     b->phaseBack = PH_NONE;
@@ -114,7 +116,10 @@ void bx_phase_start(BX *b, int phase) {
     bx_msg_clear(b);
     b->winShown = false;
     if (phase == PH_TITLE) title_start(b);
-    else if (phase == PH_MAP && !bx_map_start(b)) bx_phase_end(b);
+    else if (phase == PH_MAP) {
+        if (bx_map_start(b)) bx_autosave(b);
+        else bx_phase_end(b);
+    }
 }
 
 static void title_pick(BX *b, const char *key) {
@@ -124,6 +129,10 @@ static void title_pick(BX *b, const char *key) {
     }
     if (!strcmp(key, "load")) {
         bx_open_data(b, false);
+        return;
+    }
+    if (!strcmp(key, "config")) {
+        bx_config_open(b);
         return;
     }
     const char *label = !strcmp(key, "op") ? "opening" : !strcmp(key, "start") ? "prologue" : NULL;
@@ -142,6 +151,14 @@ static void title_pick(BX *b, const char *key) {
 }
 
 void bx_phase_update(BX *b) {
+    if (b->phase == PH_CONFIG) {
+        bx_config_update(b);
+        return;
+    }
+    if (b->phase == PH_LOG) {
+        bx_log_update(b);
+        return;
+    }
     if (b->phase == PH_DATA || b->phase == PH_TITLE_LOAD) {
         bx_data_update(b);
         return;
@@ -167,6 +184,14 @@ void bx_phase_update(BX *b) {
 }
 
 void bx_phase_draw(BX *b, u32 *dst) {
+    if (b->phase == PH_CONFIG) {
+        bx_config_draw(b, dst);
+        return;
+    }
+    if (b->phase == PH_LOG) {
+        bx_log_draw(b, dst);
+        return;
+    }
     if (b->phase == PH_DATA || b->phase == PH_TITLE_LOAD) {
         bx_data_draw(b, dst);
         return;
@@ -210,7 +235,9 @@ void bx_ui_init(BX *b) {
 
 void bx_ui_free(BX *b) {
     phase_free(b);
+    bx_config_free(b);
     bx_data_free(b);
+    bx_log_free(b);
     bx_map_free(b);
     bx_image_free(b->menuBase);
     for (int i = 0; i < b->buttonCount; i++) bx_image_free(b->buttons[i].img);
@@ -250,6 +277,8 @@ static void button_press(BX *b, const char *key) {
         bx_save_capture_thumb(b);
         bx_save_slot(b, -1);
     } else if (!strcmp(key, "quick load")) bx_load_slot(b, -1);
+    else if (!strcmp(key, "log")) bx_log_open(b);
+    else if (!strcmp(key, "config")) bx_config_open(b);
     else if (!strcmp(key, "save")) bx_open_data(b, true);
     else if (!strcmp(key, "load")) bx_open_data(b, false);
     else bx_log(b, "menu button %s isn't available yet", key);

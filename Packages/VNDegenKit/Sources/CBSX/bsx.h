@@ -235,6 +235,16 @@ enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONF
 typedef struct Phase Phase;
 typedef struct MapPhase MapPhase;
 typedef struct DataPhase DataPhase;
+typedef struct LogPhase LogPhase;
+typedef struct ConfigPhase ConfigPhase;
+
+typedef struct Settings {
+    int textSpeed, autoSpeed;
+    int color[4];
+    int attenuation;
+    int skipUnread, ceaseSkip, noEffects;
+    int voiceMask, voiceMode, autoSelect;
+} Settings;
 
 struct BX {
     char *gameDir, *saveDir;
@@ -327,6 +337,9 @@ struct BX {
     Phase *ph;
     MapPhase *map;
     DataPhase *data;
+    LogPhase *logp;
+    ConfigPhase *config;
+    Settings set;
     int phaseBack;
     int phaseResult;
 
@@ -409,6 +422,7 @@ void bx_phase_reset(BX *b);
 void bx_system(BX *b, const char *cmd);
 
 bool bx_save_slot(BX *b, int slot);
+void bx_autosave(BX *b);
 bool bx_load_slot(BX *b, int slot);
 bool bx_save_exists(BX *b, int slot);
 void bx_save_capture_thumb(BX *b);
@@ -425,5 +439,19 @@ void bx_data_update(BX *b);
 void bx_data_draw(BX *b, u32 *dst);
 void bx_data_free(BX *b);
 void bx_open_data(BX *b, bool save);
+
+bool bx_log_open(BX *b);
+void bx_log_update(BX *b);
+void bx_log_draw(BX *b, u32 *dst);
+void bx_log_free(BX *b);
+
+bool bx_config_open(BX *b);
+void bx_config_update(BX *b);
+void bx_config_draw(BX *b, u32 *dst);
+void bx_config_free(BX *b);
+void bx_settings_load(BX *b);
+void bx_settings_save(BX *b);
+void bx_settings_apply(BX *b);
+void bx_settings_defaults(BX *b);
 
 #endif
