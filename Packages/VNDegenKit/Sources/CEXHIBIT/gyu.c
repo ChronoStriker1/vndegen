@@ -225,3 +225,47 @@ void fill(u32 *dst, int dw, int dh, int x, int y, int w, int h, u32 color, int a
         for (int i = x < 0 ? 0 : x; i < x + w && i < dw; i++)
             dst[(size_t)j * (size_t)dw + i] = blend_px(dst[(size_t)j * (size_t)dw + i], color & 0xffffff, (u32)(alpha > 255 ? 255 : alpha));
 }
+
+void blit_scaled(u32 *dst, int dw, int dh, const Image *im, float sx, float sy, float sw, float sh, float dx, float dy, float dwid, float dhei, int alpha) {
+    if (!im || alpha <= 0 || dwid <= 0 || dhei <= 0 || sw <= 0 || sh <= 0) return;
+    if (dwid == sw && dhei == sh && dx == (int)dx && dy == (int)dy && sx == (int)sx && sy == (int)sy) {
+        blit_part(dst, dw, dh, im, (int)sx, (int)sy, (int)sw, (int)sh, (int)dx, (int)dy, alpha);
+        return;
+    }
+    int x0 = (int)dx, y0 = (int)dy, x1 = (int)(dx + dwid + 0.999f), y1 = (int)(dy + dhei + 0.999f);
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > dw) x1 = dw;
+    if (y1 > dh) y1 = dh;
+    float kx = sw / dwid, ky = sh / dhei;
+    int maxx = im->w - 1, maxy = im->h - 1;
+    for (int y = y0; y < y1; y++) {
+        float fy = sy + ((float)y + 0.5f - dy) * ky - 0.5f;
+        if (fy < -0.5f || fy > (float)maxy + 0.5f) continue;
+        if (fy < 0) fy = 0;
+        int iy = (int)fy;
+        if (iy >= maxy) iy = maxy > 0 ? maxy - 1 : 0;
+        u32 wy = (u32)((fy - (float)iy) * 256);
+        if (maxy == 0) wy = 0;
+        const u32 *r0 = im->px + (size_t)iy * (size_t)im->w, *r1 = maxy ? r0 + im->w : r0;
+        u32 *d = dst + (size_t)y * (size_t)dw;
+        for (int x = x0; x < x1; x++) {
+            float fx = sx + ((float)x + 0.5f - dx) * kx - 0.5f;
+            if (fx < -0.5f || fx > (float)maxx + 0.5f) continue;
+            if (fx < 0) fx = 0;
+            int ix = (int)fx;
+            if (ix >= maxx) ix = maxx > 0 ? maxx - 1 : 0;
+            u32 wx = (u32)((fx - (float)ix) * 256);
+            if (maxx == 0) wx = 0;
+            u32 p00 = r0[ix], p01 = r0[ix + (maxx ? 1 : 0)], p10 = r1[ix], p11 = r1[ix + (maxx ? 1 : 0)];
+            u32 out = 0;
+            for (int c = 0; c < 32; c += 8) {
+                u32 a = (p00 >> c & 0xff) * (256 - wx) + (p01 >> c & 0xff) * wx;
+                u32 b = (p10 >> c & 0xff) * (256 - wx) + (p11 >> c & 0xff) * wx;
+                out |= ((a * (256 - wy) + b * wy) >> 16) << c;
+            }
+            u32 a = im->alpha ? (out >> 24) * (u32)alpha / 255 : (u32)alpha;
+            d[x] = blend_px(d[x], out & 0xffffff, a);
+        }
+    }
+}

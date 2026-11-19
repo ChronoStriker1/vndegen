@@ -103,49 +103,7 @@ void view_select(EX *e, char *args) {
     e->lPress = e->rPress = false;
 }
 
-void view_move(EX *e, char *args) {
-    char *f[40];
-    int n = split_csv(args, f, 40);
-    if (n < 4) return;
-    int ms = field_int(f[1]);
-    for (int i = 4; i + 3 < n; i += 4) {
-        int id = field_int(f[i]);
-        if (id < 0) continue;
-        Layer *l = layer_get(&e->view, id, false);
-        if (!l) continue;
-        int x = field_int(f[i + 1]), y = field_int(f[i + 2]), kind = field_int(f[i + 3]);
-        if (ms <= 0) {
-            l->x = x;
-            l->y = y;
-            l->mx.active = l->my.active = false;
-        } else {
-            anim_start(e, &l->mx, (float)l->x, (float)x, ms, kind);
-            anim_start(e, &l->my, (float)l->y, (float)y, ms, kind);
-        }
-    }
-}
-
-void view_fade(EX *e, char *args, bool enter) {
-    (void)enter;
-    char *f[40];
-    int n = split_csv(args, f, 40);
-    for (int i = 2; i + 3 < n; i += 4) {
-        int id = field_int(f[i]);
-        if (id < 0) continue;
-        int to = field_int(f[i + 1]), ms = field_int(f[i + 2]);
-        for (int k = 0; k < EX_BILLBOARDS; k++) {
-            Billboard *b = &e->bb[k];
-            if (!b->used || b->id != id) continue;
-            anim_start(e, &b->alpha, b->a, (float)to, ms, 0);
-            if (ms <= 0) b->a = (float)to;
-        }
-        Layer *l = layer_get(&e->view, id, false);
-        if (l) {
-            anim_start(e, &l->fade, l->a, (float)to, ms, 0);
-            if (ms <= 0) l->a = (float)to;
-        }
-    }
-}
+Layer *view_layer(EX *e, int id) { return layer_get(&e->view, id, false); }
 
 static bool item_enabled(EX *e, Item *it) { return !it->disabledIf || !vm_cond(e, it->disabledIf) || !strcmp(it->disabledIf, "false"); }
 

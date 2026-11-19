@@ -81,10 +81,20 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     e->cgColor = 0xff000000u;
     e->volMaster = e->volBgm = e->volSe = e->volVoice = 100;
     e->mixer = mixer_new(e->audioRate);
+    e->textMs = 20;
+    e->msg.tempA = 255;
+    e->cam.w = EX_W;
+    e->cam.h = EX_H;
     ex_log(e, "opened %s", e->gameDir);
     rld_init(e);
-    vm_goto_script(e, entry ? entry : "start");
+    e->bootEntry = ex_strdup(entry ? entry : "start");
     free(entry);
+    if (rld_get(e, "def")) vm_goto_script(e, "def");
+    else {
+        vm_goto_script(e, e->bootEntry);
+        free(e->bootEntry);
+        e->bootEntry = NULL;
+    }
     if (!e->sc) {
         if (err && errSize) snprintf(err, errSize, "%s", e->problem[0] ? e->problem : "The game's first script can't be read.");
         vnexhibit_close((VNExHibit *)e);
@@ -104,6 +114,12 @@ void vnexhibit_close(VNExHibit *n) {
             image_free(e->bb[i].mask);
         }
     image_free(e->cg);
+    image_free(e->cgPrev);
+    msg_free(e);
+    chara_free(e);
+    text_free(e);
+    free(e->fontFile);
+    free(e->bootEntry);
     rld_free_all(e);
     if (e->log) fclose(e->log);
     free(e->R);
@@ -119,6 +135,16 @@ void vnexhibit_close(VNExHibit *n) {
 
 static void tick(EX *e) {
     view_input(e);
+    if (e->wait == W_TEXT || e->msg.userHidden) {
+        if (e->rPress && !e->view.active) {
+            e->msg.userHidden = !e->msg.userHidden;
+            e->rPress = false;
+        }
+        if (e->msg.userHidden && e->lPress) {
+            e->msg.userHidden = false;
+            e->lPress = false;
+        }
+    }
     vm_run(e);
     e->lPress = false;
     e->rPress = false;

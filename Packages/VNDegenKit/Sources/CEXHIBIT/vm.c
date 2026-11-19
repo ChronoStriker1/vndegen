@@ -2,78 +2,156 @@
 
 #include <ctype.h>
 
-static i32 qRegs[16], lRegs[64], fRegs[64];
-
 i32 *reg_ref(EX *e, char kind, int n) {
     static i32 dummy;
     switch (toupper((u8)kind)) {
-    case 'R': return n >= 0 && n < e->nR ? &e->R[n] : &dummy;
+    case 'R':
+        if (n >= 1000000) return n - 1000000 < e->nS ? &e->S[n - 1000000] : &dummy;
+        return n >= 0 && n < e->nR ? &e->R[n] : &dummy;
     case 'S': return n >= 0 && n < e->nS ? &e->S[n] : &dummy;
-    case 'Q': return n >= 0 && n < 16 ? &qRegs[n] : &dummy;
-    case 'L': return n >= 0 && n < 64 ? &lRegs[n] : &dummy;
-    case 'F': return n >= 0 && n < 64 ? &fRegs[n] : &dummy;
+    case 'Q': return n >= 0 && n < 16 ? &e->Q[n] : &dummy;
+    case 'L': return n >= 0 && n < 128 ? &e->L[n] : &dummy;
+    case 'F': return n >= 0 && n < 64 ? &e->F[n] : &dummy;
     default: dummy = 0; return &dummy;
     }
 }
 
-static bool cond_one(EX *e, const char **pp) {
-    const char *p = *pp;
-    while (*p == ' ') p++;
-    bool neg = false;
+typedef struct Parser {
+    EX *e;
+    const char *p;
+} Parser;
+
+static long ex_or(Parser *ps);
+
+static void skip_ws(Parser *ps) {
+    while (*ps->p == ' ' || *ps->p == '\t') ps->p++;
+}
+
+static long primary(Parser *ps) {
+    skip_ws(ps);
+    const char *p = ps->p;
+    if (*p == '(') {
+        ps->p++;
+        long v = ex_or(ps);
+        skip_ws(ps);
+        if (*ps->p == ')') ps->p++;
+        return v;
+    }
     if (*p == '!') {
-        neg = true;
-        p++;
+        ps->p++;
+        return !primary(ps);
     }
-    long lhs;
-    if (isalpha((u8)*p) && (isdigit((u8)p[1]) || p[1] == '-')) {
+    if (*p == '-') {
+        ps->p++;
+        return -primary(ps);
+    }
+    if (!strncmp(p, "true", 4)) {
+        ps->p += 4;
+        return 1;
+    }
+    if (!strncmp(p, "false", 5)) {
+        ps->p += 5;
+        return 0;
+    }
+    if (isalpha((u8)*p) && (isdigit((u8)p[1]) || (p[1] == '-' && isdigit((u8)p[2])))) {
         char k = *p++;
-        long n = strtol(p, (char **)&p, 10);
-        lhs = *reg_ref(e, k, (int)n);
-    } else if (!strncmp(p, "true", 4)) {
-        p += 4;
-        lhs = 1;
-    } else if (!strncmp(p, "false", 5)) {
-        p += 5;
-        lhs = 0;
-    } else lhs = strtol(p, (char **)&p, 0);
-    while (*p == ' ') p++;
-    bool r = lhs != 0;
-    char o1 = p[0], o2 = p[1];
-    if ((o1 == '=' && o2 == '=') || (o1 == '!' && o2 == '=') || (o1 == '>' && o2 == '=') || (o1 == '<' && o2 == '=') || o1 == '>' || o1 == '<') {
-        p += (o2 == '=') ? 2 : 1;
-        while (*p == ' ') p++;
-        long rhs;
-        if (isalpha((u8)*p) && isdigit((u8)p[1])) {
-            char k = *p++;
-            long n = strtol(p, (char **)&p, 10);
-            rhs = *reg_ref(e, k, (int)n);
-        } else rhs = strtol(p, (char **)&p, 0);
-        if (o1 == '=') r = lhs == rhs;
-        else if (o1 == '!') r = lhs != rhs;
-        else if (o1 == '>') r = o2 == '=' ? lhs >= rhs : lhs > rhs;
-        else r = o2 == '=' ? lhs <= rhs : lhs < rhs;
+        char *end;
+        long n = strtol(p, &end, 10);
+        ps->p = end;
+        return *reg_ref(ps->e, k, (int)n);
     }
-    *pp = p;
-    return neg ? !r : r;
+    char *end;
+    long v = strtol(p, &end, 0);
+    if (end == p) {
+        if (*p) ps->p++;
+        return 0;
+    }
+    ps->p = end;
+    return v;
+}
+
+static long mul(Parser *ps) {
+    long v = primary(ps);
+    for (;;) {
+        skip_ws(ps);
+        char c = *ps->p;
+        if (c != '*' && c != '/' && c != '%') return v;
+        ps->p++;
+        long r = primary(ps);
+        if (c == '*') v *= r;
+        else if (r) v = c == '/' ? v / r : v % r;
+    }
+}
+
+static long add(Parser *ps) {
+    long v = mul(ps);
+    for (;;) {
+        skip_ws(ps);
+        char c = *ps->p;
+        if (c != '+' && c != '-') return v;
+        ps->p++;
+        long r = mul(ps);
+        v = c == '+' ? v + r : v - r;
+    }
+}
+
+static long cmp(Parser *ps) {
+    long v = add(ps);
+    skip_ws(ps);
+    const char *p = ps->p;
+    int op = 0;
+    if (p[0] == '=' && p[1] == '=') op = 1;
+    else if (p[0] == '!' && p[1] == '=') op = 2;
+    else if (p[0] == '>' && p[1] == '=') op = 3;
+    else if (p[0] == '<' && p[1] == '=') op = 4;
+    else if (p[0] == '>') op = 5;
+    else if (p[0] == '<') op = 6;
+    else if (p[0] == '=') op = 7;
+    if (!op) return v;
+    ps->p += op <= 4 ? 2 : 1;
+    long r = add(ps);
+    switch (op) {
+    case 1:
+    case 7: return v == r;
+    case 2: return v != r;
+    case 3: return v >= r;
+    case 4: return v <= r;
+    case 5: return v > r;
+    default: return v < r;
+    }
+}
+
+static long ex_and(Parser *ps) {
+    long v = cmp(ps);
+    for (;;) {
+        skip_ws(ps);
+        if (*ps->p != '&') return v;
+        ps->p += ps->p[1] == '&' ? 2 : 1;
+        long r = cmp(ps);
+        v = v && r;
+    }
+}
+
+static long ex_or(Parser *ps) {
+    long v = ex_and(ps);
+    for (;;) {
+        skip_ws(ps);
+        if (*ps->p != '|') return v;
+        ps->p += ps->p[1] == '|' ? 2 : 1;
+        long r = ex_and(ps);
+        v = v || r;
+    }
+}
+
+long vm_eval(EX *e, const char *s) {
+    if (!s || !*s) return 0;
+    Parser ps = {e, s};
+    return ex_or(&ps);
 }
 
 bool vm_cond(EX *e, const char *cond) {
     if (!cond || !*cond || !strcmp(cond, "*")) return true;
-    const char *p = cond;
-    bool r = cond_one(e, &p);
-    for (;;) {
-        while (*p == ' ') p++;
-        if (p[0] == '&' && p[1] == '&') {
-            p += 2;
-            bool b = cond_one(e, &p);
-            r = r && b;
-        } else if (p[0] == '|' && p[1] == '|') {
-            p += 2;
-            bool b = cond_one(e, &p);
-            r = r || b;
-        } else break;
-    }
-    return r;
+    return vm_eval(e, cond) != 0;
 }
 
 void vm_goto_script(EX *e, const char *name) {
@@ -118,7 +196,7 @@ static void call(EX *e, int id) {
     int pc = script_func(target, id);
     if (pc < 0 && e->sc->library) {
         target = rld_get(e, e->sc->library);
-        pc = script_func(target, id);
+        pc = target ? script_func(target, id) : -1;
     }
     if (pc < 0) {
         ex_log(e, "no function %d for %s", id, e->sc->name);
@@ -140,11 +218,15 @@ static void ret(EX *e) {
     e->pc = f.pc;
 }
 
-static void set_reg(EX *e, char *s) {
+static void set_reg(EX *e, char *s, bool sys) {
     char *f[8];
     int n = split_csv(s, f, 8);
     if (n < 4) return;
-    *reg_ref(e, 'R', field_int(f[1])) = field_int(f[3]);
+    if (n > 4 && !vm_cond(e, f[4])) return;
+    int r = field_int(f[1]);
+    i32 v = (i32)vm_eval(e, f[3]);
+    if (sys && r >= 1000000) *reg_ref(e, 'S', r - 1000000) = v;
+    else *reg_ref(e, 'R', r) = v;
 }
 
 static void wait_ms(EX *e, int ms, bool click) {
@@ -152,8 +234,72 @@ static void wait_ms(EX *e, int ms, bool click) {
     e->waitUntil = e->now + (u32)(ms > 0 ? ms : 0);
 }
 
+static void draw(EX *e, const i32 *v, int nv) {
+    int id = nv ? v[0] : 0;
+    int ms = nv > 3 ? v[3] : 0;
+    int mode = nv > 1 ? v[1] : 1;
+    gfx_draw_cg(e, id, (mode & 8) ? ms : 0);
+    if (nv > 10 && v[9] > 0 && v[10] > 0) gfx_camera(e, (float)v[7], (float)v[8], (float)v[9], (float)v[10], 0, 0);
+    else gfx_camera(e, 0, 0, EX_W, EX_H, 0, 0);
+}
+
+static void env_voice(EX *e, char *s) {
+    char *f[8];
+    int n = split_csv(s, f, 8);
+    if (n < 2) return;
+    snd_play_env(e, field_int(f[1]), n > 2 ? field_int(f[2]) : 100);
+}
+
+static void chara_op(EX *e, Op *op) {
+    switch (op->op) {
+    case 33:
+        chara_leave_all(e, 0);
+        break;
+    case 37:
+        chara_enter(e, op);
+        break;
+    case 38:
+        if (op->ns) {
+            char *f[8];
+            char buf[256];
+            snprintf(buf, sizeof buf, "%s", op->s[0]);
+            int n = split_csv(buf, f, 8);
+            if (n >= 3) chara_leave(e, field_int(f[0]), field_int(f[1]));
+        }
+        break;
+    case 35:
+        for (int i = 1; i + 3 < op->nv && op->v[i] >= 0; i += 4) chara_move(e, op->v[i], op->v[i + 1], op->v[i + 3], op->v[i + 2]);
+        break;
+    case 39:
+        if (op->nv > 6) chara_move(e, op->v[0], op->v[6], op->v[1], op->v[2]);
+        break;
+    }
+}
+
+void vm_exec_embedded(EX *e, Embedded *b) {
+    Op op = {0};
+    op.op = (u16)b->op;
+    op.nv = (u8)b->nv;
+    op.v = b->v;
+    switch (b->op) {
+    case 37:
+    case 38:
+    case 33:
+    case 35:
+    case 39:
+        chara_op(e, &op);
+        break;
+    case 74:
+        draw(e, b->v, b->nv);
+        break;
+    default:
+        ex_log(e, "embedded op %d", b->op);
+        break;
+    }
+}
+
 static bool exec(EX *e, Op *op) {
-    char buf[4096];
+    char buf[8192];
     char *s0 = NULL;
     if (op->ns) {
         snprintf(buf, sizeof buf, "%s", op->s[0]);
@@ -164,6 +310,20 @@ static bool exec(EX *e, Op *op) {
     case 2:
     case 3:
     case 12:
+    case 44:
+    case 46:
+    case 61:
+    case 65:
+    case 66:
+    case 70:
+    case 71:
+    case 189:
+    case 192:
+    case 193:
+    case 195:
+    case 249:
+    case 250:
+    case 269:
         break;
     case 5: {
         char *f[8];
@@ -176,7 +336,12 @@ static bool exec(EX *e, Op *op) {
         break;
     }
     case 6:
-        set_reg(e, s0);
+        set_reg(e, s0, false);
+        break;
+    case 8:
+        set_reg(e, s0, true);
+        break;
+    case 11:
         break;
     case 13:
         wait_ms(e, op->nv ? op->v[0] : 0, op->nv > 1 && op->v[1]);
@@ -188,6 +353,12 @@ static bool exec(EX *e, Op *op) {
         vm_goto_script(e, f[0]);
         return true;
     }
+    case 18:
+        msg_show(e, op->nv && op->v[0], op->nv > 1 ? op->v[1] : 0);
+        break;
+    case 19:
+        e->msg.ctrlShown = op->nv && op->v[0];
+        break;
     case 20:
         if (op->nv && vm_cond(e, op->ns ? op->s[0] : "*") && jump_label(e, op->v[0])) return true;
         break;
@@ -198,14 +369,46 @@ static bool exec(EX *e, Op *op) {
         return true;
     }
     case 23:
+        if (op->ns) {
+            char *f[4];
+            int n = split_csv(s0, f, 4);
+            if (n > 1 && !vm_cond(e, f[1])) break;
+        }
         ret(e);
         return true;
+    case 28:
+        msg_start(e, op);
+        e->wait = W_TEXT;
+        e->pc++;
+        return false;
+    case 30:
+        msg_clear(e);
+        break;
+    case 33:
+    case 35:
+    case 37:
+    case 38:
+    case 39:
+        chara_op(e, op);
+        break;
+    case 36:
+        if (chara_busy(e)) {
+            e->wait = W_FADE;
+            return false;
+        }
+        break;
     case 47: {
         int pc = e->pc + 1;
-        while (pc < e->sc->count && e->sc->ops[pc].op != 23) pc++;
+        while (pc < e->sc->count && !(e->sc->ops[pc].op == 23 && (!e->sc->ops[pc].ns || e->sc->ops[pc].s[0][0] == '0'))) pc++;
         e->pc = pc + 1;
         return true;
     }
+    case 48:
+        chara_create(e, s0);
+        break;
+    case 49:
+        chara_define(e, s0);
+        break;
     case 50: {
         char *f[4];
         split_csv(s0, f, 4);
@@ -213,18 +416,53 @@ static bool exec(EX *e, Op *op) {
         break;
     }
     case 51:
-        snd_stop(e, 0, op->nv ? op->v[0] : 0);
+        snd_stop(e, EX_CH_MUSIC, op->nv ? op->v[0] : 0);
+        break;
+    case 54: {
+        char *f[6];
+        int n = split_csv(s0, f, 6);
+        if (n > 1) snd_play_id(e, field_int(f[0]), EX_CH_LOOP, true, field_int(f[1]));
+        break;
+    }
+    case 55:
+        snd_stop(e, EX_CH_LOOP, op->nv ? op->v[0] : 0);
         break;
     case 56:
     case 58:
-        if (op->nv) snd_play_id(e, op->v[0], 2 + (op->nv > 3 ? op->v[3] & 1 : 0), op->nv > 4 && op->v[4] == 1 && op->op == 54, 0);
+        if (op->nv) snd_play_id(e, op->v[0], EX_CH_SE, op->nv > 3 && op->v[3] == 1 && op->op == 56 && false, 0);
         break;
     case 57:
-        snd_stop(e, 2, 0);
-        snd_stop(e, 3, 0);
+        snd_stop(e, EX_CH_SE, 0);
+        break;
+    case 59:
+        break;
+    case 64:
+        msg_ctrl_define(e, s0);
+        break;
+    case 72: {
+        char *f[4];
+        split_csv(s0, f, 4);
+        msg_set_frame(e, field_int(f[0]));
+        break;
+    }
+    case 73:
+        msg_define(e, s0);
         break;
     case 74:
-        gfx_draw_cg(e, op->nv ? op->v[0] : 0, 0);
+        draw(e, op->v, op->nv);
+        if (op->nv > 3 && (op->v[1] & 8) && op->v[3] > 0 && gfx_busy(e)) {
+            e->wait = W_FADE;
+            return false;
+        }
+        break;
+    case 81:
+        if (op->nv >= 5) gfx_camera(e, (float)op->v[0], (float)op->v[1], (float)op->v[2], (float)op->v[3], op->v[4], op->nv > 6 ? op->v[6] : 0);
+        break;
+    case 82:
+        if (gfx_busy(e)) {
+            e->wait = W_FADE;
+            return false;
+        }
         break;
     case 94:
     case 95:
@@ -234,7 +472,7 @@ static bool exec(EX *e, Op *op) {
         }
         break;
     case 100:
-        view_move(e, s0);
+        gfx_move(e, s0);
         break;
     case 101:
     case 106:
@@ -244,8 +482,17 @@ static bool exec(EX *e, Op *op) {
         }
         break;
     case 105:
-        view_fade(e, s0, true);
+        gfx_fade(e, s0);
         break;
+    case 191: {
+        char *f[8];
+        int n = split_csv(s0, f, 8);
+        if (n >= 7 && field_int(f[0]) == 96) {
+            free(e->fontFile);
+            e->fontFile = ex_strdup(f[6]);
+        }
+        break;
+    }
     case 203:
         if (op->ns) view_prepare(e, op->s[0]);
         break;
@@ -261,8 +508,42 @@ static bool exec(EX *e, Op *op) {
     case 207:
         view_destroy(e);
         break;
-    case 249:
-    case 250:
+    case 221:
+        msg_wait_mark(e, s0);
+        break;
+    case 223: {
+        char *f[4];
+        int n = split_csv(s0, f, 4);
+        msg_temp_hide(e, true, n > 1 ? field_int(f[1]) : 0);
+        break;
+    }
+    case 224:
+        msg_temp_hide(e, false, op->nv ? op->v[0] : 0);
+        break;
+    case 240:
+        env_voice(e, s0);
+        break;
+    case 241:
+        snd_stop(e, EX_CH_ENV, 200);
+        break;
+    case 242:
+        if (gfx_faceup(e, s0) > 0) {
+            e->wait = W_FADE;
+            return false;
+        }
+        break;
+    case 251:
+        if (op->ns) {
+            char *f[4];
+            int n = split_csv(s0, f, 4);
+            if (n > 1) portrait_def(e, field_int(f[0]), field_int(f[1]));
+        }
+        break;
+    case 252:
+        portrait_draw_cmd(e, s0);
+        break;
+    case 253:
+        portrait_clear(e, s0);
         break;
     default:
         unknown(e, op);
@@ -272,22 +553,36 @@ static bool exec(EX *e, Op *op) {
     return true;
 }
 
+static bool advance_click(EX *e) {
+    if (!e->lPress) return false;
+    e->lPress = false;
+    return true;
+}
+
 void vm_run(EX *e) {
+    msg_tick(e);
     for (int guard = 0; guard < 20000 && !e->ended; guard++) {
         switch (e->wait) {
         case W_TIME:
             if ((i32)(e->now - e->waitUntil) < 0) return;
             break;
         case W_CLICK:
-            if ((i32)(e->now - e->waitUntil) < 0 && !e->lPress) return;
-            e->lPress = false;
+            if ((i32)(e->now - e->waitUntil) < 0 && !advance_click(e)) return;
             break;
         case W_FADE:
-            if (gfx_busy(e)) return;
+            if (gfx_busy(e) || chara_busy(e)) return;
             e->pc++;
             break;
         case W_VIEW:
             if (e->view.result == -2) return;
+            break;
+        case W_TEXT:
+            if (msg_typing(e)) {
+                if (advance_click(e)) msg_finish(e);
+                return;
+            }
+            if (!advance_click(e) && !e->skipping) return;
+            msg_flush_embedded(e);
             break;
         default:
             break;
@@ -297,6 +592,13 @@ void vm_run(EX *e) {
         if (e->pc >= e->sc->count) {
             if (e->sp) {
                 ret(e);
+                continue;
+            }
+            if (e->bootEntry) {
+                char *entry = e->bootEntry;
+                e->bootEntry = NULL;
+                vm_goto_script(e, entry);
+                free(entry);
                 continue;
             }
             ex_log(e, "%s ran off its end", e->sc->name);

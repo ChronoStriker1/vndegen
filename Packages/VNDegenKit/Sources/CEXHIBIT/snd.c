@@ -236,7 +236,7 @@ static Voice *voice_open(EX *e, const char *rel) {
 }
 
 static float channel_volume(EX *e, int ch) {
-    int v = ch == 0 ? e->volBgm : ch == 6 ? e->volVoice : e->volSe;
+    int v = ch == EX_CH_MUSIC ? e->volBgm : ch == EX_CH_VOICE || ch == EX_CH_ENV ? e->volVoice : e->volSe;
     return (float)v / 100.0f * (float)e->volMaster / 100.0f;
 }
 
@@ -292,6 +292,29 @@ void snd_play_id(EX *e, int id, int ch, bool loop, int fadeMs) {
         return;
     }
     start(e, v, ch, loop, fadeMs);
+}
+
+void snd_play_voice(EX *e, int id) {
+    char rel[64];
+    snprintf(rel, sizeof rel, "res/s/v/%02d/%05d.v", id / 1000, id);
+    char *path = ex_game_path(e, rel);
+    bool ok = ex_file_exists(path);
+    free(path);
+    if (!ok) return;
+    Voice *v = voice_open(e, rel);
+    if (v) start(e, v, EX_CH_VOICE, false, 0);
+}
+
+void snd_play_env(EX *e, int id, int volume) {
+    (void)volume;
+    char rel[64];
+    snprintf(rel, sizeof rel, "res/s/v/%02d/%05d.v", id / 1000, id);
+    Voice *v = voice_open(e, rel);
+    if (!v) {
+        ex_log(e, "missing voice %d", id);
+        return;
+    }
+    start(e, v, EX_CH_ENV, true, 0);
 }
 
 void snd_play_music(EX *e, int track, int fadeMs) {

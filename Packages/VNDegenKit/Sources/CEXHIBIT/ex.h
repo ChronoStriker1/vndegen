@@ -12,6 +12,7 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+typedef int16_t i16;
 typedef int32_t i32;
 typedef uint64_t u64;
 
@@ -68,9 +69,9 @@ typedef struct Billboard {
     bool ownImg;
     u32 color;
     int x, y, w, h;
-    Anim alpha;
+    Anim alpha, mx, my;
     float a;
-    bool removing;
+    bool removing, masked;
     Image *mask;
 } Billboard;
 
@@ -106,6 +107,99 @@ typedef struct Mixer Mixer;
 
 #define EX_CHANNELS 8
 #define EX_BILLBOARDS 64
+#define EX_FRAMES 16
+#define EX_CTRLS 24
+#define EX_EMBEDDED 16
+#define EX_ACTORS 16
+#define EX_CHARDEFS 256
+#define EX_PEOPLE 64
+
+enum { EX_CH_MUSIC, EX_CH_VOICE, EX_CH_SE, EX_CH_UI, EX_CH_LOOP, EX_CH_ENV };
+
+typedef struct TextStyle {
+    int pitch, size;
+    u32 color, shadow;
+    int shx, shy;
+    bool shadowOn;
+} TextStyle;
+
+typedef struct MsgFrame {
+    bool used;
+    Image *img;
+    int x, y;
+    int tx, ty, tw, th;
+    int nx, ny, nw, nh;
+    TextStyle text, name;
+} MsgFrame;
+
+typedef struct PlacedChar {
+    u32 cp;
+    i16 x, line;
+    bool italic;
+} PlacedChar;
+
+typedef struct Embedded {
+    int op, at, nv;
+    i32 v[16];
+} Embedded;
+
+typedef struct Ctrl {
+    int id, x, y, states;
+    Image *img, *knob;
+    bool slider;
+    int value;
+} Ctrl;
+
+typedef struct Msg {
+    MsgFrame frames[EX_FRAMES];
+    int frame;
+    bool shown, tempHidden, userHidden, ctrlShown;
+    float a, tempA;
+    Anim fade, tempFade;
+    PlacedChar *chars;
+    int count, visible;
+    u32 *name;
+    int nameLen;
+    u32 start;
+    bool active;
+    int textId, speaker;
+    Embedded *emb;
+    int embCount, embNext;
+    Image *waitImg;
+    int waitX, waitY, waitFrames;
+    Ctrl ctrls[EX_CTRLS];
+    int ctrlCount, ctrlHover;
+} Msg;
+
+typedef struct CharaDef {
+    int chara, pose, size, ox, oy, faces, fx, fy;
+} CharaDef;
+
+typedef struct Person {
+    int id;
+    bool voiced;
+    char *name;
+} Person;
+
+typedef struct Actor {
+    bool used;
+    int chara, pose, face, order;
+    Image *img;
+    float x, y, a;
+    Anim mx, my, fade;
+    bool leaving;
+} Actor;
+
+typedef struct Portrait {
+    bool used;
+    int chara, pose, face, x, y;
+    Image *img;
+} Portrait;
+
+typedef struct Camera {
+    float x, y, w, h;
+    Anim ax, ay, aw, ah;
+} Camera;
 
 typedef struct EX {
     char *gameDir, *saveDir, *cacheDir;
@@ -123,6 +217,25 @@ typedef struct EX {
     Anim cgFade;
     Billboard bb[EX_BILLBOARDS];
     View view;
+    Msg msg;
+    Camera cam;
+    CharaDef *defs;
+    int defCount;
+    Person people[EX_PEOPLE];
+    int peopleCount;
+    Actor actors[EX_ACTORS];
+    int actorOrder;
+    Portrait portraits[4];
+    int portraitZ[4];
+    void *fonts;
+    char *fontFile;
+    int textMs;
+    bool skipping;
+    char *bootEntry;
+    Image *cgPrev;
+    u32 cgPrevColor;
+    Camera camPrev;
+    i32 Q[16], L[128], F[64];
     Script **scripts;
     int scriptCount;
     u32 keys[8];
@@ -180,6 +293,7 @@ int script_label(Script *sc, int id);
 int script_func(Script *sc, int id);
 
 int split_csv(char *s, char **out, int max);
+u32 colorref(u32 c);
 int field_int(const char *s);
 
 void vm_run(EX *e);
@@ -191,6 +305,13 @@ float anim_value(EX *e, Anim *a, float cur);
 void anim_start(EX *e, Anim *a, float from, float to, int ms, int ease);
 
 void gfx_frame(EX *e);
+void gfx_camera(EX *e, float x, float y, float w, float h, int ms, int ease);
+void gfx_move(EX *e, char *args);
+void gfx_fade(EX *e, char *args);
+int gfx_faceup(EX *e, char *args);
+void chara_move(EX *e, int chara, int pos, int ms, int ease);
+void snd_play_env(EX *e, int id, int volume);
+long vm_eval(EX *e, const char *s);
 void gfx_draw_cg(EX *e, int id, int ms);
 int gfx_billboard(EX *e, char *args);
 int gfx_remove_billboard(EX *e, char *args);
@@ -200,8 +321,7 @@ void view_prepare(EX *e, const char *spec);
 void view_show(EX *e, char *args);
 void view_select(EX *e, char *args);
 void view_destroy(EX *e);
-void view_move(EX *e, char *args);
-void view_fade(EX *e, char *args, bool enter);
+Layer *view_layer(EX *e, int id);
 void view_draw(EX *e, u32 *dst);
 void view_input(EX *e);
 
@@ -214,6 +334,47 @@ void snd_stop(EX *e, int ch, int fadeMs);
 bool snd_playing(EX *e, int ch);
 void snd_play_file(EX *e, const char *rel, int ch);
 
+void text_free(EX *e);
+int text_advance(EX *e, u32 cp, int size);
+int text_ascent(EX *e, int size);
+int text_descent(EX *e, int size);
+int text_width(EX *e, const u32 *cps, int n, int size);
+void text_glyph(EX *e, u32 *dst, int dw, int dh, u32 cp, int x, int baseline, int size, u32 color, int alpha, bool italic);
+
+void msg_define(EX *e, char *args);
+void msg_wait_mark(EX *e, char *args);
+void msg_ctrl_define(EX *e, char *args);
+void msg_free(EX *e);
+void msg_set_frame(EX *e, int id);
+void msg_show(EX *e, bool on, int ms);
+void msg_temp_hide(EX *e, bool hide, int ms);
+void msg_clear(EX *e);
+void msg_start(EX *e, Op *op);
+bool msg_typing(EX *e);
+void msg_finish(EX *e);
+void msg_tick(EX *e);
+void msg_flush_embedded(EX *e);
+void msg_draw(EX *e, u32 *dst);
+void vm_exec_embedded(EX *e, Embedded *b);
+
+void chara_create(EX *e, char *args);
+void chara_define(EX *e, char *args);
+const char *chara_name(EX *e, int id);
+bool chara_voiced(EX *e, int id);
+void chara_enter(EX *e, Op *op);
+void chara_leave(EX *e, int id, int ms);
+void chara_leave_all(EX *e, int ms);
+Actor *chara_actor(EX *e, int layer);
+void chara_draw(EX *e, u32 *dst);
+bool chara_busy(EX *e);
+void chara_free(EX *e);
+void portrait_def(EX *e, int slot, int z);
+void portrait_draw_cmd(EX *e, char *args);
+void portrait_clear(EX *e, char *args);
+void portrait_draw(EX *e, u32 *dst, int z);
+void snd_play_voice(EX *e, int id);
+
+void blit_scaled(u32 *dst, int dw, int dh, const Image *src, float sx, float sy, float sw, float sh, float dx, float dy, float dwid, float dhei, int alpha);
 void blit(u32 *dst, int dw, int dh, const Image *src, int x, int y, int alpha);
 void blit_part(u32 *dst, int dw, int dh, const Image *src, int sx, int sy, int w, int h, int dx, int dy, int alpha);
 void fill(u32 *dst, int dw, int dh, int x, int y, int w, int h, u32 color, int alpha);

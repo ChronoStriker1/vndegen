@@ -233,3 +233,5 @@ int field_int(const char *s) {
     while (*s == ' ') s++;
     return (int)strtol(s, NULL, 0);
 }
+
+u32 colorref(u32 c) { return c & 0xffffff; }
