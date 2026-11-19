@@ -230,10 +230,11 @@ typedef struct Button {
     int group;
 } Button;
 
-enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_SAVE, PH_LOAD, PH_CONFIG, PH_LOG };
+enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG };
 
 typedef struct Phase Phase;
 typedef struct MapPhase MapPhase;
+typedef struct DataPhase DataPhase;
 
 struct BX {
     char *gameDir, *saveDir;
@@ -325,6 +326,8 @@ struct BX {
     int phase;
     Phase *ph;
     MapPhase *map;
+    DataPhase *data;
+    int phaseBack;
     int phaseResult;
 
     Image *menuBase;
@@ -402,6 +405,7 @@ void bx_phase_start(BX *b, int phase);
 void bx_phase_update(BX *b);
 void bx_phase_draw(BX *b, u32 *dst);
 void bx_phase_end(BX *b);
+void bx_phase_reset(BX *b);
 void bx_system(BX *b, const char *cmd);
 
 bool bx_save_slot(BX *b, int slot);
@@ -415,5 +419,11 @@ void bx_map_update(BX *b);
 void bx_map_draw(BX *b, u32 *dst);
 void bx_map_free(BX *b);
 int bx_map_hover(BX *b);
+
+void bx_data_open(BX *b, bool save);
+void bx_data_update(BX *b);
+void bx_data_draw(BX *b, u32 *dst);
+void bx_data_free(BX *b);
+void bx_open_data(BX *b, bool save);
 
 #endif

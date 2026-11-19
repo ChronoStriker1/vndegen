@@ -368,8 +368,7 @@ bool bx_load_slot(BX *b, int slot) {
         free(path);
         return false;
     }
-    bx_phase_end(b);
-    bx_map_free(b);
+    bx_phase_reset(b);
     memset(&b->scene, 0, sizeof b->scene);
     Obj *last = NULL;
     while (!r.bad) {

@@ -64,9 +64,31 @@ static void phase_free(BX *b) {
 }
 
 void bx_phase_end(BX *b) {
+    if ((b->phase == PH_DATA || b->phase == PH_TITLE_LOAD) && b->phaseBack != PH_NONE) {
+        int back = b->phaseBack;
+        b->phaseBack = PH_NONE;
+        b->phase = back;
+        return;
+    }
     phase_free(b);
     b->phase = PH_NONE;
     if (b->th.wait == W_PHASE) b->th.wait = W_NONE;
+}
+
+void bx_phase_reset(BX *b) {
+    bx_data_free(b);
+    bx_map_free(b);
+    phase_free(b);
+    b->phaseBack = PH_NONE;
+    b->phase = PH_NONE;
+    if (b->th.wait == W_PHASE) b->th.wait = W_NONE;
+}
+
+void bx_open_data(BX *b, bool save) {
+    bx_save_capture_thumb(b);
+    b->phaseBack = b->phase;
+    b->phase = b->phase == PH_TITLE ? PH_TITLE_LOAD : PH_DATA;
+    bx_data_open(b, save);
 }
 
 static void title_start(BX *b) {
@@ -100,6 +122,10 @@ static void title_pick(BX *b, const char *key) {
         b->quit = true;
         return;
     }
+    if (!strcmp(key, "load")) {
+        bx_open_data(b, false);
+        return;
+    }
     const char *label = !strcmp(key, "op") ? "opening" : !strcmp(key, "start") ? "prologue" : NULL;
     if (!label) {
         bx_log(b, "title menu %s isn't available yet", key);
@@ -116,6 +142,10 @@ static void title_pick(BX *b, const char *key) {
 }
 
 void bx_phase_update(BX *b) {
+    if (b->phase == PH_DATA || b->phase == PH_TITLE_LOAD) {
+        bx_data_update(b);
+        return;
+    }
     if (b->phase == PH_CUSTOM_MAP) {
         custom_map_update(b);
         return;
@@ -137,6 +167,10 @@ void bx_phase_update(BX *b) {
 }
 
 void bx_phase_draw(BX *b, u32 *dst) {
+    if (b->phase == PH_DATA || b->phase == PH_TITLE_LOAD) {
+        bx_data_draw(b, dst);
+        return;
+    }
     if (b->phase == PH_CUSTOM_MAP) return;
     if (b->phase == PH_MAP) {
         bx_map_draw(b, dst);
@@ -176,6 +210,7 @@ void bx_ui_init(BX *b) {
 
 void bx_ui_free(BX *b) {
     phase_free(b);
+    bx_data_free(b);
     bx_map_free(b);
     bx_image_free(b->menuBase);
     for (int i = 0; i < b->buttonCount; i++) bx_image_free(b->buttons[i].img);
@@ -215,6 +250,8 @@ static void button_press(BX *b, const char *key) {
         bx_save_capture_thumb(b);
         bx_save_slot(b, -1);
     } else if (!strcmp(key, "quick load")) bx_load_slot(b, -1);
+    else if (!strcmp(key, "save")) bx_open_data(b, true);
+    else if (!strcmp(key, "load")) bx_open_data(b, false);
     else bx_log(b, "menu button %s isn't available yet", key);
 }
 
@@ -332,7 +369,19 @@ void bx_system(BX *b, const char *cmd) {
         int v = bx_var_by_name(b, var);
         if (v >= 0) b->globals[v] = (Val){0, !b->skipMode};
     }
-    else if (!strcmp(cmd, "@end")) {
+    else if (!strcmp(cmd, "@title")) {
+        bx_snd_stop(b, CH_BGM, 500);
+        bx_snd_stop(b, CH_BGS, 0);
+        b->bgmName[0] = 0;
+        memset(&b->scene, 0, sizeof b->scene);
+        bx_transition(b, 0, 0, NULL);
+        bx_msg_clear(b);
+        b->choiceCount = 0;
+        b->th.sp = 0;
+        b->th.wait = W_NONE;
+        int l = bx_script_label(b->sc, "title");
+        bx_vm_goto(b, l >= 0 ? l : 0);
+    } else if (!strcmp(cmd, "@end")) {
         int l = bx_script_label(b->sc, "boot_logo");
         b->th.sp = 0;
         b->th.wait = W_NONE;
