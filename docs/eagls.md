@@ -27,7 +27,7 @@ voices and effects), `MOVIE/` and `Save/`. The plugin takes a folder as an EAGLS
 - Scripts (`.dat`) have a 3600-byte label table, then Shift-JIS source text with every second byte XORed with
   `EAGLS_SYSTEM` picked by `rand`, seeded from the file's last byte. The text is compiled when a file is first used:
   - `$label`, `&N"text"` (a message, which waits for a click and replaces the last one), `#Name` or `#Name=voice` (the
-    speaker and the voice for the next message), `(e)` is a line break.
+    speaker and the voice for the next message only; a message without its own name line shows no name plate), `(e)` is a line break.
   - `N(args)`: one of about 70 numbered commands. Arguments are numbers, quoted strings, `TRUE`/`FALSE`, and variables;
     a quoted string that starts with `_`, `@` or `:` names a string variable.
   - `_X=a,b,+,` assigns a reverse Polish expression (`+ - * / %`, `=` equal, `!` not equal, `> <`, `&`, `|`).
