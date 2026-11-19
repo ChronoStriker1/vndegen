@@ -548,6 +548,42 @@ void bx_common_load(BX *b) {
     b->commonSize = n;
     b->choiceFlags = p + 4;
     b->readFlags = q + 4;
+    b->achieveTable = 0;
+    for (size_t k = 0x24; k + 8 <= p; k++)
+        if (rd32(d + k) == 4 && !memcmp(d + k + 4, "ID00", 4)) {
+            b->achieveTable = k - 4;
+            break;
+        }
+}
+
+static size_t achieve_flag(BX *b, const char *id) {
+    if (!b->common || !b->achieveTable) return 0;
+    u32 count = rd32(b->common + b->achieveTable);
+    size_t k = b->achieveTable + 4, len = strlen(id);
+    for (u32 i = 0; i < count && k + 8 <= b->choiceFlags; i++) {
+        u32 n = rd32(b->common + k);
+        if (k + 8 + n > b->choiceFlags) break;
+        if (n == len && !memcmp(b->common + k + 4, id, len)) return k + 4 + n;
+        k += 8 + n;
+    }
+    return 0;
+}
+
+bool bx_achieved(BX *b, const char *id) {
+    size_t f = achieve_flag(b, id);
+    return f && rd32(b->common + f);
+}
+
+void bx_achieve(BX *b, const char *id) {
+    size_t f = achieve_flag(b, id);
+    if (!f) {
+        bx_log(b, "no achievement %s in common.dat", id);
+        return;
+    }
+    if (rd32(b->common + f)) return;
+    wr32(b->common + f, 1);
+    b->commonDirty = true;
+    bx_log(b, "achievement %s", id);
 }
 
 void bx_common_save(BX *b) {

@@ -76,7 +76,7 @@ void bx_cfg_free(Cfg *c) {
 }
 
 const char *bx_cfg_get(const Cfg *c, const char *sec, const char *key) {
-    for (int i = 0; i < c->count; i++)
+    for (int i = c->count - 1; i >= 0; i--)
         if (!strcmp(c->sec[i], sec) && !strcmp(c->key[i], key)) return c->val[i];
     return NULL;
 }

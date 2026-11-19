@@ -510,6 +510,8 @@ void bx_system(BX *b, const char *cmd) {
     if (!strcmp(cmd, "title")) bx_phase_start(b, PH_TITLE);
     else if (!strcmp(cmd, "map")) bx_phase_start(b, PH_MAP);
     else if (!strcmp(cmd, "custom map")) bx_phase_start(b, PH_CUSTOM_MAP);
+    else if (!strncmp(cmd, "実績解除 ", strlen("実績解除 "))) bx_achieve(b, cmd + strlen("実績解除 "));
+    else if (!strncmp(cmd, "達成率 ", strlen("達成率 "))) bx_log(b, "museum rate isn't counted yet: %s", cmd);
     else if (!strcmp(cmd, "op") || !strcmp(cmd, "staffroll")) {
         if (bx_movie_play(b, cmd)) b->th.wait = W_MOVIE;
     }

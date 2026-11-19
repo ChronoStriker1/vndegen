@@ -26,7 +26,8 @@ struct DataPhase {
     int hover;
     int confirmSlot;
     int hoverBtn;
-    Image *base[2], *empty, *frame, *autoOnly, *radio, *font, *noHeader, *week, *wday, *resave;
+    Image *base[2], *empty, *frame, *autoOnly, *radio, *font, *noHeader, *week, *wday, *resave, *dayNo, *dayUnit, *daySp;
+    int noHeaderPos[2], dayNoPos[2], dayNoOff, dayNoFrames, dayUnitPos[2], daySpPos[2], daySpFrames, daySpBorder;
     Btn pageBtn[PAGES_MAX], mode[2], back, title, quit, ok, cancel;
     int slotPos[SLOTS_MAX][2];
     int sortPos[3][2];
@@ -159,13 +160,23 @@ void bx_data_free(BX *b) {
     forget(d);
     free(d->cache);
     free(d->order);
-    Image *ims[] = {d->base[0], d->base[1], d->empty, d->frame, d->autoOnly, d->radio, d->font, d->noHeader, d->week, d->wday, d->resave};
+    Image *ims[] = {d->base[0], d->base[1], d->empty, d->frame, d->autoOnly, d->radio, d->font, d->noHeader, d->week, d->wday, d->resave, d->dayNo, d->dayUnit, d->daySp};
     for (size_t i = 0; i < sizeof ims / sizeof *ims; i++) bx_image_free(ims[i]);
     Btn *bs[] = {&d->mode[0], &d->mode[1], &d->back, &d->title, &d->quit, &d->ok, &d->cancel};
     for (size_t i = 0; i < sizeof bs / sizeof *bs; i++) bx_image_free(bs[i]->img);
     for (int i = 0; i < PAGES_MAX; i++) bx_image_free(d->pageBtn[i].img);
     free(d);
     b->data = NULL;
+}
+
+static Image *sv_image(BX *b, const char *sec, const char *key, int *frames, int *pos) {
+    const char *v = bx_cfg_get(&b->cfg, sec, key);
+    char name[64], f[32];
+    if (!v || bx_cfg_field(v, 0, name, sizeof name) <= 0) return NULL;
+    if (frames) *frames = bx_cfg_field(v, 1, f, sizeof f) > 0 ? clampi(bx_eval(f, NULL), 1, 64) : 1;
+    pos[0] = bx_cfg_field(v, 2, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
+    pos[1] = bx_cfg_field(v, 3, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
+    return own(b, name);
 }
 
 void bx_data_open(BX *b, bool save) {
@@ -221,7 +232,18 @@ void bx_data_open(BX *b, bool save) {
         char name[64];
         bx_cfg_field(nh, 0, name, sizeof name);
         d->noHeader = own(b, name);
+        char f[32];
+        d->noHeaderPos[0] = bx_cfg_field(nh, 2, f, sizeof f) > 0 ? bx_eval(f, NULL) : 305;
+        d->noHeaderPos[1] = bx_cfg_field(nh, 3, f, sizeof f) > 0 ? bx_eval(f, NULL) : 97;
+    } else {
+        d->noHeaderPos[0] = 305;
+        d->noHeaderPos[1] = 97;
     }
+    d->dayNo = sv_image(b, sv, "day no", &d->dayNoFrames, d->dayNoPos);
+    d->dayUnit = sv_image(b, sv, "day unit", NULL, d->dayUnitPos);
+    d->daySp = sv_image(b, sv, "day sp", &d->daySpFrames, d->daySpPos);
+    d->dayNoOff = bx_cfg_int(&b->cfg, sv, "day no offset", -9);
+    d->daySpBorder = bx_cfg_int(&b->cfg, sv, "day sp border", 0);
     pair(b, sv, "slot no pos", d->noPos, 350, 96);
     d->noOff = bx_cfg_int(&b->cfg, sv, "slot no offset", -9);
     pair(b, sv, "date pos", d->datePos, 384, 96);
@@ -360,8 +382,8 @@ static void digits(BX *b, DataPhase *d, u32 *dst, const char *s, int x, int y, i
 
 static void draw_info(BX *b, DataPhase *d, u32 *dst, int slot) {
     SlotCache *c = &d->cache[slot];
-    if (d->noHeader) bx_blit(dst, b->W, b->H, d->noHeader, 305, 97, 255);
-    int n = slot + 1;
+    if (d->noHeader) bx_blit(dst, b->W, b->H, d->noHeader, d->noHeaderPos[0], d->noHeaderPos[1], 255);
+    int n = slot;
     int x = d->noPos[0];
     do {
         char one[2] = {(char)('0' + n % 10), 0};
@@ -374,6 +396,19 @@ static void draw_info(BX *b, DataPhase *d, u32 *dst, int slot) {
     digits(b, d, dst, c->date, d->datePos[0], d->datePos[1], d->dateOff);
     digits(b, d, dst, c->clock, d->timePos[0], d->timePos[1], d->timeOff);
     int day = c->day + d->dayAdjust;
+    if (d->daySp && (day < 0 || (d->daySpBorder > 0 && c->day >= d->daySpBorder))) {
+        int h = d->daySp->h / d->daySpFrames, frame = day < 0 ? 0 : clampi(c->day - d->daySpBorder, 0, d->daySpFrames - 1);
+        bx_blit_part(dst, b->W, b->H, d->daySp, 0, frame * h, d->daySp->w, h, d->daySpPos[0], d->daySpPos[1], 255);
+        day = -1;
+    } else if (d->dayNo && day >= 0) {
+        if (d->dayUnit) bx_blit(dst, b->W, b->H, d->dayUnit, d->dayUnitPos[0], d->dayUnitPos[1], 255);
+        int h = d->dayNo->h / d->dayNoFrames, x = d->dayNoPos[0], w = day / 7 + 1;
+        do {
+            bx_blit_part(dst, b->W, b->H, d->dayNo, 0, (w % 10) * h, d->dayNo->w, h, x, d->dayNoPos[1], 255);
+            x += d->dayNoOff;
+            w /= 10;
+        } while (w);
+    }
     if (day >= 0 && d->week) {
         int h = d->week->h / 6;
         bx_blit_part(dst, b->W, b->H, d->week, 0, clampi(day / 7, 0, 5) * h, d->week->w, h, d->weekPos[0], d->weekPos[1], 255);
