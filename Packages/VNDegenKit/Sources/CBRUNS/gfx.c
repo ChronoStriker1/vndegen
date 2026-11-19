@@ -164,6 +164,7 @@ void gfx_frame(BR *e) {
 }
 
 void gfx_free(BR *e) {
+    layers_free(e);
     for (int k = 0; k < OBJ_KINDS; k++) obj_clear(e, k);
     image_free(e->bg);
     image_free(e->bgPrev);

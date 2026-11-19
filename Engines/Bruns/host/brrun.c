@@ -8,10 +8,15 @@
 static void write_png(const char *path, const uint32_t *px, int w, int h);
 
 static float audio[2048];
+static float peak;
 
 static int step(VNBruns *n) {
     int alive = vnbruns_frame(n, 16);
     vnbruns_audio(n, audio, 705);
+    for (int i = 0; i < 1410; i++) {
+        float a = audio[i] < 0 ? -audio[i] : audio[i];
+        if (a > peak) peak = a;
+    }
     return alive;
 }
 
@@ -65,6 +70,10 @@ int main(int argc, char **argv) {
             vnbruns_key(n, k, 0);
             alive = alive && run(n, 32);
         } else if (!strcmp(c, "state")) print_state((BR *)n);
+        else if (!strcmp(c, "peak")) {
+            printf("audio peak %.3f\n", peak);
+            peak = 0;
+        }
         else if (!strncmp(c, "shot:", 5)) {
             int w, h;
             const uint32_t *px = vnbruns_pixels(n, &w, &h);

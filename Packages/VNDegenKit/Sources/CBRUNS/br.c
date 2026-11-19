@@ -80,6 +80,14 @@ VNBruns *vnbruns_open(const VNBrunsConfig *cfg, char *err, size_t errSize) {
     e->screen = br_alloc(sizeof(u32) * BR_W * BR_H);
     e->unknownSeen = br_alloc(10000);
     e->nextScript = -1;
+    e->rng = (u32)cfg->startTime;
+    e->textSpeed = 1;
+    e->mixer = mixer_new();
+    e->volMaster = 100;
+    for (int i = 0; i < 3; i++) e->vol[i] = 100;
+    for (int i = 0; i < BR_CHANNELS; i++) e->chanGain[i] = 1;
+    for (int i = 0; i < 4; i++) e->music[i] = -1;
+    e->autoMs = 1500;
     if (!cfg_load(e)) {
         if (err && errSize) snprintf(err, errSize, "The game's ams.cfg can't be read.");
         vnbruns_close((VNBruns *)e);
@@ -103,6 +111,8 @@ void vnbruns_close(VNBruns *n) {
     gfx_free(e);
     parts_free_all(e);
     font_free(e);
+    msg_free(e);
+    mixer_free(e->mixer);
     image_cache_clear();
     sx_free(e->cfg.root);
     for (int i = 0; i < BR_STRINGS; i++) free(e->str[i]);
@@ -116,6 +126,7 @@ void vnbruns_close(VNBruns *n) {
 }
 
 static void tick(BR *e) {
+    msg_update(e);
     uf_tick(e);
     vm_run(e);
     e->lPress = e->rPress = false;
@@ -163,7 +174,10 @@ void vnbruns_mouse_button(VNBruns *n, int button, bool down) {
 
 void vnbruns_key(VNBruns *n, int vk, bool down) {
     BR *e = (BR *)n;
-    if (vk == 0x11) e->ctrlHeld = down;
+    if (vk == 0x11) {
+        e->ctrlHeld = down;
+        e->skipping = down;
+    }
     if (!down) return;
     if (vk == 0x0d || vk == 0x20) e->lPress = true;
     if (vk == 0x1b) e->rPress = true;
@@ -171,7 +185,10 @@ void vnbruns_key(VNBruns *n, int vk, bool down) {
 
 void vnbruns_wheel(VNBruns *n, int notches) { ((BR *)n)->wheel += notches; }
 
-void vnbruns_audio(VNBruns *n, float *out, int frames) { memset(out, 0, sizeof(float) * 2 * (size_t)frames); }
+void vnbruns_audio(VNBruns *n, float *out, int frames) {
+    BR *e = (BR *)n;
+    mixer_mix(e->mixer, out, frames, e->paused);
+}
 
 void vnbruns_set_paused(VNBruns *n, bool paused) { ((BR *)n)->paused = paused; }
 

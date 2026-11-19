@@ -123,6 +123,46 @@ void font_draw(BR *e, u32 *dst, int dw, int dh, const char *sjis, int x, int y, 
     }
 }
 
+static inline void over(u32 *d, u32 color, int a) {
+    if (a <= 0) return;
+    if (a > 255) a = 255;
+    u32 o = *d;
+    int oa = (int)(o >> 24);
+    int na = a + oa * (255 - a) / 255;
+    if (na <= 0) return;
+    u32 r = (u32)(((int)(color & 0xff) * a + (int)(o & 0xff) * oa * (255 - a) / 255) / na);
+    u32 g = (u32)(((int)(color >> 8 & 0xff) * a + (int)(o >> 8 & 0xff) * oa * (255 - a) / 255) / na);
+    u32 b = (u32)(((int)(color >> 16 & 0xff) * a + (int)(o >> 16 & 0xff) * oa * (255 - a) / 255) / na);
+    *d = r | g << 8 | b << 16 | (u32)na << 24;
+}
+
+void font_draw_layer(BR *e, Image *L, const u8 *p, int x, int y, int size, u32 color, u32 edge, int edgeW) {
+    const u8 *px;
+    int stride, cell, half;
+    if (!glyph(e, p, size > 32, &px, &stride, &cell, &half)) return;
+    int cw = half ? cell / 2 : cell;
+    int w = half ? (size + 1) / 2 : size;
+    for (int yy = -edgeW; yy < size + edgeW; yy++) {
+        int ty = y + yy;
+        if (ty < 0 || ty >= L->h) continue;
+        for (int xx = -edgeW; xx < w + edgeW; xx++) {
+            int tx = x + xx;
+            if (tx < 0 || tx >= L->w) continue;
+            int v = sample(px, stride, cell, cw, size, xx, yy);
+            int m = 0;
+            if (edgeW)
+                for (int oy = -edgeW; oy <= edgeW && m < 255; oy++)
+                    for (int ox = -edgeW; ox <= edgeW; ox++) {
+                        int s2 = sample(px, stride, cell, cw, size, xx + ox, yy + oy);
+                        if (s2 > m) m = s2;
+                    }
+            u32 *d = &L->px[(size_t)ty * L->w + tx];
+            if (m) over(d, edge, m);
+            if (v) over(d, color, v);
+        }
+    }
+}
+
 void font_free(BR *e) {
     for (int b = 0; b < 2; b++)
         for (int r = 0; r < 4; r++) {

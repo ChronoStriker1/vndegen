@@ -152,6 +152,52 @@ typedef struct Obj {
     char *text;
 } Obj;
 
+typedef struct Stream Stream;
+typedef struct Mixer Mixer;
+
+#define BR_CHANNELS 24
+enum { CH_MUSIC = 0, CH_SE = 4, CH_VOICE = 12 };
+
+#define BR_MSGWIN 64
+#define BR_MSG_GLYPHS 1024
+
+typedef struct MsgCfg {
+    bool loaded;
+    int x, y, w, h, tx, ty, tw, th, size, pitch, ruby, cpl;
+    Node *bg;
+    u32 edge;
+    bool edgeOn;
+    int kwx, kwy, kwIcon, kwIconAuto;
+    int speed[3];
+} MsgCfg;
+
+typedef struct Glyph {
+    u8 c[2];
+    int x, y;
+    u32 color;
+} Glyph;
+
+typedef struct Msg {
+    int win;
+    bool visible, instant;
+    Glyph g[BR_MSG_GLYPHS];
+    int count, shown, drawn;
+    int cx, line;
+    u32 color;
+    u32 lastReveal, waitStart;
+    Image *layer;
+} Msg;
+
+typedef struct LNode {
+    int id, parent;
+    Image *img;
+    Stream *stream;
+    i32 v[13], from[13];
+    u32 start, dur;
+    int ease, easeDir;
+    bool visible;
+} LNode;
+
 typedef struct Anim {
     float from, to;
     u32 start, dur;
@@ -210,6 +256,22 @@ typedef struct BR {
     u32 overlayColor;
     int event;
     int eventMode, eventTimeout, eventFlag;
+    LNode **nodes;
+    int nodeCount, nodeCap;
+    Image *transFrom, *frozenImg;
+    u32 transStart, transDur;
+    bool frozen;
+    Msg msg;
+    MsgCfg msgCfg[BR_MSGWIN];
+    bool skipping, autoMode, wheelDown, msgHidden;
+    int textSpeed, autoMs;
+    Mixer *mixer;
+    int music[4];
+    bool muted;
+    int vol[3], volMaster;
+    float chanGain[BR_CHANNELS];
+    int voiceNum[10];
+    u32 rng;
     u32 eventStart;
 } BR;
 
@@ -302,3 +364,35 @@ bool layers_busy(BR *e);
 void msg_send(BR *e, Node *call);
 void msg_tick(BR *e);
 void snd_se_hover(BR *e);
+void blit_tinted(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int w, int h, int alpha, u32 tint);
+void layers_clear_children(BR *e, int parent);
+void layers_reset(BR *e);
+void layers_free(BR *e);
+void layers_create(BR *e, int id, int parent);
+int layers_load(BR *e, int parent, int child, Node *src, int mode, int loop);
+void layers_visible(BR *e, int id, bool on);
+void layers_set(BR *e, int id, const i32 *a, int count);
+void layers_freeze(BR *e);
+void layers_transition(BR *e, int type, int ms);
+Stream *stream_open(BR *e, int num, int loop, u32 now);
+Image *stream_frame(BR *e, Stream *s, u32 now);
+void stream_free(Stream *s);
+void font_draw_layer(BR *e, Image *L, const u8 *p, int x, int y, int size, u32 color, u32 edge, int edgeW);
+void msg_select(BR *e, int id);
+void msg_show(BR *e, bool on);
+void msg_append(BR *e, const char *s);
+bool msg_typing(BR *e);
+void msg_update(BR *e);
+void msg_free(BR *e);
+void history_add(BR *e, const char *s);
+void history_page(BR *e);
+Mixer *mixer_new(void);
+void mixer_free(Mixer *m);
+void mixer_mix(Mixer *m, float *out, int frames, bool paused);
+void snd_apply_volumes(BR *e);
+void snd_stop(BR *e, int ch, int fadeMs);
+bool snd_playing(BR *e, int ch);
+void snd_music(BR *e, int slot, int track, int fadeMs);
+void snd_se(BR *e, int slot, int num);
+void snd_voice(BR *e, int slot, int num);
+void snd_volume(BR *e, int ch, int vol, int ms);

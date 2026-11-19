@@ -223,3 +223,23 @@ void fill_rect(u32 *dst, int dw, int dh, int x, int y, int w, int h, u32 color, 
     for (int yy = y0; yy < y1; yy++)
         for (int xx = x0; xx < x1; xx++) dst[(size_t)yy * dw + xx] = mix(dst[(size_t)yy * dw + xx], color, alpha);
 }
+
+void blit_tinted(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int w, int h, int alpha, u32 tint) {
+    if (!im || alpha <= 0 || w <= 0 || h <= 0 || sw <= 0 || sh <= 0) return;
+    int tr = tint & 0xff, tg = tint >> 8 & 0xff, tb = tint >> 16 & 0xff;
+    int x0 = dx < 0 ? 0 : dx, y0 = dy < 0 ? 0 : dy;
+    int x1 = dx + w > dw ? dw : dx + w, y1 = dy + h > dh ? dh : dy + h;
+    for (int y = y0; y < y1; y++) {
+        int iy = sy + (int)((i64)(y - dy) * sh / h);
+        if (iy < 0 || iy >= im->h) continue;
+        const u32 *s = im->px + (size_t)iy * im->w;
+        u32 *d = dst + (size_t)y * dw;
+        for (int x = x0; x < x1; x++) {
+            int ix = sx + (int)((i64)(x - dx) * sw / w);
+            if (ix < 0 || ix >= im->w) continue;
+            u32 p = s[ix];
+            u32 q = ((p & 0xff) * tr / 255) | ((p >> 8 & 0xff) * tg / 255) << 8 | ((p >> 16 & 0xff) * tb / 255) << 16 | (p & 0xff000000u);
+            d[x] = mix(d[x], q, (int)(p >> 24) * alpha / 255);
+        }
+    }
+}

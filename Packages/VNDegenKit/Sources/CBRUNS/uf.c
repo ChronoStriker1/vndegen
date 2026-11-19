@@ -71,12 +71,58 @@ bool uf_call(BR *e, int id, Node *call) {
     trace_call(e, id, call);
     Obj *o;
     switch (id) {
+    case 1000: layers_create(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 1006: {
+        i32 v[31];
+        int n = call->n - 2 < 31 ? call->n - 2 : 31;
+        for (int i = 0; i < n; i++) v[i] = A(e, call, i);
+        layers_set(e, v[2], v, n);
+        return true;
+    }
+    case 1007: layers_transition(e, A(e, call, 2), A(e, call, 3)); return true;
+    case 1008:
+        e->reflag = layers_load(e, A(e, call, 0), A(e, call, 1), call->n > 4 && call->k[4]->t == N_STR ? call->k[4] : NULL, A(e, call, 3), A(e, call, 4));
+        if (call->n > 4 && call->k[4]->t != N_STR) {
+            Node tmp = {.t = N_INT, .i = A(e, call, 2)};
+            e->reflag = layers_load(e, A(e, call, 0), A(e, call, 1), &tmp, A(e, call, 3), A(e, call, 4));
+        }
+        return true;
+    case 1014: layers_clear_children(e, A(e, call, 1)); return true;
+    case 1015: layers_freeze(e); return true;
+    case 1016: layers_visible(e, A(e, call, 2), A(e, call, 3) != 0); return true;
+    case 1020: return true;
+    case 5200: {
+        int n = A(e, call, 0);
+        e->rng = e->rng * 1103515245u + 12345u;
+        e->reflag = n > 0 ? (int)((e->rng >> 8) % (u32)n) : 0;
+        return true;
+    }
+    case 3001: snd_stop(e, CH_MUSIC + A(e, call, 0), A(e, call, 1)); return true;
+    case 3002: snd_volume(e, CH_MUSIC + A(e, call, 0), A(e, call, 1), A(e, call, 2)); return true;
+    case 3003: snd_music(e, A(e, call, 0), A(e, call, 1), A(e, call, 2)); return true;
+    case 3010: snd_se(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 3011: snd_stop(e, CH_SE + A(e, call, 0), 0); return true;
+    case 3020: snd_voice(e, A(e, call, 0), A(e, call, 1)); return true;
+    case 3021: snd_stop(e, CH_VOICE + A(e, call, 0), 0); return true;
+    case 3023: {
+        int ch = A(e, call, 0);
+        if (ch >= 0 && ch < 10) e->voiceNum[ch] = A(e, call, 1);
+        return true;
+    }
+    case 3024: {
+        int ch = A(e, call, 0);
+        if (ch >= 0 && ch < 10) snd_voice(e, ch, e->voiceNum[ch]);
+        return true;
+    }
     case 2000: {
         int img = A(e, call, 0), ms = A(e, call, 6), mode = A(e, call, 7);
         bg_set(e, img, A(e, call, 5) ? ms : 0);
         if (mode == 2 && ms > 0) e->wait = W_FADE;
         return true;
     }
+    case 2020: msg_select(e, A(e, call, 0)); return true;
+    case 2021: msg_show(e, A(e, call, 0) != 0); return true;
+    case 2022: msg_append(e, str_get(e, A(e, call, 0))); return true;
     case 2050: obj_clear(e, OBJ_IMG); return true;
     case 2120: obj_clear(e, OBJ_BTN); return true;
     case 2053:
