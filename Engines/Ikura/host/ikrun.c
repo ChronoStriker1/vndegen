@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "ikura.h"
 #include "vnfont.h"
@@ -15,6 +16,7 @@ static long wavFrames;
 static float audio[2048];
 
 static int step(VNIkura *n) {
+    if (((IK *)n)->movie) usleep(16000);
     int alive = vnikura_frame(n, 16);
     vnikura_audio(n, audio, 705);
     if (wav) {
@@ -59,7 +61,8 @@ static int prefer[256];
 static int preferCount, preferUsed;
 
 static void print_state(IK *t) {
-    printf("script=%s pc=%x wait=%d sp=%d text=", t->sc ? t->sc->name : "-", t->pc, t->wait, t->sp);
+    printf("script=%s pc=%x wait=%d sp=%d hover=%d tags=%d cursor=%d shown=%d/%d text=", t->sc ? t->sc->name : "-", t->pc, t->wait, t->sp, t->hover,
+           t->msg.tags != NULL, t->msg.cursor, t->msg.revealed, t->msg.count);
     for (int i = 0; i < t->msg.revealed; i++) putchar(t->msg.chars[i].cp < 0x80 ? (int)t->msg.chars[i].cp : '?');
     putchar('\n');
 }
@@ -166,6 +169,17 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "auto:%d,%d,%d", &k, &x, &y) == 3) alive = autoplay(n, k, x, y, argv[3]);
         else if (sscanf(c, "var:%d", &k) == 1) printf("var%d=%d\n", k, k < ((IK *)n)->varCount ? ((IK *)n)->vars[k] : 0);
         else if (!strcmp(c, "state")) print_state((IK *)n);
+        else if (!strcmp(c, "layers")) {
+            IK *t = (IK *)n;
+            for (int i = 0; i < t->layerCount; i++) {
+                Layer *l = &t->layers[i];
+                if (l->made && l->shown) printf("layer %d at %d,%d %dx%d img %d argb %d ready %d\n", i, l->x, l->y, l->w, l->h, l->img, l->argb[0], l->ready);
+            }
+            for (int k = 0; k < IK_BUTTONS; k++) {
+                Button *b = &t->buttons[k];
+                if (b->made) printf("button %d layer %d at %d,%d %dx%d mode %d type %d img %d\n", k, b->layer, b->x, b->y, b->w, b->h, b->mode, b->type, b->state[0].img);
+            }
+        }
         else if (!strncmp(c, "shot:", 5)) {
             int w, h;
             const uint32_t *px = vnikura_pixels(n, &w, &h);

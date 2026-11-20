@@ -14,8 +14,9 @@ nonisolated public struct ArchiveContents: Sendable, Equatable {
     var spaceLimit: Int64?
     public internal(set) var installer: InstallerContents?
     var pack: EnigmaPack?
+    var payloadOffset: Int64?
 
-    public var isPackedGame: Bool { pack != nil }
+    public var isPackedGame: Bool { pack != nil || payloadOffset != nil }
     public var packedGameTitle: String? { pack?.title }
 
     func includingAddOns(_ include: Bool) -> ArchiveContents {
@@ -60,8 +61,20 @@ nonisolated enum ArchiveExtractor {
         if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, EnigmaPack.isPack(source.volumes[0]) {
             return try listPack(source.volumes[0])
         }
+        if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, RPGMakerCabinet.isPacked(source.volumes[0]) {
+            throw .compressedRPGMakerGame
+        }
+        if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, let offset = NSISPayload.offset(in: source.volumes[0]) {
+            var contents = try listArchive(source, offset: offset)
+            contents.payloadOffset = offset
+            return contents
+        }
         if source.isInstaller { return try listInstallers(source) }
-        let reader = try ArchiveReader(source.volumes, password: nil, cue: source.cueSheet)
+        return try listArchive(source, offset: nil)
+    }
+
+    private static func listArchive(_ source: ArchiveSource, offset: Int64?) throws(ArchiveError) -> ArchiveContents {
+        let reader = try ArchiveReader(source.volumes, password: nil, cue: source.cueSheet, offset: offset)
         var contents = ArchiveContents()
         var entries: Int64 = 0
         var everySizeListed = true
@@ -177,7 +190,7 @@ nonisolated enum ArchiveExtractor {
         if let pack = total.pack {
             return try extract(pack, from: source.volumes[0], into: folder, total: total, reserve: reserve, progress: report)
         }
-        let reader = try ArchiveReader(source.volumes, password: password, cue: source.cueSheet)
+        let reader = try ArchiveReader(source.volumes, password: password, cue: source.cueSheet, offset: total.payloadOffset)
         let isZip = source.volumes.count == 1 && source.volumes[0].pathExtension.lowercased() == "zip"
         let deflate64 = isZip ? try? Deflate64Entries(zip: source.volumes[0]) : nil
         let fm = FileManager.default
@@ -344,10 +357,19 @@ nonisolated enum ArchiveExtractor {
             }
         }
         let executables = items.filter { $0.pathExtension.lowercased() == "exe" && !isDirectory($0) }
-        guard executables.count == 1, EnigmaPack.isPack(executables[0]),
+        guard executables.count == 1, EnigmaPack.isPack(executables[0]) || NSISPayload.offset(in: executables[0]) != nil,
               var source = try? ArchiveSource(picked: executables) else { return nil }
         source.isPackedGame = true
         return source
+    }
+
+    static func holdsCompressedRPGMakerGame(_ root: URL) -> Bool {
+        let items = visibleItems(in: root)
+        let folders = items.count == 1 && isDirectory(items[0]) ? [items[0]] : [root]
+        return folders.contains { folder in
+            let executables = visibleItems(in: folder).filter { $0.pathExtension.lowercased() == "exe" && !isDirectory($0) }
+            return executables.count == 1 && RPGMakerCabinet.isPacked(executables[0])
+        }
     }
 
     static func nestedGame(in root: URL) -> (root: URL, nested: ArchiveSource?) {
@@ -367,7 +389,7 @@ nonisolated enum ArchiveExtractor {
     }
 }
 
-nonisolated private struct SpaceMeter {
+nonisolated struct SpaceMeter {
     let limit: Int64?
     let folder: URL
     let reserve: Int64

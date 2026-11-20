@@ -7,7 +7,7 @@ nonisolated struct ConstructGame: Equatable, Sendable {
     let webRoot: String
 
     static let runtimeFile = "scripts/c3runtime.js"
-    static let webRoots = ["www", ""]
+    static let webRoots = ["www", "", "package.nw"]
     private static let rootMarkers: Set<String> = ["www", "index.html", "data.json"]
 
     var evidence: String {

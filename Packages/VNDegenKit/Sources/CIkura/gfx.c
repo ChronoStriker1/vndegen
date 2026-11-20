@@ -15,6 +15,7 @@ void gfx_close(IK *t) {
     free(t->images);
     for (int i = 0; i < t->layerCount; i++) image_free(t->layers[i].surf);
     free(t->layers);
+    free(t->order);
     free(t->buttons);
 }
 
@@ -108,7 +109,7 @@ void image_blit(Image *dst, const Image *src, int sx, int sy, int w, int h, int 
 
 void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0, u32 minAlpha) {
     if (img < 0 || img >= t->imageCount || !t->images[img]) return;
-    Image screen = {t->W, t->H, t->screen};
+    Image screen = {.w = t->W, .h = t->H, .px = t->screen};
     image_blit(&screen, t->images[img], sx, sy, w, h, x0, y0, argb, minAlpha, false);
 }
 
@@ -179,6 +180,57 @@ static void fill(IK *t, const Layer *l) {
     }
 }
 
+static void scroll_thumb(const Button *b, int *pos, int *len) {
+    int range = b->max + b->scroll.page;
+    *len = range > 0 ? b->h * b->scroll.page / range : b->h;
+    if (*len < 24) *len = 24;
+    if (*len > b->h) *len = b->h;
+    *pos = b->max > 0 ? (b->h - *len) * clampi(b->value, 0, b->max) / b->max : 0;
+}
+
+static void draw_scrollbar(IK *t, int id, const Button *b, const Layer *l) {
+    const Scroll *s = &b->scroll;
+    int img = s->img;
+    if (img < 0 || img >= t->imageCount || !t->images[img] || b->max <= 0) return;
+    const Image *im = t->images[img];
+    int st = id == t->pressed ? 2 : id == t->hover ? 1 : 0;
+    const Cell *top = s->cells[st] >= 0 && s->cells[st] < im->cellCount ? &im->cells[s->cells[st]] : NULL;
+    const Cell *bot = s->cells[3 + st] >= 0 && s->cells[3 + st] < im->cellCount ? &im->cells[s->cells[3 + st]] : NULL;
+    const Cell *mid = s->cells[6 + st] >= 0 && s->cells[6 + st] < im->cellCount ? &im->cells[s->cells[6 + st]] : NULL;
+    if (!top || !bot || !mid || mid->h <= 0) return;
+    int pos, len;
+    scroll_thumb(b, &pos, &len);
+    int x = l->x + b->x, y = l->y + b->y + pos;
+    gfx_blit(t, fullColour, img, top->sx, top->sy, top->w, top->h, x, y);
+    for (int yy = top->h; yy < len - bot->h; yy += mid->h) {
+        int h = len - bot->h - yy < mid->h ? len - bot->h - yy : mid->h;
+        gfx_blit(t, fullColour, img, mid->sx, mid->sy, mid->w, h, x, y + yy);
+    }
+    gfx_blit(t, fullColour, img, bot->sx, bot->sy, bot->w, bot->h, x, y + len - bot->h);
+}
+
+static int scroll_value(IK *t, const Button *b) {
+    int pos, len;
+    scroll_thumb(b, &pos, &len);
+    const Layer *l = &t->layers[b->layer];
+    int travel = b->h - len;
+    if (travel <= 0) return 0;
+    return clampi(((t->my - l->y - b->y - len / 2) * b->max + travel / 2) / travel, 0, b->max);
+}
+
+void scrollbar_exec(IK *t, u16 op, const u8 *a, int n) {
+    u32 id = ik_value(t, rd32(a));
+    if (id >= IK_BUTTONS) return;
+    Scroll *s = &t->buttons[id].scroll;
+    if (op == 0x0712 && n >= 8) s->img = (int)ik_value(t, rd32(a + 4));
+    else if (op == 0x0714 && n >= 8) s->page = (int)ik_value(t, rd32(a + 4));
+    else if (op == 0x071e && n >= 44) {
+        s->img = (int)ik_value(t, rd32(a + 4));
+        for (int k = 0; k < 9; k++) s->cells[k] = (int)ik_value(t, rd32(a + 8 + 4 * k));
+    }
+    t->dirty = true;
+}
+
 static int button_state(IK *t, int id, const Button *b) {
     if (!b->enabled) return 3;
     if (b->mode == 2) return 2;
@@ -198,12 +250,14 @@ void gfx_compose(IK *t) {
     for (int i = 0; i < t->W * t->H; i++) t->screen[i] = 0xff000000u;
     dun_render(t);
     bool live = buttons_live(t);
-    for (int i = 0; i < t->layerCount; i++) {
+    for (int oi = 0; oi < t->layerCount; oi++) {
+        int i = t->order[oi];
         Layer *l = &t->layers[i];
         if (!layer_drawn(t, i)) continue;
-        if (l->rot != 0 && !l->surf && l->img >= 0) rotated(t, l);
+        if (gan_drawn(t, i)) gan_draw(t, i);
+        else if (l->rot != 0 && !l->surf && l->img >= 0) rotated(t, l);
         else if (l->surf) {
-            Image screen = {t->W, t->H, t->screen};
+            Image screen = {.w = t->W, .h = t->H, .px = t->screen};
             image_blit(&screen, l->surf, 0, 0, l->w, l->h, l->x, l->y, l->argb, 0, false);
         } else if (l->img >= 0) gfx_blit(t, l->argb, l->img, l->sx, l->sy, l->w, l->h, l->x, l->y);
         else if (l->fill) fill(t, l);
@@ -211,6 +265,10 @@ void gfx_compose(IK *t) {
             for (int k = 0; k < IK_BUTTONS; k++) {
                 Button *b = &t->buttons[k];
                 if (!b->made || !b->shown || b->layer != i) continue;
+                if (b->type == 7) {
+                    draw_scrollbar(t, k, b, l);
+                    continue;
+                }
                 if (b->type == 4) {
                     ButtonState *bg = &b->state[b->enabled ? 0 : 3], *fg = &b->state[k == t->hover ? 2 : 1];
                     gfx_blit(t, fullColour, bg->img, bg->sx, bg->sy, b->w, b->h, l->x + b->x, l->y + b->y);
@@ -229,6 +287,7 @@ void gfx_compose(IK *t) {
         }
         msg_draw(t, i);
     }
+    movie_draw(t);
     t->serial++;
 }
 
@@ -256,6 +315,16 @@ void buttons_input(IK *t) {
         t->pressed = -1;
     }
     if (t->wait != W_INPUT && t->wait != W_MSG) return;
+    if (t->lDown && t->pressed >= 0 && t->buttons[t->pressed].type == 7 && t->buttons[t->pressed].bound) {
+        Button *b = &t->buttons[t->pressed];
+        int v = scroll_value(t, b);
+        if (v != b->value) {
+            b->value = v;
+            if (b->var >= 0 && b->var < t->varCount) t->vars[b->var] = v;
+            vm_branch(t, b->sc, b->label, b->call);
+            return;
+        }
+    }
     if (t->click && h >= 0 && t->buttons[h].enabled && t->buttons[h].bound) {
         Button *b = &t->buttons[h];
         t->click = false;
@@ -264,6 +333,10 @@ void buttons_input(IK *t) {
             b->mode = on ? 2 : 1;
             if (b->var >= 0 && b->var < t->varCount) t->vars[b->var] = on;
             t->lastToggle = h;
+        }
+        if (b->type == 7) {
+            b->value = scroll_value(t, b);
+            if (b->var >= 0 && b->var < t->varCount) t->vars[b->var] = b->value;
         }
         if (b->type == 4 && b->w > 0) {
             Layer *bl = &t->layers[b->layer];

@@ -3,9 +3,9 @@ import Foundation
 /// An Electron app.asar, read in place. The file starts with two Chromium pickles: an 8-byte one holding the size of the
 /// next, then one holding the JSON index as a length-prefixed string. File bytes follow, and each index entry gives its
 /// offset from the end of the header and its size. Format: https://github.com/electron/asar#format
-nonisolated struct AsarArchive: Sendable {
+nonisolated public struct AsarArchive: Sendable {
     /// Where a member's bytes are.
-    enum Member: Equatable, Sendable {
+    public enum Member: Equatable, Sendable {
         /// Inside the archive file, at an absolute offset. The whole span lies inside the file as it was when read.
         case packed(offset: UInt64, size: Int64)
         /// Beside the archive in `app.asar.unpacked/`, at this path relative to it.
@@ -20,15 +20,14 @@ nonisolated struct AsarArchive: Sendable {
     }
 
     private let root: [String: Node]
+    public let skippedEntries: Int
 
     /// Limits on the index, checked before it is read or parsed. Real game archives have indexes of a few MiB at most.
     static let maxIndexBytes = 32 << 20
     static let maxEntries = 1_000_000
     static let maxDepth = 64
 
-    /// Reads the index through `handle`, positioned anywhere. Throws for anything malformed, including a member whose
-    /// bytes would lie outside the file.
-    init(reading handle: FileHandle) throws {
+    public init(reading handle: FileHandle) throws {
         let fileLength = try handle.seekToEnd()
         try handle.seek(toOffset: 0)
         let prefix = try handle.read(upToCount: 16) ?? Data()
@@ -43,6 +42,23 @@ nonisolated struct AsarArchive: Sendable {
         var parser = IndexParser(dataStart: dataStart, dataLength: fileLength - dataStart)
         guard case .directory(let root) = try parser.node(index, depth: 0) else { throw Self.corrupt }
         self.root = root
+        skippedEntries = parser.skipped
+    }
+
+    public var files: [(path: String, member: Member)] {
+        var found: [(path: String, member: Member)] = []
+        func walk(_ directory: [String: Node], _ prefix: String) {
+            for name in directory.keys.sorted() {
+                let path = prefix.isEmpty ? name : prefix + "/" + name
+                switch directory[name]! {
+                case .directory(let entries): walk(entries, path)
+                case let .file(offset, size, unpacked): found.append((path, unpacked ? .unpacked(path) : .packed(offset: offset, size: size)))
+                case .link: continue
+                }
+            }
+        }
+        walk(root, "")
+        return found
     }
 
     /// The member at `path`, relative to the archive root with forward slashes. Names match exactly, or else ignoring
@@ -95,27 +111,37 @@ nonisolated struct AsarArchive: Sendable {
         let dataStart: UInt64
         let dataLength: UInt64
         var entries = 0
+        var skipped = 0
 
-        mutating func node(_ value: [String: Any], depth: Int) throws -> Node {
+        mutating func node(_ value: [String: Any], depth: Int) throws -> Node? {
             entries += 1
             guard entries <= AsarArchive.maxEntries, depth <= AsarArchive.maxDepth else { throw AsarArchive.corrupt }
             if let files = value["files"] as? [String: Any] {
                 var children: [String: Node] = [:]
                 for (name, child) in files {
                     guard let child = child as? [String: Any], !name.contains("/") else { throw AsarArchive.corrupt }
+                    if name.isEmpty || name == "." || name == ".." {
+                        skipped += 1
+                        continue
+                    }
                     children[name] = try node(child, depth: depth + 1)
                 }
                 return .directory(children)
             }
             if let link = value["link"] as? String { return .link(link) }
-            guard let number = value["size"] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
-                  let size = Int64(exactly: number), size >= 0
-            else { throw AsarArchive.corrupt }
+            guard let number = value["size"] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { throw AsarArchive.corrupt }
+            guard let size = Int64(exactly: number), size >= 0 else {
+                skipped += 1
+                return nil
+            }
             if value["unpacked"] as? Bool == true { return .file(offset: 0, size: size, unpacked: true) }
             // The offset is a decimal string because a JavaScript number cannot hold every UInt64.
-            guard let offset = (value["offset"] as? String).flatMap(UInt64.init),
-                  offset <= dataLength, UInt64(size) <= dataLength - offset
-            else { throw AsarArchive.corrupt }
+            let offset = (value["offset"] as? String).flatMap(UInt64.init)
+                ?? (value["offset"] as? NSNumber).flatMap { CFGetTypeID($0) == CFBooleanGetTypeID() ? nil : UInt64(exactly: $0) }
+            guard let offset, offset <= dataLength, UInt64(size) <= dataLength - offset else {
+                skipped += 1
+                return nil
+            }
             return .file(offset: dataStart + offset, size: size, unpacked: false)
         }
     }

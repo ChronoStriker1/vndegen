@@ -124,6 +124,9 @@ with a controller connected, couldn't pick from Milky Quest's title menu (#178).
 before, a click from a Mac's mouse or a controller's pointer works as on the PC, and a game that turns the mouse off
 with command 126 turns this off too.
 
+Menus a game builds itself from common events, such as the base system's save and load screens, read only the keys. A
+click on one of their slots does nothing on the PC either, so on a touch device the touch gamepad picks the slot (#189).
+
 VNDegen suggests a layout from the keys a game's events check one at a time. `vnwolf_key_checks` reads `CommonEvent.dat` and every map the system database lists, from loose files or `.wolf` archives, and returns each key input on one literal key with the name of its common event (empty for a map event). Under Xbox gamepad, Wolf's router gives LT, View, L3, R3, and the right stick nothing to do, so the keys go on View, LT, L3, and R3, and the right stick stays alone. Keys a button already sends are skipped (Z, X, Shift, Control, and the arrows), and so are function keys, right Control, and keys in events named for debugging or cheats. A key whose event's name is exactly one of a few standard names (`バックログ表示`, `【並】バックログ表示`, `ログ表示`, `メッセージ簡易ログ`, `メッセージウィンドウ消去`, `戦闘高速化`, `メッセージスキップ`, `【並】メッセージスキップ`, `文章スキップ`) gets that label and goes first. The rest follow in the files' order and show only the key. Six of the ten games read get one.
 
 When a game waits for typed text, the hub opens its keyboard on a touch device, and a hardware keyboard types directly.

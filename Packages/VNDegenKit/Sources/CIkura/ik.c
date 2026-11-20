@@ -57,6 +57,8 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
 void vnikura_close(VNIkura *n) {
     IK *t = (IK *)n;
     if (!t) return;
+    movie_stop(t);
+    gan_free(t);
     snd_close(t);
     dun_close(t);
     gfx_close(t);
@@ -68,6 +70,7 @@ void vnikura_close(VNIkura *n) {
     free(t->texts);
     free(t->imageNames);
     free(t->flags);
+    free(t->automap.bits);
     for (int i = 0; i < t->scriptCount; i++) script_free(t->scripts[i]);
     free(t->scripts);
     free(t->vars);
@@ -83,6 +86,8 @@ static void tick(IK *t) {
     gfx_update(t);
     dun_update(t);
     msg_tick(t);
+    movie_update(t, TICK_MS);
+    gan_update(t);
     switch (t->wait) {
     case W_TIME:
         if ((i32)(t->now - t->waitUntil) >= 0) t->wait = W_NONE;
@@ -93,9 +98,16 @@ static void tick(IK *t) {
     case W_VOICE:
         if (!snd_voice_playing(t) || t->click) t->wait = W_NONE;
         break;
+    case W_MOVIE:
+        if (!t->movie) t->wait = W_NONE;
+        break;
     case W_QUIT: t->quit = true; break;
     case W_INPUT:
         if (t->skipMode) msg_stop_modes(t);
+        if (t->inputTimed && (i32)(t->now - t->inputUntil) >= 0) {
+            t->inputTimed = false;
+            t->wait = W_NONE;
+        }
         break;
     default: break;
     }

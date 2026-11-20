@@ -59,9 +59,15 @@ bool store_open(Store *s, const char *gameDir, char *err, size_t errSize);
 void store_close(Store *s);
 u8 *store_load(Store *s, int kind, const char *name, size_t *size);
 
+typedef struct Cell {
+    int dx, dy, sx, sy, w, h;
+} Cell;
+
 typedef struct Image {
     int w, h;
     u32 *px;
+    Cell *cells;
+    int cellCount;
 } Image;
 
 Image *image_new(int w, int h);
@@ -110,6 +116,12 @@ typedef struct ButtonTip {
     int layer, x, y, w, h, img, sx, sy;
 } ButtonTip;
 
+typedef struct Scroll {
+    int img, page;
+    int cells[9];
+    bool dragging;
+} Scroll;
+
 typedef struct Button {
     bool made, shown, enabled;
     int type, layer, x, y, w, h;
@@ -122,6 +134,7 @@ typedef struct Button {
     int label;
     bool bound, call;
     Script *sc;
+    Scroll scroll;
 } Button;
 
 #define IK_BUTTONS 512
@@ -136,7 +149,7 @@ typedef struct Frame {
 typedef struct Glyph Glyph;
 
 typedef struct Font {
-    bool ok;
+    bool ok, embolden;
     int size, shadow, ascent;
     float scale;
     u8 *data;
@@ -172,17 +185,29 @@ typedef struct MsgWin {
     int msPerChar;
     char *raw;
     int rawLen, rawCap;
+    char voice[16];
 } MsgWin;
+
+#define IK_LOG 100
+#define IK_LOG_SLOTS 64
+
+typedef struct LogEntry {
+    char *text;
+    int name;
+    char voice[16];
+} LogEntry;
 
 #define IK_STACK 32
 
-enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_MSG, W_VOICE, W_QUIT };
+enum { W_NONE, W_TIME, W_ANIM, W_INPUT, W_MSG, W_VOICE, W_MOVIE, W_QUIT };
 
 #define IK_SLOTS 16
 #define IK_DEFAULT_VOLUME 128
 enum { CH_BGM, CH_VOICE, CH_SE, IK_CHANNELS = CH_SE + IK_SLOTS };
 
 typedef struct Mixer Mixer;
+typedef struct Movie Movie;
+typedef struct Gan Gan;
 
 typedef struct SaveFile {
     char *path;
@@ -214,6 +239,12 @@ typedef struct Dungeon {
     float viewYaw, viewX, viewZ;
 } Dungeon;
 
+typedef struct Automap {
+    int w, h, n;
+    size_t size;
+    u8 *bits;
+} Automap;
+
 typedef struct SeSlot {
     char name[16];
 } SeSlot;
@@ -239,7 +270,8 @@ struct IK {
     Frame stack[IK_STACK];
     int sp;
     int wait;
-    u32 waitUntil;
+    u32 waitUntil, inputUntil, inputPc;
+    bool inputTimed;
 
     i32 *vars;
     int varCount;
@@ -247,6 +279,7 @@ struct IK {
     int imageCount;
     Layer *layers;
     int layerCount;
+    int *order;
     Button *buttons;
     int hover, pressed;
     int cancelLabel;
@@ -264,13 +297,25 @@ struct IK {
     char (*imageNames)[16];
     SaveFile save;
     u8 *savedEnabled[4];
+    struct {
+        bool bound, call;
+        Script *sc;
+        int label;
+        int keys[256];
+    } savedInput[4];
     int keyButton[256];
     int skipMode, autoMode, modeButton[2], lastToggle;
     u32 autoAt;
     u8 *flags;
-    int flagCount;
+    int flagCount, flagBits;
     Font fonts[IK_FONTS];
     MsgWin msg;
+    LogEntry backlog[IK_LOG];
+    int logCount, logHead;
+    char logVoice[IK_LOG_SLOTS][16];
+    char **names;
+    int nameCount;
+    bool namesLoaded;
     Mixer *mixer;
     SeSlot slots[IK_SLOTS];
     char bgmName[16];
@@ -278,6 +323,9 @@ struct IK {
     int buttonCount;
     u32 rng;
     Dungeon dun;
+    Movie *movie;
+    Gan *gan;
+    Automap automap;
 
     int mx, my;
     bool lDown, rDown, click, rclick;
@@ -315,6 +363,8 @@ void msg_tick(IK *t);
 void msg_draw(IK *t, int layer);
 void msg_close(IK *t);
 void msg_stop_modes(IK *t);
+void msg_log_voice(IK *t, int slot);
+void scrollbar_exec(IK *t, u16 op, const u8 *a, int n);
 void snd_init(IK *t);
 void snd_close(IK *t);
 void snd_se_load(IK *t, int slot, const char *name);
@@ -338,5 +388,20 @@ bool dun_exec(IK *t, u16 op, const u8 *a, int n);
 void dun_render(IK *t);
 void dun_update(IK *t);
 void dun_close(IK *t);
+void automap_exec(IK *t, u16 op, const u8 *a, int n);
+bool movie_play(IK *t, const char *name, int x, int y, int w, int h, bool skippable);
+void movie_stop(IK *t);
+void movie_update(IK *t, double elapsedMs);
+void movie_draw(IK *t);
+void movie_mix(Movie *m, float *out, int frames, float vol, int rate);
+void snd_set_movie(IK *t, Movie *m);
+bool gan_exec(IK *t, u16 op, const u8 *a, int n);
+bool equip_exec(IK *t, u16 op, const u8 *a, int n);
+void gan_update(IK *t);
+void gan_draw(IK *t, int layer);
+bool gan_drawn(const IK *t, int layer);
+void gan_free(IK *t);
+void gan_save(IK *t, u8 out[32]);
+void gan_restore(IK *t, const u8 in[32]);
 
 #endif
