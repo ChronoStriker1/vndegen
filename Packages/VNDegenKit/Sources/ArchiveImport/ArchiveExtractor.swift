@@ -14,9 +14,10 @@ nonisolated public struct ArchiveContents: Sendable, Equatable {
     var spaceLimit: Int64?
     public internal(set) var installer: InstallerContents?
     var pack: EnigmaPack?
+    var cabinet: Cabinet?
     var payloadOffset: Int64?
 
-    public var isPackedGame: Bool { pack != nil || payloadOffset != nil }
+    public var isPackedGame: Bool { pack != nil || cabinet != nil || payloadOffset != nil }
     public var packedGameTitle: String? { pack?.title }
 
     func includingAddOns(_ include: Bool) -> ArchiveContents {
@@ -61,8 +62,8 @@ nonisolated enum ArchiveExtractor {
         if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, EnigmaPack.isPack(source.volumes[0]) {
             return try listPack(source.volumes[0])
         }
-        if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, RPGMakerCabinet.isPacked(source.volumes[0]) {
-            throw .compressedRPGMakerGame
+        if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, let offset = RPGMakerCabinet.offset(in: source.volumes[0]) {
+            return try listCabinet(source.volumes[0], at: offset)
         }
         if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, let offset = NSISPayload.offset(in: source.volumes[0]) {
             var contents = try listArchive(source, offset: offset)
@@ -142,6 +143,23 @@ nonisolated enum ArchiveExtractor {
         return contents
     }
 
+    private static func listCabinet(_ exe: URL, at offset: Int64) throws(ArchiveError) -> ArchiveContents {
+        let cabinet: Cabinet
+        do {
+            cabinet = try Cabinet(exe, at: offset)
+        } catch {
+            throw .packedGame(error)
+        }
+        guard !cabinet.files.isEmpty else { throw .packedGame(.notAPack) }
+        var contents = ArchiveContents()
+        for file in cabinet.files { contents.byteCount = try addListed(file.size, to: contents.byteCount) }
+        contents.fileCount = cabinet.files.count
+        let entries = Int64(cabinet.files.count + cabinet.directories.count)
+        contents.spaceLimit = try addListed(entries * entryOverhead, to: contents.byteCount)
+        contents.cabinet = cabinet
+        return contents
+    }
+
     static func contents(of installer: InstallerContents) -> ArchiveContents {
         var contents = ArchiveContents()
         var entries: Int64 = 0
@@ -189,6 +207,9 @@ nonisolated enum ArchiveExtractor {
         }
         if let pack = total.pack {
             return try extract(pack, from: source.volumes[0], into: folder, total: total, reserve: reserve, progress: report)
+        }
+        if let cabinet = total.cabinet {
+            return try extract(cabinet, from: source.volumes[0], into: folder, total: total, reserve: reserve, progress: report)
         }
         let reader = try ArchiveReader(source.volumes, password: password, cue: source.cueSheet, offset: total.payloadOffset)
         let isZip = source.volumes.count == 1 && source.volumes[0].pathExtension.lowercased() == "zip"
@@ -326,6 +347,48 @@ nonisolated enum ArchiveExtractor {
         return progress
     }
 
+    private static func extract(
+        _ cabinet: Cabinet, from exe: URL, into folder: URL, total: ArchiveContents,
+        reserve: Int64, progress report: (ImportProgress) -> Void
+    ) throws -> ImportProgress {
+        var progress = ImportProgress(total: total)
+        var lastReport = ContinuousClock.now
+        var meter = SpaceMeter(limit: total.spaceLimit, folder: folder, reserve: reserve)
+        let fm = FileManager.default
+        for directory in cabinet.directories {
+            try meter.use(entryOverhead)
+            try fm.createDirectory(at: FileCase.resolve(directory, in: folder), withIntermediateDirectories: true)
+        }
+        var open: (index: Int, file: FileDescriptor, left: Int64)?
+        defer { try? open?.file.close() }
+        do {
+            try cabinet.extract(from: exe) { index, block in
+                try Task.checkCancellation()
+                if open?.index != index {
+                    try open?.file.close()
+                    open = nil
+                    try meter.use(entryOverhead)
+                    let entry = cabinet.files[index]
+                    open = (index, try FileDescriptor.open(
+                        FilePath(FileCase.resolve(entry.path, in: folder).path), .writeOnly, options: [.create, .truncate],
+                        permissions: [.ownerReadWrite, .groupRead, .otherRead]), entry.size)
+                }
+                try meter.use(Int64(block.count))
+                _ = try open!.file.writeAll(block)
+                open!.left -= Int64(block.count)
+                if open!.left == 0 { progress.files += 1 }
+                progress.bytes += Int64(block.count)
+                if ContinuousClock.now - lastReport > .milliseconds(100) {
+                    report(progress)
+                    lastReport = .now
+                }
+            }
+        } catch let error as EnigmaPack.Failure {
+            throw ArchiveError.packedGame(error)
+        }
+        return progress
+    }
+
     /// The folder that becomes the game: the archive's only top-level folder, a CD's game folder, or the whole extraction
     /// when the archive holds several items. macOS metadata folders don't count.
     static func gameRoot(in staging: URL) -> URL {
@@ -357,19 +420,11 @@ nonisolated enum ArchiveExtractor {
             }
         }
         let executables = items.filter { $0.pathExtension.lowercased() == "exe" && !isDirectory($0) }
-        guard executables.count == 1, EnigmaPack.isPack(executables[0]) || NSISPayload.offset(in: executables[0]) != nil,
+        guard executables.count == 1,
+              EnigmaPack.isPack(executables[0]) || NSISPayload.offset(in: executables[0]) != nil || RPGMakerCabinet.isPacked(executables[0]),
               var source = try? ArchiveSource(picked: executables) else { return nil }
         source.isPackedGame = true
         return source
-    }
-
-    static func holdsCompressedRPGMakerGame(_ root: URL) -> Bool {
-        let items = visibleItems(in: root)
-        let folders = items.count == 1 && isDirectory(items[0]) ? [items[0]] : [root]
-        return folders.contains { folder in
-            let executables = visibleItems(in: folder).filter { $0.pathExtension.lowercased() == "exe" && !isDirectory($0) }
-            return executables.count == 1 && RPGMakerCabinet.isPacked(executables[0])
-        }
     }
 
     static func nestedGame(in root: URL) -> (root: URL, nested: ArchiveSource?) {

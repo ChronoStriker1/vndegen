@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Rebuilds the test archives in this folder. Needs 7-Zip (`brew install sevenzip`) and python3.
+# lzx.cab and mszip.cab aren't made here: they are libarchive's test_read_format_cab_3.cab and _2.cab, made with
+# Microsoft's makecab (BSD-2-Clause, LICENSE-libarchive-cab.txt).
 set -euo pipefail
 cd "$(dirname "$0")"
 work=$(mktemp -d)

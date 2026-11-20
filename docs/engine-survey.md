@@ -107,7 +107,7 @@ The first survey left 84 folders with engine `unknown`. This pass opened what it
 | RPG Maker MV, packed | Lilith in Nightmare! | 1189 | Enigma Virtual Box `.exe` around NW.js 0.36.2, 1.3 GB |
 | RPG Maker MZ | The Titjob Apparition of the Midnight School | 277 | Unusual. An electron-builder NSIS installer, which the import can't unpack, holding the game in `resources/app.asar` under `project/`. The MZ detection doesn't look inside `app.asar` |
 | RPG Maker VX Ace | Dark Elf Historia | 2720 | Standard. GOG installer inside a RAR, `Game.rgss3a` |
-| RPG Maker VX Ace | Succubus Hunt! | 394 | Unusual. The game is inside an IExpress (CAB) self-extracting `.exe`, which the import doesn't unpack |
+| RPG Maker VX Ace | Succubus Hunt! | 394 | Unusual. The game is in a cabinet (LZX) appended to VX Ace's self-extracting `.exe`, which the import unpacks |
 | Wolf RPG Editor | President Yukino | 1090 | Standard. GOG installer, `Data/*.wolf`, Wolf 2.21 |
 | Wolf RPG Editor | The Succubus of the Forest and a Doctor | 86 | Standard. `Data.wolf`, in a RAR inside the outer RAR |
 | Wolf RPG Editor | Demon Queen Melissa | 1334 | Standard. GOG installer, Wolf 2.23. Not a test game |

@@ -4,6 +4,14 @@ import Testing
 @testable import ArchiveImport
 
 private var fm: FileManager { .default }
+private let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
+private let lzxCabinet = (try? Data(contentsOf: fixtures.appendingPathComponent("lzx.cab"))) ?? Data()
+private let expectedFiles = [
+    "dir1/file1": Data((String(repeating: " ", count: 26) + "file 1 contents\n" + String(repeating: "hello\n", count: 3)).utf8),
+    "dir2/file2": Data((String(repeating: " ", count: 26) + "file 2 contents\n" + String(repeating: "hello\n", count: 6)).utf8),
+    "empty": Data(),
+    "zero": Data(count: 33000),
+]
 
 private func scratch() throws -> URL {
     let url = TestFolders.root.appendingPathComponent("vxacecab-\(UUID().uuidString)", isDirectory: true)
@@ -26,7 +34,7 @@ private func waitForImport(_ importer: ArchiveImporter) async throws {
 
 private func le32(_ value: UInt32) -> Data { withUnsafeBytes(of: value.littleEndian) { Data($0) } }
 
-private func selfExtractor(marker: String = "Software\\Enterbrain\\RPGVX2", cabinetSize: Int? = nil) -> Data {
+private func selfExtractor(marker: String = "Software\\Enterbrain\\RPGVX2", cabinet: Data = lzxCabinet, cabinetSize: Int? = nil) -> Data {
     var pe = Data(count: 0x400)
     pe[0] = 0x4d
     pe[1] = 0x5a
@@ -37,14 +45,9 @@ private func selfExtractor(marker: String = "Software\\Enterbrain\\RPGVX2", cabi
     pe.replaceSubrange(0x6c..<0x70, with: le32(0x200))
     let utf16 = Data(marker.utf16.flatMap { [UInt8($0 & 0xff), UInt8($0 >> 8)] })
     pe.replaceSubrange(0x200..<(0x200 + utf16.count), with: utf16)
-    let body = Data(repeating: 0xab, count: 5000)
-    let size = cabinetSize ?? 12 + body.count
-    var file = pe
-    file += Data("MSCF".utf8)
-    file += le32(0)
-    file += le32(UInt32(size))
-    file += body
-    return file
+    var body = cabinet
+    if let cabinetSize { body.replaceSubrange(8..<12, with: le32(UInt32(cabinetSize))) }
+    return pe + body
 }
 
 private func run(_ tool: String, _ arguments: [String]) throws {
@@ -72,16 +75,45 @@ private func run(_ tool: String, _ arguments: [String]) throws {
     }
 }
 
-@MainActor @Test func aPickedSelfExtractorSaysToExtractItOnAPC() async throws {
+private func contents(of folder: URL) throws -> [String: Data] {
+    var found: [String: Data] = [:]
+    for path in tree(folder) {
+        var isFolder: ObjCBool = false
+        let url = folder.appendingPathComponent(path)
+        if fm.fileExists(atPath: url.path, isDirectory: &isFolder), !isFolder.boolValue { found[path] = try Data(contentsOf: url) }
+    }
+    return found
+}
+
+@Test func decodesALZXCabinetMadeByMakecab() throws {
+    let cabinet = try Cabinet(fixtures.appendingPathComponent("lzx.cab"), at: 0)
+    #expect(Set(cabinet.files.map(\.path)) == Set(expectedFiles.keys))
+    #expect(cabinet.directories == ["dir1", "dir2"] || cabinet.directories == ["dir2", "dir1"])
+    var written: [String: Data] = [:]
+    try cabinet.extract(from: fixtures.appendingPathComponent("lzx.cab")) { index, block in
+        written[cabinet.files[index].path, default: Data()].append(contentsOf: block)
+    }
+    #expect(written == expectedFiles)
+}
+
+@MainActor @Test func aPickedSelfExtractorImportsItsGame() async throws {
     let folder = try scratch()
     let exe = folder.appendingPathComponent("SH_v180101.exe")
     try selfExtractor().write(to: exe)
-    let importer = ArchiveImporter(gamesRoot: folder.appendingPathComponent("Games"))
+    let games = folder.appendingPathComponent("Games")
+    try fm.createDirectory(at: games, withIntermediateDirectories: true)
+    let importer = ArchiveImporter(gamesRoot: games)
     await importer.choose([exe])
-    #expect(importer.errorMessage == ArchiveError.compressedRPGMakerGame.message)
+    #expect(importer.errorMessage == nil)
+    #expect(importer.pickedPackedGame)
+    importer.startImport()
+    try await waitForImport(importer)
+    guard case let .finished(result) = importer.step else { Issue.record("\(importer.step) \(importer.errorMessage ?? "")"); return }
+    #expect(try contents(of: games.appendingPathComponent(result.folderName)) == expectedFiles)
+    #expect(tree(games.appendingPathComponent(".importing")).isEmpty)
 }
 
-@MainActor @Test func aSelfExtractorInAnArchiveStopsTheImportWithTheMessage() async throws {
+@MainActor @Test func aSelfExtractorInAnArchiveUnpacksBesideItsReadme() async throws {
     let folder = try scratch()
     let content = folder.appendingPathComponent("Succubus Game [RJ000001] Ver.1/Succubus Game", isDirectory: true)
     try fm.createDirectory(at: content, withIntermediateDirectories: true)
@@ -95,7 +127,30 @@ private func run(_ tool: String, _ arguments: [String]) throws {
     await importer.choose([zip])
     importer.startImport()
     try await waitForImport(importer)
-    #expect(importer.errorMessage == ArchiveError.compressedRPGMakerGame.message)
-    #expect(tree(games).allSatisfy { $0.hasPrefix(".importing") })
+    #expect(importer.step == .nested(fileName: "SG_v180101.exe"))
+    #expect(importer.nestedSource?.isPackedGame == true)
+    importer.extractNested()
+    try await waitForImport(importer)
+    guard case let .finished(result) = importer.step else { Issue.record("\(importer.step) \(importer.errorMessage ?? "")"); return }
+    var expected = expectedFiles
+    expected["readme.txt"] = Data("read me".utf8)
+    #expect(try contents(of: games.appendingPathComponent(result.folderName)) == expected)
     #expect(tree(games.appendingPathComponent(".importing")).isEmpty)
+}
+
+@MainActor @Test func aSelfExtractorWithMSZIPSaysSo() async throws {
+    let folder = try scratch()
+    let exe = folder.appendingPathComponent("SH_v180101.exe")
+    try selfExtractor(cabinet: try Data(contentsOf: fixtures.appendingPathComponent("mszip.cab"))).write(to: exe)
+    let importer = ArchiveImporter(gamesRoot: folder.appendingPathComponent("Games"))
+    await importer.choose([exe])
+    #expect(importer.errorMessage == ArchiveError.packedGame(.unsupported("MSZIP compression")).message)
+}
+
+@Test func aCutShortCabinetIsDamaged() throws {
+    let folder = try scratch()
+    let url = folder.appendingPathComponent("cut.cab")
+    try lzxCabinet.prefix(lzxCabinet.count - 40).write(to: url)
+    let cabinet = try Cabinet(url, at: 0)
+    #expect(throws: EnigmaPack.Failure.self) { try cabinet.extract(from: url) { _, _ in } }
 }
