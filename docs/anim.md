@@ -72,6 +72,8 @@ the slot positions, the layer tables of 1.0 scales and -1 handles, the character
 and the E-mote scale. The PC needs them: without the defaults it crashes loading the slot, and without the layer
 scales it loads the scene with no characters. The comment is the speaker and the line, cut to 100 characters as the PC
 does; a longer comment that holds a line break loads black on the PC. Saves load both ways with the PC.
+A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
+does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's NO IMAGE picture.
 
 ## Known limits
 
@@ -85,5 +87,5 @@ does; a longer comment that holds a line break loads black on the PC. Saves load
 - The Settings, Extra (CG, scene and music galleries) and shortcut screens aren't built; volumes aren't kept in the
   system save yet.
 - Magical Sword's screens aren't built.
-- The Save and Load cards have no Delete button, and the card under the pointer doesn't say Click to Save.
+- The Load screen's AUTO SAVE page isn't built, and the PC's comment editing on cards isn't either.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

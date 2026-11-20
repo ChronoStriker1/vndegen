@@ -187,8 +187,8 @@ typedef struct LogEntry {
 
 enum { PH_TITLE, PH_GAME };
 enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD, SCR_FLOW, SCR_VOLUME, SCR_SETTINGS };
-enum { MSG_TITLE, MSG_QUIT, MSG_OVERWRITE, MSG_DELETE, MSG_JUMP, MSG_RESET_FLOW };
-enum { ACT_SAVE, ACT_LOAD, ACT_TITLE, ACT_QUIT, ACT_JUMP };
+enum { MSG_TITLE, MSG_QUIT, MSG_OVERWRITE, MSG_DELETE, MSG_JUMP, MSG_RESET_FLOW, MSG_RESET_SAVES };
+enum { ACT_SAVE, ACT_LOAD, ACT_TITLE, ACT_QUIT, ACT_JUMP, ACT_DELETE, ACT_RESET_SAVES };
 enum { BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE };
 
 typedef struct Font Font;
@@ -326,6 +326,8 @@ enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_BGV0 = CH_SE0 + AN_SE, CH_COUNT 
 bool an_slot_info(AN *a, int slot, SlotInfo *info);
 bool an_save_slot(AN *a, int slot);
 bool an_load_slot(AN *a, int slot);
+bool an_delete_slot(AN *a, int slot);
+bool an_reset_saves(AN *a);
 bool an_quick_save(AN *a);
 bool an_quick_load(AN *a);
 void an_confirm(AN *a, int message, int action, int arg);

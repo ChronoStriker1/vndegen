@@ -9,6 +9,7 @@ typedef struct Rect {
 static const Rect MESSAGES[] = {
     [MSG_TITLE] = {60, 452, 390, 76},  [MSG_QUIT] = {60, 534, 390, 76},  [MSG_OVERWRITE] = {60, 712, 390, 42},
     [MSG_DELETE] = {556, 712, 400, 42}, [MSG_JUMP] = {556, 794, 410, 44}, [MSG_RESET_FLOW] = {556, 630, 400, 42},
+    [MSG_RESET_SAVES] = {6, 794, 500, 44},
 };
 
 enum { BOX_X = 318, BOX_Y = 202, YES_X = 387, NO_X = 677, YESNO_Y = 336, YESNO_W = 216, YESNO_H = 72 };
@@ -53,10 +54,13 @@ static void confirm_input(AN *a) {
     }
 }
 
-enum { CARD_X = 28, CARD_Y = 120, CARD_DX = 310, CARD_DY = 273, CARD_W = 296, CARD_H = 260 };
+enum { CARD_X = 27, CARD_Y = 119, CARD_DX = 310, CARD_DY = 274, CARD_W = 296, CARD_H = 260 };
+enum { LABEL_CX = 171, LABEL_Y = 227 };
+enum { DEL_DX = 201, DEL_DY = 15, DEL_W = 78, DEL_H = 26, RESET_X = 1148, RESET_Y = 24, RESET_W = 110, RESET_H = 67 };
 enum { PAGE_X = 201, PAGE_Y = 16, PAGE_DX = 82, PAGE_DY = 45, PAGE_W = 78, PAGE_H = 38 };
 
 static Rect card(int i) { return (Rect){CARD_X + CARD_DX * (i % 4), CARD_Y + CARD_DY * (i / 4), CARD_W - 10, CARD_H - 10}; }
+static Rect delete_button(Rect card) { return (Rect){card.x + DEL_DX, card.y + DEL_DY, DEL_W, DEL_H}; }
 static Rect page_button(int i) { return (Rect){PAGE_X + PAGE_DX * (i % 10), PAGE_Y + PAGE_DY * (i / 10), PAGE_W, PAGE_H}; }
 
 static const int BIG_DIGIT_X[10] = {598, 641, 682, 724, 767, 809, 850, 893, 934, 976};
@@ -166,13 +170,22 @@ static void draw_slots(AN *a, bool saving) {
             an_gfx_blit(a->fb, a->W, a->H, b, 816, 528, 48, 22, r.x + 63, r.y + 16, 255);
         }
         if (hover) an_gfx_blit(a->fb, a->W, a->H, b, 3, 745, 294, 258, r.x + 1, r.y + 1, 255);
+        Rect d = delete_button(r);
+        an_gfx_blit(a->fb, a->W, a->H, b, 867, in_rect(a, d.x, d.y, d.w, d.h) ? 556 : 528, DEL_W, DEL_H, d.x, d.y, 255);
         int n = slot + 1;
         for (int k = 0; k < 3; k++) {
             int digit = k == 0 ? n % 10 : k == 1 ? n / 10 % 10 : n / 100 % 10;
             an_gfx_blit(a->fb, a->W, a->H, b, BIG_DIGIT_X[digit], 482, 39, 34, r.x + 10, r.y + 143 + 42 * k, 255);
         }
+        if (hover && (used || saving)) {
+            Rect d = delete_button(r);
+            bool del = used && in_rect(a, d.x, d.y, d.w, d.h);
+            int lx = del ? 603 : saving ? 659 : 658, lw = del ? 205 : saving ? 95 : 96;
+            an_gfx_blit(a->fb, a->W, a->H, b, lx, del ? 586 : 532, lw, 17, r.x + LABEL_CX - lw / 2, r.y + LABEL_Y, 255);
+        }
         if (!used) continue;
         Image *t = thumb(a, slot);
+        if (!t) t = an_image_load(a, "pSaveThumbDef");
         if (t) draw_thumb(a, t, r.x + 78, r.y + 46);
         char date[24], clock[24];
         snprintf(date, sizeof date, "%04d.%02d.%02d", info.year, info.month, info.day);
@@ -183,7 +196,10 @@ static void draw_slots(AN *a, bool saving) {
         card_comment(info.comment, lines, sizeof lines);
         an_text_draw(a, r.x + 78, r.y + 180, lines, 16, 0xff503040u, 0, 0, 18);
     }
+    an_gfx_blit(a->fb, a->W, a->H, b, 117, in_rect(a, RESET_X, RESET_Y, RESET_W, RESET_H) ? 412 : 340, RESET_W, RESET_H,
+                RESET_X, RESET_Y, 255);
     an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 62, 670, 278, 40) ? 296 : 254, 278, 40, 62, 670, 255);
+    if (a->phase != PH_GAME) return;
     an_gfx_blit(a->fb, a->W, a->H, b, 285, in_rect(a, 501, 670, 278, 40) ? 296 : 254, 278, 40, 501, 670, 255);
     an_gfx_blit(a->fb, a->W, a->H, b, 567, in_rect(a, 940, 670, 278, 40) ? 296 : 254, 278, 40, 940, 670, 255);
 }
@@ -209,13 +225,16 @@ static void slots_input(AN *a, bool saving) {
             return;
         }
     }
+    if (in_rect(a, RESET_X, RESET_Y, RESET_W, RESET_H)) {
+        an_confirm(a, MSG_RESET_SAVES, ACT_RESET_SAVES, 0);
+        return;
+    }
     if (in_rect(a, 62, 670, 278, 40)) {
         a->screen = SCR_NONE;
         return;
     }
     if (in_rect(a, 501, 670, 278, 40)) {
         if (a->phase == PH_GAME) an_confirm(a, MSG_TITLE, ACT_TITLE, 0);
-        else a->screen = SCR_NONE;
         return;
     }
     if (in_rect(a, 940, 670, 278, 40)) {
@@ -228,6 +247,11 @@ static void slots_input(AN *a, bool saving) {
         int slot = a->slotPage * 8 + i;
         SlotInfo info;
         bool used = an_slot_info(a, slot, &info);
+        Rect d = delete_button(r);
+        if (in_rect(a, d.x, d.y, d.w, d.h)) {
+            if (used) an_confirm(a, MSG_DELETE, ACT_DELETE, slot);
+            return;
+        }
         if (saving) {
             if (used) an_confirm(a, MSG_OVERWRITE, ACT_SAVE, slot);
             else an_do_action(a, ACT_SAVE, slot);
@@ -250,6 +274,12 @@ void an_do_action(AN *a, int action, int arg) {
         break;
     case ACT_QUIT: a->quit = true; break;
     case ACT_JUMP: an_flow_jump(a, arg); break;
+    case ACT_DELETE:
+        if (an_delete_slot(a, arg)) a->saveSerial++;
+        break;
+    case ACT_RESET_SAVES:
+        if (an_reset_saves(a)) a->saveSerial++;
+        break;
     }
 }
 

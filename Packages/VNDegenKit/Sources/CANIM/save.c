@@ -235,13 +235,36 @@ static void fill_slot(AN *a, u8 *s) {
     for (int i = 0; i < AN_VARS; i++) wr32(s + OFF_LOCALS + 4 * i, (u32)a->L[i]);
 }
 
+static bool write_saves(AN *a) {
+    char *p = save_path(a);
+    bool ok = write_plain(p, a->saves, (size_t)SLOT_SIZE * SLOT_COUNT, a->saveKey);
+    free(p);
+    return ok;
+}
+
+static void clear_slot(AN *a, int slot) { memset(slot_data(a, slot), 0, SLOT_SIZE); }
+
+bool an_delete_slot(AN *a, int slot) {
+    if (!slot_data(a, slot)) return false;
+    clear_slot(a, slot);
+    bool ok = write_saves(a);
+    an_log(a, "deleted slot %d: %s", slot, ok ? "ok" : "failed");
+    return ok;
+}
+
+bool an_reset_saves(AN *a) {
+    if (!saves_load(a)) return false;
+    for (int slot = 0; slot < SLOT_COUNT; slot++) clear_slot(a, slot);
+    bool ok = write_saves(a);
+    an_log(a, "reset saves: %s", ok ? "ok" : "failed");
+    return ok;
+}
+
 bool an_save_slot(AN *a, int slot) {
     u8 *s = slot_data(a, slot);
     if (!s || a->textPc == 0) return false;
     fill_slot(a, s);
-    char *p = save_path(a);
-    bool ok = write_plain(p, a->saves, (size_t)SLOT_SIZE * SLOT_COUNT, a->saveKey);
-    free(p);
+    bool ok = write_saves(a);
     if (ok) {
         write_thumbnail(a, slot);
         a->lastSlot = slot;
