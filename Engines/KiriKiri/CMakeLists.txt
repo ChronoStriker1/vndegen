@@ -331,6 +331,7 @@ add_library(kirikiri_engine OBJECT
     # The movie decoder the framework exports for other engines, such as NekoSDK. KiriKiri itself doesn't call it.
     ${KIRIKIRI_SHARED}/vnffmovie.cpp
     vndegen/ciphers.cpp
+    vndegen/extrans2.cpp
     vndegen/game_menu.cpp
     vndegen/menubar_scan.cpp
     vndegen/movie_decoder.cpp
@@ -504,6 +505,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
     add_executable(KiriKiriSplitTest EXCLUDE_FROM_ALL vndegen/split_test.cpp vndegen/vnkk.mm)
     target_link_libraries(KiriKiriSplitTest PRIVATE kirikiri_engine kirikiri_ffmpeg_static)
+
+    add_executable(KiriKiriMosaicTest EXCLUDE_FROM_ALL vndegen/mosaic_test.cpp vndegen/vnkk.mm)
+    target_link_libraries(KiriKiriMosaicTest PRIVATE kirikiri_engine kirikiri_ffmpeg_static)
 
     # Checks which script lines count as a test for a hidden menu bar. Built on demand, like KiriKiriCipherTest.
     add_executable(KiriKiriMenuBarScanTest EXCLUDE_FROM_ALL vndegen/menubar_scan_test.cpp vndegen/menubar_scan.cpp)
