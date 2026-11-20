@@ -36,6 +36,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Bruns](#bruns) | `ams.cfg` beside `binary/bruns.exe` and `scene/brs009000.bso`, up to one folder down | Mac, iPhone, iPad |
 | [Eushully AGE](#eushully-age) | `SYS4INI.BIN` beside `DATA1.ALF` or `age.exe`, up to one folder down | Mac, iPhone, iPad |
 | [BISHOP BSX](#bishop-bsx) | `bsxx.dat` beside `bsxx.cfg` and a `Graphics*.bsa` archive, up to one folder down | Mac, iPhone, iPad |
+| [PJADV](#pjadv) | an `archive.dat` that is a `GAMEDAT PAC` archive holding `scenario.dat` and `textdata.bin`, up to one folder down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
@@ -236,6 +237,10 @@ Eushully AGE games of the SYS4 generation, such as Kamidori Alchemy Meister, run
 ## BISHOP BSX
 
 BISHOP's BSXX games, such as Mesu Kyoushi ~Injoku no Kyoushitsu~ and its sequels 2, 3 and 4, run on VNDegen's own BSX runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive and picture readers and the original engine run under Wine, MIT licensed like the rest of the app. The compiled script runs the story, the day loop and the scenes; the message window, menu bar, choices, title, map, target cards, Save and Load, backlog, settings, item screen and the STRIP and VIEW switches, which the PC engine draws itself, are drawn from the game's `bsxx.cfg` and pictures, and Mesu Kyoushi 4's MPEG-1 movies play through the shared movie decoder. Saves are the PC engine's own `save/noNNN`, `save/no-01` and `save/common.dat` in the game folder, and load both ways. The museum's BGM, BGV, CG and scene modes, with playlists, share their seen records with the PC, and its bust-up editor shares its stored states. [bsx.md](bsx.md) lists which games run and the known limits, and [bsx-cleanroom.md](bsx-cleanroom.md) where the runtime's knowledge came from.
+
+## PJADV
+
+PajamasEX / Production PENCIL's PJADV games, such as Paradise Cleaning!- Tutor X Hypnosis -, run on VNDegen's own PJADV runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive and picture readers, play of the original engine under Wine and one approved reading of its save scrambling, MIT licensed like the rest of the app. The compiled scenario runs the title, menus, gallery, options and scenes; Paradise Cleaning's cleaning minigame, which the PC engine runs in its own code, is rebuilt from the help screen, `mg02_ini.txt` and measured play of the original. Text is English, or Japanese or Chinese when the device uses them. Saves are the PC engine's own `save/syssave.dat` and `save/syssvpo.dat` and load both ways. Games start on the Mouse layout: the stick moves the pointer, A and the triggers click, and the shoulders turn the wheel, which in the minigame changes tools. [pjadv.md](pjadv.md) lists which games run and the known limits, and [pjadv-cleanroom.md](pjadv-cleanroom.md) where the runtime's knowledge came from.
 
 ## Unity
 
