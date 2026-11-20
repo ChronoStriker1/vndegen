@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.57.3",
+          "buildVersion": "3000",
+          "date": "2026-11-20T04:03:08Z",
+          "localizedDescription": "The bust-up editor (立ち絵鑑賞) in the BISHOP BSX museum.\n\n## Downloads\n\n- `VNDegen-0.57.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.57.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.57.3-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- **The bust-up editor** in the museum of all four Mesu Kyoushi games: pick a background, place characters, change their pose, view, outfit, underwear and face, and move the close-up from face to hip. Mesu Kyoushi 3 adds hair-off and cut-ins, and Mesu Kyoushi 4 its steam button.\n- Its saved states are the PC's own `buex_ds` files, so states are shared with the PC version both ways.\n\n## Fixes\n\n- BSX: Mesu Kyoushi 3's Face, Bust and Hip buttons, and a few museum buttons, respond where they're drawn.\n\n## Known limits\n\n- The message tab (names, free text and balloons) and saving the scene as a picture aren't there yet; their buttons are shown as off. A state's message settings are kept as they were.\n- Output slots last only while the editor is open, as on the PC, and Mesu Kyoushi 4's steam setting isn't kept in a state.\n- Mesu Kyoushi 4's button that turns off the ahegao faces is shown but does nothing.\n\n## What wasn't tested\n\n- The Mac app wasn't checked, because the test Mac's screen was locked. The editor was checked in an iPad simulator by touch with Mesu Kyoushi 3, and in the Linux test build for all four games. The Mac app runs the same runtime.\n- Its states and screens were compared with the PC version under Wine for Mesu Kyoushi 1 and 3.\n- No physical device was used, and no code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.57.3/VNDegen-0.57.3.ipa",
+          "size": 131512645,
+          "sha256": "eef0d379598f10d06c43590896d8f96ac1f610e41ce67c6f41429c8f60ede84f",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.57.2",
           "buildVersion": "2992",
           "date": "2026-11-20T03:18:13Z",
