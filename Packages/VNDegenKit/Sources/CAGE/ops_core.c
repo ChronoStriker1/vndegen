@@ -449,9 +449,14 @@ static int op_co_handlers(AG *g) {
 
 static int op_co_yield(AG *g) {
     Frame *f = cur(g);
-    if (g->coState == 0 && f->handlerA != 0xffffffffu) { co_enter(g, g->top, f->handlerA, f->pc + g->insLen, 1); return OP_JUMP; }
-    if (f->handlerB != 0xffffffffu) { co_enter(g, g->top, f->handlerB, f->pc + g->insLen, 3); return OP_JUMP; }
-    return OP_NEXT;
+    if (g->coState == 0) {
+        if (f->handlerA == 0xffffffffu) return OP_NEXT;
+        co_enter(g, g->top, f->handlerA, f->pc + g->insLen, 1);
+        return OP_JUMP;
+    }
+    if (f->handlerB == 0xffffffffu) return OP_NEXT;
+    co_enter(g, g->top, f->handlerB, g->coResume, 3);
+    return OP_JUMP;
 }
 
 static int op_co_resume(AG *g) {
