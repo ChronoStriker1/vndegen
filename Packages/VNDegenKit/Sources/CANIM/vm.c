@@ -176,6 +176,7 @@ static void push_log(AN *a, const char *name, const char *text, const char *voic
 
 static void show_text(AN *a, const char *name, const char *text, const char *voice, int id) {
     a->textPc = a->opPc;
+    a->textRead = an_is_read(a, id);
     an_mark_read(a, id);
     a->name = name && *name ? name : NULL;
     a->text = text;
@@ -270,7 +271,7 @@ static void exec(AN *a, const Op *op) {
     }
     case 0x1e: set(a, &g[0], val(a, &g[1])); break;
     case 0x21: snprintf(a->movieName, sizeof a->movieName, "%s", str(a, &g[0])); break;
-    case 0x22: set(a, &g[0], an_movie_exists(a, a->movieName) ? 1 : 0); break;
+    case 0x22: set(a, &g[0], a->option[OPT_EVENT_MOVIES] == 0 && an_movie_exists(a, a->movieName) ? 1 : 0); break;
     case 0x94:
         if (!a->skipMode && an_movie_play(a, str(a, &g[1]), false, 0)) a->th.wait = W_MOVIE;
         break;
@@ -427,6 +428,7 @@ static void exec(AN *a, const Op *op) {
     case 0xac: set(a, &g[0], 0); break;
     case 0xaf: set(a, &g[0], a->skipMode || a->ctrl ? 1 : 0); break;
     case 0xd0:
+        if (a->option[OPT_KEEP_SKIP] == 1) a->skipMode = a->autoMode = false;
         a->choiceCount = g[0].v;
         a->choiceHover = -1;
         a->th.wait = W_CHOICE;

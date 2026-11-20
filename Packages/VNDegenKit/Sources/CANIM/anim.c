@@ -80,6 +80,7 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
     an_text_init(a);
     an_snd_init(a);
     an_volume_defaults(a);
+    an_settings_defaults(a);
     an_vm_start(a, 8);
     srand((unsigned)cfg->startTime);
     an_log(a, "opened %s: %d labels, %d strings, %d sprite names, %d voices, %d E-mote models", base, a->sc->labelCount,

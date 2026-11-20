@@ -185,7 +185,7 @@ typedef struct LogEntry {
 #define AN_SE 16
 
 enum { PH_TITLE, PH_GAME };
-enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD, SCR_FLOW, SCR_VOLUME };
+enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD, SCR_FLOW, SCR_VOLUME, SCR_SETTINGS };
 enum { MSG_TITLE, MSG_QUIT, MSG_OVERWRITE, MSG_DELETE, MSG_JUMP, MSG_RESET_FLOW };
 enum { ACT_SAVE, ACT_LOAD, ACT_TITLE, ACT_QUIT, ACT_JUMP };
 enum { BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE };
@@ -235,7 +235,7 @@ struct AN {
     u32 transColor;
 
     const char *name, *text, *voiceName;
-    bool textComplete;
+    bool textComplete, textRead;
     u32 textStart;
     LogEntry *logs;
     int logCount, logCap;
@@ -247,6 +247,7 @@ struct AN {
     int screen, logTop, wheel;
     int slotPage;
     int volume[5], voiceVolume[3], bgvVolume[3], talkVolume[3], volumeChar, dragSlider;
+    int option[11], windowOpacity, textSpeed, autoSpeed;
     FlowNode *flow;
     int flowCount, flowScroll, flowZoom;
     bool flowFromScript;
@@ -326,6 +327,9 @@ void an_do_action(AN *a, int action, int arg);
 void an_slots_open(AN *a, bool saving);
 void an_volume_open(AN *a);
 void an_volume_defaults(AN *a);
+void an_settings_open(AN *a);
+void an_settings_defaults(AN *a);
+enum { OPT_SCREEN, OPT_EFFECTS, OPT_SKIP_UNREAD, OPT_KEEP_SKIP, OPT_EVENT_MOVIES, OPT_HAIR, OPT_SKIP_VOICE, OPT_HISTORY, OPT_CONFIRM, OPT_VOICE_BAR, OPT_AUTO_BAR };
 void an_screens_render(AN *a);
 bool an_screens_input(AN *a);
 void an_go_title(AN *a);

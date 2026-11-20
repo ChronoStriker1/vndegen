@@ -44,21 +44,24 @@ void an_title_input(AN *a) {
     case TB_CONTINUE: an_slots_open(a, false); break;
     case TB_FLOWCHART: an_flow_open(a, false); break;
     case TB_VOLUME: an_volume_open(a); break;
+    case TB_SETTINGS: an_settings_open(a); break;
     case TB_EXIT: an_confirm(a, MSG_QUIT, ACT_QUIT, 0); break;
     default: break;
     }
 }
 
-enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 920, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194, WIN_ALPHA = 130 };
+enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 920, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194 };
 enum { BAR_X = 568, BAR_Y = 694, BAR_W = 712, BAR_H = 26, CHOICE_W = 719, CHOICE_H = 79, CHOICE_GAP = 16 };
 
-enum { CHARS_PER_SECOND = 120 };
+
 
 static size_t text_shown(AN *a) {
     if (!a->text) return 0;
     size_t n = strlen(a->text);
     if (a->textComplete || a->skipMode || a->ctrl) return n;
-    size_t want = (size_t)(a->now - a->textStart) * CHARS_PER_SECOND / 1000;
+    size_t cps = (size_t)(10 + a->textSpeed * a->textSpeed / 80);
+    if (a->textSpeed >= 100) return n;
+    size_t want = (size_t)(a->now - a->textStart) * cps / 1000;
     if (want >= n) return n;
     while (want > 0 && ((u8)a->text[want] & 0xc0) == 0x80) want--;
     return want;
@@ -66,12 +69,14 @@ static size_t text_shown(AN *a) {
 
 static bool text_done(AN *a) { return !a->text || text_shown(a) >= strlen(a->text); }
 
+static int win_alpha(AN *a) { return clampi(a->windowOpacity * 224 / 100, 0, 255); }
+
 static void draw_window(AN *a) {
     Image *w = an_image_load(a, "spMessageWindow");
     if (w) {
-        an_gfx_blit(a->fb, a->W, a->H, w, 2, 220, 130, WIN_H, 0, WIN_Y, WIN_ALPHA);
-        an_gfx_blit(a->fb, a->W, a->H, w, 2, 17, 1020, WIN_H, 130, WIN_Y, WIN_ALPHA);
-        an_gfx_blit(a->fb, a->W, a->H, w, 134, 220, 130, WIN_H, 1150, WIN_Y, WIN_ALPHA);
+        an_gfx_blit(a->fb, a->W, a->H, w, 2, 220, 130, WIN_H, 0, WIN_Y, win_alpha(a));
+        an_gfx_blit(a->fb, a->W, a->H, w, 2, 17, 1020, WIN_H, 130, WIN_Y, win_alpha(a));
+        an_gfx_blit(a->fb, a->W, a->H, w, 134, 220, 130, WIN_H, 1150, WIN_Y, win_alpha(a));
     }
     Image *ui = an_image_load(a, "spMessageWindowButton");
     if (a->name) {
@@ -150,16 +155,19 @@ void an_game_input(AN *a) {
         return;
     }
     if (a->th.wait == W_TEXT) {
-        bool autoNext = a->autoMode && text_done(a) && !an_snd_playing(a, CH_VOICE) && a->now - a->textStart > 1500 + 40 * (u32)strlen(a->text);
+        u32 autoWait = (u32)(2500 - a->autoSpeed * 20) + (u32)(100 - a->autoSpeed / 2) / 2 * (u32)strlen(a->text);
+        bool autoNext = a->autoMode && text_done(a) && !an_snd_playing(a, CH_VOICE) && a->now - a->textStart > autoWait;
         if (a->clicked && !text_done(a)) {
             a->clicked = false;
             a->textComplete = true;
             return;
         }
-        if (a->clicked || a->skipMode || a->ctrl || autoNext) {
+        bool skipOk = (a->skipMode || a->ctrl) && (a->option[OPT_SKIP_UNREAD] == 0 || a->textRead);
+        if (a->skipMode && !skipOk) a->skipMode = false;
+        if (a->clicked || skipOk || autoNext) {
             a->clicked = false;
             a->th.wait = W_NONE;
-            if (!a->skipMode) an_snd_stop(a, CH_VOICE);
+            if (!skipOk && a->option[OPT_SKIP_VOICE] == 0) an_snd_stop(a, CH_VOICE);
         }
         return;
     }

@@ -14,6 +14,10 @@ static const Rect MESSAGES[] = {
 enum { BOX_X = 318, BOX_Y = 202, YES_X = 387, NO_X = 677, YESNO_Y = 336, YESNO_W = 216, YESNO_H = 72 };
 
 void an_confirm(AN *a, int message, int action, int arg) {
+    if (a->option[OPT_CONFIRM] == 1 && action != ACT_SAVE) {
+        an_do_action(a, action, arg);
+        return;
+    }
     a->confirmMsg = message;
     a->confirmAction = action;
     a->confirmArg = arg;
@@ -266,6 +270,7 @@ static void draw_volume(AN *a) {
     }
     an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 940, 5, 278, 40) ? 137 : 95, 278, 40, 940, 5, 255);
     an_gfx_blit(a->fb, a->W, a->H, b, 567, in_rect(a, 62, 670, 278, 40) ? 137 : 95, 278, 40, 62, 670, 255);
+    an_gfx_blit(a->fb, a->W, a->H, b, 285, in_rect(a, 940, 670, 278, 40) ? 137 : 95, 278, 40, 940, 670, 255);
 }
 
 static void apply_volumes(AN *a) {
@@ -309,7 +314,84 @@ static void volume_input(AN *a) {
     if (in_rect(a, 62, 670, 278, 40)) a->screen = SCR_NONE;
 }
 
+typedef struct Option {
+    int x, y, ax, ay;
+} Option;
+
+static const Option OPTIONS[11] = {
+    {36, 100, 5, 6},   {36, 190, 313, 6},  {36, 280, 621, 6},  {36, 370, 5, 156},  {36, 460, 313, 156}, {36, 550, 621, 156},
+    {372, 100, 313, 456}, {372, 190, 5, 306}, {372, 280, 313, 306}, {372, 370, 621, 306}, {372, 460, 5, 456},
+};
+static const int OPTION_DEFAULT[11] = {0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0};
+enum { OPT_W = 147, OPT_H = 41, OPT_DX = 154, SET_KNOB_X = 710, SET_KNOB_RANGE = 430 };
+static const int SET_SLIDER_Y[3] = {281, 371, 461};
+
+void an_settings_defaults(AN *a) {
+    memcpy(a->option, OPTION_DEFAULT, sizeof a->option);
+    a->windowOpacity = 58;
+    a->textSpeed = 99;
+    a->autoSpeed = 0;
+}
+
+void an_settings_open(AN *a) {
+    a->screen = SCR_SETTINGS;
+    a->dragSlider = -1;
+}
+
+static int *set_slider(AN *a, int i) { return i == 0 ? &a->windowOpacity : i == 1 ? &a->textSpeed : &a->autoSpeed; }
+
+static void draw_settings(AN *a) {
+    Image *panel = an_image_load(a, "spconfig");
+    if (panel) an_gfx_blit(a->fb, a->W, a->H, panel, 0, 0, a->W, a->H, 0, 0, 255);
+    Image *b = an_image_load(a, "spconfigButton");
+    if (!b) return;
+    for (int i = 0; i < 11; i++) {
+        const Option *o = &OPTIONS[i];
+        for (int k = 0; k < 2; k++) {
+            int x = o->x + OPT_DX * k;
+            int row = a->option[i] == k ? 100 : in_rect(a, x, o->y, OPT_W, OPT_H) ? 50 : 0;
+            an_gfx_blit(a->fb, a->W, a->H, b, o->ax + OPT_DX * k, o->ay + row, OPT_W, OPT_H, x, o->y, 255);
+        }
+    }
+    for (int i = 0; i < 3; i++) {
+        int kx = SET_KNOB_X + *set_slider(a, i) * SET_KNOB_RANGE / 100, y = SET_SLIDER_Y[i];
+        an_gfx_blit(a->fb, a->W, a->H, b, 284, a->dragSlider == 10 + i ? 754 : in_rect(a, kx, y, 19, 32) ? 720 : 686, 19, 32, kx, y, 255);
+    }
+    an_gfx_blit(a->fb, a->W, a->H, b, 285, in_rect(a, 62, 670, 278, 40) ? 644 : 602, 278, 40, 62, 670, 255);
+    an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 940, 670, 278, 40) ? 728 : 686, 278, 40, 940, 670, 255);
+    an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 940, 5, 278, 40) ? 644 : 602, 278, 40, 940, 5, 255);
+}
+
+static void settings_input(AN *a) {
+    if (a->dragSlider >= 10) {
+        *set_slider(a, a->dragSlider - 10) = clampi((a->mx - SET_KNOB_X - 9) * 100 / SET_KNOB_RANGE, 0, 100);
+        if (!a->down) a->dragSlider = -1;
+        a->clicked = false;
+        return;
+    }
+    if (a->rclicked) {
+        a->rclicked = false;
+        a->screen = SCR_NONE;
+        return;
+    }
+    if (a->down)
+        for (int i = 0; i < 3; i++)
+            if (in_rect(a, SET_KNOB_X - 10, SET_SLIDER_Y[i], SET_KNOB_RANGE + 40, 32)) {
+                a->dragSlider = 10 + i;
+                return;
+            }
+    if (!a->clicked) return;
+    a->clicked = false;
+    for (int i = 0; i < 11; i++)
+        for (int k = 0; k < 2; k++)
+            if (in_rect(a, OPTIONS[i].x + OPT_DX * k, OPTIONS[i].y, OPT_W, OPT_H)) a->option[i] = k;
+    if (in_rect(a, 62, 670, 278, 40)) a->screen = SCR_NONE;
+    if (in_rect(a, 940, 670, 278, 40)) an_volume_open(a);
+    if (in_rect(a, 940, 5, 278, 40)) an_settings_defaults(a);
+}
+
 void an_screens_render(AN *a) {
+    if (a->screen == SCR_SETTINGS) draw_settings(a);
     if (a->screen == SCR_VOLUME) draw_volume(a);
     if (a->screen == SCR_SAVE || a->screen == SCR_LOAD) draw_slots(a, a->screen == SCR_SAVE);
     if (a->confirmOpen) draw_confirm(a);
@@ -326,6 +408,10 @@ bool an_screens_input(AN *a) {
     }
     if (a->screen == SCR_VOLUME) {
         volume_input(a);
+        return true;
+    }
+    if (a->screen == SCR_SETTINGS) {
+        settings_input(a);
         return true;
     }
     return false;
