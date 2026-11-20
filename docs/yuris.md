@@ -18,6 +18,8 @@ This file starts as the design checkpoint and becomes the engine notes as parts 
 | Tales of the Yokai Incident Inspectors | Japanese | 466 | `*.ypf` in the game folder, archive version 466 | No `yscfg.dat`. The library's coverage for the older engine |
 | Kaizou Shoujo: Robokko to no Ichaicha Seikatsu! | Japanese | 473 | `*.ypf` in the game folder, archive version 473 | 1024x768 |
 | Mamono Musume no Yakata Suiseikan Igyouroku: Ningyo no Sho | Japanese | 473 | `*.ypf` in the game folder, archive version 473 | 1024x768 |
+| Holy Maid Academy (GOG) | English and Chinese | 491 | `pac/*.ypf`, one 1.5 GB `update1.ypf` | 488's system variable layout. Title, story, save and load on the Mac app and an iPad simulator |
+| Sacrifice Villains (GOG) | English and Chinese | 481 | `pac/*.ypf`, one 5.7 GB `update1.ypf` | Title, story, save and load on the Mac app |
 | Mamono Musume-tachi to no Rakuen: Slime & Scylla | Japanese | 406 | `*.ypf` in the game folder, archive version 406 | 800x600, no `yscfg.dat` |
 | Saint Dorei Gakuen 2 | English patch over Japanese | 479 | `pac/*.ypf`, with loose `ysbin/` and `cgsys/` files over them | 1280x800, YCG images |
 
