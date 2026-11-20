@@ -17,6 +17,7 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
   - EAGLS: display refreshes from `-frameMonitor`'s `EGFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/eagls.txt` when the script stops it.
   - BSX: display refreshes from `-frameMonitor`'s `BXFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/bsx.txt` when it stops.
   - Bruns: display refreshes from `-frameMonitor`'s `BRFRAMES` line. The runtime steps the game every 16 ms of display time, as the PC engine's 60 fps does.
+  - Eushully AGE: display refreshes from `-frameMonitor`'s `AGFRAMES` line, 10 s windows. The runtime draws a frame each refresh, movie or not.
   - SiglusEngine: engine steps from `-frameMonitor`'s `SIGLUSFRAMES` line, 10 s windows. A `.wmv` movie's picture changes at the movie's rate inside them.
   - Godot: `-godotFrameLog`, without `-godotSnapshot`. The snapshot writes a PNG on the main thread every 2 s, which stalls the game for about 80 to 90 ms each time. It took Barely Working from 59.9 to 57.5 and Project Hadal from 59.4 to 56.9, with seconds alternating between 54 to 56 and 60 to 61 frames. The native runtimes log their own pacing with `-frameMonitor`.
 - Load is the load average at the start of the run. The MacBook's runs had nothing else of ours running. The mini's simulator runs also had the simulator's own processes and agent-device's runner.
@@ -119,6 +120,10 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | Ponscripter | Test movies at 23.976, 25 and 59.94 fps | Mac app, mini | as made | 24.0, 25.0 to 25.1, 58.6 to 60.0 drawn | 41.5 to 60.0 display | 75 s | 4.9 | 11-07 | d2668ff |
 | Artemis, reused | Test Game 81, opening movie | Mac app, MacBook | 29.97 | 29.97 | 19.95 | 101 s | 30 | 10-31 | afaeec9 |
 | Artemis, reused | Test Game 81, opening movie | iPad simulator | 29.97 | 29.97 | 20.00 | 101 s | quiet | 10-31 | afaeec9 |
+| Eushully AGE | Kamidori Alchemy Meister, `OP.MPG` opening movie, MPEG-1 1024x576 | Mac app, mini | 60 | 59.6 to 60.0 | 59.9 to 60.0, 34.3 in the start-up window | 80 s | 6.8 | 11-19 | 9ea93143 |
+| Eushully AGE | Kamidori Alchemy Meister, tutorial battle map from a save | Mac app, mini | 60 | 59.7 to 59.9 | 37.5 to 49.9 | 40 s | 6.5 | 11-19 | 9ea93143 |
+| Eushully AGE | Kamidori Alchemy Meister, `OP.MPG` opening movie, MPEG-1 1024x576 | iPad simulator | 60 | 59.6 to 60.0 | 37.4 to 60.0, 30.8 in the start-up window | 40 s | 6.6 | 11-19 | 9ea93143 |
+| Eushully AGE | Kamidori Alchemy Meister, tutorial battle map from a save, through a turn | iPad simulator | 60 | 59.9 to 60.0 | 50.0 to 60.0 | 90 s | 6.6 | 11-19 | 9ea93143 |
 
 Before #49's fix (2026-11-07), NScripter, Ponscripter, NekoSDK and Wolf RPG rounded each display refresh to whole milliseconds, so their clocks ran 4% slow at 120 Hz and 2% fast at 60 Hz. Rows marked "was" give the number before it. A Wolf RPG game at 60 Hz drew 60.0 then too, but ran 61.2 game frames a second, with a double step every 50 refreshes.
 
@@ -133,6 +138,7 @@ On the MacBook's 120 Hz display a 60 fps game reads correctly: WebKit's page run
 - Fallen Kunoichi: the map measured is the one the game calls its title screen, with 14 pictures, because the game skips the usual title. Its story maps weren't reached.
 - KiriKiri: Violated Hero IV's title needs clicks on buttons, and its battles weren't reached. A script plays the game's clip through the same plugin instead, and draws a clip frame each tick, 2 to 4 times the clip's 30 fps, so it asks more than the game does. It isn't the game's scene. The movie log gives frames shown and dropped but no 1% low, and the 5 s logo plays while the game is still loading: the display's own 1% low over that first 10 s window was 58.9 on the Mac and 20.8 on the simulator.
 - KiriKiri: Taimanin Kurenai's movies are plain 1024x768 MPEG-1 at 30 fps. A test script calls the game's own `sysmovie` for both, on a case-sensitive volume with the case of 39 names swapped, so play didn't reach them through the story. The movie log gives no 1% low. The Mac's display held 60.0 with a 1% low of 59.8 to 59.9 through both movies. The simulator run had no `-frameMonitor`. Other threads' work had the mini at a high load, and no frame dropped.
+- Eushully AGE: the battle rows start from a save on the tutorial map with its help notes shown, and the iPad run includes one turn advance with an enemy appearing. The Mac's battle run had another thread's `xcodebuild` running. The window that loads the save is left out: it held a 91 ms step on the Mac.
 - The MacBook's simulator rows started at a load of 11 to 30, while the simulator's test runner started.
 - YU-RIS on the Mac: the 10 s pacing window that holds only the movie gave 60.0 and a 1% low of 60.0. The window before it, the game's start with the archives opening and the movie's first seconds, gave 58.1 and 13.1 with a 193 ms step; the one after, the movie's end and the title loading, 59.3 and 25.0. The mini's 60 Hz display can't show the 120 Hz pacing. Saimin Gakushū's brand movie played at 29.88 on the same run of the app.
 

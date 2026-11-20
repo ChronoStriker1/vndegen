@@ -90,6 +90,7 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 | EAGLS | `Script/SCPACK.idx` beside `CG/CGPACK.idx` | Mac, iPhone, iPad | [eagls.md](docs/eagls.md) |
 | ExHibit | `ExHIBIT.ini` beside `resident.dll` and `rld/start.rld` | Mac, iPhone, iPad | [exhibit.md](docs/exhibit.md) |
 | Bruns | `ams.cfg` beside `binary/bruns.exe` and `scene/brs009000.bso` | Mac, iPhone, iPad | [bruns.md](docs/bruns.md) |
+| Eushully AGE | `SYS4INI.BIN` beside `DATA1.ALF` or `age.exe` | Mac, iPhone, iPad | [age.md](docs/age.md) |
 | BISHOP BSX | `bsxx.dat` beside `bsxx.cfg` and `Graphics*.bsa` | Mac, iPhone, iPad | [bsx.md](docs/bsx.md) |
 | Unity, opened outside VNDegen | `Game_Data/globalgamemanagers`, `mainData`, or `data.unity3d` | Mac, through the game's own Mac version or your CrossOver. iPhone and iPad: the game's page says why not | [unity.md](docs/unity.md#mac-launcher) |
 
