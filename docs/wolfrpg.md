@@ -76,6 +76,11 @@ the row in X) takes the map and position from row X of the system database's pos
 starts the player's control at "学校前" that way. "×=" with a division on the right multiplies before dividing, so 255
 ×= 50 ÷ 100 gives 127, which Yukino's portrait opacity setting relies on.
 
+A common event that a parallel event reserves (command 211) starts on the next frame, as the "once-only autorun" the
+base system's comments call it. Wolf RPG Editor's standard menu call reserves the menu that way on a new cancel press,
+and President Yukino's menu then waits for a key: started in the same frame, it took that press as cancel and closed
+before it drew, so the menu never opened.
+
 Common events and strings can read a text file. As on the PC, the runtime takes UTF-8 with or without a byte order mark,
 and otherwise Shift-JIS: The Clumsy Witch Seris is a UTF-8 game that keeps its scene text in Shift-JIS. Reading a string
 variable as a number gives the number its text starts with, which Two Beasts counts on for its script labels. A choice

@@ -731,6 +731,7 @@ void Game::update(const Input &input) {
 
     // Parallel common events run every frame while their condition holds, beside any other event, and stop where they
     // are once it doesn't (the manual's common event settings). Run condition 3, parallel always, ignores its condition.
+    bool hadThread = !threads_.empty();
     if (parallel_.size() != commons_.size()) parallel_.resize(commons_.size());
     for (size_t i = 0; i < commons_.size(); i++) {
         auto &ce = commons_[i];
@@ -766,7 +767,7 @@ void Game::update(const Input &input) {
         if (mapId_ != loadedMap_) break;  // the event moved the hero to another map
     }
 
-    if (!threads_.empty()) {
+    if (hadThread && !threads_.empty()) {
         run(threads_.front());
         if (!threads_.empty() && threads_.front().done()) {
             threads_.erase(threads_.begin());
