@@ -362,7 +362,13 @@ bool Game::step(Thread &t) {
             int target = cmd.arg(0);
             int x = value(cmd.arg(1), t), y = value(cmd.arg(2), t);
             int mapId = value(cmd.arg(3), t);
-            if (cmd.arg(4) & 0x01) {  // precise coordinates, in half tiles
+            if (target <= -10000) {
+                int row = x;
+                target += 10000;
+                mapId = dbNumber(sdb_, SysPositions, row, 0);
+                x = dbNumber(sdb_, SysPositions, row, 1);
+                y = dbNumber(sdb_, SysPositions, row, 2);
+            } else if (cmd.arg(4) & 0x01) {  // precise coordinates, in half tiles
                 x /= 2;
                 y /= 2;
             }
