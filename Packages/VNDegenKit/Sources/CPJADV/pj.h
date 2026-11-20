@@ -234,7 +234,7 @@ struct PJ {
         char name[40];
         Image *img;
         u32 used;
-    } cache[48];
+    } cache[128];
     u32 cacheTick;
 
     Layer layer[PJ_LAYERS + PJ_SUBS];
@@ -354,6 +354,7 @@ int pj_game_result(Game *g);
 int pj_game_icons(const Game *g, int *xs, int *ys, int *tools, int max);
 int pj_game_tool(const Game *g);
 int pj_game_phase(const Game *g);
+bool pj_game_uses(const Game *g, const Image *im);
 bool pj_stage_cleared(PJ *p, int chapter, int stage);
 
 bool pj_save_load(PJ *p);

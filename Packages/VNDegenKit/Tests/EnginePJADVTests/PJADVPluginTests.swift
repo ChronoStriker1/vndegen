@@ -76,7 +76,7 @@ private func game(in root: URL, title: String = "Test Cleaning! Version1.00") th
         try game(in: root)
         var title = [CChar](repeating: 0, count: 128)
         #expect(vnpjadv_probe(root.path, &title, title.count))
-        #expect(String(cString: title) == "Test Cleaning! Version1.00")
+        #expect(String(decoding: title.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self) == "Test Cleaning! Version1.00")
     }
 }
 

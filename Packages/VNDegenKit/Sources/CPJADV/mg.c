@@ -59,7 +59,7 @@ struct Game {
     int count, left;
     int tool;
     Fx fx[MAX_FX];
-    Image *back, *tips1, *tips2, *tips3, *grTips, *gpTips, *thumb, *white, *light[2], *cur[5][TOOLS];
+    Image *back, *tips1, *tips2, *tips3, *grTips, *gpTips, *thumb, *white, *light[2], *cur[5][TOOLS], *effect;
     Anm dirt[DIRTS];
     Anm ring, star[4];
     Def ringDef, starDef[4];
@@ -204,6 +204,7 @@ Game *pj_game_new(PJ *p, int kind, int chapter, int stage, i32 resultVar) {
     snprintf(name, sizeof name, "gp_tips_%s.EPA", l);
     g->gpTips = img(p, name);
     g->white = img(p, "gg_white1.EPA");
+    g->effect = img(p, "ga_effect.EPA");
     g->light[0] = img(p, "gg_light1.EPA");
     g->light[1] = img(p, "gg_light2.EPA");
     for (int f = 0; f < 5; f++)
@@ -265,7 +266,7 @@ static void erase_fx(PJ *p, Game *g, const Icon *c) {
     if (!f) return;
     memset(f, 0, sizeof *f);
     f->used = true;
-    Image *eff = img(p, "ga_effect.EPA");
+    Image *eff = g->effect;
     int ox = c->x - 98, oy = c->y - 98;
     fx_layer(&f->ring, eff, &g->ringDef, ox, oy);
     if (g->ring.kind == ANM_ONE) {
@@ -609,3 +610,13 @@ int pj_game_icons(const Game *g, int *xs, int *ys, int *tools, int max) {
 int pj_game_tool(const Game *g) { return g->tool; }
 
 int pj_game_phase(const Game *g) { return g->phase; }
+
+bool pj_game_uses(const Game *g, const Image *im) {
+    const Image *const list[] = {g->back, g->tips1, g->tips2, g->tips3, g->grTips, g->gpTips, g->thumb, g->white, g->light[0], g->light[1], g->effect};
+    for (size_t i = 0; i < sizeof list / sizeof list[0]; i++)
+        if (list[i] == im) return true;
+    for (int f = 0; f < 5; f++)
+        for (int t = 0; t < TOOLS; t++)
+            if (g->cur[f][t] == im) return true;
+    return false;
+}

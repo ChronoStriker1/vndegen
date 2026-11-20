@@ -19,6 +19,7 @@ import EngineIPAC
 import EngineIkura
 import EngineEAGLS
 import EngineBSX
+import EnginePJADV
 import EngineExHibit
 import EngineBruns
 import EngineAGE
@@ -59,6 +60,7 @@ let engines: [any EnginePlugin] = {
         IkuraPlugin(),
         EAGLSPlugin(),
         BSXPlugin(),
+        PJADVPlugin(),
         ExHibitPlugin(),
         BrunsPlugin(),
         AGEPlugin(),

@@ -71,23 +71,30 @@ static int solve(VNPJADV *n, int maxMs) {
             t += 100;
             continue;
         }
-        int tool = pj_game_tool(p->game), k;
+        int tool = pj_game_tool(p->game), k, first = 1;
         for (k = 0; k < c && tools[k] != tool; k++) {}
         if (k == c) {
             alive = press(n, 180, 910, VNPJADV_MOUSE_LEFT);
             t += 150;
             continue;
         }
-        vnpjadv_mouse_move(n, xs[k] - 60, ys[k]);
-        alive = run(n, 16);
-        vnpjadv_mouse_button(n, VNPJADV_MOUSE_LEFT, 1);
-        for (int s = 0; s < 6 && alive; s++) {
-            vnpjadv_mouse_move(n, xs[k] + (s % 2 ? -60 : 60), ys[k]);
-            alive = run(n, 48);
+        for (; k < c && alive; k++) {
+            if (tools[k] != tool) continue;
+            vnpjadv_mouse_move(n, xs[k] + 60, ys[k]);
+            if (first) {
+                alive = run(n, 16);
+                vnpjadv_mouse_button(n, VNPJADV_MOUSE_LEFT, 1);
+                first = 0;
+            }
+            alive = alive && run(n, 32);
+            for (int s = 0; s < 4 && alive; s++) {
+                vnpjadv_mouse_move(n, xs[k] + (s % 2 ? 60 : -60), ys[k]);
+                alive = run(n, 32);
+            }
+            t += 160;
         }
         vnpjadv_mouse_button(n, VNPJADV_MOUSE_LEFT, 0);
         alive = alive && run(n, 16);
-        t += 340;
     }
     printf("solve: %d ms, phase %d\n", t, p->game ? pj_game_phase(p->game) : -1);
     return alive;

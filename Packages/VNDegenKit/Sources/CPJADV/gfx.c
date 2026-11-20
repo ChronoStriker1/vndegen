@@ -5,7 +5,10 @@ static bool referenced(PJ *p, const Image *im) {
         if (p->layer[i].used && p->layer[i].img == im) return true;
     for (int i = 0; i < PJ_BUTTONS; i++)
         if (p->btn[i].used && p->btn[i].spr.img == im) return true;
-    return false;
+    for (int i = 0; i < PJ_SLIDERS; i++)
+        if (p->slider[i].used && p->slider[i].knob.img == im) return true;
+    if (p->msgFrame.used && p->msgFrame.img == im) return true;
+    return p->game && pj_game_uses(p->game, im);
 }
 
 Image *pj_image(PJ *p, const char *name) {
@@ -32,29 +35,28 @@ Image *pj_image(PJ *p, const char *name) {
         pj_log(p, "can't decode picture %s", name);
         return NULL;
     }
-    int slot = -1;
+    size_t budget = (size_t)160 << 20, bytes = (size_t)im->w * (size_t)im->h * 4;
     for (int i = 0; i < n; i++)
-        if (!p->cache[i].img) {
-            slot = i;
-            break;
-        }
+        if (p->cache[i].img) bytes += (size_t)p->cache[i].img->w * (size_t)p->cache[i].img->h * 4;
+    while (bytes > budget) {
+        int victim = -1;
+        u32 best = ~0u;
+        for (int i = 0; i < n; i++)
+            if (p->cache[i].img && p->cache[i].used < best && !referenced(p, p->cache[i].img)) {
+                best = p->cache[i].used;
+                victim = i;
+            }
+        if (victim < 0) break;
+        bytes -= (size_t)p->cache[victim].img->w * (size_t)p->cache[victim].img->h * 4;
+        pj_image_free(p->cache[victim].img);
+        p->cache[victim].img = NULL;
+    }
+    int slot = -1;
+    for (int i = 0; i < n && slot < 0; i++)
+        if (!p->cache[i].img) slot = i;
     if (slot < 0) {
-        size_t bytes = 0;
-        for (int i = 0; i < n; i++) bytes += (size_t)p->cache[i].img->w * (size_t)p->cache[i].img->h * 4;
-        for (int round = 0; round < 2 && slot < 0; round++) {
-            u32 best = ~0u;
-            for (int i = 0; i < n; i++)
-                if (p->cache[i].used < best && (round || !referenced(p, p->cache[i].img))) {
-                    best = p->cache[i].used;
-                    slot = i;
-                }
-        }
-        (void)bytes;
-        if (referenced(p, p->cache[slot].img)) {
-            pj_log(p, "picture cache full, not caching %s", name);
-            return im;
-        }
-        pj_image_free(p->cache[slot].img);
+        pj_log(p, "picture cache full, not caching %s", name);
+        return im;
     }
     snprintf(p->cache[slot].name, sizeof p->cache[slot].name, "%s", name);
     p->cache[slot].img = im;
