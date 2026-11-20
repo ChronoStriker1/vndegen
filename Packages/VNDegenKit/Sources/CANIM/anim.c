@@ -72,6 +72,9 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
     size_t n = (size_t)a->W * (size_t)a->H;
     a->fb = an_alloc(sizeof(u32) * n);
     a->prev = an_alloc(sizeof(u32) * n);
+    a->shot = an_alloc(sizeof(u32) * n);
+    a->lastSlot = -1;
+    an_system_load(a);
     an_text_init(a);
     an_snd_init(a);
     an_vm_start(a, 8);
@@ -95,6 +98,10 @@ void vnanim_close(VNANIM *n) {
     free(a->logs);
     free(a->fb);
     free(a->prev);
+    free(a->shot);
+    for (int i = 0; i < 180; i++) an_image_free(a->thumbs[i]);
+    free(a->saves);
+    free(a->sys);
     free(a->dir);
     free(a->saveDir);
     free(a->base);
@@ -107,12 +114,14 @@ bool vnanim_frame(VNANIM *n, uint32_t elapsedMs) {
     if (a->quit) return false;
     if (a->paused) return true;
     a->now += elapsedMs;
-    if (a->phase == PH_TITLE) an_title_input(a);
-    else an_game_input(a);
-    if (a->phase == PH_GAME) an_vm_step(a);
+    if (an_screens_input(a)) {
+    } else if (a->phase == PH_TITLE) an_title_input(a);
+    else if (!an_ui_input(a)) an_game_input(a);
+    if (a->phase == PH_GAME && a->screen == SCR_NONE) an_vm_step(a);
     if (an_movie_looping(a)) an_movie_update(a);
     a->clicked = false;
     a->rclicked = false;
+    a->wheel = 0;
     an_gfx_render(a);
     return !a->quit;
 }
@@ -149,7 +158,7 @@ void vnanim_key(VNANIM *n, int vk, bool down) {
 
 void vnanim_wheel(VNANIM *n, int notches) {
     AN *a = (AN *)n;
-    if (notches < 0) a->clicked = true;
+    a->wheel += notches;
 }
 
 void vnanim_audio(VNANIM *n, float *out, int frames) { an_snd_mix((AN *)n, out, frames); }

@@ -41,12 +41,13 @@ void an_title_input(AN *a) {
         a->logCount = 0;
         an_vm_start(a, 8);
         break;
-    case TB_EXIT: a->quit = true; break;
+    case TB_CONTINUE: an_slots_open(a, false); break;
+    case TB_EXIT: an_confirm(a, MSG_QUIT, ACT_QUIT, 0); break;
     default: break;
     }
 }
 
-enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 1020, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194, WIN_ALPHA = 130 };
+enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 920, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194, WIN_ALPHA = 130 };
 enum { BAR_X = 568, BAR_Y = 694, BAR_W = 712, BAR_H = 26, CHOICE_W = 719, CHOICE_H = 79, CHOICE_GAP = 16 };
 
 static void draw_window(AN *a) {
@@ -64,7 +65,7 @@ static void draw_window(AN *a) {
     if (a->text) an_text_draw(a, TEXT_X, a->name ? ROW1 + LINE_H : ROW1, a->text, TEXT_SIZE, 0xffffffffu, 0x90000000u, TEXT_W, LINE_H);
     if (ui) {
         an_gfx_blit(a->fb, a->W, a->H, ui, 2, 118, BAR_W, BAR_H, BAR_X, BAR_Y, 255);
-        for (int i = 0; i < 11; i++) an_gfx_blit(a->fb, a->W, a->H, ui, 2 + 58 * i, 2, 56, 22, 606 + 58 * i + (i >= 2) * 10 + (i >= 7) * 10 + (i >= 10) * 10, 696, 255);
+        an_bar_draw(a, ui);
         an_gfx_blit(a->fb, a->W, a->H, ui, 168, 53, 28, 28, 1243, 563, 255);
     }
     Image *cur = an_image_load(a, "pAnimeCursor");
@@ -112,7 +113,7 @@ void an_window_render(AN *a) {
         draw_choices(a);
         return;
     }
-    if (a->scene.window && a->text) draw_window(a);
+    if (a->scene.window && a->text && a->screen == SCR_NONE) draw_window(a);
 }
 
 void an_game_input(AN *a) {
@@ -127,7 +128,8 @@ void an_game_input(AN *a) {
         return;
     }
     if (a->th.wait == W_TEXT) {
-        if (a->clicked || a->skipMode) {
+        bool autoNext = a->autoMode && !an_snd_playing(a, CH_VOICE) && a->now - a->textStart > 1500 + 40 * (u32)strlen(a->text);
+        if (a->clicked || a->skipMode || a->ctrl || autoNext) {
             a->clicked = false;
             a->th.wait = W_NONE;
             if (!a->skipMode) an_snd_stop(a, CH_VOICE);

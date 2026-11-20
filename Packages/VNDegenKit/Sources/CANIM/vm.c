@@ -174,7 +174,9 @@ static void push_log(AN *a, const char *name, const char *text, const char *voic
     a->logs[a->logCount++] = (LogEntry){(char *)name, (char *)text, (char *)voice};
 }
 
-static void show_text(AN *a, const char *name, const char *text, const char *voice) {
+static void show_text(AN *a, const char *name, const char *text, const char *voice, int id) {
+    a->textPc = a->opPc;
+    an_mark_read(a, id);
     a->name = name && *name ? name : NULL;
     a->text = text;
     a->voiceName = voice;
@@ -208,14 +210,29 @@ static void skip_case(AN *a) {
     a->th.pc = pc;
 }
 
-static void end_game(AN *a) {
+void an_reset_scene(AN *a) {
     an_movie_stop(a);
-    a->th.wait = W_END;
-    a->phase = PH_TITLE;
     an_snd_stop(a, CH_BGM);
     an_snd_stop(a, CH_VOICE);
     for (int c = CH_SE0; c < CH_COUNT; c++) an_snd_stop(a, c);
     memset(&a->scene, 0, sizeof a->scene);
+    a->transTime = 0;
+    a->name = a->text = a->voiceName = NULL;
+}
+
+void an_go_title(AN *a) {
+    an_reset_scene(a);
+    an_system_save(a);
+    a->th.wait = W_END;
+    a->phase = PH_TITLE;
+    a->screen = SCR_NONE;
+}
+
+static void end_game(AN *a) {
+    an_reset_scene(a);
+    an_system_save(a);
+    a->th.wait = W_END;
+    a->phase = PH_TITLE;
 }
 
 static void exec(AN *a, const Op *op) {
@@ -376,6 +393,7 @@ static void exec(AN *a, const Op *op) {
     }
     case 0xb8: an_snd_stop(a, CH_BGM); break;
     case 0xa2: s->window = g[0].v != 0; break;
+    case 0x86: a->sceneKind = g[0].v; break;
     case 0xa8: set(a, &g[0], (i32)a->now); break;
     case 0xaa: set(a, &g[0], a->ctrl ? 1 : 0); break;
     case 0xab:
@@ -383,7 +401,7 @@ static void exec(AN *a, const Op *op) {
         a->clicked = false;
         break;
     case 0xac: set(a, &g[0], 0); break;
-    case 0xaf: set(a, &g[0], a->skipMode ? 1 : 0); break;
+    case 0xaf: set(a, &g[0], a->skipMode || a->ctrl ? 1 : 0); break;
     case 0xd0:
         a->choiceCount = g[0].v;
         a->choiceHover = -1;
@@ -392,9 +410,9 @@ static void exec(AN *a, const Op *op) {
     case 0xd1:
         if (a->choiceResult != g[0].v) skip_case(a);
         break;
-    case 0xde: show_text(a, str(a, &g[1]), str(a, &g[2]), str(a, &g[0])); break;
-    case 0xdf: show_text(a, str(a, &g[0]), str(a, &g[1]), NULL); break;
-    case 0xe1: show_text(a, NULL, str(a, &g[0]), NULL); break;
+    case 0xde: show_text(a, str(a, &g[1]), str(a, &g[2]), str(a, &g[0]), g[3].v); break;
+    case 0xdf: show_text(a, str(a, &g[0]), str(a, &g[1]), NULL, g[2].v); break;
+    case 0xe1: show_text(a, NULL, str(a, &g[0]), NULL, g[1].v); break;
     case 0xe6: end_game(a); break;
     default: break;
     }
@@ -437,6 +455,7 @@ bool an_vm_step(AN *a) {
             end_game(a);
             return false;
         }
+        a->opPc = t->pc;
         t->pc = op.next;
         exec(a, &op);
     }

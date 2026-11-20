@@ -137,6 +137,7 @@ static void apply_transition(AN *a) {
 void an_gfx_render(AN *a) {
     if (a->phase == PH_TITLE) {
         an_title_render(a);
+        an_screens_render(a);
         a->serial++;
         return;
     }
@@ -148,5 +149,7 @@ void an_gfx_render(AN *a) {
     draw_scene(a, a->fb);
     apply_transition(a);
     an_window_render(a);
+    an_ui_render(a);
+    an_screens_render(a);
     a->serial++;
 }

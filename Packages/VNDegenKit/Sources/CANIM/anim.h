@@ -161,8 +161,17 @@ typedef struct LogEntry {
 #define AN_SE 16
 
 enum { PH_TITLE, PH_GAME };
+enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD };
+enum { MSG_TITLE, MSG_QUIT, MSG_OVERWRITE, MSG_DELETE, MSG_JUMP, MSG_RESET_FLOW };
+enum { ACT_SAVE, ACT_LOAD, ACT_TITLE, ACT_QUIT };
+enum { BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE };
 
 typedef struct Font Font;
+
+typedef struct SlotInfo {
+    int year, month, day, hour, minute, second;
+    char comment[128];
+} SlotInfo;
 
 struct AN {
     char *dir, *saveDir, *base;
@@ -202,12 +211,25 @@ struct AN {
     int choiceCount, choiceHover;
     int choiceResult;
 
+    int screen, logTop, wheel;
+    int slotPage;
+    bool confirmOpen;
+    int confirmMsg, confirmAction, confirmArg;
+    Image *thumbs[180];
+    u32 thumbsSerial[180], saveSerial;
     int mx, my;
     bool down, clicked, rclicked, ctrl;
     int hover;
 
     bool skipMode, autoMode;
 
+    u8 *saves, *sys;
+    size_t sysSize;
+    u8 saveKey[16], sysKey[16];
+    int lastSlot;
+    u32 textPc, opPc;
+    int sceneKind;
+    u32 *shot;
     struct Mixer *mix;
     struct Movie *movie;
     Font *font;
@@ -248,6 +270,28 @@ void an_movie_mix(AN *a, float *out, int frames);
 
 enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_COUNT = CH_SE0 + AN_SE };
 
+bool an_slot_info(AN *a, int slot, SlotInfo *info);
+bool an_save_slot(AN *a, int slot);
+bool an_load_slot(AN *a, int slot);
+bool an_quick_save(AN *a);
+bool an_quick_load(AN *a);
+void an_confirm(AN *a, int message, int action, int arg);
+void an_do_action(AN *a, int action, int arg);
+void an_slots_open(AN *a, bool saving);
+void an_screens_render(AN *a);
+bool an_screens_input(AN *a);
+void an_go_title(AN *a);
+void an_capture_shot(AN *a);
+void an_system_load(AN *a);
+void an_system_save(AN *a);
+void an_mark_read(AN *a, int id);
+bool an_is_read(AN *a, int id);
+void an_reset_scene(AN *a);
+bool an_png_write(const char *path, const u32 *px, int w, int h);
+void an_ui_render(AN *a);
+bool an_ui_input(AN *a);
+int an_bar_hit(AN *a);
+void an_bar_draw(AN *a, Image *ui);
 void an_title_render(AN *a);
 void an_title_input(AN *a);
 void an_game_input(AN *a);

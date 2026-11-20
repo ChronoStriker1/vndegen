@@ -25,7 +25,7 @@ add_library(anim STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c)
 target_include_directories(anim PUBLIC ${RUNTIME} ${RUNTIME}/include ${SHARED})
 target_compile_options(anim PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function)
 target_compile_definitions(anim PRIVATE _GNU_SOURCE)
-target_link_libraries(anim PUBLIC vnvideo m pthread)
+target_link_libraries(anim PUBLIC vnvideo m pthread z)
 
 add_executable(animrun animrun.c)
 target_link_libraries(animrun PRIVATE anim)
