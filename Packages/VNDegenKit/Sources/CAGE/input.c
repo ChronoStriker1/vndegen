@@ -69,6 +69,7 @@ void input_service(AG *g) {
             text_finish(g);
             in->pressed &= ~0x10u;
             in->clicks &= ~1u;
+            in->latch &= ~1u;
         }
         if (!text_revealing(g)) g->wait = W_NONE;
         return;
@@ -78,6 +79,7 @@ void input_service(AG *g) {
             Frame *f = &g->fr[g->top];
             in->pressed = 0;
             in->clicks = 0;
+            in->latch = 0;
             g->wait = W_NONE;
             if (f->handlerB != 0xffffffffu) co_enter(g, g->top, f->handlerB, f->pc, 3);
             else g->coState = 0;
@@ -111,13 +113,17 @@ void input_service(AG *g) {
             Hotspot *h = &in->hot[i];
             if (h->action >= 0 && h->action < 32 && (in->pressed & (1u << h->action)) && h->click != 0xffffffffu) {
                 in->pressed &= ~(1u << h->action);
-                if (h->action == ((in->mouseSlot[0] + 4) & 31)) in->clicks &= ~1u;
+                if (h->action == ((in->mouseSlot[0] + 4) & 31)) {
+                    in->clicks &= ~1u;
+                    in->latch &= ~1u;
+                }
                 wait_callback(g, h->click);
                 return;
             }
         }
         if ((in->clicks & 1) && in->hit >= 0 && in->hot[in->hit].click != 0xffffffffu) {
             in->clicks &= ~1u;
+            in->latch &= ~1u;
             in->pressed &= ~0x10u;
             wait_callback(g, in->hot[in->hit].click);
             return;
@@ -125,6 +131,7 @@ void input_service(AG *g) {
     }
     if ((in->clicks & 1) || (in->pressed & 0x10)) {
         in->clicks &= ~1u;
+        in->latch &= ~1u;
         in->pressed &= ~0x10u;
         advance(g);
         return;

@@ -42,6 +42,11 @@ static void print_state(AG *g) {
     printf("now=%u steps=%llu wait=%d top=%d\n", g->now, (unsigned long long)g->steps, g->wait, g->top);
     for (int i = 0; i <= g->top; i++)
         printf("  frame %d %s pc=%#x rsp=%d\n", i, g->fr[i].sc ? g->fr[i].sc->name : "-", g->fr[i].pc, g->fr[i].rsp);
+    printf("  hot armed=%d n=%d hit=%d hovered=%d\n", g->in.hotArmed, g->in.nhot, g->in.hit, g->in.hovered);
+    for (int i = 0; i < g->in.nhot; i++) {
+        Hotspot *h = &g->in.hot[i];
+        printf("  hot %d %d,%d %dx%d action=%d click=%#x owner=%d\n", i, h->x, h->y, h->w, h->h, h->action, h->click, h->owner);
+    }
     for (int i = 0; i < g->gfx.nobj; i++) {
         Obj *o = g->gfx.obj[i];
         Image *im = gfx_surface(g, o->slot);
