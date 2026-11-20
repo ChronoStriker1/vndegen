@@ -51,6 +51,20 @@ void an_title_input(AN *a) {
 enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 920, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194, WIN_ALPHA = 130 };
 enum { BAR_X = 568, BAR_Y = 694, BAR_W = 712, BAR_H = 26, CHOICE_W = 719, CHOICE_H = 79, CHOICE_GAP = 16 };
 
+enum { CHARS_PER_SECOND = 120 };
+
+static size_t text_shown(AN *a) {
+    if (!a->text) return 0;
+    size_t n = strlen(a->text);
+    if (a->textComplete || a->skipMode || a->ctrl) return n;
+    size_t want = (size_t)(a->now - a->textStart) * CHARS_PER_SECOND / 1000;
+    if (want >= n) return n;
+    while (want > 0 && ((u8)a->text[want] & 0xc0) == 0x80) want--;
+    return want;
+}
+
+static bool text_done(AN *a) { return !a->text || text_shown(a) >= strlen(a->text); }
+
 static void draw_window(AN *a) {
     Image *w = an_image_load(a, "spMessageWindow");
     if (w) {
@@ -63,14 +77,20 @@ static void draw_window(AN *a) {
         if (a->voiceName && ui) an_gfx_blit(a->fb, a->W, a->H, ui, 4, 53, 76, 28, 92, 563, 255);
         an_text_draw(a, NAME_X, ROW1, a->name, TEXT_SIZE, 0xffffffffu, 0x90000000u, 0, LINE_H);
     }
-    if (a->text) an_text_draw(a, TEXT_X, a->name ? ROW1 + LINE_H : ROW1, a->text, TEXT_SIZE, 0xffffffffu, 0x90000000u, TEXT_W, LINE_H);
+    if (a->text) {
+        size_t n = strlen(a->text), shown = text_shown(a);
+        char *part = an_alloc(n + 1);
+        memcpy(part, a->text, shown < n ? shown : n);
+        an_text_draw(a, TEXT_X, a->name ? ROW1 + LINE_H : ROW1, part, TEXT_SIZE, 0xffffffffu, 0x90000000u, TEXT_W, LINE_H);
+        free(part);
+    }
     if (ui) {
         an_gfx_blit(a->fb, a->W, a->H, ui, 2, 118, BAR_W, BAR_H, BAR_X, BAR_Y, 255);
         an_bar_draw(a, ui);
         an_gfx_blit(a->fb, a->W, a->H, ui, 168, 53, 28, 28, 1243, 563, 255);
     }
     Image *cur = an_image_load(a, "pAnimeCursor");
-    if (cur && a->th.wait == W_TEXT) {
+    if (cur && a->th.wait == W_TEXT && text_done(a)) {
         int f = (int)(a->now / 80 % 9);
         int fx = 4 + (f % 6) * 42, fy = 4 + (f / 6) * 42;
         an_gfx_blit(a->fb, a->W, a->H, cur, fx, fy, 36, 36, 1216, 649, 255);
@@ -129,7 +149,12 @@ void an_game_input(AN *a) {
         return;
     }
     if (a->th.wait == W_TEXT) {
-        bool autoNext = a->autoMode && !an_snd_playing(a, CH_VOICE) && a->now - a->textStart > 1500 + 40 * (u32)strlen(a->text);
+        bool autoNext = a->autoMode && text_done(a) && !an_snd_playing(a, CH_VOICE) && a->now - a->textStart > 1500 + 40 * (u32)strlen(a->text);
+        if (a->clicked && !text_done(a)) {
+            a->clicked = false;
+            a->textComplete = true;
+            return;
+        }
         if (a->clicked || a->skipMode || a->ctrl || autoNext) {
             a->clicked = false;
             a->th.wait = W_NONE;

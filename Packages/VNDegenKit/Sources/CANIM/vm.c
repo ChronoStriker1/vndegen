@@ -181,6 +181,7 @@ static void show_text(AN *a, const char *name, const char *text, const char *voi
     a->text = text;
     a->voiceName = voice;
     a->textStart = a->now;
+    a->textComplete = false;
     a->scene.window = true;
     push_log(a, a->name, text, voice);
     if (voice && *voice) an_snd_play(a, CH_VOICE, voice, false, true);
@@ -382,6 +383,10 @@ static void exec(AN *a, const Op *op) {
         break;
     }
     case 0x87: an_snd_stop(a, CH_BGM); break;
+    case 0x8d: an_snd_play(a, CH_BGV0 + (g[0].v & 3), str(a, &g[1]), true, true); break;
+    case 0xb4:
+        for (int c = CH_BGV0; c < CH_COUNT; c++) an_snd_stop(a, c);
+        break;
     case 0x93:
         for (int c = CH_SE0; c < CH_COUNT; c++) an_snd_stop(a, c);
         break;

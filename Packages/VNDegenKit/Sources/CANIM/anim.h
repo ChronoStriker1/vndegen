@@ -234,7 +234,7 @@ struct AN {
     u32 transColor;
 
     const char *name, *text, *voiceName;
-    int textShown;
+    bool textComplete;
     u32 textStart;
     LogEntry *logs;
     int logCount, logCap;
@@ -310,7 +310,7 @@ bool an_movie_update(AN *a);
 void an_movie_draw(AN *a, u32 *dst);
 void an_movie_mix(AN *a, float *out, int frames);
 
-enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_COUNT = CH_SE0 + AN_SE };
+enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_BGV0 = CH_SE0 + AN_SE, CH_COUNT = CH_BGV0 + 4 };
 
 bool an_slot_info(AN *a, int slot, SlotInfo *info);
 bool an_save_slot(AN *a, int slot);

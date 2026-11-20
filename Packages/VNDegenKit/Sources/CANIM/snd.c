@@ -32,7 +32,7 @@ struct Mixer {
 bool an_snd_init(AN *a) {
     struct Mixer *m = an_alloc(sizeof *m);
     pthread_mutex_init(&m->lock, NULL);
-    for (int i = 0; i < CH_COUNT; i++) m->vol[i] = i == CH_BGM ? 0.6f : 0.85f;
+    for (int i = 0; i < CH_COUNT; i++) m->vol[i] = 0.8f * (i == CH_BGM ? 0.5f : 0.7f);
     a->mix = m;
     return true;
 }
@@ -115,9 +115,11 @@ void an_snd_mix(AN *a, float *out, int frames) {
     struct Mixer *m = a->mix;
     if (!m || a->paused) return;
     pthread_mutex_lock(&m->lock);
+    bool talking = m->v[CH_VOICE] && !m->v[CH_VOICE]->done;
     for (int c = 0; c < CH_COUNT; c++) {
-        mix_voice(m->v[c], m->vol[c], out, frames);
-        mix_voice(m->fading[c], m->vol[c], out, frames);
+        float vol = m->vol[c] * (c >= CH_BGV0 && talking ? 0.3f : 1.0f);
+        mix_voice(m->v[c], vol, out, frames);
+        mix_voice(m->fading[c], vol, out, frames);
     }
     an_movie_mix(a, out, frames);
     pthread_mutex_unlock(&m->lock);
