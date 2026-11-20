@@ -507,6 +507,9 @@ static bool step(PJ *p) {
     case 0x030100:
         break;
 
+    case 0x000410: pj_set_volume(p, CH_BGM, (float)val(p, a[0]) / 10000.0f); break;
+    case 0x000510: pj_set_volume(p, CH_VOICE, (float)val(p, a[0]) / 10000.0f); break;
+    case 0x000610: pj_set_volume(p, CH_SE, (float)val(p, a[0]) / 10000.0f); break;
     case 0x008120: p->result = p->lang; break;
     case 0x000120: p->result = 0; break;
 
