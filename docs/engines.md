@@ -34,6 +34,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [EAGLS](#eagls) | `Script/SCPACK.idx` beside `CG/CGPACK.idx`, up to one folder down | Mac, iPhone, iPad |
 | [ExHibit](#exhibit) | `ExHIBIT.ini` beside `resident.dll` and `rld/start.rld`, up to one folder down | Mac, iPhone, iPad |
 | [Bruns](#bruns) | `ams.cfg` beside `binary/bruns.exe` and `scene/brs009000.bso`, up to one folder down | Mac, iPhone, iPad |
+| [Eushully AGE](#eushully-age) | `SYS4INI.BIN` beside `DATA1.ALF` or `age.exe`, up to one folder down | Mac, iPhone, iPad |
 | [BISHOP BSX](#bishop-bsx) | `bsxx.dat` beside `bsxx.cfg` and a `Graphics*.bsa` archive, up to one folder down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
@@ -226,6 +227,10 @@ ExHibit games, such as Succubus Sessions: Mami Mamiya's Sweet Slice of Hell, run
 ## Bruns
 
 Bruns games, such as Orc Kingdom: Monmusu Breeder King, run on VNDegen's own Bruns runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed notes on the file encryption and the audio, and the original engine run under Wine, MIT licensed like the rest of the app. The game's scripts run everything: the title, the story, the strategy screens, dungeons and battles, and the Save, Load, config and backlog screens; the engine adds the message windows, choices and the right-side menubar from `ams.cfg`. Saves are the PC engine's own `bruns-system.dat`, under `AppData/Roaming` in the game's data folder as on Windows, and load both ways. Flow mode isn't there. [bruns.md](bruns.md) lists which games run and the known limits, and [bruns-cleanroom.md](bruns-cleanroom.md) where the runtime's knowledge came from.
+
+## Eushully AGE
+
+Eushully AGE games of the SYS4 generation, such as Kamidori Alchemy Meister, run on VNDegen's own AGE runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive and picture readers, OpenMaidEngine's MIT-licensed opcode notes read as hints, and the original engine run under Wine, MIT licensed like the rest of the app. The whole game is in its compiled scripts, so the runtime is the script machine with the engine's drawing, text, sound, movie and input services: the story, the battle maps, the workshop and town all run from the game's own code. Saves are the PC engine's own `SAVE.DAT`, `RT.DAT` and `SAVEnn.DAT` files, kept in the game's data folder as they are under AppData, and load both ways. [age.md](age.md) lists which games run and the known limits, and [age-cleanroom.md](age-cleanroom.md) where the runtime's knowledge came from.
 
 ## BISHOP BSX
 

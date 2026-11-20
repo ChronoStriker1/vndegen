@@ -16,7 +16,8 @@ Other looping WebMs reload at their end rather than use WebKit's loop, which sto
 
 vnvideo is the movie decoder VNDegen's native engines share, in `Engines/Shared/vnvideo.[ch]`. It plays:
 
-- MPEG-1 video with MPEG-1 Layer II sound, through pl_mpeg.
+- MPEG-1 video with MPEG-1 Layer I or Layer II sound, through pl_mpeg (Layer I is VNDegen's addition; see
+  `Engines/Shared/UPSTREAM.md`).
 - MPEG-1 video with MP3 (Layer III) sound, as Spooky Pregnant School: The Quickening's movies have: pl_mpeg decodes the
   picture, and a second pl_mpeg demuxer, reading the file at its own position, hands the sound packets to dr_mp3.
 - Ogg Theora video, silent or with Opus sound, through libogg, libtheora, and libopus.
