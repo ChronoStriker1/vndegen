@@ -84,6 +84,8 @@ VNPJADV *vnpjadv_open(const VNPJADVConfig *config, char *err, size_t errSize) {
     for (size_t i = 0; i < (size_t)PJ_W * PJ_H; i++) p->shown[i] = 0xff000000u;
     p->hover = -1;
     p->pressBtn = -1;
+    p->dragSlider = -1;
+    p->activeGroup = -1;
     p->groupMs = -1;
     for (int i = 0; i < PJ_LAYERS + PJ_SUBS; i++) p->layer[i].parent = -1;
     if (config->audioRate > 0) p->mix = pj_mixer_new(config->audioRate);
@@ -102,6 +104,7 @@ void vnpjadv_close(VNPJADV *v) {
     if (p->game) pj_game_free(p->game);
     for (int i = 0; i < PJ_LAYERS + PJ_SUBS; i++) pj_sprite_free(&p->layer[i]);
     for (int i = 0; i < PJ_BUTTONS; i++) pj_sprite_free(&p->btn[i].spr);
+    for (int i = 0; i < PJ_SLIDERS; i++) pj_sprite_free(&p->slider[i].knob);
     pj_sprite_free(&p->msgFrame);
     for (size_t i = 0; i < sizeof p->cache / sizeof p->cache[0]; i++) pj_image_free(p->cache[i].img);
     pj_mixer_free(p->mix);
@@ -124,7 +127,7 @@ static int button_at(PJ *p, int x, int y) {
     u32 z = 0;
     for (int i = 0; i < PJ_BUTTONS; i++) {
         Button *b = &p->btn[i];
-        if (!b->used || x < b->x1 || x >= b->x2 || y < b->y1 || y >= b->y2) continue;
+        if (!b->used || b->group != p->activeGroup || x < b->x1 || x >= b->x2 || y < b->y1 || y >= b->y2) continue;
         if (best < 0 || b->spr.z > z) {
             best = i;
             z = b->spr.z;
@@ -133,9 +136,31 @@ static int button_at(PJ *p, int x, int y) {
     return best;
 }
 
+static int slider_at(PJ *p, int x, int y) {
+    for (int i = 0; i < PJ_SLIDERS; i++) {
+        Slider *s = &p->slider[i];
+        if (!s->used || !s->shown) continue;
+        int gx = s->args[2] + s->dx, gy = s->args[3] + s->dy;
+        if (x >= gx && x < gx + s->args[6] && y >= gy && y < gy + s->args[7]) return i;
+    }
+    return -1;
+}
+
+static void slider_drag(PJ *p, int i) {
+    Slider *s = &p->slider[i];
+    int range = s->args[14], lo = s->args[15], hi = s->args[16];
+    if (range <= 0 || hi <= lo) return;
+    int gx = s->args[2] + s->dx, kw = s->args[12];
+    int v = lo + (p->mx - gx - kw / 2) * (hi - lo) / range;
+    v = clampi(v, lo, hi);
+    if (v == s->value) return;
+    s->value = v;
+    *pj_var(p, s->var) = v;
+    pj_slider_place(p, s);
+}
+
 static void update_hover(PJ *p) {
-    int h = p->wait == W_BUTTON ? button_at(p, p->mx, p->my) : -1;
-    if (h >= 0 && p->btn[h].group != p->waitGroup) h = -1;
+    int h = p->game ? -1 : button_at(p, p->mx, p->my);
     for (int i = 0; i < PJ_BUTTONS; i++) {
         Button *b = &p->btn[i];
         if (!b->used) continue;
@@ -146,21 +171,20 @@ static void update_hover(PJ *p) {
         }
     }
     p->hover = h;
+    if (p->mdown && p->dragSlider >= 0) slider_drag(p, p->dragSlider);
 }
 
 static void handle_click(PJ *p, bool right) {
     if (p->game) return;
     int key = right ? 1 : 0;
-    if (p->wait == W_BUTTON && !right) {
+    if (!right) {
         int b = button_at(p, p->mx, p->my);
-        if (b >= 0 && b == p->pressBtn && p->btn[b].group == p->waitGroup) {
-            p->wait = W_NONE;
+        if (b >= 0 && b == p->pressBtn) {
             pj_call_handler(p, p->btn[b].handler);
-            p->stack[p->sp - 2] = W_NONE;
+            return;
         }
-        return;
     }
-    if (p->keyHandler[key] && p->wait != W_BUTTON) {
+    if (p->keyHandler[key]) {
         pj_call_handler(p, p->keyHandler[key]);
         return;
     }
@@ -181,12 +205,20 @@ void vnpjadv_mouse_move(VNPJADV *v, int x, int y) {
 
 void vnpjadv_mouse_button(VNPJADV *v, int button, bool down) {
     PJ *p = (PJ *)v;
+    if (p->game) {
+        pj_game_mouse(p, p->game, button, down);
+        return;
+    }
     if (button == VNPJADV_MOUSE_LEFT) {
         p->mdown = down;
-        if (down) p->pressBtn = button_at(p, p->mx, p->my);
-        else {
-            handle_click(p, false);
+        if (down) {
+            p->pressBtn = button_at(p, p->mx, p->my);
+            p->dragSlider = p->pressBtn < 0 ? slider_at(p, p->mx, p->my) : -1;
+            if (p->dragSlider >= 0) slider_drag(p, p->dragSlider);
+        } else {
+            if (p->dragSlider < 0) handle_click(p, false);
             p->pressBtn = -1;
+            p->dragSlider = -1;
         }
     } else if (button == VNPJADV_MOUSE_RIGHT) {
         p->rdown = down;
@@ -196,7 +228,7 @@ void vnpjadv_mouse_button(VNPJADV *v, int button, bool down) {
 
 void vnpjadv_key(VNPJADV *v, int vk, bool down) {
     PJ *p = (PJ *)v;
-    if (!down) return;
+    if (!down || p->game) return;
     if (vk == 0x0d || vk == 0x20) {
         if (p->wait == W_TEXT) handle_click(p, false);
     } else if (vk == 0x1b)

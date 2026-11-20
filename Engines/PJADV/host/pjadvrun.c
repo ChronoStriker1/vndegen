@@ -52,6 +52,47 @@ static int press(VNPJADV *n, int x, int y, int button) {
     return alive && run(n, 32);
 }
 
+static int solve(VNPJADV *n, int maxMs) {
+    PJ *p = (PJ *)n;
+    int t = 0, alive = 1;
+    while (alive && t < 10000 && !p->game) {
+        alive = run(n, 100);
+        t += 100;
+    }
+    while (alive && t < maxMs && p->game && pj_game_phase(p->game) < 2) {
+        alive = run(n, 100);
+        t += 100;
+    }
+    while (alive && t < maxMs && p->game && pj_game_phase(p->game) == 2) {
+        int xs[256], ys[256], tools[256];
+        int c = pj_game_icons(p->game, xs, ys, tools, 256);
+        if (!c) {
+            alive = run(n, 100);
+            t += 100;
+            continue;
+        }
+        int tool = pj_game_tool(p->game), k;
+        for (k = 0; k < c && tools[k] != tool; k++) {}
+        if (k == c) {
+            alive = press(n, 180, 910, VNPJADV_MOUSE_LEFT);
+            t += 150;
+            continue;
+        }
+        vnpjadv_mouse_move(n, xs[k] - 60, ys[k]);
+        alive = run(n, 16);
+        vnpjadv_mouse_button(n, VNPJADV_MOUSE_LEFT, 1);
+        for (int s = 0; s < 6 && alive; s++) {
+            vnpjadv_mouse_move(n, xs[k] + (s % 2 ? -60 : 60), ys[k]);
+            alive = run(n, 48);
+        }
+        vnpjadv_mouse_button(n, VNPJADV_MOUSE_LEFT, 0);
+        alive = alive && run(n, 16);
+        t += 340;
+    }
+    printf("solve: %d ms, phase %d\n", t, p->game ? pj_game_phase(p->game) : -1);
+    return alive;
+}
+
 static void print_state(PJ *p) {
     printf("pc=%x wait=%d sp=%d game=%d text=%s\n", p->pc, p->wait, p->sp, p->game != NULL, p->msgText ? p->msgText : "");
     for (int i = 0; i < PJ_LAYERS + PJ_SUBS; i++) {
@@ -69,7 +110,7 @@ static void print_state(PJ *p) {
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: pjadvrun gameDir [-s saveDir] [-l lang] [-w wav] [-o log] [commands]\n"
-                        "commands: w:MS  c:X,Y  r:X,Y  m:X,Y  d:X,Y  u:X,Y  k:VK  p:FILE.png  P:FILE.png  t  q\n");
+                        "commands: w:MS  S[:MS]  c:X,Y  r:X,Y  m:X,Y  d:X,Y  u:X,Y  k:VK  p:FILE.png  P:FILE.png  t  q\n");
         return 2;
     }
     const char *dirs[] = {PJ_FONTS_DIR};
@@ -127,6 +168,7 @@ int main(int argc, char **argv) {
             break;
         }
         case 't': print_state((PJ *)n); break;
+        case 'S': alive = solve(n, x > 0 ? x : 120000); break;
         case 'q': alive = 0; break;
         }
     }

@@ -15,7 +15,7 @@ typedef struct Glyph {
 static struct {
     u8 *data;
     stbtt_fontinfo info;
-    bool ok;
+    bool ok, embolden;
     Glyph *glyphs;
     int count, cap;
     int *hash;
@@ -32,12 +32,13 @@ static void font_reset(void) {
 
 void pj_font_init(PJ *p) {
     font_reset();
-    static const char *const en[] = {"Meiryo UI", "Meiryo", "MS UI Gothic", "MS Gothic", NULL};
+    static const char *const en[] = {"Arial", "Meiryo UI", "MS Gothic", NULL};
+    static const char *const ja[] = {"Meiryo UI", "Meiryo", "MS UI Gothic", "MS Gothic", NULL};
     static const char *const cn[] = {"SimSun", "NSimSun", "Meiryo UI", "MS Gothic", NULL};
-    const char *const *names = p->lang == VNPJADV_LANG_CHINESE ? cn : en;
+    const char *const *names = p->lang == VNPJADV_LANG_CHINESE ? cn : p->lang == VNPJADV_LANG_JAPANESE ? ja : en;
     vnfont_match m;
     bool found = false;
-    for (int i = 0; names[i] && !found; i++) found = vnfont_resolve(names[i], 0, 0, &m) != 0;
+    for (int i = 0; names[i] && !found; i++) found = vnfont_resolve(names[i], 1, 0, &m) != 0;
     if (!found) {
         pj_log(p, "no font for the message window");
         return;
@@ -46,6 +47,7 @@ void pj_font_init(PJ *p) {
     font.data = pj_read_file(m.path, &size);
     int off = font.data ? stbtt_GetFontOffsetForIndex(font.data, m.face) : -1;
     font.ok = off >= 0 && stbtt_InitFont(&font.info, font.data, off);
+    font.embolden = m.embolden != 0;
     if (!font.ok) pj_log(p, "can't read font %s", m.path);
     else pj_log(p, "message font %s", m.path);
 }
@@ -83,7 +85,7 @@ static Glyph *glyph(u32 cp, int size) {
     g->cp = cp;
     g->size = size;
     if (font.ok) {
-        float sc = stbtt_ScaleForPixelHeight(&font.info, (float)size);
+        float sc = stbtt_ScaleForPixelHeight(&font.info, (float)size * 1.15f);
         int adv, lsb;
         stbtt_GetCodepointHMetrics(&font.info, (int)cp, &adv, &lsb);
         g->adv = (int)(adv * sc + 0.5f);
@@ -112,11 +114,11 @@ static int ascent(int size) {
     if (!font.ok) return size;
     int a, d, l;
     stbtt_GetFontVMetrics(&font.info, &a, &d, &l);
-    float sc = stbtt_ScaleForPixelHeight(&font.info, (float)size);
+    float sc = stbtt_ScaleForPixelHeight(&font.info, (float)size * 1.15f);
     return (int)(a * sc + 0.5f);
 }
 
-int pj_char_width(u32 cp, int size) { return glyph(cp, size)->adv; }
+int pj_char_width(u32 cp, int size) { return glyph(cp, size)->adv + (font.embolden ? 1 : 0); }
 
 int pj_text_width(const char *s, int n, int size) {
     int w = 0;
@@ -164,9 +166,13 @@ int pj_text_draw(u32 *dst, int dw, int dh, const char *s, int n, int x, int y, i
                 for (int oy = -e; oy <= e; oy++)
                     for (int ox = -e; ox <= e; ox++)
                         if (ox || oy) put_glyph(dst, dw, dh, g, gx + ox, gy + oy, ed);
+            if (edge != 0xffffffffu && font.embolden)
+                for (int oy = -e; oy <= e; oy++)
+                    if (oy) put_glyph(dst, dw, dh, g, gx + e + 1, gy + oy, ed);
             put_glyph(dst, dw, dh, g, gx, gy, fg);
+            if (font.embolden) put_glyph(dst, dw, dh, g, gx + 1, gy, fg);
         }
-        cx += g->adv;
+        cx += g->adv + (font.embolden ? 1 : 0);
     }
     return cx - x;
 }

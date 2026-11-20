@@ -190,12 +190,13 @@ typedef struct Button {
 #define PJ_BUTTONS 48
 
 typedef struct Slider {
-    bool used;
+    bool used, shown;
     int id;
-    int args[23];
-    i32 var;
+    int args[22];
+    u32 var;
     int value;
     int dx, dy;
+    Layer knob;
 } Slider;
 
 #define PJ_SLIDERS 8
@@ -207,7 +208,7 @@ typedef struct MsgWin {
     int font, indent;
 } MsgWin;
 
-enum { W_NONE, W_TIME, W_GROUP, W_TRANS, W_TEXT, W_BUTTON, W_FRAME, W_GAME, W_HALT };
+enum { W_NONE, W_TIME, W_GROUP, W_TRANS, W_TEXT, W_FRAME };
 
 #define PJ_STACK 64
 #define PJ_GLOBALS 4096
@@ -262,7 +263,7 @@ struct PJ {
     i32 result;
     int wait;
     int waitMs;
-    int waitGroup;
+    int activeGroup;
     bool halted;
     u32 keyHandler[16];
     u32 cancelHandler;
@@ -292,6 +293,8 @@ struct PJ {
 
     Mixer *mix;
     Game *game;
+    u8 stageClear[5][6];
+    int stageBest[5][6];
 
     bool quit;
     bool paused;
@@ -309,6 +312,11 @@ bool pj_sprite_load(PJ *p, Layer *l, const char *name);
 void pj_sprite_free(Layer *l);
 void pj_layer_set_state(PJ *p, Layer *l, int state);
 void pj_layers_tick(PJ *p, int ms);
+void pj_slider_place(PJ *p, Slider *s);
+void pj_track_start(Layer *l, int t, u32 pc, u32 end);
+void pj_track_tick(Layer *l, const Anm *a, int ti, int ms, u32 *rng);
+void pj_anm1_start(Layer *l, const Anm *a);
+bool pj_sprite_tick(PJ *p, Layer *l, int ms);
 void pj_compose(PJ *p, u32 *dst);
 void pj_freeze(PJ *p);
 void pj_commit(PJ *p, int ms);
@@ -317,6 +325,7 @@ void pj_blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, 
 
 void pj_vm_run(PJ *p, int ms);
 void pj_call_handler(PJ *p, u32 target);
+i32 *pj_var(PJ *p, u32 operand);
 
 void pj_msg_init(PJ *p);
 void pj_msg_draw(PJ *p, u32 *dst);
@@ -338,9 +347,13 @@ bool pj_playing(PJ *p, int ch, int slot);
 
 Game *pj_game_new(PJ *p, int kind, int chapter, int stage, i32 resultVar);
 void pj_game_free(Game *g);
+void pj_game_mouse(PJ *p, Game *g, int button, bool down);
 bool pj_game_tick(PJ *p, Game *g, int ms);
 void pj_game_draw(PJ *p, Game *g, u32 *dst);
 int pj_game_result(Game *g);
+int pj_game_icons(const Game *g, int *xs, int *ys, int *tools, int max);
+int pj_game_tool(const Game *g);
+int pj_game_phase(const Game *g);
 bool pj_stage_cleared(PJ *p, int chapter, int stage);
 
 bool pj_save_load(PJ *p);

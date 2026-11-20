@@ -73,7 +73,7 @@ void pj_sprite_free(Layer *l) {
     memset(l, 0, sizeof *l);
 }
 
-static void track_start(Layer *l, int t, u32 pc, u32 end) {
+void pj_track_start(Layer *l, int t, u32 pc, u32 end) {
     Track *tr = &l->tr[t];
     memset(tr, 0, sizeof *tr);
     tr->live = true;
@@ -82,9 +82,9 @@ static void track_start(Layer *l, int t, u32 pc, u32 end) {
     tr->op = -1;
 }
 
-static void anm1_start(Layer *l, const Anm *a) {
+void pj_anm1_start(Layer *l, const Anm *a) {
     for (int i = 0; i < PJ_TRACKS; i++) l->tr[i].live = false;
-    track_start(l, 0, a->start, a->end);
+    pj_track_start(l, 0, a->start, a->end);
     l->animating = true;
 }
 
@@ -137,7 +137,7 @@ bool pj_sprite_load(PJ *p, Layer *l, const char *name) {
             u8 *ad = pj_pac_read(&p->pac, d->anime[i], &size);
             if (!ad) continue;
             if (pj_anm_parse(&l->anm[l->anmCount], ad, size)) {
-                if (l->anm[l->anmCount].kind == ANM_ONE) anm1_start(l, &l->anm[l->anmCount]);
+                if (l->anm[l->anmCount].kind == ANM_ONE) pj_anm1_start(l, &l->anm[l->anmCount]);
                 l->anmCount++;
             } else
                 free(ad);
@@ -210,7 +210,7 @@ static void tween_value(int *cur, int *done, int total, int t, int dur) {
     *done = want;
 }
 
-static void track_tick(Layer *l, const Anm *a, int ti, int ms, u32 *rng) {
+void pj_track_tick(Layer *l, const Anm *a, int ti, int ms, u32 *rng) {
     Track *tr = &l->tr[ti];
     int guard = 0;
     while (tr->live && guard++ < 256) {
@@ -290,7 +290,7 @@ static void track_tick(Layer *l, const Anm *a, int ti, int ms, u32 *rng) {
             tr->pc = pc + (u32)x;
             for (int k = 0; k < PJ_TRACKS; k++)
                 if (!l->tr[k].live) {
-                    track_start(l, k, pc + 8, pc + (u32)x);
+                    pj_track_start(l, k, pc + 8, pc + (u32)x);
                     break;
                 }
             break;
@@ -302,22 +302,24 @@ static void track_tick(Layer *l, const Anm *a, int ti, int ms, u32 *rng) {
     }
 }
 
+bool pj_sprite_tick(PJ *p, Layer *l, int ms) {
+    if (!l->used || !l->animating) return false;
+    const Anm *a = NULL;
+    for (int k = 0; k < l->anmCount; k++)
+        if (l->anm[k].kind == ANM_ONE) a = &l->anm[k];
+    bool any = false;
+    if (a)
+        for (int k = 0; k < PJ_TRACKS; k++) {
+            if (l->tr[k].live) pj_track_tick(l, a, k, ms, &p->rng);
+            any |= l->tr[k].live;
+        }
+    l->animating = any;
+    return true;
+}
+
 void pj_layers_tick(PJ *p, int ms) {
-    for (int i = 0; i < PJ_LAYERS + PJ_SUBS; i++) {
-        Layer *l = &p->layer[i];
-        if (!l->used || !l->animating) continue;
-        const Anm *a = NULL;
-        for (int k = 0; k < l->anmCount; k++)
-            if (l->anm[k].kind == ANM_ONE) a = &l->anm[k];
-        bool any = false;
-        if (a)
-            for (int k = 0; k < PJ_TRACKS; k++) {
-                if (l->tr[k].live) track_tick(l, a, k, ms, &p->rng);
-                any |= l->tr[k].live;
-            }
-        l->animating = any;
-        p->dirty = true;
-    }
+    for (int i = 0; i < PJ_LAYERS + PJ_SUBS; i++)
+        if (pj_sprite_tick(p, &p->layer[i], ms)) p->dirty = true;
     if (p->tweenCount && p->groupMs >= 0) {
         p->groupT += ms;
         if (p->groupT > p->groupMs) p->groupT = p->groupMs;
@@ -338,6 +340,15 @@ void pj_layers_tick(PJ *p, int ms) {
             p->groupMs = -1;
         }
     }
+}
+
+void pj_slider_place(PJ *p, Slider *s) {
+    int range = s->args[14], lo = s->args[15], hi = s->args[16];
+    int off = hi > lo ? (clampi(s->value, lo, hi) - lo) * range / (hi - lo) : 0;
+    s->knob.x = s->args[8] + s->dx + off;
+    s->knob.y = s->args[9] + s->dy;
+    s->knob.ox = s->knob.oy = 0;
+    p->dirty = true;
 }
 
 static inline u32 blend(u32 d, u32 s, u32 a) {
@@ -415,12 +426,14 @@ static int zcmp(const void *a, const void *b) {
 
 void pj_compose(PJ *p, u32 *dst) {
     for (size_t i = 0; i < (size_t)PJ_W * PJ_H; i++) dst[i] = 0xff000000u;
-    const Layer *list[PJ_LAYERS + PJ_SUBS + PJ_BUTTONS];
+    const Layer *list[PJ_LAYERS + PJ_SUBS + PJ_BUTTONS + PJ_SLIDERS];
     int n = 0;
     for (int i = 0; i < PJ_LAYERS + PJ_SUBS; i++)
         if (p->layer[i].used && p->layer[i].shown && p->layer[i].parent < 0) list[n++] = &p->layer[i];
     for (int i = 0; i < PJ_BUTTONS; i++)
         if (p->btn[i].used && p->btn[i].spr.used && p->btn[i].spr.shown) list[n++] = &p->btn[i].spr;
+    for (int i = 0; i < PJ_SLIDERS; i++)
+        if (p->slider[i].used && p->slider[i].shown && p->slider[i].knob.used) list[n++] = &p->slider[i].knob;
     qsort(list, (size_t)n, sizeof list[0], zcmp);
     for (int i = 0; i < n; i++) {
         const Layer *l = list[i];

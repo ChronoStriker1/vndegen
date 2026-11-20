@@ -2,7 +2,7 @@
 
 static i32 imm(u32 a) { return (i32)((a & 0x08000000u) ? (a | 0xf0000000u) : (a & 0x0fffffffu)); }
 
-static i32 *ref(PJ *p, u32 a) {
+i32 *pj_var(PJ *p, u32 a) {
     static i32 sink;
     u32 n = a & 0x0fffffffu;
     switch (a >> 28) {
@@ -14,7 +14,7 @@ static i32 *ref(PJ *p, u32 a) {
     }
 }
 
-static i32 val(PJ *p, u32 a) { return (a >> 28) == 0 ? imm(a) : *ref(p, a); }
+static i32 val(PJ *p, u32 a) { return (a >> 28) == 0 ? imm(a) : *pj_var(p, a); }
 
 static const char *fname(PJ *p, i32 index) {
     const char *n = pj_script_name(&p->sc, index);
@@ -113,6 +113,21 @@ static void message(PJ *p, i32 voice, u32 nameOff, u32 textOff) {
     free(p->msgText);
     p->msgName = nameOff ? pj_script_text(&p->sc, nameOff) : NULL;
     p->msgText = pj_script_text(&p->sc, textOff);
+    if (p->lang == VNPJADV_LANG_ENGLISH) {
+        char *o = p->msgText;
+        for (const char *s = p->msgText; *s;) {
+            u32 cp;
+            int k = pj_utf8_decode(s, &cp);
+            if (cp == 0x300c || cp == 0x300d || cp == 0x300e || cp == 0x300f) *o++ = '"';
+            else if (cp == 0x3000) *o++ = ' ';
+            else {
+                memmove(o, s, (size_t)k);
+                o += k;
+            }
+            s += k;
+        }
+        *o = 0;
+    }
     p->msgShown = true;
     p->msgShownChars = 0;
     p->msgT = 0;
@@ -161,31 +176,31 @@ static bool step(PJ *p) {
     p->pc += (u32)len * 4;
     int cat = c[3], op = c[1], fl = c[2];
     switch (cat << 16 | op << 8 | fl) {
-    case 0x020100: *ref(p, a[0]) = val(p, a[1]); break;
-    case 0x020200: *ref(p, a[0]) += val(p, a[1]); break;
-    case 0x020300: *ref(p, a[0]) -= val(p, a[1]); break;
-    case 0x020400: *ref(p, a[0]) *= val(p, a[1]); break;
+    case 0x020100: *pj_var(p, a[0]) = val(p, a[1]); break;
+    case 0x020200: *pj_var(p, a[0]) += val(p, a[1]); break;
+    case 0x020300: *pj_var(p, a[0]) -= val(p, a[1]); break;
+    case 0x020400: *pj_var(p, a[0]) *= val(p, a[1]); break;
     case 0x020500: {
         i32 d = val(p, a[1]);
-        *ref(p, a[0]) = d ? *ref(p, a[0]) / d : 0;
+        *pj_var(p, a[0]) = d ? *pj_var(p, a[0]) / d : 0;
         break;
     }
     case 0x020600: {
         i32 d = val(p, a[1]);
-        *ref(p, a[0]) = d ? *ref(p, a[0]) % d : 0;
+        *pj_var(p, a[0]) = d ? *pj_var(p, a[0]) % d : 0;
         break;
     }
-    case 0x020700: (*ref(p, a[0]))++; break;
-    case 0x020800: (*ref(p, a[0]))--; break;
-    case 0x020900: *ref(p, a[0]) &= val(p, a[1]); break;
-    case 0x020001: *ref(p, a[0]) = val(p, a[0]) == val(p, a[1]); break;
-    case 0x020101: *ref(p, a[0]) = val(p, a[0]) < val(p, a[1]); break;
-    case 0x020201: *ref(p, a[0]) = val(p, a[0]) > val(p, a[1]); break;
-    case 0x020301: *ref(p, a[0]) = val(p, a[0]) <= val(p, a[1]); break;
-    case 0x020401: *ref(p, a[0]) = val(p, a[0]) >= val(p, a[1]); break;
-    case 0x020501: *ref(p, a[0]) = val(p, a[0]) && val(p, a[1]); break;
-    case 0x020601: *ref(p, a[0]) = val(p, a[0]) || val(p, a[1]); break;
-    case 0x020701: *ref(p, a[0]) = val(p, a[0]) != val(p, a[1]); break;
+    case 0x020700: (*pj_var(p, a[0]))++; break;
+    case 0x020800: (*pj_var(p, a[0]))--; break;
+    case 0x020900: *pj_var(p, a[0]) &= val(p, a[1]); break;
+    case 0x020001: *pj_var(p, a[0]) = val(p, a[0]) == val(p, a[1]); break;
+    case 0x020101: *pj_var(p, a[0]) = val(p, a[0]) < val(p, a[1]); break;
+    case 0x020201: *pj_var(p, a[0]) = val(p, a[0]) > val(p, a[1]); break;
+    case 0x020301: *pj_var(p, a[0]) = val(p, a[0]) <= val(p, a[1]); break;
+    case 0x020401: *pj_var(p, a[0]) = val(p, a[0]) >= val(p, a[1]); break;
+    case 0x020501: *pj_var(p, a[0]) = val(p, a[0]) && val(p, a[1]); break;
+    case 0x020601: *pj_var(p, a[0]) = val(p, a[0]) || val(p, a[1]); break;
+    case 0x020701: *pj_var(p, a[0]) = val(p, a[0]) != val(p, a[1]); break;
     case 0x020002: {
         if (p->savedCount < PJ_STACK) memcpy(p->saved[p->savedCount++], p->reg, sizeof p->saved[0]);
         break;
@@ -249,10 +264,9 @@ static bool step(PJ *p) {
         break;
     }
     case 0x010202:
-        p->wait = W_BUTTON;
-        p->waitGroup = val(p, a[0]);
-        p->click = false;
-        return false;
+        p->activeGroup = val(p, a[0]);
+        p->R[0] = 0;
+        break;
     case 0x010e02: {
         int g = val(p, a[0]), id = val(p, a[1]), dx = val(p, a[2]), dy = val(p, a[3]);
         for (int i = 0; i < PJ_BUTTONS; i++) {
@@ -271,37 +285,58 @@ static bool step(PJ *p) {
     case 0x010004: {
         int id = val(p, a[0]);
         for (int i = 0; i < PJ_SLIDERS; i++)
-            if (p->slider[i].used && p->slider[i].id == id) p->slider[i].used = false;
+            if (p->slider[i].used && p->slider[i].id == id) {
+                pj_sprite_free(&p->slider[i].knob);
+                p->slider[i].used = false;
+            }
         break;
     }
     case 0x010104: {
         Slider *s = NULL;
         for (int i = 0; i < PJ_SLIDERS && !s; i++)
             if (!p->slider[i].used) s = &p->slider[i];
-        if (!s) break;
+        if (!s || len < 24) break;
+        pj_sprite_free(&s->knob);
         memset(s, 0, sizeof *s);
         s->used = true;
         s->id = val(p, a[0]);
-        for (int i = 0; i < 22 && i + 1 < len - 1; i++) s->args[i] = val(p, a[i + 1]);
-        s->var = (i32)a[len - 2];
-        break;
-    }
-    case 0x010704: {
-        int id = val(p, a[0]);
-        for (int i = 0; i < PJ_SLIDERS; i++)
-            if (p->slider[i].used && p->slider[i].id == id) {
-                p->slider[i].dx += val(p, a[1]);
-                p->slider[i].dy += val(p, a[2]);
-            }
+        for (int i = 0; i < 21; i++) s->args[i] = val(p, a[i + 1]);
+        s->var = a[22];
+        pj_sprite_load(p, &s->knob, fname(p, s->args[1]));
+        s->knob.id = -1;
+        s->knob.parent = -1;
+        s->knob.shown = false;
         break;
     }
     case 0x010304:
     case 0x010504:
+    case 0x010704: {
+        int id = val(p, a[0]);
+        for (int i = 0; i < PJ_SLIDERS; i++) {
+            Slider *s = &p->slider[i];
+            if (!s->used || s->id != id) continue;
+            if (op == 3) {
+                s->shown = true;
+                s->knob.shown = true;
+                s->knob.z = ++p->zNext;
+            } else if (op == 5) {
+                s->var = a[1];
+                s->value = *pj_var(p, a[1]);
+            } else {
+                s->dx += val(p, a[1]);
+                s->dy += val(p, a[2]);
+            }
+            pj_slider_place(p, s);
+        }
+        unfreeze(p);
+        break;
+    }
     case 0x011105:
     case 0x010205:
     case 0x010405:
     case 0x010005:
-        unknown(p, at, c, len);
+    case 0x050302:
+    case 0x050402:
         break;
 
     case 0x800001: {
@@ -392,9 +427,17 @@ static bool step(PJ *p) {
         break;
     }
     case 0x041700: {
-        Layer *l = pj_layer(p, val(p, a[0]));
-        if (l) l->parent = val(p, a[1]);
-        p->dirty = true;
+        Layer *dst = pj_layer(p, val(p, a[0])), *src = pj_layer(p, val(p, a[1]));
+        unfreeze(p);
+        if (dst && src && src->used && dst != src) {
+            int id = val(p, a[0]);
+            pj_layer_load(p, id, src->name);
+            dst->x = src->x;
+            dst->y = src->y;
+            dst->sx = src->sx;
+            dst->sy = src->sy;
+            dst->alpha = src->alpha;
+        }
         break;
     }
     case 0x040001: begin_group(p); break;
@@ -451,7 +494,7 @@ static bool step(PJ *p) {
     }
     case 0x031400: {
         int w = val(p, a[0]);
-        if (w >= 0 && w <= 1) p->win[w].indent = val(p, a[1]);
+        (void)w;
         break;
     }
     case 0x031500: {
@@ -511,7 +554,6 @@ void pj_vm_run(PJ *p, int ms) {
             p->wait = W_NONE;
             break;
         case W_TEXT:
-        case W_BUTTON:
             return;
         default:
             break;
