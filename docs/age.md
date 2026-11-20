@@ -9,7 +9,7 @@ MIT licensed like the rest of the app. `docs/age-cleanroom.md` lists where each 
 
 | Game | Engine build | Notes |
 |---|---|---|
-| Kamidori Alchemy Meister (English, Aroduc 1.1 patch) | `age.exe` 4.33, scripts `SYS4433`, catalog `S4IC433` | Logos and opening movie, title, New Game options, the prologue, the tutorial battle map through the exam, the town hub, city map, workshop and party screens, Back Log, Save and Load, the original's saves both ways |
+| Kamidori Alchemy Meister (English, Aroduc 1.1 patch) | `age.exe` 4.33, scripts `SYS4433`, catalog `S4IC433` | The game's first chapter, its Prologue: logos and opening movie, title, New Game options, the opening story, the tutorial battle map through the exam, the workshop hub, the city map's events (Legunua, the Church and its shop, the Arena's list, the Bar), the world map, the Yuidora Woodland map to its stage clear, the expense report, crafting a potion, the Sales, Party, Mission and Config screens, Back Log, the BGM room, Save and Load, the original's saves both ways |
 
 The game is 1024x576.
 
@@ -84,6 +84,11 @@ original.
 
 ## Known limits
 
+- Kamidori was played by hand through its Prologue chapter, two battle maps, one craft and one shop. Three headless
+  runs of random clicks, keys and wheel turns (`Engines/AGE/host`), about 18,000 inputs from the workshop and the
+  Woodland map, went through the same screens, the battle map's fights and menus, saving and the title, and back. Later chapters, battle maps, skills, allies,
+  the Arena's fights, the mine, Enhance, Remodel and the endings weren't reached; their opcodes run the paths the
+  tested scenes confirmed or, where no scene reached them, follow the notes in `age-cleanroom.md`.
 - The menu bar, the AGERC dialogs (version, settings, exit) and the developer menus are not there.
 - Text is drawn with the shared substitute fonts through stb_truetype, so glyph shapes and some advances differ
   slightly from Windows GDI's.
