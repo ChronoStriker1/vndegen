@@ -11,11 +11,51 @@ derives from no GPL or LGPL code. Its sources:
 | Script (`PJADV_SF0001`) | The game's `scenario.dat` tokenized: each command's first dword gives its length, operation, flags and category. Operand kinds (immediates, three variable banks, temporaries, the last engine result) and what each command does from how the script uses them: loops, the title and stage-select menus, the option sliders, the scenes. Layer stacking (later loads in front) from the original's logo sequence under Wine. Polled buttons from the menus' wait loops |
 | Text (`PJADV_TF0001`, `filename.dat`) | The files: double-NUL-separated strings with `\U<n><hex>h` escapes for UTF-8, and the 32-byte resource names the script indexes from one. English text's quotes and the message window's look from screenshots of the original under Wine |
 | The cleaning minigame (`mg02`) | Not in the script. Rebuilt from the help screen, `mg02_ini.txt` (`StageSetting` rows, cursor hot spots) and play of the original under Wine, driven by xdotool and read back from screenshots by template matching (details below). Its pictures are the game's (`gg_*`, `gr_*`, `gp_*`, `mg02_dust*.anm`, `ga_eferase*`) |
+| Saves (`syssave.dat`, `syssvpo.dat`) | The scrambling from a minimal reading of the exe approved by the coordinator (below). The layouts inside from diffs of the decoded files the original wrote under Wine before and after chosen actions |
 | Sound | stb_vorbis (public domain or MIT); WAV read from the RIFF header |
 | Text drawing | stb_truetype (public domain or MIT) with the shared Windows font substitutes (`docs/fonts.md`) |
 | File name case | `Engines/Shared/casepath.c`, VNDegen's own |
 
-The exe was only run, and its strings read for file and font names. No code was read.
+Apart from the save reading below, the exe was only run, and its strings read for file and font names.
+
+## The save files: the approved reading
+
+Black-box work came first. Saves the original wrote under Wine with the same content come out different every time.
+Each file looked like a 273-byte repeating XOR, but the key changes with every write, isn't a rotation or a mix of
+shorter periods, and isn't Microsoft's `rand()` from any 32-bit seed. The coordinator then approved a minimal reading
+of the exe's save scrambling, on the same terms as ExHibit's: the key derivation, the scrambling loop and the header
+fields they use, nothing else, with notes written up and the code written from them.
+
+Tool: Ghidra 12.1.4, through REA, on `Cleaner.exe` (2XT 4.5, sha256 `682354f2...5d5b`). What was read:
+
+- `0x46c850`, found from the `syssvpo.dat` string. It builds a 16-byte header (`POPL`, `AYDT`, the body's length, four
+  zero bytes) in front of a body from another function, which wasn't read, and passes the result to the next two
+  functions before writing the file.
+- `0x42a480`: the encoded size. The input is padded to a multiple of 256 bytes, and each 256 bytes become 273, plus one
+  byte at the front.
+- `0x42a4a0`: the encoder. The first byte is a seed (the low byte of the tick count) plus 0x93. Each 256-byte block is
+  16 rows of 16 bytes. Each byte becomes itself plus two entries of a 400-byte table in the exe's data at `0x4be620`:
+  one picked by the seed and the column, the other by the seed and the row, 128 bytes further on. After each row comes
+  a check byte: the table entry for the seed and row, plus the row's byte sum. The seed then grows by that sum. A block
+  ends with a byte holding the block's sum.
+
+The table's 400 bytes were copied from the exe's `.data` section into `save.c` as data. VNDegen's encoder and decoder
+were written from these notes. The decoder also checks every row and block sum: all of the original's files pass.
+The loader wasn't read.
+
+What is inside came from the files, not the exe:
+
+- `syssave.dat`: `PJSYSDAT_Rev1.00`, then a few sizes (8000, 72, 68, 128), then the script's 2000 global variables as
+  32-bit integers from offset 64. Anchors: the volume sliders' variables `0x3fc`, `0x3fd` and `0x3ff` hold the volumes
+  the options screen shows; changing them in the original changed `0x44f`, `0x450`, `0x452` and `0x4b0` to `0x4b3`, which
+  the script copies them into; the minigame's result variable `0x3e7` is 1 after a clear. After the variables come
+  flag bytes and settings VNDegen doesn't interpret; it keeps them as they are.
+- `syssvpo.dat`: the 16-byte header, then 196-byte records, one per stage the player has cleared, in the order they were
+  first cleared: 2, the stage id (chapter times 10 plus stage), then the clear times. Each time is one more than the
+  seconds the result panel showed. A stage that was only failed has no record. BEST TIME is the largest.
+
+Checked both ways under Wine: the PC's files with two stages cleared load in VNDegen (CLEAR on both, the third stage
+open); VNDegen's files, with a third stage cleared by VNDegen, load in the original (CLEAR on stage 3, stage 4 open).
 
 ## The minigame, rule by rule
 

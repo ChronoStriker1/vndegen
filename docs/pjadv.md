@@ -44,11 +44,19 @@ A game folder holds the exe, `archive.dat` (the scenario, its text, the resource
 - Buttons are polled: the script turns a group's input on, keeps looping, and a click runs the button's handler at the
   next frame. Sliders write their variable while dragged.
 - English text shows 「」 and 『』 as straight quotes and an ideographic space as a space, as the original does.
-- Controls: the Mouse layout, a pointer on the stick with clicks on the buttons. Touch drags directly.
+- Controls: the Mouse layout, a pointer on the stick with clicks on the buttons, and the shoulder buttons (the wheel)
+  for tools. Touch drags directly.
+- A VNDegen addition: in the minigame the mouse wheel cycles tools, forward and back, so a controller doesn't have to
+  reach the tool button. The original changes tools only with that button.
+- Saves are the PC's own `save/syssave.dat` (the script's global variables, which hold the options) and
+  `save/syssvpo.dat` (the cleared stages and their times), written when a stage is cleared and on quit, and they load
+  both ways. The game has no save slots; `savedata.dat` stays empty.
 
 ## Known limits
 
 - Which minigame sound plays for which event is a guess, and so is the exact timing of the clear flash and sparkles.
 - How hard the original is about counting a second wipe made soon after the first isn't reproduced; VNDegen counts it.
 - The Window mode option changes only its label.
+- A missing `syssave.dat` is replaced by one that holds only the variables; the PC's flag bytes and settings after them
+  start empty. The game ships with both files, so this only happens when they are deleted.
 - Achievements are logged, not shown.

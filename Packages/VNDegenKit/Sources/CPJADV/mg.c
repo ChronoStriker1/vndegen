@@ -453,10 +453,8 @@ bool pj_game_tick(PJ *p, Game *g, int ms) {
         if (g->t >= 2000) {
             g->phase = PH_RESULT;
             g->t = 0;
-            int c = clampi(g->chapter, 0, 4), s = clampi(g->stage, 0, 5);
             if (g->cleared) {
-                p->stageClear[c][s] = 1;
-                if (g->finalSeconds > p->stageBest[c][s]) p->stageBest[c][s] = g->finalSeconds;
+                pj_stage_record(p, g->chapter, g->stage, g->finalSeconds);
                 pj_save_store(p);
             }
         }
@@ -563,8 +561,7 @@ void pj_game_draw(PJ *p, Game *g, u32 *dst) {
         } else
             blit(dst, g->grTips, 1, 1017, 881, 184, 528, 168, 255);
         small_number(dst, g, g->finalSeconds, 461);
-        int c = clampi(g->chapter, 0, 4), s = clampi(g->stage, 0, 5);
-        if (p->stageClear[c][s]) small_number(dst, g, p->stageBest[c][s], 525);
+        small_number(dst, g, pj_stage_best(p, g->chapter, g->stage), 525);
         if (g->resultHover == 0) blit(dst, g->grTips, 1018, 1018, 460, 149, 793, 684, 255);
         else blit(dst, g->grTips, 1026, 771, 444, 142, 801, 687, 255);
     }
@@ -590,10 +587,7 @@ void pj_game_draw(PJ *p, Game *g, u32 *dst) {
 
 int pj_game_result(Game *g) { return g->result; }
 
-bool pj_stage_cleared(PJ *p, int chapter, int stage) {
-    if (chapter < 0 || chapter > 4 || stage < 0 || stage > 5) return false;
-    return p->stageClear[chapter][stage] != 0;
-}
+
 
 int pj_game_icons(const Game *g, int *xs, int *ys, int *tools, int max) {
     int n = 0;
@@ -619,4 +613,10 @@ bool pj_game_uses(const Game *g, const Image *im) {
         for (int t = 0; t < TOOLS; t++)
             if (g->cur[f][t] == im) return true;
     return false;
+}
+
+void pj_game_wheel(PJ *p, Game *g, int notches) {
+    if (g->phase != PH_PLAY || g->paused || !notches) return;
+    g->tool = ((g->tool + (notches < 0 ? 1 : TOOLS - 1)) % TOOLS);
+    sfx(p, "SE_204");
 }

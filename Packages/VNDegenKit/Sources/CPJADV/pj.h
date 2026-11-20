@@ -293,8 +293,8 @@ struct PJ {
 
     Mixer *mix;
     Game *game;
-    u8 stageClear[5][6];
-    int stageBest[5][6];
+    u8 *sys, *recs;
+    size_t sysSize, recsSize;
 
     bool quit;
     bool paused;
@@ -348,6 +348,7 @@ bool pj_playing(PJ *p, int ch, int slot);
 Game *pj_game_new(PJ *p, int kind, int chapter, int stage, i32 resultVar);
 void pj_game_free(Game *g);
 void pj_game_mouse(PJ *p, Game *g, int button, bool down);
+void pj_game_wheel(PJ *p, Game *g, int notches);
 bool pj_game_tick(PJ *p, Game *g, int ms);
 void pj_game_draw(PJ *p, Game *g, u32 *dst);
 int pj_game_result(Game *g);
@@ -356,6 +357,8 @@ int pj_game_tool(const Game *g);
 int pj_game_phase(const Game *g);
 bool pj_game_uses(const Game *g, const Image *im);
 bool pj_stage_cleared(PJ *p, int chapter, int stage);
+int pj_stage_best(PJ *p, int chapter, int stage);
+void pj_stage_record(PJ *p, int chapter, int stage, int seconds);
 
 bool pj_save_load(PJ *p);
 bool pj_save_store(PJ *p);

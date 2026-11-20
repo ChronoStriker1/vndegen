@@ -108,6 +108,8 @@ void vnpjadv_close(VNPJADV *v) {
     pj_sprite_free(&p->msgFrame);
     for (size_t i = 0; i < sizeof p->cache / sizeof p->cache[0]; i++) pj_image_free(p->cache[i].img);
     pj_mixer_free(p->mix);
+    free(p->sys);
+    free(p->recs);
     pj_script_free(&p->sc);
     pj_pac_close(&p->pac);
     pj_ini_free(&p->bgmIni);
@@ -237,7 +239,8 @@ void vnpjadv_key(VNPJADV *v, int vk, bool down) {
 
 void vnpjadv_wheel(VNPJADV *v, int notches) {
     PJ *p = (PJ *)v;
-    if (notches < 0 && p->wait == W_TEXT) handle_click(p, false);
+    if (p->game) pj_game_wheel(p, p->game, notches);
+    else if (notches < 0 && p->wait == W_TEXT) handle_click(p, false);
 }
 
 bool vnpjadv_frame(VNPJADV *v, uint32_t elapsedMs) {
