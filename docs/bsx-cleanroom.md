@@ -17,6 +17,7 @@ from no GPL or LGPL code. Its sources:
 | Text | stb_truetype (public domain or MIT) with the shared Windows font substitutes (`docs/fonts.md`), condensed to the cfg's character width as the original draws MS Gothic |
 | BSXScript 3.1 | Mesu Kyoushi 4's script tokenized with the 3.0 model; the new opcodes' operands from where decoding broke and what follows (`3e`'s string ids are voice names), their meaning from context (`2a` after impacts, `30` names in the loop voice folders). `bsxx.cfg`'s `[bu color adjustment]` comment, whose Shift-JIS survives in fragments that spell the blend names. The shake, text placement, VIEW defaults, the map's menu bar and the save layout from recordings, screenshots and saves of the original under Wine, compared numerically with VNDegen's |
 | BSXScript 3.3 and Lua | Mesu Kyoushi 3's script and `embed.bsa` scripts read as data. The exe's packed image unpacked as data to look for the Lua modules (below), its strings read for the Lua version (5.2.0) and the host function names, and the running original's memory searched for the module text, data only. Achievements, the slot viewer and the save layout from the original under Wine: VNDegen's `common.dat` unlocks shown by the PC, its saves loaded in the PC, screenshots compared numerically |
+| Bust-up editor | `museum_buex_layout`, `bsxx.cfg`'s `[free-sight screen]`, `[bustup setting]` and `sfx bg`, the bust-up archives' names and composition headers, the PC's `buex_dsNN.dat` files and screens under Wine compared numerically with VNDegen's |
 | Museum | `cg.dat` and `scene.dat` read from the files against the pictures' names; `common.dat`'s seen, scene and playlist records from diffs of the PC's file before and after unlocking and editing playlists under Wine, and VNDegen's records loaded in the PC; `@museum_state` from `bsxx.dat`'s persistent variable table and its value in `common.dat`; `bgv_layout` and `bsxx.cfg`'s museum sections; the viewer, playlist and BGV screens, their button frames, the thumbnail dimming and the `m` blur masks from screenshots of the original under Wine compared numerically with VNDegen's; the completion rates from the PC's achievements with records set and cleared |
 | Movies | Engines/Shared/vnvideo (pl_mpeg, MIT) |
 | File name case | `Engines/Shared/casepath.c`, VNDegen's own |
@@ -64,5 +65,13 @@ Things that were unsure and how they were settled:
   one cleared, so the rate counts the wear records' bytes.
 - Playlist entries: a VNDegen playlist holding page 1 index 0 and page 0 index 2 showed those two scenes, in order, in
   the PC's playlist.
+- The editor's state file: diffs of `buex_dsNN.dat` the PC wrote after each single change under Wine (Mesu Kyoushi 1
+  and 3); every one loads in VNDegen and is written back identical, and its thumbnail compares with VNDegen's at 2.7
+  (Mesu Kyoushi 1) and 8.8 (Mesu Kyoushi 3, mostly the bust-ups' sharpness) mean difference.
+- The editor's rows: Mesu Kyoushi 1's layout comments name its first two rows the other way round; its panel labels
+  and saved states show the same pose, view, undress, outfit, underwear, face order as Mesu Kyoushi 3.
+- The editor's close-up placement: scanning offsets against the PC's thumbnails gave the canvas centring and, from a
+  bust and a hip state, the sight's line `H + top + sight * (height - H)`; Mesu Kyoushi 1 put the face position at the
+  top.
 - Thumbnail brightness: the PC's thumbnails fit 0.49 times VNDegen's full thumbnail plus a constant, in Mesu Kyoushi 1
   and 3, and come to full brightness under the pointer.

@@ -38,7 +38,8 @@ struct Strip {
     BgvPanel *bgv;
 
     Image *buBase;
-    MBtn orderUp, orderDown, onOff, pointer, switchBtn, hairBtn, cutinBtn;
+    MBtn orderUp, orderDown, onOff, pointer, switchBtn, hairBtn, cutinBtn, steamBtn, aheBtn;
+    bool steamOff;
     int posRegion[4];
     int rowPos[STRIP_ROWS][2], rowSpace[STRIP_ROWS][2], rowRepeat[STRIP_ROWS];
     char poseSig[8], viewSig[8];

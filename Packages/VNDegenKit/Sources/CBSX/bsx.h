@@ -560,7 +560,7 @@ int bx_museum_cg_pages(BX *b);
 int bx_museum_cg_thumbs(BX *b, int page);
 int bx_museum_cg_seen_variant(BX *b, int page, int thumb);
 Image *bx_museum_cg_thumb(BX *b, int page, int thumb);
-void bx_museum_cg_compose(BX *b, int page, int thumb, u32 *dst, bool hairOff, bool cutOff);
+void bx_museum_cg_compose(BX *b, int page, int thumb, u32 *dst, bool hairOff, bool cutOff, bool steamOff);
 BgvPanel *bx_bgv_open(BX *b, bool overlay);
 void bx_bgv_free(BgvPanel *p);
 bool bx_bgv_update(BX *b, BgvPanel *p);

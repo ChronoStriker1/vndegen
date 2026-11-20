@@ -724,11 +724,11 @@ Image *bx_museum_cg_thumb(BX *b, int page, int thumb) {
     return make_thumb(b, var->ids, var->count);
 }
 
-void bx_museum_cg_compose(BX *b, int page, int thumb, u32 *dst, bool hairOff, bool cutOff) {
+void bx_museum_cg_compose(BX *b, int page, int thumb, u32 *dst, bool hairOff, bool cutOff, bool steamOff) {
     int v = bx_museum_cg_seen_variant(b, page, thumb);
     if (v < 0) return;
     const Variant *var = &b->museum->pages[page].t[thumb].v[v];
-    compose(b, var->ids, var->count, dst, hairOff, cutOff, false);
+    compose(b, var->ids, var->count, dst, hairOff, cutOff, steamOff);
 }
 
 static int thumb_count(BX *b, const MuseumPhase *u) {

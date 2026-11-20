@@ -154,14 +154,34 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
 - BGM plays the cfg's tracks with the music volume. BGV (Mesu Kyoushi 3 and 4) lays out `bgv_layout` from
   `define.bsa`: per character a scrolled list of loop voices, which play as the story's `30` loops do, with their own
   volume and stop, and the overall BGV volume.
+- The strip mode (立ち絵鑑賞) is the bust-up editor `[museum phase - bu]` names, `museum_buex_layout` in `define.bsa`.
+  Its tabs pick a background (the pictures matching `[main window]`'s `bg signature`, three pages, or any seen CG),
+  play BGV (Mesu Kyoushi 3 and 4), set the characters up and store states. Each character can be shown, reordered
+  (earlier in the list is in front), moved along the position bar and switched through its rows: pose, view, undress,
+  outfit, underwear and face, always in that order whatever the layout's comments say. A bust-up is named
+  `bu<no><f|u><undress level><outfit><underwear+1><a|b><face>` from the layout's lists; an option whose body picture
+  doesn't exist is drawn off, and an outfit change picks the first underwear that exists. A close-up (`u`) is centred
+  by its composition's canvas width and scrolled by the free-sight meter: in 3.1 and later the picture's top at sight
+  0 and `H + top + sight * (height - H)` lined up with the face position, in 3.0 the face position at the top. The
+  face, bust and hip buttons set the sight from `[free-sight screen]`'s fixed positions. With a character on screen
+  the background is its `sfx bg` version and `[bu color adjustment]` tints the bust-ups. Mesu Kyoushi 3's hair-off
+  and cut-in, and Mesu Kyoushi 4's steam, apply to bust-ups and CG backgrounds.
+- Editor states are the PC's own `save/buex_dsNN.dat`, shared with the PC: the thumbnail (bottom-up BGRA at the
+  thumbnail size), then the background (group, page, index), `--order--` with a count and per character its number,
+  shown (0) or hidden (2), position (a float, -1 to 1), 6 and the six row values, `--mesgwnd--` and `--freemsg--` kept
+  as they are, and `--buinfo--` with the flags (hair-off 0x20, cut-in 0x08), the sight, the level and the wear table.
+  Clicking an empty slot saves; a saved slot offers replace, load and output slot. VNDegen reads and rewrites every
+  state the PC wrote under Wine byte for byte.
 - A save the original made under Wine loads in VNDegen, and a save VNDegen made loads in the original with its
   pictures.
 
 ## Known limits
 
-- The museum's strip mode (立ち絵鑑賞, the `museum_buex_layout` bust-up editor) isn't there; its button is drawn
-  off. Mesu Kyoushi 4's viewer ahegao-off button is drawn but does nothing. The BGV per-character volumes reset
-  when the app starts.
+- The bust-up editor's message tab (文章設定: names, free text, balloons and the colour picker) is off, and its image
+  output (画像として保存する) does nothing; states keep their messages as they are. Its output slots last until the
+  editor closes. Mesu Kyoushi 4's ahegao-off buttons (viewer and editor) are drawn but do nothing, and its steam
+  setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own. The BGV
+  per-character volumes reset when the app starts.
 - VNDegen doesn't create `common.dat`: a game folder without the PC's `save/common.dat` keeps no read marks,
   achievements or museum records.
 - Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing. Their settings screens lack

@@ -83,6 +83,8 @@ Strip *bx_strip_open(BX *b) {
     bx_mbtn_node(b, &s->switchBtn, bx_layout_get(btn, "switch"), 0, 0);
     bx_mbtn_node(b, &s->hairBtn, bx_layout_get(btn, "hair_mode"), 0, 0);
     bx_mbtn_node(b, &s->cutinBtn, bx_layout_get(btn, "cutin_mode"), 0, 0);
+    bx_mbtn_node(b, &s->steamBtn, bx_layout_get(btn, "steam_mode"), 0, 0);
+    bx_mbtn_node(b, &s->aheBtn, bx_layout_get(btn, "ahe_mode"), 0, 0);
     ints(bx_layout_get(bu, "pos_region"), s->posRegion, 4);
     const LNode *rows = bx_layout_get(bu, "switchs");
     for (int r = 0; r < STRIP_ROWS && rows && r < rows->count; r++) {
@@ -133,7 +135,7 @@ static void free_thumbs(Strip *s) {
 void bx_strip_free(Strip *s) {
     if (!s) return;
     MBtn *bs[] = {&s->back, &s->orderUp, &s->orderDown, &s->onOff, &s->pointer, &s->switchBtn, &s->hairBtn, &s->cutinBtn,
-                  &s->faceBtn, &s->bustBtn, &s->hipBtn, &s->knob, &s->barBase, &s->bar};
+                  &s->steamBtn, &s->aheBtn, &s->faceBtn, &s->bustBtn, &s->hipBtn, &s->knob, &s->barBase, &s->bar};
     for (size_t i = 0; i < sizeof bs / sizeof *bs; i++) bx_mbtn_free(bs[i]);
     for (int i = 0; i < TAB_COUNT; i++) {
         bx_mbtn_free(&s->tabs[i]);
@@ -375,7 +377,7 @@ void bx_strip_compose(BX *b, Strip *s, u32 *dst) {
     b->hairOff = s->flags & STRIP_HAIR_OFF;
     if (s->bgGroup == 1) {
         for (size_t i = 0; i < (size_t)b->W * (size_t)b->H; i++) dst[i] = 0xff000000u;
-        bx_museum_cg_compose(b, s->bgPage, s->bgIndex, dst, b->hairOff, !(s->flags & STRIP_CUTIN));
+        bx_museum_cg_compose(b, s->bgPage, s->bgIndex, dst, b->hairOff, !(s->flags & STRIP_CUTIN), s->steamOff);
         bx_compose_over(b, &sc, dst);
     } else bx_compose(b, &sc, dst);
     b->stripLevel = stripLevel;
@@ -558,6 +560,7 @@ static void bu_update(BX *b, Strip *s) {
     }
     if (bx_mbtn_on(b, &s->hairBtn)) s->flags ^= STRIP_HAIR_OFF;
     else if (bx_mbtn_on(b, &s->cutinBtn)) s->flags ^= STRIP_CUTIN;
+    else if (bx_mbtn_on(b, &s->steamBtn)) s->steamOff = !s->steamOff;
     else if (bx_mbtn_on(b, &s->faceBtn)) level_sight(b, s, 0);
     else if (bx_mbtn_on(b, &s->bustBtn)) level_sight(b, s, 1);
     else if (bx_mbtn_on(b, &s->hipBtn)) level_sight(b, s, 2);
@@ -594,6 +597,8 @@ static void bu_draw(BX *b, Strip *s, u32 *dst) {
     bx_mbtn_draw(b, dst, &p, s->drag == DRAG_POS ? 1 : 0);
     bx_mbtn_draw(b, dst, &s->hairBtn, (s->flags & STRIP_HAIR_OFF ? 2 : 0) + bx_mbtn_state(b, &s->hairBtn));
     bx_mbtn_draw(b, dst, &s->cutinBtn, (s->flags & STRIP_CUTIN ? 2 : 0) + bx_mbtn_state(b, &s->cutinBtn));
+    bx_mbtn_draw(b, dst, &s->steamBtn, (s->steamOff ? 0 : 2) + bx_mbtn_state(b, &s->steamBtn));
+    bx_mbtn_draw(b, dst, &s->aheBtn, bx_mbtn_state(b, &s->aheBtn));
     bx_mbtn_draw(b, dst, &s->faceBtn, s->level == 0 ? 2 : bx_mbtn_state(b, &s->faceBtn));
     bx_mbtn_draw(b, dst, &s->bustBtn, s->level == 1 ? 2 : bx_mbtn_state(b, &s->bustBtn));
     bx_mbtn_draw(b, dst, &s->hipBtn, s->level == 2 ? 2 : bx_mbtn_state(b, &s->hipBtn));
