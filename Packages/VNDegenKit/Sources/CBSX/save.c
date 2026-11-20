@@ -5,6 +5,7 @@
 
 #define SLOT_INFO 592
 #define HIST 50
+#define LUA_DATA "{[\"begin-time counters\"]={[1]={};[2]={};[3]={};};[\"begin-time parameters\"]={[1]={};[2]={};[3]={};};}"
 
 typedef struct Buf {
     u8 *d;
@@ -256,9 +257,14 @@ bool bx_save_slot(BX *b, int slot) {
     for (int i = 0; i < HIST; i++) put32(&buf, i < b->histCount ? b->hist[i] : 0xffffffffu);
     put32(&buf, 0);
     put32(&buf, 0xffffffffu);
-    put32(&buf, 0);
+    put32(&buf, s->minor >= 3 ? (u32)b->msgsShown : 0);
     put8(&buf, 0);
     put8(&buf, 0);
+    if (s->minor >= 3) {
+        zeros(&buf, 3);
+        put32(&buf, (u32)strlen(LUA_DATA));
+        put(&buf, LUA_DATA, strlen(LUA_DATA) + 1);
+    }
     put32(&buf, (u32)(b->bgmName[0] ? b->bgmIndex : 0));
     zeros(&buf, 12);
     put32(&buf, 1);
@@ -368,6 +374,7 @@ bool bx_load_slot(BX *b, int slot) {
         free(path);
         return false;
     }
+    int shown = (int)rd32(d + 36 + info - SLOT_INFO + 76);
     skip(&r, 0x24);
     int mode = (int)get32(&r);
     skip(&r, 4 + 4 + 9);
@@ -395,6 +402,10 @@ bool bx_load_slot(BX *b, int slot) {
     for (int i = 0; i < HIST; i++) ring[i] = get32(&r);
     for (int i = 0; i < HIST; i++) hist[i] = histCount >= HIST ? ring[(histPos + (u32)i) % HIST] : ring[i];
     skip(&r, 14);
+    if (b->sc->minor >= 3) {
+        skip(&r, 3);
+        skip(&r, (size_t)get32(&r) + 1);
+    }
     u32 bgm = get32(&r);
     skip(&r, 12 + 4 + 13);
     if (r.bad || pc >= b->sc->codeSize || depth / 2 > BX_STACK || (int)nglob != b->sc->varCount) {
@@ -440,6 +451,7 @@ bool bx_load_slot(BX *b, int slot) {
         b->th.frameLabel[b->th.sp] = stack[i + 1];
         b->th.sp++;
     }
+    b->msgsShown = shown;
     b->histCount = histCount > HIST ? HIST : (int)histCount;
     memcpy(b->hist, hist, sizeof hist);
     b->msgPc = msgPc;
@@ -536,6 +548,42 @@ void bx_common_load(BX *b) {
     b->commonSize = n;
     b->choiceFlags = p + 4;
     b->readFlags = q + 4;
+    b->achieveTable = 0;
+    for (size_t k = 0x24; k + 8 <= p; k++)
+        if (rd32(d + k) == 4 && !memcmp(d + k + 4, "ID00", 4)) {
+            b->achieveTable = k - 4;
+            break;
+        }
+}
+
+static size_t achieve_flag(BX *b, const char *id) {
+    if (!b->common || !b->achieveTable) return 0;
+    u32 count = rd32(b->common + b->achieveTable);
+    size_t k = b->achieveTable + 4, len = strlen(id);
+    for (u32 i = 0; i < count && k + 8 <= b->choiceFlags; i++) {
+        u32 n = rd32(b->common + k);
+        if (k + 8 + n > b->choiceFlags) break;
+        if (n == len && !memcmp(b->common + k + 4, id, len)) return k + 4 + n;
+        k += 8 + n;
+    }
+    return 0;
+}
+
+bool bx_achieved(BX *b, const char *id) {
+    size_t f = achieve_flag(b, id);
+    return f && rd32(b->common + f);
+}
+
+void bx_achieve(BX *b, const char *id) {
+    size_t f = achieve_flag(b, id);
+    if (!f) {
+        bx_log(b, "no achievement %s in common.dat", id);
+        return;
+    }
+    if (rd32(b->common + f)) return;
+    wr32(b->common + f, 1);
+    b->commonDirty = true;
+    bx_log(b, "achievement %s", id);
 }
 
 void bx_common_save(BX *b) {

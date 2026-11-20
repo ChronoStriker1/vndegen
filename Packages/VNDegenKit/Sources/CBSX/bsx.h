@@ -366,7 +366,7 @@ struct BX {
     Settings set;
     u8 *common;
     size_t commonSize;
-    size_t choiceFlags, readFlags;
+    size_t choiceFlags, readFlags, achieveTable;
     bool commonDirty;
     int phaseBack;
     int phaseResult;
@@ -465,6 +465,8 @@ bool bx_msg_read(BX *b, u32 msg);
 void bx_mark_read(BX *b, u32 msg);
 bool bx_choice_seen(BX *b, int id);
 void bx_mark_choice(BX *b, int id);
+bool bx_achieved(BX *b, const char *id);
+void bx_achieve(BX *b, const char *id);
 void bx_autosave(BX *b);
 bool bx_load_slot(BX *b, int slot);
 bool bx_save_exists(BX *b, int slot);

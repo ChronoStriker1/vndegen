@@ -2,6 +2,7 @@
 
 #include "tjsCommHead.h"
 #include "tjsArray.h"
+#include "tjsDictionary.h"
 #include "TVPSystem.h"
 #include "TVPEvent.h"
 #include "Platform.h"
@@ -515,6 +516,34 @@ tTJSNativeClass* TVPCreateNativeClass_System()
     TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(/*object to register*/ cls,
                                             /*func. name*/ getTickCount)
     //----------------------------------------------------------------------
+    TJS_BEGIN_NATIVE_METHOD_DECL(getMonitorInfo)
+    {
+        if (result)
+        {
+            auto rect = [](tjs_int w, tjs_int h) {
+                iTJSDispatch2* dic = TJSCreateDictionaryObject();
+                tTJSVariant zero(0), width(w), height(h);
+                dic->PropSet(TJS_MEMBERENSURE, TJS_N("x"), 0, &zero, dic);
+                dic->PropSet(TJS_MEMBERENSURE, TJS_N("y"), 0, &zero, dic);
+                dic->PropSet(TJS_MEMBERENSURE, TJS_N("w"), 0, &width, dic);
+                dic->PropSet(TJS_MEMBERENSURE, TJS_N("h"), 0, &height, dic);
+                return dic;
+            };
+            tjs_int w = tTVPScreen::GetDesktopWidth(), h = tTVPScreen::GetDesktopHeight();
+            iTJSDispatch2* info = TJSCreateDictionaryObject();
+            for (const tjs_char* name : {TJS_N("monitor"), TJS_N("work")})
+            {
+                iTJSDispatch2* r = rect(w, h);
+                tTJSVariant v(r, r);
+                r->Release();
+                info->PropSet(TJS_MEMBERENSURE, name, 0, &v, info);
+            }
+            *result = tTJSVariant(info, info);
+            info->Release();
+        }
+        return TJS_S_OK;
+    }
+    TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(cls, getMonitorInfo)
     TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/ getKeyState)
     {
         if (numparams < 1)

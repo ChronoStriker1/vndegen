@@ -128,7 +128,10 @@ enum DebugHooks {
         notify_register_dispatch("\(prefix).key", &keyToken, .main) { token in
             var state: UInt64 = 0
             notify_get_state(token, &state)
-            let key = KeyboardKey(key: state == 32 ? " " : state == 13 ? "Enter" : "", code: state == 32 ? "Space" : state == 13 ? "Enter" : "",
+            let letter = (65...90).contains(state) || (48...57).contains(state) ? String(UnicodeScalar(UInt8(state))) : nil
+            let named = [13: "Enter", 27: "Escape", 37: "ArrowLeft", 38: "ArrowUp", 39: "ArrowRight", 40: "ArrowDown"][Int(state)]
+            let key = KeyboardKey(key: state == 32 ? " " : named ?? letter?.lowercased() ?? "",
+                                  code: state == 32 ? "Space" : named ?? letter.map { (state >= 65 ? "Key" : "Digit") + $0 } ?? "",
                                   keyCode: Int(state))
             MainActor.assumeIsolated {
                 guard case let .playing(_, session) = hub.screen else { return }

@@ -124,6 +124,8 @@ The 14 Flash games in the maintainer's library, Test Games 114 to 127:
 | ActionScript 1 and 2, projector | 115, 125, 126 |
 | A collection: an HTML menu over AS2 and AS3 movies, and an AS3 projector | 120 |
 
+Treasure Hunter Eriru, an ActionScript projector action game, also reaches its stages and keeps its settings across a restart in the Mac app.
+
 All 14 reach their title and play in the Mac app and on an iPad Pro 13-inch simulator, and Test Game 122 also on an
 iPhone 18 Pro simulator. The 12 that save, save and load there. Test Game 120, a movie collection, and Test Game 125,
 whose movies use no shared objects, save nothing on the PC either. Before that, all 14 reached their title and played in Playwright's WebKit on Linux

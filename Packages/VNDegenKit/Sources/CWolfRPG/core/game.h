@@ -224,9 +224,10 @@ struct MapEventState {
     int page = -1;  // active page, or -1
     std::array<int32_t, 10> self{};
     bool erased = false;
-    bool ranAutorun = false;
     bool pageChanged = false;  // since its parallel script last started
 };
+
+int firstAutorun(const std::deque<MapEventState> &events);
 
 class Game {
 public:

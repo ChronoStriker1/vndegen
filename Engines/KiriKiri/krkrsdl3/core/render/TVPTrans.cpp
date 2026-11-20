@@ -320,13 +320,7 @@ iTVPTransHandlerProvider* TVPFindTransHandlerProvider(const ttstr& name)
     tTVPTransHandlerProviderHolder* holder = TVPTransHandlerProviders.Find(name);
     if (!holder)
     {
-        static bool showed = false;
-        if (!showed)
-        {
-            TVPShowSimpleMessageBox(TVPFormatMessage(TVPCannotFindTransHander, name),
-                                    TJS_N("Warning"));
-            showed = true;
-        }
+        TVPAddImportantLog(TVPFormatMessage(TVPCannotFindTransHander, name) + TJS_N(", using crossfade"));
         holder = TVPTransHandlerProviders.Find(TJS_N("crossfade"));
     }
 

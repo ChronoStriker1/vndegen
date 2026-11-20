@@ -206,6 +206,12 @@ static bool step(BX *b) {
         t->pc += 5;
         bx_choice_begin(b);
         return true;
+    case 0x3d: {
+        Val *dst = bx_var_ref(b, VT_TEMP, (i32)rd32(p + 2));
+        *dst = (Val){0, ~leaf(b, p + 6).v};
+        t->pc += 12;
+        return true;
+    }
     case 0x3e: {
         u32 n = rd32(p + 1);
         for (u32 i = 0; i < n && i < 2; i++) bx_voice_play(b, i ? CH_VOICE2 : CH_VOICE, val_str(b, (Val){1, (i32)rd32(p + 5 + 4 * i)}));

@@ -86,7 +86,8 @@ void yr_sysvars_init(YR *y, u32 version) {
         if (version >= t->minVersion && version <= t->maxVersion) { best = t; break; }
     }
     if (!best) best = &yr_sys_tables[yr_sys_table_count - 1];
-    bool v488 = version >= 484 && version <= 489;
+    bool v491 = version == 491;
+    bool v488 = (version >= 484 && version <= 489) || v491;
     bool v406 = version < 466;
     for (int i = 0; i < best->count; i++) {
         int id = best->names[i].id;
@@ -102,7 +103,8 @@ void yr_sysvars_init(YR *y, u32 version) {
         y->sys[14] = (YSysVar){ S_LIST, 0 };
         y->sys[15] = (YSysVar){ S_LISTNUM, 0 };
     }
-    if (version >= 481 && y->sys[127].kind == S_OTHER) y->sys[127] = (YSysVar){ S_CHR, 0 };
+    int chr = v491 ? 120 : 127;
+    if (version >= 481 && y->sys[chr].kind == S_OTHER) y->sys[chr] = (YSysVar){ S_CHR, 0 };
     if (version >= 550) {
         y->sys[50] = (YSysVar){ S_REF_INT, 0 };
         y->sys[52] = (YSysVar){ S_REF_STR, 0 };
