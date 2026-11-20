@@ -516,8 +516,8 @@ bool Game::step(Thread &t) {
 }
 
 int Game::commonByName(const std::string &name) const {
-    for (auto &ce : commons_)
-        if (ce.name == name) return ce.id;
+    for (auto ce = commons_.rbegin(); ce != commons_.rend(); ++ce)
+        if (ce->name == name) return ce->id;
     return -1;
 }
 
