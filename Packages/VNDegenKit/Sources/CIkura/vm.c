@@ -56,9 +56,14 @@ static void pop(IK *t) {
 
 void vm_branch(IK *t, Script *sc, int label, bool call) {
     if (!sc) return;
+    bool rewait = t->wait == W_INPUT && !t->inputTimed;
     t->inputTimed = false;
-    if (call) push(t);
-    else t->msg.tags = NULL;
+    if (call) {
+        u32 pc = t->pc;
+        if (rewait) t->pc = t->inputPc;
+        push(t);
+        t->pc = pc;
+    } else if (t->wait == W_MSG) t->msg.tags = NULL;
     t->sc = sc;
     t->wait = W_NONE;
     goto_label(t, (u32)label);
@@ -691,6 +696,11 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x070c: {
         u32 slot = ik_value(t, rd32(a)) & 3;
         if (!t->savedEnabled[slot]) t->savedEnabled[slot] = ik_alloc(IK_BUTTONS);
+        t->savedInput[slot].bound = t->cancelBound;
+        t->savedInput[slot].call = t->cancelCall;
+        t->savedInput[slot].sc = t->cancelSc;
+        t->savedInput[slot].label = t->cancelLabel;
+        memcpy(t->savedInput[slot].keys, t->keyButton, sizeof t->keyButton);
         for (int k = 0; k < IK_BUTTONS; k++) {
             t->savedEnabled[slot][k] = t->buttons[k].mode;
             t->buttons[k].mode = 0;
@@ -701,6 +711,11 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x070d: {
         u32 slot = ik_value(t, rd32(a)) & 3;
         if (!t->savedEnabled[slot]) break;
+        t->cancelBound = t->savedInput[slot].bound;
+        t->cancelCall = t->savedInput[slot].call;
+        t->cancelSc = t->savedInput[slot].sc;
+        t->cancelLabel = t->savedInput[slot].label;
+        memcpy(t->keyButton, t->savedInput[slot].keys, sizeof t->keyButton);
         for (int k = 0; k < IK_BUTTONS; k++)
             if (t->buttons[k].made) {
                 t->buttons[k].mode = t->savedEnabled[slot][k];
@@ -769,6 +784,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0706:
         t->wait = W_INPUT;
         t->inputTimed = false;
+        t->inputPc = t->pc - 4;
         break;
     case 0x0716:
         if (n >= 36)

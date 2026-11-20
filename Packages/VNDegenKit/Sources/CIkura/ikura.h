@@ -270,7 +270,7 @@ struct IK {
     Frame stack[IK_STACK];
     int sp;
     int wait;
-    u32 waitUntil, inputUntil;
+    u32 waitUntil, inputUntil, inputPc;
     bool inputTimed;
 
     i32 *vars;
@@ -297,6 +297,12 @@ struct IK {
     char (*imageNames)[16];
     SaveFile save;
     u8 *savedEnabled[4];
+    struct {
+        bool bound, call;
+        Script *sc;
+        int label;
+        int keys[256];
+    } savedInput[4];
     int keyButton[256];
     int skipMode, autoMode, modeButton[2], lastToggle;
     u32 autoAt;
