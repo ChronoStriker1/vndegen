@@ -5,7 +5,7 @@
 #include <math.h>
 
 enum { EMOTE_KEY = 0x473ab96d, MAX_MODELS = 8 };
-static const float CHAR_DROP = 190.0f;
+static const float CHAR_DROP = 188.8f;
 
 typedef struct Tex {
     const u8 *px;
