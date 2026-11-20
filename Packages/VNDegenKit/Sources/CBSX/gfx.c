@@ -187,6 +187,12 @@ static void draw_obj(BX *b, const Obj *o, u32 *dst, const char *tint) {
         char shown[64];
         stripped(b, o->name, shown);
         bustup_parts(shown, body, face);
+        const char *suffix = b->hairOff ? bx_cfg_get(&b->cfg, "main window", "hair suffix") : NULL;
+        if (suffix && strlen(body) + strlen(suffix) < sizeof body) {
+            char alt[64];
+            snprintf(alt, sizeof alt, "%.20s%.20s", body, suffix);
+            if (bx_res_find(&b->arc, RX_GFX, alt)) memcpy(body, alt, strlen(alt) + 1);
+        }
         y += view_offset(b, o->name);
         char fn[64], part[80];
         bool hasFace = face_name(b, shown, fn) || face_name(b, o->name, fn);
@@ -240,6 +246,10 @@ static int order_cmp(const void *pa, const void *pb) {
 void bx_compose(BX *b, const Scene *s, u32 *dst) {
     size_t n = (size_t)b->W * (size_t)b->H;
     for (size_t i = 0; i < n; i++) dst[i] = 0xff000000u;
+    bx_compose_over(b, s, dst);
+}
+
+void bx_compose_over(BX *b, const Scene *s, u32 *dst) {
     const Obj *list[BX_OBJS];
     int count = 0;
     for (int i = 0; i < BX_OBJS; i++)

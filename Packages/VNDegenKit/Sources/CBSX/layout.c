@@ -134,20 +134,24 @@ int bx_layout_ints(const LNode *n, const char *key, int *out, int max) {
     return k;
 }
 
+static bool near(u32 a, u32 b) {
+    for (int s = 0; s < 24; s += 8) {
+        int d = (int)(a >> s & 0xff) - (int)(b >> s & 0xff);
+        if (d > 12 || d < -12) return false;
+    }
+    return true;
+}
+
 static bool hit_mask(const Image *im, int h) {
-    u32 first = 0;
-    size_t solid = 0;
-    bool any = false;
-    for (int y = 0; y < h; y++)
-        for (int x = 0; x < im->w; x++) {
-            u32 p = im->px[(size_t)y * im->w + x];
-            if (!(p >> 24)) continue;
-            if (!any) first = p & 0xffffff;
-            any = true;
-            if ((p & 0xffffff) != first) return false;
-            solid += p >> 24 == 0xff;
-        }
-    return any && solid * 2 >= (size_t)im->w * (size_t)h;
+    if (h <= 0 || im->w <= 0) return false;
+    u32 centre = im->px[(size_t)(h / 2) * im->w + im->w / 2];
+    if (!(centre >> 24) || (!near(centre, 0xffffff) && !near(centre, 0))) return false;
+    size_t same = 0, total = (size_t)im->w * (size_t)h;
+    for (size_t k = 0; k < total; k++) {
+        u32 p = im->px[k];
+        if (p >> 24 && near(p, centre)) same++;
+    }
+    return same * 4 >= total * 3;
 }
 
 static bool mbtn_load(BX *b, MBtn *t, const char *name, int frames, int x, int y) {
@@ -190,8 +194,8 @@ bool bx_mbtn_on(const BX *b, const MBtn *t) {
 void bx_mbtn_draw(BX *b, u32 *dst, const MBtn *t, int state) {
     if (!t->img) return;
     int h = t->img->h / t->frames;
-    int f = clampi(state + t->skip, 0, t->frames - 1);
-    bx_blit_part(dst, b->W, b->H, t->img, 0, f * h, t->img->w, h, t->x, t->y, 255);
+    int f = clampi((state < 0 ? 0 : state) + t->skip, 0, t->frames - 1);
+    bx_blit_part(dst, b->W, b->H, t->img, 0, f * h, t->img->w, h, t->x, t->y, state < 0 ? 110 : 255);
 }
 
 int bx_mbtn_state(const BX *b, const MBtn *t) { return bx_mbtn_on(b, t) ? 1 : 0; }

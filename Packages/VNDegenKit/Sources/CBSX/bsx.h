@@ -257,6 +257,7 @@ typedef struct StatusPhase StatusPhase;
 typedef struct Museum Museum;
 typedef struct MuseumPhase MuseumPhase;
 typedef struct BgvPanel BgvPanel;
+typedef struct Strip Strip;
 
 enum { LN_NUM, LN_STR, LN_OBJ, LN_ARR };
 
@@ -438,6 +439,7 @@ struct BX {
     Mixer *mixer;
     Movie *movie;
     int audioRate;
+    bool hairOff;
     int volMaster, volBgm, volSe, volVoice, volBgs, volBgv;
     int bgvLevel[8];
     char bgmName[64];
@@ -471,6 +473,7 @@ void bx_gfx_frame(BX *b);
 int bx_eye_frame(BX *b, const Obj *o);
 int bx_view_level(BX *b);
 void bx_compose(BX *b, const Scene *s, u32 *dst);
+void bx_compose_over(BX *b, const Scene *s, u32 *dst);
 void bx_anim_update(BX *b);
 bool bx_obj_move(BX *b, int id, int x, int y, int ms);
 void bx_blit(u32 *dst, int dw, int dh, const Image *im, int dx, int dy, int alpha);
@@ -552,6 +555,12 @@ void bx_museum_close(BX *b);
 void bx_museum_update(BX *b);
 void bx_museum_draw(BX *b, u32 *dst);
 void bx_museum_replay_end(BX *b);
+Image *bx_scaled(BX *b, const u32 *full, int tw, int th);
+int bx_museum_cg_pages(BX *b);
+int bx_museum_cg_thumbs(BX *b, int page);
+int bx_museum_cg_seen_variant(BX *b, int page, int thumb);
+Image *bx_museum_cg_thumb(BX *b, int page, int thumb);
+void bx_museum_cg_compose(BX *b, int page, int thumb, u32 *dst, bool hairOff, bool cutOff, bool steamOff);
 BgvPanel *bx_bgv_open(BX *b, bool overlay);
 void bx_bgv_free(BgvPanel *p);
 bool bx_bgv_update(BX *b, BgvPanel *p);
