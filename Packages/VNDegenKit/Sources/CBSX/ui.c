@@ -120,7 +120,7 @@ void bx_phase_start(BX *b, int phase) {
     else if (phase == PH_MAP) {
         if (bx_map_start(b)) bx_autosave(b);
         else bx_phase_end(b);
-    }
+    } else if (phase == PH_CUSTOM_MAP && !bx_cfg_section(&b->cfg, "map phase")) bx_autosave(b);
 }
 
 static void title_pick(BX *b, const char *key) {
@@ -169,7 +169,8 @@ void bx_phase_update(BX *b) {
         return;
     }
     if (b->phase == PH_CUSTOM_MAP) {
-        custom_map_update(b);
+        bx_ui_update(b);
+        if (b->phase == PH_CUSTOM_MAP) custom_map_update(b);
         return;
     }
     if (b->phase == PH_MAP) {
@@ -205,7 +206,10 @@ void bx_phase_draw(BX *b, u32 *dst) {
         bx_data_draw(b, dst);
         return;
     }
-    if (b->phase == PH_CUSTOM_MAP) return;
+    if (b->phase == PH_CUSTOM_MAP) {
+        bx_ui_draw(b, dst);
+        return;
+    }
     if (b->phase == PH_MAP) {
         bx_map_draw(b, dst);
         return;
@@ -215,6 +219,8 @@ void bx_phase_draw(BX *b, u32 *dst) {
     if (p->base) bx_blit(dst, b->W, b->H, p->base, p->base->x, p->base->y, 255);
     for (int i = 0; i < p->count; i++) draw_item(b, dst, &p->items[i], i == p->hover ? 1 : 0, 0, 0);
 }
+
+static int view_button(const char *key) { return !strcmp(key, "view up") ? 1 : !strcmp(key, "view middle") ? 2 : !strcmp(key, "view down") ? 3 : 0; }
 
 void bx_ui_init(BX *b) {
     const Cfg *c = &b->cfg;
@@ -227,11 +233,8 @@ void bx_ui_init(BX *b) {
     bx_cfg_ints(c, "game menu", "show area", show, 4);
     memcpy(b->menuShow, show, sizeof show);
     b->lamp = own(b, bx_cfg_get(c, "game menu", "hold icon"));
-    char name[64];
-    const char *wn = bx_cfg_get(c, "game menu", "week no"), *wd = bx_cfg_get(c, "game menu", "week day");
-    if (wn && bx_cfg_field(wn, 0, name, sizeof name) > 0) b->infoWno = own(b, name);
-    if (wd && bx_cfg_field(wd, 0, name, sizeof name) > 0) b->infoWday = own(b, name);
     b->menuVisible = true;
+    b->winLayer = b->menuLayer = true;
     b->cutIn = true;
     for (int i = 0; i < c->count && b->buttonCount < 24; i++) {
         if (strcmp(c->sec[i], "system button")) continue;
@@ -241,6 +244,7 @@ void bx_ui_init(BX *b) {
         if (!button_spec(b, "system button", c->key[i], &it)) continue;
         Button *bt = &b->buttons[b->buttonCount++];
         snprintf(bt->key, sizeof bt->key, "%s", it.key);
+        if (view_button(it.key)) b->viewButtons = true;
         bt->img = it.img;
         bt->frames = it.frames;
         bt->x = it.x;
@@ -258,13 +262,12 @@ void bx_ui_free(BX *b) {
     bx_map_free(b);
     bx_image_free(b->menuBase);
     bx_image_free(b->lamp);
-    bx_image_free(b->infoWno);
-    bx_image_free(b->infoWday);
     for (int i = 0; i < b->buttonCount; i++) bx_image_free(b->buttons[i].img);
     bx_image_free(b->msgBase);
     bx_image_free(b->msgFrame);
     bx_image_free(b->msgName);
     bx_image_free(b->unagashi);
+    bx_image_free(b->xCounter);
     bx_image_free(b->choiceItem[0]);
     bx_image_free(b->choiceItem[1]);
     bx_image_free(b->choiceItem[2]);
@@ -311,7 +314,13 @@ static void button_press(BX *b, const char *key) {
         }
         return;
     }
+    if (view_button(key)) {
+        b->viewLevel = view_button(key);
+        b->shownDirty = true;
+        return;
+    }
     if (!strcmp(key, "skip")) b->skipMode = !b->skipMode;
+    else if (!strcmp(key, "cut in")) b->cutIn = !b->cutIn;
     else if (!strcmp(key, "auto ex")) b->autoMode = !b->autoMode;
     else if (!strcmp(key, "voice")) {
         if (b->voice) bx_snd_play(b, CH_VOICE, RX_VOICE, b->voice, false, 0);
@@ -330,14 +339,21 @@ static void button_press(BX *b, const char *key) {
 
 static bool always_shown(const Button *bt) { return !strcmp(bt->key, "simple view") || !strcmp(bt->key, "simple strip"); }
 
+static bool menu_context(BX *b) {
+    if (b->phase == PH_CUSTOM_MAP) return b->menuLayer && !b->transActive && !bx_cfg_section(&b->cfg, "map phase");
+    return b->phase == PH_NONE && b->winShown && !b->winHidden && b->menuLayer && b->th.wait == W_TEXT;
+}
+
+static bool map_disabled(BX *b, const Button *bt) { return b->phase == PH_CUSTOM_MAP && (!strcmp(bt->key, "skip") || !strcmp(bt->key, "voice")); }
+
 void bx_ui_update(BX *b) {
     b->buttonHover = -1;
     bool inMenu = b->mx >= b->menuShow[0] && b->mx < b->menuShow[0] + b->menuShow[2] && b->my >= b->menuShow[1] && b->my < b->menuShow[1] + b->menuShow[3];
-    bool window = b->winShown && !b->winHidden && b->th.wait == W_TEXT;
-    bool shown = window && (inMenu || b->menuVisible);
-    if (!window) return;
+    if (!menu_context(b)) return;
+    bool shown = inMenu || b->menuVisible;
     for (int i = 0; i < b->buttonCount; i++) {
         if (!shown && !always_shown(&b->buttons[i])) continue;
+        if (map_disabled(b, &b->buttons[i])) continue;
         Item it = button_item(&b->buttons[i]);
         if (button_enabled(b, &b->buttons[i]) && inside(&it, b->mx, b->my, b->menuX, b->menuY)) b->buttonHover = i;
     }
@@ -348,50 +364,71 @@ void bx_ui_update(BX *b) {
     }
 }
 
+static void draw_date(BX *b, u32 *dst, const char *sec, int ox, int oy);
+
 void bx_ui_draw(BX *b, u32 *dst) {
     bool inMenu = b->mx >= b->menuShow[0] && b->mx < b->menuShow[0] + b->menuShow[2] && b->my >= b->menuShow[1] && b->my < b->menuShow[1] + b->menuShow[3];
-    if (!b->winShown || b->winHidden || b->transActive || b->th.wait != W_TEXT) return;
+    if (!menu_context(b) || b->transActive) return;
     bool menu = inMenu || b->menuVisible;
     if (menu && b->menuBase) bx_blit(dst, b->W, b->H, b->menuBase, b->menuX, b->menuY, 255);
+    if (menu) {
+        struct {
+            const char *key;
+            bool on;
+        } lamps[] = {{"autoex pos", b->autoMode}, {"cut-in pos", b->cutIn}, {"hold pos", b->menuVisible}};
+        for (int i = 0; i < 3 && b->lamp; i++) {
+            int p[2] = {0, 0};
+            int h = b->lamp->h / 2;
+            if (bx_cfg_ints(&b->cfg, "game menu", lamps[i].key, p, 2) == 2)
+                bx_blit_part(dst, b->W, b->H, b->lamp, 0, lamps[i].on ? h : 0, b->lamp->w, h, b->menuX + p[0], b->menuY + p[1], 255);
+        }
+    }
     for (int i = 0; i < b->buttonCount; i++) {
         if (!button_enabled(b, &b->buttons[i]) && !always_shown(&b->buttons[i])) continue;
         if (!menu && !always_shown(&b->buttons[i])) continue;
         Item it = button_item(&b->buttons[i]);
-        bool on = (!strcmp(b->buttons[i].key, "skip") && b->skipMode) || (!strcmp(b->buttons[i].key, "auto ex") && b->autoMode);
-        draw_item(b, dst, &it, i == b->buttonHover ? 1 : on ? 2 : 0, b->menuX, b->menuY);
+        bool on = (!strcmp(b->buttons[i].key, "skip") && b->skipMode) || (!strcmp(b->buttons[i].key, "auto ex") && b->autoMode) ||
+                  (view_button(b->buttons[i].key) && bx_view_level(b) == view_button(b->buttons[i].key));
+        draw_item(b, dst, &it, map_disabled(b, &b->buttons[i]) ? 3 : i == b->buttonHover ? 1 : on ? 2 : 0, b->menuX, b->menuY);
     }
     if (!menu) return;
-    struct {
-        const char *key;
-        bool on;
-    } lamps[] = {{"autoex pos", b->autoMode}, {"cut-in pos", b->cutIn}, {"hold pos", b->menuVisible}};
-    for (int i = 0; i < 3 && b->lamp; i++) {
-        int p[2] = {0, 0};
-        int h = b->lamp->h / 2;
-        if (bx_cfg_ints(&b->cfg, "game menu", lamps[i].key, p, 2) == 2)
-            bx_blit_part(dst, b->W, b->H, b->lamp, 0, lamps[i].on ? h : 0, b->lamp->w, h, b->menuX + p[0], b->menuY + p[1], 255);
-    }
-    const char *date = bx_cfg_get(&b->cfg, "game menu", "date");
+    draw_date(b, dst, "game menu", 0, 0);
+}
+
+static void draw_date(BX *b, u32 *dst, const char *sec, int ox, int oy) {
+    const char *date = bx_cfg_get(&b->cfg, sec, "date");
     int v = date ? bx_var_by_name(b, date) : -1;
     if (v < 0) return;
-    int day = b->globals[v].v + bx_cfg_int(&b->cfg, "game menu", "day adjustment", 0);
-    if (day < 0) return;
+    int raw = b->globals[v].v, border = bx_cfg_int(&b->cfg, sec, "day sp border", 0);
+    int day = raw + bx_cfg_int(&b->cfg, sec, "day adjustment", 0);
+    bool sp = border > 0 && raw >= border;
+    if (day < 0 && !sp) return;
     struct {
         const char *key;
-        Image *img;
         int frame;
-    } info[] = {{"week no", b->infoWno, day / 7}, {"week day", b->infoWday, day % 7}};
-    for (int i = 0; i < 2; i++) {
-        const char *s = bx_cfg_get(&b->cfg, "game menu", info[i].key);
-        char f[32];
-        if (!s || !info[i].img) continue;
+    } info[] = {{"week no", day / 7}, {"week day", day % 7}, {"day sp", raw - border}};
+    for (int i = sp ? 2 : 0; i < (sp ? 3 : 2); i++) {
+        const char *s = bx_cfg_get(&b->cfg, sec, info[i].key);
+        char f[64];
+        if (!s || bx_cfg_field(s, 0, f, sizeof f) <= 0) continue;
+        Image *img = bx_image_load(b, f);
+        if (!img) continue;
         int frames = bx_cfg_field(s, 1, f, sizeof f) > 0 ? bx_eval(f, NULL) : 1;
         int x = bx_cfg_field(s, 2, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
         int y = bx_cfg_field(s, 3, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
         if (frames < 1) frames = 1;
-        int h = info[i].img->h / frames;
-        bx_blit_part(dst, b->W, b->H, info[i].img, 0, clampi(info[i].frame, 0, frames - 1) * h, info[i].img->w, h, x, y, 255);
+        int h = img->h / frames;
+        bx_blit_part(dst, b->W, b->H, img, 0, clampi(info[i].frame, 0, frames - 1) * h, img->w, h, ox + x, oy + y, 255);
     }
+}
+
+void bx_info_draw(BX *b, u32 *dst) {
+    if (!b->infoLayer || !bx_cfg_get(&b->cfg, "information window", "date")) return;
+    int pos[2] = {0, 0};
+    bx_cfg_ints(&b->cfg, "information window", "base pos", pos, 2);
+    Image *base = bx_image_load(b, bx_cfg_get(&b->cfg, "information window", "base"));
+    if (base) bx_blit(dst, b->W, b->H, base, pos[0], pos[1], 255);
+    draw_date(b, dst, "information window", pos[0], pos[1]);
 }
 
 static bool bg_name(const char *s) {
@@ -475,6 +512,11 @@ void bx_system(BX *b, const char *cmd) {
     if (!strcmp(cmd, "title")) bx_phase_start(b, PH_TITLE);
     else if (!strcmp(cmd, "map")) bx_phase_start(b, PH_MAP);
     else if (!strcmp(cmd, "custom map")) bx_phase_start(b, PH_CUSTOM_MAP);
+    else if (!strncmp(cmd, "実績解除 ", strlen("実績解除 "))) bx_achieve(b, cmd + strlen("実績解除 "));
+    else if (!strncmp(cmd, "達成率 ", strlen("達成率 "))) bx_log(b, "museum rate isn't counted yet: %s", cmd);
+    else if (!strcmp(cmd, "op") || !strcmp(cmd, "staffroll")) {
+        if (bx_movie_play(b, cmd)) b->th.wait = W_MOVIE;
+    }
     else if (!strcmp(cmd, "random bg")) random_bg(b);
     else if (sscanf(cmd, "is animeted %63s , %d", var, &level) == 2) {
         int v = bx_var_by_name(b, var);
@@ -482,7 +524,8 @@ void bx_system(BX *b, const char *cmd) {
     }
     else if (!strcmp(cmd, "@title") || !strcmp(cmd, "@end")) {
         bx_snd_stop(b, CH_BGM, 500);
-        bx_snd_stop(b, CH_BGS, 0);
+        bx_snd_loop_stop(b, CH_BGS, NULL, 0);
+        bx_snd_loop_stop(b, CH_VOICE2, NULL, 0);
         b->bgmName[0] = 0;
         memset(&b->scene, 0, sizeof b->scene);
         bx_transition(b, 0, 0, NULL);
@@ -491,6 +534,8 @@ void bx_system(BX *b, const char *cmd) {
         b->th.sp = 0;
         b->th.wait = W_NONE;
         int l = bx_script_label(b->sc, cmd[1] == 't' ? "title" : "boot_logo");
+        if (l < 0) l = bx_script_label(b->sc, "boot");
+        if (l < 0) l = bx_script_label(b->sc, "title");
         bx_vm_goto(b, l >= 0 ? l : 0);
     } else if (!strcmp(cmd, "dress_on")) b->dressEnabled = true;
     else if (!strcmp(cmd, "dress_off")) b->dressEnabled = false;

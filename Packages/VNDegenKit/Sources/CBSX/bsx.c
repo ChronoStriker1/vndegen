@@ -152,6 +152,7 @@ void vnbsx_close(VNBSX *n) {
     if (!b) return;
     if (b->sc) bx_common_save(b);
     free(b->common);
+    bx_movie_stop(b);
     bx_mixer_free(b->mixer);
     bx_ui_free(b);
     bx_msg_clear(b);
@@ -209,7 +210,7 @@ static void text_wait(BX *b) {
         return;
     }
     if (b->autoMode && bx_msg_complete(b)) {
-        if (bx_snd_playing(b, CH_VOICE)) return;
+        if (bx_snd_playing(b, CH_VOICE) || bx_snd_playing(b, CH_VOICE2)) return;
         if (!b->autoAt) b->autoAt = b->now + 500 + (u32)(100 - clampi(b->set.autoSpeed, 0, 100)) * 30;
         if ((i32)(b->now - b->autoAt) >= 0) advance(b);
     }
@@ -217,7 +218,9 @@ static void text_wait(BX *b) {
 
 static void tick(BX *b) {
     bx_anim_update(b);
-    if (b->phase != PH_NONE) bx_phase_update(b);
+    if (b->movie) {
+        if (!bx_movie_update(b) && b->th.wait == W_MOVIE) b->th.wait = W_NONE;
+    } else if (b->phase != PH_NONE) bx_phase_update(b);
     else {
         bx_ui_update(b);
         Thread *t = &b->th;
@@ -337,6 +340,11 @@ void vnbsx_wheel(VNBSX *n, int notches) { ((BX *)n)->wheel += notches; }
 void vnbsx_audio(VNBSX *n, float *out, int frames) {
     BX *b = (BX *)n;
     bx_mixer_mix(b->mixer, out, frames, b->paused);
+    if (b->paused || !b->movie) return;
+    bx_mixer_lock(b->mixer, true);
+    bx_movie_mix(b, out, frames, bx_mixer_volume(b->mixer, CH_BGM));
+    bx_mixer_lock(b->mixer, false);
+    for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
 }
 
 void vnbsx_set_paused(VNBSX *n, bool paused) { ((BX *)n)->paused = paused; }

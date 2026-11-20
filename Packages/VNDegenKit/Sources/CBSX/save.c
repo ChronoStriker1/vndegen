@@ -3,10 +3,9 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#define THUMB_W 120
-#define THUMB_H 90
 #define SLOT_INFO 592
 #define HIST 50
+#define LUA_DATA "{[\"begin-time counters\"]={[1]={};[2]={};[3]={};};[\"begin-time parameters\"]={[1]={};[2]={};[3]={};};}"
 
 typedef struct Buf {
     u8 *d;
@@ -97,13 +96,27 @@ bool bx_save_exists(BX *b, int slot) {
     return r;
 }
 
+void bx_thumb_size(BX *b, int *w, int *h) {
+    const char *r = bx_cfg_get(&b->cfg, "main window", "thumbnail ratio");
+    double ratio = r ? atof(r) : 0.15;
+    if (ratio < 0.01 || ratio > 0.5) ratio = 0.15;
+    *w = (int)(b->W * ratio);
+    *h = (int)(b->H * ratio);
+}
+
 void bx_save_capture_thumb(BX *b) {
-    if (!b->thumb) b->thumb = bx_image_new(THUMB_W, THUMB_H);
-    for (int y = 0; y < THUMB_H; y++)
-        for (int x = 0; x < THUMB_W; x++) {
+    int tw, th;
+    bx_thumb_size(b, &tw, &th);
+    if (b->thumb && (b->thumb->w != tw || b->thumb->h != th)) {
+        bx_image_free(b->thumb);
+        b->thumb = NULL;
+    }
+    if (!b->thumb) b->thumb = bx_image_new(tw, th);
+    for (int y = 0; y < th; y++)
+        for (int x = 0; x < tw; x++) {
             u32 r = 0, g = 0, bl = 0;
-            int sx0 = x * b->W / THUMB_W, sx1 = (x + 1) * b->W / THUMB_W;
-            int sy0 = y * b->H / THUMB_H, sy1 = (y + 1) * b->H / THUMB_H;
+            int sx0 = x * b->W / tw, sx1 = (x + 1) * b->W / tw;
+            int sy0 = y * b->H / th, sy1 = (y + 1) * b->H / th;
             int n = 0;
             for (int sy = sy0; sy < sy1; sy++)
                 for (int sx = sx0; sx < sx1; sx++) {
@@ -114,12 +127,12 @@ void bx_save_capture_thumb(BX *b) {
                     n++;
                 }
             if (!n) n = 1;
-            b->thumb->px[(size_t)y * THUMB_W + x] = (r / n) | (g / n) << 8 | (bl / n) << 16 | 0xff000000u;
+            b->thumb->px[(size_t)y * tw + x] = (r / n) | (g / n) << 8 | (bl / n) << 16 | 0xff000000u;
         }
 }
 
 
-static int mode_of(BX *b) { return b->phase == PH_MAP ? 7 : 1; }
+static int mode_of(BX *b) { return b->phase == PH_MAP ? 7 : b->phase == PH_CUSTOM_MAP ? 9 : 1; }
 
 static void put_wears(BX *b, Buf *buf) {
     int n = 0;
@@ -139,7 +152,13 @@ static void put_wears(BX *b, Buf *buf) {
     }
 }
 
-static void put_obj(Buf *buf, const char *name, int kind, int x, int y, int parts, int alpha) {
+static void put_obj(BX *b, Buf *buf, const char *name, int kind, int x, int y, int parts, int alpha) {
+    u8 head[0x1a];
+    int w = b->W, h = b->H, frames = kind == OK_OBJ && bx_cfg_get(&b->cfg, "button object", name) ? 2 : 1;
+    if (kind != OK_BG && kind != OK_CHAR && bx_res_head(&b->arc, RX_GFX, name, head, sizeof head)) {
+        w = rd16(head + 0x16);
+        h = rd16(head + 0x18) / frames;
+    }
     put8(buf, (u8)kind);
     zeros(buf, 12);
     put_wide_counted(buf, name);
@@ -148,10 +167,10 @@ static void put_obj(Buf *buf, const char *name, int kind, int x, int y, int part
     put32(buf, (u32)x);
     put32(buf, (u32)y);
     zeros(buf, 16);
-    put32(buf, 800);
-    put32(buf, 600);
+    put32(buf, (u32)w);
+    put32(buf, (u32)h);
     put32(buf, 0);
-    put32(buf, 1);
+    put32(buf, (u32)frames);
     put32(buf, (u32)parts);
     put32(buf, (u32)clampi(alpha, 0, 255));
     put32(buf, 0x3f800000u);
@@ -183,11 +202,12 @@ bool bx_save_slot(BX *b, int slot) {
     char id[33];
     snprintf(id, sizeof id, "%s", b->saveId[0] ? b->saveId : "00000000000000000000000000000000");
     put(&buf, id, 32);
-    put32(&buf, THUMB_W * THUMB_H * 4 + SLOT_INFO);
     if (!b->thumb) bx_save_capture_thumb(b);
-    for (int y = THUMB_H - 1; y >= 0; y--)
-        for (int x = 0; x < THUMB_W; x++) {
-            u32 p = b->thumb->px[(size_t)y * THUMB_W + x];
+    int tw = b->thumb->w, th = b->thumb->h;
+    put32(&buf, (u32)(tw * th * 4 + SLOT_INFO));
+    for (int y = th - 1; y >= 0; y--)
+        for (int x = 0; x < tw; x++) {
+            u32 p = b->thumb->px[(size_t)y * tw + x];
             u8 px[4] = {(u8)(p >> 16), (u8)(p >> 8), (u8)p, 0xff};
             put(&buf, px, 4);
         }
@@ -232,14 +252,19 @@ bool bx_save_slot(BX *b, int slot) {
     put32(&buf, (u32)s->varCount);
     for (int i = 0; i < s->varCount; i++) put32(&buf, (u32)b->globals[i].v);
     put32(&buf, b->msgPc);
-    put32(&buf, 0);
+    put32(&buf, s->minor >= 1 ? (u32)(b->histCount % HIST) : 0);
     put32(&buf, (u32)b->histCount);
     for (int i = 0; i < HIST; i++) put32(&buf, i < b->histCount ? b->hist[i] : 0xffffffffu);
     put32(&buf, 0);
     put32(&buf, 0xffffffffu);
-    put32(&buf, 0);
+    put32(&buf, s->minor >= 3 ? (u32)b->msgsShown : 0);
     put8(&buf, 0);
     put8(&buf, 0);
+    if (s->minor >= 3) {
+        zeros(&buf, 3);
+        put32(&buf, (u32)strlen(LUA_DATA));
+        put(&buf, LUA_DATA, strlen(LUA_DATA) + 1);
+    }
     put32(&buf, (u32)(b->bgmName[0] ? b->bgmIndex : 0));
     zeros(&buf, 12);
     put32(&buf, 1);
@@ -249,16 +274,17 @@ bool bx_save_slot(BX *b, int slot) {
     for (int i = 0; i < BX_OBJS; i++)
         if (b->scene.obj[i].used) list[count++] = &b->scene.obj[i];
     qsort(list, (size_t)count, sizeof *list, obj_order);
-    bool overlays = false;
-    for (int i = 0; i < count; i++) overlays |= list[i]->kind == OK_OVERLAY || (list[i]->kind == OK_BG && list[i]->face[0]);
     for (int i = 0; i < count; i++) {
         const Obj *o = list[i];
-        int parts = o->kind == OK_BG ? (overlays ? 2 : 0) : 2;
-        put_obj(&buf, o->name, o->kind, o->x, o->y, parts, o->alpha);
-        if (o->kind == OK_BG && o->face[0]) put_obj(&buf, o->face, OK_OVERLAY, 0, 0, 2, 255);
+        int parts = o->kind == OK_BG ? (o->face[0] ? 2 : 0) : 2;
+        put_obj(b, &buf, o->name, o->kind, o->x, o->y, parts, o->alpha);
+        if (o->kind == OK_BG && o->face[0]) put_obj(b, &buf, o->face, OK_OVERLAY, 0, 0, 2, 255);
     }
     put8(&buf, 0xff);
-    static const u8 tail[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    u8 tail[27] = {0};
+    tail[3] = !b->winLayer;
+    tail[7] = !b->menuLayer;
+    tail[11] = !b->infoLayer;
     put(&buf, tail, sizeof tail);
     char *path = bx_save_path(b, slot);
     char dir[2048];
@@ -341,14 +367,14 @@ bool bx_load_slot(BX *b, int slot) {
     }
     Rd r = {d, n, 32, false};
     u32 info = get32(&r);
-    size_t infoStart = r.p + THUMB_W * THUMB_H * 4;
     skip(&r, info);
-    if (r.bad || infoStart + SLOT_INFO > n) {
+    if (r.bad || info < SLOT_INFO) {
         bx_log(b, "%s is too short", path);
         free(d);
         free(path);
         return false;
     }
+    int shown = (int)rd32(d + 36 + info - SLOT_INFO + 76);
     skip(&r, 0x24);
     int mode = (int)get32(&r);
     skip(&r, 4 + 4 + 9);
@@ -370,11 +396,16 @@ bool bx_load_slot(BX *b, int slot) {
     i32 *globals = bx_alloc(sizeof(i32) * (nglob ? nglob : 1));
     for (u32 i = 0; i < nglob && !r.bad; i++) globals[i] = (i32)get32(&r);
     u32 msgPc = get32(&r);
-    get32(&r);
+    u32 histPos = get32(&r) % HIST;
     u32 histCount = get32(&r);
-    u32 hist[HIST];
-    for (int i = 0; i < HIST; i++) hist[i] = get32(&r);
+    u32 ring[HIST], hist[HIST];
+    for (int i = 0; i < HIST; i++) ring[i] = get32(&r);
+    for (int i = 0; i < HIST; i++) hist[i] = histCount >= HIST ? ring[(histPos + (u32)i) % HIST] : ring[i];
     skip(&r, 14);
+    if (b->sc->minor >= 3) {
+        skip(&r, 3);
+        skip(&r, (size_t)get32(&r) + 1);
+    }
     u32 bgm = get32(&r);
     skip(&r, 12 + 4 + 13);
     if (r.bad || pc >= b->sc->codeSize || depth / 2 > BX_STACK || (int)nglob != b->sc->varCount) {
@@ -398,6 +429,7 @@ bool bx_load_slot(BX *b, int slot) {
         u8 alpha = get8(&r);
         skip(&r, 3 + 4 + 20);
         if (kind == OK_OVERLAY) skip(&r, 29);
+        if (r.bad) break;
         if (!*name) {
             free(name);
             continue;
@@ -409,6 +441,8 @@ bool bx_load_slot(BX *b, int slot) {
         }
         free(name);
     }
+    u8 tail[27] = {0};
+    if (!r.bad && r.p + sizeof tail <= r.n) memcpy(tail, r.d + r.p, sizeof tail);
     for (int i = 0; i < b->sc->varCount; i++) b->globals[i] = (Val){0, globals[i]};
     for (int i = 0; i < BX_LOCALS; i++) b->locals[i] = (Val){0, locals[i]};
     b->th.sp = 0;
@@ -417,6 +451,7 @@ bool bx_load_slot(BX *b, int slot) {
         b->th.frameLabel[b->th.sp] = stack[i + 1];
         b->th.sp++;
     }
+    b->msgsShown = shown;
     b->histCount = histCount > HIST ? HIST : (int)histCount;
     memcpy(b->hist, hist, sizeof hist);
     b->msgPc = msgPc;
@@ -441,14 +476,18 @@ bool bx_load_slot(BX *b, int slot) {
         b->bgmName[0] = 0;
         bx_snd_stop(b, CH_BGM, 300);
     }
-    bx_snd_stop(b, CH_BGS, 0);
+    bx_snd_loop_stop(b, CH_BGS, NULL, 0);
+    bx_snd_loop_stop(b, CH_VOICE2, NULL, 0);
     bx_snd_stop(b, CH_VOICE, 0);
+    bx_snd_stop(b, CH_VOICE2, 0);
     bx_msg_clear(b);
-    b->winShown = true;
+    b->winShown = b->winLayer = !tail[3];
+    b->menuLayer = !tail[7];
+    b->infoLayer = !tail[11];
     b->winHidden = false;
-    if (mode == 7) {
+    if (mode == 7 || mode == 9) {
         b->th.wait = W_NONE;
-        bx_phase_start(b, PH_MAP);
+        bx_phase_start(b, mode == 7 ? PH_MAP : PH_CUSTOM_MAP);
     } else if (msgPc < b->sc->codeSize && b->sc->code[msgPc] == 0x1d) {
         show_message_at(b, msgPc);
         b->th.wait = W_TEXT;
@@ -509,6 +548,42 @@ void bx_common_load(BX *b) {
     b->commonSize = n;
     b->choiceFlags = p + 4;
     b->readFlags = q + 4;
+    b->achieveTable = 0;
+    for (size_t k = 0x24; k + 8 <= p; k++)
+        if (rd32(d + k) == 4 && !memcmp(d + k + 4, "ID00", 4)) {
+            b->achieveTable = k - 4;
+            break;
+        }
+}
+
+static size_t achieve_flag(BX *b, const char *id) {
+    if (!b->common || !b->achieveTable) return 0;
+    u32 count = rd32(b->common + b->achieveTable);
+    size_t k = b->achieveTable + 4, len = strlen(id);
+    for (u32 i = 0; i < count && k + 8 <= b->choiceFlags; i++) {
+        u32 n = rd32(b->common + k);
+        if (k + 8 + n > b->choiceFlags) break;
+        if (n == len && !memcmp(b->common + k + 4, id, len)) return k + 4 + n;
+        k += 8 + n;
+    }
+    return 0;
+}
+
+bool bx_achieved(BX *b, const char *id) {
+    size_t f = achieve_flag(b, id);
+    return f && rd32(b->common + f);
+}
+
+void bx_achieve(BX *b, const char *id) {
+    size_t f = achieve_flag(b, id);
+    if (!f) {
+        bx_log(b, "no achievement %s in common.dat", id);
+        return;
+    }
+    if (rd32(b->common + f)) return;
+    wr32(b->common + f, 1);
+    b->commonDirty = true;
+    bx_log(b, "achievement %s", id);
 }
 
 void bx_common_save(BX *b) {

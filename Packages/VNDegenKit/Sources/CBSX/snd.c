@@ -19,11 +19,14 @@ typedef struct Voice {
     bool primed, loop, done;
     float gain, target, delta;
     bool stopAtZero;
+    int ch;
+    char key[32], name[32];
     int16_t buf[4096];
     int bufLen, bufPos;
 } Voice;
 
-#define SLOTS (CH_COUNT * 2)
+#define LOOPS 16
+#define SLOTS (CH_COUNT * 2 + LOOPS)
 
 struct Mixer {
     int rate;
@@ -88,7 +91,7 @@ void bx_mixer_mix(Mixer *m, float *out, int frames, bool paused) {
             }
             v->primed = true;
         }
-        float vol = m->chanVol[s % CH_COUNT];
+        float vol = m->chanVol[v->ch];
         for (int i = 0; i < frames; i++) {
             if (v->gain != v->target) {
                 v->gain += v->delta;
@@ -124,8 +127,9 @@ static float cfg_volume(BX *b, const char *key, float def) {
 }
 
 static float channel_volume(BX *b, int ch) {
-    int v = ch == CH_BGM ? b->volBgm : ch == CH_BGS ? b->volBgs : ch == CH_VOICE ? b->volVoice : b->volSe;
-    float base = ch == CH_BGM ? cfg_volume(b, "bgm", 0.5f) : ch == CH_BGS ? cfg_volume(b, "bgs", 0.5f) : ch == CH_VOICE ? cfg_volume(b, "voice", 0.75f) : cfg_volume(b, "se", 0.75f);
+    bool voice = ch == CH_VOICE || ch == CH_VOICE2;
+    int v = ch == CH_BGM ? b->volBgm : ch == CH_BGS ? b->volBgs : voice ? b->volVoice : b->volSe;
+    float base = ch == CH_BGM ? cfg_volume(b, "bgm", 0.5f) : ch == CH_BGS ? cfg_volume(b, "bgs", 0.5f) : voice ? cfg_volume(b, "voice", 0.75f) : cfg_volume(b, "se", 0.75f);
     return base * (float)v / 100.0f * (float)b->volMaster / 100.0f;
 }
 
@@ -147,13 +151,12 @@ static void fade_out(BX *b, Voice *v, int ms) {
     v->delta = -v->gain / ((float)ms * (float)b->audioRate / 1000.0f);
 }
 
-void bx_snd_play(BX *b, int ch, int ix, const char *name, bool loop, int fadeMs) {
-    if (!b->mixer || ch < 0 || ch >= CH_COUNT || !name || !*name) return;
+static Voice *open_voice(BX *b, int ch, int ix, const char *name, bool loop, int fadeMs) {
     size_t n;
     u8 *d = bx_res_read(&b->arc, ix, name, &n);
     if (!d) {
         bx_log(b, "missing sound %s", name);
-        return;
+        return NULL;
     }
     Voice *v = bx_alloc(sizeof *v);
     v->data = d;
@@ -162,7 +165,7 @@ void bx_snd_play(BX *b, int ch, int ix, const char *name, bool loop, int fadeMs)
     if (!v->ogg) {
         bx_log(b, "can't decode sound %s", name);
         voice_free(v);
-        return;
+        return NULL;
     }
     v->rate = (int)stb_vorbis_get_info(v->ogg).sample_rate;
     v->loop = loop;
@@ -170,6 +173,14 @@ void bx_snd_play(BX *b, int ch, int ix, const char *name, bool loop, int fadeMs)
     v->gain = fadeMs > 0 ? 0 : 1;
     v->target = 1;
     v->delta = fadeMs > 0 ? 1.0f / ((float)fadeMs * (float)b->audioRate / 1000.0f) : 0;
+    v->ch = ch;
+    return v;
+}
+
+void bx_snd_play(BX *b, int ch, int ix, const char *name, bool loop, int fadeMs) {
+    if (!b->mixer || ch < 0 || ch >= CH_COUNT || !name || !*name) return;
+    Voice *v = open_voice(b, ch, ix, name, loop, fadeMs);
+    if (!v) return;
     Mixer *m = b->mixer;
     pthread_mutex_lock(&m->lock);
     Voice *gone = m->v[ch + CH_COUNT];
@@ -195,3 +206,50 @@ bool bx_snd_playing(BX *b, int ch) {
     pthread_mutex_unlock(&b->mixer->lock);
     return r;
 }
+
+void bx_snd_loop(BX *b, int ch, const char *key, int ix, const char *name) {
+    if (!b->mixer || !name || !*name) return;
+    Mixer *m = b->mixer;
+    pthread_mutex_lock(&m->lock);
+    int slot = -1;
+    bool same = false;
+    for (int s = CH_COUNT * 2; s < SLOTS; s++)
+        if (m->v[s] && m->v[s]->ch == ch && !strcmp(m->v[s]->key, key)) {
+            slot = s;
+            same = !m->v[s]->done && !m->v[s]->stopAtZero && !strcmp(m->v[s]->name, name);
+        }
+    pthread_mutex_unlock(&m->lock);
+    if (same) return;
+    Voice *v = open_voice(b, ch, ix, name, true, 0);
+    if (!v) return;
+    snprintf(v->key, sizeof v->key, "%s", key);
+    snprintf(v->name, sizeof v->name, "%s", name);
+    Voice *gone = NULL;
+    pthread_mutex_lock(&m->lock);
+    for (int s = CH_COUNT * 2; s < SLOTS && slot < 0; s++)
+        if (!m->v[s] || m->v[s]->done) slot = s;
+    if (slot < 0) slot = CH_COUNT * 2;
+    gone = m->v[slot];
+    m->v[slot] = v;
+    m->chanVol[ch] = channel_volume(b, ch);
+    pthread_mutex_unlock(&m->lock);
+    voice_free(gone);
+}
+
+void bx_snd_loop_stop(BX *b, int ch, const char *key, int fadeMs) {
+    if (!b->mixer) return;
+    pthread_mutex_lock(&b->mixer->lock);
+    for (int s = CH_COUNT * 2; s < SLOTS; s++) {
+        Voice *v = b->mixer->v[s];
+        if (v && v->ch == ch && (!key || !strcmp(v->key, key))) fade_out(b, v, fadeMs);
+    }
+    pthread_mutex_unlock(&b->mixer->lock);
+}
+
+void bx_mixer_lock(Mixer *m, bool lock) {
+    if (!m) return;
+    if (lock) pthread_mutex_lock(&m->lock);
+    else pthread_mutex_unlock(&m->lock);
+}
+
+float bx_mixer_volume(Mixer *m, int ch) { return m ? m->chanVol[ch] : 0; }

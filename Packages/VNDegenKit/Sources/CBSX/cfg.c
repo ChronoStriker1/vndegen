@@ -8,13 +8,28 @@ static char *trim(char *s) {
     return s;
 }
 
+static bool utf8_text(const u8 *s, size_t n) {
+    for (size_t i = 0; i < n;) {
+        u8 c = s[i];
+        int len = c < 0x80 ? 1 : (c & 0xe0) == 0xc0 ? 2 : (c & 0xf0) == 0xe0 ? 3 : (c & 0xf8) == 0xf0 ? 4 : 0;
+        if (!len || i + (size_t)len > n) return false;
+        for (int k = 1; k < len; k++)
+            if ((s[i + (size_t)k] & 0xc0) != 0x80) return false;
+        i += (size_t)len;
+    }
+    return true;
+}
+
 bool bx_cfg_parse(Cfg *c, const u8 *data, size_t size) {
     memset(c, 0, sizeof *c);
     if (!data) return false;
     char *text = bx_alloc(size + 1);
     memcpy(text, data, size);
-    char *utf = bx_sjis_to_utf8(text);
-    free(text);
+    char *utf = text;
+    if (!utf8_text(data, size)) {
+        utf = bx_sjis_to_utf8(text);
+        free(text);
+    }
     char section[128] = "";
     for (char *line = utf; line && *line;) {
         char *next = strchr(line, '\n');
@@ -61,7 +76,7 @@ void bx_cfg_free(Cfg *c) {
 }
 
 const char *bx_cfg_get(const Cfg *c, const char *sec, const char *key) {
-    for (int i = 0; i < c->count; i++)
+    for (int i = c->count - 1; i >= 0; i--)
         if (!strcmp(c->sec[i], sec) && !strcmp(c->key[i], key)) return c->val[i];
     return NULL;
 }
@@ -170,4 +185,10 @@ u32 bx_cfg_color(const Cfg *c, const char *sec, const char *key, u32 def) {
     if (!v) return def;
     u32 argb = (u32)strtoul(v, NULL, 0);
     return (argb & 0xff00ff00u) | (argb >> 16 & 0xff) | (argb & 0xff) << 16;
+}
+
+bool bx_cfg_section(const Cfg *c, const char *sec) {
+    for (int i = 0; i < c->count; i++)
+        if (!strcmp(c->sec[i], sec)) return true;
+    return false;
 }

@@ -20,6 +20,7 @@ import EngineIkura
 import EngineEAGLS
 import EngineBSX
 import EngineExHibit
+import EngineBruns
 import EngineAGE
 import EngineUnity
 import EngineWolfRPG
@@ -59,6 +60,7 @@ let engines: [any EnginePlugin] = {
         EAGLSPlugin(),
         BSXPlugin(),
         ExHibitPlugin(),
+        BrunsPlugin(),
         AGEPlugin(),
     ]
     // RTPs the player installed, kept once for every game.

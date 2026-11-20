@@ -56,8 +56,11 @@ void bx_msg_init(BX *b) {
     b->nameColor = bx_cfg_color(c, "message window", "name color", 0xffffffffu);
     b->textColor = 0xffffffffu;
     b->fontH = bx_cfg_int(c, "default font", "height", 20);
-    b->fontSize = b->fontH;
+    int points = bx_cfg_int(c, "default font", "size", 14);
+    b->fontSize = b->sc->minor >= 1 ? (points * 10 + 3) / 7 : b->fontH;
     b->fontW = bx_cfg_int(c, "default font", "width", 0);
+    b->lineH = b->sc->minor >= 1 ? b->fontH : b->fontH + 4;
+    b->textDY = b->sc->minor >= 1 ? b->fontSize - points : 0;
     b->fontBold = bx_cfg_int(c, "default font", "weight", 400) >= 700;
     b->lines = bx_cfg_int(c, "default font", "number of lines", 3);
     b->edge = bx_cfg_int(c, "default font", "edge", 1);
@@ -88,10 +91,22 @@ void bx_msg_init(BX *b) {
             memcpy(b->choiceItem[0]->px, im->px, sizeof(u32) * (size_t)im->w * (size_t)im->h);
         }
         char part[80];
-        snprintf(part, sizeof part, "%s_head", item);
-        b->choiceItem[1] = owned(b, part);
-        snprintf(part, sizeof part, "%s_foot", item);
-        b->choiceItem[2] = owned(b, part);
+        if (bx_cfg_int(c, "select window", "design0 header/footer", 1)) {
+            snprintf(part, sizeof part, "%s_head", item);
+            b->choiceItem[1] = owned(b, part);
+            snprintf(part, sizeof part, "%s_foot", item);
+            b->choiceItem[2] = owned(b, part);
+        }
+    }
+    const char *xp = bx_cfg_get(c, "message window", "x point counter");
+    char name[64];
+    if (xp && bx_cfg_field(xp, 0, name, sizeof name) > 0) {
+        b->xCounter = owned(b, name);
+        char f[64];
+        b->xFrames = bx_cfg_field(xp, 1, f, sizeof f) > 0 ? bx_eval(f, NULL) : 1;
+        if (b->xFrames < 1) b->xFrames = 1;
+        b->xPos[0] = bx_cfg_field(xp, 2, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
+        b->xPos[1] = bx_cfg_field(xp, 3, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
     }
     b->choiceDatum = bx_cfg_int(c, "select window", "vertical datum line", b->H / 2);
 }
@@ -175,6 +190,10 @@ static bool voice_allowed(BX *b, const char *voice) {
     return (mask & b->set.voiceMask) != 0;
 }
 
+void bx_voice_play(BX *b, int ch, const char *voice) {
+    if (voice && bx_res_find(&b->arc, RX_VOICE, voice) && voice_allowed(b, voice)) bx_snd_play(b, ch, RX_VOICE, voice, false, 0);
+}
+
 void bx_msg_show(BX *b, const char *name, const char *text, const char *voice) {
     bx_msg_clear(b);
     b->speaker = name ? bx_strdup(name) : NULL;
@@ -187,7 +206,7 @@ void bx_msg_show(BX *b, const char *name, const char *text, const char *voice) {
     b->winShown = true;
     b->winHidden = false;
     b->autoAt = 0;
-    if (voice && bx_res_find(&b->arc, RX_VOICE, voice) && voice_allowed(b, voice)) bx_snd_play(b, CH_VOICE, RX_VOICE, voice, false, 0);
+    bx_voice_play(b, CH_VOICE, voice);
     if (b->logCount == 512) {
         free(b->logs[0].name);
         free(b->logs[0].text);
@@ -224,12 +243,13 @@ void bx_msg_draw(BX *b, u32 *dst) {
     if (!b->winShown || b->winHidden || b->transActive) return;
     if (b->msgBase) tint(dst, b->W, b->H, b->msgBase, b->msgX + b->msgBase->x, b->msgY + b->msgBase->y, b->bgColor);
     if (b->msgFrame) bx_blit(dst, b->W, b->H, b->msgFrame, b->msgX + b->msgFrame->x, b->msgY + b->msgFrame->y, 255);
+    bx_info_draw(b, dst);
     if (!b->text) return;
     if (b->speaker && *b->speaker && b->msgName) bx_blit(dst, b->W, b->H, b->msgName, b->msgX + b->msgName->x, b->msgY + b->msgName->y, 255);
     if (b->speaker && *b->speaker)
-        bx_text_draw(b, dst, b->W, b->H, b->speaker, b->msgX + b->nameRect[0], b->msgY + b->nameRect[1], b->fontSize, b->fontW, b->nameColor, b->edge, b->shadow);
-    int lineH = b->fontH + 4;
-    int x = b->msgX + b->textRect[0], y = b->msgY + b->textRect[1];
+        bx_text_draw(b, dst, b->W, b->H, b->speaker, b->msgX + b->nameRect[0], b->msgY + b->nameRect[1] + b->textDY, b->fontSize, b->fontW, b->nameColor, b->edge, b->shadow);
+    int lineH = b->lineH;
+    int x = b->msgX + b->textRect[0], y = b->msgY + b->textRect[1] + b->textDY;
     char line[1024];
     size_t ln = 0;
     int count = 0;
@@ -252,6 +272,12 @@ void bx_msg_draw(BX *b, u32 *dst) {
         }
         p += len;
         count++;
+    }
+    const char *xv = b->xCounter && b->set.xCount ? bx_cfg_get(&b->cfg, "message window", "x point variable") : NULL;
+    int xi = xv ? bx_var_by_name(b, xv) : -1;
+    if (xi >= 0 && b->globals[xi].v > 0) {
+        int h = b->xCounter->h / b->xFrames;
+        bx_blit_part(dst, b->W, b->H, b->xCounter, 0, clampi(b->globals[xi].v, 0, b->xFrames - 1) * h, b->xCounter->w, h, b->msgX + b->xPos[0], b->msgY + b->xPos[1], 255);
     }
     if (b->textDone && b->unagashi && b->th.wait == W_TEXT) {
         int frame = (int)(b->now / (u32)b->unaSpeed) % b->unaFrames;

@@ -68,6 +68,7 @@ bool bx_archives_open(Archives *a, const char *dir);
 void bx_archives_close(Archives *a);
 const BsaEntry *bx_res_find(Archives *a, int ix, const char *name);
 u8 *bx_res_read(Archives *a, int ix, const char *name, size_t *size);
+bool bx_res_head(Archives *a, int ix, const char *name, u8 *out, size_t n);
 
 typedef struct Image {
     int w, h;
@@ -118,6 +119,7 @@ typedef struct Cfg {
 bool bx_cfg_parse(Cfg *c, const u8 *data, size_t size);
 void bx_cfg_free(Cfg *c);
 const char *bx_cfg_get(const Cfg *c, const char *sec, const char *key);
+bool bx_cfg_section(const Cfg *c, const char *sec);
 int bx_cfg_ints(const Cfg *c, const char *sec, const char *key, int *out, int max);
 int bx_cfg_int(const Cfg *c, const char *sec, const char *key, int def);
 u32 bx_cfg_color(const Cfg *c, const char *sec, const char *key, u32 def);
@@ -141,6 +143,7 @@ enum {
     W_CLICK,
     W_SOUND,
     W_ANIM,
+    W_MOVIE,
 };
 
 #define BX_STACK 128
@@ -201,11 +204,22 @@ typedef struct Mixer Mixer;
 Mixer *bx_mixer_new(int rate);
 void bx_mixer_free(Mixer *m);
 void bx_mixer_mix(Mixer *m, float *out, int frames, bool paused);
+void bx_mixer_lock(Mixer *m, bool lock);
+float bx_mixer_volume(Mixer *m, int ch);
 
-enum { CH_BGM, CH_BGS, CH_SE, CH_SE2, CH_VOICE, CH_SYS, CH_COUNT };
+typedef struct Movie Movie;
+bool bx_movie_play(BX *b, const char *name);
+void bx_movie_stop(BX *b);
+bool bx_movie_update(BX *b);
+bool bx_movie_draw(BX *b, u32 *dst);
+void bx_movie_mix(BX *b, float *out, int frames, float vol);
+
+enum { CH_BGM, CH_BGS, CH_SE, CH_SE2, CH_VOICE, CH_SYS, CH_VOICE2, CH_COUNT };
 
 void bx_snd_play(BX *b, int ch, int ix, const char *name, bool loop, int fadeMs);
 void bx_snd_stop(BX *b, int ch, int fadeMs);
+void bx_snd_loop(BX *b, int ch, const char *key, int ix, const char *name);
+void bx_snd_loop_stop(BX *b, int ch, const char *key, int fadeMs);
 bool bx_snd_playing(BX *b, int ch);
 void bx_snd_volumes(BX *b);
 
@@ -246,6 +260,7 @@ typedef struct Settings {
     int attenuation;
     int skipUnread, ceaseSkip, noEffects;
     int voiceMask, voiceMode, autoSelect;
+    int xCount;
 } Settings;
 
 struct BX {
@@ -281,6 +296,7 @@ struct BX {
     int nextBlend;
     int objHover;
     bool shownDirty;
+    int eyeShown[BX_OBJS];
     u32 *to;
     int transType;
     u32 transStart, transDur;
@@ -288,26 +304,29 @@ struct BX {
     bool transActive;
     u32 flashColor;
     u32 flashStart, flashDur;
+    int shakeX, shakeY;
+    u32 shakeStart;
 
     struct {
         char *key;
         Image *img;
-    } cache[24];
+        u32 used;
+    } cache[32];
     struct {
         char *name;
         Anim anim;
     } anims[16];
     int animCount;
-    int cacheNext;
+    u32 cacheClock;
 
     Image *msgBase, *msgFrame, *msgName;
     int msgX, msgY, msgH;
     int nameRect[4], textRect[4];
     u32 nameColor, textColor, bgColor;
-    int fontSize, fontW, fontH, lines, edge, shadow;
+    int fontSize, fontW, fontH, lineH, textDY, lines, edge, shadow;
     bool fontBold;
     int msgSpeed;
-    bool winShown, winHidden;
+    bool winShown, winHidden, winLayer, menuLayer, infoLayer;
     char *speaker;
     char *text;
     char *voice;
@@ -317,7 +336,8 @@ struct BX {
     bool textDone;
     bool skipMode, autoMode;
     u32 autoAt;
-    Image *unagashi;
+    Image *unagashi, *xCounter;
+    int xFrames, xPos[2];
     int unaX, unaY, unaW, unaH, unaFrames, unaSpeed;
     LogEntry *logs;
     int logCount;
@@ -346,12 +366,12 @@ struct BX {
     Settings set;
     u8 *common;
     size_t commonSize;
-    size_t choiceFlags, readFlags;
+    size_t choiceFlags, readFlags, achieveTable;
     bool commonDirty;
     int phaseBack;
     int phaseResult;
 
-    Image *menuBase, *lamp, *infoWno, *infoWday;
+    Image *menuBase, *lamp;
     bool cutIn;
     int menuX, menuY;
     int menuShow[4];
@@ -361,6 +381,7 @@ struct BX {
     int buttonHover;
     bool dressEnabled, viewEnabled;
     int stripLevel, viewLevel;
+    bool viewButtons;
 
     int mx, my;
     bool lDown, rDown;
@@ -369,6 +390,7 @@ struct BX {
     bool keyDown[256], keyPress[256];
 
     Mixer *mixer;
+    Movie *movie;
     int audioRate;
     int volMaster, volBgm, volSe, volVoice, volBgs;
     char bgmName[64];
@@ -395,7 +417,10 @@ void bx_obj_remove(BX *b, Obj *o);
 void bx_obj_face(BX *b, Obj *o, const char *name);
 void bx_transition(BX *b, int type, int ticks, const char *mask);
 void bx_flash(BX *b, int r, int g, int bl, int ticks);
+void bx_shake(BX *b, int x, int y);
 void bx_gfx_frame(BX *b);
+int bx_eye_frame(BX *b, const Obj *o);
+int bx_view_level(BX *b);
 void bx_compose(BX *b, const Scene *s, u32 *dst);
 void bx_anim_update(BX *b);
 bool bx_obj_move(BX *b, int id, int x, int y, int ms);
@@ -410,6 +435,7 @@ int bx_text_draw(BX *b, u32 *dst, int dw, int dh, const char *utf8, int x, int y
 
 void bx_msg_init(BX *b);
 void bx_msg_show(BX *b, const char *name, const char *text, const char *voice);
+void bx_voice_play(BX *b, int ch, const char *voice);
 void bx_msg_update(BX *b);
 void bx_msg_draw(BX *b, u32 *dst);
 bool bx_msg_complete(BX *b);
@@ -424,6 +450,7 @@ void bx_ui_init(BX *b);
 void bx_ui_free(BX *b);
 void bx_ui_update(BX *b);
 void bx_ui_draw(BX *b, u32 *dst);
+void bx_info_draw(BX *b, u32 *dst);
 void bx_phase_start(BX *b, int phase);
 void bx_phase_update(BX *b);
 void bx_phase_draw(BX *b, u32 *dst);
@@ -438,10 +465,13 @@ bool bx_msg_read(BX *b, u32 msg);
 void bx_mark_read(BX *b, u32 msg);
 bool bx_choice_seen(BX *b, int id);
 void bx_mark_choice(BX *b, int id);
+bool bx_achieved(BX *b, const char *id);
+void bx_achieve(BX *b, const char *id);
 void bx_autosave(BX *b);
 bool bx_load_slot(BX *b, int slot);
 bool bx_save_exists(BX *b, int slot);
 void bx_save_capture_thumb(BX *b);
+void bx_thumb_size(BX *b, int *w, int *h);
 char *bx_save_path(BX *b, int slot);
 
 bool bx_map_start(BX *b);
