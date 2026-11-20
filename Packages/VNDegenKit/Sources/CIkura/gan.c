@@ -192,7 +192,8 @@ static void run_program(IK *t, Gan *g) {
             g->cur = arg;
             t->dirty = true;
         } else if (op == 2) {
-            g->nextAt = t->now + (u32)(arg > 0 ? arg : 1) * GAN_UNIT_MS;
+            u32 due = g->nextAt + (u32)(arg > 0 ? arg : 1) * GAN_UNIT_MS;
+            g->nextAt = (i32)(t->now - due) > 250 ? t->now : due;
             return;
         } else if (op == 5) {
             if (g->stopAtEnd) {
