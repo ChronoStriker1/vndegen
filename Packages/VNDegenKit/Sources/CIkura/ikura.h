@@ -278,6 +278,7 @@ struct IK {
     int imageCount;
     Layer *layers;
     int layerCount;
+    int *order;
     Button *buttons;
     int hover, pressed;
     int cancelLabel;
@@ -388,6 +389,7 @@ void movie_draw(IK *t);
 void movie_mix(Movie *m, float *out, int frames, float vol, int rate);
 void snd_set_movie(IK *t, Movie *m);
 bool gan_exec(IK *t, u16 op, const u8 *a, int n);
+bool equip_exec(IK *t, u16 op, const u8 *a, int n);
 void gan_update(IK *t);
 void gan_draw(IK *t, int layer);
 bool gan_drawn(const IK *t, int layer);

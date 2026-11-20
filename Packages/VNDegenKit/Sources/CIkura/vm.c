@@ -10,7 +10,10 @@ u32 ik_value(IK *t, u32 raw) {
     return raw & 0x40000000u ? raw | 0x80000000u : raw;
 }
 
-static i32 *var_at(IK *t, u32 i) { return i < (u32)t->varCount ? &t->vars[i] : NULL; }
+static i32 *var_at(IK *t, u32 i) {
+    if (i & 0x80000000u) i = ik_value(t, i);
+    return i < (u32)t->varCount ? &t->vars[i] : NULL;
+}
 
 void vm_start(IK *t, const char *script) {
     Script *s = script_load(t, script);
@@ -170,6 +173,8 @@ static void resize(IK *t, int which, int n) {
     } else {
         t->layers = ik_realloc(t->layers, sizeof(Layer) * (size_t)n);
         if (n > t->layerCount) memset(t->layers + t->layerCount, 0, sizeof(Layer) * (size_t)(n - t->layerCount));
+        t->order = ik_realloc(t->order, sizeof(int) * (size_t)n);
+        for (int i = 0; i < n; i++) t->order[i] = i;
         t->layerCount = n;
     }
 }
@@ -329,6 +334,9 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             Layer tmp = t->layers[i];
             t->layers[i] = t->layers[j];
             t->layers[j] = tmp;
+            for (int k = 0; k < t->layerCount; k++)
+                if (t->order[k] == (int)i) t->order[k] = (int)j;
+                else if (t->order[k] == (int)j) t->order[k] = (int)i;
         }
         break;
     }
@@ -659,10 +667,6 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     case 0x0010:
     case 0x0011:
-    case 0x0f00:
-    case 0x0f01:
-    case 0x0f03:
-    case 0x0f04:
     case 0x0201:
     case 0x000d:
     case 0x0705:
@@ -851,6 +855,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         if ((op >> 8) == 0x0a && save_exec(t, op, a, n)) break;
         if ((op >> 8) == 0x0b && text_exec(t, op, a, n)) break;
         if ((op >> 8) == 0x0d && gan_exec(t, op, a, n)) break;
+        if ((op >> 8) == 0x0f && equip_exec(t, op, a, n)) break;
         if (t->trace) ik_log(t, "%s:%x op %04x not handled", t->sc->name, t->pc, op);
         break;
     }

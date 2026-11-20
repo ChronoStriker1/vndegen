@@ -74,3 +74,4 @@
 #define automap_exec ik_automap_exec
 #define msg_log_voice ik_msg_log_voice
 #define scrollbar_exec ik_scrollbar_exec
+#define equip_exec ik_equip_exec

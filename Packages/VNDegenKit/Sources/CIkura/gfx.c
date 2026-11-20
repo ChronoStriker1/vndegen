@@ -15,6 +15,7 @@ void gfx_close(IK *t) {
     free(t->images);
     for (int i = 0; i < t->layerCount; i++) image_free(t->layers[i].surf);
     free(t->layers);
+    free(t->order);
     free(t->buttons);
 }
 
@@ -249,7 +250,8 @@ void gfx_compose(IK *t) {
     for (int i = 0; i < t->W * t->H; i++) t->screen[i] = 0xff000000u;
     dun_render(t);
     bool live = buttons_live(t);
-    for (int i = 0; i < t->layerCount; i++) {
+    for (int oi = 0; oi < t->layerCount; oi++) {
+        int i = t->order[oi];
         Layer *l = &t->layers[i];
         if (!layer_drawn(t, i)) continue;
         if (gan_drawn(t, i)) gan_draw(t, i);

@@ -429,7 +429,7 @@ static void snapshot(IK *t) {
     put32(&b, (u32)t->imageCount);
     for (int i = 0; i < t->imageCount; i++) putname(&b, t->images[i] ? t->imageNames[i] : NULL);
     put32(&b, (u32)t->layerCount);
-    for (int i = 0; i < t->layerCount; i++) put32(&b, (u32)i);
+    for (int i = 0; i < t->layerCount; i++) put32(&b, (u32)t->order[i]);
     for (int i = 0; i < t->layerCount; i++) put_layer(&b, &t->layers[i]);
     put32(&b, (u32)t->buttonCount);
     putname(&b, t->cancelBound && t->cancelSc ? t->cancelSc->name : NULL);
@@ -527,6 +527,22 @@ static bool load_slot(IK *t, int slot) {
         }
     }
     u32 lc = get32(&r);
+    if (lc == (u32)t->layerCount && r.at + 4 * (size_t)lc <= r.n) {
+        int *order = ik_alloc(sizeof(int) * lc);
+        bool *seen = ik_alloc(lc);
+        bool ok = true;
+        for (u32 i = 0; i < lc; i++) {
+            u32 v = rd32(r.p + r.at + 4 * i);
+            if (v >= lc || seen[v]) ok = false;
+            else {
+                seen[v] = true;
+                order[i] = (int)v;
+            }
+        }
+        if (ok) memcpy(t->order, order, sizeof(int) * lc);
+        free(order);
+        free(seen);
+    }
     for (u32 i = 0; i < lc; i++) get32(&r);
     for (u32 i = 0; i < lc; i++) {
         if (i < (u32)t->layerCount) get_layer(t, &r, &t->layers[i]);
