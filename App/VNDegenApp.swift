@@ -21,6 +21,7 @@ import EngineEAGLS
 import EngineBSX
 import EngineExHibit
 import EngineBruns
+import EngineAGE
 import EngineUnity
 import EngineWolfRPG
 import EngineAliceSoft
@@ -60,6 +61,7 @@ let engines: [any EnginePlugin] = {
         BSXPlugin(),
         ExHibitPlugin(),
         BrunsPlugin(),
+        AGEPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)

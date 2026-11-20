@@ -24,6 +24,12 @@ Val *bx_var_ref(BX *b, int type, i32 index) {
 
 int bx_var_by_name(BX *b, const char *name) { return bx_script_var(b->sc, name); }
 
+int bx_sysvar(BX *b, u32 id) {
+    for (int i = 0; i < b->sc->sysvarCount; i++)
+        if (b->sc->sysvars[i][0] == id && b->sc->sysvars[i][1] < (u32)b->sc->varCount) return (int)b->sc->sysvars[i][1];
+    return -1;
+}
+
 static Val leaf(BX *b, const u8 *p) {
     int t = p[0];
     i32 v = (i32)rd32(p + 2);
@@ -199,6 +205,7 @@ static bool step(BX *b) {
             c->label = (int)rd32(p + 5);
             c->msg = (int)rd32(p + 9);
             c->design = bx_arg_int(b, 1);
+            c->value = bx_arg_int(b, 2);
         }
         t->pc += 13;
         return true;
@@ -223,11 +230,16 @@ static bool step(BX *b) {
         bx_log(b, "host call %s", bx_arg_str(b, 1));
         return true;
     case 0x36:
-    case 0x38:
-        if (op == 0x38) {
-            if ((int)rd32(p + 1) == t->skipLabel) t->skipLabel = -1;
-            t->curLabel = (int)rd32(p + 1);
+        if (rd32(p + 1) == 0xffffffffu && b->replaying) {
+            t->pc += 5;
+            bx_museum_replay_end(b);
+            return false;
         }
+        t->pc += 5;
+        return true;
+    case 0x38:
+        if ((int)rd32(p + 1) == t->skipLabel) t->skipLabel = -1;
+        t->curLabel = (int)rd32(p + 1);
         t->pc += 5;
         return true;
     default:

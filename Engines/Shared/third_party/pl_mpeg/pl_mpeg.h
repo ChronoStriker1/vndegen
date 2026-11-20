@@ -3687,6 +3687,10 @@ static const unsigned short PLM_AUDIO_SAMPLE_RATE[] = {
 	22050, 24000, 16000, 0  // MPEG-2
 };
 
+static const short PLM_AUDIO_BIT_RATE_LAYER_I[] = {
+	32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448
+};
+
 static const short PLM_AUDIO_BIT_RATE[] = {
 	32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, // MPEG-1
 	 8, 16, 24, 32, 40, 48,  56,  64,  80,  96, 112, 128, 144, 160  // MPEG-2
@@ -3896,6 +3900,8 @@ struct plm_audio_t {
 int plm_audio_find_frame_sync(plm_audio_t *self);
 int plm_audio_decode_header(plm_audio_t *self);
 void plm_audio_decode_frame(plm_audio_t *self);
+void plm_audio_decode_frame_layer_i(plm_audio_t *self);
+void plm_audio_synthesize(plm_audio_t *self, int out_pos);
 const plm_quantizer_spec_t *plm_audio_read_allocation(plm_audio_t *self, int sb, int tab3);
 void plm_audio_read_samples(plm_audio_t *self, int ch, int sb, int part); 
 void plm_audio_idct36(int s[32][3], int ss, float *d, int dp);
@@ -3977,12 +3983,19 @@ plm_samples_t *plm_audio_decode(plm_audio_t *self) {
 		return NULL;
 	}
 
-	plm_audio_decode_frame(self);
+	if (self->layer == PLM_AUDIO_LAYER_I) {
+		plm_audio_decode_frame_layer_i(self);
+		self->samples.count = 384;
+	}
+	else {
+		plm_audio_decode_frame(self);
+		self->samples.count = PLM_AUDIO_SAMPLES_PER_FRAME;
+	}
 	self->next_frame_data_size = 0;
 	
 	self->samples.time = self->time;
 
-	self->samples_decoded += PLM_AUDIO_SAMPLES_PER_FRAME;
+	self->samples_decoded += self->samples.count;
 	self->time = (double)self->samples_decoded / 
 		(double)PLM_AUDIO_SAMPLE_RATE[self->samplerate_index];
 	
@@ -4030,7 +4043,7 @@ int plm_audio_decode_header(plm_audio_t *self) {
 
 	if (
 		self->version != PLM_AUDIO_MPEG_1 ||
-		self->layer != PLM_AUDIO_LAYER_II
+		(self->layer != PLM_AUDIO_LAYER_II && self->layer != PLM_AUDIO_LAYER_I)
 	) {
 		return 0;
 	}
@@ -4083,8 +4096,13 @@ int plm_audio_decode_header(plm_audio_t *self) {
 
 	// Compute frame size, check if we have enough data to decode the whole
 	// frame.
-	int bitrate = PLM_AUDIO_BIT_RATE[self->bitrate_index];
 	int samplerate = PLM_AUDIO_SAMPLE_RATE[self->samplerate_index];
+	if (self->layer == PLM_AUDIO_LAYER_I) {
+		int bitrate = PLM_AUDIO_BIT_RATE_LAYER_I[self->bitrate_index];
+		int frame_size = ((12000 * bitrate / samplerate) + padding) * 4;
+		return frame_size - (hasCRC ? 6 : 4);
+	}
+	int bitrate = PLM_AUDIO_BIT_RATE[self->bitrate_index];
 	int frame_size = (144000 * bitrate / samplerate) + padding;
 	return frame_size - (hasCRC ? 6 : 4);
 }
@@ -4190,58 +4208,136 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 				self->sample[1][sb][2] = 0;
 			}
 
-			// Synthesis loop
-			for (int p = 0; p < 3; p++) {
-				// Shifting step
-				self->v_pos = (self->v_pos - 64) & 1023;
-
-				for (int ch = 0; ch < 2; ch++) {
-					plm_audio_idct36(self->sample[ch], p, self->V[ch], self->v_pos);
-
-					// Build U, windowing, calculate output
-					memset(self->U, 0, sizeof(self->U));
-
-					int d_index = 512 - (self->v_pos >> 1);
-					int v_index = (self->v_pos % 128) >> 1;
-					while (v_index < 1024) {
-						for (int i = 0; i < 32; ++i) {
-							self->U[i] += self->D[d_index++] * self->V[ch][v_index++];
-						}
-
-						v_index += 128 - 32;
-						d_index += 64 - 32;
-					}
-
-					d_index -= (512 - 32);
-					v_index = (128 - 32 + 1024) - v_index;
-					while (v_index < 1024) {
-						for (int i = 0; i < 32; ++i) {
-							self->U[i] += self->D[d_index++] * self->V[ch][v_index++];
-						}
-
-						v_index += 128 - 32;
-						d_index += 64 - 32;
-					}
-
-					// Output samples
-					#ifdef PLM_AUDIO_SEPARATE_CHANNELS
-						float *out_channel = ch == 0
-							? self->samples.left
-							: self->samples.right;
-						for (int j = 0; j < 32; j++) {
-							out_channel[out_pos + j] = self->U[j] / -1090519040.0f;
-						}
-					#else
-						for (int j = 0; j < 32; j++) {
-							self->samples.interleaved[((out_pos + j) << 1) + ch] = 
-								self->U[j] / -1090519040.0f;
-						}
-					#endif
-				} // End of synthesis channel loop
-				out_pos += 32;
-			} // End of synthesis sub-block loop
+			plm_audio_synthesize(self, out_pos);
+			out_pos += 96;
 
 		} // Decoding of the granule finished
+	}
+
+	plm_buffer_align(self->buffer);
+}
+
+void plm_audio_synthesize(plm_audio_t *self, int out_pos) {
+	for (int p = 0; p < 3; p++) {
+		// Shifting step
+		self->v_pos = (self->v_pos - 64) & 1023;
+
+		for (int ch = 0; ch < 2; ch++) {
+			plm_audio_idct36(self->sample[ch], p, self->V[ch], self->v_pos);
+
+			// Build U, windowing, calculate output
+			memset(self->U, 0, sizeof(self->U));
+
+			int d_index = 512 - (self->v_pos >> 1);
+			int v_index = (self->v_pos % 128) >> 1;
+			while (v_index < 1024) {
+				for (int i = 0; i < 32; ++i) {
+					self->U[i] += self->D[d_index++] * self->V[ch][v_index++];
+				}
+
+				v_index += 128 - 32;
+				d_index += 64 - 32;
+			}
+
+			d_index -= (512 - 32);
+			v_index = (128 - 32 + 1024) - v_index;
+			while (v_index < 1024) {
+				for (int i = 0; i < 32; ++i) {
+					self->U[i] += self->D[d_index++] * self->V[ch][v_index++];
+				}
+
+				v_index += 128 - 32;
+				d_index += 64 - 32;
+			}
+
+			// Output samples
+			#ifdef PLM_AUDIO_SEPARATE_CHANNELS
+				float *out_channel = ch == 0
+					? self->samples.left
+					: self->samples.right;
+				for (int j = 0; j < 32; j++) {
+					out_channel[out_pos + j] = self->U[j] / -1090519040.0f;
+				}
+			#else
+				for (int j = 0; j < 32; j++) {
+					self->samples.interleaved[((out_pos + j) << 1) + ch] = 
+						self->U[j] / -1090519040.0f;
+				}
+			#endif
+		} // End of synthesis channel loop
+		out_pos += 32;
+	} // End of synthesis sub-block loop
+}
+
+void plm_audio_decode_frame_layer_i(plm_audio_t *self) {
+	int channels = (self->mode == PLM_AUDIO_MODE_MONO) ? 1 : 2;
+	int bound = self->bound;
+	int alloc[2][32];
+
+	for (int sb = 0; sb < bound; sb++) {
+		for (int ch = 0; ch < channels; ch++) {
+			alloc[ch][sb] = plm_buffer_read(self->buffer, 4);
+		}
+	}
+	for (int sb = bound; sb < 32; sb++) {
+		alloc[0][sb] = alloc[1][sb] = plm_buffer_read(self->buffer, 4);
+	}
+	if (channels == 1) {
+		for (int sb = 0; sb < 32; sb++) {
+			alloc[1][sb] = alloc[0][sb];
+		}
+	}
+
+	int factor[2][32];
+	for (int sb = 0; sb < 32; sb++) {
+		for (int ch = 0; ch < channels; ch++) {
+			factor[ch][sb] = 0;
+			if (alloc[ch][sb] && alloc[ch][sb] != 15) {
+				int sf = plm_buffer_read(self->buffer, 6);
+				if (sf == 63) {
+					factor[ch][sb] = 0;
+				}
+				else {
+					int shift = sf / 3;
+					factor[ch][sb] = (PLM_AUDIO_SCALEFACTOR_BASE[sf % 3] + ((1 << shift) >> 1)) >> shift;
+				}
+			}
+		}
+		if (channels == 1) {
+			factor[1][sb] = factor[0][sb];
+		}
+	}
+
+	int out_pos = 0;
+	for (int block = 0; block < 4; block++) {
+		for (int s = 0; s < 3; s++) {
+			for (int sb = 0; sb < 32; sb++) {
+				int shared = sb >= bound;
+				for (int ch = 0; ch < (shared ? 1 : channels); ch++) {
+					int nb = alloc[ch][sb] + 1;
+					int code = 0;
+					int has = alloc[ch][sb] && alloc[ch][sb] != 15;
+					if (has) {
+						code = plm_buffer_read(self->buffer, nb);
+					}
+					for (int c = ch; c < (shared ? 2 : ch + 1); c++) {
+						if (!has || !factor[c][sb]) {
+							self->sample[c][sb][s] = 0;
+							continue;
+						}
+						int levels = (1 << nb) - 1;
+						int val = -(int)(((long long)(2 * code + 2 - (1 << nb)) * 32768) / levels);
+						int sf = factor[c][sb];
+						self->sample[c][sb][s] = (val * (sf >> 12) + ((val * (sf & 4095) + 2048) >> 12)) >> 12;
+					}
+				}
+				if (channels == 1 && !shared) {
+					self->sample[1][sb][s] = self->sample[0][sb][s];
+				}
+			}
+		}
+		plm_audio_synthesize(self, out_pos);
+		out_pos += 96;
 	}
 
 	plm_buffer_align(self->buffer);

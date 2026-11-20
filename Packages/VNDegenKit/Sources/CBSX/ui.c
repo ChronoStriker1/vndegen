@@ -136,6 +136,11 @@ static void title_pick(BX *b, const char *key) {
         bx_config_open(b);
         return;
     }
+    if (!strcmp(key, "museum")) {
+        phase_free(b);
+        bx_museum_open(b);
+        return;
+    }
     const char *label = !strcmp(key, "op") ? "opening" : !strcmp(key, "start") ? "prologue" : NULL;
     if (!label) {
         bx_log(b, "title menu %s isn't available yet", key);
@@ -154,6 +159,10 @@ static void title_pick(BX *b, const char *key) {
 void bx_phase_update(BX *b) {
     if (b->phase == PH_STATUS) {
         bx_status_update(b);
+        return;
+    }
+    if (b->phase == PH_MUSEUM) {
+        bx_museum_update(b);
         return;
     }
     if (b->phase == PH_CONFIG) {
@@ -192,6 +201,10 @@ void bx_phase_update(BX *b) {
 void bx_phase_draw(BX *b, u32 *dst) {
     if (b->phase == PH_STATUS) {
         bx_status_draw(b, dst);
+        return;
+    }
+    if (b->phase == PH_MUSEUM) {
+        bx_museum_draw(b, dst);
         return;
     }
     if (b->phase == PH_CONFIG) {
@@ -507,13 +520,16 @@ static void custom_map_update(BX *b) {
 }
 
 void bx_system(BX *b, const char *cmd) {
-    char var[64];
+    char var[64], kind[16];
     int level;
     if (!strcmp(cmd, "title")) bx_phase_start(b, PH_TITLE);
     else if (!strcmp(cmd, "map")) bx_phase_start(b, PH_MAP);
     else if (!strcmp(cmd, "custom map")) bx_phase_start(b, PH_CUSTOM_MAP);
     else if (!strncmp(cmd, "実績解除 ", strlen("実績解除 "))) bx_achieve(b, cmd + strlen("実績解除 "));
-    else if (!strncmp(cmd, "達成率 ", strlen("達成率 "))) bx_log(b, "museum rate isn't counted yet: %s", cmd);
+    else if (sscanf(cmd, "達成率 %63[^,],%15s", var, kind) == 2) {
+        int v = bx_var_by_name(b, var);
+        if (v >= 0) b->globals[v] = (Val){0, bx_museum_rate(b, kind)};
+    }
     else if (!strcmp(cmd, "op") || !strcmp(cmd, "staffroll")) {
         if (bx_movie_play(b, cmd)) b->th.wait = W_MOVIE;
     }
@@ -525,7 +541,7 @@ void bx_system(BX *b, const char *cmd) {
     else if (!strcmp(cmd, "@title") || !strcmp(cmd, "@end")) {
         bx_snd_stop(b, CH_BGM, 500);
         bx_snd_loop_stop(b, CH_BGS, NULL, 0);
-        bx_snd_loop_stop(b, CH_VOICE2, NULL, 0);
+        bx_snd_loop_stop(b, CH_BGV, NULL, 0);
         b->bgmName[0] = 0;
         memset(&b->scene, 0, sizeof b->scene);
         bx_transition(b, 0, 0, NULL);
