@@ -14,6 +14,9 @@ derives from no GPL or LGPL code. Its sources:
 | Bytecode | Tokenizing all of Double Date Dilemma's and Magical Sword's code. The string pool is in code order, so each string's index marks where an operand is, and the labels mark where instructions start; a sweep that must land on every such point settled each opcode's operand layout. The typed operands (`40` and `41` with a variable number, `43` with a constant) and the meaning of each opcode from how the scripts use them: the boot sequence, the waits, the click wait, the scene changes, the choices |
 | Sprite names | The decoded `_define.dat`: 524-byte records that map a sprite name to its picture file |
 | Title screen | The title's pictures and their frames found in the atlases; the button positions and the hover frames from a screenshot of the original under Wine, matched numerically |
+| E-mote characters | eluna (MPL-2.0, https://github.com/xmoezzz/eluna, `Engines/ANIM/third_party/eluna_rs`), behind VNDegen's `vnemote` C interface; the vertex, blend and stencil handling follows eluna's player (MIT). The PSB key was found from the game's own PSB files with eluna's key search. Positions, the global scale (`66`), the slot defaults (`53`) and the character scale table in `_define.dat` from the scripts and the define, checked against screenshots of the original under Wine |
+| Expressions | `_define.dat`'s presets (a name and variable values), matched to the values the original's saves store |
+| Saves | Saves the original made under Wine at chosen points, diffed: the date, comment, text position, background, layers, local variables, the quick save file and the thumbnails; VNDegen's saves loaded in the original and the original's in VNDegen |
 | Text | stb_truetype (public domain or MIT) with the shared Windows font substitutes (`docs/fonts.md`) for the exe's Arial |
 | File name case | `Engines/Shared/casepath.c`, VNDegen's own |
 

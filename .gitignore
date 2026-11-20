@@ -11,6 +11,7 @@ Engines/Artemis/art3m1s-core/target*/
 Engines/Artemis/art3m1s-core/**/target/
 __pycache__/
 Engines/Siglus/**/target/
+Engines/ANIM/**/target/
 
 # System 4 test host output
 s4play-last.png

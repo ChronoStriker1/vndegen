@@ -80,16 +80,34 @@ typedef struct SpriteName {
     char *name, *file;
 } SpriteName;
 
+typedef struct EmoteVar {
+    char *name;
+    float value;
+} EmoteVar;
+
+typedef struct EmotePreset {
+    char *name;
+    EmoteVar *vars;
+    int count;
+} EmotePreset;
+
 typedef struct Define {
     u8 *data;
     size_t size;
     SpriteName *sprites;
     int spriteCount;
+    EmotePreset *presets;
+    int presetCount;
+    char charName[16][16];
+    float charScale[16];
+    int charCount;
 } Define;
 
 bool an_define_load(Define *d, const char *path);
 void an_define_free(Define *d);
 const char *an_define_sprite(const Define *d, const char *name);
+const EmotePreset *an_define_preset(const Define *d, const char *name);
+float an_define_char_scale(const Define *d, const char *model);
 
 typedef struct PackEntry {
     char *name;
@@ -135,8 +153,8 @@ typedef struct Layer {
     int alpha, fromAlpha, toAlpha;
     u32 fadeStart, fadeTime;
     int scale;
-    int emoteTop;
     char motion[64];
+    u32 motionTime;
 } Layer;
 
 typedef struct Scene {
@@ -194,6 +212,7 @@ struct AN {
     Thread th;
     i32 L[AN_VARS], G[AN_VARS];
     char movieName[64];
+    char missingSound[64];
 
     int phase;
     Scene scene;
@@ -230,6 +249,10 @@ struct AN {
     u32 textPc, opPc;
     int sceneKind;
     u32 *shot;
+    struct EmoteCache *emotes;
+    float emoteScale;
+    u8 *stencil;
+    int slotX[AN_LAYERS], slotY[AN_LAYERS];
     struct Mixer *mix;
     struct Movie *movie;
     Font *font;
@@ -242,7 +265,8 @@ void an_gfx_render(AN *a);
 void an_gfx_snapshot(AN *a);
 void an_gfx_begin_transition(AN *a, int kind, u32 ms, u32 color);
 bool an_gfx_transition_done(AN *a);
-Image *an_emote_still(AN *a, const char *name);
+void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha);
+void an_emote_free(AN *a);
 void an_window_render(AN *a);
 void an_gfx_fill(u32 *dst, int w, int h, u32 color);
 void an_gfx_blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int alpha);

@@ -159,7 +159,8 @@ void an_snd_play(AN *a, int channel, const char *name, bool loop, bool fromVoice
     size_t n = 0;
     u8 *d = sound_data(a, name, fromVoice, &n);
     if (!d) {
-        an_log(a, "missing sound %s", name);
+        if (strcmp(a->missingSound, name)) an_log(a, "missing sound %s", name);
+        snprintf(a->missingSound, sizeof a->missingSound, "%s", name);
         return;
     }
     size_t skip = n >= 8 && !memcmp(d, "CRM", 4) ? 8 : 0;

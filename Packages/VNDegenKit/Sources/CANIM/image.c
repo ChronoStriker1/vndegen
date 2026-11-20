@@ -124,15 +124,12 @@ Image *an_image_load(AN *a, const char *name) {
     const char *file = an_define_sprite(&a->def, name);
     Image *im = file ? load_file(a, file) : NULL;
     if (!im) im = load_file(a, name);
-    if (!im) {
-        an_log(a, "no picture %s", name);
-        return NULL;
-    }
+    if (!im) an_log(a, "no picture %s", name);
     if (c->count == c->cap) {
         c->cap = c->cap ? c->cap * 2 : 64;
         c->e = an_realloc(c->e, sizeof(CacheEntry) * (size_t)c->cap);
     }
-    size_t bytes = sizeof(u32) * (size_t)im->cw * (size_t)im->ch;
+    size_t bytes = im ? sizeof(u32) * (size_t)im->cw * (size_t)im->ch : 0;
     c->e[c->count++] = (CacheEntry){an_strdup(name), im, c->tick, bytes};
     c->bytes += bytes;
     evict(c);

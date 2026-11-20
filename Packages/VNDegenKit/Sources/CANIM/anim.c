@@ -74,6 +74,7 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
     a->prev = an_alloc(sizeof(u32) * n);
     a->shot = an_alloc(sizeof(u32) * n);
     a->lastSlot = -1;
+    a->emoteScale = 1.0f;
     an_system_load(a);
     an_text_init(a);
     an_snd_init(a);
@@ -88,6 +89,7 @@ void vnanim_close(VNANIM *n) {
     AN *a = (AN *)n;
     if (!a) return;
     an_movie_stop(a);
+    an_emote_free(a);
     an_snd_free(a);
     an_text_free(a);
     an_image_cache_clear(a);
@@ -99,6 +101,7 @@ void vnanim_close(VNANIM *n) {
     free(a->fb);
     free(a->prev);
     free(a->shot);
+    free(a->stencil);
     for (int i = 0; i < 180; i++) an_image_free(a->thumbs[i]);
     free(a->saves);
     free(a->sys);
@@ -172,10 +175,4 @@ const char *vnanim_title(VNANIM *n) { return ((AN *)n)->title; }
 const char *vnanim_problem(VNANIM *n) {
     AN *a = (AN *)n;
     return a->problem[0] ? a->problem : NULL;
-}
-
-Image *an_emote_still(AN *a, const char *name) {
-    (void)a;
-    (void)name;
-    return NULL;
 }

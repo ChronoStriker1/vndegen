@@ -356,7 +356,10 @@ static void exec(AN *a, const Op *op) {
     }
     case 0x81: {
         Layer *l = layer(a, &g[0]);
-        if (l) snprintf(l->motion, sizeof l->motion, "%s", str(a, &g[1]));
+        if (l) {
+            snprintf(l->motion, sizeof l->motion, "%s", str(a, &g[1]));
+            l->motionTime = (u32)(g[2].v > 0 ? g[2].v : 0);
+        }
         break;
     }
     case 0x6b:
@@ -393,6 +396,13 @@ static void exec(AN *a, const Op *op) {
     }
     case 0xb8: an_snd_stop(a, CH_BGM); break;
     case 0xa2: s->window = g[0].v != 0; break;
+    case 0x66: a->emoteScale = (float)g[0].v / 1000.0f; break;
+    case 0x53:
+        if (g[0].v >= 0 && g[0].v < AN_LAYERS) {
+            a->slotX[g[0].v] = val(a, &g[1]);
+            a->slotY[g[0].v] = val(a, &g[2]);
+        }
+        break;
     case 0x86: a->sceneKind = g[0].v; break;
     case 0xa8: set(a, &g[0], (i32)a->now); break;
     case 0xaa: set(a, &g[0], a->ctrl ? 1 : 0); break;

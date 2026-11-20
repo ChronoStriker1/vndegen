@@ -89,14 +89,14 @@ static void draw_scene(AN *a, u32 *fb) {
         int x = lerp(l->fromX, l->toX, l->moveStart, l->moveTime, a->now);
         int y = lerp(l->fromY, l->toY, l->moveStart, l->moveTime, a->now);
         int alpha = lerp(l->fromAlpha, l->toAlpha, l->fadeStart, l->fadeTime, a->now);
-        Image *im = l->kind == LK_IMAGE ? an_image_load(a, l->name) : an_emote_still(a, l->name);
+        if (l->kind == LK_EMOTE) {
+            an_emote_draw(a, i, l, x, y, alpha);
+            continue;
+        }
+        Image *im = an_image_load(a, l->name);
         if (!im) continue;
         double scale = l->scale > 0 ? l->scale / 1000.0 : 1.0;
-        if (l->kind == LK_EMOTE) {
-            double cx = a->W / 2.0 + x - im->w / 2.0 * scale;
-            double cy = a->H / 2.0 + y - im->h / 2.0 * scale + l->emoteTop * scale;
-            blit_scaled(fb, a->W, a->H, im, cx, cy, scale, alpha);
-        } else if (scale != 1.0)
+        if (scale != 1.0)
             blit_scaled(fb, a->W, a->H, im, x, y, scale, alpha);
         else
             an_gfx_blit(fb, a->W, a->H, im, 0, 0, im->w, im->h, x, y, alpha);

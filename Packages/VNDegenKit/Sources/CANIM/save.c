@@ -16,7 +16,9 @@ enum {
     OFF_LAYER_X = 0x1b0,
     OFF_LAYER_NAME = 0x2a0,
     LAYER_NAME = 260,
+    SAVED_LAYERS = 10,
     OFF_LAYER_OFFSET = 0xcc8,
+    OFF_LAYER_SCALE = 0xcf0,
     OFF_LOCALS = 0x2fdf0,
     SYS_LAST_SLOT = 0x8,
     SYS_READ = 0x3ec8,
@@ -155,12 +157,14 @@ static void fill_slot(AN *a, u8 *s) {
     wr32(s + OFF_SCENE_KIND, (u32)a->sceneKind);
     wr32(s + OFF_RETURN, a->th.sp > 0 ? a->th.stack[a->th.sp - 1] : 0);
     put_name(s + OFF_BG, BG_NAME, a->scene.bg);
-    for (int i = 0; i < AN_LAYERS; i++) {
+    for (int i = 0; i < SAVED_LAYERS; i++) {
         Layer *l = &a->scene.layer[i];
         if (l->kind == LK_NONE) continue;
         put_name(s + OFF_LAYER_NAME + LAYER_NAME * i, LAYER_NAME, l->name);
         wr32(s + OFF_LAYER_X + 4 * i, 640);
-        wr32(s + OFF_LAYER_OFFSET + 8 * i, (u32)l->toX);
+        int base = a->slotX[i] ? a->slotX[i] : 640;
+        wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)(base - 640 + l->toX));
+        if (l->kind == LK_EMOTE) wr32(s + OFF_LAYER_SCALE + 4 * i, (u32)(an_define_char_scale(&a->def, l->name) * 100.0f + 0.5f));
     }
     for (int i = 0; i < AN_VARS; i++) wr32(s + OFF_LOCALS + 4 * i, (u32)a->L[i]);
 }
@@ -188,7 +192,7 @@ static bool restore_slot(AN *a, const u8 *s) {
     an_reset_scene(a);
     get_name(a->scene.bg, sizeof a->scene.bg, s + OFF_BG, BG_NAME);
     a->scene.bgScale = 1000;
-    for (int i = 0; i < AN_LAYERS; i++) {
+    for (int i = 0; i < SAVED_LAYERS; i++) {
         Layer *l = &a->scene.layer[i];
         get_name(l->name, sizeof l->name, s + OFF_LAYER_NAME + LAYER_NAME * i, LAYER_NAME);
         if (!l->name[0]) continue;
@@ -196,7 +200,8 @@ static bool restore_slot(AN *a, const u8 *s) {
         l->kind = n > 4 && an_ieq(l->name + n - 4, ".psb") ? LK_EMOTE : LK_IMAGE;
         l->alpha = l->fromAlpha = l->toAlpha = 255;
         l->scale = 1000;
-        l->toX = l->fromX = (i32)rd32(s + OFF_LAYER_OFFSET + 8 * i);
+        a->slotX[i] = 640;
+        l->toX = l->fromX = (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i);
     }
     for (int i = 0; i < AN_VARS; i++) a->L[i] = (i32)rd32(s + OFF_LOCALS + 4 * i);
     a->sceneKind = (int)rd32(s + OFF_SCENE_KIND);

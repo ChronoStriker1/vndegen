@@ -235,7 +235,63 @@ bool an_define_load(Define *def, const char *path) {
         def->sprites[i].file = dup_string(r + SPRITE_NAME, SPRITE_NAME);
     }
     def->spriteCount = bestCount;
+    for (size_t at = 1; at + 16 < def->size && def->charCount < 16; at++) {
+        if (d[at] != 'M' || d[at - 1] != 0 || !islower(d[at + 1])) continue;
+        size_t n = 1;
+        while (n < 15 && isalpha(d[at + n])) n++;
+        if (n < 3 || d[at + n] != 0 || at + n + 9 > def->size) continue;
+        double v;
+        memcpy(&v, d + at + n + 1, 8);
+        if (!(v >= 20.0 && v <= 1000.0)) continue;
+        memcpy(def->charName[def->charCount], d + at, n);
+        def->charName[def->charCount][n] = 0;
+        def->charScale[def->charCount++] = (float)v;
+        at += n + 8;
+    }
+    int cap = 64;
+    def->presets = an_alloc(sizeof(EmotePreset) * (size_t)cap);
+    for (size_t at = 0; at + 16 < def->size; at++) {
+        if (rd32(d + at) != 9 || rd32(d + at + 4) > 8 || !isalpha(d[at + 8])) continue;
+        size_t p = at + 8;
+        const u8 *z = memchr(d + p, 0, def->size - p);
+        if (!z || z - (d + p) > 64 || !islower(z[1])) continue;
+        EmotePreset pr = {dup_string(d + p, (size_t)(z - (d + p))), NULL, 0};
+        p = (size_t)(z - d) + 1;
+        int vcap = 0;
+        while (p < def->size && d[p]) {
+            const u8 *nz = memchr(d + p, 0, def->size - p);
+            if (!nz) break;
+            const u8 *vz = memchr(nz + 1, 0, def->size - (size_t)(nz + 1 - d));
+            if (!vz) break;
+            if (pr.count == vcap) {
+                vcap = vcap ? vcap * 2 : 16;
+                pr.vars = an_realloc(pr.vars, sizeof(EmoteVar) * (size_t)vcap);
+            }
+            pr.vars[pr.count++] = (EmoteVar){dup_string(d + p, (size_t)(nz - (d + p))), (float)atof((const char *)nz + 1)};
+            p = (size_t)(vz - d) + 1;
+        }
+        if (def->presetCount == cap) {
+            cap *= 2;
+            def->presets = an_realloc(def->presets, sizeof(EmotePreset) * (size_t)cap);
+        }
+        def->presets[def->presetCount++] = pr;
+        at = p;
+    }
     return true;
+}
+
+float an_define_char_scale(const Define *def, const char *model) {
+    for (int i = 0; i < def->charCount; i++) {
+        size_t n = strlen(def->charName[i]);
+        if (!strncmp(model, def->charName[i], n) && !isalpha((u8)model[n])) return def->charScale[i] / 100.0f;
+    }
+    return 1.0f;
+}
+
+const EmotePreset *an_define_preset(const Define *def, const char *name) {
+    for (int i = 0; i < def->presetCount; i++)
+        if (!strcmp(def->presets[i].name, name)) return &def->presets[i];
+    return NULL;
 }
 
 void an_define_free(Define *def) {
@@ -244,6 +300,12 @@ void an_define_free(Define *def) {
         free(def->sprites[i].file);
     }
     free(def->sprites);
+    for (int i = 0; i < def->presetCount; i++) {
+        for (int k = 0; k < def->presets[i].count; k++) free(def->presets[i].vars[k].name);
+        free(def->presets[i].vars);
+        free(def->presets[i].name);
+    }
+    free(def->presets);
     free(def->data);
     memset(def, 0, sizeof *def);
 }
