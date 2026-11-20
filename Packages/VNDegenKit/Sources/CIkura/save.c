@@ -414,7 +414,7 @@ static void snapshot(IK *t) {
     put32(&b, 0);
     putname(&b, t->bgmName);
     put32(&b, t->bgmLoop ? 1 : 0);
-    put32(&b, (u32)t->flagCount * 8);
+    put32(&b, (u32)(t->flagBits ? t->flagBits : t->flagCount * 8));
     if (t->flagCount) put(&b, t->flags, (size_t)t->flagCount);
     put32(&b, (u32)t->varCount);
     for (int i = 0; i < t->varCount; i++) put32(&b, (u32)t->vars[i]);

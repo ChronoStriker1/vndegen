@@ -301,7 +301,7 @@ struct IK {
     int skipMode, autoMode, modeButton[2], lastToggle;
     u32 autoAt;
     u8 *flags;
-    int flagCount;
+    int flagCount, flagBits;
     Font fonts[IK_FONTS];
     MsgWin msg;
     LogEntry backlog[IK_LOG];

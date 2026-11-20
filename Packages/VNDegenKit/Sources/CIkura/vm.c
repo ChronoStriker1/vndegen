@@ -489,6 +489,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         t->flags = ik_realloc(t->flags, (size_t)c + 1);
         memset(t->flags, 0, (size_t)c + 1);
         t->flagCount = c;
+        t->flagBits = rd16(a);
         break;
     }
     case 0x0301: set_flag(t, ik_value(t, rd32(a)), true); break;
