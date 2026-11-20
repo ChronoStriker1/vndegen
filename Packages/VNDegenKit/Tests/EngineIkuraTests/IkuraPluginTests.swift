@@ -191,7 +191,9 @@ import VNCore
     @Test func swappedLayersKeepTheirPlaceInTheDrawingOrder() throws {
         let (data, state) = try savedState([(0x0212, Self.u32(1) + Self.u32(5) + Self.u32(0))])
         func at(_ o: Int) -> Int { Self.read(data, state + o) }
-        #expect((0..<7).map { at(0x14f1 + 4 * $0) } == [0, 5, 2, 3, 4, 1, 6])
+        let order: [Int] = (0..<7).map { at(0x14f1 + 4 * $0) }
+        let expected: [Int] = [0, 5, 2, 3, 4, 1, 6]
+        #expect(order == expected)
     }
 
     @Test func equipmentStatsMatchTheOriginal() throws {
@@ -200,7 +202,9 @@ import VNCore
             (0x0f03, []),
         ])
         func v(_ i: Int) -> Int { Self.read(data, state + 0xa5 + 4 * i) }
-        #expect([v(166), v(167), v(168), v(169), v(170), v(171), v(173)] == [7, 58, 6, 28, 21, 6, -3])
+        let stats: [Int] = [v(166), v(167), v(168), v(169), v(170), v(171), v(173)]
+        let expected: [Int] = [7, 58, 6, 28, 21, 6, -3]
+        #expect(stats == expected)
     }
 
     @Test func anAnimationFrameDrawsOnLayerFive() throws {
@@ -227,7 +231,8 @@ import VNCore
         defer { vnikura_close(engine) }
         var w: Int32 = 0, h: Int32 = 0
         let pixels = try #require(vnikura_pixels(engine, &w, &h))
-        #expect(pixels[300 * 800 + 400] == 0xff11_2233)
-        #expect(pixels[599 * 800 + 799] == 0xff11_2233)
+        let colour: UInt32 = 0xff11_2233
+        #expect(pixels[300 * 800 + 400] == colour)
+        #expect(pixels[599 * 800 + 799] == colour)
     }
 }
