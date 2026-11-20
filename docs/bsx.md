@@ -156,6 +156,8 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
 - The museum's strip mode (立ち絵鑑賞, the `museum_buex_layout` bust-up editor) isn't there; its button is drawn
   off. Mesu Kyoushi 4's viewer ahegao-off button is drawn but does nothing. The BGV per-character volumes reset
   when the app starts.
+- VNDegen doesn't create `common.dat`: a game folder without the PC's `save/common.dat` keeps no read marks,
+  achievements or museum records.
 - Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing. Their settings screens lack
   BGM SELECT, the per-character voice details and the BGV volume.
 - Mesu Kyoushi 3's `sync` system command is logged and skipped; it comes right before a startled line and its effect
