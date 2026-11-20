@@ -10,7 +10,7 @@ typedef struct EmoteSlot {
     int layer;
     char name[64];
     vnemote *model;
-    char motion[64];
+    u32 varSerial;
     u32 lastNow;
     u32 used;
     bool failed;
@@ -48,14 +48,32 @@ void an_emote_free(AN *a) {
     a->emotes = NULL;
 }
 
-static void apply_preset(AN *a, const vnemote_api_v1 *e, vnemote *m, const char *name, u32 ms) {
-    const EmotePreset *p = an_define_preset(&a->def, name);
+void an_layer_set_var(Layer *l, const char *name, float value) {
+    for (int i = 0; i < l->varCount; i++)
+        if (!strcmp(l->vars[i].name, name)) {
+            l->vars[i].value = value;
+            return;
+        }
+    if (l->varCount >= (int)(sizeof l->vars / sizeof l->vars[0])) return;
+    snprintf(l->vars[l->varCount].name, sizeof l->vars[0].name, "%s", name);
+    l->vars[l->varCount++].value = value;
+}
+
+void an_layer_apply_preset(AN *a, Layer *l, const char *preset, u32 ms) {
+    const EmotePreset *p = an_define_preset(&a->def, preset);
     if (!p) {
-        if (!e->play_timeline(m, name, 0, 0)) an_log(a, "no E-mote preset or timeline %s", name);
+        an_log(a, "no E-mote preset %s", preset);
         return;
     }
+    for (int i = 0; i < p->count; i++) an_layer_set_var(l, p->vars[i].name, p->vars[i].value);
+    snprintf(l->motion, sizeof l->motion, "%s", preset);
+    l->motionTime = ms;
+    l->varSerial++;
+}
+
+static void push_vars(const vnemote_api_v1 *e, vnemote *m, const Layer *l, u32 ms) {
     float ticks = (float)ms * 60.0f / 1000.0f;
-    for (int i = 0; i < p->count; i++) e->set_variable(m, p->vars[i].name, p->vars[i].value, ticks, 0);
+    for (int i = 0; i < l->varCount; i++) e->set_variable(m, l->vars[i].name, l->vars[i].value, ticks, 0);
 }
 
 static EmoteSlot *slot_for(AN *a, int layer, Layer *l) {
@@ -93,7 +111,9 @@ static EmoteSlot *slot_for(AN *a, int layer, Layer *l) {
         s->failed = true;
         return NULL;
     }
-    apply_preset(a, e, s->model, "AllReset", 0);
+    s->varSerial = l->varSerial;
+    push_vars(e, s->model, l, 0);
+    e->progress(s->model, 0);
     return s;
 }
 
@@ -228,9 +248,9 @@ void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha) {
     const vnemote_api_v1 *e = api(a);
     EmoteSlot *s = e ? slot_for(a, layer, l) : NULL;
     if (!s) return;
-    if (strcmp(s->motion, l->motion)) {
-        snprintf(s->motion, sizeof s->motion, "%s", l->motion);
-        if (s->motion[0]) apply_preset(a, e, s->model, s->motion, l->motionTime);
+    if (s->varSerial != l->varSerial) {
+        s->varSerial = l->varSerial;
+        push_vars(e, s->model, l, l->motionTime);
     }
     float ticks = (float)(a->now - s->lastNow) * 60.0f / 1000.0f;
     s->lastNow = a->now;

@@ -330,6 +330,12 @@ static void exec(AN *a, const Op *op) {
         snprintf(l->name, sizeof l->name, "%s", name);
         l->alpha = l->fromAlpha = l->toAlpha = 255;
         l->scale = 1000;
+        if (l->kind == LK_EMOTE) an_layer_apply_preset(a, l, "AllReset", 0);
+        break;
+    }
+    case 0xbe: {
+        Layer *l = layer(a, &g[0]);
+        if (l && l->kind == LK_EMOTE) an_layer_apply_preset(a, l, str(a, &g[1]), (u32)(g[2].v > 0 ? g[2].v : 0));
         break;
     }
     case 0x57: {
@@ -356,10 +362,7 @@ static void exec(AN *a, const Op *op) {
     }
     case 0x81: {
         Layer *l = layer(a, &g[0]);
-        if (l) {
-            snprintf(l->motion, sizeof l->motion, "%s", str(a, &g[1]));
-            l->motionTime = (u32)(g[2].v > 0 ? g[2].v : 0);
-        }
+        if (l) an_layer_apply_preset(a, l, str(a, &g[1]), (u32)(g[2].v > 0 ? g[2].v : 0));
         break;
     }
     case 0x6b:

@@ -19,6 +19,10 @@ enum {
     SAVED_LAYERS = 10,
     OFF_LAYER_OFFSET = 0xcc8,
     OFF_LAYER_SCALE = 0xcf0,
+    OFF_LAYER_VARS = 0x1780,
+    LAYER_VARS_SIZE = 0x1450,
+    VAR_SIZE = 0x68,
+    VAR_NAME = 0x64,
     OFF_LOCALS = 0x2fdf0,
     SYS_LAST_SLOT = 0x8,
     SYS_READ = 0x3ec8,
@@ -164,7 +168,13 @@ static void fill_slot(AN *a, u8 *s) {
         wr32(s + OFF_LAYER_X + 4 * i, 640);
         int base = a->slotX[i] ? a->slotX[i] : 640;
         wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)(base - 640 + l->toX));
-        if (l->kind == LK_EMOTE) wr32(s + OFF_LAYER_SCALE + 4 * i, (u32)(an_define_char_scale(&a->def, l->name) * 100.0f + 0.5f));
+        if (l->kind != LK_EMOTE) continue;
+        wr32(s + OFF_LAYER_SCALE + 4 * i, (u32)(an_define_char_scale(&a->def, l->name) * 100.0f + 0.5f));
+        for (int k = 0; k < l->varCount && (k + 1) * VAR_SIZE <= LAYER_VARS_SIZE; k++) {
+            u8 *v = s + OFF_LAYER_VARS + LAYER_VARS_SIZE * i + VAR_SIZE * k;
+            put_name(v, VAR_NAME, l->vars[k].name);
+            memcpy(v + VAR_NAME, &l->vars[k].value, 4);
+        }
     }
     for (int i = 0; i < AN_VARS; i++) wr32(s + OFF_LOCALS + 4 * i, (u32)a->L[i]);
 }
@@ -202,6 +212,16 @@ static bool restore_slot(AN *a, const u8 *s) {
         l->scale = 1000;
         a->slotX[i] = 640;
         l->toX = l->fromX = (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i);
+        for (int k = 0; k * VAR_SIZE + VAR_SIZE <= LAYER_VARS_SIZE; k++) {
+            const u8 *v = s + OFF_LAYER_VARS + LAYER_VARS_SIZE * i + VAR_SIZE * k;
+            if (!v[0]) break;
+            char name[32];
+            get_name(name, sizeof name, v, VAR_NAME);
+            float value;
+            memcpy(&value, v + VAR_NAME, 4);
+            an_layer_set_var(l, name, value);
+        }
+        l->varSerial++;
     }
     for (int i = 0; i < AN_VARS; i++) a->L[i] = (i32)rd32(s + OFF_LOCALS + 4 * i);
     a->sceneKind = (int)rd32(s + OFF_SCENE_KIND);
