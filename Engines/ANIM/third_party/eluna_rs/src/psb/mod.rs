@@ -42,6 +42,7 @@ const PSB_FLAG_BODY_ENCRYPTED: u16 = 0x0002;
 const PSB_HEADER_FIXED_SIZE_V2: usize = 0x28;
 const PSB_HEADER_ENCRYPTED_BYTES_V2: usize = 0x20;
 const PSB_HEADER_ENCRYPTED_BYTES_V3: usize = 0x24;
+const PSB_HEADER_SIZE_V4: usize = 0x38;
 const MAX_WRAPPER_DEPTH: usize = 4;
 const MAX_VALUE_DEPTH: usize = 512;
 
@@ -87,6 +88,9 @@ pub struct PsbHeader {
     /// `0x08..0x28`. It is read after header decryption when the header
     /// encryption flag is set.
     pub extra: Option<u32>,
+    pub extra_resource_offset: Option<u32>,
+    pub extra_resource_length_offset: Option<u32>,
+    pub extra_resource_data_offset: Option<u32>,
 }
 
 impl PsbHeader {
@@ -115,6 +119,10 @@ impl PsbHeader {
         } else {
             None
         };
+        let v4 = version >= 4 && header_offset as usize >= PSB_HEADER_SIZE_V4 && data.len() >= PSB_HEADER_SIZE_V4;
+        let extra_resource_offset = if v4 { Some(read_u32_at(data, 44)?) } else { None };
+        let extra_resource_length_offset = if v4 { Some(read_u32_at(data, 48)?) } else { None };
+        let extra_resource_data_offset = if v4 { Some(read_u32_at(data, 52)?) } else { None };
 
         Ok(Self {
             signature,
@@ -129,6 +137,9 @@ impl PsbHeader {
             resource_data_offset,
             root_offset,
             extra,
+            extra_resource_offset,
+            extra_resource_length_offset,
+            extra_resource_data_offset,
         })
     }
 
@@ -579,7 +590,16 @@ impl PsbFile {
             header.resource_length_offset as u64,
             header.resource_data_offset as u64,
         )?;
-        let extra_resources = Vec::new();
+        let extra_resources = match (
+            header.extra_resource_offset,
+            header.extra_resource_length_offset,
+            header.extra_resource_data_offset,
+        ) {
+            (Some(offsets), Some(lengths), Some(start)) if offsets != 0 && lengths != 0 => {
+                read_resource_ranges_at(data, offsets as u64, lengths as u64, start as u64).unwrap_or_default()
+            }
+            _ => Vec::new(),
+        };
         let root = read_value_at(data, &names, &strings, header.root_offset as u64, 0)?;
 
         Ok(Self {
@@ -896,6 +916,11 @@ fn apply_psb_decryption(data: &mut [u8], key: Option<PsbDecryptionKey>) -> Resul
             .ok_or(PsbError::IntegerOverflow)?;
         let bytes = data.get_mut(start..end).ok_or(PsbError::UnexpectedEof)?;
         cipher.decrypt(bytes);
+        if header.version >= 4 && header.header_offset as usize >= PSB_HEADER_SIZE_V4 {
+            if let Some(extra_words) = data.get_mut(end..PSB_HEADER_SIZE_V4) {
+                cipher.clone().decrypt(extra_words);
+            }
+        }
         header = PsbHeader::read(data)?;
         validate_header_offsets(data, header)?;
     }
@@ -922,6 +947,7 @@ fn root_code_is_plain_object(data: &[u8], root_offset: u32) -> bool {
     data.get(root_offset as usize) == Some(&PSB_TYPE_OBJECT)
 }
 
+#[derive(Clone)]
 struct PsbDecryptor {
     state: [u32; 6],
 }

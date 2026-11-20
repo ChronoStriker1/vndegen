@@ -11,11 +11,33 @@ C interface of VNDegen's own. Everything else in the ANIM runtime (`Packages/VND
 | `vnemote/` | VNDegen's own: the C interface in `Packages/VNDegenKit/Sources/CANIM/include/vnemote.h` | |
 | `vendor/` | The crates eluna_rs builds with, from crates.io through `cargo vendor` (see `vnemote/Cargo.lock`) | |
 
-`third_party/eluna_rs/` holds upstream's `Cargo.toml` and `src/` unmodified. The same source, at the same upstream
-state, is also vendored inside `Engines/Siglus/siglus_rs/vendor/eluna_rs`; the two copies are kept separate so each
-engine can move to a newer eluna on its own.
+`third_party/eluna_rs/` holds upstream's `Cargo.toml` and `src/`, with the changes below. The same source, at the
+unmodified upstream state, is also vendored inside `Engines/Siglus/siglus_rs/vendor/eluna_rs`; the two copies are
+kept separate so each engine can move to a newer eluna on its own.
 
-VNDegen's changes to eluna's files: none.
+VNDegen's changes to eluna's files, each found by comparing the ANIM games' characters with the PC engine run under
+Wine, from saves both load (`docs/anim.md`):
+
+- `src/psb/mod.rs`: PSB version 4 headers carry three more words after the checksum, the offsets of the extra
+  resource offset and length arrays and of the extra resource data, encrypted with the header's key stream at the
+  point where the body's begins. They are decrypted and read, and the extra resources loaded, so mesh combinators
+  (`rawMeshList: extra_resource(n)`) find their meshes; before, eluna read none and took the index as an ordinary
+  resource. `PsbDecryptor` derives `Clone` for this.
+- `src/emote.rs`:
+  - A mesh combinator's `rawMeshList` that names an extra resource reads the extra resource.
+  - A layer whose `parameterize` is `null` samples its motion's time, like a layer without the field, instead of
+    time 0, and a motion whose own `parameterize` names a parameter runs at that parameter's time. Expression parts
+    such as the eyelids, the mouths and the blush follow their variables.
+  - A sprite's centre is its icon's origin offset plus half its size: `originX` and `originY` count from the icon's
+    top left. Face outlines, cut into tiles, were half a tile off.
+  - A layer on a `type 0` key isn't drawn, nor are its children, and a one-shot motion stops just before its final
+    key instead of on it.
+  - Sprites carry their own mesh patch (`local_mesh`) and their ancestors' mesh chain (`mesh_chain`), and
+    `EmoteMeshPatch::warp_local` and `MeshChainEntry::warp_world_point` are public, so a renderer can deform each
+    sprite in its owner's coordinates. `EmoteStaticScene::clear_frame_history` drops the held frame state.
+  - The test of a one-shot motion's end time follows the change above.
+- `src/sdk.rs`: `EmoteRuntime::reset_frame_history`, for a character whose variables are set at once, as when a save
+  loads, so held keys don't keep the pictures of the default pose.
 
 ## Licenses
 

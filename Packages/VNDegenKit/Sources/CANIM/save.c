@@ -279,6 +279,7 @@ static bool restore_slot(AN *a, const u8 *s) {
             an_layer_set_var(l, name, value);
         }
         l->varSerial++;
+        l->fresh = true;
     }
     for (int i = 0; i < AN_VARS; i++) a->L[i] = (i32)rd32(s + OFF_LOCALS + 4 * i);
     a->sceneKind = (int)rd32(s + OFF_SCENE_KIND);

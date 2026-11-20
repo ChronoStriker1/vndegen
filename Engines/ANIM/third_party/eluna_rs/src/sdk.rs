@@ -940,6 +940,13 @@ impl EmoteRuntime {
         self.player.scene()
     }
 
+    pub fn reset_frame_history(&mut self) -> Result<(), EmoteRuntimeError> {
+        let mut scene = self.player.scene().clone();
+        scene.clear_frame_history();
+        self.player.replace_scene(scene);
+        self.rebuild_scene()
+    }
+
     pub fn sprites(&self) -> &[EmoteStaticSprite] {
         &self.player.scene().sprites
     }

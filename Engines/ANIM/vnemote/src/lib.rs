@@ -79,6 +79,7 @@ pub struct ApiV1 {
     variable_name: unsafe extern "C" fn(*mut Model, c_int) -> *const c_char,
     stencils: unsafe extern "C" fn(*mut Model, *mut c_int) -> *const StencilSource,
     set_detail: unsafe extern "C" fn(*mut Model, f32),
+    reset: unsafe extern "C" fn(*mut Model),
 }
 
 static API: ApiV1 = ApiV1 {
@@ -99,6 +100,7 @@ static API: ApiV1 = ApiV1 {
     variable_name,
     stencils,
     set_detail,
+    reset,
 };
 
 #[no_mangle]
@@ -239,21 +241,37 @@ fn transform(sprite: &EmoteStaticSprite, p: [f32; 2]) -> [f32; 2] {
 }
 
 const QUAD_PIXELS: f32 = 8.0;
+const CHAIN_DIVISION: usize = 16;
+
+fn world_point(sprite: &EmoteStaticSprite, u: f32, v: f32) -> [f32; 2] {
+    let left = sprite.center_x - sprite.width * 0.5;
+    let top = sprite.center_y - sprite.height * 0.5;
+    let plain = [left + u * sprite.width, top + v * sprite.height];
+    let local = match &sprite.local_mesh {
+        Some(mesh) if mesh.domain.is_some() => mesh.warp_local(plain).unwrap_or(plain),
+        Some(mesh) => {
+            let p = mesh.sample(u, v);
+            [left + p[0] * sprite.width, top + p[1] * sprite.height]
+        }
+        None => plain,
+    };
+    sprite
+        .mesh_chain
+        .iter()
+        .rev()
+        .fold(transform(sprite, local), |point, entry| entry.warp_world_point(point).unwrap_or(point))
+}
 
 fn divisions(sprite: &EmoteStaticSprite, pixels_per_unit: f32) -> (usize, usize) {
     let (dx, dy) = match &sprite.mesh {
         Some(mesh) => (mesh.division_x.max(1) as usize, mesh.division_y.max(1) as usize),
+        None if !sprite.mesh_chain.is_empty() => (CHAIN_DIVISION, CHAIN_DIVISION),
         None => return (1, 1),
     };
     if pixels_per_unit <= 0.0 {
         return (dx, dy);
     }
-    let left = sprite.center_x - sprite.width * 0.5;
-    let top = sprite.center_y - sprite.height * 0.5;
-    let at = |u: f32, v: f32| {
-        let p = sprite.mesh.as_ref().map_or([u, v], |mesh| mesh.sample(u, v));
-        transform(sprite, [left + p[0] * sprite.width, top + p[1] * sprite.height])
-    };
+    let at = |u: f32, v: f32| world_point(sprite, u, v);
     let length = |points: &[[f32; 2]]| points.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f32>();
     let steps = [0.0, 0.25, 0.5, 0.75, 1.0];
     let mut across: f32 = 0.0;
@@ -274,16 +292,10 @@ fn push_sprite(out: &mut Vec<Vertex>, grid: &mut Vec<Vertex>, sprite: &EmoteStat
         corner(sprite, sprite.corner_colors[3]),
     ];
     let (dx, dy) = divisions(sprite, pixels_per_unit);
-    let left = sprite.center_x - sprite.width * 0.5;
-    let top = sprite.center_y - sprite.height * 0.5;
     let at = |ix: usize, iy: usize| -> Vertex {
         let u = ix as f32 / dx as f32;
         let v = iy as f32 / dy as f32;
-        let p = match &sprite.mesh {
-            Some(mesh) => mesh.sample(u, v),
-            None => [u, v],
-        };
-        let pos = transform(sprite, [left + p[0] * sprite.width, top + p[1] * sprite.height]);
+        let pos = world_point(sprite, u, v);
         let c = bilerp(&colors, u, v);
         Vertex {
             x: pos[0],
@@ -412,6 +424,12 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
         });
     }
     draws.len() as c_int
+}
+
+unsafe extern "C" fn reset(model: *mut Model) {
+    if let Some(model) = model.as_mut() {
+        let _ = model.runtime.reset_frame_history();
+    }
 }
 
 unsafe extern "C" fn set_detail(model: *mut Model, pixels_per_unit: f32) {

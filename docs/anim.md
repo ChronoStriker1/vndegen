@@ -31,15 +31,20 @@ folder down.
 - Script: a code block, a table of named labels and a string pool. Instructions carry typed operands (`40` and `41`
   variables, `43` constants), raw numbers, string indexes and addresses. The scripts run the boot sequence, the story
   and the system routines (waits, effects, the scene jump table); the screens are the engine's own.
-- E-mote: PSB files, encrypted with the engine's key, drawn at the slot positions and scales the script sets, with
-  each character's scale from the define. Expressions are presets of E-mote variables in the define.
+- E-mote: PSB files, encrypted with the engine's key, drawn at the slot positions and the scale the script sets
+  (`66`). The define's character table (name and a percentage: Risa 100, Shiho 110, Yousuke 120, Kouki 130, Sumi 250)
+  sets how far below the screen's centre a character's origin sits, 190 model units times the scale times the
+  percentage, measured against the PC; it doesn't scale the character. Expressions are presets of E-mote variables in
+  the define.
 - Sound: Ogg Vorbis behind an 8-byte header, in `bgm/` and the voice archive. Movies are MPEG-1.
 
 ## Drawing E-mote characters
 
 The runtime draws on the CPU into the frame it hands the app. Each frame, eluna advances every character on screen, in
-parallel, one character per thread: its motion, its expression changes and its own idle movement and hair physics.
-VNDegen's `vnemote` layer turns eluna's sprites into triangles, with each mesh divided to about 8 pixels on screen
+parallel, one character per thread: its motion, its expression changes, its blinking and its hair physics.
+VNDegen's `vnemote` layer turns eluna's sprites into triangles: each sprite is deformed by its own mesh in its own
+coordinates, then by each mesh-deforming ancestor in that ancestor's coordinates, nearest first, as E-mote's mesh
+chain does. Each mesh is divided to about 8 pixels on screen
 rather than the mesh's own division, which is far finer than the characters' size on screen needs. The triangles are
 drawn in horizontal bands across a small thread pool. A character whose triangles didn't change since the last frame,
 drawn at full opacity in place with normal or additive blending, is kept in a layer of its own and composited, so a
@@ -70,9 +75,10 @@ does; a longer comment that holds a line break loads black on the PC. Saves load
 
 ## Known limits
 
-- E-mote characters stand still in their expressions; their idle motion and the scripts' short pose animations
-  (`b9`, `bc`, `be`, `c2` to `c5`) don't play yet, and eluna draws some expressions differently from the PC (head tilt,
-  eyes).
+- E-mote characters blink and their hair moves, but their timelines and the scripts' short pose animations (`b9`,
+  `bc`, `be`, `c2` to `c5`) don't play yet. eluna needed fixes to draw them like the PC (`Engines/ANIM/UPSTREAM.md`);
+  faces, eyes, mouths, head tilts and the neutral pose match the PC, while turning the body (`body_LR`) and some
+  combined body poses still differ from it.
 - The Settings, Extra (CG, scene and music galleries) and shortcut screens aren't built; volumes aren't kept in the
   system save yet.
 - Magical Sword's screens aren't built.

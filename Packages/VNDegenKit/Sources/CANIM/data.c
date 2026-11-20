@@ -207,6 +207,16 @@ static bool sprite_record(const u8 *d, size_t size, size_t at) {
     return at + SPRITE_NAME + 16 <= size && sprite_name_ok(d + at) && sprite_file_ok(d + at + SPRITE_NAME);
 }
 
+static size_t char_record(const u8 *d, size_t size, size_t at) {
+    if (at + 16 > size || d[at] != 'M' || !islower(d[at + 1])) return 0;
+    size_t n = 1;
+    while (n < 15 && isalpha(d[at + n])) n++;
+    if (n < 3 || d[at + n] != 0 || at + n + 9 > size) return 0;
+    double v;
+    memcpy(&v, d + at + n + 1, 8);
+    return v >= 20.0 && v <= 1000.0 ? n : 0;
+}
+
 bool an_define_load(Define *def, const char *path) {
     memset(def, 0, sizeof *def);
     size_t size;
@@ -235,18 +245,22 @@ bool an_define_load(Define *def, const char *path) {
         def->sprites[i].file = dup_string(r + SPRITE_NAME, SPRITE_NAME);
     }
     def->spriteCount = bestCount;
-    for (size_t at = 1; at + 16 < def->size && def->charCount < 16; at++) {
-        if (d[at] != 'M' || d[at - 1] != 0 || !islower(d[at + 1])) continue;
-        size_t n = 1;
-        while (n < 15 && isalpha(d[at + n])) n++;
-        if (n < 3 || d[at + n] != 0 || at + n + 9 > def->size) continue;
+    size_t bestRun = 0, runStart = 0;
+    for (size_t at = 1; at + 16 < def->size; at++) {
+        if (d[at - 1] != 0) continue;
+        int count = 0;
+        for (size_t p = at, n; (n = char_record(d, def->size, p)) != 0 && count < 16; p += n + 9) count++;
+        if ((size_t)count > bestRun) {
+            bestRun = (size_t)count;
+            runStart = at;
+        }
+    }
+    for (size_t p = runStart, n; bestRun >= 2 && (n = char_record(d, def->size, p)) != 0 && def->charCount < 16; p += n + 9) {
         double v;
-        memcpy(&v, d + at + n + 1, 8);
-        if (!(v >= 20.0 && v <= 1000.0)) continue;
-        memcpy(def->charName[def->charCount], d + at, n);
+        memcpy(&v, d + p + n + 1, 8);
+        memcpy(def->charName[def->charCount], d + p, n);
         def->charName[def->charCount][n] = 0;
         def->charScale[def->charCount++] = (float)v;
-        at += n + 8;
     }
     int cap = 64;
     def->presets = an_alloc(sizeof(EmotePreset) * (size_t)cap);

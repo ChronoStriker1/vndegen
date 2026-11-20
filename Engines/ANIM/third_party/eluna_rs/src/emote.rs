@@ -104,13 +104,13 @@ pub struct EmoteMeshPatch {
 
 /// A mesh deformation and the coordinate frame in which its domain is authored.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct MeshChainEntry {
+pub struct MeshChainEntry {
     patch: EmoteMeshPatch,
     transform: [f32; 6],
 }
 
 impl MeshChainEntry {
-    fn warp_world_point(&self, point: [f32; 2]) -> Option<[f32; 2]> {
+    pub fn warp_world_point(&self, point: [f32; 2]) -> Option<[f32; 2]> {
         let m = self.transform;
         let inv = affine_inverse_linear(m)?;
         let local = apply_linear4(inv, [point[0] - m[4], point[1] - m[5]]);
@@ -155,6 +155,15 @@ impl EmoteMeshPatch {
             }
         }
         out
+    }
+
+    pub fn warp_local(&self, point: [f32; 2]) -> Option<[f32; 2]> {
+        let [left, top, width, height] = self.domain?;
+        if !width.is_finite() || !height.is_finite() || width.abs() <= f32::EPSILON || height.abs() <= f32::EPSILON {
+            return None;
+        }
+        let mapped = self.sample((point[0] - left) / width, (point[1] - top) / height);
+        Some([left + mapped[0] * width, top + mapped[1] * height])
     }
 
     pub fn combined_with(&self, next: &EmoteMeshPatch) -> EmoteMeshPatch {
@@ -276,6 +285,10 @@ pub struct EmoteStaticScene {
 }
 
 impl EmoteStaticScene {
+    pub fn clear_frame_history(&mut self) {
+        self.frame_runtime_states.clear();
+    }
+
     /// Keeps only sprites that belong to one motion name and recomputes bounds.
     ///
     /// This is a preview helper. The original runtime motion selection still
@@ -376,6 +389,8 @@ pub struct EmoteStaticSprite {
     pub uv_right: f32,
     pub uv_bottom: f32,
     pub mesh: Option<EmoteMeshPatch>,
+    pub local_mesh: Option<EmoteMeshPatch>,
+    pub mesh_chain: Vec<MeshChainEntry>,
     pub draw_frame_info: EmoteDrawFrameInfo,
 }
 
@@ -1947,6 +1962,7 @@ struct TravelContext {
     mesh_division_x: u32,
     mesh_division_y: u32,
     mesh_patch: Option<EmoteMeshPatch>,
+    local_mesh_patch: Option<EmoteMeshPatch>,
     /// Active ancestor mesh-transform patches used by StepFrameMeshChain. The
     /// current layer's own mesh transform is appended only for descendants.
     mesh_chain: Arc<Vec<MeshChainEntry>>,
@@ -2034,6 +2050,7 @@ impl Default for TravelContext {
             mesh_division_x: 1,
             mesh_division_y: 1,
             mesh_patch: None,
+            local_mesh_patch: None,
             mesh_chain: Arc::default(),
             mesh_combine_candidate_start: 0,
             mesh_parameters: Arc::default(),
@@ -2996,12 +3013,12 @@ fn build_sprite(
     // static preview path does not re-evaluate parameterized mesh state.
     let subtract_icon_origin = ctx.mesh_transform == 0;
     let center_x = if subtract_icon_origin {
-        ox - icon.origin_x
+        ox - icon.origin_x + width * 0.5
     } else {
         ox
     };
     let center_y = if subtract_icon_origin {
-        oy - icon.origin_y
+        oy - icon.origin_y + height * 0.5
     } else {
         oy
     };
@@ -3035,6 +3052,8 @@ fn build_sprite(
         uv_right: (icon.left + width) / texture.width as f32,
         uv_bottom: (icon.top + height) / texture.height as f32,
         mesh: ctx.mesh_patch,
+        local_mesh: ctx.local_mesh_patch,
+        mesh_chain: ctx.mesh_chain.as_ref().clone(),
         draw_frame_info: draw_frame_info(label, &ctx),
     })
 }
@@ -3083,6 +3102,8 @@ fn build_feedback_history_sprite(
         uv_right: if width < 0.0 { 0.0 } else { 1.0 },
         uv_bottom: if height < 0.0 { 0.0 } else { 1.0 },
         mesh: None,
+        local_mesh: None,
+        mesh_chain: Vec::new(),
         draw_frame_info: state.draw_frame_info.clone(),
     })
 }
@@ -3521,6 +3542,8 @@ impl Default for DynamicFrameState {
     }
 }
 
+const ONE_SHOT_END_MARGIN: f32 = 0.001;
+
 fn effective_motion_time(motion: &PsbValue, time_ticks: f32) -> f32 {
     // MMotionPlayer::Progress (sub_10350870) keeps accumulated time (+280)
     // separate from effective motion time (+284).  Forward playback wraps at
@@ -3550,7 +3573,7 @@ fn effective_motion_time(motion: &PsbValue, time_ticks: f32) -> f32 {
         let span = last_time - loop_time;
         loop_time + (time_ticks - loop_time).rem_euclid(span)
     } else {
-        last_time
+        (last_time - ONE_SHOT_END_MARGIN).max(0.0)
     }
 }
 
@@ -4491,7 +4514,7 @@ fn layer_parameter_eval(
     _frame_list: &[PsbValue],
     fallback_time_ticks: f32,
 ) -> Option<LayerParameterEval> {
-    if let Some(parameterize) = layer.field("parameterize") {
+    if let Some(parameterize) = layer.field("parameterize").filter(|p| !matches!(p, PsbValue::Null)) {
         let Some(parameter) = resolve_parameterize(parameterize, parameter_table) else {
             return Some(LayerParameterEval {
                 id: None,
@@ -4775,6 +4798,7 @@ fn travel_layer_at(
     );
     let mut local_mesh_patch = None;
     let mut draw_ctx = ctx.clone();
+    draw_ctx.local_mesh_patch = None;
     let mut child_ctx = ctx.clone();
     let sync_child_shape = (ctx.mesh_sync_child & 0x8) != 0;
     let layer_mesh_parameter = if sync_child_shape {
@@ -4795,6 +4819,7 @@ fn travel_layer_at(
         if let Some(patch) = mesh_combinator.self_patch {
             local_mesh_patch = combine_patch(local_mesh_patch, patch);
             draw_ctx.mesh_patch = combine_patch(draw_ctx.mesh_patch.take(), patch);
+            draw_ctx.local_mesh_patch = local_mesh_patch;
             if sync_child_shape {
                 child_ctx.mesh_patch = combine_patch(child_ctx.mesh_patch.take(), patch);
                 if let Some(id) = &layer_mesh_parameter {
@@ -4879,6 +4904,7 @@ fn travel_layer_at(
             };
             local_mesh_patch = combine_patch(local_mesh_patch, mesh);
             draw_ctx.mesh_patch = combine_patch(draw_ctx.mesh_patch.take(), mesh);
+            draw_ctx.local_mesh_patch = local_mesh_patch;
             if sync_child_shape {
                 child_ctx.mesh_patch = combine_patch(child_ctx.mesh_patch.take(), mesh);
                 if let Some(id) = &layer_mesh_parameter {
@@ -4956,6 +4982,9 @@ fn travel_layer_at(
         prepare_child_inherit_source(&mut child_ctx, current_mesh_sync);
 
 
+        if state.serialized_frame_type == 0 {
+            draw_ctx.ready_to_draw = false;
+        }
         if let Some(src) = state.src.as_deref().filter(|src| !src.is_empty()) {
             let visible = draw_ctx.ready_to_draw
                 && draw_ctx.base_visible
@@ -6890,6 +6919,12 @@ fn recurse_motion_at(
         .field("parameter")
         .and_then(PsbValue::as_list)
         .or(parameter_table);
+    let time_ticks = match motion.field("parameterize") {
+        Some(PsbValue::Null) | None => time_ticks,
+        Some(_) => layer_parameter_eval(motion, motion_parameter_table, variables, &[], time_ticks)
+            .and_then(|eval| eval.value.map(|_| eval.local_time_ticks))
+            .unwrap_or(time_ticks),
+    };
     let effective_time = effective_motion_time(motion, time_ticks);
     let priority_ranks = Arc::new(motion_priority_ranks(motion, effective_time));
     let scope_start = layer_states.len();
@@ -7075,8 +7110,10 @@ fn evaluate_one_combinator(
         }
     });
     let neutral_index = combinator.field_i64("neutralIndex").unwrap_or(-1);
-    let resource_index = combinator.field("rawMeshList")?.as_u32()? as usize;
-    let raw = psb.resource_bytes(psb_data, resource_index)?;
+    let raw = match combinator.field("rawMeshList")? {
+        PsbValue::ExtraResource(index) => psb.extra_resource_bytes(psb_data, *index as usize)?,
+        other => psb.resource_bytes(psb_data, other.as_u32()? as usize)?,
+    };
     let meshes = decode_raw_mesh_list(raw, mesh_count, is_delta)?;
     if meshes.is_empty() {
         return None;
@@ -7268,6 +7305,8 @@ mod tests {
             uv_right: 1.0,
             uv_bottom: 1.0,
             mesh: None,
+            local_mesh: None,
+            mesh_chain: Vec::new(),
             draw_frame_info: draw_frame_info(Some(label.to_owned()), &ctx),
         }
     }
@@ -7941,12 +7980,13 @@ mod tests {
     }
 
     #[test]
-    fn non_looping_motion_clamps_at_last_time() {
+    fn non_looping_motion_stops_before_its_end_key() {
         let motion = PsbValue::Object(vec![
             ("loopTime".to_owned(), PsbValue::Float(-1.0)),
             ("lastTime".to_owned(), PsbValue::Float(100.0)),
         ]);
-        assert!((effective_motion_time(&motion, 120.0) - 100.0).abs() < 1.0e-6);
+        let end = effective_motion_time(&motion, 120.0);
+        assert!(end < 100.0 && end > 99.99);
     }
 
     #[test]
@@ -8356,6 +8396,8 @@ mod tests {
             uv_right: 1.0,
             uv_bottom: 1.0,
             mesh: None,
+            local_mesh: None,
+            mesh_chain: Vec::new(),
             draw_frame_info: draw_frame_info(None, &TravelContext::default()),
         };
         let b = compute_bounds(&[sprite]).unwrap();

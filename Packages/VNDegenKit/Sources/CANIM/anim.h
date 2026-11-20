@@ -161,6 +161,7 @@ typedef struct Layer {
     } vars[48];
     int varCount;
     u32 varSerial;
+    bool fresh;
 } Layer;
 
 typedef struct Scene {

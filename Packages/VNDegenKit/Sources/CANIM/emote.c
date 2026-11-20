@@ -5,6 +5,7 @@
 #include <math.h>
 
 enum { EMOTE_KEY = 0x473ab96d, MAX_MODELS = 8 };
+static const float CHAR_DROP = 190.0f;
 
 typedef struct Tex {
     const u8 *px;
@@ -140,7 +141,8 @@ static EmoteSlot *slot_for(AN *a, int layer, Layer *l) {
     }
     s->varSerial = l->varSerial;
     push_vars(e, s->model, l, 0);
-    e->progress(s->model, 0);
+    e->reset(s->model);
+    l->fresh = false;
     return s;
 }
 
@@ -385,12 +387,14 @@ void an_emote_prepare(AN *a) {
         if (!s) continue;
         if (s->varSerial != l->varSerial) {
             s->varSerial = l->varSerial;
-            push_vars(e, s->model, l, l->motionTime);
+            push_vars(e, s->model, l, l->fresh ? 0 : l->motionTime);
+            if (l->fresh) e->reset(s->model);
+            l->fresh = false;
         }
         float ticks = (float)(a->now - s->lastNow) * 60.0f / 1000.0f;
         s->lastNow = a->now;
         s->ticks = ticks > 6 ? 6 : ticks;
-        s->scale = (l->scale > 0 ? (float)l->scale / 1000.0f : 1.0f) * a->emoteScale * an_define_char_scale(&a->def, l->name);
+        s->scale = (l->scale > 0 ? (float)l->scale / 1000.0f : 1.0f) * a->emoteScale;
         jobs[n++] = s;
     }
     an_parallel(a, n, build_job, jobs);
@@ -512,7 +516,7 @@ void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha) {
     if (!s) return;
     float charScale = an_define_char_scale(&a->def, l->name);
     int baseX = a->slotX[layer] ? a->slotX[layer] : a->W / 2;
-    RasterJob j = {a, s, {(float)(baseX + x), (float)(a->H / 2 + a->slotY[layer] + y) + 256.0f * a->emoteScale * charScale, s->scale,
+    RasterJob j = {a, s, {(float)(baseX + x), (float)(a->H / 2 + a->slotY[layer] + y) + CHAR_DROP * a->emoteScale * charScale, s->scale,
                           (float)alpha / 255.0f, 0, 0, 0, 0, a->fb, a->W, 0, 0, false}, 0, a->W - 1, 0, a->H - 1, 0};
     if (!a->stencil) a->stencil = an_alloc((size_t)a->W * (size_t)a->H);
     j.bands = an_pool_size(a) * 2;
