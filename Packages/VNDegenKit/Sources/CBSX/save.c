@@ -501,6 +501,7 @@ bool bx_load_slot(BX *b, int slot) {
 }
 
 void bx_autosave(BX *b) {
+    if (b->replaying) return;
     int first = bx_cfg_int(&b->cfg, "data screen", "no begin", 15);
     if (first <= 0) return;
     int pick = -1;

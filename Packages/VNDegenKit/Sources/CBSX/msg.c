@@ -326,11 +326,15 @@ void bx_choice_update(BX *b) {
     }
     if (b->click && b->choiceHover >= 0) {
         b->click = false;
-        int label = b->choice[b->choiceHover].label;
-        bx_mark_choice(b, b->choice[b->choiceHover].id);
+        Choice *c = &b->choice[b->choiceHover];
+        int v = bx_sysvar(b, BX_SYS_SELECT_TYPE);
+        if (v >= 0) b->globals[v] = (Val){0, c->value};
+        bool jump = c->design >= 0 && c->label >= 0;
+        int label = c->label;
+        bx_mark_choice(b, c->id);
         b->choiceCount = 0;
         b->th.wait = W_NONE;
-        bx_vm_goto(b, label);
+        if (jump) bx_vm_goto(b, label);
     }
 }
 

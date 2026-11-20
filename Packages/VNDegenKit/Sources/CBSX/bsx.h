@@ -234,7 +234,7 @@ typedef struct Choice {
     int id;
     int label;
     int msg;
-    int design;
+    int design, value;
     int x, y, w, h;
 } Choice;
 
@@ -451,6 +451,8 @@ i32 bx_arg_int(BX *b, int i);
 const char *bx_arg_str(BX *b, int i);
 Val *bx_var_ref(BX *b, int type, i32 index);
 int bx_var_by_name(BX *b, const char *name);
+enum { BX_SYS_SELECT_TYPE = 0x10303e8 };
+int bx_sysvar(BX *b, u32 id);
 void bx_cmd(BX *b, int op);
 
 void bx_gfx_init(BX *b);

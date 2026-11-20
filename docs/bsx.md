@@ -39,7 +39,7 @@ folder as a BSX game when `bsxx.dat` sits beside `bsxx.cfg` and a `Graphics*.bsa
   temporary) and a 32-bit value. `12` assigns; `0b` to `11` compare and `13` to `1a` compute into a temporary, `T0`
   being the flag; `04` jumps, `05` and `06` jump on the flag; `03`, `09` and `0a` go to, call and return from a label;
   `08` sets where a click skips to; `1b` and `1c` add and subtract one; `1d` shows a message, with a speaker and a
-  voice; `33` and `34` add and show choices; `36` marks scene replay ends; `38` marks a label. `1e` to `37` are
+  voice; `33` and `34` add and show choices (below); `36` marks scene replay ends; `38` marks a label. `1e` to `37` are
   commands that take their arguments from the argument registers set just before.
 - Commands: `1e`/`1f` put a picture (a background, an overlay, a bust-up or a clickable object) on the next screen,
   `21` puts an event picture's face, `22` removes a picture, `23` moves one or plays a `define.bsa` animation, `24`
@@ -50,6 +50,11 @@ folder as a BSX game when `bsxx.dat` sits beside `bsxx.cfg` and a `Graphics*.bsa
 - `map.dat` (`BSX MAP INFO r3`): the time variable and the map's time slots, icon names, the places with their icon
   layouts, and for each heroine and item the place and icon per progress step and slot. The map returns the pick in
   `#character`.
+- Choices: `33` takes an id, a label and a message, with the design in the first argument register and a value in
+  the second. A pick writes the value to the variable `bsxx.dat`'s system-variable table binds to 0x10303e8
+  (`#select_type`) and goes to the label when the design isn't negative. Mesu Kyoushi 4's choices all have negative
+  designs and read `#select_type`; its second field is then the value again, or -1. The system-variable table pairs
+  engine ids with script variables (0x1030000 `#day`, 0x1030001 `#time`, 0x103000a `#select_value`).
 - `bsxx.cfg` lays out every engine screen: the message window, the menu bar, choices, the title, the map, the target
   cards, Save and Load, the slot viewer, settings, backlog, the item screen and the museum.
 
@@ -144,7 +149,8 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   frame as its hit mask, and its states start at the second.
 - Scenes play now or go into one of ten playlists (`[scene playlist]`). The playlists sit at the end of `common.dat`:
   a count of 10, per list a count and 12-byte entries (page, index and route), then the selected list. A replay runs
-  the scene's label until `36 -1` and comes back to the museum's scene page, or plays the playlist's next scene.
+  the scene's label until `36 -1`, without auto saves, and comes back to the museum's scene page, or plays the
+  playlist's next scene.
 - BGM plays the cfg's tracks with the music volume. BGV (Mesu Kyoushi 3 and 4) lays out `bgv_layout` from
   `define.bsa`: per character a scrolled list of loop voices, which play as the story's `30` loops do, with their own
   volume and stop, and the overall BGV volume.
