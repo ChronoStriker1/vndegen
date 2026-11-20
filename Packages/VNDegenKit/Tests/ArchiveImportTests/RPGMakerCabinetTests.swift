@@ -35,7 +35,8 @@ private func selfExtractor(marker: String = "Software\\Enterbrain\\RPGVX2", cabi
     pe[0x46] = 1
     pe.replaceSubrange(0x68..<0x6c, with: le32(0x200))
     pe.replaceSubrange(0x6c..<0x70, with: le32(0x200))
-    pe.replaceSubrange(0x300..<(0x300 + marker.utf8.count), with: Data(marker.utf8))
+    let utf16 = Data(marker.utf16.flatMap { [UInt8($0 & 0xff), UInt8($0 >> 8)] })
+    pe.replaceSubrange(0x200..<(0x200 + utf16.count), with: utf16)
     let body = Data(repeating: 0xab, count: 5000)
     let size = cabinetSize ?? 12 + body.count
     var file = pe

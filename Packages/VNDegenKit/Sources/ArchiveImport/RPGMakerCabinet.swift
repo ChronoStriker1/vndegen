@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated enum RPGMakerCabinet {
-    private static let marker = Array("Software\\Enterbrain\\RPGVX".utf8)
+    private static let marker = "Software\\Enterbrain\\RPGVX".utf16.flatMap { [UInt8($0 & 0xff), UInt8($0 >> 8)] }
     private static let maxStub = 8 << 20
 
     static func isPacked(_ url: URL) -> Bool {
