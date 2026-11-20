@@ -60,8 +60,8 @@ Mesu Kyoushi 4 changes these from 3.0:
 - A message's voice is a count and that many voice names, so a line can be voiced by two characters. `3e` plays
   voices the same way without a message. `41` calls a named function of the exe (`InitBeginTimeParameters()`); the
   runtime logs it and goes on.
-- `30` and `31` start and stop a character's looping voice, and `2e` and `2f` start and stop looping effects by name,
-  several at once. `2a` shakes the screen: a new random offset of up to one and a half times its arguments every frame
+- `30` and `31` start and stop a character's looping voice (BGV, at `[default volume]`'s `bgv` level), and `2e` and
+  `2f` start and stop looping effects by name, several at once. `2a` shakes the screen: a new random offset of up to one and a half times its arguments every frame
   for half a second. `26` also switches the menu bar (1) and the information window (2), which hides during event
   pictures. The `op` and `staffroll` system commands play `movie/op.mpg` and `movie/staffroll.mpg` (MPEG-1 with MP2
   sound, through the shared `vnvideo`); a click skips them.
@@ -89,7 +89,8 @@ Mesu Kyoushi 3 adds these to 3.1:
 - Achievements: `実績解除 IDnn` sets the entry's flag in `common.dat`'s achievement table (a count, then each entry's
   name and a 32-bit flag, before the choice table) to 1. The status screen (DATA) lists `define.bsa`'s
   `achievement.db` with `status_layout`'s font (in points), columns, colours and scroll bar, and hides locked secret
-  entries. `達成率` sets the museum's completion rates, which count once the museum exists.
+  entries. `達成率` sets a variable to the museum's CG or strip completion rate; at the title the script unlocks ID50
+  and ID46 when they reach 100.
 - The slot viewer draws the week number inside its unit picture and the weekday, or the special-day picture before
   the first day. Slots are numbered from 0. Slots 0 to 24 are auto saves.
 - From 3.1 on, the glyph size follows the font size (14 gives 20 pixels) and the font height is the line pitch. The
@@ -116,16 +117,46 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
   and the museum's records. VNDegen finds the choice and read tables by their counts, updates them, and leaves the rest
   as the PC wrote it.
 - 3.3 adds the messages shown and the Lua table line after the message history.
+
+## Museum
+
+The title's museum button opens `[museum phase]`. Its mode buttons are on when `@museum_state` has their `modeN
+state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (sections 4 and 5), which
+`common.dat` keeps after the read table as a count and 32-bit values; the PC writes 0xffffffff.
+
+- `cg.dat` lists the CG pages: a page count, then per page a thumbnail count, per thumbnail a variant count, and per
+  variant a picture count, that many 32-bit picture ids and a tail byte (two between variants). A name table follows:
+  a count and NUL-terminated UTF-16 picture names. `scene.dat` is CSV: page, index, replay label, an empty route and
+  the pictures that make its thumbnail.
+- `common.dat` keeps, after the persistent variables, a count and a byte per `cg.dat` name (seen) and a count and a
+  byte per scene (open). A picture is seen when it is put on screen; a scene opens once all its pictures are seen.
+  VNDegen reads and writes these bytes in place, so the museum shares them with the PC. The strip rate counts the
+  wear records' bytes. The rates are the seen variants, the open scenes and the set wear bytes out of all, in percent,
+  which the PC confirms: all set unlocks Mesu Kyoushi 3's ID46 and ID50, one wear byte clear keeps ID46 locked.
+- Thumbnails are the variant's pictures composed and scaled to the slot size, blurred where a `<picture>m` mask is
+  white, and drawn at half brightness unless the pointer is on them. A page's slot frames come from the mode's `base`
+  composition, one part per thumbnail that exists.
+- The CG viewer steps through the seen variants; a click past the last one closes it, a right click hides its panel.
+  Its panel (`[cg viewer]`) has the arrows, the number, cut-in (hides a variant's picture whose name is another's plus
+  `c`), hair (uses `<picture><hair suffix>` when the game has one), BGV volume and the BGV panel.
+- Scenes play now or go into one of ten playlists (`[scene playlist]`). The playlists sit at the end of `common.dat`:
+  a count of 10, per list a count and 12-byte entries (page, index and route), then the selected list. A replay runs
+  the scene's label until `36 -1` and comes back to the museum's scene page, or plays the playlist's next scene.
+- BGM plays the cfg's tracks with the music volume. BGV (Mesu Kyoushi 3 and 4) lays out `bgv_layout` from
+  `define.bsa`: per character a scrolled list of loop voices, which play as the story's `30` loops do, with their own
+  volume and stop, and the overall BGV volume.
 - A save the original made under Wine loads in VNDegen, and a save VNDegen made loads in the original with its
   pictures.
 
 ## Known limits
 
-- The museum (BGM, CG, scene replay and bust-up viewer) isn't there yet. Its title button does nothing.
+- The museum's strip mode (立ち絵鑑賞, the `museum_buex_layout` bust-up editor) isn't there; its button is drawn
+  off. Mesu Kyoushi 4's viewer steam and ahe buttons are drawn but do nothing. The BGV per-character volumes reset
+  when the app starts.
 - Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing. Their settings screens lack
   BGM SELECT, the per-character voice details and the BGV volume.
 - Mesu Kyoushi 3's `sync` system command is logged and skipped; it comes right before a startled line and its effect
-  isn't known. Its two completion-rate achievements wait for the museum.
+  isn't known.
 - The space a translation puts after `「` is drawn; Mesu Kyoushi 4's PC drops it.
 - Settings are VNDegen's own `save/vndegen.cfg`, not the PC's settings in `common.dat`. The full-screen, effect detail
   and auto-select options are shown but do nothing.

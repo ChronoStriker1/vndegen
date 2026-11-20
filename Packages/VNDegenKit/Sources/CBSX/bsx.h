@@ -214,12 +214,13 @@ bool bx_movie_update(BX *b);
 bool bx_movie_draw(BX *b, u32 *dst);
 void bx_movie_mix(BX *b, float *out, int frames, float vol);
 
-enum { CH_BGM, CH_BGS, CH_SE, CH_SE2, CH_VOICE, CH_SYS, CH_VOICE2, CH_COUNT };
+enum { CH_BGM, CH_BGS, CH_SE, CH_SE2, CH_VOICE, CH_SYS, CH_VOICE2, CH_BGV, CH_COUNT };
 
 void bx_snd_play(BX *b, int ch, int ix, const char *name, bool loop, int fadeMs);
 void bx_snd_stop(BX *b, int ch, int fadeMs);
 void bx_snd_loop(BX *b, int ch, const char *key, int ix, const char *name);
 void bx_snd_loop_stop(BX *b, int ch, const char *key, int fadeMs);
+void bx_snd_loop_level(BX *b, int ch, const char *key, float level);
 bool bx_snd_playing(BX *b, int ch);
 void bx_snd_volumes(BX *b);
 
@@ -245,7 +246,7 @@ typedef struct Button {
     int group;
 } Button;
 
-enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG, PH_STATUS };
+enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG, PH_STATUS, PH_MUSEUM };
 
 typedef struct Phase Phase;
 typedef struct MapPhase MapPhase;
@@ -253,6 +254,47 @@ typedef struct DataPhase DataPhase;
 typedef struct LogPhase LogPhase;
 typedef struct ConfigPhase ConfigPhase;
 typedef struct StatusPhase StatusPhase;
+typedef struct Museum Museum;
+typedef struct MuseumPhase MuseumPhase;
+typedef struct BgvPanel BgvPanel;
+
+enum { LN_NUM, LN_STR, LN_OBJ, LN_ARR };
+
+typedef struct LNode {
+    int kind;
+    char *key, *str;
+    int num;
+    struct LNode *kids;
+    int count;
+} LNode;
+
+LNode *bx_layout_load(BX *b, const char *name);
+void bx_layout_free(LNode *n);
+const LNode *bx_layout_get(const LNode *n, const char *key);
+int bx_layout_int(const LNode *n, const char *key, int def);
+const char *bx_layout_str(const LNode *n, const char *key);
+int bx_layout_ints(const LNode *n, const char *key, int *out, int max);
+
+typedef struct MBtn {
+    Image *img;
+    int frames, skip, x, y;
+} MBtn;
+
+typedef struct MBar {
+    Image *img;
+    int x, y, hit[4];
+} MBar;
+
+bool bx_mbtn_cfg(BX *b, MBtn *t, const char *sec, const char *key, int dx, int dy);
+bool bx_mbtn_node(BX *b, MBtn *t, const LNode *n, int dx, int dy);
+bool bx_mbtn_on(const BX *b, const MBtn *t);
+void bx_mbtn_draw(BX *b, u32 *dst, const MBtn *t, int state);
+int bx_mbtn_state(const BX *b, const MBtn *t);
+void bx_mbtn_free(MBtn *t);
+void bx_mbar_set(MBar *r, Image *img, int x, int y, const int *hit);
+bool bx_mbar_on(const BX *b, const MBar *r);
+int bx_mbar_value(const BX *b, const MBar *r);
+void bx_mbar_draw(BX *b, u32 *dst, const MBar *r, int value);
 
 typedef struct Settings {
     int textSpeed, autoSpeed;
@@ -366,7 +408,11 @@ struct BX {
     Settings set;
     u8 *common;
     size_t commonSize;
-    size_t choiceFlags, readFlags, achieveTable;
+    size_t choiceFlags, readFlags, achieveTable, wearTable;
+    Museum *museum;
+    MuseumPhase *museumPhase;
+    bool replaying;
+    int replayPage;
     bool commonDirty;
     int phaseBack;
     int phaseResult;
@@ -392,7 +438,8 @@ struct BX {
     Mixer *mixer;
     Movie *movie;
     int audioRate;
-    int volMaster, volBgm, volSe, volVoice, volBgs;
+    int volMaster, volBgm, volSe, volVoice, volBgs, volBgv;
+    int bgvLevel[8];
     char bgmName[64];
 };
 
@@ -491,6 +538,22 @@ bool bx_log_open(BX *b);
 void bx_log_update(BX *b);
 void bx_log_draw(BX *b, u32 *dst);
 void bx_log_free(BX *b);
+
+void bx_museum_init(BX *b);
+void bx_museum_free(BX *b);
+void bx_museum_find_wear(BX *b);
+void bx_museum_seen(BX *b, const char *name);
+void bx_museum_wear(BX *b, int ch, int wear);
+int bx_museum_rate(BX *b, const char *kind);
+bool bx_museum_open(BX *b);
+void bx_museum_close(BX *b);
+void bx_museum_update(BX *b);
+void bx_museum_draw(BX *b, u32 *dst);
+void bx_museum_replay_end(BX *b);
+BgvPanel *bx_bgv_open(BX *b, bool overlay);
+void bx_bgv_free(BgvPanel *p);
+bool bx_bgv_update(BX *b, BgvPanel *p);
+void bx_bgv_draw(BX *b, BgvPanel *p, u32 *dst);
 
 bool bx_status_open(BX *b);
 void bx_status_update(BX *b);

@@ -223,11 +223,16 @@ static bool step(BX *b) {
         bx_log(b, "host call %s", bx_arg_str(b, 1));
         return true;
     case 0x36:
-    case 0x38:
-        if (op == 0x38) {
-            if ((int)rd32(p + 1) == t->skipLabel) t->skipLabel = -1;
-            t->curLabel = (int)rd32(p + 1);
+        if (rd32(p + 1) == 0xffffffffu && b->replaying) {
+            t->pc += 5;
+            bx_museum_replay_end(b);
+            return false;
         }
+        t->pc += 5;
+        return true;
+    case 0x38:
+        if ((int)rd32(p + 1) == t->skipLabel) t->skipLabel = -1;
+        t->curLabel = (int)rd32(p + 1);
         t->pc += 5;
         return true;
     default:

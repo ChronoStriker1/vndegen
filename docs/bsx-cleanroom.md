@@ -17,6 +17,7 @@ from no GPL or LGPL code. Its sources:
 | Text | stb_truetype (public domain or MIT) with the shared Windows font substitutes (`docs/fonts.md`), condensed to the cfg's character width as the original draws MS Gothic |
 | BSXScript 3.1 | Mesu Kyoushi 4's script tokenized with the 3.0 model; the new opcodes' operands from where decoding broke and what follows (`3e`'s string ids are voice names), their meaning from context (`2a` after impacts, `30` names in the loop voice folders). `bsxx.cfg`'s `[bu color adjustment]` comment, whose Shift-JIS survives in fragments that spell the blend names. The shake, text placement, VIEW defaults, the map's menu bar and the save layout from recordings, screenshots and saves of the original under Wine, compared numerically with VNDegen's |
 | BSXScript 3.3 and Lua | Mesu Kyoushi 3's script and `embed.bsa` scripts read as data. The exe's packed image unpacked as data to look for the Lua modules (below), its strings read for the Lua version (5.2.0) and the host function names, and the running original's memory searched for the module text, data only. Achievements, the slot viewer and the save layout from the original under Wine: VNDegen's `common.dat` unlocks shown by the PC, its saves loaded in the PC, screenshots compared numerically |
+| Museum | `cg.dat` and `scene.dat` read from the files against the pictures' names; `common.dat`'s seen, scene and playlist records from diffs of the PC's file before and after unlocking and editing playlists under Wine, and VNDegen's records loaded in the PC; `@museum_state` from `bsxx.dat`'s persistent variable table and its value in `common.dat`; `bgv_layout` and `bsxx.cfg`'s museum sections; the viewer, playlist and BGV screens, their button frames, the thumbnail dimming and the `m` blur masks from screenshots of the original under Wine compared numerically with VNDegen's; the completion rates from the PC's achievements with records set and cleared |
 | Movies | Engines/Shared/vnvideo (pl_mpeg, MIT) |
 | File name case | `Engines/Shared/casepath.c`, VNDegen's own |
 
@@ -59,3 +60,9 @@ Things that were unsure and how they were settled:
 - Slot numbers: the original shows `no000` as No. 0.
 - Repeated cfg keys: Mesu Kyoushi 3 sets `sort button0` twice, and the original's radio sits at the second value.
 - Lamps: the original draws Mesu Kyoushi 3's lamp diamonds under the button text.
+- The strip rate: Mesu Kyoushi 3's PC unlocked ID46 (strip rate 100) with every wear byte set and kept it locked with
+  one cleared, so the rate counts the wear records' bytes.
+- Playlist entries: a VNDegen playlist holding page 1 index 0 and page 0 index 2 showed those two scenes, in order, in
+  the PC's playlist.
+- Thumbnail brightness: the PC's thumbnails fit 0.49 times VNDegen's full thumbnail plus a constant, in Mesu Kyoushi 1
+  and 3, and come to full brightness under the pointer.

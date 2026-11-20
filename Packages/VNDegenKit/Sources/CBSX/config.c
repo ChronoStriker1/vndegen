@@ -108,7 +108,7 @@ void bx_settings_defaults(BX *b) {
     b->set.ceaseSkip = 1;
     b->set.voiceMask = 0xff;
     b->set.xCount = 1;
-    b->volMaster = b->volBgm = b->volSe = b->volBgs = b->volVoice = 100;
+    b->volMaster = b->volBgm = b->volSe = b->volBgs = b->volVoice = b->volBgv = 100;
 }
 
 static char *settings_path(BX *b) { return bx_fmt("%s/save/vndegen.cfg", b->saveDir); }
@@ -130,7 +130,7 @@ void bx_settings_load(BX *b) {
             int *v;
         } keys[] = {{"text speed", &b->set.textSpeed}, {"auto speed", &b->set.autoSpeed}, {"red", &b->set.color[0]},
                     {"green", &b->set.color[1]}, {"blue", &b->set.color[2]}, {"alpha", &b->set.color[3]},
-                    {"master", &b->volMaster}, {"bgm", &b->volBgm}, {"se", &b->volSe}, {"bgs", &b->volBgs},
+                    {"master", &b->volMaster}, {"bgm", &b->volBgm}, {"se", &b->volSe}, {"bgs", &b->volBgs}, {"bgv", &b->volBgv},
                     {"voice", &b->volVoice}, {"attenuation", &b->set.attenuation}, {"skip unread", &b->set.skipUnread},
                     {"cease skip", &b->set.ceaseSkip}, {"voice mask", &b->set.voiceMask}, {"voice mode", &b->set.voiceMode},
                     {"auto select", &b->set.autoSelect}, {"effects", &b->set.noEffects}, {"x count", &b->set.xCount}};
@@ -142,10 +142,10 @@ void bx_settings_load(BX *b) {
 
 void bx_settings_save(BX *b) {
     char *text = bx_fmt("text speed = %d\nauto speed = %d\nred = %d\ngreen = %d\nblue = %d\nalpha = %d\nmaster = %d\nbgm = %d\nse = %d\n"
-                        "bgs = %d\nvoice = %d\nattenuation = %d\nskip unread = %d\ncease skip = %d\nvoice mask = %d\nvoice mode = %d\n"
+                        "bgs = %d\nbgv = %d\nvoice = %d\nattenuation = %d\nskip unread = %d\ncease skip = %d\nvoice mask = %d\nvoice mode = %d\n"
                         "auto select = %d\neffects = %d\nx count = %d\n",
                         b->set.textSpeed, b->set.autoSpeed, b->set.color[0], b->set.color[1], b->set.color[2], b->set.color[3],
-                        b->volMaster, b->volBgm, b->volSe, b->volBgs, b->volVoice, b->set.attenuation, b->set.skipUnread,
+                        b->volMaster, b->volBgm, b->volSe, b->volBgs, b->volBgv, b->volVoice, b->set.attenuation, b->set.skipUnread,
                         b->set.ceaseSkip, b->set.voiceMask, b->set.voiceMode, b->set.autoSelect, b->set.noEffects, b->set.xCount);
     char dir[2048];
     snprintf(dir, sizeof dir, "%s/save", b->saveDir);
