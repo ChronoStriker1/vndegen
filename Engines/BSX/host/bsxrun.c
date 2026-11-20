@@ -287,6 +287,10 @@ int main(int argc, char **argv) {
         } else if (!strncmp(c, "system:", 7)) {
             bx_system(b, c + 7);
             alive = run(n, 16);
+        } else if (!strcmp(c, "museum")) {
+            bx_phase_end(b);
+            bx_museum_open(b);
+            alive = run(n, 100);
         } else if (!strcmp(c, "state")) print_state(b);
         else if (!strcmp(c, "mapstate")) print_map(b);
         else if (!strcmp(c, "skip")) b->skipMode = true;

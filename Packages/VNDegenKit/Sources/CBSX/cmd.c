@@ -93,10 +93,10 @@ void bx_cmd(BX *b, int op) {
         bx_snd_loop_stop(b, CH_BGS, s1, 0);
         break;
     case 0x30:
-        if (s1 && bx_res_find(&b->arc, RX_VOICE, s1)) bx_snd_loop(b, CH_VOICE2, voice_key(s1, key), RX_VOICE, s1);
+        if (s1 && bx_res_find(&b->arc, RX_VOICE, s1)) bx_snd_loop(b, CH_BGV, voice_key(s1, key), RX_VOICE, s1);
         break;
     case 0x31:
-        bx_snd_loop_stop(b, CH_VOICE2, s1 ? voice_key(s1, key) : NULL, 0);
+        bx_snd_loop_stop(b, CH_BGV, s1 ? voice_key(s1, key) : NULL, 0);
         break;
     case 0x32:
         bx_snd_play(b, a2 ? CH_SE2 : CH_SE, RX_SE, s1, false, 0);

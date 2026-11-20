@@ -17,7 +17,7 @@ typedef struct Voice {
     double step, pos;
     int16_t cur[2], next[2];
     bool primed, loop, done;
-    float gain, target, delta;
+    float gain, target, delta, level;
     bool stopAtZero;
     int ch;
     char key[32], name[32];
@@ -101,7 +101,7 @@ void bx_mixer_mix(Mixer *m, float *out, int frames, bool paused) {
                     break;
                 }
             }
-            float f = (float)v->pos, g = v->gain * vol / 32768.0f;
+            float f = (float)v->pos, g = v->gain * v->level * vol / 32768.0f;
             out[i * 2] += ((float)v->cur[0] + ((float)v->next[0] - (float)v->cur[0]) * f) * g;
             out[i * 2 + 1] += ((float)v->cur[1] + ((float)v->next[1] - (float)v->cur[1]) * f) * g;
             v->pos += v->step;
@@ -127,9 +127,9 @@ static float cfg_volume(BX *b, const char *key, float def) {
 }
 
 static float channel_volume(BX *b, int ch) {
-    bool voice = ch == CH_VOICE || ch == CH_VOICE2;
-    int v = ch == CH_BGM ? b->volBgm : ch == CH_BGS ? b->volBgs : voice ? b->volVoice : b->volSe;
-    float base = ch == CH_BGM ? cfg_volume(b, "bgm", 0.5f) : ch == CH_BGS ? cfg_volume(b, "bgs", 0.5f) : voice ? cfg_volume(b, "voice", 0.75f) : cfg_volume(b, "se", 0.75f);
+    bool voice = ch == CH_VOICE || ch == CH_VOICE2 || ch == CH_BGV;
+    int v = ch == CH_BGM ? b->volBgm : ch == CH_BGS ? b->volBgs : ch == CH_BGV ? b->volBgv : voice ? b->volVoice : b->volSe;
+    float base = ch == CH_BGM ? cfg_volume(b, "bgm", 0.5f) : ch == CH_BGS ? cfg_volume(b, "bgs", 0.5f) : ch == CH_BGV ? cfg_volume(b, "bgv", 0.5f) : voice ? cfg_volume(b, "voice", 0.75f) : cfg_volume(b, "se", 0.75f);
     return base * (float)v / 100.0f * (float)b->volMaster / 100.0f;
 }
 
@@ -172,6 +172,7 @@ static Voice *open_voice(BX *b, int ch, int ix, const char *name, bool loop, int
     v->step = (double)v->rate / (double)b->audioRate;
     v->gain = fadeMs > 0 ? 0 : 1;
     v->target = 1;
+    v->level = 1;
     v->delta = fadeMs > 0 ? 1.0f / ((float)fadeMs * (float)b->audioRate / 1000.0f) : 0;
     v->ch = ch;
     return v;
@@ -242,6 +243,16 @@ void bx_snd_loop_stop(BX *b, int ch, const char *key, int fadeMs) {
     for (int s = CH_COUNT * 2; s < SLOTS; s++) {
         Voice *v = b->mixer->v[s];
         if (v && v->ch == ch && (!key || !strcmp(v->key, key))) fade_out(b, v, fadeMs);
+    }
+    pthread_mutex_unlock(&b->mixer->lock);
+}
+
+void bx_snd_loop_level(BX *b, int ch, const char *key, float level) {
+    if (!b->mixer) return;
+    pthread_mutex_lock(&b->mixer->lock);
+    for (int s = CH_COUNT * 2; s < SLOTS; s++) {
+        Voice *v = b->mixer->v[s];
+        if (v && v->ch == ch && (!key || !strcmp(v->key, key))) v->level = level;
     }
     pthread_mutex_unlock(&b->mixer->lock);
 }
