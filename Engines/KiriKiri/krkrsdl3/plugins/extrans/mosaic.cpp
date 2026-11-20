@@ -500,7 +500,6 @@ void RegisterMosaicInOutTransHandlerProviders()
     MosaicOutTransHandlerProvider = new tTVPMosaicTransHandlerProvider(tmmMosaicOut);
     TVPAddTransHandlerProvider(MosaicOutTransHandlerProvider);
 }
-//---------------------------------------------------------------------------
 void UnregisterMosaicInOutTransHandlerProviders()
 {
     if (!MosaicInTransHandlerProvider)
@@ -512,4 +511,3 @@ void UnregisterMosaicInOutTransHandlerProviders()
     MosaicOutTransHandlerProvider->Release();
     MosaicOutTransHandlerProvider = nullptr;
 }
-//---------------------------------------------------------------------------
