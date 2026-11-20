@@ -593,7 +593,7 @@ void Game::setVariable(Thread &t, const Command &c) {
         case 0x00: out = rhs; break;
         case 0x01: out = cur + rhs; break;
         case 0x02: out = cur - rhs; break;
-        case 0x03: out = cur * rhs; break;
+        case 0x03: out = calc == 0x30 && b ? int32_t(int64_t(cur) * a / b) : cur * rhs; break;
         case 0x04: out = rhs ? cur / rhs : cur; break;
         case 0x05: out = rhs ? cur % rhs : cur; break;
         case 0x06: out = std::max(cur, rhs); break;

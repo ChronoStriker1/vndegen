@@ -73,7 +73,8 @@ A call by name to a common event whose name more than one common event has runs 
 President Yukino keeps an older `■常時立絵` (28) whose portrait files aren't in its archives beside the one it uses (29). A
 call to a name no common event has does nothing, also as on the PC. A move to a registered position (target -10001,
 the row in X) takes the map and position from row X of the system database's position list (type 7); President Yukino
-starts the player's control at "学校前" that way.
+starts the player's control at "学校前" that way. "×=" with a division on the right multiplies before dividing, so 255
+×= 50 ÷ 100 gives 127, which Yukino's portrait opacity setting relies on.
 
 Common events and strings can read a text file. As on the PC, the runtime takes UTF-8 with or without a byte order mark,
 and otherwise Shift-JIS: The Clumsy Witch Seris is a UTF-8 game that keeps its scene text in Shift-JIS. Reading a string
