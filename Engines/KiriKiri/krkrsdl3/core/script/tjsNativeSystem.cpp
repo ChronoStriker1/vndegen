@@ -516,7 +516,7 @@ tTJSNativeClass* TVPCreateNativeClass_System()
     TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(/*object to register*/ cls,
                                             /*func. name*/ getTickCount)
     //----------------------------------------------------------------------
-    TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/ getMonitorInfo)
+    TJS_BEGIN_NATIVE_METHOD_DECL(getMonitorInfo)
     {
         if (result)
         {
@@ -543,9 +543,7 @@ tTJSNativeClass* TVPCreateNativeClass_System()
         }
         return TJS_S_OK;
     }
-    TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(/*object to register*/ cls,
-                                            /*func. name*/ getMonitorInfo)
-    //----------------------------------------------------------------------
+    TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(cls, getMonitorInfo)
     TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/ getKeyState)
     {
         if (numparams < 1)
