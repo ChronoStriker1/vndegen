@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.56.2",
+          "buildVersion": "2924",
+          "date": "2026-11-20T00:46:25Z",
+          "localizedDescription": "Fixes found while adding 27 new test games: import, Wolf RPG, KiriKiri and YU-RIS, with four more games that now play.\n\n## Downloads\n\n- `VNDegen-0.56.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.56.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.56.2-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixes\n\n- Import: a game packed inside two wrapper folders unpacks. A GOG installer inside an archive keeps the game's own name, so its details are found. A GOG game whose files sit at the top level no longer offers to extract its web cache as if it were the game.\n- Wolf RPG: events that run automatically repeat while their page is active, as on the PC. The Succubus of the Forest and a Doctor plays past its opening, and Two Beasts starts a new game from the keyboard. A move route on a hidden event ends at once, so President Yukino goes on past its prologue.\n- KiriKiri: Tenioha! feat. Mami starts. A transition the engine lacks plays as a crossfade, without a warning box.\n- YU-RIS: Holy Maid Academy, on engine version 0.491, plays.\n\n## Known limits\n\n- Tenioha's save menu appears only when the mouse hovers over it, so it can't be opened by touch yet.\n- In Life as a Caretaker, two dialogs draw some kanji as empty boxes on the Mac. The iPad draws them.\n\n## What wasn't tested\n\n- No physical device was used. Each fix was checked in the Mac app, and the Wolf, Godot, YU-RIS and KiriKiri games also on an iPad simulator.\n- The Wolf, KiriKiri and YU-RIS changes were compared before and after on the other test games of each engine, with no differences other than the fixed games.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.56.2/VNDegen-0.56.2.ipa",
+          "size": 131288511,
+          "sha256": "402798d3e47f26df02fec67aa3df8e7b371d7016d44c646d2a73d22842a7e0a9",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.56.1",
           "buildVersion": "2907",
           "date": "2026-11-19T23:43:24Z",

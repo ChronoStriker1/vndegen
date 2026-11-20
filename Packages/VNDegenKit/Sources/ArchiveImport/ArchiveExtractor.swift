@@ -350,6 +350,13 @@ nonisolated enum ArchiveExtractor {
         return source
     }
 
+    static func nestedGame(in root: URL) -> (root: URL, nested: ArchiveSource?) {
+        if let nested = nestedArchive(in: root) { return (root, nested) }
+        let items = visibleItems(in: root)
+        guard items.count == 1, isDirectory(items[0]), let nested = nestedArchive(in: items[0]) else { return (root, nil) }
+        return (items[0], nested)
+    }
+
     private static func visibleItems(in folder: URL) -> [URL] {
         let items = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
         return items.filter { !["__MACOSX", ".DS_Store"].contains($0.lastPathComponent) }

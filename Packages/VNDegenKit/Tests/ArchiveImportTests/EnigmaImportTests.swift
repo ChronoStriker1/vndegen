@@ -155,6 +155,34 @@ func readsBothPackLayouts(legacy: Bool) throws {
     #expect(tree(games.appendingPathComponent(".importing")).isEmpty)
 }
 
+@MainActor @Test func unpacksAPackedGameTwoFoldersDownInAnArchive() async throws {
+    let folder = try scratch()
+    let outer = folder.appendingPathComponent("GAME-RJ000001")
+    let content = outer.appendingPathComponent("Pack Quest ver1.00")
+    try fm.createDirectory(at: content, withIntermediateDirectories: true)
+    _ = try put(SyntheticEnigmaPack.make(game()), as: "packquest.exe", in: content)
+    try Data("read me".utf8).write(to: content.appendingPathComponent("readme.txt"))
+    let zip = folder.appendingPathComponent("Pack Quest.zip")
+    try run("/usr/bin/ditto", ["-c", "-k", "--norsrc", "--keepParent", outer.path, zip.path])
+    let games = folder.appendingPathComponent("Games")
+    try fm.createDirectory(at: games, withIntermediateDirectories: true)
+    let importer = ArchiveImporter(gamesRoot: games)
+    await importer.choose([zip])
+    importer.startImport()
+    try await waitForImport(importer)
+    #expect(importer.step == .nested(fileName: "packquest.exe"))
+    #expect(importer.nestedSource?.isPackedGame == true)
+    importer.extractNested()
+    try await waitForImport(importer)
+    guard case let .finished(result) = importer.step else { Issue.record("\(importer.errorMessage ?? "")"); return }
+    #expect(result.folderName == "Pack Quest")
+    #expect(tree(games.appendingPathComponent("Pack Quest")) == [
+        "package.json", "readme.txt", "www", "www/data", "www/data/System.json", "www/index.html", "www/js",
+        "www/js/rpg_core.js", "www/save",
+    ])
+    #expect(tree(games.appendingPathComponent(".importing")).isEmpty)
+}
+
 @Test func listsAPackedGameReadyToImport() throws {
     let folder = try scratch()
     _ = try put(SyntheticEnigmaPack.make(game()), as: "Game_full.exe", in: folder)

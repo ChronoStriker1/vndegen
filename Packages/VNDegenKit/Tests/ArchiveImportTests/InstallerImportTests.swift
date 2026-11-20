@@ -110,6 +110,24 @@ func importsAGOGInstallerWithItsAddOn(includeAddOn: Bool) async throws {
     #expect(try Data(contentsOf: games.appendingPathComponent("Orc Game - Flags/data.xp3")) == Data(repeating: 7, count: 100_000))
 }
 
+@MainActor @Test func keepsAGamesOwnZipWithoutTheNestedPrompt() async throws {
+    let folder = try scratch()
+    let setup = try put(SyntheticGOGInstaller.make(appName: "Pack Game", entries: [
+        SyntheticGOGInstaller.info(name: "Pack Game", gameId: "300", rootGameId: "300"),
+        .file("{app}\\Pack Game.exe", Array("exe".utf8)),
+        .file("{app}\\Pack Game.pck", Array("pck".utf8)),
+        .file("{app}\\webcache.zip", Array("PK".utf8)),
+    ]), as: "setup_pack_game_1.0_(300)", in: folder)
+    let games = folder.appendingPathComponent("Games")
+    try fm.createDirectory(at: games, withIntermediateDirectories: true)
+    let importer = ArchiveImporter(gamesRoot: games)
+    await importer.choose([setup])
+    importer.startImport()
+    try await waitForImport(importer)
+    #expect(importer.step.isInstallerFinished, "\(importer.step)")
+    #expect(tree(games.appendingPathComponent("Pack Game")) == ["Pack Game.exe", "Pack Game.pck", "goggame-300.info", "webcache.zip"])
+}
+
 @MainActor @Test func refusesAnAddOnChosenAlone() async throws {
     let folder = try scratch()
     let setup = try put(addOn, as: "setup_orc_game_unrated_1.0_(42)", in: folder)
@@ -162,8 +180,30 @@ func importsAGOGInstallerWithItsAddOn(includeAddOn: Bool) async throws {
     importer.extractNested()
     try await waitForImport(importer)
     #expect(importer.step.isInstallerFinished, "\(importer.errorMessage ?? "")")
-    #expect(tree(games.appendingPathComponent("Orc Game")) == ["Orc Game.exe", "data.xp3", "goggame-100.info"])
+    #expect(tree(games.appendingPathComponent("Orc Game - Flags")) == ["Orc Game.exe", "data.xp3", "goggame-100.info"])
     #expect(tree(games.appendingPathComponent(".importing")).isEmpty)
+}
+
+@MainActor @Test func keepsAFolderNameTypedBeforeTheNestedInstaller() async throws {
+    let folder = try scratch()
+    let content = folder.appendingPathComponent("game-orc.game-(42)")
+    try fm.createDirectory(at: content, withIntermediateDirectories: true)
+    _ = try put(base(), as: "setup_orc_game_1.0_(42)", in: content)
+    let zip = folder.appendingPathComponent("game-orc.game-(42).zip")
+    try run("/usr/bin/ditto", ["-c", "-k", "--norsrc", "--keepParent", content.path, zip.path])
+    let games = folder.appendingPathComponent("Games")
+    try fm.createDirectory(at: games, withIntermediateDirectories: true)
+    let importer = ArchiveImporter(gamesRoot: games)
+    await importer.choose([zip])
+    #expect(importer.folderName == "game-orc.game-(42)")
+    importer.folderName = "My Orcs"
+    importer.startImport()
+    try await waitForImport(importer)
+    #expect(importer.step == .nested(fileName: "setup_orc_game_1.0_(42).exe"))
+    importer.extractNested()
+    try await waitForImport(importer)
+    #expect(importer.step.isInstallerFinished, "\(importer.errorMessage ?? "")")
+    #expect(tree(games.appendingPathComponent("My Orcs")) == ["Orc Game.exe", "data.xp3", "goggame-100.info"])
 }
 
 @MainActor @Test func importsAnISODiscImage() async throws {

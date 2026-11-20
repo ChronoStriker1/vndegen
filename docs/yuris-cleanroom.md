@@ -34,6 +34,13 @@ YPF-Manager, RxYuris or yu-ris-ext-ybn. This file lists where each part's knowle
   from the output. Each game's version was matched to a table by comparing the type and dimensions of its 1000 system
   entries in `ysv.ybn` with the SDK-compiled ones: 466 matches 0.466, 474 matches 0.479, 481 and 555 match 0.495
   exactly. 488 (Saimin Seishidou) matches none and still needs its own table.
+- **Engine 491.** Holy Maid Academy (0.491) uses 488's layout: the 0.495 ids with the GOSUB return values three
+  earlier and every id from 71 on seven earlier. Found the 406 way, by aligning the same ERIS routines with Sacrifice
+  Villains (0.481, the 0.495 table): 3,925 instructions that differ only in system variable ids pair 491's @S57, @S58
+  and $S59 with 0.495's @_RINT, @_RFLT and $_RSTR (60 to 62), $S115, $S116 and $S120 with 122, 123 and 127, @S140
+  with 147 and @S237 and @S238 with 244 and 245. The types and dimensions of `ysv.ybn`'s system entries agree with
+  that shift for 538 of 541 ids, the other three being unnamed. 491 is selected by its own version; 490 and 492
+  to 494 have no library game to check. `Engines/YuRIS/host/sysvar_test.c` holds the aligned pairs.
 - **Start.** The 0.495 engine refuses to start without the label `SYSTEM_START` (its error dialog under Wine), so the
   runtime starts there, else at the top of `system_start.yst`.
 - **Text output.** Probe scripts run under the 0.495 engine with a second task sampling `$_TEXT_FLAG` every frame:

@@ -44,3 +44,11 @@ endif()
 
 add_executable(yrdis yrdis.c)
 target_link_libraries(yrdis PRIVATE yuris)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(sysvar_test sysvar_test.c)
+  target_link_libraries(sysvar_test PRIVATE yuris)
+  target_compile_options(sysvar_test PRIVATE -UNDEBUG)
+  add_test(NAME sysvar COMMAND sysvar_test)
+endif()

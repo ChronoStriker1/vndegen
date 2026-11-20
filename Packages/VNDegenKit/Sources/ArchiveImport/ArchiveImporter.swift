@@ -195,6 +195,7 @@ public final class ArchiveImporter {
 
     public func extractNested() {
         guard case .nested = step, task == nil, let inner = nestedSource else { return }
+        let archiveName = source?.suggestedFolderName
         unpackRoot = inner.isPackedGame ? pendingRoot : nil
         pendingRoot = nil
         nestedSource = nil
@@ -209,6 +210,9 @@ public final class ArchiveImporter {
                 guard self.selection === selection, !Task.isCancelled else { return }
                 task = nil
                 contents = listed
+                if let installer = listed.installer, folderName == archiveName {
+                    folderName = installer.folderName
+                }
                 if listed.installer?.addOns.isEmpty == false {
                     step = .reviewing
                 } else {
@@ -302,7 +306,8 @@ public final class ArchiveImporter {
                     finish(staging)
                     return
                 }
-                let (root, nested) = await Self.inspect(staging)
+                let (root, nested): (URL, ArchiveSource?) = source.isInstaller
+                    ? (ArchiveExtractor.gameRoot(in: staging), nil) : await Self.inspect(staging)
                 try Task.checkCancellation()
                 task = nil
                 if let inner = nested {
@@ -426,8 +431,7 @@ public final class ArchiveImporter {
 
     @concurrent
     private static func inspect(_ staging: URL) async -> (root: URL, nested: ArchiveSource?) {
-        let root = ArchiveExtractor.gameRoot(in: staging)
-        return (root, ArchiveExtractor.nestedArchive(in: root))
+        ArchiveExtractor.nestedGame(in: ArchiveExtractor.gameRoot(in: staging))
     }
 
     @concurrent
