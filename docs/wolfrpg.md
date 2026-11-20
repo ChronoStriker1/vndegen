@@ -183,7 +183,10 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
   listings, and the time hasn't been measured. The largest case in the library's listing is Livestream: Escape from Hotel
   Izanami, an unrecognized game, with 25 entries in the listing and 5,178 names one level down.
 - A load restores variables, the map and the characters, but not pictures, the screen tint, or which music was
-  playing. Wolf RPG Editor 2 and 3.2x show no saved pictures after a load either; the map's own music starts.
+  playing. Wolf RPG Editor 2 and 3.2x engines that write save version 125 or 142 show no saved pictures after a load
+  either; the map's own music starts. President Yukino's engine (version 128) does restore them, so after a load in
+  VNDegen, or of a VNDegen save on the PC, its day bar and Yukino's portrait stay hidden until the menu is opened and
+  closed. The PC also shows the map scrolled a little differently after loading a VNDegen save.
 - After a save moves between VNDegen and the PC in either direction, The Clumsy Witch Seris shows its HUD, minimap and
   building labels again only once the menu has been opened and closed. Wolf RPG Editor 3.5 restores pictures from a
   save, and VNDegen neither writes pictures into saves nor restores them. Saves made and loaded within VNDegen behave
