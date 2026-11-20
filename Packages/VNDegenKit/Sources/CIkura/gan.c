@@ -21,9 +21,9 @@ struct Gan {
     int frameCount;
     const u8 *prog;
     int progLen, pc, start;
-    int cur;
+    int cur, shown;
     bool playing, stopAtEnd, paused;
-    u32 nextAt, pausedLeft;
+    u32 nextAt, pausedLeft, startedAt;
 };
 
 typedef struct Src {
@@ -137,6 +137,9 @@ static const u8 *frame_pixels(Gan *g, GanFrame *f, int depth) {
 void gan_free(IK *t) {
     Gan *g = t->gan;
     if (!g) return;
+    if (g->shown > 1 && t->now > g->startedAt)
+        ik_log(t, "animation %s: %d frames in %u ms, %.2f a second", g->name, g->shown, t->now - g->startedAt,
+               (double)g->shown * 1000.0 / (double)(t->now - g->startedAt));
     for (int i = 0; i < g->frameCount; i++) free(g->frames[i].px);
     free(g->frames);
     free(g->data);
@@ -185,6 +188,7 @@ static void run_program(IK *t, Gan *g) {
         int op = (int)rd32(g->prog + 8 * g->pc), arg = (int)rd32(g->prog + 8 * g->pc + 4);
         g->pc++;
         if (op == 1) {
+            if (arg != g->cur) g->shown++;
             g->cur = arg;
             t->dirty = true;
         } else if (op == 2) {
@@ -256,6 +260,8 @@ bool gan_exec(IK *t, u16 op, const u8 *a, int n) {
         g->stopAtEnd = false;
         g->paused = false;
         g->nextAt = t->now;
+        g->startedAt = t->now;
+        g->shown = 0;
         run_program(t, g);
         break;
     case 0x0d02:

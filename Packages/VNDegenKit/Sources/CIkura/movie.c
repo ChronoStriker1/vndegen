@@ -16,7 +16,7 @@ struct Movie {
     float *buf;
     size_t bufCap, have;
     bool started, skippable;
-    int x, y, w, h;
+    int x, y, w, h, newFrames;
     Image *frame;
 };
 
@@ -45,6 +45,9 @@ static void movie_free(Movie *m) {
 void movie_stop(IK *t) {
     Movie *m = t->movie;
     if (!m) return;
+    if (m->clock > 0)
+        ik_log(t, "movie %s: %d new frames in %.0f ms, %.2f a second, made at %.2f", m->name, m->newFrames, m->clock * 1000,
+               m->newFrames / m->clock, m->info.fps);
     snd_set_movie(t, NULL);
     t->movie = NULL;
     movie_free(m);
@@ -148,6 +151,7 @@ void movie_update(IK *t, double elapsedMs) {
     int changed = 0;
     const u8 *px = vnvideo_frame(m->video, movie_time(t, m), &changed);
     if (!px || (m->started && !changed)) return;
+    if (changed) m->newFrames++;
     m->started = true;
     int sw = m->info.width, sh = m->info.height;
     for (int y = 0; y < m->h; y++) {
