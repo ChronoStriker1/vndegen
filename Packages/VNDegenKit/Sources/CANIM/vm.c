@@ -359,6 +359,24 @@ static void exec(AN *a, const Op *op) {
         l->moveTime = t;
         break;
     }
+    case 0xbc: {
+        Layer *l = layer(a, &g[0]);
+        if (!l) break;
+        u32 t = (u32)val(a, &g[4]);
+        int cx = l->moveTime && a->now - l->moveStart < l->moveTime
+                     ? l->fromX + (int)((i64)(l->toX - l->fromX) * (i64)(a->now - l->moveStart) / (i64)l->moveTime)
+                     : l->toX;
+        int cy = l->moveTime && a->now - l->moveStart < l->moveTime
+                     ? l->fromY + (int)((i64)(l->toY - l->fromY) * (i64)(a->now - l->moveStart) / (i64)l->moveTime)
+                     : l->toY;
+        l->fromX = cx;
+        l->fromY = cy;
+        l->toX = cx + val(a, &g[1]);
+        l->toY = cy + val(a, &g[2]);
+        l->moveStart = a->now;
+        l->moveTime = t;
+        break;
+    }
     case 0x7c: {
         Layer *l = layer(a, &g[0]);
         if (l) l->scale = val(a, &g[1]);
