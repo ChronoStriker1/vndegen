@@ -28,7 +28,7 @@ typedef struct SceneEntry {
 struct Museum {
     CgPage *pages;
     int pageCount;
-    char **names;
+    char **names, **tags;
     int nameCount;
     int *hash;
     int hashSize;
@@ -45,7 +45,7 @@ struct Museum {
 enum { MM_BGM, MM_BGV, MM_CG, MM_SCENE, MM_STRIP, MM_COUNT };
 
 typedef struct Viewer {
-    bool open, panel, hairOff, cutOff, dragVol;
+    bool open, panel, hairOff, cutOff, steamOff, dragVol;
     int thumb, variant;
     u32 *pixels;
     int px, py;
@@ -166,12 +166,16 @@ static bool load_cg(BX *b, Museum *m) {
         m->nameCount = rd16(d + p);
         p += 2;
         m->names = bx_alloc(sizeof(char *) * (size_t)(m->nameCount ? m->nameCount : 1));
+        m->tags = bx_alloc(sizeof(char *) * (size_t)(m->nameCount ? m->nameCount : 1));
         for (int i = 0; i < m->nameCount; i++) {
             size_t e = p;
             while (e + 1 < n && (d[e] || d[e + 1])) e += 2;
             char *s = bx_utf16_to_utf8(d + p, (e - p) / 2);
             for (char *c = s; *c; c++)
                 if (*c >= 'A' && *c <= 'Z') *c = (char)(*c + 32);
+            char *colon = strchr(s, ':');
+            m->tags[i] = bx_strdup(colon ? colon + 1 : "");
+            if (colon) *colon = 0;
             m->names[i] = s;
             p = e + 2;
         }
@@ -323,8 +327,12 @@ void bx_museum_free(BX *b) {
         free(m->pages[pg].t);
     }
     free(m->pages);
-    for (int i = 0; i < m->nameCount; i++) free(m->names[i]);
+    for (int i = 0; i < m->nameCount; i++) {
+        free(m->names[i]);
+        free(m->tags[i]);
+    }
     free(m->names);
+    free(m->tags);
     free(m->hash);
     free(m->scenes);
     free(m);
@@ -458,10 +466,11 @@ static void close_viewer(Viewer *v) {
     bx_image_free(v->vol.img);
     MBtn *bs[] = {&v->prev, &v->next, &v->cut, &v->hair, &v->exit, &v->detail, &v->stop, &v->steam, &v->ahe};
     for (size_t i = 0; i < sizeof bs / sizeof *bs; i++) bx_mbtn_free(bs[i]);
-    bool hairOff = v->hairOff, cutOff = v->cutOff;
+    bool hairOff = v->hairOff, cutOff = v->cutOff, steamOff = v->steamOff;
     memset(v, 0, sizeof *v);
     v->hairOff = hairOff;
     v->cutOff = cutOff;
+    v->steamOff = steamOff;
 }
 
 static void close_list(Playlist *l) {
@@ -585,6 +594,7 @@ static void open_mode(BX *b, MuseumPhase *u, int mode) {
 }
 
 static bool is_cutin(const Museum *m, const int *ids, int count, int i) {
+    if (strchr(m->tags[ids[i]], 'c')) return true;
     const char *n = m->names[ids[i]];
     size_t len = strlen(n);
     if (len < 2 || n[len - 1] != 'c') return false;
@@ -593,13 +603,13 @@ static bool is_cutin(const Museum *m, const int *ids, int count, int i) {
     return false;
 }
 
-static void compose(BX *b, const int *ids, int count, u32 *dst, bool hairOff, bool cutOff) {
+static void compose(BX *b, const int *ids, int count, u32 *dst, bool hairOff, bool cutOff, bool steamOff) {
     Museum *m = b->museum;
     size_t n = (size_t)b->W * (size_t)b->H;
     for (size_t i = 0; i < n; i++) dst[i] = 0xff000000u;
     const char *suffix = bx_cfg_get(&b->cfg, "main window", "hair suffix");
     for (int i = 0; i < count; i++) {
-        if (ids[i] < 0 || ids[i] >= m->nameCount || (cutOff && is_cutin(m, ids, count, i))) continue;
+        if (ids[i] < 0 || ids[i] >= m->nameCount || (cutOff && is_cutin(m, ids, count, i)) || (steamOff && strchr(m->tags[ids[i]], 's'))) continue;
         const char *name = m->names[ids[i]];
         char alt[96];
         if (hairOff && suffix) {
@@ -659,7 +669,7 @@ static Image *make_thumb(BX *b, const int *ids, int count) {
     int tw, th;
     bx_thumb_size(b, &tw, &th);
     u32 *full = bx_alloc(sizeof(u32) * (size_t)b->W * (size_t)b->H);
-    compose(b, ids, count, full, false, false);
+    compose(b, ids, count, full, false, false, false);
     Image *t = bx_image_new(tw, th);
     for (int y = 0; y < th; y++) {
         int y0 = y * b->H / th, y1 = (y + 1) * b->H / th;
@@ -754,7 +764,7 @@ static void view_variant(BX *b, MuseumPhase *u) {
     Viewer *v = &u->view;
     const Thumb *t = &m->pages[u->page].t[v->thumb];
     if (!v->pixels) v->pixels = bx_alloc(sizeof(u32) * (size_t)b->W * (size_t)b->H);
-    compose(b, t->v[v->variant].ids, t->v[v->variant].count, v->pixels, v->hairOff, v->cutOff);
+    compose(b, t->v[v->variant].ids, t->v[v->variant].count, v->pixels, v->hairOff, v->cutOff, v->steamOff);
 }
 
 static bool step_variant(BX *b, MuseumPhase *u, int dir) {
@@ -1051,9 +1061,10 @@ static void viewer_update(BX *b, MuseumPhase *u) {
             step_variant(b, u, bx_mbtn_on(b, &v->prev) ? -1 : 1);
             return;
         }
-        if (bx_mbtn_on(b, &v->hair) || bx_mbtn_on(b, &v->cut)) {
+        if (bx_mbtn_on(b, &v->hair) || bx_mbtn_on(b, &v->cut) || bx_mbtn_on(b, &v->steam)) {
             if (bx_mbtn_on(b, &v->hair)) v->hairOff = !v->hairOff;
-            else v->cutOff = !v->cutOff;
+            else if (bx_mbtn_on(b, &v->cut)) v->cutOff = !v->cutOff;
+            else v->steamOff = !v->steamOff;
             view_variant(b, u);
             return;
         }
@@ -1207,10 +1218,11 @@ static void viewer_draw(BX *b, MuseumPhase *u, u32 *dst) {
     if (!v->panel) return;
     if (v->base) bx_blit(dst, b->W, b->H, v->base, v->px, v->py, 255);
     bx_mbar_draw(b, dst, &v->vol, b->volBgv);
-    MBtn *plain[] = {&v->prev, &v->next, &v->exit, &v->detail, &v->stop, &v->steam, &v->ahe};
+    MBtn *plain[] = {&v->prev, &v->next, &v->exit, &v->detail, &v->stop, &v->ahe};
     for (size_t i = 0; i < sizeof plain / sizeof *plain; i++) bx_mbtn_draw(b, dst, plain[i], bx_mbtn_state(b, plain[i]));
     bx_mbtn_draw(b, dst, &v->hair, (v->hairOff ? 2 : 0) + bx_mbtn_state(b, &v->hair));
     bx_mbtn_draw(b, dst, &v->cut, (v->cutOff ? 0 : 2) + bx_mbtn_state(b, &v->cut));
+    bx_mbtn_draw(b, dst, &v->steam, (v->steamOff ? 0 : 2) + bx_mbtn_state(b, &v->steam));
     if (v->digits) {
         const Thumb *t = &m->pages[u->page].t[v->thumb];
         draw_digits(b, dst, v->digits, v->digitFrames, v->variant + 1, 2, v->now[0], v->now[1], v->now[2]);

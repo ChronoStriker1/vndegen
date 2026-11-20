@@ -126,7 +126,8 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
 
 - `cg.dat` lists the CG pages: a page count, then per page a thumbnail count, per thumbnail a variant count, and per
   variant a picture count, that many 32-bit picture ids and a tail byte (two between variants). A name table follows:
-  a count and NUL-terminated UTF-16 picture names. `scene.dat` is CSV: page, index, replay label, an empty route and
+  a count and NUL-terminated UTF-16 picture names. A name may end in `:` and tags: `c` marks a cut-in, `s` a breath
+  or heat-haze layer (Mesu Kyoushi 4's `t` and `n` pictures). `scene.dat` is CSV: page, index, replay label, an empty route and
   the pictures that make its thumbnail.
 - `common.dat` keeps, after the persistent variables, a count and a byte per `cg.dat` name (seen) and a count and a
   byte per scene (open). A picture is seen when it is put on screen; a scene opens once all its pictures are seen.
@@ -137,8 +138,10 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   white, and drawn at half brightness unless the pointer is on them. A page's slot frames come from the mode's `base`
   composition, one part per thumbnail that exists.
 - The CG viewer steps through the seen variants; a click past the last one closes it, a right click hides its panel.
-  Its panel (`[cg viewer]`) has the arrows, the number, cut-in (hides a variant's picture whose name is another's plus
-  `c`), hair (uses `<picture><hair suffix>` when the game has one), BGV volume and the BGV panel.
+  Its panel (`[cg viewer]`) has the arrows, the number, cut-in (hides `c`-tagged pictures and pictures whose name is
+  another's plus `c`), hair (uses `<picture><hair suffix>` when the game has one), Mesu Kyoushi 4's steam (hides
+  `s`-tagged pictures), BGV volume and the BGV panel. A button picture whose first frame is one flat colour has that
+  frame as its hit mask, and its states start at the second.
 - Scenes play now or go into one of ten playlists (`[scene playlist]`). The playlists sit at the end of `common.dat`:
   a count of 10, per list a count and 12-byte entries (page, index and route), then the selected list. A replay runs
   the scene's label until `36 -1` and comes back to the museum's scene page, or plays the playlist's next scene.
@@ -151,7 +154,7 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
 ## Known limits
 
 - The museum's strip mode (立ち絵鑑賞, the `museum_buex_layout` bust-up editor) isn't there; its button is drawn
-  off. Mesu Kyoushi 4's viewer steam and ahe buttons are drawn but do nothing. The BGV per-character volumes reset
+  off. Mesu Kyoushi 4's viewer ahegao-off button is drawn but does nothing. The BGV per-character volumes reset
   when the app starts.
 - Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing. Their settings screens lack
   BGM SELECT, the per-character voice details and the BGV volume.
