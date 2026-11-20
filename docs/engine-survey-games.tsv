@@ -255,7 +255,7 @@ Life as a Caretaker in Another World ~Putting a Bratty, Busty Elf in Her Place~	
 LIFE IS PARADISE (Deluxe Edition)	rpg-maker-family	RPG Maker VX Ace		Life is Paradise [RJ094661] (E)/Life is Paradise!/Data/Actors.rvdata2	399	archived
 Lifeguard Holic	general-engine	Unity		Lifeguard Holic/Lifeguard Holic_Data/il2cpp_data/	1503	archived; IL2CPP; Naninovel
 Lightning Warrior Raidy	vn-engine	Ikura GDL		VNDB release engine field	824	installed; engine from VNDB release engine field
-Lightning Warrior Raidy II_ Temple of Desire	vn-engine	Ikura GDL		VNDB release engine field	684	archived; engine from VNDB release engine field; left out after the content check (2026-11-18)
+Lightning Warrior Raidy II_ Temple of Desire	vn-engine	Ikura GDL		VNDB release engine field	684	archived; engine from VNDB release engine field; passed the content re-check (2026-11-19); runs on Ikura GDL (0.57.2)
 Lightning Warrior Raidy III	vn-engine	Ikura GDL			3960	archived; no known signature; main exe Lightning Warrior Raidy III/Raidy III setup.exe; Ikura GDL by its file list (loose GRP/*.GGP, SNR/*.SNR, ZMZ), inside a Setup Factory installer VNDegen can't unpack (2026-11-18)
 Lilipalace (English Ver.)	vn-engine	NScripter		Lilipalace - RE228152(E)/RE228152 - Lilipalace/nscript.dat	195	archived
 Lilitales	vn-engine	NScripter		Lilitales/00.ns2	591	archived; .ns2 archives, Lua plugin (nslua.dll)
