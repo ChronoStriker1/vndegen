@@ -37,7 +37,7 @@ A game folder holds the exe, `archive.dat` (the scenario, its text, the resource
 
 ## What VNDegen does
 
-- Language: English, or the device's language when it is Japanese or Chinese. The PC's startup language and display
+- Language: English, or Japanese when the device uses it. The PC's startup language and display
   dialogs are skipped; the game always draws at 1920x1080.
 - Layers stack in the order they were loaded, later in front, which the original's logos show. Screen changes made with
   the `80` commands wait for the next transition command, which crossfades.
@@ -60,3 +60,7 @@ A game folder holds the exe, `archive.dat` (the scenario, its text, the resource
 - A missing `syssave.dat` is replaced by one that holds only the variables; the PC's flag bytes and settings after them
   start empty. The game ships with both files, so this only happens when they are deleted.
 - Achievements are logged, not shown.
+- The game's Chinese scenes aren't offered. The script's Chinese branch is left over from another Pencil game: it
+  shows other characters and asks for pictures and voices (`BG305_01A`, `EH_A01_01`, `NTRP_*`) that aren't in this
+  game's archives. The runtime still runs it when asked for language 3, black behind the text. Not checked in the
+  original under Wine.

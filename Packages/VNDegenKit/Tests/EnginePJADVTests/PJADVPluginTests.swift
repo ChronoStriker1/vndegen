@@ -94,11 +94,10 @@ private func game(in root: URL, title: String = "Test Cleaning! Version1.00") th
 @Suite struct PJADVLanguageTests {
     @Test func followsTheDeviceLanguageAndDefaultsToEnglish() {
         #expect(PJADVLanguage.choose(preferred: ["ja-JP", "en-US"]) == .japanese)
-        #expect(PJADVLanguage.choose(preferred: ["zh-Hans-CN"]) == .chinese)
+        #expect(PJADVLanguage.choose(preferred: ["zh-Hans-CN"]) == .english)
         #expect(PJADVLanguage.choose(preferred: ["fr-FR", "en-GB"]) == .english)
         #expect(PJADVLanguage.choose(preferred: ["de-DE"]) == .english)
         #expect(PJADVLanguage.english.rawValue == 1)
         #expect(PJADVLanguage.japanese.rawValue == 2)
-        #expect(PJADVLanguage.chinese.rawValue == 3)
     }
 }

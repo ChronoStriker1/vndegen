@@ -50,14 +50,12 @@ nonisolated public enum PJADVError: Error, LocalizedError {
 nonisolated enum PJADVLanguage: Int32 {
     case english = 1
     case japanese = 2
-    case chinese = 3
 
     static func choose(preferred: [String] = Locale.preferredLanguages) -> PJADVLanguage {
         for tag in preferred {
             switch Locale.Language(identifier: tag).languageCode?.identifier {
             case "en": return .english
             case "ja": return .japanese
-            case "zh": return .chinese
             default: continue
             }
         }
