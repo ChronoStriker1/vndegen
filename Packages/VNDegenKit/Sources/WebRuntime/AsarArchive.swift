@@ -136,8 +136,9 @@ nonisolated public struct AsarArchive: Sendable {
             }
             if value["unpacked"] as? Bool == true { return .file(offset: 0, size: size, unpacked: true) }
             // The offset is a decimal string because a JavaScript number cannot hold every UInt64.
-            guard let offset = (value["offset"] as? String).flatMap(UInt64.init) else { throw AsarArchive.corrupt }
-            guard offset <= dataLength, UInt64(size) <= dataLength - offset else {
+            let offset = (value["offset"] as? String).flatMap(UInt64.init)
+                ?? (value["offset"] as? NSNumber).flatMap { CFGetTypeID($0) == CFBooleanGetTypeID() ? nil : UInt64(exactly: $0) }
+            guard let offset, offset <= dataLength, UInt64(size) <= dataLength - offset else {
                 skipped += 1
                 return nil
             }
