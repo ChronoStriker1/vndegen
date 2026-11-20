@@ -56,6 +56,8 @@ pub struct Model {
     draws: Vec<Draw>,
     stencils: Vec<StencilSource>,
     names: Vec<CString>,
+    pixels_per_unit: f32,
+    grid: Vec<Vertex>,
 }
 
 #[repr(C)]
@@ -76,6 +78,7 @@ pub struct ApiV1 {
     variable_count: unsafe extern "C" fn(*mut Model) -> c_int,
     variable_name: unsafe extern "C" fn(*mut Model, c_int) -> *const c_char,
     stencils: unsafe extern "C" fn(*mut Model, *mut c_int) -> *const StencilSource,
+    set_detail: unsafe extern "C" fn(*mut Model, f32),
 }
 
 static API: ApiV1 = ApiV1 {
@@ -95,6 +98,7 @@ static API: ApiV1 = ApiV1 {
     variable_count,
     variable_name,
     stencils,
+    set_detail,
 };
 
 #[no_mangle]
@@ -148,6 +152,8 @@ unsafe extern "C" fn open(data: *const u8, size: usize, key: u32, error: *mut c_
                 draws: Vec::new(),
                 stencils: Vec::new(),
                 names,
+                pixels_per_unit: 0.0,
+                grid: Vec::new(),
             }))
         }
         Err(err) => {
@@ -232,17 +238,42 @@ fn transform(sprite: &EmoteStaticSprite, p: [f32; 2]) -> [f32; 2] {
     [m[0] * local[0] + m[1] * local[1] + m[4], m[2] * local[0] + m[3] * local[1] + m[5]]
 }
 
-fn push_sprite(out: &mut Vec<Vertex>, sprite: &EmoteStaticSprite) {
+const QUAD_PIXELS: f32 = 8.0;
+
+fn divisions(sprite: &EmoteStaticSprite, pixels_per_unit: f32) -> (usize, usize) {
+    let (dx, dy) = match &sprite.mesh {
+        Some(mesh) => (mesh.division_x.max(1) as usize, mesh.division_y.max(1) as usize),
+        None => return (1, 1),
+    };
+    if pixels_per_unit <= 0.0 {
+        return (dx, dy);
+    }
+    let left = sprite.center_x - sprite.width * 0.5;
+    let top = sprite.center_y - sprite.height * 0.5;
+    let at = |u: f32, v: f32| {
+        let p = sprite.mesh.as_ref().map_or([u, v], |mesh| mesh.sample(u, v));
+        transform(sprite, [left + p[0] * sprite.width, top + p[1] * sprite.height])
+    };
+    let length = |points: &[[f32; 2]]| points.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f32>();
+    let steps = [0.0, 0.25, 0.5, 0.75, 1.0];
+    let mut across: f32 = 0.0;
+    let mut down: f32 = 0.0;
+    for edge in [0.0, 0.5, 1.0] {
+        across = across.max(length(&steps.map(|t| at(t, edge))));
+        down = down.max(length(&steps.map(|t| at(edge, t))));
+    }
+    let fit = |extent: f32, most: usize| ((extent * pixels_per_unit / QUAD_PIXELS).ceil().max(1.0) as usize).min(most);
+    (fit(across, dx), fit(down, dy))
+}
+
+fn push_sprite(out: &mut Vec<Vertex>, grid: &mut Vec<Vertex>, sprite: &EmoteStaticSprite, pixels_per_unit: f32) {
     let colors = [
         corner(sprite, sprite.corner_colors[0]),
         corner(sprite, sprite.corner_colors[1]),
         corner(sprite, sprite.corner_colors[2]),
         corner(sprite, sprite.corner_colors[3]),
     ];
-    let (dx, dy) = match &sprite.mesh {
-        Some(mesh) => (mesh.division_x.max(1) as usize, mesh.division_y.max(1) as usize),
-        None => (1, 1),
-    };
+    let (dx, dy) = divisions(sprite, pixels_per_unit);
     let left = sprite.center_x - sprite.width * 0.5;
     let top = sprite.center_y - sprite.height * 0.5;
     let at = |ix: usize, iy: usize| -> Vertex {
@@ -265,9 +296,17 @@ fn push_sprite(out: &mut Vec<Vertex>, sprite: &EmoteStaticSprite) {
             a: c[3],
         }
     };
+    grid.clear();
+    for y in 0..=dy {
+        for x in 0..=dx {
+            grid.push(at(x, y));
+        }
+    }
+    let row = dx + 1;
     for y in 0..dy {
         for x in 0..dx {
-            let (tl, bl, tr, br) = (at(x, y), at(x, y + 1), at(x + 1, y), at(x + 1, y + 1));
+            let (tl, tr) = (grid[y * row + x], grid[y * row + x + 1]);
+            let (bl, br) = (grid[(y + 1) * row + x], grid[(y + 1) * row + x + 1]);
             out.extend_from_slice(&[tl, bl, tr, tr, bl, br]);
         }
     }
@@ -286,7 +325,8 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
     let Some(model) = model.as_mut() else {
         return 0;
     };
-    let Model { runtime, vertices, draws, stencils, .. } = model;
+    let Model { runtime, vertices, draws, stencils, grid, pixels_per_unit, .. } = model;
+    let pixels_per_unit = *pixels_per_unit;
     vertices.clear();
     draws.clear();
     stencils.clear();
@@ -341,7 +381,7 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
                 for key in keys {
                     if let Some(source) = by_key.get(key).copied() {
                         let first = vertices.len() as u32;
-                        push_sprite(vertices, source);
+                        push_sprite(vertices, grid, source, pixels_per_unit);
                         stencils.push(StencilSource {
                             phase: phase as u32,
                             texture: source.texture_resource_index,
@@ -357,7 +397,7 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
             }
         }
         let first = vertices.len() as u32;
-        push_sprite(vertices, sprite);
+        push_sprite(vertices, grid, sprite, pixels_per_unit);
         draws.push(Draw {
             texture: sprite.texture_resource_index,
             blend: sprite.blend_mode,
@@ -372,6 +412,12 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
         });
     }
     draws.len() as c_int
+}
+
+unsafe extern "C" fn set_detail(model: *mut Model, pixels_per_unit: f32) {
+    if let Some(model) = model.as_mut() {
+        model.pixels_per_unit = if pixels_per_unit.is_finite() { pixels_per_unit.max(0.0) } else { 0.0 };
+    }
 }
 
 unsafe extern "C" fn stencils(model: *mut Model, count: *mut c_int) -> *const StencilSource {

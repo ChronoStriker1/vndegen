@@ -75,6 +75,7 @@ static int lerp(int from, int to, u32 start, u32 time, u32 now) {
 static void draw_scene(AN *a, u32 *fb) {
     Scene *s = &a->scene;
     an_gfx_fill(fb, a->W, a->H, 0xff000000u);
+    an_emote_prepare(a);
     Image *bg = an_image_load(a, s->bg);
     if (bg) {
         int x = lerp(s->bgFromX, s->bgX, s->bgMoveStart, s->bgMoveTime, a->now);

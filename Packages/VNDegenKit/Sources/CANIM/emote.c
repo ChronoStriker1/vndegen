@@ -6,6 +6,11 @@
 
 enum { EMOTE_KEY = 0x473ab96d, MAX_MODELS = 8 };
 
+typedef struct Tex {
+    const u8 *px;
+    int w, h;
+} Tex;
+
 typedef struct EmoteSlot {
     int layer;
     char name[64];
@@ -14,6 +19,24 @@ typedef struct EmoteSlot {
     u32 lastNow;
     u32 used;
     bool failed;
+    bool built, plain;
+    float ticks, scale;
+    u64 hash;
+    int sameBuilds;
+    u32 buildSerial;
+    u32 *cache;
+    size_t cacheCap;
+    int cacheX, cacheY, cacheW, cacheH;
+    u32 cacheSerial;
+    float cacheOx, cacheOy, cacheScale;
+    float viewOx, viewOy, viewScale;
+    bool cacheValid;
+    const vnemote_draw *draws;
+    const vnemote_vertex *verts;
+    const vnemote_stencil *stencils;
+    int drawCount, stencilCount;
+    Tex *tex, *stencilTex;
+    int texCap, stencilTexCap;
 } EmoteSlot;
 
 struct EmoteCache {
@@ -36,6 +59,9 @@ static const vnemote_api_v1 *api(AN *a) {
 
 static void slot_free(const vnemote_api_v1 *e, EmoteSlot *s) {
     if (s->model && e) e->close(s->model);
+    free(s->tex);
+    free(s->stencilTex);
+    free(s->cache);
     memset(s, 0, sizeof *s);
 }
 
@@ -43,6 +69,7 @@ void an_emote_free(AN *a) {
     struct EmoteCache *c = a->emotes;
     if (!c) return;
     const vnemote_api_v1 *e = api(a);
+    an_pool_free(a);
     for (int i = 0; i < MAX_MODELS; i++) slot_free(e, &c->slot[i]);
     free(c);
     a->emotes = NULL;
@@ -152,12 +179,7 @@ static inline u32 blend_px(u32 d, float r, float g, float b, float al, u32 mode)
     return R | G << 8 | B << 16 | 0xff000000u;
 }
 
-typedef struct Tex {
-    const u8 *px;
-    int w, h;
-} Tex;
-
-static inline void sample(const Tex *t, float u, float v, float out[4]) {
+static inline bool sample(const Tex *t, float u, float v, float out[4]) {
     float fx = u * (float)t->w - 0.5f, fy = v * (float)t->h - 0.5f;
     int x0 = (int)floorf(fx), y0 = (int)floorf(fy);
     float ax = fx - (float)x0, ay = fy - (float)y0;
@@ -168,18 +190,39 @@ static inline void sample(const Tex *t, float u, float v, float out[4]) {
     y1 = clampi(y1, 0, t->h - 1);
     const u8 *p00 = t->px + ((size_t)y0 * (size_t)t->w + (size_t)x0) * 4, *p10 = t->px + ((size_t)y0 * (size_t)t->w + (size_t)x1) * 4;
     const u8 *p01 = t->px + ((size_t)y1 * (size_t)t->w + (size_t)x0) * 4, *p11 = t->px + ((size_t)y1 * (size_t)t->w + (size_t)x1) * 4;
-    for (int c = 0; c < 4; c++) {
-        float top = p00[c] + (p10[c] - p00[c]) * ax, bottom = p01[c] + (p11[c] - p01[c]) * ax;
-        out[c] = (top + (bottom - top) * ay) / 255.0f;
-    }
+    if (!(p00[3] | p10[3] | p01[3] | p11[3])) return false;
+    float w00 = (1 - ax) * (1 - ay) * (1.0f / 255.0f), w10 = ax * (1 - ay) * (1.0f / 255.0f);
+    float w01 = (1 - ax) * ay * (1.0f / 255.0f), w11 = ax * ay * (1.0f / 255.0f);
+    for (int c = 0; c < 4; c++) out[c] = p00[c] * w00 + p10[c] * w10 + p01[c] * w01 + p11[c] * w11;
+    return true;
 }
 
 typedef struct View {
     float ox, oy, scale, alpha;
     int x0, y0, x1, y1;
+    u32 *px;
+    int stride, px0, py0;
+    bool premul;
 } View;
 
+static inline u32 premul_px(u32 d, float r, float g, float b, float al, u32 mode) {
+    u32 dr = d & 0xff, dg = d >> 8 & 0xff, db = d >> 16 & 0xff, da = d >> 24;
+    if (mode == 1) {
+        dr += (u32)(r * al * 255.0f + 0.5f);
+        dg += (u32)(g * al * 255.0f + 0.5f);
+        db += (u32)(b * al * 255.0f + 0.5f);
+        return (dr > 255 ? 255 : dr) | (dg > 255 ? 255 : dg) << 8 | (db > 255 ? 255 : db) << 16 | da << 24;
+    }
+    u32 A = (u32)(al * 256.0f + 0.5f), IA = 256 - A;
+    u32 R = ((u32)(r * 255.0f + 0.5f) * A + dr * IA) >> 8;
+    u32 G = ((u32)(g * 255.0f + 0.5f) * A + dg * IA) >> 8;
+    u32 B = ((u32)(b * 255.0f + 0.5f) * A + db * IA) >> 8;
+    u32 OA = (255 * A + da * IA) >> 8;
+    return R | G << 8 | B << 16 | OA << 24;
+}
+
 enum { ST_NONE, ST_TEST, ST_INC, ST_DEC };
+enum { AT_U, AT_V, AT_R, AT_G, AT_B, AT_A, AT_MX, AT_MY, AT_COUNT };
 
 static void raster(AN *a, const View *vw, const Tex *t, const vnemote_vertex *v, const vnemote_draw *d, int st, u8 ref) {
     float sx[3], sy[3];
@@ -191,44 +234,86 @@ static void raster(AN *a, const View *vw, const Tex *t, const vnemote_vertex *v,
     if (fabsf(area) < 1e-6f) return;
     int minx = (int)floorf(fminf(sx[0], fminf(sx[1], sx[2]))), maxx = (int)ceilf(fmaxf(sx[0], fmaxf(sx[1], sx[2])));
     int miny = (int)floorf(fminf(sy[0], fminf(sy[1], sy[2]))), maxy = (int)ceilf(fmaxf(sy[0], fmaxf(sy[1], sy[2])));
+    if (maxx < vw->x0 || minx > vw->x1 || maxy < vw->y0 || miny > vw->y1) return;
     minx = clampi(minx, vw->x0, vw->x1);
     maxx = clampi(maxx, vw->x0, vw->x1);
     miny = clampi(miny, vw->y0, vw->y1);
     maxy = clampi(maxy, vw->y0, vw->y1);
+    if (minx > maxx || miny > maxy) return;
     float inv = 1.0f / area;
+    float e0x = -(sy[2] - sy[1]) * inv, e0y = (sx[2] - sx[1]) * inv;
+    float e1x = -(sy[0] - sy[2]) * inv, e1y = (sx[0] - sx[2]) * inv;
+    float px0 = (float)minx + 0.5f, py0 = (float)miny + 0.5f;
+    float w0r = ((sx[2] - sx[1]) * (py0 - sy[1]) - (sy[2] - sy[1]) * (px0 - sx[1])) * inv;
+    float w1r = ((sx[0] - sx[2]) * (py0 - sy[2]) - (sy[0] - sy[2]) * (px0 - sx[2])) * inv;
+    float at[3][AT_COUNT];
+    for (int i = 0; i < 3; i++) {
+        at[i][AT_U] = v[i].u;
+        at[i][AT_V] = v[i].v;
+        at[i][AT_R] = v[i].r;
+        at[i][AT_G] = v[i].g;
+        at[i][AT_B] = v[i].b;
+        at[i][AT_A] = v[i].a * vw->alpha;
+        at[i][AT_MX] = v[i].x;
+        at[i][AT_MY] = v[i].y;
+    }
+    float base[AT_COUNT], dx[AT_COUNT], dy[AT_COUNT];
+    for (int k = 0; k < AT_COUNT; k++) {
+        float d0 = at[0][k] - at[2][k], d1 = at[1][k] - at[2][k];
+        base[k] = at[2][k] + d0 * w0r + d1 * w1r;
+        dx[k] = d0 * e0x + d1 * e1x;
+        dy[k] = d0 * e0y + d1 * e1y;
+    }
+    bool clip = d && (d->clip[0] > -1e29f || d->clip[1] > -1e29f || d->clip[2] < 1e29f || d->clip[3] < 1e29f);
+    bool mask = st == ST_INC || st == ST_DEC;
     u32 blend = d ? d->blend : 0;
     bool mod2x = (blend & 0xf0) == 0x10;
     u32 mode = blend & 0x0f;
     if (mode > 5) mode = 0;
+    const float eps = -1e-4f;
     for (int y = miny; y <= maxy; y++) {
-        float py = (float)y + 0.5f;
-        u32 *row = a->fb + (size_t)y * (size_t)a->W;
+        u32 *row = vw->px + (size_t)(y - vw->py0) * (size_t)vw->stride;
         u8 *srow = a->stencil + (size_t)y * (size_t)a->W;
-        for (int x = minx; x <= maxx; x++) {
+        float w0 = w0r, w1 = w1r, p[AT_COUNT];
+        for (int k = 0; k < AT_COUNT; k++) p[k] = base[k];
+        bool inside = false;
+        for (int x = minx; x <= maxx; x++, w0 += e0x, w1 += e1x) {
+            if (x > minx)
+                for (int k = 0; k < AT_COUNT; k++) p[k] += dx[k];
+            if (w0 < eps || w1 < eps || 1.0f - w0 - w1 < eps) {
+                if (inside) break;
+                continue;
+            }
+            inside = true;
             if (st != ST_NONE && srow[x] != ref) continue;
-            float px = (float)x + 0.5f;
-            float w0 = ((sx[2] - sx[1]) * (py - sy[1]) - (sy[2] - sy[1]) * (px - sx[1])) * inv;
-            float w1 = ((sx[0] - sx[2]) * (py - sy[2]) - (sy[0] - sy[2]) * (px - sx[2])) * inv;
-            float w2 = 1.0f - w0 - w1;
-            if (w0 < -1e-4f || w1 < -1e-4f || w2 < -1e-4f) continue;
-            float mx = v[0].x * w0 + v[1].x * w1 + v[2].x * w2, my = v[0].y * w0 + v[1].y * w1 + v[2].y * w2;
-            if (d && (mx < d->clip[0] || my < d->clip[1] || mx > d->clip[2] || my > d->clip[3])) continue;
-            float u = v[0].u * w0 + v[1].u * w1 + v[2].u * w2, vv = v[0].v * w0 + v[1].v * w1 + v[2].v * w2;
+            if (clip && (p[AT_MX] < d->clip[0] || p[AT_MY] < d->clip[1] || p[AT_MX] > d->clip[2] || p[AT_MY] > d->clip[3])) continue;
             float c[4];
-            sample(t, u, vv, c);
-            float r = c[0] * (v[0].r * w0 + v[1].r * w1 + v[2].r * w2);
-            float g = c[1] * (v[0].g * w0 + v[1].g * w1 + v[2].g * w2);
-            float b = c[2] * (v[0].b * w0 + v[1].b * w1 + v[2].b * w2);
-            float al = c[3] * (v[0].a * w0 + v[1].a * w1 + v[2].a * w2) * vw->alpha;
+            if (!sample(t, p[AT_U], p[AT_V], c)) continue;
+            float al = c[3] * p[AT_A];
             if (al <= 0.003f) continue;
-            if (st == ST_INC || st == ST_DEC) {
+            if (mask) {
                 srow[x] = (u8)(st == ST_INC ? ref + 1 : ref - 1);
                 continue;
             }
+            float r = c[0] * p[AT_R], g = c[1] * p[AT_G], b = c[2] * p[AT_B];
             if (mod2x) {
                 r = fminf(r * 2, 1);
                 g = fminf(g * 2, 1);
                 b = fminf(b * 2, 1);
+            }
+            u32 *out = &row[x - vw->px0];
+            if (vw->premul) {
+                *out = premul_px(*out, r, g, b, al, mode);
+                continue;
+            }
+            if (mode == 0) {
+                u32 dd = *out;
+                u32 A = (u32)(al * 256.0f + 0.5f), IA = 256 - A;
+                u32 R = ((u32)(r * 255.0f + 0.5f) * A + (dd & 0xff) * IA) >> 8;
+                u32 G = ((u32)(g * 255.0f + 0.5f) * A + (dd >> 8 & 0xff) * IA) >> 8;
+                u32 B = ((u32)(b * 255.0f + 0.5f) * A + (dd >> 16 & 0xff) * IA) >> 8;
+                *out = R | G << 8 | B << 16 | 0xff000000u;
+                continue;
             }
             if (mode == 3 || mode == 4) {
                 r *= al;
@@ -239,81 +324,237 @@ static void raster(AN *a, const View *vw, const Tex *t, const vnemote_vertex *v,
                 g = 1 - g;
                 b = 1 - b;
             }
-            row[x] = blend_px(row[x], r, g, b, al, mode);
+            *out = blend_px(*out, r, g, b, al, mode);
         }
+        w0r += e0y;
+        w1r += e1y;
+        for (int k = 0; k < AT_COUNT; k++) base[k] += dy[k];
     }
 }
 
-void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha) {
-    const vnemote_api_v1 *e = api(a);
-    EmoteSlot *s = e ? slot_for(a, layer, l) : NULL;
-    if (!s) return;
-    if (s->varSerial != l->varSerial) {
-        s->varSerial = l->varSerial;
-        push_vars(e, s->model, l, l->motionTime);
-    }
-    float ticks = (float)(a->now - s->lastNow) * 60.0f / 1000.0f;
-    s->lastNow = a->now;
-    if (ticks > 6) ticks = 6;
-    e->progress(s->model, ticks);
+static void build_job(void *ctx, int i) {
+    EmoteSlot *s = ((EmoteSlot **)ctx)[i];
+    const vnemote_api_v1 *e = api(NULL);
+    e->set_detail(s->model, s->scale);
+    e->progress(s->model, s->ticks);
     e->build(s->model);
-    int nd = 0, nv = 0;
-    const vnemote_draw *draws = e->draws(s->model, &nd);
-    const vnemote_vertex *verts = e->vertices(s->model, &nv);
-    float charScale = an_define_char_scale(&a->def, l->name);
-    float scale = (l->scale > 0 ? (float)l->scale / 1000.0f : 1.0f) * a->emoteScale * charScale;
-    int baseX = a->slotX[layer] ? a->slotX[layer] : a->W / 2;
-    View vw = {(float)(baseX + x), (float)(a->H / 2 + a->slotY[layer] + y) + 256.0f * a->emoteScale * charScale, scale,
-               (float)alpha / 255.0f, 0, 0, 0, 0};
-    int ns = 0;
-    const vnemote_stencil *stencils = e->stencils(s->model, &ns);
-    if (!a->stencil) a->stencil = an_alloc((size_t)a->W * (size_t)a->H);
-    for (int i = 0; i < nd; i++) {
-        const vnemote_draw *d = &draws[i];
+    int nv = 0;
+    s->draws = e->draws(s->model, &s->drawCount);
+    s->verts = e->vertices(s->model, &nv);
+    s->stencils = e->stencils(s->model, &s->stencilCount);
+    if (s->drawCount > s->texCap) {
+        s->texCap = s->drawCount;
+        s->tex = realloc(s->tex, sizeof(Tex) * (size_t)s->texCap);
+    }
+    if (s->stencilCount > s->stencilTexCap) {
+        s->stencilTexCap = s->stencilCount;
+        s->stencilTex = realloc(s->stencilTex, sizeof(Tex) * (size_t)s->stencilTexCap);
+    }
+    for (int k = 0; k < s->drawCount; k++) {
+        Tex *t = &s->tex[k];
+        t->px = e->texture(s->model, s->draws[k].texture, &t->w, &t->h);
+        if (t->w <= 0 || t->h <= 0) t->px = NULL;
+    }
+    for (int k = 0; k < s->stencilCount; k++) {
+        Tex *t = &s->stencilTex[k];
+        t->px = s->stencils[k].phase == VNEMOTE_STENCIL_NEXT ? NULL : e->texture(s->model, s->stencils[k].texture, &t->w, &t->h);
+        if (t->w <= 0 || t->h <= 0) t->px = NULL;
+    }
+    s->plain = true;
+    for (int k = 0; k < s->drawCount; k++)
+        if ((s->draws[k].blend & 0x0f) > 1) s->plain = false;
+    u64 h = 1469598103934665603ull;
+    const u32 *w = (const u32 *)s->verts;
+    for (size_t q = 0; q < (size_t)nv * sizeof(vnemote_vertex) / 4; q++) h = (h ^ w[q]) * 1099511628211ull;
+    for (int k = 0; k < s->drawCount; k++) h = (h ^ s->draws[k].texture ^ (u64)s->draws[k].first << 20 ^ (u64)s->draws[k].count << 40) * 1099511628211ull;
+    s->sameBuilds = h == s->hash ? s->sameBuilds + 1 : 0;
+    if (h != s->hash) s->buildSerial++;
+    s->hash = h;
+    s->built = true;
+}
+
+void an_emote_prepare(AN *a) {
+    const vnemote_api_v1 *e = api(a);
+    if (!e) return;
+    EmoteSlot *jobs[MAX_MODELS];
+    int n = 0;
+    for (int i = 0; i < AN_LAYERS && n < MAX_MODELS; i++) {
+        Layer *l = &a->scene.layer[i];
+        if (l->kind != LK_EMOTE) continue;
+        EmoteSlot *s = slot_for(a, i, l);
+        if (!s) continue;
+        if (s->varSerial != l->varSerial) {
+            s->varSerial = l->varSerial;
+            push_vars(e, s->model, l, l->motionTime);
+        }
+        float ticks = (float)(a->now - s->lastNow) * 60.0f / 1000.0f;
+        s->lastNow = a->now;
+        s->ticks = ticks > 6 ? 6 : ticks;
+        s->scale = (l->scale > 0 ? (float)l->scale / 1000.0f : 1.0f) * a->emoteScale * an_define_char_scale(&a->def, l->name);
+        jobs[n++] = s;
+    }
+    an_parallel(a, n, build_job, jobs);
+}
+
+typedef struct RasterJob {
+    AN *a;
+    EmoteSlot *s;
+    View view;
+    int left, right, top, bottom;
+    int bands;
+} RasterJob;
+
+static void raster_band(void *ctx, int band) {
+    const RasterJob *j = ctx;
+    AN *a = j->a;
+    const EmoteSlot *s = j->s;
+    int rows = j->bottom - j->top + 1;
+    int top = j->top + rows * band / j->bands, bottom = j->top + rows * (band + 1) / j->bands - 1;
+    if (bottom < top) return;
+    View vw = j->view;
+    for (int i = 0; i < s->drawCount; i++) {
+        const vnemote_draw *d = &s->draws[i];
         if (d->pass != VNEMOTE_PASS_NORMAL && d->pass != VNEMOTE_PASS_FILTERED) continue;
-        Tex t;
-        t.px = e->texture(s->model, d->texture, &t.w, &t.h);
-        if (!t.px || t.w <= 0 || t.h <= 0) continue;
-        vw.x0 = 0;
-        vw.y0 = 0;
-        vw.x1 = a->W - 1;
-        vw.y1 = a->H - 1;
+        const Tex *t = &s->tex[i];
+        if (!t->px) continue;
+        vw.x0 = j->left;
+        vw.y0 = top;
+        vw.x1 = j->right;
+        vw.y1 = bottom;
         if (!d->stencil_count) {
-            for (u32 k = 0; k + 2 < d->count; k += 3) raster(a, &vw, &t, verts + d->first + k, d, ST_NONE, 0);
+            for (u32 k = 0; k + 2 < d->count; k += 3) raster(a, &vw, t, s->verts + d->first + k, d, ST_NONE, 0);
             continue;
         }
         float bx0 = 1e30f, by0 = 1e30f, bx1 = -1e30f, by1 = -1e30f;
         for (u32 k = 0; k < d->count; k++) {
-            const vnemote_vertex *p = verts + d->first + k;
+            const vnemote_vertex *p = s->verts + d->first + k;
             float px = vw.ox + p->x * vw.scale, py = vw.oy + p->y * vw.scale;
             bx0 = fminf(bx0, px);
             by0 = fminf(by0, py);
             bx1 = fmaxf(bx1, px);
             by1 = fmaxf(by1, py);
         }
-        vw.x0 = clampi((int)floorf(bx0), 0, a->W - 1);
-        vw.y0 = clampi((int)floorf(by0), 0, a->H - 1);
-        vw.x1 = clampi((int)ceilf(bx1), 0, a->W - 1);
-        vw.y1 = clampi((int)ceilf(by1), 0, a->H - 1);
-        if (vw.x1 < vw.x0 || vw.y1 < vw.y0) continue;
+        vw.x0 = clampi((int)floorf(bx0), j->left, j->right);
+        vw.y0 = clampi((int)floorf(by0), top, bottom);
+        vw.x1 = clampi((int)ceilf(bx1), j->left, j->right);
+        vw.y1 = clampi((int)ceilf(by1), top, bottom);
+        if (ceilf(by1) < (float)top || floorf(by0) > (float)bottom || ceilf(bx1) < (float)j->left || floorf(bx0) > (float)j->right) continue;
         for (int y = vw.y0; y <= vw.y1; y++) memset(a->stencil + (size_t)y * (size_t)a->W + (size_t)vw.x0, (int)d->stencil_initial, (size_t)(vw.x1 - vw.x0 + 1));
         u8 ref = (u8)d->stencil_initial;
         float keepAlpha = vw.alpha;
         vw.alpha = 1.0f;
-        for (u32 k = d->stencil_first; k < d->stencil_first + d->stencil_count && (int)k < ns; k++) {
-            const vnemote_stencil *m = &stencils[k];
+        for (u32 k = d->stencil_first; k < d->stencil_first + d->stencil_count && (int)k < s->stencilCount; k++) {
+            const vnemote_stencil *m = &s->stencils[k];
             if (m->phase == VNEMOTE_STENCIL_NEXT) {
                 ref++;
                 continue;
             }
-            Tex mt;
-            mt.px = e->texture(s->model, m->texture, &mt.w, &mt.h);
-            if (!mt.px || mt.w <= 0 || mt.h <= 0) continue;
+            const Tex *mt = &s->stencilTex[k];
+            if (!mt->px) continue;
             int op = m->phase == VNEMOTE_STENCIL_INNER ? ST_INC : ST_DEC;
             u8 r = m->phase == VNEMOTE_STENCIL_INNER ? ref : (u8)d->stencil_final;
-            for (u32 q = 0; q + 2 < m->count; q += 3) raster(a, &vw, &mt, verts + m->first + q, NULL, op, r);
+            for (u32 q = 0; q + 2 < m->count; q += 3) raster(a, &vw, mt, s->verts + m->first + q, NULL, op, r);
         }
         vw.alpha = keepAlpha;
-        for (u32 k = 0; k + 2 < d->count; k += 3) raster(a, &vw, &t, verts + d->first + k, d, ST_TEST, (u8)d->stencil_final);
+        for (u32 k = 0; k + 2 < d->count; k += 3) raster(a, &vw, t, s->verts + d->first + k, d, ST_TEST, (u8)d->stencil_final);
     }
+}
+
+static void composite_band(void *ctx, int band) {
+    const RasterJob *j = ctx;
+    AN *a = j->a;
+    const EmoteSlot *s = j->s;
+    int top = s->cacheH * band / j->bands, bottom = s->cacheH * (band + 1) / j->bands;
+    for (int y = top; y < bottom; y++) {
+        const u32 *src = s->cache + (size_t)y * (size_t)s->cacheW;
+        u32 *dst = a->fb + (size_t)(s->cacheY + y) * (size_t)a->W + (size_t)s->cacheX;
+        for (int x = 0; x < s->cacheW; x++) {
+            u32 c = src[x], sa = c >> 24;
+            if (!sa && !(c & 0xffffffu)) continue;
+            if (sa == 255) {
+                dst[x] = c;
+                continue;
+            }
+            u32 d = dst[x], ia = 255 - sa;
+            u32 r = (c & 0xff) + ((d & 0xff) * ia + 127) / 255, g = (c >> 8 & 0xff) + ((d >> 8 & 0xff) * ia + 127) / 255;
+            u32 b = (c >> 16 & 0xff) + ((d >> 16 & 0xff) * ia + 127) / 255;
+            dst[x] = (r > 255 ? 255 : r) | (g > 255 ? 255 : g) << 8 | (b > 255 ? 255 : b) << 16 | 0xff000000u;
+        }
+    }
+}
+
+static bool cache_bounds(AN *a, const EmoteSlot *s, const View *vw, int *x0, int *y0, int *x1, int *y1) {
+    float bx0 = 1e30f, by0 = 1e30f, bx1 = -1e30f, by1 = -1e30f;
+    for (int i = 0; i < s->drawCount; i++) {
+        const vnemote_draw *d = &s->draws[i];
+        if (d->pass != VNEMOTE_PASS_NORMAL && d->pass != VNEMOTE_PASS_FILTERED) continue;
+        for (u32 k = 0; k < d->count; k++) {
+            const vnemote_vertex *p = s->verts + d->first + k;
+            bx0 = fminf(bx0, p->x);
+            by0 = fminf(by0, p->y);
+            bx1 = fmaxf(bx1, p->x);
+            by1 = fmaxf(by1, p->y);
+        }
+    }
+    *x0 = clampi((int)floorf(vw->ox + bx0 * vw->scale) - 1, 0, a->W - 1);
+    *y0 = clampi((int)floorf(vw->oy + by0 * vw->scale) - 1, 0, a->H - 1);
+    *x1 = clampi((int)ceilf(vw->ox + bx1 * vw->scale) + 1, 0, a->W - 1);
+    *y1 = clampi((int)ceilf(vw->oy + by1 * vw->scale) + 1, 0, a->H - 1);
+    return bx0 <= bx1 && *x0 <= *x1 && *y0 <= *y1;
+}
+
+void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha) {
+    struct EmoteCache *c = a->emotes;
+    if (!c) return;
+    EmoteSlot *s = NULL;
+    for (int i = 0; i < MAX_MODELS && !s; i++)
+        if (c->slot[i].built && c->slot[i].layer == layer && !strcmp(c->slot[i].name, l->name)) s = &c->slot[i];
+    if (!s) return;
+    float charScale = an_define_char_scale(&a->def, l->name);
+    int baseX = a->slotX[layer] ? a->slotX[layer] : a->W / 2;
+    RasterJob j = {a, s, {(float)(baseX + x), (float)(a->H / 2 + a->slotY[layer] + y) + 256.0f * a->emoteScale * charScale, s->scale,
+                          (float)alpha / 255.0f, 0, 0, 0, 0, a->fb, a->W, 0, 0, false}, 0, a->W - 1, 0, a->H - 1, 0};
+    if (!a->stencil) a->stencil = an_alloc((size_t)a->W * (size_t)a->H);
+    j.bands = an_pool_size(a) * 2;
+    View *v = &j.view;
+    bool moving = s->viewOx != v->ox || s->viewOy != v->oy || s->viewScale != v->scale;
+    s->viewOx = v->ox;
+    s->viewOy = v->oy;
+    s->viewScale = v->scale;
+    if (!s->sameBuilds || !s->plain || alpha < 255 || moving) {
+        s->cacheValid = false;
+        an_parallel(a, j.bands, raster_band, &j);
+        return;
+    }
+    if (!s->cacheValid || s->cacheSerial != s->buildSerial || s->cacheOx != v->ox || s->cacheOy != v->oy || s->cacheScale != v->scale) {
+        int x0, y0, x1, y1;
+        if (!cache_bounds(a, s, v, &x0, &y0, &x1, &y1)) return;
+        s->cacheX = x0;
+        s->cacheY = y0;
+        s->cacheW = x1 - x0 + 1;
+        s->cacheH = y1 - y0 + 1;
+        size_t need = (size_t)s->cacheW * (size_t)s->cacheH;
+        if (need > s->cacheCap) {
+            free(s->cache);
+            s->cache = an_alloc(need * sizeof(u32));
+            s->cacheCap = need;
+        }
+        memset(s->cache, 0, need * sizeof(u32));
+        v->px = s->cache;
+        v->stride = s->cacheW;
+        v->px0 = x0;
+        v->py0 = y0;
+        v->premul = true;
+        j.left = x0;
+        j.right = x1;
+        j.top = y0;
+        j.bottom = y1;
+        an_parallel(a, j.bands, raster_band, &j);
+        s->cacheValid = true;
+        s->cacheSerial = s->buildSerial;
+        s->cacheOx = v->ox;
+        s->cacheOy = v->oy;
+        s->cacheScale = v->scale;
+    }
+    an_parallel(a, j.bands, composite_band, &j);
 }

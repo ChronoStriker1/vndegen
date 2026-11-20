@@ -51,6 +51,7 @@ typedef struct vnemote_api_v1 {
     int (*variable_count)(vnemote *model);
     const char *(*variable_name)(vnemote *model, int index);
     const vnemote_stencil *(*stencils)(vnemote *model, int *count);
+    void (*set_detail)(vnemote *model, float pixelsPerUnit);
 } vnemote_api_v1;
 
 const vnemote_api_v1 *vnemote_get_api_v1(void);

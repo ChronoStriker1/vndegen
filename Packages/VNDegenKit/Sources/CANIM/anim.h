@@ -269,6 +269,7 @@ struct AN {
     int sceneKind;
     u32 *shot;
     struct EmoteCache *emotes;
+    struct Pool *pool;
     float emoteScale;
     u8 *stencil;
     int slotX[AN_LAYERS], slotY[AN_LAYERS];
@@ -288,6 +289,10 @@ void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha);
 void an_layer_set_var(Layer *l, const char *name, float value);
 void an_layer_apply_preset(AN *a, Layer *l, const char *preset, u32 ms);
 void an_emote_free(AN *a);
+void an_emote_prepare(AN *a);
+void an_parallel(AN *a, int jobs, void (*fn)(void *, int), void *ctx);
+int an_pool_size(AN *a);
+void an_pool_free(AN *a);
 void an_window_render(AN *a);
 void an_gfx_fill(u32 *dst, int w, int h, u32 color);
 void an_gfx_blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int alpha);
