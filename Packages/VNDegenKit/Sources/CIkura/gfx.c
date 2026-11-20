@@ -201,7 +201,8 @@ void gfx_compose(IK *t) {
     for (int i = 0; i < t->layerCount; i++) {
         Layer *l = &t->layers[i];
         if (!layer_drawn(t, i)) continue;
-        if (l->rot != 0 && !l->surf && l->img >= 0) rotated(t, l);
+        if (gan_drawn(t, i)) gan_draw(t, i);
+        else if (l->rot != 0 && !l->surf && l->img >= 0) rotated(t, l);
         else if (l->surf) {
             Image screen = {.w = t->W, .h = t->H, .px = t->screen};
             image_blit(&screen, l->surf, 0, 0, l->w, l->h, l->x, l->y, l->argb, 0, false);

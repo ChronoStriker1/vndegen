@@ -61,7 +61,7 @@ static int prefer[256];
 static int preferCount, preferUsed;
 
 static void print_state(IK *t) {
-    printf("script=%s pc=%x wait=%d sp=%d text=", t->sc ? t->sc->name : "-", t->pc, t->wait, t->sp);
+    printf("script=%s pc=%x wait=%d sp=%d hover=%d text=", t->sc ? t->sc->name : "-", t->pc, t->wait, t->sp, t->hover);
     for (int i = 0; i < t->msg.revealed; i++) putchar(t->msg.chars[i].cp < 0x80 ? (int)t->msg.chars[i].cp : '?');
     putchar('\n');
 }

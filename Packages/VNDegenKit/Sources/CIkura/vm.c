@@ -215,7 +215,7 @@ static void draw_cell(IK *t, const u8 *a, bool toImage, bool copy) {
     t->dirty = true;
 }
 
-static void cell_button(IK *t, u32 id, int type, int lay, int x, int y, bool place, int img, const u8 *cells, int mode) {
+static void cell_button(IK *t, u32 id, int type, int lay, int x, int y, bool place, int img, const u8 *cells) {
     Button *b = button(t, id);
     if (!b) return;
     memset(b, 0, sizeof *b);
@@ -224,7 +224,8 @@ static void cell_button(IK *t, u32 id, int type, int lay, int x, int y, bool pla
     b->var = -1;
     b->layer = lay;
     for (int k = 0; k < 4; k++) {
-        const Cell *ce = cell_at(t, img, (int)ik_value(t, rd32(cells + 4 * k)));
+        int c = (int)ik_value(t, rd32(cells + 4 * k));
+        const Cell *ce = c >= 0 ? cell_at(t, img, c) : NULL;
         b->state[k] = ce ? (ButtonState){img, ce->sx, ce->sy} : (ButtonState){-1, 0, 0};
         if (ce && !b->w) {
             b->w = ce->w;
@@ -237,8 +238,8 @@ static void cell_button(IK *t, u32 id, int type, int lay, int x, int y, bool pla
     }
     b->x = x;
     b->y = y;
-    b->mode = (u8)clampi(mode, 0, 2);
-    b->enabled = b->mode != 0;
+    b->mode = 1;
+    b->enabled = true;
     b->shown = true;
 }
 
@@ -624,6 +625,22 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         b->enabled = b->mode != 0;
         break;
     }
+    case 0x0c00:
+        if (n >= 12) {
+            int w = (int)ik_value(t, rd32(a)), h = (int)ik_value(t, rd32(a + 4)), c = (int)ik_value(t, rd32(a + 8));
+            if (w > 0 && h > 0 && c > 0 && (size_t)w * h * c < 1 << 24) {
+                free(t->automap.bits);
+                t->automap = (Automap){w, h, c, ((size_t)w * h * c + 7) / 8, NULL};
+                t->automap.bits = ik_alloc(t->automap.size);
+            }
+        }
+        break;
+    case 0x0c03:
+    case 0x0c04:
+    case 0x0c05:
+    case 0x0c06:
+        automap_exec(t, op, a, n);
+        break;
     case 0x0e00:
         if (n >= 40 && movie_play(t, name_arg(a + 4, 12), (int)ik_value(t, rd32(a + 16)), (int)ik_value(t, rd32(a + 20)),
                                   (int)ik_value(t, rd32(a + 24)), (int)ik_value(t, rd32(a + 28)), ik_value(t, rd32(a + 36)) != 0))
@@ -733,18 +750,17 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0706: t->wait = W_INPUT; break;
     case 0x0716:
         if (n >= 36)
-            cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), 0, 0, false, (int)ik_value(t, rd32(a + 8)), a + 12,
-                        (int)ik_value(t, rd32(a + 32)));
+            cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), 0, 0, false, (int)ik_value(t, rd32(a + 8)), a + 12);
         break;
     case 0x0717:
         if (n >= 44)
             cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)), true,
-                        (int)ik_value(t, rd32(a + 16)), a + 20, (int)ik_value(t, rd32(a + 40)));
+                        (int)ik_value(t, rd32(a + 16)), a + 20);
         break;
     case 0x071f:
         if (n >= 40)
             cell_button(t, rd32(a), (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), 0, 0, false, (int)ik_value(t, rd32(a + 12)),
-                        a + 16, (int)ik_value(t, rd32(a + 36)));
+                        a + 16);
         break;
     case 0x0719: {
         int m = clampi((int)ik_value(t, rd32(a + 8)), 0, 2);
@@ -763,8 +779,8 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         Button *b = button(t, rd32(a));
         u32 st = ik_value(t, rd32(a + 4));
         if (!b || st > 3 || n < 16) break;
-        int img = (int)ik_value(t, rd32(a + 8));
-        const Cell *ce = cell_at(t, img, (int)ik_value(t, rd32(a + 12)));
+        int img = (int)ik_value(t, rd32(a + 8)), c = (int)ik_value(t, rd32(a + 12));
+        const Cell *ce = c >= 0 ? cell_at(t, img, c) : NULL;
         b->state[st] = ce ? (ButtonState){img, ce->sx, ce->sy} : (ButtonState){-1, 0, 0};
         if (n >= 20) b->stateFlag[st] = (u8)ik_value(t, rd32(a + 16));
         t->dirty = true;
@@ -823,6 +839,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         if ((op >> 8) == 0x08 && dun_exec(t, op, a, n)) break;
         if ((op >> 8) == 0x0a && save_exec(t, op, a, n)) break;
         if ((op >> 8) == 0x0b && text_exec(t, op, a, n)) break;
+        if ((op >> 8) == 0x0d && gan_exec(t, op, a, n)) break;
         if (t->trace) ik_log(t, "%s:%x op %04x not handled", t->sc->name, t->pc, op);
         break;
     }

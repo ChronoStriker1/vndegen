@@ -16,6 +16,9 @@
 #define NAME_LEN 12
 #define SETTINGS 64
 #define SETTINGS_USED 42
+#define WIDE_RECORDS 23
+#define WIDE_MIDDLE (4 * (6 + 9 * WIDE_RECORDS + 5))
+#define GAN_STATE 32
 
 static const i32 defaultSettings[SETTINGS_USED] = {1000, 1, 0, 500, 500, 0, 128, 0, 128, 0, 128, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                                                    1,    1, 1, 1,   1,   1, 1, 1,   1, 1,   1, 1,   1, 1, 1, 1, 0, 0, 0, 0, 0};
@@ -158,15 +161,24 @@ static void flag_put(IK *t, int i, bool on) {
     else t->flags[i >> 3] &= (u8)~(1 << (i & 7));
 }
 
+static bool global_span(const u8 *d, size_t n, u32 *at, u32 *len) {
+    u32 a = rd32(d + 8), e = rd32(d + 12);
+    if (a < TABLE || e <= a || e > n) return false;
+    *at = a;
+    *len = e - a;
+    return true;
+}
+
 static void save_global(IK *t, int f0, int fc, int v0, int vc) {
     size_t n;
     u8 *d = read_save(t, &n);
-    if (16 + (fc + 7) / 8 + vc * 4 > GLOBAL_END - GLOBAL_AT) {
+    u32 at, len;
+    if (!global_span(d, n, &at, &len) || 16 + (fc + 7) / 8 + vc * 4 > (int)len) {
         free(d);
         return;
     }
-    u8 *g = d + GLOBAL_AT;
-    memset(g, 0, GLOBAL_END - GLOBAL_AT);
+    u8 *g = d + at;
+    memset(g, 0, len);
     wr32(g, (u32)f0);
     wr32(g + 4, (u32)fc);
     wr32(g + 8, (u32)v0);
@@ -183,9 +195,14 @@ static void save_global(IK *t, int f0, int fc, int v0, int vc) {
 static void load_global(IK *t) {
     size_t n;
     u8 *d = read_save(t, &n);
-    const u8 *g = d + GLOBAL_AT;
+    u32 at, len;
+    if (!global_span(d, n, &at, &len)) {
+        free(d);
+        return;
+    }
+    const u8 *g = d + at;
     int f0 = (int)rd32(g), fc = (int)rd32(g + 4), v0 = (int)rd32(g + 8), vc = (int)rd32(g + 12);
-    if (fc >= 0 && vc >= 0 && 16 + (fc + 7) / 8 + vc * 4 <= GLOBAL_END - GLOBAL_AT) {
+    if (fc >= 0 && vc >= 0 && 16 + (fc + 7) / 8 + vc * 4 <= (int)len) {
         const u8 *bits = g + 16;
         for (int i = 0; i < fc; i++) flag_put(t, f0 + i, bits[i >> 3] >> (i & 7) & 1);
         const u8 *vars = bits + (fc + 7) / 8;
@@ -297,7 +314,7 @@ static void get_layer(IK *t, Rd *r, Layer *l) {
     (void)t;
 }
 
-static void put_button(Buf *b, const Button *bt) {
+static void put_button(Buf *b, const Button *bt, bool wide) {
     put32(b, (u32)bt->type);
     put32(b, (u32)bt->layer);
     put32(b, (u32)bt->x);
@@ -308,8 +325,18 @@ static void put_button(Buf *b, const Button *bt) {
     putname(b, bt->bound && bt->sc ? bt->sc->name : NULL);
     put32(b, bt->bound ? (u32)bt->label : 0xffffffffu);
     put32(b, bt->call ? 1 : 0);
-    put32(b, 0xffffffffu);
-    for (int k = 0; k < 7; k++) put32(b, bt->raw[k]);
+    if (wide) {
+        put32(b, 0xffffu);
+        put32(b, 0xffff0001u);
+        put32(b, 0xffffffffu);
+        for (int k = 0; k < 3; k++) put32(b, 0);
+        for (int r = 0; r < WIDE_RECORDS; r++)
+            for (int k = 0; k < 9; k++) put32(b, k == 5 ? 0xffffffffu : 0);
+        for (int k = 0; k < 5; k++) put32(b, 0);
+    } else {
+        put32(b, 0xffffffffu);
+        for (int k = 0; k < 7; k++) put32(b, bt->raw[k]);
+    }
     for (int k = 0; k < 4; k++) put32(b, (u32)bt->state[k].img);
     for (int k = 0; k < 4; k++) {
         put32(b, (u32)bt->state[k].sx);
@@ -319,7 +346,7 @@ static void put_button(Buf *b, const Button *bt) {
     if (bt->type == 3 || bt->type == 4) put32(b, (u32)bt->var);
 }
 
-static void get_button(IK *t, Rd *r, Button *bt, u32 type) {
+static void get_button(IK *t, Rd *r, Button *bt, u32 type, bool wide) {
     memset(bt, 0, sizeof *bt);
     bt->made = true;
     bt->shown = true;
@@ -335,8 +362,13 @@ static void get_button(IK *t, Rd *r, Button *bt, u32 type) {
     getname(r, name);
     u32 label = get32(r);
     bt->call = get32(r) != 0;
-    get32(r);
-    for (int k = 0; k < 7; k++) bt->raw[k] = get32(r);
+    if (wide) {
+        if (r->at + WIDE_MIDDLE > r->n) r->bad = true;
+        else r->at += WIDE_MIDDLE;
+    } else {
+        get32(r);
+        for (int k = 0; k < 7; k++) bt->raw[k] = get32(r);
+    }
     for (int k = 0; k < 4; k++) bt->state[k].img = (int)get32(r);
     for (int k = 0; k < 4; k++) {
         bt->state[k].sx = (int)get32(r);
@@ -386,6 +418,14 @@ static void snapshot(IK *t) {
     if (t->flagCount) put(&b, t->flags, (size_t)t->flagCount);
     put32(&b, (u32)t->varCount);
     for (int i = 0; i < t->varCount; i++) put32(&b, (u32)t->vars[i]);
+    bool wide = t->automap.bits != NULL;
+    if (wide) {
+        put32(&b, (u32)t->automap.w);
+        put32(&b, (u32)t->automap.h);
+        put32(&b, (u32)t->automap.n);
+        put32(&b, (u32)t->automap.size);
+        put(&b, t->automap.bits, t->automap.size);
+    }
     put32(&b, (u32)t->imageCount);
     for (int i = 0; i < t->imageCount; i++) putname(&b, t->images[i] ? t->imageNames[i] : NULL);
     put32(&b, (u32)t->layerCount);
@@ -400,8 +440,13 @@ static void snapshot(IK *t) {
     put32(&b, (t->wheelCall ? 1u : 0u) | (t->wheelBound ? 0x10000u : 0));
     put32(&b, (u32)t->wheelVar);
     for (int i = 0; i < t->buttonCount; i++) {
-        if (t->buttons[i].made) put_button(&b, &t->buttons[i]);
+        if (t->buttons[i].made) put_button(&b, &t->buttons[i], wide);
         else put32(&b, 0xffffffffu);
+    }
+    if (wide) {
+        u8 g[GAN_STATE];
+        gan_save(t, g);
+        put(&b, g, GAN_STATE);
     }
     wr32(b.p, (u32)b.n);
     free(t->save.snap);
@@ -457,6 +502,18 @@ static bool load_slot(IK *t, int slot) {
         u32 v = get32(&r);
         if (i < (u32)t->varCount) t->vars[i] = (i32)v;
     }
+    bool wide = t->automap.bits != NULL;
+    if (wide) {
+        get32(&r);
+        get32(&r);
+        get32(&r);
+        u32 size = get32(&r);
+        if (r.at + size > r.n) r.bad = true;
+        else {
+            memcpy(t->automap.bits, r.p + r.at, size < t->automap.size ? size : t->automap.size);
+            r.at += size;
+        }
+    }
     u32 ic = get32(&r);
     for (u32 i = 0; i < ic; i++) {
         char img[16];
@@ -500,12 +557,15 @@ static bool load_slot(IK *t, int slot) {
             continue;
         }
         Button tmp;
-        get_button(t, &r, &tmp, type);
+        get_button(t, &r, &tmp, type, wide);
         if (i < IK_BUTTONS) t->buttons[i] = tmp;
     }
+    u8 ganState[GAN_STATE] = {0};
+    if (wide && r.at + GAN_STATE <= r.n) memcpy(ganState, r.p + r.at, GAN_STATE);
     free(d);
     if (r.bad) ik_log(t, "save slot %d is shorter than its state", slot);
     t->msgMode = (int)(mode & 0xffff);
+    if (wide) gan_restore(t, ganState);
     if (bgm[0]) snd_bgm(t, bgm, loop);
     else snd_bgm_fade(t, 0);
     snd_voice_stop(t);

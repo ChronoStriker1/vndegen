@@ -58,6 +58,7 @@ void vnikura_close(VNIkura *n) {
     IK *t = (IK *)n;
     if (!t) return;
     movie_stop(t);
+    gan_free(t);
     snd_close(t);
     dun_close(t);
     gfx_close(t);
@@ -69,6 +70,7 @@ void vnikura_close(VNIkura *n) {
     free(t->texts);
     free(t->imageNames);
     free(t->flags);
+    free(t->automap.bits);
     for (int i = 0; i < t->scriptCount; i++) script_free(t->scripts[i]);
     free(t->scripts);
     free(t->vars);
@@ -85,6 +87,7 @@ static void tick(IK *t) {
     dun_update(t);
     msg_tick(t);
     movie_update(t, TICK_MS);
+    gan_update(t);
     switch (t->wait) {
     case W_TIME:
         if ((i32)(t->now - t->waitUntil) >= 0) t->wait = W_NONE;

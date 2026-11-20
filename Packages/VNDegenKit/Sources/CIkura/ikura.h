@@ -190,6 +190,7 @@ enum { CH_BGM, CH_VOICE, CH_SE, IK_CHANNELS = CH_SE + IK_SLOTS };
 
 typedef struct Mixer Mixer;
 typedef struct Movie Movie;
+typedef struct Gan Gan;
 
 typedef struct SaveFile {
     char *path;
@@ -220,6 +221,12 @@ typedef struct Dungeon {
     bool stale;
     float viewYaw, viewX, viewZ;
 } Dungeon;
+
+typedef struct Automap {
+    int w, h, n;
+    size_t size;
+    u8 *bits;
+} Automap;
 
 typedef struct SeSlot {
     char name[16];
@@ -286,6 +293,8 @@ struct IK {
     u32 rng;
     Dungeon dun;
     Movie *movie;
+    Gan *gan;
+    Automap automap;
 
     int mx, my;
     bool lDown, rDown, click, rclick;
@@ -346,11 +355,19 @@ bool dun_exec(IK *t, u16 op, const u8 *a, int n);
 void dun_render(IK *t);
 void dun_update(IK *t);
 void dun_close(IK *t);
+void automap_exec(IK *t, u16 op, const u8 *a, int n);
 bool movie_play(IK *t, const char *name, int x, int y, int w, int h, bool skippable);
 void movie_stop(IK *t);
 void movie_update(IK *t, double elapsedMs);
 void movie_draw(IK *t);
 void movie_mix(Movie *m, float *out, int frames, float vol, int rate);
 void snd_set_movie(IK *t, Movie *m);
+bool gan_exec(IK *t, u16 op, const u8 *a, int n);
+void gan_update(IK *t);
+void gan_draw(IK *t, int layer);
+bool gan_drawn(const IK *t, int layer);
+void gan_free(IK *t);
+void gan_save(IK *t, u8 out[32]);
+void gan_restore(IK *t, const u8 in[32]);
 
 #endif

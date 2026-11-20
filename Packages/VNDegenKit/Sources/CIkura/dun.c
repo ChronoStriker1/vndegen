@@ -147,7 +147,7 @@ void dun_render(IK *t) {
         Column *c = &d->cols[i];
         c->wz = kind ? tt : 1e9f;
         c->lat2 = 1 + a * a;
-        c->u = u;
+        c->u = t->automap.bits ? 1 - u : u;
         c->kind = kind;
         c->dx = dx;
         c->dz = dz;
@@ -247,6 +247,115 @@ static void act(IK *t, int actVar, int xVar, int yVar) {
     t->vars[actVar] = d->dir;
 }
 
+static bool automap_bit(IK *t, int plane, int x, int y, bool *ok) {
+    Automap *m = &t->automap;
+    *ok = m->bits && plane >= 0 && plane < m->n && x >= 0 && y >= 0 && x < m->w && y < m->h;
+    if (!*ok) return true;
+    size_t i = ((size_t)plane * (size_t)m->h + (size_t)y) * (size_t)m->w + (size_t)x;
+    return m->bits[i >> 3] >> (7 - (i & 7)) & 1;
+}
+
+static void automap_mark(IK *t, int plane, int x, int y, bool unexplored) {
+    bool ok;
+    automap_bit(t, plane, x, y, &ok);
+    if (!ok) return;
+    Automap *m = &t->automap;
+    size_t i = ((size_t)plane * (size_t)m->h + (size_t)y) * (size_t)m->w + (size_t)x;
+    if (unexplored) m->bits[i >> 3] |= (u8)(0x80 >> (i & 7));
+    else m->bits[i >> 3] &= (u8)~(0x80 >> (i & 7));
+}
+
+typedef struct MapDraw {
+    Layer *layer;
+    Image *dst;
+    Image *src;
+    int x, y, cw, ch, plane, ox, oy, cols, rows;
+    int sx[2], sy[2];
+} MapDraw;
+
+static bool map_draw_args(IK *t, u16 op, const u8 *a, int n, MapDraw *d) {
+    int k = op == 0x0c05 ? 2 : 0;
+    if (n < 52 + 8 * (k / 2)) return false;
+    Layer *l = NULL;
+    u32 li = ik_value(t, rd32(a));
+    if (li < (u32)t->layerCount) l = &t->layers[li];
+    int img = val(t, a + 12);
+    if (!l || img < 0 || img >= t->imageCount || !t->images[img]) return false;
+    d->layer = l;
+    d->dst = layer_surface(t, l);
+    d->src = t->images[img];
+    d->x = val(t, a + 4);
+    d->y = val(t, a + 8);
+    if (op == 0x0c05) {
+        for (int i = 0; i < 2; i++) {
+            d->sx[i] = val(t, a + 16 + 8 * i);
+            d->sy[i] = val(t, a + 20 + 8 * i);
+        }
+    } else {
+        for (int i = 0; i < 2; i++) {
+            int c = val(t, a + 16 + 4 * i);
+            if (c < 0 || c >= d->src->cellCount) return false;
+            d->sx[i] = d->src->cells[c].sx;
+            d->sy[i] = d->src->cells[c].sy;
+        }
+    }
+    const u8 *q = a + 24 + 4 * k;
+    d->cw = val(t, q);
+    d->ch = val(t, q + 4);
+    d->plane = val(t, q + 8);
+    d->ox = val(t, q + 12);
+    d->oy = val(t, q + 16);
+    d->cols = val(t, q + 20);
+    d->rows = val(t, q + 24);
+    return d->cw > 0 && d->ch > 0;
+}
+
+static void map_cell(IK *t, MapDraw *d, int cx, int cy, int which) {
+    static const int white[4] = {255, 255, 255, 255};
+    int x = d->x + cx * d->cw, y = d->y + cy * d->ch;
+    layer_restore(t, d->layer, x, y, d->cw, d->ch);
+    image_blit(d->dst, d->src, d->sx[which] + cx * d->cw, d->sy[which] + cy * d->ch, d->cw, d->ch, x, y, white, 0, false);
+}
+
+void automap_exec(IK *t, u16 op, const u8 *a, int n) {
+    Automap *m = &t->automap;
+    if (!m->bits) return;
+    switch (op) {
+    case 0x0c03: {
+        int plane = n >= 20 ? val(t, a + 16) : -1;
+        if (plane < 0) memset(m->bits, 0xff, m->size);
+        else
+            for (int y = 0; y < m->h; y++)
+                for (int x = 0; x < m->w; x++) automap_mark(t, plane, x, y, true);
+        break;
+    }
+    case 0x0c04:
+        if (n >= 20)
+            for (int y = 0, x0 = val(t, a), y0 = val(t, a + 4), w = val(t, a + 8), h = val(t, a + 12), p = val(t, a + 16); y < h; y++)
+                for (int x = 0; x < w; x++) automap_mark(t, p, x0 + x, y0 + y, false);
+        break;
+    default: {
+        MapDraw d;
+        if (!map_draw_args(t, op, a, n, &d)) break;
+        for (int cy = 0; cy < d.rows; cy++)
+            for (int cx = 0; cx < d.cols; cx++) {
+                bool ok;
+                map_cell(t, &d, cx, cy, automap_bit(t, d.plane, d.ox + cx, d.oy + cy, &ok) ? 1 : 0);
+            }
+        break;
+    }
+    }
+    t->dirty = true;
+}
+
+static void automap_here(IK *t, const u8 *a, int n) {
+    MapDraw d;
+    if (!map_draw_args(t, 0x0809, a, n, &d)) return;
+    int cx = t->dun.x - d.ox, cy = t->dun.y - d.oy;
+    automap_mark(t, d.plane, t->dun.x, t->dun.y, false);
+    if (cx >= 0 && cy >= 0 && cx < d.cols && cy < d.rows) map_cell(t, &d, cx, cy, 0);
+}
+
 bool dun_exec(IK *t, u16 op, const u8 *a, int n) {
     Dungeon *d = &t->dun;
     char name[16];
@@ -305,6 +414,9 @@ bool dun_exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0806:
         d->compass = val(t, a);
         place_markers(t);
+        break;
+    case 0x0809:
+        automap_here(t, a, n);
         break;
     case 0x0807:
         if (n < 28) break;

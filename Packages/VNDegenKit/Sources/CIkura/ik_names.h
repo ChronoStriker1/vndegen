@@ -64,3 +64,11 @@
 #define movie_stop ik_movie_stop
 #define movie_update ik_movie_update
 #define snd_set_movie ik_snd_set_movie
+#define gan_draw ik_gan_draw
+#define gan_drawn ik_gan_drawn
+#define gan_exec ik_gan_exec
+#define gan_free ik_gan_free
+#define gan_restore ik_gan_restore
+#define gan_save ik_gan_save
+#define gan_update ik_gan_update
+#define automap_exec ik_automap_exec
