@@ -35,7 +35,13 @@ Wine, from saves both load (`docs/anim.md`):
   - Sprites carry their own mesh patch (`local_mesh`) and their ancestors' mesh chain (`mesh_chain`), and
     `EmoteMeshPatch::warp_local` and `MeshChainEntry::warp_world_point` are public, so a renderer can deform each
     sprite in its owner's coordinates. `EmoteStaticScene::clear_frame_history` drops the held frame state.
-  - The test of a one-shot motion's end time follows the change above.
+  - A mesh combinator's mesh is its whole list: the first variable's mesh, which is stored absolute, plus each later
+    variable's mesh, stored as a displacement. That mesh deforms the layer and, through the mesh chain, its
+    children. Before, the later variables reached only children's own meshes and not the chain, so turns
+    (`head_LR`, `body_LR`) and nods (`head_UD`, `body_UD`) barely moved a character. eluna also read the first mesh
+    as a displacement when the layer's `parameterize` named another variable, which pushed such layers out of shape
+    (an arm, a neckline) once that variable moved. The data has the first mesh absolute in every case.
+  - The test of a one-shot motion's end time follows the change above, and a test covers the mesh combinator.
 - `src/sdk.rs`: `EmoteRuntime::reset_frame_history`, for a character whose variables are set at once, as when a save
   loads, so held keys don't keep the pictures of the default pose.
 

@@ -4633,81 +4633,28 @@ fn combine_patch(base: Option<EmoteMeshPatch>, patch: EmoteMeshPatch) -> Option<
     })
 }
 
-#[derive(Debug, Clone)]
-struct MeshCombinatorEval {
-    self_patch: Option<EmoteMeshPatch>,
-    child_patch: Option<EmoteMeshPatch>,
-}
-
-fn evaluate_mesh_combinator_split(
+fn evaluate_mesh_combinator(
     layer: &PsbValue,
-    parameter_table: Option<&[PsbValue]>,
     psb: &PsbFile,
     psb_data: Option<&[u8]>,
     variables: &BTreeMap<String, f32>,
     division_x: u32,
     division_y: u32,
-) -> Option<MeshCombinatorEval> {
+) -> Option<EmoteMeshPatch> {
     let data = psb_data?;
     let combinators = layer
         .field("meshCombinator")?
         .field("combinatorList")?
         .as_list()?;
-    if combinators.is_empty() {
-        return None;
-    }
     let layer_domain = layer_mesh_domain(layer);
-
-    let first_key = combinators
-        .first()
-        .and_then(|c| c.field("variable"))
-        .and_then(|v| v.field_str("key"));
-    let parent_key = layer
-        .field("parameterize")
-        .and_then(|p| resolve_parameterize(p, parameter_table))
-        .and_then(|p| {
-            p.field_str("id")
-                .or_else(|| p.field_str("key"))
-                .or_else(|| p.field_str("name"))
-        });
-    let restore_first_to_parent = match (parent_key, first_key) {
-        (None, _) => true,
-        (Some("param"), _) => true,
-        (Some(parent), Some(first)) => parent == first,
-        (Some(_), None) => false,
-    };
-
-    let mut self_patch = None;
-    let mut child_patch = None;
-
-    let mut start_index = 0usize;
-    if restore_first_to_parent {
-        if let Some(first) = combinators.first() {
-            if let Some(patch) =
-                evaluate_one_combinator(first, psb, data, variables, division_x, division_y, false)
-            {
-                self_patch = Some(patch_with_domain(patch, layer_domain));
-                start_index = 1;
-            }
-        }
-    }
-
-    for combinator in combinators.iter().skip(start_index) {
-        if let Some(patch) = evaluate_one_combinator(
-            combinator, psb, data, variables, division_x, division_y, true,
+    combinators.iter().enumerate().fold(None, |patch, (index, combinator)| {
+        match evaluate_one_combinator(
+            combinator, psb, data, variables, division_x, division_y, index > 0,
         ) {
-            child_patch = combine_patch(child_patch, patch_with_domain(patch, layer_domain));
+            Some(next) => combine_patch(patch, patch_with_domain(next, layer_domain)),
+            None => patch,
         }
-    }
-
-    if self_patch.is_none() && child_patch.is_none() {
-        None
-    } else {
-        Some(MeshCombinatorEval {
-            self_patch,
-            child_patch,
-        })
-    }
+    })
 }
 
 fn layer_mesh_domain(layer: &PsbValue) -> Option<[f32; 4]> {
@@ -4787,9 +4734,8 @@ fn travel_layer_at(
             .entry(ctx.path.clone())
             .or_insert_with(|| ctx.stencil_composite_mask_layer_list.clone());
     }
-    let mesh_combinator = evaluate_mesh_combinator_split(
+    let mesh_combinator = evaluate_mesh_combinator(
         &layer,
-        parameter_table,
         psb,
         psb_data,
         variables,
@@ -4815,24 +4761,14 @@ fn travel_layer_at(
     if is_composite_mask_owner {
         child_ctx.parent_mask_path = Some(ctx.path.clone());
     }
-    if let Some(mesh_combinator) = mesh_combinator {
-        if let Some(patch) = mesh_combinator.self_patch {
-            local_mesh_patch = combine_patch(local_mesh_patch, patch);
-            draw_ctx.mesh_patch = combine_patch(draw_ctx.mesh_patch.take(), patch);
-            draw_ctx.local_mesh_patch = local_mesh_patch;
-            if sync_child_shape {
-                child_ctx.mesh_patch = combine_patch(child_ctx.mesh_patch.take(), patch);
-                if let Some(id) = &layer_mesh_parameter {
-                    Arc::make_mut(&mut child_ctx.mesh_parameters).insert(id.clone());
-                }
-            }
-        }
+    if let Some(patch) = mesh_combinator {
+        local_mesh_patch = combine_patch(local_mesh_patch, patch);
+        draw_ctx.mesh_patch = combine_patch(draw_ctx.mesh_patch.take(), patch);
+        draw_ctx.local_mesh_patch = local_mesh_patch;
         if sync_child_shape {
-            if let Some(patch) = mesh_combinator.child_patch {
-                child_ctx.mesh_patch = combine_patch(child_ctx.mesh_patch.take(), patch);
-                if let Some(id) = &layer_mesh_parameter {
-                    Arc::make_mut(&mut child_ctx.mesh_parameters).insert(id.clone());
-                }
+            child_ctx.mesh_patch = combine_patch(child_ctx.mesh_patch.take(), patch);
+            if let Some(id) = &layer_mesh_parameter {
+                Arc::make_mut(&mut child_ctx.mesh_parameters).insert(id.clone());
             }
         }
     }
@@ -7201,6 +7137,86 @@ fn decode_raw_mesh_list(raw: &[u8], mesh_count: usize, is_delta: bool) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn combinator_list_adds_later_deltas_to_an_absolute_first_mesh() {
+        use crate::psb::{PsbHeader, PsbResourceRange};
+        let identity: Vec<f32> = (0..16)
+            .flat_map(|i| [(i % 4) as f32 / 3.0, (i / 4) as f32 / 3.0])
+            .collect();
+        let mut first = identity.repeat(3);
+        for i in 0..16 {
+            first[64 + i * 2] += 0.25;
+        }
+        let mut second = vec![0.0f32; 96];
+        for i in 0..16 {
+            second[64 + i * 2 + 1] += 0.5;
+        }
+        let mut data = Vec::new();
+        let mut ranges = Vec::new();
+        for list in [&first, &second] {
+            ranges.push(PsbResourceRange { offset: data.len() as u64, length: (list.len() * 4) as u64 });
+            for value in list.iter() {
+                data.extend_from_slice(&value.to_le_bytes());
+            }
+        }
+        let header = PsbHeader {
+            signature: 0,
+            version: 4,
+            flags: 0,
+            header_offset: 0,
+            name_offset: 0,
+            string_offset: 0,
+            string_data_offset: 0,
+            resource_offset: 0,
+            resource_length_offset: 0,
+            resource_data_offset: 0,
+            root_offset: 0,
+            extra: None,
+            extra_resource_offset: None,
+            extra_resource_length_offset: None,
+            extra_resource_data_offset: None,
+        };
+        let psb = PsbFile {
+            header,
+            version: 4,
+            encrypted: false,
+            checksum: None,
+            names: Vec::new(),
+            strings: Vec::new(),
+            resources: Vec::new(),
+            extra_resources: ranges,
+            root: PsbValue::Null,
+        };
+        let combinator = |key: &str, index: u32| {
+            PsbValue::Object(vec![
+                ("neutralIndex".into(), PsbValue::Int(1)),
+                ("rawMeshList".into(), PsbValue::ExtraResource(index)),
+                (
+                    "variable".into(),
+                    PsbValue::Object(vec![
+                        ("key".into(), PsbValue::String(key.into())),
+                        ("meshCount".into(), PsbValue::Int(3)),
+                        ("rangeBegin".into(), PsbValue::Int(-30)),
+                        ("rangeEnd".into(), PsbValue::Int(30)),
+                    ]),
+                ),
+            ])
+        };
+        let layer = PsbValue::Object(vec![
+            (
+                "meshCombinator".into(),
+                PsbValue::Object(vec![(
+                    "combinatorList".into(),
+                    PsbValue::List(vec![combinator("body_slant", 0), combinator("body_UD", 1)]),
+                )]),
+            ),
+        ]);
+        let variables = BTreeMap::from([("body_slant".to_owned(), 30.0), ("body_UD".to_owned(), 30.0)]);
+        let patch = evaluate_mesh_combinator(&layer, &psb, Some(&data), &variables, 4, 4).unwrap();
+        assert_eq!(patch.control_points[0], [0.25, 0.5]);
+        assert_eq!(patch.control_points[15], [1.25, 1.5]);
+    }
 
     #[test]
     fn mesh_icon_dimensions_and_off_center_origin_define_local_domain() {
