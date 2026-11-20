@@ -1,0 +1,246 @@
+#ifndef ANIM_H
+#define ANIM_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "vnanim.h"
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef int16_t i16;
+typedef int32_t i32;
+typedef int64_t i64;
+
+typedef struct AN AN;
+
+void *an_alloc(size_t n);
+void *an_realloc(void *p, size_t n);
+char *an_strdup(const char *s);
+char *an_fmt(const char *fmt, ...);
+u8 *an_read_file(const char *path, size_t *size);
+bool an_write_file(const char *path, const void *data, size_t size);
+bool an_file_exists(const char *path);
+bool an_mkdirs(const char *dir);
+int an_path_resolve(const char *path, char *out, size_t size);
+void an_log(AN *a, const char *fmt, ...);
+char *an_sjis_to_utf8(const char *s);
+int an_utf8_decode(const char *s, u32 *cp);
+bool an_ieq(const char *a, const char *b);
+u32 an_hash(const char *s);
+static inline u16 rd16(const u8 *p) { return (u16)(p[0] | p[1] << 8); }
+static inline u32 rd32(const u8 *p) { return (u32)p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24; }
+static inline void wr32(u8 *p, u32 v) { p[0] = (u8)v; p[1] = (u8)(v >> 8); p[2] = (u8)(v >> 16); p[3] = (u8)(v >> 24); }
+static inline int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+void an_gax_crypt(u8 key[16], u8 *data, size_t size, bool encrypt);
+u8 *an_gax_open(const u8 *file, size_t size, size_t *outSize);
+
+typedef struct Image {
+    int w, h;
+    int x0, y0, cw, ch;
+    u32 *px;
+} Image;
+
+Image *an_image_new(int w, int h);
+void an_image_free(Image *im);
+Image *an_image_png(const u8 *data, size_t size);
+Image *an_image_load(AN *a, const char *name);
+void an_image_cache_clear(AN *a);
+static inline u32 an_image_at(const Image *im, int x, int y) {
+    x -= im->x0;
+    y -= im->y0;
+    if (x < 0 || y < 0 || x >= im->cw || y >= im->ch) return 0;
+    return im->px[(size_t)y * (size_t)im->cw + (size_t)x];
+}
+
+typedef struct Script {
+    u8 *data;
+    size_t size;
+    u32 codeEnd, tableEnd;
+    u32 *labelAddr;
+    char **labelName;
+    int labelCount;
+    char **strs;
+    int strCount;
+} Script;
+
+Script *an_script_load(const char *path, char *err, size_t errSize);
+void an_script_free(Script *s);
+int an_script_label(const Script *s, const char *name);
+const char *an_script_label_at(const Script *s, u32 pc);
+
+typedef struct SpriteName {
+    char *name, *file;
+} SpriteName;
+
+typedef struct Define {
+    u8 *data;
+    size_t size;
+    SpriteName *sprites;
+    int spriteCount;
+} Define;
+
+bool an_define_load(Define *d, const char *path);
+void an_define_free(Define *d);
+const char *an_define_sprite(const Define *d, const char *name);
+
+typedef struct PackEntry {
+    char *name;
+    u32 offset, size;
+} PackEntry;
+
+typedef struct Pack {
+    FILE *f;
+    PackEntry *e;
+    int count;
+    int *hash;
+    int hashSize;
+} Pack;
+
+bool an_pack_open(Pack *p, const char *path, bool wide);
+void an_pack_close(Pack *p);
+const PackEntry *an_pack_find(const Pack *p, const char *name);
+u8 *an_pack_read(Pack *p, const PackEntry *e);
+
+enum { W_NONE, W_FRAME, W_TIME, W_TEXT, W_TRANS, W_CHOICE, W_MOVIE, W_END };
+
+#define AN_STACK 64
+#define AN_VARS 1024
+
+typedef struct Thread {
+    u32 pc;
+    u32 stack[AN_STACK];
+    int sp;
+    int wait;
+    u32 waitUntil;
+} Thread;
+
+enum { LK_NONE, LK_IMAGE, LK_EMOTE };
+
+#define AN_LAYERS 16
+
+typedef struct Layer {
+    int kind;
+    char name[64];
+    int x, y;
+    int fromX, fromY, toX, toY;
+    u32 moveStart, moveTime;
+    int alpha, fromAlpha, toAlpha;
+    u32 fadeStart, fadeTime;
+    int scale;
+    int emoteTop;
+    char motion[64];
+} Layer;
+
+typedef struct Scene {
+    char bg[64];
+    int bgX, bgY, bgFromX, bgFromY;
+    u32 bgMoveStart, bgMoveTime;
+    int bgScale;
+    Layer layer[AN_LAYERS];
+    bool window;
+} Scene;
+
+typedef struct Choice {
+    int value;
+    char *text;
+    int x, y, w, h;
+} Choice;
+
+typedef struct LogEntry {
+    char *name, *text, *voice;
+} LogEntry;
+
+#define AN_SE 16
+
+enum { PH_TITLE, PH_GAME };
+
+typedef struct Font Font;
+
+struct AN {
+    char *dir, *saveDir, *base;
+    FILE *log;
+    char problem[512];
+    char title[256];
+    int W, H;
+    u32 *fb, *prev, *trans;
+    u32 serial;
+    u32 now;
+    int rate;
+    bool quit, paused;
+
+    Script *sc;
+    Define def;
+    Pack voice, psb;
+
+    struct ImageCache *images;
+
+    Thread th;
+    i32 L[AN_VARS], G[AN_VARS];
+    char *strReg;
+
+    int phase;
+    Scene scene;
+    u32 transStart, transTime;
+    int transKind;
+    u32 transColor;
+
+    const char *name, *text, *voiceName;
+    int textShown;
+    u32 textStart;
+    LogEntry *logs;
+    int logCount, logCap;
+
+    Choice choice[16];
+    int choiceCount, choiceHover;
+    int choiceResult;
+
+    int mx, my;
+    bool down, clicked, rclicked, ctrl;
+    int hover;
+
+    bool skipMode, autoMode;
+
+    struct Mixer *mix;
+    struct Movie *movie;
+    Font *font;
+};
+
+bool an_vm_step(AN *a);
+void an_vm_start(AN *a, u32 pc);
+
+void an_gfx_render(AN *a);
+void an_gfx_snapshot(AN *a);
+void an_gfx_begin_transition(AN *a, int kind, u32 ms, u32 color);
+bool an_gfx_transition_done(AN *a);
+Image *an_emote_still(AN *a, const char *name);
+void an_window_render(AN *a);
+void an_gfx_fill(u32 *dst, int w, int h, u32 color);
+void an_gfx_blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int alpha);
+
+bool an_text_init(AN *a);
+void an_text_free(AN *a);
+int an_text_draw(AN *a, int x, int y, const char *s, int size, u32 color, u32 shadow, int maxWidth, int lineHeight);
+int an_text_width(AN *a, const char *s, int size);
+
+bool an_snd_init(AN *a);
+void an_snd_free(AN *a);
+void an_snd_play(AN *a, int channel, const char *name, bool loop, bool fromVoice);
+void an_snd_stop(AN *a, int channel);
+bool an_snd_playing(AN *a, int channel);
+void an_snd_mix(AN *a, float *out, int frames);
+
+enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_COUNT = CH_SE0 + AN_SE };
+
+void an_title_render(AN *a);
+void an_title_input(AN *a);
+void an_game_input(AN *a);
+
+#endif
