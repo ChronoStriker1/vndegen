@@ -15,6 +15,19 @@
         },
     });
 
+    let runtimeInterface;
+    Object.defineProperty(window, 'RuntimeInterface', {
+        configurable: true,
+        get: () => runtimeInterface,
+        set: (value) => {
+            runtimeInterface = typeof value !== 'function' ? value : class extends value {
+                constructor(options) {
+                    super(options && options.exportType === 'nwjs' ? { ...options, exportType: 'html5' } : options);
+                }
+            };
+        },
+    });
+
     const listeners = new Set();
     const deliver = (data) => setTimeout(() => { for (const listener of listeners) listener({ data: data }); }, 0);
     const webview = {

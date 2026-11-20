@@ -11,7 +11,9 @@ none.
 |---|---|
 | Transpile Girl Rescue Operation! v2024.03.03 | Construct 3, Windows WebView2, worker mode, Spine 4.1 characters, box2d physics, 2,388 WebM Opus sounds |
 
-It is the library's only Construct game. A search of the library folders for `c3runtime.js`, `c2runtime.js` and
+| Dungeon Vixens: A Tale of Temptation 1.6 (GOG) | Construct 3, NW.js 0.89, DOM mode, Steam mode with Greenworks, WebM Opus sounds |
+
+Transpile Girl was the library's only Construct game when the plugin was written. A search of the library folders for `c3runtime.js`, `c2runtime.js` and
 `offlineClient.js`, and of the archives the engine survey couldn't read, found no other.
 
 ## What a game folder holds
@@ -19,11 +21,15 @@ It is the library's only Construct game. A search of the library folders for `c3
 A Construct 3 export is `index.html`, `data.json` (the project), `scripts/c3runtime.js` (the engine),
 `scripts/main.js` and `workermain.js`, with `images/`, `media/` and `fonts/`. The Windows WebView2 export puts these in
 `www/`, beside a small wrapper `.exe`, `WebView2Loader.dll`, `WV2ExtManager.dll`, wrapper extensions named `*.ext.dll`
-and a `package.json` with the window's settings. The HTML5 export is the web files alone. Windows ignores case, and
+and a `package.json` with the window's settings. The HTML5 export is the web files alone. The NW.js export zips the web files into `package.nw`, beside NW.js's own
+files and a small `.exe` stub. WebKit can't read a zip, so importing such a game, from an archive or an installer,
+unpacks `package.nw` into a folder of the same name, which NW.js runs as well, as long as the game holds NW.js
+(`nw.dll` or `nw.pak`) and the zip has an `index.html`. A game copied in as a folder keeps its zip and isn't found.
+Remove engine files offers NW.js's files and keeps `package.nw/`. Windows ignores case, and
 Transpile Girl asks for `scripts/` and `fonts/` while its folders are `Scripts/` and `Fonts/`; VNDegen's file lookups
 find them whatever the case.
 
-Detection looks for `index.html`, `data.json` and `scripts/c3runtime.js` in `www/` or at the top of the copied folder,
+Detection looks for `index.html`, `data.json` and `scripts/c3runtime.js` in `www/`, `package.nw/` or at the top of the copied folder,
 and in folders up to two levels down, because an archive import wraps the game in a folder named after the archive.
 The shallowest game wins. At the top of the folder the match is certain, and inside wrapper folders it is likely. Its
 version is "Construct 3".
@@ -31,7 +37,13 @@ version is "Construct 3".
 ## Running
 
 The page runs as a plain browser page with no Node, as the WebView2 wrapper gives it none. `construct.js`, a page
-script, does four things before the game's own scripts run:
+script, does five things before the game's own scripts run:
+
+- **NW.js exports run as HTML5.** An NW.js export creates its runtime with `exportType: "nwjs"`, and Construct's AJAX
+  plugin then calls Node's `require("fs")` at once, which leaves the page black. The script wraps the
+  `RuntimeInterface` class `main.js` defines, so a runtime created as `nwjs` is created as `html5` instead. The game then
+  takes the HTML5 export's paths: no `require`, no `nw.Window`, and Greenworks reports Steam unavailable, so
+  achievements and the overlay do nothing.
 
 - **DOM mode.** A game exported in worker mode runs its engine in a Web Worker with an `OffscreenCanvas`. The script
   hides `OffscreenCanvas` from the page, and Construct's own check then runs the engine in the page itself, as it does

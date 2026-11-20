@@ -309,12 +309,15 @@ public final class ArchiveImporter {
                 let (root, nested): (URL, ArchiveSource?) = source.isInstaller
                     ? (ArchiveExtractor.gameRoot(in: staging), nil) : await Self.inspect(staging)
                 try Task.checkCancellation()
-                task = nil
                 if let inner = nested {
+                    task = nil
                     pendingRoot = root
                     nestedSource = inner
                     step = .nested(fileName: inner.fileName)
                 } else {
+                    try await Self.unpackWebArchives(in: root)
+                    try Task.checkCancellation()
+                    task = nil
                     finish(root)
                 }
             } catch {
@@ -427,6 +430,11 @@ public final class ArchiveImporter {
     @concurrent
     private static func list(_ source: ArchiveSource) async throws -> ArchiveContents {
         try ArchiveExtractor.list(source)
+    }
+
+    @concurrent
+    private static func unpackWebArchives(in root: URL) async throws {
+        try ArchiveExtractor.unpackWebArchives(in: root)
     }
 
     @concurrent

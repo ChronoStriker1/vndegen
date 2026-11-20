@@ -45,7 +45,9 @@ nonisolated public struct ConstructPlugin: EnginePlugin {
     public var listsEngineFiles: Bool { true }
 
     public func engineFileList(_ probe: FolderProbe) -> EngineFileList? {
-        guard let game = ConstructGame(probe), game.root.isEmpty, game.webRoot == "www", probe.contains(Self.webView2Loader) else { return nil }
+        guard let game = ConstructGame(probe), game.root.isEmpty else { return nil }
+        if game.webRoot == "package.nw" { return DesktopRuntimeFiles.nwjs(probe) }
+        guard game.webRoot == "www", probe.contains(Self.webView2Loader) else { return nil }
         let top = probe.entries.filter { !$0.contains("/") }.sorted()
         let extensions = top.filter { $0.lowercased().hasSuffix(".ext.dll") }
         let executables = top.filter { $0.lowercased().hasSuffix(".exe") }

@@ -71,6 +71,10 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
         volumes.count == 2 && volumes[0].pathExtension.lowercased() == "cue" ? CueSheet.read(volumes[0]) : nil
     }
 
+    init(packageNW url: URL) {
+        self.init(volumes: [url], suggestedFolderName: url.deletingPathExtension().lastPathComponent, installers: [])
+    }
+
     private init(volumes: [URL], suggestedFolderName: String, installers: [InstallerVolumes]) {
         self.volumes = volumes
         self.suggestedFolderName = suggestedFolderName

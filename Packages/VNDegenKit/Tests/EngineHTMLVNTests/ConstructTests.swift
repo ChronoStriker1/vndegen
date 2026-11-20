@@ -88,3 +88,26 @@ private func detect(_ root: URL) -> EngineMatch? { ConstructPlugin().detect(Fold
     let list = try #require(ConstructPlugin().engineFileList(FolderProbe(scanning: root)))
     #expect(list.files == ["webview2loader.dll", "wv2extmanager.dll", "d3d11overlay_x64.ext.dll"])
 }
+
+private func nwjsFiles() -> [String: Data] {
+    exportFiles("package.nw/").merging([
+        "DungeonVixens.exe": Data(count: 2048), "nw.dll": Data(), "node.dll": Data(), "nw_elf.dll": Data(), "icudtl.dat": Data(),
+        "resources.pak": Data(), "locales/en-US.pak": Data(), "goggame-1817545222.info": Data("{}".utf8),
+    ]) { a, _ in a }
+}
+
+@Test func detectsAnNWjsExportUnpackedIntoPackageNW() throws {
+    let root = try temporaryFolder(nwjsFiles())
+    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(detect(root) == EngineMatch(engine: .construct, confidence: .certain, version: "Construct 3", evidence: "package.nw/scripts/c3runtime.js"))
+    #expect(ConstructGame(folder: root) == ConstructGame(root: "", webRoot: "package.nw"))
+}
+
+@Test func anNWjsExportListsNWjsAndKeepsTheGame() throws {
+    let root = try temporaryFolder(nwjsFiles())
+    defer { try? FileManager.default.removeItem(at: root) }
+    let list = try #require(ConstructPlugin().engineFileList(FolderProbe(scanning: root)))
+    #expect(["nw.dll", "node.dll", "nw_elf.dll", "icudtl.dat", "resources.pak"].allSatisfy { list.lists(file: $0, size: 0) })
+    #expect(list.lists(file: "locales/en-US.pak", size: 0))
+    #expect(!list.lists(file: "package.nw/index.html", size: 1) && !list.lists(file: "goggame-1817545222.info", size: 2))
+}
