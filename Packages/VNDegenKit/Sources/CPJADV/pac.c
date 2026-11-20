@@ -89,9 +89,7 @@ static bool add_archive(Pac *a, const char *path, PJ *log) {
     return true;
 }
 
-static bool opened(const Pac *a, const char *dir, const char *name, char opens[][64], int openCount) {
-    (void)a;
-    (void)dir;
+static bool opened(const char *name, char opens[][64], int openCount) {
     for (int i = 0; i < openCount; i++)
         if (pj_ieq(opens[i], name)) return true;
     return false;
@@ -112,7 +110,7 @@ bool pj_pac_open(Pac *a, const char *dir, PJ *log) {
         Ini c = {0};
         pj_ini_parse(&c, ini, size);
         for (int i = 0; i < c.count; i++) {
-            if (!pj_ieq(c.key[i], "file") || opened(a, dir, c.val[i], opens, openCount)) continue;
+            if (!pj_ieq(c.key[i], "file") || opened(c.val[i], opens, openCount)) continue;
             path = pj_fmt("%s/%s", dir, c.val[i]);
             if (add_archive(a, path, log) && openCount < PJ_ARCS * 2) snprintf(opens[openCount++], 64, "%s", c.val[i]);
             free(path);
@@ -128,7 +126,7 @@ bool pj_pac_open(Pac *a, const char *dir, PJ *log) {
     int count = 0;
     for (struct dirent *de; (de = readdir(d)) && count < 64;) {
         size_t n = strlen(de->d_name);
-        if (n < 5 || n >= 64 || !pj_ieq(de->d_name + n - 4, ".dat") || opened(a, dir, de->d_name, opens, openCount)) continue;
+        if (n < 5 || n >= 64 || !pj_ieq(de->d_name + n - 4, ".dat") || opened(de->d_name, opens, openCount)) continue;
         names[count++] = pj_strdup(de->d_name);
     }
     closedir(d);

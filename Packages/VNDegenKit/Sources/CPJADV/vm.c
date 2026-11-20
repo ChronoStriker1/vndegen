@@ -492,16 +492,12 @@ static bool step(PJ *p) {
         m->font = val(p, a[9]);
         break;
     }
-    case 0x031400: {
-        int w = val(p, a[0]);
-        (void)w;
-        break;
-    }
     case 0x031500: {
         int w = val(p, a[0]);
         if (w >= 0 && w <= 1) p->win[w].edge = (u32)val(p, a[1]);
         break;
     }
+    case 0x031400:
     case 0x031000:
     case 0x030001:
     case 0x030100:

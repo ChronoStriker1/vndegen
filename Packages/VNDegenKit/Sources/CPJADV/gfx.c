@@ -413,12 +413,11 @@ void pj_blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, 
     }
 }
 
-static void draw_sprite(PJ *p, u32 *dst, const Layer *l, int px, int py) {
+static void draw_sprite(u32 *dst, const Layer *l, int px, int py) {
     if (!l->img) return;
     int x = l->x + l->ox + px, y = l->y + l->oy + py;
     pj_blit(dst, PJ_W, PJ_H, l->img, l->sx, l->sy, l->sw, l->sh, x, y, l->alpha, l->scale, l->hasDef ? l->def.cx : 0,
             l->hasDef ? l->def.cy : 0);
-    (void)p;
 }
 
 static int zcmp(const void *a, const void *b) {
@@ -439,10 +438,10 @@ void pj_compose(PJ *p, u32 *dst) {
     qsort(list, (size_t)n, sizeof list[0], zcmp);
     for (int i = 0; i < n; i++) {
         const Layer *l = list[i];
-        draw_sprite(p, dst, l, 0, 0);
+        draw_sprite(dst, l, 0, 0);
         for (int k = 0; k < PJ_LAYERS + PJ_SUBS && l->id >= 0; k++) {
             const Layer *c = &p->layer[k];
-            if (c->used && c->shown && c->parent == l->id && c != l) draw_sprite(p, dst, c, l->x + l->ox, l->y + l->oy);
+            if (c->used && c->shown && c->parent == l->id && c != l) draw_sprite(dst, c, l->x + l->ox, l->y + l->oy);
         }
     }
     pj_msg_draw(p, dst);
