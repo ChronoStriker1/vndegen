@@ -1,4 +1,5 @@
 #include "ikura.h"
+#include "ik_casepath.h"
 
 #include <math.h>
 #include <time.h>
@@ -654,8 +655,17 @@ bool save_exec(IK *t, u16 op, const u8 *a, int n) {
         if (n >= NAME_LEN + 4) t->save.slots = (int)rd32(a + n - 4);
         free(t->save.path);
         t->save.path = ik_fmt("%s/%s", t->saveDir, name);
+        char real[2048];
+        if (ik_casepath_resolve(t->save.path, real, sizeof real) >= 0) {
+            free(t->save.path);
+            t->save.path = ik_strdup(real);
+        }
         if (!ik_file_exists(t->save.path)) {
             char *orig = ik_fmt("%s/%s", t->gameDir, name);
+            if (ik_casepath_resolve(orig, real, sizeof real) >= 0) {
+                free(orig);
+                orig = ik_strdup(real);
+            }
             size_t sz;
             u8 *d = ik_read_file(orig, &sz);
             if (d && sz >= HEAD_SIZE) write_save(t, d, sz);
