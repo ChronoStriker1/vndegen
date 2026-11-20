@@ -144,7 +144,10 @@ static bool hit_mask(const Image *im, int h) {
             if (!(p >> 24)) continue;
             if (!any) first = p & 0xffffff;
             any = true;
-            if ((p & 0xffffff) != first) return false;
+            for (int s = 0; s < 24; s += 8) {
+                int d = (int)(p >> s & 0xff) - (int)(first >> s & 0xff);
+                if (d > 12 || d < -12) return false;
+            }
             solid += p >> 24 == 0xff;
         }
     return any && solid * 2 >= (size_t)im->w * (size_t)h;
@@ -190,8 +193,8 @@ bool bx_mbtn_on(const BX *b, const MBtn *t) {
 void bx_mbtn_draw(BX *b, u32 *dst, const MBtn *t, int state) {
     if (!t->img) return;
     int h = t->img->h / t->frames;
-    int f = clampi(state + t->skip, 0, t->frames - 1);
-    bx_blit_part(dst, b->W, b->H, t->img, 0, f * h, t->img->w, h, t->x, t->y, 255);
+    int f = clampi((state < 0 ? 0 : state) + t->skip, 0, t->frames - 1);
+    bx_blit_part(dst, b->W, b->H, t->img, 0, f * h, t->img->w, h, t->x, t->y, state < 0 ? 110 : 255);
 }
 
 int bx_mbtn_state(const BX *b, const MBtn *t) { return bx_mbtn_on(b, t) ? 1 : 0; }

@@ -1,4 +1,4 @@
-#include "bsx.h"
+#include "strip.h"
 
 typedef struct Variant {
     int count;
@@ -90,6 +90,7 @@ struct MuseumPhase {
     Viewer view;
     BgvPanel *bgv;
     bool bgvOverlay;
+    Strip *strip;
 };
 
 static Image *own(BX *b, const char *name) {
@@ -500,6 +501,8 @@ static void free_mode(MuseumPhase *u) {
     bx_bgv_free(u->bgv);
     u->bgv = NULL;
     u->bgvOverlay = false;
+    bx_strip_free(u->strip);
+    u->strip = NULL;
     u->under = u->over = u->parts = u->percent = NULL;
     memset(&u->vol, 0, sizeof u->vol);
     u->frameCount = u->pageCount = u->trackCount = 0;
@@ -536,6 +539,10 @@ static void open_mode(BX *b, MuseumPhase *u, int mode) {
     u->thumbsMade = 0;
     if (mode == MM_BGV) {
         u->bgv = bx_bgv_open(b, false);
+        return;
+    }
+    if (mode == MM_STRIP) {
+        u->strip = bx_strip_open(b);
         return;
     }
     const char *sec = mode_section(mode);
@@ -665,11 +672,9 @@ static void blur_masked(BX *b, Image *t, const int *ids, int count) {
     free(blur);
 }
 
-static Image *make_thumb(BX *b, const int *ids, int count) {
-    int tw, th;
-    bx_thumb_size(b, &tw, &th);
-    u32 *full = bx_alloc(sizeof(u32) * (size_t)b->W * (size_t)b->H);
-    compose(b, ids, count, full, false, false, false);
+static const Variant *first_seen(BX *b, const Thumb *t);
+
+Image *bx_scaled(BX *b, const u32 *full, int tw, int th) {
     Image *t = bx_image_new(tw, th);
     for (int y = 0; y < th; y++) {
         int y0 = y * b->H / th, y1 = (y + 1) * b->H / th;
@@ -687,9 +692,43 @@ static Image *make_thumb(BX *b, const int *ids, int count) {
             t->px[(size_t)y * tw + x] = 0xff000000u | (s[2] / k) << 16 | (s[1] / k) << 8 | s[0] / k;
         }
     }
+    return t;
+}
+
+static Image *make_thumb(BX *b, const int *ids, int count) {
+    int tw, th;
+    bx_thumb_size(b, &tw, &th);
+    u32 *full = bx_alloc(sizeof(u32) * (size_t)b->W * (size_t)b->H);
+    compose(b, ids, count, full, false, false, false);
+    Image *t = bx_scaled(b, full, tw, th);
     free(full);
     blur_masked(b, t, ids, count);
     return t;
+}
+
+int bx_museum_cg_pages(BX *b) { return b->museum ? b->museum->pageCount : 0; }
+
+int bx_museum_cg_thumbs(BX *b, int page) { return b->museum && page >= 0 && page < b->museum->pageCount ? b->museum->pages[page].count : 0; }
+
+int bx_museum_cg_seen_variant(BX *b, int page, int thumb) {
+    if (thumb < 0 || thumb >= bx_museum_cg_thumbs(b, page)) return -1;
+    const Thumb *t = &b->museum->pages[page].t[thumb];
+    const Variant *v = first_seen(b, t);
+    return v ? (int)(v - t->v) : -1;
+}
+
+Image *bx_museum_cg_thumb(BX *b, int page, int thumb) {
+    int v = bx_museum_cg_seen_variant(b, page, thumb);
+    if (v < 0) return NULL;
+    const Variant *var = &b->museum->pages[page].t[thumb].v[v];
+    return make_thumb(b, var->ids, var->count);
+}
+
+void bx_museum_cg_compose(BX *b, int page, int thumb, u32 *dst, bool hairOff, bool cutOff) {
+    int v = bx_museum_cg_seen_variant(b, page, thumb);
+    if (v < 0) return;
+    const Variant *var = &b->museum->pages[page].t[thumb].v[v];
+    compose(b, var->ids, var->count, dst, hairOff, cutOff, false);
 }
 
 static int thumb_count(BX *b, const MuseumPhase *u) {
@@ -927,7 +966,8 @@ void bx_museum_close(BX *b) {
 }
 
 static bool mode_available(BX *b, const MuseumPhase *u, int i) {
-    return u->modeOf[i] != MM_STRIP && (b->museum->state & u->modeBits[i]) && (u->modeOf[i] != MM_BGV || bx_cfg_section(&b->cfg, "museum phase - bgv"));
+    return (b->museum->state & u->modeBits[i]) && (u->modeOf[i] != MM_BGV || bx_cfg_section(&b->cfg, "museum phase - bgv")) &&
+           (u->modeOf[i] != MM_STRIP || bx_cfg_get(&b->cfg, "museum phase - bu", "layout"));
 }
 
 static int thumb_at(BX *b, MuseumPhase *u) {
@@ -1165,6 +1205,14 @@ static void grid_update(BX *b, MuseumPhase *u) {
 void bx_museum_update(BX *b) {
     MuseumPhase *u = b->museumPhase;
     if (!u) return;
+    if (u->strip) {
+        if (bx_strip_update(b, u->strip)) {
+            bx_snd_loop_stop(b, CH_BGV, NULL, 300);
+            open_mode(b, u, MM_BGM);
+        }
+        b->click = b->rclick = false;
+        return;
+    }
     if (u->bgv) {
         bool closed = bx_bgv_update(b, u->bgv);
         if (u->bgvOverlay) {
@@ -1294,6 +1342,10 @@ static void bgm_draw(BX *b, MuseumPhase *u, u32 *dst) {
 void bx_museum_draw(BX *b, u32 *dst) {
     MuseumPhase *u = b->museumPhase;
     if (!u) return;
+    if (u->strip) {
+        bx_strip_draw(b, u->strip, dst);
+        return;
+    }
     if (u->view.open && !u->bgvOverlay) {
         viewer_draw(b, u, dst);
         return;
