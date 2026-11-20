@@ -5,6 +5,89 @@
 
 #import "drivers/coreaudio/audio_driver_coreaudio.h"
 
+#import <CoreText/CoreText.h>
+
+#include <vector>
+
+static uint32_t vngd_be32(const uint8_t *p_bytes) {
+	return uint32_t(p_bytes[0]) << 24 | uint32_t(p_bytes[1]) << 16 | uint32_t(p_bytes[2]) << 8 | p_bytes[3];
+}
+
+static bool vngd_font_has_outlines(NSString *p_path) {
+	NSFileHandle *file = [NSFileHandle fileHandleForReadingAtPath:p_path];
+	NSData *head = [file readDataOfLength:16];
+	if (head.length < 16) {
+		return false;
+	}
+	const uint8_t *bytes = (const uint8_t *)head.bytes;
+	uint64_t face = 0;
+	if (memcmp(bytes, "ttcf", 4) == 0) {
+		face = vngd_be32(bytes + 12);
+		[file seekToFileOffset:face];
+		head = [file readDataOfLength:12];
+		if (head.length < 12) {
+			return false;
+		}
+		bytes = (const uint8_t *)head.bytes;
+	}
+	const uint32_t tables = uint32_t(bytes[4]) << 8 | bytes[5];
+	[file seekToFileOffset:face + 12];
+	NSData *directory = [file readDataOfLength:tables * 16];
+	const uint8_t *entries = (const uint8_t *)directory.bytes;
+	for (NSUInteger i = 0; i + 16 <= directory.length; i += 16) {
+		for (const char *tag : { "glyf", "CFF ", "CFF2", "sbix", "CBDT", "EBDT" }) {
+			if (memcmp(entries + i, tag, 4) == 0) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+static Vector<String> vngd_readable_fonts_for_text(const Vector<String> &p_paths, const String &p_font_name, const String &p_text, const String &p_locale) {
+	Vector<String> readable;
+	for (const String &path : p_paths) {
+		if (vngd_font_has_outlines([NSString stringWithUTF8String:path.utf8().get_data()])) {
+			readable.push_back(path);
+		}
+	}
+	if (!readable.is_empty() || p_paths.is_empty() || p_text.is_empty()) {
+		return readable;
+	}
+	NSString *text = [NSString stringWithUTF8String:p_text.utf8().get_data()];
+	CTFontRef base = CTFontCreateWithName((__bridge CFStringRef)[NSString stringWithUTF8String:p_font_name.utf8().get_data()], 16, nullptr);
+	NSArray *languages = p_locale.is_empty() ? @[] : @[ [NSString stringWithUTF8String:p_locale.replace("_", "-").utf8().get_data()] ];
+	NSArray *cascade = CFBridgingRelease(CTFontCopyDefaultCascadeListForLanguages(base, (__bridge CFArrayRef)languages));
+	CFRelease(base);
+	const NSUInteger length = text.length;
+	const NSUInteger first = [text rangeOfComposedCharacterSequenceAtIndex:0].length;
+	std::vector<unichar> characters(length);
+	[text getCharacters:characters.data() range:NSMakeRange(0, length)];
+	std::vector<CGGlyph> glyphs(length);
+	String partial;
+	for (id descriptor in cascade) {
+		NSURL *url = CFBridgingRelease(CTFontDescriptorCopyAttribute((__bridge CTFontDescriptorRef)descriptor, kCTFontURLAttribute));
+		if (!url || !vngd_font_has_outlines(url.path)) {
+			continue;
+		}
+		CTFontRef font = CTFontCreateWithFontDescriptor((__bridge CTFontDescriptorRef)descriptor, 16, nullptr);
+		const bool all = CTFontGetGlyphsForCharacters(font, characters.data(), glyphs.data(), length);
+		const bool starts = all || CTFontGetGlyphsForCharacters(font, characters.data(), glyphs.data(), first);
+		CFRelease(font);
+		if (all) {
+			readable.push_back(String::utf8(url.path.UTF8String));
+			return readable;
+		}
+		if (starts && partial.is_empty()) {
+			partial = String::utf8(url.path.UTF8String);
+		}
+	}
+	if (!partial.is_empty()) {
+		readable.push_back(partial);
+	}
+	return readable;
+}
+
 #if TARGET_OS_IPHONE
 #import "platform/ios/os_ios.h"
 
@@ -21,6 +104,9 @@ public:
 		vngd_use_case_lookup<DirAccessUnix>();
 	}
 	void initialize_joypads() override {}
+	Vector<String> get_system_font_path_for_text(const String &p_font_name, const String &p_text, const String &p_locale, const String &p_script, int p_weight, int p_stretch, bool p_italic) const override {
+		return vngd_readable_fonts_for_text(OS_VNDegen<OS_IOS>::get_system_font_path_for_text(p_font_name, p_text, p_locale, p_script, p_weight, p_stretch, p_italic), p_font_name, p_text, p_locale);
+	}
 	OS_VNDegenApple(const VNGDLaunch *p_launch) :
 			OS_VNDegen<OS_IOS>(p_launch) {}
 };
@@ -38,6 +124,9 @@ public:
 		vngd_use_case_lookup<DirAccessMacOS>();
 	}
 	void initialize_joypads() override {}
+	Vector<String> get_system_font_path_for_text(const String &p_font_name, const String &p_text, const String &p_locale, const String &p_script, int p_weight, int p_stretch, bool p_italic) const override {
+		return vngd_readable_fonts_for_text(OS_VNDegen<OS_MacOS>::get_system_font_path_for_text(p_font_name, p_text, p_locale, p_script, p_weight, p_stretch, p_italic), p_font_name, p_text, p_locale);
+	}
 	void run() override {}
 	OS_VNDegenApple(const VNGDLaunch *p_launch) :
 			OS_VNDegen<OS_MacOS>(p_launch, p_launch->executable, 0, nullptr) {}
