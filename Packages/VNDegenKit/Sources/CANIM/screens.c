@@ -78,6 +78,34 @@ static Image *thumb(AN *a, int slot) {
     return a->thumbs[slot];
 }
 
+enum { CARD_LINES = 2, CARD_LINE_CHARS = 20 };
+
+static void card_comment(const char *in, char *out, size_t cap) {
+    size_t n = 0;
+    int lines = 0;
+    out[0] = 0;
+    while (*in && lines < CARD_LINES) {
+        size_t len = 0, cut = 0;
+        while (in[len] && !(in[len] == '@' && in[len + 1] == 'n') && len < CARD_LINE_CHARS) {
+            if (in[len] == ' ') cut = len;
+            len++;
+        }
+        bool more = in[len] && !(in[len] == '@' && in[len + 1] == 'n');
+        if (more && in[len] != ' ' && cut) len = cut;
+        if (lines && n + 2 < cap) {
+            out[n++] = '@';
+            out[n++] = 'n';
+        }
+        for (size_t i = 0; i < len && n + 1 < cap; i++) out[n++] = in[i];
+        out[n] = 0;
+        in += len;
+        if (in[0] == '@' && in[1] == 'n') in += 2;
+        else
+            while (*in == ' ') in++;
+        lines++;
+    }
+}
+
 static void draw_thumb(AN *a, const Image *t, int x, int y) {
     enum { TW = 184, TH = 104 };
     for (int j = 0; j < TH; j++) {
@@ -151,7 +179,9 @@ static void draw_slots(AN *a, bool saving) {
         snprintf(clock, sizeof clock, "%02d:%02d:%02d", info.hour, info.minute, info.second);
         vertical(a, b, date, r.x + 14, r.y + 19);
         vertical(a, b, clock, r.x + 34, r.y + 20);
-        an_text_draw(a, r.x + 82, r.y + 194, info.comment, 14, 0xff503040u, 0, 200, 22);
+        char lines[128];
+        card_comment(info.comment, lines, sizeof lines);
+        an_text_draw(a, r.x + 78, r.y + 180, lines, 16, 0xff503040u, 0, 0, 18);
     }
     an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 62, 670, 278, 40) ? 296 : 254, 278, 40, 62, 670, 255);
     an_gfx_blit(a->fb, a->W, a->H, b, 285, in_rect(a, 501, 670, 278, 40) ? 296 : 254, 278, 40, 501, 670, 255);

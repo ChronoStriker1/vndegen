@@ -53,7 +53,7 @@ CANIM), as `build/anim/VNEmote.xcframework` for the Mac, iPhone and iPad and the
 and each crate it builds in. `scripts/build.sh` runs it before every app build. It installs the pinned Rust toolchain
 and the Apple targets through rustup when they are missing (`brew install rustup` first), builds offline from the
 crates vendored in `Engines/ANIM/vendor`, and does nothing when its inputs haven't changed. The runtime finds the
-library at run time and draws no characters without it. On Linux, `Engines/ANIM/host` builds the runtime with cargo
+library at run time and draws no characters without it. On Linux, `Engines/ANIM/host` builds the runtime, and vnemote through cargo,
 for its headless and SDL test tools.
 
 ## Saves
@@ -62,8 +62,11 @@ The PC engine's own files in the game folder: `<name>_save.dat` (180 slots of 24
 Save and Load screens), `qSavedata.dat` (the quick save), `cg/pSaveThumbNNN.png` (256 by 256, the screen at the top)
 and `<name>_system.dat` (read lines, the flowchart's passed and read nodes, the last slot). A slot keeps the date, the
 comment, the text instruction it was made at, the background, each layer's picture or character, offset, scale and
-E-mote variables, and the script's local variables; VNDegen writes those and leaves the rest of the slot empty. Saves
-load both ways with the PC.
+E-mote variables, and the script's local variables. VNDegen writes those, and the defaults the PC keeps in every slot:
+the slot positions, the layer tables of 1.0 scales and -1 handles, the characters' idle motion name (`sPauseWait01`)
+and the E-mote scale. The PC needs them: without the defaults it crashes loading the slot, and without the layer
+scales it loads the scene with no characters. The comment is the speaker and the line, cut to 100 characters as the PC
+does; a longer comment that holds a line break loads black on the PC. Saves load both ways with the PC.
 
 ## Known limits
 
@@ -73,4 +76,5 @@ load both ways with the PC.
 - The Settings, Extra (CG, scene and music galleries) and shortcut screens aren't built; volumes aren't kept in the
   system save yet.
 - Magical Sword's screens aren't built.
+- The Save and Load cards have no Delete button, and the card under the pointer doesn't say Click to Save.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

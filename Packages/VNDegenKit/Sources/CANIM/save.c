@@ -8,6 +8,7 @@ enum {
     FILE_HEAD = 20,
     OFF_COMMENT = 0x09,
     COMMENT_END = 0x74,
+    COMMENT_MAX = 101,
     OFF_PC = 0x74,
     OFF_SCENE_KIND = 0x78,
     OFF_RETURN = 0x7c,
@@ -19,11 +20,29 @@ enum {
     SAVED_LAYERS = 10,
     OFF_LAYER_OFFSET = 0xcc8,
     OFF_LAYER_SCALE = 0xcf0,
+    OFF_LAYER_ONE = 0x250,
+    OFF_LAYER_HANDLES = 0xd68,
+    LAYER_HANDLES_END = 0x1218,
+    OFF_LAYER_WAIT = 0x1240,
+    LAYER_WAIT = 0x64,
+    OFF_LAYER_TIMES = 0x1650,
     OFF_LAYER_VARS = 0x1780,
     LAYER_VARS_SIZE = 0x1450,
     VAR_SIZE = 0x68,
     VAR_NAME = 0x64,
     OFF_LOCALS = 0x2fdf0,
+    OFF_SLOT_X = 0x30f78,
+    OFF_SLOT_X_NOW = 0x31018,
+    POS_SLOTS = 5,
+    OFF_SLOT_ORDER = 0x310b8,
+    OFF_SLOT_ORDER2 = 0x310e0,
+    OFF_LAYER_SHOWN = 0x31108,
+    OFF_LAYER_SCALE3 = 0x32dd8,
+    LAYER_SCALE3 = 0x38,
+    OFF_EMOTE_WAIT = 0x3b744,
+    OFF_EMOTE_WAIT_TIME = 0x3b7a8,
+    OFF_EMOTE_SCALE = 0x3b7c8,
+    OFF_EMOTE_ON = 0x3b7d0,
     SYS_LAST_SLOT = 0x8,
     SYS_READ = 0x3ec8,
     SYS_READ_MAX = 0x7a000,
@@ -133,16 +152,53 @@ static void write_thumbnail(AN *a, int slot) {
             if (!count) count = 1;
             px[y * TW + x] = (r / count) | (g / count) << 8 | (b / count) << 16 | 0xff000000u;
         }
+    char *dir = an_fmt("%s/cg", a->saveDir);
+    an_mkdirs(dir);
+    free(dir);
     char *p = an_fmt("%s/cg/pSaveThumb%03d.png", a->saveDir, slot);
-    an_png_write(p, px, TW, TH);
+    if (!an_png_write(p, px, TW, TH)) an_log(a, "can't write %s", p);
     free(p);
     free(px);
 }
 
 void an_capture_shot(AN *a) { memcpy(a->shot, a->fb, sizeof(u32) * (size_t)a->W * (size_t)a->H); }
 
+static const int SLOT_DEFAULT_X[POS_SLOTS] = {220, 430, 640, 850, 1060};
+static const u32 SLOT_ORDER[] = {2, 0, 4, 3, 1, 5}, SLOT_ORDER2[] = {1, 4, 0, 3, 2};
+
+static void wrf64(u8 *p, double v) { memcpy(p, &v, 8); }
+
+static double rdf64(const u8 *p) {
+    double v;
+    memcpy(&v, p, 8);
+    return v;
+}
+
+static int slot_x(AN *a, int i) { return a->slotX[i] ? a->slotX[i] : i < POS_SLOTS ? SLOT_DEFAULT_X[i] : 640; }
+
+static void pc_defaults(AN *a, u8 *s) {
+    for (int i = 0; i < SAVED_LAYERS; i++) {
+        wrf64(s + OFF_LAYER_ONE + 8 * i, 1.0);
+        put_name(s + OFF_LAYER_WAIT + LAYER_WAIT * i, LAYER_WAIT, "sPauseWait01");
+        wr32(s + OFF_LAYER_TIMES + 4 * i, i < SAVED_LAYERS / 2 ? 1800 : 2000);
+        wr32(s + OFF_LAYER_SHOWN + 4 * i, 1);
+    }
+    memset(s + OFF_LAYER_HANDLES, 0xff, LAYER_HANDLES_END - OFF_LAYER_HANDLES);
+    for (int i = 0; i < POS_SLOTS; i++) {
+        wrf64(s + OFF_SLOT_X + 8 * i, slot_x(a, i));
+        wrf64(s + OFF_SLOT_X_NOW + 8 * i, slot_x(a, i));
+    }
+    for (size_t i = 0; i < sizeof SLOT_ORDER / sizeof SLOT_ORDER[0]; i++) wr32(s + OFF_SLOT_ORDER + 4 * i, SLOT_ORDER[i]);
+    for (size_t i = 0; i < sizeof SLOT_ORDER2 / sizeof SLOT_ORDER2[0]; i++) wr32(s + OFF_SLOT_ORDER2 + 4 * i, SLOT_ORDER2[i]);
+    put_name(s + OFF_EMOTE_WAIT, LAYER_WAIT, "sPauseWait01");
+    wr32(s + OFF_EMOTE_WAIT_TIME, 2000);
+    wrf64(s + OFF_EMOTE_SCALE, a->emoteScale > 0 ? a->emoteScale : 1.0f);
+    wr32(s + OFF_EMOTE_ON, 1);
+}
+
 static void fill_slot(AN *a, u8 *s) {
     memset(s, 0, SLOT_SIZE);
+    pc_defaults(a, s);
     time_t now = time(NULL);
     struct tm tm;
     localtime_r(&now, &tm);
@@ -155,7 +211,7 @@ static void fill_slot(AN *a, u8 *s) {
     s[7] = (u8)tm.tm_min;
     s[8] = (u8)tm.tm_sec;
     char *comment = a->name ? an_fmt("%s@n%s", a->name, a->text ? a->text : "") : an_strdup(a->text ? a->text : "");
-    put_name(s + OFF_COMMENT, COMMENT_END - OFF_COMMENT, comment);
+    put_name(s + OFF_COMMENT, COMMENT_MAX, comment);
     free(comment);
     wr32(s + OFF_PC, a->textPc);
     wr32(s + OFF_SCENE_KIND, (u32)a->sceneKind);
@@ -166,8 +222,8 @@ static void fill_slot(AN *a, u8 *s) {
         if (l->kind == LK_NONE) continue;
         put_name(s + OFF_LAYER_NAME + LAYER_NAME * i, LAYER_NAME, l->name);
         wr32(s + OFF_LAYER_X + 4 * i, 640);
-        int base = a->slotX[i] ? a->slotX[i] : 640;
-        wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)(base - 640 + l->toX));
+        wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)((a->slotX[i] ? a->slotX[i] : 640) - 640 + l->toX));
+        for (int k = 0; k < 3; k++) wrf64(s + OFF_LAYER_SCALE3 + LAYER_SCALE3 * i + 8 * k, 1.0);
         if (l->kind != LK_EMOTE) continue;
         wr32(s + OFF_LAYER_SCALE + 4 * i, (u32)(an_define_char_scale(&a->def, l->name) * 100.0f + 0.5f));
         for (int k = 0; k < l->varCount && (k + 1) * VAR_SIZE <= LAYER_VARS_SIZE; k++) {
@@ -210,8 +266,9 @@ static bool restore_slot(AN *a, const u8 *s) {
         l->kind = n > 4 && an_ieq(l->name + n - 4, ".psb") ? LK_EMOTE : LK_IMAGE;
         l->alpha = l->fromAlpha = l->toAlpha = 255;
         l->scale = 1000;
-        a->slotX[i] = 640;
-        l->toX = l->fromX = (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i);
+        double base = i < POS_SLOTS ? rdf64(s + OFF_SLOT_X + 8 * i) : 0;
+        a->slotX[i] = base > 0 && base < 4096 ? (int)base : 640;
+        l->toX = l->fromX = (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i) - (a->slotX[i] - 640);
         for (int k = 0; k * VAR_SIZE + VAR_SIZE <= LAYER_VARS_SIZE; k++) {
             const u8 *v = s + OFF_LAYER_VARS + LAYER_VARS_SIZE * i + VAR_SIZE * k;
             if (!v[0]) break;
@@ -225,6 +282,8 @@ static bool restore_slot(AN *a, const u8 *s) {
     }
     for (int i = 0; i < AN_VARS; i++) a->L[i] = (i32)rd32(s + OFF_LOCALS + 4 * i);
     a->sceneKind = (int)rd32(s + OFF_SCENE_KIND);
+    double scale = rdf64(s + OFF_EMOTE_SCALE);
+    if (scale > 0.05 && scale < 10) a->emoteScale = (float)scale;
     a->phase = PH_GAME;
     a->screen = SCR_NONE;
     memset(&a->th, 0, sizeof a->th);
