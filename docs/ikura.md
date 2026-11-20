@@ -9,11 +9,12 @@ Wine. It is MIT licensed like the rest of the app. `docs/ikura-cleanroom.md` lis
 | Game | Engine build | Notes |
 |---|---|---|
 | Lightning Warrior Raidy (G-Collections English release) | `RaidyUS.exe`, 2007-12 | Intro, dungeon floors with battles, menus, saves |
+| Lightning Warrior Raidy II: Temple of Desire (G-Collections English release) | `Raidy_2_US.exe`, 2011-03 | Opening movie, town, shops, dungeon, animated scenes, backlog, gallery, saves |
 
-Lightning Warrior Raidy II is left out (see the content rule in the project's private notes). Raidy III ships as a
-Setup Factory installer, which VNDegen can't unpack. The game is 800x600.
+Raidy III ships as a Setup Factory installer, which VNDegen can't unpack. Both games are 800x600.
 
-The disc is a BIN/CUE image; the library's import reads it and keeps only the game's folder (`docs/library.md`).
+Raidy's disc is a BIN/CUE image; the library's import reads it and keeps only the game's folder (`docs/library.md`).
+Raidy II is a plain folder.
 
 ## How the games are built
 
@@ -40,11 +41,52 @@ folders down.
 - The dungeon (`08xx`) is an 81x81 grid from `DATA/*.ZMZ`: cells at odd coordinates, walls, doors and the entrance
   gate between them. The PC draws it with Direct3D; VNDegen raycasts the same view: a 90 degree field of view, the
   eye at the middle of walls three quarters of a cell high, floor, ceiling, wall and door textures, and a light at the
-  eye. Turns and steps take 500 ms. The compass needle and the map marker turn with the view.
+  eye. Turns and steps take 500 ms. The compass needle and the map marker turn with the view. Raidy II's build maps
+  wall and door textures the other way round.
+
+## What Raidy II's engine build adds
+
+Raidy II's exe reads the same archives, pictures, sound and scripts; about sixty commands are new.
+
+- Pictures carry a table of cells in the GGP header (offset and size at `0x1c`): each cell is a destination, a
+  source and a size, 12 bytes, and cell 0 is the whole picture. Layers (`0215`), buttons (`0716`, `0717`, `071f`,
+  `0721`), button states (`071d`), tips (`0722`) and draws (`010a`-`010d`: onto a layer or a picture, blended or
+  copied) name a cell. A negative cell number places the cell at its own destination; a button cell of -1 has no
+  picture. Scripts name pictures and sounds without the archive's extension.
+- Layers keep a drawing order. `0212` swaps what two layer numbers refer to, and each layer keeps its place in the
+  order; the order is saved. `0213` shows or hides a range, `0214` and `0216` make built layers from a picture region
+  or a fill, `0217` and `0218` jump when a layer is shown or hidden. The PC redraws only at a fade's `0009`/`000a`
+  pair or while it waits for input, never during a timed `000b` wait.
+- `0008` calls through a switch table, `040b` reads a variable indirectly and `040d` copies a run of them, `0309`
+  copies flags, `0108` loads the picture a text slot names, `0109` frees a range of pictures, `0719` and `071c` set
+  the mode of or clear a range of buttons, and a variable reference in a destination writes the variable it names.
+- The opening movie (`0e00`), `RAIDY2OP.MPG` in the game folder, is MPEG-1 with Layer II sound, played by the shared
+  `vnvideo` decoder into a screen rectangle; a click skips it.
+- Animated scenes (`0d00`-`0d05`) are `GANM0100` files in `GRP`: a program of show-frame, hold and loop steps and
+  800x600 frames, each a run-length key frame or a delta over the frame it names. They play on layer 5 in 40 ms
+  units. `0d02 2` finishes the loop and stops, `0d02 0` unloads, `0d03` reports when it has stopped, `0d04` pauses
+  around the save menus and `0d05` waits a frame.
+- The automap (`0c00`-`0c06`, `0809`): fourteen planes of 40x40 bits, most significant bit first, set where a cell is
+  unexplored. `0c03` resets them, `0c04` marks a rectangle explored, `0809` marks the player's cell and draws it, and
+  `0c06` and `0c05` draw a floor's map from cells or pixel positions: explored cells from the finished map, unexplored
+  ones from blank parchment.
+- Equipment (`0f00`, `0f01`, `0f03`, `0f04`): the item tables are in the exe. The hands share a twenty-entry table
+  (twelve weapons, three of them two-handed, then eight shields); there are ten armours and six accessories. `0f03`
+  works out hit, attack, defence and speed from the level, the base values and the equipment, `0f04` equips or
+  removes, and `0f00` and `0f01` keep and restore all of it while a shop lets Raidy try something on.
+- The backlog (`0914`, `0915`, `0509`, `0b04`) keeps the last hundred messages with their speaker, named from
+  `DATA/NAMELIST.TXT`, and voice. Button type 7 is a vertical scrollbar (`0712`, `0714`, `071e`).
+- The message window's Skip and Auto toggles are bound with `071a` and `071b`; `0916` clears the window; `0715` waits
+  for a time or input.
+- A button bound with a call returns to the input wait it interrupted, so a page such as the save page stays open after
+  the action. `070c` and `070d` keep and restore the cancel and key bindings along with the buttons' modes. A jump
+  from a button drops the current message only when it interrupts the message itself.
+- The window font is "ＭＳ ゴシック" (MS Gothic), bold, drawn with the shared substitute and emboldened as Windows does.
 
 ## Saves
 
-The PC engine keeps every slot in one file in the game folder, `RAIDYUS.SAV` for Raidy, and so does VNDegen:
+The PC engine keeps every slot in one file in the game folder, `RAIDYUS.SAV` for Raidy and `RAIDY2R.SAV` for
+Raidy II, and so does VNDegen:
 
 - A header with the slot count (50), a table of slot offsets, the global block (flags and variables that last across
   games, such as the extras' unlocks) and a 64-word settings block (effect speed, skip mode, auto and text speed,
@@ -52,8 +94,13 @@ The PC engine keeps every slot in one file in the game folder, `RAIDYUS.SAV` for
 - Each slot: the date, the line on screen, a 112x84 thumbnail and an 8544-byte state: the script and label to resume
   at, the BGM, the flags, the variables, the picture names, every layer and every button with its binding. A load
   restores the state, runs `LOAD.SNR` (which rebuilds the dungeon from the variables) and resumes.
+- Raidy II's header gives the settings block at `0xdc` and the global block from `0x1dc` to `0x25d`; a 25 KB block
+  before the first slot (read marks) is kept as it is. Its slot state adds the automap after the variables, a
+  972-byte button record (its 840 extra bytes are written with the values a fresh PC save holds) and the animation's
+  state at the end.
+- The save file is found whatever the case of its name in the folder.
 - Slots saved by the PC engine under Wine load here on the same screen, and slots saved here list and load in the PC
-  engine on the same screen.
+  engine on the same screen, for both games.
 
 ## What runs
 
@@ -68,10 +115,14 @@ Games start on the "Visual novel" controller layout.
 
 ## Known limits
 
-- The backlog (the window's Log button and the wheel) isn't done.
+- Raidy's backlog (the window's Log button and the wheel) isn't done; Raidy II's is.
 - Read marks aren't kept, so Skip skips all text whatever the skip setting says. Auto waits for the voice, then a
   delay of twice the auto speed setting in milliseconds.
 - Effect mode (Nowait, Fast) doesn't shorten the scripts' fades.
 - Layers drawn as rotated or skewed quads (`0204`) are drawn as their bounding box; Raidy uses quads only for
   full-screen fades.
 - The texture filtering and lighting of the 3D view are close to, not identical with, the PC's.
+- Raidy II: the arguments of `0716`/`0717` after the cells, `000e`, `0010`, `0011` and `0724` are accepted and do
+  nothing; what they do wasn't found. The read marks block in
+  `RAIDY2R.SAV` is kept but not used.
+- Raidy II: the ending (`L2_ED`) wasn't played through.

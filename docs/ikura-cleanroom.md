@@ -14,10 +14,19 @@ It derives from no GPL or LGPL code. Its sources:
 | 3D dungeon | The ZMZ grid compared with the game's own map pictures; the view's geometry and lighting fitted to screenshots of the original at known positions, and the animation timing to frame recordings |
 | Saves (`RAIDYUS.SAV`) | Diffs of files the original wrote under Wine at known points, options changed one at a time, and transplants of single sections between files. Checked both ways: the original's slots load here, ours load there |
 | File name case | `Engines/Shared/casepath.c`, VNDegen's own |
+| Raidy II: cells, layers, buttons | The game's scripts and GGP headers; test scripts in `SNR0` run by the original under Wine and recorded at 20 frames a second (layer swaps and the drawing order, range show and hide, jumps on a layer's state, switch calls, indirect variables, flag copies) |
+| Raidy II: animations (`GAN`) | GARbro `ArcFormats/Ikura/ArcGAN.cs` (MIT): the frame index and the run-length key and delta frames. The program's timing (40 ms units) and the layer they draw on from recordings of the original under Wine; the decoded frames matched its output to a mean difference of 0.12/255 |
+| Raidy II: movie | `RAIDY2OP.MPG` is MPEG-1 with Layer II sound; the shared `vnvideo` decoder (pl_mpeg, MIT) plays it |
+| Raidy II: automap | Saves the original wrote (bit order and plane layout) and test scripts drawing the map with each command alone and with its arguments swapped |
+| Raidy II: equipment | Black box only: test scripts set the equipment and base variables, ran `0f03` or `0f04`, and saved; the variables were read from the save files. The tables and formulas reproduce every variable in 98 compared saves |
+| Raidy II: backlog | The game's `BACKLOG.SNR` and screenshots of the original's log page |
+| Raidy II: saves (`RAIDY2R.SAV`) | Saves the original wrote under Wine and the game's own shipped save, walked field by field; checked both ways |
 
 The exe was run under Wine for nearly everything. Its machine code was read in two places only, for facts: the
 `CreateFontA` call's arguments and the table its sound code passes to `SetVolume`. VNDegen computes the curve that
 table follows rather than copying it.
+
+For Raidy II the exe's machine code wasn't read at all.
 
 Things that were unsure and how they were settled:
 
@@ -29,3 +38,9 @@ Things that were unsure and how they were settled:
 - The dungeon's camera: two faces of one wall seen from two cells give the distance and focal length; the texture's
   mortar spacing confirmed them.
 - The save state's resume point: the last label the main script reached, as both a message and a dungeon save show.
+- Raidy II's `0212`: a content swap or a renumbering. Test scripts showed the content moves with the number, and the
+  PC's saves showed each layer keeping its place in the drawing order; both together are a renumbering.
+- Raidy II's window font: Wine draws a proportional face because the prefix has no MS Gothic. A Windows install has
+  MS Gothic, so VNDegen draws the MS Gothic substitute the script names.
+- Raidy II's `0716`/`0717` trailing arguments: the last one isn't the starting mode (the load page's slot buttons have
+  0 and the script expects them enabled); both are accepted and ignored.

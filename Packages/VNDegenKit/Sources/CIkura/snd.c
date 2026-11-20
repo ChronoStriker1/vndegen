@@ -25,6 +25,7 @@ typedef struct Sound {
 
 struct Mixer {
     pthread_mutex_t lock;
+    Movie *movie;
     Sound *ch[IK_CHANNELS];
     float vol[IK_CHANNELS];
 };
@@ -207,6 +208,12 @@ void snd_bgm_fade(IK *t, int ms) {
     pthread_mutex_unlock(&t->mixer->lock);
 }
 
+void snd_set_movie(IK *t, Movie *m) {
+    pthread_mutex_lock(&t->mixer->lock);
+    t->mixer->movie = m;
+    pthread_mutex_unlock(&t->mixer->lock);
+}
+
 void snd_mix(IK *t, float *out, int frames) {
     memset(out, 0, sizeof(float) * (size_t)frames * 2);
     if (!t->mixer || t->paused) return;
@@ -244,6 +251,7 @@ void snd_mix(IK *t, float *out, int frames) {
             }
         }
     }
+    if (t->mixer->movie) movie_mix(t->mixer->movie, out, frames, t->mixer->vol[CH_BGM], t->audioRate);
     pthread_mutex_unlock(&t->mixer->lock);
     for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
 }

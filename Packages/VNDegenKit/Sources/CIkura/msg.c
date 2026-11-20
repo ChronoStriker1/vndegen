@@ -18,6 +18,7 @@ static void clear(MsgWin *m) {
     m->penX = m->x;
     m->penY = m->y;
     m->name = -1;
+    m->voice[0] = 0;
 }
 
 static void push_char(MsgWin *m, u32 cp, int x, int y) {
@@ -85,7 +86,22 @@ static void add_text(IK *t, const u8 *s, int len) {
     free(cps);
 }
 
+static void log_add(IK *t) {
+    MsgWin *m = &t->msg;
+    if (!m->rawLen) return;
+    LogEntry *e = &t->backlog[(t->logHead + t->logCount) % IK_LOG];
+    if (t->logCount == IK_LOG) {
+        e = &t->backlog[t->logHead];
+        t->logHead = (t->logHead + 1) % IK_LOG;
+    } else t->logCount++;
+    free(e->text);
+    e->text = ik_strdup(m->raw);
+    e->name = m->name;
+    snprintf(e->voice, sizeof e->voice, "%s", m->voice);
+}
+
 static void finish(IK *t) {
+    if (t->msg.tags) log_add(t);
     t->msg.tags = NULL;
     if (t->wait == W_MSG) t->wait = W_NONE;
 }
@@ -130,6 +146,7 @@ static void run_tags(IK *t) {
                 memcpy(name, p + 1, 12);
                 name[12] = 0;
                 snd_voice(t, name);
+                snprintf(m->voice, sizeof m->voice, "%s", name);
             }
             m->tagPos += 13;
             break;
@@ -208,6 +225,54 @@ void msg_tick(IK *t) {
     run_tags(t);
 }
 
+static void load_names(IK *t) {
+    t->namesLoaded = true;
+    size_t n;
+    u8 *d = store_load(&t->store, AR_DATA, "NAMELIST.TXT", &n);
+    if (!d) return;
+    const char *p = (const char *)d, *end = p + n;
+    while (p < end) {
+        const char *eol = memchr(p, '\n', (size_t)(end - p));
+        if (!eol) eol = end;
+        const char *q1 = memchr(p, '"', (size_t)(eol - p));
+        const char *q2 = q1 ? memchr(q1 + 1, '"', (size_t)(eol - q1 - 1)) : NULL;
+        if (q1 && q2) {
+            t->names = ik_realloc(t->names, sizeof(char *) * (size_t)(t->nameCount + 1));
+            char *s = ik_alloc((size_t)(q2 - q1));
+            memcpy(s, q1 + 1, (size_t)(q2 - q1 - 1));
+            t->names[t->nameCount++] = s;
+        }
+        p = eol + 1;
+    }
+    free(d);
+}
+
+static void flag_set(IK *t, int i, bool on) {
+    if (i < 0 || i >= t->flagCount * 8) return;
+    if (on) t->flags[i >> 3] |= (u8)(1 << (i & 7));
+    else t->flags[i >> 3] &= (u8)~(1 << (i & 7));
+}
+
+static void log_page(IK *t, int start, int count, int textBase, int varBase, int nameBase, int flagBase) {
+    if (!t->namesLoaded) load_names(t);
+    for (int i = 0; i < count; i++) {
+        int k = start + i;
+        LogEntry *e = k >= 0 && k < t->logCount ? &t->backlog[(t->logHead + k) % IK_LOG] : NULL;
+        const char *text = e ? e->text : "";
+        vm_set_text(t, textBase + i, text, (int)strlen(text));
+        const char *name = e && e->name >= 0 && e->name < t->nameCount ? t->names[e->name] : "";
+        vm_set_text(t, nameBase + i, name, (int)strlen(name));
+        if (varBase + i >= 0 && varBase + i < t->varCount) t->vars[varBase + i] = nameBase + i - 1;
+        if (nameBase + i >= 0 && nameBase + i < IK_LOG_SLOTS)
+            snprintf(t->logVoice[nameBase + i], sizeof t->logVoice[0], "%s", e ? e->voice : "");
+        flag_set(t, flagBase + i, e && e->voice[0]);
+    }
+}
+
+void msg_log_voice(IK *t, int slot) {
+    if (slot >= 0 && slot < IK_LOG_SLOTS && t->logVoice[slot][0]) snd_voice(t, t->logVoice[slot]);
+}
+
 bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
     MsgWin *m = &t->msg;
     switch (op) {
@@ -273,6 +338,19 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
         run_tags(t);
         break;
     case 0x0910: t->msgMode = val(t, a); break;
+    case 0x0914: {
+        u32 v = rd32(a);
+        if (v < (u32)t->varCount) t->vars[v] = t->logCount;
+        break;
+    }
+    case 0x0915:
+        if (n >= 24) log_page(t, val(t, a), val(t, a + 4), val(t, a + 8), val(t, a + 12), val(t, a + 16), val(t, a + 20));
+        break;
+    case 0x0916:
+        clear(m);
+        m->tags = NULL;
+        t->dirty = true;
+        break;
     case 0x0911:
     case 0x090d:
     case 0x090e:
@@ -309,6 +387,9 @@ void msg_draw(IK *t, int layer) {
 }
 
 void msg_close(IK *t) {
+    for (int i = 0; i < IK_LOG; i++) free(t->backlog[i].text);
+    for (int i = 0; i < t->nameCount; i++) free(t->names[i]);
+    free(t->names);
     free(t->msg.chars);
     t->msg.chars = NULL;
     free(t->msg.raw);

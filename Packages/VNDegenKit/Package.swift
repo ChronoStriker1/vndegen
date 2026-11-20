@@ -169,7 +169,7 @@ let package = Package(
         .target(name: "EngineTmrHiro", dependencies: ["VNCore", "CTmrHiro", "FrameHost"], swiftSettings: mainActorByDefault),
         .target(name: "CIPAC", dependencies: ["CVNFont"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineIPAC", dependencies: ["VNCore", "CIPAC", "FrameHost"], swiftSettings: mainActorByDefault),
-        .target(name: "CIkura", dependencies: ["CVNFont"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
+        .target(name: "CIkura", dependencies: ["CVNFont", "CVNVideo"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineIkura", dependencies: ["VNCore", "CIkura", "FrameHost"], swiftSettings: mainActorByDefault),
         .target(name: "CEAGLS", dependencies: ["CVNFont", "CVNVideo"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineEAGLS", dependencies: ["VNCore", "CEAGLS", "FrameHost"], swiftSettings: mainActorByDefault),
