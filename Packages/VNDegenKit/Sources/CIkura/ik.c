@@ -104,6 +104,10 @@ static void tick(IK *t) {
     case W_QUIT: t->quit = true; break;
     case W_INPUT:
         if (t->skipMode) msg_stop_modes(t);
+        if (t->inputTimed && (i32)(t->now - t->inputUntil) >= 0) {
+            t->inputTimed = false;
+            t->wait = W_NONE;
+        }
         break;
     default: break;
     }

@@ -56,6 +56,7 @@ static void pop(IK *t) {
 
 void vm_branch(IK *t, Script *sc, int label, bool call) {
     if (!sc) return;
+    t->inputTimed = false;
     if (call) push(t);
     else t->msg.tags = NULL;
     t->sc = sc;
@@ -665,6 +666,8 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
                                   (int)ik_value(t, rd32(a + 24)), (int)ik_value(t, rd32(a + 28)), ik_value(t, rd32(a + 36)) != 0))
             t->wait = W_MOVIE;
         break;
+    case 0x000e:
+    case 0x0724:
     case 0x0010:
     case 0x0011:
     case 0x0201:
@@ -762,7 +765,10 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         }
         break;
     }
-    case 0x0706: t->wait = W_INPUT; break;
+    case 0x0706:
+        t->wait = W_INPUT;
+        t->inputTimed = false;
+        break;
     case 0x0716:
         if (n >= 36)
             cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), 0, 0, false, (int)ik_value(t, rd32(a + 8)), a + 12);
@@ -801,6 +807,23 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         t->dirty = true;
         break;
     }
+    case 0x0721: {
+        Button *b = button(t, rd32(a));
+        if (!b || n < 24) break;
+        int img = (int)ik_value(t, rd32(a + 4));
+        for (int k = 0; k < 4; k++) {
+            int c = (int)ik_value(t, rd32(a + 8 + 4 * k));
+            const Cell *ce = c >= 0 ? cell_at(t, img, c) : NULL;
+            b->state[k] = ce ? (ButtonState){img, ce->sx, ce->sy} : (ButtonState){-1, 0, 0};
+        }
+        t->dirty = true;
+        break;
+    }
+    case 0x0715:
+        t->wait = W_INPUT;
+        t->inputUntil = t->now + ik_value(t, rd32(a));
+        t->inputTimed = true;
+        break;
     case 0x0722: {
         Button *b = button(t, rd32(a));
         if (!b || n < 28) break;

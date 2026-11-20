@@ -152,4 +152,82 @@ import VNCore
         #expect(at(state + 0x10e8) == 80)
         #expect(at(state + 0x1118) == 0xffffffff)
     }
+
+    private var raidy2Sizes: [(UInt16, [UInt8])] {
+        [(0x0300, Self.u16(900)), (0x0400, Self.u16(512)), (0x0c00, Self.u32(40) + Self.u32(40) + Self.u32(14)), (0x0100, Self.u16(27)),
+         (0x0200, Self.u16(45)), (0x0700, Self.u32(80))]
+    }
+
+    private func savedState(_ ops: [(UInt16, [UInt8])]) throws -> (data: [UInt8], state: Int) {
+        let start = Self.script(raidy2Sizes + ops + [
+            (0x0a00, Self.name("TEST.SAV") + Self.u32(50)),
+            (0x0a05, Self.u32(8) + Self.u32(112) + Self.u32(84)),
+            (0x0a06, Self.u32(3)),
+            (0x0706, []),
+        ])
+        let root = try makeGame(start)
+        let engine = try #require(run(root, frames: 4))
+        vnikura_close(engine)
+        let data = try [UInt8](Data(contentsOf: root.appending(path: "TEST.SAV")))
+        let slot = Self.read(data, 0x14 + 4 * 3)
+        return (data, slot + 0x6f54)
+    }
+
+    static func read(_ data: [UInt8], _ o: Int) -> Int {
+        Int(Int32(bitPattern: UInt32(data[o]) | UInt32(data[o + 1]) << 8 | UInt32(data[o + 2]) << 16 | UInt32(data[o + 3]) << 24))
+    }
+
+    @Test func aRaidy2SaveHasTheAutomapAndWideButtons() throws {
+        let (data, state) = try savedState([])
+        func at(_ o: Int) -> Int { Self.read(data, state + o) }
+        #expect(at(0x2c) == 900)
+        #expect(at(0xa1) == 512)
+        #expect(at(0x8a5) == 40 && at(0x8a9) == 40 && at(0x8ad) == 14 && at(0x8b1) == 2800)
+        #expect(at(0x13a5) == 27)
+        #expect(at(0x14ed) == 45)
+        #expect(at(0x20e5) == 80)
+    }
+
+    @Test func swappedLayersKeepTheirPlaceInTheDrawingOrder() throws {
+        let (data, state) = try savedState([(0x0212, Self.u32(1) + Self.u32(5) + Self.u32(0))])
+        func at(_ o: Int) -> Int { Self.read(data, state + o) }
+        #expect((0..<7).map { at(0x14f1 + 4 * $0) } == [0, 5, 2, 3, 4, 1, 6])
+    }
+
+    @Test func equipmentStatsMatchTheOriginal() throws {
+        let (data, state) = try savedState([
+            (0x0401, Self.u32(154) + Self.u32(7)), (0x0401, Self.u32(150) + Self.u32(3)), (0x0401, Self.u32(162) + Self.u32(3)),
+            (0x0f03, []),
+        ])
+        func v(_ i: Int) -> Int { Self.read(data, state + 0xa5 + 4 * i) }
+        #expect([v(166), v(167), v(168), v(169), v(170), v(171), v(173)] == [7, 58, 6, 28, 21, 6, -3])
+    }
+
+    @Test func anAnimationFrameDrawsOnLayerFive() throws {
+        var gan = Array("GANM0100".utf8) + Self.u32(3) + Self.u32(1)
+        gan += Self.u32(1) + Self.u32(1) + Self.u32(2) + Self.u32(25) + Self.u32(5) + Self.u32(0)
+        gan += [UInt8](repeating: 0, count: 0x2010 - gan.count)
+        let frame: [UInt8] = [0x11, 0x22, 0x33, 0x11, 0x22, 0x33, 0xff, 0xff] + Self.u32(480000)
+        gan += Self.u32(1) + Self.u32(0) + Self.u32(0x2020) + Self.u32(frame.count)
+        gan += frame
+        let start = Self.script(raidySizes + [
+            (0x0202, Self.u32(5) + Self.u32(800) + Self.u32(600)),
+            (0x0206, Self.u32(5) + Self.u32(255) + Self.u32(0) + Self.u32(0) + Self.u32(0)),
+            (0x0208, Self.u32(5)),
+            (0x0205, Self.u32(5) + Self.u32(1)),
+            (0x0d00, Self.name("T")),
+            (0x0d01, Self.u32(5)),
+            (0x0706, []),
+        ])
+        let root = TestFolders.root.appending(path: "ikura-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Self.archive([("START.SNR", start)]).write(to: root.appending(path: "SNR"))
+        try Self.archive([("T.GAN", gan)]).write(to: root.appending(path: "GRP"))
+        let engine = try #require(run(root, frames: 4))
+        defer { vnikura_close(engine) }
+        var w: Int32 = 0, h: Int32 = 0
+        let pixels = try #require(vnikura_pixels(engine, &w, &h))
+        #expect(pixels[300 * 800 + 400] == 0xff11_2233)
+        #expect(pixels[599 * 800 + 799] == 0xff11_2233)
+    }
 }

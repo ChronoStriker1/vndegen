@@ -270,7 +270,8 @@ struct IK {
     Frame stack[IK_STACK];
     int sp;
     int wait;
-    u32 waitUntil;
+    u32 waitUntil, inputUntil;
+    bool inputTimed;
 
     i32 *vars;
     int varCount;
