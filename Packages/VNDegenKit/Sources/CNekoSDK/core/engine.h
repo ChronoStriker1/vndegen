@@ -358,6 +358,7 @@ private:
     bool voiceAllowed(const std::string &voice) const;
     int soundGroup(int kind, const std::string &path) const;  // the volume a sound plays at
     int cardsPerPage() const;
+    int cardWidth(const Image &sheet) const;
     void cardPlace(int index, int &x, int &y) const;
     std::string mainFlowKey() const;
     bool galleryPageExists(int page) const;

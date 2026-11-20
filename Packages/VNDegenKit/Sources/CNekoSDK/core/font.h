@@ -22,5 +22,6 @@ int fontAscent(int face, int px);
 int fontMissingAdvance(int face, int px);
 // Where the font pack is: its folder holding fonts.tsv. Call before drawing text.
 void setFontPackDir(const std::string &dir);
+int gameFontFace(const std::vector<uint8_t> &data);
 
 }  // namespace neko

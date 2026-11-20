@@ -128,9 +128,10 @@ void Config::parse(const std::vector<uint8_t> &data) {
     std::string text = sjis::toUtf8(std::string(data.begin(), data.end()));
     for (const std::string &raw : split(text, '\n')) {
         std::string line = raw.substr(0, raw.find("//"));
-        size_t tab = line.find_first_of(" \t");
+        size_t tab = line.find_first_of(" \t,");
         if (tab == std::string::npos) continue;
-        std::string key = trim(line.substr(0, tab)), value = trim(line.substr(tab));
+        std::string key = trim(line.substr(0, tab)), value = trim(line.substr(tab + (line[tab] == ',' ? 1 : 0)));
+        if (line[tab] == ',') value = trim(value.substr(0, value.find(',')));
         if (!key.empty() && !value.empty() && key[0] != '#') values_[key] = value;
     }
 }
@@ -316,6 +317,12 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     if (auto it = screens_.find("defaults"); it != screens_.end()) {
         const Screen &d = it->second;
         if (const auto *f = d.setting("textfont"); f && !f->empty()) fontFace_ = field(*f, 0);
+        if (const auto *f = d.setting("textfontfile"); f && !f->empty()) {
+            std::string relative = (*f)[0];
+            std::replace(relative.begin(), relative.end(), '\\', '/');
+            if (std::vector<uint8_t> data = readWhole(matchCase(root_, relative)); !data.empty()) fontFace_ = gameFontFace(data);
+            else warnOnce("The table's text font isn't in the game folder: " + (*f)[0]);
+        }
         commentFace_ = fontFace_;
         // `commentfont N`: the face of a save card's comment, which the PC asks for apart from the text's.
         if (const auto *f = d.setting("commentfont"); f && !f->empty()) commentFace_ = field(*f, 0);
@@ -421,6 +428,7 @@ void Engine::openScreen(const std::string &name) {
     if (const auto *tabs = screen_->setting("gallerytabs"); tabs && !tabs->empty()) galleryTab_ = field(*tabs, 0);
     if (name == "title" && !titleBgm_.empty() && !titleMusic_) {
         if (Bytes data = files_.read(titleBgm_)) {
+            if (defaultsHave("titlebgmheard")) noteSeen(titleBgm_);
             titleMusic_ = audio_.open(data);
             if (titleMusic_) {
                 audio_.setLoops(titleMusic_, 0);
@@ -621,6 +629,7 @@ void Engine::runAction(const std::string &action) {
     if (action == "start_prologue") { storyFlowKey_ = "FirstFlow"; startStory(); return; }
     if (action == "start_main") { storyFlowKey_ = mainFlowKey(); startStory(); return; }
     if (action == "start_sub") { storyFlowKey_ = "SubFlow1"; startStory(); return; }
+    if (action.rfind("flowkey:", 0) == 0) { storyFlowKey_ = action.substr(8); startStory(); return; }
     if (action.rfind("route", 0) == 0) {
         pendingRoute_ = std::atoi(action.c_str() + 5);
         storyFlowKey_ = "FirstFlow";
@@ -1023,7 +1032,7 @@ bool Engine::moveFocus(int dx, int dy) {
                 for (int i = 0; i < perPage; i++) {
                     int cx, cy;
                     cardPlace(i, cx, cy);
-                    spots.push_back({cx + sheet->w / 2, cy + sheet->h / (rows ? field(*rows, 0) : 5) / 2});
+                    spots.push_back({cx + cardWidth(*sheet) / 2, cy + sheet->h / (rows ? field(*rows, 0) : 5) / 2});
                     // A card with a save has its lock and Delete to reach too, without a pointer.
                     if (!slotInfo(page_ * perPage + i + 1).exists) continue;
                     for (const char *key : {"slotlock", "slotdelete"})
@@ -1299,6 +1308,10 @@ void Engine::loadGalleries() {
             if (f.size() == 4 && normalizedPath(f[3]).find(".ogg") != std::string::npos) e.bgm = f[3];
             // Test Game 87's names the scene script that replays it (set 1).
             if (f.size() == 4 && normalizedPath(f[3]).find(".txt") != std::string::npos) e.flow = "replayscene:" + f[3];
+            if (f.size() == 5 && normalizedPath(f[4]).find(".txt") != std::string::npos) {
+                e.bgm.clear();
+                e.flow = f[4];
+            }
             cgEntries_.push_back(e);
         } else if (f[0] != "##" && !cgEntries_.empty()) {
             auto parts = split(f[0], ',');
@@ -1919,9 +1932,9 @@ void Engine::composeGallery(Canvas &out) {
                 for (size_t i = 0; i < e.images.size() && !unlocked; i++) unlocked = galleryImageSeen(e, i);
         }
         if (sheet) {
-            int h = sheet->h / 5;
+            int h = sheet->h / 5, w = sheet->w / std::max(1, sheetName->size() >= 2 ? field(*sheetName, 1) : 1);
             int row = !unlocked ? int(StateDisabled) : index == hovered ? int(StateHover) : int(StateNormal);
-            drawPart(out, *sheet, cx, cy, 0, row * h, sheet->w, h, 1);
+            drawPart(out, *sheet, cx, cy, 0, row * h, w, h, 1);
         }
         // Or a plain card with a blank one for what's locked, and a frame for the hovered one, as in Test Game 84.
         const auto *card = screen_->setting("cellcard"), *blank = screen_->setting("cellempty"), *frame = screen_->setting("cellframe");
@@ -2754,6 +2767,7 @@ SaveData Engine::captureSave() {
     for (const auto &[name, part] : parts_) part->savePC(d);
     d.windowShown = windowShown_;
     d.current = currentText_;
+    if (defaultsHave("textcomment")) d.comment = currentText_.text;
     d.backlog = backlog_;
     auto soundsOf = [&](const std::map<int, Playing> &table, const std::map<int, int> &players, int base) {
         for (const auto &[channel, playing] : table) {
@@ -3103,6 +3117,11 @@ int Engine::cardsPerPage() const {
     return grid && grid->size() >= 7 ? field(*grid, 5) * field(*grid, 6) : 0;
 }
 
+int Engine::cardWidth(const Image &sheet) const {
+    const auto *cols = screen_ ? screen_->setting("slotcols") : nullptr;
+    return sheet.w / std::max(1, cols ? field(*cols, 0) : 1);
+}
+
 // Where the card at this place on a page sits.
 // `pageoff N`: page N's button is disabled on this screen, as Test Game 89's Quick Save page is on its save screen.
 bool Engine::pageStepOff(const std::string &action) const {
@@ -3227,7 +3246,7 @@ int Engine::slotAt(int x, int y) const {
     ImageRef sheet = images_->get((*screen_->setting("slots"))[0]);
     if (!sheet) return -1;
     const auto *rows = screen_->setting("slotrows");
-    int w = sheet->w, h = sheet->h / (rows ? field(*rows, 0) : 5);
+    int w = cardWidth(*sheet), h = sheet->h / (rows ? field(*rows, 0) : 5);
     for (int i = 0; i < perPage; i++) {
         int cx, cy;
         cardPlace(i, cx, cy);
@@ -3280,7 +3299,7 @@ void Engine::composeSlots(Canvas &out) {
             int row = (loading && !info.exists) || (isLocked && screen_->setting("lockdim")) ? int(StateDisabled) : slot == hovered ? int(StateHover) : int(StateNormal);
             // `emptycards OPACITY`: Test Game 92's PC draws an empty card on the load screen faded, at 80 of 256.
             float cardOpacity = loading && !info.exists && screen_->setting("emptycards") ? float(offset("emptycards", 0)) / 256 : 1;
-            drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, sheet->w, cardH, cardOpacity);
+            drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, cardWidth(*sheet), cardH, cardOpacity);
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
             else if (empty) drawPart(out, *empty, cx + offset("slotempty", 1), cy + offset("slotempty", 2), 0, 0, empty->w, empty->h, 1);
             // `slotthumbframe SHEET X Y`: a frame around the thumbnail of every card with a save, as Test Game 82's cards have.
@@ -3368,6 +3387,12 @@ void Engine::composeSlots(Canvas &out) {
                 std::string text = info.comment;
                 if (text.empty())
                     for (size_t i = 4; i < line->size(); i++) text += (i > 4 ? " " : "") + (*line)[i];
+                if (const auto *cut = screen_->setting("slotcommentcut"); cut && !cut->empty()) {
+                    size_t at = 0;
+                    for (int count = 0; at < text.size() && count < field(*cut, 0); count++)
+                        for (at++; at < text.size() && (static_cast<unsigned char>(text[at]) & 0xC0) == 0x80; at++) {}
+                    if (at < text.size()) text = text.substr(0, at) + "...";
+                }
                 drawComment(out, text, cx + field(*line, 0), cy + field(*line, 1), field(*line, 2), field(*line, 3));
             }
             // `datefield year|month|day|hour|minute X Y [STEP] [blank]`: each part of the date at a place of its own on the card,

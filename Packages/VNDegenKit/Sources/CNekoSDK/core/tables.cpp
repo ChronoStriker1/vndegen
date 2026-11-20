@@ -20,6 +20,7 @@ namespace {
 #include "tables/mankitsu.inc"
 #include "tables/funbagfantasy1.inc"
 #include "tables/yabai.inc"
+#include "tables/edensritter.inc"
 #include "tables/storytest.inc"
 #include "tables/layouttest.inc"
 #include "tables/cardtest.inc"
@@ -56,6 +57,14 @@ const char *menuTable(const std::string &folder) {
         return table.c_str();
     }
     if (folder == "waffle\\funbagfantasy") return kFunbagFantasy1;
+    if (folder == "waffle\\eden's ritter - paladins of ecstasy") {
+        static const std::string table = std::string(kEdensRitterShared) + kEdensRitter1;
+        return table.c_str();
+    }
+    if (folder == "waffle\\eden's ritter - priestess of pleasure") {
+        static const std::string table = std::string(kEdensRitterShared) + kEdensRitter2;
+        return table.c_str();
+    }
     if (folder == "waffle\\ヤバい！－復讐・闇サイト－") return kYabai1;
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestpcplain") return kStoryTest;
     if (folder == "vndegen\\storytestdim") {

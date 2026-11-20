@@ -26,6 +26,8 @@ namespace {
 std::mutex mu;
 std::string packDir;
 bool packReady = false;
+constexpr int kFirstGameFace = 1000;
+std::vector<std::vector<uint8_t>> gameFonts;
 
 std::vector<uint8_t> readFile(const std::string &p) {
     std::ifstream f(p, std::ios::binary);
@@ -46,6 +48,12 @@ const char *windowsFontName(int face) {
 }
 
 bool packFont(int face, FontSource &out) {
+    if (face >= kFirstGameFace) {
+        if (size_t(face - kFirstGameFace) >= gameFonts.size()) return false;
+        out.data = gameFonts[size_t(face - kFirstGameFace)];
+        out.face = 0;
+        return !out.data.empty();
+    }
     if (!packReady && !packDir.empty()) {
         const char *dirs[] = {packDir.c_str()};
         vnfont_init((packDir + "/fonts.tsv").c_str(), dirs, 1);
@@ -253,6 +261,13 @@ void setFontPackDir(const std::string &dir) {
     packDir = dir;
 }
 
+int gameFontFace(const std::vector<uint8_t> &data) {
+    std::lock_guard<std::mutex> lock(mu);
+    auto it = std::find(gameFonts.begin(), gameFonts.end(), data);
+    if (it == gameFonts.end()) it = gameFonts.insert(gameFonts.end(), data);
+    return kFirstGameFace + int(it - gameFonts.begin());
+}
+
 bool glyph(int face, uint32_t cp, int px, bool bold, GlyphImage &out) {
     using Key = std::tuple<int, uint32_t, int, bool>;
     static std::map<Key, GlyphImage> cache;
@@ -260,7 +275,7 @@ bool glyph(int face, uint32_t cp, int px, bool bold, GlyphImage &out) {
     // Windows draws what Lucida Sans Unicode lacks, such as kana and ♪, from MS UI Gothic, the first of its font link,
     // so its stand-in's missing characters come from MS UI Gothic's.
     // Verdana's stand-in does the same, which isn't measured: Test Game 82's English text has nothing it lacks.
-    if ((face == 7 || face == 8 || face == 9) && !faceFor(face).has(cp)) face = 4;
+    if ((face == 7 || face == 8 || face == 9 || face >= kFirstGameFace) && !faceFor(face).has(cp)) face = 4;
     Key k{face, cp, px, bold};
     auto it = cache.find(k);
     if (it != cache.end()) { out = it->second; return true; }

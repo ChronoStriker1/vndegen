@@ -81,7 +81,7 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 | Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` | Mac, iPhone, iPad | [wolfrpg.md](docs/wolfrpg.md) |
 | AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` | Mac, iPhone, iPad | [system3.md](docs/system3.md) |
 | AliceSoft System 4 | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe` | Mac, iPhone, iPad | [system4.md](docs/system4.md) |
-| NekoSDK (15 games) | `cfg.pak` beside `scr.pak` | Mac, iPhone, iPad | [engines.md](docs/engines.md#nekosdk) |
+| NekoSDK (17 games) | `cfg.pak` beside `scr.pak` | Mac, iPhone, iPad | [engines.md](docs/engines.md#nekosdk) |
 | YU-RIS | `yscfg.dat` or `ysbin.ypf` beside `.ypf` archives | Mac, iPhone, iPad | [yuris.md](docs/yuris.md) |
 | Nitroplus N2System | `system.npa` beside `nss.npa` | Mac, iPhone, iPad | [n2system.md](docs/n2system.md) |
 | Tmr-Hiro ADV System | `srp.pac` beside `Agrd.pac` | Mac, iPhone, iPad | [tmrhiro.md](docs/tmrhiro.md) |

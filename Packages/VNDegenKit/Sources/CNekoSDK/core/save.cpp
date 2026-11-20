@@ -122,6 +122,18 @@ const SaveLayout kMankitsu = [] {
     l.firstCard = 0;
     return l;
 }();
+const SaveLayout kEdensRitter = [] {
+    SaveLayout l = kRinjin;
+    l.tailSize = 6070;
+    l.tail = {{819, "ffffffff"}, {865, "ffffffff"}, {935, "ffffffff"}, {1009, "3c"}, {5256, "68"}};
+    return l;
+}();
+const SaveLayout kEdensRitter2 = [] {
+    SaveLayout l = kChristmas;
+    l.after = {{2, "ffffffff"}, {72, "ffffffff"}};
+    l.tail.erase(l.tail.begin());
+    return l;
+}();
 // Test Game 96's, from set 2's 18 PC saves (lead): the older engine's records, 396 bytes each after their names with 26
 // zeros before each, and the older text records, sound channels and tail, with the newer place for the choice's picture
 // and a second picture's name after it. 154 channels and 14 zeros before the scene's name are the most that fit; the tail
@@ -343,6 +355,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     // Test Game 92 saves as Ore o Hoshigaru Tsuma to Gibo does: its PC save reads with that layout.
     if (folder == "waffle\\animother") return &kAniMother;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
+    if (folder == "waffle\\eden's ritter - paladins of ecstasy") return &kEdensRitter;
+    if (folder == "waffle\\eden's ritter - priestess of pleasure") return &kEdensRitter2;
     // The runtime's own story-table test game saves as The Alchemist does.
     if (folder == "vndegen\\storytest" || folder == "vndegen\\storytestload" || folder == "vndegen\\storynumber") return &kAlchemist;
     // And so do the save card and confession tree test games.
@@ -374,7 +388,7 @@ bool namesPictureTwice(const SaveLayout &layout) {
     // The PC's own saves name it twice in the Christmas game, The Alchemist, Test Games 85, 88 and 93; Test Games 84, 89,
     // 92 and 94's and the older engine's leave it empty. Test Game 94's PC, given a save of the runtime's with the name
     // twice, lost the picture and went on elsewhere, and with it once came back as from its own save there (under Wine).
-    for (const SaveLayout *twice : {&kChristmas, &kAlchemist, &kMother3, &kTsumaGibo, &kFunbag4})
+    for (const SaveLayout *twice : {&kChristmas, &kAlchemist, &kMother3, &kTsumaGibo, &kFunbag4, &kEdensRitter2})
         if (&layout == twice) return true;
     return false;
 }

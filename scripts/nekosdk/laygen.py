@@ -18,7 +18,7 @@ def sparse(x):
         else: i+=1
     return out
 def cstr(sp): return '{'+', '.join('{%d, "%s"}'%(o,v.hex()) for o,v in sp)+'}'
-p=0xcd; p+=4+rd(p); p+=4196; p+=4+rd(p); p+=39596; p+=400
+p=5+rd(1)+200; p+=4+rd(p); p+=4196; p+=4+rd(p); p+=39596; p+=400
 fixed=b[p:p+39600]; p+=39600; p+=40000; count=rd(p); p+=44; start=p
 found=None
 def walk(SH,RX):
@@ -54,7 +54,7 @@ def entry(p,trail):
         p+=4+L
     return p+trail
 hit=None
-for trail in (16,12,20):
+for trail in (16,12,20,8):
   for gap in (0x18,):
     for e in range(a,a+3000):
         if b[e] in(0,1) and b[e+1] in(0,1):
