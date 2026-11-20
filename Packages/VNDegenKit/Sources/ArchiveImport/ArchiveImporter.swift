@@ -301,6 +301,8 @@ public final class ArchiveImporter {
                 progress = extracted
                 if target != nil {
                     try FileManager.default.removeItem(at: source.volumes[0])
+                    try await Self.unpackWebArchives(in: staging)
+                    try Task.checkCancellation()
                     task = nil
                     unpackRoot = nil
                     finish(staging)

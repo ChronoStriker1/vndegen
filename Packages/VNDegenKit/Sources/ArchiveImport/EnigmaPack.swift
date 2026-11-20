@@ -277,7 +277,7 @@ nonisolated public struct EnigmaPack: Sendable, Equatable {
     }
 }
 
-nonisolated private extension Array where Element == UInt8 {
+nonisolated extension Array where Element == UInt8 {
     func u16(_ offset: Int) -> UInt16 { UInt16(self[offset]) | UInt16(self[offset + 1]) << 8 }
     func u32(_ offset: Int) -> UInt32 { (0..<4).reduce(0) { $0 | UInt32(self[offset + $1]) << (8 * $1) } }
     func u64(_ offset: Int) -> UInt64 { (0..<8).reduce(0) { $0 | UInt64(self[offset + $1]) << (8 * $1) } }

@@ -173,9 +173,3 @@ private nonisolated final class InflateStream {
         }
     }
 }
-
-private nonisolated extension Array where Element == UInt8 {
-    func u16(_ at: Int) -> UInt16 { UInt16(self[at]) | UInt16(self[at + 1]) << 8 }
-    func u32(_ at: Int) -> UInt32 { UInt32(u16(at)) | UInt32(u16(at + 2)) << 16 }
-    func u64(_ at: Int) -> UInt64 { UInt64(u32(at)) | UInt64(u32(at + 4)) << 32 }
-}

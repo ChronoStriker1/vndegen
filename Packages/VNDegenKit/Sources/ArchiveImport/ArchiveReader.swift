@@ -83,7 +83,7 @@ nonisolated final class ArchiveReader {
 
     private let archive: OpaquePointer
 
-    init(_ volumes: [URL], password: String?, cue: CueSheet? = nil) throws(ArchiveError) {
+    init(_ volumes: [URL], password: String?, cue: CueSheet? = nil, offset: Int64? = nil) throws(ArchiveError) {
         archive = archive_read_new()
         _ = archive_read_support_format_zip_seekable(archive)
         _ = archive_read_support_format_rar(archive)
@@ -92,6 +92,14 @@ nonisolated final class ArchiveReader {
         _ = archive_read_support_format_iso9660(archive)
         if let password { _ = archive_read_add_passphrase(archive, password) }
 
+        if let offset, volumes.count == 1 {
+            if carchive_open_window(archive, volumes[0].path, offset) != ARCHIVE_OK {
+                let error = currentError()
+                _ = archive_read_free(archive)
+                throw error
+            }
+            return
+        }
         if let cue, volumes.count == 2 {
             if carchive_open_raw_sectors(archive, volumes[1].path, cue.sectorSize, cue.dataOffset) != ARCHIVE_OK {
                 let error = currentError()
