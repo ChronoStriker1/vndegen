@@ -116,6 +116,12 @@ typedef struct ButtonTip {
     int layer, x, y, w, h, img, sx, sy;
 } ButtonTip;
 
+typedef struct Scroll {
+    int img, page;
+    int cells[9];
+    bool dragging;
+} Scroll;
+
 typedef struct Button {
     bool made, shown, enabled;
     int type, layer, x, y, w, h;
@@ -128,6 +134,7 @@ typedef struct Button {
     int label;
     bool bound, call;
     Script *sc;
+    Scroll scroll;
 } Button;
 
 #define IK_BUTTONS 512
@@ -178,7 +185,17 @@ typedef struct MsgWin {
     int msPerChar;
     char *raw;
     int rawLen, rawCap;
+    char voice[16];
 } MsgWin;
+
+#define IK_LOG 100
+#define IK_LOG_SLOTS 64
+
+typedef struct LogEntry {
+    char *text;
+    int name;
+    char voice[16];
+} LogEntry;
 
 #define IK_STACK 32
 
@@ -285,6 +302,12 @@ struct IK {
     int flagCount;
     Font fonts[IK_FONTS];
     MsgWin msg;
+    LogEntry backlog[IK_LOG];
+    int logCount, logHead;
+    char logVoice[IK_LOG_SLOTS][16];
+    char **names;
+    int nameCount;
+    bool namesLoaded;
     Mixer *mixer;
     SeSlot slots[IK_SLOTS];
     char bgmName[16];
@@ -332,6 +355,8 @@ void msg_tick(IK *t);
 void msg_draw(IK *t, int layer);
 void msg_close(IK *t);
 void msg_stop_modes(IK *t);
+void msg_log_voice(IK *t, int slot);
+void scrollbar_exec(IK *t, u16 op, const u8 *a, int n);
 void snd_init(IK *t);
 void snd_close(IK *t);
 void snd_se_load(IK *t, int slot, const char *name);

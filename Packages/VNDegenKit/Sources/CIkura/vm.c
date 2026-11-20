@@ -526,6 +526,12 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         }
         break;
     case 0x0601: snd_bgm_fade(t, 0); break;
+    case 0x0509: msg_log_voice(t, (int)ik_value(t, rd32(a))); break;
+    case 0x050a: {
+        i32 *v = var_at(t, rd32(a));
+        if (v) *v = 0;
+        break;
+    }
     case 0x0506: snd_voice(t, name_arg(a, n)); break;
     case 0x0507: snd_voice_stop(t); break;
     case 0x0508: t->wait = W_VOICE; break;
@@ -584,6 +590,11 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         }
         break;
     }
+    case 0x0712:
+    case 0x0714:
+    case 0x071e:
+        scrollbar_exec(t, op, a, n);
+        break;
     case 0x070e: {
         Button *b = button(t, rd32(a));
         if (b) b->max = (int)ik_value(t, rd32(a + 4));
@@ -955,6 +966,36 @@ bool text_exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     case 0x0b02:
         if (n >= 64) layer_text(t, (int)ik_value(t, rd32(a)), a, true);
+        break;
+    case 0x0b04:
+        if (n >= 6) {
+            int len = rd16(a + 4);
+            if (6 + len > n) len = n - 6;
+            const u8 *f = a + 6, *args = a + 6 + len;
+            int argc = (n - 6 - len) / 4, used = 0;
+            bool anyText = false, emptyText = false;
+            char out[1024];
+            int o = 0;
+            for (int i = 0; i < len && o < (int)sizeof out - 1;) {
+                if (f[i] == '%' && i + 1 < len && (f[i + 1] == 's' || f[i + 1] == 'd')) {
+                    i32 v = used < argc ? (i32)ik_value(t, rd32(args + 4 * used)) : 0;
+                    used++;
+                    if (f[i + 1] == 'd') o += snprintf(out + o, sizeof out - (size_t)o, "%d", (int)v);
+                    else {
+                        const char *s = v >= 0 && v < t->textCount && t->texts[v] ? t->texts[v] : "";
+                        anyText = true;
+                        if (!*s) emptyText = true;
+                        o += snprintf(out + o, sizeof out - (size_t)o, "%s", s);
+                    }
+                    if (o > (int)sizeof out - 1) o = (int)sizeof out - 1;
+                    i += 2;
+                    continue;
+                }
+                out[o++] = (char)f[i++];
+            }
+            if (anyText && emptyText) o = 0;
+            vm_set_text(t, (int)ik_value(t, rd32(a)), out, o);
+        }
         break;
     case 0x0b03:
         if (n >= 6) {
