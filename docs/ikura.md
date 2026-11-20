@@ -78,6 +78,9 @@ Raidy II's exe reads the same archives, pictures, sound and scripts; about sixty
   `DATA/NAMELIST.TXT`, and voice. Button type 7 is a vertical scrollbar (`0712`, `0714`, `071e`).
 - The message window's Skip and Auto toggles are bound with `071a` and `071b`; `0916` clears the window; `0715` waits
   for a time or input.
+- A button bound with a call returns to the input wait it interrupted, so a page such as the save page stays open after
+  the action. `070c` and `070d` keep and restore the cancel and key bindings along with the buttons' modes. A jump
+  from a button drops the current message only when it interrupts the message itself.
 - The window font is "ＭＳ ゴシック" (MS Gothic), bold, drawn with the shared substitute and emboldened as Windows does.
 
 ## Saves
@@ -95,6 +98,7 @@ Raidy II, and so does VNDegen:
   before the first slot (read marks) is kept as it is. Its slot state adds the automap after the variables, a
   972-byte button record (its 840 extra bytes are written with the values a fresh PC save holds) and the animation's
   state at the end.
+- The save file is found whatever the case of its name in the folder.
 - Slots saved by the PC engine under Wine load here on the same screen, and slots saved here list and load in the PC
   engine on the same screen, for both games.
 
