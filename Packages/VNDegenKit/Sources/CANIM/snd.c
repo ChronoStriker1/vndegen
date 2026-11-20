@@ -119,6 +119,7 @@ void an_snd_mix(AN *a, float *out, int frames) {
         mix_voice(m->v[c], m->vol[c], out, frames);
         mix_voice(m->fading[c], m->vol[c], out, frames);
     }
+    an_movie_mix(a, out, frames);
     pthread_mutex_unlock(&m->lock);
     for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
 }
@@ -209,4 +210,11 @@ bool an_snd_playing(AN *a, int channel) {
     bool r = m->v[channel] && !m->v[channel]->done;
     pthread_mutex_unlock(&m->lock);
     return r;
+}
+
+void an_snd_lock(AN *a, bool lock) {
+    struct Mixer *m = a->mix;
+    if (!m) return;
+    if (lock) pthread_mutex_lock(&m->lock);
+    else pthread_mutex_unlock(&m->lock);
 }

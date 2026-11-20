@@ -82,7 +82,7 @@ static Glyph *glyph(Font *f, u32 cp, int size) {
     g->cp = cp;
     g->size = size;
     if (f->ok) {
-        float sc = stbtt_ScaleForPixelHeight(&f->info, (float)size);
+        float sc = stbtt_ScaleForMappingEmToPixels(&f->info, (float)size);
         int adv, lsb;
         stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
         g->adv = (int)(adv * sc + 0.5f);
@@ -104,13 +104,6 @@ static Glyph *glyph(Font *f, u32 cp, int size) {
         f->hash[h] = f->count - 1;
     }
     return g;
-}
-
-static int ascent(Font *f, int size) {
-    if (!f->ok) return size;
-    int asc, desc, gap;
-    stbtt_GetFontVMetrics(&f->info, &asc, &desc, &gap);
-    return (int)(asc * stbtt_ScaleForPixelHeight(&f->info, (float)size) + 0.5f);
 }
 
 static void put_glyph(u32 *dst, int dw, int dh, const Glyph *g, int x, int y, u32 color) {
@@ -152,10 +145,10 @@ int an_text_width(AN *a, const char *s, int size) {
     return w;
 }
 
-int an_text_draw(AN *a, int x, int y, const char *s, int size, u32 color, u32 edge, int maxWidth, int lineHeight) {
+int an_text_draw(AN *a, int x, int baseline, const char *s, int size, u32 color, u32 shadow, int maxWidth, int lineHeight) {
     Font *f = a->font;
     if (!f) return 0;
-    int base = y + ascent(f, size);
+    int base = baseline;
     int cx = x, lines = 1;
     while (*s) {
         if ((s[0] == '@' && s[1] == 'n') || s[0] == '\n') {
@@ -180,10 +173,10 @@ int an_text_draw(AN *a, int x, int y, const char *s, int size, u32 color, u32 ed
         Glyph *g = glyph(f, cp, size);
         if (g->bm) {
             int gx = cx + g->x0, gy = base + g->y0;
-            if (edge >> 24)
-                for (int oy = -2; oy <= 2; oy++)
-                    for (int ox = -2; ox <= 2; ox++)
-                        if ((ox || oy) && ox * ox + oy * oy <= 5) put_glyph(a->fb, a->W, a->H, g, gx + ox, gy + oy, edge);
+            if (shadow >> 24) {
+                put_glyph(a->fb, a->W, a->H, g, gx + 1, gy + 1, shadow);
+                put_glyph(a->fb, a->W, a->H, g, gx + 2, gy + 2, shadow);
+            }
             put_glyph(a->fb, a->W, a->H, g, gx, gy, color);
         }
         cx += g->adv;

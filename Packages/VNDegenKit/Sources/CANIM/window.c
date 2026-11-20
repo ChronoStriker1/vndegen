@@ -46,25 +46,32 @@ void an_title_input(AN *a) {
     }
 }
 
-enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 170, TEXT_Y = 600, TEXT_W = 940, TEXT_SIZE = 26, LINE_H = 34, NAME_Y = 556 };
+enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 1020, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194, WIN_ALPHA = 130 };
 enum { BAR_X = 568, BAR_Y = 694, BAR_W = 712, BAR_H = 26, CHOICE_W = 719, CHOICE_H = 79, CHOICE_GAP = 16 };
 
 static void draw_window(AN *a) {
     Image *w = an_image_load(a, "spMessageWindow");
     if (w) {
-        an_gfx_blit(a->fb, a->W, a->H, w, 2, 220, 130, WIN_H, 0, WIN_Y, 255);
-        an_gfx_blit(a->fb, a->W, a->H, w, 2, 17, 1020, WIN_H, 130, WIN_Y, 255);
-        an_gfx_blit(a->fb, a->W, a->H, w, 134, 220, 130, WIN_H, 1150, WIN_Y, 255);
+        an_gfx_blit(a->fb, a->W, a->H, w, 2, 220, 130, WIN_H, 0, WIN_Y, WIN_ALPHA);
+        an_gfx_blit(a->fb, a->W, a->H, w, 2, 17, 1020, WIN_H, 130, WIN_Y, WIN_ALPHA);
+        an_gfx_blit(a->fb, a->W, a->H, w, 134, 220, 130, WIN_H, 1150, WIN_Y, WIN_ALPHA);
     }
-    if (a->name) an_text_draw(a, TEXT_X, NAME_Y, a->name, TEXT_SIZE, 0xff9fd6ffu, 0xc0000000u, 0, LINE_H);
-    if (a->text) an_text_draw(a, TEXT_X, TEXT_Y, a->text, TEXT_SIZE, 0xffffffffu, 0xc0000000u, TEXT_W, LINE_H);
-    Image *bar = an_image_load(a, "spMessageWindowButton");
-    if (bar) an_gfx_blit(a->fb, a->W, a->H, bar, 2, 118, BAR_W, BAR_H, BAR_X, BAR_Y, 255);
+    Image *ui = an_image_load(a, "spMessageWindowButton");
+    if (a->name) {
+        if (a->voiceName && ui) an_gfx_blit(a->fb, a->W, a->H, ui, 4, 53, 76, 28, 92, 563, 255);
+        an_text_draw(a, NAME_X, ROW1, a->name, TEXT_SIZE, 0xffffffffu, 0x90000000u, 0, LINE_H);
+    }
+    if (a->text) an_text_draw(a, TEXT_X, a->name ? ROW1 + LINE_H : ROW1, a->text, TEXT_SIZE, 0xffffffffu, 0x90000000u, TEXT_W, LINE_H);
+    if (ui) {
+        an_gfx_blit(a->fb, a->W, a->H, ui, 2, 118, BAR_W, BAR_H, BAR_X, BAR_Y, 255);
+        for (int i = 0; i < 11; i++) an_gfx_blit(a->fb, a->W, a->H, ui, 2 + 58 * i, 2, 56, 22, 606 + 58 * i + (i >= 2) * 10 + (i >= 7) * 10 + (i >= 10) * 10, 696, 255);
+        an_gfx_blit(a->fb, a->W, a->H, ui, 168, 53, 28, 28, 1243, 563, 255);
+    }
     Image *cur = an_image_load(a, "pAnimeCursor");
     if (cur && a->th.wait == W_TEXT) {
         int f = (int)(a->now / 80 % 9);
         int fx = 4 + (f % 6) * 42, fy = 4 + (f / 6) * 42;
-        an_gfx_blit(a->fb, a->W, a->H, cur, fx, fy, 36, 36, 1180, 650, 255);
+        an_gfx_blit(a->fb, a->W, a->H, cur, fx, fy, 36, 36, 1216, 649, 255);
     }
 }
 
@@ -96,7 +103,7 @@ static void draw_choices(AN *a) {
         Choice *c = &a->choice[i];
         if (sel) an_gfx_blit(a->fb, a->W, a->H, sel, 152, i == hover ? 99 : 7, CHOICE_W, CHOICE_H, c->x, c->y, 255);
         int w = an_text_width(a, c->text, TEXT_SIZE);
-        an_text_draw(a, c->x + (c->w - w) / 2, c->y + (c->h - TEXT_SIZE) / 2 - 4, c->text, TEXT_SIZE, 0xffffffffu, 0xc0000000u, 0, LINE_H);
+        an_text_draw(a, c->x + (c->w - w) / 2, c->y + c->h / 2 + 8, c->text, TEXT_SIZE, 0xffffffffu, 0x90000000u, 0, LINE_H);
     }
 }
 
@@ -125,6 +132,12 @@ void an_game_input(AN *a) {
             a->th.wait = W_NONE;
             if (!a->skipMode) an_snd_stop(a, CH_VOICE);
         }
+        return;
+    }
+    if (a->th.wait == W_MOVIE && (a->clicked || a->skipMode)) {
+        a->clicked = false;
+        an_movie_stop(a);
+        a->th.wait = W_NONE;
         return;
     }
     if (a->th.wait == W_TRANS && a->clicked) {

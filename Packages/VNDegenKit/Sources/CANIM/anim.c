@@ -84,6 +84,7 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
 void vnanim_close(VNANIM *n) {
     AN *a = (AN *)n;
     if (!a) return;
+    an_movie_stop(a);
     an_snd_free(a);
     an_text_free(a);
     an_image_cache_clear(a);
@@ -109,6 +110,7 @@ bool vnanim_frame(VNANIM *n, uint32_t elapsedMs) {
     if (a->phase == PH_TITLE) an_title_input(a);
     else an_game_input(a);
     if (a->phase == PH_GAME) an_vm_step(a);
+    if (an_movie_looping(a)) an_movie_update(a);
     a->clicked = false;
     a->rclicked = false;
     an_gfx_render(a);

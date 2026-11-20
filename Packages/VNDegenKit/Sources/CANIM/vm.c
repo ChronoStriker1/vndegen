@@ -209,6 +209,7 @@ static void skip_case(AN *a) {
 }
 
 static void end_game(AN *a) {
+    an_movie_stop(a);
     a->th.wait = W_END;
     a->phase = PH_TITLE;
     an_snd_stop(a, CH_BGM);
@@ -248,7 +249,14 @@ static void exec(AN *a, const Op *op) {
         break;
     }
     case 0x1e: set(a, &g[0], val(a, &g[1])); break;
-    case 0x22: set(a, &g[0], 0); break;
+    case 0x21: snprintf(a->movieName, sizeof a->movieName, "%s", str(a, &g[0])); break;
+    case 0x22: set(a, &g[0], an_movie_exists(a, a->movieName) ? 1 : 0); break;
+    case 0x94:
+        if (!a->skipMode && an_movie_play(a, str(a, &g[1]), false, 0)) a->th.wait = W_MOVIE;
+        break;
+    case 0x95: an_movie_play(a, str(a, &g[1]), true, 0); break;
+    case 0x96: an_movie_play(a, str(a, &g[1]), true, (u32)val(a, &g[2])); break;
+    case 0x97: an_movie_stop(a); break;
     case 0x26: {
         i32 lo = g[1].v, hi = g[2].v;
         set(a, &g[0], hi > lo ? lo + rand() % (hi - lo + 1) : lo);
@@ -415,9 +423,12 @@ bool an_vm_step(AN *a) {
             if (!an_gfx_transition_done(a)) return true;
             t->wait = W_NONE;
             break;
+        case W_MOVIE:
+            if (an_movie_update(a)) return true;
+            t->wait = W_NONE;
+            break;
         case W_TEXT:
-        case W_CHOICE:
-        case W_MOVIE: return true;
+        case W_CHOICE: return true;
         }
         Op op;
         if (!decode(a, t->pc, &op)) {

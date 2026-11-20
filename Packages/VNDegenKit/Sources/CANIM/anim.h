@@ -184,7 +184,7 @@ struct AN {
 
     Thread th;
     i32 L[AN_VARS], G[AN_VARS];
-    char *strReg;
+    char movieName[64];
 
     int phase;
     Scene scene;
@@ -236,6 +236,15 @@ void an_snd_play(AN *a, int channel, const char *name, bool loop, bool fromVoice
 void an_snd_stop(AN *a, int channel);
 bool an_snd_playing(AN *a, int channel);
 void an_snd_mix(AN *a, float *out, int frames);
+void an_snd_lock(AN *a, bool lock);
+
+bool an_movie_exists(AN *a, const char *name);
+bool an_movie_play(AN *a, const char *name, bool loop, u32 fadeMs);
+void an_movie_stop(AN *a);
+bool an_movie_looping(AN *a);
+bool an_movie_update(AN *a);
+void an_movie_draw(AN *a, u32 *dst);
+void an_movie_mix(AN *a, float *out, int frames);
 
 enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_COUNT = CH_SE0 + AN_SE };
 

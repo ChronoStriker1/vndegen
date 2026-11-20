@@ -82,6 +82,7 @@ static void draw_scene(AN *a, u32 *fb) {
         if (s->bgScale > 0 && s->bgScale != 1000) blit_scaled(fb, a->W, a->H, bg, -x * s->bgScale / 1000.0, -y * s->bgScale / 1000.0, s->bgScale / 1000.0, 255);
         else an_gfx_blit(fb, a->W, a->H, bg, x, y, a->W, a->H, 0, 0, 255);
     }
+    if (an_movie_looping(a)) an_movie_draw(a, fb);
     for (int i = 0; i < AN_LAYERS; i++) {
         Layer *l = &s->layer[i];
         if (l->kind == LK_NONE) continue;
@@ -136,6 +137,11 @@ static void apply_transition(AN *a) {
 void an_gfx_render(AN *a) {
     if (a->phase == PH_TITLE) {
         an_title_render(a);
+        a->serial++;
+        return;
+    }
+    if (a->th.wait == W_MOVIE) {
+        an_movie_draw(a, a->fb);
         a->serial++;
         return;
     }
