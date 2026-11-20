@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.57.4",
+          "buildVersion": "3006",
+          "date": "2026-11-20T06:48:29Z",
+          "localizedDescription": "Two more NekoSDK games, Eden's Ritter 1 and 1_2, and import of RPG Maker VX Ace games sold as one compressed .exe.\n\n## Downloads\n\n- `VNDegen-0.57.4-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.57.4.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.57.4-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- **Eden's Ritter: Paladins of Ecstasy** and **Eden's Ritter: Priestess of Pleasure** run on the NekoSDK runtime: the title, the story, Config, the save and load screens, the galleries and the Extra Story. Saves are the PC game's own files, so they move both ways.\n- Import: an RPG Maker VX Ace game sold as one self-extracting .exe with compressed game data, such as Succubus Hunt!, now unpacks and imports, picked on its own or inside an archive. VNDegen reads its cabinet itself; no PC is needed.\n\n## Known limits\n\n- Eden's Ritter: the CG viewer panel, the first game's side-story CG and scene lists, particle effects and the second game's title mist aren't there.\n- In the first game, five pictures stored under garbled names in its archive aren't found. In the second, one line's voice names its file without its folder, so it doesn't play.\n- Only LZX cabinets are read. MSZIP, Quantum and split cabinets get a message saying they aren't supported.\n\n## What wasn't tested\n\n- No physical device was used. Each game was checked in the Mac app and an iPad simulator, from import to a save and a load after a restart.\n- The Eden's Ritter screens and saves were compared with the PC version under Wine, and three other NekoSDK games were checked to draw the same as before. Succubus Hunt!'s 77 files were checked to be byte for byte the same as Windows' own extraction.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.57.4/VNDegen-0.57.4.ipa",
+          "size": 131545098,
+          "sha256": "1020233809630c52f68c0c8cf4411633e8758afc2ba71fab232772fbf799fe34",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.57.3",
           "buildVersion": "3000",
           "date": "2026-11-20T04:03:08Z",
