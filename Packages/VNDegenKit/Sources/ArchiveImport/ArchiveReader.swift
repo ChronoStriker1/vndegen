@@ -26,11 +26,14 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
     case severalGames
     case packedGame(EnigmaPack.Failure)
     case missingDiscImage(String)
+    case compressedRPGMakerGame
 
     public var message: String {
         switch self {
         case .notAnArchive: "Choose a zip, RAR, 7z, ISO, or CUE file, or a GOG installer."
         case let .missingDiscImage(name): "\(name) is missing. Choose it together with the .cue file, or put it in the same folder."
+        case .compressedRPGMakerGame:
+            "This game is packed with RPG Maker VX Ace's own compression, which VNDegen can't unpack. On a PC, run the .exe and let it extract the game, or open the .exe with 7-Zip, then copy the game's folder to VNDegen."
         case .severalArchives: "Choose one archive at a time. For a multi-part archive, choose all of its parts."
         case let .missingVolume(part): "Part \(part) of this archive is missing. Choose all of its parts together."
         case let .duplicateVolume(part): "Two files are part \(part) of this archive. Remove one of them and choose again."
@@ -83,7 +86,7 @@ nonisolated final class ArchiveReader {
 
     private let archive: OpaquePointer
 
-    init(_ volumes: [URL], password: String?, cue: CueSheet? = nil) throws(ArchiveError) {
+    init(_ volumes: [URL], password: String?, cue: CueSheet? = nil, offset: Int64? = nil) throws(ArchiveError) {
         archive = archive_read_new()
         _ = archive_read_support_format_zip_seekable(archive)
         _ = archive_read_support_format_rar(archive)
@@ -92,6 +95,14 @@ nonisolated final class ArchiveReader {
         _ = archive_read_support_format_iso9660(archive)
         if let password { _ = archive_read_add_passphrase(archive, password) }
 
+        if let offset, volumes.count == 1 {
+            if carchive_open_window(archive, volumes[0].path, offset) != ARCHIVE_OK {
+                let error = currentError()
+                _ = archive_read_free(archive)
+                throw error
+            }
+            return
+        }
         if let cue, volumes.count == 2 {
             if carchive_open_raw_sectors(archive, volumes[1].path, cue.sectorSize, cue.dataOffset) != ARCHIVE_OK {
                 let error = currentError()

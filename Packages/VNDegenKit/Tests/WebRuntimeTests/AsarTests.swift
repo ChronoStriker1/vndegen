@@ -108,14 +108,42 @@ private func archive(entry: String, body: Data = Data(count: 10)) throws -> Asar
     #expect(try archive(entry: #"{"size":10,"offset":"0"}"#)?.member("a.txt") != nil)
     #expect(try archive(entry: #"{"size":4,"offset":"6"}"#)?.member("a.txt") != nil)
     #expect(try archive(entry: #"{"size":0,"offset":"10"}"#)?.member("a.txt") != nil)
-    for bad in [
+    #expect(try archive(entry: #"{"size":4,"offset":6}"#)?.member("a.txt") != nil)
+    for skipped in [
         #"{"size":10,"offset":"18446744073709551615"}"#, #"{"size":18446744073709551615,"offset":"0"}"#,
-        #"{"size":-1,"offset":"0"}"#, #"{"size":1e30,"offset":"0"}"#, #"{"size":2.5,"offset":"0"}"#, #"{"size":true,"offset":"0"}"#,
-        #"{"size":11,"offset":"0"}"#, #"{"size":5,"offset":"6"}"#, #"{"size":1,"offset":"-1"}"#, #"{"size":1}"#,
-        #"{"size":-1,"unpacked":true}"#,
+        #"{"size":-1,"offset":"0"}"#, #"{"size":1e30,"offset":"0"}"#, #"{"size":2.5,"offset":"0"}"#,
+        #"{"size":11,"offset":"0"}"#, #"{"size":5,"offset":"6"}"#, #"{"size":-1,"unpacked":true}"#,
+        #"{"size":1,"offset":"-1"}"#, #"{"size":1}"#, #"{"size":1,"offset":-1}"#, #"{"size":1,"offset":0.5}"#,
+        #"{"size":1,"offset":true}"#, #"{"size":11,"offset":0}"#,
     ] {
-        #expect(try archive(entry: bad) == nil, "\(bad)")
+        let opened = try archive(entry: skipped)
+        #expect(opened != nil && opened?.member("a.txt") == nil && opened?.files.isEmpty == true && opened?.skippedEntries == 1, "\(skipped)")
     }
+    for refused in [#"{"size":true,"offset":"0"}"#, #"{"offset":"0"}"#] {
+        #expect(try archive(entry: refused) == nil, "\(refused)")
+    }
+}
+
+@Test func decoyEntriesAreSkippedAndTheRestListed() throws {
+    let url = TestFolders.root.appendingPathComponent("vndegen-asar-\(UUID().uuidString).asar")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let decoy = String(repeating: "7f", count: 30)
+    try writeRawAsar(to: url, index: Data(("""
+        {"files":{"package.json":{"size":2,"offset":"0"},"project":{"files":{"index.html":{"size":6,"offset":"2"}}},
+        "\(decoy)":{"size":1073741824,"offset":0},"license":{"size":1.2e307,"offset":2586274755},
+        "test":{"files":{"test1.js":{"size":9.9e306,"offset":254757513}}},".":{"size":1,"offset":"0"}}}
+        """).utf8), body: Data("{}<html>".utf8))
+    let archive = try AsarArchive(reading: FileHandle(forReadingFrom: url))
+    #expect(archive.files.map(\.path) == ["package.json", "project/index.html"])
+    let handle = try FileHandle(forReadingFrom: url)
+    let contents = try archive.files.map { file -> String in
+        guard case let .packed(offset, size) = file.member else { return "" }
+        try handle.seek(toOffset: offset)
+        return String(decoding: try handle.read(upToCount: Int(size)) ?? Data(), as: UTF8.self)
+    }
+    #expect(contents == ["{}", "<html>"])
+    #expect(archive.skippedEntries == 4)
+    #expect(archive.member(decoy) == nil && archive.member("license") == nil && archive.member("project/index.html") != nil)
 }
 
 @Test func aBadArchiveIsNotServedAndDoesNotTrap() throws {
@@ -124,7 +152,6 @@ private func archive(entry: String, body: Data = Data(count: 10)) throws -> Asar
     try writeRawAsar(to: root.appendingPathComponent("resources/app.asar"),
                      index: Data(#"{"files":{"index.html":{"size":4,"offset":"18446744073709551615"}}}"#.utf8), body: Data("html".utf8))
     let folder = GameFolder(root: root, webRoot: "resources/app.asar")
-    #expect(folder.archive == nil)
     #expect(folder.read(servedPath: "/index.html", limit: 4) == nil)
 }
 

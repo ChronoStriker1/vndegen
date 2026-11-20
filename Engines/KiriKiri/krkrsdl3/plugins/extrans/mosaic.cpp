@@ -42,9 +42,12 @@ protected:
     tjs_int CurBlockSize; // 現在のブロック幅
     tjs_int BlendRatio;   // ブレンド比
     bool First;           // 一番最初の呼び出しかどうか
+    tTVPMosaicMode Mode;
+    tjs_int StepSize;
 
 public:
-    tTVPMosaicTransHandler(tjs_uint64 time, tjs_int width, tjs_int height, tjs_int maxblocksize)
+    tTVPMosaicTransHandler(tjs_uint64 time, tjs_int width, tjs_int height, tjs_int maxblocksize,
+                           tTVPMosaicMode mode = tmmMosaic, tjs_int stepsize = 1)
     {
         RefCount = 1;
 
@@ -53,6 +56,8 @@ public:
         Time = time;
         HalfTime = time / 2;
         MaxBlockSize = maxblocksize;
+        Mode = mode;
+        StepSize = stepsize < 1 ? 1 : stepsize;
 
         First = true;
     }
@@ -121,11 +126,22 @@ tjs_error tTVPMosaicTransHandler::StartProcess(tjs_uint64 tick)
     tjs_int64 t = CurTime = (tick - StartTick);
     if (CurTime > Time)
         CurTime = Time;
-    if (t >= HalfTime)
-        t = Time - t;
-    if (t < 0)
-        t = 0;
-    CurBlockSize = (MaxBlockSize - 2) * t / HalfTime + 2;
+    if (Mode == tmmMosaic)
+    {
+        if (t >= HalfTime)
+            t = Time - t;
+        if (t < 0)
+            t = 0;
+        CurBlockSize = (MaxBlockSize - 2) * t / HalfTime + 2;
+    }
+    else
+    {
+        if (Mode == tmmMosaicOut)
+            t = (tjs_int64)Time - t;
+        if (t < 0)
+            t = 0;
+        CurBlockSize = (tjs_int)((MaxBlockSize - 2) * t / (tjs_int64)Time / StepSize * StepSize) + 2;
+    }
 
     // BlendRatio
     BlendRatio = CurTime * 255 / Time;
@@ -366,8 +382,9 @@ tjs_error tTVPMosaicTransHandler::Process(tTVPDivisibleData* data)
 class tTVPMosaicTransHandlerProvider : public iTVPTransHandlerProvider
 {
     tjs_uint RefCount; // 参照カウンタ
+    tTVPMosaicMode Mode;
 public:
-    tTVPMosaicTransHandlerProvider() { RefCount = 1; }
+    tTVPMosaicTransHandlerProvider(tTVPMosaicMode mode = tmmMosaic) { RefCount = 1; Mode = mode; }
     ~tTVPMosaicTransHandlerProvider() { ; }
 
     tjs_error AddRef()
@@ -394,7 +411,9 @@ public:
     {
         // このトランジションの名前を返す
         if (name)
-            *name = TJS_N("mosaic");
+            *name = Mode == tmmMosaicIn    ? TJS_N("mosaicin")
+                    : Mode == tmmMosaicOut ? TJS_N("mosaicout")
+                                           : TJS_N("mosaic");
         return TJS_S_OK;
     }
 
@@ -428,6 +447,7 @@ public:
         tTJSVariant tmp;
         tjs_uint64 time;
         tjs_int maxblocksize = 30;
+        tjs_int stepsize = 1;
 
         if (TJS_FAILED(options->GetValue(TJS_N("time"), &tmp)))
             return TJS_E_FAIL; // time 属性が指定されていない
@@ -441,8 +461,12 @@ public:
             if (tmp.Type() != tvtVoid)
                 maxblocksize = (tjs_int)tmp;
 
+        if (Mode != tmmMosaic && TJS_SUCCEEDED(options->GetValue(TJS_N("stepsize"), &tmp)))
+            if (tmp.Type() != tvtVoid)
+                stepsize = (tjs_int)tmp;
+
         // オブジェクトを作成
-        *handler = new tTVPMosaicTransHandler(time, src1w, src1h, maxblocksize);
+        *handler = new tTVPMosaicTransHandler(time, src1w, src1h, maxblocksize, Mode, stepsize);
 
         return TJS_S_OK;
     }
@@ -463,5 +487,29 @@ void UnregisterMosaicTransHandlerProvider()
     // 登録抹消する
     TVPRemoveTransHandlerProvider(MosaicTransHandlerProvider);
     MosaicTransHandlerProvider->Release();
+}
+//---------------------------------------------------------------------------
+static tTVPMosaicTransHandlerProvider* MosaicInTransHandlerProvider;
+static tTVPMosaicTransHandlerProvider* MosaicOutTransHandlerProvider;
+void RegisterMosaicInOutTransHandlerProviders()
+{
+    if (MosaicInTransHandlerProvider)
+        return;
+    MosaicInTransHandlerProvider = new tTVPMosaicTransHandlerProvider(tmmMosaicIn);
+    TVPAddTransHandlerProvider(MosaicInTransHandlerProvider);
+    MosaicOutTransHandlerProvider = new tTVPMosaicTransHandlerProvider(tmmMosaicOut);
+    TVPAddTransHandlerProvider(MosaicOutTransHandlerProvider);
+}
+//---------------------------------------------------------------------------
+void UnregisterMosaicInOutTransHandlerProviders()
+{
+    if (!MosaicInTransHandlerProvider)
+        return;
+    TVPRemoveTransHandlerProvider(MosaicInTransHandlerProvider);
+    MosaicInTransHandlerProvider->Release();
+    MosaicInTransHandlerProvider = nullptr;
+    TVPRemoveTransHandlerProvider(MosaicOutTransHandlerProvider);
+    MosaicOutTransHandlerProvider->Release();
+    MosaicOutTransHandlerProvider = nullptr;
 }
 //---------------------------------------------------------------------------

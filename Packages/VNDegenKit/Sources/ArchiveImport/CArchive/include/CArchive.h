@@ -53,6 +53,7 @@ int archive_read_open1(struct archive *);
 void archive_set_error(struct archive *, int code, const char *fmt, ...);
 
 int carchive_open_raw_sectors(struct archive *, const char *path, int sector_size, int data_offset);
+int carchive_open_window(struct archive *, const char *path, int64_t start);
 
 const char *archive_entry_pathname(struct archive_entry *);
 const char *archive_entry_pathname_utf8(struct archive_entry *);
