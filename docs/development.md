@@ -4,7 +4,7 @@ How to build VNDegen, how the source is laid out, and how to add an engine. [eng
 
 ## Building
 
-You need a Mac with Xcode 27, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`), and Go (`brew install go`) for the rclone library that save sync uses. Run `scripts/build.sh` on that Mac:
+You need a Mac with Xcode 27, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`), Go (`brew install go`) for the rclone library that save sync uses, and rustup (`brew install rustup`) for the engines written in Rust. Run `scripts/build.sh` on that Mac:
 
 ```sh
 scripts/build.sh test      # package tests
@@ -19,6 +19,7 @@ scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 
 - **KiriKiri.** Every app build first builds the KiriKiri engine into `build/kirikiri` with `scripts/kirikiri-engine.sh`, which does nothing when the engine is up to date. Its dependencies come from vcpkg, cached in `~/Library/Caches/VNDegen`, so the first build takes a while and later ones skip it.
 - **Godot.** Every app build first builds Godot 3 and 4 into `build/godot` with `scripts/godot-engine.sh`, which does nothing when its inputs haven't changed. The Godot sources and SCons are cached in `~/Library/Caches/VNDegen/godot`, SCons in one venv per Python and SCons version that builds share and never change once made, and each build folder gets its own work folder there, so builds of different branches don't rebuild each other's objects. A first build in a new folder compiles Godot from scratch, which can take a Mac's load past 500, so run it where nothing else is going. `VNDEGEN_GODOT_CACHE` moves the cache.
+- **Rust engines.** Every app build first builds the Artemis engine (`scripts/artemis-engine.sh`), siglus_rs (`scripts/siglus-engine.sh`) and the ANIM engine's E-mote library, eluna behind VNDegen's C interface in `Engines/ANIM/vnemote` (`scripts/anim-emote.sh`, into `build/anim/VNEmote.xcframework`). Each installs its pinned Rust toolchain and the Apple targets through rustup when they are missing, and does nothing when its inputs haven't changed. The E-mote library's crates are vendored in `Engines/ANIM/vendor`, so its build never fetches.
 - **Alpha clips.** Every build makes the VP9 decoder the RPG Maker clip converter links, with `scripts/alpha-video.sh`, from the libvpx source in `Engines/Shared/third_party`. It builds the decoder alone, as a static library in `VPX.xcframework`, so libvpx links into the app's executable and the app embeds no framework for it.
 - **rclone.** Every build first makes rclone's library from `Packages/VNDegenKit/Rclone/` for iPhone, iPad, the simulator, and the Mac (`scripts/rclone-runtime.sh`, kept until its sources or the Go version change).
 - **Ren'Py.** The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). iOS builds also download Ren'Py's iOS libraries (renios) and link them into the app. `scripts/build.sh` does that before it builds. In Xcode, run `scripts/renpy-runtime.sh build/renpy ios` once first.

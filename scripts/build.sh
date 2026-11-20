@@ -38,7 +38,7 @@ case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;
 
 # The app's Licenses page lists the notices that each bundled runtime writes to build/<runtime>/licenses/. An app build
 # fails when one of these has none, so a missing notice can't reach a release. A new runtime adds its name here.
-licensed=(rclone renpy rgss kirikiri ruffle godot artemis siglus app fonts midi video)
+licensed=(rclone renpy rgss kirikiri ruffle godot artemis siglus anim app fonts midi video)
 require_licenses() {
   local runtime
   for runtime in "${licensed[@]}"; do
@@ -55,6 +55,7 @@ xcb() {
   scripts/godot-engine.sh build/godot >build/godot-engine.log 2>&1 || { tail -n 40 build/godot-engine.log; return 1; }
   scripts/artemis-engine.sh build/artemis >build/artemis-engine.log 2>&1 || { tail -n 40 build/artemis-engine.log; return 1; }
   scripts/siglus-engine.sh build/siglus >build/siglus-engine.log 2>&1 || { tail -n 40 build/siglus-engine.log; return 1; }
+  scripts/anim-emote.sh build/anim >build/anim-emote.log 2>&1 || { tail -n 40 build/anim-emote.log; return 1; }
   xcodebuild -project VNDegen.xcodeproj -scheme VNDegen "$@" 2>&1 | filter 'error:|BUILD (SUCCEEDED|FAILED)|\*\* '
 }
 

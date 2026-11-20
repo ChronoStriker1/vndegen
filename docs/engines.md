@@ -36,6 +36,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Bruns](#bruns) | `ams.cfg` beside `binary/bruns.exe` and `scene/brs009000.bso`, up to one folder down | Mac, iPhone, iPad |
 | [Eushully AGE](#eushully-age) | `SYS4INI.BIN` beside `DATA1.ALF` or `age.exe`, up to one folder down | Mac, iPhone, iPad |
 | [BISHOP BSX](#bishop-bsx) | `bsxx.dat` beside `bsxx.cfg` and a `Graphics*.bsa` archive, up to one folder down | Mac, iPhone, iPad |
+| [ANIM](#anim) | `<name>_sce.dat` beside `<name>_define.dat`, `<name>_system.dat` and `cg/psbpack.dat`, up to one folder down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
@@ -236,6 +237,10 @@ Eushully AGE games of the SYS4 generation, such as Kamidori Alchemy Meister, run
 ## BISHOP BSX
 
 BISHOP's BSXX games, such as Mesu Kyoushi ~Injoku no Kyoushitsu~ and its sequels 2, 3 and 4, run on VNDegen's own BSX runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive and picture readers and the original engine run under Wine, MIT licensed like the rest of the app. The compiled script runs the story, the day loop and the scenes; the message window, menu bar, choices, title, map, target cards, Save and Load, backlog, settings, item screen and the STRIP and VIEW switches, which the PC engine draws itself, are drawn from the game's `bsxx.cfg` and pictures, and Mesu Kyoushi 4's MPEG-1 movies play through the shared movie decoder. Saves are the PC engine's own `save/noNNN`, `save/no-01` and `save/common.dat` in the game folder, and load both ways. The museum's BGM, BGV, CG and scene modes, with playlists, share their seen records with the PC, and its bust-up editor shares its stored states. [bsx.md](bsx.md) lists which games run and the known limits, and [bsx-cleanroom.md](bsx-cleanroom.md) where the runtime's knowledge came from.
+
+## ANIM
+
+ANIM's games, such as Double Date Dilemma, run on VNDegen's own ANIM runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed readers and the original engine run under Wine, MIT licensed like the rest of the app. The compiled script runs the story; the title, message window, menu bar, choices, backlog and Save and Load, which the PC engine draws itself, are drawn from the game's own pictures. E-mote characters are drawn from their PSB files through eluna, an MPL-2.0 Rust reimplementation of E-mote built into the app as a framework. MPEG-1 movies and the looping scene animations play through the shared movie decoder. Saves are the PC engine's own `<name>_save.dat`, `qSavedata.dat`, `<name>_system.dat` and `cg/pSaveThumbNNN.png` in the game folder, and load both ways. [anim.md](anim.md) lists which games run and the known limits, and [anim-cleanroom.md](anim-cleanroom.md) where the runtime's knowledge came from.
 
 ## Unity
 

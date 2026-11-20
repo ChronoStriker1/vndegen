@@ -35,6 +35,27 @@ folder down.
   each character's scale from the define. Expressions are presets of E-mote variables in the define.
 - Sound: Ogg Vorbis behind an 8-byte header, in `bgm/` and the voice archive. Movies are MPEG-1.
 
+## Drawing E-mote characters
+
+The runtime draws on the CPU into the frame it hands the app. Each frame, eluna advances every character on screen, in
+parallel, one character per thread: its motion, its expression changes and its own idle movement and hair physics.
+VNDegen's `vnemote` layer turns eluna's sprites into triangles, with each mesh divided to about 8 pixels on screen
+rather than the mesh's own division, which is far finer than the characters' size on screen needs. The triangles are
+drawn in horizontal bands across a small thread pool. A character whose triangles didn't change since the last frame,
+drawn at full opacity in place with normal or additive blending, is kept in a layer of its own and composited, so a
+scene of characters standing still costs little more than its background. Three characters on screen take about
+22 ms a frame on a desktop CPU, nearly all of it in eluna.
+
+## Building the E-mote library
+
+`scripts/anim-emote.sh` builds `Engines/ANIM/vnemote`, eluna behind VNDegen's C interface (`include/vnemote.h` in
+CANIM), as `build/anim/VNEmote.xcframework` for the Mac, iPhone and iPad and the simulator, with the licenses of eluna
+and each crate it builds in. `scripts/build.sh` runs it before every app build. It installs the pinned Rust toolchain
+and the Apple targets through rustup when they are missing (`brew install rustup` first), builds offline from the
+crates vendored in `Engines/ANIM/vendor`, and does nothing when its inputs haven't changed. The runtime finds the
+library at run time and draws no characters without it. On Linux, `Engines/ANIM/host` builds the runtime with cargo
+for its headless and SDL test tools.
+
 ## Saves
 
 The PC engine's own files in the game folder: `<name>_save.dat` (180 slots of 248,216 bytes, the first 160 on the
