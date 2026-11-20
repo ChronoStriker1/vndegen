@@ -185,7 +185,7 @@ typedef struct LogEntry {
 #define AN_SE 16
 
 enum { PH_TITLE, PH_GAME };
-enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD, SCR_FLOW };
+enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD, SCR_FLOW, SCR_VOLUME };
 enum { MSG_TITLE, MSG_QUIT, MSG_OVERWRITE, MSG_DELETE, MSG_JUMP, MSG_RESET_FLOW };
 enum { ACT_SAVE, ACT_LOAD, ACT_TITLE, ACT_QUIT, ACT_JUMP };
 enum { BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE };
@@ -226,6 +226,7 @@ struct AN {
     i32 L[AN_VARS], G[AN_VARS];
     char movieName[64];
     char missingSound[64];
+    int soundTag;
 
     int phase;
     Scene scene;
@@ -245,6 +246,7 @@ struct AN {
 
     int screen, logTop, wheel;
     int slotPage;
+    int volume[5], voiceVolume[3], bgvVolume[3], talkVolume[3], volumeChar, dragSlider;
     FlowNode *flow;
     int flowCount, flowScroll, flowZoom;
     bool flowFromScript;
@@ -301,6 +303,8 @@ void an_snd_stop(AN *a, int channel);
 bool an_snd_playing(AN *a, int channel);
 void an_snd_mix(AN *a, float *out, int frames);
 void an_snd_lock(AN *a, bool lock);
+void an_snd_set_volume(AN *a, int channel, float volume);
+float an_channel_volume(AN *a, int channel, const char *name, int tag);
 
 bool an_movie_exists(AN *a, const char *name);
 bool an_movie_play(AN *a, const char *name, bool loop, u32 fadeMs);
@@ -320,6 +324,8 @@ bool an_quick_load(AN *a);
 void an_confirm(AN *a, int message, int action, int arg);
 void an_do_action(AN *a, int action, int arg);
 void an_slots_open(AN *a, bool saving);
+void an_volume_open(AN *a);
+void an_volume_defaults(AN *a);
 void an_screens_render(AN *a);
 bool an_screens_input(AN *a);
 void an_go_title(AN *a);

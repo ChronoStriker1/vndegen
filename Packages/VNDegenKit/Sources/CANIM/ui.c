@@ -129,6 +129,7 @@ static void bar_action(AN *a, int i) {
     case BAR_QLOAD: an_quick_load(a); break;
     case BAR_TITLE: an_confirm(a, MSG_TITLE, ACT_TITLE, 0); break;
     case BAR_FLOW: an_flow_open(a, false); break;
+    case BAR_VOL: an_volume_open(a); break;
     default: an_log(a, "menu bar button %d isn't built yet", i); break;
     }
 }

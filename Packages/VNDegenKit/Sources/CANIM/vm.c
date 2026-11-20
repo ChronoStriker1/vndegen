@@ -383,7 +383,11 @@ static void exec(AN *a, const Op *op) {
         break;
     }
     case 0x87: an_snd_stop(a, CH_BGM); break;
-    case 0x8d: an_snd_play(a, CH_BGV0 + (g[0].v & 3), str(a, &g[1]), true, true); break;
+    case 0x8d:
+        a->soundTag = str(a, &g[2])[0];
+        an_snd_play(a, CH_BGV0 + (g[0].v & 3), str(a, &g[1]), true, true);
+        a->soundTag = 0;
+        break;
     case 0xb4:
         for (int c = CH_BGV0; c < CH_COUNT; c++) an_snd_stop(a, c);
         break;

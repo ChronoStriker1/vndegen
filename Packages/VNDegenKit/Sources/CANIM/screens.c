@@ -219,7 +219,98 @@ void an_do_action(AN *a, int action, int arg) {
     }
 }
 
+static const int SLIDER_Y[5] = {173, 273, 373, 473, 573};
+enum { LEFT_X = 51, RIGHT_X = 680, KNOB_W = 19, KNOB_H = 32, SLIDER_W = 500 };
+
+void an_volume_defaults(AN *a) {
+    static const int defaults[5] = {80, 50, 70, 70, 70};
+    memcpy(a->volume, defaults, sizeof defaults);
+    for (int i = 0; i < 3; i++) {
+        a->voiceVolume[i] = 70;
+        a->bgvVolume[i] = 70;
+        a->talkVolume[i] = 20;
+    }
+}
+
+void an_volume_open(AN *a) {
+    a->screen = SCR_VOLUME;
+    a->dragSlider = -1;
+}
+
+static int *slider_value(AN *a, int i) {
+    if (i < 5) return &a->volume[i];
+    int c = a->volumeChar;
+    return i == 5 ? &a->voiceVolume[c] : i == 6 ? &a->bgvVolume[c] : &a->talkVolume[c];
+}
+
+static void slider_pos(int i, int *x, int *y) {
+    *x = i < 5 ? LEFT_X : RIGHT_X;
+    *y = i < 5 ? SLIDER_Y[i] : SLIDER_Y[i - 3];
+}
+
+static void draw_volume(AN *a) {
+    Image *panel = an_image_load(a, "spvolume");
+    if (panel) an_gfx_blit(a->fb, a->W, a->H, panel, 0, 0, a->W, a->H, 0, 0, 255);
+    Image *b = an_image_load(a, "spVolumeButton");
+    if (!b) return;
+    an_gfx_blit(a->fb, a->W, a->H, b, 2 + 594 * a->volumeChar, 425, 592, 464, 644, 176, 255);
+    for (int c = 0; c < 3; c++) {
+        int fy = c == a->volumeChar ? 343 : in_rect(a, 646 + 90 * c, 97, 80, 80) ? 261 : 179;
+        an_gfx_blit(a->fb, a->W, a->H, b, 2 + 82 * c, fy, 80, 80, 646 + 90 * c, 97, 255);
+    }
+    for (int i = 0; i < 8; i++) {
+        int x, y;
+        slider_pos(i, &x, &y);
+        int kx = x + *slider_value(a, i) * SLIDER_W / 100;
+        an_gfx_blit(a->fb, a->W, a->H, b, 848, a->dragSlider == i ? 163 : in_rect(a, kx, y, KNOB_W, KNOB_H) ? 129 : 95, KNOB_W, KNOB_H, kx, y, 255);
+    }
+    an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 940, 5, 278, 40) ? 137 : 95, 278, 40, 940, 5, 255);
+    an_gfx_blit(a->fb, a->W, a->H, b, 567, in_rect(a, 62, 670, 278, 40) ? 137 : 95, 278, 40, 62, 670, 255);
+}
+
+static void apply_volumes(AN *a) {
+    an_snd_set_volume(a, CH_BGM, an_channel_volume(a, CH_BGM, NULL, 0));
+    for (int c = CH_SE0; c < CH_BGV0; c++) an_snd_set_volume(a, c, an_channel_volume(a, c, NULL, 0));
+    an_snd_set_volume(a, CH_VOICE, an_channel_volume(a, CH_VOICE, a->voiceName, 0));
+}
+
+static void volume_input(AN *a) {
+    if (a->dragSlider >= 0) {
+        int x, y;
+        slider_pos(a->dragSlider, &x, &y);
+        *slider_value(a, a->dragSlider) = clampi((a->mx - x - KNOB_W / 2) * 100 / SLIDER_W, 0, 100);
+        apply_volumes(a);
+        if (!a->down) a->dragSlider = -1;
+        a->clicked = false;
+        return;
+    }
+    if (a->rclicked) {
+        a->rclicked = false;
+        a->screen = SCR_NONE;
+        return;
+    }
+    if (a->down)
+        for (int i = 0; i < 8; i++) {
+            int x, y;
+            slider_pos(i, &x, &y);
+            if (in_rect(a, x - 10, y, SLIDER_W + KNOB_W + 20, KNOB_H)) {
+                a->dragSlider = i;
+                return;
+            }
+        }
+    if (!a->clicked) return;
+    a->clicked = false;
+    for (int c = 0; c < 3; c++)
+        if (in_rect(a, 646 + 90 * c, 97, 80, 80)) a->volumeChar = c;
+    if (in_rect(a, 940, 5, 278, 40)) {
+        an_volume_defaults(a);
+        apply_volumes(a);
+    }
+    if (in_rect(a, 62, 670, 278, 40)) a->screen = SCR_NONE;
+}
+
 void an_screens_render(AN *a) {
+    if (a->screen == SCR_VOLUME) draw_volume(a);
     if (a->screen == SCR_SAVE || a->screen == SCR_LOAD) draw_slots(a, a->screen == SCR_SAVE);
     if (a->confirmOpen) draw_confirm(a);
 }
@@ -231,6 +322,10 @@ bool an_screens_input(AN *a) {
     }
     if (a->screen == SCR_SAVE || a->screen == SCR_LOAD) {
         slots_input(a, a->screen == SCR_SAVE);
+        return true;
+    }
+    if (a->screen == SCR_VOLUME) {
+        volume_input(a);
         return true;
     }
     return false;

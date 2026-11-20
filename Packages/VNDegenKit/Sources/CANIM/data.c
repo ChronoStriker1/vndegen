@@ -204,7 +204,7 @@ static bool sprite_file_ok(const u8 *p) {
 }
 
 static bool sprite_record(const u8 *d, size_t size, size_t at) {
-    return at + SPRITE_RECORD <= size && sprite_name_ok(d + at) && sprite_file_ok(d + at + SPRITE_NAME);
+    return at + SPRITE_NAME + 16 <= size && sprite_name_ok(d + at) && sprite_file_ok(d + at + SPRITE_NAME);
 }
 
 bool an_define_load(Define *def, const char *path) {
@@ -218,7 +218,7 @@ bool an_define_load(Define *def, const char *path) {
     const u8 *d = def->data;
     size_t best = 0;
     int bestCount = 0;
-    for (size_t at = 0; at + SPRITE_RECORD <= def->size; at++) {
+    for (size_t at = 0; at + SPRITE_NAME + 16 <= def->size; at++) {
         if (!sprite_record(d, def->size, at)) continue;
         if (at >= SPRITE_RECORD && sprite_record(d, def->size, at - SPRITE_RECORD)) continue;
         int count = 0;

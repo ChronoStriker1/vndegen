@@ -26,13 +26,13 @@ struct Mixer {
     pthread_mutex_t lock;
     Voice *v[CH_COUNT];
     Voice *fading[CH_COUNT];
-    float vol[CH_COUNT];
+    float vol[CH_COUNT], talk[CH_COUNT];
 };
 
 bool an_snd_init(AN *a) {
     struct Mixer *m = an_alloc(sizeof *m);
     pthread_mutex_init(&m->lock, NULL);
-    for (int i = 0; i < CH_COUNT; i++) m->vol[i] = 0.8f * (i == CH_BGM ? 0.5f : 0.7f);
+    for (int i = 0; i < CH_COUNT; i++) m->vol[i] = m->talk[i] = 0.8f * (i == CH_BGM ? 0.5f : 0.7f);
     a->mix = m;
     return true;
 }
@@ -117,7 +117,7 @@ void an_snd_mix(AN *a, float *out, int frames) {
     pthread_mutex_lock(&m->lock);
     bool talking = m->v[CH_VOICE] && !m->v[CH_VOICE]->done;
     for (int c = 0; c < CH_COUNT; c++) {
-        float vol = m->vol[c] * (c >= CH_BGV0 && talking ? 0.3f : 1.0f);
+        float vol = c >= CH_BGV0 && talking ? m->talk[c] : m->vol[c];
         mix_voice(m->v[c], vol, out, frames);
         mix_voice(m->fading[c], vol, out, frames);
     }
@@ -173,6 +173,7 @@ void an_snd_play(AN *a, int channel, const char *name, bool loop, bool fromVoice
         free(d);
         return;
     }
+    m->vol[channel] = an_channel_volume(a, channel, name, a->soundTag);
     Voice *v = an_alloc(sizeof *v);
     v->data = d;
     v->ogg = ogg;
@@ -220,4 +221,30 @@ void an_snd_lock(AN *a, bool lock) {
     if (!m) return;
     if (lock) pthread_mutex_lock(&m->lock);
     else pthread_mutex_unlock(&m->lock);
+}
+
+void an_snd_set_volume(AN *a, int channel, float volume) {
+    struct Mixer *m = a->mix;
+    if (!m || channel < 0 || channel >= CH_COUNT) return;
+    pthread_mutex_lock(&m->lock);
+    m->vol[channel] = volume;
+    pthread_mutex_unlock(&m->lock);
+}
+
+static int char_index(const char *name, int tag) {
+    char c = (char)tag;
+    if (!c && name && *name) c = name[strlen(name) - 1];
+    return c == 'a' ? 0 : c == 'b' ? 1 : 2;
+}
+
+float an_channel_volume(AN *a, int channel, const char *name, int tag) {
+    float master = (float)a->volume[0] / 100.0f;
+    if (channel == CH_BGM) return master * (float)a->volume[1] / 100.0f;
+    if (channel == CH_VOICE) return master * (float)a->voiceVolume[char_index(name, 0)] / 100.0f;
+    if (channel >= CH_BGV0) {
+        int k = char_index(name, tag);
+        if (a->mix) a->mix->talk[channel] = master * (float)a->talkVolume[k] / 100.0f;
+        return master * (float)a->bgvVolume[k] / 100.0f;
+    }
+    return master * (float)a->volume[2] / 100.0f;
 }
