@@ -11,7 +11,7 @@ void input_init(AG *g) {
     in->keyAction[0x20] = 5;
     in->keyAction[0x08] = 6;
     in->actionCount = 7;
-    for (int i = 0; i < 32; i++) { in->joy[i] = 0xffffffffu; in->joyButton[i] = -1; }
+    for (int i = 0; i < 32; i++) in->joyButton[i] = -1;
     in->mouseTarget = 0xffffffffu;
     in->mouseOwner = -1;
     in->hit = in->hovered = -1;
@@ -212,7 +212,7 @@ static int op_joy_count(AG *g) { arg_set_i(g, 1, 0); return OP_NEXT; }
 
 static int op_joy_register(AG *g) {
     i32 i = arg_i(g, 1);
-    if (i >= 0 && i < 32) g->in.joy[i] = (u32)arg_i(g, 2);
+    if (i >= 0 && i < 32) g->fr[g->top].joy[i] = (u32)arg_i(g, 2);
     return OP_NEXT;
 }
 
@@ -225,20 +225,21 @@ static int op_joy_poll(AG *g) {
 
 static int op_joy_dispatch(AG *g) {
     Input *in = &g->in;
+    u32 *joy = g->fr[g->top].joy;
     if (in->mask) {
         for (int a = in->scan; a < in->actionCount && a < 32; a++) {
             if (!(in->mask & (1u << a))) continue;
             in->scan = a + 1;
-            if (in->joy[a] != 0xffffffffu) {
-                vm_callback(g, in->joy[a]);
+            if (joy[a] != 0xffffffffu) {
+                vm_callback(g, joy[a]);
                 return OP_JUMP;
             }
         }
         return OP_NEXT;
     }
     int slot = in->actionCount;
-    if (slot < 32 && in->joy[slot] != 0xffffffffu) {
-        vm_call_local(g, in->joy[slot]);
+    if (slot < 32 && joy[slot] != 0xffffffffu) {
+        vm_call_local(g, joy[slot]);
         return OP_JUMP;
     }
     return OP_NEXT;

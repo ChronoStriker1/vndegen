@@ -211,6 +211,7 @@ static bool frame_load(AG *g, Frame *f, u32 id) {
     f->preload = -1;
     f->t1 = f->t2 = -1;
     f->handlerA = f->handlerB = 0xffffffffu;
+    memset(f->joy, 0xff, sizeof f->joy);
     return true;
 }
 

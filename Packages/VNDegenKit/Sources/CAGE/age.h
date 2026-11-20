@@ -141,6 +141,7 @@ typedef struct Frame {
     int launchReturn;
     int preload;
     i32 t1, t2;
+    u32 joy[32];
 } Frame;
 
 enum { OP_NEXT, OP_JUMP, OP_WAIT, OP_HALT, OP_STAY };
@@ -338,7 +339,6 @@ typedef struct Input {
     u32 mask;
     int scan;
     bool scanEmptyDone;
-    u32 joy[32];
     u32 mouseTarget;
     i32 mouseInterval;
     u32 mouseLast;
