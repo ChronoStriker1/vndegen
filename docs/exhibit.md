@@ -66,7 +66,7 @@ VNDegen uses the same folder and format:
 
 ## What runs
 
-- The logos, the title (New Game, Resume, Load, Settings, Exit), the whole story to the ending.
+- The logos, the title (New Game, Resume, Load, Settings, Extra, Exit), the whole story to the ending.
 - Messages with names, typing, voices, the wait mark, click to finish or advance, Ctrl or the control bar to skip,
   auto mode, the wheel for the backlog, right click for the system menu.
 - Backgrounds, the camera, crossfades, mask wipes, sprites with faces, hops and shakes, portraits, the letterbox and
@@ -77,11 +77,19 @@ VNDegen uses the same folder and format:
   and voice marks; the five config pages, of which window transparency, text and auto speed, the sound and voice
   volumes, per-character voice volumes, the countdown and the system sound take effect.
 
+- Extra: the CG, Scene and Music pages, drawn from the game's own pictures (`res/g/sy/02`, the thumbnails in
+  `res/g/sy/tn`). The CG groups come from `cgMode.rld`'s `CGMODE` list, the scenes from `res/c/replay1.rnf`, and the
+  music list and its track numbers from `musicMode.rld` and the table `def.rld` builds with `CREATEDBINT`. A CG group
+  opens once one of its pictures has been shown and steps through all of them; a scene opens once its `SETDONEFLAG`
+  has run and plays from its script with `R1020` set, and the scene's own `exitReplay` brings Extra back; every track
+  plays, with the music volume bar. VNDegen keeps what has been seen in `userdata/vndegen/extra.txt`.
+
 ## Known limits
 
 - The emotion icons that `MANPU` attaches to sprites (`.dlt` animations) are not drawn; see the clean-room notes.
-- The title's Extra item (CG gallery, music room, scene replay) is greyed: its commands (`CGMODE`, the select-item
-  commands) aren't written yet.
+- Extra counts only what was seen in VNDegen: the PC game's own record of seen pictures and scenes isn't read. The CG
+  viewer has no Full Screen or Original buttons.
+- Returning to the title from the system menu doesn't ask first, as the PC game does.
 - The backlog's Jump buttons aren't shown, and the config page's window-size and full-screen choices do nothing.
 
 ## Linux host

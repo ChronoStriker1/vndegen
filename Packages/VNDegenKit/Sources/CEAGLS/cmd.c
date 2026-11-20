@@ -303,6 +303,7 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
     case 150: {
         int i = I(e, in, 0);
         if (i < 0 || i >= 16) break;
+        e->fonts[i].em = I(e, in, 1);
         e->fonts[i].size = I(e, in, 3);
         e->fonts[i].bold = I(e, in, 2) != 0;
         e->fonts[i].spacing = I(e, in, 4);
@@ -338,6 +339,16 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
     case 147:
         if (in->argc > 0) screen(e, t, UI_CONFIG);
         break;
+    case 131:
+    case 132:
+        gallery_open(e, in->n == 131 ? UI_CG : UI_SCENE);
+        e->scriptUi = true;
+        e->scriptUiDone = false;
+        t->wait = W_UI;
+        break;
+    case 140:
+        gallery_scene_end(e, t);
+        break;
     case 135:
         ui_message_box(e, 2);
         e->scriptUi = true;
@@ -363,7 +374,6 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
     case 75:
     case 134:
     case 138:
-    case 140:
     case 141:
     case 149:
     case 171: break;

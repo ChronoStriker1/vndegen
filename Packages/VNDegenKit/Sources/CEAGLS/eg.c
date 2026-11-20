@@ -129,6 +129,7 @@ void vneagls_close(VNEAGLS *n) {
     image_free(e->thumb);
     mixer_free(e->mixer);
     ui_free(e);
+    gallery_free(e);
     msg_clear(e);
     free(e->text);
     for (int i = 0; i < e->logCount; i++) {

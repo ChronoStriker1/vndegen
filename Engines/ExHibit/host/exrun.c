@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
         else if (sscanf(c, "skipto:%d", &k) == 1) {
             EX *e = (EX *)n;
             e->skipping = true;
-            for (int guard = 0; guard < 200000 && alive && e->msg.textId != k && !e->view.active; guard++) alive = run(n, 16);
+            for (int guard = 0; guard < 200000 && alive && e->msg.textId != k && !e->view.active && !e->extra; guard++) alive = run(n, 16);
             e->skipping = false;
             alive = alive && run(n, 1000);
         } else if (sscanf(c, "upto:%d", &k) == 1) {

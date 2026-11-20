@@ -226,6 +226,7 @@ void movie_close_all(EG *e);
 bool movie_any(EG *e);
 
 typedef struct Font {
+    int em;
     int size;
     bool bold;
     int spacing;
@@ -258,6 +259,7 @@ typedef struct SlotInfo {
 } SlotInfo;
 
 typedef struct UI UI;
+typedef struct Gallery Gallery;
 
 #define EG_SLOTS 80
 
@@ -356,6 +358,8 @@ struct EG {
 
     int uiMode;
     UI *ui;
+    bool nameFresh;
+    Gallery *gallery;
     int menuHover;
     int winHover;
     char *pendingTitle;
@@ -408,6 +412,11 @@ void choice_draw(EG *e, u32 *dst);
 void vm_init(EG *e);
 void vm_goto(EG *e, Thread *t, const char *file, const char *label);
 bool vm_call(EG *e, Thread *t, const char *file, const char *label);
+void gallery_open(EG *e, int kind);
+void gallery_update(EG *e);
+void gallery_draw(EG *e, u32 *dst);
+void gallery_free(EG *e);
+bool gallery_scene_end(EG *e, Thread *t);
 void vm_run(EG *e);
 Script *vm_script(EG *e, const char *file);
 i32 vm_int(EG *e, const Arg *a);
