@@ -135,6 +135,12 @@ static void apply_transition(AN *a) {
 }
 
 void an_gfx_render(AN *a) {
+    if (a->screen == SCR_FLOW) {
+        an_flow_render(a);
+        an_screens_render(a);
+        a->serial++;
+        return;
+    }
     if (a->phase == PH_TITLE) {
         an_title_render(a);
         an_screens_render(a);

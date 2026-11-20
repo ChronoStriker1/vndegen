@@ -185,12 +185,19 @@ typedef struct LogEntry {
 #define AN_SE 16
 
 enum { PH_TITLE, PH_GAME };
-enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD };
+enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD, SCR_FLOW };
 enum { MSG_TITLE, MSG_QUIT, MSG_OVERWRITE, MSG_DELETE, MSG_JUMP, MSG_RESET_FLOW };
-enum { ACT_SAVE, ACT_LOAD, ACT_TITLE, ACT_QUIT };
+enum { ACT_SAVE, ACT_LOAD, ACT_TITLE, ACT_QUIT, ACT_JUMP };
 enum { BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE };
 
 typedef struct Font Font;
+
+typedef struct FlowNode {
+    int kind, id, x, y;
+    const char *text;
+    int links[4];
+    int linkCount;
+} FlowNode;
 
 typedef struct SlotInfo {
     int year, month, day, hour, minute, second;
@@ -238,6 +245,9 @@ struct AN {
 
     int screen, logTop, wheel;
     int slotPage;
+    FlowNode *flow;
+    int flowCount, flowScroll, flowZoom;
+    bool flowFromScript;
     bool confirmOpen;
     int confirmMsg, confirmAction, confirmArg;
     Image *thumbs[180];
@@ -313,6 +323,12 @@ void an_slots_open(AN *a, bool saving);
 void an_screens_render(AN *a);
 bool an_screens_input(AN *a);
 void an_go_title(AN *a);
+void an_flow_load(AN *a);
+void an_flow_mark(AN *a, int index);
+void an_flow_open(AN *a, bool fromScript);
+void an_flow_jump(AN *a, int id);
+void an_flow_render(AN *a);
+bool an_flow_input(AN *a);
 void an_capture_shot(AN *a);
 void an_system_load(AN *a);
 void an_system_save(AN *a);

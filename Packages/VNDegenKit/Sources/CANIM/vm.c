@@ -239,10 +239,12 @@ static void exec(AN *a, const Op *op) {
     const Arg *g = op->arg;
     Scene *s = &a->scene;
     switch (op->code) {
-    case 0x01:
+    case 0x01: end_game(a); break;
     case 0x05:
-        end_game(a);
+        if (a->flowCount) an_flow_open(a, true);
+        else end_game(a);
         break;
+    case 0x48: an_flow_mark(a, val(a, &g[0])); break;
     case 0x0b: a->th.pc = (u32)g[0].v; break;
     case 0x0c:
         if (a->th.sp < AN_STACK) a->th.stack[a->th.sp++] = a->th.pc;

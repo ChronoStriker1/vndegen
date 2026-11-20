@@ -215,6 +215,7 @@ void an_do_action(AN *a, int action, int arg) {
         an_go_title(a);
         break;
     case ACT_QUIT: a->quit = true; break;
+    case ACT_JUMP: an_flow_jump(a, arg); break;
     }
 }
 

@@ -42,6 +42,7 @@ void an_title_input(AN *a) {
         an_vm_start(a, 8);
         break;
     case TB_CONTINUE: an_slots_open(a, false); break;
+    case TB_FLOWCHART: an_flow_open(a, false); break;
     case TB_EXIT: an_confirm(a, MSG_QUIT, ACT_QUIT, 0); break;
     default: break;
     }

@@ -61,6 +61,7 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
     p = an_fmt("%s/%s_define.dat", a->dir, base);
     if (!an_define_load(&a->def, p)) an_log(a, "can't read %s", p);
     free(p);
+    an_flow_load(a);
     p = an_fmt("%s/voice/%s_wave.pck", a->dir, base);
     if (!an_pack_open(&a->voice, p, false)) an_log(a, "no voice archive %s", p);
     free(p);
@@ -98,6 +99,7 @@ void vnanim_close(VNANIM *n) {
     an_pack_close(&a->voice);
     an_pack_close(&a->psb);
     free(a->logs);
+    free(a->flow);
     free(a->fb);
     free(a->prev);
     free(a->shot);
@@ -117,7 +119,7 @@ bool vnanim_frame(VNANIM *n, uint32_t elapsedMs) {
     if (a->quit) return false;
     if (a->paused) return true;
     a->now += elapsedMs;
-    if (an_screens_input(a)) {
+    if (an_screens_input(a) || an_flow_input(a)) {
     } else if (a->phase == PH_TITLE) an_title_input(a);
     else if (!an_ui_input(a)) an_game_input(a);
     if (a->phase == PH_GAME && a->screen == SCR_NONE) an_vm_step(a);
