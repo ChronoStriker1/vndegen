@@ -212,7 +212,7 @@ IPAC games, such as Mamono Musume to no Seikatsu: Lamia no Baai, run on VNDegen'
 
 ## Ikura GDL
 
-Ikura GDL games, such as Lightning Warrior Raidy, run on VNDegen's own Ikura runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed format readers and the original engine run under Wine, MIT licensed like the rest of the app. The title, menus, battles and map are the game's own scripts; the first-person dungeon view is drawn by the runtime at the PC's geometry. Saves are the PC engine's own `RAIDYUS.SAV` in the game folder, so they move between VNDegen and a PC copy of the game. [ikura.md](ikura.md) lists which games run and the known limits, and [ikura-cleanroom.md](ikura-cleanroom.md) where the runtime's knowledge came from.
+Ikura GDL games, Lightning Warrior Raidy and Raidy II, run on VNDegen's own Ikura runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed format readers and the original engine run under Wine, MIT licensed like the rest of the app. The title, menus, battles and map are the game's own scripts; the first-person dungeon view is drawn by the runtime at the PC's geometry. Raidy II's opening movie, animated scenes, automap and backlog are the runtime's too. Saves are the PC engine's own `RAIDYUS.SAV` or `RAIDY2R.SAV` in the game folder, so they move between VNDegen and a PC copy of the game. [ikura.md](ikura.md) lists which games run and the known limits, and [ikura-cleanroom.md](ikura-cleanroom.md) where the runtime's knowledge came from.
 
 
 ## EAGLS
