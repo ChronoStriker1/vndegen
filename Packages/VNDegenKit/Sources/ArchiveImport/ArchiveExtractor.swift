@@ -61,6 +61,9 @@ nonisolated enum ArchiveExtractor {
         if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, EnigmaPack.isPack(source.volumes[0]) {
             return try listPack(source.volumes[0])
         }
+        if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, RPGMakerCabinet.isPacked(source.volumes[0]) {
+            throw .compressedRPGMakerGame
+        }
         if source.isInstaller, source.installers.count == 1, source.volumes.count == 1, let offset = NSISPayload.offset(in: source.volumes[0]) {
             var contents = try listArchive(source, offset: offset)
             contents.payloadOffset = offset
@@ -358,6 +361,15 @@ nonisolated enum ArchiveExtractor {
               var source = try? ArchiveSource(picked: executables) else { return nil }
         source.isPackedGame = true
         return source
+    }
+
+    static func holdsCompressedRPGMakerGame(_ root: URL) -> Bool {
+        let items = visibleItems(in: root)
+        let folders = items.count == 1 && isDirectory(items[0]) ? [items[0]] : [root]
+        return folders.contains { folder in
+            let executables = visibleItems(in: folder).filter { $0.pathExtension.lowercased() == "exe" && !isDirectory($0) }
+            return executables.count == 1 && RPGMakerCabinet.isPacked(executables[0])
+        }
     }
 
     static func nestedGame(in root: URL) -> (root: URL, nested: ArchiveSource?) {

@@ -317,6 +317,7 @@ public final class ArchiveImporter {
                     nestedSource = inner
                     step = .nested(fileName: inner.fileName)
                 } else {
+                    if ArchiveExtractor.holdsCompressedRPGMakerGame(root) { throw ArchiveError.compressedRPGMakerGame }
                     try await Self.unpackWebArchives(in: root)
                     try Task.checkCancellation()
                     task = nil
