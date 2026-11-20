@@ -29,10 +29,11 @@ target_link_libraries(anim PUBLIC vnvideo m pthread z)
 
 set(EMOTE ${CMAKE_CURRENT_SOURCE_DIR}/../vnemote)
 set(EMOTE_LIB ${CMAKE_CURRENT_BINARY_DIR}/emote/release/libvnemote.a)
+file(GLOB_RECURSE ELUNA_SOURCES CONFIGURE_DEPENDS ${EMOTE}/../third_party/eluna_rs/src/*.rs)
 add_custom_command(OUTPUT ${EMOTE_LIB}
   COMMAND env CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR}/emote cargo build --release --offline --locked
   WORKING_DIRECTORY ${EMOTE}
-  DEPENDS ${EMOTE}/src/lib.rs ${EMOTE}/Cargo.toml ${EMOTE}/Cargo.lock
+  DEPENDS ${EMOTE}/src/lib.rs ${EMOTE}/Cargo.toml ${EMOTE}/Cargo.lock ${ELUNA_SOURCES}
   USES_TERMINAL)
 add_custom_target(vnemote DEPENDS ${EMOTE_LIB})
 add_library(emote STATIC IMPORTED)

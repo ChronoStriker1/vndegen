@@ -156,7 +156,32 @@ int main(int argc, char **argv) {
             if (l < 0) fprintf(stderr, "no label %s\n", c + 6);
             else an_vm_start(a, (u32)l);
         } else if (!strncmp(c, "pc:", 3)) an_vm_start(a, (u32)strtoul(c + 3, NULL, 16));
-        else if (!strcmp(c, "state")) print_state(a);
+        else if (sscanf(c, "load:%d", &k) == 1) printf("load %d: %s\n", k, an_load_slot(a, k) ? "ok" : "failed");
+        else if (sscanf(c, "save:%d", &k) == 1) {
+            an_capture_shot(a);
+            printf("save %d: %s\n", k, an_save_slot(a, k) ? "ok" : "failed");
+        } else if (!strncmp(c, "var:", 4)) {
+            char name[64] = "";
+            float v;
+            if (sscanf(c + 4, "%d,%63[^,],%f", &k, name, &v) == 3 && k >= 0 && k < AN_LAYERS) {
+                an_layer_set_var(&a->scene.layer[k], name, v);
+                a->scene.layer[k].varSerial++;
+                a->scene.layer[k].fresh = true;
+            }
+        } else if (!strncmp(c, "emote:", 6)) {
+            char model[64] = "", preset[64] = "";
+            if (sscanf(c + 6, "%d,%63[^,],%63s", &k, model, preset) == 3 && k >= 0 && k < AN_LAYERS) {
+                Layer *l = &a->scene.layer[k];
+                memset(l, 0, sizeof *l);
+                l->kind = LK_EMOTE;
+                snprintf(l->name, sizeof l->name, "%s", model);
+                l->alpha = l->fromAlpha = l->toAlpha = 255;
+                l->scale = 1000;
+                an_layer_apply_preset(a, l, "AllReset", 0);
+                an_layer_apply_preset(a, l, preset, 0);
+                l->fresh = true;
+            }
+        } else if (!strcmp(c, "state")) print_state(a);
         else if (!strcmp(c, "skip")) a->skipMode = true;
         else if (!strcmp(c, "noskip")) a->skipMode = false;
         else if (!strncmp(c, "shot:", 5)) {
