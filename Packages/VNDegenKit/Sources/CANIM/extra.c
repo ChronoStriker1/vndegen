@@ -315,6 +315,7 @@ static void start_replay(AN *a, int n) {
     int label = an_script_label(a->sc, "CheckMemory");
     if (label < 0) return;
     memset(&a->scene, 0, sizeof a->scene);
+    an_fibers_stop(a);
     memset(a->L, 0, sizeof a->L);
     a->L[4] = n;
     a->logCount = 0;

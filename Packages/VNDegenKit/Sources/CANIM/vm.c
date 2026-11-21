@@ -133,6 +133,30 @@ static bool decode(AN *a, u32 pc, Op *op) {
     return q <= end;
 }
 
+enum { FIBERS = 8 };
+
+typedef struct Fiber {
+    bool on;
+    int id;
+    Thread th;
+    i32 L[AN_VARS];
+} Fiber;
+
+static Fiber *fiber_table(AN *a) {
+    if (!a->fibers) a->fibers = an_alloc(sizeof(Fiber) * FIBERS);
+    return a->fibers;
+}
+
+void an_fibers_stop(AN *a) {
+    if (a->fibers) memset(a->fibers, 0, sizeof(Fiber) * FIBERS);
+}
+
+static void fiber_stop(AN *a, int id) {
+    Fiber *f = fiber_table(a);
+    for (int i = 0; i < FIBERS; i++)
+        if (f[i].on && f[i].id == id) f[i].on = false;
+}
+
 static i32 *var(AN *a, const Arg *g) {
     if (g->tag == TAG_LOCAL && g->v >= 0 && g->v < AN_VARS) return &a->L[g->v];
     if (g->tag == TAG_GLOBAL && g->v >= 0 && g->v < AN_VARS) return &a->G[g->v];
@@ -213,6 +237,7 @@ static void skip_case(AN *a) {
 }
 
 void an_reset_scene(AN *a) {
+    an_fibers_stop(a);
     an_movie_stop(a);
     an_snd_stop(a, CH_BGM);
     an_snd_stop(a, CH_VOICE);
@@ -239,6 +264,35 @@ static void end_game(AN *a) {
     an_system_save(a);
     a->th.wait = W_END;
     a->phase = PH_TITLE;
+}
+
+static u32 block_end(AN *a, u32 pc) {
+    int depth = 0;
+    for (int n = 0; n < 4096; n++) {
+        Op op;
+        if (!decode(a, pc, &op)) return pc;
+        pc = op.next;
+        if (op.code == 0xb8 || op.code == 0xb9) depth++;
+        else if (op.code == 0xc4 && depth-- == 0) return pc;
+    }
+    return pc;
+}
+
+static void fork_block(AN *a, const Op *op) {
+    int id = val(a, &op->arg[0]);
+    u32 body = op->next;
+    a->th.pc = block_end(a, body);
+    if (a->fiberMainL) return;
+    fiber_stop(a, id);
+    Fiber *f = fiber_table(a), *slot = NULL;
+    for (int i = 0; i < FIBERS && !slot; i++)
+        if (!f[i].on) slot = &f[i];
+    if (!slot) return;
+    memset(&slot->th, 0, sizeof slot->th);
+    slot->on = true;
+    slot->id = id;
+    slot->th.pc = body;
+    memcpy(slot->L, a->L, sizeof a->L);
 }
 
 static void exec(AN *a, const Op *op) {
@@ -441,7 +495,23 @@ static void exec(AN *a, const Op *op) {
         an_snd_play(a, CH_BGM, name, true, false);
         break;
     }
-    case 0xb8: an_snd_stop(a, CH_BGM); break;
+    case 0xb8:
+    case 0xb9: fork_block(a, op); break;
+    case 0xc4: break;
+    case 0xc5: fiber_stop(a, val(a, &g[0])); break;
+    case 0xc2:
+        set(a, &g[0], val(a, &g[1]));
+        if (a->fiberMainL && g[0].tag == TAG_LOCAL && g[0].v >= 0 && g[0].v < AN_VARS) a->fiberMainL[g[0].v] = val(a, &g[1]);
+        break;
+    case 0xc0: {
+        Layer *l = layer(a, &g[0]);
+        if (!l) break;
+        l->fromScale = an_layer_scale(a, l);
+        l->scale = val(a, &g[1]);
+        l->scaleStart = a->now;
+        l->scaleTime = (u32)val(a, &g[2]);
+        break;
+    }
     case 0xa2: s->window = g[0].v != 0; break;
     case 0x66: a->emoteScale = (float)g[0].v / 1000.0f; break;
     case 0x53:
@@ -491,6 +561,50 @@ void an_vm_start(AN *a, u32 pc) {
     memset(&a->th, 0, sizeof a->th);
     a->th.pc = pc;
     a->phase = PH_GAME;
+}
+
+static void fiber_run(AN *a, Fiber *f) {
+    for (int budget = 0; budget < 2000 && f->on; budget++) {
+        Thread *t = &a->th;
+        if (t->wait == W_TIME) {
+            if ((i32)(a->now - t->waitUntil) < 0 && !a->skipMode) return;
+            t->wait = W_NONE;
+        } else if (t->wait != W_NONE) {
+            f->on = false;
+            return;
+        }
+        Op op;
+        if (!decode(a, t->pc, &op)) {
+            f->on = false;
+            return;
+        }
+        if (op.code == 0xc4) {
+            f->on = false;
+            return;
+        }
+        t->pc = op.next;
+        exec(a, &op);
+    }
+}
+
+void an_fibers_step(AN *a) {
+    if (!a->fibers) return;
+    static _Thread_local i32 mainL[AN_VARS];
+    for (int i = 0; i < FIBERS; i++) {
+        Fiber *f = &a->fibers[i];
+        if (!f->on) continue;
+        Thread mainTh = a->th;
+        memcpy(mainL, a->L, sizeof a->L);
+        a->th = f->th;
+        memcpy(a->L, f->L, sizeof a->L);
+        a->fiberMainL = mainL;
+        fiber_run(a, f);
+        f->th = a->th;
+        memcpy(f->L, a->L, sizeof a->L);
+        a->fiberMainL = NULL;
+        a->th = mainTh;
+        memcpy(a->L, mainL, sizeof a->L);
+    }
 }
 
 bool an_vm_step(AN *a) {

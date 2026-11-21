@@ -71,6 +71,7 @@ void an_title_input(AN *a) {
     case TA_NEW:
         memset(a->L, 0, sizeof a->L);
         memset(&a->scene, 0, sizeof a->scene);
+        an_fibers_stop(a);
         a->G[2] = 1;
         a->logCount = 0;
         an_vm_start(a, 8);

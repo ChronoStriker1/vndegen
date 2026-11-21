@@ -48,6 +48,14 @@ folder down.
 - Backlog: entries 46 pixels a line plus one blank line, the newest ending at y 666 and older ones above it, the line
   on screen included. Magical Sword draws it at 20 pixels with unrounded advances, the speaker's line 41 pixels below
   the name and indented 12 pixels; the scroll thumb's height is the share of entries shown.
+- Pose animations: `b9 <id> <n>` and `b8 <id> <n>` start a block that runs beside the story up to its `c4`, while the
+  script carries on after it: preset changes (`be`), moves relative to the last one (`bc`), scale (`c0`), sounds
+  (`c3`) and waits (`43`), each on its own clock. `c2` sets a flag the main script reads (`L15`, the block finished),
+  and `c5 <id>` stops a block early, after which the script applies the final pose itself. Each block runs once; on the
+  PC neither the floating pig (`EmSetFloating`) nor `EmSetShakeLoop` repeats, and the pig rises at once whatever the
+  second number. A new scene, a load or the title stops them. Measured on Magical Sword's goddess, the expression
+  changes and the stepwise moves land within 0.1 second of the PC. The models' own E-mote timelines (`sample_00` and
+  the like, left by the authoring tool) are never named by either game and don't play on the PC.
 - Choices: `d0` lists the options by id; `b0 n on` before it turns option n on or off (a system routine turns all six
   on), which is how Double Date Dilemma's six-way choice opens its options one by one and Magical Sword drops an
   option already taken. One shown option sits at y 213, two at 175 and 305 (130 apart), in both games; three or more,
@@ -150,8 +158,8 @@ on leaving.
 
 ## Known limits
 
-- E-mote characters blink and their hair moves, but their timelines and the scripts' short pose animations (`b9`,
-  `bc`, `be`, `c2` to `c5`) don't play yet. eluna needed fixes to draw them like the PC (`Engines/ANIM/UPSTREAM.md`);
+- `bd` and `bb` inside pose blocks are skipped; their meaning isn't known. A character's first frame takes its preset
+  at once, where the PC eases into it during the scene's fade-in. eluna needed fixes to draw them like the PC (`Engines/ANIM/UPSTREAM.md`);
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
 - The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.

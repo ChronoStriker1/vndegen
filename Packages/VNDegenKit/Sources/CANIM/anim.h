@@ -260,6 +260,8 @@ struct AN {
 
     Thread th;
     i32 L[AN_VARS], G[AN_VARS];
+    struct Fiber *fibers;
+    i32 *fiberMainL;
     char movieName[64];
     char missingSound[64];
     int soundTag;
@@ -321,6 +323,8 @@ struct AN {
 
 bool an_vm_step(AN *a);
 void an_vm_start(AN *a, u32 pc);
+void an_fibers_step(AN *a);
+void an_fibers_stop(AN *a);
 
 void an_gfx_render(AN *a);
 void an_gfx_snapshot(AN *a);

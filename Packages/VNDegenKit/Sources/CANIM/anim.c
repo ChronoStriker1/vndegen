@@ -102,6 +102,7 @@ void vnanim_close(VNANIM *n) {
     an_pack_close(&a->voice);
     an_pack_close(&a->psb);
     free(a->logs);
+    free(a->fibers);
     free(a->flow);
     free(a->fb);
     free(a->prev);
@@ -125,7 +126,10 @@ bool vnanim_frame(VNANIM *n, uint32_t elapsedMs) {
     if (an_screens_input(a) || an_flow_input(a)) {
     } else if (a->phase == PH_TITLE) an_title_input(a);
     else if (!an_ui_input(a)) an_game_input(a);
-    if (a->phase == PH_GAME && a->screen == SCR_NONE) an_vm_step(a);
+    if (a->phase == PH_GAME && a->screen == SCR_NONE) {
+        an_vm_step(a);
+        an_fibers_step(a);
+    }
     if (an_movie_looping(a)) an_movie_update(a);
     a->clicked = false;
     a->rclicked = false;
