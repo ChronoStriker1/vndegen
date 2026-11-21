@@ -144,8 +144,7 @@ void an_extra_open(AN *a) {
 static void draw_tabs(AN *a, Image *b, int tab) {
     const ExtraLayout *L = &EXTRA[a->game];
     for (int k = 0; k < EX_TABS; k++) {
-        bool live = k != EX_SPRITES;
-        int state = k == a->extraTab ? 2 : live && in_rect(a, TAB_X + TAB_DX * k, TAB_Y, TAB_W, TAB_H) ? 1 : 0;
+        int state = k == a->extraTab ? 2 : in_rect(a, TAB_X + TAB_DX * k, TAB_Y, TAB_W, TAB_H) ? 1 : 0;
         int ax = tab == EX_MUSIC ? L->musicTabX + 186 * k : 3 + 186 * k, ay = tab == EX_MUSIC ? L->musicTabY + 42 * state : 284 + 42 * state;
         an_gfx_blit(a->fb, a->W, a->H, b, ax, ay, TAB_W, TAB_H, TAB_X + TAB_DX * k, TAB_Y + (tab == EX_MUSIC && a->game == GAME_DDD), 255);
     }
@@ -312,6 +311,11 @@ void an_extra_render(AN *a) {
         an_movie_draw(a, a->fb);
         return;
     }
+    if (a->extraTab == EX_SPRITES) {
+        Image *rb = an_image_load(a, "spEmoteRoomButton");
+        if (rb) an_room_render(a, rb);
+        return;
+    }
     Image *bg = an_image_load(a, screen_name(a->extraTab));
     if (bg) an_gfx_blit(a->fb, a->W, a->H, bg, 0, 0, a->W, a->H, 0, 0, 255);
     Image *b = an_image_load(a, atlas_name(a->extraTab));
@@ -378,6 +382,7 @@ static void play_track(AN *a, int n) {
 }
 
 static void leave(AN *a) {
+    if (a->extraTab == EX_SPRITES) an_room_close(a);
     a->screen = SCR_NONE;
     if (a->extraTrack >= 0 && a->extraBgm[0]) an_snd_play(a, CH_BGM, a->extraBgm, true, false);
     a->extraTrack = -1;
@@ -407,6 +412,7 @@ bool an_extra_input(AN *a) {
         if (next >= 0) play_track(a, next);
         else a->extraTrack = -1;
     }
+    if (a->extraTab == EX_SPRITES && an_room_input(a)) return true;
     if (a->rclicked) {
         a->rclicked = false;
         leave(a);
@@ -419,8 +425,10 @@ bool an_extra_input(AN *a) {
         return true;
     }
     for (int k = 0; k < EX_TABS; k++)
-        if (k != EX_SPRITES && in_rect(a, TAB_X + TAB_DX * k, TAB_Y, TAB_W, TAB_H) && k != a->extraTab) {
+        if (in_rect(a, TAB_X + TAB_DX * k, TAB_Y, TAB_W, TAB_H) && k != a->extraTab) {
+            if (a->extraTab == EX_SPRITES) an_room_close(a);
             a->extraTab = k;
+            if (k == EX_SPRITES) an_room_open(a);
             a->extraPage = 0;
             return true;
         }

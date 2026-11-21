@@ -159,6 +159,33 @@ any click, so what clicks do there wasn't seen. Music plays the bgm files in the
 Dilemma's are numbered 01-07, 20, 21, 30, 31), on to the next unless Repeat is on, and the title music comes back
 on leaving.
 
+Sprites is the PC's character viewer. The define holds its lists after the movies: the characters, the backgrounds
+(from `spRoombg01`), each character's expressions, each character's outfits (an E-mote model and an icon number) and
+the arm presets that go with them. Double Date Dilemma's records use other type numbers, so they're found by their
+shape. A choice loads the outfit's model, applies `AllReset`, `emViewDefault1` (hair on) or `emViewDefault2`, the
+arm preset and the expression, then the sliders. The character stands at the screen's centre at half the story's
+scale. Each slider is a knob offset of 0 to 180 pixels; the variables and the numbers beside them were read from the
+PC under Wine, knob by knob:
+
+| Slider | Variable | Number shown |
+| --- | --- | --- |
+| Zoom | scale 500 + 1500 × px / 180 | 50 + 150 × px / 180 |
+| Head and body tilt, eyes up/down, left/right | px / 3 − 30 | px / 3 |
+| Eyes | px / 3 − 10 | px / 3 |
+| Eyebrows | ⌊px × 53 / 180⌋ | the same |
+| Mouth | ⌊px × 46 / 180⌋ in steps of 10, 46 at the end | the same |
+| Mouth open | px / 36 | its whole part |
+| Blush | px / 90 | its whole part |
+
+Tears set `face_tears` to 30, the crest (Magical Sword) `fade_x` to 1, and Idle Motion picks `sPauseWait01` or
+`sNoIdle`; Lip Sync moves `face_talk`. Save and Load keep one setting per character in the PC's system save: the ten
+knob offsets at 0x7e9e4 + 40 × c, the outfit at 0x7ee94 + 4 × c, the expression's name at 0x7ef0c, the expression and
+background at 0x7efd4 and 0x7f04c + 4 × c, then tears, hair, crest and lip sync from 0x7f1b4, 0x7f22c, 0x7f2a4 and
+0x7f31c + 4 × c. Saves load both ways with the PC. The camera button writes the scene without the controls to
+`SaveGraphic/emotesave_NNN.png` in the save folder, numbered from 000 as on the PC (whose own file comes out black
+under Wine). The info line shows the help for the row under the pointer, and Double Date Dilemma's Lips and Move
+buttons have their own on and off lines.
+
 ## Known limits
 
 - `bd` and `bb` inside pose blocks are skipped; their meaning isn't known. A character's first frame takes its preset
@@ -166,11 +193,14 @@ on leaving.
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
 - The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
-- Extra's Sprites page isn't built: its tab is drawn but does nothing. Settings' font list is empty
-  and its choice does nothing, and the volume screen's Play and Allow Test buttons are drawn but do nothing.
+- The Sprites viewer's folder button does nothing, and Save doesn't keep Idle Motion: no field for it turned up in the
+  PC's save. Settings' font list is empty and its choice does nothing, and the volume screen's Play and Allow Test
+  buttons are drawn but do nothing.
 - Double Date Dilemma's memory blurbs are drawn about 1.5% narrower than the PC's, so a line can break one word
   earlier.
-- Magical Sword: every screen but Extra is built to its own layout and checked against the PC. Its goddess, with three
+- The goddess (Malg202) draws her eyes wrongly in the Sprites viewer, with sparkles over half-closed lids where the PC
+  shows plain open eyes; upstream eluna draws them the same way. The other characters' eyes match the PC.
+- Magical Sword: every screen is built to its own layout and checked against the PC. Its goddess, with three
   times the sprites of a Double Date Dilemma character, runs at 46 frames a second alone in the Debug Mac app and 26
   in the opening's 300% close-up (34 and 20 on the iPad simulator). A Release build on the iPad simulator updates the
   screen about as often (32 and 20, counted from screen recordings), so the close-up isn't smooth there; a Release Mac

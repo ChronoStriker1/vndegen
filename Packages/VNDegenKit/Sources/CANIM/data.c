@@ -321,6 +321,100 @@ static void define_galleries(Define *def, const u8 *d, size_t size) {
     }
 }
 
+static const u8 *room_string(const u8 *p, const u8 *end, char **out) {
+    const u8 *z = memchr(p, 0, (size_t)(end - p));
+    if (!z) return NULL;
+    *out = dup_string(p, (size_t)(z - p));
+    return z + 1;
+}
+
+static bool room_end(const u8 *p, const u8 *end) { return p + 1 < end && p[0] == '}' && p[1] == 0; }
+
+static char **room_list(const u8 **pp, const u8 *end, int *count) {
+    char **list = NULL;
+    const u8 *p = *pp;
+    *count = 0;
+    while (p < end && !room_end(p, end)) {
+        char *s;
+        p = room_string(p, end, &s);
+        if (!p) break;
+        list = an_realloc(list, sizeof(char *) * (size_t)(*count + 1));
+        list[(*count)++] = s;
+    }
+    *pp = p ? p + 2 : end;
+    return list;
+}
+
+static RoomChar *room_char(Define *def, const char *key) {
+    for (int i = 0; i < def->roomCount; i++)
+        if (!strcmp(def->room[i].key, key)) return &def->room[i];
+    return NULL;
+}
+
+static void define_room(Define *def, const u8 *d, size_t size) {
+    const u8 *end = d + size;
+    const u8 *bg = NULL;
+    for (size_t at = 4; at + 16 < size && !bg; at++)
+        if (!memcmp(d + at, "spRoombg01", 11) && d[at - 1] == 0 && d[at - 2] == 0 && d[at - 3] == 0) bg = d + at;
+    if (!bg) return;
+    const u8 *p = bg - 7;
+    while (p > d && !room_end(p, end)) p--;
+    if (p <= d) return;
+    const u8 *chars = p + 6;
+    int n = 0;
+    char **keys = room_list(&chars, end, &n);
+    def->room = an_alloc(sizeof(RoomChar) * (size_t)(n ? n : 1));
+    for (int i = 0; i < n; i++) def->room[i].key = keys[i];
+    def->roomCount = n;
+    free(keys);
+    p = bg;
+    def->roomBg = room_list(&p, end, &def->roomBgCount);
+    while (p + 8 < end) {
+        p += 4;
+        char *key;
+        const u8 *q = room_string(p, end, &key);
+        if (!q) break;
+        RoomChar *c = room_char(def, key);
+        char *first = NULL;
+        const u8 *r = room_string(q, end, &first);
+        bool outfit = r && r + 4 < end && r[0] < 64 && !r[1] && !r[2] && !r[3];
+        free(first);
+        if (!c && !outfit) {
+            free(key);
+            int pairs = 0;
+            char **arm = room_list(&p, end, &pairs);
+            for (int i = 0; i + 1 < pairs; i += 2) {
+                def->armModel = an_realloc(def->armModel, sizeof(char *) * (size_t)(def->armCount + 1));
+                def->armPreset = an_realloc(def->armPreset, sizeof(char *) * (size_t)(def->armCount + 1));
+                def->armModel[def->armCount] = arm[i];
+                def->armPreset[def->armCount++] = arm[i + 1];
+            }
+            if (pairs % 2) free(arm[pairs - 1]);
+            free(arm);
+            break;
+        }
+        free(key);
+        if (!c) break;
+        if (!outfit) {
+            const u8 *s = q;
+            c->expr = room_list(&s, end, &c->exprCount);
+            p = s;
+            continue;
+        }
+        while (q < end && !room_end(q, end)) {
+            char *model;
+            q = room_string(q, end, &model);
+            if (!q || q + 4 > end) break;
+            c->outfit = an_realloc(c->outfit, sizeof(char *) * (size_t)(c->outfitCount + 1));
+            c->outfitIcon = an_realloc(c->outfitIcon, sizeof(int) * (size_t)(c->outfitCount + 1));
+            c->outfit[c->outfitCount] = model;
+            c->outfitIcon[c->outfitCount++] = (int)rd32(q);
+            q += 4;
+        }
+        p = q + 2;
+    }
+}
+
 bool an_define_load(Define *def, const char *path) {
     memset(def, 0, sizeof *def);
     size_t size;
@@ -401,6 +495,7 @@ bool an_define_load(Define *def, const char *path) {
     }
     def->sample = define_sample(d, def->size);
     define_galleries(def, d, def->size);
+    define_room(def, d, def->size);
     return true;
 }
 
@@ -454,6 +549,24 @@ void an_define_free(Define *def) {
     free(def->memory);
     for (int i = 0; i < def->movieCount; i++) free(def->movie[i]);
     free(def->movie);
+    for (int i = 0; i < def->roomCount; i++) {
+        RoomChar *c = &def->room[i];
+        for (int k = 0; k < c->exprCount; k++) free(c->expr[k]);
+        for (int k = 0; k < c->outfitCount; k++) free(c->outfit[k]);
+        free(c->expr);
+        free(c->outfit);
+        free(c->outfitIcon);
+        free(c->key);
+    }
+    free(def->room);
+    for (int i = 0; i < def->roomBgCount; i++) free(def->roomBg[i]);
+    free(def->roomBg);
+    for (int i = 0; i < def->armCount; i++) {
+        free(def->armModel[i]);
+        free(def->armPreset[i]);
+    }
+    free(def->armModel);
+    free(def->armPreset);
     free(def->data);
     memset(def, 0, sizeof *def);
 }

@@ -122,7 +122,22 @@ typedef struct Define {
     int memoryCount;
     char **movie;
     int movieCount;
+    struct RoomChar *room;
+    int roomCount;
+    char **roomBg;
+    int roomBgCount;
+    char **armModel, **armPreset;
+    int armCount;
 } Define;
+
+typedef struct RoomChar {
+    char *key;
+    char **expr;
+    int exprCount;
+    char **outfit;
+    int *outfitIcon;
+    int outfitCount;
+} RoomChar;
 
 bool an_define_load(Define *d, const char *path);
 void an_define_free(Define *d);
@@ -397,6 +412,10 @@ void an_extra_open(AN *a);
 void an_extra_render(AN *a);
 bool an_extra_input(AN *a);
 void an_replay_end(AN *a);
+void an_room_open(AN *a);
+void an_room_close(AN *a);
+void an_room_render(AN *a, Image *b);
+bool an_room_input(AN *a);
 bool an_quick_save(AN *a);
 bool an_quick_load(AN *a);
 void an_confirm(AN *a, int message, int action, int arg);
