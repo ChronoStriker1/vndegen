@@ -12,7 +12,7 @@ on DxLib. How the runtime was written, and from which sources, is in `docs/wolfr
 | C interface | `Packages/VNDegenKit/Sources/CWolfRPG/include/vnwolf.h` | What the app calls: start, step, frame, audio, keys, pause, stop |
 | Plugin | `Packages/VNDegenKit/Sources/EngineWolfRPG/` | Detection, the session, input mapping, save locations |
 | Presenter | `Packages/VNDegenKit/Sources/FrameHost/` | Shows the runtime's frame through Metal and plays its sound through AVAudioEngine, shared with the other software-composited runtimes |
-| Linux test host | `Engines/WolfRPG/host/` | Builds the same sources on Linux with tools that run games headless |
+| Linux test host | `Engines/WolfRPG/host/` | Builds the same sources on Linux with tools that run games headless. `wolfplay`'s `--save SLOT@FRAME` and `--load SLOT@FRAME` write or read `Save/SaveDataNN.sav` after that frame |
 
 The runtime draws each frame on the CPU at the game's resolution (320 x 240 to 960 x 720 in the test games). The
 session steps it once per display refresh on the main thread, and the runtime advances the game at its own frame rate
@@ -182,7 +182,12 @@ In version 128 saves the pictures on screen go into the save, and a load shows t
 Yukino's day bar and portrait are there right after a load, from a PC save or VNDegen's, and VNDegen's frame then
 matches the PC engine's apart from the camera. The PC engines load VNDegen's version 128 saves with their pictures
 (President Yukino and Drain Dungeon under Wine). Images, text, windows, `<SQUARE>` and `<GRADX>` pictures keep their
-position, anchor, pattern, opacity, zoom, angle, colour and blend. Pictures numbered below 0 stay out of saves, as the PC
+position, anchor, pattern, opacity, zoom, angle, colour and blend.
+
+A picture's angle is in tenths of a degree, clockwise about the picture's centre: Drain Dungeon's engine under Wine draws
+an angle of 300 as 30 degrees, with the corners where `Engines/WolfRPG/host/picture_angle_test.cpp` expects them. Up to
+0.58.1 the runtime read it as whole degrees. Parade Buster's own scripts agree: its spinning `tri.png` steps by 400 and wraps at
+3600, a full turn. Windows and shapes don't turn. Pictures numbered below 0 stay out of saves, as the PC
 engine leaves them out. Saves of other versions carry no pictures and a load clears them, as their engines do or as is
 safe: ANGEL QUEST's engine (version 123) closes when it loads a save holding a picture record.
 

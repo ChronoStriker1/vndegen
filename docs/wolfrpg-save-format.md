@@ -90,7 +90,7 @@ Each picture has its number, a kind (`0 0` an image, `1 0` text, `0 1` a window,
 | `a[7]` | -1 in every save seen |
 | `a[8]` | The frames of the last command on the picture; changing it shows nothing |
 | `a[9]`, `a[10]` | Zoom across and down |
-| `a[11]` | The angle as the picture command gives it: 45 turns an image by about 4.5 degrees on the PC. Text pictures don't turn |
+| `a[11]` | The angle as the picture command gives it, in tenths of a degree: 45 turns an image by 4.5 degrees on the PC and 300 by 30. Text pictures loaded from a save didn't turn |
 | `b[0..5]` | Colour now and its target, red, green and blue, as percent × 254 / 100 − 254: 100% is 0, 80% −51, 0% −254 |
 | `v69` | 0x646464 twice, then zeros, then 100 twice, in every save seen. Setting `v69[2]` crashes the engine; the other zeros, `v72b`, `v73a`, `v74`, `v75`, `v81` and `v87` change nothing seen when set to 45 |
 | `v73b` | The event that made the picture: a type or −1, the common event, the command line |

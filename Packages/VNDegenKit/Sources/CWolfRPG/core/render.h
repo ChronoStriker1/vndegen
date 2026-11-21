@@ -12,6 +12,8 @@
 
 namespace wolf {
 
+double pictureAngleDegrees(const Picture &p);
+
 class Renderer {
 public:
     explicit Renderer(const Game &game);

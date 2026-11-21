@@ -11,7 +11,6 @@
 //   wolfplay <game folder> --pics 200   (lists the pictures shown at that frame)
 //   wolfplay <game folder> --sys 200   (lists the message and choice system variables at that frame)
 //   wolfplay <game folder> --rclick 210:640,480 --wheel 220:-1 --key 230:144   (a keyboard key by Wolf's code)
-//   wolfplay <game folder> --save 1@2000 --load 1@2500   (writes or reads Save/SaveDataNN.sav after that frame)
 #include "game.h"
 #include "render.h"
 
@@ -40,7 +39,7 @@ static uint32_t keyNamed(const std::string &n) {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: wolfplay <game folder> [--frames N] [--shot F:file.png] [--press F:key]\n");
+        std::fprintf(stderr, "usage: wolfplay <game folder> [--frames N] [--shot F:file.png] [--press F:key] [--save SLOT@F] [--load SLOT@F]\n");
         return 2;
     }
     int frames = 120, titleAt = -1;

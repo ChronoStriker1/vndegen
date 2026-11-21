@@ -124,6 +124,8 @@ Renderer::Renderer(const Game &game)
     : game_(game), images_(game.files(), game.log), map_(images_, game), text_(game, &images_) {}
 
 // Wolf's window skins are cut into a 3 by 3 grid: the corners stay, and the edges and middle stretch.
+double pictureAngleDegrees(const Picture &p) { return p.kind == PictureKind::Window ? 0 : p.angle.value() / 10; }
+
 void Renderer::drawWindow(Canvas &canvas, const Bitmap &skin, RectF d, float opacity) {
     if (skin.empty()) {
         canvas.fill(d, 0, 0, 40, uint8_t(200 * opacity));
@@ -252,7 +254,7 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     o.b = float(p.b.value() + p.pulse[2] * swing) / 100;
     o.blend = p.blend == 1 ? Blend::Add : p.blend == 2 ? Blend::Subtract : p.blend == 3 ? Blend::Multiply : Blend::Normal;
     // Windows and shapes ignore the angle, as Wolf's manual says.
-    o.angle = p.kind == PictureKind::Window ? 0 : p.angle.value();
+    o.angle = pictureAngleDegrees(p);
     canvas.draw(*img, from, {x, y, w, h}, o);
 }
 
