@@ -85,8 +85,8 @@ void an_title_input(AN *a) {
     }
 }
 
-enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 884, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194 };
-enum { BAR_X = 568, BAR_Y = 694, BAR_W = 712, BAR_H = 26, CHOICE_W = 719, CHOICE_H = 79, CHOICE_GAP = 16 };
+enum { WIN_Y = 534, WIN_H = 186, TEXT_SIZE = 24, LINE_H = 46 };
+enum { CHOICE_W = 719, CHOICE_H = 79, CHOICE_GAP = 16 };
 
 
 
@@ -106,27 +106,65 @@ static bool text_done(AN *a) { return !a->text || text_shown(a) >= strlen(a->tex
 
 static int win_alpha(AN *a) { return clampi(a->windowOpacity * 224 / 100, 0, 255); }
 
+typedef struct GaugeLabel {
+    int ax, ay, w, h, x;
+} GaugeLabel;
+
+static const GaugeLabel GAUGE_LABEL[GAME_COUNT][2] = {
+    [GAME_DDD] = {{4, 585, 55, 13, 22}, {68, 585, 53, 14, 94}},
+    [GAME_MGSW] = {{8, 585, 46, 13, 26}, {73, 585, 41, 13, 99}},
+};
+
+enum { GAUGE_LABEL_Y = 682, GAUGE_Y = 697, GAUGE_W = 60, GAUGE_FILL = 58 };
+
+static u32 auto_wait(AN *a) { return (u32)(2500 - a->autoSpeed * 20) + (u32)(100 - a->autoSpeed / 2) / 2 * (u32)strlen(a->text); }
+
+static void draw_gauge(AN *a, Image *w, int k, float left) {
+    const GaugeLabel *g = &GAUGE_LABEL[a->game][k];
+    int x = 20 + 70 * k;
+    an_gfx_blit(a->fb, a->W, a->H, w, g->ax, g->ay, g->w, g->h, g->x, GAUGE_LABEL_Y, 255);
+    an_gfx_blit(a->fb, a->W, a->H, w, 2 + 62 * k, 600, GAUGE_W, 7, x, GAUGE_Y, 255);
+    int fill = (int)(left * GAUGE_FILL + 0.5f);
+    if (fill > 0) an_gfx_blit(a->fb, a->W, a->H, w, 3 + 62 * k, 610, fill, 5, x + 1, GAUGE_Y + 1, 255);
+}
+
+static void draw_gauges(AN *a, Image *w) {
+    if (a->option[OPT_VOICE_BAR] == 0) {
+        float p = an_snd_progress(a, CH_VOICE);
+        draw_gauge(a, w, 0, p < 0 ? 0 : 1 - p);
+    }
+    if (a->option[OPT_AUTO_BAR] == 0) {
+        float left = 0;
+        if (a->autoMode && a->text && a->th.wait == W_TEXT) {
+            u32 wait = auto_wait(a), spent = a->now - a->textStart;
+            left = spent >= wait ? 0 : 1 - (float)spent / (float)wait;
+        }
+        draw_gauge(a, w, 1, left);
+    }
+}
+
 static void draw_window(AN *a) {
+    const UILayout *u = an_ui(a);
     Image *w = an_image_load(a, "spMessageWindow");
     if (w) {
         an_gfx_blit(a->fb, a->W, a->H, w, 2, 220, 130, WIN_H, 0, WIN_Y, win_alpha(a));
         an_gfx_blit(a->fb, a->W, a->H, w, 2, 17, 1020, WIN_H, 130, WIN_Y, win_alpha(a));
         an_gfx_blit(a->fb, a->W, a->H, w, 134, 220, 130, WIN_H, 1150, WIN_Y, win_alpha(a));
+        draw_gauges(a, w);
     }
     Image *ui = an_image_load(a, "spMessageWindowButton");
     if (a->name) {
         if (a->voiceName && ui) an_gfx_blit(a->fb, a->W, a->H, ui, 4, 53, 76, 28, 92, 563, 255);
-        an_text_draw(a, NAME_X, ROW1, a->name, TEXT_SIZE, 0xffffffffu, 0x90000000u, 0, LINE_H);
+        an_text_draw(a, u->nameX, u->nameRow, a->name, u->textSize, 0xffffffffu, 0x90000000u, 0, u->linePitch);
     }
     if (a->text) {
         size_t n = strlen(a->text), shown = text_shown(a);
         char *part = an_alloc(n + 1);
         memcpy(part, a->text, shown < n ? shown : n);
-        an_text_draw(a, TEXT_X, a->name ? ROW1 + LINE_H : ROW1, part, TEXT_SIZE, 0xffffffffu, 0x90000000u, TEXT_W, LINE_H);
+        an_text_draw(a, u->textX, a->name ? u->textRow : u->textRowNoName, part, u->textSize, 0xffffffffu, 0x90000000u, u->textW, u->linePitch);
         free(part);
     }
     if (ui) {
-        an_gfx_blit(a->fb, a->W, a->H, ui, 2, 118, BAR_W, BAR_H, BAR_X, BAR_Y, 255);
         an_bar_draw(a, ui);
         an_gfx_blit(a->fb, a->W, a->H, ui, 168, 53, 28, 28, 1243, 563, 255);
     }
@@ -190,7 +228,7 @@ void an_game_input(AN *a) {
         return;
     }
     if (a->th.wait == W_TEXT) {
-        u32 autoWait = (u32)(2500 - a->autoSpeed * 20) + (u32)(100 - a->autoSpeed / 2) / 2 * (u32)strlen(a->text);
+        u32 autoWait = auto_wait(a);
         bool autoNext = a->autoMode && text_done(a) && !an_snd_playing(a, CH_VOICE) && a->now - a->textStart > autoWait;
         if (a->clicked && !text_done(a)) {
             a->clicked = false;

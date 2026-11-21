@@ -351,6 +351,58 @@ bool an_quick_load(AN *a) {
     return ok;
 }
 
+typedef struct OptionByte {
+    u32 at;
+    u8 first, second;
+} OptionByte;
+
+static const OptionByte OPTION_BYTES[11] = {
+    [OPT_SCREEN] = {0, 0, 0},           [OPT_EFFECTS] = {0x1, 0, 2},       [OPT_SKIP_UNREAD] = {0x2, 1, 0},
+    [OPT_KEEP_SKIP] = {0x3, 1, 0},      [OPT_EVENT_MOVIES] = {0x6, 1, 0},  [OPT_HAIR] = {0x1668, 1, 0},
+    [OPT_SKIP_VOICE] = {0x7e524, 1, 0}, [OPT_HISTORY] = {0x7e520, 0, 1},  [OPT_CONFIRM] = {0x5, 1, 0},
+    [OPT_VOICE_BAR] = {0x7e528, 1, 0},  [OPT_AUTO_BAR] = {0x7e52c, 1, 0},
+};
+
+enum { SYS_VOLUME = 0x18, SYS_TEXT_SPEED = 0x27c, SYS_AUTO_SPEED = 0x280, SYS_OPACITY = 0x298, SYS_SETTINGS_END = 0x7e530 };
+static const u32 VOLUME_BYTES[5] = {0x18, 0x19, 0x1b, 0x1e, 0x1f};
+enum { SYS_VOICE = 0x21, SYS_BGV = 0x2b };
+
+static void settings_read(AN *a) {
+    if (!a->sys || a->sysSize < SYS_SETTINGS_END) return;
+    const u8 *s = a->sys;
+    for (int i = 0; i < 11; i++) {
+        const OptionByte *o = &OPTION_BYTES[i];
+        if (o->first == o->second) continue;
+        if (s[o->at] == o->first) a->option[i] = 0;
+        else if (s[o->at] == o->second) a->option[i] = 1;
+    }
+    for (int i = 0; i < 5; i++) a->volume[i] = clampi(s[VOLUME_BYTES[i]], 0, 100);
+    for (int c = 0; c < 3; c++) {
+        a->voiceVolume[c] = clampi(s[SYS_VOICE + c], 0, 100);
+        a->bgvVolume[c] = clampi(s[SYS_BGV + c], 0, 100);
+    }
+    a->windowOpacity = clampi((int)rd32(s + SYS_OPACITY) * 100 / 217, 0, 100);
+    a->textSpeed = clampi((200 - (int)rd32(s + SYS_TEXT_SPEED)) * 100 / 172, 0, 100);
+    a->autoSpeed = clampi((50 - (int)rd32(s + SYS_AUTO_SPEED)) * 100 / 43, 0, 100);
+}
+
+static void settings_write(AN *a) {
+    if (!a->sys || a->sysSize < SYS_SETTINGS_END) return;
+    u8 *s = a->sys;
+    for (int i = 0; i < 11; i++) {
+        const OptionByte *o = &OPTION_BYTES[i];
+        if (o->first != o->second) s[o->at] = a->option[i] ? o->second : o->first;
+    }
+    for (int i = 0; i < 5; i++) s[VOLUME_BYTES[i]] = (u8)clampi(a->volume[i], 0, 100);
+    for (int c = 0; c < 3; c++) {
+        s[SYS_VOICE + c] = (u8)clampi(a->voiceVolume[c], 0, 100);
+        s[SYS_BGV + c] = (u8)clampi(a->bgvVolume[c], 0, 100);
+    }
+    wr32(s + SYS_OPACITY, (u32)(a->windowOpacity * 217 / 100));
+    wr32(s + SYS_TEXT_SPEED, (u32)(200 - a->textSpeed * 172 / 100));
+    wr32(s + SYS_AUTO_SPEED, (u32)(50 - a->autoSpeed * 43 / 100));
+}
+
 void an_system_load(AN *a) {
     char *p = system_path(a);
     size_t n = 0;
@@ -365,11 +417,13 @@ void an_system_load(AN *a) {
         return;
     }
     a->lastSlot = (int)rd32(a->sys + SYS_LAST_SLOT);
+    settings_read(a);
 }
 
 void an_system_save(AN *a) {
     if (!a->sys) return;
     wr32(a->sys + SYS_LAST_SLOT, (u32)a->lastSlot);
+    settings_write(a);
     char *p = system_path(a);
     write_plain(p, a->sys, a->sysSize, a->sysKey);
     free(p);

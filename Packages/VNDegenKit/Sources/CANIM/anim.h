@@ -222,6 +222,12 @@ typedef struct SlotInfo {
 
 enum { GAME_DDD, GAME_MGSW, GAME_COUNT };
 
+typedef struct UILayout {
+    int textSize, nameX, nameRow, textX, textRow, textRowNoName, linePitch, textW;
+    int barX, barCount, barGap[3], barAction[11];
+    int stripX, stripW, lockX, lockAX, lockAY, lockW, lockH;
+} UILayout;
+
 struct AN {
     char *dir, *saveDir, *base;
     int game;
@@ -269,6 +275,7 @@ struct AN {
     int slotPage;
     int volume[5], voiceVolume[3], bgvVolume[3], talkVolume[3], volumeChar, dragSlider;
     int option[11], windowOpacity, textSpeed, autoSpeed;
+    u32 sampleStart;
     FlowNode *flow;
     int flowCount, flowScroll, flowZoom;
     bool flowFromScript;
@@ -328,6 +335,7 @@ void an_snd_free(AN *a);
 void an_snd_play(AN *a, int channel, const char *name, bool loop, bool fromVoice);
 void an_snd_stop(AN *a, int channel);
 bool an_snd_playing(AN *a, int channel);
+float an_snd_progress(AN *a, int channel);
 void an_snd_mix(AN *a, float *out, int frames);
 void an_snd_lock(AN *a, bool lock);
 void an_snd_set_volume(AN *a, int channel, float volume);
@@ -377,6 +385,7 @@ bool an_png_write(const char *path, const u32 *px, int w, int h);
 void an_ui_render(AN *a);
 bool an_ui_input(AN *a);
 int an_bar_hit(AN *a);
+const UILayout *an_ui(const AN *a);
 void an_bar_draw(AN *a, Image *ui);
 void an_title_render(AN *a);
 void an_title_input(AN *a);

@@ -20,6 +20,7 @@ typedef struct Voice {
     bool stopAtZero;
     int16_t buf[4096];
     int bufLen, bufPos;
+    unsigned total, played;
 } Voice;
 
 struct Mixer {
@@ -73,6 +74,7 @@ static bool read_frame(Voice *v, int16_t out[2]) {
     out[0] = v->buf[v->bufPos * 2];
     out[1] = v->buf[v->bufPos * 2 + 1];
     v->bufPos++;
+    v->played++;
     return true;
 }
 
@@ -179,6 +181,7 @@ void an_snd_play(AN *a, int channel, const char *name, bool loop, bool fromVoice
     v->ogg = ogg;
     v->loop = loop;
     v->step = (double)stb_vorbis_get_info(ogg).sample_rate / (double)a->rate;
+    v->total = loop ? 0 : stb_vorbis_stream_length_in_samples(ogg);
     v->gain = v->target = 1;
     pthread_mutex_lock(&m->lock);
     Voice *gone = m->fading[channel];
@@ -205,6 +208,16 @@ void an_snd_stop(AN *a, int channel) {
     m->v[channel] = NULL;
     pthread_mutex_unlock(&m->lock);
     voice_free(gone);
+}
+
+float an_snd_progress(AN *a, int channel) {
+    struct Mixer *m = a->mix;
+    if (!m || channel < 0 || channel >= CH_COUNT) return -1;
+    pthread_mutex_lock(&m->lock);
+    Voice *v = m->v[channel];
+    float r = v && !v->done && v->total ? (float)v->played / (float)v->total : -1;
+    pthread_mutex_unlock(&m->lock);
+    return r > 1 ? 1 : r;
 }
 
 bool an_snd_playing(AN *a, int channel) {

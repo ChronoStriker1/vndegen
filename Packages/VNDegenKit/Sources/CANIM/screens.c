@@ -296,6 +296,16 @@ void an_volume_defaults(AN *a) {
     }
 }
 
+enum { INFO_X = 253, INFO_Y = 16, INFO_W = 420, INFO_H = 22, INFO_PITCH = 26, INFO_RIGHT = 426 };
+
+static void draw_info(AN *a, int row) {
+    if (row < 0) return;
+    Image *m = an_image_load(a, "spconfigMessage");
+    if (!m) return;
+    int col = row >= 100 ? INFO_RIGHT : 0;
+    an_gfx_blit(a->fb, a->W, a->H, m, col, 4 + INFO_PITCH * (row % 100), INFO_W, INFO_H, INFO_X, INFO_Y, 255);
+}
+
 void an_volume_open(AN *a) {
     a->screen = SCR_VOLUME;
     a->dragSlider = -1;
@@ -331,6 +341,20 @@ static void draw_volume(AN *a) {
     an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 940, 5, 278, 40) ? 137 : 95, 278, 40, 940, 5, 255);
     an_gfx_blit(a->fb, a->W, a->H, b, 567, in_rect(a, 62, 670, 278, 40) ? 137 : 95, 278, 40, 62, 670, 255);
     an_gfx_blit(a->fb, a->W, a->H, b, 285, in_rect(a, 940, 670, 278, 40) ? 137 : 95, 278, 40, 940, 670, 255);
+    static const int SLIDER_INFO[8] = {102, 103, 104, 107, 108, 109, 105, 106};
+    int info = -1;
+    for (int i = 0; i < 8; i++) {
+        int x, y;
+        slider_pos(i, &x, &y);
+        if (in_rect(a, x - 10, y, SLIDER_W + KNOB_W + 20, KNOB_H)) info = SLIDER_INFO[i];
+    }
+    for (int c = 0; c < 3; c++)
+        if (in_rect(a, 646 + 90 * c, 97, 80, 80)) info = 111 + c;
+    if (in_rect(a, 940, 5, 278, 40)) info = 120;
+    if (in_rect(a, 62, 670, 278, 40)) info = 121;
+    if (in_rect(a, 940, 670, 278, 40)) info = 122;
+    if (a->dragSlider >= 0 && a->dragSlider < 8) info = SLIDER_INFO[a->dragSlider];
+    draw_info(a, info);
 }
 
 static void apply_volumes(AN *a) {
@@ -395,14 +419,39 @@ void an_settings_defaults(AN *a) {
 
 void an_settings_open(AN *a) {
     a->screen = SCR_SETTINGS;
+    a->sampleStart = a->now;
     a->dragSlider = -1;
 }
 
 static int *set_slider(AN *a, int i) { return i == 0 ? &a->windowOpacity : i == 1 ? &a->textSpeed : &a->autoSpeed; }
 
+enum { SAMPLE_X = 376, SAMPLE_Y = 547, SAMPLE_W = 847, SAMPLE_H = 99, SAMPLE_NAME_X = 381, SAMPLE_TEXT_X = 394, SAMPLE_ROW = 581 };
+static const char SAMPLE_NAME[] = "Kouki", SAMPLE_TEXT[] = "Do you wanna go somewhere, maybe get something to eat?";
+
+static void draw_sample(AN *a) {
+    u32 al = (u32)clampi(a->windowOpacity * 217 / 100, 0, 255), ia = 255 - al;
+    for (int y = SAMPLE_Y; y < SAMPLE_Y + SAMPLE_H; y++) {
+        u32 *row = a->fb + (size_t)y * (size_t)a->W;
+        for (int x = SAMPLE_X; x < SAMPLE_X + SAMPLE_W; x++) {
+            u32 d = row[x];
+            u32 r = ((d & 0xff) * ia + 90 * al) / 255, g = ((d >> 8 & 0xff) * ia + 77 * al) / 255, b = ((d >> 16 & 0xff) * ia + 72 * al) / 255;
+            row[x] = r | g << 8 | b << 16 | 0xff000000u;
+        }
+    }
+    size_t n = strlen(SAMPLE_TEXT), cps = (size_t)(10 + a->textSpeed * a->textSpeed / 80);
+    u32 typing = a->textSpeed >= 100 ? 0 : (u32)(n * 1000 / cps);
+    u32 t = (a->now - a->sampleStart) % (typing + 2000);
+    size_t shown = a->textSpeed >= 100 ? n : (size_t)t * cps / 1000;
+    char part[sizeof SAMPLE_TEXT];
+    snprintf(part, sizeof part, "%.*s", (int)(shown < n ? shown : n), SAMPLE_TEXT);
+    an_text_draw(a, SAMPLE_NAME_X, SAMPLE_ROW, SAMPLE_NAME, 24, 0xffffffffu, 0x90000000u, 0, 46);
+    an_text_draw(a, SAMPLE_TEXT_X, SAMPLE_ROW + 46, part, 24, 0xffffffffu, 0x90000000u, 0, 46);
+}
+
 static void draw_settings(AN *a) {
     Image *panel = an_image_load(a, "spconfig");
     if (panel) an_gfx_blit(a->fb, a->W, a->H, panel, 0, 0, a->W, a->H, 0, 0, 255);
+    if (a->game == GAME_DDD) draw_sample(a);
     Image *b = an_image_load(a, "spconfigButton");
     if (!b) return;
     for (int i = 0; i < 11; i++) {
@@ -420,6 +469,18 @@ static void draw_settings(AN *a) {
     an_gfx_blit(a->fb, a->W, a->H, b, 285, in_rect(a, 62, 670, 278, 40) ? 644 : 602, 278, 40, 62, 670, 255);
     an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 940, 670, 278, 40) ? 728 : 686, 278, 40, 940, 670, 255);
     an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 940, 5, 278, 40) ? 644 : 602, 278, 40, 940, 5, 255);
+    static const int OPTION_INFO[11] = {0, 3, 6, 9, 12, 126, 15, 18, 21, 24, 27};
+    int info = -1;
+    for (int i = 0; i < 11; i++)
+        for (int k = 0; k < 2; k++)
+            if (in_rect(a, OPTIONS[i].x + OPT_DX * k, OPTIONS[i].y, OPT_W, OPT_H)) info = OPTION_INFO[i] + 1 + k;
+    for (int i = 0; i < 3; i++)
+        if (in_rect(a, SET_KNOB_X - 10, SET_SLIDER_Y[i], SET_KNOB_RANGE + 40, 32)) info = 33 + i;
+    if (a->dragSlider >= 10) info = 33 + a->dragSlider - 10;
+    if (in_rect(a, 940, 5, 278, 40)) info = 37;
+    if (in_rect(a, 62, 670, 278, 40)) info = 38;
+    if (in_rect(a, 940, 670, 278, 40)) info = 101;
+    draw_info(a, info);
 }
 
 static void settings_input(AN *a) {
@@ -466,12 +527,10 @@ bool an_screens_input(AN *a) {
         slots_input(a, a->screen == SCR_SAVE);
         return true;
     }
-    if (a->screen == SCR_VOLUME) {
-        volume_input(a);
-        return true;
-    }
-    if (a->screen == SCR_SETTINGS) {
-        settings_input(a);
+    if (a->screen == SCR_VOLUME || a->screen == SCR_SETTINGS) {
+        if (a->screen == SCR_VOLUME) volume_input(a);
+        else settings_input(a);
+        if (a->screen != SCR_VOLUME && a->screen != SCR_SETTINGS) an_system_save(a);
         return true;
     }
     return false;

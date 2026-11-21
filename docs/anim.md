@@ -89,6 +89,17 @@ does; a longer comment that holds a line break loads black on the PC. Saves load
 A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
 does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's NO IMAGE picture.
 
+## Settings
+
+Settings and Volume keep their values in the PC's own `<name>_system.dat`, where the PC keeps them, so they carry
+between the PC and VNDegen: each option a byte (Screen Effects at 0x01, Skip Unread at 0x02 and so on, worked out by
+changing one at a time under Wine), the volumes as percentages from 0x18 (master, music, sound effects, the two
+ambient volumes, then each character's voice and background voices), the window opacity as 0 to 217 at 0x298, and the
+text and auto speeds as delays at 0x27c and 0x280. They're written when the player leaves either screen. Screen Mode
+isn't stored there, and VNDegen has no use for it. The info line at the top of both screens and Settings' text box
+sample, typed at the chosen speed, follow the PC; the menu bar's lock icon and the Voice Wait and Auto Wait gauges are
+drawn as on the PC, the gauges when their options are on.
+
 ## Known limits
 
 - E-mote characters blink and their hair moves, but their timelines and the scripts' short pose animations (`b9`,
@@ -96,8 +107,8 @@ does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's N
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
 - The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
-- The Settings, Extra (CG, scene and music galleries) and shortcut screens aren't built; volumes aren't kept in the
-  system save yet.
-- Magical Sword's screens aren't built.
+- The Extra screens (CG, scene and music galleries) and the shortcut key list aren't built. Settings' font choice
+  and the volume screen's Play and Allow Test buttons do nothing.
+- Magical Sword: the title, message window and menu bar are built; its other screens use Double Date Dilemma's layout for now.
 - The Load screen's AUTO SAVE page isn't built, and the PC's comment editing on cards isn't either.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

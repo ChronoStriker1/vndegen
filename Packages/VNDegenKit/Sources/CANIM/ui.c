@@ -1,24 +1,52 @@
 #include "anim.h"
 
-enum { BAR_COUNT = 11, BAR_Y = 696, BAR_W = 56, BAR_H = 22 };
+enum { BAR_Y = 696, BAR_W = 56, BAR_H = 22, BAR_PITCH = 58, BAR_GAP = 10, LOCK_Y = 695 };
 
-static int bar_x(int i) { return 606 + 58 * i + (i >= 2) * 10 + (i >= 7) * 10 + (i >= 10) * 10; }
+static const UILayout UI[GAME_COUNT] = {
+    [GAME_DDD] = {24, 194, 583, 180, 629, 583, 46, 884,
+                  606, 11, {2, 7, 10},
+                  {BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE},
+                  568, 712, 578, 204, 80, 19, 23},
+    [GAME_MGSW] = {19, 169, 583, 164, 626, 626, 41, 700,
+                   664, 10, {2, 6, 9},
+                   {BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE},
+                   624, 656, 636, 203, 51, 18, 23},
+};
+
+const UILayout *an_ui(const AN *a) { return &UI[a->game]; }
+
+static int bar_x(const UILayout *u, int i) {
+    int x = u->barX + BAR_PITCH * i;
+    for (int g = 0; g < 3; g++)
+        if (i >= u->barGap[g]) x += BAR_GAP;
+    return x;
+}
+
+static int bar_index(AN *a) {
+    const UILayout *u = an_ui(a);
+    if (a->my < BAR_Y || a->my >= BAR_Y + BAR_H) return -1;
+    for (int i = 0; i < u->barCount; i++)
+        if (a->mx >= bar_x(u, i) && a->mx < bar_x(u, i) + BAR_W) return i;
+    return -1;
+}
 
 int an_bar_hit(AN *a) {
-    if (a->my < BAR_Y || a->my >= BAR_Y + BAR_H) return -1;
-    for (int i = 0; i < BAR_COUNT; i++)
-        if (a->mx >= bar_x(i) && a->mx < bar_x(i) + BAR_W) return i;
-    return -1;
+    int i = bar_index(a);
+    return i < 0 ? -1 : an_ui(a)->barAction[i];
 }
 
 static bool in_rect(AN *a, int x, int y, int w, int h) { return a->mx >= x && a->my >= y && a->mx < x + w && a->my < y + h; }
 
 void an_bar_draw(AN *a, Image *ui) {
-    int hover = an_bar_hit(a);
-    for (int i = 0; i < BAR_COUNT; i++) {
-        bool lit = i == hover || (i == BAR_SKIP && a->skipMode) || (i == BAR_AUTO && a->autoMode);
-        if (lit) an_gfx_blit(a->fb, a->W, a->H, ui, 3 + 58 * i, 27, 55, 21, bar_x(i) + 1, BAR_Y + 1, 255);
-        else an_gfx_blit(a->fb, a->W, a->H, ui, 2 + 58 * i, 2, BAR_W, BAR_H, bar_x(i), BAR_Y, 255);
+    const UILayout *u = an_ui(a);
+    an_gfx_blit(a->fb, a->W, a->H, ui, 2, 118, u->stripW, 26, u->stripX, BAR_Y - 2, 255);
+    an_gfx_blit(a->fb, a->W, a->H, ui, u->lockAX, u->lockAY, u->lockW, u->lockH, u->lockX, LOCK_Y, 255);
+    int hover = bar_index(a);
+    for (int i = 0; i < u->barCount; i++) {
+        int action = u->barAction[i];
+        bool lit = i == hover || (action == BAR_SKIP && a->skipMode) || (action == BAR_AUTO && a->autoMode);
+        if (lit) an_gfx_blit(a->fb, a->W, a->H, ui, 3 + BAR_PITCH * i, 27, 55, 21, bar_x(u, i) + 1, BAR_Y + 1, 255);
+        else an_gfx_blit(a->fb, a->W, a->H, ui, 2 + BAR_PITCH * i, 2, BAR_W, BAR_H, bar_x(u, i), BAR_Y, 255);
     }
 }
 
