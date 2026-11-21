@@ -330,7 +330,6 @@ static int mpeg_layer3(vnvideo *v) {
     return 1;
 }
 
-// A bare MPEG-1 video stream, with no program stream around it and so no sound.
 static int mpeg_open_elementary(vnvideo *v) {
     plm_buffer_t *buffer = plm_buffer_create_with_callbacks(buffer_load, buffer_seek, buffer_tell, (size_t)v->size, v);
     v->elementary = buffer ? plm_video_create_with_buffer(buffer, 1) : NULL;

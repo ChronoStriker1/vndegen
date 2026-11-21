@@ -126,8 +126,6 @@ final class ANIMSession: EngineSession {
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
     }
 
-    /// The game's own help page, which the PC opens in a browser, in a sheet over the game. It reads only the game's
-    /// folder and never the network; the game waits while it's open.
     private func showPage(_ page: URL) {
         showingPage = true
         setPaused(true)

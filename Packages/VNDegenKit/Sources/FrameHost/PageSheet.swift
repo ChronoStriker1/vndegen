@@ -7,11 +7,8 @@ import UIKit
 import AppKit
 #endif
 
-/// A game's own HTML page, such as a manual or a help page, shown in a sheet over the game and held to the page's folder.
 @MainActor
 public enum PageSheet {
-    /// Shows `page` over `view`. Files inside the page's folder load; a link to the web goes to `onWebLink` when given and
-    /// is refused otherwise. `done` runs once, however the sheet closes.
     public static func show(_ page: URL, title: String, over view: PlatformView, onWebLink: ((URL) -> Void)? = nil,
                             done: @escaping () -> Void) {
         let controller = PageSheetController(page: page, folder: page.deletingLastPathComponent(), title: title,
@@ -45,8 +42,6 @@ typealias PageSheetBaseController = UIViewController
 typealias PageSheetBaseController = NSViewController
 #endif
 
-/// A web view that keeps nothing between visits, with a content rule that blocks every network load, pictures and
-/// scripts included, which navigation decisions alone don't see.
 @MainActor
 final class PageSheetController: PageSheetBaseController, WKNavigationDelegate {
     private let page: URL, folder: URL
@@ -58,7 +53,6 @@ final class PageSheetController: PageSheetBaseController, WKNavigationDelegate {
         configuration.allowsAirPlayForMediaPlayback = false
         return WKWebView(frame: .zero, configuration: configuration)
     }()
-    // One rule a scheme: WebKit's rule patterns have no alternation.
     private static let offlineRules = #"""
         [{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}},
          {"trigger":{"url-filter":"^wss?://"},"action":{"type":"block"}},
@@ -92,7 +86,6 @@ final class PageSheetController: PageSheetBaseController, WKNavigationDelegate {
         web.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         view = stack
         #endif
-        // The page loads only once nothing in it can reach the network; if the rule can't be made, it doesn't load.
         WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "vndegen.manual.offline", encodedContentRuleList: Self.offlineRules) { [weak self] rules, error in
             Task { @MainActor in
                 guard let self else { return }
@@ -114,7 +107,6 @@ final class PageSheetController: PageSheetBaseController, WKNavigationDelegate {
         #endif
     }
 
-    /// Tells the session the page has closed, once.
     func finish() {
         done?()
         done = nil

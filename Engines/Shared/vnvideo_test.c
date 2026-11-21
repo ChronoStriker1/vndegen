@@ -146,7 +146,6 @@ static void builtin(const char *dir) {
           "MPEG-1 with frame rate code 0 plays at 30 fps and ends");
     unlink(rate_zero);
 
-    // The same picture as a bare video stream, with no program stream around it.
     snprintf(path, sizeof path, "%s/red-elementary.mpg", dir);
     check(play(path, 0, 10, &r, &info), "bare MPEG-1 video opens");
     check(info.width == 96 && info.height == 64 && fabs(info.fps - 30) < 0.01 && info.audio_rate == 0,
