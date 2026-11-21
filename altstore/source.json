@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.59.4",
+          "buildVersion": "3106",
+          "date": "2026-11-21T13:58:52Z",
+          "localizedDescription": "ANIM fixes: the goddess's eyes in Magical Sword, and the second swimsuit event's backdrop in Double Date Dilemma.\n\n## Downloads\n\n- `VNDegen-0.59.4-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.59.4.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.59.4-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **ANIM:** E-mote parts clipped to another part are now clipped. In Magical Sword the goddess's irises and highlights stay inside her eyes, and Double Date Dilemma's faces come slightly closer to the PC.\n- **ANIM:** E-mote pictures stored as 8-bit alpha or grey now draw, so the backdrop in Double Date Dilemma's second swimsuit event is no longer missing tiles.\n\n## Known limits\n\n- The goddess's eyelids still look half closed in Magical Sword's opening and one later scene, where the PC shows them open.\n- Faint seams show between the backdrop tiles in the second swimsuit event.\n- When a line hides one character and shows another, the PC holds the old picture for about half a second and then crossfades; VNDegen swaps them at once.\n\n## What wasn't tested\n\n- No physical device was used. These were checked in the Linux test build, the Mac app and an iPad simulator, and against the PC version under Wine.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.59.4/VNDegen-0.59.4.ipa",
+          "size": 132329920,
+          "sha256": "e77eb7326034677e332d87d655f6b41cfe2c117d418e21caefc49abd2322c85d",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.59.3",
           "buildVersion": "3099",
           "date": "2026-11-21T12:17:59Z",
