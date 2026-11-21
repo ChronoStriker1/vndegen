@@ -93,6 +93,7 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 | Eushully AGE | `SYS4INI.BIN` beside `DATA1.ALF` or `age.exe` | Mac, iPhone, iPad | [age.md](docs/age.md) |
 | BISHOP BSX | `bsxx.dat` beside `bsxx.cfg` and `Graphics*.bsa` | Mac, iPhone, iPad | [bsx.md](docs/bsx.md) |
 | PJADV | `archive.dat` holding `scenario.dat` and `textdata.bin` | Mac, iPhone, iPad | [pjadv.md](docs/pjadv.md) |
+| ANIM | `<name>_sce.dat` beside `<name>_define.dat`, `<name>_system.dat` and `cg/psbpack.dat` | Mac, iPhone, iPad | [anim.md](docs/anim.md) |
 | Unity, opened outside VNDegen | `Game_Data/globalgamemanagers`, `mainData`, or `data.unity3d` | Mac, through the game's own Mac version or your CrossOver. iPhone and iPad: the game's page says why not | [unity.md](docs/unity.md#mac-launcher) |
 
 [docs/engines.md](docs/engines.md) has the exact detection rules and how each engine runs, saves, and what it can't do yet. Some RPG Maker XP, VX, and VX Ace games need the RTP, which VNDegen downloads from the RPG Maker website when you ask. [docs/engine-survey.md](docs/engine-survey.md) covers other engines and how each could be supported.
