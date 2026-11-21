@@ -81,6 +81,13 @@ a Double Date Dilemma character: alone she holds 46 frames a second in the Debug
 close-up, where most of the time goes to drawing her pixels. 16-pixel cells, rather than 8, scored the same on the face
 checks and cut her vertices to under a third.
 
+Masks are drawn as stencils: the sprites a layer's stencil list names (an inner mask passes inside them, an outer one
+outside), and for a composite owner (`stencilType` bit 2) every source in its composite list, drawn at full opacity
+even when the source itself is invisible. A sprite under a composite owner that isn't on its stencil chain (eluna's
+`Filtered` pass, such as the goddess's irises under `ステンシル(shirome)`) takes that owner as an inner mask. Textures
+come as 32-bit RGBA, or 8-bit `A8` (white with that alpha) and `L8` (grey), which NOM04 uses for most of its
+trimming-frame tiles.
+
 Characters play the PC's idle motion, measured under Wine. Each E-mote layer names an idle in the save (`sPauseWait01`
 unless set otherwise); the define's type-10 records list its variables and ranges (`head_UD` -10 to 10, `body_UD` -20
 to 20). Every 0.8 to 1.9 seconds each variable heads, in a straight line, for a random value in the other half of its
@@ -188,18 +195,27 @@ buttons have their own on and off lines.
 
 ## Known limits
 
-- `bd` and `bb` inside pose blocks are skipped; their meaning isn't known. A character's first frame takes its preset
+- `bd n` and `bb n` are skipped. `bd` appears 22 times across both games, each time inside a pose block just before an
+  expression preset with the same duration (`bd 400`, then `be` with 400 ms); `bb -1` runs once at the start of each
+  script. Two PC recordings of the goddess's `bd 400` (the line after she grants the skill) show nothing beyond her
+  usual blinks, which the PC times the same way on every load, so no visible effect could be tied to either. A character's first frame takes its preset
   at once, where the PC eases into it during the scene's fade-in. eluna needed fixes to draw them like the PC (`Engines/ANIM/UPSTREAM.md`);
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
-- The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
-  one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
+- The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't.
+- When a line hides one layer and shows another, the PC holds the old picture for about half a second and then
+  crossfades over about 0.3 s; VNDegen swaps them at once (seen when the goddess returns after the skill list).
 - The Sprites viewer's folder button does nothing, and Save doesn't keep Idle Motion: no field for it turned up in the
   PC's save. Settings' font list is empty and its choice does nothing, and the volume screen's Play and Allow Test
   buttons are drawn but do nothing.
 - Double Date Dilemma's memory blurbs are drawn about 1.5% narrower than the PC's, so a line can break one word
   earlier.
-- The goddess (Malg202) draws her eyes wrongly in the Sprites viewer, with sparkles over half-closed lids where the PC
-  shows plain open eyes; upstream eluna draws them the same way. The other characters' eyes match the PC.
+- The goddess (Malg202) draws her lids too low: her eyes look half closed where the PC's are open, in the story and in
+  the Sprites viewer. Her irises now stay inside the eye whites. She is on screen in the opening (`000-000`, `000-010`)
+  and in `060-040`/`060-050`, plus the `Mem30` replay (Malg200, Malg203). Her eye motion's time follows
+  `face_eye_open` (rest value 2, time 12); our render matches the PC's open eyes only near time 0. The parameter
+  mapping, three readings of the null mesh keys in her lid and iris meshes, and leaving lid sprites unwarped were
+  tried and none matched; the cause is somewhere in how the mesh chain deforms her nested eye layers. Other
+  characters' eyes match the PC.
 - Magical Sword: every screen is built to its own layout and checked against the PC. Its goddess, with three
   times the sprites of a Double Date Dilemma character, runs at 46 frames a second alone in the Debug Mac app and 26
   in the opening's 300% close-up (34 and 20 on the iPad simulator). A Release build on the iPad simulator updates the
