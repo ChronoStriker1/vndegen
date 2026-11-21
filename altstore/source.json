@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.58.2",
+          "buildVersion": "3038",
+          "date": "2026-11-21T01:57:11Z",
+          "localizedDescription": "Wolf RPG pictures now come back after loading a save, as on the PC, and picture angles match the PC.\n\n## Downloads\n\n- `VNDegen-0.58.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.58.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.58.2-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **Wolf RPG:** President Yukino, Drain Dungeon and Journey of Depravity bring back the pictures that were on screen when you load a save, as their PC versions do. In President Yukino that is the day bar and portrait. Their saves keep the pictures both ways with the PC.\n- **Wolf RPG:** picture angles are in tenths of a degree, as on the PC, so turned and spinning pictures, such as Parade Buster's target marker, turn by the right amount.\n\n## Known limits\n\n- Picture effects (shake, pulse, automatic patterns), XY and cut images, and text pictures with control codes other than a leading font size aren't restored from saves.\n- Seris saves pictures in a newer layout, which VNDegen doesn't read yet.\n- Games on older Wolf engines (ANGEL QUEST, Milky Quest, Parade Buster, Succubus Forest) get no pictures in their saves, since their PC versions don't restore them, or close when a save holds one.\n- President Yukino's camera after a load still differs from the PC, as before.\n\n## What wasn't tested\n\n- The iPad simulator. The changes were checked in the Mac app, the Linux test build and against the PC versions under Wine.\n- Milky Quest's PC version wouldn't start under Wine, so what it saves wasn't checked.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.58.2/VNDegen-0.58.2.ipa",
+          "size": 131640841,
+          "sha256": "93d26751654af08086b4bf9bff183917f8331519c91338e16b0ba5653220e657",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.58.1",
           "buildVersion": "3032",
           "date": "2026-11-21T00:34:41Z",
