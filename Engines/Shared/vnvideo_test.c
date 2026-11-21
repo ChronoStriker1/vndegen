@@ -146,6 +146,16 @@ static void builtin(const char *dir) {
           "MPEG-1 with frame rate code 0 plays at 30 fps and ends");
     unlink(rate_zero);
 
+    // The same picture as a bare video stream, with no program stream around it.
+    snprintf(path, sizeof path, "%s/red-elementary.mpg", dir);
+    check(play(path, 0, 10, &r, &info), "bare MPEG-1 video opens");
+    check(info.width == 96 && info.height == 64 && fabs(info.fps - 30) < 0.01 && info.audio_rate == 0,
+          "bare MPEG-1 video size, rate and no sound");
+    check(r.frames >= 28 && r.frames <= 30, "bare MPEG-1 video frame count");
+    check(near(r.first[0], 192) && near(r.first[1], 32) && near(r.first[2], 64), "bare MPEG-1 video colors");
+    check(r.ended && r.seconds < 1.2, "bare MPEG-1 video ends after its last frame");
+    check(play(path, 1, 2.5, &r, &info) && r.frames >= 60, "looping bare MPEG-1 video runs on");
+
     snprintf(path, sizeof path, "%s/red-tone-mp3.mpg", dir);
     check(play(path, 0, 10, &r, &info), "MPEG-1 with MP3 opens");
     check(info.width == 96 && info.height == 64 && fabs(info.fps - 30) < 0.01, "MPEG-1 with MP3 size and rate");

@@ -66,6 +66,7 @@ struct vnvideo {
     vnvideo_info info;
 
     plm_t *plm;
+    plm_video_t *elementary;
     mp3_state *mp3;
     ogg_state ogg;
 
@@ -329,7 +330,19 @@ static int mpeg_layer3(vnvideo *v) {
     return 1;
 }
 
-static int mpeg_open(vnvideo *v) {
+// A bare MPEG-1 video stream, with no program stream around it and so no sound.
+static int mpeg_open_elementary(vnvideo *v) {
+    plm_buffer_t *buffer = plm_buffer_create_with_callbacks(buffer_load, buffer_seek, buffer_tell, (size_t)v->size, v);
+    v->elementary = buffer ? plm_video_create_with_buffer(buffer, 1) : NULL;
+    if (!v->elementary || !plm_video_has_header(v->elementary)) return 0;
+    v->info.width = plm_video_get_width(v->elementary);
+    v->info.height = plm_video_get_height(v->elementary);
+    v->info.fps = plm_video_get_framerate(v->elementary);
+    return v->info.width > 0 && v->info.height > 0 && v->info.fps > 0;
+}
+
+static int mpeg_open(vnvideo *v, int elementary) {
+    if (elementary) return mpeg_open_elementary(v);
     plm_buffer_t *buffer = plm_buffer_create_with_callbacks(buffer_load, buffer_seek, buffer_tell, (size_t)v->size, v);
     v->plm = plm_create_with_buffer(buffer, 1);
     if (v->plm && plm_get_num_audio_streams(v->plm) > 0 && mpeg_layer3(v)) {
@@ -381,7 +394,7 @@ static int mpeg_step(vnvideo *v) {
     if (!isfinite(v->video_time)) return 0;
     uint8_t *slot = free_slot(v);
     if (!slot) return 0;
-    plm_frame_t *frame = plm_decode_video(v->plm);
+    plm_frame_t *frame = v->elementary ? plm_video_decode(v->elementary) : plm_decode_video(v->plm);
     if (!frame) {
         end_video(v);
         return isfinite(v->audio_time);
@@ -395,6 +408,10 @@ static int mpeg_step(vnvideo *v) {
 }
 
 static void mpeg_rewind(vnvideo *v) {
+    if (v->elementary) {
+        plm_video_rewind(v->elementary);
+        return;
+    }
     plm_rewind(v->plm);
     if (v->mp3) mp3_rewind(v->mp3);
 }
@@ -643,6 +660,7 @@ static void *decode_thread(void *argument) {
 
 static void destroy(vnvideo *v) {
     if (v->plm) plm_destroy(v->plm);
+    if (v->elementary) plm_video_destroy(v->elementary);
     if (v->mp3) {
         plm_demux_destroy(v->mp3->demux);
         free(v->mp3);
@@ -682,7 +700,7 @@ vnvideo *vnvideo_open(vnvideo_read_fn read, void *user, uint64_t size, int loop,
         opened = ogg_open(v, &v->info, error, error_size);
     } else if (magic[0] == 0 && magic[1] == 0 && magic[2] == 1 && (magic[3] == 0xBA || magic[3] == 0xB3)) {
         v->format = FORMAT_MPEG;
-        opened = mpeg_open(v);
+        opened = mpeg_open(v, magic[3] == 0xB3);
         if (!opened) snprintf(error, error_size, "not an MPEG-1 movie pl_mpeg can read");
     } else {
         snprintf(error, error_size, "unknown movie format %02x%02x%02x%02x", magic[0], magic[1], magic[2], magic[3]);

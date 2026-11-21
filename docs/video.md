@@ -20,6 +20,8 @@ vnvideo is the movie decoder VNDegen's native engines share, in `Engines/Shared/
   `Engines/Shared/UPSTREAM.md`).
 - MPEG-1 video with MP3 (Layer III) sound, as Spooky Pregnant School: The Quickening's movies have: pl_mpeg decodes the
   picture, and a second pl_mpeg demuxer, reading the file at its own position, hands the sound packets to dr_mp3.
+- A bare MPEG-1 video stream, silent, with no program stream around it, as Magical Sword's `ConceLine.mpg` is: pl_mpeg's
+  video decoder reads it directly.
 - Ogg Theora video, silent or with Opus sound, through libogg, libtheora, and libopus.
 
 Ogg Theora with Vorbis sound plays silent, since no library game needs its sound: the one library movie with a Vorbis track, Magical Girl Riru's, is silent. `Engines/Shared/UPSTREAM.md` lists the libraries' versions and what was kept of each.
