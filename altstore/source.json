@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.59.1",
+          "buildVersion": "3087",
+          "date": "2026-11-21T08:59:16Z",
+          "localizedDescription": "Magical Sword on ANIM, and ANIM's Settings screen and kept volumes for both of its games.\n\n## Downloads\n\n- `VNDegen-0.59.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.59.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.59.1-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## New\n\n- **My Unique Reincarnation Skill 'Magical Sword' Makes Every Busty Girl Yield to Orgasm!**, with its fan English patch, on ANIM: the title, the story with its choices, Config, Volume, the shortcut key list, Save and Load, the message log, and its help page in a sheet inside the app. Each screen has its own layout, checked against the PC. Saves load both ways with the PC.\n- **Both ANIM games:** settings and volumes, including each character's voice volume, are kept in the game's own system file, as on the PC. Double Date Dilemma gains its shortcut key list and the rest of its Settings screen.\n\n## Fixed\n\n- **ANIM:** a save made in a zoomed scene loads zoomed, both ways with the PC.\n- **ANIM:** Double Date Dilemma's six-way choice opens its options one by one, as on the PC, and Skip Voice is no longer inverted.\n- **ANIM:** save comments are written in the PC's encoding, so they read correctly on the PC.\n- **ANIM:** the message log is aligned to the bottom, as on the PC.\n- **Movies:** a movie that is a bare MPEG-1 video stream, without sound, plays.\n\n## Known limits\n\n- Magical Sword's opening close-up of the goddess updates about 20 times a second on the iPad simulator, so it isn't smooth there. The Mac app wasn't watched in its release build.\n- The Extra galleries (CG, scenes, music) aren't built in either game, nor are Magical Sword's AUTO SAVE page and comment editing on save cards.\n- E-mote timelines and the scripts' short pose animations don't play.\n\n## What wasn't tested\n\n- No physical device was used. The game was played in the Linux test build, the Mac app and an iPad simulator, by touch.\n- Saves were exchanged with the original engine under Wine both ways.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.59.1/VNDegen-0.59.1.ipa",
+          "size": 132312010,
+          "sha256": "dc629ce8f2391056a4a8da05c7d98a9b32048fef441582f964d7bebcda396228",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.59.0",
           "buildVersion": "3070",
           "date": "2026-11-21T02:40:31Z",
