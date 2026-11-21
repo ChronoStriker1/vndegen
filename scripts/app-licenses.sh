@@ -37,6 +37,7 @@ cp "$kit/Sources/CIPAC/third_party/LICENSE-stb.txt" "$out.part/stb_truetype (IPA
 cp "$kit/Sources/CIPAC/third_party/LICENSE-dr_libs.txt" "$out.part/dr_wav (IPAC MS ADPCM sound).txt"
 cp "$kit/Sources/CIkura/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (Ikura GDL images, text and Ogg).txt"
 cp "$kit/Sources/CBSX/third_party/LICENSE-stb.txt" "$out.part/stb_truetype and stb_vorbis (BISHOP BSX text and Ogg).txt"
+cp "$kit/Sources/CANIM/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (ANIM images, text and Ogg).txt"
 cp "$kit/Sources/CPJADV/third_party/LICENSE-stb.txt" "$out.part/stb_truetype and stb_vorbis (PJADV text and Ogg).txt"
 cp "$kit/Sources/CEAGLS/third_party/LICENSE-stb.txt" "$out.part/stb_truetype and stb_vorbis (EAGLS text and Ogg).txt"
 cp "$kit/Sources/CEAGLS/third_party/LICENSE-dr_libs.txt" "$out.part/dr_wav (EAGLS sound).txt"
