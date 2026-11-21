@@ -210,8 +210,10 @@ static void fill_slot(AN *a, u8 *s) {
     s[6] = (u8)tm.tm_hour;
     s[7] = (u8)tm.tm_min;
     s[8] = (u8)tm.tm_sec;
-    char *comment = a->name ? an_fmt("%s@n%s", a->name, a->text ? a->text : "") : an_strdup(a->text ? a->text : "");
-    put_name(s + OFF_COMMENT, COMMENT_MAX, comment);
+    char *comment = a->name ? an_fmt(a->game == GAME_MGSW ? "%s%s" : "%s@n%s", a->name, a->text ? a->text : "") : an_strdup(a->text ? a->text : "");
+    char *sjis = an_utf8_to_sjis(comment);
+    put_name(s + OFF_COMMENT, COMMENT_MAX, sjis);
+    free(sjis);
     free(comment);
     wr32(s + OFF_PC, a->textPc);
     wr32(s + OFF_SCENE_KIND, (u32)a->sceneKind);

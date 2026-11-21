@@ -86,7 +86,7 @@ void an_title_input(AN *a) {
 }
 
 enum { WIN_Y = 534, WIN_H = 186, TEXT_SIZE = 24, LINE_H = 46 };
-enum { CHOICE_W = 719, CHOICE_H = 79, CHOICE_GAP = 16 };
+enum { CHOICE_W = 719, CHOICE_H = 79 };
 
 
 
@@ -143,7 +143,7 @@ static void draw_gauges(AN *a, Image *w) {
     }
 }
 
-static void draw_window(AN *a) {
+static void draw_window(AN *a, bool textless) {
     const UILayout *u = an_ui(a);
     Image *w = an_image_load(a, "spMessageWindow");
     if (w) {
@@ -153,6 +153,13 @@ static void draw_window(AN *a) {
         draw_gauges(a, w);
     }
     Image *ui = an_image_load(a, "spMessageWindowButton");
+    if (textless) {
+        if (ui) {
+            an_bar_draw(a, ui);
+            an_gfx_blit(a->fb, a->W, a->H, ui, 168, 53, 28, 28, 1243, 563, 255);
+        }
+        return;
+    }
     if (a->name) {
         if (a->voiceName && ui) an_gfx_blit(a->fb, a->W, a->H, ui, 4, 53, 76, 28, 92, 563, 255);
         an_text_draw(a, u->nameX, u->nameRow, a->name, u->textSize, 0xffffffffu, 0x90000000u, 0, u->linePitch);
@@ -176,15 +183,23 @@ static void draw_window(AN *a) {
     }
 }
 
+static const int CHOICE_AREA[GAME_COUNT] = {[GAME_DDD] = 559, [GAME_MGSW] = 505};
+enum { CHOICE_PITCH = 130 };
+
 static void layout_choices(AN *a) {
-    int total = a->choiceCount * CHOICE_H + (a->choiceCount - 1) * CHOICE_GAP;
-    int y = (WIN_Y - total) / 2;
+    int shown = 0;
+    for (int i = 0; i < a->choiceCount; i++) shown += !a->choiceOff[i];
+    int area = CHOICE_AREA[a->game], pitch = shown ? area / shown : CHOICE_PITCH;
+    if (pitch > CHOICE_PITCH) pitch = CHOICE_PITCH;
+    int total = shown ? (shown - 1) * pitch + CHOICE_H : 0;
+    int y = (area - total) / 2, k = 0;
     for (int i = 0; i < a->choiceCount; i++) {
         Choice *c = &a->choice[i];
         c->x = (a->W - CHOICE_W) / 2;
-        c->y = y + i * (CHOICE_H + CHOICE_GAP);
-        c->w = CHOICE_W;
+        c->y = y + k * pitch;
+        c->w = a->choiceOff[i] ? 0 : CHOICE_W;
         c->h = CHOICE_H;
+        k += !a->choiceOff[i];
     }
 }
 
@@ -202,18 +217,20 @@ static void draw_choices(AN *a) {
     int hover = choice_hit(a);
     for (int i = 0; i < a->choiceCount; i++) {
         Choice *c = &a->choice[i];
+        if (!c->w) continue;
         if (sel) an_gfx_blit(a->fb, a->W, a->H, sel, 152, i == hover ? 99 : 7, CHOICE_W, CHOICE_H, c->x, c->y, 255);
-        int w = an_text_width(a, c->text, TEXT_SIZE);
-        an_text_draw(a, c->x + (c->w - w) / 2, c->y + c->h / 2 + 8, c->text, TEXT_SIZE, 0xffffffffu, 0x90000000u, 0, LINE_H);
+        int size = an_ui(a)->textSize, w = an_text_width(a, c->text, size);
+        an_text_draw(a, c->x + (c->w - w) / 2, c->y + c->h / 2 + 8, c->text, size, 0xffffffffu, 0x90000000u, 0, LINE_H);
     }
 }
 
 void an_window_render(AN *a) {
     if (a->th.wait == W_CHOICE) {
+        if (a->scene.window && a->screen == SCR_NONE) draw_window(a, true);
         draw_choices(a);
         return;
     }
-    if (a->scene.window && a->text && a->screen == SCR_NONE) draw_window(a);
+    if (a->scene.window && a->text && a->screen == SCR_NONE) draw_window(a, false);
 }
 
 void an_game_input(AN *a) {

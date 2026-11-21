@@ -31,6 +31,7 @@ bool an_mkdirs(const char *dir);
 int an_path_resolve(const char *path, char *out, size_t size);
 void an_log(AN *a, const char *fmt, ...);
 char *an_sjis_to_utf8(const char *s);
+char *an_utf8_to_sjis(const char *s);
 int an_utf8_decode(const char *s, u32 *cp);
 bool an_ieq(const char *a, const char *b);
 u32 an_hash(const char *s);
@@ -272,6 +273,7 @@ struct AN {
 
     Choice choice[16];
     int choiceCount, choiceHover;
+    bool choiceOff[16];
     int choiceResult;
 
     int screen, logTop, wheel;

@@ -460,6 +460,9 @@ static void exec(AN *a, const Op *op) {
     case 0xd1:
         if (a->choiceResult != g[0].v) skip_case(a);
         break;
+    case 0xb0:
+        if (g[0].v >= 1 && g[0].v <= 16) a->choiceOff[g[0].v - 1] = g[1].v == 0;
+        break;
     case 0xde: show_text(a, str(a, &g[1]), str(a, &g[2]), str(a, &g[0]), g[3].v); break;
     case 0xdf: show_text(a, str(a, &g[0]), str(a, &g[1]), NULL, g[2].v); break;
     case 0xe1: show_text(a, NULL, str(a, &g[0]), NULL, g[1].v); break;

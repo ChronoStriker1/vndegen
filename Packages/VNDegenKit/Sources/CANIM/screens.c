@@ -69,12 +69,55 @@ typedef struct CardLayout {
     int digitX, digitPitch, smallPitch, dateX, dateY, clockX, clockY;
     u32 comment;
     bool lastFrame;
+    int commentBytes, commentWidth;
 } CardLayout;
 
 static const CardLayout CARD[GAME_COUNT] = {
-    [GAME_DDD] = {10, 42, 11, 14, 19, 34, 20, 0xff503040u, true},
-    [GAME_MGSW] = {11, 32, 10, 15, 20, 35, 20, 0xffffffffu, false},
+    [GAME_DDD] = {10, 42, 11, 14, 19, 34, 20, 0xff503040u, true, 0, 0},
+    [GAME_MGSW] = {11, 32, 10, 15, 20, 35, 20, 0xffffffffu, false, 40, 206},
 };
+
+enum { CARD_TEXT_SIZE = 16 };
+
+static void wrap_comment(AN *a, const CardLayout *L, const char *raw, char *out, size_t cap) {
+    char cut[128];
+    size_t n = 0;
+    while (raw[n] && n < sizeof cut - 1) {
+        size_t len = ((u8)raw[n] >= 0x81 && (u8)raw[n] <= 0x9f) || ((u8)raw[n] >= 0xe0 && (u8)raw[n] <= 0xfc) ? 2 : 1;
+        if (n + len > (size_t)L->commentBytes) break;
+        n += len;
+    }
+    memcpy(cut, raw, n);
+    cut[n] = 0;
+    char *text = an_sjis_to_utf8(cut);
+    size_t o = 0;
+    int width = 0;
+    for (const char *p = text; *p && o + 6 < cap;) {
+        if (p[0] == '@' && p[1] == 'n') {
+            out[o++] = '@';
+            out[o++] = 'n';
+            p += 2;
+            width = 0;
+            continue;
+        }
+        u32 cp;
+        int len = an_utf8_decode(p, &cp);
+        char one[8];
+        snprintf(one, sizeof one, "%.*s", len, p);
+        int w = an_text_width(a, one, CARD_TEXT_SIZE);
+        if (width && width + w > L->commentWidth) {
+            out[o++] = '@';
+            out[o++] = 'n';
+            width = 0;
+        }
+        memcpy(out + o, p, (size_t)len);
+        o += (size_t)len;
+        width += w;
+        p += len;
+    }
+    out[o] = 0;
+    free(text);
+}
 
 static Image *thumb(AN *a, int slot) {
     if (slot < 0 || slot >= 180) return NULL;
@@ -205,9 +248,14 @@ static void draw_slots(AN *a, bool saving) {
         snprintf(clock, sizeof clock, "%02d:%02d:%02d", info.hour, info.minute, info.second);
         vertical(a, b, date, r.x + L->dateX, r.y + L->dateY);
         vertical(a, b, clock, r.x + L->clockX, r.y + L->clockY);
-        char lines[128];
-        card_comment(info.comment, lines, sizeof lines);
-        an_text_draw(a, r.x + 78, r.y + 180, lines, 16, L->comment, 0, 0, 18);
+        char lines[256];
+        if (L->commentBytes) wrap_comment(a, L, info.comment, lines, sizeof lines);
+        else {
+            char *utf = an_sjis_to_utf8(info.comment);
+            card_comment(utf, lines, sizeof lines);
+            free(utf);
+        }
+        an_text_draw(a, r.x + 78, r.y + 180, lines, CARD_TEXT_SIZE, L->comment, 0, 0, 18);
     }
     an_gfx_blit(a->fb, a->W, a->H, b, 117, in_rect(a, RESET_X, RESET_Y, RESET_W, RESET_H) ? 412 : 340, RESET_W, RESET_H,
                 RESET_X, RESET_Y, 255);

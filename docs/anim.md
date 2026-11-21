@@ -11,7 +11,7 @@ from.
 | Game | Notes |
 |---|---|
 | Double Date Dilemma (`DDD.exe`, 2022, English) | Boot logos, title, story, choices, voices, music, loops, background voices, movies and the scene loops, E-mote characters, the flowchart and its jumps to either point of view, Save and Load both ways with the PC, quick save, backlog, the Volume screen |
-| My Unique Reincarnation Skill 'Magical Sword' Makes Every Busty Girl Yield to Orgasm! (`mgsw.exe`, 2025, fan English patch) | Runs the same script engine; its title and screens are laid out differently and aren't built yet |
+| My Unique Reincarnation Skill 'Magical Sword' Makes Every Busty Girl Yield to Orgasm! (`mgsw.exe`, 2025, fan English patch) | The same engine with its own layouts: title, HELP page, message window and menu bar, Config, Volume, Save and Load both ways with the PC, the message log, choices, the opening's camera pans and zooms |
 
 The two Stepmother Loves Her Son games were left out under the content rule.
 
@@ -48,6 +48,10 @@ folder down.
 - Backlog: entries 46 pixels a line plus one blank line, the newest ending at y 666 and older ones above it, the line
   on screen included. Magical Sword draws it at 20 pixels with unrounded advances, the speaker's line 41 pixels below
   the name and indented 12 pixels; the scroll thumb's height is the share of entries shown.
+- Choices: `d0` lists the options by id; `b0 n on` before it turns option n on or off (a system routine turns all six
+  on), which is how Double Date Dilemma's six-way choice opens its options one by one and Magical Sword drops an
+  option already taken. Shown options are spaced 130 pixels apart, or less when they wouldn't fit, around y 280
+  (Double Date Dilemma) or 252 (Magical Sword), over the message window's background and menu bar without its text.
 - Sound: Ogg Vorbis behind an 8-byte header, in `bgm/` and the voice archive. Movies are MPEG-1.
 
 ## Drawing E-mote characters
@@ -94,7 +98,9 @@ the slot positions, the layer tables of 1.0 scales and -1 handles, the character
 and the E-mote scale. The PC needs them: without the defaults it crashes loading the slot, and without the layer
 scales it loads the scene with no characters. The comment is the speaker and the line, cut to 100 characters as the PC
 does; a longer comment that holds a line break loads black on the PC. Saves load both ways with the PC.
-A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
+The comment is kept in Shift-JIS, as the PC reads it. Magical Sword's PC writes the speaker and the line without a
+break, and its cards show the first 40 bytes broken at 206 pixels wherever that falls, mid-word included; Double
+Date Dilemma's show two lines of up to 20 characters broken at spaces. A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
 does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's NO IMAGE picture.
 
 ## Settings

@@ -159,6 +159,37 @@ char *an_sjis_to_utf8(const char *s) {
     return out;
 }
 
+static int sjis_put(char *o, u32 cp) {
+    if (cp < 0x80) {
+        o[0] = (char)cp;
+        return 1;
+    }
+    if (cp >= 0xff61 && cp <= 0xff9f) {
+        o[0] = (char)(0xa1 + cp - 0xff61);
+        return 1;
+    }
+    for (int i = 0; i < 11340; i++)
+        if (an_sjis_table[i] == cp) {
+            int lead = i / 189;
+            o[0] = (char)(lead < 31 ? 0x81 + lead : 0xe0 + lead - 31);
+            o[1] = (char)(0x40 + i % 189);
+            return 2;
+        }
+    o[0] = '?';
+    return 1;
+}
+
+char *an_utf8_to_sjis(const char *s) {
+    char *out = an_alloc(strlen(s) * 2 + 1), *o = out;
+    while (*s) {
+        u32 cp;
+        s += an_utf8_decode(s, &cp);
+        o += sjis_put(o, cp);
+    }
+    *o = 0;
+    return out;
+}
+
 int an_utf8_decode(const char *s, u32 *cp) {
     const u8 *p = (const u8 *)s;
     if (p[0] < 0x80) {

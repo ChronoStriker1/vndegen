@@ -74,6 +74,8 @@ static int answer(VNANIM *n) {
     int pick = preferUsed < preferCount ? prefer[preferUsed++] : 1;
     if (pick < 1) pick = 1;
     if (pick > a->choiceCount) pick = a->choiceCount;
+    while (a->choiceOff[pick - 1] && pick < a->choiceCount) pick++;
+    while (a->choiceOff[pick - 1] && pick > 1) pick--;
     Choice *c = &a->choice[pick - 1];
     printf("choice %d of %d: %s\n", pick, a->choiceCount, c->text);
     return press(n, c->x + c->w / 2, c->y + c->h / 2);
