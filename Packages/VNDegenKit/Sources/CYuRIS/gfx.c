@@ -73,6 +73,8 @@ void yr_gfx_open(YR *y) {
 void yr_gfx_close(YR *y) {
     if (!y->gfx) return;
     yr_layer_free(y->gfx->root);
+    for (int i = 0; i < y->gfx->missingCount; i++) free(y->gfx->missing[i]);
+    free(y->gfx->missing);
     free(y->gfx);
     y->gfx = NULL;
 }
@@ -159,6 +161,14 @@ static unsigned char *ycg_decode(const u8 *d, size_t n, int *w, int *h) {
     return px;
 }
 
+static bool first_miss(YGfx *g, const char *file) {
+    for (int i = 0; i < g->missingCount; i++)
+        if (!strcmp(g->missing[i], file)) return false;
+    g->missing = yr_realloc(g->missing, sizeof(char *) * (size_t)(g->missingCount + 1));
+    g->missing[g->missingCount++] = yr_strdup(file);
+    return true;
+}
+
 bool yr_layer_load(YR *y, YLayer *l, const char *file) {
     if (!file || !*file) {
         // FILE="" makes a 1x1 black image.
@@ -171,7 +181,7 @@ bool yr_layer_load(YR *y, YLayer *l, const char *file) {
     }
     YFile f;
     if (!yr_fs_read(y, file, imageExts, &f)) {
-        yr_log(y, "CG: file not found: %s\n", file);
+        if (y->log && first_miss(y->gfx, file)) yr_log(y, "CG: file not found: %s\n", file);
         return false;
     }
     int w, h, comp;

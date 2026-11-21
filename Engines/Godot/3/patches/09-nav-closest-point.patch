@@ -1,0 +1,61 @@
+--- a/modules/navigation/nav_map.cpp
++++ b/modules/navigation/nav_map.cpp
+@@ -444,6 +444,49 @@
+ 	return cp.owner;
+ }
+ 
++static Vector3 vngd_closest_point_on_triangle(const Vector3 &p_a, const Vector3 &p_b, const Vector3 &p_c, const Vector3 &p_point) {
++	const double ax = p_a.x, ay = p_a.y, az = p_a.z;
++	const double abx = p_b.x - ax, aby = p_b.y - ay, abz = p_b.z - az;
++	const double acx = p_c.x - ax, acy = p_c.y - ay, acz = p_c.z - az;
++	const double apx = p_point.x - ax, apy = p_point.y - ay, apz = p_point.z - az;
++	const double d1 = abx * apx + aby * apy + abz * apz;
++	const double d2 = acx * apx + acy * apy + acz * apz;
++	if (d1 <= 0.0 && d2 <= 0.0) {
++		return p_a;
++	}
++	const double bpx = p_point.x - p_b.x, bpy = p_point.y - p_b.y, bpz = p_point.z - p_b.z;
++	const double d3 = abx * bpx + aby * bpy + abz * bpz;
++	const double d4 = acx * bpx + acy * bpy + acz * bpz;
++	if (d3 >= 0.0 && d4 <= d3) {
++		return p_b;
++	}
++	const double vc = d1 * d4 - d3 * d2;
++	if (vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0) {
++		const double v = d1 / (d1 - d3);
++		return Vector3(ax + v * abx, ay + v * aby, az + v * abz);
++	}
++	const double cpx = p_point.x - p_c.x, cpy = p_point.y - p_c.y, cpz = p_point.z - p_c.z;
++	const double d5 = abx * cpx + aby * cpy + abz * cpz;
++	const double d6 = acx * cpx + acy * cpy + acz * cpz;
++	if (d6 >= 0.0 && d5 <= d6) {
++		return p_c;
++	}
++	const double vb = d5 * d2 - d1 * d6;
++	if (vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0) {
++		const double w = d2 / (d2 - d6);
++		return Vector3(ax + w * acx, ay + w * acy, az + w * acz);
++	}
++	const double va = d3 * d6 - d5 * d4;
++	if (va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0) {
++		const double w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
++		return Vector3(p_b.x + w * (p_c.x - p_b.x), p_b.y + w * (p_c.y - p_b.y), p_b.z + w * (p_c.z - p_b.z));
++	}
++	const double denom = 1.0 / (va + vb + vc);
++	const double v = vb * denom;
++	const double w = vc * denom;
++	return Vector3(ax + abx * v + acx * w, ay + aby * v + acy * w, az + abz * v + acz * w);
++}
++
+ gd::ClosestPointQueryResult NavMap::get_closest_point_info(const Vector3 &p_point) const {
+ 	gd::ClosestPointQueryResult result;
+ 	real_t closest_point_ds = 1e20;
+@@ -454,7 +497,7 @@
+ 		// For each face check the distance to the point
+ 		for (size_t point_id = 2; point_id < p.points.size(); point_id += 1) {
+ 			const Face3 f(p.points[0].pos, p.points[point_id - 1].pos, p.points[point_id].pos);
+-			const Vector3 inters = f.get_closest_point_to(p_point);
++			const Vector3 inters = vngd_closest_point_on_triangle(f.vertex[0], f.vertex[1], f.vertex[2], p_point);
+ 			const real_t ds = inters.distance_squared_to(p_point);
+ 			if (ds < closest_point_ds) {
+ 				result.point = inters;

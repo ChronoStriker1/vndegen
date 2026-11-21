@@ -274,7 +274,7 @@ SaveFile Game::blankSave() {
     Encoding enc = gameDat_.encoding;
     uint16_t version = saveBase_ ? saveBase_->version
                        : wolf35_                                                    ? kVersion35
-                       : (enc == Encoding::UTF8 || gameDat_.settings.size() > 21) ? kVersion3
+                       : (enc == Encoding::UTF8 || gameDat_.settings.size() > 22) ? kVersion3
                                                                                    : kVersion2;
     SaveFile f = defaultSave(version, enc == Encoding::UTF8);
     f.title = saveString(gameDat_.title, enc);

@@ -13,6 +13,8 @@ One runtime per major version covers the older minor versions:
 
 Games exported with Godot 3.3 and 3.5 and with Godot 4.2, 4.3, and 4.5 were tested. A game can still behave differently from its PC version where a newer Godot changed a behavior, since VNDegen runs it on the newest Godot of its line.
 
+Godot 3.5 moved `Navigation2D` onto the navigation server, which finds a map's closest point per triangle in 32-bit floats. On long, thin triangles that moved points inside the map by up to 3 pixels, where Godot 3.4's own 2D code returned them unchanged. Yu Crossing Animals (3.4.5) keeps its hero on the map that way and takes a step only when the closest point is within 0.1 pixel, so on stock 3.6 its hero couldn't walk at all. Patch 09 computes that point in 64-bit floats: on the village's map, no point inside a polygon moves, where stock 3.6.3 moved 563 of 5,803 checked.
+
 ## Rendering
 
 Every game draws inside VNDegen's window, so the VNDegen menu and touch controls sit over it as over the other engines.

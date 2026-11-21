@@ -362,7 +362,13 @@ bool Game::step(Thread &t) {
             int target = cmd.arg(0);
             int x = value(cmd.arg(1), t), y = value(cmd.arg(2), t);
             int mapId = value(cmd.arg(3), t);
-            if (cmd.arg(4) & 0x01) {  // precise coordinates, in half tiles
+            if (target <= -10000) {
+                int row = x;
+                target += 10000;
+                mapId = dbNumber(sdb_, SysPositions, row, 0);
+                x = dbNumber(sdb_, SysPositions, row, 1);
+                y = dbNumber(sdb_, SysPositions, row, 2);
+            } else if (cmd.arg(4) & 0x01) {  // precise coordinates, in half tiles
                 x /= 2;
                 y /= 2;
             }
@@ -516,8 +522,8 @@ bool Game::step(Thread &t) {
 }
 
 int Game::commonByName(const std::string &name) const {
-    for (auto &ce : commons_)
-        if (ce.name == name) return ce.id;
+    for (auto ce = commons_.rbegin(); ce != commons_.rend(); ++ce)
+        if (ce->name == name) return ce->id;
     return -1;
 }
 
@@ -587,7 +593,7 @@ void Game::setVariable(Thread &t, const Command &c) {
         case 0x00: out = rhs; break;
         case 0x01: out = cur + rhs; break;
         case 0x02: out = cur - rhs; break;
-        case 0x03: out = cur * rhs; break;
+        case 0x03: out = calc == 0x30 && b ? int32_t(int64_t(cur) * a / b) : cur * rhs; break;
         case 0x04: out = rhs ? cur / rhs : cur; break;
         case 0x05: out = rhs ? cur % rhs : cur; break;
         case 0x06: out = std::max(cur, rhs); break;

@@ -400,7 +400,7 @@ Ore o Hoshigaru Tsuma to Gibo	vn-engine	NekoSDK		セーブデータフォルダ�
 Overthrow The Great Demoness!	general-engine	Flash		[RJ247971] 打倒！超魔王様/打倒！超魔王様（Flash版）/sub/cou1.swf	463	archived
 Overthrow! The Demon Queen	general-engine	Flash		overthrow.swf	39	installed
 Parade Buster	rpg-maker-family	Wolf RPG Editor		Parade Buster Ver.1.4 (Partial E)/Data/BasicData/	307	archived
-Paradise Cleaning!- Tutor X Hypnosis -	vn-engine	PJADV	2XT 4.5	Cleaner.exe version resource: OriginalFilename PJADV.exe, ProductName "2XT - Pencil Adventure Engine" 4.5 (PajamasEX / Production PENCIL); archive.dat, graphic.dat, voice.dat and other .dat archives	311	archived; Steam build (steam_api.dll); VNDegen doesn't run this engine; second survey 2026-11-19
+Paradise Cleaning!- Tutor X Hypnosis -	vn-engine	PJADV	2XT 4.5	Cleaner.exe version resource: OriginalFilename PJADV.exe, ProductName "2XT - Pencil Adventure Engine" 4.5 (PajamasEX / Production PENCIL); archive.dat, graphic.dat, voice.dat and other .dat archives	311	archived; Steam build (steam_api.dll); second survey 2026-11-19; runs on PJADV (0.58.0)
 Part-Time Witch	general-engine	Unity		PartTime Witch/UnityPlayer.dll	352	archived; Mono; SOVEREIGN.dll beside the exe
 PASSION MORTALE!完成版	custom	DxLib (custom)		PASSION MORTALE!_完成版.exe strings name DxLib sources; Data/sound.dat	645	archived; same circle layout as THEIR HAPPIEST HOUR; VNDegen doesn't run this engine; second survey 2026-11-19
 Peeping Office Worker	general-engine	Unity		BOXMAN [1.0]/UnityPlayer.dll	2977	installed; Mono; Naninovel
@@ -510,8 +510,8 @@ Spooky Pregnant School_ The Quickening	vn-engine	Tmr-Hiro ADV System		Spooky Pre
 SpunkStock_ Music Festival	general-engine	Unity		SpunkStock Music Festival/UnityPlayer.dll	280	archived; Mono; SOVEREIGN.dll beside the exe
 St. Yariman's Former Sluts ~Mega MILF Edition~	vn-engine	KiriKiri	2.32.2.426	data.xp3 beside Yariman.exe (TVP(KIRIKIRI) 2 core 2.32.2.426), in GOG installer	1465	installed; plugins KAGParser, addFont, extrans, layerExSave, menu, wuvorbis; VNDegen runs this engine; second survey 2026-11-19
 Stealing Mother from the Deadbeat Dad She Can’t Leave_ Pursued, Loved, and Taken Away	vn-engine	KiriKiri		Stealing My Mother Away/bgm.xp3	438	archived
-Stepmother Loves Her Son 2 – Mommy Yuna Will Teach You Everything	vn-engine	ANIM engine		mamahaha2-nodrm.exe version resource "Anim Copyright (C) 2024"; cg/*.gax, cg/psbpack.dat, voice/mamahaha2_wave.pck, emotedriver.dll	1463	archived; E-mote; VNDegen doesn't run this engine; second survey 2026-11-19
-Stepmother Loves Her Son! ~You Can Let Mommy Spoil You… Mama Rinko’s Naughty Caretaking~	vn-engine	ANIM engine		mamahaha.exe version resource "Anim Copyright (C) 2024"; cg/*.gax, cg/psbpack.dat, emotedriver.dll	1366	archived; E-mote; VNDegen doesn't run this engine; second survey 2026-11-19
+Stepmother Loves Her Son 2 – Mommy Yuna Will Teach You Everything	vn-engine	ANIM engine		mamahaha2-nodrm.exe version resource "Anim Copyright (C) 2024"; cg/*.gax, cg/psbpack.dat, voice/mamahaha2_wave.pck, emotedriver.dll	1463	archived; left out after the content check (2026-11-20); E-mote; VNDegen doesn't run this engine; second survey 2026-11-19
+Stepmother Loves Her Son! ~You Can Let Mommy Spoil You… Mama Rinko’s Naughty Caretaking~	vn-engine	ANIM engine		mamahaha.exe version resource "Anim Copyright (C) 2024"; cg/*.gax, cg/psbpack.dat, emotedriver.dll	1366	archived; left out after the content check (2026-11-20); E-mote; VNDegen doesn't run this engine; second survey 2026-11-19
 Straight Through the Maze - Save Captured Elves with H	rpg-maker-family	RPG Maker VX Ace		直進迷宮ver1.01/Game.rgss3a	424	archived
 Stranger Maidens Please Protect Me!	general-engine	Unity		Stranger Maidens Please Protect Me/Stranger Maidens_Data/Managed/	1771	archived; Mono; Naninovel
 Stripjong - Super Real Mahjong Venus Returns	general-engine	Unity		SRMR/UnityPlayer.dll	1733	archived; IL2CPP; SOVEREIGN.dll beside the exe

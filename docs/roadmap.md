@@ -127,17 +127,20 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Lightning Warrior Raidy II on Ikura GDL, with PC saves both ways; KiriKiri's mosaicin and mosaicout; Godot 4 kanji on the Mac; import of NW.js Construct games and electron-builder installers (0.57.2).
 - The BSX museum's bust-up editor, with states shared with the PC (0.57.3).
 - Eden's Ritter 1 and 1_2 on NekoSDK, with PC saves both ways, and import of RPG Maker VX Ace games packed as one compressed .exe (0.57.4).
+- PJADV, on VNDegen's own clean-room runtime, with Paradise Cleaning!- Tutor X Hypnosis -: its cleaning minigame rebuilt from play, and PC saves both ways (0.58.0).
+- President Yukino (Wolf RPG) plays and saves for the PC; Yu Crossing Animals' hero walks (Godot 3); #190 (0.58.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
-- From the new test games (0.56.2): #190 small checks. #187 was fixed in 0.57.2; #188 and #189 needed no change (Tenioha's bar opens with a tap on its strip, and Wolf's save screen takes keys only on the PC too).
+- From the new test games (0.56.2): #190's checks were done in 0.58.1; the one thing left is restoring Wolf pictures from saves (President Yukino's day bar). #187 was fixed in 0.57.2; #188 and #189 needed no change (Tenioha's bar opens with a tap on its strip, and Wolf's save screen takes keys only on the PC too).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
+- ANIM (`feat/anim`): Double Date Dilemma's E-mote faces now match the PC after fixes to eluna; body and head turns and tilts still don't. Its release waits on them, with a 4-day limit set on 2026-11-20.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
@@ -152,7 +155,7 @@ Engines with games in the library that VNDegen doesn't run yet, from the [engine
 2. New test games for the engines VNDegen runs, from the second engine survey (2026-11-19): done in 0.56.2. 17 of 27 pass from import to a save and a load in the Mac app; the fixes it needed are in that release. Its follow-ups shipped in 0.57.2: the mosaic transitions, #187 to #189, Dungeon Vixens, Titjob Apparition and an import message for Succubus Hunt!. Eden's Ritter 1 and 1_2 on NekoSDK, and a CAB/LZX reader of VNDegen's own so Succubus Hunt! imports, followed in 0.57.4. Jewel Knights Crusaders (an older Ikura dialect) was approved on 2026-11-20 but left out the same day, after its event pictures were decoded: it fails the content check.
 3. BISHOP BSX, on a clean-room runtime of VNDegen's own, on branch `feat/bsx`. Mesu Kyoushi ~Injoku no Kyoushitsu~ shipped in 0.55.0. Mesu Kyoushi 2 and 4 followed in 0.55.2 and 0.55.4. Mesu Kyoushi 3 followed in 0.56.1, without Lua: the modules its boot script names aren't in the game, and its story runs without them on the PC too. The museum (music, CGs, scene replay and the background voice room) followed in 0.57.1. Its bust-up editor (立ち絵鑑賞) followed in 0.57.3, without its message tab or picture output. Done for now.
 4. Eushully AGE with Kamidori Alchemy Meister: shipped as a first release in 0.57.0, played through the Prologue chapter (the story, two battle maps, crafting and a shop) with saves both ways. The maintainer approved the whole game on 2026-11-19. Later chapters, the Arena, Enhance, Remodel and the endings weren't reached; bugs found there get fixed as patches.
-5. The ANIM engine (4 games, 6 to 8 weeks, half of it for E-mote character playback) and PJADV (1 game, 2 to 3 weeks), by the second survey. The maintainer approved both on 2026-11-20; they started on branches `feat/anim` and `feat/pjadv`.
+5. The ANIM engine (4 games, 6 to 8 weeks, half of it for E-mote character playback) and PJADV (1 game, 2 to 3 weeks), by the second survey. The maintainer approved both on 2026-11-20; they started on branches `feat/anim` and `feat/pjadv`. ANIM: both Stepmother Loves Her Son games were left out after the content check, so it is Double Date Dilemma first and then Magical Sword, about 6.5 to 7.5 weeks, with E-mote characters drawn by eluna (MPL-2.0, Rust). PJADV shipped in 0.58.0, after about a day: Paradise Cleaning!'s timed cleaning minigame, built into the exe rather than its scripts, was rebuilt from play under Wine, and the save scrambling from a reading of only that code, recorded in docs/pjadv-cleanroom.md.
 6. KiriKiri's mosaicin and mosaicout transitions, which Tenioha! feat. Mami uses: shipped in 0.57.2.
 
 ## Set aside

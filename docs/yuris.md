@@ -119,6 +119,10 @@ every use of the named commands with the step number and game time; `YR_TRACE_GO
 one variable; `YR_DUMP_LAYERS=1` and `YR_DUMP_TASKS=1` log the layer tree and the tasks at close; `YR_PROFILE=1` logs
 script and drawing time per frame.
 
+The log names each image a CG command asks for and the game doesn't have once, the first time it's asked for. The games'
+menus ask for button states and help images they don't ship, such as `btn_click_bt3` and `btn_skip_bt4` in Holy Maid
+Academy and Sacrifice Villains; their archives lack them too, and nothing is missing on screen.
+
 ## Known limits
 
 - YMV, FLASH, MIDI, CDDA and E-mote (EMOTE) aren't built. MOVIE plays MPEG-1 and Ogg Theora through the shared vnvideo decoder, scaled to its area without smoothing.

@@ -40,6 +40,8 @@ struct YGfx {
     YLayer *cur;          // where relative IDs start (:/W0)
     u64 order;
     bool dirty;
+    char **missing;
+    int missingCount;
 };
 
 void yr_gfx_open(YR *y);
