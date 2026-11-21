@@ -68,11 +68,12 @@ static const int BIG_DIGIT_X[10] = {598, 641, 682, 724, 767, 809, 850, 893, 934,
 typedef struct CardLayout {
     int digitX, digitPitch, smallPitch, dateX, dateY, clockX, clockY;
     u32 comment;
+    bool lastFrame;
 } CardLayout;
 
 static const CardLayout CARD[GAME_COUNT] = {
-    [GAME_DDD] = {10, 42, 11, 14, 19, 34, 20, 0xff503040u},
-    [GAME_MGSW] = {11, 32, 10, 15, 20, 35, 20, 0xffffffffu},
+    [GAME_DDD] = {10, 42, 11, 14, 19, 34, 20, 0xff503040u, true},
+    [GAME_MGSW] = {11, 32, 10, 15, 20, 35, 20, 0xffffffffu, false},
 };
 
 static Image *thumb(AN *a, int slot) {
@@ -178,7 +179,7 @@ static void draw_slots(AN *a, bool saving) {
         bool hover = in_rect(a, r.x, r.y, r.w, r.h);
         an_gfx_blit(a->fb, a->W, a->H, b, used ? 300 : 2, 482, 296, 260, r.x, r.y, 255);
         if (slot == a->lastSlot && used) {
-            an_gfx_blit(a->fb, a->W, a->H, b, 301, 745, 294, 258, r.x + 1, r.y + 1, 255);
+            if (L->lastFrame) an_gfx_blit(a->fb, a->W, a->H, b, 301, 745, 294, 258, r.x + 1, r.y + 1, 255);
             an_gfx_blit(a->fb, a->W, a->H, b, 816, 528, 48, 22, r.x + 63, r.y + 16, 255);
         }
         if (hover) an_gfx_blit(a->fb, a->W, a->H, b, 3, 745, 294, 258, r.x + 1, r.y + 1, 255);

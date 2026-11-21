@@ -39,7 +39,10 @@ folder down.
   the define.
 - Text: Arial at 24 pixels (Liberation Sans or another metric match where Arial is missing), each glyph's advance
   rounded up to a whole pixel as Windows lays it out, wrapped at 884 pixels from x 180 (the PC keeps an 878-pixel line
-  and wraps one of 891).
+  and wraps one of 891). Kanji and kana the font lacks come from the Japanese fallback (MS Gothic's substitute).
+- Backlog: entries 46 pixels a line plus one blank line, the newest ending at y 666 and older ones above it, the line
+  on screen included. Magical Sword draws it at 20 pixels with unrounded advances, the speaker's line 41 pixels below
+  the name and indented 12 pixels; the scroll thumb's height is the share of entries shown.
 - Sound: Ogg Vorbis behind an 8-byte header, in `bgm/` and the voice archive. Movies are MPEG-1.
 
 ## Drawing E-mote characters
@@ -118,7 +121,7 @@ lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the ga
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
 - The Extra screens (CG, scene and music galleries) aren't built. Settings' font list is empty and its choice does
   nothing, and the volume screen's Play and Allow Test buttons are drawn but do nothing.
-- Magical Sword: the title, message window, menu bar, Config and Volume screens and the save cards are built; its
+- Magical Sword: the title, message window, menu bar, Config, Volume, Save, Load and the message log are built; its
   other screens use Double Date Dilemma's layout for now.
 - The Load screen's AUTO SAVE page isn't built, and the PC's comment editing on cards isn't either.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

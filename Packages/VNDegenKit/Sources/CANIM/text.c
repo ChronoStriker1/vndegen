@@ -9,6 +9,7 @@ typedef struct Glyph {
     u32 cp;
     int size;
     int x0, y0, w, h, adv;
+    float fadv;
     u8 *bm;
 } Glyph;
 
@@ -101,7 +102,8 @@ static Glyph *glyph(Font *f, u32 cp, int size) {
         float sc = stbtt_ScaleForMappingEmToPixels(&f->info, (float)size);
         int adv, lsb;
         stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
-        g->adv = (int)ceilf(adv * sc);
+        g->fadv = adv * sc;
+        g->adv = (int)ceilf(g->fadv);
         int x0, y0, x1, y1;
         stbtt_GetCodepointBitmapBox(&f->info, (int)cp, sc, sc, &x0, &y0, &x1, &y1);
         g->x0 = x0;
@@ -112,7 +114,7 @@ static Glyph *glyph(Font *f, u32 cp, int size) {
             g->bm = an_alloc((size_t)g->w * (size_t)g->h);
             stbtt_MakeCodepointBitmap(&f->info, g->bm, g->w, g->h, g->w, sc, sc, (int)cp);
         }
-    } else g->adv = size / 2;
+    } else g->fadv = (float)(g->adv = size / 2);
     if (f->count * 2 > f->hashSize) rehash(f);
     else {
         u32 h = gkey(cp, size) & (u32)(f->hashSize - 1);
@@ -166,10 +168,12 @@ int an_text_draw(AN *a, int x, int baseline, const char *s, int size, u32 color,
     if (!f) return 0;
     int base = baseline;
     int cx = x, lines = 1;
+    float fx = (float)x;
     while (*s) {
         if ((s[0] == '@' && s[1] == 'n') || s[0] == '\n') {
             s += s[0] == '@' ? 2 : 1;
             cx = x;
+            fx = (float)x;
             base += lineHeight;
             lines++;
             continue;
@@ -179,6 +183,7 @@ int an_text_draw(AN *a, int x, int baseline, const char *s, int size, u32 color,
             if (cx + sp->adv + word_width(f, s + 1, size) > x + maxWidth) {
                 s++;
                 cx = x;
+                fx = (float)x;
                 base += lineHeight;
                 lines++;
                 continue;
@@ -195,7 +200,10 @@ int an_text_draw(AN *a, int x, int baseline, const char *s, int size, u32 color,
             }
             put_glyph(a->fb, a->W, a->H, g, gx, gy, color);
         }
-        cx += g->adv;
+        if (a->fractionalText) {
+            fx += g->fadv;
+            cx = (int)lroundf(fx);
+        } else cx += g->adv;
     }
     return lines;
 }

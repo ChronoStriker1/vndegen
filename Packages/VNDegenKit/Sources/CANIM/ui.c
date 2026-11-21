@@ -53,7 +53,17 @@ void an_bar_draw(AN *a, Image *ui) {
 bool an_close_hit(AN *a) { return in_rect(a, 1243, 563, 28, 28); }
 bool an_voice_hit(AN *a) { return a->voiceName && a->name && in_rect(a, 92, 563, 76, 28); }
 
-enum { LOG_TOP = 68, LOG_LINE = 46, LOG_BOTTOM = 650, LOG_TEXT_X = 115, LOG_NAME_X = 128, LOG_SIZE = 24 };
+enum { LOG_TOP = 68, LOG_LINE = 46, LOG_END = 666, LOG_TEXT_X = 115, THUMB_X = 1225, THUMB_Y = 60, THUMB_W = 30, THUMB_H = 601, THUMB_MIN = 12 };
+
+typedef struct LogLayout {
+    int size, nameX, namedTextX, pitch, trackAX, trackAY, trackW, trackH, trackX, trackY;
+    bool fractional;
+} LogLayout;
+
+static const LogLayout LOG[GAME_COUNT] = {
+    [GAME_DDD] = {24, 128, 115, 46, 5, 22, 35, 610, 1223, 56, false},
+    [GAME_MGSW] = {20, 132, 127, 41, 3, 19, 38, 615, 1221, 53, true},
+};
 
 static int entry_lines(AN *a, const LogEntry *e) {
     int lines = 1;
@@ -66,9 +76,16 @@ static int log_first_for_bottom(AN *a) {
     int h = 0, i = a->logCount - 1;
     for (; i >= 0; i--) {
         h += entry_lines(a, &a->logs[i]) * LOG_LINE;
-        if (h > LOG_BOTTOM - LOG_TOP) return i + 1;
+        if (h > LOG_END - LOG_TOP) return i + 1;
     }
     return 0;
+}
+
+static int log_y(AN *a) {
+    if (a->logTop < log_first_for_bottom(a)) return LOG_TOP;
+    int h = 0;
+    for (int i = a->logTop; i < a->logCount; i++) h += entry_lines(a, &a->logs[i]) * LOG_LINE;
+    return LOG_END - h;
 }
 
 static void log_open(AN *a) {
@@ -77,31 +94,45 @@ static void log_open(AN *a) {
     a->logTop = log_first_for_bottom(a);
 }
 
+static void draw_thumb(AN *a, Image *b, int shown) {
+    int last = log_first_for_bottom(a);
+    int h = a->logCount ? clampi(THUMB_H * shown / a->logCount, THUMB_MIN, THUMB_H) : THUMB_H;
+    int y = THUMB_Y + (last ? (THUMB_H - h) * a->logTop / last : 0);
+    an_gfx_blit_fit(a->fb, a->W, a->H, b, 49, 26, THUMB_W, THUMB_H, THUMB_X, y, THUMB_W, h);
+}
+
 static void draw_log(AN *a) {
     Image *veil = an_image_load(a, "spBackLog");
     if (veil) an_gfx_blit(a->fb, a->W, a->H, veil, 0, 0, a->W, a->H, 0, 0, 255);
     Image *b = an_image_load(a, "spBackLogButton");
-    int y = LOG_TOP;
+    const LogLayout *L = &LOG[a->game];
+    int y = log_y(a), shown = 0;
     for (int i = a->logTop; i < a->logCount; i++) {
         const LogEntry *e = &a->logs[i];
         int h = entry_lines(a, e) * LOG_LINE;
-        if (y + h - LOG_LINE > LOG_BOTTOM) break;
+        if (y + h > LOG_END) break;
+        shown++;
+        bool voice = e->voice && e->voice[0];
         if (b) {
-            an_gfx_blit(a->fb, a->W, a->H, b, 2, 891, 32, 32, 21, y, 255);
-            if (e->voice && e->voice[0]) an_gfx_blit(a->fb, a->W, a->H, b, 2, 925, 32, 32, 71, y, 255);
+            an_gfx_blit(a->fb, a->W, a->H, b, 2, in_rect(a, 21, y, 32, 32) ? 925 : 891, 32, 32, 21, y, 255);
+            if (voice) an_gfx_blit(a->fb, a->W, a->H, b, 36, in_rect(a, 71, y, 32, 32) ? 925 : 891, 32, 32, 71, y, 255);
         }
-        int base = y + 23;
+        int base = y + 23, x = LOG_TEXT_X;
+        a->fractionalText = L->fractional;
         if (e->name) {
-            an_text_draw(a, LOG_NAME_X, base, e->name, LOG_SIZE, 0xffffffffu, 0x90000000u, 0, LOG_LINE);
-            base += LOG_LINE;
+            an_text_draw(a, L->nameX, base, e->name, L->size, 0xffffffffu, 0x90000000u, 0, L->pitch);
+            base += L->pitch;
+            x = L->namedTextX;
         }
-        an_text_draw(a, LOG_TEXT_X, base, e->text, LOG_SIZE, 0xffffffffu, 0x90000000u, 1060, LOG_LINE);
+        an_text_draw(a, x, base, e->text, L->size, 0xffffffffu, 0x90000000u, 1060, L->pitch);
+        a->fractionalText = false;
         y += h;
     }
     if (b) {
-        an_gfx_blit(a->fb, a->W, a->H, b, 5, 22, 35, 610, 1223, 56, 255);
-        an_gfx_blit(a->fb, a->W, a->H, b, in_rect(a, 1221, 14, 38, 38) ? 45 : 3, 654, 38, 38, 1221, 14, 255);
-        an_gfx_blit(a->fb, a->W, a->H, b, in_rect(a, 1221, 671, 38, 38) ? 45 : 3, 696, 38, 38, 1221, 671, 255);
+        an_gfx_blit(a->fb, a->W, a->H, b, L->trackAX, L->trackAY, L->trackW, L->trackH, L->trackX, L->trackY, 255);
+        draw_thumb(a, b, shown);
+        an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 1221, 14, 38, 38) ? 696 : 654, 38, 38, 1221, 14, 255);
+        an_gfx_blit(a->fb, a->W, a->H, b, 45, in_rect(a, 1221, 671, 38, 38) ? 696 : 654, 38, 38, 1221, 671, 255);
         an_gfx_blit(a->fb, a->W, a->H, b, 3, in_rect(a, 63, 670, 278, 40) ? 813 : 771, 278, 40, 63, 670, 255);
     }
 }
@@ -128,11 +159,11 @@ static void log_input(AN *a) {
     else if (in_rect(a, 1221, 14, 38, 38)) log_scroll(a, -1);
     else if (in_rect(a, 1221, 671, 38, 38)) log_scroll(a, 1);
     else {
-        int y = LOG_TOP;
+        int y = log_y(a);
         for (int i = a->logTop; i < a->logCount; i++) {
             const LogEntry *e = &a->logs[i];
             int h = entry_lines(a, e) * LOG_LINE;
-            if (y + h - LOG_LINE > LOG_BOTTOM) break;
+            if (y + h > LOG_END) break;
             if (e->voice && e->voice[0] && in_rect(a, 71, y, 32, 32)) an_snd_play(a, CH_VOICE, e->voice, false, true);
             y += h;
         }

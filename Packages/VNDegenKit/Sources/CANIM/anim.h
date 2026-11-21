@@ -281,7 +281,7 @@ struct AN {
     FlowNode *flow;
     int flowCount, flowScroll, flowZoom;
     bool flowFromScript;
-    bool confirmOpen, shortcutsOpen;
+    bool confirmOpen, shortcutsOpen, fractionalText;
     int confirmMsg, confirmAction, confirmArg;
     Image *thumbs[180];
     u32 thumbsSerial[180], saveSerial;
