@@ -357,11 +357,13 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
         .iter()
         .map(|state| (state.draw_frame_info.native_draw_key.as_slice(), &state.draw_frame_info))
         .collect();
+    let by_path: HashMap<&str, &EmoteDrawFrameInfo> =
+        scene.layer_states.iter().map(|state| (state.draw_frame_info.path.as_str(), &state.draw_frame_info)).collect();
     for sprite in &visible {
         if matches!(sprite.draw_frame_info.pass, EmoteDrawPass::MaskGeneration | EmoteDrawPass::StencilCompositeMask) {
             continue;
         }
-        let mut chain: Vec<&EmoteDrawFrameInfo> = Vec::new();
+        let mut chain: Vec<(&EmoteDrawFrameInfo, i64)> = Vec::new();
         let mut cursor = sprite.draw_frame_info.stencil_parent_native_key.as_deref();
         let mut seen = std::collections::HashSet::new();
         while let Some(key) = cursor {
@@ -372,15 +374,20 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
                 break;
             };
             if matches!(info.stencil_phase, 1 | 2) {
-                chain.push(info);
+                chain.push((info, info.stencil_phase));
             }
             cursor = info.stencil_parent_native_key.as_deref();
         }
-        let initial: u32 = if chain.iter().any(|i| i.stencil_phase == 2) { 1 } else { 0 };
+        if let Some(owner) = sprite.draw_frame_info.parent_mask_path.as_deref().and_then(|path| by_path.get(path).copied()) {
+            if !chain.iter().any(|(info, _)| info.native_draw_key == owner.native_draw_key) {
+                chain.push((owner, 1));
+            }
+        }
+        let initial: u32 = if chain.iter().any(|(_, phase)| *phase == 2) { 1 } else { 0 };
         let mut final_ref = initial;
         let stencil_first = stencils.len() as u32;
         for phase in [1i64, 2i64] {
-            for info in chain.iter().copied().filter(|i| i.stencil_phase == phase) {
+            for info in chain.iter().filter(|(_, p)| *p == phase).map(|(info, _)| *info) {
                 let keys: Vec<&[u64]> = if (info.stencil_type & 4) != 0 {
                     scene
                         .composite_mask_sources_by_key
