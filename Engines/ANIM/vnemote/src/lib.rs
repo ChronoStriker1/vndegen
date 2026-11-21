@@ -240,7 +240,7 @@ fn transform(sprite: &EmoteStaticSprite, p: [f32; 2]) -> [f32; 2] {
     [m[0] * local[0] + m[1] * local[1] + m[4], m[2] * local[0] + m[3] * local[1] + m[5]]
 }
 
-const QUAD_PIXELS: f32 = 8.0;
+const QUAD_PIXELS: f32 = 16.0;
 const CHAIN_DIVISION: usize = 16;
 
 fn world_point(sprite: &EmoteStaticSprite, u: f32, v: f32) -> [f32; 2] {
