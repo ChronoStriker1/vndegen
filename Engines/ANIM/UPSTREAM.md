@@ -47,6 +47,10 @@ Wine, from saves both load (`docs/anim.md`):
   - The test of a one-shot motion's end time follows the change above, and a test covers the mesh combinator.
 - `src/sdk.rs`: `EmoteRuntime::reset_frame_history`, for a character whose variables are set at once, as when a save
   loads, so held keys don't keep the pictures of the default pose.
+  Each frame builds the scene once: hair and bust physics run first, on the previous frame's scene, and the scene is
+  then built with their variables, instead of building it, running physics on it and building it again. Physics answers
+  one frame later, which doesn't show, and a character takes half the time, which three moving characters need to hold
+  60 frames a second.
 
 ## Licenses
 

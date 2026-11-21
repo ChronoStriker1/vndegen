@@ -393,12 +393,10 @@ impl EmoteRuntime {
         let Some(motion) = self.active_motion.as_deref() else {
             return Ok(());
         };
-        // Preserve the complete pre-tick StepFrame snapshot across BOTH scene
-        // builds below. Native needs previous finalized XYZ for nested-motion
-        // dt=2 and persistent local frame values for serialized type-0 HOLD.
-        // The second rebuild only reflects physics variables at the same motion
-        // time and must not treat the first rebuild as a new native frame.
-        let previous_scene = self.player.scene().clone();
+        if physics_delta_ticks > 0.0 && self.player.is_physics_enabled() {
+            self.player
+                .evaluate_physics_for_current_scene(physics_delta_ticks);
+        }
         let variables = self.player.evaluated_variable_values();
         let scene = self
             .schema
@@ -408,27 +406,10 @@ impl EmoteRuntime {
                 motion,
                 self.player.elapsed_ticks(),
                 &variables,
-                &previous_scene,
+                self.player.scene(),
                 self.ground_correction_hook,
             )?;
         self.player.replace_scene(scene);
-        if physics_delta_ticks > 0.0 && self.player.is_physics_enabled() {
-            self.player
-                .evaluate_physics_for_current_scene(physics_delta_ticks);
-            let variables = self.player.evaluated_variable_values();
-            let scene = self
-                .schema
-                .build_motion_scene_at_with_resources_variables_previous_scene_and_ground_hook(
-                    &self.psb,
-                    &self.normalized_data,
-                    motion,
-                    self.player.elapsed_ticks(),
-                    &variables,
-                    &previous_scene,
-                    self.ground_correction_hook,
-                )?;
-            self.player.replace_scene(scene);
-        }
         Ok(())
     }
 
