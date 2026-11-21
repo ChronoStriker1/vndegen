@@ -7,7 +7,7 @@ static const UILayout UI[GAME_COUNT] = {
                   606, 11, {2, 7, 10},
                   {BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE},
                   568, 712, 578, 204, 80, 19, 23},
-    [GAME_MGSW] = {19, 169, 583, 164, 626, 626, 41, 700,
+    [GAME_MGSW] = {19, 169, 583, 164, 626, 626, 41, 940,
                    664, 10, {2, 6, 9},
                    {BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE},
                    624, 656, 636, 203, 51, 18, 23},

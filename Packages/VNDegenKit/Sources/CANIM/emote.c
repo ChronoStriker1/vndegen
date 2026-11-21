@@ -530,7 +530,8 @@ void an_emote_prepare(AN *a) {
         float ticks = (float)(a->now - s->lastNow) * 60.0f / 1000.0f;
         s->lastNow = a->now;
         s->ticks = ticks > 6 ? 6 : ticks;
-        s->scale = (l->scale > 0 ? (float)l->scale / 1000.0f : 1.0f) * a->emoteScale;
+        int ls = an_layer_scale(a, l);
+        s->scale = (ls > 0 ? (float)ls / 1000.0f : 1.0f) * a->emoteScale;
         jobs[n++] = s;
     }
     an_parallel(a, n, build_job, jobs);

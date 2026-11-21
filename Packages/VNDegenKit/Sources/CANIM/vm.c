@@ -351,10 +351,12 @@ static void exec(AN *a, const Op *op) {
         Layer *l = layer(a, &g[0]);
         if (!l) break;
         u32 t = (u32)val(a, &g[4]);
-        l->fromX = t ? l->toX : val(a, &g[1]);
-        l->fromY = t ? l->toY : val(a, &g[2]);
-        l->toX = val(a, &g[1]);
-        l->toY = val(a, &g[2]);
+        int x, y;
+        an_layer_pos(a, l, &x, &y);
+        l->toX += val(a, &g[1]);
+        l->toY += val(a, &g[2]);
+        l->fromX = t ? x : l->toX;
+        l->fromY = t ? y : l->toY;
         l->moveStart = a->now;
         l->moveTime = t;
         break;
@@ -379,7 +381,11 @@ static void exec(AN *a, const Op *op) {
     }
     case 0x7c: {
         Layer *l = layer(a, &g[0]);
-        if (l) l->scale = val(a, &g[1]);
+        if (!l) break;
+        l->fromScale = an_layer_scale(a, l);
+        l->scale = val(a, &g[1]);
+        l->scaleStart = a->now;
+        l->scaleTime = (u32)val(a, &g[2]);
         break;
     }
     case 0x81: {

@@ -48,7 +48,7 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
     a->dir = an_strdup(cfg->gameDir);
     a->saveDir = an_strdup(cfg->saveDir ? cfg->saveDir : cfg->gameDir);
     a->base = base;
-    a->game = !strcmp(base, "mgsw") ? GAME_MGSW : GAME_DDD;
+    a->game = an_ieq(base, "mgsw") ? GAME_MGSW : GAME_DDD;
     a->rate = cfg->audioRate > 0 ? cfg->audioRate : 44100;
     if (cfg->logPath) a->log = fopen(cfg->logPath, "a");
     snprintf(a->title, sizeof a->title, "%s", base);

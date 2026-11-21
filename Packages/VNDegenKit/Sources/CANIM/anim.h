@@ -167,7 +167,8 @@ typedef struct Layer {
     u32 moveStart, moveTime;
     int alpha, fromAlpha, toAlpha;
     u32 fadeStart, fadeTime;
-    int scale;
+    int scale, fromScale;
+    u32 scaleStart, scaleTime;
     char motion[64];
     u32 motionTime;
     struct LayerVar {
@@ -326,6 +327,8 @@ void an_pool_free(AN *a);
 void an_window_render(AN *a);
 void an_gfx_fill(u32 *dst, int w, int h, u32 color);
 void an_gfx_blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int alpha);
+void an_layer_pos(const AN *a, const Layer *l, int *x, int *y);
+int an_layer_scale(const AN *a, const Layer *l);
 void an_gfx_blit_fit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int w, int h);
 
 bool an_text_init(AN *a);

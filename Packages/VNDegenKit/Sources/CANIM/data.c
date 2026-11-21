@@ -354,11 +354,16 @@ const IdleMotion *an_define_idle(const Define *def, const char *name) {
 }
 
 float an_define_char_scale(const Define *def, const char *model) {
+    size_t best = 0;
+    float scale = 1.0f;
     for (int i = 0; i < def->charCount; i++) {
         size_t n = strlen(def->charName[i]);
-        if (!strncmp(model, def->charName[i], n) && !isalpha((u8)model[n])) return def->charScale[i] / 100.0f;
+        if (n > best && !strncmp(model, def->charName[i], n)) {
+            best = n;
+            scale = def->charScale[i] / 100.0f;
+        }
     }
-    return 1.0f;
+    return scale;
 }
 
 const EmotePreset *an_define_preset(const Define *def, const char *name) {

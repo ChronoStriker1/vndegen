@@ -105,6 +105,13 @@ static int lerp(int from, int to, u32 start, u32 time, u32 now) {
     return from + (int)((i64)(to - from) * (i64)(now - start) / (i64)time);
 }
 
+void an_layer_pos(const AN *a, const Layer *l, int *x, int *y) {
+    *x = lerp(l->fromX, l->toX, l->moveStart, l->moveTime, a->now);
+    *y = lerp(l->fromY, l->toY, l->moveStart, l->moveTime, a->now);
+}
+
+int an_layer_scale(const AN *a, const Layer *l) { return lerp(l->fromScale ? l->fromScale : l->scale, l->scale, l->scaleStart, l->scaleTime, a->now); }
+
 static void draw_scene(AN *a, u32 *fb) {
     Scene *s = &a->scene;
     an_gfx_fill(fb, a->W, a->H, 0xff000000u);
@@ -113,15 +120,15 @@ static void draw_scene(AN *a, u32 *fb) {
     if (bg) {
         int x = lerp(s->bgFromX, s->bgX, s->bgMoveStart, s->bgMoveTime, a->now);
         int y = lerp(s->bgFromY, s->bgY, s->bgMoveStart, s->bgMoveTime, a->now);
-        if (s->bgScale > 0 && s->bgScale != 1000) blit_scaled(fb, a->W, a->H, bg, -x * s->bgScale / 1000.0, -y * s->bgScale / 1000.0, s->bgScale / 1000.0, 255);
+        if (s->bgScale > 0 && s->bgScale != 1000) blit_scaled(fb, a->W, a->H, bg, -x, -y, s->bgScale / 1000.0, 255);
         else an_gfx_blit(fb, a->W, a->H, bg, x, y, a->W, a->H, 0, 0, 255);
     }
     if (an_movie_looping(a)) an_movie_draw(a, fb);
     for (int i = 0; i < AN_LAYERS; i++) {
         Layer *l = &s->layer[i];
         if (l->kind == LK_NONE) continue;
-        int x = lerp(l->fromX, l->toX, l->moveStart, l->moveTime, a->now);
-        int y = lerp(l->fromY, l->toY, l->moveStart, l->moveTime, a->now);
+        int x, y;
+        an_layer_pos(a, l, &x, &y);
         int alpha = lerp(l->fromAlpha, l->toAlpha, l->fadeStart, l->fadeTime, a->now);
         if (l->kind == LK_EMOTE) {
             an_emote_draw(a, i, l, x, y, alpha);
@@ -129,7 +136,8 @@ static void draw_scene(AN *a, u32 *fb) {
         }
         Image *im = an_image_load(a, l->name);
         if (!im) continue;
-        double scale = l->scale > 0 ? l->scale / 1000.0 : 1.0;
+        int ls = an_layer_scale(a, l);
+        double scale = ls > 0 ? ls / 1000.0 : 1.0;
         if (scale != 1.0)
             blit_scaled(fb, a->W, a->H, im, x, y, scale, alpha);
         else

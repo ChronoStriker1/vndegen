@@ -35,7 +35,12 @@ folder down.
   (`66`). The define's character table (name and a percentage: Risa 100, Shiho 110, Yousuke 120, Kouki 130, Sumi 250)
   sets how far below the screen's centre a character's origin sits, 100 pixels times the percentage whatever the
   scale (a model not in the table, such as an event, counts as 100), measured against the PC; it doesn't scale the
-  character. Expressions are presets of E-mote variables in
+  character. A model takes the entry its name starts with (Magical Sword's `Malg202` is `Mal`, 40), as the PC
+  records in the save.
+- Camera and layers: `80` places the background by the top left of its scaled picture (x, y, scale, time), so
+  `80 #320 #180 #1500` is a centred zoom. `59` moves a layer by an amount, relative to where its last move ended, and
+  `7c` scales it, both over a time; `52` puts a new layer back at no offset and 100%. Magical Sword's opening pans from
+  the goddess's legs to her face this way, and matches the PC frame for frame. Expressions are presets of E-mote variables in
   the define.
 - Text: Arial at 24 pixels (Liberation Sans or another metric match where Arial is missing), each glyph's advance
   rounded up to a whole pixel as Windows lays it out, wrapped at 884 pixels from x 180 (the PC keeps an 878-pixel line
