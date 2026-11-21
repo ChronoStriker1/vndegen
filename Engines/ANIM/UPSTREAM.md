@@ -41,6 +41,9 @@ Wine, from saves both load (`docs/anim.md`):
     (`head_LR`, `body_LR`) and nods (`head_UD`, `body_UD`) barely moved a character. eluna also read the first mesh
     as a displacement when the layer's `parameterize` named another variable, which pushed such layers out of shape
     (an arm, a neckline) once that variable moved. The data has the first mesh absolute in every case.
+  - A composite mask's source layer counts when its frame is active and has a picture, whatever its opacity, and
+    sprites say so in `mask_shape`. Event models clip their backdrop with a screen-sized frame at opacity 0 (NOM03's
+    `トリミング枠`); eluna dropped it as a source, so the backdrop was never drawn and the event CG behind showed.
   - The test of a one-shot motion's end time follows the change above, and a test covers the mesh combinator.
 - `src/sdk.rs`: `EmoteRuntime::reset_frame_history`, for a character whose variables are set at once, as when a save
   loads, so held keys don't keep the pictures of the default pose.

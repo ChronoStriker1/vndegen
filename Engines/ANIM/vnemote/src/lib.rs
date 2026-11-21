@@ -349,8 +349,8 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
         .filter(|s| s.visible && s.opacity > 0.0 && !s.feedback_history)
         .collect();
     let mut by_key: HashMap<&[u64], &EmoteStaticSprite> = HashMap::new();
-    for sprite in &visible {
-        by_key.insert(sprite.draw_frame_info.native_draw_key.as_slice(), *sprite);
+    for sprite in scene.sprites.iter().filter(|s| (s.mask_shape || s.visible) && !s.feedback_history) {
+        by_key.insert(sprite.draw_frame_info.native_draw_key.as_slice(), sprite);
     }
     let infos: HashMap<&[u64], &EmoteDrawFrameInfo> = scene
         .layer_states
@@ -393,7 +393,8 @@ unsafe extern "C" fn build(model: *mut Model) -> c_int {
                 for key in keys {
                     if let Some(source) = by_key.get(key).copied() {
                         let first = vertices.len() as u32;
-                        push_sprite(vertices, grid, source, pixels_per_unit);
+                        let shape = EmoteStaticSprite { opacity: 1.0, ..source.clone() };
+                        push_sprite(vertices, grid, &shape, pixels_per_unit);
                         stencils.push(StencilSource {
                             phase: phase as u32,
                             texture: source.texture_resource_index,

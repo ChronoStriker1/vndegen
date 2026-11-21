@@ -33,9 +33,13 @@ folder down.
   and the system routines (waits, effects, the scene jump table); the screens are the engine's own.
 - E-mote: PSB files, encrypted with the engine's key, drawn at the slot positions and the scale the script sets
   (`66`). The define's character table (name and a percentage: Risa 100, Shiho 110, Yousuke 120, Kouki 130, Sumi 250)
-  sets how far below the screen's centre a character's origin sits, 188.8 model units times the scale times the
-  percentage, measured against the PC; it doesn't scale the character. Expressions are presets of E-mote variables in
+  sets how far below the screen's centre a character's origin sits, 100 pixels times the percentage whatever the
+  scale (a model not in the table, such as an event, counts as 100), measured against the PC; it doesn't scale the
+  character. Expressions are presets of E-mote variables in
   the define.
+- Text: Arial at 24 pixels (Liberation Sans or another metric match where Arial is missing), each glyph's advance
+  rounded up to a whole pixel as Windows lays it out, wrapped at 884 pixels from x 180 (the PC keeps an 878-pixel line
+  and wraps one of 891).
 - Sound: Ogg Vorbis behind an 8-byte header, in `bgm/` and the voice archive. Movies are MPEG-1.
 
 ## Drawing E-mote characters
@@ -84,6 +88,8 @@ does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's N
   the script picks another; the define's records list variables and ranges, `head_UD` -10 to 10 and `body_UD` -20 to
   20 for `sPauseWait01`) that replaces those variables as it goes, so characters sway, and the PC moves their gaze.
   VNDegen's characters hold the scripted pose.
+- The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
+  one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
 - The Settings, Extra (CG, scene and music galleries) and shortcut screens aren't built; volumes aren't kept in the
   system save yet.
 - Magical Sword's screens aren't built.

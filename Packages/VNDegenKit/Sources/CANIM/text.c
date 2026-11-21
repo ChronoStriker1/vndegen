@@ -85,7 +85,7 @@ static Glyph *glyph(Font *f, u32 cp, int size) {
         float sc = stbtt_ScaleForMappingEmToPixels(&f->info, (float)size);
         int adv, lsb;
         stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
-        g->adv = (int)(adv * sc + 0.5f);
+        g->adv = (int)ceilf(adv * sc);
         int x0, y0, x1, y1;
         stbtt_GetCodepointBitmapBox(&f->info, (int)cp, sc, sc, &x0, &y0, &x1, &y1);
         g->x0 = x0;

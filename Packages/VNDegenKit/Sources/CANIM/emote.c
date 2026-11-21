@@ -5,7 +5,7 @@
 #include <math.h>
 
 enum { EMOTE_KEY = 0x473ab96d, MAX_MODELS = 8 };
-static const float CHAR_DROP = 188.8f;
+static const float CHAR_DROP = 100.0f;
 
 typedef struct Tex {
     const u8 *px;
@@ -516,7 +516,7 @@ void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha) {
     if (!s) return;
     float charScale = an_define_char_scale(&a->def, l->name);
     int baseX = a->slotX[layer] ? a->slotX[layer] : a->W / 2;
-    RasterJob j = {a, s, {(float)(baseX + x), (float)(a->H / 2 + a->slotY[layer] + y) + CHAR_DROP * a->emoteScale * charScale, s->scale,
+    RasterJob j = {a, s, {(float)(baseX + x), (float)(a->H / 2 + a->slotY[layer] + y) + CHAR_DROP * charScale, s->scale,
                           (float)alpha / 255.0f, 0, 0, 0, 0, a->fb, a->W, 0, 0, false}, 0, a->W - 1, 0, a->H - 1, 0};
     if (!a->stencil) a->stencil = an_alloc((size_t)a->W * (size_t)a->H);
     j.bands = an_pool_size(a) * 2;

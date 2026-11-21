@@ -365,6 +365,7 @@ pub struct EmoteStaticSprite {
     /// True for native type-10 Feedback drawables. Their texture comes from
     /// the previous framebuffer rather than a PSB texture resource.
     pub feedback_history: bool,
+    pub mask_shape: bool,
     pub z: f32,
     pub opacity: f32,
     /// Native decoded-frame blend mode (`bm`). The low nibble selects the
@@ -1492,7 +1493,7 @@ fn resolve_composite_mask_owners(
                     // emitted sprite is the portable equivalent.
                     if sprite_by_key
                         .get(&source.draw_frame_info.native_draw_key)
-                        .is_some_and(|sprite| sprite.visible && sprite.opacity > 0.0)
+                        .is_some_and(|sprite| sprite.mask_shape)
                         && !resolved.contains(&source.path)
                     {
                         resolved.push(source.path.clone());
@@ -3033,6 +3034,7 @@ fn build_sprite(
         texture_format: texture.format.clone(),
         icon_name: icon_name.to_owned(),
         feedback_history: false,
+        mask_shape: ctx.ready_to_draw && ctx.base_visible,
         z: base[2],
         opacity: (ctx.opacity_multiplier * (opa_raw / 255.0)).clamp(0.0, 1.0),
         blend_mode,
@@ -3083,6 +3085,7 @@ fn build_feedback_history_sprite(
         texture_format: None,
         icon_name: "__framebuffer".to_owned(),
         feedback_history: true,
+        mask_shape: false,
         z: state.raw_position[2],
         opacity: state.opacity,
         blend_mode: frame.blend_mode,
@@ -7302,6 +7305,7 @@ mod tests {
             texture_format: None,
             icon_name: "icon".to_owned(),
             feedback_history: false,
+            mask_shape: true,
             z: 0.0,
             opacity: 1.0,
             blend_mode: 0,
@@ -8393,6 +8397,7 @@ mod tests {
             texture_format: Some("RGBA8".to_owned()),
             icon_name: "icon".to_owned(),
             feedback_history: false,
+            mask_shape: true,
             z: 0.0,
             opacity: 1.0,
             blend_mode: 0x10,

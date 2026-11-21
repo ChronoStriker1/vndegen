@@ -50,7 +50,7 @@ void an_title_input(AN *a) {
     }
 }
 
-enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 920, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194 };
+enum { WIN_Y = 534, WIN_H = 186, TEXT_X = 180, ROW1 = 583, TEXT_W = 884, TEXT_SIZE = 24, LINE_H = 46, NAME_X = 194 };
 enum { BAR_X = 568, BAR_Y = 694, BAR_W = 712, BAR_H = 26, CHOICE_W = 719, CHOICE_H = 79, CHOICE_GAP = 16 };
 
 
