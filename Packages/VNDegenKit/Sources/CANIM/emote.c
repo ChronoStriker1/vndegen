@@ -49,6 +49,8 @@ typedef struct EmoteSlot {
     int texCap, stencilTexCap;
     IdleTrack idle[2];
     u32 seed;
+    float *drawY;
+    int drawYCap;
 } EmoteSlot;
 
 struct EmoteCache {
@@ -73,6 +75,7 @@ static void slot_free(const vnemote_api_v1 *e, EmoteSlot *s) {
     if (s->model && e) e->close(s->model);
     free(s->tex);
     free(s->stencilTex);
+    free(s->drawY);
     free(s->cache);
     memset(s, 0, sizeof *s);
 }
@@ -194,7 +197,7 @@ static inline u32 blend_px(u32 d, float r, float g, float b, float al, u32 mode)
 
 static inline bool sample(const Tex *t, float u, float v, float out[4]) {
     float fx = u * (float)t->w - 0.5f, fy = v * (float)t->h - 0.5f;
-    int x0 = (int)floorf(fx), y0 = (int)floorf(fy);
+    int x0 = (int)(fx + 1.0f) - 1, y0 = (int)(fy + 1.0f) - 1;
     float ax = fx - (float)x0, ay = fy - (float)y0;
     int x1 = x0 + 1, y1 = y0 + 1;
     x0 = clampi(x0, 0, t->w - 1);
@@ -239,10 +242,12 @@ enum { AT_U, AT_V, AT_R, AT_G, AT_B, AT_A, AT_MX, AT_MY, AT_COUNT };
 
 static void raster(AN *a, const View *vw, const Tex *t, const vnemote_vertex *v, const vnemote_draw *d, int st, u8 ref) {
     float sx[3], sy[3];
-    for (int i = 0; i < 3; i++) {
-        sx[i] = vw->ox + v[i].x * vw->scale;
-        sy[i] = vw->oy + v[i].y * vw->scale;
-    }
+    for (int i = 0; i < 3; i++) sy[i] = vw->oy + v[i].y * vw->scale;
+    float ylo = sy[0] < sy[1] ? sy[0] : sy[1], yhi = sy[0] > sy[1] ? sy[0] : sy[1];
+    ylo = sy[2] < ylo ? sy[2] : ylo;
+    yhi = sy[2] > yhi ? sy[2] : yhi;
+    if (yhi < (float)vw->y0 - 1 || ylo > (float)vw->y1 + 1) return;
+    for (int i = 0; i < 3; i++) sx[i] = vw->ox + v[i].x * vw->scale;
     float area = (sx[1] - sx[0]) * (sy[2] - sy[0]) - (sx[2] - sx[0]) * (sy[1] - sy[0]);
     if (fabsf(area) < 1e-6f) return;
     int minx = (int)floorf(fminf(sx[0], fminf(sx[1], sx[2]))), maxx = (int)ceilf(fmaxf(sx[0], fmaxf(sx[1], sx[2])));
@@ -284,35 +289,77 @@ static void raster(AN *a, const View *vw, const Tex *t, const vnemote_vertex *v,
     u32 mode = blend & 0x0f;
     if (mode > 5) mode = 0;
     const float eps = -1e-4f;
-    for (int y = miny; y <= maxy; y++) {
+    bool flat = true;
+    for (int k = AT_R; k <= AT_A; k++)
+        if (at[0][k] != at[1][k] || at[0][k] != at[2][k]) flat = false;
+    float kr = at[0][AT_R], kg = at[0][AT_G], kb = at[0][AT_B], ka = at[0][AT_A];
+    if (mod2x) {
+        kr *= 2;
+        kg *= 2;
+        kb *= 2;
+    }
+    float e2x = -(e0x + e1x), w2r = 1.0f - w0r - w1r, e2y = -(e0y + e1y);
+    int span = maxx - minx;
+    for (int y = miny; y <= maxy; y++, w0r += e0y, w1r += e1y, w2r += e2y) {
+        float lo = 0, hi = (float)span;
+        const float f0[3] = {w0r, w1r, w2r}, fx[3] = {e0x, e1x, e2x};
+        for (int q = 0; q < 3; q++) {
+            if (fx[q] > 0) {
+                float k = (eps - f0[q]) / fx[q];
+                if (k > lo) lo = k;
+            } else if (fx[q] < 0) {
+                float k = (eps - f0[q]) / fx[q];
+                if (k < hi) hi = k;
+            } else if (f0[q] < eps) {
+                lo = 1;
+                hi = 0;
+            }
+        }
+        int k0 = (int)ceilf(lo), k1 = (int)floorf(hi);
+        while (k0 <= k1 && (f0[0] + fx[0] * (float)k0 < eps || f0[1] + fx[1] * (float)k0 < eps || f0[2] + fx[2] * (float)k0 < eps)) k0++;
+        while (k1 >= k0 && (f0[0] + fx[0] * (float)k1 < eps || f0[1] + fx[1] * (float)k1 < eps || f0[2] + fx[2] * (float)k1 < eps)) k1--;
+        if (k0 > k1) continue;
+        int yrow = y - miny;
         u32 *row = vw->px + (size_t)(y - vw->py0) * (size_t)vw->stride;
         u8 *srow = a->stencil + (size_t)y * (size_t)a->W;
-        float w0 = w0r, w1 = w1r, p[AT_COUNT];
-        for (int k = 0; k < AT_COUNT; k++) p[k] = base[k];
-        bool inside = false;
-        for (int x = minx; x <= maxx; x++, w0 += e0x, w1 += e1x) {
-            if (x > minx)
-                for (int k = 0; k < AT_COUNT; k++) p[k] += dx[k];
-            if (w0 < eps || w1 < eps || 1.0f - w0 - w1 < eps) {
-                if (inside) break;
-                continue;
+        float p[AT_COUNT];
+        for (int k = 0; k < AT_COUNT; k++) p[k] = base[k] + dy[k] * (float)yrow + dx[k] * (float)k0;
+        for (int x = minx + k0; x <= minx + k1; x++) {
+            if (x > minx + k0) {
+                p[AT_U] += dx[AT_U];
+                p[AT_V] += dx[AT_V];
+                if (!flat)
+                    for (int k = AT_R; k <= AT_A; k++) p[k] += dx[k];
+                if (clip) {
+                    p[AT_MX] += dx[AT_MX];
+                    p[AT_MY] += dx[AT_MY];
+                }
             }
-            inside = true;
             if (st != ST_NONE && srow[x] != ref) continue;
             if (clip && (p[AT_MX] < d->clip[0] || p[AT_MY] < d->clip[1] || p[AT_MX] > d->clip[2] || p[AT_MY] > d->clip[3])) continue;
             float c[4];
             if (!sample(t, p[AT_U], p[AT_V], c)) continue;
-            float al = c[3] * p[AT_A];
+            float al = c[3] * (flat ? ka : p[AT_A]);
             if (al <= 0.003f) continue;
             if (mask) {
                 srow[x] = (u8)(st == ST_INC ? ref + 1 : ref - 1);
                 continue;
             }
-            float r = c[0] * p[AT_R], g = c[1] * p[AT_G], b = c[2] * p[AT_B];
+            float r, g, b;
+            if (flat) {
+                r = c[0] * kr;
+                g = c[1] * kg;
+                b = c[2] * kb;
+            } else {
+                float m = mod2x ? 2.0f : 1.0f;
+                r = c[0] * p[AT_R] * m;
+                g = c[1] * p[AT_G] * m;
+                b = c[2] * p[AT_B] * m;
+            }
             if (mod2x) {
-                r = fminf(r * 2, 1);
-                g = fminf(g * 2, 1);
-                b = fminf(b * 2, 1);
+                r = r > 1 ? 1 : r;
+                g = g > 1 ? 1 : g;
+                b = b > 1 ? 1 : b;
             }
             u32 *out = &row[x - vw->px0];
             if (vw->premul) {
@@ -339,9 +386,6 @@ static void raster(AN *a, const View *vw, const Tex *t, const vnemote_vertex *v,
             }
             *out = blend_px(*out, r, g, b, al, mode);
         }
-        w0r += e0y;
-        w1r += e1y;
-        for (int k = 0; k < AT_COUNT; k++) base[k] += dy[k];
     }
 }
 
@@ -363,10 +407,22 @@ static void build_job(void *ctx, int i) {
         s->stencilTexCap = s->stencilCount;
         s->stencilTex = realloc(s->stencilTex, sizeof(Tex) * (size_t)s->stencilTexCap);
     }
+    if (s->drawCount > s->drawYCap) {
+        s->drawYCap = s->drawCount;
+        s->drawY = realloc(s->drawY, sizeof(float) * 2 * (size_t)s->drawYCap);
+    }
     for (int k = 0; k < s->drawCount; k++) {
         Tex *t = &s->tex[k];
         t->px = e->texture(s->model, s->draws[k].texture, &t->w, &t->h);
         if (t->w <= 0 || t->h <= 0) t->px = NULL;
+        float lo = 1e30f, hi = -1e30f;
+        for (u32 q = 0; q < s->draws[k].count; q++) {
+            float y = s->verts[s->draws[k].first + q].y;
+            lo = y < lo ? y : lo;
+            hi = y > hi ? y : hi;
+        }
+        s->drawY[2 * k] = lo;
+        s->drawY[2 * k + 1] = hi;
     }
     for (int k = 0; k < s->stencilCount; k++) {
         Tex *t = &s->stencilTex[k];
@@ -496,6 +552,7 @@ static void raster_band(void *ctx, int band) {
         if (d->pass != VNEMOTE_PASS_NORMAL && d->pass != VNEMOTE_PASS_FILTERED) continue;
         const Tex *t = &s->tex[i];
         if (!t->px) continue;
+        if (vw.oy + s->drawY[2 * i + 1] * vw.scale < (float)top - 1 || vw.oy + s->drawY[2 * i] * vw.scale > (float)bottom + 1) continue;
         vw.x0 = j->left;
         vw.y0 = top;
         vw.x1 = j->right;
