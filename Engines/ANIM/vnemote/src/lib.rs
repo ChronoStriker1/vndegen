@@ -509,21 +509,30 @@ fn big_endian_rgba(format: Option<&str>) -> bool {
 fn decode_texture(model: &Model, index: u32) -> Option<Texture> {
     let source = model.runtime.texture_sources().values().find(|t| t.resource_index == index)?;
     let bytes = model.runtime.texture_bytes(index)?;
-    let bpp = source.bit_count.unwrap_or(32) as usize;
-    if bpp != 32 {
+    let format = source.format.as_deref().unwrap_or("");
+    let eight_bit = format.eq_ignore_ascii_case("A8") || format.eq_ignore_ascii_case("L8");
+    let bpp = if eight_bit { 8 } else { source.bit_count.unwrap_or(32) as usize };
+    if bpp != 32 && bpp != 8 {
         return None;
     }
-    let expected = source.width as usize * source.height as usize * 4;
+    let align = bpp / 8;
+    let pixels = source.width as usize * source.height as usize;
+    let expected = pixels * align;
     let payload = if source.compress.as_deref().is_some_and(|c| c.eq_ignore_ascii_case("RL")) {
-        decompress_rl(bytes, 4, expected)?
+        decompress_rl(bytes, align, expected)?
     } else {
         bytes.to_vec()
     };
     if payload.len() != expected {
         return None;
     }
-    let mut rgba = Vec::with_capacity(expected);
-    if big_endian_rgba(source.format.as_deref()) {
+    let mut rgba = Vec::with_capacity(pixels * 4);
+    if bpp == 8 {
+        let luminance = format.eq_ignore_ascii_case("L8");
+        for &v in &payload {
+            rgba.extend_from_slice(&if luminance { [v, v, v, 255] } else { [255, 255, 255, v] });
+        }
+    } else if big_endian_rgba(source.format.as_deref()) {
         rgba.extend_from_slice(&payload);
     } else {
         for px in payload.chunks_exact(4) {
