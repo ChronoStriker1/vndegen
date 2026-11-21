@@ -20,32 +20,45 @@ struct Font {
     int count, cap;
     int *hash;
     int hashSize;
+    Font *fallback;
 };
 
-bool an_text_init(AN *a) {
+static Font *font_open(AN *a, const vnfont_match *m) {
     Font *f = an_alloc(sizeof *f);
-    a->font = f;
-    vnfont_match m;
-    if (!vnfont_resolve("Arial", 0, 0, &m) && !vnfont_resolve("MS Gothic", 0, 0, &m)) {
+    size_t size;
+    f->data = an_read_file(m->path, &size);
+    int off = f->data ? stbtt_GetFontOffsetForIndex(f->data, m->face) : -1;
+    f->ok = off >= 0 && stbtt_InitFont(&f->info, f->data, off);
+    if (!f->ok) an_log(a, "can't read font %s", m->path);
+    return f;
+}
+
+bool an_text_init(AN *a) {
+    vnfont_match m, jp;
+    bool hasJp = vnfont_resolve("MS Gothic", 0, 0, &jp);
+    if (!vnfont_resolve("Arial", 0, 0, &m) && !hasJp) {
+        a->font = an_alloc(sizeof(Font));
         an_log(a, "no font for the message window");
         return false;
     }
-    size_t size;
-    f->data = an_read_file(m.path, &size);
-    int off = f->data ? stbtt_GetFontOffsetForIndex(f->data, m.face) : -1;
-    f->ok = off >= 0 && stbtt_InitFont(&f->info, f->data, off);
-    if (!f->ok) an_log(a, "can't read font %s", m.path);
-    return f->ok;
+    if (!vnfont_resolve("Arial", 0, 0, &m)) m = jp;
+    a->font = font_open(a, &m);
+    if (hasJp && strcmp(jp.path, m.path)) a->font->fallback = font_open(a, &jp);
+    return a->font->ok;
 }
 
-void an_text_free(AN *a) {
-    Font *f = a->font;
+static void font_free(Font *f) {
     if (!f) return;
     for (int i = 0; i < f->count; i++) free(f->glyphs[i].bm);
     free(f->glyphs);
     free(f->hash);
     free(f->data);
+    font_free(f->fallback);
     free(f);
+}
+
+void an_text_free(AN *a) {
+    font_free(a->font);
     a->font = NULL;
 }
 
@@ -65,6 +78,9 @@ static void rehash(Font *f) {
 }
 
 static Glyph *glyph(Font *f, u32 cp, int size) {
+    if (f->fallback && f->fallback->ok && cp > 0x7f && f->ok && !stbtt_FindGlyphIndex(&f->info, (int)cp) &&
+        stbtt_FindGlyphIndex(&f->fallback->info, (int)cp))
+        return glyph(f->fallback, cp, size);
     if (f->hashSize) {
         u32 h = gkey(cp, size) & (u32)(f->hashSize - 1);
         while (f->hash[h] >= 0) {

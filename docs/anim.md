@@ -94,11 +94,20 @@ does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's N
 Settings and Volume keep their values in the PC's own `<name>_system.dat`, where the PC keeps them, so they carry
 between the PC and VNDegen: each option a byte (Screen Effects at 0x01, Skip Unread at 0x02 and so on, worked out by
 changing one at a time under Wine), the volumes as percentages from 0x18 (master, music, sound effects, the two
-ambient volumes, then each character's voice and background voices), the window opacity as 0 to 217 at 0x298, and the
-text and auto speeds as delays at 0x27c and 0x280. They're written when the player leaves either screen. Screen Mode
-isn't stored there, and VNDegen has no use for it. The info line at the top of both screens and Settings' text box
-sample, typed at the chosen speed, follow the PC; the menu bar's lock icon and the Voice Wait and Auto Wait gauges are
-drawn as on the PC, the gauges when their options are on.
+ambient volumes), the window opacity as 0 to 217 at 0x298, and the text and auto speeds as delays at 0x27c and 0x280.
+Each character tab's voice volume sits at 0x21 plus the tab, and its background voices and their speech volume in two
+more arrays, at 0x2b and 0x2f in Double Date Dilemma (two tabs with background voices) and at 0x2b and 0x34 in Magical
+Sword (eight); the last tab, Others, has only a voice volume. A voice or background voice belongs to the tab its
+character letter names (the last letter of a voice's name, the tag of a background voice). Magical Sword keeps every
+option at Double Date Dilemma's byte; its Voice Cut is Skip Voice. They're written when the player leaves either
+screen. Screen Mode isn't stored there, and VNDegen has no use for it.
+
+The info line at the top of both screens follows the PC, and keeps the last control's line when the pointer leaves it,
+as the PC does. Magical Sword's English patch redrew the info strip with one line per option, which the PC draws a
+little smaller than the strip. Settings' text box sample is typed at the chosen speed in the window colour at the chosen
+opacity: Magical Sword's comes from its define file (in Japanese, as on the PC, drawn with the Japanese fallback font),
+Double Date Dilemma's from its exe. The Shortcut Key List button shows the PC's list over the screen. The menu bar's
+lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the gauges when their options are on.
 
 ## Known limits
 
@@ -107,8 +116,9 @@ drawn as on the PC, the gauges when their options are on.
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
 - The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
-- The Extra screens (CG, scene and music galleries) and the shortcut key list aren't built. Settings' font choice
-  and the volume screen's Play and Allow Test buttons do nothing.
-- Magical Sword: the title, message window and menu bar are built; its other screens use Double Date Dilemma's layout for now.
+- The Extra screens (CG, scene and music galleries) aren't built. Settings' font list is empty and its choice does
+  nothing, and the volume screen's Play and Allow Test buttons are drawn but do nothing.
+- Magical Sword: the title, message window, menu bar, Config and Volume screens and the save cards are built; its
+  other screens use Double Date Dilemma's layout for now.
 - The Load screen's AUTO SAVE page isn't built, and the PC's comment editing on cards isn't either.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

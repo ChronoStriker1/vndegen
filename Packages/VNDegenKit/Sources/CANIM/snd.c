@@ -244,18 +244,31 @@ void an_snd_set_volume(AN *a, int channel, float volume) {
     pthread_mutex_unlock(&m->lock);
 }
 
-static int char_index(const char *name, int tag) {
+static const VoiceTabs VOICE_TABS[GAME_COUNT] = {
+    [GAME_DDD] = {3, "ab", 0x21, 0x2b, 0x2f},
+    [GAME_MGSW] = {9, "abcefdgh", 0x21, 0x2b, 0x34},
+};
+
+const VoiceTabs *an_voice_tabs(const AN *a) { return &VOICE_TABS[a->game]; }
+
+int an_voice_tab(const AN *a, char letter) {
+    const VoiceTabs *t = an_voice_tabs(a);
+    const char *p = letter ? strchr(t->letters, letter) : NULL;
+    return p ? (int)(p - t->letters) : t->count - 1;
+}
+
+static int char_index(const AN *a, const char *name, int tag) {
     char c = (char)tag;
     if (!c && name && *name) c = name[strlen(name) - 1];
-    return c == 'a' ? 0 : c == 'b' ? 1 : 2;
+    return an_voice_tab(a, c);
 }
 
 float an_channel_volume(AN *a, int channel, const char *name, int tag) {
     float master = (float)a->volume[0] / 100.0f;
     if (channel == CH_BGM) return master * (float)a->volume[1] / 100.0f;
-    if (channel == CH_VOICE) return master * (float)a->voiceVolume[char_index(name, 0)] / 100.0f;
+    if (channel == CH_VOICE) return master * (float)a->voiceVolume[char_index(a, name, 0)] / 100.0f;
     if (channel >= CH_BGV0) {
-        int k = char_index(name, tag);
+        int k = char_index(a, name, tag);
         if (a->mix) a->mix->talk[channel] = master * (float)a->talkVolume[k] / 100.0f;
         return master * (float)a->bgvVolume[k] / 100.0f;
     }

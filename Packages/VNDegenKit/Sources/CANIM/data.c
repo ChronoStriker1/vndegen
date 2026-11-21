@@ -253,6 +253,18 @@ static size_t idle_record(Define *def, const u8 *d, size_t size, size_t at) {
     return (size_t)(q + 1 - d);
 }
 
+enum { DEFINE_SAMPLE_RECORD = 0x24, SAMPLE_TYPE = 0x11 };
+
+static char *define_sample(const u8 *d, size_t size) {
+    if (size < DEFINE_SAMPLE_RECORD + 64 || rd32(d + DEFINE_SAMPLE_RECORD) != SAMPLE_TYPE) return NULL;
+    const u8 *end = d + size, *font = d + DEFINE_SAMPLE_RECORD + 8;
+    const u8 *z = memchr(font, 0, (size_t)(end - font));
+    if (!z || end - z < 6) return NULL;
+    const u8 *text = z + 5, *tz = memchr(text, 0, (size_t)(end - text));
+    if (!tz || tz == text) return NULL;
+    return dup_string(text, (size_t)(tz - text));
+}
+
 bool an_define_load(Define *def, const char *path) {
     memset(def, 0, sizeof *def);
     size_t size;
@@ -331,6 +343,7 @@ bool an_define_load(Define *def, const char *path) {
         size_t next = idle_record(def, d, def->size, at);
         if (next) at = next - 1;
     }
+    def->sample = define_sample(d, def->size);
     return true;
 }
 
@@ -372,6 +385,7 @@ void an_define_free(Define *def) {
         free(def->idles[i].name);
     }
     free(def->idles);
+    free(def->sample);
     free(def->data);
     memset(def, 0, sizeof *def);
 }

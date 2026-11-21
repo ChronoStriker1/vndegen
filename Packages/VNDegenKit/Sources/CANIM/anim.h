@@ -114,6 +114,7 @@ typedef struct Define {
     char charName[16][16];
     float charScale[16];
     int charCount;
+    char *sample;
 } Define;
 
 bool an_define_load(Define *d, const char *path);
@@ -220,6 +221,7 @@ typedef struct SlotInfo {
     char comment[128];
 } SlotInfo;
 
+enum { AN_VOICE_TABS = 9 };
 enum { GAME_DDD, GAME_MGSW, GAME_COUNT };
 
 typedef struct UILayout {
@@ -273,13 +275,13 @@ struct AN {
 
     int screen, logTop, wheel;
     int slotPage;
-    int volume[5], voiceVolume[3], bgvVolume[3], talkVolume[3], volumeChar, dragSlider;
+    int volume[5], voiceVolume[AN_VOICE_TABS], bgvVolume[AN_VOICE_TABS], talkVolume[AN_VOICE_TABS], volumeChar, dragSlider, infoRow;
     int option[11], windowOpacity, textSpeed, autoSpeed;
     u32 sampleStart;
     FlowNode *flow;
     int flowCount, flowScroll, flowZoom;
     bool flowFromScript;
-    bool confirmOpen;
+    bool confirmOpen, shortcutsOpen;
     int confirmMsg, confirmAction, confirmArg;
     Image *thumbs[180];
     u32 thumbsSerial[180], saveSerial;
@@ -324,6 +326,7 @@ void an_pool_free(AN *a);
 void an_window_render(AN *a);
 void an_gfx_fill(u32 *dst, int w, int h, u32 color);
 void an_gfx_blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int alpha);
+void an_gfx_blit_fit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int w, int h);
 
 bool an_text_init(AN *a);
 void an_text_free(AN *a);
@@ -336,6 +339,13 @@ void an_snd_play(AN *a, int channel, const char *name, bool loop, bool fromVoice
 void an_snd_stop(AN *a, int channel);
 bool an_snd_playing(AN *a, int channel);
 float an_snd_progress(AN *a, int channel);
+typedef struct VoiceTabs {
+    int count;
+    const char *letters;
+    u32 voiceAt, bgvAt, talkAt;
+} VoiceTabs;
+const VoiceTabs *an_voice_tabs(const AN *a);
+int an_voice_tab(const AN *a, char letter);
 void an_snd_mix(AN *a, float *out, int frames);
 void an_snd_lock(AN *a, bool lock);
 void an_snd_set_volume(AN *a, int channel, float volume);

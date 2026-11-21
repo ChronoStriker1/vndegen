@@ -1,4 +1,5 @@
 #include "anim.h"
+#include <math.h>
 
 void an_gfx_fill(u32 *dst, int w, int h, u32 color) {
     size_t n = (size_t)w * (size_t)h;
@@ -39,6 +40,38 @@ void an_gfx_blit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int 
         for (int x = 0; x < x1 - x0; x++) {
             u32 a = (s[x] >> 24) * (u32)alpha / 255;
             if (a) d[x] = blend(d[x], s[x], a);
+        }
+    }
+}
+
+void an_gfx_blit_fit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, int sw, int sh, int dx, int dy, int w, int h) {
+    if (!im || w <= 0 || h <= 0) return;
+    for (int j = 0; j < h; j++) {
+        int y = dy + j;
+        if (y < 0 || y >= dh) continue;
+        float v = sy + (j + 0.5f) * (float)sh / (float)h - 0.5f;
+        int v0 = (int)floorf(v);
+        float fv = v - (float)v0;
+        for (int i = 0; i < w; i++) {
+            int x = dx + i;
+            if (x < 0 || x >= dw) continue;
+            float u = sx + (i + 0.5f) * (float)sw / (float)w - 0.5f;
+            int u0 = (int)floorf(u);
+            float fu = u - (float)u0, acc[4] = {0};
+            for (int k = 0; k < 4; k++) {
+                int tx = u0 + (k & 1), ty = v0 + (k >> 1);
+                if (tx < sx || ty < sy || tx >= sx + sw || ty >= sy + sh) continue;
+                u32 c = an_image_at(im, tx, ty);
+                float wt = ((k & 1) ? fu : 1 - fu) * ((k >> 1) ? fv : 1 - fv) * (float)(c >> 24);
+                acc[0] += wt * (float)(c & 0xff);
+                acc[1] += wt * (float)(c >> 8 & 0xff);
+                acc[2] += wt * (float)(c >> 16 & 0xff);
+                acc[3] += wt;
+            }
+            if (acc[3] < 0.5f) continue;
+            u32 c = (u32)(acc[0] / acc[3]) | (u32)(acc[1] / acc[3]) << 8 | (u32)(acc[2] / acc[3]) << 16;
+            u32 *d = dst + (size_t)y * (size_t)dw + (size_t)x;
+            *d = blend(*d, c, (u32)(acc[3] + 0.5f));
         }
     }
 }
