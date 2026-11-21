@@ -140,6 +140,8 @@ lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the ga
   nothing, and the volume screen's Play and Allow Test buttons are drawn but do nothing.
 - Magical Sword: every screen but Extra is built to its own layout and checked against the PC. Its goddess, with three
   times the sprites of a Double Date Dilemma character, runs at 46 frames a second alone in the Debug Mac app and 26
-  in the opening's 300% close-up (34 and 20 on the iPad simulator).
+  in the opening's 300% close-up (34 and 20 on the iPad simulator). A Release build on the iPad simulator updates the
+  screen about as often (32 and 20, counted from screen recordings), so the close-up isn't smooth there; a Release Mac
+  app hasn't been watched, since its library and input can't be set from a test run.
 - Magical Sword's Load screen AUTO SAVE page isn't built, nor is the PC's comment editing on cards.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.
