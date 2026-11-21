@@ -186,6 +186,7 @@ static void draw_window(AN *a, bool textless) {
 
 static const int CHOICE_AREA[GAME_COUNT] = {[GAME_DDD] = 559, [GAME_MGSW] = 505};
 enum { CHOICE_PITCH = 130 };
+static const int CHOICE_FIRST[2] = {213, 175};
 
 static void layout_choices(AN *a) {
     int shown = 0;
@@ -193,7 +194,7 @@ static void layout_choices(AN *a) {
     int area = CHOICE_AREA[a->game], pitch = shown ? area / shown : CHOICE_PITCH;
     if (pitch > CHOICE_PITCH) pitch = CHOICE_PITCH;
     int total = shown ? (shown - 1) * pitch + CHOICE_H : 0;
-    int y = (area - total) / 2, k = 0;
+    int y = shown >= 1 && shown <= 2 ? CHOICE_FIRST[shown - 1] : (area - total) / 2, k = 0;
     for (int i = 0; i < a->choiceCount; i++) {
         Choice *c = &a->choice[i];
         c->x = (a->W - CHOICE_W) / 2;

@@ -376,6 +376,8 @@ enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_BGV0 = CH_SE0 + AN_SE, CH_COUNT 
 
 bool an_slot_info(AN *a, int slot, SlotInfo *info);
 bool an_save_slot(AN *a, int slot);
+void an_auto_save(AN *a, u32 pc);
+int an_last_auto(const AN *a);
 bool an_load_slot(AN *a, int slot);
 bool an_delete_slot(AN *a, int slot);
 bool an_reset_saves(AN *a);

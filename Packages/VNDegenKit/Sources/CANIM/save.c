@@ -47,6 +47,9 @@ enum {
     OFF_EMOTE_SCALE = 0x3b7c8,
     OFF_EMOTE_ON = 0x3b7d0,
     SYS_LAST_SLOT = 0x8,
+    SYS_LAST_AUTO = 0xc,
+    AUTO_FIRST = 160,
+    AUTO_SLOTS = 8,
     SYS_READ = 0x3ec8,
     SYS_READ_MAX = 0x7a000,
 };
@@ -274,6 +277,26 @@ bool an_reset_saves(AN *a) {
     bool ok = write_saves(a);
     an_log(a, "reset saves: %s", ok ? "ok" : "failed");
     return ok;
+}
+
+int an_last_auto(const AN *a) { return a->sys && a->sysSize >= SYS_LAST_AUTO + 4 ? (int)(i32)rd32(a->sys + SYS_LAST_AUTO) : -1; }
+
+void an_auto_save(AN *a, u32 pc) {
+    if (!a->sys || a->sysSize < SYS_LAST_AUTO + 4) return;
+    i32 last = (i32)rd32(a->sys + SYS_LAST_AUTO);
+    int slot = last >= AUTO_FIRST && last < AUTO_FIRST + AUTO_SLOTS - 1 ? last + 1 : AUTO_FIRST;
+    u8 *s = slot_data(a, slot);
+    if (!s || a->textPc == 0) return;
+    an_capture_shot(a);
+    u32 textPc = a->textPc;
+    fill_slot(a, s);
+    wr32(s + OFF_PC, pc);
+    a->textPc = textPc;
+    if (!write_saves(a)) return;
+    write_thumbnail(a, slot);
+    wr32(a->sys + SYS_LAST_AUTO, (u32)slot);
+    an_system_save(a);
+    an_log(a, "auto saved slot %d at %x", slot, pc);
 }
 
 bool an_save_slot(AN *a, int slot) {

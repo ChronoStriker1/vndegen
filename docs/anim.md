@@ -50,8 +50,9 @@ folder down.
   the name and indented 12 pixels; the scroll thumb's height is the share of entries shown.
 - Choices: `d0` lists the options by id; `b0 n on` before it turns option n on or off (a system routine turns all six
   on), which is how Double Date Dilemma's six-way choice opens its options one by one and Magical Sword drops an
-  option already taken. Shown options are spaced 130 pixels apart, or less when they wouldn't fit, around y 280
-  (Double Date Dilemma) or 252 (Magical Sword), over the message window's background and menu bar without its text.
+  option already taken. One shown option sits at y 213, two at 175 and 305 (130 apart), in both games; three or more,
+  which haven't been measured, are centred and closer when they wouldn't fit. They're drawn over the message window's
+  background and menu bar without its text.
 - Sound: Ogg Vorbis behind an 8-byte header, in `bgm/` and the voice archive. Movies are MPEG-1.
 
 ## Drawing E-mote characters
@@ -106,7 +107,10 @@ scales it loads the scene with no characters. The comment is the speaker and the
 does; a longer comment that holds a line break loads black on the PC. Saves load both ways with the PC.
 The comment is kept in Shift-JIS, as the PC reads it. Magical Sword's PC writes the speaker and the line without a
 break, and its cards show the first 40 bytes broken at 206 pixels wherever that falls, mid-word included; Double
-Date Dilemma's show two lines of up to 20 characters broken at spaces. A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
+Date Dilemma's show two lines of up to 20 characters broken at spaces. Magical Sword autosaves before each choice (op `15`, which Double Date Dilemma's PC doesn't act on): slots 160 to 167
+in turn, the last one used kept at 0x0c in the system save (-1 before the first), the slot resuming at the choice
+itself. Its Load screen's AUTO SAVE button shows those eight as cards 161 to 168. The PC's own autosave thumbnail
+comes out black under Wine; VNDegen's shows the scene. A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
 does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's NO IMAGE picture.
 
 ## Settings
@@ -160,5 +164,5 @@ on leaving.
   in the opening's 300% close-up (34 and 20 on the iPad simulator). A Release build on the iPad simulator updates the
   screen about as often (32 and 20, counted from screen recordings), so the close-up isn't smooth there; a Release Mac
   app hasn't been watched, since its library and input can't be set from a test run.
-- Magical Sword's Load screen AUTO SAVE page isn't built, nor is the PC's comment editing on cards.
+- The PC's comment editing on save cards isn't built.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

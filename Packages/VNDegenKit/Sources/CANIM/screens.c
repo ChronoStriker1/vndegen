@@ -202,6 +202,10 @@ static void vertical(AN *a, Image *b, const char *s, int x, int y) {
     }
 }
 
+enum { AUTO_PAGE = 20, AUTO_X = 1031, AUTO_Y = 24, AUTO_W = 108, AUTO_H = 66 };
+
+static bool has_auto_page(AN *a, bool saving) { return !saving && a->game == GAME_MGSW; }
+
 static void draw_slots(AN *a, bool saving) {
     const CardLayout *L = &CARD[a->game];
     Image *veil = an_image_load(a, saving ? "spSave" : "spLoad");
@@ -214,6 +218,11 @@ static void draw_slots(AN *a, bool saving) {
         int fy = i == a->slotPage ? row + 84 : in_rect(a, r.x, r.y, r.w, r.h) ? row + 42 : row;
         an_gfx_blit(a->fb, a->W, a->H, b, 3 + 82 * (i % 10), fy, PAGE_W, PAGE_H, r.x, r.y, 255);
     }
+    if (has_auto_page(a, saving)) {
+        int fy = a->slotPage == AUTO_PAGE ? 148 : in_rect(a, AUTO_X, AUTO_Y, AUTO_W, AUTO_H) ? 76 : 4;
+        an_gfx_blit(a->fb, a->W, a->H, b, 824, fy, AUTO_W, AUTO_H, AUTO_X, AUTO_Y, 255);
+    }
+    int newSlot = a->slotPage == AUTO_PAGE ? an_last_auto(a) : a->lastSlot;
     for (int i = 0; i < 8; i++) {
         int slot = a->slotPage * 8 + i;
         Rect r = card(i);
@@ -221,7 +230,7 @@ static void draw_slots(AN *a, bool saving) {
         bool used = an_slot_info(a, slot, &info);
         bool hover = in_rect(a, r.x, r.y, r.w, r.h);
         an_gfx_blit(a->fb, a->W, a->H, b, used ? 300 : 2, 482, 296, 260, r.x, r.y, 255);
-        if (slot == a->lastSlot && used) {
+        if (slot == newSlot && used) {
             if (L->lastFrame) an_gfx_blit(a->fb, a->W, a->H, b, 301, 745, 294, 258, r.x + 1, r.y + 1, 255);
             an_gfx_blit(a->fb, a->W, a->H, b, 816, 528, 48, 22, r.x + 63, r.y + 16, 255);
         }
@@ -285,6 +294,10 @@ static void slots_input(AN *a, bool saving) {
             a->slotPage = i;
             return;
         }
+    }
+    if (has_auto_page(a, saving) && in_rect(a, AUTO_X, AUTO_Y, AUTO_W, AUTO_H)) {
+        a->slotPage = AUTO_PAGE;
+        return;
     }
     if (in_rect(a, RESET_X, RESET_Y, RESET_W, RESET_H)) {
         an_confirm(a, MSG_RESET_SAVES, ACT_RESET_SAVES, 0);

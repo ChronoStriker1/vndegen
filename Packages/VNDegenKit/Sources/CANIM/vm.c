@@ -469,6 +469,9 @@ static void exec(AN *a, const Op *op) {
         if (a->choiceResult != g[0].v) skip_case(a);
         break;
     case 0x1f: an_cg_unlock(a, str(a, &g[0])); break;
+    case 0x15:
+        if (a->game == GAME_MGSW) an_auto_save(a, a->th.pc);
+        break;
     case 0x02:
         if (a->replay) an_replay_end(a);
         else an_memory_unlock(a, g[0].v);
