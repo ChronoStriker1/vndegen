@@ -128,6 +128,9 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | Eushully AGE | Kamidori Alchemy Meister, tutorial battle map from a save | Mac app, mini | 60 | 59.7 to 59.9 | 37.5 to 49.9 | 40 s | 6.5 | 11-19 | 9ea93143 |
 | Eushully AGE | Kamidori Alchemy Meister, `OP.MPG` opening movie, MPEG-1 1024x576 | iPad simulator | 60 | 59.6 to 60.0 | 37.4 to 60.0, 30.8 in the start-up window | 40 s | 6.6 | 11-19 | 9ea93143 |
 | Eushully AGE | Kamidori Alchemy Meister, tutorial battle map from a save, through a turn | iPad simulator | 60 | 59.9 to 60.0 | 50.0 to 60.0 | 90 s | 6.6 | 11-19 | 9ea93143 |
+| ANIM | Double Date Dilemma, Shiho, Yousuke and Risa on screen with their idle motion, from a save | Mac app, mini | 60 | 59.6 to 60.0 | 32.0 to 59.9 | 100 s | 3.4 | 11-20 | e5a41105 |
+| ANIM | Double Date Dilemma, Shiho, Yousuke and Risa on screen with their idle motion, from a save | iPad simulator | 60 | 30.0 | 22.6 to 23.4 | 70 s | 3.9 | 11-20 | e5a41105 |
+| ANIM | Double Date Dilemma, a still event picture with no E-mote character, from a save | iPad simulator | 60 | 50.0 to 50.5 | 26.4 to 27.0 | 20 s | 3.9 | 11-20 | e5a41105 |
 
 Before #49's fix (2026-11-07), NScripter, Ponscripter, NekoSDK and Wolf RPG rounded each display refresh to whole milliseconds, so their clocks ran 4% slow at 120 Hz and 2% fast at 60 Hz. Rows marked "was" give the number before it. A Wolf RPG game at 60 Hz drew 60.0 then too, but ran 61.2 game frames a second, with a double step every 50 refreshes.
 
@@ -147,6 +150,10 @@ On the MacBook's 120 Hz display a 60 fps game reads correctly: WebKit's page run
 - YU-RIS on the Mac: the 10 s pacing window that holds only the movie gave 60.0 and a 1% low of 60.0. The window before it, the game's start with the archives opening and the movie's first seconds, gave 58.1 and 13.1 with a 193 ms step; the one after, the movie's end and the title loading, 59.3 and 25.0. The mini's 60 Hz display can't show the 120 Hz pacing. Saimin Gakushū's brand movie played at 29.88 on the same run of the app.
 
 ## Shortfalls and their causes
+
+### Double Date Dilemma (ANIM) on the iPad simulator
+
+Three E-mote characters with their idle motion hold 60 in the Mac app on the mini but 30.0 on the mini's simulator, steady, with each frame just missing the 16.7 ms deadline (worst step 40 to 44 ms). The same simulator drew a still event picture with no character at only 50, while the Mac app keeps the three-character scene at 60 on the same machine, so most of the gap is the simulator's drawing path rather than the runtime; simulator timing isn't an iPad's. The runtime draws the characters on the CPU every frame: before e5a41105 and eb8a593b the Mac app gave 42 on this scene (eluna built each frame twice, and every drawing band set up every triangle). A real iPad might show more or less than the simulator; the maintainer checks on hardware.
 
 ### Orc Kingdom (Bruns) on the iPad simulator
 

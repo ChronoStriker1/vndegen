@@ -52,8 +52,10 @@ chain does. Each mesh is divided to about 8 pixels on screen
 rather than the mesh's own division, which is far finer than the characters' size on screen needs. The triangles are
 drawn in horizontal bands across a small thread pool. A character whose triangles didn't change since the last frame,
 drawn at full opacity in place with normal or additive blending, is kept in a layer of its own and composited, so a
-scene of characters standing still costs little more than its background. Three characters on screen take about
-22 ms a frame on a desktop CPU held still and about 28 ms while their idle motion plays.
+scene of characters standing still costs little more than its background. eluna builds each frame's scene once, with hair and
+bust physics taken from the frame before, and the drawing bands skip sprites and triangles outside their rows. Three
+characters swaying in their idle motion hold 60 frames a second in the Mac app on the Mac mini (30 on its iPad
+simulator, which draws a still picture at only 50; `docs/frame-rate.md`).
 
 Characters play the PC's idle motion, measured under Wine. Each E-mote layer names an idle in the save (`sPauseWait01`
 unless set otherwise); the define's type-10 records list its variables and ranges (`head_UD` -10 to 10, `body_UD` -20
