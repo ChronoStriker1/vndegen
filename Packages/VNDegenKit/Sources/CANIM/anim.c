@@ -48,6 +48,7 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
     a->dir = an_strdup(cfg->gameDir);
     a->saveDir = an_strdup(cfg->saveDir ? cfg->saveDir : cfg->gameDir);
     a->base = base;
+    a->game = !strcmp(base, "mgsw") ? GAME_MGSW : GAME_DDD;
     a->rate = cfg->audioRate > 0 ? cfg->audioRate : 44100;
     if (cfg->logPath) a->log = fopen(cfg->logPath, "a");
     snprintf(a->title, sizeof a->title, "%s", base);
@@ -181,6 +182,15 @@ void vnanim_set_paused(VNANIM *n, bool paused) { ((AN *)n)->paused = paused; }
 void vnanim_request_quit(VNANIM *n) { ((AN *)n)->quit = true; }
 
 const char *vnanim_title(VNANIM *n) { return ((AN *)n)->title; }
+
+const char *vnanim_take_page(VNANIM *n) {
+    AN *a = (AN *)n;
+    if (!a->page[0]) return NULL;
+    static _Thread_local char out[sizeof a->page];
+    snprintf(out, sizeof out, "%s", a->page);
+    a->page[0] = 0;
+    return out;
+}
 
 const char *vnanim_problem(VNANIM *n) {
     AN *a = (AN *)n;

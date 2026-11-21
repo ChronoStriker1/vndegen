@@ -39,6 +39,7 @@ void vnanim_set_paused(VNANIM *an, bool paused);
 void vnanim_request_quit(VNANIM *an);
 
 const char *vnanim_title(VNANIM *an);
+const char *vnanim_take_page(VNANIM *an);
 const char *vnanim_problem(VNANIM *an);
 
 #ifdef __cplusplus

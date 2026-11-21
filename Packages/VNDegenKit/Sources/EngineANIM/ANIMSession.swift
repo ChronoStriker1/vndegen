@@ -25,6 +25,7 @@ final class ANIMSession: EngineSession {
     private var router = ANIMInputRouter()
     private var frameSize = CGSize(width: 1280, height: 720)
     private var shownSerial: UInt32 = .max
+    private var showingPage = false
 
     init(_ launch: GameLaunch, root: URL, saveDirectory: URL) {
         self.launch = launch
@@ -93,6 +94,7 @@ final class ANIMSession: EngineSession {
             driver.finish(byGame: true)
             return
         }
+        if let page = vnanim_take_page(engine), !showingPage { showPage(URL(fileURLWithPath: String(cString: page))) }
         let serial = vnanim_frame_serial(engine)
         #if DEBUG
         driver.pacing?.note(link, presented: serial != shownSerial)
@@ -122,6 +124,18 @@ final class ANIMSession: EngineSession {
     func send(_ event: ControllerEvent) {
         let frame = frameView
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
+    }
+
+    /// The game's own help page, which the PC opens in a browser, in a sheet over the game. It reads only the game's
+    /// folder and never the network; the game waits while it's open.
+    private func showPage(_ page: URL) {
+        showingPage = true
+        setPaused(true)
+        PageSheet.show(page, title: "Help", over: view) { [weak self] in
+            guard let self else { return }
+            showingPage = false
+            setPaused(false)
+        }
     }
 
     func setPaused(_ paused: Bool) {

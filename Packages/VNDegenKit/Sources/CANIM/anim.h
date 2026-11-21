@@ -220,8 +220,12 @@ typedef struct SlotInfo {
     char comment[128];
 } SlotInfo;
 
+enum { GAME_DDD, GAME_MGSW, GAME_COUNT };
+
 struct AN {
     char *dir, *saveDir, *base;
+    int game;
+    char page[1024];
     FILE *log;
     char problem[512];
     char title[256];

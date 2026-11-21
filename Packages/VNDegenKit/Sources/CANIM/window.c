@@ -1,20 +1,41 @@
 #include "anim.h"
 
+enum { TA_NEW, TA_LOAD, TA_SETTINGS, TA_VOLUME, TA_EXTRA, TA_FLOWCHART, TA_HELP, TA_EXIT };
+
 typedef struct TitleButton {
-    int fx, fy, y;
+    int action, ax, ay, sx, sy, hx, hy, hw, hh;
 } TitleButton;
 
-enum { TB_NEW, TB_CONTINUE, TB_SETTINGS, TB_VOLUME, TB_EXTRA, TB_FLOWCHART, TB_EXIT, TB_COUNT };
+typedef struct TitleLayout {
+    int count, w, h, hoverDx, hoverDy;
+    TitleButton button[8];
+} TitleLayout;
 
-static const TitleButton TITLE[TB_COUNT] = {
-    {3, 4, 38}, {373, 4, 98}, {3, 124, 158}, {373, 124, 218}, {3, 244, 278}, {373, 244, 338}, {373, 364, 458},
+static const TitleLayout TITLE[GAME_COUNT] = {
+    [GAME_DDD] = {7, 366, 54, 0, 60,
+                  {{TA_NEW, 3, 4, 115, 38, 115, 38, 366, 54},
+                   {TA_LOAD, 373, 4, 115, 98, 115, 98, 366, 54},
+                   {TA_SETTINGS, 3, 124, 115, 158, 115, 158, 366, 54},
+                   {TA_VOLUME, 373, 124, 115, 218, 115, 218, 366, 54},
+                   {TA_EXTRA, 3, 244, 115, 278, 115, 278, 366, 54},
+                   {TA_FLOWCHART, 373, 244, 115, 338, 115, 338, 366, 54},
+                   {TA_EXIT, 373, 364, 115, 458, 115, 458, 366, 54}}},
+    [GAME_MGSW] = {7, 458, 68, 0, 68,
+                   {{TA_NEW, 0, 0, 50, 235, 61, 242, 387, 56},
+                    {TA_LOAD, 458, 0, 50, 302, 61, 309, 404, 56},
+                    {TA_SETTINGS, 0, 136, 50, 369, 61, 376, 329, 56},
+                    {TA_VOLUME, 458, 136, 50, 436, 61, 443, 344, 56},
+                    {TA_EXTRA, 0, 272, 50, 503, 61, 510, 309, 56},
+                    {TA_HELP, 458, 272, 50, 570, 61, 577, 404, 56},
+                    {TA_EXIT, 0, 408, 50, 637, 61, 644, 278, 56}}},
 };
 
-enum { TITLE_X = 115, TITLE_W = 366, TITLE_H = 54, TITLE_HOVER = 60 };
-
 static int title_hit(AN *a) {
-    for (int i = 0; i < TB_COUNT; i++)
-        if (a->mx >= TITLE_X && a->mx < TITLE_X + TITLE_W && a->my >= TITLE[i].y && a->my < TITLE[i].y + TITLE_H) return i;
+    const TitleLayout *t = &TITLE[a->game];
+    for (int i = 0; i < t->count; i++) {
+        const TitleButton *b = &t->button[i];
+        if (a->mx >= b->hx && a->mx < b->hx + b->hw && a->my >= b->hy && a->my < b->hy + b->hh) return i;
+    }
     return -1;
 }
 
@@ -22,30 +43,44 @@ void an_title_render(AN *a) {
     an_gfx_fill(a->fb, a->W, a->H, 0xff000000u);
     Image *bg = an_image_load(a, "pMenu");
     if (bg) an_gfx_blit(a->fb, a->W, a->H, bg, 0, 0, a->W, a->H, 0, 0, 255);
-    Image *b = an_image_load(a, "pMenuButton");
+    Image *img = an_image_load(a, "pMenuButton");
+    const TitleLayout *t = &TITLE[a->game];
     int hover = title_hit(a);
-    for (int i = 0; i < TB_COUNT && b; i++) {
-        int fy = TITLE[i].fy + (i == hover ? TITLE_HOVER : 0);
-        an_gfx_blit(a->fb, a->W, a->H, b, TITLE[i].fx, fy, TITLE_W, TITLE_H, TITLE_X, TITLE[i].y, 255);
+    for (int i = 0; i < t->count && img; i++) {
+        const TitleButton *b = &t->button[i];
+        bool lit = i == hover;
+        an_gfx_blit(a->fb, a->W, a->H, img, b->ax + (lit ? t->hoverDx : 0), b->ay + (lit ? t->hoverDy : 0), t->w, t->h, b->sx, b->sy, 255);
     }
+}
+
+static void open_help(AN *a) {
+    char *p = an_fmt("%s/help.html", a->dir);
+    if (an_path_resolve(p, a->page, sizeof a->page) < 0 || !an_file_exists(a->page)) {
+        an_log(a, "no help.html in the game folder");
+        a->page[0] = 0;
+    }
+    free(p);
 }
 
 void an_title_input(AN *a) {
     if (!a->clicked) return;
     a->clicked = false;
-    switch (title_hit(a)) {
-    case TB_NEW:
+    int hit = title_hit(a);
+    if (hit < 0) return;
+    switch (TITLE[a->game].button[hit].action) {
+    case TA_NEW:
         memset(a->L, 0, sizeof a->L);
         memset(&a->scene, 0, sizeof a->scene);
         a->G[2] = 1;
         a->logCount = 0;
         an_vm_start(a, 8);
         break;
-    case TB_CONTINUE: an_slots_open(a, false); break;
-    case TB_FLOWCHART: an_flow_open(a, false); break;
-    case TB_VOLUME: an_volume_open(a); break;
-    case TB_SETTINGS: an_settings_open(a); break;
-    case TB_EXIT: an_confirm(a, MSG_QUIT, ACT_QUIT, 0); break;
+    case TA_LOAD: an_slots_open(a, false); break;
+    case TA_FLOWCHART: an_flow_open(a, false); break;
+    case TA_VOLUME: an_volume_open(a); break;
+    case TA_SETTINGS: an_settings_open(a); break;
+    case TA_HELP: open_help(a); break;
+    case TA_EXIT: an_confirm(a, MSG_QUIT, ACT_QUIT, 0); break;
     default: break;
     }
 }
