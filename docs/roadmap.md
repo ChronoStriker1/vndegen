@@ -129,12 +129,13 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Eden's Ritter 1 and 1_2 on NekoSDK, with PC saves both ways, and import of RPG Maker VX Ace games packed as one compressed .exe (0.57.4).
 - PJADV, on VNDegen's own clean-room runtime, with Paradise Cleaning!- Tutor X Hypnosis -: its cleaning minigame rebuilt from play, and PC saves both ways (0.58.0).
 - President Yukino (Wolf RPG) plays and saves for the PC; Yu Crossing Animals' hero walks (Godot 3); #190 (0.58.1).
+- Wolf RPG pictures restored from saves both ways with the PC, and picture angles in tenths of a degree (0.58.2).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
-- From the new test games (0.56.2): #190's checks were done in 0.58.1; the one thing left is restoring Wolf pictures from saves (President Yukino's day bar). #187 was fixed in 0.57.2; #188 and #189 needed no change (Tenioha's bar opens with a tap on its strip, and Wolf's save screen takes keys only on the PC too).
+- From the new test games (0.56.2): #190's checks were done in 0.58.1, and restoring Wolf pictures from saves in 0.58.2. #187 was fixed in 0.57.2; #188 and #189 needed no change (Tenioha's bar opens with a tap on its strip, and Wolf's save screen takes keys only on the PC too).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
