@@ -375,6 +375,38 @@ bool an_quick_load(AN *a) {
     return ok;
 }
 
+enum { SYS_CG = 0x25c8, SYS_CG_MAX = 1200, SYS_MEMORY = 0x3888, SYS_MEMORY_MAX = 200 };
+
+static u8 *sys_flag(const AN *a, u32 base, int i, int max) {
+    if (!a->sys || i < 0 || i >= max || a->sysSize < base + 4u * (u32)max) return NULL;
+    return a->sys + base + 4u * (u32)i;
+}
+
+bool an_cg_unlocked(const AN *a, int id) {
+    const u8 *p = sys_flag(a, SYS_CG, id, SYS_CG_MAX);
+    return p && rd32(p) != 0;
+}
+
+void an_cg_unlock(AN *a, const char *name) {
+    if (!name || !*name) return;
+    for (int i = 0; i < a->def.cgCount; i++)
+        if (an_ieq(a->def.cg[i], name)) {
+            u8 *p = sys_flag(a, SYS_CG, i, SYS_CG_MAX);
+            if (p) wr32(p, 1);
+            return;
+        }
+}
+
+bool an_memory_unlocked(const AN *a, int n) {
+    const u8 *p = sys_flag(a, SYS_MEMORY, n, SYS_MEMORY_MAX);
+    return p && rd32(p) != 0;
+}
+
+void an_memory_unlock(AN *a, int n) {
+    u8 *p = sys_flag(a, SYS_MEMORY, n, SYS_MEMORY_MAX);
+    if (p) wr32(p, 1);
+}
+
 typedef struct OptionByte {
     u32 at;
     u8 first, second;

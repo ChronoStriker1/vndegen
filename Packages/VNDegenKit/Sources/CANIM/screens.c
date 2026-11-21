@@ -679,6 +679,7 @@ static void settings_input(AN *a) {
 }
 
 void an_screens_render(AN *a) {
+    an_extra_render(a);
     if (a->screen == SCR_SETTINGS) draw_settings(a);
     if (a->screen == SCR_VOLUME) draw_volume(a);
     if (a->screen == SCR_SAVE || a->screen == SCR_LOAD) draw_slots(a, a->screen == SCR_SAVE);
@@ -686,6 +687,7 @@ void an_screens_render(AN *a) {
 }
 
 bool an_screens_input(AN *a) {
+    if (an_extra_input(a)) return true;
     if (a->confirmOpen) {
         confirm_input(a);
         return true;

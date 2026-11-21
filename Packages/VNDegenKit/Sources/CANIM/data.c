@@ -265,6 +265,46 @@ static char *define_sample(const u8 *d, size_t size) {
     return dup_string(text, (size_t)(tz - text));
 }
 
+enum { CG_RECORD = 2, MEMORY_RECORD = 8, GALLERY_MAX = 2000 };
+
+static bool cg_name_ok(const u8 *p, const u8 *end) {
+    int n = 0;
+    while (p + n < end && p[n] && n < 16) {
+        if (!isalnum(p[n]) && p[n] != '_') return false;
+        n++;
+    }
+    return n >= 3 && n < 16 && p + n < end && !p[n] && isalpha(p[0]);
+}
+
+static void define_galleries(Define *def, const u8 *d, size_t size) {
+    const u8 *end = d + size;
+    for (size_t at = 0; at + 12 < size && !def->cgCount; at++) {
+        if (rd32(d + at) != CG_RECORD || rd32(d + at + 4) != 0 || !cg_name_ok(d + at + 8, end)) continue;
+        size_t p = at;
+        while (def->cgCount < GALLERY_MAX && p + 12 < size && rd32(d + p) == CG_RECORD && rd32(d + p + 4) == (u32)def->cgCount &&
+               cg_name_ok(d + p + 8, end)) {
+            const u8 *z = memchr(d + p + 8, 0, (size_t)(end - d - p - 8));
+            def->cg = an_realloc(def->cg, sizeof(char *) * (size_t)(def->cgCount + 1));
+            def->cg[def->cgCount++] = dup_string(d + p + 8, (size_t)(z - d - p - 8));
+            p = (size_t)(z - d) + 1;
+        }
+        if (def->cgCount < 8) {
+            for (int i = 0; i < def->cgCount; i++) free(def->cg[i]);
+            free(def->cg);
+            def->cg = NULL;
+            def->cgCount = 0;
+        }
+    }
+    for (size_t at = 0; at + 16 < size; at++) {
+        if (rd32(d + at) != MEMORY_RECORD || rd32(d + at + 4) != (u32)def->memoryCount + 1 || rd32(d + at + 8) > 9) continue;
+        const u8 *text = d + at + 12, *z = memchr(text, 0, (size_t)(end - text));
+        if (!z || z == text || z - text > 1024 || (text[0] < 0x80 && !isalpha(text[0]))) continue;
+        def->memory = an_realloc(def->memory, sizeof(char *) * (size_t)(def->memoryCount + 1));
+        def->memory[def->memoryCount++] = dup_string(text, (size_t)(z - text));
+        at = (size_t)(z - d);
+    }
+}
+
 bool an_define_load(Define *def, const char *path) {
     memset(def, 0, sizeof *def);
     size_t size;
@@ -344,6 +384,7 @@ bool an_define_load(Define *def, const char *path) {
         if (next) at = next - 1;
     }
     def->sample = define_sample(d, def->size);
+    define_galleries(def, d, def->size);
     return true;
 }
 
@@ -391,6 +432,10 @@ void an_define_free(Define *def) {
     }
     free(def->idles);
     free(def->sample);
+    for (int i = 0; i < def->cgCount; i++) free(def->cg[i]);
+    free(def->cg);
+    for (int i = 0; i < def->memoryCount; i++) free(def->memory[i]);
+    free(def->memory);
     free(def->data);
     memset(def, 0, sizeof *def);
 }

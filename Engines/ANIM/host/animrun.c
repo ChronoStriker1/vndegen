@@ -46,14 +46,16 @@ static void wav_header(FILE *f, long frames) {
     fwrite(&data, 4, 1, f);
 }
 
-static int press(VNANIM *n, int x, int y) {
+static int press_button(VNANIM *n, int x, int y, int button) {
     vnanim_mouse_move(n, x, y);
     int alive = run(n, 32);
-    vnanim_mouse_button(n, VNANIM_MOUSE_LEFT, 1);
+    vnanim_mouse_button(n, button, 1);
     alive = alive && run(n, 48);
-    vnanim_mouse_button(n, VNANIM_MOUSE_LEFT, 0);
+    vnanim_mouse_button(n, button, 0);
     return alive && run(n, 32);
 }
+
+static int press(VNANIM *n, int x, int y) { return press_button(n, x, y, VNANIM_MOUSE_LEFT); }
 
 static void print_state(AN *a) {
     char layers[512] = "";
@@ -141,6 +143,7 @@ int main(int argc, char **argv) {
         int x, y, k;
         if (sscanf(c, "wait:%d", &k) == 1) alive = run(n, k);
         else if (sscanf(c, "click:%d,%d", &x, &y) == 2) alive = press(n, x, y);
+        else if (sscanf(c, "rclick:%d,%d", &x, &y) == 2) alive = press_button(n, x, y, VNANIM_MOUSE_RIGHT);
         else if (sscanf(c, "move:%d,%d", &x, &y) == 2) {
             vnanim_mouse_move(n, x, y);
             alive = run(n, 32);

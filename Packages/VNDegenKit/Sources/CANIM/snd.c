@@ -159,6 +159,7 @@ static u8 *sound_data(AN *a, const char *name, bool fromVoice, size_t *size) {
 
 void an_snd_play(AN *a, int channel, const char *name, bool loop, bool fromVoice) {
     struct Mixer *m = a->mix;
+    if (channel == CH_BGM && name) snprintf(a->bgm, sizeof a->bgm, "%s", name);
     if (!m || channel < 0 || channel >= CH_COUNT || !name || !*name) return;
     size_t n = 0;
     u8 *d = sound_data(a, name, fromVoice, &n);

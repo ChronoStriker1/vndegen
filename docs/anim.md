@@ -129,6 +129,21 @@ opacity: Magical Sword's comes from its define file (in Japanese, as on the PC, 
 Double Date Dilemma's from its exe. The Shortcut Key List button shows the PC's list over the screen. The menu bar's
 lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the gauges when their options are on.
 
+## Extra
+
+The Extra screen's CG, Scenes and Music pages follow the PC in both games, which lay them out alike. The define lists
+every CG as a numbered type-2 record (`HEL01aa` is 0), grouped by the first five letters of its name, and every
+memory as a type-8 record with its title and blurb. The thumbnails are ready-made pages (`p_cgtnNN`, `p_metnNN`),
+24 cells of 256 by 144: rows alternate between the sepia pictures and the coloured ones the pointer brings up. A
+CG counts as seen once the script shows it as a background (`4b`), a layer (`52`) or names it (`1f`, Double Date
+Dilemma); a memory once the script passes its marker (`02 n`, just before the `MemNN` label). Both are kept in the PC's
+`<name>_system.dat`, four bytes each, CGs from 0x25c8 and memories from 0x3888 + 4 × n, so unlocks carry both ways
+with the PC. The viewer steps through every unlocked CG from the clicked group onwards; a right click returns. A
+memory replays through the script's own `CheckMemory` routine with `L4` set to its number and returns to the Scenes
+page at its next marker, or when the script would end. Music plays the bgm files in the PC's order (Double Date
+Dilemma's are numbered 01-07, 20, 21, 30, 31), on to the next unless Repeat is on, and the title music comes back
+on leaving.
+
 ## Known limits
 
 - E-mote characters blink and their hair moves, but their timelines and the scripts' short pose animations (`b9`,
@@ -136,8 +151,10 @@ lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the ga
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
 - The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
-- The Extra screens (CG, scene and music galleries) aren't built. Settings' font list is empty and its choice does
-  nothing, and the volume screen's Play and Allow Test buttons are drawn but do nothing.
+- Extra's Animation and Sprites pages aren't built: their tabs are drawn but do nothing. Settings' font list is empty
+  and its choice does nothing, and the volume screen's Play and Allow Test buttons are drawn but do nothing.
+- Double Date Dilemma's memory blurbs are drawn about 1.5% narrower than the PC's, so a line can break one word
+  earlier.
 - Magical Sword: every screen but Extra is built to its own layout and checked against the PC. Its goddess, with three
   times the sprites of a Double Date Dilemma character, runs at 46 frames a second alone in the Debug Mac app and 26
   in the opening's 300% close-up (34 and 20 on the iPad simulator). A Release build on the iPad simulator updates the

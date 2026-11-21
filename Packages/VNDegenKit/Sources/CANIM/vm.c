@@ -231,6 +231,10 @@ void an_go_title(AN *a) {
 }
 
 static void end_game(AN *a) {
+    if (a->replay) {
+        an_replay_end(a);
+        return;
+    }
     an_reset_scene(a);
     an_system_save(a);
     a->th.wait = W_END;
@@ -303,6 +307,7 @@ static void exec(AN *a, const Op *op) {
         break;
     case 0x4b:
         snprintf(s->bg, sizeof s->bg, "%s", str(a, &g[0]));
+        an_cg_unlock(a, s->bg);
         memset(s->layer, 0, sizeof s->layer);
         s->bgX = s->bgY = s->bgFromX = s->bgFromY = 0;
         s->bgMoveTime = 0;
@@ -331,6 +336,7 @@ static void exec(AN *a, const Op *op) {
         Layer *l = layer(a, &g[0]);
         if (!l) break;
         const char *name = str(a, &g[1]);
+        an_cg_unlock(a, name);
         memset(l, 0, sizeof *l);
         l->kind = ends_with(name, ".psb") ? LK_EMOTE : LK_IMAGE;
         snprintf(l->name, sizeof l->name, "%s", name);
@@ -461,6 +467,11 @@ static void exec(AN *a, const Op *op) {
         break;
     case 0xd1:
         if (a->choiceResult != g[0].v) skip_case(a);
+        break;
+    case 0x1f: an_cg_unlock(a, str(a, &g[0])); break;
+    case 0x02:
+        if (a->replay) an_replay_end(a);
+        else an_memory_unlock(a, g[0].v);
         break;
     case 0xb0:
         if (g[0].v >= 1 && g[0].v <= 16) a->choiceOff[g[0].v - 1] = g[1].v == 0;

@@ -80,6 +80,7 @@ void an_title_input(AN *a) {
     case TA_VOLUME: an_volume_open(a); break;
     case TA_SETTINGS: an_settings_open(a); break;
     case TA_HELP: open_help(a); break;
+    case TA_EXTRA: an_extra_open(a); break;
     case TA_EXIT: an_confirm(a, MSG_QUIT, ACT_QUIT, 0); break;
     default: break;
     }

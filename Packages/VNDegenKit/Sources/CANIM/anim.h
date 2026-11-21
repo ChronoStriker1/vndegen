@@ -116,6 +116,10 @@ typedef struct Define {
     float charScale[16];
     int charCount;
     char *sample;
+    char **cg;
+    int cgCount;
+    char **memory;
+    int memoryCount;
 } Define;
 
 bool an_define_load(Define *d, const char *path);
@@ -205,7 +209,7 @@ typedef struct LogEntry {
 #define AN_SE 16
 
 enum { PH_TITLE, PH_GAME };
-enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD, SCR_FLOW, SCR_VOLUME, SCR_SETTINGS };
+enum { SCR_NONE, SCR_HIDDEN, SCR_LOG, SCR_SAVE, SCR_LOAD, SCR_FLOW, SCR_VOLUME, SCR_SETTINGS, SCR_EXTRA };
 enum { MSG_TITLE, MSG_QUIT, MSG_OVERWRITE, MSG_DELETE, MSG_JUMP, MSG_RESET_FLOW, MSG_RESET_SAVES };
 enum { ACT_SAVE, ACT_LOAD, ACT_TITLE, ACT_QUIT, ACT_JUMP, ACT_DELETE, ACT_RESET_SAVES };
 enum { BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE };
@@ -279,6 +283,9 @@ struct AN {
 
     int screen, logTop, wheel;
     int slotPage;
+    int extraTab, extraPage, extraViewer, extraTrack, replay;
+    bool extraRepeat;
+    char bgm[16], extraBgm[16];
     int volume[5], voiceVolume[AN_VOICE_TABS], bgvVolume[AN_VOICE_TABS], talkVolume[AN_VOICE_TABS], volumeChar, dragSlider, infoRow;
     int option[11], windowOpacity, textSpeed, autoSpeed;
     u32 sampleStart;
@@ -372,6 +379,14 @@ bool an_save_slot(AN *a, int slot);
 bool an_load_slot(AN *a, int slot);
 bool an_delete_slot(AN *a, int slot);
 bool an_reset_saves(AN *a);
+bool an_cg_unlocked(const AN *a, int id);
+void an_cg_unlock(AN *a, const char *name);
+bool an_memory_unlocked(const AN *a, int n);
+void an_memory_unlock(AN *a, int n);
+void an_extra_open(AN *a);
+void an_extra_render(AN *a);
+bool an_extra_input(AN *a);
+void an_replay_end(AN *a);
 bool an_quick_save(AN *a);
 bool an_quick_load(AN *a);
 void an_confirm(AN *a, int message, int action, int arg);
