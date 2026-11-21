@@ -16,6 +16,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
+#include <optional>
 #include <unistd.h>
 #include <strings.h>
 
@@ -31,10 +32,7 @@ namespace wolf {
 
 namespace {
 
-// Save versions the PC engine writes: Wolf RPG Editor 2.2x writes 125, 3.x writes 142, and 3.71 writes 159 (0x9F)
-// in the 3.5 container. Newer engines read older versions, so a game whose own saves are unknown gets the older one
-// unless its data is in the 3.x or 3.5 format.
-constexpr uint16_t kVersion2 = 125, kVersion3 = 142, kVersion35 = 0x9F;
+constexpr uint16_t kVersion2 = 125, kVersion22 = 128, kVersion3 = 142, kVersion35 = 0x9F;
 
 // UTF-8 to the game's encoding. Characters Shift-JIS lacks become '?'.
 std::string encode(const std::string &utf8, Encoding enc) {
@@ -83,6 +81,45 @@ std::string slotFile(int slot) { return slot == 0 ? std::string("Save/SaveData")
 SaveString saveString(const std::string &utf8, Encoding enc) { return {encode(utf8, enc), true}; }
 
 std::string text(const SaveString &s, Encoding enc) { return toUtf8(s.bytes, enc); }
+
+constexpr int32_t kSavedColor = 0x646464;
+
+int32_t savedChannel(double percent) { return int32_t(std::lround(percent) * 254 / 100) - 254; }
+
+int savedPercent(int32_t value) { return int(std::lround((value + 254) * 100.0 / 254)); }
+
+std::optional<std::string> pictureTextBytes(const std::string &utf8, Encoding enc) {
+    std::string out, rest = utf8;
+    if (rest.starts_with("\\f[")) {
+        size_t end = rest.find(']');
+        if (end == std::string::npos) return std::nullopt;
+        int size = std::atoi(rest.c_str() + 3);
+        if (size < 1 || size > 240) return std::nullopt;
+        out = std::string{'\x01', '\x05', '\x03', '\x0e', char(size + 14), '\x01'};
+        rest.erase(0, end + 1);
+    }
+    if (rest.find('\\') != std::string::npos) return std::nullopt;
+    return out + encode(rest, enc);
+}
+
+std::optional<std::string> pictureText(const std::string &bytes, Encoding enc) {
+    std::string out, rest = bytes;
+    if (rest.size() >= 6 && rest.compare(0, 4, "\x01\x05\x03\x0e") == 0 && rest[5] == '\x01') {
+        out = format("\\f[%d]", int(static_cast<unsigned char>(rest[4])) - 14);
+        rest.erase(0, 6);
+    }
+    if (rest.find('\x01') != std::string::npos) return std::nullopt;
+    return out + toUtf8(rest, enc);
+}
+
+std::optional<std::array<int32_t, 3>> windowStyle(const std::string &source) {
+    if (!source.starts_with("<")) return std::array<int32_t, 3>{-1, -1, 1};
+    if (source.starts_with("<SQUARE>")) return std::array<int32_t, 3>{0, -1, 0};
+    int from = 0, to = 0;
+    if (std::sscanf(source.c_str(), "<GRADX-%d-%d>", &from, &to) == 2 && from >= 0 && from < 1000 && to >= 0 && to < 1000)
+        return std::array<int32_t, 3>{4, from * 1000 + to, 1};
+    return std::nullopt;
+}
 
 // A character as the PC engine writes one with nothing special about it. The fields from version 0x9F hold what
 // Wolf RPG Editor 3.71 writes for the hero and party; map events differ in v9fA and v9fD (snapshot sets those).
@@ -275,8 +312,10 @@ SaveFile Game::blankSave() {
     uint16_t version = saveBase_ ? saveBase_->version
                        : wolf35_                                                    ? kVersion35
                        : (enc == Encoding::UTF8 || gameDat_.settings.size() > 22) ? kVersion3
+                       : gameDat_.settings.size() == 22                            ? kVersion22
                                                                                    : kVersion2;
     SaveFile f = defaultSave(version, enc == Encoding::UTF8);
+    if (version == kVersion22) f.system.v126 = 10;
     f.title = saveString(gameDat_.title, enc);
     // With no map loaded the engine still writes a 20 by 15 map of tile 100000.
     f.map.width = 20;
@@ -313,6 +352,11 @@ SaveFile Game::snapshot() {
         }
     }
     SaveFile f = saveBase_ ? *saveBase_ : blankSave();
+    if (f.version == kVersion2 && !wolf35_ && enc != Encoding::UTF8 && gameDat_.settings.size() == 22) {
+        f.version = kVersion22;
+        f.system.v126 = 10;
+        f.system.v128 = 0;
+    }
     f.title = saveString(gameDat_.title, enc);
     f.header[6] = enc == Encoding::UTF8 ? 'U' : 0;
     // The XY arrays, which saves hold from version 0x9F.
@@ -433,9 +477,11 @@ SaveFile Game::snapshot() {
     }
     if (f.party.trail.size() < 100) f.party.trail.resize(100);
 
-    // Section 5: pictures. The PC engine shows none of a save's pictures after loading it, and it crashed on pictures
-    // written from VNDegen's state, so saves carry none, written as the engine writes an empty list.
     f.pictures = {};
+    if (f.version == kVersion22) {
+        f.pictures.pictures = savedPictures(enc);
+        f.pictures.count = uint16_t(f.pictures.pictures.size());
+    }
 
     // Section 6: the CDB.
     f.variableDb.types.clear();
@@ -489,6 +535,88 @@ void Game::applyPendingLoad() {
     if (s) applySave(*s);
 }
 
+std::vector<SavePicture> Game::savedPictures(Encoding enc) const {
+    std::vector<SavePicture> out;
+    for (auto &[number, p] : pictures_) {
+        if (number < 0 || p.erasing || p.xyImage || p.cutW > 0 || p.kind == PictureKind::None) continue;
+        SavePicture sp;
+        sp.number = number;
+        sp.unknown3 = uint16_t(p.anchor);
+        std::array<int32_t, 3> style{-1, -1, 1};
+        if (p.kind == PictureKind::Text) {
+            auto bytes = pictureTextBytes(p.source, enc);
+            if (!bytes) continue;
+            sp.kind = {1, 0};
+            sp.file = {*bytes, true};
+        } else if (p.kind == PictureKind::Window) {
+            auto windowed = windowStyle(p.source);
+            if (!windowed) continue;
+            style = *windowed;
+            sp.kind = {0, 1};
+            sp.file = saveString(p.source, enc);
+        } else {
+            sp.file = saveString(p.source, enc);
+        }
+        bool window = p.kind == PictureKind::Window;
+        sp.a = {int32_t(std::lround(p.x.to)), int32_t(std::lround(p.y.to)), window ? p.windowW : p.divX,
+                window ? p.windowH : p.divY, p.pattern, int32_t(std::lround(p.opacity.to)), p.blend, -1, 1,
+                int32_t(std::lround(p.zoomX.to)), int32_t(std::lround(p.zoomY.to)), int32_t(std::lround(p.angle.to))};
+        sp.b = {savedChannel(p.r.to), savedChannel(p.g.to), savedChannel(p.b.to),
+                savedChannel(p.r.to), savedChannel(p.g.to), savedChannel(p.b.to)};
+        sp.v69[0] = sp.v69[1] = kSavedColor;
+        sp.v69[16] = sp.v69[17] = 100;
+        sp.v73b = {-1, -1, -1, -1, -1, -1};
+        sp.v76 = style;
+        out.push_back(std::move(sp));
+    }
+    return out;
+}
+
+void Game::restorePictures(const SaveFile &s, Encoding enc) {
+    if (s.version != kVersion22) return;
+    for (auto &sp : s.pictures.pictures) {
+        Picture p;
+        if (sp.kind[0] == 1) {
+            auto text = pictureText(sp.file.bytes, enc);
+            if (!text) continue;
+            p.kind = PictureKind::Text;
+            p.source = *text;
+            auto size = textPictureSize(p.source);
+            p.imageW = size[0];
+            p.imageH = size[1];
+        } else if (sp.kind[1] == 1) {
+            p.kind = PictureKind::Window;
+            p.source = text(sp.file, enc);
+            if (!windowStyle(p.source)) continue;
+            p.windowW = p.imageW = sp.a[2];
+            p.windowH = p.imageH = sp.a[3];
+        } else {
+            p.kind = PictureKind::File;
+            p.source = text(sp.file, enc);
+            if (p.source.starts_with("<")) continue;
+            p.divX = std::max(1, sp.a[2]);
+            p.divY = std::max(1, sp.a[3]);
+            auto size = fileImageSize(p.source);
+            p.imageW = size[0];
+            p.imageH = size[1];
+        }
+        p.generation = ++generation_;
+        p.anchor = sp.unknown3 <= 5 ? sp.unknown3 : 0;
+        p.blend = sp.a[6] >= 0 && sp.a[6] <= 3 ? sp.a[6] : 0;
+        p.pattern = std::max(1, sp.a[4]);
+        p.x.set(sp.a[0], 0);
+        p.y.set(sp.a[1], 0);
+        p.opacity.set(std::clamp(sp.a[5], 0, 255), 0);
+        p.zoomX.set(sp.a[9], 0);
+        p.zoomY.set(sp.a[10], 0);
+        p.angle.set(sp.a[11], 0);
+        p.r.set(savedPercent(sp.b[3]), 0);
+        p.g.set(savedPercent(sp.b[4]), 0);
+        p.b.set(savedPercent(sp.b[5]), 0);
+        pictures_[sp.number] = std::move(p);
+    }
+}
+
 void Game::applySave(const SaveFile &s) {
     Encoding enc = s.utf8() ? Encoding::UTF8 : Encoding::ShiftJIS;
     // Every running event ends, as on the PC.
@@ -506,7 +634,7 @@ void Game::applySave(const SaveFile &s) {
     // The generation keeps counting, so the renderer never takes a frozen frame from before the load.
     transition_ = {.generation = transition_.generation + 1};
     scrollX_ = scrollY_ = 0;
-    pictures_.clear();  // the PC engine shows no pictures after a load, not even those in the save
+    pictures_.clear();
     autoKeys_ = autoMouse_ = 0;
     autoKeyCodes_.reset();
     autoWheel_ = 0;
@@ -635,6 +763,7 @@ void Game::applySave(const SaveFile &s) {
         }
     }
 
+    restorePictures(s, enc);
     saveBase_ = std::make_shared<SaveFile>(s);
     updateCamera();
     log(format("loaded a save: map %d, hero at %d,%d", mapId_, hero_.tx, hero_.ty));

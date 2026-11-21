@@ -174,7 +174,17 @@ Wine for a Wolf RPG Editor 2 and a Wolf RPG Editor 3 test game, and for The Clum
 save version 159 in its compressed and encrypted container) and ANGEL QUEST (Wolf RPG Editor 2, version 123), and for Two Beasts Or Not To Beast! (version 142). Two Beasts saves from its phone, and a load differs there: the PC engine shows the phone again from a VNDegen save and a black map with its HUD from its own save, where a right click opens the phone, and VNDegen shows the room from either. Fields
 the runtime doesn't use are carried over from the last save read or written. `docs/wolfrpg-save-format.md` describes the
 format and how each field was established, and `docs/wolfrpg-cleanroom.md` the version 159 container and additions. A
-Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf RPG Editor 3.714 writes.
+Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf RPG Editor 3.714 writes, and a game
+whose Game.dat has a 22-byte settings block gets version 128, as Wolf RPG Editor 2.21 and 2.23 write. Such a game's
+version 125 saves, which VNDegen 0.58.1 wrote, load as before, and the next save made from them is version 128.
+
+In version 128 saves the pictures on screen go into the save, and a load shows them again, as those engines do: President
+Yukino's day bar and portrait are there right after a load, from a PC save or VNDegen's, and VNDegen's frame then
+matches the PC engine's apart from the camera. The PC engines load VNDegen's version 128 saves with their pictures
+(President Yukino and Drain Dungeon under Wine). Images, text, windows, `<SQUARE>` and `<GRADX>` pictures keep their
+position, anchor, pattern, opacity, zoom, angle, colour and blend. Pictures numbered below 0 stay out of saves, as the PC
+engine leaves them out. Saves of other versions carry no pictures and a load clears them, as their engines do or as is
+safe: ANGEL QUEST's engine (version 123) closes when it loads a save holding a picture record.
 
 ## Known limits
 
@@ -182,11 +192,11 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
   A short listing with no Wolf game that reaches this plugin pays for that at each library refresh. It's bounded at 200
   listings, and the time hasn't been measured. The largest case in the library's listing is Livestream: Escape from Hotel
   Izanami, an unrecognized game, with 25 entries in the listing and 5,178 names one level down.
-- A load restores variables, the map and the characters, but not pictures, the screen tint, or which music was
-  playing. Wolf RPG Editor 2 and 3.2x engines that write save version 125 or 142 show no saved pictures after a load
-  either; the map's own music starts. President Yukino's engine (version 128) does restore them, so after a load in
-  VNDegen, or of a VNDegen save on the PC, its day bar and Yukino's portrait stay hidden until the menu is opened and
-  closed. The PC also shows the map scrolled a little differently after loading a VNDegen save.
+- A load restores variables, the map and the characters, and pictures from version 128 saves, but not the screen tint
+  or which music was playing; the map's own music starts. Saved pictures come back without their effects (shake, pulse,
+  flicker, automatic patterns, the effect command's zoom and shift), and pictures made from XY arrays, cut with
+  `<CUT/...>`, or holding text codes other than a leading `\f[n]` are left out of saves and loads. The PC also shows
+  the map scrolled a little differently after loading a VNDegen save.
 - After a save moves between VNDegen and the PC in either direction, The Clumsy Witch Seris shows its HUD, minimap and
   building labels again only once the menu has been opened and closed. Wolf RPG Editor 3.5 restores pictures from a
   save, and VNDegen neither writes pictures into saves nor restores them. Saves made and loaded within VNDegen behave

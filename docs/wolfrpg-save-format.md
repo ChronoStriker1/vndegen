@@ -78,9 +78,27 @@ The hero, then five party members, as characters. Then two unknown bytes, `trail
 
 ## Section 5: pictures
 
-Each picture has its number, a kind (`0 0` an image, `1 0` text, `0 1` a window or `<SQUARE>`), its file or text, and `a`: x, y, divisions across and down (width and height for a window), frame, opacity, three unknown values, zoom across and down, and angle. Text is stored with the engine's own control codes in place of `\f[..]` and the like.
+Each picture has its number, a kind (`0 0` an image, `1 0` text, `0 1` a window, `<SQUARE>` or `<GRADX-a-b>`), its file or text, and `a`. In version 128 saves, checked against the PC engines under Wine by changing one field at a time in their own saves:
 
-The PC engine that writes version 125 shows none of a save's pictures after loading it; President Yukino's, which writes 128, shows them. A save holding only a full-screen picture at full opacity loads without it, and saves made from a menu load without the menu. The engine crashed on pictures written from VNDegen's state. So VNDegen writes an empty picture list, as the engine writes one, and clears pictures on load. Games that keep pictures on screen redraw them from their own events, as Test Game 52 does.
+| Field | Meaning |
+|---|---|
+| `unknown3` | The anchor, as the picture command gives it: 0 top left, 1 centre, 3 top right and so on |
+| `a[0]`, `a[1]` | x and y |
+| `a[2]`, `a[3]` | Divisions across and down, or a window's width and height |
+| `a[4]`, `a[5]` | Pattern and opacity |
+| `a[6]` | Blend mode: subtract (2) hides white text on black, as the picture command's blend does |
+| `a[7]` | -1 in every save seen |
+| `a[8]` | The frames of the last command on the picture; changing it shows nothing |
+| `a[9]`, `a[10]` | Zoom across and down |
+| `a[11]` | The angle as the picture command gives it: 45 turns an image by about 4.5 degrees on the PC. Text pictures don't turn |
+| `b[0..5]` | Colour now and its target, red, green and blue, as percent × 254 / 100 − 254: 100% is 0, 80% −51, 0% −254 |
+| `v69` | 0x646464 twice, then zeros, then 100 twice, in every save seen. Setting `v69[2]` crashes the engine; the other zeros, `v72b`, `v73a`, `v74`, `v75`, `v81` and `v87` change nothing seen when set to 45 |
+| `v73b` | The event that made the picture: a type or −1, the common event, the command line |
+| `v76` | −1 −1 1 for images and text, 0 −1 0 for `<SQUARE>`, and 4, a × 1000 + b, 1 for `<GRADX-a-b>` |
+
+Text keeps the engine's own codes: `\f[n]` is the six bytes 01 05 03 0E (n + 14) 01, and other codes (`\E`, positions, colours) are longer sequences not mapped yet.
+
+Engines that write version 128 (President Yukino's 2.21, Drain Dungeon's and Journey of Depravity's 2.23) save the pictures on screen and show them again after a load: a picture added to a Drain Dungeon save at a number the game never uses shows after loading on the PC. VNDegen writes and restores pictures for version 128 saves, leaving out pictures numbered below 0 (Drain Dungeon's dungeon background is -5 and the PC's save has none of them), and writes `a[8]` as 1, `v73b` as -1 and `v69` as the PC writes them for a plain picture. ANGEL QUEST's engine (version 123) closes when it loads a save holding a picture record in version 128's shape, and the engine that writes 125 (Test Game 53) showed none of a save's pictures, so VNDegen writes an empty list for those and clears pictures on load, as before. Wolf RPG Editor 3.714 (version 159) also restores pictures, but its record holds them differently (x and y twice, zoom and angle not where version 128 has them), so VNDegen neither writes nor restores them there yet.
 
 ## Section 6: the variable database (CDB)
 
@@ -92,7 +110,7 @@ A presence byte, 0 in every test save.
 
 ## How the runtime uses this
 
-**Saving** (command 220 with exec code 0, or `Game::saveSlot`) writes `Save/SaveDataNN.sav`, creating `Save/` if needed, through a temporary file renamed over the slot. The fields above come from the game's state. Every other field comes from the save the session last read or wrote, else from the newest save already in the game's `Save` folder, which the same engine wrote, else from the values the engine writes into an empty save. The version is that save's, else 142 for games with Wolf RPG Editor 3 data (UTF-8, or a Game.dat settings block longer than 22 bytes), else 125. Wolf RPG Editor 2.2x games have a 22-byte block (President Yukino, Drain Dungeon, Journey of Depravity) and 3.x ones a longer one (Two Beasts has 35). President Yukino's engine writes version 128 and stops with "Buffer overrun detected" on a version 142 System.sav or save; a version 125 one it reads.
+**Saving** (command 220 with exec code 0, or `Game::saveSlot`) writes `Save/SaveDataNN.sav`, creating `Save/` if needed, through a temporary file renamed over the slot. The fields above come from the game's state. Every other field comes from the save the session last read or wrote, else from the newest save already in the game's `Save` folder, which the same engine wrote, else from the values the engine writes into an empty save. The version is that save's, else 142 for games with Wolf RPG Editor 3 data (UTF-8, or a Game.dat settings block longer than 22 bytes), 128 for a block of 22 bytes, else 125. A version 125 save of a game with a 22-byte block, which only VNDegen 0.58.1 writes, becomes version 128 on the next save, with `v126` 10 and `v128` 0 as those engines write them; those two values are all that 128 adds to 125's layout. The block's size follows the engine: ANGEL QUEST's has 20 bytes and its engine writes 123; Milky Quest's (Test Game 53), Parade Buster's and The Succubus of the Forest's have 21 and their engine writes 125; President Yukino's (2.21), Drain Dungeon's and Journey of Depravity's (2.23) have 22 and theirs write 128; 3.x games have a longer one (Two Beasts has 35). President Yukino's engine stops with "Buffer overrun detected" on a version 142 System.sav or save.
 
 **Loading** (exec code 1, or `Game::loadSlot`) reads the file at once and applies it at the start of the next frame, when every running event ends, as on the PC. It restores the variables of every kind above, event and common event self variables, the CDB, system variables 0 to 7, 28, 29 and 100 to 102, the party's graphics (system strings 10 to 15), the map with its saved tiles and tileset, the hero's and members' positions and directions, and each event's position, direction and frame. Event pages follow from the restored variables. An event the save shows as hidden while its page would show it was erased, and stays so. The map's own music plays. System variable 24 is 1 after a load and 0 after a failed one, and 25 holds the slot.
 

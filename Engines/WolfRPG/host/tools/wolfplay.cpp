@@ -11,6 +11,7 @@
 //   wolfplay <game folder> --pics 200   (lists the pictures shown at that frame)
 //   wolfplay <game folder> --sys 200   (lists the message and choice system variables at that frame)
 //   wolfplay <game folder> --rclick 210:640,480 --wheel 220:-1 --key 230:144   (a keyboard key by Wolf's code)
+//   wolfplay <game folder> --save 1@2000 --load 1@2500   (writes or reads Save/SaveDataNN.sav after that frame)
 #include "game.h"
 #include "render.h"
 
@@ -55,6 +56,7 @@ int main(int argc, char **argv) {
     std::set<int> sysLists;
     int drawFrom = 0, drawTo = -1;
     std::multimap<int, std::string> typed;
+    std::multimap<int, int> saves, loads;
     for (int i = 2; i + 1 < argc; i += 2) {
         std::string opt = argv[i], val = argv[i + 1];
         size_t colon = val.find(':');
@@ -84,6 +86,8 @@ int main(int argc, char **argv) {
         }
         else if (opt == "--type" && colon != std::string::npos) typed.emplace(std::atoi(val.c_str()), val.substr(colon + 1));
         else if (opt == "--draw") std::sscanf(val.c_str(), "%d-%d", &drawFrom, &drawTo);
+        else if ((opt == "--save" || opt == "--load") && val.find('@') != std::string::npos)
+            (opt == "--save" ? saves : loads).emplace(std::atoi(val.c_str() + val.find('@') + 1), std::atoi(val.c_str()));
         else if (opt == "--pics") picLists.insert(std::atoi(val.c_str()));
         else if (opt == "--sys") sysLists.insert(std::atoi(val.c_str()));
         else if (opt == "--wheel" && colon != std::string::npos)
@@ -150,6 +154,16 @@ int main(int argc, char **argv) {
             auto updateStart = std::chrono::steady_clock::now();
             game.update(in);
             if (f >= drawFrom && f <= drawTo) updateSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - updateStart).count();
+            for (auto [it, end] = saves.equal_range(f); it != end; ++it) {
+                std::string err;
+                bool ok = game.saveSlot(it->second, &err);
+                std::printf("frame %d: save slot %d %s %s\n", f, it->second, ok ? "ok" : "failed:", err.c_str());
+            }
+            for (auto [it, end] = loads.equal_range(f); it != end; ++it) {
+                std::string err;
+                bool ok = game.loadSlot(it->second, &err);
+                std::printf("frame %d: load slot %d %s %s\n", f, it->second, ok ? "ok" : "failed:", err.c_str());
+            }
             if (std::getenv("WOLF_HERO") && f % 30 == 0) {
                 auto h = game.heroTile();
                 std::printf("frame %d: map %d hero %d,%d facing %d%s%s\n", f, game.mapId(), h[0], h[1], h[2],

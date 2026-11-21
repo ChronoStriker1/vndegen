@@ -1020,6 +1020,21 @@ void Game::pictureCommand(Thread &t, const Command &c) {
     for (int n = first; n <= std::max(first, last) && n - first < 10000; n++) pictureCommandOne(t, c, n);
 }
 
+std::array<int, 2> Game::fileImageSize(const std::string &source) {
+    // Games show the same pictures every frame in battle, so a file is read for its size only once.
+    auto [known, added] = imageSizes_.try_emplace(source);
+    if (added) {
+        if (auto bytes = files_.read(source)) imageSize(*bytes, known->second[0], known->second[1]);
+    }
+    return known->second;
+}
+
+std::array<int, 2> Game::textPictureSize(const std::string &text) {
+    if (!textMeasure_) textMeasure_ = std::make_shared<TextRenderer>(*this, nullptr);
+    auto size = textMeasure_->measure(text, baseTextStyle(*this));
+    return {size[0], size[1]};
+}
+
 void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     uint32_t flags = uint32_t(c.arg(0));
     // The flags hold, from the low byte up: the display type and the operation; the anchor and the blend mode (15
@@ -1094,13 +1109,9 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
                 fresh.imageH = xy->h;
                 fresh.xyImage = xy;
             } else {
-                // Games show the same pictures every frame in battle, so a file is read for its size only once.
-                auto [known, added] = imageSizes_.try_emplace(fresh.source);
-                if (added) {
-                    if (auto bytes = files_.read(fresh.source)) imageSize(*bytes, known->second[0], known->second[1]);
-                }
-                fresh.imageW = known->second[0];
-                fresh.imageH = known->second[1];
+                auto size = fileImageSize(fresh.source);
+                fresh.imageW = size[0];
+                fresh.imageH = size[1];
             }
             if (fresh.cutW > 0) {
                 fresh.imageW = fresh.cutW * fresh.divX;
@@ -1113,8 +1124,7 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         } else {
             // The picture variable command reads a text picture's size, which the standard systems use to centre
             // text and to shrink names too wide for their column.
-            if (!textMeasure_) textMeasure_ = std::make_shared<TextRenderer>(*this, nullptr);
-            auto size = textMeasure_->measure(fresh.source, baseTextStyle(*this));
+            auto size = textPictureSize(fresh.source);
             fresh.imageW = size[0];
             fresh.imageH = size[1];
         }

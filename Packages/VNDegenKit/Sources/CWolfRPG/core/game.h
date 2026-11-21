@@ -21,6 +21,8 @@
 
 namespace wolf {
 
+struct SavePicture;
+
 // Wolf's own keys. The host maps keyboards, controllers and touch onto them.
 enum Key : uint32_t {
     KeyDown = 1 << 0,
@@ -339,6 +341,8 @@ private:
     int commonByName(const std::string &name) const;
     void pictureCommand(Thread &t, const Command &c);
     void pictureCommandOne(Thread &t, const Command &c, int number);
+    std::array<int, 2> fileImageSize(const std::string &source);
+    std::array<int, 2> textPictureSize(const std::string &text);
     void setVariable(Thread &t, const Command &c);
     void setString(Thread &t, const Command &c);
     void extendedString(Thread &t, const Command &c, int32_t target, int op);
@@ -390,6 +394,8 @@ private:
     SaveFile blankSave();      // what the engine writes when a variable goes into a save that doesn't exist yet
     void applyPendingLoad();   // Game::update calls it first thing while pendingLoad_ is set
     void applySave(const SaveFile &s);
+    std::vector<SavePicture> savedPictures(Encoding enc) const;
+    void restorePictures(const SaveFile &s, Encoding enc);
     // Reads or writes the variable at `address` in a save, for commands 221 and 222.
     void readSavedVariable(const SaveFile *s, int32_t address, int32_t target, Thread &t);
     void writeSavedVariable(SaveFile &s, int32_t address, int32_t source, Thread &t);
