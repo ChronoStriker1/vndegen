@@ -49,6 +49,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
 - `06-user-time-scale.patch`: the speed a player picks, on top of the game's own time scale, as Godot 4's `Engine::set_user_time_scale`. The main loop runs that many times as many physics steps of the same length, up to that many times the usual 8 per frame, and scales each frame's time by it. `SpatialVelocityTracker`, which measures in physics steps, counts them at that rate, as Godot 4's does. `vngd_set_speed` sets it.
 - `07-angle-copy-screen.patch`: skips `glInvalidateFramebuffer` in `_copy_screen` on MetalANGLE builds. With it, a game whose Environment uses the Canvas background mode, such as Test Game 113, shows the canvas layers that go through the copy as black. The Mac build uses desktop OpenGL and never made the call.
 - `08-script-threads.patch`: the thread count and wait of Godot 4's patch 09, for Godot 3's `Thread` and `SceneTree::finish`. Godot 3 has no `WorkerThreadPool`.
+- `09-nav-closest-point.patch`: computes the navigation map's closest point on each triangle in 64-bit floats (the region method from Ericson's Real-Time Collision Detection) instead of `Face3::get_closest_point_to` in 32-bit, so a point inside a 2D navigation polygon comes back unchanged, as Godot 3.4's `Navigation2D` returned it. Physics keeps `Face3`. [godot.md](../../docs/godot.md#which-godot-runs-a-game) has the case.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|
