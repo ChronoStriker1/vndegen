@@ -19,7 +19,8 @@ enum {
     LAYER_NAME = 260,
     SAVED_LAYERS = 10,
     OFF_LAYER_OFFSET = 0xcc8,
-    OFF_LAYER_SCALE = 0xcf0,
+    OFF_LAYER_Y = 0xcf0,
+    OFF_LAYER_ZOOM = 0xd18,
     OFF_LAYER_ONE = 0x250,
     OFF_LAYER_HANDLES = 0xd68,
     LAYER_HANDLES_END = 0x1218,
@@ -31,6 +32,8 @@ enum {
     VAR_SIZE = 0x68,
     VAR_NAME = 0x64,
     OFF_LOCALS = 0x2fdf0,
+    OFF_CAMERA_ON = 0x30f58,
+    OFF_CAMERA = 0x30f60,
     OFF_SLOT_X = 0x30f78,
     OFF_SLOT_X_NOW = 0x31018,
     POS_SLOTS = 5,
@@ -176,6 +179,8 @@ static double rdf64(const u8 *p) {
 
 static int slot_x(AN *a, int i) { return a->slotX[i] ? a->slotX[i] : i < POS_SLOTS ? SLOT_DEFAULT_X[i] : 640; }
 
+static int layer_drop(AN *a, const Layer *l) { return (int)(an_define_char_scale(&a->def, l->name) * 100.0f + 0.5f); }
+
 static void pc_defaults(AN *a, u8 *s) {
     for (int i = 0; i < SAVED_LAYERS; i++) {
         wrf64(s + OFF_LAYER_ONE + 8 * i, 1.0);
@@ -219,6 +224,13 @@ static void fill_slot(AN *a, u8 *s) {
     wr32(s + OFF_SCENE_KIND, (u32)a->sceneKind);
     wr32(s + OFF_RETURN, a->th.sp > 0 ? a->th.stack[a->th.sp - 1] : 0);
     put_name(s + OFF_BG, BG_NAME, a->scene.bg);
+    if (a->scene.camera) {
+        wr32(s + OFF_CAMERA_ON, 1);
+        wrf64(s + OFF_CAMERA, a->scene.bgX);
+        wrf64(s + OFF_CAMERA + 8, a->scene.bgY);
+        wr32(s + OFF_CAMERA + 16, (u32)a->scene.bgScale);
+        wr32(s + OFF_CAMERA + 20, a->scene.bgMoveTime);
+    }
     for (int i = 0; i < SAVED_LAYERS; i++) {
         Layer *l = &a->scene.layer[i];
         if (l->kind == LK_NONE) continue;
@@ -227,8 +239,9 @@ static void fill_slot(AN *a, u8 *s) {
         wr32(s + OFF_LAYER_X + 4 * i, 640);
         wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)((a->slotX[i] ? a->slotX[i] : 640) - 640 + l->toX));
         for (int k = 0; k < 3; k++) wrf64(s + OFF_LAYER_SCALE3 + LAYER_SCALE3 * i + 8 * k, 1.0);
+        if (l->scale != 1000) wr32(s + OFF_LAYER_ZOOM + 4 * i, (u32)l->scale);
         if (l->kind != LK_EMOTE) continue;
-        wr32(s + OFF_LAYER_SCALE + 4 * i, (u32)(an_define_char_scale(&a->def, l->name) * 100.0f + 0.5f));
+        wr32(s + OFF_LAYER_Y + 4 * i, (u32)(l->toY + layer_drop(a, l)));
         for (int k = 0; k < l->varCount && (k + 1) * VAR_SIZE <= LAYER_VARS_SIZE; k++) {
             u8 *v = s + OFF_LAYER_VARS + LAYER_VARS_SIZE * i + VAR_SIZE * k;
             put_name(v, VAR_NAME, l->vars[k].name);
@@ -284,6 +297,13 @@ static bool restore_slot(AN *a, const u8 *s) {
     an_reset_scene(a);
     get_name(a->scene.bg, sizeof a->scene.bg, s + OFF_BG, BG_NAME);
     a->scene.bgScale = 1000;
+    if (rd32(s + OFF_CAMERA_ON) == 1) {
+        i32 scale = (i32)rd32(s + OFF_CAMERA + 16);
+        a->scene.camera = true;
+        a->scene.bgX = a->scene.bgFromX = (int)rdf64(s + OFF_CAMERA);
+        a->scene.bgY = a->scene.bgFromY = (int)rdf64(s + OFF_CAMERA + 8);
+        a->scene.bgScale = scale > 0 ? scale : 1000;
+    }
     for (int i = 0; i < SAVED_LAYERS; i++) {
         Layer *l = &a->scene.layer[i];
         get_name(l->name, sizeof l->name, s + OFF_LAYER_NAME + LAYER_NAME * i, LAYER_NAME);
@@ -292,10 +312,12 @@ static bool restore_slot(AN *a, const u8 *s) {
         size_t n = strlen(l->name);
         l->kind = n > 4 && an_ieq(l->name + n - 4, ".psb") ? LK_EMOTE : LK_IMAGE;
         l->alpha = l->fromAlpha = l->toAlpha = 255;
-        l->scale = 1000;
+        i32 zoom = (i32)rd32(s + OFF_LAYER_ZOOM + 4 * i);
+        l->scale = zoom > 0 ? zoom : 1000;
         double base = i < POS_SLOTS ? rdf64(s + OFF_SLOT_X + 8 * i) : 0;
         a->slotX[i] = base > 0 && base < 4096 ? (int)base : 640;
         l->toX = l->fromX = (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i) - (a->slotX[i] - 640);
+        if (l->kind == LK_EMOTE) l->toY = l->fromY = (i32)rd32(s + OFF_LAYER_Y + 4 * i) - layer_drop(a, l);
         for (int k = 0; k * VAR_SIZE + VAR_SIZE <= LAYER_VARS_SIZE; k++) {
             const u8 *v = s + OFF_LAYER_VARS + LAYER_VARS_SIZE * i + VAR_SIZE * k;
             if (!v[0]) break;

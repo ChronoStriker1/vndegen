@@ -307,6 +307,7 @@ static void exec(AN *a, const Op *op) {
         s->bgX = s->bgY = s->bgFromX = s->bgFromY = 0;
         s->bgMoveTime = 0;
         s->bgScale = 1000;
+        s->camera = false;
         break;
     case 0x4d:
         s->bgFromX = s->bgX;
@@ -324,6 +325,7 @@ static void exec(AN *a, const Op *op) {
         s->bgScale = val(a, &g[2]);
         s->bgMoveStart = a->now;
         s->bgMoveTime = (u32)val(a, &g[3]);
+        s->camera = true;
         break;
     case 0x52: {
         Layer *l = layer(a, &g[0]);

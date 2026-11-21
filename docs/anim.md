@@ -96,7 +96,10 @@ The PC engine's own files in the game folder: `<name>_save.dat` (180 slots of 24
 Save and Load screens), `qSavedata.dat` (the quick save), `cg/pSaveThumbNNN.png` (256 by 256, the screen at the top)
 and `<name>_system.dat` (read lines, the flowchart's passed and read nodes, the last slot). A slot keeps the date, the
 comment, the text instruction it was made at, the background, each layer's picture or character, offset, scale and
-E-mote variables, and the script's local variables. VNDegen writes those, and the defaults the PC keeps in every slot:
+E-mote variables, and the script's local variables. A layer's y is kept as its offset plus its character-table drop (Malg202 at -1500
+saves -1460), its scale from `7c` beside it (0 for 100%), and the camera from `80` as an on flag, x and y, scale and
+time; a new background turns the flag off and leaves the old values, which the PC then ignores. Saves made in Magical
+Sword's 300% close-up load zoomed both ways. VNDegen writes those, and the defaults the PC keeps in every slot:
 the slot positions, the layer tables of 1.0 scales and -1 handles, the characters' idle motion name (`sPauseWait01`)
 and the E-mote scale. The PC needs them: without the defaults it crashes loading the slot, and without the layer
 scales it loads the scene with no characters. The comment is the speaker and the line, cut to 100 characters as the PC

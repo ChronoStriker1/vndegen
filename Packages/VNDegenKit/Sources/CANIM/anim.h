@@ -187,6 +187,7 @@ typedef struct Scene {
     int bgX, bgY, bgFromX, bgFromY;
     u32 bgMoveStart, bgMoveTime;
     int bgScale;
+    bool camera;
     Layer layer[AN_LAYERS];
     bool window;
 } Scene;
