@@ -217,6 +217,42 @@ static size_t char_record(const u8 *d, size_t size, size_t at) {
     return v >= 20.0 && v <= 1000.0 ? n : 0;
 }
 
+static const u8 *idle_field(const u8 *p, const u8 *end, bool number) {
+    const u8 *z = memchr(p, 0, (size_t)(end - p));
+    if (!z || z - p > 31) return NULL;
+    for (const u8 *c = p; c < z; c++)
+        if (number ? !(isdigit(*c) || *c == '-' || *c == '.') : !(isalnum(*c) || *c == '_')) return NULL;
+    return z + 1;
+}
+
+static size_t idle_record(Define *def, const u8 *d, size_t size, size_t at) {
+    const u8 *end = d + size, *p = d + at + 4;
+    if (rd32(d + at) != 10 || p >= end || !isalpha(*p)) return 0;
+    const u8 *q = idle_field(p, end, false);
+    if (!q || q - p < 3) return 0;
+    IdleMotion m = {dup_string(p, (size_t)(q - p)), NULL, 0};
+    int cap = 0;
+    while (q < end && *q) {
+        const u8 *lo = idle_field(q, end, false), *hi = lo ? idle_field(lo, end, true) : NULL, *next = hi ? idle_field(hi, end, true) : NULL;
+        if (!next) break;
+        if (m.count == cap) {
+            cap = cap ? cap * 2 : 8;
+            m.vars = an_realloc(m.vars, sizeof(IdleVar) * (size_t)cap);
+        }
+        m.vars[m.count++] = (IdleVar){dup_string(q, (size_t)(lo - q)), (float)atof((const char *)lo), (float)atof((const char *)hi)};
+        q = next;
+    }
+    if (q >= end || *q || !m.count) {
+        for (int i = 0; i < m.count; i++) free(m.vars[i].name);
+        free(m.vars);
+        free(m.name);
+        return 0;
+    }
+    def->idles = an_realloc(def->idles, sizeof(IdleMotion) * (size_t)(def->idleCount + 1));
+    def->idles[def->idleCount++] = m;
+    return (size_t)(q + 1 - d);
+}
+
 bool an_define_load(Define *def, const char *path) {
     memset(def, 0, sizeof *def);
     size_t size;
@@ -291,7 +327,17 @@ bool an_define_load(Define *def, const char *path) {
         def->presets[def->presetCount++] = pr;
         at = p;
     }
+    for (size_t at = 0; at + 8 < def->size; at++) {
+        size_t next = idle_record(def, d, def->size, at);
+        if (next) at = next - 1;
+    }
     return true;
+}
+
+const IdleMotion *an_define_idle(const Define *def, const char *name) {
+    for (int i = 0; i < def->idleCount; i++)
+        if (!strcmp(def->idles[i].name, name)) return &def->idles[i];
+    return NULL;
 }
 
 float an_define_char_scale(const Define *def, const char *model) {
@@ -320,6 +366,12 @@ void an_define_free(Define *def) {
         free(def->presets[i].name);
     }
     free(def->presets);
+    for (int i = 0; i < def->idleCount; i++) {
+        for (int k = 0; k < def->idles[i].count; k++) free(def->idles[i].vars[k].name);
+        free(def->idles[i].vars);
+        free(def->idles[i].name);
+    }
+    free(def->idles);
     free(def->data);
     memset(def, 0, sizeof *def);
 }

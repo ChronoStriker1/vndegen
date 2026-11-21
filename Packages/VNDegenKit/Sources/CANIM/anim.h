@@ -91,6 +91,17 @@ typedef struct EmotePreset {
     int count;
 } EmotePreset;
 
+typedef struct IdleVar {
+    char *name;
+    float lo, hi;
+} IdleVar;
+
+typedef struct IdleMotion {
+    char *name;
+    IdleVar *vars;
+    int count;
+} IdleMotion;
+
 typedef struct Define {
     u8 *data;
     size_t size;
@@ -98,6 +109,8 @@ typedef struct Define {
     int spriteCount;
     EmotePreset *presets;
     int presetCount;
+    IdleMotion *idles;
+    int idleCount;
     char charName[16][16];
     float charScale[16];
     int charCount;
@@ -107,6 +120,7 @@ bool an_define_load(Define *d, const char *path);
 void an_define_free(Define *d);
 const char *an_define_sprite(const Define *d, const char *name);
 const EmotePreset *an_define_preset(const Define *d, const char *name);
+const IdleMotion *an_define_idle(const Define *d, const char *name);
 float an_define_char_scale(const Define *d, const char *model);
 
 typedef struct PackEntry {
@@ -162,6 +176,7 @@ typedef struct Layer {
     int varCount;
     u32 varSerial;
     bool fresh;
+    char idle[32];
 } Layer;
 
 typedef struct Scene {
@@ -214,6 +229,7 @@ struct AN {
     u32 *fb, *prev, *trans;
     u32 serial;
     u32 now;
+    u32 lastInput;
     int rate;
     bool quit, paused;
 

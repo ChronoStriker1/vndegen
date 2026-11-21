@@ -221,6 +221,7 @@ static void fill_slot(AN *a, u8 *s) {
         Layer *l = &a->scene.layer[i];
         if (l->kind == LK_NONE) continue;
         put_name(s + OFF_LAYER_NAME + LAYER_NAME * i, LAYER_NAME, l->name);
+        if (l->idle[0]) put_name(s + OFF_LAYER_WAIT + LAYER_WAIT * i, LAYER_WAIT, l->idle);
         wr32(s + OFF_LAYER_X + 4 * i, 640);
         wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)((a->slotX[i] ? a->slotX[i] : 640) - 640 + l->toX));
         for (int k = 0; k < 3; k++) wrf64(s + OFF_LAYER_SCALE3 + LAYER_SCALE3 * i + 8 * k, 1.0);
@@ -284,6 +285,7 @@ static bool restore_slot(AN *a, const u8 *s) {
     for (int i = 0; i < SAVED_LAYERS; i++) {
         Layer *l = &a->scene.layer[i];
         get_name(l->name, sizeof l->name, s + OFF_LAYER_NAME + LAYER_NAME * i, LAYER_NAME);
+        get_name(l->idle, sizeof l->idle, s + OFF_LAYER_WAIT + LAYER_WAIT * i, LAYER_WAIT);
         if (!l->name[0]) continue;
         size_t n = strlen(l->name);
         l->kind = n > 4 && an_ieq(l->name + n - 4, ".psb") ? LK_EMOTE : LK_IMAGE;

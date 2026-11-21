@@ -53,7 +53,15 @@ rather than the mesh's own division, which is far finer than the characters' siz
 drawn in horizontal bands across a small thread pool. A character whose triangles didn't change since the last frame,
 drawn at full opacity in place with normal or additive blending, is kept in a layer of its own and composited, so a
 scene of characters standing still costs little more than its background. Three characters on screen take about
-22 ms a frame on a desktop CPU, nearly all of it in eluna.
+22 ms a frame on a desktop CPU held still and about 28 ms while their idle motion plays.
+
+Characters play the PC's idle motion, measured under Wine. Each E-mote layer names an idle in the save (`sPauseWait01`
+unless set otherwise); the define's type-10 records list its variables and ranges (`head_UD` -10 to 10, `body_UD` -20
+to 20). Every 0.8 to 1.9 seconds each variable heads, in a straight line, for a random value in the other half of its
+range from the last one, so the character sways up and down; the idle replaces those variables' scripted values, as on
+the PC. After 40 seconds without a click or key the wider `sPoseWaitPause` record joins in (head and body turns, head
+tilt, and its own nods; the PC leaves its `body_slant` still), and the next input holds its variables where they are
+until the next 40 seconds pass.
 
 ## Building the E-mote library
 
@@ -84,10 +92,6 @@ does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's N
 - E-mote characters blink and their hair moves, but their timelines and the scripts' short pose animations (`b9`,
   `bc`, `be`, `c2` to `c5`) don't play yet. eluna needed fixes to draw them like the PC (`Engines/ANIM/UPSTREAM.md`);
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
-- The PC's idle motion isn't played. Each character on the PC runs an idle named in the save (`sPauseWait01` unless
-  the script picks another; the define's records list variables and ranges, `head_UD` -10 to 10 and `body_UD` -20 to
-  20 for `sPauseWait01`) that replaces those variables as it goes, so characters sway, and the PC moves their gaze.
-  VNDegen's characters hold the scripted pose.
 - The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
 - The Settings, Extra (CG, scene and music galleries) and shortcut screens aren't built; volumes aren't kept in the

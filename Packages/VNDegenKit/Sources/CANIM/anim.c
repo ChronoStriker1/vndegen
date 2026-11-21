@@ -151,15 +151,21 @@ void vnanim_mouse_move(VNANIM *n, int x, int y) {
 void vnanim_mouse_button(VNANIM *n, int button, bool down) {
     AN *a = (AN *)n;
     if (button == VNANIM_MOUSE_LEFT) {
-        if (a->down && !down) a->clicked = true;
+        if (a->down && !down) {
+            a->clicked = true;
+            a->lastInput = a->now;
+        }
         a->down = down;
-    } else if (button == VNANIM_MOUSE_RIGHT && down)
+    } else if (button == VNANIM_MOUSE_RIGHT && down) {
         a->rclicked = true;
+        a->lastInput = a->now;
+    }
 }
 
 void vnanim_key(VNANIM *n, int vk, bool down) {
     AN *a = (AN *)n;
     if (vk == 0x11) a->ctrl = down;
+    if (down) a->lastInput = a->now;
     if ((vk == 0x0d || vk == 0x20) && !down) a->clicked = true;
 }
 

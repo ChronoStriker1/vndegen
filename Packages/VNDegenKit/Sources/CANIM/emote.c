@@ -4,8 +4,17 @@
 #include <dlfcn.h>
 #include <math.h>
 
-enum { EMOTE_KEY = 0x473ab96d, MAX_MODELS = 8 };
+enum { EMOTE_KEY = 0x473ab96d, MAX_MODELS = 8, IDLE_VARS = 8 };
+enum { IDLE_STEP_MIN = 800, IDLE_STEP_MAX = 1900, IDLE_LONG_AFTER = 40000 };
 static const float CHAR_DROP = 100.0f;
+static const char IDLE_DEFAULT[] = "sPauseWait01", IDLE_LONG[] = "sPoseWaitPause", IDLE_LONG_FIXED[] = "body_slant";
+
+typedef struct IdleTrack {
+    const IdleMotion *motion;
+    float from[IDLE_VARS], to[IDLE_VARS], now[IDLE_VARS];
+    u32 start, length;
+    bool running, held, high;
+} IdleTrack;
 
 typedef struct Tex {
     const u8 *px;
@@ -38,6 +47,8 @@ typedef struct EmoteSlot {
     int drawCount, stencilCount;
     Tex *tex, *stencilTex;
     int texCap, stencilTexCap;
+    IdleTrack idle[2];
+    u32 seed;
 } EmoteSlot;
 
 struct EmoteCache {
@@ -375,6 +386,66 @@ static void build_job(void *ctx, int i) {
     s->built = true;
 }
 
+static float layer_var(const Layer *l, const char *name) {
+    for (int i = 0; i < l->varCount; i++)
+        if (!strcmp(l->vars[i].name, name)) return l->vars[i].value;
+    return 0;
+}
+
+static float idle_random(EmoteSlot *s) {
+    s->seed = s->seed * 1664525u + 1013904223u;
+    return (float)(s->seed >> 8) / 16777216.0f;
+}
+
+static bool idle_owned(const IdleTrack *t, const char *name) {
+    if (!t || !t->motion) return false;
+    for (int i = 0; i < t->motion->count && i < IDLE_VARS; i++)
+        if (!strcmp(t->motion->vars[i].name, name)) return true;
+    return false;
+}
+
+static void idle_track(AN *a, const vnemote_api_v1 *e, EmoteSlot *s, Layer *l, IdleTrack *t, const IdleMotion *m,
+                       const IdleTrack *over, bool run) {
+    if (t->motion != m) {
+        memset(t, 0, sizeof *t);
+        t->motion = m;
+    }
+    if (!m) return;
+    if (!run) {
+        if (t->running) {
+            t->running = false;
+            t->held = true;
+        }
+    } else if (!t->running || a->now - t->start >= t->length) {
+        t->high = !t->high;
+        for (int i = 0; i < m->count && i < IDLE_VARS; i++) {
+            float lo = m->vars[i].lo, hi = m->vars[i].hi, mid = (lo + hi) * 0.5f;
+            t->from[i] = t->running || t->held ? t->now[i] : layer_var(l, m->vars[i].name);
+            t->to[i] = t->high ? mid + (hi - mid) * idle_random(s) : lo + (mid - lo) * idle_random(s);
+        }
+        t->start = a->now;
+        t->length = IDLE_STEP_MIN + (u32)((float)(IDLE_STEP_MAX - IDLE_STEP_MIN) * idle_random(s));
+        t->running = true;
+        t->held = false;
+    }
+    if (!t->running && !t->held) return;
+    float k = t->running ? fminf((float)(a->now - t->start) / (float)t->length, 1.0f) : 1.0f;
+    for (int i = 0; i < m->count && i < IDLE_VARS; i++) {
+        if (t->running) t->now[i] = t->from[i] + (t->to[i] - t->from[i]) * k;
+        if (over && over->running && idle_owned(over, m->vars[i].name)) continue;
+        if (!strcmp(m->name, IDLE_LONG) && !strcmp(m->vars[i].name, IDLE_LONG_FIXED)) continue;
+        e->set_variable(s->model, m->vars[i].name, t->now[i], 0, 0);
+    }
+}
+
+static void idle_step(AN *a, const vnemote_api_v1 *e, EmoteSlot *s, Layer *l, int layer) {
+    if (!s->seed) s->seed = 0x9e3779b9u ^ (u32)layer * 2654435761u;
+    const IdleMotion *base = an_define_idle(&a->def, l->idle[0] ? l->idle : IDLE_DEFAULT);
+    const IdleMotion *wide = an_define_idle(&a->def, IDLE_LONG);
+    idle_track(a, e, s, l, &s->idle[1], wide == base ? NULL : wide, NULL, a->now - a->lastInput >= IDLE_LONG_AFTER);
+    idle_track(a, e, s, l, &s->idle[0], base, &s->idle[1], true);
+}
+
 void an_emote_prepare(AN *a) {
     const vnemote_api_v1 *e = api(a);
     if (!e) return;
@@ -388,9 +459,13 @@ void an_emote_prepare(AN *a) {
         if (s->varSerial != l->varSerial) {
             s->varSerial = l->varSerial;
             push_vars(e, s->model, l, l->fresh ? 0 : l->motionTime);
-            if (l->fresh) e->reset(s->model);
+            if (l->fresh) {
+                e->reset(s->model);
+                memset(s->idle, 0, sizeof s->idle);
+            }
             l->fresh = false;
         }
+        idle_step(a, e, s, l, i);
         float ticks = (float)(a->now - s->lastNow) * 60.0f / 1000.0f;
         s->lastNow = a->now;
         s->ticks = ticks > 6 ? 6 : ticks;
