@@ -144,6 +144,11 @@ static EmoteSlot *slot_for(AN *a, int layer, Layer *l) {
     s->used = c->tick;
     s->lastNow = a->now;
     const PackEntry *pe = an_pack_find(&a->psb, l->name);
+    if (!pe && !strncmp(l->name, "emote_", 6)) {
+        char *alias = an_fmt("e_%s", l->name + 6);
+        pe = an_pack_find(&a->psb, alias);
+        free(alias);
+    }
     u8 *data = pe ? an_pack_read(&a->psb, pe) : NULL;
     char err[256] = "";
     s->model = data ? e->open(data, pe->size, EMOTE_KEY, err, sizeof err) : NULL;
