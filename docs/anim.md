@@ -143,7 +143,7 @@ lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the ga
 
 ## Extra
 
-The Extra screen's CG, Scenes and Music pages follow the PC in both games, which lay them out alike. The define lists
+The Extra screen's CG, Animation, Scenes and Music pages follow the PC in both games, which lay them out alike. The define lists
 every CG as a numbered type-2 record (`HEL01aa` is 0), grouped by the first five letters of its name, and every
 memory as a type-8 record with its title and blurb. The thumbnails are ready-made pages (`p_cgtnNN`, `p_metnNN`),
 24 cells of 256 by 144: rows alternate between the sepia pictures and the coloured ones the pointer brings up. A
@@ -152,7 +152,10 @@ Dilemma); a memory once the script passes its marker (`02 n`, just before the `M
 `<name>_system.dat`, four bytes each, CGs from 0x25c8 and memories from 0x3888 + 4 × n, so unlocks carry both ways
 with the PC. The viewer steps through every unlocked CG from the clicked group onwards; a right click returns. A
 memory replays through the script's own `CheckMemory` routine with `L4` set to its number and returns to the Scenes
-page at its next marker, or when the script would end. Music plays the bgm files in the PC's order (Double Date
+page at its next marker, or when the script would end. Animation lists the define's movies (type-3 records, `HEL03aa.mpg` is 0), each unlocked once the
+script plays it as a scene loop (`95`, `96`), kept at 0x3ba8 + 4 × n; its thumbnails are `p_mvtnNN`. A movie loops full
+screen; a click moves to the next unlocked one and a right click returns. The PC's own player crashes under Wine on
+any click, so what clicks do there wasn't seen. Music plays the bgm files in the PC's order (Double Date
 Dilemma's are numbered 01-07, 20, 21, 30, 31), on to the next unless Repeat is on, and the title music comes back
 on leaving.
 
@@ -163,7 +166,7 @@ on leaving.
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
 - The second swimsuit event (NOM04) shows a few backdrop tiles wrong: a lighter block at the lower left and a darker
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
-- Extra's Animation and Sprites pages aren't built: their tabs are drawn but do nothing. Settings' font list is empty
+- Extra's Sprites page isn't built: its tab is drawn but does nothing. Settings' font list is empty
   and its choice does nothing, and the volume screen's Play and Allow Test buttons are drawn but do nothing.
 - Double Date Dilemma's memory blurbs are drawn about 1.5% narrower than the PC's, so a line can break one word
   earlier.

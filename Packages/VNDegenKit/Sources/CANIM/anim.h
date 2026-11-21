@@ -120,6 +120,8 @@ typedef struct Define {
     int cgCount;
     char **memory;
     int memoryCount;
+    char **movie;
+    int movieCount;
 } Define;
 
 bool an_define_load(Define *d, const char *path);
@@ -285,7 +287,7 @@ struct AN {
 
     int screen, logTop, wheel;
     int slotPage;
-    int extraTab, extraPage, extraViewer, extraTrack, replay;
+    int extraTab, extraPage, extraViewer, extraTrack, extraMovie, replay;
     bool extraRepeat;
     char bgm[16], extraBgm[16];
     int volume[5], voiceVolume[AN_VOICE_TABS], bgvVolume[AN_VOICE_TABS], talkVolume[AN_VOICE_TABS], volumeChar, dragSlider, infoRow;
@@ -388,6 +390,8 @@ bool an_reset_saves(AN *a);
 bool an_cg_unlocked(const AN *a, int id);
 void an_cg_unlock(AN *a, const char *name);
 bool an_memory_unlocked(const AN *a, int n);
+bool an_movie_unlocked(const AN *a, int id);
+void an_movie_unlock(AN *a, const char *name);
 void an_memory_unlock(AN *a, int n);
 void an_extra_open(AN *a);
 void an_extra_render(AN *a);

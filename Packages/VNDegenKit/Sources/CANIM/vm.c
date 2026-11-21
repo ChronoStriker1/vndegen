@@ -333,8 +333,14 @@ static void exec(AN *a, const Op *op) {
     case 0x94:
         if (!a->skipMode && an_movie_play(a, str(a, &g[1]), false, 0)) a->th.wait = W_MOVIE;
         break;
-    case 0x95: an_movie_play(a, str(a, &g[1]), true, 0); break;
-    case 0x96: an_movie_play(a, str(a, &g[1]), true, (u32)val(a, &g[2])); break;
+    case 0x95:
+        an_movie_unlock(a, str(a, &g[1]));
+        an_movie_play(a, str(a, &g[1]), true, 0);
+        break;
+    case 0x96:
+        an_movie_unlock(a, str(a, &g[1]));
+        an_movie_play(a, str(a, &g[1]), true, (u32)val(a, &g[2]));
+        break;
     case 0x97: an_movie_stop(a); break;
     case 0x26: {
         i32 lo = g[1].v, hi = g[2].v;

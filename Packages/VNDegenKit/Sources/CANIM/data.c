@@ -265,7 +265,16 @@ static char *define_sample(const u8 *d, size_t size) {
     return dup_string(text, (size_t)(tz - text));
 }
 
-enum { CG_RECORD = 2, MEMORY_RECORD = 8, GALLERY_MAX = 2000 };
+enum { CG_RECORD = 2, MOVIE_RECORD = 3, MEMORY_RECORD = 8, GALLERY_MAX = 2000 };
+
+static bool movie_name_ok(const u8 *p, const u8 *end) {
+    int n = 0;
+    while (p + n < end && p[n] && n < 32) {
+        if (!isalnum(p[n]) && p[n] != '_' && p[n] != '.') return false;
+        n++;
+    }
+    return n > 4 && p + n < end && !p[n] && !memcmp(p + n - 4, ".mpg", 4);
+}
 
 static bool cg_name_ok(const u8 *p, const u8 *end) {
     int n = 0;
@@ -294,6 +303,13 @@ static void define_galleries(Define *def, const u8 *d, size_t size) {
             def->cg = NULL;
             def->cgCount = 0;
         }
+    }
+    for (size_t at = 0; at + 12 < size; at++) {
+        if (rd32(d + at) != MOVIE_RECORD || rd32(d + at + 4) != (u32)def->movieCount || !movie_name_ok(d + at + 8, end)) continue;
+        const u8 *z = memchr(d + at + 8, 0, (size_t)(end - d - at - 8));
+        def->movie = an_realloc(def->movie, sizeof(char *) * (size_t)(def->movieCount + 1));
+        def->movie[def->movieCount++] = dup_string(d + at + 8, (size_t)(z - d - at - 8));
+        at = (size_t)(z - d);
     }
     for (size_t at = 0; at + 16 < size; at++) {
         if (rd32(d + at) != MEMORY_RECORD || rd32(d + at + 4) != (u32)def->memoryCount + 1 || rd32(d + at + 8) > 9) continue;
@@ -436,6 +452,8 @@ void an_define_free(Define *def) {
     free(def->cg);
     for (int i = 0; i < def->memoryCount; i++) free(def->memory[i]);
     free(def->memory);
+    for (int i = 0; i < def->movieCount; i++) free(def->movie[i]);
+    free(def->movie);
     free(def->data);
     memset(def, 0, sizeof *def);
 }

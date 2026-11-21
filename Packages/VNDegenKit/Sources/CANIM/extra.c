@@ -80,16 +80,18 @@ static int unlocked_in(AN *a, int start, int size) {
 static int per_page(int tab) { return GRID_COLS * (tab == EX_SCENES ? MEMORY_ROWS : CG_ROWS); }
 
 static int page_count(AN *a, int tab) {
-    int items = tab == EX_SCENES ? a->def.memoryCount : group_count(a);
+    int items = tab == EX_SCENES ? a->def.memoryCount : tab == EX_ANIME ? a->def.movieCount : group_count(a);
     return (items + per_page(tab) - 1) / per_page(tab);
 }
 
 static const char *atlas_name(int tab) { return tab == EX_SCENES ? "pMemoryButton" : tab == EX_MUSIC ? "pMusicButton" : "pCgButton"; }
-static const char *screen_name(int tab) { return tab == EX_SCENES ? "pMemory" : tab == EX_MUSIC ? "pMusic" : "pCg"; }
+static const char *screen_name(int tab) {
+    return tab == EX_SCENES ? "pMemory" : tab == EX_MUSIC ? "pMusic" : tab == EX_ANIME ? "pAnime" : "pCg";
+}
 
 static Image *thumbs(AN *a, int tab, int page) {
     char name[32];
-    snprintf(name, sizeof name, tab == EX_SCENES ? "p_metn%02d" : "p_cgtn%02d", page + 1);
+    snprintf(name, sizeof name, tab == EX_SCENES ? "p_metn%02d" : tab == EX_ANIME ? "p_mvtn%02d" : "p_cgtn%02d", page + 1);
     return an_image_load(a, name);
 }
 
@@ -135,13 +137,14 @@ void an_extra_open(AN *a) {
     a->extraPage = 0;
     a->extraViewer = -1;
     a->extraTrack = -1;
+    a->extraMovie = -1;
     snprintf(a->extraBgm, sizeof a->extraBgm, "%s", a->bgm);
 }
 
 static void draw_tabs(AN *a, Image *b, int tab) {
     const ExtraLayout *L = &EXTRA[a->game];
     for (int k = 0; k < EX_TABS; k++) {
-        bool live = k != EX_ANIME && k != EX_SPRITES;
+        bool live = k != EX_SPRITES;
         int state = k == a->extraTab ? 2 : live && in_rect(a, TAB_X + TAB_DX * k, TAB_Y, TAB_W, TAB_H) ? 1 : 0;
         int ax = tab == EX_MUSIC ? L->musicTabX + 186 * k : 3 + 186 * k, ay = tab == EX_MUSIC ? L->musicTabY + 42 * state : 284 + 42 * state;
         an_gfx_blit(a->fb, a->W, a->H, b, ax, ay, TAB_W, TAB_H, TAB_X + TAB_DX * k, TAB_Y + (tab == EX_MUSIC && a->game == GAME_DDD), 255);
@@ -230,6 +233,20 @@ static void wrap_chars(AN *a, const char *in, int size, int width, char *out, si
     out[o] = 0;
 }
 
+static void draw_anime(AN *a, Image *b) {
+    const ExtraLayout *L = &EXTRA[a->game];
+    Image *t = thumbs(a, EX_ANIME, a->extraPage);
+    int first = a->extraPage * per_page(EX_ANIME);
+    int shown = a->def.movieCount - first < per_page(EX_ANIME) ? a->def.movieCount - first : per_page(EX_ANIME);
+    int hover = cell_hit(a, shown), have = 0;
+    for (int k = 0; k < shown; k++) {
+        bool open = an_movie_unlocked(a, first + k);
+        draw_cell(a, b, t, k, open, open && k == hover);
+    }
+    for (int i = 0; i < a->def.movieCount; i++) have += an_movie_unlocked(a, i);
+    draw_big_cells(a, b, L, a->def.movieCount ? have * 100 / a->def.movieCount : 0, L->percentRight, L->percentY);
+}
+
 static void draw_scenes(AN *a, Image *b) {
     const ExtraLayout *L = &EXTRA[a->game];
     Image *t = thumbs(a, EX_SCENES, a->extraPage);
@@ -290,16 +307,32 @@ void an_extra_render(AN *a) {
         draw_viewer(a);
         return;
     }
+    if (a->extraMovie >= 0) {
+        an_gfx_fill(a->fb, a->W, a->H, 0xff000000u);
+        an_movie_draw(a, a->fb);
+        return;
+    }
     Image *bg = an_image_load(a, screen_name(a->extraTab));
     if (bg) an_gfx_blit(a->fb, a->W, a->H, bg, 0, 0, a->W, a->H, 0, 0, 255);
     Image *b = an_image_load(a, atlas_name(a->extraTab));
     if (!b) return;
     if (a->extraTab != EX_MUSIC) draw_pages(a, b);
     if (a->extraTab == EX_CG) draw_cg(a, b);
+    else if (a->extraTab == EX_ANIME) draw_anime(a, b);
     else if (a->extraTab == EX_SCENES) draw_scenes(a, b);
     else draw_music(a, b);
     Image *chrome = a->extraTab == EX_MUSIC ? b : an_image_load(a, "pCgButton");
     if (chrome) draw_tabs(a, chrome, a->extraTab);
+}
+
+static void play_movie(AN *a, int from) {
+    for (int i = from; i < a->def.movieCount; i++)
+        if (an_movie_unlocked(a, i) && an_movie_play(a, a->def.movie[i], true, 0)) {
+            a->extraMovie = i;
+            return;
+        }
+    an_movie_stop(a);
+    a->extraMovie = -1;
 }
 
 static void viewer_next(AN *a) {
@@ -359,6 +392,15 @@ bool an_extra_input(AN *a) {
         a->clicked = a->rclicked = false;
         return true;
     }
+    if (a->extraMovie >= 0) {
+        if (a->rclicked) {
+            an_movie_stop(a);
+            a->extraMovie = -1;
+        } else if (a->clicked)
+            play_movie(a, a->extraMovie + 1);
+        a->clicked = a->rclicked = false;
+        return true;
+    }
     const ExtraLayout *L = &EXTRA[a->game];
     if (a->extraTab == EX_MUSIC && a->extraTrack >= 0 && !a->extraRepeat && !an_snd_playing(a, CH_BGM)) {
         int next = a->extraTrack + 1 < L->trackCount ? a->extraTrack + 1 : -1;
@@ -377,7 +419,7 @@ bool an_extra_input(AN *a) {
         return true;
     }
     for (int k = 0; k < EX_TABS; k++)
-        if (k != EX_ANIME && k != EX_SPRITES && in_rect(a, TAB_X + TAB_DX * k, TAB_Y, TAB_W, TAB_H) && k != a->extraTab) {
+        if (k != EX_SPRITES && in_rect(a, TAB_X + TAB_DX * k, TAB_Y, TAB_W, TAB_H) && k != a->extraTab) {
             a->extraTab = k;
             a->extraPage = 0;
             return true;
@@ -405,6 +447,12 @@ bool an_extra_input(AN *a) {
             return true;
         }
     int first = a->extraPage * per_page(a->extraTab);
+    if (a->extraTab == EX_ANIME) {
+        int shown = a->def.movieCount - first < per_page(EX_ANIME) ? a->def.movieCount - first : per_page(EX_ANIME);
+        int k = cell_hit(a, shown);
+        if (k >= 0 && an_movie_unlocked(a, first + k)) play_movie(a, first + k);
+        return true;
+    }
     if (a->extraTab == EX_CG) {
         int groups = group_count(a), shown = groups - first < per_page(EX_CG) ? groups - first : per_page(EX_CG);
         int k = cell_hit(a, shown);

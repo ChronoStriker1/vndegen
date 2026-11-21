@@ -84,8 +84,8 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
     an_snd_init(a);
     an_vm_start(a, 8);
     srand((unsigned)cfg->startTime);
-    an_log(a, "opened %s: %d labels, %d strings, %d sprite names, %d voices, %d E-mote models, %d CGs, %d memories", base, a->sc->labelCount,
-           a->sc->strCount, a->def.spriteCount, a->voice.count, a->psb.count, a->def.cgCount, a->def.memoryCount);
+    an_log(a, "opened %s: %d labels, %d strings, %d sprite names, %d voices, %d E-mote models, %d CGs, %d memories, %d movies", base, a->sc->labelCount,
+           a->sc->strCount, a->def.spriteCount, a->voice.count, a->psb.count, a->def.cgCount, a->def.memoryCount, a->def.movieCount);
     return (VNANIM *)a;
 }
 
