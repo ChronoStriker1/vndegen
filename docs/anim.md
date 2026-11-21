@@ -135,7 +135,8 @@ lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the ga
   one at the right, where the PC shows the floor. The first (NOM03) matches the PC.
 - The Extra screens (CG, scene and music galleries) aren't built. Settings' font list is empty and its choice does
   nothing, and the volume screen's Play and Allow Test buttons are drawn but do nothing.
-- Magical Sword: the title, message window, menu bar, Config, Volume, Save, Load and the message log are built; its
-  other screens use Double Date Dilemma's layout for now.
-- The Load screen's AUTO SAVE page isn't built, and the PC's comment editing on cards isn't either.
+- Magical Sword: every screen but Extra is built to its own layout and checked against the PC. Its goddess, with three
+  times the sprites of a Double Date Dilemma character, runs at 46 frames a second alone in the Debug Mac app and 26
+  in the opening's 300% close-up (34 and 20 on the iPad simulator).
+- Magical Sword's Load screen AUTO SAVE page isn't built, nor is the PC's comment editing on cards.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

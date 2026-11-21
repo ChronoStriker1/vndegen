@@ -133,6 +133,8 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | ANIM | Double Date Dilemma, a still event picture with no E-mote character, from a save | iPad simulator | 60 | 49.3 to 51.5 | 26.3 to 27.5 | 40 s | 4.9 | 11-20 | fadf6e09 |
 | ANIM | Magical Sword, the goddess (1,051 sprites) alone with her idle motion, Debug build | Mac app, mini | 60 | 45.6 to 45.9 | 25.4 to 25.7 | 30 s | | 11-21 | 6c8aab9c |
 | ANIM | Magical Sword, the goddess at 300% in the opening close-up, Debug build | Mac app, mini | 60 | 25.4 to 25.7 | 16.9 to 17.9 | 30 s | | 11-21 | 6c8aab9c |
+| ANIM | Magical Sword, the goddess (1,051 sprites) alone with her idle motion | iPad simulator | 60 | 33.4 to 34.0 | 24.1 | 30 s | | 11-21 | 6c8aab9c |
+| ANIM | Magical Sword, the goddess at 300% in the opening close-up | iPad simulator | 60 | 20.0 | 17.9 to 18.9 | 40 s | | 11-21 | 6c8aab9c |
 
 Before #49's fix (2026-11-07), NScripter, Ponscripter, NekoSDK and Wolf RPG rounded each display refresh to whole milliseconds, so their clocks ran 4% slow at 120 Hz and 2% fast at 60 Hz. Rows marked "was" give the number before it. A Wolf RPG game at 60 Hz drew 60.0 then too, but ran 61.2 game frames a second, with a double step every 50 refreshes.
 
