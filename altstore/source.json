@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.58.1",
+          "buildVersion": "3032",
+          "date": "2026-11-21T00:34:41Z",
+          "localizedDescription": "Fixes for President Yukino on Wolf RPG and Yu Crossing Animals on Godot 3, from the checks in #190.\n\n## Downloads\n\n- `VNDegen-0.58.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.58.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.58.1-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **Wolf RPG:** President Yukino now plays past its prologue, opens its menu and shows its portraits, and its saves load in the PC version. Five differences from the PC engine were fixed:\n  - a common event called by name runs the last event with that name;\n  - \"move to registered position\" works;\n  - \"×=\" with a division multiplies first;\n  - an event started by a parallel event runs on the next frame;\n  - Wolf 2.2x games get saves the PC version can load.\n- **Godot 3:** Yu Crossing Animals' hero can walk. Godot 3.5 and later find the nearest point on the navigation map with too little precision; VNDegen now uses full precision there.\n- **YU-RIS:** a missing optional button image is logged once instead of every frame.\n\nTwo things in #190 needed no change: Yu Crossing's language list starts on Polski on the PC too, and President Yukino's calls to common events it doesn't have are skipped on the PC too.\n\n## Known limits\n\n- After loading a President Yukino save, its day bar and portrait come back only once the menu has been opened. The PC engine restores pictures from the save; VNDegen doesn't yet.\n- Drain Dungeon and Journey of Depravity, before they have saves of their own, now get the same older save format. It wasn't checked in their PC versions.\n\n## What wasn't tested\n\n- Yu Crossing Animals' save, which the game allows only far into the story.\n- The Wolf RPG changes on the iPad simulator. They were checked in the Mac app and the Linux test build.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.58.1/VNDegen-0.58.1.ipa",
+          "size": 131638284,
+          "sha256": "36a583151b4ee4b372a72cdd55b42a8f9892d913b2701f602dad83e6ed0a0202",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.58.0",
           "buildVersion": "3021",
           "date": "2026-11-20T16:46:43Z",
