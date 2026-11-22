@@ -35,3 +35,29 @@ where play couldn't pin it down.
 - **Placing.** Measured: a facility is chosen from the list and placed on an open cell; 決定 builds it and takes its cost
   in resources; the town window shows the result before 決定. VNDegen places with one click where the original holds the
   piece until a second.
+
+## Battles, rule by rule
+
+Measured from the original's battle log under Wine, read line by line from captures (the log is drawn in a 12-pixel
+font that Ume Gothic at 12 pixels matches exactly), over six battles in 千樹庭's first area with Darkus at level 1.
+
+- **Stats.** `unit.obj` columns 23 and 24 are HP and MP, and 25 to 32 physical attack, magic attack, physical
+  defence, magic defence, speed, evasion, government and command, the order of the training screen's card
+  (`grw_f00`). Column 15 is the unit's 格 (Darkus 0), column 17 its level, column 19 its growth type. Measured: Darkus
+  shows 170 HP and 35 MP.
+- **Growth.** `lvup.obj` gives each growth type's gains as text, such as `攻撃+1/4|防御+1/6|速度+1/12|回避+1/15`, one
+  point for every so many levels. Inferred: counted from level 1, so a level 5 enemy of the common type has one more
+  attack and no more defence. Every sample below fits that.
+- **Damage.** A random number in the skill's power range (`skill.obj` columns 17 and 18), plus the attacker's
+  physical attack, minus the target's physical defence. Measured: 31 hits by ten skills, each inside its predicted
+  range. Darkus's 剣撃 (27 to 30, attack 18) did 44, 44, 36, 33, 45, 44, 43, 41, 42, 48 and 46 to targets of defence
+  3, 12, 0, 2, 5 and 0; enemies' hits on Darkus (defence 17) matched the same way, such as ホネ's 突き刺し (25 to 28,
+  attack 9) for 18 each time and フニ's ひっかき (25 to 28, attack 10) for 20 and 21. 斬撃, 打撃 and 射撃 skills all
+  follow it.
+- **Several targets.** 乱舞斬 (target 敵３) hit its first target for full damage and the second for half. Measured
+  twice; how the third target and rows count is still open.
+- **Healing.** 小回復 (38 to 42) healed 39 and 38: inferred as the power alone.
+- **Hit and miss.** Not yet known: ツタ (accuracy 85) missed Darkus three times in four, more than its accuracy
+  suggests, so evasion or speed takes part.
+- **Rewards.** Measured: a win gives money, resources and experience in a box over the board; a loss ends the
+  expedition and loses what it found.
