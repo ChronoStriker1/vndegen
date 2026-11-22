@@ -948,6 +948,9 @@ impl<'a> OriginalStreamReader<'a> {
         let cnt = self.count(1)?;
         let mut out = Vec::with_capacity(cnt);
         for _ in 0..cnt {
+            if self.rd.pos >= jump.max(0) as usize {
+                break;
+            }
             out.push(read_one(self)?);
         }
         self.finish_fixed_array(jump)?;
@@ -973,6 +976,9 @@ impl<'a> OriginalStreamReader<'a> {
         let jump = self.rd.i32()?;
         let cnt = self.count(1)?;
         for _ in 0..cnt {
+            if self.rd.pos >= jump.max(0) as usize {
+                break;
+            }
             skip_one(self)?;
         }
         self.finish_fixed_array(jump)
@@ -1885,6 +1891,28 @@ mod local_layout_tests {
 #[cfg(all(test, not(all(target_arch = "wasm32", target_os = "unknown"))))]
 mod vndegen_case_tests {
     use super::*;
+
+    #[test]
+    fn fixed_items_stop_at_the_array_end_when_the_count_is_larger() {
+        let mut bytes = Vec::new();
+        for v in [24i32, 5, 7, 8, 9, 10, 42] {
+            bytes.extend_from_slice(&v.to_le_bytes());
+        }
+        let mut rd = OriginalStreamReader::new(&bytes);
+        let items = rd.fixed_items(|rd| rd.i32()).unwrap();
+        assert_eq!(items, vec![7, 8, 9, 10]);
+        assert_eq!(rd.i32().unwrap(), 42);
+
+        let mut rd = OriginalStreamReader::new(&bytes);
+        let mut seen = 0;
+        rd.skip_fixed_items(|rd| {
+            seen += 1;
+            rd.skip(4)
+        })
+        .unwrap();
+        assert_eq!(seen, 4);
+        assert_eq!(rd.i32().unwrap(), 42);
+    }
 
     /// A PC backup restored on a disk that doesn't ignore case keeps the PC's spelling, and saves go there.
     #[test]

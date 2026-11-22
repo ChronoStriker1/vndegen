@@ -9916,12 +9916,12 @@ impl<'a> SceneVm<'a> {
         w: &mut crate::original_save::OriginalStreamWriter,
         m: &runtime::globals::MwndState,
         page: &runtime::globals::MwndMessagePageState,
+        name_moji_size: i64,
     ) {
         // C_elm_mwnd_msg::PARAM (21 consecutive i32 fields).
         let (cnt_x, cnt_y) = m.window_moji_cnt.unwrap_or((0, 0));
-        let (pos_x, pos_y) = m.message_pos.unwrap_or((0, 0));
+        let (pos_x, pos_y) = page.cursor_pos;
         let (space_x, space_y) = m.moji_space.unwrap_or((-1, 10));
-        let (talk_l, talk_t, talk_r, talk_b) = m.message_margin.unwrap_or((0, 0, 0, 0));
         for value in [
             cnt_x,
             cnt_y,
@@ -9937,13 +9937,13 @@ impl<'a> SceneVm<'a> {
             page.fuchi_color.unwrap_or(-1),
             m.ruby_size,
             m.ruby_space,
-            m.default_moji_size,
+            name_moji_size,
             0,
             m.name_bracket,
-            talk_l,
-            talk_t,
-            talk_r,
-            talk_b,
+            0,
+            0,
+            0,
+            0,
         ] {
             w.push_i32(Self::save_i32(value));
         }
@@ -10003,14 +10003,9 @@ impl<'a> SceneVm<'a> {
         let _name_moji_size = rd.i32()?;
         let _name_newline = rd.i32()?;
         let _name_bracket = rd.i32()?;
-        let talk_l = rd.i32()? as i64;
-        let talk_t = rd.i32()? as i64;
-        let talk_r = rd.i32()? as i64;
-        let talk_b = rd.i32()? as i64;
+        rd.skip(16)?;
         m.window_moji_cnt = Some((cnt_x, cnt_y));
-        m.message_pos = Some((pos_x, pos_y));
         m.moji_space = Some((space_x, space_y));
-        m.message_margin = Some((talk_l, talk_t, talk_r, talk_b));
         m.ruby_size = ruby_size;
         m.ruby_space = ruby_space;
 
@@ -10422,11 +10417,17 @@ impl<'a> SceneVm<'a> {
         w.push_i32(Self::save_i32(m.close_anime_start_time));
 
         w.push_i32((m.message_pages.len() + 1).min(i32::MAX as usize) as i32);
+        let name_moji_size = self
+            .ctx
+            .tables
+            .mwnd_templates
+            .get(mwnd_idx)
+            .map_or(m.default_moji_size, |template| template.name_moji_size);
         for page in &m.message_pages {
-            Self::write_cpp_mwnd_message(w, m, page);
+            Self::write_cpp_mwnd_message(w, m, page, name_moji_size);
         }
         let active = Self::active_mwnd_message_page(m);
-        Self::write_cpp_mwnd_message(w, m, &active);
+        Self::write_cpp_mwnd_message(w, m, &active, name_moji_size);
         self.write_cpp_mwnd_waku(w, m, None);
         Self::write_cpp_mwnd_name(w, m);
         let name_waku_no = self.ctx.tables.mwnd_templates.get(mwnd_idx).map_or(-1, |t| t.name_waku_no);
@@ -10577,6 +10578,25 @@ impl<'a> SceneVm<'a> {
         ] {
             Self::write_cpp_int_event_raw(w, e);
         }
+        if w.legacy {
+            let r = &world.camera_eye_xz_eve;
+            for v in [
+                world.camera_view_angle,
+                world.mono,
+                r.cur_time,
+                r.end_time,
+                r.delay_time,
+                r.loop_type,
+                r.speed_type,
+                r.start_x,
+                r.start_z,
+                r.end_x,
+                r.end_z,
+            ] {
+                w.push_i32(v);
+            }
+            return;
+        }
         for v in [
             world.camera_view_angle,
             world.mono,
@@ -10613,6 +10633,20 @@ impl<'a> SceneVm<'a> {
         world.camera_up_z = Self::read_cpp_int_event_raw(rd)?;
         world.camera_view_angle = rd.i32()?;
         world.mono = rd.i32()?;
+        if rd.layout == NativeLocalLayout::Legacy {
+            world.camera_eye_xz_eve = runtime::globals::WorldRotateEvent {
+                cur_time: rd.i32()?,
+                end_time: rd.i32()?,
+                delay_time: rd.i32()?,
+                loop_type: rd.i32()?,
+                speed_type: rd.i32()?,
+                start_x: rd.i32()?,
+                start_z: rd.i32()?,
+                end_x: rd.i32()?,
+                end_z: rd.i32()?,
+            };
+            return Ok(world);
+        }
         world.order = rd.i32()?;
         world.layer = rd.i32()?;
         world.wipe_copy = rd.i32()?;
@@ -11867,18 +11901,10 @@ impl<'a> SceneVm<'a> {
         w.push_i32(option);
     }
 
-    fn write_cpp_runtime_proc_stack(&self, w: &mut crate::original_save::OriginalStreamWriter) {
-        // Do not fabricate C_tnm_proc states.  Until the real C++ proc element,
-        // arg_list, return_value_flag and option are mirrored from runtime state,
-        // only the script proc can be represented safely; other transient waits are
-        // saved as NONE rather than writing a guessed proc_type.
-        let proc_type = if matches!(self.ctx.last_proc_kind(), runtime::ProcKind::Script) {
-            1
-        } else {
-            0
-        };
-        Self::write_cpp_proc_record(w, proc_type, &[], 0);
-        w.push_i32(0);
+    fn write_cpp_runtime_proc_stack(w: &mut crate::original_save::OriginalStreamWriter) {
+        Self::write_cpp_proc_record(w, 1, &[], 0);
+        w.push_i32(1);
+        Self::write_cpp_proc_record(w, 0, &[], 0);
     }
 
     fn read_cpp_proc_record(
@@ -12009,7 +12035,7 @@ impl<'a> SceneVm<'a> {
         w.push_i32(self.current_line_no);
         w.push_i32(self.stream.get_prg_cntr() as i32);
 
-        self.write_cpp_runtime_proc_stack(&mut w);
+        Self::write_cpp_runtime_proc_stack(&mut w);
         w.push_element(&self.ctx.globals.current_mwnd_element);
         w.push_element(&self.ctx.globals.current_sel_mwnd_element);
         w.push_element(&self.ctx.globals.last_mwnd_element);
@@ -15002,6 +15028,58 @@ mod command_dispatch_tests {
     }
 
     #[test]
+    fn legacy_world_record_ends_with_the_camera_rotation_event() {
+        use crate::original_save::{OriginalStreamReader, OriginalStreamWriter};
+        let mut native = vec![0i32];
+        for (def, loop_type) in [
+            (0, -1),
+            (0, -1),
+            (-1000, -1),
+            (0, -1),
+            (0, -1),
+            (0, -1),
+            (0, -1),
+            (1, -1),
+            (0, -1),
+        ] {
+            native.extend([def, def, 0, 0, 0, def, def, def, loop_type, -1, 0]);
+        }
+        native.extend([450, 0, 161903, 0, 0, -1, 0, 0, 0, 0, 0]);
+        let bytes: Vec<u8> = native.iter().flat_map(|v| v.to_le_bytes()).collect();
+        assert_eq!(bytes.len(), 444);
+
+        let mut rd = OriginalStreamReader::new(&bytes);
+        rd.layout = NativeLocalLayout::Legacy;
+        let world = SceneVm::read_cpp_world(&mut rd, 0).unwrap();
+        assert!(rd.remaining().is_empty());
+        assert_eq!((world.camera_view_angle, world.mono), (450, 0));
+        assert_eq!(world.camera_eye_xz_eve.cur_time, 161903);
+        assert_eq!(world.camera_eye_xz_eve.loop_type, -1);
+        assert_eq!(world.camera_eye_z.def_value, -1000);
+
+        let vm = test_vm();
+        let mut w = OriginalStreamWriter::new();
+        w.legacy = true;
+        vm.write_cpp_world(&mut w, &world);
+        assert_eq!(w.into_inner(), bytes);
+
+        let mut w = OriginalStreamWriter::new();
+        vm.write_cpp_world(&mut w, &world);
+        assert_eq!(w.into_inner().len(), 424);
+    }
+
+    #[test]
+    fn local_save_runs_the_script_proc_over_an_empty_proc() {
+        use crate::original_save::OriginalStreamWriter;
+        let mut w = OriginalStreamWriter::new();
+        SceneVm::write_cpp_runtime_proc_stack(&mut w);
+        let bytes = w.into_inner();
+        let int_at = |at: usize| i32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+        assert_eq!(bytes.len(), 147 + 4 + 147);
+        assert_eq!((int_at(0), int_at(147), int_at(151)), (1, 1, 0));
+    }
+
+    #[test]
     fn legacy_backlog_entries_do_not_have_save_id_check_bytes() {
         use crate::original_save::{OriginalStreamReader, OriginalStreamWriter};
         for early in [false, true] {
@@ -15874,10 +15952,12 @@ mod call_frame_save_metadata_tests {
         ] {
             words[idx] = HEADER_SIZE;
         }
+        words[2] = 16;
         let mut out = Vec::with_capacity(HEADER_SIZE as usize);
         for word in words {
             out.extend_from_slice(&word.to_le_bytes());
         }
+        out.resize(HEADER_SIZE as usize + 16, 0);
         out
     }
 

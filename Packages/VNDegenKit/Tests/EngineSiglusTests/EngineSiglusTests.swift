@@ -84,7 +84,7 @@ private let seen = Data([0x00, 0x00, 0x00, 0x00, 0x40, 0x9c, 0x00, 0x00])
         let realLive = try #require(RealLivePlugin().saveLocations(folder: root, dataDirectory: data).first)
         #expect(realLive.directory == data.appending(path: "savedata_rs", directoryHint: .isDirectory))
         #expect(RealLivePlugin().backupWarning(for: Game(id: GameID("g")), dataDirectory: data) != nil)
-        #expect(SiglusPlugin().backupWarning(for: Game(id: GameID("g")), dataDirectory: data) != nil)
+        #expect(SiglusPlugin().backupWarning(for: Game(id: GameID("g")), dataDirectory: data) == nil)
     }
 }
 

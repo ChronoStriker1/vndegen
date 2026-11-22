@@ -100,7 +100,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Mac: the close, minimise and zoom buttons are hidden while a game plays and show with the VNDegen menu open (#90, 0.41.2).
 - The web view no longer allows AirPlay for a game's movies and sound; a TV is reached with Screen Mirroring (0.41.3).
 - N2System (Nitroplus), on VNDegen's own clean-room runtime, with the English release of Hanachirasu and PC saves both ways (0.42.0).
-- SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, the player's preferred language, word wrap for English, and `.wmv` movies through the app's FFmpeg (0.43.0). PC saves load in VNDegen; saves made in VNDegen can crash the PC version.
+- SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, the player's preferred language, word wrap for English, and `.wmv` movies through the app's FFmpeg (0.43.0). Saves go both ways with the PC version (0.59.5).
 - RPG Maker MV and MZ games packed into one Enigma Virtual Box exe are unpacked on import, without running the exe, with the library's three such games (0.44.0).
 - Construct 3, in the web view, with Transpile Girl Rescue Operation! (0.45.0). Its saves stay in VNDegen, as Twine's do.
 - Tmr-Hiro ADV System, on VNDegen's own clean-room runtime, with the English release of Welcome to the Mizuryuu kei land and PC saves both ways (0.46.0). More Tmr-Hiro games follow in sets.
@@ -135,6 +135,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - ANIM's Extra galleries (CG, scenes, music) with unlocks shared with the PC, and Magical Sword's autosaves (0.59.2).
 - ANIM's pose animations beside the story, and Extra's Animation page and Sprites viewer (0.59.3).
 - ANIM: clipped E-mote parts (the goddess's irises) and 8-bit E-mote textures (0.59.4).
+- SiglusEngine: saves made in VNDegen load in the PC version with their text, planetarian HD's PC saves load in VNDegen, and movies that store their sound behind the picture play all of it (0.59.5).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -145,7 +146,6 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
@@ -165,7 +165,7 @@ Engines with games in the library that VNDegen doesn't run yet, from the [engine
 
 ## Set aside
 - FFD and SRPG Studio, set aside on 2026-11-19: their one library game each, Eiyu Senki and Succubus Senki, was left out after the content check. Both formats can be read from MIT sources (GARbro, SRPG-ToolBox), so each comes back if the library gains another game for it.
-- SystemAoi and Smile Game Builder, set aside again on 2026-11-19 after their games passed the content re-check, for size. Bunny Black 3 (SystemAoi 5) keeps its battles, 3D dungeon, unit building and kingdom management in about 686 KB of the exe's own code, not in scripts, and its movies are WMV, which no permissively licensed decoder reads: about 8 to 12 weeks for one Japanese-only game. Sacred (Smile Game Builder) is about 6 to 10 weeks, for the reasons below. Either comes back if the maintainer asks.
+- SystemAoi and Smile Game Builder, set aside again on 2026-11-19 after their games passed the content re-check, for size. Bunny Black 3 (SystemAoi 5) keeps its battles, 3D dungeon, unit building and kingdom management in about 686 KB of the exe's own code, not in scripts, and its movies are WMV, which no permissively licensed decoder reads: about 8 to 12 weeks for one Japanese-only game. Sacred (Smile Game Builder) is about 6 to 10 weeks, for the reasons below. Either comes back if the maintainer asks. The maintainer brought SystemAoi back on 2026-11-21: Bunny Black 3 is being built on `feat/systemaoi`, in slices, the first one the opening through the first dungeon.
 - Smile Game Builder, set aside on 2026-11-18. Two of its three library games were left out after the content check, and the one left, Princess Colette's Great Adventure, is Japanese only. Its games are 3D, so a runtime of VNDegen's own would need a 3D renderer, FBX models and a battle system, about 4 to 6 weeks for that one game. Running the games' own .NET player would need its native graphics library rewritten, which the clean-room rule doesn't allow. It comes back if the library gains more Smile Game Builder games, especially English ones.
 - Save sync through the cloud services that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, set aside by the maintainer on 2026-11-16. A plan was written first: Google's and Microsoft's terms don't allow shipping rclone's own client IDs, so OneDrive and Dropbox would need VNDegen's own app registrations and Google Drive and Box each user's own client ID. Nothing was built.
 - An App Store release, ruled out by the maintainer on 2026-11-16. The groundwork that was done stays: the LGPL libraries in replaceable frameworks with their source on each release, and MetalANGLE for arm64 only.

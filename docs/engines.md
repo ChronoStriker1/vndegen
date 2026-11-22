@@ -127,7 +127,7 @@ Artemis games run on art3m1s-core, an open-source Rust reimplementation of the A
 
 ## SiglusEngine
 
-SiglusEngine games run on siglus_rs, an open-source Rust reimplementation of the engine, built into the app as the VNSiglus framework and drawn through wgpu's Metal backend. The game runs in the player's first preferred language it ships (planetarian HD ships seven), English when none matches. Saves are the PC engine's own files in the PC's folder beside the game, `savedata/` or `savedata_en/` and so on by language, so Ludusavi moves them both ways; a slot saved in VNDegen can crash the PC version when loaded there or load without its message text, which the backup warning in the game's Saves sheet says. `.omv` movies play through siglus_rs, and `.wmv` movies through the app's FFmpeg. English text wraps by word. RealLive, which siglus_rs also runs, isn't in this build. [siglus.md](siglus.md) has the details.
+SiglusEngine games run on siglus_rs, an open-source Rust reimplementation of the engine, built into the app as the VNSiglus framework and drawn through wgpu's Metal backend. The game runs in the player's first preferred language it ships (planetarian HD ships seven), English when none matches. Saves are the PC engine's own files in the PC's folder beside the game, `savedata/` or `savedata_en/` and so on by language, so Ludusavi moves them both ways, and slots saved on either side load on the other. `.omv` movies play through siglus_rs, and `.wmv` movies through the app's FFmpeg. English text wraps by word. RealLive, which siglus_rs also runs, isn't in this build. [siglus.md](siglus.md) has the details.
 
 ## Godot
 
