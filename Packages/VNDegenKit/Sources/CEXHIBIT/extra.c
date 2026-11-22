@@ -77,7 +77,7 @@ static void extra_store(EX *e) {
     free(b);
 }
 
-void extra_load(EX *e) {
+static void vndegen_seen_load(EX *e) {
     char *path = extra_path(e);
     size_t n;
     char *d = (char *)ex_read_file(path, &n);
@@ -101,16 +101,71 @@ void extra_load(EX *e) {
     free(text);
 }
 
+static i32 sys_reg(const u8 *d, int i) { return (i32)((u32)d[22 + i * 4] | (u32)d[23 + i * 4] << 8 | (u32)d[24 + i * 4] << 16 | (u32)d[25 + i * 4] << 24); }
+
+static void set_sys_reg(u8 *d, int i, i32 v) {
+    for (int k = 0; k < 4; k++) d[22 + i * 4 + k] = (u8)((u32)v >> (8 * k));
+}
+
+static void pc_seen_sync(EX *e) {
+    if (!e->className) return;
+    char *path = ex_fmt("%s/%s.system.dat", e->saveDir, e->className);
+    size_t n;
+    u8 *d = ex_read_file(path, &n);
+    if (!d || n < 22 || memcmp(d + 12, "FCReg", 6)) {
+        free(d);
+        free(path);
+        return;
+    }
+    int count = (int)((u32)d[18] | (u32)d[19] << 8 | (u32)d[20] << 16 | (u32)d[21] << 24);
+    if (count < 193 || n < 22 + (size_t)count * 4) {
+        free(d);
+        free(path);
+        return;
+    }
+    int nCg = sys_reg(d, 189), nScene = sys_reg(d, 190), cgBase = 193, sceneBase = cgBase + nCg;
+    if (nCg < 0 || nScene < 0 || sceneBase + nScene > count) {
+        free(d);
+        free(path);
+        return;
+    }
+    bool changed = false;
+    for (int id = 0; id < nCg && id < EX_SEEN_CG; id++) {
+        if (sys_reg(d, cgBase + id)) e->seenCg[id >> 3] |= (u8)(1 << (id & 7));
+        else if (seen_cg(e, id)) {
+            set_sys_reg(d, cgBase + id, 1);
+            changed = true;
+        }
+    }
+    for (int s = 0; s < nScene && s < EX_SEEN_SCENES; s++) {
+        if (sys_reg(d, sceneBase + s)) e->seenScene[s] = 1;
+        else if (e->seenScene[s]) {
+            set_sys_reg(d, sceneBase + s, 1);
+            changed = true;
+        }
+    }
+    if (changed) ex_write_file(path, d, n);
+    free(d);
+    free(path);
+}
+
+void extra_load(EX *e) {
+    vndegen_seen_load(e);
+    pc_seen_sync(e);
+}
+
 void extra_mark_cg(EX *e, int id) {
     if (id < 0 || id >= EX_SEEN_CG || seen_cg(e, id)) return;
     e->seenCg[id >> 3] |= (u8)(1 << (id & 7));
     extra_store(e);
+    pc_seen_sync(e);
 }
 
 void extra_mark_scene(EX *e, int n) {
     if (n < 0 || n >= EX_SEEN_SCENES || e->seenScene[n]) return;
     e->seenScene[n] = 1;
     extra_store(e);
+    pc_seen_sync(e);
 }
 
 static Op *find_op(EX *e, const char *script, int code, const char *prefix) {

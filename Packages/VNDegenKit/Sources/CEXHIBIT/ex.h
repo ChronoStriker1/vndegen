@@ -276,6 +276,7 @@ typedef struct EX {
     u32 tickAcc;
     int wheel;
     char *title;
+    char *className;
     u32 serial;
     u32 *screen;
     Image *cg;

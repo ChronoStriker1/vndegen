@@ -63,6 +63,11 @@ VNDegen uses the same folder and format:
 - VNDegen writes the same records, so its saves load on the PC (checked under Wine), and keeps its own exact state in
   `userdata/vndegen/slotNNN.sav`, which it uses when it matches the slot.
 - Settings are kept in `userdata/vndegen/config.txt`.
+- The PC keeps what has been seen in `userdata/<CLASS>.system.dat` (`CLASS` from `ExHIBIT.ini`), a register file of
+  `N_SYSREG` numbers whose registers 189 to 192 hold the sizes of four tables that follow from register 193: one
+  register per picture number (`N_CG`), one per scene (`N_SCENE`), then sounds and read text. VNDegen reads the
+  picture and scene tables when it starts and sets the registers for what it shows, so Extra counts what was seen on
+  either side. It writes only when that file is there, changing no other register.
 
 ## What runs
 
@@ -82,13 +87,13 @@ VNDegen uses the same folder and format:
   music list and its track numbers from `musicMode.rld` and the table `def.rld` builds with `CREATEDBINT`. A CG group
   opens once one of its pictures has been shown and steps through all of them; a scene opens once its `SETDONEFLAG`
   has run and plays from its script with `R1020` set, and the scene's own `exitReplay` brings Extra back; every track
-  plays, with the music volume bar. VNDegen keeps what has been seen in `userdata/vndegen/extra.txt`.
+  plays, with the music volume bar. VNDegen keeps what has been seen in `userdata/vndegen/extra.txt` and in the PC's
+  `system.dat` (see Saves).
 
 ## Known limits
 
 - The emotion icons that `MANPU` attaches to sprites (`.dlt` animations) are not drawn; see the clean-room notes.
-- Extra counts only what was seen in VNDegen: the PC game's own record of seen pictures and scenes isn't read. The CG
-  viewer has no Full Screen or Original buttons.
+- The CG viewer has no Full Screen or Original buttons.
 - Returning to the title from the system menu doesn't ask first, as the PC game does.
 - The backlog's Jump buttons aren't shown, and the config page's window-size and full-screen choices do nothing.
 
