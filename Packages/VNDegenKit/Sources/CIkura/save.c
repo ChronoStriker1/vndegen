@@ -731,7 +731,10 @@ bool save_exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0a03:
         if (n >= 16) save_global(t, val(t, a), val(t, a + 4), val(t, a + 8), val(t, a + 12));
         break;
-    case 0x0a04: load_global(t); break;
+    case 0x0a04:
+        load_global(t);
+        t->save.globalLoaded = true;
+        break;
     case 0x0a05: {
         snapshot(t);
         int slot = val(t, a), w = val(t, a + 4), h = val(t, a + 8);
@@ -783,7 +786,18 @@ bool save_exec(IK *t, u16 op, const u8 *a, int n) {
     return true;
 }
 
+static void close_writes(IK *t) {
+    Script *s = t->save.globalLoaded ? script_load(t, "CLOSE.SNR") : NULL;
+    for (u32 pc = 0; s && pc + 4 <= s->codeSize;) {
+        u16 op = rd16(s->code + pc), len = rd16(s->code + pc + 2);
+        if (len < 4 || pc + len > s->codeSize) break;
+        if (op == 0x0a03 || op == 0x0a0a) save_exec(t, op, s->code + pc + 4, len - 4);
+        pc += len;
+    }
+}
+
 void save_close(IK *t) {
+    close_writes(t);
     store_read(t);
     free(t->save.read);
     free(t->save.path);

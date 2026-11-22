@@ -215,7 +215,7 @@ typedef struct SaveFile {
     int slots;
     u8 *snap;
     size_t snapSize;
-    bool haveSnap;
+    bool haveSnap, globalLoaded;
     u8 *read;
     int readUnits;
     bool readDirty;

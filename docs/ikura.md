@@ -82,10 +82,10 @@ Raidy II's exe reads the same archives, pictures, sound and scripts; about sixty
   for a time or input.
 - Read marks: a script names its slot in the marks table with `090a` at its start, and `0908`'s first argument is the
   line's number in that script. `0a0b` (in `START.SNR`) loads the table and `0a0a` (in `CLOSE.SNR`, run when the game
-  quits) writes it back; VNDegen also writes it when the game closes. Scripts without a slot, such as the battles,
-  count as read. Settings 1 and 2 are the skip setting (0 Skip All, 1 Read Only) and
-  Nonstop. With Read Only, Skip shows an unread line and waits for a click, then goes on skipping; Skip ends at a
-  choice or other input wait unless Nonstop is on.
+  quits) writes it back, as VNDegen also does when the game closes (Saves, below). Scripts without a slot, such as
+  the battles, count as read. Settings 1 and 2 are the skip setting (0 Skip All, 1 Read Only) and Nonstop. With Read
+  Only, Skip shows an unread line and waits for a click, then goes on skipping; Skip ends at a choice or other input
+  wait unless Nonstop is on.
 - A button bound with a call returns to the input wait it interrupted, so a page such as the save page stays open after
   the action. `070c` and `070d` keep and restore the cancel and key bindings along with the buttons' modes. A jump
   from a button drops the current message only when it interrupts the message itself.
@@ -99,6 +99,10 @@ Raidy II, and so does VNDegen:
 - A header with the slot count (50), a table of slot offsets, the global block (flags and variables that last across
   games, such as the extras' unlocks) and a 64-word settings block (effect speed, skip mode, auto and text speed,
   sound switches and volumes, voiced characters).
+- The PC writes the global block only when the game quits, from `CLOSE.SNR` (`0a03`), and when a slot is loaded. A
+  player who leaves through VNDegen's menu doesn't run `CLOSE.SNR`, so when the game closes VNDegen does what that
+  script writes: the global block and, in Raidy II, the read marks. Without this the ending's clear flag and gallery
+  unlocks since the last in-game quit were lost.
 - Each slot: the date, the line on screen, a 112x84 thumbnail and an 8544-byte state: the script and label to resume
   at, the BGM, the flags, the variables, the picture names, every layer and every button with its binding. A load
   restores the state, runs `LOAD.SNR` (which rebuilds the dungeon from the variables) and resumes.
