@@ -203,7 +203,10 @@ safe: ANGEL QUEST's engine (version 123) closes when it loads a save holding a p
   or which music was playing; the map's own music starts. Saved pictures come back without their effects (shake, pulse,
   flicker, automatic patterns, the effect command's zoom and shift), and pictures made from XY arrays, cut with
   `<CUT/...>`, or holding text codes other than `\f`, `\E`, `<R>` and `\ay` are left out of saves and loads. Version 159
-  saves leave out window pictures too.
+  saves leave out window pictures too. No library game meets this at a save point: in 40,000 frames of each game
+  that saves pictures (President Yukino, Drain Dungeon, Journey of Depravity, The Clumsy Witch Seris), the only
+  effects are the message pause icon's and Seris's title backdrop's automatic patterns, and the only other codes
+  (`\c`, `\ax`) are on Seris's XY minimap and labels, which its menu erases before it saves.
 - The camera goes into version 128 saves as the PC writes it, so the PC shows a VNDegen save scrolled as it shows its
   own (President Yukino and Journey of Depravity under Wine). VNDegen keeps the hero in the middle after any load.
   The Clumsy Witch Seris's own engine writes 0 there and opens a load at the map's top left, its own saves included,
