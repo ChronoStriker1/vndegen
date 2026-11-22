@@ -100,7 +100,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Mac: the close, minimise and zoom buttons are hidden while a game plays and show with the VNDegen menu open (#90, 0.41.2).
 - The web view no longer allows AirPlay for a game's movies and sound; a TV is reached with Screen Mirroring (0.41.3).
 - N2System (Nitroplus), on VNDegen's own clean-room runtime, with the English release of Hanachirasu and PC saves both ways (0.42.0).
-- SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, the player's preferred language, word wrap for English, and `.wmv` movies through the app's FFmpeg (0.43.0). PC saves load in VNDegen; saves made in VNDegen can crash the PC version.
+- SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, the player's preferred language, word wrap for English, and `.wmv` movies through the app's FFmpeg (0.43.0). Saves go both ways with the PC version (0.59.5).
 - RPG Maker MV and MZ games packed into one Enigma Virtual Box exe are unpacked on import, without running the exe, with the library's three such games (0.44.0).
 - Construct 3, in the web view, with Transpile Girl Rescue Operation! (0.45.0). Its saves stay in VNDegen, as Twine's do.
 - Tmr-Hiro ADV System, on VNDegen's own clean-room runtime, with the English release of Welcome to the Mizuryuu kei land and PC saves both ways (0.46.0). More Tmr-Hiro games follow in sets.
@@ -135,6 +135,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - ANIM's Extra galleries (CG, scenes, music) with unlocks shared with the PC, and Magical Sword's autosaves (0.59.2).
 - ANIM's pose animations beside the story, and Extra's Animation page and Sprites viewer (0.59.3).
 - ANIM: clipped E-mote parts (the goddess's irises) and 8-bit E-mote textures (0.59.4).
+- SiglusEngine: saves made in VNDegen load in the PC version with their text, planetarian HD's PC saves load in VNDegen, and movies that store their sound behind the picture play all of it (0.59.5).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -145,7 +146,6 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- SiglusEngine: saves made in VNDegen crash the PC version or load there without text, because siglus_rs writes the newest native save layout. It is worth reporting upstream; nobody has yet. Being fixed on `fix/siglus-saves` since 2026-11-21 (maintainer).
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
