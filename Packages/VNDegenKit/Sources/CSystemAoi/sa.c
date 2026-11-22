@@ -16,7 +16,7 @@ static const char *const uiNames[UI_COUNT] = {"msg_b00.agf", "msg_b01.agf", "msg
                                               "msg_b05.agf", "msg_b06.agf", "msg_a03.agf", "msg_c00.agf", "msg_c01.agf",
                                               "msg_c02.agf"};
 
-enum { MODE_TITLE, MODE_STORY };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 enum { TITLE_X = 640, TITLE_Y = 369, TITLE_H = 50, TITLE_W = 640 };
 
@@ -82,6 +82,8 @@ struct SA {
     char lastVoice[40];
     char pageVoice[40];
     Backlog log;
+    Town town;
+    bool inGame;
     char name[96];
     char *lines[MSG_LINES];
     int lineCount;
@@ -577,6 +579,7 @@ static bool start_script(SA *s, const char *box, int entry) {
 
 static void go_title(SA *s) {
     reset_scene(s);
+    s->inGame = false;
     sa_stop(s->mix, CH_VOICE, 0, 0);
     sa_stop(s->mix, CH_BGM, 0, 500);
     s->mode = MODE_TITLE;
@@ -590,7 +593,54 @@ static void new_game(SA *s) {
     memset(s->vm.f, 0, sizeof s->vm.f);
     snprintf(s->nextBox, sizeof s->nextBox, "bo0000.box");
     s->nextEntry = 0;
+    sa_town_new_game(&s->town);
+    s->inGame = true;
     start_script(s, "init.box", 0);
+}
+
+static void end_turn(SA *s) {
+    VM *vm = &s->vm;
+    int food = 0, money = 0, res = 0, people = 0, cap = 0;
+    for (int c = 0; c < TOWN_CELLS; c++) {
+        int type = s->town.cell[c].type;
+        int r = type ? sa_town_type_row(&s->town, type) : -1;
+        if (r < 0) continue;
+        cap += sa_table_int(&s->town.build, r, 9);
+        if (!sa_town_staffed(&s->town, vm, c)) continue;
+        food += sa_table_int(&s->town.build, r, 26);
+        money += sa_table_int(&s->town.build, r, 28);
+        res += sa_table_int(&s->town.build, r, 30) - sa_table_int(&s->town.build, r, 34);
+        people += sa_table_int(&s->town.build, r, 25);
+    }
+    food -= vm->c[C_RESIDENTS] / 10;
+    sa_log(s, "turn %d ends: residents %d%+d, food %d%+d, money %d%+d, resources %d%+d", vm->c[C_TURN] + 1, vm->c[C_RESIDENTS], people,
+           vm->c[C_FOOD], food, vm->c[C_MONEY], money, vm->c[C_RESOURCES], res);
+    vm->c[C_RESIDENTS] += people;
+    if (cap && vm->c[C_RESIDENTS] > cap) vm->c[C_RESIDENTS] = cap;
+    vm->c[C_FOOD] += food;
+    vm->c[C_MONEY] += money;
+    vm->c[C_RESOURCES] += res;
+    vm->c[C_TURN]++;
+    reset_scene(s);
+    start_script(s, "bo0000.box", 0);
+}
+
+static void town_action(SA *s, int action) {
+    switch (action) {
+    case TOWN_CMD_REST:
+        end_turn(s);
+        break;
+    case TOWN_BTN_HIDE:
+        s->town.hidden = !s->town.hidden;
+        break;
+    case TOWN_NONE:
+        if (s->town.hidden) s->town.hidden = false;
+        break;
+    default:
+        sa_log(s, "town action %d not built yet", action);
+        break;
+    }
+    s->dirty = true;
 }
 
 static void title_pick(SA *s, int item) {
@@ -687,6 +737,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     load_bgm_defs(s);
     load_faces(s);
     sa_log_init(&s->log, &s->vfs);
+    if (!sa_town_init(&s->town, &s->vfs)) sa_log(s, "can't read the town tables");
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
@@ -727,6 +778,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     free(s->from);
     free(s->bgm);
     sa_log_free(&s->log);
+    sa_town_free(&s->town);
     picture_clear(&s->face);
     for (int i = 0; i < s->faceCount; i++) {
         free(s->faceName[i]);
@@ -771,6 +823,19 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             }
             return !s->quit;
         }
+    }
+    if (s->mode == MODE_TOWN) {
+        if (sa_town_hover(&s->town, &s->vm, s->mouseX, s->mouseY)) s->dirty = true;
+        if (s->clicked) {
+            s->clicked = false;
+            town_action(s, sa_town_hit(&s->town, &s->vm, s->mouseX, s->mouseY));
+        }
+        if (s->mode == MODE_TOWN && s->dirty) {
+            sa_town_draw(&s->town, &s->vfs, &s->vm, s->fb);
+            s->serial++;
+            s->dirty = false;
+        }
+        if (s->mode == MODE_TOWN) return true;
     }
     if (s->total && s->shown < s->total) {
         s->textMs += elapsedMs;
@@ -924,11 +989,17 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             s->nextBox[0] = 0;
             start_script(s, box, s->nextEntry);
         } else {
-            if (s->vm.f[0x78]) sa_log(s, "turn scripts done; the town is not built yet");
-            go_title(s);
             char *sav = sa_fmt("%s/Bunny3.sav", s->saveDir);
             sa_mkdirs(sav);
             free(sav);
+            if (s->inGame) {
+                reset_scene(s);
+                s->mode = MODE_TOWN;
+                s->town.hover = -1;
+                s->dirty = true;
+            } else {
+                go_title(s);
+            }
             return true;
         }
     }

@@ -288,4 +288,55 @@ void sa_table_free(Table *t);
 i32 sa_table_int(const Table *t, int row, int col);
 const char *sa_table_text(const Table *t, int row, int col);
 
+#define TOWN_W 10
+#define TOWN_H 9
+#define TOWN_CELLS (TOWN_W * TOWN_H)
+
+enum {
+    TOWN_NONE,
+    TOWN_CMD_EXPEDITION,
+    TOWN_CMD_POLICY,
+    TOWN_CMD_REST,
+    TOWN_CMD_BUILD,
+    TOWN_CMD_DEPLOY,
+    TOWN_CMD_EQUIP,
+    TOWN_CMD_TRAIN,
+    TOWN_CMD_SHOP,
+    TOWN_CMD_SUBMIT,
+    TOWN_BTN_LOG,
+    TOWN_BTN_SAVE,
+    TOWN_BTN_LOAD,
+    TOWN_BTN_OPTION,
+    TOWN_BTN_HIDE,
+    TOWN_ACTIONS,
+};
+
+typedef struct Facility {
+    int type;
+    int level;
+    int exp;
+} Facility;
+
+typedef struct Town {
+    Table build, mass, lvup;
+    Facility cell[TOWN_CELLS];
+    int stage;
+    Image *bg[8];
+    Image **tile;
+    Image *ui[40];
+    int hover;
+    bool hidden;
+} Town;
+
+bool sa_town_init(Town *t, Vfs *vfs);
+void sa_town_free(Town *t);
+void sa_town_new_game(Town *t);
+int sa_town_type_row(const Town *t, int id);
+int sa_town_staffed(const Town *t, const VM *vm, int cell);
+void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb);
+int sa_town_hit(const Town *t, const VM *vm, int x, int y);
+bool sa_town_hover(Town *t, const VM *vm, int x, int y);
+
+enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28 };
+
 #endif

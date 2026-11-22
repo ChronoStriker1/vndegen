@@ -86,6 +86,19 @@ int main(int argc, char **argv) {
         }
         int x, y;
         int n;
+        if (sscanf(argv[a], "skip=%d", &n) == 1) {
+            vnsystemaoi_set_skip(s, 1);
+            alive = alive && run(s, n);
+            vnsystemaoi_set_skip(s, 0);
+        }
+        if (sscanf(argv[a], "wait=%d", &n) == 1) alive = alive && run(s, n);
+        if (sscanf(argv[a], "shot=%d", &n) == 1) {
+            int w, h;
+            const uint32_t *px = vnsystemaoi_pixels(s, &w, &h);
+            char path[1024];
+            snprintf(path, sizeof path, "%s/act%02d.png", argv[2], n);
+            write_png(path, px, w, h, 1, 0);
+        }
         if (sscanf(argv[a], "wheel=%d", &n) == 1) {
             vnsystemaoi_wheel(s, n);
             alive = alive && run(s, 300);
