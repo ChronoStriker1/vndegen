@@ -17,6 +17,10 @@ enum { TAB_CG, TAB_SCENE, TAB_MUSIC };
 #define SCENE_Y 103
 #define LIST_X 108
 #define LIST_Y 73
+#define VIEW_BTN_Y 1006
+#define VIEW_NUM_X 888
+#define VIEW_NUM_Y 1046
+#define VIEW_PAGE_Y 240
 
 typedef struct Group {
     int count;
@@ -46,8 +50,9 @@ struct Extra {
     Image *tabs[4], *pages[4];
     Image *volIcon, *volLabel, *volL, *volR, *volTrack, *volKnob, *digits;
     Image *thumbs[MAX_GROUPS > MAX_SCENES ? MAX_GROUPS : MAX_SCENES];
-    int viewGroup, viewIdx;
+    int viewGroup, viewIdx, viewHover;
     Image *view;
+    Image *viewBtn[3], *viewNum, *viewDigits, *viewNumL, *viewNumR, *viewPageL, *viewPageR;
     bool barHidden;
     int playing;
 };
@@ -339,6 +344,14 @@ void extra_open(EX *e, int tab) {
     x->volR = load(e, "res/g/sy/01/1920_621r.gyu");
     x->volTrack = load(e, "res/g/sy/01/1920_621.gyu");
     x->volKnob = load(e, "res/g/sy/01/1920_621t.gyu");
+    static const char *const viewBtns[3] = {"res/g/sy/03/1920_3105.gyu", "res/g/sy/03/1920_3101.gyu", "res/g/sy/03/1920_3103.gyu"};
+    for (int i = 0; i < 3; i++) x->viewBtn[i] = load(e, viewBtns[i]);
+    x->viewNum = load(e, "res/g/sy/03/1920_3114.gyu");
+    x->viewDigits = load(e, "res/g/sy/03/1920_3110.gyu");
+    x->viewNumL = load(e, "res/g/sy/03/1920_3115.gyu");
+    x->viewNumR = load(e, "res/g/sy/03/1920_3116.gyu");
+    x->viewPageL = load(e, "res/g/sy/03/1920_3127.gyu");
+    x->viewPageR = load(e, "res/g/sy/03/1920_3123.gyu");
     x->digits = load(e, "res/g/sy/01/1920_621n.gyu");
     x->playing = -1;
     set_tab(e, x, tab);
@@ -367,6 +380,8 @@ void extra_free(EX *e) {
     Image *vol[] = {x->volIcon, x->volLabel, x->volL, x->volR, x->volTrack, x->volKnob, x->digits};
     for (size_t i = 0; i < sizeof vol / sizeof *vol; i++) image_free(vol[i]);
     image_free(x->view);
+    Image *view[] = {x->viewBtn[0], x->viewBtn[1], x->viewBtn[2], x->viewNum, x->viewDigits, x->viewNumL, x->viewNumR, x->viewPageL, x->viewPageR};
+    for (size_t i = 0; i < sizeof view / sizeof *view; i++) image_free(view[i]);
     free(x);
     e->extra = NULL;
 }
@@ -437,24 +452,90 @@ static void cg_show(EX *e, Extra *x) {
     x->view = cg_pic(e, x->groups[x->viewGroup].cg[x->viewIdx]);
 }
 
+enum { VIEW_NONE, VIEW_RETURN, VIEW_ALL, VIEW_RESET, VIEW_PREV, VIEW_NEXT, VIEW_PAGE_PREV, VIEW_PAGE_NEXT };
+
+static int viewer_hit(EX *e, Extra *x) {
+    if (x->barHidden) return VIEW_NONE;
+    for (int i = 0; i < 3; i++)
+        if (in_box(e, 1648 + i * 80, VIEW_BTN_Y, 72, 72)) return VIEW_RETURN + i;
+    if (in_box(e, VIEW_NUM_X, VIEW_NUM_Y, 28, 28)) return VIEW_PREV;
+    if (in_box(e, VIEW_NUM_X + 116, VIEW_NUM_Y, 28, 28)) return VIEW_NEXT;
+    if (in_box(e, 0, VIEW_PAGE_Y, 132, 600)) return VIEW_PAGE_PREV;
+    if (in_box(e, EX_W - 132, VIEW_PAGE_Y, 132, 600)) return VIEW_PAGE_NEXT;
+    return VIEW_NONE;
+}
+
+static void viewer_close(Extra *x) {
+    image_free(x->view);
+    x->view = NULL;
+}
+
+static void viewer_input(EX *e, Extra *x) {
+    Group *g = &x->groups[x->viewGroup];
+    int h = viewer_hit(e, x);
+    if (h != x->viewHover && h != VIEW_NONE && h != VIEW_ALL && h != VIEW_RESET) snd_play_file(e, "res/s/e/993.wav", EX_CH_UI);
+    x->viewHover = h;
+    if (e->rPress) x->barHidden = !x->barHidden;
+    else if (e->lPress) {
+        switch (h) {
+        case VIEW_RETURN: viewer_close(x); break;
+        case VIEW_ALL:
+        case VIEW_RESET: break;
+        case VIEW_PREV:
+        case VIEW_PAGE_PREV:
+            if (x->viewIdx > 0) {
+                x->viewIdx--;
+                cg_show(e, x);
+            }
+            break;
+        case VIEW_NEXT:
+        case VIEW_PAGE_NEXT:
+            if (x->viewIdx + 1 < g->count) {
+                x->viewIdx++;
+                cg_show(e, x);
+            }
+            break;
+        default:
+            if (x->barHidden && e->mouseY >= EX_H - 80) x->barHidden = false;
+            else if (++x->viewIdx >= g->count) viewer_close(x);
+            else cg_show(e, x);
+            break;
+        }
+    }
+    e->lPress = e->rPress = false;
+}
+
+static void viewer_number(Extra *x, u32 *dst) {
+    if (!x->viewDigits) return;
+    int cells[7], n = 0, cur = x->viewIdx + 1, total = x->groups[x->viewGroup].count;
+    for (int d = 100; d >= 1; d /= 10) cells[n++] = cur >= d || d == 1 ? cur / d % 10 : 10;
+    cells[n++] = 11;
+    for (int d = 100; d >= 1; d /= 10)
+        if (total >= d || d == 1) cells[n++] = total / d % 10;
+    while (n < 7) cells[n++] = 10;
+    for (int i = 0; i < n; i++) draw_state(dst, x->viewDigits, 12, cells[i], VIEW_NUM_X + 30 + i * 12, VIEW_NUM_Y + 4);
+}
+
+static void viewer_draw(Extra *x, u32 *dst) {
+    for (size_t i = 0; i < (size_t)EX_W * EX_H; i++) dst[i] = 0xff000000u;
+    blit(dst, EX_W, EX_H, x->view, 0, 0, 255);
+    if (x->barHidden) return;
+    draw_state(dst, x->viewBtn[0], 3, x->viewHover == VIEW_RETURN ? 1 : 0, 1648, VIEW_BTN_Y);
+    draw_state(dst, x->viewBtn[1], 6, 3, 1728, VIEW_BTN_Y);
+    draw_state(dst, x->viewBtn[2], 6, 3, 1808, VIEW_BTN_Y);
+    if (x->viewNum) blit(dst, EX_W, EX_H, x->viewNum, VIEW_NUM_X, VIEW_NUM_Y, 255);
+    if (x->viewHover == VIEW_PREV) draw_state(dst, x->viewNumL, 3, 1, VIEW_NUM_X, VIEW_NUM_Y);
+    if (x->viewHover == VIEW_NEXT) draw_state(dst, x->viewNumR, 3, 1, VIEW_NUM_X + 116, VIEW_NUM_Y);
+    viewer_number(x, dst);
+    if (x->viewHover == VIEW_PAGE_PREV) draw_state(dst, x->viewPageL, 3, 1, 0, VIEW_PAGE_Y);
+    if (x->viewHover == VIEW_PAGE_NEXT) draw_state(dst, x->viewPageR, 3, 1, EX_W - 132, VIEW_PAGE_Y);
+}
+
 void extra_input(EX *e) {
     Extra *x = e->extra;
     if (!x) return;
     if (x->view) {
-        Group *g = &x->groups[x->viewGroup];
-        bool onBar = e->mouseY >= EX_H - 80;
-        if (e->rPress) x->barHidden = !x->barHidden;
-        else if (e->lPress && onBar && e->mouseX >= EX_W - 300) {
-            image_free(x->view);
-            x->view = NULL;
-        } else if (e->lPress && onBar && x->barHidden) x->barHidden = false;
-        else if (e->lPress) {
-            if (++x->viewIdx >= g->count) {
-                image_free(x->view);
-                x->view = NULL;
-            } else cg_show(e, x);
-        }
-        e->lPress = e->rPress = false;
+        viewer_input(e, x);
         return;
     }
     int h = hit(e, x);
@@ -503,14 +584,7 @@ void extra_draw(EX *e, u32 *dst) {
     Extra *x = e->extra;
     if (!x) return;
     if (x->view) {
-        for (size_t i = 0; i < (size_t)EX_W * EX_H; i++) dst[i] = 0xff000000u;
-        blit(dst, EX_W, EX_H, x->view, 0, 0, 255);
-        if (!x->barHidden) {
-            char n[32];
-            snprintf(n, sizeof n, "%d / %d", x->viewIdx + 1, x->groups[x->viewGroup].count);
-            text_draw_sjis(e, dst, n, 940, EX_H - 30, 30, 0xffffff, 0x202020, 255);
-            text_draw_sjis(e, dst, "Return", EX_W - 260, EX_H - 30, 30, 0xffffff, 0x202020, 255);
-        }
+        viewer_draw(x, dst);
         return;
     }
     int t = x->tab;

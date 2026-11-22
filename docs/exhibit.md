@@ -90,12 +90,13 @@ VNDegen uses the same folder and format:
   opens once one of its pictures has been shown and steps through all of them; a scene opens once its `SETDONEFLAG`
   has run and plays from its script with `R1020` set, and the scene's own `exitReplay` brings Extra back; every track
   plays, with the music volume bar. VNDegen keeps what has been seen in `userdata/vndegen/extra.txt` and in the PC's
-  `system.dat` (see Saves).
+  `system.dat` (see Saves). The CG viewer has the PC's controls from `res/c/cgmode.type.rnf`: Return, the counter with
+  its arrows, the arrows at the sides, right click to hide them, and the Full Screen and Original buttons, which the
+  PC draws dimmed and inactive for this game because every picture in the gallery is screen-sized.
 
 ## Known limits
 
 - The emotion icons that `MANPU` attaches to sprites (`.dlt` animations) are not drawn; see the clean-room notes.
-- The CG viewer has no Full Screen or Original buttons.
 - The backlog's Jump buttons aren't shown, and the config page's window-size and full-screen choices do nothing.
 
 ## Linux host
