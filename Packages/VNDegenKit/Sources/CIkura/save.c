@@ -20,6 +20,7 @@
 #define WIDE_RECORDS 23
 #define WIDE_MIDDLE (4 * (6 + 9 * WIDE_RECORDS + 5))
 #define GAN_STATE 32
+#define READ_UNIT 128
 
 static const i32 defaultSettings[SETTINGS_USED] = {1000, 1, 0, 500, 500, 0, 128, 0, 128, 0, 128, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                                                    1,    1, 1, 1,   1,   1, 1, 1,   1, 1,   1, 1,   1, 1, 1, 1, 0, 0, 0, 0, 0};
@@ -211,6 +212,57 @@ static void load_global(IK *t) {
             if (v0 + i >= 0 && v0 + i < t->varCount) t->vars[v0 + i] = (i32)rd32(vars + 4 * i);
     }
     free(d);
+}
+
+static bool read_span(const u8 *d, size_t n, u32 *at, int *units) {
+    u32 e = rd32(d + 12);
+    if (e < TABLE || (size_t)e + 8 > n) return false;
+    u32 c = rd32(d + e), len = rd32(d + e + 4);
+    if (!c || c > 4096 || len != c * READ_UNIT || (size_t)e + 8 + len > n) return false;
+    *at = e + 8;
+    *units = (int)c;
+    return true;
+}
+
+static void load_read(IK *t) {
+    free(t->save.read);
+    t->save.read = NULL;
+    t->save.readUnits = 0;
+    t->save.readDirty = false;
+    size_t n;
+    u8 *d = read_save(t, &n);
+    u32 at;
+    int units;
+    if (read_span(d, n, &at, &units)) {
+        t->save.read = ik_alloc((size_t)units * READ_UNIT);
+        memcpy(t->save.read, d + at, (size_t)units * READ_UNIT);
+        t->save.readUnits = units;
+    }
+    free(d);
+}
+
+static void store_read(IK *t) {
+    if (!t->save.read || !t->save.readDirty) return;
+    size_t n;
+    u8 *d = read_save(t, &n);
+    u32 at;
+    int units;
+    if (read_span(d, n, &at, &units) && units == t->save.readUnits) {
+        memcpy(d + at, t->save.read, (size_t)units * READ_UNIT);
+        write_save(t, d, n);
+        t->save.readDirty = false;
+    }
+    free(d);
+}
+
+bool save_read_mark(IK *t, int slot, u32 n) {
+    if (!t->save.read || slot < 0 || slot >= t->save.readUnits || n >= READ_UNIT * 8) return false;
+    u8 *b = t->save.read + (size_t)slot * READ_UNIT + (n >> 3);
+    u8 bit = (u8)(0x80 >> (n & 7));
+    if (*b & bit) return false;
+    *b |= bit;
+    t->save.readDirty = true;
+    return true;
 }
 
 static void thumbnail(IK *t, u8 *out) {
@@ -724,14 +776,16 @@ bool save_exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     }
     case 0x0a0d: t->save.haveSnap = false; break;
-    case 0x0a0a:
-    case 0x0a0b: break;
+    case 0x0a0a: store_read(t); break;
+    case 0x0a0b: load_read(t); break;
     default: return false;
     }
     return true;
 }
 
 void save_close(IK *t) {
+    store_read(t);
+    free(t->save.read);
     free(t->save.path);
     free(t->save.snap);
 }

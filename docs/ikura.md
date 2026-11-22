@@ -78,6 +78,12 @@ Raidy II's exe reads the same archives, pictures, sound and scripts; about sixty
   `DATA/NAMELIST.TXT`, and voice. Button type 7 is a vertical scrollbar (`0712`, `0714`, `071e`).
 - The message window's Skip and Auto toggles are bound with `071a` and `071b`; `0916` clears the window; `0715` waits
   for a time or input.
+- Read marks: a script names its slot in the marks table with `090a` at its start, and `0908`'s first argument is the
+  line's number in that script. `0a0b` (in `START.SNR`) loads the table and `0a0a` (in `CLOSE.SNR`, run when the game
+  quits) writes it back; VNDegen also writes it when the game closes. Scripts without a slot, such as the battles,
+  count as read. Settings 1 and 2 are the skip setting (0 Skip All, 1 Read Only) and
+  Nonstop. With Read Only, Skip shows an unread line and waits for a click, then goes on skipping; Skip ends at a
+  choice or other input wait unless Nonstop is on.
 - A button bound with a call returns to the input wait it interrupted, so a page such as the save page stays open after
   the action. `070c` and `070d` keep and restore the cancel and key bindings along with the buttons' modes. A jump
   from a button drops the current message only when it interrupts the message itself.
@@ -94,10 +100,11 @@ Raidy II, and so does VNDegen:
 - Each slot: the date, the line on screen, a 112x84 thumbnail and an 8544-byte state: the script and label to resume
   at, the BGM, the flags, the variables, the picture names, every layer and every button with its binding. A load
   restores the state, runs `LOAD.SNR` (which rebuilds the dungeon from the variables) and resumes.
-- Raidy II's header gives the settings block at `0xdc` and the global block from `0x1dc` to `0x25d`; a 25 KB block
-  before the first slot (read marks) is kept as it is. Its slot state adds the automap after the variables, a
-  972-byte button record (its 840 extra bytes are written with the values a fresh PC save holds) and the animation's
-  state at the end.
+- Raidy II's header gives the settings block at `0xdc` and the global block from `0x1dc` to `0x25d`. The read marks
+  follow the global block: a count of slots (200), their size in bytes, then 128 bytes a slot, line n at byte n / 8,
+  bit `0x80 >> (n % 8)`. Raidy's PC keeps no read marks, and its file has no such block. Its slot state adds the
+  automap after the variables, a 972-byte button record (its 840 extra bytes are written with the values a fresh PC
+  save holds) and the animation's state at the end.
 - The save file is found whatever the case of its name in the folder.
 - Slots saved by the PC engine under Wine load here on the same screen, and slots saved here list and load in the PC
   engine on the same screen, for both games.
@@ -116,13 +123,14 @@ Games start on the "Visual novel" controller layout.
 ## Known limits
 
 - Raidy's backlog (the window's Log button and the wheel) isn't done; Raidy II's is.
-- Read marks aren't kept, so Skip skips all text whatever the skip setting says. Auto waits for the voice, then a
-  delay of twice the auto speed setting in milliseconds.
+- Raidy: Skip passes every line and ends at a choice whatever the skip setting and Nonstop say. Its PC keeps no read
+  marks in its save; under Wine its Read Only skip passed lines not read in that run, but stopped after a choice with
+  Nonstop on, and wasn't worked out further.
+- Auto waits for the voice, then a delay of twice the auto speed setting in milliseconds.
 - Effect mode (Nowait, Fast) doesn't shorten the scripts' fades.
 - Layers drawn as rotated or skewed quads (`0204`) are drawn as their bounding box; Raidy uses quads only for
   full-screen fades.
 - The texture filtering and lighting of the 3D view are close to, not identical with, the PC's.
 - Raidy II: the arguments of `0716`/`0717` after the cells, `000e`, `0010`, `0011` and `0724` are accepted and do
-  nothing; what they do wasn't found. The read marks block in
-  `RAIDY2R.SAV` is kept but not used.
+  nothing; what they do wasn't found. `090b`, at the end of most scenes, and `090c` are accepted and do nothing.
 - Raidy II: the ending (`L2_ED`) wasn't played through.

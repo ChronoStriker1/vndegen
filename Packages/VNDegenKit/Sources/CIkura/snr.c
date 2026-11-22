@@ -27,6 +27,16 @@ Script *script_load(IK *t, const char *name) {
     for (u32 i = 0; i <= codeSize; i++) s->labelAt[i] = -1;
     for (int i = s->labelCount - 1; i >= 0; i--)
         if (s->labels[i] <= codeSize) s->labelAt[s->labels[i]] = (i16)i;
+    s->readSlot = -1;
+    for (u32 pc = 0; pc + 4 <= codeSize;) {
+        u16 op = rd16(s->code + pc), len = rd16(s->code + pc + 2);
+        if (len < 4 || pc + len > codeSize) break;
+        if (op == 0x090a && len >= 8) {
+            s->readSlot = (int)rd32(s->code + pc + 4);
+            break;
+        }
+        pc += len;
+    }
     t->scripts = ik_realloc(t->scripts, sizeof(Script *) * (size_t)(t->scriptCount + 1));
     t->scripts[t->scriptCount++] = s;
     return s;

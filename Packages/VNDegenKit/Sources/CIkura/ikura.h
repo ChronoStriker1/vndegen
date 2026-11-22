@@ -83,6 +83,7 @@ typedef struct Script {
     i16 *labelAt;
     const u8 *code;
     u32 codeSize;
+    int readSlot;
 } Script;
 
 Script *script_load(IK *t, const char *name);
@@ -181,7 +182,7 @@ typedef struct MsgWin {
     const u8 *tags;
     int tagLen, tagPos;
     u32 revealAt, cursorAt;
-    bool cursor;
+    bool cursor, unread;
     int msPerChar;
     char *raw;
     int rawLen, rawCap;
@@ -215,6 +216,9 @@ typedef struct SaveFile {
     u8 *snap;
     size_t snapSize;
     bool haveSnap;
+    u8 *read;
+    int readUnits;
+    bool readDirty;
 } SaveFile;
 
 #define IK_MAX_W 1024
@@ -380,6 +384,7 @@ void snd_volume(IK *t, int ch, int v);
 bool save_exec(IK *t, u16 op, const u8 *a, int n);
 bool text_exec(IK *t, u16 op, const u8 *a, int n);
 void save_close(IK *t);
+bool save_read_mark(IK *t, int slot, u32 n);
 void settings_apply(IK *t);
 void text_draw_on(IK *t, Image *dst, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]);
 void vm_set_text(IK *t, int slot, const char *s, int len);

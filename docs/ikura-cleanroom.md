@@ -21,6 +21,7 @@ It derives from no GPL or LGPL code. Its sources:
 | Raidy II: equipment | Black box only: test scripts set the equipment and base variables, ran `0f03` or `0f04`, and saved; the variables were read from the save files. The tables and formulas reproduce every variable in 98 compared saves |
 | Raidy II: backlog | The game's `BACKLOG.SNR` and screenshots of the original's log page |
 | Raidy II: saves (`RAIDY2R.SAV`) | Saves the original wrote under Wine and the game's own shipped save, walked field by field; checked both ways |
+| Raidy II: read marks | The shipped save's marks block against each script's `090a` slot and line numbers; lines cleared in the block and played under Wine (where Skip stopped, when the PC wrote the block back), and the skip setting and Nonstop changed one at a time. Raidy's PC, run the same way, wrote no marks and skipped unread lines |
 
 The exe was run under Wine for nearly everything. Its machine code was read in two places only, for facts: the
 `CreateFontA` call's arguments and the table its sound code passes to `SetVolume`. VNDegen computes the curve that

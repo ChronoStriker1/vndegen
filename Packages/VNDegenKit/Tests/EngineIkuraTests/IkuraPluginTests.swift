@@ -196,6 +196,27 @@ import VNCore
         #expect(order == expected)
     }
 
+    @Test func aShownLineIsMarkedReadInTheSaveFile() throws {
+        let text: [UInt8] = [0x03, 0x04, 0x00, 0xff] + Self.u16(1) + [0x41, 0x02, 0x00]
+        let start = Self.script(raidy2Sizes + [
+            (0x0a00, Self.name("TEST.SAV") + Self.u32(50)),
+            (0x0a0b, []),
+            (0x090a, Self.u32(2)),
+            (0x0908, Self.u32(10) + text),
+        ])
+        let root = try makeGame(start)
+        var file = Self.u32(50) + Self.u32(0xdc) + Self.u32(0x1dc) + Self.u32(0x25d)
+        file += [UInt8](repeating: 0, count: 0x25d - file.count) + Self.u32(10) + Self.u32(1280) + [UInt8](repeating: 0, count: 1280)
+        try Data(file).write(to: root.appending(path: "TEST.SAV"))
+        let engine = try #require(run(root, frames: 4))
+        vnikura_close(engine)
+        let data = try [UInt8](Data(contentsOf: root.appending(path: "TEST.SAV")))
+        let marks = Array(data[0x265..<0x265 + 1280])
+        var expected = [UInt8](repeating: 0, count: 1280)
+        expected[2 * 128 + 1] = 0x20
+        #expect(marks == expected)
+    }
+
     @Test func equipmentStatsMatchTheOriginal() throws {
         let (data, state) = try savedState([
             (0x0401, Self.u32(154) + Self.u32(7)), (0x0401, Self.u32(150) + Self.u32(3)), (0x0401, Self.u32(162) + Self.u32(3)),
