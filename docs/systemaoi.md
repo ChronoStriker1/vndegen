@@ -42,3 +42,29 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   textures. Each dungeon has a part set (`m000set.pvm` to `m100set.pvm`: floors, poles, roofs, walls, doors, stairs).
   `map.vfs` holds 117 floor maps (`mpDDFF.amd`), 15 by 15 cells of 104 bytes after a 48-byte header, each cell with an
   open-side mask (1 north, 2 east, 4 south, 8 west) and an event number.
+
+## What the runtime does so far
+
+- **Title.** The game's title with its six items. A first start plays the prologue, as the original does before
+  `Bunny3.sav` exists. Start runs `init.box` and then the turn script in `bo0000.box`. Load, Option and Extra aren't
+  built yet, and the town isn't either, so the runtime returns to the title when the turn script ends.
+- **Script machine.** Text, speakers, waits, choices, integer and flag variables in five banks, text conditions with
+  indexed variables (`CL000[CL019]`), jumps and calls within a script and into other scripts, random numbers, and the
+  loop the quiz uses.
+- **Story drawing.** Backgrounds and event pictures, standing pictures by slot, fades between them, the message window
+  with its Auto, Skip, LOG, Repeat, Option and close buttons, the click-wait feather, and choices in the game's own
+  box. Speakers with a face set in `evntFace.obj` show the face whose expression matches their last standing picture.
+  Placement was measured against the original under Wine; text lines up within two pixels.
+- **Backlog.** Each page's speaker and lines, with a button that plays a voiced line again.
+- **Input.** A click or Enter goes on; the wheel opens and scrolls the backlog; a right click fast-forwards, the
+  original's default.
+- **Sound.** BGM by its `bgm.asd` entry with the loop points the file gives, and voices as their lines show.
+- **Movies.** `data1.dat` and `data2.dat` play through the app's movie decoder, `vnffmovie` (see
+  [video.md](video.md)); a click ends one.
+
+## Known limits
+
+- The town, expeditions, the 3D dungeon, battles, units and items aren't built yet; they are the original's exe, not
+  its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
+- Saves, the Option screen and the Extra menu aren't built yet.
+- The original's option settings (text speed, window transparency, volumes) are its defaults.
