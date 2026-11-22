@@ -23,6 +23,10 @@ nonisolated public struct SystemAoiPlugin: EnginePlugin {
     }
 
     public var defaultControls: ControlLayout { .mouse }
+
+    public var defaultControlChanges: [ControlInput: ControlAction] {
+        [.x: .key(KeyboardKey(key: "Control", code: "ControlLeft", keyCode: 17))]
+    }
 }
 
 nonisolated public enum SystemAoiError: Error, LocalizedError {

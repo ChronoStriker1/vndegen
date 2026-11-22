@@ -69,4 +69,12 @@ private func folder(_ name: String) throws -> URL {
         #expect(router.hostKey(hidUsage: 224, pressed: false) == [.skip(false)])
         #expect(router.hostKey(hidUsage: 40, pressed: true) == [.key(0x0d, down: true)])
     }
+
+    @Test func controllerXHoldsSkip() {
+        let control = KeyboardKey(key: "Control", code: "ControlLeft", keyCode: 17)
+        #expect(SystemAoiPlugin().defaultControlChanges[.x] == .key(control))
+        var router = SystemAoiInputRouter()
+        #expect(router.translate(.key(control, pressed: true)) { $0 } == [.skip(true)])
+        #expect(router.translate(.key(control, pressed: false)) { $0 } == [.skip(false)])
+    }
 }
