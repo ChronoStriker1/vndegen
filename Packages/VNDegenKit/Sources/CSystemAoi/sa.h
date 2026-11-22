@@ -91,6 +91,11 @@ Image *sa_image_new(int w, int h);
 void sa_image_free(Image *im);
 Image *sa_agf_decode(const u8 *data, size_t size);
 
+void sa_blit(u32 *dst, const Image *im, int x, int y);
+void sa_blit_alpha(u32 *dst, const Image *im, int x, int y, u32 alpha);
+void sa_blit_rect(u32 *dst, const Image *im, int sx, int sy, int w, int h, int x, int y);
+void sa_fill(u32 *dst, int x, int y, int w, int h, u32 rgba);
+
 enum {
     OPD_NONE,
     OPD_INT,
@@ -240,5 +245,35 @@ void sa_font_set_spacing(int px);
 int sa_char_width(u32 cp, int size);
 int sa_text_width(const char *s, int n, int size);
 int sa_text_draw(u32 *dst, int dw, int dh, const char *s, int n, int x, int y, int size, u32 color, u32 edge);
+
+#define LOG_ENTRIES 300
+
+typedef struct LogEntry {
+    char *name;
+    char voice[40];
+    char **lines;
+    int lineCount;
+} LogEntry;
+
+enum { LOG_ART_PANEL, LOG_ART_BACK, LOG_ART_PLAY, LOG_ART_TRACK, LOG_ART_THUMB, LOG_ART_UP, LOG_ART_DOWN, LOG_ART_FAST, LOG_ART_AUTO, LOG_ART_COUNT };
+enum { LOG_ACT_NONE, LOG_ACT_CLOSE, LOG_ACT_VOICE, LOG_ACT_FAST, LOG_ACT_AUTO };
+
+typedef struct Backlog {
+    LogEntry e[LOG_ENTRIES];
+    int count, first;
+    bool open;
+    int scroll;
+    int hover;
+    Image *art[LOG_ART_COUNT];
+} Backlog;
+
+void sa_log_init(Backlog *b, Vfs *vfs);
+void sa_log_free(Backlog *b);
+void sa_log_add(Backlog *b, const char *name, const char *voice, char **lines, int lineCount);
+void sa_log_open(Backlog *b);
+void sa_log_scroll(Backlog *b, int lines);
+int sa_log_click(Backlog *b, int x, int y, char *voice, size_t voiceSize);
+bool sa_log_hover(Backlog *b, int x, int y);
+void sa_log_draw(Backlog *b, u32 *fb, bool fast, bool autoMode);
 
 #endif

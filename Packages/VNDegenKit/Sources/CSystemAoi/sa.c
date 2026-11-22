@@ -63,7 +63,7 @@ struct SA {
     int hoverButton;
     bool autoMode, skipMode, windowHidden;
     u32 featherMs, autoMs;
-    bool forceSkip;
+    bool forceSkip, rightClicked;
     int mode, titleHover;
     VNSystemAoiMovies movies;
     bool haveMovies;
@@ -80,6 +80,8 @@ struct SA {
     int nextEntry;
     Image *titleBg, *titleItem[TITLE_ITEMS];
     char lastVoice[40];
+    char pageVoice[40];
+    Backlog log;
     char name[96];
     char *lines[MSG_LINES];
     int lineCount;
@@ -159,6 +161,7 @@ static void host_text(void *ctx, const char *utf8, bool newLine) {
     s->total += utf8_len(utf8);
     if (s->voice[0]) {
         snprintf(s->lastVoice, sizeof s->lastVoice, "%s.aog", s->voice);
+        snprintf(s->pageVoice, sizeof s->pageVoice, "%s", s->lastVoice);
         sa_play(s->mix, CH_VOICE, 0, s->lastVoice, false);
         s->voice[0] = 0;
     }
@@ -236,6 +239,8 @@ static void host_speaker(void *ctx, const char *name, const char *voice, const c
 
 static void host_page(void *ctx) {
     SA *s = ctx;
+    sa_log_add(&s->log, s->name, s->pageVoice, s->lines, s->lineCount);
+    s->pageVoice[0] = 0;
     s->dirty = true;
 }
 
@@ -456,88 +461,9 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     }
 }
 
-static void blit(u32 *dst, const Image *im, int x, int y) {
-    if (!im) return;
-    for (int j = 0; j < im->h; j++) {
-        int dy = y + j;
-        if (dy < 0 || dy >= SA_H) continue;
-        const u32 *src = im->px + (size_t)j * im->w;
-        u32 *d = dst + (size_t)dy * SA_W;
-        for (int i = 0; i < im->w; i++) {
-            int dx = x + i;
-            if (dx < 0 || dx >= SA_W) continue;
-            u32 p = src[i], a = p >> 24;
-            if (!a) continue;
-            if (a == 255) {
-                d[dx] = p;
-                continue;
-            }
-            u32 q = d[dx], ia = 255 - a;
-            u32 r = ((p & 0xff) * a + (q & 0xff) * ia) / 255;
-            u32 g = ((p >> 8 & 0xff) * a + (q >> 8 & 0xff) * ia) / 255;
-            u32 b = ((p >> 16 & 0xff) * a + (q >> 16 & 0xff) * ia) / 255;
-            d[dx] = 0xff000000u | b << 16 | g << 8 | r;
-        }
-    }
-}
 
-static void blit_alpha(u32 *dst, const Image *im, int x, int y, u32 alpha) {
-    if (!im) return;
-    for (int j = 0; j < im->h; j++) {
-        int dy = y + j;
-        if (dy < 0 || dy >= SA_H) continue;
-        for (int i = 0; i < im->w; i++) {
-            int dx = x + i;
-            if (dx < 0 || dx >= SA_W) continue;
-            u32 p = im->px[(size_t)j * im->w + i], a = (p >> 24) * alpha / 255;
-            if (!a) continue;
-            u32 q = dst[(size_t)dy * SA_W + dx], ia = 255 - a;
-            u32 r = ((p & 0xff) * a + (q & 0xff) * ia) / 255;
-            u32 g = ((p >> 8 & 0xff) * a + (q >> 8 & 0xff) * ia) / 255;
-            u32 b = ((p >> 16 & 0xff) * a + (q >> 16 & 0xff) * ia) / 255;
-            dst[(size_t)dy * SA_W + dx] = 0xff000000u | b << 16 | g << 8 | r;
-        }
-    }
-}
 
-static void blit_rect(u32 *dst, const Image *im, int sx, int sy, int w, int h, int x, int y) {
-    if (!im) return;
-    for (int j = 0; j < h; j++) {
-        int dy = y + j, syy = sy + j;
-        if (dy < 0 || dy >= SA_H || syy < 0 || syy >= im->h) continue;
-        for (int i = 0; i < w; i++) {
-            int dx = x + i, sxx = sx + i;
-            if (dx < 0 || dx >= SA_W || sxx < 0 || sxx >= im->w) continue;
-            u32 p = im->px[(size_t)syy * im->w + sxx], a = p >> 24;
-            if (!a) continue;
-            u32 *d = &dst[(size_t)dy * SA_W + dx];
-            if (a == 255) {
-                *d = p;
-                continue;
-            }
-            u32 q = *d, ia = 255 - a;
-            u32 r = ((p & 0xff) * a + (q & 0xff) * ia) / 255;
-            u32 g = ((p >> 8 & 0xff) * a + (q >> 8 & 0xff) * ia) / 255;
-            u32 b = ((p >> 16 & 0xff) * a + (q >> 16 & 0xff) * ia) / 255;
-            *d = 0xff000000u | b << 16 | g << 8 | r;
-        }
-    }
-}
 
-static void fill(u32 *dst, int x, int y, int w, int h, u32 rgba) {
-    u32 a = rgba >> 24;
-    for (int j = y; j < y + h; j++) {
-        if (j < 0 || j >= SA_H) continue;
-        for (int i = x; i < x + w; i++) {
-            if (i < 0 || i >= SA_W) continue;
-            u32 q = dst[(size_t)j * SA_W + i], ia = 255 - a;
-            u32 r = ((rgba & 0xff) * a + (q & 0xff) * ia) / 255;
-            u32 g = ((rgba >> 8 & 0xff) * a + (q >> 8 & 0xff) * ia) / 255;
-            u32 b = ((rgba >> 16 & 0xff) * a + (q >> 16 & 0xff) * ia) / 255;
-            dst[(size_t)j * SA_W + i] = 0xff000000u | b << 16 | g << 8 | r;
-        }
-    }
-}
 
 enum { MSG_X = 0, MSG_Y = 546, TEXT_X = 324, TEXT_Y = 589, TEXT_SIZE = 28, TEXT_PITCH = 31, NAME_X = 305, NAME_Y = 553 };
 enum { CHOICE_W = 504, CHOICE_H = 50, CHOICE_EDGE = 22, FEATHER_X = 1046, FEATHER_Y = 679 };
@@ -554,32 +480,32 @@ static int button_at(int x, int y) {
     return -1;
 }
 
-static bool window_shown(SA *s) { return (s->lineCount || s->name[0]) && !s->windowHidden; }
+static bool window_shown(SA *s) { return (s->lineCount || s->name[0]) && !s->windowHidden && !s->log.open; }
 
 static void compose(SA *s) {
     u32 *fb = s->fb;
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
-    blit(fb, s->bg.img, 0, 0);
+    sa_blit(fb, s->bg.img, 0, 0);
     for (int i = 0; i < STD_SLOTS; i++) {
         Picture *p = &s->std[i];
         if (!p->img) continue;
         int cx = p->xslot * SA_W / 8;
-        blit(fb, p->img, cx - p->img->w / 2, SA_H - p->img->h);
+        sa_blit(fb, p->img, cx - p->img->w / 2, SA_H - p->img->h);
     }
     if (window_shown(s)) {
-        blit_alpha(fb, s->msgBand, MSG_X, MSG_Y, 160);
-        blit(fb, s->msgFrame, MSG_X, MSG_Y);
-        blit_rect(fb, s->ui[UI_LEAF], 0, 0, 44, 41, 1044, 536);
+        sa_blit_alpha(fb, s->msgBand, MSG_X, MSG_Y, 160);
+        sa_blit(fb, s->msgFrame, MSG_X, MSG_Y);
+        sa_blit_rect(fb, s->ui[UI_LEAF], 0, 0, 44, 41, 1044, 536);
         for (int i = 0; i < BTN_COUNT; i++) {
             const Button *b = &buttons[i];
             int col = (i == BTN_AUTO && s->autoMode) || (i == BTN_SKIP && s->skipMode) ? 1 : 0;
-            blit_rect(fb, s->ui[b->ui], col * b->w, i == s->hoverButton ? b->h : 0, b->w, b->h, b->x, b->y);
+            sa_blit_rect(fb, s->ui[b->ui], col * b->w, i == s->hoverButton ? b->h : 0, b->w, b->h, b->x, b->y);
         }
         if (s->vm.state == VM_WAIT_CLICK && s->shown >= s->total) {
             int f = (int)(s->featherMs / 33) % 31;
-            blit_rect(fb, s->ui[UI_FEATHER], f * 32, 0, 32, 32, FEATHER_X, FEATHER_Y);
+            sa_blit_rect(fb, s->ui[UI_FEATHER], f * 32, 0, 32, 32, FEATHER_X, FEATHER_Y);
         }
-        blit(fb, s->face.img, -1, 294);
+        sa_blit(fb, s->face.img, -1, 294);
         if (s->name[0]) sa_text_draw(fb, SA_W, SA_H, s->name, -1, NAME_X, NAME_Y, TEXT_SIZE, 0xffffff, 0x000000);
         int left = s->shown;
         for (int i = 0; i < s->lineCount && left > 0; i++) {
@@ -590,16 +516,17 @@ static void compose(SA *s) {
     }
     if (s->vm.state == VM_WAIT_CHOICE) {
         int x = (SA_W - CHOICE_W) / 2;
-        blit(fb, s->ui[UI_CHOICE_TOP], x, choice_y(s, 0) - CHOICE_EDGE);
+        sa_blit(fb, s->ui[UI_CHOICE_TOP], x, choice_y(s, 0) - CHOICE_EDGE);
         for (int i = 0; i < s->vm.choiceCount; i++) {
             int y = choice_y(s, i);
-            blit_rect(fb, s->ui[UI_CHOICE_ROW], 0, i == s->hover ? CHOICE_H : 0, CHOICE_W, CHOICE_H, x, y);
+            sa_blit_rect(fb, s->ui[UI_CHOICE_ROW], 0, i == s->hover ? CHOICE_H : 0, CHOICE_W, CHOICE_H, x, y);
             const char *t = s->vm.choice[i].label;
             int w = sa_text_width(t, -1, TEXT_SIZE);
             sa_text_draw(fb, SA_W, SA_H, t, -1, x + (CHOICE_W - w) / 2, y + (CHOICE_H - TEXT_SIZE) / 2, TEXT_SIZE, 0x302010, 0xffffffffu);
         }
-        blit(fb, s->ui[UI_CHOICE_BOTTOM], x, choice_y(s, s->vm.choiceCount));
+        sa_blit(fb, s->ui[UI_CHOICE_BOTTOM], x, choice_y(s, s->vm.choiceCount));
     }
+    if (s->log.open) sa_log_draw(&s->log, fb, s->skipMode, s->autoMode);
     if (s->transDur && s->transMs < s->transDur) {
         u32 a = s->transMs * 256 / s->transDur;
         for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) {
@@ -621,9 +548,9 @@ static int title_at(int x, int y) {
 static void compose_title(SA *s) {
     u32 *fb = s->fb;
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
-    blit(fb, s->titleBg, 0, 0);
+    sa_blit(fb, s->titleBg, 0, 0);
     for (int i = 0; i < TITLE_ITEMS; i++)
-        blit_rect(fb, s->titleItem[i], 0, i == s->titleHover ? TITLE_H : 0, TITLE_W, TITLE_H, TITLE_X, TITLE_Y + i * TITLE_H);
+        sa_blit_rect(fb, s->titleItem[i], 0, i == s->titleHover ? TITLE_H : 0, TITLE_W, TITLE_H, TITLE_X, TITLE_Y + i * TITLE_H);
     s->serial++;
 }
 
@@ -759,6 +686,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     s->from = sa_alloc((size_t)SA_W * SA_H * 4);
     load_bgm_defs(s);
     load_faces(s);
+    sa_log_init(&s->log, &s->vfs);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
@@ -798,6 +726,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     for (int i = 0; i < UI_COUNT; i++) sa_image_free(s->ui[i]);
     free(s->from);
     free(s->bgm);
+    sa_log_free(&s->log);
     picture_clear(&s->face);
     for (int i = 0; i < s->faceCount; i++) {
         free(s->faceName[i]);
@@ -891,6 +820,36 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         s->autoMs = 0;
     }
     if (s->skipMode && s->shown < s->total) s->shown = s->total;
+    if (s->log.open) {
+        if (sa_log_hover(&s->log, s->mouseX, s->mouseY)) s->dirty = true;
+        if (s->rightClicked) {
+            s->rightClicked = false;
+            s->log.open = false;
+            s->dirty = true;
+        }
+        if (s->clicked) {
+            s->clicked = false;
+            char voice[40] = "";
+            int act = sa_log_click(&s->log, s->mouseX, s->mouseY, voice, sizeof voice);
+            if (act == LOG_ACT_VOICE) sa_play(s->mix, CH_VOICE, 0, voice, false);
+            if (act == LOG_ACT_FAST || act == LOG_ACT_AUTO) {
+                s->log.open = false;
+                s->skipMode = act == LOG_ACT_FAST;
+                s->autoMode = act == LOG_ACT_AUTO;
+            }
+            s->dirty = true;
+        }
+        if (s->dirty) {
+            compose(s);
+            s->dirty = false;
+        }
+        return true;
+    }
+    if (s->rightClicked) {
+        s->rightClicked = false;
+        if (s->vm.state == VM_WAIT_CLICK || s->vm.state == VM_WAIT_CHOICE) s->windowHidden = !s->windowHidden;
+        s->dirty = true;
+    }
     int btn = window_shown(s) ? button_at(s->mouseX, s->mouseY) : -1;
     if (btn != s->hoverButton) {
         s->hoverButton = btn;
@@ -918,6 +877,10 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             break;
         case BTN_CLOSE:
             s->windowHidden = true;
+            break;
+        case BTN_LOG:
+            sa_log_open(&s->log);
+            s->autoMode = s->skipMode = false;
             break;
         default:
             sa_log(s, "button %d not built yet", btn);
@@ -995,6 +958,7 @@ void vnsystemaoi_mouse_move(VNSystemAoi *sa, int x, int y) {
 void vnsystemaoi_mouse_button(VNSystemAoi *sa, int button, bool down) {
     SA *s = (SA *)sa;
     if (button == VNSYSTEMAOI_MOUSE_LEFT && !down) s->clicked = true;
+    if (button == VNSYSTEMAOI_MOUSE_RIGHT && !down) s->rightClicked = true;
 }
 
 void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down) {
@@ -1022,7 +986,21 @@ void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down) {
     }
 }
 
-void vnsystemaoi_wheel(VNSystemAoi *sa, int notches) {}
+void vnsystemaoi_wheel(VNSystemAoi *sa, int notches) {
+    SA *s = (SA *)sa;
+    if (s->mode != MODE_STORY || s->movie) return;
+    if (!s->log.open) {
+        if (notches > 0 && s->log.count) {
+            sa_log_open(&s->log);
+            s->autoMode = s->skipMode = false;
+            s->dirty = true;
+        }
+        return;
+    }
+    if (notches < 0 && s->log.scroll == 0) s->log.open = false;
+    else sa_log_scroll(&s->log, notches);
+    s->dirty = true;
+}
 
 void vnsystemaoi_audio(VNSystemAoi *sa, float *out, int frames) {
     SA *s = (SA *)sa;

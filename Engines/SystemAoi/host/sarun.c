@@ -74,7 +74,22 @@ int main(int argc, char **argv) {
         }
     }
     for (int a = 5; a < argc; a++) {
+        if (!strcmp(argv[a], "clicks")) {
+            for (int i = 0; alive && i < clicks; i++) {
+                vnsystemaoi_key(s, 0x0d, 1);
+                alive = run(s, 64);
+                vnsystemaoi_key(s, 0x0d, 1);
+                alive = alive && run(s, 400);
+            }
+            clicks = 0;
+            continue;
+        }
         int x, y;
+        int n;
+        if (sscanf(argv[a], "wheel=%d", &n) == 1) {
+            vnsystemaoi_wheel(s, n);
+            alive = alive && run(s, 300);
+        }
         if (sscanf(argv[a], "click=%d,%d", &x, &y) == 2) {
             vnsystemaoi_mouse_move(s, x, y);
             alive = alive && run(s, 100);
