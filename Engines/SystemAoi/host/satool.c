@@ -132,6 +132,21 @@ int main(int argc, char **argv) {
         fclose(f);
         sa_mixer_free(m);
         printf("%ld frames\n", frames);
+    } else if (!strcmp(cmd, "table") && argc == 4) {
+        Table t;
+        if (!sa_table_load(&t, &v, argv[3])) {
+            rc = 1;
+        } else {
+            for (int r = 0; r < t.rows; r++) {
+                for (int c = 0; c < t.cols; c++) {
+                    if (c) putchar('\t');
+                    if (t.isText[c]) printf("\"%s\"", sa_table_text(&t, r, c));
+                    else printf("%d", sa_table_int(&t, r, c));
+                }
+                putchar('\n');
+            }
+            sa_table_free(&t);
+        }
     } else if (!strcmp(cmd, "agf") && argc == 5) {
         size_t n;
         u8 *d = sa_vfs_read(&v, argv[3], &n);

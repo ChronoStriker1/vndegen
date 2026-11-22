@@ -276,4 +276,16 @@ int sa_log_click(Backlog *b, int x, int y, char *voice, size_t voiceSize);
 bool sa_log_hover(Backlog *b, int x, int y);
 void sa_log_draw(Backlog *b, u32 *fb, bool fast, bool autoMode);
 
+typedef struct Table {
+    int rows, cols;
+    i32 *cell;
+    u8 *isText;
+    char **text;
+} Table;
+
+bool sa_table_load(Table *t, Vfs *vfs, const char *name);
+void sa_table_free(Table *t);
+i32 sa_table_int(const Table *t, int row, int col);
+const char *sa_table_text(const Table *t, int row, int col);
+
 #endif
