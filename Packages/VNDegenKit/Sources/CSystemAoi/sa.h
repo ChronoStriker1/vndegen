@@ -195,6 +195,7 @@ void sa_vm_free(VM *vm);
 i32 sa_vm_get(VM *vm, const u8 *code, const Operand *o);
 void sa_vm_set(VM *vm, const Operand *o, i32 v);
 bool sa_vm_cond(VM *vm, const char *expr);
+u32 sa_vm_random(VM *vm);
 
 typedef struct PvmVertex {
     float pos[3], normal[3], uv[2];
@@ -325,7 +326,7 @@ typedef struct Town {
     Image **tile;
     Image *ui[40];
     int hover;
-    bool hidden;
+    bool hidden, mapOnly;
 } Town;
 
 bool sa_town_init(Town *t, Vfs *vfs);
@@ -336,6 +337,31 @@ int sa_town_staffed(const Town *t, const VM *vm, int cell);
 void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb);
 int sa_town_hit(const Town *t, const VM *vm, int x, int y);
 bool sa_town_hover(Town *t, const VM *vm, int x, int y);
+void sa_town_draw_info(Town *t, const VM *vm, u32 *fb);
+void sa_draw_number(u32 *fb, const Image *font, const char *s, int right, int y, int row, int cw, int ch);
+void sa_draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch);
+Image *sa_load_image(Vfs *vfs, const char *name);
+
+#define BUILD_PENDING 32
+
+typedef struct BuildScreen {
+    bool open;
+    int held;
+    int listHover, cellHover, buttonHover;
+    int pendingCell[BUILD_PENDING], pendingType[BUILD_PENDING];
+    int pendingCount;
+    Image *art[16];
+    Image *icon[40];
+} BuildScreen;
+
+enum { BUILD_STAY, BUILD_CLOSED };
+
+void sa_build_init(BuildScreen *b, Vfs *vfs);
+void sa_build_free(BuildScreen *b);
+void sa_build_open(BuildScreen *b);
+int sa_build_click(BuildScreen *b, Town *t, VM *vm, int x, int y, bool right);
+bool sa_build_hover(BuildScreen *b, Town *t, VM *vm, int x, int y);
+void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb);
 
 enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28 };
 

@@ -70,7 +70,7 @@ enum {
     CELL_DY = 38,
 };
 
-static Image *load(Vfs *vfs, const char *name) {
+Image *sa_load_image(Vfs *vfs, const char *name) {
     size_t n;
     u8 *d = sa_vfs_read(vfs, name, &n);
     Image *im = d ? sa_agf_decode(d, n) : NULL;
@@ -84,7 +84,7 @@ bool sa_town_init(Town *t, Vfs *vfs) {
     if (!sa_table_load(&t->build, vfs, "TownBuil.obj") || !sa_table_load(&t->mass, vfs, "TownMass.obj") ||
         !sa_table_load(&t->lvup, vfs, "TownLvup.obj"))
         return false;
-    for (int i = 0; i < UI_COUNT; i++) t->ui[i] = load(vfs, uiNames[i]);
+    for (int i = 0; i < UI_COUNT; i++) t->ui[i] = sa_load_image(vfs, uiNames[i]);
     t->tile = sa_alloc(sizeof(Image *) * (size_t)t->build.rows);
     return true;
 }
@@ -145,7 +145,7 @@ static void cell_center(int cell, int *x, int *y) {
 static Image *tile_for(Town *t, Vfs *vfs, int type) {
     int r = sa_town_type_row(t, type);
     if (r < 0) return NULL;
-    if (!t->tile[r]) t->tile[r] = load(vfs, sa_table_text(&t->build, r, 37));
+    if (!t->tile[r]) t->tile[r] = sa_load_image(vfs, sa_table_text(&t->build, r, 37));
     return t->tile[r];
 }
 
@@ -175,7 +175,7 @@ static int digit_index(char c) {
     return p && c ? (int)(p - set) : -1;
 }
 
-static void draw_number(u32 *fb, const Image *font, const char *s, int right, int y, int row, int cw, int ch) {
+void sa_draw_number(u32 *fb, const Image *font, const char *s, int right, int y, int row, int cw, int ch) {
     int n = (int)strlen(s);
     int x = right - n * cw;
     for (int i = 0; i < n; i++, x += cw) {
@@ -184,10 +184,10 @@ static void draw_number(u32 *fb, const Image *font, const char *s, int right, in
     }
 }
 
-static void draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch) {
+void sa_draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch) {
     char buf[24];
     snprintf(buf, sizeof buf, sign && v > 0 ? "+%d" : "%d", v);
-    draw_number(fb, font, buf, right, y, row, cw, ch);
+    sa_draw_number(fb, font, buf, right, y, row, cw, ch);
 }
 
 static Image *row_art(Town *t, Vfs *vfs, int area, int index) {
@@ -201,7 +201,7 @@ static Image *row_art(Town *t, Vfs *vfs, int area, int index) {
     if (!cache[area][index]) {
         char n[24];
         snprintf(n, sizeof n, "flw_b0%d%d.agf", area, index);
-        cache[area][index] = load(vfs, n);
+        cache[area][index] = sa_load_image(vfs, n);
     }
     return cache[area][index];
 }
@@ -212,7 +212,7 @@ static Image *section_art(Vfs *vfs, int area) {
     if (!cache[area]) {
         char n[24];
         snprintf(n, sizeof n, "flw_b0%d.agf", area);
-        cache[area] = load(vfs, n);
+        cache[area] = sa_load_image(vfs, n);
     }
     return cache[area];
 }
@@ -256,14 +256,14 @@ static void draw_window(Town *t, Vfs *vfs, const VM *vm, u32 *fb, int x, int tit
             sa_blit(fb, row_art(t, vfs, area, index), x, ry);
             char buf[16];
             snprintf(buf, sizeof buf, "%d", working);
-            draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 117, ry + 5, 0, 10, 13);
+            sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 117, ry + 5, 0, 10, 13);
             snprintf(buf, sizeof buf, "%d", count);
-            draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 147, ry + 5, 0, 10, 13);
+            sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 147, ry + 5, 0, 10, 13);
             snprintf(buf, sizeof buf, "%d", level);
-            draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 193, ry + 5, 0, 10, 13);
+            sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 193, ry + 5, 0, 10, 13);
             slot++;
         }
-        draw_int(fb, t->ui[UI_SMALLDIGITS], built, false, x + 193, y + 5, 0, 10, 13);
+        sa_draw_int(fb, t->ui[UI_SMALLDIGITS], built, false, x + 193, y + 5, 0, 10, 13);
         y += sec ? sec->h : HEADER_H;
     }
     sa_blit(fb, t->ui[titleUi], x, WIN_Y);
@@ -285,14 +285,14 @@ static void income(const Town *t, const VM *vm, int *food, int *money, int *res,
         if (!t->cell[c].type || !sa_town_staffed(t, vm, c)) continue;
         int r = sa_town_type_row(t, t->cell[c].type);
         if (r < 0) continue;
-        *food += sa_table_int(&t->build, r, 26);
-        *money += sa_table_int(&t->build, r, 28);
-        *res += sa_table_int(&t->build, r, 30) - sa_table_int(&t->build, r, 34);
-        *people += sa_table_int(&t->build, r, 25);
+        *food += sa_table_int(&t->build, r, 25);
+        *money += sa_table_int(&t->build, r, 27);
+        *res += sa_table_int(&t->build, r, 29) - sa_table_int(&t->build, r, 34);
+        *people += sa_table_int(&t->build, r, 24);
     }
 }
 
-static void draw_town_info(Town *t, const VM *vm, u32 *fb) {
+void sa_town_draw_info(Town *t, const VM *vm, u32 *fb) {
     const Image *dg = t->ui[UI_DIGITS];
     int jobs = 0;
     for (int c = 0; c < TOWN_CELLS; c++)
@@ -302,18 +302,18 @@ static void draw_town_info(Town *t, const VM *vm, u32 *fb) {
     int y = INFO_Y + 29;
     int right = INFO_X + 191;
     sa_blit(fb, t->ui[UI_TOWNSEC0], INFO_X, y);
-    draw_int(fb, dg, vm->c[C_RESIDENTS], false, right, y + 5, 2, 10, 13);
-    draw_int(fb, dg, vm->c[C_RESIDENTS] - jobs, true, right, y + 25, vm->c[C_RESIDENTS] - jobs < 0 ? 1 : 2, 10, 13);
-    draw_int(fb, dg, housing(t), false, right, y + 45, 0, 10, 13);
+    sa_draw_int(fb, dg, vm->c[C_RESIDENTS], false, right, y + 5, 2, 10, 13);
+    sa_draw_int(fb, dg, vm->c[C_RESIDENTS] - jobs, true, right, y + 25, vm->c[C_RESIDENTS] - jobs < 0 ? 1 : 2, 10, 13);
+    sa_draw_int(fb, dg, housing(t), false, right, y + 45, 0, 10, 13);
     y += t->ui[UI_TOWNSEC0] ? t->ui[UI_TOWNSEC0]->h : 64;
     const int values[3] = {vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
     const int incomes[3] = {food - vm->c[C_RESIDENTS] / 10, money, res};
     for (int i = 0; i < 3; i++) {
         const Image *sec = t->ui[UI_TOWNSEC1 + i];
         sa_blit(fb, sec, INFO_X, y);
-        draw_int(fb, dg, values[i], false, right, y + 5, i == 1 ? 2 : 0, 10, 13);
-        draw_int(fb, dg, incomes[i], true, right, y + 25, incomes[i] > 0 ? 2 : incomes[i] < 0 ? 1 : 0, 10, 13);
-        draw_number(fb, dg, "--", right, y + 45, 0, 10, 13);
+        sa_draw_int(fb, dg, values[i], false, right, y + 5, i == 1 ? 2 : 0, 10, 13);
+        sa_draw_int(fb, dg, incomes[i], true, right, y + 25, incomes[i] > 0 ? 2 : incomes[i] < 0 ? 1 : 0, 10, 13);
+        sa_draw_number(fb, dg, "--", right, y + 45, 0, 10, 13);
         y += sec ? sec->h : 64;
     }
     sa_blit(fb, t->ui[UI_TOWNINFO], INFO_X, INFO_Y);
@@ -348,7 +348,7 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
     int stage = t->stage < 1 ? 1 : t->stage;
     static const char *const bgNames[] = {"tmap00a.agf", "tmap00a.agf", "tmap01a.agf", "tmap02a.agf"};
     int bi = stage > 3 ? 3 : stage;
-    if (!t->bg[bi]) t->bg[bi] = load(vfs, bgNames[bi]);
+    if (!t->bg[bi]) t->bg[bi] = sa_load_image(vfs, bgNames[bi]);
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
     sa_blit(fb, t->bg[bi], 0, 0);
     for (int sum = 0; sum < TOWN_W + TOWN_H; sum++)
@@ -360,6 +360,14 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
             cell_center(c, &cx, &cy);
             blit_dim(fb, im, cx - 68, cy + 34 - im->h, sa_town_staffed(t, vm, c) ? 256 : 192);
         }
+    if (t->mapOnly) {
+        sa_blit(fb, t->ui[UI_GOAL], GOAL_X, GOAL_Y);
+        sa_draw_number(fb, t->ui[UI_DIGITS], "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);
+        char tn[16];
+        snprintf(tn, sizeof tn, "%d", vm->c[C_TURN] + 1);
+        sa_draw_number(fb, t->ui[UI_DIGITS], tn, GOAL_X + 183, GOAL_Y + 9, 0, 10, 13);
+        return;
+    }
     Placed p[24];
     int n = layout(t, vm, p);
     for (int i = 0; i < n; i++) {
@@ -370,12 +378,12 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
     sa_blit(fb, t->ui[UI_BAR], 57, 2);
     draw_window(t, vfs, vm, fb, FAC1_X, UI_FAC1, fac1Areas, 4);
     draw_window(t, vfs, vm, fb, FAC2_X, UI_FAC2, fac2Areas, 3);
-    draw_town_info(t, vm, fb);
+    sa_town_draw_info(t, vm, fb);
     sa_blit(fb, t->ui[UI_GOAL], GOAL_X, GOAL_Y);
-    draw_number(fb, t->ui[UI_DIGITS], "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);
+    sa_draw_number(fb, t->ui[UI_DIGITS], "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);
     char turn[16];
     snprintf(turn, sizeof turn, "%d", vm->c[C_TURN] + 1);
-    draw_number(fb, t->ui[UI_DIGITS], turn, GOAL_X + 183, GOAL_Y + 9, 0, 10, 13);
+    sa_draw_number(fb, t->ui[UI_DIGITS], turn, GOAL_X + 183, GOAL_Y + 9, 0, 10, 13);
 }
 
 int sa_town_hit(const Town *t, const VM *vm, int x, int y) {

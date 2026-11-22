@@ -107,6 +107,9 @@ void sa_vm_set(VM *vm, const Operand *o, i32 v) {
 }
 
 static bool term(VM *vm, const char **s, i32 *out);
+static u32 next_random(VM *vm);
+
+u32 sa_vm_random(VM *vm) { return next_random(vm); }
 
 static u32 next_random(VM *vm) {
     if (!vm->rng) vm->rng = 0x9e3779b9u;

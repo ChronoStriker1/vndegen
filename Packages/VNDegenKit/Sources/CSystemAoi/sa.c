@@ -83,7 +83,9 @@ struct SA {
     char pageVoice[40];
     Backlog log;
     Town town;
+    BuildScreen build;
     bool inGame;
+    int afterScript;
     char name[96];
     char *lines[MSG_LINES];
     int lineCount;
@@ -607,10 +609,11 @@ static void end_turn(SA *s) {
         if (r < 0) continue;
         cap += sa_table_int(&s->town.build, r, 9);
         if (!sa_town_staffed(&s->town, vm, c)) continue;
-        food += sa_table_int(&s->town.build, r, 26);
-        money += sa_table_int(&s->town.build, r, 28);
-        res += sa_table_int(&s->town.build, r, 30) - sa_table_int(&s->town.build, r, 34);
-        people += sa_table_int(&s->town.build, r, 25);
+        food += sa_table_int(&s->town.build, r, 25);
+        money += sa_table_int(&s->town.build, r, 27);
+        res += sa_table_int(&s->town.build, r, 29) - sa_table_int(&s->town.build, r, 34);
+        int lo = sa_table_int(&s->town.build, r, 23), hi = sa_table_int(&s->town.build, r, 24);
+        people += hi > lo ? lo + (int)(sa_vm_random(vm) % (u32)(hi - lo + 1)) : hi;
     }
     food -= vm->c[C_RESIDENTS] / 10;
     sa_log(s, "turn %d ends: residents %d%+d, food %d%+d, money %d%+d, resources %d%+d", vm->c[C_TURN] + 1, vm->c[C_RESIDENTS], people,
@@ -625,11 +628,47 @@ static void end_turn(SA *s) {
     start_script(s, "bo0000.box", 0);
 }
 
-static void town_action(SA *s, int action) {
+static int command_number(int action) {
+    switch (action) {
+    case TOWN_CMD_EXPEDITION: return 20;
+    case TOWN_CMD_POLICY: return 21;
+    case TOWN_CMD_REST: return 22;
+    case TOWN_CMD_BUILD: return 23;
+    case TOWN_CMD_DEPLOY: return 24;
+    case TOWN_CMD_EQUIP: return 25;
+    case TOWN_CMD_TRAIN: return 26;
+    case TOWN_CMD_SHOP: return 27;
+    }
+    return -1;
+}
+
+static void run_command(SA *s, int action) {
     switch (action) {
     case TOWN_CMD_REST:
         end_turn(s);
         break;
+    case TOWN_CMD_BUILD:
+        sa_build_open(&s->build);
+        s->town.mapOnly = true;
+        break;
+    default:
+        sa_log(s, "town command %d not built yet", action);
+        break;
+    }
+    s->dirty = true;
+}
+
+static void town_action(SA *s, int action) {
+    int number = command_number(action);
+    if (number >= 0) {
+        s->vm.c[0x5f] = number;
+        s->afterScript = action;
+        reset_scene(s);
+        start_script(s, "bo3000.box", 0);
+        s->dirty = true;
+        return;
+    }
+    switch (action) {
     case TOWN_BTN_HIDE:
         s->town.hidden = !s->town.hidden;
         break;
@@ -738,6 +777,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     load_faces(s);
     sa_log_init(&s->log, &s->vfs);
     if (!sa_town_init(&s->town, &s->vfs)) sa_log(s, "can't read the town tables");
+    sa_build_init(&s->build, &s->vfs);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
@@ -779,6 +819,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     free(s->bgm);
     sa_log_free(&s->log);
     sa_town_free(&s->town);
+    sa_build_free(&s->build);
     picture_clear(&s->face);
     for (int i = 0; i < s->faceCount; i++) {
         free(s->faceName[i]);
@@ -823,6 +864,22 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             }
             return !s->quit;
         }
+    }
+    if (s->mode == MODE_TOWN && s->build.open) {
+        if (sa_build_hover(&s->build, &s->town, &s->vm, s->mouseX, s->mouseY)) s->dirty = true;
+        if (s->clicked || s->rightClicked) {
+            int r = sa_build_click(&s->build, &s->town, &s->vm, s->mouseX, s->mouseY, s->rightClicked);
+            s->clicked = s->rightClicked = false;
+            if (r == BUILD_CLOSED) s->town.mapOnly = false;
+            s->dirty = true;
+        }
+        if (s->dirty) {
+            sa_town_draw(&s->town, &s->vfs, &s->vm, s->fb);
+            if (s->build.open) sa_build_draw(&s->build, &s->town, &s->vfs, &s->vm, s->fb);
+            s->serial++;
+            s->dirty = false;
+        }
+        return true;
     }
     if (s->mode == MODE_TOWN) {
         if (sa_town_hover(&s->town, &s->vm, s->mouseX, s->mouseY)) s->dirty = true;
@@ -992,7 +1049,14 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             char *sav = sa_fmt("%s/Bunny3.sav", s->saveDir);
             sa_mkdirs(sav);
             free(sav);
-            if (s->inGame) {
+            if (s->inGame && s->afterScript) {
+                int a = s->afterScript;
+                s->afterScript = 0;
+                reset_scene(s);
+                s->mode = MODE_TOWN;
+                s->town.hover = -1;
+                run_command(s, a);
+            } else if (s->inGame) {
                 reset_scene(s);
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
