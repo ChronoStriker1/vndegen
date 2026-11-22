@@ -180,7 +180,7 @@ version 125 saves, which VNDegen 0.58.1 wrote, load as before, and the next save
 
 In version 128 and 159 saves the pictures on screen go into the save, and a load shows them again, as those engines do: President
 Yukino's day bar and portrait are there right after a load, from a PC save or VNDegen's, and VNDegen's frame then
-matches the PC engine's apart from the camera. The PC engines load VNDegen's version 128 saves with their pictures
+matches the PC engine's. The PC engines load VNDegen's version 128 saves with their pictures
 (President Yukino and Drain Dungeon under Wine). Images, text, windows, `<SQUARE>` and `<GRADX>` pictures keep their
 position, anchor, pattern, opacity, zoom, angle, colour and blend. The Clumsy Witch Seris (159) keeps its HUD this way: a
 save moved between VNDegen and the PC in either direction shows the HUD, minimap and portrait right after the load, as
@@ -203,8 +203,11 @@ safe: ANGEL QUEST's engine (version 123) closes when it loads a save holding a p
   or which music was playing; the map's own music starts. Saved pictures come back without their effects (shake, pulse,
   flicker, automatic patterns, the effect command's zoom and shift), and pictures made from XY arrays, cut with
   `<CUT/...>`, or holding text codes other than `\f`, `\E`, `<R>` and `\ay` are left out of saves and loads. Version 159
-  saves leave out window pictures too. The PC also shows
-  the map scrolled a little differently after loading a VNDegen save.
+  saves leave out window pictures too.
+- The camera goes into version 128 saves as the PC writes it, so the PC shows a VNDegen save scrolled as it shows its
+  own (President Yukino and Journey of Depravity under Wine). VNDegen keeps the hero in the middle after any load.
+  The Clumsy Witch Seris's own engine writes 0 there and opens a load at the map's top left, its own saves included,
+  where VNDegen centres the hero; other versions' camera isn't written.
 - DxLib archive version 7 isn't read. No library game uses it: ANGEL QUEST, once thought to, is a version 3 archive
   with the oldest Wolf RPG Editor key, and plays.
 - Wolf RPG Editor Pro's encrypted data (basic data files whose second byte is `P`) isn't read. No library game needs

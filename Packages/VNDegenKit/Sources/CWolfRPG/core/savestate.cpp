@@ -428,6 +428,8 @@ SaveFile Game::snapshot() {
     SaveMap old = std::move(m);
     m = SaveMap{};
     m.unknown1 = old.mapId == mapId_ ? old.unknown1 : std::array<int32_t, 2>{};
+    if (f.version == kVersion22 && map_)
+        m.unknown1 = {int32_t(std::lround(std::max(0.0, cameraX_) * 4)), int32_t(std::lround(std::max(0.0, cameraY_) * 4))};
     m.v72 = old.v72;
     m.values2 = old.values2;
     m.mapId = map_ ? mapId_ : -1;

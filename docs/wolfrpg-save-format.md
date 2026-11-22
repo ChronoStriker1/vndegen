@@ -28,7 +28,7 @@ After the header: a marker byte 0x19, the game title (u16 length), the save vers
 | Field | Meaning | Established by |
 |---|---|---|
 | `mapId` | Row of the system database's map list. -1 in a save that has no map yet | Controlled saves: 2 on the second map, 3 after walking to the third |
-| `unknown1` | Two values, usually 0 | Not known; kept |
+| `unknown1` | The camera's top left in quarter pixels, which the engine shows right after a load: 240 1040 is 60, 260 | Load test: President Yukino's own save at the school front holds 240 1040, the hero-centred camera for 40-pixel tiles, and one with 0 0 opens scrolled to the map's top; Journey of Depravity's holds 0 64, its 16-pixel limit. VNDegen writes its camera there in version 128 saves and carries the value over in others |
 | `width`, `height`, `tiles` | The current map's size and its three tile layers, laid out like `Map::tiles`, so tiles changed by events persist. A -1 in place of the first tile means none are stored, which system variable 127 asks for | Game data: they equal the map file's |
 | `tilesetBase`, `autotiles`, `tileFlags` | The tileset in use: base image, autotile images, and every tile's passability | Game data: they equal the tileset's in `TileSetData.dat` |
 | `events` | Every event of the current map, in map order, as characters (below) | Game data, controlled saves |
