@@ -1,6 +1,7 @@
 #include "sa.h"
 
 #include <stdarg.h>
+#include <sys/stat.h>
 
 #include "vnfont.h"
 
@@ -12,6 +13,10 @@ enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEA
 static const char *const uiNames[UI_COUNT] = {"msg_b00.agf", "msg_b01.agf", "msg_b02.agf", "msg_b03.agf", "msg_b04.agf",
                                               "msg_b05.agf", "msg_b06.agf", "msg_a03.agf", "msg_c00.agf", "msg_c01.agf",
                                               "msg_c02.agf"};
+
+enum { MODE_TITLE, MODE_STORY };
+enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
+enum { TITLE_X = 640, TITLE_Y = 369, TITLE_H = 50, TITLE_W = 640 };
 
 typedef struct Button {
     int ui, x, y, w, h;
@@ -56,6 +61,14 @@ struct SA {
     int hoverButton;
     bool autoMode, skipMode, windowHidden;
     u32 featherMs, autoMs;
+    int mode, titleHover;
+    char *faceName[64], *facePrefix[64];
+    int faceCount;
+    char faceExpr[64][4];
+    Picture face;
+    char nextBox[32];
+    int nextEntry;
+    Image *titleBg, *titleItem[TITLE_ITEMS];
     char lastVoice[40];
     char name[96];
     char *lines[MSG_LINES];
@@ -142,8 +155,70 @@ static void host_text(void *ctx, const char *utf8, bool newLine) {
     s->dirty = true;
 }
 
+static int face_index_by_prefix(SA *s, const char *prefix) {
+    for (int i = 0; i < s->faceCount; i++)
+        if (!strncmp(s->facePrefix[i], prefix, 5)) return i;
+    return -1;
+}
+
+static void load_faces(SA *s) {
+    size_t n;
+    u8 *raw = sa_vfs_read(&s->vfs, "evntFace.obj", &n);
+    if (!raw) return;
+    for (size_t i = 0; i < n; i++) raw[i] = (u8)~raw[i];
+    size_t start = 0;
+    for (size_t k = 1; k * 12 + 24 < n && !start; k++) {
+        size_t P = k * 12;
+        bool ok = true;
+        for (int r = 0; r < 3 && ok; r++)
+            for (int c = 0; c < 2 && ok; c++) {
+                u32 off = rd32(raw + r * 12 + c * 4);
+                if (P + off + 2 > n || (!raw[P + off] && !raw[P + off + 1]) || (off && (raw[P + off - 2] || raw[P + off - 1]))) ok = false;
+            }
+        if (ok) start = P;
+    }
+    if (!start) {
+        free(raw);
+        return;
+    }
+    char *prev = NULL;
+    for (size_t p = start; p + 1 < n && s->faceCount < 64;) {
+        size_t q = p;
+        while (q + 1 < n && (raw[q] || raw[q + 1])) q += 2;
+        char *str = sa_utf16_to_utf8(raw + p, (int)((q - p) / 2));
+        if (!str[0] || !strcmp(str, "    ")) {
+            free(str);
+            break;
+        }
+        if (!strncmp(str, "ta", 2) && strlen(str) == 5 && prev) {
+            s->faceName[s->faceCount] = prev;
+            s->facePrefix[s->faceCount] = str;
+            snprintf(s->faceExpr[s->faceCount], 4, "000");
+            s->faceCount++;
+            prev = NULL;
+        } else {
+            free(prev);
+            prev = str;
+        }
+        p = q + 2;
+    }
+    free(prev);
+    free(raw);
+    sa_log(s, "%d face sets", s->faceCount);
+}
+
 static void host_speaker(void *ctx, const char *name, const char *voice, const char *face) {
     SA *s = ctx;
+    char want[40] = "";
+    if (face[0]) snprintf(want, sizeof want, "%s", face);
+    else
+        for (int i = 0; i < s->faceCount; i++)
+            if (!strcmp(s->faceName[i], name)) {
+                snprintf(want, sizeof want, "ka%.3s%s.agf", s->facePrefix[i] + 2, s->faceExpr[i]);
+                break;
+            }
+    if (want[0]) picture_set(s, &s->face, want, 0, 0);
+    else picture_clear(&s->face);
     snprintf(s->name, sizeof s->name, "%s", name);
     snprintf(s->voice, sizeof s->voice, "%s", voice[0] == '!' ? voice + 1 : "");
     s->dirty = true;
@@ -243,6 +318,8 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         int y = in->count > 2 ? sa_vm_get(vm, code, &in->o[2]) : 4;
         begin_transition(s, vm, in->count > 3 ? sa_vm_get(vm, code, &in->o[3]) : 0);
         if (x >= 0 && x < STD_SLOTS) picture_set(s, &s->std[x], n, x, y);
+        int fi = face_index_by_prefix(s, n);
+        if (fi >= 0 && strlen(n) >= 8) snprintf(s->faceExpr[fi], 4, "%.3s", n + 5);
         free(n);
         break;
     }
@@ -406,6 +483,7 @@ static void compose(SA *s) {
             int f = (int)(s->featherMs / 33) % 31;
             blit_rect(fb, s->ui[UI_FEATHER], f * 32, 0, 32, 32, FEATHER_X, FEATHER_Y);
         }
+        blit(fb, s->face.img, -1, 294);
         if (s->name[0]) sa_text_draw(fb, SA_W, SA_H, s->name, -1, NAME_X, NAME_Y, TEXT_SIZE, 0xffffff, 0x000000);
         int left = s->shown;
         for (int i = 0; i < s->lineCount && left > 0; i++) {
@@ -436,6 +514,80 @@ static void compose(SA *s) {
         }
     }
     s->serial++;
+}
+
+static int title_at(int x, int y) {
+    if (x < TITLE_X || x >= TITLE_X + TITLE_W || y < TITLE_Y) return -1;
+    int i = (y - TITLE_Y) / TITLE_H;
+    return i < TITLE_ITEMS ? i : -1;
+}
+
+static void compose_title(SA *s) {
+    u32 *fb = s->fb;
+    for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
+    blit(fb, s->titleBg, 0, 0);
+    for (int i = 0; i < TITLE_ITEMS; i++)
+        blit_rect(fb, s->titleItem[i], 0, i == s->titleHover ? TITLE_H : 0, TITLE_W, TITLE_H, TITLE_X, TITLE_Y + i * TITLE_H);
+    s->serial++;
+}
+
+static void reset_scene(SA *s) {
+    picture_clear(&s->bg);
+    picture_clear(&s->face);
+    for (int i = 0; i < STD_SLOTS; i++) picture_clear(&s->std[i]);
+    clear_text(s);
+    s->name[0] = 0;
+    picture_clear(&s->face);
+    s->windowHidden = s->autoMode = s->skipMode = false;
+    s->transDur = 0;
+    s->waitClick = false;
+}
+
+static bool start_script(SA *s, const char *box, int entry) {
+    s->vm.depth = 0;
+    s->vm.choiceCount = 0;
+    s->mode = MODE_STORY;
+    if (sa_vm_start(&s->vm, &s->vfs, box, entry, &s->host)) return true;
+    sa_log(s, "can't start %s #%d", box, entry);
+    return false;
+}
+
+static void go_title(SA *s) {
+    reset_scene(s);
+    sa_stop(s->mix, CH_VOICE, 0, 0);
+    sa_stop(s->mix, CH_BGM, 0, 500);
+    s->mode = MODE_TITLE;
+    s->titleHover = -1;
+    s->dirty = true;
+}
+
+static void new_game(SA *s) {
+    reset_scene(s);
+    memset(s->vm.c, 0, sizeof s->vm.c);
+    memset(s->vm.f, 0, sizeof s->vm.f);
+    snprintf(s->nextBox, sizeof s->nextBox, "bo0000.box");
+    s->nextEntry = 0;
+    start_script(s, "init.box", 0);
+}
+
+static void title_pick(SA *s, int item) {
+    switch (item) {
+    case TITLE_PROLOGUE:
+        reset_scene(s);
+        s->nextBox[0] = 0;
+        start_script(s, "pro.box", 0);
+        break;
+    case TITLE_START:
+        new_game(s);
+        break;
+    case TITLE_END:
+        s->quit = true;
+        break;
+    default:
+        sa_log(s, "title item %d not built yet", item);
+        break;
+    }
+    s->dirty = true;
 }
 
 static int choice_at(SA *s, int x, int y) {
@@ -488,13 +640,24 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     s->hoverButton = -1;
     s->from = sa_alloc((size_t)SA_W * SA_H * 4);
     load_bgm_defs(s);
+    load_faces(s);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
-    if (!sa_vm_start(&s->vm, &s->vfs, "pro.box", 0, &s->host)) {
-        if (err) snprintf(err, errSize, "can't start the prologue script");
-        vnsystemaoi_close((VNSystemAoi *)s);
-        return NULL;
+    s->titleBg = load_image(s, "tit_a00.agf");
+    for (int i = 0; i < TITLE_ITEMS; i++) {
+        char n[32];
+        snprintf(n, sizeof n, "tit_a1%d.agf", i);
+        s->titleItem[i] = load_image(s, n);
+    }
+    char *sav = sa_fmt("%s/Bunny3.sav", s->saveDir);
+    char real[2048];
+    bool first = sa_path_resolve(sav, real, sizeof real) != 1;
+    free(sav);
+    go_title(s);
+    if (first) {
+        title_pick(s, TITLE_PROLOGUE);
+        sa_log(s, "first start: prologue");
     }
     s->dirty = true;
     return (VNSystemAoi *)s;
@@ -510,9 +673,16 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     for (int i = 0; i < STD_SLOTS; i++) picture_clear(&s->std[i]);
     sa_image_free(s->msgFrame);
     sa_image_free(s->msgBand);
+    sa_image_free(s->titleBg);
+    for (int i = 0; i < TITLE_ITEMS; i++) sa_image_free(s->titleItem[i]);
     for (int i = 0; i < UI_COUNT; i++) sa_image_free(s->ui[i]);
     free(s->from);
     free(s->bgm);
+    picture_clear(&s->face);
+    for (int i = 0; i < s->faceCount; i++) {
+        free(s->faceName[i]);
+        free(s->facePrefix[i]);
+    }
     clear_text(s);
     sa_font_free();
     if (s->logFile) fclose(s->logFile);
@@ -526,6 +696,24 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     SA *s = (SA *)sa;
     if (s->quit) return false;
     if (s->paused) return true;
+    if (s->mode == MODE_TITLE) {
+        int h = title_at(s->mouseX, s->mouseY);
+        if (h != s->titleHover) {
+            s->titleHover = h;
+            s->dirty = true;
+        }
+        if (s->clicked) {
+            s->clicked = false;
+            if (h >= 0) title_pick(s, h);
+        }
+        if (s->mode == MODE_TITLE) {
+            if (s->dirty) {
+                compose_title(s);
+                s->dirty = false;
+            }
+            return !s->quit;
+        }
+    }
     if (s->total && s->shown < s->total) {
         s->textMs += elapsedMs;
         int want = (int)(s->textMs / 30);
@@ -605,6 +793,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             if (c >= 0) {
                 clear_text(s);
                 s->name[0] = 0;
+                picture_clear(&s->face);
                 sa_vm_choose(&s->vm, c);
             }
         } else if (s->shown < s->total) {
@@ -612,6 +801,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         } else if (s->vm.state == VM_WAIT_CLICK) {
             clear_text(s);
             s->name[0] = 0;
+            picture_clear(&s->face);
             sa_stop(s->mix, CH_VOICE, 0, 0);
             sa_vm_click(&s->vm);
         }
@@ -619,8 +809,19 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     }
     if (s->vm.state == VM_RUN) sa_vm_run(&s->vm, &s->vfs, &s->host, 20000);
     if (s->vm.state == VM_DONE) {
-        s->quit = true;
-        return false;
+        if (s->nextBox[0]) {
+            char box[32];
+            snprintf(box, sizeof box, "%s", s->nextBox);
+            s->nextBox[0] = 0;
+            start_script(s, box, s->nextEntry);
+        } else {
+            if (s->vm.f[0x78]) sa_log(s, "turn scripts done; the town is not built yet");
+            go_title(s);
+            char *sav = sa_fmt("%s/Bunny3.sav", s->saveDir);
+            sa_mkdirs(sav);
+            free(sav);
+            return true;
+        }
     }
     int h = choice_at(s, s->mouseX, s->mouseY);
     if (h != s->hover) {
@@ -663,6 +864,7 @@ void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down) {
             int c = s->hover;
             clear_text(s);
             s->name[0] = 0;
+            picture_clear(&s->face);
             sa_vm_choose(&s->vm, c);
             s->dirty = true;
         } else {

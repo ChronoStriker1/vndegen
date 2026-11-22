@@ -18,7 +18,7 @@ static int run(VNSystemAoi *s, int ms) {
 
 int main(int argc, char **argv) {
     if (argc < 4) {
-        fprintf(stderr, "sarun <gameDir> <outDir> <clicks> [shotEvery]\n");
+        fprintf(stderr, "sarun <gameDir> <outDir> <clicks> [shotEvery] [click=x,y ...]\n");
         return 2;
     }
     const char *dirs[] = {SA_FONTS_DIR};
@@ -34,6 +34,16 @@ int main(int argc, char **argv) {
     }
     int clicks = atoi(argv[3]), every = argc > 4 ? atoi(argv[4]) : 0;
     int alive = run(s, 500);
+    for (int a = 5; a < argc; a++) {
+        int x, y;
+        if (sscanf(argv[a], "click=%d,%d", &x, &y) == 2) {
+            vnsystemaoi_mouse_move(s, x, y);
+            alive = alive && run(s, 100);
+            vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 1);
+            vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 0);
+            alive = alive && run(s, 1000);
+        }
+    }
     for (int i = 0; alive && i < clicks; i++) {
         vnsystemaoi_key(s, 0x0d, 1);
         vnsystemaoi_key(s, 0x0d, 0);
