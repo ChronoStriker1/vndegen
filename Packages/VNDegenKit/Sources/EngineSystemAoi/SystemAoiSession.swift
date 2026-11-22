@@ -1,0 +1,139 @@
+import CSystemAoi
+import FrameHost
+import Foundation
+import OSLog
+import QuartzCore
+import VNCore
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
+
+nonisolated let systemAoiLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "systemaoi")
+
+final class SystemAoiSession: EngineSession {
+    var failedToStart: Bool { driver.failedToStart }
+    var startFailureReason: String? { driver.startFailureReason }
+    let view: PlatformView
+    private let driver: FrameDriver
+    private var frameView: FrameView { driver.view }
+    private var engine: OpaquePointer? { driver.engine }
+    private let launch: GameLaunch
+    private let root: URL
+    private var router = SystemAoiInputRouter()
+    private var frameSize = CGSize(width: 1280, height: 720)
+    private var shownSerial: UInt32 = .max
+
+    init(_ launch: GameLaunch, root: URL) {
+        self.launch = launch
+        self.root = root
+        let id = launch.game.id.rawValue
+        driver = FrameDriver(pacingTag: "SAFRAMES", setPaused: { vnsystemaoi_set_paused($0, $1) }, close: { engine in
+            if let problem = vnsystemaoi_problem(engine) {
+                systemAoiLog.error("\(id, privacy: .public) stopped: \(String(cString: problem), privacy: .public)")
+            }
+            vnsystemaoi_close(engine)
+        }, onExit: launch.onExit)
+        view = driver.view
+        frameView.onReady = { [weak self] in self?.start() }
+        frameView.onPointer = { [weak self] event in
+            guard let self else { return }
+            deliver(router.pointer(event, at: event.location))
+        }
+        frameView.onScroll = { [weak self] notches in
+            guard let self else { return }
+            let whole = Int(notches.rounded())
+            if whole != 0 { deliver([.wheel(whole)]) }
+        }
+        frameView.onKey = { [weak self] usage, pressed, _ in
+            guard let self else { return }
+            deliver(router.hostKey(hidUsage: usage, pressed: pressed))
+        }
+    }
+
+    private func start() {
+        guard driver.canStart else { return }
+        let logURL = launch.dataDirectory.appendingPathComponent("logs/systemaoi.txt")
+        try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? Data().write(to: logURL)
+        let movies = vnsystemaoi_find_movies()
+        if movies == nil { systemAoiLog.notice("movies left out: the KiriKiri framework's decoder isn't loaded") }
+        let rate = 44100.0
+        var problem = [CChar](repeating: 0, count: 512)
+        let started: OpaquePointer? = root.path.withCString { rootPath in
+            logURL.path.withCString { logPath in
+                var config = VNSystemAoiConfig()
+                config.gameDir = rootPath
+                config.saveDir = rootPath
+                config.logPath = logPath
+                config.audioRate = Int32(rate)
+                config.seed = UInt32.random(in: 1...UInt32.max)
+                config.movies = movies
+                return vnsystemaoi_open(&config, &problem, problem.count)
+            }
+        }
+        guard let started else {
+            let reason = String(decoding: problem.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            systemAoiLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(reason, privacy: .public)")
+            driver.failToStart(reason)
+            return
+        }
+        systemAoiLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
+        driver.run(started, sampleRate: rate, audio: { vnsystemaoi_audio($0, $1, $2) }) { [weak self] engine, ms, link in
+            self?.step(engine, ms, link)
+        }
+        if driver.paused { setPaused(true) }
+    }
+
+    private func step(_ engine: OpaquePointer, _ ms: Int, _ link: CADisplayLink) {
+        if !vnsystemaoi_frame(engine, UInt32(min(max(ms, 0), 100))) {
+            driver.finish(byGame: true)
+            return
+        }
+        let serial = vnsystemaoi_frame_serial(engine)
+        #if DEBUG
+        driver.pacing?.note(link, presented: serial != shownSerial)
+        #endif
+        guard serial != shownSerial else { return }
+        shownSerial = serial
+        var w: Int32 = 0, h: Int32 = 0
+        if let pixels = vnsystemaoi_pixels(engine, &w, &h), w > 0, h > 0 {
+            frameSize = CGSize(width: Int(w), height: Int(h))
+            frameView.present(pixels, width: Int(w), height: Int(h))
+        }
+    }
+
+    private func deliver(_ inputs: [SystemAoiInput]) {
+        guard let engine else { return }
+        for input in inputs {
+            switch input {
+            case let .key(code, down): vnsystemaoi_key(engine, code, down)
+            case let .mouseButton(button, down): vnsystemaoi_mouse_button(engine, button, down)
+            case let .mouseMove(p):
+                vnsystemaoi_mouse_move(engine, Int32(p.x * frameSize.width), Int32(p.y * frameSize.height))
+            case let .wheel(n): vnsystemaoi_wheel(engine, Int32(n))
+            case let .skip(on): vnsystemaoi_set_skip(engine, on)
+            }
+        }
+    }
+
+    func send(_ event: ControllerEvent) {
+        let frame = frameView
+        deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
+    }
+
+    func setPaused(_ paused: Bool) {
+        driver.setPaused(paused) { _ in
+            if paused { deliver(router.releaseAll()) }
+        }
+    }
+
+    func terminate() {
+        driver.terminate()
+    }
+
+    func waitUntilStopped() async {
+        await driver.waitUntilStopped()
+    }
+}

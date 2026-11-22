@@ -21,6 +21,7 @@ import EngineEAGLS
 import EngineBSX
 import EngineANIM
 import EnginePJADV
+import EngineSystemAoi
 import EngineExHibit
 import EngineBruns
 import EngineAGE
@@ -63,6 +64,7 @@ let engines: [any EnginePlugin] = {
         BSXPlugin(),
         ANIMPlugin(),
         PJADVPlugin(),
+        SystemAoiPlugin(),
         ExHibitPlugin(),
         BrunsPlugin(),
         AGEPlugin(),

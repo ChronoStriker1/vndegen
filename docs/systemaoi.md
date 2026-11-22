@@ -46,8 +46,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 ## What the runtime does so far
 
 - **Title.** The game's title with its six items. A first start plays the prologue, as the original does before
-  `Bunny3.sav` exists. Start runs `init.box` and then the turn script in `bo0000.box`. Load, Option and Extra aren't
-  built yet, and the town isn't either, so the runtime returns to the title when the turn script ends.
+  `Bunny3.sav` exists. Start runs `init.box` and then the turn script in `bo0000.box`, then opens the town. Load,
+  Option and Extra aren't built yet.
 - **Script machine.** Text, speakers, waits, choices, integer and flag variables in five banks, text conditions with
   indexed variables (`CL000[CL019]`), jumps and calls within a script and into other scripts, random numbers, and the
   loop the quiz uses.
@@ -61,10 +61,17 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - **Sound.** BGM by its `bgm.asd` entry with the loop points the file gives, and voices as their lines show.
 - **Movies.** `data1.dat` and `data2.dat` play through the app's movie decoder, `vnffmovie` (see
   [video.md](video.md)); a click ends one.
+- **Town.** The map with its facilities, the two facility windows, the town window, the commands the story has
+  opened, and LOG, SAVE, LOAD and Option. Each command first runs the game's hook for it (`bo3000.box` script 0 with
+  `C095` set to the command), so its first-use help shows as in the original. 建設 opens the build screen: the list,
+  the board, the card, Reset, Undo, 決定 and 戻る, with the town window showing the result before 決定. 休憩 ends the
+  turn: the turn's income, then the next turn's script. 遠征, 内政, 配置, 装備, 育成 and 商会 aren't built yet.
+- **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
+  FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
 
 ## Known limits
 
-- The town, expeditions, the 3D dungeon, battles, units and items aren't built yet; they are the original's exe, not
-  its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
+- Expeditions, the 3D dungeon, battles, units, items and most town commands aren't built yet; they are the original's
+  exe, not its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Saves, the Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.
