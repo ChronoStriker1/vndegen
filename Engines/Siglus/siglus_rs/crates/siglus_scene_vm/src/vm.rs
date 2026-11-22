@@ -10577,6 +10577,25 @@ impl<'a> SceneVm<'a> {
         ] {
             Self::write_cpp_int_event_raw(w, e);
         }
+        if w.legacy {
+            let r = &world.camera_eye_xz_eve;
+            for v in [
+                world.camera_view_angle,
+                world.mono,
+                r.cur_time,
+                r.end_time,
+                r.delay_time,
+                r.loop_type,
+                r.speed_type,
+                r.start_x,
+                r.start_z,
+                r.end_x,
+                r.end_z,
+            ] {
+                w.push_i32(v);
+            }
+            return;
+        }
         for v in [
             world.camera_view_angle,
             world.mono,
@@ -10613,6 +10632,20 @@ impl<'a> SceneVm<'a> {
         world.camera_up_z = Self::read_cpp_int_event_raw(rd)?;
         world.camera_view_angle = rd.i32()?;
         world.mono = rd.i32()?;
+        if rd.layout == NativeLocalLayout::Legacy {
+            world.camera_eye_xz_eve = runtime::globals::WorldRotateEvent {
+                cur_time: rd.i32()?,
+                end_time: rd.i32()?,
+                delay_time: rd.i32()?,
+                loop_type: rd.i32()?,
+                speed_type: rd.i32()?,
+                start_x: rd.i32()?,
+                start_z: rd.i32()?,
+                end_x: rd.i32()?,
+                end_z: rd.i32()?,
+            };
+            return Ok(world);
+        }
         world.order = rd.i32()?;
         world.layer = rd.i32()?;
         world.wipe_copy = rd.i32()?;
@@ -14999,6 +15032,47 @@ mod command_dispatch_tests {
             assert!(obj.runtime.child_objects.is_empty());
         }
         assert!(rd.remaining().is_empty());
+    }
+
+    #[test]
+    fn legacy_world_record_ends_with_the_camera_rotation_event() {
+        use crate::original_save::{OriginalStreamReader, OriginalStreamWriter};
+        let mut native = vec![0i32];
+        for (def, loop_type) in [
+            (0, -1),
+            (0, -1),
+            (-1000, -1),
+            (0, -1),
+            (0, -1),
+            (0, -1),
+            (0, -1),
+            (1, -1),
+            (0, -1),
+        ] {
+            native.extend([def, def, 0, 0, 0, def, def, def, loop_type, -1, 0]);
+        }
+        native.extend([450, 0, 161903, 0, 0, -1, 0, 0, 0, 0, 0]);
+        let bytes: Vec<u8> = native.iter().flat_map(|v| v.to_le_bytes()).collect();
+        assert_eq!(bytes.len(), 444);
+
+        let mut rd = OriginalStreamReader::new(&bytes);
+        rd.layout = NativeLocalLayout::Legacy;
+        let world = SceneVm::read_cpp_world(&mut rd, 0).unwrap();
+        assert!(rd.remaining().is_empty());
+        assert_eq!((world.camera_view_angle, world.mono), (450, 0));
+        assert_eq!(world.camera_eye_xz_eve.cur_time, 161903);
+        assert_eq!(world.camera_eye_xz_eve.loop_type, -1);
+        assert_eq!(world.camera_eye_z.def_value, -1000);
+
+        let vm = test_vm();
+        let mut w = OriginalStreamWriter::new();
+        w.legacy = true;
+        vm.write_cpp_world(&mut w, &world);
+        assert_eq!(w.into_inner(), bytes);
+
+        let mut w = OriginalStreamWriter::new();
+        vm.write_cpp_world(&mut w, &world);
+        assert_eq!(w.into_inner().len(), 424);
     }
 
     #[test]
