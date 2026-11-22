@@ -1892,7 +1892,6 @@ mod local_layout_tests {
 mod vndegen_case_tests {
     use super::*;
 
-    /// A PC backup restored on a disk that doesn't ignore case keeps the PC's spelling, and saves go there.
     #[test]
     fn fixed_items_stop_at_the_array_end_when_the_count_is_larger() {
         let mut bytes = Vec::new();
@@ -1915,6 +1914,7 @@ mod vndegen_case_tests {
         assert_eq!(rd.i32().unwrap(), 42);
     }
 
+    /// A PC backup restored on a disk that doesn't ignore case keeps the PC's spelling, and saves go there.
     #[test]
     fn saves_use_the_spelling_on_disk() {
         let root = std::env::temp_dir().join(format!("siglus-save-case-{}", std::process::id()));
