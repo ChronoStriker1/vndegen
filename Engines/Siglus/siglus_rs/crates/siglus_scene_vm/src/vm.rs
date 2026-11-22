@@ -15951,10 +15951,12 @@ mod call_frame_save_metadata_tests {
         ] {
             words[idx] = HEADER_SIZE;
         }
+        words[2] = 16;
         let mut out = Vec::with_capacity(HEADER_SIZE as usize);
         for word in words {
             out.extend_from_slice(&word.to_le_bytes());
         }
+        out.resize(HEADER_SIZE as usize + 16, 0);
         out
     }
 
