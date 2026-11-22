@@ -78,6 +78,8 @@ VNDegen uses the same folder and format:
   blur of the heroine's-view scenes, H-scene speech bubbles, the end-of-scene fades.
 - The control bar (voice replay, quick save and load, save, load, system menu, backlog, auto, skip, mute, hide, the
   window transparency slider) and the system menu (config, save, load, backlog, title, end game).
+- The PC's confirm boxes, as `def.rld` defines them: before returning to the title, ending the game, a quick load, and
+  saving over a used slot. The title screen's Exit ends the game without asking, as on the PC.
 - Save and Load with ten pages, the auto and quick pages, thumbnails and the newest-save mark; the backlog with names
   and voice marks; the five config pages, of which window transparency, text and auto speed, the sound and voice
   volumes, per-character voice volumes, the countdown and the system sound take effect.
@@ -94,7 +96,6 @@ VNDegen uses the same folder and format:
 
 - The emotion icons that `MANPU` attaches to sprites (`.dlt` animations) are not drawn; see the clean-room notes.
 - The CG viewer has no Full Screen or Original buttons.
-- Returning to the title from the system menu doesn't ask first, as the PC game does.
 - The backlog's Jump buttons aren't shown, and the config page's window-size and full-screen choices do nothing.
 
 ## Linux host
