@@ -147,6 +147,13 @@ static Button *button(IK *t, u32 id) {
 
 void image_load(IK *t, int slot, const char *name) {
     if (slot < 0 || slot >= t->imageCount) return;
+    for (int i = 0; t->images[slot] && i < t->layerCount; i++) {
+        Layer *l = &t->layers[i];
+        if (l->made && l->ready && !l->surf && l->img == slot && l->rot == 0) {
+            layer_surface(t, l);
+            l->kept = true;
+        }
+    }
     image_free(t->images[slot]);
     t->images[slot] = NULL;
     snprintf(t->imageNames[slot], sizeof t->imageNames[slot], "%s", name);
@@ -429,6 +436,11 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     case 0x0207:
         if ((l = layer(t, rd32(a)))) {
+            if (l->kept) {
+                image_free(l->surf);
+                l->surf = NULL;
+                l->kept = false;
+            }
             l->img = (int)ik_value(t, rd32(a + 4));
             l->sx = (int)ik_value(t, rd32(a + 8));
             l->sy = (int)ik_value(t, rd32(a + 12));
@@ -439,6 +451,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             l->ready = true;
             image_free(l->surf);
             l->surf = NULL;
+            l->kept = false;
         }
         break;
     case 0x0209:

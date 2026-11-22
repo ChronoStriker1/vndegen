@@ -100,7 +100,7 @@ typedef struct Layer {
     int w, h, x, y;
     int img, sx, sy;
     int argb[4];
-    bool shown, ready, fill, textured, quad;
+    bool shown, ready, fill, textured, quad, kept;
     int tw, th;
     u32 fillArgb;
     Image *surf;

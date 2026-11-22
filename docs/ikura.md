@@ -56,7 +56,9 @@ Raidy II's exe reads the same archives, pictures, sound and scripts; about sixty
 - Layers keep a drawing order. `0212` swaps what two layer numbers refer to, and each layer keeps its place in the
   order; the order is saved. `0213` shows or hides a range, `0214` and `0216` make built layers from a picture region
   or a fill, `0217` and `0218` jump when a layer is shown or hidden. The PC redraws only at a fade's `0009`/`000a`
-  pair or while it waits for input, never during a timed `000b` wait.
+  pair or while it waits for input, never during a timed `000b` wait. A built layer keeps the picture it was built
+  from: loading another picture into its slot (`0101`) leaves it as it was until `0207` or `0208` builds it again, so
+  the opening's desert stays behind the logo, which is loaded into the same slot.
 - `0008` calls through a switch table, `040b` reads a variable indirectly and `040d` copies a run of them, `0309`
   copies flags, `0108` loads the picture a text slot names, `0109` frees a range of pictures, `0719` and `071c` set
   the mode of or clear a range of buttons, and a variable reference in a destination writes the variable it names.
