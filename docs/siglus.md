@@ -18,11 +18,23 @@ Steam releases such as planetarian HD ship one script and Gameexe per language b
 
 Saves are the PC engine's own files in the PC's folder beside the game: `savedata/` for the plain pack, and `savedata_en/` and so on for a language pack, as the PC version names them. A folder of another spelling, such as `SAVEDATA/` from a Windows backup, is used as it is. The files are `0000.sav` and up for the slots with `0000.bmp` thumbnails, `global.sav`, `read.sav` and `config.sav`; siglus_rs adds `twitter_state.dat`, which the PC ignores.
 
-Checked against Harmonia's own engine under Wine:
+Checked against both games' own engines under Wine: Harmonia (1.1.108) and planetarian HD (1.1.132). planetarian HD's exe runs only `Scene.pck` or `SceneZH.pck` and picks the Chinese pack when Steam doesn't answer, so its checks used the Chinese pack on both sides; the slot layout doesn't depend on the language.
 
-- PC to VNDegen: slots, `global.sav`, `read.sav` and `config.sav` load, and the story resumes where it was saved. Saving a just-loaded PC slot again gives the same data byte for byte.
-- VNDegen to PC: `global.sav` and `read.sav` load. `config.sav` is written in the version the game's engine reads: the version of the one already there, or for a new one the version that goes with the game's `.exe` (1.2 up to build 132, 1.3 from 133, 1.4 from 141). Harmonia's engine refuses to start with any other version.
-- A slot saved in VNDegen is written in the layout the game's engine reads, so the PC version loads one from a playthrough VNDegen started and resumes the scene, but then draws no message text. A slot saved after loading a PC slot crashes the PC version. See Known limits.
+- PC to VNDegen: slots, `global.sav`, `read.sav` and `config.sav` load, and the story resumes at the saved line with the page's earlier lines in place. Saving a just-loaded PC slot again gives the same data byte for byte.
+- VNDegen to PC: slots load and resume with their message text and play on, both from a playthrough VNDegen started and from one continued from a PC slot. `global.sav` and `read.sav` load. `config.sav` is written in the version the game's engine reads: the version of the one already there, or for a new one the version that goes with the game's `.exe` (1.2 up to build 132, 1.3 from 133, 1.4 from 141). Harmonia's engine refuses to start with any other version.
+
+### Slot layout
+
+A slot file is a header followed by the LZSS-packed payload. The header is the version (1.0), the save time, seven UTF-16 strings of 256 characters (append folder and name, scene title, message, full message, two comments), 256 flag values and the packed size, 4,652 bytes in both games. siglus_rs packs without matches, as literals only, which the PC engine reads. The payload holds the save id, the strings again, the local stream, the 44-byte extra stream and the selection snapshots.
+
+The local stream is read in order with no field tags, so every record has to be the size the game's engine expects. The engines before build 133 use the older local layout: no script font name, a 344-byte local data block, no backlog check flag, and the `.gan` work after each object. What VNDegen settled against the PC versions:
+
+- The current proc and the proc stack. A slot is taken at a save point while the script runs: the current proc is the script proc (type 1) and the stack holds one empty proc (type 0), 147 bytes each. With an empty current proc and no stack the PC loads the slot but never runs the script, and the message window stays empty.
+- Fixed arrays are an end offset, a count and the records. The PC can write fewer records than the count: planetarian HD writes 90 of its 100 stage objects and puts the end offset after the 90th. A reader stops at the end offset.
+- A world record before build 133 is the mode, the nine camera events (44 bytes each), the view angle, mono, and the xz camera rotation event: current time, end time, delay, loop type, speed type, start x and z, end x and z. That is 444 bytes. Newer engines save order, layer and the two wipe fields in place of the rotation, 424 bytes. A slot with the newer record crashes Harmonia's engine. Only the current time and the loop type (-1) differ from zero in either game, so the order of the other rotation fields is inferred.
+- A message page's PARAM record holds the text cursor (0,36 after one line of Harmonia's 24-pixel text with 12 pixels between lines), the current talk margins (0 in every slot seen) and the template's name text size. The window's own message offset and margins are in the window record. Writing the offset as the cursor made the PC draw the first line of a page indented.
+
+Differences the PC versions accept: siglus_rs writes some fixed arrays empty where the PC writes the full count from the Gameexe (scene properties, masks, g00 buffers, screen effects, PCM events, edit boxes, the frame's face and object lists), 11 counters where Harmonia writes 16, world mode 1 where the PC writes 0, and its own clock values in the message window's time fields.
 
 ## Text
 
@@ -47,7 +59,6 @@ While VNDegen's menu is open the game stops and its sound is muted. Kira 0.9 can
 
 ## Known limits
 
-- A slot saved in VNDegen can crash the PC version when loaded there, or load without its message text. Slots saved on the PC load in VNDegen, and `global.sav`, `read.sav` and `config.sav` move both ways. The backup warning in the game's Saves sheet says so.
 - The language follows the system's preferred languages; there is no per-game choice.
 - Sound keeps playing, muted, while VNDegen's menu is open.
 - SiglusEngine games read a gamepad on the PC. VNDegen sends them keys and clicks instead, so a game's own gamepad prompts don't show.

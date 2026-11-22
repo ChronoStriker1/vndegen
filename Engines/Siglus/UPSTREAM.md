@@ -20,6 +20,7 @@ The first commit that adds `siglus_rs/` holds the upstream files unmodified, exc
 - `crates/siglus_scene_vm/assets/fonts/default.ttf`, Microsoft's MS PGothic, which upstream compiles into the engine. The host passes a substitute at run time.
 - `crates/reallive/src/dt00` and `crates/reallive/src/pt00`, machine translations of the decompiled DLLs of Tomoyo After's dungeon game (`dt00.dll`) and Little Busters!' baseball game (`PT00.DLL`). That code has no license of its own.
 - `icon/Icon.png`, the desktop player's window icon.
+- The test `yuv_black_converts_to_opaque_black`, which tests the left-out WMV decoder's colour conversion; `wmv_stub/` returns an empty frame there.
 
 ## License
 
@@ -66,3 +67,8 @@ On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's in
 - Look for a game's fonts in `dat/` too, where the Gameexe's `#FONT_FILE` fonts are.
 - Write slots in the local layout the game's engine reads: the layout of the slot that was loaded, else the older one for engines before build 133 (no script font name, the 344-byte local data block, no backlog check flag, and gan work after each object's gan file). Each message window keeps its name window template.
 - Return to the caller's scene when a subroutine jumped to another scene before its `return`, as the original engine's call record does. Harmonia's in-game menu opens its config that way, and its BACK button ended the game.
+- Save the current proc as the script proc over one empty proc, as the PC engine does. The empty current proc VNDegen wrote before made the PC load a slot without running its script.
+- Read and write the world record of engines before build 133 with its xz camera rotation event and without order, layer and wipe fields. The newer record crashed Harmonia's engine.
+- Read a fixed array no further than its end offset. planetarian HD's engine writes fewer stage objects than the array's count.
+- Save a message page's text cursor, zero talk margins and the template's name text size in its PARAM record, and read the page's values without replacing the window's message offset and margins. Applying a window's template keeps the cursor of a window that holds restored text.
+- Give the call-return tests a scene with code to return into; they returned past the end of an empty scene.

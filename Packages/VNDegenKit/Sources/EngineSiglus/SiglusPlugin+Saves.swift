@@ -10,10 +10,6 @@ extension SiglusPlugin {
         return [SaveLocation(directory: directory) { path in Self.saveRelativePath(path, folder: saveFolder) }]
     }
 
-    nonisolated public func backupWarning(for game: Game, dataDirectory: URL) -> String? {
-        "Saves made in VNDegen load in VNDegen but can crash the PC version when loaded there. PC saves load in VNDegen."
-    }
-
     /// The part of a path after its last `folder` component, matched ignoring case as Windows does. Nil for a file
     /// outside such a folder.
     nonisolated static func saveRelativePath(_ path: String, folder: String) -> String? {
