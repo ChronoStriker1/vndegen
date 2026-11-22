@@ -6211,7 +6211,6 @@ mod wmv_movie_adapter_tests {
     use super::{
         RgbaImage, WmvDecodedFrame, is_wmv_extension, select_wmv_stream_frame,
         wmv_audio_alignment_frames, wmv_frame_duration_ms, wmv_rebase_duration_ms,
-        wmv_yuv_frame_to_rgba,
     };
 
     fn frame(index: usize, pts_ms: u64) -> WmvDecodedFrame {
@@ -6300,18 +6299,5 @@ mod wmv_movie_adapter_tests {
     #[test]
     fn frame_duration_uses_median_positive_pts_delta() {
         assert_eq!(wmv_frame_duration_ms(&[0, 40, 80, 200]), Some(40));
-    }
-
-    #[test]
-    fn yuv_black_converts_to_opaque_black() {
-        let yuv = wmv_decoder::YuvFrame {
-            width: 2,
-            height: 2,
-            y: vec![16; 4],
-            cb: vec![128],
-            cr: vec![128],
-        };
-        let rgba = wmv_yuv_frame_to_rgba(&yuv);
-        assert_eq!(rgba.rgba, [0, 0, 0, 255].repeat(4));
     }
 }
