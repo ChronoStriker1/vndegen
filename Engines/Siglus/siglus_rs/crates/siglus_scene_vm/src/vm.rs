@@ -11900,18 +11900,10 @@ impl<'a> SceneVm<'a> {
         w.push_i32(option);
     }
 
-    fn write_cpp_runtime_proc_stack(&self, w: &mut crate::original_save::OriginalStreamWriter) {
-        // Do not fabricate C_tnm_proc states.  Until the real C++ proc element,
-        // arg_list, return_value_flag and option are mirrored from runtime state,
-        // only the script proc can be represented safely; other transient waits are
-        // saved as NONE rather than writing a guessed proc_type.
-        let proc_type = if matches!(self.ctx.last_proc_kind(), runtime::ProcKind::Script) {
-            1
-        } else {
-            0
-        };
-        Self::write_cpp_proc_record(w, proc_type, &[], 0);
-        w.push_i32(0);
+    fn write_cpp_runtime_proc_stack(w: &mut crate::original_save::OriginalStreamWriter) {
+        Self::write_cpp_proc_record(w, 1, &[], 0);
+        w.push_i32(1);
+        Self::write_cpp_proc_record(w, 0, &[], 0);
     }
 
     fn read_cpp_proc_record(
@@ -12042,7 +12034,7 @@ impl<'a> SceneVm<'a> {
         w.push_i32(self.current_line_no);
         w.push_i32(self.stream.get_prg_cntr() as i32);
 
-        self.write_cpp_runtime_proc_stack(&mut w);
+        Self::write_cpp_runtime_proc_stack(&mut w);
         w.push_element(&self.ctx.globals.current_mwnd_element);
         w.push_element(&self.ctx.globals.current_sel_mwnd_element);
         w.push_element(&self.ctx.globals.last_mwnd_element);
@@ -15073,6 +15065,17 @@ mod command_dispatch_tests {
         let mut w = OriginalStreamWriter::new();
         vm.write_cpp_world(&mut w, &world);
         assert_eq!(w.into_inner().len(), 424);
+    }
+
+    #[test]
+    fn local_save_runs_the_script_proc_over_an_empty_proc() {
+        use crate::original_save::OriginalStreamWriter;
+        let mut w = OriginalStreamWriter::new();
+        SceneVm::write_cpp_runtime_proc_stack(&mut w);
+        let bytes = w.into_inner();
+        let int_at = |at: usize| i32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+        assert_eq!(bytes.len(), 147 + 4 + 147);
+        assert_eq!((int_at(0), int_at(147), int_at(151)), (1, 1, 0));
     }
 
     #[test]
