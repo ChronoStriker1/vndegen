@@ -108,6 +108,30 @@ int main(int argc, char **argv) {
             sa_pvm_free(&m);
         }
         free(d);
+    } else if (!strcmp(cmd, "wav") && argc == 5) {
+        Mixer *m = sa_mixer_new(44100, &v);
+        sa_play(m, CH_VOICE, 0, argv[3], false);
+        FILE *f = fopen(argv[4], "wb");
+        static float buf[2048];
+        long frames = 0;
+        fseek(f, 44, SEEK_SET);
+        while (sa_playing(m, CH_VOICE, 0) && frames < 44100L * 600) {
+            sa_mixer_mix(m, buf, 1024, false);
+            int16_t s16[2048];
+            for (int i = 0; i < 2048; i++) s16[i] = (int16_t)(buf[i] * 32767.0f);
+            fwrite(s16, sizeof s16, 1, f);
+            frames += 1024;
+        }
+        uint32_t data = (uint32_t)(frames * 4), riff = data + 36;
+        uint8_t hd[44] = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 16, 0, 0, 0, 1, 0, 2, 0,
+                          0x44, 0xac, 0, 0, 0x10, 0xb1, 2, 0, 4, 0, 16, 0, 'd', 'a', 't', 'a'};
+        memcpy(hd + 4, &riff, 4);
+        memcpy(hd + 40, &data, 4);
+        fseek(f, 0, SEEK_SET);
+        fwrite(hd, 1, 44, f);
+        fclose(f);
+        sa_mixer_free(m);
+        printf("%ld frames\n", frames);
     } else if (!strcmp(cmd, "agf") && argc == 5) {
         size_t n;
         u8 *d = sa_vfs_read(&v, argv[3], &n);

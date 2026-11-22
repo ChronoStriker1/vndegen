@@ -218,4 +218,15 @@ bool sa_pvm_parse(Pvm *m, const u8 *data, size_t size);
 void sa_pvm_free(Pvm *m);
 int sa_pvm_find(const Pvm *m, const char *name);
 
+typedef struct Mixer Mixer;
+enum { CH_BGM, CH_SE, CH_VOICE, CH_COUNT };
+Mixer *sa_mixer_new(int rate, Vfs *vfs);
+void sa_mixer_free(Mixer *m);
+void sa_mixer_mix(Mixer *m, float *out, int frames, bool paused);
+void sa_mixer_set_log(Mixer *m, void (*log)(void *ctx, const char *msg), void *ctx);
+void sa_play(Mixer *m, int ch, int slot, const char *name, bool loop);
+void sa_stop(Mixer *m, int ch, int slot, int fadeMs);
+void sa_set_volume(Mixer *m, int ch, float v);
+bool sa_playing(Mixer *m, int ch, int slot);
+
 #endif

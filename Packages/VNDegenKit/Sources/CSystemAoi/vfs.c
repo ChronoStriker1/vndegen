@@ -85,7 +85,13 @@ static bool add_archive(Vfs *v, const char *dir, const char *file) {
             v->e = sa_realloc(v->e, sizeof(VfsEntry) * (size_t)v->cap);
         }
         v->e[v->count++] = ent;
-        if (v->count * 2 > v->hashSize) rehash(v);
+        if (v->count * 2 > v->hashSize) {
+            rehash(v);
+        } else {
+            u32 h = hash_name(ent.name) & (u32)(v->hashSize - 1);
+            while (v->hash[h] >= 0) h = (h + 1) & (u32)(v->hashSize - 1);
+            v->hash[h] = v->count - 1;
+        }
     }
     free(idx);
     free(names);
