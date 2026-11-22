@@ -721,6 +721,8 @@ void config_load(EG *e) {
     e->textSpeed = 40 - e->textSpeedSlider * 40 / 100;
 }
 
+static void export_pc_globals(EG *e);
+
 void config_save(EG *e) {
     size_t cap = 4096, n = 0;
     char *out = eg_alloc(cap);
@@ -761,30 +763,40 @@ void config_save(EG *e) {
     free(path);
     free(out);
     e->globalDirty = false;
+    export_pc_globals(e);
 }
 
-#define GLOBAL_BLOCK 0x10B0C8
+#define GLOBAL_BLOCK 0x10AFC8
 #define GLOBAL_INTS 1228
+#define GLOBAL_INT_MAX (GLOBAL_INTS + INT_SLOTS * INT_REC)
 
-static void import_pc_globals(EG *e) {
-    char path[2048];
-    snprintf(path, sizeof path, "%s/Save/GlobalSave.sav", e->saveDir);
+static char *pc_global_path(EG *e) { return eg_fmt("%s/Save/GlobalSave.sav", e->saveDir); }
+
+static u8 *read_pc_globals(EG *e) {
+    char *path = pc_global_path(e);
     size_t n;
     u8 *d = eg_read_file(path, &n);
+    free(path);
     if (!d || n < 134 || memcmp(d, banner, 20)) {
         free(d);
-        return;
+        return NULL;
     }
     u32 na = rd32(d + 128);
     if ((size_t)132 + na + 1 > n) {
         free(d);
-        return;
+        return NULL;
     }
     u32 seed;
     eg_rand_seed(&seed, (i32)(int8_t)d[132 + na]);
     xor_stream(d + 132, na, &seed);
     u8 *g = lzss_unpack(d + 132, na, GLOBAL_BLOCK);
     free(d);
+    return g;
+}
+
+static void import_pc_globals(EG *e) {
+    u8 *g = read_pc_globals(e);
+    if (!g) return;
     int count = 0;
     for (int s = 0; s < INT_SLOTS; s++) {
         const u8 *r = g + GLOBAL_INTS + (size_t)s * INT_REC;
@@ -801,6 +813,66 @@ static void import_pc_globals(EG *e) {
     }
     free(g);
     eg_log(e, "read %d globals from the PC's GlobalSave.sav", count);
+}
+
+static void export_pc_globals(EG *e) {
+    u8 *g = read_pc_globals(e);
+    if (!g) return;
+    u8 *table = g + GLOBAL_INTS;
+    int maxProbe = (int)rd32(g + GLOBAL_INT_MAX);
+    if (!maxProbe) {
+        free(g);
+        return;
+    }
+    int added = 0, changed = 0;
+    for (int i = 0; i < e->vars.count; i++) {
+        Var *v = &e->vars.vars[i];
+        if (v->name[0] != '@' || v->str) continue;
+        char name[68];
+        lower_name(name, v->name, sizeof name);
+        int idx = probe_slot(table, INT_REC, INT_SLOTS, name, &maxProbe, true);
+        if (idx < 0) {
+            idx = probe_slot(table, INT_REC, INT_SLOTS, name, &maxProbe, false);
+            if (idx < 0) continue;
+            u8 *r = table + (size_t)idx * INT_REC;
+            memset(r, 0, INT_REC);
+            r[0] = 1;
+            snprintf((char *)r + 1, 67, "%s", name);
+            added++;
+        }
+        u8 *r = table + (size_t)idx * INT_REC;
+        for (int k = 0; k < 100; k++) {
+            u32 x = k < v->n ? (u32)v->v[k].i : 0;
+            if (rd32(r + 68 + k * 4) != x) {
+                wr32(r + 68 + k * 4, x);
+                changed++;
+            }
+        }
+    }
+    if (!added && !changed) {
+        free(g);
+        return;
+    }
+    wr32(g + GLOBAL_INT_MAX, (u32)maxProbe);
+    size_t na;
+    u8 *pa = lzss_pack(g, GLOBAL_BLOCK, &na);
+    free(g);
+    size_t total = 128 + 4 + na + 1;
+    u8 *f = eg_alloc(total);
+    memcpy(f, banner, sizeof banner);
+    wr32(f + 128, (u32)na);
+    memcpy(f + 132, pa, na);
+    free(pa);
+    i8 seedByte = (i8)(time(NULL) % 255);
+    u32 seed;
+    eg_rand_seed(&seed, seedByte);
+    xor_stream(f + 132, na, &seed);
+    f[132 + na] = (u8)seedByte;
+    char *path = pc_global_path(e);
+    bool ok = eg_write_file(path, f, total);
+    eg_log(e, "%s %d new and %d changed globals to the PC's GlobalSave.sav", ok ? "wrote" : "failed to write", added, changed);
+    free(path);
+    free(f);
 }
 
 void global_load(EG *e) {

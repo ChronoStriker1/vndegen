@@ -63,8 +63,11 @@ uses the same folder:
   Each layer's record goes in the PC's per-layer block (0x5E00 bytes from 0x9B580; the background's record twice,
   with its picture size, and a character's in a second table as well), the fonts from the script's `150` definitions,
   the backlog ring's header and counters, and the name plate's fixed geometry. The PC fills in its own handles.
-- `@` globals (seen CGs and scenes) are read from the PC's `GlobalSave.sav`. VNDegen keeps its settings and the `@`
-  and `:` variables in `Save/VNDegen.cfg`, and its quick save in `Save/VNDegenQuick.sav`.
+- `@` globals (seen CGs and scenes) are read from the PC's `GlobalSave.sav`, and VNDegen adds the ones it sets to that
+  file's table of globals, leaving the rest of the file as the PC wrote it, so what was seen in either shows as seen in
+  both. The game ships a `GlobalSave.sav` whose table the PC fills on its first start, and the PC stops with an error if
+  a global it declares there is already in it, so VNDegen writes only to a file the PC has started with. VNDegen keeps
+  its settings and the `@` and `:` variables in `Save/VNDegen.cfg`, and its quick save in `Save/VNDegenQuick.sav`.
 
 ## What runs
 
@@ -100,4 +103,5 @@ Games start on the "Visual novel" controller layout.
 - Transitions other than crossfades and mask wipes (`4` with effects 3, 5, 8 and 10) are drawn as crossfades.
 - The settings dialog's Screen, System, Info and Machine tabs aren't there; full screen is the app's.
 - Name entry takes letters, digits and spaces from a hardware keyboard; without one, the default name stays.
-- VNDegen doesn't write `GlobalSave.sav`, so CGs and scenes seen in VNDegen don't show as seen on the PC.
+- CGs and scenes seen in VNDegen show as seen on the PC only once the PC game has been started with that game folder:
+  until then its shipped `GlobalSave.sav` is left as it is.
