@@ -110,6 +110,12 @@ int main(int argc, char **argv) {
             vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 0);
             alive = alive && run(s, 1000);
         }
+        if (sscanf(argv[a], "press=%d,%d", &x, &y) == 2) {
+            vnsystemaoi_mouse_move(s, x, y);
+            alive = alive && run(s, 16);
+            vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 1);
+            vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 0);
+        }
     }
     for (int i = 0; alive && i < clicks; i++) {
         vnsystemaoi_key(s, 0x0d, 1);

@@ -62,7 +62,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - **Movies.** `data1.dat` and `data2.dat` play through the app's movie decoder, `vnffmovie` (see
   [video.md](video.md)); a click ends one.
 - **Town.** The map with its facilities, the two facility windows, the town window, the commands the story has
-  opened, and LOG, SAVE, LOAD and Option. Each command first runs the game's hook for it (`bo3000.box` script 0 with
+  opened, LOG, SAVE, LOAD and Option, and the party's diorama at the bottom left with each unit's idle animation and
+  bars. Each command first runs the game's hook for it (`bo3000.box` script 0 with
   `C095` set to the command), so its first-use help shows as in the original. 建設 opens the build screen: the list,
   the board, the card, Reset, Undo, 決定 and 戻る, with the town window showing the result before 決定. 休憩 ends the
   turn: the turn's income, then the next turn's script. 遠征, 内政, 配置, 装備, 育成 and 商会 aren't built yet.

@@ -35,6 +35,29 @@ where play couldn't pin it down.
 - **Placing.** Measured: a facility is chosen from the list and placed on an open cell; 決定 builds it and takes its cost
   in resources; the town window shows the result before 決定. VNDegen places with one click where the original holds the
   piece until a second.
+- **Party diorama.** Measured against a turn 2 capture: the platform is `m996bt1a` from `bmap.vfs` at (-62, 504),
+  drawn 1:1; the six slot tiles are the first 152x150 frame of `mfloor01`, front row at (108, 451) and back row at
+  (27, 492), each 57 right and 29 down from the last; the five tiles on the step are that frame at half size, half a
+  step apart from (-16, 588). A unit's sprite sheet is `u` and `unit.obj` column 11 (Darkus 9990), centred on its
+  tile with its bottom 17 below the tile's centre; its HP and MP bars are two `bat_o00` frames 12 and 8 above the
+  sprite, with `bat_o01`'s first three rows and `bat_o03` inside, 50 wide when full. The idle animation plays the
+  sheet's filled cells in order, 100 ms each (measured at 30 fps under Wine). The 格 label is `mai_f00` at (1, 695).
+  The platform, tiles, bars and map match the capture pixel for pixel. Inferred: which tile each slot uses, the half
+  size tiles' filter (6 levels off), the label's digits (the original's are bolder than `dgn_f00`), and the diorama
+  hiding with the windows.
+
+## Script commands, from play
+
+- **`f5 "<facility>" 1`.** Measured from the opening under Wine: the town map without its windows becomes the
+  background, fading in, and the scene's background then fades in over it. Inferred: the fade's length, 300 ms.
+- **`50 <x> <y> <mode>`.** Used once, in the prologue, on `bg999a0`, a 1280x1220 picture: `50 0 -500 0` then
+  `50 0 0 1`. Measured at 30 fps under Wine: the picture, first shown at its top, scrolls up at a steady 40 pixels a
+  second (25 ms a pixel) until its bottom shows; the script waits there, a click ends the scroll at once, and with
+  skip held it runs about 16 times as fast. Inferred: mode 0 starts the move to (x, y) and mode 1 waits for it.
+- **`f8` and `f9`.** From the script around them: they set a flag when BUNNY BLACK 1 or 2 is installed, and the
+  opening then offers special units; VNDegen reports neither.
+- **`ef 0 <n> <mode>`.** Inferred from the scripts: a percentage that falls with the message "the town's facilities
+  were damaged" (-60 to -40) and rises by 3 to 5 each turn; VNDegen keeps it, from 100, but nothing shows it yet.
 
 ## Battles, rule by rule
 

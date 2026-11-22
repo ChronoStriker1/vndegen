@@ -8,6 +8,8 @@
 #include "vnfont.h"
 
 #define STD_SLOTS 9
+#define PAN_MS_PER_PX 25
+#define PAN_SKIP_SPEED 16
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
@@ -57,6 +59,9 @@ struct SA {
     char title[128];
     char problem[256];
     Picture bg;
+    int bgX, bgY, panFromX, panFromY, panToX, panToY;
+    u32 panMs, panDur;
+    bool panWait;
     Picture std[STD_SLOTS];
     Image *msgFrame;
     Image *ui[UI_COUNT];
@@ -83,6 +88,7 @@ struct SA {
     char pageVoice[40];
     Backlog log;
     Town town;
+    Party party;
     BuildScreen build;
     bool inGame;
     int afterScript;
@@ -405,6 +411,8 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         char *n = opd_str(code, in, 0);
         begin_transition(s, vm, in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 0);
         picture_set(s, &s->bg, n, 0, 0);
+        s->bgX = s->bgY = 0;
+        s->panDur = 0;
         for (int i = 0; i < STD_SLOTS; i++) picture_clear(&s->std[i]);
         free(n);
         break;
@@ -438,6 +446,45 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         break;
     }
     case 0x42:
+        break;
+    case 0xf5: {
+        begin_transition(s, vm, 11);
+        picture_clear(&s->bg);
+        s->bg.img = sa_image_new(SA_W, SA_H);
+        sa_town_draw_map(&s->town, &s->vfs, vm, s->bg.img->px);
+        snprintf(s->bg.name, sizeof s->bg.name, "*town");
+        s->bgX = s->bgY = 0;
+        s->panDur = 0;
+        for (int i = 0; i < STD_SLOTS; i++) picture_clear(&s->std[i]);
+        s->dirty = true;
+        break;
+    }
+    case 0x50:
+        if (in->count >= 3 && sa_vm_get(vm, code, &in->o[2]) == 0) {
+            s->panFromX = s->bgX;
+            s->panFromY = s->bgY;
+            s->panToX = sa_vm_get(vm, code, &in->o[0]);
+            s->panToY = sa_vm_get(vm, code, &in->o[1]);
+            int dx = abs(s->panToX - s->panFromX), dy = abs(s->panToY - s->panFromY);
+            s->panMs = 0;
+            s->panDur = (u32)(dx > dy ? dx : dy) * PAN_MS_PER_PX;
+            if (!s->panDur) {
+                s->bgX = s->panToX;
+                s->bgY = s->panToY;
+            }
+            s->dirty = true;
+        } else if (s->panDur) {
+            vm->state = VM_WAIT_TIME;
+            s->waitMs = s->panDur - s->panMs;
+            s->waitClick = false;
+            s->panWait = true;
+        }
+        break;
+    case 0xef:
+        if (in->count >= 2) {
+            int c = s->town.condition + sa_vm_get(vm, code, &in->o[1]);
+            s->town.condition = c < 0 ? 0 : c > 100 ? 100 : c;
+        }
         break;
     case 0x2a: {
         int n = in->count > 0 ? sa_vm_get(vm, code, &in->o[0]) : 0;
@@ -489,7 +536,7 @@ static bool window_shown(SA *s) { return (s->lineCount || s->name[0]) && !s->win
 static void compose(SA *s) {
     u32 *fb = s->fb;
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
-    sa_blit(fb, s->bg.img, 0, 0);
+    sa_blit(fb, s->bg.img, s->bgX, s->bgY);
     for (int i = 0; i < STD_SLOTS; i++) {
         Picture *p = &s->std[i];
         if (!p->img) continue;
@@ -560,6 +607,8 @@ static void compose_title(SA *s) {
 
 static void reset_scene(SA *s) {
     picture_clear(&s->bg);
+    s->bgX = s->bgY = 0;
+    s->panDur = 0;
     picture_clear(&s->face);
     for (int i = 0; i < STD_SLOTS; i++) picture_clear(&s->std[i]);
     clear_text(s);
@@ -596,6 +645,7 @@ static void new_game(SA *s) {
     snprintf(s->nextBox, sizeof s->nextBox, "bo0000.box");
     s->nextEntry = 0;
     sa_town_new_game(&s->town);
+    sa_party_new_game(&s->party, &s->vfs);
     s->inGame = true;
     start_script(s, "init.box", 0);
 }
@@ -777,6 +827,8 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     load_faces(s);
     sa_log_init(&s->log, &s->vfs);
     if (!sa_town_init(&s->town, &s->vfs)) sa_log(s, "can't read the town tables");
+    if (!sa_party_init(&s->party, &s->vfs)) sa_log(s, "can't read the unit table");
+    s->town.party = &s->party;
     sa_build_init(&s->build, &s->vfs);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
@@ -819,6 +871,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     free(s->bgm);
     sa_log_free(&s->log);
     sa_town_free(&s->town);
+    sa_party_free(&s->party);
     sa_build_free(&s->build);
     picture_clear(&s->face);
     for (int i = 0; i < s->faceCount; i++) {
@@ -882,6 +935,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         return true;
     }
     if (s->mode == MODE_TOWN) {
+        if (sa_party_tick(&s->party, elapsedMs) && !s->town.hidden && !s->town.mapOnly) s->dirty = true;
         if (sa_town_hover(&s->town, &s->vm, s->mouseX, s->mouseY)) s->dirty = true;
         if (s->clicked) {
             s->clicked = false;
@@ -906,7 +960,15 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (s->forceSkip && s->mode == MODE_STORY) {
         if (s->transDur) s->transMs = s->transDur;
         if (s->vm.state == VM_WAIT_TIME && !s->movie) s->waitMs = 0;
-        if (s->vm.state == VM_WAIT_TIME && s->waitClick) {
+        if (s->vm.state == VM_WAIT_TIME && s->panWait) {
+            s->bgX = s->panToX;
+            s->bgY = s->panToY;
+            s->panDur = 0;
+            s->panWait = false;
+            s->dirty = true;
+            s->waitMs = 0;
+            s->vm.state = VM_RUN;
+        } else if (s->vm.state == VM_WAIT_TIME && s->waitClick) {
             s->waitClick = false;
             s->vm.state = VM_RUN;
         }
@@ -915,6 +977,21 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             s->clicked = true;
             s->mouseX = s->mouseY = -1;
         }
+    }
+    if (s->panDur) {
+        s->panMs += s->forceSkip || s->skipMode ? elapsedMs * PAN_SKIP_SPEED : elapsedMs;
+        u32 t = s->panMs < s->panDur ? s->panMs : s->panDur;
+        s->bgX = s->panFromX + (int)((int64_t)(s->panToX - s->panFromX) * t / s->panDur);
+        s->bgY = s->panFromY + (int)((int64_t)(s->panToY - s->panFromY) * t / s->panDur);
+        if (t == s->panDur) {
+            s->panDur = 0;
+            if (s->panWait && s->vm.state == VM_WAIT_TIME) {
+                s->waitMs = 0;
+                s->vm.state = VM_RUN;
+            }
+            s->panWait = false;
+        }
+        s->dirty = true;
     }
     if (s->transDur) {
         s->transMs += elapsedMs;

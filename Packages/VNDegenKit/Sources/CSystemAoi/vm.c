@@ -349,6 +349,10 @@ int sa_vm_run(VM *vm, Vfs *vfs, const VMHost *h, int budget) {
         case 0x78:
             vm->depth--;
             break;
+        case 0xf8:
+        case 0xf9:
+            if (in.count >= 1) sa_vm_set(vm, &o[0], 0);
+            break;
         default:
             if (h->command) h->command(h->ctx, code, &in, vm);
             else if (unknown_once(vm, in.op)) vlog(h, "opcode %02x not handled (%s #%d at %x)", in.op, vm->boxes[f->box].file, f->entry, in.at);

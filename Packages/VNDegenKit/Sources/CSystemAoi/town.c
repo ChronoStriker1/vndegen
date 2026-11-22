@@ -110,6 +110,7 @@ int sa_town_type_row(const Town *t, int id) {
 void sa_town_new_game(Town *t) {
     memset(t->cell, 0, sizeof t->cell);
     t->stage = 1;
+    t->condition = 100;
     int maou = sa_town_type_row(t, 100);
     int start = maou >= 0 ? sa_table_int(&t->build, maou, 7) : 44;
     if (start >= 0 && start < TOWN_CELLS) {
@@ -344,7 +345,7 @@ static int layout(const Town *t, const VM *vm, Placed *out) {
     return n;
 }
 
-void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
+void sa_town_draw_map(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
     int stage = t->stage < 1 ? 1 : t->stage;
     static const char *const bgNames[] = {"tmap00a.agf", "tmap00a.agf", "tmap01a.agf", "tmap02a.agf"};
     int bi = stage > 3 ? 3 : stage;
@@ -360,6 +361,10 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
             cell_center(c, &cx, &cy);
             blit_dim(fb, im, cx - 68, cy + 34 - im->h, sa_town_staffed(t, vm, c) ? 256 : 192);
         }
+}
+
+void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
+    sa_town_draw_map(t, vfs, vm, fb);
     if (t->mapOnly) {
         sa_blit(fb, t->ui[UI_GOAL], GOAL_X, GOAL_Y);
         sa_draw_number(fb, t->ui[UI_DIGITS], "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);
@@ -375,6 +380,7 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
         sa_blit_rect(fb, t->ui[p[i].ui], 0, t->hover == p[i].action ? p[i].h : 0, p[i].w, p[i].h, p[i].x, p[i].y);
     }
     if (t->hidden) return;
+    if (t->party) sa_party_draw_diorama(t->party, fb, vm->c[C_RANK_MAX]);
     sa_blit(fb, t->ui[UI_BAR], 57, 2);
     draw_window(t, vfs, vm, fb, FAC1_X, UI_FAC1, fac1Areas, 4);
     draw_window(t, vfs, vm, fb, FAC2_X, UI_FAC2, fac2Areas, 3);

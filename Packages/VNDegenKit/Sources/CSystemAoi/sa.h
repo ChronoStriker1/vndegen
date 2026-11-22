@@ -318,10 +318,35 @@ typedef struct Facility {
     int exp;
 } Facility;
 
+#define PARTY_SLOTS 6
+#define PARTY_FRONT 3
+#define PARTY_CELL_MS 100
+
+typedef struct Party {
+    Table units;
+    int unit[PARTY_SLOTS];
+    int hp[PARTY_SLOTS], mp[PARTY_SLOTS];
+    Image *sprite[PARTY_SLOTS];
+    int cells[PARTY_SLOTS];
+    u32 ms;
+    Image *platform, *tile, *smallTile, *gaugeFrame, *hpGauge, *mpGauge, *label, *digits;
+} Party;
+
+bool sa_party_init(Party *p, Vfs *vfs);
+void sa_party_free(Party *p);
+void sa_party_new_game(Party *p, Vfs *vfs);
+void sa_party_place(Party *p, Vfs *vfs, int slot, int id);
+int sa_party_unit_row(const Party *p, int id);
+int sa_party_rank(const Party *p);
+bool sa_party_tick(Party *p, u32 ms);
+void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit);
+
 typedef struct Town {
     Table build, mass, lvup;
     Facility cell[TOWN_CELLS];
     int stage;
+    int condition;
+    Party *party;
     Image *bg[8];
     Image **tile;
     Image *ui[40];
@@ -334,6 +359,7 @@ void sa_town_free(Town *t);
 void sa_town_new_game(Town *t);
 int sa_town_type_row(const Town *t, int id);
 int sa_town_staffed(const Town *t, const VM *vm, int cell);
+void sa_town_draw_map(Town *t, Vfs *vfs, const VM *vm, u32 *fb);
 void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb);
 int sa_town_hit(const Town *t, const VM *vm, int x, int y);
 bool sa_town_hover(Town *t, const VM *vm, int x, int y);
