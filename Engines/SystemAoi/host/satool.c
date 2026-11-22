@@ -91,6 +91,23 @@ int main(int argc, char **argv) {
             }
             sa_vm_free(&vm);
         }
+    } else if (!strcmp(cmd, "pvm") && argc == 4) {
+        size_t n;
+        u8 *d = sa_vfs_read(&v, argv[3], &n);
+        Pvm m;
+        if (!d || !sa_pvm_parse(&m, d, n)) {
+            rc = 1;
+        } else {
+            for (int i = 0; i < m.count; i++) {
+                PvmLayer *l = &m.layer[i];
+                int depth = 0;
+                for (int p = l->parent; p >= 0; p = m.layer[p].parent) depth++;
+                printf("%*s%s sw=%d tex=%s v=%d t=%d blend=%d%s\n", depth * 2, "", l->name, l->sw, l->texture, l->vcount, l->tcount, l->blend,
+                       l->hasTranslate ? " translate" : "");
+            }
+            sa_pvm_free(&m);
+        }
+        free(d);
     } else if (!strcmp(cmd, "agf") && argc == 5) {
         size_t n;
         u8 *d = sa_vfs_read(&v, argv[3], &n);

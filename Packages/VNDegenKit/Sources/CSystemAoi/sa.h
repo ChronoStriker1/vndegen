@@ -187,4 +187,35 @@ i32 sa_vm_get(VM *vm, const u8 *code, const Operand *o);
 void sa_vm_set(VM *vm, const Operand *o, i32 v);
 bool sa_vm_cond(VM *vm, const char *expr);
 
+typedef struct PvmVertex {
+    float pos[3], normal[3], uv[2];
+} PvmVertex;
+
+typedef struct PvmLayer {
+    char name[48];
+    int parent;
+    int sw;
+    u32 diffuse, ambient, specular, emissive;
+    float power;
+    char texture[48];
+    int blend;
+    float translate[3];
+    int range[3];
+    bool hasTranslate, hasRange;
+    PvmVertex *v;
+    int vcount;
+    u16 *tri;
+    int tcount;
+} PvmLayer;
+
+typedef struct Pvm {
+    PvmLayer *layer;
+    int count;
+    bool backFace;
+} Pvm;
+
+bool sa_pvm_parse(Pvm *m, const u8 *data, size_t size);
+void sa_pvm_free(Pvm *m);
+int sa_pvm_find(const Pvm *m, const char *name);
+
 #endif
