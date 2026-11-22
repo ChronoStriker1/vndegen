@@ -127,6 +127,10 @@ final class ANIMSession: EngineSession {
     }
 
     private func showPage(_ page: URL) {
+        if page.hasDirectoryPath || (try? page.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            openFolder(page)
+            return
+        }
         showingPage = true
         setPaused(true)
         PageSheet.show(page, title: "Help", over: view) { [weak self] in
@@ -134,6 +138,18 @@ final class ANIMSession: EngineSession {
             showingPage = false
             setPaused(false)
         }
+    }
+
+    private func openFolder(_ folder: URL) {
+        #if canImport(UIKit)
+        var files = URLComponents()
+        files.scheme = "shareddocuments"
+        files.host = ""
+        files.path = folder.path
+        if let files = files.url { UIApplication.shared.open(files) }
+        #else
+        NSWorkspace.shared.open(folder)
+        #endif
     }
 
     func setPaused(_ paused: Bool) {

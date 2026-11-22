@@ -16,6 +16,8 @@ static int preferCount, preferUsed;
 
 static int step(VNANIM *n) {
     int alive = vnanim_frame(n, 16);
+    const char *page = vnanim_take_page(n);
+    if (page) printf("page %s\n", page);
     vnanim_audio(n, audio, 705);
     if (wav) {
         int16_t s[1410];

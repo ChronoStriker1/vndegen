@@ -190,7 +190,8 @@ knob offsets at 0x7e9e4 + 40 × c, the outfit at 0x7ee94 + 4 × c, the expressio
 background at 0x7efd4 and 0x7f04c + 4 × c, then tears, hair, crest and lip sync from 0x7f1b4, 0x7f22c, 0x7f2a4 and
 0x7f31c + 4 × c. Saves load both ways with the PC. The camera button writes the scene without the controls to
 `SaveGraphic/emotesave_NNN.png` in the save folder, numbered from 000 as on the PC (whose own file comes out black
-under Wine). The info line shows the help for the row under the pointer, and Double Date Dilemma's Lips and Move
+under Wine). The folder button beside it opens that folder, in Finder on the Mac and in Files on iPhone and iPad, as the
+PC opens it in Explorer ("Save image and open folder." on its info line); it writes no picture itself. The info line shows the help for the row under the pointer, and Double Date Dilemma's Lips and Move
 buttons have their own on and off lines.
 
 ## Known limits
@@ -204,8 +205,7 @@ buttons have their own on and off lines.
 - The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't.
 - When a line hides one layer and shows another, the PC holds the old picture for about half a second and then
   crossfades over about 0.3 s; VNDegen swaps them at once (seen when the goddess returns after the skill list).
-- The Sprites viewer's folder button does nothing, and Save doesn't keep Idle Motion: no field for it turned up in the
-  PC's save. Settings' font list is empty and its choice does nothing, and the volume screen's Play and Allow Test
+- The Sprites viewer's Save doesn't keep Idle Motion: no field for it turned up in the PC's save. Settings' font list is empty and its choice does nothing, and the volume screen's Play and Allow Test
   buttons are drawn but do nothing.
 - Double Date Dilemma's memory blurbs are drawn about 1.5% narrower than the PC's, so a line can break one word
   earlier.
