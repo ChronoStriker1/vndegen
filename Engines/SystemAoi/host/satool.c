@@ -5,8 +5,18 @@
 #include "png.h"
 #include "sa.h"
 
+static void h_text(void *c, const char *t, bool nl) { printf("  %s\n", t); }
+static void h_speaker(void *c, const char *n, const char *v, const char *f) { printf("[%s %s %s]\n", n, v, f); }
+static void h_page(void *c) { printf("  --\n"); }
+static void h_log(void *c, const char *m) { printf("!! %s\n", m); }
+static void h_command(void *c, const u8 *code, const Insn *in, VM *vm) {
+    char *t = sa_insn_text(code, in);
+    printf("cmd %s\n", t + 8);
+    free(t);
+}
+
 static int usage(void) {
-    fprintf(stderr, "satool <gameDir> list | extract <name> <out> | box <name.box> <outDir> | agf <name> <out.png>\n");
+    fprintf(stderr, "satool <gameDir> list | extract <name> <out> | box <name.box> <outDir> | dis <name.box> <entry|*> | run <name.box> <entry> [choices] | agf <name> <out.png>\n");
     return 2;
 }
 
@@ -42,6 +52,45 @@ int main(int argc, char **argv) {
             sa_box_free(&b);
         }
         free(d);
+    } else if (!strcmp(cmd, "dis") && argc == 5) {
+        size_t n;
+        u8 *d = sa_vfs_read(&v, argv[3], &n);
+        Box b;
+        if (!d || !sa_box_parse(&b, d, n)) {
+            rc = 1;
+        } else {
+            for (int i = 0; i < b.count; i++) {
+                if (strcmp(argv[4], "*") && strcmp(argv[4], b.e[i].name)) continue;
+                printf("# %s\n", b.e[i].name);
+                Insn in;
+                for (u32 at = 0; sa_insn_decode(b.e[i].data, b.e[i].size, at, &in); at = in.next) {
+                    char *t = sa_insn_text(b.e[i].data, &in);
+                    puts(t);
+                    free(t);
+                }
+            }
+            sa_box_free(&b);
+        }
+        free(d);
+    } else if (!strcmp(cmd, "run") && argc >= 5) {
+        static VM vm;
+        VMHost h = {.text = h_text, .speaker = h_speaker, .page = h_page, .command = h_command, .log = h_log};
+        const char *choices = argc > 5 ? argv[5] : "";
+        int ci = 0;
+        if (!sa_vm_start(&vm, &v, argv[3], atoi(argv[4]), &h)) {
+            rc = 1;
+        } else {
+            for (int steps = 0; steps < 100000; steps++) {
+                int st = sa_vm_run(&vm, &v, &h, 1000);
+                if (st == VM_WAIT_CLICK) sa_vm_click(&vm);
+                else if (st == VM_WAIT_CHOICE) {
+                    int pick = choices[ci] ? choices[ci++] - '0' : 0;
+                    for (int i = 0; i < vm.choiceCount; i++) printf("  %c%d %s\n", i == pick ? '>' : ' ', i, vm.choice[i].label);
+                    sa_vm_choose(&vm, pick);
+                } else if (st == VM_DONE) break;
+            }
+            sa_vm_free(&vm);
+        }
     } else if (!strcmp(cmd, "agf") && argc == 5) {
         size_t n;
         u8 *d = sa_vfs_read(&v, argv[3], &n);

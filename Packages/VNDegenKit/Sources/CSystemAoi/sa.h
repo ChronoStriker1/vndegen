@@ -90,4 +90,101 @@ Image *sa_image_new(int w, int h);
 void sa_image_free(Image *im);
 Image *sa_agf_decode(const u8 *data, size_t size);
 
+enum {
+    OPD_NONE,
+    OPD_INT,
+    OPD_BYTE,
+    OPD_STR,
+    OPD_ADDR,
+    OPD_VAR,
+    OPD_IVAR,
+    OPD_COND,
+};
+
+#define SA_MAX_OPDS 24
+
+typedef struct Operand {
+    u8 kind;
+    u8 bank;
+    u16 index;
+    i32 value;
+    u32 strOffset;
+    u16 strLen;
+    u8 condKind;
+} Operand;
+
+typedef struct Insn {
+    u32 at, next;
+    u8 op;
+    int count;
+    Operand o[SA_MAX_OPDS];
+} Insn;
+
+bool sa_insn_decode(const u8 *code, u32 size, u32 at, Insn *in);
+char *sa_operand_text(const u8 *code, const Operand *o);
+char *sa_insn_text(const u8 *code, const Insn *in);
+
+#define SA_C_VARS 4096
+#define SA_F_VARS 8192
+#define SA_L_VARS 64
+#define SA_G_VARS 2048
+#define SA_STACK 32
+#define SA_CHOICES 16
+#define SA_BOXES 64
+
+typedef struct LoadedBox {
+    char file[32];
+    Box box;
+} LoadedBox;
+
+typedef struct Frame {
+    int box, entry;
+    u32 pc;
+    u32 ret[SA_STACK];
+    int sp;
+    i32 cl[SA_L_VARS];
+    u8 fl[SA_L_VARS];
+} Frame;
+
+typedef struct Choice {
+    char *label;
+    u32 target;
+} Choice;
+
+enum { VM_RUN, VM_WAIT_CLICK, VM_WAIT_CHOICE, VM_WAIT_TIME, VM_DONE };
+
+typedef struct VM {
+    LoadedBox boxes[SA_BOXES];
+    int boxCount;
+    char *boxSlot[256];
+    Frame frames[SA_STACK];
+    int depth;
+    i32 c[SA_C_VARS];
+    u8 f[SA_F_VARS];
+    u8 g[SA_G_VARS];
+    Choice choice[SA_CHOICES];
+    int choiceCount;
+    int state;
+    u32 waitMs;
+    u32 unknownSeen[8];
+} VM;
+
+typedef struct VMHost {
+    void *ctx;
+    void (*text)(void *ctx, const char *utf8, bool newLine);
+    void (*speaker)(void *ctx, const char *name, const char *voice, const char *face);
+    void (*page)(void *ctx);
+    void (*command)(void *ctx, const u8 *code, const Insn *in, VM *vm);
+    void (*log)(void *ctx, const char *msg);
+} VMHost;
+
+bool sa_vm_start(VM *vm, Vfs *vfs, const char *boxFile, int entry, const VMHost *host);
+int sa_vm_run(VM *vm, Vfs *vfs, const VMHost *host, int budget);
+void sa_vm_choose(VM *vm, int index);
+void sa_vm_click(VM *vm);
+void sa_vm_free(VM *vm);
+i32 sa_vm_get(VM *vm, const u8 *code, const Operand *o);
+void sa_vm_set(VM *vm, const Operand *o, i32 v);
+bool sa_vm_cond(VM *vm, const char *expr);
+
 #endif
