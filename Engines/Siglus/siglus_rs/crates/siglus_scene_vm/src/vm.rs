@@ -9916,12 +9916,12 @@ impl<'a> SceneVm<'a> {
         w: &mut crate::original_save::OriginalStreamWriter,
         m: &runtime::globals::MwndState,
         page: &runtime::globals::MwndMessagePageState,
+        name_moji_size: i64,
     ) {
         // C_elm_mwnd_msg::PARAM (21 consecutive i32 fields).
         let (cnt_x, cnt_y) = m.window_moji_cnt.unwrap_or((0, 0));
-        let (pos_x, pos_y) = m.message_pos.unwrap_or((0, 0));
+        let (pos_x, pos_y) = page.cursor_pos;
         let (space_x, space_y) = m.moji_space.unwrap_or((-1, 10));
-        let (talk_l, talk_t, talk_r, talk_b) = m.message_margin.unwrap_or((0, 0, 0, 0));
         for value in [
             cnt_x,
             cnt_y,
@@ -9937,13 +9937,13 @@ impl<'a> SceneVm<'a> {
             page.fuchi_color.unwrap_or(-1),
             m.ruby_size,
             m.ruby_space,
-            m.default_moji_size,
+            name_moji_size,
             0,
             m.name_bracket,
-            talk_l,
-            talk_t,
-            talk_r,
-            talk_b,
+            0,
+            0,
+            0,
+            0,
         ] {
             w.push_i32(Self::save_i32(value));
         }
@@ -10003,14 +10003,9 @@ impl<'a> SceneVm<'a> {
         let _name_moji_size = rd.i32()?;
         let _name_newline = rd.i32()?;
         let _name_bracket = rd.i32()?;
-        let talk_l = rd.i32()? as i64;
-        let talk_t = rd.i32()? as i64;
-        let talk_r = rd.i32()? as i64;
-        let talk_b = rd.i32()? as i64;
+        rd.skip(16)?;
         m.window_moji_cnt = Some((cnt_x, cnt_y));
-        m.message_pos = Some((pos_x, pos_y));
         m.moji_space = Some((space_x, space_y));
-        m.message_margin = Some((talk_l, talk_t, talk_r, talk_b));
         m.ruby_size = ruby_size;
         m.ruby_space = ruby_space;
 
@@ -10422,11 +10417,17 @@ impl<'a> SceneVm<'a> {
         w.push_i32(Self::save_i32(m.close_anime_start_time));
 
         w.push_i32((m.message_pages.len() + 1).min(i32::MAX as usize) as i32);
+        let name_moji_size = self
+            .ctx
+            .tables
+            .mwnd_templates
+            .get(mwnd_idx)
+            .map_or(m.default_moji_size, |template| template.name_moji_size);
         for page in &m.message_pages {
-            Self::write_cpp_mwnd_message(w, m, page);
+            Self::write_cpp_mwnd_message(w, m, page, name_moji_size);
         }
         let active = Self::active_mwnd_message_page(m);
-        Self::write_cpp_mwnd_message(w, m, &active);
+        Self::write_cpp_mwnd_message(w, m, &active, name_moji_size);
         self.write_cpp_mwnd_waku(w, m, None);
         Self::write_cpp_mwnd_name(w, m);
         let name_waku_no = self.ctx.tables.mwnd_templates.get(mwnd_idx).map_or(-1, |t| t.name_waku_no);

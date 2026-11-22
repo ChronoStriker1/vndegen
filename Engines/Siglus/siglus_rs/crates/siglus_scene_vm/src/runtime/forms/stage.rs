@@ -3215,10 +3215,12 @@ fn ensure_mwnd(ctx: &mut CommandContext, st: &mut StageFormState, stage_idx: i64
             m.moji_color = None;
             m.shadow_color = None;
             m.fuchi_color = None;
-            m.cursor_pos = (0, 0);
-            m.moji_rep_pos = (0, 0);
-            m.cur_msg_type = -1;
-            m.line_head = true;
+            if m.glyphs.is_empty() {
+                m.cursor_pos = (0, 0);
+                m.moji_rep_pos = (0, 0);
+                m.cur_msg_type = -1;
+                m.line_head = true;
+            }
             m.window_appear = m.open;
             m.name_moji_color = None;
             m.name_shadow_color = None;
