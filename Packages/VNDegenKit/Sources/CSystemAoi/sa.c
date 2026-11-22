@@ -1,6 +1,8 @@
 #include "sa.h"
 
 #include <stdarg.h>
+#include <dlfcn.h>
+#include <pthread.h>
 #include <sys/stat.h>
 
 #include "vnfont.h"
@@ -61,7 +63,15 @@ struct SA {
     int hoverButton;
     bool autoMode, skipMode, windowHidden;
     u32 featherMs, autoMs;
+    bool forceSkip;
     int mode, titleHover;
+    VNSystemAoiMovies movies;
+    bool haveMovies;
+    pthread_mutex_t movieLock;
+    void *movie;
+    FILE *movieFile;
+    double movieTime;
+    int movieW, movieH;
     char *faceName[64], *facePrefix[64];
     int faceCount;
     char faceExpr[64][4];
@@ -296,6 +306,84 @@ static void begin_transition(SA *s, VM *vm, int kind) {
     s->waitMs = ms;
 }
 
+static int64_t movie_read(void *user, uint64_t offset, void *buffer, size_t length) {
+    FILE *f = user;
+    if (fseeko(f, (off_t)offset, SEEK_SET)) return -1;
+    return (int64_t)fread(buffer, 1, length, f);
+}
+
+static void movie_stop(SA *s) {
+    pthread_mutex_lock(&s->movieLock);
+    void *m = s->movie;
+    s->movie = NULL;
+    pthread_mutex_unlock(&s->movieLock);
+    if (m) s->movies.close(m);
+    if (s->movieFile) fclose(s->movieFile);
+    s->movieFile = NULL;
+    if (s->vm.state == VM_WAIT_TIME) s->vm.state = VM_RUN;
+    s->dirty = true;
+}
+
+static void movie_start(SA *s, VM *vm, const char *name) {
+    if (!s->haveMovies) {
+        sa_log(s, "movie %s left out: no movie decoder", name);
+        return;
+    }
+    char *p = sa_fmt("%s/%s", s->gameDir, name);
+    char real[2048];
+    FILE *f = sa_path_resolve(p, real, sizeof real) == 1 ? fopen(real, "rb") : NULL;
+    free(p);
+    if (!f) {
+        sa_log(s, "missing movie %s", name);
+        return;
+    }
+    fseeko(f, 0, SEEK_END);
+    uint64_t size = (uint64_t)ftello(f);
+    VNSystemAoiMovieInfo info = {0};
+    char err[256] = "";
+    void *m = s->movies.open(movie_read, f, size, 0, &info, err, sizeof err);
+    if (!m) {
+        sa_log(s, "can't play movie %s: %s", name, err);
+        fclose(f);
+        return;
+    }
+    sa_log(s, "movie %s %dx%d %.2f fps %.1f s, sound %d Hz", name, info.width, info.height, info.fps, info.duration, info.audioRate);
+    sa_stop(s->mix, CH_BGM, 0, 0);
+    s->movieFile = f;
+    s->movieTime = 0;
+    s->movieW = info.width;
+    s->movieH = info.height;
+    pthread_mutex_lock(&s->movieLock);
+    s->movie = m;
+    pthread_mutex_unlock(&s->movieLock);
+    vm->state = VM_WAIT_TIME;
+    s->waitMs = 0;
+    s->waitClick = false;
+}
+
+static void movie_tick(SA *s, u32 ms) {
+    s->movieTime += ms / 1000.0;
+    int changed = 0, ended = 0;
+    const uint8_t *px = s->movies.frame(s->movie, s->movieTime, &changed, &ended);
+    if (px && changed) {
+        u32 *fb = s->fb;
+        for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
+        int ox = (SA_W - s->movieW) / 2, oy = (SA_H - s->movieH) / 2;
+        for (int y = 0; y < s->movieH; y++) {
+            int dy = oy + y;
+            if (dy < 0 || dy >= SA_H) continue;
+            for (int x = 0; x < s->movieW; x++) {
+                int dx = ox + x;
+                if (dx < 0 || dx >= SA_W) continue;
+                const uint8_t *q = px + ((size_t)y * s->movieW + x) * 4;
+                fb[(size_t)dy * SA_W + dx] = 0xff000000u | (u32)q[2] << 16 | (u32)q[1] << 8 | q[0];
+            }
+        }
+        s->serial++;
+    }
+    if (ended) movie_stop(s);
+}
+
 static char *opd_str(const u8 *code, const Insn *in, int i) {
     if (i >= in->count || in->o[i].kind != OPD_STR) return sa_strdup("");
     return sa_utf16_to_utf8(code + in->o[i].strOffset, in->o[i].strLen);
@@ -333,6 +421,14 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     }
     case 0x41:
         if (in->count > 0) play_bgm(s, sa_vm_get(vm, code, &in->o[0]));
+        break;
+    case 0x49: {
+        char *n = opd_str(code, in, 0);
+        movie_start(s, vm, n);
+        free(n);
+        break;
+    }
+    case 0x42:
         break;
     case 0x2a: {
         int n = in->count > 0 ? sa_vm_get(vm, code, &in->o[0]) : 0;
@@ -600,6 +696,23 @@ static int choice_at(SA *s, int x, int y) {
     return -1;
 }
 
+const VNSystemAoiMovies *vnsystemaoi_find_movies(void) {
+    static VNSystemAoiMovies movies;
+    static bool found = false;
+    if (found) return &movies;
+    const char *names[5] = {"vnffmovie_open", "vnffmovie_frame", "vnffmovie_audio", "vnffmovie_seek", "vnffmovie_close"};
+    void *ptrs[5];
+    for (int i = 0; i < 5; i++)
+        if (!(ptrs[i] = dlsym(RTLD_DEFAULT, names[i]))) return NULL;
+    movies.open = (void *(*)(VNSystemAoiMovieRead, void *, uint64_t, int, VNSystemAoiMovieInfo *, char *, size_t))ptrs[0];
+    movies.frame = (const uint8_t *(*)(void *, double, int *, int *))ptrs[1];
+    movies.audio = (size_t(*)(void *, float *, size_t))ptrs[2];
+    movies.seek = (void (*)(void *, double))ptrs[3];
+    movies.close = (void (*)(void *))ptrs[4];
+    found = true;
+    return &movies;
+}
+
 bool vnsystemaoi_probe(const char *gameDir, char *title, size_t titleSize) {
     char *p = sa_fmt("%s/box.vfs", gameDir);
     char real[2048];
@@ -638,6 +751,11 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     s->msgBand = load_image(s, "msg_a00a.agf");
     for (int i = 0; i < UI_COUNT; i++) s->ui[i] = load_image(s, uiNames[i]);
     s->hoverButton = -1;
+    pthread_mutex_init(&s->movieLock, NULL);
+    if (config->movies) {
+        s->movies = *config->movies;
+        s->haveMovies = true;
+    }
     s->from = sa_alloc((size_t)SA_W * SA_H * 4);
     load_bgm_defs(s);
     load_faces(s);
@@ -666,6 +784,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
 void vnsystemaoi_close(VNSystemAoi *sa) {
     SA *s = (SA *)sa;
     if (!s) return;
+    if (s->movie) movie_stop(s);
     sa_mixer_free(s->mix);
     sa_vm_free(&s->vm);
     sa_vfs_close(&s->vfs);
@@ -696,6 +815,15 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     SA *s = (SA *)sa;
     if (s->quit) return false;
     if (s->paused) return true;
+    if (s->movie) {
+        if (s->clicked) {
+            s->clicked = false;
+            movie_stop(s);
+        } else {
+            movie_tick(s, elapsedMs);
+            return true;
+        }
+    }
     if (s->mode == MODE_TITLE) {
         int h = title_at(s->mouseX, s->mouseY);
         if (h != s->titleHover) {
@@ -721,6 +849,19 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         if (want != s->shown) {
             s->shown = want;
             s->dirty = true;
+        }
+    }
+    if (s->forceSkip && s->mode == MODE_STORY) {
+        if (s->transDur) s->transMs = s->transDur;
+        if (s->vm.state == VM_WAIT_TIME && !s->movie) s->waitMs = 0;
+        if (s->vm.state == VM_WAIT_TIME && s->waitClick) {
+            s->waitClick = false;
+            s->vm.state = VM_RUN;
+        }
+        if (s->vm.state == VM_WAIT_CLICK) {
+            s->shown = s->total;
+            s->clicked = true;
+            s->mouseX = s->mouseY = -1;
         }
     }
     if (s->transDur) {
@@ -885,9 +1026,27 @@ void vnsystemaoi_wheel(VNSystemAoi *sa, int notches) {}
 void vnsystemaoi_audio(VNSystemAoi *sa, float *out, int frames) {
     SA *s = (SA *)sa;
     sa_mixer_mix(s->mix, out, frames, s->paused);
+    pthread_mutex_lock(&s->movieLock);
+    if (s->movie && !s->paused) {
+        static float buf[8192];
+        int done = 0;
+        while (done < frames) {
+            int want = frames - done < 4096 ? frames - done : 4096;
+            size_t got = s->movies.audio(s->movie, buf, (size_t)want);
+            for (size_t i = 0; i < got * 2; i++) out[done * 2 + i] += buf[i];
+            if (got < (size_t)want) break;
+            done += (int)got;
+        }
+    }
+    pthread_mutex_unlock(&s->movieLock);
 }
 
 void vnsystemaoi_set_paused(VNSystemAoi *sa, bool paused) { ((SA *)sa)->paused = paused; }
+void vnsystemaoi_set_skip(VNSystemAoi *sa, bool on) {
+    SA *s = (SA *)sa;
+    s->forceSkip = on;
+    s->dirty = true;
+}
 void vnsystemaoi_request_quit(VNSystemAoi *sa) { ((SA *)sa)->quit = true; }
 const char *vnsystemaoi_title(VNSystemAoi *sa) { return ((SA *)sa)->title; }
 const char *vnsystemaoi_problem(VNSystemAoi *sa) {

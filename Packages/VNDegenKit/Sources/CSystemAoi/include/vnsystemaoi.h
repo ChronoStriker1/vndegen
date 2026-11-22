@@ -11,12 +11,33 @@ extern "C" {
 
 typedef struct VNSystemAoi VNSystemAoi;
 
+typedef struct VNSystemAoiMovieInfo {
+    int width, height;
+    double fps;
+    double duration;
+    int audioRate, audioChannels;
+} VNSystemAoiMovieInfo;
+
+typedef int64_t (*VNSystemAoiMovieRead)(void *user, uint64_t offset, void *buffer, size_t length);
+
+typedef struct VNSystemAoiMovies {
+    void *(*open)(VNSystemAoiMovieRead read, void *user, uint64_t size, int loop, VNSystemAoiMovieInfo *info, char *error,
+                  size_t errorSize);
+    const uint8_t *(*frame)(void *movie, double time, int *changed, int *ended);
+    size_t (*audio)(void *movie, float *out, size_t frames);
+    void (*seek)(void *movie, double time);
+    void (*close)(void *movie);
+} VNSystemAoiMovies;
+
+const VNSystemAoiMovies *vnsystemaoi_find_movies(void);
+
 typedef struct VNSystemAoiConfig {
     const char *gameDir;
     const char *saveDir;
     const char *logPath;
     int audioRate;
     unsigned int seed;
+    const VNSystemAoiMovies *movies;
 } VNSystemAoiConfig;
 
 VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t errSize);
@@ -36,6 +57,7 @@ void vnsystemaoi_wheel(VNSystemAoi *sa, int notches);
 
 void vnsystemaoi_audio(VNSystemAoi *sa, float *out, int frames);
 void vnsystemaoi_set_paused(VNSystemAoi *sa, bool paused);
+void vnsystemaoi_set_skip(VNSystemAoi *sa, bool on);
 void vnsystemaoi_request_quit(VNSystemAoi *sa);
 
 const char *vnsystemaoi_title(VNSystemAoi *sa);
