@@ -48,6 +48,7 @@ int main(int argc, char **argv) {
             write_png(path, px, w, h, 1, 0);
         }
     }
+    alive = alive && run(s, 3000);
     int w, h;
     const uint32_t *px = vnsystemaoi_pixels(s, &w, &h);
     char path[1024];

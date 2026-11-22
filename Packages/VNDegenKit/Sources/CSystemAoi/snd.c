@@ -28,6 +28,7 @@ struct Voice {
     int ch;
     int16_t buf[4096];
     int bufLen, bufPos;
+    u32 played, loopStart, loopEnd;
     Voice *then;
 };
 
@@ -108,7 +109,14 @@ static bool refill(Voice *v) {
 }
 
 static bool read_frame(Voice *v, int16_t out[2]) {
+    if (v->loopEnd && v->played >= v->loopEnd) {
+        if (v->ogg) stb_vorbis_seek(v->ogg, v->loopStart);
+        else v->pcmPos = v->loopStart;
+        v->bufLen = v->bufPos = 0;
+        v->played = v->loopStart;
+    }
     if (v->bufPos >= v->bufLen && !refill(v)) return false;
+    v->played++;
     out[0] = v->buf[v->bufPos * 2];
     out[1] = v->buf[v->bufPos * 2 + 1];
     v->bufPos++;
@@ -272,6 +280,17 @@ void sa_play(Mixer *m, int ch, int slot, const char *name, bool loop) {
     if (!m || !name || !*name) return;
     Voice *v = open_voice(m, ch, name, loop);
     if (v) install(m, ch, slot, v);
+}
+
+void sa_play_loop(Mixer *m, int ch, int slot, const char *name, double loopTo, double loopFrom) {
+    if (!m || !name || !*name) return;
+    Voice *v = open_voice(m, ch, name, true);
+    if (!v) return;
+    if (loopFrom > loopTo && loopFrom > 0) {
+        v->loopStart = (u32)(loopTo * v->rate + 0.5);
+        v->loopEnd = (u32)(loopFrom * v->rate + 0.5);
+    }
+    install(m, ch, slot, v);
 }
 
 void sa_stop(Mixer *m, int ch, int slot, int fadeMs) {

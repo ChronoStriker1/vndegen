@@ -226,12 +226,14 @@ void sa_mixer_free(Mixer *m);
 void sa_mixer_mix(Mixer *m, float *out, int frames, bool paused);
 void sa_mixer_set_log(Mixer *m, void (*log)(void *ctx, const char *msg), void *ctx);
 void sa_play(Mixer *m, int ch, int slot, const char *name, bool loop);
+void sa_play_loop(Mixer *m, int ch, int slot, const char *name, double loopTo, double loopFrom);
 void sa_stop(Mixer *m, int ch, int slot, int fadeMs);
 void sa_set_volume(Mixer *m, int ch, float v);
 bool sa_playing(Mixer *m, int ch, int slot);
 
 bool sa_font_init(const char *const *names, char *used, size_t usedSize);
 void sa_font_free(void);
+void sa_font_set_spacing(int px);
 int sa_char_width(u32 cp, int size);
 int sa_text_width(const char *s, int n, int size);
 int sa_text_draw(u32 *dst, int dw, int dh, const char *s, int n, int x, int y, int size, u32 color, u32 edge);
