@@ -847,7 +847,11 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     }
     if (s->rightClicked) {
         s->rightClicked = false;
-        if (s->vm.state == VM_WAIT_CLICK || s->vm.state == VM_WAIT_CHOICE) s->windowHidden = !s->windowHidden;
+        if (s->windowHidden) s->windowHidden = false;
+        else {
+            s->skipMode = !s->skipMode;
+            s->autoMode = false;
+        }
         s->dirty = true;
     }
     int btn = window_shown(s) ? button_at(s->mouseX, s->mouseY) : -1;
