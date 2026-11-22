@@ -762,6 +762,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
+    s->vm.rng = config->seed ? config->seed : 0x2545f491u;
     s->titleBg = load_image(s, "tit_a00.agf");
     for (int i = 0; i < TITLE_ITEMS; i++) {
         char n[32];

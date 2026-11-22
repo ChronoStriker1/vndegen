@@ -106,6 +106,16 @@ void sa_vm_set(VM *vm, const Operand *o, i32 v) {
     }
 }
 
+static bool term(VM *vm, const char **s, i32 *out);
+
+static u32 next_random(VM *vm) {
+    if (!vm->rng) vm->rng = 0x9e3779b9u;
+    vm->rng ^= vm->rng << 13;
+    vm->rng ^= vm->rng >> 17;
+    vm->rng ^= vm->rng << 5;
+    return vm->rng;
+}
+
 static bool term(VM *vm, const char **s, i32 *out) {
     const char *p = *s;
     while (*p == ' ' || *p == '\t') p++;
@@ -137,6 +147,15 @@ static bool term(VM *vm, const char **s, i32 *out) {
     char *e;
     long idx = strtol(p, &e, 10);
     if (e == p) return false;
+    if (*e == '[') {
+        const char *q = e + 1;
+        i32 sub = 0;
+        if (!term(vm, &q, &sub)) return false;
+        while (*q == ' ') q++;
+        if (*q != ']') return false;
+        idx += sub;
+        e = (char *)q + 1;
+    }
     o.index = (u16)idx;
     *out = sa_vm_get(vm, NULL, &o);
     *s = e;
@@ -212,7 +231,40 @@ int sa_vm_run(VM *vm, Vfs *vfs, const VMHost *h, int budget) {
         const Operand *o = in.o;
         switch (in.op) {
         case 0x00:
+            if (in.count == 1 && o[0].kind == OPD_ADDR && f->loopActive) {
+                Insn hdr;
+                if (sa_insn_decode(code, be->size, f->loopHeader, &hdr) && hdr.count >= 2 &&
+                    sa_vm_get(vm, code, &hdr.o[0]) >= sa_vm_get(vm, code, &hdr.o[1])) {
+                    f->loopActive = false;
+                    f->pc = (u32)o[0].value;
+                }
+            }
+            break;
         case 0x2b:
+            break;
+        case 0x20:
+            if (in.count >= 3) {
+                if (f->loopActive && f->loopHeader == in.at) sa_vm_set(vm, &o[0], sa_vm_get(vm, code, &o[0]) + 1);
+                else {
+                    sa_vm_set(vm, &o[0], sa_vm_get(vm, code, &o[2]));
+                    f->loopActive = true;
+                    f->loopHeader = in.at;
+                }
+            }
+            break;
+        case 0x24:
+            if (in.count >= 1) f->pc = (u32)o[0].value;
+            break;
+        case 0x2e:
+            if (in.count >= 3) {
+                i32 lo = sa_vm_get(vm, code, &o[1]), hi = sa_vm_get(vm, code, &o[2]);
+                if (hi < lo) {
+                    i32 t = lo;
+                    lo = hi;
+                    hi = t;
+                }
+                sa_vm_set(vm, &o[0], lo + (i32)(next_random(vm) % (u32)(hi - lo + 1)));
+            }
             break;
         case 0x02:
             for (int i = 0; i < in.count; i++) {
@@ -243,12 +295,21 @@ int sa_vm_run(VM *vm, Vfs *vfs, const VMHost *h, int budget) {
             }
             break;
         case 0x0a:
-            if (in.count >= 2) sa_vm_set(vm, &o[0], sa_vm_get(vm, code, &o[1]));
+            if (in.count >= 3 && o[0].kind == OPD_IVAR) {
+                Operand dst = o[1];
+                Operand idx = {.kind = OPD_VAR, .bank = 0x22, .index = o[0].index};
+                dst.index = (u16)(dst.index + sa_vm_get(vm, code, &idx));
+                sa_vm_set(vm, &dst, sa_vm_get(vm, code, &o[2]));
+            } else if (in.count >= 2) {
+                sa_vm_set(vm, &o[0], sa_vm_get(vm, code, &o[1]));
+            }
             break;
         case 0x0b:
             if (in.count >= 3) sa_vm_set(vm, &o[0], sa_vm_get(vm, code, &o[1]) + sa_vm_get(vm, code, &o[2]));
+            else if (in.count == 2) sa_vm_set(vm, &o[0], sa_vm_get(vm, code, &o[0]) + sa_vm_get(vm, code, &o[1]));
             break;
         case 0x15:
+        case 0x18:
             if (in.count >= 1) f->pc = (u32)o[0].value;
             break;
         case 0x16:
@@ -262,6 +323,7 @@ int sa_vm_run(VM *vm, Vfs *vfs, const VMHost *h, int budget) {
             else vm->depth--;
             break;
         case 0x1a:
+        case 0x1c:
             if (in.count >= 2) {
                 char *e = sa_utf16_to_utf8(code + o[0].strOffset, o[0].strLen);
                 if (!sa_vm_cond(vm, e)) f->pc = (u32)o[1].value;

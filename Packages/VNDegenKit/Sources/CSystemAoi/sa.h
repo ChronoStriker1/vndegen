@@ -141,6 +141,8 @@ typedef struct LoadedBox {
 typedef struct Frame {
     int box, entry;
     u32 pc;
+    u32 loopHeader;
+    bool loopActive;
     u32 ret[SA_STACK];
     int sp;
     i32 cl[SA_L_VARS];
@@ -168,6 +170,7 @@ typedef struct VM {
     int state;
     u32 waitMs;
     u32 unknownSeen[8];
+    u32 rng;
 } VM;
 
 typedef struct VMHost {
