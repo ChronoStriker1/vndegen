@@ -18,7 +18,7 @@ static const char *const uiNames[UI_COUNT] = {"msg_b00.agf", "msg_b01.agf", "msg
                                               "msg_b05.agf", "msg_b06.agf", "msg_a03.agf", "msg_c00.agf", "msg_c01.agf",
                                               "msg_c02.agf"};
 
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 enum { TITLE_X = 640, TITLE_Y = 369, TITLE_H = 50, TITLE_W = 640 };
 
@@ -89,6 +89,7 @@ struct SA {
     Backlog log;
     Town town;
     Party party;
+    Battle battle;
     BuildScreen build;
     bool inGame;
     int afterScript;
@@ -829,6 +830,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     if (!sa_town_init(&s->town, &s->vfs)) sa_log(s, "can't read the town tables");
     if (!sa_party_init(&s->party, &s->vfs)) sa_log(s, "can't read the unit table");
     s->town.party = &s->party;
+    if (!sa_battle_init(&s->battle, &s->vfs, &s->party)) sa_log(s, "can't read the battle tables");
     sa_build_init(&s->build, &s->vfs);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
@@ -871,6 +873,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     free(s->bgm);
     sa_log_free(&s->log);
     sa_town_free(&s->town);
+    sa_battle_free(&s->battle);
     sa_party_free(&s->party);
     sa_build_free(&s->build);
     picture_clear(&s->face);
@@ -917,6 +920,25 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             }
             return !s->quit;
         }
+    }
+    if (s->mode == MODE_BATTLE) {
+        if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
+        if (sa_battle_hover(&s->battle, s->mouseX, s->mouseY)) s->dirty = true;
+        if (s->clicked) {
+            s->clicked = false;
+            if (sa_battle_click(&s->battle, s->mouseX, s->mouseY) != BATTLE_RUNNING) {
+                s->mode = MODE_TOWN;
+                s->town.mapOnly = false;
+            }
+            s->dirty = true;
+        }
+        if (s->dirty) {
+            if (s->mode == MODE_BATTLE) sa_battle_draw(&s->battle, s->fb);
+            else sa_town_draw(&s->town, &s->vfs, &s->vm, s->fb);
+            s->serial++;
+            s->dirty = false;
+        }
+        return true;
     }
     if (s->mode == MODE_TOWN && s->build.open) {
         if (sa_build_hover(&s->build, &s->town, &s->vm, s->mouseX, s->mouseY)) s->dirty = true;
@@ -1247,4 +1269,15 @@ const char *vnsystemaoi_title(VNSystemAoi *sa) { return ((SA *)sa)->title; }
 const char *vnsystemaoi_problem(VNSystemAoi *sa) {
     SA *s = (SA *)sa;
     return s->problem[0] ? s->problem : NULL;
+}
+
+void sa_debug_battle(VNSystemAoi *sa, const char *group, const char *backdrop) {
+    SA *s = (SA *)sa;
+    if (!s->party.unit[PARTY_FRONT + 1]) sa_party_new_game(&s->party, &s->vfs);
+    if (!sa_battle_start(&s->battle, &s->vfs, group, backdrop, sa_vm_random(&s->vm))) {
+        sa_log(s, "no enemy group %s", group);
+        return;
+    }
+    s->mode = MODE_BATTLE;
+    s->dirty = true;
 }

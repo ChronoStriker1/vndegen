@@ -81,7 +81,7 @@ void sa_party_free(Party *p) {
     memset(p, 0, sizeof *p);
 }
 
-static void sprite_cells(const Image *im, int *cols, int *rows) {
+void sa_sprite_layout(const Image *im, int *cols, int *rows) {
     static const int layouts[][2] = {{11, 3}, {6, 2}, {4, 2}};
     for (size_t i = 0; i < sizeof layouts / sizeof layouts[0]; i++)
         if (im->w % layouts[i][0] == 0 && im->h % layouts[i][1] == 0) {
@@ -93,9 +93,9 @@ static void sprite_cells(const Image *im, int *cols, int *rows) {
     *rows = 1;
 }
 
-static int filled_cells(const Image *im) {
+int sa_sprite_filled_cells(const Image *im) {
     int cols, rows;
-    sprite_cells(im, &cols, &rows);
+    sa_sprite_layout(im, &cols, &rows);
     int cw = im->w / cols, ch = im->h / rows, n = 0;
     for (int c = 0; c < cols * rows; c++) {
         bool any = false;
@@ -128,7 +128,7 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
     char name[24];
     snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&p->units, r, 11));
     p->sprite[slot] = sa_load_image(vfs, name);
-    p->cells[slot] = p->sprite[slot] ? filled_cells(p->sprite[slot]) : 0;
+    p->cells[slot] = p->sprite[slot] ? sa_sprite_filled_cells(p->sprite[slot]) : 0;
 }
 
 void sa_party_new_game(Party *p, Vfs *vfs) {
@@ -145,11 +145,29 @@ bool sa_party_tick(Party *p, u32 ms) {
     return false;
 }
 
-static void slot_tile(int slot, int *x, int *y) {
+static void slot_tile(int slot, int boardX, int boardY, int *x, int *y) {
     int k = slot % 3;
     bool front = slot >= PARTY_FRONT;
-    *x = (front ? FRONT_X : BACK_X) + k * STEP_X;
-    *y = (front ? FRONT_Y : BACK_Y) + k * STEP_Y;
+    *x = boardX - PLATFORM_X + (front ? FRONT_X : BACK_X) + k * STEP_X;
+    *y = boardY - PLATFORM_Y + (front ? FRONT_Y : BACK_Y) + k * STEP_Y;
+}
+
+void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y) {
+    slot_tile(slot, boardX, boardY, x, y);
+    *x += TILE_CX;
+    *y += TILE_CY;
+}
+
+void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy) { sa_blit(fb, p->tile, cx - TILE_CX, cy - TILE_CY); }
+
+void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY) {
+    for (int k = 0; k < RESERVE_SLOTS; k++)
+        sa_blit(fb, p->smallTile, boardX - PLATFORM_X + RESERVE_X + k * STEP_X / 2, boardY - PLATFORM_Y + RESERVE_Y + k * STEP_Y / 2);
+    for (int s = 0; s < PARTY_SLOTS; s++) {
+        int x, y;
+        slot_tile(s, boardX, boardY, &x, &y);
+        sa_blit(fb, p->tile, x, y);
+    }
 }
 
 static void gauge(u32 *fb, const Image *im, int value, int max, int x, int y) {
@@ -167,33 +185,31 @@ int sa_party_rank(const Party *p) {
     return sum;
 }
 
+void sa_party_draw_bars(Party *p, u32 *fb, int x, int y, int hp, int maxHp, int mp, int maxMp) {
+    sa_blit(fb, p->gaugeFrame, x - 3, y - 12);
+    sa_blit(fb, p->gaugeFrame, x - 3, y - 8);
+    gauge(fb, p->hpGauge, hp, maxHp, x - 2, y - 11);
+    gauge(fb, p->mpGauge, mp, maxMp, x - 2, y - 7);
+}
+
 void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit) {
     sa_blit(fb, p->platform, PLATFORM_X, PLATFORM_Y);
-    for (int k = 0; k < RESERVE_SLOTS; k++)
-        sa_blit(fb, p->smallTile, RESERVE_X + k * STEP_X / 2, RESERVE_Y + k * STEP_Y / 2);
-    for (int s = 0; s < PARTY_SLOTS; s++) {
-        int x, y;
-        slot_tile(s, &x, &y);
-        sa_blit(fb, p->tile, x, y);
-    }
+    sa_party_draw_tiles(p, fb, PLATFORM_X, PLATFORM_Y);
     for (int k = 0; k < 3; k++)
         for (int row = 0; row < 2; row++) {
             int s = row ? PARTY_FRONT + k : k;
             const Image *im = p->sprite[s];
             if (!p->unit[s] || !im) continue;
             int cols, rows;
-            sprite_cells(im, &cols, &rows);
+            sa_sprite_layout(im, &cols, &rows);
             int cw = im->w / cols, ch = im->h / rows;
             int cell = p->cells[s] > 0 ? (int)(p->ms / PARTY_CELL_MS % (u32)p->cells[s]) : 0;
-            int tx, ty;
-            slot_tile(s, &tx, &ty);
-            int x = tx + TILE_CX - cw / 2, y = ty + TILE_CY + FEET - ch;
+            int cx, cy;
+            sa_party_tile_center(s, PLATFORM_X, PLATFORM_Y, &cx, &cy);
+            int x = cx - cw / 2, y = cy + FEET - ch;
             sa_blit_rect(fb, im, cell % cols * cw, cell / cols * ch, cw, ch, x, y);
             int r = sa_party_unit_row(p, p->unit[s]);
-            sa_blit(fb, p->gaugeFrame, x - 3, y - 12);
-            sa_blit(fb, p->gaugeFrame, x - 3, y - 8);
-            gauge(fb, p->hpGauge, p->hp[s], sa_table_int(&p->units, r, 23), x - 2, y - 11);
-            gauge(fb, p->mpGauge, p->mp[s], sa_table_int(&p->units, r, 24), x - 2, y - 7);
+            sa_party_draw_bars(p, fb, cx - 22, y, p->hp[s], sa_table_int(&p->units, r, 23), p->mp[s], sa_table_int(&p->units, r, 24));
         }
     sa_blit(fb, p->label, 1, LABEL_Y);
     char n[16];

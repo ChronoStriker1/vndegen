@@ -77,8 +77,23 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   3, 12, 0, 2, 5 and 0; enemies' hits on Darkus (defence 17) matched the same way, such as ホネ's 突き刺し (25 to 28,
   attack 9) for 18 each time and フニ's ひっかき (25 to 28, attack 10) for 20 and 21. 斬撃, 打撃 and 射撃 skills all
   follow it.
-- **Several targets.** 乱舞斬 and 火矢三連 (target 敵３) hit their first target for full damage and the second for
-  half. Measured three times; how the third target and rows count is still open.
+- **Several targets.** 乱舞斬 and 火矢三連 (target 敵３) hit their first target for full damage, the second for half
+  and, once seen, the third for a quarter (乱舞斬's 12 where a first hit would have done 50 to 53). Against two enemies
+  乱舞斬 hit each once, so VNDegen picks different targets; 火矢三連 once hit the same slime twice (a miss, then 20),
+  which that doesn't explain yet.
+- **Choosing a skill.** `unit.obj` lists up to eight skills from column 41 in threes: name, weight and a third number.
+  Enemies' weights (ベト: ベトアタック 30, ベトシュート 10, ベトハンマー 10) fit how often each showed in the logs;
+  VNDegen picks by weight, and heals only when an ally is at half health or below (inferred). Order in a round is by
+  speed, ties at random (inferred).
+- **Encounters.** `party.obj` lists each enemy group: three rows of six half-step cells from column 18, each row
+  followed by a minimum and a maximum. Fixed groups name a unit in each cell; random groups (ランダム) give a list of
+  candidates in the row's last cell, and the game draws between the two counts from it. Enemy keys such as ベトＡ are
+  `unit.obj` column 1, with the level in column 17 and the sprite in column 11.
+- **Board.** Measured: the party's platform (`m000bt1a` in 千樹庭) at (193, 299) with the town diorama's tiles, the
+  enemies' platform `m000bt2a` at (406, 116) for small groups and `m000bt2b` at (326, 130) for a seven-slime group,
+  the Backs and Forward panels (`bat_j01`, `bat_j00`) at (103, 541) and (603, 541) with a `bat_j02` box per slot, the
+  preset buttons `bat_d00` to `bat_d11` down the left, 戦闘開始 (`bat_l00`) at (500, 497) and the log (`bat_m00`) at
+  (1105, 270) with 12-pixel text on 18-pixel lines. The backdrop is the 3D dungeon, still to come.
 - **Magic.** Not yet known: Darkus's 火矢三連 (fire, 28 to 30, magic attack 15) did 36 to a ベト of magic defence 4,
   three less than the physical rule with magic stats would give.
 - **Healing.** 小回復 (38 to 42) healed 39 and 38: inferred as the power alone.

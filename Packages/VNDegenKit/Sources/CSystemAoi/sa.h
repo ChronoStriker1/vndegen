@@ -340,6 +340,56 @@ int sa_party_unit_row(const Party *p, int id);
 int sa_party_rank(const Party *p);
 bool sa_party_tick(Party *p, u32 ms);
 void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit);
+void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y);
+void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy);
+void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY);
+void sa_party_draw_bars(Party *p, u32 *fb, int x, int y, int hp, int maxHp, int mp, int maxMp);
+void sa_sprite_layout(const Image *im, int *cols, int *rows);
+int sa_sprite_filled_cells(const Image *im);
+
+enum { STAT_ATTACK, STAT_MAGIC, STAT_DEFENCE, STAT_RESIST, STAT_SPEED, STAT_EVASION, STAT_GOVERN, STAT_COMMAND };
+enum { BATTLE_RUNNING, BATTLE_WON, BATTLE_LOST };
+
+#define BATTLE_FIGHTERS 24
+#define BATTLE_LOG 64
+#define BATTLE_ART 26
+
+typedef struct Fighter {
+    int id, row, level, slot, gridRow, gridCell;
+    bool enemy;
+    int hp, mp, maxHp, maxMp;
+    int stat[8];
+    Image *sprite;
+    int cells;
+} Fighter;
+
+typedef struct BattleLine {
+    char *text;
+    bool enemy, indent;
+} BattleLine;
+
+typedef struct Battle {
+    bool open, acting;
+    int result, round, hover;
+    Party *party;
+    Table groups, skills, lvup;
+    Fighter f[BATTLE_FIGHTERS];
+    int count;
+    int order[BATTLE_FIGHTERS], orderCount, next;
+    BattleLine log[BATTLE_LOG];
+    int logCount;
+    Image *art[BATTLE_ART], *board[2], *back;
+    u32 ms, animMs, rng;
+} Battle;
+
+bool sa_battle_init(Battle *b, Vfs *vfs, Party *party);
+void sa_battle_free(Battle *b);
+bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed);
+bool sa_battle_tick(Battle *b, u32 ms);
+int sa_battle_click(Battle *b, int x, int y);
+bool sa_battle_hover(Battle *b, int x, int y);
+void sa_battle_draw(Battle *b, u32 *fb);
+void sa_debug_battle(VNSystemAoi *sa, const char *group, const char *backdrop);
 
 typedef struct Town {
     Table build, mass, lvup;
