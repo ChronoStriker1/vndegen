@@ -178,11 +178,13 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 whose Game.dat has a 22-byte settings block gets version 128, as Wolf RPG Editor 2.21 and 2.23 write. Such a game's
 version 125 saves, which VNDegen 0.58.1 wrote, load as before, and the next save made from them is version 128.
 
-In version 128 saves the pictures on screen go into the save, and a load shows them again, as those engines do: President
+In version 128 and 159 saves the pictures on screen go into the save, and a load shows them again, as those engines do: President
 Yukino's day bar and portrait are there right after a load, from a PC save or VNDegen's, and VNDegen's frame then
 matches the PC engine's apart from the camera. The PC engines load VNDegen's version 128 saves with their pictures
 (President Yukino and Drain Dungeon under Wine). Images, text, windows, `<SQUARE>` and `<GRADX>` pictures keep their
-position, anchor, pattern, opacity, zoom, angle, colour and blend.
+position, anchor, pattern, opacity, zoom, angle, colour and blend. The Clumsy Witch Seris (159) keeps its HUD this way: a
+save moved between VNDegen and the PC in either direction shows the HUD, minimap and portrait right after the load, as
+the PC's own save does in its own engine. Text pictures keep `\f`, `\E`, `<R>` and `\ay` codes.
 
 A picture's angle is in tenths of a degree, clockwise about the picture's centre: Drain Dungeon's engine under Wine draws
 an angle of 300 as 30 degrees, with the corners where `Engines/WolfRPG/host/picture_angle_test.cpp` expects them. Up to
@@ -200,12 +202,9 @@ safe: ANGEL QUEST's engine (version 123) closes when it loads a save holding a p
 - A load restores variables, the map and the characters, and pictures from version 128 saves, but not the screen tint
   or which music was playing; the map's own music starts. Saved pictures come back without their effects (shake, pulse,
   flicker, automatic patterns, the effect command's zoom and shift), and pictures made from XY arrays, cut with
-  `<CUT/...>`, or holding text codes other than a leading `\f[n]` are left out of saves and loads. The PC also shows
+  `<CUT/...>`, or holding text codes other than `\f`, `\E`, `<R>` and `\ay` are left out of saves and loads. Version 159
+  saves leave out window pictures too. The PC also shows
   the map scrolled a little differently after loading a VNDegen save.
-- After a save moves between VNDegen and the PC in either direction, The Clumsy Witch Seris shows its HUD, minimap and
-  building labels again only once the menu has been opened and closed. Wolf RPG Editor 3.5 restores pictures from a
-  save, and VNDegen neither writes pictures into saves nor restores them. Saves made and loaded within VNDegen behave
-  as before.
 - DxLib archive version 7 isn't read. No library game uses it: ANGEL QUEST, once thought to, is a version 3 archive
   with the oldest Wolf RPG Editor key, and plays.
 - Wolf RPG Editor Pro's encrypted data (basic data files whose second byte is `P`) isn't read. No library game needs
