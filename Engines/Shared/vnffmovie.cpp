@@ -31,9 +31,6 @@ constexpr double kSoundSlack = 0.05;
 // Sound this far behind the picture is dropped, as for a movie whose sound nobody plays, or plays again after another's.
 constexpr double kSoundBehind = 0.1;
 constexpr int kIoBuffer = 64 << 10;
-// Containers that store a stream's packets well ahead of another's, as some ASF files store their video 1.4 s ahead of
-// their sound, would hold the sound back behind the few decoded frames. While the sound queued doesn't reach this far
-// past the picture, reading goes on and the video packets wait undecoded, up to this many.
 constexpr double kSoundLead = 0.5;
 constexpr size_t kMaxPendingVideo = 600;
 
