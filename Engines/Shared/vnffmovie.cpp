@@ -31,6 +31,8 @@ constexpr double kSoundSlack = 0.05;
 // Sound this far behind the picture is dropped, as for a movie whose sound nobody plays, or plays again after another's.
 constexpr double kSoundBehind = 0.1;
 constexpr int kIoBuffer = 64 << 10;
+constexpr double kSoundLead = 0.5;
+constexpr size_t kMaxPendingVideo = 600;
 
 struct Frame {
     double pts = 0;
@@ -71,6 +73,9 @@ struct vnffmovie {
     double audioClock = 0;
     double audioShift = 0;
     std::deque<Frame> frames;
+    std::deque<AVPacket *> pendingVideo;
+    bool readEnded = false;
+    int readResult = 0;
     std::deque<float> sound;
     Frame shown;
     bool hasShown = false;
@@ -118,7 +123,14 @@ double seconds(const vnffmovie *m, int64_t pts, int index) {
     return double(pts) * av_q2d(m->format->streams[index]->time_base) - m->start;
 }
 
+void clearPending(vnffmovie *m) {
+    for (AVPacket *p : m->pendingVideo) av_packet_free(&p);
+    m->pendingVideo.clear();
+    m->readEnded = false;
+}
+
 void destroy(vnffmovie *m) {
+    clearPending(m);
     sws_freeContext(m->scaler);
     swr_free(&m->resampler);
     av_frame_free(&m->decoded);
@@ -234,19 +246,32 @@ void run(vnffmovie *m) {
             m->loopOffset = 0;
             m->lastPts = 0;
             m->dropBefore = m->soundEnd = m->playClock = m->pictureTime = m->seekTarget;
+            clearPending(m);
             lock.unlock();
             bool restarted = restart(m, m->dropBefore);
             lock.lock();
             if (!restarted) m->finished = true;
             continue;
         }
-        if (m->finished || m->frames.size() >= kMaxFrames || m->soundEnd - m->pictureTime > kSoundAhead) {
+        bool roomForFrames = m->frames.size() < kMaxFrames;
+        bool soundStarved = m->audio && m->soundEnd < m->pictureTime + kSoundLead && m->pendingVideo.size() < kMaxPendingVideo;
+        if (roomForFrames && !m->pendingVideo.empty()) {
+            AVPacket *pending = m->pendingVideo.front();
+            m->pendingVideo.pop_front();
+            lock.unlock();
+            decode(m, m->video, pending);
+            av_packet_free(&pending);
+            lock.lock();
+            continue;
+        }
+        if (m->finished || (m->readEnded && !roomForFrames) || (!roomForFrames && !soundStarved) || m->soundEnd - m->pictureTime > kSoundAhead) {
             m->wake.wait(lock);
             continue;
         }
-        lock.unlock();
-        int result = av_read_frame(m->format, m->packet);
-        if (result < 0) {
+        if (m->readEnded) {
+            m->readEnded = false;
+            int result = m->readResult;
+            lock.unlock();
             decode(m, m->video, nullptr);
             if (m->audio) decode(m, m->audio, nullptr);
             // A read error ends the movie, as does a loop that can't start over or whose last pass showed nothing.
@@ -262,8 +287,26 @@ void run(vnffmovie *m) {
             if (!again) m->finished = true;
             continue;
         }
-        if (m->packet->stream_index == m->videoIndex) decode(m, m->video, m->packet);
-        else if (m->packet->stream_index == m->audioIndex) decode(m, m->audio, m->packet);
+        lock.unlock();
+        int result = av_read_frame(m->format, m->packet);
+        if (result < 0) {
+            lock.lock();
+            m->readEnded = true;
+            m->readResult = result;
+            continue;
+        }
+        bool queued = false;
+        if (m->packet->stream_index == m->videoIndex) {
+            lock.lock();
+            if (!m->pendingVideo.empty() || m->frames.size() >= kMaxFrames) {
+                m->pendingVideo.push_back(av_packet_clone(m->packet));
+                queued = true;
+            }
+            lock.unlock();
+            if (!queued) decode(m, m->video, m->packet);
+        } else if (m->packet->stream_index == m->audioIndex) {
+            decode(m, m->audio, m->packet);
+        }
         av_packet_unref(m->packet);
         lock.lock();
     }
