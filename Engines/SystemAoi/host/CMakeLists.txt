@@ -19,3 +19,7 @@ target_link_libraries(systemaoi PUBLIC m pthread)
 
 add_executable(satool satool.c)
 target_link_libraries(satool PRIVATE systemaoi)
+
+add_executable(sarun sarun.c)
+target_link_libraries(sarun PRIVATE systemaoi)
+target_compile_definitions(sarun PRIVATE SA_FONTS_DIR="${SHARED}/fonts")

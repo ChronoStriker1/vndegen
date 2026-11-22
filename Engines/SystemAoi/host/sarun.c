@@ -1,0 +1,60 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "png.h"
+#include "vnfont.h"
+#include "vnsystemaoi.h"
+
+static float audio[4096];
+
+static int run(VNSystemAoi *s, int ms) {
+    for (int t = 0; t < ms; t += 16) {
+        if (!vnsystemaoi_frame(s, 16)) return 0;
+        vnsystemaoi_audio(s, audio, 705);
+    }
+    return 1;
+}
+
+int main(int argc, char **argv) {
+    if (argc < 4) {
+        fprintf(stderr, "sarun <gameDir> <outDir> <clicks> [shotEvery]\n");
+        return 2;
+    }
+    const char *dirs[] = {SA_FONTS_DIR};
+    vnfont_init(SA_FONTS_DIR "/fonts.tsv", dirs, 1);
+    char *log = malloc(strlen(argv[2]) + 16);
+    sprintf(log, "%s/sarun.log", argv[2]);
+    VNSystemAoiConfig cfg = {.gameDir = argv[1], .saveDir = argv[2], .logPath = log, .audioRate = 44100};
+    char err[256] = "";
+    VNSystemAoi *s = vnsystemaoi_open(&cfg, err, sizeof err);
+    if (!s) {
+        fprintf(stderr, "%s\n", err);
+        return 1;
+    }
+    int clicks = atoi(argv[3]), every = argc > 4 ? atoi(argv[4]) : 0;
+    int alive = run(s, 500);
+    for (int i = 0; alive && i < clicks; i++) {
+        vnsystemaoi_key(s, 0x0d, 1);
+        vnsystemaoi_key(s, 0x0d, 0);
+        alive = run(s, 64);
+        vnsystemaoi_key(s, 0x0d, 1);
+        alive = alive && run(s, 400);
+        if (every && i % every == 0) {
+            int w, h;
+            const uint32_t *px = vnsystemaoi_pixels(s, &w, &h);
+            char path[1024];
+            snprintf(path, sizeof path, "%s/shot%05d.png", argv[2], i);
+            write_png(path, px, w, h, 1, 0);
+        }
+    }
+    int w, h;
+    const uint32_t *px = vnsystemaoi_pixels(s, &w, &h);
+    char path[1024];
+    snprintf(path, sizeof path, "%s/last.png", argv[2]);
+    write_png(path, px, w, h, 1, 0);
+    printf("alive=%d serial=%u\n", alive, vnsystemaoi_frame_serial(s));
+    vnsystemaoi_close(s);
+    free(log);
+    return 0;
+}

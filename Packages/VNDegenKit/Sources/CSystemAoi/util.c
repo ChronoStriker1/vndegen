@@ -95,6 +95,28 @@ bool sa_ieq(const char *a, const char *b) {
     return *a == *b;
 }
 
+int sa_utf8_decode(const char *s, u32 *cp) {
+    const u8 *p = (const u8 *)s;
+    if (p[0] < 0x80) {
+        *cp = p[0];
+        return 1;
+    }
+    if ((p[0] & 0xe0) == 0xc0 && (p[1] & 0xc0) == 0x80) {
+        *cp = (u32)(p[0] & 0x1f) << 6 | (p[1] & 0x3f);
+        return 2;
+    }
+    if ((p[0] & 0xf0) == 0xe0 && (p[1] & 0xc0) == 0x80 && (p[2] & 0xc0) == 0x80) {
+        *cp = (u32)(p[0] & 0x0f) << 12 | (u32)(p[1] & 0x3f) << 6 | (p[2] & 0x3f);
+        return 3;
+    }
+    if ((p[0] & 0xf8) == 0xf0 && (p[1] & 0xc0) == 0x80 && (p[2] & 0xc0) == 0x80 && (p[3] & 0xc0) == 0x80) {
+        *cp = (u32)(p[0] & 0x07) << 18 | (u32)(p[1] & 0x3f) << 12 | (u32)(p[2] & 0x3f) << 6 | (p[3] & 0x3f);
+        return 4;
+    }
+    *cp = 0xfffd;
+    return 1;
+}
+
 int sa_utf8_put(char *out, u32 cp) {
     if (cp < 0x80) {
         out[0] = (char)cp;

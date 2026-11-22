@@ -34,6 +34,7 @@ void sa_log(SA *s, const char *fmt, ...);
 
 bool sa_ieq(const char *a, const char *b);
 int sa_utf8_put(char *out, u32 cp);
+int sa_utf8_decode(const char *s, u32 *cp);
 char *sa_utf16_to_utf8(const u8 *p, int chars);
 
 static inline u16 rd16(const u8 *p) { return (u16)(p[0] | p[1] << 8); }
@@ -228,5 +229,11 @@ void sa_play(Mixer *m, int ch, int slot, const char *name, bool loop);
 void sa_stop(Mixer *m, int ch, int slot, int fadeMs);
 void sa_set_volume(Mixer *m, int ch, float v);
 bool sa_playing(Mixer *m, int ch, int slot);
+
+bool sa_font_init(const char *const *names, char *used, size_t usedSize);
+void sa_font_free(void);
+int sa_char_width(u32 cp, int size);
+int sa_text_width(const char *s, int n, int size);
+int sa_text_draw(u32 *dst, int dw, int dh, const char *s, int n, int x, int y, int size, u32 color, u32 edge);
 
 #endif
