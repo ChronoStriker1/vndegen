@@ -85,12 +85,14 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
-  loading and deleting ask YES or NO, saving shows the original's comment box with OK and CANCEL. Saves are the original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the
-  save folder, packed with its codec (`aoicmp.c`, `pcsave.c`): the original loads VNDegen's saves and VNDegen lists and
-  loads the original's. Beside each, `vndegen/slotNN.sav` keeps what the original's image doesn't yet carry for
-  VNDegen (other members, orders, the map memory); it is used only while its time matches the original file's. As in
-  the original, the game autosaves at the start of each turn and on entering each dungeon floor, through ten slots in
-  turn; a dungeon autosave loads back onto its floor, any other save into the town.
+  loading and deleting ask YES or NO, saving shows the original's comment box with OK and CANCEL. Saves are the
+  original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the save folder, packed with its codec
+  (`aoicmp.c`, `pcsave.c`): the variables, the town, every member with their place, and the equipment. The original
+  loads VNDegen's saves and VNDegen lists and loads the original's. Beside each, `vndegen/slotNN.sav` keeps what the
+  image doesn't yet carry for VNDegen (orders, reserve tiles, the map memory); it is used only while its time matches
+  the original file's. As in the original, the game autosaves at the start of each turn and on entering each dungeon
+  floor, through ten slots in turn; a dungeon autosave loads back onto its floor, any other save into the town. New
+  members join off the board, as in the original.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
   FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
 
