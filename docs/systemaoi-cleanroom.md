@@ -223,3 +223,27 @@ calls it is inferred from that and from play, and marked so.
 - **Battles from the dungeon** use the dungeon's platforms (`mNNNbt1a` and `bt2a` to `bt2c`, NNN the dungeon less
   one) and the top bar names the dungeon and floor. The backdrop is the dungeon view; the original's seems to look
   further along, from a different camera.
+
+## 内政, from the screens and the tables
+
+- **Screen.** Measured (the windows 99 to 100% pixel-exact): the throne room `bg010a0`, the 内政 window `dom_a00` at
+  (176, 84) with a button per category (`dom_a01` 視察, `a02` イベント, `a03` 交換; normal, hover, chosen) from
+  (176, 123) 40 pixels apart and 戻る (`dom_a04`) at (366, 254); the category's window (`dom_b00`, `c00`, `d00`) at
+  (531, 84) with the actions' pictures (`DomeEvnt.obj` column 3; normal, hover) from (531, 123); the description
+  panel `dom_a05` at (531, 316), which shows the hovered action's two texts (columns 21 and 22) in 16-pixel text from
+  (547, 347), 18 pixels a line, wrapped at 368 pixels; the town window and the turn at the right. Choosing an action
+  halves the screen's brightness and shows 内政結果 (`dom_a06`) at (362, 185) with the action, its texts, 実行
+  (`a07`) and キャンセル (`a08`) at (397, 435) and (577, 435).
+- **Categories.** 視察 is always there; イベント once F041 is set (the turn script sets it when the residents reach
+  300) and 交換 once F042 is (food, money and resources together reaching 5000). `DomeEvnt.obj` lists 視察 and
+  イベント actions; 交換 has none there and isn't built.
+- **An action's row.** Column 2 its category, 4 a flag it needs, 6 a facility it needs, 8 the residents it needs,
+  14 its event number, 15 residents gained, 16 to 18 food, money and resources (costs are negative), 20 the EXP every
+  working facility gains, 21 and 22 its texts, 23 the expedition effect it gives.
+- **実行.** The engine sets C492 to the event number and runs `bo3100.box` entry 2, which plays the event's scene
+  (`ca0000`) and counts it in C601. Inferred: the resources change and the facilities gain the EXP first, the turn
+  ends after the scene (the income box follows), and 実行 is disabled when a cost can't be paid. Facilities level up
+  by `TownLvup.obj`: `TownBuil.obj` column 5 picks the growth row, whose third column is the EXP each level needs.
+- **`f3 "name" …`** queries a facility type: operand 3 receives how many are built, operand 4 their highest level
+  (the 街視察 scene stores each type's level in C650 onwards, for the after-scene report); with no name, operand 1
+  receives the number of facilities built (inferred).

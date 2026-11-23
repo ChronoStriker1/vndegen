@@ -131,6 +131,8 @@ int main(int argc, char **argv) {
             sa_debug_place(s, x, y, dd);
             alive = alive && run(s, 100);
         }
+        if (sscanf(argv[a], "setf=%d,%d", &x, &y) == 2) sa_debug_set(s, true, x, y);
+        if (sscanf(argv[a], "setc=%d,%d", &x, &y) == 2) sa_debug_set(s, false, x, y);
         if (sscanf(argv[a], "bench=%d", &n) == 1) printf("dungeon frame %.2f ms\n", sa_debug_bench(s, n));
         if (!strcmp(argv[a], "finds")) {
             int f[4];

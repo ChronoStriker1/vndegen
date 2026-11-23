@@ -379,6 +379,7 @@ enum {
     TOWN_CMD_TRAIN,
     TOWN_CMD_SHOP,
     TOWN_CMD_SUBMIT,
+    TOWN_POLICY_DONE,
     TOWN_BTN_LOG,
     TOWN_BTN_SAVE,
     TOWN_BTN_LOAD,
@@ -520,6 +521,7 @@ void sa_debug_new_game(VNSystemAoi *sa);
 void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor);
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir);
 double sa_debug_bench(VNSystemAoi *sa, int n);
+void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value);
 void sa_debug_finds(VNSystemAoi *sa, int *out);
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
 int sa_item_pick(const Table *items, const char *table, u32 roll);
@@ -551,6 +553,7 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb);
 int sa_town_hit(const Town *t, const VM *vm, int x, int y);
 bool sa_town_hover(Town *t, const VM *vm, int x, int y);
 void sa_town_draw_info(Town *t, const VM *vm, u32 *fb);
+void sa_town_draw_status(Town *t, const VM *vm, u32 *fb);
 void sa_draw_number(u32 *fb, const Image *font, const char *s, int right, int y, int row, int cw, int ch);
 void sa_draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch);
 Image *sa_load_image(Vfs *vfs, const char *name);

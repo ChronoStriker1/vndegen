@@ -384,6 +384,10 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
     sa_blit(fb, t->ui[UI_BAR], 57, 2);
     draw_window(t, vfs, vm, fb, FAC1_X, UI_FAC1, fac1Areas, 4);
     draw_window(t, vfs, vm, fb, FAC2_X, UI_FAC2, fac2Areas, 3);
+    sa_town_draw_status(t, vm, fb);
+}
+
+void sa_town_draw_status(Town *t, const VM *vm, u32 *fb) {
     sa_town_draw_info(t, vm, fb);
     sa_blit(fb, t->ui[UI_GOAL], GOAL_X, GOAL_Y);
     sa_draw_number(fb, t->ui[UI_DIGITS], "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);

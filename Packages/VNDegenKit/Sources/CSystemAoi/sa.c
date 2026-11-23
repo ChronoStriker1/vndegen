@@ -435,6 +435,26 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     case 0xbf:
         if (in->count >= 2) sa_vm_set(vm, &in->o[0], sa_exp_floors_reached(s, sa_vm_get(vm, code, &in->o[1]) + 1));
         break;
+    case 0xf3:
+        if (in->count >= 5) {
+            char *name = in->o[0].kind == OPD_STR ? opd_str(code, in, 0) : NULL;
+            int count = 0, level = 0, total = 0;
+            for (int c = 0; c < TOWN_CELLS; c++) {
+                const Facility *f = &s->town.cell[c];
+                int r = f->type ? sa_town_type_row(&s->town, f->type) : -1;
+                if (r < 0) continue;
+                total++;
+                if (name && strcmp(sa_table_text(&s->town.build, r, 1), name)) continue;
+                count++;
+                if (f->level > level) level = f->level;
+            }
+            for (int i = 1; i < in->count; i++) {
+                if (in->o[i].kind != OPD_VAR) continue;
+                sa_vm_set(vm, &in->o[i], i == 3 ? count : i == 4 ? level : i == 1 ? total : 0);
+            }
+            free(name);
+        }
+        break;
     case 0x94:
         if (in->count >= 1) sa_party_add_item(&s->party, sa_vm_get(vm, code, &in->o[0]), in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
         break;
@@ -728,6 +748,12 @@ static void run_command(SA *s, int action) {
     case TOWN_CMD_EXPEDITION:
         sa_exp_open_select(s);
         break;
+    case TOWN_CMD_POLICY:
+        sa_policy_open(s);
+        break;
+    case TOWN_POLICY_DONE:
+        sa_end_turn(s);
+        break;
     case TOWN_CMD_BUILD:
         sa_build_open(&s->build);
         s->town.mapOnly = true;
@@ -864,6 +890,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     sa_build_init(&s->build, &s->vfs);
     sa_dialog_init(&s->dialog, &s->vfs);
     sa_exp_init(s);
+    sa_policy_init(&s->policy, &s->vfs);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
@@ -910,6 +937,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_build_free(&s->build);
     sa_dialog_free(&s->dialog);
     sa_exp_free(s);
+    sa_policy_free(&s->policy);
     sa_dungeon_free(&s->dungeon);
     r3_free(&s->dungeon.r3);
     picture_clear(&s->face);
@@ -967,6 +995,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         return true;
     }
     if (sa_exp_frame(s, elapsedMs)) return true;
+    if (sa_policy_frame(s)) return true;
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
         if (sa_battle_hover(&s->battle, s->mouseX, s->mouseY)) s->dirty = true;
@@ -1392,4 +1421,11 @@ double sa_debug_bench(VNSystemAoi *sa, int n) {
     for (int i = 0; i < n; i++) sa_exp_draw_view(s, s->fb);
     clock_gettime(CLOCK_MONOTONIC, &b);
     return ((double)(b.tv_sec - a.tv_sec) * 1e3 + (double)(b.tv_nsec - a.tv_nsec) / 1e6) / (n > 0 ? n : 1);
+}
+
+void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value) {
+    SA *s = (SA *)sa;
+    if (flag) s->vm.f[index] = (u8)(value != 0);
+    else s->vm.c[index] = value;
+    s->dirty = true;
 }

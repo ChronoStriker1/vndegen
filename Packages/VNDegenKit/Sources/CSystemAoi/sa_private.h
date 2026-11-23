@@ -9,6 +9,15 @@
 #define EXP_DUNGEONS 12
 #define EXP_FLOORS 24
 
+#define POLICY_CATEGORIES 3
+#define POLICY_ROWS 16
+
+typedef struct Policy {
+    Table events;
+    Image *bg, *art[13], **pictures;
+    int category, hover, pick;
+} Policy;
+
 typedef struct Expedition {
     bool active;
     int dungeon, floor, row;
@@ -22,7 +31,7 @@ typedef struct Expedition {
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -86,6 +95,7 @@ struct SA {
     Dialog dialog;
     Dungeon dungeon;
     Expedition exp;
+    Policy policy;
     bool turnPending;
     bool inGame;
     int afterScript;
@@ -108,6 +118,10 @@ struct SA {
 };
 
 bool sa_start_script(SA *s, const char *box, int entry);
+void sa_policy_init(Policy *p, Vfs *vfs);
+void sa_policy_free(Policy *p);
+void sa_policy_open(SA *s);
+bool sa_policy_frame(SA *s);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);
 void sa_exp_open_select(SA *s);
