@@ -46,7 +46,7 @@ folder down.
   status window and the memory filters where the picture lies in its texture, and Double Date Dilemma's `59 2 1424 0 0 0`
   puts a cut-in 400 pixels right, as the PC draws them. The PC keeps that x in a layer's slot-x field (0x1b0) with no
   offset, where an E-mote layer keeps 640 and its offset, and VNDegen saves and loads picture layers the same way. Up to
-  0.59.8 VNDegen drew them 1024 pixels to the right, off the screen, and the PC loaded VNDegen's saves with them 384
+  0.59.9 VNDegen drew them 1024 pixels to the right, off the screen, and the PC loaded VNDegen's saves with them 384
   pixels left.
 - Clearing a layer (`57`) crossfades the whole scene, from the picture before the line to the one after, linearly over
   0.4 s starting at the click, while the next line types; showing a layer (`52`) alone is instant. Recorded at 30 fps on
@@ -62,7 +62,7 @@ folder down.
   and end where the PC's do, to a pixel. Magical Sword: 21 pixels with unrounded advances from x 175, 42 pixels a line,
   and a line opening with a quote or bracket hangs it 11 pixels to the left, its later lines staying at 175, as the PC
   draws them; its lines within 2% of the PC's widths. Kanji and kana a font lacks come from MS Gothic's substitute.
-  Up to 0.59.8 both games drew Liberation Sans, matched to a Wine prefix with no Japanese fonts, where the PC falls
+  Up to 0.59.9 both games drew Liberation Sans, matched to a Wine prefix with no Japanese fonts, where the PC falls
   back to Arial; a Windows PC has MS Gothic and MS PMincho, and a prefix with the Ume fonts shows them.
 - Backlog: entries 46 pixels a line plus one blank line, the newest ending at y 666 and older ones above it, the line
   on screen included. Magical Sword draws it at 21 pixels with unrounded advances, the speaker's line 42 pixels below
