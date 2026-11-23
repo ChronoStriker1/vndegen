@@ -18,6 +18,8 @@ public:
     bool open(const std::string &root);
     // The file's bytes, or null when no archive or patch has it.
     Bytes read(const std::string &path) const;
+    // The file as the base archives and folders hold it, under any patch that takes its place.
+    Bytes readBase(const std::string &path) const;
     bool exists(const std::string &path) const;
     // The path as the PC names it in a save: `sys_5\scr\x.txt` for a file a patch provides, as Test Game 92's PC saves
     // name its patched scripts, and the path as given otherwise.
@@ -44,7 +46,8 @@ private:
     void indexArchive(const std::string &file, const std::string &folder, int priority, const std::string &patch = {});
     void indexFolder(const std::string &dir, const std::string &prefix, int priority, const std::string &patch);
     std::vector<std::string> archives_;
-    std::unordered_map<std::string, Source> index_;
+    std::unordered_map<std::string, Source> index_, base_;
+    Bytes readSource(const Source &s) const;
 };
 
 // Lower case with backslashes, the form the index uses.

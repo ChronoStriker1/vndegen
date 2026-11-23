@@ -340,6 +340,8 @@ hover 519 528 990 580 obj\j004_004.bmp 664 683 8 6
 hover 519 580 990 660 obj\j004_004.bmp 664 683 8 7
 
 screen defaults
+cglists base:cfg\cg_view.ini sys_1\cfg\cg_view.ini cfg\cg_view_bangai.ini
+scenelists base:cfg\play_view.ini sys_1\cfg\play_view.ini cfg\play_view_bangai.ini
 titlebgmheard
 inneralways
 textcomment
@@ -409,6 +411,7 @@ cell 882 436
 celllabel obj\e006_001.bmp 16 15
 celldigits obj\e006_000.bmp 50 10 3 18
 gallerytabs 0
+cellhide
 button page0 obj\e001_000.bmp 534 626 11 5 0
 button page1 obj\e001_000.bmp 590 626 11 5 1
 button page2 obj\e001_000.bmp 646 626 11 5 2
@@ -457,6 +460,7 @@ cell 882 436
 celllabel obj\e006_001.bmp 16 15
 celldigits obj\e006_000.bmp 50 10 3 18
 gallerytabs 0
+cellhide
 button page0 obj\e001_000.bmp 534 626 11 5 0
 button page1 obj\e001_000.bmp 590 626 11 5 1
 button page2 obj\e001_000.bmp 646 626 11 5 2

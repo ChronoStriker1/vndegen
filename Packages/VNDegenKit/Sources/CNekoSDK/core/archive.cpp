@@ -137,6 +137,10 @@ static bool singleEntry(const std::vector<uint8_t> &d, std::string &name, uint32
 }
 
 void Files::add(const std::string &path, Source source) {
+    if (source.patch.empty()) {
+        auto &base = base_[normalizedPath(path)];
+        if (source.priority >= base.priority) base = source;
+    }
     auto &slot = index_[normalizedPath(path)];
     if (source.priority >= slot.priority) slot = std::move(source);
 }
@@ -260,6 +264,7 @@ void Files::indexFolder(const std::string &dir, const std::string &prefix, int p
 bool Files::open(const std::string &root) {
     archives_.clear();
     index_.clear();
+    base_.clear();
     DIR *d = opendir(root.c_str());
     if (!d) return false;
     struct Found { std::string name, stem; bool folder; };
@@ -322,8 +327,15 @@ int64_t Files::storedSize(const std::string &path) const {
 
 Bytes Files::read(const std::string &path) const {
     auto it = index_.find(normalizedPath(path));
-    if (it == index_.end()) return nullptr;
-    const Source &s = it->second;
+    return it == index_.end() ? nullptr : readSource(it->second);
+}
+
+Bytes Files::readBase(const std::string &path) const {
+    auto it = base_.find(normalizedPath(path));
+    return it == base_.end() ? nullptr : readSource(it->second);
+}
+
+Bytes Files::readSource(const Source &s) const {
     if (s.archive < 0) {
         std::ifstream f(s.loose, std::ios::binary);
         if (!f) return nullptr;
