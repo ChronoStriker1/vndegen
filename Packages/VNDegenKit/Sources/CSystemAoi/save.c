@@ -176,6 +176,15 @@ static bool write_sidecar(SA *s, int slot, int count) {
     return ok;
 }
 
+void sa_save_delete(SA *s, int slot) {
+    char *path = sa_pcsave_path(s, slot), *side = slot_path(s, slot);
+    remove(path);
+    remove(side);
+    sa_log(s, "save slot %d: deleted", slot);
+    free(path);
+    free(side);
+}
+
 bool sa_save_summary(SA *s, int slot, SaveSummary *out) {
     char *path = sa_pcsave_path(s, slot);
     bool ok = sa_pcsave_summary(s, path, out);
@@ -207,7 +216,6 @@ bool sa_save_read(SA *s, int slot) {
         ok = sa_pcsave_read(s, path);
         free(path);
     }
-    if (ok) s->playMs = (u32)s->vm.c[11] * 1000;
     return ok;
 }
 

@@ -351,6 +351,13 @@ calls it is inferred from that and from play, and marked so.
   and `sav_d00` to `d09` (save) from (288, 376), 80 apart; 戻る `sav_a05` at (1094, 376); the slot rows `sav_c00` to
   `c09` and `sav_e00` to `e09` (600 by 50) at x 35 and 645 from y 437, 55 apart. Choosing a slot halves the screen and
   asks with YES `pop_b00` at (440, 382) and NO `pop_b01` at (640, 382).
+- **Choosing a slot.** Measured: a click picks a row (lit) and shows its details: No.NN at (310, 50), the date, the
+  time, プレイ時間 and the play time across the top, the count at the right ending at 1,196, then the 現在 lines, the
+  weapon at x 860. DEL (`sav_a04`, 120 by 40) at (298, 318) and DATA LOAD or DATA SAVE (`sav_a02`, `sav_a03`, 200 by
+  40) at (1037, 318). DATA LOAD and DEL ask ロードしますか？ or 削除しますか？ over the screen dimmed to 3/8; DATA SAVE asks
+  セーブしますか？ in a box at (412, 294), 455 by 130, with two lines about the comment and a black field at (446, 378)
+  with its caret, over the screen dimmed to 15/32, and OK and CANCEL (`pop_b02`, `pop_b03`) at (440, 425) and
+  (640, 425). The save screen has no autosave panel or DATA LOG plate. The load screen opens on the last page used.
 - **Panels.** Measured: the autosave panel shows NoA and the slot, the autosave's running count at the right, the date,
   the turn, the place (街, or the dungeon and floor names on two lines), the four town numbers and Darkus's level, in
   a bold face 14 pixels high, 20 apart from (55, 48). The panel beside it shows 現在, the game in progress (the turn

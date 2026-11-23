@@ -73,6 +73,16 @@ static void draw_line(u32 *fb, const char *s, int x, int y) {
     }
 }
 
+void sa_popup_box(Image *const *frame, u32 *fb, const char *const *lines, int count, int x, int y, int w, int h) {
+    sa_font_set_spacing(POP_SPACING);
+    sa_blit_rect(fb, frame[3], 0, POP_SRC_H - (h - POP_EDGE_H), POP_EDGE_W, h - POP_EDGE_H, x, y + POP_EDGE_H);
+    sa_blit_rect(fb, frame[2], POP_SRC_W - (w - POP_EDGE_W - 2), 0, w - POP_EDGE_W - 2, POP_EDGE_H, x + POP_EDGE_W, y + h - POP_EDGE_H);
+    sa_blit_rect(fb, frame[1], 0, 0, POP_EDGE_W, h - POP_EDGE_H, x + w - POP_EDGE_W, y);
+    sa_blit_rect(fb, frame[0], 0, 0, w - POP_EDGE_W, POP_EDGE_H, x, y);
+    for (int i = 0; i < count; i++) draw_line(fb, lines[i], x + POP_TEXT_X, y + POP_TEXT_Y + i * POP_LINE);
+    sa_font_set_spacing(1);
+}
+
 void sa_popup_draw(Image *const *frame, u32 *fb, const char *const *lines, int count) {
     sa_font_set_spacing(POP_SPACING);
     int w = 0;
@@ -82,11 +92,5 @@ void sa_popup_draw(Image *const *frame, u32 *fb, const char *const *lines, int c
     }
     w += POP_PAD_X;
     int h = POP_PAD_Y + POP_LINE * count;
-    int x = POP_CX - w / 2, y = POP_CY - h / 2;
-    sa_blit_rect(fb, frame[3], 0, POP_SRC_H - (h - POP_EDGE_H), POP_EDGE_W, h - POP_EDGE_H, x, y + POP_EDGE_H);
-    sa_blit_rect(fb, frame[2], POP_SRC_W - (w - POP_EDGE_W - 2), 0, w - POP_EDGE_W - 2, POP_EDGE_H, x + POP_EDGE_W, y + h - POP_EDGE_H);
-    sa_blit_rect(fb, frame[1], 0, 0, POP_EDGE_W, h - POP_EDGE_H, x + w - POP_EDGE_W, y);
-    sa_blit_rect(fb, frame[0], 0, 0, w - POP_EDGE_W, POP_EDGE_H, x, y);
-    for (int i = 0; i < count; i++) draw_line(fb, lines[i], x + POP_TEXT_X, y + POP_TEXT_Y + i * POP_LINE);
-    sa_font_set_spacing(1);
+    sa_popup_box(frame, fb, lines, count, POP_CX - w / 2, POP_CY - h / 2, w, h);
 }

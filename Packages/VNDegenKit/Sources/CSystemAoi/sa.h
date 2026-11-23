@@ -554,6 +554,7 @@ int sa_item_pick(const Table *items, const char *table, u32 roll);
 void sa_popup_load(Image **frame, Vfs *vfs);
 void sa_dim(u32 *fb);
 void sa_popup_draw(Image *const *frame, u32 *fb, const char *const *lines, int count);
+void sa_popup_box(Image *const *frame, u32 *fb, const char *const *lines, int count, int x, int y, int w, int h);
 
 typedef struct Town {
     Table build, mass, lvup;

@@ -63,13 +63,13 @@ typedef struct SaveSummary {
 
 #define SAVE_SLOTS 100
 #define SAVE_AUTOS 10
-#define SAVESCREEN_ART 47
+#define SAVESCREEN_ART 52
 
 typedef struct SaveScreen {
     Image *art[SAVESCREEN_ART];
     SaveSummary sum[SAVE_SLOTS + SAVE_AUTOS];
     bool saving;
-    int page, hover, confirm, latest, autoLatest, back;
+    int page, hover, confirm, ask, picked, latest, autoLatest, back;
     SaveSummary now;
 } SaveScreen;
 
@@ -207,6 +207,7 @@ bool sa_deploy_frame(SA *s, u32 ms);
 bool sa_save_write(SA *s, int slot, int count);
 void sa_save_current(SA *s, SaveSummary *out);
 bool sa_save_read(SA *s, int slot);
+void sa_save_delete(SA *s, int slot);
 bool sa_save_summary(SA *s, int slot, SaveSummary *out);
 void sa_load_into_town(SA *s, int slot);
 void sa_enter_loaded(SA *s);

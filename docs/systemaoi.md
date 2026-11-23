@@ -83,8 +83,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   game's hooks run on entering, on stepping onto floor objects and walls, before and after battles and on the way
   home. Battles start from the dungeon; a loss ends the expedition, and walking out the exit brings the finds home.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
-  newest autosave in its panel, the hovered slot's summary or the current game (現在) beside it, and the original's
-  YES and NO confirmation. Saves are the original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the
+  newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
+  count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
+  loading and deleting ask YES or NO, saving shows the original's comment box with OK and CANCEL. Saves are the original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the
   save folder, packed with its codec (`aoicmp.c`, `pcsave.c`): the original loads VNDegen's saves and VNDegen lists and
   loads the original's. Beside each, `vndegen/slotNN.sav` keeps what the original's image doesn't yet carry for
   VNDegen (other members, orders, the map memory); it is used only while its time matches the original file's. As in
@@ -102,6 +103,5 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
 - Saves: the original's image is written for Darkus alone; other members, the map memory, a floor's battle state and
   the event history after the town grid aren't mapped yet, so a save carrying them opens in the original without
-  them. The DATA LOG's slot details, DEL, DATA LOAD and DATA SAVE buttons and the save comment aren't built; choosing
-  a slot asks YES or NO at once. The Option screen and the Extra menu aren't built yet.
+  them. The save comment box takes no text; the comment stays empty. The Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.
