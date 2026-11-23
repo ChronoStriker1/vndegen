@@ -126,6 +126,16 @@ int main(int argc, char **argv) {
             vnsystemaoi_key(s, n, 0);
             alive = alive && run(s, 300);
         }
+        int dd;
+        if (sscanf(argv[a], "place=%d,%d,%d", &x, &y, &dd) == 3) {
+            sa_debug_place(s, x, y, dd);
+            alive = alive && run(s, 100);
+        }
+        if (!strcmp(argv[a], "finds")) {
+            int f[4];
+            sa_debug_finds(s, f);
+            printf("finds residents %d food %d money %d resources %d\n", f[0], f[1], f[2], f[3]);
+        }
         if (!strcmp(argv[a], "newgame")) {
             sa_debug_new_game(s);
             alive = alive && run(s, 100);

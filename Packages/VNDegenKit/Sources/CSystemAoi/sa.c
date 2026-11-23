@@ -422,6 +422,15 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         s->dirty = true;
         break;
     }
+    case 0x89:
+        if (s->exp.active) {
+            begin_transition(s, vm, in->count > 3 ? sa_vm_get(vm, code, &in->o[3]) : 10);
+            clear_text(s);
+            s->name[0] = 0;
+            sa_exp_draw_view(s, s->fb);
+            sa_show_frame_as_bg(s, s->fb, "*dungeon");
+        }
+        break;
     case 0x94:
         if (in->count >= 1) sa_party_add_item(&s->party, sa_vm_get(vm, code, &in->o[0]), in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
         break;
@@ -1353,4 +1362,11 @@ void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor) {
     if (dungeon < 0) sa_exp_force_battle(s);
     else if (dungeon > 0) sa_exp_enter(s, dungeon, floor);
     else sa_exp_open_select(s);
+}
+
+void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir) { sa_exp_debug_place((SA *)sa, x, y, dir); }
+
+void sa_debug_finds(VNSystemAoi *sa, int *out) {
+    SA *s = (SA *)sa;
+    for (int i = 0; i < 4; i++) out[i] = s->vm.c[0xd2 + i];
 }

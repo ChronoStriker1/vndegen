@@ -30,8 +30,12 @@ enum {
     PLATE_W = 404,
     PLATE_H = 54,
     PLATE_PITCH = 60,
-    AREA_X = 760,
-    BADGE_X = 354,
+    AREA_X = 765,
+    BADGE_DX = 14,
+    AREA_TEXT_Y = 16,
+    AREA_SIZE = 22,
+    AREA_SPACING = 4,
+    F_SEEN = 731,
     BADGE_DY = 12,
     BACK_X = 444,
     BACK_Y = 640,
@@ -44,9 +48,9 @@ enum {
     F_NAME = 4,
     F_MAP = 5,
     F_SET = 6,
-    F_MIN_STEPS = 19,
+    F_SPREAD = 12,
+    F_STEPS = 13,
     F_GROUPS = 31,
-    F_RATE = 32,
 };
 
 #define NO_EDGE 0xffffffffu
@@ -67,6 +71,8 @@ void sa_exp_init(SA *s) {
     e->areaPlate = sa_load_image(&s->vfs, "gat_a01.agf");
     e->back = sa_load_image(&s->vfs, "gat_c00.agf");
     e->badge = sa_load_image(&s->vfs, "gat_d01.agf");
+    e->seen = sa_load_image(&s->vfs, "gat_d02.agf");
+    e->platform = sa_load_image(&s->vfs, "m998bt1a.agf");
     e->hover = -1;
 }
 
@@ -79,6 +85,8 @@ void sa_exp_free(SA *s) {
     sa_image_free(e->areaPlate);
     sa_image_free(e->back);
     sa_image_free(e->badge);
+    sa_image_free(e->seen);
+    sa_image_free(e->platform);
     memset(e, 0, sizeof *e);
 }
 
@@ -121,18 +129,21 @@ static void draw_select(SA *s) {
     for (int i = 0; i < open_dungeons(s); i++) {
         int frame = e->picked == i + 1 ? 2 : e->hover == i + 1 ? 1 : 0;
         sa_blit_rect(fb, e->plate[i + 1], 0, frame * PLATE_H, PLATE_W, PLATE_H, PLATE_X, PLATE_Y + i * PLATE_PITCH);
-        if (!e->visited[i]) sa_blit_rect(fb, e->badge, 0, 0, e->badge ? e->badge->w : 0, 28, BADGE_X, PLATE_Y + i * PLATE_PITCH + BADGE_DY);
+        sa_blit(fb, s->vm.f[F_SEEN + i] ? e->seen : e->badge, PLATE_X + BADGE_DX, PLATE_Y + i * PLATE_PITCH + BADGE_DY);
     }
     if (e->picked)
         for (int i = 0; i < open_floors(s, e->picked); i++) {
             int y = PLATE_Y + i * PLATE_PITCH, frame = e->hover == HOVER_AREA + i + 1 ? 1 : 0;
             sa_blit_rect(fb, e->areaPlate, 0, frame * PLATE_H, PLATE_W, PLATE_H, AREA_X, y);
+            sa_blit(fb, e->seen, AREA_X + BADGE_DX, y + BADGE_DY);
             const char *name = text(&e->floors, floor_row(e, e->picked, i + 1), F_NAME);
-            int w = sa_text_width(name, -1, 22);
-            sa_text_draw(fb, SA_W, SA_H, name, -1, AREA_X + (PLATE_W - w) / 2, y + 15, 22, 0x503010, 0xffffff);
+            sa_font_set_spacing(AREA_SPACING);
+            int w = sa_text_width(name, -1, AREA_SIZE);
+            sa_text_draw(fb, SA_W, SA_H, name, -1, AREA_X + (PLATE_W - w) / 2, y + AREA_TEXT_Y, AREA_SIZE, 0xffffff, 0x0b0d0a);
+            sa_font_set_spacing(1);
         }
     sa_blit_rect(fb, e->back, 0, e->hover == HOVER_BACK ? BACK_H : 0, BACK_W, BACK_H, BACK_X, BACK_Y);
-    sa_party_draw_diorama(&s->party, fb, s->vm.c[C_RANK_MAX], NULL);
+    sa_party_draw_diorama(&s->party, fb, s->vm.c[C_RANK_MAX], e->platform);
 }
 
 static bool run_next_hook(SA *s) {
@@ -184,11 +195,15 @@ static void finish_after(SA *s) {
     }
 }
 
+void sa_exp_draw_view(SA *s, u32 *fb) {
+    sa_dungeon_draw(&s->dungeon, fb);
+    sa_dungeon_draw_hud(&s->dungeon, fb, &s->party, s->vm.c[C_RANK_MAX]);
+}
+
 static void run_hooks(SA *s, const int *hooks, int n, int after) {
     Expedition *e = &s->exp;
     if (s->mode == MODE_DUNGEON) {
-        sa_dungeon_draw(&s->dungeon, s->fb);
-        sa_dungeon_draw_hud(&s->dungeon, s->fb, &s->party, s->vm.c[C_RANK_MAX]);
+        sa_exp_draw_view(s, s->fb);
         sa_reset_scene(s);
         sa_show_frame_as_bg(s, s->fb, "*dungeon");
     }
@@ -208,6 +223,11 @@ static void sync_position(SA *s) {
     s->vm.c[C_EXP_X] = s->dungeon.x;
     s->vm.c[C_EXP_Y] = s->dungeon.y;
     s->vm.c[C_EXP_DIR] = s->dungeon.dir;
+}
+
+static void reset_countdown(SA *s) {
+    int steps = sa_table_int(&s->exp.floors, s->exp.row, F_STEPS), spread = sa_table_int(&s->exp.floors, s->exp.row, F_SPREAD);
+    s->exp.stepsLeft = steps - spread + (int)(sa_vm_random(&s->vm) % (u32)(2 * spread + 1));
 }
 
 void sa_exp_enter(SA *s, int dungeon, int floor) {
@@ -232,7 +252,7 @@ void sa_exp_enter(SA *s, int dungeon, int floor) {
     e->dungeon = dungeon;
     e->floor = floor;
     e->row = r;
-    e->sinceBattle = 0;
+    reset_countdown(s);
     s->vm.c[C_EXP_DUNGEON] = dungeon;
     s->vm.c[C_EXP_FLOOR] = floor;
     s->vm.c[C_EXP_DUNGEON_BGM] = dungeon;
@@ -268,7 +288,7 @@ static void start_battle(SA *s) {
         return;
     }
     sa_battle_set_names(&s->battle, text(&s->exp.dungeons, s->exp.dungeon - 1, 1), text(&s->exp.floors, s->exp.row, F_NAME));
-    s->exp.sinceBattle = 0;
+    reset_countdown(s);
     s->vm.c[C_EXP_RESULT] = 1;
     s->vm.c[C_EXP_GROUP] = sa_table_int(&s->battle.groups, s->battle.group, 0);
     static const int hooks[] = {HOOK_BATTLE_START};
@@ -317,9 +337,7 @@ static void after_move(SA *s, int r) {
     }
     if (r != DUN_MOVED) return;
     sync_position(s);
-    s->exp.sinceBattle++;
-    int rate = sa_table_int(&s->exp.floors, s->exp.row, F_RATE);
-    if (s->exp.sinceBattle >= sa_table_int(&s->exp.floors, s->exp.row, F_MIN_STEPS) && (int)(sa_vm_random(&s->vm) % 100) < rate) {
+    if (--s->exp.stepsLeft <= 0) {
         start_battle(s);
         return;
     }
@@ -349,7 +367,6 @@ bool sa_exp_frame(SA *s, u32 ms) {
                 s->mode = MODE_TOWN;
                 s->town.mapOnly = false;
             } else if (h >= HOVER_AREA) {
-                if (s->exp.picked) s->exp.visited[s->exp.picked - 1] = true;
                 sa_exp_enter(s, s->exp.picked, h - HOVER_AREA);
             } else if (h > 0)
                 s->exp.picked = h;
@@ -384,4 +401,15 @@ bool sa_exp_frame(SA *s, u32 ms) {
 
 void sa_exp_force_battle(SA *s) {
     if (s->mode == MODE_DUNGEON && s->exp.active) start_battle(s);
+}
+
+void sa_exp_debug_place(SA *s, int x, int y, int dir) {
+    if (!s->exp.active) return;
+    sa_dungeon_place(&s->dungeon, x, y, dir);
+    sync_position(s);
+    if (sa_dungeon_object(&s->dungeon) >= 0) {
+        static const int hooks[] = {HOOK_STEP};
+        run_hooks(s, hooks, 1, AFTER_WALK);
+    }
+    s->dirty = true;
 }

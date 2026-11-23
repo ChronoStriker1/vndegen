@@ -188,14 +188,18 @@ calls it is inferred from that and from play, and marked so.
 - **`8a`'s numbers** add to what the expedition has found; the loss hook passes their negatives, so a loss leaves
   nothing. Measured: the loss message reads 戦闘敗北した事により、遠征で得た物を全て失ってしまった。, then the turn
   ends with the income box.
+- **`89`** after an event's scenes fades back to the dungeon view (C070, C071, C072, fade 10).
 - **Coming home.** Inferred: walking into the floor's exit (wall 20), or 休憩, runs hook 17, adds the finds to the
   town and ends the turn.
-- **Encounters.** Inferred until measured: after at least `floor.obj` column 19 steps (3) since the last battle, each
-  step has column 32's chance (10%) of a battle with a group drawn from column 31 (千05 or 千06 on the first floor).
-  A PC run gave battles after 12 and about 15 steps.
-- **Dungeon select.** Measured: the hall `bg005a0`, a plate per dungeon (`gat_bNN`, normal, hover, chosen) from
-  (340, 40), the NEW badge `gat_d01` until it is visited, and 戻る (`gat_c00`) at (444, 640). Inferred: the floors'
-  plates (`gat_a01` with the floor's name) to the right at x 760, one row per floor.
+- **Encounters.** Measured: the number under the compass counts the expedition's steps, and battles came on steps
+  48, 56, 69 and 81 of one expedition (7 to 12 steps after the previous one; the count also rose by one over each
+  battle). Inferred: a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2), with a group drawn from
+  column 31 (千05 or 千06 on the first floor).
+- **Dungeon select.** Measured (99% of pixels exact): the hall `bg005a0` with the party on the `m998bt1a` platform,
+  a plate per dungeon (`gat_bNN`, normal, hover, chosen) from (340, 40), its badge at (354, 52) (`gat_d01` NEW until
+  F731 onwards is set by the setup hook, then `gat_d02`), and 戻る (`gat_c00`) at (444, 640). Choosing a dungeon
+  shows its floors' plates (`gat_a01`, with `gat_d02` and the floor's name in white, 22 pixels, centred 16 pixels
+  down) from (765, 40). Inferred: one row per floor reached; only the first is offered so far.
 - **Battles from the dungeon** use the dungeon's platforms (`mNNNbt1a` and `bt2a` to `bt2c`, NNN the dungeon less
   one) and the top bar names the dungeon and floor. The backdrop is the dungeon view; the original's seems to look
   further along, from a different camera.

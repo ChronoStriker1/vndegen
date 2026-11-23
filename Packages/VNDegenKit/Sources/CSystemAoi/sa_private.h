@@ -10,12 +10,11 @@
 typedef struct Expedition {
     bool active;
     int dungeon, floor, row;
-    int sinceBattle;
+    int stepsLeft;
     int hooks[EXP_HOOKS], hookCount, after;
     Table floors, dungeons;
-    Image *hall, *plate[12], *areaPlate, *back, *badge;
+    Image *hall, *plate[12], *areaPlate, *back, *badge, *seen, *platform;
     int hover, picked;
-    bool visited[16];
 } Expedition;
 #define MSG_LINES 4
 
@@ -116,6 +115,8 @@ void sa_exp_battle_over(SA *s, int result);
 void sa_exp_gain(SA *s, const int gain[4]);
 void sa_exp_enter(SA *s, int dungeon, int floor);
 void sa_exp_force_battle(SA *s);
+void sa_exp_draw_view(SA *s, u32 *fb);
+void sa_exp_debug_place(SA *s, int x, int y, int dir);
 void sa_reset_scene(SA *s);
 void sa_end_turn(SA *s);
 void sa_show_frame_as_bg(SA *s, const u32 *px, const char *name);
