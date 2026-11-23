@@ -162,7 +162,7 @@ static void draw_row(SA *s, u32 *fb, int i) {
     }
     stamp(m, t, sizeof t);
     text(fb, t, x + ROW_TEXT_X + 60, y + ROW_TEXT_Y, color);
-    snprintf(t, sizeof t, "%dターン", m->turn + 1);
+    snprintf(t, sizeof t, "%dターン", m->turn);
     right(fb, t, x + TURN_RIGHT, y + ROW_TEXT_Y, color);
     snprintf(t, sizeof t, "Lv %d", m->level);
     text(fb, t, x + LV_X, y + ROW_TEXT_Y, color);
@@ -192,7 +192,7 @@ static void draw_summary(u32 *fb, const SaveSummary *m, int slot, int x, int y, 
     localtime_r(&tt, &tm);
     snprintf(t, sizeof t, "%d月%d日 %02d:%02d", tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
     atext(fb, t, x, y + line, 0xffffff);
-    snprintf(t, sizeof t, "%dターン", m->turn + 1);
+    snprintf(t, sizeof t, "%dターン", m->turn);
     atext(fb, t, x, y + 2 * line, 0xffffff);
     atext(fb, m->place[0], x, y + 3 * line, 0xffffff);
     atext(fb, m->place[1], x, y + 4 * line, 0xffffff);
@@ -217,7 +217,7 @@ static void draw_detail(u32 *fb, const SaveSummary *m, const char *title) {
     }
     int x = DETAIL_X + DETAIL_INDENT;
     char t[128];
-    snprintf(t, sizeof t, "%dターン %s%s%s", m->turn + 1, m->place[0], m->place[1][0] ? " " : "", m->place[1]);
+    snprintf(t, sizeof t, "%dターン %s%s%s", m->turn, m->place[0], m->place[1][0] ? " " : "", m->place[1]);
     big(fb, t, x, DETAIL_Y + DETAIL_LINE);
     static const char *const labels[4] = {"住民", "食料", "資金", "資源"};
     for (int k = 0; k < 4; k++) {

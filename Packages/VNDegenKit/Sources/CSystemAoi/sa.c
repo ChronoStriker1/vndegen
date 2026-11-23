@@ -731,6 +731,7 @@ static void new_game(SA *s) {
     s->nextEntry = 0;
     sa_town_new_game(&s->town);
     s->vm.c[C_TOWN_STAGE] = s->town.stage;
+    s->vm.c[C_TURN] = 1;
     sa_party_new_game(&s->party, &s->vfs);
     s->inGame = true;
     sa_start_script(s, "init.box", 0);
@@ -752,7 +753,7 @@ void sa_end_turn(SA *s) {
         people += hi > lo ? lo + (int)(sa_vm_random(vm) % (u32)(hi - lo + 1)) : hi;
     }
     food -= vm->c[C_RESIDENTS] / 10;
-    sa_log(s, "turn %d ends: residents %d%+d, food %d%+d, money %d%+d, resources %d%+d", vm->c[C_TURN] + 1, vm->c[C_RESIDENTS], people,
+    sa_log(s, "turn %d ends: residents %d%+d, food %d%+d, money %d%+d, resources %d%+d", vm->c[C_TURN], vm->c[C_RESIDENTS], people,
            vm->c[C_FOOD], food, vm->c[C_MONEY], money, vm->c[C_RESOURCES], res);
     int before[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
     vm->c[C_RESIDENTS] += people;
