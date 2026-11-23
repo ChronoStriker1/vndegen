@@ -446,10 +446,12 @@ the same points (offsets in bytes, numbers little-endian):
   top right of a slot's details, and the autosave panel's count), C011 the play time in seconds. Loading and saving
   again changes only these.
 - **Map memory** from 6,172: 150 records of 532 bytes (fifteen dungeons of ten floors, ending where the members
-  begin): sixteen bytes, a word with the floor in its second byte and the dungeon in its third (00 01 01 00 for
-  千樹庭's first floor, 00 02 01 00 for its second), then four layers of 32 row bitmasks. Layers 0 and 3 were equal
-  in every save and 1 and 2 subsets of them; which layer is the visited cells and how a cell maps to a bit isn't
-  settled yet, so VNDegen neither reads nor writes it.
+  begin): four numbers (a 3 on 千樹庭's second floor; not understood, kept as read), a word with the floor in its
+  second byte and the dungeon in its third (00 01 01 00 for 千樹庭's first floor), then four layers of 32 words. Word
+  14 - x holds column x with bit y for row y (the `.amd` file's own order). Layer 0 is the visited cells and layer 3
+  a copy of it; layer 1 marks a step walked between a cell and the one below it, layer 2 between a cell and the one
+  west of it (cells next to each other but never walked between stay clear). Fitted on every save from Wine: all
+  set bits fall on open cells only with this mapping, and VNDegen's walking reproduces the layers.
 - **Other regions** not yet placed: 215,608 to 229,808 (only in dungeon autosaves; 544-byte records like the
   members' battle blocks, likely the floor's enemies), 993,208 to 997,999 (four 1,200-byte records starting -1, 1,
   -1), 1,012,652 on (event history), 1,035,056 to 1,066,684 (the backlog's text) and an ascending list of offsets at

@@ -78,6 +78,8 @@ void sa_exp_init(SA *s) {
     e->platform = sa_load_image(&s->vfs, "m998bt1a.agf");
     e->hover = -1;
     e->explored = sa_alloc(sizeof(*e->explored) * EXP_DUNGEONS);
+    e->passages = sa_alloc(sizeof(*e->passages) * EXP_DUNGEONS);
+    e->floorInfo = sa_alloc(sizeof(*e->floorInfo) * EXP_DUNGEONS);
 }
 
 void sa_exp_free(SA *s) {
@@ -92,6 +94,8 @@ void sa_exp_free(SA *s) {
     sa_image_free(e->seen);
     sa_image_free(e->platform);
     free(e->explored);
+    free(e->passages);
+    free(e->floorInfo);
     memset(e, 0, sizeof *e);
 }
 
@@ -250,7 +254,10 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
         return;
     }
     sa_dungeon_art(&s->dungeon, &s->vfs, platform);
-    if (e->explored && dungeon < EXP_DUNGEONS && floor < EXP_FLOORS) s->dungeon.visited = e->explored[dungeon][floor];
+    if (e->explored && dungeon < EXP_DUNGEONS && floor < EXP_FLOORS) {
+        s->dungeon.visited = e->explored[dungeon][floor];
+        s->dungeon.passage = e->passages[dungeon][floor];
+    }
     int x = 0, y = 0, dir = 2;
     sa_dungeon_find_entrance(&s->dungeon, &x, &y, &dir);
     sa_dungeon_place(&s->dungeon, x, y, dir);
@@ -279,6 +286,11 @@ void sa_exp_names(SA *s, int dungeon, int floor, const char **dungeonName, const
     int r = floor_row(e, dungeon, floor);
     *dungeonName = dungeon > 0 && dungeon <= e->dungeons.rows ? text(&e->dungeons, dungeon - 1, 1) : NULL;
     *floorName = r >= 0 ? text(&e->floors, r, F_NAME) : NULL;
+}
+
+const char *sa_exp_floor_map(SA *s, int dungeon, int floor) {
+    int r = floor_row(&s->exp, dungeon, floor);
+    return r >= 0 ? text(&s->exp.floors, r, F_MAP) : NULL;
 }
 
 void sa_exp_place_names(SA *s, const char **dungeon, const char **floor) {

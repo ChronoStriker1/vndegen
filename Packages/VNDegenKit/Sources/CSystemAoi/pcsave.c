@@ -20,6 +20,14 @@ enum {
     FORM_BOTTOM = 14,
     FORM_RESERVE = 23,
     RESERVE_TILES = 5,
+    MAPS_AT = 6172,
+    MAP_RECORD = 532,
+    MAP_HEAD = 16,
+    MAP_LAYERS = 20,
+    MAP_LAYER = 128,
+    MAP_DUNGEONS = 15,
+    MAP_FLOORS = 10,
+    MAP_SIDE = 15,
     MEMBER_LEVEL = 12,
     MEMBER_EXP = 16,
     MEMBER_HP = 28,
@@ -46,9 +54,12 @@ enum {
     PLACE_TOWN = 6,
     PLACE_DUNGEON = 62,
     SEED_VAR = 6,
+    DUNGEON_VAR = 70,
 };
 
 static int at(const u8 *img, size_t off) { return (int)rd32(img + off); }
+
+static void put(u8 *img, size_t off, int v) { wr32(img + off, (u32)v); }
 
 static Bench member_at(const u8 *img, int k) {
     size_t m = MEMBER_AT + (size_t)k * MEMBER_SIZE;
@@ -80,6 +91,51 @@ static void put_slot(SA *s, int slot, const Bench *b) {
     p->sp[slot] = b->sp;
     memcpy(p->trained[slot], b->trained, sizeof b->trained);
     p->equip[slot] = b->equip;
+}
+
+static size_t map_record(int dungeon, int floor) { return MAPS_AT + (size_t)((dungeon - 1) * MAP_FLOORS + floor - 1) * MAP_RECORD; }
+
+static void read_maps(SA *s, const u8 *img) {
+    if (!s->exp.explored) return;
+    for (int d = 1; d < EXP_DUNGEONS && d <= MAP_DUNGEONS; d++)
+        for (int f = 1; f < EXP_FLOORS && f <= MAP_FLOORS; f++) {
+            for (int i = 0; i < 4; i++) s->exp.floorInfo[d][f][i] = at(img, map_record(d, f) + (size_t)i * 4);
+            size_t o = map_record(d, f) + MAP_LAYERS;
+            for (int x = 0; x < MAP_SIDE; x++) {
+                size_t k = (size_t)(MAP_SIDE - 1 - x) * 4;
+                u32 bits = rd32(img + o + k), down = rd32(img + o + MAP_LAYER + k), west = rd32(img + o + 2 * MAP_LAYER + k);
+                for (int y = 0; y < MAP_SIDE; y++) {
+                    int c = y * MAP_SIDE + x;
+                    s->exp.explored[d][f][c] = bits >> y & 1;
+                    s->exp.passages[d][f][c] = (u8)((down >> y & 1 ? PASS_DOWN : 0) | (west >> y & 1 ? PASS_WEST : 0));
+                }
+            }
+        }
+}
+
+static void write_maps(SA *s, u8 *img) {
+    if (!s->exp.explored) return;
+    for (int d = 1; d < EXP_DUNGEONS && d <= MAP_DUNGEONS; d++)
+        for (int f = 1; f < EXP_FLOORS && f <= MAP_FLOORS; f++) {
+            const bool *v = s->exp.explored[d][f];
+            size_t o = map_record(d, f);
+            for (int i = 0; i < 4; i++) put(img, o + (size_t)i * 4, s->exp.floorInfo[d][f][i]);
+            bool any = false;
+            for (int c = 0; c < DUN_CELLS && !any; c++) any = v[c];
+            if (!any) continue;
+            put(img, o + MAP_HEAD, d << 16 | f << 8);
+            for (int x = 0; x < MAP_SIDE; x++)
+                for (int y = 0; y < MAP_SIDE; y++) {
+                    int c = y * MAP_SIDE + x;
+                    u8 pass = s->exp.passages[d][f][c];
+                    bool layer[4] = {v[c], pass & PASS_DOWN, pass & PASS_WEST, v[c]};
+                    for (int l = 0; l < 4; l++) {
+                        if (!layer[l]) continue;
+                        size_t w = o + MAP_LAYERS + (size_t)l * MAP_LAYER + (size_t)(MAP_SIDE - 1 - x) * 4;
+                        wr32(img + w, rd32(img + w) | 1u << y);
+                    }
+                }
+        }
 }
 
 static void read_members(SA *s, const u8 *img) {
@@ -130,6 +186,10 @@ bool sa_pcsave_read(SA *s, const char *path) {
     }
     s->town.stage = s->vm.c[C_TOWN_STAGE];
     read_members(s, img);
+    read_maps(s, img);
+    s->exp.active = s->vm.c[PLACE_VAR + 1] == 2;
+    s->exp.dungeon = s->vm.c[DUNGEON_VAR];
+    s->exp.floor = s->vm.c[DUNGEON_VAR + 1];
     Party *p = &s->party;
     p->items = 0;
     for (int i = 0; i < STOCK_ENTRIES; i++) {
@@ -142,8 +202,6 @@ bool sa_pcsave_read(SA *s, const char *path) {
     sa_log(s, "pc save %s: turn %d, read", path, s->vm.c[C_TURN]);
     return true;
 }
-
-static void put(u8 *img, size_t off, int v) { wr32(img + off, (u32)v); }
 
 static const struct {
     int off, value;
@@ -291,6 +349,7 @@ bool sa_pcsave_write(SA *s, const char *path) {
     }
     put(img, GRID_AFTER, 1);
     write_members(s, img);
+    write_maps(s, img);
     for (int i = 0; i < PC_C_VARS; i++) put(img, VM_AT + (size_t)i * 4, s->vm.c[i]);
     memcpy(img + VM_AT + PC_C_VARS * 4, s->vm.f, PC_F_VARS);
     for (size_t i = 0; i < sizeof engineVars / sizeof engineVars[0]; i++) put(img, VM_AT + (size_t)engineVars[i].off * 4, engineVars[i].value);

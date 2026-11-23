@@ -82,6 +82,8 @@ typedef struct Expedition {
     Image *hall, *plate[12], *areaPlate, *back, *badge, *seen, *platform;
     int hover, picked;
     bool (*explored)[EXP_FLOORS][DUN_CELLS];
+    u8 (*passages)[EXP_FLOORS][DUN_CELLS];
+    int (*floorInfo)[EXP_FLOORS][4];
 } Expedition;
 #define MSG_LINES 4
 
@@ -231,6 +233,7 @@ void sa_exp_gain(SA *s, const int gain[4]);
 void sa_exp_enter(SA *s, int dungeon, int floor);
 void sa_exp_resume(SA *s, int dungeon, int floor);
 void sa_exp_place_names(SA *s, const char **dungeon, const char **floor);
+const char *sa_exp_floor_map(SA *s, int dungeon, int floor);
 void sa_exp_names(SA *s, int dungeon, int floor, const char **dungeonName, const char **floorName);
 void sa_exp_force_battle(SA *s);
 int sa_exp_floors_reached(const SA *s, int dungeon);

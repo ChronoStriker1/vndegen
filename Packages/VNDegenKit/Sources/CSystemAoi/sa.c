@@ -735,6 +735,9 @@ static void new_game(SA *s) {
     sa_party_new_game(&s->party, &s->vfs);
     s->inGame = true;
     s->playMs = 0;
+    if (s->exp.explored) memset(s->exp.explored, 0, sizeof(*s->exp.explored) * EXP_DUNGEONS);
+    if (s->exp.passages) memset(s->exp.passages, 0, sizeof(*s->exp.passages) * EXP_DUNGEONS);
+    if (s->exp.floorInfo) memset(s->exp.floorInfo, 0, sizeof(*s->exp.floorInfo) * EXP_DUNGEONS);
     sa_start_script(s, "init.box", 0);
 }
 

@@ -139,7 +139,9 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     d->r3.fogColor = 0x1e2d28;
     d->r3.cull = -1;
     memset(d->own, 0, sizeof d->own);
+    memset(d->ownPassage, 0, sizeof d->ownPassage);
     d->visited = d->own;
+    d->passage = d->ownPassage;
     d->hover = -1;
     d->steps = 0;
     d->loaded = true;
@@ -243,9 +245,13 @@ static bool walk(Dungeon *d, int side) {
     }
     const i32 *there = cell_at(d, d->x + stepX[side], d->y + stepY[side]);
     if (!there || there[F_FLOOR] < 0) return false;
+    int from = d->y * MAP_W + d->x;
     d->x += stepX[side];
     d->y += stepY[side];
-    d->visited[d->y * MAP_W + d->x] = true;
+    int to = d->y * MAP_W + d->x;
+    d->visited[to] = true;
+    if (side == DIR_S || side == DIR_W) d->passage[from] |= side == DIR_S ? PASS_DOWN : PASS_WEST;
+    else d->passage[to] |= side == DIR_N ? PASS_DOWN : PASS_WEST;
     d->steps++;
     start_anim(d);
     return true;

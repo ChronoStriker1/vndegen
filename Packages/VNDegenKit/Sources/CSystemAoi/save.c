@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 3u
+#define SAVE_VERSION 4u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
@@ -161,6 +161,8 @@ static bool write_sidecar(SA *s, int slot, int count) {
         put_ints(&w, b->trained, 10);
     }
     put(&w, s->exp.explored, sizeof(*s->exp.explored) * EXP_DUNGEONS);
+    put(&w, s->exp.passages, sizeof(*s->exp.passages) * EXP_DUNGEONS);
+    for (int d = 0; d < EXP_DUNGEONS; d++) put_ints(&w, &s->exp.floorInfo[d][0][0], EXP_FLOORS * 4);
     const int exp[3] = {s->exp.active, s->exp.dungeon, s->exp.floor};
     put_ints(&w, exp, 3);
     char *dir = sa_fmt("%s/vndegen", s->saveDir);
@@ -275,6 +277,8 @@ static bool read_sidecar(SA *s, int slot) {
         get_ints(&r, b->trained, 10);
     }
     get(&r, s->exp.explored, sizeof(*s->exp.explored) * EXP_DUNGEONS);
+    get(&r, s->exp.passages, sizeof(*s->exp.passages) * EXP_DUNGEONS);
+    for (int d = 0; d < EXP_DUNGEONS; d++) get_ints(&r, &s->exp.floorInfo[d][0][0], EXP_FLOORS * 4);
     int exp[3];
     get_ints(&r, exp, 3);
     s->exp.active = exp[0] != 0;

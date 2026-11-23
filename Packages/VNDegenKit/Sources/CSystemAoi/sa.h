@@ -250,6 +250,9 @@ Image *sa_bmp_decode(const u8 *d, size_t n);
 
 #define DUN_CELLS 225
 #define DUN_FIELDS 26
+
+enum { DIR_N, DIR_E, DIR_S, DIR_W };
+enum { PASS_DOWN = 1, PASS_WEST = 2 };
 #define DUN_TEX 64
 
 struct Party;
@@ -269,6 +272,7 @@ typedef struct Dungeon {
     int texCount;
     i32 cell[DUN_CELLS][DUN_FIELDS];
     bool own[DUN_CELLS], *visited;
+    u8 ownPassage[DUN_CELLS], *passage;
     bool loaded;
     int x, y, dir;
     float fov, camX, camZ, yaw;
