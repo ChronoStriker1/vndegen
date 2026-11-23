@@ -415,6 +415,7 @@ typedef struct Order {
 
 #define PARTY_SLOTS 6
 #define PARTY_PRESETS 3
+#define PARTY_ITEMS 256
 #define PARTY_FRONT 3
 #define PARTY_CELL_MS 100
 
@@ -424,6 +425,7 @@ typedef struct Party {
     int hp[PARTY_SLOTS], mp[PARTY_SLOTS];
     int level[PARTY_SLOTS], exp[PARTY_SLOTS];
     Order order[PARTY_SLOTS], preset[PARTY_PRESETS][PARTY_SLOTS];
+    int itemId[PARTY_ITEMS], itemCount[PARTY_ITEMS], items;
     bool presetSaved[PARTY_PRESETS];
     Image *sprite[PARTY_SLOTS];
     int cells[PARTY_SLOTS];
@@ -437,6 +439,9 @@ void sa_party_new_game(Party *p, Vfs *vfs);
 void sa_party_place(Party *p, Vfs *vfs, int slot, int id);
 int sa_party_unit_row(const Party *p, int id);
 int sa_party_rank(const Party *p);
+void sa_party_add_item(Party *p, int id, int n);
+int sa_party_item_count(const Party *p, int id);
+int sa_party_count_units(const Party *p, const char *key);
 bool sa_party_tick(Party *p, u32 ms);
 void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platform);
 void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y);

@@ -135,6 +135,7 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
 }
 
 void sa_party_new_game(Party *p, Vfs *vfs) {
+    p->items = 0;
     for (int i = 0; i < PARTY_SLOTS; i++) sa_party_place(p, vfs, i, 0);
     sa_party_place(p, vfs, PARTY_FRONT + 1, 1);
 }
@@ -246,6 +247,33 @@ int sa_sprite_split(const Image *im, SpriteFrame *out, int max) {
             int right = i + 1 < count ? (runs[i][1] + runs[i + 1][0]) / 2 : im->w;
             out[n++] = (SpriteFrame){left, b * bh, right - left, bh};
         }
+    }
+    return n;
+}
+
+void sa_party_add_item(Party *p, int id, int n) {
+    for (int i = 0; i < p->items; i++)
+        if (p->itemId[i] == id) {
+            p->itemCount[i] += n;
+            return;
+        }
+    if (p->items == PARTY_ITEMS) return;
+    p->itemId[p->items] = id;
+    p->itemCount[p->items++] = n;
+}
+
+int sa_party_item_count(const Party *p, int id) {
+    for (int i = 0; i < p->items; i++)
+        if (p->itemId[i] == id) return p->itemCount[i];
+    return 0;
+}
+
+int sa_party_count_units(const Party *p, const char *key) {
+    int n = 0;
+    for (int s = 0; s < PARTY_SLOTS; s++) {
+        if (!p->unit[s]) continue;
+        int r = sa_party_unit_row(p, p->unit[s]);
+        if (!key || !*key || !strcmp(sa_table_text(&p->units, r, 1), key)) n++;
     }
     return n;
 }

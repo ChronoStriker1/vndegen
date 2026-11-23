@@ -422,6 +422,27 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         s->dirty = true;
         break;
     }
+    case 0x94:
+        if (in->count >= 1) sa_party_add_item(&s->party, sa_vm_get(vm, code, &in->o[0]), in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
+        break;
+    case 0x96:
+        if (in->count >= 2) sa_vm_set(vm, &in->o[0], sa_party_item_count(&s->party, sa_vm_get(vm, code, &in->o[1])));
+        break;
+    case 0xad:
+        if (in->count >= 1) {
+            char *k = in->count > 2 && in->o[2].kind == OPD_STR ? opd_str(code, in, 2) : NULL;
+            sa_vm_set(vm, &in->o[0], sa_party_count_units(&s->party, k));
+            free(k);
+        }
+        break;
+    case 0xde:
+        if (in->count >= 1) sa_vm_set(vm, &in->o[0], 0);
+        break;
+    case 0x01:
+    case 0xa1:
+    case 0xdf:
+    case 0xe1:
+        break;
     case 0xd7:
         if (in->count >= 5) {
             char *f = opd_str(code, in, 0);
