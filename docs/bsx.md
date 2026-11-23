@@ -210,8 +210,10 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   editor closes. Mesu Kyoushi 4's ahegao-off buttons (viewer and editor) are drawn but do nothing, and its steam
   setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own.
 - Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing.
-- Mesu Kyoushi 3's `sync` system command is logged and skipped; it comes right before a startled line and its effect
-  isn't known.
+- Mesu Kyoushi 3's `sync` system command (`37 sync 5`, three times in the script) is logged and skipped. Under Wine
+  the PC shows the speaker lines that follow it together, one row each with the name in a column of its own
+  (Tatsuya's 「Wha...!?」 over Touko's 「What...?!」) and one click for the group, which ends at the next narration line;
+  VNDegen shows them one at a time.
 - The full-screen, effect detail and auto-select options are stored as the PC stores them but do nothing; the BGM
   volume under a voice is stored and not applied.
 - Cut-in in the story hides the pictures the museum viewer's cut-in hides (`c`-tagged in `cg.dat`, or another
