@@ -610,12 +610,58 @@ static void draw_sample(AN *a) {
     an_text_draw(a, L->textX, L->row + L->pitch, part, L->size, 0xffffffffu, 0x90000000u, 0, L->pitch);
 }
 
+typedef struct FontListLayout {
+    int headX, headBase, headSize, rowX, rowBase, rowSize;
+    bool headFractional;
+    u32 color;
+} FontListLayout;
+
+static const FontListLayout FONT_LIST[GAME_COUNT] = {
+    [GAME_DDD] = {709, 120, 24, 719, 152, 20, false, 0xff222222u},
+    [GAME_MGSW] = {708, 120, 20, 718, 152, 18, true, 0xffffffffu},
+};
+enum { FONT_ROWS = 4, FONT_PITCH = 23, FONT_LIST_X = 708, FONT_LIST_Y = 134, FONT_LIST_W = 448, FONT_ARROW_X = 1190, FONT_UP_Y = 134, FONT_DOWN_Y = 188, FONT_ARROW_W = 40 };
+
+static void draw_fonts(AN *a, Image *b) {
+    const FontListLayout *L = &FONT_LIST[a->game];
+    for (int i = 0; i < FONT_ROWS && a->fontTop + i < a->fontCount; i++)
+        if (in_rect(a, FONT_LIST_X, FONT_LIST_Y + FONT_PITCH * i, FONT_LIST_W, FONT_PITCH))
+            an_gfx_blit(a->fb, a->W, a->H, b, 305, 711, FONT_LIST_W, FONT_PITCH, FONT_LIST_X, FONT_LIST_Y + FONT_PITCH * i, 255);
+    for (int k = 0; k < 2; k++) {
+        int y = k ? FONT_DOWN_Y : FONT_UP_Y;
+        bool lit = in_rect(a, FONT_ARROW_X, y, FONT_ARROW_W, FONT_ARROW_W);
+        an_gfx_blit(a->fb, a->W, a->H, b, 2 + 42 * k, lit ? 812 : 770, FONT_ARROW_W, FONT_ARROW_W, FONT_ARROW_X, y, 255);
+    }
+    an_ui_text_draw(a, L->headX, L->headBase, a->fontName, L->headSize, L->color, L->headFractional);
+    for (int i = 0; i < FONT_ROWS && a->fontTop + i < a->fontCount; i++)
+        an_ui_text_draw(a, L->rowX, L->rowBase + FONT_PITCH * i, a->fonts[a->fontTop + i], L->rowSize, L->color, true);
+}
+
+static bool fonts_input(AN *a) {
+    int maxTop = a->fontCount > FONT_ROWS ? a->fontCount - FONT_ROWS : 0;
+    if (in_rect(a, FONT_ARROW_X, FONT_UP_Y, FONT_ARROW_W, FONT_ARROW_W)) {
+        a->fontTop = clampi(a->fontTop - 1, 0, maxTop);
+        return true;
+    }
+    if (in_rect(a, FONT_ARROW_X, FONT_DOWN_Y, FONT_ARROW_W, FONT_ARROW_W)) {
+        a->fontTop = clampi(a->fontTop + 1, 0, maxTop);
+        return true;
+    }
+    for (int i = 0; i < FONT_ROWS && a->fontTop + i < a->fontCount; i++)
+        if (in_rect(a, FONT_LIST_X, FONT_LIST_Y + FONT_PITCH * i, FONT_LIST_W, FONT_PITCH)) {
+            an_text_set_font(a, a->fonts[a->fontTop + i]);
+            return true;
+        }
+    return false;
+}
+
 static void draw_settings(AN *a) {
     Image *panel = an_image_load(a, "spconfig");
     if (panel) an_gfx_blit(a->fb, a->W, a->H, panel, 0, 0, a->W, a->H, 0, 0, 255);
     draw_sample(a);
     Image *b = an_image_load(a, "spconfigButton");
     if (!b) return;
+    draw_fonts(a, b);
     for (int i = 0; i < 11; i++) {
         const Option *o = &OPTIONS[i];
         for (int k = 0; k < 2; k++) {
@@ -678,8 +724,14 @@ static void settings_input(AN *a) {
                 a->dragSlider = 10 + i;
                 return;
             }
+    if (a->wheel && in_rect(a, FONT_LIST_X, FONT_LIST_Y, FONT_ARROW_X + FONT_ARROW_W - FONT_LIST_X, FONT_PITCH * FONT_ROWS)) {
+        int maxTop = a->fontCount > FONT_ROWS ? a->fontCount - FONT_ROWS : 0;
+        a->fontTop = clampi(a->fontTop - a->wheel, 0, maxTop);
+        a->wheel = 0;
+    }
     if (!a->clicked) return;
     a->clicked = false;
+    if (fonts_input(a)) return;
     for (int i = 0; i < 11; i++)
         for (int k = 0; k < 2; k++) {
             Rect r;

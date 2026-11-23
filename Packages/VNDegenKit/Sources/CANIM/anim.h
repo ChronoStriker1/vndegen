@@ -252,6 +252,8 @@ typedef struct UILayout {
     int textSize, nameX, nameRow, textX, textRow, textRowNoName, linePitch, textW;
     int barX, barCount, barGap[3], barAction[11];
     int stripX, stripW, lockX, lockAX, lockAY, lockW, lockH;
+    int hangOpening;
+    bool fractional;
 } UILayout;
 
 struct AN {
@@ -335,7 +337,9 @@ struct AN {
     int slotX[AN_LAYERS], slotY[AN_LAYERS];
     struct Mixer *mix;
     struct Movie *movie;
-    Font *font;
+    Font *font, *uiFont;
+    char fontName[64], fonts[32][64];
+    int fontCount, fontTop;
 };
 
 bool an_vm_step(AN *a);
@@ -364,8 +368,11 @@ void an_gfx_blit_fit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, 
 
 bool an_text_init(AN *a);
 void an_text_free(AN *a);
+bool an_text_set_font(AN *a, const char *name);
+int an_ui_text_draw(AN *a, int x, int baseline, const char *s, int size, u32 color, bool fractional);
 int an_text_draw(AN *a, int x, int y, const char *s, int size, u32 color, u32 shadow, int maxWidth, int lineHeight);
 int an_text_width(AN *a, const char *s, int size);
+bool an_text_opens(const char *s);
 
 bool an_snd_init(AN *a);
 void an_snd_free(AN *a);

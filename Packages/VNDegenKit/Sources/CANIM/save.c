@@ -467,7 +467,7 @@ static const OptionByte OPTION_BYTES[GAME_COUNT][11] = {
         },
 };
 
-enum { SYS_VOLUME = 0x18, SYS_TEXT_SPEED = 0x27c, SYS_AUTO_SPEED = 0x280, SYS_OPACITY = 0x298, SYS_SETTINGS_END = 0x7e530 };
+enum { SYS_VOLUME = 0x18, SYS_TEXT_SPEED = 0x27c, SYS_AUTO_SPEED = 0x280, SYS_OPACITY = 0x298, SYS_FONT = 0x7e324, SYS_FONT_SIZE = 32, SYS_SETTINGS_END = 0x7e530 };
 static const u32 VOLUME_BYTES[5] = {0x18, 0x19, 0x1b, 0x1e, 0x1f};
 
 static void settings_read(AN *a) {
@@ -490,6 +490,11 @@ static void settings_read(AN *a) {
     a->windowOpacity = clampi((int)rd32(s + SYS_OPACITY) * 100 / 217, 0, 100);
     a->textSpeed = clampi((200 - (int)rd32(s + SYS_TEXT_SPEED)) * 100 / 172, 0, 100);
     a->autoSpeed = clampi((50 - (int)rd32(s + SYS_AUTO_SPEED)) * 100 / 43, 0, 100);
+    char name[SYS_FONT_SIZE + 1] = {0};
+    memcpy(name, s + SYS_FONT, SYS_FONT_SIZE);
+    char *utf = an_sjis_to_utf8(name);
+    snprintf(a->fontName, sizeof a->fontName, "%s", utf ? utf : "");
+    free(utf);
 }
 
 static void settings_write(AN *a) {
@@ -510,6 +515,12 @@ static void settings_write(AN *a) {
     wr32(s + SYS_OPACITY, (u32)(a->windowOpacity * 217 / 100));
     wr32(s + SYS_TEXT_SPEED, (u32)(200 - a->textSpeed * 172 / 100));
     wr32(s + SYS_AUTO_SPEED, (u32)(50 - a->autoSpeed * 43 / 100));
+    char *sjis = an_utf8_to_sjis(a->fontName);
+    if (sjis && strlen(sjis) < SYS_FONT_SIZE) {
+        memset(s + SYS_FONT, 0, SYS_FONT_SIZE);
+        memcpy(s + SYS_FONT, sjis, strlen(sjis));
+    }
+    free(sjis);
 }
 
 void an_system_load(AN *a) {

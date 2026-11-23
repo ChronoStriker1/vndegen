@@ -42,12 +42,21 @@ folder down.
   `7c` scales it, both over a time; `52` puts a new layer back at no offset and 100%. Magical Sword's opening pans from
   the goddess's legs to her face this way, and matches the PC frame for frame. Expressions are presets of E-mote variables in
   the define.
-- Text: Arial at 24 pixels (Liberation Sans or another metric match where Arial is missing), each glyph's advance
-  rounded up to a whole pixel as Windows lays it out, wrapped at 884 pixels from x 180 (the PC keeps an 878-pixel line
-  and wraps one of 891). Kanji and kana the font lacks come from the Japanese fallback (MS Gothic's substitute).
+- Text: the font the player picked in Settings, whose name the PC keeps in its system save (decoded, 32 bytes of
+  Shift-JIS at 0x7e324). With none stored, each exe's own default: MS Gothic in Double Date Dilemma and MS PMincho
+  in Magical Sword, drawn through their substitutes (Ume Gothic, Ume P Mincho, `docs/fonts.md`). The story, the backlog,
+  the save cards' comments, the Settings sample and the Scenes blurbs all use it, as on the PC. A size of n pixels
+  is the font's whole cell (ascent plus descent) at n × 2288 / 2048, as Windows sizes a font by its cell height for
+  Arial's metrics; the baseline is moved so a font's ascent sits where Arial's would. Double Date Dilemma: 24 pixels,
+  each advance rounded up to a whole pixel, wrapped at 884 pixels from x 180; with Ume Gothic its first 24 lines break
+  and end where the PC's do, to a pixel. Magical Sword: 21 pixels with unrounded advances from x 175, 42 pixels a line,
+  and a line opening with a quote or bracket hangs it 11 pixels to the left, its later lines staying at 175, as the PC
+  draws them; its lines within 2% of the PC's widths. Kanji and kana a font lacks come from MS Gothic's substitute.
+  Up to 0.59.6 both games drew Liberation Sans, matched to a Wine prefix with no Japanese fonts, where the PC falls
+  back to Arial; a Windows PC has MS Gothic and MS PMincho, and a prefix with the Ume fonts shows them.
 - Backlog: entries 46 pixels a line plus one blank line, the newest ending at y 666 and older ones above it, the line
-  on screen included. Magical Sword draws it at 20 pixels with unrounded advances, the speaker's line 41 pixels below
-  the name and indented 12 pixels; the scroll thumb's height is the share of entries shown.
+  on screen included. Magical Sword draws it at 21 pixels with unrounded advances, the speaker's line 42 pixels below
+  the name and indented 26 pixels, its opening bracket hung 11; the scroll thumb's height is the share of entries shown.
 - Pose animations: `b9 <id> <n>` and `b8 <id> <n>` start a block that runs beside the story up to its `c4`, while the
   script carries on after it: preset changes (`be`), moves relative to the last one (`bc`), scale (`c0`), sounds
   (`c3`) and waits (`43`), each on its own clock. `c2` sets a flag the main script reads (`L15`, the block finished),
@@ -141,10 +150,16 @@ character letter names (the last letter of a voice's name, the tag of a backgrou
 option at Double Date Dilemma's byte; its Voice Cut is Skip Voice. They're written when the player leaves either
 screen. Screen Mode isn't stored there, and VNDegen has no use for it.
 
+Font Settings lists the fonts VNDegen has substitutes for, by their Windows names (Arial, Times New Roman, Courier New
+and so on), where the PC lists the fonts installed on Windows. The box above the list shows the font in use, a pick
+changes the story's text at once, and the name is written to the system save at 0x7e324, as the PC writes it; a name
+the PC stored that VNDegen has no substitute for, such as a font only that PC had, stays stored and the text falls
+back to the game's default. The list scrolls with its arrows or the wheel, four rows at a time on screen.
+
 The info line at the top of both screens follows the PC, and keeps the last control's line when the pointer leaves it,
 as the PC does. Magical Sword's English patch redrew the info strip with one line per option, which the PC draws a
 little smaller than the strip. Settings' text box sample is typed at the chosen speed in the window colour at the chosen
-opacity: Magical Sword's comes from its define file (in Japanese, as on the PC, drawn with the Japanese fallback font),
+opacity: Magical Sword's comes from its define file (in Japanese, as on the PC),
 Double Date Dilemma's from its exe. The Shortcut Key List button shows the PC's list over the screen. The menu bar's
 lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the gauges when their options are on.
 
@@ -206,10 +221,7 @@ buttons have their own on and off lines.
 - The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't.
 - When a line hides one layer and shows another, the PC holds the old picture for about half a second and then
   crossfades over about 0.3 s; VNDegen swaps them at once (seen when the goddess returns after the skill list).
-- Settings' font list is empty and its choice does nothing, and the volume screen's Play and Allow Test
-  buttons are drawn but do nothing.
-- Double Date Dilemma's memory blurbs are drawn about 1.5% narrower than the PC's, so a line can break one word
-  earlier.
+- The volume screen's Play and Allow Test buttons are drawn but do nothing.
 - The goddess (Malg202) draws her lids too low: her eyes look half closed where the PC's are open, in the story and in
   the Sprites viewer. Her irises now stay inside the eye whites. She is on screen in the opening (`000-000`, `000-010`)
   and in `060-040`/`060-050`, plus the `Mem30` replay (Malg200, Malg203). Her eye motion's time follows
