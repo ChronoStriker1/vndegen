@@ -253,6 +253,8 @@ buttons have their own on and off lines.
 - Magical Sword: every screen is built to its own layout and checked against the PC. Its goddess, with three
   times the sprites of a Double Date Dilemma character, runs at 46 frames a second alone in the Debug Mac app and 26
   in the opening's 300% close-up (34 and 20 on the iPad simulator). A Release build on the iPad simulator updates the
-  screen about as often (32 and 20, counted from screen recordings), so the close-up isn't smooth there; a Release Mac
-  app hasn't been watched, since its library and input can't be set from a test run.
+  screen about as often (32 and 20, counted from screen recordings), so the close-up isn't smooth there. On the Mac mini
+  the close-up holds 25 frames a second in a Debug build and 24.7 in one built with Swift's optimizer (with the system
+  idle but for another thread's simulator, load 5 to 7); the runtime is built at -O2 and eluna in Rust's release mode in
+  every build, so a Release app draws it no faster. The rest of the opening holds 60.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.
