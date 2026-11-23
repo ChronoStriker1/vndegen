@@ -136,7 +136,8 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     d->r3.fogFar = 28;
     d->r3.fogColor = 0x1e2d28;
     d->r3.cull = -1;
-    memset(d->visited, 0, sizeof d->visited);
+    memset(d->own, 0, sizeof d->own);
+    d->visited = d->own;
     d->hover = -1;
     d->steps = 0;
     d->loaded = true;
@@ -193,7 +194,7 @@ void sa_dungeon_place(Dungeon *d, int x, int y, int dir) {
     d->camZ = d->toZ = -(float)y * CELL;
     d->yaw = d->toYaw = (float)d->dir * QUARTER;
     d->animDur = 0;
-    if (cell_at(d, x, y)) d->visited[y * MAP_W + x] = true;
+    if (cell_at(d, x, y) && d->visited) d->visited[y * MAP_W + x] = true;
 }
 
 bool sa_dungeon_find_entrance(const Dungeon *d, int *x, int *y, int *dir) {

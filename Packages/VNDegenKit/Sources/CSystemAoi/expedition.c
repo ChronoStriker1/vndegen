@@ -74,6 +74,7 @@ void sa_exp_init(SA *s) {
     e->seen = sa_load_image(&s->vfs, "gat_d02.agf");
     e->platform = sa_load_image(&s->vfs, "m998bt1a.agf");
     e->hover = -1;
+    e->explored = sa_alloc(sizeof(*e->explored) * EXP_DUNGEONS);
 }
 
 void sa_exp_free(SA *s) {
@@ -87,6 +88,7 @@ void sa_exp_free(SA *s) {
     sa_image_free(e->badge);
     sa_image_free(e->seen);
     sa_image_free(e->platform);
+    free(e->explored);
     memset(e, 0, sizeof *e);
 }
 
@@ -245,6 +247,7 @@ void sa_exp_enter(SA *s, int dungeon, int floor) {
         return;
     }
     sa_dungeon_art(&s->dungeon, &s->vfs, platform);
+    if (e->explored && dungeon < EXP_DUNGEONS && floor < EXP_FLOORS) s->dungeon.visited = e->explored[dungeon][floor];
     int x = 0, y = 0, dir = 2;
     sa_dungeon_find_entrance(&s->dungeon, &x, &y, &dir);
     sa_dungeon_place(&s->dungeon, x, y, dir);

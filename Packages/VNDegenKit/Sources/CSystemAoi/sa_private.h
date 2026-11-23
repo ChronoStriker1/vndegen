@@ -6,6 +6,8 @@
 
 #define STD_SLOTS 9
 #define EXP_HOOKS 8
+#define EXP_DUNGEONS 12
+#define EXP_FLOORS 24
 
 typedef struct Expedition {
     bool active;
@@ -15,6 +17,7 @@ typedef struct Expedition {
     Table floors, dungeons;
     Image *hall, *plate[12], *areaPlate, *back, *badge, *seen, *platform;
     int hover, picked;
+    bool (*explored)[EXP_FLOORS][DUN_CELLS];
 } Expedition;
 #define MSG_LINES 4
 

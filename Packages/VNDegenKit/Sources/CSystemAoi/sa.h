@@ -267,7 +267,7 @@ typedef struct Dungeon {
     char texName[DUN_TEX][48];
     int texCount;
     i32 cell[DUN_CELLS][DUN_FIELDS];
-    bool visited[DUN_CELLS];
+    bool own[DUN_CELLS], *visited;
     bool loaded;
     int x, y, dir;
     float fov, camX, camZ, yaw;

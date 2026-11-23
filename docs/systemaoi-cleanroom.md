@@ -176,6 +176,7 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   original shows 開ける at one); neither is handled by the floor hook, so both are the engine's. Open: what they do.
   `floor.obj` columns 35 onwards hold eight (table, minimum, maximum, count) entries such as 宝箱Ａ 1 3 1, whose names
   are `item.obj` column 30 tags; inferred to fill the crystals.
+- **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one.
 - **Start cell.** Open: the first expedition started beside the exit facing away from it, a later one two cells
   further in; VNDegen starts beside the exit.
 
