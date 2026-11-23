@@ -303,6 +303,14 @@ int main(int argc, char **argv) {
                 if (b->th.wait == W_CHOICE) alive = answer(n);
                 else alive = run(n, 16);
             }
+        } else if (!strncmp(c, "img:", 4)) {
+            Image *im = bx_image_load(b, c + 4);
+            if (im) {
+                char path[1024];
+                snprintf(path, sizeof path, "%s/img-%s.png", argv[3], c + 4);
+                write_png(path, im->px, im->w, im->h);
+                printf("img %s %dx%d at %d,%d\n", c + 4, im->w, im->h, im->x, im->y);
+            } else printf("img %s missing\n", c + 4);
         } else if (!strncmp(c, "shot:", 5)) {
             int w, h;
             const uint32_t *px = vnbsx_pixels(n, &w, &h);
