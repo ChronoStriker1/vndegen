@@ -188,8 +188,8 @@ button music obj\d004_000.bmp 754 502 9 5 5 help obj\d005_000.bmp 0 666 1 10 0 5
 button manual obj\d004_000.bmp 347 560 9 5 6 help obj\d005_000.bmp 0 666 1 10 0 6
 button config obj\d004_000.bmp 549 560 9 5 7 help obj\d005_000.bmp 0 666 1 10 0 7
 button quit obj\d004_000.bmp 754 560 9 5 8 help obj\d005_000.bmp 0 666 1 10 0 8
-button flowkey:BangaiFlow obj\d200_000.bmp 1164 440 1 5 0 help obj\d200_001.bmp 0 666 1 1 0 0
-button flowkey:ExFlow obj\d300_000.bmp 1164 532 1 5 0 help obj\d300_001.bmp 0 666 1 1 0 0
+button flowkey:ExFlow obj\d200_000.bmp 1164 440 1 5 0 help obj\d200_001.bmp 0 666 1 1 0 0
+button flowkey:BangaiFlow obj\d300_000.bmp 1164 532 1 5 0 help obj\d300_001.bmp 0 666 1 1 0 0
 button versioninfo obj\d008_000.bmp 1114 6 1 5 0 help obj\d008_001.bmp 0 666 1 1 0 0
 
 screen config
