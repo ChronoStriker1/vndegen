@@ -74,4 +74,3 @@ to one folder down. The PC version only runs after its own installer; VNDegen ne
 - Flow mode isn't there; this game leaves its menubar slot empty, so nothing reaches it.
 - The animated mouse cursors (`.ani`) aren't drawn, and the window size and full-screen settings do nothing.
 - Mask pictures (1006's second group of parameters) aren't drawn; the game doesn't appear to use them.
-- The backlog's line spacing is close to the PC's but not the same.

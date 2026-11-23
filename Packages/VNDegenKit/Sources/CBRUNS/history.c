@@ -2,7 +2,7 @@
 
 #define HIST_MAX 300
 #define LINE_H 36
-#define SEP_H 44
+#define SEP_H 38
 #define WRAP_W 860
 #define FONT 28
 
