@@ -141,6 +141,9 @@ int sa_utf8_put(char *out, u32 cp) {
 }
 
 char *sa_utf16_to_utf8(const u8 *p, int chars) {
+    int len = 0;
+    while (len < chars && rd16(p + len * 2)) len++;
+    chars = len;
     char *s = sa_alloc((size_t)chars * 4 + 1);
     int n = 0;
     for (int i = 0; i < chars; i++) {
