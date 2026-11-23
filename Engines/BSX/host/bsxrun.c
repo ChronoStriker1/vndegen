@@ -156,7 +156,15 @@ static int autoplay(VNBSX *n, int steps, int pace) {
     return alive;
 }
 
-static int skipplay(VNBSX *n, int steps, int pickIcons) {
+static bool close_up_shown(BX *b) {
+    for (int i = 0; i < BX_OBJS; i++) {
+        const Obj *o = &b->shown.obj[i];
+        if (o->used && o->kind == OK_CHAR && strlen(o->name) == 12 && (o->name[4] == 'u' || o->name[4] == 'U')) return true;
+    }
+    return false;
+}
+
+static int skipplay(VNBSX *n, int steps, int pickIcons, bool untilCloseUp) {
     BX *b = (BX *)n;
     int alive = 1;
     int nt[2] = {448, 528};
@@ -168,6 +176,11 @@ static int skipplay(VNBSX *n, int steps, int pickIcons) {
     const char *last = "";
     for (int j = 0; j < steps && alive; j++) {
         int x, y;
+        if (untilCloseUp && close_up_shown(b) && b->th.wait == W_TEXT) {
+            b->skipMode = false;
+            printf("close-up at step %d\n", j);
+            break;
+        }
         b->skipMode = true;
         const char *l = label_at(b, b->th.pc);
         if (strcmp(l, last)) {
@@ -247,9 +260,11 @@ int main(int argc, char **argv) {
             printf("load %d: %s\n", k, bx_load_slot(b, k) ? "ok" : "failed");
             alive = run(n, 100);
         } else if (sscanf(c, "skipplay:%d,%d", &k, &x) == 2) {
-            alive = skipplay(n, k, x);
+            alive = skipplay(n, k, x, false);
+        } else if (sscanf(c, "closeup:%d,%d", &k, &x) == 2) {
+            alive = skipplay(n, k, x, true);
         } else if (sscanf(c, "skipplay:%d", &k) == 1) {
-            alive = skipplay(n, k, 0);
+            alive = skipplay(n, k, 0, false);
         } else if (sscanf(c, "autoplay:%d,%d", &k, &x) == 2) {
             alive = autoplay(n, k, x);
         } else if (sscanf(c, "untilmsg:%d", &k) == 1) {
