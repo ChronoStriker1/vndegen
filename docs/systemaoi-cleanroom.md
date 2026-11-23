@@ -154,8 +154,8 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   `m000set` is 炎山洞's lava. Floor, ceiling and wall parts are drawn per cell; walls are modelled on the cell's +x
   side and turned onto each side.
 - **Map layout.** `mpDDFF.amd` stores its 15 by 15 cells column by column, mirrored: cell (x, y), with y growing
-  south, is record (14 − x) × 15 + y. The wall fields are 18 north, 9 east, 12 south and 15 west (0 a wall, 10 a door,
-  20 the exit), and the open-side mask's bits 1, 2, 4 and 8 are east, south, west and north. Measured: the start
+  south, is record (14 − x) × 15 + y. The wall fields are 18 north, 9 east, 12 south and 15 west (0 a wall, 10 a doorway
+  the party walks through, 20 the exit), and the open-side mask's bits 1, 2, 4 and 8 are east, south, west and north. Measured: the start
   (0, 0) has the exit to the north, and walking south gives a wall two cells on with an opening to the east, as the
   original shows.
 - **Camera.** `Cam.pvc`'s position and target (3.2 high, 4.6 behind the cell's centre, tilted down slightly), with
@@ -172,6 +172,10 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Action buttons.** Measured: standing on the exit cell facing the door shows 帰る (`dgn_g02`) at (1101, 498),
   above the pad; walking into the door does nothing. Inferred: floor part 100 (`f100`, stairs down) shows 下りる
   (`g01`) and 101 (`f101`, up) shows 上る (`g00`), going to the next or previous floor, arriving at its entrance.
+- **Floor objects seen on the first floor.** 100 is a door model standing in a dead end, 60 a yellow crystal (the
+  original shows 開ける at one); neither is handled by the floor hook, so both are the engine's. Open: what they do.
+  `floor.obj` columns 35 onwards hold eight (table, minimum, maximum, count) entries such as 宝箱Ａ 1 3 1, whose names
+  are `item.obj` column 30 tags; inferred to fill the crystals.
 - **Start cell.** Open: the first expedition started beside the exit facing away from it, a later one two cells
   further in; VNDegen starts beside the exit.
 

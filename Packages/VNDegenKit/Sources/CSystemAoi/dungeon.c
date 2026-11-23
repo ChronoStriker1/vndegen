@@ -13,6 +13,7 @@ enum {
     F_WALL_S = 12,
     F_WALL_W = 15,
     WALL_EXIT = 20,
+    WALL_DOORWAY = 10,
     VIEW_CELLS = 6,
     MOVE_MS = 133,
     DOOR_TURN_MS = 18000,
@@ -218,7 +219,10 @@ static void start_anim(Dungeon *d) {
     d->animDur = MOVE_MS;
 }
 
-static bool passable(const i32 *cell, int side) { return cell[wallField[side]] < 0 || cell[wallField[side] + 1] == 1; }
+static bool passable(const i32 *cell, int side) {
+    int w = cell[wallField[side]];
+    return w < 0 || w == WALL_DOORWAY || cell[wallField[side] + 1] == 1;
+}
 
 static bool walk(Dungeon *d, int side) {
     const i32 *here = cell_at(d, d->x, d->y);
@@ -455,10 +459,10 @@ static void draw_minimap(Dungeon *d, u32 *fb) {
                     int v = 60 + (int)(10 * (dx * dx + dy * dy) / 2);
                     fb[(size_t)(y0 + y) * SA_W + x0 + x] = rgb(v, v - 11, v - 11);
                 }
-            if (cell[F_WALL_N] >= 0 && cell[F_WALL_N] != WALL_EXIT) fill(fb, x0 + 2, y0 + 2, MINI_CELL - 2, MINI_WALL, wall);
-            if (cell[F_WALL_S] >= 0 && cell[F_WALL_S] != WALL_EXIT) fill(fb, x0 + 2, y0 + MINI_CELL - MINI_WALL, MINI_CELL - 2, MINI_WALL, wall);
-            if (cell[F_WALL_W] >= 0 && cell[F_WALL_W] != WALL_EXIT) fill(fb, x0 + 2, y0 + 2, MINI_WALL, MINI_CELL - 2, wall);
-            if (cell[F_WALL_E] >= 0 && cell[F_WALL_E] != WALL_EXIT) fill(fb, x0 + MINI_CELL - MINI_WALL, y0 + 2, MINI_WALL, MINI_CELL - 2, wall);
+            if (cell[F_WALL_N] >= 0 && cell[F_WALL_N] != WALL_EXIT && cell[F_WALL_N] != WALL_DOORWAY) fill(fb, x0 + 2, y0 + 2, MINI_CELL - 2, MINI_WALL, wall);
+            if (cell[F_WALL_S] >= 0 && cell[F_WALL_S] != WALL_EXIT && cell[F_WALL_S] != WALL_DOORWAY) fill(fb, x0 + 2, y0 + MINI_CELL - MINI_WALL, MINI_CELL - 2, MINI_WALL, wall);
+            if (cell[F_WALL_W] >= 0 && cell[F_WALL_W] != WALL_EXIT && cell[F_WALL_W] != WALL_DOORWAY) fill(fb, x0 + 2, y0 + 2, MINI_WALL, MINI_CELL - 2, wall);
+            if (cell[F_WALL_E] >= 0 && cell[F_WALL_E] != WALL_EXIT && cell[F_WALL_E] != WALL_DOORWAY) fill(fb, x0 + MINI_CELL - MINI_WALL, y0 + 2, MINI_WALL, MINI_CELL - 2, wall);
         }
     int cx = MINI_X + MINI_CELLS / 2 * MINI_CELL + MINI_CELL / 2, cy = MINI_Y + MINI_CELLS / 2 * MINI_CELL + MINI_CELL / 2;
     for (int t = 0; t < 10; t++)
