@@ -274,10 +274,16 @@ void sa_exp_enter(SA *s, int dungeon, int floor) { enter(s, dungeon, floor, true
 
 void sa_exp_resume(SA *s, int dungeon, int floor) { enter(s, dungeon, floor, false); }
 
-void sa_exp_place_names(SA *s, const char **dungeon, const char **floor) {
+void sa_exp_names(SA *s, int dungeon, int floor, const char **dungeonName, const char **floorName) {
     const Expedition *e = &s->exp;
-    *dungeon = e->active ? text(&e->dungeons, e->dungeon - 1, 1) : NULL;
-    *floor = e->active ? text(&e->floors, e->row, F_NAME) : NULL;
+    int r = floor_row(e, dungeon, floor);
+    *dungeonName = dungeon > 0 && dungeon <= e->dungeons.rows ? text(&e->dungeons, dungeon - 1, 1) : NULL;
+    *floorName = r >= 0 ? text(&e->floors, r, F_NAME) : NULL;
+}
+
+void sa_exp_place_names(SA *s, const char **dungeon, const char **floor) {
+    if (s->exp.active) sa_exp_names(s, s->exp.dungeon, s->exp.floor, dungeon, floor);
+    else *dungeon = *floor = NULL;
 }
 
 static void pick_group(SA *s, char *out, size_t size) {

@@ -57,6 +57,11 @@ static void get_ints(Reader *r, int *v, size_t count) {
 
 static char *slot_path(const SA *s, int slot) { return sa_fmt("%s/vndegen/slot%02d.sav", s->saveDir, slot); }
 
+char *sa_pcsave_path(const SA *s, int slot) {
+    if (slot >= SAVE_SLOTS) return sa_fmt("%s/Bunny3.sav/Bunny3A%d.dat", s->saveDir, slot - SAVE_SLOTS);
+    return sa_fmt("%s/Bunny3.sav/Bunny3%02d.dat", s->saveDir, slot);
+}
+
 static void copy_name(char *out, const char *name) { snprintf(out, 48, "%s", name ? name : ""); }
 
 void sa_save_current(SA *s, SaveSummary *out) {
@@ -77,6 +82,7 @@ void sa_save_current(SA *s, SaveSummary *out) {
 static void write_summary(Writer *w, SA *s, int count) {
     SaveSummary m;
     sa_save_current(s, &m);
+    m.time = (u32)s->vm.c[2];
     put32(w, m.time);
     put32(w, (u32)m.turn);
     put_ints(w, m.town, 4);
@@ -97,7 +103,23 @@ static void read_summary(Reader *r, SaveSummary *out) {
     out->place[0][47] = out->place[1][47] = out->weapon[47] = 0;
 }
 
+static bool write_sidecar(SA *s, int slot, int count);
+
 bool sa_save_write(SA *s, int slot, int count) {
+    u32 now = (u32)time(NULL);
+    s->vm.c[2] = s->vm.c[13] = (int)now;
+    s->vm.c[3] = count;
+    s->vm.c[11] = (int)(s->playMs / 1000);
+    char *dir = sa_fmt("%s/Bunny3.sav", s->saveDir);
+    sa_mkdirs(dir);
+    free(dir);
+    char *path = sa_pcsave_path(s, slot);
+    bool ok = sa_pcsave_write(s, path);
+    free(path);
+    return ok && write_sidecar(s, slot, count);
+}
+
+static bool write_sidecar(SA *s, int slot, int count) {
     Writer w = {0};
     put32(&w, SAVE_MAGIC);
     put32(&w, SAVE_VERSION);
@@ -155,23 +177,41 @@ bool sa_save_write(SA *s, int slot, int count) {
 }
 
 bool sa_save_summary(SA *s, int slot, SaveSummary *out) {
-    memset(out, 0, sizeof *out);
+    char *path = sa_pcsave_path(s, slot);
+    bool ok = sa_pcsave_summary(s, path, out);
+    free(path);
+    return ok;
+}
+
+static u32 sidecar_time(SA *s, int slot) {
     char *path = slot_path(s, slot);
     size_t n;
     u8 *d = sa_read_file(path, &n);
     free(path);
-    if (!d) return false;
+    if (!d) return 0;
     Reader r = {d, n, 0, false};
-    bool ok = get32(&r) == SAVE_MAGIC && get32(&r) == SAVE_VERSION;
-    if (ok) {
-        read_summary(&r, out);
-        out->used = !r.bad;
-    }
+    u32 when = get32(&r) == SAVE_MAGIC && get32(&r) == SAVE_VERSION ? get32(&r) : 0;
     free(d);
-    return out->used;
+    return r.bad ? 0 : when;
 }
 
+static bool read_sidecar(SA *s, int slot);
+
 bool sa_save_read(SA *s, int slot) {
+    SaveSummary pc;
+    if (!sa_save_summary(s, slot, &pc)) return false;
+    bool ok;
+    if (sidecar_time(s, slot) == pc.time) ok = read_sidecar(s, slot);
+    else {
+        char *path = sa_pcsave_path(s, slot);
+        ok = sa_pcsave_read(s, path);
+        free(path);
+    }
+    if (ok) s->playMs = (u32)s->vm.c[11] * 1000;
+    return ok;
+}
+
+static bool read_sidecar(SA *s, int slot) {
     char *path = slot_path(s, slot);
     size_t n;
     u8 *d = sa_read_file(path, &n);

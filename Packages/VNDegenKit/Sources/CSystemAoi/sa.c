@@ -734,6 +734,7 @@ static void new_game(SA *s) {
     s->vm.c[C_TURN] = 1;
     sa_party_new_game(&s->party, &s->vfs);
     s->inGame = true;
+    s->playMs = 0;
     sa_start_script(s, "init.box", 0);
 }
 
@@ -1055,6 +1056,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     SA *s = (SA *)sa;
     if (s->quit) return false;
     if (s->paused) return true;
+    if (s->inGame) s->playMs += elapsedMs;
     if (s->movie) {
         if (s->clicked) {
             s->clicked = false;
@@ -1571,6 +1573,8 @@ void sa_debug_pcload(VNSystemAoi *sa, const char *path) {
     if (!s->inGame) sa_party_new_game(&s->party, &s->vfs);
     if (sa_pcsave_read(s, path)) sa_enter_loaded(s);
 }
+
+void sa_debug_pcsave(VNSystemAoi *sa, const char *path) { sa_pcsave_write((SA *)sa, path); }
 
 void sa_debug_save(VNSystemAoi *sa, int slot, bool load) {
     SA *s = (SA *)sa;

@@ -84,12 +84,12 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   home. Battles start from the dungeon; a loss ends the expedition, and walking out the exit brings the finds home.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel, the hovered slot's summary or the current game (現在) beside it, and the original's
-  YES and NO confirmation. A save holds the whole runtime state (variables, town, party, reserve, items, orders, the
-  explored maps and the expedition) in VNDegen's own format, `vndegen/slotNN.sav` in the save folder. As in the
-  original, the game autosaves at the start of each turn and on entering each dungeon floor, through ten slots in
-  turn; a dungeon autosave loads back onto its floor, any other save into the town. The original's own saves load
-  too (`pcsave.c`, through the codec in `aoicmp.c`): the variables, the town, Darkus and the equipment; other party
-  members and the map memory not yet.
+  YES and NO confirmation. Saves are the original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the
+  save folder, packed with its codec (`aoicmp.c`, `pcsave.c`): the original loads VNDegen's saves and VNDegen lists and
+  loads the original's. Beside each, `vndegen/slotNN.sav` keeps what the original's image doesn't yet carry for
+  VNDegen (other members, orders, the map memory); it is used only while its time matches the original file's. As in
+  the original, the game autosaves at the start of each turn and on entering each dungeon floor, through ten slots in
+  turn; a dungeon autosave loads back onto its floor, any other save into the town.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
   FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
 
@@ -100,6 +100,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
-- Saves are VNDegen's own format; reading and writing the original's `Bunny3.sav` files isn't built yet. The
-  summary of a hovered slot uses the 現在 layout, which the original wasn't seen to show for a filled slot. The Option screen and the Extra menu aren't built yet.
+- Saves: the original's image is written for Darkus alone; other members, the map memory, a floor's battle state and
+  the event history after the town grid aren't mapped yet, so a save carrying them opens in the original without
+  them. The DATA LOG's slot details, DEL, DATA LOAD and DATA SAVE buttons and the save comment aren't built; choosing
+  a slot asks YES or NO at once. The Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.

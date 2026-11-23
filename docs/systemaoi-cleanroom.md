@@ -420,9 +420,10 @@ the same points (offsets in bytes, numbers little-endian):
   resources; C070 and C071 the dungeon and floor; C073 to C075 the position. At turn 2 the flags match VNDegen's except
   F000, F001, F021 and F924, which the original sets itself. The original also keeps numbers VNDegen doesn't yet:
   C000 (2^31 - 1), C002 to C013, C190 to C194 (-1), C209, C220 to C262, C393 and C400 to C409.
-- **Town grid** at 1,010,852: 90 cells of five 32-bit numbers. A built cell holds the facility type (100 the 魔王亭,
-  108 a field), a flag (1 the turn it was built), the level, a counter that grows each turn (4, 9 and 44 at turns 1, 2
-  and 9) and 0. An empty cell holds 0, -1, 0, 0 and the cell's state (-1, 0 or 1).
+- **Town grid** at 1,010,848: 90 cells of five 32-bit numbers: the cell's state (0 when `TownMass.obj` opens it at
+  the town's stage or lower, else -1), the facility type (100 the 魔王亭, 108 a field; 0 empty), a flag (1 the turn a
+  facility was built, -1 when empty), the level, and a counter that grows each turn (4, 9 and 44 at turns 1, 2 and 9).
+  The number after the grid is 1. From 1,012,652 come script names in UTF-16 with numbers, likely the events seen.
 - **Equipment** at 1,004,728: (item, free, in use) triples, as the 装備 screen shows them (ダークスの剣 0/1 while
   Darkus wields it). Equipping 名剣ルージュ instead moved the counts, changed Darkus's item at 87,220 from 100 to 104,
   and his bonus at 86,716 (the second stat block's eleventh number) from 20 to 7, the items' 斬補正.
@@ -440,3 +441,13 @@ the same points (offsets in bytes, numbers little-endian):
 - **Other regions** not yet placed: 6,189 to 7,136 (only in dungeon autosaves; 128-byte rows, likely the floor's map),
   215,608 to 229,808 (544-byte records like the party's), 993,208 to 998,847, 1,035,056 to 1,066,684 and an ascending
   list of offsets at 1,115,868, likely the backlog.
+- **Engine numbers.** C000 is always 2^31 - 1, C007 and C008 100, C036 and C037 1, C190 to C194 -1. C004 and C005
+  are 6 and 1 in the town and 62 and 2 in a dungeon; the slot details read the place from them and an image without
+  them opens a story scene instead of the town. C006 changes each turn, likely the random seed. The original
+  recomputes C209, C220 to C262 and C393 to C409 on loading (the town window shows the right numbers without them).
+  C003 counts manual saves and autosaves separately across the game.
+- **Writing.** VNDegen writes the image from its state: the scene-state pattern, the -1 run at 1,008,208, equipment,
+  the grid, Darkus's records (stat blocks from `unit.obj` columns 23 to 32 plus training, 必殺耐性 and 異常耐性 from
+  column 33, the skills from columns 41 on), the variables and the engine numbers. At turn 2 the party and scene
+  regions come out byte for byte as the original's; the original loads the file into the same town. Inferred: the
+  three 2s after the resistances, and which bonus slots follow 斬補正 (打, 射, 魔).

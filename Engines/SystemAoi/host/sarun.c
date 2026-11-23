@@ -133,6 +133,7 @@ int main(int argc, char **argv) {
         }
         if (!strncmp(argv[a], "join=", 5)) sa_debug_join(s, argv[a] + 5);
         if (sscanf(argv[a], "save=%d", &n) == 1) sa_debug_save(s, n, false);
+        if (!strncmp(argv[a], "pcsave=", 7)) sa_debug_pcsave(s, argv[a] + 7);
         if (!strncmp(argv[a], "pcload=", 7)) {
             sa_debug_pcload(s, argv[a] + 7);
             alive = alive && run(s, 100);

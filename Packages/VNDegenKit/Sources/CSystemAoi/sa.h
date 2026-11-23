@@ -546,6 +546,7 @@ void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value);
 void sa_debug_join(VNSystemAoi *sa, const char *key);
 void sa_debug_save(VNSystemAoi *sa, int slot, bool load);
 void sa_debug_pcload(VNSystemAoi *sa, const char *path);
+void sa_debug_pcsave(VNSystemAoi *sa, const char *path);
 void sa_debug_finds(VNSystemAoi *sa, int *out);
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
 int sa_item_pick(const Table *items, const char *table, u32 roll);

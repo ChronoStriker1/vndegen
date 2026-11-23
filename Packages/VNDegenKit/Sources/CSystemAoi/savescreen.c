@@ -274,7 +274,10 @@ static void confirm(SA *s) {
     int slot = v->confirm;
     v->confirm = -1;
     if (v->saving) {
-        sa_save_write(s, slot, 0);
+        int count = 0;
+        for (int i = 0; i < SAVE_SLOTS; i++)
+            if (v->sum[i].used && v->sum[i].count > count) count = v->sum[i].count;
+        sa_save_write(s, slot, count + 1);
         refresh(s);
         return;
     }
