@@ -265,6 +265,7 @@ void sa_exp_enter(SA *s, int dungeon, int floor) {
     sync_position(s);
     sa_log(s, "expedition: %s %s", text(&e->dungeons, dungeon - 1, 1), text(&e->floors, r, F_NAME));
     s->mode = MODE_DUNGEON;
+    sa_autosave(s);
     static const int hooks[] = {HOOK_SETUP, HOOK_DUNGEON, HOOK_FLOOR};
     run_hooks(s, hooks, 3, AFTER_WALK);
 }

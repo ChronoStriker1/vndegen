@@ -132,6 +132,11 @@ int main(int argc, char **argv) {
             alive = alive && run(s, 100);
         }
         if (!strncmp(argv[a], "join=", 5)) sa_debug_join(s, argv[a] + 5);
+        if (sscanf(argv[a], "save=%d", &n) == 1) sa_debug_save(s, n, false);
+        if (sscanf(argv[a], "load=%d", &n) == 1) {
+            sa_debug_save(s, n, true);
+            alive = alive && run(s, 100);
+        }
         if (sscanf(argv[a], "setf=%d,%d", &x, &y) == 2) sa_debug_set(s, true, x, y);
         if (sscanf(argv[a], "setc=%d,%d", &x, &y) == 2) sa_debug_set(s, false, x, y);
         if (sscanf(argv[a], "bench=%d", &n) == 1) printf("dungeon frame %.2f ms\n", sa_debug_bench(s, n));

@@ -855,6 +855,10 @@ static void town_action(SA *s, int action) {
     case TOWN_BTN_HIDE:
         s->town.hidden = !s->town.hidden;
         break;
+    case TOWN_BTN_SAVE:
+    case TOWN_BTN_LOAD:
+        sa_savescreen_open(s, action == TOWN_BTN_SAVE);
+        break;
     case TOWN_NONE:
         if (s->town.hidden) s->town.hidden = false;
         break;
@@ -877,6 +881,9 @@ static void title_pick(SA *s, int item) {
         break;
     case TITLE_END:
         s->quit = true;
+        break;
+    case TITLE_LOAD:
+        sa_savescreen_open(s, false);
         break;
     default:
         sa_log(s, "title item %d not built yet", item);
@@ -972,6 +979,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     sa_card_init(&s->card, &s->vfs);
     sa_train_init(&s->train, &s->vfs);
     sa_deploy_init(&s->deploy, &s->vfs);
+    sa_savescreen_init(&s->saves, &s->vfs);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
@@ -1024,6 +1032,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_card_free(&s->card);
     sa_train_free(&s->train);
     sa_deploy_free(&s->deploy);
+    sa_savescreen_free(&s->saves);
     sa_dungeon_free(&s->dungeon);
     r3_free(&s->dungeon.r3);
     picture_clear(&s->face);
@@ -1086,6 +1095,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_shop_frame(s)) return true;
     if (sa_train_frame(s)) return true;
     if (sa_deploy_frame(s, elapsedMs)) return true;
+    if (sa_savescreen_frame(s)) return true;
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
         if (sa_battle_hover(&s->battle, s->mouseX, s->mouseY)) s->dirty = true;
@@ -1145,7 +1155,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             s->serial++;
             s->dirty = false;
         }
-        if (s->mode == MODE_TOWN) return true;
+        if (s->mode == MODE_TOWN || s->mode == MODE_SAVES) return true;
     }
     dialog_input(s, elapsedMs);
     if (s->total && s->shown < s->total) {
@@ -1528,4 +1538,27 @@ void sa_debug_join(VNSystemAoi *sa, const char *key) {
     SA *s = (SA *)sa;
     sa_party_join(&s->party, &s->vfs, key);
     s->dirty = true;
+}
+
+void sa_load_into_town(SA *s, int slot) {
+    if (!s->inGame) sa_party_new_game(&s->party, &s->vfs);
+    if (!sa_save_read(s, slot)) return;
+    sa_reset_scene(s);
+    s->inGame = true;
+    s->exp.active = false;
+    s->turnPending = false;
+    s->dialog.open = false;
+    s->mode = MODE_TOWN;
+    s->town.mapOnly = false;
+    s->town.hover = -1;
+    s->dirty = true;
+}
+
+void sa_debug_save(VNSystemAoi *sa, int slot, bool load) {
+    SA *s = (SA *)sa;
+    if (load) {
+        if (s->movie) movie_stop(s);
+        sa_load_into_town(s, slot);
+    } else
+        sa_save_write(s, slot);
 }

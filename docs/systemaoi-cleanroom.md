@@ -342,3 +342,16 @@ calls it is inferred from that and from play, and marked so.
 - **Placing.** Inferred (the original didn't respond to clicks or a drag with Darkus alone): choose a member (tile
   or row), then a tile: two main tiles swap, a reserve tile benches the member (one must stay), and a reserve
   member goes to a main tile when the party's 格 stays within the limit. 解任 and 編成 aren't built.
+
+## Saves
+
+- **DATA LOG screen.** Measured against the original's load screen: the background `sav_a00`/`sav_a01`, the autosave
+  panel `sav_a06` at (35, 10) and the summary panel `sav_a07` at (46, 376); the page tabs `sav_b00` to `b09` (load)
+  and `sav_d00` to `d09` (save) from (288, 376), 80 apart; 戻る `sav_a05` at (1094, 376); the slot rows `sav_c00` to
+  `c09` and `sav_e00` to `e09` (600 by 50) at x 35 and 645 from y 437, 55 apart. Choosing a slot halves the screen and
+  asks with YES `pop_b00` at (440, 382) and NO `pop_b01` at (640, 382).
+- **Autosaves.** Measured: the original writes `Bunny3A0.dat` to `A9.dat` in turn, each when a dungeon is entered.
+- **The original's files.** Measured from saves written under Wine: a header of five 32-bit numbers (the unpacked
+  size, 1,128,076 for a save and 30,784 for the options; the file size; the unpacked size again; 0; the packed size),
+  a tag byte (0x82 for saves, 0x81 for the options), a 256-entry table of byte frequencies, and an entropy-coded body.
+  The coder isn't worked out yet, so VNDegen writes its own format for now.

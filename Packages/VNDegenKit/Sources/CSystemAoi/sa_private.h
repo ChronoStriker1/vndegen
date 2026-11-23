@@ -54,6 +54,23 @@ typedef struct Deploy {
     int hover, picked;
 } Deploy;
 
+typedef struct SaveSummary {
+    bool used;
+    u32 time;
+    int turn, town[4], level;
+} SaveSummary;
+
+#define SAVE_SLOTS 100
+#define SAVE_AUTOS 10
+#define SAVESCREEN_ART 47
+
+typedef struct SaveScreen {
+    Image *art[SAVESCREEN_ART];
+    SaveSummary sum[SAVE_SLOTS + SAVE_AUTOS];
+    bool saving;
+    int page, hover, confirm, latest, autoLatest, back;
+} SaveScreen;
+
 typedef struct Expedition {
     bool active;
     int dungeon, floor, row;
@@ -67,7 +84,7 @@ typedef struct Expedition {
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -137,6 +154,7 @@ struct SA {
     Card card;
     Train train;
     Deploy deploy;
+    SaveScreen saves;
     bool turnPending;
     bool inGame;
     int afterScript;
@@ -183,6 +201,15 @@ void sa_deploy_init(Deploy *d, Vfs *vfs);
 void sa_deploy_free(Deploy *d);
 void sa_deploy_open(SA *s);
 bool sa_deploy_frame(SA *s, u32 ms);
+bool sa_save_write(SA *s, int slot);
+bool sa_save_read(SA *s, int slot);
+bool sa_save_summary(SA *s, int slot, SaveSummary *out);
+void sa_load_into_town(SA *s, int slot);
+void sa_savescreen_init(SaveScreen *v, Vfs *vfs);
+void sa_savescreen_free(SaveScreen *v);
+void sa_savescreen_open(SA *s, bool saving);
+bool sa_savescreen_frame(SA *s);
+void sa_autosave(SA *s);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);
 void sa_exp_open_select(SA *s);
