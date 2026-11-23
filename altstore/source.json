@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.59.15",
+          "buildVersion": "3247",
+          "date": "2026-11-23T21:25:52Z",
+          "localizedDescription": "Web-based games ask before a link opens your browser, and title links that stopped some RPG Maker MZ games with an error now work.\n\n## Downloads\n\n- `VNDegen-0.59.15-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.59.15.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.59.15-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Added\n\n- **BISHOP BSX:** Mesu Kyoushi 3 and 4's free-sight meter. On the dress screen, FACE, BUST and HIP pick a fixed view of close-ups, and dragging the knob or clicking the meter sets your own. The view stays on later lines and is kept in saves, so it moves with the PC both ways.\n\n## Fixed\n\n- **Web runtime:** games that run in the web view, such as RPG Maker MV and MZ and TyranoScript, ask before a link opens your browser or mail app, with Cancel as the default (#196).\n- **RPG Maker MV and MZ:** title commands that open a game's web page, such as Zombies & Utopia's Support Us, ask before opening your browser instead of stopping the game with \"Cannot find module 'child_process'\" (#197). A game can't run any other program.\n\n## What wasn't tested\n\n- No physical device was used. These were checked in the Linux test build, the Mac app and an iPad simulator, on Zombies & Utopia.\n- Succubus x Saint's Home Page command uses the same path and was checked only in tests.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.59.15/VNDegen-0.59.15.ipa",
+          "size": 132402251,
+          "sha256": "f435f6c033b316dd1d3746ef5c2858d290a0cd5c0726d00a3ed7ec617ebd4762",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.59.14",
           "buildVersion": "3242",
           "date": "2026-11-23T21:07:02Z",
