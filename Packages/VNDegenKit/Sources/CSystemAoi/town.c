@@ -380,7 +380,7 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
         sa_blit_rect(fb, t->ui[p[i].ui], 0, t->hover == p[i].action ? p[i].h : 0, p[i].w, p[i].h, p[i].x, p[i].y);
     }
     if (t->hidden) return;
-    if (t->party) sa_party_draw_diorama(t->party, fb, vm->c[C_RANK_MAX]);
+    if (t->party) sa_party_draw_diorama(t->party, fb, vm->c[C_RANK_MAX], NULL);
     sa_blit(fb, t->ui[UI_BAR], 57, 2);
     draw_window(t, vfs, vm, fb, FAC1_X, UI_FAC1, fac1Areas, 4);
     draw_window(t, vfs, vm, fb, FAC2_X, UI_FAC2, fac2Areas, 3);

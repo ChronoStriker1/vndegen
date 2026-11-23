@@ -719,6 +719,15 @@ static bool dialog_input(SA *s) {
     return true;
 }
 
+static void dungeon_result(SA *s, int r) {
+    if (r == DUN_REST) {
+        sa_log(s, "dungeon: rest ends the expedition");
+        s->mode = MODE_TOWN;
+        end_turn(s);
+    }
+    s->dirty = true;
+}
+
 static int command_number(int action) {
     switch (action) {
     case TOWN_CMD_EXPEDITION: return 20;
@@ -966,8 +975,17 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         }
     }
     if (s->mode == MODE_DUNGEON) {
-        if (s->dirty) {
+        if (sa_dungeon_tick(&s->dungeon, elapsedMs)) s->dirty = true;
+        if (sa_party_tick(&s->party, elapsedMs)) s->dirty = true;
+        if (sa_dungeon_hover(&s->dungeon, s->mouseX, s->mouseY)) s->dirty = true;
+        s->rightClicked = false;
+        if (s->clicked) {
+            s->clicked = false;
+            dungeon_result(s, sa_dungeon_click(&s->dungeon, s->mouseX, s->mouseY));
+        }
+        if (s->mode == MODE_DUNGEON && s->dirty) {
             sa_dungeon_draw(&s->dungeon, s->fb);
+            sa_dungeon_draw_hud(&s->dungeon, s->fb, &s->party, s->vm.c[C_RANK_MAX]);
             s->serial++;
             s->dirty = false;
         }
@@ -1269,6 +1287,10 @@ void vnsystemaoi_mouse_button(VNSystemAoi *sa, int button, bool down) {
 void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down) {
     SA *s = (SA *)sa;
     if (!down) return;
+    if (s->mode == MODE_DUNGEON) {
+        dungeon_result(s, sa_dungeon_key(&s->dungeon, virtualKey));
+        return;
+    }
     if (virtualKey == 0x0d || virtualKey == 0x20) {
         if (s->vm.state == VM_WAIT_CHOICE && s->hover < 0) s->hover = 0;
         if (s->vm.state == VM_WAIT_CHOICE) {
@@ -1358,17 +1380,14 @@ void sa_debug_new_game(VNSystemAoi *sa) {
 
 void sa_debug_dungeon(VNSystemAoi *sa, const char *map, int x, int y, int dir) {
     SA *s = (SA *)sa;
-    if (!sa_dungeon_load(&s->dungeon, &s->vfs, getenv("SA_SET") ? getenv("SA_SET") : "m010set.pvm", map)) {
+    if (!s->party.unit[PARTY_FRONT + 1]) sa_party_new_game(&s->party, &s->vfs);
+    if (!sa_dungeon_load(&s->dungeon, &s->vfs, "m010set.pvm", map)) {
         sa_log(s, "can't load the dungeon %s", map);
         return;
     }
-    s->dungeon.x = x;
-    s->dungeon.y = y;
-    s->dungeon.dir = dir;
-    s->dungeon.camX = (float)x * 8;
-    s->dungeon.camZ = -(float)y * 8;
-    s->dungeon.yaw = (float)dir * 1.5707963f;
-    if (getenv("SA_FOV")) s->dungeon.fov = (float)atof(getenv("SA_FOV"));
+    sa_dungeon_art(&s->dungeon, &s->vfs, "m000bt1a.agf");
+    if (x < 0 && !sa_dungeon_find_entrance(&s->dungeon, &x, &y, &dir)) x = y = dir = 0;
+    sa_dungeon_place(&s->dungeon, x, y, dir);
     s->mode = MODE_DUNGEON;
     s->dirty = true;
 }

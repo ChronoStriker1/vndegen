@@ -197,8 +197,8 @@ void sa_party_draw_bars(Party *p, u32 *fb, int x, int y, int hp, int maxHp, int 
     gauge(fb, p->mpGauge, mp, maxMp, x - 2, y - 7);
 }
 
-void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit) {
-    sa_blit(fb, p->platform, PLATFORM_X, PLATFORM_Y);
+void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platform) {
+    sa_blit(fb, platform ? platform : p->platform, PLATFORM_X, PLATFORM_Y);
     sa_party_draw_tiles(p, fb, PLATFORM_X, PLATFORM_Y, NULL);
     for (int k = 0; k < 3; k++)
         for (int row = 0; row < 2; row++) {

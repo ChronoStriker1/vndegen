@@ -251,6 +251,10 @@ Image *sa_bmp_decode(const u8 *d, size_t n);
 #define DUN_FIELDS 26
 #define DUN_TEX 64
 
+struct Party;
+
+enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_PLATFORM, DUN_ART };
+
 typedef struct Dungeon {
     Pvm set;
     int *last;
@@ -259,15 +263,31 @@ typedef struct Dungeon {
     int texCount;
     int *layerTex;
     i32 cell[DUN_CELLS][DUN_FIELDS];
+    bool visited[DUN_CELLS];
     bool loaded;
     int x, y, dir;
     float fov, camX, camZ, yaw;
+    float fromX, fromZ, fromYaw, toX, toZ, toYaw;
+    u32 animMs, animDur;
+    int hover, steps;
+    Image *art[DUN_ART];
+    Image *needle[4];
     R3 r3;
 } Dungeon;
 
+enum { DUN_STAY, DUN_REST, DUN_MOVED };
+
 bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map);
 void sa_dungeon_free(Dungeon *d);
+void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform);
+void sa_dungeon_place(Dungeon *d, int x, int y, int dir);
+bool sa_dungeon_find_entrance(const Dungeon *d, int *x, int *y, int *dir);
+bool sa_dungeon_tick(Dungeon *d, u32 ms);
+bool sa_dungeon_hover(Dungeon *d, int x, int y);
+int sa_dungeon_click(Dungeon *d, int x, int y);
+int sa_dungeon_key(Dungeon *d, int key);
 void sa_dungeon_draw(Dungeon *d, u32 *fb);
+void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
 void sa_debug_dungeon(VNSystemAoi *sa, const char *map, int x, int y, int dir);
 
 typedef struct Mixer Mixer;
@@ -413,7 +433,7 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id);
 int sa_party_unit_row(const Party *p, int id);
 int sa_party_rank(const Party *p);
 bool sa_party_tick(Party *p, u32 ms);
-void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit);
+void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platform);
 void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y);
 void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy, int frame);
 void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY, const int *frames);
