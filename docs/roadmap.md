@@ -142,6 +142,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - BISHOP BSX settings kept in the PC's `common.dat`, Mesu Kyoushi 3 and 4's voice and BGM settings, and the voice modes (0.59.9).
 - ANIM's own fonts and font list, cut-ins and filters on screen, the Volume screen and comment editing; BISHOP BSX auto saves keep to slot 0, as on the PC, so PC saves on the first page aren't overwritten (0.59.10).
 - Mesu Kyoushi 3 and 4's dress screen, and BSX map saves that load back onto the map (0.59.11).
+- Mesu Kyoushi 3 and 4's free-sight meter, kept in saves both ways (0.59.12).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
