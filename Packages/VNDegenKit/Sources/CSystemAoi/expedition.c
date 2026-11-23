@@ -462,3 +462,16 @@ void sa_exp_debug_place(SA *s, int x, int y, int dir) {
     }
     s->dirty = true;
 }
+
+int sa_exp_floors_reached(const SA *s, int dungeon) {
+    const Expedition *e = &s->exp;
+    if (!e->explored || dungeon < 0 || dungeon >= EXP_DUNGEONS) return 0;
+    int n = 0;
+    for (int f = 0; f < EXP_FLOORS; f++)
+        for (int c = 0; c < DUN_CELLS; c++)
+            if (e->explored[dungeon][f][c]) {
+                n++;
+                break;
+            }
+    return n;
+}

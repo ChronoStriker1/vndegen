@@ -118,6 +118,7 @@ void sa_exp_battle_over(SA *s, int result);
 void sa_exp_gain(SA *s, const int gain[4]);
 void sa_exp_enter(SA *s, int dungeon, int floor);
 void sa_exp_force_battle(SA *s);
+int sa_exp_floors_reached(const SA *s, int dungeon);
 void sa_exp_draw_view(SA *s, u32 *fb);
 void sa_exp_debug_place(SA *s, int x, int y, int dir);
 void sa_reset_scene(SA *s);

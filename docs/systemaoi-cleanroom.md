@@ -179,8 +179,10 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   floor's k-th crystal (in map order) gives between the minimum and maximum of items from the k-th entry, each drawn
   by `item.obj` column 31's weight, says 『name』を手に入れた。 and removes the crystal.
 - **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one.
-- **Start cell.** Open: the first expedition started beside the exit facing away from it, a later one two cells
-  further in; VNDegen starts beside the exit.
+- **Start cell.** Measured: twice one cell in from the exit cell, facing away from the door (the start view
+  correlates 0.53 with VNDegen's, and 0.63 after turning to the door); once a cell further. VNDegen starts one cell in.
+- **`bf var, N`** feeds the turn script's thresholds (1, 2, 5, 8): inferred as the number of floors reached in
+  dungeon N + 1.
 
 ## Expeditions, from the scripts and play
 

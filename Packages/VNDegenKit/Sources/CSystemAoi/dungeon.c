@@ -198,6 +198,11 @@ void sa_dungeon_place(Dungeon *d, int x, int y, int dir) {
     if (cell_at(d, x, y) && d->visited) d->visited[y * MAP_W + x] = true;
 }
 
+static bool passable(const i32 *cell, int side) {
+    int w = cell[wallField[side]];
+    return w < 0 || w == WALL_DOORWAY || cell[wallField[side] + 1] == 1;
+}
+
 bool sa_dungeon_find_entrance(const Dungeon *d, int *x, int *y, int *dir) {
     for (int side = 0; side < 4; side++)
         for (int c = 0; c < DUN_CELLS; c++)
@@ -205,6 +210,14 @@ bool sa_dungeon_find_entrance(const Dungeon *d, int *x, int *y, int *dir) {
                 *x = c % MAP_W;
                 *y = c / MAP_W;
                 *dir = (side + 2) & 3;
+                const i32 *here = d->cell[c];
+                if (passable(here, *dir)) {
+                    const i32 *next = cell_at(d, *x + stepX[*dir], *y + stepY[*dir]);
+                    if (next && next[F_FLOOR] >= 0) {
+                        *x += stepX[*dir];
+                        *y += stepY[*dir];
+                    }
+                }
                 return true;
             }
     return false;
@@ -219,11 +232,6 @@ static void start_anim(Dungeon *d) {
     d->toYaw = d->yaw;
     d->animMs = 0;
     d->animDur = MOVE_MS;
-}
-
-static bool passable(const i32 *cell, int side) {
-    int w = cell[wallField[side]];
-    return w < 0 || w == WALL_DOORWAY || cell[wallField[side] + 1] == 1;
 }
 
 static bool walk(Dungeon *d, int side) {

@@ -431,6 +431,9 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             sa_show_frame_as_bg(s, s->fb, "*dungeon");
         }
         break;
+    case 0xbf:
+        if (in->count >= 2) sa_vm_set(vm, &in->o[0], sa_exp_floors_reached(s, sa_vm_get(vm, code, &in->o[1]) + 1));
+        break;
     case 0x94:
         if (in->count >= 1) sa_party_add_item(&s->party, sa_vm_get(vm, code, &in->o[0]), in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
         break;
