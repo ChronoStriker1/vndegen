@@ -47,7 +47,10 @@ constexpr int kLogDim = 182;
 // Eight cards to a page and ten pages of saves, and then the Q-Save page.
 
 // Scripts name a voice `voice\\x.ogg`, or in places in Test Game 84 just `x`, which plays all the same on the PC.
-static std::string voicePath(const std::string &name) { return name.find('\\') == std::string::npos ? "voice\\" + name + ".ogg" : name; }
+static std::string voicePath(const std::string &name) {
+    if (name.find('\\') != std::string::npos) return name;
+    return "voice\\" + name + (name.find('.') == std::string::npos ? ".ogg" : "");
+}
 constexpr int kCountEdgeR = 200, kCountEdgeG = 30, kCountEdgeB = 30;
 // cfg.sav's tables of what's been unlocked: a row of ints for each CG, a picture to an int, and an int for each track.
 // They sit after a string at byte 44020, so they move with its length.
