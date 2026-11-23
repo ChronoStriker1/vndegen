@@ -1,5 +1,6 @@
 import FontPack
 import Foundation
+import FrameHost
 import OSLog
 import VNCore
 import WebKit
@@ -176,6 +177,8 @@ final class WebGameSession: NSObject, EngineSession {
     private var paused = false
     private var lastReload: ContinuousClock.Instant?
     private var closeDialog: (() -> Void)?
+    var askToOpen: (URL, @escaping () -> Void) -> Void = { _, done in done() }
+    private var askingLink = false
     /// Ends once the page has had its last word after `terminate()` and the view is torn down.
     private var stopping: Task<Void, Never>?
     #if DEBUG
@@ -215,6 +218,10 @@ final class WebGameSession: NSObject, EngineSession {
         Self.add(startScripts, to: configuration.userContentController)
         webView = GameWebView(frame: .zero, configuration: configuration)
         view = webView
+        askToOpen = { [weak webView] url, done in
+            guard let webView else { return done() }
+            WebLinks.askToOpen(url, over: webView, done: done)
+        }
         startURL = URL(string: GameFolder.origin + game.startPage) ?? game.folder.indexURL
         super.init()
 
@@ -524,12 +531,9 @@ final class WebGameSession: NSObject, EngineSession {
     }
 
     private func openExternal(_ url: URL) {
-        guard ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") else { return }
-        #if canImport(UIKit)
-        UIApplication.shared.open(url)
-        #else
-        NSWorkspace.shared.open(url)
-        #endif
+        guard !ended, !askingLink, let link = WebLinks.page(url.absoluteString, mail: true) else { return }
+        askingLink = true
+        askToOpen(link) { [weak self] in self?.askingLink = false }
     }
 
     private func answerBridge(_ json: String) -> String {

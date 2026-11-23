@@ -17,4 +17,13 @@ import FrameHost
             #expect(WebLinks.page(text) == nil, "\(text)")
         }
     }
+
+    @Test func mailOpensOnlyWhereItIsAsked() {
+        #expect(WebLinks.page("mailto:someone@example.com") == nil)
+        #expect(WebLinks.page("mailto:someone@example.com", mail: true)?.absoluteString == "mailto:someone@example.com")
+        #expect(WebLinks.page("https://example.com", mail: true)?.host == "example.com")
+        for text in ["mailto:", "file:///etc/hosts", "steam://run/1"] {
+            #expect(WebLinks.page(text, mail: true) == nil, "\(text)")
+        }
+    }
 }

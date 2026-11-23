@@ -17,15 +17,19 @@ public enum WebLinks {
             || ["xctest", "swiftpm-testing-helper"].contains(process.processName)
     }
 
-    public nonisolated static func page(_ text: String) -> URL? {
-        guard let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
-              url.host?.isEmpty == false else { return nil }
+    public nonisolated static func page(_ text: String, mail: Bool = false) -> URL? {
+        guard let url = URL(string: text), let scheme = url.scheme?.lowercased() else { return nil }
+        if mail, scheme == "mailto" {
+            return URLComponents(url: url, resolvingAgainstBaseURL: false)?.path.isEmpty == false ? url : nil
+        }
+        guard ["http", "https"].contains(scheme), url.host?.isEmpty == false else { return nil }
         return url
     }
 
     public static func askToOpen(_ url: URL, over view: PlatformView, done: @escaping () -> Void = {}) {
-        guard page(url.absoluteString) != nil else { return done() }
-        let title = "Open this page in your browser?", message = url.absoluteString
+        guard page(url.absoluteString, mail: true) != nil else { return done() }
+        let mail = url.scheme?.lowercased() == "mailto"
+        let title = mail ? "Write an email in your mail app?" : "Open this page in your browser?", message = url.absoluteString
         let open = {
             if mayOpenPages {
                 #if canImport(UIKit)
