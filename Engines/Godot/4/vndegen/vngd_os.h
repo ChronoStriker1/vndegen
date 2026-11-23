@@ -6,6 +6,7 @@
 #include "vngd_files.h"
 
 #include "core/os/os.h"
+#include "core/string/print_string.h"
 #include "core/string/ustring.h"
 
 #include <vnfont.h>
@@ -15,6 +16,8 @@ template <class Base>
 class OS_VNDegen : public Base {
 	String executable;
 	String data_path;
+	void (*open_url)(const char *, void *) = nullptr;
+	void *context = nullptr;
 
 public:
 	using Base::get_user_data_dir;
@@ -35,6 +38,20 @@ public:
 
 	void add_frame_delay(bool p_can_draw, bool p_wake_for_events) override {}
 
+	Error shell_open(const String &p_uri) override {
+		const String scheme = p_uri.get_slice(":", 0).to_lower();
+		if ((scheme != "http" && scheme != "https") || !open_url) {
+			print_line("VNDegen: not opening " + p_uri);
+			return ERR_UNAVAILABLE;
+		}
+		open_url(p_uri.utf8().get_data(), context);
+		return OK;
+	}
+	Error shell_show_in_file_manager(String p_path, bool p_open_folder = true) override {
+		print_line("VNDegen: not showing " + p_path);
+		return ERR_UNAVAILABLE;
+	}
+
 	// A Windows font the game asks for by name, such as through a SystemFont, comes from VNDegen's substitutes first.
 	String get_system_font_path(const String &p_font_name, int p_weight = 400, int p_stretch = 100, bool p_italic = false) const override {
 		vnfont_match match;
@@ -49,5 +66,7 @@ public:
 			Base(p_args...) {
 		executable = String::utf8(p_launch->executable);
 		data_path = String::utf8(p_launch->dataDir);
+		open_url = p_launch->openURL;
+		context = p_launch->context;
 	}
 };

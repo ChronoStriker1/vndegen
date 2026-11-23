@@ -43,6 +43,7 @@ typedef struct VNGDLaunch {
     bool epicOnlineServices;
     // Godot 4: the 32-byte AES key the game's pack is encrypted with, found in its .exe, or NULL.
     const uint8_t *encryptionKey;
+    void (*openURL)(const char *url, void *context);
 } VNGDLaunch;
 
 // Loads the game and starts it. Returns 0 on success, 1 when it fails, and 2 when it fails in a way that leaves this

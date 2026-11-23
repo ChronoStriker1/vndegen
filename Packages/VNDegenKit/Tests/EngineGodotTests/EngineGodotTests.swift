@@ -709,3 +709,21 @@ private func key(_ code: Int) -> ControlAction { .key(KeyboardKey(windowsKeyCode
     }
 }
 #endif
+
+@MainActor @Test func aGamesWebLinkAsksFirstAndNothingElseOpens() async {
+    var asked: [String] = []
+    var finish: (() -> Void)?
+    let links = GodotLinks { url, done in
+        asked.append(url.absoluteString)
+        finish = done
+    }
+    for text in ["file:///Users/someone", "/Users/someone/Documents", "steam://run/1", "https://discord.gg/abc", "https://example.com/second"] {
+        text.withCString { GodotLinks.callback($0, links.context) }
+    }
+    for _ in 0..<10 { await Task.yield() }
+    #expect(asked == ["https://discord.gg/abc"])
+    finish?()
+    "https://example.com/third".withCString { GodotLinks.callback($0, links.context) }
+    for _ in 0..<10 { await Task.yield() }
+    #expect(asked == ["https://discord.gg/abc", "https://example.com/third"])
+}

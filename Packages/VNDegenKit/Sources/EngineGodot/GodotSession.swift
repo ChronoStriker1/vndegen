@@ -42,6 +42,7 @@ final class GodotSession: EngineSession {
     private let displayLink = DisplayLinkDriver()
     private var quitTimer: Timer?
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
+    private lazy var links = GodotLinks(over: host)
 
     /// Longest a game gets to close after the hub ends it, such as one that asks the player to confirm.
     static let quitTimeout: Duration = .seconds(3)
@@ -104,10 +105,11 @@ final class GodotSession: EngineSession {
             var settings = VNGDLaunch(pack: strings[0], executable: strings[1], dataDir: strings[2], logPath: strings[3],
                                       renderingMethod: rendering, layer: Unmanaged.passUnretained(host.metalLayer).toOpaque(),
                                       width: Float(size.width), height: Float(size.height), scale: Float(host.scale),
-                                      keyboard: nil, context: nil, fontTable: fontTable, fontFolders: fontFolders,
+                                      keyboard: nil, context: links.context, fontTable: fontTable, fontFolders: fontFolders,
                                       fontFolderCount: Int32(folderPaths.count), steam: requirements.steam,
                                       epicOnlineServices: requirements.epicOnlineServices,
-                                      encryptionKey: requirements.encryptionKey == nil ? nil : key.bindMemory(to: UInt8.self).baseAddress)
+                                      encryptionKey: requirements.encryptionKey == nil ? nil : key.bindMemory(to: UInt8.self).baseAddress,
+                                      openURL: GodotLinks.callback)
             return engine.start(&settings)
         }
         guard result == 0 else {
