@@ -117,3 +117,9 @@
 #define gallery_open eg_gallery_open
 #define gallery_scene_end eg_gallery_scene_end
 #define gallery_update eg_gallery_update
+#define oppai_bra_found eg_oppai_bra_found
+#define oppai_draw eg_oppai_draw
+#define oppai_free eg_oppai_free
+#define oppai_open eg_oppai_open
+#define oppai_scouted eg_oppai_scouted
+#define oppai_update eg_oppai_update

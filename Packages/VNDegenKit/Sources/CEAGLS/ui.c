@@ -835,6 +835,7 @@ void ui_update(EG *e) {
     case UI_SOUND: sound_update(e); break;
     case UI_CG:
     case UI_SCENE: gallery_update(e); break;
+    case UI_OPPAI: oppai_update(e); break;
     case UI_BRA: {
         int c = mask_color(u->bra.mask, e->mx, e->my);
         if (c != u->hover && c) sound(e, "SYS_OV");
@@ -887,6 +888,7 @@ void ui_draw(EG *e, u32 *dst) {
     case UI_SOUND: sound_draw(e, dst); break;
     case UI_CG:
     case UI_SCENE: gallery_draw(e, dst); break;
+    case UI_OPPAI: oppai_draw(e, dst); break;
     default: break;
     }
     if (u->noticeUntil && (i32)(e->now - u->noticeUntil) < 0) {
@@ -944,6 +946,8 @@ static void window_button(EG *e, int c) {
         sheet_load(e, &u->bra, "Option2");
         e->uiMode = UI_BRA;
         break;
+    case 70: oppai_open(e); break;
+
     default: eg_log(e, "window button %d does nothing", c); break;
     }
 }

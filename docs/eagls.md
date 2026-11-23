@@ -93,6 +93,15 @@ uses the same folder:
   `$SceneStart`, which opens the page again. A scene's choices are the player's to make, as on the PC, whose choice
   script (`Choices.dat`) runs the same in Scene View as in the story. The slot order isn't in the scripts: it was read off the thumbnail sheets
   by matching each thumbnail against the game's pictures.
+- Oppai Gallery, which the exe draws itself: from the title's bonus button once `@pr` is set (it shows "?????" before)
+  and from the window's Oppai Gallery button. The 48 heroines stand in a ring: the centred one in the frame, six to each
+  side at 80-pixel steps behind her dimmed with `haku_D2`, and the far side of the ring in the back row from the small
+  pictures at 56-pixel steps, turning the other way. A heroine not yet scouted (`@MilkScautar[n]` is 0) is drawn dark
+  with `haku_D` and can't be opened. The arrows and Back and Next turn the ring with a short slide; the S to E tabs go
+  to each group's first heroine (1, 4, 12, 20, 28, 42) and light for the centred heroine's group; the centred heroine's
+  name is shown from `haku_Name`, and each group's champion (4, 14, 24, 39, 43) wears the crown. Opening a heroine
+  shows her page (`haku_xNNP`); the Oppai Scouter switch shows `haku_xNNPC` over the figure, Back and Next step through
+  the scouted heroines, and Return or a right click goes back to the ring on her. Close or a right click leaves.
 - Soundtrack: the ten tracks, play, stop, previous, next and the volume bar, at the PC's places, drawn opaque as the PC draws
   them.
 - Settings: VNDegen draws a dialog standing in for the PC's Windows property sheet, with its Screen, Text, Sound and
@@ -105,8 +114,7 @@ Games start on the "Visual novel" controller layout.
 
 ## Known limits
 
-- The title's locked "?????" bonus and the window's Oppai Gallery and Oppai View buttons, which the story turns on
-  once the scouter is found, do nothing: they are screens built into the game's exe.
+- The window's Oppai View and Oppai Scouter buttons do nothing.
 - The champion brassiere page shows every brassiere as not found.
 - The settings dialog leaves out what belongs to the PC's window and hardware: the Screen tab's window size, mouse
   cursor, right click (greyed out on the PC too), cursor operation and V-Sync, the System tab's CPU level,

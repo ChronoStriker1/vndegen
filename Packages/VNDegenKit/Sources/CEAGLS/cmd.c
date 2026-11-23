@@ -337,6 +337,14 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
         t->wait = W_UI;
         break;
     case 135: screen(e, t, UI_CONFIG); break;
+    case 147:
+        if (in->argc > 0) {
+            oppai_open(e);
+            e->scriptUi = true;
+            e->scriptUiDone = false;
+            t->wait = W_UI;
+        }
+        break;
     case 131:
     case 132:
         gallery_open(e, in->n == 131 ? UI_CG : UI_SCENE);
@@ -373,7 +381,6 @@ void cmd_exec(EG *e, Thread *t, const Ins *in) {
     case 134:
     case 138:
     case 141:
-    case 147:
     case 149:
     case 171: break;
     default: unknown(e, in); break;
