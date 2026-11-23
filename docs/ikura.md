@@ -30,6 +30,7 @@ folders down.
 - Scripts (`.SNR`) are compiled: a header (label table size, code size, message count), a table of label offsets,
   then instructions of a 16-bit opcode, a 16-bit length and arguments. An argument with the top bit set names a
   variable; literals are 31-bit signed. Names in arguments are 12-byte fields that need not end in a NUL.
+- A condition (`0407`) compares two values with one of six codes: 0 `==`, 1 `<`, 2 `<=`, 3 `>`, 4 `>=`, 5 `!=`.
 - The engine runs `START.SNR` at boot, `LOAD.SNR` after a save is loaded and `CLOSE.SNR` when the window closes.
   Everything else, the title, the message window, menus, the battle system and the map, is the game's scripts.
 - Pictures go into numbered slots; layers show a slot's region, fade (`020b`) and move (`020c`, `0211`); scripts

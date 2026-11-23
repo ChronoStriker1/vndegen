@@ -34,8 +34,10 @@ Things that were unsure and how they were settled:
 - `0205`: not visibility of a layer's colour but whether the layer shows at all; a layer also needs `0208` before it
   draws (tested with layers that differ in one operation each).
 - Buttons draw only while the engine waits for input (a test with no wait drew none).
-- The comparison codes: `<=`, `>`, `>=` and `<` were settled by the scripts' own loops and limits (a level-up cap, the
-  MP check before a spell).
+- The comparison codes: first read from the scripts' own loops and limits (a level-up cap, the MP check before a
+  spell), which left 1 and 5 the wrong way round: Raidy II's music routine never changed track. A test `START.SNR` in
+  `SNR0` then ran every code on 1:2, 2:2 and 3:2 and saved a slot, in both games' exes under Wine; the slot's
+  variables gave 0 `==`, 1 `<`, 2 `<=`, 3 `>`, 4 `>=`, 5 `!=` in both.
 - The dungeon's camera: two faces of one wall seen from two cells give the distance and focal length; the texture's
   mortar spacing confirmed them.
 - The save state's resume point: the last label the main script reached, as both a message and a dungeon save show.

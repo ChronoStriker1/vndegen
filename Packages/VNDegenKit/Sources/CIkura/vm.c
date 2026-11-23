@@ -104,11 +104,11 @@ static void expr(IK *t, const u8 *a, int n) {
 static bool compare(int op, i32 a, i32 b) {
     switch (op) {
     case 0: return a == b;
-    case 1: return a != b;
+    case 1: return a < b;
     case 2: return a <= b;
     case 3: return a > b;
     case 4: return a >= b;
-    case 5: return a < b;
+    case 5: return a != b;
     default: return false;
     }
 }
