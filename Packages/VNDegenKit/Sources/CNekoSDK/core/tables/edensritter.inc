@@ -710,6 +710,23 @@ check voice5 obj\j019_000.bmp 827 619 7 5 5
 check voice6 obj\j019_000.bmp 951 619 7 5 6
 
 screen cg
+viewer obj\l000_000.bmp 628 565
+viewerhelp obj\l004_000.bmp 933 683 11
+viewerbutton hide obj\l001_000.bmp 1240 575 help 0
+viewerbutton zoomout obj\l003_000.bmp 645 640 3 0 help 8
+viewerbutton zoomreset obj\l003_000.bmp 681 640 3 1 help 9
+viewerbutton zoomin obj\l003_000.bmp 717 640 3 2 help 10
+viewerbutton replay obj\l001_001.bmp 762 639 7 0 help 1
+viewerbutton prevcg obj\l001_001.bmp 822 639 7 1 help 2
+viewerbutton prevvar obj\l001_001.bmp 877 639 7 2 help 3
+viewerbutton nextvar obj\l001_001.bmp 1022 639 7 3 help 4
+viewerbutton nextcg obj\l001_001.bmp 1077 639 7 4 help 5
+viewerbutton auto obj\l001_001.bmp 1137 639 7 5 help 6
+viewerbutton return obj\l001_001.bmp 1198 639 7 6 help 7
+viewernumber zoom obj\l002_000.bmp 683 611 13 1
+viewernumber zoomfrac obj\l002_001.bmp 706 613 11 2
+viewernumber index obj\l002_000.bmp 946 630 13 2
+viewernumber total obj\l002_001.bmp 986 648 11 2
 selectedlook
 pic obj\f010_000.bmp 0 0
 pic obj\f004_001.bmp 0 0 alpha 80 tab 0
@@ -738,6 +755,7 @@ cell 882 436
 celllabel obj\e006_001.bmp 16 15
 celldigits obj\e006_000.bmp 50 10 3 18
 gallerytabs 0
+cellhide
 button page0 obj\e001_000.bmp 534 626 11 5 0
 button page1 obj\e001_000.bmp 590 626 11 5 1
 button page2 obj\e001_000.bmp 646 626 11 5 2
@@ -784,6 +802,7 @@ cell 882 436
 celllabel obj\e006_001.bmp 16 15
 celldigits obj\e006_000.bmp 50 10 3 18
 gallerytabs 0
+cellhide
 button page0 obj\e001_000.bmp 534 626 11 5 0
 button page1 obj\e001_000.bmp 590 626 11 5 1
 button page2 obj\e001_000.bmp 646 626 11 5 2
