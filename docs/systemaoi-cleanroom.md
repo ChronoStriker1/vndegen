@@ -458,3 +458,16 @@ the same points (offsets in bytes, numbers little-endian):
   column 33, the skills from columns 41 on), the variables and the engine numbers. At turn 2 the party and scene
   regions come out byte for byte as the original's; the original loads the file into the same town. Inferred: the
   three 2s after the resistances, and which bonus slots follow 斬補正 (打, 射, 魔).
+- **Members.** Measured from a save where ミアルテ (unit 157) and ルーアルテ (158) had just joined: one record of
+  1,296 bytes per member from 86,008, Darkus first. In each: the unit at +0, its place in the list at +4 and +8, the
+  level at +12, EXP at +16, four bytes at +24 (00 01 02 00 for Darkus, 00 04 01 00 and 00 04 02 00 for the sisters),
+  HP and MP at +28, skill points at +80, the trained gains from +84, two 544-byte battle blocks at +124 and +668, the
+  equipped item at +1212 (-1 after it once one is set), the skills from +1220 and a number at +1284. In a battle
+  block: `unit.obj` columns 23 to 32 at +0; 必殺耐性 and 異常耐性 (column 33) at +176 and +184; the field, reserve and
+  government abilities (columns 34 to 36, as `ability.obj` ids) at +188 to +196; the skill slots (column 38) at
+  +456; the equipment's 斬補正 in the second block at +40. Not yet explained: ミアルテ's 30 at +56, 60 and -50 at
+  +148 (likely her 光 and 闇 affinities), a 5 at +252 of the second block, and her skills written as (531, 3). The
+  original doesn't rebuild these blocks on loading: with them zeroed, her card shows 300/0 and no abilities.
+- **Joining.** The turn script's event (`bo0002`, run while F2321 and F211 are on, F2322 off and C060 >= C704)
+  joins ミアルテ and ルーアルテ and shows ミアルテ、ルーアルテが仲間になった。 in the message box with both units'
+  pictures under the text.
