@@ -362,7 +362,7 @@ void bx_data_update(BX *b) {
     int slot = d->hover;
     SlotCache *c = &d->cache[slot];
     if (d->save) {
-        if (slot < d->first) return;
+        if (slot == 0) return;
         if (c->exists) d->confirmSlot = slot;
         else do_save(b, slot);
     } else if (c->exists) {
@@ -468,8 +468,8 @@ void bx_data_draw(BX *b, u32 *dst) {
         SlotCache *c = &d->cache[slot];
         int x = d->slotPos[i][0], y = d->slotPos[i][1];
         if (c->exists && c->thumb) bx_blit(dst, b->W, b->H, c->thumb, x, y, 255);
-        else if (d->empty) bx_blit(dst, b->W, b->H, d->empty, x, y, 255);
-        if (slot < d->first && d->save && d->autoOnly && c->exists) bx_blit(dst, b->W, b->H, d->autoOnly, x, y, 255);
+        else if (d->empty && !(slot == 0 && d->autoOnly)) bx_blit(dst, b->W, b->H, d->empty, x, y, 255);
+        if (slot == 0 && d->autoOnly && (d->save || !c->exists)) bx_blit(dst, b->W, b->H, d->autoOnly, x, y, 255);
         if (slot == d->hover && d->frame) bx_blit(dst, b->W, b->H, d->frame, x + d->frameOff[0], y + d->frameOff[1], 255);
     }
     if (d->hover >= 0) draw_info(b, d, dst, d->hover);

@@ -43,7 +43,9 @@ Things that were unsure and how they were settled:
 - Command `24`: it comes right before the eyecatch's red picture, and the original shows the background tinted red,
   so it multiplies the next picture.
 - Command `26`: it sets the message window's visibility around transitions.
-- Auto saves: the original wrote `no000` on reaching the map; the manual says choices save too. Mesu Kyoushi 4's
+- Auto saves: the original wrote `no000` on reaching the map; the manual says choices save too. Mesu Kyoushi 1's PC wrote
+  `no000` again on each of three map visits in a row, and Mesu Kyoushi 1's and 4's took a manual save in slot 1; VNDegen had
+  spread its auto saves over the slots below `no begin` and refused manual saves there. Mesu Kyoushi 4's
   original wrote `no000` with mode 9 as its custom map opened.
 - Picture record sizes: Mesu Kyoushi 4's saves hold each picture's size (an icon frame is 80x80), the frame count (2
   for icons), and a background's two parts only with a face; 3.0's 800x600 matched because its pictures were

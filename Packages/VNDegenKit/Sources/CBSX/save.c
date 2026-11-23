@@ -502,27 +502,8 @@ bool bx_load_slot(BX *b, int slot) {
 
 void bx_autosave(BX *b) {
     if (b->replaying) return;
-    int first = bx_cfg_int(&b->cfg, "data screen", "no begin", 15);
-    if (first <= 0) return;
-    int pick = -1;
-    long long oldest = 0;
-    for (int i = 0; i < first; i++) {
-        char *path = bx_save_path(b, i);
-        char real[2048];
-        struct stat st;
-        bool found = bx_path_resolve(path, real, sizeof real) > 0 && !stat(real, &st);
-        free(path);
-        if (!found) {
-            pick = i;
-            break;
-        }
-        if (pick < 0 || (long long)st.st_mtime < oldest) {
-            pick = i;
-            oldest = (long long)st.st_mtime;
-        }
-    }
     bx_save_capture_thumb(b);
-    bx_save_slot(b, pick);
+    bx_save_slot(b, 0);
 }
 
 static void putf(Buf *buf, float f) {
