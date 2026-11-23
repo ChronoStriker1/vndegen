@@ -14,6 +14,7 @@ for the one place where the engine's code was read, what was looked at and what 
 | Music encryption | `resident.dll`'s Ogg Vorbis open path, read with Ghidra as described below |
 | Extra (CG, Scene, Music) | The game's scripts and layout files (`cgMode.rld`, `musicMode.rld`, `def.rld`, `res/c/replay1.rnf`, `res/c/cgmode.type.rnf`), its pictures, and the original under Wine as a black box |
 | CG viewer controls | `res/c/cgmode.type.rnf` (the buttons, counter and side arrows, their pictures and places), the gallery pictures' sizes, and the original under Wine for which controls are active |
+| Backlog Jump | `res/c/backlog.layout2.rnf` (the Jump buttons, the row rectangles and the highlight picture), `ExHIBIT.ini`'s `N_HISTORY`, and the original under Wine for what Jump does |
 | Confirm boxes | `def.rld`'s dialog definitions (the panel picture and place, the YES and NO buttons), and the original under Wine for which actions ask |
 | Seen pictures and scenes (`system.dat`) | The original under Wine as a black box: diffs of `system.dat` as it played, and Extra after single registers were cleared or set in the file. The table sizes are the `N_CG`, `N_SCENE` and `N_SOUND` values of `ExHIBIT.ini`, which the file repeats in registers 189 to 191 |
 | Emotion icons (`.dlt`) | The header and frame loop of `resident.dll`'s DLT decoder, read with Ghidra as described below; not implemented |
