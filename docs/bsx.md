@@ -97,14 +97,15 @@ Mesu Kyoushi 3 adds these to 3.1:
   entries. `達成率` sets a variable to the museum's CG or strip completion rate; at the title the script unlocks ID50
   and ID46 when they reach 100.
 - The slot viewer draws the week number inside its unit picture and the weekday, or the special-day picture before
-  the first day. Slots are numbered from 0. Slots 0 to 24 are auto saves.
+  the first day. Slots are numbered from 0.
 - From 3.1 on, the glyph size follows the font size (14 gives 20 pixels) and the font height is the line pitch. The
   menu bar's lamps are drawn under its buttons, which are text over the lamp diamonds in Mesu Kyoushi 3. Where
   `bsxx.cfg` repeats a key, its last value counts.
 
 ## Saves
 
-The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when the map opens and at choices),
+The PC engine writes `save/noNNN` (slots; slot 0, marked AUTO ONLY on the save and load screens, is its auto save, made
+when the map opens and at choices, and every slot from 1 takes a manual save),
 `save/no-01` (quick save) and `save/common.dat` in the game folder. VNDegen uses the same files:
 
 - A slot is a 32-character id, a thumbnail (the screen times the cfg's `thumbnail ratio`: 120x90, 128x96 for
@@ -149,6 +150,7 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
   and BGV volume (the other speakers' for 他). With BGM select at マイルド (1), a track `define.bsa`'s `bgm_select`
   table lists in its first column plays as the second (`bgm06` as `bgm11`); which column is which was read from the
   table's order and the radio's stored value, not heard on the PC.
+- A load resumes on the line the slot shows, on the PC under Wine (Mesu Kyoushi 1, its own save) and in VNDegen alike.
 - 3.3 adds the messages shown and the Lua table line after the message history.
 
 ## Museum
