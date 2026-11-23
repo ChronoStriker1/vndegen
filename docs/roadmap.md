@@ -152,6 +152,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
+- SystemAoi, on VNDegen's own clean-room runtime, with Bunny Black 3, on `feat/systemaoi` since 2026-11-21: its rules rebuilt from play under Wine, in slices, the first one the opening through the first dungeon. The estimate is 8 to 12 weeks.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
@@ -196,7 +197,7 @@ The items of the 2026-10-25 plan that are done, kept for their decisions and not
 - YU-RIS, on VNDegen's own clean-room runtime. Nine library games play, released from 0.38.0 to 0.41.0, with saves that move to and from a PC. The other six library games weren't tested. [yuris.md](yuris.md) has what runs and the known limits.
 - Visual Novel Maker and Twine, in the web view. Shipped in 0.38.0.
 - SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, released in 0.43.0. siglus_rs's LGPL WMV decoder, its embedded font and its unlicensed DLL ports are left out. [siglus.md](siglus.md) has what runs and the known limits.
-- SystemAoi was taken off the plan on 2026-11-18, when Bunny Black 1 to 3 were left out after the content check. Bunny Black 3 passed the re-check on 2026-11-19, but the engine stays set aside for size (Set aside, above).
+- SystemAoi was taken off the plan on 2026-11-18, when Bunny Black 1 to 3 were left out after the content check. Bunny Black 3 passed the re-check on 2026-11-19, and the engine was set aside for size until the maintainer brought it back on 2026-11-21 (In progress).
 - Tmr-Hiro ADV System, on VNDegen's own clean-room runtime, with all five library games, released from 0.46.0 to 0.50.0 with saves that move to and from a PC. [tmrhiro.md](tmrhiro.md) has what runs and the known limits.
 - N2System (Nitroplus), on VNDegen's own clean-room runtime, with Hanachirasu, released in 0.42.0 with saves that move to and from a PC. The library's Sonicomi is Nitroplus's later 3D Diesel engine and isn't a target. [n2system.md](n2system.md) has what runs and the known limits.
 
