@@ -136,6 +136,8 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
   voice mask has a bit per settings character, the speakers' volumes scale their voices, and the BGV room's
   per-character volumes are the same BGV levels. VNDegen's own `save/vndegen.cfg` keeps only the x-count switch, which
   has no place there yet; its older settings are taken over once, when VNDegen first makes `common.dat`.
+- The translations put a space after every `「`; Mesu Kyoushi 1's and 4's PCs under Wine draw the line without it, and so
+  does VNDegen, in the window and the log (Mesu Kyoushi 2 and 3 weren't looked at).
 - The voice modes, as Mesu Kyoushi 4's PC plays them under Wine with music muted: 0 stops a voice when the line is
   clicked on; 1 repeats it until then (once in auto or skip); 2 and 3 let it play on through the following lines
   until another voiced line starts.
@@ -207,7 +209,6 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
 - Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing.
 - Mesu Kyoushi 3's `sync` system command is logged and skipped; it comes right before a startled line and its effect
   isn't known.
-- The space a translation puts after `「` is drawn; Mesu Kyoushi 4's PC drops it.
 - The full-screen, effect detail and auto-select options are stored as the PC stores them but do nothing; the BGM
   volume under a voice is stored and not applied.
 - Cut-in in the story hides the pictures the museum viewer's cut-in hides (`c`-tagged in `cg.dat`, or another
