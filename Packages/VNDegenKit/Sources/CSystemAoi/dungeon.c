@@ -7,8 +7,10 @@ enum {
     MAP_HEADER = 48,
     CELL_BYTES = 104,
     F_FLOOR = 5,
-    F_WALL0 = 9,
-    WALL_STEP = 3,
+    F_WALL_N = 18,
+    F_WALL_E = 9,
+    F_WALL_S = 12,
+    F_WALL_W = 15,
     VIEW_CELLS = 6,
 };
 
@@ -59,15 +61,17 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
         free(data);
         return false;
     }
-    for (int c = 0; c < DUN_CELLS; c++)
-        for (int f = 0; f < DUN_FIELDS; f++) d->cell[c][f] = (i32)rd32(data + MAP_HEADER + (size_t)c * CELL_BYTES + (size_t)f * 4);
+    for (int c = 0; c < DUN_CELLS; c++) {
+        int x = MAP_W - 1 - c / MAP_H, y = c % MAP_H;
+        for (int f = 0; f < DUN_FIELDS; f++) d->cell[y * MAP_W + x][f] = (i32)rd32(data + MAP_HEADER + (size_t)c * CELL_BYTES + (size_t)f * 4);
+    }
     free(data);
     if (!d->r3.zbuf) r3_init(&d->r3, SA_W, SA_H);
-    d->fov = getenv("SA_FOV") ? (float)atof(getenv("SA_FOV")) : 40;
-    d->r3.fogNear = getenv("SA_FOGN") ? (float)atof(getenv("SA_FOGN")) : 4;
-    d->r3.fogFar = getenv("SA_FOGF") ? (float)atof(getenv("SA_FOGF")) : 24;
-    d->r3.fogColor = getenv("SA_FOGC") ? (u32)strtoul(getenv("SA_FOGC"), NULL, 16) : 0x1e2a28;
-    d->r3.cull = getenv("SA_CULL") ? atoi(getenv("SA_CULL")) : 1;
+    d->fov = getenv("SA_FOV") ? (float)atof(getenv("SA_FOV")) : 47.2f;
+    d->r3.fogNear = getenv("SA_FOGN") ? (float)atof(getenv("SA_FOGN")) : -4;
+    d->r3.fogFar = getenv("SA_FOGF") ? (float)atof(getenv("SA_FOGF")) : 28;
+    d->r3.fogColor = getenv("SA_FOGC") ? (u32)strtoul(getenv("SA_FOGC"), NULL, 16) : 0x1e2d28;
+    d->r3.cull = getenv("SA_CULL") ? atoi(getenv("SA_CULL")) : -1;
     d->loaded = true;
     return true;
 }
@@ -104,13 +108,14 @@ static void make_cam(const Dungeon *d, Cam *c) {
 }
 
 static float shade_of(const float *n) {
+    if (getenv("SA_RAW")) return 1;
     float s = 192.0f / 255.0f;
     for (int i = 0; i < 2; i++) {
         float l = sqrtf(lights[i][0] * lights[i][0] + lights[i][1] * lights[i][1] + lights[i][2] * lights[i][2]);
         float dot = (n[0] * lights[i][0] + n[1] * lights[i][1] + n[2] * lights[i][2]) / l;
         if (dot > 0) s += 80.0f / 255.0f * dot;
     }
-    return s;
+    return s * (getenv("SA_SHADEK") ? (float)atof(getenv("SA_SHADEK")) : 1.6f);
 }
 
 static void draw_part(Dungeon *d, const Cam *c, const char *name, float cx, float cz, int quarter) {
@@ -143,6 +148,7 @@ static void draw_part(Dungeon *d, const Cam *c, const char *name, float cx, floa
 }
 
 static const int sideQuarter[4] = {-1, 0, 1, 2};
+static const int wallField[4] = {F_WALL_N, F_WALL_E, F_WALL_S, F_WALL_W};
 
 void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u | d->r3.fogColor;
@@ -161,7 +167,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             draw_part(d, &c, name, cx, cz, 0);
             draw_part(d, &c, "r000", cx, cz, 0);
             for (int s = 0; s < 4; s++) {
-                int w = cell[F_WALL0 + s * WALL_STEP];
+                int w = cell[wallField[s]];
                 if (w < 0) continue;
                 snprintf(name, sizeof name, "w%03d", w);
                 draw_part(d, &c, name, cx, cz, sideQuarter[s]);

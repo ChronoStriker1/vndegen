@@ -144,3 +144,23 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   column 30 names the group's table (column 67, 落物00), weighted by column 31. No money showed in these battles.
 - **Defeat.** Measured: a fallen ally is logged as ダークスが倒された. The screen after a loss wasn't captured; a
   loss ends the expedition and loses what it found.
+
+## The dungeon view, from captures
+
+Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cell facing each way and two steps on.
+
+- **Part set.** `floor.obj`'s column after the map name names the part set: 10 for 千樹庭 is `m010set.pvm` (forest);
+  `m000set` is 炎山洞's lava. Floor, ceiling and wall parts are drawn per cell; walls are modelled on the cell's +x
+  side and turned onto each side.
+- **Map layout.** `mpDDFF.amd` stores its 15 by 15 cells column by column, mirrored: cell (x, y), with y growing
+  south, is record (14 − x) × 15 + y. The wall fields are 18 north, 9 east, 12 south and 15 west (0 a wall, 10 a door,
+  20 the exit), and the open-side mask's bits 1, 2, 4 and 8 are east, south, west and north. Measured: the start
+  (0, 0) has the exit to the north, and walking south gives a wall two cells on with an opening to the east, as the
+  original shows.
+- **Camera.** `Cam.pvc`'s position and target (3.2 high, 4.6 behind the cell's centre, tilted down slightly), with
+  a 47.2° vertical field of view: the floor lines and wall edges fit that best (correlation 0.58 against 0.30 to 0.35
+  at other angles); the file's Zoom(40) isn't used as given.
+- **Light and fog.** Inferred from colour fits: textures times 1.6 × (ambient 0.75 plus the two lights' diffuse), and
+  linear fog to (40, 45, 30) from −4 to 28 units. Back faces are culled. A texture whose top-left colour covers a
+  tenth of it treats that colour as transparent (the grass `010w0x0`).
+- **Not yet known.** The exit shows as a free-standing gold-framed door, not a part of the set.

@@ -129,5 +129,11 @@ Image *sa_bmp_decode(const u8 *d, size_t n) {
             im->px[(size_t)y * w + x] = 0xff000000u | (u32)p[0] << 16 | (u32)p[1] << 8 | p[2];
         }
     }
+    u32 key = im->px[0];
+    size_t same = 0, total = (size_t)w * (size_t)h;
+    for (size_t i = 0; i < total; i++) same += im->px[i] == key;
+    if (same * 10 >= total)
+        for (size_t i = 0; i < total; i++)
+            if (im->px[i] == key) im->px[i] = 0;
     return im;
 }
