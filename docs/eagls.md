@@ -80,6 +80,8 @@ uses the same folder:
 - Save and Load pages with ten pages of eight slots, thumbnails, the NEW mark, Save Confirm and Load Delete, and the
   confirm dialogs; the backlog with speaker names, its scroll bar and voice buttons; name entry; choices.
 - The map that picks the next heroine, from the game's own scripts and click maps.
+- Name entry takes letters, digits and spaces, as the PC's box does, from a hardware keyboard or, on iPhone and iPad,
+  VNDegen's keyboard, which opens while the box waits and again when the game is touched.
 - CG View: five pages of the game's own sheets (`CGMode1-N`, its `C` thumbnails, `S` highlights and `CGModeMask`). A
   slot shows its thumbnail once any of its pictures has been seen (`@xa01`, `@xa01r1` and so on). Clicking it shows
   each seen version full screen in turn; the tall group pictures show their top, then their bottom.
@@ -102,6 +104,5 @@ Games start on the "Visual novel" controller layout.
 - The champion brassiere page shows every brassiere as not found.
 - Transitions other than crossfades and mask wipes (`4` with effects 3, 5, 8 and 10) are drawn as crossfades.
 - The settings dialog's Screen, System, Info and Machine tabs aren't there; full screen is the app's.
-- Name entry takes letters, digits and spaces from a hardware keyboard; without one, the default name stays.
 - CGs and scenes seen in VNDegen show as seen on the PC only once the PC game has been started with that game folder:
   until then its shipped `GlobalSave.sav` is left as it is.

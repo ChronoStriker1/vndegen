@@ -216,6 +216,13 @@ void game_to_title(EG *e) {
     config_save(e);
 }
 
+static void edit_append(EG *e, char c) {
+    size_t n = strlen(e->editBuf);
+    if (!c || (int)n >= e->editMax || n + 1 >= sizeof e->editBuf) return;
+    e->editBuf[n] = c;
+    e->editBuf[n + 1] = 0;
+}
+
 static void edit_key(EG *e, int vk) {
     size_t n = strlen(e->editBuf);
     if (vk == 0x0d) {
@@ -237,9 +244,16 @@ static void edit_key(EG *e, int vk) {
     if (vk >= 'A' && vk <= 'Z') c = (char)(e->keyDown[0x10] ? vk : vk + 32);
     else if (vk >= '0' && vk <= '9') c = (char)vk;
     else if (vk == 0x20) c = ' ';
-    if (!c || (int)n >= e->editMax || n + 1 >= sizeof e->editBuf) return;
-    e->editBuf[n] = c;
-    e->editBuf[n + 1] = 0;
+    edit_append(e, c);
+}
+
+bool vneagls_wants_text(VNEAGLS *n) { return n && ((EG *)n)->editing; }
+
+void vneagls_text(VNEAGLS *n, const char *utf8) {
+    EG *e = (EG *)n;
+    if (!e || !e->editing || !utf8) return;
+    for (const char *p = utf8; *p; p++)
+        if ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == ' ') edit_append(e, *p);
 }
 
 static void tick(EG *e) {
