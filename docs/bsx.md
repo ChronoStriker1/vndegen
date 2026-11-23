@@ -171,7 +171,7 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   Its panel (`[cg viewer]`) has the arrows, the number, cut-in (hides `c`-tagged pictures and pictures whose name is
   another's plus `c`), hair (uses `<picture><hair suffix>` when the game has one), Mesu Kyoushi 4's steam (hides
   `s`-tagged pictures), BGV volume and the BGV panel. A button picture whose first frame is one flat colour has that
-  frame as its hit mask, and its states start at the second.
+  frame as its hit mask, and its states start at the second; the save and load screens' buttons follow the same rule, as Mesu Kyoushi 3's overwrite question's はい and いいえ need.
 - Scenes play now or go into one of ten playlists (`[scene playlist]`). The playlists sit at the end of `common.dat`:
   a count of 10, per list a count and 12-byte entries (page, index and route), then the selected list. A replay runs
   the scene's label until `36 -1`, without auto saves, and comes back to the museum's scene page, or plays the

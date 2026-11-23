@@ -7,7 +7,7 @@
 
 typedef struct Btn {
     Image *img;
-    int frames, x, y;
+    int frames, skip, x, y;
 } Btn;
 
 typedef struct SlotCache {
@@ -60,6 +60,7 @@ static void btn(BX *b, const char *sec, const char *key, Btn *bt) {
     if (bt->frames < 1) bt->frames = 1;
     bt->x = bx_cfg_field(v, 2, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
     bt->y = bx_cfg_field(v, 3, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
+    bt->skip = bt->img && bt->frames > 2 && bx_hit_mask(bt->img, bt->img->h / bt->frames) ? 1 : 0;
 }
 
 static bool in_btn(const Btn *bt, int x, int y) {
@@ -71,7 +72,7 @@ static bool in_btn(const Btn *bt, int x, int y) {
 static void draw_btn(BX *b, u32 *dst, const Btn *bt, int frame) {
     if (!bt->img) return;
     int h = bt->img->h / bt->frames;
-    frame = clampi(frame, 0, bt->frames - 1);
+    frame = clampi(frame + bt->skip, 0, bt->frames - 1);
     bx_blit_part(dst, b->W, b->H, bt->img, 0, frame * h, bt->img->w, h, bt->x, bt->y, 255);
 }
 

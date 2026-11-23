@@ -286,6 +286,7 @@ typedef struct MBar {
     int x, y, hit[4];
 } MBar;
 
+bool bx_hit_mask(const Image *im, int h);
 bool bx_mbtn_cfg(BX *b, MBtn *t, const char *sec, const char *key, int dx, int dy);
 bool bx_mbtn_node(BX *b, MBtn *t, const LNode *n, int dx, int dy);
 bool bx_mbtn_on(const BX *b, const MBtn *t);
