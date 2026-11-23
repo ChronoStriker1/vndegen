@@ -81,6 +81,16 @@ Things that were unsure and how they were settled:
   with an undress digit above 0, so the dress state is the only thing that undresses a bust-up. The figure's place
   came from diffing a page with and without it: `co054012` (332x576 at 102,100 in a 550x700 canvas) at 339,134. A
   save VNDegen wrote at 全裸 on 普段着 loaded on the PC with Miyu undressed and the page at 全裸.
+- The free sight, under Wine: Mesu Kyoushi 4's PC scrolled Miyu's close-up as its dress screen knob was dragged,
+  kept it on the following lines and wrote the sight as a float after the play head's 1 byte, then the view byte:
+  HIP from the menu bar 0.4058 and 2, a drag 0.7517 and 3, a click on Mesu Kyoushi 3's meter at y 500 0.6015 and 3.
+  (1897 - 768 - 429) / (2493 - 768) gives Miyu's hip 0.4058 from `bu05u0012b` (2493 high at 429); Mesu Kyoushi 1's
+  FACE and HIP on Ritsuko's close-up wrote 0.0546 and 0.4394, which (762 - 676) / 1575 and (1368 - 676) / 1575 give
+  from `bu03u0014a` (2175 high at 76), so 3.0 uses the same scale. The knob's top sat at 381 and 588 for 0.4058 and
+  0.7517 (`knob` y 140 plus the sight times 596). Mesu Kyoushi 1's PC showed a VNDegen save's close-up 162 pixels
+  lower than VNDegen did, its face fixed position, and VIEW stepped bust, hip, face from there; the mouse wheel opens
+  the backlog and no meter shows in its story. The 視点 button changed nothing in two clicks. Pictures moved at once,
+  with no easing. VNDegen's screens of these saves differ from the PC's by under 2 on average.
 - The editor's rows: Mesu Kyoushi 1's layout comments name its first two rows the other way round; its panel labels
   and saved states show the same pose, view, undress, outfit, underwear, face order as Mesu Kyoushi 3.
 - The editor's close-up placement: scanning offsets against the PC's thumbnails gave the canvas centring and, from a

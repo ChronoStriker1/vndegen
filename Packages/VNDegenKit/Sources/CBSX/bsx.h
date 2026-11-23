@@ -443,6 +443,7 @@ struct BX {
     u8 dressRec[BX_DRESS_CH][BX_DRESS_WEAR];
     u8 dressAll;
     int stripLevel, viewLevel;
+    float sight;
     bool viewButtons;
 
     int mx, my;
@@ -489,6 +490,7 @@ void bx_shake(BX *b, int x, int y);
 void bx_gfx_frame(BX *b);
 int bx_eye_frame(BX *b, const Obj *o);
 int bx_view_level(BX *b);
+void bx_view_set(BX *b, int level);
 void bx_compose(BX *b, const Scene *s, u32 *dst);
 void bx_compose_over(BX *b, const Scene *s, u32 *dst);
 void bx_anim_update(BX *b);

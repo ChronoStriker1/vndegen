@@ -16,6 +16,9 @@ struct DressPhase {
     u32 *pageBg;
     MBtn modes[3], targets[BX_DRESS_CH], cstate[DR_LEVELS], back, bulkBtn, levels[24];
     MBtn costumes[DR_LINES];
+    MBtn views[3], knob;
+    int meter[4];
+    bool drag;
     int targetCount;
     int ngng[DR_LEVELS], ngngCount;
     int bodyX, bodyY, figureX, figureY;
@@ -199,6 +202,8 @@ void bx_dress_free(BX *b) {
     for (int i = 0; i < 24; i++) bx_mbtn_free(&d->levels[i]);
     bx_mbtn_free(&d->back);
     bx_mbtn_free(&d->bulkBtn);
+    for (int i = 0; i < 3; i++) bx_mbtn_free(&d->views[i]);
+    bx_mbtn_free(&d->knob);
     free(d);
     b->dressPhase = NULL;
 }
@@ -233,6 +238,12 @@ bool bx_dress_open(BX *b) {
         bx_mbtn_cfg(b, &d->levels[i], SEC, key, 0, 0);
     }
     bx_mbtn_cfg(b, &d->back, SEC, "back button", 0, 0);
+    if (bx_cfg_int(&b->cfg, SEC, "enable view control", 0) && bx_cfg_int(&b->cfg, "free-sight screen", "mode", 0)) {
+        static const char *keys[3] = {"face button", "bust button", "hip button"};
+        for (int i = 0; i < 3; i++) bx_mbtn_cfg(b, &d->views[i], "free-sight screen", keys[i], 0, 0);
+        bx_mbtn_cfg(b, &d->knob, "free-sight screen", "knob", 0, 0);
+        bx_cfg_ints(&b->cfg, "free-sight screen", "meter region", d->meter, 4);
+    }
     bx_mbtn_cfg(b, &d->bulkBtn, SEC, "dress00", 0, 0);
     d->ngngCount = bx_cfg_ints(&b->cfg, SEC, "ngng convert table", d->ngng, DR_LEVELS);
     int pos[2] = {0, 0};
@@ -285,9 +296,29 @@ static void page_click(BX *b, DressPhase *d) {
     }
 }
 
+static bool on_meter(const BX *b, const DressPhase *d) {
+    int half = d->knob.img ? d->knob.img->h / d->knob.frames / 2 : 0;
+    return d->knob.img && d->meter[3] > d->meter[1] && b->mx >= d->meter[0] && b->mx < d->meter[2] && b->my >= d->meter[1] - half && b->my <= d->meter[3] + half;
+}
+
+static void meter_update(BX *b, DressPhase *d) {
+    if (d->page >= 0 || !d->knob.img) {
+        d->drag = false;
+        return;
+    }
+    if (b->lPress && on_meter(b, d)) d->drag = true;
+    if (!b->lDown) d->drag = false;
+    if (!d->drag) return;
+    float t = (float)(b->my - d->meter[1]) / (float)(d->meter[3] - d->meter[1]);
+    b->sight = t < 0 ? 0 : t > 1 ? 1 : t;
+    b->viewLevel = 4;
+    b->shownDirty = true;
+}
+
 void bx_dress_update(BX *b) {
     DressPhase *d = b->dressPhase;
     if (!d) return;
+    meter_update(b, d);
     bool click = b->click;
     b->click = false;
     if (b->rclick || (click && bx_mbtn_on(b, &d->back))) {
@@ -298,7 +329,12 @@ void bx_dress_update(BX *b) {
         } else close_dress(b);
         return;
     }
-    if (!click) return;
+    if (!click || on_meter(b, d)) return;
+    for (int i = 0; i < 3 && d->page < 0; i++)
+        if (bx_mbtn_on(b, &d->views[i])) {
+            bx_view_set(b, i + 1);
+            return;
+        }
     if (bx_mbtn_on(b, &d->modes[0])) {
         if (d->mode) {
             d->mode = 0;
@@ -351,7 +387,13 @@ void bx_dress_draw(BX *b, u32 *dst) {
     else
         for (int i = 0; i < d->targetCount; i++) bx_mbtn_draw(b, dst, &d->targets[i], state(b, &d->targets[i], d->chosen == i));
     bx_mbtn_draw(b, dst, &d->back, bx_mbtn_on(b, &d->back) ? 1 : 0);
-    if (d->page < 0) return;
+    if (d->page < 0) {
+        for (int i = 0; i < 3; i++) bx_mbtn_draw(b, dst, &d->views[i], state(b, &d->views[i], bx_view_level(b) == i + 1));
+        MBtn k = d->knob;
+        k.y += (int)(b->sight * (float)(d->meter[3] - d->meter[1]) + 0.5f);
+        bx_mbtn_draw(b, dst, &k, 0);
+        return;
+    }
     int ch = d->page + 1;
     bx_mbtn_draw(b, dst, &d->bulkBtn, state(b, &d->bulkBtn, d->item < 0));
     for (int i = 0; i < d->lineCount; i++) {

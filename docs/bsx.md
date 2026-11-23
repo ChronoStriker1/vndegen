@@ -111,8 +111,9 @@ once it is drawn, and a save made from the map's menu bar loads back onto the ma
 
 - A slot is a 32-character id, a thumbnail (the screen times the cfg's `thumbnail ratio`: 120x90, 128x96 for
   Mesu Kyoushi 4, 204x115 for 3), the slot header (date, time, day, time slot, the current text with
-  its speaker), the play head (the mode, 7 on the map, then 17 bytes whose 14th is the dress screen's all-characters
-  level, then each character's dress record: a count, and per character its max wear plus one and that many bytes, from
+  its speaker), the play head (the mode, 7 on the map, then four zero bytes, a 1, the free sight as a float, the view
+  (0 face, 1 bust, 2 hip, 3 free), three zeros, the dress screen's all-characters level and three zeros, then each
+  character's dress record: a count, and per character its max wear plus one and that many bytes, from
   `bsxx.cfg`), the program counter after the current message, the call
   frames (return address and the caller's label), locals, globals, the last 50 message positions, the music, and the
   pictures on screen (kind, name, position, the picture's own size from its file, its frames, parts, opacity; an
@@ -206,6 +207,14 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   character wears on screen (else the first that exists), its 550x700 canvas centred on the screen plus `whole body
   pos`; the story's bust-ups are hidden on a page. 全体 mode shows `common stateN`, which sets every character's level
   (digit N). BACK or a right click goes from a page to the list and from the list back to the game.
+- Close-ups (`bu..u....`) are scrolled by the view. FACE, BUST and HIP (Mesu Kyoushi 3 and 4's menu bar, the dress
+  screen's view bar, or 3.0's VIEW button, which steps face, bust, hip) show `[free-sight screen]`'s fixed position for
+  the character and pose, FACE by default; a new background goes back to FACE. On the dress screen's list (the 視点
+  button lit; on the PC the button itself does nothing) the view bar's knob drags a free sight, 0 at the top of the
+  `meter region` to 1 at its bottom, drawn at the `knob` position plus the sight times the region's height. A sight
+  `t` puts the close-up's body picture (its first 10 characters) at `-(top + t * (height - H))`; a fixed position `p`
+  is the sight `(p - H - top) / (height - H)`, which is what FACE, BUST and HIP store, in 3.0 as in 3.1 and 3.3. The
+  sight and view are saved, and the free sight lasts until a fixed position or a new background.
 - The dress state lives in the save: per character a byte per outfit code holding the undress digit picked for it, the
   outfit `0` byte holding the all-outfits digit plus one (0 when off), and the all-characters digit plus one in the
   play head. A bust-up is drawn with the all-characters digit if set, else the character's all-outfits digit, else its
@@ -227,9 +236,8 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   output (画像として保存する) does nothing; states keep their messages as they are. Its output slots last until the
   editor closes. Mesu Kyoushi 4's ahegao-off buttons (viewer and editor) are drawn but do nothing, and its steam
   setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own.
-- The dress screen's 視点 button is drawn as the PC draws it but does nothing, and its view bar has no face, bust and
-  hip buttons or knob: that is the free-sight meter. When the all-outfits or all-characters level is one an outfit has
-  no picture for, VNDegen shows the outfit's nearest lower level; the PC wasn't watched in that case.
+- When the dress screen's all-outfits or all-characters level is one an outfit has no picture for, VNDegen shows the
+  outfit's nearest lower level; the PC wasn't watched in that case.
 - Mesu Kyoushi 3's `sync` system command (`37 sync 5`, three times in the script) is logged and skipped. Under Wine
   the PC shows the speaker lines that follow it together, one row each with the name in a column of its own
   (Tatsuya's 「Wha...!?」 over Touko's 「What...?!」) and one click for the group, which ends at the next narration line;
@@ -240,7 +248,6 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   picture's name plus `c` while that picture is shown); it wasn't watched in a story scene on the PC.
 - Voice mode 2 (until the same speaker's next line) is played as mode 3; on the PC both carried a voice through an
   unvoiced line, and how mode 2 overlaps two speakers' voices wasn't measured.
-- The free-sight meter (dragging a close-up bust-up) isn't there; VIEW moves between the three fixed positions.
 - `ActionType2` (before the staff roll) is ignored.
 - A game without any save to take its id from, other than the four Mesu Kyoushi games, writes saves the PC engine
   refuses.

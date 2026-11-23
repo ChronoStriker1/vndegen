@@ -167,16 +167,52 @@ static void stripped(BX *b, const char *name, char *out) {
     }
 }
 
-int bx_view_level(BX *b) { return b->viewLevel ? b->viewLevel : b->viewButtons ? 1 : 0; }
+int bx_view_level(BX *b) { return b->viewLevel ? b->viewLevel : b->viewButtons || bx_cfg_int(&b->cfg, "free-sight screen", "mode", 0) ? 1 : 0; }
 
-static int view_offset(BX *b, const char *name) {
-    if (!bx_view_level(b) || strlen(name) != 12 || (name[4] != 'u' && name[4] != 'U')) return 0;
+static bool close_up(const char *name) { return strlen(name) == 12 && (name[4] == 'u' || name[4] == 'U'); }
+
+static void fixed_positions(BX *b, const char *name, int *pos) {
     char key[64];
     snprintf(key, sizeof key, "fixed position%.2s%c", name + 2, name[9]);
-    int pos[3] = {0, 0, 0};
+    pos[0] = pos[1] = pos[2] = 0;
     if (bx_cfg_ints(&b->cfg, "free-sight screen", key, pos, 3) < 3) bx_cfg_ints(&b->cfg, "free-sight screen", "fixed position", pos, 3);
-    int v = pos[clampi(bx_view_level(b) - 1, 0, 2)];
+}
+
+static Image *close_up_body(BX *b, const char *name) {
+    char body[16];
+    snprintf(body, sizeof body, "%.10s", name);
+    Image *im = bx_image_load(b, body);
+    return im && im->h > b->H ? im : NULL;
+}
+
+static int view_offset(BX *b, const char *name) {
+    int level = bx_view_level(b);
+    if (!level || !close_up(name)) return 0;
+    if (level == 4) {
+        Image *im = close_up_body(b, name);
+        return im ? -(int)((float)im->y + b->sight * (float)(im->h - b->H) + 0.5f) : 0;
+    }
+    int pos[3];
+    fixed_positions(b, name, pos);
+    int v = pos[clampi(level - 1, 0, 2)];
     return v ? -(v - b->H) : 0;
+}
+
+void bx_view_set(BX *b, int level) {
+    b->viewLevel = level;
+    b->shownDirty = true;
+    if (level < 1 || level > 3) return;
+    for (int i = 0; i < BX_OBJS; i++) {
+        const Obj *o = &b->shown.obj[i];
+        if (!o->used || o->kind != OK_CHAR || !close_up(o->name)) continue;
+        Image *im = close_up_body(b, o->name);
+        if (!im) continue;
+        int pos[3];
+        fixed_positions(b, o->name, pos);
+        float t = (float)(pos[level - 1] - b->H - im->y) / (float)(im->h - b->H);
+        b->sight = t < 0 ? 0 : t > 1 ? 1 : t;
+        return;
+    }
 }
 
 static void draw_obj(BX *b, const Obj *o, u32 *dst, const char *tint) {
@@ -308,6 +344,7 @@ Obj *bx_obj_put(BX *b, int kind, int id, const char *name, int x, int y) {
             s->obj[i].used = false;
         b->stripLevel = 0;
         b->viewLevel = 0;
+        b->sight = 0;
     }
     Obj *o = find_named(s, kind, name);
     int keepId = o ? o->id : 0;
