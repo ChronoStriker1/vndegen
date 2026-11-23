@@ -43,4 +43,5 @@ python3 -I scripts/altstore-source.py "$version" "$build_number" "$out/VNDegen-$
 git add altstore/source.json
 git commit -q -m "List $version in the AltStore source"
 git push -q origin main
+find build/release -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | head -n -2 | while read -r old; do rm -rf -- "build/release/$old"; done
 echo "Released $version. Merge main back into dev: git checkout dev && git merge main"
