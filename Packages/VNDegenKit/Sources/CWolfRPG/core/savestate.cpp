@@ -88,30 +88,6 @@ int32_t savedChannel(double percent) { return int32_t(std::lround(percent) * 254
 
 int savedPercent(int32_t value) { return int(std::lround((value + 254) * 100.0 / 254)); }
 
-std::optional<std::string> pictureTextBytes(const std::string &utf8, Encoding enc) {
-    std::string out, rest = utf8;
-    if (rest.starts_with("\\f[")) {
-        size_t end = rest.find(']');
-        if (end == std::string::npos) return std::nullopt;
-        int size = std::atoi(rest.c_str() + 3);
-        if (size < 1 || size > 240) return std::nullopt;
-        out = std::string{'\x01', '\x05', '\x03', '\x0e', char(size + 14), '\x01'};
-        rest.erase(0, end + 1);
-    }
-    if (rest.find('\\') != std::string::npos) return std::nullopt;
-    return out + encode(rest, enc);
-}
-
-std::optional<std::string> pictureText(const std::string &bytes, Encoding enc) {
-    std::string out, rest = bytes;
-    if (rest.size() >= 6 && rest.compare(0, 4, "\x01\x05\x03\x0e") == 0 && rest[5] == '\x01') {
-        out = format("\\f[%d]", int(static_cast<unsigned char>(rest[4])) - 14);
-        rest.erase(0, 6);
-    }
-    if (rest.find('\x01') != std::string::npos) return std::nullopt;
-    return out + toUtf8(rest, enc);
-}
-
 std::optional<std::array<int32_t, 3>> windowStyle(const std::string &source) {
     if (!source.starts_with("<")) return std::array<int32_t, 3>{-1, -1, 1};
     if (source.starts_with("<SQUARE>")) return std::array<int32_t, 3>{0, -1, 0};
@@ -206,6 +182,79 @@ std::vector<int32_t> savedList(const std::vector<int32_t> &vars, const Database 
 }
 
 }  // namespace
+
+struct PictureTextCode {
+    std::string_view source;
+    uint8_t code;
+    bool number;
+    int offset;
+};
+
+constexpr PictureTextCode kPictureTextCodes[] = {
+    {"\\f[", 0x03, true, 0},
+    {"\\E", 0x05, false, 0},
+    {"<R>", 0x15, false, 0},
+    {"\\ay[", 0x1e, true, 5000},
+};
+
+std::optional<std::string> pictureTextBytes(const std::string &utf8, Encoding enc) {
+    std::string out, literal;
+    size_t i = 0;
+    while (i < utf8.size()) {
+        const PictureTextCode *match = nullptr;
+        for (auto &c : kPictureTextCodes)
+            if (utf8.compare(i, c.source.size(), c.source) == 0) match = &c;
+        if (!match) {
+            if (utf8[i] == '\\' || utf8.compare(i, 3, "<L>") == 0 || utf8.compare(i, 3, "<C>") == 0) return std::nullopt;
+            literal += utf8[i++];
+            continue;
+        }
+        out += encode(literal, enc);
+        literal.clear();
+        i += match->source.size();
+        if (!match->number) {
+            out += std::string{'\x01', '\x02', char(match->code)};
+            continue;
+        }
+        size_t end = utf8.find(']', i);
+        if (end == std::string::npos) return std::nullopt;
+        int value = std::atoi(utf8.c_str() + i) + match->offset;
+        if (value < 0 || value >= (256 - 14) * 64) return std::nullopt;
+        out += std::string{'\x01', '\x05', char(match->code), char(14 + value / 64), char(14 + value % 64), '\x01'};
+        i = end + 1;
+    }
+    return out + encode(literal, enc);
+}
+
+std::optional<std::string> pictureText(const std::string &bytes, Encoding enc) {
+    std::string out, literal;
+    size_t i = 0;
+    while (i < bytes.size()) {
+        if (bytes[i] != '\x01') {
+            literal += bytes[i++];
+            continue;
+        }
+        if (i + 2 >= bytes.size()) return std::nullopt;
+        size_t length = static_cast<unsigned char>(bytes[i + 1]);
+        uint8_t code = static_cast<unsigned char>(bytes[i + 2]);
+        auto known = std::find_if(std::begin(kPictureTextCodes), std::end(kPictureTextCodes),
+                                  [&](auto &c) { return c.code == code; });
+        if (known == std::end(kPictureTextCodes) || length != (known->number ? 5u : 2u) || i + 1 + length > bytes.size())
+            return std::nullopt;
+        out += toUtf8(literal, enc);
+        literal.clear();
+        if (known->number) {
+            if (bytes[i + 5] != '\x01') return std::nullopt;
+            int value = (static_cast<unsigned char>(bytes[i + 3]) - 14) * 64 + static_cast<unsigned char>(bytes[i + 4]) - 14;
+            std::string name(known->source);
+            out += format("%s%d]", name.c_str(), value - known->offset);
+        } else {
+            out += known->source;
+        }
+        i += 1 + length;
+    }
+    return out + toUtf8(literal, enc);
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 // Files
@@ -379,6 +428,8 @@ SaveFile Game::snapshot() {
     SaveMap old = std::move(m);
     m = SaveMap{};
     m.unknown1 = old.mapId == mapId_ ? old.unknown1 : std::array<int32_t, 2>{};
+    if (f.version == kVersion22 && map_)
+        m.unknown1 = {int32_t(std::lround(std::max(0.0, cameraX_) * 4)), int32_t(std::lround(std::max(0.0, cameraY_) * 4))};
     m.v72 = old.v72;
     m.values2 = old.values2;
     m.mapId = map_ ? mapId_ : -1;
@@ -478,8 +529,8 @@ SaveFile Game::snapshot() {
     if (f.party.trail.size() < 100) f.party.trail.resize(100);
 
     f.pictures = {};
-    if (f.version == kVersion22) {
-        f.pictures.pictures = savedPictures(enc);
+    if (f.version == kVersion22 || f.version == kVersion35) {
+        f.pictures.pictures = savedPictures(enc, f.version);
         f.pictures.count = uint16_t(f.pictures.pictures.size());
     }
 
@@ -535,10 +586,12 @@ void Game::applyPendingLoad() {
     if (s) applySave(*s);
 }
 
-std::vector<SavePicture> Game::savedPictures(Encoding enc) const {
+std::vector<SavePicture> Game::savedPictures(Encoding enc, uint16_t version) const {
+    bool v35 = version == kVersion35;
     std::vector<SavePicture> out;
     for (auto &[number, p] : pictures_) {
         if (number < 0 || p.erasing || p.xyImage || p.cutW > 0 || p.kind == PictureKind::None) continue;
+        if (v35 && p.kind == PictureKind::Window) continue;
         SavePicture sp;
         sp.number = number;
         sp.unknown3 = uint16_t(p.anchor);
@@ -557,23 +610,40 @@ std::vector<SavePicture> Game::savedPictures(Encoding enc) const {
         } else {
             sp.file = saveString(p.source, enc);
         }
-        bool window = p.kind == PictureKind::Window;
-        sp.a = {int32_t(std::lround(p.x.to)), int32_t(std::lround(p.y.to)), window ? p.windowW : p.divX,
-                window ? p.windowH : p.divY, p.pattern, int32_t(std::lround(p.opacity.to)), p.blend, -1, 1,
-                int32_t(std::lround(p.zoomX.to)), int32_t(std::lround(p.zoomY.to)), int32_t(std::lround(p.angle.to))};
-        sp.b = {savedChannel(p.r.to), savedChannel(p.g.to), savedChannel(p.b.to),
-                savedChannel(p.r.to), savedChannel(p.g.to), savedChannel(p.b.to)};
+        int32_t x = int32_t(std::lround(p.x.to)), y = int32_t(std::lround(p.y.to));
+        int32_t opacity = int32_t(std::lround(p.opacity.to));
+        int32_t zoomX = int32_t(std::lround(p.zoomX.to)), zoomY = int32_t(std::lround(p.zoomY.to));
+        int32_t angle = int32_t(std::lround(p.angle.to));
+        std::array<int32_t, 3> colour{savedChannel(p.r.to), savedChannel(p.g.to), savedChannel(p.b.to)};
         sp.v69[0] = sp.v69[1] = kSavedColor;
         sp.v69[16] = sp.v69[17] = 100;
-        sp.v73b = {-1, -1, -1, -1, -1, -1};
-        sp.v76 = style;
+        if (v35) {
+            bool text = p.kind == PictureKind::Text;
+            sp.a = {x, y, x, y, p.divX, p.divY, p.pattern, opacity, opacity, p.blend, -1, 1};
+            sp.b = {zoomX, zoomY, zoomX, zoomY, angle, angle};
+            sp.v9fA = {colour[0], colour[1], colour[2], colour[0], colour[1], colour[2]};
+            sp.v76 = {0, 0, -1};
+            sp.v81 = {-1, -1, -1, -1, -1, -1, -1, 1, 0, 0, 0, 0, 0, 0, 100, 100, 100, 100, 0, 0, 0};
+            sp.v89 = {0, -1, 0, 0, 0, 0, 0};
+            sp.v9fB = text ? std::array<int32_t, 8>{0, 0, 0, -1, -1, 0, 0, 0} : std::array<int32_t, 8>{0, 0, 0, 0, 1, 0, 100, 100};
+            sp.v9fC = {0, 1};
+            sp.v9fFlag = 1;
+        } else {
+            bool window = p.kind == PictureKind::Window;
+            sp.a = {x, y, window ? p.windowW : p.divX, window ? p.windowH : p.divY, p.pattern, opacity, p.blend, -1, 1,
+                    zoomX, zoomY, angle};
+            sp.b = {colour[0], colour[1], colour[2], colour[0], colour[1], colour[2]};
+            sp.v73b = {-1, -1, -1, -1, -1, -1};
+            sp.v76 = style;
+        }
         out.push_back(std::move(sp));
     }
     return out;
 }
 
 void Game::restorePictures(const SaveFile &s, Encoding enc) {
-    if (s.version != kVersion22) return;
+    bool v35 = s.version == kVersion35;
+    if (s.version != kVersion22 && !v35) return;
     for (auto &sp : s.pictures.pictures) {
         Picture p;
         if (sp.kind[0] == 1) {
@@ -585,6 +655,7 @@ void Game::restorePictures(const SaveFile &s, Encoding enc) {
             p.imageW = size[0];
             p.imageH = size[1];
         } else if (sp.kind[1] == 1) {
+            if (v35) continue;
             p.kind = PictureKind::Window;
             p.source = text(sp.file, enc);
             if (!windowStyle(p.source)) continue;
@@ -594,25 +665,29 @@ void Game::restorePictures(const SaveFile &s, Encoding enc) {
             p.kind = PictureKind::File;
             p.source = text(sp.file, enc);
             if (p.source.starts_with("<")) continue;
-            p.divX = std::max(1, sp.a[2]);
-            p.divY = std::max(1, sp.a[3]);
+            p.divX = std::max(1, v35 ? sp.a[4] : sp.a[2]);
+            p.divY = std::max(1, v35 ? sp.a[5] : sp.a[3]);
             auto size = fileImageSize(p.source);
             p.imageW = size[0];
             p.imageH = size[1];
         }
+        int32_t pattern = v35 ? sp.a[6] : sp.a[4], opacity = v35 ? sp.a[7] : sp.a[5], blend = v35 ? sp.a[9] : sp.a[6];
+        int32_t zoomX = v35 ? sp.b[0] : sp.a[9], zoomY = v35 ? sp.b[1] : sp.a[10], angle = v35 ? sp.b[4] : sp.a[11];
+        auto &colour = v35 ? sp.v9fA : sp.b;
+        int colourAt = v35 ? 0 : 3;
         p.generation = ++generation_;
         p.anchor = sp.unknown3 <= 5 ? sp.unknown3 : 0;
-        p.blend = sp.a[6] >= 0 && sp.a[6] <= 3 ? sp.a[6] : 0;
-        p.pattern = std::max(1, sp.a[4]);
+        p.blend = blend >= 0 && blend <= 3 ? blend : 0;
+        p.pattern = std::max(1, pattern);
         p.x.set(sp.a[0], 0);
         p.y.set(sp.a[1], 0);
-        p.opacity.set(std::clamp(sp.a[5], 0, 255), 0);
-        p.zoomX.set(sp.a[9], 0);
-        p.zoomY.set(sp.a[10], 0);
-        p.angle.set(sp.a[11], 0);
-        p.r.set(savedPercent(sp.b[3]), 0);
-        p.g.set(savedPercent(sp.b[4]), 0);
-        p.b.set(savedPercent(sp.b[5]), 0);
+        p.opacity.set(std::clamp(opacity, 0, 255), 0);
+        p.zoomX.set(zoomX, 0);
+        p.zoomY.set(zoomY, 0);
+        p.angle.set(angle, 0);
+        p.r.set(savedPercent(colour[colourAt]), 0);
+        p.g.set(savedPercent(colour[colourAt + 1]), 0);
+        p.b.set(savedPercent(colour[colourAt + 2]), 0);
         pictures_[sp.number] = std::move(p);
     }
 }

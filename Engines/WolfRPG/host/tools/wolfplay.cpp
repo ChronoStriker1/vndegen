@@ -180,6 +180,12 @@ int main(int argc, char **argv) {
                 for (auto &[n, p] : game.pictures())
                     std::printf("pic %d kind %d blend %d rgb %.0f,%.0f,%.0f %.0f,%.0f anchor %d size %dx%d zoom %.0f/%.0f opacity %.0f \"%.50s\"\n", n, int(p.kind), p.blend, p.r.value(), p.g.value(), p.b.value(), p.x.value(),
                                 p.y.value(), p.anchor, p.imageW, p.imageH, p.zoomX.value(), p.zoomY.value(), p.opacity.value(), p.source.c_str());
+                for (auto &[n, p] : game.pictures())
+                    if (p.autoPatternMode || p.shakePower || p.pulseInterval || p.flickerFrames || p.shiftX || p.shiftY ||
+                        p.effectZoom.value() != 100 || p.cutW || p.xyImage)
+                        std::printf("pic %d effects auto %d shake %d pulse %d flicker %d shift %d,%d effect zoom %.0f cut %d xy %d\n", n,
+                                    p.autoPatternMode, p.shakePower, p.pulseInterval, p.flickerFrames, p.shiftX, p.shiftY,
+                                    p.effectZoom.value(), p.cutW, p.xyImage ? 1 : 0);
             }
             if (sysLists.count(f)) {
                 std::printf("frame %d sys:", f);

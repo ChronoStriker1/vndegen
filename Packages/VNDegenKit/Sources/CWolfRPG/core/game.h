@@ -394,7 +394,7 @@ private:
     SaveFile blankSave();      // what the engine writes when a variable goes into a save that doesn't exist yet
     void applyPendingLoad();   // Game::update calls it first thing while pendingLoad_ is set
     void applySave(const SaveFile &s);
-    std::vector<SavePicture> savedPictures(Encoding enc) const;
+    std::vector<SavePicture> savedPictures(Encoding enc, uint16_t version) const;
     void restorePictures(const SaveFile &s, Encoding enc);
     // Reads or writes the variable at `address` in a save, for commands 221 and 222.
     void readSavedVariable(const SaveFile *s, int32_t address, int32_t target, Thread &t);
