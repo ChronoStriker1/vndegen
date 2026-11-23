@@ -256,6 +256,7 @@ void vneagls_text(VNEAGLS *n, const char *utf8) {
 static void tick(EG *e) {
     if (e->scriptUi && e->scriptUiDone) {
         e->scriptUi = false;
+        e->fromScreen = true;
         if (e->th[0].wait == W_UI) e->th[0].wait = W_NONE;
     }
     if (e->editing) {
@@ -281,6 +282,7 @@ static void tick(EG *e) {
         if (e->rclick) e->rclicked = true;
     }
     if (e->uiMode == UI_NONE) vm_run(e);
+    e->fromScreen = false;
     movie_update(e);
     e->click = false;
     e->rclick = false;

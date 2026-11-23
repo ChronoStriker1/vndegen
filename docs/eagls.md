@@ -72,7 +72,10 @@ uses the same folder:
 ## What runs
 
 - The logos, the title with its hover buttons, New Game, Load Game, CG View, Scene View, Soundtrack, Settings and Exit Game.
-- The prologue movie, backgrounds, characters, emotes, transitions with mask pictures, shaking.
+- The prologue movie, backgrounds, characters, emotes, shaking, and the transitions `4` draws: crossfades, mask wipes,
+  a mosaic that coarsens to 80-pixel blocks and clears (3), a random pixel dissolve (5), a left-to-right wipe of
+  20-pixel strips (8) and blinds of 20-pixel strips (10). A transition that starts as a script's screen closes, such
+  as the title's return from CG View, starts from that screen, as on the PC.
 - Messages with the PC's layout, speaker plates, voices, the wait cursor, click to finish or advance, right click to
   hide the window, the wheel to open the backlog, Ctrl to skip.
 - The window's wheel: settings, log, hide, skip, auto, quick save, quick load, and the system menu (save, load,
@@ -105,7 +108,6 @@ Games start on the "Visual novel" controller layout.
   once the scouter is found, do nothing: they are screens built into the game's exe.
 - In Scene View a scene's choices are the player's to make, as in the story.
 - The champion brassiere page shows every brassiere as not found.
-- Transitions other than crossfades and mask wipes (`4` with effects 3, 5, 8 and 10) are drawn as crossfades.
 - The settings dialog leaves out what belongs to the PC's window and hardware: the Screen tab's window size, mouse
   cursor, right click (greyed out on the PC too), cursor operation and V-Sync, the System tab's CPU level,
   performance optimization and Delete all saved data, and the Info and Machine tabs. The app sets the window and

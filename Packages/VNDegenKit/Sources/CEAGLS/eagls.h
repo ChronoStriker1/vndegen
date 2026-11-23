@@ -367,6 +367,7 @@ struct EG {
     u8 *global;
     size_t globalSize;
     bool globalDirty;
+    bool fromScreen;
 };
 
 void gfx_init(EG *e);
