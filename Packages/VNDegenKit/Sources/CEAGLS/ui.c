@@ -916,6 +916,18 @@ static void quick_load(EG *e) {
     if (save_exists(e, EG_SLOTS)) load_slot(e, EG_SLOTS);
 }
 
+static void use_scouter(EG *e) {
+    Var *file = var_find(&e->vars, "_MilkFile"), *label = var_find(&e->vars, "_MilkLabel");
+    const char *f = file && file->n ? file->v[0].s : NULL, *l = label && label->n ? label->v[0].s : NULL;
+    if (!f || !l || !*f || !*l) return;
+    char name[64];
+    snprintf(name, sizeof name, "%s.dat", f);
+    Thread *t = &e->th[0];
+    msg_clear(e);
+    t->wait = W_NONE;
+    vm_goto(e, t, name, l);
+}
+
 static void window_button(EG *e, int c) {
     UI *u = e->ui;
     if (c != 150) u->menuOpen = false;
@@ -947,7 +959,8 @@ static void window_button(EG *e, int c) {
         e->uiMode = UI_BRA;
         break;
     case 70: oppai_open(e); break;
-
+    case 60: set_sysvar(e, ":OptionNum3", !sysvar(e, ":OptionNum3")); break;
+    case 50: use_scouter(e); break;
     default: eg_log(e, "window button %d does nothing", c); break;
     }
 }

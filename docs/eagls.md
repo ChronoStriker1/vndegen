@@ -102,6 +102,10 @@ uses the same folder:
   name is shown from `haku_Name`, and each group's champion (4, 14, 24, 39, 43) wears the crown. Opening a heroine
   shows her page (`haku_xNNP`); the Oppai Scouter switch shows `haku_xNNPC` over the figure, Back and Next step through
   the scouted heroines, and Return or a right click goes back to the ring on her. Close or a right click leaves.
+- The window's Oppai View switch, which the exe handles: it turns `:OptionNum3` on and off, which the scripts read to
+  draw scouted heroines with their scouter pictures, and the window shows its `MesWinS` art (the switch lit red)
+  while it is on. At the moments the story offers the scouter, its scripts set `_MilkFile` and `_MilkLabel` and load a
+  window with an OPPAI SCOUTER button, which goes to that label.
 - Soundtrack: the ten tracks, play, stop, previous, next and the volume bar, at the PC's places, drawn opaque as the PC draws
   them.
 - Settings: VNDegen draws a dialog standing in for the PC's Windows property sheet, with its Screen, Text, Sound and
@@ -114,7 +118,6 @@ Games start on the "Visual novel" controller layout.
 
 ## Known limits
 
-- The window's Oppai View and Oppai Scouter buttons do nothing.
 - The champion brassiere page shows every brassiere as not found.
 - The settings dialog leaves out what belongs to the PC's window and hardware: the Screen tab's window size, mouse
   cursor, right click (greyed out on the PC too), cursor operation and V-Sync, the System tab's CPU level,
