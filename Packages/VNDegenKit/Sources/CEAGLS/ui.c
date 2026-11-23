@@ -31,7 +31,7 @@ struct UI {
     int cfgTab;
     int cfgDrag;
     int cfgHover;
-    int cfgSaved[8];
+    int cfgSaved[12];
     int newest;
     SlotInfo info[EG_SLOTS];
     bool infoLoaded;
@@ -39,6 +39,8 @@ struct UI {
     u32 noticeUntil;
     char notice[64];
 };
+
+static void settings_get(EG *e, int *v);
 
 static void sheet_load(EG *e, Sheet *s, const char *base) {
     if (s->base) return;
@@ -177,14 +179,7 @@ void ui_open(EG *e, int mode) {
     case UI_CONFIG:
         u->cfgTab = 0;
         u->cfgDrag = -1;
-        u->cfgSaved[0] = e->textSpeed;
-        u->cfgSaved[1] = e->autoSpeed;
-        u->cfgSaved[2] = e->volBgm;
-        u->cfgSaved[3] = e->volVoice;
-        u->cfgSaved[4] = e->volSe;
-        u->cfgSaved[5] = e->volMovie;
-        u->cfgSaved[6] = e->textWhite;
-        u->cfgSaved[7] = e->mute;
+        settings_get(e, u->cfgSaved);
         e->uiMode = mode;
         break;
     default: e->uiMode = mode; break;
@@ -507,40 +502,66 @@ static bool in_rect(Rect r, int x, int y) { return x >= r.x && y >= r.y && x < r
 #define DLG_W 432
 #define DLG_H 324
 
-static const char *cfgTabs[] = {"Text", "Sound"};
+static const char *cfgTabs[] = {"Screen", "Text", "Sound", "System"};
+enum { CFG_TABS = 4 };
 
 static Rect tab_rect(int i) { return (Rect){DLG_X + 6 + i * 64, DLG_Y + 6, 62, 20}; }
 static Rect ok_rect(void) { return (Rect){DLG_X + DLG_W - 190, DLG_Y + DLG_H - 30, 86, 22}; }
 static Rect cancel_rect(void) { return (Rect){DLG_X + DLG_W - 96, DLG_Y + DLG_H - 30, 86, 22}; }
+
+enum { CTL_SLIDER, CTL_CHECK, CTL_RADIO, CTL_BUTTON };
 
 typedef struct Ctl {
     int kind;
     const char *label;
     int *value;
     int max;
+    const char *opts[3];
 } Ctl;
 
 static int ctl_list(EG *e, int tab, Ctl *out) {
     int n = 0;
     if (tab == 0) {
-        out[n++] = (Ctl){0, "Text Speed", &e->textSpeedSlider, 100};
-        out[n++] = (Ctl){0, "Auto Speed", &e->autoSpeed, 100};
-        out[n++] = (Ctl){1, "Text Color: White", &e->textWhite, 1};
-        out[n++] = (Ctl){1, "Enable skipping for unread lines", &e->skipUnread, 1};
-        out[n++] = (Ctl){1, "In auto-mode, wait for voice to finish", &e->autoWaitVoice, 1};
+        out[n++] = (Ctl){CTL_RADIO, "Screen Effects", &e->effects, 2, {"None", "Partial", "Full"}};
+        out[n++] = (Ctl){CTL_CHECK, "Left click to skip effects", &e->clickSkip, 1, {0}};
+    } else if (tab == 3) {
+        out[n++] = (Ctl){CTL_BUTTON, "Reset Config to Default", NULL, 0, {0}};
+    } else if (tab == 1) {
+        out[n++] = (Ctl){0, "Text Speed", &e->textSpeedSlider, 100, {0}};
+        out[n++] = (Ctl){0, "Auto Speed", &e->autoSpeed, 100, {0}};
+        out[n++] = (Ctl){1, "Text Color: White", &e->textWhite, 1, {0}};
+        out[n++] = (Ctl){1, "Enable skipping for unread lines", &e->skipUnread, 1, {0}};
+        out[n++] = (Ctl){1, "In auto-mode, wait for voice to finish", &e->autoWaitVoice, 1, {0}};
     } else {
-        out[n++] = (Ctl){1, "Mute All", &e->mute, 1};
-        out[n++] = (Ctl){0, "Music Volume", &e->volBgm, 100};
-        out[n++] = (Ctl){0, "Voice Volume", &e->volVoice, 100};
-        out[n++] = (Ctl){0, "Sound Effects Volume", &e->volSe, 100};
-        out[n++] = (Ctl){0, "Movie Volume", &e->volMovie, 100};
+        out[n++] = (Ctl){1, "Mute All", &e->mute, 1, {0}};
+        out[n++] = (Ctl){0, "Music Volume", &e->volBgm, 100, {0}};
+        out[n++] = (Ctl){0, "Voice Volume", &e->volVoice, 100, {0}};
+        out[n++] = (Ctl){0, "Sound Effects Volume", &e->volSe, 100, {0}};
+        out[n++] = (Ctl){0, "Movie Volume", &e->volMovie, 100, {0}};
     }
     return n;
 }
 
 static Rect ctl_rect(int i, int kind) {
     int y = DLG_Y + 44 + i * 46;
-    return kind == 0 ? (Rect){DLG_X + 24, y + 18, DLG_W - 48, 16} : (Rect){DLG_X + 24, y + 10, 16, 16};
+    if (kind == CTL_SLIDER) return (Rect){DLG_X + 24, y + 18, DLG_W - 48, 16};
+    if (kind == CTL_BUTTON) return (Rect){DLG_X + 24, y + 8, 200, 22};
+    return (Rect){DLG_X + 24, y + 10, 16, 16};
+}
+
+static Rect radio_rect(int i, int k) { return (Rect){DLG_X + 24 + k * 130, DLG_Y + 44 + i * 46 + 22, 120, 16}; }
+
+static void settings_get(EG *e, int *v) {
+    int src[12] = {e->textSpeed, e->autoSpeed, e->volBgm, e->volVoice, e->volSe, e->volMovie,
+                   e->textWhite, e->mute, e->skipUnread, e->autoWaitVoice, e->effects, e->clickSkip};
+    memcpy(v, src, sizeof src);
+}
+
+static void settings_set(EG *e, const int *v) {
+    int *dst[12] = {&e->textSpeed, &e->autoSpeed, &e->volBgm, &e->volVoice, &e->volSe, &e->volMovie,
+                    &e->textWhite, &e->mute, &e->skipUnread, &e->autoWaitVoice, &e->effects, &e->clickSkip};
+    for (int i = 0; i < 12; i++) *dst[i] = v[i];
+    e->textSpeedSlider = (40 - e->textSpeed) * 100 / 40;
 }
 
 static void frame(u32 *dst, int W, int H, Rect r, u32 light, u32 dark) {
@@ -563,7 +584,7 @@ static void config_draw(EG *e, u32 *dst) {
     int W = e->W, H = e->H;
     fill_rect(dst, W, H, DLG_X, DLG_Y, DLG_W, DLG_H, 0xfff0f0f0u);
     frame(dst, W, H, (Rect){DLG_X, DLG_Y, DLG_W, DLG_H}, 0xffffffffu, 0xff404040u);
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < CFG_TABS; i++) {
         Rect t = tab_rect(i);
         fill_rect(dst, W, H, t.x, t.y, t.w, t.h, i == u->cfgTab ? 0xffffffffu : 0xffe0e0e0u);
         frame(dst, W, H, t, 0xffffffffu, 0xff909090u);
@@ -574,6 +595,21 @@ static void config_draw(EG *e, u32 *dst) {
     int n = ctl_list(e, u->cfgTab, c);
     for (int i = 0; i < n; i++) {
         Rect r = ctl_rect(i, c[i].kind);
+        if (c[i].kind == CTL_BUTTON) {
+            button(e, dst, r, c[i].label, u->cfgHover == 10 + i);
+            continue;
+        }
+        if (c[i].kind == CTL_RADIO) {
+            text_draw(e, dst, W, H, c[i].label, r.x, r.y - 4, 14, 0, 0xff000000u, false);
+            for (int k = 0; k <= c[i].max; k++) {
+                Rect o = radio_rect(i, k);
+                fill_rect(dst, W, H, o.x, o.y, 16, 16, 0xffffffffu);
+                frame(dst, W, H, (Rect){o.x, o.y, 16, 16}, 0xff606060u, 0xffd0d0d0u);
+                if (*c[i].value == k) fill_rect(dst, W, H, o.x + 5, o.y + 5, 6, 6, 0xff000000u);
+                text_draw(e, dst, W, H, c[i].opts[k], o.x + 24, o.y + 1, 14, 0, 0xff000000u, false);
+            }
+            continue;
+        }
         if (c[i].kind == 0) {
             text_draw(e, dst, W, H, c[i].label, r.x, r.y - 18, 14, 0, 0xff000000u, false);
             fill_rect(dst, W, H, r.x, r.y + 6, r.w, 4, 0xffc8c8c8u);
@@ -605,6 +641,8 @@ static void config_update(EG *e) {
     Ctl c[8];
     int n = ctl_list(e, u->cfgTab, c);
     u->cfgHover = in_rect(ok_rect(), e->mx, e->my) ? 1 : in_rect(cancel_rect(), e->mx, e->my) ? 2 : 0;
+    for (int i = 0; i < n; i++)
+        if (c[i].kind == CTL_BUTTON && in_rect(ctl_rect(i, CTL_BUTTON), e->mx, e->my)) u->cfgHover = 10 + i;
     if (u->cfgDrag >= 0 && u->cfgDrag < n) {
         if (!e->lDown) u->cfgDrag = -1;
         else {
@@ -621,13 +659,21 @@ static void config_update(EG *e) {
             }
     bool cancel = e->rclick;
     if (e->click) {
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < CFG_TABS; i++)
             if (in_rect(tab_rect(i), e->mx, e->my)) u->cfgTab = i;
-        for (int i = 0; i < n; i++)
-            if (c[i].kind == 1 && in_rect((Rect){ctl_rect(i, 1).x, ctl_rect(i, 1).y, 300, 16}, e->mx, e->my)) {
+        for (int i = 0; i < n; i++) {
+            if (c[i].kind == CTL_CHECK && in_rect((Rect){ctl_rect(i, 1).x, ctl_rect(i, 1).y, 300, 16}, e->mx, e->my)) {
                 *c[i].value = !*c[i].value;
                 config_apply(e);
             }
+            if (c[i].kind == CTL_RADIO)
+                for (int k = 0; k <= c[i].max; k++)
+                    if (in_rect(radio_rect(i, k), e->mx, e->my)) *c[i].value = k;
+            if (c[i].kind == CTL_BUTTON && u->cfgHover == 10 + i) {
+                config_defaults(e);
+                config_apply(e);
+            }
+        }
         if (u->cfgHover == 1) {
             config_apply(e);
             config_save(e);
@@ -637,15 +683,7 @@ static void config_update(EG *e) {
         if (u->cfgHover == 2) cancel = true;
     }
     if (cancel) {
-        e->textSpeed = u->cfgSaved[0];
-        e->autoSpeed = u->cfgSaved[1];
-        e->volBgm = u->cfgSaved[2];
-        e->volVoice = u->cfgSaved[3];
-        e->volSe = u->cfgSaved[4];
-        e->volMovie = u->cfgSaved[5];
-        e->textWhite = u->cfgSaved[6];
-        e->mute = u->cfgSaved[7];
-        e->textSpeedSlider = (40 - e->textSpeed) * 100 / 40;
+        settings_set(e, u->cfgSaved);
         snd_volumes(e);
         close_ui(e);
     }

@@ -91,8 +91,11 @@ uses the same folder:
   by matching each thumbnail against the game's pictures.
 - Soundtrack: the ten tracks, play, stop, previous, next and the volume bar, at the PC's places, drawn opaque as the PC draws
   them.
-- Settings: VNDegen draws a dialog with the PC dialog's Text and Sound options (text speed, auto speed, white text,
-  skip unread, wait for voices in auto, volumes and mute), standing in for the PC's Windows property sheet.
+- Settings: VNDegen draws a dialog standing in for the PC's Windows property sheet, with its Screen, Text, Sound and
+  System tabs. Screen has Screen Effects (None draws every transition at once, as on the PC; Partial played the same as
+  Full on the PC wherever it was tried, so it does too) and Left click to skip effects (off, as on the PC, so a click
+  doesn't cut a transition short until it is turned on). Text and Sound have text speed, auto speed, white text, skip
+  unread, wait for voices in auto, volumes and mute. System has Reset Config to Default.
 
 Games start on the "Visual novel" controller layout.
 
@@ -103,6 +106,9 @@ Games start on the "Visual novel" controller layout.
 - In Scene View a scene's choices are the player's to make, as in the story.
 - The champion brassiere page shows every brassiere as not found.
 - Transitions other than crossfades and mask wipes (`4` with effects 3, 5, 8 and 10) are drawn as crossfades.
-- The settings dialog's Screen, System, Info and Machine tabs aren't there; full screen is the app's.
+- The settings dialog leaves out what belongs to the PC's window and hardware: the Screen tab's window size, mouse
+  cursor, right click (greyed out on the PC too), cursor operation and V-Sync, the System tab's CPU level,
+  performance optimization and Delete all saved data, and the Info and Machine tabs. The app sets the window and
+  manages saves.
 - CGs and scenes seen in VNDegen show as seen on the PC only once the PC game has been started with that game folder:
   until then its shipped `GlobalSave.sav` is left as it is.

@@ -676,6 +676,16 @@ void save_capture_thumb(EG *e) {
 
 static char *config_path(EG *e) { return eg_fmt("%s/Save/VNDegen.cfg", e->saveDir); }
 
+void config_defaults(EG *e) {
+    e->textSpeedSlider = 50;
+    e->textSpeed = 20;
+    e->autoSpeed = 50;
+    e->textWhite = e->mute = e->skipUnread = e->clickSkip = 0;
+    e->autoWaitVoice = 1;
+    e->effects = 2;
+    e->volBgm = e->volSe = e->volVoice = e->volMovie = 100;
+}
+
 void config_load(EG *e) {
     char *path = config_path(e);
     size_t n;
@@ -690,7 +700,7 @@ void config_load(EG *e) {
         int *v;
     } items[] = {{"TextSpeed", &e->textSpeedSlider}, {"AutoSpeed", &e->autoSpeed}, {"TextWhite", &e->textWhite}, {"SkipUnread", &e->skipUnread},
                  {"AutoWaitVoice", &e->autoWaitVoice}, {"Mute", &e->mute}, {"Music", &e->volBgm}, {"Voice", &e->volVoice},
-                 {"Sound", &e->volSe}, {"Movie", &e->volMovie}};
+                 {"Sound", &e->volSe}, {"Movie", &e->volMovie}, {"Effects", &e->effects}, {"ClickSkip", &e->clickSkip}};
     for (size_t i = 0; i < sizeof items / sizeof *items; i++) {
         int v;
         if (ini_ints(&ini, items[i].k, &v, 1) == 1) *items[i].v = v;
@@ -735,8 +745,9 @@ void config_save(EG *e) {
         }                                                                           \
         n += (size_t)snprintf(out + n, cap - n, __VA_ARGS__);                       \
     } while (0)
-    PUT("TextSpeed=%d\nAutoSpeed=%d\nTextWhite=%d\nSkipUnread=%d\nAutoWaitVoice=%d\nMute=%d\nMusic=%d\nVoice=%d\nSound=%d\nMovie=%d\n",
-        e->textSpeedSlider, e->autoSpeed, e->textWhite, e->skipUnread, e->autoWaitVoice, e->mute, e->volBgm, e->volVoice, e->volSe, e->volMovie);
+    PUT("TextSpeed=%d\nAutoSpeed=%d\nTextWhite=%d\nSkipUnread=%d\nAutoWaitVoice=%d\nMute=%d\nMusic=%d\nVoice=%d\nSound=%d\nMovie=%d\nEffects=%d\nClickSkip=%d\n",
+        e->textSpeedSlider, e->autoSpeed, e->textWhite, e->skipUnread, e->autoWaitVoice, e->mute, e->volBgm, e->volVoice, e->volSe, e->volMovie,
+        e->effects, e->clickSkip);
     for (int i = 0; i < e->vars.count; i++) {
         Var *v = &e->vars.vars[i];
         if (v->name[0] != ':' && v->name[0] != '@') continue;

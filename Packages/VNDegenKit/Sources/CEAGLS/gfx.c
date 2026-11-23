@@ -190,7 +190,7 @@ void gfx_transition(EG *e, int effect, const char *mask, int ms, bool reverse) {
     else memcpy(e->from, e->shown, sizeof(u32) * (size_t)e->W * (size_t)e->H);
     image_free(e->transMask);
     e->transMask = NULL;
-    bool skip = e->skipMode || e->keyDown[0x11];
+    bool skip = e->skipMode || e->keyDown[0x11] || !e->effects;
     if (effect == 0 || ms <= 0 || skip) {
         e->transActive = false;
         gfx_present(e);
@@ -209,7 +209,7 @@ void gfx_transition(EG *e, int effect, const char *mask, int ms, bool reverse) {
 
 bool gfx_transition_done(EG *e) {
     if (!e->transActive) return true;
-    if (e->click && !e->transMask) {
+    if (e->click && e->clickSkip) {
         gfx_present(e);
         return true;
     }

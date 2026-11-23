@@ -344,7 +344,7 @@ struct EG {
     int audioRate;
     Movie *movies[4];
     int volMaster, volBgm, volSe, volVoice, volMovie;
-    int textSpeedSlider, autoSpeed, textWhite, mute, skipUnread, autoWaitVoice;
+    int textSpeedSlider, autoSpeed, textWhite, mute, skipUnread, autoWaitVoice, effects, clickSkip;
     Image *thumb;
     u8 *prevBlock;
     char bgmName[2][64];
@@ -445,6 +445,7 @@ void global_load(EG *e);
 void global_save(EG *e);
 void config_load(EG *e);
 void config_save(EG *e);
+void config_defaults(EG *e);
 void game_to_title(EG *e);
 void ui_open_title_load(EG *e);
 void ui_open_sound(EG *e);

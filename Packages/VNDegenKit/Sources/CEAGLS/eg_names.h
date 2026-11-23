@@ -10,6 +10,7 @@
 #define cmd_exec eg_cmd_exec
 #define config_load eg_config_load
 #define config_save eg_config_save
+#define config_defaults eg_config_defaults
 #define fill_rect eg_fill_rect
 #define game_to_title eg_game_to_title
 #define gfx_close eg_gfx_close

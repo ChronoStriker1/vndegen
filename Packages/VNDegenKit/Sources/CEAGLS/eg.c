@@ -99,11 +99,8 @@ VNEAGLS *vneagls_open(const VNEAGLSConfig *cfg, char *err, size_t errSize) {
     ini_ints(&e->ini, "ScreenYsize", &size[1], 1);
     e->W = size[0] > 0 ? size[0] : 800;
     e->H = size[1] > 0 ? size[1] : 600;
-    e->textSpeedSlider = 50;
-    e->textSpeed = 20;
-    e->autoSpeed = 50;
-    e->autoWaitVoice = 1;
-    e->volMaster = e->volBgm = e->volSe = e->volVoice = e->volMovie = 100;
+    e->volMaster = 100;
+    config_defaults(e);
     e->mesAlpha = 255;
     gfx_init(e);
     text_init(e);
