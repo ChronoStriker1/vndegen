@@ -117,6 +117,15 @@ int main(int argc, char **argv) {
             if (sscanf(argv[a] + 8, "%63[^,],%d,%d,%d", map, &dx, &dy, &dd) == 4) sa_debug_dungeon(s, map, dx, dy, dd);
             alive = alive && run(s, 100);
         }
+        if (sscanf(argv[a], "expedition=%d,%d", &x, &y) == 2) {
+            sa_debug_expedition(s, x, y);
+            alive = alive && run(s, 100);
+        }
+        if (sscanf(argv[a], "key=%d", &n) == 1) {
+            vnsystemaoi_key(s, n, 1);
+            vnsystemaoi_key(s, n, 0);
+            alive = alive && run(s, 300);
+        }
         if (!strcmp(argv[a], "newgame")) {
             sa_debug_new_game(s);
             alive = alive && run(s, 100);

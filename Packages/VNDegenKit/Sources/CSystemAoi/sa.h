@@ -270,6 +270,7 @@ typedef struct Dungeon {
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
     u32 animMs, animDur;
     int hover, steps;
+    bool bumped;
     Image *art[DUN_ART];
     Image *needle[4];
     R3 r3;
@@ -288,6 +289,10 @@ int sa_dungeon_click(Dungeon *d, int x, int y);
 int sa_dungeon_key(Dungeon *d, int key);
 void sa_dungeon_draw(Dungeon *d, u32 *fb);
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
+int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
+void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
+bool sa_dungeon_facing_exit(const Dungeon *d);
+int sa_dungeon_object(const Dungeon *d);
 void sa_debug_dungeon(VNSystemAoi *sa, const char *map, int x, int y, int dir);
 
 typedef struct Mixer Mixer;
@@ -471,7 +476,8 @@ typedef struct BattleLine {
 
 typedef struct Battle {
     bool open, acting, autoBattle;
-    int result, round, hover, group, boardSize, gaugeMode;
+    int result, round, hover, group, boardSize, boardSet, gaugeMode;
+    char dungeonName[48], floorName[48];
     Party *party;
     Table groups, skills, lvup, items;
     Fighter f[BATTLE_FIGHTERS];
@@ -490,6 +496,8 @@ typedef struct Battle {
 bool sa_battle_init(Battle *b, Vfs *vfs, Party *party);
 void sa_battle_free(Battle *b);
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed);
+bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, Image *backdrop, int boardSet, u32 seed);
+void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor);
 bool sa_battle_tick(Battle *b, u32 ms);
 int sa_battle_click(Battle *b, int x, int y);
 bool sa_battle_hover(Battle *b, int x, int y);
@@ -497,6 +505,7 @@ void sa_battle_cancel(Battle *b);
 void sa_battle_draw(Battle *b, u32 *fb);
 void sa_debug_battle(VNSystemAoi *sa, const char *group, const char *backdrop);
 void sa_debug_new_game(VNSystemAoi *sa);
+void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor);
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
 
 void sa_popup_load(Image **frame, Vfs *vfs);

@@ -1,4 +1,4 @@
-#include "sa.h"
+#include "sa_private.h"
 
 #include <stdarg.h>
 #include <dlfcn.h>
@@ -7,19 +7,14 @@
 
 #include "vnfont.h"
 
-#define STD_SLOTS 9
 #define PAN_MS_PER_PX 25
 #define PAN_SKIP_SPEED 16
-#define MSG_LINES 4
 
-enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
 
 static const char *const uiNames[UI_COUNT] = {"msg_b00.agf", "msg_b01.agf", "msg_b02.agf", "msg_b03.agf", "msg_b04.agf",
                                               "msg_b05.agf", "msg_b06.agf", "msg_a03.agf", "msg_c00.agf", "msg_c01.agf",
                                               "msg_c02.agf"};
 
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON };
-enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 enum { TITLE_X = 640, TITLE_Y = 369, TITLE_H = 50, TITLE_W = 640 };
 
 typedef struct Button {
@@ -33,86 +28,6 @@ static const Button buttons[BTN_COUNT] = {
     {UI_REPEAT, 1086, 644, 80, 30}, {UI_OPTION, 1086, 674, 80, 30}, {UI_CLOSE, 1191, 554, 32, 30},
 };
 
-typedef struct BgmDef {
-    int id;
-    char file[40];
-    double loopTo, loopFrom;
-} BgmDef;
-
-typedef struct Picture {
-    char name[40];
-    Image *img;
-    int xslot, yslot;
-} Picture;
-
-struct SA {
-    VNSystemAoiConfig cfg;
-    char *gameDir, *saveDir;
-    FILE *logFile;
-    Vfs vfs;
-    VM vm;
-    VMHost host;
-    Mixer *mix;
-    u32 *fb;
-    u32 serial;
-    bool dirty, quit, paused;
-    char title[128];
-    char problem[256];
-    Picture bg;
-    int bgX, bgY, panFromX, panFromY, panToX, panToY;
-    u32 panMs, panDur;
-    bool panWait;
-    Picture std[STD_SLOTS];
-    Image *msgFrame;
-    Image *ui[UI_COUNT];
-    int hoverButton;
-    bool autoMode, skipMode, windowHidden;
-    u32 featherMs, autoMs;
-    bool forceSkip, rightClicked;
-    int mode, titleHover;
-    VNSystemAoiMovies movies;
-    bool haveMovies;
-    pthread_mutex_t movieLock;
-    void *movie;
-    FILE *movieFile;
-    double movieTime;
-    int movieW, movieH;
-    char *faceName[64], *facePrefix[64];
-    int faceCount;
-    char faceExpr[64][4];
-    Picture face;
-    char nextBox[32];
-    int nextEntry;
-    Image *titleBg, *titleItem[TITLE_ITEMS];
-    char lastVoice[40];
-    char pageVoice[40];
-    Backlog log;
-    Town town;
-    Party party;
-    Battle battle;
-    BuildScreen build;
-    Dialog dialog;
-    Dungeon dungeon;
-    bool turnPending;
-    bool inGame;
-    int afterScript;
-    char name[96];
-    char *lines[MSG_LINES];
-    int lineCount;
-    int shown, total;
-    u32 textMs;
-    char voice[32];
-    int mouseX, mouseY;
-    bool clicked;
-    int hover;
-    u32 waitMs;
-    bool waitClick;
-    BgmDef *bgm;
-    int bgmCount;
-    Image *msgBand;
-    u32 *from;
-    u32 transMs, transDur;
-};
 
 void sa_log(SA *s, const char *fmt, ...) {
     if (!s || !s->logFile) return;
@@ -153,6 +68,17 @@ static void picture_set(SA *s, Picture *p, const char *name, int xslot, int yslo
 static void picture_clear(Picture *p) {
     sa_image_free(p->img);
     memset(p, 0, sizeof *p);
+}
+
+void sa_show_frame_as_bg(SA *s, const u32 *px, const char *name) {
+    picture_clear(&s->bg);
+    s->bg.img = sa_image_new(SA_W, SA_H);
+    memcpy(s->bg.img->px, px, sizeof(u32) * SA_W * SA_H);
+    snprintf(s->bg.name, sizeof s->bg.name, "%s", name);
+    s->bgX = s->bgY = 0;
+    s->panDur = 0;
+    for (int i = 0; i < STD_SLOTS; i++) picture_clear(&s->std[i]);
+    s->dirty = true;
 }
 
 static void clear_text(SA *s) {
@@ -485,12 +411,38 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         }
         break;
     case 0x8a: {
+        int gain[4] = {0, 0, 0, 0};
+        for (int i = 0; i < 4 && i < in->count; i++) gain[i] = sa_vm_get(vm, code, &in->o[i]);
+        sa_exp_gain(s, gain);
         char *t = opd_str(code, in, 4);
         clear_text(s);
         sa_dialog_open(&s->dialog, t);
         free(t);
         vm->state = VM_WAIT_DIALOG;
         s->dirty = true;
+        break;
+    }
+    case 0xd7:
+        if (in->count >= 5) {
+            char *f = opd_str(code, in, 0);
+            sa_dungeon_set(&s->dungeon, f, sa_vm_get(vm, code, &in->o[1]), sa_vm_get(vm, code, &in->o[2]), sa_vm_get(vm, code, &in->o[3]),
+                           sa_vm_get(vm, code, &in->o[4]), in->count > 5 ? sa_vm_get(vm, code, &in->o[5]) : 0);
+            free(f);
+            s->dirty = true;
+        }
+        break;
+    case 0xd8:
+        if (in->count >= 5) {
+            char *f = opd_str(code, in, 0);
+            sa_vm_set(vm, &in->o[1], sa_dungeon_get(&s->dungeon, f, sa_vm_get(vm, code, &in->o[2]), sa_vm_get(vm, code, &in->o[3]),
+                                                    sa_vm_get(vm, code, &in->o[4])));
+            free(f);
+        }
+        break;
+    case 0xa8: {
+        char *g = opd_str(code, in, 0);
+        sa_log(s, "enemy group %s placed (not built yet)", g);
+        free(g);
         break;
     }
     case 0xef:
@@ -621,7 +573,7 @@ static void compose_title(SA *s) {
     s->serial++;
 }
 
-static void reset_scene(SA *s) {
+void sa_reset_scene(SA *s) {
     picture_clear(&s->bg);
     s->bgX = s->bgY = 0;
     s->panDur = 0;
@@ -635,7 +587,7 @@ static void reset_scene(SA *s) {
     s->waitClick = false;
 }
 
-static bool start_script(SA *s, const char *box, int entry) {
+bool sa_start_script(SA *s, const char *box, int entry) {
     s->vm.depth = 0;
     s->vm.choiceCount = 0;
     s->mode = MODE_STORY;
@@ -645,7 +597,7 @@ static bool start_script(SA *s, const char *box, int entry) {
 }
 
 static void go_title(SA *s) {
-    reset_scene(s);
+    sa_reset_scene(s);
     s->inGame = false;
     sa_stop(s->mix, CH_VOICE, 0, 0);
     sa_stop(s->mix, CH_BGM, 0, 500);
@@ -655,7 +607,7 @@ static void go_title(SA *s) {
 }
 
 static void new_game(SA *s) {
-    reset_scene(s);
+    sa_reset_scene(s);
     memset(s->vm.c, 0, sizeof s->vm.c);
     memset(s->vm.f, 0, sizeof s->vm.f);
     snprintf(s->nextBox, sizeof s->nextBox, "bo0000.box");
@@ -663,10 +615,10 @@ static void new_game(SA *s) {
     sa_town_new_game(&s->town);
     sa_party_new_game(&s->party, &s->vfs);
     s->inGame = true;
-    start_script(s, "init.box", 0);
+    sa_start_script(s, "init.box", 0);
 }
 
-static void end_turn(SA *s) {
+void sa_end_turn(SA *s) {
     VM *vm = &s->vm;
     int food = 0, money = 0, res = 0, people = 0, cap = 0;
     for (int c = 0; c < TOWN_CELLS; c++) {
@@ -700,8 +652,8 @@ static void end_turn(SA *s) {
 static void next_turn(SA *s) {
     s->turnPending = false;
     s->town.mapOnly = false;
-    reset_scene(s);
-    start_script(s, "bo0000.box", 0);
+    sa_reset_scene(s);
+    sa_start_script(s, "bo0000.box", 0);
 }
 
 static bool dialog_input(SA *s) {
@@ -717,15 +669,6 @@ static bool dialog_input(SA *s) {
         }
     }
     return true;
-}
-
-static void dungeon_result(SA *s, int r) {
-    if (r == DUN_REST) {
-        sa_log(s, "dungeon: rest ends the expedition");
-        s->mode = MODE_TOWN;
-        end_turn(s);
-    }
-    s->dirty = true;
 }
 
 static int command_number(int action) {
@@ -745,7 +688,10 @@ static int command_number(int action) {
 static void run_command(SA *s, int action) {
     switch (action) {
     case TOWN_CMD_REST:
-        end_turn(s);
+        sa_end_turn(s);
+        break;
+    case TOWN_CMD_EXPEDITION:
+        sa_exp_open_select(s);
         break;
     case TOWN_CMD_BUILD:
         sa_build_open(&s->build);
@@ -763,8 +709,8 @@ static void town_action(SA *s, int action) {
     if (number >= 0) {
         s->vm.c[0x5f] = number;
         s->afterScript = action;
-        reset_scene(s);
-        start_script(s, "bo3000.box", 0);
+        sa_reset_scene(s);
+        sa_start_script(s, "bo3000.box", 0);
         s->dirty = true;
         return;
     }
@@ -785,9 +731,9 @@ static void town_action(SA *s, int action) {
 static void title_pick(SA *s, int item) {
     switch (item) {
     case TITLE_PROLOGUE:
-        reset_scene(s);
+        sa_reset_scene(s);
         s->nextBox[0] = 0;
-        start_script(s, "pro.box", 0);
+        sa_start_script(s, "pro.box", 0);
         break;
     case TITLE_START:
         new_game(s);
@@ -882,6 +828,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     if (!sa_battle_init(&s->battle, &s->vfs, &s->party)) sa_log(s, "can't read the battle tables");
     sa_build_init(&s->build, &s->vfs);
     sa_dialog_init(&s->dialog, &s->vfs);
+    sa_exp_init(s);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
@@ -927,6 +874,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_party_free(&s->party);
     sa_build_free(&s->build);
     sa_dialog_free(&s->dialog);
+    sa_exp_free(s);
     sa_dungeon_free(&s->dungeon);
     r3_free(&s->dungeon.r3);
     picture_clear(&s->face);
@@ -974,23 +922,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             return !s->quit;
         }
     }
-    if (s->mode == MODE_DUNGEON) {
-        if (sa_dungeon_tick(&s->dungeon, elapsedMs)) s->dirty = true;
-        if (sa_party_tick(&s->party, elapsedMs)) s->dirty = true;
-        if (sa_dungeon_hover(&s->dungeon, s->mouseX, s->mouseY)) s->dirty = true;
-        s->rightClicked = false;
-        if (s->clicked) {
-            s->clicked = false;
-            dungeon_result(s, sa_dungeon_click(&s->dungeon, s->mouseX, s->mouseY));
-        }
-        if (s->mode == MODE_DUNGEON && s->dirty) {
-            sa_dungeon_draw(&s->dungeon, s->fb);
-            sa_dungeon_draw_hud(&s->dungeon, s->fb, &s->party, s->vm.c[C_RANK_MAX]);
-            s->serial++;
-            s->dirty = false;
-        }
-        return true;
-    }
+    if (sa_exp_frame(s, elapsedMs)) return true;
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
         if (sa_battle_hover(&s->battle, s->mouseX, s->mouseY)) s->dirty = true;
@@ -1001,10 +933,8 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         }
         if (s->clicked) {
             s->clicked = false;
-            if (sa_battle_click(&s->battle, s->mouseX, s->mouseY) != BATTLE_RUNNING) {
-                s->mode = MODE_TOWN;
-                s->town.mapOnly = false;
-            }
+            int result = sa_battle_click(&s->battle, s->mouseX, s->mouseY);
+            if (result != BATTLE_RUNNING) sa_exp_battle_over(s, result);
             s->dirty = true;
         }
         if (s->dirty) {
@@ -1223,12 +1153,13 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         s->dirty = true;
     }
     if (s->vm.state == VM_RUN) sa_vm_run(&s->vm, &s->vfs, &s->host, 20000);
+    if (s->vm.state == VM_DONE && !s->nextBox[0] && sa_exp_script_done(s)) return true;
     if (s->vm.state == VM_DONE) {
         if (s->nextBox[0]) {
             char box[32];
             snprintf(box, sizeof box, "%s", s->nextBox);
             s->nextBox[0] = 0;
-            start_script(s, box, s->nextEntry);
+            sa_start_script(s, box, s->nextEntry);
         } else {
             char *sav = sa_fmt("%s/Bunny3.sav", s->saveDir);
             sa_mkdirs(sav);
@@ -1236,12 +1167,12 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             if (s->inGame && s->afterScript) {
                 int a = s->afterScript;
                 s->afterScript = 0;
-                reset_scene(s);
+                sa_reset_scene(s);
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
                 run_command(s, a);
             } else if (s->inGame) {
-                reset_scene(s);
+                sa_reset_scene(s);
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
                 s->dirty = true;
@@ -1288,7 +1219,7 @@ void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down) {
     SA *s = (SA *)sa;
     if (!down) return;
     if (s->mode == MODE_DUNGEON) {
-        dungeon_result(s, sa_dungeon_key(&s->dungeon, virtualKey));
+        sa_exp_key(s, virtualKey);
         return;
     }
     if (virtualKey == 0x0d || virtualKey == 0x20) {
@@ -1390,4 +1321,15 @@ void sa_debug_dungeon(VNSystemAoi *sa, const char *map, int x, int y, int dir) {
     sa_dungeon_place(&s->dungeon, x, y, dir);
     s->mode = MODE_DUNGEON;
     s->dirty = true;
+}
+
+void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor) {
+    SA *s = (SA *)sa;
+    if (!s->inGame) {
+        sa_party_new_game(&s->party, &s->vfs);
+        s->inGame = true;
+    }
+    if (dungeon < 0) sa_exp_force_battle(s);
+    else if (dungeon > 0) sa_exp_enter(s, dungeon, floor);
+    else sa_exp_open_select(s);
 }

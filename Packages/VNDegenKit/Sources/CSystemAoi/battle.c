@@ -70,6 +70,9 @@ enum {
     EXP_W = 100,
     LV_RIGHT = 44,
     LV_Y = 666,
+    NAME_X = 76,
+    FLOOR_NAME_X = 300,
+    NAME_Y = 15,
     START_X = 500,
     START_Y = 497,
     START_W = 204,
@@ -116,9 +119,8 @@ enum {
 static const int sideY[12] = {414, 434, 474, 494, 514, 554, 574, 594, 634, 654, 674, 694};
 
 static const struct {
-    const char *name;
     int x, y;
-} boards[4] = {{NULL, 0, 0}, {"m000bt2a.agf", 406, 116}, {"m000bt2b.agf", 326, 130}, {"m000bt2c.agf", 250, 80}};
+} boards[4] = {{0, 0}, {406, 116}, {326, 130}, {250, 80}};
 
 static const char *text_of(const Table *t, int row, int col) { return sa_table_text(t, row, col); }
 
@@ -277,7 +279,17 @@ static void place_group(Battle *b, Vfs *vfs, int g) {
 }
 
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed) {
+    return sa_battle_begin(b, vfs, group, backdrop ? sa_load_image(vfs, backdrop) : NULL, 0, seed);
+}
+
+void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor) {
+    snprintf(b->dungeonName, sizeof b->dungeonName, "%s", dungeon);
+    snprintf(b->floorName, sizeof b->floorName, "%s", floor);
+}
+
+bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, Image *backdrop, int boardSet, u32 seed) {
     clear_fighters(b);
+    b->dungeonName[0] = b->floorName[0] = 0;
     b->rng = seed ? seed : 0x9e3779b9u;
     int g = row_by_text(&b->groups, 2, group);
     if (g < 0) return false;
@@ -298,10 +310,23 @@ bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdro
     b->gainResources = b->gainExp = 0;
     b->gainItem[0] = 0;
     place_group(b, vfs, g);
-    if (!b->board[0]) b->board[0] = sa_load_image(vfs, "m000bt1a.agf");
-    if (!b->board[b->boardSize]) b->board[b->boardSize] = sa_load_image(vfs, boards[b->boardSize].name);
+    if (b->boardSet != boardSet)
+        for (int i = 0; i < 4; i++) {
+            sa_image_free(b->board[i]);
+            b->board[i] = NULL;
+        }
+    b->boardSet = boardSet;
+    char name[24];
+    if (!b->board[0]) {
+        snprintf(name, sizeof name, "m%03dbt1a.agf", boardSet);
+        b->board[0] = sa_load_image(vfs, name);
+    }
+    if (!b->board[b->boardSize]) {
+        snprintf(name, sizeof name, "m%03dbt2%c.agf", boardSet, "?abc"[b->boardSize]);
+        b->board[b->boardSize] = sa_load_image(vfs, name);
+    }
     sa_image_free(b->back);
-    b->back = backdrop ? sa_load_image(vfs, backdrop) : NULL;
+    b->back = backdrop;
     b->open = true;
     b->result = BATTLE_RUNNING;
     b->acting = false;
@@ -951,6 +976,8 @@ void sa_battle_draw(Battle *b, u32 *fb) {
     if (b->back) sa_blit(fb, b->back, 0, 0);
     draw_board(b, fb);
     sa_blit_rect(fb, b->art[ART_BAR], 0, 0, 448, 28, 10, 10);
+    sa_text_draw(fb, SA_W, SA_H, b->dungeonName, -1, NAME_X, NAME_Y, 15, 0x000000, NO_EDGE);
+    sa_text_draw(fb, SA_W, SA_H, b->floorName, -1, FLOOR_NAME_X, NAME_Y, 15, 0x000000, NO_EDGE);
     for (int i = 0; i < 12; i++)
         sa_blit_rect(fb, b->art[ART_SIDE0 + i], 0, b->hover == HOVER_SIDE + i || side_lit(b, i) ? SIDE_H : 0, SIDE_W, SIDE_H, SIDE_X,
                      sideY[i]);

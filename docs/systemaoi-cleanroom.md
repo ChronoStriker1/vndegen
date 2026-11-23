@@ -164,3 +164,38 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   linear fog to (40, 45, 30) from −4 to 28 units. Back faces are culled. A texture whose top-left colour covers a
   tenth of it treats that colour as transparent (the grass `010w0x0`).
 - **Not yet known.** The exit shows as a free-standing gold-framed door, not a part of the set.
+
+## Expeditions, from the scripts and play
+
+`init.box` registers a script per hook number (`72`). What each hook does is read from its script; when the engine
+calls it is inferred from that and from play, and marked so.
+
+- **Variables the engine keeps.** C070 the dungeon and C071 the floor (`floor.obj` columns 0 and 1), C073, C074 and
+  C075 the party's cell and facing (passed to `d7`/`d8`), C150 the enemy group's id, C151 the dungeon again (for its
+  music), C155 a battle's result (1 won, 2 lost; 3 fled is inferred). C210 to C213 hold what the expedition has found
+  (residents, food, money, resources). Facing is inferred as 0 north, 1 east, 2 south, 3 west.
+- **Hooks.** 10 `bo1000` sets the pickup ranges per dungeon (C520 to C527); 25 `bo2500` plays the dungeon's music by
+  C151 (31 for 千樹庭); 11 `bo1100` sets up a floor (enemy groups by name with `a8`, floor objects with `d7`); 12
+  `bo1200` handles the cell the party stands on or faces (pickups, keyed doors `壁` 101 to 110, opened as 111); 17
+  `bo1700` runs on the way home; 26 `bo2600` before a battle (battle music 35); 27 `bo2700` after one (on a loss
+  Darkus's line, then the loss message). Inferred order on entering: 10, 25, 11; hook 12 after each step onto a cell
+  with a floor object and on walking into a wall; 17 on leaving.
+- **`d7` and `d8`.** Write and read the map: `d7 "name" value x y mode [facing]`, `d8 "name" var x y facing`. Names:
+  床物 (the cell's object, `mpDDFF.amd` field 6), 壁 (the wall on a side) and 移動 (the field after it; 1 lets the
+  party through). Mode 2 also writes the neighbour's facing side (inferred from doors being opened that way).
+- **Pickups.** Floor objects 101 to 104 give residents, money, resources or food (a random amount in the hook's
+  ranges, 20 to 40 residents, 20 to 100 money, 10 to 30 food, 20 to 80 resources in 千樹庭) and become 105.
+- **`8a`'s numbers** add to what the expedition has found; the loss hook passes their negatives, so a loss leaves
+  nothing. Measured: the loss message reads 戦闘敗北した事により、遠征で得た物を全て失ってしまった。, then the turn
+  ends with the income box.
+- **Coming home.** Inferred: walking into the floor's exit (wall 20), or 休憩, runs hook 17, adds the finds to the
+  town and ends the turn.
+- **Encounters.** Inferred until measured: after at least `floor.obj` column 19 steps (3) since the last battle, each
+  step has column 32's chance (10%) of a battle with a group drawn from column 31 (千05 or 千06 on the first floor).
+  A PC run gave battles after 12 and about 15 steps.
+- **Dungeon select.** Measured: the hall `bg005a0`, a plate per dungeon (`gat_bNN`, normal, hover, chosen) from
+  (340, 40), the NEW badge `gat_d01` until it is visited, and 戻る (`gat_c00`) at (444, 640). Inferred: the floors'
+  plates (`gat_a01` with the floor's name) to the right at x 760, one row per floor.
+- **Battles from the dungeon** use the dungeon's platforms (`mNNNbt1a` and `bt2a` to `bt2c`, NNN the dungeon less
+  one) and the top bar names the dungeon and floor. The backdrop is the dungeon view; the original's seems to look
+  further along, from a different camera.

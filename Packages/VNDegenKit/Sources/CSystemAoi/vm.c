@@ -311,6 +311,18 @@ int sa_vm_run(VM *vm, Vfs *vfs, const VMHost *h, int budget) {
             if (in.count >= 3) sa_vm_set(vm, &o[0], sa_vm_get(vm, code, &o[1]) + sa_vm_get(vm, code, &o[2]));
             else if (in.count == 2) sa_vm_set(vm, &o[0], sa_vm_get(vm, code, &o[0]) + sa_vm_get(vm, code, &o[1]));
             break;
+        case 0x0c:
+        case 0x0d:
+        case 0x0e:
+        case 0x0f:
+            if (in.count >= 3) {
+                i32 x = sa_vm_get(vm, code, &o[1]), y = sa_vm_get(vm, code, &o[2]), r = 0;
+                if (in.op == 0x0c) r = x - y;
+                else if (in.op == 0x0d) r = x * y;
+                else if (y) r = in.op == 0x0e ? x / y : x % y;
+                sa_vm_set(vm, &o[0], r);
+            }
+            break;
         case 0x15:
         case 0x18:
             if (in.count >= 1) f->pc = (u32)o[0].value;

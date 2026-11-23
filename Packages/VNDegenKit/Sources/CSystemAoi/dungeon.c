@@ -7,6 +7,7 @@ enum {
     MAP_HEADER = 48,
     CELL_BYTES = 104,
     F_FLOOR = 5,
+    F_OBJECT = 6,
     F_WALL_N = 18,
     F_WALL_E = 9,
     F_WALL_S = 12,
@@ -195,9 +196,14 @@ static void start_anim(Dungeon *d) {
     d->animDur = MOVE_MS;
 }
 
+static bool passable(const i32 *cell, int side) { return cell[wallField[side]] < 0 || cell[wallField[side] + 1] == 1; }
+
 static bool walk(Dungeon *d, int side) {
     const i32 *here = cell_at(d, d->x, d->y);
-    if (!here || here[wallField[side]] >= 0) return false;
+    if (!here || !passable(here, side)) {
+        if (here && side == d->dir) d->bumped = true;
+        return false;
+    }
     const i32 *there = cell_at(d, d->x + stepX[side], d->y + stepY[side]);
     if (!there || there[F_FLOOR] < 0) return false;
     d->x += stepX[side];
@@ -427,4 +433,38 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
     }
     sa_blit_rect(fb, d->art[DUN_ART_REST], 0, d->hover == HOVER_REST ? REST_H : 0, REST_W, REST_H, REST_X, REST_Y);
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
+}
+
+static int field_of(const char *name, int dir) {
+    if (!strcmp(name, "床物")) return F_OBJECT;
+    if (!strcmp(name, "壁")) return wallField[dir & 3];
+    if (!strcmp(name, "移動")) return wallField[dir & 3] + 1;
+    return -1;
+}
+
+int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir) {
+    const i32 *c = cell_at(d, x, y);
+    int f = field_of(name, dir);
+    return c && f >= 0 ? c[f] : -1;
+}
+
+void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir) {
+    int f = field_of(name, dir);
+    if (f < 0 || !cell_at(d, x, y)) return;
+    d->cell[y * MAP_W + x][f] = value;
+    if (mode == 2 && f != F_OBJECT) {
+        int nx = x + stepX[dir & 3], ny = y + stepY[dir & 3];
+        int g = field_of(name, dir + 2);
+        if (cell_at(d, nx, ny)) d->cell[ny * MAP_W + nx][g] = value;
+    }
+}
+
+bool sa_dungeon_facing_exit(const Dungeon *d) {
+    const i32 *c = cell_at(d, d->x, d->y);
+    return c && c[wallField[d->dir]] == WALL_EXIT;
+}
+
+int sa_dungeon_object(const Dungeon *d) {
+    const i32 *c = cell_at(d, d->x, d->y);
+    return c ? c[F_OBJECT] : -1;
 }

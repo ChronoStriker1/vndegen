@@ -76,12 +76,17 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   Rounds play in speed order with the damage, hit and target rules in `docs/systemaoi-cleanroom.md`. A win dims the
   screen and shows the resources, EXP and any item found; EXP fills the panel's bar and raises levels. Only a debug
   hook starts a battle so far.
+- **Expeditions.** 遠征 opens the dungeon select; a floor's map is drawn in 3D from its part set (software rendered),
+  walked with the pad or the arrow keys, with the compass, a minimap of visited cells and the party's diorama. The
+  game's hooks run on entering, on stepping onto floor objects and walls, before and after battles and on the way
+  home. Battles start from the dungeon; a loss ends the expedition, and walking out the exit brings the finds home.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
   FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
 
 ## Known limits
 
-- Expeditions, the 3D dungeon, units, items and most town commands aren't built yet; they are the original's exe, not
+- Units, items and most town commands aren't built yet, nor the dungeon's events beyond pickups, doors and the
+  scripts' messages; they are the original's exe, not
   its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
