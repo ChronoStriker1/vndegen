@@ -412,12 +412,19 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         }
         break;
     case 0x8a: {
-        int gain[4] = {0, 0, 0, 0};
-        for (int i = 0; i < 4 && i < in->count; i++) gain[i] = sa_vm_get(vm, code, &in->o[i]);
+        int gain[4] = {0, 0, 0, 0}, before[4], after[4];
+        bool any = false;
+        for (int i = 0; i < 4 && i < in->count; i++) {
+            gain[i] = sa_vm_get(vm, code, &in->o[i]);
+            any = any || gain[i];
+        }
+        for (int i = 0; i < 4; i++) before[i] = vm->c[0xd2 + i];
         sa_exp_gain(s, gain);
+        for (int i = 0; i < 4; i++) after[i] = vm->c[0xd2 + i];
         char *t = opd_str(code, in, 4);
         clear_text(s);
-        sa_dialog_open(&s->dialog, t);
+        if (any && s->exp.active) sa_dialog_open_turn(&s->dialog, before, after, t);
+        else sa_dialog_open(&s->dialog, t);
         free(t);
         vm->state = VM_WAIT_DIALOG;
         s->dirty = true;

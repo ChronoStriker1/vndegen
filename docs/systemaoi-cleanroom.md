@@ -209,7 +209,8 @@ calls it is inferred from that and from play, and marked so.
   party through). Mode 2 also writes the neighbour's facing side (inferred from doors being opened that way).
 - **Pickups.** Floor objects 101 to 104 give residents, money, resources or food (a random amount in the hook's
   ranges, 20 to 40 residents, 20 to 100 money, 10 to 30 food, 20 to 80 resources in 千樹庭) and become 105.
-- **`8a`'s numbers** add to what the expedition has found; the loss hook passes their negatives, so a loss leaves
+- **`8a`'s numbers** add to what the expedition has found, and when any is non-zero the box shows the finds before,
+  the change and after in its table (measured on the loss message: 資金 1 → 0, 資源 1 → 0); the loss hook passes their negatives, so a loss leaves
   nothing. Measured: the loss message reads 戦闘敗北した事により、遠征で得た物を全て失ってしまった。, then the turn
   ends with the income box.
 - **`89`** after an event's scenes fades back to the dungeon view (C070, C071, C072, fade 10).
