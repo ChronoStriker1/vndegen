@@ -362,6 +362,23 @@ default voice 100
 default backvoice 100
 
 screen cg
+viewer obj\l000_000.bmp 628 565
+viewerhelp obj\l004_000.bmp 933 683 11
+viewerbutton hide obj\l001_000.bmp 1240 575 help 0
+viewerbutton zoomout obj\l003_000.bmp 645 640 3 0 help 8
+viewerbutton zoomreset obj\l003_000.bmp 681 640 3 1 help 9
+viewerbutton zoomin obj\l003_000.bmp 717 640 3 2 help 10
+viewerbutton replay obj\l001_001.bmp 762 639 7 0 help 1
+viewerbutton prevcg obj\l001_001.bmp 822 639 7 1 help 2
+viewerbutton prevvar obj\l001_001.bmp 877 639 7 2 help 3
+viewerbutton nextvar obj\l001_001.bmp 1022 639 7 3 help 4
+viewerbutton nextcg obj\l001_001.bmp 1077 639 7 4 help 5
+viewerbutton auto obj\l001_001.bmp 1137 639 7 5 help 6
+viewerbutton return obj\l001_001.bmp 1198 639 7 6 help 7
+viewernumber zoom obj\l002_000.bmp 683 611 13 1
+viewernumber zoomfrac obj\l002_001.bmp 706 613 11 2
+viewernumber index obj\l002_000.bmp 946 630 13 2
+viewernumber total obj\l002_001.bmp 986 648 11 2
 selectedlook
 pic obj\e000_000.bmp 0 0
 pic obj\e000_001.bmp 0 0
