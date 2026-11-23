@@ -111,6 +111,12 @@ int main(int argc, char **argv) {
             vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 0);
             alive = alive && run(s, 1000);
         }
+        if (!strncmp(argv[a], "dungeon=", 8)) {
+            char map[64];
+            int dx, dy, dd;
+            if (sscanf(argv[a] + 8, "%63[^,],%d,%d,%d", map, &dx, &dy, &dd) == 4) sa_debug_dungeon(s, map, dx, dy, dd);
+            alive = alive && run(s, 100);
+        }
         if (!strcmp(argv[a], "newgame")) {
             sa_debug_new_game(s);
             alive = alive && run(s, 100);

@@ -228,6 +228,48 @@ bool sa_pvm_parse(Pvm *m, const u8 *data, size_t size);
 void sa_pvm_free(Pvm *m);
 int sa_pvm_find(const Pvm *m, const char *name);
 
+typedef struct R3Vert {
+    float x, y, z, u, v, shade;
+} R3Vert;
+
+typedef struct R3 {
+    int w, h;
+    float *zbuf;
+    u32 *fb;
+    float focal, fogNear, fogFar;
+    u32 fogColor;
+    int cull;
+} R3;
+
+void r3_init(R3 *r, int w, int h);
+void r3_free(R3 *r);
+void r3_begin(R3 *r, u32 *fb, float fovDeg);
+void r3_tri(R3 *r, const R3Vert *v, const Image *tex);
+Image *sa_bmp_decode(const u8 *d, size_t n);
+
+#define DUN_CELLS 225
+#define DUN_FIELDS 26
+#define DUN_TEX 64
+
+typedef struct Dungeon {
+    Pvm set;
+    int *last;
+    Image *tex[DUN_TEX];
+    char texName[DUN_TEX][48];
+    int texCount;
+    int *layerTex;
+    i32 cell[DUN_CELLS][DUN_FIELDS];
+    bool loaded;
+    int x, y, dir;
+    float fov, camX, camZ, yaw;
+    R3 r3;
+} Dungeon;
+
+bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map);
+void sa_dungeon_free(Dungeon *d);
+void sa_dungeon_draw(Dungeon *d, u32 *fb);
+void sa_debug_dungeon(VNSystemAoi *sa, const char *map, int x, int y, int dir);
+
 typedef struct Mixer Mixer;
 enum { CH_BGM, CH_SE, CH_VOICE, CH_COUNT };
 Mixer *sa_mixer_new(int rate, Vfs *vfs);

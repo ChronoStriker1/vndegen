@@ -18,7 +18,7 @@ static const char *const uiNames[UI_COUNT] = {"msg_b00.agf", "msg_b01.agf", "msg
                                               "msg_b05.agf", "msg_b06.agf", "msg_a03.agf", "msg_c00.agf", "msg_c01.agf",
                                               "msg_c02.agf"};
 
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 enum { TITLE_X = 640, TITLE_Y = 369, TITLE_H = 50, TITLE_W = 640 };
 
@@ -92,6 +92,7 @@ struct SA {
     Battle battle;
     BuildScreen build;
     Dialog dialog;
+    Dungeon dungeon;
     bool turnPending;
     bool inGame;
     int afterScript;
@@ -917,6 +918,8 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_party_free(&s->party);
     sa_build_free(&s->build);
     sa_dialog_free(&s->dialog);
+    sa_dungeon_free(&s->dungeon);
+    r3_free(&s->dungeon.r3);
     picture_clear(&s->face);
     for (int i = 0; i < s->faceCount; i++) {
         free(s->faceName[i]);
@@ -961,6 +964,14 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             }
             return !s->quit;
         }
+    }
+    if (s->mode == MODE_DUNGEON) {
+        if (s->dirty) {
+            sa_dungeon_draw(&s->dungeon, s->fb);
+            s->serial++;
+            s->dirty = false;
+        }
+        return true;
     }
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
@@ -1343,4 +1354,21 @@ void sa_debug_new_game(VNSystemAoi *sa) {
     if (s->movie) movie_stop(s);
     s->mode = MODE_STORY;
     new_game(s);
+}
+
+void sa_debug_dungeon(VNSystemAoi *sa, const char *map, int x, int y, int dir) {
+    SA *s = (SA *)sa;
+    if (!sa_dungeon_load(&s->dungeon, &s->vfs, getenv("SA_SET") ? getenv("SA_SET") : "m010set.pvm", map)) {
+        sa_log(s, "can't load the dungeon %s", map);
+        return;
+    }
+    s->dungeon.x = x;
+    s->dungeon.y = y;
+    s->dungeon.dir = dir;
+    s->dungeon.camX = (float)x * 8;
+    s->dungeon.camZ = -(float)y * 8;
+    s->dungeon.yaw = (float)dir * 1.5707963f;
+    if (getenv("SA_FOV")) s->dungeon.fov = (float)atof(getenv("SA_FOV"));
+    s->mode = MODE_DUNGEON;
+    s->dirty = true;
 }
