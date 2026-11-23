@@ -445,9 +445,15 @@ the same points (offsets in bytes, numbers little-endian):
 - **Save details** in the variables: C002 and C013 the save time in Unix seconds, C003 the save count (shown at the
   top right of a slot's details, and the autosave panel's count), C011 the play time in seconds. Loading and saving
   again changes only these.
-- **Other regions** not yet placed: 6,189 to 7,136 (only in dungeon autosaves; 128-byte rows, likely the floor's map),
-  215,608 to 229,808 (544-byte records like the party's), 993,208 to 998,847, 1,035,056 to 1,066,684 and an ascending
-  list of offsets at 1,115,868, likely the backlog.
+- **Map memory** from 6,172: 150 records of 532 bytes (fifteen dungeons of ten floors, ending where the members
+  begin): sixteen bytes, a word with the floor in its second byte and the dungeon in its third (00 01 01 00 for
+  千樹庭's first floor, 00 02 01 00 for its second), then four layers of 32 row bitmasks. Layers 0 and 3 were equal
+  in every save and 1 and 2 subsets of them; which layer is the visited cells and how a cell maps to a bit isn't
+  settled yet, so VNDegen neither reads nor writes it.
+- **Other regions** not yet placed: 215,608 to 229,808 (only in dungeon autosaves; 544-byte records like the
+  members' battle blocks, likely the floor's enemies), 993,208 to 997,999 (four 1,200-byte records starting -1, 1,
+  -1), 1,012,652 on (event history), 1,035,056 to 1,066,684 (the backlog's text) and an ascending list of offsets at
+  1,115,868 (the backlog's index).
 - **Engine numbers.** C000 is always 2^31 - 1, C007 and C008 100, C036 and C037 1, C190 to C194 -1. C004 and C005
   are 6 and 1 in the town and 62 and 2 in a dungeon; the slot details read the place from them and an image without
   them opens a story scene instead of the town. C006 changes each turn, likely the random seed. The original
