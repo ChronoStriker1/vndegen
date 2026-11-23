@@ -34,5 +34,6 @@ Things that were unsure and how they were settled:
 - `123` loops until its condition holds: the wait script loops on `_Timer > _WaitTime`.
 - Loops yield: the name confirmation polls the mouse in a loop with no wait; without a frame's wait it would never
   draw.
-- `136` opens Save, `137(0)` the title's Load, `137(1)` Load, `146` and `147(0)` the settings: from the map's and the
-  title's buttons and their pictures.
+- `136` opens Save, `137(0)` the title's Load, `137(1)` Load, `146` and `135` the settings, `133` the exit question and
+  `147(0)` the title's bonus button: from the ids in the map's and the title's click maps (`titleM`, `TitleMpr`), the
+  scripts that handle each id, and the same buttons on the PC.
