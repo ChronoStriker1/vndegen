@@ -143,18 +143,19 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - ANIM's own fonts and font list, cut-ins and filters on screen, the Volume screen and comment editing; BISHOP BSX auto saves keep to slot 0, as on the PC, so PC saves on the first page aren't overwritten (0.59.10).
 - Mesu Kyoushi 3 and 4's dress screen, and BSX map saves that load back onto the map (0.59.11).
 - Mesu Kyoushi 3 and 4's free-sight meter, kept in saves both ways (0.59.12).
+- A regression sweep of every engine after 0.59.5 to 0.59.12 found no regression; it fixed KiriKiri `.tpm` plugins and PJADV options kept on quit (0.59.13).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - Code audit of 2026-11-13: 77 issues, #93 to #169 (60 bugs, 17 improvements; `security` marks 10). All four high ones are fixed.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
 - From the new test games (0.56.2): #190's checks were done in 0.58.1, and restoring Wolf pictures from saves in 0.58.2. #187 was fixed in 0.57.2; #188 and #189 needed no change (Tenioha's bar opens with a tap on its strip, and Wolf's save screen takes keys only on the PC too).
+- From the regression sweep of 2026-11-23: #193 (Godot games open web links without asking), #194 (Project Hadal's black slot panels) and #195 (Fallen Kunoichi stops after its first lines in the Mac app).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SystemAoi, on VNDegen's own clean-room runtime, with Bunny Black 3, on `feat/systemaoi` since 2026-11-21: its rules rebuilt from play under Wine, in slices, the first one the opening through the first dungeon. The estimate is 8 to 12 weeks.
-- A regression sweep of 0.59.12, from 2026-11-23: one game per engine in the Mac app and eight on the iPad simulator, since seven releases went out in two days. Small regressions are fixed as patches; the rest become issues.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
