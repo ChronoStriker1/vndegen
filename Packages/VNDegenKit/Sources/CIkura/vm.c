@@ -272,6 +272,18 @@ static const char *name_arg(const u8 *a, int n) {
     return buf;
 }
 
+static const char *bgm_name(IK *t, const u8 *a, int n) {
+    const char *f = name_arg(a, n < 12 ? n : 12), *p = strchr(f, '%');
+    if (!p) return f;
+    const char *q = p + 1;
+    int w = 0;
+    while (*q >= '0' && *q <= '9') w = w * 10 + (*q++ - '0');
+    if (!*q) return f;
+    static char out[64];
+    snprintf(out, sizeof out, "%.*s%0*d%s", (int)(p - f), f, w, t->varCount ? (int)t->vars[0] : 0, q + 1);
+    return out;
+}
+
 static void exec(IK *t, u16 op, const u8 *a, int n) {
     Layer *l;
     switch (op) {
@@ -563,7 +575,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0506: snd_voice(t, name_arg(a, n)); break;
     case 0x0507: snd_voice_stop(t); break;
     case 0x0508: t->wait = W_VOICE; break;
-    case 0x0600: snd_bgm(t, name_arg(a, n < 12 ? n : 12), n >= 16 && ik_value(t, rd32(a + 12)) != 0); break;
+    case 0x0600: snd_bgm(t, bgm_name(t, a, n), n >= 16 && ik_value(t, rd32(a + 12)) != 0); break;
     case 0x0602: snd_bgm_fade(t, (int)ik_value(t, rd32(a))); break;
     case 0x020b:
         if ((l = layer(t, rd32(a)))) {

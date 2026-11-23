@@ -63,6 +63,9 @@ Raidy II's exe reads the same archives, pictures, sound and scripts; about sixty
 - `0008` calls through a switch table, `040b` reads a variable indirectly and `040d` copies a run of them, `0309`
   copies flags, `0108` loads the picture a text slot names, `0109` frees a range of pictures, `0719` and `071c` set
   the mode of or clear a range of buttons, and a variable reference in a destination writes the variable it names.
+- Music: every script has a routine that takes the track in variable 476, copies it into variable 0 and plays
+  `0600 RD2%02X`. The PC fills the name from variable 0 in decimal (track 29 plays `RD229.OGG`, matched by its
+  sound under Wine), zero-padded to the width.
 - The opening movie (`0e00`), `RAIDY2OP.MPG` in the game folder, is MPEG-1 with Layer II sound, played by the shared
   `vnvideo` decoder into a screen rectangle; a click skips it.
 - Animated scenes (`0d00`-`0d05`) are `GANM0100` files in `GRP`: a program of show-frame, hold and loop steps and

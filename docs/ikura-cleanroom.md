@@ -16,6 +16,7 @@ It derives from no GPL or LGPL code. Its sources:
 | File name case | `Engines/Shared/casepath.c`, VNDegen's own |
 | Raidy II: cells, layers, buttons | The game's scripts and GGP headers; test scripts in `SNR0` run by the original under Wine and recorded at 20 frames a second (layer swaps and the drawing order, range show and hide, jumps on a layer's state, switch calls, indirect variables, flag copies) |
 | Raidy II: animations (`GAN`) | GARbro `ArcFormats/Ikura/ArcGAN.cs` (MIT): the frame index and the run-length key and delta frames. The program's timing (40 ms units) and the layer they draw on from recordings of the original under Wine; the decoded frames matched its output to a mean difference of 0.12/255 |
+| Raidy II: music names | `0600`'s `RD2%02X` and the routine that sets variable 0 before it; the PC's sound under Wine recorded from a null sink and matched to the decoded tracks by envelope correlation (0.98 for `RD229.OGG`, 0.19 for the track before) |
 | Raidy II: movie | `RAIDY2OP.MPG` is MPEG-1 with Layer II sound; the shared `vnvideo` decoder (pl_mpeg, MIT) plays it |
 | Raidy II: automap | Saves the original wrote (bit order and plane layout) and test scripts drawing the map with each command alone and with its arguments swapped |
 | Raidy II: equipment | Black box only: test scripts set the equipment and base variables, ran `0f03` or `0f04`, and saved; the variables were read from the save files. The tables and formulas reproduce every variable in 98 compared saves |
