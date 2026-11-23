@@ -191,11 +191,27 @@ static bool voice_allowed(BX *b, const char *voice) {
 }
 
 void bx_voice_play(BX *b, int ch, const char *voice) {
-    if (voice && bx_res_find(&b->arc, RX_VOICE, voice) && voice_allowed(b, voice)) bx_snd_play(b, ch, RX_VOICE, voice, false, 0);
+    if (voice && bx_res_find(&b->arc, RX_VOICE, voice) && voice_allowed(b, voice))
+        bx_snd_play(b, ch, RX_VOICE, voice, b->set.voiceMode == 1 && !b->autoMode && !b->skipMode, 0);
 }
 
-void bx_msg_show(BX *b, const char *name, const char *text, const char *voice) {
+static char *without_quote_space(const char *text) {
+    char *out = bx_strdup(text ? text : ""), *w = out;
+    for (const char *p = out; *p;) {
+        bool quote = !strncmp(p, "\xe3\x80\x8c", 3);
+        int n = quote ? 3 : 1;
+        memmove(w, p, (size_t)n);
+        w += n;
+        p += n;
+        if (quote && *p == ' ') p++;
+    }
+    *w = 0;
+    return out;
+}
+
+void bx_msg_show(BX *b, const char *name, const char *raw, const char *voice) {
     bx_msg_clear(b);
+    char *text = without_quote_space(raw);
     b->speaker = name ? bx_strdup(name) : NULL;
     b->text = wrap(b, text);
     b->voice = voice ? bx_strdup(voice) : NULL;
@@ -217,7 +233,7 @@ void bx_msg_show(BX *b, const char *name, const char *text, const char *voice) {
     if (!b->logs) b->logs = bx_alloc(sizeof(LogEntry) * 512);
     LogEntry *l = &b->logs[b->logCount++];
     l->name = name ? bx_strdup(name) : NULL;
-    l->text = bx_strdup(text);
+    l->text = text;
     l->voice = voice ? bx_strdup(voice) : NULL;
     if (b->skipMode) bx_msg_reveal(b);
 }

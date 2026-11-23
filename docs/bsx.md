@@ -118,9 +118,37 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
   custom map that is the game's map.
 - The id is the same in every save of a game and is checked on load. It is read from the game's `save/` folder; the
   four Mesu Kyoushi games' ids are also built in.
+- A character's wear record has a byte per outfit code (the two digits after a bust-up's undress digit), set once the
+  character has been shown in that outfit, as the PC sets it under Wine; Mesu Kyoushi 3's and 4's dress screen lists an
+  outfit only when its byte is set.
 - `common.dat` holds the PC's settings (with the same wear records), a byte per choice taken, a byte per message read,
   and the museum's records. VNDegen finds the choice and read tables by their counts, updates them, and leaves the rest
   as the PC wrote it.
+- A game folder without `save/common.dat` gets the one the PC makes when it first quits: the id; the settings block
+  (50 bytes in 3.0, 51 in 3.1 and 3.3) with the text and auto speeds at 0.5 and `[message window]`'s `bg color`; the
+  wear records, each `chN displayed wear` byte set; 3.3's achievement table (a count, then each `IDnn` of the
+  achievement db with its flag clear); the choice and message tables cleared; the persistent variables, the first
+  0xffffffff and the rest 0; the CG and scene records cleared; 3.3's Lua table `{}`; the volumes from `[default
+  volume]` (master, BGM, BGM under a voice, SE, BGS, voice, BGV, as floats); the voice mask; each `voiceNN` id with its
+  voice and BGV volume; the voice and BGV volume of every other speaker, three bytes of 1 and ten empty playlists.
+- Settings are the PC's, in `common.dat`, so they move with the saves. In the settings block, the text and auto speeds
+  are floats at 0x35 and 0x39 (1 minus the slider's place) and the window colour B, G, R, A at 0x3d. In 3.0 the effects,
+  cease skip, unread skip and voice mode bytes are at 0x4c to 0x4f and auto select at 0x51; in 3.1 and 3.3 effects
+  are bit 0x80 of 0x48, cease skip, unread skip and voice mode at 0x4a to 0x4c, Mesu Kyoushi 4's BGM select at 0x4d
+  and auto select at 0x52. The volumes are the final gains (a BGM slider at 35% plays at 0.35 times the master). The
+  voice mask has a bit per settings character, the speakers' volumes scale their voices, and the BGV room's
+  per-character volumes are the same BGV levels. VNDegen's own `save/vndegen.cfg` keeps only the x-count switch, which
+  has no place there yet; its older settings are taken over once, when VNDegen first makes `common.dat`.
+- The translations put a space after every `「`; Mesu Kyoushi 1's and 4's PCs under Wine draw the line without it, and so
+  does VNDegen, in the window and the log (Mesu Kyoushi 2 and 3 weren't looked at).
+- The voice modes, as Mesu Kyoushi 4's PC plays them under Wine with music muted: 0 stops a voice when the line is
+  clicked on; 1 repeats it until then (once in auto or skip); 2 and 3 let it play on through the following lines
+  until another voiced line starts.
+- The settings screen has the BGV slider (`volume5`), Mesu Kyoushi 4's BGM select (`bgm selector pos0` and `pos1`) and
+  each character's 詳細 button, which opens `[detailed sound setting]`: the character's voice on or off and its voice
+  and BGV volume (the other speakers' for 他). With BGM select at マイルド (1), a track `define.bsa`'s `bgm_select`
+  table lists in its first column plays as the second (`bgm06` as `bgm11`); which column is which was read from the
+  table's order and the radio's stored value, not heard on the PC.
 - 3.3 adds the messages shown and the Lua table line after the message history.
 
 ## Museum
@@ -146,7 +174,7 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   Its panel (`[cg viewer]`) has the arrows, the number, cut-in (hides `c`-tagged pictures and pictures whose name is
   another's plus `c`), hair (uses `<picture><hair suffix>` when the game has one), Mesu Kyoushi 4's steam (hides
   `s`-tagged pictures), BGV volume and the BGV panel. A button picture whose first frame is one flat colour has that
-  frame as its hit mask, and its states start at the second.
+  frame as its hit mask, and its states start at the second; the save and load screens' buttons follow the same rule, as Mesu Kyoushi 3's overwrite question's はい and いいえ need.
 - Scenes play now or go into one of ten playlists (`[scene playlist]`). The playlists sit at the end of `common.dat`:
   a count of 10, per list a count and 12-byte entries (page, index and route), then the selected list. A replay runs
   the scene's label until `36 -1`, without auto saves, and comes back to the museum's scene page, or plays the
@@ -180,18 +208,18 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
 - The bust-up editor's message tab (文章設定: names, free text, balloons and the colour picker) is off, and its image
   output (画像として保存する) does nothing; states keep their messages as they are. Its output slots last until the
   editor closes. Mesu Kyoushi 4's ahegao-off buttons (viewer and editor) are drawn but do nothing, and its steam
-  setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own. The BGV
-  per-character volumes reset when the app starts.
-- VNDegen doesn't create `common.dat`: a game folder without the PC's `save/common.dat` keeps no read marks,
-  achievements or museum records.
-- Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing. Their settings screens lack
-  BGM SELECT, the per-character voice details and the BGV volume.
-- Mesu Kyoushi 3's `sync` system command is logged and skipped; it comes right before a startled line and its effect
-  isn't known.
-- The space a translation puts after `「` is drawn; Mesu Kyoushi 4's PC drops it.
-- Settings are VNDegen's own `save/vndegen.cfg`, not the PC's settings in `common.dat`. The full-screen, effect detail
-  and auto-select options are shown but do nothing.
-- The cut-in and voice replay modes aren't there; a voice plays once.
+  setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own.
+- Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing.
+- Mesu Kyoushi 3's `sync` system command (`37 sync 5`, three times in the script) is logged and skipped. Under Wine
+  the PC shows the speaker lines that follow it together, one row each with the name in a column of its own
+  (Tatsuya's 「Wha...!?」 over Touko's 「What...?!」) and one click for the group, which ends at the next narration line;
+  VNDegen shows them one at a time.
+- The full-screen, effect detail and auto-select options are stored as the PC stores them but do nothing; the BGM
+  volume under a voice is stored and not applied.
+- Cut-in in the story hides the pictures the museum viewer's cut-in hides (`c`-tagged in `cg.dat`, or another
+  picture's name plus `c` while that picture is shown); it wasn't watched in a story scene on the PC.
+- Voice mode 2 (until the same speaker's next line) is played as mode 3; on the PC both carried a voice through an
+  unvoiced line, and how mode 2 overlaps two speakers' voices wasn't measured.
 - The free-sight meter (dragging a close-up bust-up) isn't there; VIEW moves between the three fixed positions.
 - `ActionType2` (before the staff roll) is ignored.
 - A game without any save to take its id from, other than the four Mesu Kyoushi games, writes saves the PC engine

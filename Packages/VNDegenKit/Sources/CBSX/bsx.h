@@ -286,6 +286,7 @@ typedef struct MBar {
     int x, y, hit[4];
 } MBar;
 
+bool bx_hit_mask(const Image *im, int h);
 bool bx_mbtn_cfg(BX *b, MBtn *t, const char *sec, const char *key, int dx, int dy);
 bool bx_mbtn_node(BX *b, MBtn *t, const LNode *n, int dx, int dy);
 bool bx_mbtn_on(const BX *b, const MBtn *t);
@@ -303,8 +304,15 @@ typedef struct Settings {
     int attenuation;
     int skipUnread, ceaseSkip, noEffects;
     int voiceMask, voiceMode, autoSelect;
-    int xCount;
+    int xCount, bgmSelect;
 } Settings;
+
+#define BX_VOICES 32
+
+typedef struct VoiceLevel {
+    char sig[4];
+    int mask, voice, bgv;
+} VoiceLevel;
 
 struct BX {
     char *gameDir, *saveDir;
@@ -441,7 +449,9 @@ struct BX {
     int audioRate;
     bool hairOff;
     int volMaster, volBgm, volSe, volVoice, volBgs, volBgv;
-    int bgvLevel[8];
+    VoiceLevel voices[BX_VOICES], otherVoices;
+    int voiceCount;
+    bool commonMade;
     char bgmName[64];
 };
 
@@ -545,6 +555,9 @@ void bx_log_draw(BX *b, u32 *dst);
 void bx_log_free(BX *b);
 
 void bx_museum_init(BX *b);
+bool bx_museum_cutin_tag(BX *b, const char *name);
+void bx_museum_tables(BX *b);
+void bx_museum_counts(BX *b, int *names, int *scenes);
 void bx_museum_free(BX *b);
 void bx_museum_find_wear(BX *b);
 void bx_museum_seen(BX *b, const char *name);
@@ -579,5 +592,8 @@ void bx_settings_load(BX *b);
 void bx_settings_save(BX *b);
 void bx_settings_apply(BX *b);
 void bx_settings_defaults(BX *b);
+int bx_voice_level(BX *b, const char *name, bool bgv);
+VoiceLevel *bx_voice_of(BX *b, int mask);
+const char *bx_bgm_track(BX *b, const char *name);
 
 #endif

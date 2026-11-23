@@ -312,9 +312,18 @@ void bx_museum_init(BX *b) {
         return;
     }
     load_scenes(b, m);
-    find_tables(b, m);
     b->museum = m;
-    if (!m->cgFlags) bx_log(b, "no museum records in common.dat");
+}
+
+void bx_museum_tables(BX *b) {
+    if (!b->museum) return;
+    find_tables(b, b->museum);
+    if (!b->museum->cgFlags) bx_log(b, "no museum records in common.dat");
+}
+
+void bx_museum_counts(BX *b, int *names, int *scenes) {
+    *names = b->museum ? b->museum->nameCount : 0;
+    *scenes = b->museum ? b->museum->sceneCount : 0;
 }
 
 void bx_museum_free(BX *b) {
@@ -598,6 +607,12 @@ static void open_mode(BX *b, MuseumPhase *u, int mode) {
         bx_mbtn_cfg(b, &u->addList, sec, "add playlist", 0, 0);
         bx_mbtn_cfg(b, &u->openList, sec, "playlist button", 0, 0);
     }
+}
+
+bool bx_museum_cutin_tag(BX *b, const char *name) {
+    Museum *m = b->museum;
+    int id = m ? name_id(m, name) : -1;
+    return id >= 0 && strchr(m->tags[id], 'c');
 }
 
 static bool is_cutin(const Museum *m, const int *ids, int count, int i) {

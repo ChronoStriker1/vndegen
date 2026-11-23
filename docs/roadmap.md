@@ -139,6 +139,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Wolf RPG saves keep The Clumsy Witch Seris's HUD and President Yukino's camera, and Drain Dungeon's progress counter (0.59.6).
 - Raidy II's read marks, music and kept unlocks (Ikura GDL), and Eden's Ritter's CG viewer panel and full galleries (NekoSDK) (0.59.7).
 - EAGLS and ExHibit share what was seen with the PC; EAGLS's settings tabs, transitions and Oppai screens, ExHibit's confirm boxes, CG viewer controls and backlog Jump, and Bruns's licence, save comments and backlog (0.59.8).
+- BISHOP BSX settings kept in the PC's `common.dat`, Mesu Kyoushi 3 and 4's voice and BGM settings, and the voice modes (0.59.9).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -149,7 +150,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- Known limits from the release notes, from 2026-11-22, once every engine on the plan had shipped: BISHOP BSX on `fix/limits-bni` and ANIM on `fix/limits-aw` are left. Wolf RPG shipped in 0.59.6, Ikura and NekoSDK in 0.59.7, and ExHibit, EAGLS and Bruns in 0.59.8. Each triages its engines' limits first, fixes what breaks play or saves and the screens that do nothing, and ships as patch releases.
+- Known limits from the release notes, from 2026-11-22, once every engine on the plan had shipped: Mesu Kyoushi 3 and 4's dress screen on `fix/limits-bni` and ANIM on `fix/limits-aw` are left. Wolf RPG shipped in 0.59.6, Ikura and NekoSDK in 0.59.7, ExHibit, EAGLS and Bruns in 0.59.8, and the rest of BSX in 0.59.9. Each triages its engines' limits first, fixes what breaks play or saves and the screens that do nothing, and ships as patch releases.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
