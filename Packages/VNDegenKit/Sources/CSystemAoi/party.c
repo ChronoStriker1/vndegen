@@ -129,6 +129,8 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
     p->exp[slot] = 0;
     p->order[slot] = (Order){ORDER_FREE, -1, AIM_FREE};
     p->equip[slot] = 0;
+    p->sp[slot] = sa_table_int(&p->units, r, 37);
+    memset(p->trained[slot], 0, sizeof p->trained[slot]);
     char name[24];
     snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&p->units, r, 11));
     p->sprite[slot] = sa_load_image(vfs, name);
@@ -277,4 +279,17 @@ int sa_party_count_units(const Party *p, const char *key) {
         if (!key || !*key || !strcmp(sa_table_text(&p->units, r, 1), key)) n++;
     }
     return n;
+}
+
+int sa_party_max_hp(const Party *p, int slot) {
+    return sa_table_int(&p->units, sa_party_unit_row(p, p->unit[slot]), 23) + p->trained[slot][0];
+}
+
+int sa_party_max_mp(const Party *p, int slot) {
+    return sa_table_int(&p->units, sa_party_unit_row(p, p->unit[slot]), 24) + p->trained[slot][1];
+}
+
+int sa_party_stat(const Party *p, int slot, int stat) {
+    static const int trainedIndex[8] = {2, 3, 4, 5, 6, 7, 8, 9};
+    return sa_table_int(&p->units, sa_party_unit_row(p, p->unit[slot]), 25 + stat) + p->trained[slot][trainedIndex[stat]];
 }

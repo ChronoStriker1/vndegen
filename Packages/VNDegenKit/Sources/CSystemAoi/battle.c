@@ -302,6 +302,9 @@ bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, Image *backdrop, in
         f->slot = s;
         f->level = b->party->level[s] > 0 ? b->party->level[s] : 1;
         fighter_stats(b, f);
+        for (int k = 0; k < 8; k++) f->stat[k] += b->party->trained[s][2 + k];
+        f->maxHp += b->party->trained[s][0];
+        f->maxMp += b->party->trained[s][1];
         f->hp = b->party->hp[s];
         f->mp = b->party->mp[s];
     }

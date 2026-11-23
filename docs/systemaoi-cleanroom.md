@@ -290,3 +290,23 @@ calls it is inferred from that and from play, and marked so.
   the town's 資金.
 - **Trading.** Inferred: 購入 and 売却 add one to the row's 取引数 (a row trades one way), キャンセル clears it, and
   決定 applies all of them at once; equipped items can't be sold, and 購入 stops when the money would run out.
+
+## 育成, from the screen
+
+- **Screen.** Measured (94% of pixels exact; the rest is the card's text): the library `bg009a0`; the members list
+  `grw_a00` at (10, 16) with the tabs ＬＶ, 名前, スキルＰ (`grw_b01` to `b03`) and a 30-pixel row per member
+  (`grw_a01`: LV, name, and the skill points in blue) from (10, 45); the trainings `grw_d00` at (304, 16) with an
+  83-pixel row each (`grw_d01`: normal, red when the points don't reach, yellow on hover) from (304, 45): the
+  training's name, ステータスの…を N 上昇させます。, 消費気力 --- and 必要Ｐ; the member's status card `grw_f00` at
+  (997, 21) and 能力説明 (`pun_b00`) at (997, 521); 戻る (`grw_h00`) at (1120, 670). Choosing a training halves the
+  screen and shows スキル上昇 (`grw_j00`) at (291, 262) with 決定 and キャンセル.
+- **Trainings.** Measured: `StUp.obj`'s one row holds (points, gain) pairs for 体力, 気力, 物理攻撃力, 魔法攻撃力,
+  物理防御力, 魔法防御力, 速度, 回避, 統治 and 統率: (10, 15), (10, 10), (10, 1) four times, (15, 1) twice and (50, 1)
+  twice; the screen shows the first eight. 体力ＵＰ took Darkus from 170/170 to 185/185 and his points from 10 to 0.
+  A unit starts with `unit.obj` column 37's points (Darkus 10). Inferred: `lvup.obj` column 3 (8 for Darkus's type)
+  is the points each level gives; not applied yet.
+- **Status card.** Measured layout: name and LV, race and 必要EXP (the EXP still needed), the role badge, 必要格,
+  体力, 気力, スキルP, 速度, 回避, 統治 and 統率, 属性, the four attack and defence stats (numbers from the
+  `grw_i00` digits), the skills with their MP, the count of skills over the unit's slots (`unit.obj` column 38),
+  the field, reserve and government abilities (columns 34 to 36), the equipped item, the unit's sprite, and its
+  description (column 76) below. Used by 育成; 装備 and 配置 show the same card on hover (not yet).

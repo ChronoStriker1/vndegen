@@ -436,6 +436,7 @@ typedef struct Party {
     Order order[PARTY_SLOTS], preset[PARTY_PRESETS][PARTY_SLOTS];
     int itemId[PARTY_ITEMS], itemCount[PARTY_ITEMS], items;
     int equip[PARTY_SLOTS];
+    int sp[PARTY_SLOTS], trained[PARTY_SLOTS][10];
     bool presetSaved[PARTY_PRESETS];
     Image *sprite[PARTY_SLOTS];
     int cells[PARTY_SLOTS];
@@ -452,6 +453,9 @@ int sa_party_rank(const Party *p);
 void sa_party_add_item(Party *p, int id, int n);
 int sa_party_item_count(const Party *p, int id);
 int sa_party_count_units(const Party *p, const char *key);
+int sa_party_max_hp(const Party *p, int slot);
+int sa_party_max_mp(const Party *p, int slot);
+int sa_party_stat(const Party *p, int slot, int stat);
 bool sa_party_tick(Party *p, u32 ms);
 void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platform);
 void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y);
