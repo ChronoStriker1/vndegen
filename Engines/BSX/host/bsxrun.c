@@ -253,11 +253,14 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "autoplay:%d,%d", &k, &x) == 2) {
             alive = autoplay(n, k, x);
         } else if (sscanf(c, "untilmsg:%d", &k) == 1) {
-            for (int j = 0; j < 20000 && alive && !(b->th.wait == W_TEXT && b->logCount && b->text && b->sc->msgs[k] && strstr(b->logs[b->logCount - 1].text, b->sc->msgs[k]) == b->logs[b->logCount - 1].text); j++) {
+            char *want = k >= 0 && k < b->sc->msgCount ? bx_strdup(b->sc->msgs[k]) : NULL;
+            for (char *q = want; q && (q = strstr(q, "\xe3\x80\x8c ")); q += 3) memmove(q + 3, q + 4, strlen(q + 4) + 1);
+            for (int j = 0; j < 20000 && alive && want && !(b->th.wait == W_TEXT && b->logCount && b->text && strstr(b->logs[b->logCount - 1].text, want) == b->logs[b->logCount - 1].text); j++) {
                 if (b->th.wait == W_CHOICE) alive = answer(n);
                 else if (b->th.wait == W_TEXT || b->th.wait == W_CLICK) alive = press(n, 400, 200, VNBSX_MOUSE_LEFT);
                 else alive = run(n, 16);
             }
+            free(want);
         } else if (sscanf(c, "untilwait:%d", &k) == 1) {
             for (int j = 0; j < 2000 && alive && b->th.wait != k; j++) alive = run(n, 16);
         } else if (!strncmp(c, "label:", 6)) {
