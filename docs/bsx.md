@@ -121,6 +121,13 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
 - `common.dat` holds the PC's settings (with the same wear records), a byte per choice taken, a byte per message read,
   and the museum's records. VNDegen finds the choice and read tables by their counts, updates them, and leaves the rest
   as the PC wrote it.
+- A game folder without `save/common.dat` gets the one the PC makes when it first quits: the id; the settings block
+  (50 bytes in 3.0, 51 in 3.1 and 3.3) with the text and auto speeds at 0.5 and `[message window]`'s `bg color`; the
+  wear records, each `chN displayed wear` byte set; 3.3's achievement table (a count, then each `IDnn` of the
+  achievement db with its flag clear); the choice and message tables cleared; the persistent variables, the first
+  0xffffffff and the rest 0; the CG and scene records cleared; 3.3's Lua table `{}`; the volumes from `[default
+  volume]` (master, BGM, BGM under a voice, SE, BGS, voice, BGV, as floats); the voice mask; each `voiceNN` id with its
+  voice and BGV volume; two more volumes of 1.0, three bytes of 1 and ten empty playlists.
 - 3.3 adds the messages shown and the Lua table line after the message history.
 
 ## Museum
@@ -182,8 +189,6 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   editor closes. Mesu Kyoushi 4's ahegao-off buttons (viewer and editor) are drawn but do nothing, and its steam
   setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own. The BGV
   per-character volumes reset when the app starts.
-- VNDegen doesn't create `common.dat`: a game folder without the PC's `save/common.dat` keeps no read marks,
-  achievements or museum records.
 - Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing. Their settings screens lack
   BGM SELECT, the per-character voice details and the BGV volume.
 - Mesu Kyoushi 3's `sync` system command is logged and skipped; it comes right before a startled line and its effect

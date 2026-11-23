@@ -312,9 +312,18 @@ void bx_museum_init(BX *b) {
         return;
     }
     load_scenes(b, m);
-    find_tables(b, m);
     b->museum = m;
-    if (!m->cgFlags) bx_log(b, "no museum records in common.dat");
+}
+
+void bx_museum_tables(BX *b) {
+    if (!b->museum) return;
+    find_tables(b, b->museum);
+    if (!b->museum->cgFlags) bx_log(b, "no museum records in common.dat");
+}
+
+void bx_museum_counts(BX *b, int *names, int *scenes) {
+    *names = b->museum ? b->museum->nameCount : 0;
+    *scenes = b->museum ? b->museum->sceneCount : 0;
 }
 
 void bx_museum_free(BX *b) {

@@ -525,6 +525,138 @@ void bx_autosave(BX *b) {
     bx_save_slot(b, pick);
 }
 
+static void putf(Buf *buf, float f) {
+    u32 v;
+    memcpy(&v, &f, 4);
+    put32(buf, v);
+}
+
+static float cfg_float(BX *b, const char *sec, const char *key, float def) {
+    const char *v = bx_cfg_get(&b->cfg, sec, key);
+    return v ? (float)atof(v) : def;
+}
+
+static void put_fixed_settings(BX *b, Buf *buf) {
+    int minor = b->sc->minor;
+    zeros(buf, 8);
+    put32(buf, minor >= 3 ? 0 : 1);
+    put8(buf, 0);
+    put32(buf, 1);
+    put32(buf, minor >= 3 ? 0 : 0x7fffffffu);
+    putf(buf, 0.5f);
+    putf(buf, 0.5f);
+    u32 c = bx_cfg_color(&b->cfg, "message window", "bg color", 0x80000000u);
+    put32(buf, (c & 0xff00ff00u) | (c & 0xff) << 16 | (c >> 16 & 0xff));
+    put32(buf, 0xffffffffu);
+    if (minor == 0) {
+        static const u8 rest[] = {1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0};
+        put(buf, rest, sizeof rest);
+    } else {
+        static const u8 rest[] = {0x9f, 0x1d, 0, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        put(buf, rest, sizeof rest);
+        if (minor < 3) buf->d[buf->n - 13] = 0;
+    }
+}
+
+static void put_achievements(BX *b, Buf *buf) {
+    const char *db = bx_cfg_get(&b->cfg, "main window", "achievement db");
+    if (!db) return;
+    char name[64];
+    size_t n;
+    snprintf(name, sizeof name, "%s.db", db);
+    u8 *d = bx_res_read(&b->arc, RX_DEF, name, &n);
+    if (!d) d = bx_res_read(&b->arc, RX_DEF, db, &n);
+    char *text = bx_alloc(n + 1);
+    if (d) memcpy(text, d, n);
+    free(d);
+    Buf ids = {0};
+    u32 count = 0;
+    for (const char *p = d ? strstr(text, "\"ID") : NULL; p; p = strstr(p + 1, "\"ID")) {
+        const char *e = strchr(p + 1, '"');
+        if (!e) break;
+        u32 len = (u32)(e - p - 1);
+        put32(&ids, len);
+        put(&ids, p + 1, len);
+        put32(&ids, 0);
+        count++;
+        p = e;
+    }
+    free(text);
+    put32(buf, count);
+    if (ids.n) put(buf, ids.d, ids.n);
+    free(ids.d);
+}
+
+static void put_volume_tail(BX *b, Buf *buf) {
+    const char *dv = "default volume";
+    putf(buf, cfg_float(b, dv, "master", 1.0f));
+    putf(buf, cfg_float(b, dv, "bgm", 0.5f));
+    putf(buf, cfg_float(b, dv, "attenuated bgm", 0.6f));
+    putf(buf, cfg_float(b, dv, "se", 0.75f));
+    putf(buf, cfg_float(b, dv, "bgs", 0.5f));
+    putf(buf, cfg_float(b, dv, "voice", 0.75f));
+    putf(buf, cfg_float(b, dv, "bgv", 0.5f));
+    put32(buf, 0xffffffffu);
+    for (int i = 1; i < 100; i++) {
+        char key[32];
+        snprintf(key, sizeof key, "voice%02d", i);
+        const char *id = bx_cfg_get(&b->cfg, "config screen", key);
+        if (!id) break;
+        u8 w[4] = {0};
+        for (int k = 0; k < 2 && id[k]; k++) w[2 * k] = (u8)id[k];
+        put(buf, w, 4);
+        snprintf(key, sizeof key, "voice%02d voice", i);
+        putf(buf, cfg_float(b, "config screen", key, 1.0f));
+        snprintf(key, sizeof key, "voice%02d bgv", i);
+        putf(buf, cfg_float(b, "config screen", key, 1.0f));
+    }
+    putf(buf, 1.0f);
+    putf(buf, 1.0f);
+    put8(buf, 1);
+    put8(buf, 1);
+    put8(buf, 1);
+    put32(buf, 10);
+    zeros(buf, 44);
+}
+
+static u8 *build_common(BX *b, size_t *size) {
+    Buf buf = {0};
+    put(&buf, b->saveId[0] ? b->saveId : "00000000000000000000000000000000", 32);
+    put_fixed_settings(b, &buf);
+    size_t wear = buf.n;
+    put_wears(b, &buf);
+    for (u32 i = 0, count = rd32(buf.d + wear), at = (u32)wear + 4; i < count; i++) {
+        u32 w = rd32(buf.d + at);
+        char key[40];
+        snprintf(key, sizeof key, "ch%u displayed wear", i + 1);
+        int shown[16];
+        int k = bx_cfg_ints(&b->cfg, "bustup setting", key, shown, 16);
+        for (int j = 0; j < k; j++)
+            if (shown[j] >= 0 && (u32)shown[j] < w) buf.d[at + 4 + (u32)shown[j]] = 1;
+        at += 4 + w;
+    }
+    put_achievements(b, &buf);
+    put32(&buf, b->sc->hdr[2]);
+    zeros(&buf, b->sc->hdr[2]);
+    put32(&buf, (u32)b->sc->msgCount);
+    zeros(&buf, (size_t)b->sc->msgCount);
+    put32(&buf, b->sc->hdr[3]);
+    for (u32 i = 0; i < b->sc->hdr[3]; i++) put32(&buf, i ? 0 : 0xffffffffu);
+    int names, scenes;
+    bx_museum_counts(b, &names, &scenes);
+    put32(&buf, (u32)names);
+    zeros(&buf, (size_t)names);
+    put32(&buf, (u32)scenes);
+    zeros(&buf, (size_t)scenes);
+    if (b->sc->minor >= 3) {
+        put32(&buf, 2);
+        put(&buf, "{}", 2);
+    }
+    put_volume_tail(b, &buf);
+    *size = buf.n;
+    return buf.d;
+}
+
 void bx_common_load(BX *b) {
     free(b->common);
     b->common = NULL;
@@ -533,7 +665,8 @@ void bx_common_load(BX *b) {
     snprintf(path, sizeof path, "%s/save/common.dat", b->saveDir);
     size_t n;
     u8 *d = bx_read_file(path, &n);
-    if (!d) return;
+    bool made = !d;
+    if (made) d = build_common(b, &n);
     u32 choices = b->sc->hdr[2], msgs = (u32)b->sc->msgCount;
     size_t p = 0x20, q = 0;
     for (; p + 8 + choices <= n && p < 0x1000; p++) {
@@ -547,6 +680,7 @@ void bx_common_load(BX *b) {
     }
     b->common = d;
     b->commonSize = n;
+    b->commonDirty = made;
     b->choiceFlags = p + 4;
     b->readFlags = q + 4;
     b->achieveTable = 0;
@@ -590,6 +724,8 @@ void bx_achieve(BX *b, const char *id) {
 void bx_common_save(BX *b) {
     if (!b->common || !b->commonDirty) return;
     char path[2048];
+    snprintf(path, sizeof path, "%s/save", b->saveDir);
+    bx_mkdirs(path);
     snprintf(path, sizeof path, "%s/save/common.dat", b->saveDir);
     if (bx_write_file(path, b->common, b->commonSize)) b->commonDirty = false;
 }
