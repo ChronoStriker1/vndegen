@@ -73,7 +73,7 @@ typedef struct CardLayout {
 } CardLayout;
 
 static const CardLayout CARD[GAME_COUNT] = {
-    [GAME_DDD] = {10, 42, 11, 14, 19, 34, 20, 0xff503040u, true, 0, 0},
+    [GAME_DDD] = {10, 32, 11, 14, 19, 34, 20, 0xff503040u, true, 0, 0},
     [GAME_MGSW] = {11, 32, 10, 15, 20, 35, 20, 0xffffffffu, false, 40, 206},
 };
 
