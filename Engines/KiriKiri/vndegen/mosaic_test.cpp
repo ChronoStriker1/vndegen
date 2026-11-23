@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+bool TVPLoadInternalPlugin(const ttstr &name);
+
 static int failures;
 
 static void expect(bool ok, const std::string &what)
@@ -179,7 +181,9 @@ int main()
     ncbAutoRegister::UnloadModule(TJS_N("extrans2.tpm"));
     ncbAutoRegister::UnloadModule(TJS_N("extrans2.dll"));
     expect(ncbAutoRegister::LoadModule(TJS_N("extrans2.dll")), "extrans2.dll loads again after both unload");
-    expect(ncbAutoRegister::LoadModule(TJS_N("extrans.dll")), "extrans.dll loads beside it");
+    expect(TVPLoadInternalPlugin(TJS_N("/game/plugin/extrans.tpm")), "a game's plugin/extrans.tpm loads the built-in extrans.dll");
+    expect(!ncbAutoRegister::LoadModule(TJS_N("extrans.dll")), "so extrans.dll is already loaded when the game links it");
+    expect(!TVPLoadInternalPlugin(TJS_N("/game/plugin/kropus.tpm")), "a .tpm with no built-in module loads nothing");
 
     Options tenioha;
     tenioha.Values = {{"time", 1600}, {"maxsize", 100}, {"stepsize", 5}};
