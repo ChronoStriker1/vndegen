@@ -79,7 +79,8 @@ uses the same folder:
 - Messages with the PC's layout, speaker plates, voices, the wait cursor, click to finish or advance, right click to
   hide the window, the wheel to open the backlog, Ctrl to skip.
 - The window's wheel: settings, log, hide, skip, auto, quick save, quick load, and the system menu (save, load,
-  animation settings, champion brassiere page, return to title, exit).
+  animation settings, champion brassiere page, return to title, exit). The champion brassiere page shows a block's
+  brassiere as found once the game's `_MilkFlg` for that block's champion (4, 14, 24, 39, 43) is set, as on the PC.
 - Save and Load pages with ten pages of eight slots, thumbnails, the NEW mark, Save Confirm and Load Delete, and the
   confirm dialogs; the backlog with speaker names, its scroll bar and voice buttons; name entry; choices.
 - The map that picks the next heroine, from the game's own scripts and click maps.
@@ -118,7 +119,6 @@ Games start on the "Visual novel" controller layout.
 
 ## Known limits
 
-- The champion brassiere page shows every brassiere as not found.
 - The settings dialog leaves out what belongs to the PC's window and hardware: the Screen tab's window size, mouse
   cursor, right click (greyed out on the PC too), cursor operation and V-Sync, the System tab's CPU level,
   performance optimization and Delete all saved data, and the Info and Machine tabs. The app sets the window and

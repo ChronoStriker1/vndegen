@@ -859,8 +859,8 @@ static void anim_draw(EG *e, u32 *dst) {
 static void bra_draw(EG *e, u32 *dst) {
     UI *u = e->ui;
     blit(dst, e->W, e->H, u->bra.base, 0, 0, 255);
-    static const int colors[5] = {10, 20, 30, 40, 50};
-    (void)colors;
+    for (int i = 0; i < 5; i++)
+        if (oppai_bra_found(e, i)) draw_masked(dst, e->W, e->H, u->bra.hover, u->bra.mask, 10 + 10 * i, 0, 0);
     if (u->hover == 60) draw_masked(dst, e->W, e->H, u->bra.hover, u->bra.mask, 60, 0, 0);
 }
 
