@@ -471,3 +471,15 @@ the same points (offsets in bytes, numbers little-endian):
 - **Joining.** The turn script's event (`bo0002`, run while F2321 and F211 are on, F2322 off and C060 >= C704)
   joins ミアルテ and ルーアルテ and shows ミアルテ、ルーアルテが仲間になった。 in the message box with both units'
   pictures under the text.
+- **Formation.** Measured by placing ミアルテ in 配置: a list of 32-bit numbers at 998,000 where cells 9 to 11 are the
+  main members' top row, 14 to 16 the bottom row and 23 to 27 the five reserve tiles; -1 is an empty tile, -2 a
+  cell that isn't a tile, and a member's index (its record's place) a placed member. Cell 7 counts the members once
+  any has joined (with cells 5 and 6 at 1 and 0; -1, -1 and 0 for Darkus alone). Placing her set her record's +25
+  byte from 4 to 1, and added her 魔法耐性's 50 to a row of resistances in her second battle block only. 配置 works by
+  clicking a member, whose sprite then follows the pointer, and clicking a tile.
+- **Joined members.** Measured: a new member joins unplaced (not on a tile). Units whose skills are 固定 keep only
+  their first skill, with 3 after it for both sisters (inferred: the number of further fixed skills). Not derived
+  yet, so VNDegen writes zeros there: the sisters' 30 at +56 of both battle blocks, their 光 resistance at +148
+  (60 and 35: 20 plus the 光耐性 of column 33, inferred) and -50 at +152, ルーアルテ's 25 at +172, her thirteen 2s at
+  +260 of the second block, the position bonuses, and Darkus's 3 at +1284 (turn 9 on). The original loads such a
+  file with the right members, places, stats, abilities and skills.

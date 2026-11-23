@@ -101,7 +101,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
-- Saves: the original's image is written for Darkus alone; other members, the map memory, a floor's battle state and
-  the event history after the town grid aren't mapped yet, so a save carrying them opens in the original without
-  them. The save comment box takes no text; the comment stays empty. The Option screen and the Extra menu aren't built yet.
+- Saves: members are written with their stats, abilities, skills and places, but not yet their race resistances
+  or the bonuses their abilities give where they stand; reserve-tile places come back as unplaced. The map memory,
+  a floor's battle state and the event history after the town grid aren't mapped yet, so a save carrying them
+  opens in the original without them. The save comment box takes no text; the comment stays empty. The Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.

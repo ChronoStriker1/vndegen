@@ -52,7 +52,7 @@ static Image *crop(const Image *im, int sy, int h) {
 
 bool sa_party_init(Party *p, Vfs *vfs) {
     memset(p, 0, sizeof *p);
-    if (!sa_table_load(&p->units, vfs, "unit.obj")) return false;
+    if (!sa_table_load(&p->units, vfs, "unit.obj") || !sa_table_load(&p->abilities, vfs, "ability.obj")) return false;
     p->platform = sa_load_image(vfs, "m996bt1a.agf");
     Image *tiles = sa_load_image(vfs, "mfloor01.agf");
     p->tile = tiles;
@@ -78,6 +78,7 @@ void sa_party_free(Party *p) {
     sa_image_free(p->label);
     sa_image_free(p->digits);
     sa_table_free(&p->units);
+    sa_table_free(&p->abilities);
     memset(p, 0, sizeof *p);
 }
 
@@ -352,12 +353,10 @@ bool sa_party_join(Party *p, Vfs *vfs, const char *key) {
     for (int i = 0; i < p->rosterCount; i++)
         if (p->roster[i] == id) return true;
     if (p->rosterCount < PARTY_ROSTER) p->roster[p->rosterCount++] = id;
-    static const int order[PARTY_SLOTS] = {PARTY_FRONT, PARTY_FRONT + 2, 1, 0, 2, PARTY_FRONT + 1};
-    for (int i = 0; i < PARTY_SLOTS; i++)
-        if (!p->unit[order[i]]) {
-            sa_party_place(p, vfs, order[i], id);
-            return true;
-        }
+    if (!sa_party_members(p)) {
+        sa_party_place(p, vfs, PARTY_FRONT + 1, id);
+        return true;
+    }
     if (p->benchCount < PARTY_BENCH) {
         Bench *b = &p->bench[p->benchCount++];
         memset(b, 0, sizeof *b);

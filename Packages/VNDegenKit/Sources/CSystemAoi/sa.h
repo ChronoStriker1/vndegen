@@ -436,7 +436,7 @@ typedef struct Bench {
 #define PARTY_BENCH 16
 
 typedef struct Party {
-    Table units;
+    Table units, abilities;
     Bench bench[PARTY_BENCH];
     int benchCount;
     int unit[PARTY_SLOTS];
