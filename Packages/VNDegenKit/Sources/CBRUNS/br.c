@@ -110,6 +110,7 @@ VNBruns *vnbruns_open(const VNBrunsConfig *cfg, char *err, size_t errSize) {
     e->menu.rclick = true;
     e->mixer = mixer_new();
     e->volMaster = 100;
+    e->dlgResult = 1;
     for (int i = 0; i < 3; i++) e->vol[i] = 100;
     for (int i = 0; i < BR_CHANNELS; i++) e->chanGain[i] = 1;
     for (int i = 0; i < 4; i++) e->music[i] = -1;
@@ -136,6 +137,8 @@ void vnbruns_close(VNBruns *n) {
     BR *e = (BR *)n;
     if (!e) return;
     if (e->sysDirty) sys_save(e);
+    free(e->dlgTitle);
+    free(e->dlgText);
     sx_free(e->sysRoot);
     sx_free(e->gameSnap);
     sx_free(e->loadedState);
@@ -241,6 +244,55 @@ void vnbruns_audio(VNBruns *n, float *out, int frames) {
 void vnbruns_set_paused(VNBruns *n, bool paused) { ((BR *)n)->paused = paused; }
 
 void vnbruns_request_quit(VNBruns *n) { ((BR *)n)->quit = true; }
+
+void vnbruns_enable_dialogs(VNBruns *n, bool on) { ((BR *)n)->dialogs = on; }
+
+int vnbruns_dialog(VNBruns *n, const char **title, const char **text, int *maxBytes) {
+    BR *e = (BR *)n;
+    if (title) *title = e->dlgTitle ? e->dlgTitle : "";
+    if (text) *text = e->dlgText ? e->dlgText : "";
+    if (maxBytes) *maxBytes = e->dlgMax;
+    return e->dlgKind;
+}
+
+void vnbruns_dialog_answer(VNBruns *n, bool ok, const char *utf8) {
+    BR *e = (BR *)n;
+    if (!e->dlgKind) return;
+    if (e->dlgKind == BR_DIALOG_TEXT && ok) {
+        const char *in = utf8 ? utf8 : "";
+        char *wide = br_alloc(strlen(in) * 3 + 1);
+        size_t w = 0;
+        for (const u8 *p = (const u8 *)in; *p; p++) {
+            u32 cp = *p == ' ' ? 0x3000 : *p > ' ' && *p < 0x7f ? 0xff01 + (u32)(*p - '!') : 0;
+            if (!cp) {
+                wide[w++] = (char)*p;
+                continue;
+            }
+            wide[w++] = (char)(0xe0 | cp >> 12);
+            wide[w++] = (char)(0x80 | (cp >> 6 & 0x3f));
+            wide[w++] = (char)(0x80 | (cp & 0x3f));
+        }
+        wide[w] = 0;
+        char *s = br_utf8_to_sjis(wide);
+        free(wide);
+        size_t len = 0;
+        while (s[len]) {
+            int k = br_sjis_len((const u8 *)s + len);
+            if ((int)(len + (size_t)k) > e->dlgMax) break;
+            len += (size_t)k;
+        }
+        s[len] = 0;
+        str_set(e, e->dlgDst, s);
+        free(s);
+    }
+    e->reflag = ok ? 1 : 0;
+    e->dlgResult = ok ? 1 : 0;
+    e->dlgKind = 0;
+    free(e->dlgTitle);
+    free(e->dlgText);
+    e->dlgTitle = e->dlgText = NULL;
+    e->wait = W_NONE;
+}
 
 const char *vnbruns_title(VNBruns *n) {
     static char buf[256];

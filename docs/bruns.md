@@ -50,6 +50,10 @@ to one folder down. The PC version only runs after its own installer; VNDegen ne
 - `4000 mask timeout flag` waits for events: bit 0 a click, bit 2 parts buttons (click and hover events from 2131),
   bit 13 the mouse (131072 plus flags), bit 14 keys (65536 plus the virtual key times four, plus one when released),
   bit 16 touchmaps (a mode's base plus the region).
+- The PC's two Windows dialogs are the app's: the licence (7002) on first start, with the game's `eula.rtf` and the
+  PC's 同意して続ける and 同意しない buttons (declining ends the game, as on the PC), and the save comment box (7001),
+  which starts with the slot's comment and, like the PC's, stores letters and digits full-width, up to the length the
+  script gives. The Linux hosts accept the licence and keep the comment without asking.
 - Save, Load, quick save and load, config, backlog, the right-click view and the return to the title are the game's
   own system scripts (9001 to 9020). The engine runs them when the menubar, a right click or the wheel asks, with the
   game's state set aside and put back when they end.
@@ -68,8 +72,6 @@ to one folder down. The PC version only runs after its own installer; VNDegen ne
 ## Known limits
 
 - Flow mode isn't there; this game leaves its menubar slot empty, so nothing reaches it.
-- The licence dialog the PC shows on first start is accepted without showing it, and the save comment box (7001)
-  keeps the default comment.
 - The animated mouse cursors (`.ani`) aren't drawn, and the window size and full-screen settings do nothing.
 - Mask pictures (1006's second group of parameters) aren't drawn; the game doesn't appear to use them.
 - The backlog's line spacing is close to the PC's but not the same.
