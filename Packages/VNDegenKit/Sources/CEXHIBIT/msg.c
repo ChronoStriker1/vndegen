@@ -560,15 +560,22 @@ void history_add(EX *e, const char *name, const char *text, int voice) {
     HistEntry *h = &e->history[slot];
     free(h->name);
     free(h->text);
+    free(h->state);
     h->name = name ? ex_strdup(name) : NULL;
     h->text = ex_strdup(text ? text : "");
     h->voice = voice;
+    h->state = e->view.active || e->extra ? NULL : save_state(e, &h->stateLen);
+}
+
+void history_truncate(EX *e, int count) {
+    if (count < e->histCount) e->histCount = count < 0 ? 0 : count;
 }
 
 void history_free(EX *e) {
     for (int i = 0; i < EX_HISTORY; i++) {
         free(e->history[i].name);
         free(e->history[i].text);
+        free(e->history[i].state);
     }
     memset(e->history, 0, sizeof e->history);
     e->histCount = e->histHead = 0;

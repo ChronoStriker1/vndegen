@@ -186,11 +186,11 @@ void gfx_present(EG *e) {
 }
 
 void gfx_transition(EG *e, int effect, const char *mask, int ms, bool reverse) {
-    if (e->transActive) memcpy(e->from, e->screen, sizeof(u32) * (size_t)e->W * (size_t)e->H);
+    if (e->transActive || e->fromScreen) memcpy(e->from, e->screen, sizeof(u32) * (size_t)e->W * (size_t)e->H);
     else memcpy(e->from, e->shown, sizeof(u32) * (size_t)e->W * (size_t)e->H);
     image_free(e->transMask);
     e->transMask = NULL;
-    bool skip = e->skipMode || e->keyDown[0x11];
+    bool skip = e->skipMode || e->keyDown[0x11] || !e->effects;
     if (effect == 0 || ms <= 0 || skip) {
         e->transActive = false;
         gfx_present(e);
@@ -209,7 +209,7 @@ void gfx_transition(EG *e, int effect, const char *mask, int ms, bool reverse) {
 
 bool gfx_transition_done(EG *e) {
     if (!e->transActive) return true;
-    if (e->click && !e->transMask) {
+    if (e->click && e->clickSkip) {
         gfx_present(e);
         return true;
     }
@@ -239,7 +239,45 @@ static void mask_blend(EG *e, u32 *out, const u32 *a, const u32 *b, int p256) {
     }
 }
 
+static void pattern_blend(EG *e, u32 *out, const u32 *a, const u32 *b, int p256) {
+    int W = e->W, H = e->H;
+    if (e->transEffect == 3) {
+        int up = p256 < 128 ? p256 : 256 - p256;
+        int block = 1 + up * 79 / 128;
+        const u32 *src = p256 < 128 ? a : b;
+        for (int by = 0; by < H; by += block)
+            for (int bx = 0; bx < W; bx += block) {
+                int cx = bx + block / 2 < W ? bx + block / 2 : W - 1, cy = by + block / 2 < H ? by + block / 2 : H - 1;
+                u32 c = src[(size_t)cy * W + cx] | 0xff000000u;
+                for (int y = by; y < by + block && y < H; y++)
+                    for (int x = bx; x < bx + block && x < W; x++) out[(size_t)y * W + x] = c;
+            }
+        return;
+    }
+    int cells = (W + 19) / 20;
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            size_t i = (size_t)y * W + x;
+            bool shown;
+            if (e->transEffect == 5) {
+                u32 h = (u32)i;
+                h ^= h >> 16;
+                h *= 0x7feb352du;
+                h ^= h >> 15;
+                h *= 0x846ca68bu;
+                h ^= h >> 16;
+                shown = (int)(h & 255) < p256;
+            } else {
+                int c = x / 20, o = x % 20;
+                int w = e->transEffect == 8 ? 2 * (p256 * (cells + 10) / 256 - c) : p256 * 20 / 256;
+                shown = o < w;
+            }
+            out[i] = (shown ? b[i] : a[i]) | 0xff000000u;
+        }
+}
+
 void gfx_frame(EG *e) {
+    if (e->scriptUi && e->scriptUiDone) return;
     size_t n = (size_t)e->W * (size_t)e->H;
     if (e->transActive) {
         gfx_compose(e, e->work);
@@ -247,6 +285,8 @@ void gfx_frame(EG *e) {
         int p = e->transDur ? (int)((u64)el * 256 / e->transDur) : 256;
         if (p > 256) p = 256;
         if (e->transMask) mask_blend(e, e->screen, e->from, e->work, p);
+        else if (e->transEffect == 3 || e->transEffect == 5 || e->transEffect == 8 || e->transEffect == 10)
+            pattern_blend(e, e->screen, e->from, e->work, p);
         else
             for (size_t i = 0; i < n; i++) e->screen[i] = blend_px(e->from[i], e->work[i] & 0xffffff, (u32)(p * 255 / 256));
     } else if (movie_any(e)) {

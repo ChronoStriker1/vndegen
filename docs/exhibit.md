@@ -63,6 +63,11 @@ VNDegen uses the same folder and format:
 - VNDegen writes the same records, so its saves load on the PC (checked under Wine), and keeps its own exact state in
   `userdata/vndegen/slotNNN.sav`, which it uses when it matches the slot.
 - Settings are kept in `userdata/vndegen/config.txt`.
+- The PC keeps what has been seen in `userdata/<CLASS>.system.dat` (`CLASS` from `ExHIBIT.ini`), a register file of
+  `N_SYSREG` numbers whose registers 189 to 192 hold the sizes of four tables that follow from register 193: one
+  register per picture number (`N_CG`), one per scene (`N_SCENE`), then sounds and read text. VNDegen reads the
+  picture and scene tables when it starts and sets the registers for what it shows, so Extra counts what was seen on
+  either side. It writes only when that file is there, changing no other register.
 
 ## What runs
 
@@ -73,24 +78,28 @@ VNDegen uses the same folder and format:
   blur of the heroine's-view scenes, H-scene speech bubbles, the end-of-scene fades.
 - The control bar (voice replay, quick save and load, save, load, system menu, backlog, auto, skip, mute, hide, the
   window transparency slider) and the system menu (config, save, load, backlog, title, end game).
-- Save and Load with ten pages, the auto and quick pages, thumbnails and the newest-save mark; the backlog with names
-  and voice marks; the five config pages, of which window transparency, text and auto speed, the sound and voice
-  volumes, per-character voice volumes, the countdown and the system sound take effect.
+- The PC's confirm boxes, as `def.rld` defines them: before returning to the title, ending the game, a quick load, and
+  saving over a used slot. The title screen's Exit ends the game without asking, as on the PC.
+- Save and Load with ten pages, the auto and quick pages, thumbnails and the newest-save mark; the backlog with names,
+  voice marks, the hovered row's highlight and Jump, which takes the game back to that line as it stood then (each
+  line keeps the state a save would have, as the PC keeps one per line); the five config pages, of which window
+  transparency, text and auto speed, the sound and voice volumes, per-character voice volumes, the countdown and the
+  system sound take effect.
 
 - Extra: the CG, Scene and Music pages, drawn from the game's own pictures (`res/g/sy/02`, the thumbnails in
   `res/g/sy/tn`). The CG groups come from `cgMode.rld`'s `CGMODE` list, the scenes from `res/c/replay1.rnf`, and the
   music list and its track numbers from `musicMode.rld` and the table `def.rld` builds with `CREATEDBINT`. A CG group
   opens once one of its pictures has been shown and steps through all of them; a scene opens once its `SETDONEFLAG`
   has run and plays from its script with `R1020` set, and the scene's own `exitReplay` brings Extra back; every track
-  plays, with the music volume bar. VNDegen keeps what has been seen in `userdata/vndegen/extra.txt`.
+  plays, with the music volume bar. VNDegen keeps what has been seen in `userdata/vndegen/extra.txt` and in the PC's
+  `system.dat` (see Saves). The CG viewer has the PC's controls from `res/c/cgmode.type.rnf`: Return, the counter with
+  its arrows, the arrows at the sides, right click to hide them, and the Full Screen and Original buttons, which the
+  PC draws dimmed and inactive for this game because every picture in the gallery is screen-sized.
 
 ## Known limits
 
 - The emotion icons that `MANPU` attaches to sprites (`.dlt` animations) are not drawn; see the clean-room notes.
-- Extra counts only what was seen in VNDegen: the PC game's own record of seen pictures and scenes isn't read. The CG
-  viewer has no Full Screen or Original buttons.
-- Returning to the title from the system menu doesn't ask first, as the PC game does.
-- The backlog's Jump buttons aren't shown, and the config page's window-size and full-screen choices do nothing.
+- The config page's window-size and full-screen choices do nothing; the app sets the window.
 
 ## Linux host
 

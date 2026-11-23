@@ -25,6 +25,7 @@ final class BrunsSession: EngineSession {
     private var router = BrunsInputRouter()
     private var frameSize = CGSize(width: 1280, height: 720)
     private var shownSerial: UInt32 = .max
+    private var dialogOpen = false
 
     init(_ launch: GameLaunch, root: URL, saveDirectory: URL) {
         self.launch = launch
@@ -82,6 +83,7 @@ final class BrunsSession: EngineSession {
             driver.failToStart(reason)
             return
         }
+        vnbruns_enable_dialogs(started, true)
         brunsLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
         driver.run(started, sampleRate: rate, audio: { vnbruns_audio($0, $1, $2) }) { [weak self] engine, ms, link in
             self?.step(engine, ms, link)
@@ -94,6 +96,7 @@ final class BrunsSession: EngineSession {
             driver.finish(byGame: true)
             return
         }
+        if !dialogOpen { showDialog(engine) }
         let serial = vnbruns_frame_serial(engine)
         #if DEBUG
         driver.pacing?.note(link, presented: serial != shownSerial)
@@ -104,6 +107,26 @@ final class BrunsSession: EngineSession {
         if let pixels = vnbruns_pixels(engine, &w, &h), w > 0, h > 0 {
             frameSize = CGSize(width: Int(w), height: Int(h))
             frameView.present(pixels, width: Int(w), height: Int(h))
+        }
+    }
+
+    private func showDialog(_ engine: OpaquePointer) {
+        var title: UnsafePointer<CChar>?, text: UnsafePointer<CChar>?
+        var maxBytes: Int32 = 0
+        let kind = Int(vnbruns_dialog(engine, &title, &text, &maxBytes))
+        guard kind != VNBRUNS_DIALOG_NONE else { return }
+        let heading = title.map { String(cString: $0) } ?? "", body = text.map { String(cString: $0) } ?? ""
+        dialogOpen = true
+        deliver(router.releaseAll())
+        let answer: (Bool, String?) -> Void = { [weak self] accepted, typed in
+            guard let self else { return }
+            dialogOpen = false
+            if let engine = self.engine { vnbruns_dialog_answer(engine, accepted, typed) }
+        }
+        if kind == VNBRUNS_DIALOG_LICENCE {
+            askToAcceptLicence(title: heading, file: URL(fileURLWithPath: body), over: view) { answer($0, nil) }
+        } else {
+            askForText(title: heading, message: "", current: body, over: view) { answer($0 != nil, $0) }
         }
     }
 

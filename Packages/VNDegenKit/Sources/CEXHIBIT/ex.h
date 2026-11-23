@@ -123,7 +123,8 @@ typedef struct SavePoint {
 } SavePoint;
 
 typedef struct HistEntry {
-    char *name, *text;
+    char *name, *text, *state;
+    size_t stateLen;
     int voice;
 } HistEntry;
 
@@ -276,6 +277,7 @@ typedef struct EX {
     u32 tickAcc;
     int wheel;
     char *title;
+    char *className;
     u32 serial;
     u32 *screen;
     Image *cg;
@@ -495,6 +497,7 @@ void gfx_restore_billboard(EX *e, const int *v, const char *file);
 void chara_restore(EX *e, const int *v);
 void history_add(EX *e, const char *name, const char *text, int voice);
 void history_free(EX *e);
+void history_truncate(EX *e, int count);
 void state_reset(EX *e);
 void reset_for_title(EX *e);
 

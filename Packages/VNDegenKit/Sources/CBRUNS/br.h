@@ -323,12 +323,16 @@ typedef struct BR {
     int voiceCh, voiceId;
     u32 rng;
     u32 eventStart;
+    bool dialogs;
+    int dlgKind, dlgDst, dlgMax, dlgResult;
+    char *dlgTitle, *dlgText;
 } BR;
 
 void *br_alloc(size_t n);
 void *br_realloc(void *p, size_t n);
 char *br_strdup(const char *s);
 char *br_fmt(const char *fmt, ...);
+int br_path_resolve(const char *path, char *out, size_t size);
 u8 *br_read_file(const char *path, size_t *size);
 bool br_write_file(const char *path, const void *data, size_t size);
 bool br_mkdirs(const char *dir);
@@ -410,6 +414,7 @@ void layers_draw(BR *e, u32 *dst);
 void msg_draw(BR *e, u32 *dst);
 const char *str_get(BR *e, int id);
 void str_set(BR *e, int id, const char *s);
+enum { BR_DIALOG_TEXT = 1, BR_DIALOG_LICENCE = 2 };
 bool layers_busy(BR *e);
 void msg_send(BR *e, Node *call);
 void msg_tick(BR *e);
