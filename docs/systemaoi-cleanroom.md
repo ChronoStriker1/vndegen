@@ -409,3 +409,23 @@ state. What they do:
 
 VNDegen's codec (`aoicmp.c`) was written from this description. It repacks all fourteen saves and option files written
 under Wine byte for byte (`satool codec`).
+
+## The original's save image, from diffs
+
+Saves unpack to 1,128,076 bytes. Found by comparing the fourteen saves written under Wine with the runtime's state at
+the same points (offsets in bytes, numbers little-endian):
+
+- **Script variables** at 1,119,076: C000 to C999 as 32-bit numbers, then F000 to F4999 as bytes, to the end. C060 is
+  the turn as shown (1 on the first turn); the scripts only compare it. C200 to C203 are residents, food, money and
+  resources; C070 and C071 the dungeon and floor; C073 to C075 the position. At turn 2 the flags match VNDegen's except
+  F000, F001, F021 and F924, which the original sets itself. The original also keeps numbers VNDegen doesn't yet:
+  C000 (2^31 - 1), C002 to C013, C190 to C194 (-1), C209, C220 to C262, C393 and C400 to C409.
+- **Town grid** at 1,010,852: 90 cells of five 32-bit numbers. A built cell holds the facility type (100 the 魔王亭,
+  108 a field), a flag (1 the turn it was built), the level, a counter that grows each turn (4, 9 and 44 at turns 1, 2
+  and 9) and 0. An empty cell holds 0, -1, 0, 0 and the cell's state (-1, 0 or 1).
+- **Build list** at 1,004,728: (type, count, flag) triples, 100, 104 and 143 at the start.
+- **Party** from about 86,000: Darkus (unit 1) with HP and MP at 86,036 and skill points at 86,088; two 544-byte stat
+  blocks at 86,132 and 86,676 (HP 170, MP 35, then the eight stats); the items as (id, count) pairs from 87,228.
+- **Other regions** not yet placed: 6,189 to 7,136 (only in dungeon autosaves; 128-byte rows, likely the floor's map),
+  215,608 to 229,808 (544-byte records like the party's), 993,208 to 998,847, 1,035,056 to 1,066,684 and an ascending
+  list of offsets at 1,115,868, likely the backlog.
