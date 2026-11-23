@@ -46,7 +46,10 @@ Things that were unsure and how they were settled:
 - Auto saves: the original wrote `no000` on reaching the map; the manual says choices save too. Mesu Kyoushi 1's PC wrote
   `no000` again on each of three map visits in a row, and Mesu Kyoushi 1's and 4's took a manual save in slot 1; VNDegen had
   spread its auto saves over the slots below `no begin` and refused manual saves there. Mesu Kyoushi 4's
-  original wrote `no000` with mode 9 as its custom map opened.
+  original wrote `no000` with mode 9 as its custom map opened. Both PCs' map auto saves picture the drawn map; VNDegen
+  had saved before drawing it, so Mesu Kyoushi 1's picture came out black on the Mac. Mesu Kyoushi 4's PC also wrote
+  mode 9 for a manual save from the map's menu bar and loaded it onto the map with no text; VNDegen had written the save
+  screen's phase as mode 1 and loaded the last line over the map.
 - Picture record sizes: Mesu Kyoushi 4's saves hold each picture's size (an icon frame is 80x80), the frame count (2
   for icons), and a background's two parts only with a face; 3.0's 800x600 matched because its pictures were
   full-screen.

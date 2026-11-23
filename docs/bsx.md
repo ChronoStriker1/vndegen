@@ -105,7 +105,8 @@ Mesu Kyoushi 3 adds these to 3.1:
 ## Saves
 
 The PC engine writes `save/noNNN` (slots; slot 0, marked AUTO ONLY on the save and load screens, is its auto save, made
-when the map opens and at choices, and every slot from 1 takes a manual save),
+when the map opens and at choices, and every slot from 1 takes a manual save; the map's auto save pictures the map
+once it is drawn, and a save made from the map's menu bar loads back onto the map),
 `save/no-01` (quick save) and `save/common.dat` in the game folder. VNDegen uses the same files:
 
 - A slot is a 32-character id, a thumbnail (the screen times the cfg's `thumbnail ratio`: 120x90, 128x96 for

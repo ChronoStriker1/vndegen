@@ -132,7 +132,10 @@ void bx_save_capture_thumb(BX *b) {
 }
 
 
-static int mode_of(BX *b) { return b->phase == PH_MAP ? 7 : b->phase == PH_CUSTOM_MAP ? 9 : 1; }
+static int mode_of(BX *b) {
+    int phase = b->phaseBack != PH_NONE ? b->phaseBack : b->phase;
+    return phase == PH_MAP ? 7 : phase == PH_CUSTOM_MAP ? 9 : 1;
+}
 
 static void put_wears(BX *b, Buf *buf) {
     int n = 0;
