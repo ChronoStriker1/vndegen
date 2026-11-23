@@ -355,6 +355,7 @@ void an_gfx_render(AN *a);
 void an_gfx_snapshot(AN *a);
 void an_gfx_begin_transition(AN *a, int kind, u32 ms, u32 color);
 bool an_gfx_transition_done(AN *a);
+void an_gfx_scene_fade(AN *a, u32 ms);
 void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha);
 void an_layer_set_var(Layer *l, const char *name, float value);
 void an_layer_apply_preset(AN *a, Layer *l, const char *preset, u32 ms);

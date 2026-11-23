@@ -158,6 +158,15 @@ void an_gfx_begin_transition(AN *a, int kind, u32 ms, u32 color) {
     a->transColor = color;
 }
 
+void an_gfx_scene_fade(AN *a, u32 ms) {
+    if (a->transTime && a->transStart == a->now) return;
+    draw_scene(a, a->prev);
+    a->transKind = 1;
+    a->transStart = a->now;
+    a->transTime = ms;
+    a->transColor = 0;
+}
+
 bool an_gfx_transition_done(AN *a) { return !a->transTime || a->now - a->transStart >= a->transTime; }
 
 static void apply_transition(AN *a) {

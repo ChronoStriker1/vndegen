@@ -48,6 +48,10 @@ folder down.
   offset, where an E-mote layer keeps 640 and its offset, and VNDegen saves and loads picture layers the same way. Up to
   0.59.6 VNDegen drew them 1024 pixels to the right, off the screen, and the PC loaded VNDegen's saves with them 384
   pixels left.
+- Clearing a layer (`57`) crossfades the whole scene, from the picture before the line to the one after, linearly over
+  0.4 s starting at the click, while the next line types; showing a layer (`52`) alone is instant. Recorded at 30 fps on
+  the original under Wine where Magical Sword hides the goddess, shows her, and swaps the status window for her; the
+  message window and menu bar aren't part of the fade. Skip mode doesn't fade.
 - Text: the font the player picked in Settings, whose name the PC keeps in its system save (decoded, 32 bytes of
   Shift-JIS at 0x7e324). With none stored, each exe's own default: MS Gothic in Double Date Dilemma and MS PMincho
   in Magical Sword, drawn through their substitutes (Ume Gothic, Ume P Mincho, `docs/fonts.md`). The story, the backlog,
@@ -236,8 +240,6 @@ buttons have their own on and off lines.
   at once, where the PC eases into it during the scene's fade-in. eluna needed fixes to draw them like the PC (`Engines/ANIM/UPSTREAM.md`);
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
 - The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't.
-- When a line hides one layer and shows another, the PC holds the old picture for about half a second and then
-  crossfades over about 0.3 s; VNDegen swaps them at once (seen when the goddess returns after the skill list).
 - The goddess (Malg202) draws her lids too low: her eyes look half closed where the PC's are open, in the story and in
   the Sprites viewer. Her irises now stay inside the eye whites. She is on screen in the opening (`000-000`, `000-010`)
   and in `060-040`/`060-050`, plus the `Mem30` replay (Malg200, Malg203). Her eye motion's time follows
