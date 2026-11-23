@@ -519,6 +519,7 @@ void sa_debug_battle(VNSystemAoi *sa, const char *group, const char *backdrop);
 void sa_debug_new_game(VNSystemAoi *sa);
 void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor);
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir);
+double sa_debug_bench(VNSystemAoi *sa, int n);
 void sa_debug_finds(VNSystemAoi *sa, int *out);
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
 int sa_item_pick(const Table *items, const char *table, u32 roll);

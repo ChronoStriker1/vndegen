@@ -18,7 +18,7 @@ void r3_free(R3 *r) {
 void r3_begin(R3 *r, u32 *fb, float fovDeg) {
     r->fb = fb;
     r->focal = (float)r->h * 0.5f / tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
-    for (int i = 0; i < r->w * r->h; i++) r->zbuf[i] = 1e30f;
+    memset(r->zbuf, 0, sizeof(float) * (size_t)r->w * (size_t)r->h);
 }
 
 static R3Vert lerp(const R3Vert *a, const R3Vert *b, float t) {
@@ -36,15 +36,6 @@ typedef struct Scr {
     float x, y, iz, uz, vz, s;
 } Scr;
 
-static u32 texel(const Image *t, float u, float v) {
-    int x = (int)floorf(u * (float)t->w), y = (int)floorf(v * (float)t->h);
-    x %= t->w;
-    y %= t->h;
-    if (x < 0) x += t->w;
-    if (y < 0) y += t->h;
-    return t->px[(size_t)y * t->w + x];
-}
-
 static float edge(const Scr *a, const Scr *b, float x, float y) { return (b->x - a->x) * (y - a->y) - (b->y - a->y) * (x - a->x); }
 
 static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Image *tex) {
@@ -55,33 +46,73 @@ static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Ima
     float miny = fminf(p0->y, fminf(p1->y, p2->y)), maxy = fmaxf(p0->y, fmaxf(p1->y, p2->y));
     int x0 = (int)fmaxf(0, floorf(minx)), x1 = (int)fminf((float)r->w - 1, ceilf(maxx));
     int y0 = (int)fmaxf(0, floorf(miny)), y1 = (int)fminf((float)r->h - 1, ceilf(maxy));
+    if (x0 > x1 || y0 > y1) return;
     float inv = 1.0f / area;
-    u32 fr = r->fogColor & 0xff, fg = r->fogColor >> 8 & 0xff, fbl = r->fogColor >> 16 & 0xff;
+    float a0 = -(p2->y - p1->y) * inv, b0 = (p2->x - p1->x) * inv;
+    float a1 = -(p0->y - p2->y) * inv, b1 = (p0->x - p2->x) * inv;
+    float a2 = -(p1->y - p0->y) * inv, b2 = (p1->x - p0->x) * inv;
+    float sx = (float)x0 + 0.5f, sy = (float)y0 + 0.5f;
+    float r0 = edge(p1, p2, sx, sy) * inv, r1 = edge(p2, p0, sx, sy) * inv, r2 = edge(p0, p1, sx, sy) * inv;
+    float diz_dx = a0 * p0->iz + a1 * p1->iz + a2 * p2->iz, diz_dy = b0 * p0->iz + b1 * p1->iz + b2 * p2->iz;
+    float duz_dx = a0 * p0->uz + a1 * p1->uz + a2 * p2->uz, duz_dy = b0 * p0->uz + b1 * p1->uz + b2 * p2->uz;
+    float dvz_dx = a0 * p0->vz + a1 * p1->vz + a2 * p2->vz, dvz_dy = b0 * p0->vz + b1 * p1->vz + b2 * p2->vz;
+    float ds_dx = a0 * p0->s + a1 * p1->s + a2 * p2->s, ds_dy = b0 * p0->s + b1 * p1->s + b2 * p2->s;
+    float riz = r0 * p0->iz + r1 * p1->iz + r2 * p2->iz, ruz = r0 * p0->uz + r1 * p1->uz + r2 * p2->uz;
+    float rvz = r0 * p0->vz + r1 * p1->vz + r2 * p2->vz, rs = r0 * p0->s + r1 * p1->s + r2 * p2->s;
+    int tw = tex ? tex->w : 1, th = tex ? tex->h : 1;
+    bool pow2 = tex && !(tw & (tw - 1)) && !(th & (th - 1));
+    float fogSpan = r->fogFar - r->fogNear, fogInv = fogSpan > 0 ? 1.0f / fogSpan : 0;
+    int fr = (int)(r->fogColor & 0xff), fg = (int)(r->fogColor >> 8 & 0xff), fbl = (int)(r->fogColor >> 16 & 0xff);
+    const float eps = -1e-5f;
     for (int y = y0; y <= y1; y++) {
-        float py = (float)y + 0.5f;
-        for (int x = x0; x <= x1; x++) {
-            float px = (float)x + 0.5f;
-            float w0 = edge(p1, p2, px, py) * inv, w1 = edge(p2, p0, px, py) * inv, w2 = edge(p0, p1, px, py) * inv;
-            if (w0 < 0 || w1 < 0 || w2 < 0) continue;
-            float iz = w0 * p0->iz + w1 * p1->iz + w2 * p2->iz;
-            if (iz <= 0) continue;
-            float z = 1.0f / iz;
-            size_t i = (size_t)y * r->w + x;
-            if (z >= r->zbuf[i]) continue;
-            float u = (w0 * p0->uz + w1 * p1->uz + w2 * p2->uz) * z, v = (w0 * p0->vz + w1 * p1->vz + w2 * p2->vz) * z;
-            u32 c = tex ? texel(tex, u, v) : 0xffffffffu;
-            if (tex && (c >> 24) < 128) continue;
-            r->zbuf[i] = z;
-            float s = w0 * p0->s + w1 * p1->s + w2 * p2->s;
-            float f = r->fogFar > r->fogNear ? (r->fogFar - z) / (r->fogFar - r->fogNear) : 1.0f;
-            f = f < 0 ? 0 : f > 1 ? 1 : f;
-            float rr = (float)(c & 0xff) * s, gg = (float)(c >> 8 & 0xff) * s, bb = (float)(c >> 16 & 0xff) * s;
-            rr = rr > 255 ? 255 : rr;
-            gg = gg > 255 ? 255 : gg;
-            bb = bb > 255 ? 255 : bb;
-            u32 R = (u32)(rr * f + (float)fr * (1 - f)), G = (u32)(gg * f + (float)fg * (1 - f)), B = (u32)(bb * f + (float)fbl * (1 - f));
-            r->fb[i] = 0xff000000u | B << 16 | G << 8 | R;
+        float lo = 0, hi = (float)(x1 - x0);
+        const float wv[3] = {r0, r1, r2}, av[3] = {a0, a1, a2};
+        bool empty = false;
+        for (int e = 0; e < 3 && !empty; e++) {
+            if (av[e] > 1e-12f) lo = fmaxf(lo, (eps - wv[e]) / av[e]);
+            else if (av[e] < -1e-12f) hi = fminf(hi, (eps - wv[e]) / av[e]);
+            else if (wv[e] < eps) empty = true;
         }
+        int xa = x0 + (int)ceilf(lo), xb = x0 + (int)floorf(hi);
+        if (!empty && xa <= xb) {
+            float t = (float)(xa - x0);
+            float iz = riz + diz_dx * t, uz = ruz + duz_dx * t, vz = rvz + dvz_dx * t, sh = rs + ds_dx * t;
+            u32 *row = r->fb + (size_t)y * r->w;
+            float *zrow = r->zbuf + (size_t)y * r->w;
+            for (int x = xa; x <= xb; x++, iz += diz_dx, uz += duz_dx, vz += dvz_dx, sh += ds_dx) {
+                if (iz <= zrow[x]) continue;
+                float z = 1.0f / iz;
+            u32 c = 0xffffffffu;
+            if (tex) {
+                int tx = (int)(uz * z * (float)tw), ty = (int)(vz * z * (float)th);
+                if (pow2) {
+                    tx &= tw - 1;
+                    ty &= th - 1;
+                } else {
+                    tx %= tw;
+                    ty %= th;
+                    if (tx < 0) tx += tw;
+                    if (ty < 0) ty += th;
+                }
+                c = tex->px[(size_t)ty * tw + tx];
+                if ((c >> 24) < 128) continue;
+            }
+            zrow[x] = iz;
+            float f = fogSpan > 0 ? (r->fogFar - z) * fogInv : 1.0f;
+            f = f < 0 ? 0 : f > 1 ? 1 : f;
+            float cr = fminf((float)(c & 0xff) * sh, 255), cg = fminf((float)(c >> 8 & 0xff) * sh, 255), cb = fminf((float)(c >> 16 & 0xff) * sh, 255);
+            float g1 = 1 - f;
+            u32 rr = (u32)(cr * f + (float)fr * g1), gg = (u32)(cg * f + (float)fg * g1), bb = (u32)(cb * f + (float)fbl * g1);
+            row[x] = 0xff000000u | bb << 16 | gg << 8 | rr;
+            }
+        }
+        r0 += b0;
+        r1 += b1;
+        r2 += b2;
+        riz += diz_dy;
+        ruz += duz_dy;
+        rvz += dvz_dy;
+        rs += ds_dy;
     }
 }
 

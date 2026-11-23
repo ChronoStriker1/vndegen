@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include "vnfont.h"
 
@@ -1382,4 +1383,13 @@ void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir) { sa_exp_debug_place
 void sa_debug_finds(VNSystemAoi *sa, int *out) {
     SA *s = (SA *)sa;
     for (int i = 0; i < 4; i++) out[i] = s->vm.c[0xd2 + i];
+}
+
+double sa_debug_bench(VNSystemAoi *sa, int n) {
+    SA *s = (SA *)sa;
+    struct timespec a, b;
+    clock_gettime(CLOCK_MONOTONIC, &a);
+    for (int i = 0; i < n; i++) sa_exp_draw_view(s, s->fb);
+    clock_gettime(CLOCK_MONOTONIC, &b);
+    return ((double)(b.tv_sec - a.tv_sec) * 1e3 + (double)(b.tv_nsec - a.tv_nsec) / 1e6) / (n > 0 ? n : 1);
 }

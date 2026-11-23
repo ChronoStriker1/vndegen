@@ -54,6 +54,7 @@ enum { PAD_FORWARD, PAD_BACK, PAD_RIGHT, PAD_LEFT, PAD_CORNER_L, PAD_CORNER_R };
 #define FOV 47.2f
 #define LIGHT_GAIN 1.6f
 #define QUARTER 1.5707963f
+#define VIEW_SLOPE 0.75f
 
 static const float lights[2][3] = {{10, 4.5f, 30}, {-10, 4.5f, 30}};
 static const int wallField[4] = {F_WALL_N, F_WALL_E, F_WALL_S, F_WALL_W};
@@ -416,28 +417,48 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     r3_begin(&d->r3, fb, d->fov);
     Cam c;
     make_cam(d, &c);
+    int order[DUN_CELLS], n = 0;
+    float dist[DUN_CELLS];
     for (int row = 0; row < MAP_H; row++)
         for (int col = 0; col < MAP_W; col++) {
             if (abs(col - d->x) > VIEW_CELLS || abs(row - d->y) > VIEW_CELLS) continue;
-            const i32 *cell = d->cell[row * MAP_W + col];
-            if (cell[F_FLOOR] < 0) continue;
-            float cx = (float)col * CELL, cz = -(float)row * CELL;
-            char name[16];
-            snprintf(name, sizeof name, "f%03d", cell[F_FLOOR]);
-            draw_part(d, &d->set, &c, name, cx, cz, 0);
-            draw_part(d, &d->set, &c, "r000", cx, cz, 0);
-            for (int s = 0; s < 4; s++) {
-                int w = cell[wallField[s]];
-                if (w < 0) continue;
-                snprintf(name, sizeof name, "w%03d", w);
-                draw_part(d, &d->set, &c, name, cx, cz, sideQuarter[s]);
-                if (w == WALL_EXIT) draw_model(d, &d->common, &c, "a100", cx, cz, (float)sideQuarter[s] * QUARTER + spin(d));
-            }
-            if (cell[F_OBJECT] >= 0) {
-                snprintf(name, sizeof name, "a%03d", cell[F_OBJECT]);
-                draw_part(d, &d->common, &c, name, cx, cz, 0);
+            float dx = (float)col * CELL - c.pos[0], dz = -(float)row * CELL - c.pos[2];
+            float ahead = dx * c.f[0] + dz * c.f[2], side = fabsf(dx * c.r[0] + dz * c.r[2]);
+            if (ahead < -CELL || side > ahead * VIEW_SLOPE + CELL * 1.5f) continue;
+            int k = n++;
+            dist[k] = dx * dx + dz * dz;
+            order[k] = row * MAP_W + col;
+            while (k > 0 && dist[k - 1] > dist[k]) {
+                float tf = dist[k];
+                dist[k] = dist[k - 1];
+                dist[k - 1] = tf;
+                int ti = order[k];
+                order[k] = order[k - 1];
+                order[k - 1] = ti;
+                k--;
             }
         }
+    for (int i = 0; i < n; i++) {
+        int row = order[i] / MAP_W, col = order[i] % MAP_W;
+        const i32 *cell = d->cell[row * MAP_W + col];
+        if (cell[F_FLOOR] < 0) continue;
+        float cx = (float)col * CELL, cz = -(float)row * CELL;
+        char name[16];
+        snprintf(name, sizeof name, "f%03d", cell[F_FLOOR]);
+        draw_part(d, &d->set, &c, name, cx, cz, 0);
+        draw_part(d, &d->set, &c, "r000", cx, cz, 0);
+        for (int s = 0; s < 4; s++) {
+            int w = cell[wallField[s]];
+            if (w < 0) continue;
+            snprintf(name, sizeof name, "w%03d", w);
+            draw_part(d, &d->set, &c, name, cx, cz, sideQuarter[s]);
+            if (w == WALL_EXIT) draw_model(d, &d->common, &c, "a100", cx, cz, (float)sideQuarter[s] * QUARTER + spin(d));
+        }
+        if (cell[F_OBJECT] >= 0) {
+            snprintf(name, sizeof name, "a%03d", cell[F_OBJECT]);
+            draw_part(d, &d->common, &c, name, cx, cz, 0);
+        }
+    }
 }
 
 static void fill(u32 *fb, int x, int y, int w, int h, u32 c) {
