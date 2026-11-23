@@ -42,6 +42,9 @@ const char *vnanim_title(VNANIM *an);
 const char *vnanim_take_page(VNANIM *an);
 const char *vnanim_problem(VNANIM *an);
 
+int vnanim_take_comment_request(VNANIM *an, char *comment, size_t size);
+bool vnanim_set_comment(VNANIM *an, int slot, const char *comment);
+
 #ifdef __cplusplus
 }
 #endif

@@ -226,7 +226,7 @@ bool uf_call(BR *e, int id, Node *call) {
         return true;
     }
     case 4000: event_wait(e, A(e, call, 0), A(e, call, 1), A(e, call, 2)); return true;
-    case 4001: e->reflag = 1; return true;
+    case 4001: e->reflag = e->dlgResult; return true;
     case 4110: {
         int f = A(e, call, 0);
         e->reflag = f >= 0 && f < BR_FLAGS ? e->flag[f] : 0;
@@ -304,12 +304,33 @@ bool uf_call(BR *e, int id, Node *call) {
         }
         return true;
     case 5005: sys_format_time(e, A(e, call, 0), A(e, call, 1)); return true;
-    case 7001: e->reflag = 0; return true;
+    case 7001:
+        if (!e->dialogs) {
+            e->reflag = 0;
+            return true;
+        }
+        e->dlgKind = BR_DIALOG_TEXT;
+        e->dlgDst = A(e, call, 0);
+        e->dlgMax = A(e, call, 2);
+        e->dlgTitle = br_sjis_to_utf8(S(e, call, 3));
+        e->dlgText = br_sjis_to_utf8(str_get(e, A(e, call, 1)));
+        e->wait = W_DIALOG;
+        return true;
     case 6005:
     case 6009: return true;
     case 6006: e->reflag = 0; return true;
     case 6010: e->reflag = 0; return true;
-    case 7002: return true;
+    case 7002: {
+        if (!e->dialogs) return true;
+        char *path = br_game_path(e, S(e, call, 1));
+        char found[2048];
+        e->dlgKind = BR_DIALOG_LICENCE;
+        e->dlgTitle = br_sjis_to_utf8(S(e, call, 0));
+        e->dlgText = br_strdup(br_path_resolve(path, found, sizeof found) >= 0 ? found : path);
+        free(path);
+        e->wait = W_DIALOG;
+        return true;
+    }
     default: unknown(e, id); return true;
     }
 }

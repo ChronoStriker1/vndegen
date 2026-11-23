@@ -95,6 +95,7 @@ final class ANIMSession: EngineSession {
             return
         }
         if let page = vnanim_take_page(engine), !showingPage { showPage(URL(fileURLWithPath: String(cString: page))) }
+        if !showingPage { askForComment(engine) }
         let serial = vnanim_frame_serial(engine)
         #if DEBUG
         driver.pacing?.note(link, presented: serial != shownSerial)
@@ -127,6 +128,10 @@ final class ANIMSession: EngineSession {
     }
 
     private func showPage(_ page: URL) {
+        if page.hasDirectoryPath || (try? page.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            openFolder(page)
+            return
+        }
         showingPage = true
         setPaused(true)
         PageSheet.show(page, title: "Help", over: view) { [weak self] in
@@ -134,6 +139,33 @@ final class ANIMSession: EngineSession {
             showingPage = false
             setPaused(false)
         }
+    }
+
+    private func askForComment(_ engine: OpaquePointer) {
+        var buffer = [CChar](repeating: 0, count: 512)
+        let slot = vnanim_take_comment_request(engine, &buffer, buffer.count)
+        guard slot >= 0 else { return }
+        showingPage = true
+        setPaused(true)
+        let current = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        CommentPrompt.ask(current, over: view) { [weak self] text in
+            guard let self else { return }
+            if let text, let engine = self.engine { vnanim_set_comment(engine, slot, text) }
+            showingPage = false
+            setPaused(false)
+        }
+    }
+
+    private func openFolder(_ folder: URL) {
+        #if canImport(UIKit)
+        var files = URLComponents()
+        files.scheme = "shareddocuments"
+        files.host = ""
+        files.path = folder.path
+        if let files = files.url { UIApplication.shared.open(files) }
+        #else
+        NSWorkspace.shared.open(folder)
+        #endif
     }
 
     func setPaused(_ paused: Bool) {

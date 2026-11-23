@@ -78,7 +78,7 @@ void bx_cmd(BX *b, int op) {
         b->bgmIndex = bx_arg(b, 2).v;
         if (strcmp(name, b->bgmName) || !bx_snd_playing(b, CH_BGM)) {
             snprintf(b->bgmName, sizeof b->bgmName, "%s", name);
-            bx_snd_play(b, CH_BGM, RX_BGM, name, loop, a1 * 100);
+            bx_snd_play(b, CH_BGM, RX_BGM, bx_bgm_track(b, name), loop, a1 * 100);
         }
         break;
     }

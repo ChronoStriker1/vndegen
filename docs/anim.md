@@ -42,12 +42,31 @@ folder down.
   `7c` scales it, both over a time; `52` puts a new layer back at no offset and 100%. Magical Sword's opening pans from
   the goddess's legs to her face this way, and matches the PC frame for frame. Expressions are presets of E-mote variables in
   the define.
-- Text: Arial at 24 pixels (Liberation Sans or another metric match where Arial is missing), each glyph's advance
-  rounded up to a whole pixel as Windows lays it out, wrapped at 884 pixels from x 180 (the PC keeps an 878-pixel line
-  and wraps one of 891). Kanji and kana the font lacks come from the Japanese fallback (MS Gothic's substitute).
+- Pictures on layers: a picture layer's x is its `59` moves less 1024, so `59 5 1024 0 0 0` puts Magical Sword's skill
+  status window and the memory filters where the picture lies in its texture, and Double Date Dilemma's `59 2 1424 0 0 0`
+  puts a cut-in 400 pixels right, as the PC draws them. The PC keeps that x in a layer's slot-x field (0x1b0) with no
+  offset, where an E-mote layer keeps 640 and its offset, and VNDegen saves and loads picture layers the same way. Up to
+  0.59.9 VNDegen drew them 1024 pixels to the right, off the screen, and the PC loaded VNDegen's saves with them 384
+  pixels left.
+- Clearing a layer (`57`) crossfades the whole scene, from the picture before the line to the one after, linearly over
+  0.4 s starting at the click, while the next line types; showing a layer (`52`) alone is instant. Recorded at 30 fps on
+  the original under Wine where Magical Sword hides the goddess, shows her, and swaps the status window for her; the
+  message window and menu bar aren't part of the fade. Skip mode doesn't fade.
+- Text: the font the player picked in Settings, whose name the PC keeps in its system save (decoded, 32 bytes of
+  Shift-JIS at 0x7e324). With none stored, each exe's own default: MS Gothic in Double Date Dilemma and MS PMincho
+  in Magical Sword, drawn through their substitutes (Ume Gothic, Ume P Mincho, `docs/fonts.md`). The story, the backlog,
+  the save cards' comments, the Settings sample and the Scenes blurbs all use it, as on the PC. A size of n pixels
+  is the font's whole cell (ascent plus descent) at n × 2288 / 2048, as Windows sizes a font by its cell height for
+  Arial's metrics; the baseline is moved so a font's ascent sits where Arial's would. Double Date Dilemma: 24 pixels,
+  each advance rounded up to a whole pixel, wrapped at 884 pixels from x 180; with Ume Gothic its first 24 lines break
+  and end where the PC's do, to a pixel. Magical Sword: 21 pixels with unrounded advances from x 175, 42 pixels a line,
+  and a line opening with a quote or bracket hangs it 11 pixels to the left, its later lines staying at 175, as the PC
+  draws them; its lines within 2% of the PC's widths. Kanji and kana a font lacks come from MS Gothic's substitute.
+  Up to 0.59.9 both games drew Liberation Sans, matched to a Wine prefix with no Japanese fonts, where the PC falls
+  back to Arial; a Windows PC has MS Gothic and MS PMincho, and a prefix with the Ume fonts shows them.
 - Backlog: entries 46 pixels a line plus one blank line, the newest ending at y 666 and older ones above it, the line
-  on screen included. Magical Sword draws it at 20 pixels with unrounded advances, the speaker's line 41 pixels below
-  the name and indented 12 pixels; the scroll thumb's height is the share of entries shown.
+  on screen included. Magical Sword draws it at 21 pixels with unrounded advances, the speaker's line 42 pixels below
+  the name and indented 26 pixels, its opening bracket hung 11; the scroll thumb's height is the share of entries shown.
 - Pose animations: `b9 <id> <n>` and `b8 <id> <n>` start a block that runs beside the story up to its `c4`, while the
   script carries on after it: preset changes (`be`), moves relative to the last one (`bc`), scale (`c0`), sounds
   (`c3`) and waits (`43`), each on its own clock. `c2` sets a flag the main script reads (`L15`, the block finished),
@@ -122,9 +141,14 @@ scales it loads the scene with no characters. The comment is the speaker and the
 does; a longer comment that holds a line break loads black on the PC. Saves load both ways with the PC.
 The comment is kept in Shift-JIS, as the PC reads it. Magical Sword's PC writes the speaker and the line without a
 break, and its cards show the first 40 bytes broken at 206 pixels wherever that falls, mid-word included; Double
-Date Dilemma's show two lines of up to 20 characters broken at spaces. Magical Sword autosaves before each choice (op `15`, which Double Date Dilemma's PC doesn't act on): slots 160 to 167
+Date Dilemma's show two lines of up to 20 characters broken at spaces. Magical Sword's cards say "Click to edit comment." over a used card's
+comment, on both Save and Load, where the PC opens a text box on the card; VNDegen asks for the text in a system prompt
+instead and writes it over the card's comment, up to 100 bytes of Shift-JIS, leaving the old bytes after its end as the
+PC leaves them. The PC shows a comment VNDegen wrote. What the PC stores for typed text couldn't be watched: under Wine
+its box reads back empty, so the PC writes an empty comment whatever is typed. Double Date Dilemma's cards have no
+comment editing on the PC. Magical Sword autosaves before each choice (op `15`, which Double Date Dilemma's PC doesn't act on): slots 160 to 167
 in turn, the last one used kept at 0x0c in the system save (-1 before the first), the slot resuming at the choice
-itself. Its Load screen's AUTO SAVE button shows those eight as cards 161 to 168. The PC's own autosave thumbnail
+itself. Its Load screen's AUTO SAVE button shows those eight as cards 161 to 168. Double Date Dilemma's Load screen has the same button and page, which stays empty since that game never autosaves, as on the PC. The PC's own autosave thumbnail
 comes out black under Wine; VNDegen's shows the scene. A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
 does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's NO IMAGE picture.
 
@@ -139,12 +163,24 @@ more arrays, at 0x2b and 0x2f in Double Date Dilemma (two tabs with background v
 Sword (eight); the last tab, Others, has only a voice volume. A voice or background voice belongs to the tab its
 character letter names (the last letter of a voice's name, the tag of a background voice). Magical Sword keeps every
 option at Double Date Dilemma's byte; its Voice Cut is Skip Voice. They're written when the player leaves either
-screen. Screen Mode isn't stored there, and VNDegen has no use for it.
+screen. Each volume's Play button (Magical Sword's PLAY) mutes it, the master and each character
+tab's three as well, and the mute is kept 0x64 bytes after its volume (1 muted), as the PC keeps it. Allow Test (TEST
+PLAY) loops a sample at that row's volume until it is clicked again, the screen is left or, for a character row, another
+tab is picked, each the sound the PC plays, matched by recording the original under Wine: the music room's first
+track, `wse20000`, `b090001g`, `b130008j`, the tab's `w<name>_sample` voice, and its background voices (`b1040` and
+`b5040` for Risa, `b2040` and `b6040` for Shiho; Magical Sword's `b<name>p20` for both rows). The Volume screen's To
+Settings button opens Settings. Screen Mode isn't stored there, and VNDegen has no use for it.
+
+Font Settings lists the fonts VNDegen has substitutes for, by their Windows names (Arial, Times New Roman, Courier New
+and so on), where the PC lists the fonts installed on Windows. The box above the list shows the font in use, a pick
+changes the story's text at once, and the name is written to the system save at 0x7e324, as the PC writes it; a name
+the PC stored that VNDegen has no substitute for, such as a font only that PC had, stays stored and the text falls
+back to the game's default. The list scrolls with its arrows or the wheel, four rows at a time on screen.
 
 The info line at the top of both screens follows the PC, and keeps the last control's line when the pointer leaves it,
 as the PC does. Magical Sword's English patch redrew the info strip with one line per option, which the PC draws a
 little smaller than the strip. Settings' text box sample is typed at the chosen speed in the window colour at the chosen
-opacity: Magical Sword's comes from its define file (in Japanese, as on the PC, drawn with the Japanese fallback font),
+opacity: Magical Sword's comes from its define file (in Japanese, as on the PC),
 Double Date Dilemma's from its exe. The Shortcut Key List button shows the PC's list over the screen. The menu bar's
 lock icon and the Voice Wait and Auto Wait gauges are drawn as on the PC, the gauges when their options are on.
 
@@ -188,9 +224,11 @@ Tears set `face_tears` to 30, the crest (Magical Sword) `fade_x` to 1, and Idle 
 `sNoIdle`; Lip Sync moves `face_talk`. Save and Load keep one setting per character in the PC's system save: the ten
 knob offsets at 0x7e9e4 + 40 × c, the outfit at 0x7ee94 + 4 × c, the expression's name at 0x7ef0c, the expression and
 background at 0x7efd4 and 0x7f04c + 4 × c, then tears, hair, crest and lip sync from 0x7f1b4, 0x7f22c, 0x7f2a4 and
-0x7f31c + 4 × c. Saves load both ways with the PC. The camera button writes the scene without the controls to
+0x7f31c + 4 × c. Saves load both ways with the PC. Idle Motion isn't part of a saved pose: on the PC, Load leaves it
+as it was (Magical Sword under Wine, saved with it on, loaded with it off), and VNDegen does the same. The camera button writes the scene without the controls to
 `SaveGraphic/emotesave_NNN.png` in the save folder, numbered from 000 as on the PC (whose own file comes out black
-under Wine). The info line shows the help for the row under the pointer, and Double Date Dilemma's Lips and Move
+under Wine). The folder button beside it opens that folder, in Finder on the Mac and in Files on iPhone and iPad, as the
+PC opens it in Explorer ("Save image and open folder." on its info line); it writes no picture itself. The info line shows the help for the row under the pointer, and Double Date Dilemma's Lips and Move
 buttons have their own on and off lines.
 
 ## Known limits
@@ -201,14 +239,10 @@ buttons have their own on and off lines.
   usual blinks, which the PC times the same way on every load, so no visible effect could be tied to either. A character's first frame takes its preset
   at once, where the PC eases into it during the scene's fade-in. eluna needed fixes to draw them like the PC (`Engines/ANIM/UPSTREAM.md`);
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
-- The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't.
-- When a line hides one layer and shows another, the PC holds the old picture for about half a second and then
-  crossfades over about 0.3 s; VNDegen swaps them at once (seen when the goddess returns after the skill list).
-- The Sprites viewer's folder button does nothing, and Save doesn't keep Idle Motion: no field for it turned up in the
-  PC's save. Settings' font list is empty and its choice does nothing, and the volume screen's Play and Allow Test
-  buttons are drawn but do nothing.
-- Double Date Dilemma's memory blurbs are drawn about 1.5% narrower than the PC's, so a line can break one word
-  earlier.
+- The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't: one-pixel lines
+  on a 117 by 121 pixel grid, a few levels darker. Neither snapping vertices to 1/16 pixel, as a GPU does, nor point
+  sampling where a texel's neighbours are transparent changes them, so they aren't gaps between the tiles' triangles or
+  their texture edges.
 - The goddess (Malg202) draws her lids too low: her eyes look half closed where the PC's are open, in the story and in
   the Sprites viewer. Her irises now stay inside the eye whites. She is on screen in the opening (`000-000`, `000-010`)
   and in `060-040`/`060-050`, plus the `Mem30` replay (Malg200, Malg203). Her eye motion's time follows
@@ -219,7 +253,8 @@ buttons have their own on and off lines.
 - Magical Sword: every screen is built to its own layout and checked against the PC. Its goddess, with three
   times the sprites of a Double Date Dilemma character, runs at 46 frames a second alone in the Debug Mac app and 26
   in the opening's 300% close-up (34 and 20 on the iPad simulator). A Release build on the iPad simulator updates the
-  screen about as often (32 and 20, counted from screen recordings), so the close-up isn't smooth there; a Release Mac
-  app hasn't been watched, since its library and input can't be set from a test run.
-- The PC's comment editing on save cards isn't built.
+  screen about as often (32 and 20, counted from screen recordings), so the close-up isn't smooth there. On the Mac mini
+  the close-up holds 25 frames a second in a Debug build and 24.7 in one built with Swift's optimizer (with the system
+  idle but for another thread's simulator, load 5 to 7); the runtime is built at -O2 and eluna in Rust's release mode in
+  every build, so a Release app draws it no faster. The rest of the opening holds 60.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

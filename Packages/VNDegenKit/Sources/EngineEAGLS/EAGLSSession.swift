@@ -25,6 +25,7 @@ final class EAGLSSession: EngineSession {
     private var router = EAGLSInputRouter()
     private var frameSize = CGSize(width: 800, height: 600)
     private var shownSerial: UInt32 = .max
+    private var wantedText = false
 
     init(_ launch: GameLaunch, root: URL, saveDirectory: URL) {
         self.launch = launch
@@ -93,6 +94,11 @@ final class EAGLSSession: EngineSession {
             driver.finish(byGame: true)
             return
         }
+        let wantsText = vneagls_wants_text(engine)
+        if wantsText != wantedText {
+            wantedText = wantsText
+            askForKeyboard(wantsText)
+        }
         let serial = vneagls_frame_serial(engine)
         #if DEBUG
         driver.pacing?.note(link, presented: serial != shownSerial)
@@ -119,7 +125,21 @@ final class EAGLSSession: EngineSession {
         }
     }
 
+    private func askForKeyboard(_ wants: Bool) {
+        NotificationCenter.default.post(name: .gameWantsKeyboard, object: self, userInfo: ["wants": wants])
+    }
+
+    func type(_ typed: TypedText) {
+        guard let engine else { return }
+        switch typed {
+        case let .text(text): vneagls_text(engine, text)
+        case .newline: deliver([.key(0x0d, down: true), .key(0x0d, down: false)])
+        case .deleteBackward: deliver([.key(0x08, down: true), .key(0x08, down: false)])
+        }
+    }
+
     func send(_ event: ControllerEvent) {
+        if case let .pointer(pointer) = event, pointer.phase == .began, wantedText { askForKeyboard(true) }
         let frame = frameView
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
     }

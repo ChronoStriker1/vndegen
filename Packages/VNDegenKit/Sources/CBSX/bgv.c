@@ -120,7 +120,15 @@ void bx_bgv_free(BgvPanel *p) {
     free(p);
 }
 
-static void apply_level(BX *b, const BgvChar *c, int i) { bx_snd_loop_level(b, CH_BGV, c->sig, (float)b->bgvLevel[i] / 100.0f); }
+static int *level_of(BX *b, const BgvChar *c) {
+    for (int i = 0; i < b->voiceCount; i++)
+        if (!strcmp(b->voices[i].sig, c->sig)) return &b->voices[i].bgv;
+    return &b->otherVoices.bgv;
+}
+
+static void apply_level(BX *b, const BgvChar *c) {
+    bx_snd_loop_level(b, CH_BGV, c->sig, (float)*level_of(b, c) / 100.0f);
+}
 
 static int row_at(const BX *b, const BgvChar *c) {
     if (b->mx < c->view[0] || b->mx >= c->view[0] + c->view[2] || b->my < c->view[1]) return -1;
@@ -152,7 +160,7 @@ static void set_volume(BX *b, int v) {
 bool bx_bgv_update(BX *b, BgvPanel *p) {
     if (p->drag != DRAG_NONE) {
         if (!b->lDown) {
-            if (p->drag == DRAG_VOL) bx_settings_save(b);
+            if (p->drag == DRAG_VOL || p->drag < DRAG_SCROLL) bx_settings_save(b);
             p->drag = DRAG_NONE;
         } else if (p->drag == DRAG_VOL) set_volume(b, bx_mbar_value(b, &p->vol));
         else if (p->drag >= DRAG_SCROLL) {
@@ -161,8 +169,8 @@ bool bx_bgv_update(BX *b, BgvPanel *p) {
             scroll_to(c, (b->my - p->grab - c->barY) * c->count / (track > 0 ? track : 1));
         } else {
             int i = p->drag;
-            b->bgvLevel[i] = bx_mbar_value(b, &p->ch[i].vol);
-            apply_level(b, &p->ch[i], i);
+            *level_of(b, &p->ch[i]) = bx_mbar_value(b, &p->ch[i].vol);
+            apply_level(b, &p->ch[i]);
         }
     }
     if (b->wheel)
@@ -182,8 +190,8 @@ bool bx_bgv_update(BX *b, BgvPanel *p) {
             BgvChar *c = &p->ch[i];
             if (bx_mbar_on(b, &c->vol)) {
                 p->drag = i;
-                b->bgvLevel[i] = bx_mbar_value(b, &c->vol);
-                apply_level(b, c, i);
+                *level_of(b, c) = bx_mbar_value(b, &c->vol);
+                apply_level(b, c);
             } else if (on_bar(b, c)) {
                 int y, h = knob(c, &y);
                 if (b->my < y || b->my >= y + h) scroll_to(c, c->top + (b->my < y ? -c->lines : c->lines));
@@ -212,11 +220,12 @@ bool bx_bgv_update(BX *b, BgvPanel *p) {
             int r = row_at(b, c);
             if (r >= 0 && c->voices[r][0]) {
                 bx_snd_loop(b, CH_BGV, c->sig, RX_VOICE, c->voices[r]);
-                apply_level(b, c, i);
+                apply_level(b, c);
             } else if (bx_mbtn_on(b, &c->stop)) bx_snd_loop_stop(b, CH_BGV, c->sig, 300);
             else if (bx_mbtn_on(b, &c->min) || bx_mbtn_on(b, &c->max)) {
-                b->bgvLevel[i] = clampi(b->bgvLevel[i] + (bx_mbtn_on(b, &c->min) ? -10 : 10), 0, 100);
-                apply_level(b, c, i);
+                *level_of(b, c) = clampi(*level_of(b, c) + (bx_mbtn_on(b, &c->min) ? -10 : 10), 0, 100);
+                apply_level(b, c);
+                bx_settings_save(b);
             } else continue;
             b->click = false;
             return false;
@@ -247,7 +256,7 @@ void bx_bgv_draw(BX *b, BgvPanel *p, u32 *dst) {
             bx_blit_part(dst, b->W, b->H, c->bar, 0, 0, c->bar->w, h - cap, c->barX, y, 255);
             bx_blit_part(dst, b->W, b->H, c->bar, 0, c->bar->h - cap, c->bar->w, cap, c->barX, y + h - cap, 255);
         }
-        bx_mbar_draw(b, dst, &c->vol, b->bgvLevel[i]);
+        bx_mbar_draw(b, dst, &c->vol, *level_of(b, c));
         bx_mbtn_draw(b, dst, &c->stop, bx_mbtn_state(b, &c->stop));
         bx_mbtn_draw(b, dst, &c->min, bx_mbtn_state(b, &c->min));
         bx_mbtn_draw(b, dst, &c->max, bx_mbtn_state(b, &c->max));

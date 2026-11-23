@@ -30,6 +30,8 @@ typedef struct Op {
     u32 next;
 } Op;
 
+enum { LAYER_FADE_MS = 400 };
+
 enum { TAG_NONE = 0, TAG_LOCAL = 0x40, TAG_GLOBAL = 0x41, TAG_CONST = 0x43, TAG_RAW = 1, TAG_STR = 2, TAG_ADDR = 3 };
 
 static bool decode(AN *a, u32 pc, Op *op) {
@@ -412,7 +414,9 @@ static void exec(AN *a, const Op *op) {
     }
     case 0x57: {
         Layer *l = layer(a, &g[0]);
-        if (l) memset(l, 0, sizeof *l);
+        if (!l) break;
+        if (l->kind && !a->skipMode) an_gfx_scene_fade(a, LAYER_FADE_MS);
+        memset(l, 0, sizeof *l);
         break;
     }
     case 0x59: {

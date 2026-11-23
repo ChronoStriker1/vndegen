@@ -201,6 +201,7 @@ void dump(const SaveFile &f) {
         o.str("file", pic.file);
         o.list("a", pic.a);
         o.list("b", pic.b);
+        if (f.version >= 0x9F) o.list("v9fA", pic.v9fA);
         o.list("v69", pic.v69);
         o.num("v6b", pic.v6b);
         o.list("v72a", pic.v72a);
@@ -214,6 +215,12 @@ void dump(const SaveFile &f) {
         o.list("v87", pic.v87);
         for (size_t j = 0; j < pic.v89Lists.size(); j++) o.list("v89Lists[" + std::to_string(j) + "]", pic.v89Lists[j]);
         o.list("v89", pic.v89);
+        if (f.version >= 0x9F) {
+            o.list("v9fB", pic.v9fB);
+            o.list("v9fC", pic.v9fC);
+            o.num("v9fFlag", pic.v9fFlag);
+            if (pic.v9fFlag) o.list("v9fD", pic.v9fD);
+        }
     }
 
     auto d = p.sub("variableDb");

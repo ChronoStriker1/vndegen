@@ -164,7 +164,8 @@ static bool window_visible(EG *e) { return e->mesMode && !e->winHidden && e->uiM
 void msg_draw(EG *e, u32 *dst) {
     if (!window_visible(e)) return;
     int alpha = e->mesAlpha;
-    Image *win = e->mesImg[0];
+    Var *view = var_find(&e->vars, ":OptionNum3");
+    Image *win = view && var_at(view, 0)->i && e->mesImg[6] ? e->mesImg[6] : e->mesImg[0];
     if (win) blit(dst, e->W, e->H, win, e->winRect[0], e->winRect[1], alpha);
     if (e->speaker && e->th[0].wait != W_CHOICE) {
         const Font *f = msg_font(e, 1);

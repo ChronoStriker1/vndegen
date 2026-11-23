@@ -140,11 +140,11 @@ VNBSX *vnbsx_open(const VNBSXConfig *cfg, char *err, size_t errSize) {
     bx_msg_init(b);
     bx_ui_init(b);
     b->mixer = bx_mixer_new(b->audioRate);
-    bx_settings_load(b);
-    for (int i = 0; i < 8; i++) b->bgvLevel[i] = 100;
+    bx_museum_init(b);
     bx_common_load(b);
     bx_museum_find_wear(b);
-    bx_museum_init(b);
+    bx_museum_tables(b);
+    bx_settings_load(b);
     bx_vm_init(b);
     bx_log(b, "opened %s, %s, %d labels, %d messages", b->gameDir, b->sc->version, b->sc->labelCount, b->sc->msgCount);
     return (VNBSX *)b;
@@ -182,6 +182,10 @@ void vnbsx_close(VNBSX *n) {
 static void advance(BX *b) {
     b->th.wait = W_NONE;
     b->autoAt = 0;
+    if (b->set.voiceMode <= 1) {
+        bx_snd_stop(b, CH_VOICE, 0);
+        bx_snd_stop(b, CH_VOICE2, 0);
+    }
 }
 
 static bool skip_to_label(BX *b) {

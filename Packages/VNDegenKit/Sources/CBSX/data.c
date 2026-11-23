@@ -7,7 +7,7 @@
 
 typedef struct Btn {
     Image *img;
-    int frames, x, y;
+    int frames, skip, x, y;
 } Btn;
 
 typedef struct SlotCache {
@@ -60,6 +60,7 @@ static void btn(BX *b, const char *sec, const char *key, Btn *bt) {
     if (bt->frames < 1) bt->frames = 1;
     bt->x = bx_cfg_field(v, 2, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
     bt->y = bx_cfg_field(v, 3, f, sizeof f) > 0 ? bx_eval(f, NULL) : 0;
+    bt->skip = bt->img && bt->frames > 2 && bx_hit_mask(bt->img, bt->img->h / bt->frames) ? 1 : 0;
 }
 
 static bool in_btn(const Btn *bt, int x, int y) {
@@ -71,7 +72,7 @@ static bool in_btn(const Btn *bt, int x, int y) {
 static void draw_btn(BX *b, u32 *dst, const Btn *bt, int frame) {
     if (!bt->img) return;
     int h = bt->img->h / bt->frames;
-    frame = clampi(frame, 0, bt->frames - 1);
+    frame = clampi(frame + bt->skip, 0, bt->frames - 1);
     bx_blit_part(dst, b->W, b->H, bt->img, 0, frame * h, bt->img->w, h, bt->x, bt->y, 255);
 }
 
@@ -361,7 +362,7 @@ void bx_data_update(BX *b) {
     int slot = d->hover;
     SlotCache *c = &d->cache[slot];
     if (d->save) {
-        if (slot < d->first) return;
+        if (slot == 0) return;
         if (c->exists) d->confirmSlot = slot;
         else do_save(b, slot);
     } else if (c->exists) {
@@ -467,8 +468,8 @@ void bx_data_draw(BX *b, u32 *dst) {
         SlotCache *c = &d->cache[slot];
         int x = d->slotPos[i][0], y = d->slotPos[i][1];
         if (c->exists && c->thumb) bx_blit(dst, b->W, b->H, c->thumb, x, y, 255);
-        else if (d->empty) bx_blit(dst, b->W, b->H, d->empty, x, y, 255);
-        if (slot < d->first && d->save && d->autoOnly && c->exists) bx_blit(dst, b->W, b->H, d->autoOnly, x, y, 255);
+        else if (d->empty && !(slot == 0 && d->autoOnly)) bx_blit(dst, b->W, b->H, d->empty, x, y, 255);
+        if (slot == 0 && d->autoOnly && (d->save || !c->exists)) bx_blit(dst, b->W, b->H, d->autoOnly, x, y, 255);
         if (slot == d->hover && d->frame) bx_blit(dst, b->W, b->H, d->frame, x + d->frameOff[0], y + d->frameOff[1], 255);
     }
     if (d->hover >= 0) draw_info(b, d, dst, d->hover);

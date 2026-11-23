@@ -4,7 +4,8 @@
 
 #include <time.h>
 
-enum { UI_NONE, UI_SYSMENU, UI_SAVE, UI_LOAD, UI_BACKLOG, UI_CONFIG };
+enum { UI_NONE, UI_SYSMENU, UI_SAVE, UI_LOAD, UI_BACKLOG, UI_CONFIG, UI_ASK };
+enum { ASK_EXIT = 0, ASK_TITLE = 1, ASK_QUICK_LOAD = 2, ASK_OVERWRITE = 3 };
 
 typedef struct Cfg Cfg;
 static void cfg_build(EX *e, Ui *u);
@@ -42,11 +43,14 @@ struct Ui {
     int hover, pressed;
     int page, pages, pageStart[16], pageCount[16];
     int top;
-    Image *mark, *voiceMark;
+    Image *mark, *voiceMark, *rowOn;
     int newest;
     bool fromTitle;
     bool dragging;
     Cfg *cfg;
+    bool asking;
+    int askAction, askSlot, askHover, askX, askY, yesX, yesY, noX, noY;
+    Image *askPanel, *askYes, *askNo;
 };
 
 static void kv_free(Ui *u) {
@@ -189,6 +193,10 @@ static void free_ui(Ui *u) {
     for (int i = 0; i < u->ni; i++) image_free(u->items[i].img);
     image_free(u->mark);
     image_free(u->voiceMark);
+    image_free(u->rowOn);
+    image_free(u->askPanel);
+    image_free(u->askYes);
+    image_free(u->askNo);
     kv_free(u);
     free(u);
 }
@@ -295,14 +303,10 @@ static void open_backlog(EX *e, Ui *u) {
     rnf_load(e, u, "res/c/backlog.layout2.rnf");
     build_from_rnf(e, u);
     u->voiceMark = image_load(e, "res/g/sy/01/1920_197.gyu");
+    u->rowOn = image_load(e, "res/g/sy/01/1920_199.gyu");
     int total = e->histCount - (e->msg.active ? 1 : 0);
     u->top = total - ROWS;
     if (u->top < 0) u->top = 0;
-    for (int i = 0; i < u->ni; i++)
-        if (u->items[i].layer == 851) {
-            image_free(u->items[i].img);
-            u->items[i].img = NULL;
-        }
 }
 
 bool ui_active(EX *e) { return e->ui != NULL; }
@@ -327,6 +331,99 @@ static bool resume_latest(EX *e) {
             best = i;
         }
     return best >= 0 && load_slot(e, best);
+}
+
+static bool ask_load(EX *e, Ui *u, int dialog) {
+    Script *sc = rld_get(e, "def");
+    for (int i = 0; sc && i < sc->count; i++) {
+        Op *op = &sc->ops[i];
+        if (op->op != 66 || !op->ns) continue;
+        char buf[1024];
+        snprintf(buf, sizeof buf, "%s", op->s[0]);
+        char *f[32];
+        if (split_csv(buf, f, 32) < 22 || field_int(f[0]) != dialog) continue;
+        image_free(u->askPanel);
+        image_free(u->askYes);
+        image_free(u->askNo);
+        u->askPanel = image_load(e, f[7]);
+        u->askYes = image_load(e, f[17]);
+        u->askNo = image_load(e, f[21]);
+        if (!u->askPanel || !u->askYes || !u->askNo) return false;
+        u->askX = field_int(f[5]);
+        u->askY = field_int(f[6]);
+        u->yesX = u->askX + field_int(f[15]);
+        u->yesY = u->askY + field_int(f[16]);
+        u->noX = u->askX + field_int(f[19]);
+        u->noY = u->askY + field_int(f[20]);
+        u->asking = true;
+        u->askHover = -1;
+        e->lPress = e->rPress = false;
+        return true;
+    }
+    return false;
+}
+
+static bool run_action(EX *e, int action) {
+    switch (action) {
+    case 112: return e->slots[99].used && load_slot(e, 99);
+    case 1:
+        ui_close(e);
+        vm_goto_script(e, "title");
+        e->wait = W_NONE;
+        reset_for_title(e);
+        return true;
+    case 121: e->quit = true; return true;
+    }
+    return false;
+}
+
+static bool ask_first(EX *e, int action) {
+    if (action == 112 && !e->slots[99].used) return false;
+    ui_close(e);
+    Ui *u = ex_alloc(sizeof *u);
+    u->kind = UI_ASK;
+    u->hover = u->pressed = -1;
+    u->askAction = action;
+    u->askSlot = -1;
+    e->ui = u;
+    if (ask_load(e, u, action == 1 ? ASK_TITLE : action == 121 ? ASK_EXIT : ASK_QUICK_LOAD)) return true;
+    ui_close(e);
+    return run_action(e, action);
+}
+
+static int ask_hit(EX *e, Ui *u) {
+    int w = u->askYes->w / 3, h = u->askYes->h;
+    if (e->mouseY < u->yesY || e->mouseY >= u->yesY + h) return -1;
+    if (e->mouseX >= u->yesX && e->mouseX < u->yesX + w) return 1;
+    if (e->mouseX >= u->noX && e->mouseX < u->noX + w) return 0;
+    return -1;
+}
+
+static void ask_input(EX *e, Ui *u) {
+    int hover = ask_hit(e, u);
+    if (hover != u->askHover && hover >= 0) snd_play_file(e, "res/s/e/993.wav", EX_CH_UI);
+    u->askHover = hover;
+    e->wheel = 0;
+    bool answered = e->rPress || (e->lPress && hover >= 0);
+    bool yes = !e->rPress && hover == 1;
+    e->lPress = e->rPress = false;
+    if (!answered) return;
+    snd_play_file(e, "res/s/e/990.wav", EX_CH_UI);
+    u->asking = false;
+    if (u->kind != UI_ASK) {
+        if (yes && u->askSlot >= 0 && save_slot(e, u->askSlot)) u->newest = u->askSlot;
+        return;
+    }
+    int action = u->askAction;
+    ui_close(e);
+    if (yes) run_action(e, action);
+}
+
+static void ask_draw(Ui *u, u32 *dst) {
+    blit(dst, EX_W, EX_H, u->askPanel, u->askX, u->askY, 255);
+    int w = u->askYes->w / 3, h = u->askYes->h;
+    blit_part(dst, EX_W, EX_H, u->askYes, (u->askHover == 1 ? 1 : 0) * w, 0, w, h, u->yesX, u->yesY, 255);
+    blit_part(dst, EX_W, EX_H, u->askNo, (u->askHover == 0 ? 1 : 0) * w, 0, w, h, u->noX, u->noY, 255);
 }
 
 bool ui_open(EX *e, int action) {
@@ -356,16 +453,8 @@ bool ui_open(EX *e, int action) {
         capture_shot(e);
         return save_slot(e, 99);
     case 112:
-        return e->slots[99].used && load_slot(e, 99);
     case 1:
-        ui_close(e);
-        vm_goto_script(e, "title");
-        e->wait = W_NONE;
-        reset_for_title(e);
-        return true;
-    case 121:
-        e->quit = true;
-        return true;
+    case 121: return ask_first(e, action);
     default:
         ex_log(e, "menu action %d", action);
         return false;
@@ -411,8 +500,12 @@ static void slot_click(EX *e, Ui *u, int itemId) {
     if (slot < 0 || slot >= EX_SLOTS) return;
     snd_play_file(e, "res/s/e/990.wav", EX_CH_UI);
     if (u->kind == UI_SAVE) {
-        if (save_slot(e, slot)) u->newest = slot;
         e->lastPage = u->page;
+        if (e->slots[slot].used && ask_load(e, u, ASK_OVERWRITE)) {
+            u->askSlot = slot;
+            return;
+        }
+        if (save_slot(e, slot)) u->newest = slot;
         return;
     }
     if (!e->slots[slot].used) return;
@@ -435,12 +528,46 @@ static HistEntry *hist(EX *e, int i) {
     return &e->history[(e->histHead + i) % EX_HISTORY];
 }
 
+static HistEntry *backlog_row(EX *e, Ui *u, int r) {
+    int total = e->histCount - (e->msg.active ? 1 : 0);
+    return r >= 0 && r < ROWS && u->top + r < total ? hist(e, u->top + r) : NULL;
+}
+
+static int backlog_row_at(EX *e) {
+    if (e->mouseX < 37 || e->mouseX >= 117 + 1704 || e->mouseY < 81) return -1;
+    int r = (e->mouseY - 81) / ROW_H;
+    return r < ROWS ? r : -1;
+}
+
+static void backlog_jump(EX *e, Ui *u, int r) {
+    HistEntry *h = backlog_row(e, u, r);
+    if (!h || !h->state) return;
+    size_t n = h->stateLen;
+    char *state = ex_alloc(n + 1);
+    memcpy(state, h->state, n);
+    snd_play_file(e, "res/s/e/990.wav", EX_CH_UI);
+    history_truncate(e, u->top + r);
+    ui_close(e);
+    if (!load_state(e, state, n)) ex_log(e, "can't jump back in the backlog");
+    free(state);
+}
+
 void ui_input(EX *e) {
     Ui *u = e->ui;
     if (!u) return;
+    if (u->asking) {
+        ask_input(e, u);
+        return;
+    }
     int hover = -1;
-    for (int i = 0; i < u->ni; i++)
-        if (hit(e, u, &u->items[i])) hover = u->items[i].id;
+    for (int i = 0; i < u->ni; i++) {
+        UItem *it = &u->items[i];
+        if (u->kind == UI_BACKLOG && it->layer == 851) {
+            HistEntry *h = backlog_row(e, u, it->id - 10);
+            if (!h || !h->state) continue;
+        }
+        if (hit(e, u, it)) hover = it->id;
+    }
     if (hover != u->hover && hover >= 0) snd_play_file(e, "res/s/e/993.wav", EX_CH_UI);
     u->hover = hover;
     int wheel = e->wheel;
@@ -465,6 +592,12 @@ void ui_input(EX *e) {
             case 6: backlog_scroll(e, u, -1); break;
             case 8: backlog_scroll(e, u, 1); break;
             case 9: backlog_scroll(e, u, ROWS); break;
+            case 10:
+            case 11:
+            case 12:
+            case 13:
+            case 14:
+            case 15: backlog_jump(e, u, hover - 10); return;
             default:
                 for (int r = 0; r < ROWS; r++) {
                     HistEntry *h = hist(e, u->top + r);
@@ -601,10 +734,14 @@ static void draw_slots(EX *e, Ui *u, u32 *dst) {
 
 static void draw_backlog(EX *e, Ui *u, u32 *dst) {
     int total = e->histCount - (e->msg.active ? 1 : 0);
+    int over = backlog_row_at(e);
     for (int r = 0; r < ROWS; r++) {
-        HistEntry *h = hist(e, u->top + r);
-        if (!h || u->top + r >= total) break;
+        HistEntry *h = backlog_row(e, u, r);
+        if (!h) break;
         int y = 81 + r * ROW_H;
+        if (r == over && u->rowOn) blit_part(dst, EX_W, EX_H, u->rowOn, 117, y, 1704, ROW_H, 117, y, 255);
+        UItem *jump = h->state ? item(u, 10 + r) : NULL;
+        if (jump) draw_item(e, u, dst, jump, u->hover == jump->id ? 1 : 0);
         if (h->name && *h->name) text_draw_sjis(e, dst, h->name, 117, y + 40, 32, 0xffffff, 0, 255);
         if (h->voice >= 0 && u->voiceMark) blit(dst, EX_W, EX_H, u->voiceMark, 527, y + 3, 255);
         text_wrap_sjis(e, dst, h->text, 581, y + 40 - text_ascent(e, 32), 1240, 50, 32, 0xffffff, 0, 255, 3);
@@ -639,6 +776,7 @@ void ui_draw(EX *e, u32 *dst) {
         for (int i = 0; i < u->ni; i++) draw_item(e, u, dst, &u->items[i], u->hover == u->items[i].id ? 1 : 0);
     } else if (u->kind == UI_SAVE || u->kind == UI_LOAD) draw_slots(e, u, dst);
     else if (u->kind == UI_BACKLOG) draw_backlog(e, u, dst);
+    if (u->asking) ask_draw(u, dst);
 }
 
 typedef struct CItem {

@@ -166,6 +166,8 @@ typedef struct Thread {
 enum { OK_BG = 1, OK_OVERLAY = 2, OK_CHAR = 3, OK_OBJ = 160 };
 
 #define BX_OBJS 64
+#define BX_DRESS_CH 32
+#define BX_DRESS_WEAR 64
 
 typedef struct KeyFrame {
     int no, x, y, opacity;
@@ -246,7 +248,7 @@ typedef struct Button {
     int group;
 } Button;
 
-enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG, PH_STATUS, PH_MUSEUM };
+enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG, PH_STATUS, PH_MUSEUM, PH_DRESS };
 
 typedef struct Phase Phase;
 typedef struct MapPhase MapPhase;
@@ -254,6 +256,7 @@ typedef struct DataPhase DataPhase;
 typedef struct LogPhase LogPhase;
 typedef struct ConfigPhase ConfigPhase;
 typedef struct StatusPhase StatusPhase;
+typedef struct DressPhase DressPhase;
 typedef struct Museum Museum;
 typedef struct MuseumPhase MuseumPhase;
 typedef struct BgvPanel BgvPanel;
@@ -286,6 +289,7 @@ typedef struct MBar {
     int x, y, hit[4];
 } MBar;
 
+bool bx_hit_mask(const Image *im, int h);
 bool bx_mbtn_cfg(BX *b, MBtn *t, const char *sec, const char *key, int dx, int dy);
 bool bx_mbtn_node(BX *b, MBtn *t, const LNode *n, int dx, int dy);
 bool bx_mbtn_on(const BX *b, const MBtn *t);
@@ -303,8 +307,15 @@ typedef struct Settings {
     int attenuation;
     int skipUnread, ceaseSkip, noEffects;
     int voiceMask, voiceMode, autoSelect;
-    int xCount;
+    int xCount, bgmSelect;
 } Settings;
+
+#define BX_VOICES 32
+
+typedef struct VoiceLevel {
+    char sig[4];
+    int mask, voice, bgv;
+} VoiceLevel;
 
 struct BX {
     char *gameDir, *saveDir;
@@ -413,6 +424,7 @@ struct BX {
     Museum *museum;
     MuseumPhase *museumPhase;
     bool replaying;
+    bool autosavePending;
     int replayPage;
     bool commonDirty;
     int phaseBack;
@@ -427,7 +439,11 @@ struct BX {
     int buttonCount;
     int buttonHover;
     bool dressEnabled, viewEnabled;
+    DressPhase *dressPhase;
+    u8 dressRec[BX_DRESS_CH][BX_DRESS_WEAR];
+    u8 dressAll;
     int stripLevel, viewLevel;
+    float sight;
     bool viewButtons;
 
     int mx, my;
@@ -441,7 +457,9 @@ struct BX {
     int audioRate;
     bool hairOff;
     int volMaster, volBgm, volSe, volVoice, volBgs, volBgv;
-    int bgvLevel[8];
+    VoiceLevel voices[BX_VOICES], otherVoices;
+    int voiceCount;
+    bool commonMade;
     char bgmName[64];
 };
 
@@ -472,6 +490,7 @@ void bx_shake(BX *b, int x, int y);
 void bx_gfx_frame(BX *b);
 int bx_eye_frame(BX *b, const Obj *o);
 int bx_view_level(BX *b);
+void bx_view_set(BX *b, int level);
 void bx_compose(BX *b, const Scene *s, u32 *dst);
 void bx_compose_over(BX *b, const Scene *s, u32 *dst);
 void bx_anim_update(BX *b);
@@ -545,10 +564,14 @@ void bx_log_draw(BX *b, u32 *dst);
 void bx_log_free(BX *b);
 
 void bx_museum_init(BX *b);
+bool bx_museum_cutin_tag(BX *b, const char *name);
+void bx_museum_tables(BX *b);
+void bx_museum_counts(BX *b, int *names, int *scenes);
 void bx_museum_free(BX *b);
 void bx_museum_find_wear(BX *b);
 void bx_museum_seen(BX *b, const char *name);
 void bx_museum_wear(BX *b, int ch, int wear);
+bool bx_museum_worn(BX *b, int ch, int wear);
 int bx_museum_rate(BX *b, const char *kind);
 bool bx_museum_open(BX *b);
 void bx_museum_close(BX *b);
@@ -566,6 +589,13 @@ void bx_bgv_free(BgvPanel *p);
 bool bx_bgv_update(BX *b, BgvPanel *p);
 void bx_bgv_draw(BX *b, BgvPanel *p, u32 *dst);
 
+bool bx_dress_available(BX *b);
+bool bx_dress_name(BX *b, const char *name, char *out);
+bool bx_dress_open(BX *b);
+void bx_dress_update(BX *b);
+void bx_dress_draw(BX *b, u32 *dst);
+void bx_dress_free(BX *b);
+
 bool bx_status_open(BX *b);
 void bx_status_update(BX *b);
 void bx_status_draw(BX *b, u32 *dst);
@@ -579,5 +609,8 @@ void bx_settings_load(BX *b);
 void bx_settings_save(BX *b);
 void bx_settings_apply(BX *b);
 void bx_settings_defaults(BX *b);
+int bx_voice_level(BX *b, const char *name, bool bgv);
+VoiceLevel *bx_voice_of(BX *b, int mask);
+const char *bx_bgm_track(BX *b, const char *name);
 
 #endif

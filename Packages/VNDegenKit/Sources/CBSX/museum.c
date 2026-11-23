@@ -312,9 +312,18 @@ void bx_museum_init(BX *b) {
         return;
     }
     load_scenes(b, m);
-    find_tables(b, m);
     b->museum = m;
-    if (!m->cgFlags) bx_log(b, "no museum records in common.dat");
+}
+
+void bx_museum_tables(BX *b) {
+    if (!b->museum) return;
+    find_tables(b, b->museum);
+    if (!b->museum->cgFlags) bx_log(b, "no museum records in common.dat");
+}
+
+void bx_museum_counts(BX *b, int *names, int *scenes) {
+    *names = b->museum ? b->museum->nameCount : 0;
+    *scenes = b->museum ? b->museum->sceneCount : 0;
 }
 
 void bx_museum_free(BX *b) {
@@ -405,6 +414,19 @@ int bx_museum_rate(BX *b, const char *kind) {
         k += w;
     }
     return all ? got * 100 / all : 0;
+}
+
+bool bx_museum_worn(BX *b, int ch, int wear) {
+    if (!b->common || !b->wearTable || ch < 1 || wear < 0) return false;
+    u32 count = rd32(b->common + b->wearTable);
+    size_t k = b->wearTable + 4;
+    for (u32 c = 1; c <= count && k + 4 <= b->commonSize; c++) {
+        u32 w = rd32(b->common + k);
+        k += 4;
+        if ((int)c == ch) return (u32)wear < w && k + (size_t)wear < b->commonSize && b->common[k + (size_t)wear];
+        k += w;
+    }
+    return false;
 }
 
 void bx_museum_wear(BX *b, int ch, int wear) {
@@ -598,6 +620,12 @@ static void open_mode(BX *b, MuseumPhase *u, int mode) {
         bx_mbtn_cfg(b, &u->addList, sec, "add playlist", 0, 0);
         bx_mbtn_cfg(b, &u->openList, sec, "playlist button", 0, 0);
     }
+}
+
+bool bx_museum_cutin_tag(BX *b, const char *name) {
+    Museum *m = b->museum;
+    int id = m ? name_id(m, name) : -1;
+    return id >= 0 && strchr(m->tags[id], 'c');
 }
 
 static bool is_cutin(const Museum *m, const int *ids, int count, int i) {

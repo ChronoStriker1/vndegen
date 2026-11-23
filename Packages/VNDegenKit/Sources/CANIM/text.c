@@ -34,18 +34,88 @@ static Font *font_open(AN *a, const vnfont_match *m) {
     return f;
 }
 
+#define CELL_PER_EM (2288.0f / 2048.0f)
+#define ASCENT_PER_EM (1854.0f / 2048.0f)
+
+static int baseline_shift(Font *f, int size) {
+    if (!f || !f->ok) return 0;
+    int ascent, descent, gap;
+    stbtt_GetFontVMetrics(&f->info, &ascent, &descent, &gap);
+    float cell = (float)size * CELL_PER_EM;
+    return (int)lroundf(cell * (float)ascent / (float)(ascent - descent) - (float)size * ASCENT_PER_EM);
+}
+
+static const char *const DEFAULT_FONT[GAME_COUNT] = {[GAME_DDD] = "MS Gothic", [GAME_MGSW] = "MS PMincho"};
+
+static void list_fonts(AN *a);
+
+static Font *font_named(AN *a, const char *name) {
+    vnfont_match m;
+    if (!name || !*name || !vnfont_resolve(name, 0, 0, &m)) return NULL;
+    Font *f = font_open(a, &m);
+    if (!f->ok) {
+        free(f->data);
+        free(f);
+        return NULL;
+    }
+    vnfont_match j;
+    if (vnfont_resolve("MS Gothic", 0, 0, &j) && strcmp(j.path, m.path)) f->fallback = font_open(a, &j);
+    return f;
+}
+
+static void font_free(Font *f);
+
+bool an_text_set_font(AN *a, const char *name) {
+    Font *f = font_named(a, name);
+    if (!f) return false;
+    font_free(a->font);
+    a->font = f;
+    snprintf(a->fontName, sizeof a->fontName, "%s", name);
+    return true;
+}
+
 bool an_text_init(AN *a) {
-    vnfont_match m, jp;
-    bool hasJp = vnfont_resolve("MS Gothic", 0, 0, &jp);
-    if (!vnfont_resolve("Arial", 0, 0, &m) && !hasJp) {
+    const char *def = DEFAULT_FONT[a->game];
+    Font *f = font_named(a, a->fontName);
+    if (!f) {
+        if (a->fontName[0]) an_log(a, "no substitute for the font %s, so the text uses %s", a->fontName, def);
+        f = font_named(a, def);
+    }
+    if (!f) f = font_named(a, "Arial");
+    a->uiFont = font_named(a, "Arial");
+    list_fonts(a);
+    if (!f) {
         a->font = an_alloc(sizeof(Font));
         an_log(a, "no font for the message window");
         return false;
     }
-    if (!vnfont_resolve("Arial", 0, 0, &m)) m = jp;
-    a->font = font_open(a, &m);
-    if (hasJp && strcmp(jp.path, m.path)) a->font->fallback = font_open(a, &jp);
-    return a->font->ok;
+    a->font = f;
+    return true;
+}
+
+static void list_fonts(AN *a) {
+    vnfont_match paths[32];
+    vnfont_entry e;
+    a->fontCount = 0;
+    for (int i = 0; vnfont_entry_at(i, &e) && a->fontCount < 32; i++) {
+        if (e.match.bold || e.match.italic || (unsigned char)e.name[0] >= 0x80) continue;
+        bool seen = false;
+        for (int k = 0; k < a->fontCount; k++) seen |= !strcmp(paths[k].path, e.match.path) && paths[k].face == e.match.face;
+        if (seen) continue;
+        paths[a->fontCount] = e.match;
+        snprintf(a->fonts[a->fontCount++], sizeof a->fonts[0], "%.63s", e.name);
+    }
+}
+
+int an_ui_text_draw(AN *a, int x, int baseline, const char *s, int size, u32 color, bool fractional) {
+    Font *f = a->font;
+    bool frac = a->fractionalText;
+    if (a->uiFont) a->font = a->uiFont;
+    a->fractionalText = fractional;
+    int lines = an_text_draw(a, x, baseline, s, size, color, 0, 0, size);
+    a->font = f;
+    a->fractionalText = frac;
+    return lines;
 }
 
 static void font_free(Font *f) {
@@ -60,7 +130,8 @@ static void font_free(Font *f) {
 
 void an_text_free(AN *a) {
     font_free(a->font);
-    a->font = NULL;
+    font_free(a->uiFont);
+    a->font = a->uiFont = NULL;
 }
 
 static u32 gkey(u32 cp, int size) { return cp * 31u + (u32)size * 2654435761u; }
@@ -99,7 +170,7 @@ static Glyph *glyph(Font *f, u32 cp, int size) {
     g->cp = cp;
     g->size = size;
     if (f->ok) {
-        float sc = stbtt_ScaleForMappingEmToPixels(&f->info, (float)size);
+        float sc = stbtt_ScaleForPixelHeight(&f->info, (float)size * CELL_PER_EM);
         int adv, lsb;
         stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
         g->fadv = adv * sc;
@@ -163,10 +234,20 @@ int an_text_width(AN *a, const char *s, int size) {
     return w;
 }
 
+bool an_text_opens(const char *s) {
+    static const u32 OPENING[] = {'"', '(', 0x201c, 0x2018, 0x300c, 0x300e, 0xff08};
+    if (!*s) return false;
+    u32 cp;
+    an_utf8_decode(s, &cp);
+    for (size_t i = 0; i < sizeof OPENING / sizeof OPENING[0]; i++)
+        if (cp == OPENING[i]) return true;
+    return false;
+}
+
 int an_text_draw(AN *a, int x, int baseline, const char *s, int size, u32 color, u32 shadow, int maxWidth, int lineHeight) {
     Font *f = a->font;
     if (!f) return 0;
-    int base = baseline;
+    int base = baseline + baseline_shift(f, size);
     int cx = x, lines = 1;
     float fx = (float)x;
     while (*s) {

@@ -20,7 +20,7 @@ derives from no GPL or LGPL code. Its sources:
 | Save and Load cards | DELETE, Reset Saves and the hover labels from the button atlas; what they do from save files diffed before and after using them in the original under Wine |
 | Expressions | `_define.dat`'s presets (a name and variable values), matched to the values the original's saves store |
 | Saves | Saves the original made under Wine at chosen points, diffed: the date, comment, text position, background, layers, local variables, the quick save file and the thumbnails; VNDegen's saves loaded in the original and the original's in VNDegen |
-| Text | stb_truetype (public domain or MIT) with the shared Windows font substitutes (`docs/fonts.md`) for the exe's Arial. Glyph advances rounded up and the wrap width from line widths and wrap points measured on screenshots of the original under Wine |
+| Text | stb_truetype (public domain or MIT) with the shared Windows font substitutes (`docs/fonts.md`). The default fonts from the exes' strings (`MS Gothic`, `MS PMincho`); where the chosen name is kept, from the system save diffed before and after a pick under Wine; sizes, wrap widths, line pitch and the hung opening bracket from screenshots of the original under Wine with the Ume fonts installed as the MS fonts' substitutes |
 | File name case | `Engines/Shared/casepath.c`, VNDegen's own |
 
 The exe was only run, and its strings read for file names (`cg\psbpack.dat`, `%s_save.dat`) and the fonts it asks

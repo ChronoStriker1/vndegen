@@ -142,7 +142,7 @@ static bool near(u32 a, u32 b) {
     return true;
 }
 
-static bool hit_mask(const Image *im, int h) {
+bool bx_hit_mask(const Image *im, int h) {
     if (h <= 0 || im->w <= 0) return false;
     u32 centre = im->px[(size_t)(h / 2) * im->w + im->w / 2];
     if (!(centre >> 24) || (!near(centre, 0xffffff) && !near(centre, 0))) return false;
@@ -161,7 +161,7 @@ static bool mbtn_load(BX *b, MBtn *t, const char *name, int frames, int x, int y
     t->img = bx_image_new(im->w, im->h);
     memcpy(t->img->px, im->px, sizeof(u32) * (size_t)im->w * (size_t)im->h);
     t->frames = clampi(frames, 1, 16);
-    t->skip = t->frames > 2 && hit_mask(t->img, t->img->h / t->frames) ? 1 : 0;
+    t->skip = t->frames > 2 && bx_hit_mask(t->img, t->img->h / t->frames) ? 1 : 0;
     t->x = x;
     t->y = y;
     return true;

@@ -478,9 +478,11 @@ bool state_apply(BR *e, Node *st, bool globals) {
     msg_select(e, geti(mw, "cfgno", 0));
     msg_show(e, getb(mw, "visible", false));
     const char *text = sx_str(get(mw, "text"));
+    if (globals) history_free(e);
     if (text && *text) {
         msg_append(e, text);
         e->msg.shown = e->msg.count;
+        if (globals) history_add(e, text);
     }
     Node *menu = sx_find(dlk, "menu");
     e->menu.show = getb(menu, "show", true);
