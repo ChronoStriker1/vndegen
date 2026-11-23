@@ -136,6 +136,9 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
   voice mask has a bit per settings character, the speakers' volumes scale their voices, and the BGV room's
   per-character volumes are the same BGV levels. VNDegen's own `save/vndegen.cfg` keeps only the x-count switch, which
   has no place there yet; its older settings are taken over once, when VNDegen first makes `common.dat`.
+- The voice modes, as Mesu Kyoushi 4's PC plays them under Wine with music muted: 0 stops a voice when the line is
+  clicked on; 1 repeats it until then (once in auto or skip); 2 and 3 let it play on through the following lines
+  until another voiced line starts.
 - The settings screen has the BGV slider (`volume5`), Mesu Kyoushi 4's BGM select (`bgm selector pos0` and `pos1`) and
   each character's 詳細 button, which opens `[detailed sound setting]`: the character's voice on or off and its voice
   and BGV volume (the other speakers' for 他). With BGM select at マイルド (1), a track `define.bsa`'s `bgm_select`
@@ -207,7 +210,10 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
 - The space a translation puts after `「` is drawn; Mesu Kyoushi 4's PC drops it.
 - The full-screen, effect detail and auto-select options are stored as the PC stores them but do nothing; the BGM
   volume under a voice is stored and not applied.
-- The cut-in and voice replay modes aren't there; a voice plays once.
+- Cut-in in the story hides the pictures the museum viewer's cut-in hides (`c`-tagged in `cg.dat`, or another
+  picture's name plus `c` while that picture is shown); it wasn't watched in a story scene on the PC.
+- Voice mode 2 (until the same speaker's next line) is played as mode 3; on the PC both carried a voice through an
+  unvoiced line, and how mode 2 overlaps two speakers' voices wasn't measured.
 - The free-sight meter (dragging a close-up bust-up) isn't there; VIEW moves between the three fixed positions.
 - `ActionType2` (before the staff roll) is ignored.
 - A game without any save to take its id from, other than the four Mesu Kyoushi games, writes saves the PC engine

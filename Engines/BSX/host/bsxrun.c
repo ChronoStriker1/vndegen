@@ -76,8 +76,8 @@ static void print_state(BX *b) {
         snprintf(one, sizeof one, "%s%d:%s%s%s@%d,%d", objs[0] ? " " : "", o->kind, o->name, o->face[0] ? "+" : "", o->face, o->x, o->y);
         strncat(objs, one, sizeof objs - strlen(objs) - 1);
     }
-    printf("label=%s pc=%x wait=%d phase=%d choices=%d bgm=%s objs=[%s] name=%s text=%s\n", label_at(b, b->th.pc), b->th.pc,
-           b->th.wait, b->phase, b->choiceCount, b->bgmName, objs, b->speaker ? b->speaker : "", b->text ? b->text : "");
+    printf("label=%s pc=%x wait=%d phase=%d choices=%d bgm=%s objs=[%s] voice=%s name=%s text=%s\n", label_at(b, b->th.pc), b->th.pc,
+           b->th.wait, b->phase, b->choiceCount, b->bgmName, objs, b->voice ? b->voice : "", b->speaker ? b->speaker : "", b->text ? b->text : "");
 }
 
 static void print_map(BX *b) {

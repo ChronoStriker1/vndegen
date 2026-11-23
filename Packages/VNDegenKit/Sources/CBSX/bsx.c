@@ -182,6 +182,10 @@ void vnbsx_close(VNBSX *n) {
 static void advance(BX *b) {
     b->th.wait = W_NONE;
     b->autoAt = 0;
+    if (b->set.voiceMode <= 1) {
+        bx_snd_stop(b, CH_VOICE, 0);
+        bx_snd_stop(b, CH_VOICE2, 0);
+    }
 }
 
 static bool skip_to_label(BX *b) {

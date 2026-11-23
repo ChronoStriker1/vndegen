@@ -191,7 +191,8 @@ static bool voice_allowed(BX *b, const char *voice) {
 }
 
 void bx_voice_play(BX *b, int ch, const char *voice) {
-    if (voice && bx_res_find(&b->arc, RX_VOICE, voice) && voice_allowed(b, voice)) bx_snd_play(b, ch, RX_VOICE, voice, false, 0);
+    if (voice && bx_res_find(&b->arc, RX_VOICE, voice) && voice_allowed(b, voice))
+        bx_snd_play(b, ch, RX_VOICE, voice, b->set.voiceMode == 1 && !b->autoMode && !b->skipMode, 0);
 }
 
 void bx_msg_show(BX *b, const char *name, const char *text, const char *voice) {
