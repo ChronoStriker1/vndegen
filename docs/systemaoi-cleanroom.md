@@ -2,7 +2,8 @@
 
 The SystemAoi runtime (`Packages/VNDegenKit/Sources/CSystemAoi`, hosts in `Engines/SystemAoi/host`) is being written
 for VNDegen. It derives from no GPL or LGPL code. The game's exe and DLLs are run under Wine as a black box and not
-disassembled; their strings were read for file names only.
+disassembled; their strings were read for file names only. The one exception is the save codec below, read with the
+maintainer's approval.
 
 | Part | Sources |
 |---|---|
@@ -14,7 +15,7 @@ disassembled; their strings were read for file names only.
 | Tables (`obj.vfs`) | The game's files: the layout from the trailing counts, which multiply out for all 24 tables. Column meanings from the HTML manual's numbers (a 魔王亭 makes 30 money a turn) and from play under Wine |
 | 3D models and maps | The game's files: Pegasus3D models are text. The maps' open-side mask from the symmetry between neighbouring cells |
 | The game's rules | The game's HTML manual (`html/page/*.htm`) and printed manual, then play of the original under Wine |
-| Saves | Diffs of the files the original writes under Wine |
+| Saves | Diffs of the files the original writes under Wine; the codec from a reading of its two routines (below) |
 
 ## The town, rule by rule
 
@@ -364,3 +365,16 @@ calls it is inferred from that and from play, and marked so.
   size, 1,128,076 for a save and 30,784 for the options; the file size; the unpacked size again; 0; the packed size),
   a tag byte (0x82 for saves, 0x81 for the options), a 256-entry table of byte frequencies, and an entropy-coded body.
   The coder isn't worked out yet, so VNDegen writes its own format for now.
+
+## The save codec: what was read, and why
+
+Black-box work fixed the files' header and showed an entropy-coded body over a second layer, but no decoder built
+from guesses (canonical Huffman, arithmetic and range coders at several precisions and bit orders) reproduced a
+save's known town numbers. With the maintainer's approval (2026-11-23), the reading is limited to:
+
+- the routine that packs a save or option file and the one that unpacks it, with the small helpers they call for the
+  coder (bit input and output, the model's tables);
+- expected in `AoiCmp5.dll`, the DLL named for compression, or in `Bunny3.exe` where it calls the packer.
+
+Nothing else is read: no game logic, no rule, no screen. What was read is recorded below as a description of the
+format, and VNDegen's codec is written from that description, not from the code.
