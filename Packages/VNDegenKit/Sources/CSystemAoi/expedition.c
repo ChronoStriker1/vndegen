@@ -50,7 +50,10 @@ enum {
     F_SET = 6,
     F_SPREAD = 12,
     F_STEPS = 13,
-    F_GROUPS = 31,
+    F_GROUP_LISTS = 30,
+    F_GROUP_WEIGHTS = 32,
+    F_MORE_GROUPS = 35,
+    F_CHESTS = 36,
 };
 
 #define NO_EDGE 0xffffffffu
@@ -267,7 +270,19 @@ void sa_exp_enter(SA *s, int dungeon, int floor) {
 }
 
 static void pick_group(SA *s, char *out, size_t size) {
-    const char *list = text(&s->exp.floors, s->exp.row, F_GROUPS);
+    static const int lists[3] = {F_GROUP_LISTS, F_GROUP_LISTS + 1, F_MORE_GROUPS};
+    int weight[3], total = 0;
+    for (int i = 0; i < 3; i++) {
+        const char *l = text(&s->exp.floors, s->exp.row, lists[i]);
+        weight[i] = *l && strcmp(l, "*") ? sa_table_int(&s->exp.floors, s->exp.row, F_GROUP_WEIGHTS + i) : 0;
+        total += weight[i];
+    }
+    int which = 1;
+    if (total > 0) {
+        int roll = (int)(sa_vm_random(&s->vm) % (u32)total);
+        for (which = 0; which < 2 && roll >= weight[which]; which++) roll -= weight[which];
+    }
+    const char *list = text(&s->exp.floors, s->exp.row, lists[which]);
     int n = 1;
     for (const char *p = list; *p; p++) n += *p == '|';
     int k = (int)(sa_vm_random(&s->vm) % (u32)n);
@@ -291,6 +306,7 @@ static void start_battle(SA *s) {
         return;
     }
     sa_battle_set_names(&s->battle, text(&s->exp.dungeons, s->exp.dungeon - 1, 1), text(&s->exp.floors, s->exp.row, F_NAME));
+    sa_log(s, "battle: %s", group);
     reset_countdown(s);
     s->vm.c[C_EXP_RESULT] = 1;
     s->vm.c[C_EXP_GROUP] = sa_table_int(&s->battle.groups, s->battle.group, 0);
@@ -321,6 +337,26 @@ static void go_home(SA *s) {
     run_hooks(s, hooks, 1, AFTER_HOME);
 }
 
+static void open_crystal(SA *s) {
+    int slot = sa_dungeon_crystal_index(&s->dungeon);
+    if (slot > 7) slot = 7;
+    int col = F_CHESTS + slot * 4;
+    const char *table = text(&s->exp.floors, s->exp.row, col);
+    int lo = sa_table_int(&s->exp.floors, s->exp.row, col + 1), hi = sa_table_int(&s->exp.floors, s->exp.row, col + 2);
+    int n = hi > lo ? lo + (int)(sa_vm_random(&s->vm) % (u32)(hi - lo + 1)) : lo;
+    char msg[256] = "";
+    for (int i = 0; i < n; i++) {
+        int r = sa_item_pick(&s->battle.items, table, sa_vm_random(&s->vm));
+        if (r < 0) continue;
+        sa_party_add_item(&s->party, sa_table_int(&s->battle.items, r, 0), 1);
+        size_t len = strlen(msg);
+        snprintf(msg + len, sizeof msg - len, "%s『%s』を手に入れた。", len ? "|" : "", text(&s->battle.items, r, 1));
+    }
+    sa_dungeon_clear_object(&s->dungeon);
+    sa_log(s, "crystal %d (%s): %s", slot, table, msg);
+    if (msg[0]) sa_dialog_open(&s->dialog, msg);
+}
+
 static void change_floor(SA *s, int by) {
     int floor = s->exp.floor + by;
     if (floor < 1 || floor_row(&s->exp, s->exp.dungeon, floor) < 0) return;
@@ -337,6 +373,7 @@ static void after_move(SA *s, int r) {
     if (r == DUN_ACTION) {
         int act = sa_dungeon_action(d);
         if (act == DUN_ACT_HOME) go_home(s);
+        else if (act == DUN_ACT_OPEN) open_crystal(s);
         else change_floor(s, act == DUN_ACT_DOWN ? 1 : -1);
         return;
     }

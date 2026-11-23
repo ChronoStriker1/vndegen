@@ -589,20 +589,25 @@ static bool has_tag(const char *list, const char *tag) {
     return false;
 }
 
-static void drop_item(Battle *b, const char *table) {
+int sa_item_pick(const Table *items, const char *table, u32 roll) {
     int total = 0;
-    for (int r = 0; r < b->items.rows; r++)
-        if (has_tag(text_of(&b->items, r, 30), table)) total += sa_table_int(&b->items, r, 31);
-    if (total <= 0) return;
-    int pick = (int)(rnd(b) % (u32)total);
-    for (int r = 0; r < b->items.rows; r++) {
-        if (!has_tag(text_of(&b->items, r, 30), table)) continue;
-        pick -= sa_table_int(&b->items, r, 31);
-        if (pick < 0) {
-            snprintf(b->gainItem, sizeof b->gainItem, "%s", text_of(&b->items, r, 1));
-            return;
-        }
+    for (int r = 0; r < items->rows; r++)
+        if (has_tag(text_of(items, r, 30), table)) total += sa_table_int(items, r, 31);
+    if (total <= 0) return -1;
+    int pick = (int)(roll % (u32)total);
+    for (int r = 0; r < items->rows; r++) {
+        if (!has_tag(text_of(items, r, 30), table)) continue;
+        pick -= sa_table_int(items, r, 31);
+        if (pick < 0) return r;
     }
+    return -1;
+}
+
+static void drop_item(Battle *b, const char *table) {
+    int r = sa_item_pick(&b->items, table, rnd(b));
+    if (r < 0) return;
+    snprintf(b->gainItem, sizeof b->gainItem, "%s", text_of(&b->items, r, 1));
+    sa_party_add_item(b->party, sa_table_int(&b->items, r, 0), 1);
 }
 
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level) {

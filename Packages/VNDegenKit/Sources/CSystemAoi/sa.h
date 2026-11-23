@@ -253,8 +253,8 @@ Image *sa_bmp_decode(const u8 *d, size_t n);
 
 struct Party;
 
-enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_PLATFORM, DUN_ART };
-enum { DUN_ACT_NONE, DUN_ACT_HOME, DUN_ACT_DOWN, DUN_ACT_UP };
+enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN, DUN_ART_PLATFORM, DUN_ART };
+enum { DUN_ACT_NONE, DUN_ACT_HOME, DUN_ACT_DOWN, DUN_ACT_UP, DUN_ACT_OPEN };
 
 typedef struct PartSet {
     Pvm pvm;
@@ -298,6 +298,8 @@ void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int m
 bool sa_dungeon_facing_exit(const Dungeon *d);
 int sa_dungeon_action(const Dungeon *d);
 int sa_dungeon_object(const Dungeon *d);
+int sa_dungeon_crystal_index(const Dungeon *d);
+void sa_dungeon_clear_object(Dungeon *d);
 void sa_debug_dungeon(VNSystemAoi *sa, const char *map, int x, int y, int dir);
 
 typedef struct Mixer Mixer;
@@ -519,6 +521,7 @@ void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor);
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir);
 void sa_debug_finds(VNSystemAoi *sa, int *out);
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
+int sa_item_pick(const Table *items, const char *table, u32 roll);
 
 void sa_popup_load(Image **frame, Vfs *vfs);
 void sa_dim(u32 *fb);

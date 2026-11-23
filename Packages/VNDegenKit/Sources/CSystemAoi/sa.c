@@ -953,6 +953,15 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             return !s->quit;
         }
     }
+    if (s->mode == MODE_DUNGEON && dialog_input(s, elapsedMs)) {
+        if (s->dirty) {
+            sa_exp_draw_view(s, s->fb);
+            sa_dialog_draw(&s->dialog, s->fb);
+            s->serial++;
+            s->dirty = false;
+        }
+        return true;
+    }
     if (sa_exp_frame(s, elapsedMs)) return true;
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;

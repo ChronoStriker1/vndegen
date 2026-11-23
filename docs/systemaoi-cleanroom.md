@@ -174,8 +174,10 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   (`g01`) and 101 (`f101`, up) shows 上る (`g00`), going to the next or previous floor, arriving at its entrance.
 - **Floor objects seen on the first floor.** 100 is a door model standing in a dead end, 60 a yellow crystal (the
   original shows 開ける at one); neither is handled by the floor hook, so both are the engine's. Open: what they do.
-  `floor.obj` columns 35 onwards hold eight (table, minimum, maximum, count) entries such as 宝箱Ａ 1 3 1, whose names
-  are `item.obj` column 30 tags; inferred to fill the crystals.
+  `floor.obj` columns 36 onwards hold eight (table, minimum, maximum, count) entries such as 武器Ａ 1 1 1 and 宝箱Ａ 1 3
+  1, whose names are `item.obj` column 30 tags. Inferred: standing on a crystal shows 開ける (`dgn_g07`); opening the
+  floor's k-th crystal (in map order) gives between the minimum and maximum of items from the k-th entry, each drawn
+  by `item.obj` column 31's weight, says 『name』を手に入れた。 and removes the crystal.
 - **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one.
 - **Start cell.** Open: the first expedition started beside the exit facing away from it, a later one two cells
   further in; VNDegen starts beside the exit.
@@ -207,8 +209,10 @@ calls it is inferred from that and from play, and marked so.
 - **Coming home.** 帰る (or 休憩, inferred) runs hook 17, adds the finds to the town and ends the turn (inferred).
 - **Encounters.** Measured: the number under the compass counts the expedition's steps, and battles came on steps
   48, 56, 69 and 81 of one expedition (7 to 12 steps after the previous one; the count also rose by one over each
-  battle). Inferred: a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2), with a group drawn from
-  column 31 (千05 or 千06 on the first floor).
+  battle). Inferred: a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2). The group comes from one of
+  three lists, columns 30, 31 and 35 (on the first floor 千固定0100|千固定0101, 千05|千06 and 千00|千01), chosen by
+  the weights in columns 32 to 34 (10, 60, 10); measured in support: the fixed seven-slime group 千固定0100 came up
+  in the original's random battles.
 - **Dungeon select.** Measured (99% of pixels exact): the hall `bg005a0` with the party on the `m998bt1a` platform,
   a plate per dungeon (`gat_bNN`, normal, hover, chosen) from (340, 40), its badge at (354, 52) (`gat_d01` NEW until
   F731 onwards is set by the setup hook, then `gat_d02`), and 戻る (`gat_c00`) at (444, 640). Choosing a dungeon

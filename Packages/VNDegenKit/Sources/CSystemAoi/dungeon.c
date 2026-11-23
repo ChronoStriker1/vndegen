@@ -25,6 +25,7 @@ enum {
     HOVER_ACTION = 101,
     FLOOR_DOWN = 100,
     FLOOR_UP = 101,
+    OBJECT_CRYSTAL = 60,
     PANEL_X = 0,
     PANEL_Y = 0,
     REST_X = 1101,
@@ -164,7 +165,7 @@ void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
     if (!d->art[DUN_ART_PANEL]) {
         static const char *const names[] = {"dgn_b00.agf", "dgn_c00.agf", "dgn_c01.agf", "dgn_c02.agf", "dgn_c03.agf", "dgn_c04.agf",
                                             "dgn_c05.agf", "dgn_c06.agf", "dgn_d00.agf", "dgn_d01.agf", "dgn_g02.agf", "dgn_g01.agf",
-                                            "dgn_g00.agf"};
+                                            "dgn_g00.agf", "dgn_g07.agf"};
         for (int i = 0; i < DUN_ART_PLATFORM; i++) d->art[i] = sa_load_image(vfs, names[i]);
         for (int q = 0; q < 4; q++) d->needle[q] = rotate_quarter(d->art[DUN_ART_NEEDLE], q);
     }
@@ -275,6 +276,7 @@ int sa_dungeon_action(const Dungeon *d) {
     if (c[wallField[d->dir]] == WALL_EXIT) return DUN_ACT_HOME;
     if (c[F_FLOOR] == FLOOR_DOWN) return DUN_ACT_DOWN;
     if (c[F_FLOOR] == FLOOR_UP) return DUN_ACT_UP;
+    if (c[F_OBJECT] == OBJECT_CRYSTAL) return DUN_ACT_OPEN;
     return DUN_ACT_NONE;
 }
 
@@ -495,7 +497,7 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
         if (i >= 4) sa_blit_rect(fb, im, 0, h, PAD_W, h, padPos[i].x, padPos[i].y + h);
     }
     sa_blit_rect(fb, d->art[DUN_ART_REST], 0, d->hover == HOVER_REST ? REST_H : 0, REST_W, REST_H, REST_X, REST_Y);
-    static const int actionArt[] = {0, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP};
+    static const int actionArt[] = {0, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN};
     int act = sa_dungeon_action(d);
     if (act) sa_blit_rect(fb, d->art[actionArt[act]], 0, d->hover == HOVER_ACTION ? ACTION_H : 0, ACTION_W, ACTION_H, ACTION_X, ACTION_Y);
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
@@ -533,4 +535,17 @@ bool sa_dungeon_facing_exit(const Dungeon *d) {
 int sa_dungeon_object(const Dungeon *d) {
     const i32 *c = cell_at(d, d->x, d->y);
     return c ? c[F_OBJECT] : -1;
+}
+
+int sa_dungeon_crystal_index(const Dungeon *d) {
+    int n = 0;
+    for (int c = 0; c < DUN_CELLS; c++) {
+        if (c == d->y * MAP_W + d->x) return n;
+        if (d->cell[c][F_OBJECT] == OBJECT_CRYSTAL) n++;
+    }
+    return n;
+}
+
+void sa_dungeon_clear_object(Dungeon *d) {
+    if (cell_at(d, d->x, d->y)) d->cell[d->y * MAP_W + d->x][F_OBJECT] = -1;
 }
