@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.59.9",
+          "buildVersion": "3192",
+          "date": "2026-11-23T03:45:42Z",
+          "localizedDescription": "Mesu Kyoushi's settings are now the PC's own, kept in `common.dat`, so they carry over with your saves.\n\n## Downloads\n\n- `VNDegen-0.59.9-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.59.9.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.59.9-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **BISHOP BSX:** settings in Mesu Kyoushi 1 to 4 are the PC's, saved in `common.dat`, so they carry over with saves and the PC's settings screen shows them.\n- **BISHOP BSX:** a game folder without `common.dat` gets the one the PC makes, so read marks, achievements and museum records are kept.\n- **BISHOP BSX:** Mesu Kyoushi 3 and 4's settings screens have the BGV volume and each character's voice and BGV settings, and Mesu Kyoushi 4's has BGM select.\n- **BISHOP BSX:** the voice modes work as on the PC. By default a voice stops when you click.\n- **BISHOP BSX:** CUT-IN hides cut-in panels in the story.\n- **BISHOP BSX:** the space after 「 in the translations is gone, as on the PC.\n- **BISHOP BSX:** Mesu Kyoushi 3's overwrite question shows its buttons.\n- **BISHOP BSX:** a bust-up records its outfit as worn, as the PC does, so the museum's strip rate is right.\n\n## Known limits\n\n- **BISHOP BSX:** Mesu Kyoushi 3 and 4's dress screen isn't built yet; it comes in a later release. Mesu Kyoushi 3 shows lines one at a time where the PC shows several speakers' lines together. The free-sight meter and the bust-up editor's message tab aren't built.\n\n## What wasn't tested\n\n- No physical device was used. These were checked in the Linux test build, the Mac app and an iPad simulator, and against the PC versions under Wine.\n- Voice mode 1 (repeat) wasn't measured against the PC.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.59.9/VNDegen-0.59.9.ipa",
+          "size": 132375794,
+          "sha256": "acb69616f322cf119b14789dc5c6d2a1b789f859fbf91d98e3a39b64bde48704",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.59.8",
           "buildVersion": "3175",
           "date": "2026-11-23T02:49:53Z",
