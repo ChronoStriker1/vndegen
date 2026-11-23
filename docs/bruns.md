@@ -55,7 +55,7 @@ to one folder down. The PC version only runs after its own installer; VNDegen ne
   which starts with the slot's comment and, like the PC's, stores letters and digits full-width, up to the length the
   script gives. The Linux hosts accept the licence and keep the comment without asking.
 - Save, Load, quick save and load, config, backlog, the right-click view and the return to the title are the game's
-  own system scripts (9001 to 9020). The engine runs them when the menubar, a right click or the wheel asks, with the
+  own system scripts (9001 to 9020). A load starts the backlog afresh with the page it restores, as on the PC. The engine runs them when the menubar, a right click or the wheel asks, with the
   game's state set aside and put back when they end.
 - Saves follow the PC: one `bruns-system.dat` (EENZ S-expression) holds the system flags, the read-text and seen-picture
   records and every slot, each with the layers, pictures, music, message window, call stack and words. The runtime
