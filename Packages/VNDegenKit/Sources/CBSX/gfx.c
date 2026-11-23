@@ -643,5 +643,9 @@ void bx_gfx_frame(BX *b) {
         bx_choice_draw(b, b->screen);
         bx_ui_draw(b, b->screen);
     }
+    if (b->autosavePending) {
+        b->autosavePending = false;
+        bx_autosave(b);
+    }
     b->serial++;
 }

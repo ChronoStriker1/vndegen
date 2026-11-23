@@ -118,9 +118,9 @@ void bx_phase_start(BX *b, int phase) {
     b->winShown = false;
     if (phase == PH_TITLE) title_start(b);
     else if (phase == PH_MAP) {
-        if (bx_map_start(b)) bx_autosave(b);
+        if (bx_map_start(b)) b->autosavePending = true;
         else bx_phase_end(b);
-    } else if (phase == PH_CUSTOM_MAP && !bx_cfg_section(&b->cfg, "map phase")) bx_autosave(b);
+    } else if (phase == PH_CUSTOM_MAP && !bx_cfg_section(&b->cfg, "map phase")) b->autosavePending = true;
 }
 
 static void title_pick(BX *b, const char *key) {

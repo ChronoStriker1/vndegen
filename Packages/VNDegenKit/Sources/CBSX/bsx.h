@@ -421,6 +421,7 @@ struct BX {
     Museum *museum;
     MuseumPhase *museumPhase;
     bool replaying;
+    bool autosavePending;
     int replayPage;
     bool commonDirty;
     int phaseBack;
