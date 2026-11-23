@@ -5,9 +5,12 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
+
+#include "data.h"
 
 namespace wolf {
 
@@ -291,6 +294,9 @@ struct SaveFile {
 SaveFile parseSave(std::span<const uint8_t> fileBytes);
 // Writes the file: fixes the checksum in header[2], then encrypts with the header's seeds.
 std::vector<uint8_t> serializeSave(const SaveFile &save);
+
+std::optional<std::string> pictureTextBytes(const std::string &utf8, Encoding enc);
+std::optional<std::string> pictureText(const std::string &bytes, Encoding enc);
 
 // The XOR layer on its own, for tools. It is its own inverse.
 void cryptSave(std::span<uint8_t> fileBytes);

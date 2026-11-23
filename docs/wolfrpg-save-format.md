@@ -28,7 +28,7 @@ After the header: a marker byte 0x19, the game title (u16 length), the save vers
 | Field | Meaning | Established by |
 |---|---|---|
 | `mapId` | Row of the system database's map list. -1 in a save that has no map yet | Controlled saves: 2 on the second map, 3 after walking to the third |
-| `unknown1` | Two values, usually 0 | Not known; kept |
+| `unknown1` | The camera's top left in quarter pixels, which the engine shows right after a load: 240 1040 is 60, 260 | Load test: President Yukino's own save at the school front holds 240 1040, the hero-centred camera for 40-pixel tiles, and one with 0 0 opens scrolled to the map's top; Journey of Depravity's holds 0 64, its 16-pixel limit. VNDegen writes its camera there in version 128 saves and carries the value over in others |
 | `width`, `height`, `tiles` | The current map's size and its three tile layers, laid out like `Map::tiles`, so tiles changed by events persist. A -1 in place of the first tile means none are stored, which system variable 127 asks for | Game data: they equal the map file's |
 | `tilesetBase`, `autotiles`, `tileFlags` | The tileset in use: base image, autotile images, and every tile's passability | Game data: they equal the tileset's in `TileSetData.dat` |
 | `events` | Every event of the current map, in map order, as characters (below) | Game data, controlled saves |
@@ -96,9 +96,31 @@ Each picture has its number, a kind (`0 0` an image, `1 0` text, `0 1` a window,
 | `v73b` | The event that made the picture: a type or −1, the common event, the command line |
 | `v76` | −1 −1 1 for images and text, 0 −1 0 for `<SQUARE>`, and 4, a × 1000 + b, 1 for `<GRADX-a-b>` |
 
-Text keeps the engine's own codes: `\f[n]` is the six bytes 01 05 03 0E (n + 14) 01, and other codes (`\E`, positions, colours) are longer sequences not mapped yet.
+Text keeps the engine's own codes, each a 01 byte, a length that counts itself, the code and its value. A value is two digits, each plus 14, the first counting 64s: `\f[n]` is 01 05 03 0E (n + 14) 01 for sizes under 64. The codes read so far, from the bytes the PC engines wrote for text whose source the events give:
 
-Engines that write version 128 (President Yukino's 2.21, Drain Dungeon's and Journey of Depravity's 2.23) save the pictures on screen and show them again after a load: a picture added to a Drain Dungeon save at a number the game never uses shows after loading on the PC. VNDegen writes and restores pictures for version 128 saves, leaving out pictures numbered below 0 (Drain Dungeon's dungeon background is -5 and the PC's save has none of them), and writes `a[8]` as 1, `v73b` as -1 and `v69` as the PC writes them for a plain picture. ANGEL QUEST's engine (version 123) closes when it loads a save holding a picture record in version 128's shape, and the engine that writes 125 (Test Game 53) showed none of a save's pictures, so VNDegen writes an empty list for those and clears pictures on load, as before. Wolf RPG Editor 3.714 (version 159) also restores pictures, but its record holds them differently (x and y twice, zoom and angle not where version 128 has them), so VNDegen neither writes nor restores them there yet.
+| Code | Bytes |
+|---|---|
+| `\f[n]` | 01 05 03, n in two digits, 01 |
+| `\E` | 01 02 05 |
+| `<R>` | 01 02 15 |
+| `\ay[n]` | 01 05 1E, n + 5000 in two digits, 01: `\ay[32]` is 5C 36 and `\ay[62]` 5D 14 |
+
+Other codes (colours, `\ax`, `<C>`) aren't mapped yet, and a text picture holding one is left out of the save.
+
+Engines that write version 128 (President Yukino's 2.21, Drain Dungeon's and Journey of Depravity's 2.23) save the pictures on screen and show them again after a load: a picture added to a Drain Dungeon save at a number the game never uses shows after loading on the PC. VNDegen writes and restores pictures for version 128 saves, leaving out pictures numbered below 0 (Drain Dungeon's dungeon background is -5 and the PC's save has none of them), and writes `a[8]` as 1, `v73b` as -1 and `v69` as the PC writes them for a plain picture. ANGEL QUEST's engine (version 123) closes when it loads a save holding a picture record in version 128's shape, and the engine that writes 125 (Test Game 53) showed none of a save's pictures, so VNDegen writes an empty list for those and clears pictures on load, as before. Wolf RPG Editor 3.714 (version 159) also restores pictures, with each value now and its target where a picture command moves it. Checked against The Clumsy Witch Seris's engine under Wine by adding pictures to its own save, one changed field each; it draws the values now and leaves the targets alone after a load:
+
+| Field | Meaning |
+|---|---|
+| `a[0]`, `a[1]`; `a[2]`, `a[3]` | x and y now; their targets |
+| `a[4]`, `a[5]`, `a[6]` | Divisions across and down, and pattern |
+| `a[7]`, `a[8]` | Opacity now and its target |
+| `a[9]` | Blend mode |
+| `b[0]`, `b[1]`; `b[2]`, `b[3]` | Zoom across and down now; their targets |
+| `b[4]`, `b[5]` | Angle now and its target |
+| `v9fA` | Colour now, red, green and blue, then its target, as version 128's `b` |
+| `v81[14]`, `v81[16]` | The effect command's zoom across and down: 0 hides the picture, 50 halves it |
+
+VNDegen writes and restores images and text there as for version 128, with each target equal to its value, `v81` as -1 seven times, 1, zeros and the four 100s, and `v9fB` to `v9fD` as the engine writes them for an image or text. The engine loads those saves with their pictures. Window pictures aren't written for version 159: no Seris save shows where their size goes.
 
 ## Section 6: the variable database (CDB)
 
@@ -120,6 +142,5 @@ A presence byte, 0 in every test save.
 
 - The screen tint and the playing BGM and BGS weren't located in the saves. After a load the map's music plays and the tint stays as it was. Music an event started before the save is lost.
 - String variables were never changed in a controlled save, so their place rests on the layout alone.
-- Text pictures and pictures in general don't survive a load, as on the PC.
 - Under Wine, Test Game 52 crashes when Continue is chosen while `Save/System.sav` exists, with the engine's own `System.sav` and saves as much as with VNDegen's, so reading a VNDegen-written `System.sav` was checked in the runtime only.
 - A Wolf RPG Editor engine older than 2.2x that has no saves in its folder gets a version 125 save, which it may not read.
