@@ -239,7 +239,10 @@ buttons have their own on and off lines.
   usual blinks, which the PC times the same way on every load, so no visible effect could be tied to either. A character's first frame takes its preset
   at once, where the PC eases into it during the scene's fade-in. eluna needed fixes to draw them like the PC (`Engines/ANIM/UPSTREAM.md`);
   with the PC's idle held still, faces, eyes, mouths, head and body turns, nods and tilts match it.
-- The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't.
+- The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't: one-pixel lines
+  on a 117 by 121 pixel grid, a few levels darker. Neither snapping vertices to 1/16 pixel, as a GPU does, nor point
+  sampling where a texel's neighbours are transparent changes them, so they aren't gaps between the tiles' triangles or
+  their texture edges.
 - The goddess (Malg202) draws her lids too low: her eyes look half closed where the PC's are open, in the story and in
   the Sprites viewer. Her irises now stay inside the eye whites. She is on screen in the opening (`000-000`, `000-010`)
   and in `060-040`/`060-050`, plus the `Mem30` replay (Malg200, Malg203). Her eye motion's time follows
