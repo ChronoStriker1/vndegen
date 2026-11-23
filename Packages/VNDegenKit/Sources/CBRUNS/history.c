@@ -119,10 +119,10 @@ void history_page(BR *e) {
         split(en, h->page);
         en->voiceCh = h->voiceCh;
         en->voiceId = h->voiceId;
+        h->voiceCh = -1;
     }
     free(h->page);
     h->page = NULL;
-    h->voiceCh = -1;
 }
 
 static Entry *at(History *h, int i) { return &h->e[(h->head + i) % HIST_MAX]; }
