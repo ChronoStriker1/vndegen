@@ -374,8 +374,47 @@
         inherits: (child, parent) => { child.super_ = parent; Object.setPrototypeOf(child.prototype, parent.prototype); },
     };
 
+    const openCommand = /^\s*(?:cmd(?:\.exe)?\s+\/c\s+)?(?:open|xdg-open|start(?:\s+"")?|rundll32(?:\.exe)?\s+url\.dll,\s*FileProtocolHandler)\s+(?:"([^"]+)"|'([^']+)'|(\S+))\s*$/i;
+    function openLink(command) {
+        const match = openCommand.exec(String(command));
+        const url = match && (match[1] || match[2] || match[3]);
+        if (!url || !/^(https?:\/\/|mailto:)/i.test(url)) return false;
+        nw.Shell.openExternal(url);
+        return true;
+    }
+    function refusal(command) {
+        const error = new Error('Command failed: ' + command);
+        error.code = 'ENOSYS';
+        return error;
+    }
+    function childProcess(command, callback) {
+        const error = openLink(command) ? null : refusal(command);
+        const child = { pid: 0, stdout: { on: noop }, stderr: { on: noop }, stdin: { write: noop, end: noop }, kill: noop };
+        const listeners = {};
+        child.on = child.once = (name, listener) => { (listeners[name] = listeners[name] || []).push(listener); return child; };
+        setTimeout(() => {
+            if (typeof callback === 'function') callback(error, '', '');
+            for (const listener of (error && listeners.error) || []) listener(error);
+            for (const listener of listeners.exit || []) listener(error ? 1 : 0, null);
+            for (const listener of listeners.close || []) listener(error ? 1 : 0, null);
+        }, 0);
+        return child;
+    }
+    const joined = (file, args) => [file].concat(Array.isArray(args) ? args.map((arg) => '"' + arg + '"') : []).join(' ');
+    const lastFunction = (args) => [...args].reverse().find((arg) => typeof arg === 'function');
+    const child_process = {
+        exec: (command, ...rest) => childProcess(command, lastFunction(rest)),
+        execFile: (file, args, ...rest) => childProcess(joined(file, args), lastFunction([args, ...rest])),
+        spawn: (file, args) => childProcess(joined(file, args)),
+        execSync: (command) => {
+            if (!openLink(command)) throw refusal(command);
+            return Buffer.from('');
+        },
+    };
+
     const modules = {
         fs: fs, path: path, os: os, process: process, util: util, buffer: { Buffer: Buffer }, 'fs-extra': fsExtra, 'adm-zip': AdmZip,
+        child_process: child_process,
     };
     if (config.runtime === 'electron') {
         modules.electron = electron;
