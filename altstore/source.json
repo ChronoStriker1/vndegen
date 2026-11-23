@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.59.8",
+          "buildVersion": "3175",
+          "date": "2026-11-23T02:49:53Z",
+          "localizedDescription": "EAGLS, ExHibit and Bruns gain the screens and dialogs they were missing, and EAGLS and ExHibit share what you've seen with the PC.\n\n## Downloads\n\n- `VNDegen-0.59.8-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.59.8.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.59.8-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **EAGLS:** the CGs and scenes you've seen are shared with the PC's `GlobalSave.sav`, both ways.\n- **EAGLS:** name entry works without a hardware keyboard.\n- **EAGLS:** the title's Settings and Exit buttons work. Before, Settings opened the exit box and Exit did nothing.\n- **EAGLS:** Settings gains the Screen and System tabs: screen effects, left click to skip effects, and Reset Config.\n- **EAGLS:** the mosaic, dissolve, wipe and blinds transitions are drawn as on the PC.\n- **EAGLS:** Oppai no Ouja 48's Oppai Gallery, Oppai View, Oppai Scouter and champion bra page work.\n- **ExHibit:** Extra shares the CGs and scenes you've seen with the PC, both ways.\n- **ExHibit:** the game asks before returning to the title, ending, quick loading or overwriting a save.\n- **ExHibit:** the CG viewer has the PC's controls, and the backlog has Jump.\n- **Bruns:** the licence dialog shows on first start, and saves take a comment, as on the PC.\n- **Bruns:** the backlog's spacing matches the PC, its voice replay buttons show, and a load keeps the loaded page in the backlog.\n\n## Known limits\n\n- **EAGLS:** what you've seen is written to `GlobalSave.sav` only once the PC version has started once with that folder.\n- **ExHibit:** MANPU icons aren't drawn.\n- **Bruns:** animated cursors aren't drawn.\n\n## What wasn't tested\n\n- No physical device was used. These were checked in the Linux test build, the Mac app and an iPad simulator, and against the PC versions under Wine.\n- Sound wasn't listened to.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.59.8/VNDegen-0.59.8.ipa",
+          "size": 132371257,
+          "sha256": "4ccb330ffae3fbbd14185ecdc40bf3eec36e10be01b02f69db3a010b3f283c57",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.59.7",
           "buildVersion": "3150",
           "date": "2026-11-23T02:04:17Z",
