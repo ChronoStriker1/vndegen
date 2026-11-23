@@ -42,6 +42,12 @@ folder down.
   `7c` scales it, both over a time; `52` puts a new layer back at no offset and 100%. Magical Sword's opening pans from
   the goddess's legs to her face this way, and matches the PC frame for frame. Expressions are presets of E-mote variables in
   the define.
+- Pictures on layers: a picture layer's x is its `59` moves less 1024, so `59 5 1024 0 0 0` puts Magical Sword's skill
+  status window and the memory filters where the picture lies in its texture, and Double Date Dilemma's `59 2 1424 0 0 0`
+  puts a cut-in 400 pixels right, as the PC draws them. The PC keeps that x in a layer's slot-x field (0x1b0) with no
+  offset, where an E-mote layer keeps 640 and its offset, and VNDegen saves and loads picture layers the same way. Up to
+  0.59.6 VNDegen drew them 1024 pixels to the right, off the screen, and the PC loaded VNDegen's saves with them 384
+  pixels left.
 - Text: the font the player picked in Settings, whose name the PC keeps in its system save (decoded, 32 bytes of
   Shift-JIS at 0x7e324). With none stored, each exe's own default: MS Gothic in Double Date Dilemma and MS PMincho
   in Magical Sword, drawn through their substitutes (Ume Gothic, Ume P Mincho, `docs/fonts.md`). The story, the backlog,

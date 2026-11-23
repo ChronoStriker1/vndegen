@@ -112,6 +112,8 @@ void an_layer_pos(const AN *a, const Layer *l, int *x, int *y) {
 
 int an_layer_scale(const AN *a, const Layer *l) { return lerp(l->fromScale ? l->fromScale : l->scale, l->scale, l->scaleStart, l->scaleTime, a->now); }
 
+enum { IMAGE_LAYER_ORIGIN_X = 1024 };
+
 static void draw_scene(AN *a, u32 *fb) {
     Scene *s = &a->scene;
     an_gfx_fill(fb, a->W, a->H, 0xff000000u);
@@ -136,6 +138,7 @@ static void draw_scene(AN *a, u32 *fb) {
         }
         Image *im = an_image_load(a, l->name);
         if (!im) continue;
+        x -= IMAGE_LAYER_ORIGIN_X;
         int ls = an_layer_scale(a, l);
         double scale = ls > 0 ? ls / 1000.0 : 1.0;
         if (scale != 1.0)

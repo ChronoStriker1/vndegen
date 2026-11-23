@@ -239,8 +239,11 @@ static void fill_slot(AN *a, u8 *s) {
         if (l->kind == LK_NONE) continue;
         put_name(s + OFF_LAYER_NAME + LAYER_NAME * i, LAYER_NAME, l->name);
         if (l->idle[0]) put_name(s + OFF_LAYER_WAIT + LAYER_WAIT * i, LAYER_WAIT, l->idle);
-        wr32(s + OFF_LAYER_X + 4 * i, 640);
-        wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)((a->slotX[i] ? a->slotX[i] : 640) - 640 + l->toX));
+        if (l->kind == LK_EMOTE) {
+            wr32(s + OFF_LAYER_X + 4 * i, 640);
+            wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)((a->slotX[i] ? a->slotX[i] : 640) - 640 + l->toX));
+        } else
+            wr32(s + OFF_LAYER_X + 4 * i, (u32)l->toX);
         for (int k = 0; k < 3; k++) wrf64(s + OFF_LAYER_SCALE3 + LAYER_SCALE3 * i + 8 * k, 1.0);
         if (l->scale != 1000) wr32(s + OFF_LAYER_ZOOM + 4 * i, (u32)l->scale);
         if (l->kind != LK_EMOTE) continue;
@@ -359,7 +362,7 @@ static bool restore_slot(AN *a, const u8 *s) {
         l->scale = zoom > 0 ? zoom : 1000;
         double base = i < POS_SLOTS ? rdf64(s + OFF_SLOT_X + 8 * i) : 0;
         a->slotX[i] = base > 0 && base < 4096 ? (int)base : 640;
-        l->toX = l->fromX = (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i) - (a->slotX[i] - 640);
+        l->toX = l->fromX = l->kind == LK_EMOTE ? (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i) - (a->slotX[i] - 640) : (i32)rd32(s + OFF_LAYER_X + 4 * i);
         if (l->kind == LK_EMOTE) l->toY = l->fromY = (i32)rd32(s + OFF_LAYER_Y + 4 * i) - layer_drop(a, l);
         for (int k = 0; k * VAR_SIZE + VAR_SIZE <= LAYER_VARS_SIZE; k++) {
             const u8 *v = s + OFF_LAYER_VARS + LAYER_VARS_SIZE * i + VAR_SIZE * k;
