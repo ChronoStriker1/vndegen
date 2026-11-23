@@ -90,7 +90,8 @@ uses the same folder:
   each seen version full screen in turn; the tall group pictures show their top, then their bottom.
 - Scene View: four pages (`SCMode1-N`), one slot per scene, shown once `@Reco_<scene>` is set. Clicking a slot plays
   the scene from its `$Reco_<scene>` label with `:SCENEFLG` set; the scene's closing `140()` returns to `TitleSC.dat`'s
-  `$SceneStart`, which opens the page again. The slot order isn't in the scripts: it was read off the thumbnail sheets
+  `$SceneStart`, which opens the page again. A scene's choices are the player's to make, as on the PC, whose choice
+  script (`Choices.dat`) runs the same in Scene View as in the story. The slot order isn't in the scripts: it was read off the thumbnail sheets
   by matching each thumbnail against the game's pictures.
 - Soundtrack: the ten tracks, play, stop, previous, next and the volume bar, at the PC's places, drawn opaque as the PC draws
   them.
@@ -106,7 +107,6 @@ Games start on the "Visual novel" controller layout.
 
 - The title's locked "?????" bonus and the window's Oppai Gallery and Oppai View buttons, which the story turns on
   once the scouter is found, do nothing: they are screens built into the game's exe.
-- In Scene View a scene's choices are the player's to make, as in the story.
 - The champion brassiere page shows every brassiere as not found.
 - The settings dialog leaves out what belongs to the PC's window and hardware: the Screen tab's window size, mouse
   cursor, right click (greyed out on the PC too), cursor operation and V-Sync, the System tab's CPU level,
