@@ -118,6 +118,9 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
   custom map that is the game's map.
 - The id is the same in every save of a game and is checked on load. It is read from the game's `save/` folder; the
   four Mesu Kyoushi games' ids are also built in.
+- A character's wear record has a byte per outfit code (the two digits after a bust-up's undress digit), set once the
+  character has been shown in that outfit, as the PC sets it under Wine; Mesu Kyoushi 3's and 4's dress screen lists an
+  outfit only when its byte is set.
 - `common.dat` holds the PC's settings (with the same wear records), a byte per choice taken, a byte per message read,
   and the museum's records. VNDegen finds the choice and read tables by their counts, updates them, and leaves the rest
   as the PC wrote it.

@@ -332,7 +332,8 @@ Obj *bx_obj_put(BX *b, int kind, int id, const char *name, int x, int y) {
     b->nextBlend = 0;
     snprintf(o->name, sizeof o->name, "%s", name);
     bx_museum_seen(b, name);
-    if (kind == OK_CHAR && strlen(name) >= 6 && name[5] >= '0' && name[5] <= '9') bx_museum_wear(b, o->charNo, name[5] - '0');
+    if (kind == OK_CHAR && strlen(name) >= 8 && isdigit((unsigned char)name[6]) && isdigit((unsigned char)name[7]))
+        bx_museum_wear(b, o->charNo, (name[6] - '0') * 10 + name[7] - '0');
     o->x = x;
     o->y = y;
     o->seq = ++s->seq;
