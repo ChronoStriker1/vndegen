@@ -67,12 +67,20 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   `C095` set to the command), so its first-use help shows as in the original. 建設 opens the build screen: the list,
   the board, the card, Reset, Undo, 決定 and 戻る, with the town window showing the result before 決定. 休憩 ends the
   turn: the turn's income, then the next turn's script. 遠征, 内政, 配置, 装備, 育成 and 商会 aren't built yet.
+- **Battles.** The board with the party's and the enemies' platforms, idle animations and bars, the Backs and Forward
+  panels, the side buttons, 戦闘開始, 自動戦闘, ゲージON and the log. Each unit's action and target buttons open the
+  game's skill and target pickers; the side buttons set every unit's order or target and save and load three sets.
+  Rounds play in speed order with the damage, hit and target rules in `docs/systemaoi-cleanroom.md`. A win dims the
+  screen and shows the resources, EXP and any item found; EXP fills the panel's bar and raises levels. Only a debug
+  hook starts a battle so far.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
   FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
 
 ## Known limits
 
-- Expeditions, the 3D dungeon, battles, units, items and most town commands aren't built yet; they are the original's
-  exe, not its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
+- Expeditions, the 3D dungeon, units, items and most town commands aren't built yet; they are the original's exe, not
+  its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
+- Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
+  screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
 - Saves, the Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.

@@ -68,9 +68,14 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   defence, magic defence, speed, evasion, government and command, the order of the training screen's card
   (`grw_f00`). Column 15 is the unit's 格 (Darkus 0), column 17 its level, column 19 its growth type. Measured: Darkus
   shows 170 HP and 35 MP.
-- **Growth.** `lvup.obj` gives each growth type's gains as text, such as `攻撃+1/4|防御+1/6|速度+1/12|回避+1/15`, one
-  point for every so many levels. Inferred: counted from level 1, so a level 5 enemy of the common type has one more
-  attack and no more defence. Every sample below fits that.
+- **Growth.** `lvup.obj` column 24 gives each growth type's gains as text, such as
+  `攻撃+1/4|防御+1/6|速度+1/12|回避+1/15`, one point for every so many levels. Inferred: counted from level 1, so a
+  level 5 enemy of the common type has one more attack and no more defence. Every sample below fits that, and one
+  needs it: a level 5 ベト's ベトハンマー (27 to 30, attack 7) hit Darkus for 21, one more than its base attack allows.
+- **Experience.** Measured: the panel's EXP bar is 100 pixels wide and fills by EXP × 100 / 120, where 120 is the
+  first number in the unit's growth row (`lvup.obj` column 2): 9, 21 and 43 EXP showed 7, 17 and 35 pixels, and 11
+  and 21 showed 9 and 17. So level 2 takes 120. Inferred: each later level takes that number times the level, and
+  levels don't raise HP or MP until that is measured.
 - **Damage.** A random number in the skill's power range (`skill.obj` columns 17 and 18), plus the attacker's
   physical attack, minus the target's physical defence. Measured: 44 hits by eleven skills, each inside its predicted
   range. Darkus's 剣撃 (27 to 30, attack 18) did 44, 44, 36, 33, 45, 44, 43, 41, 42, 48 and 46 to targets of defence
@@ -85,19 +90,47 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   Enemies' weights (ベト: ベトアタック 30, ベトシュート 10, ベトハンマー 10) fit how often each showed in the logs;
   VNDegen picks by weight, and heals only when an ally is at half health or below (inferred). Order in a round is by
   speed, ties at random (inferred).
-- **Encounters.** `party.obj` lists each enemy group: three rows of six half-step cells from column 18, each row
-  followed by a minimum and a maximum. Fixed groups name a unit in each cell; random groups (ランダム) give a list of
-  candidates in the row's last cell, and the game draws between the two counts from it. Enemy keys such as ベトＡ are
+- **Encounters.** `party.obj` lists each enemy group in three rows of eight columns from column 18: five cells, a
+  list of candidates, then a minimum and a maximum. The first row is the front (前衛). A cell names a unit for that
+  column; the game then draws between the two counts from the list and puts them in free columns. Measured on the
+  fixed group 千固定0100: ベト, 二角ベト and ベト stood in the front row's columns 0, 2 and 4, two 一角ベト in the
+  middle row's 1 and 3, and one 二角ベト from the back row's list (counts 0 to 1). Enemy keys such as ベトＡ are
   `unit.obj` column 1, with the level in column 17 and the sprite in column 11.
-- **Board.** Measured: the party's platform (`m000bt1a` in 千樹庭) at (193, 299) with the town diorama's tiles, the
-  enemies' platform `m000bt2a` at (406, 116) for small groups and `m000bt2b` at (326, 130) for a seven-slime group,
-  the Backs and Forward panels (`bat_j01`, `bat_j00`) at (103, 541) and (603, 541) with a `bat_j02` box per slot, the
+- **Board.** Measured: the party's platform (`m000bt1a` in 千樹庭) at (193, 299) with the town diorama's tiles, and
+  the enemies' on a grid of three rows by five columns whose tile centres are (627 + 57k − 81r, 202 + 29k + 41r), row
+  r from the back. `party.obj` column 17 picks the platform: 1 is `m000bt2a` at (406, 116) with columns 1 to 3, 2 is
+  `m000bt2b` at (326, 130) with all five. Inferred: 10 is the larger `m000bt2c`, placed at (250, 80) until a capture
+  shows it. Enemy sprite sheets (`u????a2`) pack two rows of frames at uneven widths; the runtime splits them at the
+  gaps between the opaque parts. Floor tile frames: grey, red, blue (the party while orders are given) and yellow
+  (the unit being given orders, or the targets a choice covers). The Backs and Forward panels (`bat_j01`, `bat_j00`) at (103, 541) and (603, 541) with a `bat_j02` box per slot, the
   preset buttons `bat_d00` to `bat_d11` down the left, 戦闘開始 (`bat_l00`) at (500, 497) and the log (`bat_m00`) at
   (1105, 270) with 12-pixel text on 18-pixel lines. The backdrop is the 3D dungeon, still to come.
-- **Magic.** Not yet known: Darkus's 火矢三連 (fire, 28 to 30, magic attack 15) did 36 to a ベト of magic defence 4,
-  three less than the physical rule with magic stats would give.
+- **Magic.** Inferred: the same rule with magic attack and magic defence. Darkus's 火矢三連 (fire, 28 to 30, magic
+  attack 15) did 39 to a 二角ベト of magic defence 4 (predicted 39 to 41), and 20 to the second target; it did 36 to a
+  ベト once, three short, which stays open.
 - **Healing.** 小回復 (38 to 42) healed 39 and 38: inferred as the power alone.
-- **Hit and miss.** Not yet known: ツタ (accuracy 85) missed Darkus three times in seven, more than its accuracy
-  suggests, so evasion or speed takes part; Darkus's 剣撃 (accuracy 100) missed a ドリツル (evasion 2) once in 16.
-- **Rewards.** Measured: a win gives money, resources and experience in a box over the board; a loss ends the
-  expedition and loses what it found.
+- **Hit and miss.** Inferred: a hit when a roll under 100 is below the skill's accuracy (`skill.obj` column 16) minus
+  the target's evasion. Too few misses were seen to pin it down: ツタ (accuracy 85) missed Darkus three times in seven,
+  and Darkus's 剣撃 (accuracy 100) missed a ドリツル (evasion 2) once in 16.
+- **Orders.** Measured from the original's screens: clicking a unit's action button opens スキル選択 to the right of
+  its box, anchored to the screen's bottom (`bat_e01` header, `bat_e03` rows 29 pixels apart, `bat_e02` foot at
+  y 716): the unit's skills, each with its attribute icon from `pun_d00` (斬 打 射 無 光 闇 火 水 土 風 雷 回 異), name
+  and MP, then 自由戦闘, 攻撃戦闘, 防御, 支援戦闘, 交代 and 逃走. The target button opens スキル対象選択 (`bat_g01` to
+  `g03`): 敵 for a skill aimed at enemies, 味方 for one aimed at allies, 自由 otherwise, then 前衛, 中衛, 後衛, 右側, 真中
+  and 左側. Choosing an enemy skill while the target is 自由 makes it 敵. Hovering a target lights its tiles: the back,
+  middle or front row; on the right, the two highest columns; in the middle, column 2; on the left, columns 0 and 1.
+  行動全自由 lights while every order is 自由戦闘. The other buttons set every unit's order or target, or save and
+  load three sets of orders. Inferred, until a capture shows it: 攻撃戦闘 and 支援戦闘 pick by weight among attacking or
+  supporting skills, 防御 halves damage taken that round, 逃走 ends the battle when that unit acts, an empty target
+  area falls back to any target, the party's 右側 is the third column of a row, and 自動戦闘 starts each round by
+  itself. ゲージON steps through `bat_p00`, `p01` and `p02` (ゲージOFF, 戦闘時可変), the last showing the bars only
+  while a round plays (inferred).
+- **Rewards.** Measured over five wins: the screen dims to 3/8 brightness and a box in the general popup frame
+  (`pop_a00` to `a03`, edges only) centred on (641, 360) says 資源を*N*材手に入れた, *N*Pの経験値を獲得した and, once,
+  使い込まれた杖を手に入れた, in white with the numbers and names in green or yellow, 24 pixels a line. Resources were
+  1 or 2, the range in `party.obj` columns 63 and 64. EXP was 9 and 10 for a ドリツル, 12 and 11 for a ナメッド and 22
+  for a クラム and a フニ, whose `unit.obj` column 72 values are 8, 10, 10 and 10: inferred as their sum times 110 to
+  125 per cent. Inferred: an item drops with the chance in `party.obj` column 65 (10), from the items whose `item.obj`
+  column 30 names the group's table (column 67, 落物00), weighted by column 31. No money showed in these battles.
+- **Defeat.** Measured: a fallen ally is logged as ダークスが倒された. The screen after a loss wasn't captured; a
+  loss ends the expedition and loses what it found.

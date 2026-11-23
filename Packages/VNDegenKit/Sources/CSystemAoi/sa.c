@@ -924,6 +924,11 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
         if (sa_battle_hover(&s->battle, s->mouseX, s->mouseY)) s->dirty = true;
+        if (s->rightClicked) {
+            s->rightClicked = false;
+            sa_battle_cancel(&s->battle);
+            s->dirty = true;
+        }
         if (s->clicked) {
             s->clicked = false;
             if (sa_battle_click(&s->battle, s->mouseX, s->mouseY) != BATTLE_RUNNING) {

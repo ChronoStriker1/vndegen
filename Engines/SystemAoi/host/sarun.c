@@ -115,6 +115,16 @@ int main(int argc, char **argv) {
             sa_debug_battle(s, argv[a] + 7, "bg021a0.agf");
             alive = alive && run(s, 100);
         }
+        if (sscanf(argv[a], "move=%d,%d", &x, &y) == 2) {
+            vnsystemaoi_mouse_move(s, x, y);
+            alive = alive && run(s, 100);
+        }
+        if (sscanf(argv[a], "rpress=%d,%d", &x, &y) == 2) {
+            vnsystemaoi_mouse_move(s, x, y);
+            alive = alive && run(s, 16);
+            vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_RIGHT, 1);
+            vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_RIGHT, 0);
+        }
         if (sscanf(argv[a], "press=%d,%d", &x, &y) == 2) {
             vnsystemaoi_mouse_move(s, x, y);
             alive = alive && run(s, 16);

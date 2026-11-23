@@ -243,6 +243,7 @@ bool sa_playing(Mixer *m, int ch, int slot);
 bool sa_font_init(const char *const *names, char *used, size_t usedSize);
 void sa_font_free(void);
 void sa_font_set_spacing(int px);
+void sa_font_set_plain(bool on);
 int sa_char_width(u32 cp, int size);
 int sa_text_width(const char *s, int n, int size);
 int sa_text_draw(u32 *dst, int dw, int dh, const char *s, int n, int x, int y, int size, u32 color, u32 edge);
@@ -318,7 +319,35 @@ typedef struct Facility {
     int exp;
 } Facility;
 
+enum { ORDER_FREE, ORDER_ATTACK, ORDER_SUPPORT, ORDER_DEFEND, ORDER_SWAP, ORDER_INTRUDE, ORDER_FLEE, ORDER_SKILL };
+enum {
+    AIM_FREE,
+    AIM_ALL,
+    AIM_ENEMY,
+    AIM_ALLY,
+    AIM_FRONT,
+    AIM_MIDDLE,
+    AIM_BACK,
+    AIM_RIGHT,
+    AIM_LEFT,
+    AIM_CENTRE,
+    AIM_RIGHTMOST,
+    AIM_LEFTMOST,
+    AIM_COUNT
+};
+
+#define SPRITE_FRAMES 32
+
+typedef struct SpriteFrame {
+    int x, y, w, h;
+} SpriteFrame;
+
+typedef struct Order {
+    int mode, skill, aim;
+} Order;
+
 #define PARTY_SLOTS 6
+#define PARTY_PRESETS 3
 #define PARTY_FRONT 3
 #define PARTY_CELL_MS 100
 
@@ -326,6 +355,9 @@ typedef struct Party {
     Table units;
     int unit[PARTY_SLOTS];
     int hp[PARTY_SLOTS], mp[PARTY_SLOTS];
+    int level[PARTY_SLOTS], exp[PARTY_SLOTS];
+    Order order[PARTY_SLOTS], preset[PARTY_PRESETS][PARTY_SLOTS];
+    bool presetSaved[PARTY_PRESETS];
     Image *sprite[PARTY_SLOTS];
     int cells[PARTY_SLOTS];
     u32 ms;
@@ -341,26 +373,33 @@ int sa_party_rank(const Party *p);
 bool sa_party_tick(Party *p, u32 ms);
 void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit);
 void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y);
-void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy);
-void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY);
+void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy, int frame);
+void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY, const int *frames);
 void sa_party_draw_bars(Party *p, u32 *fb, int x, int y, int hp, int maxHp, int mp, int maxMp);
 void sa_sprite_layout(const Image *im, int *cols, int *rows);
 int sa_sprite_filled_cells(const Image *im);
+int sa_sprite_split(const Image *im, SpriteFrame *out, int max);
 
 enum { STAT_ATTACK, STAT_MAGIC, STAT_DEFENCE, STAT_RESIST, STAT_SPEED, STAT_EVASION, STAT_GOVERN, STAT_COMMAND };
-enum { BATTLE_RUNNING, BATTLE_WON, BATTLE_LOST };
+enum { BATTLE_RUNNING, BATTLE_WON, BATTLE_LOST, BATTLE_FLED };
+enum { PICK_NONE, PICK_ACTION, PICK_TARGET };
 
 #define BATTLE_FIGHTERS 24
 #define BATTLE_LOG 64
-#define BATTLE_ART 26
+#define BATTLE_ART 64
+#define BATTLE_PICKS 16
+#define POP_GREEN "\x01"
+#define POP_YELLOW "\x02"
+#define POP_WHITE "\x03"
 
 typedef struct Fighter {
     int id, row, level, slot, gridRow, gridCell;
-    bool enemy;
+    bool enemy, guard;
     int hp, mp, maxHp, maxMp;
     int stat[8];
     Image *sprite;
-    int cells;
+    SpriteFrame frame[SPRITE_FRAMES];
+    int frames;
 } Fighter;
 
 typedef struct BattleLine {
@@ -369,16 +408,20 @@ typedef struct BattleLine {
 } BattleLine;
 
 typedef struct Battle {
-    bool open, acting;
-    int result, round, hover;
+    bool open, acting, autoBattle;
+    int result, round, hover, group, boardSize, gaugeMode;
     Party *party;
-    Table groups, skills, lvup;
+    Table groups, skills, lvup, items;
     Fighter f[BATTLE_FIGHTERS];
     int count;
     int order[BATTLE_FIGHTERS], orderCount, next;
     BattleLine log[BATTLE_LOG];
     int logCount;
-    Image *art[BATTLE_ART], *board[2], *back;
+    int picker, pickSlot, pickCount;
+    Order pick[BATTLE_PICKS];
+    int gainResources, gainExp;
+    char gainItem[64];
+    Image *art[BATTLE_ART], *board[4], *back, *pop[4];
     u32 ms, animMs, rng;
 } Battle;
 
@@ -388,8 +431,14 @@ bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdro
 bool sa_battle_tick(Battle *b, u32 ms);
 int sa_battle_click(Battle *b, int x, int y);
 bool sa_battle_hover(Battle *b, int x, int y);
+void sa_battle_cancel(Battle *b);
 void sa_battle_draw(Battle *b, u32 *fb);
 void sa_debug_battle(VNSystemAoi *sa, const char *group, const char *backdrop);
+int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
+
+void sa_popup_load(Image **frame, Vfs *vfs);
+void sa_dim(u32 *fb);
+void sa_popup_draw(Image *const *frame, u32 *fb, const char *const *lines, int count);
 
 typedef struct Town {
     Table build, mass, lvup;

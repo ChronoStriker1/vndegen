@@ -8,33 +8,50 @@ enum {
     ART_AUTO,
     ART_GAUGE,
     ART_LOG,
-    ART_ACTION,
-    ART_TARGET,
     ART_NONE_ACTION,
     ART_NONE_TARGET,
     ART_HP,
     ART_MP,
     ART_SLOT,
-    ART_SIDE0,
+    ART_EXP,
+    ART_ACT_HEAD,
+    ART_ACT_BOTTOM,
+    ART_ACT_ROW,
+    ART_AIM_HEAD,
+    ART_AIM_BOTTOM,
+    ART_AIM_ROW,
+    ART_ICONS,
+    ART_GAUGE_OFF,
+    ART_GAUGE_VARY,
+    ART_NAMED,
+    ART_MODE0 = ART_NAMED,
+    ART_AIM0 = ART_MODE0 + 7,
+    ART_SIDE0 = ART_AIM0 + AIM_COUNT,
     ART_COUNT = ART_SIDE0 + 12,
 };
 
-static const char *const artNames[ART_SIDE0] = {
-    "bat_a00.agf", "bat_j01.agf", "bat_j00.agf", "bat_l00.agf", "bat_p01.agf", "bat_p00.agf", "bat_m00.agf",
-    "bat_f00.agf", "bat_h00.agf", "bat_f99.agf", "bat_h99.agf", "bat_k01.agf", "bat_k02.agf", "bat_j02.agf",
+static const char *const artNames[ART_NAMED] = {
+    "bat_a00.agf", "bat_j01.agf", "bat_j00.agf", "bat_l00.agf", "bat_l01.agf", "bat_p00.agf", "bat_m00.agf",
+    "bat_f99.agf", "bat_h99.agf", "bat_k01.agf", "bat_k02.agf", "bat_j02.agf", "bat_k03.agf", "bat_e01.agf",
+    "bat_e02.agf", "bat_e03.agf", "bat_g01.agf", "bat_g02.agf", "bat_g03.agf", "pun_d00.agf", "bat_p01.agf", "bat_p02.agf",
 };
+
+static const char *const iconOrder[] = {"斬", "打", "射", "無", "光", "闇", "火", "水", "土", "風", "雷", "回", "異"};
+
+static const int pickModes[] = {ORDER_FREE, ORDER_ATTACK, ORDER_DEFEND, ORDER_SUPPORT, ORDER_SWAP, ORDER_FLEE};
+static const int pickAims[] = {AIM_FRONT, AIM_MIDDLE, AIM_BACK, AIM_RIGHT, AIM_CENTRE, AIM_LEFT};
 
 enum {
     PARTY_BOARD_X = 193,
     PARTY_BOARD_Y = 299,
-    ENEMY_BOARD_X = 406,
-    ENEMY_BOARD_Y = 116,
-    ENEMY_CX = 684,
-    ENEMY_CY = 232,
-    HALF_X = 57,
-    HALF_Y = 29,
+    GRID_X = 627,
+    GRID_Y = 202,
+    STEP_X = 57,
+    STEP_Y = 29,
     ROW_X = -81,
     ROW_Y = 41,
+    GRID_ROWS = 3,
+    GRID_COLS = 5,
     BACKS_X = 103,
     FORWARD_X = 603,
     PANEL_Y = 541,
@@ -44,13 +61,24 @@ enum {
     SLOT_PITCH = 163,
     LABEL_Y = 569,
     TARGET_Y = 595,
+    LABEL_W = 148,
+    LABEL_H = 20,
     HP_X = 47,
     HP_Y = 634,
     MP_Y = 658,
+    EXP_Y = 674,
+    EXP_W = 100,
+    LV_RIGHT = 44,
+    LV_Y = 666,
     START_X = 500,
     START_Y = 497,
     START_W = 204,
     START_H = 44,
+    AUTO_X = 706,
+    GAUGE_X = 998,
+    TOGGLE_Y = 510,
+    TOGGLE_W = 104,
+    TOGGLE_H = 29,
     LOG_X = 1105,
     LOG_Y = 270,
     LOG_TEXT_X = 1113,
@@ -60,12 +88,37 @@ enum {
     LOG_LINES = 23,
     LOG_SIZE = 12,
     SIDE_X = 0,
+    SIDE_W = 100,
+    SIDE_H = 19,
+    PICK_OFFSET = 158,
+    PICK_W = 164,
+    PICK_ROW = 29,
+    PICK_BOTTOM = 716,
+    PICK_HEAD = 23,
+    PICK_INSET_X = 7,
+    PICK_INSET_Y = 4,
+    ICON = 20,
+    SKILL_SIZE = 12,
     ACTION_MS = 1500,
+    TILE_PLAIN = 0,
+    TILE_BLUE = 2,
+    TILE_YELLOW = 3,
+    HOVER_START = 1,
+    HOVER_AUTO = 2,
+    HOVER_GAUGE = 3,
+    HOVER_SIDE = 100,
+    HOVER_PICK = 200,
+    HOVER_LABEL = 300,
 };
 
 #define NO_EDGE 0xffffffffu
 
 static const int sideY[12] = {414, 434, 474, 494, 514, 554, 574, 594, 634, 654, 674, 694};
+
+static const struct {
+    const char *name;
+    int x, y;
+} boards[4] = {{NULL, 0, 0}, {"m000bt2a.agf", 406, 116}, {"m000bt2b.agf", 326, 130}, {"m000bt2c.agf", 250, 80}};
 
 static const char *text_of(const Table *t, int row, int col) { return sa_table_text(t, row, col); }
 
@@ -78,7 +131,7 @@ static int row_by_text(const Table *t, int col, const char *s) {
 static int growth(const Table *lvup, const char *type, const char *stat, int level) {
     int r = row_by_text(lvup, 1, type);
     if (r < 0 || level <= 1) return 0;
-    const char *s = text_of(lvup, r, 22);
+    const char *s = text_of(lvup, r, 24);
     const char *p = strstr(s, stat);
     if (!p) return 0;
     int add = 0, per = 0;
@@ -112,13 +165,21 @@ static Image *sprite_for(Vfs *vfs, int number, bool enemy) {
 bool sa_battle_init(Battle *b, Vfs *vfs, Party *party) {
     memset(b, 0, sizeof *b);
     b->party = party;
-    b->hover = -1;
     if (!sa_table_load(&b->groups, vfs, "party.obj") || !sa_table_load(&b->skills, vfs, "skill.obj") ||
-        !sa_table_load(&b->lvup, vfs, "lvup.obj"))
+        !sa_table_load(&b->lvup, vfs, "lvup.obj") || !sa_table_load(&b->items, vfs, "item.obj"))
         return false;
-    for (int i = 0; i < ART_SIDE0; i++) b->art[i] = sa_load_image(vfs, artNames[i]);
+    sa_popup_load(b->pop, vfs);
+    for (int i = 0; i < ART_NAMED; i++) b->art[i] = sa_load_image(vfs, artNames[i]);
+    char name[16];
+    for (int i = 0; i < 7; i++) {
+        snprintf(name, sizeof name, "bat_f%02d.agf", i);
+        b->art[ART_MODE0 + i] = sa_load_image(vfs, name);
+    }
+    for (int i = 0; i < AIM_COUNT; i++) {
+        snprintf(name, sizeof name, "bat_h%02d.agf", i);
+        b->art[ART_AIM0 + i] = sa_load_image(vfs, name);
+    }
     for (int i = 0; i < 12; i++) {
-        char name[16];
         snprintf(name, sizeof name, "bat_d%02d.agf", i);
         b->art[ART_SIDE0 + i] = sa_load_image(vfs, name);
     }
@@ -136,11 +197,13 @@ static void clear_fighters(Battle *b) {
 void sa_battle_free(Battle *b) {
     clear_fighters(b);
     for (int i = 0; i < BATTLE_ART; i++) sa_image_free(b->art[i]);
-    for (int i = 0; i < 2; i++) sa_image_free(b->board[i]);
+    for (int i = 0; i < 4; i++) sa_image_free(b->board[i]);
+    for (int i = 0; i < 4; i++) sa_image_free(b->pop[i]);
     sa_image_free(b->back);
     sa_table_free(&b->groups);
     sa_table_free(&b->skills);
     sa_table_free(&b->lvup);
+    sa_table_free(&b->items);
     memset(b, 0, sizeof *b);
 }
 
@@ -153,7 +216,9 @@ static u32 rnd(Battle *b) {
 
 static int range(Battle *b, int lo, int hi) { return hi <= lo ? lo : lo + (int)(rnd(b) % (u32)(hi - lo + 1)); }
 
-static void add_enemy(Battle *b, Vfs *vfs, const char *key, int row, int cell) {
+static bool board_has(const Battle *b, int col) { return b->boardSize != 1 || (col >= 1 && col <= 3); }
+
+static void add_enemy(Battle *b, Vfs *vfs, const char *key, int row, int col) {
     if (b->count >= BATTLE_FIGHTERS) return;
     int r = row_by_text(&b->party->units, 1, key);
     if (r < 0) return;
@@ -163,12 +228,12 @@ static void add_enemy(Battle *b, Vfs *vfs, const char *key, int row, int cell) {
     f->id = sa_table_int(&b->party->units, r, 0);
     f->level = sa_table_int(&b->party->units, r, 17);
     f->gridRow = row;
-    f->gridCell = cell;
+    f->gridCell = col;
     fighter_stats(b, f);
     f->hp = f->maxHp;
     f->mp = f->maxMp;
     f->sprite = sprite_for(vfs, sa_table_int(&b->party->units, r, 11), true);
-    f->cells = f->sprite ? sa_sprite_filled_cells(f->sprite) : 0;
+    f->frames = f->sprite ? sa_sprite_split(f->sprite, f->frame, SPRITE_FRAMES) : 0;
 }
 
 static void pick_from_list(Battle *b, const char *list, char *out, size_t size) {
@@ -185,28 +250,28 @@ static void pick_from_list(Battle *b, const char *list, char *out, size_t size) 
 }
 
 static void place_group(Battle *b, Vfs *vfs, int g) {
-    bool random = !strcmp(text_of(&b->groups, g, 7), "ランダム") && sa_table_int(&b->groups, g, 8) < 0;
-    for (int row = 0; row < 3; row++) {
-        int base = 18 + row * 8;
-        if (!random) {
-            for (int c = 0; c < 6; c++) {
-                const char *k = text_of(&b->groups, g, base + c);
-                if (*k && strcmp(k, "*")) add_enemy(b, vfs, k, row, c);
-            }
-            continue;
+    for (int i = 0; i < GRID_ROWS; i++) {
+        int base = 18 + i * 8, row = GRID_ROWS - 1 - i;
+        bool used[GRID_COLS] = {false};
+        for (int c = 0; c < GRID_COLS; c++) {
+            const char *k = text_of(&b->groups, g, base + c);
+            if (!*k || !strcmp(k, "*")) continue;
+            add_enemy(b, vfs, k, row, c);
+            used[c] = true;
         }
         const char *list = text_of(&b->groups, g, base + 5);
         if (!*list || !strcmp(list, "*")) continue;
         int n = range(b, sa_table_int(&b->groups, g, base + 6), sa_table_int(&b->groups, g, base + 7));
-        bool used[3] = {false, false, false};
-        for (int i = 0; i < n && i < 3; i++) {
-            int c;
-            do c = (int)(rnd(b) % 3);
-            while (used[c]);
+        for (int j = 0; j < n; j++) {
+            int avail[GRID_COLS], count = 0;
+            for (int c = 0; c < GRID_COLS; c++)
+                if (!used[c] && board_has(b, c)) avail[count++] = c;
+            if (!count) break;
+            int c = avail[rnd(b) % (u32)count];
             used[c] = true;
             char key[64];
             pick_from_list(b, list, key, sizeof key);
-            add_enemy(b, vfs, key, row, c * 2 + (row & 1));
+            add_enemy(b, vfs, key, row, c);
         }
     }
 }
@@ -222,19 +287,27 @@ bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdro
         f->row = sa_party_unit_row(b->party, b->party->unit[s]);
         f->id = b->party->unit[s];
         f->slot = s;
-        f->level = 1;
+        f->level = b->party->level[s] > 0 ? b->party->level[s] : 1;
         fighter_stats(b, f);
         f->hp = b->party->hp[s];
         f->mp = b->party->mp[s];
     }
+    b->group = g;
+    int size = sa_table_int(&b->groups, g, 17);
+    b->boardSize = size == 1 ? 1 : size == 2 ? 2 : 3;
+    b->gainResources = b->gainExp = 0;
+    b->gainItem[0] = 0;
     place_group(b, vfs, g);
     if (!b->board[0]) b->board[0] = sa_load_image(vfs, "m000bt1a.agf");
-    if (!b->board[1]) b->board[1] = sa_load_image(vfs, "m000bt2a.agf");
+    if (!b->board[b->boardSize]) b->board[b->boardSize] = sa_load_image(vfs, boards[b->boardSize].name);
     sa_image_free(b->back);
     b->back = backdrop ? sa_load_image(vfs, backdrop) : NULL;
     b->open = true;
     b->result = BATTLE_RUNNING;
     b->acting = false;
+    b->autoBattle = false;
+    b->picker = PICK_NONE;
+    b->hover = 0;
     b->round = 0;
     return true;
 }
@@ -262,25 +335,72 @@ static int count_side(Battle *b, bool enemy) {
     return n;
 }
 
-static int pick_target(Battle *b, bool enemySide, const bool *taken) {
-    int n = 0, list[BATTLE_FIGHTERS];
-    for (int i = 0; i < b->count; i++)
-        if (b->f[i].enemy == enemySide && alive(&b->f[i]) && !taken[i]) list[n++] = i;
+static bool in_area(Battle *b, const Fighter *f, int aim) {
+    if (f->enemy) {
+        int edge = -1;
+        for (int i = 0; i < b->count; i++) {
+            const Fighter *o = &b->f[i];
+            if (!o->enemy || !alive(o)) continue;
+            if (aim == AIM_RIGHTMOST && o->gridCell > edge) edge = o->gridCell;
+            if (aim == AIM_LEFTMOST && (edge < 0 || o->gridCell < edge)) edge = o->gridCell;
+        }
+        switch (aim) {
+        case AIM_FRONT: return f->gridRow == 2;
+        case AIM_MIDDLE: return f->gridRow == 1;
+        case AIM_BACK: return f->gridRow == 0;
+        case AIM_RIGHT: return f->gridCell >= 3;
+        case AIM_CENTRE: return f->gridCell == 2;
+        case AIM_LEFT: return f->gridCell <= 1;
+        case AIM_RIGHTMOST:
+        case AIM_LEFTMOST: return f->gridCell == edge;
+        default: return true;
+        }
+    }
+    int k = f->slot % 3;
+    switch (aim) {
+    case AIM_FRONT: return f->slot >= PARTY_FRONT;
+    case AIM_MIDDLE: return false;
+    case AIM_BACK: return f->slot < PARTY_FRONT;
+    case AIM_RIGHT:
+    case AIM_RIGHTMOST: return k == 2;
+    case AIM_CENTRE: return k == 1;
+    case AIM_LEFT:
+    case AIM_LEFTMOST: return k == 0;
+    default: return true;
+    }
+}
+
+static int candidates(Battle *b, bool enemySide, int aim, const bool *taken, int *list) {
+    int n = 0;
+    for (int pass = 0; pass < 2 && !n; pass++)
+        for (int i = 0; i < b->count; i++) {
+            Fighter *f = &b->f[i];
+            if (f->enemy != enemySide || !alive(f) || (taken && taken[i])) continue;
+            if (!pass && !in_area(b, f, aim)) continue;
+            list[n++] = i;
+        }
+    return n;
+}
+
+static int pick_target(Battle *b, bool enemySide, int aim, const bool *taken) {
+    int list[BATTLE_FIGHTERS];
+    int n = candidates(b, enemySide, aim, taken, list);
     return n ? list[rnd(b) % (u32)n] : -1;
 }
 
-static int most_hurt(Battle *b, bool enemySide) {
-    int best = -1;
-    for (int i = 0; i < b->count; i++) {
-        Fighter *f = &b->f[i];
-        if (f->enemy != enemySide || !alive(f) || f->maxHp <= 0) continue;
-        if (best < 0 || f->hp * b->f[best].maxHp < b->f[best].hp * f->maxHp) best = i;
+static int most_hurt(Battle *b, bool enemySide, int aim) {
+    int list[BATTLE_FIGHTERS], best = -1;
+    int n = candidates(b, enemySide, aim, NULL, list);
+    for (int j = 0; j < n; j++) {
+        Fighter *f = &b->f[list[j]];
+        if (f->maxHp <= 0) continue;
+        if (best < 0 || f->hp * b->f[best].maxHp < b->f[best].hp * f->maxHp) best = list[j];
     }
     return best;
 }
 
 static bool wounded(Battle *b, bool enemySide) {
-    int i = most_hurt(b, enemySide);
+    int i = most_hurt(b, enemySide, AIM_FREE);
     return i >= 0 && b->f[i].hp * 2 <= b->f[i].maxHp;
 }
 
@@ -289,22 +409,39 @@ static int skill_row(Battle *b, const char *name) {
     return r >= 0 ? r : row_by_text(&b->skills, 2, name);
 }
 
-static int choose_skill(Battle *b, Fighter *f) {
+static bool for_allies(Battle *b, int s) { return !strncmp(text_of(&b->skills, s, 15), "味", strlen("味")); }
+
+static bool supportive(Battle *b, int s) { return !strcmp(text_of(&b->skills, s, 14), "回復") || for_allies(b, s); }
+
+static int unit_skills(Battle *b, int unitRow, int *rows, int *weights) {
     const Table *u = &b->party->units;
-    int rows[8], weights[8], n = 0, total = 0;
+    int n = 0;
     for (int k = 0; k < 8; k++) {
-        const char *name = text_of(u, f->row, 41 + k * 3);
+        const char *name = text_of(u, unitRow, 41 + k * 3);
         if (!*name || !strcmp(name, "*")) continue;
         int r = skill_row(b, name);
-        if (r < 0 || sa_table_int(&b->skills, r, 13) > f->mp) continue;
-        int w = sa_table_int(u, f->row, 42 + k * 3);
-        if (w <= 0) w = 1;
+        if (r < 0) continue;
+        rows[n] = r;
+        weights[n++] = sa_table_int(u, unitRow, 42 + k * 3);
+    }
+    return n;
+}
+
+static int choose_skill(Battle *b, Fighter *f, int mode) {
+    int all[8], w[8], rows[8], weights[8], n = 0, total = 0;
+    int count = unit_skills(b, f->row, all, w);
+    for (int k = 0; k < count; k++) {
+        int r = all[k];
+        if (sa_table_int(&b->skills, r, 13) > f->mp) continue;
+        bool support = supportive(b, r);
+        if (mode == ORDER_ATTACK && support) continue;
+        if (mode == ORDER_SUPPORT && !support) continue;
         if (!strcmp(text_of(&b->skills, r, 14), "回復") && !wounded(b, f->enemy)) continue;
         rows[n] = r;
-        weights[n++] = w;
-        total += w;
+        weights[n] = w[k] > 0 ? w[k] : 1;
+        total += weights[n++];
     }
-    if (!n) return -1;
+    if (!n) return mode == ORDER_SUPPORT ? choose_skill(b, f, ORDER_FREE) : -1;
     int pick = (int)(rnd(b) % (u32)total);
     for (int i = 0; i < n; i++) {
         if (pick < weights[i]) return rows[i];
@@ -326,11 +463,8 @@ static int hits_of(const char *target) {
     return 1;
 }
 
-static void act(Battle *b, int who) {
+static void use_skill(Battle *b, int who, int s, int aim) {
     Fighter *f = &b->f[who];
-    if (!alive(f)) return;
-    int s = choose_skill(b, f);
-    if (s < 0) return;
     char line[128];
     snprintf(line, sizeof line, "の%s", text_of(&b->skills, s, 2));
     log_line(b, name_of(b, f), f->enemy, line, false);
@@ -339,7 +473,7 @@ static void act(Battle *b, int who) {
     const char *target = text_of(&b->skills, s, 15);
     int lo = sa_table_int(&b->skills, s, 17), hi = sa_table_int(&b->skills, s, 18);
     if (!strcmp(attribute, "回復")) {
-        int t = most_hurt(b, f->enemy);
+        int t = most_hurt(b, f->enemy, aim);
         if (t < 0) t = who;
         int heal = range(b, lo, hi);
         Fighter *tf = &b->f[t];
@@ -351,7 +485,7 @@ static void act(Battle *b, int who) {
     int hits = hits_of(target), landed = 0;
     bool taken[BATTLE_FIGHTERS] = {false};
     for (int h = 0; h < hits; h++) {
-        int t = pick_target(b, !f->enemy, taken);
+        int t = pick_target(b, !f->enemy, aim, taken);
         if (t < 0) break;
         taken[t] = true;
         Fighter *tf = &b->f[t];
@@ -363,18 +497,50 @@ static void act(Battle *b, int who) {
         bool phys = physical(attribute);
         int damage = range(b, lo, hi) + f->stat[phys ? STAT_ATTACK : STAT_MAGIC] - tf->stat[phys ? STAT_DEFENCE : STAT_RESIST];
         damage >>= landed++;
+        if (tf->guard) damage /= 2;
         if (damage < 1) damage = 1;
         tf->hp = tf->hp > damage ? tf->hp - damage : 0;
         snprintf(line, sizeof line, "に%dダメージ", damage);
         log_line(b, name_of(b, tf), tf->enemy, line, true);
-        if (!alive(tf)) log_line(b, name_of(b, tf), tf->enemy, "を倒した", false);
+        if (!alive(tf)) log_line(b, name_of(b, tf), tf->enemy, tf->enemy ? "を倒した" : "が倒された", false);
     }
+}
+
+static void act(Battle *b, int who) {
+    Fighter *f = &b->f[who];
+    if (!alive(f)) return;
+    if (f->enemy) {
+        int s = choose_skill(b, f, ORDER_FREE);
+        if (s >= 0) use_skill(b, who, s, AIM_FREE);
+        return;
+    }
+    const Order *o = &b->party->order[f->slot];
+    int s = -1;
+    switch (o->mode) {
+    case ORDER_FLEE:
+        log_line(b, name_of(b, f), false, "は逃走した", false);
+        b->result = BATTLE_FLED;
+        return;
+    case ORDER_DEFEND:
+        f->guard = true;
+        log_line(b, name_of(b, f), false, "は防御した", false);
+        return;
+    case ORDER_SWAP:
+    case ORDER_INTRUDE: return;
+    case ORDER_SKILL:
+        s = o->skill >= 0 && sa_table_int(&b->skills, o->skill, 13) <= f->mp ? o->skill : choose_skill(b, f, ORDER_FREE);
+        break;
+    default: s = choose_skill(b, f, o->mode); break;
+    }
+    if (s >= 0) use_skill(b, who, s, o->aim);
 }
 
 static void plan_round(Battle *b) {
     b->orderCount = 0;
-    for (int i = 0; i < b->count; i++)
+    for (int i = 0; i < b->count; i++) {
+        b->f[i].guard = false;
         if (alive(&b->f[i])) b->order[b->orderCount++] = i;
+    }
     for (int i = 0; i < b->orderCount; i++)
         for (int j = i + 1; j < b->orderCount; j++) {
             int a = b->order[i], c = b->order[j];
@@ -385,14 +551,71 @@ static void plan_round(Battle *b) {
             }
         }
     b->next = 0;
-    b->ms = 0;
+    b->ms = ACTION_MS;
     b->acting = true;
+    b->picker = PICK_NONE;
     b->round++;
 }
 
+static bool has_tag(const char *list, const char *tag) {
+    size_t n = strlen(tag);
+    for (const char *p = list; p; p = strchr(p, '|') ? strchr(p, '|') + 1 : NULL)
+        if (!strncmp(p, tag, n) && (p[n] == '|' || !p[n])) return true;
+    return false;
+}
+
+static void drop_item(Battle *b, const char *table) {
+    int total = 0;
+    for (int r = 0; r < b->items.rows; r++)
+        if (has_tag(text_of(&b->items, r, 30), table)) total += sa_table_int(&b->items, r, 31);
+    if (total <= 0) return;
+    int pick = (int)(rnd(b) % (u32)total);
+    for (int r = 0; r < b->items.rows; r++) {
+        if (!has_tag(text_of(&b->items, r, 30), table)) continue;
+        pick -= sa_table_int(&b->items, r, 31);
+        if (pick < 0) {
+            snprintf(b->gainItem, sizeof b->gainItem, "%s", text_of(&b->items, r, 1));
+            return;
+        }
+    }
+}
+
+int sa_battle_exp_needed(const Battle *b, int unitRow, int level) {
+    int r = row_by_text(&b->lvup, 1, text_of(&b->party->units, unitRow, 19));
+    int base = r >= 0 ? sa_table_int(&b->lvup, r, 2) : 0;
+    return base > 0 ? base * level : 0;
+}
+
+static void reward(Battle *b) {
+    const Table *g = &b->groups;
+    b->gainResources = range(b, sa_table_int(g, b->group, 63), sa_table_int(g, b->group, 64));
+    int sum = 0;
+    for (int i = 0; i < b->count; i++)
+        if (b->f[i].enemy) sum += sa_table_int(&b->party->units, b->f[i].row, 72);
+    b->gainExp = (sum * range(b, 110, 125) + 50) / 100;
+    b->gainItem[0] = 0;
+    if ((int)(rnd(b) % 100) < sa_table_int(g, b->group, 65)) drop_item(b, text_of(g, b->group, 67));
+    for (int i = 0; i < b->count; i++) {
+        Fighter *f = &b->f[i];
+        if (f->enemy || !alive(f)) continue;
+        int s = f->slot;
+        b->party->exp[s] += b->gainExp;
+        int need;
+        while ((need = sa_battle_exp_needed(b, f->row, b->party->level[s])) > 0 && b->party->exp[s] >= need) {
+            b->party->exp[s] -= need;
+            b->party->level[s]++;
+        }
+    }
+}
+
 static void finish_check(Battle *b) {
-    if (!count_side(b, true)) b->result = BATTLE_WON;
-    else if (!count_side(b, false)) b->result = BATTLE_LOST;
+    if (b->result == BATTLE_RUNNING) {
+        if (!count_side(b, true)) {
+            b->result = BATTLE_WON;
+            reward(b);
+        } else if (!count_side(b, false))
+            b->result = BATTLE_LOST;
+    }
     if (b->result != BATTLE_RUNNING) b->acting = false;
     for (int i = 0; i < b->count; i++)
         if (!b->f[i].enemy) {
@@ -404,7 +627,13 @@ static void finish_check(Battle *b) {
 bool sa_battle_tick(Battle *b, u32 ms) {
     b->animMs += ms;
     bool changed = b->animMs / PARTY_CELL_MS != (b->animMs - ms) / PARTY_CELL_MS;
-    if (!b->acting) return changed;
+    if (!b->acting) {
+        if (b->autoBattle && b->result == BATTLE_RUNNING) {
+            plan_round(b);
+            return true;
+        }
+        return changed;
+    }
     b->ms += ms;
     while (b->acting && b->ms >= ACTION_MS) {
         b->ms -= ACTION_MS;
@@ -419,20 +648,114 @@ bool sa_battle_tick(Battle *b, u32 ms) {
     return changed;
 }
 
+static bool inside(int x, int y, int rx, int ry, int w, int h) { return x >= rx && x < rx + w && y >= ry && y < ry + h; }
+
+static int label_x(int slot) { return (slot >= PARTY_FRONT ? FORWARD_X : BACKS_X) + SLOT_X + slot % 3 * SLOT_PITCH; }
+
+static int box_x(int slot) { return (slot >= PARTY_FRONT ? FORWARD_X : BACKS_X) + BOX_X + slot % 3 * SLOT_PITCH; }
+
+static int pick_x(const Battle *b) {
+    int x = box_x(b->pickSlot) + PICK_OFFSET;
+    return x + PICK_W > SA_W ? SA_W - PICK_W : x;
+}
+
+static int pick_top(const Battle *b) { return PICK_BOTTOM - b->pickCount * PICK_ROW; }
+
+static int first_aim(Battle *b, const Order *o) {
+    if (o->mode != ORDER_SKILL || o->skill < 0) return AIM_FREE;
+    return for_allies(b, o->skill) ? AIM_ALLY : AIM_ENEMY;
+}
+
+static void open_picker(Battle *b, int slot, int kind) {
+    b->picker = kind;
+    b->pickSlot = slot;
+    b->pickCount = 0;
+    if (kind == PICK_ACTION) {
+        int rows[8], weights[8];
+        int n = unit_skills(b, sa_party_unit_row(b->party, b->party->unit[slot]), rows, weights);
+        for (int i = 0; i < n; i++) b->pick[b->pickCount++] = (Order){ORDER_SKILL, rows[i], 0};
+        for (size_t i = 0; i < sizeof pickModes / sizeof pickModes[0]; i++) b->pick[b->pickCount++] = (Order){pickModes[i], -1, 0};
+        return;
+    }
+    b->pick[b->pickCount++] = (Order){0, -1, first_aim(b, &b->party->order[slot])};
+    for (size_t i = 0; i < sizeof pickAims / sizeof pickAims[0]; i++) b->pick[b->pickCount++] = (Order){0, -1, pickAims[i]};
+}
+
+static void choose(Battle *b, int i) {
+    Order *o = &b->party->order[b->pickSlot];
+    if (b->picker == PICK_ACTION) {
+        o->mode = b->pick[i].mode;
+        o->skill = b->pick[i].skill;
+        if (o->aim == AIM_FREE || o->aim == AIM_ENEMY || o->aim == AIM_ALLY) o->aim = first_aim(b, o);
+    } else
+        o->aim = b->pick[i].aim;
+    b->picker = PICK_NONE;
+}
+
+static void side_button(Battle *b, int i) {
+    Party *p = b->party;
+    for (int s = 0; s < PARTY_SLOTS; s++) {
+        if (!p->unit[s]) continue;
+        Order *o = &p->order[s];
+        if (i == 0 || i == 1) {
+            o->mode = i ? ORDER_FLEE : ORDER_FREE;
+            o->skill = -1;
+            if (o->aim == AIM_ENEMY || o->aim == AIM_ALLY) o->aim = AIM_FREE;
+        } else if (i >= 8)
+            o->aim = i == 8 ? first_aim(b, o) : i == 9 ? AIM_FRONT : i == 10 ? AIM_MIDDLE : AIM_BACK;
+    }
+    if (i >= 2 && i <= 4) {
+        memcpy(p->preset[i - 2], p->order, sizeof p->order);
+        p->presetSaved[i - 2] = true;
+    }
+    if (i >= 5 && i <= 7 && p->presetSaved[i - 5]) memcpy(p->order, p->preset[i - 5], sizeof p->order);
+}
+
+static int hit(Battle *b, int x, int y) {
+    if (b->result != BATTLE_RUNNING) return 0;
+    if (b->picker) {
+        int px = pick_x(b), top = pick_top(b);
+        for (int i = 0; i < b->pickCount; i++)
+            if (inside(x, y, px, top + i * PICK_ROW, PICK_W, PICK_ROW)) return HOVER_PICK + i;
+        return 0;
+    }
+    if (b->acting) return 0;
+    if (inside(x, y, START_X, START_Y, START_W, START_H)) return HOVER_START;
+    if (inside(x, y, AUTO_X, TOGGLE_Y, TOGGLE_W, TOGGLE_H)) return HOVER_AUTO;
+    if (inside(x, y, GAUGE_X, TOGGLE_Y, TOGGLE_W, TOGGLE_H)) return HOVER_GAUGE;
+    for (int i = 0; i < 12; i++)
+        if (inside(x, y, SIDE_X, sideY[i], SIDE_W, SIDE_H)) return HOVER_SIDE + i;
+    for (int s = 0; s < PARTY_SLOTS; s++) {
+        if (!b->party->unit[s]) continue;
+        if (inside(x, y, label_x(s), LABEL_Y, LABEL_W, LABEL_H)) return HOVER_LABEL + s * 2;
+        if (inside(x, y, label_x(s), TARGET_Y, LABEL_W, LABEL_H)) return HOVER_LABEL + s * 2 + 1;
+    }
+    return 0;
+}
+
 int sa_battle_click(Battle *b, int x, int y) {
     if (b->result != BATTLE_RUNNING) {
         b->open = false;
         return b->result;
     }
-    if (!b->acting && x >= START_X && x < START_X + START_W && y >= START_Y && y < START_Y + START_H) {
-        plan_round(b);
-        b->ms = ACTION_MS;
+    int h = hit(b, x, y);
+    if (b->picker) {
+        if (h >= HOVER_PICK) choose(b, h - HOVER_PICK);
+        else b->picker = PICK_NONE;
+        return BATTLE_RUNNING;
     }
+    if (h == HOVER_AUTO) b->autoBattle = !b->autoBattle;
+    else if (h == HOVER_GAUGE) b->gaugeMode = (b->gaugeMode + 1) % 3;
+    else if (h == HOVER_START) plan_round(b);
+    else if (h >= HOVER_LABEL) open_picker(b, (h - HOVER_LABEL) / 2, (h - HOVER_LABEL) % 2 ? PICK_TARGET : PICK_ACTION);
+    else if (h >= HOVER_SIDE) side_button(b, h - HOVER_SIDE);
     return BATTLE_RUNNING;
 }
 
+void sa_battle_cancel(Battle *b) { b->picker = PICK_NONE; }
+
 bool sa_battle_hover(Battle *b, int x, int y) {
-    int h = !b->acting && x >= START_X && x < START_X + START_W && y >= START_Y && y < START_Y + START_H ? 0 : -1;
+    int h = hit(b, x, y);
     if (h == b->hover) return false;
     b->hover = h;
     return true;
@@ -440,8 +763,8 @@ bool sa_battle_hover(Battle *b, int x, int y) {
 
 static void tile_center(const Fighter *f, int *x, int *y) {
     if (f->enemy) {
-        *x = ENEMY_CX + f->gridCell * HALF_X / 2 + f->gridRow * ROW_X;
-        *y = ENEMY_CY + f->gridCell * HALF_Y / 2 + f->gridRow * ROW_Y;
+        *x = GRID_X + f->gridCell * STEP_X + f->gridRow * ROW_X;
+        *y = GRID_Y + f->gridCell * STEP_Y + f->gridRow * ROW_Y;
         return;
     }
     sa_party_tile_center(f->slot, PARTY_BOARD_X, PARTY_BOARD_Y, x, y);
@@ -450,23 +773,30 @@ static void tile_center(const Fighter *f, int *x, int *y) {
 static void draw_fighter(Battle *b, u32 *fb, Fighter *f) {
     if (!alive(f)) return;
     const Image *im = f->enemy ? f->sprite : b->party->sprite[f->slot];
-    int cells = f->enemy ? f->cells : b->party->cells[f->slot];
     if (!im) return;
-    int cols, rows;
-    sa_sprite_layout(im, &cols, &rows);
-    int cw = im->w / cols, ch = im->h / rows;
-    int cell = cells > 0 ? (int)(b->animMs / PARTY_CELL_MS % (u32)cells) : 0;
+    SpriteFrame fr;
+    if (f->enemy) {
+        if (!f->frames) return;
+        fr = f->frame[b->animMs / PARTY_CELL_MS % (u32)f->frames];
+    } else {
+        int cols, rows, cells = b->party->cells[f->slot];
+        sa_sprite_layout(im, &cols, &rows);
+        int cw = im->w / cols, ch = im->h / rows;
+        int cell = cells > 0 ? (int)(b->animMs / PARTY_CELL_MS % (u32)cells) : 0;
+        fr = (SpriteFrame){cell % cols * cw, cell / cols * ch, cw, ch};
+    }
     int cx, cy;
     tile_center(f, &cx, &cy);
-    int x = cx - cw / 2, y = cy + 17 - ch;
-    sa_blit_rect(fb, im, cell % cols * cw, cell / cols * ch, cw, ch, x, y);
-    sa_party_draw_bars(b->party, fb, x + cw / 2 - 22, y, f->hp, f->maxHp, f->mp, f->maxMp);
+    int x = cx - fr.w / 2, y = cy + 17 - fr.h;
+    sa_blit_rect(fb, im, fr.x, fr.y, fr.w, fr.h, x, y);
+    if (b->gaugeMode == 0 || (b->gaugeMode == 2 && b->acting)) sa_party_draw_bars(b->party, fb, cx - 22, y, f->hp, f->maxHp, f->mp, f->maxMp);
 }
 
 static void draw_log(Battle *b, u32 *fb) {
     sa_blit_rect(fb, b->art[ART_LOG], 0, 0, b->art[ART_LOG] ? b->art[ART_LOG]->w : 0, 450, LOG_X, LOG_Y);
     int first = b->logCount > LOG_LINES ? b->logCount - LOG_LINES : 0;
     sa_font_set_spacing(0);
+    sa_font_set_plain(true);
     for (int i = first; i < b->logCount; i++) {
         BattleLine *l = &b->log[i];
         int y = LOG_TEXT_Y + (i - first) * LOG_PITCH;
@@ -478,26 +808,54 @@ static void draw_log(Battle *b, u32 *fb) {
             q += sa_utf8_decode(q, &cp);
         }
         u32 nameColor = l->enemy ? 0xff0000u : 0x0000ffu;
-        sa_text_draw(fb, SA_W, SA_H, l->text, nameLen, x, y, LOG_SIZE, nameColor, NO_EDGE);
-        x += sa_text_width(l->text, nameLen, LOG_SIZE);
+        x += sa_text_draw(fb, SA_W, SA_H, l->text, nameLen, x, y, LOG_SIZE, nameColor, NO_EDGE);
         sa_text_draw(fb, SA_W, SA_H, tab + 1, -1, x, y, LOG_SIZE, 0x000000, NO_EDGE);
     }
+    sa_font_set_plain(false);
     sa_font_set_spacing(1);
 }
 
+static int icon_of(Battle *b, int skill) {
+    const char *a = text_of(&b->skills, skill, 14);
+    for (size_t i = 0; i < sizeof iconOrder / sizeof iconOrder[0]; i++)
+        if (!strncmp(a, iconOrder[i], strlen(iconOrder[i]))) return (int)i;
+    return 3;
+}
+
+static void draw_skill_button(Battle *b, u32 *fb, int skill, int x, int y, bool lit) {
+    sa_blit_rect(fb, b->art[ART_NONE_ACTION], 0, lit ? LABEL_H : 0, LABEL_W, LABEL_H, x, y);
+    sa_blit_rect(fb, b->art[ART_ICONS], 0, icon_of(b, skill) * ICON, ICON, ICON, x - 1, y - 1);
+    const char *name = text_of(&b->skills, skill, 2);
+    sa_font_set_spacing(4);
+    int w = sa_text_width(name, -1, SKILL_SIZE);
+    sa_text_draw(fb, SA_W, SA_H, name, -1, x + (LABEL_W - w) / 2, y + 4, SKILL_SIZE, 0xffffff, 0x000000);
+    sa_font_set_spacing(1);
+    char n[8];
+    snprintf(n, sizeof n, "%d", sa_table_int(&b->skills, skill, 13));
+    sa_text_draw(fb, SA_W, SA_H, n, -1, x + LABEL_W - 4 - sa_text_width(n, -1, 14), y + 3, 14, 0xc0c0c0, NO_EDGE);
+}
+
+static void draw_order(Battle *b, u32 *fb, const Order *o, int x, int y, bool lit) {
+    if (o->mode == ORDER_SKILL && o->skill >= 0) draw_skill_button(b, fb, o->skill, x, y, lit);
+    else sa_blit_rect(fb, b->art[ART_MODE0 + o->mode], 0, lit ? LABEL_H : 0, LABEL_W, LABEL_H, x, y);
+}
+
 static void draw_slot(Battle *b, u32 *fb, int slot) {
-    int panelX = slot >= PARTY_FRONT ? FORWARD_X : BACKS_X;
-    int x = panelX + SLOT_X + slot % 3 * SLOT_PITCH;
+    int x = label_x(slot);
     const Fighter *f = NULL;
     for (int i = 0; i < b->count; i++)
         if (!b->f[i].enemy && b->f[i].slot == slot) f = &b->f[i];
-    sa_blit(fb, b->art[ART_SLOT], panelX + BOX_X + slot % 3 * SLOT_PITCH, BOX_Y);
+    sa_blit(fb, b->art[ART_SLOT], box_x(slot), BOX_Y);
     if (!f) {
-        sa_blit_rect(fb, b->art[ART_NONE_ACTION], 0, 0, 148, 20, x, LABEL_Y);
+        sa_blit_rect(fb, b->art[ART_NONE_ACTION], 0, 0, LABEL_W, LABEL_H, x, LABEL_Y);
         return;
     }
-    sa_blit_rect(fb, b->art[ART_ACTION], 0, 0, 148, 20, x, LABEL_Y);
-    sa_blit_rect(fb, b->art[ART_TARGET], 0, 0, 148, 20, x, TARGET_Y);
+    const Order *o = &b->party->order[slot];
+    bool running = b->result == BATTLE_RUNNING && !b->acting;
+    bool litAction = running && (b->hover == HOVER_LABEL + slot * 2 || (b->picker == PICK_ACTION && b->pickSlot == slot));
+    bool litTarget = running && (b->hover == HOVER_LABEL + slot * 2 + 1 || (b->picker == PICK_TARGET && b->pickSlot == slot));
+    draw_order(b, fb, o, x, LABEL_Y, litAction);
+    sa_blit_rect(fb, b->art[ART_AIM0 + o->aim], 0, litTarget ? LABEL_H : 0, LABEL_W, LABEL_H, x, TARGET_Y);
     int hpw = f->maxHp > 0 ? f->hp * 100 / f->maxHp : 0, mpw = f->maxMp > 0 ? f->mp * 100 / f->maxMp : 0;
     int band = f->hp * 2 > f->maxHp ? (f->hp == f->maxHp ? 0 : 1) : 2;
     sa_blit_rect(fb, b->art[ART_HP], 0, band * 7, hpw, 7, x + HP_X, HP_Y);
@@ -507,37 +865,115 @@ static void draw_slot(Battle *b, u32 *fb, int slot) {
     sa_text_draw(fb, SA_W, SA_H, n, -1, x + 148 - sa_text_width(n, -1, 15), HP_Y - 17, 15, 0x503720, NO_EDGE);
     snprintf(n, sizeof n, "%d/%d", f->mp, f->maxMp);
     sa_text_draw(fb, SA_W, SA_H, n, -1, x + 148 - sa_text_width(n, -1, 15), MP_Y - 17, 15, 0x503720, NO_EDGE);
-    const char *name = name_of(b, f);
-    sa_text_draw(fb, SA_W, SA_H, name, -1, x + 28, 690, 16, 0xffffff, 0x000000);
+    int need = sa_battle_exp_needed(b, f->row, b->party->level[slot]);
+    int expw = need > 0 ? b->party->exp[slot] * EXP_W / need : 0;
+    sa_blit_rect(fb, b->art[ART_EXP], 0, 0, expw > EXP_W ? EXP_W : expw, 7, x + HP_X, EXP_Y);
+    snprintf(n, sizeof n, "%d", f->level);
+    sa_text_draw(fb, SA_W, SA_H, n, -1, x + LV_RIGHT - sa_text_width(n, -1, 15), LV_Y, 15, 0x503720, NO_EDGE);
+    sa_text_draw(fb, SA_W, SA_H, name_of(b, f), -1, x + 28, 690, 16, 0xffffff, 0x000000);
+}
+
+static void draw_picker(Battle *b, u32 *fb) {
+    int x = pick_x(b), top = pick_top(b);
+    bool action = b->picker == PICK_ACTION;
+    sa_blit(fb, b->art[action ? ART_ACT_HEAD : ART_AIM_HEAD], x, top - PICK_HEAD);
+    for (int i = 0; i < b->pickCount; i++) {
+        int y = top + i * PICK_ROW;
+        bool lit = b->hover == HOVER_PICK + i;
+        sa_blit(fb, b->art[action ? ART_ACT_ROW : ART_AIM_ROW], x, y);
+        if (action) draw_order(b, fb, &b->pick[i], x + PICK_INSET_X, y + PICK_INSET_Y, lit);
+        else
+            sa_blit_rect(fb, b->art[ART_AIM0 + b->pick[i].aim], 0, lit ? LABEL_H : 0, LABEL_W, LABEL_H, x + PICK_INSET_X,
+                         y + PICK_INSET_Y);
+    }
+    sa_blit(fb, b->art[action ? ART_ACT_BOTTOM : ART_AIM_BOTTOM], x, PICK_BOTTOM);
+}
+
+static int aim_shown(const Battle *b) {
+    if (b->picker != PICK_TARGET) return -1;
+    if (b->hover >= HOVER_PICK && b->hover < HOVER_PICK + b->pickCount) return b->pick[b->hover - HOVER_PICK].aim;
+    return b->party->order[b->pickSlot].aim;
+}
+
+static void draw_board(Battle *b, u32 *fb) {
+    int aim = aim_shown(b);
+    bool allySide = b->picker == PICK_TARGET && first_aim(b, &b->party->order[b->pickSlot]) == AIM_ALLY;
+    bool ordering = b->result == BATTLE_RUNNING && !b->acting;
+    int frames[PARTY_SLOTS];
+    for (int s = 0; s < PARTY_SLOTS; s++) {
+        Fighter probe = {.slot = s};
+        if (!ordering) frames[s] = TILE_PLAIN;
+        else if (b->picker == PICK_TARGET) frames[s] = allySide && in_area(b, &probe, aim) ? TILE_YELLOW : TILE_PLAIN;
+        else if (b->picker == PICK_ACTION && b->pickSlot == s) frames[s] = TILE_YELLOW;
+        else frames[s] = TILE_BLUE;
+    }
+    sa_blit(fb, b->board[b->boardSize], boards[b->boardSize].x, boards[b->boardSize].y);
+    sa_blit(fb, b->board[0], PARTY_BOARD_X, PARTY_BOARD_Y);
+    sa_party_draw_tiles(b->party, fb, PARTY_BOARD_X, PARTY_BOARD_Y, frames);
+    for (int r = 0; r < GRID_ROWS; r++)
+        for (int c = 0; c < GRID_COLS; c++) {
+            if (!board_has(b, c)) continue;
+            Fighter probe = {.enemy = true, .gridRow = r, .gridCell = c};
+            int cx, cy;
+            tile_center(&probe, &cx, &cy);
+            bool lit = ordering && aim >= 0 && !allySide && in_area(b, &probe, aim);
+            sa_party_draw_tile(b->party, fb, cx, cy, lit ? TILE_YELLOW : TILE_PLAIN);
+        }
+    int order[BATTLE_FIGHTERS], ys[BATTLE_FIGHTERS];
+    for (int i = 0; i < b->count; i++) {
+        int cx;
+        tile_center(&b->f[i], &cx, &ys[i]);
+        order[i] = i;
+    }
+    for (int i = 1; i < b->count; i++)
+        for (int j = i; j > 0 && ys[order[j]] < ys[order[j - 1]]; j--) {
+            int t = order[j];
+            order[j] = order[j - 1];
+            order[j - 1] = t;
+        }
+    for (int i = 0; i < b->count; i++) draw_fighter(b, fb, &b->f[order[i]]);
+}
+
+static bool side_lit(const Battle *b, int i) {
+    if (i > 1) return false;
+    int mode = i ? ORDER_FLEE : ORDER_FREE;
+    bool any = false;
+    for (int s = 0; s < PARTY_SLOTS; s++) {
+        if (!b->party->unit[s]) continue;
+        if (b->party->order[s].mode != mode) return false;
+        any = true;
+    }
+    return any;
 }
 
 void sa_battle_draw(Battle *b, u32 *fb) {
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
     if (b->back) sa_blit(fb, b->back, 0, 0);
-    sa_blit(fb, b->board[1], ENEMY_BOARD_X, ENEMY_BOARD_Y);
-    sa_blit(fb, b->board[0], PARTY_BOARD_X, PARTY_BOARD_Y);
-    sa_party_draw_tiles(b->party, fb, PARTY_BOARD_X, PARTY_BOARD_Y);
-    for (int r = 0; r < 3; r++)
-        for (int c = r & 1; c < 6; c += 2) {
-            Fighter probe = {.enemy = true, .gridRow = r, .gridCell = c};
-            int cx, cy;
-            tile_center(&probe, &cx, &cy);
-            sa_party_draw_tile(b->party, fb, cx, cy);
-        }
-    for (int depth = 0; depth < 16; depth++)
-        for (int i = 0; i < b->count; i++) {
-            Fighter *f = &b->f[i];
-            int d = f->enemy ? f->gridRow * 2 + f->gridCell / 2 : 8 + f->slot % 3 + (f->slot >= PARTY_FRONT ? 0 : 3);
-            if (d == depth) draw_fighter(b, fb, f);
-        }
+    draw_board(b, fb);
     sa_blit_rect(fb, b->art[ART_BAR], 0, 0, 448, 28, 10, 10);
-    for (int i = 0; i < 12; i++) sa_blit_rect(fb, b->art[ART_SIDE0 + i], 0, 0, 100, 19, SIDE_X, sideY[i]);
+    for (int i = 0; i < 12; i++)
+        sa_blit_rect(fb, b->art[ART_SIDE0 + i], 0, b->hover == HOVER_SIDE + i || side_lit(b, i) ? SIDE_H : 0, SIDE_W, SIDE_H, SIDE_X,
+                     sideY[i]);
     sa_blit(fb, b->art[ART_BACKS], BACKS_X, PANEL_Y);
     sa_blit(fb, b->art[ART_FORWARD], FORWARD_X, PANEL_Y);
     for (int s = 0; s < PARTY_SLOTS; s++) draw_slot(b, fb, s);
     if (b->result == BATTLE_RUNNING && !b->acting)
-        sa_blit_rect(fb, b->art[ART_START], 0, b->hover == 0 ? START_H : 0, START_W, START_H, START_X, START_Y);
-    sa_blit_rect(fb, b->art[ART_AUTO], 0, 0, 104, 29, 706, 510);
-    sa_blit_rect(fb, b->art[ART_GAUGE], 0, 0, 104, 29, 998, 510);
+        sa_blit_rect(fb, b->art[ART_START], 0, b->hover == HOVER_START ? START_H : 0, START_W, START_H, START_X, START_Y);
+    if (b->result == BATTLE_RUNNING)
+        sa_blit_rect(fb, b->art[ART_AUTO], b->autoBattle ? TOGGLE_W : 0, b->hover == HOVER_AUTO ? TOGGLE_H : 0, TOGGLE_W, TOGGLE_H,
+                     AUTO_X, TOGGLE_Y);
+    static const int gaugeArt[3] = {ART_GAUGE, ART_GAUGE_OFF, ART_GAUGE_VARY};
+    sa_blit_rect(fb, b->art[gaugeArt[b->gaugeMode]], 0, b->hover == HOVER_GAUGE ? TOGGLE_H : 0, TOGGLE_W, TOGGLE_H, GAUGE_X, TOGGLE_Y);
     draw_log(b, fb);
+    if (b->picker) draw_picker(b, fb);
+    if (b->result == BATTLE_RUNNING) return;
+    sa_dim(fb);
+    if (b->result != BATTLE_WON) return;
+    char *lines[3];
+    int n = 0;
+    lines[n++] = sa_fmt(POP_GREEN "資源" POP_WHITE "を" POP_GREEN "%d材" POP_WHITE "手に入れた", b->gainResources);
+    lines[n++] = sa_fmt(POP_YELLOW "%dP" POP_WHITE "の経験値を獲得した", b->gainExp);
+    if (b->gainItem[0]) lines[n++] = sa_fmt(POP_YELLOW "%s" POP_WHITE "を手に入れた", b->gainItem);
+    sa_popup_draw(b->pop, fb, (const char *const *)lines, n);
+    for (int i = 0; i < n; i++) free(lines[i]);
 }

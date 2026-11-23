@@ -114,17 +114,22 @@ static int ascent(int size) {
 }
 
 static int spacing;
+static bool plain;
 
 void sa_font_set_spacing(int px) { spacing = px; }
 
-int sa_char_width(u32 cp, int size) { return glyph(cp, size)->adv + spacing + (font.embolden ? 1 : 0); }
+void sa_font_set_plain(bool on) { plain = on; }
+
+static int bold(void) { return font.embolden && !plain ? 1 : 0; }
+
+int sa_char_width(u32 cp, int size) { return glyph(cp, size)->adv + spacing + bold(); }
 
 int sa_text_width(const char *s, int n, int size) {
     int w = 0;
     for (int i = 0; *s && (n < 0 || i < n); i++) {
         u32 cp;
         s += sa_utf8_decode(s, &cp);
-        w += glyph(cp, size)->adv + spacing;
+        w += glyph(cp, size)->adv + spacing + bold();
     }
     return w;
 }
@@ -137,7 +142,9 @@ static void put_glyph(u32 *dst, int dw, int dh, const Glyph *g, int x, int y, u3
         for (int i = 0; i < g->w; i++) {
             int px = x + i;
             if (px < 0 || px >= dw) continue;
-            u32 a = g->bm[(size_t)j * g->w + i] * ca / 255;
+            u32 a = g->bm[(size_t)j * g->w + i];
+            if (plain) a = a >= 100 ? 255 : 0;
+            a = a * ca / 255;
             if (!a) continue;
             u32 *d = &dst[(size_t)py * dw + px];
             u32 ia = 255 - a;
@@ -165,13 +172,13 @@ int sa_text_draw(u32 *dst, int dw, int dh, const char *s, int n, int x, int y, i
                 for (int oy = -e; oy <= e; oy++)
                     for (int ox = -e; ox <= e; ox++)
                         if (ox || oy) put_glyph(dst, dw, dh, g, gx + ox, gy + oy, ed);
-            if (edge != 0xffffffffu && font.embolden)
+            if (edge != 0xffffffffu && bold())
                 for (int oy = -e; oy <= e; oy++)
                     if (oy) put_glyph(dst, dw, dh, g, gx + e + 1, gy + oy, ed);
             put_glyph(dst, dw, dh, g, gx, gy, fg);
-            if (font.embolden) put_glyph(dst, dw, dh, g, gx + 1, gy, fg);
+            if (bold()) put_glyph(dst, dw, dh, g, gx + 1, gy, fg);
         }
-        cx += g->adv + spacing + (font.embolden ? 1 : 0);
+        cx += g->adv + spacing + bold();
     }
     return cx - x;
 }

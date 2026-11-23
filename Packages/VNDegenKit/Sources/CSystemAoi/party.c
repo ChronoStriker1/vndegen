@@ -11,6 +11,7 @@ enum {
     STEP_Y = 29,
     TILE_CX = 74,
     TILE_CY = 110,
+    TILE_H = 150,
     RESERVE_X = -16,
     RESERVE_Y = 588,
     RESERVE_SLOTS = 5,
@@ -54,9 +55,8 @@ bool sa_party_init(Party *p, Vfs *vfs) {
     if (!sa_table_load(&p->units, vfs, "unit.obj")) return false;
     p->platform = sa_load_image(vfs, "m996bt1a.agf");
     Image *tiles = sa_load_image(vfs, "mfloor01.agf");
-    p->tile = crop(tiles, 0, 150);
-    p->smallTile = half_size(tiles, 0, 150);
-    sa_image_free(tiles);
+    p->tile = tiles;
+    p->smallTile = half_size(tiles, 0, TILE_H);
     p->gaugeFrame = sa_load_image(vfs, "bat_o00.agf");
     Image *hp = sa_load_image(vfs, "bat_o01.agf");
     p->hpGauge = crop(hp, 0, 3);
@@ -125,6 +125,9 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
     }
     p->hp[slot] = sa_table_int(&p->units, r, 23);
     p->mp[slot] = sa_table_int(&p->units, r, 24);
+    p->level[slot] = 1;
+    p->exp[slot] = 0;
+    p->order[slot] = (Order){ORDER_FREE, -1, AIM_FREE};
     char name[24];
     snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&p->units, r, 11));
     p->sprite[slot] = sa_load_image(vfs, name);
@@ -158,15 +161,17 @@ void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y) {
     *y += TILE_CY;
 }
 
-void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy) { sa_blit(fb, p->tile, cx - TILE_CX, cy - TILE_CY); }
+void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy, int frame) {
+    if (p->tile) sa_blit_rect(fb, p->tile, 0, frame * TILE_H, p->tile->w, TILE_H, cx - TILE_CX, cy - TILE_CY);
+}
 
-void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY) {
+void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY, const int *frames) {
     for (int k = 0; k < RESERVE_SLOTS; k++)
         sa_blit(fb, p->smallTile, boardX - PLATFORM_X + RESERVE_X + k * STEP_X / 2, boardY - PLATFORM_Y + RESERVE_Y + k * STEP_Y / 2);
     for (int s = 0; s < PARTY_SLOTS; s++) {
         int x, y;
         slot_tile(s, boardX, boardY, &x, &y);
-        sa_blit(fb, p->tile, x, y);
+        sa_party_draw_tile(p, fb, x + TILE_CX, y + TILE_CY, frames ? frames[s] : 0);
     }
 }
 
@@ -194,7 +199,7 @@ void sa_party_draw_bars(Party *p, u32 *fb, int x, int y, int hp, int maxHp, int 
 
 void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit) {
     sa_blit(fb, p->platform, PLATFORM_X, PLATFORM_Y);
-    sa_party_draw_tiles(p, fb, PLATFORM_X, PLATFORM_Y);
+    sa_party_draw_tiles(p, fb, PLATFORM_X, PLATFORM_Y, NULL);
     for (int k = 0; k < 3; k++)
         for (int row = 0; row < 2; row++) {
             int s = row ? PARTY_FRONT + k : k;
@@ -218,4 +223,29 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit) {
     for (int i = 0; i < len; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, 0, 10, 13, COUNT_RIGHT - (len - i) * 10, DIGIT_Y);
     snprintf(n, sizeof n, "%d", rankLimit);
     for (int i = 0; n[i]; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, 0, 10, 13, LIMIT_X + i * 10, DIGIT_Y);
+}
+
+int sa_sprite_split(const Image *im, SpriteFrame *out, int max) {
+    int bands = im->h % 2 == 0 ? 2 : 1, bh = im->h / bands, n = 0;
+    for (int b = 0; b < bands; b++) {
+        int runs[SPRITE_FRAMES][2], count = 0, start = -1;
+        for (int x = 0; x <= im->w; x++) {
+            bool solid = false;
+            for (int y = b * bh; x < im->w && y < (b + 1) * bh && !solid; y++) solid = (im->px[(size_t)y * im->w + x] >> 24) > 128;
+            if (solid && start < 0) start = x;
+            if (!solid && start >= 0) {
+                if (count < SPRITE_FRAMES) {
+                    runs[count][0] = start;
+                    runs[count++][1] = x;
+                }
+                start = -1;
+            }
+        }
+        for (int i = 0; i < count && n < max; i++) {
+            int left = i ? (runs[i - 1][1] + runs[i][0]) / 2 : 0;
+            int right = i + 1 < count ? (runs[i][1] + runs[i + 1][0]) / 2 : im->w;
+            out[n++] = (SpriteFrame){left, b * bh, right - left, bh};
+        }
+    }
+    return n;
 }
