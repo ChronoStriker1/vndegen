@@ -104,11 +104,11 @@ static void expr(IK *t, const u8 *a, int n) {
 static bool compare(int op, i32 a, i32 b) {
     switch (op) {
     case 0: return a == b;
-    case 1: return a != b;
+    case 1: return a < b;
     case 2: return a <= b;
     case 3: return a > b;
     case 4: return a >= b;
-    case 5: return a < b;
+    case 5: return a != b;
     default: return false;
     }
 }
@@ -147,6 +147,13 @@ static Button *button(IK *t, u32 id) {
 
 void image_load(IK *t, int slot, const char *name) {
     if (slot < 0 || slot >= t->imageCount) return;
+    for (int i = 0; t->images[slot] && i < t->layerCount; i++) {
+        Layer *l = &t->layers[i];
+        if (l->made && l->ready && !l->surf && l->img == slot && l->rot == 0) {
+            layer_surface(t, l);
+            l->kept = true;
+        }
+    }
     image_free(t->images[slot]);
     t->images[slot] = NULL;
     snprintf(t->imageNames[slot], sizeof t->imageNames[slot], "%s", name);
@@ -263,6 +270,18 @@ static const char *name_arg(const u8 *a, int n) {
     }
     buf[k] = 0;
     return buf;
+}
+
+static const char *bgm_name(IK *t, const u8 *a, int n) {
+    const char *f = name_arg(a, n < 12 ? n : 12), *p = strchr(f, '%');
+    if (!p) return f;
+    const char *q = p + 1;
+    int w = 0;
+    while (*q >= '0' && *q <= '9') w = w * 10 + (*q++ - '0');
+    if (!*q) return f;
+    static char out[64];
+    snprintf(out, sizeof out, "%.*s%0*d%s", (int)(p - f), f, w, t->varCount ? (int)t->vars[0] : 0, q + 1);
+    return out;
 }
 
 static void exec(IK *t, u16 op, const u8 *a, int n) {
@@ -429,6 +448,11 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     case 0x0207:
         if ((l = layer(t, rd32(a)))) {
+            if (l->kept) {
+                image_free(l->surf);
+                l->surf = NULL;
+                l->kept = false;
+            }
             l->img = (int)ik_value(t, rd32(a + 4));
             l->sx = (int)ik_value(t, rd32(a + 8));
             l->sy = (int)ik_value(t, rd32(a + 12));
@@ -439,6 +463,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             l->ready = true;
             image_free(l->surf);
             l->surf = NULL;
+            l->kept = false;
         }
         break;
     case 0x0209:
@@ -550,7 +575,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     case 0x0506: snd_voice(t, name_arg(a, n)); break;
     case 0x0507: snd_voice_stop(t); break;
     case 0x0508: t->wait = W_VOICE; break;
-    case 0x0600: snd_bgm(t, name_arg(a, n < 12 ? n : 12), n >= 16 && ik_value(t, rd32(a + 12)) != 0); break;
+    case 0x0600: snd_bgm(t, bgm_name(t, a, n), n >= 16 && ik_value(t, rd32(a + 12)) != 0); break;
     case 0x0602: snd_bgm_fade(t, (int)ik_value(t, rd32(a))); break;
     case 0x020b:
         if ((l = layer(t, rd32(a)))) {

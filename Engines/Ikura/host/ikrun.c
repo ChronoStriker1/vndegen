@@ -167,7 +167,11 @@ int main(int argc, char **argv) {
         } else if (sscanf(c, "prefer:%d", &k) == 1) {
             if (preferCount < 256) prefer[preferCount++] = k;
         } else if (sscanf(c, "auto:%d,%d,%d", &k, &x, &y) == 3) alive = autoplay(n, k, x, y, argv[3]);
-        else if (sscanf(c, "var:%d", &k) == 1) printf("var%d=%d\n", k, k < ((IK *)n)->varCount ? ((IK *)n)->vars[k] : 0);
+        else if (sscanf(c, "load:%d", &k) == 1) {
+            uint8_t slot[4] = {(uint8_t)k, (uint8_t)(k >> 8), 0, 0};
+            save_exec((IK *)n, 0x0a07, slot, 4);
+            alive = run(n, 32);
+        } else if (sscanf(c, "var:%d", &k) == 1) printf("var%d=%d\n", k, k < ((IK *)n)->varCount ? ((IK *)n)->vars[k] : 0);
         else if (!strcmp(c, "state")) print_state((IK *)n);
         else if (!strcmp(c, "layers")) {
             IK *t = (IK *)n;

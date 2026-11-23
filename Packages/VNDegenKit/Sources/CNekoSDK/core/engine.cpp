@@ -47,7 +47,10 @@ constexpr int kLogDim = 182;
 // Eight cards to a page and ten pages of saves, and then the Q-Save page.
 
 // Scripts name a voice `voice\\x.ogg`, or in places in Test Game 84 just `x`, which plays all the same on the PC.
-static std::string voicePath(const std::string &name) { return name.find('\\') == std::string::npos ? "voice\\" + name + ".ogg" : name; }
+static std::string voicePath(const std::string &name) {
+    if (name.find('\\') != std::string::npos) return name;
+    return "voice\\" + name + (name.find('.') == std::string::npos ? ".ogg" : "");
+}
 constexpr int kCountEdgeR = 200, kCountEdgeG = 30, kCountEdgeB = 30;
 // cfg.sav's tables of what's been unlocked: a row of ints for each CG, a picture to an int, and an int for each track.
 // They sit after a string at byte 44020, so they move with its length.
@@ -1271,9 +1274,9 @@ void Engine::loadGalleries() {
         globalMacros_ = lists.global;
         scenarioMacros_ = lists.scenario;
     }
-    auto lines = [&](const char *path) {
+    auto lines = [&](const std::string &path) {
         std::vector<std::string> out;
-        Bytes data = files_.read(path);
+        Bytes data = path.rfind("base:", 0) == 0 ? files_.readBase(path.substr(5)) : files_.read(path);
         if (!data) return out;
         for (const std::string &raw : split(sjis::toUtf8(std::string(data->begin(), data->end())), '\n')) {
             std::string line = trim(raw.substr(0, raw.find("//")));
@@ -1294,8 +1297,16 @@ void Engine::loadGalleries() {
         }
         return out;
     };
+    auto listFiles = [&](const char *key, const char *otherwise) {
+        auto defaults = screens_.find("defaults");
+        const auto *named = defaults == screens_.end() ? nullptr : defaults->second.setting(key);
+        std::vector<std::string> files;
+        for (const std::string &file : named ? *named : std::vector<std::string>{otherwise})
+            for (const std::string &line : lines(file)) files.push_back(line);
+        return files;
+    };
     // `#p page thumbnail 0 bgm flow`, then `0,n,picture` lines, then `##`.
-    for (const std::string &line : lines("cfg\\cg_view.ini")) {
+    for (const std::string &line : listFiles("cglists", "cfg\\cg_view.ini")) {
         auto f = fields(line);
         if (f.empty()) continue;
         if (f[0] == "#p" && f.size() >= 3) {
@@ -1354,7 +1365,7 @@ void Engine::loadGalleries() {
     // Test Game 90's lines are `TAB THUMB STEP NUMBER SCRIPT`, five fields: the script read unlocks the scene, and its
     // replay plays that script alone and comes back (set 1, by a file trace under Wine). STEP is -1 on every line there
     // and NUMBER counts up by tab, and neither changes anything set 1 could see.
-    for (const std::string &line : lines("cfg\\play_view.ini")) {
+    for (const std::string &line : listFiles("scenelists", "cfg\\play_view.ini")) {
         auto f = fields(line);
         if (f.size() == 5 && normalizedPath(f[4]).find(".txt") != std::string::npos) {
             GalleryEntry e;

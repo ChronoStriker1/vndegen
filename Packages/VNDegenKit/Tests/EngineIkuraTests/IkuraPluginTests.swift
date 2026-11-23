@@ -196,6 +196,72 @@ import VNCore
         #expect(order == expected)
     }
 
+    @Test func conditionCodesCompareAsThePCDoes() throws {
+        var ops = raidy2Sizes + [(0x0a00, Self.name("TEST.SAV") + Self.u32(50))]
+        var labels = [Int]()
+        var k = 0
+        for (lhs, rhs) in [(1, 2), (2, 2), (3, 2)] {
+            for code in 0..<6 {
+                ops.append((0x0401, Self.u32(100 + k) + Self.u32(0)))
+                ops.append((0x0407, Self.u32(lhs) + [UInt8(code)] + Self.u32(rhs) + [0] + Self.u16(labels.count) + [0xff]))
+                ops.append((0x0004, Self.u16(labels.count + 1)))
+                labels += [ops.count, ops.count + 1]
+                ops.append((0x0401, Self.u32(100 + k) + Self.u32(1)))
+                k += 1
+            }
+        }
+        ops += [(0x0a05, Self.u32(8) + Self.u32(112) + Self.u32(84)), (0x0a06, Self.u32(3)), (0x0706, [])]
+        let root = try makeGame(Self.script(ops, labels: labels))
+        let engine = try #require(run(root, frames: 4))
+        vnikura_close(engine)
+        let data = try [UInt8](Data(contentsOf: root.appending(path: "TEST.SAV")))
+        let state = Self.read(data, 0x14 + 4 * 3) + 0x6f54
+        let results = (0..<18).map { Self.read(data, state + 0xa5 + 4 * (100 + $0)) }
+        let expected = [0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1]
+        #expect(results == expected)
+    }
+
+    @Test func aShownLineIsMarkedReadInTheSaveFile() throws {
+        let text: [UInt8] = [0x03, 0x04, 0x00, 0xff] + Self.u16(1) + [0x41, 0x02, 0x00]
+        let start = Self.script(raidy2Sizes + [
+            (0x0a00, Self.name("TEST.SAV") + Self.u32(50)),
+            (0x0a0b, []),
+            (0x090a, Self.u32(2)),
+            (0x0908, Self.u32(10) + text),
+        ])
+        let root = try makeGame(start)
+        var file = Self.u32(50) + Self.u32(0xdc) + Self.u32(0x1dc) + Self.u32(0x25d)
+        file += [UInt8](repeating: 0, count: 0x25d - file.count) + Self.u32(10) + Self.u32(1280) + [UInt8](repeating: 0, count: 1280)
+        try Data(file).write(to: root.appending(path: "TEST.SAV"))
+        let engine = try #require(run(root, frames: 4))
+        vnikura_close(engine)
+        let data = try [UInt8](Data(contentsOf: root.appending(path: "TEST.SAV")))
+        let marks = Array(data[0x265..<0x265 + 1280])
+        var expected = [UInt8](repeating: 0, count: 1280)
+        expected[2 * 128 + 1] = 0x20
+        #expect(marks == expected)
+    }
+
+    @Test func closingTheGameWritesWhatItsQuitScriptWrites() throws {
+        let start = Self.script(raidySizes + [
+            (0x0a00, Self.name("TEST.SAV") + Self.u32(50)),
+            (0x0a04, []),
+            (0x0301, Self.u32(513)),
+            (0x0706, []),
+        ])
+        let close = Self.script([(0x0a03, Self.u32(512) + Self.u32(8) + Self.u32(496) + Self.u32(1)), (0x0000, [])])
+        let root = TestFolders.root.appending(path: "ikura-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Self.archive([("START.SNR", start), ("CLOSE.SNR", close)]).write(to: root.appending(path: "SNR"))
+        try Self.archive([("BLANK.GGP", [0])]).write(to: root.appending(path: "GRP"))
+        let engine = try #require(run(root, frames: 4))
+        vnikura_close(engine)
+        let data = try [UInt8](Data(contentsOf: root.appending(path: "TEST.SAV")))
+        let global = Array(data[0xdc..<0xdc + 21])
+        let expected: [UInt8] = Self.u32(512) + Self.u32(8) + Self.u32(496) + Self.u32(1) + [0x02] + Self.u32(0)
+        #expect(global == expected)
+    }
+
     @Test func equipmentStatsMatchTheOriginal() throws {
         let (data, state) = try savedState([
             (0x0401, Self.u32(154) + Self.u32(7)), (0x0401, Self.u32(150) + Self.u32(3)), (0x0401, Self.u32(162) + Self.u32(3)),

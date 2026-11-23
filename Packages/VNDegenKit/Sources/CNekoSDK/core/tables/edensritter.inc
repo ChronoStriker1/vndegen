@@ -188,8 +188,8 @@ button music obj\d004_000.bmp 754 502 9 5 5 help obj\d005_000.bmp 0 666 1 10 0 5
 button manual obj\d004_000.bmp 347 560 9 5 6 help obj\d005_000.bmp 0 666 1 10 0 6
 button config obj\d004_000.bmp 549 560 9 5 7 help obj\d005_000.bmp 0 666 1 10 0 7
 button quit obj\d004_000.bmp 754 560 9 5 8 help obj\d005_000.bmp 0 666 1 10 0 8
-button flowkey:BangaiFlow obj\d200_000.bmp 1164 440 1 5 0 help obj\d200_001.bmp 0 666 1 1 0 0
-button flowkey:ExFlow obj\d300_000.bmp 1164 532 1 5 0 help obj\d300_001.bmp 0 666 1 1 0 0
+button flowkey:ExFlow obj\d200_000.bmp 1164 440 1 5 0 help obj\d200_001.bmp 0 666 1 1 0 0
+button flowkey:BangaiFlow obj\d300_000.bmp 1164 532 1 5 0 help obj\d300_001.bmp 0 666 1 1 0 0
 button versioninfo obj\d008_000.bmp 1114 6 1 5 0 help obj\d008_001.bmp 0 666 1 1 0 0
 
 screen config
@@ -340,6 +340,8 @@ hover 519 528 990 580 obj\j004_004.bmp 664 683 8 6
 hover 519 580 990 660 obj\j004_004.bmp 664 683 8 7
 
 screen defaults
+cglists base:cfg\cg_view.ini sys_1\cfg\cg_view.ini cfg\cg_view_bangai.ini
+scenelists base:cfg\play_view.ini sys_1\cfg\play_view.ini cfg\play_view_bangai.ini
 titlebgmheard
 inneralways
 textcomment
@@ -362,6 +364,23 @@ default voice 100
 default backvoice 100
 
 screen cg
+viewer obj\l000_000.bmp 628 565
+viewerhelp obj\l004_000.bmp 933 683 11
+viewerbutton hide obj\l001_000.bmp 1240 575 help 0
+viewerbutton zoomout obj\l003_000.bmp 645 640 3 0 help 8
+viewerbutton zoomreset obj\l003_000.bmp 681 640 3 1 help 9
+viewerbutton zoomin obj\l003_000.bmp 717 640 3 2 help 10
+viewerbutton replay obj\l001_001.bmp 762 639 7 0 help 1
+viewerbutton prevcg obj\l001_001.bmp 822 639 7 1 help 2
+viewerbutton prevvar obj\l001_001.bmp 877 639 7 2 help 3
+viewerbutton nextvar obj\l001_001.bmp 1022 639 7 3 help 4
+viewerbutton nextcg obj\l001_001.bmp 1077 639 7 4 help 5
+viewerbutton auto obj\l001_001.bmp 1137 639 7 5 help 6
+viewerbutton return obj\l001_001.bmp 1198 639 7 6 help 7
+viewernumber zoom obj\l002_000.bmp 683 611 13 1
+viewernumber zoomfrac obj\l002_001.bmp 706 613 11 2
+viewernumber index obj\l002_000.bmp 946 630 13 2
+viewernumber total obj\l002_001.bmp 986 648 11 2
 selectedlook
 pic obj\e000_000.bmp 0 0
 pic obj\e000_001.bmp 0 0
@@ -392,6 +411,7 @@ cell 882 436
 celllabel obj\e006_001.bmp 16 15
 celldigits obj\e006_000.bmp 50 10 3 18
 gallerytabs 0
+cellhide
 button page0 obj\e001_000.bmp 534 626 11 5 0
 button page1 obj\e001_000.bmp 590 626 11 5 1
 button page2 obj\e001_000.bmp 646 626 11 5 2
@@ -440,6 +460,7 @@ cell 882 436
 celllabel obj\e006_001.bmp 16 15
 celldigits obj\e006_000.bmp 50 10 3 18
 gallerytabs 0
+cellhide
 button page0 obj\e001_000.bmp 534 626 11 5 0
 button page1 obj\e001_000.bmp 590 626 11 5 1
 button page2 obj\e001_000.bmp 646 626 11 5 2
@@ -689,6 +710,23 @@ check voice5 obj\j019_000.bmp 827 619 7 5 5
 check voice6 obj\j019_000.bmp 951 619 7 5 6
 
 screen cg
+viewer obj\l000_000.bmp 628 565
+viewerhelp obj\l004_000.bmp 933 683 11
+viewerbutton hide obj\l001_000.bmp 1240 575 help 0
+viewerbutton zoomout obj\l003_000.bmp 645 640 3 0 help 8
+viewerbutton zoomreset obj\l003_000.bmp 681 640 3 1 help 9
+viewerbutton zoomin obj\l003_000.bmp 717 640 3 2 help 10
+viewerbutton replay obj\l001_001.bmp 762 639 7 0 help 1
+viewerbutton prevcg obj\l001_001.bmp 822 639 7 1 help 2
+viewerbutton prevvar obj\l001_001.bmp 877 639 7 2 help 3
+viewerbutton nextvar obj\l001_001.bmp 1022 639 7 3 help 4
+viewerbutton nextcg obj\l001_001.bmp 1077 639 7 4 help 5
+viewerbutton auto obj\l001_001.bmp 1137 639 7 5 help 6
+viewerbutton return obj\l001_001.bmp 1198 639 7 6 help 7
+viewernumber zoom obj\l002_000.bmp 683 611 13 1
+viewernumber zoomfrac obj\l002_001.bmp 706 613 11 2
+viewernumber index obj\l002_000.bmp 946 630 13 2
+viewernumber total obj\l002_001.bmp 986 648 11 2
 selectedlook
 pic obj\f010_000.bmp 0 0
 pic obj\f004_001.bmp 0 0 alpha 80 tab 0
@@ -717,6 +755,7 @@ cell 882 436
 celllabel obj\e006_001.bmp 16 15
 celldigits obj\e006_000.bmp 50 10 3 18
 gallerytabs 0
+cellhide
 button page0 obj\e001_000.bmp 534 626 11 5 0
 button page1 obj\e001_000.bmp 590 626 11 5 1
 button page2 obj\e001_000.bmp 646 626 11 5 2
@@ -763,6 +802,7 @@ cell 882 436
 celllabel obj\e006_001.bmp 16 15
 celldigits obj\e006_000.bmp 50 10 3 18
 gallerytabs 0
+cellhide
 button page0 obj\e001_000.bmp 534 626 11 5 0
 button page1 obj\e001_000.bmp 590 626 11 5 1
 button page2 obj\e001_000.bmp 646 626 11 5 2

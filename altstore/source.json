@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.59.7",
+          "buildVersion": "3150",
+          "date": "2026-11-23T02:04:17Z",
+          "localizedDescription": "Lightning Warrior Raidy II keeps read marks and changes its music, and Eden's Ritter's CG viewer and galleries are complete.\n\n## Downloads\n\n- `VNDegen-0.59.7-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.59.7.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.59.7-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **Ikura GDL:** Lightning Warrior Raidy II keeps read marks as the PC does, so Skip set to Read Only stops at new text, and Nonstop works.\n- **Ikura GDL:** Raidy II's music changes as the story asks. Before, the first track kept playing.\n- **Ikura GDL:** Raidy II's opening shows its logo over the desert.\n- **Ikura GDL:** gallery unlocks and the ending's clear flag are kept when you leave through VNDegen's menu.\n- **Ikura GDL:** comparisons in scripts work as on the PC, in Raidy and Raidy II.\n- **NekoSDK:** the CG viewer in Eden's Ritter 1 and 1_2 has its control panel.\n- **NekoSDK:** Eden's Ritter 1's galleries and scene lists include the Extra Story and side-story entries, Extra Story 1 and 2 start the right stories, and five side-story pictures now show.\n- **NekoSDK:** Eden's Ritter 1_2 plays a voice line that was missing.\n\n## Known limits\n\n- NekoSDK: particles (command 150) and Eden's Ritter 1_2's title mist aren't drawn.\n\n## What wasn't tested\n\n- No physical device was used. These were checked in the Linux test build, the Mac app and an iPad simulator, and against the PC versions under Wine.\n- Raidy II's later floors weren't played by hand. All 135 of its story scripts were run in the test build, and its ending plays through to the title.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.59.7/VNDegen-0.59.7.ipa",
+          "size": 132342326,
+          "sha256": "abb46487581977e8134c132d3f357f62e9e07f5d4d18323f6520fc209a23b0f3",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.59.6",
           "buildVersion": "3130",
           "date": "2026-11-23T01:12:27Z",

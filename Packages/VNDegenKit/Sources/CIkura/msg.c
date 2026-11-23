@@ -5,6 +5,8 @@
 
 static int val(IK *t, const u8 *p) { return (int)ik_value(t, rd32(p)); }
 
+static bool skipping(IK *t) { return t->skipMode && !(t->msg.unread && t->settings[1]); }
+
 static u32 abgr(IK *t, const u8 *p) {
     u32 a = (u32)clampi(val(t, p), 0, 255), b = (u32)clampi(val(t, p + 4), 0, 255), g = (u32)clampi(val(t, p + 8), 0, 255),
         r = (u32)clampi(val(t, p + 12), 0, 255);
@@ -141,7 +143,7 @@ static void run_tags(IK *t) {
         }
         case 0x13:
             if (left < 13) goto bad;
-            if (!t->skipMode) {
+            if (!skipping(t)) {
                 char name[13];
                 memcpy(name, p + 1, 12);
                 name[12] = 0;
@@ -184,11 +186,11 @@ void msg_stop_modes(IK *t) {
 void msg_tick(IK *t) {
     MsgWin *m = &t->msg;
     if (t->wait != W_MSG || !m->tags) return;
-    if ((t->skipMode || t->autoMode) && (t->click || t->rclick)) {
+    if ((skipping(t) || t->autoMode) && (t->click || t->rclick)) {
         msg_stop_modes(t);
         t->click = false;
     }
-    if (t->skipMode && m->revealed < m->count) {
+    if (skipping(t) && m->revealed < m->count) {
         m->revealed = m->count;
         t->dirty = true;
     }
@@ -209,7 +211,7 @@ void msg_tick(IK *t) {
     if (m->cursor) {
         if ((t->now - m->cursorAt) / CURSOR_MS != (t->now - 17 - m->cursorAt) / CURSOR_MS) t->dirty = true;
         bool go = t->click;
-        if (t->skipMode) go = true;
+        if (skipping(t)) go = true;
         else if (t->autoMode && !snd_voice_playing(t)) {
             if (!t->autoAt) t->autoAt = t->now + (u32)clampi(t->settings[3], 0, 1000) * 2u;
             go = (i32)(t->now - t->autoAt) >= 0;
@@ -334,6 +336,7 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
         m->tagLen = n - 4;
         m->tagPos = 0;
         m->cursor = false;
+        m->unread = t->sc && save_read_mark(t, t->sc->readSlot, rd32(a));
         t->wait = W_MSG;
         run_tags(t);
         break;
