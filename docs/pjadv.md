@@ -49,8 +49,9 @@ A game folder holds the exe, `archive.dat` (the scenario, its text, the resource
 - A VNDegen addition: in the minigame the mouse wheel cycles tools, forward and back, so a controller doesn't have to
   reach the tool button. The original changes tools only with that button.
 - Saves are the PC's own `save/syssave.dat` (the script's global variables, which hold the options) and
-  `save/syssvpo.dat` (the cleared stages and their times), written when a stage is cleared and on quit, and they load
-  both ways. The game has no save slots; `savedata.dat` stays empty.
+  `save/syssvpo.dat` (the cleared stages and their times), written when a stage is cleared and, when the options or
+  other globals changed, when the game ends, whether by its own EXIT or by Quit to library, and they load both ways.
+  The game has no save slots; `savedata.dat` stays empty.
 
 ## Known limits
 

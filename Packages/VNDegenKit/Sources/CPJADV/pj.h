@@ -362,5 +362,6 @@ void pj_stage_record(PJ *p, int chapter, int stage, int seconds);
 
 bool pj_save_load(PJ *p);
 bool pj_save_store(PJ *p);
+bool pj_save_store_if_changed(PJ *p);
 
 #endif
