@@ -491,3 +491,6 @@ the same points (offsets in bytes, numbers little-endian):
   (60 and 35: 20 plus the 光耐性 of column 33, inferred) and -50 at +152, ルーアルテ's 25 at +172, her thirteen 2s at
   +260 of the second block, the position bonuses, and Darkus's 3 at +1284 (turn 9 on). The original loads such a
   file with the right members, places, stats, abilities and skills.
+- **Dungeon saves.** Measured: an image with C004/C005 at 62/2 (in a dungeon) but nothing in the dungeon-only
+  regions (the 36 bytes before the members, 215,608 to 231,104, the scene data after 998,288 and 52 bytes from
+  1,009,560) crashes the original as soon as its load screen lists it. With 6/1 it lists and loads it into the town.

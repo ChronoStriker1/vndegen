@@ -52,7 +52,6 @@ enum {
     FREE_COUNT = 30,
     PLACE_VAR = 4,
     PLACE_TOWN = 6,
-    PLACE_DUNGEON = 62,
     SEED_VAR = 6,
     DUNGEON_VAR = 70,
 };
@@ -187,7 +186,7 @@ bool sa_pcsave_read(SA *s, const char *path) {
     s->town.stage = s->vm.c[C_TOWN_STAGE];
     read_members(s, img);
     read_maps(s, img);
-    s->exp.active = s->vm.c[PLACE_VAR + 1] == 2;
+    s->exp.active = s->vm.c[DUNGEON_VAR] > 0 && s->vm.c[DUNGEON_VAR + 1] > 0;
     s->exp.dungeon = s->vm.c[DUNGEON_VAR];
     s->exp.floor = s->vm.c[DUNGEON_VAR + 1];
     Party *p = &s->party;
@@ -353,8 +352,8 @@ bool sa_pcsave_write(SA *s, const char *path) {
     for (int i = 0; i < PC_C_VARS; i++) put(img, VM_AT + (size_t)i * 4, s->vm.c[i]);
     memcpy(img + VM_AT + PC_C_VARS * 4, s->vm.f, PC_F_VARS);
     for (size_t i = 0; i < sizeof engineVars / sizeof engineVars[0]; i++) put(img, VM_AT + (size_t)engineVars[i].off * 4, engineVars[i].value);
-    put(img, VM_AT + PLACE_VAR * 4, s->exp.active ? PLACE_DUNGEON : PLACE_TOWN);
-    put(img, VM_AT + (PLACE_VAR + 1) * 4, s->exp.active ? 2 : 1);
+    put(img, VM_AT + PLACE_VAR * 4, PLACE_TOWN);
+    put(img, VM_AT + (PLACE_VAR + 1) * 4, 1);
     if (!s->vm.c[SEED_VAR]) put(img, VM_AT + SEED_VAR * 4, (int)(sa_vm_random(&s->vm) & 0x7fffffff));
     size_t n;
     u8 *packed = vnsystemaoi_pack(img, IMAGE_SIZE, &n);
@@ -384,7 +383,7 @@ bool sa_pcsave_summary(SA *s, const char *path, SaveSummary *out) {
     for (int i = 0; i < 4; i++) out->town[i] = (int)rd32(c + (C_RESIDENTS + i) * 4);
     out->level = at(img, MEMBER_AT + MEMBER_LEVEL);
     const char *dungeon = NULL, *floor = NULL;
-    if (rd32(c + (PLACE_VAR + 1) * 4) == 2) sa_exp_names(s, (int)rd32(c + 70 * 4), (int)rd32(c + 71 * 4), &dungeon, &floor);
+    if ((int)rd32(c + DUNGEON_VAR * 4) > 0) sa_exp_names(s, (int)rd32(c + DUNGEON_VAR * 4), (int)rd32(c + (DUNGEON_VAR + 1) * 4), &dungeon, &floor);
     snprintf(out->place[0], sizeof out->place[0], "%s", dungeon ? dungeon : "街");
     snprintf(out->place[1], sizeof out->place[1], "%s", floor ? floor : "");
     int weapon = at(img, MEMBER_AT + MEMBER_EQUIP);

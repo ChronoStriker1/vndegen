@@ -106,6 +106,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
 - Saves: members are written with their stats, abilities, skills and places, but not yet their race resistances
   or the bonuses their abilities give where they stand; reserve-tile places come back as unplaced. A floor's
-  battle state and the event history after the town grid aren't mapped yet, so a save carrying them opens in the
-  original without them. The save comment box takes no text; the comment stays empty. The Option screen and the Extra menu aren't built yet.
+  battle state and the event history after the town grid aren't mapped yet. The original crashed listing a dungeon
+  autosave written without the battle state, so VNDegen writes its dungeon autosaves as town saves for the original
+  (it opens them in the town); VNDegen itself still resumes them on their floor. The save comment box takes no text; the comment stays empty. The Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.
