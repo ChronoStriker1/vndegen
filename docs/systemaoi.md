@@ -83,10 +83,11 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   game's hooks run on entering, on stepping onto floor objects and walls, before and after battles and on the way
   home. Battles start from the dungeon; a loss ends the expedition, and walking out the exit brings the finds home.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
-  autosave panel, the slot's summary, and the original's YES and NO confirmation. A save holds the whole runtime state
-  (variables, town, party, reserve, items, orders and the explored maps) in VNDegen's own format,
-  `vndegen/slotNN.sav` in the save folder; entering a dungeon autosaves to the next of ten autosave slots, as the
-  original does. Loading puts the game back in the town.
+  newest autosave in its panel, the hovered slot's summary or the current game (現在) beside it, and the original's
+  YES and NO confirmation. A save holds the whole runtime state (variables, town, party, reserve, items, orders, the
+  explored maps and the expedition) in VNDegen's own format, `vndegen/slotNN.sav` in the save folder. As in the
+  original, the game autosaves at the start of each turn and on entering each dungeon floor, through ten slots in
+  turn; a dungeon autosave loads back onto its floor, any other save into the town.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
   FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
 
@@ -98,5 +99,5 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
 - Saves are VNDegen's own format; reading and writing the original's `Bunny3.sav` files isn't built yet. The
-  DATA LOG screen's summary panel shows only the slot's number. The Option screen and the Extra menu aren't built yet.
+  summary of a hovered slot uses the 現在 layout, which the original wasn't seen to show for a filled slot. The Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.

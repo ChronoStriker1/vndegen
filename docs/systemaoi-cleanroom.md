@@ -350,7 +350,16 @@ calls it is inferred from that and from play, and marked so.
   and `sav_d00` to `d09` (save) from (288, 376), 80 apart; 戻る `sav_a05` at (1094, 376); the slot rows `sav_c00` to
   `c09` and `sav_e00` to `e09` (600 by 50) at x 35 and 645 from y 437, 55 apart. Choosing a slot halves the screen and
   asks with YES `pop_b00` at (440, 382) and NO `pop_b01` at (640, 382).
-- **Autosaves.** Measured: the original writes `Bunny3A0.dat` to `A9.dat` in turn, each when a dungeon is entered.
+- **Panels.** Measured: the autosave panel shows NoA and the slot, the autosave's running count at the right, the date,
+  the turn, the place (街, or the dungeon and floor names on two lines), the four town numbers and Darkus's level, in
+  a bold face 14 pixels high, 20 apart from (55, 48). The panel beside it shows 現在, the game in progress (the turn
+  and place, the town numbers, and Darkus's level and weapon), in a bold face 24 apart from (310, 50); at the title
+  it shows NoData. Hovering an empty slot shows its number and NoData.
+- **Autosaves.** Measured: `Bunny3A0.dat` to `A9.dat` hold a running count, and the count modulo ten picks the file
+  (count 36 in `A6`, 41 in `A1`); the panel shows the highest count. The original autosaves on entering each floor
+  (the place reads 千樹庭 / 中央森, then 中央森の東) and in the town (9ターン 街 after an expedition). Inferred: the town
+  autosave comes at the start of each turn. Loading a floor's autosave puts the party back on that floor with its
+  explored map; loading a town autosave puts the game in the town.
 - **The original's files.** Measured from saves written under Wine: a header of five 32-bit numbers (the unpacked
   size, 1,128,076 for a save and 30,784 for the options; the file size; the unpacked size again; 0; the packed size),
   a tag byte (0x82 for saves, 0x81 for the options), a 256-entry table of byte frequencies, and an entropy-coded body.

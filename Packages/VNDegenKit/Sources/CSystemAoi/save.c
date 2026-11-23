@@ -2,7 +2,8 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 1u
+#define SAVE_VERSION 2u
+#define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
     u8 *d;
@@ -56,18 +57,51 @@ static void get_ints(Reader *r, int *v, size_t count) {
 
 static char *slot_path(const SA *s, int slot) { return sa_fmt("%s/vndegen/slot%02d.sav", s->saveDir, slot); }
 
-static void write_summary(Writer *w, const SA *s) {
-    put32(w, (u32)time(NULL));
-    put32(w, (u32)s->vm.c[C_TURN]);
-    for (int i = 0; i < 4; i++) put32(w, (u32)s->vm.c[C_RESIDENTS + i]);
-    put32(w, (u32)(s->party.level[PARTY_FRONT + 1] ? s->party.level[PARTY_FRONT + 1] : 1));
+static void copy_name(char *out, const char *name) { snprintf(out, 48, "%s", name ? name : ""); }
+
+void sa_save_current(SA *s, SaveSummary *out) {
+    memset(out, 0, sizeof *out);
+    out->used = true;
+    out->time = (u32)time(NULL);
+    out->turn = s->vm.c[C_TURN];
+    for (int i = 0; i < 4; i++) out->town[i] = s->vm.c[C_RESIDENTS + i];
+    out->level = s->party.level[LEADER] ? s->party.level[LEADER] : 1;
+    const char *dungeon, *floor;
+    sa_exp_place_names(s, &dungeon, &floor);
+    copy_name(out->place[0], dungeon ? dungeon : "街");
+    copy_name(out->place[1], floor);
+    for (int i = 0; s->party.equip[LEADER] && i < s->equip.items.rows; i++)
+        if (sa_table_int(&s->equip.items, i, 0) == s->party.equip[LEADER]) copy_name(out->weapon, sa_table_text(&s->equip.items, i, 1));
 }
 
-bool sa_save_write(SA *s, int slot) {
+static void write_summary(Writer *w, SA *s, int count) {
+    SaveSummary m;
+    sa_save_current(s, &m);
+    put32(w, m.time);
+    put32(w, (u32)m.turn);
+    put_ints(w, m.town, 4);
+    put32(w, (u32)m.level);
+    put32(w, (u32)count);
+    put(w, m.place, sizeof m.place);
+    put(w, m.weapon, sizeof m.weapon);
+}
+
+static void read_summary(Reader *r, SaveSummary *out) {
+    out->time = get32(r);
+    out->turn = (int)get32(r);
+    get_ints(r, out->town, 4);
+    out->level = (int)get32(r);
+    out->count = (int)get32(r);
+    get(r, out->place, sizeof out->place);
+    get(r, out->weapon, sizeof out->weapon);
+    out->place[0][47] = out->place[1][47] = out->weapon[47] = 0;
+}
+
+bool sa_save_write(SA *s, int slot, int count) {
     Writer w = {0};
     put32(&w, SAVE_MAGIC);
     put32(&w, SAVE_VERSION);
-    write_summary(&w, s);
+    write_summary(&w, s, count);
     put_ints(&w, s->vm.c, SA_C_VARS);
     put(&w, s->vm.f, SA_F_VARS);
     put(&w, s->vm.g, SA_G_VARS);
@@ -105,6 +139,8 @@ bool sa_save_write(SA *s, int slot) {
         put_ints(&w, b->trained, 10);
     }
     put(&w, s->exp.explored, sizeof(*s->exp.explored) * EXP_DUNGEONS);
+    const int exp[3] = {s->exp.active, s->exp.dungeon, s->exp.floor};
+    put_ints(&w, exp, 3);
     char *dir = sa_fmt("%s/vndegen", s->saveDir);
     sa_mkdirs(dir);
     free(dir);
@@ -128,10 +164,7 @@ bool sa_save_summary(SA *s, int slot, SaveSummary *out) {
     Reader r = {d, n, 0, false};
     bool ok = get32(&r) == SAVE_MAGIC && get32(&r) == SAVE_VERSION;
     if (ok) {
-        out->time = get32(&r);
-        out->turn = (int)get32(&r);
-        for (int i = 0; i < 4; i++) out->town[i] = (int)get32(&r);
-        out->level = (int)get32(&r);
+        read_summary(&r, out);
         out->used = !r.bad;
     }
     free(d);
@@ -149,7 +182,8 @@ bool sa_save_read(SA *s, int slot) {
         free(d);
         return false;
     }
-    for (int i = 0; i < 7; i++) get32(&r);
+    SaveSummary skip;
+    read_summary(&r, &skip);
     get_ints(&r, s->vm.c, SA_C_VARS);
     get(&r, s->vm.f, SA_F_VARS);
     get(&r, s->vm.g, SA_G_VARS);
@@ -193,6 +227,11 @@ bool sa_save_read(SA *s, int slot) {
         get_ints(&r, b->trained, 10);
     }
     get(&r, s->exp.explored, sizeof(*s->exp.explored) * EXP_DUNGEONS);
+    int exp[3];
+    get_ints(&r, exp, 3);
+    s->exp.active = exp[0] != 0;
+    s->exp.dungeon = exp[1];
+    s->exp.floor = exp[2];
     free(d);
     sa_log(s, "load slot %d: %s", slot, r.bad ? "short" : "ok");
     return !r.bad;

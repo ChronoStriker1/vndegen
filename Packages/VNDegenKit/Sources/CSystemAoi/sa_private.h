@@ -57,7 +57,8 @@ typedef struct Deploy {
 typedef struct SaveSummary {
     bool used;
     u32 time;
-    int turn, town[4], level;
+    int turn, town[4], level, count;
+    char place[2][48], weapon[48];
 } SaveSummary;
 
 #define SAVE_SLOTS 100
@@ -69,6 +70,7 @@ typedef struct SaveScreen {
     SaveSummary sum[SAVE_SLOTS + SAVE_AUTOS];
     bool saving;
     int page, hover, confirm, latest, autoLatest, back;
+    SaveSummary now;
 } SaveScreen;
 
 typedef struct Expedition {
@@ -155,7 +157,7 @@ struct SA {
     Train train;
     Deploy deploy;
     SaveScreen saves;
-    bool turnPending;
+    bool turnPending, autosaveTurn;
     bool inGame;
     int afterScript;
     char name[96];
@@ -201,7 +203,8 @@ void sa_deploy_init(Deploy *d, Vfs *vfs);
 void sa_deploy_free(Deploy *d);
 void sa_deploy_open(SA *s);
 bool sa_deploy_frame(SA *s, u32 ms);
-bool sa_save_write(SA *s, int slot);
+bool sa_save_write(SA *s, int slot, int count);
+void sa_save_current(SA *s, SaveSummary *out);
 bool sa_save_read(SA *s, int slot);
 bool sa_save_summary(SA *s, int slot, SaveSummary *out);
 void sa_load_into_town(SA *s, int slot);
@@ -219,6 +222,8 @@ void sa_exp_key(SA *s, int key);
 void sa_exp_battle_over(SA *s, int result);
 void sa_exp_gain(SA *s, const int gain[4]);
 void sa_exp_enter(SA *s, int dungeon, int floor);
+void sa_exp_resume(SA *s, int dungeon, int floor);
+void sa_exp_place_names(SA *s, const char **dungeon, const char **floor);
 void sa_exp_force_battle(SA *s);
 int sa_exp_floors_reached(const SA *s, int dungeon);
 void sa_exp_draw_view(SA *s, u32 *fb);

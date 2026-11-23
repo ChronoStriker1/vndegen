@@ -235,7 +235,7 @@ static void reset_countdown(SA *s) {
     s->exp.stepsLeft = steps - spread + (int)(sa_vm_random(&s->vm) % (u32)(2 * spread + 1));
 }
 
-void sa_exp_enter(SA *s, int dungeon, int floor) {
+static void enter(SA *s, int dungeon, int floor, bool autosave) {
     Expedition *e = &s->exp;
     int r = floor_row(e, dungeon, floor);
     if (r < 0) {
@@ -265,9 +265,19 @@ void sa_exp_enter(SA *s, int dungeon, int floor) {
     sync_position(s);
     sa_log(s, "expedition: %s %s", text(&e->dungeons, dungeon - 1, 1), text(&e->floors, r, F_NAME));
     s->mode = MODE_DUNGEON;
-    sa_autosave(s);
+    if (autosave) sa_autosave(s);
     static const int hooks[] = {HOOK_SETUP, HOOK_DUNGEON, HOOK_FLOOR};
     run_hooks(s, hooks, 3, AFTER_WALK);
+}
+
+void sa_exp_enter(SA *s, int dungeon, int floor) { enter(s, dungeon, floor, true); }
+
+void sa_exp_resume(SA *s, int dungeon, int floor) { enter(s, dungeon, floor, false); }
+
+void sa_exp_place_names(SA *s, const char **dungeon, const char **floor) {
+    const Expedition *e = &s->exp;
+    *dungeon = e->active ? text(&e->dungeons, e->dungeon - 1, 1) : NULL;
+    *floor = e->active ? text(&e->floors, e->row, F_NAME) : NULL;
 }
 
 static void pick_group(SA *s, char *out, size_t size) {

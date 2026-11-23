@@ -24,9 +24,16 @@ enum {
     TURN_RIGHT = 395,
     LV_X = 445,
     COUNT_RIGHT = 582,
-    DETAIL_X = 312,
+    DETAIL_X = 310,
     DETAIL_Y = 50,
-    AUTO_TEXT_X = 56,
+    DETAIL_SIZE = 24,
+    DETAIL_INDENT = 48,
+    DETAIL_LINE = 24,
+    DETAIL_VALUE_RIGHT = 515,
+    DETAIL_LV_X = 562,
+    COUNT_X = 262,
+    AUTO_SIZE = 18,
+    AUTO_TEXT_X = 55,
     AUTO_TEXT_Y = 48,
     AUTO_LINE = 20,
     YES_X = 440,
@@ -83,12 +90,10 @@ static void refresh(SA *s) {
         }
     }
     v->autoLatest = -1;
-    newest = 0;
-    for (int i = 0; i < SAVE_AUTOS; i++)
-        if (v->sum[SAVE_SLOTS + i].used && v->sum[SAVE_SLOTS + i].time >= newest) {
-            newest = v->sum[SAVE_SLOTS + i].time;
-            v->autoLatest = SAVE_SLOTS + i;
-        }
+    for (int i = SAVE_SLOTS; i < SAVE_SLOTS + SAVE_AUTOS; i++)
+        if (v->sum[i].used && (v->autoLatest < 0 || v->sum[i].count > v->sum[v->autoLatest].count)) v->autoLatest = i;
+    if (s->inGame) sa_save_current(s, &v->now);
+    else memset(&v->now, 0, sizeof v->now);
 }
 
 void sa_savescreen_open(SA *s, bool saving) {
@@ -104,8 +109,8 @@ void sa_savescreen_open(SA *s, bool saving) {
 void sa_autosave(SA *s) {
     SaveScreen *v = &s->saves;
     refresh(s);
-    int slot = SAVE_SLOTS + (v->autoLatest < 0 ? 0 : (v->autoLatest - SAVE_SLOTS + 1) % SAVE_AUTOS);
-    sa_save_write(s, slot);
+    int count = (v->autoLatest < 0 ? 0 : v->sum[v->autoLatest].count) + 1;
+    sa_save_write(s, SAVE_SLOTS + count % SAVE_AUTOS, count);
 }
 
 static bool in(int x, int y, int rx, int ry, int w, int h) { return x >= rx && x < rx + w && y >= ry && y < ry + h; }
@@ -164,31 +169,65 @@ static void draw_row(SA *s, u32 *fb, int i) {
     text(fb, "街", x + ROW_TEXT_X + 30, y + ROW_TEXT_Y + ROW_LINE, color);
 }
 
+static void atext(u32 *fb, const char *t, int x, int y, u32 color) { sa_text_draw(fb, SA_W, SA_H, t, -1, x, y, AUTO_SIZE, color, 0x000000); }
+
+static void aright(u32 *fb, const char *t, int r, int y, u32 color) { atext(fb, t, r - sa_text_width(t, -1, AUTO_SIZE), y, color); }
+
 static void draw_summary(u32 *fb, const SaveSummary *m, int slot, int x, int y, int line) {
-    char t[64];
+    char t[96];
+    sa_font_set_plain(false);
     if (slot >= SAVE_SLOTS) snprintf(t, sizeof t, "NoA%d", slot - SAVE_SLOTS);
     else snprintf(t, sizeof t, "No%02d", slot);
-    text(fb, t, x, y, 0xffffff);
+    atext(fb, t, x, y, 0xffffff);
     if (!m->used) {
-        text(fb, "NoData", x, y + line, 0xffffff);
+        atext(fb, "NoData", x, y + line, 0xffffff);
         return;
+    }
+    if (slot >= SAVE_SLOTS) {
+        snprintf(t, sizeof t, "%d", m->count);
+        aright(fb, t, COUNT_X, y, 0xffffff);
     }
     time_t tt = (time_t)m->time;
     struct tm tm;
     localtime_r(&tt, &tm);
     snprintf(t, sizeof t, "%d月%d日 %02d:%02d", tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
-    text(fb, t, x, y + line, 0xffffff);
+    atext(fb, t, x, y + line, 0xffffff);
     snprintf(t, sizeof t, "%dターン", m->turn + 1);
-    text(fb, t, x, y + 2 * line, 0xffffff);
-    text(fb, "街", x, y + 3 * line, 0xffffff);
+    atext(fb, t, x, y + 2 * line, 0xffffff);
+    atext(fb, m->place[0], x, y + 3 * line, 0xffffff);
+    atext(fb, m->place[1], x, y + 4 * line, 0xffffff);
     static const char *const labels[4] = {"住民", "食料", "資金", "資源"};
     for (int k = 0; k < 4; k++) {
-        text(fb, labels[k], x, y + (5 + k) * line, 0xffffff);
+        atext(fb, labels[k], x, y + (5 + k) * line, 0xffffff);
         snprintf(t, sizeof t, "%d", m->town[k]);
-        right(fb, t, x + 128, y + (5 + k) * line, 0xffffff);
+        aright(fb, t, x + 127, y + (5 + k) * line, 0xffffff);
     }
     snprintf(t, sizeof t, "Lv %d ダークス", m->level);
-    text(fb, t, x, y + 10 * line, 0xffffff);
+    atext(fb, t, x, y + 10 * line, 0xffffff);
+}
+
+static void big(u32 *fb, const char *t, int x, int y) { sa_text_draw(fb, SA_W, SA_H, t, -1, x, y, DETAIL_SIZE, 0xffffff, 0x000000); }
+
+static void draw_detail(u32 *fb, const SaveSummary *m, const char *title) {
+    sa_font_set_plain(false);
+    big(fb, title, DETAIL_X, DETAIL_Y);
+    if (!m->used) {
+        big(fb, "NoData", DETAIL_X + 10, DETAIL_Y + DETAIL_LINE);
+        return;
+    }
+    int x = DETAIL_X + DETAIL_INDENT;
+    char t[128];
+    snprintf(t, sizeof t, "%dターン %s%s%s", m->turn + 1, m->place[0], m->place[1][0] ? " " : "", m->place[1]);
+    big(fb, t, x, DETAIL_Y + DETAIL_LINE);
+    static const char *const labels[4] = {"住民", "食料", "資金", "資源"};
+    for (int k = 0; k < 4; k++) {
+        int y = DETAIL_Y + (2 + k) * DETAIL_LINE;
+        big(fb, labels[k], x, y);
+        snprintf(t, sizeof t, "%d", m->town[k]);
+        big(fb, t, DETAIL_VALUE_RIGHT - sa_text_width(t, -1, DETAIL_SIZE), y);
+    }
+    snprintf(t, sizeof t, "Lv %d ダークス%s%s", m->level, m->weapon[0] ? " " : "", m->weapon);
+    big(fb, t, DETAIL_LV_X, DETAIL_Y + 3 * DETAIL_LINE);
 }
 
 static void draw(SA *s) {
@@ -199,6 +238,7 @@ static void draw(SA *s) {
     sa_font_set_spacing(0);
     sa_font_set_plain(true);
     if (v->autoLatest >= 0) draw_summary(fb, &v->sum[v->autoLatest], v->autoLatest, AUTO_TEXT_X, AUTO_TEXT_Y, AUTO_LINE);
+    sa_font_set_plain(true);
     sa_blit_rect(fb, v->art[ART_LOG], 0, 0, 236, TAB_H, LOG_X, BAR_Y);
     for (int i = 0; i < 10; i++) {
         int frame = i == v->page ? 2 : v->hover == HOVER_TAB + i ? 1 : 0;
@@ -206,12 +246,13 @@ static void draw(SA *s) {
     }
     sa_blit_rect(fb, v->art[ART_BACK], 0, v->hover == HOVER_BACK ? TAB_H : 0, BACK_W, TAB_H, BACK_X, BAR_Y);
     for (int i = 0; i < SLOTS_PER_PAGE; i++) draw_row(s, fb, i);
-    int show = v->confirm >= 0 ? v->confirm : v->hover >= HOVER_ROW ? v->page * SLOTS_PER_PAGE + v->hover - HOVER_ROW : -1;
+    int show = v->confirm >= SAVE_SLOTS ? -1 : v->confirm >= 0 ? v->confirm : v->hover >= HOVER_ROW ? v->page * SLOTS_PER_PAGE + v->hover - HOVER_ROW : -1;
     if (show >= 0) {
-        char t[32];
-        snprintf(t, sizeof t, "No%02d %s", show, v->sum[show].used ? "" : "NoData");
-        sa_text_draw(fb, SA_W, SA_H, t, -1, DETAIL_X, DETAIL_Y, 22, 0xffffff, 0x000000);
-    }
+        char t[16];
+        snprintf(t, sizeof t, "No%02d", show);
+        draw_detail(fb, &v->sum[show], t);
+    } else
+        draw_detail(fb, &v->now, "現在");
     sa_font_set_plain(false);
     sa_font_set_spacing(1);
     if (v->confirm < 0) return;
@@ -233,7 +274,7 @@ static void confirm(SA *s) {
     int slot = v->confirm;
     v->confirm = -1;
     if (v->saving) {
-        sa_save_write(s, slot);
+        sa_save_write(s, slot, 0);
         refresh(s);
         return;
     }

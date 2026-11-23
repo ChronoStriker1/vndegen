@@ -769,6 +769,7 @@ void sa_end_turn(SA *s) {
 
 static void next_turn(SA *s) {
     s->turnPending = false;
+    s->autosaveTurn = true;
     s->town.mapOnly = false;
     sa_reset_scene(s);
     sa_start_script(s, "bo0000.box", 0);
@@ -1349,6 +1350,10 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
                 s->dirty = true;
+                if (s->autosaveTurn) {
+                    s->autosaveTurn = false;
+                    sa_autosave(s);
+                }
             } else {
                 go_title(s);
             }
@@ -1545,13 +1550,15 @@ void sa_load_into_town(SA *s, int slot) {
     if (!sa_save_read(s, slot)) return;
     sa_reset_scene(s);
     s->inGame = true;
+    bool inDungeon = s->exp.active;
     s->exp.active = false;
-    s->turnPending = false;
+    s->turnPending = s->autosaveTurn = false;
     s->dialog.open = false;
     s->mode = MODE_TOWN;
     s->town.mapOnly = false;
     s->town.hover = -1;
     s->dirty = true;
+    if (inDungeon) sa_exp_resume(s, s->exp.dungeon, s->exp.floor);
 }
 
 void sa_debug_save(VNSystemAoi *sa, int slot, bool load) {
@@ -1560,5 +1567,5 @@ void sa_debug_save(VNSystemAoi *sa, int slot, bool load) {
         if (s->movie) movie_stop(s);
         sa_load_into_town(s, slot);
     } else
-        sa_save_write(s, slot);
+        sa_save_write(s, slot, 0);
 }
