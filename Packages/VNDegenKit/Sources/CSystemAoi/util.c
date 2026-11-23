@@ -175,3 +175,26 @@ void sa_image_free(Image *im) {
     free(im->px);
     free(im);
 }
+
+Image *sa_image_scale(const Image *im, int w, int h) {
+    Image *out = sa_image_new(w, h);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            int x0 = x * im->w / w, x1 = (x + 1) * im->w / w, y0 = y * im->h / h, y1 = (y + 1) * im->h / h;
+            if (x1 <= x0) x1 = x0 + 1;
+            if (y1 <= y0) y1 = y0 + 1;
+            u32 sum[4] = {0, 0, 0, 0}, n = 0;
+            for (int sy = y0; sy < y1; sy++)
+                for (int sx = x0; sx < x1; sx++) {
+                    u32 p = im->px[(size_t)sy * im->w + sx], a = p >> 24;
+                    sum[0] += (p & 0xff) * a;
+                    sum[1] += (p >> 8 & 0xff) * a;
+                    sum[2] += (p >> 16 & 0xff) * a;
+                    sum[3] += a;
+                    n++;
+                }
+            u32 a = sum[3];
+            out->px[(size_t)y * w + x] = a ? (a / n) << 24 | (sum[2] / a) << 16 | (sum[1] / a) << 8 | sum[0] / a : 0;
+        }
+    return out;
+}

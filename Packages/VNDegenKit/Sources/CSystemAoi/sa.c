@@ -751,6 +751,9 @@ static void run_command(SA *s, int action) {
     case TOWN_CMD_POLICY:
         sa_policy_open(s);
         break;
+    case TOWN_CMD_EQUIP:
+        sa_equip_open(s);
+        break;
     case TOWN_POLICY_DONE:
         sa_end_turn(s);
         break;
@@ -891,6 +894,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     sa_dialog_init(&s->dialog, &s->vfs);
     sa_exp_init(s);
     sa_policy_init(&s->policy, &s->vfs);
+    sa_equip_init(&s->equip, &s->vfs);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
@@ -938,6 +942,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_dialog_free(&s->dialog);
     sa_exp_free(s);
     sa_policy_free(&s->policy);
+    sa_equip_free(&s->equip);
     sa_dungeon_free(&s->dungeon);
     r3_free(&s->dungeon.r3);
     picture_clear(&s->face);
@@ -996,6 +1001,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     }
     if (sa_exp_frame(s, elapsedMs)) return true;
     if (sa_policy_frame(s)) return true;
+    if (sa_equip_frame(s)) return true;
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
         if (sa_battle_hover(&s->battle, s->mouseX, s->mouseY)) s->dirty = true;

@@ -488,6 +488,24 @@ static int hits_of(const char *target) {
     return 1;
 }
 
+static int equip_bonus(Battle *b, const Fighter *f, const char *attribute) {
+    int id = b->party->equip[f->slot];
+    if (!id) return 0;
+    int r = -1;
+    for (int i = 0; i < b->items.rows && r < 0; i++)
+        if (sa_table_int(&b->items, i, 0) == id) r = i;
+    if (r < 0) return 0;
+    char key[16];
+    snprintf(key, sizeof key, "%.3s補正", physical(attribute) ? attribute : "魔");
+    int bonus = 0;
+    for (int col = 15; col <= 22; col++) {
+        const char *t = text_of(&b->items, r, col);
+        const char *p = strstr(t, key);
+        if (p) bonus += atoi(p + strlen(key));
+    }
+    return bonus;
+}
+
 static void use_skill(Battle *b, int who, int s, int aim) {
     Fighter *f = &b->f[who];
     char line[128];
@@ -520,7 +538,9 @@ static void use_skill(Battle *b, int who, int s, int aim) {
             continue;
         }
         bool phys = physical(attribute);
-        int damage = range(b, lo, hi) + f->stat[phys ? STAT_ATTACK : STAT_MAGIC] - tf->stat[phys ? STAT_DEFENCE : STAT_RESIST];
+        int power = range(b, lo, hi);
+        if (!f->enemy) power = power * (100 + equip_bonus(b, f, attribute)) / 100;
+        int damage = power + f->stat[phys ? STAT_ATTACK : STAT_MAGIC] - tf->stat[phys ? STAT_DEFENCE : STAT_RESIST];
         damage >>= landed++;
         if (tf->guard) damage /= 2;
         if (damage < 1) damage = 1;

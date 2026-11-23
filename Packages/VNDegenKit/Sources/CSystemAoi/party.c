@@ -128,6 +128,7 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
     p->level[slot] = 1;
     p->exp[slot] = 0;
     p->order[slot] = (Order){ORDER_FREE, -1, AIM_FREE};
+    p->equip[slot] = 0;
     char name[24];
     snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&p->units, r, 11));
     p->sprite[slot] = sa_load_image(vfs, name);

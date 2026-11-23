@@ -88,6 +88,7 @@ typedef struct Image {
 } Image;
 
 Image *sa_image_new(int w, int h);
+Image *sa_image_scale(const Image *im, int w, int h);
 void sa_image_free(Image *im);
 Image *sa_agf_decode(const u8 *data, size_t size);
 
@@ -434,6 +435,7 @@ typedef struct Party {
     int level[PARTY_SLOTS], exp[PARTY_SLOTS];
     Order order[PARTY_SLOTS], preset[PARTY_PRESETS][PARTY_SLOTS];
     int itemId[PARTY_ITEMS], itemCount[PARTY_ITEMS], items;
+    int equip[PARTY_SLOTS];
     bool presetSaved[PARTY_PRESETS];
     Image *sprite[PARTY_SLOTS];
     int cells[PARTY_SLOTS];

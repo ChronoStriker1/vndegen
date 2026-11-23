@@ -247,3 +247,22 @@ calls it is inferred from that and from play, and marked so.
 - **`f3 "name" …`** queries a facility type: operand 3 receives how many are built, operand 4 their highest level
   (the 街視察 scene stores each type's level in C650 onwards, for the after-scene report); with no name, operand 1
   receives the number of facilities built (inferred).
+
+## 装備, from the screen
+
+- **Screen.** Measured (98% of pixels exact): the library `bg009a0`; the members window `ite_c00` at (2, 20) with
+  the sort tabs ポジション, 名前, ＬＶ, 格, 統治, 統率 and アイテム (`ite_d01` to `d07`) from (24, 27), 62 pixels
+  apart, and a row per member (`ite_c01`, 26 pixels high, from (2, 76)): the position badge (`uts_h98` フィールド),
+  the name, LV, 格, 統治 and 統率 in four cells, and the equipped item's name; the items window `ite_g00` at (625, 20)
+  with the tabs 種類, 名前, 個数 (`ite_l01` to `l03`) from (648, 27) and a row per item (`ite_g01`): the item's icon
+  (`itemNN.agf` scaled to 22 pixels, NN `item.obj` column 3), its name, and the free count over the total, the free
+  count in red and the row grey when none is free; the scroll bars (`ite_c03` to `c05`) at x 586 and 900; 装備解除
+  (`ite_j00`) at (934, 675) and 戻る (`ite_j01`) at (1117, 675).
+- **Equipping.** Measured: choosing an item, then a member, gives the member that item (the row shows it and the
+  item's free count drops); choosing another item for the same member swaps it. Each member holds one item. Darkus
+  starts with ダークスの剣, 名剣ルージュ and 魔力の杖 (`init.box`'s `94`), none equipped, so the damage samples above
+  were taken bare. Gems (宝石) aren't listed.
+- **Effects.** Inferred, to be measured: an item's `斬補正+N`-style effects (`item.obj` columns 15 to 22) raise the
+  power of skills of that kind by N per cent (斬, 打 and 射 for physical skills, 魔 for the rest), as the items'
+  descriptions say (ダークスの剣: 斬撃系スキルの威力を２０％ＵＰ). Other effects (defence, speed, resistances) aren't
+  applied yet. Hovering a member or an item shows a detail card that isn't built yet.
