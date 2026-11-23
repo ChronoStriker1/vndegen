@@ -462,6 +462,13 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             free(name);
         }
         break;
+    case 0xf1:
+        if (in->count >= 1) {
+            s->town.stage = sa_vm_get(vm, code, &in->o[0]);
+            vm->c[C_TOWN_STAGE] = s->town.stage;
+            s->dirty = true;
+        }
+        break;
     case 0x94:
         if (in->count >= 1) sa_party_add_item(&s->party, sa_vm_get(vm, code, &in->o[0]), in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
         break;
@@ -674,6 +681,7 @@ static void new_game(SA *s) {
     snprintf(s->nextBox, sizeof s->nextBox, "bo0000.box");
     s->nextEntry = 0;
     sa_town_new_game(&s->town);
+    s->vm.c[C_TOWN_STAGE] = s->town.stage;
     sa_party_new_game(&s->party, &s->vfs);
     s->inGame = true;
     sa_start_script(s, "init.box", 0);

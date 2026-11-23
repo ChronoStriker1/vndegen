@@ -607,6 +607,6 @@ int sa_build_click(BuildScreen *b, Town *t, VM *vm, int x, int y, bool right);
 bool sa_build_hover(BuildScreen *b, Town *t, VM *vm, int x, int y);
 void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb);
 
-enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28 };
+enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_TOWN_STAGE = 490 };
 
 #endif

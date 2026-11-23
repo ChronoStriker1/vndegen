@@ -66,6 +66,11 @@ where play couldn't pin it down.
   before value (measured: 1066 on the way from 1060 to 1090); over a second (inferred). The script's last operand is
   the text; what the four numbers before it do is still open (the defeat hook passes four variables, the unit-join
   messages pass a number first, perhaps a picture for `ret_a05`).
+- **`f1 N`** widens the town's build area to stage N (the turn script calls it with 建設エリアが広がりました once
+  enough is built: stage 2 at 30 facility points, 3 at 70, from `f3`'s total). The engine keeps the stage in C490,
+  which the turn script reads (inferred from those reads; no script writes it).
+- **`c3 "role" var var`** asks which unit holds a town role (街長, 農業担当 and the others 配置 assigns); not built
+  yet, so it answers none.
 - **Script hooks.** `init.box` registers a script per hook number with `72`: 0 `bo0000` (each turn), 27 `bo2700`
   (a battle's end, the result in C155: 2 is a loss, which says Darkus's line and shows the loss message), 30
   `bo3000` (town commands, C095), and others for the expedition still to map.
