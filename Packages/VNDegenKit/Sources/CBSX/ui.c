@@ -335,15 +335,11 @@ static void button_press(BX *b, const char *key) {
         return;
     }
     if (!strcmp(key, "simple view")) {
-        if (any_bustup(b, true)) {
-            b->viewLevel = b->viewLevel % 3 + 1;
-            b->shownDirty = true;
-        }
+        if (any_bustup(b, true)) bx_view_set(b, bx_view_level(b) % 3 + 1);
         return;
     }
     if (view_button(key)) {
-        b->viewLevel = view_button(key);
-        b->shownDirty = true;
+        bx_view_set(b, view_button(key));
         return;
     }
     if (!strcmp(key, "skip")) b->skipMode = !b->skipMode;
