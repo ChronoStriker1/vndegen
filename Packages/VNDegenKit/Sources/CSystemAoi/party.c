@@ -81,16 +81,62 @@ void sa_party_free(Party *p) {
     memset(p, 0, sizeof *p);
 }
 
+static bool solid(const Image *im, int x, int y) { return (im->px[(size_t)y * im->w + x] >> 24) > 128; }
+
+static bool clear_row(const Image *im, int y) {
+    for (int x = 0; x < im->w; x++)
+        if (solid(im, x, y)) return false;
+    return true;
+}
+
+static bool clear_column(const Image *im, int x, int h) {
+    for (int y = 0; y < h; y++)
+        if (solid(im, x, y)) return false;
+    return true;
+}
+
+static void find_layout(const Image *im, int *cols, int *rows) {
+    int y = 0;
+    while (y < im->h && clear_row(im, y)) y++;
+    while (y < im->h && !clear_row(im, y)) y++;
+    int ch = im->h;
+    for (int d = y; d <= im->h; d++)
+        if (im->h % d == 0 && (d == im->h || clear_row(im, d) || clear_row(im, d - 1))) {
+            ch = d;
+            break;
+        }
+    int x = 0;
+    while (x < im->w && clear_column(im, x, ch)) x++;
+    while (x < im->w && !clear_column(im, x, ch)) x++;
+    int cw = im->w;
+    for (int d = x; d <= im->w; d++)
+        if (im->w % d == 0 && (d == im->w || clear_column(im, d, ch) || clear_column(im, d - 1, ch))) {
+            cw = d;
+            break;
+        }
+    *cols = im->w / cw;
+    *rows = im->h / ch;
+}
+
 void sa_sprite_layout(const Image *im, int *cols, int *rows) {
-    static const int layouts[][2] = {{11, 3}, {6, 2}, {4, 2}};
-    for (size_t i = 0; i < sizeof layouts / sizeof layouts[0]; i++)
-        if (im->w % layouts[i][0] == 0 && im->h % layouts[i][1] == 0) {
-            *cols = layouts[i][0];
-            *rows = layouts[i][1];
+    static struct {
+        const Image *im;
+        int w, h, cols, rows;
+    } cache[32];
+    static int next;
+    for (int i = 0; i < 32; i++)
+        if (cache[i].im == im && cache[i].w == im->w && cache[i].h == im->h) {
+            *cols = cache[i].cols;
+            *rows = cache[i].rows;
             return;
         }
-    *cols = 1;
-    *rows = 1;
+    find_layout(im, cols, rows);
+    cache[next].im = im;
+    cache[next].w = im->w;
+    cache[next].h = im->h;
+    cache[next].cols = *cols;
+    cache[next].rows = *rows;
+    next = (next + 1) % 32;
 }
 
 int sa_sprite_filled_cells(const Image *im) {
@@ -139,6 +185,8 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
 
 void sa_party_new_game(Party *p, Vfs *vfs) {
     p->items = 0;
+    p->rosterCount = 1;
+    p->roster[0] = 1;
     for (int i = 0; i < PARTY_SLOTS; i++) sa_party_place(p, vfs, i, 0);
     sa_party_place(p, vfs, PARTY_FRONT + 1, 1);
 }
@@ -292,4 +340,22 @@ int sa_party_max_mp(const Party *p, int slot) {
 int sa_party_stat(const Party *p, int slot, int stat) {
     static const int trainedIndex[8] = {2, 3, 4, 5, 6, 7, 8, 9};
     return sa_table_int(&p->units, sa_party_unit_row(p, p->unit[slot]), 25 + stat) + p->trained[slot][trainedIndex[stat]];
+}
+
+bool sa_party_join(Party *p, Vfs *vfs, const char *key) {
+    int r = -1;
+    for (int i = 0; i < p->units.rows && r < 0; i++)
+        if (!strcmp(sa_table_text(&p->units, i, 1), key)) r = i;
+    if (r < 0) return false;
+    int id = sa_table_int(&p->units, r, 0);
+    for (int i = 0; i < p->rosterCount; i++)
+        if (p->roster[i] == id) return true;
+    if (p->rosterCount < PARTY_ROSTER) p->roster[p->rosterCount++] = id;
+    static const int order[PARTY_SLOTS] = {PARTY_FRONT, PARTY_FRONT + 2, 1, 0, 2, PARTY_FRONT + 1};
+    for (int i = 0; i < PARTY_SLOTS; i++)
+        if (!p->unit[order[i]]) {
+            sa_party_place(p, vfs, order[i], id);
+            return true;
+        }
+    return true;
 }

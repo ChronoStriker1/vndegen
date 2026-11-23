@@ -509,6 +509,15 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         if (in->count >= 2 && in->o[in->count - 1].kind == OPD_VAR) sa_vm_set(vm, &in->o[in->count - 1], 0);
         if (in->op == 0x9e && in->count >= 1) sa_vm_set(vm, &in->o[0], 0);
         break;
+    case 0xbc:
+        if (in->count >= 2) {
+            char *key = opd_str(code, in, 1);
+            if (sa_party_join(&s->party, &s->vfs, key)) sa_log(s, "joined: %s", key);
+            else sa_log(s, "no unit %s to join", key);
+            free(key);
+            s->dirty = true;
+        }
+        break;
     case 0x94:
         if (in->count >= 1) sa_party_add_item(&s->party, sa_vm_get(vm, code, &in->o[0]), in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
         break;
@@ -1506,5 +1515,11 @@ void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value) {
     SA *s = (SA *)sa;
     if (flag) s->vm.f[index] = (u8)(value != 0);
     else s->vm.c[index] = value;
+    s->dirty = true;
+}
+
+void sa_debug_join(VNSystemAoi *sa, const char *key) {
+    SA *s = (SA *)sa;
+    sa_party_join(&s->party, &s->vfs, key);
     s->dirty = true;
 }

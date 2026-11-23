@@ -424,6 +424,7 @@ typedef struct Order {
 
 #define PARTY_SLOTS 6
 #define PARTY_PRESETS 3
+#define PARTY_ROSTER 64
 #define PARTY_ITEMS 256
 #define PARTY_FRONT 3
 #define PARTY_CELL_MS 100
@@ -437,6 +438,7 @@ typedef struct Party {
     int itemId[PARTY_ITEMS], itemCount[PARTY_ITEMS], items;
     int equip[PARTY_SLOTS];
     int sp[PARTY_SLOTS], trained[PARTY_SLOTS][10];
+    int roster[PARTY_ROSTER], rosterCount;
     bool presetSaved[PARTY_PRESETS];
     Image *sprite[PARTY_SLOTS];
     int cells[PARTY_SLOTS];
@@ -453,6 +455,7 @@ int sa_party_rank(const Party *p);
 void sa_party_add_item(Party *p, int id, int n);
 int sa_party_item_count(const Party *p, int id);
 int sa_party_count_units(const Party *p, const char *key);
+bool sa_party_join(Party *p, Vfs *vfs, const char *key);
 int sa_party_max_hp(const Party *p, int slot);
 int sa_party_max_mp(const Party *p, int slot);
 int sa_party_stat(const Party *p, int slot, int stat);
@@ -528,6 +531,7 @@ void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor);
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir);
 double sa_debug_bench(VNSystemAoi *sa, int n);
 void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value);
+void sa_debug_join(VNSystemAoi *sa, const char *key);
 void sa_debug_finds(VNSystemAoi *sa, int *out);
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
 int sa_item_pick(const Table *items, const char *table, u32 roll);

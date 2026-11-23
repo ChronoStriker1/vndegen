@@ -79,6 +79,11 @@ where play couldn't pin it down.
 - **Other commands seen in the opening turns.** `f7 N` takes N EXP from every facility (抵抗勢力の攻撃…経験値ダウン),
   `ee "facility" cell` places a facility (the 学園 at cell 21), `c9 var "unit"` gives a unit's level (inferred from
   its use against C590).
+- **`bc 0 "unit" -1`** makes a unit join (74 uses: 味方ミアルテ, 味方ルーアルテ and the others), with an `8a`
+  message naming them. VNDegen adds the unit to the roster and to the first free party slot (front left, front
+  right, back centre, back left, back right, front centre; inferred until 配置 is built). Ally sprite sheets have
+  their own grids (6 by 6, 4 by 3 as well as Darkus's 11 by 3): the frame size is read from the sheet's first row of
+  frames.
 - **Script hooks.** `init.box` registers a script per hook number with `72`: 0 `bo0000` (each turn), 27 `bo2700`
   (a battle's end, the result in C155: 2 is a loss, which says Darkus's line and shows the loss message), 30
   `bo3000` (town commands, C095), and others for the expedition still to map.
