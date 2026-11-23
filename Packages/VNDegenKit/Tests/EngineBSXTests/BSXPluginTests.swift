@@ -176,3 +176,36 @@ private struct BSXScriptBuilder {
         #expect(try game(pickedValue: 1) != 0xffff_ffff)
     }
 }
+
+@Suite struct BSXCommonTests {
+    @Test func aGameWithoutCommonDatGetsThePCsFirstOne() throws {
+        let root = TestFolders.root.appending(path: "bsx-common-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var script = BSXScriptBuilder()
+        script.emit([0x1d, 0])
+        script.emit(2)
+        let file = script.file(variables: ["#day"], strings: ["white"], messages: ["One", "Two", "Three"], systemVariables: [])
+        try file.write(to: root.appending(path: "bsxx.dat"))
+        let cfg = "[main window]\nwidth = 800\nheight = 600\n[message window]\nbg color = 0xa5000000\n[default volume]\nbgm = 0.35\n"
+            + "[config screen]\nvoice01 = 01\nvoice01 mask = 0x01\nvoice ex mask = 0x20\n"
+        try Data(cfg.utf8).write(to: root.appending(path: "bsxx.cfg"))
+        var archive = Data("BSArc".utf8) + Data(count: 3)
+        archive.append(contentsOf: [2, 0, 1, 0] + BSXScriptBuilder.word(17) + [0x78] + BSXScriptBuilder.word(0) + BSXScriptBuilder.word(16)
+                       + BSXScriptBuilder.word(1) + Array("a.bsg".utf8) + [0])
+        try archive.write(to: root.appending(path: "Graphics.bsa"))
+        var error = [CChar](repeating: 0, count: 256)
+        let bx = try #require(root.path.withCString { dir in
+            var config = VNBSXConfig(gameDir: dir, saveDir: dir, logPath: nil, audioRate: 44100, startTime: 1)
+            return vnbsx_open(&config, &error, error.count)
+        })
+        vnbsx_close(bx)
+        let common = try [UInt8](Data(contentsOf: root.appending(path: "save/common.dat")))
+        let settings: [UInt8] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0x7f, 0, 0, 0, 0x3f, 0, 0, 0, 0x3f,
+                                 0, 0, 0, 0xa5, 0xff, 0xff, 0xff, 0xff, 0x9f, 0, 0, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        #expect(Array(common[32 ..< 83]) == settings)
+        let tail: [UInt8] = [0, 0, 0x80, 0x3f, 0x33, 0x33, 0xb3, 0x3e, 0x9a, 0x99, 0x19, 0x3f, 0, 0, 0x40, 0x3f, 0, 0, 0, 0x3f,
+                             0, 0, 0x40, 0x3f, 0, 0, 0, 0x3f, 0xff, 0xff, 0xff, 0xff, 0x30, 0, 0x31, 0, 0, 0, 0x80, 0x3f, 0, 0, 0x80, 0x3f,
+                             0, 0, 0x80, 0x3f, 0, 0, 0x80, 0x3f, 1, 1, 1, 10]
+        #expect(Array(common.suffix(tail.count + 47)).prefix(tail.count) == tail[...])
+    }
+}

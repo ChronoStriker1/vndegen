@@ -681,6 +681,7 @@ void bx_common_load(BX *b) {
     b->common = d;
     b->commonSize = n;
     b->commonDirty = made;
+    b->commonMade = made;
     b->choiceFlags = p + 4;
     b->readFlags = q + 4;
     b->achieveTable = 0;

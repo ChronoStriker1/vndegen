@@ -127,7 +127,15 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
   achievement db with its flag clear); the choice and message tables cleared; the persistent variables, the first
   0xffffffff and the rest 0; the CG and scene records cleared; 3.3's Lua table `{}`; the volumes from `[default
   volume]` (master, BGM, BGM under a voice, SE, BGS, voice, BGV, as floats); the voice mask; each `voiceNN` id with its
-  voice and BGV volume; two more volumes of 1.0, three bytes of 1 and ten empty playlists.
+  voice and BGV volume; the voice and BGV volume of every other speaker, three bytes of 1 and ten empty playlists.
+- Settings are the PC's, in `common.dat`, so they move with the saves. In the settings block, the text and auto speeds
+  are floats at 0x35 and 0x39 (1 minus the slider's place) and the window colour B, G, R, A at 0x3d. In 3.0 the effects,
+  cease skip, unread skip and voice mode bytes are at 0x4c to 0x4f and auto select at 0x51; in 3.1 and 3.3 effects
+  are bit 0x80 of 0x48, cease skip, unread skip and voice mode at 0x4a to 0x4c, Mesu Kyoushi 4's BGM select at 0x4d
+  and auto select at 0x52. The volumes are the final gains (a BGM slider at 35% plays at 0.35 times the master). The
+  voice mask has a bit per settings character, the speakers' volumes scale their voices, and the BGV room's
+  per-character volumes are the same BGV levels. VNDegen's own `save/vndegen.cfg` keeps only the x-count switch, which
+  has no place there yet; its older settings are taken over once, when VNDegen first makes `common.dat`.
 - 3.3 adds the messages shown and the Lua table line after the message history.
 
 ## Museum
@@ -187,15 +195,14 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
 - The bust-up editor's message tab (文章設定: names, free text, balloons and the colour picker) is off, and its image
   output (画像として保存する) does nothing; states keep their messages as they are. Its output slots last until the
   editor closes. Mesu Kyoushi 4's ahegao-off buttons (viewer and editor) are drawn but do nothing, and its steam
-  setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own. The BGV
-  per-character volumes reset when the app starts.
+  setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own.
 - Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing. Their settings screens lack
   BGM SELECT, the per-character voice details and the BGV volume.
 - Mesu Kyoushi 3's `sync` system command is logged and skipped; it comes right before a startled line and its effect
   isn't known.
 - The space a translation puts after `「` is drawn; Mesu Kyoushi 4's PC drops it.
-- Settings are VNDegen's own `save/vndegen.cfg`, not the PC's settings in `common.dat`. The full-screen, effect detail
-  and auto-select options are shown but do nothing.
+- The full-screen, effect detail and auto-select options are stored as the PC stores them but do nothing; the BGM
+  volume under a voice is stored and not applied.
 - The cut-in and voice replay modes aren't there; a voice plays once.
 - The free-sight meter (dragging a close-up bust-up) isn't there; VIEW moves between the three fixed positions.
 - `ActionType2` (before the staff roll) is ignored.

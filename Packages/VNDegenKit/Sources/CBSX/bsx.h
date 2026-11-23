@@ -303,8 +303,15 @@ typedef struct Settings {
     int attenuation;
     int skipUnread, ceaseSkip, noEffects;
     int voiceMask, voiceMode, autoSelect;
-    int xCount;
+    int xCount, bgmSelect;
 } Settings;
+
+#define BX_VOICES 32
+
+typedef struct VoiceLevel {
+    char sig[4];
+    int voice, bgv;
+} VoiceLevel;
 
 struct BX {
     char *gameDir, *saveDir;
@@ -441,7 +448,9 @@ struct BX {
     int audioRate;
     bool hairOff;
     int volMaster, volBgm, volSe, volVoice, volBgs, volBgv;
-    int bgvLevel[8];
+    VoiceLevel voices[BX_VOICES], otherVoices;
+    int voiceCount;
+    bool commonMade;
     char bgmName[64];
 };
 
@@ -581,5 +590,6 @@ void bx_settings_load(BX *b);
 void bx_settings_save(BX *b);
 void bx_settings_apply(BX *b);
 void bx_settings_defaults(BX *b);
+int bx_voice_level(BX *b, const char *name, bool bgv);
 
 #endif

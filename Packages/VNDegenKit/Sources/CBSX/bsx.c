@@ -140,12 +140,11 @@ VNBSX *vnbsx_open(const VNBSXConfig *cfg, char *err, size_t errSize) {
     bx_msg_init(b);
     bx_ui_init(b);
     b->mixer = bx_mixer_new(b->audioRate);
-    bx_settings_load(b);
-    for (int i = 0; i < 8; i++) b->bgvLevel[i] = 100;
     bx_museum_init(b);
     bx_common_load(b);
     bx_museum_find_wear(b);
     bx_museum_tables(b);
+    bx_settings_load(b);
     bx_vm_init(b);
     bx_log(b, "opened %s, %s, %d labels, %d messages", b->gameDir, b->sc->version, b->sc->labelCount, b->sc->msgCount);
     return (VNBSX *)b;

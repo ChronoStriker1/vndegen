@@ -121,16 +121,10 @@ void bx_mixer_mix(Mixer *m, float *out, int frames, bool paused) {
     for (int i = 0; i < frames * 2; i++) out[i] = out[i] > 1 ? 1 : out[i] < -1 ? -1 : out[i];
 }
 
-static float cfg_volume(BX *b, const char *key, float def) {
-    const char *v = bx_cfg_get(&b->cfg, "default volume", key);
-    return v ? (float)atof(v) : def;
-}
-
 static float channel_volume(BX *b, int ch) {
     bool voice = ch == CH_VOICE || ch == CH_VOICE2 || ch == CH_BGV;
     int v = ch == CH_BGM ? b->volBgm : ch == CH_BGS ? b->volBgs : ch == CH_BGV ? b->volBgv : voice ? b->volVoice : b->volSe;
-    float base = ch == CH_BGM ? cfg_volume(b, "bgm", 0.5f) : ch == CH_BGS ? cfg_volume(b, "bgs", 0.5f) : ch == CH_BGV ? cfg_volume(b, "bgv", 0.5f) : voice ? cfg_volume(b, "voice", 0.75f) : cfg_volume(b, "se", 0.75f);
-    return base * (float)v / 100.0f * (float)b->volMaster / 100.0f;
+    return (float)v / 100.0f * (float)b->volMaster / 100.0f;
 }
 
 void bx_snd_volumes(BX *b) {
@@ -172,7 +166,7 @@ static Voice *open_voice(BX *b, int ch, int ix, const char *name, bool loop, int
     v->step = (double)v->rate / (double)b->audioRate;
     v->gain = fadeMs > 0 ? 0 : 1;
     v->target = 1;
-    v->level = 1;
+    v->level = ch == CH_VOICE || ch == CH_VOICE2 || ch == CH_BGV ? (float)bx_voice_level(b, name, ch == CH_BGV) / 100.0f : 1;
     v->delta = fadeMs > 0 ? 1.0f / ((float)fadeMs * (float)b->audioRate / 1000.0f) : 0;
     v->ch = ch;
     return v;
