@@ -1,7 +1,7 @@
 import Foundation
-import SwiftUI
 import VNCore
 #if canImport(UIKit)
+import SwiftUI
 import UIKit
 #else
 import AppKit
@@ -33,6 +33,12 @@ func askForText(title: String, message: String, current: String, over view: Plat
     #endif
 }
 
+nonisolated func licenceText(_ url: URL) -> String {
+    let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [.documentType: NSAttributedString.DocumentType.rtf]
+    return (try? NSAttributedString(url: url, options: options, documentAttributes: nil))?.string ?? ""
+}
+
+#if canImport(UIKit)
 struct LicenceView: View {
     let title: String
     let text: String
@@ -63,16 +69,12 @@ struct LicenceView: View {
         .environment(\.colorScheme, .light)
         .background(Color(white: 0.94))
     }
-
-    nonisolated static func plainText(of url: URL) -> String {
-        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [.documentType: NSAttributedString.DocumentType.rtf]
-        return (try? NSAttributedString(url: url, options: options, documentAttributes: nil))?.string ?? ""
-    }
 }
+#endif
 
 @MainActor
 func askToAcceptLicence(title: String, file: URL, over view: PlatformView, done: @escaping (Bool) -> Void) {
-    let text = LicenceView.plainText(of: file)
+    let text = licenceText(file)
     #if canImport(UIKit)
     var presenter = view.window?.rootViewController
     while let shown = presenter?.presentedViewController { presenter = shown }
@@ -86,12 +88,18 @@ func askToAcceptLicence(title: String, file: URL, over view: PlatformView, done:
     presenter.present(controller, animated: true)
     #else
     guard let window = view.window else { return done(true) }
-    let panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
-    panel.title = title
-    panel.contentViewController = NSHostingController(rootView: LicenceView(title: title, text: text) { [weak window, weak panel] accepted in
-        if let panel { window?.endSheet(panel) }
-        done(accepted)
-    })
-    window.beginSheet(panel)
+    let alert = NSAlert()
+    alert.messageText = title
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    scroll.hasVerticalScroller = true
+    let body = NSTextView(frame: scroll.bounds)
+    body.string = text
+    body.isEditable = false
+    body.autoresizingMask = [.width]
+    scroll.documentView = body
+    alert.accessoryView = scroll
+    alert.addButton(withTitle: "同意して続ける")
+    alert.addButton(withTitle: "同意しない")
+    alert.beginSheetModal(for: window) { done($0 == .alertFirstButtonReturn) }
     #endif
 }
