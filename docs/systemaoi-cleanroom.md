@@ -329,3 +329,16 @@ calls it is inferred from that and from play, and marked so.
   `grw_i00` digits), the skills with their MP, the count of skills over the unit's slots (`unit.obj` column 38),
   the field, reserve and government abilities (columns 34 to 36), the equipped item, the unit's sprite, and its
   description (column 76) below. Used by 育成; 装備 and 配置 show the same card on hover (not yet).
+
+## 配置, from the screen
+
+- **Screen.** Measured (97% of pixels exact with Darkus alone): the library `bg009a0`; the members window from
+  `ums_a00` at (2, 21), `ums_a01` at (2, 338) and 解任 `ums_a02` at (438, 503), with 格 used over the limit
+  (`uts_b03` at (230, 26)) and 編成 (`uts_b02`) at (403, 26); six メインメンバー tiles (`ums_z00`, 108 by 118) at
+  x 112, 229 and 346 and y 86 (the front row) and 211 (the back), five リザーブメンバー tiles from (13, 366) 108
+  apart, and the 解任 tile at (445, 536), each with the unit's sprite; the members list `uts_c00` at (567, 21) with
+  the tabs ポジション to 統率 (`uts_d01` to `d06`) and a row per member; the status card; the party's diorama on the
+  library platform `m997bt1a`; 戻る (`uts_g00`) at (1117, 675).
+- **Placing.** Inferred (the original didn't respond to clicks or a drag with Darkus alone): choose a member (tile
+  or row), then a tile: two main tiles swap, a reserve tile benches the member (one must stay), and a reserve
+  member goes to a main tile when the party's 格 stays within the limit. 解任 and 編成 aren't built.

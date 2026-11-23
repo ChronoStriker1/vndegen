@@ -185,6 +185,7 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
 
 void sa_party_new_game(Party *p, Vfs *vfs) {
     p->items = 0;
+    p->benchCount = 0;
     p->rosterCount = 1;
     p->roster[0] = 1;
     for (int i = 0; i < PARTY_SLOTS; i++) sa_party_place(p, vfs, i, 0);
@@ -357,5 +358,79 @@ bool sa_party_join(Party *p, Vfs *vfs, const char *key) {
             sa_party_place(p, vfs, order[i], id);
             return true;
         }
+    if (p->benchCount < PARTY_BENCH) {
+        Bench *b = &p->bench[p->benchCount++];
+        memset(b, 0, sizeof *b);
+        b->unit = id;
+        b->hp = sa_table_int(&p->units, r, 23);
+        b->mp = sa_table_int(&p->units, r, 24);
+        b->level = 1;
+        b->sp = sa_table_int(&p->units, r, 37);
+    }
     return true;
+}
+
+#define SWAP(field)                                                                                                    \
+    do {                                                                                                               \
+        __typeof__(p->field[0]) tmp_ = p->field[a];                                                                    \
+        p->field[a] = p->field[b];                                                                                     \
+        p->field[b] = tmp_;                                                                                            \
+    } while (0)
+
+void sa_party_swap(Party *p, int a, int b) {
+    if (a == b || a < 0 || b < 0 || a >= PARTY_SLOTS || b >= PARTY_SLOTS) return;
+    SWAP(unit);
+    SWAP(hp);
+    SWAP(mp);
+    SWAP(level);
+    SWAP(exp);
+    SWAP(order);
+    SWAP(equip);
+    SWAP(sp);
+    SWAP(sprite);
+    SWAP(cells);
+    int t[10];
+    memcpy(t, p->trained[a], sizeof t);
+    memcpy(p->trained[a], p->trained[b], sizeof t);
+    memcpy(p->trained[b], t, sizeof t);
+}
+
+int sa_party_members(const Party *p) {
+    int n = 0;
+    for (int i = 0; i < PARTY_SLOTS; i++) n += p->unit[i] != 0;
+    return n;
+}
+
+bool sa_party_bench(Party *p, int slot) {
+    if (slot < 0 || slot >= PARTY_SLOTS || !p->unit[slot] || p->benchCount == PARTY_BENCH || sa_party_members(p) <= 1) return false;
+    Bench *b = &p->bench[p->benchCount++];
+    b->unit = p->unit[slot];
+    b->hp = p->hp[slot];
+    b->mp = p->mp[slot];
+    b->level = p->level[slot];
+    b->exp = p->exp[slot];
+    b->equip = p->equip[slot];
+    b->sp = p->sp[slot];
+    memcpy(b->trained, p->trained[slot], sizeof b->trained);
+    sa_image_free(p->sprite[slot]);
+    p->sprite[slot] = NULL;
+    p->unit[slot] = 0;
+    p->cells[slot] = 0;
+    return true;
+}
+
+void sa_party_unbench(Party *p, Vfs *vfs, int index, int slot) {
+    if (index < 0 || index >= p->benchCount || slot < 0 || slot >= PARTY_SLOTS) return;
+    Bench b = p->bench[index];
+    memmove(p->bench + index, p->bench + index + 1, sizeof(Bench) * (size_t)(p->benchCount - index - 1));
+    p->benchCount--;
+    if (p->unit[slot]) sa_party_bench(p, slot);
+    sa_party_place(p, vfs, slot, b.unit);
+    p->hp[slot] = b.hp;
+    p->mp[slot] = b.mp;
+    p->level[slot] = b.level;
+    p->exp[slot] = b.exp;
+    p->equip[slot] = b.equip;
+    p->sp[slot] = b.sp;
+    memcpy(p->trained[slot], b.trained, sizeof b.trained);
 }

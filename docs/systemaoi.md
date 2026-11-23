@@ -70,7 +70,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   food, money and resources before and after) over the bare map, then the next turn's script.
 - **Message box.** Script command `8a` opens the game's message box (`ret_a02`, `a04`, `a00` and the OK button
   `ret_a01`) with its text, `|` breaking lines, and the script waits for OK. 装備 gives members the party's items, 商会 buys and sells
-  them, and 育成 spends skill points on stats. 配置 isn't built yet.
+  them, 育成 spends skill points on stats, and 配置 arranges
+  the party and its reserve.
 - **Battles.** The board with the party's and the enemies' platforms, idle animations and bars, the Backs and Forward
   panels, the side buttons, 戦闘開始, 自動戦闘, ゲージON and the log. Each unit's action and target buttons open the
   game's skill and target pickers; the side buttons set every unit's order or target and save and load three sets.

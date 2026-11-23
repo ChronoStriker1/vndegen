@@ -429,8 +429,16 @@ typedef struct Order {
 #define PARTY_FRONT 3
 #define PARTY_CELL_MS 100
 
+typedef struct Bench {
+    int unit, hp, mp, level, exp, equip, sp, trained[10];
+} Bench;
+
+#define PARTY_BENCH 16
+
 typedef struct Party {
     Table units;
+    Bench bench[PARTY_BENCH];
+    int benchCount;
     int unit[PARTY_SLOTS];
     int hp[PARTY_SLOTS], mp[PARTY_SLOTS];
     int level[PARTY_SLOTS], exp[PARTY_SLOTS];
@@ -456,6 +464,10 @@ void sa_party_add_item(Party *p, int id, int n);
 int sa_party_item_count(const Party *p, int id);
 int sa_party_count_units(const Party *p, const char *key);
 bool sa_party_join(Party *p, Vfs *vfs, const char *key);
+void sa_party_swap(Party *p, int a, int b);
+bool sa_party_bench(Party *p, int slot);
+void sa_party_unbench(Party *p, Vfs *vfs, int index, int slot);
+int sa_party_members(const Party *p);
 int sa_party_max_hp(const Party *p, int slot);
 int sa_party_max_mp(const Party *p, int slot);
 int sa_party_stat(const Party *p, int slot, int stat);

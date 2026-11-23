@@ -48,6 +48,12 @@ typedef struct Train {
     int member, pick, hover;
 } Train;
 
+typedef struct Deploy {
+    Image *art[18], *benchSprite[PARTY_BENCH];
+    int benchUnit[PARTY_BENCH];
+    int hover, picked;
+} Deploy;
+
 typedef struct Expedition {
     bool active;
     int dungeon, floor, row;
@@ -61,7 +67,7 @@ typedef struct Expedition {
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -130,6 +136,7 @@ struct SA {
     Shop shop;
     Card card;
     Train train;
+    Deploy deploy;
     bool turnPending;
     bool inGame;
     int afterScript;
@@ -172,6 +179,10 @@ void sa_train_init(Train *t, Vfs *vfs);
 void sa_train_free(Train *t);
 void sa_train_open(SA *s);
 bool sa_train_frame(SA *s);
+void sa_deploy_init(Deploy *d, Vfs *vfs);
+void sa_deploy_free(Deploy *d);
+void sa_deploy_open(SA *s);
+bool sa_deploy_frame(SA *s, u32 ms);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);
 void sa_exp_open_select(SA *s);
