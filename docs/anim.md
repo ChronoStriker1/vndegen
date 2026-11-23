@@ -138,7 +138,7 @@ PC leaves them. The PC shows a comment VNDegen wrote. What the PC stores for typ
 its box reads back empty, so the PC writes an empty comment whatever is typed. Double Date Dilemma's cards have no
 comment editing on the PC. Magical Sword autosaves before each choice (op `15`, which Double Date Dilemma's PC doesn't act on): slots 160 to 167
 in turn, the last one used kept at 0x0c in the system save (-1 before the first), the slot resuming at the choice
-itself. Its Load screen's AUTO SAVE button shows those eight as cards 161 to 168. The PC's own autosave thumbnail
+itself. Its Load screen's AUTO SAVE button shows those eight as cards 161 to 168. Double Date Dilemma's Load screen has the same button and page, which stays empty since that game never autosaves, as on the PC. The PC's own autosave thumbnail
 comes out black under Wine; VNDegen's shows the scene. A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
 does; the thumbnails stay in `cg/`, and a used slot without one shows the PC's NO IMAGE picture.
 

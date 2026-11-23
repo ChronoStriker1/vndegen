@@ -208,7 +208,7 @@ static void vertical(AN *a, Image *b, const char *s, int x, int y) {
 
 enum { AUTO_PAGE = 20, AUTO_X = 1031, AUTO_Y = 24, AUTO_W = 108, AUTO_H = 66 };
 
-static bool has_auto_page(AN *a, bool saving) { return !saving && a->game == GAME_MGSW; }
+static bool has_auto_page(AN *a, bool saving) { return !saving; }
 
 static void draw_slots(AN *a, bool saving) {
     const CardLayout *L = &CARD[a->game];
