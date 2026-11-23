@@ -124,6 +124,18 @@ std::vector<uint8_t> unpackEntry(const uint8_t *data, size_t size) {
     return out;
 }
 
+static bool singleEntry(const std::vector<uint8_t> &d, std::string &name, uint32_t &offset, uint32_t &size) {
+    if (d.size() < 14 || std::memcmp(d.data(), "NEKOPACK4S", 10)) return false;
+    uint32_t length = rd32(&d[10]);
+    if (length == 0 || uint64_t(length) + 22 > d.size()) return false;
+    int32_t key = 0;
+    for (uint32_t i = 0; i < length; i++) key += int8_t(d[14 + i]);
+    name.assign(reinterpret_cast<const char *>(&d[14]), strnlen(reinterpret_cast<const char *>(&d[14]), length));
+    offset = rd32(&d[14 + length]) ^ uint32_t(key);
+    size = rd32(&d[18 + length]) ^ uint32_t(key);
+    return uint64_t(offset) + size <= d.size();
+}
+
 void Files::add(const std::string &path, Source source) {
     auto &slot = index_[normalizedPath(path)];
     if (source.priority >= slot.priority) slot = std::move(source);
@@ -192,6 +204,17 @@ void Files::indexArchive(const std::string &file, const std::string &folder, int
         source.size = rd32(&index[pos + 4]) ^ uint32_t(key);
         pos += 8;
         if (uint64_t(source.offset) + source.size > fileSize) continue;
+        if (isArchiveName(lower(name))) {
+            std::vector<uint8_t> packed(source.size);
+            f.seekg(source.offset);
+            std::string inner;
+            uint32_t innerOffset, innerSize;
+            if (f.read(reinterpret_cast<char *>(packed.data()), source.size) &&
+                singleEntry(unpackEntry(packed.data(), packed.size()), inner, innerOffset, innerSize)) {
+                name = inner;
+                source.nested = true;
+            }
+        }
         // An archive in a patch folder, such as Test Game 92's sys_5/obj.pak, holds that folder's files. As in a base
         // archive, an entry with folders of its own also answers to its own name, unless the full path is art.
         if (!patch.empty()) {
@@ -311,6 +334,10 @@ Bytes Files::read(const std::string &path) const {
     f.seekg(s.offset);
     if (!f.read(reinterpret_cast<char *>(packed.data()), s.size)) return nullptr;
     auto plain = unpackEntry(packed.data(), packed.size());
+    std::string inner;
+    uint32_t innerOffset, innerSize;
+    if (s.nested) plain = singleEntry(plain, inner, innerOffset, innerSize) ? unpackEntry(plain.data() + innerOffset, innerSize)
+                                                                          : std::vector<uint8_t>();
     if (plain.empty()) return nullptr;
     return std::make_shared<const std::vector<uint8_t>>(std::move(plain));
 }

@@ -35,6 +35,7 @@ private:
         int archive = -1;  // index into archives_; -1 for a loose file
         std::string loose;
         uint32_t offset = 0, size = 0;
+        bool nested = false;
         std::string patch;  // the patch it comes from, such as sys_5, or empty
     };
     void add(const std::string &path, Source source);
