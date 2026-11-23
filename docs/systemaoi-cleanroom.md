@@ -119,6 +119,11 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
 - **Magic.** Inferred: the same rule with magic attack and magic defence. Darkus's 火矢三連 (fire, 28 to 30, magic
   attack 15) did 39 to a 二角ベト of magic defence 4 (predicted 39 to 41), and 20 to the second target; it did 36 to a
   ベト once, three short, which stays open.
+- **身代わり.** Measured: a クマン (battle ability 身代わり, `unit.obj` column 34) took a hit of 乱舞斬 aimed at a ウルフ;
+  the log said クマンが身代わりになった, ウルフに0ダメージ, クマンに58ダメージ. 58 fits the damage against the ウルフ's
+  defence (55 to 58 with the sword), not the クマン's (50 to 53). `ability.obj` says it covers allies with less HP
+  "時々" and gives 50 in column 4: inferred as a 50% chance. The same 乱舞斬 hit the クマン twice with two enemies
+  left, so several-target skills can hit one target again, which explains 火矢三連's double hit.
 - **Healing.** 小回復 (38 to 42) healed 39 and 38: inferred as the power alone.
 - **Hit and miss.** Inferred: a hit when a roll under 100 is below the skill's accuracy (`skill.obj` column 16) minus
   the target's evasion. Too few misses were seen to pin it down: ツタ (accuracy 85) missed Darkus three times in seven,
@@ -262,7 +267,9 @@ calls it is inferred from that and from play, and marked so.
   item's free count drops); choosing another item for the same member swaps it. Each member holds one item. Darkus
   starts with ダークスの剣, 名剣ルージュ and 魔力の杖 (`init.box`'s `94`), none equipped, so the damage samples above
   were taken bare. Gems (宝石) aren't listed.
-- **Effects.** Inferred, to be measured: an item's `斬補正+N`-style effects (`item.obj` columns 15 to 22) raise the
-  power of skills of that kind by N per cent (斬, 打 and 射 for physical skills, 魔 for the rest), as the items'
-  descriptions say (ダークスの剣: 斬撃系スキルの威力を２０％ＵＰ). Other effects (defence, speed, resistances) aren't
+- **Effects.** Measured with ダークスの剣 (斬補正+20, 斬撃系スキルの威力を２０％ＵＰ): 剣撃 did 49 and 50 to a ナメッド
+  (bare, 40 to 43). That fits (power + attack) × 120% − defence (49 to 52), and not the power alone × 120% (at most
+  49). An item's `斬補正+N`-style effects (`item.obj` columns 15 to 22) apply this way to skills of that kind (斬, 打
+  and 射 for physical skills, 魔 for the rest; the others inferred). (damage) × 120% rounded up also fits both
+  samples; a target with more defence would tell them apart. Other effects (defence, speed, resistances) aren't
   applied yet. Hovering a member or an item shows a detail card that isn't built yet.

@@ -103,6 +103,7 @@ enum {
     ICON = 20,
     SKILL_SIZE = 12,
     ACTION_MS = 1500,
+    SUBSTITUTE_CHANCE = 50,
     TILE_PLAIN = 0,
     TILE_BLUE = 2,
     TILE_YELLOW = 3,
@@ -506,6 +507,17 @@ static int equip_bonus(Battle *b, const Fighter *f, const char *attribute) {
     return bonus;
 }
 
+static int substitute(Battle *b, int target) {
+    const Fighter *t = &b->f[target];
+    for (int i = 0; i < b->count; i++) {
+        const Fighter *c = &b->f[i];
+        if (i == target || c->enemy != t->enemy || !alive(c) || c->hp <= t->hp) continue;
+        if (strcmp(text_of(&b->party->units, c->row, 34), "身代わり")) continue;
+        if ((int)(rnd(b) % 100) < SUBSTITUTE_CHANCE) return i;
+    }
+    return -1;
+}
+
 static void use_skill(Battle *b, int who, int s, int aim) {
     Fighter *f = &b->f[who];
     char line[128];
@@ -538,9 +550,15 @@ static void use_skill(Battle *b, int who, int s, int aim) {
             continue;
         }
         bool phys = physical(attribute);
-        int power = range(b, lo, hi);
-        if (!f->enemy) power = power * (100 + equip_bonus(b, f, attribute)) / 100;
-        int damage = power + f->stat[phys ? STAT_ATTACK : STAT_MAGIC] - tf->stat[phys ? STAT_DEFENCE : STAT_RESIST];
+        int raw = range(b, lo, hi) + f->stat[phys ? STAT_ATTACK : STAT_MAGIC];
+        if (!f->enemy) raw = raw * (100 + equip_bonus(b, f, attribute)) / 100;
+        int damage = raw - tf->stat[phys ? STAT_DEFENCE : STAT_RESIST];
+        int cover = substitute(b, t);
+        if (cover >= 0) {
+            log_line(b, name_of(b, &b->f[cover]), b->f[cover].enemy, "が身代わりになった", true);
+            log_line(b, name_of(b, tf), tf->enemy, "に0ダメージ", true);
+            tf = &b->f[cover];
+        }
         damage >>= landed++;
         if (tf->guard) damage /= 2;
         if (damage < 1) damage = 1;
