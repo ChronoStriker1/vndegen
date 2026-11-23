@@ -373,14 +373,86 @@ static const VolumeLayout VOLUME[GAME_COUNT] = {
                    102, 27, 3, 109, {3, 34, 65}, 350, 471, 135, 980, 1101, 335},
 };
 
-static void sound_buttons(AN *a, Image *b, int testX, int playX, int y, bool test) {
-    const VolumeLayout *L = &VOLUME[a->game];
-    if (test)
-        an_gfx_blit(a->fb, a->W, a->H, b, L->testAX, L->btnRow[in_rect(a, testX, y, L->btnW, L->btnH) ? 1 : 0], L->btnW, L->btnH, testX, y, 255);
-    an_gfx_blit(a->fb, a->W, a->H, b, L->playAX, L->btnRow[2], L->btnW, L->btnH, playX, y, 255);
+static bool slider_shown(AN *a, int i) { return i < 6 || a->volumeChar < an_voice_tabs(a)->count - 1; }
+
+static const char *const TEST_SOUND[GAME_COUNT][5] = {
+    [GAME_DDD] = {NULL, "01", "wse20000", "b090001g", "b130008j"},
+    [GAME_MGSW] = {NULL, "01", "wse20000", "b090001g", "b130008j"},
+};
+static const char *const TEST_VOICE[GAME_COUNT][AN_VOICE_TABS] = {
+    [GAME_DDD] = {"wrisa_sample", "wsiho_sample", "wothe_sample"},
+    [GAME_MGSW] = {"wele_sample", "wmon_sample", "walp_sample", "wsel_sample", "wlan_sample", "wjen_sample", "wisa_sample",
+                   "wkam_sample", "woth_sample"},
+};
+static const char *const TEST_BGV[GAME_COUNT][AN_VOICE_TABS] = {
+    [GAME_DDD] = {"b1040", "b2040"},
+    [GAME_MGSW] = {"belp20", "bmop20", "balp20", "bsep20", "blap20", "bjep20", "bisp20", "bkap20"},
+};
+static const char *const TEST_TALK[GAME_COUNT][AN_VOICE_TABS] = {
+    [GAME_DDD] = {"b5040", "b6040"},
+    [GAME_MGSW] = {"belp20", "bmop20", "balp20", "bsep20", "blap20", "bjep20", "bisp20", "bkap20"},
+};
+static const int TEST_CHANNEL[8] = {-1, CH_BGM, CH_SE0 + AN_SE - 1, CH_SE0 + AN_SE - 2, CH_SE0 + AN_SE - 3, CH_VOICE, CH_BGV0 + 3, CH_BGV0 + 2};
+
+static bool *row_mute(AN *a, int i) {
+    if (i < 5) return &a->mute[i];
+    int c = a->volumeChar;
+    return i == 5 ? &a->voiceMute[c] : i == 6 ? &a->bgvMute[c] : &a->talkMute[c];
 }
 
-static bool slider_shown(AN *a, int i) { return i < 6 || a->volumeChar < an_voice_tabs(a)->count - 1; }
+static float test_volume(AN *a, int i) {
+    if (a->mute[0] || *row_mute(a, i)) return 0;
+    int c = a->volumeChar;
+    int v = i < 5 ? a->volume[i] : i == 5 ? a->voiceVolume[c] : i == 6 ? a->bgvVolume[c] : a->talkVolume[c];
+    return (float)a->volume[0] / 100.0f * (float)v / 100.0f;
+}
+
+static void test_stop(AN *a, int i) {
+    if (!(a->volumeTests & 1 << i)) return;
+    a->volumeTests &= ~(1 << i);
+    an_snd_stop(a, TEST_CHANNEL[i]);
+    if (i == 1 && a->testBgm[0]) an_snd_play(a, CH_BGM, a->testBgm, true, false);
+}
+
+static void test_start(AN *a, int i) {
+    int c = a->volumeChar;
+    const char *name = i < 5 ? TEST_SOUND[a->game][i] : i == 5 ? TEST_VOICE[a->game][c] : i == 6 ? TEST_BGV[a->game][c] : TEST_TALK[a->game][c];
+    if (!name) return;
+    if (i == 1) snprintf(a->testBgm, sizeof a->testBgm, "%s", an_snd_playing(a, CH_BGM) ? a->bgm : "");
+    a->volumeTests |= 1 << i;
+    an_snd_play(a, TEST_CHANNEL[i], name, true, i != 1);
+    an_snd_set_volume(a, TEST_CHANNEL[i], test_volume(a, i));
+}
+
+void an_volume_tests_stop(AN *a) {
+    for (int i = 1; i < 8; i++) test_stop(a, i);
+}
+
+static void sound_buttons(AN *a, Image *b, int testX, int playX, int y, int i) {
+    const VolumeLayout *L = &VOLUME[a->game];
+    if (i > 0) {
+        int row = a->volumeTests & 1 << i ? 2 : in_rect(a, testX, y, L->btnW, L->btnH) ? 1 : 0;
+        an_gfx_blit(a->fb, a->W, a->H, b, L->testAX, L->btnRow[row], L->btnW, L->btnH, testX, y, 255);
+    }
+    int row = !*row_mute(a, i) ? 2 : in_rect(a, playX, y, L->btnW, L->btnH) ? 1 : 0;
+    an_gfx_blit(a->fb, a->W, a->H, b, L->playAX, L->btnRow[row], L->btnW, L->btnH, playX, y, 255);
+}
+
+static bool button_row(AN *a, bool play, int *row) {
+    const VolumeLayout *L = &VOLUME[a->game];
+    for (int i = 0; i < 8; i++) {
+        bool left = i < 5;
+        int x = left ? (play ? L->leftPlayX : L->leftTestX) : (play ? L->rightPlayX : L->rightTestX);
+        int y = left ? L->leftY + 100 * i : L->rightY + 100 * (i - 5);
+        if ((i == 0 && !play) || (!left && !slider_shown(a, i))) continue;
+        if (in_rect(a, x, y, L->btnW, L->btnH)) {
+            *row = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 
 static bool on_tab(AN *a, int c) {
     const VolumeLayout *L = &VOLUME[a->game];
@@ -462,9 +534,9 @@ static void draw_volume(AN *a) {
         an_gfx_blit(a->fb, a->W, a->H, b, L->tabAX + L->tabADX * c, L->tabRow[state], L->tabW, state ? L->tabSelH : L->tabH,
                     L->tabX + L->tabDX * c, L->tabY, 255);
     }
-    for (int i = 0; i < 5; i++) sound_buttons(a, b, L->leftTestX, L->leftPlayX, L->leftY + 100 * i, i > 0);
+    for (int i = 0; i < 5; i++) sound_buttons(a, b, L->leftTestX, L->leftPlayX, L->leftY + 100 * i, i);
     for (int k = 0; k < 3; k++)
-        if (slider_shown(a, 5 + k)) sound_buttons(a, b, L->rightTestX, L->rightPlayX, L->rightY + 100 * k, true);
+        if (slider_shown(a, 5 + k)) sound_buttons(a, b, L->rightTestX, L->rightPlayX, L->rightY + 100 * k, 5 + k);
     for (int i = 0; i < 8; i++) {
         if (!slider_shown(a, i)) continue;
         int x, y;
@@ -486,6 +558,9 @@ static void draw_volume(AN *a) {
     if (in_rect(a, 940, 5, 278, 40)) info = 120;
     if (in_rect(a, 62, 670, 278, 40)) info = 121;
     if (in_rect(a, 940, 670, 278, 40)) info = 122;
+    int row;
+    if (button_row(a, false, &row)) info = 118;
+    if (button_row(a, true, &row)) info = 119;
     if (a->dragSlider >= 0 && a->dragSlider < 8) info = SLIDER_INFO[a->dragSlider];
     draw_info(a, info);
 }
@@ -494,6 +569,8 @@ static void apply_volumes(AN *a) {
     an_snd_set_volume(a, CH_BGM, an_channel_volume(a, CH_BGM, NULL, 0));
     for (int c = CH_SE0; c < CH_BGV0; c++) an_snd_set_volume(a, c, an_channel_volume(a, c, NULL, 0));
     an_snd_set_volume(a, CH_VOICE, an_channel_volume(a, CH_VOICE, a->voiceName, 0));
+    for (int i = 1; i < 8; i++)
+        if (a->volumeTests & 1 << i) an_snd_set_volume(a, TEST_CHANNEL[i], test_volume(a, i));
 }
 
 static void volume_input(AN *a) {
@@ -509,6 +586,7 @@ static void volume_input(AN *a) {
     if (a->rclicked) {
         a->rclicked = false;
         a->screen = SCR_NONE;
+        an_volume_tests_stop(a);
         return;
     }
     if (a->down)
@@ -522,13 +600,29 @@ static void volume_input(AN *a) {
         }
     if (!a->clicked) return;
     a->clicked = false;
+    int row;
+    if (button_row(a, false, &row)) {
+        if (a->volumeTests & 1 << row) test_stop(a, row);
+        else test_start(a, row);
+        return;
+    }
+    if (button_row(a, true, &row)) {
+        *row_mute(a, row) = !*row_mute(a, row);
+        apply_volumes(a);
+        return;
+    }
     for (int c = 0; c < an_voice_tabs(a)->count; c++)
-        if (on_tab(a, c)) a->volumeChar = c;
+        if (on_tab(a, c) && c != a->volumeChar) {
+            for (int i = 5; i < 8; i++) test_stop(a, i);
+            a->volumeChar = c;
+        }
     if (in_rect(a, 940, 5, 278, 40)) {
         an_volume_defaults(a);
         apply_volumes(a);
     }
     if (in_rect(a, 62, 670, 278, 40)) a->screen = SCR_NONE;
+    if (in_rect(a, 940, 670, 278, 40)) an_settings_open(a);
+    if (a->screen != SCR_VOLUME) an_volume_tests_stop(a);
 }
 
 typedef struct Option {

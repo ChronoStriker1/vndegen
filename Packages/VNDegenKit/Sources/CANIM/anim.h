@@ -308,6 +308,9 @@ struct AN {
     bool extraRepeat;
     char bgm[16], extraBgm[16];
     int volume[5], voiceVolume[AN_VOICE_TABS], bgvVolume[AN_VOICE_TABS], talkVolume[AN_VOICE_TABS], volumeChar, dragSlider, infoRow;
+    bool mute[5], voiceMute[AN_VOICE_TABS], bgvMute[AN_VOICE_TABS], talkMute[AN_VOICE_TABS];
+    int volumeTests;
+    char testBgm[16];
     int option[11], windowOpacity, textSpeed, autoSpeed;
     u32 sampleStart;
     FlowNode *flow;
@@ -390,6 +393,7 @@ int an_voice_tab(const AN *a, char letter);
 void an_snd_mix(AN *a, float *out, int frames);
 void an_snd_lock(AN *a, bool lock);
 void an_snd_set_volume(AN *a, int channel, float volume);
+void an_volume_tests_stop(AN *a);
 float an_channel_volume(AN *a, int channel, const char *name, int tag);
 
 bool an_movie_exists(AN *a, const char *name);

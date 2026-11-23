@@ -241,7 +241,7 @@ void an_snd_set_volume(AN *a, int channel, float volume) {
     struct Mixer *m = a->mix;
     if (!m || channel < 0 || channel >= CH_COUNT) return;
     pthread_mutex_lock(&m->lock);
-    m->vol[channel] = volume;
+    m->vol[channel] = m->talk[channel] = volume;
     pthread_mutex_unlock(&m->lock);
 }
 
@@ -265,13 +265,16 @@ static int char_index(const AN *a, const char *name, int tag) {
 }
 
 float an_channel_volume(AN *a, int channel, const char *name, int tag) {
-    float master = (float)a->volume[0] / 100.0f;
-    if (channel == CH_BGM) return master * (float)a->volume[1] / 100.0f;
-    if (channel == CH_VOICE) return master * (float)a->voiceVolume[char_index(a, name, 0)] / 100.0f;
+    float master = a->mute[0] ? 0 : (float)a->volume[0] / 100.0f;
+    if (channel == CH_BGM) return a->mute[1] ? 0 : master * (float)a->volume[1] / 100.0f;
+    if (channel == CH_VOICE) {
+        int k = char_index(a, name, 0);
+        return a->voiceMute[k] ? 0 : master * (float)a->voiceVolume[k] / 100.0f;
+    }
     if (channel >= CH_BGV0) {
         int k = char_index(a, name, tag);
-        if (a->mix) a->mix->talk[channel] = master * (float)a->talkVolume[k] / 100.0f;
-        return master * (float)a->bgvVolume[k] / 100.0f;
+        if (a->mix) a->mix->talk[channel] = a->talkMute[k] ? 0 : master * (float)a->talkVolume[k] / 100.0f;
+        return a->bgvMute[k] ? 0 : master * (float)a->bgvVolume[k] / 100.0f;
     }
-    return master * (float)a->volume[2] / 100.0f;
+    return a->mute[2] ? 0 : master * (float)a->volume[2] / 100.0f;
 }

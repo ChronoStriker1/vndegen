@@ -148,7 +148,13 @@ more arrays, at 0x2b and 0x2f in Double Date Dilemma (two tabs with background v
 Sword (eight); the last tab, Others, has only a voice volume. A voice or background voice belongs to the tab its
 character letter names (the last letter of a voice's name, the tag of a background voice). Magical Sword keeps every
 option at Double Date Dilemma's byte; its Voice Cut is Skip Voice. They're written when the player leaves either
-screen. Screen Mode isn't stored there, and VNDegen has no use for it.
+screen. Each volume's Play button (Magical Sword's PLAY) mutes it, the master and each character
+tab's three as well, and the mute is kept 0x64 bytes after its volume (1 muted), as the PC keeps it. Allow Test (TEST
+PLAY) loops a sample at that row's volume until it is clicked again, the screen is left or, for a character row, another
+tab is picked, each the sound the PC plays, matched by recording the original under Wine: the music room's first
+track, `wse20000`, `b090001g`, `b130008j`, the tab's `w<name>_sample` voice, and its background voices (`b1040` and
+`b5040` for Risa, `b2040` and `b6040` for Shiho; Magical Sword's `b<name>p20` for both rows). The Volume screen's To
+Settings button opens Settings. Screen Mode isn't stored there, and VNDegen has no use for it.
 
 Font Settings lists the fonts VNDegen has substitutes for, by their Windows names (Arial, Times New Roman, Courier New
 and so on), where the PC lists the fonts installed on Windows. The box above the list shows the font in use, a pick
@@ -221,7 +227,6 @@ buttons have their own on and off lines.
 - The second swimsuit event (NOM04) shows faint seams between its backdrop tiles that the PC doesn't.
 - When a line hides one layer and shows another, the PC holds the old picture for about half a second and then
   crossfades over about 0.3 s; VNDegen swaps them at once (seen when the goddess returns after the skill list).
-- The volume screen's Play and Allow Test buttons are drawn but do nothing.
 - The goddess (Malg202) draws her lids too low: her eyes look half closed where the PC's are open, in the story and in
   the Sprites viewer. Her irises now stay inside the eye whites. She is on screen in the opening (`000-000`, `000-010`)
   and in `060-040`/`060-050`, plus the `Mem30` replay (Malg200, Malg203). Her eye motion's time follows

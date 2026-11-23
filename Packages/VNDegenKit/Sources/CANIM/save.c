@@ -467,7 +467,7 @@ static const OptionByte OPTION_BYTES[GAME_COUNT][11] = {
         },
 };
 
-enum { SYS_VOLUME = 0x18, SYS_TEXT_SPEED = 0x27c, SYS_AUTO_SPEED = 0x280, SYS_OPACITY = 0x298, SYS_FONT = 0x7e324, SYS_FONT_SIZE = 32, SYS_SETTINGS_END = 0x7e530 };
+enum { SYS_VOLUME = 0x18, SYS_TEXT_SPEED = 0x27c, SYS_AUTO_SPEED = 0x280, SYS_OPACITY = 0x298, SYS_FONT = 0x7e324, SYS_MUTE = 0x64, SYS_FONT_SIZE = 32, SYS_SETTINGS_END = 0x7e530 };
 static const u32 VOLUME_BYTES[5] = {0x18, 0x19, 0x1b, 0x1e, 0x1f};
 
 static void settings_read(AN *a) {
@@ -479,13 +479,19 @@ static void settings_read(AN *a) {
         if (s[o->at] == o->first) a->option[i] = 0;
         else if (s[o->at] == o->second) a->option[i] = 1;
     }
-    for (int i = 0; i < 5; i++) a->volume[i] = clampi(s[VOLUME_BYTES[i]], 0, 100);
+    for (int i = 0; i < 5; i++) {
+        a->volume[i] = clampi(s[VOLUME_BYTES[i]], 0, 100);
+        a->mute[i] = s[VOLUME_BYTES[i] + SYS_MUTE] != 0;
+    }
     const VoiceTabs *t = an_voice_tabs(a);
     for (int c = 0; c < t->count; c++) {
         a->voiceVolume[c] = clampi(s[t->voiceAt + (u32)c], 0, 100);
+        a->voiceMute[c] = s[t->voiceAt + (u32)c + SYS_MUTE] != 0;
         if (c == t->count - 1) continue;
         a->bgvVolume[c] = clampi(s[t->bgvAt + (u32)c], 0, 100);
         a->talkVolume[c] = clampi(s[t->talkAt + (u32)c], 0, 100);
+        a->bgvMute[c] = s[t->bgvAt + (u32)c + SYS_MUTE] != 0;
+        a->talkMute[c] = s[t->talkAt + (u32)c + SYS_MUTE] != 0;
     }
     a->windowOpacity = clampi((int)rd32(s + SYS_OPACITY) * 100 / 217, 0, 100);
     a->textSpeed = clampi((200 - (int)rd32(s + SYS_TEXT_SPEED)) * 100 / 172, 0, 100);
@@ -504,13 +510,19 @@ static void settings_write(AN *a) {
         const OptionByte *o = &OPTION_BYTES[a->game][i];
         if (o->first != o->second) s[o->at] = a->option[i] ? o->second : o->first;
     }
-    for (int i = 0; i < 5; i++) s[VOLUME_BYTES[i]] = (u8)clampi(a->volume[i], 0, 100);
+    for (int i = 0; i < 5; i++) {
+        s[VOLUME_BYTES[i]] = (u8)clampi(a->volume[i], 0, 100);
+        s[VOLUME_BYTES[i] + SYS_MUTE] = a->mute[i];
+    }
     const VoiceTabs *t = an_voice_tabs(a);
     for (int c = 0; c < t->count; c++) {
         s[t->voiceAt + (u32)c] = (u8)clampi(a->voiceVolume[c], 0, 100);
+        s[t->voiceAt + (u32)c + SYS_MUTE] = a->voiceMute[c];
         if (c == t->count - 1) continue;
         s[t->bgvAt + (u32)c] = (u8)clampi(a->bgvVolume[c], 0, 100);
         s[t->talkAt + (u32)c] = (u8)clampi(a->talkVolume[c], 0, 100);
+        s[t->bgvAt + (u32)c + SYS_MUTE] = a->bgvMute[c];
+        s[t->talkAt + (u32)c + SYS_MUTE] = a->talkMute[c];
     }
     wr32(s + SYS_OPACITY, (u32)(a->windowOpacity * 217 / 100));
     wr32(s + SYS_TEXT_SPEED, (u32)(200 - a->textSpeed * 172 / 100));
