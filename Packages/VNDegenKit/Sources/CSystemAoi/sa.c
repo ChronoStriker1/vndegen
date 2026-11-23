@@ -1548,7 +1548,10 @@ void sa_debug_join(VNSystemAoi *sa, const char *key) {
 
 void sa_load_into_town(SA *s, int slot) {
     if (!s->inGame) sa_party_new_game(&s->party, &s->vfs);
-    if (!sa_save_read(s, slot)) return;
+    if (sa_save_read(s, slot)) sa_enter_loaded(s);
+}
+
+void sa_enter_loaded(SA *s) {
     sa_reset_scene(s);
     s->inGame = true;
     bool inDungeon = s->exp.active;
@@ -1560,6 +1563,13 @@ void sa_load_into_town(SA *s, int slot) {
     s->town.hover = -1;
     s->dirty = true;
     if (inDungeon) sa_exp_resume(s, s->exp.dungeon, s->exp.floor);
+}
+
+void sa_debug_pcload(VNSystemAoi *sa, const char *path) {
+    SA *s = (SA *)sa;
+    if (s->movie) movie_stop(s);
+    if (!s->inGame) sa_party_new_game(&s->party, &s->vfs);
+    if (sa_pcsave_read(s, path)) sa_enter_loaded(s);
 }
 
 void sa_debug_save(VNSystemAoi *sa, int slot, bool load) {

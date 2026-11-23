@@ -87,7 +87,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   YES and NO confirmation. A save holds the whole runtime state (variables, town, party, reserve, items, orders, the
   explored maps and the expedition) in VNDegen's own format, `vndegen/slotNN.sav` in the save folder. As in the
   original, the game autosaves at the start of each turn and on entering each dungeon floor, through ten slots in
-  turn; a dungeon autosave loads back onto its floor, any other save into the town.
+  turn; a dungeon autosave loads back onto its floor, any other save into the town. The original's own saves load
+  too (`pcsave.c`, through the codec in `aoicmp.c`): the variables, the town, Darkus and the equipment; other party
+  members and the map memory not yet.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
   FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
 

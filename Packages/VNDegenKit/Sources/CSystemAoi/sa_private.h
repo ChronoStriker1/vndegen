@@ -208,6 +208,8 @@ void sa_save_current(SA *s, SaveSummary *out);
 bool sa_save_read(SA *s, int slot);
 bool sa_save_summary(SA *s, int slot, SaveSummary *out);
 void sa_load_into_town(SA *s, int slot);
+void sa_enter_loaded(SA *s);
+bool sa_pcsave_read(SA *s, const char *path);
 void sa_savescreen_init(SaveScreen *v, Vfs *vfs);
 void sa_savescreen_free(SaveScreen *v);
 void sa_savescreen_open(SA *s, bool saving);

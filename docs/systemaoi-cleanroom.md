@@ -423,12 +423,17 @@ the same points (offsets in bytes, numbers little-endian):
 - **Town grid** at 1,010,852: 90 cells of five 32-bit numbers. A built cell holds the facility type (100 the 魔王亭,
   108 a field), a flag (1 the turn it was built), the level, a counter that grows each turn (4, 9 and 44 at turns 1, 2
   and 9) and 0. An empty cell holds 0, -1, 0, 0 and the cell's state (-1, 0 or 1).
-- **Item list** at 1,004,728: (item, count, flag) triples, starting with items 100, 104 and 143 (ダークスの剣, 名剣ルージュ
-  and 魔力の杖); likely the shop's stock.
+- **Equipment** at 1,004,728: (item, free, in use) triples, as the 装備 screen shows them (ダークスの剣 0/1 while
+  Darkus wields it). Equipping 名剣ルージュ instead moved the counts, changed Darkus's item at 87,220 from 100 to 104,
+  and his bonus at 86,716 (the second stat block's eleventh number) from 20 to 7, the items' 斬補正.
 - **Party** from 86,008: Darkus's unit (1), then his level at 86,020, EXP at 86,024, HP and MP at 86,036, skill
   points at 86,088 and the gains from training from 86,092 (体力ＵＰ wrote 15 there, and 185 into HP and both stat
-  blocks). Two 544-byte stat blocks at 86,132 and 86,676 (HP, MP, then the eight stats). The party's items as
-  (id, count) pairs from 87,228; at turn 9, with ダークスの剣 equipped, 87,220 holds (100, -1).
+  blocks). Two 544-byte stat blocks at 86,132 and 86,676: `unit.obj` columns 23 to 32 (HP, MP and the eight stats)
+  plus training, the second also holding the equipment bonus. The skill slots (column 38) at 86,588 and 87,132; the
+  equipped item at 87,220; the skills as (skill, 1) pairs from 87,228 (剣撃, 乱舞斬, 秘剣・鶯, 小回復, 火矢三連).
+- **What the original needs.** It loads an image holding only the party region, the scene state at 993,200 to
+  998,900, the town region at 1,004,728 to 1,013,300 and the variables, with everything else zero: no backlog, no
+  map memory. Its LOG screen then opens empty.
 - **Save details** in the variables: C002 and C013 the save time in Unix seconds, C003 the save count (shown at the
   top right of a slot's details, and the autosave panel's count), C011 the play time in seconds. Loading and saving
   again changes only these.
