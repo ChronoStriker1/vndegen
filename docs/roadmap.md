@@ -136,6 +136,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - ANIM's pose animations beside the story, and Extra's Animation page and Sprites viewer (0.59.3).
 - ANIM: clipped E-mote parts (the goddess's irises) and 8-bit E-mote textures (0.59.4).
 - SiglusEngine: saves made in VNDegen load in the PC version with their text, planetarian HD's PC saves load in VNDegen, and movies that store their sound behind the picture play all of it (0.59.5).
+- Wolf RPG saves keep The Clumsy Witch Seris's HUD and President Yukino's camera, and Drain Dungeon's progress counter (0.59.6).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
