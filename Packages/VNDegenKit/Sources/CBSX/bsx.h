@@ -310,7 +310,7 @@ typedef struct Settings {
 
 typedef struct VoiceLevel {
     char sig[4];
-    int voice, bgv;
+    int mask, voice, bgv;
 } VoiceLevel;
 
 struct BX {
@@ -591,5 +591,7 @@ void bx_settings_save(BX *b);
 void bx_settings_apply(BX *b);
 void bx_settings_defaults(BX *b);
 int bx_voice_level(BX *b, const char *name, bool bgv);
+VoiceLevel *bx_voice_of(BX *b, int mask);
+const char *bx_bgm_track(BX *b, const char *name);
 
 #endif

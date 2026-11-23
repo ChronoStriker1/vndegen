@@ -136,6 +136,11 @@ The PC engine writes `save/noNNN` (slots; 0 to 14 are its auto saves, made when 
   voice mask has a bit per settings character, the speakers' volumes scale their voices, and the BGV room's
   per-character volumes are the same BGV levels. VNDegen's own `save/vndegen.cfg` keeps only the x-count switch, which
   has no place there yet; its older settings are taken over once, when VNDegen first makes `common.dat`.
+- The settings screen has the BGV slider (`volume5`), Mesu Kyoushi 4's BGM select (`bgm selector pos0` and `pos1`) and
+  each character's 詳細 button, which opens `[detailed sound setting]`: the character's voice on or off and its voice
+  and BGV volume (the other speakers' for 他). With BGM select at マイルド (1), a track `define.bsa`'s `bgm_select`
+  table lists in its first column plays as the second (`bgm06` as `bgm11`); which column is which was read from the
+  table's order and the radio's stored value, not heard on the PC.
 - 3.3 adds the messages shown and the Lua table line after the message history.
 
 ## Museum
@@ -196,8 +201,7 @@ state` bit. `@museum_state` is the first of `bsxx.dat`'s persistent variables (s
   output (画像として保存する) does nothing; states keep their messages as they are. Its output slots last until the
   editor closes. Mesu Kyoushi 4's ahegao-off buttons (viewer and editor) are drawn but do nothing, and its steam
   setting isn't stored in a state. In 3.0 the free-sight scale past the face position is VNDegen's own.
-- Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing. Their settings screens lack
-  BGM SELECT, the per-character voice details and the BGV volume.
+- Mesu Kyoushi 3's and 4's dress screen (STRIP) isn't there; the button does nothing.
 - Mesu Kyoushi 3's `sync` system command is logged and skipped; it comes right before a startled line and its effect
   isn't known.
 - The space a translation puts after `「` is drawn; Mesu Kyoushi 4's PC drops it.

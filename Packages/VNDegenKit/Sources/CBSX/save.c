@@ -471,7 +471,7 @@ bool bx_load_slot(BX *b, int slot) {
     if ((i32)bgm > 0 && bgm < (u32)b->sc->strCount) {
         b->bgmIndex = (int)bgm;
         snprintf(b->bgmName, sizeof b->bgmName, "%s", b->sc->strs[bgm]);
-        bx_snd_play(b, CH_BGM, RX_BGM, b->bgmName, true, 500);
+        bx_snd_play(b, CH_BGM, RX_BGM, bx_bgm_track(b, b->bgmName), true, 500);
     } else {
         b->bgmName[0] = 0;
         bx_snd_stop(b, CH_BGM, 300);
