@@ -15,6 +15,7 @@ enum {
     TEXT_SIZE = 20,
     LINE_H = 20,
     ROW_H = 31,
+    COUNT_MS = 1000,
     NUM_Y = 5,
     NUM_SIZE = 20,
     NUM_SPACING = 6,
@@ -65,6 +66,7 @@ void sa_dialog_open(Dialog *d, const char *text) {
 void sa_dialog_open_turn(Dialog *d, const int before[4], const int after[4], const char *text) {
     sa_dialog_open(d, text);
     d->table = true;
+    d->ms = 0;
     memcpy(d->before, before, sizeof d->before);
     memcpy(d->after, after, sizeof d->after);
 }
@@ -72,6 +74,12 @@ void sa_dialog_open_turn(Dialog *d, const int before[4], const int after[4], con
 static int ok_y(const Dialog *d) { return DLG_Y + HEAD_H + (d->table ? TABLE_H : 0) + TEXT_H + OK_DY; }
 
 static bool on_ok(const Dialog *d, int x, int y) { return x >= OK_X && x < OK_X + OK_W && y >= ok_y(d) && y < ok_y(d) + OK_H; }
+
+bool sa_dialog_tick(Dialog *d, u32 ms) {
+    if (!d->table || d->ms >= COUNT_MS) return false;
+    d->ms += ms;
+    return true;
+}
 
 bool sa_dialog_hover(Dialog *d, int x, int y) {
     bool h = on_ok(d, x, y);
@@ -106,7 +114,8 @@ void sa_dialog_draw(Dialog *d, u32 *fb) {
             int ry = y + i * ROW_H, delta = d->after[i] - d->before[i];
             u32 shade = delta > 0 ? 0x007fff : delta < 0 ? 0xff0000 : 0x321a02;
             number(fb, d->before[i], BEFORE_RIGHT, ry + NUM_Y, NUM_SIZE, NUM_SPACING, 0x321a02);
-            number(fb, d->after[i], AFTER_RIGHT, ry + NUM_Y, NUM_SIZE, NUM_SPACING, shade);
+            int shown = d->ms >= COUNT_MS ? d->after[i] : d->before[i] + (int)((int64_t)delta * d->ms / COUNT_MS);
+            number(fb, shown, AFTER_RIGHT, ry + NUM_Y, NUM_SIZE, NUM_SPACING, shade);
             number(fb, delta < 0 ? -delta : delta, DELTA_RIGHT, ry + DELTA_Y, DELTA_SIZE, 1, shade);
         }
         y += TABLE_H;

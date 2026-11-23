@@ -62,7 +62,8 @@ where play couldn't pin it down.
 - **`8a`, the message box.** Measured from the original: the box from `chipB`'s `ret_a02` header at (430, 130), the
   `ret_a04` text area (text at (462, 178), 20 pixels a line) and the `ret_a00` foot with OK (`ret_a01`, normal and
   hover) at (565, 332). The turn's income box adds `ret_a03` (住民, 食料, 資金 and 資源 before, change and after)
-  between the header and the text, says このターンの収支です, and shows rises in blue. The script's last operand is
+  between the header and the text, says このターンの収支です, and shows rises in blue. The after column counts up from the
+  before value (measured: 1066 on the way from 1060 to 1090); over a second (inferred). The script's last operand is
   the text; what the four numbers before it do is still open (the defeat hook passes four variables, the unit-join
   messages pass a number first, perhaps a picture for `ret_a05`).
 - **Script hooks.** `init.box` registers a script per hook number with `72`: 0 `bo0000` (each turn), 27 `bo2700`

@@ -559,6 +559,7 @@ typedef struct Dialog {
     char *lines[DIALOG_LINES];
     int lineCount;
     int before[4], after[4];
+    u32 ms;
     Image *art[DIALOG_ART];
 } Dialog;
 
@@ -566,6 +567,7 @@ void sa_dialog_init(Dialog *d, Vfs *vfs);
 void sa_dialog_free(Dialog *d);
 void sa_dialog_open(Dialog *d, const char *text);
 void sa_dialog_open_turn(Dialog *d, const int before[4], const int after[4], const char *text);
+bool sa_dialog_tick(Dialog *d, u32 ms);
 bool sa_dialog_hover(Dialog *d, int x, int y);
 bool sa_dialog_click(Dialog *d, int x, int y);
 void sa_dialog_draw(Dialog *d, u32 *fb);

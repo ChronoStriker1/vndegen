@@ -686,8 +686,9 @@ static void next_turn(SA *s) {
     sa_start_script(s, "bo0000.box", 0);
 }
 
-static bool dialog_input(SA *s) {
+static bool dialog_input(SA *s, u32 ms) {
     if (!s->dialog.open) return false;
+    if (sa_dialog_tick(&s->dialog, ms)) s->dirty = true;
     if (sa_dialog_hover(&s->dialog, s->mouseX, s->mouseY)) s->dirty = true;
     s->rightClicked = false;
     if (s->clicked) {
@@ -991,7 +992,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         }
         return true;
     }
-    if (s->mode == MODE_TOWN && dialog_input(s)) {
+    if (s->mode == MODE_TOWN && dialog_input(s, elapsedMs)) {
         if (s->mode == MODE_TOWN && s->dirty) {
             sa_town_draw(&s->town, &s->vfs, &s->vm, s->fb);
             sa_dialog_draw(&s->dialog, s->fb);
@@ -1014,7 +1015,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         }
         if (s->mode == MODE_TOWN) return true;
     }
-    dialog_input(s);
+    dialog_input(s, elapsedMs);
     if (s->total && s->shown < s->total) {
         s->textMs += elapsedMs;
         int want = (int)(s->textMs / 30);
