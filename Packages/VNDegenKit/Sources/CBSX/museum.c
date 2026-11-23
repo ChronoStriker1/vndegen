@@ -609,6 +609,12 @@ static void open_mode(BX *b, MuseumPhase *u, int mode) {
     }
 }
 
+bool bx_museum_cutin_tag(BX *b, const char *name) {
+    Museum *m = b->museum;
+    int id = m ? name_id(m, name) : -1;
+    return id >= 0 && strchr(m->tags[id], 'c');
+}
+
 static bool is_cutin(const Museum *m, const int *ids, int count, int i) {
     if (strchr(m->tags[ids[i]], 'c')) return true;
     const char *n = m->names[ids[i]];

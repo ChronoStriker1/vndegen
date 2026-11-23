@@ -249,6 +249,16 @@ void bx_compose(BX *b, const Scene *s, u32 *dst) {
     bx_compose_over(b, s, dst);
 }
 
+static bool cut_in(BX *b, const Obj *const *list, int count, int i) {
+    const char *n = list[i]->name;
+    if (bx_museum_cutin_tag(b, n)) return true;
+    size_t len = strlen(n);
+    if (len < 2 || n[len - 1] != 'c') return false;
+    for (int k = 0; k < count; k++)
+        if (k != i && strlen(list[k]->name) == len - 1 && !strncmp(list[k]->name, n, len - 1)) return true;
+    return false;
+}
+
 void bx_compose_over(BX *b, const Scene *s, u32 *dst) {
     const Obj *list[BX_OBJS];
     int count = 0;
@@ -257,7 +267,8 @@ void bx_compose_over(BX *b, const Scene *s, u32 *dst) {
     qsort(list, (size_t)count, sizeof *list, order_cmp);
     const char *tint = count && list[0]->kind == OK_BG ? bx_cfg_get(&b->cfg, "bu color adjustment", list[0]->name) : NULL;
     if (tint && !strchr("*+-^/&", tint[0])) tint = NULL;
-    for (int i = 0; i < count; i++) draw_obj(b, list[i], dst, tint);
+    for (int i = 0; i < count; i++)
+        if (b->cutIn || !cut_in(b, list, count, i)) draw_obj(b, list[i], dst, tint);
 }
 
 static bool numbered(int kind) { return kind != OK_BG; }

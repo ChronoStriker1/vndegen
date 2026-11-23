@@ -554,6 +554,7 @@ void bx_log_draw(BX *b, u32 *dst);
 void bx_log_free(BX *b);
 
 void bx_museum_init(BX *b);
+bool bx_museum_cutin_tag(BX *b, const char *name);
 void bx_museum_tables(BX *b);
 void bx_museum_counts(BX *b, int *names, int *scenes);
 void bx_museum_free(BX *b);
