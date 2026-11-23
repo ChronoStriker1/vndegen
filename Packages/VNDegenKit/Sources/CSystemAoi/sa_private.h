@@ -26,6 +26,16 @@ typedef struct Equip {
     int unit, item, hover;
 } Equip;
 
+#define SHOP_ICONS 100
+#define SHOP_ROWS 256
+#define SHOP_ROWS_MAX 256
+
+typedef struct Shop {
+    Image *art[22], *icon[SHOP_ICONS], *bigIcon[SHOP_ICONS];
+    int trade[SHOP_ROWS_MAX];
+    int hover, focus, scroll;
+} Shop;
+
 typedef struct Expedition {
     bool active;
     int dungeon, floor, row;
@@ -39,7 +49,7 @@ typedef struct Expedition {
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -105,6 +115,7 @@ struct SA {
     Expedition exp;
     Policy policy;
     Equip equip;
+    Shop shop;
     bool turnPending;
     bool inGame;
     int afterScript;
@@ -135,6 +146,11 @@ void sa_equip_init(Equip *e, Vfs *vfs);
 void sa_equip_free(Equip *e);
 void sa_equip_open(SA *s);
 bool sa_equip_frame(SA *s);
+void sa_shop_init(Shop *p, Vfs *vfs);
+void sa_shop_free(Shop *p);
+void sa_shop_open(SA *s);
+bool sa_shop_frame(SA *s);
+void sa_shop_wheel(SA *s, int notches);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);
 void sa_exp_open_select(SA *s);

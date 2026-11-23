@@ -389,6 +389,10 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
 
 void sa_town_draw_status(Town *t, const VM *vm, u32 *fb) {
     sa_town_draw_info(t, vm, fb);
+    sa_town_draw_status_goal(t, vm, fb);
+}
+
+void sa_town_draw_status_goal(Town *t, const VM *vm, u32 *fb) {
     sa_blit(fb, t->ui[UI_GOAL], GOAL_X, GOAL_Y);
     sa_draw_number(fb, t->ui[UI_DIGITS], "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);
     char turn[16];

@@ -274,3 +274,19 @@ calls it is inferred from that and from play, and marked so.
   and 射 for physical skills, 魔 for the rest; the others inferred). (damage) × 120% rounded up also fits both
   samples; a target with more defence would tell them apart. Other effects (defence, speed, resistances) aren't
   applied yet. Hovering a member or an item shows a detail card that isn't built yet.
+
+## 商会, from the screen
+
+- **Screen.** Measured (93% of pixels exact; the rest is the figure's expression and the card's text): the library
+  `bg009a0` with ソフィア (`ta01a000`) at the left; the list `shp_a00` at (241, 21) with the tabs `shp_b01` to `b06`
+  and a 35-pixel row per item (`shp_a01`) from (241, 74): icon, name, 販売価格, 売却価格, 所持数, 取引数, and the
+  buttons 購入 (`shp_g00`), 売却 (`g01`) and キャンセル (`g02`) at x 693, 765 and 837 (normal, hover, disabled);
+  the item card `pit_a00` at (968, 86); the 所持金 box `flw_a02` at (1077, 31) under the goal box; the totals
+  `shp_d00` at (968, 530) with 購入合計, 売却合計 and 計; 決定 (`shp_d01`) at (1048, 620) and 戻る (`shp_e00`) at
+  (1120, 672).
+- **Stock and prices.** Measured: the list holds, in `item.obj` order, the items on sale and the ones the party owns.
+  An item is on sale when column 7 is 0 (inferred: or when the flag it names, 170 to 175, is set); otherwise its
+  販売価格 shows dashes. 販売価格 is column 9, 売却価格 a quarter of it (150 → 37, 500 → 125, 1000 → 250). 所持金 is
+  the town's 資金.
+- **Trading.** Inferred: 購入 and 売却 add one to the row's 取引数 (a row trades one way), キャンセル clears it, and
+  決定 applies all of them at once; equipped items can't be sold, and 購入 stops when the money would run out.

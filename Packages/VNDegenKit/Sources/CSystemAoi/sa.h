@@ -556,6 +556,7 @@ int sa_town_hit(const Town *t, const VM *vm, int x, int y);
 bool sa_town_hover(Town *t, const VM *vm, int x, int y);
 void sa_town_draw_info(Town *t, const VM *vm, u32 *fb);
 void sa_town_draw_status(Town *t, const VM *vm, u32 *fb);
+void sa_town_draw_status_goal(Town *t, const VM *vm, u32 *fb);
 void sa_draw_number(u32 *fb, const Image *font, const char *s, int right, int y, int row, int cw, int ch);
 void sa_draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch);
 Image *sa_load_image(Vfs *vfs, const char *name);
