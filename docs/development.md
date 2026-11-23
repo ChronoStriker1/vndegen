@@ -43,6 +43,8 @@ The DEBUG launch argument `-forceOrientation landscape` asks the scene to turn t
 
 A DEBUG build takes `-libraryRoot <folder>`, which points the app at a separate library so test runs never touch `~/Games/VNDegen`, and `-autolaunch "<game folder name>"`, which starts a game directly.
 
+On a Mac whose foreground belongs to another app, such as a shared build Mac, a DEBUG app launched from a shell is never the active app, so a web game's page never has focus. Launch it with `-ignoreOcclusion YES` for web engine checks there. The page then keeps running while no window shows, and `document.hasFocus()` reports true, as in a focused window. Without it, RPG Maker MZ advances no Effekseer animation, since it does that only while the page has focus, and a game that keeps its scene running without focus, as Fallen Kunoichi does, waits forever on an animation that says to wait (#195). Stock MZ stops its whole scene while the page has no focus, as on the PC.
+
 ### Installing your own build
 
 `scripts/build.sh ipa` makes an unsigned IPA. Sideloadly or AltStore signs and installs it with a free Apple ID. Apps signed that way expire after 7 days and need to be installed again.

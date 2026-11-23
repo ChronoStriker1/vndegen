@@ -12,7 +12,7 @@ import WebKit
 
     /// `folder` sets the paths the shim reports, such as `process.mainModule.filename`, and `runtime` what it emulates.
     init(storage: Bool = true, scripts: [String] = [], scheme: (any WKURLSchemeHandler)? = nil, folder: GameFolder? = nil,
-         runtime: PageRuntime? = nil, answer: @escaping (BridgeRequest) -> BridgeReply) throws {
+         runtime: PageRuntime? = nil, alwaysFocused: Bool = false, answer: @escaping (BridgeRequest) -> BridgeReply) throws {
         self.answer = answer
         let root = TestFolders.root
         let game = WebGameConfiguration(folder: folder ?? GameFolder(root: root, webRoot: ""), appName: "test", runtime: runtime,
@@ -21,7 +21,7 @@ import WebKit
         let configuration = WKWebViewConfiguration()
         configuration.mediaTypesRequiringUserActionForPlayback = []
         if let scheme { configuration.setURLSchemeHandler(scheme, forURLScheme: GameFolder.scheme) }
-        for source in [try WebGameSession.shimSource(for: game)] + scripts {
+        for source in [try WebGameSession.shimSource(for: game, alwaysFocused: alwaysFocused)] + scripts {
             configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)

@@ -653,6 +653,8 @@
         if (window.visualViewport) window.visualViewport.addEventListener('resize', unscroll);
     }
 
+    if (config.focus === 'always') document.hasFocus = () => true;
+
     // Console and uncaught errors go to the app log, where scripts/sim.sh log can show them.
     function describe(value) {
         if (typeof value === 'string') return value;
