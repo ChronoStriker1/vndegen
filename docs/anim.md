@@ -131,7 +131,12 @@ scales it loads the scene with no characters. The comment is the speaker and the
 does; a longer comment that holds a line break loads black on the PC. Saves load both ways with the PC.
 The comment is kept in Shift-JIS, as the PC reads it. Magical Sword's PC writes the speaker and the line without a
 break, and its cards show the first 40 bytes broken at 206 pixels wherever that falls, mid-word included; Double
-Date Dilemma's show two lines of up to 20 characters broken at spaces. Magical Sword autosaves before each choice (op `15`, which Double Date Dilemma's PC doesn't act on): slots 160 to 167
+Date Dilemma's show two lines of up to 20 characters broken at spaces. Magical Sword's cards say "Click to edit comment." over a used card's
+comment, on both Save and Load, where the PC opens a text box on the card; VNDegen asks for the text in a system prompt
+instead and writes it over the card's comment, up to 100 bytes of Shift-JIS, leaving the old bytes after its end as the
+PC leaves them. The PC shows a comment VNDegen wrote. What the PC stores for typed text couldn't be watched: under Wine
+its box reads back empty, so the PC writes an empty comment whatever is typed. Double Date Dilemma's cards have no
+comment editing on the PC. Magical Sword autosaves before each choice (op `15`, which Double Date Dilemma's PC doesn't act on): slots 160 to 167
 in turn, the last one used kept at 0x0c in the system save (-1 before the first), the slot resuming at the choice
 itself. Its Load screen's AUTO SAVE button shows those eight as cards 161 to 168. The PC's own autosave thumbnail
 comes out black under Wine; VNDegen's shows the scene. A card's DELETE and the Reset Saves button clear the slot, or all 180, to zeros after a confirmation, as the PC
@@ -239,5 +244,4 @@ buttons have their own on and off lines.
   in the opening's 300% close-up (34 and 20 on the iPad simulator). A Release build on the iPad simulator updates the
   screen about as often (32 and 20, counted from screen recordings), so the close-up isn't smooth there; a Release Mac
   app hasn't been watched, since its library and input can't be set from a test run.
-- The PC's comment editing on save cards isn't built.
 - The PC's screen effects (shake, flashes other than the colour flash) are approximated.

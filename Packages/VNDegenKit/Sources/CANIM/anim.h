@@ -260,6 +260,7 @@ struct AN {
     char *dir, *saveDir, *base;
     int game;
     char page[1024];
+    int commentSlot;
     FILE *log;
     char problem[512];
     char title[256];
@@ -407,6 +408,7 @@ void an_movie_mix(AN *a, float *out, int frames);
 enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_BGV0 = CH_SE0 + AN_SE, CH_COUNT = CH_BGV0 + 4 };
 
 bool an_slot_info(AN *a, int slot, SlotInfo *info);
+bool an_set_comment(AN *a, int slot, const char *utf8);
 bool an_save_slot(AN *a, int slot);
 void an_auto_save(AN *a, u32 pc);
 int an_last_auto(const AN *a);

@@ -263,6 +263,26 @@ static bool write_saves(AN *a) {
 
 static void clear_slot(AN *a, int slot) { memset(slot_data(a, slot), 0, SLOT_SIZE); }
 
+bool an_set_comment(AN *a, int slot, const char *utf8) {
+    u8 *s = slot_data(a, slot);
+    if (!s || rd16(s) != 1) return false;
+    char *sjis = an_utf8_to_sjis(utf8);
+    size_t n = strlen(sjis), cap = COMMENT_MAX - 1;
+    if (n > cap) {
+        n = 0;
+        for (const u8 *p = (const u8 *)sjis; *p;) {
+            size_t len = ((*p >= 0x81 && *p <= 0x9f) || (*p >= 0xe0 && *p <= 0xfc)) && p[1] ? 2 : 1;
+            if (n + len > cap) break;
+            n += len;
+            p += len;
+        }
+    }
+    memcpy(s + OFF_COMMENT, sjis, n);
+    s[OFF_COMMENT + n] = 0;
+    free(sjis);
+    return write_saves(a);
+}
+
 bool an_delete_slot(AN *a, int slot) {
     if (!slot_data(a, slot)) return false;
     clear_slot(a, slot);

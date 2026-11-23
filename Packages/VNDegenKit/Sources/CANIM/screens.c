@@ -55,7 +55,11 @@ static void confirm_input(AN *a) {
 }
 
 enum { CARD_X = 27, CARD_Y = 119, CARD_DX = 310, CARD_DY = 274, CARD_W = 296, CARD_H = 260 };
-enum { LABEL_CX = 171, LABEL_Y = 227 };
+enum { LABEL_CX = 171, LABEL_Y = 227, COMMENT_DX = 70, COMMENT_DY = 160, COMMENT_W = 202, COMMENT_H = 54 };
+
+static bool edits_comments(const AN *a) { return a->game == GAME_MGSW; }
+
+static Rect comment_box(Rect card) { return (Rect){card.x + COMMENT_DX, card.y + COMMENT_DY, COMMENT_W, COMMENT_H}; }
 enum { DEL_DX = 201, DEL_DY = 15, DEL_W = 78, DEL_H = 26, RESET_X = 1148, RESET_Y = 24, RESET_W = 110, RESET_H = 67 };
 enum { PAGE_X = 201, PAGE_Y = 16, PAGE_DX = 82, PAGE_DY = 45, PAGE_W = 78, PAGE_H = 38 };
 
@@ -245,8 +249,10 @@ static void draw_slots(AN *a, bool saving) {
         if (hover && (used || saving)) {
             Rect d = delete_button(r);
             bool del = used && in_rect(a, d.x, d.y, d.w, d.h);
-            int lx = del ? 603 : saving ? 659 : 658, lw = del ? 205 : saving ? 95 : 96;
-            an_gfx_blit(a->fb, a->W, a->H, b, lx, del ? 586 : 532, lw, 17, r.x + LABEL_CX - lw / 2, r.y + LABEL_Y, 255);
+            Rect c = comment_box(r);
+            bool edit = !del && used && edits_comments(a) && in_rect(a, c.x, c.y, c.w, c.h);
+            int lx = del ? 603 : edit ? 629 : saving ? 659 : 658, lw = del ? 205 : edit ? 153 : saving ? 95 : 96;
+            an_gfx_blit(a->fb, a->W, a->H, b, lx, del ? 586 : edit ? 613 : 532, lw, 17, r.x + LABEL_CX - lw / 2, r.y + LABEL_Y, 255);
         }
         if (!used) continue;
         Image *t = thumb(a, slot);
@@ -324,6 +330,11 @@ static void slots_input(AN *a, bool saving) {
         Rect d = delete_button(r);
         if (in_rect(a, d.x, d.y, d.w, d.h)) {
             if (used) an_confirm(a, MSG_DELETE, ACT_DELETE, slot);
+            return;
+        }
+        Rect c = comment_box(r);
+        if (used && edits_comments(a) && in_rect(a, c.x, c.y, c.w, c.h)) {
+            a->commentSlot = slot;
             return;
         }
         if (saving) {
