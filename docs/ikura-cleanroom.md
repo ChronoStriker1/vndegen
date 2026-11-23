@@ -46,6 +46,8 @@ Things that were unsure and how they were settled:
   PC's saves showed each layer keeping its place in the drawing order; both together are a renumbering.
 - Raidy II's window font: Wine draws a proportional face because the prefix has no MS Gothic. A Windows install has
   MS Gothic, so VNDegen draws the MS Gothic substitute the script names.
+- A save made after the opening's logo replaced the desert's picture slot loads, on the PC under Wine and in VNDegen
+  alike, with the logo on black: the slot holds the logo, and a loaded layer is built from its slot.
 - When the global block is written: under Wine, Raidy II's PC played its ending from a crafted save and kept the
   clear flag (512) out of `RAIDY2R.SAV` until it quit from the title; its global block then matched, byte for byte,
   the one VNDegen writes when it closes after the same ending.

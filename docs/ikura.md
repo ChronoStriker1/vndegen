@@ -143,4 +143,8 @@ Games start on the "Visual novel" controller layout.
 - The texture filtering and lighting of the 3D view are close to, not identical with, the PC's.
 - Raidy II: the arguments of `0716`/`0717` after the cells, `000e`, `0010`, `0011` and `0724` are accepted and do
   nothing; what they do wasn't found. `090b`, at the end of most scenes, and `090c` are accepted and do nothing.
-- Raidy II: the ending (`L2_ED`) wasn't played through.
+- Raidy II was played by hand only on the first dungeon floor. The rest was run headless: each of its 135 story
+  scripts started from a save built from the shipped unlock save's dungeon slot and auto-played 250 steps with no
+  error, missing file or sanitizer report, and the ending (`L2_ED`), from the line before it, plays through the staff
+  roll to the title as the PC's does under Wine, its global block then the PC's byte for byte. Later floors weren't
+  walked or fought through.
