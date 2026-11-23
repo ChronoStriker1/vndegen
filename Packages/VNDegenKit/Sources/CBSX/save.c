@@ -151,7 +151,7 @@ static void put_wears(BX *b, Buf *buf) {
         snprintf(key, sizeof key, "ch%d max wear no", i + 1);
         int w = clampi(bx_cfg_int(&b->cfg, "bustup setting", key, 0), 0, 255) + 1;
         put32(buf, (u32)w);
-        zeros(buf, (size_t)w);
+        for (int k = 0; k < w; k++) put8(buf, i < BX_DRESS_CH && k < BX_DRESS_WEAR ? b->dressRec[i][k] : 0);
     }
 }
 
@@ -238,7 +238,9 @@ bool bx_save_slot(BX *b, int slot) {
     put32(&buf, (u32)mode_of(b));
     put32(&buf, 0);
     put32(&buf, 1);
-    zeros(&buf, 9);
+    zeros(&buf, 5);
+    put8(&buf, b->dressAll);
+    zeros(&buf, 3);
     put_wears(b, &buf);
     u32 cap = s->hdr[0] ? s->hdr[0] : 1024;
     put32(&buf, b->th.pc);
@@ -280,7 +282,8 @@ bool bx_save_slot(BX *b, int slot) {
     for (int i = 0; i < count; i++) {
         const Obj *o = list[i];
         int parts = o->kind == OK_BG ? (o->face[0] ? 2 : 0) : 2;
-        put_obj(b, &buf, o->name, o->kind, o->x, o->y, parts, o->alpha);
+        char dressed[64];
+        put_obj(b, &buf, o->kind == OK_CHAR && bx_dress_name(b, o->name, dressed) ? dressed : o->name, o->kind, o->x, o->y, parts, o->alpha);
         if (o->kind == OK_BG && o->face[0]) put_obj(b, &buf, o->face, OK_OVERLAY, 0, 0, 2, 255);
     }
     put8(&buf, 0xff);
@@ -380,9 +383,16 @@ bool bx_load_slot(BX *b, int slot) {
     int shown = (int)rd32(d + 36 + info - SLOT_INFO + 76);
     skip(&r, 0x24);
     int mode = (int)get32(&r);
-    skip(&r, 4 + 4 + 9);
+    skip(&r, 4 + 4 + 5);
+    u8 dressAll = r.bad || r.p >= r.n ? 0 : r.d[r.p];
+    skip(&r, 4);
+    u8 dressRec[BX_DRESS_CH][BX_DRESS_WEAR] = {{0}};
     u32 chars = get32(&r);
-    for (u32 i = 0; i < chars && i < 64 && !r.bad; i++) skip(&r, get32(&r));
+    for (u32 i = 0; i < chars && i < 64 && !r.bad; i++) {
+        u32 w = get32(&r);
+        for (u32 k = 0; k < w && i < BX_DRESS_CH && k < BX_DRESS_WEAR && r.p + k < r.n; k++) dressRec[i][k] = r.d[r.p + k];
+        skip(&r, w);
+    }
     u32 pc = get32(&r);
     u32 depth = get32(&r);
     u32 cap = get32(&r);
@@ -468,6 +478,8 @@ bool bx_load_slot(BX *b, int slot) {
     bx_transition(b, 0, 0, NULL);
     b->shownDirty = true;
     b->stripLevel = b->viewLevel = 0;
+    memcpy(b->dressRec, dressRec, sizeof dressRec);
+    b->dressAll = dressAll;
     bool bust = false;
     for (int i = 0; i < BX_OBJS; i++) bust |= b->scene.obj[i].used && b->scene.obj[i].kind == OK_CHAR;
     b->dressEnabled = b->viewEnabled = bust;
