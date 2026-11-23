@@ -78,6 +78,7 @@ void bx_phase_end(BX *b) {
 void bx_phase_reset(BX *b) {
     bx_config_free(b);
     bx_status_free(b);
+    bx_dress_free(b);
     bx_data_free(b);
     bx_log_free(b);
     bx_map_free(b);
@@ -118,9 +119,9 @@ void bx_phase_start(BX *b, int phase) {
     b->winShown = false;
     if (phase == PH_TITLE) title_start(b);
     else if (phase == PH_MAP) {
-        if (bx_map_start(b)) bx_autosave(b);
+        if (bx_map_start(b)) b->autosavePending = true;
         else bx_phase_end(b);
-    } else if (phase == PH_CUSTOM_MAP && !bx_cfg_section(&b->cfg, "map phase")) bx_autosave(b);
+    } else if (phase == PH_CUSTOM_MAP && !bx_cfg_section(&b->cfg, "map phase")) b->autosavePending = true;
 }
 
 static void title_pick(BX *b, const char *key) {
@@ -152,11 +153,19 @@ static void title_pick(BX *b, const char *key) {
         return;
     }
     bx_phase_end(b);
+    if (!strcmp(key, "start")) {
+        memset(b->dressRec, 0, sizeof b->dressRec);
+        b->dressAll = 0;
+    }
     b->th.sp = 0;
     bx_vm_goto(b, l);
 }
 
 void bx_phase_update(BX *b) {
+    if (b->phase == PH_DRESS) {
+        bx_dress_update(b);
+        return;
+    }
     if (b->phase == PH_STATUS) {
         bx_status_update(b);
         return;
@@ -199,6 +208,10 @@ void bx_phase_update(BX *b) {
 }
 
 void bx_phase_draw(BX *b, u32 *dst) {
+    if (b->phase == PH_DRESS) {
+        bx_dress_draw(b, dst);
+        return;
+    }
     if (b->phase == PH_STATUS) {
         bx_status_draw(b, dst);
         return;
@@ -270,6 +283,7 @@ void bx_ui_free(BX *b) {
     phase_free(b);
     bx_config_free(b);
     bx_status_free(b);
+    bx_dress_free(b);
     bx_data_free(b);
     bx_log_free(b);
     bx_map_free(b);
@@ -348,6 +362,7 @@ static void button_press(BX *b, const char *key) {
     else if (!strcmp(key, "log")) bx_log_open(b);
     else if (!strcmp(key, "config")) bx_config_open(b);
     else if (!strcmp(key, "status")) bx_status_open(b);
+    else if (!strcmp(key, "dress")) bx_dress_open(b);
     else if (!strcmp(key, "save")) bx_open_data(b, true);
     else if (!strcmp(key, "load")) bx_open_data(b, false);
     else bx_log(b, "menu button %s isn't available yet", key);

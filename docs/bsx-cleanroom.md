@@ -46,7 +46,10 @@ Things that were unsure and how they were settled:
 - Auto saves: the original wrote `no000` on reaching the map; the manual says choices save too. Mesu Kyoushi 1's PC wrote
   `no000` again on each of three map visits in a row, and Mesu Kyoushi 1's and 4's took a manual save in slot 1; VNDegen had
   spread its auto saves over the slots below `no begin` and refused manual saves there. Mesu Kyoushi 4's
-  original wrote `no000` with mode 9 as its custom map opened.
+  original wrote `no000` with mode 9 as its custom map opened. Both PCs' map auto saves picture the drawn map; VNDegen
+  had saved before drawing it, so Mesu Kyoushi 1's picture came out black on the Mac. Mesu Kyoushi 4's PC also wrote
+  mode 9 for a manual save from the map's menu bar and loaded it onto the map with no text; VNDegen had written the save
+  screen's phase as mode 1 and loaded the last line over the map.
 - Picture record sizes: Mesu Kyoushi 4's saves hold each picture's size (an icon frame is 80x80), the frame count (2
   for icons), and a background's two parts only with a face; 3.0's 800x600 matched because its pictures were
   full-screen.
@@ -70,6 +73,14 @@ Things that were unsure and how they were settled:
 - The editor's state file: diffs of `buex_dsNN.dat` the PC wrote after each single change under Wine (Mesu Kyoushi 1
   and 3); every one loads in VNDegen and is written back identical, and its thumbnail compares with VNDegen's at 2.7
   (Mesu Kyoushi 1) and 8.8 (Mesu Kyoushi 3, mostly the bust-ups' sharpness) mean difference.
+- The dress screen, under Wine (Mesu Kyoushi 4 at Miyu's first line, Mesu Kyoushi 3 from a save): saves made after each
+  change gave the record bytes (下着 on 普段着 wrote ch5 byte 1 = 4; 全服装一括 at 全裸 and 下着 wrote byte 0 = 6 and 5;
+  全体 at 下着 and 全裸 wrote 5 and 6 in the play head's 14th byte, and 個別 wrote 0; Mesu Kyoushi 3's 全裸, row 4 with
+  `ngng convert table` 0, 1, 2, 3, 5, wrote 6). A save kept its bust-up as `bu05f4012b12` and, loaded later, the
+  next close-up came up in underwear and the page showed 下着. No script line in Mesu Kyoushi 3 or 4 names a bust-up
+  with an undress digit above 0, so the dress state is the only thing that undresses a bust-up. The figure's place
+  came from diffing a page with and without it: `co054012` (332x576 at 102,100 in a 550x700 canvas) at 339,134. A
+  save VNDegen wrote at 全裸 on 普段着 loaded on the PC with Miyu undressed and the page at 全裸.
 - The editor's rows: Mesu Kyoushi 1's layout comments name its first two rows the other way round; its panel labels
   and saved states show the same pose, view, undress, outfit, underwear, face order as Mesu Kyoushi 3.
 - The editor's close-up placement: scanning offsets against the PC's thumbnails gave the canvas centring and, from a

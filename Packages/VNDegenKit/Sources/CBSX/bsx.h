@@ -166,6 +166,8 @@ typedef struct Thread {
 enum { OK_BG = 1, OK_OVERLAY = 2, OK_CHAR = 3, OK_OBJ = 160 };
 
 #define BX_OBJS 64
+#define BX_DRESS_CH 32
+#define BX_DRESS_WEAR 64
 
 typedef struct KeyFrame {
     int no, x, y, opacity;
@@ -246,7 +248,7 @@ typedef struct Button {
     int group;
 } Button;
 
-enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG, PH_STATUS, PH_MUSEUM };
+enum { PH_NONE, PH_TITLE, PH_MAP, PH_CUSTOM_MAP, PH_DATA, PH_TITLE_LOAD, PH_CONFIG, PH_LOG, PH_STATUS, PH_MUSEUM, PH_DRESS };
 
 typedef struct Phase Phase;
 typedef struct MapPhase MapPhase;
@@ -254,6 +256,7 @@ typedef struct DataPhase DataPhase;
 typedef struct LogPhase LogPhase;
 typedef struct ConfigPhase ConfigPhase;
 typedef struct StatusPhase StatusPhase;
+typedef struct DressPhase DressPhase;
 typedef struct Museum Museum;
 typedef struct MuseumPhase MuseumPhase;
 typedef struct BgvPanel BgvPanel;
@@ -421,6 +424,7 @@ struct BX {
     Museum *museum;
     MuseumPhase *museumPhase;
     bool replaying;
+    bool autosavePending;
     int replayPage;
     bool commonDirty;
     int phaseBack;
@@ -435,6 +439,9 @@ struct BX {
     int buttonCount;
     int buttonHover;
     bool dressEnabled, viewEnabled;
+    DressPhase *dressPhase;
+    u8 dressRec[BX_DRESS_CH][BX_DRESS_WEAR];
+    u8 dressAll;
     int stripLevel, viewLevel;
     bool viewButtons;
 
@@ -562,6 +569,7 @@ void bx_museum_free(BX *b);
 void bx_museum_find_wear(BX *b);
 void bx_museum_seen(BX *b, const char *name);
 void bx_museum_wear(BX *b, int ch, int wear);
+bool bx_museum_worn(BX *b, int ch, int wear);
 int bx_museum_rate(BX *b, const char *kind);
 bool bx_museum_open(BX *b);
 void bx_museum_close(BX *b);
@@ -578,6 +586,13 @@ BgvPanel *bx_bgv_open(BX *b, bool overlay);
 void bx_bgv_free(BgvPanel *p);
 bool bx_bgv_update(BX *b, BgvPanel *p);
 void bx_bgv_draw(BX *b, BgvPanel *p, u32 *dst);
+
+bool bx_dress_available(BX *b);
+bool bx_dress_name(BX *b, const char *name, char *out);
+bool bx_dress_open(BX *b);
+void bx_dress_update(BX *b);
+void bx_dress_draw(BX *b, u32 *dst);
+void bx_dress_free(BX *b);
 
 bool bx_status_open(BX *b);
 void bx_status_update(BX *b);

@@ -153,7 +153,7 @@ int bx_eye_frame(BX *b, const Obj *o) {
 
 static void stripped(BX *b, const char *name, char *out) {
     snprintf(out, 64, "%s", name);
-    if (!b->stripLevel || strlen(name) != 12) return;
+    if (bx_dress_name(b, name, out) || !b->stripLevel || strlen(name) != 12) return;
     int table[8] = {0}, n = bx_cfg_ints(&b->cfg, "system button", "simple strip table", table, 8);
     if (b->stripLevel >= n) return;
     char alt[64], body[64], face[64];
@@ -642,6 +642,10 @@ void bx_gfx_frame(BX *b) {
         bx_msg_draw(b, b->screen);
         bx_choice_draw(b, b->screen);
         bx_ui_draw(b, b->screen);
+    }
+    if (b->autosavePending) {
+        b->autosavePending = false;
+        bx_autosave(b);
     }
     b->serial++;
 }

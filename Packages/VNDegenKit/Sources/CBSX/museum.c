@@ -416,6 +416,19 @@ int bx_museum_rate(BX *b, const char *kind) {
     return all ? got * 100 / all : 0;
 }
 
+bool bx_museum_worn(BX *b, int ch, int wear) {
+    if (!b->common || !b->wearTable || ch < 1 || wear < 0) return false;
+    u32 count = rd32(b->common + b->wearTable);
+    size_t k = b->wearTable + 4;
+    for (u32 c = 1; c <= count && k + 4 <= b->commonSize; c++) {
+        u32 w = rd32(b->common + k);
+        k += 4;
+        if ((int)c == ch) return (u32)wear < w && k + (size_t)wear < b->commonSize && b->common[k + (size_t)wear];
+        k += w;
+    }
+    return false;
+}
+
 void bx_museum_wear(BX *b, int ch, int wear) {
     if (!b->common || !b->wearTable || ch < 1 || wear < 0) return;
     u32 count = rd32(b->common + b->wearTable);
