@@ -122,8 +122,8 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
 - **身代わり.** Measured: a クマン (battle ability 身代わり, `unit.obj` column 34) took a hit of 乱舞斬 aimed at a ウルフ;
   the log said クマンが身代わりになった, ウルフに0ダメージ, クマンに58ダメージ. 58 fits the damage against the ウルフ's
   defence (55 to 58 with the sword), not the クマン's (50 to 53). `ability.obj` says it covers allies with less HP
-  "時々" and gives 50 in column 4: inferred as a 50% chance. The same 乱舞斬 hit the クマン twice with two enemies
-  left, so several-target skills can hit one target again, which explains 火矢三連's double hit.
+  "時々" and gives 50 in column 4: inferred as a 50% chance. That 乱舞斬 logged only this one hit against two
+  enemies; how many hits a several-target skill makes when fewer enemies stand is still open.
 - **Healing.** 小回復 (38 to 42) healed 39 and 38: inferred as the power alone.
 - **Hit and miss.** Inferred: a hit when a roll under 100 is below the skill's accuracy (`skill.obj` column 16) minus
   the target's evasion. Too few misses were seen to pin it down: ツタ (accuracy 85) missed Darkus three times in seven,
