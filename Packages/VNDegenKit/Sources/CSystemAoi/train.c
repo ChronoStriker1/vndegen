@@ -31,9 +31,9 @@ enum {
     BACK_Y = 670,
     BTN_W = 152,
     BTN_H = 44,
-    CONFIRM_X = 291,
-    CONFIRM_Y = 262,
-    CONFIRM_ROW_Y = 311,
+    CONFIRM_X = 290,
+    CONFIRM_Y = 260,
+    CONFIRM_ROW_Y = 308,
     CONFIRM_SP_RIGHT = 935,
     CONFIRM_SP_Y = 425,
     OK_X = 632,
@@ -117,15 +117,16 @@ static void num(const Train *t, u32 *fb, int v, int right, int y, int row) {
     sa_draw_number(fb, t->art[ART_DIGITS], n, right, y, row, CW, CH);
 }
 
-static void draw_row(SA *s, u32 *fb, int k, int y, int frame, int slot) {
+static void draw_row(SA *s, u32 *fb, int k, int y, int frame, int slot, int x) {
     Train *t = &s->train;
-    sa_blit_rect(fb, t->art[ART_TRAIN], 0, frame * TRAIN_H, TRAIN_W, TRAIN_H, TRAIN_X, y);
-    sa_text_draw(fb, SA_W, SA_H, trainNames[k], -1, TITLE_X, y + TITLE_DY, 16, 0x000000, NO_EDGE);
+    int dx = x - TRAIN_X;
+    sa_blit_rect(fb, t->art[ART_TRAIN], 0, frame * TRAIN_H, TRAIN_W, TRAIN_H, x, y);
+    sa_text_draw(fb, SA_W, SA_H, trainNames[k], -1, TITLE_X + dx, y + TITLE_DY, 16, 0x000000, NO_EDGE);
     char d[96];
     snprintf(d, sizeof d, "ステータスの%sを%d上昇させます。", statNames[k], gain(t, k));
-    sa_text_draw(fb, SA_W, SA_H, d, -1, DESC_X, y + DESC_DY, 14, 0x000000, NO_EDGE);
-    sa_draw_number(fb, t->art[ART_DIGITS], "---", MP_RIGHT, y + TITLE_DY + 2, 0, CW, CH);
-    num(t, fb, cost(t, k), COST_RIGHT, y + TITLE_DY + 2, cost(t, k) > s->party.sp[slot] ? 1 : 0);
+    sa_text_draw(fb, SA_W, SA_H, d, -1, DESC_X + dx, y + DESC_DY, 14, 0x000000, NO_EDGE);
+    sa_draw_number(fb, t->art[ART_DIGITS], "---", MP_RIGHT + dx, y + TITLE_DY + 2, 0, CW, CH);
+    num(t, fb, cost(t, k), COST_RIGHT + dx, y + TITLE_DY + 2, cost(t, k) > s->party.sp[slot] ? 1 : 0);
 }
 
 static void draw(SA *s) {
@@ -158,7 +159,7 @@ static void draw(SA *s) {
     if (slot >= 0)
         for (int k = 0; k < TRAIN_ROWS; k++) {
             bool can = cost(t, k) <= s->party.sp[slot];
-            draw_row(s, fb, k, TRAIN_Y + k * TRAIN_PITCH, !can ? 1 : t->hover == HOVER_TRAIN + k ? 3 : 0, slot);
+            draw_row(s, fb, k, TRAIN_Y + k * TRAIN_PITCH, !can ? 1 : t->hover == HOVER_TRAIN + k ? 3 : 0, slot, TRAIN_X);
         }
     sa_font_set_plain(false);
     sa_font_set_spacing(1);
@@ -169,7 +170,7 @@ static void draw(SA *s) {
     sa_blit(fb, t->art[ART_CONFIRM], CONFIRM_X, CONFIRM_Y);
     sa_font_set_spacing(0);
     sa_font_set_plain(true);
-    draw_row(s, fb, t->pick, CONFIRM_ROW_Y, 0, slot);
+    draw_row(s, fb, t->pick, CONFIRM_ROW_Y, 0, slot, CONFIRM_X);
     num(t, fb, s->party.sp[slot], CONFIRM_SP_RIGHT, CONFIRM_SP_Y, 0);
     sa_font_set_plain(false);
     sa_font_set_spacing(1);

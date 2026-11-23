@@ -299,7 +299,8 @@ calls it is inferred from that and from play, and marked so.
   83-pixel row each (`grw_d01`: normal, red when the points don't reach, yellow on hover) from (304, 45): the
   training's name, ステータスの…を N 上昇させます。, 消費気力 --- and 必要Ｐ; the member's status card `grw_f00` at
   (997, 21) and 能力説明 (`pun_b00`) at (997, 521); 戻る (`grw_h00`) at (1120, 670). Choosing a training halves the
-  screen and shows スキル上昇 (`grw_j00`) at (291, 262) with 決定 and キャンセル.
+  screen and shows スキル上昇 (`grw_j00`) at (290, 260), the training's row at (290, 308), and 決定 and キャンセル at
+  (632, 447) and (792, 447) (99% of its pixels exact).
 - **Trainings.** Measured: `StUp.obj`'s one row holds (points, gain) pairs for 体力, 気力, 物理攻撃力, 魔法攻撃力,
   物理防御力, 魔法防御力, 速度, 回避, 統治 and 統率: (10, 15), (10, 10), (10, 1) four times, (15, 1) twice and (50, 1)
   twice; the screen shows the first eight. 体力ＵＰ took Darkus from 170/170 to 185/185 and his points from 10 to 0.
