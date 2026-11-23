@@ -361,10 +361,8 @@ calls it is inferred from that and from play, and marked so.
   (the place reads 千樹庭 / 中央森, then 中央森の東) and in the town (9ターン 街 after an expedition). Inferred: the town
   autosave comes at the start of each turn. Loading a floor's autosave puts the party back on that floor with its
   explored map; loading a town autosave puts the game in the town.
-- **The original's files.** Measured from saves written under Wine: a header of five 32-bit numbers (the unpacked
-  size, 1,128,076 for a save and 30,784 for the options; the file size; the unpacked size again; 0; the packed size),
-  a tag byte (0x82 for saves, 0x81 for the options), a 256-entry table of byte frequencies, and an entropy-coded body.
-  The coder isn't worked out yet, so VNDegen writes its own format for now.
+- **The original's files.** `Bunny30N.dat`, `Bunny3AN.dat` and `Bunny3.opt` unpack to 1,128,076 and 30,784 bytes
+  with the codec below. `Bunny3.red` (text already read) is stored plain. `Bunny3.dsk` (32 bytes) hasn't been looked at.
 
 ## The save codec: what was read, and why
 
@@ -378,3 +376,36 @@ save's known town numbers. With the maintainer's approval (2026-11-23), the read
 
 Nothing else is read: no game logic, no rule, no screen. What was read is recorded below as a description of the
 format, and VNDegen's codec is written from that description, not from the code.
+
+Read on 2026-11-23 in `AoiCmp5.dll`: its exported `AoiCompressPack` and `AoiCompressUnpack`, the three decoders and
+three encoders they dispatch to, and the LZ window helper. All are self-contained byte transforms; none touches game
+state. What they do:
+
+- **Container.** Sixteen bytes: the unpacked size, the file size, the block size, and flags (bit 0: the data follows
+  stored). Then blocks to the end of the file, each a 32-bit length, a method byte and that many bytes. Saves and
+  options are one block.
+- **Method byte.** Bit 7: a range coder over the block. Bits 0 to 3: 1 a run-length layer, 2 an LZ layer, applied
+  under the range coder. Bits 4 to 6 name five other filters the packer can try; none is used by these files, and
+  VNDegen doesn't build them. Saves are 0x82, options 0x81.
+- **Choosing.** The packer tries each low layer (none, runs, LZ) with and without the range coder and keeps the
+  smallest, taking a later one only when strictly smaller. An encoder gives up when its output would outgrow its
+  input.
+- **Range coder.** Byte counts over the block; when the largest passes 255 every count becomes
+  ceil(count x 255 / largest). The 256 counts are stored first, symbol 255 first. A 257th end symbol has count 1.
+  Low starts at 0 and range at 2^32 - 1. For each symbol, r = range / total, low += start x r, range = count x r;
+  then while low and low + range agree in their top byte, the top byte of low goes out and both shift left by 8;
+  then while range is under 2^16, the top byte goes out, range becomes (2^16 - (low mod 2^16)) x 256 and low shifts
+  left by 8. After the end symbol the four bytes of low go out. Inputs under 512 bytes aren't coded. The decoder mirrors
+  this, reading four bytes first and finding each symbol by binary search over the running totals.
+- **LZ.** A byte n from 1 to 255 is followed by n literal bytes; a zero byte is followed by a 16-bit distance and an
+  8-bit length, copied byte by byte from the output so far. The packer looks back over the last 4,096 positions that
+  start with the same byte, newest first, for the longest match up to 255 bytes (a later candidate must be strictly
+  longer; a match as long as the limit ends the search), and uses it when it is 5 bytes or more. Literals collect into
+  runs of up to 255. Inputs under 6 bytes aren't coded.
+- **Runs.** Pairs of a type and a count: type 0 is followed by count literal bytes; types 1 to 4 by one value of that
+  many bytes, repeated count times. The packer tries widths 1 to 4 in turn when at least 4 bytes remain, needing 4, 3,
+  2 and 2 repeats; a run never includes the last byte of what remains. Otherwise the byte joins a literal run of up to
+  255. Inputs under 4 bytes aren't coded.
+
+VNDegen's codec (`aoicmp.c`) was written from this description. It repacks all fourteen saves and option files written
+under Wine byte for byte (`satool codec`).

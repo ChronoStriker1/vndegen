@@ -60,6 +60,9 @@ void vnsystemaoi_set_paused(VNSystemAoi *sa, bool paused);
 void vnsystemaoi_set_skip(VNSystemAoi *sa, bool on);
 void vnsystemaoi_request_quit(VNSystemAoi *sa);
 
+uint8_t *vnsystemaoi_unpack(const uint8_t *data, size_t size, size_t *outSize);
+uint8_t *vnsystemaoi_pack(const uint8_t *data, size_t size, size_t *outSize);
+
 const char *vnsystemaoi_title(VNSystemAoi *sa);
 const char *vnsystemaoi_problem(VNSystemAoi *sa);
 

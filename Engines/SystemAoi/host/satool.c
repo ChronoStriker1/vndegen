@@ -16,11 +16,30 @@ static void h_command(void *c, const u8 *code, const Insn *in, VM *vm) {
 }
 
 static int usage(void) {
-    fprintf(stderr, "satool <gameDir> list | extract <name> <out> | box <name.box> <outDir> | dis <name.box> <entry|*> | run <name.box> <entry> [choices] | agf <name> <out.png>\n");
+    fprintf(stderr, "satool <gameDir> list | extract <name> <out> | box <name.box> <outDir> | dis <name.box> <entry|*> | run <name.box> <entry> [choices] | agf <name> <out.png>\n       satool codec <save.dat ...>\n");
     return 2;
 }
 
+static int codec(int count, char **files) {
+    int bad = 0;
+    for (int i = 0; i < count; i++) {
+        size_t n, rawLen, packedLen;
+        u8 *d = sa_read_file(files[i], &n);
+        u8 *raw = d ? vnsystemaoi_unpack(d, n, &rawLen) : NULL;
+        u8 *packed = raw ? vnsystemaoi_pack(raw, rawLen, &packedLen) : NULL;
+        bool same = packed && packedLen == n && !memcmp(packed, d, n);
+        printf("%s: %s, unpacked %zu, repacked %zu of %zu, %s\n", files[i], raw ? "ok" : "unpack failed", raw ? rawLen : 0,
+               packed ? packedLen : 0, n, same ? "identical" : "different");
+        bad += !same;
+        free(d);
+        free(raw);
+        free(packed);
+    }
+    return bad != 0;
+}
+
 int main(int argc, char **argv) {
+    if (argc >= 3 && !strcmp(argv[1], "codec")) return codec(argc - 2, argv + 2);
     if (argc < 3) return usage();
     Vfs v;
     if (!sa_vfs_open(&v, argv[1])) {
