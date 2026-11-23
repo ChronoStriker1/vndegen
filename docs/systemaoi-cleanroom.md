@@ -423,9 +423,15 @@ the same points (offsets in bytes, numbers little-endian):
 - **Town grid** at 1,010,852: 90 cells of five 32-bit numbers. A built cell holds the facility type (100 the 魔王亭,
   108 a field), a flag (1 the turn it was built), the level, a counter that grows each turn (4, 9 and 44 at turns 1, 2
   and 9) and 0. An empty cell holds 0, -1, 0, 0 and the cell's state (-1, 0 or 1).
-- **Build list** at 1,004,728: (type, count, flag) triples, 100, 104 and 143 at the start.
-- **Party** from about 86,000: Darkus (unit 1) with HP and MP at 86,036 and skill points at 86,088; two 544-byte stat
-  blocks at 86,132 and 86,676 (HP 170, MP 35, then the eight stats); the items as (id, count) pairs from 87,228.
+- **Item list** at 1,004,728: (item, count, flag) triples, starting with items 100, 104 and 143 (ダークスの剣, 名剣ルージュ
+  and 魔力の杖); likely the shop's stock.
+- **Party** from 86,008: Darkus's unit (1), then his level at 86,020, EXP at 86,024, HP and MP at 86,036, skill
+  points at 86,088 and the gains from training from 86,092 (体力ＵＰ wrote 15 there, and 185 into HP and both stat
+  blocks). Two 544-byte stat blocks at 86,132 and 86,676 (HP, MP, then the eight stats). The party's items as
+  (id, count) pairs from 87,228; at turn 9, with ダークスの剣 equipped, 87,220 holds (100, -1).
+- **Save details** in the variables: C002 and C013 the save time in Unix seconds, C003 the save count (shown at the
+  top right of a slot's details, and the autosave panel's count), C011 the play time in seconds. Loading and saving
+  again changes only these.
 - **Other regions** not yet placed: 6,189 to 7,136 (only in dungeon autosaves; 128-byte rows, likely the floor's map),
   215,608 to 229,808 (544-byte records like the party's), 993,208 to 998,847, 1,035,056 to 1,066,684 and an ascending
   list of offsets at 1,115,868, likely the backlog.
