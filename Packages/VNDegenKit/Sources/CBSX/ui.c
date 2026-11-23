@@ -333,7 +333,10 @@ static void button_press(BX *b, const char *key) {
         return;
     }
     if (!strcmp(key, "skip")) b->skipMode = !b->skipMode;
-    else if (!strcmp(key, "cut in")) b->cutIn = !b->cutIn;
+    else if (!strcmp(key, "cut in")) {
+        b->cutIn = !b->cutIn;
+        b->shownDirty = true;
+    }
     else if (!strcmp(key, "auto ex")) b->autoMode = !b->autoMode;
     else if (!strcmp(key, "voice")) {
         if (b->voice) bx_snd_play(b, CH_VOICE, RX_VOICE, b->voice, false, 0);
