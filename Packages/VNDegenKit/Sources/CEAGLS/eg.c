@@ -99,11 +99,8 @@ VNEAGLS *vneagls_open(const VNEAGLSConfig *cfg, char *err, size_t errSize) {
     ini_ints(&e->ini, "ScreenYsize", &size[1], 1);
     e->W = size[0] > 0 ? size[0] : 800;
     e->H = size[1] > 0 ? size[1] : 600;
-    e->textSpeedSlider = 50;
-    e->textSpeed = 20;
-    e->autoSpeed = 50;
-    e->autoWaitVoice = 1;
-    e->volMaster = e->volBgm = e->volSe = e->volVoice = e->volMovie = 100;
+    e->volMaster = 100;
+    config_defaults(e);
     e->mesAlpha = 255;
     gfx_init(e);
     text_init(e);
@@ -130,6 +127,7 @@ void vneagls_close(VNEAGLS *n) {
     mixer_free(e->mixer);
     ui_free(e);
     gallery_free(e);
+    oppai_free(e);
     msg_clear(e);
     free(e->text);
     for (int i = 0; i < e->logCount; i++) {
@@ -216,6 +214,13 @@ void game_to_title(EG *e) {
     config_save(e);
 }
 
+static void edit_append(EG *e, char c) {
+    size_t n = strlen(e->editBuf);
+    if (!c || (int)n >= e->editMax || n + 1 >= sizeof e->editBuf) return;
+    e->editBuf[n] = c;
+    e->editBuf[n + 1] = 0;
+}
+
 static void edit_key(EG *e, int vk) {
     size_t n = strlen(e->editBuf);
     if (vk == 0x0d) {
@@ -237,14 +242,22 @@ static void edit_key(EG *e, int vk) {
     if (vk >= 'A' && vk <= 'Z') c = (char)(e->keyDown[0x10] ? vk : vk + 32);
     else if (vk >= '0' && vk <= '9') c = (char)vk;
     else if (vk == 0x20) c = ' ';
-    if (!c || (int)n >= e->editMax || n + 1 >= sizeof e->editBuf) return;
-    e->editBuf[n] = c;
-    e->editBuf[n + 1] = 0;
+    edit_append(e, c);
+}
+
+bool vneagls_wants_text(VNEAGLS *n) { return n && ((EG *)n)->editing; }
+
+void vneagls_text(VNEAGLS *n, const char *utf8) {
+    EG *e = (EG *)n;
+    if (!e || !e->editing || !utf8) return;
+    for (const char *p = utf8; *p; p++)
+        if ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == ' ') edit_append(e, *p);
 }
 
 static void tick(EG *e) {
     if (e->scriptUi && e->scriptUiDone) {
         e->scriptUi = false;
+        e->fromScreen = true;
         if (e->th[0].wait == W_UI) e->th[0].wait = W_NONE;
     }
     if (e->editing) {
@@ -270,6 +283,7 @@ static void tick(EG *e) {
         if (e->rclick) e->rclicked = true;
     }
     if (e->uiMode == UI_NONE) vm_run(e);
+    e->fromScreen = false;
     movie_update(e);
     e->click = false;
     e->rclick = false;

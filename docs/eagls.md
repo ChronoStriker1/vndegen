@@ -63,41 +63,65 @@ uses the same folder:
   Each layer's record goes in the PC's per-layer block (0x5E00 bytes from 0x9B580; the background's record twice,
   with its picture size, and a character's in a second table as well), the fonts from the script's `150` definitions,
   the backlog ring's header and counters, and the name plate's fixed geometry. The PC fills in its own handles.
-- `@` globals (seen CGs and scenes) are read from the PC's `GlobalSave.sav`. VNDegen keeps its settings and the `@`
-  and `:` variables in `Save/VNDegen.cfg`, and its quick save in `Save/VNDegenQuick.sav`.
+- `@` globals (seen CGs and scenes) are read from the PC's `GlobalSave.sav`, and VNDegen adds the ones it sets to that
+  file's table of globals, leaving the rest of the file as the PC wrote it, so what was seen in either shows as seen in
+  both. The game ships a `GlobalSave.sav` whose table the PC fills on its first start, and the PC stops with an error if
+  a global it declares there is already in it, so VNDegen writes only to a file the PC has started with. VNDegen keeps
+  its settings and the `@` and `:` variables in `Save/VNDegen.cfg`, and its quick save in `Save/VNDegenQuick.sav`.
 
 ## What runs
 
 - The logos, the title with its hover buttons, New Game, Load Game, CG View, Scene View, Soundtrack, Settings and Exit Game.
-- The prologue movie, backgrounds, characters, emotes, transitions with mask pictures, shaking.
+- The prologue movie, backgrounds, characters, emotes, shaking, and the transitions `4` draws: crossfades, mask wipes,
+  a mosaic that coarsens to 80-pixel blocks and clears (3), a random pixel dissolve (5), a left-to-right wipe of
+  20-pixel strips (8) and blinds of 20-pixel strips (10). A transition that starts as a script's screen closes, such
+  as the title's return from CG View, starts from that screen, as on the PC.
 - Messages with the PC's layout, speaker plates, voices, the wait cursor, click to finish or advance, right click to
   hide the window, the wheel to open the backlog, Ctrl to skip.
 - The window's wheel: settings, log, hide, skip, auto, quick save, quick load, and the system menu (save, load,
-  animation settings, champion brassiere page, return to title, exit).
+  animation settings, champion brassiere page, return to title, exit). The champion brassiere page shows a block's
+  brassiere as found once the game's `_MilkFlg` for that block's champion (4, 14, 24, 39, 43) is set, as on the PC.
 - Save and Load pages with ten pages of eight slots, thumbnails, the NEW mark, Save Confirm and Load Delete, and the
   confirm dialogs; the backlog with speaker names, its scroll bar and voice buttons; name entry; choices.
 - The map that picks the next heroine, from the game's own scripts and click maps.
+- Name entry takes letters, digits and spaces, as the PC's box does, from a hardware keyboard or, on iPhone and iPad,
+  VNDegen's keyboard, which opens while the box waits and again when the game is touched.
 - CG View: five pages of the game's own sheets (`CGMode1-N`, its `C` thumbnails, `S` highlights and `CGModeMask`). A
   slot shows its thumbnail once any of its pictures has been seen (`@xa01`, `@xa01r1` and so on). Clicking it shows
   each seen version full screen in turn; the tall group pictures show their top, then their bottom.
 - Scene View: four pages (`SCMode1-N`), one slot per scene, shown once `@Reco_<scene>` is set. Clicking a slot plays
   the scene from its `$Reco_<scene>` label with `:SCENEFLG` set; the scene's closing `140()` returns to `TitleSC.dat`'s
-  `$SceneStart`, which opens the page again. The slot order isn't in the scripts: it was read off the thumbnail sheets
+  `$SceneStart`, which opens the page again. A scene's choices are the player's to make, as on the PC, whose choice
+  script (`Choices.dat`) runs the same in Scene View as in the story. The slot order isn't in the scripts: it was read off the thumbnail sheets
   by matching each thumbnail against the game's pictures.
+- Oppai Gallery, which the exe draws itself: from the title's bonus button once `@pr` is set (it shows "?????" before)
+  and from the window's Oppai Gallery button. The 48 heroines stand in a ring: the centred one in the frame, six to each
+  side at 80-pixel steps behind her dimmed with `haku_D2`, and the far side of the ring in the back row from the small
+  pictures at 56-pixel steps, turning the other way. A heroine not yet scouted (`@MilkScautar[n]` is 0) is drawn dark
+  with `haku_D` and can't be opened. The arrows and Back and Next turn the ring with a short slide; the S to E tabs go
+  to each group's first heroine (1, 4, 12, 20, 28, 42) and light for the centred heroine's group; the centred heroine's
+  name is shown from `haku_Name`, and each group's champion (4, 14, 24, 39, 43) wears the crown. Opening a heroine
+  shows her page (`haku_xNNP`); the Oppai Scouter switch shows `haku_xNNPC` over the figure, Back and Next step through
+  the scouted heroines, and Return or a right click goes back to the ring on her. Close or a right click leaves.
+- The window's Oppai View switch, which the exe handles: it turns `:OptionNum3` on and off, which the scripts read to
+  draw scouted heroines with their scouter pictures, and the window shows its `MesWinS` art (the switch lit red)
+  while it is on. At the moments the story offers the scouter, its scripts set `_MilkFile` and `_MilkLabel` and load a
+  window with an OPPAI SCOUTER button, which goes to that label.
 - Soundtrack: the ten tracks, play, stop, previous, next and the volume bar, at the PC's places, drawn opaque as the PC draws
   them.
-- Settings: VNDegen draws a dialog with the PC dialog's Text and Sound options (text speed, auto speed, white text,
-  skip unread, wait for voices in auto, volumes and mute), standing in for the PC's Windows property sheet.
+- Settings: VNDegen draws a dialog standing in for the PC's Windows property sheet, with its Screen, Text, Sound and
+  System tabs. Screen has Screen Effects (None draws every transition at once, as on the PC; Partial played the same as
+  Full on the PC wherever it was tried, so it does too) and Left click to skip effects (off, as on the PC, so a click
+  doesn't cut a transition short until it is turned on). Text and Sound have text speed, auto speed, white text, skip
+  unread, wait for voices in auto, volumes and mute. System has Reset Config to Default.
 
 Games start on the "Visual novel" controller layout.
 
 ## Known limits
 
-- The title's locked "?????" bonus and the window's Oppai Gallery and Oppai View buttons, which the story turns on
-  once the scouter is found, do nothing: they are screens built into the game's exe.
-- In Scene View a scene's choices are the player's to make, as in the story.
-- The champion brassiere page shows every brassiere as not found.
-- Transitions other than crossfades and mask wipes (`4` with effects 3, 5, 8 and 10) are drawn as crossfades.
-- The settings dialog's Screen, System, Info and Machine tabs aren't there; full screen is the app's.
-- Name entry takes letters, digits and spaces from a hardware keyboard; without one, the default name stays.
-- VNDegen doesn't write `GlobalSave.sav`, so CGs and scenes seen in VNDegen don't show as seen on the PC.
+- The settings dialog leaves out what belongs to the PC's window and hardware: the Screen tab's window size, mouse
+  cursor, right click (greyed out on the PC too), cursor operation and V-Sync, the System tab's CPU level,
+  performance optimization and Delete all saved data, and the Info and Machine tabs. The app sets the window and
+  manages saves.
+- CGs and scenes seen in VNDegen show as seen on the PC only once the PC game has been started with that game folder:
+  until then its shipped `GlobalSave.sav` is left as it is.

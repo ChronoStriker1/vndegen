@@ -73,6 +73,7 @@ VNExHibit *vnexhibit_open(const VNExHibitConfig *cfg, char *err, size_t errSize)
     if (e->nR < 2048) e->nR = 2048;
     if (e->nS < 10240) e->nS = 10240;
     e->title = ini_value(ini, "TITLE");
+    e->className = ini_value(ini, "CLASS");
     char *entry = ini_value(ini, "entry");
     free(ini);
     e->R = ex_alloc(sizeof(i32) * (size_t)e->nR);
@@ -142,6 +143,7 @@ void vnexhibit_close(VNExHibit *n) {
     free(e->S);
     free(e->screen);
     free(e->title);
+    free(e->className);
     free(e->unknownSeen);
     free(e->gameDir);
     free(e->saveDir);

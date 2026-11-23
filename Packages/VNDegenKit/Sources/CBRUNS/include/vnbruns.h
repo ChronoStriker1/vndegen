@@ -39,6 +39,11 @@ void vnbruns_audio(VNBruns *br, float *out, int frames);
 void vnbruns_set_paused(VNBruns *br, bool paused);
 void vnbruns_request_quit(VNBruns *br);
 
+enum { VNBRUNS_DIALOG_NONE = 0, VNBRUNS_DIALOG_TEXT = 1, VNBRUNS_DIALOG_LICENCE = 2 };
+void vnbruns_enable_dialogs(VNBruns *br, bool on);
+int vnbruns_dialog(VNBruns *br, const char **title, const char **text, int *maxBytes);
+void vnbruns_dialog_answer(VNBruns *br, bool ok, const char *utf8);
+
 const char *vnbruns_title(VNBruns *br);
 const char *vnbruns_problem(VNBruns *br);
 

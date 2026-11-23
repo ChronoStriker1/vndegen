@@ -33,6 +33,8 @@ void vneagls_mouse_move(VNEAGLS *eg, int x, int y);
 void vneagls_mouse_button(VNEAGLS *eg, int button, bool down);
 void vneagls_key(VNEAGLS *eg, int virtualKey, bool down);
 void vneagls_wheel(VNEAGLS *eg, int notches);
+bool vneagls_wants_text(VNEAGLS *eg);
+void vneagls_text(VNEAGLS *eg, const char *utf8);
 
 void vneagls_audio(VNEAGLS *eg, float *out, int frames);
 void vneagls_set_paused(VNEAGLS *eg, bool paused);

@@ -249,7 +249,7 @@ typedef struct ChoiceBox {
     char *text;
 } ChoiceBox;
 
-enum { UI_NONE, UI_SAVE, UI_LOAD, UI_CONFIG, UI_LOG, UI_MSGBOX, UI_ANIM, UI_BRA, UI_CG, UI_SCENE, UI_SOUND };
+enum { UI_NONE, UI_SAVE, UI_LOAD, UI_CONFIG, UI_LOG, UI_MSGBOX, UI_ANIM, UI_BRA, UI_CG, UI_SCENE, UI_SOUND, UI_OPPAI };
 
 typedef struct SlotInfo {
     bool used;
@@ -260,6 +260,7 @@ typedef struct SlotInfo {
 
 typedef struct UI UI;
 typedef struct Gallery Gallery;
+typedef struct Oppai Oppai;
 
 #define EG_SLOTS 80
 
@@ -344,7 +345,7 @@ struct EG {
     int audioRate;
     Movie *movies[4];
     int volMaster, volBgm, volSe, volVoice, volMovie;
-    int textSpeedSlider, autoSpeed, textWhite, mute, skipUnread, autoWaitVoice;
+    int textSpeedSlider, autoSpeed, textWhite, mute, skipUnread, autoWaitVoice, effects, clickSkip;
     Image *thumb;
     u8 *prevBlock;
     char bgmName[2][64];
@@ -360,6 +361,7 @@ struct EG {
     UI *ui;
     bool nameFresh;
     Gallery *gallery;
+    Oppai *oppai;
     int menuHover;
     int winHover;
     char *pendingTitle;
@@ -367,6 +369,7 @@ struct EG {
     u8 *global;
     size_t globalSize;
     bool globalDirty;
+    bool fromScreen;
 };
 
 void gfx_init(EG *e);
@@ -417,6 +420,12 @@ void gallery_update(EG *e);
 void gallery_draw(EG *e, u32 *dst);
 void gallery_free(EG *e);
 bool gallery_scene_end(EG *e, Thread *t);
+void oppai_open(EG *e);
+void oppai_update(EG *e);
+void oppai_draw(EG *e, u32 *dst);
+void oppai_free(EG *e);
+bool oppai_scouted(EG *e, int k);
+bool oppai_bra_found(EG *e, int block);
 void vm_run(EG *e);
 Script *vm_script(EG *e, const char *file);
 i32 vm_int(EG *e, const Arg *a);
@@ -445,6 +454,7 @@ void global_load(EG *e);
 void global_save(EG *e);
 void config_load(EG *e);
 void config_save(EG *e);
+void config_defaults(EG *e);
 void game_to_title(EG *e);
 void ui_open_title_load(EG *e);
 void ui_open_sound(EG *e);
