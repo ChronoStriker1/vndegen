@@ -15,6 +15,15 @@ enum {
     WALL_EXIT = 20,
     VIEW_CELLS = 6,
     MOVE_MS = 133,
+    DOOR_TURN_MS = 18000,
+    DOOR_FRAME_MS = 66,
+    ACTION_X = 1101,
+    ACTION_Y = 498,
+    ACTION_W = 160,
+    ACTION_H = 40,
+    HOVER_ACTION = 101,
+    FLOOR_DOWN = 100,
+    FLOOR_UP = 101,
     PANEL_X = 0,
     PANEL_Y = 0,
     REST_X = 1101,
@@ -68,37 +77,49 @@ static int texture_index(Dungeon *d, Vfs *vfs, const char *name) {
     return d->texCount++;
 }
 
+static void free_set(PartSet *p) {
+    sa_pvm_free(&p->pvm);
+    free(p->last);
+    free(p->layerTex);
+    memset(p, 0, sizeof *p);
+}
+
 static void free_level(Dungeon *d) {
-    sa_pvm_free(&d->set);
-    free(d->last);
-    free(d->layerTex);
-    d->last = d->layerTex = NULL;
+    free_set(&d->set);
+    free_set(&d->common);
     for (int i = 0; i < d->texCount; i++) sa_image_free(d->tex[i]);
     d->texCount = 0;
     d->loaded = false;
 }
 
-bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
-    free_level(d);
+static bool load_set(Dungeon *d, Vfs *vfs, PartSet *p, const char *name) {
     size_t n;
-    u8 *data = sa_vfs_read(vfs, set, &n);
-    bool ok = data && sa_pvm_parse(&d->set, data, n);
+    u8 *data = sa_vfs_read(vfs, name, &n);
+    bool ok = data && sa_pvm_parse(&p->pvm, data, n);
     free(data);
     if (!ok) return false;
-    d->last = sa_alloc(sizeof(int) * (size_t)d->set.count);
-    d->layerTex = sa_alloc(sizeof(int) * (size_t)d->set.count);
-    for (int i = 0; i < d->set.count; i++) {
+    p->last = sa_alloc(sizeof(int) * (size_t)p->pvm.count);
+    p->layerTex = sa_alloc(sizeof(int) * (size_t)p->pvm.count);
+    for (int i = 0; i < p->pvm.count; i++) {
         int j = i;
-        while (j + 1 < d->set.count) {
-            int p = d->set.layer[j + 1].parent;
-            while (p >= 0 && p != i) p = d->set.layer[p].parent;
-            if (p != i) break;
+        while (j + 1 < p->pvm.count) {
+            int q = p->pvm.layer[j + 1].parent;
+            while (q >= 0 && q != i) q = p->pvm.layer[q].parent;
+            if (q != i) break;
             j++;
         }
-        d->last[i] = j;
-        d->layerTex[i] = texture_index(d, vfs, d->set.layer[i].texture);
+        p->last[i] = j;
+        p->layerTex[i] = texture_index(d, vfs, p->pvm.layer[i].texture);
     }
-    data = sa_vfs_read(vfs, map, &n);
+    return true;
+}
+
+bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
+    free_level(d);
+    if (!load_set(d, vfs, &d->set, set)) return false;
+    load_set(d, vfs, &d->common, "mallset.pvm");
+    size_t n;
+    u8 *data = sa_vfs_read(vfs, map, &n);
     if (!data || n < MAP_HEADER + (size_t)DUN_CELLS * CELL_BYTES) {
         free(data);
         return false;
@@ -139,8 +160,9 @@ static Image *rotate_quarter(const Image *im, int q) {
 
 void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
     if (!d->art[DUN_ART_PANEL]) {
-        static const char *const names[] = {"dgn_b00.agf", "dgn_c00.agf", "dgn_c01.agf", "dgn_c02.agf", "dgn_c03.agf",
-                                            "dgn_c04.agf", "dgn_c05.agf", "dgn_c06.agf", "dgn_d00.agf", "dgn_d01.agf"};
+        static const char *const names[] = {"dgn_b00.agf", "dgn_c00.agf", "dgn_c01.agf", "dgn_c02.agf", "dgn_c03.agf", "dgn_c04.agf",
+                                            "dgn_c05.agf", "dgn_c06.agf", "dgn_d00.agf", "dgn_d01.agf", "dgn_g02.agf", "dgn_g01.agf",
+                                            "dgn_g00.agf"};
         for (int i = 0; i < DUN_ART_PLATFORM; i++) d->art[i] = sa_load_image(vfs, names[i]);
         for (int q = 0; q < 4; q++) d->needle[q] = rotate_quarter(d->art[DUN_ART_NEEDLE], q);
     }
@@ -231,8 +253,31 @@ static int act(Dungeon *d, int pad) {
     return DUN_STAY;
 }
 
+static bool door_near(const Dungeon *d) {
+    for (int y = d->y - 3; y <= d->y + 3; y++)
+        for (int x = d->x - 3; x <= d->x + 3; x++) {
+            const i32 *c = cell_at(d, x, y);
+            if (!c || c[F_FLOOR] < 0) continue;
+            for (int s = 0; s < 4; s++)
+                if (c[wallField[s]] == WALL_EXIT) return true;
+        }
+    return false;
+}
+
+int sa_dungeon_action(const Dungeon *d) {
+    const i32 *c = cell_at(d, d->x, d->y);
+    if (!c || d->animDur) return DUN_ACT_NONE;
+    if (c[wallField[d->dir]] == WALL_EXIT) return DUN_ACT_HOME;
+    if (c[F_FLOOR] == FLOOR_DOWN) return DUN_ACT_DOWN;
+    if (c[F_FLOOR] == FLOOR_UP) return DUN_ACT_UP;
+    return DUN_ACT_NONE;
+}
+
 bool sa_dungeon_tick(Dungeon *d, u32 ms) {
-    if (!d->animDur) return false;
+    u32 before = d->clock / DOOR_FRAME_MS;
+    d->clock += ms;
+    bool turning = d->clock / DOOR_FRAME_MS != before && door_near(d);
+    if (!d->animDur) return turning;
     d->animMs += ms;
     float t = d->animMs >= d->animDur ? 1 : (float)d->animMs / (float)d->animDur;
     d->camX = d->fromX + (d->toX - d->fromX) * t;
@@ -252,6 +297,7 @@ static bool on_art(const Image *im, int fh, int ax, int ay, int x, int y) {
 
 static int hit(const Dungeon *d, int x, int y) {
     if (x >= REST_X && x < REST_X + REST_W && y >= REST_Y && y < REST_Y + REST_H) return HOVER_REST;
+    if (sa_dungeon_action(d) && x >= ACTION_X && x < ACTION_X + ACTION_W && y >= ACTION_Y && y < ACTION_Y + ACTION_H) return HOVER_ACTION;
     for (int i = 0; i < 4; i++)
         if (on_art(d->art[DUN_ART_PAD0 + i], padPos[i].h, padPos[i].x, padPos[i].y, x, y)) return i;
     return -1;
@@ -267,6 +313,7 @@ bool sa_dungeon_hover(Dungeon *d, int x, int y) {
 int sa_dungeon_click(Dungeon *d, int x, int y) {
     int h = hit(d, x, y);
     if (h == HOVER_REST) return DUN_REST;
+    if (h == HOVER_ACTION) return DUN_ACTION;
     return h >= 0 ? act(d, h) : DUN_STAY;
 }
 
@@ -311,14 +358,14 @@ static float shade_of(const float *n) {
     return s * LIGHT_GAIN;
 }
 
-static void draw_part(Dungeon *d, const Cam *c, const char *name, float cx, float cz, int quarter) {
-    int i = sa_pvm_find(&d->set, name);
+static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a) {
+    int i = sa_pvm_find(&ps->pvm, name);
     if (i < 0) return;
-    float a = (float)quarter * QUARTER, ca = cosf(a), sa = sinf(a);
-    for (int k = i; k <= d->last[i]; k++) {
-        const PvmLayer *ly = &d->set.layer[k];
+    float ca = cosf(a), sa = sinf(a);
+    for (int k = i; k <= ps->last[i]; k++) {
+        const PvmLayer *ly = &ps->pvm.layer[k];
         if (ly->name[0] == '>' || !strncmp(ly->name, "next", 4)) continue;
-        const Image *tex = ly->tcount && d->layerTex[k] >= 0 ? d->tex[d->layerTex[k]] : NULL;
+        const Image *tex = ly->tcount && ps->layerTex[k] >= 0 ? d->tex[ps->layerTex[k]] : NULL;
         for (int t = 0; t < ly->tcount; t++) {
             R3Vert v[3];
             for (int j = 0; j < 3; j++) {
@@ -340,6 +387,12 @@ static void draw_part(Dungeon *d, const Cam *c, const char *name, float cx, floa
     }
 }
 
+static float spin(const Dungeon *d) { return (float)(d->clock % DOOR_TURN_MS) * 6.2831853f / DOOR_TURN_MS; }
+
+static void draw_part(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, int quarter) {
+    draw_model(d, ps, c, name, cx, cz, (float)quarter * QUARTER);
+}
+
 void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     u32 fog = d->r3.fogColor;
     u32 bg = 0xff000000u | (fog & 0xff) << 16 | (fog & 0xff00) | (fog >> 16 & 0xff);
@@ -356,13 +409,18 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             float cx = (float)col * CELL, cz = -(float)row * CELL;
             char name[16];
             snprintf(name, sizeof name, "f%03d", cell[F_FLOOR]);
-            draw_part(d, &c, name, cx, cz, 0);
-            draw_part(d, &c, "r000", cx, cz, 0);
+            draw_part(d, &d->set, &c, name, cx, cz, 0);
+            draw_part(d, &d->set, &c, "r000", cx, cz, 0);
             for (int s = 0; s < 4; s++) {
                 int w = cell[wallField[s]];
                 if (w < 0) continue;
                 snprintf(name, sizeof name, "w%03d", w);
-                draw_part(d, &c, name, cx, cz, sideQuarter[s]);
+                draw_part(d, &d->set, &c, name, cx, cz, sideQuarter[s]);
+                if (w == WALL_EXIT) draw_model(d, &d->common, &c, "a100", cx, cz, (float)sideQuarter[s] * QUARTER + spin(d));
+            }
+            if (cell[F_OBJECT] >= 0) {
+                snprintf(name, sizeof name, "a%03d", cell[F_OBJECT]);
+                draw_part(d, &d->common, &c, name, cx, cz, 0);
             }
         }
 }
@@ -432,6 +490,9 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
         if (i >= 4) sa_blit_rect(fb, im, 0, h, PAD_W, h, padPos[i].x, padPos[i].y + h);
     }
     sa_blit_rect(fb, d->art[DUN_ART_REST], 0, d->hover == HOVER_REST ? REST_H : 0, REST_W, REST_H, REST_X, REST_Y);
+    static const int actionArt[] = {0, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP};
+    int act = sa_dungeon_action(d);
+    if (act) sa_blit_rect(fb, d->art[actionArt[act]], 0, d->hover == HOVER_ACTION ? ACTION_H : 0, ACTION_W, ACTION_H, ACTION_X, ACTION_Y);
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
 }
 

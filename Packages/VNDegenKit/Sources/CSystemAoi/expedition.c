@@ -318,19 +318,28 @@ static void go_home(SA *s) {
     run_hooks(s, hooks, 1, AFTER_HOME);
 }
 
+static void change_floor(SA *s, int by) {
+    int floor = s->exp.floor + by;
+    if (floor < 1 || floor_row(&s->exp, s->exp.dungeon, floor) < 0) return;
+    sa_log(s, "expedition: to floor %d", floor);
+    sa_exp_enter(s, s->exp.dungeon, floor);
+}
+
 static void after_move(SA *s, int r) {
     Dungeon *d = &s->dungeon;
     if (r == DUN_REST) {
         go_home(s);
         return;
     }
+    if (r == DUN_ACTION) {
+        int act = sa_dungeon_action(d);
+        if (act == DUN_ACT_HOME) go_home(s);
+        else change_floor(s, act == DUN_ACT_DOWN ? 1 : -1);
+        return;
+    }
     if (d->bumped) {
         d->bumped = false;
         sync_position(s);
-        if (sa_dungeon_facing_exit(d)) {
-            go_home(s);
-            return;
-        }
         static const int hooks[] = {HOOK_STEP};
         run_hooks(s, hooks, 1, AFTER_WALK);
         return;

@@ -163,7 +163,16 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Light and fog.** Inferred from colour fits: textures times 1.6 × (ambient 0.75 plus the two lights' diffuse), and
   linear fog to (40, 45, 30) from −4 to 28 units. Back faces are culled. A texture whose top-left colour covers a
   tenth of it treats that colour as transparent (the grass `010w0x0`).
-- **Not yet known.** The exit shows as a free-standing gold-framed door, not a part of the set.
+- **Objects.** `mallset.pvm` holds the objects every dungeon shares (`action_box`): `a100` the exit's gold-framed
+  door, `a101` to `a108` the floor markers of pickups (101 to 104 glowing, 105 spent), items, event marks and enemy
+  markers. Measured: the door stands at the centre of the exit cell (the cell with wall 20) and turns slowly, edge-on
+  to face-on in about 4.5 seconds (a turn every 18 seconds, filmed at 10 fps). A floor object N draws `aN` at its
+  cell's centre (inferred for all but the door).
+- **Action buttons.** Measured: standing on the exit cell facing the door shows 帰る (`dgn_g02`) at (1101, 498),
+  above the pad; walking into the door does nothing. Inferred: floor part 100 (`f100`, stairs down) shows 下りる
+  (`g01`) and 101 (`f101`, up) shows 上る (`g00`), going to the next or previous floor, arriving at its entrance.
+- **Start cell.** Open: the first expedition started beside the exit facing away from it, a later one two cells
+  further in; VNDegen starts beside the exit.
 
 ## Expeditions, from the scripts and play
 
@@ -189,8 +198,7 @@ calls it is inferred from that and from play, and marked so.
   nothing. Measured: the loss message reads 戦闘敗北した事により、遠征で得た物を全て失ってしまった。, then the turn
   ends with the income box.
 - **`89`** after an event's scenes fades back to the dungeon view (C070, C071, C072, fade 10).
-- **Coming home.** Inferred: walking into the floor's exit (wall 20), or 休憩, runs hook 17, adds the finds to the
-  town and ends the turn.
+- **Coming home.** 帰る (or 休憩, inferred) runs hook 17, adds the finds to the town and ends the turn (inferred).
 - **Encounters.** Measured: the number under the compass counts the expedition's steps, and battles came on steps
   48, 56, 69 and 81 of one expedition (7 to 12 steps after the previous one; the count also rose by one over each
   battle). Inferred: a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2), with a group drawn from

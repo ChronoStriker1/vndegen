@@ -253,22 +253,26 @@ Image *sa_bmp_decode(const u8 *d, size_t n);
 
 struct Party;
 
-enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_PLATFORM, DUN_ART };
+enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_PLATFORM, DUN_ART };
+enum { DUN_ACT_NONE, DUN_ACT_HOME, DUN_ACT_DOWN, DUN_ACT_UP };
+
+typedef struct PartSet {
+    Pvm pvm;
+    int *last, *layerTex;
+} PartSet;
 
 typedef struct Dungeon {
-    Pvm set;
-    int *last;
+    PartSet set, common;
     Image *tex[DUN_TEX];
     char texName[DUN_TEX][48];
     int texCount;
-    int *layerTex;
     i32 cell[DUN_CELLS][DUN_FIELDS];
     bool visited[DUN_CELLS];
     bool loaded;
     int x, y, dir;
     float fov, camX, camZ, yaw;
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
-    u32 animMs, animDur;
+    u32 animMs, animDur, clock;
     int hover, steps;
     bool bumped;
     Image *art[DUN_ART];
@@ -276,7 +280,7 @@ typedef struct Dungeon {
     R3 r3;
 } Dungeon;
 
-enum { DUN_STAY, DUN_REST, DUN_MOVED };
+enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION };
 
 bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map);
 void sa_dungeon_free(Dungeon *d);
@@ -292,6 +296,7 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
 int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
 bool sa_dungeon_facing_exit(const Dungeon *d);
+int sa_dungeon_action(const Dungeon *d);
 int sa_dungeon_object(const Dungeon *d);
 void sa_debug_dungeon(VNSystemAoi *sa, const char *map, int x, int y, int dir);
 
