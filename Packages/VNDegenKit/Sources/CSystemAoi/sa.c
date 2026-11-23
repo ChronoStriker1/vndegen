@@ -469,6 +469,46 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             s->dirty = true;
         }
         break;
+    case 0xf7:
+        if (in->count >= 1) {
+            int loss = sa_vm_get(vm, code, &in->o[0]);
+            for (int c = 0; c < TOWN_CELLS; c++)
+                if (s->town.cell[c].type) s->town.cell[c].exp = s->town.cell[c].exp > loss ? s->town.cell[c].exp - loss : 0;
+        }
+        break;
+    case 0xee:
+        if (in->count >= 2) {
+            char *name = opd_str(code, in, 0);
+            int cell = sa_vm_get(vm, code, &in->o[1]);
+            for (int r = 0; r < s->town.build.rows; r++)
+                if (!strcmp(sa_table_text(&s->town.build, r, 1), name) && cell >= 0 && cell < TOWN_CELLS) {
+                    s->town.cell[cell].type = sa_table_int(&s->town.build, r, 0);
+                    s->town.cell[cell].level = 1;
+                    s->town.cell[cell].exp = 0;
+                    break;
+                }
+            free(name);
+            s->dirty = true;
+        }
+        break;
+    case 0xc9:
+        if (in->count >= 2) {
+            char *key = opd_str(code, in, 1);
+            int level = 0;
+            for (int i = 0; i < PARTY_SLOTS; i++) {
+                int r = s->party.unit[i] ? sa_party_unit_row(&s->party, s->party.unit[i]) : -1;
+                if (r >= 0 && !strcmp(sa_table_text(&s->party.units, r, 1), key)) level = s->party.level[i];
+            }
+            sa_vm_set(vm, &in->o[0], level);
+            free(key);
+        }
+        break;
+    case 0x9e:
+    case 0x9f:
+    case 0xc3:
+        if (in->count >= 2 && in->o[in->count - 1].kind == OPD_VAR) sa_vm_set(vm, &in->o[in->count - 1], 0);
+        if (in->op == 0x9e && in->count >= 1) sa_vm_set(vm, &in->o[0], 0);
+        break;
     case 0x94:
         if (in->count >= 1) sa_party_add_item(&s->party, sa_vm_get(vm, code, &in->o[0]), in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
         break;

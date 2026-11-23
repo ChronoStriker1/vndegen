@@ -71,6 +71,14 @@ where play couldn't pin it down.
   which the turn script reads (inferred from those reads; no script writes it).
 - **`c3 "role" var var`** asks which unit holds a town role (街長, 農業担当 and the others 配置 assigns); not built
   yet, so it answers none.
+- **Missions (目標).** The turn script runs the target scene (`fa0000.box`) once F143 is set, after `9e var` gives
+  1 or more, then `9f var`: inferred as "a mission is due" and "start it". `mission.obj` lists マクドゥの試験 1 to 15
+  with numbers that look like turns (8 and 9, 17, 26 and 27, …) and three amounts (200, 1000, 200 for the first),
+  shown in the 目標 box and settled with 提出. F143 isn't set in the opening turns, so none was seen yet; VNDegen
+  answers no mission due until a capture shows the rules.
+- **Other commands seen in the opening turns.** `f7 N` takes N EXP from every facility (抵抗勢力の攻撃…経験値ダウン),
+  `ee "facility" cell` places a facility (the 学園 at cell 21), `c9 var "unit"` gives a unit's level (inferred from
+  its use against C590).
 - **Script hooks.** `init.box` registers a script per hook number with `72`: 0 `bo0000` (each turn), 27 `bo2700`
   (a battle's end, the result in C155: 2 is a loss, which says Darkus's line and shows the loss message), 30
   `bo3000` (town commands, C095), and others for the expedition still to map.
