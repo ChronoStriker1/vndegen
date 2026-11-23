@@ -16,6 +16,8 @@ static int preferCount, preferUsed;
 
 static int step(VNANIM *n) {
     int alive = vnanim_frame(n, 16);
+    const char *page = vnanim_take_page(n);
+    if (page) printf("page %s\n", page);
     vnanim_audio(n, audio, 705);
     if (wav) {
         int16_t s[1410];
@@ -186,6 +188,11 @@ int main(int argc, char **argv) {
                 an_layer_apply_preset(a, l, preset, 0);
                 l->fresh = true;
             }
+        } else if (!strncmp(c, "comment:", 8)) {
+            char current[512];
+            int slot = vnanim_take_comment_request(n, current, sizeof current);
+            printf("comment request %d \"%s\"\n", slot, current);
+            if (slot >= 0) printf("comment set %s\n", vnanim_set_comment(n, slot, c + 8) ? "ok" : "failed");
         } else if (!strcmp(c, "state")) print_state(a);
         else if (!strcmp(c, "skip")) a->skipMode = true;
         else if (!strcmp(c, "noskip")) a->skipMode = false;

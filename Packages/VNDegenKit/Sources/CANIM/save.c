@@ -239,8 +239,11 @@ static void fill_slot(AN *a, u8 *s) {
         if (l->kind == LK_NONE) continue;
         put_name(s + OFF_LAYER_NAME + LAYER_NAME * i, LAYER_NAME, l->name);
         if (l->idle[0]) put_name(s + OFF_LAYER_WAIT + LAYER_WAIT * i, LAYER_WAIT, l->idle);
-        wr32(s + OFF_LAYER_X + 4 * i, 640);
-        wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)((a->slotX[i] ? a->slotX[i] : 640) - 640 + l->toX));
+        if (l->kind == LK_EMOTE) {
+            wr32(s + OFF_LAYER_X + 4 * i, 640);
+            wr32(s + OFF_LAYER_OFFSET + 4 * i, (u32)((a->slotX[i] ? a->slotX[i] : 640) - 640 + l->toX));
+        } else
+            wr32(s + OFF_LAYER_X + 4 * i, (u32)l->toX);
         for (int k = 0; k < 3; k++) wrf64(s + OFF_LAYER_SCALE3 + LAYER_SCALE3 * i + 8 * k, 1.0);
         if (l->scale != 1000) wr32(s + OFF_LAYER_ZOOM + 4 * i, (u32)l->scale);
         if (l->kind != LK_EMOTE) continue;
@@ -262,6 +265,26 @@ static bool write_saves(AN *a) {
 }
 
 static void clear_slot(AN *a, int slot) { memset(slot_data(a, slot), 0, SLOT_SIZE); }
+
+bool an_set_comment(AN *a, int slot, const char *utf8) {
+    u8 *s = slot_data(a, slot);
+    if (!s || rd16(s) != 1) return false;
+    char *sjis = an_utf8_to_sjis(utf8);
+    size_t n = strlen(sjis), cap = COMMENT_MAX - 1;
+    if (n > cap) {
+        n = 0;
+        for (const u8 *p = (const u8 *)sjis; *p;) {
+            size_t len = ((*p >= 0x81 && *p <= 0x9f) || (*p >= 0xe0 && *p <= 0xfc)) && p[1] ? 2 : 1;
+            if (n + len > cap) break;
+            n += len;
+            p += len;
+        }
+    }
+    memcpy(s + OFF_COMMENT, sjis, n);
+    s[OFF_COMMENT + n] = 0;
+    free(sjis);
+    return write_saves(a);
+}
 
 bool an_delete_slot(AN *a, int slot) {
     if (!slot_data(a, slot)) return false;
@@ -339,7 +362,7 @@ static bool restore_slot(AN *a, const u8 *s) {
         l->scale = zoom > 0 ? zoom : 1000;
         double base = i < POS_SLOTS ? rdf64(s + OFF_SLOT_X + 8 * i) : 0;
         a->slotX[i] = base > 0 && base < 4096 ? (int)base : 640;
-        l->toX = l->fromX = (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i) - (a->slotX[i] - 640);
+        l->toX = l->fromX = l->kind == LK_EMOTE ? (i32)rd32(s + OFF_LAYER_OFFSET + 4 * i) - (a->slotX[i] - 640) : (i32)rd32(s + OFF_LAYER_X + 4 * i);
         if (l->kind == LK_EMOTE) l->toY = l->fromY = (i32)rd32(s + OFF_LAYER_Y + 4 * i) - layer_drop(a, l);
         for (int k = 0; k * VAR_SIZE + VAR_SIZE <= LAYER_VARS_SIZE; k++) {
             const u8 *v = s + OFF_LAYER_VARS + LAYER_VARS_SIZE * i + VAR_SIZE * k;
@@ -467,7 +490,7 @@ static const OptionByte OPTION_BYTES[GAME_COUNT][11] = {
         },
 };
 
-enum { SYS_VOLUME = 0x18, SYS_TEXT_SPEED = 0x27c, SYS_AUTO_SPEED = 0x280, SYS_OPACITY = 0x298, SYS_SETTINGS_END = 0x7e530 };
+enum { SYS_VOLUME = 0x18, SYS_TEXT_SPEED = 0x27c, SYS_AUTO_SPEED = 0x280, SYS_OPACITY = 0x298, SYS_FONT = 0x7e324, SYS_MUTE = 0x64, SYS_FONT_SIZE = 32, SYS_SETTINGS_END = 0x7e530 };
 static const u32 VOLUME_BYTES[5] = {0x18, 0x19, 0x1b, 0x1e, 0x1f};
 
 static void settings_read(AN *a) {
@@ -479,17 +502,28 @@ static void settings_read(AN *a) {
         if (s[o->at] == o->first) a->option[i] = 0;
         else if (s[o->at] == o->second) a->option[i] = 1;
     }
-    for (int i = 0; i < 5; i++) a->volume[i] = clampi(s[VOLUME_BYTES[i]], 0, 100);
+    for (int i = 0; i < 5; i++) {
+        a->volume[i] = clampi(s[VOLUME_BYTES[i]], 0, 100);
+        a->mute[i] = s[VOLUME_BYTES[i] + SYS_MUTE] != 0;
+    }
     const VoiceTabs *t = an_voice_tabs(a);
     for (int c = 0; c < t->count; c++) {
         a->voiceVolume[c] = clampi(s[t->voiceAt + (u32)c], 0, 100);
+        a->voiceMute[c] = s[t->voiceAt + (u32)c + SYS_MUTE] != 0;
         if (c == t->count - 1) continue;
         a->bgvVolume[c] = clampi(s[t->bgvAt + (u32)c], 0, 100);
         a->talkVolume[c] = clampi(s[t->talkAt + (u32)c], 0, 100);
+        a->bgvMute[c] = s[t->bgvAt + (u32)c + SYS_MUTE] != 0;
+        a->talkMute[c] = s[t->talkAt + (u32)c + SYS_MUTE] != 0;
     }
     a->windowOpacity = clampi((int)rd32(s + SYS_OPACITY) * 100 / 217, 0, 100);
     a->textSpeed = clampi((200 - (int)rd32(s + SYS_TEXT_SPEED)) * 100 / 172, 0, 100);
     a->autoSpeed = clampi((50 - (int)rd32(s + SYS_AUTO_SPEED)) * 100 / 43, 0, 100);
+    char name[SYS_FONT_SIZE + 1] = {0};
+    memcpy(name, s + SYS_FONT, SYS_FONT_SIZE);
+    char *utf = an_sjis_to_utf8(name);
+    snprintf(a->fontName, sizeof a->fontName, "%s", utf ? utf : "");
+    free(utf);
 }
 
 static void settings_write(AN *a) {
@@ -499,17 +533,29 @@ static void settings_write(AN *a) {
         const OptionByte *o = &OPTION_BYTES[a->game][i];
         if (o->first != o->second) s[o->at] = a->option[i] ? o->second : o->first;
     }
-    for (int i = 0; i < 5; i++) s[VOLUME_BYTES[i]] = (u8)clampi(a->volume[i], 0, 100);
+    for (int i = 0; i < 5; i++) {
+        s[VOLUME_BYTES[i]] = (u8)clampi(a->volume[i], 0, 100);
+        s[VOLUME_BYTES[i] + SYS_MUTE] = a->mute[i];
+    }
     const VoiceTabs *t = an_voice_tabs(a);
     for (int c = 0; c < t->count; c++) {
         s[t->voiceAt + (u32)c] = (u8)clampi(a->voiceVolume[c], 0, 100);
+        s[t->voiceAt + (u32)c + SYS_MUTE] = a->voiceMute[c];
         if (c == t->count - 1) continue;
         s[t->bgvAt + (u32)c] = (u8)clampi(a->bgvVolume[c], 0, 100);
         s[t->talkAt + (u32)c] = (u8)clampi(a->talkVolume[c], 0, 100);
+        s[t->bgvAt + (u32)c + SYS_MUTE] = a->bgvMute[c];
+        s[t->talkAt + (u32)c + SYS_MUTE] = a->talkMute[c];
     }
     wr32(s + SYS_OPACITY, (u32)(a->windowOpacity * 217 / 100));
     wr32(s + SYS_TEXT_SPEED, (u32)(200 - a->textSpeed * 172 / 100));
     wr32(s + SYS_AUTO_SPEED, (u32)(50 - a->autoSpeed * 43 / 100));
+    char *sjis = an_utf8_to_sjis(a->fontName);
+    if (sjis && strlen(sjis) < SYS_FONT_SIZE) {
+        memset(s + SYS_FONT, 0, SYS_FONT_SIZE);
+        memcpy(s + SYS_FONT, sjis, strlen(sjis));
+    }
+    free(sjis);
 }
 
 void an_system_load(AN *a) {

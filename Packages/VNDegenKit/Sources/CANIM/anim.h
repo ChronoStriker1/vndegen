@@ -252,12 +252,15 @@ typedef struct UILayout {
     int textSize, nameX, nameRow, textX, textRow, textRowNoName, linePitch, textW;
     int barX, barCount, barGap[3], barAction[11];
     int stripX, stripW, lockX, lockAX, lockAY, lockW, lockH;
+    int hangOpening;
+    bool fractional;
 } UILayout;
 
 struct AN {
     char *dir, *saveDir, *base;
     int game;
     char page[1024];
+    int commentSlot;
     FILE *log;
     char problem[512];
     char title[256];
@@ -306,6 +309,9 @@ struct AN {
     bool extraRepeat;
     char bgm[16], extraBgm[16];
     int volume[5], voiceVolume[AN_VOICE_TABS], bgvVolume[AN_VOICE_TABS], talkVolume[AN_VOICE_TABS], volumeChar, dragSlider, infoRow;
+    bool mute[5], voiceMute[AN_VOICE_TABS], bgvMute[AN_VOICE_TABS], talkMute[AN_VOICE_TABS];
+    int volumeTests;
+    char testBgm[16];
     int option[11], windowOpacity, textSpeed, autoSpeed;
     u32 sampleStart;
     FlowNode *flow;
@@ -335,7 +341,9 @@ struct AN {
     int slotX[AN_LAYERS], slotY[AN_LAYERS];
     struct Mixer *mix;
     struct Movie *movie;
-    Font *font;
+    Font *font, *uiFont;
+    char fontName[64], fonts[32][64];
+    int fontCount, fontTop;
 };
 
 bool an_vm_step(AN *a);
@@ -347,6 +355,7 @@ void an_gfx_render(AN *a);
 void an_gfx_snapshot(AN *a);
 void an_gfx_begin_transition(AN *a, int kind, u32 ms, u32 color);
 bool an_gfx_transition_done(AN *a);
+void an_gfx_scene_fade(AN *a, u32 ms);
 void an_emote_draw(AN *a, int layer, Layer *l, int x, int y, int alpha);
 void an_layer_set_var(Layer *l, const char *name, float value);
 void an_layer_apply_preset(AN *a, Layer *l, const char *preset, u32 ms);
@@ -364,8 +373,11 @@ void an_gfx_blit_fit(u32 *dst, int dw, int dh, const Image *im, int sx, int sy, 
 
 bool an_text_init(AN *a);
 void an_text_free(AN *a);
+bool an_text_set_font(AN *a, const char *name);
+int an_ui_text_draw(AN *a, int x, int baseline, const char *s, int size, u32 color, bool fractional);
 int an_text_draw(AN *a, int x, int y, const char *s, int size, u32 color, u32 shadow, int maxWidth, int lineHeight);
 int an_text_width(AN *a, const char *s, int size);
+bool an_text_opens(const char *s);
 
 bool an_snd_init(AN *a);
 void an_snd_free(AN *a);
@@ -383,6 +395,7 @@ int an_voice_tab(const AN *a, char letter);
 void an_snd_mix(AN *a, float *out, int frames);
 void an_snd_lock(AN *a, bool lock);
 void an_snd_set_volume(AN *a, int channel, float volume);
+void an_volume_tests_stop(AN *a);
 float an_channel_volume(AN *a, int channel, const char *name, int tag);
 
 bool an_movie_exists(AN *a, const char *name);
@@ -396,6 +409,7 @@ void an_movie_mix(AN *a, float *out, int frames);
 enum { CH_BGM = 0, CH_VOICE = 1, CH_SE0 = 2, CH_BGV0 = CH_SE0 + AN_SE, CH_COUNT = CH_BGV0 + 4 };
 
 bool an_slot_info(AN *a, int slot, SlotInfo *info);
+bool an_set_comment(AN *a, int slot, const char *utf8);
 bool an_save_slot(AN *a, int slot);
 void an_auto_save(AN *a, u32 pc);
 int an_last_auto(const AN *a);

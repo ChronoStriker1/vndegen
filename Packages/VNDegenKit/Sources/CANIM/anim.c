@@ -76,6 +76,7 @@ VNANIM *vnanim_open(const VNANIMConfig *cfg, char *err, size_t errSize) {
     a->prev = an_alloc(sizeof(u32) * n);
     a->shot = an_alloc(sizeof(u32) * n);
     a->lastSlot = -1;
+    a->commentSlot = -1;
     a->emoteScale = 1.0f;
     an_volume_defaults(a);
     an_settings_defaults(a);
@@ -195,6 +196,21 @@ const char *vnanim_take_page(VNANIM *n) {
     a->page[0] = 0;
     return out;
 }
+
+int vnanim_take_comment_request(VNANIM *n, char *comment, size_t size) {
+    AN *a = (AN *)n;
+    int slot = a->commentSlot;
+    if (slot < 0) return -1;
+    a->commentSlot = -1;
+    SlotInfo info;
+    if (!an_slot_info(a, slot, &info)) return -1;
+    char *utf = an_sjis_to_utf8(info.comment);
+    snprintf(comment, size, "%s", utf);
+    free(utf);
+    return slot;
+}
+
+bool vnanim_set_comment(VNANIM *n, int slot, const char *comment) { return an_set_comment((AN *)n, slot, comment); }
 
 const char *vnanim_problem(VNANIM *n) {
     AN *a = (AN *)n;

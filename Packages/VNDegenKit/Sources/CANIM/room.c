@@ -387,6 +387,14 @@ bool an_room_input(AN *a) {
         screenshot(a);
         return true;
     }
+    if (in_rect(a, 1068, 616, 73, 55)) {
+        a->clicked = false;
+        char *dir = an_fmt("%s/SaveGraphic", a->saveDir);
+        an_mkdirs(dir);
+        snprintf(a->page, sizeof a->page, "%s", dir);
+        free(dir);
+        return true;
+    }
     if (in_rect(a, 1166, 612, 63, 63)) {
         a->clicked = false;
         reset_sliders(a);

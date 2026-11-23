@@ -55,7 +55,11 @@ static void confirm_input(AN *a) {
 }
 
 enum { CARD_X = 27, CARD_Y = 119, CARD_DX = 310, CARD_DY = 274, CARD_W = 296, CARD_H = 260 };
-enum { LABEL_CX = 171, LABEL_Y = 227 };
+enum { LABEL_CX = 171, LABEL_Y = 227, COMMENT_DX = 70, COMMENT_DY = 160, COMMENT_W = 202, COMMENT_H = 54 };
+
+static bool edits_comments(const AN *a) { return a->game == GAME_MGSW; }
+
+static Rect comment_box(Rect card) { return (Rect){card.x + COMMENT_DX, card.y + COMMENT_DY, COMMENT_W, COMMENT_H}; }
 enum { DEL_DX = 201, DEL_DY = 15, DEL_W = 78, DEL_H = 26, RESET_X = 1148, RESET_Y = 24, RESET_W = 110, RESET_H = 67 };
 enum { PAGE_X = 201, PAGE_Y = 16, PAGE_DX = 82, PAGE_DY = 45, PAGE_W = 78, PAGE_H = 38 };
 
@@ -73,7 +77,7 @@ typedef struct CardLayout {
 } CardLayout;
 
 static const CardLayout CARD[GAME_COUNT] = {
-    [GAME_DDD] = {10, 42, 11, 14, 19, 34, 20, 0xff503040u, true, 0, 0},
+    [GAME_DDD] = {10, 32, 11, 14, 19, 34, 20, 0xff503040u, true, 0, 0},
     [GAME_MGSW] = {11, 32, 10, 15, 20, 35, 20, 0xffffffffu, false, 40, 206},
 };
 
@@ -204,7 +208,7 @@ static void vertical(AN *a, Image *b, const char *s, int x, int y) {
 
 enum { AUTO_PAGE = 20, AUTO_X = 1031, AUTO_Y = 24, AUTO_W = 108, AUTO_H = 66 };
 
-static bool has_auto_page(AN *a, bool saving) { return !saving && a->game == GAME_MGSW; }
+static bool has_auto_page(AN *a, bool saving) { return !saving; }
 
 static void draw_slots(AN *a, bool saving) {
     const CardLayout *L = &CARD[a->game];
@@ -245,8 +249,10 @@ static void draw_slots(AN *a, bool saving) {
         if (hover && (used || saving)) {
             Rect d = delete_button(r);
             bool del = used && in_rect(a, d.x, d.y, d.w, d.h);
-            int lx = del ? 603 : saving ? 659 : 658, lw = del ? 205 : saving ? 95 : 96;
-            an_gfx_blit(a->fb, a->W, a->H, b, lx, del ? 586 : 532, lw, 17, r.x + LABEL_CX - lw / 2, r.y + LABEL_Y, 255);
+            Rect c = comment_box(r);
+            bool edit = !del && used && edits_comments(a) && in_rect(a, c.x, c.y, c.w, c.h);
+            int lx = del ? 603 : edit ? 629 : saving ? 659 : 658, lw = del ? 205 : edit ? 153 : saving ? 95 : 96;
+            an_gfx_blit(a->fb, a->W, a->H, b, lx, del ? 586 : edit ? 613 : 532, lw, 17, r.x + LABEL_CX - lw / 2, r.y + LABEL_Y, 255);
         }
         if (!used) continue;
         Image *t = thumb(a, slot);
@@ -326,6 +332,11 @@ static void slots_input(AN *a, bool saving) {
             if (used) an_confirm(a, MSG_DELETE, ACT_DELETE, slot);
             return;
         }
+        Rect c = comment_box(r);
+        if (used && edits_comments(a) && in_rect(a, c.x, c.y, c.w, c.h)) {
+            a->commentSlot = slot;
+            return;
+        }
         if (saving) {
             if (used) an_confirm(a, MSG_OVERWRITE, ACT_SAVE, slot);
             else an_do_action(a, ACT_SAVE, slot);
@@ -373,14 +384,86 @@ static const VolumeLayout VOLUME[GAME_COUNT] = {
                    102, 27, 3, 109, {3, 34, 65}, 350, 471, 135, 980, 1101, 335},
 };
 
-static void sound_buttons(AN *a, Image *b, int testX, int playX, int y, bool test) {
-    const VolumeLayout *L = &VOLUME[a->game];
-    if (test)
-        an_gfx_blit(a->fb, a->W, a->H, b, L->testAX, L->btnRow[in_rect(a, testX, y, L->btnW, L->btnH) ? 1 : 0], L->btnW, L->btnH, testX, y, 255);
-    an_gfx_blit(a->fb, a->W, a->H, b, L->playAX, L->btnRow[2], L->btnW, L->btnH, playX, y, 255);
+static bool slider_shown(AN *a, int i) { return i < 6 || a->volumeChar < an_voice_tabs(a)->count - 1; }
+
+static const char *const TEST_SOUND[GAME_COUNT][5] = {
+    [GAME_DDD] = {NULL, "01", "wse20000", "b090001g", "b130008j"},
+    [GAME_MGSW] = {NULL, "01", "wse20000", "b090001g", "b130008j"},
+};
+static const char *const TEST_VOICE[GAME_COUNT][AN_VOICE_TABS] = {
+    [GAME_DDD] = {"wrisa_sample", "wsiho_sample", "wothe_sample"},
+    [GAME_MGSW] = {"wele_sample", "wmon_sample", "walp_sample", "wsel_sample", "wlan_sample", "wjen_sample", "wisa_sample",
+                   "wkam_sample", "woth_sample"},
+};
+static const char *const TEST_BGV[GAME_COUNT][AN_VOICE_TABS] = {
+    [GAME_DDD] = {"b1040", "b2040"},
+    [GAME_MGSW] = {"belp20", "bmop20", "balp20", "bsep20", "blap20", "bjep20", "bisp20", "bkap20"},
+};
+static const char *const TEST_TALK[GAME_COUNT][AN_VOICE_TABS] = {
+    [GAME_DDD] = {"b5040", "b6040"},
+    [GAME_MGSW] = {"belp20", "bmop20", "balp20", "bsep20", "blap20", "bjep20", "bisp20", "bkap20"},
+};
+static const int TEST_CHANNEL[8] = {-1, CH_BGM, CH_SE0 + AN_SE - 1, CH_SE0 + AN_SE - 2, CH_SE0 + AN_SE - 3, CH_VOICE, CH_BGV0 + 3, CH_BGV0 + 2};
+
+static bool *row_mute(AN *a, int i) {
+    if (i < 5) return &a->mute[i];
+    int c = a->volumeChar;
+    return i == 5 ? &a->voiceMute[c] : i == 6 ? &a->bgvMute[c] : &a->talkMute[c];
 }
 
-static bool slider_shown(AN *a, int i) { return i < 6 || a->volumeChar < an_voice_tabs(a)->count - 1; }
+static float test_volume(AN *a, int i) {
+    if (a->mute[0] || *row_mute(a, i)) return 0;
+    int c = a->volumeChar;
+    int v = i < 5 ? a->volume[i] : i == 5 ? a->voiceVolume[c] : i == 6 ? a->bgvVolume[c] : a->talkVolume[c];
+    return (float)a->volume[0] / 100.0f * (float)v / 100.0f;
+}
+
+static void test_stop(AN *a, int i) {
+    if (!(a->volumeTests & 1 << i)) return;
+    a->volumeTests &= ~(1 << i);
+    an_snd_stop(a, TEST_CHANNEL[i]);
+    if (i == 1 && a->testBgm[0]) an_snd_play(a, CH_BGM, a->testBgm, true, false);
+}
+
+static void test_start(AN *a, int i) {
+    int c = a->volumeChar;
+    const char *name = i < 5 ? TEST_SOUND[a->game][i] : i == 5 ? TEST_VOICE[a->game][c] : i == 6 ? TEST_BGV[a->game][c] : TEST_TALK[a->game][c];
+    if (!name) return;
+    if (i == 1) snprintf(a->testBgm, sizeof a->testBgm, "%s", an_snd_playing(a, CH_BGM) ? a->bgm : "");
+    a->volumeTests |= 1 << i;
+    an_snd_play(a, TEST_CHANNEL[i], name, true, i != 1);
+    an_snd_set_volume(a, TEST_CHANNEL[i], test_volume(a, i));
+}
+
+void an_volume_tests_stop(AN *a) {
+    for (int i = 1; i < 8; i++) test_stop(a, i);
+}
+
+static void sound_buttons(AN *a, Image *b, int testX, int playX, int y, int i) {
+    const VolumeLayout *L = &VOLUME[a->game];
+    if (i > 0) {
+        int row = a->volumeTests & 1 << i ? 2 : in_rect(a, testX, y, L->btnW, L->btnH) ? 1 : 0;
+        an_gfx_blit(a->fb, a->W, a->H, b, L->testAX, L->btnRow[row], L->btnW, L->btnH, testX, y, 255);
+    }
+    int row = !*row_mute(a, i) ? 2 : in_rect(a, playX, y, L->btnW, L->btnH) ? 1 : 0;
+    an_gfx_blit(a->fb, a->W, a->H, b, L->playAX, L->btnRow[row], L->btnW, L->btnH, playX, y, 255);
+}
+
+static bool button_row(AN *a, bool play, int *row) {
+    const VolumeLayout *L = &VOLUME[a->game];
+    for (int i = 0; i < 8; i++) {
+        bool left = i < 5;
+        int x = left ? (play ? L->leftPlayX : L->leftTestX) : (play ? L->rightPlayX : L->rightTestX);
+        int y = left ? L->leftY + 100 * i : L->rightY + 100 * (i - 5);
+        if ((i == 0 && !play) || (!left && !slider_shown(a, i))) continue;
+        if (in_rect(a, x, y, L->btnW, L->btnH)) {
+            *row = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 
 static bool on_tab(AN *a, int c) {
     const VolumeLayout *L = &VOLUME[a->game];
@@ -462,9 +545,9 @@ static void draw_volume(AN *a) {
         an_gfx_blit(a->fb, a->W, a->H, b, L->tabAX + L->tabADX * c, L->tabRow[state], L->tabW, state ? L->tabSelH : L->tabH,
                     L->tabX + L->tabDX * c, L->tabY, 255);
     }
-    for (int i = 0; i < 5; i++) sound_buttons(a, b, L->leftTestX, L->leftPlayX, L->leftY + 100 * i, i > 0);
+    for (int i = 0; i < 5; i++) sound_buttons(a, b, L->leftTestX, L->leftPlayX, L->leftY + 100 * i, i);
     for (int k = 0; k < 3; k++)
-        if (slider_shown(a, 5 + k)) sound_buttons(a, b, L->rightTestX, L->rightPlayX, L->rightY + 100 * k, true);
+        if (slider_shown(a, 5 + k)) sound_buttons(a, b, L->rightTestX, L->rightPlayX, L->rightY + 100 * k, 5 + k);
     for (int i = 0; i < 8; i++) {
         if (!slider_shown(a, i)) continue;
         int x, y;
@@ -486,6 +569,9 @@ static void draw_volume(AN *a) {
     if (in_rect(a, 940, 5, 278, 40)) info = 120;
     if (in_rect(a, 62, 670, 278, 40)) info = 121;
     if (in_rect(a, 940, 670, 278, 40)) info = 122;
+    int row;
+    if (button_row(a, false, &row)) info = 118;
+    if (button_row(a, true, &row)) info = 119;
     if (a->dragSlider >= 0 && a->dragSlider < 8) info = SLIDER_INFO[a->dragSlider];
     draw_info(a, info);
 }
@@ -494,6 +580,8 @@ static void apply_volumes(AN *a) {
     an_snd_set_volume(a, CH_BGM, an_channel_volume(a, CH_BGM, NULL, 0));
     for (int c = CH_SE0; c < CH_BGV0; c++) an_snd_set_volume(a, c, an_channel_volume(a, c, NULL, 0));
     an_snd_set_volume(a, CH_VOICE, an_channel_volume(a, CH_VOICE, a->voiceName, 0));
+    for (int i = 1; i < 8; i++)
+        if (a->volumeTests & 1 << i) an_snd_set_volume(a, TEST_CHANNEL[i], test_volume(a, i));
 }
 
 static void volume_input(AN *a) {
@@ -509,6 +597,7 @@ static void volume_input(AN *a) {
     if (a->rclicked) {
         a->rclicked = false;
         a->screen = SCR_NONE;
+        an_volume_tests_stop(a);
         return;
     }
     if (a->down)
@@ -522,13 +611,29 @@ static void volume_input(AN *a) {
         }
     if (!a->clicked) return;
     a->clicked = false;
+    int row;
+    if (button_row(a, false, &row)) {
+        if (a->volumeTests & 1 << row) test_stop(a, row);
+        else test_start(a, row);
+        return;
+    }
+    if (button_row(a, true, &row)) {
+        *row_mute(a, row) = !*row_mute(a, row);
+        apply_volumes(a);
+        return;
+    }
     for (int c = 0; c < an_voice_tabs(a)->count; c++)
-        if (on_tab(a, c)) a->volumeChar = c;
+        if (on_tab(a, c) && c != a->volumeChar) {
+            for (int i = 5; i < 8; i++) test_stop(a, i);
+            a->volumeChar = c;
+        }
     if (in_rect(a, 940, 5, 278, 40)) {
         an_volume_defaults(a);
         apply_volumes(a);
     }
     if (in_rect(a, 62, 670, 278, 40)) a->screen = SCR_NONE;
+    if (in_rect(a, 940, 670, 278, 40)) an_settings_open(a);
+    if (a->screen != SCR_VOLUME) an_volume_tests_stop(a);
 }
 
 typedef struct Option {
@@ -610,12 +715,58 @@ static void draw_sample(AN *a) {
     an_text_draw(a, L->textX, L->row + L->pitch, part, L->size, 0xffffffffu, 0x90000000u, 0, L->pitch);
 }
 
+typedef struct FontListLayout {
+    int headX, headBase, headSize, rowX, rowBase, rowSize;
+    bool headFractional;
+    u32 color;
+} FontListLayout;
+
+static const FontListLayout FONT_LIST[GAME_COUNT] = {
+    [GAME_DDD] = {709, 120, 24, 719, 152, 20, false, 0xff222222u},
+    [GAME_MGSW] = {708, 120, 20, 718, 152, 18, true, 0xffffffffu},
+};
+enum { FONT_ROWS = 4, FONT_PITCH = 23, FONT_LIST_X = 708, FONT_LIST_Y = 134, FONT_LIST_W = 448, FONT_ARROW_X = 1190, FONT_UP_Y = 134, FONT_DOWN_Y = 188, FONT_ARROW_W = 40 };
+
+static void draw_fonts(AN *a, Image *b) {
+    const FontListLayout *L = &FONT_LIST[a->game];
+    for (int i = 0; i < FONT_ROWS && a->fontTop + i < a->fontCount; i++)
+        if (in_rect(a, FONT_LIST_X, FONT_LIST_Y + FONT_PITCH * i, FONT_LIST_W, FONT_PITCH))
+            an_gfx_blit(a->fb, a->W, a->H, b, 305, 711, FONT_LIST_W, FONT_PITCH, FONT_LIST_X, FONT_LIST_Y + FONT_PITCH * i, 255);
+    for (int k = 0; k < 2; k++) {
+        int y = k ? FONT_DOWN_Y : FONT_UP_Y;
+        bool lit = in_rect(a, FONT_ARROW_X, y, FONT_ARROW_W, FONT_ARROW_W);
+        an_gfx_blit(a->fb, a->W, a->H, b, 2 + 42 * k, lit ? 812 : 770, FONT_ARROW_W, FONT_ARROW_W, FONT_ARROW_X, y, 255);
+    }
+    an_ui_text_draw(a, L->headX, L->headBase, a->fontName, L->headSize, L->color, L->headFractional);
+    for (int i = 0; i < FONT_ROWS && a->fontTop + i < a->fontCount; i++)
+        an_ui_text_draw(a, L->rowX, L->rowBase + FONT_PITCH * i, a->fonts[a->fontTop + i], L->rowSize, L->color, true);
+}
+
+static bool fonts_input(AN *a) {
+    int maxTop = a->fontCount > FONT_ROWS ? a->fontCount - FONT_ROWS : 0;
+    if (in_rect(a, FONT_ARROW_X, FONT_UP_Y, FONT_ARROW_W, FONT_ARROW_W)) {
+        a->fontTop = clampi(a->fontTop - 1, 0, maxTop);
+        return true;
+    }
+    if (in_rect(a, FONT_ARROW_X, FONT_DOWN_Y, FONT_ARROW_W, FONT_ARROW_W)) {
+        a->fontTop = clampi(a->fontTop + 1, 0, maxTop);
+        return true;
+    }
+    for (int i = 0; i < FONT_ROWS && a->fontTop + i < a->fontCount; i++)
+        if (in_rect(a, FONT_LIST_X, FONT_LIST_Y + FONT_PITCH * i, FONT_LIST_W, FONT_PITCH)) {
+            an_text_set_font(a, a->fonts[a->fontTop + i]);
+            return true;
+        }
+    return false;
+}
+
 static void draw_settings(AN *a) {
     Image *panel = an_image_load(a, "spconfig");
     if (panel) an_gfx_blit(a->fb, a->W, a->H, panel, 0, 0, a->W, a->H, 0, 0, 255);
     draw_sample(a);
     Image *b = an_image_load(a, "spconfigButton");
     if (!b) return;
+    draw_fonts(a, b);
     for (int i = 0; i < 11; i++) {
         const Option *o = &OPTIONS[i];
         for (int k = 0; k < 2; k++) {
@@ -678,8 +829,14 @@ static void settings_input(AN *a) {
                 a->dragSlider = 10 + i;
                 return;
             }
+    if (a->wheel && in_rect(a, FONT_LIST_X, FONT_LIST_Y, FONT_ARROW_X + FONT_ARROW_W - FONT_LIST_X, FONT_PITCH * FONT_ROWS)) {
+        int maxTop = a->fontCount > FONT_ROWS ? a->fontCount - FONT_ROWS : 0;
+        a->fontTop = clampi(a->fontTop - a->wheel, 0, maxTop);
+        a->wheel = 0;
+    }
     if (!a->clicked) return;
     a->clicked = false;
+    if (fonts_input(a)) return;
     for (int i = 0; i < 11; i++)
         for (int k = 0; k < 2; k++) {
             Rect r;

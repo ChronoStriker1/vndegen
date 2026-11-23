@@ -170,7 +170,19 @@ static void draw_window(AN *a, bool textless) {
         size_t n = strlen(a->text), shown = text_shown(a);
         char *part = an_alloc(n + 1);
         memcpy(part, a->text, shown < n ? shown : n);
-        an_text_draw(a, u->textX, a->name ? u->textRow : u->textRowNoName, part, u->textSize, 0xffffffffu, 0x90000000u, u->textW, u->linePitch);
+        a->fractionalText = u->fractional;
+        int row = a->name ? u->textRow : u->textRowNoName;
+        const char *body = part;
+        if (u->hangOpening && an_text_opens(part)) {
+            u32 cp;
+            int len = an_utf8_decode(part, &cp);
+            char open[8];
+            snprintf(open, sizeof open, "%.*s", len, part);
+            an_text_draw(a, u->textX - u->hangOpening, row, open, u->textSize, 0xffffffffu, 0x90000000u, 0, u->linePitch);
+            body = part + len;
+        }
+        an_text_draw(a, u->textX, row, body, u->textSize, 0xffffffffu, 0x90000000u, u->textW, u->linePitch);
+        a->fractionalText = false;
         free(part);
     }
     if (ui) {

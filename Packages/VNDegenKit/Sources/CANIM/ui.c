@@ -6,11 +6,11 @@ static const UILayout UI[GAME_COUNT] = {
     [GAME_DDD] = {24, 194, 583, 180, 629, 583, 46, 884,
                   606, 11, {2, 7, 10},
                   {BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_FLOW, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE},
-                  568, 712, 578, 204, 80, 19, 23},
-    [GAME_MGSW] = {19, 169, 583, 164, 626, 626, 41, 940,
+                  568, 712, 578, 204, 80, 19, 23, 0, false},
+    [GAME_MGSW] = {21, 169, 583, 175, 628, 628, 42, 929,
                    664, 10, {2, 6, 9},
                    {BAR_QSAVE, BAR_QLOAD, BAR_SAVE, BAR_LOAD, BAR_SET, BAR_VOL, BAR_SKIP, BAR_AUTO, BAR_HIST, BAR_TITLE},
-                   624, 656, 636, 203, 51, 18, 23},
+                   624, 656, 636, 203, 51, 18, 23, 11, true},
 };
 
 const UILayout *an_ui(const AN *a) { return &UI[a->game]; }
@@ -62,7 +62,7 @@ typedef struct LogLayout {
 
 static const LogLayout LOG[GAME_COUNT] = {
     [GAME_DDD] = {24, 128, 115, 46, 5, 22, 35, 610, 1223, 56, false},
-    [GAME_MGSW] = {20, 132, 127, 41, 3, 19, 38, 615, 1221, 53, true},
+    [GAME_MGSW] = {21, 132, 141, 42, 3, 19, 38, 615, 1221, 53, true},
 };
 
 static int entry_lines(AN *a, const LogEntry *e) {
@@ -124,7 +124,18 @@ static void draw_log(AN *a) {
             base += L->pitch;
             x = L->namedTextX;
         }
-        an_text_draw(a, x, base, e->text, L->size, 0xffffffffu, 0x90000000u, 1060, L->pitch);
+        const char *body = e->text;
+        int hang = an_ui(a)->hangOpening;
+        if (e->name && hang && an_text_opens(body)) {
+            u32 cp;
+            int len = an_utf8_decode(body, &cp);
+            char open[8];
+            snprintf(open, sizeof open, "%.*s", len, body);
+            an_text_draw(a, x - hang, base, open, L->size, 0xffffffffu, 0x90000000u, 0, L->pitch);
+            body += len;
+        } else if (e->name && hang)
+            x -= hang;
+        an_text_draw(a, x, base, body, L->size, 0xffffffffu, 0x90000000u, 1060, L->pitch);
         a->fractionalText = false;
         y += h;
     }
