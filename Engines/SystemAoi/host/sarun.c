@@ -111,6 +111,10 @@ int main(int argc, char **argv) {
             vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 0);
             alive = alive && run(s, 1000);
         }
+        if (!strcmp(argv[a], "newgame")) {
+            sa_debug_new_game(s);
+            alive = alive && run(s, 100);
+        }
         if (!strncmp(argv[a], "battle=", 7)) {
             sa_debug_battle(s, argv[a] + 7, "bg021a0.agf");
             alive = alive && run(s, 100);

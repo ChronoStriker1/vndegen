@@ -159,7 +159,7 @@ typedef struct Choice {
     u32 target;
 } Choice;
 
-enum { VM_RUN, VM_WAIT_CLICK, VM_WAIT_CHOICE, VM_WAIT_TIME, VM_DONE };
+enum { VM_RUN, VM_WAIT_CLICK, VM_WAIT_CHOICE, VM_WAIT_TIME, VM_WAIT_DIALOG, VM_DONE };
 
 typedef struct VM {
     LoadedBox boxes[SA_BOXES];
@@ -434,6 +434,7 @@ bool sa_battle_hover(Battle *b, int x, int y);
 void sa_battle_cancel(Battle *b);
 void sa_battle_draw(Battle *b, u32 *fb);
 void sa_debug_battle(VNSystemAoi *sa, const char *group, const char *backdrop);
+void sa_debug_new_game(VNSystemAoi *sa);
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
 
 void sa_popup_load(Image **frame, Vfs *vfs);
@@ -466,6 +467,25 @@ void sa_town_draw_info(Town *t, const VM *vm, u32 *fb);
 void sa_draw_number(u32 *fb, const Image *font, const char *s, int right, int y, int row, int cw, int ch);
 void sa_draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch);
 Image *sa_load_image(Vfs *vfs, const char *name);
+
+#define DIALOG_ART 5
+#define DIALOG_LINES 8
+
+typedef struct Dialog {
+    bool open, table, hover;
+    char *lines[DIALOG_LINES];
+    int lineCount;
+    int before[4], after[4];
+    Image *art[DIALOG_ART];
+} Dialog;
+
+void sa_dialog_init(Dialog *d, Vfs *vfs);
+void sa_dialog_free(Dialog *d);
+void sa_dialog_open(Dialog *d, const char *text);
+void sa_dialog_open_turn(Dialog *d, const int before[4], const int after[4], const char *text);
+bool sa_dialog_hover(Dialog *d, int x, int y);
+bool sa_dialog_click(Dialog *d, int x, int y);
+void sa_dialog_draw(Dialog *d, u32 *fb);
 
 #define BUILD_PENDING 32
 

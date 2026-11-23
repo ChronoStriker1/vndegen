@@ -91,6 +91,8 @@ struct SA {
     Party party;
     Battle battle;
     BuildScreen build;
+    Dialog dialog;
+    bool turnPending;
     bool inGame;
     int afterScript;
     char name[96];
@@ -481,6 +483,15 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             s->panWait = true;
         }
         break;
+    case 0x8a: {
+        char *t = opd_str(code, in, 4);
+        clear_text(s);
+        sa_dialog_open(&s->dialog, t);
+        free(t);
+        vm->state = VM_WAIT_DIALOG;
+        s->dirty = true;
+        break;
+    }
     case 0xef:
         if (in->count >= 2) {
             int c = s->town.condition + sa_vm_get(vm, code, &in->o[1]);
@@ -532,7 +543,9 @@ static int button_at(int x, int y) {
     return -1;
 }
 
-static bool window_shown(SA *s) { return (s->lineCount || s->name[0]) && !s->windowHidden && !s->log.open; }
+static bool window_shown(SA *s) {
+    return (s->lineCount || s->name[0]) && !s->windowHidden && !s->log.open && !s->dialog.open;
+}
 
 static void compose(SA *s) {
     u32 *fb = s->fb;
@@ -578,6 +591,7 @@ static void compose(SA *s) {
         }
         sa_blit(fb, s->ui[UI_CHOICE_BOTTOM], x, choice_y(s, s->vm.choiceCount));
     }
+    sa_dialog_draw(&s->dialog, fb);
     if (s->log.open) sa_log_draw(&s->log, fb, s->skipMode, s->autoMode);
     if (s->transDur && s->transMs < s->transDur) {
         u32 a = s->transMs * 256 / s->transDur;
@@ -669,14 +683,39 @@ static void end_turn(SA *s) {
     food -= vm->c[C_RESIDENTS] / 10;
     sa_log(s, "turn %d ends: residents %d%+d, food %d%+d, money %d%+d, resources %d%+d", vm->c[C_TURN] + 1, vm->c[C_RESIDENTS], people,
            vm->c[C_FOOD], food, vm->c[C_MONEY], money, vm->c[C_RESOURCES], res);
+    int before[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
     vm->c[C_RESIDENTS] += people;
     if (cap && vm->c[C_RESIDENTS] > cap) vm->c[C_RESIDENTS] = cap;
     vm->c[C_FOOD] += food;
     vm->c[C_MONEY] += money;
     vm->c[C_RESOURCES] += res;
     vm->c[C_TURN]++;
+    int after[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
+    sa_dialog_open_turn(&s->dialog, before, after, "このターンの収支です");
+    s->turnPending = true;
+    s->town.mapOnly = true;
+}
+
+static void next_turn(SA *s) {
+    s->turnPending = false;
+    s->town.mapOnly = false;
     reset_scene(s);
     start_script(s, "bo0000.box", 0);
+}
+
+static bool dialog_input(SA *s) {
+    if (!s->dialog.open) return false;
+    if (sa_dialog_hover(&s->dialog, s->mouseX, s->mouseY)) s->dirty = true;
+    s->rightClicked = false;
+    if (s->clicked) {
+        s->clicked = false;
+        if (sa_dialog_click(&s->dialog, s->mouseX, s->mouseY)) {
+            if (s->vm.state == VM_WAIT_DIALOG) s->vm.state = VM_RUN;
+            if (s->turnPending) next_turn(s);
+            s->dirty = true;
+        }
+    }
+    return true;
 }
 
 static int command_number(int action) {
@@ -832,6 +871,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     s->town.party = &s->party;
     if (!sa_battle_init(&s->battle, &s->vfs, &s->party)) sa_log(s, "can't read the battle tables");
     sa_build_init(&s->build, &s->vfs);
+    sa_dialog_init(&s->dialog, &s->vfs);
     snprintf(s->title, sizeof s->title, "BUNNY BLACK 3");
     s->host = (VMHost){.ctx = s, .text = host_text, .speaker = host_speaker, .page = host_page, .command = host_command, .log = host_log};
     s->hover = -1;
@@ -876,6 +916,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_battle_free(&s->battle);
     sa_party_free(&s->party);
     sa_build_free(&s->build);
+    sa_dialog_free(&s->dialog);
     picture_clear(&s->face);
     for (int i = 0; i < s->faceCount; i++) {
         free(s->faceName[i]);
@@ -961,6 +1002,15 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         }
         return true;
     }
+    if (s->mode == MODE_TOWN && dialog_input(s)) {
+        if (s->mode == MODE_TOWN && s->dirty) {
+            sa_town_draw(&s->town, &s->vfs, &s->vm, s->fb);
+            sa_dialog_draw(&s->dialog, s->fb);
+            s->serial++;
+            s->dirty = false;
+        }
+        if (s->mode == MODE_TOWN) return true;
+    }
     if (s->mode == MODE_TOWN) {
         if (sa_party_tick(&s->party, elapsedMs) && !s->town.hidden && !s->town.mapOnly) s->dirty = true;
         if (sa_town_hover(&s->town, &s->vm, s->mouseX, s->mouseY)) s->dirty = true;
@@ -975,6 +1025,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         }
         if (s->mode == MODE_TOWN) return true;
     }
+    dialog_input(s);
     if (s->total && s->shown < s->total) {
         s->textMs += elapsedMs;
         int want = (int)(s->textMs / 30);
@@ -1285,4 +1336,11 @@ void sa_debug_battle(VNSystemAoi *sa, const char *group, const char *backdrop) {
     }
     s->mode = MODE_BATTLE;
     s->dirty = true;
+}
+
+void sa_debug_new_game(VNSystemAoi *sa) {
+    SA *s = (SA *)sa;
+    if (s->movie) movie_stop(s);
+    s->mode = MODE_STORY;
+    new_game(s);
 }

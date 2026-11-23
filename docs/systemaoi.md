@@ -66,7 +66,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   bars. Each command first runs the game's hook for it (`bo3000.box` script 0 with
   `C095` set to the command), so its first-use help shows as in the original. 建設 opens the build screen: the list,
   the board, the card, Reset, Undo, 決定 and 戻る, with the town window showing the result before 決定. 休憩 ends the
-  turn: the turn's income, then the next turn's script. 遠征, 内政, 配置, 装備, 育成 and 商会 aren't built yet.
+  turn: the income box (residents, food, money and resources before and after) over the bare map, then the next
+  turn's script.
+- **Message box.** Script command `8a` opens the game's message box (`ret_a02`, `a04`, `a00` and the OK button
+  `ret_a01`) with its text, `|` breaking lines, and the script waits for OK. 遠征, 内政, 配置, 装備, 育成 and 商会 aren't built yet.
 - **Battles.** The board with the party's and the enemies' platforms, idle animations and bars, the Backs and Forward
   panels, the side buttons, 戦闘開始, 自動戦闘, ゲージON and the log. Each unit's action and target buttons open the
   game's skill and target pickers; the side buttons set every unit's order or target and save and load three sets.
