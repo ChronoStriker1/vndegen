@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.59.11",
+          "buildVersion": "3222",
+          "date": "2026-11-23T05:19:03Z",
+          "localizedDescription": "Mesu Kyoushi 3 and 4 gain their dress screen, and saves made on the map load back onto the map.\n\n## Downloads\n\n- `VNDegen-0.59.11-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.59.11.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.59.11-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Added\n\n- **BISHOP BSX:** Mesu Kyoushi 3 and 4's dress screen (STRIP). Pick a character, or all of them, and set how undressed they are, by outfit or for every outfit. Outfits you haven't seen yet show 未確認. The choice is kept in saves as the PC keeps it, so PC saves load with their levels and VNDegen's load on the PC the same way.\n\n## Fixed\n\n- **BISHOP BSX:** the map's auto save shows the map in its picture. In Mesu Kyoushi 1 it had been black.\n- **BISHOP BSX:** a save made from the map's menu bar loads back onto the map with no text, as on the PC. Before, it loaded with the last line in the window.\n\n## Known limits\n\n- **BISHOP BSX:** the dress screen's 視点 button and view bar (the free-sight meter) are drawn but do nothing. Mesu Kyoushi 3 shows lines one at a time where the PC shows several speakers' lines together.\n\n## What wasn't tested\n\n- No physical device was used. These were checked in the Linux test build, the Mac app and an iPad simulator, and against the PC versions under Wine.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.59.11/VNDegen-0.59.11.ipa",
+          "size": 132393735,
+          "sha256": "dc9f8997fb1d494bd9ea73b405d7fc0c6ca17e903635a7a7062907f9dcebdfa9",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.59.10",
           "buildVersion": "3214",
           "date": "2026-11-23T04:14:12Z",
