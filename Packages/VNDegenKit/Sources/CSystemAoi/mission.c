@@ -32,15 +32,16 @@ enum {
     HOVER_SUBMIT = 1,
     HOVER_CANCEL = 2,
     COMMAND_HOOK = 31,
+    CONFIRM_X = 540,
 };
 
-enum { ART_BG, ART_PANEL, ART_SUBMIT, ART_CANCEL, ART_SMALL, ART_BIG, ART_COUNT };
+enum { ART_BG, ART_PANEL, ART_SUBMIT, ART_CANCEL, ART_SMALL, ART_BIG, ART_CONFIRM, ART_COUNT };
 
 void sa_mission_init(SA *s) {
     Missions *m = &s->missions;
     memset(m, 0, sizeof *m);
     if (!sa_table_load(&m->table, &s->vfs, "mission.obj")) sa_log(s, "can't read mission.obj");
-    static const char *const names[ART_COUNT] = {"bg009a0.agf", "pay_a00.agf", "pay_b00.agf", "pay_b01.agf", "pay_c00.agf", "pay_c01.agf"};
+    static const char *const names[ART_COUNT] = {"bg009a0.agf", "pay_a00.agf", "pay_b00.agf", "pay_b01.agf", "pay_c00.agf", "pay_c01.agf", "pay_b02.agf"};
     for (int i = 0; i < ART_COUNT; i++) m->art[i] = sa_load_image(&s->vfs, names[i]);
     s->town.missions = &m->table;
 }
@@ -142,6 +143,7 @@ void sa_mission_end(SA *s, int result) {
 static bool affordable(SA *s) { return met(s); }
 
 void sa_mission_open(SA *s) {
+    s->missions.confirm = false;
     s->missions.hover = 0;
     s->mode = MODE_SUBMIT;
     s->dirty = true;
@@ -153,10 +155,8 @@ static int hit(SA *s, int x, int y) {
     return 0;
 }
 
-static void draw(SA *s) {
+static void draw_panel(SA *s, u32 *fb) {
     Missions *m = &s->missions;
-    u32 *fb = s->fb;
-    sa_blit(fb, m->art[ART_BG], 0, 0);
     sa_blit(fb, m->art[ART_PANEL], PANEL_X, PANEL_Y);
     sa_draw_int(fb, m->art[ART_SMALL], s->vm.c[C_TURN], false, TURN_RIGHT, TURN_Y, 0, SMALL_W, SMALL_H);
     sa_draw_int(fb, m->art[ART_SMALL], s->vm.c[C_MISSION_END], false, TURN_RIGHT, TURN_Y + TURN_DY, 0, SMALL_W, SMALL_H);
@@ -168,6 +168,43 @@ static void draw(SA *s) {
         sa_draw_int(fb, m->art[ART_BIG], target[i], false, COL_RIGHT + COL_DX, y, 0, BIG_W, BIG_H);
         sa_draw_int(fb, m->art[ART_BIG], after, false, COL_RIGHT + 2 * COL_DX, y, after < 0 ? 1 : 2, BIG_W, BIG_H);
     }
+}
+
+static bool on_confirm(int x, int y) { return x >= CONFIRM_X && x < CONFIRM_X + SUBMIT_W && y >= BTN_Y && y < BTN_Y + BTN_H; }
+
+void sa_mission_draw_confirm(SA *s, u32 *fb) {
+    Missions *m = &s->missions;
+    if (!m->confirm) return;
+    draw_panel(s, fb);
+    sa_blit_rect(fb, m->art[ART_CONFIRM], 0, m->hover ? BTN_H : 0, SUBMIT_W, BTN_H, CONFIRM_X, BTN_Y);
+}
+
+bool sa_mission_confirm_input(SA *s) {
+    Missions *m = &s->missions;
+    if (!m->confirm) return false;
+    bool changed = false;
+    int h = on_confirm(s->mouseX, s->mouseY);
+    if (h != m->hover) {
+        m->hover = h;
+        changed = true;
+    }
+    s->rightClicked = false;
+    if (s->clicked) {
+        s->clicked = false;
+        if (h) {
+            m->confirm = false;
+            if (s->vm.state == VM_WAIT_DIALOG) s->vm.state = VM_RUN;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+static void draw(SA *s) {
+    Missions *m = &s->missions;
+    u32 *fb = s->fb;
+    sa_blit(fb, m->art[ART_BG], 0, 0);
+    draw_panel(s, fb);
     if (affordable(s)) sa_blit_rect(fb, m->art[ART_SUBMIT], 0, m->hover == HOVER_SUBMIT ? BTN_H : 0, SUBMIT_W, BTN_H, SUBMIT_X, BTN_Y);
     sa_blit_rect(fb, m->art[ART_CANCEL], 0, m->hover == HOVER_CANCEL ? BTN_H : 0, CANCEL_W, BTN_H, CANCEL_X, BTN_Y);
 }

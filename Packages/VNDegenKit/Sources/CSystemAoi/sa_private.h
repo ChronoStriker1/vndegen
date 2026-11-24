@@ -42,9 +42,10 @@ typedef struct Shop {
 
 typedef struct Missions {
     Table table;
-    Image *art[6];
+    Image *art[8];
     int log[MISSION_LOG][3], logCount;
     int hover;
+    bool confirm;
 } Missions;
 
 typedef struct Card {
@@ -129,6 +130,7 @@ typedef struct Picture {
 } Picture;
 
 struct SA {
+    bool gameOver;
     bool townHook;
     char joined[DIALOG_UNITS][48];
     int joinedCount;
@@ -260,6 +262,8 @@ bool sa_mission_target(SA *s, int *out);
 void sa_mission_check(SA *s);
 void sa_mission_end(SA *s, int result);
 void sa_mission_open(SA *s);
+void sa_mission_draw_confirm(SA *s, u32 *fb);
+bool sa_mission_confirm_input(SA *s);
 bool sa_mission_frame(SA *s);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);

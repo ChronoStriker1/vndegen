@@ -600,6 +600,17 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             s->town.condition = c < 0 ? 0 : c > 100 ? 100 : c;
         }
         break;
+    case 0xa4:
+        s->missions.confirm = true;
+        s->missions.hover = 0;
+        vm->state = VM_WAIT_DIALOG;
+        s->dirty = true;
+        break;
+    case 0x7a:
+        s->gameOver = true;
+        vm->depth = 0;
+        vm->state = VM_DONE;
+        break;
     case 0x2a: {
         int n = in->count > 0 ? sa_vm_get(vm, code, &in->o[0]) : 0;
         if (n < 0) {
@@ -694,6 +705,7 @@ static void compose(SA *s) {
         sa_blit(fb, s->ui[UI_CHOICE_BOTTOM], x, choice_y(s, s->vm.choiceCount));
     }
     sa_dialog_draw(&s->dialog, fb);
+    sa_mission_draw_confirm(s, fb);
     if (s->log.open) sa_log_draw(&s->log, fb, s->skipMode, s->autoMode);
     if (s->transDur && s->transMs < s->transDur) {
         u32 a = s->transMs * 256 / s->transDur;
@@ -1225,6 +1237,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         if (s->mode == MODE_TOWN || s->mode == MODE_SAVES) return true;
     }
     dialog_input(s, elapsedMs);
+    if (sa_mission_confirm_input(s)) s->dirty = true;
     if (s->total && s->shown < s->total) {
         s->textMs += elapsedMs;
         int want = (int)(s->textMs / 30);
@@ -1411,6 +1424,10 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
                 run_command(s, a);
+            } else if (s->gameOver) {
+                s->gameOver = false;
+                sa_log(s, "game over: back to the title");
+                go_title(s);
             } else if (s->inGame && s->townHook && s->vm.boxSlot[TOWN_HOOK]) {
                 s->townHook = false;
                 char box[32];
