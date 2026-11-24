@@ -159,10 +159,9 @@ void sa_dialog_draw(Dialog *d, u32 *fb) {
             sa_blit(fb, card, cx, cy);
             const Image *im = d->unitSprite[i];
             if (im) {
-                int cols, rows;
-                sa_sprite_layout(im, &cols, &rows);
-                int sw = im->w / cols, sh = im->h / rows;
-                sa_blit_rect(fb, im, 0, 0, sw, sh, cx + cw / 2 - sw / 2, cy + CARD_FEET - sh);
+                SpriteFrame f[2];
+                if (sa_sprite_split(im, f, 1) < 1) f[0] = (SpriteFrame){0, 0, im->w, im->h};
+                sa_blit_rect(fb, im, f[0].x, f[0].y, f[0].w, f[0].h, cx + cw / 2 - f[0].w / 2, cy + CARD_FEET - f[0].h);
             }
             sa_font_set_spacing(NAME_SPACING);
             int w = sa_text_width(d->unitName[i], -1, NAME_SIZE) - NAME_SPACING;

@@ -121,7 +121,7 @@ static void pay(SA *s) {
 
 void sa_mission_check(SA *s) {
     int state = 0;
-    if (s->vm.c[C_MISSION] && s->vm.c[C_TURN] > s->vm.c[C_MISSION_END]) {
+    if (s->vm.c[C_MISSION] && s->vm.c[C_TURN] >= s->vm.c[C_MISSION_END]) {
         state = met(s) ? 1 : 2;
         if (state == 1) pay(s);
     }

@@ -815,7 +815,6 @@ void sa_end_turn(SA *s) {
     vm->c[C_FOOD] += food;
     vm->c[C_MONEY] += money;
     vm->c[C_RESOURCES] += res;
-    vm->c[C_TURN]++;
     int after[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
     sa_dialog_open_turn(&s->dialog, before, after, "このターンの収支です");
     s->turnPending = true;
@@ -825,9 +824,21 @@ void sa_end_turn(SA *s) {
 static void next_turn(SA *s) {
     s->turnPending = false;
     s->autosaveTurn = true;
-    s->townHook = true;
     s->town.mapOnly = false;
     sa_reset_scene(s);
+    if (s->vm.boxSlot[TOWN_HOOK]) {
+        char box[32];
+        snprintf(box, sizeof box, "%s", s->vm.boxSlot[TOWN_HOOK]);
+        sa_town_draw_map(&s->town, &s->vfs, &s->vm, s->fb);
+        for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) s->fb[i] = 0xff000000u | (s->fb[i] >> 1 & 0x7f7f7f);
+        sa_show_frame_as_bg(s, s->fb, "*town");
+        snprintf(s->nextBox, sizeof s->nextBox, "bo0000.box");
+        s->nextEntry = 0;
+        s->turnAdvance = true;
+        sa_start_script(s, box, 0);
+        return;
+    }
+    s->vm.c[C_TURN]++;
     sa_start_script(s, "bo0000.box", 0);
 }
 
@@ -1413,6 +1424,11 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             char box[32];
             snprintf(box, sizeof box, "%s", s->nextBox);
             s->nextBox[0] = 0;
+            if (s->turnAdvance) {
+                s->turnAdvance = false;
+                s->vm.c[C_TURN]++;
+                sa_reset_scene(s);
+            }
             sa_start_script(s, box, s->nextEntry);
         } else {
             char *sav = sa_fmt("%s/Bunny3.sav", s->saveDir);
@@ -1429,14 +1445,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
                 s->gameOver = false;
                 sa_log(s, "game over: back to the title");
                 go_title(s);
-            } else if (s->inGame && s->townHook && s->vm.boxSlot[TOWN_HOOK]) {
-                s->townHook = false;
-                char box[32];
-                snprintf(box, sizeof box, "%s", s->vm.boxSlot[TOWN_HOOK]);
-                sa_reset_scene(s);
-                sa_start_script(s, box, 0);
             } else if (s->inGame) {
-                s->townHook = false;
                 sa_reset_scene(s);
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
@@ -1659,7 +1668,7 @@ void sa_enter_loaded(SA *s) {
     s->inGame = true;
     bool inDungeon = s->exp.active;
     s->exp.active = false;
-    s->turnPending = s->autosaveTurn = s->townHook = false;
+    s->turnPending = s->autosaveTurn = s->turnAdvance = false;
     s->dialog.open = false;
     s->mode = MODE_TOWN;
     s->town.mapOnly = false;

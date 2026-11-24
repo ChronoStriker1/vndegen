@@ -130,8 +130,8 @@ typedef struct Picture {
 } Picture;
 
 struct SA {
+    bool turnAdvance;
     bool gameOver;
-    bool townHook;
     char joined[DIALOG_UNITS][48];
     int joinedCount;
     VNSystemAoiConfig cfg;
