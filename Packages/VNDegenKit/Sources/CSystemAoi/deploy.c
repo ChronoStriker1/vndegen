@@ -40,6 +40,9 @@ enum {
     HOVER_UNIT = 400,
     HOVER_POST = 500,
     HOVER_TAB = 600,
+    HOVER_FIRE = 800,
+    FIRE_X = 445,
+    FIRE_Y = 536,
     HOVER_DISMISS = 700,
     TAB_X = 321,
     TAB_DX = 79,
@@ -134,6 +137,7 @@ static int hit(SA *s, int x, int y) {
             if (in(x, y, LIST_X, ROW_Y + i * ROW_H, ROW_W, ROW_H)) return HOVER_ROW + i;
         return -1;
     }
+    if (in(x, y, FIRE_X, FIRE_Y, TILE_W, TILE_H)) return HOVER_FIRE;
     for (int i = 0; i < 6; i++)
         if (in(x, y, main_x(i), main_y(i), TILE_W, TILE_H)) return HOVER_MAIN + i;
     for (int i = 0; i < BENCH_SLOTS; i++)
@@ -213,6 +217,11 @@ static void apply(SA *s, int from, int to) {
         return;
     }
     int b = bench_index(s, from);
+    if (to == HOVER_FIRE) {
+        if (is_main(from) && sa_party_bench(p, mainSlot[from - HOVER_MAIN])) p->bench[p->benchCount - 1].tile = -1;
+        else if (b >= 0) p->bench[b].tile = -1;
+        return;
+    }
     if (is_main(from) && is_main(to))
         sa_party_swap(p, mainSlot[from - HOVER_MAIN], mainSlot[to - HOVER_MAIN]);
     else if (is_main(from) && (is_tile(to) || to >= HOVER_UNIT)) {
@@ -288,7 +297,7 @@ static void draw_form(SA *s, u32 *fb) {
         int b = sa_party_reserve_at(p, i);
         if (b >= 0 && d->picked != k && d->picked != HOVER_UNIT + b) sprite(fb, bench_sprite(s, b), x, BENCH_Y);
     }
-    tile(d, fb, 445, 536, false);
+    tile(d, fb, FIRE_X, FIRE_Y, d->hover == HOVER_FIRE);
 }
 
 static const Image *unit_sprite(SA *s, int unit) {
@@ -417,7 +426,7 @@ bool sa_deploy_frame(SA *s, u32 ms) {
         else if (h >= HOVER_TAB && h < HOVER_TAB + 3) {
             d->tab = h - HOVER_TAB;
             d->picked = -1;
-        } else if (h == HOVER_DISMISS && d->picked < 0) {
+        } else if ((h == HOVER_DISMISS || h == HOVER_FIRE) && d->picked < 0) {
         } else if (k >= 0 && d->picked < 0) d->picked = k;
         else if (k >= 0) {
             apply(s, d->picked, k);
