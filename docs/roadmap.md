@@ -149,8 +149,8 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - SystemAoi, on VNDegen's own runtime, with BUNNY BLACK 3: the prologue, the town's opening turns and 千樹庭, with saves both ways (0.60.0).
 - BUNNY BLACK 3 through 炎山洞 and the first missions (0.60.1).
 - BUNNY BLACK 3's recruits, from housing and beaten area bosses, and its town events on the PC's turn (0.60.2).
-- BUNNY BLACK 3's town posts, 内政's 交換 and 解任 (0.60.4).
 - iPhone Duo layouts that follow the DuoApps patterns: off the fold, side bars, columns from the space (0.60.3).
+- BUNNY BLACK 3's town posts, 内政's 交換 and 解任 (0.60.4).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
