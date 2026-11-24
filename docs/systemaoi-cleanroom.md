@@ -324,6 +324,22 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
 - **Save.** A list from 1,008,328 of (mission, 1, result) per mission started: (4, 1, 0) while it ran, (4, 1, 1)
   once passed.
 
+## Town posts, from the screen
+
+- **組織図.** Measured from turn 20 (F044 adds 一覧, 組織図 and 編成 to 配置's top bar, `uts_b00` to `b02` at (321, 26),
+  79 apart): `uts_a01` with nine post tiles (`uts_w00`) at (299, 112) 街長, (412, 168) 街長補佐, (165, 187) 農業担当,
+  (249, 229) 商業担当, (333, 271) 工業担当, (417, 313) 警備担当, (5, 214) 教育担当, (89, 255) 娯楽担当, (173, 298)
+  衛生担当 (`Position.obj`'s rows 1 to 9), 解任 (`uts_x01`) at (376, 677), and a corner panel with the post, the
+  holder and their 統治/統率. Clicking a member then a tile posts them (they leave the field); the list badge
+  shows the post (`uts_h00` onwards). The town window gains a 街役職情報 tab listing the holders.
+- **Save.** Post k holds the member's index at 1,008,208 + 4k (-1 when empty); the member's +25 byte is 3 and +26
+  the post. VNDegen round-trips both. The original also adds bonuses to the holder's second stat block (ミアルテ
+  as 街長: 統治 +5, 統率 +4; ルーアルテ as 農業担当 with 天才: +2, +2; and twelve 2s from +928): not derived.
+- **Effects.** Not measured beyond one turn: with ミアルテ as 街長 and ルーアルテ as 農業担当 the residents grew by
+  5 where the same turn without them grew by 2 (residents' growth is random, so this proves nothing yet); food,
+  money and resources were the same. VNDegen's posts change nothing in the town so far. `c3 "post"` answers
+  whether a post is held and by whom (bo3105's scenes).
+
 ## Recruits and the turn order, from the scripts and play
 
 - **Turn order.** Measured under Wine: after 休憩's income box the town hook (bo0100, hook 1) runs first, over the
@@ -355,7 +371,9 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   (`a07`) and キャンセル (`a08`) at (397, 435) and (577, 435).
 - **Categories.** 視察 is always there; イベント once F041 is set (the turn script sets it when the residents reach
   300) and 交換 once F042 is (food, money and resources together reaching 5000). `DomeEvnt.obj` lists 視察 and
-  イベント actions; 交換 has none there and isn't built.
+  イベント actions. 交換 is the engine's: measured, six fixed trades of 1000 (資金 → 資源 or 食料 300, 資源 → 資金
+  or 食料 350, 食料 → 資金 or 資源 200) on `dom_dz00` to `dz05`, the 1000 red when short; the description panel
+  sits at y 437 and reads 物々交換です。; 実行 trades, shows 交換しました。 with the table and ends the turn.
 - **An action's row.** Column 2 its category, 4 a flag it needs, 6 a facility it needs, 8 the residents it needs,
   14 its event number, 15 residents gained, 16 to 18 food, money and resources (costs are negative), 20 the EXP every
   working facility gains, 21 and 22 its texts, 23 the expedition effect it gives.
