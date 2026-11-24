@@ -162,7 +162,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`: the town's 迷宮 defence, from turn 42. The opening shipped in 0.60.0, then 炎山洞 and missions (0.60.1), recruiting (0.60.2) and town posts (0.60.4).
+- SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`: the town's 迷宮 defence, from turn 42: adventurers raiding ダークス宮 each turn, a simulation in the exe with its own screens and posts, about 2 to 3 weeks. The opening shipped in 0.60.0, then 炎山洞 and missions (0.60.1), recruiting (0.60.2) and town posts (0.60.4).
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
