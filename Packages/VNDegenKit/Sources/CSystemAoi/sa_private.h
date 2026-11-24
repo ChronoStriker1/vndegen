@@ -89,12 +89,12 @@ typedef struct Expedition {
     int steps, areaStart, fighting, stepsLeft;
     int arriveSide, arriveAlong, resumeX, resumeY, resumeDir;
     int last[4], entry[4];
-    bool keepGroups;
+    bool keepGroups, resuming, stepHook;
     ExpGroup group[EXP_GROUPS];
     int groupCount;
     int hooks[EXP_HOOKS], hookCount, after;
     Table floors, dungeons;
-    Image *hall, *plate[12], *areaPlate, *back, *badge, *seen, *platform;
+    Image *hall, *plate[12], *areaPlate[11], *back, *badge, *seen, *platform;
     int hover, picked;
     bool (*explored)[EXP_FLOORS][DUN_CELLS];
     u8 (*passages)[EXP_FLOORS][DUN_CELLS];

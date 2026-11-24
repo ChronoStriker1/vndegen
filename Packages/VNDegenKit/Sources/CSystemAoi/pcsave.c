@@ -27,7 +27,6 @@ enum {
     MAP_LAYER = 128,
     MAP_DUNGEONS = 15,
     MAP_FLOORS = 10,
-    MAP_SIDE = 15,
     MEMBER_LEVEL = 12,
     MEMBER_EXP = 16,
     MEMBER_HP = 28,
@@ -127,11 +126,11 @@ static void read_maps(SA *s, const u8 *img) {
         for (int f = 1; f < EXP_FLOORS && f <= MAP_FLOORS; f++) {
             for (int i = 0; i < 4; i++) s->exp.floorInfo[d][f][i] = at(img, map_record(d, f) + (size_t)i * 4);
             size_t o = map_record(d, f) + MAP_LAYERS;
-            for (int y = 0; y < MAP_SIDE; y++) {
+            for (int y = 0; y < DUN_SIDE; y++) {
                 size_t k = (size_t)y * 4;
                 u32 bits = rd32(img + o + k), east = rd32(img + o + MAP_LAYER + k), south = rd32(img + o + 2 * MAP_LAYER + k);
-                for (int x = 0; x < MAP_SIDE; x++) {
-                    int c = y * MAP_SIDE + x;
+                for (int x = 0; x < DUN_SIDE; x++) {
+                    int c = y * DUN_SIDE + x;
                     s->exp.explored[d][f][c] = bits >> x & 1;
                     s->exp.passages[d][f][c] = (u8)((east >> x & 1 ? PASS_EAST : 0) | (south >> x & 1 ? PASS_SOUTH : 0));
                 }
@@ -150,9 +149,9 @@ static void write_maps(SA *s, u8 *img) {
             for (int c = 0; c < DUN_CELLS && !any; c++) any = v[c];
             if (!any) continue;
             put(img, o + MAP_HEAD, d << 16 | f << 8);
-            for (int x = 0; x < MAP_SIDE; x++)
-                for (int y = 0; y < MAP_SIDE; y++) {
-                    int c = y * MAP_SIDE + x;
+            for (int x = 0; x < DUN_SIDE; x++)
+                for (int y = 0; y < DUN_SIDE; y++) {
+                    int c = y * DUN_SIDE + x;
                     u8 pass = s->exp.passages[d][f][c];
                     bool layer[4] = {v[c], pass & PASS_EAST, pass & PASS_SOUTH, v[c]};
                     for (int l = 0; l < 4; l++) {

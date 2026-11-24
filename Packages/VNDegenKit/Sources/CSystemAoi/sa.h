@@ -198,6 +198,7 @@ i32 sa_vm_get(VM *vm, const u8 *code, const Operand *o);
 void sa_vm_set(VM *vm, const Operand *o, i32 v);
 bool sa_vm_cond(VM *vm, const char *expr);
 u32 sa_vm_random(VM *vm);
+void sa_vm_register_hooks(VM *vm, Vfs *vfs, const char *boxFile);
 
 typedef struct PvmVertex {
     float pos[3], normal[3], uv[2];
@@ -249,13 +250,14 @@ void r3_begin(R3 *r, u32 *fb, float fovDeg);
 void r3_tri(R3 *r, const R3Vert *v, const Image *tex);
 Image *sa_bmp_decode(const u8 *d, size_t n);
 
-#define DUN_CELLS 225
+#define DUN_SIDE 20
+#define DUN_CELLS (DUN_SIDE * DUN_SIDE)
 #define BATTLE_CELLS 15
 #define DUN_FIELDS 26
 
 enum { DIR_N, DIR_E, DIR_S, DIR_W };
 enum { PASS_EAST = 1, PASS_SOUTH = 2 };
-#define DUN_TEX 64
+#define DUN_TEX 192
 
 struct Party;
 
@@ -278,6 +280,7 @@ typedef struct Dungeon {
     bool own[DUN_CELLS], *visited;
     u8 ownPassage[DUN_CELLS], *passage;
     bool loaded;
+    int w, h;
     int x, y, dir;
     float fov, camX, camZ, yaw;
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
@@ -291,7 +294,7 @@ typedef struct Dungeon {
     R3 r3;
 } Dungeon;
 
-enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION };
+enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };
 
 bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map);
 void sa_dungeon_free(Dungeon *d);

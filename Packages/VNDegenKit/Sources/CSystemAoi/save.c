@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 6u
+#define SAVE_VERSION 7u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
