@@ -1024,7 +1024,14 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     char *sav = sa_fmt("%s/Bunny3.sav", s->saveDir);
     char real[2048];
     bool first = sa_path_resolve(sav, real, sizeof real) != 1;
+    if (first) sa_mkdirs(sav);
     free(sav);
+    char *global = sa_fmt("%s/vndegen/global.dat", s->saveDir);
+    size_t gn;
+    u8 *g = sa_read_file(global, &gn);
+    if (g && gn == sizeof s->vm.g) memcpy(s->vm.g, g, gn);
+    free(g);
+    free(global);
     go_title(s);
     if (first) {
         title_pick(s, TITLE_PROLOGUE);
@@ -1085,6 +1092,14 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (s->quit) return false;
     if (s->paused) return true;
     if (s->inGame) s->playMs += elapsedMs;
+    if (s->vm.gDirty) {
+        s->vm.gDirty = false;
+        char *dir = sa_fmt("%s/vndegen", s->saveDir), *path = sa_fmt("%s/global.dat", dir);
+        sa_mkdirs(dir);
+        sa_write_file(path, s->vm.g, sizeof s->vm.g);
+        free(dir);
+        free(path);
+    }
     if (s->movie) {
         if (s->clicked) {
             s->clicked = false;

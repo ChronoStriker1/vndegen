@@ -101,7 +101,10 @@ void sa_vm_set(VM *vm, const Operand *o, i32 v) {
         if (f && o->index < SA_L_VARS) f->fl[o->index] = v != 0;
         break;
     case 0x44:
-        if (o->index < SA_G_VARS) vm->g[o->index] = v != 0;
+        if (o->index < SA_G_VARS && vm->g[o->index] != (v != 0)) {
+            vm->g[o->index] = v != 0;
+            vm->gDirty = true;
+        }
         break;
     }
 }

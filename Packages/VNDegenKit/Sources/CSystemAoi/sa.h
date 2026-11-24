@@ -171,6 +171,7 @@ typedef struct VM {
     i32 c[SA_C_VARS];
     u8 f[SA_F_VARS];
     u8 g[SA_G_VARS];
+    bool gDirty;
     Choice choice[SA_CHOICES];
     int choiceCount;
     int state;
