@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 7u
+#define SAVE_VERSION 8u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
@@ -173,8 +173,8 @@ static bool write_sidecar(SA *s, int slot, int count) {
     put32(&w, (u32)s->exp.groupCount);
     for (int i = 0; i < s->exp.groupCount; i++) {
         const ExpGroup *g = &s->exp.group[i];
-        const int v[9] = {g->alive, g->party, g->number, g->x, g->y, g->dir, g->flags, g->cooldown, g->fought};
-        put_ints(&w, v, 9);
+        const int v[11] = {g->alive, g->party, g->number, g->x, g->y, g->dir, g->flags, g->cooldown, g->fought, g->extra, g->stay};
+        put_ints(&w, v, 11);
         put_ints(&w, g->cells, BATTLE_CELLS);
         put_ints(&w, &g->target[0][0], EXP_TARGETS * 2);
     }
@@ -303,9 +303,10 @@ static bool read_sidecar(SA *s, int slot) {
     if (s->exp.groupCount < 0 || s->exp.groupCount > EXP_GROUPS) r.bad = true, s->exp.groupCount = 0;
     for (int i = 0; i < s->exp.groupCount; i++) {
         ExpGroup *g = &s->exp.group[i];
-        int v[9];
-        get_ints(&r, v, 9);
+        int v[11];
+        get_ints(&r, v, 11);
         g->alive = v[0] != 0, g->party = v[1], g->number = v[2], g->x = v[3], g->y = v[4], g->dir = v[5], g->flags = v[6], g->cooldown = v[7], g->fought = v[8];
+        g->extra = v[9], g->stay = v[10] != 0;
         get_ints(&r, g->cells, BATTLE_CELLS);
         get_ints(&r, &g->target[0][0], EXP_TARGETS * 2);
     }
