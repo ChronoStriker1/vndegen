@@ -500,6 +500,12 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
         return;
     }
     sa_dungeon_art(&s->dungeon, &s->vfs, platform);
+    bool sense = false;
+    for (int i = 0; i < PARTY_SLOTS && !sense; i++)
+        if (s->party.unit[i]) sense = !strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.unit[i]), 34), "感知");
+    for (int i = 0; i < s->party.benchCount && !sense; i++)
+        if (s->party.bench[i].tile >= 0) sense = !strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.bench[i].unit), 35), "感知");
+    sa_dungeon_sense(sense);
     int entry = sa_table_int(&e->floors, r, F_ENTRY);
     if (entry > 0 && entry < SA_F_VARS && s->vm.f[entry]) sa_dungeon_open_doors(&s->dungeon);
     u32 fog = (u32)sa_table_int(&e->floors, r, F_FOG);

@@ -14,6 +14,7 @@ enum {
     OBJECT_DOOR = 100,
     OBJECT_DOOR_SPOT = 99,
     WALL_DOORWAY = 10,
+    WALL_HIDDEN = 100,
     VIEW_CELLS = 6,
     MOVE_MS = 133,
     DOOR_TURN_MS = 18000,
@@ -214,6 +215,16 @@ void sa_dungeon_free(Dungeon *d) {
     d->r3 = keep;
 }
 
+static bool hiddenOpen;
+
+static const i32 *cell_at(const Dungeon *d, int x, int y);
+
+static bool hidden_between(const Dungeon *d, int x, int y, int side) {
+    if (!hiddenOpen) return false;
+    const i32 *n = cell_at(d, x + stepX[side & 3], y + stepY[side & 3]);
+    return n && n[wallField[(side + 2) & 3]] == WALL_HIDDEN;
+}
+
 static const i32 *cell_at(const Dungeon *d, int x, int y) {
     if (x < 0 || y < 0 || x >= d->w || y >= d->h) return NULL;
     return d->cell[y * DUN_SIDE + x];
@@ -230,9 +241,11 @@ void sa_dungeon_place(Dungeon *d, int x, int y, int dir) {
     if (cell_at(d, x, y) && d->visited) d->visited[y * DUN_SIDE + x] = true;
 }
 
+void sa_dungeon_sense(bool on) { hiddenOpen = on; }
+
 static bool passable(const i32 *cell, int side) {
     int w = cell[wallField[side]];
-    return w < 0 || w == WALL_DOORWAY || cell[wallField[side] + 1] == 1;
+    return w < 0 || w == WALL_DOORWAY || (w == WALL_HIDDEN && hiddenOpen) || cell[wallField[side] + 1] == 1;
 }
 
 static void mark_passage(Dungeon *d, int from, int to, int side);
@@ -266,7 +279,7 @@ void sa_dungeon_open_doors(Dungeon *d) {
 
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side) {
     const i32 *c = cell_at(d, x, y);
-    if (!c || c[F_FLOOR] < 0 || !passable(c, side & 3)) return -1;
+    if (!c || c[F_FLOOR] < 0 || (!passable(c, side & 3) && !hidden_between(d, x, y, side))) return -1;
     const i32 *n = cell_at(d, x + stepX[side & 3], y + stepY[side & 3]);
     return n && n[F_FLOOR] >= 0 ? (y + stepY[side & 3]) * DUN_SIDE + x + stepX[side & 3] : -1;
 }
@@ -338,7 +351,7 @@ static void start_anim(Dungeon *d) {
 
 static bool walk(Dungeon *d, int side) {
     const i32 *here = cell_at(d, d->x, d->y);
-    if (!here || !passable(here, side)) {
+    if (!here || (!passable(here, side) && !hidden_between(d, d->x, d->y, side))) {
         if (here && side == d->dir) d->bumped = true;
         return false;
     }

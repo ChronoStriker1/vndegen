@@ -1634,6 +1634,12 @@ int sa_debug_get(VNSystemAoi *sa, bool flag, int index) {
     return flag ? s->vm.f[index] : s->vm.c[index];
 }
 
+void sa_debug_unbench(VNSystemAoi *sa, int index, int slot) {
+    SA *s = (SA *)sa;
+    sa_party_unbench(&s->party, &s->vfs, index, slot);
+    s->dirty = true;
+}
+
 void sa_debug_join(VNSystemAoi *sa, const char *key) {
     SA *s = (SA *)sa;
     sa_party_join(&s->party, &s->vfs, key);
