@@ -22,7 +22,7 @@ nonisolated public struct SystemAoiPlugin: EnginePlugin {
         return SystemAoiSession(launch, root: layout.url(in: launch.folder))
     }
 
-    public var defaultControls: ControlLayout { .mouse }
+    public var defaultControls: ControlLayout { .visualNovel }
 
     public var defaultControlChanges: [ControlInput: ControlAction] {
         [.x: .key(KeyboardKey(key: "Control", code: "ControlLeft", keyCode: 17))]

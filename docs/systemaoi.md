@@ -99,7 +99,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   back onto its cell, any other save into the town. New members join off the board and are shown on cards in the
   message box, as in the original. 配置's lower tiles are the reserve.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
-  FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
+  FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip. Games start on the Visual novel
+  controller layout: the town, battles and menus are mouse-only, so the right stick moves the pointer and RT clicks;
+  A (Return) reads on; the D-pad and left stick are the arrow keys, which walk the dungeon. Mouse would leave the
+  dungeon to pointer clicks on its pad, and RPG Maker controls have no pointer for the menus.
 
 ## Known limits
 
