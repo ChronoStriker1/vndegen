@@ -146,6 +146,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - A regression sweep of every engine after 0.59.5 to 0.59.12 found no regression; it fixed KiriKiri `.tpm` plugins and PJADV options kept on quit (0.59.13).
 - Godot games ask before a link opens the browser (0.59.14).
 - Web games ask before a link opens the browser, and title links through `child_process` no longer stop RPG Maker MZ games (0.59.15).
+- SystemAoi, on VNDegen's own runtime, with BUNNY BLACK 3: the prologue, the town's opening turns and 千樹庭, with saves both ways (0.60.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -157,7 +158,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- SystemAoi, on VNDegen's own clean-room runtime, with Bunny Black 3, on `feat/systemaoi` since 2026-11-21: its rules rebuilt from play under Wine, in slices, the first one the opening through the first dungeon. The estimate is 8 to 12 weeks.
+- SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`: 炎山洞 and the story events the areas start, about 2 weeks. The first slice, the opening, shipped in 0.60.0; the first mission comes later than planned, after the 氷掌閣 story event.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
@@ -177,7 +178,7 @@ Engines with games in the library that VNDegen doesn't run yet, from the [engine
 
 ## Set aside
 - FFD and SRPG Studio, set aside on 2026-11-19: their one library game each, Eiyu Senki and Succubus Senki, was left out after the content check. Both formats can be read from MIT sources (GARbro, SRPG-ToolBox), so each comes back if the library gains another game for it.
-- SystemAoi and Smile Game Builder, set aside again on 2026-11-19 after their games passed the content re-check, for size. Bunny Black 3 (SystemAoi 5) keeps its battles, 3D dungeon, unit building and kingdom management in about 686 KB of the exe's own code, not in scripts, and its movies are WMV, which no permissively licensed decoder reads: about 8 to 12 weeks for one Japanese-only game. Sacred (Smile Game Builder) is about 6 to 10 weeks, for the reasons below. Either comes back if the maintainer asks. The maintainer brought SystemAoi back on 2026-11-21: Bunny Black 3 is being built on `feat/systemaoi`, in slices, the first one the opening through the first dungeon.
+- SystemAoi and Smile Game Builder, set aside again on 2026-11-19 after their games passed the content re-check, for size. Bunny Black 3 (SystemAoi 5) keeps its battles, 3D dungeon, unit building and kingdom management in about 686 KB of the exe's own code, not in scripts, and its movies are WMV, which no permissively licensed decoder reads: about 8 to 12 weeks for one Japanese-only game. Sacred (Smile Game Builder) is about 6 to 10 weeks, for the reasons below. Either comes back if the maintainer asks. The maintainer brought SystemAoi back on 2026-11-21, and BUNNY BLACK 3's opening shipped in 0.60.0, with its WMV movies played by `vnffmovie`. Later slices are In progress.
 - Smile Game Builder, set aside on 2026-11-18. Two of its three library games were left out after the content check, and the one left, Princess Colette's Great Adventure, is Japanese only. Its games are 3D, so a runtime of VNDegen's own would need a 3D renderer, FBX models and a battle system, about 4 to 6 weeks for that one game. Running the games' own .NET player would need its native graphics library rewritten, which the clean-room rule doesn't allow. It comes back if the library gains more Smile Game Builder games, especially English ones.
 - Save sync through the cloud services that need a sign-in (Box, Dropbox, Google Drive and OneDrive) and a custom rclone remote, set aside by the maintainer on 2026-11-16. A plan was written first: Google's and Microsoft's terms don't allow shipping rclone's own client IDs, so OneDrive and Dropbox would need VNDegen's own app registrations and Google Drive and Box each user's own client ID. Nothing was built.
 - An App Store release, ruled out by the maintainer on 2026-11-16. The groundwork that was done stays: the LGPL libraries in replaceable frameworks with their source on each release, and MetalANGLE for arm64 only.
@@ -202,7 +203,7 @@ The items of the 2026-10-25 plan that are done, kept for their decisions and not
 - YU-RIS, on VNDegen's own clean-room runtime. Nine library games play, released from 0.38.0 to 0.41.0, with saves that move to and from a PC. The other six library games weren't tested. [yuris.md](yuris.md) has what runs and the known limits.
 - Visual Novel Maker and Twine, in the web view. Shipped in 0.38.0.
 - SiglusEngine, on siglus_rs (MPL-2.0), with planetarian HD and Harmonia, released in 0.43.0. siglus_rs's LGPL WMV decoder, its embedded font and its unlicensed DLL ports are left out. [siglus.md](siglus.md) has what runs and the known limits.
-- SystemAoi was taken off the plan on 2026-11-18, when Bunny Black 1 to 3 were left out after the content check. Bunny Black 3 passed the re-check on 2026-11-19, and the engine was set aside for size until the maintainer brought it back on 2026-11-21 (In progress).
+- SystemAoi was taken off the plan on 2026-11-18, when Bunny Black 1 to 3 were left out after the content check. Bunny Black 3 passed the re-check on 2026-11-19, and the engine was set aside for size until the maintainer brought it back on 2026-11-21. Its opening shipped in 0.60.0, and later slices are In progress.
 - Tmr-Hiro ADV System, on VNDegen's own clean-room runtime, with all five library games, released from 0.46.0 to 0.50.0 with saves that move to and from a PC. [tmrhiro.md](tmrhiro.md) has what runs and the known limits.
 - N2System (Nitroplus), on VNDegen's own clean-room runtime, with Hanachirasu, released in 0.42.0 with saves that move to and from a PC. The library's Sonicomi is Nitroplus's later 3D Diesel engine and isn't a target. [n2system.md](n2system.md) has what runs and the known limits.
 
