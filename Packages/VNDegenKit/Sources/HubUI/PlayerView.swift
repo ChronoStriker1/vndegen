@@ -459,6 +459,7 @@ private struct PlayerMenuView: View {
     let onGameMenu: () -> Void
     let onGameItem: (GameMenuItem) -> Void
     let onCheats: () -> Void
+    @State private var cardSize = CGSize.zero
 
     var body: some View {
         ZStack {
@@ -498,11 +499,22 @@ private struct PlayerMenuView: View {
         // never started.
         let sideBySide = metrics.isShort && metrics.size.width >= 640
         let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 18))
-        return layout {
-            session
-            controls
+        return ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                layout {
+                    session
+                    controls
+                }
+                .padding(isNarrow ? 20 : 28)
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { cardSize = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(width: cardSize == .zero ? nil : cardSize.width)
+            .frame(maxHeight: cardSize == .zero ? nil : cardSize.height)
+            .onChange(of: menu.focus) { _, focus in
+                withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
+            }
         }
-        .padding(isNarrow ? 20 : 28)
         .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
         .padding(12)
@@ -518,19 +530,23 @@ private struct PlayerMenuView: View {
             Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .primary, focused: isFocused(.resume)))
                 .onHover { if $0 { menu.focus = .resume } }
+                .id(PlayerMenu.Item.resume)
             if !menu.gameItems.isEmpty {
                 Button(action: onGameMenu) { Label("Game commands", systemImage: "list.bullet").frame(minWidth: buttonWidth) }
                     .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.gameMenu)))
                     .onHover { if $0 { menu.focus = .gameMenu } }
+                    .id(PlayerMenu.Item.gameMenu)
             }
             if menu.offersCheats {
                 Button(action: onCheats) { Label("Cheats", systemImage: "wand.and.stars").frame(minWidth: buttonWidth) }
                     .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.cheats)))
                     .onHover { if $0 { menu.focus = .cheats } }
+                    .id(PlayerMenu.Item.cheats)
             }
             Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.quit)))
                 .onHover { if $0 { menu.focus = .quit } }
+                .id(PlayerMenu.Item.quit)
         }
     }
 
@@ -544,6 +560,7 @@ private struct PlayerMenuView: View {
             Button(action: onMapping) { Label("Controller layout", systemImage: "slider.horizontal.3").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.mapping)))
                 .onHover { if $0 { menu.focus = .mapping } }
+                .id(PlayerMenu.Item.mapping)
         }
     }
 
@@ -602,6 +619,7 @@ private struct PlayerMenuView: View {
             .scaleEffect(focused ? 1.04 : 1)
             .animation(Theme.focusAnimation, value: focused)
             .onHover { if $0 { menu.focus = item } }
+            .id(item)
     }
 
     private func segment(_ title: String, selected: Bool, item: PlayerMenu.Item, action: @escaping () -> Void) -> some View {
