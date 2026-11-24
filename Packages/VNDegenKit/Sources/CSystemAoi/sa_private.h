@@ -59,9 +59,9 @@ typedef struct Train {
 } Train;
 
 typedef struct Deploy {
-    Image *art[18], *benchSprite[PARTY_BENCH];
+    Image *art[40], *benchSprite[PARTY_BENCH];
     int benchUnit[PARTY_BENCH];
-    int hover, picked, heldX, heldY;
+    int hover, picked, heldX, heldY, tab;
 } Deploy;
 
 typedef struct SaveSummary {

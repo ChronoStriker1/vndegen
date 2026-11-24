@@ -52,6 +52,7 @@ static Image *crop(const Image *im, int sy, int h) {
 bool sa_party_init(Party *p, Vfs *vfs) {
     memset(p, 0, sizeof *p);
     p->vfs = vfs;
+    sa_table_load(&p->positions, vfs, "Position.obj");
     if (!sa_table_load(&p->units, vfs, "unit.obj") || !sa_table_load(&p->abilities, vfs, "ability.obj")) return false;
     p->platform = sa_load_image(vfs, "m996bt1a.agf");
     Image *tiles = sa_load_image(vfs, "mfloor01.agf");
@@ -80,6 +81,7 @@ void sa_party_free(Party *p) {
     sa_image_free(p->digits);
     sa_table_free(&p->units);
     sa_table_free(&p->abilities);
+    sa_table_free(&p->positions);
     memset(p, 0, sizeof *p);
 }
 
@@ -190,6 +192,7 @@ void sa_party_new_game(Party *p, Vfs *vfs) {
     p->benchCount = 0;
     p->rosterCount = 1;
     p->roster[0] = 1;
+    memset(p->post, 0, sizeof p->post);
     for (int i = 0; i < PARTY_SLOTS; i++) sa_party_place(p, vfs, i, 0);
     sa_party_place(p, vfs, PARTY_FRONT + 1, 1);
 }
@@ -479,6 +482,25 @@ bool sa_party_join(Party *p, Vfs *vfs, const char *key) {
         b->tile = -1;
     }
     return true;
+}
+
+int sa_party_post_of(const Party *p, int unit) {
+    for (int i = 1; i < PARTY_POSTS && unit; i++)
+        if (p->post[i] == unit) return i;
+    return 0;
+}
+
+int sa_party_post_index(const Party *p, const char *name) {
+    for (int r = 1; r < p->positions.rows && r < PARTY_POSTS; r++)
+        if (!strcmp(sa_table_text(&p->positions, r, 0), name)) return r;
+    return 0;
+}
+
+void sa_party_set_post(Party *p, int post, int unit) {
+    if (post <= 0 || post >= PARTY_POSTS) return;
+    int was = sa_party_post_of(p, unit);
+    if (was) p->post[was] = p->post[post];
+    p->post[post] = unit;
 }
 
 int sa_party_reserve_at(const Party *p, int tile) {

@@ -534,7 +534,13 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         sa_mission_check(s);
         break;
     case 0xc3:
-        if (in->count >= 2 && in->o[in->count - 1].kind == OPD_VAR) sa_vm_set(vm, &in->o[in->count - 1], 0);
+        if (in->count >= 3) {
+            char *name = opd_str(code, in, 0);
+            int unit = s->party.post[sa_party_post_index(&s->party, name)];
+            free(name);
+            sa_vm_set(vm, &in->o[1], unit != 0);
+            sa_vm_set(vm, &in->o[2], unit);
+        }
         break;
     case 0xbc:
         if (in->count >= 2) {

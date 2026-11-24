@@ -38,13 +38,41 @@ enum {
     HOVER_BENCH = 200,
     HOVER_ROW = 300,
     HOVER_UNIT = 400,
+    HOVER_POST = 500,
+    HOVER_TAB = 600,
+    HOVER_DISMISS = 700,
+    TAB_X = 321,
+    TAB_DX = 79,
+    TAB_W = 76,
+    TAB_H = 20,
+    ORG_POSTS = 9,
+    POST_W = 98,
+    POST_H = 64,
+    DISMISS_X = 376,
+    DISMISS_Y = 677,
+    DISMISS_W = 180,
+    DISMISS_H = 27,
+    INFO_X = 9,
+    INFO_RIGHT = 222,
+    INFO_Y = 31,
+    INFO_DY = 20,
+    F_POSTS = 44,
 };
 
-enum { ART_TOP, ART_BOTTOM, ART_DISMISS, ART_TILE, ART_LIST, ART_ROWS, ART_BADGE, ART_BACK, ART_BG, ART_PLATFORM, ART_RANK, ART_FORM, ART_TAB0, ART_COUNT = ART_TAB0 + 6 };
+enum { TAB_LIST, TAB_ORG, TAB_FORM };
+
+static const struct {
+    int post, x, y;
+} orgTile[ORG_POSTS] = {{1, 299, 112}, {2, 412, 168}, {3, 165, 187}, {7, 5, 214}, {4, 249, 229},
+                        {8, 89, 255}, {5, 333, 271}, {9, 173, 298}, {6, 417, 313}};
+
+enum { ART_TOP, ART_BOTTOM, ART_DISMISS, ART_TILE, ART_LIST, ART_ROWS, ART_BADGE, ART_BACK, ART_BG, ART_PLATFORM, ART_RANK, ART_FORM, ART_TAB0, ART_ORG = ART_TAB0 + 6, ART_BTN_LIST, ART_BTN_ORG, ART_POST_TILE, ART_FIRE, ART_LABEL0, ART_COUNT = ART_LABEL0 + ORG_POSTS };
 
 static const char *const artNames[ART_COUNT] = {"ums_a00.agf", "ums_a01.agf", "ums_a02.agf", "ums_z00.agf", "uts_c00.agf", "uts_c01.agf",
                                                 "uts_h98.agf", "uts_g00.agf", "bg009a0.agf", "m997bt1a.agf", "uts_b03.agf", "uts_b02.agf", "uts_d01.agf", "uts_d02.agf",
-                                                "uts_d03.agf", "uts_d04.agf", "uts_d05.agf", "uts_d06.agf"};
+                                                "uts_d03.agf", "uts_d04.agf", "uts_d05.agf", "uts_d06.agf", "uts_a01.agf", "uts_b00.agf", "uts_b01.agf",
+                                                "uts_w00.agf", "uts_x01.agf", "uts_h00.agf", "uts_h01.agf", "uts_h02.agf", "uts_h03.agf", "uts_h04.agf",
+                                                "uts_h05.agf", "uts_h06.agf", "uts_h07.agf", "uts_h08.agf"};
 
 static const int mainSlot[6] = {PARTY_FRONT, PARTY_FRONT + 1, PARTY_FRONT + 2, 0, 1, 2};
 
@@ -65,6 +93,7 @@ void sa_deploy_free(Deploy *d) {
 void sa_deploy_open(SA *s) {
     Deploy *d = &s->deploy;
     d->hover = d->picked = -1;
+    d->tab = TAB_FORM;
     s->mode = MODE_DEPLOY;
     s->dirty = true;
 }
@@ -83,8 +112,28 @@ static int rows(const SA *s, int *keys) {
     return n;
 }
 
+static bool posts_open(const SA *s) { return s->vm.f[F_POSTS] != 0; }
+
+static bool on_tile(const Image *im, int fx, int fy, int x0, int y0, int x, int y) {
+    if (!im || x < x0 || y < y0 || x >= x0 + POST_W || y >= y0 + POST_H) return false;
+    return im->px[(size_t)(fy + y - y0) * im->w + fx + x - x0] >> 24 > 128;
+}
+
 static int hit(SA *s, int x, int y) {
+    Deploy *d = &s->deploy;
     if (in(x, y, BACK_X, BACK_Y, BTN_W, BTN_H)) return HOVER_BACK;
+    if (posts_open(s))
+        for (int t = TAB_ORG; t <= TAB_FORM; t++)
+            if (in(x, y, TAB_X + t * TAB_DX, TAB_Y - 1, TAB_W, TAB_H)) return HOVER_TAB + t;
+    if (d->tab == TAB_ORG) {
+        if (in(x, y, DISMISS_X, DISMISS_Y, DISMISS_W, DISMISS_H)) return HOVER_DISMISS;
+        for (int i = 0; i < ORG_POSTS; i++)
+            if (on_tile(d->art[ART_POST_TILE], 0, 0, orgTile[i].x, orgTile[i].y, x, y)) return HOVER_POST + orgTile[i].post;
+        int keys[PARTY_SLOTS + PARTY_BENCH], n = rows(s, keys);
+        for (int i = 0; i < n && i < ROWS; i++)
+            if (in(x, y, LIST_X, ROW_Y + i * ROW_H, ROW_W, ROW_H)) return HOVER_ROW + i;
+        return -1;
+    }
     for (int i = 0; i < 6; i++)
         if (in(x, y, main_x(i), main_y(i), TILE_W, TILE_H)) return HOVER_MAIN + i;
     for (int i = 0; i < BENCH_SLOTS; i++)
@@ -96,7 +145,7 @@ static int hit(SA *s, int x, int y) {
 }
 
 static int resolve(SA *s, int h) {
-    if (h >= HOVER_ROW) {
+    if (h >= HOVER_ROW && h < HOVER_UNIT) {
         int keys[PARTY_SLOTS + PARTY_BENCH], n = rows(s, keys);
         return h - HOVER_ROW < n ? keys[h - HOVER_ROW] : -1;
     }
@@ -115,6 +164,8 @@ static int rank_with(const SA *s, int slot, int unit) {
 
 static bool is_main(int k) { return k >= HOVER_MAIN && k < HOVER_MAIN + 6; }
 
+static bool is_post(int k) { return k > HOVER_POST && k < HOVER_POST + PARTY_POSTS; }
+
 static bool is_tile(int k) { return k >= HOVER_BENCH && k < HOVER_BENCH + BENCH_SLOTS; }
 
 static int bench_index(const SA *s, int k) {
@@ -123,8 +174,44 @@ static int bench_index(const SA *s, int k) {
     return -1;
 }
 
+static int unit_of(SA *s, int k) {
+    Party *p = &s->party;
+    if (is_main(k)) return p->unit[mainSlot[k - HOVER_MAIN]];
+    if (is_post(k)) return p->post[k - HOVER_POST];
+    int b = bench_index(s, k);
+    return b >= 0 ? p->bench[b].unit : 0;
+}
+
+static void apply_post(SA *s, int from, int to) {
+    Party *p = &s->party;
+    int unit = unit_of(s, from);
+    if (to == HOVER_DISMISS) {
+        if (is_post(from)) p->post[from - HOVER_POST] = 0;
+        return;
+    }
+    if (!unit || !is_post(to)) return;
+    if (is_main(from)) {
+        if (!sa_party_bench(p, mainSlot[from - HOVER_MAIN])) return;
+        p->bench[p->benchCount - 1].tile = -1;
+    } else if (!is_post(from)) {
+        int b = bench_index(s, from);
+        if (b >= 0) p->bench[b].tile = -1;
+    }
+    if (is_post(from)) {
+        int other = p->post[to - HOVER_POST];
+        p->post[to - HOVER_POST] = unit;
+        p->post[from - HOVER_POST] = other;
+        return;
+    }
+    sa_party_set_post(p, to - HOVER_POST, unit);
+}
+
 static void apply(SA *s, int from, int to) {
     Party *p = &s->party;
+    if (s->deploy.tab == TAB_ORG) {
+        apply_post(s, from, to);
+        return;
+    }
     int b = bench_index(s, from);
     if (is_main(from) && is_main(to))
         sa_party_swap(p, mainSlot[from - HOVER_MAIN], mainSlot[to - HOVER_MAIN]);
@@ -164,11 +251,29 @@ static void tile(const Deploy *d, u32 *fb, int x, int y, bool lit) {
     sa_blit_rect(fb, d->art[ART_TILE], lit ? TILE_W : 0, 0, TILE_W, TILE_H, x, y);
 }
 
+static void draw_org(SA *s, u32 *fb);
+static void draw_form(SA *s, u32 *fb);
+static void draw_list(SA *s, u32 *fb);
+
 static void draw(SA *s) {
     Deploy *d = &s->deploy;
-    Party *p = &s->party;
     u32 *fb = s->fb;
     sa_blit(fb, d->art[ART_BG], 0, 0);
+    if (d->tab == TAB_ORG) draw_org(s, fb);
+    else draw_form(s, fb);
+    sa_blit_rect(fb, d->art[ART_RANK], 0, 0, 92, 21, 230, 26);
+    if (posts_open(s)) {
+        const Image *btn[3] = {d->art[ART_BTN_LIST], d->art[ART_BTN_ORG], d->art[ART_FORM]};
+        for (int t = 0; t < 3; t++)
+            sa_blit_rect(fb, btn[t], d->tab == t ? TAB_W : 0, d->hover == HOVER_TAB + t ? TAB_H : 0, TAB_W, TAB_H, TAB_X + t * TAB_DX, TAB_Y - 1);
+    } else
+        sa_blit_rect(fb, d->art[ART_FORM], TAB_W, 0, TAB_W, TAB_H, TAB_X + 2 * TAB_DX, TAB_Y - 1);
+    draw_list(s, fb);
+}
+
+static void draw_form(SA *s, u32 *fb) {
+    Deploy *d = &s->deploy;
+    Party *p = &s->party;
     sa_blit(fb, d->art[ART_TOP], 2, 21);
     sa_blit(fb, d->art[ART_BOTTOM], 2, 338);
     sa_blit(fb, d->art[ART_DISMISS], 438, 503);
@@ -184,8 +289,61 @@ static void draw(SA *s) {
         if (b >= 0 && d->picked != k && d->picked != HOVER_UNIT + b) sprite(fb, bench_sprite(s, b), x, BENCH_Y);
     }
     tile(d, fb, 445, 536, false);
-    sa_blit_rect(fb, d->art[ART_RANK], 0, 0, 92, 21, 230, 26);
-    sa_blit_rect(fb, d->art[ART_FORM], 0, 0, 152, 20, 403, 26);
+}
+
+static const Image *unit_sprite(SA *s, int unit) {
+    for (int i = 0; i < s->party.benchCount; i++)
+        if (s->party.bench[i].unit == unit) return bench_sprite(s, i);
+    for (int i = 0; i < PARTY_SLOTS; i++)
+        if (s->party.unit[i] == unit) return s->party.sprite[i];
+    return NULL;
+}
+
+static void info_line(u32 *fb, const char *t, int y) {
+    sa_text_draw(fb, SA_W, SA_H, t, -1, INFO_RIGHT - sa_text_width(t, -1, 15), y, 15, 0x000000, NO_EDGE);
+}
+
+static void draw_org(SA *s, u32 *fb) {
+    Deploy *d = &s->deploy;
+    Party *p = &s->party;
+    sa_blit(fb, d->art[ART_ORG], 2, 21);
+    for (int i = 0; i < ORG_POSTS; i++) {
+        int k = HOVER_POST + orgTile[i].post, fx = d->picked == k ? 0 : d->hover == k ? POST_W : 0, fy = d->picked == k ? POST_H : 0;
+        sa_blit_rect(fb, d->art[ART_POST_TILE], fx, fy, POST_W, POST_H, orgTile[i].x, orgTile[i].y);
+    }
+    for (int i = 0; i < ORG_POSTS; i++) {
+        int k = HOVER_POST + orgTile[i].post, unit = p->post[orgTile[i].post];
+        if (unit && d->picked != k) sprite(fb, unit_sprite(s, unit), orgTile[i].x + POST_W / 2 - TILE_W / 2, orgTile[i].y + POST_H / 2 - FEET + 6);
+    }
+    sa_blit_rect(fb, d->art[ART_FIRE], 0, d->hover == HOVER_DISMISS ? DISMISS_H : 0, DISMISS_W, DISMISS_H, DISMISS_X, DISMISS_Y);
+    int focus = is_post(d->hover) ? d->hover : is_post(d->picked) ? d->picked : -1;
+    sa_font_set_spacing(0);
+    sa_font_set_plain(true);
+    if (focus > 0) {
+        int post = focus - HOVER_POST, unit = p->post[post], r = unit ? sa_party_unit_row(p, unit) : -1;
+        info_line(fb, sa_table_text(&p->positions, post, 0), INFO_Y);
+        if (r >= 0) {
+            char v[16];
+            info_line(fb, sa_table_text(&p->units, r, 2), INFO_Y + INFO_DY);
+            snprintf(v, sizeof v, "%d", sa_table_int(&p->units, r, 31));
+            info_line(fb, v, INFO_Y + 2 * INFO_DY);
+            snprintf(v, sizeof v, "%d", sa_table_int(&p->units, r, 32));
+            info_line(fb, v, INFO_Y + 3 * INFO_DY);
+        } else {
+            info_line(fb, "--", INFO_Y + 2 * INFO_DY);
+            info_line(fb, "--", INFO_Y + 3 * INFO_DY);
+        }
+    } else {
+        info_line(fb, "--", INFO_Y + 2 * INFO_DY);
+        info_line(fb, "--", INFO_Y + 3 * INFO_DY);
+    }
+    sa_font_set_plain(false);
+    sa_font_set_spacing(1);
+}
+
+static void draw_list(SA *s, u32 *fb) {
+    Deploy *d = &s->deploy;
+    Party *p = &s->party;
     char rank[24];
     snprintf(rank, sizeof rank, "%d/ %d", sa_party_rank(p), s->vm.c[C_RANK_MAX]);
     sa_text_draw(fb, SA_W, SA_H, rank, -1, RANK_RIGHT - sa_text_width(rank, -1, 15), RANK_Y + 2, 15, 0x000000, NO_EDGE);
@@ -206,7 +364,9 @@ static void draw(SA *s) {
         }
         int frame = d->picked == k ? 2 : d->hover == HOVER_ROW + i ? 3 : 0;
         sa_blit_rect(fb, d->art[ART_ROWS], 0, frame * ROW_H, ROW_W, ROW_H, LIST_X, y);
-        if (is_main(k) || p->bench[k - HOVER_UNIT].tile >= 0) sa_blit(fb, d->art[ART_BADGE], BADGE_X, y + BADGE_DY);
+        int post = sa_party_post_of(p, unit);
+        if (post > 0 && post <= ORG_POSTS) sa_blit(fb, d->art[ART_LABEL0 + post - 1], BADGE_X, y + BADGE_DY);
+        else if (is_main(k) || p->bench[k - HOVER_UNIT].tile >= 0) sa_blit(fb, d->art[ART_BADGE], BADGE_X, y + BADGE_DY);
         int r = sa_party_unit_row(p, unit);
         sa_text_draw(fb, SA_W, SA_H, sa_table_text(&p->units, r, 2), -1, NAME_X, y + TEXT_DY, 18, 0x000000, NO_EDGE);
         const int stats[4] = {level, sa_table_int(&p->units, r, 15), sa_table_int(&p->units, r, 31), sa_table_int(&p->units, r, 32)};
@@ -221,10 +381,11 @@ static void draw(SA *s) {
     int focus = resolve(s, d->hover);
     if (focus < 0) focus = d->picked;
     sa_card_draw(s, fb, focus >= HOVER_MAIN && focus < HOVER_BENCH ? mainSlot[focus - HOVER_MAIN] : -1, CARD_X, CARD_Y);
-    sa_party_draw_diorama(p, fb, s->vm.c[C_RANK_MAX], d->art[ART_PLATFORM]);
+    if (d->tab != TAB_ORG) sa_party_draw_diorama(p, fb, s->vm.c[C_RANK_MAX], d->art[ART_PLATFORM]);
     sa_blit_rect(fb, d->art[ART_BACK], 0, d->hover == HOVER_BACK ? BTN_H : 0, BTN_W, BTN_H, BACK_X, BACK_Y);
     const Image *held = NULL;
-    if (is_main(d->picked) && p->unit[mainSlot[d->picked - HOVER_MAIN]]) held = p->sprite[mainSlot[d->picked - HOVER_MAIN]];
+    if (is_post(d->picked) && p->post[d->picked - HOVER_POST]) held = unit_sprite(s, p->post[d->picked - HOVER_POST]);
+    else if (is_main(d->picked) && p->unit[mainSlot[d->picked - HOVER_MAIN]]) held = p->sprite[mainSlot[d->picked - HOVER_MAIN]];
     else if (bench_index(s, d->picked) >= 0) held = bench_sprite(s, bench_index(s, d->picked));
     if (held) sprite(fb, held, s->mouseX - TILE_W / 2, s->mouseY - FEET / 2);
 }
@@ -253,7 +414,11 @@ bool sa_deploy_frame(SA *s, u32 ms) {
         s->clicked = false;
         int k = resolve(s, h);
         if (h == HOVER_BACK) s->mode = MODE_TOWN;
-        else if (k >= 0 && d->picked < 0) d->picked = k;
+        else if (h >= HOVER_TAB && h < HOVER_TAB + 3) {
+            d->tab = h - HOVER_TAB;
+            d->picked = -1;
+        } else if (h == HOVER_DISMISS && d->picked < 0) {
+        } else if (k >= 0 && d->picked < 0) d->picked = k;
         else if (k >= 0) {
             apply(s, d->picked, k);
             d->picked = -1;

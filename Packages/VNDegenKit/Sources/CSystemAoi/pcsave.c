@@ -58,6 +58,7 @@ enum {
     SCENE_STEP = 1200,
     FREE_AT = 1008208,
     FREE_COUNT = 30,
+    POSTED = 3,
     PLACE_VAR = 4,
     PLACE_TOWN = 6,
     SEED_VAR = 6,
@@ -191,6 +192,11 @@ static void read_members(SA *s, const u8 *img) {
             b.tile = -1;
             p->bench[p->benchCount++] = b;
         }
+    memset(p->post, 0, sizeof p->post);
+    for (int i = 1; i < FREE_COUNT && i < PARTY_POSTS; i++) {
+        int k = at(img, FREE_AT + (size_t)i * 4);
+        if (k >= 0 && k < count) p->post[i] = p->roster[k];
+    }
     if (!sa_party_members(p) && p->benchCount) {
         Bench b = p->bench[0];
         memmove(p->bench, p->bench + 1, sizeof(Bench) * (size_t)--p->benchCount);
@@ -362,7 +368,12 @@ static void write_member(SA *s, u8 *img, int k, const Bench *b, bool placed, con
     write_unit(s, img, m, b, false, bonus);
     put(img, m + 4, k);
     put(img, m + 8, k);
-    put(img, m + MEMBER_BYTES, (k ? k : 2) << 16 | (placed ? 1 : 4) << 8);
+    int post = sa_party_post_of(&s->party, b->unit);
+    if (post) {
+        put(img, m + MEMBER_BYTES, post << 16 | POSTED << 8);
+        put(img, FREE_AT + (size_t)post * 4, k);
+    } else
+        put(img, m + MEMBER_BYTES, (k ? k : 2) << 16 | (placed ? 1 : 4) << 8);
 }
 
 static void party_bonus(SA *s, int (*delta)[10]) {
