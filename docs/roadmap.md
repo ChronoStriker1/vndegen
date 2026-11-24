@@ -149,6 +149,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - SystemAoi, on VNDegen's own runtime, with BUNNY BLACK 3: the prologue, the town's opening turns and 千樹庭, with saves both ways (0.60.0).
 - BUNNY BLACK 3 through 炎山洞 and the first missions (0.60.1).
 - BUNNY BLACK 3's recruits, from housing and beaten area bosses, and its town events on the PC's turn (0.60.2).
+- BUNNY BLACK 3's town posts, 内政's 交換 and 解任 (0.60.4).
 - iPhone Duo layouts that follow the DuoApps patterns: off the fold, side bars, columns from the space (0.60.3).
 
 ## Bugs to fix
@@ -161,7 +162,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`: the town's defence (the turn-20 attack and 警備). The opening shipped in 0.60.0, 炎山洞 and the first missions in 0.60.1, and recruiting in 0.60.2.
+- SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`: the town's 迷宮 defence, from turn 42. The opening shipped in 0.60.0, then 炎山洞 and missions (0.60.1), recruiting (0.60.2) and town posts (0.60.4).
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
