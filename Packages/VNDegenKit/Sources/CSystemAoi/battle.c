@@ -303,6 +303,12 @@ static void roll_cells(Battle *b, int g, int *cells) {
     }
 }
 
+int sa_battle_board_size(const Battle *b, int party) {
+    for (int r = 0; r < b->groups.rows; r++)
+        if (sa_table_int(&b->groups, r, 0) == party) return board_size(b, r);
+    return 3;
+}
+
 bool sa_battle_roll(Battle *b, const char *group, u32 seed, int *cells) {
     int g = row_by_text(&b->groups, 2, group);
     if (g < 0) return false;

@@ -70,6 +70,8 @@ enum {
     F_SPREAD = 12,
     F_STEPS = 13,
     F_FOG = 10,
+    F_BACKDROP = 8,
+    PLACE_BASE = 41,
     F_GLOW = 9,
     F_ENTRY = 14,
     D_OPEN_FLAG = 3,
@@ -402,6 +404,12 @@ static void spawn_group(SA *s, const char *name) {
     set_target(g, pick_cell(&s->dungeon, g->x, g->y, GROUP_SPAWN_DISTANCE, h ^ 0x5bd1e995u));
     sa_battle_roll(&s->battle, name, mix(h ^ 0x27d4eb2fu), g->cells);
     sa_log(s, "group %d (%s) at %d,%d", g->number, name, g->x, g->y);
+}
+
+int sa_exp_place_code(SA *s) {
+    const char *bg = text(&s->exp.floors, s->exp.row, F_BACKDROP);
+    int n = 0;
+    return sscanf(bg, "bg%3d", &n) == 1 ? n + PLACE_BASE : PLACE_BASE + 21;
 }
 
 int sa_exp_area_registered(SA *s) {

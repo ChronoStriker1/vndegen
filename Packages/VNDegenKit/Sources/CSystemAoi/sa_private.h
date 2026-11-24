@@ -78,7 +78,7 @@ typedef struct SaveScreen {
 
 typedef struct ExpGroup {
     bool alive;
-    int party, number, x, y, dir, flags, cooldown, fought;
+    int party, number, x, y, dir, flags, cooldown, fought, extra;
     int cells[BATTLE_CELLS];
     int target[EXP_TARGETS][2];
 } ExpGroup;
@@ -251,6 +251,7 @@ void sa_exp_enter(SA *s, int dungeon, int floor);
 void sa_exp_resume(SA *s, int dungeon, int floor, int x, int y, int dir, bool keepGroups);
 void sa_exp_add_group(SA *s, const char *name);
 int sa_exp_area_registered(SA *s);
+int sa_exp_place_code(SA *s);
 void sa_exp_place_names(SA *s, const char **dungeon, const char **floor);
 const char *sa_exp_floor_map(SA *s, int dungeon, int floor);
 void sa_exp_names(SA *s, int dungeon, int floor, const char **dungeonName, const char **floorName);

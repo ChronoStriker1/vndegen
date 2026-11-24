@@ -564,6 +564,7 @@ void sa_battle_free(Battle *b);
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed);
 bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, Image *backdrop, int boardSet, u32 seed);
 bool sa_battle_roll(Battle *b, const char *group, u32 seed, int *cells);
+int sa_battle_board_size(const Battle *b, int party);
 void sa_battle_unit_stats(const Battle *b, int row, int level, int *out);
 void sa_battle_position_bonus(const Battle *b, int n, const int *unitRow, const int *gridRow, const int *gridCol, int (*delta)[10]);
 void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor);
