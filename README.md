@@ -51,8 +51,8 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/hub-duo-outer.jpg" width="300" alt="iPhone Duo folded, on the outer display, in Header list: one column of header art beside the camera inset">
-  <img src="docs/screenshots/hub-duo-inner.jpg" width="520" alt="iPhone Duo unfolded, on the inner display, in Header list: two columns of header art">
+  <img src="docs/screenshots/hub-duo-outer.jpg" width="300" alt="iPhone Duo folded, on the outer display, in Header list: one column of header art, with the Add game, view, lock, and Settings buttons in a side bar below the camera">
+  <img src="docs/screenshots/hub-duo-inner.jpg" width="520" alt="iPhone Duo unfolded, on the inner display, in Header list: two columns of header art, with the same buttons in a side bar on the right">
   <br><sub>iPhone Duo folded, outer display &nbsp;·&nbsp; iPhone Duo unfolded, inner display: Header list</sub>
 </p>
 

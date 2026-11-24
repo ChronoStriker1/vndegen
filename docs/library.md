@@ -81,16 +81,28 @@ RPG Maker MV and MZ clips with transparency are converted the first time they pl
 
 ## Layouts
 
-The view button in the top bar steps the library through four layouts:
+The view button in the top bar, or in the side bar described below, steps the library through four layouts:
 
 - **Featured** puts the focused game's hero art, logo, and Play button above the shelves.
 - **Capsule rows** shows shelves of large portrait capsules.
-- **Header list** stacks each game's wide header art, in as many columns as the screen allows.
-- **Grid** shows every game's capsule in a dense grid, three to a row on iPhone and more on wider screens, with the number of games beside All games.
+- **Header list** stacks each game's wide header art, in as many columns as the screen allows, each at most 480 points wide.
+- **Grid** shows every game's capsule in a dense grid, three to a row on iPhone and more on wider screens, with the number of games beside All games. Tiles stop growing at a little more than the shelves' capsule size, and a wider screen adds a column instead.
 
 iPhone starts on Header list, iPad on Capsule rows, and Mac on Featured, and each device remembers its choice.
 
 The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place. On iPad, VNDegen also runs in a window of its own, at any size iPadOS allows. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of its window controls. On a Mac, a game fills the whole window, so the close, minimise and zoom buttons hide while it plays and come back in the library, on game pages, in Settings, and while the VNDegen menu is open. Command-W, Command-M, the menu bar and full screen work as usual.
+
+### iPhone Duo
+
+VNDegen follows the [DuoApps patterns](https://www.duoapps.com/patterns/) for the iPhone Duo, and decides by the space it has and the regions the system reserves, never by the device:
+
+- **Side bar.** Where the system puts its own bars in a vertical column, the hub does too: on the outer display in both orientations, and on the inner display held as a book. The library's Add game, view, lock, and Settings buttons, and Back on game pages and in Settings, sit in that column on the camera's side, grouped on capsules and clear of the camera. When the column is too short for them all, the last ones move into a More menu. Held upright, the inner display keeps the top bar. Sheets put Done in the same column, and on the inner display, where sheets sit in the middle of the screen, keep it at the top.
+- **The fold.** Partly folded, nothing VNDegen draws to be tapped sits on the fold. The VNDegen menu moves to the right half, or below a fold across the screen. Settings and the game page's buttons keep to the left half, and the passcode keypad sits below a fold across the screen, with its title above. Scrolling lists may pass over the fold.
+- **Columns.** On a display that folds, the grid and the header list show an even number of columns, so the fold falls between two, and while partly folded the gap there widens to the fold's width. On the inner display held upright the grid shows six columns where it would otherwise show five.
+- **Game page.** The banner follows the width, between 180 and 540 points tall, and never the screen's height.
+- **The VNDegen menu** scrolls when it is taller than the screen, as on the closed Duo held on its side, so every button stays in reach.
+
+Opening, closing, and folding keep the library's place, an open sheet, a game page's position, and a running game.
 
 ## The game menu
 
