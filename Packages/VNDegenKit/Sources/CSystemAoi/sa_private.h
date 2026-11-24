@@ -79,6 +79,7 @@ typedef struct SaveScreen {
 typedef struct ExpGroup {
     bool alive;
     int party, number, x, y, dir, flags, cooldown, fought, extra;
+    bool stay;
     int cells[BATTLE_CELLS];
     int target[EXP_TARGETS][2];
 } ExpGroup;
@@ -250,6 +251,7 @@ void sa_exp_gain(SA *s, const int gain[4]);
 void sa_exp_enter(SA *s, int dungeon, int floor);
 void sa_exp_resume(SA *s, int dungeon, int floor, int x, int y, int dir, bool keepGroups);
 void sa_exp_add_group(SA *s, const char *name);
+void sa_exp_add_group_at(SA *s, const char *name, int x, int y);
 int sa_exp_area_registered(SA *s);
 int sa_exp_place_code(SA *s);
 void sa_exp_place_names(SA *s, const char **dungeon, const char **floor);

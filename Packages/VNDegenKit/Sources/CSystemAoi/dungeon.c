@@ -541,7 +541,6 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
                 k--;
             }
         }
-    int glow_marks[DUN_CELLS], glows = 0;
     for (int i = 0; i < n; i++) {
         int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
         const i32 *cell = d->cell[row * DUN_SIDE + col];
@@ -557,16 +556,11 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             snprintf(name, sizeof name, "w%03d", w);
             draw_part(d, &d->set, &c, name, cx, cz, sideQuarter[s]);
         }
-        if (sa_dungeon_cell_is_passage(d, col, row)) glow_marks[glows++] = order[i];
         if (cell[F_OBJECT] >= 0) {
             snprintf(name, sizeof name, "a%03d", cell[F_OBJECT]);
             draw_model(d, &d->common, &c, name, cx, cz, cell[F_OBJECT] == OBJECT_DOOR ? spin(d) : 0);
         }
     }
-    d->r3.glow = true;
-    for (int i = glows - 1; i >= 0; i--)
-        draw_model(d, &d->common, &c, "a099", (float)(glow_marks[i] % DUN_SIDE) * CELL, -(float)(glow_marks[i] / DUN_SIDE) * CELL, 0);
-    d->r3.glow = false;
 }
 
 static void fill(u32 *fb, int x, int y, int w, int h, u32 c) {

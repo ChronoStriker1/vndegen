@@ -242,7 +242,6 @@ typedef struct R3 {
     float focal, fogNear, fogFar;
     u32 fogColor;
     int cull;
-    bool glow;
 } R3;
 
 void r3_init(R3 *r, int w, int h);

@@ -424,6 +424,19 @@ void sa_exp_add_group(SA *s, const char *name) {
     sync_marks(s);
 }
 
+void sa_exp_add_group_at(SA *s, const char *name, int x, int y) {
+    if (!s->exp.active) return;
+    int before = s->exp.groupCount;
+    spawn_group(s, name);
+    if (s->exp.groupCount > before && x >= 0 && y >= 0) {
+        ExpGroup *g = &s->exp.group[s->exp.groupCount - 1];
+        g->x = x;
+        g->y = y;
+        g->stay = true;
+    }
+    sync_marks(s);
+}
+
 static void spawn_floor_groups(SA *s) {
     Expedition *e = &s->exp;
     e->groupCount = 0;
@@ -447,6 +460,7 @@ static void sync_marks(SA *s) {
 
 static void move_group(SA *s, ExpGroup *g) {
     Dungeon *d = &s->dungeon;
+    if (g->stay) return;
     if (g->target[0][0] < 0 || (g->x == g->target[0][0] && g->y == g->target[0][1]))
         set_target(g, pick_cell(d, g->x, g->y, GROUP_SPAWN_DISTANCE, sa_vm_random(&s->vm)));
     if (g->target[0][0] < 0) return;

@@ -579,7 +579,8 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         break;
     case 0xa8: {
         char *g = opd_str(code, in, 0);
-        sa_exp_add_group(s, g);
+        if (in->count >= 3) sa_exp_add_group_at(s, g, sa_vm_get(vm, code, &in->o[1]), sa_vm_get(vm, code, &in->o[2]));
+        else sa_exp_add_group(s, g);
         free(g);
         break;
     }
