@@ -159,6 +159,7 @@ New bugs get a GitHub issue and a line here.
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
 - SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`: 炎山洞 and the story events the areas start, about 2 weeks. The first slice, the opening, shipped in 0.60.0; the first mission comes later than planned, after the 氷掌閣 story event.
+- iPhone Duo layouts checked against the DuoApps patterns (duoapps.com/patterns), on `feat/duo-patterns` since 2026-11-24: an audit of every screen closed, open and folded, then the fixes the coordinator approves.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
