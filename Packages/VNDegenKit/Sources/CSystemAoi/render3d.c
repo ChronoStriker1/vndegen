@@ -97,6 +97,12 @@ static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Ima
                 c = tex->px[(size_t)ty * tw + tx];
                 if ((c >> 24) < 128) continue;
             }
+            if (r->glow) {
+                u32 d = row[x];
+                u32 gr = (u32)fminf((float)(d & 0xff) * 0.8f + 60, 255), gg = (u32)((float)(d >> 8 & 0xff) * 0.8f), gb = (u32)fminf((float)(d >> 16 & 0xff) * 0.8f + 70, 255);
+                row[x] = 0xff000000u | gb << 16 | gg << 8 | gr;
+                continue;
+            }
             zrow[x] = iz;
             float f = fogSpan > 0 ? (r->fogFar - z) * fogInv : 1.0f;
             f = f < 0 ? 0 : f > 1 ? 1 : f;

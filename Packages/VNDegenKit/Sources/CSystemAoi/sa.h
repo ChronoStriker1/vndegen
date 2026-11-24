@@ -242,6 +242,7 @@ typedef struct R3 {
     float focal, fogNear, fogFar;
     u32 fogColor;
     int cull;
+    bool glow;
 } R3;
 
 void r3_init(R3 *r, int w, int h);
@@ -281,6 +282,7 @@ typedef struct Dungeon {
     u8 ownPassage[DUN_CELLS], *passage;
     bool loaded;
     int w, h;
+    float floorGain;
     int x, y, dir;
     float fov, camX, camZ, yaw;
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;

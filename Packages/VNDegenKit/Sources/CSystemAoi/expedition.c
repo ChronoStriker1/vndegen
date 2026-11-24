@@ -40,6 +40,7 @@ enum {
     GROUP_COOLDOWN = 40,
     GROUP_FLED = 2,
     ENCOUNTER_FROM = 40,
+    GLOW_GAIN_X100 = 155,
 };
 
 enum {
@@ -69,6 +70,7 @@ enum {
     F_SPREAD = 12,
     F_STEPS = 13,
     F_FOG = 10,
+    F_GLOW = 9,
     F_ENTRY = 14,
     D_OPEN_FLAG = 3,
     F_GROUP_LISTS = 30,
@@ -472,6 +474,7 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     sa_dungeon_art(&s->dungeon, &s->vfs, platform);
     u32 fog = (u32)sa_table_int(&e->floors, r, F_FOG);
     s->dungeon.r3.fogColor = (fog >> 16 & 0xff) | (fog & 0xff00) | (fog & 0xff) << 16;
+    s->dungeon.floorGain = sa_table_int(&e->floors, r, F_GLOW) == 1 ? GLOW_GAIN_X100 / 100.0f : 1;
     if (e->explored && dungeon < EXP_DUNGEONS && floor < EXP_FLOORS) {
         s->dungeon.visited = e->explored[dungeon][floor];
         s->dungeon.passage = e->passages[dungeon][floor];
