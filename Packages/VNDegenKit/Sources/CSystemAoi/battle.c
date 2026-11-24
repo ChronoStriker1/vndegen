@@ -131,36 +131,7 @@ static int row_by_text(const Table *t, int col, const char *s) {
     return -1;
 }
 
-static int growth(const Table *lvup, const char *type, const char *stat, int level) {
-    int r = row_by_text(lvup, 1, type);
-    if (r < 0 || level <= 1) return 0;
-    const char *s = text_of(lvup, r, 24);
-    const char *p = strstr(s, stat);
-    if (!p) return 0;
-    int add = 0, per = 0;
-    if (sscanf(p + strlen(stat), "+%d/%d", &add, &per) != 2 || per <= 0) return 0;
-    return (level - 1) / per * add;
-}
-
-static int level_gain(const Table *lvup, const char *type, int col, int level) {
-    int r = row_by_text(lvup, 1, type);
-    return r < 0 || level <= 1 ? 0 : (level - 1) * sa_table_int(lvup, r, col);
-}
-
-void sa_battle_unit_stats(const Battle *b, int row, int level, int *out) {
-    const Table *u = &b->party->units;
-    const char *type = text_of(u, row, 19);
-    out[0] = sa_table_int(u, row, 23) + level_gain(&b->lvup, type, 4, level);
-    out[1] = sa_table_int(u, row, 24) + level_gain(&b->lvup, type, 5, level);
-    for (int i = 0; i < 8; i++) out[2 + i] = sa_table_int(u, row, 25 + i);
-    int attack = growth(&b->lvup, type, "攻撃", level), defence = growth(&b->lvup, type, "防御", level);
-    out[2 + STAT_ATTACK] += attack;
-    out[2 + STAT_MAGIC] += attack;
-    out[2 + STAT_DEFENCE] += defence;
-    out[2 + STAT_RESIST] += defence;
-    out[2 + STAT_SPEED] += growth(&b->lvup, type, "速度", level);
-    out[2 + STAT_EVASION] += growth(&b->lvup, type, "回避", level);
-}
+void sa_battle_unit_stats(const Battle *b, int row, int level, int *out) { sa_party_unit_stats(b->party, row, level, out); }
 
 static int ability_value(const Table *abilities, const char *name) {
     for (int r = 0; r < abilities->rows; r++)
@@ -217,6 +188,7 @@ bool sa_battle_init(Battle *b, Vfs *vfs, Party *party) {
     if (!sa_table_load(&b->groups, vfs, "party.obj") || !sa_table_load(&b->skills, vfs, "skill.obj") ||
         !sa_table_load(&b->lvup, vfs, "lvup.obj") || !sa_table_load(&b->items, vfs, "item.obj"))
         return false;
+    party->lvup = &b->lvup;
     sa_popup_load(b->pop, vfs);
     for (int i = 0; i < ART_NAMED; i++) b->art[i] = sa_load_image(vfs, artNames[i]);
     char name[16];

@@ -268,8 +268,7 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platfo
             sa_party_tile_center(s, PLATFORM_X, PLATFORM_Y, &cx, &cy);
             int x = cx - cw / 2, y = cy + FEET - ch;
             sa_blit_rect(fb, im, cell % cols * cw, cell / cols * ch, cw, ch, x, y);
-            int r = sa_party_unit_row(p, p->unit[s]);
-            sa_party_draw_bars(p, fb, cx - 22, y, p->hp[s], sa_table_int(&p->units, r, 23), p->mp[s], sa_table_int(&p->units, r, 24));
+            sa_party_draw_bars(p, fb, cx - 22, y, p->hp[s], sa_party_max_hp(p, s), p->mp[s], sa_party_max_mp(p, s));
         }
     for (int t = 0; t < PARTY_RESERVE; t++) {
         int b = sa_party_reserve_at(p, t), unit = b >= 0 ? p->bench[b].unit : 0;
@@ -359,18 +358,56 @@ int sa_party_count_units(const Party *p, const char *key) {
     return n;
 }
 
-int sa_party_max_hp(const Party *p, int slot) {
-    return sa_table_int(&p->units, sa_party_unit_row(p, p->unit[slot]), 23) + p->trained[slot][0];
+static int find_type(const Table *lvup, const char *type) {
+    for (int r = 0; r < lvup->rows; r++)
+        if (!strcmp(sa_table_text(lvup, r, 1), type)) return r;
+    return -1;
 }
 
-int sa_party_max_mp(const Party *p, int slot) {
-    return sa_table_int(&p->units, sa_party_unit_row(p, p->unit[slot]), 24) + p->trained[slot][1];
+static int growth(const Table *lvup, const char *type, const char *stat, int level) {
+    int r = find_type(lvup, type);
+    if (r < 0 || level <= 1) return 0;
+    const char *s = sa_table_text(lvup, r, 24);
+    const char *p = strstr(s, stat);
+    if (!p) return 0;
+    int add = 0, per = 0;
+    if (sscanf(p + strlen(stat), "+%d/%d", &add, &per) != 2 || per <= 0) return 0;
+    return (level - 1) / per * add;
 }
 
-int sa_party_stat(const Party *p, int slot, int stat) {
-    static const int trainedIndex[8] = {2, 3, 4, 5, 6, 7, 8, 9};
-    return sa_table_int(&p->units, sa_party_unit_row(p, p->unit[slot]), 25 + stat) + p->trained[slot][trainedIndex[stat]];
+static int level_gain(const Table *lvup, const char *type, int col, int level) {
+    int r = find_type(lvup, type);
+    return r < 0 || level <= 1 ? 0 : (level - 1) * sa_table_int(lvup, r, col);
 }
+
+void sa_party_unit_stats(const Party *p, int row, int level, int *out) {
+    const Table *u = &p->units;
+    static const Table none;
+    const Table *lvup = p->lvup ? p->lvup : &none;
+    const char *type = sa_table_text(u, row, 19);
+    out[0] = sa_table_int(u, row, 23) + level_gain(lvup, type, 4, level);
+    out[1] = sa_table_int(u, row, 24) + level_gain(lvup, type, 5, level);
+    for (int i = 0; i < 8; i++) out[2 + i] = sa_table_int(u, row, 25 + i);
+    int attack = growth(lvup, type, "攻撃", level), defence = growth(lvup, type, "防御", level);
+    out[2 + STAT_ATTACK] += attack;
+    out[2 + STAT_MAGIC] += attack;
+    out[2 + STAT_DEFENCE] += defence;
+    out[2 + STAT_RESIST] += defence;
+    out[2 + STAT_SPEED] += growth(lvup, type, "速度", level);
+    out[2 + STAT_EVASION] += growth(lvup, type, "回避", level);
+}
+
+static int slot_value(const Party *p, int slot, int index) {
+    int v[10];
+    sa_party_unit_stats(p, sa_party_unit_row(p, p->unit[slot]), p->level[slot] > 0 ? p->level[slot] : 1, v);
+    return v[index] + p->trained[slot][index];
+}
+
+int sa_party_max_hp(const Party *p, int slot) { return slot_value(p, slot, 0); }
+
+int sa_party_max_mp(const Party *p, int slot) { return slot_value(p, slot, 1); }
+
+int sa_party_stat(const Party *p, int slot, int stat) { return slot_value(p, slot, 2 + stat); }
 
 bool sa_party_join(Party *p, Vfs *vfs, const char *key) {
     int r = -1;

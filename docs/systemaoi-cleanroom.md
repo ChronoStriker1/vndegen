@@ -177,34 +177,59 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Part set.** `floor.obj`'s column after the map name names the part set: 10 for 千樹庭 is `m010set.pvm` (forest);
   `m000set` is 炎山洞's lava. Floor, ceiling and wall parts are drawn per cell; walls are modelled on the cell's +x
   side and turned onto each side.
-- **Map layout.** `mpDDFF.amd` stores its 15 by 15 cells column by column, mirrored: cell (x, y), with y growing
-  south, is record (14 − x) × 15 + y. The wall fields are 18 north, 9 east, 12 south and 15 west (0 a wall, 10 a doorway
-  the party walks through, 20 the exit), and the open-side mask's bits 1, 2, 4 and 8 are east, south, west and north. Measured: the start
-  (0, 0) has the exit to the north, and walking south gives a wall two cells on with an opening to the east, as the
-  original shows.
+- **Map layout.** `mpDDFF.amd` stores its 15 by 15 cells row by row after a 48-byte header: cell (x, y), with y
+  growing south, is record x + 15 y. The wall fields are 9, 12, 15 and 18 for north, east, south and west (0 a wall,
+  10 a doorway the party walks through, 20 an edge passage to the next area), each followed by its 移動 field; field
+  21 is the open-side mask (bits 1, 2, 4 and 8 for north, east, south and west). Measured: the original's C073 to
+  C075, its saves' positions and the scripts' `d7`/`d8` coordinates all use this frame (the start view of a PC
+  autosave on (6, 2) facing south matches VNDegen's on the same cell; the minimap's door, room and passages line
+  up). An earlier VNDegen build read the maps turned a quarter, which kept the views right but put every
+  coordinate, the compass and the minimap a quarter off.
 - **Camera.** `Cam.pvc`'s position and target (3.2 high, 4.6 behind the cell's centre, tilted down slightly), with
   a 47.2° vertical field of view: the floor lines and wall edges fit that best (correlation 0.58 against 0.30 to 0.35
   at other angles); the file's Zoom(40) isn't used as given.
 - **Light and fog.** Inferred from colour fits: textures times 1.6 × (ambient 0.75 plus the two lights' diffuse), and
   linear fog to (40, 45, 30) from −4 to 28 units. Back faces are culled. A texture whose top-left colour covers a
   tenth of it treats that colour as transparent (the grass `010w0x0`).
-- **Objects.** `mallset.pvm` holds the objects every dungeon shares (`action_box`): `a100` the exit's gold-framed
-  door, `a101` to `a108` the floor markers of pickups (101 to 104 glowing, 105 spent), items, event marks and enemy
-  markers. Measured: the door stands at the centre of the exit cell (the cell with wall 20) and turns slowly, edge-on
-  to face-on in about 4.5 seconds (a turn every 18 seconds, filmed at 10 fps). A floor object N draws `aN` at its
-  cell's centre (inferred for all but the door).
-- **Action buttons.** Measured: standing on the exit cell facing the door shows 帰る (`dgn_g02`) at (1101, 498),
-  above the pad; walking into the door does nothing. Inferred: floor part 100 (`f100`, stairs down) shows 下りる
-  (`g01`) and 101 (`f101`, up) shows 上る (`g00`), going to the next or previous floor, arriving at its entrance.
-- **Floor objects seen on the first floor.** 100 is a door model standing in a dead end, 60 a yellow crystal (the
-  original shows 開ける at one); neither is handled by the floor hook, so both are the engine's. Open: what they do.
+- **Objects.** `mallset.pvm` holds the objects every dungeon shares (`action_box`): `a100` the gold-framed door,
+  `a101` to `a108` the floor markers of pickups (101 to 104 glowing, 105 spent) and other marks. Measured: floor
+  object 100 is the door home; it stands at its cell's centre and turns slowly, edge-on to face-on in about 4.5
+  seconds (a turn every 18 seconds, filmed at 10 fps). A floor object N draws `aN` at its cell's centre (inferred
+  for all but the door). Wall-20 sides draw nothing; the original floats a purple marker over such cells.
+- **Action buttons.** Measured: standing on the door's cell shows 帰る (`dgn_g02`) at (1101, 498), above the pad.
+  Inferred: floor part 100 (`f100`, stairs down) shows 下りる (`g01`) and 101 (`f101`, up) shows 上る (`g00`).
+- **Areas.** `floor.obj`'s rows of one dungeon are areas side by side, named from the first: 中央森, 中央森の東,
+  中央森の東南 and so on (`奥` one further the same way). Measured: stepping onto a cell with a wall-20 side moves at
+  once to the neighbouring area (a LOADING badge, then an autosave), arriving one cell in from that area's passage
+  on the facing edge at the same row or column, still facing the same way; 中央森's east passage at (14, 2) leads to
+  中央森の東's west passage at (0, 2), and back. Every passage of 千樹庭's ten areas pairs up that way. VNDegen places
+  areas on a grid from their names and checks the neighbour has the matching passage; failing that, it takes the
+  one area that has.
+- **Floor objects seen on the first floor.** 100 the door, 60 a yellow crystal (the original shows 開ける at one);
+  neither is handled by the floor hook, so both are the engine's.
   `floor.obj` columns 36 onwards hold eight (table, minimum, maximum, count) entries such as 武器Ａ 1 1 1 and 宝箱Ａ 1 3
   1, whose names are `item.obj` column 30 tags. Inferred: standing on a crystal shows 開ける (`dgn_g07`); opening the
   floor's k-th crystal (in map order) gives between the minimum and maximum of items from the k-th entry, each drawn
   by `item.obj` column 31's weight, says 『name』を手に入れた。 and removes the crystal.
-- **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one.
-- **Start cell.** Measured: twice one cell in from the exit cell, facing away from the door (the start view
-  correlates 0.53 with VNDegen's, and 0.63 after turning to the door); once a cell further. VNDegen starts one cell in.
+- **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one. Its icons are 16-pixel
+  tiles drawn twice the size: `mmf0003` the door, `mmf0004` a crystal, `mma0000` the party's arrow and `mma0001` an
+  enemy group's red cross (drawn for groups up to a cell outside the 5 by 5 window, overlapping its edge). A passage
+  side is a magenta bar. `mmf`/`mmw` hold more floor and wall tiles VNDegen doesn't use yet.
+- **Start cell.** Measured: one cell from the door, through its open side, facing away from it ((6, 2) facing south
+  in 中央森, every time).
+- **Step counter.** Measured: the number under the compass is the expedition's steps, drawn with `dgn_f00` (digits
+  10 pixels apart) right-aligned with its last digit at (994, 72). Turning doesn't count; crossing to another area
+  doesn't either. The 目標/時間 panel shows at the top right as in the town.
+- **Enemy groups.** Measured: each area's fixed groups (`floor.obj` column 30, 千固定0100 and 千固定0101 in 中央森)
+  stand on the floor from the moment the party arrives, always on the same cells ((4, 12) and (14, 7) in 中央森,
+  (12, 7) and (10, 0) in 中央森の東), with their members rolled afresh each time (`party.obj`'s random cells). They
+  show only on the minimap, not in the 3D view, and move a cell at a time as the party walks, toward a target cell
+  ((4, 1) for the first), then on to another. Walking onto a group's cell starts its battle; after fleeing, the group
+  was elsewhere and every group's counter read 40. Leaving an area and coming back resets its groups. Inferred:
+  groups move one cell per party step along the shortest path; a group that has fought waits out its 40-step count
+  before it can fight again; a beaten group is gone for the visit. VNDegen's spawn cells are its own (eight or more
+  steps from the arrival, chosen per area and group), as the original's rule isn't known. `a8 "name"` from the
+  scripts adds a group the same way.
 - **`bf var, N`** feeds the turn script's thresholds (1, 2, 5, 8): inferred as the number of floors reached in
   dungeon N + 1.
 
@@ -214,7 +239,10 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 calls it is inferred from that and from play, and marked so.
 
 - **Variables the engine keeps.** C070 the dungeon and C071 the floor (`floor.obj` columns 0 and 1), C073, C074 and
-  C075 the party's cell and facing (passed to `d7`/`d8`), C150 the enemy group's id, C151 the dungeon again (for its
+  C075 the party's cell and facing (passed to `d7`/`d8`), C069 the expedition's steps plus one and C068 the steps in
+  the current area (both kept after coming home), C076 and C077 set to 2 and 3 from the first expedition on (the
+  original draws no walls and only the party's cell with them at 0; inferred as the view and minimap ranges that
+  遠視 and 地図 widen), C150 the enemy group's id, C151 the dungeon again (for its
   music), C155 a battle's result (1 won, 2 lost; 3 fled is inferred). C210 to C213 hold what the expedition has found
   (residents, food, money, resources). Facing is inferred as 0 north, 1 east, 2 south, 3 west.
 - **Hooks.** 10 `bo1000` sets the pickup ranges per dungeon (C520 to C527); 25 `bo2500` plays the dungeon's music by
@@ -234,9 +262,9 @@ calls it is inferred from that and from play, and marked so.
   ends with the income box.
 - **`89`** after an event's scenes fades back to the dungeon view (C070, C071, C072, fade 10).
 - **Coming home.** 帰る (or 休憩, inferred) runs hook 17, adds the finds to the town and ends the turn (inferred).
-- **Encounters.** Measured: the number under the compass counts the expedition's steps, and battles came on steps
-  48, 56, 69 and 81 of one expedition (7 to 12 steps after the previous one; the count also rose by one over each
-  battle). Inferred: a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2). The group comes from one of
+- **Encounters.** Measured: battles came on steps 48, 56, 69 and 81 of one expedition (7 to 12 steps after the
+  previous one), and none in the first 34 steps of another. Inferred: random encounters start once the expedition
+  has walked 40 steps, then come on a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2). The group comes from one of
   three lists, columns 30, 31 and 35 (on the first floor 千固定0100|千固定0101, 千05|千06 and 千00|千01), chosen by
   the weights in columns 32 to 34 (10, 60, 10); measured in support: the fixed seven-slime group 千固定0100 came up
   in the original's random battles.
@@ -430,7 +458,9 @@ the same points (offsets in bytes, numbers little-endian):
 - **Town grid** at 1,010,848: 90 cells of five 32-bit numbers: the cell's state (0 when `TownMass.obj` opens it at
   the town's stage or lower, else -1), the facility type (100 the 魔王亭, 108 a field; 0 empty), a flag (1 the turn a
   facility was built, -1 when empty), the level, and a counter that grows each turn (4, 9 and 44 at turns 1, 2 and 9).
-  The number after the grid is 1. From 1,012,652 come script names in UTF-16 with numbers, likely the events seen.
+  The number after the grid is 1. From 1,012,652 come 56-byte records naming script files in UTF-16 (`ac0000.box`,
+  then the hook boxes the game has run, `bo0000` to `bo3100`) with two numbers each; a script cache rather than story
+  progress. The original loads images without it, so VNDegen leaves it empty.
 - **Equipment** at 1,004,728: (item, free, in use) triples, as the 装備 screen shows them (ダークスの剣 0/1 while
   Darkus wields it). Equipping 名剣ルージュ instead moved the counts, changed Darkus's item at 87,220 from 100 to 104,
   and his bonus at 86,716 (the second stat block's eleventh number) from 20 to 7, the items' 斬補正.
@@ -448,14 +478,39 @@ the same points (offsets in bytes, numbers little-endian):
 - **Map memory** from 6,172: 150 records of 532 bytes (fifteen dungeons of ten floors, ending where the members
   begin): four numbers (a 3 on 千樹庭's second floor; not understood, kept as read), a word with the floor in its
   second byte and the dungeon in its third (00 01 01 00 for 千樹庭's first floor), then four layers of 32 words. Word
-  14 - x holds column x with bit y for row y (the `.amd` file's own order). Layer 0 is the visited cells and layer 3
-  a copy of it; layer 1 marks a step walked between a cell and the one below it, layer 2 between a cell and the one
-  west of it (cells next to each other but never walked between stay clear). Fitted on every save from Wine: all
-  set bits fall on open cells only with this mapping, and VNDegen's walking reproduces the layers.
-- **Other regions** not yet placed: 215,608 to 229,808 (only in dungeon autosaves; 544-byte records like the
-  members' battle blocks, likely the floor's enemies), 993,208 to 997,999 (four 1,200-byte records starting -1, 1,
-  -1), 1,012,652 on (event history), 1,035,056 to 1,066,684 (the backlog's text) and an ascending list of offsets at
-  1,115,868 (the backlog's index).
+  y holds row y with bit x for column x. Layer 0 is the visited cells and layer 3 a copy of it; layer 1 marks a step
+  walked between a cell and the one east of it, layer 2 between a cell and the one south of it (cells next to each
+  other but never walked between stay clear). Fitted on every save from Wine: all set bits fall on open cells only,
+  and VNDegen's walking reproduces the layers.
+- **Last position** at 998,016 (the formation list's cells 4 to 7): the area (dungeon << 16 | floor << 8) while in
+  a dungeon and 0 in the town, then the cell and facing, kept after coming home (-1, -1, 0 before any expedition).
+  The 36 bytes at 85,972 end with the area and cell of the last door the party came in by ((1, 1) at (6, 2) for
+  every 千樹庭 save); zero before any expedition. The 52 bytes at 1,009,560 are thirteen -1s and a 0 in every save.
+- **Enemy groups** of the current area at 998,288: up to two records of 280 bytes (70 numbers): the group's
+  `party.obj` id, its number (1, 2), the area word, its cell and facing, its 15 board cells (row by row, three rows
+  of five, `party.obj`'s row 0 first) holding the record numbers of its units or -1, ten -1s, zeros, five target
+  cells as (x, y) pairs padded with -1, a flag word (1 for the first group, 0x101 for the second; 2 added after a
+  battle), -1, the 40-step counter, the times fought (1 after fleeing), two zeros and -1. Its units are member
+  records numbered from 100 (215,608 = 86,008 + 100 × 1,296): the unit at +0, -1 at +4, the record number at +8,
+  the level, 0, the group number at +20, the group, 1 and the board cell as bytes at +24, HP and MP, then the battle
+  blocks as for members. Measured on every Wine autosave: VNDegen's import and export of a floor autosave come out
+  equal in these regions, except the order of the records (the original numbers them as it rolls them) and the
+  ability numbers below.
+- **Battle blocks**, from the enemies and members: `unit.obj` columns 23 to 32 grown to the unit's level (`lvup.obj`
+  by the unit's growth type, column 19: HP + (level - 1) × column 4, MP + (level - 1) × column 5, 攻撃 on both attack
+  stats and 防御 on both defences by the type's `+1/N` steps; ベトＡ at level 5 is 42/12 and 8/8 from 30/8 and 7/7);
+  equipment bonuses 斬, 打, 射, 魔 at 10 to 13 and the element's attack 30 at 14 on (光 at 14, 闇 at 15, as the sisters
+  and ダークマン); resistances from 33 (斬 33, 打 34, 射 35 measured; 魔 36, 光 37, 闇 38, 火 39, 水 40, 風 41, 土 42 and
+  雷 43 inferred from the sisters' 光 and ルーアルテ's 雷), the unit's own element adding 20 and its opposite -50;
+  必殺耐性 at 44 and 異常耐性 at 46; the abilities' ids at 47 to 49; the skill slots at 114. The second block adds the
+  position bonuses of the field abilities (`ability.obj` column 4 as the amount): 攻撃強化 on both attacks, 防御強化
+  on both defences, 速度強化 and 回避強化, to all (全), the front row (前, the party's front row and an enemy board's
+  row 0), the back row (後), the unit's column (縦) or row (横), each counted once per unit that has it (two
+  ダークマンＡ give the back row 攻撃 +10). Measured on fourteen enemy records across three groups. 生命力's 20 sits at
+  106 of the second block; 凶暴者 and others use slots after it that aren't mapped. Enemies list all their skills,
+  with 3 after a 固定 one and 1 after the rest, except that 一角ベトＡ lists two of its three (not explained).
+- **Other regions** not yet placed: 993,208 to 997,999 (four 1,200-byte records starting -1, 1, -1), 1,035,056 to
+  1,066,684 (the backlog's text) and an ascending list of offsets at 1,115,868 (the backlog's index).
 - **Engine numbers.** C000 is always 2^31 - 1, C007 and C008 100, C036 and C037 1, C190 to C194 -1. C004 and C005
   are 6 and 1 in the town and 62 and 2 in a dungeon; the slot details read the place from them and an image without
   them opens a story scene instead of the town. C006 changes each turn, likely the random seed. The original
@@ -481,16 +536,21 @@ the same points (offsets in bytes, numbers little-endian):
   pictures under the text.
 - **Formation.** Measured by placing ミアルテ in 配置: a list of 32-bit numbers at 998,000 where cells 9 to 11 are the
   main members' top row, 14 to 16 the bottom row and 23 to 27 the five reserve tiles; -1 is an empty tile, -2 a
-  cell that isn't a tile, and a member's index (its record's place) a placed member. Cell 7 counts the members once
-  any has joined (with cells 5 and 6 at 1 and 0; -1, -1 and 0 for Darkus alone). Placing her set her record's +25
+  cell that isn't a tile, and a member's index (its record's place) a placed member. Cells 4 to 7 are the last
+  position (above), not a member count as first thought. Placing her set her record's +25
   byte from 4 to 1, and added her 魔法耐性's 50 to a row of resistances in her second battle block only. 配置 works by
   clicking a member, whose sprite then follows the pointer, and clicking a tile.
 - **Joined members.** Measured: a new member joins unplaced (not on a tile). Units whose skills are 固定 keep only
-  their first skill, with 3 after it for both sisters (inferred: the number of further fixed skills). Not derived
-  yet, so VNDegen writes zeros there: the sisters' 30 at +56 of both battle blocks, their 光 resistance at +148
-  (60 and 35: 20 plus the 光耐性 of column 33, inferred) and -50 at +152, ルーアルテ's 25 at +172, her thirteen 2s at
-  +260 of the second block, the position bonuses, and Darkus's 3 at +1284 (turn 9 on). The original loads such a
-  file with the right members, places, stats, abilities and skills.
-- **Dungeon saves.** Measured: an image with C004/C005 at 62/2 (in a dungeon) but nothing in the dungeon-only
-  regions (the 36 bytes before the members, 215,608 to 231,104, the scene data after 998,288 and 52 bytes from
-  1,009,560) crashes the original as soon as its load screen lists it. With 6/1 it lists and loads it into the town.
+  their first skill, with 3 after it (the mark of a fixed skill, as on enemies). Not derived yet, so VNDegen writes
+  zeros there: ルーアルテ's thirteen 2s at +260 of the second block, a 5 at +252, and Darkus's 3 at +1284 (turn 9
+  on). The original loads such a file with the right members, places, stats, abilities and skills.
+- **Reserve.** The five lower tiles of 配置 are the reserve (リザーブメンバー); a member there is written in cells 23
+  to 27 with its +25 byte at 1 (inferred, as for a main tile).
+- **Joining box.** Measured: `8a 2 0 0 0` in the town adds its numbers to the town (住民 15 → 17) and shows the
+  table; the units that joined just before get a card each under the text (`ret_a05` on the `ret_a06` panel, the
+  front sprite `uNNNNa2` and the name), newest first, then OK.
+- **Dungeon saves.** Measured: an image with C004/C005 at 62/2 (in a dungeon) but nothing in the dungeon regions
+  crashes the original as soon as its load screen lists it. With the groups, their enemies, the last position, the
+  entry and C076/C077 written, the original lists VNDegen's dungeon saves (8ターン 千樹庭 中央森の東 0歩目) and loads
+  them onto the saved cell, facing, map memory and groups (checked on a save from a VNDegen game four steps in, and
+  on VNDegen's re-export of a PC autosave). The slot's N歩目 read 0 on every save so far; VNDegen shows C072.

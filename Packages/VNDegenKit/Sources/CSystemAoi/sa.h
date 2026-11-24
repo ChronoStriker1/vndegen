@@ -471,6 +471,7 @@ typedef struct Party {
     u32 ms;
     Image *platform, *tile, *smallTile, *gaugeFrame, *hpGauge, *mpGauge, *label, *digits;
     Vfs *vfs;
+    const Table *lvup;
     Image *reserveSprite[PARTY_RESERVE];
     int reserveUnit[PARTY_RESERVE];
 } Party;
@@ -489,6 +490,7 @@ void sa_party_swap(Party *p, int a, int b);
 bool sa_party_bench(Party *p, int slot);
 void sa_party_set_reserve(Party *p, int index, int tile);
 int sa_party_reserve_at(const Party *p, int tile);
+void sa_party_unit_stats(const Party *p, int row, int level, int *out);
 void sa_party_unbench(Party *p, Vfs *vfs, int index, int slot);
 int sa_party_members(const Party *p);
 int sa_party_max_hp(const Party *p, int slot);

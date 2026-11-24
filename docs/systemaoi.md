@@ -78,22 +78,26 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   Rounds play in speed order with the damage, hit and target rules in `docs/systemaoi-cleanroom.md`. A win dims the
   screen and shows the resources, EXP and any item found; EXP fills the panel's bar and raises levels. Only a debug
   hook starts a battle so far.
-- **Expeditions.** 遠征 opens the dungeon select; a floor's map is drawn in 3D from its part set (software rendered),
-  walked with the pad or the arrow keys, with the compass, a minimap of visited cells and the party's diorama. The
-  game's hooks run on entering, on stepping onto floor objects and walls, before and after battles and on the way
-  home. Battles start from the dungeon; a loss ends the expedition, and walking out the exit brings the finds home.
+- **Expeditions.** 遠征 opens the dungeon select; an area's map is drawn in 3D from its part set (software
+  rendered) in the original's own coordinates, walked with the pad or the arrow keys, with the compass, the step
+  count, a minimap of visited cells with the door, crystals and enemy groups, the 目標/時間 panel and the party's
+  diorama. The party starts beside the door home; 帰る on the door's cell brings the finds home. Stepping onto an
+  edge passage moves to the neighbouring area. Each area's enemy groups walk the floor as red crosses on the
+  minimap and fight when met; random encounters begin after 40 steps. The game's hooks run on entering, on stepping
+  onto floor objects and walls, before and after battles and on the way home; a loss ends the expedition.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
   loading and deleting ask YES or NO, saving shows the original's comment box with OK and CANCEL. Saves are the
   original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the save folder, packed with its codec
-  (`aoicmp.c`, `pcsave.c`): the variables, the town, every member with their place, the equipment and the map memory
-  (visited cells and the steps walked). The original
-  loads VNDegen's saves and VNDegen lists and loads the original's. Beside each, `vndegen/slotNN.sav` keeps what the
-  image doesn't yet carry for VNDegen (orders, reserve tiles); it is used only while its time matches
-  the original file's. As in the original, the game autosaves at the start of each turn and on entering each dungeon
-  floor, through ten slots in turn; a dungeon autosave loads back onto its floor, any other save into the town. New
-  members join off the board, as in the original.
+  (`aoicmp.c`, `pcsave.c`): the variables, the town, every member with their place (main or reserve tile), stats,
+  resistances and position bonuses, the equipment, the map memory (visited cells and the steps walked) and, in a
+  dungeon, the cell, the area's enemy groups and their units. The original loads VNDegen's saves, town or dungeon,
+  and VNDegen lists and loads the original's. Beside each, `vndegen/slotNN.sav` keeps what the image doesn't carry
+  (battle orders); it is used only while its time matches the original file's. As in the original, the game
+  autosaves at the start of each turn and on entering each area, through ten slots in turn; a dungeon save loads
+  back onto its cell, any other save into the town. New members join off the board and are shown on cards in the
+  message box, as in the original. 配置's lower tiles are the reserve.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
   FrameHost view at 1280x720. Ctrl or the controller's dash button holds skip.
 
@@ -104,9 +108,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   its scripts, and are being rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
-- Saves: members are written with their stats, abilities, skills and places, but not yet their race resistances
-  or the bonuses their abilities give where they stand; reserve-tile places come back as unplaced. A floor's
-  battle state and the event history after the town grid aren't mapped yet. The original crashed listing a dungeon
-  autosave written without the battle state, so VNDegen writes its dungeon autosaves as town saves for the original
-  (it opens them in the town); VNDegen itself still resumes them on their floor. The save comment box takes no text; the comment stays empty. The Option screen and the Extra menu aren't built yet.
+- Dungeon: where an area's enemy groups first stand and how they choose their way are VNDegen's own (the
+  original's cells are kept when loading its saves); a floor's taken pickups and opened doors aren't saved (the
+  original's image doesn't seem to hold them either); the purple passage markers aren't drawn.
+- Saves: a few ability numbers in the battle blocks (凶暴者 and the like) and the script cache after the town grid
+  are written empty; the original loads such files. The save comment box takes no text; the comment stays empty.
+  The Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.
