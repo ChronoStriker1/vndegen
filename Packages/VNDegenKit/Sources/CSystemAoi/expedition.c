@@ -755,11 +755,72 @@ static void cross_area(SA *s, int side) {
     enter(s, e->dungeon, sa_table_int(&e->floors, to, F_FLOOR), true);
 }
 
+static int name_dir(const char *name) {
+    static const char *const dirs[] = {"北東", "北西", "南東", "南西"};
+    for (int i = 0; i < 4; i++)
+        if (strstr(name, dirs[i])) return i;
+    return -1;
+}
+
+static int quadrant(const Dungeon *d, int x, int y) { return (y * 2 >= d->h ? 2 : 0) + (x * 2 >= d->w ? 0 : 1); }
+
+typedef struct Stair {
+    int row, x, y, quad;
+} Stair;
+
+static int list_stairs(SA *s, int part, Stair *out, int max) {
+    Expedition *e = &s->exp;
+    int n = 0;
+    for (int r = 0; r < e->floors.rows && n < max; r++) {
+        if (sa_table_int(&e->floors, r, F_DUNGEON) != e->dungeon) continue;
+        Dungeon *probe = sa_alloc(sizeof *probe);
+        if (sa_dungeon_read_map(probe, &s->vfs, text(&e->floors, r, F_MAP)))
+            for (int c = 0; c < DUN_CELLS && n < max; c++)
+                if (probe->cell[c][5] == part) out[n++] = (Stair){r, c % DUN_SIDE, c / DUN_SIDE, quadrant(probe, c % DUN_SIDE, c / DUN_SIDE)};
+        free(probe);
+    }
+    return n;
+}
+
+static int stairs_in(const Stair *l, int n, int row) {
+    int k = 0;
+    for (int i = 0; i < n; i++) k += l[i].row == row;
+    return k;
+}
+
+static bool stair_target(SA *s, bool down, Stair *out) {
+    Expedition *e = &s->exp;
+    Stair from[32], to[32];
+    int nf = list_stairs(s, down ? 100 : 101, from, 32), nt = list_stairs(s, down ? 101 : 100, to, 32);
+    int here = quadrant(&s->dungeon, s->dungeon.x, s->dungeon.y), dir = name_dir(text(&e->floors, e->row, F_NAME));
+    int best = -1, bestScore = -1;
+    for (int i = 0; i < nt; i++) {
+        if (to[i].row == e->row) continue;
+        int other = name_dir(text(&e->floors, to[i].row, F_NAME)), score = 1;
+        if (stairs_in(from, nf, e->row) > 1 && other >= 0 && other == here) score = 3;
+        else if (stairs_in(to, nt, to[i].row) > 1 && dir >= 0 && to[i].quad == dir) score = 3;
+        else if (other < 0 && dir < 0 && stairs_in(to, nt, to[i].row) == 1) score = 2;
+        if (score > bestScore) best = i, bestScore = score;
+    }
+    if (best < 0) return false;
+    *out = to[best];
+    return true;
+}
+
 static void change_floor(SA *s, int by) {
-    int floor = s->exp.floor + by;
-    if (floor < 1 || floor_row(&s->exp, s->exp.dungeon, floor) < 0) return;
-    sa_log(s, "expedition: to floor %d", floor);
-    sa_exp_enter(s, s->exp.dungeon, floor);
+    Expedition *e = &s->exp;
+    Stair t;
+    if (!stair_target(s, by > 0, &t)) {
+        sa_log(s, "no stairs to follow from %s", text(&e->floors, e->row, F_NAME));
+        return;
+    }
+    sa_log(s, "expedition: stairs to %s", text(&e->floors, t.row, F_NAME));
+    e->arriveSide = -1;
+    e->resumeX = t.x;
+    e->resumeY = t.y;
+    e->resumeDir = s->dungeon.dir;
+    e->keepGroups = false;
+    enter(s, e->dungeon, sa_table_int(&e->floors, t.row, F_FLOOR), true);
 }
 
 static bool run_step_hook(SA *s);
