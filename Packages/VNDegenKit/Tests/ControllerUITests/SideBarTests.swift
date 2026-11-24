@@ -24,7 +24,7 @@ import Testing
     let bar = SideBarPlacement(edge: .trailing, size: CGSize(width: 951, height: 669),
                                insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 0),
                                occlusions: [CGRect(x: 677, y: 21, width: 58, height: 37)])
-    #expect(bar == SideBarPlacement(edge: .trailing, width: 72, top: 8, bottom: 42))
+    #expect(bar == SideBarPlacement(edge: .trailing, width: 72, widening: 72, top: 8, bottom: 42))
 }
 
 @Test func theBarShowsEveryItemThatFitsAndMovesTheRestIntoOneMenuFromTheBottom() {

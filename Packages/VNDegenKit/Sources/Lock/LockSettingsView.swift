@@ -152,7 +152,7 @@ public struct LockSettingsView: View {
 private struct PasscodeFlowSheet: View {
     let model: LockSettingsModel
     let entry: PasscodeEntry
-    @Environment(\.cameraCornerTrailing) private var cameraCorner
+    @Environment(\.sheetSideBar) private var sideBar
 
     /// Laid out as the unlock screen is: Cancel in the top corner, then the flow's name over the keypad's prompt, with the
     /// keypad centered in the space under Cancel.
@@ -181,7 +181,7 @@ private struct PasscodeFlowSheet: View {
         }
         // Beside a camera in the top corner the system insets that whole side, which would push the keypad off center
         // below the camera too. Cancel is in the other corner.
-        .ignoresSafeArea(.container, edges: cameraCorner > 0 ? .horizontal : [])
+        .ignoresSafeArea(.container, edges: sideBar != nil ? .horizontal : [])
         .preferredColorScheme(.dark)
         #if os(macOS)
         // The keypad sizes itself from the room it has, so the sheet can't take its size from the keypad.

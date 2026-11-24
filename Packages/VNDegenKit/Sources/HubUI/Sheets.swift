@@ -9,7 +9,7 @@ import ControllerUI
 /// Shared chrome for the hub's sheets: a title, a close button, and the dark surface.
 struct SheetScaffold<Content: View>: View {
     @Environment(Navigator.self) private var nav
-    @Environment(\.cameraCornerTrailing) private var cameraCorner
+    @Environment(\.sheetSideBar) private var sideBar
     let title: String
     var subtitle: String?
     /// Only for sheets that turn off keyboard translation. Elsewhere InputHub already maps Escape to cancel.
@@ -21,8 +21,6 @@ struct SheetScaffold<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        // Beside a camera in the top corner, Done moves to the bottom. See `cameraCornerTrailing`.
-        let doneBelow = cameraCorner > 0
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -32,41 +30,27 @@ struct SheetScaffold<Content: View>: View {
                     }
                 }
                 Spacer()
-                if showsDone, !doneBelow { done }
+                if showsDone, sideBar == nil { done }
             }
             .padding(22)
-            // The title keeps clear of a camera in the top corner.
-            .padding(.trailing, max(0, cameraCorner - 22))
             content
-                .frame(maxHeight: doneBelow ? .infinity : nil, alignment: .top)
-            if showsDone, doneBelow {
-                done.padding(.horizontal, 22).padding(.vertical, 12)
-                    .background(alignment: .top) { BottomBarFade(color: Theme.background) }
-            }
+                .frame(maxHeight: sideBar == nil ? nil : .infinity, alignment: .top)
         }
         .foregroundStyle(.white)
         .background(Theme.background.opacity(0.98))
+        .sheetSideBarClose("Done", systemImage: "checkmark", shortcut: escapeCloses ? .cancelAction : nil,
+                           placement: showsDone ? sideBar : nil, action: close)
         .preferredColorScheme(.dark)
     }
 
-    private var done: some View {
-        Button { if let onClose { onClose() } else { nav.back() } } label: {
-            Text("Done").frame(maxWidth: cameraCorner > 0 ? .infinity : nil)
-        }
-        .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
-        .keyboardShortcut(escapeCloses ? .cancelAction : nil)
+    private func close() {
+        if let onClose { onClose() } else { nav.back() }
     }
-}
 
-/// Fades a list out where it meets a bar pinned under it, rather than cutting it at a hard edge.
-struct BottomBarFade: View {
-    let color: Color
-
-    var body: some View {
-        LinearGradient(colors: [color.opacity(0), color], startPoint: .top, endPoint: .bottom)
-            .frame(height: 28)
-            .offset(y: -28)
-            .allowsHitTesting(false)
+    private var done: some View {
+        Button("Done", action: close)
+            .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
+            .keyboardShortcut(escapeCloses ? .cancelAction : nil)
     }
 }
 
@@ -653,19 +637,17 @@ final class Confirmation {
 
 struct ConfirmationSheet: View {
     @Environment(Navigator.self) private var nav
-    @Environment(\.cameraCornerTrailing) private var cameraCorner
+    @Environment(\.sheetSideBar) private var sideBar
     let confirmation: Confirmation
     var body: some View {
         // Cancel is the way out, so a Done beside it would only blur which button keeps the game.
         SheetScaffold(title: confirmation.title, escapeCloses: true, showsDone: false) {
-            // In the folded iPhone Duo's full-height sheets the buttons are stacked full width at the bottom, where the
-            // other sheets put Done.
-            layout(stacked: cameraCorner > 0)
+            layout(stacked: sideBar != nil)
                 .padding(.horizontal, 22)
-                .padding(.bottom, cameraCorner > 0 ? 12 : 22)
+                .padding(.bottom, sideBar != nil ? 12 : 22)
         }
         .fittedSheetHeight()
-        .onChange(of: cameraCorner > 0, initial: true) { _, stacked in nav.confirmationStacked = stacked }
+        .onChange(of: sideBar != nil, initial: true) { _, stacked in nav.confirmationStacked = stacked }
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 280)
         #endif

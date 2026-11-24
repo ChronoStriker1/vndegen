@@ -88,12 +88,11 @@ struct HubMetrics: Equatable {
         return metrics
     }
 
-    func withSideBar(on edge: HorizontalEdge?, occlusions: [CGRect]) -> HubMetrics {
-        guard let edge else { return self }
-        let bar = SideBarPlacement(edge: edge, size: CGSize(width: fullWidth, height: fullHeight), insets: insets, occlusions: occlusions)
+    func withSideBar(_ bar: SideBarPlacement?) -> HubMetrics {
+        guard let bar else { return self }
         var metrics = self
         metrics.sideBar = bar
-        if edge == .leading {
+        if bar.edge == .leading {
             metrics.size.width -= max(0, bar.width - insets.leading)
             metrics.insets.leading = max(insets.leading, bar.width)
         } else {
@@ -195,12 +194,6 @@ extension View {
         if metrics.acrossSideCamera { contentMargins(.horizontal, 20, for: .scrollContent) } else { self }
     }
 
-    /// A sheet's content under metrics from `besideSideCamera`: across the camera's inset too, with its header's
-    /// trailing button kept out of the camera's column.
-    func sheetBesideSideCamera() -> some View {
-        modifier(SheetBesideSideCamera())
-    }
-
     /// Insets both sides by the larger horizontal safe area, so centered layouts stay centered on the screen when only
     /// one side has an inset, such as the iPhone Duo's 84 pt camera inset.
     func balancedHorizontalSafeArea(_ metrics: HubMetrics) -> some View {
@@ -237,17 +230,5 @@ extension TimeInterval {
         guard self >= 60 else { return nil }
         let minutes = Int(self / 60)
         return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
-    }
-}
-
-private struct SheetBesideSideCamera: ViewModifier {
-    @Environment(\.hubMetrics) private var metrics
-
-    func body(content: Content) -> some View {
-        let across = metrics.acrossSideCamera
-        // Every sheet keeps its header out of the camera's column and its Done at the bottom. See `cameraCornerTrailing`.
-        content
-            .environment(\.cameraCornerTrailing, across ? metrics.windowControls.trailing : 0)
-            .ignoresSafeArea(.container, edges: across ? .horizontal : [])
     }
 }

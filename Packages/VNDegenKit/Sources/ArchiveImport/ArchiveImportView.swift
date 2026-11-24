@@ -243,14 +243,14 @@ public struct ArchiveImportView: View {
         self.onFinish = onFinish
     }
 
-    @Environment(\.cameraCornerTrailing) private var cameraCorner
+    @Environment(\.sheetSideBar) private var sideBar
+
+    private var closeTitle: String { model.importer?.step == .extracting ? "Cancel" : "Done" }
 
     private var closeButton: some View {
-        Button(action: model.close) {
-            Text(model.importer?.step == .extracting ? "Cancel" : "Done").frame(maxWidth: cameraCorner > 0 ? .infinity : nil)
-        }
-        .buttonStyle(ImportButtonStyle(kind: .secondary))
-        .keyboardShortcut(.cancelAction)
+        Button(closeTitle, action: model.close)
+            .buttonStyle(ImportButtonStyle(kind: .secondary))
+            .keyboardShortcut(.cancelAction)
     }
 
     public var body: some View {
@@ -264,11 +264,9 @@ public struct ArchiveImportView: View {
                     }
                 }
                 Spacer()
-                if cameraCorner == 0 { closeButton }
+                if sideBar == nil { closeButton }
             }
             .padding(22)
-            // The title keeps clear of a camera in the top corner.
-            .padding(.trailing, max(0, cameraCorner - 22))
             ScrollViewReader { proxy in
                 ScrollView {
                     if let importer {
@@ -285,18 +283,11 @@ public struct ArchiveImportView: View {
                     withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(control, anchor: .center) }
                 }
             }
-            // Beside a camera in the top corner, Done moves to the bottom, as on the hub's sheets.
-            if cameraCorner > 0 {
-                closeButton.padding(.horizontal, 22).padding(.vertical, 12)
-                    // A long list of archives fades out where it meets the bar.
-                    .background(alignment: .top) {
-                        LinearGradient(colors: [ImportTheme.background.opacity(0), ImportTheme.background], startPoint: .top, endPoint: .bottom)
-                            .frame(height: 28).offset(y: -28).allowsHitTesting(false)
-                    }
-            }
         }
         .foregroundStyle(.white)
         .background(ImportTheme.background.opacity(0.98))
+        .sheetSideBarClose(closeTitle, systemImage: model.importer?.step == .extracting ? "xmark" : "checkmark",
+                           shortcut: .cancelAction, placement: sideBar, action: model.close)
         .preferredColorScheme(.dark)
         .onScreenKeyboard(model.keyboard)
         #if os(macOS)

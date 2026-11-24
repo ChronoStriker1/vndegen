@@ -9,19 +9,23 @@ nonisolated public struct SideBarPlacement: Equatable {
 
     public let edge: HorizontalEdge
     public let width: CGFloat
+    public let widening: CGFloat
     public let top: CGFloat
     public let bottom: CGFloat
 
-    init(edge: HorizontalEdge, width: CGFloat, top: CGFloat, bottom: CGFloat) {
+    init(edge: HorizontalEdge, width: CGFloat, widening: CGFloat = 0, top: CGFloat, bottom: CGFloat) {
         self.edge = edge
         self.width = width
+        self.widening = widening
         self.top = top
         self.bottom = bottom
     }
 
     public init(edge: HorizontalEdge, size: CGSize, insets: EdgeInsets, occlusions: [CGRect]) {
         self.edge = edge
-        width = max(edge == .leading ? insets.leading : insets.trailing, Self.minimumWidth)
+        let inset = edge == .leading ? insets.leading : insets.trailing
+        width = max(inset, Self.minimumWidth)
+        widening = width - inset
         let column = CGRect(x: edge == .leading ? 0 : size.width - width, y: 0, width: width, height: size.height)
         var top = insets.top
         var bottom = insets.bottom
@@ -75,15 +79,17 @@ public struct SideBarItem: Identifiable {
     public let title: String
     public let systemImage: String
     public let focused: Bool
+    public let shortcut: KeyboardShortcut?
     public let action: () -> Void
     public let hover: (Bool) -> Void
 
-    public init(id: String, title: String, systemImage: String, focused: Bool = false,
+    public init(id: String, title: String, systemImage: String, focused: Bool = false, shortcut: KeyboardShortcut? = nil,
                 action: @escaping () -> Void, hover: @escaping (Bool) -> Void = { _ in }) {
         self.id = id
         self.title = title
         self.systemImage = systemImage
         self.focused = focused
+        self.shortcut = shortcut
         self.action = action
         self.hover = hover
     }
@@ -150,16 +156,17 @@ public struct SideBarColumn: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
+        .keyboardShortcut(item.shortcut)
         .onHover(perform: item.hover)
         .accessibilityLabel(item.title)
     }
 }
 
 #if os(iOS)
-public struct VerticalBarEdgeReader: UIViewRepresentable {
-    let onChange: (HorizontalEdge?) -> Void
+public struct SideBarReader: UIViewRepresentable {
+    let onChange: (SideBarPlacement?) -> Void
 
-    public init(onChange: @escaping (HorizontalEdge?) -> Void) {
+    public init(onChange: @escaping (SideBarPlacement?) -> Void) {
         self.onChange = onChange
     }
 
@@ -173,8 +180,8 @@ public struct VerticalBarEdgeReader: UIViewRepresentable {
     public func updateUIView(_ probe: Probe, context: Context) { probe.onChange = onChange }
 
     public final class Probe: UIView {
-        var onChange: (HorizontalEdge?) -> Void = { _ in }
-        private var reported: HorizontalEdge??
+        var onChange: (SideBarPlacement?) -> Void = { _ in }
+        private var reported: SideBarPlacement??
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -195,28 +202,30 @@ public struct VerticalBarEdgeReader: UIViewRepresentable {
             report()
         }
 
+        override public func safeAreaInsetsDidChange() {
+            super.safeAreaInsetsDidChange()
+            report()
+        }
+
         private func report() {
             guard #available(iOS 27.1, *), let window else { return }
             let frame = convert(bounds, to: window)
             let ltr = effectiveUserInterfaceLayoutDirection == .leftToRight
+            let leadingGap = ltr ? frame.minX : window.bounds.maxX - frame.maxX
+            let trailingGap = ltr ? window.bounds.maxX - frame.maxX : frame.minX
             let edge: HorizontalEdge? = switch traitCollection.verticalBarEdge {
-            case .leading: (ltr ? frame.minX : window.bounds.maxX - frame.maxX) < 1 ? .leading : nil
-            case .trailing: (ltr ? window.bounds.maxX - frame.maxX : frame.minX) < 1 ? .trailing : nil
+            case .leading where leadingGap <= 16: .leading
+            case .trailing where trailingGap <= 16: .trailing
             default: nil
             }
-            guard reported != .some(edge) else { return }
-            reported = .some(edge)
-            Task { @MainActor [onChange] in onChange(edge) }
+            let insets = EdgeInsets(top: safeAreaInsets.top, leading: ltr ? safeAreaInsets.left : safeAreaInsets.right,
+                                    bottom: safeAreaInsets.bottom, trailing: ltr ? safeAreaInsets.right : safeAreaInsets.left)
+            let occlusions = reservedRegions(kind: .occlusion).filter(\.isActive).map(\.frame)
+            let placement = edge.map { SideBarPlacement(edge: $0, size: bounds.size, insets: insets, occlusions: occlusions) }
+            guard reported != .some(placement) else { return }
+            reported = .some(placement)
+            Task { @MainActor [onChange] in onChange(placement) }
         }
     }
 }
 #endif
-
-extension GeometryProxy {
-    nonisolated public func occlusions() -> [CGRect] {
-        if #available(iOS 27.1, macOS 27.1, *) {
-            return reservedRegions(kind: .occlusion).filter(\.isActive).map(\.frame)
-        }
-        return []
-    }
-}

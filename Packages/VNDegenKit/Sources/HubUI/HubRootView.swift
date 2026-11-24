@@ -12,7 +12,7 @@ public struct HubRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var backgrounded = false
     @State private var windowControls = WindowControlsInsets()
-    @State private var barEdge: HorizontalEdge?
+    @State private var sideBar: SideBarPlacement?
 
     public init(hub: Hub) {
         self.hub = hub
@@ -27,8 +27,7 @@ public struct HubRootView: View {
     }
 
     private func libraryMetrics(_ geo: GeometryProxy) -> HubMetrics {
-        let insets = geo.safeAreaInsets
-        return metrics(geo).withSideBar(on: barEdge, occlusions: geo.occlusions().map { $0.offsetBy(dx: insets.leading, dy: insets.top) })
+        metrics(geo).withSideBar(sideBar)
     }
 
     public var body: some View {
@@ -55,7 +54,7 @@ public struct HubRootView: View {
             WindowControlsReader { windowControls = $0 }
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
-            VerticalBarEdgeReader { barEdge = $0 }
+            SideBarReader { sideBar = $0 }
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
         }
@@ -134,7 +133,7 @@ private struct LibraryContainer: View {
         .animation(.smooth(duration: 0.2), value: nav.checkingSaves)
         .sheet(item: $nav.presentedSheet) { sheet in
             sheetContent(sheet)
-                .sheetBesideSideCamera()
+                .sheetSideBar()
                 .environment(hub)
                 .environment(nav)
         }
@@ -211,9 +210,7 @@ private struct LibraryContainer: View {
                         .scrollContentBackground(.hidden)
                         .formBesideSideCamera(metrics)
                 }
-                // Before Ludusavi is set up the sheet holds one short prompt, so it opens at half height, except where
-                // every sheet opens full height. See `cameraCornerTrailing`.
-                .presentationDetents(model.service.server == nil && !metrics.acrossSideCamera ? [.medium] : [.large])
+                .presentationDetents(model.service.server == nil && metrics.sideCamera == 0 ? [.medium] : [.large])
                 #if os(macOS)
                 .frame(minWidth: 520, minHeight: 560)
                 #endif
@@ -223,7 +220,7 @@ private struct LibraryContainer: View {
                 SheetScaffold(title: "Newer saves", subtitle: hub.displayTitle(game), escapeCloses: false) {
                     LaunchSavesView(model: model).scrollContentBackground(.hidden)
                 }
-                .presentationDetents(metrics.acrossSideCamera ? [.large] : [.medium, .large])
+                .presentationDetents(metrics.sideCamera > 0 ? [.large] : [.medium, .large])
                 .interactiveDismissDisabled()
                 #if os(macOS)
                 .frame(minWidth: 480, minHeight: 380)

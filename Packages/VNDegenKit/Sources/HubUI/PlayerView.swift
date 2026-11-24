@@ -106,7 +106,7 @@ struct PlayerView: View {
         #endif
         .sheet(item: $mappingEditor) { editor in
             ButtonMappingSheet(editor: editor) { mappingEditor = nil }
-                .sheetBesideSideCamera()
+                .sheetSideBar()
                 .environment(\.hubMetrics, metrics.besideSideCamera)
                 .environment(hub)
                 .environment(nav)
