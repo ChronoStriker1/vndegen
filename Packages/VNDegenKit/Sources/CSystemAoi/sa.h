@@ -199,6 +199,7 @@ void sa_vm_set(VM *vm, const Operand *o, i32 v);
 bool sa_vm_cond(VM *vm, const char *expr);
 u32 sa_vm_random(VM *vm);
 void sa_vm_register_hooks(VM *vm, Vfs *vfs, const char *boxFile);
+char *sa_vm_expand(VM *vm, const char *text);
 
 typedef struct PvmVertex {
     float pos[3], normal[3], uv[2];

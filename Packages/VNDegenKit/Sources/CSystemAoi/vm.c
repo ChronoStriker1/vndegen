@@ -182,6 +182,29 @@ static bool term(VM *vm, const char **s, i32 *out) {
     return true;
 }
 
+char *sa_vm_expand(VM *vm, const char *text) {
+    size_t n = strlen(text), cap = n + 64, len = 0;
+    char *out = sa_alloc(cap);
+    for (const char *p = text; *p;) {
+        const char *end = *p == '&' ? strchr(p + 1, '&') : NULL;
+        i32 v;
+        const char *q = p + 1;
+        if (end && term(vm, &q, &v) && q == end) {
+            char num[16];
+            int k = snprintf(num, sizeof num, "%d", v);
+            if (len + (size_t)k + 1 > cap) out = realloc(out, cap = cap * 2 + (size_t)k);
+            memcpy(out + len, num, (size_t)k);
+            len += (size_t)k;
+            p = end + 1;
+            continue;
+        }
+        if (len + 2 > cap) out = realloc(out, cap *= 2);
+        out[len++] = *p++;
+    }
+    out[len] = 0;
+    return out;
+}
+
 bool sa_vm_cond(VM *vm, const char *expr) {
     const char *p = expr;
     i32 a = 0, b = 0;

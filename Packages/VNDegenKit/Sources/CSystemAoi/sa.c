@@ -426,7 +426,8 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         else
             for (int i = 0; i < 4; i++) vm->c[base + i] += gain[i];
         for (int i = 0; i < 4; i++) after[i] = vm->c[base + i];
-        char *t = opd_str(code, in, 4);
+        char *raw = opd_str(code, in, 4), *t = sa_vm_expand(vm, raw);
+        free(raw);
         clear_text(s);
         if (any) sa_dialog_open_turn(&s->dialog, before, after, t);
         else sa_dialog_open(&s->dialog, t);
