@@ -324,6 +324,25 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
 - **Save.** A list from 1,008,328 of (mission, 1, result) per mission started: (4, 1, 0) while it ran, (4, 1, 1)
   once passed.
 
+## Recruits and the turn order, from the scripts and play
+
+- **Turn order.** Measured under Wine: after 休憩's income box the town hook (bo0100, hook 1) runs first, over the
+  town map at half brightness and still on the old turn; then the turn advances (C060) and the turn script
+  (bo0000) plays. Evidence: the hook's F1901 event (C060 >= 20) is clear in the original's turn-20 autosave and set
+  in its turn-21 one. The mission deadline check in the hook therefore fires when the old turn reaches C057.
+- **Recruits.** The hook calls ha0000 from turn 3 on. For each housing type it asks `f3` for the type's highest
+  level (operand 4) and, at set levels, joins units with `bc` (住居 1: ベト and クマン; 3: モエルモン; 5: 天界兵Ａ;
+  …; 豪邸住居 3: サキュー, who has 感知), then shows 部下が増えました。 with their cards. Measured: three 住居 built
+  at turn 19 gave ベト and クマン at the next turn; VNDegen's box matches the original's to 95% of pixels. Cards show
+  the sheet's first frame (クマン's sheet holds a group of eight).
+- **Command hook.** Measured: 建設's 決定 runs the command hook (bo3100 #0 with C095 23), whose first run plays the
+  carpenters' scene (bo3104).
+- **Area bosses.** `floor.obj` columns 23, 25, 27 and 29 name up to four groups; the area's map marks one cell for
+  each in field 7 (1 to 4). `party.obj` column 7 is the group's movement, 停止 or ランダム. Beating one sets C150 to
+  its id, and the battle hook (bo2701) recruits its leader (ヤーヌ隊 9801: アンゴラメイ; イシュ隊 9804:
+  サマキュー; …). Inferred from the tables, maps and scripts; the 抵抗勢力拠点 areas open after the turn-20 event
+  and three won battles (F2001 to F2003, then F1902), which weren't played through under Wine.
+
 ## 内政, from the screens and the tables
 
 - **Screen.** Measured (the windows 99 to 100% pixel-exact): the throne room `bg010a0`, the 内政 window `dom_a00` at
