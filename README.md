@@ -30,6 +30,7 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 - **Game commands.** Menus a game keeps in its window's menu bar, such as KiriKiri's, appear in the VNDegen menu. [Controls](docs/controls.md#game-commands)
 - **Cheats** for RPG Maker MV, MZ, XP, VX, and VX Ace, Wolf RPG Editor, and AliceSoft System 3 and 4: gold, items, encounters, game speed, variables with a find by value, and switches. Godot and Flash games get game speed. [Controls](docs/controls.md#cheats)
 - **Hidden games** behind Face ID, Touch ID, or a passcode. [Library](docs/library.md#hidden-games)
+- **Links ask first.** A web page or mail address a game opens, such as a title's Discord or Patreon button, asks before it opens your browser or mail app. Godot and web games can't open files or run other programs. [Engines](docs/engines.md#rpg-maker-mv-and-mz)
 - **Ludusavi saves.** Back up and restore through the SMB share, FTP server or WebDAV server your Ludusavi uses, so saves move between VNDegen and your PCs. [Ludusavi](docs/ludusavi.md)
 - **Windows fonts.** Games that ask for MS Gothic, Arial, and other Windows fonts get free fonts with the same metrics. [Fonts](docs/fonts.md)
 - **Movies and see-through clips.** Native engines decode their own movies, and RPG Maker MV and MZ clips with transparency are converted the first time they play. [Video](docs/video.md)
@@ -147,7 +148,7 @@ Games marked Hide leave the library until it is unlocked with Face ID, Touch ID,
 
 ## Controls
 
-In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad start with a layout of keys and clicks instead: "Visual novel" for KiriKiri, NScripter, Artemis, SiglusEngine, and AliceSoft, "Mouse" for Flash, "RPG Maker controls" for RPG Maker XP, VX, and VX Ace, and Steam's Keyboard and Mouse layout for TyranoScript. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
+In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad start with a layout of keys and clicks instead: "Visual novel" for most visual novel engines, such as KiriKiri, NScripter, Artemis, SiglusEngine, AliceSoft, EAGLS, IPAC, Ikura GDL and SystemAoi, "Mouse" for Flash, Twine and PJADV, "RPG Maker controls" for RPG Maker XP, VX, and VX Ace, and Steam's Keyboard and Mouse layout for TyranoScript. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
 
 | In the library and the VNDegen menu | Controller | Keyboard |
 |---|---|---|
@@ -176,10 +177,12 @@ A controller's Home button, the touch gamepad's house button, the small menu but
 - [library.md](docs/library.md): adding games, library folders, layouts, hidden games, and metadata sources
 - [controls.md](docs/controls.md): control methods, controller layouts, a game's dialogs, and Game commands
 - [cheats.md](docs/cheats.md): what the Cheats page does in each engine
-- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits, with more in [rgss.md](docs/rgss.md), [artemis.md](docs/artemis.md), [siglus.md](docs/siglus.md), [wolfrpg.md](docs/wolfrpg.md), [system3.md](docs/system3.md), [system4.md](docs/system4.md), [nscripter.md](docs/nscripter.md), [godot.md](docs/godot.md), [flash.md](docs/flash.md), and [htmlvn.md](docs/htmlvn.md)
+- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits, with more in [rgss.md](docs/rgss.md), [artemis.md](docs/artemis.md), [siglus.md](docs/siglus.md), [godot.md](docs/godot.md), [flash.md](docs/flash.md), [htmlvn.md](docs/htmlvn.md), [construct.md](docs/construct.md), [nscripter.md](docs/nscripter.md), [wolfrpg.md](docs/wolfrpg.md), [system3.md](docs/system3.md), [system4.md](docs/system4.md), [nekosdk.md](docs/nekosdk.md), [yuris.md](docs/yuris.md), [n2system.md](docs/n2system.md), [tmrhiro.md](docs/tmrhiro.md), [ipac.md](docs/ipac.md), [ikura.md](docs/ikura.md), [eagls.md](docs/eagls.md), [exhibit.md](docs/exhibit.md), [bruns.md](docs/bruns.md), [age.md](docs/age.md), [bsx.md](docs/bsx.md), [pjadv.md](docs/pjadv.md), [anim.md](docs/anim.md), [systemaoi.md](docs/systemaoi.md), and [unity.md](docs/unity.md)
 - [video.md](docs/video.md): movie decoding and the see-through clip converter
 - [ludusavi.md](docs/ludusavi.md): setting up and using Ludusavi backups
 - [fonts.md](docs/fonts.md): the Windows font substitutes
+- [frame-rate.md](docs/frame-rate.md): frame rate checks of each engine
+- The `*-cleanroom.md` files beside each engine's notes: where the knowledge behind VNDegen's own runtimes came from
 - [development.md](docs/development.md): building, the project layout, and adding an engine
 - [roadmap.md](docs/roadmap.md) and [releases/](docs/releases/): the plan and each release's notes
 
