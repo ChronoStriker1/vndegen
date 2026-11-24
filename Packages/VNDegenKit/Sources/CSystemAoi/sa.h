@@ -410,8 +410,22 @@ enum {
     TOWN_BTN_LOAD,
     TOWN_BTN_OPTION,
     TOWN_BTN_HIDE,
-    TOWN_ACTIONS,
+    TOWN_CMD_MAZE,
+    TOWN_TAB0,
+    TOWN_WINBTN0 = TOWN_TAB0 + 6,
+    TOWN_SECTION0 = TOWN_WINBTN0 + 6 * 3,
+    TOWN_ACTIONS = TOWN_SECTION0 + 6 * 4,
 };
+
+enum { TW_FAC1, TW_FAC2, TW_INFO, TW_MAZE, TW_ROLES, TW_MAZE_ROLES, TOWN_WINDOWS };
+enum { TOWN_SECTIONS = 4, TOWN_UI = 96 };
+
+typedef struct Maze {
+    int floors;
+    int guards, passages, traps, chests;
+    int food, money, resources;
+    int fame, intruders;
+} Maze;
 
 typedef struct Facility {
     int type;
@@ -503,6 +517,9 @@ bool sa_party_bench(Party *p, int slot);
 void sa_party_set_reserve(Party *p, int index, int tile);
 int sa_party_reserve_at(const Party *p, int tile);
 int sa_party_post_of(const Party *p, int unit);
+int sa_party_post_icon(const Party *p, int unit, int post);
+bool sa_party_post_stats(const Party *p, int unit, int post, int *gov, int *lead);
+int sa_party_post_effect(const Party *p, int unit, int post);
 int sa_party_post_index(const Party *p, const char *name);
 void sa_party_set_post(Party *p, int post, int unit);
 void sa_party_unit_stats(const Party *p, int row, int level, int *out);
@@ -610,10 +627,13 @@ typedef struct Town {
     Party *party;
     Image *bg[8];
     Image **tile;
-    Image *ui[40];
+    Image *ui[TOWN_UI];
     int hover;
     bool hidden, mapOnly;
+    bool shut[TOWN_WINDOWS], folded[TOWN_WINDOWS], narrow[TOWN_WINDOWS], sectionFolded[TOWN_WINDOWS][TOWN_SECTIONS];
     const Table *missions;
+    const Maze *maze;
+    Vfs *vfs;
 } Town;
 
 bool sa_town_init(Town *t, Vfs *vfs);
@@ -625,6 +645,10 @@ void sa_town_draw_map(Town *t, Vfs *vfs, const VM *vm, u32 *fb);
 void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb);
 int sa_town_hit(const Town *t, const VM *vm, int x, int y);
 bool sa_town_hover(Town *t, const VM *vm, int x, int y);
+bool sa_town_toggle(Town *t, int action);
+int sa_town_role_window_hit(const Town *t, const VM *vm, int x, int y);
+void sa_town_draw_role_window(Town *t, const VM *vm, u32 *fb);
+bool sa_maze_post_open(const Maze *m, const VM *vm, int post);
 void sa_town_draw_info(Town *t, const VM *vm, u32 *fb);
 void sa_town_draw_status(Town *t, const VM *vm, u32 *fb);
 void sa_town_draw_status_goal(Town *t, const VM *vm, u32 *fb);
@@ -679,6 +703,7 @@ int sa_build_click(BuildScreen *b, Town *t, VM *vm, int x, int y, bool right);
 bool sa_build_hover(BuildScreen *b, Town *t, VM *vm, int x, int y);
 void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb);
 
+enum { F_MAZE = 38, F_POSTS = 44 };
 enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_TOWN_STAGE = 490, C_PLACE_STEPS = 0x48, C_MISSION_ID = 55, C_MISSION_DUE = 57 };
 
 #endif

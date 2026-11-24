@@ -63,6 +63,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   [video.md](video.md)); a click ends one.
 - **Town.** The map with its facilities, the two facility windows, the town window, the commands the story has opened,
   LOG, SAVE, LOAD and Option, and the party's diorama at the bottom left with each unit's idle animation and bars.
+  The tab bar shows and hides the windows; each window folds, closes and (the 役職 windows) narrows, and a section's
+  header folds it. From turn 42 the ダークス宮 button opens the cross-section of the 迷宮 with 最近の収支 and
+  迷宮職情報, and the town gains 迷宮情報 and 迷宮職情報; 街役職情報 lists the town's post holders.
   Each command first runs the game's hook for it (`bo3000.box` script 0 with `C095` set to the command), so its
   first-use help shows as in the original. 建設 opens the build screen: the list, the board, the card, Reset, Undo, 決定
   and 戻る, with the town window showing the result before 決定. 内政 shows the throne room with the 視察 and イベント actions
@@ -110,9 +113,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   千樹庭's areas, 炎山洞 (opened by its event on 遠征 from turn 10 after five expeditions) with its stairs between
   areas, area entries registered at door spots, the missions (マクドゥの試験) from turn 17, recruits from the town's housing, and area bosses whose
   defeat recruits their leaders.
-  Hidden doors (wall 100) open with a 感知 unit in the party (inferred). 配置's 組織図 posts and 内政's 交換 are
-  there; posts don't change the town's numbers yet. Not built yet: the town's defence, 編成, and the
-  dungeons after 炎山洞. These live in
+  Hidden doors (wall 100) open with a 感知 unit in the party (inferred). 配置's 組織図 posts (the town's and, from
+  turn 42, the 迷宮's) and 内政's 交換 are there, with the holders' ability raises; posts don't change the town's
+  numbers yet. The ダークス宮 screens are there; the 迷宮's turn (its numbers, intruders, growth and floors past
+  the second) isn't built yet, nor 編成 or the dungeons after 炎山洞. These live in
   the original's exe, not its scripts, and are rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.

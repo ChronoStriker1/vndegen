@@ -22,21 +22,45 @@ enum {
     UI_TOWNINFO,
     UI_DIGITS,
     UI_SMALLDIGITS,
-    UI_WINBTN0,
-    UI_WINBTN1,
-    UI_WINBTN2,
     UI_TOWNSEC0,
     UI_TOWNSEC1,
     UI_TOWNSEC2,
     UI_TOWNSEC3,
-    UI_COUNT,
+    UI_TAB0,
+    UI_MAZE_BTN = UI_TAB0 + 6,
+    UI_MAZE_WIN,
+    UI_MAZE_DIGITS,
+    UI_FAME,
+    UI_MARK,
+    UI_ROLES_WIDE,
+    UI_ROLES_NARROW,
+    UI_ROLES_DIGITS,
+    UI_MROLES_WIDE,
+    UI_MROLES_NARROW,
+    UI_MROLES_DIGITS,
+    UI_MROLES_TITLE,
+    UI_MROLES_NARROW_TITLE,
+    UI_POST_ICON,
+    UI_FOLD0,
+    UI_BTN0 = UI_FOLD0 + TOWN_WINDOWS,
+    UI_SECFOLD0 = UI_BTN0 + TOWN_WINDOWS * 3,
+    UI_COUNT = UI_SECFOLD0 + 11,
 };
 
 static const char *const uiNames[UI_COUNT] = {
     "mai_a00.agf", "mai_d00.agf", "mai_b00.agf", "mai_b01.agf", "mai_b02.agf", "mai_b03.agf", "mai_b04.agf",
     "mai_b05.agf", "mai_b06.agf", "mai_b07.agf", "mai_b08.agf", "mai_c00.agf", "mai_c01.agf", "mai_c02.agf",
     "mai_c03.agf", "flw_a01.agf", "flw_b02.agf", "flw_b52.agf", "flw_c02.agf", "flw_c15.agf", "flw_b21.agf",
-    "flw_b18.agf", "flw_b19.agf", "flw_b20.agf", "flw_c03.agf", "flw_c04.agf", "flw_c05.agf", "flw_c06.agf",
+    "flw_c03.agf", "flw_c04.agf", "flw_c05.agf", "flw_c06.agf",
+    "mai_d01.agf", "mai_d02.agf", "mai_d03.agf", "mai_d04.agf", "mai_d05.agf", "mai_d06.agf", "mai_e00.agf",
+    "flw_d01.agf", "flw_d05.agf", "flw_d10.agf",
+    "flw_d11.agf", "flw_e01.agf", "flw_e03.agf", "flw_e08.agf", "flw_f01.agf", "flw_f03.agf", "flw_f08.agf",
+    "flw_f02.agf", "flw_f04.agf", "uts_i02.agf", "flw_b00.agf", "flw_b50.agf", "flw_c00.agf", "flw_d00.agf", "flw_e00.agf", "flw_f00.agf",
+    "flw_b18.agf", "flw_b19.agf", "flw_b20.agf", "flw_b68.agf", "flw_b69.agf", "flw_b70.agf", "flw_c12.agf",
+    "flw_c13.agf", "flw_c14.agf", "flw_d03.agf", "flw_d03.agf", "flw_d04.agf", "flw_e05.agf", "flw_e06.agf",
+    "flw_e07.agf", "flw_f05.agf", "flw_f06.agf", "flw_f07.agf", "flw_b11.agf", "flw_b12.agf", "flw_b13.agf",
+    "flw_b14.agf", "flw_b15.agf", "flw_b16.agf", "flw_b17.agf", "flw_c08.agf", "flw_c09.agf", "flw_c10.agf",
+    "flw_c11.agf",
 };
 
 typedef struct Command {
@@ -44,34 +68,67 @@ typedef struct Command {
 } Command;
 
 static const Command commands[] = {
-    {TOWN_CMD_EXPEDITION, UI_EXPEDITION, 0x1e, 4, 36, 156, 44}, {TOWN_CMD_POLICY, UI_POLICY, 0x1f, 4, 82, 156, 44},
-    {TOWN_CMD_REST, UI_REST, 0x28, 4, 128, 156, 44},             {TOWN_CMD_BUILD, UI_BUILD, 0x21, 15, 179, 136, 39},
-    {TOWN_CMD_DEPLOY, UI_DEPLOY, 0x22, 15, 220, 136, 39},        {TOWN_CMD_EQUIP, UI_EQUIP, 0x23, 15, 261, 136, 39},
-    {TOWN_CMD_TRAIN, UI_TRAIN, 0x24, 15, 302, 136, 39},          {TOWN_CMD_SHOP, UI_SHOP, 0x25, 15, 343, 136, 39},
+    {TOWN_CMD_EXPEDITION, UI_EXPEDITION, 0x1e, 16, 39, 156, 44}, {TOWN_CMD_POLICY, UI_POLICY, 0x1f, 16, 85, 156, 44},
+    {TOWN_CMD_REST, UI_REST, 0x28, 16, 131, 156, 44},             {TOWN_CMD_BUILD, UI_BUILD, 0x21, 16, 180, 136, 39},
+    {TOWN_CMD_DEPLOY, UI_DEPLOY, 0x22, 16, 220, 136, 39},         {TOWN_CMD_EQUIP, UI_EQUIP, 0x23, 16, 260, 136, 39},
+    {TOWN_CMD_TRAIN, UI_TRAIN, 0x24, 16, 300, 136, 39},           {TOWN_CMD_SHOP, UI_SHOP, 0x25, 16, 340, 136, 39},
 };
 
 enum {
-    FAC1_X = 179,
-    FAC2_X = 389,
+    FAC1_X = 180,
+    FAC2_X = 390,
     WIN_Y = 39,
     SEC_Y = 68,
     ROW_H = 20,
     HEADER_H = 23,
-    INFO_X = 1076,
+    INFO_X = 1077,
     INFO_Y = 39,
-    GOAL_X = 1076,
+    GOAL_X = 1077,
     SUBMIT_X = 16,
     SUBMIT_Y = 420,
     MISSION_TARGET = 12,
-    GOAL_Y = 2,
-    SIDE_X = 1158,
-    SIDE_Y = 570,
+    GOAL_Y = 3,
+    SIDE_X = 1159,
+    SIDE_Y = 571,
     SIDE_STEP = 35,
     GRID_X = 738,
     GRID_Y = 48,
     CELL_DX = 76,
     CELL_DY = 38,
+    TITLE_DY = 1,
+    BTN_DY = 7,
+    FOLD_W = 180,
+    FOLDED_DY = 4,
+    MAZE_X = 868,
+    MAZE_Y = 70,
+    ROLES_X = 400,
+    ROLES_Y = 493,
+    MROLES_X = 750,
+    MROLES_Y = 453,
+    ROLE_ROW_Y = 32,
+    ROLE_ICON_X = 94,
+    ROLE_NAME_X = 124,
+    ROLE_NAME_DY = -2,
+    ROLE_NAME_SIZE = 16,
+    ICON_W = 24,
+    ICON_H = 20,
+    MARK_W = 24,
+    MARK_H = 15,
+    FAME_W = 68,
+    BAR_X = 54,
+    BAR_Y = 3,
+    TAB_X = 68,
+    TAB_Y = 7,
+    TAB_DX = 42,
+    TAB_W = 40,
+    TAB_H = 21,
+    MAZE_BTN_X = 832,
+    MAZE_BTN_Y = 4,
+    CLOSE_X = 14,
+    CLOSE_Y = 1,
 };
+
+#define NO_EDGE 0xffffffffu
 
 Image *sa_load_image(Vfs *vfs, const char *name) {
     size_t n;
@@ -84,6 +141,7 @@ Image *sa_load_image(Vfs *vfs, const char *name) {
 bool sa_town_init(Town *t, Vfs *vfs) {
     memset(t, 0, sizeof *t);
     t->hover = -1;
+    t->vfs = vfs;
     if (!sa_table_load(&t->build, vfs, "TownBuil.obj") || !sa_table_load(&t->mass, vfs, "TownMass.obj") ||
         !sa_table_load(&t->lvup, vfs, "TownLvup.obj"))
         return false;
@@ -94,7 +152,7 @@ bool sa_town_init(Town *t, Vfs *vfs) {
 
 void sa_town_free(Town *t) {
     for (int i = 0; i < 8; i++) sa_image_free(t->bg[i]);
-    for (int i = 0; i < 40; i++) sa_image_free(t->ui[i]);
+    for (int i = 0; i < UI_COUNT; i++) sa_image_free(t->ui[i]);
     if (t->tile)
         for (int i = 0; i < t->build.rows; i++) sa_image_free(t->tile[i]);
     free(t->tile);
@@ -233,11 +291,56 @@ static int area_of(const Town *t, int r) {
     return -1;
 }
 
-static void draw_window(Town *t, Vfs *vfs, const VM *vm, u32 *fb, int x, int titleUi, const int *areas, int areaCount) {
-    int y = SEC_Y;
+typedef struct WinFrame {
+    int x, y, w, btnX, btnY, buttons;
+} WinFrame;
+
+static WinFrame frame_of(const Town *t, int w) {
+    switch (w) {
+    case TW_FAC1: return (WinFrame){FAC1_X, WIN_Y, 200, FAC1_X + 135, WIN_Y + BTN_DY, 3};
+    case TW_FAC2: return (WinFrame){FAC2_X, WIN_Y, 200, FAC2_X + 135, WIN_Y + BTN_DY, 3};
+    case TW_INFO: return (WinFrame){INFO_X, INFO_Y, 200, INFO_X + 134, INFO_Y + BTN_DY, 3};
+    case TW_MAZE: return (WinFrame){MAZE_X, MAZE_Y, 200, MAZE_X + 135, MAZE_Y + 6, 2};
+    case TW_ROLES: return (WinFrame){ROLES_X, ROLES_Y, t->narrow[w] ? 272 : 332, ROLES_X + 205, ROLES_Y + 6, 3};
+    default: return (WinFrame){MROLES_X, MROLES_Y, t->narrow[w] ? 272 : 332, MROLES_X + 205, MROLES_Y + 6, 3};
+    }
+}
+
+static bool window_open(const Town *t, const VM *vm, int w) {
+    if (w == TW_MAZE || w == TW_MAZE_ROLES) return vm->f[F_MAZE] != 0;
+    if (w == TW_ROLES) return vm->f[F_POSTS] != 0;
+    (void)t;
+    return true;
+}
+
+static bool window_shown(const Town *t, const VM *vm, int w) { return window_open(t, vm, w) && !t->shut[w]; }
+
+static int first_button(const Town *t, int w) { return t->folded[w] || w == TW_MAZE ? 1 : 0; }
+
+static void draw_buttons(Town *t, u32 *fb, int w) {
+    WinFrame f = frame_of(t, w);
+    for (int i = first_button(t, w); i < 3; i++) {
+        int k = TOWN_WINBTN0 + w * 3 + i;
+        sa_blit_rect(fb, t->ui[UI_BTN0 + w * 3 + i], 0, t->hover == k ? 19 : 0, 20, 19, f.btnX + i * 20, f.btnY);
+    }
+}
+
+static bool draw_folded(Town *t, u32 *fb, int w) {
+    if (!t->folded[w]) return false;
+    WinFrame f = frame_of(t, w);
+    sa_blit(fb, t->ui[UI_FOLD0 + w], f.x + f.w - FOLD_W, f.y);
+    draw_buttons(t, fb, w);
+    return true;
+}
+
+static void draw_window(Town *t, Vfs *vfs, const VM *vm, u32 *fb, int w, int titleUi, const int *areas, int areaCount) {
+    if (draw_folded(t, fb, w)) return;
+    int x = frame_of(t, w).x, y = SEC_Y;
+    sa_blit(fb, t->ui[titleUi], x, WIN_Y + TITLE_DY);
     for (int a = 0; a < areaCount; a++) {
         int area = areas[a];
-        Image *sec = section_art(vfs, area);
+        bool shut = t->sectionFolded[w][a];
+        Image *sec = shut ? t->ui[UI_SECFOLD0 + area - 3] : section_art(vfs, area);
         sa_blit(fb, sec, x, y);
         int built = 0, slot = 0, index = 0;
         for (int r = 0; r < t->build.rows; r++) {
@@ -255,7 +358,7 @@ static void draw_window(Town *t, Vfs *vfs, const VM *vm, u32 *fb, int x, int tit
             built += count;
             int flag = sa_table_int(&t->build, r, 6);
             bool known = count || (flag >= 0 && flag < SA_F_VARS && vm->f[flag]);
-            if (!known) continue;
+            if (!known || shut) continue;
             int ry = y + HEADER_H + slot * ROW_H;
             sa_blit(fb, row_art(t, vfs, area, index), x, ry);
             char buf[16];
@@ -267,11 +370,16 @@ static void draw_window(Town *t, Vfs *vfs, const VM *vm, u32 *fb, int x, int tit
             sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 193, ry + 5, 0, 10, 13);
             slot++;
         }
-        sa_draw_int(fb, t->ui[UI_SMALLDIGITS], built, false, x + 193, y + 5, 0, 10, 13);
+        sa_draw_int(fb, t->ui[UI_SMALLDIGITS], built, false, x + 193, y + (shut ? FOLDED_DY : 5), 0, 10, 13);
         y += sec ? sec->h : HEADER_H;
     }
-    sa_blit(fb, t->ui[titleUi], x, WIN_Y);
-    for (int i = 0; i < 3; i++) sa_blit_rect(fb, t->ui[UI_WINBTN0 + i], 0, 0, 20, 19, x + 135 + i * 20, WIN_Y + 6);
+    draw_buttons(t, fb, w);
+}
+
+static int section_height(const Town *t, Vfs *vfs, int w, int a, int area) {
+    const Image *im = w == TW_INFO ? (t->sectionFolded[w][a] ? t->ui[UI_SECFOLD0 + 7 + a] : t->ui[UI_TOWNSEC0 + a])
+                                   : (t->sectionFolded[w][a] ? t->ui[UI_SECFOLD0 + area - 3] : section_art(vfs, area));
+    return im ? im->h : HEADER_H;
 }
 
 static int housing(const Town *t) {
@@ -315,7 +423,8 @@ static void draw_goal(Town *t, const VM *vm, u32 *fb) {
     sa_draw_number(fb, t->ui[UI_DIGITS], s, GOAL_X + 183, GOAL_Y + 9, 0, 10, 13);
 }
 
-void sa_town_draw_info(Town *t, const VM *vm, u32 *fb) {
+static void draw_info(Town *t, const VM *vm, u32 *fb, bool live) {
+    if (live && draw_folded(t, fb, TW_INFO)) return;
     const Image *dg = t->ui[UI_DIGITS];
     int jobs = 0;
     for (int c = 0; c < TOWN_CELLS; c++)
@@ -324,27 +433,113 @@ void sa_town_draw_info(Town *t, const VM *vm, u32 *fb) {
     income(t, vm, &food, &money, &res, &people);
     int y = INFO_Y + 29;
     int right = INFO_X + 191;
-    sa_blit(fb, t->ui[UI_TOWNSEC0], INFO_X, y);
-    sa_draw_int(fb, dg, vm->c[C_RESIDENTS], false, right, y + 5, 2, 10, 13);
-    sa_draw_int(fb, dg, vm->c[C_RESIDENTS] - jobs, true, right, y + 25, vm->c[C_RESIDENTS] - jobs < 0 ? 1 : 2, 10, 13);
-    sa_draw_int(fb, dg, housing(t), false, right, y + 45, 0, 10, 13);
-    y += t->ui[UI_TOWNSEC0] ? t->ui[UI_TOWNSEC0]->h : 64;
-    const int values[3] = {vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
-    const int incomes[3] = {food - vm->c[C_RESIDENTS] / 10, money, res};
+    const int values[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
+    const int incomes[4] = {0, food - vm->c[C_RESIDENTS] / 10, money, res};
     int goal[3];
     bool hasGoal = targets(t, vm, goal);
-    for (int i = 0; i < 3; i++) {
-        const Image *sec = t->ui[UI_TOWNSEC1 + i];
-        int sign = incomes[i] > 0 ? 2 : incomes[i] < 0 ? 1 : 0;
+    for (int i = 0; i < 4; i++) {
+        bool shut = live && t->sectionFolded[TW_INFO][i];
+        const Image *sec = t->ui[shut ? UI_SECFOLD0 + 7 + i : UI_TOWNSEC0 + i];
+        int sign = i == 0 ? (vm->c[C_RESIDENTS] - jobs < 0 ? 1 : 2) : incomes[i] > 0 ? 2 : incomes[i] < 0 ? 1 : 0;
         sa_blit(fb, sec, INFO_X, y);
-        sa_draw_int(fb, dg, values[i], false, right, y + 5, sign, 10, 13);
-        sa_draw_int(fb, dg, incomes[i], true, right, y + 25, sign, 10, 13);
-        if (hasGoal) sa_draw_int(fb, dg, goal[i], false, right, y + 45, values[i] >= goal[i] ? 2 : 1, 10, 13);
-        else sa_draw_number(fb, dg, "--", right, y + 45, 0, 10, 13);
+        sa_draw_int(fb, dg, values[i], false, right, y + (shut ? FOLDED_DY : 5), sign, 10, 13);
+        if (!shut && i == 0) {
+            sa_draw_int(fb, dg, vm->c[C_RESIDENTS] - jobs, true, right, y + 25, vm->c[C_RESIDENTS] - jobs < 0 ? 1 : 2, 10, 13);
+            sa_draw_int(fb, dg, housing(t), false, right, y + 45, 0, 10, 13);
+        } else if (!shut) {
+            sa_draw_int(fb, dg, incomes[i], true, right, y + 25, sign, 10, 13);
+            if (hasGoal) sa_draw_int(fb, dg, goal[i - 1], false, right, y + 45, values[i] >= goal[i - 1] ? 2 : 1, 10, 13);
+            else sa_draw_number(fb, dg, "--", right, y + 45, 0, 10, 13);
+        }
         y += sec ? sec->h : 64;
     }
-    sa_blit(fb, t->ui[UI_TOWNINFO], INFO_X, INFO_Y);
-    for (int i = 0; i < 3; i++) sa_blit_rect(fb, t->ui[UI_WINBTN0 + i], 0, 0, 20, 19, INFO_X + 135 + i * 20, INFO_Y + 6);
+    sa_blit(fb, t->ui[UI_TOWNINFO], INFO_X, INFO_Y + TITLE_DY);
+    if (live) draw_buttons(t, fb, TW_INFO);
+    else
+        for (int i = 0; i < 3; i++) sa_blit_rect(fb, t->ui[UI_BTN0 + TW_INFO * 3 + i], 0, 0, 20, 19, INFO_X + 134 + i * 20, INFO_Y + BTN_DY);
+}
+
+void sa_town_draw_info(Town *t, const VM *vm, u32 *fb) { draw_info(t, vm, fb, false); }
+
+static void draw_maze(Town *t, const VM *vm, u32 *fb) {
+    (void)vm;
+    if (draw_folded(t, fb, TW_MAZE)) return;
+    const Maze *m = t->maze;
+    const Image *dg = t->ui[UI_MAZE_DIGITS];
+    sa_blit(fb, t->ui[UI_MAZE_WIN], MAZE_X, MAZE_Y);
+    if (m) {
+        sa_draw_int(fb, dg, m->floors, false, MAZE_X + 163, MAZE_Y + 33, 0, 10, 13);
+        const int stats[4] = {m->guards, m->passages, m->traps, m->chests};
+        for (int i = 0; i < 4; i++) {
+            sa_blit_rect(fb, t->ui[UI_MARK], 0, 0, MARK_W, MARK_H, MAZE_X + 122, MAZE_Y + 52 + i * 20);
+            sa_draw_int(fb, dg, stats[i], false, MAZE_X + 192, MAZE_Y + 54 + i * 20, 0, 10, 13);
+        }
+        const int money[3] = {m->food, m->money, m->resources};
+        for (int i = 0; i < 3; i++) sa_draw_int(fb, dg, money[i], false, MAZE_X + 192, MAZE_Y + 158 + i * 20, money[i] > 0 ? 2 : money[i] < 0 ? 1 : 0, 10, 13);
+        sa_blit_rect(fb, t->ui[UI_FAME], 0, m->fame * MARK_H, FAME_W, MARK_H, MAZE_X + 122, MAZE_Y + 219);
+        sa_draw_int(fb, dg, m->intruders, false, MAZE_X + 173, MAZE_Y + 241, 0, 10, 13);
+    }
+    draw_buttons(t, fb, TW_MAZE);
+}
+
+static const Image *role_label(Town *t, int index, bool narrow) {
+    static Image *cache[2][11];
+    static Vfs *owner;
+    if (owner != t->vfs) {
+        memset(cache, 0, sizeof cache);
+        owner = t->vfs;
+    }
+    if (!cache[narrow][index]) {
+        char n[24];
+        snprintf(n, sizeof n, "flw_f%d%02d.agf", narrow ? 1 : 0, index);
+        cache[narrow][index] = sa_load_image(t->vfs, n);
+    }
+    return cache[narrow][index];
+}
+
+static void draw_roles(Town *t, const VM *vm, u32 *fb, int w) {
+    if (draw_folded(t, fb, w)) return;
+    WinFrame f = frame_of(t, w);
+    bool maze = w == TW_MAZE_ROLES, narrow = t->narrow[w];
+    int first = maze ? 10 : 1, count = maze ? 11 : 9;
+    sa_blit(fb, t->ui[maze ? (narrow ? UI_MROLES_NARROW : UI_MROLES_WIDE) : (narrow ? UI_ROLES_NARROW : UI_ROLES_WIDE)], f.x, f.y);
+    if (maze) sa_blit(fb, t->ui[narrow ? UI_MROLES_NARROW_TITLE : UI_MROLES_TITLE], f.x, f.y);
+    const Image *dg = t->ui[maze ? UI_MROLES_DIGITS : UI_ROLES_DIGITS];
+    const Party *p = t->party;
+    sa_font_set_spacing(0);
+    sa_font_set_plain(true);
+    for (int i = 0; i < count; i++) {
+        int post = first + i, y = f.y + ROLE_ROW_Y + i * ROW_H;
+        if (!sa_maze_post_open(t->maze, vm, post)) continue;
+        if (maze) sa_blit(fb, role_label(t, i, narrow), f.x, y - 2);
+        int unit = p ? p->post[post] : 0, r = unit ? sa_party_unit_row(p, unit) : -1;
+        if (r >= 0) {
+            int icon = sa_party_post_icon(p, unit, post);
+            if (icon >= 0) sa_blit_rect(fb, t->ui[UI_POST_ICON], icon % 2 * ICON_W, icon / 2 * ICON_H, ICON_W, ICON_H, f.x + ROLE_ICON_X, y - 4);
+            sa_text_draw(fb, SA_W, SA_H, sa_table_text(&p->units, r, 2), -1, f.x + ROLE_NAME_X, y + ROLE_NAME_DY, ROLE_NAME_SIZE, 0x000000, NO_EDGE);
+        }
+        if (narrow) continue;
+        if (r >= 0) {
+            int gov, lead, row = sa_party_post_stats(p, unit, post, &gov, &lead) ? 2 : 0;
+            sa_draw_int(fb, dg, gov, false, f.x + 290, y, row, 10, 13);
+            sa_draw_int(fb, dg, lead, false, f.x + 320, y, row, 10, 13);
+        } else {
+            sa_draw_number(fb, dg, "--", f.x + 290, y, 0, 10, 13);
+            sa_draw_number(fb, dg, "--", f.x + 320, y, 0, 10, 13);
+        }
+    }
+    sa_font_set_plain(false);
+    sa_font_set_spacing(1);
+    draw_buttons(t, fb, w);
+}
+
+static void draw_tabs(Town *t, const VM *vm, u32 *fb) {
+    sa_blit(fb, t->ui[UI_BAR], BAR_X, BAR_Y);
+    for (int w = 0; w < TOWN_WINDOWS; w++) {
+        if (!window_open(t, vm, w)) continue;
+        int k = TOWN_TAB0 + w;
+        sa_blit_rect(fb, t->ui[UI_TAB0 + w], t->shut[w] ? 0 : TAB_W, t->hover == k ? TAB_H : 0, TAB_W, TAB_H, TAB_X + w * TAB_DX, TAB_Y);
+    }
 }
 
 typedef struct Placed {
@@ -368,7 +563,8 @@ static int layout(const Town *t, const VM *vm, Placed *out) {
     out[n++] = (Placed){TOWN_BTN_SAVE, UI_SAVE, SIDE_X, SIDE_Y + SIDE_STEP, 116, 34, 2};
     out[n++] = (Placed){TOWN_BTN_LOAD, UI_LOAD, SIDE_X, SIDE_Y + 2 * SIDE_STEP, 116, 34, 2};
     out[n++] = (Placed){TOWN_BTN_OPTION, UI_OPTION, SIDE_X, SIDE_Y + 3 * SIDE_STEP, 116, 34, 2};
-    out[n++] = (Placed){TOWN_BTN_HIDE, UI_CLOSE, 13, 0, 36, 34, 2};
+    out[n++] = (Placed){TOWN_BTN_HIDE, UI_CLOSE, CLOSE_X, CLOSE_Y, 36, 34, 2};
+    if (vm->f[F_MAZE]) out[n++] = (Placed){TOWN_CMD_MAZE, UI_MAZE_BTN, MAZE_BTN_X, MAZE_BTN_Y, 224, 56, 2};
     return n;
 }
 
@@ -404,10 +600,14 @@ void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
     }
     if (t->hidden) return;
     if (t->party) sa_party_draw_diorama(t->party, fb, vm->c[C_RANK_MAX], NULL);
-    sa_blit(fb, t->ui[UI_BAR], 57, 2);
-    draw_window(t, vfs, vm, fb, FAC1_X, UI_FAC1, fac1Areas, 4);
-    draw_window(t, vfs, vm, fb, FAC2_X, UI_FAC2, fac2Areas, 3);
-    sa_town_draw_status(t, vm, fb);
+    draw_tabs(t, vm, fb);
+    if (window_shown(t, vm, TW_FAC1)) draw_window(t, vfs, vm, fb, TW_FAC1, UI_FAC1, fac1Areas, 4);
+    if (window_shown(t, vm, TW_FAC2)) draw_window(t, vfs, vm, fb, TW_FAC2, UI_FAC2, fac2Areas, 3);
+    if (window_shown(t, vm, TW_MAZE)) draw_maze(t, vm, fb);
+    if (window_shown(t, vm, TW_INFO)) draw_info(t, vm, fb, true);
+    draw_goal(t, vm, fb);
+    if (window_shown(t, vm, TW_ROLES)) draw_roles(t, vm, fb, TW_ROLES);
+    if (window_shown(t, vm, TW_MAZE_ROLES)) draw_roles(t, vm, fb, TW_MAZE_ROLES);
 }
 
 void sa_town_draw_status(Town *t, const VM *vm, u32 *fb) {
@@ -417,7 +617,92 @@ void sa_town_draw_status(Town *t, const VM *vm, u32 *fb) {
 
 void sa_town_draw_status_goal(Town *t, const VM *vm, u32 *fb) { draw_goal(t, vm, fb); }
 
+static bool inside(int x, int y, int rx, int ry, int w, int h) { return x >= rx && x < rx + w && y >= ry && y < ry + h; }
+
+static int window_height(const Town *t, int w) {
+    switch (w) {
+    case TW_MAZE: return t->ui[UI_MAZE_WIN] ? t->ui[UI_MAZE_WIN]->h : 0;
+    case TW_ROLES: return t->ui[UI_ROLES_WIDE] ? t->ui[UI_ROLES_WIDE]->h : 0;
+    case TW_MAZE_ROLES: return t->ui[UI_MROLES_WIDE] ? t->ui[UI_MROLES_WIDE]->h : 0;
+    default: return 0;
+    }
+}
+
+static int windows_hit(const Town *t, const VM *vm, const int *order, int count, int x, int y) {
+    for (int i = 0; i < count; i++) {
+        int w = order[i];
+        if (!window_shown(t, vm, w)) continue;
+        WinFrame f = frame_of(t, w);
+        for (int b = first_button(t, w); b < 3; b++)
+            if (inside(x, y, f.btnX + b * 20, f.btnY, 20, 19)) return TOWN_WINBTN0 + w * 3 + b;
+        if (t->folded[w]) {
+            if (inside(x, y, f.x + f.w - FOLD_W, f.y, FOLD_W, 32)) return TOWN_NONE;
+            continue;
+        }
+        if (w == TW_FAC1 || w == TW_FAC2 || w == TW_INFO) {
+            const int *areas = w == TW_FAC1 ? fac1Areas : fac2Areas;
+            int n = w == TW_FAC1 ? 4 : w == TW_FAC2 ? 3 : 4, sy = w == TW_INFO ? INFO_Y + 29 : SEC_Y;
+            for (int a = 0; a < n; a++) {
+                int h = section_height(t, t->vfs, w, a, w == TW_INFO ? 0 : areas[a]);
+                if (inside(x, y, f.x, sy, f.w, t->sectionFolded[w][a] ? h : HEADER_H)) return TOWN_SECTION0 + w * TOWN_SECTIONS + a;
+                sy += h;
+            }
+            continue;
+        }
+        if (inside(x, y, f.x, f.y, f.w, window_height(t, w))) return TOWN_NONE;
+    }
+    return -1;
+}
+
+int sa_town_role_window_hit(const Town *t, const VM *vm, int x, int y) {
+    static const int only[1] = {TW_MAZE_ROLES};
+    return windows_hit(t, vm, only, 1, x, y);
+}
+
+void sa_town_draw_role_window(Town *t, const VM *vm, u32 *fb) {
+    if (window_shown(t, vm, TW_MAZE_ROLES)) draw_roles(t, vm, fb, TW_MAZE_ROLES);
+}
+
+static int window_hit(const Town *t, const VM *vm, int x, int y) {
+    static const int order[TOWN_WINDOWS] = {TW_MAZE_ROLES, TW_ROLES, TW_INFO, TW_MAZE, TW_FAC2, TW_FAC1};
+    int h = windows_hit(t, vm, order, TOWN_WINDOWS, x, y);
+    if (h >= 0) return h;
+    for (int w = 0; w < TOWN_WINDOWS; w++)
+        if (window_open(t, vm, w) && inside(x, y, TAB_X + w * TAB_DX, TAB_Y, TAB_W, TAB_H)) return TOWN_TAB0 + w;
+    return -1;
+}
+
+bool sa_town_toggle(Town *t, int action) {
+    if (action >= TOWN_TAB0 && action < TOWN_TAB0 + TOWN_WINDOWS) {
+        int w = action - TOWN_TAB0;
+        t->shut[w] = !t->shut[w];
+        return true;
+    }
+    if (action >= TOWN_WINBTN0 && action < TOWN_SECTION0) {
+        int w = (action - TOWN_WINBTN0) / 3, b = (action - TOWN_WINBTN0) % 3;
+        if (b == 2) t->shut[w] = true;
+        else if (b == 1) t->folded[w] = !t->folded[w];
+        else if (w == TW_ROLES || w == TW_MAZE_ROLES) t->narrow[w] = !t->narrow[w];
+        else {
+            bool any = false;
+            for (int a = 0; a < TOWN_SECTIONS; a++) any |= !t->sectionFolded[w][a];
+            for (int a = 0; a < TOWN_SECTIONS; a++) t->sectionFolded[w][a] = any;
+        }
+        return true;
+    }
+    if (action >= TOWN_SECTION0 && action < TOWN_ACTIONS) {
+        int k = action - TOWN_SECTION0;
+        t->sectionFolded[k / TOWN_SECTIONS][k % TOWN_SECTIONS] = !t->sectionFolded[k / TOWN_SECTIONS][k % TOWN_SECTIONS];
+        return true;
+    }
+    return false;
+}
+
 int sa_town_hit(const Town *t, const VM *vm, int x, int y) {
+    if (!t->hidden && !t->mapOnly) {
+        int w = window_hit(t, vm, x, y);
+        if (w >= 0) return w;
+    }
     Placed p[24];
     int n = layout(t, vm, p);
     for (int i = 0; i < n; i++)

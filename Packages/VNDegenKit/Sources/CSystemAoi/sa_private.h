@@ -48,6 +48,24 @@ typedef struct Missions {
     bool confirm;
 } Missions;
 
+enum { MAZE_FLOORS = 7, MAZE_SIZES = 5 };
+
+typedef struct Recent {
+    int parties, deepest;
+    int fights[2], chests[2], traps[2], lost[2];
+    int repelled, opened, broken;
+    int flow[3][4];
+} Recent;
+
+typedef struct MazeView {
+    Image *art[8];
+    Image *piece[MAZE_FLOORS][MAZE_SIZES][4];
+    Recent recent;
+    int size[MAZE_FLOORS];
+    int hover;
+    bool hideRecent;
+} MazeView;
+
 typedef struct Card {
     Image *frame, *digits, *badge, *desc, *icon[CARD_ICONS];
 } Card;
@@ -59,7 +77,7 @@ typedef struct Train {
 } Train;
 
 typedef struct Deploy {
-    Image *art[40], *benchSprite[PARTY_BENCH];
+    Image *art[56], *benchSprite[PARTY_BENCH];
     int benchUnit[PARTY_BENCH];
     int hover, picked, heldX, heldY, tab;
 } Deploy;
@@ -114,7 +132,7 @@ typedef struct Expedition {
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES, MODE_SUBMIT };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES, MODE_SUBMIT, MODE_MAZE };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -187,6 +205,8 @@ struct SA {
     Equip equip;
     Shop shop;
     Missions missions;
+    Maze maze;
+    MazeView mazeView;
     Card card;
     Train train;
     Deploy deploy;
@@ -266,6 +286,12 @@ void sa_mission_open(SA *s);
 void sa_mission_draw_confirm(SA *s, u32 *fb);
 bool sa_mission_confirm_input(SA *s);
 bool sa_mission_frame(SA *s);
+void sa_maze_init(SA *s);
+void sa_maze_free(SA *s);
+void sa_maze_reset(SA *s);
+void sa_maze_open(SA *s);
+void sa_maze_draw_scene(SA *s, u32 *fb);
+bool sa_maze_frame(SA *s);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);
 void sa_exp_open_select(SA *s);

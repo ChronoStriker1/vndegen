@@ -329,12 +329,24 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
 - **組織図.** Measured from turn 20 (F044 adds 一覧, 組織図 and 編成 to 配置's top bar, `uts_b00` to `b02` at (321, 26),
   79 apart): `uts_a01` with nine post tiles (`uts_w00`) at (299, 112) 街長, (412, 168) 街長補佐, (165, 187) 農業担当,
   (249, 229) 商業担当, (333, 271) 工業担当, (417, 313) 警備担当, (5, 214) 教育担当, (89, 255) 娯楽担当, (173, 298)
-  衛生担当 (`Position.obj`'s rows 1 to 9), 解任 (`uts_x01`) at (376, 677), and a corner panel with the post, the
+  衛生担当 (`Position.obj`'s rows 1 to 9), 解任 (`uts_x01`) at (372, 675), and a corner panel with the post, the
   holder and their 統治/統率. Clicking a member then a tile posts them (they leave the field); the list badge
   shows the post (`uts_h00` onwards). The town window gains a 街役職情報 tab listing the holders.
 - **Save.** Post k holds the member's index at 1,008,208 + 4k (-1 when empty); the member's +25 byte is 3 and +26
-  the post. VNDegen round-trips both. The original also adds bonuses to the holder's second stat block (ミアルテ
-  as 街長: 統治 +5, 統率 +4; ルーアルテ as 農業担当 with 天才: +2, +2; and twelve 2s from +928): not derived.
+  the post. The town's posts keep their `Position.obj` row; the 迷宮's are the row + 1 (迷宮長, row 10, is 11 in a
+  turn 42 save the original wrote). The holder's second stat block (+668) carries the raised 統治 and 統率 at its
+  ints 8 and 9 (ミアルテ as 街長 8/10 over 3/6), and a 天才 holder has 2 in its thirteen ints from 65 (VNDegen writes
+  the ability's value there for abilities that raise "その効果", inferred). VNDegen round-trips all of it.
+- **Ability bonus.** Measured on turn 42 by moving two members between posts: a holder whose ガヴァメント能力
+  (`unit.obj` column 36) works at the post shows 統治 and 統率 raised, in blue (0x0068B7) in 配置's list and in the
+  役職 windows, and with `uts_i02`'s first icon beside their tile and their window row. ミアルテ (政治家, 3/6)
+  reads 8/10 as 街長, 迷宮長 or 警備担当 and 3/6 as 第一階層長 (統率 only); ルーアルテ (天才, 2/5) reads 4/7 at every
+  post tried. Inferred: the raise is `ability.obj` column 4 to 統治 and that less a fifth to 統率 (5 → +5/+4, 2 →
+  +2/+2), where an ability works follows its description (政治家 at posts whose `Position.obj` column 2 has 統治,
+  大将軍 with 統率, 指揮官 at 迷宮長 and 補佐, 小隊長 at the floor heads, the 才 at their own post, and so on), 無能
+  lowers by the same amount with the red icon, and 人気者, 資金管理, 食料管理 and 資源管理 show their own icons
+  (people, money, food, resources) without a raise. 配置's list also shows the first icon beside some rows in a
+  way not pinned down; VNDegen doesn't draw it there.
 - **Effects.** Not measured beyond one turn: with ミアルテ as 街長 and ルーアルテ as 農業担当 the residents grew by
   5 where the same turn without them grew by 2 (residents' growth is random, so this proves nothing yet); food,
   money and resources were the same. VNDegen's posts change nothing in the town so far. `c3 "post"` answers
@@ -342,6 +354,39 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
 
 - **解任 (配置).** The tile at (445, 536) takes a field or reserve member off the board; inferred (dropping an
   unplaced member there did nothing on the PC).
+
+## ダークス宮, from the screens
+
+- **Opening.** Measured: turn 42's script (`bo0000.box`, F506 and F038 off) plays ソフィア's scene, shows
+  迷宮配置が出来るようになりました。 and sets F038, F349 (迷宮視察 in 内政) and F506. F038 opens everything below.
+- **Town.** Measured pixel for pixel against turn 42 (the same capture showed the whole town 1 px right of what
+  VNDegen drew before, and 遠征, 内政 and 休憩 12 px right; all now match): the tab bar `mai_d00` at (54, 3) with
+  施設1, 施設2, 街, 迷宮, 街役 and 迷役 (`mai_d01` to `d06`, 40 by 21, lit while the window shows) from (68, 7), 42
+  apart; the ダークス宮 button `mai_e00` at (832, 4); 迷宮情報 (`flw_d01`) at (868, 70) with 迷宮サイズ, 守備要員,
+  通路, 罠 and 宝箱 each with a `flw_d11` mark, 迷宮収支 and 迷宮評判 (`flw_d10`, 皆無 to 常識; 幻 on turn 42) and
+  侵入者; 街役職情報 (`flw_e01`) at (400, 493) and 迷宮職情報 (`flw_f01` with the `flw_f02` title and a `flw_f0NN`
+  label for each open post) at (750, 453), each row with the holder's icon, name and 統治/統率 (`flw_e08`'s blue row
+  when raised, `--` when empty). A window's buttons, from the right: × hides it (its tab goes dark), − folds it to its
+  180-wide title (`flw_b00`, `b50`, `c00`, `d00`, `e00`, `f00`) right-aligned on the same row, and the round arrow
+  narrows a 役職 window to its 272-wide form (`flw_e03`, `f03`) or folds a 施設 or 街 window's sections to their
+  headers (`flw_b11` to `b17`, `c08` to `c11`); a section's own header folds just that section. Inferred: the 迷宮
+  marks stay × (19, 48 and 30 still showed ×, so the steps are unknown); 迷宮長補佐, 遊撃隊隊長 and 支援隊隊長 stay
+  closed (no script opens them and turn 42 shows them blank); 街役 opens with F044.
+- **The screen.** Measured pixel for pixel (both tabs, and with 最近の収支 hidden and the 役職 window narrowed): the
+  command hook (`C095` 28) shows its help over the cross-section the first time (F108); the backdrop `dmap00`; each
+  floor K at size S is `dK_Sf`, right-aligned (floor 1 ends at x 1060 on row 162, floor 2 at 1119 on row 242), with
+  its stairs `dK_Ss` at (914, 120) and (977, 167); the deepest floor's shaft `dK_Sy` at (225, 121) and tunnel
+  `dK_Sx` at (244, the floor's row + 29); the tab bar `dmz_e00` at (54, 4) with 迷宮役職 and 最近収支 (`dmz_e01`,
+  `e02`) from (68, 8), 63 apart; 最近の収支 (`dmz_b00`) at (30, 374) with `dmz_d00` digits; the 迷宮職情報 window
+  shared with the town; 戻る (`dmz_c02`) at (1117, 675). `dK_S` exists for each floor's sizes up to
+  `maze.obj`'s 広さ最大 (3, 2, 4, 5, 3, 5, 5). Not known yet: where floors 3 to 7 sit, sizes above 1, and what
+  grows them; `dmap01` to `dmap03` are full mazes drawn with another layout and don't match. `dmappos.obj` lists
+  points per floor and size whose use isn't known.
+- **組織図.** Measured: the 迷宮 platform `uts_a03` at (9, 421) with 迷宮長 at (298, 382), 第一階層長 at (15, 459)
+  and 第二階層長 at (99, 501) (`uts_v00`); the list badges `uts_h09` to `h19`. Inferred: the other floor heads
+  continue the step (84, 42) as floors open.
+- **Stats.** Seen once, not derived: after ミアルテ took 警備担当 and ルーアルテ 商業担当, 迷宮情報 read 守備要員 19,
+  罠 48 and 宝箱 30.
 
 ## Recruits and the turn order, from the scripts and play
 

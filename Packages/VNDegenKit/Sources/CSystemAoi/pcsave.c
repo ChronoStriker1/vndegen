@@ -58,6 +58,10 @@ enum {
     SCENE_STEP = 1200,
     FREE_AT = 1008208,
     FREE_COUNT = 30,
+    TOWN_POSTS = 9,
+    BLOCK_GOVERN = 8,
+    BLOCK_POST_EFFECT = 65,
+    POST_EFFECTS = 13,
     POSTED = 3,
     PLACE_VAR = 4,
     PLACE_TOWN = 6,
@@ -169,6 +173,10 @@ static void write_maps(SA *s, u8 *img) {
         }
 }
 
+static int pc_post(int post) { return post > TOWN_POSTS ? post + 1 : post; }
+
+static int vn_post(int id) { return id > TOWN_POSTS + 1 ? id - 1 : id <= TOWN_POSTS ? id : 0; }
+
 static void read_members(SA *s, const u8 *img) {
     Party *p = &s->party;
     for (int i = 0; i < PARTY_SLOTS; i++) sa_party_place(p, &s->vfs, i, 0);
@@ -193,9 +201,9 @@ static void read_members(SA *s, const u8 *img) {
             p->bench[p->benchCount++] = b;
         }
     memset(p->post, 0, sizeof p->post);
-    for (int i = 1; i < FREE_COUNT && i < PARTY_POSTS; i++) {
-        int k = at(img, FREE_AT + (size_t)i * 4);
-        if (k >= 0 && k < count) p->post[i] = p->roster[k];
+    for (int i = 1; i < FREE_COUNT; i++) {
+        int k = at(img, FREE_AT + (size_t)i * 4), post = vn_post(i);
+        if (k >= 0 && k < count && post > 0 && post < PARTY_POSTS) p->post[post] = p->roster[k];
     }
     if (!sa_party_members(p) && p->benchCount) {
         Bench b = p->bench[0];
@@ -370,8 +378,15 @@ static void write_member(SA *s, u8 *img, int k, const Bench *b, bool placed, con
     put(img, m + 8, k);
     int post = sa_party_post_of(&s->party, b->unit);
     if (post) {
-        put(img, m + MEMBER_BYTES, post << 16 | POSTED << 8);
-        put(img, FREE_AT + (size_t)post * 4, k);
+        int id = pc_post(post), gov, lead;
+        size_t c = m + MEMBER_STATS + MEMBER_COPY;
+        put(img, m + MEMBER_BYTES, id << 16 | POSTED << 8);
+        put(img, FREE_AT + (size_t)id * 4, k);
+        sa_party_post_stats(&s->party, b->unit, post, &gov, &lead);
+        put(img, c + BLOCK_GOVERN * 4, gov + b->trained[BLOCK_GOVERN]);
+        put(img, c + (BLOCK_GOVERN + 1) * 4, lead + b->trained[BLOCK_GOVERN + 1]);
+        int effect = sa_party_post_effect(&s->party, b->unit, post);
+        for (int i = 0; i < POST_EFFECTS; i++) put(img, c + (size_t)(BLOCK_POST_EFFECT + i) * 4, effect);
     } else
         put(img, m + MEMBER_BYTES, (k ? k : 2) << 16 | (placed ? 1 : 4) << 8);
 }

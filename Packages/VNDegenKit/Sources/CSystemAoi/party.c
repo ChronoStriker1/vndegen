@@ -490,6 +490,58 @@ int sa_party_post_of(const Party *p, int unit) {
     return 0;
 }
 
+static int ability_row(const Party *p, const char *name) {
+    for (int r = 0; r < p->abilities.rows; r++)
+        if (!strcmp(sa_table_text(&p->abilities, r, 2), name)) return r;
+    return -1;
+}
+
+static bool ability_applies(const char *a, const char *key, int post) {
+    bool town = post <= 9, floorHead = post >= 12 && post <= 18;
+    static const char *const talents[] = {"農業の才", "商業の才", "工業の才", "警備の才", "教育の才", "娯楽の才", "衛生の才"};
+    for (int i = 0; i < 7; i++)
+        if (!strcmp(a, talents[i])) return post == 3 + i;
+    return !strcmp(a, "天才") || !strcmp(a, "無能") || (!strcmp(a, "政治家") && strstr(key, "統治")) || (!strcmp(a, "大将軍") && strstr(key, "統率")) ||
+           (!strcmp(a, "指揮官") && (post == 10 || post == 11)) || (!strcmp(a, "小隊長") && floorHead) || (!strcmp(a, "独立行動") && post >= 12) ||
+           (!strcmp(a, "軍事向き") && !town) || (!strcmp(a, "内政向き") && town) || (!strcmp(a, "内政の才") && post >= 3 && post <= 9) ||
+           (!strcmp(a, "補佐官") && (post == 2 || post == 11));
+}
+
+int sa_party_post_icon(const Party *p, int unit, int post) {
+    int r = sa_party_unit_row(p, unit);
+    if (r < 0 || post <= 0 || post >= p->positions.rows) return -1;
+    const char *a = sa_table_text(&p->units, r, 36);
+    if (!strcmp(a, "人気者")) return post <= 2 ? 2 : -1;
+    if (!strcmp(a, "資金管理")) return 3;
+    if (!strcmp(a, "食料管理")) return 4;
+    if (!strcmp(a, "資源管理")) return 5;
+    if (!ability_applies(a, sa_table_text(&p->positions, post, 2), post)) return -1;
+    return !strcmp(a, "無能") ? 1 : 0;
+}
+
+bool sa_party_post_stats(const Party *p, int unit, int post, int *gov, int *lead) {
+    int r = sa_party_unit_row(p, unit);
+    *gov = r >= 0 ? sa_table_int(&p->units, r, 31) : 0;
+    *lead = r >= 0 ? sa_table_int(&p->units, r, 32) : 0;
+    int icon = sa_party_post_icon(p, unit, post);
+    if (icon != 0 && icon != 1) return false;
+    int ar = ability_row(p, sa_table_text(&p->units, r, 36));
+    int v = ar >= 0 ? sa_table_int(&p->abilities, ar, 4) : 0, sign = icon == 1 ? -1 : 1;
+    *gov += sign * v;
+    *lead += sign * (v - v / 5);
+    return v != 0;
+}
+
+int sa_party_post_effect(const Party *p, int unit, int post) {
+    int icon = sa_party_post_icon(p, unit, post), r = sa_party_unit_row(p, unit);
+    if (icon != 0 && icon != 1) return 0;
+    int ar = ability_row(p, sa_table_text(&p->units, r, 36));
+    if (ar < 0) return 0;
+    const char *text = sa_table_text(&p->abilities, ar, 6);
+    int v = sa_table_int(&p->abilities, ar, 4);
+    return strstr(text, "効果を向上") ? v : strstr(text, "効果を低下") ? -v : 0;
+}
+
 int sa_party_post_index(const Party *p, const char *name) {
     for (int r = 1; r < p->positions.rows && r < PARTY_POSTS; r++)
         if (!strcmp(sa_table_text(&p->positions, r, 0), name)) return r;

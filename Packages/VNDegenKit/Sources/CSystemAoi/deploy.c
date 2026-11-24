@@ -49,17 +49,24 @@ enum {
     TAB_W = 76,
     TAB_H = 20,
     ORG_POSTS = 9,
+    MAZE_TILES = 8,
+    LABELS = 20,
+    ICON_W = 24,
+    ICON_H = 20,
+    ICON_DY = 10,
+    MAZE_ORG_X = 9,
+    MAZE_ORG_Y = 421,
+    BOOSTED = 0x0068b7,
     POST_W = 98,
     POST_H = 64,
-    DISMISS_X = 376,
-    DISMISS_Y = 677,
+    DISMISS_X = 372,
+    DISMISS_Y = 675,
     DISMISS_W = 180,
     DISMISS_H = 27,
     INFO_X = 9,
     INFO_RIGHT = 222,
     INFO_Y = 31,
     INFO_DY = 20,
-    F_POSTS = 44,
 };
 
 enum { TAB_LIST, TAB_ORG, TAB_FORM };
@@ -69,13 +76,19 @@ static const struct {
 } orgTile[ORG_POSTS] = {{1, 299, 112}, {2, 412, 168}, {3, 165, 187}, {7, 5, 214}, {4, 249, 229},
                         {8, 89, 255}, {5, 333, 271}, {9, 173, 298}, {6, 417, 313}};
 
-enum { ART_TOP, ART_BOTTOM, ART_DISMISS, ART_TILE, ART_LIST, ART_ROWS, ART_BADGE, ART_BACK, ART_BG, ART_PLATFORM, ART_RANK, ART_FORM, ART_TAB0, ART_ORG = ART_TAB0 + 6, ART_BTN_LIST, ART_BTN_ORG, ART_POST_TILE, ART_FIRE, ART_LABEL0, ART_COUNT = ART_LABEL0 + ORG_POSTS };
+static const struct {
+    int post, x, y;
+} mazeTile[MAZE_TILES] = {{10, 298, 382}, {12, 15, 459}, {13, 99, 501}, {14, 183, 543}, {15, 267, 585}, {16, 351, 627}, {17, 435, 669}, {18, 519, 711}};
+
+enum { ART_TOP, ART_BOTTOM, ART_DISMISS, ART_TILE, ART_LIST, ART_ROWS, ART_BADGE, ART_BACK, ART_BG, ART_PLATFORM, ART_RANK, ART_FORM, ART_TAB0, ART_ORG = ART_TAB0 + 6, ART_BTN_LIST, ART_BTN_ORG, ART_POST_TILE, ART_FIRE, ART_MAZE_ORG, ART_MAZE_TILE, ART_ICON, ART_LABEL0, ART_COUNT = ART_LABEL0 + LABELS };
 
 static const char *const artNames[ART_COUNT] = {"ums_a00.agf", "ums_a01.agf", "ums_a02.agf", "ums_z00.agf", "uts_c00.agf", "uts_c01.agf",
                                                 "uts_h98.agf", "uts_g00.agf", "bg009a0.agf", "m997bt1a.agf", "uts_b03.agf", "uts_b02.agf", "uts_d01.agf", "uts_d02.agf",
                                                 "uts_d03.agf", "uts_d04.agf", "uts_d05.agf", "uts_d06.agf", "uts_a01.agf", "uts_b00.agf", "uts_b01.agf",
-                                                "uts_w00.agf", "uts_x01.agf", "uts_h00.agf", "uts_h01.agf", "uts_h02.agf", "uts_h03.agf", "uts_h04.agf",
-                                                "uts_h05.agf", "uts_h06.agf", "uts_h07.agf", "uts_h08.agf"};
+                                                "uts_w00.agf", "uts_x01.agf", "uts_a03.agf", "uts_v00.agf", "uts_i02.agf", "uts_h00.agf", "uts_h01.agf",
+                                                "uts_h02.agf", "uts_h03.agf", "uts_h04.agf", "uts_h05.agf", "uts_h06.agf", "uts_h07.agf", "uts_h08.agf",
+                                                "uts_h09.agf", "uts_h10.agf", "uts_h11.agf", "uts_h12.agf", "uts_h13.agf", "uts_h14.agf", "uts_h15.agf",
+                                                "uts_h16.agf", "uts_h17.agf", "uts_h18.agf", "uts_h19.agf"};
 
 static const int mainSlot[6] = {PARTY_FRONT, PARTY_FRONT + 1, PARTY_FRONT + 2, 0, 1, 2};
 
@@ -117,6 +130,8 @@ static int rows(const SA *s, int *keys) {
 
 static bool posts_open(const SA *s) { return s->vm.f[F_POSTS] != 0; }
 
+static bool maze_tile_open(const SA *s, int i) { return sa_maze_post_open(&s->maze, &s->vm, mazeTile[i].post); }
+
 static bool on_tile(const Image *im, int fx, int fy, int x0, int y0, int x, int y) {
     if (!im || x < x0 || y < y0 || x >= x0 + POST_W || y >= y0 + POST_H) return false;
     return im->px[(size_t)(fy + y - y0) * im->w + fx + x - x0] >> 24 > 128;
@@ -132,6 +147,8 @@ static int hit(SA *s, int x, int y) {
         if (in(x, y, DISMISS_X, DISMISS_Y, DISMISS_W, DISMISS_H)) return HOVER_DISMISS;
         for (int i = 0; i < ORG_POSTS; i++)
             if (on_tile(d->art[ART_POST_TILE], 0, 0, orgTile[i].x, orgTile[i].y, x, y)) return HOVER_POST + orgTile[i].post;
+        for (int i = 0; i < MAZE_TILES; i++)
+            if (maze_tile_open(s, i) && on_tile(d->art[ART_MAZE_TILE], 0, 0, mazeTile[i].x, mazeTile[i].y, x, y)) return HOVER_POST + mazeTile[i].post;
         int keys[PARTY_SLOTS + PARTY_BENCH], n = rows(s, keys);
         for (int i = 0; i < n && i < ROWS; i++)
             if (in(x, y, LIST_X, ROW_Y + i * ROW_H, ROW_W, ROW_H)) return HOVER_ROW + i;
@@ -312,18 +329,32 @@ static void info_line(u32 *fb, const char *t, int y) {
     sa_text_draw(fb, SA_W, SA_H, t, -1, INFO_RIGHT - sa_text_width(t, -1, 15), y, 15, 0x000000, NO_EDGE);
 }
 
+static void post_tile(SA *s, u32 *fb, const Image *art, int post, int x, int y) {
+    Deploy *d = &s->deploy;
+    int k = HOVER_POST + post, fx = d->picked == k ? 0 : d->hover == k ? POST_W : 0, fy = d->picked == k ? POST_H : 0;
+    sa_blit_rect(fb, art, fx, fy, POST_W, POST_H, x, y);
+}
+
+static void post_unit(SA *s, u32 *fb, int post, int x, int y) {
+    Party *p = &s->party;
+    int unit = p->post[post];
+    if (!unit || s->deploy.picked == HOVER_POST + post) return;
+    sprite(fb, unit_sprite(s, unit), x + POST_W / 2 - TILE_W / 2, y + POST_H / 2 - FEET + 6);
+    int icon = sa_party_post_icon(p, unit, post);
+    if (icon >= 0) sa_blit_rect(fb, s->deploy.art[ART_ICON], icon % 2 * ICON_W, icon / 2 * ICON_H, ICON_W, ICON_H, x, y + ICON_DY);
+}
+
 static void draw_org(SA *s, u32 *fb) {
     Deploy *d = &s->deploy;
     Party *p = &s->party;
     sa_blit(fb, d->art[ART_ORG], 2, 21);
-    for (int i = 0; i < ORG_POSTS; i++) {
-        int k = HOVER_POST + orgTile[i].post, fx = d->picked == k ? 0 : d->hover == k ? POST_W : 0, fy = d->picked == k ? POST_H : 0;
-        sa_blit_rect(fb, d->art[ART_POST_TILE], fx, fy, POST_W, POST_H, orgTile[i].x, orgTile[i].y);
-    }
-    for (int i = 0; i < ORG_POSTS; i++) {
-        int k = HOVER_POST + orgTile[i].post, unit = p->post[orgTile[i].post];
-        if (unit && d->picked != k) sprite(fb, unit_sprite(s, unit), orgTile[i].x + POST_W / 2 - TILE_W / 2, orgTile[i].y + POST_H / 2 - FEET + 6);
-    }
+    if (s->vm.f[F_MAZE]) sa_blit(fb, d->art[ART_MAZE_ORG], MAZE_ORG_X, MAZE_ORG_Y);
+    for (int i = 0; i < ORG_POSTS; i++) post_tile(s, fb, d->art[ART_POST_TILE], orgTile[i].post, orgTile[i].x, orgTile[i].y);
+    for (int i = 0; i < MAZE_TILES; i++)
+        if (maze_tile_open(s, i)) post_tile(s, fb, d->art[ART_MAZE_TILE], mazeTile[i].post, mazeTile[i].x, mazeTile[i].y);
+    for (int i = 0; i < ORG_POSTS; i++) post_unit(s, fb, orgTile[i].post, orgTile[i].x, orgTile[i].y);
+    for (int i = 0; i < MAZE_TILES; i++)
+        if (maze_tile_open(s, i)) post_unit(s, fb, mazeTile[i].post, mazeTile[i].x, mazeTile[i].y);
     sa_blit_rect(fb, d->art[ART_FIRE], 0, d->hover == HOVER_DISMISS ? DISMISS_H : 0, DISMISS_W, DISMISS_H, DISMISS_X, DISMISS_Y);
     int focus = is_post(d->hover) ? d->hover : is_post(d->picked) ? d->picked : -1;
     sa_font_set_spacing(0);
@@ -333,10 +364,12 @@ static void draw_org(SA *s, u32 *fb) {
         info_line(fb, sa_table_text(&p->positions, post, 0), INFO_Y);
         if (r >= 0) {
             char v[16];
+            int gov, lead;
+            sa_party_post_stats(p, unit, post, &gov, &lead);
             info_line(fb, sa_table_text(&p->units, r, 2), INFO_Y + INFO_DY);
-            snprintf(v, sizeof v, "%d", sa_table_int(&p->units, r, 31));
+            snprintf(v, sizeof v, "%d", gov);
             info_line(fb, v, INFO_Y + 2 * INFO_DY);
-            snprintf(v, sizeof v, "%d", sa_table_int(&p->units, r, 32));
+            snprintf(v, sizeof v, "%d", lead);
             info_line(fb, v, INFO_Y + 3 * INFO_DY);
         } else {
             info_line(fb, "--", INFO_Y + 2 * INFO_DY);
@@ -374,15 +407,18 @@ static void draw_list(SA *s, u32 *fb) {
         int frame = d->picked == k ? 2 : d->hover == HOVER_ROW + i ? 3 : 0;
         sa_blit_rect(fb, d->art[ART_ROWS], 0, frame * ROW_H, ROW_W, ROW_H, LIST_X, y);
         int post = sa_party_post_of(p, unit);
-        if (post > 0 && post <= ORG_POSTS) sa_blit(fb, d->art[ART_LABEL0 + post - 1], BADGE_X, y + BADGE_DY);
+        if (post > 0 && post <= LABELS) sa_blit(fb, d->art[ART_LABEL0 + post - 1], BADGE_X, y + BADGE_DY);
         else if (is_main(k) || p->bench[k - HOVER_UNIT].tile >= 0) sa_blit(fb, d->art[ART_BADGE], BADGE_X, y + BADGE_DY);
         int r = sa_party_unit_row(p, unit);
         sa_text_draw(fb, SA_W, SA_H, sa_table_text(&p->units, r, 2), -1, NAME_X, y + TEXT_DY, 18, 0x000000, NO_EDGE);
-        const int stats[4] = {level, sa_table_int(&p->units, r, 15), sa_table_int(&p->units, r, 31), sa_table_int(&p->units, r, 32)};
+        int gov, lead;
+        bool boosted = post && sa_party_post_stats(p, unit, post, &gov, &lead);
+        if (!boosted) sa_party_post_stats(p, unit, 0, &gov, &lead);
+        const int stats[4] = {level, sa_table_int(&p->units, r, 15), gov, lead};
         for (int j = 0; j < 4; j++) {
             char v[12];
             snprintf(v, sizeof v, "%d", stats[j]);
-            sa_text_draw(fb, SA_W, SA_H, v, -1, STAT_X + (j + 1) * STAT_W - 6 - sa_text_width(v, -1, 15), y + TEXT_DY + 1, 15, 0x000000, NO_EDGE);
+            sa_text_draw(fb, SA_W, SA_H, v, -1, STAT_X + (j + 1) * STAT_W - 6 - sa_text_width(v, -1, 15), y + TEXT_DY + 1, 15, j >= 2 && boosted ? BOOSTED : 0x000000, NO_EDGE);
         }
     }
     sa_font_set_plain(false);

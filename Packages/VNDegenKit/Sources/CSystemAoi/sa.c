@@ -794,6 +794,7 @@ static void new_game(SA *s) {
     memset(s->exp.entry, 0, sizeof s->exp.entry);
     s->exp.groupCount = 0;
     sa_mission_reset(s);
+    sa_maze_reset(s);
     sa_start_script(s, "init.box", 0);
 }
 
@@ -879,6 +880,7 @@ static int command_number(int action) {
     case TOWN_CMD_TRAIN: return 26;
     case TOWN_CMD_SUBMIT: return 29;
     case TOWN_CMD_SHOP: return 27;
+    case TOWN_CMD_MAZE: return 28;
     }
     return -1;
 }
@@ -909,6 +911,9 @@ static void run_command(SA *s, int action) {
     case TOWN_CMD_SUBMIT:
         sa_mission_open(s);
         break;
+    case TOWN_CMD_MAZE:
+        sa_maze_open(s);
+        break;
     case TOWN_POLICY_DONE:
         sa_end_turn(s);
         break;
@@ -929,7 +934,17 @@ static void town_action(SA *s, int action) {
         s->vm.c[0x5f] = number;
         s->afterScript = action;
         sa_reset_scene(s);
+        if (action == TOWN_CMD_MAZE) {
+            picture_clear(&s->bg);
+            s->bg.img = sa_image_new(SA_W, SA_H);
+            sa_maze_draw_scene(s, s->bg.img->px);
+            snprintf(s->bg.name, sizeof s->bg.name, "*maze");
+        }
         sa_start_script(s, "bo3000.box", 0);
+        s->dirty = true;
+        return;
+    }
+    if (sa_town_toggle(&s->town, action)) {
         s->dirty = true;
         return;
     }
@@ -1059,6 +1074,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     sa_equip_init(&s->equip, &s->vfs);
     sa_shop_init(&s->shop, &s->vfs);
     sa_mission_init(s);
+    sa_maze_init(s);
     sa_card_init(&s->card, &s->vfs);
     sa_train_init(&s->train, &s->vfs);
     sa_deploy_init(&s->deploy, &s->vfs);
@@ -1120,6 +1136,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_equip_free(&s->equip);
     sa_shop_free(&s->shop);
     sa_mission_free(s);
+    sa_maze_free(s);
     sa_card_free(&s->card);
     sa_train_free(&s->train);
     sa_deploy_free(&s->deploy);
@@ -1194,6 +1211,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_equip_frame(s)) return true;
     if (sa_shop_frame(s)) return true;
     if (sa_mission_frame(s)) return true;
+    if (sa_maze_frame(s)) return true;
     if (sa_train_frame(s)) return true;
     if (sa_deploy_frame(s, elapsedMs)) return true;
     if (sa_savescreen_frame(s)) return true;
