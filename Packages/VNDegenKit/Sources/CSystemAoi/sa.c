@@ -857,7 +857,11 @@ static bool dialog_input(SA *s, u32 ms) {
         s->clicked = false;
         if (sa_dialog_click(&s->dialog, s->mouseX, s->mouseY)) {
             if (s->vm.state == VM_WAIT_DIALOG) s->vm.state = VM_RUN;
-            if (s->turnPending) next_turn(s);
+            if (s->endTurnAfterDialog) {
+                s->endTurnAfterDialog = false;
+                sa_end_turn(s);
+            } else if (s->turnPending)
+                next_turn(s);
             s->dirty = true;
         }
     }
@@ -1243,7 +1247,11 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     }
     if (s->mode == MODE_TOWN && dialog_input(s, elapsedMs)) {
         if (s->mode == MODE_TOWN && s->dirty) {
-            sa_town_draw(&s->town, &s->vfs, &s->vm, s->fb);
+            if (s->town.mapOnly) {
+                sa_town_draw_map(&s->town, &s->vfs, &s->vm, s->fb);
+                for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) s->fb[i] = 0xff000000u | (s->fb[i] >> 1 & 0x7f7f7f);
+            } else
+                sa_town_draw(&s->town, &s->vfs, &s->vm, s->fb);
             sa_dialog_draw(&s->dialog, s->fb);
             s->serial++;
             s->dirty = false;

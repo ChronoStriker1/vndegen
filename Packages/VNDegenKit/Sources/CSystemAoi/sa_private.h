@@ -14,7 +14,7 @@
 
 typedef struct Policy {
     Table events;
-    Image *bg, *art[13], **pictures;
+    Image *bg, *art[19], **pictures;
     int category, hover, pick;
 } Policy;
 
@@ -130,6 +130,7 @@ typedef struct Picture {
 } Picture;
 
 struct SA {
+    bool endTurnAfterDialog;
     bool turnAdvance;
     bool gameOver;
     char joined[DIALOG_UNITS][48];

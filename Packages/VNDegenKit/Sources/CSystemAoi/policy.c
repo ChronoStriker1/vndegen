@@ -55,10 +55,19 @@ enum {
     LVUP_GROUP = 5,
 };
 
-enum { ART_LIST, ART_BACK, ART_DESC, ART_CONFIRM, ART_RUN, ART_CANCEL, ART_COSTS, ART_CAT0, ART_HEAD0 = ART_CAT0 + POLICY_CATEGORIES, ART_COUNT = ART_HEAD0 + POLICY_CATEGORIES };
+enum { EXCHANGE_DESC_DY = 121, TRADES = 6, CAT_EXCHANGE = 2, TRADE_GIVE = 1000, NUM_SIZE = 20, NUM_SPACING = 6, GIVE_RIGHT = 178, GET_RIGHT = 378, NUM_DY = 9 };
+
+enum { ART_LIST, ART_BACK, ART_DESC, ART_CONFIRM, ART_RUN, ART_CANCEL, ART_COSTS, ART_CAT0, ART_HEAD0 = ART_CAT0 + POLICY_CATEGORIES, ART_TRADE0 = ART_HEAD0 + POLICY_CATEGORIES, ART_COUNT = ART_TRADE0 + TRADES };
+
+static const struct {
+    int from, to, get;
+} trades[TRADES] = {{1, 2, 300}, {1, 0, 300}, {2, 1, 350}, {2, 0, 350}, {0, 1, 200}, {0, 2, 200}};
+
+static const char *const tradeText = "物々交換です。";
 
 static const char *const artNames[ART_COUNT] = {"dom_a00.agf", "dom_a04.agf", "dom_a05.agf", "dom_a06.agf", "dom_a07.agf", "dom_a08.agf", "dom_a10.agf",
-                                                "dom_a01.agf", "dom_a02.agf", "dom_a03.agf", "dom_b00.agf", "dom_c00.agf", "dom_d00.agf"};
+                                                "dom_a01.agf", "dom_a02.agf", "dom_a03.agf", "dom_b00.agf", "dom_c00.agf", "dom_d00.agf",
+                                                "dom_dz00.agf", "dom_dz01.agf", "dom_dz02.agf", "dom_dz03.agf", "dom_dz04.agf", "dom_dz05.agf"};
 
 #define NO_EDGE 0xffffffffu
 
@@ -105,6 +114,10 @@ static bool event_open(const SA *s, int r) {
 
 static int list_events(const SA *s, int *rows) {
     int n = 0;
+    if (s->policy.category == CAT_EXCHANGE) {
+        for (int i = 0; i < TRADES; i++) rows[n++] = -2 - i;
+        return n;
+    }
     for (int r = 0; r < s->policy.events.rows && n < POLICY_ROWS; r++)
         if (sa_table_int(&s->policy.events, r, E_CATEGORY) == s->policy.category && event_open(s, r)) rows[n++] = r;
     return n;
@@ -118,6 +131,7 @@ static int list_categories(const SA *s, int *cats) {
 }
 
 static bool affordable(const SA *s, int r) {
+    if (r < 0) return s->vm.c[C_FOOD + trades[-2 - r].from] >= TRADE_GIVE;
     const Table *t = &s->policy.events;
     return s->vm.c[C_FOOD] + sa_table_int(t, r, E_FOOD) >= 0 && s->vm.c[C_MONEY] + sa_table_int(t, r, E_MONEY) >= 0 &&
            s->vm.c[C_RESOURCES] + sa_table_int(t, r, E_RESOURCES) >= 0;
@@ -142,7 +156,7 @@ static bool in(int x, int y, int rx, int ry, int w, int h) { return x >= rx && x
 
 static int hit(SA *s, int x, int y) {
     Policy *p = &s->policy;
-    if (p->pick >= 0) {
+    if (p->pick != -1) {
         if (in(x, y, RUN_X, CONFIRM_BTN_Y, BTN_W, BTN_H)) return HOVER_RUN;
         if (in(x, y, CANCEL_X, CONFIRM_BTN_Y, BTN_W, BTN_H)) return HOVER_CANCEL;
         return -1;
@@ -157,7 +171,35 @@ static int hit(SA *s, int x, int y) {
     return -1;
 }
 
+static void number(u32 *fb, int v, int right, int y, u32 color) {
+    char t[16];
+    snprintf(t, sizeof t, "%d", v);
+    sa_font_set_spacing(NUM_SPACING);
+    sa_text_draw(fb, SA_W, SA_H, t, -1, right - sa_text_width(t, -1, NUM_SIZE) + NUM_SPACING, y, NUM_SIZE, color, NO_EDGE);
+    sa_font_set_spacing(1);
+}
+
+static void draw_row(SA *s, u32 *fb, int r, int frame, int x, int y) {
+    if (r >= 0) {
+        Image *im = picture(s, r);
+        if (im) sa_blit_rect(fb, im, 0, frame * ROW_H, im->w, ROW_H, x, y);
+        return;
+    }
+    int i = -2 - r;
+    sa_blit_rect(fb, s->policy.art[ART_TRADE0 + i], 0, frame * ROW_H, ACT_W, ROW_H, x, y);
+    number(fb, TRADE_GIVE, x + GIVE_RIGHT, y + NUM_DY, affordable(s, r) ? 0x321a02 : 0xff0000);
+    number(fb, trades[i].get, x + GET_RIGHT, y + NUM_DY, 0x321a02);
+}
+
 static void text_block(u32 *fb, const Table *t, int r, int x, int y) {
+    if (r < 0) {
+        sa_font_set_spacing(0);
+        sa_font_set_plain(true);
+        sa_text_draw(fb, SA_W, SA_H, tradeText, -1, x, y, TEXT_SIZE, 0x000000, NO_EDGE);
+        sa_font_set_plain(false);
+        sa_font_set_spacing(1);
+        return;
+    }
     sa_font_set_spacing(0);
     sa_font_set_plain(true);
     int line = 0;
@@ -199,23 +241,20 @@ static void draw(SA *s) {
     sa_blit_rect(fb, p->art[ART_BACK], 0, p->hover == HOVER_BACK ? BTN_H : 0, BTN_W, BTN_H, BACK_X, BACK_Y);
     sa_blit(fb, p->art[ART_HEAD0 + p->category], ACT_X, WIN_Y);
     int rows[POLICY_ROWS], n = list_events(s, rows);
-    for (int i = 0; i < n; i++) {
-        Image *im = picture(s, rows[i]);
-        if (!im) continue;
-        int frame = !affordable(s, rows[i]) ? 2 : p->hover == HOVER_ACTION + i ? 1 : 0;
-        sa_blit_rect(fb, im, 0, frame * ROW_H, im->w, ROW_H, ACT_X, ROW_Y + i * ROW_H);
-    }
-    sa_blit(fb, p->art[ART_DESC], DESC_X, DESC_Y);
-    if (p->pick < 0 && p->hover >= HOVER_ACTION && p->hover < HOVER_ACTION + n)
-        text_block(fb, &p->events, rows[p->hover - HOVER_ACTION], DESC_TEXT_X, DESC_TEXT_Y);
-    if (p->pick < 0) return;
+    for (int i = 0; i < n; i++)
+        draw_row(s, fb, rows[i], !affordable(s, rows[i]) && rows[i] >= 0 ? 2 : p->hover == HOVER_ACTION + i ? 1 : 0, ACT_X, ROW_Y + i * ROW_H);
+    int dy = p->category == CAT_EXCHANGE ? EXCHANGE_DESC_DY : 0;
+    sa_blit(fb, p->art[ART_DESC], DESC_X, DESC_Y + dy);
+    if (p->pick == -1 && p->hover >= HOVER_ACTION && p->hover < HOVER_ACTION + n)
+        text_block(fb, &p->events, rows[p->hover - HOVER_ACTION], DESC_TEXT_X, DESC_TEXT_Y + dy);
+    if (p->pick == -1) return;
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u | (fb[i] >> 1 & 0x7f7f7fu);
     sa_blit(fb, p->art[ART_CONFIRM], CONFIRM_X, CONFIRM_Y);
-    Image *im = picture(s, p->pick);
-    if (im) sa_blit_rect(fb, im, 0, 0, im->w, ROW_H, CONFIRM_X, CONFIRM_ROW_Y);
+    draw_row(s, fb, p->pick, 0, CONFIRM_X, CONFIRM_ROW_Y);
     text_block(fb, &p->events, p->pick, CONFIRM_TEXT_X, CONFIRM_TEXT_Y);
     const Table *t = &p->events;
-    int food = sa_table_int(t, p->pick, E_FOOD), money = sa_table_int(t, p->pick, E_MONEY), res = sa_table_int(t, p->pick, E_RESOURCES);
+    int food = p->pick >= 0 ? sa_table_int(t, p->pick, E_FOOD) : 0, money = p->pick >= 0 ? sa_table_int(t, p->pick, E_MONEY) : 0,
+        res = p->pick >= 0 ? sa_table_int(t, p->pick, E_RESOURCES) : 0;
     if (food || money || res) {
         sa_blit(fb, p->art[ART_COSTS], CONFIRM_X, CONFIRM_COST_Y);
         static const int right[3] = {114, 246, 378};
@@ -251,11 +290,28 @@ static void grow_facilities(SA *s, int amount) {
     }
 }
 
+static void trade(SA *s, int i) {
+    VM *vm = &s->vm;
+    int before[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
+    vm->c[C_FOOD + trades[i].from] -= TRADE_GIVE;
+    vm->c[C_FOOD + trades[i].to] += trades[i].get;
+    int after[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
+    sa_log(s, "trade %d", i);
+    s->mode = MODE_TOWN;
+    s->town.mapOnly = true;
+    sa_dialog_open_turn(&s->dialog, before, after, "交換しました。");
+    s->endTurnAfterDialog = true;
+}
+
 static void run(SA *s) {
     Policy *p = &s->policy;
     const Table *t = &p->events;
     int r = p->pick;
     p->pick = -1;
+    if (r <= -2) {
+        trade(s, -2 - r);
+        return;
+    }
     s->vm.c[C_RESIDENTS] += sa_table_int(t, r, E_RESIDENTS);
     s->vm.c[C_FOOD] += sa_table_int(t, r, E_FOOD);
     s->vm.c[C_MONEY] += sa_table_int(t, r, E_MONEY);
@@ -283,7 +339,7 @@ bool sa_policy_frame(SA *s) {
     }
     if (s->rightClicked) {
         s->rightClicked = false;
-        if (p->pick >= 0) p->pick = -1;
+        if (p->pick != -1) p->pick = -1;
         else s->mode = MODE_TOWN;
         s->dirty = true;
     }
