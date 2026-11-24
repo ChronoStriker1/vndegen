@@ -17,6 +17,7 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
   - EAGLS: display refreshes from `-frameMonitor`'s `EGFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/eagls.txt` when the script stops it.
   - BSX: display refreshes from `-frameMonitor`'s `BXFRAMES` line, and a movie's frames from the `movie` line the runtime writes to the game's `logs/bsx.txt` when it stops.
   - Bruns: display refreshes from `-frameMonitor`'s `BRFRAMES` line. The runtime steps the game every 16 ms of display time, as the PC engine's 60 fps does.
+  - SystemAoi: display refreshes from `-frameMonitor`'s `SAFRAMES` line, 10 s windows; `drawn` is the frames the software-rendered dungeon view changed in a second.
   - Eushully AGE: display refreshes from `-frameMonitor`'s `AGFRAMES` line, 10 s windows. The runtime draws a frame each refresh, movie or not.
   - SiglusEngine: engine steps from `-frameMonitor`'s `SIGLUSFRAMES` line, 10 s windows. A `.wmv` movie's picture changes at the movie's rate inside them.
   - Godot: `-godotFrameLog`, without `-godotSnapshot`. The snapshot writes a PNG on the main thread every 2 s, which stalls the game for about 80 to 90 ms each time. It took Barely Working from 59.9 to 57.5 and Project Hadal from 59.4 to 56.9, with seconds alternating between 54 to 56 and 60 to 61 frames. The native runtimes log their own pacing with `-frameMonitor`.
@@ -92,6 +93,8 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | BSX | Mesu Kyoushi 3, `op.mpg` opening movie at boot, MPEG-1 1366x768 with MP2 sound at 48 kHz | iPad simulator | 30 movie, 60 display | 2748 frames in 91.7 s, movie 29.96, display 60.0 | display 60.0 | 92 s, the whole movie | 6.9 | 11-19 | 26e6b68f |
 | Bruns | Orc Kingdom, the first forest dungeon: walking, encounters and battles, from a PC save at the main room | Mac app, mini | 60 | 58.9 to 60.0 | 18.7 to 60.0 | 100 s | 6.3 to 14.9 | 11-19 | 70af8073 |
 | Bruns | Orc Kingdom, the first forest dungeon: walking, encounters and battles, from a PC save at the main room | iPad simulator | 60 | 56.7 to 58.6 | 16.3 to 29.5 | 140 s | 30 to 56 | 11-19 | 0774b96c |
+| SystemAoi | BUNNY BLACK 3, 千樹庭's first area: walking and turning, from a PC save at turn 10 | Mac app, mini | 60 | 60.0 | 60.0 | 80 s | 2.9 | 11-24 | 386ba85a |
+| SystemAoi | BUNNY BLACK 3, 千樹庭's first area: walking and turning, from a PC save at turn 10 | iPad simulator | 60 | 58.3 to 58.9 | 27.1 to 29.3 | 90 s | 4.2 | 11-24 | 386ba85a |
 | SiglusEngine | planetarian HD, `.wmv` opening movie | Mac app, mini | 60 | 60.0 | 48 to 60 | about 65 s, the whole movie | 3.8 to 5.6 | 11-16 | not recorded |
 | SiglusEngine | planetarian HD, `.wmv` opening movie | iPad simulator | 60 | 59.8 to 60.0 | 42.9 to 60.0 | about 65 s, the whole movie | 9.3 | 11-16 | 35a1bca0 |
 | RGSS | Monster Girl Quest Paradox, walking in the village | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 13 | 11-04 | 2f48b68 |
