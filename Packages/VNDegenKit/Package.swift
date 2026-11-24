@@ -81,7 +81,7 @@ let package = Package(
                               .unsafeFlags(["-O2", "-fobjc-arc"])],
                 linkerSettings: [.linkedFramework("AVFoundation"), .linkedFramework("Accelerate"),
                                  .linkedFramework("VideoToolbox"), .linkedFramework("CoreVideo"), .linkedFramework("CoreMedia")]),
-        .target(name: "WebRuntime", dependencies: ["VNCore", "FontPack", "CVNAlpha"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
+        .target(name: "WebRuntime", dependencies: ["VNCore", "FontPack", "CVNAlpha", "FrameHost"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
                 swiftSettings: mainActorByDefault),
         .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),

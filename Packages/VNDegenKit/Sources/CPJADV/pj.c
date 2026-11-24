@@ -101,6 +101,7 @@ VNPJADV *vnpjadv_open(const VNPJADVConfig *config, char *err, size_t errSize) {
 void vnpjadv_close(VNPJADV *v) {
     PJ *p = (PJ *)v;
     if (!p) return;
+    pj_save_store_if_changed(p);
     if (p->game) pj_game_free(p->game);
     for (int i = 0; i < PJ_LAYERS + PJ_SUBS; i++) pj_sprite_free(&p->layer[i]);
     for (int i = 0; i < PJ_BUTTONS; i++) pj_sprite_free(&p->btn[i].spr);

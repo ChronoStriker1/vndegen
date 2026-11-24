@@ -44,7 +44,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 
 ## RPG Maker MV and MZ
 
-RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, `util`, or `nw.gui` keep working. The layer also means saves land where the PC version puts them, in `save/` beside `index.html` (`www/save/*.rpgsave` for MV, `save/*.rmmzsave` for MZ), and encrypted images and audio, Effekseer effects, and WebM movies all work.
+RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, `util`, or `nw.gui` keep working. The layer also means saves land where the PC version puts them, in `save/` beside `index.html` (`www/save/*.rpgsave` for MV, `save/*.rmmzsave` for MZ), and encrypted images and audio, Effekseer effects, and WebM movies all work. A web page or mail address the game opens outside itself, such as a title's Patreon command, asks first in the dialog Godot and NekoSDK games use, and only http, https and mailto addresses open. A plugin that opens one with `child_process`, as title link plugins do under NW.js, gets the same question; any other command it gives runs nothing and fails.
 
 Some MV and MZ games ship as one `.exe` made with Enigma Virtual Box, which holds the whole NW.js folder. VNDegen unpacks the game from it on import, alone or from the archive it came in, and leaves out the NW.js files, so it runs as any other MV or MZ game. The packed PC game saves to `www/save` beside its `.exe`, which is where VNDegen saves too. [library.md](library.md#installers-and-disc-images) has the details.
 

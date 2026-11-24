@@ -40,6 +40,10 @@ Godot keeps a game's saves in `user://`. On Windows that is `%APPDATA%\Godot\app
 
 The game sees its `.exe` in its own folder as its executable path, and `res://` paths that the pack doesn't hold lead to that folder, as on Windows, where a game starts in its own folder. Games that save beside the `.exe`, by either path, save in their own folder, as on PC.
 
+## Web links
+
+A game's `OS.shell_open` of an http or https address, such as a Discord or Patreon button on its title, asks first, in the same dialog NekoSDK's web survey uses (`WebLinks` in FrameHost). The dialog shows the address, and Cancel is its default button. The page opens in the system browser only after the player picks Open, and never in a session launched with `-debugHooks` or in tests. The game gets `OK` as it would on a PC that opened the page. Any other address, such as a file, a folder, `user://` or another app's scheme, doesn't open, and the game gets `ERR_UNAVAILABLE`. Godot 4's `OS.shell_show_in_file_manager` does nothing either. Both majors behave the same; Godot 3's links opened nothing before.
+
 ## Steam and Epic Online Services
 
 Some games call Steam through GodotSteam, either built into their own copy of Godot or as a GDExtension. VNDegen can't run either one, so its Godot provides GodotSteam's `Steam` class and singleton in their place (`Engines/Godot/vngd_steam.h`). It answers as Steam does offline, with the player signed in and owning the game. Achievements and stats last until the game quits, and leaderboard requests fail. VNDegen provides it when the game's `.exe` imports Steam's library or its pack has `godotsteam.gdextension`. It has the members the library's Steam games call: starting and stopping Steam, the player and the app, achievements, stats, and leaderboards. A game that calls a member it lacks fails to compile that script, and its log names the member.

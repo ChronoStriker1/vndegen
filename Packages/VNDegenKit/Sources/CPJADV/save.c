@@ -199,6 +199,13 @@ bool pj_save_load(PJ *p) {
     return true;
 }
 
+bool pj_save_store_if_changed(PJ *p) {
+    if (!p->sys || !p->recs) return false;
+    for (int i = 0; i < SYS_GLOBALS && i < PJ_GLOBALS; i++)
+        if (rd32(p->sys + SYS_GLOBALS_AT + 4 * i) != (u32)p->g[i]) return pj_save_store(p);
+    return true;
+}
+
 bool pj_save_store(PJ *p) {
     if (!p->sys || !p->recs) return false;
     for (int i = 0; i < SYS_GLOBALS && i < PJ_GLOBALS; i++) wr32(p->sys + SYS_GLOBALS_AT + 4 * i, (u32)p->g[i]);

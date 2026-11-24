@@ -9,6 +9,7 @@
 
 #include "core/io/logger.h"
 #include "core/os/input_event.h"
+#include "core/print_string.h"
 #include "core/project_settings.h"
 #include "drivers/coreaudio/audio_driver_coreaudio.h"
 #include "drivers/gles2/rasterizer_gles2.h"
@@ -208,6 +209,7 @@ class OS_VNDegen3 : public OS_Unix {
 	float scale = 1;
 	void (*keyboard)(bool, void *) = nullptr;
 	void *keyboard_context = nullptr;
+	void (*open_url)(const char *, void *) = nullptr;
 
 	Surface surface;
 	bool gles3 = true;
@@ -238,6 +240,7 @@ public:
 		scale = p_launch->scale > 0 ? p_launch->scale : 1;
 		keyboard = p_launch->keyboard;
 		keyboard_context = p_launch->context;
+		open_url = p_launch->openURL;
 		Vector<Logger *> loggers;
 		loggers.push_back(memnew(StdLogger));
 		_set_logger(memnew(CompositeLogger(loggers)));
@@ -382,6 +385,16 @@ public:
 
 	Error get_entropy(uint8_t *r_buffer, int p_bytes) override {
 		arc4random_buf(r_buffer, p_bytes);
+		return OK;
+	}
+
+	Error shell_open(String p_uri) override {
+		const String scheme = p_uri.get_slice(":", 0).to_lower();
+		if ((scheme != "http" && scheme != "https") || !open_url) {
+			print_line("VNDegen: not opening " + p_uri);
+			return ERR_UNAVAILABLE;
+		}
+		open_url(p_uri.utf8().get_data(), keyboard_context);
 		return OK;
 	}
 

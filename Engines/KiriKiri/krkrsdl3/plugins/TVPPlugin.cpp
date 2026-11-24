@@ -218,5 +218,11 @@ void TVPUnloadInternalPlugins()
 
 bool TVPLoadInternalPlugin(const ttstr& _name)
 {
-    return ncbAutoRegister::LoadModule(TVPExtractStorageName(_name));
+    ttstr name = TVPExtractStorageName(_name);
+    if (ncbAutoRegister::LoadModule(name))
+        return true;
+    tjs_int stem = name.length() - 4;
+    if (stem <= 0 || name.SubString(stem, 4).AsLowerCase() != TJS_N(".tpm"))
+        return false;
+    return ncbAutoRegister::LoadModule(name.SubString(0, stem) + TJS_N(".dll"));
 }

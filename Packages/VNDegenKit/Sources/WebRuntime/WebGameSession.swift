@@ -1,5 +1,6 @@
 import FontPack
 import Foundation
+import FrameHost
 import OSLog
 import VNCore
 import WebKit
@@ -176,6 +177,8 @@ final class WebGameSession: NSObject, EngineSession {
     private var paused = false
     private var lastReload: ContinuousClock.Instant?
     private var closeDialog: (() -> Void)?
+    var askToOpen: (URL, @escaping () -> Void) -> Void = { _, done in done() }
+    private var askingLink = false
     /// Ends once the page has had its last word after `terminate()` and the view is torn down.
     private var stopping: Task<Void, Never>?
     #if DEBUG
@@ -194,7 +197,7 @@ final class WebGameSession: NSObject, EngineSession {
         log = game.log
         onExit = launch.onExit
         makeCheats = game.cheats
-        let shim = try Self.shimSource(for: game)
+        let shim = try Self.shimSource(for: game, alwaysFocused: Self.ignoresOcclusion)
         let fonts = try Self.fontScript(preload: game.preloadFonts)
         let ogg = game.decodesOgg ? [try Self.oggScript()] : []
         // Version 0.2.0 transcoded Ogg to AAC files here.
@@ -215,6 +218,10 @@ final class WebGameSession: NSObject, EngineSession {
         Self.add(startScripts, to: configuration.userContentController)
         webView = GameWebView(frame: .zero, configuration: configuration)
         view = webView
+        askToOpen = { [weak webView] url, done in
+            guard let webView else { return done() }
+            WebLinks.askToOpen(url, over: webView, done: done)
+        }
         startURL = URL(string: GameFolder.origin + game.startPage) ?? game.folder.indexURL
         super.init()
 
@@ -227,7 +234,7 @@ final class WebGameSession: NSObject, EngineSession {
         #if os(macOS)
         // -ignoreOcclusion YES keeps the page running while no window shows, as on a test Mac whose screen is locked,
         // where WebKit would hide the page and stop its animation frames.
-        if UserDefaults.standard.bool(forKey: "ignoreOcclusion") { Self.setOcclusionDetection(false, of: webView) }
+        if Self.ignoresOcclusion { Self.setOcclusionDetection(false, of: webView) }
         #endif
         #endif
         webView.allowsLinkPreview = false
@@ -265,6 +272,12 @@ final class WebGameSession: NSObject, EngineSession {
             controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
     }
+
+    #if DEBUG && os(macOS)
+    private static var ignoresOcclusion: Bool { UserDefaults.standard.bool(forKey: "ignoreOcclusion") }
+    #else
+    private static let ignoresOcclusion = false
+    #endif
 
     #if DEBUG && os(macOS)
     /// WebKit's `-[WKWebView _setWindowOcclusionDetectionEnabled:]`, for test runs only.
@@ -323,7 +336,7 @@ final class WebGameSession: NSObject, EngineSession {
         return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_FONTS__", with: json)
     }
 
-    static func shimSource(for game: WebGameConfiguration) throws -> String {
+    static func shimSource(for game: WebGameConfiguration, alwaysFocused: Bool = false) throws -> String {
         guard let url = Bundle.module.url(forResource: "nwjs-shim", withExtension: "js") else { throw WebRuntimeError.shimMissing }
         var config: [String: String] = [
             "mainModule": game.folder.mainModule, "cwd": GameFolder.virtualRoot, "platform": "darwin", "appName": game.appName,
@@ -341,6 +354,7 @@ final class WebGameSession: NSObject, EngineSession {
         }
         if game.storage != nil { config["storage"] = "files" }
         if game.scrollsPage { config["scrolling"] = "page" }
+        if alwaysFocused { config["focus"] = "always" }
         let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
         return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_CONFIG__", with: json)
     }
@@ -517,12 +531,9 @@ final class WebGameSession: NSObject, EngineSession {
     }
 
     private func openExternal(_ url: URL) {
-        guard ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") else { return }
-        #if canImport(UIKit)
-        UIApplication.shared.open(url)
-        #else
-        NSWorkspace.shared.open(url)
-        #endif
+        guard !ended, !askingLink, let link = WebLinks.page(url.absoluteString, mail: true) else { return }
+        askingLink = true
+        askToOpen(link) { [weak self] in self?.askingLink = false }
     }
 
     private func answerBridge(_ json: String) -> String {
