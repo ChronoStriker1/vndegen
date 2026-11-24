@@ -603,7 +603,7 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
         return;
     }
     sa_battle_set_names(&s->battle, text(&s->exp.dungeons, s->exp.dungeon - 1, 1), text(&s->exp.floors, s->exp.row, F_NAME));
-    sa_log(s, "battle: %s", group);
+    sa_log(s, "battle: %s, %d fighters", group, s->battle.count);
     s->vm.c[C_EXP_RESULT] = 1;
     s->vm.c[C_EXP_GROUP] = sa_table_int(&s->battle.groups, s->battle.group, 0);
     reset_countdown(s);
