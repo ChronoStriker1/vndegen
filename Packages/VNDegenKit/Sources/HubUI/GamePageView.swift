@@ -129,13 +129,15 @@ struct GamePageView: View {
                     .padding(.bottom, 8)
             }
             .overlay(alignment: .topLeading) {
-                HubButton(target: .back, kind: .icon) { Image(systemName: "chevron.left") }
-                    .accessibilityLabel("Back")
-                    .padding(.leading, metrics.insets.leading + metrics.topRowPadding(.leading))
-                    .padding(.top, metrics.insets.top + 10)
-                    #if os(macOS)
-                    .padding(.top, 18)
-                    #endif
+                if metrics.sideBar == nil {
+                    HubButton(target: .back, kind: .icon) { Image(systemName: "chevron.left") }
+                        .accessibilityLabel("Back")
+                        .padding(.leading, metrics.insets.leading + metrics.topRowPadding(.leading))
+                        .padding(.top, metrics.insets.top + 10)
+                        #if os(macOS)
+                        .padding(.top, 18)
+                        #endif
+                }
             }
     }
 

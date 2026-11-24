@@ -179,21 +179,23 @@ struct TopBar: View {
             .layoutPriority(1)
             // The stack's own spacing keeps the name off the buttons, so it may use all the room up to them.
             Spacer(minLength: 0)
-            // The empty library has its own, larger Add game button.
-            if !nav.visibleGames.isEmpty {
-                HubButton(target: .addGame, kind: .icon) { Image(systemName: "plus") }
-                    .accessibilityLabel("Add game")
-                // Shows the current layout. Pressing it moves to the next.
-                HubButton(target: .layoutButton, kind: .icon) { Image(systemName: nav.layout.systemImage) }
-                    .accessibilityLabel("Library view")
-                    .accessibilityValue(nav.layout.title)
+            if metrics.sideBar == nil {
+                // The empty library has its own, larger Add game button.
+                if !nav.visibleGames.isEmpty {
+                    HubButton(target: .addGame, kind: .icon) { Image(systemName: "plus") }
+                        .accessibilityLabel("Add game")
+                    // Shows the current layout. Pressing it moves to the next.
+                    HubButton(target: .layoutButton, kind: .icon) { Image(systemName: nav.layout.systemImage) }
+                        .accessibilityLabel("Library view")
+                        .accessibilityValue(nav.layout.title)
+                }
+                HubButton(target: .lockButton, kind: .icon) {
+                    Image(systemName: hub.lock.isUnlocked ? "lock.open.fill" : "lock.fill")
+                }
+                .accessibilityLabel(hub.lock.isUnlocked ? "Hide hidden games" : "Show hidden games")
+                HubButton(target: .settingsButton, kind: .icon) { Image(systemName: "gearshape.fill") }
+                    .accessibilityLabel("Settings")
             }
-            HubButton(target: .lockButton, kind: .icon) {
-                Image(systemName: hub.lock.isUnlocked ? "lock.open.fill" : "lock.fill")
-            }
-            .accessibilityLabel(hub.lock.isUnlocked ? "Hide hidden games" : "Show hidden games")
-            HubButton(target: .settingsButton, kind: .icon) { Image(systemName: "gearshape.fill") }
-                .accessibilityLabel("Settings")
         }
         .padding(.leading, besideControls ? metrics.topRowPadding(.leading) : metrics.padding)
         .padding(.trailing, besideControls ? metrics.topRowPadding(.trailing) : metrics.padding)

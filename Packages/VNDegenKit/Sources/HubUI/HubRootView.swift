@@ -12,6 +12,7 @@ public struct HubRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var backgrounded = false
     @State private var windowControls = WindowControlsInsets()
+    @State private var barEdge: HorizontalEdge?
 
     public init(hub: Hub) {
         self.hub = hub
@@ -25,12 +26,17 @@ public struct HubRootView: View {
                           foldGap: fold.map { $0.height >= $0.width ? $0.width : 0 } ?? 0)
     }
 
+    private func libraryMetrics(_ geo: GeometryProxy) -> HubMetrics {
+        let insets = geo.safeAreaInsets
+        return metrics(geo).withSideBar(on: barEdge, occlusions: geo.occlusions().map { $0.offsetBy(dx: insets.leading, dy: insets.top) })
+    }
+
     public var body: some View {
         GeometryReader { geo in
             Group {
                 switch hub.screen {
                 // The player keeps the system's safe area, which its touch controls and game pane are laid out in.
-                case .library: LibraryContainer().besideSideCamera(metrics(geo))
+                case .library: LibraryContainer().besideSideCamera(libraryMetrics(geo))
                 case let .playing(_, session): PlayerView(hub: hub, session: session)
                 }
                 // The screenshot viewer covers the library from here rather than from the library's own overlay, since the
@@ -47,6 +53,9 @@ public struct HubRootView: View {
         #if os(iOS)
         .background {
             WindowControlsReader { windowControls = $0 }
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
+            VerticalBarEdgeReader { barEdge = $0 }
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
         }
@@ -105,6 +114,12 @@ private struct LibraryContainer: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: nav.path)
+        .overlay {
+            if let placement = metrics.sideBar {
+                HubSideBar(placement: placement)
+            }
+        }
+        .onChange(of: metrics.sideBar != nil, initial: true) { _, vertical in nav.verticalBar = vertical }
         .overlay(alignment: .bottom) {
             if nav.checkingSaves != nil {
                 Label("Checking for newer saves…", systemImage: "arrow.triangle.2.circlepath")

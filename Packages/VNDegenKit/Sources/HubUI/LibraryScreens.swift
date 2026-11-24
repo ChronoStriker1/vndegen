@@ -21,8 +21,10 @@ private struct ScreenHeader: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            HubButton(target: .back, kind: .icon) { Image(systemName: "chevron.left") }
-                .accessibilityLabel("Back")
+            if metrics.sideBar == nil {
+                HubButton(target: .back, kind: .icon) { Image(systemName: "chevron.left") }
+                    .accessibilityLabel("Back")
+            }
             Text(title).font(.display(metrics.isCompact ? 24 : 30))
             if let detail {
                 Text(detail).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.tertiaryText)

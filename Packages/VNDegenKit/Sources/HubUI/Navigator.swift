@@ -214,6 +214,7 @@ final class Navigator {
     }
     /// Set by the home screen's header list from its width.
     var headerColumns = 1
+    var verticalBar = false
     /// How the game page lays out its buttons, set by the page from the width it has.
     enum PageActions {
         /// Play and the rest in one row.
@@ -329,11 +330,11 @@ final class Navigator {
             let archives = hub.localArchives.map { Target.importArchive($0.url) }
             if visibleGames.isEmpty {
                 // The empty library lists archives one under another.
-                return [Row(id: "bar", items: [.lockButton, .settingsButton])]
+                return barRows([.lockButton, .settingsButton])
                     + archives.map { Row(id: "\($0)", items: [$0]) }
                     + [Row(id: "empty-add", items: [.addGame]), Row(id: "empty-folder", items: [.openFolder, .rescan])]
             }
-            var rows = [Row(id: "bar", items: [.addGame, .layoutButton, .lockButton, .settingsButton])]
+            var rows = barRows([.addGame, .layoutButton, .lockButton, .settingsButton])
             if layout == .featured, heroGame != nil { rows.append(Row(id: "hero", items: [.play, .details])) }
             if !archives.isEmpty { rows.append(Row(id: Self.archivesRowID, items: archives)) }
             for (shelf, games) in shelves {
@@ -399,6 +400,10 @@ final class Navigator {
             items.append(.settingsPage(.licenses))
             return rows + items.map { Row(id: "settings-\($0)", items: [$0]) }
         }
+    }
+
+    private func barRows(_ items: [Target]) -> [Row] {
+        verticalBar ? items.map { Row(id: "bar-\($0)", items: [$0]) } : [Row(id: "bar", items: items)]
     }
 
     /// The open game page's screenshots, empty until a lookup finds some.

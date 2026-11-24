@@ -437,3 +437,21 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(!nav.rows().contains { $0.items.contains(.pageScreenshotsMore) })
     #expect(nav.rows().flatMap(\.items).filter { if case .pageScreenshot = $0 { true } else { false } }.count == 9)
 }
+
+@MainActor
+@Test func aVerticalBarStacksItsButtonsSoUpAndDownMoveThroughThem() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.back()
+    nav.layout = .headers
+    nav.verticalBar = true
+    #expect(nav.rows().map(\.id) == ["bar-addGame", "bar-layoutButton", "bar-lockButton", "bar-settingsButton", "all-0"])
+    nav.setFocus(.addGame)
+    press(nav, .down)
+    #expect(nav.focus == .layoutButton)
+    press(nav, .down, .down, .down)
+    #expect(nav.focus == .tile(.all, id))
+    press(nav, .up)
+    #expect(nav.focus == .settingsButton)
+    nav.verticalBar = false
+    #expect(nav.rows().map(\.id) == ["bar", "all-0"])
+}

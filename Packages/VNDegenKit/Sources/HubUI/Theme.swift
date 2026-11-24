@@ -1,4 +1,5 @@
 import SwiftUI
+import ControllerUI
 
 enum Theme {
     static let background = Color(red: 0.035, green: 0.035, blue: 0.06)
@@ -29,6 +30,7 @@ struct HubMetrics: Equatable {
     var acrossSideCamera = false
     var foldable = false
     var foldGap: CGFloat = 0
+    var sideBar: SideBarPlacement?
 
     /// Width including the safe area, for art that runs edge to edge.
     var fullWidth: CGFloat { size.width + insets.leading + insets.trailing }
@@ -74,7 +76,7 @@ struct HubMetrics: Equatable {
     /// camera's corner kept clear as an iPad window's controls are, through `topRowPadding` and `cornerClearance`.
     var besideSideCamera: HubMetrics {
         let side = sideCamera
-        guard side > 0 else { return self }
+        guard side > 0, sideBar == nil else { return self }
         var metrics = self
         metrics.size.width += insets.leading + insets.trailing
         metrics.windowControls.leading = max(windowControls.leading, insets.leading)
@@ -83,6 +85,21 @@ struct HubMetrics: Equatable {
         metrics.insets.leading = 0
         metrics.insets.trailing = 0
         metrics.acrossSideCamera = true
+        return metrics
+    }
+
+    func withSideBar(on edge: HorizontalEdge?, occlusions: [CGRect]) -> HubMetrics {
+        guard let edge else { return self }
+        let bar = SideBarPlacement(edge: edge, size: CGSize(width: fullWidth, height: fullHeight), insets: insets, occlusions: occlusions)
+        var metrics = self
+        metrics.sideBar = bar
+        if edge == .leading {
+            metrics.size.width -= max(0, bar.width - insets.leading)
+            metrics.insets.leading = max(insets.leading, bar.width)
+        } else {
+            metrics.size.width -= max(0, bar.width - insets.trailing)
+            metrics.insets.trailing = max(insets.trailing, bar.width)
+        }
         return metrics
     }
 
@@ -168,7 +185,7 @@ extension View {
     /// Lays the content out across a side camera's inset, with metrics to match. See `HubMetrics.sideCamera`.
     func besideSideCamera(_ metrics: HubMetrics) -> some View {
         environment(\.hubMetrics, metrics.besideSideCamera)
-            .ignoresSafeArea(.container, edges: metrics.sideCamera > 0 ? .horizontal : [])
+            .ignoresSafeArea(.container, edges: metrics.besideSideCamera.acrossSideCamera ? .horizontal : [])
     }
 
     /// A form across a side camera's inset. A form takes its side margins from the system's safe area, which the hub
@@ -187,7 +204,9 @@ extension View {
     /// Insets both sides by the larger horizontal safe area, so centered layouts stay centered on the screen when only
     /// one side has an inset, such as the iPhone Duo's 84 pt camera inset.
     func balancedHorizontalSafeArea(_ metrics: HubMetrics) -> some View {
-        padding(.horizontal, max(metrics.insets.leading, metrics.insets.trailing))
+        let side = max(metrics.insets.leading, metrics.insets.trailing)
+        return padding(.leading, metrics.sideBar == nil ? side : metrics.insets.leading)
+            .padding(.trailing, metrics.sideBar == nil ? side : metrics.insets.trailing)
             .ignoresSafeArea(edges: .horizontal)
     }
 }
