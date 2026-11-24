@@ -553,7 +553,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         }
         break;
     case 0xde:
-        if (in->count >= 1) sa_vm_set(vm, &in->o[0], 0);
+        if (in->count >= 1) sa_vm_set(vm, &in->o[0], sa_exp_area_registered(s));
         break;
     case 0x01:
     case 0xa1:

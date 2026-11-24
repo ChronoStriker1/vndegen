@@ -404,6 +404,12 @@ static void spawn_group(SA *s, const char *name) {
     sa_log(s, "group %d (%s) at %d,%d", g->number, name, g->x, g->y);
 }
 
+int sa_exp_area_registered(SA *s) {
+    if (!s->exp.active) return 0;
+    int entry = sa_table_int(&s->exp.floors, s->exp.row, F_ENTRY);
+    return entry > 0 && entry < SA_F_VARS && s->vm.f[entry];
+}
+
 void sa_exp_add_group(SA *s, const char *name) {
     if (!s->exp.active) return;
     spawn_group(s, name);
@@ -472,6 +478,8 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
         return;
     }
     sa_dungeon_art(&s->dungeon, &s->vfs, platform);
+    int entry = sa_table_int(&e->floors, r, F_ENTRY);
+    if (entry > 0 && entry < SA_F_VARS && s->vm.f[entry]) sa_dungeon_open_doors(&s->dungeon);
     u32 fog = (u32)sa_table_int(&e->floors, r, F_FOG);
     s->dungeon.r3.fogColor = (fog >> 16 & 0xff) | (fog & 0xff00) | (fog & 0xff) << 16;
     s->dungeon.floorGain = sa_table_int(&e->floors, r, F_GLOW) == 1 ? GLOW_GAIN_X100 / 100.0f : 1;

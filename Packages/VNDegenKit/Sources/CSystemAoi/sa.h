@@ -312,6 +312,7 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
 int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
 bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map);
+void sa_dungeon_open_doors(Dungeon *d);
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side);
 bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y);
 int sa_dungeon_passage_side(const Dungeon *d);

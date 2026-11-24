@@ -12,6 +12,7 @@ enum {
     F_WALL_W = 18,
     WALL_PASSAGE = 20,
     OBJECT_DOOR = 100,
+    OBJECT_DOOR_SPOT = 99,
     WALL_DOORWAY = 10,
     WALL_ONE_WAY = 100,
     VIEW_CELLS = 6,
@@ -257,6 +258,11 @@ bool sa_dungeon_find_entrance(const Dungeon *d, int *x, int *y, int *dir) {
         for (int side = 0; side < 4; side++)
             if (d->cell[c][F_FLOOR] >= 0 && d->cell[c][wallField[side]] == WALL_PASSAGE && step_in(d, c, x, y, dir)) return true;
     return false;
+}
+
+void sa_dungeon_open_doors(Dungeon *d) {
+    for (int c = 0; c < DUN_CELLS; c++)
+        if (d->cell[c][F_OBJECT] == OBJECT_DOOR_SPOT) d->cell[c][F_OBJECT] = OBJECT_DOOR;
 }
 
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side) {
