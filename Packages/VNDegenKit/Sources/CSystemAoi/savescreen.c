@@ -290,7 +290,8 @@ static void draw_detail(u32 *fb, const SaveSummary *m, int slot) {
         return;
     }
     int x = DETAIL_X + DETAIL_INDENT;
-    snprintf(t, sizeof t, "%dターン %s%s%s", m->turn, m->place[0], m->place[1][0] ? " " : "", m->place[1]);
+    if (m->place[1][0]) snprintf(t, sizeof t, "%dターン %s %s %d歩目", m->turn, m->place[0], m->place[1], m->steps);
+    else snprintf(t, sizeof t, "%dターン %s", m->turn, m->place[0]);
     big(fb, t, x, DETAIL_Y + DETAIL_LINE);
     static const char *const labels[4] = {"住民", "食料", "資金", "資源"};
     for (int k = 0; k < 4; k++) {

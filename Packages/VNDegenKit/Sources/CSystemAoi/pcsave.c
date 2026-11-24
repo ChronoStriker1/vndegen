@@ -176,12 +176,17 @@ static void read_members(SA *s, const u8 *img) {
         int k = at(img, FORM_AT + (size_t)cell * 4), slot = form_slot(cell);
         if (k < 0 || k >= count || done[k] || (slot < 0 && cell < FORM_RESERVE)) continue;
         Bench b = member_at(img, k);
+        b.tile = slot < 0 ? cell - FORM_RESERVE : -1;
         if (slot >= 0) put_slot(s, slot, &b);
         else if (p->benchCount < PARTY_BENCH) p->bench[p->benchCount++] = b;
         done[k] = true;
     }
     for (int k = 0; k < count; k++)
-        if (!done[k] && p->benchCount < PARTY_BENCH) p->bench[p->benchCount++] = member_at(img, k);
+        if (!done[k] && p->benchCount < PARTY_BENCH) {
+            Bench b = member_at(img, k);
+            b.tile = -1;
+            p->bench[p->benchCount++] = b;
+        }
     if (!sa_party_members(p) && p->benchCount) {
         Bench b = p->bench[0];
         memmove(p->bench, p->bench + 1, sizeof(Bench) * (size_t)--p->benchCount);
@@ -390,6 +395,7 @@ static void write_members(SA *s, u8 *img) {
         for (int j = 0; j < p->benchCount && !b.unit; j++)
             if (p->bench[j].unit == id) b = p->bench[j];
         if (!b.unit) continue;
+        if (cell < 0 && b.tile >= 0 && b.tile < RESERVE_TILES) cell = FORM_RESERVE + b.tile;
         write_member(s, img, k, &b, cell >= 0, at >= 0 ? bonus[at] : NULL);
         if (cell >= 0) put(img, FORM_AT + (size_t)cell * 4, k);
         k++;
@@ -561,6 +567,7 @@ bool sa_pcsave_summary(SA *s, const char *path, SaveSummary *out) {
     if ((int)rd32(c + DUNGEON_VAR * 4) > 0) sa_exp_names(s, (int)rd32(c + DUNGEON_VAR * 4), (int)rd32(c + (DUNGEON_VAR + 1) * 4), &dungeon, &floor);
     snprintf(out->place[0], sizeof out->place[0], "%s", dungeon ? dungeon : "街");
     snprintf(out->place[1], sizeof out->place[1], "%s", floor ? floor : "");
+    out->steps = (int)rd32(c + C_PLACE_STEPS * 4);
     int weapon = at(img, MEMBER_AT + MEMBER_EQUIP);
     for (int i = 0; weapon && i < s->equip.items.rows; i++)
         if (sa_table_int(&s->equip.items, i, 0) == weapon) snprintf(out->weapon, sizeof out->weapon, "%s", sa_table_text(&s->equip.items, i, 1));

@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 5u
+#define SAVE_VERSION 6u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
@@ -75,6 +75,7 @@ void sa_save_current(SA *s, SaveSummary *out) {
     sa_exp_place_names(s, &dungeon, &floor);
     copy_name(out->place[0], dungeon ? dungeon : "街");
     copy_name(out->place[1], floor);
+    out->steps = s->vm.c[C_PLACE_STEPS];
     for (int i = 0; s->party.equip[LEADER] && i < s->equip.items.rows; i++)
         if (sa_table_int(&s->equip.items, i, 0) == s->party.equip[LEADER]) copy_name(out->weapon, sa_table_text(&s->equip.items, i, 1));
 }
@@ -90,6 +91,7 @@ static void write_summary(Writer *w, SA *s, int count) {
     put32(w, (u32)count);
     put(w, m.place, sizeof m.place);
     put(w, m.weapon, sizeof m.weapon);
+    put32(w, (u32)m.steps);
 }
 
 static void read_summary(Reader *r, SaveSummary *out) {
@@ -100,6 +102,7 @@ static void read_summary(Reader *r, SaveSummary *out) {
     out->count = (int)get32(r);
     get(r, out->place, sizeof out->place);
     get(r, out->weapon, sizeof out->weapon);
+    out->steps = (int)get32(r);
     out->place[0][47] = out->place[1][47] = out->weapon[47] = 0;
 }
 
@@ -156,8 +159,8 @@ static bool write_sidecar(SA *s, int slot, int count) {
     put32(&w, (u32)p->benchCount);
     for (int i = 0; i < p->benchCount; i++) {
         const Bench *b = &p->bench[i];
-        const int v[7] = {b->unit, b->hp, b->mp, b->level, b->exp, b->equip, b->sp};
-        put_ints(&w, v, 7);
+        const int v[8] = {b->unit, b->hp, b->mp, b->level, b->exp, b->equip, b->sp, b->tile};
+        put_ints(&w, v, 8);
         put_ints(&w, b->trained, 10);
     }
     put(&w, s->exp.explored, sizeof(*s->exp.explored) * EXP_DUNGEONS);
@@ -281,9 +284,9 @@ static bool read_sidecar(SA *s, int slot) {
     if (p->benchCount < 0 || p->benchCount > PARTY_BENCH) r.bad = true, p->benchCount = 0;
     for (int i = 0; i < p->benchCount; i++) {
         Bench *b = &p->bench[i];
-        int v[7];
-        get_ints(&r, v, 7);
-        b->unit = v[0], b->hp = v[1], b->mp = v[2], b->level = v[3], b->exp = v[4], b->equip = v[5], b->sp = v[6];
+        int v[8];
+        get_ints(&r, v, 8);
+        b->unit = v[0], b->hp = v[1], b->mp = v[2], b->level = v[3], b->exp = v[4], b->equip = v[5], b->sp = v[6], b->tile = v[7];
         get_ints(&r, b->trained, 10);
     }
     get(&r, s->exp.explored, sizeof(*s->exp.explored) * EXP_DUNGEONS);

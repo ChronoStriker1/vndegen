@@ -51,13 +51,13 @@ typedef struct Train {
 typedef struct Deploy {
     Image *art[18], *benchSprite[PARTY_BENCH];
     int benchUnit[PARTY_BENCH];
-    int hover, picked;
+    int hover, picked, heldX, heldY;
 } Deploy;
 
 typedef struct SaveSummary {
     bool used;
     u32 time;
-    int turn, town[4], level, count, play;
+    int turn, town[4], level, count, play, steps;
     char place[2][48], weapon[48];
 } SaveSummary;
 
@@ -86,7 +86,7 @@ typedef struct ExpGroup {
 typedef struct Expedition {
     bool active;
     int dungeon, floor, row;
-    int steps, areaStart, fighting;
+    int steps, areaStart, fighting, stepsLeft;
     int arriveSide, arriveAlong, resumeX, resumeY, resumeDir;
     int last[4], entry[4];
     bool keepGroups;

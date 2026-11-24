@@ -34,6 +34,7 @@ enum {
     GROUP_SPAWN_DISTANCE = 8,
     GROUP_COOLDOWN = 40,
     GROUP_FLED = 2,
+    ENCOUNTER_FROM = 40,
     MAP_SIDE = 15,
 };
 
@@ -61,7 +62,11 @@ enum {
     F_NAME = 4,
     F_MAP = 5,
     F_SET = 6,
+    F_SPREAD = 12,
+    F_STEPS = 13,
     F_GROUP_LISTS = 30,
+    F_GROUP_WEIGHTS = 32,
+    F_MORE_GROUPS = 35,
     F_CHESTS = 36,
 };
 
@@ -311,6 +316,7 @@ static int group_id(SA *s, const char *name) {
 }
 
 static void sync_marks(SA *s);
+static void reset_countdown(SA *s);
 
 static void set_target(ExpGroup *g, int c) {
     for (int i = 0; i < EXP_TARGETS; i++) g->target[i][0] = g->target[i][1] = -1;
@@ -419,7 +425,10 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     e->dungeon = dungeon;
     e->floor = floor;
     e->row = r;
-    if (fresh) e->steps = 0;
+    if (fresh) {
+        e->steps = 0;
+        reset_countdown(s);
+    }
     e->areaStart = e->steps;
     if (e->arriveSide >= 0) {
         if (!sa_dungeon_arrive(&s->dungeon, e->arriveSide, e->arriveAlong)) e->arriveSide = -1;
@@ -492,17 +501,42 @@ void sa_exp_place_names(SA *s, const char **dungeon, const char **floor) {
     else *dungeon = *floor = NULL;
 }
 
-static void start_battle(SA *s, int which) {
-    Expedition *e = &s->exp;
-    if (which < 0 || which >= e->groupCount) return;
-    ExpGroup *g = &e->group[which];
-    const char *group = group_name(s, g->party);
-    if (!group) return;
-    e->fighting = which;
+static void pick_group(SA *s, char *out, size_t size) {
+    static const int lists[3] = {F_GROUP_LISTS, F_GROUP_LISTS + 1, F_MORE_GROUPS};
+    int weight[3], total = 0;
+    for (int i = 0; i < 3; i++) {
+        const char *l = text(&s->exp.floors, s->exp.row, lists[i]);
+        weight[i] = *l && strcmp(l, "*") ? sa_table_int(&s->exp.floors, s->exp.row, F_GROUP_WEIGHTS + i) : 0;
+        total += weight[i];
+    }
+    int which = 1;
+    if (total > 0) {
+        int roll = (int)(sa_vm_random(&s->vm) % (u32)total);
+        for (which = 0; which < 2 && roll >= weight[which]; which++) roll -= weight[which];
+    }
+    const char *list = text(&s->exp.floors, s->exp.row, lists[which]);
+    int n = 1;
+    for (const char *p = list; *p; p++) n += *p == '|';
+    int k = (int)(sa_vm_random(&s->vm) % (u32)n);
+    const char *p = list;
+    while (k-- > 0) p = strchr(p, '|') + 1;
+    const char *end = strchr(p, '|');
+    size_t len = end ? (size_t)(end - p) : strlen(p);
+    if (len >= size) len = size - 1;
+    memcpy(out, p, len);
+    out[len] = 0;
+}
+
+static void reset_countdown(SA *s) {
+    int steps = sa_table_int(&s->exp.floors, s->exp.row, F_STEPS), spread = sa_table_int(&s->exp.floors, s->exp.row, F_SPREAD);
+    s->exp.stepsLeft = steps - spread + (int)(sa_vm_random(&s->vm) % (u32)(2 * spread + 1));
+}
+
+static void begin_battle(SA *s, const char *group, const int *cells) {
     sa_dungeon_draw(&s->dungeon, s->fb);
     Image *view = sa_image_new(SA_W, SA_H);
     memcpy(view->px, s->fb, sizeof(u32) * SA_W * SA_H);
-    if (!sa_battle_begin(&s->battle, &s->vfs, group, g->cells, view, s->exp.dungeon - 1, sa_vm_random(&s->vm))) {
+    if (!sa_battle_begin(&s->battle, &s->vfs, group, cells, view, s->exp.dungeon - 1, sa_vm_random(&s->vm))) {
         sa_log(s, "no enemy group %s", group);
         return;
     }
@@ -510,8 +544,26 @@ static void start_battle(SA *s, int which) {
     sa_log(s, "battle: %s", group);
     s->vm.c[C_EXP_RESULT] = 1;
     s->vm.c[C_EXP_GROUP] = sa_table_int(&s->battle.groups, s->battle.group, 0);
+    reset_countdown(s);
     static const int hooks[] = {HOOK_BATTLE_START};
     run_hooks(s, hooks, 1, AFTER_BATTLE);
+}
+
+static void start_battle(SA *s, int which) {
+    Expedition *e = &s->exp;
+    if (which < 0 || which >= e->groupCount) return;
+    ExpGroup *g = &e->group[which];
+    const char *group = group_name(s, g->party);
+    if (!group) return;
+    e->fighting = which;
+    begin_battle(s, group, g->cells);
+}
+
+static void random_battle(SA *s) {
+    char group[64];
+    pick_group(s, group, sizeof group);
+    s->exp.fighting = -1;
+    begin_battle(s, group, NULL);
 }
 
 void sa_exp_battle_over(SA *s, int result) {
@@ -689,6 +741,10 @@ static void after_move(SA *s, int r) {
     sync_marks(s);
     if (hit >= 0) {
         start_battle(s, hit);
+        return;
+    }
+    if (e->steps >= ENCOUNTER_FROM && --e->stepsLeft <= 0) {
+        random_battle(s);
         return;
     }
     if (sa_dungeon_object(d) >= 0) {

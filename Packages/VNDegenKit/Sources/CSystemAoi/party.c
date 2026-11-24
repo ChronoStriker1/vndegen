@@ -14,7 +14,6 @@ enum {
     TILE_H = 150,
     RESERVE_X = -16,
     RESERVE_Y = 588,
-    RESERVE_SLOTS = 5,
     FEET = 17,
     LABEL_Y = 695,
     COUNT_RIGHT = 44,
@@ -52,6 +51,7 @@ static Image *crop(const Image *im, int sy, int h) {
 
 bool sa_party_init(Party *p, Vfs *vfs) {
     memset(p, 0, sizeof *p);
+    p->vfs = vfs;
     if (!sa_table_load(&p->units, vfs, "unit.obj") || !sa_table_load(&p->abilities, vfs, "ability.obj")) return false;
     p->platform = sa_load_image(vfs, "m996bt1a.agf");
     Image *tiles = sa_load_image(vfs, "mfloor01.agf");
@@ -69,6 +69,7 @@ bool sa_party_init(Party *p, Vfs *vfs) {
 
 void sa_party_free(Party *p) {
     for (int i = 0; i < PARTY_SLOTS; i++) sa_image_free(p->sprite[i]);
+    for (int i = 0; i < PARTY_RESERVE; i++) sa_image_free(p->reserveSprite[i]);
     sa_image_free(p->platform);
     sa_image_free(p->tile);
     sa_image_free(p->smallTile);
@@ -220,7 +221,7 @@ void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy, int frame) {
 }
 
 void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY, const int *frames) {
-    for (int k = 0; k < RESERVE_SLOTS; k++)
+    for (int k = 0; k < PARTY_RESERVE; k++)
         sa_blit(fb, p->smallTile, boardX - PLATFORM_X + RESERVE_X + k * STEP_X / 2, boardY - PLATFORM_Y + RESERVE_Y + k * STEP_Y / 2);
     for (int s = 0; s < PARTY_SLOTS; s++) {
         int x, y;
@@ -270,6 +271,33 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platfo
             int r = sa_party_unit_row(p, p->unit[s]);
             sa_party_draw_bars(p, fb, cx - 22, y, p->hp[s], sa_table_int(&p->units, r, 23), p->mp[s], sa_table_int(&p->units, r, 24));
         }
+    for (int t = 0; t < PARTY_RESERVE; t++) {
+        int b = sa_party_reserve_at(p, t), unit = b >= 0 ? p->bench[b].unit : 0;
+        if (p->reserveUnit[t] != unit) {
+            sa_image_free(p->reserveSprite[t]);
+            p->reserveSprite[t] = NULL;
+            p->reserveUnit[t] = unit;
+            if (unit && p->vfs) {
+                char name[24];
+                snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&p->units, sa_party_unit_row(p, unit), 11));
+                Image *full = sa_load_image(p->vfs, name);
+                if (full) {
+                    int cols, rows;
+                    sa_sprite_layout(full, &cols, &rows);
+                    Image *cell = sa_image_new(full->w / cols, full->h / rows);
+                    for (int y = 0; y < cell->h; y++) memcpy(cell->px + (size_t)y * cell->w, full->px + (size_t)y * full->w, sizeof(u32) * (size_t)cell->w);
+                    p->reserveSprite[t] = half_size(cell, 0, cell->h);
+                    sa_image_free(cell);
+                    sa_image_free(full);
+                }
+            }
+        }
+        const Image *im = p->reserveSprite[t];
+        if (!im) continue;
+        int cx = RESERVE_X + t * STEP_X / 2 + p->smallTile->w / 2;
+        int cy = RESERVE_Y + t * STEP_Y / 2 + p->smallTile->h / 2;
+        sa_blit(fb, im, cx - im->w / 2, cy + FEET / 2 - im->h);
+    }
     sa_blit(fb, p->label, 1, LABEL_Y);
     char n[16];
     snprintf(n, sizeof n, "%d", sa_party_rank(p));
@@ -365,8 +393,22 @@ bool sa_party_join(Party *p, Vfs *vfs, const char *key) {
         b->mp = sa_table_int(&p->units, r, 24);
         b->level = 1;
         b->sp = sa_table_int(&p->units, r, 37);
+        b->tile = -1;
     }
     return true;
+}
+
+int sa_party_reserve_at(const Party *p, int tile) {
+    for (int i = 0; i < p->benchCount; i++)
+        if (p->bench[i].tile == tile) return i;
+    return -1;
+}
+
+void sa_party_set_reserve(Party *p, int index, int tile) {
+    if (index < 0 || index >= p->benchCount || tile >= PARTY_RESERVE) return;
+    int there = tile >= 0 ? sa_party_reserve_at(p, tile) : -1;
+    if (there >= 0) p->bench[there].tile = p->bench[index].tile;
+    p->bench[index].tile = tile;
 }
 
 #define SWAP(field)                                                                                                    \
@@ -410,6 +452,7 @@ bool sa_party_bench(Party *p, int slot) {
     b->exp = p->exp[slot];
     b->equip = p->equip[slot];
     b->sp = p->sp[slot];
+    b->tile = -1;
     memcpy(b->trained, p->trained[slot], sizeof b->trained);
     sa_image_free(p->sprite[slot]);
     p->sprite[slot] = NULL;

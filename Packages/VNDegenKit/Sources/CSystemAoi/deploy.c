@@ -37,6 +37,7 @@ enum {
     HOVER_MAIN = 100,
     HOVER_BENCH = 200,
     HOVER_ROW = 300,
+    HOVER_UNIT = 400,
 };
 
 enum { ART_TOP, ART_BOTTOM, ART_DISMISS, ART_TILE, ART_LIST, ART_ROWS, ART_BADGE, ART_BACK, ART_BG, ART_PLATFORM, ART_RANK, ART_FORM, ART_TAB0, ART_COUNT = ART_TAB0 + 6 };
@@ -78,7 +79,7 @@ static int rows(const SA *s, int *keys) {
     int n = 0;
     for (int i = 0; i < 6; i++)
         if (s->party.unit[mainSlot[i]]) keys[n++] = HOVER_MAIN + i;
-    for (int i = 0; i < s->party.benchCount; i++) keys[n++] = HOVER_BENCH + i;
+    for (int i = 0; i < s->party.benchCount; i++) keys[n++] = HOVER_UNIT + i;
     return n;
 }
 
@@ -112,16 +113,28 @@ static int rank_with(const SA *s, int slot, int unit) {
     return sum;
 }
 
+static bool is_main(int k) { return k >= HOVER_MAIN && k < HOVER_MAIN + 6; }
+
+static bool is_tile(int k) { return k >= HOVER_BENCH && k < HOVER_BENCH + BENCH_SLOTS; }
+
+static int bench_index(const SA *s, int k) {
+    if (is_tile(k)) return sa_party_reserve_at(&s->party, k - HOVER_BENCH);
+    if (k >= HOVER_UNIT && k - HOVER_UNIT < s->party.benchCount) return k - HOVER_UNIT;
+    return -1;
+}
+
 static void apply(SA *s, int from, int to) {
     Party *p = &s->party;
-    if (from >= HOVER_MAIN && from < HOVER_BENCH && to >= HOVER_MAIN && to < HOVER_BENCH)
+    int b = bench_index(s, from);
+    if (is_main(from) && is_main(to))
         sa_party_swap(p, mainSlot[from - HOVER_MAIN], mainSlot[to - HOVER_MAIN]);
-    else if (from >= HOVER_MAIN && from < HOVER_BENCH && to >= HOVER_BENCH)
-        sa_party_bench(p, mainSlot[from - HOVER_MAIN]);
-    else if (from >= HOVER_BENCH && from - HOVER_BENCH < p->benchCount && to >= HOVER_MAIN && to < HOVER_BENCH) {
+    else if (is_main(from) && (is_tile(to) || to >= HOVER_UNIT)) {
+        if (sa_party_bench(p, mainSlot[from - HOVER_MAIN]) && is_tile(to)) sa_party_set_reserve(p, p->benchCount - 1, to - HOVER_BENCH);
+    } else if (b >= 0 && is_main(to)) {
         int slot = mainSlot[to - HOVER_MAIN];
-        if (rank_with(s, slot, p->bench[from - HOVER_BENCH].unit) <= s->vm.c[C_RANK_MAX]) sa_party_unbench(p, &s->vfs, from - HOVER_BENCH, slot);
-    }
+        if (rank_with(s, slot, p->bench[b].unit) <= s->vm.c[C_RANK_MAX]) sa_party_unbench(p, &s->vfs, b, slot);
+    } else if (b >= 0 && is_tile(to))
+        sa_party_set_reserve(p, b, to - HOVER_BENCH);
 }
 
 static const Image *bench_sprite(SA *s, int i) {
@@ -162,12 +175,13 @@ static void draw(SA *s) {
     for (int i = 0; i < 6; i++) {
         int k = HOVER_MAIN + i;
         tile(d, fb, main_x(i), main_y(i), d->picked == k || d->hover == k);
-        if (p->unit[mainSlot[i]]) sprite(fb, p->sprite[mainSlot[i]], main_x(i), main_y(i));
+        if (p->unit[mainSlot[i]] && d->picked != k) sprite(fb, p->sprite[mainSlot[i]], main_x(i), main_y(i));
     }
     for (int i = 0; i < BENCH_SLOTS; i++) {
         int k = HOVER_BENCH + i, x = BENCH_X + i * BENCH_DX;
         tile(d, fb, x, BENCH_Y, d->picked == k || d->hover == k);
-        if (i < p->benchCount) sprite(fb, bench_sprite(s, i), x, BENCH_Y);
+        int b = sa_party_reserve_at(p, i);
+        if (b >= 0 && d->picked != k && d->picked != HOVER_UNIT + b) sprite(fb, bench_sprite(s, b), x, BENCH_Y);
     }
     tile(d, fb, 445, 536, false);
     sa_blit_rect(fb, d->art[ART_RANK], 0, 0, 92, 21, 230, 26);
@@ -182,17 +196,17 @@ static void draw(SA *s) {
     sa_font_set_plain(true);
     for (int i = 0; i < n && i < ROWS; i++) {
         int k = keys[i], y = ROW_Y + i * ROW_H, unit, level;
-        if (k < HOVER_BENCH) {
+        if (is_main(k)) {
             int sl = mainSlot[k - HOVER_MAIN];
             unit = p->unit[sl];
             level = p->level[sl];
         } else {
-            unit = p->bench[k - HOVER_BENCH].unit;
-            level = p->bench[k - HOVER_BENCH].level;
+            unit = p->bench[k - HOVER_UNIT].unit;
+            level = p->bench[k - HOVER_UNIT].level;
         }
         int frame = d->picked == k ? 2 : d->hover == HOVER_ROW + i ? 3 : 0;
         sa_blit_rect(fb, d->art[ART_ROWS], 0, frame * ROW_H, ROW_W, ROW_H, LIST_X, y);
-        if (k < HOVER_BENCH) sa_blit(fb, d->art[ART_BADGE], BADGE_X, y + BADGE_DY);
+        if (is_main(k) || p->bench[k - HOVER_UNIT].tile >= 0) sa_blit(fb, d->art[ART_BADGE], BADGE_X, y + BADGE_DY);
         int r = sa_party_unit_row(p, unit);
         sa_text_draw(fb, SA_W, SA_H, sa_table_text(&p->units, r, 2), -1, NAME_X, y + TEXT_DY, 18, 0x000000, NO_EDGE);
         const int stats[4] = {level, sa_table_int(&p->units, r, 15), sa_table_int(&p->units, r, 31), sa_table_int(&p->units, r, 32)};
@@ -209,6 +223,10 @@ static void draw(SA *s) {
     sa_card_draw(s, fb, focus >= HOVER_MAIN && focus < HOVER_BENCH ? mainSlot[focus - HOVER_MAIN] : -1, CARD_X, CARD_Y);
     sa_party_draw_diorama(p, fb, s->vm.c[C_RANK_MAX], d->art[ART_PLATFORM]);
     sa_blit_rect(fb, d->art[ART_BACK], 0, d->hover == HOVER_BACK ? BTN_H : 0, BTN_W, BTN_H, BACK_X, BACK_Y);
+    const Image *held = NULL;
+    if (is_main(d->picked) && p->unit[mainSlot[d->picked - HOVER_MAIN]]) held = p->sprite[mainSlot[d->picked - HOVER_MAIN]];
+    else if (bench_index(s, d->picked) >= 0) held = bench_sprite(s, bench_index(s, d->picked));
+    if (held) sprite(fb, held, s->mouseX - TILE_W / 2, s->mouseY - FEET / 2);
 }
 
 bool sa_deploy_frame(SA *s, u32 ms) {
@@ -218,6 +236,11 @@ bool sa_deploy_frame(SA *s, u32 ms) {
     int h = hit(s, s->mouseX, s->mouseY);
     if (h != d->hover) {
         d->hover = h;
+        s->dirty = true;
+    }
+    if (d->picked >= 0 && (s->mouseX != d->heldX || s->mouseY != d->heldY)) {
+        d->heldX = s->mouseX;
+        d->heldY = s->mouseY;
         s->dirty = true;
     }
     if (s->rightClicked) {

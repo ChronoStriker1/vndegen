@@ -258,7 +258,7 @@ enum { PASS_EAST = 1, PASS_SOUTH = 2 };
 
 struct Party;
 
-enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN, DUN_ART_PLATFORM, DUN_ART };
+enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN, DUN_ART_DIGITS, DUN_ART_PLATFORM, DUN_ART };
 enum { DUN_ICON_DOOR, DUN_ICON_CHEST, DUN_ICON_GROUP, DUN_ICON_PARTY, DUN_ICONS };
 #define DUN_MARKS 8
 enum { DUN_ACT_NONE, DUN_ACT_HOME, DUN_ACT_DOWN, DUN_ACT_UP, DUN_ACT_OPEN };
@@ -446,7 +446,10 @@ typedef struct Order {
 
 typedef struct Bench {
     int unit, hp, mp, level, exp, equip, sp, trained[10];
+    int tile;
 } Bench;
+
+#define PARTY_RESERVE 5
 
 #define PARTY_BENCH 16
 
@@ -467,6 +470,9 @@ typedef struct Party {
     int cells[PARTY_SLOTS];
     u32 ms;
     Image *platform, *tile, *smallTile, *gaugeFrame, *hpGauge, *mpGauge, *label, *digits;
+    Vfs *vfs;
+    Image *reserveSprite[PARTY_RESERVE];
+    int reserveUnit[PARTY_RESERVE];
 } Party;
 
 bool sa_party_init(Party *p, Vfs *vfs);
@@ -481,6 +487,8 @@ int sa_party_count_units(const Party *p, const char *key);
 bool sa_party_join(Party *p, Vfs *vfs, const char *key);
 void sa_party_swap(Party *p, int a, int b);
 bool sa_party_bench(Party *p, int slot);
+void sa_party_set_reserve(Party *p, int index, int tile);
+int sa_party_reserve_at(const Party *p, int tile);
 void sa_party_unbench(Party *p, Vfs *vfs, int index, int slot);
 int sa_party_members(const Party *p);
 int sa_party_max_hp(const Party *p, int slot);
@@ -646,6 +654,6 @@ int sa_build_click(BuildScreen *b, Town *t, VM *vm, int x, int y, bool right);
 bool sa_build_hover(BuildScreen *b, Town *t, VM *vm, int x, int y);
 void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb);
 
-enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_TOWN_STAGE = 490 };
+enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_TOWN_STAGE = 490, C_PLACE_STEPS = 0x48 };
 
 #endif

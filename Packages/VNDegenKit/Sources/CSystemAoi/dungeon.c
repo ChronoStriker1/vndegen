@@ -43,6 +43,9 @@ enum {
     MINI_CELLS = 5,
     MINI_WALL = 4,
     MINI_MARK = 16,
+    DIGIT_W = 10,
+    STEPS_X = 994,
+    STEPS_Y = 72,
     PAD_W = 64,
     HOVER_REST = 100,
 };
@@ -182,7 +185,7 @@ void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
     if (!d->art[DUN_ART_PANEL]) {
         static const char *const names[] = {"dgn_b00.agf", "dgn_c00.agf", "dgn_c01.agf", "dgn_c02.agf", "dgn_c03.agf", "dgn_c04.agf",
                                             "dgn_c05.agf", "dgn_c06.agf", "dgn_d00.agf", "dgn_d01.agf", "dgn_g02.agf", "dgn_g01.agf",
-                                            "dgn_g00.agf", "dgn_g07.agf"};
+                                            "dgn_g00.agf", "dgn_g07.agf", "dgn_f00.agf"};
         for (int i = 0; i < DUN_ART_PLATFORM; i++) d->art[i] = sa_load_image(vfs, names[i]);
         for (int q = 0; q < 4; q++) d->needle[q] = rotate_quarter(d->art[DUN_ART_NEEDLE], q);
         static const char *const icons[] = {"mmf0003.agf", "mmf0004.agf", "mma0001.agf", "mma0000.agf"};
@@ -615,6 +618,10 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
     const Image *n = d->needle[(4 - d->dir) & 3];
     if (n) sa_blit(fb, n, NEEDLE_CX - n->w / 2 + nudge[d->dir][0], NEEDLE_CY - n->h / 2 + nudge[d->dir][1]);
     draw_minimap(d, fb);
+    char digits[12];
+    int len = snprintf(digits, sizeof digits, "%d", d->steps);
+    for (int i = 0; i < len && d->art[DUN_ART_DIGITS]; i++)
+        sa_blit_rect(fb, d->art[DUN_ART_DIGITS], (digits[i] - '0') * DIGIT_W, 0, DIGIT_W, d->art[DUN_ART_DIGITS]->h, STEPS_X - (len - 1 - i) * DIGIT_W, STEPS_Y);
     for (int i = 0; i < 6; i++) {
         const Image *im = d->art[DUN_ART_PAD0 + i];
         if (!im) continue;
