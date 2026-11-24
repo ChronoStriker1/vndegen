@@ -46,3 +46,11 @@ private func close(_ a: CGFloat, _ b: CGFloat) -> Bool { abs(a - b) < 0.01 }
     #expect(metrics.headerColumns == 2)
     #expect(close(metrics.headerWidth, 462.04))
 }
+
+@MainActor
+@Test func aGamePageBannerFollowsTheWidthBetweenAFloorAndACap() {
+    #expect(HubMetrics(size: CGSize(width: 466, height: 644)).bannerHeight == 180)
+    #expect(close(HubMetrics(size: CGSize(width: 951, height: 635)).bannerHeight, 307.09))
+    #expect(HubMetrics(size: CGSize(width: 1920, height: 1080)).bannerHeight == 540)
+    #expect(HubMetrics(size: CGSize(width: 951, height: 300)).bannerHeight == HubMetrics(size: CGSize(width: 951, height: 1200)).bannerHeight)
+}

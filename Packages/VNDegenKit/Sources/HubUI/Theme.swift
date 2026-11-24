@@ -160,10 +160,7 @@ struct HubMetrics: Equatable {
         if isCompact { return CGSize(width: size.width * 0.72, height: 120) }
         return CGSize(width: min(520, size.width * 0.38), height: min(190, size.height * 0.2))
     }
-    var bannerHeight: CGFloat {
-        let wide = size.width / (3840.0 / 1240.0)
-        return min(size.height * (isShort ? 0.62 : 0.5), max(isCompact ? size.height * 0.28 : 280, wide))
-    }
+    var bannerHeight: CGFloat { min(540, max(180, size.width / (3840.0 / 1240.0))) }
     var titleSize: CGFloat { isCompact ? 30 : (isShort ? 30 : 44) }
 }
 
