@@ -60,6 +60,9 @@ enum {
     INFO_X = 1076,
     INFO_Y = 39,
     GOAL_X = 1076,
+    SUBMIT_X = 16,
+    SUBMIT_Y = 420,
+    MISSION_TARGET = 12,
     GOAL_Y = 2,
     SIDE_X = 1158,
     SIDE_Y = 570,
@@ -293,6 +296,25 @@ static void income(const Town *t, const VM *vm, int *food, int *money, int *res,
     }
 }
 
+static bool targets(const Town *t, const VM *vm, int *out) {
+    if (!t->missions || !vm->c[C_MISSION_ID]) return false;
+    for (int r = 0; r < t->missions->rows; r++)
+        if (sa_table_int(t->missions, r, 0) == vm->c[C_MISSION_ID]) {
+            for (int i = 0; i < 3; i++) out[i] = sa_table_int(t->missions, r, MISSION_TARGET + i);
+            return true;
+        }
+    return false;
+}
+
+static void draw_goal(Town *t, const VM *vm, u32 *fb) {
+    sa_blit(fb, t->ui[UI_GOAL], GOAL_X, GOAL_Y);
+    char s[16];
+    snprintf(s, sizeof s, "%d", vm->c[C_MISSION_DUE]);
+    sa_draw_number(fb, t->ui[UI_DIGITS], vm->c[C_MISSION_ID] ? s : "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);
+    snprintf(s, sizeof s, "%d", vm->c[C_TURN]);
+    sa_draw_number(fb, t->ui[UI_DIGITS], s, GOAL_X + 183, GOAL_Y + 9, 0, 10, 13);
+}
+
 void sa_town_draw_info(Town *t, const VM *vm, u32 *fb) {
     const Image *dg = t->ui[UI_DIGITS];
     int jobs = 0;
@@ -309,12 +331,16 @@ void sa_town_draw_info(Town *t, const VM *vm, u32 *fb) {
     y += t->ui[UI_TOWNSEC0] ? t->ui[UI_TOWNSEC0]->h : 64;
     const int values[3] = {vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
     const int incomes[3] = {food - vm->c[C_RESIDENTS] / 10, money, res};
+    int goal[3];
+    bool hasGoal = targets(t, vm, goal);
     for (int i = 0; i < 3; i++) {
         const Image *sec = t->ui[UI_TOWNSEC1 + i];
+        int sign = incomes[i] > 0 ? 2 : incomes[i] < 0 ? 1 : 0;
         sa_blit(fb, sec, INFO_X, y);
-        sa_draw_int(fb, dg, values[i], false, right, y + 5, i == 1 ? 2 : 0, 10, 13);
-        sa_draw_int(fb, dg, incomes[i], true, right, y + 25, incomes[i] > 0 ? 2 : incomes[i] < 0 ? 1 : 0, 10, 13);
-        sa_draw_number(fb, dg, "--", right, y + 45, 0, 10, 13);
+        sa_draw_int(fb, dg, values[i], false, right, y + 5, sign, 10, 13);
+        sa_draw_int(fb, dg, incomes[i], true, right, y + 25, sign, 10, 13);
+        if (hasGoal) sa_draw_int(fb, dg, goal[i], false, right, y + 45, values[i] >= goal[i] ? 2 : 1, 10, 13);
+        else sa_draw_number(fb, dg, "--", right, y + 45, 0, 10, 13);
         y += sec ? sec->h : 64;
     }
     sa_blit(fb, t->ui[UI_TOWNINFO], INFO_X, INFO_Y);
@@ -337,6 +363,7 @@ static int layout(const Town *t, const VM *vm, Placed *out) {
         if (c->action == TOWN_CMD_REST && !built && vm->c[C_TURN] == 1) continue;
         out[n++] = (Placed){c->action, c->ui, c->x, c->y, c->w, c->h, 3};
     }
+    if (vm->c[C_MISSION_ID]) out[n++] = (Placed){TOWN_CMD_SUBMIT, UI_SUBMIT, SUBMIT_X, SUBMIT_Y, 164, 44, 3};
     out[n++] = (Placed){TOWN_BTN_LOG, UI_LOG, SIDE_X, SIDE_Y, 116, 34, 2};
     out[n++] = (Placed){TOWN_BTN_SAVE, UI_SAVE, SIDE_X, SIDE_Y + SIDE_STEP, 116, 34, 2};
     out[n++] = (Placed){TOWN_BTN_LOAD, UI_LOAD, SIDE_X, SIDE_Y + 2 * SIDE_STEP, 116, 34, 2};
@@ -366,11 +393,7 @@ void sa_town_draw_map(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
 void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
     sa_town_draw_map(t, vfs, vm, fb);
     if (t->mapOnly) {
-        sa_blit(fb, t->ui[UI_GOAL], GOAL_X, GOAL_Y);
-        sa_draw_number(fb, t->ui[UI_DIGITS], "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);
-        char tn[16];
-        snprintf(tn, sizeof tn, "%d", vm->c[C_TURN]);
-        sa_draw_number(fb, t->ui[UI_DIGITS], tn, GOAL_X + 183, GOAL_Y + 9, 0, 10, 13);
+        draw_goal(t, vm, fb);
         return;
     }
     Placed p[24];
@@ -392,13 +415,7 @@ void sa_town_draw_status(Town *t, const VM *vm, u32 *fb) {
     sa_town_draw_status_goal(t, vm, fb);
 }
 
-void sa_town_draw_status_goal(Town *t, const VM *vm, u32 *fb) {
-    sa_blit(fb, t->ui[UI_GOAL], GOAL_X, GOAL_Y);
-    sa_draw_number(fb, t->ui[UI_DIGITS], "---", GOAL_X + 84, GOAL_Y + 9, 0, 10, 13);
-    char turn[16];
-    snprintf(turn, sizeof turn, "%d", vm->c[C_TURN]);
-    sa_draw_number(fb, t->ui[UI_DIGITS], turn, GOAL_X + 183, GOAL_Y + 9, 0, 10, 13);
-}
+void sa_town_draw_status_goal(Town *t, const VM *vm, u32 *fb) { draw_goal(t, vm, fb); }
 
 int sa_town_hit(const Town *t, const VM *vm, int x, int y) {
     Placed p[24];

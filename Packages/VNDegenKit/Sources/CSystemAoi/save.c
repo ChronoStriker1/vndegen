@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 8u
+#define SAVE_VERSION 9u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
@@ -168,6 +168,8 @@ static bool write_sidecar(SA *s, int slot, int count) {
     for (int d = 0; d < EXP_DUNGEONS; d++) put_ints(&w, &s->exp.floorInfo[d][0][0], EXP_FLOORS * 4);
     const int exp[3] = {s->exp.active, s->exp.dungeon, s->exp.floor};
     put_ints(&w, exp, 3);
+    put32(&w, (u32)s->missions.logCount);
+    put_ints(&w, &s->missions.log[0][0], MISSION_LOG * 3);
     put_ints(&w, s->exp.last, 4);
     put_ints(&w, s->exp.entry, 4);
     put32(&w, (u32)s->exp.groupCount);
@@ -297,6 +299,9 @@ static bool read_sidecar(SA *s, int slot) {
     s->exp.active = exp[0] != 0;
     s->exp.dungeon = exp[1];
     s->exp.floor = exp[2];
+    s->missions.logCount = (int)get32(&r);
+    if (s->missions.logCount < 0 || s->missions.logCount > MISSION_LOG) r.bad = true, s->missions.logCount = 0;
+    get_ints(&r, &s->missions.log[0][0], MISSION_LOG * 3);
     get_ints(&r, s->exp.last, 4);
     get_ints(&r, s->exp.entry, 4);
     s->exp.groupCount = (int)get32(&r);

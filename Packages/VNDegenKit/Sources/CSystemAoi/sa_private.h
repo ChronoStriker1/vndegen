@@ -38,6 +38,15 @@ typedef struct Shop {
 
 #define CARD_ICONS 13
 
+#define MISSION_LOG 64
+
+typedef struct Missions {
+    Table table;
+    Image *art[6];
+    int log[MISSION_LOG][3], logCount;
+    int hover;
+} Missions;
+
 typedef struct Card {
     Image *frame, *digits, *badge, *desc, *icon[CARD_ICONS];
 } Card;
@@ -104,7 +113,7 @@ typedef struct Expedition {
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES, MODE_SUBMIT };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -120,6 +129,7 @@ typedef struct Picture {
 } Picture;
 
 struct SA {
+    bool townHook;
     char joined[DIALOG_UNITS][48];
     int joinedCount;
     VNSystemAoiConfig cfg;
@@ -173,6 +183,7 @@ struct SA {
     Policy policy;
     Equip equip;
     Shop shop;
+    Missions missions;
     Card card;
     Train train;
     Deploy deploy;
@@ -240,6 +251,16 @@ void sa_savescreen_free(SaveScreen *v);
 void sa_savescreen_open(SA *s, bool saving);
 bool sa_savescreen_frame(SA *s);
 void sa_autosave(SA *s);
+void sa_mission_init(SA *s);
+void sa_mission_free(SA *s);
+void sa_mission_reset(SA *s);
+int sa_mission_available(SA *s);
+int sa_mission_start(SA *s);
+bool sa_mission_target(SA *s, int *out);
+void sa_mission_check(SA *s);
+void sa_mission_end(SA *s, int result);
+void sa_mission_open(SA *s);
+bool sa_mission_frame(SA *s);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);
 void sa_exp_open_select(SA *s);

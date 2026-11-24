@@ -1,5 +1,7 @@
 #include "sa_private.h"
 
+enum { TOWN_HOOK = 1 };
+
 #include <stdarg.h>
 #include <dlfcn.h>
 #include <pthread.h>
@@ -522,10 +524,16 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         }
         break;
     case 0x9e:
+        if (in->count >= 1) sa_vm_set(vm, &in->o[0], sa_mission_available(s));
+        break;
     case 0x9f:
+        if (in->count >= 1) sa_vm_set(vm, &in->o[0], sa_mission_start(s));
+        break;
+    case 0xa0:
+        sa_mission_check(s);
+        break;
     case 0xc3:
         if (in->count >= 2 && in->o[in->count - 1].kind == OPD_VAR) sa_vm_set(vm, &in->o[in->count - 1], 0);
-        if (in->op == 0x9e && in->count >= 1) sa_vm_set(vm, &in->o[0], 0);
         break;
     case 0xbc:
         if (in->count >= 2) {
@@ -555,8 +563,10 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     case 0xde:
         if (in->count >= 1) sa_vm_set(vm, &in->o[0], sa_exp_area_registered(s));
         break;
-    case 0x01:
     case 0xa1:
+        sa_mission_end(s, in->count >= 1 ? sa_vm_get(vm, code, &in->o[0]) : 0);
+        break;
+    case 0x01:
     case 0xdf:
     case 0xe1:
         break;
@@ -764,6 +774,7 @@ static void new_game(SA *s) {
     memcpy(s->exp.last, noPlace, sizeof noPlace);
     memset(s->exp.entry, 0, sizeof s->exp.entry);
     s->exp.groupCount = 0;
+    sa_mission_reset(s);
     sa_start_script(s, "init.box", 0);
 }
 
@@ -801,6 +812,7 @@ void sa_end_turn(SA *s) {
 static void next_turn(SA *s) {
     s->turnPending = false;
     s->autosaveTurn = true;
+    s->townHook = true;
     s->town.mapOnly = false;
     sa_reset_scene(s);
     sa_start_script(s, "bo0000.box", 0);
@@ -831,6 +843,7 @@ static int command_number(int action) {
     case TOWN_CMD_DEPLOY: return 24;
     case TOWN_CMD_EQUIP: return 25;
     case TOWN_CMD_TRAIN: return 26;
+    case TOWN_CMD_SUBMIT: return 29;
     case TOWN_CMD_SHOP: return 27;
     }
     return -1;
@@ -858,6 +871,9 @@ static void run_command(SA *s, int action) {
         break;
     case TOWN_CMD_DEPLOY:
         sa_deploy_open(s);
+        break;
+    case TOWN_CMD_SUBMIT:
+        sa_mission_open(s);
         break;
     case TOWN_POLICY_DONE:
         sa_end_turn(s);
@@ -1008,6 +1024,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     sa_policy_init(&s->policy, &s->vfs);
     sa_equip_init(&s->equip, &s->vfs);
     sa_shop_init(&s->shop, &s->vfs);
+    sa_mission_init(s);
     sa_card_init(&s->card, &s->vfs);
     sa_train_init(&s->train, &s->vfs);
     sa_deploy_init(&s->deploy, &s->vfs);
@@ -1068,6 +1085,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_policy_free(&s->policy);
     sa_equip_free(&s->equip);
     sa_shop_free(&s->shop);
+    sa_mission_free(s);
     sa_card_free(&s->card);
     sa_train_free(&s->train);
     sa_deploy_free(&s->deploy);
@@ -1141,6 +1159,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_policy_frame(s)) return true;
     if (sa_equip_frame(s)) return true;
     if (sa_shop_frame(s)) return true;
+    if (sa_mission_frame(s)) return true;
     if (sa_train_frame(s)) return true;
     if (sa_deploy_frame(s, elapsedMs)) return true;
     if (sa_savescreen_frame(s)) return true;
@@ -1392,7 +1411,14 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
                 run_command(s, a);
+            } else if (s->inGame && s->townHook && s->vm.boxSlot[TOWN_HOOK]) {
+                s->townHook = false;
+                char box[32];
+                snprintf(box, sizeof box, "%s", s->vm.boxSlot[TOWN_HOOK]);
+                sa_reset_scene(s);
+                sa_start_script(s, box, 0);
             } else if (s->inGame) {
+                s->townHook = false;
                 sa_reset_scene(s);
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
@@ -1609,7 +1635,7 @@ void sa_enter_loaded(SA *s) {
     s->inGame = true;
     bool inDungeon = s->exp.active;
     s->exp.active = false;
-    s->turnPending = s->autosaveTurn = false;
+    s->turnPending = s->autosaveTurn = s->townHook = false;
     s->dialog.open = false;
     s->mode = MODE_TOWN;
     s->town.mapOnly = false;

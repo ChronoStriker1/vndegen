@@ -81,6 +81,7 @@ enum {
     ENEMIES_MAX = 30,
     STAND_AT = 1009560,
     STAND_COUNT = 13,
+    MISSIONS_AT = 1008328,
 };
 
 static int at(const u8 *img, size_t off) { return (int)rd32(img + off); }
@@ -227,6 +228,9 @@ bool sa_pcsave_read(SA *s, const char *path) {
     s->exp.dungeon = s->vm.c[DUNGEON_VAR];
     s->exp.floor = s->vm.c[DUNGEON_VAR + 1];
     read_dungeon(s, img);
+    s->missions.logCount = 0;
+    for (int i = 0; i < MISSION_LOG && at(img, MISSIONS_AT + (size_t)i * 12); i++, s->missions.logCount++)
+        for (int k = 0; k < 3; k++) s->missions.log[i][k] = at(img, MISSIONS_AT + (size_t)i * 12 + (size_t)k * 4);
     Party *p = &s->party;
     p->items = 0;
     for (int i = 0; i < STOCK_ENTRIES; i++) {
@@ -537,6 +541,8 @@ bool sa_pcsave_write(SA *s, const char *path) {
     write_members(s, img);
     write_maps(s, img);
     write_dungeon(s, img);
+    for (int i = 0; i < s->missions.logCount; i++)
+        for (int k = 0; k < 3; k++) put(img, MISSIONS_AT + (size_t)i * 12 + (size_t)k * 4, s->missions.log[i][k]);
     for (int i = 0; i < PC_C_VARS; i++) put(img, VM_AT + (size_t)i * 4, s->vm.c[i]);
     memcpy(img + VM_AT + PC_C_VARS * 4, s->vm.f, PC_F_VARS);
     for (size_t i = 0; i < sizeof engineVars / sizeof engineVars[0]; i++) put(img, VM_AT + (size_t)engineVars[i].off * 4, engineVars[i].value);
