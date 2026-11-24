@@ -2,19 +2,20 @@
 #include <math.h>
 
 enum {
-    MAP_W = 15,
-    MAP_H = 15,
     MAP_HEADER = 48,
     CELL_BYTES = 104,
     F_FLOOR = 5,
     F_OBJECT = 6,
+    F_MARK = 7,
     F_WALL_N = 9,
     F_WALL_E = 12,
     F_WALL_S = 15,
     F_WALL_W = 18,
     WALL_PASSAGE = 20,
     OBJECT_DOOR = 100,
+    OBJECT_DOOR_SPOT = 99,
     WALL_DOORWAY = 10,
+    WALL_HIDDEN = 100,
     VIEW_CELLS = 6,
     MOVE_MS = 133,
     DOOR_TURN_MS = 18000,
@@ -125,12 +126,19 @@ static bool load_set(Dungeon *d, Vfs *vfs, PartSet *p, const char *name) {
 bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map) {
     size_t n;
     u8 *data = sa_vfs_read(vfs, map, &n);
-    if (!data || n < MAP_HEADER + (size_t)DUN_CELLS * CELL_BYTES) {
+    int w = data && n >= MAP_HEADER ? (int)rd32(data + 4) : 0, h = data && n >= MAP_HEADER ? (int)rd32(data + 8) : 0;
+    if (w <= 0 || h <= 0 || w > DUN_SIDE || h > DUN_SIDE || n < MAP_HEADER + (size_t)(w * h) * CELL_BYTES) {
         free(data);
         return false;
     }
+    d->w = w;
+    d->h = h;
     for (int c = 0; c < DUN_CELLS; c++)
-        for (int f = 0; f < DUN_FIELDS; f++) d->cell[c][f] = (i32)rd32(data + MAP_HEADER + (size_t)c * CELL_BYTES + (size_t)f * 4);
+        for (int f = 0; f < DUN_FIELDS; f++) d->cell[c][f] = f == F_FLOOR || f == F_OBJECT ? -1 : 0;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+            for (int f = 0; f < DUN_FIELDS; f++)
+                d->cell[y * DUN_SIDE + x][f] = (i32)rd32(data + MAP_HEADER + (size_t)(y * w + x) * CELL_BYTES + (size_t)f * 4);
     free(data);
     return true;
 }
@@ -146,6 +154,7 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     d->r3.fogFar = 28;
     d->r3.fogColor = 0x1e2d28;
     d->r3.cull = -1;
+    d->floorGain = 1;
     memset(d->own, 0, sizeof d->own);
     memset(d->ownPassage, 0, sizeof d->ownPassage);
     d->visited = d->own;
@@ -207,9 +216,19 @@ void sa_dungeon_free(Dungeon *d) {
     d->r3 = keep;
 }
 
+static bool hiddenOpen;
+
+static const i32 *cell_at(const Dungeon *d, int x, int y);
+
+static bool hidden_between(const Dungeon *d, int x, int y, int side) {
+    if (!hiddenOpen) return false;
+    const i32 *n = cell_at(d, x + stepX[side & 3], y + stepY[side & 3]);
+    return n && n[wallField[(side + 2) & 3]] == WALL_HIDDEN;
+}
+
 static const i32 *cell_at(const Dungeon *d, int x, int y) {
-    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return NULL;
-    return d->cell[y * MAP_W + x];
+    if (x < 0 || y < 0 || x >= d->w || y >= d->h) return NULL;
+    return d->cell[y * DUN_SIDE + x];
 }
 
 void sa_dungeon_place(Dungeon *d, int x, int y, int dir) {
@@ -220,12 +239,14 @@ void sa_dungeon_place(Dungeon *d, int x, int y, int dir) {
     d->camZ = d->toZ = -(float)y * CELL;
     d->yaw = d->toYaw = (float)d->dir * QUARTER;
     d->animDur = 0;
-    if (cell_at(d, x, y) && d->visited) d->visited[y * MAP_W + x] = true;
+    if (cell_at(d, x, y) && d->visited) d->visited[y * DUN_SIDE + x] = true;
 }
+
+void sa_dungeon_sense(bool on) { hiddenOpen = on; }
 
 static bool passable(const i32 *cell, int side) {
     int w = cell[wallField[side]];
-    return w < 0 || w == WALL_DOORWAY || cell[wallField[side] + 1] == 1;
+    return w < 0 || w == WALL_DOORWAY || (w == WALL_HIDDEN && hiddenOpen) || cell[wallField[side] + 1] == 1;
 }
 
 static void mark_passage(Dungeon *d, int from, int to, int side);
@@ -233,10 +254,10 @@ static void mark_passage(Dungeon *d, int from, int to, int side);
 static bool step_in(const Dungeon *d, int c, int *x, int *y, int *dir) {
     for (int side = 0; side < 4; side++) {
         if (!passable(d->cell[c], side) || d->cell[c][wallField[side]] == WALL_PASSAGE) continue;
-        const i32 *next = cell_at(d, c % MAP_W + stepX[side], c / MAP_W + stepY[side]);
+        const i32 *next = cell_at(d, c % DUN_SIDE + stepX[side], c / DUN_SIDE + stepY[side]);
         if (!next || next[F_FLOOR] < 0) continue;
-        *x = c % MAP_W + stepX[side];
-        *y = c / MAP_W + stepY[side];
+        *x = c % DUN_SIDE + stepX[side];
+        *y = c / DUN_SIDE + stepY[side];
         *dir = side;
         return true;
     }
@@ -252,11 +273,26 @@ bool sa_dungeon_find_entrance(const Dungeon *d, int *x, int *y, int *dir) {
     return false;
 }
 
+bool sa_dungeon_find_mark(const Dungeon *d, int mark, int *x, int *y) {
+    for (int c = 0; c < DUN_CELLS; c++)
+        if (d->cell[c][F_MARK] == mark && d->cell[c][F_FLOOR] >= 0) {
+            *x = c % DUN_SIDE;
+            *y = c / DUN_SIDE;
+            return true;
+        }
+    return false;
+}
+
+void sa_dungeon_open_doors(Dungeon *d) {
+    for (int c = 0; c < DUN_CELLS; c++)
+        if (d->cell[c][F_OBJECT] == OBJECT_DOOR_SPOT) d->cell[c][F_OBJECT] = OBJECT_DOOR;
+}
+
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side) {
     const i32 *c = cell_at(d, x, y);
-    if (!c || c[F_FLOOR] < 0 || !passable(c, side & 3)) return -1;
+    if (!c || c[F_FLOOR] < 0 || (!passable(c, side & 3) && !hidden_between(d, x, y, side))) return -1;
     const i32 *n = cell_at(d, x + stepX[side & 3], y + stepY[side & 3]);
-    return n && n[F_FLOOR] >= 0 ? (y + stepY[side & 3]) * MAP_W + x + stepX[side & 3] : -1;
+    return n && n[F_FLOOR] >= 0 ? (y + stepY[side & 3]) * DUN_SIDE + x + stepX[side & 3] : -1;
 }
 
 bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y) {
@@ -283,7 +319,7 @@ bool sa_dungeon_has_passage(const Dungeon *d, int side, int along) {
 bool sa_dungeon_passage_cell(const Dungeon *d, int side, int along, int *x, int *y) {
     for (int c = 0; c < DUN_CELLS; c++) {
         if (d->cell[c][F_FLOOR] < 0 || d->cell[c][wallField[side & 3]] != WALL_PASSAGE) continue;
-        int cx = c % MAP_W, cy = c / MAP_W;
+        int cx = c % DUN_SIDE, cy = c / DUN_SIDE;
         if ((side & 1 ? cy : cx) != along) continue;
         *x = cx;
         *y = cy;
@@ -297,12 +333,12 @@ bool sa_dungeon_arrive(Dungeon *d, int side, int along) {
     if (!sa_dungeon_passage_cell(d, side, along, &x, &y)) return false;
     int in = (side + 2) & 3;
     const i32 *next = cell_at(d, x + stepX[in], y + stepY[in]);
-    if (d->visited) d->visited[y * MAP_W + x] = true;
-    if (next && next[F_FLOOR] >= 0 && passable(d->cell[y * MAP_W + x], in)) {
-        int from = y * MAP_W + x;
+    if (d->visited) d->visited[y * DUN_SIDE + x] = true;
+    if (next && next[F_FLOOR] >= 0 && passable(d->cell[y * DUN_SIDE + x], in)) {
+        int from = y * DUN_SIDE + x;
         x += stepX[in];
         y += stepY[in];
-        mark_passage(d, from, y * MAP_W + x, in);
+        mark_passage(d, from, y * DUN_SIDE + x, in);
     }
     sa_dungeon_place(d, x, y, in);
     return true;
@@ -326,16 +362,16 @@ static void start_anim(Dungeon *d) {
 
 static bool walk(Dungeon *d, int side) {
     const i32 *here = cell_at(d, d->x, d->y);
-    if (!here || !passable(here, side)) {
+    if (!here || (!passable(here, side) && !hidden_between(d, d->x, d->y, side))) {
         if (here && side == d->dir) d->bumped = true;
         return false;
     }
     const i32 *there = cell_at(d, d->x + stepX[side], d->y + stepY[side]);
     if (!there || there[F_FLOOR] < 0) return false;
-    int from = d->y * MAP_W + d->x;
+    int from = d->y * DUN_SIDE + d->x;
     d->x += stepX[side];
     d->y += stepY[side];
-    int to = d->y * MAP_W + d->x;
+    int to = d->y * DUN_SIDE + d->x;
     d->visited[to] = true;
     mark_passage(d, from, to, side);
     d->steps++;
@@ -354,8 +390,8 @@ static int act(Dungeon *d, int pad) {
     switch (pad) {
     case PAD_FORWARD: return walk(d, d->dir) ? DUN_MOVED : DUN_STAY;
     case PAD_BACK: return walk(d, (d->dir + 2) & 3) ? DUN_MOVED : DUN_STAY;
-    case PAD_RIGHT: turn(d, 1); return DUN_STAY;
-    case PAD_LEFT: turn(d, -1); return DUN_STAY;
+    case PAD_RIGHT: turn(d, 1); return DUN_TURNED;
+    case PAD_LEFT: turn(d, -1); return DUN_TURNED;
     }
     return DUN_STAY;
 }
@@ -486,7 +522,7 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
                                n[0] * c->f[0] + n[1] * c->f[1] + n[2] * c->f[2]};
                 v[j].u = pv->uv[0];
                 v[j].v = pv->uv[1];
-                v[j].shade = shade_of(cn);
+                v[j].shade = shade_of(cn) * (name[0] == 'f' ? d->floorGain : 1);
             }
             r3_tri(&d->r3, v, tex);
         }
@@ -501,7 +537,7 @@ static void draw_part(Dungeon *d, const PartSet *ps, const Cam *c, const char *n
 
 void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     u32 fog = d->r3.fogColor;
-    u32 bg = 0xff000000u | (fog & 0xff) << 16 | (fog & 0xff00) | (fog >> 16 & 0xff);
+    u32 bg = 0xff000000u | fog;
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = bg;
     if (!d->loaded) return;
     r3_begin(&d->r3, fb, d->fov);
@@ -509,15 +545,15 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     make_cam(d, &c);
     int order[DUN_CELLS], n = 0;
     float dist[DUN_CELLS];
-    for (int row = 0; row < MAP_H; row++)
-        for (int col = 0; col < MAP_W; col++) {
+    for (int row = 0; row < d->h; row++)
+        for (int col = 0; col < d->w; col++) {
             if (abs(col - d->x) > VIEW_CELLS || abs(row - d->y) > VIEW_CELLS) continue;
             float dx = (float)col * CELL - c.pos[0], dz = -(float)row * CELL - c.pos[2];
             float ahead = dx * c.f[0] + dz * c.f[2], side = fabsf(dx * c.r[0] + dz * c.r[2]);
             if (ahead < -CELL || side > ahead * VIEW_SLOPE + CELL * 1.5f) continue;
             int k = n++;
             dist[k] = dx * dx + dz * dz;
-            order[k] = row * MAP_W + col;
+            order[k] = row * DUN_SIDE + col;
             while (k > 0 && dist[k - 1] > dist[k]) {
                 float tf = dist[k];
                 dist[k] = dist[k - 1];
@@ -529,8 +565,8 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             }
         }
     for (int i = 0; i < n; i++) {
-        int row = order[i] / MAP_W, col = order[i] % MAP_W;
-        const i32 *cell = d->cell[row * MAP_W + col];
+        int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
+        const i32 *cell = d->cell[row * DUN_SIDE + col];
         if (cell[F_FLOOR] < 0) continue;
         float cx = (float)col * CELL, cz = -(float)row * CELL;
         char name[16];
@@ -572,7 +608,7 @@ static void draw_minimap(Dungeon *d, u32 *fb) {
         for (int i = 0; i < MINI_CELLS; i++) {
             int mx = d->x + i - MINI_CELLS / 2, my = d->y + j - MINI_CELLS / 2;
             const i32 *cell = cell_at(d, mx, my);
-            if (!cell || !d->visited[my * MAP_W + mx]) continue;
+            if (!cell || !d->visited[my * DUN_SIDE + mx]) continue;
             int x0 = MINI_X + i * MINI_CELL, y0 = MINI_Y + j * MINI_CELL;
             for (int y = 2; y < MINI_CELL; y++)
                 for (int x = 2; x < MINI_CELL; x++) {
@@ -589,7 +625,7 @@ static void draw_minimap(Dungeon *d, u32 *fb) {
         for (int i = 0; i < MINI_CELLS; i++) {
             int mx = d->x + i - MINI_CELLS / 2, my = d->y + j - MINI_CELLS / 2;
             const i32 *cell = cell_at(d, mx, my);
-            if (!cell || !d->visited[my * MAP_W + mx]) continue;
+            if (!cell || !d->visited[my * DUN_SIDE + mx]) continue;
             int x0 = MINI_X + i * MINI_CELL, y0 = MINI_Y + j * MINI_CELL;
             for (int side = 0; side < 4; side++) {
                 if (cell[wallField[side]] != WALL_PASSAGE) continue;
@@ -652,11 +688,11 @@ int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir) {
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir) {
     int f = field_of(name, dir);
     if (f < 0 || !cell_at(d, x, y)) return;
-    d->cell[y * MAP_W + x][f] = value;
+    d->cell[y * DUN_SIDE + x][f] = value;
     if (mode == 2 && f != F_OBJECT) {
         int nx = x + stepX[dir & 3], ny = y + stepY[dir & 3];
         int g = field_of(name, dir + 2);
-        if (cell_at(d, nx, ny)) d->cell[ny * MAP_W + nx][g] = value;
+        if (cell_at(d, nx, ny)) d->cell[ny * DUN_SIDE + nx][g] = value;
     }
 }
 
@@ -668,12 +704,12 @@ int sa_dungeon_object(const Dungeon *d) {
 int sa_dungeon_crystal_index(const Dungeon *d) {
     int n = 0;
     for (int c = 0; c < DUN_CELLS; c++) {
-        if (c == d->y * MAP_W + d->x) return n;
+        if (c == d->y * DUN_SIDE + d->x) return n;
         if (d->cell[c][F_OBJECT] == OBJECT_CRYSTAL) n++;
     }
     return n;
 }
 
 void sa_dungeon_clear_object(Dungeon *d) {
-    if (cell_at(d, d->x, d->y)) d->cell[d->y * MAP_W + d->x][F_OBJECT] = -1;
+    if (cell_at(d, d->x, d->y)) d->cell[d->y * DUN_SIDE + d->x][F_OBJECT] = -1;
 }

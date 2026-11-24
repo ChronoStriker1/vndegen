@@ -306,8 +306,42 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platfo
     for (int i = 0; n[i]; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, 0, 10, 13, LIMIT_X + i * 10, DIGIT_Y);
 }
 
+static int period(const int *prof, int w, double limit) {
+    long total = 0;
+    for (int x = 0; x < w; x++) total += prof[x];
+    if (!total) return 0;
+    int best = 0;
+    double bestErr = 0;
+    for (int cw = 24; cw <= w / 2; cw++) {
+        int cols = w / cw;
+        if (w - cols * cw >= cols) continue;
+        long err = 0, sum = 0;
+        for (int x = 0; x + cw < cols * cw; x++) {
+            err += abs(prof[x] - prof[x + cw]);
+            sum += prof[x];
+        }
+        if (!sum) continue;
+        double e = (double)err / (double)sum;
+        if (!best || e < bestErr - 0.02) best = cw, bestErr = e;
+    }
+    return best && bestErr < limit ? best : 0;
+}
+
 int sa_sprite_split(const Image *im, SpriteFrame *out, int max) {
-    int bands = im->h % 2 == 0 ? 2 : 1, bh = im->h / bands, n = 0;
+    int *rows = sa_alloc(sizeof(int) * (size_t)(im->h + 1));
+    for (int y = 0; y < im->h; y++) {
+        rows[y] = 0;
+        for (int x = 0; x < im->w; x++) rows[y] += (im->px[(size_t)y * im->w + x] >> 24) > 128;
+    }
+    int ch = period(rows, im->h, 0.5);
+    free(rows);
+    int bands = ch ? im->h / ch : im->h % 2 == 0 ? 2 : 1, bh = im->h / bands, n = 0;
+    int *prof = sa_alloc(sizeof(int) * (size_t)(im->w + 1));
+    for (int x = 0; x < im->w; x++) {
+        prof[x] = 0;
+        for (int y = 0; y < bh; y++) prof[x] += (im->px[(size_t)y * im->w + x] >> 24) > 128;
+    }
+    int cw = period(prof, im->w, 0.35);
     for (int b = 0; b < bands; b++) {
         int runs[SPRITE_FRAMES][2], count = 0, start = -1;
         for (int x = 0; x <= im->w; x++) {
@@ -322,12 +356,24 @@ int sa_sprite_split(const Image *im, SpriteFrame *out, int max) {
                 start = -1;
             }
         }
+        int widest = 0;
+        for (int i = 0; i < count; i++) widest = runs[i][1] - runs[i][0] > widest ? runs[i][1] - runs[i][0] : widest;
+        if (cw && widest > cw) {
+            for (int c = 0; c < im->w / cw && n < max; c++) {
+                bool any = false;
+                for (int y = b * bh; y < (b + 1) * bh && !any; y++)
+                    for (int x = c * cw; x < (c + 1) * cw && !any; x++) any = (im->px[(size_t)y * im->w + x] >> 24) > 128;
+                if (any) out[n++] = (SpriteFrame){c * cw, b * bh, cw, bh};
+            }
+            continue;
+        }
         for (int i = 0; i < count && n < max; i++) {
             int left = i ? (runs[i - 1][1] + runs[i][0]) / 2 : 0;
             int right = i + 1 < count ? (runs[i][1] + runs[i + 1][0]) / 2 : im->w;
             out[n++] = (SpriteFrame){left, b * bh, right - left, bh};
         }
     }
+    free(prof);
     return n;
 }
 

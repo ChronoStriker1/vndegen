@@ -24,6 +24,11 @@ enum {
     C_FIND0 = 0xd2,
     C_AREA_STEPS = 0x44,
     C_STEPS = 0x45,
+    C_EXP_STEPS = 0x43,
+    C_ALL_STEPS = 0x42,
+    C_ALL_ACTIONS = 0x3d,
+    C_EXP_ACTIONS = 0x3e,
+    C_AREA_ACTIONS = 0x3f,
     C_VIEW_RANGE = 0x4c,
     C_MAP_RANGE = 0x4d,
     VIEW_RANGE = 2,
@@ -35,7 +40,7 @@ enum {
     GROUP_COOLDOWN = 40,
     GROUP_FLED = 2,
     ENCOUNTER_FROM = 40,
-    MAP_SIDE = 15,
+    GLOW_GAIN_X100 = 155,
 };
 
 enum {
@@ -64,6 +69,15 @@ enum {
     F_SET = 6,
     F_SPREAD = 12,
     F_STEPS = 13,
+    F_FOG = 10,
+    F_BACKDROP = 8,
+    PLACE_BASE = 41,
+    F_GLOW = 9,
+    F_ENTRY = 14,
+    D_OPEN_FLAG = 3,
+    F_BOSSES = 23,
+    BOSS_SLOTS = 4,
+    P_MOVE = 7,
     F_GROUP_LISTS = 30,
     F_GROUP_WEIGHTS = 32,
     F_MORE_GROUPS = 35,
@@ -85,7 +99,11 @@ void sa_exp_init(SA *s) {
         snprintf(n, sizeof n, "gat_b%02d.agf", i);
         e->plate[i] = sa_load_image(&s->vfs, n);
     }
-    e->areaPlate = sa_load_image(&s->vfs, "gat_a01.agf");
+    for (int i = 1; i < 11; i++) {
+        char n[16];
+        snprintf(n, sizeof n, "gat_a%02d.agf", i);
+        e->areaPlate[i] = sa_load_image(&s->vfs, n);
+    }
     e->back = sa_load_image(&s->vfs, "gat_c00.agf");
     e->badge = sa_load_image(&s->vfs, "gat_d01.agf");
     e->seen = sa_load_image(&s->vfs, "gat_d02.agf");
@@ -103,7 +121,7 @@ void sa_exp_free(SA *s) {
     sa_table_free(&e->dungeons);
     sa_image_free(e->hall);
     for (int i = 0; i < 12; i++) sa_image_free(e->plate[i]);
-    sa_image_free(e->areaPlate);
+    for (int i = 0; i < 11; i++) sa_image_free(e->areaPlate[i]);
     sa_image_free(e->back);
     sa_image_free(e->badge);
     sa_image_free(e->seen);
@@ -120,11 +138,48 @@ static int floor_row(const Expedition *e, int dungeon, int floor) {
     return -1;
 }
 
-static int open_dungeons(const SA *s) { return s->exp.dungeons.rows ? 1 : 0; }
+static bool flag_on(const SA *s, int flag) { return flag == 0 || (flag > 0 && flag < SA_F_VARS && s->vm.f[flag]); }
 
-static int open_floors(const SA *s, int dungeon) {
+static int open_dungeons(const SA *s, int *out);
+
+static int open_dungeons_list(const SA *s, int *out) {
     int n = 0;
-    while (floor_row(&s->exp, dungeon, n + 1) >= 0 && n < 1) n++;
+    for (int r = 0; r < s->exp.dungeons.rows && n < EXP_DUNGEONS; r++) {
+        int flag = sa_table_int(&s->exp.dungeons, r, D_OPEN_FLAG);
+        if (flag > 0 && s->vm.f[flag]) out[n++] = sa_table_int(&s->exp.dungeons, r, 0);
+    }
+    if (!n && s->exp.dungeons.rows) out[n++] = 1;
+    return n;
+}
+
+static bool floor_seen(const SA *s, int dungeon, int floor) {
+    if (!s->exp.explored || dungeon <= 0 || dungeon >= EXP_DUNGEONS || floor <= 0 || floor >= EXP_FLOORS) return false;
+    for (int c = 0; c < DUN_CELLS; c++)
+        if (s->exp.explored[dungeon][floor][c]) return true;
+    return false;
+}
+
+static bool dungeon_seen(const SA *s, int dungeon) {
+    for (int f = 1; f < EXP_FLOORS; f++)
+        if (floor_seen(s, dungeon, f)) return true;
+    return false;
+}
+
+static int open_dungeons(const SA *s, int *out) { return open_dungeons_list(s, out); }
+
+static int area_top(const SA *s) {
+    int ids[EXP_DUNGEONS], n = open_dungeons(s, ids);
+    for (int i = 0; i < n; i++)
+        if (ids[i] == s->exp.picked) return PLATE_Y + i * PLATE_PITCH;
+    return PLATE_Y;
+}
+
+static int open_entries(const SA *s, int dungeon, int *rows) {
+    int n = 0;
+    for (int r = 0; r < s->exp.floors.rows && n < EXP_FLOORS; r++)
+        if (sa_table_int(&s->exp.floors, r, F_DUNGEON) == dungeon && sa_table_int(&s->exp.floors, r, F_ENTRY) >= 0 &&
+            flag_on(s, sa_table_int(&s->exp.floors, r, F_ENTRY)))
+            rows[n++] = r;
     return n;
 }
 
@@ -137,11 +192,12 @@ void sa_exp_open_select(SA *s) {
 
 static int select_hit(const SA *s, int x, int y) {
     if (x >= BACK_X && x < BACK_X + BACK_W && y >= BACK_Y && y < BACK_Y + BACK_H) return HOVER_BACK;
-    for (int i = 0; i < open_dungeons(s); i++)
-        if (x >= PLATE_X && x < PLATE_X + PLATE_W && y >= PLATE_Y + i * PLATE_PITCH && y < PLATE_Y + i * PLATE_PITCH + PLATE_H) return i + 1;
+    int ids[EXP_DUNGEONS], rows[EXP_FLOORS], n = open_dungeons(s, ids);
+    for (int i = 0; i < n; i++)
+        if (x >= PLATE_X && x < PLATE_X + PLATE_W && y >= PLATE_Y + i * PLATE_PITCH && y < PLATE_Y + i * PLATE_PITCH + PLATE_H) return ids[i];
     if (s->exp.picked)
-        for (int i = 0; i < open_floors(s, s->exp.picked); i++)
-            if (x >= AREA_X && x < AREA_X + PLATE_W && y >= PLATE_Y + i * PLATE_PITCH && y < PLATE_Y + i * PLATE_PITCH + PLATE_H)
+        for (int i = 0; i < open_entries(s, s->exp.picked, rows); i++)
+            if (x >= AREA_X && x < AREA_X + PLATE_W && y >= area_top(s) + i * PLATE_PITCH && y < area_top(s) + i * PLATE_PITCH + PLATE_H)
                 return HOVER_AREA + i + 1;
     return -1;
 }
@@ -150,17 +206,20 @@ static void draw_select(SA *s) {
     Expedition *e = &s->exp;
     u32 *fb = s->fb;
     sa_blit(fb, e->hall, 0, 0);
-    for (int i = 0; i < open_dungeons(s); i++) {
-        int frame = e->picked == i + 1 ? 2 : e->hover == i + 1 ? 1 : 0;
-        sa_blit_rect(fb, e->plate[i + 1], 0, frame * PLATE_H, PLATE_W, PLATE_H, PLATE_X, PLATE_Y + i * PLATE_PITCH);
-        sa_blit(fb, s->vm.f[F_SEEN + i] ? e->seen : e->badge, PLATE_X + BADGE_DX, PLATE_Y + i * PLATE_PITCH + BADGE_DY);
+    int ids[EXP_DUNGEONS], rows[EXP_FLOORS], n = open_dungeons(s, ids);
+    for (int i = 0; i < n; i++) {
+        int d = ids[i], frame = e->picked == d ? 2 : e->hover == d ? 1 : 0;
+        if (d < 12) sa_blit_rect(fb, e->plate[d], 0, frame * PLATE_H, PLATE_W, PLATE_H, PLATE_X, PLATE_Y + i * PLATE_PITCH);
+        sa_blit(fb, dungeon_seen(s, d) ? e->seen : e->badge, PLATE_X + BADGE_DX, PLATE_Y + i * PLATE_PITCH + BADGE_DY);
     }
     if (e->picked)
-        for (int i = 0; i < open_floors(s, e->picked); i++) {
-            int y = PLATE_Y + i * PLATE_PITCH, frame = e->hover == HOVER_AREA + i + 1 ? 1 : 0;
-            sa_blit_rect(fb, e->areaPlate, 0, frame * PLATE_H, PLATE_W, PLATE_H, AREA_X, y);
-            sa_blit(fb, e->seen, AREA_X + BADGE_DX, y + BADGE_DY);
-            const char *name = text(&e->floors, floor_row(e, e->picked, i + 1), F_NAME);
+        for (int i = 0; i < open_entries(s, e->picked, rows); i++) {
+            int y = area_top(s) + i * PLATE_PITCH, frame = e->hover == HOVER_AREA + i + 1 ? 1 : 0;
+            const Image *plate = e->picked < 11 && e->areaPlate[e->picked] ? e->areaPlate[e->picked] : e->areaPlate[1];
+            sa_blit_rect(fb, plate, 0, frame * PLATE_H, PLATE_W, PLATE_H, AREA_X, y);
+            int floor = sa_table_int(&e->floors, rows[i], F_FLOOR);
+            sa_blit(fb, floor_seen(s, e->picked, floor) ? e->seen : e->badge, AREA_X + BADGE_DX, y + BADGE_DY);
+            const char *name = text(&e->floors, rows[i], F_NAME);
             sa_font_set_spacing(AREA_SPACING);
             int w = sa_text_width(name, -1, AREA_SIZE);
             sa_text_draw(fb, SA_W, SA_H, name, -1, AREA_X + (PLATE_W - w) / 2, y + AREA_TEXT_Y, AREA_SIZE, 0xffffff, 0x0b0d0a);
@@ -259,6 +318,7 @@ static void sync_position(SA *s) {
 
 static void sync_steps(SA *s) {
     s->vm.c[C_STEPS] = s->exp.steps + 1;
+    s->vm.c[C_EXP_STEPS] = s->exp.steps;
     s->vm.c[C_AREA_STEPS] = s->exp.steps - s->exp.areaStart;
     s->dungeon.steps = s->exp.steps;
 }
@@ -274,12 +334,12 @@ static u32 mix(u32 h) {
 static int distances(const Dungeon *d, int x, int y, int *dist) {
     int queue[DUN_CELLS], head = 0, tail = 0;
     for (int c = 0; c < DUN_CELLS; c++) dist[c] = -1;
-    dist[y * MAP_SIDE + x] = 0;
-    queue[tail++] = y * MAP_SIDE + x;
+    dist[y * DUN_SIDE + x] = 0;
+    queue[tail++] = y * DUN_SIDE + x;
     while (head < tail) {
         int c = queue[head++];
         for (int side = 0; side < 4; side++) {
-            int n = sa_dungeon_neighbour(d, c % MAP_SIDE, c / MAP_SIDE, side);
+            int n = sa_dungeon_neighbour(d, c % DUN_SIDE, c / DUN_SIDE, side);
             if (n < 0 || dist[n] >= 0) continue;
             dist[n] = dist[c] + 1;
             queue[tail++] = n;
@@ -289,7 +349,7 @@ static int distances(const Dungeon *d, int x, int y, int *dist) {
 }
 
 static bool free_cell(const Dungeon *d, int c) {
-    int x = c % MAP_SIDE, y = c / MAP_SIDE;
+    int x = c % DUN_SIDE, y = c / DUN_SIDE;
     return sa_dungeon_get(d, "床物", x, y, 0) < 0 && !sa_dungeon_cell_is_passage(d, x, y);
 }
 
@@ -322,8 +382,8 @@ static void reset_countdown(SA *s);
 static void set_target(ExpGroup *g, int c) {
     for (int i = 0; i < EXP_TARGETS; i++) g->target[i][0] = g->target[i][1] = -1;
     if (c < 0) return;
-    g->target[0][0] = c % MAP_SIDE;
-    g->target[0][1] = c / MAP_SIDE;
+    g->target[0][0] = c % DUN_SIDE;
+    g->target[0][1] = c / DUN_SIDE;
 }
 
 static void spawn_group(SA *s, const char *name) {
@@ -342,11 +402,25 @@ static void spawn_group(SA *s, const char *name) {
     g->flags = g->number > 1 ? 0x100 | 1 : 1;
     u32 h = (u32)(e->dungeon * 977 + e->floor * 131 + g->number * 7919);
     int c = pick_cell(&s->dungeon, s->dungeon.x, s->dungeon.y, GROUP_SPAWN_DISTANCE, h);
-    g->x = c < 0 ? s->dungeon.x : c % MAP_SIDE;
-    g->y = c < 0 ? s->dungeon.y : c / MAP_SIDE;
+    g->x = c < 0 ? s->dungeon.x : c % DUN_SIDE;
+    g->y = c < 0 ? s->dungeon.y : c / DUN_SIDE;
     set_target(g, pick_cell(&s->dungeon, g->x, g->y, GROUP_SPAWN_DISTANCE, h ^ 0x5bd1e995u));
     sa_battle_roll(&s->battle, name, mix(h ^ 0x27d4eb2fu), g->cells);
+    for (int r = 0; r < s->battle.groups.rows; r++)
+        if (sa_table_int(&s->battle.groups, r, 0) == id) g->stay = !strcmp(text(&s->battle.groups, r, P_MOVE), "停止");
     sa_log(s, "group %d (%s) at %d,%d", g->number, name, g->x, g->y);
+}
+
+int sa_exp_place_code(SA *s) {
+    const char *bg = text(&s->exp.floors, s->exp.row, F_BACKDROP);
+    int n = 0;
+    return sscanf(bg, "bg%3d", &n) == 1 ? n + PLACE_BASE : PLACE_BASE + 21;
+}
+
+int sa_exp_area_registered(SA *s) {
+    if (!s->exp.active) return 0;
+    int entry = sa_table_int(&s->exp.floors, s->exp.row, F_ENTRY);
+    return entry > 0 && entry < SA_F_VARS && s->vm.f[entry];
 }
 
 void sa_exp_add_group(SA *s, const char *name) {
@@ -355,14 +429,38 @@ void sa_exp_add_group(SA *s, const char *name) {
     sync_marks(s);
 }
 
+void sa_exp_add_group_at(SA *s, const char *name, int x, int y) {
+    if (!s->exp.active) return;
+    int before = s->exp.groupCount;
+    spawn_group(s, name);
+    if (s->exp.groupCount > before && x >= 0 && y >= 0) {
+        ExpGroup *g = &s->exp.group[s->exp.groupCount - 1];
+        g->x = x;
+        g->y = y;
+        g->stay = true;
+    }
+    sync_marks(s);
+}
+
 static void spawn_floor_groups(SA *s) {
     Expedition *e = &s->exp;
     e->groupCount = 0;
     const char *list = text(&e->floors, e->row, F_GROUP_LISTS);
-    if (!*list || !strcmp(list, "*")) return;
     char buf[256];
-    snprintf(buf, sizeof buf, "%s", list);
+    snprintf(buf, sizeof buf, "%s", *list && strcmp(list, "*") ? list : "");
     for (char *p = strtok(buf, "|"); p; p = strtok(NULL, "|")) spawn_group(s, p);
+    for (int k = 0; k < BOSS_SLOTS; k++) {
+        const char *boss = text(&e->floors, e->row, F_BOSSES + 2 * k);
+        int x, y;
+        if (!*boss || !strcmp(boss, "*") || !sa_dungeon_find_mark(&s->dungeon, k + 1, &x, &y)) continue;
+        int before = e->groupCount;
+        spawn_group(s, boss);
+        if (e->groupCount == before) continue;
+        ExpGroup *g = &e->group[e->groupCount - 1];
+        g->x = x;
+        g->y = y;
+        sa_log(s, "group %d stands at %d,%d", g->number, x, y);
+    }
 }
 
 static void sync_marks(SA *s) {
@@ -378,17 +476,18 @@ static void sync_marks(SA *s) {
 
 static void move_group(SA *s, ExpGroup *g) {
     Dungeon *d = &s->dungeon;
+    if (g->stay) return;
     if (g->target[0][0] < 0 || (g->x == g->target[0][0] && g->y == g->target[0][1]))
         set_target(g, pick_cell(d, g->x, g->y, GROUP_SPAWN_DISTANCE, sa_vm_random(&s->vm)));
     if (g->target[0][0] < 0) return;
     int dist[DUN_CELLS];
     distances(d, g->target[0][0], g->target[0][1], dist);
-    int here = dist[g->y * MAP_SIDE + g->x];
+    int here = dist[g->y * DUN_SIDE + g->x];
     for (int side = 0; side < 4; side++) {
         int n = sa_dungeon_neighbour(d, g->x, g->y, side);
         if (n < 0 || dist[n] < 0 || (here >= 0 && dist[n] >= here)) continue;
-        g->x = n % MAP_SIDE;
-        g->y = n / MAP_SIDE;
+        g->x = n % DUN_SIDE;
+        g->y = n / DUN_SIDE;
         g->dir = side;
         return;
     }
@@ -417,6 +516,17 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
         return;
     }
     sa_dungeon_art(&s->dungeon, &s->vfs, platform);
+    bool sense = false;
+    for (int i = 0; i < PARTY_SLOTS && !sense; i++)
+        if (s->party.unit[i]) sense = !strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.unit[i]), 34), "感知");
+    for (int i = 0; i < s->party.benchCount && !sense; i++)
+        if (s->party.bench[i].tile >= 0) sense = !strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.bench[i].unit), 35), "感知");
+    sa_dungeon_sense(sense);
+    int entry = sa_table_int(&e->floors, r, F_ENTRY);
+    if (entry > 0 && entry < SA_F_VARS && s->vm.f[entry]) sa_dungeon_open_doors(&s->dungeon);
+    u32 fog = (u32)sa_table_int(&e->floors, r, F_FOG);
+    s->dungeon.r3.fogColor = (fog >> 16 & 0xff) | (fog & 0xff00) | (fog & 0xff) << 16;
+    s->dungeon.floorGain = sa_table_int(&e->floors, r, F_GLOW) == 1 ? GLOW_GAIN_X100 / 100.0f : 1;
     if (e->explored && dungeon < EXP_DUNGEONS && floor < EXP_FLOORS) {
         s->dungeon.visited = e->explored[dungeon][floor];
         s->dungeon.passage = e->passages[dungeon][floor];
@@ -429,7 +539,9 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     if (fresh) {
         e->steps = 0;
         reset_countdown(s);
+        s->vm.c[C_EXP_ACTIONS] = 1;
     }
+    if (!e->resuming) s->vm.c[C_AREA_ACTIONS] = 1;
     e->areaStart = e->steps;
     if (e->arriveSide >= 0) {
         if (!sa_dungeon_arrive(&s->dungeon, e->arriveSide, e->arriveAlong)) e->arriveSide = -1;
@@ -459,8 +571,11 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     sa_log(s, "expedition: %s %s", text(&e->dungeons, dungeon - 1, 1), text(&e->floors, r, F_NAME));
     s->mode = MODE_DUNGEON;
     if (autosave) sa_autosave(s);
-    static const int hooks[] = {HOOK_SETUP, HOOK_DUNGEON, HOOK_FLOOR};
-    run_hooks(s, hooks, 3, AFTER_WALK);
+    static const int first[] = {HOOK_SETUP, HOOK_DUNGEON, HOOK_FLOOR}, next[] = {HOOK_FLOOR}, resumed[] = {HOOK_DUNGEON};
+    if (e->resuming) run_hooks(s, resumed, 1, AFTER_WALK);
+    else if (fresh) run_hooks(s, first, 3, AFTER_WALK);
+    else run_hooks(s, next, 1, AFTER_WALK);
+    e->resuming = false;
 }
 
 void sa_exp_enter(SA *s, int dungeon, int floor) {
@@ -479,6 +594,7 @@ void sa_exp_resume(SA *s, int dungeon, int floor, int x, int y, int dir, bool ke
     e->resumeDir = dir;
     e->keepGroups = keepGroups;
     e->active = false;
+    e->resuming = true;
     enter(s, dungeon, floor, false);
     e->steps = steps;
     e->areaStart = steps - area;
@@ -542,7 +658,7 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
         return;
     }
     sa_battle_set_names(&s->battle, text(&s->exp.dungeons, s->exp.dungeon - 1, 1), text(&s->exp.floors, s->exp.row, F_NAME));
-    sa_log(s, "battle: %s", group);
+    sa_log(s, "battle: %s, %d fighters", group, s->battle.count);
     s->vm.c[C_EXP_RESULT] = 1;
     s->vm.c[C_EXP_GROUP] = sa_table_int(&s->battle.groups, s->battle.group, 0);
     reset_countdown(s);
@@ -582,8 +698,8 @@ void sa_exp_battle_over(SA *s, int result) {
         else {
             int c = pick_cell(&s->dungeon, s->dungeon.x, s->dungeon.y, GROUP_SPAWN_DISTANCE, sa_vm_random(&s->vm));
             if (c >= 0) {
-                g->x = c % MAP_SIDE;
-                g->y = c / MAP_SIDE;
+                g->x = c % DUN_SIDE;
+                g->y = c / DUN_SIDE;
             }
             g->fought++;
         }
@@ -694,12 +810,75 @@ static void cross_area(SA *s, int side) {
     enter(s, e->dungeon, sa_table_int(&e->floors, to, F_FLOOR), true);
 }
 
-static void change_floor(SA *s, int by) {
-    int floor = s->exp.floor + by;
-    if (floor < 1 || floor_row(&s->exp, s->exp.dungeon, floor) < 0) return;
-    sa_log(s, "expedition: to floor %d", floor);
-    sa_exp_enter(s, s->exp.dungeon, floor);
+static int name_dir(const char *name) {
+    static const char *const dirs[] = {"北東", "北西", "南東", "南西"};
+    for (int i = 0; i < 4; i++)
+        if (strstr(name, dirs[i])) return i;
+    return -1;
 }
+
+static int quadrant(const Dungeon *d, int x, int y) { return (y * 2 >= d->h ? 2 : 0) + (x * 2 >= d->w ? 0 : 1); }
+
+typedef struct Stair {
+    int row, x, y, quad;
+} Stair;
+
+static int list_stairs(SA *s, int part, Stair *out, int max) {
+    Expedition *e = &s->exp;
+    int n = 0;
+    for (int r = 0; r < e->floors.rows && n < max; r++) {
+        if (sa_table_int(&e->floors, r, F_DUNGEON) != e->dungeon) continue;
+        Dungeon *probe = sa_alloc(sizeof *probe);
+        if (sa_dungeon_read_map(probe, &s->vfs, text(&e->floors, r, F_MAP)))
+            for (int c = 0; c < DUN_CELLS && n < max; c++)
+                if (probe->cell[c][5] == part) out[n++] = (Stair){r, c % DUN_SIDE, c / DUN_SIDE, quadrant(probe, c % DUN_SIDE, c / DUN_SIDE)};
+        free(probe);
+    }
+    return n;
+}
+
+static int stairs_in(const Stair *l, int n, int row) {
+    int k = 0;
+    for (int i = 0; i < n; i++) k += l[i].row == row;
+    return k;
+}
+
+static bool stair_target(SA *s, bool down, Stair *out) {
+    Expedition *e = &s->exp;
+    Stair from[32], to[32];
+    int nf = list_stairs(s, down ? 100 : 101, from, 32), nt = list_stairs(s, down ? 101 : 100, to, 32);
+    int here = quadrant(&s->dungeon, s->dungeon.x, s->dungeon.y), dir = name_dir(text(&e->floors, e->row, F_NAME));
+    int best = -1, bestScore = -1;
+    for (int i = 0; i < nt; i++) {
+        if (to[i].row == e->row) continue;
+        int other = name_dir(text(&e->floors, to[i].row, F_NAME)), score = 1;
+        if (stairs_in(from, nf, e->row) > 1 && other >= 0 && other == here) score = 3;
+        else if (stairs_in(to, nt, to[i].row) > 1 && dir >= 0 && to[i].quad == dir) score = 3;
+        else if (other < 0 && dir < 0 && stairs_in(to, nt, to[i].row) == 1) score = 2;
+        if (score > bestScore) best = i, bestScore = score;
+    }
+    if (best < 0) return false;
+    *out = to[best];
+    return true;
+}
+
+static void change_floor(SA *s, int by) {
+    Expedition *e = &s->exp;
+    Stair t;
+    if (!stair_target(s, by > 0, &t)) {
+        sa_log(s, "no stairs to follow from %s", text(&e->floors, e->row, F_NAME));
+        return;
+    }
+    sa_log(s, "expedition: stairs to %s", text(&e->floors, t.row, F_NAME));
+    e->arriveSide = -1;
+    e->resumeX = t.x;
+    e->resumeY = t.y;
+    e->resumeDir = s->dungeon.dir;
+    e->keepGroups = false;
+    enter(s, e->dungeon, sa_table_int(&e->floors, t.row, F_FLOOR), true);
+}
+
+static bool run_step_hook(SA *s);
 
 static void after_move(SA *s, int r) {
     Dungeon *d = &s->dungeon;
@@ -717,12 +896,17 @@ static void after_move(SA *s, int r) {
     if (d->bumped) {
         d->bumped = false;
         sync_position(s);
-        static const int hooks[] = {HOOK_STEP};
-        run_hooks(s, hooks, 1, AFTER_WALK);
+        s->exp.stepHook = true;
         return;
+    }
+    if (r == DUN_MOVED || r == DUN_TURNED) {
+        s->vm.c[C_ALL_ACTIONS]++;
+        s->vm.c[C_EXP_ACTIONS]++;
+        s->vm.c[C_AREA_ACTIONS]++;
     }
     if (r != DUN_MOVED) return;
     Expedition *e = &s->exp;
+    s->vm.c[C_ALL_STEPS]++;
     e->steps++;
     sync_steps(s);
     sync_position(s);
@@ -748,14 +932,19 @@ static void after_move(SA *s, int r) {
         random_battle(s);
         return;
     }
-    if (sa_dungeon_object(d) >= 0) {
-        static const int hooks[] = {HOOK_STEP};
-        run_hooks(s, hooks, 1, AFTER_WALK);
-    }
+    e->stepHook = true;
+}
+
+static bool run_step_hook(SA *s) {
+    if (!s->exp.stepHook || s->dungeon.animDur) return false;
+    s->exp.stepHook = false;
+    static const int hooks[] = {HOOK_STEP};
+    run_hooks(s, hooks, 1, AFTER_WALK);
+    return true;
 }
 
 void sa_exp_key(SA *s, int key) {
-    if (s->mode == MODE_DUNGEON && !s->dungeon.animDur) after_move(s, sa_dungeon_key(&s->dungeon, key));
+    if (s->mode == MODE_DUNGEON && !s->dungeon.animDur && !s->exp.stepHook) after_move(s, sa_dungeon_key(&s->dungeon, key));
     s->dirty = true;
 }
 
@@ -774,7 +963,8 @@ bool sa_exp_frame(SA *s, u32 ms) {
                 s->mode = MODE_TOWN;
                 s->town.mapOnly = false;
             } else if (h >= HOVER_AREA) {
-                sa_exp_enter(s, s->exp.picked, h - HOVER_AREA);
+                int rows[EXP_FLOORS], n = open_entries(s, s->exp.picked, rows);
+                if (h - HOVER_AREA - 1 < n) sa_exp_enter(s, s->exp.picked, sa_table_int(&s->exp.floors, rows[h - HOVER_AREA - 1], F_FLOOR));
             } else if (h > 0)
                 s->exp.picked = h;
             s->dirty = true;
@@ -789,12 +979,13 @@ bool sa_exp_frame(SA *s, u32 ms) {
     if (s->mode != MODE_DUNGEON) return false;
     Dungeon *d = &s->dungeon;
     if (sa_dungeon_tick(d, ms)) s->dirty = true;
+    if (run_step_hook(s)) return true;
     if (sa_party_tick(&s->party, ms)) s->dirty = true;
     if (sa_dungeon_hover(d, s->mouseX, s->mouseY)) s->dirty = true;
     s->rightClicked = false;
     if (s->clicked) {
         s->clicked = false;
-        if (!d->animDur) after_move(s, sa_dungeon_click(d, s->mouseX, s->mouseY));
+        if (!d->animDur && !s->exp.stepHook) after_move(s, sa_dungeon_click(d, s->mouseX, s->mouseY));
         s->dirty = true;
     }
     if (s->mode == MODE_DUNGEON && s->dirty) {
@@ -826,14 +1017,6 @@ void sa_exp_debug_place(SA *s, int x, int y, int dir) {
 }
 
 int sa_exp_floors_reached(const SA *s, int dungeon) {
-    const Expedition *e = &s->exp;
-    if (!e->explored || dungeon < 0 || dungeon >= EXP_DUNGEONS) return 0;
-    int n = 0;
-    for (int f = 0; f < EXP_FLOORS; f++)
-        for (int c = 0; c < DUN_CELLS; c++)
-            if (e->explored[dungeon][f][c]) {
-                n++;
-                break;
-            }
-    return n;
+    int rows[EXP_FLOORS];
+    return open_entries(s, dungeon, rows);
 }

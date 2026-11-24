@@ -198,6 +198,8 @@ i32 sa_vm_get(VM *vm, const u8 *code, const Operand *o);
 void sa_vm_set(VM *vm, const Operand *o, i32 v);
 bool sa_vm_cond(VM *vm, const char *expr);
 u32 sa_vm_random(VM *vm);
+void sa_vm_register_hooks(VM *vm, Vfs *vfs, const char *boxFile);
+char *sa_vm_expand(VM *vm, const char *text);
 
 typedef struct PvmVertex {
     float pos[3], normal[3], uv[2];
@@ -249,13 +251,14 @@ void r3_begin(R3 *r, u32 *fb, float fovDeg);
 void r3_tri(R3 *r, const R3Vert *v, const Image *tex);
 Image *sa_bmp_decode(const u8 *d, size_t n);
 
-#define DUN_CELLS 225
+#define DUN_SIDE 20
+#define DUN_CELLS (DUN_SIDE * DUN_SIDE)
 #define BATTLE_CELLS 15
 #define DUN_FIELDS 26
 
 enum { DIR_N, DIR_E, DIR_S, DIR_W };
 enum { PASS_EAST = 1, PASS_SOUTH = 2 };
-#define DUN_TEX 64
+#define DUN_TEX 192
 
 struct Party;
 
@@ -278,6 +281,8 @@ typedef struct Dungeon {
     bool own[DUN_CELLS], *visited;
     u8 ownPassage[DUN_CELLS], *passage;
     bool loaded;
+    int w, h;
+    float floorGain;
     int x, y, dir;
     float fov, camX, camZ, yaw;
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
@@ -291,7 +296,7 @@ typedef struct Dungeon {
     R3 r3;
 } Dungeon;
 
-enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION };
+enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };
 
 bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map);
 void sa_dungeon_free(Dungeon *d);
@@ -307,6 +312,9 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
 int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
 bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map);
+void sa_dungeon_open_doors(Dungeon *d);
+bool sa_dungeon_find_mark(const Dungeon *d, int mark, int *x, int *y);
+void sa_dungeon_sense(bool on);
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side);
 bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y);
 int sa_dungeon_passage_side(const Dungeon *d);
@@ -558,6 +566,7 @@ void sa_battle_free(Battle *b);
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed);
 bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, Image *backdrop, int boardSet, u32 seed);
 bool sa_battle_roll(Battle *b, const char *group, u32 seed, int *cells);
+int sa_battle_board_size(const Battle *b, int party);
 void sa_battle_unit_stats(const Battle *b, int row, int level, int *out);
 void sa_battle_position_bonus(const Battle *b, int n, const int *unitRow, const int *gridRow, const int *gridCol, int (*delta)[10]);
 void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor);
@@ -574,6 +583,7 @@ double sa_debug_bench(VNSystemAoi *sa, int n);
 void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value);
 int sa_debug_get(VNSystemAoi *sa, bool flag, int index);
 void sa_debug_join(VNSystemAoi *sa, const char *key);
+void sa_debug_unbench(VNSystemAoi *sa, int index, int slot);
 void sa_debug_save(VNSystemAoi *sa, int slot, bool load);
 void sa_debug_pcload(VNSystemAoi *sa, const char *path);
 void sa_debug_pcsave(VNSystemAoi *sa, const char *path);
@@ -597,6 +607,7 @@ typedef struct Town {
     Image *ui[40];
     int hover;
     bool hidden, mapOnly;
+    const Table *missions;
 } Town;
 
 bool sa_town_init(Town *t, Vfs *vfs);
@@ -653,7 +664,7 @@ typedef struct BuildScreen {
     Image *icon[40];
 } BuildScreen;
 
-enum { BUILD_STAY, BUILD_CLOSED };
+enum { BUILD_STAY, BUILD_CLOSED, BUILD_DECIDED };
 
 void sa_build_init(BuildScreen *b, Vfs *vfs);
 void sa_build_free(BuildScreen *b);
@@ -662,6 +673,6 @@ int sa_build_click(BuildScreen *b, Town *t, VM *vm, int x, int y, bool right);
 bool sa_build_hover(BuildScreen *b, Town *t, VM *vm, int x, int y);
 void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb);
 
-enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_TOWN_STAGE = 490, C_PLACE_STEPS = 0x48 };
+enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_TOWN_STAGE = 490, C_PLACE_STEPS = 0x48, C_MISSION_ID = 55, C_MISSION_DUE = 57 };
 
 #endif

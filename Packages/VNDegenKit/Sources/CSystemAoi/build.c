@@ -163,7 +163,7 @@ int sa_build_click(BuildScreen *b, Town *t, VM *vm, int x, int y, bool right) {
         case B_DECIDE:
             commit(b, t, vm);
             b->held = -1;
-            break;
+            return BUILD_DECIDED;
         case B_BACK:
             b->open = false;
             b->pendingCount = 0;

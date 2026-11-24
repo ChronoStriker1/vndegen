@@ -38,6 +38,16 @@ typedef struct Shop {
 
 #define CARD_ICONS 13
 
+#define MISSION_LOG 64
+
+typedef struct Missions {
+    Table table;
+    Image *art[8];
+    int log[MISSION_LOG][3], logCount;
+    int hover;
+    bool confirm;
+} Missions;
+
 typedef struct Card {
     Image *frame, *digits, *badge, *desc, *icon[CARD_ICONS];
 } Card;
@@ -73,12 +83,13 @@ typedef struct SaveScreen {
     SaveSummary now;
 } SaveScreen;
 
-#define EXP_GROUPS 8
+#define EXP_GROUPS 12
 #define EXP_TARGETS 5
 
 typedef struct ExpGroup {
     bool alive;
-    int party, number, x, y, dir, flags, cooldown, fought;
+    int party, number, x, y, dir, flags, cooldown, fought, extra;
+    bool stay;
     int cells[BATTLE_CELLS];
     int target[EXP_TARGETS][2];
 } ExpGroup;
@@ -89,12 +100,12 @@ typedef struct Expedition {
     int steps, areaStart, fighting, stepsLeft;
     int arriveSide, arriveAlong, resumeX, resumeY, resumeDir;
     int last[4], entry[4];
-    bool keepGroups;
+    bool keepGroups, resuming, stepHook;
     ExpGroup group[EXP_GROUPS];
     int groupCount;
     int hooks[EXP_HOOKS], hookCount, after;
     Table floors, dungeons;
-    Image *hall, *plate[12], *areaPlate, *back, *badge, *seen, *platform;
+    Image *hall, *plate[12], *areaPlate[11], *back, *badge, *seen, *platform;
     int hover, picked;
     bool (*explored)[EXP_FLOORS][DUN_CELLS];
     u8 (*passages)[EXP_FLOORS][DUN_CELLS];
@@ -103,7 +114,7 @@ typedef struct Expedition {
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES, MODE_SUBMIT };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -119,6 +130,8 @@ typedef struct Picture {
 } Picture;
 
 struct SA {
+    bool turnAdvance;
+    bool gameOver;
     char joined[DIALOG_UNITS][48];
     int joinedCount;
     VNSystemAoiConfig cfg;
@@ -172,6 +185,7 @@ struct SA {
     Policy policy;
     Equip equip;
     Shop shop;
+    Missions missions;
     Card card;
     Train train;
     Deploy deploy;
@@ -239,6 +253,18 @@ void sa_savescreen_free(SaveScreen *v);
 void sa_savescreen_open(SA *s, bool saving);
 bool sa_savescreen_frame(SA *s);
 void sa_autosave(SA *s);
+void sa_mission_init(SA *s);
+void sa_mission_free(SA *s);
+void sa_mission_reset(SA *s);
+int sa_mission_available(SA *s);
+int sa_mission_start(SA *s);
+bool sa_mission_target(SA *s, int *out);
+void sa_mission_check(SA *s);
+void sa_mission_end(SA *s, int result);
+void sa_mission_open(SA *s);
+void sa_mission_draw_confirm(SA *s, u32 *fb);
+bool sa_mission_confirm_input(SA *s);
+bool sa_mission_frame(SA *s);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);
 void sa_exp_open_select(SA *s);
@@ -250,6 +276,9 @@ void sa_exp_gain(SA *s, const int gain[4]);
 void sa_exp_enter(SA *s, int dungeon, int floor);
 void sa_exp_resume(SA *s, int dungeon, int floor, int x, int y, int dir, bool keepGroups);
 void sa_exp_add_group(SA *s, const char *name);
+void sa_exp_add_group_at(SA *s, const char *name, int x, int y);
+int sa_exp_area_registered(SA *s);
+int sa_exp_place_code(SA *s);
 void sa_exp_place_names(SA *s, const char **dungeon, const char **floor);
 const char *sa_exp_floor_map(SA *s, int dungeon, int floor);
 void sa_exp_names(SA *s, int dungeon, int floor, const char **dungeonName, const char **floorName);

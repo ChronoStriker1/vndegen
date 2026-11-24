@@ -1,5 +1,7 @@
 #include "sa_private.h"
 
+enum { TOWN_HOOK = 1, COMMAND_HOOK = 31 };
+
 #include <stdarg.h>
 #include <dlfcn.h>
 #include <pthread.h>
@@ -424,7 +426,8 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         else
             for (int i = 0; i < 4; i++) vm->c[base + i] += gain[i];
         for (int i = 0; i < 4; i++) after[i] = vm->c[base + i];
-        char *t = opd_str(code, in, 4);
+        char *raw = opd_str(code, in, 4), *t = sa_vm_expand(vm, raw);
+        free(raw);
         clear_text(s);
         if (any) sa_dialog_open_turn(&s->dialog, before, after, t);
         else sa_dialog_open(&s->dialog, t);
@@ -522,10 +525,16 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         }
         break;
     case 0x9e:
+        if (in->count >= 1) sa_vm_set(vm, &in->o[0], sa_mission_available(s));
+        break;
     case 0x9f:
+        if (in->count >= 1) sa_vm_set(vm, &in->o[0], sa_mission_start(s));
+        break;
+    case 0xa0:
+        sa_mission_check(s);
+        break;
     case 0xc3:
         if (in->count >= 2 && in->o[in->count - 1].kind == OPD_VAR) sa_vm_set(vm, &in->o[in->count - 1], 0);
-        if (in->op == 0x9e && in->count >= 1) sa_vm_set(vm, &in->o[0], 0);
         break;
     case 0xbc:
         if (in->count >= 2) {
@@ -553,10 +562,12 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         }
         break;
     case 0xde:
-        if (in->count >= 1) sa_vm_set(vm, &in->o[0], 0);
+        if (in->count >= 1) sa_vm_set(vm, &in->o[0], sa_exp_area_registered(s));
+        break;
+    case 0xa1:
+        sa_mission_end(s, in->count >= 1 ? sa_vm_get(vm, code, &in->o[0]) : 0);
         break;
     case 0x01:
-    case 0xa1:
     case 0xdf:
     case 0xe1:
         break;
@@ -579,7 +590,8 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         break;
     case 0xa8: {
         char *g = opd_str(code, in, 0);
-        sa_exp_add_group(s, g);
+        if (in->count >= 3) sa_exp_add_group_at(s, g, sa_vm_get(vm, code, &in->o[1]), sa_vm_get(vm, code, &in->o[2]));
+        else sa_exp_add_group(s, g);
         free(g);
         break;
     }
@@ -588,6 +600,17 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             int c = s->town.condition + sa_vm_get(vm, code, &in->o[1]);
             s->town.condition = c < 0 ? 0 : c > 100 ? 100 : c;
         }
+        break;
+    case 0xa4:
+        s->missions.confirm = true;
+        s->missions.hover = 0;
+        vm->state = VM_WAIT_DIALOG;
+        s->dirty = true;
+        break;
+    case 0x7a:
+        s->gameOver = true;
+        vm->depth = 0;
+        vm->state = VM_DONE;
         break;
     case 0x2a: {
         int n = in->count > 0 ? sa_vm_get(vm, code, &in->o[0]) : 0;
@@ -683,6 +706,7 @@ static void compose(SA *s) {
         sa_blit(fb, s->ui[UI_CHOICE_BOTTOM], x, choice_y(s, s->vm.choiceCount));
     }
     sa_dialog_draw(&s->dialog, fb);
+    sa_mission_draw_confirm(s, fb);
     if (s->log.open) sa_log_draw(&s->log, fb, s->skipMode, s->autoMode);
     if (s->transDur && s->transMs < s->transDur) {
         u32 a = s->transMs * 256 / s->transDur;
@@ -763,6 +787,7 @@ static void new_game(SA *s) {
     memcpy(s->exp.last, noPlace, sizeof noPlace);
     memset(s->exp.entry, 0, sizeof s->exp.entry);
     s->exp.groupCount = 0;
+    sa_mission_reset(s);
     sa_start_script(s, "init.box", 0);
 }
 
@@ -790,7 +815,6 @@ void sa_end_turn(SA *s) {
     vm->c[C_FOOD] += food;
     vm->c[C_MONEY] += money;
     vm->c[C_RESOURCES] += res;
-    vm->c[C_TURN]++;
     int after[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
     sa_dialog_open_turn(&s->dialog, before, after, "このターンの収支です");
     s->turnPending = true;
@@ -802,6 +826,19 @@ static void next_turn(SA *s) {
     s->autosaveTurn = true;
     s->town.mapOnly = false;
     sa_reset_scene(s);
+    if (s->vm.boxSlot[TOWN_HOOK]) {
+        char box[32];
+        snprintf(box, sizeof box, "%s", s->vm.boxSlot[TOWN_HOOK]);
+        sa_town_draw_map(&s->town, &s->vfs, &s->vm, s->fb);
+        for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) s->fb[i] = 0xff000000u | (s->fb[i] >> 1 & 0x7f7f7f);
+        sa_show_frame_as_bg(s, s->fb, "*town");
+        snprintf(s->nextBox, sizeof s->nextBox, "bo0000.box");
+        s->nextEntry = 0;
+        s->turnAdvance = true;
+        sa_start_script(s, box, 0);
+        return;
+    }
+    s->vm.c[C_TURN]++;
     sa_start_script(s, "bo0000.box", 0);
 }
 
@@ -830,6 +867,7 @@ static int command_number(int action) {
     case TOWN_CMD_DEPLOY: return 24;
     case TOWN_CMD_EQUIP: return 25;
     case TOWN_CMD_TRAIN: return 26;
+    case TOWN_CMD_SUBMIT: return 29;
     case TOWN_CMD_SHOP: return 27;
     }
     return -1;
@@ -857,6 +895,9 @@ static void run_command(SA *s, int action) {
         break;
     case TOWN_CMD_DEPLOY:
         sa_deploy_open(s);
+        break;
+    case TOWN_CMD_SUBMIT:
+        sa_mission_open(s);
         break;
     case TOWN_POLICY_DONE:
         sa_end_turn(s);
@@ -1007,6 +1048,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     sa_policy_init(&s->policy, &s->vfs);
     sa_equip_init(&s->equip, &s->vfs);
     sa_shop_init(&s->shop, &s->vfs);
+    sa_mission_init(s);
     sa_card_init(&s->card, &s->vfs);
     sa_train_init(&s->train, &s->vfs);
     sa_deploy_init(&s->deploy, &s->vfs);
@@ -1067,6 +1109,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_policy_free(&s->policy);
     sa_equip_free(&s->equip);
     sa_shop_free(&s->shop);
+    sa_mission_free(s);
     sa_card_free(&s->card);
     sa_train_free(&s->train);
     sa_deploy_free(&s->deploy);
@@ -1140,6 +1183,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_policy_frame(s)) return true;
     if (sa_equip_frame(s)) return true;
     if (sa_shop_frame(s)) return true;
+    if (sa_mission_frame(s)) return true;
     if (sa_train_frame(s)) return true;
     if (sa_deploy_frame(s, elapsedMs)) return true;
     if (sa_savescreen_frame(s)) return true;
@@ -1171,6 +1215,16 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             int r = sa_build_click(&s->build, &s->town, &s->vm, s->mouseX, s->mouseY, s->rightClicked);
             s->clicked = s->rightClicked = false;
             if (r == BUILD_CLOSED) s->town.mapOnly = false;
+            if (r == BUILD_DECIDED && s->vm.boxSlot[COMMAND_HOOK]) {
+                char box[32];
+                snprintf(box, sizeof box, "%s", s->vm.boxSlot[COMMAND_HOOK]);
+                s->build.open = false;
+                s->vm.c[0x5f] = 23;
+                s->afterScript = TOWN_CMD_BUILD;
+                sa_reset_scene(s);
+                sa_start_script(s, box, 0);
+                return true;
+            }
             s->dirty = true;
         }
         if (s->dirty) {
@@ -1205,6 +1259,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         if (s->mode == MODE_TOWN || s->mode == MODE_SAVES) return true;
     }
     dialog_input(s, elapsedMs);
+    if (sa_mission_confirm_input(s)) s->dirty = true;
     if (s->total && s->shown < s->total) {
         s->textMs += elapsedMs;
         int want = (int)(s->textMs / 30);
@@ -1379,6 +1434,11 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             char box[32];
             snprintf(box, sizeof box, "%s", s->nextBox);
             s->nextBox[0] = 0;
+            if (s->turnAdvance) {
+                s->turnAdvance = false;
+                s->vm.c[C_TURN]++;
+                sa_reset_scene(s);
+            }
             sa_start_script(s, box, s->nextEntry);
         } else {
             char *sav = sa_fmt("%s/Bunny3.sav", s->saveDir);
@@ -1391,6 +1451,10 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
                 s->mode = MODE_TOWN;
                 s->town.hover = -1;
                 run_command(s, a);
+            } else if (s->gameOver) {
+                s->gameOver = false;
+                sa_log(s, "game over: back to the title");
+                go_title(s);
             } else if (s->inGame) {
                 sa_reset_scene(s);
                 s->mode = MODE_TOWN;
@@ -1590,6 +1654,12 @@ int sa_debug_get(VNSystemAoi *sa, bool flag, int index) {
     return flag ? s->vm.f[index] : s->vm.c[index];
 }
 
+void sa_debug_unbench(VNSystemAoi *sa, int index, int slot) {
+    SA *s = (SA *)sa;
+    sa_party_unbench(&s->party, &s->vfs, index, slot);
+    s->dirty = true;
+}
+
 void sa_debug_join(VNSystemAoi *sa, const char *key) {
     SA *s = (SA *)sa;
     sa_party_join(&s->party, &s->vfs, key);
@@ -1602,12 +1672,13 @@ void sa_load_into_town(SA *s, int slot) {
 }
 
 void sa_enter_loaded(SA *s) {
+    sa_vm_register_hooks(&s->vm, &s->vfs, "init.box");
     s->playMs = (u32)s->vm.c[11] * 1000;
     sa_reset_scene(s);
     s->inGame = true;
     bool inDungeon = s->exp.active;
     s->exp.active = false;
-    s->turnPending = s->autosaveTurn = false;
+    s->turnPending = s->autosaveTurn = s->turnAdvance = false;
     s->dialog.open = false;
     s->mode = MODE_TOWN;
     s->town.mapOnly = false;

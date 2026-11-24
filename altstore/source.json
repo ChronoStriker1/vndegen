@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.1",
+          "buildVersion": "3354",
+          "date": "2026-11-24T20:17:13Z",
+          "localizedDescription": "BUNNY BLACK 3 now reaches 炎山洞 and the first missions.\n\n## Downloads\n\n- `VNDegen-0.60.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.1-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Added\n\n- **BISHOP BSX:** Mesu Kyoushi 3 and 4's free-sight meter. On the dress screen, FACE, BUST and HIP pick a fixed view of close-ups, and dragging the knob or clicking the meter sets your own. The view stays on later lines and is kept in saves, so it moves with the PC both ways.\n\n## Added\n\n- **SystemAoi:** BUNNY BLACK 3 reaches 炎山洞, which opens through its event on 遠征, as on the PC. Stairs lead between its areas, and door spots register new entry areas on the dungeon select screen.\n- **SystemAoi:** the マクドゥの試験 missions start at turn 17, with their set-up panel, 提出 in the town, rewards and deadlines.\n- **SystemAoi:** area events and the first-step explanations play when the original plays them, and so do the town's events after each turn, such as recruit scenes. Messages show the numbers they name.\n- Saves with missions and 炎山洞 load both ways with the PC.\n\n## Known limits\n\n- A hidden door opens only while a unit with 感知 is placed. That is VNDegen's reading of the original, so 炎山洞's lower areas wait until such a unit joins, and recruiting isn't built yet.\n- Which mission comes, when several could start on the same turn, is picked at random.\n- The town's defence, 解任/編成, recruiting from battles and the dungeons after 炎山洞 come later.\n- The limits listed for 0.60.0 still apply.\n\n## What wasn't tested\n\n- No physical device or physical controller was used. The game was played in the Linux test build, the Mac app and an iPad simulator, and saves were exchanged with the original engine under Wine both ways.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.1/VNDegen-0.60.1.ipa",
+          "size": 132621157,
+          "sha256": "6dbbbd9912ab3990cda38225126046a31da6d539450360274f259a293a36d43a",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.0",
           "buildVersion": "3332",
           "date": "2026-11-24T18:09:53Z",

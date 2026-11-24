@@ -27,7 +27,6 @@ enum {
     MAP_LAYER = 128,
     MAP_DUNGEONS = 15,
     MAP_FLOORS = 10,
-    MAP_SIDE = 15,
     MEMBER_LEVEL = 12,
     MEMBER_EXP = 16,
     MEMBER_HP = 28,
@@ -76,11 +75,13 @@ enum {
     GROUP_FLAGS = 63,
     GROUP_COOLDOWN = 65,
     GROUP_FOUGHT = 66,
+    GROUP_EXTRA = 40,
     ENEMY_AT = 215608,
     ENEMY_BASE = 100,
     ENEMIES_MAX = 30,
     STAND_AT = 1009560,
     STAND_COUNT = 13,
+    MISSIONS_AT = 1008328,
 };
 
 static int at(const u8 *img, size_t off) { return (int)rd32(img + off); }
@@ -119,40 +120,43 @@ static void put_slot(SA *s, int slot, const Bench *b) {
     p->equip[slot] = b->equip;
 }
 
-static size_t map_record(int dungeon, int floor) { return MAPS_AT + (size_t)((dungeon - 1) * MAP_FLOORS + floor - 1) * MAP_RECORD; }
+static size_t map_record(int index) { return MAPS_AT + (size_t)index * MAP_RECORD; }
 
 static void read_maps(SA *s, const u8 *img) {
     if (!s->exp.explored) return;
-    for (int d = 1; d < EXP_DUNGEONS && d <= MAP_DUNGEONS; d++)
-        for (int f = 1; f < EXP_FLOORS && f <= MAP_FLOORS; f++) {
-            for (int i = 0; i < 4; i++) s->exp.floorInfo[d][f][i] = at(img, map_record(d, f) + (size_t)i * 4);
-            size_t o = map_record(d, f) + MAP_LAYERS;
-            for (int y = 0; y < MAP_SIDE; y++) {
-                size_t k = (size_t)y * 4;
-                u32 bits = rd32(img + o + k), east = rd32(img + o + MAP_LAYER + k), south = rd32(img + o + 2 * MAP_LAYER + k);
-                for (int x = 0; x < MAP_SIDE; x++) {
-                    int c = y * MAP_SIDE + x;
-                    s->exp.explored[d][f][c] = bits >> x & 1;
-                    s->exp.passages[d][f][c] = (u8)((east >> x & 1 ? PASS_EAST : 0) | (south >> x & 1 ? PASS_SOUTH : 0));
-                }
+    for (int r = 0; r < MAP_DUNGEONS * MAP_FLOORS; r++) {
+        u32 head = rd32(img + map_record(r) + MAP_HEAD);
+        int d = (int)(head >> 16 & 0xff), f = (int)(head >> 8 & 0xff);
+        if (!head || d < 1 || d >= EXP_DUNGEONS || f < 1 || f >= EXP_FLOORS) continue;
+        for (int i = 0; i < 4; i++) s->exp.floorInfo[d][f][i] = at(img, map_record(r + 1) + (size_t)i * 4);
+        size_t o = map_record(r) + MAP_LAYERS;
+        for (int y = 0; y < DUN_SIDE; y++) {
+            size_t k = (size_t)y * 4;
+            u32 bits = rd32(img + o + k), east = rd32(img + o + MAP_LAYER + k), south = rd32(img + o + 2 * MAP_LAYER + k);
+            for (int x = 0; x < DUN_SIDE; x++) {
+                int c = y * DUN_SIDE + x;
+                s->exp.explored[d][f][c] = bits >> x & 1;
+                s->exp.passages[d][f][c] = (u8)((east >> x & 1 ? PASS_EAST : 0) | (south >> x & 1 ? PASS_SOUTH : 0));
             }
         }
+    }
 }
 
 static void write_maps(SA *s, u8 *img) {
     if (!s->exp.explored) return;
-    for (int d = 1; d < EXP_DUNGEONS && d <= MAP_DUNGEONS; d++)
-        for (int f = 1; f < EXP_FLOORS && f <= MAP_FLOORS; f++) {
+    int r = 0;
+    for (int d = 1; d < EXP_DUNGEONS; d++)
+        for (int f = 1; f < EXP_FLOORS && r < MAP_DUNGEONS * MAP_FLOORS; f++) {
             const bool *v = s->exp.explored[d][f];
-            size_t o = map_record(d, f);
-            for (int i = 0; i < 4; i++) put(img, o + (size_t)i * 4, s->exp.floorInfo[d][f][i]);
             bool any = false;
             for (int c = 0; c < DUN_CELLS && !any; c++) any = v[c];
             if (!any) continue;
+            size_t o = map_record(r++);
+            for (int i = 0; i < 4; i++) put(img, map_record(r) + (size_t)i * 4, s->exp.floorInfo[d][f][i]);
             put(img, o + MAP_HEAD, d << 16 | f << 8);
-            for (int x = 0; x < MAP_SIDE; x++)
-                for (int y = 0; y < MAP_SIDE; y++) {
-                    int c = y * MAP_SIDE + x;
+            for (int x = 0; x < DUN_SIDE; x++)
+                for (int y = 0; y < DUN_SIDE; y++) {
+                    int c = y * DUN_SIDE + x;
                     u8 pass = s->exp.passages[d][f][c];
                     bool layer[4] = {v[c], pass & PASS_EAST, pass & PASS_SOUTH, v[c]};
                     for (int l = 0; l < 4; l++) {
@@ -224,6 +228,9 @@ bool sa_pcsave_read(SA *s, const char *path) {
     s->exp.dungeon = s->vm.c[DUNGEON_VAR];
     s->exp.floor = s->vm.c[DUNGEON_VAR + 1];
     read_dungeon(s, img);
+    s->missions.logCount = 0;
+    for (int i = 0; i < MISSION_LOG && at(img, MISSIONS_AT + (size_t)i * 12); i++, s->missions.logCount++)
+        for (int k = 0; k < 3; k++) s->missions.log[i][k] = at(img, MISSIONS_AT + (size_t)i * 12 + (size_t)k * 4);
     Party *p = &s->party;
     p->items = 0;
     for (int i = 0; i < STOCK_ENTRIES; i++) {
@@ -419,7 +426,9 @@ static void write_dungeon(SA *s, u8 *img) {
         put(img, o + 12, g->x);
         put(img, o + 16, g->y);
         put(img, o + 20, g->dir);
-        for (int c = 0; c < BATTLE_CELLS + 10; c++) put(img, o + (size_t)(GROUP_CELLS + c) * 4, -1);
+        int board = sa_battle_board_size(&s->battle, g->party);
+        for (int c = 0; c < BATTLE_CELLS + 10; c++)
+            put(img, o + (size_t)(GROUP_CELLS + c) * 4, board == 1 && c < BATTLE_CELLS && (c % 5 == 0 || c % 5 == 4) ? -2 : -1);
         int rows[BATTLE_CELLS], gr[BATTLE_CELLS], gc[BATTLE_CELLS], at[BATTLE_CELLS], count = 0, delta[BATTLE_CELLS][10];
         for (int c = 0; c < BATTLE_CELLS; c++) {
             at[c] = -1;
@@ -458,6 +467,7 @@ static void write_dungeon(SA *s, u8 *img) {
         put(img, o + (GROUP_FLAGS + 1) * 4, -1);
         put(img, o + GROUP_COOLDOWN * 4, g->cooldown);
         put(img, o + GROUP_FOUGHT * 4, g->fought);
+        put(img, o + GROUP_EXTRA * 4, g->extra);
         put(img, o + (GROUP_SIZE - 4), -1);
     }
 }
@@ -491,6 +501,9 @@ static void read_dungeon(SA *s, const u8 *img) {
         g->flags = at(img, o + GROUP_FLAGS * 4);
         g->cooldown = at(img, o + GROUP_COOLDOWN * 4);
         g->fought = at(img, o + GROUP_FOUGHT * 4);
+        g->extra = at(img, o + GROUP_EXTRA * 4);
+        for (int r = 0; r < s->battle.groups.rows; r++)
+            if (sa_table_int(&s->battle.groups, r, 0) == g->party) g->stay = !strcmp(sa_table_text(&s->battle.groups, r, 7), "停止");
     }
 }
 
@@ -530,10 +543,12 @@ bool sa_pcsave_write(SA *s, const char *path) {
     write_members(s, img);
     write_maps(s, img);
     write_dungeon(s, img);
+    for (int i = 0; i < s->missions.logCount; i++)
+        for (int k = 0; k < 3; k++) put(img, MISSIONS_AT + (size_t)i * 12 + (size_t)k * 4, s->missions.log[i][k]);
     for (int i = 0; i < PC_C_VARS; i++) put(img, VM_AT + (size_t)i * 4, s->vm.c[i]);
     memcpy(img + VM_AT + PC_C_VARS * 4, s->vm.f, PC_F_VARS);
     for (size_t i = 0; i < sizeof engineVars / sizeof engineVars[0]; i++) put(img, VM_AT + (size_t)engineVars[i].off * 4, engineVars[i].value);
-    put(img, VM_AT + PLACE_VAR * 4, s->exp.active ? PLACE_DUNGEON : PLACE_TOWN);
+    put(img, VM_AT + PLACE_VAR * 4, s->exp.active ? sa_exp_place_code(s) : PLACE_TOWN);
     put(img, VM_AT + (PLACE_VAR + 1) * 4, s->exp.active ? 2 : 1);
     if (!s->vm.c[SEED_VAR]) put(img, VM_AT + SEED_VAR * 4, (int)(sa_vm_random(&s->vm) & 0x7fffffff));
     size_t n;

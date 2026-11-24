@@ -106,11 +106,12 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 
 ## Known limits
 
-- Built and measured for the opening: the town's commands (建設, 内政, 休憩, 配置, 装備, 育成, 商会), units, items,
-  battles and 千樹庭's areas. Not built yet, as the opening doesn't reach them: missions (マクドゥの試験, after the
-  氷掌閣 event), the town's defence, 解任 and 編成, stairs between floors, and the dungeons after 千樹庭 (炎山洞
-  opens around turn 20 once enough areas are reached). These live in the original's exe, not its scripts, and are
-  rebuilt from play (`docs/systemaoi-cleanroom.md`).
+- Built and measured: the town's commands (建設, 内政, 休憩, 配置, 装備, 育成, 商会, 提出), units, items, battles,
+  千樹庭's areas, 炎山洞 (opened by its event on 遠征 from turn 10 after five expeditions) with its stairs between
+  areas, area entries registered at door spots, the missions (マクドゥの試験) from turn 17, recruits from the town's housing, and area bosses whose
+  defeat recruits their leaders.
+  Hidden doors (wall 100) open with a 感知 unit in the party (inferred). Not built yet: the town's defence, 解任 and 編成, and the dungeons after 炎山洞. These live in
+  the original's exe, not its scripts, and are rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
 - Dungeon: where an area's enemy groups first stand and how they choose their way are VNDegen's own (the

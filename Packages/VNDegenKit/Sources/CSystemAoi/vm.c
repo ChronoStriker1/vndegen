@@ -46,6 +46,20 @@ static bool push_frame(VM *vm, Vfs *vfs, const char *file, int entry, const VMHo
     return true;
 }
 
+static char *str_of(const u8 *code, const Operand *o);
+
+void sa_vm_register_hooks(VM *vm, Vfs *vfs, const char *boxFile) {
+    int b = load_box(vm, vfs, boxFile);
+    if (b < 0 || vm->boxes[b].box.count < 1) return;
+    const BoxEntry *be = &vm->boxes[b].box.e[0];
+    Insn in;
+    for (u32 pc = 0; pc < be->size && sa_insn_decode(be->data, be->size, pc, &in); pc = in.next) {
+        if (in.op != 0x72 || in.count < 2 || in.o[0].value < 0 || in.o[0].value >= 256) continue;
+        free(vm->boxSlot[in.o[0].value]);
+        vm->boxSlot[in.o[0].value] = str_of(be->data, &in.o[1]);
+    }
+}
+
 bool sa_vm_start(VM *vm, Vfs *vfs, const char *boxFile, int entry, const VMHost *host) {
     vm->state = VM_RUN;
     return push_frame(vm, vfs, boxFile, entry, host);
@@ -166,6 +180,29 @@ static bool term(VM *vm, const char **s, i32 *out) {
     *out = sa_vm_get(vm, NULL, &o);
     *s = e;
     return true;
+}
+
+char *sa_vm_expand(VM *vm, const char *text) {
+    size_t n = strlen(text), cap = n + 64, len = 0;
+    char *out = sa_alloc(cap);
+    for (const char *p = text; *p;) {
+        const char *end = *p == '&' ? strchr(p + 1, '&') : NULL;
+        i32 v;
+        const char *q = p + 1;
+        if (end && term(vm, &q, &v) && q == end) {
+            char num[16];
+            int k = snprintf(num, sizeof num, "%d", v);
+            if (len + (size_t)k + 1 > cap) out = realloc(out, cap = cap * 2 + (size_t)k);
+            memcpy(out + len, num, (size_t)k);
+            len += (size_t)k;
+            p = end + 1;
+            continue;
+        }
+        if (len + 2 > cap) out = realloc(out, cap *= 2);
+        out[len++] = *p++;
+    }
+    out[len] = 0;
+    return out;
 }
 
 bool sa_vm_cond(VM *vm, const char *expr) {
