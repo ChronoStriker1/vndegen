@@ -1,6 +1,6 @@
 #include "sa_private.h"
 
-enum { TOWN_HOOK = 1 };
+enum { TOWN_HOOK = 1, COMMAND_HOOK = 31 };
 
 #include <stdarg.h>
 #include <dlfcn.h>
@@ -1215,6 +1215,16 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             int r = sa_build_click(&s->build, &s->town, &s->vm, s->mouseX, s->mouseY, s->rightClicked);
             s->clicked = s->rightClicked = false;
             if (r == BUILD_CLOSED) s->town.mapOnly = false;
+            if (r == BUILD_DECIDED && s->vm.boxSlot[COMMAND_HOOK]) {
+                char box[32];
+                snprintf(box, sizeof box, "%s", s->vm.boxSlot[COMMAND_HOOK]);
+                s->build.open = false;
+                s->vm.c[0x5f] = 23;
+                s->afterScript = TOWN_CMD_BUILD;
+                sa_reset_scene(s);
+                sa_start_script(s, box, 0);
+                return true;
+            }
             s->dirty = true;
         }
         if (s->dirty) {

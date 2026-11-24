@@ -663,7 +663,7 @@ typedef struct BuildScreen {
     Image *icon[40];
 } BuildScreen;
 
-enum { BUILD_STAY, BUILD_CLOSED };
+enum { BUILD_STAY, BUILD_CLOSED, BUILD_DECIDED };
 
 void sa_build_init(BuildScreen *b, Vfs *vfs);
 void sa_build_free(BuildScreen *b);
