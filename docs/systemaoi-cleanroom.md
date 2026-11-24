@@ -297,6 +297,30 @@ calls it is inferred from that and from play, and marked so.
   one) and the top bar names the dungeon and floor. The backdrop is the dungeon view; the original's seems to look
   further along, from a different camera.
 
+## Missions, from the scripts and play
+
+Measured under Wine from a turn-16 save, through to the deadline and a submission.
+
+- **Start.** The turn script (bo0000) asks `9e` whether a mission is open this turn and `9f` to pick one, then
+  plays its scene (fa0000 #1) and `a4` shows the 提出 panel with 確認 over the scene. `mission.obj`: column 0 the id,
+  6 and 7 the turns it can start on, 11 the turns allowed (C057 = start + 11 - 1: 17 + 8 - 1 = 24), 12 to 14 the
+  food, money and resources wanted. C055 is the mission, C056 its first turn, C057 its last. The original picked
+  試験04 where 試験02 to 04 all start on turn 17; VNDegen picks among them at random (inferred).
+- **Town.** While a mission runs, 提出 (`mai_b08`) shows at (16, 420), the top panel's 目標 gives C057, and the town
+  window's 目標 rows give the amounts, blue when met and red when not.
+- **提出.** Opens over `bg009a0`: `pay_a00` at (340, 130), the turns in `pay_c00` digits, the amounts in `pay_c01`
+  (black, red, blue rows), and 提出 (`pay_b00`, only when every amount is met) and キャンセル (`pay_b01`) at (570, 350) and
+  (780, 350). 提出 takes the amounts and runs the command hook (bo3100 #0 with C095 29), which adds the turns to
+  spare to C581, ends the mission (`a1 1`) and plays 条件達成 (fa0000 #2); C580 counts missions passed. 99% of
+  the screen's pixels match.
+- **Deadline.** The town hook (bo0100, run after every turn script) calls `a0` once the turn reaches C057; past
+  it, the mission passes if the town has the amounts, and they are taken (the original went from 205 food, 1,720
+  money and 850 resources to 5, 720 and 350 at turn 25), else it fails; C058 tells the hook which (1, 2), and the
+  hook ends the mission with `a1` and plays fa0000 #2 or #3. A failed test ends in マクドゥ's scene and `7a`, back
+  to the title (inferred).
+- **Save.** A list from 1,008,328 of (mission, 1, result) per mission started: (4, 1, 0) while it ran, (4, 1, 1)
+  once passed.
+
 ## 内政, from the screens and the tables
 
 - **Screen.** Measured (the windows 99 to 100% pixel-exact): the throne room `bg010a0`, the 内政 window `dom_a00` at
