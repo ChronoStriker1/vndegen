@@ -485,6 +485,8 @@ private struct PlayerMenuView: View {
             }
             // The cards reach across a side camera's inset, so they keep below the camera.
             .padding(.top, metrics.acrossSideCamera ? metrics.cornerClearance : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .outOfFold(vertical: .trailing, horizontal: .bottom)
         }
         .onScreenKeyboard(menu.page == .cheats ? menu.cheats?.keyboard : nil)
     }

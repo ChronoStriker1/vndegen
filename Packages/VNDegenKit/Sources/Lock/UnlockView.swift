@@ -1,5 +1,6 @@
 import SwiftUI
 import VNCore
+import ControllerUI
 
 /// Asks for Face ID, Touch ID, or the passcode. Calls `onDone` with whether the library unlocked.
 /// With no passcode and no usable biometrics, it first asks the user to create a passcode.
@@ -21,22 +22,31 @@ public struct UnlockView: View {
             let wide = geometry.size.width > geometry.size.height * 1.15
             // The keypad column is about 60 points of text plus 5.3 key heights.
             let keySize = min(max((geometry.size.height - (wide ? 110 : 300)) / 5.3, 44), 80)
+            let split = FoldSplit(fold: geometry.fold(), in: geometry.size)
             ZStack {
                 LockBackdrop()
-                Group {
-                    if wide {
-                        HStack(spacing: 56) {
-                            header(keySize: keySize)
-                            keypadOrBiometrics(keySize: keySize)
-                        }
-                    } else {
-                        VStack(spacing: keySize * 0.4) {
-                            header(keySize: keySize)
-                            keypadOrBiometrics(keySize: keySize)
+                if let split {
+                    let keySize = min(max((split.trailingOrBottom.height - (split.axis == .vertical ? 110 : 80)) / 5.3, 44), 80)
+                    header(keySize: keySize)
+                        .position(x: split.leadingOrTop.midX, y: split.leadingOrTop.midY)
+                    keypadOrBiometrics(keySize: keySize)
+                        .position(x: split.trailingOrBottom.midX, y: split.trailingOrBottom.midY)
+                } else {
+                    Group {
+                        if wide {
+                            HStack(spacing: 56) {
+                                header(keySize: keySize)
+                                keypadOrBiometrics(keySize: keySize)
+                            }
+                        } else {
+                            VStack(spacing: keySize * 0.4) {
+                                header(keySize: keySize)
+                                keypadOrBiometrics(keySize: keySize)
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 cancelButton
             }
         }

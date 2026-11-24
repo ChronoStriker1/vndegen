@@ -154,6 +154,7 @@ struct SettingsView: View {
                 // Its help text reads in lines of a comfortable length on a wide screen.
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity)
+                .outOfFold(vertical: .leading)
                 .onChange(of: nav.focus) { _, focus in
                     guard nav.focusMovedByController, let focus else { return }
                     withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }

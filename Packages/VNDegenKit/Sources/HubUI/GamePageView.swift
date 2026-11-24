@@ -1,5 +1,6 @@
 import SwiftUI
 import VNCore
+import ControllerUI
 import GameInput
 
 struct GamePageView: View {
@@ -19,6 +20,8 @@ struct GamePageView: View {
                     banner.id("banner")
                     VStack(alignment: .leading, spacing: 28) {
                         actions
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .outOfFold(vertical: .leading)
                             // Read off the main thread, as the engine section reads its note, since it can list the
                             // game's folder. It follows the engine choice and the engine's options.
                             .task(id: "\(game.engine?.rawValue ?? "")|\(nav.variantRevision)") {
