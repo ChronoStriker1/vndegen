@@ -502,6 +502,8 @@ static void read_dungeon(SA *s, const u8 *img) {
         g->cooldown = at(img, o + GROUP_COOLDOWN * 4);
         g->fought = at(img, o + GROUP_FOUGHT * 4);
         g->extra = at(img, o + GROUP_EXTRA * 4);
+        for (int r = 0; r < s->battle.groups.rows; r++)
+            if (sa_table_int(&s->battle.groups, r, 0) == g->party) g->stay = !strcmp(sa_table_text(&s->battle.groups, r, 7), "停止");
     }
 }
 
