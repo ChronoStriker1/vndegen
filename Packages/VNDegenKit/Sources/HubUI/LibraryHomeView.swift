@@ -353,7 +353,7 @@ private struct HeaderShelf: View {
         let width = metrics.headerWidth
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: shelf.title, systemImage: shelf == .hidden ? "lock.open.fill" : nil)
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(width), spacing: metrics.tileSpacing), count: metrics.headerColumns),
+            LazyVGrid(columns: metrics.gridItems(columns: metrics.headerColumns, width: width),
                       alignment: .leading, spacing: metrics.tileSpacing) {
                 ForEach(games) { game in
                     HeaderTile(game: game, target: .tile(shelf, game.id), width: width)
@@ -386,7 +386,7 @@ private struct GridShelf: View {
                         .foregroundStyle(Theme.tertiaryText)
                 }
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(width), spacing: metrics.tileSpacing), count: metrics.gridColumns),
+            LazyVGrid(columns: metrics.gridItems(columns: metrics.gridColumns, width: width),
                       alignment: .leading, spacing: metrics.tileSpacing + 8) {
                 ForEach(games) { game in
                     GameTile(game: game, target: .tile(shelf, game.id), width: width)

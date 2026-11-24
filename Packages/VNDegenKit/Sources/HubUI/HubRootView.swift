@@ -1,4 +1,5 @@
 import SwiftUI
+import ControllerUI
 import VNCore
 import SaveSync
 import ArchiveImport
@@ -18,7 +19,10 @@ public struct HubRootView: View {
     }
 
     private func metrics(_ geo: GeometryProxy) -> HubMetrics {
-        HubMetrics(size: geo.size, insets: geo.safeAreaInsets, windowControls: windowControls)
+        let fold = geo.fold()
+        return HubMetrics(size: geo.size, insets: geo.safeAreaInsets, windowControls: windowControls,
+                          foldable: geo.fold(includingInactive: true) != nil,
+                          foldGap: fold.map { $0.height >= $0.width ? $0.width : 0 } ?? 0)
     }
 
     public var body: some View {

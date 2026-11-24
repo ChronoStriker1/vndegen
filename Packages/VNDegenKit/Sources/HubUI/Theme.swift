@@ -27,6 +27,8 @@ struct HubMetrics: Equatable {
     var windowControls = WindowControlsInsets()
     /// True for metrics from `besideSideCamera`, whose content reaches across the camera's inset.
     var acrossSideCamera = false
+    var foldable = false
+    var foldGap: CGFloat = 0
 
     /// Width including the safe area, for art that runs edge to edge.
     var fullWidth: CGFloat { size.width + insets.leading + insets.trailing }
@@ -113,22 +115,29 @@ struct HubMetrics: Equatable {
     }
 
     /// Columns in the header list: one on a phone held upright, two or more as the width allows.
-    var headerColumns: Int { max(1, Int((size.width - padding * 2 + tileSpacing) / (320 + tileSpacing))) }
-    var headerWidth: CGFloat {
-        let columns = CGFloat(headerColumns)
-        return (size.width - padding * 2 - tileSpacing * (columns - 1)) / columns
+    var headerColumns: Int { columns(maxWidth: 480, minimum: 1) }
+    var headerWidth: CGFloat { cellWidth(columns: headerColumns) }
+
+    var gridColumns: Int { columns(maxWidth: tileWidth * 1.2, minimum: 2) }
+    /// Stretched so each row runs edge to edge rather than leaving a ragged gap on the right.
+    var gridTileWidth: CGFloat { cellWidth(columns: gridColumns) }
+
+    func columnSpacing(after column: Int, of columns: Int) -> CGFloat {
+        columns.isMultiple(of: 2) && column == columns / 2 - 1 ? max(tileSpacing, foldGap) : tileSpacing
     }
 
-    /// Columns in the grid layout: three on a phone, and on wider screens as many capsules of the shelves' size as fit.
-    var gridColumns: Int {
-        let available = size.width - padding * 2
-        let target = isCompact ? (available - tileSpacing * 2) / 3 : tileWidth
-        return max(2, Int((available + tileSpacing) / (target + tileSpacing)))
+    func gridItems(columns: Int, width: CGFloat) -> [GridItem] {
+        (0..<columns).map { GridItem(.fixed(width), spacing: columnSpacing(after: $0, of: columns)) }
     }
-    /// Stretched so each row runs edge to edge rather than leaving a ragged gap on the right.
-    var gridTileWidth: CGFloat {
-        let columns = CGFloat(gridColumns)
-        return (size.width - padding * 2 - tileSpacing * (columns - 1)) / columns
+
+    private func columns(maxWidth: CGFloat, minimum: Int) -> Int {
+        let fitting = max(minimum, Int(((size.width - padding * 2 + tileSpacing) / (maxWidth + tileSpacing)).rounded(.up)))
+        return foldable && fitting > 1 && !fitting.isMultiple(of: 2) ? fitting + 1 : fitting
+    }
+
+    private func cellWidth(columns: Int) -> CGFloat {
+        let gaps = (0..<columns - 1).reduce(CGFloat(0)) { $0 + columnSpacing(after: $1, of: columns) }
+        return (size.width - padding * 2 - gaps) / CGFloat(columns)
     }
 
     /// Columns in a game page's screenshot grid `width` wide: two on a phone held upright, and more as the width allows,
