@@ -177,14 +177,14 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Part set.** `floor.obj`'s column after the map name names the part set: 10 for 千樹庭 is `m010set.pvm` (forest);
   `m000set` is 炎山洞's lava. Floor, ceiling and wall parts are drawn per cell; walls are modelled on the cell's +x
   side and turned onto each side.
-- **Map layout.** `mpDDFF.amd` stores its 15 by 15 cells row by row after a 48-byte header: cell (x, y), with y
-  growing south, is record x + 15 y. The wall fields are 9, 12, 15 and 18 for north, east, south and west (0 a wall,
-  10 a doorway the party walks through, 20 an edge passage to the next area), each followed by its 移動 field; field
-  21 is the open-side mask (bits 1, 2, 4 and 8 for north, east, south and west). Measured: the original's C073 to
-  C075, its saves' positions and the scripts' `d7`/`d8` coordinates all use this frame (the start view of a PC
-  autosave on (6, 2) facing south matches VNDegen's on the same cell; the minimap's door, room and passages line
-  up). An earlier VNDegen build read the maps turned a quarter, which kept the views right but put every
-  coordinate, the compass and the minimap a quarter off.
+- **Map layout.** `mpDDFF.amd` holds a 48-byte header (word 1 the width, word 2 the height: 15 by 15 in 千樹庭, 16 by
+  16 and 20 by 20 in 炎山洞, 5 to 20 in all) and then the cells row by row: cell (x, y), with y growing south, is
+  record x + width × y. The wall fields are 9, 12, 15 and 18 for north, east, south and west (0 a wall, 10 a doorway
+  the party walks through, 20 an edge passage to the next area, 100 a wall passable only from its own side), each
+  followed by its 移動 field; field 21 is the open-side mask (bits 1, 2, 4 and 8 for north, east, south and west).
+  Measured: the original's C073 to C075, its saves' positions and the scripts' `d7`/`d8` coordinates all use this
+  frame. Wall 100: walking into 中腹エリア's stair rooms from outside meets a wall; from inside they open (inferred
+  from the maps, whose rooms have 100 on their own side).
 - **Camera.** `Cam.pvc`'s position and target (3.2 high, 4.6 behind the cell's centre, tilted down slightly), with
   a 47.2° vertical field of view: the floor lines and wall edges fit that best (correlation 0.58 against 0.30 to 0.35
   at other angles); the file's Zoom(40) isn't used as given.
@@ -230,8 +230,28 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   before it can fight again; a beaten group is gone for the visit. VNDegen's spawn cells are its own (eight or more
   steps from the arrival, chosen per area and group), as the original's rule isn't known. `a8 "name"` from the
   scripts adds a group the same way.
-- **`bf var, N`** feeds the turn script's thresholds (1, 2, 5, 8): inferred as the number of floors reached in
-  dungeon N + 1.
+- **`bf var, N`** answers how many of dungeon N + 1's areas are offered as entries (below). Measured: the PC's
+  turn-10 save has F751 (bf = 1) set and F752 (bf ≥ 2) clear although its party had walked into 中央森の東, which a
+  count of visited areas would have made 2.
+- **Entries.** `dungeon.obj` column 3 is the flag that opens a dungeon in the select screen (F300 千樹庭, F301
+  炎山洞); `floor.obj` column 14 is the flag that offers an area as an entry (0 always, -1 never; 中央森 0, 中央森の東南
+  F256, 炎山洞 中腹エリア F279, the 抵抗勢力拠点 F1902). Measured: after the 炎山洞 event (bo3001, on 遠征 at turn 10)
+  the select screen lists 炎山洞 and its 中腹エリア, VNDegen's 96% pixel-exact. Floor object 99 is a door spot:
+  stepping on it, the floor hook (bo1200 entry 4) turns it into the door 100 and sets the area's flag; `de` tells
+  that hook whether the current area's flag is already set (kept in F450), and a registered area shows its door
+  from the start. Inferred from the scripts and maps.
+- **Stairs.** Floor parts 100 and 101 show 下りる and 上る. Inferred from the maps: they lead to the area with the
+  opposite stairs, the one whose name gives the stairs' quarter of the map when an area has several (炎山洞
+  中腹エリア's four stair rooms lead to 裾野エリア南東, 南西, 北西 and 北東), else the one area left (中腹エリア北 to
+  山頂エリア); the party arrives on the target's stairs.
+- **Per-area looks.** `floor.obj` column 10 is the fog colour (0x2b3021 in 千樹庭, 0x38221c in 炎山洞, fitted on the
+  far view). Column 9 is 1 for 炎山洞 and the dungeons after it, whose floors show about 1.55 times brighter than
+  the walls (inferred from one capture; VNDegen lights their floor parts that much more).
+- **Counters and the floor hook.** Measured from autosaves: C061 to C063 count pad actions (moves and turns: all
+  expeditions, this one, this area), C066 all steps and C067 this expedition's steps; the floor hook (12) runs
+  after every step and wall bump (炎山洞's first-step explanation plays on the first step, as on the PC). Hook 10
+  runs once per expedition (C600 counts expeditions: 5 at turn 10 in every save after five trips with many areas).
+  On loading, the hooks `init.box` registers are registered again.
 
 ## Expeditions, from the scripts and play
 
@@ -269,10 +289,10 @@ calls it is inferred from that and from play, and marked so.
   the weights in columns 32 to 34 (10, 60, 10); measured in support: the fixed seven-slime group 千固定0100 came up
   in the original's random battles.
 - **Dungeon select.** Measured (99% of pixels exact): the hall `bg005a0` with the party on the `m998bt1a` platform,
-  a plate per dungeon (`gat_bNN`, normal, hover, chosen) from (340, 40), its badge at (354, 52) (`gat_d01` NEW until
-  F731 onwards is set by the setup hook, then `gat_d02`), and 戻る (`gat_c00`) at (444, 640). Choosing a dungeon
-  shows its floors' plates (`gat_a01`, with `gat_d02` and the floor's name in white, 22 pixels, centred 16 pixels
-  down) from (765, 40). Inferred: one row per floor reached; only the first is offered so far.
+  a plate per open dungeon (`gat_bNN`, normal, hover, chosen) from (340, 40), its badge at (354, 52) (`gat_d01` NEW
+  until one of its maps is visited, then `gat_d02`), and 戻る (`gat_c00`) at (444, 640). Choosing a dungeon shows
+  its entries' plates (`gat_aNN` for dungeon NN, with the badge and the area's name in white, 22 pixels, centred 16
+  pixels down) from (765, the chosen dungeon's row).
 - **Battles from the dungeon** use the dungeon's platforms (`mNNNbt1a` and `bt2a` to `bt2c`, NNN the dungeon less
   one) and the top bar names the dungeon and floor. The backdrop is the dungeon view; the original's seems to look
   further along, from a different camera.
@@ -475,13 +495,13 @@ the same points (offsets in bytes, numbers little-endian):
 - **Save details** in the variables: C002 and C013 the save time in Unix seconds, C003 the save count (shown at the
   top right of a slot's details, and the autosave panel's count), C011 the play time in seconds. Loading and saving
   again changes only these.
-- **Map memory** from 6,172: 150 records of 532 bytes (fifteen dungeons of ten floors, ending where the members
-  begin): four numbers (a 3 on 千樹庭's second floor; not understood, kept as read), a word with the floor in its
-  second byte and the dungeon in its third (00 01 01 00 for 千樹庭's first floor), then four layers of 32 words. Word
-  y holds row y with bit x for column x. Layer 0 is the visited cells and layer 3 a copy of it; layer 1 marks a step
-  walked between a cell and the one east of it, layer 2 between a cell and the one south of it (cells next to each
-  other but never walked between stay clear). Fitted on every save from Wine: all set bits fall on open cells only,
-  and VNDegen's walking reproduces the layers.
+- **Map memory** from 6,188: up to 150 records of 532 bytes, one per area visited, in turn: a word naming the area
+  (the dungeon in its third byte, the floor in its second), four layers of 32 words, and four numbers (a 1 or 3 on
+  some areas; not understood, kept as read). Measured on a 炎山洞 autosave: 中央森, 中央森の東, then 炎山洞
+  中腹エリア, with no slot for the areas between. Word y holds row y with bit x for column x. Layer 0 is the visited
+  cells and layer 3 a copy of it; layer 1 marks a step walked between a cell and the one east of it, layer 2 between
+  a cell and the one south of it (cells next to each other but never walked between stay clear). VNDegen writes the
+  areas in dungeon and floor order. Fitted on every save from Wine.
 - **Last position** at 998,016 (the formation list's cells 4 to 7): the area (dungeon << 16 | floor << 8) while in
   a dungeon and 0 in the town, then the cell and facing, kept after coming home (-1, -1, 0 before any expedition).
   The 36 bytes at 85,972 end with the area and cell of the last door the party came in by ((1, 1) at (6, 2) for
@@ -512,7 +532,8 @@ the same points (offsets in bytes, numbers little-endian):
 - **Other regions** not yet placed: 993,208 to 997,999 (four 1,200-byte records starting -1, 1, -1), 1,035,056 to
   1,066,684 (the backlog's text) and an ascending list of offsets at 1,115,868 (the backlog's index).
 - **Engine numbers.** C000 is always 2^31 - 1, C007 and C008 100, C036 and C037 1, C190 to C194 -1. C004 and C005
-  are 6 and 1 in the town and 62 and 2 in a dungeon; the slot details read the place from them and an image without
+  are 6 and 1 in the town and 41 plus the area's backdrop number (62 in 千樹庭's bg021, 61 in 炎山洞's bg020) and 2 in
+  a dungeon; the slot details read the place from them and an image without
   them opens a story scene instead of the town. C006 changes each turn, likely the random seed. The original
   recomputes C209, C220 to C262 and C393 to C409 on loading (the town window shows the right numbers without them).
   C003 counts manual saves and autosaves separately across the game.
