@@ -37,6 +37,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Eushully AGE](#eushully-age) | `SYS4INI.BIN` beside `DATA1.ALF` or `age.exe`, up to one folder down | Mac, iPhone, iPad |
 | [BISHOP BSX](#bishop-bsx) | `bsxx.dat` beside `bsxx.cfg` and a `Graphics*.bsa` archive, up to one folder down | Mac, iPhone, iPad |
 | [ANIM](#anim) | `<name>_sce.dat` beside `<name>_define.dat`, `<name>_system.dat` and `cg/psbpack.dat`, up to one folder down | Mac, iPhone, iPad |
+| [SystemAoi](#systemaoi) | `box.vfs` holding `init.box` and `pro.box`, up to one folder down | Mac, iPhone, iPad |
 | [PJADV](#pjadv) | an `archive.dat` that is a `GAMEDAT PAC` archive holding `scenario.dat` and `textdata.bin`, up to one folder down | Mac, iPhone, iPad |
 | [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
@@ -246,6 +247,10 @@ ANIM's games, such as Double Date Dilemma, run on VNDegen's own ANIM runtime, wr
 ## PJADV
 
 PajamasEX / Production PENCIL's PJADV games, such as Paradise Cleaning!- Tutor X Hypnosis -, run on VNDegen's own PJADV runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive and picture readers, play of the original engine under Wine and one approved reading of its save scrambling, MIT licensed like the rest of the app. The compiled scenario runs the title, menus, gallery, options and scenes; Paradise Cleaning's cleaning minigame, which the PC engine runs in its own code, is rebuilt from the help screen, `mg02_ini.txt` and measured play of the original. Text is English, or Japanese when the device uses it; the game's Chinese scenes belong to another game and aren't offered. Saves are the PC engine's own `save/syssave.dat` and `save/syssvpo.dat` and load both ways. Games start on the Mouse layout: the stick moves the pointer, A and the triggers click, and the shoulders turn the wheel, which in the minigame changes tools. [pjadv.md](pjadv.md) lists which games run and the known limits, and [pjadv-cleanroom.md](pjadv-cleanroom.md) where the runtime's knowledge came from.
+
+## SystemAoi
+
+SoftHouseChara's SystemAoi 5 games, such as BUNNY BLACK 3, run on VNDegen's own SystemAoi runtime, written in C for VNDegen from the games' files, GARbro's MIT-licensed archive notes, play of the original engine under Wine and one approved reading of its save packer, MIT licensed like the rest of the app. The compiled scripts run the story; the town, its commands, the units, battles, expeditions and the 3D dungeon, which the PC engine runs in its own code, are rebuilt from the game's tables and measured play, and the dungeon is drawn from its own models in software. Saves are the PC engine's own `Bunny3.sav/Bunny3NN.dat` and autosaves beside the game, and load both ways, in the town and in a dungeon. Games start on the Visual novel layout: the D-pad and left stick walk the dungeon and the right stick moves the pointer for the town and battle screens. [systemaoi.md](systemaoi.md) lists what runs and the known limits, and [systemaoi-cleanroom.md](systemaoi-cleanroom.md) where the runtime's knowledge came from.
 
 ## Unity
 
