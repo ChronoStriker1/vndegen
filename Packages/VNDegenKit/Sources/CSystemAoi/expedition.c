@@ -75,6 +75,9 @@ enum {
     F_GLOW = 9,
     F_ENTRY = 14,
     D_OPEN_FLAG = 3,
+    F_BOSSES = 23,
+    BOSS_SLOTS = 4,
+    P_MOVE = 7,
     F_GROUP_LISTS = 30,
     F_GROUP_WEIGHTS = 32,
     F_MORE_GROUPS = 35,
@@ -403,6 +406,8 @@ static void spawn_group(SA *s, const char *name) {
     g->y = c < 0 ? s->dungeon.y : c / DUN_SIDE;
     set_target(g, pick_cell(&s->dungeon, g->x, g->y, GROUP_SPAWN_DISTANCE, h ^ 0x5bd1e995u));
     sa_battle_roll(&s->battle, name, mix(h ^ 0x27d4eb2fu), g->cells);
+    for (int r = 0; r < s->battle.groups.rows; r++)
+        if (sa_table_int(&s->battle.groups, r, 0) == id) g->stay = !strcmp(text(&s->battle.groups, r, P_MOVE), "停止");
     sa_log(s, "group %d (%s) at %d,%d", g->number, name, g->x, g->y);
 }
 
@@ -441,10 +446,21 @@ static void spawn_floor_groups(SA *s) {
     Expedition *e = &s->exp;
     e->groupCount = 0;
     const char *list = text(&e->floors, e->row, F_GROUP_LISTS);
-    if (!*list || !strcmp(list, "*")) return;
     char buf[256];
-    snprintf(buf, sizeof buf, "%s", list);
+    snprintf(buf, sizeof buf, "%s", *list && strcmp(list, "*") ? list : "");
     for (char *p = strtok(buf, "|"); p; p = strtok(NULL, "|")) spawn_group(s, p);
+    for (int k = 0; k < BOSS_SLOTS; k++) {
+        const char *boss = text(&e->floors, e->row, F_BOSSES + 2 * k);
+        int x, y;
+        if (!*boss || !strcmp(boss, "*") || !sa_dungeon_find_mark(&s->dungeon, k + 1, &x, &y)) continue;
+        int before = e->groupCount;
+        spawn_group(s, boss);
+        if (e->groupCount == before) continue;
+        ExpGroup *g = &e->group[e->groupCount - 1];
+        g->x = x;
+        g->y = y;
+        sa_log(s, "group %d stands at %d,%d", g->number, x, y);
+    }
 }
 
 static void sync_marks(SA *s) {

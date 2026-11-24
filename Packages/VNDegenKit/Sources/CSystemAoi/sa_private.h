@@ -83,7 +83,7 @@ typedef struct SaveScreen {
     SaveSummary now;
 } SaveScreen;
 
-#define EXP_GROUPS 8
+#define EXP_GROUPS 12
 #define EXP_TARGETS 5
 
 typedef struct ExpGroup {

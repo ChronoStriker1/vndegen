@@ -313,6 +313,7 @@ int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
 bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map);
 void sa_dungeon_open_doors(Dungeon *d);
+bool sa_dungeon_find_mark(const Dungeon *d, int mark, int *x, int *y);
 void sa_dungeon_sense(bool on);
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side);
 bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y);

@@ -6,6 +6,7 @@ enum {
     CELL_BYTES = 104,
     F_FLOOR = 5,
     F_OBJECT = 6,
+    F_MARK = 7,
     F_WALL_N = 9,
     F_WALL_E = 12,
     F_WALL_S = 15,
@@ -269,6 +270,16 @@ bool sa_dungeon_find_entrance(const Dungeon *d, int *x, int *y, int *dir) {
     for (int c = 0; c < DUN_CELLS; c++)
         for (int side = 0; side < 4; side++)
             if (d->cell[c][F_FLOOR] >= 0 && d->cell[c][wallField[side]] == WALL_PASSAGE && step_in(d, c, x, y, dir)) return true;
+    return false;
+}
+
+bool sa_dungeon_find_mark(const Dungeon *d, int mark, int *x, int *y) {
+    for (int c = 0; c < DUN_CELLS; c++)
+        if (d->cell[c][F_MARK] == mark && d->cell[c][F_FLOOR] >= 0) {
+            *x = c % DUN_SIDE;
+            *y = c / DUN_SIDE;
+            return true;
+        }
     return false;
 }
 
