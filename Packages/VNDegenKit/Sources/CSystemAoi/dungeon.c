@@ -14,7 +14,6 @@ enum {
     OBJECT_DOOR = 100,
     OBJECT_DOOR_SPOT = 99,
     WALL_DOORWAY = 10,
-    WALL_ONE_WAY = 100,
     VIEW_CELLS = 6,
     MOVE_MS = 133,
     DOOR_TURN_MS = 18000,
@@ -233,7 +232,7 @@ void sa_dungeon_place(Dungeon *d, int x, int y, int dir) {
 
 static bool passable(const i32 *cell, int side) {
     int w = cell[wallField[side]];
-    return w < 0 || w == WALL_DOORWAY || w == WALL_ONE_WAY || cell[wallField[side] + 1] == 1;
+    return w < 0 || w == WALL_DOORWAY || cell[wallField[side] + 1] == 1;
 }
 
 static void mark_passage(Dungeon *d, int from, int to, int side);

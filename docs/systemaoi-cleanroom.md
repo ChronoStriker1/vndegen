@@ -180,11 +180,13 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Map layout.** `mpDDFF.amd` holds a 48-byte header (word 1 the width, word 2 the height: 15 by 15 in 千樹庭, 16 by
   16 and 20 by 20 in 炎山洞, 5 to 20 in all) and then the cells row by row: cell (x, y), with y growing south, is
   record x + width × y. The wall fields are 9, 12, 15 and 18 for north, east, south and west (0 a wall, 10 a doorway
-  the party walks through, 20 an edge passage to the next area, 100 a wall passable only from its own side), each
+  the party walks through, 20 an edge passage to the next area, 100 likely a hidden door), each
   followed by its 移動 field; field 21 is the open-side mask (bits 1, 2, 4 and 8 for north, east, south and west).
   Measured: the original's C073 to C075, its saves' positions and the scripts' `d7`/`d8` coordinates all use this
-  frame. Wall 100: walking into 中腹エリア's stair rooms from outside meets a wall; from inside they open (inferred
-  from the maps, whose rooms have 100 on their own side).
+  frame. Wall 100 stays a wall: measured, forty bumps into 中腹エリア's stair room from outside never opened it.
+  `dunChang.obj` (100: 壁 0 to 100, 移動 0 to 1, 5) and 感知 ("迷宮で隠された扉の存在に気付く") suggest a hidden door
+  that a 感知 unit or a 5% chance reveals; not built, as the rule isn't pinned. The stair rooms behind it (and so
+  裾野エリア) aren't reachable yet.
 - **Camera.** `Cam.pvc`'s position and target (3.2 high, 4.6 behind the cell's centre, tilted down slightly), with
   a 47.2° vertical field of view: the floor lines and wall edges fit that best (correlation 0.58 against 0.30 to 0.35
   at other angles); the file's Zoom(40) isn't used as given.
