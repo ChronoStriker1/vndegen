@@ -249,15 +249,18 @@ void r3_tri(R3 *r, const R3Vert *v, const Image *tex);
 Image *sa_bmp_decode(const u8 *d, size_t n);
 
 #define DUN_CELLS 225
+#define BATTLE_CELLS 15
 #define DUN_FIELDS 26
 
 enum { DIR_N, DIR_E, DIR_S, DIR_W };
-enum { PASS_DOWN = 1, PASS_WEST = 2 };
+enum { PASS_EAST = 1, PASS_SOUTH = 2 };
 #define DUN_TEX 64
 
 struct Party;
 
 enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN, DUN_ART_PLATFORM, DUN_ART };
+enum { DUN_ICON_DOOR, DUN_ICON_CHEST, DUN_ICON_GROUP, DUN_ICON_PARTY, DUN_ICONS };
+#define DUN_MARKS 8
 enum { DUN_ACT_NONE, DUN_ACT_HOME, DUN_ACT_DOWN, DUN_ACT_UP, DUN_ACT_OPEN };
 
 typedef struct PartSet {
@@ -282,6 +285,8 @@ typedef struct Dungeon {
     bool bumped;
     Image *art[DUN_ART];
     Image *needle[4];
+    Image *icon[DUN_ICONS], *arrow[4];
+    int markCount, markX[DUN_MARKS], markY[DUN_MARKS];
     R3 r3;
 } Dungeon;
 
@@ -300,7 +305,13 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb);
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
 int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
-bool sa_dungeon_facing_exit(const Dungeon *d);
+bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map);
+int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side);
+bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y);
+int sa_dungeon_passage_side(const Dungeon *d);
+bool sa_dungeon_passage_cell(const Dungeon *d, int side, int along, int *x, int *y);
+bool sa_dungeon_has_passage(const Dungeon *d, int side, int along);
+bool sa_dungeon_arrive(Dungeon *d, int side, int along);
 int sa_dungeon_action(const Dungeon *d);
 int sa_dungeon_object(const Dungeon *d);
 int sa_dungeon_crystal_index(const Dungeon *d);
@@ -534,7 +545,10 @@ typedef struct Battle {
 bool sa_battle_init(Battle *b, Vfs *vfs, Party *party);
 void sa_battle_free(Battle *b);
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed);
-bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, Image *backdrop, int boardSet, u32 seed);
+bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, Image *backdrop, int boardSet, u32 seed);
+bool sa_battle_roll(Battle *b, const char *group, u32 seed, int *cells);
+void sa_battle_unit_stats(const Battle *b, int row, int level, int *out);
+void sa_battle_position_bonus(const Battle *b, int n, const int *unitRow, const int *gridRow, const int *gridCol, int (*delta)[10]);
 void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor);
 bool sa_battle_tick(Battle *b, u32 ms);
 int sa_battle_click(Battle *b, int x, int y);
@@ -547,6 +561,7 @@ void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor);
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir);
 double sa_debug_bench(VNSystemAoi *sa, int n);
 void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value);
+int sa_debug_get(VNSystemAoi *sa, bool flag, int index);
 void sa_debug_join(VNSystemAoi *sa, const char *key);
 void sa_debug_save(VNSystemAoi *sa, int slot, bool load);
 void sa_debug_pcload(VNSystemAoi *sa, const char *path);

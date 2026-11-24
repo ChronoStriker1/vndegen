@@ -142,16 +142,62 @@ static int growth(const Table *lvup, const char *type, const char *stat, int lev
     return (level - 1) / per * add;
 }
 
-static void fighter_stats(Battle *b, Fighter *f) {
+static int level_gain(const Table *lvup, const char *type, int col, int level) {
+    int r = row_by_text(lvup, 1, type);
+    return r < 0 || level <= 1 ? 0 : (level - 1) * sa_table_int(lvup, r, col);
+}
+
+void sa_battle_unit_stats(const Battle *b, int row, int level, int *out) {
     const Table *u = &b->party->units;
-    const char *type = text_of(u, f->row, 19);
-    for (int i = 0; i < 8; i++) f->stat[i] = sa_table_int(u, f->row, 25 + i);
-    f->stat[STAT_ATTACK] += growth(&b->lvup, type, "攻撃", f->level);
-    f->stat[STAT_DEFENCE] += growth(&b->lvup, type, "防御", f->level);
-    f->stat[STAT_SPEED] += growth(&b->lvup, type, "速度", f->level);
-    f->stat[STAT_EVASION] += growth(&b->lvup, type, "回避", f->level);
-    f->maxHp = sa_table_int(u, f->row, 23);
-    f->maxMp = sa_table_int(u, f->row, 24);
+    const char *type = text_of(u, row, 19);
+    out[0] = sa_table_int(u, row, 23) + level_gain(&b->lvup, type, 4, level);
+    out[1] = sa_table_int(u, row, 24) + level_gain(&b->lvup, type, 5, level);
+    for (int i = 0; i < 8; i++) out[2 + i] = sa_table_int(u, row, 25 + i);
+    int attack = growth(&b->lvup, type, "攻撃", level), defence = growth(&b->lvup, type, "防御", level);
+    out[2 + STAT_ATTACK] += attack;
+    out[2 + STAT_MAGIC] += attack;
+    out[2 + STAT_DEFENCE] += defence;
+    out[2 + STAT_RESIST] += defence;
+    out[2 + STAT_SPEED] += growth(&b->lvup, type, "速度", level);
+    out[2 + STAT_EVASION] += growth(&b->lvup, type, "回避", level);
+}
+
+static int ability_value(const Table *abilities, const char *name) {
+    for (int r = 0; r < abilities->rows; r++)
+        if (!strcmp(sa_table_text(abilities, r, 1), name)) return sa_table_int(abilities, r, 4);
+    return 0;
+}
+
+void sa_battle_position_bonus(const Battle *b, int n, const int *unitRow, const int *gridRow, const int *gridCol, int (*delta)[10]) {
+    static const struct {
+        const char *stat;
+        int first, count;
+    } kinds[] = {{"攻撃強化", 2 + STAT_ATTACK, 2}, {"防御強化", 2 + STAT_DEFENCE, 2}, {"速度強化", 2 + STAT_SPEED, 1}, {"回避強化", 2 + STAT_EVASION, 1}};
+    const Table *u = &b->party->units, *a = &b->party->abilities;
+    for (int i = 0; i < n; i++) memset(delta[i], 0, sizeof delta[i]);
+    for (int i = 0; i < n; i++) {
+        const char *name = text_of(u, unitRow[i], 34), *slash = strstr(name, "／");
+        if (!slash) continue;
+        int value = ability_value(a, name);
+        const char *range = slash + strlen("／");
+        for (size_t k = 0; k < sizeof kinds / sizeof kinds[0]; k++) {
+            if (strncmp(name, kinds[k].stat, strlen(kinds[k].stat))) continue;
+            for (int j = 0; j < n; j++) {
+                bool hit = !strcmp(range, "全") || (!strcmp(range, "前") && gridRow[j] == 0) || (!strcmp(range, "後") && gridRow[j] == 2) ||
+                           (!strcmp(range, "縦") && gridCol[j] == gridCol[i]) || (!strcmp(range, "横") && gridRow[j] == gridRow[i]);
+                if (hit)
+                    for (int c = 0; c < kinds[k].count; c++) delta[j][kinds[k].first + c] += value;
+            }
+        }
+    }
+}
+
+static void fighter_stats(Battle *b, Fighter *f) {
+    int v[10];
+    sa_battle_unit_stats(b, f->row, f->level, v);
+    f->maxHp = v[0];
+    f->maxMp = v[1];
+    for (int i = 0; i < 8; i++) f->stat[i] = v[2 + i];
 }
 
 static Image *sprite_for(Vfs *vfs, int number, bool enemy) {
@@ -221,10 +267,8 @@ static int range(Battle *b, int lo, int hi) { return hi <= lo ? lo : lo + (int)(
 
 static bool board_has(const Battle *b, int col) { return b->boardSize != 1 || (col >= 1 && col <= 3); }
 
-static void add_enemy(Battle *b, Vfs *vfs, const char *key, int row, int col) {
-    if (b->count >= BATTLE_FIGHTERS) return;
-    int r = row_by_text(&b->party->units, 1, key);
-    if (r < 0) return;
+static void add_enemy(Battle *b, Vfs *vfs, int r, int row, int col) {
+    if (b->count >= BATTLE_FIGHTERS || r < 0) return;
     Fighter *f = &b->f[b->count++];
     f->enemy = true;
     f->row = r;
@@ -252,14 +296,21 @@ static void pick_from_list(Battle *b, const char *list, char *out, size_t size) 
     out[len] = 0;
 }
 
-static void place_group(Battle *b, Vfs *vfs, int g) {
+static int board_size(const Battle *b, int g) {
+    int size = sa_table_int(&b->groups, g, 17);
+    return size == 1 ? 1 : size == 2 ? 2 : 3;
+}
+
+static void roll_cells(Battle *b, int g, int *cells) {
+    for (int i = 0; i < BATTLE_CELLS; i++) cells[i] = -1;
     for (int i = 0; i < GRID_ROWS; i++) {
-        int base = 18 + i * 8, row = GRID_ROWS - 1 - i;
+        int base = 18 + i * 8;
         bool used[GRID_COLS] = {false};
         for (int c = 0; c < GRID_COLS; c++) {
             const char *k = text_of(&b->groups, g, base + c);
-            if (!*k || !strcmp(k, "*")) continue;
-            add_enemy(b, vfs, k, row, c);
+            int r = *k && strcmp(k, "*") ? row_by_text(&b->party->units, 1, k) : -1;
+            if (r < 0) continue;
+            cells[i * GRID_COLS + c] = sa_table_int(&b->party->units, r, 0);
             used[c] = true;
         }
         const char *list = text_of(&b->groups, g, base + 5);
@@ -274,13 +325,35 @@ static void place_group(Battle *b, Vfs *vfs, int g) {
             used[c] = true;
             char key[64];
             pick_from_list(b, list, key, sizeof key);
-            add_enemy(b, vfs, key, row, c);
+            int r = row_by_text(&b->party->units, 1, key);
+            if (r >= 0) cells[i * GRID_COLS + c] = sa_table_int(&b->party->units, r, 0);
         }
     }
 }
 
+bool sa_battle_roll(Battle *b, const char *group, u32 seed, int *cells) {
+    int g = row_by_text(&b->groups, 2, group);
+    if (g < 0) return false;
+    u32 keepRng = b->rng;
+    int keepSize = b->boardSize;
+    b->rng = seed ? seed : 0x9e3779b9u;
+    b->boardSize = board_size(b, g);
+    roll_cells(b, g, cells);
+    b->rng = keepRng;
+    b->boardSize = keepSize;
+    return true;
+}
+
+static void place_group(Battle *b, Vfs *vfs, int g, const int *preset) {
+    int cells[BATTLE_CELLS];
+    if (preset) memcpy(cells, preset, sizeof cells);
+    else roll_cells(b, g, cells);
+    for (int i = 0; i < BATTLE_CELLS; i++)
+        if (cells[i] >= 0) add_enemy(b, vfs, sa_party_unit_row(b->party, cells[i]), GRID_ROWS - 1 - i / GRID_COLS, i % GRID_COLS);
+}
+
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed) {
-    return sa_battle_begin(b, vfs, group, backdrop ? sa_load_image(vfs, backdrop) : NULL, 0, seed);
+    return sa_battle_begin(b, vfs, group, NULL, backdrop ? sa_load_image(vfs, backdrop) : NULL, 0, seed);
 }
 
 void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor) {
@@ -288,7 +361,7 @@ void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor) {
     snprintf(b->floorName, sizeof b->floorName, "%s", floor);
 }
 
-bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, Image *backdrop, int boardSet, u32 seed) {
+bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, Image *backdrop, int boardSet, u32 seed) {
     clear_fighters(b);
     b->dungeonName[0] = b->floorName[0] = 0;
     b->rng = seed ? seed : 0x9e3779b9u;
@@ -309,11 +382,28 @@ bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, Image *backdrop, in
         f->mp = b->party->mp[s];
     }
     b->group = g;
-    int size = sa_table_int(&b->groups, g, 17);
-    b->boardSize = size == 1 ? 1 : size == 2 ? 2 : 3;
+    b->boardSize = board_size(b, g);
     b->gainResources = b->gainExp = 0;
     b->gainItem[0] = 0;
-    place_group(b, vfs, g);
+    place_group(b, vfs, g, cells);
+    for (int side = 0; side < 2; side++) {
+        int idx[BATTLE_FIGHTERS], rows[BATTLE_FIGHTERS], gr[BATTLE_FIGHTERS], gc[BATTLE_FIGHTERS], n = 0;
+        for (int i = 0; i < b->count; i++) {
+            const Fighter *f = &b->f[i];
+            if (f->enemy != (side == 1)) continue;
+            idx[n] = i;
+            rows[n] = f->row;
+            gr[n] = f->enemy ? GRID_ROWS - 1 - f->gridRow : f->slot >= PARTY_FRONT ? 0 : 2;
+            gc[n] = f->enemy ? f->gridCell : f->slot % PARTY_FRONT;
+            n++;
+        }
+        int delta[BATTLE_FIGHTERS][10];
+        sa_battle_position_bonus(b, n, rows, gr, gc, delta);
+        for (int k = 0; k < n; k++) {
+            Fighter *f = &b->f[idx[k]];
+            for (int i = 0; i < 8; i++) f->stat[i] += delta[k][2 + i];
+        }
+    }
     if (b->boardSet != boardSet)
         for (int i = 0; i < 4; i++) {
             sa_image_free(b->board[i]);

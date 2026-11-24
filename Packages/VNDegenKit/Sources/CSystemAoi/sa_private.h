@@ -73,10 +73,25 @@ typedef struct SaveScreen {
     SaveSummary now;
 } SaveScreen;
 
+#define EXP_GROUPS 8
+#define EXP_TARGETS 5
+
+typedef struct ExpGroup {
+    bool alive;
+    int party, number, x, y, dir, flags, cooldown, fought;
+    int cells[BATTLE_CELLS];
+    int target[EXP_TARGETS][2];
+} ExpGroup;
+
 typedef struct Expedition {
     bool active;
     int dungeon, floor, row;
-    int stepsLeft;
+    int steps, areaStart, fighting;
+    int arriveSide, arriveAlong, resumeX, resumeY, resumeDir;
+    int last[4], entry[4];
+    bool keepGroups;
+    ExpGroup group[EXP_GROUPS];
+    int groupCount;
     int hooks[EXP_HOOKS], hookCount, after;
     Table floors, dungeons;
     Image *hall, *plate[12], *areaPlate, *back, *badge, *seen, *platform;
@@ -231,7 +246,8 @@ void sa_exp_key(SA *s, int key);
 void sa_exp_battle_over(SA *s, int result);
 void sa_exp_gain(SA *s, const int gain[4]);
 void sa_exp_enter(SA *s, int dungeon, int floor);
-void sa_exp_resume(SA *s, int dungeon, int floor);
+void sa_exp_resume(SA *s, int dungeon, int floor, int x, int y, int dir, bool keepGroups);
+void sa_exp_add_group(SA *s, const char *name);
 void sa_exp_place_names(SA *s, const char **dungeon, const char **floor);
 const char *sa_exp_floor_map(SA *s, int dungeon, int floor);
 void sa_exp_names(SA *s, int dungeon, int floor, const char **dungeonName, const char **floorName);

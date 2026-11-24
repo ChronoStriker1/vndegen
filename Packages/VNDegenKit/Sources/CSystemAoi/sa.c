@@ -558,7 +558,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         break;
     case 0xa8: {
         char *g = opd_str(code, in, 0);
-        sa_log(s, "enemy group %s placed (not built yet)", g);
+        sa_exp_add_group(s, g);
         free(g);
         break;
     }
@@ -738,6 +738,10 @@ static void new_game(SA *s) {
     if (s->exp.explored) memset(s->exp.explored, 0, sizeof(*s->exp.explored) * EXP_DUNGEONS);
     if (s->exp.passages) memset(s->exp.passages, 0, sizeof(*s->exp.passages) * EXP_DUNGEONS);
     if (s->exp.floorInfo) memset(s->exp.floorInfo, 0, sizeof(*s->exp.floorInfo) * EXP_DUNGEONS);
+    static const int noPlace[4] = {0, -1, -1, 0};
+    memcpy(s->exp.last, noPlace, sizeof noPlace);
+    memset(s->exp.entry, 0, sizeof s->exp.entry);
+    s->exp.groupCount = 0;
     sa_start_script(s, "init.box", 0);
 }
 
@@ -1545,6 +1549,11 @@ void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value) {
     s->dirty = true;
 }
 
+int sa_debug_get(VNSystemAoi *sa, bool flag, int index) {
+    SA *s = (SA *)sa;
+    return flag ? s->vm.f[index] : s->vm.c[index];
+}
+
 void sa_debug_join(VNSystemAoi *sa, const char *key) {
     SA *s = (SA *)sa;
     sa_party_join(&s->party, &s->vfs, key);
@@ -1568,7 +1577,7 @@ void sa_enter_loaded(SA *s) {
     s->town.mapOnly = false;
     s->town.hover = -1;
     s->dirty = true;
-    if (inDungeon) sa_exp_resume(s, s->exp.dungeon, s->exp.floor);
+    if (inDungeon) sa_exp_resume(s, s->exp.dungeon, s->exp.floor, s->vm.c[73], s->vm.c[74], s->vm.c[75], s->exp.groupCount > 0);
 }
 
 void sa_debug_pcload(VNSystemAoi *sa, const char *path) {

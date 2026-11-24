@@ -44,6 +44,15 @@ enum {
     BLOCK_SLOTS = 456,
     MEMBER_SKILLS = 1220,
     MEMBER_BONUS = 10,
+    FIXED_MARK = 3,
+    BLOCK_RESIST = 33,
+    BLOCK_SURVIVE = 106,
+    BLOCK_ELEMENT_ATTACK = 14,
+    ELEMENT_ATTACK = 30,
+    BLOCK_RESISTS = 11,
+    BLOCK_ELEMENT_FIRST = 4,
+    ELEMENT_OWN = 20,
+    ELEMENT_OPPOSITE = -50,
     GRID_AT = 1010848,
     GRID_AFTER = 1012648,
     SCENE_AT = 993208,
@@ -54,6 +63,24 @@ enum {
     PLACE_TOWN = 6,
     SEED_VAR = 6,
     DUNGEON_VAR = 70,
+    PLACE_DUNGEON = 62,
+    POS_VAR = 73,
+    LAST_AT = 998016,
+    ENTRY_AT = 85972,
+    GROUP_AT = 998288,
+    GROUP_SIZE = 280,
+    GROUPS_MAX = 2,
+    GROUP_CELLS = 6,
+    GROUP_RESERVE = 21,
+    GROUP_TARGETS = 53,
+    GROUP_FLAGS = 63,
+    GROUP_COOLDOWN = 65,
+    GROUP_FOUGHT = 66,
+    ENEMY_AT = 215608,
+    ENEMY_BASE = 100,
+    ENEMIES_MAX = 30,
+    STAND_AT = 1009560,
+    STAND_COUNT = 13,
 };
 
 static int at(const u8 *img, size_t off) { return (int)rd32(img + off); }
@@ -100,13 +127,13 @@ static void read_maps(SA *s, const u8 *img) {
         for (int f = 1; f < EXP_FLOORS && f <= MAP_FLOORS; f++) {
             for (int i = 0; i < 4; i++) s->exp.floorInfo[d][f][i] = at(img, map_record(d, f) + (size_t)i * 4);
             size_t o = map_record(d, f) + MAP_LAYERS;
-            for (int x = 0; x < MAP_SIDE; x++) {
-                size_t k = (size_t)(MAP_SIDE - 1 - x) * 4;
-                u32 bits = rd32(img + o + k), down = rd32(img + o + MAP_LAYER + k), west = rd32(img + o + 2 * MAP_LAYER + k);
-                for (int y = 0; y < MAP_SIDE; y++) {
+            for (int y = 0; y < MAP_SIDE; y++) {
+                size_t k = (size_t)y * 4;
+                u32 bits = rd32(img + o + k), east = rd32(img + o + MAP_LAYER + k), south = rd32(img + o + 2 * MAP_LAYER + k);
+                for (int x = 0; x < MAP_SIDE; x++) {
                     int c = y * MAP_SIDE + x;
-                    s->exp.explored[d][f][c] = bits >> y & 1;
-                    s->exp.passages[d][f][c] = (u8)((down >> y & 1 ? PASS_DOWN : 0) | (west >> y & 1 ? PASS_WEST : 0));
+                    s->exp.explored[d][f][c] = bits >> x & 1;
+                    s->exp.passages[d][f][c] = (u8)((east >> x & 1 ? PASS_EAST : 0) | (south >> x & 1 ? PASS_SOUTH : 0));
                 }
             }
         }
@@ -127,11 +154,11 @@ static void write_maps(SA *s, u8 *img) {
                 for (int y = 0; y < MAP_SIDE; y++) {
                     int c = y * MAP_SIDE + x;
                     u8 pass = s->exp.passages[d][f][c];
-                    bool layer[4] = {v[c], pass & PASS_DOWN, pass & PASS_WEST, v[c]};
+                    bool layer[4] = {v[c], pass & PASS_EAST, pass & PASS_SOUTH, v[c]};
                     for (int l = 0; l < 4; l++) {
                         if (!layer[l]) continue;
-                        size_t w = o + MAP_LAYERS + (size_t)l * MAP_LAYER + (size_t)(MAP_SIDE - 1 - x) * 4;
-                        wr32(img + w, rd32(img + w) | 1u << y);
+                        size_t w = o + MAP_LAYERS + (size_t)l * MAP_LAYER + (size_t)y * 4;
+                        wr32(img + w, rd32(img + w) | 1u << x);
                     }
                 }
         }
@@ -162,6 +189,8 @@ static void read_members(SA *s, const u8 *img) {
     }
 }
 
+static void read_dungeon(SA *s, const u8 *img);
+
 bool sa_pcsave_read(SA *s, const char *path) {
     size_t n, size;
     u8 *file = sa_read_file(path, &n);
@@ -189,6 +218,7 @@ bool sa_pcsave_read(SA *s, const char *path) {
     s->exp.active = s->vm.c[DUNGEON_VAR] > 0 && s->vm.c[DUNGEON_VAR + 1] > 0;
     s->exp.dungeon = s->vm.c[DUNGEON_VAR];
     s->exp.floor = s->vm.c[DUNGEON_VAR + 1];
+    read_dungeon(s, img);
     Party *p = &s->party;
     p->items = 0;
     for (int i = 0; i < STOCK_ENTRIES; i++) {
@@ -226,6 +256,13 @@ static int ability_id(SA *s, const char *name) {
     return 0;
 }
 
+static int ability_value(SA *s, const char *name) {
+    const Table *a = &s->party.abilities;
+    for (int i = 0; i < a->rows; i++)
+        if (!strcmp(sa_table_text(a, i, 1), name)) return sa_table_int(a, i, 4);
+    return 0;
+}
+
 static int resist(const char *ability, const char *key) {
     const char *p = strstr(ability, key);
     return p ? atoi(p + strlen(key)) : 0;
@@ -242,17 +279,32 @@ static int item_bonus(SA *s, int id, const char *key) {
     return 0;
 }
 
-static void write_member(SA *s, u8 *img, int k, const Bench *b, bool placed) {
+static const char *const resistKeys[] = {"斬耐性+", "打耐性+", "射耐性+", "魔耐性+", "光耐性+", "闇耐性+", "火耐性+", "水耐性+", "風耐性+", "土耐性+", "雷耐性+"};
+static const char *const elements[] = {"光", "闇", "火", "水", "風", "土"};
+
+static void write_resists(SA *s, u8 *img, size_t c, int r) {
+    const Table *u = &s->party.units;
+    const char *text = sa_table_text(u, r, 33), *element = sa_table_text(u, r, 14);
+    for (int i = 0; i < BLOCK_RESISTS; i++) {
+        int v = resist(text, resistKeys[i]);
+        for (int e = 0; e < 6; e++) {
+            if (strcmp(element, elements[e])) continue;
+            if (i == BLOCK_ELEMENT_FIRST + e) v += ELEMENT_OWN;
+            if (i == BLOCK_ELEMENT_FIRST + (e ^ 1)) v += ELEMENT_OPPOSITE;
+        }
+        put(img, c + (size_t)(BLOCK_RESIST + i) * 4, v);
+    }
+    for (int e = 0; e < 6; e++)
+        if (!strcmp(element, elements[e])) put(img, c + (size_t)(BLOCK_ELEMENT_ATTACK + e) * 4, ELEMENT_ATTACK);
+}
+
+static void write_unit(SA *s, u8 *img, size_t m, const Bench *b, bool allSkills, const int *bonus) {
     const Party *p = &s->party;
     const Table *u = &p->units;
     int r = sa_party_unit_row(p, b->unit);
-    size_t m = MEMBER_AT + (size_t)k * MEMBER_SIZE;
     put(img, m, b->unit);
-    put(img, m + 4, k);
-    put(img, m + 8, k);
     put(img, m + MEMBER_LEVEL, b->level);
     put(img, m + MEMBER_EXP, b->exp);
-    put(img, m + MEMBER_BYTES, (k ? k : 2) << 16 | (placed ? 1 : 4) << 8);
     put(img, m + MEMBER_HP, b->hp);
     put(img, m + MEMBER_MP, b->mp);
     put(img, m + MEMBER_SP, b->sp);
@@ -260,7 +312,11 @@ static void write_member(SA *s, u8 *img, int k, const Bench *b, bool placed) {
     static const char *const bonusKeys[] = {"斬補正", "打補正", "射補正", "魔補正"};
     for (int copy = 0; copy < 2; copy++) {
         size_t c = m + MEMBER_STATS + (size_t)copy * MEMBER_COPY;
-        for (int i = 0; i < 10; i++) put(img, c + (size_t)i * 4, sa_table_int(u, r, 23 + i) + b->trained[i]);
+        int v[10];
+        sa_battle_unit_stats(&s->battle, r, b->level > 0 ? b->level : 1, v);
+        for (int i = 0; i < 10; i++) put(img, c + (size_t)i * 4, v[i] + b->trained[i] + (copy && bonus ? bonus[i] : 0));
+        write_resists(s, img, c, r);
+        if (copy && !strcmp(sa_table_text(u, r, 34), "生命力")) put(img, c + BLOCK_SURVIVE * 4, ability_value(s, "生命力"));
         if (copy && b->equip)
             for (int i = 0; i < 4; i++) put(img, c + (size_t)(MEMBER_BONUS + i) * 4, item_bonus(s, b->equip, bonusKeys[i]));
         put(img, c + BLOCK_CRITICAL, resist(sa_table_text(u, r, 33), "必殺耐性+"));
@@ -274,29 +330,59 @@ static void write_member(SA *s, u8 *img, int k, const Bench *b, bool placed) {
     }
     size_t q = m + MEMBER_SKILLS;
     int ids[8], known = 0;
+    bool fixedOf[8];
     for (int i = 0; i < 8; i++) {
         const char *name = sa_table_text(u, r, 41 + i * 3);
         int id = *name && strcmp(name, "*") ? skill_id(s, name) : 0;
-        if (id) ids[known++] = id;
+        if (!id) continue;
+        fixedOf[known] = !strncmp(name, FIXED_SKILL, strlen(FIXED_SKILL));
+        ids[known++] = id;
     }
-    bool fixed = known && !strncmp(sa_table_text(u, r, 41), FIXED_SKILL, strlen(FIXED_SKILL));
-    for (int i = 0; i < (fixed ? 1 : known); i++, q += 8) {
+    bool fixed = known && fixedOf[0];
+    for (int i = 0; i < (fixed && !allSkills ? 1 : known); i++, q += 8) {
         put(img, q, ids[i]);
-        put(img, q + 4, fixed ? known - 1 : 1);
+        put(img, q + 4, fixedOf[i] ? FIXED_MARK : 1);
     }
+}
+
+static void write_member(SA *s, u8 *img, int k, const Bench *b, bool placed, const int *bonus) {
+    size_t m = MEMBER_AT + (size_t)k * MEMBER_SIZE;
+    write_unit(s, img, m, b, false, bonus);
+    put(img, m + 4, k);
+    put(img, m + 8, k);
+    put(img, m + MEMBER_BYTES, (k ? k : 2) << 16 | (placed ? 1 : 4) << 8);
+}
+
+static void party_bonus(SA *s, int (*delta)[10]) {
+    const Party *p = &s->party;
+    int rows[PARTY_SLOTS], gr[PARTY_SLOTS], gc[PARTY_SLOTS], slot[PARTY_SLOTS], n = 0;
+    for (int sl = 0; sl < PARTY_SLOTS; sl++) {
+        memset(delta[sl], 0, sizeof delta[sl]);
+        if (!p->unit[sl]) continue;
+        rows[n] = sa_party_unit_row(p, p->unit[sl]);
+        gr[n] = sl >= PARTY_FRONT ? 0 : 2;
+        gc[n] = sl % PARTY_FRONT;
+        slot[n++] = sl;
+    }
+    int d[PARTY_SLOTS][10];
+    sa_battle_position_bonus(&s->battle, n, rows, gr, gc, d);
+    for (int i = 0; i < n; i++) memcpy(delta[slot[i]], d[i], sizeof d[i]);
 }
 
 static void write_members(SA *s, u8 *img) {
     const Party *p = &s->party;
+    int bonus[PARTY_SLOTS][10];
+    party_bonus(s, bonus);
     for (int cell = 8; cell < FORM_RESERVE + RESERVE_TILES + 5; cell++)
         put(img, FORM_AT + (size_t)cell * 4, form_slot(cell) >= 0 || (cell >= FORM_RESERVE && cell < FORM_RESERVE + RESERVE_TILES) ? -1 : -2);
     int k = 0;
     for (int i = 0; i < p->rosterCount && k < MEMBERS_MAX; i++) {
         int id = p->roster[i];
         Bench b = {0};
-        int cell = -1;
+        int cell = -1, at = -1;
         for (int sl = 0; sl < PARTY_SLOTS && cell < 0; sl++) {
             if (p->unit[sl] != id) continue;
+            at = sl;
             b.unit = id, b.hp = p->hp[sl], b.mp = p->mp[sl], b.level = p->level[sl], b.exp = p->exp[sl], b.equip = p->equip[sl], b.sp = p->sp[sl];
             memcpy(b.trained, p->trained[sl], sizeof b.trained);
             cell = sl >= PARTY_FRONT ? FORM_TOP + sl - PARTY_FRONT : FORM_BOTTOM + sl;
@@ -304,14 +390,102 @@ static void write_members(SA *s, u8 *img) {
         for (int j = 0; j < p->benchCount && !b.unit; j++)
             if (p->bench[j].unit == id) b = p->bench[j];
         if (!b.unit) continue;
-        write_member(s, img, k, &b, cell >= 0);
+        write_member(s, img, k, &b, cell >= 0, at >= 0 ? bonus[at] : NULL);
         if (cell >= 0) put(img, FORM_AT + (size_t)cell * 4, k);
         k++;
     }
-    bool more = k > 1;
-    put(img, FORM_AT + 5 * 4, more ? 1 : -1);
-    put(img, FORM_AT + 6 * 4, more ? 0 : -1);
-    put(img, FORM_AT + FORM_COUNT * 4, more ? k : 0);
+}
+
+static void write_dungeon(SA *s, u8 *img) {
+    const Expedition *e = &s->exp;
+    for (int i = 0; i < 4; i++) put(img, LAST_AT + (size_t)i * 4, e->last[i]);
+    for (int i = 0; i < 4; i++) put(img, ENTRY_AT + 16 + (size_t)i * 4, e->entry[i]);
+    for (int i = 0; i < STAND_COUNT; i++) put(img, STAND_AT + (size_t)i * 4, -1);
+    if (!e->active) return;
+    int n = 0, k = 0;
+    for (int i = 0; i < e->groupCount && k < GROUPS_MAX; i++) {
+        const ExpGroup *g = &e->group[i];
+        if (!g->alive) continue;
+        size_t o = GROUP_AT + (size_t)k++ * GROUP_SIZE;
+        put(img, o, g->party);
+        put(img, o + 4, g->number);
+        put(img, o + 8, e->dungeon << 16 | e->floor << 8);
+        put(img, o + 12, g->x);
+        put(img, o + 16, g->y);
+        put(img, o + 20, g->dir);
+        for (int c = 0; c < BATTLE_CELLS + 10; c++) put(img, o + (size_t)(GROUP_CELLS + c) * 4, -1);
+        int rows[BATTLE_CELLS], gr[BATTLE_CELLS], gc[BATTLE_CELLS], at[BATTLE_CELLS], count = 0, delta[BATTLE_CELLS][10];
+        for (int c = 0; c < BATTLE_CELLS; c++) {
+            at[c] = -1;
+            int r = g->cells[c] >= 0 ? sa_party_unit_row(&s->party, g->cells[c]) : -1;
+            if (r < 0) continue;
+            at[c] = count;
+            rows[count] = r;
+            gr[count] = c / 5;
+            gc[count++] = c % 5;
+        }
+        sa_battle_position_bonus(&s->battle, count, rows, gr, gc, delta);
+        for (int c = 0; c < BATTLE_CELLS; c++) {
+            if (at[c] < 0 || n >= ENEMIES_MAX) continue;
+            int r = rows[at[c]];
+            Bench b = {0};
+            b.unit = g->cells[c];
+            b.level = sa_table_int(&s->party.units, r, 17);
+            int v[10];
+            sa_battle_unit_stats(&s->battle, r, b.level, v);
+            b.hp = v[0];
+            b.mp = v[1];
+            size_t m = ENEMY_AT + (size_t)n * MEMBER_SIZE;
+            write_unit(s, img, m, &b, true, delta[at[c]]);
+            put(img, m + 4, -1);
+            put(img, m + 8, ENEMY_BASE + n);
+            put(img, m + 20, g->number);
+            put(img, m + MEMBER_BYTES, g->number | 1 << 8 | c << 16);
+            put(img, o + (size_t)(GROUP_CELLS + c) * 4, ENEMY_BASE + n);
+            n++;
+        }
+        for (int t = 0; t < EXP_TARGETS; t++) {
+            put(img, o + (size_t)(GROUP_TARGETS + t * 2) * 4, g->target[t][0]);
+            put(img, o + (size_t)(GROUP_TARGETS + t * 2 + 1) * 4, g->target[t][1]);
+        }
+        put(img, o + GROUP_FLAGS * 4, g->flags);
+        put(img, o + (GROUP_FLAGS + 1) * 4, -1);
+        put(img, o + GROUP_COOLDOWN * 4, g->cooldown);
+        put(img, o + GROUP_FOUGHT * 4, g->fought);
+        put(img, o + (GROUP_SIZE - 4), -1);
+    }
+}
+
+static void read_dungeon(SA *s, const u8 *img) {
+    Expedition *e = &s->exp;
+    for (int i = 0; i < 4; i++) e->last[i] = at(img, LAST_AT + (size_t)i * 4);
+    for (int i = 0; i < 4; i++) e->entry[i] = at(img, ENTRY_AT + 16 + (size_t)i * 4);
+    e->groupCount = 0;
+    if (!e->active) return;
+    for (int k = 0; k < GROUPS_MAX; k++) {
+        size_t o = GROUP_AT + (size_t)k * GROUP_SIZE;
+        if (!at(img, o)) break;
+        ExpGroup *g = &e->group[e->groupCount++];
+        memset(g, 0, sizeof *g);
+        g->party = at(img, o);
+        g->number = at(img, o + 4);
+        g->x = at(img, o + 12);
+        g->y = at(img, o + 16);
+        g->dir = at(img, o + 20);
+        g->alive = true;
+        for (int c = 0; c < BATTLE_CELLS; c++) {
+            int idx = at(img, o + (size_t)(GROUP_CELLS + c) * 4) - ENEMY_BASE;
+            g->cells[c] = idx >= 0 && idx < ENEMIES_MAX ? at(img, ENEMY_AT + (size_t)idx * MEMBER_SIZE) : -1;
+            if (g->cells[c] <= 0) g->cells[c] = -1;
+        }
+        for (int t = 0; t < EXP_TARGETS; t++) {
+            g->target[t][0] = at(img, o + (size_t)(GROUP_TARGETS + t * 2) * 4);
+            g->target[t][1] = at(img, o + (size_t)(GROUP_TARGETS + t * 2 + 1) * 4);
+        }
+        g->flags = at(img, o + GROUP_FLAGS * 4);
+        g->cooldown = at(img, o + GROUP_COOLDOWN * 4);
+        g->fought = at(img, o + GROUP_FOUGHT * 4);
+    }
 }
 
 bool sa_pcsave_write(SA *s, const char *path) {
@@ -349,11 +523,12 @@ bool sa_pcsave_write(SA *s, const char *path) {
     put(img, GRID_AFTER, 1);
     write_members(s, img);
     write_maps(s, img);
+    write_dungeon(s, img);
     for (int i = 0; i < PC_C_VARS; i++) put(img, VM_AT + (size_t)i * 4, s->vm.c[i]);
     memcpy(img + VM_AT + PC_C_VARS * 4, s->vm.f, PC_F_VARS);
     for (size_t i = 0; i < sizeof engineVars / sizeof engineVars[0]; i++) put(img, VM_AT + (size_t)engineVars[i].off * 4, engineVars[i].value);
-    put(img, VM_AT + PLACE_VAR * 4, PLACE_TOWN);
-    put(img, VM_AT + (PLACE_VAR + 1) * 4, 1);
+    put(img, VM_AT + PLACE_VAR * 4, s->exp.active ? PLACE_DUNGEON : PLACE_TOWN);
+    put(img, VM_AT + (PLACE_VAR + 1) * 4, s->exp.active ? 2 : 1);
     if (!s->vm.c[SEED_VAR]) put(img, VM_AT + SEED_VAR * 4, (int)(sa_vm_random(&s->vm) & 0x7fffffff));
     size_t n;
     u8 *packed = vnsystemaoi_pack(img, IMAGE_SIZE, &n);

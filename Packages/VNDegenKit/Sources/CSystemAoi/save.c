@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 4u
+#define SAVE_VERSION 5u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
@@ -165,6 +165,16 @@ static bool write_sidecar(SA *s, int slot, int count) {
     for (int d = 0; d < EXP_DUNGEONS; d++) put_ints(&w, &s->exp.floorInfo[d][0][0], EXP_FLOORS * 4);
     const int exp[3] = {s->exp.active, s->exp.dungeon, s->exp.floor};
     put_ints(&w, exp, 3);
+    put_ints(&w, s->exp.last, 4);
+    put_ints(&w, s->exp.entry, 4);
+    put32(&w, (u32)s->exp.groupCount);
+    for (int i = 0; i < s->exp.groupCount; i++) {
+        const ExpGroup *g = &s->exp.group[i];
+        const int v[9] = {g->alive, g->party, g->number, g->x, g->y, g->dir, g->flags, g->cooldown, g->fought};
+        put_ints(&w, v, 9);
+        put_ints(&w, g->cells, BATTLE_CELLS);
+        put_ints(&w, &g->target[0][0], EXP_TARGETS * 2);
+    }
     char *dir = sa_fmt("%s/vndegen", s->saveDir);
     sa_mkdirs(dir);
     free(dir);
@@ -284,6 +294,18 @@ static bool read_sidecar(SA *s, int slot) {
     s->exp.active = exp[0] != 0;
     s->exp.dungeon = exp[1];
     s->exp.floor = exp[2];
+    get_ints(&r, s->exp.last, 4);
+    get_ints(&r, s->exp.entry, 4);
+    s->exp.groupCount = (int)get32(&r);
+    if (s->exp.groupCount < 0 || s->exp.groupCount > EXP_GROUPS) r.bad = true, s->exp.groupCount = 0;
+    for (int i = 0; i < s->exp.groupCount; i++) {
+        ExpGroup *g = &s->exp.group[i];
+        int v[9];
+        get_ints(&r, v, 9);
+        g->alive = v[0] != 0, g->party = v[1], g->number = v[2], g->x = v[3], g->y = v[4], g->dir = v[5], g->flags = v[6], g->cooldown = v[7], g->fought = v[8];
+        get_ints(&r, g->cells, BATTLE_CELLS);
+        get_ints(&r, &g->target[0][0], EXP_TARGETS * 2);
+    }
     free(d);
     sa_log(s, "load slot %d: %s", slot, r.bad ? "short" : "ok");
     return !r.bad;
