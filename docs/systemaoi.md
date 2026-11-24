@@ -111,7 +111,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   areas, area entries registered at door spots, the missions (マクドゥの試験) from turn 17, recruits from the town's housing, and area bosses whose
   defeat recruits their leaders.
   Hidden doors (wall 100) open with a 感知 unit in the party (inferred). 配置's 組織図 posts and 内政's 交換 are
-  there; posts don't change the town's numbers yet. Not built yet: the town's defence, 解任 of units, 編成, and the
+  there; posts don't change the town's numbers yet. Not built yet: the town's defence, 編成, and the
   dungeons after 炎山洞. These live in
   the original's exe, not its scripts, and are rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the

@@ -340,6 +340,9 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   money and resources were the same. VNDegen's posts change nothing in the town so far. `c3 "post"` answers
   whether a post is held and by whom (bo3105's scenes).
 
+- **解任 (配置).** The tile at (445, 536) takes a field or reserve member off the board; inferred (dropping an
+  unplaced member there did nothing on the PC).
+
 ## Recruits and the turn order, from the scripts and play
 
 - **Turn order.** Measured under Wine: after 休憩's income box the town hook (bo0100, hook 1) runs first, over the
