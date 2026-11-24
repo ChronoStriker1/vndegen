@@ -224,6 +224,7 @@ static void finish_after(SA *s) {
 void sa_exp_draw_view(SA *s, u32 *fb) {
     sa_dungeon_draw(&s->dungeon, fb);
     sa_dungeon_draw_hud(&s->dungeon, fb, &s->party, s->vm.c[C_RANK_MAX]);
+    sa_town_draw_status_goal(&s->town, &s->vm, fb);
 }
 
 static void run_hooks(SA *s, const int *hooks, int n, int after) {
@@ -797,8 +798,7 @@ bool sa_exp_frame(SA *s, u32 ms) {
         s->dirty = true;
     }
     if (s->mode == MODE_DUNGEON && s->dirty) {
-        sa_dungeon_draw(d, s->fb);
-        sa_dungeon_draw_hud(d, s->fb, &s->party, s->vm.c[C_RANK_MAX]);
+        sa_exp_draw_view(s, s->fb);
         s->serial++;
         s->dirty = false;
     }

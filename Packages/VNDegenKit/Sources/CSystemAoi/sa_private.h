@@ -119,6 +119,8 @@ typedef struct Picture {
 } Picture;
 
 struct SA {
+    char joined[DIALOG_UNITS][48];
+    int joinedCount;
     VNSystemAoiConfig cfg;
     char *gameDir, *saveDir;
     FILE *logFile;

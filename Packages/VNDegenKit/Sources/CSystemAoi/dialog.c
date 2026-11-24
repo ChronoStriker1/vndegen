@@ -24,19 +24,41 @@ enum {
     BEFORE_RIGHT = 622,
     DELTA_RIGHT = 690,
     AFTER_RIGHT = 815,
+    UNITS_H = 166,
+    UNITS_W = 424,
+    CARD_W = 148,
+    CARD_DY = 10,
+    CARD_FEET = 125,
+    CARD_NAME_Y = 130,
+    NAME_SIZE = 10,
+    NAME_SPACING = 3,
 };
 
-enum { ART_FOOT, ART_OK, ART_HEAD, ART_TABLE, ART_TEXT };
+enum { ART_FOOT, ART_OK, ART_HEAD, ART_TABLE, ART_TEXT, ART_CARD, ART_UNITS };
 
 void sa_dialog_init(Dialog *d, Vfs *vfs) {
     memset(d, 0, sizeof *d);
-    static const char *const names[DIALOG_ART] = {"ret_a00.agf", "ret_a01.agf", "ret_a02.agf", "ret_a03.agf", "ret_a04.agf"};
+    static const char *const names[DIALOG_ART] = {"ret_a00.agf", "ret_a01.agf", "ret_a02.agf", "ret_a03.agf", "ret_a04.agf", "ret_a05.agf", "ret_a06.agf"};
     for (int i = 0; i < DIALOG_ART; i++) d->art[i] = sa_load_image(vfs, names[i]);
 }
 
 static void clear_lines(Dialog *d) {
     for (int i = 0; i < d->lineCount; i++) free(d->lines[i]);
     d->lineCount = 0;
+    for (int i = 0; i < d->unitCount; i++) sa_image_free(d->unitSprite[i]);
+    d->unitCount = 0;
+}
+
+void sa_dialog_add_unit(Dialog *d, Image *sprite, const char *name) {
+    if (d->unitCount == DIALOG_UNITS) {
+        sa_image_free(sprite);
+        return;
+    }
+    memmove(d->unitSprite + 1, d->unitSprite, sizeof d->unitSprite[0] * (size_t)d->unitCount);
+    memmove(d->unitName + 1, d->unitName, sizeof d->unitName[0] * (size_t)d->unitCount);
+    d->unitSprite[0] = sprite;
+    snprintf(d->unitName[0], sizeof d->unitName[0], "%s", name);
+    d->unitCount++;
 }
 
 void sa_dialog_free(Dialog *d) {
@@ -71,7 +93,7 @@ void sa_dialog_open_turn(Dialog *d, const int before[4], const int after[4], con
     memcpy(d->after, after, sizeof d->after);
 }
 
-static int ok_y(const Dialog *d) { return DLG_Y + HEAD_H + (d->table ? TABLE_H : 0) + TEXT_H + OK_DY; }
+static int ok_y(const Dialog *d) { return DLG_Y + HEAD_H + (d->table ? TABLE_H : 0) + TEXT_H + (d->unitCount ? UNITS_H : 0) + OK_DY; }
 
 static bool on_ok(const Dialog *d, int x, int y) { return x >= OK_X && x < OK_X + OK_W && y >= ok_y(d) && y < ok_y(d) + OK_H; }
 
@@ -128,6 +150,27 @@ void sa_dialog_draw(Dialog *d, u32 *fb) {
     sa_font_set_plain(false);
     sa_font_set_spacing(1);
     y += TEXT_H;
+    if (d->unitCount) {
+        sa_blit(fb, d->art[ART_UNITS], DLG_X, y);
+        const Image *card = d->art[ART_CARD];
+        int cw = card ? card->w : CARD_W, x0 = DLG_X + UNITS_W / 2 - cw * d->unitCount / 2;
+        for (int i = 0; i < d->unitCount; i++) {
+            int cx = x0 + i * cw, cy = y + CARD_DY;
+            sa_blit(fb, card, cx, cy);
+            const Image *im = d->unitSprite[i];
+            if (im) {
+                int cols, rows;
+                sa_sprite_layout(im, &cols, &rows);
+                int sw = im->w / cols, sh = im->h / rows;
+                sa_blit_rect(fb, im, 0, 0, sw, sh, cx + cw / 2 - sw / 2, cy + CARD_FEET - sh);
+            }
+            sa_font_set_spacing(NAME_SPACING);
+            int w = sa_text_width(d->unitName[i], -1, NAME_SIZE) - NAME_SPACING;
+            sa_text_draw(fb, SA_W, SA_H, d->unitName[i], -1, cx + cw / 2 - w / 2, cy + CARD_NAME_Y, NAME_SIZE, 0xffffff, 0x000000);
+            sa_font_set_spacing(1);
+        }
+        y += UNITS_H;
+    }
     sa_blit(fb, d->art[ART_FOOT], DLG_X, y);
     sa_blit_rect(fb, d->art[ART_OK], 0, d->hover ? OK_H : 0, OK_W, OK_H, OK_X, y + OK_DY);
 }

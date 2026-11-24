@@ -612,7 +612,8 @@ void sa_draw_number(u32 *fb, const Image *font, const char *s, int right, int y,
 void sa_draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch);
 Image *sa_load_image(Vfs *vfs, const char *name);
 
-#define DIALOG_ART 5
+#define DIALOG_ART 7
+#define DIALOG_UNITS 4
 #define DIALOG_LINES 8
 
 typedef struct Dialog {
@@ -622,12 +623,16 @@ typedef struct Dialog {
     int before[4], after[4];
     u32 ms;
     Image *art[DIALOG_ART];
+    int unitCount;
+    Image *unitSprite[DIALOG_UNITS];
+    char unitName[DIALOG_UNITS][48];
 } Dialog;
 
 void sa_dialog_init(Dialog *d, Vfs *vfs);
 void sa_dialog_free(Dialog *d);
 void sa_dialog_open(Dialog *d, const char *text);
 void sa_dialog_open_turn(Dialog *d, const int before[4], const int after[4], const char *text);
+void sa_dialog_add_unit(Dialog *d, Image *sprite, const char *name);
 bool sa_dialog_tick(Dialog *d, u32 ms);
 bool sa_dialog_hover(Dialog *d, int x, int y);
 bool sa_dialog_click(Dialog *d, int x, int y);

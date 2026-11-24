@@ -418,14 +418,32 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             gain[i] = sa_vm_get(vm, code, &in->o[i]);
             any = any || gain[i];
         }
-        for (int i = 0; i < 4; i++) before[i] = vm->c[0xd2 + i];
-        sa_exp_gain(s, gain);
-        for (int i = 0; i < 4; i++) after[i] = vm->c[0xd2 + i];
+        int base = s->exp.active ? 0xd2 : C_RESIDENTS;
+        for (int i = 0; i < 4; i++) before[i] = vm->c[base + i];
+        if (s->exp.active) sa_exp_gain(s, gain);
+        else
+            for (int i = 0; i < 4; i++) vm->c[base + i] += gain[i];
+        for (int i = 0; i < 4; i++) after[i] = vm->c[base + i];
         char *t = opd_str(code, in, 4);
         clear_text(s);
-        if (any && s->exp.active) sa_dialog_open_turn(&s->dialog, before, after, t);
+        if (any) sa_dialog_open_turn(&s->dialog, before, after, t);
         else sa_dialog_open(&s->dialog, t);
         free(t);
+        for (int i = 0; i < s->joinedCount; i++) {
+            int r = -1;
+            for (int k = 0; k < s->party.units.rows && r < 0; k++)
+                if (!strcmp(sa_table_text(&s->party.units, k, 1), s->joined[i])) r = k;
+            if (r < 0) continue;
+            char name[24];
+            snprintf(name, sizeof name, "u%04da2.agf", sa_table_int(&s->party.units, r, 11));
+            Image *im = sa_load_image(&s->vfs, name);
+            if (!im) {
+                snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&s->party.units, r, 11));
+                im = sa_load_image(&s->vfs, name);
+            }
+            sa_dialog_add_unit(&s->dialog, im, sa_table_text(&s->party.units, r, 2));
+        }
+        s->joinedCount = 0;
         vm->state = VM_WAIT_DIALOG;
         s->dirty = true;
         break;
@@ -512,7 +530,10 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     case 0xbc:
         if (in->count >= 2) {
             char *key = opd_str(code, in, 1);
-            if (sa_party_join(&s->party, &s->vfs, key)) sa_log(s, "joined: %s", key);
+            if (sa_party_join(&s->party, &s->vfs, key)) {
+                sa_log(s, "joined: %s", key);
+                if (s->joinedCount < DIALOG_UNITS) snprintf(s->joined[s->joinedCount++], sizeof s->joined[0], "%s", key);
+            }
             else sa_log(s, "no unit %s to join", key);
             free(key);
             s->dirty = true;
