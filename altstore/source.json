@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.12",
+          "buildVersion": "3455",
+          "date": "2026-11-25T20:25:42Z",
+          "localizedDescription": "On the iPhone Duo held sideways, the touch gamepad spreads across the whole front display when the game does.\n\n## Downloads\n\n- `VNDegen-0.60.12-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.12.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.12-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n\n\n\n## Changed\n\n- **iPhone Duo:** closed and held on its side, with the game picture at Full width, the touch gamepad and the small menu button spread across the whole front display, with the same margins on both sides as on an iPhone in landscape. A control that would sit on the camera or its housing steps just clear of it: with the camera on the right, the A, B, X and Y buttons move about 6 points in. At Clear of the camera, the controls stay beside the camera as before.\n\n## What wasn't tested\n\n- No physical iPhone Duo was used; this was checked on the iPhone Duo simulator with No Socks RPG and Kaeru nyo Panyon, with the camera on each side, and on an iPhone simulator for comparison.\n- The on-screen keyboard together with the gamepad in this pose was checked only by a unit test.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.12/VNDegen-0.60.12.ipa",
+          "size": 132801778,
+          "sha256": "fb55451b50b32ed1ac6124a016110db0a400873c973e38ddbad4aa48bd1dc4f1",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.11",
           "buildVersion": "3448",
           "date": "2026-11-25T20:02:32Z",
