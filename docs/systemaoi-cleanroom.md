@@ -251,14 +251,50 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   in five dungeons, the poles cut the 8-by-6 block-mean error by 12% and supply the pillars along 堕天牢's and the
   ice dungeon's walls (the ice dungeon's bare near walls were where the PC draws pillars). Poles in open space (every
   corner) fit worse. `mpDDFF.amd` field 22 (63 on most floor cells) didn't tell which corners.
-- **Ambient.** `Light.pvl` holds a global ambient light (32) and two directional lights, each with ambient 80 and
-  diffuse 80 shining along (±10, 4.5, 30): together the 192 of the fit below. `floor.obj` column 7 is 1 in the
-  dungeons from 絶命院 on except 9 and 0 in 千樹庭 and 炎山洞; where it is 1 the PC draws as if the global ambient
-  were off (ambient 160 cut the block error in those dungeons from 55 to 33 and made their roofs no longer too
-  bright), so VNDegen uses 160 there. Inferred from the fit; the flag's real meaning is unknown.
-- **Light and fog.** Inferred from colour fits: textures times 1.6 × (ambient 0.75 plus the two lights' diffuse), and
-  linear fog to (40, 45, 30) from −4 to 28 units. Back faces are culled. A texture whose top-left colour covers a
-  tenth of it treats that colour as transparent (the grass `010w0x0`).
+- **Ambient and light.** `Light.pvl` holds a global ambient light (32) and two directional lights (ambient 80,
+  diffuse 80, `Direct(±10, 4.5, 30)`), but drawn as written they don't match the PC. Measured on eleven PC frames
+  taken on known cells in five dungeons (`lightcmp.sh`, plus a pass that renders the bare textures, the fog factor and
+  each pixel's surface class and divides the PC's pixels by them): relative to the bare texture the PC lights
+  ceilings least (about 0.9), side walls more (about 1.15), walls facing the camera more again (about 1.35) and
+  floors most (1.45 to 1.7, with the ground fog below), with the same factors whichever way the party faces. Floors
+  bright and ceilings dark means light from above; front walls brighter than sides means light toward the camera.
+  The file's vector lit neither, which left 絶命院, the darkest set, 6 to 10% too dark. Fitted, inferred: textures
+  times 1.6 × (ambient plus 50/255 × the diffuse of two view-space lights toward (±0.46, 0.3, −0.44)), with ambient
+  140/255, or 130/255 where `floor.obj` column 7 is 1 (the dungeons from 絶命院 on except 9). Over the eleven frames
+  the 8-by-6 block-mean error fell from 66.4 to 56.3 and the mean log error of the per-surface factors from 0.21 to
+  0.10; 絶命院's two frames went from 9.5% and 6.1% too dark to 3.0% and 4.8%, 堕天牢's to within 2%. The ice
+  dungeon is the exception: its one frame went from 1.4% too dark to 7.6% too bright (its bright walls wash out,
+  where the PC keeps their detail), and a separate ambient for it would have no rule behind it. Fog stays linear
+  from −4 to 28 units to the floor's `floor.obj` column 10 colour (a fog fit didn't beat it). 炎山洞's 1.55 floor
+  gain is no longer needed: the ground fog gives its floor the same brightness.
+- **Ground fog.** Each part set names two effects in its `effect_box` (`>e,effectNN0` and `NN1`), `.def` text files
+  in the game's archives. `NN0` is a `FogFoot` in every set: a texture (`fogfootNN0.bmp`, a pale mottled 128×128),
+  a scroll speed per frame (`texSpdX`, `texSpdY`), an alpha range (`AlphaMin`, `AlphaMax`, out of 255) and heights
+  (`HighMin`, `HighMax`, `HighAdd`). VNDegen draws it as a plane `HighAdd` above every visible floor cell, one
+  texture repeat per cell, blended over the floor with an alpha that swings between the two values every 4 seconds
+  and scrolls at the given speed at 60 frames a second. The plane, the repeat, the blend and the swing are inferred;
+  measured: without it the PC's floors were on average 1.41 times as bright as VNDegen's, with it 1.08 (1.05 with
+  the fitted light), and the floors take on the PC's paler mottle. The `NN1` effects (falling leaves in 千樹庭, sparks in 炎山洞, snow in 060 and 070, light
+  motes in 080 and 090) aren't drawn.
+- **Light and fog.** Back faces are culled. A texture whose top-left colour covers a tenth of it treats that colour
+  as transparent (the grass `010w0x0`).
+- **Door leaves.** The door walls `w100` and `w111` hold two leaf layers (`door1`/`door2`, `door3`/`door4`) with a
+  `Translate` at their hinge, (4, 0, ±1.7): the leaf's vertices are relative to it. Measured under Wine at
+  千樹庭's key door (mp0103, cell 13,3, with 千樹の鍵 in the bag): bumping the locked door (107) runs the floor
+  hook, `d7` makes the side 111 and passable, `81` runs, then 鍵で、扉を開いた。 shows over the old door; after it
+  the door stands closed with the white ring of `w111`, and the next step swings both leaves away from the party as
+  it walks through. `81` changed nothing that could be seen (a sound or a redraw, inferred) and VNDegen skips it.
+  VNDegen applies the hinge offset and, while the party walks through a wall, turns that side's leaves 90° away
+  over the step and hides the copy drawn from the far cell; the angle and timing are inferred (the PC's leaves were
+  about 60° open a third of the way through).
+- **Side panel button.** The PC draws the side panel's fold button, `dgn_b01`'s ◀ frame (a 2-by-2 sheet of 30-pixel
+  frames: ▶, ◀ and their hover versions), at (139, 0), in the notch of `dgn_b00` (measured, mean error 0.6 per
+  channel). VNDegen draws it; what a click on it does (folding the panel, inferred from the arrows) isn't built.
+- **Floor tile scale.** Measured: the floor parts map their texture twice across a cell (u 0 to 2, v −1 to 1) in
+  every set, and VNDegen draws them so. Against eight PC frames, the normalised cross-correlation of the high-passed
+  floor peaks at the file's scale (0.67 to 0.91) and drops to 0.36 to 0.81 at ±5%, at half or double the repeat and
+  with u and v swapped. What still looks different on the floors is the PC's texture filtering and the ground fog,
+  not the scale.
 - **Objects.** `mallset.pvm` holds the objects every dungeon shares (`action_box`): `a100` the gold-framed door,
   `a101` to `a108` the floor markers of pickups (101 to 104 glowing, 105 spent) and other marks. Measured: floor
   object 100 is the door home; it stands at its cell's centre and turns slowly, edge-on to face-on in about 4.5
@@ -1131,3 +1167,25 @@ the same points (offsets in bytes, numbers little-endian):
   entry and C076/C077 written, the original lists VNDegen's dungeon saves (8ターン 千樹庭 中央森の東 0歩目) and loads
   them onto the saved cell, facing, map memory and groups (checked on a save from a VNDegen game four steps in, and
   on VNDegen's re-export of a PC autosave). The slot's N歩目 read 0 on every save so far; VNDegen shows C072.
+
+## Ending, second playthrough and the story hooks VNDegen doesn't run
+
+- **True ending.** bo2701 sets F161 when 真魔力塊隊 (party 9907) is beaten; the town hook (bo0100) then plays bo0104
+  (the ending, the staff roll `data2.dat`, 109 seconds, which Ctrl doesn't skip), ac0001 (引継ぎデータを登録しますか？)
+  and `7a` back to the title. Measured under Wine with F161 set in a save that has its hook slots: the same scenes
+  in the same order as VNDegen. A save without hook slots runs no hooks, so it never reaches the ending.
+  `bo0105` (内政END, F137 with C580 ≥ 30) shares the hook.
+- **Carry-over (`85`, `86`).** Measured: 登録する sets the global flag the new game checks (FG801) without writing any
+  file within the next minute; a new game then asks 引き継ぎますか？, then whether to use the special units, then the
+  enemy strength (初期の強さ, 周回用の強さ, 極めの強さ), and turn 1 opens with the ending turn's food, money and
+  resources (48,996, 49,059 and 49,000) and the first five items, Darkus alone in the party. VNDegen ignores both
+  ops, so the offer never comes.
+- **Hooks never run by VNDegen.** init.box also registers 13, 14, 15, 19, 20, 21, 22 and 23. 14 (bo1400 → bo1401)
+  holds 74 boss-side cutaways keyed on C070/C071 and C095 = 1, C096 = n; the PC didn't play 千樹庭 11F's first on
+  entering, walking toward or meeting ヤーヌの部下隊, and C095 holds the town command (24) in the dungeon, so the exe
+  sets them when it calls the hook (trigger unknown). 19 (bo1900) holds scenes keyed on floor objects 22, 30, 32
+  and 33 with three or more in the party; 22 (bo2200) the dungeon rest conversations, once per expedition (F129,
+  cleared by bo1000) with three or more in the party, the next unseen one whose turn (0, 20, 40, …) has come. On
+  the PC, 休憩 with Darkus alone opened camp without one. 13, 15, 20 and 23 are empty or only set a backdrop;
+  21 turns a crystal (60) into 61. `ga0000.box` (ga0003: after ミアルテ防衛隊Ａ to Ｆ and 魔力塊隊, `b1` names the next
+  group, ending with 真魔力塊隊) is neither registered nor named by any script; when the PC runs it isn't measured.

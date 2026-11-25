@@ -97,13 +97,21 @@ static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Ima
                 c = tex->px[(size_t)ty * tw + tx];
                 if ((c >> 24) < 128) continue;
             }
-            zrow[x] = iz;
             float f = fogSpan > 0 ? (r->fogFar - z) * fogInv : 1.0f;
             f = f < 0 ? 0 : f > 1 ? 1 : f;
             float cr = fminf((float)(c & 0xff) * sh, 255), cg = fminf((float)(c >> 8 & 0xff) * sh, 255), cb = fminf((float)(c >> 16 & 0xff) * sh, 255);
             float g1 = 1 - f;
-            u32 rr = (u32)(cr * f + (float)fr * g1), gg = (u32)(cg * f + (float)fg * g1), bb = (u32)(cb * f + (float)fbl * g1);
-            row[x] = 0xff000000u | bb << 16 | gg << 8 | rr;
+            float or_ = cr * f + (float)fr * g1, og = cg * f + (float)fg * g1, ob = cb * f + (float)fbl * g1;
+            if (r->blend > 0) {
+                u32 dst = row[x];
+                float a = r->blend, k = 1 - a;
+                or_ = or_ * a + (float)(dst & 0xff) * k;
+                og = og * a + (float)(dst >> 8 & 0xff) * k;
+                ob = ob * a + (float)(dst >> 16 & 0xff) * k;
+            } else {
+                zrow[x] = iz;
+            }
+            row[x] = 0xff000000u | (u32)ob << 16 | (u32)og << 8 | (u32)or_;
             }
         }
         r0 += b0;

@@ -20,6 +20,7 @@ enum {
     MOVE_MS = 133,
     DOOR_TURN_MS = 18000,
     DOOR_FRAME_MS = 66,
+    FOG_PULSE_MS = 4000,
     ACTION_X = 1101,
     ACTION_Y = 498,
     ACTION_W = 160,
@@ -48,6 +49,9 @@ enum {
     PLATE_NUMBER_RIGHT = 74,
     PANEL_X = 0,
     PANEL_Y = 0,
+    FOLD_X = 139,
+    FOLD_Y = 0,
+    FOLD_SIZE = 30,
     REST_X = 1101,
     REST_Y = 674,
     REST_W = 160,
@@ -87,12 +91,15 @@ static const struct {
 #define CAM_PITCH (-0.08f)
 #define FOV 47.2f
 #define LIGHT_GAIN 1.6f
+#define AMBIENT (140.0f / 255.0f)
+#define AMBIENT_DIM (130.0f / 255.0f)
+#define DIFFUSE (50.0f / 255.0f)
 #define AMBIENT_ALL (192.0f / 255.0f)
 #define POLE_SIDE (DUN_SIDE + 1)
 #define QUARTER 1.5707963f
 #define VIEW_SLOPE 0.75f
 
-static const float lights[2][3] = {{10, 4.5f, 30}, {-10, 4.5f, 30}};
+static const float lights[2][3] = {{0.46f, 0.3f, -0.44f}, {-0.46f, 0.3f, -0.44f}};
 static const int wallField[4] = {F_WALL_N, F_WALL_E, F_WALL_S, F_WALL_W};
 static const int stepX[4] = {0, 1, 0, -1}, stepY[4] = {-1, 0, 1, 0};
 static const int sideQuarter[4] = {-1, 0, 1, 2};
@@ -229,9 +236,66 @@ bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map) {
     return true;
 }
 
+static float def_value(const char *text, const char *key, float fallback) {
+    size_t n = strlen(key);
+    for (const char *p = text; *p; p++) {
+        if ((p != text && p[-1] != '\n') || strncmp(p, key, n) || (p[n] != ' ' && p[n] != '\t' && p[n] != '=')) continue;
+        const char *q = strchr(p, '=');
+        return q ? strtof(q + 1, NULL) : fallback;
+    }
+    return fallback;
+}
+
+static bool def_string(const char *text, const char *key, char *out, size_t size) {
+    size_t n = strlen(key);
+    for (const char *p = text; *p; p++) {
+        if ((p != text && p[-1] != '\n') || strncmp(p, key, n) || (p[n] != ' ' && p[n] != '\t' && p[n] != '=')) continue;
+        const char *q = strchr(p, '=');
+        if (!q) return false;
+        q++;
+        while (*q == ' ' || *q == '\t') q++;
+        size_t k = 0;
+        while (q[k] && q[k] != ';' && q[k] != ' ' && q[k] != '\t' && q[k] != '\r' && q[k] != '\n' && k + 1 < size) {
+            out[k] = q[k];
+            k++;
+        }
+        out[k] = 0;
+        return k > 0;
+    }
+    return false;
+}
+
+static void load_effects(Dungeon *d, Vfs *vfs) {
+    d->fogTex = -1;
+    for (int i = 0; i < d->set.pvm.count; i++) {
+        const char *name = d->set.pvm.layer[i].name;
+        if (strncmp(name, ">e,", 3)) continue;
+        char file[64];
+        snprintf(file, sizeof file, "%s.def", name + 3);
+        size_t n;
+        u8 *data = sa_vfs_read(vfs, file, &n);
+        if (!data) continue;
+        char *text = sa_alloc(n + 1);
+        memcpy(text, data, n);
+        text[n] = 0;
+        free(data);
+        char type[32], tex[48];
+        if (def_string(text, "type", type, sizeof type) && !strcmp(type, "FogFoot") && def_string(text, "TexFile", tex, sizeof tex)) {
+            d->fogTex = texture_index(d, vfs, tex);
+            d->fogSpeed[0] = def_value(text, "texSpdX", 0);
+            d->fogSpeed[1] = def_value(text, "texSpdY", 0);
+            d->fogAlpha[0] = def_value(text, "AlphaMin", 0);
+            d->fogAlpha[1] = def_value(text, "AlphaMax", 0);
+            d->fogHeight = def_value(text, "HighAdd", 0);
+        }
+        free(text);
+    }
+}
+
 bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     free_level(d);
     if (!load_set(d, vfs, &d->set, set)) return false;
+    load_effects(d, vfs);
     load_set(d, vfs, &d->common, "mallset.pvm");
     if (!sa_dungeon_read_map(d, vfs, map)) return false;
     if (!d->r3.zbuf) r3_init(&d->r3, SA_W, SA_H);
@@ -291,7 +355,7 @@ void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
     if (!d->art[DUN_ART_PANEL]) {
         static const char *const names[] = {"dgn_b00.agf", "dgn_c00.agf", "dgn_c01.agf", "dgn_c02.agf", "dgn_c03.agf", "dgn_c04.agf",
                                             "dgn_c05.agf", "dgn_c06.agf", "dgn_d00.agf", "dgn_d01.agf", "dgn_g02.agf", "dgn_g01.agf",
-                                            "dgn_g00.agf", "dgn_g07.agf", "dgn_f00.agf"};
+                                            "dgn_g00.agf", "dgn_g07.agf", "dgn_f00.agf", "dgn_b01.agf"};
         for (int i = 0; i < DUN_ART_PLATFORM; i++) d->art[i] = sa_load_image(vfs, names[i]);
         for (int q = 0; q < 4; q++) d->needle[q] = rotate_quarter(d->art[DUN_ART_NEEDLE], q);
         static const char *const icons[] = {"mmf0003.agf", "mmf0004.agf", "mma0001.agf", "mma0000.agf"};
@@ -492,12 +556,15 @@ static bool walk(Dungeon *d, int side) {
     mark_passage(d, from, to, side);
     d->steps++;
     start_anim(d);
+    d->passCell = from;
+    d->passSide = side;
     return true;
 }
 
 static void turn(Dungeon *d, int by) {
     d->dir = (d->dir + by) & 3;
     start_anim(d);
+    d->passCell = -1;
     d->toYaw = d->yaw + (float)by * QUARTER;
 }
 
@@ -615,22 +682,24 @@ static void make_cam(const Dungeon *d, Cam *c) {
 }
 
 static float shade_of(const Dungeon *d, const float *n) {
-    float s = d->ambient;
+    float s = d->ambient < AMBIENT_ALL ? AMBIENT_DIM : AMBIENT;
     for (int i = 0; i < 2; i++) {
         float l = sqrtf(lights[i][0] * lights[i][0] + lights[i][1] * lights[i][1] + lights[i][2] * lights[i][2]);
         float dot = (n[0] * lights[i][0] + n[1] * lights[i][1] + n[2] * lights[i][2]) / l;
-        if (dot > 0) s += 80.0f / 255.0f * dot;
+        if (dot > 0) s += DIFFUSE * dot;
     }
     return s * LIGHT_GAIN;
 }
 
-static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a) {
+static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a, float swing) {
     int i = sa_pvm_find(&ps->pvm, name);
     if (i < 0) return;
     float ca = cosf(a), sa = sinf(a);
     for (int k = i; k <= ps->last[i]; k++) {
         const PvmLayer *ly = &ps->pvm.layer[k];
         if (ly->name[0] == '>' || (k != i && !strncmp(ly->name, "next", 4))) continue;
+        if (ly->hasTranslate && swing < 0) continue;
+        float hinge = ly->hasTranslate ? (ly->translate[2] > 0 ? -swing : swing) : 0, hc = cosf(hinge), hs = sinf(hinge);
         const Image *tex = ly->tcount && ps->layerTex[k] >= 0 ? d->tex[ps->layerTex[k]] : NULL;
         for (int t = 0; t < ly->tcount; t++) {
             R3Vert v[3];
@@ -639,8 +708,14 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
             if (bad) continue;
             for (int j = 0; j < 3; j++) {
                 const PvmVertex *pv = &ly->v[ly->tri[t * 3 + j]];
-                float wx = pv->pos[0] * ca + pv->pos[2] * sa + cx, wy = pv->pos[1], wz = -pv->pos[0] * sa + pv->pos[2] * ca + cz;
-                float n[3] = {pv->normal[0] * ca + pv->normal[2] * sa, pv->normal[1], -pv->normal[0] * sa + pv->normal[2] * ca};
+                float px = pv->pos[0] * hc + pv->pos[2] * hs, pz = -pv->pos[0] * hs + pv->pos[2] * hc;
+                float nx = pv->normal[0] * hc + pv->normal[2] * hs, nz = -pv->normal[0] * hs + pv->normal[2] * hc;
+                if (ly->hasTranslate) {
+                    px += ly->translate[0];
+                    pz += ly->translate[2];
+                }
+                float wx = px * ca + pz * sa + cx, wy = pv->pos[1] + (ly->hasTranslate ? ly->translate[1] : 0), wz = -px * sa + pz * ca + cz;
+                float n[3] = {nx * ca + nz * sa, pv->normal[1], -nx * sa + nz * ca};
                 float dx = wx - c->pos[0], dy = wy - c->pos[1], dz = wz - c->pos[2];
                 v[j].x = dx * c->r[0] + dy * c->r[1] + dz * c->r[2];
                 v[j].y = dx * c->u[0] + dy * c->u[1] + dz * c->u[2];
@@ -649,7 +724,7 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
                                n[0] * c->f[0] + n[1] * c->f[1] + n[2] * c->f[2]};
                 v[j].u = pv->uv[0];
                 v[j].v = pv->uv[1];
-                v[j].shade = shade_of(d, cn) * (name[0] == 'f' ? d->floorGain : 1);
+                v[j].shade = shade_of(d, cn);
             }
             r3_tri(&d->r3, v, tex);
         }
@@ -659,7 +734,42 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
 static float spin(const Dungeon *d) { return (float)(d->clock % DOOR_TURN_MS) * 6.2831853f / DOOR_TURN_MS; }
 
 static void draw_part(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, int quarter) {
-    draw_model(d, ps, c, name, cx, cz, (float)quarter * QUARTER);
+    draw_model(d, ps, c, name, cx, cz, (float)quarter * QUARTER, 0);
+}
+
+static float leaf_swing(const Dungeon *d, int cellIndex, int side) {
+    if (!d->animDur || d->passCell < 0) return 0;
+    if (cellIndex == d->passCell && side == d->passSide) return QUARTER * fminf(1, (float)d->animMs / (float)d->animDur);
+    int px = d->passCell % DUN_SIDE + stepX[d->passSide], py = d->passCell / DUN_SIDE + stepY[d->passSide];
+    return cellIndex == py * DUN_SIDE + px && side == ((d->passSide + 2) & 3) ? -1 : 0;
+}
+
+static void draw_fog_foot(Dungeon *d, const Cam *c, const int *order, int n) {
+    if (d->fogTex < 0) return;
+    float frames = (float)d->clock * 60.0f / 1000.0f;
+    float su = d->fogSpeed[0] * frames, sv = d->fogSpeed[1] * frames;
+    float pulse = 0.5f + 0.5f * sinf((float)(d->clock % FOG_PULSE_MS) * 6.2831853f / FOG_PULSE_MS);
+    d->r3.blend = (d->fogAlpha[0] + (d->fogAlpha[1] - d->fogAlpha[0]) * pulse) / 255.0f;
+    static const float corner[6][2] = {{-1, 1}, {1, 1}, {1, -1}, {-1, 1}, {1, -1}, {-1, -1}};
+    for (int i = 0; i < n; i++) {
+        int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
+        if (d->cell[order[i]][F_FLOOR] < 0) continue;
+        float cx = (float)col * CELL, cz = -(float)row * CELL;
+        R3Vert v[6];
+        for (int j = 0; j < 6; j++) {
+            float wx = cx + corner[j][0] * CELL * 0.5f, wz = cz + corner[j][1] * CELL * 0.5f;
+            float dx = wx - c->pos[0], dy = d->fogHeight - c->pos[1], dz = wz - c->pos[2];
+            v[j].x = dx * c->r[0] + dy * c->r[1] + dz * c->r[2];
+            v[j].y = dx * c->u[0] + dy * c->u[1] + dz * c->u[2];
+            v[j].z = dx * c->f[0] + dy * c->f[1] + dz * c->f[2];
+            v[j].u = wx / CELL + su;
+            v[j].v = -wz / CELL + sv;
+            v[j].shade = 1;
+        }
+        r3_tri(&d->r3, v, d->tex[d->fogTex]);
+        r3_tri(&d->r3, v + 3, d->tex[d->fogTex]);
+    }
+    d->r3.blend = 0;
 }
 
 void sa_dungeon_draw(Dungeon *d, u32 *fb) {
@@ -724,13 +834,14 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             if (w == WALL_PASSAGE) draw_part(d, &d->set, &c, "next000", cx, cz, sideQuarter[s]);
             if (w < 0 || w == WALL_PASSAGE) continue;
             snprintf(name, sizeof name, "w%03d", w);
-            draw_part(d, &d->set, &c, name, cx, cz, sideQuarter[s]);
+            draw_model(d, &d->set, &c, name, cx, cz, (float)sideQuarter[s] * QUARTER, leaf_swing(d, order[i], s));
         }
         if (cell[F_OBJECT] >= 0) {
             snprintf(name, sizeof name, "a%03d", cell[F_OBJECT]);
-            draw_model(d, &d->common, &c, name, cx, cz, cell[F_OBJECT] == OBJECT_DOOR ? spin(d) : 0);
+            draw_model(d, &d->common, &c, name, cx, cz, cell[F_OBJECT] == OBJECT_DOOR ? spin(d) : 0, 0);
         }
     }
+    draw_fog_foot(d, &c, order, n);
 }
 
 static void fill(u32 *fb, int x, int y, int w, int h, u32 c) {
@@ -817,6 +928,7 @@ void sa_dungeon_draw_map(Dungeon *d, u32 *fb, int x, int y, int scale) { draw_ma
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
     if (d->hover >= HOVER_WALK) sa_blit_alpha(fb, d->walk[d->hover - HOVER_WALK], walkArrows[d->hover - HOVER_WALK].x, walkArrows[d->hover - HOVER_WALK].y, WALK_ALPHA);
     sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
+    sa_blit_rect(fb, d->art[DUN_ART_FOLD], FOLD_SIZE, 0, FOLD_SIZE, FOLD_SIZE, FOLD_X, FOLD_Y);
     sa_blit_rect(fb, d->art[DUN_ART_COMPASS], 0, 0, d->art[DUN_ART_COMPASS] ? d->art[DUN_ART_COMPASS]->w : 0, 76, COMPASS_X,
                  COMPASS_Y);
     static const int nudge[4][2] = {{2, 1}, {1, 0}, {0, 1}, {1, 2}};
@@ -860,6 +972,7 @@ const Image *sa_dungeon_platform(const Dungeon *d) { return d->art[DUN_ART_PLATF
 
 void sa_dungeon_draw_frame(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
     sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
+    sa_blit_rect(fb, d->art[DUN_ART_FOLD], FOLD_SIZE, 0, FOLD_SIZE, FOLD_SIZE, FOLD_X, FOLD_Y);
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
 }
 

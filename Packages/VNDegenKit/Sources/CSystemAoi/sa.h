@@ -243,6 +243,7 @@ typedef struct R3 {
     float focal, fogNear, fogFar;
     u32 fogColor;
     int cull;
+    float blend;
 } R3;
 
 void r3_init(R3 *r, int w, int h);
@@ -262,7 +263,7 @@ enum { PASS_EAST = 1, PASS_SOUTH = 2 };
 
 struct Party;
 
-enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN, DUN_ART_DIGITS, DUN_ART_PLATFORM, DUN_ART };
+enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN, DUN_ART_DIGITS, DUN_ART_FOLD, DUN_ART_PLATFORM, DUN_ART };
 enum { DUN_ICON_DOOR, DUN_ICON_CHEST, DUN_ICON_GROUP, DUN_ICON_PARTY, DUN_ICONS };
 #define DUN_MARKS 8
 #define DUN_WALKS 6
@@ -328,6 +329,9 @@ typedef struct Dungeon {
     DunStatus status[DUN_STATUS];
     int statusCount;
     R3 r3;
+    int fogTex;
+    float fogSpeed[2], fogAlpha[2], fogHeight;
+    int passCell, passSide;
 } Dungeon;
 
 enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };
@@ -679,6 +683,7 @@ void sa_debug_save(VNSystemAoi *sa, int slot, bool load);
 void sa_debug_pcload(VNSystemAoi *sa, const char *path);
 void sa_debug_pcsave(VNSystemAoi *sa, const char *path);
 void sa_debug_finds(VNSystemAoi *sa, int *out);
+void sa_debug_item(VNSystemAoi *sa, int id, int n);
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level);
 int sa_item_pick(const Table *items, const char *table, u32 roll);
 
