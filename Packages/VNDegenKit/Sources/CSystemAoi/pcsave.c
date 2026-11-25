@@ -611,7 +611,8 @@ static int write_members(SA *s, u8 *img) {
 
 static void write_dungeon(SA *s, u8 *img) {
     const Expedition *e = &s->exp;
-    for (int i = 0; i < 4; i++) put(img, LAST_AT + (size_t)i * 4, e->last[i]);
+    const int here[4] = {e->dungeon << 16 | e->floor << 8, s->dungeon.x, s->dungeon.y, s->dungeon.dir};
+    for (int i = 0; i < 4; i++) put(img, LAST_AT + (size_t)i * 4, e->active ? here[i] : e->last[i]);
     for (int i = 0; i < 4; i++) put(img, ENTRY_AT + 16 + (size_t)i * 4, e->entry[i]);
     for (int i = 0; i < STAND_COUNT; i++) put(img, STAND_AT + (size_t)i * 4, -1);
     if (!e->active) return;
@@ -680,6 +681,8 @@ static void write_dungeon(SA *s, u8 *img) {
 static void read_dungeon(SA *s, const u8 *img) {
     Expedition *e = &s->exp;
     for (int i = 0; i < 4; i++) e->last[i] = at(img, LAST_AT + (size_t)i * 4);
+    if (e->active && e->last[0] == (e->dungeon << 16 | e->floor << 8))
+        for (int i = 0; i < 3; i++) s->vm.c[POS_VAR + i] = e->last[1 + i];
     for (int i = 0; i < 4; i++) e->entry[i] = at(img, ENTRY_AT + 16 + (size_t)i * 4);
     e->groupCount = 0;
     if (!e->active) return;
@@ -759,6 +762,8 @@ bool sa_pcsave_write(SA *s, const char *path) {
     for (size_t i = 0; i < sizeof engineVars / sizeof engineVars[0]; i++)
         if (!s->vm.c[engineVars[i].off]) put(img, VM_AT + (size_t)engineVars[i].off * 4, engineVars[i].value);
     put(img, VM_AT + PLACE_VAR * 4, s->exp.active ? sa_exp_place_code(s) : PLACE_TOWN);
+    if (s->exp.active)
+        for (int i = 0; i < 3; i++) put(img, VM_AT + (size_t)(POS_VAR + i) * 4, at(img, LAST_AT + (size_t)(1 + i) * 4));
     put(img, VM_AT + (PLACE_VAR + 1) * 4, s->exp.active ? 2 : 1);
     if (!s->vm.c[SEED_VAR]) put(img, VM_AT + SEED_VAR * 4, (int)(sa_vm_random(&s->vm) & 0x7fffffff));
     size_t n;
