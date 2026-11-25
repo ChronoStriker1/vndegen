@@ -394,6 +394,8 @@ bool sa_deploy_frame(SA *s, u32 ms);
 enum { GOVERN_PLAIN, GOVERN_CAPPED, GOVERN_RAISED };
 void sa_deploy_govern(const Party *p, int unit, int post, int value[2], int tone[2]);
 u32 sa_deploy_govern_color(int tone);
+#define C_SINCE_BATTLE 0x40
+bool sa_encounter_due(int sinceBattle, bool alarm, u32 roll);
 bool sa_save_write(SA *s, int slot, int count);
 void sa_save_current(SA *s, SaveSummary *out);
 bool sa_save_read(SA *s, int slot);

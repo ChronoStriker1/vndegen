@@ -108,8 +108,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   The party starts beside the door home; 帰る on the door's cell brings the finds home. Stepping onto an edge passage
   moves to the neighbouring area. Each area's enemy groups walk the routes in its map file, or wander, as red crosses
   on the minimap, moving with the party's actions as in the original, and fight when met; more appear as the party
-  walks, a beaten group is gone and one the party fled from moves out of sight; random encounters begin after 40
-  steps. The game's hooks run on entering, on stepping onto floor objects and walls, before and after battles and on
+  walks, a beaten group is gone and one the party fled from moves out of sight; random encounters come once ten
+  steps have passed since the last battle. The game's hooks run on entering, on stepping onto floor objects and walls, before and after battles and on
   the way home; a loss ends the expedition.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
@@ -152,8 +152,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred.
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
-  cell a fled group moves to is drawn by VNDegen's own random numbers, and when random battles start is known not
-  to be the 40 steps VNDegen uses in 中腹エリア; a floor's taken pickups and opened doors aren't saved (the
+  cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (1 in 20 a step
+  after a 10-step quiet) is fitted to eighteen of the original's intervals; 警戒心 and the bells' 引き寄せ don't
+  change it yet; a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either). The dungeon light and fog are fitted to eleven of the original's
   frames (each within 4%, the ice dungeon 3% too bright); which walls get a set's variant textures isn't known (the
   ice dungeon's diamond walls are drawn plain); the falling leaves, sparks, snow and light motes some dungeons

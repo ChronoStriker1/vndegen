@@ -501,11 +501,20 @@ calls it is inferred from that and from play, and marked so.
   the skill's range (小回復 gave 39 of 38 to 42) and spends its MP. Inferred: only 回復 skills are listed.
 - **Coming home.** 帰る (or 休憩, inferred) runs hook 17, adds the finds to the town and ends the turn (inferred).
 - **Encounters.** Measured: battles came on steps 48, 56, 69 and 81 of one expedition (7 to 12 steps after the
-  previous one), and none in the first 34 steps of another. In 中腹エリア, walking from its autosave (an expedition 0
-  steps in), the first battles came on steps 14, 16, 21 and 45 of five runs and later ones 8 to 39 steps apart, so the
-  40-step start below doesn't hold there; the rule isn't known yet. Inferred: random encounters start once the
-  expedition has walked 40 steps, then come on a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2). The
-  group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
+  previous one), and none in the first 34 steps of another. In 中腹エリア, walking back and forth from its autosave
+  (an expedition 0 steps in), the first random battle came on steps 14, 16, 21, 43 and 45 of five runs and 20, 34, 34,
+  40, 45 and 53 with the save's seed (C006) raised by 1 to 6 (none in 30 at the save's own seed), and later ones 10,
+  12, 14, 20, 20, 34 and 39 steps after the one before. The save keeps no countdown: between battles only C064 (steps
+  since the last battle: 1 on entering and after each battle, one more a step), the step and action counters and the
+  random seed words change. C064 drives it: set to 200 in the same saves there was no battle in 30, 25 and 36 steps
+  (seeds 0, 5 and 3, against 20 and 34 for seeds 5 and 3), and set to 15 seed 3's battle came at step 11 instead of
+  34 while seed 5's didn't come in 25 steps. Inferred, the simplest rule that fits the eighteen intervals: no random
+  battle while C064 is 10 or less, then 1 in 20 a step (the likeliest rate, 18 battles over 372 steps past the first
+  ten; the first battles alone give 1 in 26, the later ones 1 in 12), 1 in 10 under 警報. The game's texts call it a
+  rate (警戒心: 迷宮で敵との遭遇率が下がる; the bells' 引き寄せ ±10), which VNDegen doesn't apply yet. What C064 over
+  about 40 does isn't known (no battle came in 91 steps there). VNDegen keeps C064 as the original does, so PC saves
+  carry it both ways; before, it started random battles after 40 steps and then every 10 ± 2 (step 48 from that
+  autosave whatever the seed). The group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
   千05|千06), chosen by the weights in columns 32 to 34 (10, 60, 10). Measured in support: all eight random battles
   in 中腹エリア's runs were column 35 groups (炎01 twice, 炎02 twice, 炎03, 炎04 twice, 炎05), and the fixed
   seven-slime group 千固定0100 came up in 千樹庭's random battles.
