@@ -174,7 +174,42 @@ typedef struct SampleEntry {
     u32 offset, size;
 } SampleEntry;
 
+#define REC_UNITS 512
+#define REC_FLOORS 150
+#define REC_ITEMS 290
+
+typedef struct UnitRecord {
+    int id, level, kills, extra[2];
+} UnitRecord;
+
+typedef struct Records {
+    UnitRecord unit[REC_UNITS];
+    int unitCount;
+    int floorKey[REC_FLOORS], floorPct[REC_FLOORS];
+    int floorCount;
+    int item[REC_ITEMS];
+    int itemCount;
+    int floorCells[EXP_DUNGEONS][EXP_FLOORS];
+    u32 battleMark[3];
+    bool dirty;
+} Records;
+
+#define BOOK_ART 32
+#define BOOK_ROWS 512
+
+typedef struct BookScreen {
+    Image *art[BOOK_ART], *icon[100], *bigIcon[100], *sprite, *mapIcon[24];
+    Table items;
+    SpriteFrame frame[SPRITE_FRAMES];
+    int order[BOOK_ROWS], count, sortKey, sortDir, pick, motion, spriteUnit, frames;
+    int pickPos;
+    bool shown;
+    u32 ms;
+} BookScreen;
+
 typedef struct ExtraScreen {
+    Records records;
+    BookScreen book;
     Image *art[EXTRA_ART];
     Table cg, scenes, scenarios, hints;
     u8 viewedCg[EXTRA_CG], viewedScene[EXTRA_SCENES], viewedScenario[EXTRA_SCENARIOS];
@@ -392,9 +427,20 @@ void sa_extra_init(SA *s);
 void sa_extra_free(SA *s);
 void sa_extra_open(SA *s);
 bool sa_extra_frame(SA *s);
+void sa_extra_tick(SA *s, u32 elapsedMs);
 bool sa_extra_script_done(SA *s);
 void sa_extra_wheel(SA *s, int notches);
 void sa_extra_seen_picture(SA *s, const char *name);
+void sa_records_load(SA *s);
+void sa_records_flush(SA *s);
+void sa_records_sync(SA *s);
+void sa_records_join(SA *s, const char *key);
+void sa_records_item(SA *s, int id);
+void sa_records_battle(SA *s);
+const UnitRecord *sa_records_unit(const SA *s, int id);
+int sa_records_floor(const SA *s, int dungeon, int floor);
+bool sa_records_has_item(const SA *s, int id);
+int sa_records_floor_cells(SA *s, int dungeon, int floor);
 void sa_go_title(SA *s);
 void sa_mission_init(SA *s);
 void sa_mission_free(SA *s);

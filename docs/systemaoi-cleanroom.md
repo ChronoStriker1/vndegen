@@ -838,8 +838,65 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
 - **クイズ and ヒント.** クイズ runs `quiz.box` and comes back to the menu. ヒント shows one of the 80 lines of
   `ExHint.obj` (column 2, `|` breaking lines) in the popup box over the menu dimmed; a click closes it. Which line is
   picked is inferred (at random).
-- **Not built.** ユニット図鑑, アイテム図鑑 and 迷宮踏破リスト (captures `ex-unit`, `ex-item`, `ex-dungeon`): they need a record of
-  the units met, items found and floors walked that VNDegen doesn't keep yet.
+- **The records behind the books.** Measured by diffing `Bunny3.opt` around controlled Wine plays: the three books
+  live only in that global file (30,784 bytes unpacked, packed with the save codec), not in the save images, and the
+  original writes it when a game is saved (loading writes nothing). Each record list is sorted by key and ends at a
+  fixed offset, with the empty records at the front: units end at 25,972 as 20-byte records (id, level, kills, two
+  ints always 0), floors end at 27,172 as 8-byte records (dungeon << 16 | floor << 8, percent; at most 150), items end
+  at 28,332 as int32 ids. A unit is recorded when it joins by script command `bc` (the housing recruits of `ha0000`
+  added ルリエス, タロウ, ベリアルト十三世, モーリス and ワフフ) with level 1, and its level rises to the highest it reaches
+  (Darkus went 1 to 2 on a level-up); Darkus is there from the first turn. Loading a save with a unit in the roster
+  (白夜) and fighting with it records nothing. An enemy is recorded with kills when it is killed (a fixed 千樹庭 group
+  added ベト 2 and 一角ベト 2 and raised 二角ベト 3 to 4); enemies fled from are not recorded. An item is recorded when it
+  enters the stock: a 商会 purchase added 量産された剣, and the first turn's file holds the three items the opening's
+  script gives (`94 100`, `94 104`, `94 143`). A floor is recorded on entry and keeps the highest percent reached:
+  floor(100 x visited cells / cells with a floor) (中央森の南, 121 floor cells: 3 cells 2%, 6 cells 4%, not 5%;
+  nine of twelve older records fit the saves' map memory the same way). 100% was reached by loading a save with
+  every floor cell of 中央森の東南 visited and stepping once. Without `Bunny3.opt` the original treats the next start
+  as the first (warning page and prologue), so a file holding only the records is not enough for it.
+- **VNDegen's records.** VNDegen keeps the same lists in `vndegen/records.dat` and merges them both ways with
+  `Bunny3.sav/Bunny3.opt` whenever it exists: read at launch, then on each save the file is read again, merged (the
+  higher level, kills and percent win) and written back with every other byte left as the original wrote it, so
+  the original's options and flags survive. Checked both ways: VNDegen shows the original's file (the screens
+  below), and the original showed a VNDegen-written file (the new item 選ばれた量産剣, 中央森の西南 at 0%, ナメッド at 5
+  kills) and kept it through its own save. Inferred: kills are counted when a battle ends, from the enemies at 0 HP,
+  which also counts enemies killed before a flee; floor percents come from the game's map memory at each save, so
+  a loaded save's visited floors are recorded on the next save (the original's own rule for loaded map memory was
+  not checked); a recorded ally's level follows the party at each save; items dropped in battle and found in
+  crystals count like purchases.
+- **ユニット図鑑.** Measured, 0.6 to 1.8% of pixels off against the original (the rest is text weight and the
+  sprite's animation phase): `exu_a00`; 20 rows `exu_a01` (584 by 32: plain, hovered, chosen) from (188, 65); the
+  name in blue for allies and red for enemies, the race small at the right, LV (allies' recorded level, `---` for
+  enemies) and 討伐数 (`------` for allies, kills for enemies); unknown rows `? ? ? ? ?`. Rows follow `unit.obj`
+  (414). The sort buttons 名前, ＬＶ and 討伐数 (`exu_a10`, `a12`, `a13`, three 60 by 20 states: off, red ascending,
+  blue descending) at x 580, 642 and 704, y 17; the second click turns descending. Sorting puts the rows that
+  have the key first (allies for ＬＶ, enemies for 討伐数, every row for 名前 with unknown rows read as ？), the rest
+  after in table order, and descending reverses both parts (ties in reverse table order); it clears the card,
+  and the highlight stays on the list position (unknown rows never show it). The scroll bar: ▲ `exu_a20` (772, 30),
+  rails `exu_a22` (772, 65, 610 high), ▼ `exu_a21` (772, 675) and the thumb from `exu_a23` as long as the visible
+  share; the wheel moves one row. The counter `known / 414  pct%` in `exu_1219` at the CG screen's places. Hovering
+  a known row shows its card; a click keeps it and adds the モーション panel `exu_c99` at (1094, 58): for allies
+  six front buttons `exu_c00` to `c05` from (1100, 101), 23 apart, and 後向き 待機 `c06` at (1100, 249); for enemies
+  `c06` to `c11` from (1100, 249). The card is the 配置 status card moved to (814, 70) with its description at
+  (814, 570) and ステータス表示 / 能力詳細 at (1008, 51), showing the unit at its recorded level (enemies at their table
+  level) with full HP and MP, the next level's EXP, no post and なし for the item. The picture is the `*2` sheet
+  (後向き 待機) until a motion is chosen; front motions use `a0` to `f0`, back ones `a2` to `f2`. Inferred: 名前 sorts
+  by Shift JIS order, approximated from the kana tables (kanji fall back to code point order); the motion buttons
+  have no chosen frame; skill points are the table's plus 3 a level for allies.
+- **アイテム図鑑.** Measured, 1.1 to 1.8% off: `exi_a00`; rows `exi_a01` (plain, hovered, chosen, unknown dark) from
+  (188, 64) in `item.obj` order (204); the item's small icon, its name, 購入額 (the price, or dashes when not on sale)
+  and 売却額 (a quarter); unknown rows `? ? ? ? ?` on the dark frame. Sort buttons アイテム名, 売却額 and 購入額
+  (`exi_a11`, `a12`, `a13`). Hovering a known row shows the 商会 item card `pit_a00` at (882, 150) with the rank
+  star (`pit_a01` frame from `item.obj` column 34) at (896, 186), and two dashes for the price of an item not on sale; a click does nothing.
+- **迷宮踏破リスト.** Measured, 1.6 to 2.0% off: `xdn_a00`; 13 rows `xdn_c00` (616 by 51: plain, hovered, chosen,
+  unknown) from (10, 45) in `floor.obj` order (116): the dungeon and floor name with a full-width space and the
+  percent at the right, `？？？？` when unknown. ▲ `xdn_d00` (625, 11), rails `xdn_d02` (625, 46, 634 high), ▼
+  `xdn_d01` (625, 680), thumb `xdn_d03`. The panel `xdn_e00` at (670, 58) says 踏破率１００%のダンジョンは／ここにミニマップが
+  表示されます。; choosing a 100% floor draws its whole map there instead, 32-pixel cells centred (15 by 15 from (734,
+  90)): the floor tile `mmf0000`, walls `mmw000N` and edge passages `mmw004N` doubled, and the objects (door `mmf0003`,
+  crystal `mmf0004`, residents, money, resources and food `mmf0201` to `0204`, magic circle `0205`). The counter is
+  the floors at 100%. Not drawn: the spinning coin beside a 100% row (its art wasn't found), and a few short wall
+  marks the original draws on cells without a floor.
 
 ## The save codec: what was read, and why
 

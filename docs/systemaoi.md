@@ -55,7 +55,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   SE and voice volumes take effect; the settings are kept in `vndegen/global.dat` across launches.
 - **Extra.** The Extra menu with CG閲覧 (the gallery of event pictures seen, from `sam.vfs` samples, each opening full
   screen), シーン回想 and エクストラシナリオ (the scenes the story has opened, replayed from their scripts), 音楽鑑賞 (all 64
-  tracks with play, stop, previous, next and the BGM volume), クイズ (`quiz.box`) and ヒント (a line from `ExHint.obj`).
+  tracks with play, stop, previous, next and the BGM volume), クイズ (`quiz.box`), ヒント (a line from `ExHint.obj`), and
+  the three books: ユニット図鑑 (every unit met, with its card, motions and sorting), アイテム図鑑 (every item found, with
+  its card) and 迷宮踏破リスト (every floor entered with the share walked, and the whole map of a floor walked to 100%).
+  The books read and write the original's own record file, `Bunny3.opt`, so they show the same entries on both.
   Scenes and extra scenarios open with the story's own system flags; pictures are marked seen when shown.
 - **Script machine.** Text, speakers, waits, choices, integer and flag variables in five banks, text conditions with
   indexed variables (`CL000[CL019]`), jumps and calls within a script and into other scripts, random numbers, and the
@@ -160,6 +163,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   popup, cursor, 3D, game speed, battle, ranks, autosave mode, VE and inactive-volume settings are kept but do
   nothing yet; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
   original shows in Windows tooltips aren't drawn.
-- Extra: ユニット図鑑, アイテム図鑑 and 迷宮踏破リスト aren't built (VNDegen doesn't yet record the units met, items found and
-  floors walked). Pictures seen before this version aren't in the gallery until shown again. The small labels use
-  the app's font.
+- Extra: the books' records follow the original's measured rules, but kill counts, floor percents from a loaded save
+  and battle-drop and crystal items are counted by inferred rules; 名前 sorting approximates Shift JIS order; the
+  spinning coin beside a 100% floor isn't drawn. VNDegen writes the records into `Bunny3.opt` only when the
+  original has created it (a file holding only records would make the original replay its prologue); otherwise
+  they stay in `vndegen/records.dat`. Pictures seen before this version aren't in the gallery until shown again.
+  The small labels use the app's font.
