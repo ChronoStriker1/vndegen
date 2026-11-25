@@ -140,6 +140,7 @@ static void commit(BuildScreen *b, Town *t, VM *vm) {
         f->type = b->pendingType[i] == 99 ? 0 : b->pendingType[i];
         f->level = f->type ? 1 : 0;
         f->exp = 0;
+        f->built = f->type ? vm->c[C_TURN] : 0;
     }
     b->pendingCount = 0;
 }

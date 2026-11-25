@@ -302,9 +302,10 @@ void sa_exp_draw_view(SA *s, u32 *fb) {
 static void run_hooks(SA *s, const int *hooks, int n, int after) {
     Expedition *e = &s->exp;
     if (s->mode == MODE_DUNGEON) {
-        sa_exp_draw_view(s, s->fb);
+        if (after == AFTER_LOST) sa_dungeon_draw(&s->dungeon, s->fb);
+        else sa_exp_draw_view(s, s->fb);
         sa_reset_scene(s);
-        sa_show_frame_as_bg(s, s->fb, "*dungeon");
+        sa_show_frame_as_bg(s, s->fb, after == AFTER_LOST ? "*lost" : "*dungeon");
     }
     e->hookCount = 0;
     for (int i = 0; i < n && i < EXP_HOOKS; i++) e->hooks[e->hookCount++] = hooks[i];

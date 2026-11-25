@@ -766,6 +766,7 @@ bool sa_pcsave_write(SA *s, const char *path) {
         for (int i = 0; i < 3; i++) put(img, VM_AT + (size_t)(POS_VAR + i) * 4, at(img, LAST_AT + (size_t)(1 + i) * 4));
     put(img, VM_AT + (PLACE_VAR + 1) * 4, s->exp.active ? 2 : 1);
     if (!s->vm.c[SEED_VAR]) put(img, VM_AT + SEED_VAR * 4, (int)(sa_vm_random(&s->vm) & 0x7fffffff));
+    sa_save_comment_put(s, img);
     size_t n;
     u8 *packed = vnsystemaoi_pack(img, IMAGE_SIZE, &n);
     bool ok = packed && sa_write_file(path, packed, n);
@@ -787,6 +788,7 @@ bool sa_pcsave_summary(SA *s, const char *path, SaveSummary *out) {
     }
     const u8 *c = img + VM_AT;
     out->used = true;
+    sa_save_comment_get(img, out);
     out->time = rd32(c + 2 * 4);
     out->count = (int)rd32(c + 3 * 4);
     out->play = (int)rd32(c + 11 * 4);

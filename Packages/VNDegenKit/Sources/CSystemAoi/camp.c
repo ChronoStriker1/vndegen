@@ -503,6 +503,10 @@ static void press(SA *s, int button) {
         keep_backdrop(s);
         sa_savescreen_open(s, button == BTN_SAVE);
         break;
+    case BTN_OPTION:
+        keep_backdrop(s);
+        sa_option_open(s);
+        break;
     default:
         sa_log(s, "camp button %d not built yet", button);
         break;

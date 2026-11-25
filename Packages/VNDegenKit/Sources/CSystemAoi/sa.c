@@ -384,6 +384,12 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     }
     case 0x42:
         break;
+    case 0xf6:
+        sa_town_burst(&s->town, vm, in->count ? sa_vm_get(vm, code, &in->o[0]) : 0);
+        vm->state = VM_WAIT_TIME;
+        s->waitMs = SA_TOWN_BURST_MS;
+        s->dirty = true;
+        break;
     case 0xf5: {
         begin_transition(s, vm, 11);
         picture_clear(&s->bg);
@@ -435,6 +441,10 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         clear_text(s);
         if (any) sa_dialog_open_turn(&s->dialog, before, after, t);
         else sa_dialog_open(&s->dialog, t);
+        if (s->bg.img && !strcmp(s->bg.name, "*lost")) {
+            sa_battle_shade(s->bg.img->px, s->bg.img->w * s->bg.img->h);
+            snprintf(s->bg.name, sizeof s->bg.name, "*dungeon");
+        }
         free(t);
         for (int i = 0; i < s->joinedCount; i++) {
             int r = -1;
@@ -510,6 +520,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
                     s->town.cell[cell].type = sa_table_int(&s->town.build, r, 0);
                     s->town.cell[cell].level = 1;
                     s->town.cell[cell].exp = 0;
+                    s->town.cell[cell].built = s->vm.c[C_TURN];
                     break;
                 }
             free(name);
@@ -1291,6 +1302,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_extra_frame(s)) return true;
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
+        if (!s->battle.open) sa_exp_battle_over(s, s->battle.result);
         if (sa_battle_hover(&s->battle, s->mouseX, s->mouseY)) s->dirty = true;
         if (s->rightClicked) {
             s->rightClicked = false;
@@ -1410,6 +1422,10 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             }
             s->panWait = false;
         }
+        s->dirty = true;
+    }
+    if (sa_town_burst_tick(&s->town, elapsedMs)) {
+        if (s->bg.img && !strcmp(s->bg.name, "*town")) sa_town_draw_map(&s->town, &s->vfs, &s->vm, s->bg.img->px);
         s->dirty = true;
     }
     if (s->transDur) {
