@@ -293,8 +293,9 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   MP, never below 1 HP, by `unit.obj` column 13 (1 for floating units such as spirits, dark orbs and angels,
   taken as 飛行).
 - **Per-area looks.** `floor.obj` column 10 is the fog colour (0x2b3021 in 千樹庭, 0x38221c in 炎山洞, fitted on the
-  far view). Column 9 is 1 for 炎山洞 and the dungeons after it, whose floors show about 1.55 times brighter than
-  the walls (inferred from one capture; VNDegen lights their floor parts that much more).
+  far view). Column 9 is the dungeon's index from 0 (1 for 炎山洞). 炎山洞's floors show about 1.55 times brighter
+  than the walls (inferred from one capture); VNDegen lights them that much more where column 9 is 1, and the later
+  dungeons' floors at the plain level.
 - **Counters and the floor hook.** Measured from autosaves: C061 to C063 count pad actions (moves and turns: all
   expeditions, this one, this area), C066 all steps and C067 this expedition's steps; the floor hook (12) runs
   after every step and wall bump (炎山洞's first-step explanation plays on the first step, as on the PC). Hook 10
