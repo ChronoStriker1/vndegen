@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.6",
+          "buildVersion": "3400",
+          "date": "2026-11-25T13:09:48Z",
+          "localizedDescription": "BUNNY BLACK 3's facilities level up and its town posts raise production, and saves VNDegen writes run the PC's story events again.\n\n## Downloads\n\n- `VNDegen-0.60.6-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.6.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.6-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n## Added\n\n- **SystemAoi:** BUNNY BLACK 3's facilities gain experience each turn and level up as on the PC, and each level raises what they make and the dungeon's numbers.\n- **SystemAoi:** members on town posts raise the production of the staffed facilities in their area, by their 統治.\n- **SystemAoi:** the dungeon's post holders stand on their floors in ダークス宮's cross-section.\n\n## Fixed\n\n- **SystemAoi:** saves VNDegen writes now keep the slots the PC uses for its turn script and story hooks. The PC loaded the older ones but then played no story events from them.\n\n## Known limits\n\n- How much 農業, 商業 and 工業担当, 街長 and 街長補佐 add was measured on the PC; the other posts' areas are VNDegen's reading of the game's tables.\n- The post holders' size and place on their floors are close to the PC's but not measured exactly.\n- 編成 and the dungeons after 炎山洞 come later. The limits listed for 0.60.0 to 0.60.5 still apply.\n\n## What wasn't tested\n\n- No physical device or physical controller was used. The game was played in the Linux test build, the Mac app and an iPad simulator, and saves were exchanged with the original engine under Wine both ways.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.6/VNDegen-0.60.6.ipa",
+          "size": 132734195,
+          "sha256": "50fc4d10cf9b0224c40bd98c7c67280fa3dfc60df0420f9b00a082db25b1a1cb",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.5",
           "buildVersion": "3393",
           "date": "2026-11-25T11:05:51Z",
