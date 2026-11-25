@@ -1206,11 +1206,37 @@ the same points (offsets in bytes, numbers little-endian):
   enemy strength (初期の強さ, 周回用の強さ, 極めの強さ), and turn 1 opens with the ending turn's food, money and
   resources (48,996, 49,059 and 49,000) and the first five items, Darkus alone in the party. VNDegen ignores both
   ops, so the offer never comes.
-- **Hooks never run by VNDegen.** init.box also registers 13, 14, 15, 19, 20, 21, 22 and 23. 14 (bo1400 → bo1401)
-  holds 74 boss-side cutaways keyed on C070/C071 and C095 = 1, C096 = n; the PC didn't play 千樹庭 11F's first on
-  entering, walking toward or meeting ヤーヌの部下隊, and C095 holds the town command (24) in the dungeon, so the exe
-  sets them when it calls the hook (trigger unknown). 19 (bo1900) holds scenes keyed on floor objects 22, 30, 32
-  and 33 with three or more in the party; 22 (bo2200) the dungeon rest conversations, once per expedition (F129,
+- **Boss-side cutaways (hook 14).** bo1400 clears F120 and, unless F155, F160 or F161 is on, runs bo1401, then
+  bo1000 when a scene set F120. bo1401 holds 74 scenes keyed on C090 = 1, the area (C070/C071), C095 = 1 and
+  C096 = n, each once (F2101 to F2173). Measured: n is field 7 of the party's cell in the area's map (`mpDDFF.amd`,
+  -1 elsewhere). The maps mark 109 cells in 38 areas; every one of bo1401's 73 area and n pairs has a marked cell,
+  and the one marked pair without a scene (絶命院 十七層, 3/6, n = 4) does nothing. Under Wine, from
+  VNDegen exports of the turn-42 save: on 千樹庭 抵抗勢力拠点 (1/11) the cell marked 4 played n = 4
+  (「次々と仕掛けなさい！」) after a step back onto it (F then B, or F, F, B, B) and after a single turn on it,
+  never on the steps that left it or crossed other cells (150 turns on another cell, 4 steps forward, 3 back:
+  nothing); the same save with C006 at 12,345 or 777 and C060 at 30 or 43 played the same scene on the same step,
+  so no random roll or turn count is involved; with F2104 already on, 27 more steps on and off the cell played
+  nothing. 絶命院 十二層の扉 (3/1) n = 1 (ナイン) and 石葉層 四層 (7/4) n = 1 (「他勢力からの残存戦力…」) played on
+  the step onto their cells. ヤーヌの部下隊 stands on 1/11's cell marked 1: walking into it played its intro
+  (bo2501), the battle, then after the win bo2701's scene (the captured messenger) and then n = 1, with the party on
+  the cell (F2101 on, C073/C074 9, 11). Four scenes in three dungeons. After the hook the original's saves hold
+  C095 and C096 at 0. VNDegen runs the hook after the step hook (12) when a step, a wall bump or a turn ends on a
+  marked cell, and after the battle hook (27) when a battle there is won; the order 12 then 14 (no marked cell has
+  a floor object or a special wall, so 12 does nothing there), the bump and turn cases running 12 as well, and
+  running after won random battles are inferred. VNDegen leaves C095 at 1 and C096 at n (inferred harmless: no
+  other script reads C096, and the town sets C095 before its command hooks). Because the hook runs on every
+  action that ends on the cell, 絶命院 二十三層's second branch for n = 2 (F2114 on, F2115 off, F130 off; bo1100
+  clears F130 on entering 3/10) puts its seven アイス隊 back once per later visit, as written.
+- **`d4` (the floor collapse).** `d4 dungeon floor 0 0 x y facing`, used once, in 絶命院 十二層の扉's n = 1 scene
+  (`d4 3 5 0 0 12 12 3`, after 大規模に、床が崩れた。). Measured under Wine: the party lands on 十六層 (3/5) at
+  (12, 12) facing 3, the scene goes on with `89` showing the new area, the original writes a dungeon autosave there
+  (C068 the area's steps back to 0, C063 the area's actions at 1, the expedition's steps kept: the HUD showed 2
+  after one more step), the old area's map memory keeps its three cells and 3/5 gets a record with its one, and
+  3/5's groups are spawned as on any entry (絶固定0500 at 8, 12 and two drawn from its list). VNDegen does the same
+  without stopping the scene and runs the floor hook (11) after hook 14 ends (inferred: 3/5's bo1100 has nothing to
+  show it). The two zero operands aren't understood and are ignored.
+- **Hooks never run by VNDegen.** init.box also registers 13, 15, 19, 20, 21, 22 and 23. 19 (bo1900) holds scenes
+  keyed on floor objects 22, 30, 32 and 33 with three or more in the party; 22 (bo2200) the dungeon rest conversations, once per expedition (F129,
   cleared by bo1000) with three or more in the party, the next unseen one whose turn (0, 20, 40, …) has come. On
   the PC, 休憩 with Darkus alone opened camp without one. 13, 15, 20 and 23 are empty or only set a backdrop;
   21 turns a crystal (60) into 61. `ga0000.box` (ga0003: after ミアルテ防衛隊Ａ to Ｆ and 魔力塊隊, `b1` names the next

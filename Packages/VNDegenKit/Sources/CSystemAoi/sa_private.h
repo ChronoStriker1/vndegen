@@ -502,4 +502,12 @@ void sa_reset_scene(SA *s);
 void sa_end_turn(SA *s);
 void sa_show_frame_as_bg(SA *s, const u32 *px, const char *name);
 
+typedef struct StoryWarp {
+    int dungeon, floor, x, y, dir;
+} StoryWarp;
+
+int sa_story_scene(const SA *s);
+bool sa_story_arm(SA *s);
+bool sa_story_collapse(const int *v, int count, StoryWarp *to);
+
 #endif
