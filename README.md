@@ -51,9 +51,21 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/hub-duo-outer.jpg" width="300" alt="iPhone Duo folded, on the outer display, in Header list: one column of header art, with the Add game, view, lock, and Settings buttons in a side bar below the camera">
-  <img src="docs/screenshots/hub-duo-inner.jpg" width="520" alt="iPhone Duo unfolded, on the inner display, in Header list: two columns of header art, with the same buttons in a side bar on the right">
-  <br><sub>iPhone Duo folded, outer display &nbsp;·&nbsp; iPhone Duo unfolded, inner display: Header list</sub>
+  <img src="docs/screenshots/duo-front-portrait-library.jpg" width="300" alt="iPhone Duo closed and held upright, on the front display, in Header list: one column of header art led by Kaeru nyo Panyon, with the Add game, view, lock, and Settings buttons in a side bar below the camera">
+  <img src="docs/screenshots/duo-front-portrait-game.jpg" width="300" alt="iPhone Duo closed and held upright, playing Kaeru nyo Panyon, an AliceSoft System 3 game, in portrait: its title screen with the castle, the rainbow logo, and the Game, Load, Resume menu across the width of the front display">
+  <br><sub>iPhone Duo closed, front display upright: library &nbsp;·&nbsp; Kaeru nyo Panyon with in-game orientation set to Portrait</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/duo-front-landscape-library.jpg" width="410" alt="iPhone Duo closed and held on its side, on the front display, in Header list: two columns of header art, with the side bar of buttons below the camera on the left">
+  <img src="docs/screenshots/duo-front-landscape-game.jpg" width="410" alt="iPhone Duo closed and held on its side, playing No Socks RPG, an RPG Maker MZ game, on the beach map: the game fills the full width with the camera over its top left corner, and the touch gamepad's D-pad, A B X Y, shoulder, and home buttons sit over it">
+  <br><sub>iPhone Duo closed, front display on its side: library &nbsp;·&nbsp; No Socks RPG at Full width with the touch gamepad</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/duo-inner-library.jpg" width="410" alt="iPhone Duo open and held like a book, on the inner display, in Header list: two columns of header art, with the side bar of buttons on the right">
+  <img src="docs/screenshots/duo-inner-game.jpg" width="410" alt="iPhone Duo open and held like a book, playing Kaeru nyo Panyon in a forest: the party of eight lined up on the left and a dialogue box with a character portrait along the bottom, filling the inner display">
+  <br><sub>iPhone Duo open, inner display held like a book: library &nbsp;·&nbsp; Kaeru nyo Panyon</sub>
 </p>
 
 <p align="center">
