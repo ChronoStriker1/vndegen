@@ -117,3 +117,19 @@ private let duoOnItsSide = CGSize(width: 594, height: 432)
     #expect(!iPhone.controlsAcrossSideCamera(.fullWidth))
     #expect(!book.controlsAcrossSideCamera(.fullWidth))
 }
+
+@MainActor
+@Test func theMenuButtonAcrossTheCameraStepsOffItTheShorterWay() {
+    let screen = CGRect(x: 0, y: 0, width: 678, height: 432)
+    let left = HubMetrics(size: duoOnItsSide, insets: EdgeInsets(top: 0, leading: 84, bottom: 34, trailing: 0),
+                          occlusions: [CGRect(x: 0, y: 0, width: 84, height: 82), CGRect(x: 29.33, y: 29.33, width: 37, height: 37)])
+    let right = HubMetrics(size: duoOnItsSide, insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 84),
+                           occlusions: [CGRect(x: 594, y: 384, width: 84, height: 82), CGRect(x: 611.67, y: 399.67, width: 37, height: 37)])
+    #expect(left.menuButtonClearance(.topLeading, in: screen) == CGSize(width: 0, height: 72))
+    #expect(left.menuButtonClearance(.topTrailing, in: screen) == .zero)
+    #expect(left.menuButtonClearance(.bottomLeading, in: screen) == .zero)
+    let bottomRight = right.menuButtonClearance(.bottomTrailing, in: screen)
+    #expect(bottomRight.width == 0 && abs(bottomRight.height + 38) < 0.001)
+    #expect(right.menuButtonClearance(.topTrailing, in: screen) == .zero)
+    #expect(left.menuButtonClearance(.topLeading, in: CGRect(x: 84, y: 0, width: 594, height: 432)) == .zero)
+}

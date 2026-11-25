@@ -87,6 +87,7 @@ struct PlayerView: View {
                 // users get back to the menu.
                 MenuButton(corner: game?.menuButtonCorner ?? .standard, metrics: metrics, action: menuButton,
                            move: setMenuButtonCorner)
+                    .ignoresSafeArea(controlsAcrossCamera ? .container : [], edges: .horizontal)
             }
             if isCovered {
                 // Recreated when the app becomes active, so the Face ID prompt starts in the foreground rather than
