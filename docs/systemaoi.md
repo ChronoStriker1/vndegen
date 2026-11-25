@@ -147,7 +147,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 6 to 10
   over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred.
-- Dungeon: how often a group appears partway through a visit (one in 140 steps) is fitted to two sightings, the
+- Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
   cell a fled group moves to is drawn by VNDegen's own random numbers, and when random battles start is known not
   to be the 40 steps VNDegen uses in 中腹エリア; a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either). 絶命院 still draws about 6 to 9% darker than the original.

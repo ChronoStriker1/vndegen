@@ -38,7 +38,7 @@ enum {
 
 enum {
     GROUP_AWAY = 3,
-    SYMBOL_CHANCE = 140,
+    SYMBOL_CHANCE = 100,
     ENCOUNTER_FROM = 40,
     GLOW_GAIN_X100 = 155,
     ALL_AMBIENT = 192,

@@ -321,17 +321,17 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   PC's save from two actions after a flee through 14 more turns and matches all 14 group states. Inferred: the cell is
   any free cell the group can reach outside the 5 by 5 window, at random; a wanderer's next target is any cell it
   can reach; random cells avoid floor objects and passages.
-  Groups also appear during a visit. Measured in 中腹エリア (column 18 is 0, one routed group), walking back and forth
-  from the PC's autosave and saving every 1 to 12 steps over about 290 steps in eight runs: two groups from column 31
-  appeared, a 炎26 at step 14 (its action counter was 6 when it reached the party at step 20) and a 炎24 at step 49
-  (counter 9 at step 58), the second on a cell 5 to 7 rows from the party, outside the 5 by 5 window, as a wanderer
-  (flag word −1) bound for a random cell. A group that appears is numbered after the others and moves by the rules
-  above: VNDegen replays the PC's save from 9 steps after the 炎24 appeared through 14 more steps and matches all 4
-  group states (the routed group and the new one). That replay also showed a group that has used up the four corners
-  its record holds goes straight on to its target without planning again (the routed group's leg had five). The rule is inferred from those two: after each step, while the
-  area has fewer live groups than `floor.obj` column 19 (5 in 中腹エリア) and a column 31 list, one in 140 steps adds a
-  group drawn from column 31 on a free cell outside the 5 by 5 window. `a8 "name"` from the scripts adds a wandering
-  group.
+  Groups also appear during a visit. Measured in 中腹エリア (column 18 is 0, one routed group), walking back and forth from
+  the PC's autosave and saving every 1 to 40 steps over 283 steps in seven runs: three groups from column 31 appeared,
+  a 炎26 at step 14 (its action counter was 6 when it reached the party at step 20), a 炎24 at step 49 (counter 9 at
+  step 58) and a 炎24 at step 19 (counter 21 at step 40), the second on a cell 5 to 7 rows from the party, outside the
+  5 by 5 window, each a wanderer (flag word −1) bound for a random cell. A group that appears is numbered after the
+  others and moves by the rules above: VNDegen replays the PC's save from 9 steps after the 炎24 appeared through 14
+  more steps and matches all 4 group states (the routed group and the new one). That replay also showed a group that
+  has used up the four corners its record holds goes straight on to its target without planning again (the routed
+  group's leg had five). The rule is inferred from those three: after each step, while the area has fewer live groups
+  than `floor.obj` column 19 (5 in 中腹エリア) and a column 31 list, one step in 100 adds a group drawn from column 31 on a
+  free cell outside the 5 by 5 window. `a8 "name"` from the scripts adds a wandering group.
 - **`bf var, N`** answers how many of dungeon N + 1's areas are offered as entries (below). Measured: the PC's
   turn-10 save has F751 (bf = 1) set and F752 (bf ≥ 2) clear although its party had walked into 中央森の東, which a
   count of visited areas would have made 2.
