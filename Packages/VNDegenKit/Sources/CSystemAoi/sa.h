@@ -639,6 +639,7 @@ int sa_battle_board_size(const Battle *b, int party);
 void sa_battle_unit_stats(const Battle *b, int row, int level, int *out);
 void sa_battle_position_bonus(const Battle *b, int n, const int *unitRow, const int *gridRow, const int *gridCol, int (*delta)[10]);
 void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor);
+void sa_battle_shade(u32 *px, int n);
 bool sa_battle_tick(Battle *b, u32 ms);
 int sa_battle_click(Battle *b, int x, int y);
 bool sa_battle_hover(Battle *b, int x, int y);

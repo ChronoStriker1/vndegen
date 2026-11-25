@@ -82,12 +82,13 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   `ret_a01`) with its text, `|` breaking lines, and the script waits for OK. 装備 gives members the party's items, 商会 buys and sells
   them, 育成 spends skill points on stats, and 配置 arranges
   the party and its reserve.
-- **Battles.** The board with the party's and the enemies' platforms, idle animations and bars, the Backs and Forward
-  panels, the side buttons, 戦闘開始, 自動戦闘, ゲージON and the log. Each unit's action and target buttons open the
+- **Battles.** The board with the party's and the enemies' platforms, idle animations and bars over the dungeon
+  view at half brightness, the Backs and Forward panels with the original's digits and order badges, the side
+  buttons, 戦闘開始, 自動戦闘, ゲージON and the log. Each unit's action and target buttons open the
   game's skill and target pickers; the side buttons set every unit's order or target and save and load three sets.
   Rounds play in speed order with the damage, hit and target rules in `docs/systemaoi-cleanroom.md`. A win dims the
-  screen and shows the resources, EXP and any item found; EXP fills the panel's bar and raises levels. Only a debug
-  hook starts a battle so far.
+  screen and shows the resources, EXP and any item found; EXP fills the panel's bar and raises levels. A loss
+  goes on by itself to the defeat line and box over the dungeon view, then the turn's end.
 - **Expeditions.** 遠征 opens the dungeon select; an area's map is drawn in 3D from its part set (software
   rendered) in the original's own coordinates, walked with the pad or the arrow keys, with the compass, the step
   count, a minimap of visited cells with the door, crystals and enemy groups, the 目標/時間 panel and the party's
@@ -129,8 +130,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   minimap icons, teleporters and stairs from the maps' link records, spinners, dark zones, healing magic circles and 堕天牢's floor
   hazards; several effects' sizes are inferred. These live in the original's exe, not its scripts, and are rebuilt
   from play (`docs/systemaoi-cleanroom.md`).
-- Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
-  screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
+- Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 6 to 10
+  over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
+  are inferred.
 - Dungeon: where an area's enemy groups first stand and how they choose their way are VNDegen's own (the
   original's cells are kept when loading its saves); a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either); the purple passage markers aren't drawn.
