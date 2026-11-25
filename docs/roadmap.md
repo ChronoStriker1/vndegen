@@ -164,6 +164,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
+- iPhone Duo, on `feat/duo-fullwidth`: with the closed Duo held on its side, games use the display's full width by default, with a setting to fit them below the camera instead (maintainer, 2026-11-25).
 - SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`: 編成, then the dungeons after 炎山洞. The opening shipped in 0.60.0, then 炎山洞 and missions (0.60.1), recruiting (0.60.2), town posts (0.60.4), the 迷宮 defence (0.60.5) and facility levels (0.60.6).
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
