@@ -673,6 +673,8 @@ void sa_debug_new_game(VNSystemAoi *sa);
 void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor);
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir);
 void sa_debug_group(VNSystemAoi *sa, const char *name, int x, int y);
+void sa_debug_battle_end(VNSystemAoi *sa, int result);
+void sa_debug_calm(VNSystemAoi *sa, bool on);
 double sa_debug_bench(VNSystemAoi *sa, int n);
 void sa_debug_maze(VNSystemAoi *sa, int turns);
 void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value);

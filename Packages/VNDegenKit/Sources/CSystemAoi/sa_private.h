@@ -228,7 +228,7 @@ typedef struct ExtraScreen {
 typedef struct ExpGroup {
     bool alive;
     int party, number, x, y, dir, flags, clock, fought, extra;
-    bool stay;
+    bool stay, retarget;
     int cells[BATTLE_CELLS];
     int target[EXP_TARGETS][2];
 } ExpGroup;
@@ -254,7 +254,7 @@ typedef struct Expedition {
     int (*floorInfo)[EXP_FLOORS][4];
     int special[EXP_SPECIALS], specialValue[EXP_SPECIALS];
     int blindSteps, supportSteps, curse[2];
-    bool alarm, noResidents, cancelled;
+    bool alarm, noResidents, cancelled, lifted, calm;
     char notice[EXP_NOTICE_LINES][128];
     int noticeCount;
 } Expedition;
@@ -419,7 +419,7 @@ bool sa_option_frame(SA *s);
 void sa_option_apply(SA *s);
 int sa_option(const SA *s, int which);
 u32 sa_option_text_ms(const SA *s);
-u32 sa_option_auto_ms(const SA *s);
+u32 sa_option_auto_ms(const SA *s, int chars, int lines);
 u32 sa_option_window_alpha(const SA *s);
 void sa_global_load(SA *s);
 void sa_global_save(SA *s);

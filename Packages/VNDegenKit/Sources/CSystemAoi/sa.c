@@ -101,7 +101,7 @@ static void host_text(void *ctx, const char *utf8, bool newLine) {
     SA *s = ctx;
     if (s->lineCount == MSG_LINES) return;
     s->lines[s->lineCount++] = sa_strdup(utf8);
-    s->total += utf8_len(utf8);
+    s->total += utf8_len(utf8) + (s->lineCount > 1);
     if (s->voice[0]) {
         snprintf(s->lastVoice, sizeof s->lastVoice, "%s.aog", s->voice);
         snprintf(s->pageVoice, sizeof s->pageVoice, "%s", s->lastVoice);
@@ -721,6 +721,7 @@ static void compose(SA *s) {
         if (s->name[0]) sa_text_draw(fb, SA_W, SA_H, s->name, -1, NAME_X, NAME_Y, TEXT_SIZE, 0xffffff, 0x000000);
         int left = s->shown;
         for (int i = 0; i < s->lineCount && left > 0; i++) {
+            if (i && --left <= 0) break;
             int n = utf8_len(s->lines[i]);
             sa_text_draw(fb, SA_W, SA_H, s->lines[i], n < left ? n : left, TEXT_X, TEXT_Y + i * TEXT_PITCH, TEXT_SIZE, 0xffffff, 0x000000);
             left -= n;
@@ -1445,7 +1446,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         s->dirty = true;
         bool voice = sa_playing(s->mix, CH_VOICE, 0);
         if (sa_option(s, OPT_AUTO_VOICE)) voice = false;
-        if (s->skipMode || (s->autoMode && !voice && (s->autoMs += elapsedMs) >= sa_option_auto_ms(s))) {
+        if (s->skipMode || (s->autoMode && !voice && (s->autoMs += elapsedMs) >= sa_option_auto_ms(s, s->total - (s->lineCount > 1 ? s->lineCount - 1 : 0), s->lineCount))) {
             s->autoMs = 0;
             s->clicked = true;
             s->mouseX = s->mouseY = -1;
@@ -1621,7 +1622,10 @@ void vnsystemaoi_mouse_move(VNSystemAoi *sa, int x, int y) {
     SA *s = (SA *)sa;
     s->mouseX = x;
     s->mouseY = y;
+    s->exp.lifted = false;
 }
+
+void vnsystemaoi_pointer_lift(VNSystemAoi *sa) { ((SA *)sa)->exp.lifted = true; }
 
 void vnsystemaoi_mouse_button(VNSystemAoi *sa, int button, bool down) {
     SA *s = (SA *)sa;
@@ -1765,6 +1769,15 @@ void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor) {
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir) { sa_exp_debug_place((SA *)sa, x, y, dir); }
 
 void sa_debug_group(VNSystemAoi *sa, const char *name, int x, int y) { sa_exp_add_group_at((SA *)sa, name, x, y); }
+
+void sa_debug_calm(VNSystemAoi *sa, bool on) { ((SA *)sa)->exp.calm = on; }
+
+void sa_debug_battle_end(VNSystemAoi *sa, int result) {
+    SA *s = (SA *)sa;
+    if (s->mode != MODE_BATTLE) return;
+    s->battle.result = result;
+    s->battle.open = false;
+}
 
 void sa_debug_finds(VNSystemAoi *sa, int *out) {
     SA *s = (SA *)sa;

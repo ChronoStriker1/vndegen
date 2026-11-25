@@ -350,10 +350,28 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   autosaves through the same party actions and matches every saved group state: 46 of 46 in 中央森 (44 actions,
   two routes, three point changes) and 30 of 30 in 十三層 (24 actions, one route, two wanderers), cells, facings,
   targets, corners, flags and counters. Walking onto a group's cell, or a group stepping onto the party, starts its
-  battle. Inferred: a beaten group is gone for the visit; after fleeing, the group moves to a cell at least eight
-  steps away; a wanderer's next target is any cell it can reach; random cells avoid floor objects and passages.
-  Groups that appear later (a group from column 31 stood in 中腹エリア after 22 steps, where column 18 is 0) aren't
-  rebuilt. `a8 "name"` from the scripts adds a wandering group.
+  battle. Stepping onto a group still counts as an action for every group (all counters were 1 after one step into
+  a group and a flee). After a battle, measured on Wine saves taken right after it (中腹エリア, a VNDegen save with a
+  炎24 group put on the cell ahead): a won group's record is gone and the records after it close up; a group the
+  party fled from stays, keeps its number, facing, action counter, destination and corners (the flee's 1 to 6 rounds
+  don't count as actions), and stands on another cell: (3, 0), (3, 0), (8, 2) and (12, 14) from the party at (13, 2),
+  and (12, 10) from (13, 3), 7 to 14 steps away and always outside the 5 by 5 window round the party. Its next action
+  picks a new destination (a new target and corners at the second action in two runs). Two runs from the same save
+  with the same rounds put it on the same cell, so the cell comes from the save's random numbers. VNDegen replays the
+  PC's save from two actions after a flee through 14 more turns and matches all 14 group states. Inferred: the cell is
+  any free cell the group can reach outside the 5 by 5 window, at random; a wanderer's next target is any cell it
+  can reach; random cells avoid floor objects and passages.
+  Groups also appear during a visit. Measured in 中腹エリア (column 18 is 0, one routed group), walking back and forth from
+  the PC's autosave and saving every 1 to 40 steps over 283 steps in seven runs: three groups from column 31 appeared,
+  a 炎26 at step 14 (its action counter was 6 when it reached the party at step 20), a 炎24 at step 49 (counter 9 at
+  step 58) and a 炎24 at step 19 (counter 21 at step 40), the second on a cell 5 to 7 rows from the party, outside the
+  5 by 5 window, each a wanderer (flag word −1) bound for a random cell. A group that appears is numbered after the
+  others and moves by the rules above: VNDegen replays the PC's save from 9 steps after the 炎24 appeared through 14
+  more steps and matches all 4 group states (the routed group and the new one). That replay also showed a group that
+  has used up the four corners its record holds goes straight on to its target without planning again (the routed
+  group's leg had five). The rule is inferred from those three: after each step, while the area has fewer live groups
+  than `floor.obj` column 19 (5 in 中腹エリア) and a column 31 list, one step in 100 adds a group drawn from column 31 on a
+  free cell outside the 5 by 5 window. `a8 "name"` from the scripts adds a wandering group.
 - **`bf var, N`** answers how many of dungeon N + 1's areas are offered as entries (below). Measured: the PC's
   turn-10 save has F751 (bf = 1) set and F752 (bf ≥ 2) clear although its party had walked into 中央森の東, which a
   count of visited areas would have made 2.
@@ -473,11 +491,14 @@ calls it is inferred from that and from play, and marked so.
   the skill's range (小回復 gave 39 of 38 to 42) and spends its MP. Inferred: only 回復 skills are listed.
 - **Coming home.** 帰る (or 休憩, inferred) runs hook 17, adds the finds to the town and ends the turn (inferred).
 - **Encounters.** Measured: battles came on steps 48, 56, 69 and 81 of one expedition (7 to 12 steps after the
-  previous one), and none in the first 34 steps of another. Inferred: random encounters start once the expedition
-  has walked 40 steps, then come on a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2). The group comes from one of
-  three lists, columns 30, 31 and 35 (on the first floor 千固定0100|千固定0101, 千05|千06 and 千00|千01), chosen by
-  the weights in columns 32 to 34 (10, 60, 10); measured in support: the fixed seven-slime group 千固定0100 came up
-  in the original's random battles.
+  previous one), and none in the first 34 steps of another. In 中腹エリア, walking from its autosave (an expedition 0
+  steps in), the first battles came on steps 14, 16, 21 and 45 of five runs and later ones 8 to 39 steps apart, so the
+  40-step start below doesn't hold there; the rule isn't known yet. Inferred: random encounters start once the
+  expedition has walked 40 steps, then come on a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2). The
+  group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
+  千05|千06), chosen by the weights in columns 32 to 34 (10, 60, 10). Measured in support: all eight random battles
+  in 中腹エリア's runs were column 35 groups (炎01 twice, 炎02 twice, 炎03, 炎04 twice, 炎05), and the fixed
+  seven-slime group 千固定0100 came up in 千樹庭's random battles.
 - **Dungeon select.** Measured (99% of pixels exact): the hall `bg005a0` with the party on the `m998bt1a` platform,
   a plate per open dungeon (`gat_bNN`, normal, hover, chosen) from (340, 40), its badge at (354, 52) (`gat_d01` NEW
   until one of its maps is visited, then `gat_d02`), and 戻る (`gat_c00`) at (444, 640). Choosing a dungeon shows
@@ -835,12 +856,16 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
 - **What the settings do.** Measured: the message band's alpha for 最薄 to 最濃 is 64, 112, 160, 192 and 255 (fitted
   from the band over `bg008a0`, spread 0.001); VNDegen's band matches within 0.6. A volume of v plays at v / 15 of
   full scale (music room recordings at 12, 10, 8, 6, 4, 2, 1 gave 0.78, 0.66, 0.53, 0.40, 0.26, 0.13, 0.065 of 15);
-  the music room's vol is the BGM option. 文字の表示速度 最速 shows a page at once. The other speeds could only be timed
-  with the shared machine at a load of 30 to 40, which slows the original's frames under Wine; timing the second
-  line of the quiz's first page gave 速い 38, 普通 109, 遅い 91 and 最遅 250 to 320 ms a character, 遅い faster than 普通,
-  so the numbers only say 最遅 is about three times 普通 and 速い about a third. VNDegen keeps 30 ms for 普通 and uses
-  15, 60 and 90 for the others (inferred), 0.5, 1, 1.5, 2.5 and 4 s for the auto modes (inferred around the existing
-  1.5 s). 改ページ makes a click during text go straight to the next page; ウインドウOFF makes the right click hide
+  the music room's vol is the BGM option. 文字の表示速度, measured by recording the text band at 60 frames a second
+  (ffmpeg's screen grab, frame timestamps) while the prologue's OP簡易版 pages played, at a load of 1.2 to 2.6: 最速
+  shows a page at once, 速い, 普通, 遅い and 最遅 show a character every 25, 50, 75 and 100 ms (each within 2% over six
+  or seven pages of known length, 4 to 54 characters), and each line break costs one character's time (a three-line
+  page of 53 characters takes 54 steps). オートモード速度, timed from a page's last character to the window clearing
+  on the next page, with the text at 普通 and オートモード音声 at 待たない: a fixed part, a part per character and a part
+  per line, 230 + 25 a character + 700 a line ms for 最速 and 速い (the two are the same), 260 + 50 + 975 for 普通,
+  290 + 75 + 1225 for 遅い and 320 + 100 + 1475 for 最遅 (9 to 12 pages each, every page within 40 ms). The earlier
+  timings, taken at a load of 30 to 40, were two to three times slower, so the original's text runs on its frames.
+  改ページ makes a click during text go straight to the next page; ウインドウOFF makes the right click hide
   the window; 待たない lets auto mode go on while a voice plays; 停止 stops the voice when the page turns (残す, the
   default, lets it finish); ADV なし drops the fades. Kept but without effect yet: the screen mode, the message frame,
   the popups, the cursor, the 3D settings, the game speed, battle effects and ranks, the autosave mode, VE and the
@@ -1046,7 +1071,8 @@ the same points (offsets in bytes, numbers little-endian):
   cells (row by row, three rows of five, `party.obj`'s row 0 first) holding the record numbers of its units or -1,
   ten -1s, zeros, five target cells as (x, y) pairs padded with -1 (the target, then the corners of its path), a
   flag word (route << 8 | target point, −1 for a wandering group), -1, the group's action counter (see Enemy groups
-  above), the times fought (1 after fleeing), two zeros and -1. Its units are member records numbered from 100
+  above), a number that was 3 on a group that had appeared during the visit and 0 ten actions later (0 after a flee;
+  what it counts isn't known), two zeros and -1. Its units are member records numbered from 100
   (215,608 = 86,008 + 100 × 1,296): the unit at +0, -1 at +4, the record number at +8, the level, 0, the group
   number at +20, the group, 1 and the board cell as bytes at +24, HP and MP, then the battle blocks as for members.
   Measured on every Wine autosave: VNDegen's import and export of a floor autosave come out equal in these regions,

@@ -199,6 +199,19 @@ int main(int argc, char **argv) {
             vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_RIGHT, 1);
             vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_RIGHT, 0);
         }
+        if (sscanf(argv[a], "calm=%d", &n) == 1) sa_debug_calm(s, n);
+        if (sscanf(argv[a], "battleend=%d", &n) == 1) {
+            sa_debug_battle_end(s, n);
+            alive = alive && run(s, 300);
+        }
+        if (sscanf(argv[a], "tap=%d,%d", &x, &y) == 2) {
+            vnsystemaoi_mouse_move(s, x, y);
+            alive = alive && run(s, 16);
+            vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 1);
+            vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_LEFT, 0);
+            vnsystemaoi_pointer_lift(s);
+            alive = alive && run(s, 1000);
+        }
         if (sscanf(argv[a], "press=%d,%d", &x, &y) == 2) {
             vnsystemaoi_mouse_move(s, x, y);
             alive = alive && run(s, 16);

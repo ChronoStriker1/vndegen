@@ -40,6 +40,9 @@ final class SystemAoiSession: EngineSession {
         frameView.onPointer = { [weak self] event in
             guard let self else { return }
             deliver(router.pointer(event, at: event.location))
+            #if canImport(UIKit)
+            if event.phase == .ended || event.phase == .cancelled, let engine { vnsystemaoi_pointer_lift(engine) }
+            #endif
         }
         frameView.onScroll = { [weak self] notches in
             guard let self else { return }

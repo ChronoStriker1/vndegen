@@ -108,8 +108,8 @@ static const u8 defaults[OPT_COUNT] = {
     [OPT_BGM] = 8,    [OPT_SE] = 8,      [OPT_VE] = 8,         [OPT_TALK] = 10,
 };
 
-static const u32 textMs[5] = {0, 15, 30, 60, 90};
-static const u32 autoMs[5] = {500, 1000, 1500, 2500, 4000};
+static const u32 textMs[5] = {0, 25, 50, 75, 100};
+static const u32 autoBaseMs[5] = {230, 250, 260, 290, 320}, autoCharMs[5] = {25, 25, 50, 75, 100}, autoLineMs[5] = {700, 700, 975, 1225, 1475};
 static const u32 windowAlpha[5] = {64, 112, 160, 192, 255};
 
 void sa_option_defaults(OptionScreen *o) {
@@ -151,7 +151,10 @@ int sa_option(const SA *s, int which) { return s->opt.value[which]; }
 
 u32 sa_option_text_ms(const SA *s) { return textMs[s->opt.value[OPT_TEXT_SPEED] % 5]; }
 
-u32 sa_option_auto_ms(const SA *s) { return autoMs[s->opt.value[OPT_AUTO_SPEED] % 5]; }
+u32 sa_option_auto_ms(const SA *s, int chars, int lines) {
+    int k = s->opt.value[OPT_AUTO_SPEED] % 5;
+    return autoBaseMs[k] + autoCharMs[k] * (u32)chars + autoLineMs[k] * (u32)lines;
+}
 
 u32 sa_option_window_alpha(const SA *s) { return windowAlpha[s->opt.value[OPT_ALPHA] % 5]; }
 
