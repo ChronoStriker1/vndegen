@@ -88,13 +88,15 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   Rounds play in speed order with the damage, hit and target rules in `docs/systemaoi-cleanroom.md`. A win dims the
   screen and shows the resources, EXP and any item found; EXP fills the panel's bar and raises levels. Only a debug
   hook starts a battle so far.
-- **Expeditions.** 遠征 opens the dungeon select; an area's map is drawn in 3D from its part set (software
-  rendered) in the original's own coordinates, walked with the pad or the arrow keys, with the compass, the step
-  count, a minimap of visited cells with the door, crystals and enemy groups, the 目標/時間 panel and the party's
-  diorama. The party starts beside the door home; 帰る on the door's cell brings the finds home. Stepping onto an
-  edge passage moves to the neighbouring area. Each area's enemy groups walk the floor as red crosses on the
-  minimap and fight when met; random encounters begin after 40 steps. The game's hooks run on entering, on stepping
-  onto floor objects and walls, before and after battles and on the way home; a loss ends the expedition.
+- **Expeditions.** 遠征 opens the dungeon select; an area's map is drawn in 3D from its part set (software rendered) in
+  the original's own coordinates, walked with the pad, the arrow keys or the walk arrows that appear under the pointer
+  on the view (a click or tap walks, turns or sidesteps), with the compass, the step count, a minimap of visited cells
+  with the door, crystals and enemy groups, the 目標/時間 panel and the party's diorama. The party starts beside the door
+  home; 帰る on the door's cell brings the finds home. Stepping onto an edge passage moves to the neighbouring area.
+  Each area's enemy groups walk the routes in its map file, or wander, as red crosses on the minimap, moving with the
+  party's actions as in the original, and fight when met; random encounters begin after 40 steps. The game's hooks run
+  on entering, on stepping onto floor objects and walls, before and after battles and on the way home; a loss ends the
+  expedition.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
@@ -131,9 +133,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
-- Dungeon: where an area's enemy groups first stand and how they choose their way are VNDegen's own (the
-  original's cells are kept when loading its saves); a floor's taken pickups and opened doors aren't saved (the
-  original's image doesn't seem to hold them either); the purple passage markers aren't drawn.
+- Dungeon: enemy groups that appear partway through a visit aren't rebuilt, and how a group behaves after a battle
+  is inferred; a floor's taken pickups and opened doors aren't saved (the original's image doesn't seem to hold
+  them either). 絶命院 still draws about 6 to 9% darker than the original.
 - Saves: a few ability numbers in the battle blocks (凶暴者 and the like) and the script cache after the town grid
   are written empty; the original loads such files. The save comment box takes no text; the comment stays empty.
   The Option screen and the Extra menu aren't built yet.

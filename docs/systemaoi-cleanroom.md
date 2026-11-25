@@ -224,7 +224,17 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   `a101` to `a108` the floor markers of pickups (101 to 104 glowing, 105 spent) and other marks. Measured: floor
   object 100 is the door home; it stands at its cell's centre and turns slowly, edge-on to face-on in about 4.5
   seconds (a turn every 18 seconds, filmed at 10 fps). A floor object N draws `aN` at its cell's centre (inferred
-  for all but the door). Wall-20 sides draw nothing; the original floats a purple marker over such cells.
+  for all but the door). Wall-20 sides draw no wall. Measured: the original floats a small purple marker over the
+  passage side, the part set's `next000` (a child of `w020`, textured from `updown.bmp`), still over time; VNDegen
+  draws that layer on each passage side and its pixels come within about 5 levels of the PC's two cells away.
+- **Walk arrows.** Measured by hovering a 40-pixel grid over the view in 中央森: under the pointer the original shows
+  one of `dgn_e00` (forward), `e01` (back), `e03` (turn left), `e02` (turn right), `e05` and `e04` (the side
+  chevrons), each the picture's lower (hover) half at its own size and half opacity, with its top-left at (469, 164),
+  (469, 360), (350, 262), (640, 262), (249, 275) and (929, 275); the upper (white) half never showed, hovered,
+  pressed or facing a wall. Which arrow shows is the first, in that order, whose hover picture has any opacity under
+  the pointer: 486 of 486 grid points agree. Clicking walks, turns or sidesteps (the chevrons step left and right
+  keeping the facing, and count a step); the pad's two corner buttons sidestep the same way and light both their
+  pieces (frames 2 and 3) under the pointer.
 - **Action buttons.** Measured: standing on the door's cell shows 帰る (`dgn_g02`) at (1101, 498), above the pad.
   Inferred: floor part 100 (`f100`, stairs down) shows 下りる (`g01`) and 101 (`f101`, up) shows 上る (`g00`).
 - **Areas.** `floor.obj`'s rows of one dungeon are areas side by side, named from the first: 中央森, 中央森の東,
@@ -250,16 +260,25 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Step counter.** Measured: the number under the compass is the expedition's steps, drawn with `dgn_f00` (digits
   10 pixels apart) right-aligned with its last digit at (994, 72). Turning doesn't count; crossing to another area
   doesn't either. The 目標/時間 panel shows at the top right as in the town.
-- **Enemy groups.** Measured: each area's fixed groups (`floor.obj` column 30, 千固定0100 and 千固定0101 in 中央森)
-  stand on the floor from the moment the party arrives, always on the same cells ((4, 12) and (14, 7) in 中央森,
-  (12, 7) and (10, 0) in 中央森の東), with their members rolled afresh each time (`party.obj`'s random cells). They
-  show only on the minimap, not in the 3D view, and move a cell at a time as the party walks, toward a target cell
-  ((4, 1) for the first), then on to another. Walking onto a group's cell starts its battle; after fleeing, the group
-  was elsewhere and every group's counter read 40. Leaving an area and coming back resets its groups. Inferred:
-  groups move one cell per party step along the shortest path; a group that has fought waits out its 40-step count
-  before it can fight again; a beaten group is gone for the visit. VNDegen's spawn cells are its own (eight or more
-  steps from the arrival, chosen per area and group), as the original's rule isn't known. `a8 "name"` from the
-  scripts adds a group the same way.
+- **Enemy groups.** Measured from Wine saves (two dungeons, 千樹庭's 中央森 and 絶命院's 十三層, and the autosaves of
+  炎山洞's areas). The k-th name in `floor.obj` column 30 walks the k-th route in the map trailer: it starts on the
+  route's first point ((4, 12) and (14, 7) in 中央森, (5, 6) in 十三層, every entry), and on reaching a point it heads
+  for point a (or, where a < b, one of a to b at random; a −1 point is a resting place). Names past the routes
+  (炎山洞's 裾野 areas have none) and column 18's count of names drawn at random from column 31 (0 in 千樹庭, 1 in
+  裾野, 2 in 十三層) stand on random cells and walk to random cells. Facing is random at the start. Every group
+  keeps a counter of the party's actions since it appeared (moves and turns, not bumps into walls; save offset 65 in
+  the group record); on each even count it either turns a quarter toward its next cell or steps into it. Its way is
+  the breadth-first path that tries east, south, west and north in that order and keeps the first route found to a
+  cell, through open sides only (not doorways, hidden doors or passages): 28 of 28 paths in the saves match. The
+  record keeps the target and up to four corners of that path, dropping a corner on the next action after reaching
+  it, and the flag word is route << 8 | target point (−1 for a wandering group). VNDegen replays the PC's own
+  autosaves through the same party actions and matches every saved group state: 46 of 46 in 中央森 (44 actions,
+  two routes, three point changes) and 30 of 30 in 十三層 (24 actions, one route, two wanderers), cells, facings,
+  targets, corners, flags and counters. Walking onto a group's cell, or a group stepping onto the party, starts its
+  battle. Inferred: a beaten group is gone for the visit; after fleeing, the group moves to a cell at least eight
+  steps away; a wanderer's next target is any cell it can reach; random cells avoid floor objects and passages.
+  Groups that appear later (a group from column 31 stood in 中腹エリア after 22 steps, where column 18 is 0) aren't
+  rebuilt. `a8 "name"` from the scripts adds a wandering group.
 - **`bf var, N`** answers how many of dungeon N + 1's areas are offered as entries (below). Measured: the PC's
   turn-10 save has F751 (bf = 1) set and F752 (bf ≥ 2) clear although its party had walked into 中央森の東, which a
   count of visited areas would have made 2.
@@ -796,16 +815,16 @@ the same points (offsets in bytes, numbers little-endian):
   a dungeon and 0 in the town, then the cell and facing, kept after coming home (-1, -1, 0 before any expedition).
   The 36 bytes at 85,972 end with the area and cell of the last door the party came in by ((1, 1) at (6, 2) for
   every 千樹庭 save); zero before any expedition. The 52 bytes at 1,009,560 are thirteen -1s and a 0 in every save.
-- **Enemy groups** of the current area at 998,288: up to two records of 280 bytes (70 numbers): the group's
-  `party.obj` id, its number (1, 2), the area word, its cell and facing, its 15 board cells (row by row, three rows
-  of five, `party.obj`'s row 0 first) holding the record numbers of its units or -1, ten -1s, zeros, five target
-  cells as (x, y) pairs padded with -1, a flag word (1 for the first group, 0x101 for the second; 2 added after a
-  battle), -1, the 40-step counter, the times fought (1 after fleeing), two zeros and -1. Its units are member
-  records numbered from 100 (215,608 = 86,008 + 100 × 1,296): the unit at +0, -1 at +4, the record number at +8,
-  the level, 0, the group number at +20, the group, 1 and the board cell as bytes at +24, HP and MP, then the battle
-  blocks as for members. Measured on every Wine autosave: VNDegen's import and export of a floor autosave come out
-  equal in these regions, except the order of the records (the original numbers them as it rolls them) and the
-  ability numbers below.
+- **Enemy groups** of the current area at 998,288: one record of 280 bytes (70 numbers) per group (six in 炎山洞's
+  裾野エリア北東): the group's `party.obj` id, its number (1, 2, ...), the area word, its cell and facing, its 15 board
+  cells (row by row, three rows of five, `party.obj`'s row 0 first) holding the record numbers of its units or -1,
+  ten -1s, zeros, five target cells as (x, y) pairs padded with -1 (the target, then the corners of its path), a
+  flag word (route << 8 | target point, −1 for a wandering group), -1, the group's action counter (see Enemy groups
+  above), the times fought (1 after fleeing), two zeros and -1. Its units are member records numbered from 100
+  (215,608 = 86,008 + 100 × 1,296): the unit at +0, -1 at +4, the record number at +8, the level, 0, the group
+  number at +20, the group, 1 and the board cell as bytes at +24, HP and MP, then the battle blocks as for members.
+  Measured on every Wine autosave: VNDegen's import and export of a floor autosave come out equal in these regions,
+  except the order of the records (the original numbers them as it rolls them) and the ability numbers below.
 - **Battle blocks**, from the enemies and members: `unit.obj` columns 23 to 32 grown to the unit's level (`lvup.obj`
   by the unit's growth type, column 19: HP + (level - 1) × column 4, MP + (level - 1) × column 5, 攻撃 on both attack
   stats and 防御 on both defences by the type's `+1/N` steps; ベトＡ at level 5 is 42/12 and 8/8 from 30/8 and 7/7);
