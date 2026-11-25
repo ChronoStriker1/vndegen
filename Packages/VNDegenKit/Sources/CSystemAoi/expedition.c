@@ -287,6 +287,11 @@ void sa_exp_draw_view(SA *s, u32 *fb) {
     sa_dungeon_draw_hud(&s->dungeon, fb, &s->party, s->vm.c[C_RANK_MAX]);
     s->party.sgp = -1;
     sa_town_draw_status_goal(&s->town, &s->vm, fb);
+    if (s->exp.noticeCount) {
+        const char *lines[EXP_NOTICE_LINES];
+        for (int i = 0; i < s->exp.noticeCount; i++) lines[i] = s->exp.notice[i];
+        sa_popup_draw(s->battle.pop, fb, lines, s->exp.noticeCount);
+    }
 }
 
 static void run_hooks(SA *s, const int *hooks, int n, int after) {
@@ -381,6 +386,8 @@ static int group_id(SA *s, const char *name) {
 
 static void sync_marks(SA *s);
 static void reset_countdown(SA *s);
+static bool party_has(SA *s, const char *ability);
+static void sync_status(SA *s);
 
 static void set_target(ExpGroup *g, int c) {
     for (int i = 0; i < EXP_TARGETS; i++) g->target[i][0] = g->target[i][1] = -1;
@@ -519,12 +526,7 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
         return;
     }
     sa_dungeon_art(&s->dungeon, &s->vfs, platform);
-    bool sense = false;
-    for (int i = 0; i < PARTY_SLOTS && !sense; i++)
-        if (s->party.unit[i]) sense = !strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.unit[i]), 34), "感知");
-    for (int i = 0; i < s->party.benchCount && !sense; i++)
-        if (s->party.bench[i].tile >= 0) sense = !strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.bench[i].unit), 35), "感知");
-    sa_dungeon_sense(sense);
+    sa_dungeon_sense(party_has(s, "感知"));
     int entry = sa_table_int(&e->floors, r, F_ENTRY);
     if (entry > 0 && entry < SA_F_VARS && s->vm.f[entry]) sa_dungeon_open_doors(&s->dungeon);
     u32 fog = (u32)sa_table_int(&e->floors, r, F_FOG);
@@ -548,7 +550,12 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
             s->vm.c[C_SGP] = left > 0 ? left : 0;
             memset(e->special, 0, sizeof e->special);
         }
+        e->blindSteps = e->supportSteps = 0;
+        memset(e->curse, 0, sizeof e->curse);
     }
+    e->alarm = e->noResidents = false;
+    e->noticeCount = 0;
+    sync_status(s);
     if (!e->resuming) s->vm.c[C_AREA_ACTIONS] = 1;
     e->areaStart = e->steps;
     if (e->arriveSide >= 0) {
@@ -655,6 +662,7 @@ static void pick_group(SA *s, char *out, size_t size) {
 static void reset_countdown(SA *s) {
     int steps = sa_table_int(&s->exp.floors, s->exp.row, F_STEPS), spread = sa_table_int(&s->exp.floors, s->exp.row, F_SPREAD);
     s->exp.stepsLeft = steps - spread + (int)(sa_vm_random(&s->vm) % (u32)(2 * spread + 1));
+    if (s->exp.alarm) s->exp.stepsLeft /= 2;
 }
 
 static void begin_battle(SA *s, const char *group, const int *cells) {
@@ -678,6 +686,14 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
         }
         s->exp.special[buffs[k][0] - 1]--;
     }
+    for (int i = 0; i < s->battle.count; i++) {
+        Fighter *f = &s->battle.f[i];
+        if (f->enemy) continue;
+        f->stat[STAT_DEFENCE] -= s->exp.curse[0];
+        f->stat[STAT_RESIST] -= s->exp.curse[0];
+        f->stat[STAT_EVASION] -= s->exp.curse[1];
+    }
+    memset(s->exp.curse, 0, sizeof s->exp.curse);
     sa_battle_set_names(&s->battle, text(&s->exp.dungeons, s->exp.dungeon - 1, 1), text(&s->exp.floors, s->exp.row, F_NAME));
     sa_log(s, "battle: %s, %d fighters", group, s->battle.count);
     s->vm.c[C_EXP_RESULT] = 1;
@@ -739,6 +755,7 @@ void sa_exp_battle_over(SA *s, int result) {
 void sa_exp_gain(SA *s, const int gain[4]) {
     if (!s->exp.active) return;
     for (int i = 0; i < 4; i++) {
+        if (!i && s->exp.noResidents && gain[i] > 0) continue;
         int boost = sa_exp_special_value(s, i ? SPECIAL_SEARCH : SPECIAL_RECRUIT);
         s->vm.c[C_FIND0 + i] += gain[i] + gain[i] * boost / 100;
     }
@@ -897,72 +914,189 @@ static void cross_area(SA *s, int side) {
     enter(s, e->dungeon, sa_table_int(&e->floors, to, F_FLOOR), true);
 }
 
-static int name_dir(const char *name) {
-    static const char *const dirs[] = {"北東", "北西", "南東", "南西"};
-    for (int i = 0; i < 4; i++)
-        if (strstr(name, dirs[i])) return i;
-    return -1;
-}
-
-static int quadrant(const Dungeon *d, int x, int y) { return (y * 2 >= d->h ? 2 : 0) + (x * 2 >= d->w ? 0 : 1); }
-
-typedef struct Stair {
-    int row, x, y, quad;
-} Stair;
-
-static int list_stairs(SA *s, int part, Stair *out, int max) {
+static void follow_link(SA *s, const DunLink *l) {
     Expedition *e = &s->exp;
-    int n = 0;
-    for (int r = 0; r < e->floors.rows && n < max; r++) {
-        if (sa_table_int(&e->floors, r, F_DUNGEON) != e->dungeon) continue;
-        Dungeon *probe = sa_alloc(sizeof *probe);
-        if (sa_dungeon_read_map(probe, &s->vfs, text(&e->floors, r, F_MAP)))
-            for (int c = 0; c < DUN_CELLS && n < max; c++)
-                if (probe->cell[c][5] == part) out[n++] = (Stair){r, c % DUN_SIDE, c / DUN_SIDE, quadrant(probe, c % DUN_SIDE, c / DUN_SIDE)};
-        free(probe);
-    }
-    return n;
-}
-
-static int stairs_in(const Stair *l, int n, int row) {
-    int k = 0;
-    for (int i = 0; i < n; i++) k += l[i].row == row;
-    return k;
-}
-
-static bool stair_target(SA *s, bool down, Stair *out) {
-    Expedition *e = &s->exp;
-    Stair from[32], to[32];
-    int nf = list_stairs(s, down ? 100 : 101, from, 32), nt = list_stairs(s, down ? 101 : 100, to, 32);
-    int here = quadrant(&s->dungeon, s->dungeon.x, s->dungeon.y), dir = name_dir(text(&e->floors, e->row, F_NAME));
-    int best = -1, bestScore = -1;
-    for (int i = 0; i < nt; i++) {
-        if (to[i].row == e->row) continue;
-        int other = name_dir(text(&e->floors, to[i].row, F_NAME)), score = 1;
-        if (stairs_in(from, nf, e->row) > 1 && other >= 0 && other == here) score = 3;
-        else if (stairs_in(to, nt, to[i].row) > 1 && dir >= 0 && to[i].quad == dir) score = 3;
-        else if (other < 0 && dir < 0 && stairs_in(to, nt, to[i].row) == 1) score = 2;
-        if (score > bestScore) best = i, bestScore = score;
-    }
-    if (best < 0) return false;
-    *out = to[best];
-    return true;
-}
-
-static void change_floor(SA *s, int by) {
-    Expedition *e = &s->exp;
-    Stair t;
-    if (!stair_target(s, by > 0, &t)) {
-        sa_log(s, "no stairs to follow from %s", text(&e->floors, e->row, F_NAME));
+    int floor = l->target < 0 ? e->floor : l->target >> 8 & 0xff;
+    if (floor == e->floor) {
+        sa_dungeon_place(&s->dungeon, l->tx, l->ty, l->dir);
+        sync_position(s);
         return;
     }
-    sa_log(s, "expedition: stairs to %s", text(&e->floors, t.row, F_NAME));
+    sa_log(s, "expedition: link to floor %d at %d,%d", floor, l->tx, l->ty);
     e->arriveSide = -1;
-    e->resumeX = t.x;
-    e->resumeY = t.y;
-    e->resumeDir = s->dungeon.dir;
+    e->resumeX = l->tx;
+    e->resumeY = l->ty;
+    e->resumeDir = l->dir;
     e->keepGroups = false;
-    enter(s, e->dungeon, sa_table_int(&e->floors, t.row, F_FLOOR), true);
+    enter(s, e->dungeon, floor, true);
+}
+
+static void change_floor(SA *s) {
+    DunLink l;
+    if (sa_dungeon_link(&s->dungeon, DUN_LINK_STAIRS, &l)) follow_link(s, &l);
+    else sa_log(s, "no stairs to follow from %s", text(&s->exp.floors, s->exp.row, F_NAME));
+}
+
+enum { TRAP_HAZARD, TRAP_BLIND, TRAP_MAP, TRAP_RESIDENTS, TRAP_SUPPORT, TRAP_PURGE, TRAP_SGP, TRAP_ALARM, TRAP_PHANTOM, TRAP_CURSE, TRAP_TELEPORT, TRAP_SPIN };
+enum { HIT_WALK = 1, HIT_FLY = 2, HIT_ALL = 3 };
+enum { TRAP_STEPS = 50, AVOID_PERCENT = 20, AVOID_FINDER_PERCENT = 50, UNIT_FLYING = 13 };
+
+static const struct {
+    int object, kind, arg, hp, mp;
+    const char *name, *line;
+} traps[] = {
+    {1, TRAP_HAZARD, HIT_WALK, 30, 0, "棘の床", "徒歩タイプにダメージ！"},
+    {2, TRAP_HAZARD, HIT_FLY, 30, 0, "棘の風", "飛行タイプにダメージ！"},
+    {3, TRAP_HAZARD, HIT_ALL, 0, 20, "嫌な音", "全員の気力が減った！"},
+    {4, TRAP_HAZARD, HIT_ALL, 23, 20, "不快な爆破", "全員にダメージ！|全員の気力が減った！"},
+    {5, TRAP_HAZARD, HIT_WALK, 23, 20, "不快なヌメリ", "徒歩タイプにダメージ！|徒歩タイプの気力が減った！"},
+    {6, TRAP_HAZARD, HIT_FLY, 23, 20, "不快な風", "飛行タイプにダメージ！|飛行タイプの気力が減った！"},
+    {10, TRAP_BLIND, 0, 0, 0, "ブラインド罠", NULL},
+    {12, TRAP_CURSE, 0, 10, 0, "防御力低下罠", NULL},
+    {13, TRAP_CURSE, 1, 20, 0, "回避力低下罠", NULL},
+    {20, TRAP_MAP, 0, 0, 0, "地図破壊罠", NULL},
+    {21, TRAP_RESIDENTS, 0, 0, 0, "大警告罠", "このフロアから住民の気配が消えた！"},
+    {22, TRAP_SUPPORT, 0, 0, 0, "サポート分離罠", "しばらくスペシャルギュンギュスカーが使えない！"},
+    {23, TRAP_PURGE, 0, 0, 0, "浄化罠", "スペシャルギュンギュスカー効果が消えた！"},
+    {24, TRAP_SGP, 1, 0, 0, "格減らし罠", "スペシャルギュンギュスカーで利用できる格が1減った！"},
+    {25, TRAP_SGP, 2, 0, 0, "格枯らし罠", "スペシャルギュンギュスカーで利用できる格が2減った！"},
+    {30, TRAP_ALARM, 0, 0, 0, "警報", NULL},
+    {32, TRAP_PHANTOM, 0, 0, 0, "幻影罠", NULL},
+    {33, TRAP_SPIN, 0, 0, 0, NULL, NULL},
+    {39, TRAP_TELEPORT, 0, 0, 0, NULL, "空間が歪み、運ばれた！"},
+};
+
+static void notice(SA *s, const char *text) {
+    Expedition *e = &s->exp;
+    e->noticeCount = 0;
+    for (const char *p = text; p && e->noticeCount < EXP_NOTICE_LINES;) {
+        const char *bar = strchr(p, '|');
+        size_t n = bar ? (size_t)(bar - p) : strlen(p);
+        if (n >= sizeof e->notice[0]) n = sizeof e->notice[0] - 1;
+        memcpy(e->notice[e->noticeCount], p, n);
+        e->notice[e->noticeCount++][n] = 0;
+        p = bar ? bar + 1 : NULL;
+    }
+}
+
+static bool party_has(SA *s, const char *ability) {
+    for (int i = 0; i < PARTY_SLOTS; i++)
+        if (s->party.unit[i] && !strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.unit[i]), 34), ability)) return true;
+    for (int i = 0; i < s->party.benchCount; i++)
+        if (s->party.bench[i].tile >= 0 && !strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.bench[i].unit), 35), ability))
+            return true;
+    return false;
+}
+
+static void hurt(SA *s, int who, int hpPercent, int mpPercent) {
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int n = sa_party_member_list(&s->party, ms);
+    for (int i = 0; i < n; i++) {
+        if (ms[i].slot < 0 && (ms[i].bench < 0 || s->party.bench[ms[i].bench].tile < 0)) continue;
+        bool flying = sa_table_int(&s->party.units, sa_party_unit_row(&s->party, ms[i].unit), UNIT_FLYING) == 1;
+        if (!(who & (flying ? HIT_FLY : HIT_WALK))) continue;
+        int hp = *ms[i].hp - sa_party_member_value(&s->party, &ms[i], 0) * hpPercent / 100;
+        int mp = *ms[i].mp - sa_party_member_value(&s->party, &ms[i], 1) * mpPercent / 100;
+        *ms[i].hp = hp > 1 ? hp : 1;
+        *ms[i].mp = mp > 0 ? mp : 0;
+    }
+}
+
+static void forget_area(SA *s) {
+    Dungeon *d = &s->dungeon;
+    if (!d->visited) return;
+    memset(d->visited, 0, sizeof(bool) * DUN_CELLS);
+    d->visited[d->y * DUN_SIDE + d->x] = true;
+}
+
+static void sync_status(SA *s) {
+    Dungeon *d = &s->dungeon;
+    d->statusCount = 0;
+    d->blind = s->exp.blindSteps > 0;
+    if (s->exp.blindSteps > 0) d->status[d->statusCount++] = (DunStatus){"ブラインド", s->exp.blindSteps};
+    if (s->exp.supportSteps > 0) d->status[d->statusCount++] = (DunStatus){"ＳＰ分断", s->exp.supportSteps};
+}
+
+static void count_down_traps(SA *s) {
+    if (s->exp.blindSteps > 0) s->exp.blindSteps--;
+    if (s->exp.supportSteps > 0) s->exp.supportSteps--;
+    sync_status(s);
+}
+
+bool sa_exp_support_cut(const SA *s) { return s->exp.active && s->exp.supportSteps > 0; }
+
+static bool spring_trap(SA *s) {
+    Expedition *e = &s->exp;
+    Dungeon *d = &s->dungeon;
+    int object = sa_dungeon_object(d), t = -1;
+    for (size_t i = 0; i < sizeof traps / sizeof traps[0] && t < 0; i++)
+        if (traps[i].object == object) t = (int)i;
+    if (t < 0) return false;
+    int kind = traps[t].kind;
+    char msg[256];
+    if (kind == TRAP_SPIN) {
+        sa_dungeon_place(d, d->x, d->y, (int)(sa_vm_random(&s->vm) % 4));
+        sync_position(s);
+        return false;
+    }
+    sa_dungeon_reveal(d);
+    if (kind == TRAP_TELEPORT) {
+        DunLink l;
+        if (!sa_dungeon_link(d, DUN_LINK_TELEPORT, &l)) return false;
+        bool away = l.target >= 0 && (l.target >> 8 & 0xff) != e->floor;
+        follow_link(s, &l);
+        notice(s, traps[t].line);
+        return away;
+    }
+    if (kind != TRAP_HAZARD) {
+        int avoid = sa_exp_special_active(s, SPECIAL_NO_TRAP) ? 100 : party_has(s, "罠発見") ? AVOID_FINDER_PERCENT : AVOID_PERCENT;
+        if ((int)(sa_vm_random(&s->vm) % 100) < avoid) {
+            snprintf(msg, sizeof msg, "%sを回避した", traps[t].name);
+            notice(s, msg);
+            return false;
+        }
+    }
+    snprintf(msg, sizeof msg, "%sに引っかかった！%s%s", traps[t].name, traps[t].line ? "|" : "", traps[t].line ? traps[t].line : "");
+    notice(s, msg);
+    switch (kind) {
+    case TRAP_HAZARD:
+        hurt(s, traps[t].arg, traps[t].hp, traps[t].mp);
+        break;
+    case TRAP_BLIND:
+        e->blindSteps = TRAP_STEPS;
+        break;
+    case TRAP_MAP:
+        forget_area(s);
+        break;
+    case TRAP_RESIDENTS:
+        e->noResidents = true;
+        break;
+    case TRAP_SUPPORT:
+        e->supportSteps = TRAP_STEPS;
+        break;
+    case TRAP_PURGE:
+        memset(e->special, 0, sizeof e->special);
+        break;
+    case TRAP_SGP:
+        s->vm.c[C_SGP] = s->vm.c[C_SGP] > traps[t].arg ? s->vm.c[C_SGP] - traps[t].arg : 0;
+        break;
+    case TRAP_ALARM:
+        e->alarm = true;
+        e->stepsLeft /= 2;
+        break;
+    case TRAP_PHANTOM: {
+        char group[64];
+        pick_group(s, group, sizeof group);
+        spawn_group(s, group);
+        sync_marks(s);
+        break;
+    }
+    case TRAP_CURSE:
+        e->curse[traps[t].arg] = traps[t].hp;
+        break;
+    }
+    sync_status(s);
+    return false;
 }
 
 static bool run_step_hook(SA *s);
@@ -977,7 +1111,7 @@ static void after_move(SA *s, int r) {
         int act = sa_dungeon_action(d);
         if (act == DUN_ACT_HOME) go_home(s);
         else if (act == DUN_ACT_OPEN) open_crystal(s);
-        else change_floor(s, act == DUN_ACT_DOWN ? 1 : -1);
+        else change_floor(s);
         return;
     }
     if (d->bumped) {
@@ -1002,6 +1136,8 @@ static void after_move(SA *s, int r) {
         cross_area(s, side);
         return;
     }
+    count_down_traps(s);
+    if (spring_trap(s)) return;
     int hit = group_here(s);
     for (int i = 0; i < e->groupCount && hit < 0; i++) {
         ExpGroup *g = &e->group[i];
@@ -1036,7 +1172,8 @@ static bool run_step_hook(SA *s) {
 }
 
 void sa_exp_key(SA *s, int key) {
-    if (s->mode == MODE_DUNGEON && !s->dungeon.animDur && !s->exp.stepHook) after_move(s, sa_dungeon_key(&s->dungeon, key));
+    if (s->mode == MODE_DUNGEON && s->exp.noticeCount) s->exp.noticeCount = 0;
+    else if (s->mode == MODE_DUNGEON && !s->dungeon.animDur && !s->exp.stepHook) after_move(s, sa_dungeon_key(&s->dungeon, key));
     s->dirty = true;
 }
 
@@ -1077,7 +1214,8 @@ bool sa_exp_frame(SA *s, u32 ms) {
     s->rightClicked = false;
     if (s->clicked) {
         s->clicked = false;
-        if (!d->animDur && !s->exp.stepHook) after_move(s, sa_dungeon_click(d, s->mouseX, s->mouseY));
+        if (s->exp.noticeCount) s->exp.noticeCount = 0;
+        else if (!d->animDur && !s->exp.stepHook) after_move(s, sa_dungeon_click(d, s->mouseX, s->mouseY));
         s->dirty = true;
     }
     if (s->mode == MODE_DUNGEON && s->dirty) {

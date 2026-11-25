@@ -265,12 +265,24 @@ struct Party;
 enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN, DUN_ART_DIGITS, DUN_ART_PLATFORM, DUN_ART };
 enum { DUN_ICON_DOOR, DUN_ICON_CHEST, DUN_ICON_GROUP, DUN_ICON_PARTY, DUN_ICONS };
 #define DUN_MARKS 8
+#define DUN_LINKS 48
+#define DUN_STATUS 4
+#define DUN_TRAP_ICONS 20
 enum { DUN_ACT_NONE, DUN_ACT_HOME, DUN_ACT_DOWN, DUN_ACT_UP, DUN_ACT_OPEN };
 
 typedef struct PartSet {
     Pvm pvm;
     int *last, *layerTex;
 } PartSet;
+
+typedef struct DunLink {
+    int kind, x, y, target, tx, ty, dir;
+} DunLink;
+
+typedef struct DunStatus {
+    char label[24];
+    int steps;
+} DunStatus;
 
 typedef struct Dungeon {
     PartSet set, common;
@@ -291,10 +303,16 @@ typedef struct Dungeon {
     bool bumped;
     Image *art[DUN_ART];
     Image *needle[4];
-    Image *icon[DUN_ICONS], *arrow[4], *big[16];
-    const Image *bigFrom[16];
+    Image *icon[DUN_ICONS], *arrow[4], *big[48];
+    const Image *bigFrom[48];
     int bigCount;
     int markCount, markX[DUN_MARKS], markY[DUN_MARKS];
+    DunLink link[DUN_LINKS];
+    int linkCount;
+    bool seen[DUN_CELLS], blind;
+    Image *trapIcon[DUN_TRAP_ICONS], *plates;
+    DunStatus status[DUN_STATUS];
+    int statusCount;
     R3 r3;
 } Dungeon;
 
@@ -312,6 +330,10 @@ int sa_dungeon_key(Dungeon *d, int key);
 void sa_dungeon_draw(Dungeon *d, u32 *fb);
 void sa_dungeon_draw_map(Dungeon *d, u32 *fb, int x, int y, int scale);
 const Image *sa_dungeon_platform(const Dungeon *d);
+enum { DUN_LINK_STAIRS = 1, DUN_LINK_TELEPORT = 2 };
+bool sa_dungeon_link(const Dungeon *d, int kind, DunLink *out);
+void sa_dungeon_reveal(Dungeon *d);
+bool sa_dungeon_in_dark(const Dungeon *d);
 void sa_dungeon_draw_frame(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
 int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);

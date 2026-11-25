@@ -125,8 +125,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   production. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
   breakthrough damage are measured; the odds of each event are fitted to the original's counts. Facilities gain
   EXP each turn and level up, and town posts raise their area's production. 配置 has 一覧, 組織図 and 編成, and the
-  status card switches to 能力詳細. Not built yet: the dungeons after 炎山洞. These
-  live in the original's exe, not its scripts, and are rebuilt from play (`docs/systemaoi-cleanroom.md`).
+  status card switches to 能力詳細. The later dungeons' floor objects work: traps with their messages, timers and
+  minimap icons, teleporters and stairs from the maps' link records, spinners, dark zones and 堕天牢's floor
+  hazards; several effects' sizes are inferred. These live in the original's exe, not its scripts, and are rebuilt
+  from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
 - Dungeon: where an area's enemy groups first stand and how they choose their way are VNDegen's own (the

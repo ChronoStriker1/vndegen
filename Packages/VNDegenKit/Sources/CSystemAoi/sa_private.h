@@ -126,6 +126,7 @@ typedef struct ExpGroup {
 } ExpGroup;
 
 #define EXP_SPECIALS 12
+#define EXP_NOTICE_LINES 3
 
 typedef struct Expedition {
     bool active;
@@ -144,6 +145,10 @@ typedef struct Expedition {
     u8 (*passages)[EXP_FLOORS][DUN_CELLS];
     int (*floorInfo)[EXP_FLOORS][4];
     int special[EXP_SPECIALS], specialValue[EXP_SPECIALS];
+    int blindSteps, supportSteps, curse[2];
+    bool alarm, noResidents;
+    char notice[EXP_NOTICE_LINES][128];
+    int noticeCount;
 } Expedition;
 #define MSG_LINES 4
 
@@ -314,6 +319,7 @@ void sa_camp_draw_backdrop(SA *s, u32 *fb);
 int sa_back_mode(const SA *s);
 bool sa_exp_special(SA *s, int id, int a, int b);
 bool sa_exp_special_active(const SA *s, int id);
+bool sa_exp_support_cut(const SA *s);
 int sa_exp_special_value(const SA *s, int id);
 void sa_maze_init(SA *s);
 void sa_maze_free(SA *s);

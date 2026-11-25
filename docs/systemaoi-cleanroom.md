@@ -259,10 +259,39 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   stepping on it, the floor hook (bo1200 entry 4) turns it into the door 100 and sets the area's flag; `de` tells
   that hook whether the current area's flag is already set (kept in F450), and a registered area shows its door
   from the start. Inferred from the scripts and maps.
-- **Stairs.** Floor parts 100 and 101 show 下りる and 上る. Inferred from the maps: they lead to the area with the
-  opposite stairs, the one whose name gives the stairs' quarter of the map when an area has several (炎山洞
-  中腹エリア's four stair rooms lead to 裾野エリア南東, 南西, 北西 and 北東), else the one area left (中腹エリア北 to
-  山頂エリア); the party arrives on the target's stairs.
+- **Links.** After its cells a map file holds 11-word records `kind, x, y, target, tx, ty, facing, 0, 0, 0, 0`, the
+  target −1 for the same area or dungeon << 16 | floor << 8 (`floor.obj` columns 0 and 1). Kind 1 sits on every
+  stair cell (158 in all, floor parts 100 and 101) and kind 2 on every teleporter (object 39, all 30), with 56 more
+  kind-2 records on plain cells. Measured: three teleporters sent the party exactly to their records' cells and
+  facings (炎山洞 裾野エリア (15, 5) to 中腹エリア (13, 3) facing north, whatever the save's random seed), so the PC
+  reads them; VNDegen follows kind 1 for 上る/下りる and kind 2 for teleporters. The rest of the trailer (lists of
+  numbered cells) is unknown.
+- **Traps and floor hazards.** Engine-side: the floor hook (bo1200) handles only pickups, keyed doors, door spots
+  and story events. Measured on the PC by stepping onto each object from a save made next to it: the message is a
+  battle-style popup (`pop_a`) at the view's centre, and the next key or click only dismisses it. Traps say
+  「name に引っかかった！」 with a second line, or 「name を回避した」: 10 ブラインド罠, 12 防御力低下罠, 13
+  回避力低下罠, 20 地図破壊罠, 21 大警告罠 (このフロアから住民の気配が消えた！), 22 サポート分離罠
+  (しばらくスペシャルギュンギュスカーが使えない！), 23 浄化罠 (スペシャルギュンギュスカー効果が消えた！), 24 格減らし罠 and 25
+  格枯らし罠 (C042 −1 and −2, measured), 30 警報 (no 罠 in its name), 32 幻影罠. 39 says 「空間が歪み、運ばれた！」 and
+  follows its link. 33 turns the party without a word (east to south once). 41 is a dark zone: its model `a041` is a
+  box that fills the view from inside, and the minimap is hidden there. 42 is a magic circle (`a042`), no message
+  and no effect seen at full health. 堕天牢's 1 to 6 are floor hazards with no 回避: 1 棘の床 (徒歩タイプにダメージ！,
+  measured −51 of 170 HP), 2 棘の風 (飛行), 3 嫌な音 (全員の気力が減った！), 4 不快な爆破 (全員にダメージ！ and
+  気力, measured −39 of 170 HP and −7 of 35 MP), 5 不快なヌメリ (徒歩, both) and 6 不快な風 (飛行, both). The game's
+  manual (`html/page/img/trap.jpg`) names the trap families: ダークゾーン, 暗闇, 地図破り, 大警告 (battles add no
+  residents), 警報 (more encounters), サポート分断, 浄化, テレポート, 格減らし, 格枯らし, the four find losses
+  (逃走, 強奪, 喪失, 腐敗; no map uses them), 幻影 (a phantom symbol enemy) and 呪い (stats down), and says only losses
+  last. Measured: ブラインド blanks the view to the fog colour and the minimap to the party's arrow, and both it and
+  サポート分離 list a red `dgn_b02` plate in the side panel at (0, 38), 20 apart, with the steps left (ブラインド
+  51 and ＳＰ分断 50 just after). After a trap the minimap shows its icon: `mmf0121` to `mmf0126` for hazards 1 to 6
+  (measured), and by the manual's legend `mmf0101` 暗闇, 0102 地図破り, 0103 大警告, 0104 警報, 0105 サポート分断,
+  0106 浄化, 0107 テレポート, 0108 and 0109 格, 0114 幻影, 0127 呪い and `mmf0200` the dark zone. Three of
+  fourteen traps were avoided with no 罠発見 unit. Inferred: avoidance 20% (50% with a 罠発見 unit, always under
+  罠回避); timers 50 steps; 防御力低下 and 回避力低下 take 10 and 20 from the next battle (the SGP ups' sizes);
+  警報 halves the encounter count for the area; 大警告 stops battle residents for the area; 地図破壊 forgets the
+  area's map; 幻影 adds one of the area's groups; the hazards take 30% (棘) or 23% of maximum HP and 20% of maximum
+  MP, never below 1 HP, by `unit.obj` column 13 (1 for floating units such as spirits, dark orbs and angels,
+  taken as 飛行).
 - **Per-area looks.** `floor.obj` column 10 is the fog colour (0x2b3021 in 千樹庭, 0x38221c in 炎山洞, fitted on the
   far view). Column 9 is 1 for 炎山洞 and the dungeons after it, whose floors show about 1.55 times brighter than
   the walls (inferred from one capture; VNDegen lights their floor parts that much more).

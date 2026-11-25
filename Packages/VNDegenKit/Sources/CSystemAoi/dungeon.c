@@ -28,6 +28,20 @@ enum {
     FLOOR_DOWN = 100,
     FLOOR_UP = 101,
     OBJECT_CRYSTAL = 60,
+    OBJECT_DARK = 41,
+    LINK_INTS = 11,
+    PLATE_X = 0,
+    PLATE_Y = 38,
+    PLATE_SRC_Y = 20,
+    PLATE_W = 80,
+    PLATE_H = 20,
+    PLATE_TEXT_X = 4,
+    PLATE_TEXT_Y = 5,
+    PLATE_NUMBER_SIZE = 12,
+    PLATE_NUMBER_SPACING = 3,
+    PLATE_NUMBER_Y = 5,
+    PLATE_TEXT_SIZE = 10,
+    PLATE_NUMBER_RIGHT = 74,
     PANEL_X = 0,
     PANEL_Y = 0,
     REST_X = 1101,
@@ -44,7 +58,7 @@ enum {
     MINI_CELLS = 5,
     MINI_WALL = 4,
     MINI_MARK = 16,
-    DUN_BIG_ICONS = 16,
+    DUN_BIG_ICONS = 48,
     DIGIT_W = 10,
     STEPS_X = 994,
     STEPS_Y = 72,
@@ -71,6 +85,17 @@ static const int sideQuarter[4] = {-1, 0, 1, 2};
 static const struct {
     int x, y, h;
 } padPos[6] = {{1150, 535, 63}, {1150, 613, 63}, {1186, 574, 63}, {1114, 574, 63}, {1111, 539, 67}, {1190, 539, 67}};
+
+static const struct {
+    int object, icon;
+} trapIcons[DUN_TRAP_ICONS] = {{1, 121},  {2, 122},  {3, 123},  {4, 124},  {5, 125},  {6, 126},  {10, 101}, {12, 127}, {13, 127}, {20, 102},
+                               {21, 103}, {22, 105}, {23, 106}, {24, 108}, {25, 109}, {30, 104}, {32, 114}, {39, 107}, {41, 200}, {-1, 0}};
+
+static int trap_icon(int object) {
+    for (int i = 0; i < DUN_TRAP_ICONS; i++)
+        if (trapIcons[i].object == object && object >= 0) return i;
+    return -1;
+}
 
 static int texture_index(Dungeon *d, Vfs *vfs, const char *name) {
     if (!*name) return -1;
@@ -140,6 +165,17 @@ bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map) {
         for (int x = 0; x < w; x++)
             for (int f = 0; f < DUN_FIELDS; f++)
                 d->cell[y * DUN_SIDE + x][f] = (i32)rd32(data + MAP_HEADER + (size_t)(y * w + x) * CELL_BYTES + (size_t)f * 4);
+    d->linkCount = 0;
+    size_t at = MAP_HEADER + (size_t)(w * h) * CELL_BYTES, ints = (n - at) / 4;
+    for (size_t i = 0; i + LINK_INTS <= ints && d->linkCount < DUN_LINKS; i++) {
+        i32 v[LINK_INTS];
+        for (int k = 0; k < LINK_INTS; k++) v[k] = (i32)rd32(data + at + (i + (size_t)k) * 4);
+        bool same = v[3] == -1, other = (v[3] & 0xff) == 0 && v[3] >> 16 >= 1 && v[3] >> 16 <= 10;
+        if ((v[0] != DUN_LINK_STAIRS && v[0] != DUN_LINK_TELEPORT) || v[7] || v[8] || v[9] || v[10] || (!same && !other)) continue;
+        if (v[1] < 0 || v[1] >= w || v[2] < 0 || v[2] >= h || v[4] < 0 || v[4] >= DUN_SIDE || v[5] < 0 || v[5] >= DUN_SIDE || v[6] < 0 || v[6] > 3) continue;
+        d->link[d->linkCount++] = (DunLink){v[0], v[1], v[2], v[3], v[4], v[5], v[6]};
+        i += LINK_INTS - 1;
+    }
     free(data);
     return true;
 }
@@ -158,6 +194,8 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     d->floorGain = 1;
     memset(d->own, 0, sizeof d->own);
     memset(d->ownPassage, 0, sizeof d->ownPassage);
+    memset(d->seen, 0, sizeof d->seen);
+    d->blind = false;
     d->visited = d->own;
     d->passage = d->ownPassage;
     d->hover = -1;
@@ -201,6 +239,13 @@ void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
         static const char *const icons[] = {"mmf0003.agf", "mmf0004.agf", "mma0001.agf", "mma0000.agf"};
         for (int i = 0; i < DUN_ICONS; i++) d->icon[i] = scale2(sa_load_image(vfs, icons[i]));
         for (int q = 0; q < 4; q++) d->arrow[q] = rotate_quarter(d->icon[DUN_ICON_PARTY], q);
+        for (int i = 0; i < DUN_TRAP_ICONS; i++) {
+            if (trapIcons[i].object < 0) continue;
+            char name[16];
+            snprintf(name, sizeof name, "mmf%04d.agf", trapIcons[i].icon);
+            d->trapIcon[i] = scale2(sa_load_image(vfs, name));
+        }
+        d->plates = sa_load_image(vfs, "dgn_b02.agf");
     }
     sa_image_free(d->art[DUN_ART_PLATFORM]);
     d->art[DUN_ART_PLATFORM] = platform ? sa_load_image(vfs, platform) : NULL;
@@ -211,6 +256,8 @@ void sa_dungeon_free(Dungeon *d) {
     for (int i = 0; i < DUN_ART; i++) sa_image_free(d->art[i]);
     for (int q = 0; q < 4; q++) sa_image_free(d->needle[q]);
     for (int i = 0; i < DUN_ICONS; i++) sa_image_free(d->icon[i]);
+    for (int i = 0; i < DUN_TRAP_ICONS; i++) sa_image_free(d->trapIcon[i]);
+    sa_image_free(d->plates);
     for (int i = 0; i < d->bigCount; i++) sa_image_free(d->big[i]);
     d->bigCount = 0;
     for (int q = 0; q < 4; q++) sa_image_free(d->arrow[q]);
@@ -513,6 +560,9 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
         const Image *tex = ly->tcount && ps->layerTex[k] >= 0 ? d->tex[ps->layerTex[k]] : NULL;
         for (int t = 0; t < ly->tcount; t++) {
             R3Vert v[3];
+            bool bad = false;
+            for (int j = 0; j < 3; j++) bad = bad || ly->tri[t * 3 + j] < 0 || ly->tri[t * 3 + j] >= ly->vcount;
+            if (bad) continue;
             for (int j = 0; j < 3; j++) {
                 const PvmVertex *pv = &ly->v[ly->tri[t * 3 + j]];
                 float wx = pv->pos[0] * ca + pv->pos[2] * sa + cx, wy = pv->pos[1], wz = -pv->pos[0] * sa + pv->pos[2] * ca + cz;
@@ -542,7 +592,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     u32 fog = d->r3.fogColor;
     u32 bg = 0xff000000u | fog;
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = bg;
-    if (!d->loaded) return;
+    if (!d->loaded || d->blind) return;
     r3_begin(&d->r3, fb, d->fov);
     Cam c;
     make_cam(d, &c);
@@ -609,6 +659,11 @@ static const Image *icon_at(Dungeon *d, const Image *base, int scale) {
 
 static void draw_map(Dungeon *d, u32 *fb, int ox, int oy, int scale) {
     const int cs = MINI_CELL * scale, ws = MINI_WALL * scale, ms = MINI_MARK * scale, inset = 2 * scale;
+    if (sa_dungeon_in_dark(d)) return;
+    if (d->blind) {
+        if (d->arrow[d->dir]) sa_blit(fb, icon_at(d, d->arrow[d->dir], scale), ox + MINI_CELLS / 2 * cs, oy + MINI_CELLS / 2 * cs);
+        return;
+    }
     fill(fb, ox, oy, cs * MINI_CELLS, cs * MINI_CELLS, rgb(0, 0, 0));
     u32 grid = rgb(56, 56, 56), wall = rgb(240, 240, 240);
     for (int k = 0; k <= MINI_CELLS; k++) {
@@ -650,6 +705,9 @@ static void draw_map(Dungeon *d, u32 *fb, int ox, int oy, int scale) {
             }
             int icon = cell[F_OBJECT] == OBJECT_DOOR ? DUN_ICON_DOOR : cell[F_OBJECT] == OBJECT_CRYSTAL ? DUN_ICON_CHEST : -1;
             if (icon >= 0 && d->icon[icon]) sa_blit(fb, icon_at(d, d->icon[icon], scale), x0, y0);
+            int trap = trap_icon(cell[F_OBJECT]);
+            if (trap >= 0 && d->trapIcon[trap] && (cell[F_OBJECT] == OBJECT_DARK || d->seen[my * DUN_SIDE + mx]))
+                sa_blit(fb, icon_at(d, d->trapIcon[trap], scale), x0, y0);
         }
     int cx = ox + MINI_CELLS / 2 * cs, cy = oy + MINI_CELLS / 2 * cs;
     for (int g = 0; g < d->markCount; g++) {
@@ -685,6 +743,19 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
     static const int actionArt[] = {0, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN};
     int act = sa_dungeon_action(d);
     if (act) sa_blit_rect(fb, d->art[actionArt[act]], 0, d->hover == HOVER_ACTION ? ACTION_H : 0, ACTION_W, ACTION_H, ACTION_X, ACTION_Y);
+    for (int i = 0; i < d->statusCount && d->plates; i++) {
+        int y = PLATE_Y + i * PLATE_H;
+        sa_blit_rect(fb, d->plates, 0, PLATE_SRC_Y, PLATE_W, PLATE_H, PLATE_X, y);
+        char n[12];
+        snprintf(n, sizeof n, "%d", d->status[i].steps);
+        sa_font_set_plain(true);
+        sa_font_set_spacing(0);
+        sa_text_draw(fb, SA_W, SA_H, d->status[i].label, -1, PLATE_X + PLATE_TEXT_X, y + PLATE_TEXT_Y, PLATE_TEXT_SIZE, 0xffffff, 0xffffffffu);
+        sa_font_set_plain(false);
+        sa_font_set_spacing(PLATE_NUMBER_SPACING);
+        sa_text_draw(fb, SA_W, SA_H, n, -1, PLATE_NUMBER_RIGHT - sa_text_width(n, -1, PLATE_NUMBER_SIZE) + PLATE_NUMBER_SPACING, y + PLATE_NUMBER_Y, PLATE_NUMBER_SIZE, 0xffffff, 0xffffffffu);
+        sa_font_set_spacing(1);
+    }
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
 }
 
@@ -732,6 +803,21 @@ int sa_dungeon_crystal_index(const Dungeon *d) {
     }
     return n;
 }
+
+bool sa_dungeon_link(const Dungeon *d, int kind, DunLink *out) {
+    for (int i = 0; i < d->linkCount; i++)
+        if (d->link[i].kind == kind && d->link[i].x == d->x && d->link[i].y == d->y) {
+            *out = d->link[i];
+            return true;
+        }
+    return false;
+}
+
+void sa_dungeon_reveal(Dungeon *d) {
+    if (cell_at(d, d->x, d->y)) d->seen[d->y * DUN_SIDE + d->x] = true;
+}
+
+bool sa_dungeon_in_dark(const Dungeon *d) { return sa_dungeon_object(d) == OBJECT_DARK; }
 
 void sa_dungeon_clear_object(Dungeon *d) {
     if (cell_at(d, d->x, d->y)) d->cell[d->y * DUN_SIDE + d->x][F_OBJECT] = -1;

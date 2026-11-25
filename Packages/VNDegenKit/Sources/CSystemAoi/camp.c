@@ -482,7 +482,7 @@ static void use_sgp(SA *s, int row) {
 static void press(SA *s, int button) {
     switch (button) {
     case BTN_SGP:
-        s->camp.sgpOpen = true;
+        s->camp.sgpOpen = !sa_exp_support_cut(s);
         break;
     case BTN_EQUIP:
         keep_backdrop(s);
