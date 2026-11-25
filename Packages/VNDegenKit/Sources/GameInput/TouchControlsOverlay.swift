@@ -33,38 +33,41 @@ public struct TouchControlsOverlay: View {
     let gameFrame: CGRect?
     /// Whether the controls keep below `gameFrame`, so none of them covers the game, as on a phone held upright.
     let controlsBelowGame: Bool
+    let keepClear: [CGRect]
     @State private var taps = 0
 
     public init(mode: TouchControlsMode, mapping: ButtonMapping, input: InputHub, gameFrame: CGRect? = nil,
-                controlsBelowGame: Bool = false) {
+                controlsBelowGame: Bool = false, keepClear: [CGRect] = []) {
         self.mode = mode
         self.mapping = mapping
         self.input = input
         self.gameFrame = gameFrame
         self.controlsBelowGame = controlsBelowGame
+        self.keepClear = keepClear
     }
 
     /// The height `mode`'s controls take below the game in a portrait screen `width` wide, above the safe area's bottom
     /// inset: the whole gamepad, or the cursor's Home button, since its trackpad covers the screen.
     public static func portraitControlsHeight(_ mode: TouchControlsMode, width: CGFloat) -> CGFloat {
-        let unit = unit(for: width)
+        let unit = GamepadLayout.unit(for: width)
         return switch mode {
-        case .gamepad: GamepadControls.height(unit: unit)
+        case .gamepad: GamepadLayout.height(unit: unit)
         case .cursor: unit * 0.62 + 16
         case .direct, .off: 0
         }
     }
 
-    /// The size the controls are built from, for an overlay whose shorter side is `side` long.
-    private static func unit(for side: CGFloat) -> CGFloat { min(max(side / 6.2, 54), 76) }
-
     public var body: some View {
         GeometryReader { geometry in
-            let unit = Self.unit(for: min(geometry.size.width, geometry.size.height))
+            let unit = GamepadLayout.unit(for: min(geometry.size.width, geometry.size.height))
+            let frame = geometry.frame(in: .global)
             // How far down the overlay the controls may start: below the game, when it sits above them.
-            let top = controlsBelowGame ? gameFrame.map { max(0, $0.maxY - geometry.frame(in: .global).minY) } ?? 0 : 0
+            let top = controlsBelowGame ? gameFrame.map { max(0, $0.maxY - frame.minY) } ?? 0 : 0
             switch mode {
-            case .gamepad: GamepadControls(unit: unit, mapping: mapping, press: press).padding(.top, top)
+            case .gamepad:
+                GamepadControls(layout: GamepadLayout(size: geometry.size, top: top)
+                    .keepingClear(of: keepClear.map { $0.offsetBy(dx: -frame.minX, dy: -frame.minY) }, in: geometry.size),
+                                mapping: mapping, press: press)
             case .cursor:
                 ZStack(alignment: .topTrailing) {
                     MouseControls(mouse: input.mouse, gameFrame: gameFrame, send: sendPointer)
@@ -111,58 +114,46 @@ private struct HomeButton: View {
 // MARK: - Gamepad mode
 
 private struct GamepadControls: View {
-    let unit: CGFloat
+    let layout: GamepadLayout
     let mapping: ButtonMapping
     let press: TouchPress
 
-    /// The rows' heights, the spacing after the spacer and between the rows, and the bottom padding, as `body` lays them
-    /// out.
-    static func height(unit: CGFloat) -> CGFloat {
-        let triggers = 0.6, bumpers = 0.62, sticks = 1 + 0.82 * 2
-        return unit * (triggers + bumpers + sticks + 0.28 * 3 + 0.25)
-    }
-
     var body: some View {
-        VStack(spacing: unit * 0.28) {
-            Spacer(minLength: 0)
+        let unit = layout.unit
+        ZStack(alignment: .topLeading) {
             // The triggers sit above the bumpers, as on an Xbox controller.
-            HStack {
-                shoulder(.l2)
-                Spacer(minLength: 0)
-                shoulder(.r2)
+            shoulder(.l2).placed(at: layout.l2)
+            shoulder(.r2).placed(at: layout.r2)
+            shoulder(.l).placed(at: layout.l)
+            HomeButton(size: unit * 0.62, press: press).placed(at: layout.home)
+            MappedButton(input: .view, mapping: mapping, press: press) { pressed in
+                RoundKey(symbol: "rectangle.on.rectangle", size: unit * 0.62, pressed: pressed)
             }
-            HStack(spacing: unit * 0.2) {
-                shoulder(.l)
-                HomeButton(size: unit * 0.62, press: press)
-                Spacer(minLength: 0)
-                MappedButton(input: .view, mapping: mapping, press: press) { pressed in
-                    RoundKey(symbol: "rectangle.on.rectangle", size: unit * 0.62, pressed: pressed)
-                }
-                MappedButton(input: .menu, mapping: mapping, press: press) { pressed in
-                    RoundKey(symbol: "line.3.horizontal", size: unit * 0.62, pressed: pressed)
-                }
-                shoulder(.r)
+            .placed(at: layout.view)
+            MappedButton(input: .menu, mapping: mapping, press: press) { pressed in
+                RoundKey(symbol: "line.3.horizontal", size: unit * 0.62, pressed: pressed)
             }
-            HStack(alignment: .bottom) {
-                DPad(size: unit * 2.5, mapping: mapping, press: press)
-                Spacer(minLength: 0)
-                FaceButtons(unit: unit, mapping: mapping, press: press)
-            }
+            .placed(at: layout.menu)
+            shoulder(.r).placed(at: layout.r)
+            DPad(size: layout.dpad.width, mapping: mapping, press: press).placed(at: layout.dpad)
+            FaceButtons(unit: unit, mapping: mapping, press: press).placed(at: layout.face)
         }
-        .padding(.horizontal, unit * 0.3)
-        .padding(.bottom, unit * 0.25)
     }
 
     private func shoulder(_ input: ControlInput) -> some View {
         MappedButton(input: input, mapping: mapping, press: press) { pressed in
             Text(input.title)
-                .font(.system(size: unit * 0.3, weight: .bold, design: .rounded))
+                .font(.system(size: layout.unit * 0.3, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
                 .shadow(color: .black.opacity(0.6), radius: 1.5)
-                .frame(width: unit * 1.2, height: unit * 0.6)
+                .frame(width: layout.l2.width, height: layout.l2.height)
                 .background(KeyFill(shape: Capsule(style: .circular), pressed: pressed))
         }
     }
+}
+
+extension View {
+    fileprivate func placed(at frame: CGRect) -> some View { position(x: frame.midX, y: frame.midY) }
 }
 
 /// A touch gamepad button that does what the mapping says. A remapped button shows its binding in a small badge, and a

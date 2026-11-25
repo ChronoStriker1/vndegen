@@ -112,6 +112,7 @@ final class ArtemisSession: EngineSession {
         }
         guard loaded == 0 else { return fail("the game's project could not be loaded") }
         stage = CGSize(width: Int(core.api.runtime_stage_width!(runtime)), height: Int(core.api.runtime_stage_height!(runtime)))
+        host.pictureSize = stage
         let layer = host.metalLayer
         layer.device = MTLCreateSystemDefaultDevice()
         layer.pixelFormat = .bgra8Unorm

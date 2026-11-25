@@ -36,6 +36,8 @@ enum {
 };
 void vndegen_renpy_app_state(int state);
 
+void vndegen_renpy_set_picture_handler(void (*handler)(int width, int height));
+
 // Called by VNDegen's launcher inside the game, through ctypes.
 
 /// The requests made since the last call, as a bit set.
@@ -46,3 +48,4 @@ void vndegen_renpy_wait_while_paused(void);
 /// Runs the main run loop briefly, for waits inside the game.
 void vndegen_renpy_pump(void);
 void vndegen_renpy_window_ready(void);
+void vndegen_renpy_picture(int width, int height);

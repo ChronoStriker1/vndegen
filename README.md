@@ -70,7 +70,7 @@ The iPhone Duo starts on Header list, like the iPhone, and arranges each display
 
 <p align="center">
   <img src="docs/screenshots/duo-front-landscape-library.jpg" width="410" alt="iPhone Duo closed and held on its side, on the front display, in Header list: two columns of header art, with the side bar of buttons below the camera on the left">
-  <img src="docs/screenshots/duo-front-landscape-game.jpg" width="410" alt="iPhone Duo closed and held on its side, playing No Socks RPG, an RPG Maker MZ game, on the beach map: the game fills the full width with the camera over its top left corner, and the touch gamepad's D-pad, A B X Y, shoulder, and home buttons sit over it">
+  <img src="docs/screenshots/duo-front-landscape-game.jpg" width="410" alt="iPhone Duo closed and held on its side, playing No Socks RPG, an RPG Maker MZ game, on the beach map: the game fills the full width with the camera over its top left corner, and the touch gamepad's D-pad, A B X Y, shoulder, and home buttons sit over it across the full width">
   <br><sub>iPhone Duo closed, front display on its side: library &nbsp;·&nbsp; No Socks RPG at Full width with the touch gamepad</sub>
 </p>
 

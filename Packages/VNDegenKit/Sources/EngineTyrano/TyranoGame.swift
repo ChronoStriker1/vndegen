@@ -23,6 +23,7 @@ nonisolated struct TyranoGame: Equatable, Sendable {
     /// `configSave=file`: saves are `<projectID>_*.sav` files beside the PC build's executable, which is the game folder.
     /// Otherwise they go to localStorage.
     let savesToFiles: Bool
+    let pictureSize: CGSize?
 
     static let engineFile = "tyrano/plugins/kag/kag.js"
     /// Where Tyrano exports put index.html, most common first.
@@ -61,6 +62,8 @@ nonisolated extension TyranoGame {
         let config = Self.config(text)
         projectID = config["projectID"] ?? "tyranoproject"
         savesToFiles = packaging != .browser && config["configSave"] == "file"
+        pictureSize = if let width = config["scWidth"].flatMap(Int.init), let height = config["scHeight"].flatMap(Int.init),
+                         width > 0, height > 0 { CGSize(width: width, height: height) } else { nil }
     }
 
     /// kag.js opens with `tyrano.plugin.kag={version:450,` where 450 means 4.50.

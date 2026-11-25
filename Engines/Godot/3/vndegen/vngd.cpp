@@ -316,6 +316,18 @@ void vngd_request_quit(void) {
 	}
 }
 
+bool vngd_picture_size(float *p_width, float *p_height) {
+	SceneTree *tree = state.started ? SceneTree::get_singleton() : nullptr;
+	Viewport *root = tree ? tree->get_root() : nullptr;
+	if (!root) {
+		return false;
+	}
+	Size2 size = root->get_visible_rect().size;
+	*p_width = size.width;
+	*p_height = size.height;
+	return size.width > 0 && size.height > 0;
+}
+
 void vngd_stop(void) {
 	if (!state.os) {
 		return;

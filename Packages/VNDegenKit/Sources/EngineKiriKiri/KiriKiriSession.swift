@@ -145,13 +145,19 @@ final class KiriKiriSession: EngineSession {
         defer { Self.inFrame = false }
         switch state {
         case .running:
-            if engine.iterate() != 0 { finish() }
+            if engine.iterate() != 0 { finish() } else { readPictureSize() }
         case let .quitting(since):
             if engine.iterate() != 0 || ContinuousClock.now > since + Self.quitTimeout { finish() }
         case .waiting, .starting, .stoppingAfterFrame, .stopped:
             break
         }
         if case .stoppingAfterFrame = state { finish() }
+    }
+
+    private func readPictureSize() {
+        var width: Int32 = 0, height: Int32 = 0
+        guard engine.pictureSize(&width, &height) else { return }
+        host.pictureSize = CGSize(width: Int(width), height: Int(height))
     }
 
     /// Runs when the display link or the quit timer fires inside a frame, which happens only while the game's own modal

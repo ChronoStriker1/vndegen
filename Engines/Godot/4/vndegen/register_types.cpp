@@ -22,6 +22,7 @@ __attribute__((used)) static const void *vngd_functions[] = {
 	(const void *)&vngd_set_paused,
 	(const void *)&vngd_set_speed,
 	(const void *)&vngd_request_quit,
+	(const void *)&vngd_picture_size,
 	(const void *)&vngd_stop,
 	(const void *)&vngd_problem,
 };

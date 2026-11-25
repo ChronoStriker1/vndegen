@@ -6,6 +6,9 @@ import UIKit
 /// Holds the view SDL draws the game in. SDL reads touches there itself. A hardware keyboard reaches the game through
 /// this view, which takes keyboard focus whenever it is on screen, as the web engines' view does.
 final class KiriKiriHostView: UIView {
+    var pictureSize: CGSize? {
+        didSet { if pictureSize != oldValue { NotificationCenter.default.post(name: .gamePictureSizeChanged, object: self) } }
+    }
     /// Called once, after the view is first in a window at a usable size.
     var onReady: (@MainActor () -> Void)?
     /// An SDL scancode going down or up, and whether it is a key repeat.
@@ -85,6 +88,9 @@ import AppKit
 /// The view the engine draws the game in, filling it. It reads the mouse and keyboard for the game, as the web
 /// engines' view does, and takes keyboard focus whenever it is on screen.
 final class KiriKiriHostView: NSView {
+    var pictureSize: CGSize? {
+        didSet { if pictureSize != oldValue { NotificationCenter.default.post(name: .gamePictureSizeChanged, object: self) } }
+    }
     /// Called once, after the view is first in a window at a usable size.
     var onReady: (@MainActor () -> Void)?
     /// An SDL scancode going down or up, and whether it is a key repeat.
@@ -193,3 +199,5 @@ extension KiriKiriHostView {
         RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(start) }
     }
 }
+
+extension KiriKiriHostView: GamePictureSource {}

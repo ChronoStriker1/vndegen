@@ -7,6 +7,9 @@ import UIKit
 /// The view the engine draws the game in with Metal, fit to the view with bars beside or above it. It reads touches as
 /// the mouse, and a hardware keyboard, taking keyboard focus whenever it is on screen.
 final class ArtemisHostView: UIView {
+    var pictureSize: CGSize? {
+        didSet { if pictureSize != oldValue { NotificationCenter.default.post(name: .gamePictureSizeChanged, object: self) } }
+    }
     /// Called once, after the view is first in a window at a usable size.
     var onReady: (@MainActor () -> Void)?
     /// A virtual-key code going down or up, and whether it is a key repeat.
@@ -95,6 +98,9 @@ import AppKit
 /// The view the engine draws the game in with Metal, fit to the view with bars beside or above it. It reads the mouse
 /// and keyboard for the game, and takes keyboard focus whenever it is on screen.
 final class ArtemisHostView: NSView {
+    var pictureSize: CGSize? {
+        didSet { if pictureSize != oldValue { NotificationCenter.default.post(name: .gamePictureSizeChanged, object: self) } }
+    }
     /// Called once, after the view is first in a window at a usable size.
     var onReady: (@MainActor () -> Void)?
     /// A virtual-key code going down or up, and whether it is a key repeat.
@@ -217,3 +223,5 @@ extension CATransaction {
         commit()
     }
 }
+
+extension ArtemisHostView: GamePictureSource {}

@@ -52,6 +52,7 @@ import WebKit
                 return {
                     suspend: () => this.calls.push('suspend'), resume: () => this.calls.push('resume'),
                     addFSCommandHandler: (handler) => this.handlers.push(handler),
+                    metadata: this.metadata || null,
                 };
             }
         }
@@ -111,6 +112,18 @@ import WebKit
     #expect(try await page.run("return window.hides") as? Int == 2)
     try await page.run("document.getElementById('a').handlers[0]('quit', '');")
     #expect(page.requests.contains(.quit))
+}
+
+@MainActor @Test func thePictureIsTheStageOfTheOneMovieOnThePage() async throws {
+    let page = try FlashPage(origin: URL(string: "https://localhost/")!)
+    try await page.load()
+    let picture = "return JSON.stringify(__vndegenPicture())"
+    try await page.run("for (const player of document.querySelectorAll('ruffle-player')) player.metadata = { width: 600, height: 600 };")
+    #expect(try await page.run(picture) as? String == "null")
+    try await page.run("document.getElementById('b').remove(); document.getElementById('a').metadata = null;")
+    #expect(try await page.run(picture) as? String == "null")
+    try await page.run("document.getElementById('a').metadata = { width: 600, height: 600 };")
+    #expect(try await page.run(picture) as? String == "[600,600]")
 }
 
 @MainActor @Test func ruffleStorageKeysTakeOneForm() async throws {

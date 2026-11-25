@@ -92,6 +92,8 @@ VNGD_API void vngd_set_speed(int speed);
 // a confirmation, keeps running. Keep calling vngd_iterate until it returns nonzero.
 VNGD_API void vngd_request_quit(void);
 
+VNGD_API bool vngd_picture_size(float *width, float *height);
+
 // Tears the engine down after the game has quit or after vngd_request_quit.
 VNGD_API void vngd_stop(void);
 
