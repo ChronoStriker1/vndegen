@@ -8,6 +8,7 @@
 #include "vnfont.h"
 #include "vnsystemaoi.h"
 #include "sa.h"
+#include "sa_private.h"
 #ifdef SA_HOST_MOVIES
 #include "vnffmovie.h"
 #endif
@@ -159,6 +160,10 @@ int main(int argc, char **argv) {
             int f[4];
             sa_debug_finds(s, f);
             printf("finds residents %d food %d money %d resources %d\n", f[0], f[1], f[2], f[3]);
+        }
+        if (!strcmp(argv[a], "battlelog")) {
+            const Battle *b = &((SA *)s)->battle;
+            for (int i = 0; i < b->logCount; i++) printf("log %s\n", b->log[i].text);
         }
         if (!strcmp(argv[a], "newgame")) {
             sa_debug_new_game(s);

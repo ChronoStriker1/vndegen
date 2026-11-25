@@ -3,6 +3,7 @@
 #include <strings.h>
 
 #define FIXED_SKILL "固定／"
+#define PLAIN_MAGIC "無"
 
 enum {
     IMAGE_SIZE = 1128076,
@@ -49,6 +50,9 @@ enum {
     BLOCK_RESIST = 33,
     BLOCK_ELEMENT_ATTACK = 14,
     ELEMENT_ATTACK = 30,
+    ELEMENT_STEP = 10,
+    ELEMENTS = 6,
+    BLOCK_PLAIN_ATTACK = 13,
     BLOCK_RESISTS = 11,
     BLOCK_ELEMENT_FIRST = 4,
     BLOCK_MAGIC = 36,
@@ -71,6 +75,7 @@ enum {
     CACHE_COUNT_AT = 1035056,
     SCENE_AT = 993208,
     SCENE_STEP = 1200,
+    ORDER_RECORDS = 4,
     FREE_AT = 1008208,
     FREE_COUNT = 30,
     TOWN_POSTS = 9,
@@ -236,6 +241,7 @@ static void read_members(SA *s, const u8 *img) {
 }
 
 static void read_dungeon(SA *s, const u8 *img);
+static void read_orders(SA *s, const u8 *img, int members);
 
 static void write_maze(SA *s, u8 *img) {
     put(img, MAZE_AT, s->vm.c[C_MAZE_INTRUDERS]);
@@ -317,6 +323,7 @@ bool sa_pcsave_read(SA *s, const char *path) {
     }
     s->town.stage = s->vm.c[C_TOWN_STAGE];
     read_members(s, img);
+    read_orders(s, img, s->party.rosterCount);
     read_maps(s, img);
     s->exp.active = s->vm.c[DUNGEON_VAR] > 0 && s->vm.c[DUNGEON_VAR + 1] > 0;
     s->exp.dungeon = s->vm.c[DUNGEON_VAR];
@@ -350,11 +357,11 @@ static const struct {
     {0, 0x7fffffff}, {7, 100}, {8, 100}, {36, 1}, {37, 1}, {190, -1}, {191, -1}, {192, -1}, {193, -1}, {194, -1},
 };
 
-static int skill_id(SA *s, const char *name) {
+static int skill_row(SA *s, const char *name) {
     const Table *k = &s->battle.skills;
     for (int i = 0; i < k->rows; i++)
-        if (!strcmp(sa_table_text(k, i, 1), name)) return sa_table_int(k, i, 0);
-    return 0;
+        if (!strcmp(sa_table_text(k, i, 1), name)) return i;
+    return -1;
 }
 
 static int ability_id(SA *s, const char *name) {
@@ -393,19 +400,52 @@ static int element_affinity(int e, int i) {
     return k == self ? 10 : k == (self + 1) % 4 ? 50 : k == (self + 3) % 4 ? -50 : 0;
 }
 
-static void write_resists(SA *s, u8 *img, size_t c, int r) {
-    const Table *u = &s->party.units;
-    const char *text = sa_table_text(u, r, 33), *element = sa_table_text(u, r, 14);
+static int element_of(const char *name) {
     int e = 0;
-    while (e < 6 && strcmp(element, elements[e])) e++;
-    for (int i = 0; i < BLOCK_RESISTS; i++) put(img, c + (size_t)(BLOCK_RESIST + i) * 4, resist(text, resistKeys[i]) + (e < 6 ? element_affinity(e, i) : 0));
-    if (e < 6) put(img, c + (size_t)(BLOCK_ELEMENT_ATTACK + e) * 4, ELEMENT_ATTACK);
+    while (e < ELEMENTS && strcmp(name, elements[e])) e++;
+    return e;
 }
 
-static void write_unit(SA *s, u8 *img, size_t m, const Bench *b, bool allSkills, const int *bonus) {
+static int attack_slot(const char *attribute) {
+    int e = element_of(attribute);
+    return e < ELEMENTS ? BLOCK_ELEMENT_ATTACK + e : strcmp(attribute, PLAIN_MAGIC) ? -1 : BLOCK_PLAIN_ATTACK;
+}
+
+static void write_resists(SA *s, u8 *img, size_t c, int r, const int *skills, int n) {
+    const Table *u = &s->party.units, *k = &s->battle.skills;
+    const char *text = sa_table_text(u, r, 33);
+    int e = element_of(sa_table_text(u, r, 14)), known[BLOCK_ELEMENT_ATTACK + ELEMENTS] = {0};
+    if (e < ELEMENTS) put(img, c + (size_t)(BLOCK_ELEMENT_ATTACK + e) * 4, ELEMENT_ATTACK);
+    for (int i = 0; i < n; i++) {
+        int slot = attack_slot(sa_table_text(k, skills[i], 14));
+        if (slot >= 0 && known[slot]++) put(img, c + (size_t)slot * 4, at(img, c + (size_t)slot * 4) + ELEMENT_STEP);
+    }
+    for (int i = 0; i < BLOCK_RESISTS; i++) {
+        int v = resist(text, resistKeys[i]) + (e < ELEMENTS ? element_affinity(e, i) : 0);
+        for (int j = 0; j < n; j++) v += resist(sa_table_text(k, skills[j], 6), resistKeys[i]);
+        put(img, c + (size_t)(BLOCK_RESIST + i) * 4, v);
+    }
+}
+
+static int unit_skills(SA *s, int r, const Bench *b, bool enemy, int *rows, int *marks) {
+    const Table *u = &s->party.units;
+    int n = 0;
+    for (int k = 0; k < 8; k++) {
+        const char *name = sa_table_text(u, r, 41 + k * 3);
+        int row = *name && strcmp(name, "*") ? skill_row(s, name) : -1;
+        if (row < 0 || (enemy && !sa_party_unit_knows(&s->party, r, b->level, k))) continue;
+        if (!enemy && n && marks[0] == FIXED_MARK) break;
+        rows[n] = row;
+        marks[n++] = strncmp(name, FIXED_SKILL, strlen(FIXED_SKILL)) ? 1 : FIXED_MARK;
+    }
+    return n;
+}
+
+static void write_unit(SA *s, u8 *img, size_t m, const Bench *b, bool enemy, const int *bonus) {
     const Party *p = &s->party;
     const Table *u = &p->units;
     int r = sa_party_unit_row(p, b->unit);
+    int skills[8], marks[8], n = unit_skills(s, r, b, enemy, skills, marks);
     put(img, m, b->unit);
     put(img, m + MEMBER_LEVEL, b->level);
     put(img, m + MEMBER_EXP, b->exp);
@@ -418,10 +458,13 @@ static void write_unit(SA *s, u8 *img, size_t m, const Bench *b, bool allSkills,
         size_t c = m + MEMBER_STATS + (size_t)copy * MEMBER_COPY;
         int v[10];
         sa_battle_unit_stats(&s->battle, r, b->level > 0 ? b->level : 1, v);
-        for (int i = 0; i < 10; i++) put(img, c + (size_t)i * 4, v[i] + b->trained[i] + (copy && bonus ? bonus[i] : 0));
-        write_resists(s, img, c, r);
+        for (int i = 0; i < 10; i++) {
+            int value = v[i] + b->trained[i] + (copy && bonus ? bonus[i] : 0);
+            put(img, c + (size_t)i * 4, copy && i >= BLOCK_GOVERN ? sa_party_govern_cap(value) : value);
+        }
+        write_resists(s, img, c, r, skills, n);
         if (copy && b->equip)
-            for (int i = 0; i < 4; i++) put(img, c + (size_t)(MEMBER_BONUS + i) * 4, item_bonus(s, b->equip, bonusKeys[i]));
+            for (int i = 0; i < 4; i++) put(img, c + (size_t)(MEMBER_BONUS + i) * 4, at(img, c + (size_t)(MEMBER_BONUS + i) * 4) + item_bonus(s, b->equip, bonusKeys[i]));
         put(img, c + BLOCK_CRITICAL, resist(sa_table_text(u, r, 33), "必殺耐性"));
         put(img, c + BLOCK_AILMENT, resist(sa_table_text(u, r, 33), "異常耐性"));
         for (int i = 0; i < 3; i++) put(img, c + BLOCK_ABILITIES + (size_t)i * 4, ability_id(s, sa_table_text(u, r, 34 + i)));
@@ -431,20 +474,9 @@ static void write_unit(SA *s, u8 *img, size_t m, const Bench *b, bool allSkills,
         put(img, m + MEMBER_EQUIP, b->equip);
         put(img, m + MEMBER_EQUIP + 4, -1);
     }
-    size_t q = m + MEMBER_SKILLS;
-    int ids[8], known = 0;
-    bool fixedOf[8];
-    for (int i = 0; i < 8; i++) {
-        const char *name = sa_table_text(u, r, 41 + i * 3);
-        int id = *name && strcmp(name, "*") ? skill_id(s, name) : 0;
-        if (!id) continue;
-        fixedOf[known] = !strncmp(name, FIXED_SKILL, strlen(FIXED_SKILL));
-        ids[known++] = id;
-    }
-    bool fixed = known && fixedOf[0];
-    for (int i = 0; i < (fixed && !allSkills ? 1 : known); i++, q += 8) {
-        put(img, q, ids[i]);
-        put(img, q + 4, fixedOf[i] ? FIXED_MARK : 1);
+    for (int i = 0; i < n; i++) {
+        put(img, m + MEMBER_SKILLS + (size_t)i * 8, sa_table_int(&s->battle.skills, skills[i], 0));
+        put(img, m + MEMBER_SKILLS + (size_t)i * 8 + 4, marks[i]);
     }
 }
 
@@ -457,7 +489,8 @@ static const struct {
     {"邪魔回復", {94}, {4}},     {"身代わり", {95}, {4}},   {"囮", {98}, {4}},
     {"援護射撃", {103, 104}, {4, 5}},
     {"自爆", {105}, {4}},        {"生命力", {106}, {4}},    {"凶暴者", {107, 108, 112}, {4, 4, 5}},
-    {"勤勉", {BLOCK_TEAM_EXP}, {4}},
+    {"勤勉", {BLOCK_TEAM_EXP}, {4}},     {"先制攻撃", {118}, {4}},  {"前向精神", {83}, {4}},
+    {"魔法無効化", {97}, {4}},   {"いなし", {101, 102}, {4, 5}},
 };
 
 static const struct {
@@ -541,8 +574,8 @@ static void write_member(SA *s, u8 *img, int k, const Bench *b, int cell, const 
         put(img, m + MEMBER_BYTES, id << 16 | POSTED << 8);
         put(img, FREE_AT + (size_t)id * 4, k);
         sa_party_post_stats(&s->party, b->unit, post, &gov, &lead);
-        put(img, c + BLOCK_GOVERN * 4, gov + b->trained[BLOCK_GOVERN]);
-        put(img, c + (BLOCK_GOVERN + 1) * 4, lead + b->trained[BLOCK_GOVERN + 1]);
+        put(img, c + BLOCK_GOVERN * 4, sa_party_govern_cap(gov + b->trained[BLOCK_GOVERN]));
+        put(img, c + (BLOCK_GOVERN + 1) * 4, sa_party_govern_cap(lead + b->trained[BLOCK_GOVERN + 1]));
     } else if (place == PLACE_FIELD)
         put(img, m + MEMBER_BYTES, (cell - FIELD_TAG_BASE) << 16 | PLACE_FIELD << 8);
     else if (place == PLACE_RESERVE)
@@ -607,6 +640,58 @@ static int write_members(SA *s, u8 *img) {
         k++;
     }
     return k;
+}
+
+static const int modeCodes[] = {[ORDER_FREE] = -1, [ORDER_ATTACK] = -2, [ORDER_SUPPORT] = -4, [ORDER_DEFEND] = -3,
+                                [ORDER_SWAP] = -5, [ORDER_INTRUDE] = -1, [ORDER_FLEE] = -6, [ORDER_SKILL] = -1};
+static const int aimCodes[AIM_COUNT] = {[AIM_FREE] = -1,  [AIM_ALL] = -1,   [AIM_ENEMY] = -2,     [AIM_ALLY] = -3,
+                                        [AIM_FRONT] = -4, [AIM_MIDDLE] = -5, [AIM_BACK] = -6,     [AIM_RIGHT] = -7,
+                                        [AIM_LEFT] = -9,  [AIM_CENTRE] = -8, [AIM_RIGHTMOST] = -1, [AIM_LEFTMOST] = -1};
+
+static int code_index(const int *codes, int n, int code) {
+    for (int i = 0; i < n; i++)
+        if (codes[i] == code) return i;
+    return 0;
+}
+
+static int member_slot(const Party *p, int unit) {
+    for (int sl = 0; sl < PARTY_SLOTS; sl++)
+        if (unit && p->unit[sl] == unit) return sl;
+    return -1;
+}
+
+static void write_orders(SA *s, u8 *img, int members) {
+    const Party *p = &s->party;
+    for (int k = 0; k < ORDER_RECORDS; k++)
+        for (int i = 0; i < (members ? members : 1); i++) {
+            size_t o = SCENE_AT + (size_t)k * SCENE_STEP + (size_t)i * 12;
+            int slot = member_slot(p, at(img, MEMBER_AT + (size_t)i * MEMBER_SIZE));
+            const Order *d = slot < 0 ? NULL : k ? &p->preset[k - 1][slot] : &p->order[slot];
+            bool skill = d && d->mode == ORDER_SKILL && d->skill >= 0;
+            put(img, o, skill ? sa_table_int(&s->battle.skills, d->skill, 0) : d ? modeCodes[d->mode] : -1);
+            put(img, o + 4, 1);
+            put(img, o + 8, d && d->aim >= 0 && d->aim < AIM_COUNT ? aimCodes[d->aim] : -1);
+        }
+}
+
+static void read_orders(SA *s, const u8 *img, int members) {
+    Party *p = &s->party;
+    memset(p->order, 0, sizeof p->order);
+    memset(p->preset, 0, sizeof p->preset);
+    memset(p->presetSaved, 0, sizeof p->presetSaved);
+    for (int k = 0; k < ORDER_RECORDS; k++)
+        for (int i = 0; i < members; i++) {
+            size_t o = SCENE_AT + (size_t)k * SCENE_STEP + (size_t)i * 12;
+            int slot = member_slot(p, at(img, MEMBER_AT + (size_t)i * MEMBER_SIZE)), action = at(img, o), aim = at(img, o + 8);
+            if (slot < 0) continue;
+            Order *d = k ? &p->preset[k - 1][slot] : &p->order[slot];
+            const Table *t = &s->battle.skills;
+            int row = -1;
+            for (int r = 0; action >= 0 && r < t->rows && row < 0; r++)
+                if (sa_table_int(t, r, 0) == action) row = r;
+            *d = (Order){row >= 0 ? ORDER_SKILL : code_index(modeCodes, ORDER_SKILL, action), row, code_index(aimCodes, AIM_COUNT, aim)};
+            if (k && (action != -1 || aim != -1)) p->presetSaved[k - 1] = true;
+        }
 }
 
 static void write_dungeon(SA *s, u8 *img) {
@@ -744,13 +829,7 @@ bool sa_pcsave_write(SA *s, const char *path) {
     put(img, GRID_AFTER, 1);
     write_cache(s, img);
     int members = write_members(s, img);
-    for (int k = 0; k < 4; k++)
-        for (int i = 0; i < (members ? members : 1); i++) {
-            size_t o = SCENE_AT + (size_t)k * SCENE_STEP + (size_t)i * 12;
-            put(img, o, -1);
-            put(img, o + 4, 1);
-            put(img, o + 8, -1);
-        }
+    write_orders(s, img, members);
     write_maps(s, img);
     write_dungeon(s, img);
     write_maze(s, img);

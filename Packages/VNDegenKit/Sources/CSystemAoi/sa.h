@@ -509,6 +509,7 @@ typedef struct Order {
 
 #define PARTY_SLOTS 6
 #define PARTY_PRESETS 3
+#define PARTY_GOVERN_MAX 10
 #define PARTY_ROSTER 64
 #define PARTY_ITEMS 256
 #define PARTY_FRONT 3
@@ -569,6 +570,7 @@ void sa_party_free(Party *p);
 void sa_party_new_game(Party *p, Vfs *vfs);
 void sa_party_place(Party *p, Vfs *vfs, int slot, int id);
 int sa_party_unit_row(const Party *p, int id);
+bool sa_party_unit_knows(const Party *p, int row, int level, int k);
 int sa_party_rank(const Party *p);
 void sa_party_add_item(Party *p, int id, int n);
 int sa_party_item_count(const Party *p, int id);
@@ -581,6 +583,7 @@ int sa_party_reserve_at(const Party *p, int tile);
 int sa_party_post_of(const Party *p, int unit);
 int sa_party_post_icon(const Party *p, int unit, int post);
 bool sa_party_post_stats(const Party *p, int unit, int post, int *gov, int *lead);
+int sa_party_govern_cap(int v);
 int sa_party_post_effect(const Party *p, int unit, int post);
 int sa_party_post_index(const Party *p, const char *name);
 void sa_party_set_post(Party *p, int post, int unit);

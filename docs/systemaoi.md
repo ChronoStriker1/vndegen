@@ -116,9 +116,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the save folder, packed with its codec
   (`aoicmp.c`, `pcsave.c`): the variables, the town, every member with their place (main or reserve tile), stats,
   resistances and position bonuses, the equipment, the map memory (visited cells and the steps walked) and, in a
-  dungeon, the cell, the area's enemy groups and their units. The original loads VNDegen's saves, town or dungeon,
-  and VNDegen lists and loads the original's. Beside each, `vndegen/slotNN.sav` keeps what the image doesn't carry
-  (battle orders); it is used only while its time matches the original file's. As in the original, the game
+  dungeon, the cell, the area's enemy groups and their units, and the battle orders with their three saved sets. The
+  original loads VNDegen's saves, town or dungeon, and VNDegen lists and loads the original's. Beside each,
+  `vndegen/slotNN.sav` keeps VNDegen's own copy of the state; it is used only while its time matches the original
+  file's. As in the original, the game
   autosaves at the start of each turn and on entering each area, through ten slots in turn; a dungeon save loads
   back onto its cell, any other save into the town. New members join off the board and are shown on cards in the
   message box, as in the original. 配置's lower tiles are the reserve.
@@ -150,10 +151,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   is inferred; a floor's taken pickups and opened doors aren't saved (the original's image doesn't seem to hold
   them either). 絶命院 still draws about 6 to 9% darker than the original.
 - Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
-  学, 魔法全体防御, the 属性耐性 areas); abilities never seen in the original's saves (先制攻撃, 警戒心, 掛け声,
-  the 支援 abilities and others) are written as zeros, and 資金管理 and 食料管理 sit at inferred slots. Enemies list
-  all their skills and the base element attack, where the original lists only the skills they have learned by their
-  level and adds those skills' element bonuses. Battle orders are written as the default for every member. Comments
+  学, 魔法全体防御, the 属性耐性 areas, and 先制攻撃, 前向精神, 魔法無効化 and いなし from enemies); abilities never
+  seen in the original's saves (警戒心, 掛け声, the 支援 abilities and others) are written as zeros, and 資金管理 and
+  食料管理 sit at inferred slots. Enemies know and use only the skills learned by their level, and their records
+  match the original's for every floor autosave compared. Comments
   are typed as plain characters: there's no Japanese input method in the field, and on a touch screen without a
   keyboard the comment stays empty.
 - Option: the text speeds other than 最速 and 普通 and the auto speeds are inferred; the screen mode, message frame,

@@ -1,5 +1,7 @@
 #include "sa.h"
 
+#include <limits.h>
+
 enum {
     ART_BAR,
     ART_BACKS,
@@ -538,12 +540,12 @@ static bool for_allies(Battle *b, int s) { return !strncmp(text_of(&b->skills, s
 
 static bool supportive(Battle *b, int s) { return !strcmp(text_of(&b->skills, s, 14), "回復") || for_allies(b, s); }
 
-static int unit_skills(Battle *b, int unitRow, int *rows, int *weights) {
+static int unit_skills(Battle *b, int unitRow, int level, int *rows, int *weights) {
     const Table *u = &b->party->units;
     int n = 0;
     for (int k = 0; k < 8; k++) {
         const char *name = text_of(u, unitRow, 41 + k * 3);
-        if (!*name || !strcmp(name, "*")) continue;
+        if (!*name || !strcmp(name, "*") || !sa_party_unit_knows(b->party, unitRow, level, k)) continue;
         int r = skill_row(b, name);
         if (r < 0) continue;
         rows[n] = r;
@@ -554,7 +556,7 @@ static int unit_skills(Battle *b, int unitRow, int *rows, int *weights) {
 
 static int choose_skill(Battle *b, Fighter *f, int mode) {
     int all[8], w[8], rows[8], weights[8], n = 0, total = 0;
-    int count = unit_skills(b, f->row, all, w);
+    int count = unit_skills(b, f->row, f->enemy ? f->level : INT_MAX, all, w);
     for (int k = 0; k < count; k++) {
         int r = all[k];
         if (sa_table_int(&b->skills, r, 13) > f->mp) continue;
@@ -850,7 +852,7 @@ static void open_picker(Battle *b, int slot, int kind) {
     b->pickCount = 0;
     if (kind == PICK_ACTION) {
         int rows[8], weights[8];
-        int n = unit_skills(b, sa_party_unit_row(b->party, b->party->unit[slot]), rows, weights);
+        int n = unit_skills(b, sa_party_unit_row(b->party, b->party->unit[slot]), INT_MAX, rows, weights);
         for (int i = 0; i < n; i++) b->pick[b->pickCount++] = (Order){ORDER_SKILL, rows[i], 0};
         for (size_t i = 0; i < sizeof pickModes / sizeof pickModes[0]; i++) b->pick[b->pickCount++] = (Order){pickModes[i], -1, 0};
         return;
