@@ -140,10 +140,14 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   and, once seen, the third for a quarter (乱舞斬's 12 where a first hit would have done 50 to 53). Against two enemies
   乱舞斬 hit each once, so VNDegen picks different targets; 火矢三連 once hit the same slime twice (a miss, then 20),
   which that doesn't explain yet.
-- **Choosing a skill.** `unit.obj` lists up to eight skills from column 41 in threes: name, weight and a third number.
-  Enemies' weights (ベト: ベトアタック 30, ベトシュート 10, ベトハンマー 10) fit how often each showed in the logs;
-  VNDegen picks by weight, and heals only when an ally is at half health or below (inferred). Order in a round is by
-  speed, ties at random (inferred).
+- **Choosing a skill.** `unit.obj` lists up to eight skills in threes from column 40: the level the skill is learned
+  at, its name and its weight. Measured on every enemy record the original rolled in 38 floor autosaves (ten earlier
+  ones, four area-entry autosaves of 中央森 and 絶命院, and 24 new ones made by stepping through passages into
+  千樹庭's northern areas, 炎山洞's middle ones and 鳳蜘蛛; 480 records, 58 distinct): an enemy knows exactly the skills whose level is at most its own (炎の精霊Ａ at level 10 knows 小さな火
+  and 火矢三連, Ｂ at 15 adds 火矢砲 (15), Ｃ at 25 adds 火矢幕 (25), and none knows 炎獄 (70)); VNDegen's enemies
+  use only those in battle. Enemies' weights (ベト: ベトアタック 30, ベトシュート 10, ベトハンマー 10) fit how often
+  each showed in the logs; VNDegen picks by weight, and heals only when an ally is at half health or below
+  (inferred). Order in a round is by speed, ties at random (inferred).
 - **Encounters.** `party.obj` lists each enemy group in three rows of eight columns from column 18: five cells, a
   list of candidates, then a minimum and a maximum. The first row is the front (前衛). A cell names a unit for that
   column; the game then draws between the two counts from the list and puts them in free columns. Measured on the
@@ -964,9 +968,16 @@ the same points (offsets in bytes, numbers little-endian):
   +50 and -50 around the cycle 火, 水, 土, 風 (火 +50 水 and -50 風, 水 +50 土 and -50 火, 土 +50 風 and -50 水,
   風 +50 火 and -50 土; measured on 炎の精霊, シュシュ, フロッグメン, モエルモン, クラ, キュリハ and チャミ);
   異常耐性 at 44 and 必殺耐性 at 46 (モンエイＢ's 異常耐性+100 at 44, 天界兵Ａ's 必殺耐性+15 at 46); the abilities'
-  ids at 47 to 49; the skill slots at 114. Enemies with element skills carry more element attack and resistance than
-  30 (炎の精霊 40, 50 and 60, ボボボＣ's 火 resistance +40 from 火属性防御) and list only the skills they have
-  learned for their level; VNDegen writes the base numbers and every skill (not derived). The second block adds the
+  ids at 47 to 49; the skill slots at 114. The skills a unit knows (see Choosing a skill) raise its attack for their
+  attribute: each known skill of 光, 闇, 火, 水, 土 or 風 after the first of that attribute adds 10 to that
+  element's attack, and each 無 skill after the first adds 10 at 13; 斬撃, 打撃 and 射撃 skills add nothing. Fixed skills
+  count like the others (炎の精霊Ａ, 火, 小さな火 and 火矢三連: 40; Ｂ with 火矢砲: 50; Ｃ
+  with 火矢幕: 60; ボボボ's 火打, 火矢砲 and 火矢幕: 50; モエルモンＣ, 土, with 炭火, 火矢三連 and 火矢砲: 火 20;
+  ディスタＢ, 土, with 光槍三連 and 光槍砲: 光 10; 暗黒騎士Ｂ, 闇, with one 闇 skill: 30; ミラリンＢ's 魔力の玉 and
+  無心砲: 10 at 13). A known 属性防御 skill adds its `skill.obj` column 6 text to the resistances (ボボボＣ's 火属性防御:
+  火 +40). Measured on the same 480 records. Inferred: 雷 skills add nothing (no record had two), members count
+  the same way (none has two skills of one attribute yet), and an item's 魔補正 adds to the skills' number at 13.
+  The second block adds the
   position bonuses of the field abilities (`ability.obj` column 4 as the amount): 攻撃強化 on both attacks, 防御強化
   on both defences, 速度強化 and 回避強化, to all (全), the front row (前, the party's front row and an enemy board's
   row 0), the back row (後), the unit's column (縦) or row (横), each counted once per unit that has it (two
@@ -977,7 +988,8 @@ the same points (offsets in bytes, numbers little-endian):
   enemy, the reserve one (column 35) on a reserve tile; posted and unplaced members use their government ability
   (column 36) instead. Active abilities put `ability.obj` column 4 (or 5) at: 罠発見 52, 罠無効化 53, 遠視 57, 地図 59,
   サブメンバー 92 and 93 (columns 4, 5), 邪魔回復 94, 身代わり 95, 囮 98, 援護射撃 103 and 104 (columns 4, 5), 自爆 105,
-  生命力 106, 凶暴者 107 and 108 (column 4) and 112 (column 5), 勤勉 113. 魔法耐性 adds its 50 to 36 to 43 (魔 and the
+  生命力 106, 凶暴者 107 and 108 (column 4) and 112 (column 5), 勤勉 113, and from enemies' records 前向精神 83,
+  魔法無効化 97, いなし 101 and 102 (columns 4, 5) and 先制攻撃 118. 魔法耐性 adds its 50 to 36 to 43 (魔 and the
   seven elements). Some apply to the whole party (main and reserve tiles) or an enemy's whole group: 学 adds 10 to 113
   of each (a reserve クラム gave Darkus 113 = 10) and 魔法全体防御 adds 25 to 36 to 43 of each. 斬撃, 打撃 and
   射撃属性耐性 add 20 to 33, 34 or 35 by area, as the 強化 abilities do (／前 on the front row, ／横 the holder's row,
@@ -986,12 +998,27 @@ the same points (offsets in bytes, numbers little-endian):
   description says it helps that post (天才 all thirteen, 内政向き the first nine, 内政の才 67 to 73, 農業 67, 商業 68,
   教育 71, 娯楽 72, 指揮官 74 and 75, 小隊長 76). Inferred: 資金管理 79 and 食料管理 81, 無能 -2 on all thirteen, the
   rest of the post kinds from the descriptions, 学 and 魔法全体防御 counted from the reserve too, and the slots of
-  abilities never seen in a save (先制攻撃, 警戒心, 掛け声, the 支援 abilities, 感知 and others), which VNDegen leaves
-  at zero. A posted member's 統治 and 統率 in the second block are raised as before; キュリハ (大将軍) at 街長補佐 went
-  from 6 and 7 to 10 and 10, as if capped at 10 (one sample).
-- **Order records** at 993,208: four records of 1,200 bytes, each one triple per member in roster order, (-1, 1, -1) in
-  every save seen (likely the battle orders and their three saved sets; not mapped, so VNDegen writes the default per
-  member). **Other regions** not yet placed: 1,037,468 to 1,066,684 (the backlog's text) and an ascending list of
+  abilities never seen in a save (警戒心, 掛け声, the 支援 abilities, 感知 and others), which VNDegen leaves
+  at zero. A posted member's 統治 and 統率 in the second block are raised as before, and in the second block both are
+  capped at 10 for every member, posted or not, raised or not, at any level; the first block keeps the uncapped
+  sum. Measured from the original's own rebuilds after 組織図 moves on turn 42, with training raised in the save to
+  get values over 10 (統治/統率 as table + training → second block): キュリハ (大将軍) 6/7 at 街長補佐 → 10/10;
+  キュリハ 12/12 at 街長 → 10/10, at 商業担当 (no raise) → 10/10, dismissed → 10/10, and at level 20 as 街長 →
+  10/10; ミアルテ (政治家) 8/6 at 街長補佐 → 10/10; ルーアルテ (天才) 9/12 at 農業担当 → 10/10, and at level 50 at
+  工業担当 → 10/10; 天ベト (小隊長) 2/9 at 第二階層長 → 4/10; and under the cap ミアルテ 3/6 → 8/10, ルーアルテ
+  2/5 → 4/7, 天ベト 2/0 → 4/2. 配置 shows a value the cap lowered below the member's own in red (キュリハ's 10/10
+  at 12/12). VNDegen caps the second block and the raised stats it uses for the posts; its own screens don't draw
+  the red yet.
+- **Order records** at 993,208: four records of 1,200 bytes, each one triple per member in roster order: the battle
+  orders now (record 0) and the three sets 行動記録1 to 3 save (records 1 to 3), (-1, 1, -1) when never set. A triple
+  is (action, 1, target): the action is the skill's `skill.obj` id or −1 自由戦闘, −2 攻撃戦闘, −3 防御; the target −1
+  自由, −2 敵, −4 前衛, −5 中衛, −6 後衛, −7 右側. Measured in a Wine battle on turn 42 (ダークス 乱舞斬 at 後衛 saved
+  to set 1, at 前衛 to set 2, then at 中衛; 101P 防御; アングラ 攻撃戦闘 at 敵; タロウ 自由戦闘 at 右側): the save
+  held (102, 1, −6), (102, 1, −4) and (102, 1, −5) for ダークス in records 1, 2 and 0, (−3, 1, −1), (−2, 1, −2) and
+  (−1, 1, −7) for the others in all three, and record 3 untouched. Inferred from the pickers' order: −4 支援戦闘,
+  −5 交代, −6 逃走, −3 味方, −8 真中 and −9 左側. VNDegen writes each field member's orders from its slot and reads
+  them back (its sets are per slot, the original's per member); the original loaded VNDegen's export with the same
+  orders on the battle panels and set 1 restored 後衛. **Other regions** not yet placed: 1,037,468 to 1,066,684 (the backlog's text) and an ascending list of
   offsets at 1,115,868 (the backlog's index).
 - **Engine numbers.** C000 is always 2^31 - 1, C007 and C008 100, C037 1, C190 to C194 -1; C036 is 1 to turn 9 and 3
   from turn 10 in the original's games (5 to 8 in later edited saves), so VNDegen keeps the variable's value and

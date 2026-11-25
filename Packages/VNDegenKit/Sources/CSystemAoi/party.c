@@ -170,6 +170,8 @@ int sa_party_unit_row(const Party *p, int id) {
     return -1;
 }
 
+bool sa_party_unit_knows(const Party *p, int row, int level, int k) { return sa_table_int(&p->units, row, 40 + k * 3) <= level; }
+
 void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
     if (slot < 0 || slot >= PARTY_SLOTS) return;
     sa_image_free(p->sprite[slot]);
@@ -610,16 +612,17 @@ int sa_party_post_icon(const Party *p, int unit, int post) {
     return !strcmp(a, "無能") ? 1 : 0;
 }
 
+int sa_party_govern_cap(int v) { return v < PARTY_GOVERN_MAX ? v : PARTY_GOVERN_MAX; }
+
 bool sa_party_post_stats(const Party *p, int unit, int post, int *gov, int *lead) {
     int r = sa_party_unit_row(p, unit);
     *gov = r >= 0 ? sa_table_int(&p->units, r, 31) : 0;
     *lead = r >= 0 ? sa_table_int(&p->units, r, 32) : 0;
     int icon = sa_party_post_icon(p, unit, post);
-    if (icon != 0 && icon != 1) return false;
-    int ar = ability_row(p, sa_table_text(&p->units, r, 36));
+    int ar = icon == 0 || icon == 1 ? ability_row(p, sa_table_text(&p->units, r, 36)) : -1;
     int v = ar >= 0 ? sa_table_int(&p->abilities, ar, 4) : 0, sign = icon == 1 ? -1 : 1;
-    *gov += sign * v;
-    *lead += sign * (v - v / 5);
+    *gov = sa_party_govern_cap(*gov + sign * v);
+    *lead = sa_party_govern_cap(*lead + sign * (v - v / 5));
     return v != 0;
 }
 
