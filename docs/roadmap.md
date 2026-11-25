@@ -159,6 +159,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - BUNNY BLACK 3's later dungeons drawn as on the PC, with the area bosses' intros, magic circles and phantom traps (0.60.10).
 - BUNNY BLACK 3's title Load, Option and Extra, battle backdrops and digits, enemy groups moving as on the PC, walking arrows, and saves matching the PC's fields (0.60.11).
 - On the closed iPhone Duo held on its side at Full width, the touch gamepad spans the whole display, clear of the camera (0.60.12).
+- Every engine reports its picture size, so Clear of the camera places wide games below or above the camera (0.60.13).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
