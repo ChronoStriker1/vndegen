@@ -101,6 +101,7 @@ VNDegen follows the [DuoApps patterns](https://www.duoapps.com/patterns/) for th
 - **Columns.** On a display that folds, the grid and the header list show an even number of columns, so the fold falls between two, and while partly folded the gap there widens to the fold's width. On the inner display held upright the grid shows six columns where it would otherwise show five.
 - **Game page.** The banner follows the width, between 180 and 540 points tall, and never the screen's height.
 - **The VNDegen menu** scrolls when it is taller than the screen, as on the closed Duo held on its side, so every button stays in reach.
+- **Games held sideways.** Where the window keeps a column for a camera down one side, as on the closed Duo held on its side, a game uses the display's full width by default, fitted to its shape and centred, and the camera may cover a corner of it. **Game picture** in Settings, shown only in that pose, and the Picture row of the VNDegen menu switch to **Below the camera**, or Above the camera when the camera is at the bottom: the game fits the full width below the camera's housing, or above it, so none of it is covered. The touch gamepad and the small menu button stay over the game, inside the safe area, so none of them sits on the camera. Switching, rotating, and opening or closing the Duo keep the game running.
 
 Opening, closing, and folding keep the library's place, an open sheet, a game page's position, and a running game.
 

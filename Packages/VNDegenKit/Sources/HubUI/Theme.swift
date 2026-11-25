@@ -31,6 +31,7 @@ struct HubMetrics: Equatable {
     var foldable = false
     var foldGap: CGFloat = 0
     var sideBar: SideBarPlacement?
+    var occlusions: [CGRect] = []
 
     /// Width including the safe area, for art that runs edge to edge.
     var fullWidth: CGFloat { size.width + insets.leading + insets.trailing }
@@ -65,11 +66,24 @@ struct HubMetrics: Equatable {
 
     /// The iPhone Duo's outer display, turned on its side, keeps its camera in a safe-area inset down one side of the
     /// screen and none down the other. iPhones whose camera sits in the Dynamic Island inset both sides alike, so this
-    /// is nil for them, as it is for a portrait screen. A game keeps clear of it, so none of the game sits under the
-    /// camera.
+    /// is nil for them, as it is for a portrait screen.
     var landscapeSideCamera: (edge: HorizontalEdge, width: CGFloat)? {
         guard fullWidth > fullHeight, (insets.leading == 0) != (insets.trailing == 0) else { return nil }
         return insets.leading > 0 ? (.leading, insets.leading) : (.trailing, insets.trailing)
+    }
+
+    var cameraAtBottom: Bool { occlusions.contains { $0.midY >= fullHeight / 2 } }
+
+    func gameClearance(_ picture: SideCameraPicture) -> EdgeInsets {
+        guard picture == .clearOfCamera, let camera = landscapeSideCamera else { return EdgeInsets() }
+        guard !occlusions.isEmpty else {
+            return camera.edge == .leading
+                ? EdgeInsets(top: 0, leading: camera.width, bottom: 0, trailing: 0)
+                : EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: camera.width)
+        }
+        let top = occlusions.filter { $0.midY < fullHeight / 2 }.map(\.maxY).max() ?? 0
+        let bottom = occlusions.filter { $0.midY >= fullHeight / 2 }.map { fullHeight - $0.minY }.max() ?? 0
+        return EdgeInsets(top: max(0, top), leading: 0, bottom: max(0, bottom), trailing: 0)
     }
 
     /// These metrics for content that reaches across a side camera's inset below the camera: the full width, with the

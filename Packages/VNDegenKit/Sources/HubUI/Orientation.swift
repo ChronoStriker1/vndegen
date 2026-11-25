@@ -22,6 +22,26 @@ extension PlayOrientation {
     }
 }
 
+enum SideCameraPicture: String, CaseIterable {
+    case fullWidth
+    case clearOfCamera
+
+    static let storageKey = "sideCameraPicture"
+
+    static var setting: SideCameraPicture {
+        UserDefaults.standard.string(forKey: storageKey).flatMap(Self.init(rawValue:)) ?? .fullWidth
+    }
+
+    func title(cameraAtBottom: Bool) -> String {
+        switch self {
+        case .fullWidth: "Full width"
+        case .clearOfCamera: cameraAtBottom ? "Above the camera" : "Below the camera"
+        }
+    }
+
+    var other: SideCameraPicture { self == .fullWidth ? .clearOfCamera : .fullWidth }
+}
+
 #if os(iOS)
 /// Reports the orientations the app allows right now. Install it in the app with `@UIApplicationDelegateAdaptor`.
 public final class HubAppDelegate: NSObject, UIApplicationDelegate {

@@ -121,7 +121,7 @@ final class Navigator {
         case pageScreenshot(Int), pageScreenshotsMore
         case settingsPage(SettingsPage)
         /// Settings pickers, iOS only. Confirm and left and right step through the values.
-        case controlMethod, controllerMouse, mouseStyle, playOrientation
+        case controlMethod, controllerMouse, mouseStyle, playOrientation, sideCameraPicture
         case engineOption(EngineID?)
         case variantOption(String?)
         case orientationOption(PlayOrientation?)
@@ -215,6 +215,7 @@ final class Navigator {
     /// Set by the home screen's header list from its width.
     var headerColumns = 1
     var verticalBar = false
+    var offersSideCameraPicture = false
     /// How the game page lays out its buttons, set by the page from the width it has.
     enum PageActions {
         /// Play and the rest in one row.
@@ -390,6 +391,7 @@ final class Navigator {
             if method.kind == .controller { items.append(.controllerMouse) }
             if method.mouse != nil { items.append(.mouseStyle) }
             items.append(.playOrientation)
+            if offersSideCameraPicture { items.append(.sideCameraPicture) }
             #endif
             items.append(.settingsPage(.plugins))
             items += FontPack.packages.map { .fontPackage($0.id) }
@@ -565,7 +567,7 @@ final class Navigator {
         case let .importArchive(url): openImport([url])
         case .openFolder: FileBrowser.open(hub.library.paths.gamesRoot, create: true)
         case .rescan: rescan()
-        case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation: stepSetting(target, by: 1)
+        case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation, .sideCameraPicture: stepSetting(target, by: 1)
         case .layoutButton: layout = layout.next
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()
@@ -939,6 +941,7 @@ final class Navigator {
         case .controllerMouse: setControlMethod(ControlMethod.setting.togglingMouse)
         case .mouseStyle: setControlMethod(ControlMethod.setting.switchingMouseStyle)
         case .playOrientation: cycle(PlayOrientation.storageKey, fallback: PlayOrientation.setting, by: step)
+        case .sideCameraPicture: cycle(SideCameraPicture.storageKey, fallback: SideCameraPicture.setting, by: step)
         default: return false
         }
         return true
