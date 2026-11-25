@@ -230,7 +230,7 @@ static void draw_card(SA *s, u32 *fb, int r) {
     Shop *p = &s->shop;
     sa_blit(fb, p->art[ART_CARD], CARD_X, CARD_Y);
     if (r < 0) return;
-    sa_blit_rect(fb, p->art[ART_STAR], 0, 0, 32, 32, STAR_X, STAR_Y - 8);
+    sa_blit_rect(fb, p->art[ART_STAR], 0, clampi(sa_table_int(items(s), r, 34), 0, 3) * 32, 32, 32, STAR_X, STAR_Y - 8);
     sa_font_set_spacing(6);
     sa_text_draw(fb, SA_W, SA_H, sa_table_text(items(s), r, I_NAME), -1, CARD_NAME_X, CARD_NAME_Y, 14, 0x000000, NO_EDGE);
     sa_font_set_spacing(0);
@@ -304,6 +304,7 @@ static void settle(SA *s) {
     for (int r = 0; r < items(s)->rows && r < SHOP_ROWS_MAX; r++) {
         int t = s->shop.trade[r];
         if (t) sa_party_add_item(&s->party, sa_table_int(items(s), r, I_ID), t);
+        if (t > 0) sa_records_item(s, sa_table_int(items(s), r, I_ID));
         s->shop.trade[r] = 0;
     }
     sa_log(s, "shop: bought %d, sold %d", buy, sell);

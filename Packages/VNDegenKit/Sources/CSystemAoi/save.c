@@ -119,6 +119,7 @@ bool sa_save_write(SA *s, int slot, int count) {
     char *path = sa_pcsave_path(s, slot);
     bool ok = sa_pcsave_write(s, path);
     free(path);
+    sa_records_flush(s);
     return ok && write_sidecar(s, slot, count);
 }
 

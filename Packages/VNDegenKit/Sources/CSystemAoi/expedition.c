@@ -40,7 +40,6 @@ enum {
     GROUP_AWAY = 3,
     SYMBOL_CHANCE = 100,
     ENCOUNTER_FROM = 40,
-    GLOW_GAIN_X100 = 155,
     ALL_AMBIENT = 192,
     DIRECT_AMBIENT = 160,
 };
@@ -75,7 +74,6 @@ enum {
     F_FOG = 10,
     F_BACKDROP = 8,
     PLACE_BASE = 41,
-    F_GLOW = 9,
     F_ENTRY = 14,
     D_OPEN_FLAG = 3,
     F_BOSSES = 23,
@@ -658,7 +656,6 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     if (entry > 0 && entry < SA_F_VARS && s->vm.f[entry]) sa_dungeon_open_doors(&s->dungeon);
     u32 fog = (u32)sa_table_int(&e->floors, r, F_FOG);
     s->dungeon.r3.fogColor = (fog >> 16 & 0xff) | (fog & 0xff00) | (fog & 0xff) << 16;
-    s->dungeon.floorGain = sa_table_int(&e->floors, r, F_GLOW) == 1 ? GLOW_GAIN_X100 / 100.0f : 1;
     s->dungeon.ambient = (sa_table_int(&e->floors, r, F_NO_AMBIENT) ? DIRECT_AMBIENT : ALL_AMBIENT) / 255.0f;
     if (e->explored && dungeon < EXP_DUNGEONS && floor < EXP_FLOORS) {
         s->dungeon.visited = e->explored[dungeon][floor];
@@ -870,6 +867,7 @@ static void random_battle(SA *s) {
 }
 
 void sa_exp_battle_over(SA *s, int result) {
+    sa_records_battle(s);
     if (!s->exp.active) {
         s->mode = MODE_TOWN;
         s->town.mapOnly = false;
@@ -986,6 +984,7 @@ static void open_crystal(SA *s) {
         int r = sa_item_pick(&s->battle.items, table, sa_vm_random(&s->vm));
         if (r < 0) continue;
         sa_party_add_item(&s->party, sa_table_int(&s->battle.items, r, 0), 1);
+        sa_records_item(s, sa_table_int(&s->battle.items, r, 0));
         size_t len = strlen(msg);
         snprintf(msg + len, sizeof msg - len, "%s『%s』を手に入れた。", len ? "|" : "", text(&s->battle.items, r, 1));
     }

@@ -304,7 +304,6 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     d->r3.fogFar = 28;
     d->r3.fogColor = 0x1e2d28;
     d->r3.cull = -1;
-    d->floorGain = 1;
     d->ambient = AMBIENT_ALL;
     memset(d->own, 0, sizeof d->own);
     memset(d->ownPassage, 0, sizeof d->ownPassage);

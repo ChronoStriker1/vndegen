@@ -562,6 +562,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             char *key = opd_str(code, in, 1);
             if (sa_party_join(&s->party, &s->vfs, key)) {
                 sa_log(s, "joined: %s", key);
+                sa_records_join(s, key);
                 if (s->joinedCount < DIALOG_UNITS) snprintf(s->joined[s->joinedCount++], sizeof s->joined[0], "%s", key);
             }
             else sa_log(s, "no unit %s to join", key);
@@ -570,7 +571,11 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         }
         break;
     case 0x94:
-        if (in->count >= 1) sa_party_add_item(&s->party, sa_vm_get(vm, code, &in->o[0]), in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
+        if (in->count >= 1) {
+            int id = sa_vm_get(vm, code, &in->o[0]);
+            sa_party_add_item(&s->party, id, in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 1);
+            sa_records_item(s, id);
+        }
         break;
     case 0x96:
         if (in->count >= 2) sa_vm_set(vm, &in->o[0], sa_party_item_count(&s->party, sa_vm_get(vm, code, &in->o[1])));
@@ -1300,6 +1305,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_deploy_frame(s, elapsedMs)) return true;
     if (sa_savescreen_frame(s)) return true;
     if (sa_option_frame(s)) return true;
+    sa_extra_tick(s, elapsedMs);
     if (sa_extra_frame(s)) return true;
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;

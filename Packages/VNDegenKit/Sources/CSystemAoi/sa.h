@@ -305,7 +305,7 @@ typedef struct Dungeon {
     u8 ownPassage[DUN_CELLS], *passage;
     bool loaded;
     int w, h;
-    float floorGain, ambient;
+    float ambient;
     int x, y, dir;
     float fov, camX, camZ, yaw;
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
