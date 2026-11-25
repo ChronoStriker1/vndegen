@@ -462,6 +462,7 @@ typedef struct Facility {
     int type;
     int level;
     int exp;
+    int built;
 } Facility;
 
 enum { ORDER_FREE, ORDER_ATTACK, ORDER_SUPPORT, ORDER_DEFEND, ORDER_SWAP, ORDER_INTRUDE, ORDER_FLEE, ORDER_SKILL };
