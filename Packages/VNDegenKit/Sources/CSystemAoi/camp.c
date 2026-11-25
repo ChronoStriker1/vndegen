@@ -568,3 +568,5 @@ bool sa_camp_frame(SA *s) {
     }
     return true;
 }
+
+void sa_debug_item(VNSystemAoi *sa, int id, int n) { sa_party_add_item(&((SA *)sa)->party, id, n); }
