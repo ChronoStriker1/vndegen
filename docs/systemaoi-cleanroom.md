@@ -207,6 +207,16 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Camera.** `Cam.pvc`'s position and target (3.2 high, 4.6 behind the cell's centre, tilted down slightly), with
   a 47.2° vertical field of view: the floor lines and wall edges fit that best (correlation 0.58 against 0.30 to 0.35
   at other angles); the file's Zoom(40) isn't used as given.
+- **Poles.** Each part set's `p000` is a column (1.4 wide in the later sets, a cluster of trunks in 千樹庭) that
+  VNDegen stands at every cell corner a wall ends on. Measured by fit: against eleven PC frames taken on known cells
+  in five dungeons, the poles cut the 8-by-6 block-mean error by 12% and supply the pillars along 堕天牢's and the
+  ice dungeon's walls (the ice dungeon's bare near walls were where the PC draws pillars). Poles in open space (every
+  corner) fit worse. `mpDDFF.amd` field 22 (63 on most floor cells) didn't tell which corners.
+- **Ambient.** `Light.pvl` holds a global ambient light (32) and two directional lights, each with ambient 80 and
+  diffuse 80 shining along (±10, 4.5, 30): together the 192 of the fit below. `floor.obj` column 7 is 1 in the
+  dungeons from 絶命院 on except 9 and 0 in 千樹庭 and 炎山洞; where it is 1 the PC draws as if the global ambient
+  were off (ambient 160 cut the block error in those dungeons from 55 to 33 and made their roofs no longer too
+  bright), so VNDegen uses 160 there. Inferred from the fit; the flag's real meaning is unknown.
 - **Light and fog.** Inferred from colour fits: textures times 1.6 × (ambient 0.75 plus the two lights' diffuse), and
   linear fog to (40, 45, 30) from −4 to 28 units. Back faces are culled. A texture whose top-left colour covers a
   tenth of it treats that colour as transparent (the grass `010w0x0`).

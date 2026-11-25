@@ -42,6 +42,8 @@ enum {
     GROUP_FLED = 2,
     ENCOUNTER_FROM = 40,
     GLOW_GAIN_X100 = 155,
+    ALL_AMBIENT = 192,
+    DIRECT_AMBIENT = 160,
 };
 
 enum {
@@ -68,6 +70,7 @@ enum {
     F_NAME = 4,
     F_MAP = 5,
     F_SET = 6,
+    F_NO_AMBIENT = 7,
     F_SPREAD = 12,
     F_STEPS = 13,
     F_FOG = 10,
@@ -532,6 +535,7 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     u32 fog = (u32)sa_table_int(&e->floors, r, F_FOG);
     s->dungeon.r3.fogColor = (fog >> 16 & 0xff) | (fog & 0xff00) | (fog & 0xff) << 16;
     s->dungeon.floorGain = sa_table_int(&e->floors, r, F_GLOW) == 1 ? GLOW_GAIN_X100 / 100.0f : 1;
+    s->dungeon.ambient = (sa_table_int(&e->floors, r, F_NO_AMBIENT) ? DIRECT_AMBIENT : ALL_AMBIENT) / 255.0f;
     if (e->explored && dungeon < EXP_DUNGEONS && floor < EXP_FLOORS) {
         s->dungeon.visited = e->explored[dungeon][floor];
         s->dungeon.passage = e->passages[dungeon][floor];
@@ -937,7 +941,7 @@ static void change_floor(SA *s) {
     else sa_log(s, "no stairs to follow from %s", text(&s->exp.floors, s->exp.row, F_NAME));
 }
 
-enum { TRAP_HAZARD, TRAP_BLIND, TRAP_MAP, TRAP_RESIDENTS, TRAP_SUPPORT, TRAP_PURGE, TRAP_SGP, TRAP_ALARM, TRAP_PHANTOM, TRAP_CURSE, TRAP_TELEPORT, TRAP_SPIN };
+enum { TRAP_HAZARD, TRAP_BLIND, TRAP_MAP, TRAP_RESIDENTS, TRAP_SUPPORT, TRAP_PURGE, TRAP_SGP, TRAP_ALARM, TRAP_PHANTOM, TRAP_CURSE, TRAP_TELEPORT, TRAP_SPIN, TRAP_HEAL };
 enum { HIT_WALK = 1, HIT_FLY = 2, HIT_ALL = 3 };
 enum { TRAP_STEPS = 50, AVOID_PERCENT = 20, AVOID_FINDER_PERCENT = 50, UNIT_FLYING = 13 };
 
@@ -964,6 +968,7 @@ static const struct {
     {32, TRAP_PHANTOM, 0, 0, 0, "幻影罠", NULL},
     {33, TRAP_SPIN, 0, 0, 0, NULL, NULL},
     {39, TRAP_TELEPORT, 0, 0, 0, NULL, "空間が歪み、運ばれた！"},
+    {42, TRAP_HEAL, 0, 0, 0, NULL, NULL},
 };
 
 static void notice(SA *s, const char *text) {
@@ -1034,6 +1039,10 @@ static bool spring_trap(SA *s) {
     if (t < 0) return false;
     int kind = traps[t].kind;
     char msg[256];
+    if (kind == TRAP_HEAL) {
+        heal_all(s, true, true);
+        return false;
+    }
     if (kind == TRAP_SPIN) {
         sa_dungeon_place(d, d->x, d->y, (int)(sa_vm_random(&s->vm) % 4));
         sync_position(s);

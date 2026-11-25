@@ -74,6 +74,8 @@ enum { PAD_FORWARD, PAD_BACK, PAD_RIGHT, PAD_LEFT, PAD_CORNER_L, PAD_CORNER_R };
 #define CAM_PITCH (-0.08f)
 #define FOV 47.2f
 #define LIGHT_GAIN 1.6f
+#define AMBIENT_ALL (192.0f / 255.0f)
+#define POLE_SIDE (DUN_SIDE + 1)
 #define QUARTER 1.5707963f
 #define VIEW_SLOPE 0.75f
 
@@ -192,6 +194,7 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     d->r3.fogColor = 0x1e2d28;
     d->r3.cull = -1;
     d->floorGain = 1;
+    d->ambient = AMBIENT_ALL;
     memset(d->own, 0, sizeof d->own);
     memset(d->ownPassage, 0, sizeof d->ownPassage);
     memset(d->seen, 0, sizeof d->seen);
@@ -540,8 +543,8 @@ static void make_cam(const Dungeon *d, Cam *c) {
     c->u[2] = c->f[0] * c->r[1] - c->f[1] * c->r[0];
 }
 
-static float shade_of(const float *n) {
-    float s = 192.0f / 255.0f;
+static float shade_of(const Dungeon *d, const float *n) {
+    float s = d->ambient;
     for (int i = 0; i < 2; i++) {
         float l = sqrtf(lights[i][0] * lights[i][0] + lights[i][1] * lights[i][1] + lights[i][2] * lights[i][2]);
         float dot = (n[0] * lights[i][0] + n[1] * lights[i][1] + n[2] * lights[i][2]) / l;
@@ -575,7 +578,7 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
                                n[0] * c->f[0] + n[1] * c->f[1] + n[2] * c->f[2]};
                 v[j].u = pv->uv[0];
                 v[j].v = pv->uv[1];
-                v[j].shade = shade_of(cn) * (name[0] == 'f' ? d->floorGain : 1);
+                v[j].shade = shade_of(d, cn) * (name[0] == 'f' ? d->floorGain : 1);
             }
             r3_tri(&d->r3, v, tex);
         }
@@ -617,10 +620,29 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
                 k--;
             }
         }
+    bool pole[POLE_SIDE * POLE_SIDE];
+    memset(pole, 0, sizeof pole);
     for (int i = 0; i < n; i++) {
         int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
         const i32 *cell = d->cell[row * DUN_SIDE + col];
         if (cell[F_FLOOR] < 0) continue;
+        for (int s = 0; s < 4; s++) {
+            int w = cell[wallField[s]];
+            if (w < 0 || w == WALL_PASSAGE) continue;
+            int ax = col + (s == DIR_E), ay = row + (s == DIR_S), bx = col + (s != DIR_W), by = row + (s != DIR_N);
+            pole[ay * POLE_SIDE + ax] = pole[by * POLE_SIDE + bx] = true;
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
+        const i32 *cell = d->cell[row * DUN_SIDE + col];
+        if (cell[F_FLOOR] < 0) continue;
+        for (int k = 0; k < 4; k++) {
+            int px = col + (k & 1), py = row + (k >> 1);
+            if (!pole[py * POLE_SIDE + px]) continue;
+            pole[py * POLE_SIDE + px] = false;
+            draw_part(d, &d->set, &c, "p000", ((float)px - 0.5f) * CELL, -((float)py - 0.5f) * CELL, 0);
+        }
         float cx = (float)col * CELL, cz = -(float)row * CELL;
         char name[16];
         snprintf(name, sizeof name, "f%03d", cell[F_FLOOR]);
