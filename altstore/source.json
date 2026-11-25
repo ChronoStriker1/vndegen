@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.13",
+          "buildVersion": "3466",
+          "date": "2026-11-25T21:43:43Z",
+          "localizedDescription": "On the iPhone Duo held sideways, Clear of the camera now knows the picture size of every engine's games.\n\n## Downloads\n\n- `VNDegen-0.60.13-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.13.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.13-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n\n\n\n\n## Changed\n\n- **iPhone Duo:** Godot, Ren'Py, Artemis, KiriKiri, SiglusEngine, TyranoScript and Flash games now tell VNDegen their picture size. With the Duo closed and held on its side at Clear of the camera, a wide game from these engines now fits below or above the camera instead of always sitting beside it. KiriKiri and Godot games that change their size while playing are followed.\n\n## Known limits\n\n- Twine stories report no size, because they lay out as pages and fill either area, so they stay beside the camera's column.\n- Ren'Py games on the Mac and Unity games run in their own windows and aren't affected.\n\n## What wasn't tested\n\n- No physical iPhone Duo was used. On the iPhone Duo simulator, a Godot game (16:9) and a KiriKiri game (4:3) were checked with the camera on each side. Artemis, SiglusEngine, Ren'Py, TyranoScript and Flash were checked by unit tests only, and a game changing its size mid-game wasn't tried.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.13/VNDegen-0.60.13.ipa",
+          "size": 132803197,
+          "sha256": "d45a330ccf9465c5874a98ec06333c31cbe61791ec32e66fa18f1a594e628e89",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.12",
           "buildVersion": "3455",
           "date": "2026-11-25T20:25:42Z",
