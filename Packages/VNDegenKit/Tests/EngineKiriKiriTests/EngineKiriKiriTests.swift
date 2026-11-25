@@ -497,6 +497,7 @@ private enum FakeEngine {
     nonisolated(unsafe) static var menu: String?
     nonisolated(unsafe) static var clicked: [String] = []
     nonisolated(unsafe) static var problem: String?
+    nonisolated(unsafe) static var picture: (Int32, Int32)?
     /// Runs inside the next frame, as a native modal loop would.
     nonisolated(unsafe) static var duringFrame: (() -> Void)?
     /// Runs inside the start, as a dialog the game shows while it starts would.
@@ -512,6 +513,7 @@ private enum FakeEngine {
         menu = nil
         clicked = []
         problem = nil
+        picture = nil
         duringFrame = nil
         duringStart = nil
     }
@@ -558,6 +560,12 @@ private enum FakeEngine {
             },
             menuClick: { id in
                 FakeEngine.clicked.append(String(cString: id!))
+                return true
+            },
+            pictureSize: { width, height in
+                guard let picture = FakeEngine.picture else { return false }
+                width?.pointee = picture.0
+                height?.pointee = picture.1
                 return true
             },
             problem: { FakeEngine.problem.map { UnsafePointer(strdup($0)!) } })
@@ -630,6 +638,26 @@ private enum FakeEngine {
         }
         session.step()
         #expect(FakeEngine.clicked == ["7"])
+        session.terminate()
+        session.step()
+        await session.waitUntilStopped()
+    }
+
+    @Test func reportsTheGamesScreenSizeAfterEachFrameThatChangesIt() async throws {
+        let session = try session("Test Game 03")
+        let host = try #require(session.view as? KiriKiriHostView)
+        let changes = NotificationCount(.gamePictureSizeChanged, object: host)
+        host.onReady?()
+        session.step()
+        #expect((session.view as? GamePictureSource)?.pictureSize == nil)
+        FakeEngine.picture = (640, 480)
+        session.step()
+        session.step()
+        #expect((session.view as? GamePictureSource)?.pictureSize == CGSize(width: 640, height: 480))
+        FakeEngine.picture = (1024, 768)
+        session.step()
+        #expect((session.view as? GamePictureSource)?.pictureSize == CGSize(width: 1024, height: 768))
+        #expect(changes.count == 2)
         session.terminate()
         session.step()
         await session.waitUntilStopped()

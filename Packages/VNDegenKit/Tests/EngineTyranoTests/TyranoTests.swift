@@ -54,7 +54,7 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
     defer { try? FileManager.default.removeItem(at: root) }
     #expect(detect(root) == EngineMatch(engine: .tyrano, confidence: .certain, version: "4.50", evidence: "tyrano/plugins/kag/kag.js"))
     let tyrano = try #require(TyranoGame(folder: root))
-    #expect(tyrano == TyranoGame(webRoot: "", packaging: .nwjs, version: "4.50", projectID: "TestGame01", savesToFiles: true))
+    #expect(tyrano == TyranoGame(webRoot: "", packaging: .nwjs, version: "4.50", projectID: "TestGame01", savesToFiles: true, pictureSize: nil))
     #expect(TyranoPlugin.runtime(for: tyrano) == .nwjs(execPath: "/game/Game.app/Contents/MacOS/nwjs"))
 
     let location = try #require(TyranoPlugin().saveLocations(folder: root, dataDirectory: root).first)
@@ -88,7 +88,7 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
         "data/system/Config.tjs": ";projectID = packed;\n;configSave = webstorage\n",
     ])
     let tyrano = try #require(TyranoGame(folder: root))
-    #expect(tyrano == TyranoGame(webRoot: "resources/app.asar", packaging: .electron, version: "5.20", projectID: "packed", savesToFiles: false))
+    #expect(tyrano == TyranoGame(webRoot: "resources/app.asar", packaging: .electron, version: "5.20", projectID: "packed", savesToFiles: false, pictureSize: nil))
     #expect(TyranoPlugin.runtime(for: tyrano) == .electron(appPath: "/game/Game.app/Contents/Resources/app.asar"))
     #expect(detect(root)?.evidence == "resources/app.asar/tyrano/plugins/kag/kag.js")
 }
@@ -163,6 +163,17 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
     defer { try? FileManager.default.removeItem(at: root) }
     let tyrano = try #require(TyranoGame(folder: root))
     #expect(tyrano.savesToFiles && tyrano.projectID == "tyranoproject")
+}
+
+@Test func thePictureIsTheScreenSizeConfigTjsSets() throws {
+    let root = try game([
+        "index.html": "<html>", "package.json": "{}", "tyrano/plugins/kag/kag.js": kag450,
+        "data/system/Config.tjs": ";ScreenRatio=fix\r\n;ScreenCentering=true\r\n;scWidth=1350\r\n;scHeight=900\r\n",
+    ])
+    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(try #require(TyranoGame(folder: root)).pictureSize == CGSize(width: 1350, height: 900))
+    try Data(";scWidth=1350\r\n".utf8).write(to: root.appending(path: "data/system/Config.tjs"))
+    #expect(try #require(TyranoGame(folder: root)).pictureSize == nil)
 }
 
 @Test func anElectronBuildBacksUpItsSaveKeyAndTakesTheKeyOfRestoredSaves() throws {

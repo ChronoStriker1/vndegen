@@ -17,6 +17,7 @@ _vnkk_set_menu_bar
 _vnkk_menu_bar_shown
 _vnkk_menu
 _vnkk_menu_click
+_vnkk_picture_size
 _vnffmovie_open
 _vnffmovie_frame
 _vnffmovie_audio

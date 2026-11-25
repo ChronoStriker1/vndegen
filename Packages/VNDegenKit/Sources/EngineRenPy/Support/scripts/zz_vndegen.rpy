@@ -98,6 +98,18 @@ init 999 python in _vndegen:
 
     config.periodic_callbacks.append(note_main_menu)
 
+    if renpy.ios:
+        picture_reported = [None]
+
+        def report_picture():
+            size = (int(config.screen_width), int(config.screen_height))
+            if size != picture_reported[0]:
+                picture_reported[0] = size
+                import ctypes
+                ctypes.CDLL(None).vndegen_renpy_picture(size[0], size[1])
+
+        config.periodic_callbacks.append(report_picture)
+
     # On iOS VNDegen's launcher answers the hub instead, through quit_game.
     if not renpy.ios:
         signal.signal(signal.SIGTERM, request_quit)

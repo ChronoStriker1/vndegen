@@ -156,6 +156,11 @@
     // <object> elements.
     const players = () => Array.from(document.querySelectorAll('ruffle-player, ruffle-embed, ruffle-object'))
         .filter((player) => typeof player.ruffle === 'function');
+    window.__vndegenPicture = () => {
+        const list = players();
+        const metadata = list.length === 1 ? list[0].ruffle().metadata : null;
+        return metadata && metadata.width > 0 && metadata.height > 0 ? [metadata.width, metadata.height] : null;
+    };
     if (window.__vndegen) {
         window.__vndegen.onPause = (paused) => {
             if (paused) flush();

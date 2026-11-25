@@ -73,6 +73,7 @@ final class SiglusSession: EngineSession {
         var width: UInt32 = 0, height: UInt32 = 0
         core.api.siglus_screen_size!(created, &width, &height)
         screen = CGSize(width: Int(width), height: Int(height))
+        host.pictureSize = screen
         core.api.siglus_set_message_box!(created, { context, request, kind, title, message in
             guard let context else { return }
             let session = Unmanaged<SiglusSession>.fromOpaque(context).takeUnretainedValue()

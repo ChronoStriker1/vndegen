@@ -23,6 +23,7 @@ struct KiriKiriEngine {
     let menuBarShown: @convention(c) () -> Int32
     let menu: @convention(c) () -> UnsafePointer<CChar>?
     let menuClick: @convention(c) (UnsafePointer<CChar>?) -> Bool
+    let pictureSize: @convention(c) (UnsafeMutablePointer<Int32>?, UnsafeMutablePointer<Int32>?) -> Bool
     let problem: @convention(c) () -> UnsafePointer<CChar>?
 
     /// Nil when this build of VNDegen has no engine.
@@ -51,12 +52,15 @@ struct KiriKiriEngine {
               let menuBarShown: @convention(c) () -> Int32 = function("vnkk_menu_bar_shown"),
               let menu: @convention(c) () -> UnsafePointer<CChar>? = function("vnkk_menu"),
               let menuClick: @convention(c) (UnsafePointer<CChar>?) -> Bool = function("vnkk_menu_click"),
+              let pictureSize: @convention(c) (UnsafeMutablePointer<Int32>?, UnsafeMutablePointer<Int32>?) -> Bool =
+                function("vnkk_picture_size"),
               let problem: @convention(c) () -> UnsafePointer<CChar>? = function("vnkk_problem")
         else { return nil }
         return KiriKiriEngine(setFonts: setFonts, start: start, iterate: iterate, key: key, mouseButton: mouseButton, mouseMove: mouseMove,
                               click: click, wheel: wheel, text: text, setPaused: setPaused, requestQuit: requestQuit,
                               saveSystemData: saveSystemData, stop: stop, view: view, setMenuBar: setMenuBar,
-                              menuBarShown: menuBarShown, menu: menu, menuClick: menuClick, problem: problem)
+                              menuBarShown: menuBarShown, menu: menu, menuClick: menuClick, pictureSize: pictureSize,
+                              problem: problem)
     }
 
     /// Hands the engine the Windows font substitutes FontPack has configured, for the next game it starts.

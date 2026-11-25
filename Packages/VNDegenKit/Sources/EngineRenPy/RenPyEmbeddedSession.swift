@@ -52,6 +52,9 @@ final class RenPyEmbeddedSession: EngineSession {
             let uiWindow = Unmanaged<UIWindow>.fromOpaque(window).takeUnretainedValue()
             MainActor.assumeIsolated { RenPyEmbeddedSession.active?.container.show(uiWindow) }
         }
+        vndegen_renpy_set_picture_handler { width, height in
+            MainActor.assumeIsolated { RenPyEmbeddedSession.active?.container.pictureSize = CGSize(width: Int(width), height: Int(height)) }
+        }
         observeLifeCycle()
         // A run loop block, not a main-queue one, as vndegen_renpy_run requires. It also runs after the hub has put
         // the session's view on screen.
@@ -194,6 +197,9 @@ private final class RenPyContainerView: UIView {
     /// controller, so the controller is kept for it.
     private static var sdlController: UIViewController?
     private weak var gameView: UIView?
+    var pictureSize: CGSize? {
+        didSet { if pictureSize != oldValue { NotificationCenter.default.post(name: .gamePictureSizeChanged, object: self) } }
+    }
 
     init() {
         super.init(frame: .zero)
@@ -230,4 +236,6 @@ private final class RenPyContainerView: UIView {
         gameView.frame = bounds.offsetBy(dx: 0, dy: min(0, gameView.frame.minY))
     }
 }
+
+extension RenPyContainerView: GamePictureSource {}
 #endif

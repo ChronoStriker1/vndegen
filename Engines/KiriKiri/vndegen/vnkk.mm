@@ -574,6 +574,15 @@ bool vnkk_menu_click(const char *id)
     return started && !finished && id && VNKKMenuClick(id);
 }
 
+bool vnkk_picture_size(int *width, int *height)
+{
+    if (!started || finished || !TVPMainWindow)
+        return false;
+    *width = TVPMainWindow->GetInnerWidth();
+    *height = TVPMainWindow->GetInnerHeight();
+    return *width > 0 && *height > 0;
+}
+
 void vnkk_record_problem(const char *sentence)
 {
     problem = sentence;
