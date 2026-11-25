@@ -284,8 +284,9 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   (しばらくスペシャルギュンギュスカーが使えない！), 23 浄化罠 (スペシャルギュンギュスカー効果が消えた！), 24 格減らし罠 and 25
   格枯らし罠 (C042 −1 and −2, measured), 30 警報 (no 罠 in its name), 32 幻影罠. 39 says 「空間が歪み、運ばれた！」 and
   follows its link. 33 turns the party without a word (east to south once). 41 is a dark zone: its model `a041` is a
-  box that fills the view from inside, and the minimap is hidden there. 42 is a magic circle (`a042`), no message
-  and no effect seen at full health. 堕天牢's 1 to 6 are floor hazards with no 回避: 1 棘の床 (徒歩タイプにダメージ！,
+  box that fills the view from inside, and the minimap is hidden there. 42 is a magic circle (`a042`) that heals
+  without a word: measured, Darkus at 20 of 170 HP and 5 of 35 MP walked onto one and came back full (the whole
+  party is inferred). 堕天牢's 1 to 6 are floor hazards with no 回避: 1 棘の床 (徒歩タイプにダメージ！,
   measured −51 of 170 HP), 2 棘の風 (飛行), 3 嫌な音 (全員の気力が減った！), 4 不快な爆破 (全員にダメージ！ and
   気力, measured −39 of 170 HP and −7 of 35 MP), 5 不快なヌメリ (徒歩, both) and 6 不快な風 (飛行, both). The game's
   manual (`html/page/img/trap.jpg`) names the trap families: ダークゾーン, 暗闇, 地図破り, 大警告 (battles add no

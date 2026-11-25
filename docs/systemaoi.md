@@ -126,7 +126,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   breakthrough damage are measured; the odds of each event are fitted to the original's counts. Facilities gain
   EXP each turn and level up, and town posts raise their area's production. 配置 has 一覧, 組織図 and 編成, and the
   status card switches to 能力詳細. The later dungeons' floor objects work: traps with their messages, timers and
-  minimap icons, teleporters and stairs from the maps' link records, spinners, dark zones and 堕天牢's floor
+  minimap icons, teleporters and stairs from the maps' link records, spinners, dark zones, healing magic circles and 堕天牢's floor
   hazards; several effects' sizes are inferred. These live in the original's exe, not its scripts, and are rebuilt
   from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
