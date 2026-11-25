@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import EngineSiglus
@@ -167,4 +168,14 @@ private let seen = Data([0x00, 0x00, 0x00, 0x00, 0x40, 0x9c, 0x00, 0x00])
         #expect(SiglusPrompt.buttons(1) == ["OK", "Cancel"])
         #expect(SiglusPrompt.buttons(3) == ["Yes", "No", "Cancel"])
     }
+}
+
+@MainActor @Test func theViewReportsTheGamesScreenOnceForEachChange() {
+    let host = SiglusHostView()
+    let changes = NotificationCount(.gamePictureSizeChanged, object: host)
+    #expect((host as GamePictureSource).pictureSize == nil)
+    host.pictureSize = CGSize(width: 1280, height: 720)
+    host.pictureSize = CGSize(width: 1280, height: 720)
+    #expect(changes.count == 1)
+    #expect((host as GamePictureSource).pictureSize == CGSize(width: 1280, height: 720))
 }
