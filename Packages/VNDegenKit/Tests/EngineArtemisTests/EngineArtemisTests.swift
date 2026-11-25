@@ -194,3 +194,13 @@ import VNCore
     }
 }
 #endif
+
+@MainActor @Test func theViewReportsTheStageOnceForEachChange() {
+    let host = ArtemisHostView()
+    let changes = NotificationCount(.gamePictureSizeChanged, object: host)
+    #expect((host as GamePictureSource).pictureSize == nil)
+    host.pictureSize = CGSize(width: 1280, height: 720)
+    host.pictureSize = CGSize(width: 1280, height: 720)
+    #expect(changes.count == 1)
+    #expect((host as GamePictureSource).pictureSize == CGSize(width: 1280, height: 720))
+}
