@@ -42,6 +42,7 @@ static const struct {
     {622, 930, 547, {813, 655, 493, 335, 170}},
 };
 
+enum { HOLDERS = 11, HOLDER_SCALE = 4, HOLDER_COLS = 5, HOLDER_ROWS = 4, HOLDER_FRAMES = 18, HOLDER_FRAME_MS = 100, HOLDER_DY = 13, HOLDER_MARGIN = 20 };
 enum { RULE_FLOORS = 1, RULE_SIZE, RULE_MAX_SIZE, RULE_TURNS = 5, RULE_INTRUDERS, DEPTH_OFFSET = 42, THROUGH_SHARE = 400, FAME_OFFSET = 11, BASE_INTRUDERS = 8 };
 
 static int rule(const SA *s, int id, int col) {
@@ -77,6 +78,7 @@ void sa_maze_free(SA *s) {
     sa_table_free(&v->rules);
     sa_table_free(&v->areas);
     for (int i = 0; i < 13; i++) sa_image_free(v->icon[i]);
+    for (int i = 0; i < HOLDERS; i++) sa_image_free(v->holder[i]);
     for (int k = 0; k < MAZE_FLOORS; k++)
         for (int z = 0; z < MAZE_SIZES; z++)
             for (int p = 0; p < 4; p++) sa_image_free(v->piece[k][z][p]);
@@ -410,7 +412,55 @@ void sa_maze_draw_scene(SA *s, u32 *fb) {
     if (s->vm.c[C_MAZE_THROUGH] > 0 && area_at(s, deep, 0, &ax, &ay)) sa_blit(fb, icon(s, ICON_EXIT), floorAt[deep].x[size - 1] - EXIT_DX, ay);
 }
 
+static Image *scale_frames(const Image *sheet) {
+    int fw = sheet->w / HOLDER_COLS, fh = sheet->h / HOLDER_ROWS, w = fw / HOLDER_SCALE, h = fh / HOLDER_SCALE;
+    Image *out = sa_image_new(w * HOLDER_COLS, h * HOLDER_ROWS), *frame = sa_image_new(fw, fh);
+    for (int f = 0; f < HOLDER_COLS * HOLDER_ROWS; f++) {
+        int sx = f % HOLDER_COLS * sheet->w / HOLDER_COLS, sy = f / HOLDER_COLS * fh;
+        for (int y = 0; y < fh; y++) memcpy(frame->px + (size_t)y * fw, sheet->px + (size_t)(sy + y) * sheet->w + sx, (size_t)fw * 4);
+        Image *small = sa_image_scale(frame, w, h);
+        for (int y = 0; y < h; y++) memcpy(out->px + (size_t)(f / HOLDER_COLS * h + y) * out->w + f % HOLDER_COLS * w, small->px + (size_t)y * w, (size_t)w * 4);
+        sa_image_free(small);
+    }
+    sa_image_free(frame);
+    return out;
+}
+
+static void place_holders(SA *s) {
+    MazeView *v = &s->mazeView;
+    for (int i = 0; i < HOLDERS; i++) {
+        sa_image_free(v->holder[i]);
+        v->holder[i] = NULL;
+        int post = POST_HEAD + i, unit = s->party.post[post];
+        if (!unit || !sa_maze_post_open(&s->maze, &s->vm, post)) continue;
+        int r = sa_party_unit_row(&s->party, unit);
+        if (r < 0) continue;
+        char name[24];
+        snprintf(name, sizeof name, "u%04de0.agf", sa_table_int(&s->party.units, r, 11));
+        Image *sheet = sa_load_image(&s->vfs, name);
+        if (!sheet) continue;
+        v->holder[i] = scale_frames(sheet);
+        sa_image_free(sheet);
+        int k = post >= POST_FLOOR1 && post < POST_FLOOR1 + MAZE_FLOORS ? post - POST_FLOOR1 : s->maze.floors - 1;
+        const Image *f = piece(s, k, v->size[k], PIECE_FLOOR);
+        int left = floorAt[k].x[v->size[k] - 1], span = f ? f->w - 2 * HOLDER_MARGIN : 0;
+        v->holderFloor[i] = k;
+        v->holderX[i] = left + HOLDER_MARGIN + (span > 0 ? (int)(sa_vm_random(&s->vm) % (u32)span) : 0);
+    }
+}
+
+static void draw_holders(SA *s, u32 *fb) {
+    MazeView *v = &s->mazeView;
+    for (int i = 0; i < HOLDERS; i++) {
+        const Image *h = v->holder[i];
+        if (!h) continue;
+        int fw = h->w / HOLDER_COLS, fh = h->h / HOLDER_ROWS, frame = (int)(v->ms / HOLDER_FRAME_MS + (u32)i * 7) % HOLDER_FRAMES;
+        sa_blit_rect(fb, h, frame % HOLDER_COLS * fw, frame / HOLDER_COLS * fh, fw, fh, v->holderX[i], floorAt[v->holderFloor[i]].y - HOLDER_DY);
+    }
+}
+
 void sa_maze_open(SA *s) {
+    place_holders(s);
     s->mazeView.hover = 0;
     s->mode = MODE_MAZE;
     s->dirty = true;
@@ -502,6 +552,7 @@ static void draw(SA *s) {
     MazeView *v = &s->mazeView;
     u32 *fb = s->fb;
     sa_maze_draw_scene(s, fb);
+    draw_holders(s, fb);
     sa_blit(fb, v->art[ART_BAR], BAR_X, BAR_Y);
     const bool on[2] = {!s->town.shut[TW_MAZE_ROLES], !v->hideRecent};
     for (int i = 0; i < 2; i++)
@@ -512,9 +563,13 @@ static void draw(SA *s) {
     sa_blit_rect(fb, v->art[ART_BACK], 0, v->hover == HOVER_BACK ? BACK_H : 0, BACK_W, BACK_H, BACK_X, BACK_Y);
 }
 
-bool sa_maze_frame(SA *s) {
+bool sa_maze_frame(SA *s, u32 elapsedMs) {
     if (s->mode != MODE_MAZE) return false;
     MazeView *v = &s->mazeView;
+    u32 before = v->ms / HOLDER_FRAME_MS;
+    v->ms += elapsedMs;
+    for (int i = 0; i < HOLDERS; i++)
+        if (v->holder[i] && v->ms / HOLDER_FRAME_MS != before) s->dirty = true;
     int h = hit(s, s->mouseX, s->mouseY);
     if (h != v->hover) {
         v->hover = h;

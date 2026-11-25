@@ -806,9 +806,45 @@ static int town_range(SA *s, int r, int level, int col) {
     return hi > lo ? lo + (int)(sa_vm_random(&s->vm) % (u32)(hi - lo + 1)) : lo;
 }
 
+enum { FIRST_LEISURE = 116, LAST_LEISURE = 120 };
+enum { POST_MAYOR = 1, POST_DEPUTY_MAYOR, POST_FARM, POST_TRADE, POST_INDUSTRY, POST_GUARD, POST_SCHOOL, POST_LEISURE, POST_HEALTH, TOWN_POSTS };
+
+static int post_of_facility(const SA *s, int r) {
+    int id = sa_table_int(&s->town.build, r, 0);
+    if (id >= FIRST_LEISURE && id <= LAST_LEISURE) return POST_LEISURE;
+    static const char *const areas[] = {"農業", "商業", "工業", "行政", "学園", "環境"};
+    static const int posts[] = {POST_FARM, POST_TRADE, POST_INDUSTRY, POST_GUARD, POST_SCHOOL, POST_HEALTH};
+    const char *area = sa_table_text(&s->town.build, r, 2);
+    for (int i = 0; i < 6; i++)
+        if (!strcmp(area, areas[i])) return posts[i];
+    return 0;
+}
+
+static void post_rolls(SA *s, int bonus[TOWN_POSTS]) {
+    for (int p = 1; p < TOWN_POSTS; p++) {
+        int gov = 0, lead = 0, unit = s->party.post[p];
+        if (unit) sa_party_post_stats(&s->party, unit, p, &gov, &lead);
+        int lo = p == POST_DEPUTY_MAYOR ? 15 : 30, hi = p == POST_DEPUTY_MAYOR ? 35 : 70;
+        bonus[p] = unit ? gov * (lo + (int)(sa_vm_random(&s->vm) % (u32)(hi - lo + 1))) : 0;
+    }
+}
+
+static void add_post_bonus(SA *s, int r, const int bonus[TOWN_POSTS], int *food, int *money, int *res) {
+    int post = post_of_facility(s, r);
+    int total = bonus[POST_DEPUTY_MAYOR] + (post ? bonus[post] : 0) + (post && post != POST_GUARD ? bonus[POST_MAYOR] : 0);
+    int base[3] = {sa_table_int(&s->town.build, r, 25), sa_table_int(&s->town.build, r, 27), sa_table_int(&s->town.build, r, 29)};
+    if (total <= 0 || (!base[0] && !base[1] && !base[2])) return;
+    int main = 0;
+    for (int i = 1; i < 3; i++)
+        if (base[i] > base[main]) main = i;
+    int *out[3] = {food, money, res};
+    *out[main] += total / 100;
+}
+
 void sa_end_turn(SA *s) {
     VM *vm = &s->vm;
-    int food = 0, money = 0, res = 0, people = 0, cap = 0;
+    int food = 0, money = 0, res = 0, people = 0, cap = 0, bonus[TOWN_POSTS];
+    post_rolls(s, bonus);
     for (int c = 0; c < TOWN_CELLS; c++) {
         int type = s->town.cell[c].type;
         int r = type ? sa_town_type_row(&s->town, type) : -1;
@@ -820,6 +856,7 @@ void sa_end_turn(SA *s) {
         money += town_range(s, r, level, 27);
         res += town_range(s, r, level, 29) - sa_town_value(&s->town, r, level, 34);
         people += town_range(s, r, level, 23);
+        add_post_bonus(s, r, bonus, &food, &money, &res);
     }
     sa_town_grow_all(&s->town, vm, 1);
     sa_town_level_up(&s->town);
@@ -1227,7 +1264,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_equip_frame(s)) return true;
     if (sa_shop_frame(s)) return true;
     if (sa_mission_frame(s)) return true;
-    if (sa_maze_frame(s)) return true;
+    if (sa_maze_frame(s, elapsedMs)) return true;
     if (sa_train_frame(s)) return true;
     if (sa_deploy_frame(s, elapsedMs)) return true;
     if (sa_savescreen_frame(s)) return true;

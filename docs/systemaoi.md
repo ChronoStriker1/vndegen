@@ -71,7 +71,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   says the defence failed). 迷宮情報's numbers and marks come from the post holders, the staffed facilities and
   the depth; 評判 from the facilities sets how many come. The 迷宮 deepens to seven floors as the town grows and
   time passes, each floor widens with its 階層長, and 補佐, 支援 and 遊撃 open with depth. 迷宮 post holders gain
-  EXP every turn. The cross-section shows each area's event and the breakthrough.
+  EXP every turn and stand on their floors in the cross-section, which also shows each area's event and the
+  breakthrough.
   Each command first runs the game's hook for it (`bo3000.box` script 0 with `C095` set to the command), so its
   first-use help shows as in the original. 建設 opens the build screen: the list, the board, the card, Reset, Undo, 決定
   and 戻る, with the town window showing the result before 決定. 内政 shows the throne room with the 視察 and イベント actions
@@ -120,10 +121,11 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   areas, area entries registered at door spots, the missions (マクドゥの試験) from turn 17, recruits from the town's housing, and area bosses whose
   defeat recruits their leaders.
   Hidden doors (wall 100) open with a 感知 unit in the party (inferred). 配置's 組織図 posts (the town's and, from
-  turn 42, the 迷宮's) and 内政's 交換 are there, with the holders' ability raises; posts don't change the town's
-  production yet. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
-  breakthrough damage are measured; the odds of each event are fitted to the original's counts. Not built yet:
-  the post holders' small figures on their floors in the cross-section, 編成, and the dungeons after 炎山洞. These
+  turn 42, the 迷宮's) and 内政's 交換 are there, with the holders' ability raises; posts change the town's
+  production. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
+  breakthrough damage are measured; the odds of each event are fitted to the original's counts. Facilities gain
+  EXP each turn and level up, and town posts raise their area's production. Not built yet: 編成, and the dungeons
+  after 炎山洞. These
   live in the original's exe, not its scripts, and are rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.

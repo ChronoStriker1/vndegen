@@ -65,6 +65,9 @@ typedef struct MazeView {
     int size[MAZE_FLOORS];
     int hover;
     bool hideRecent;
+    Image *holder[11];
+    int holderX[11], holderFloor[11];
+    u32 ms;
 } MazeView;
 
 typedef struct Card {
@@ -295,7 +298,7 @@ void sa_maze_update(SA *s);
 bool sa_maze_turn(SA *s, int net[3]);
 void sa_maze_summary(const SA *s, Recent *r);
 void sa_maze_draw_scene(SA *s, u32 *fb);
-bool sa_maze_frame(SA *s);
+bool sa_maze_frame(SA *s, u32 elapsedMs);
 void sa_exp_init(SA *s);
 void sa_exp_free(SA *s);
 void sa_exp_open_select(SA *s);

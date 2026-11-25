@@ -28,6 +28,13 @@ where play couldn't pin it down.
   3 to 5 comes after it, so a level shows a turn later. A level adds every `TownLvup` row up to it to the
   facility's `TownBuil` values (column c adds to column c + 6), except housing: three level-10 住居 still housed
   200 each.
+- **Posts and production.** Measured over 4 turns each (fields, shops and mines, holders' 統治 10 to 200): the town
+  window's 収支 ignores posts, but at the turn's end each staffed facility in a post's area gains about 統治 × 0.3 to
+  0.7 (one roll a turn) on its main product: 農業担当 on fields' food (+51%, +265%, +481% and +1040% at 10, 50,
+  100 and 200), 商業担当 on shops' money, 工業担当 on mines' resources (not their money); 街長 the same on every
+  area but the 魔王亭's money; 街長補佐 about half that, the 魔王亭 included. Inferred: 警備担当 covers 行政, 教育担当
+  学園, 衛生担当 環境, and 娯楽担当 the 娯楽店, Ｈな娯楽店, スタジアム, プール and 酒造店 (which 商業担当 then
+  leaves); the main product is the largest of the facility's food, money and resources columns.
 - **Facilities.** `TownBuil.obj` columns: 9 housing, 18 build cost in resources, 19 workers needed, 23 and 24 residents a
   turn, 25 and 26 food, 27 and 28 money, 29 and 30 resources, 34 resources used a turn, 35 to 37 pictures, 66 and 67 the
   card's texts. Measured: costs and workers match the manual; a 魔王亭 makes 30 money a turn and a field costs 150
@@ -451,6 +458,10 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   money and, for traps, ⌈town 罠 points / 10⌉ resources.
 - **EXP.** Measured: every open 迷宮 post's holder gains 2 EXP per intruder each turn (16 for 8), whatever
   happened; town posts gain none.
+- **Post holders on the floors.** Measured from captures: each 迷宮 post's holder stands on a floor of the
+  cross-section (a floor head on its own, the 迷宮長 on the deepest) playing its attack animation, a different spot
+  each visit. Inferred: VNDegen draws the unit's `uNNNNe0` sheet (18 frames) at a quarter size, 100 ms a frame,
+  13 pixels above the floor's row (captures fit it to about 5 levels in 255, not exactly).
 - **Breakthrough.** Measured over 20 turns: each adventurer who passes the deepest floor takes 0.25% of food, money
   and resources, rounded up on the total (8 of them took 1000 from 50000, at any depth). The turn's income box then
   adds ダークス宮の防衛に失敗しました; a turn where all were sent back adds nothing.
