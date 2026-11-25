@@ -100,13 +100,14 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   goes on by itself to the defeat line and box over the dungeon view, then the turn's end.
 - **Expeditions.** 遠征 opens the dungeon select; an area's map is drawn in 3D from its part set (software rendered) in
   the original's own coordinates, walked with the pad, the arrow keys or the walk arrows that appear under the pointer
-  on the view (a click or tap walks, turns or sidesteps), with the compass, the step count, a minimap of visited cells
-  with the door, crystals and enemy groups, the 目標/時間 panel and the party's diorama. The party starts beside the door
-  home; 帰る on the door's cell brings the finds home. Stepping onto an edge passage moves to the neighbouring area.
-  Each area's enemy groups walk the routes in its map file, or wander, as red crosses on the minimap, moving with the
-  party's actions as in the original, and fight when met; random encounters begin after 40 steps. The game's hooks run
-  on entering, on stepping onto floor objects and walls, before and after battles and on the way home; a loss ends the
-  expedition.
+  on the view (a click or tap walks, turns or sidesteps; a tap leaves no arrow behind), with the compass, the step
+  count, a minimap of visited cells with the door, crystals and enemy groups, the 目標/時間 panel and the party's diorama.
+  The party starts beside the door home; 帰る on the door's cell brings the finds home. Stepping onto an edge passage
+  moves to the neighbouring area. Each area's enemy groups walk the routes in its map file, or wander, as red crosses
+  on the minimap, moving with the party's actions as in the original, and fight when met; more appear as the party
+  walks, a beaten group is gone and one the party fled from moves out of sight; random encounters begin after 40
+  steps. The game's hooks run on entering, on stepping onto floor objects and walls, before and after battles and on
+  the way home; a loss ends the expedition.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
@@ -146,9 +147,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 6 to 10
   over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred.
-- Dungeon: enemy groups that appear partway through a visit aren't rebuilt, and how a group behaves after a battle
-  is inferred; a floor's taken pickups and opened doors aren't saved (the original's image doesn't seem to hold
-  them either). 絶命院 still draws about 6 to 9% darker than the original.
+- Dungeon: how often a group appears partway through a visit (one in 140 steps) is fitted to two sightings, the
+  cell a fled group moves to is drawn by VNDegen's own random numbers, and when random battles start is known not
+  to be the 40 steps VNDegen uses in 中腹エリア; a floor's taken pickups and opened doors aren't saved (the
+  original's image doesn't seem to hold them either). 絶命院 still draws about 6 to 9% darker than the original.
 - Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
   学, 魔法全体防御, the 属性耐性 areas); abilities never seen in the original's saves (先制攻撃, 警戒心, 掛け声,
   the 支援 abilities and others) are written as zeros, and 資金管理 and 食料管理 sit at inferred slots. Enemies list
@@ -156,9 +158,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   level and adds those skills' element bonuses. Battle orders are written as the default for every member. Comments
   are typed as plain characters: there's no Japanese input method in the field, and on a touch screen without a
   keyboard the comment stays empty.
-- Option: the text speeds other than 最速 and 普通 and the auto speeds are inferred; the screen mode, message frame,
-  popup, cursor, 3D, game speed, battle, ranks, autosave mode, VE and inactive-volume settings are kept but do
-  nothing yet; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
+- Option: whether オートモード音声's 再生終了まで待つ adds the auto wait after the voice or overlaps it is inferred; the screen mode,
+  message frame, popup, cursor, 3D, game speed, battle, ranks, autosave mode, VE and inactive-volume settings are kept
+  but do nothing yet; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
   original shows in Windows tooltips aren't drawn.
 - Extra: ユニット図鑑, アイテム図鑑 and 迷宮踏破リスト aren't built (VNDegen doesn't yet record the units met, items found and
   floors walked). Pictures seen before this version aren't in the gallery until shown again. The small labels use

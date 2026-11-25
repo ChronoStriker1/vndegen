@@ -37,7 +37,8 @@ enum {
 };
 
 enum {
-    GROUP_SPAWN_DISTANCE = 8,
+    GROUP_AWAY = 3,
+    SYMBOL_CHANCE = 140,
     ENCOUNTER_FROM = 40,
     GLOW_GAIN_X100 = 155,
     ALL_AMBIENT = 192,
@@ -82,6 +83,7 @@ enum {
     P_MOVE = 7,
     F_GROUP_LISTS = 30,
     F_SYMBOLS = 18,
+    F_SYMBOL_MAX = 19,
     F_GROUP_WEIGHTS = 32,
     F_MORE_GROUPS = 35,
     F_CHESTS = 36,
@@ -362,8 +364,10 @@ static bool free_cell(const Dungeon *d, int c) {
 static int pick_cell(const Dungeon *d, int fromX, int fromY, int minDist, u32 h) {
     int dist[DUN_CELLS], n = 0, pick[DUN_CELLS];
     distances(d, fromX, fromY, dist);
-    for (int c = 0; c < DUN_CELLS; c++)
-        if (dist[c] >= minDist && free_cell(d, c)) pick[n++] = c;
+    for (int c = 0; c < DUN_CELLS; c++) {
+        int dx = abs(c % DUN_SIDE - fromX), dy = abs(c / DUN_SIDE - fromY);
+        if (dist[c] > 0 && (dx > dy ? dx : dy) >= minDist && free_cell(d, c)) pick[n++] = c;
+    }
     if (!n)
         for (int c = 0; c < DUN_CELLS; c++)
             if (dist[c] > 0 && free_cell(d, c)) pick[n++] = c;
@@ -468,7 +472,7 @@ static void next_dest(SA *s, ExpGroup *g) {
     set_dest(d, g, n > 1 ? cells[1 + sa_vm_random(&s->vm) % (u32)(n - 1)] : -1);
 }
 
-static void spawn_group(SA *s, const char *name, int route) {
+static void spawn_group(SA *s, const char *name, int route, int away) {
     Expedition *e = &s->exp;
     const Dungeon *d = &s->dungeon;
     int id = group_id(s, name);
@@ -484,7 +488,7 @@ static void spawn_group(SA *s, const char *name, int route) {
     g->dir = (int)(sa_vm_random(&s->vm) & 3);
     bool routed = route >= 0 && route < d->routeCount && d->route[route].count > 0;
     g->flags = routed ? route << 8 : -1;
-    int c = routed ? cell_of(d->route[route].point[0][0], d->route[route].point[0][1]) : pick_cell(d, d->x, d->y, 1, sa_vm_random(&s->vm));
+    int c = routed ? cell_of(d->route[route].point[0][0], d->route[route].point[0][1]) : pick_cell(d, d->x, d->y, away, sa_vm_random(&s->vm));
     g->x = c < 0 ? d->x : c % DUN_SIDE;
     g->y = c < 0 ? d->y : c / DUN_SIDE;
     sa_battle_roll(&s->battle, name, sa_vm_random(&s->vm), g->cells);
@@ -508,14 +512,14 @@ int sa_exp_area_registered(SA *s) {
 
 void sa_exp_add_group(SA *s, const char *name) {
     if (!s->exp.active) return;
-    spawn_group(s, name, -1);
+    spawn_group(s, name, -1, 1);
     sync_marks(s);
 }
 
 void sa_exp_add_group_at(SA *s, const char *name, int x, int y) {
     if (!s->exp.active) return;
     int before = s->exp.groupCount;
-    spawn_group(s, name, -1);
+    spawn_group(s, name, -1, 1);
     if (s->exp.groupCount > before && x >= 0 && y >= 0) {
         ExpGroup *g = &s->exp.group[s->exp.groupCount - 1];
         g->x = x;
@@ -532,9 +536,9 @@ static void spawn_list(SA *s, int col, int count, bool routes) {
     snprintf(buf, sizeof buf, "%s", *list && strcmp(list, "*") ? list : "");
     for (char *p = strtok(buf, "|"); p && n < EXP_GROUPS; p = strtok(NULL, "|")) names[n++] = p;
     if (routes)
-        for (int i = 0; i < n; i++) spawn_group(s, names[i], i);
+        for (int i = 0; i < n; i++) spawn_group(s, names[i], i, 1);
     else
-        for (int i = 0; i < count && n; i++) spawn_group(s, names[sa_vm_random(&s->vm) % (u32)n], -1);
+        for (int i = 0; i < count && n; i++) spawn_group(s, names[sa_vm_random(&s->vm) % (u32)n], -1, 1);
 }
 
 static void spawn_floor_groups(SA *s) {
@@ -547,7 +551,7 @@ static void spawn_floor_groups(SA *s) {
         int x, y;
         if (!*boss || !strcmp(boss, "*") || !sa_dungeon_find_mark(&s->dungeon, k + 1, &x, &y)) continue;
         int before = e->groupCount;
-        spawn_group(s, boss, -1);
+        spawn_group(s, boss, -1, 1);
         if (e->groupCount == before) continue;
         ExpGroup *g = &e->group[e->groupCount - 1];
         g->x = x;
@@ -555,6 +559,20 @@ static void spawn_floor_groups(SA *s) {
         g->stay = true;
         sa_log(s, "group %d stands at %d,%d", g->number, x, y);
     }
+}
+
+static void maybe_spawn_symbol(SA *s) {
+    Expedition *e = &s->exp;
+    const char *list = text(&e->floors, e->row, F_GROUP_LISTS + 1);
+    if (!*list || !strcmp(list, "*") || e->groupCount >= EXP_GROUPS) return;
+    int alive = 0;
+    for (int i = 0; i < e->groupCount; i++) alive += e->group[i].alive;
+    if (alive >= sa_table_int(&e->floors, e->row, F_SYMBOL_MAX) || sa_vm_random(&s->vm) % SYMBOL_CHANCE) return;
+    char buf[256], *names[EXP_GROUPS];
+    int n = 0;
+    snprintf(buf, sizeof buf, "%s", list);
+    for (char *p = strtok(buf, "|"); p && n < EXP_GROUPS; p = strtok(NULL, "|")) names[n++] = p;
+    if (n) spawn_group(s, names[sa_vm_random(&s->vm) % (u32)n], -1, GROUP_AWAY);
 }
 
 static void sync_marks(SA *s) {
@@ -577,13 +595,15 @@ static void group_act(SA *s, ExpGroup *g) {
     const Dungeon *d = &s->dungeon;
     if (g->stay) return;
     int here = cell_of(g->x, g->y);
-    if (g->target[0][0] < 0 || cell_of(g->target[0][0], g->target[0][1]) == here) next_dest(s, g);
+    if (g->retarget || g->target[0][0] < 0 || cell_of(g->target[0][0], g->target[0][1]) == here) {
+        g->retarget = false;
+        next_dest(s, g);
+    }
     if (g->target[0][0] < 0) return;
     if (g->target[1][0] >= 0 && cell_of(g->target[1][0], g->target[1][1]) == here) {
         memmove(g->target[1], g->target[2], sizeof g->target[0] * (EXP_TARGETS - 2));
         g->target[EXP_TARGETS - 1][0] = g->target[EXP_TARGETS - 1][1] = -1;
     }
-    if (g->target[1][0] < 0) plan_corners(d, g);
     int way = g->target[1][0] >= 0 ? cell_of(g->target[1][0], g->target[1][1]) : cell_of(g->target[0][0], g->target[0][1]);
     int path[DUN_CELLS], n = group_path(d, here, way, path);
     if (n < 2) {
@@ -743,7 +763,7 @@ void sa_exp_place_names(SA *s, const char **dungeon, const char **floor) {
 }
 
 static void pick_group(SA *s, char *out, size_t size) {
-    static const int lists[3] = {F_GROUP_LISTS, F_GROUP_LISTS + 1, F_MORE_GROUPS};
+    static const int lists[3] = {F_GROUP_LISTS, F_MORE_GROUPS, F_GROUP_LISTS + 1};
     int weight[3], total = 0;
     for (int i = 0; i < 3; i++) {
         const char *l = text(&s->exp.floors, s->exp.row, lists[i]);
@@ -862,12 +882,12 @@ void sa_exp_battle_over(SA *s, int result) {
         ExpGroup *g = &e->group[e->fighting];
         if (result == BATTLE_WON) g->alive = false;
         else {
-            int c = pick_cell(&s->dungeon, s->dungeon.x, s->dungeon.y, GROUP_SPAWN_DISTANCE, sa_vm_random(&s->vm));
+            int c = pick_cell(&s->dungeon, s->dungeon.x, s->dungeon.y, GROUP_AWAY, sa_vm_random(&s->vm));
             if (c >= 0) {
                 g->x = c % DUN_SIDE;
                 g->y = c / DUN_SIDE;
             }
-            g->fought++;
+            g->retarget = true;
         }
         e->fighting = -1;
         sync_marks(s);
@@ -1217,7 +1237,7 @@ static bool spring_trap(SA *s) {
     case TRAP_PHANTOM: {
         char group[16];
         snprintf(group, sizeof group, "罠幻%02d", (int)(sa_vm_random(&s->vm) % PHANTOMS));
-        spawn_group(s, group, -1);
+        spawn_group(s, group, -1, 1);
         sync_marks(s);
         break;
     }
@@ -1276,15 +1296,16 @@ static void after_move(SA *s, int r) {
     count_down_traps(s);
     if (spring_trap(s)) return;
     int hit = group_here(s);
-    if (hit < 0) tick_groups(s, &hit);
-    else sync_marks(s);
+    tick_groups(s, &hit);
     if (hit >= 0) {
         start_battle(s, hit);
         return;
     }
+    if (!e->calm) maybe_spawn_symbol(s);
+    sync_marks(s);
     bool calm = sa_exp_special_active(s, SPECIAL_NO_ENEMY) && (int)(sa_vm_random(&s->vm) % 100) >= sa_exp_special_value(s, SPECIAL_NO_ENEMY);
     count_down_specials(e);
-    if (e->steps >= ENCOUNTER_FROM && --e->stepsLeft <= 0) {
+    if (!e->calm && e->steps >= ENCOUNTER_FROM && --e->stepsLeft <= 0) {
         if (calm) reset_countdown(s);
         else {
             random_battle(s);
@@ -1341,7 +1362,7 @@ bool sa_exp_frame(SA *s, u32 ms) {
     if (sa_dungeon_tick(d, ms)) s->dirty = true;
     if (run_step_hook(s)) return true;
     if (sa_party_tick(&s->party, ms)) s->dirty = true;
-    if (sa_dungeon_hover(d, s->mouseX, s->mouseY)) s->dirty = true;
+    if (sa_dungeon_hover(d, s->exp.lifted ? -1 : s->mouseX, s->exp.lifted ? -1 : s->mouseY)) s->dirty = true;
     s->rightClicked = false;
     if (s->clicked) {
         s->clicked = false;

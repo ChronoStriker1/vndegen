@@ -52,6 +52,7 @@ uint32_t vnsystemaoi_frame_serial(VNSystemAoi *sa);
 enum { VNSYSTEMAOI_MOUSE_LEFT = 1, VNSYSTEMAOI_MOUSE_RIGHT = 2 };
 void vnsystemaoi_mouse_move(VNSystemAoi *sa, int x, int y);
 void vnsystemaoi_mouse_button(VNSystemAoi *sa, int button, bool down);
+void vnsystemaoi_pointer_lift(VNSystemAoi *sa);
 void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down);
 void vnsystemaoi_wheel(VNSystemAoi *sa, int notches);
 void vnsystemaoi_text(VNSystemAoi *sa, const char *utf8);
