@@ -72,6 +72,10 @@ struct HubMetrics: Equatable {
         return insets.leading > 0 ? (.leading, insets.leading) : (.trailing, insets.trailing)
     }
 
+    func controlsAcrossSideCamera(_ picture: SideCameraPicture) -> Bool {
+        picture == .fullWidth && landscapeSideCamera != nil
+    }
+
     func gameClearance(_ picture: SideCameraPicture, pictureSize: CGSize?) -> EdgeInsets {
         guard picture == .clearOfCamera, let camera = landscapeSideCamera else { return EdgeInsets() }
         let beside = camera.edge == .leading

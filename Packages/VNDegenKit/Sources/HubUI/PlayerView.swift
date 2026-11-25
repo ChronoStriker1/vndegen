@@ -57,14 +57,15 @@ struct PlayerView: View {
                 // the whole screen, so it keeps the full height, and its Home button sits in the other corner.
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input,
                                      gameFrame: gamePaneHeight == nil && metrics.landscapeSideCamera == nil ? nil : gameFrame,
-                                     controlsBelowGame: gamePaneHeight != nil)
+                                     controlsBelowGame: gamePaneHeight != nil, keepClear: metrics.occlusions)
                     .padding(.top, overlayMode == .gamepad ? metrics.cornerClearance : 0)
                     // Below the game, a side inset's camera is up beside the game, so the gamepad keeps the safe area's
                     // width but sits in the middle of the screen. The cursor's pad keeps the whole screen. The on-screen
                     // keyboard covers the controls rather than pushing them up over the game.
                     .padding(.horizontal, gamePaneHeight == nil || overlayMode != .gamepad ? 0
                              : (metrics.insets.leading + metrics.insets.trailing) / 2)
-                    .ignoresSafeArea(gamePaneHeight == nil ? [] : .container, edges: .horizontal)
+                    .ignoresSafeArea(gamePaneHeight != nil || overlayMode == .gamepad && controlsAcrossCamera ? .container : [],
+                                     edges: .horizontal)
                     .ignoresSafeArea(gamePaneHeight == nil ? [] : .keyboard)
             }
             if hub.input.mouse.showsKeyboard, !menu.isOpen, !isCovered {
@@ -86,6 +87,7 @@ struct PlayerView: View {
                 // users get back to the menu.
                 MenuButton(corner: game?.menuButtonCorner ?? .standard, metrics: metrics, action: menuButton,
                            move: setMenuButtonCorner)
+                    .ignoresSafeArea(controlsAcrossCamera ? .container : [], edges: .horizontal)
             }
             if isCovered {
                 // Recreated when the app becomes active, so the Face ID prompt starts in the foreground rather than
@@ -172,6 +174,8 @@ struct PlayerView: View {
 
     /// What touches do in the game now. Nil while the menu or the unlock screen covers it.
     private var overlayMode: TouchControlsMode? { menu.isOpen || isCovered ? nil : touchMode }
+
+    private var controlsAcrossCamera: Bool { gamePaneHeight == nil && metrics.controlsAcrossSideCamera(picture) }
 
     /// The game's height when it sits at the top of a portrait screen or window, above touch controls that would otherwise
     /// cover it. Nil when it fills the screen, as in landscape, and when the controls would leave the game no room.

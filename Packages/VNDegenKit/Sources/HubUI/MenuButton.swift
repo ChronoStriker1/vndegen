@@ -1,3 +1,4 @@
+import GameInput
 import SwiftUI
 import VNCore
 
@@ -31,6 +32,7 @@ struct MenuButton: View {
             .accessibilityAction(named: "Move to next corner") { move(corner.next) }
             .padding(10)
             .padding(corner.edge == .leading ? .leading : .trailing, corner.isTop ? metrics.topClearance(corner.edge) : 0)
+            .offset(metrics.menuButtonClearance(corner, in: proxy.frame(in: .global)))
             .offset(drag ?? .zero)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: corner.alignment)
         }
@@ -52,6 +54,16 @@ struct MenuButton: View {
                     move(target)
                 }
             }
+    }
+}
+
+extension HubMetrics {
+    func menuButtonClearance(_ corner: MenuButtonCorner, in area: CGRect) -> CGSize {
+        let inset = 10 + (corner.isTop ? topClearance(corner.edge) : 0)
+        let button = CGRect(x: corner.edge == .leading ? inset : area.width - inset - 48,
+                            y: corner.isTop ? 10 : area.height - 58, width: 48, height: 48)
+        return offsetClearing([button], of: occlusions.map { $0.offsetBy(dx: -area.minX, dy: -area.minY) },
+                              within: CGRect(origin: .zero, size: area.size))
     }
 }
 
