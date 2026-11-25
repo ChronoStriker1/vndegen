@@ -352,6 +352,18 @@ void vngd_request_quit(void) {
 	root->emit_signal(SNAME("close_requested"));
 }
 
+bool vngd_picture_size(float *p_width, float *p_height) {
+	SceneTree *tree = state.started ? SceneTree::get_singleton() : nullptr;
+	Window *root = tree ? tree->get_root() : nullptr;
+	if (!root) {
+		return false;
+	}
+	Size2 size = root->get_visible_rect().size;
+	*p_width = size.width;
+	*p_height = size.height;
+	return size.width > 0 && size.height > 0;
+}
+
 void vngd_stop(void) {
 	if (!state.os) {
 		return;

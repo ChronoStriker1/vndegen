@@ -131,15 +131,21 @@ final class GodotSession: EngineSession {
         displayLink.start(in: host) { [weak self] _ in self?.step() }
     }
 
-    fileprivate func step() {
+    func step() {
         switch state {
         case .running:
-            if engine.iterate() != 0 { finish() }
+            if engine.iterate() != 0 { finish() } else { readPictureSize() }
         case let .quitting(since):
             if engine.iterate() != 0 || ContinuousClock.now > since + Self.quitTimeout { finish() }
         case .waiting, .stopped:
             break
         }
+    }
+
+    private func readPictureSize() {
+        var width: Float = 0, height: Float = 0
+        guard engine.pictureSize(&width, &height) else { return }
+        host.pictureSize = CGSize(width: CGFloat(width), height: CGFloat(height))
     }
 
     private func finish() {

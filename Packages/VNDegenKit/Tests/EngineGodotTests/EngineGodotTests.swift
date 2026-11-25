@@ -727,3 +727,46 @@ private func key(_ code: Int) -> ControlAction { .key(KeyboardKey(windowsKeyCode
     for _ in 0..<10 { await Task.yield() }
     #expect(asked == ["https://discord.gg/abc", "https://example.com/third"])
 }
+
+private enum FakeGodot {
+    nonisolated(unsafe) static var picture: (Float, Float)?
+    nonisolated(unsafe) static var quitRequested = false
+
+    @MainActor static var engine: GodotEngine {
+        GodotEngine(start: { _ in 0 }, iterate: { FakeGodot.quitRequested ? 1 : 0 }, resize: { _, _, _ in }, key: { _, _, _ in },
+                    text: { _ in }, mouseMove: { _, _ in }, mouseButton: { _, _ in }, wheel: { _ in }, joyButton: { _, _ in },
+                    joyAxis: { _, _ in }, setPaused: { _ in }, setSpeed: { _ in }, requestQuit: { FakeGodot.quitRequested = true },
+                    pictureSize: { width, height in
+                        guard let picture = FakeGodot.picture else { return false }
+                        width?.pointee = picture.0
+                        height?.pointee = picture.1
+                        return true
+                    },
+                    stop: {}, problem: { nil })
+    }
+}
+
+@MainActor @Test func theViewReportsTheGamesViewportAfterEachFrameThatChangesIt() async throws {
+    FakeGodot.picture = nil
+    FakeGodot.quitRequested = false
+    let game = try GameFolder(["game.pck": pack(format: 1, version: (3, 5, 3), files: ["res://project.binary"]), "game.exe": Data()])
+    let data = TestFolders.root.appendingPathComponent("godot-data-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: data) }
+    let layout = try #require(GodotLayout(game.probe))
+    let launch = GameLaunch(game: Game(id: GameID("Test Game 109")), folder: game.root, dataDirectory: data, onExit: {})
+    let session = try GodotSession(launch, paths: GodotPaths(folder: game.root, dataDirectory: data, layout: layout),
+                                   requirements: GodotRequirements(), engine: FakeGodot.engine)
+    let host = try #require(session.view as? GodotHostView)
+    let changes = NotificationCount(.gamePictureSizeChanged, object: host)
+    host.onReady?()
+    session.step()
+    #expect((session.view as? GamePictureSource)?.pictureSize == nil)
+    FakeGodot.picture = (1280, 720)
+    session.step()
+    session.step()
+    #expect((session.view as? GamePictureSource)?.pictureSize == CGSize(width: 1280, height: 720))
+    #expect(changes.count == 1)
+    session.terminate()
+    session.step()
+    await session.waitUntilStopped()
+}

@@ -18,6 +18,7 @@ struct GodotEngine {
     let setPaused: @convention(c) (Bool) -> Void
     let setSpeed: @convention(c) (Int32) -> Void
     let requestQuit: @convention(c) () -> Void
+    let pictureSize: @convention(c) (UnsafeMutablePointer<Float>?, UnsafeMutablePointer<Float>?) -> Bool
     let stop: @convention(c) () -> Void
     let problem: @convention(c) () -> UnsafePointer<CChar>?
 
@@ -54,12 +55,15 @@ struct GodotEngine {
               let setPaused: @convention(c) (Bool) -> Void = function("vngd_set_paused"),
               let setSpeed: @convention(c) (Int32) -> Void = function("vngd_set_speed"),
               let requestQuit: @convention(c) () -> Void = function("vngd_request_quit"),
+              let pictureSize: @convention(c) (UnsafeMutablePointer<Float>?, UnsafeMutablePointer<Float>?) -> Bool =
+                function("vngd_picture_size"),
               let stop: @convention(c) () -> Void = function("vngd_stop"),
               let problem: @convention(c) () -> UnsafePointer<CChar>? = function("vngd_problem")
         else { return nil }
         return GodotEngine(start: start, iterate: iterate, resize: resize, key: key, text: text, mouseMove: mouseMove,
                            mouseButton: mouseButton, wheel: wheel, joyButton: joyButton, joyAxis: joyAxis,
-                           setPaused: setPaused, setSpeed: setSpeed, requestQuit: requestQuit, stop: stop, problem: problem)
+                           setPaused: setPaused, setSpeed: setSpeed, requestQuit: requestQuit, pictureSize: pictureSize,
+                           stop: stop, problem: problem)
         #else
         return nil
         #endif

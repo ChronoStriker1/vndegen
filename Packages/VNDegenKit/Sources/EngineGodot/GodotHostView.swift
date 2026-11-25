@@ -8,6 +8,9 @@ import UIKit
 /// hub shows no touch gamepad over it, work as the mouse, so a tap clicks where it lands. A hardware keyboard reaches
 /// the game through this view, which takes keyboard focus whenever it is on screen.
 final class GodotHostView: UIView {
+    var pictureSize: CGSize? {
+        didSet { if pictureSize != oldValue { NotificationCenter.default.post(name: .gamePictureSizeChanged, object: self) } }
+    }
     /// Called once, after the view is first in a window at a usable size.
     var onReady: (() -> Void)?
     /// Called when the view's size or scale changes after that.
@@ -124,6 +127,9 @@ import AppKit
 /// The view the game draws in, backed by the CAMetalLayer the engine renders to. It reads the mouse and keyboard for
 /// the game and takes keyboard focus whenever it is on screen.
 final class GodotHostView: NSView {
+    var pictureSize: CGSize? {
+        didSet { if pictureSize != oldValue { NotificationCenter.default.post(name: .gamePictureSizeChanged, object: self) } }
+    }
     var onReady: (() -> Void)?
     var onResize: ((CGSize, CGFloat) -> Void)?
     var onKey: ((Int, Bool, String?) -> Void)?
@@ -238,3 +244,5 @@ final class GodotHostView: NSView {
 
 }
 #endif
+
+extension GodotHostView: GamePictureSource {}
