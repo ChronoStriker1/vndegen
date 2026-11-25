@@ -599,6 +599,12 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     case 0xa9:
         sa_exp_cancel_encounter(s);
         break;
+    case 0xb1: {
+        char *g = opd_str(code, in, 0);
+        sa_exp_chain_battle(s, g);
+        free(g);
+        break;
+    }
     case 0xa1:
         sa_mission_end(s, in->count >= 1 ? sa_vm_get(vm, code, &in->o[0]) : 0);
         break;

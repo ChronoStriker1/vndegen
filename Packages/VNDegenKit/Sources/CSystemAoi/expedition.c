@@ -8,10 +8,11 @@ enum {
     HOOK_DUNGEON = 25,
     HOOK_BATTLE_START = 26,
     HOOK_BATTLE_END = 27,
+    HOOK_GROUP_SCRIPT = -2,
 };
 
 enum { SPECIAL_RETURN = 1, SPECIAL_HP, SPECIAL_MP, SPECIAL_CURE, SPECIAL_NO_ENEMY, SPECIAL_NO_TRAP, SPECIAL_ATTACK, SPECIAL_DEFENCE, SPECIAL_EVASION, SPECIAL_SPEED, SPECIAL_RECRUIT, SPECIAL_SEARCH };
-enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST, AFTER_ENCOUNTER };
+enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST, AFTER_ENCOUNTER, AFTER_CHAIN };
 
 enum {
     C_EXP_X = 0x49,
@@ -79,6 +80,9 @@ enum {
     F_BOSSES = 23,
     BOSS_SLOTS = 4,
     P_MOVE = 7,
+    P_AFTER_SCRIPT = 74,
+    STAY_FLAGS = -5,
+    BOSS_INFO = 0,
     F_GROUP_LISTS = 30,
     F_SYMBOLS = 18,
     F_SYMBOL_MAX = 19,
@@ -237,6 +241,14 @@ static bool run_next_hook(SA *s) {
     while (e->hookCount) {
         int h = e->hooks[0];
         memmove(e->hooks, e->hooks + 1, sizeof(int) * (size_t)--e->hookCount);
+        if (h == HOOK_GROUP_SCRIPT) {
+            if (!e->groupScript[0]) continue;
+            char script[sizeof e->groupScript];
+            snprintf(script, sizeof script, "%s", e->groupScript);
+            e->groupScript[0] = 0;
+            sa_log(s, "group script: %s #%d", script, e->groupEntry);
+            return sa_start_script(s, script, e->groupEntry);
+        }
         const char *box = h >= 0 && h < 256 ? s->vm.boxSlot[h] : NULL;
         if (!box) continue;
         char name[32];
@@ -254,6 +266,7 @@ static void walk_view(SA *s) {
 }
 
 static void encounter(SA *s);
+static void begin_battle(SA *s, const char *group, const int *cells);
 
 static void finish_after(SA *s) {
     Expedition *e = &s->exp;
@@ -262,6 +275,15 @@ static void finish_after(SA *s) {
     switch (after) {
     case AFTER_WALK: walk_view(s); break;
     case AFTER_ENCOUNTER: encounter(s); break;
+    case AFTER_CHAIN: {
+        char group[sizeof e->chain];
+        snprintf(group, sizeof group, "%s", e->chain);
+        e->chain[0] = 0;
+        e->fighting = -1;
+        walk_view(s);
+        begin_battle(s, group, NULL);
+        break;
+    }
     case AFTER_BATTLE:
         s->mode = MODE_BATTLE;
         s->dirty = true;
@@ -493,6 +515,10 @@ static void spawn_group(SA *s, const char *name, int route, int away) {
     for (int r = 0; r < s->battle.groups.rows; r++)
         if (sa_table_int(&s->battle.groups, r, 0) == id) g->stay = !strcmp(text(&s->battle.groups, r, P_MOVE), "停止");
     next_dest(s, g);
+    if (routed && g->stay) {
+        g->flags = STAY_FLAGS;
+        set_dest(d, g, c);
+    }
     sa_log(s, "group %d (%s) at %d,%d to %d,%d", g->number, name, g->x, g->y, g->target[0][0], g->target[0][1]);
 }
 
@@ -508,9 +534,22 @@ int sa_exp_area_registered(SA *s) {
     return entry > 0 && entry < SA_F_VARS && s->vm.f[entry];
 }
 
+static int split_names(const char *list, char *buf, size_t size, char **names) {
+    int n = 0;
+    snprintf(buf, size, "%s", *list && strcmp(list, "*") ? list : "");
+    for (char *p = strtok(buf, "|"); p && n < EXP_GROUPS; p = strtok(NULL, "|")) names[n++] = p;
+    return n;
+}
+
+static int fixed_route_base(SA *s) {
+    char buf[256], *names[EXP_GROUPS];
+    return s->dungeon.routeCount - split_names(text(&s->exp.floors, s->exp.row, F_GROUP_LISTS), buf, sizeof buf, names);
+}
+
 void sa_exp_add_group(SA *s, const char *name) {
-    if (!s->exp.active) return;
-    spawn_group(s, name, -1, 1);
+    Expedition *e = &s->exp;
+    if (!e->active) return;
+    spawn_group(s, name, e->nextRoute < fixed_route_base(s) ? e->nextRoute++ : -1, 1);
     sync_marks(s);
 }
 
@@ -527,36 +566,45 @@ void sa_exp_add_group_at(SA *s, const char *name, int x, int y) {
     sync_marks(s);
 }
 
-static void spawn_list(SA *s, int col, int count, bool routes) {
-    const char *list = text(&s->exp.floors, s->exp.row, col);
-    char buf[256], *names[EXP_GROUPS];
-    int n = 0;
-    snprintf(buf, sizeof buf, "%s", *list && strcmp(list, "*") ? list : "");
-    for (char *p = strtok(buf, "|"); p && n < EXP_GROUPS; p = strtok(NULL, "|")) names[n++] = p;
-    if (routes)
-        for (int i = 0; i < n; i++) spawn_group(s, names[i], i, 1);
-    else
-        for (int i = 0; i < count && n; i++) spawn_group(s, names[sa_vm_random(&s->vm) % (u32)n], -1, 1);
+static int *boss_info(SA *s) {
+    Expedition *e = &s->exp;
+    if (!e->floorInfo || e->dungeon < 0 || e->dungeon >= EXP_DUNGEONS || e->floor < 0 || e->floor >= EXP_FLOORS) return NULL;
+    return &e->floorInfo[e->dungeon][e->floor][BOSS_INFO];
+}
+
+static const char *boss_name(SA *s, int k) {
+    const char *boss = text(&s->exp.floors, s->exp.row, F_BOSSES + 2 * k);
+    return *boss && strcmp(boss, "*") ? boss : NULL;
+}
+
+int sa_exp_group_slot(SA *s, const ExpGroup *g) {
+    const char *name = group_name(s, g->party);
+    if (!s->exp.active || !name) return -1;
+    for (int k = 0; k < BOSS_SLOTS; k++)
+        if (boss_name(s, k) && !strcmp(boss_name(s, k), name)) return k;
+    return -1;
 }
 
 static void spawn_floor_groups(SA *s) {
     Expedition *e = &s->exp;
     e->groupCount = 0;
-    spawn_list(s, F_GROUP_LISTS, 0, true);
-    spawn_list(s, F_GROUP_LISTS + 1, sa_table_int(&e->floors, e->row, F_SYMBOLS), false);
-    for (int k = 0; k < BOSS_SLOTS; k++) {
-        const char *boss = text(&e->floors, e->row, F_BOSSES + 2 * k);
-        int x, y;
-        if (!*boss || !strcmp(boss, "*") || !sa_dungeon_find_mark(&s->dungeon, k + 1, &x, &y)) continue;
-        int before = e->groupCount;
-        spawn_group(s, boss, -1, 1);
-        if (e->groupCount == before) continue;
-        ExpGroup *g = &e->group[e->groupCount - 1];
-        g->x = x;
-        g->y = y;
-        g->stay = true;
-        sa_log(s, "group %d stands at %d,%d", g->number, x, y);
+    char buf[256], *names[EXP_GROUPS];
+    int bosses = 0, base = fixed_route_base(s), n = split_names(text(&e->floors, e->row, F_GROUP_LISTS), buf, sizeof buf, names);
+    for (int k = 0; k < BOSS_SLOTS; k++)
+        if (boss_name(s, k)) bosses = k + 1;
+    for (int i = 0; i < n; i++) spawn_group(s, names[i], base + i >= bosses ? base + i : -1, 1);
+    const int *beaten = boss_info(s);
+    for (int k = 0; k < bosses; k++) {
+        if (!boss_name(s, k)) continue;
+        if (beaten && *beaten >> k & 1) {
+            sa_log(s, "boss %d (%s) already beaten", k, boss_name(s, k));
+            continue;
+        }
+        spawn_group(s, boss_name(s, k), k, 1);
     }
+    e->nextRoute = bosses;
+    n = split_names(text(&e->floors, e->row, F_GROUP_LISTS + 1), buf, sizeof buf, names);
+    for (int i = 0; i < sa_table_int(&e->floors, e->row, F_SYMBOLS) && n; i++) spawn_group(s, names[sa_vm_random(&s->vm) % (u32)n], -1, 1);
 }
 
 static void maybe_spawn_symbol(SA *s) {
@@ -567,9 +615,7 @@ static void maybe_spawn_symbol(SA *s) {
     for (int i = 0; i < e->groupCount; i++) alive += e->group[i].alive;
     if (alive >= sa_table_int(&e->floors, e->row, F_SYMBOL_MAX) || sa_vm_random(&s->vm) % SYMBOL_CHANCE) return;
     char buf[256], *names[EXP_GROUPS];
-    int n = 0;
-    snprintf(buf, sizeof buf, "%s", list);
-    for (char *p = strtok(buf, "|"); p && n < EXP_GROUPS; p = strtok(NULL, "|")) names[n++] = p;
+    int n = split_names(list, buf, sizeof buf, names);
     if (n) spawn_group(s, names[sa_vm_random(&s->vm) % (u32)n], -1, GROUP_AWAY);
 }
 
@@ -878,6 +924,8 @@ void sa_exp_battle_over(SA *s, int result) {
     Expedition *e = &s->exp;
     if (e->fighting >= 0 && e->fighting < e->groupCount) {
         ExpGroup *g = &e->group[e->fighting];
+        int slot = sa_exp_group_slot(s, g), *beaten = boss_info(s);
+        if (result == BATTLE_WON && slot >= 0 && beaten) *beaten |= 1 << slot;
         if (result == BATTLE_WON) g->alive = false;
         else {
             int c = pick_cell(&s->dungeon, s->dungeon.x, s->dungeon.y, GROUP_AWAY, sa_vm_random(&s->vm));
@@ -890,9 +938,26 @@ void sa_exp_battle_over(SA *s, int result) {
         e->fighting = -1;
         sync_marks(s);
     }
-    static const int hooks[] = {HOOK_BATTLE_END};
+    e->groupScript[0] = 0;
+    const char *script = text(&s->battle.groups, s->battle.group, P_AFTER_SCRIPT);
+    if (*script && strcmp(script, "*")) {
+        snprintf(e->groupScript, sizeof e->groupScript, "%s", script);
+        e->groupEntry = sa_table_int(&s->battle.groups, s->battle.group, P_AFTER_SCRIPT + 1);
+    }
+    static const int hooks[] = {HOOK_BATTLE_END, HOOK_GROUP_SCRIPT};
     s->mode = MODE_DUNGEON;
-    run_hooks(s, hooks, 1, result == BATTLE_LOST ? AFTER_LOST : AFTER_WALK);
+    run_hooks(s, hooks, 2, result == BATTLE_LOST ? AFTER_LOST : AFTER_WALK);
+}
+
+void sa_exp_chain_battle(SA *s, const char *name) {
+    Expedition *e = &s->exp;
+    if (!e->active || group_id(s, name) < 0) {
+        sa_log(s, "no chain group %s", name);
+        return;
+    }
+    snprintf(e->chain, sizeof e->chain, "%s", name);
+    if (e->after == AFTER_WALK) e->after = AFTER_CHAIN;
+    sa_log(s, "chain battle: %s", name);
 }
 
 void sa_exp_gain(SA *s, const int gain[4]) {
