@@ -30,6 +30,10 @@ enum {
     OBJECT_CRYSTAL = 60,
     OBJECT_DARK = 41,
     LINK_INTS = 11,
+    HEADER_ROUTES = 32,
+    HEADER_LINKS = 36,
+    HEADER_CRYSTALS = 44,
+    TRAILER_START_BYTES = 12,
     PLATE_X = 0,
     PLATE_Y = 38,
     PLATE_SRC_Y = 20,
@@ -64,9 +68,18 @@ enum {
     STEPS_Y = 72,
     PAD_W = 64,
     HOVER_REST = 100,
+    HOVER_WALK = 200,
+    WALK_ALPHA = 128,
 };
 
 enum { PAD_FORWARD, PAD_BACK, PAD_RIGHT, PAD_LEFT, PAD_CORNER_L, PAD_CORNER_R };
+
+static const struct {
+    const char *art;
+    int x, y, pad;
+} walkArrows[DUN_WALKS] = {{"dgn_e00.agf", 469, 164, PAD_FORWARD}, {"dgn_e01.agf", 469, 360, PAD_BACK},
+                           {"dgn_e03.agf", 350, 262, PAD_LEFT},    {"dgn_e02.agf", 640, 262, PAD_RIGHT},
+                           {"dgn_e05.agf", 249, 275, PAD_CORNER_L}, {"dgn_e04.agf", 929, 275, PAD_CORNER_R}};
 
 #define CELL 8.0f
 #define CAM_Y 3.2f
@@ -151,6 +164,50 @@ static bool load_set(Dungeon *d, Vfs *vfs, PartSet *p, const char *name) {
     return true;
 }
 
+static i32 trailer_int(const u8 *data, size_t n, size_t *at, bool *ok) {
+    if (*at + 4 > n) {
+        *ok = false;
+        return 0;
+    }
+    i32 v = (i32)rd32(data + *at);
+    *at += 4;
+    return v;
+}
+
+static void read_trailer(Dungeon *d, const u8 *data, size_t n) {
+    d->linkCount = d->routeCount = d->crystalCount = 0;
+    size_t at = MAP_HEADER + (size_t)(d->w * d->h) * CELL_BYTES;
+    bool ok = true;
+    int routes = (int)rd32(data + HEADER_ROUTES), links = (int)rd32(data + HEADER_LINKS), crystals = (int)rd32(data + HEADER_CRYSTALS);
+    trailer_int(data, n, &at, &ok);
+    for (int r = 0; r < routes && ok; r++) {
+        int count = trailer_int(data, n, &at, &ok);
+        DunRoute *rt = d->routeCount < DUN_ROUTES ? &d->route[d->routeCount++] : NULL;
+        if (rt) rt->count = 0;
+        for (int k = 0; k < count && ok; k++) {
+            int v[4];
+            for (int j = 0; j < 4; j++) v[j] = trailer_int(data, n, &at, &ok);
+            if (rt && rt->count < DUN_ROUTE_POINTS) memcpy(rt->point[rt->count++], v, sizeof v);
+        }
+    }
+    at += TRAILER_START_BYTES;
+    for (int i = 0; i < links && ok; i++) {
+        i32 v[LINK_INTS];
+        for (int k = 0; k < LINK_INTS; k++) v[k] = trailer_int(data, n, &at, &ok);
+        bool same = v[3] == -1, other = (v[3] & 0xff) == 0 && v[3] >> 16 >= 1 && v[3] >> 16 <= 10;
+        if (!ok || d->linkCount >= DUN_LINKS || (v[0] != DUN_LINK_STAIRS && v[0] != DUN_LINK_TELEPORT) || (!same && !other)) continue;
+        if (v[1] < 0 || v[1] >= d->w || v[2] < 0 || v[2] >= d->h || v[4] < 0 || v[4] >= DUN_SIDE || v[5] < 0 || v[5] >= DUN_SIDE || v[6] < 0 || v[6] > 3) continue;
+        d->link[d->linkCount++] = (DunLink){v[0], v[1], v[2], v[3], v[4], v[5], v[6]};
+    }
+    for (int i = 0; i < crystals && ok; i++) {
+        int x = trailer_int(data, n, &at, &ok), y = trailer_int(data, n, &at, &ok);
+        if (ok && d->crystalCount < DUN_CRYSTALS) {
+            d->crystal[d->crystalCount][0] = x;
+            d->crystal[d->crystalCount++][1] = y;
+        }
+    }
+}
+
 bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map) {
     size_t n;
     u8 *data = sa_vfs_read(vfs, map, &n);
@@ -167,17 +224,7 @@ bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map) {
         for (int x = 0; x < w; x++)
             for (int f = 0; f < DUN_FIELDS; f++)
                 d->cell[y * DUN_SIDE + x][f] = (i32)rd32(data + MAP_HEADER + (size_t)(y * w + x) * CELL_BYTES + (size_t)f * 4);
-    d->linkCount = 0;
-    size_t at = MAP_HEADER + (size_t)(w * h) * CELL_BYTES, ints = (n - at) / 4;
-    for (size_t i = 0; i + LINK_INTS <= ints && d->linkCount < DUN_LINKS; i++) {
-        i32 v[LINK_INTS];
-        for (int k = 0; k < LINK_INTS; k++) v[k] = (i32)rd32(data + at + (i + (size_t)k) * 4);
-        bool same = v[3] == -1, other = (v[3] & 0xff) == 0 && v[3] >> 16 >= 1 && v[3] >> 16 <= 10;
-        if ((v[0] != DUN_LINK_STAIRS && v[0] != DUN_LINK_TELEPORT) || v[7] || v[8] || v[9] || v[10] || (!same && !other)) continue;
-        if (v[1] < 0 || v[1] >= w || v[2] < 0 || v[2] >= h || v[4] < 0 || v[4] >= DUN_SIDE || v[5] < 0 || v[5] >= DUN_SIDE || v[6] < 0 || v[6] > 3) continue;
-        d->link[d->linkCount++] = (DunLink){v[0], v[1], v[2], v[3], v[4], v[5], v[6]};
-        i += LINK_INTS - 1;
-    }
+    read_trailer(d, data, n);
     free(data);
     return true;
 }
@@ -232,6 +279,14 @@ static Image *rotate_quarter(const Image *im, int q) {
     return out;
 }
 
+static Image *lower_half(Image *im) {
+    if (!im) return NULL;
+    Image *out = sa_image_new(im->w, im->h / 2);
+    memcpy(out->px, im->px + (size_t)(im->h - out->h) * im->w, sizeof(u32) * (size_t)out->w * out->h);
+    sa_image_free(im);
+    return out;
+}
+
 void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
     if (!d->art[DUN_ART_PANEL]) {
         static const char *const names[] = {"dgn_b00.agf", "dgn_c00.agf", "dgn_c01.agf", "dgn_c02.agf", "dgn_c03.agf", "dgn_c04.agf",
@@ -249,6 +304,7 @@ void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
             d->trapIcon[i] = scale2(sa_load_image(vfs, name));
         }
         d->plates = sa_load_image(vfs, "dgn_b02.agf");
+        for (int i = 0; i < DUN_WALKS; i++) d->walk[i] = lower_half(sa_load_image(vfs, walkArrows[i].art));
     }
     sa_image_free(d->art[DUN_ART_PLATFORM]);
     d->art[DUN_ART_PLATFORM] = platform ? sa_load_image(vfs, platform) : NULL;
@@ -264,6 +320,7 @@ void sa_dungeon_free(Dungeon *d) {
     for (int i = 0; i < d->bigCount; i++) sa_image_free(d->big[i]);
     d->bigCount = 0;
     for (int q = 0; q < 4; q++) sa_image_free(d->arrow[q]);
+    for (int i = 0; i < DUN_WALKS; i++) sa_image_free(d->walk[i]);
     R3 keep = d->r3;
     memset(d, 0, sizeof *d);
     d->r3 = keep;
@@ -346,6 +403,12 @@ int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side) {
     if (!c || c[F_FLOOR] < 0 || (!passable(c, side & 3) && !hidden_between(d, x, y, side))) return -1;
     const i32 *n = cell_at(d, x + stepX[side & 3], y + stepY[side & 3]);
     return n && n[F_FLOOR] >= 0 ? (y + stepY[side & 3]) * DUN_SIDE + x + stepX[side & 3] : -1;
+}
+
+int sa_dungeon_group_step(const Dungeon *d, int x, int y, int side) {
+    const i32 *c = cell_at(d, x, y), *n = cell_at(d, x + stepX[side & 3], y + stepY[side & 3]);
+    if (!c || !n || c[F_FLOOR] < 0 || n[F_FLOOR] < 0 || c[wallField[side & 3]] >= 0) return -1;
+    return (y + stepY[side & 3]) * DUN_SIDE + x + stepX[side & 3];
 }
 
 bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y) {
@@ -445,6 +508,8 @@ static int act(Dungeon *d, int pad) {
     case PAD_BACK: return walk(d, (d->dir + 2) & 3) ? DUN_MOVED : DUN_STAY;
     case PAD_RIGHT: turn(d, 1); return DUN_TURNED;
     case PAD_LEFT: turn(d, -1); return DUN_TURNED;
+    case PAD_CORNER_L: return walk(d, (d->dir + 3) & 3) ? DUN_MOVED : DUN_STAY;
+    case PAD_CORNER_R: return walk(d, (d->dir + 1) & 3) ? DUN_MOVED : DUN_STAY;
     }
     return DUN_STAY;
 }
@@ -485,16 +550,21 @@ bool sa_dungeon_tick(Dungeon *d, u32 ms) {
     return true;
 }
 
-static bool on_art(const Image *im, int fh, int ax, int ay, int x, int y) {
+static bool on_art(const Image *im, int sy, int fh, int ax, int ay, int x, int y, u32 minAlpha) {
     if (!im || x < ax || y < ay || x >= ax + im->w || y >= ay + fh) return false;
-    return im->px[(size_t)(y - ay) * im->w + (x - ax)] >> 24 > 128;
+    return im->px[(size_t)(sy + y - ay) * im->w + (x - ax)] >> 24 > minAlpha;
 }
 
 static int hit(const Dungeon *d, int x, int y) {
     if (x >= REST_X && x < REST_X + REST_W && y >= REST_Y && y < REST_Y + REST_H) return HOVER_REST;
     if (sa_dungeon_action(d) && x >= ACTION_X && x < ACTION_X + ACTION_W && y >= ACTION_Y && y < ACTION_Y + ACTION_H) return HOVER_ACTION;
-    for (int i = 0; i < 4; i++)
-        if (on_art(d->art[DUN_ART_PAD0 + i], padPos[i].h, padPos[i].x, padPos[i].y, x, y)) return i;
+    for (int i = 0; i < 6; i++) {
+        int h = padPos[i].h;
+        if (on_art(d->art[DUN_ART_PAD0 + i], 0, h, padPos[i].x, padPos[i].y, x, y, 128)) return i;
+        if (i >= PAD_CORNER_L && on_art(d->art[DUN_ART_PAD0 + i], h, h, padPos[i].x, padPos[i].y + h, x, y, 128)) return i;
+    }
+    for (int i = 0; i < DUN_WALKS; i++)
+        if (d->walk[i] && on_art(d->walk[i], 0, d->walk[i]->h, walkArrows[i].x, walkArrows[i].y, x, y, 0)) return HOVER_WALK + i;
     return -1;
 }
 
@@ -509,6 +579,7 @@ int sa_dungeon_click(Dungeon *d, int x, int y) {
     int h = hit(d, x, y);
     if (h == HOVER_REST) return DUN_REST;
     if (h == HOVER_ACTION) return DUN_ACTION;
+    if (h >= HOVER_WALK) return act(d, walkArrows[h - HOVER_WALK].pad);
     return h >= 0 ? act(d, h) : DUN_STAY;
 }
 
@@ -559,7 +630,7 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
     float ca = cosf(a), sa = sinf(a);
     for (int k = i; k <= ps->last[i]; k++) {
         const PvmLayer *ly = &ps->pvm.layer[k];
-        if (ly->name[0] == '>' || !strncmp(ly->name, "next", 4)) continue;
+        if (ly->name[0] == '>' || (k != i && !strncmp(ly->name, "next", 4))) continue;
         const Image *tex = ly->tcount && ps->layerTex[k] >= 0 ? d->tex[ps->layerTex[k]] : NULL;
         for (int t = 0; t < ly->tcount; t++) {
             R3Vert v[3];
@@ -650,6 +721,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
         draw_part(d, &d->set, &c, "r000", cx, cz, 0);
         for (int s = 0; s < 4; s++) {
             int w = cell[wallField[s]];
+            if (w == WALL_PASSAGE) draw_part(d, &d->set, &c, "next000", cx, cz, sideQuarter[s]);
             if (w < 0 || w == WALL_PASSAGE) continue;
             snprintf(name, sizeof name, "w%03d", w);
             draw_part(d, &d->set, &c, name, cx, cz, sideQuarter[s]);
@@ -743,6 +815,7 @@ static void draw_map(Dungeon *d, u32 *fb, int ox, int oy, int scale) {
 void sa_dungeon_draw_map(Dungeon *d, u32 *fb, int x, int y, int scale) { draw_map(d, fb, x, y, scale); }
 
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
+    if (d->hover >= HOVER_WALK) sa_blit_alpha(fb, d->walk[d->hover - HOVER_WALK], walkArrows[d->hover - HOVER_WALK].x, walkArrows[d->hover - HOVER_WALK].y, WALK_ALPHA);
     sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
     sa_blit_rect(fb, d->art[DUN_ART_COMPASS], 0, 0, d->art[DUN_ART_COMPASS] ? d->art[DUN_ART_COMPASS]->w : 0, 76, COMPASS_X,
                  COMPASS_Y);
@@ -758,8 +831,10 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
         const Image *im = d->art[DUN_ART_PAD0 + i];
         if (!im) continue;
         int h = padPos[i].h;
-        sa_blit_rect(fb, im, 0, i < 4 && d->hover == i ? h : 0, PAD_W, h, padPos[i].x, padPos[i].y);
-        if (i >= 4) sa_blit_rect(fb, im, 0, h, PAD_W, h, padPos[i].x, padPos[i].y + h);
+        int lit = d->hover == i ? 1 : 0;
+        if (i < PAD_CORNER_L) sa_blit_rect(fb, im, 0, lit * h, PAD_W, h, padPos[i].x, padPos[i].y);
+        else
+            for (int k = 0; k < 2; k++) sa_blit_rect(fb, im, 0, (lit * 2 + k) * h, PAD_W, h, padPos[i].x, padPos[i].y + k * h);
     }
     sa_blit_rect(fb, d->art[DUN_ART_REST], 0, d->hover == HOVER_REST ? REST_H : 0, REST_W, REST_H, REST_X, REST_Y);
     static const int actionArt[] = {0, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN};
@@ -818,6 +893,8 @@ int sa_dungeon_object(const Dungeon *d) {
 }
 
 int sa_dungeon_crystal_index(const Dungeon *d) {
+    for (int i = 0; i < d->crystalCount; i++)
+        if (d->crystal[i][0] == d->x && d->crystal[i][1] == d->y) return i;
     int n = 0;
     for (int c = 0; c < DUN_CELLS; c++) {
         if (c == d->y * DUN_SIDE + d->x) return n;

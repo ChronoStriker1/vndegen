@@ -192,7 +192,7 @@ typedef struct ExtraScreen {
 
 typedef struct ExpGroup {
     bool alive;
-    int party, number, x, y, dir, flags, cooldown, fought, extra;
+    int party, number, x, y, dir, flags, clock, fought, extra;
     bool stay;
     int cells[BATTLE_CELLS];
     int target[EXP_TARGETS][2];
