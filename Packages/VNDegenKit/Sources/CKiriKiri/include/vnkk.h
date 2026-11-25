@@ -98,6 +98,8 @@ VNKK_API const char *vnkk_menu(void);
 // its next frame. Returns false when no item has the id.
 VNKK_API bool vnkk_menu_click(const char *id);
 
+VNKK_API bool vnkk_picture_size(int *width, int *height);
+
 // The UIView SDL renders into, for the host to place in its own view hierarchy. NULL on macOS,
 // where the engine places its view in VNKKLaunch.hostView itself.
 VNKK_API void *vnkk_view(void);
