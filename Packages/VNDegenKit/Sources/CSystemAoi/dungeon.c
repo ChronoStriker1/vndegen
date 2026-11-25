@@ -68,9 +68,18 @@ enum {
     STEPS_Y = 72,
     PAD_W = 64,
     HOVER_REST = 100,
+    HOVER_WALK = 200,
+    WALK_ALPHA = 128,
 };
 
 enum { PAD_FORWARD, PAD_BACK, PAD_RIGHT, PAD_LEFT, PAD_CORNER_L, PAD_CORNER_R };
+
+static const struct {
+    const char *art;
+    int x, y, pad;
+} walkArrows[DUN_WALKS] = {{"dgn_e00.agf", 469, 164, PAD_FORWARD}, {"dgn_e01.agf", 469, 360, PAD_BACK},
+                           {"dgn_e03.agf", 350, 262, PAD_LEFT},    {"dgn_e02.agf", 640, 262, PAD_RIGHT},
+                           {"dgn_e05.agf", 249, 275, PAD_CORNER_L}, {"dgn_e04.agf", 929, 275, PAD_CORNER_R}};
 
 #define CELL 8.0f
 #define CAM_Y 3.2f
@@ -270,6 +279,14 @@ static Image *rotate_quarter(const Image *im, int q) {
     return out;
 }
 
+static Image *lower_half(Image *im) {
+    if (!im) return NULL;
+    Image *out = sa_image_new(im->w, im->h / 2);
+    memcpy(out->px, im->px + (size_t)(im->h - out->h) * im->w, sizeof(u32) * (size_t)out->w * out->h);
+    sa_image_free(im);
+    return out;
+}
+
 void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
     if (!d->art[DUN_ART_PANEL]) {
         static const char *const names[] = {"dgn_b00.agf", "dgn_c00.agf", "dgn_c01.agf", "dgn_c02.agf", "dgn_c03.agf", "dgn_c04.agf",
@@ -287,6 +304,7 @@ void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
             d->trapIcon[i] = scale2(sa_load_image(vfs, name));
         }
         d->plates = sa_load_image(vfs, "dgn_b02.agf");
+        for (int i = 0; i < DUN_WALKS; i++) d->walk[i] = lower_half(sa_load_image(vfs, walkArrows[i].art));
     }
     sa_image_free(d->art[DUN_ART_PLATFORM]);
     d->art[DUN_ART_PLATFORM] = platform ? sa_load_image(vfs, platform) : NULL;
@@ -302,6 +320,7 @@ void sa_dungeon_free(Dungeon *d) {
     for (int i = 0; i < d->bigCount; i++) sa_image_free(d->big[i]);
     d->bigCount = 0;
     for (int q = 0; q < 4; q++) sa_image_free(d->arrow[q]);
+    for (int i = 0; i < DUN_WALKS; i++) sa_image_free(d->walk[i]);
     R3 keep = d->r3;
     memset(d, 0, sizeof *d);
     d->r3 = keep;
@@ -489,6 +508,8 @@ static int act(Dungeon *d, int pad) {
     case PAD_BACK: return walk(d, (d->dir + 2) & 3) ? DUN_MOVED : DUN_STAY;
     case PAD_RIGHT: turn(d, 1); return DUN_TURNED;
     case PAD_LEFT: turn(d, -1); return DUN_TURNED;
+    case PAD_CORNER_L: return walk(d, (d->dir + 3) & 3) ? DUN_MOVED : DUN_STAY;
+    case PAD_CORNER_R: return walk(d, (d->dir + 1) & 3) ? DUN_MOVED : DUN_STAY;
     }
     return DUN_STAY;
 }
@@ -529,16 +550,21 @@ bool sa_dungeon_tick(Dungeon *d, u32 ms) {
     return true;
 }
 
-static bool on_art(const Image *im, int fh, int ax, int ay, int x, int y) {
+static bool on_art(const Image *im, int sy, int fh, int ax, int ay, int x, int y, u32 minAlpha) {
     if (!im || x < ax || y < ay || x >= ax + im->w || y >= ay + fh) return false;
-    return im->px[(size_t)(y - ay) * im->w + (x - ax)] >> 24 > 128;
+    return im->px[(size_t)(sy + y - ay) * im->w + (x - ax)] >> 24 > minAlpha;
 }
 
 static int hit(const Dungeon *d, int x, int y) {
     if (x >= REST_X && x < REST_X + REST_W && y >= REST_Y && y < REST_Y + REST_H) return HOVER_REST;
     if (sa_dungeon_action(d) && x >= ACTION_X && x < ACTION_X + ACTION_W && y >= ACTION_Y && y < ACTION_Y + ACTION_H) return HOVER_ACTION;
-    for (int i = 0; i < 4; i++)
-        if (on_art(d->art[DUN_ART_PAD0 + i], padPos[i].h, padPos[i].x, padPos[i].y, x, y)) return i;
+    for (int i = 0; i < 6; i++) {
+        int h = padPos[i].h;
+        if (on_art(d->art[DUN_ART_PAD0 + i], 0, h, padPos[i].x, padPos[i].y, x, y, 128)) return i;
+        if (i >= PAD_CORNER_L && on_art(d->art[DUN_ART_PAD0 + i], h, h, padPos[i].x, padPos[i].y + h, x, y, 128)) return i;
+    }
+    for (int i = 0; i < DUN_WALKS; i++)
+        if (d->walk[i] && on_art(d->walk[i], 0, d->walk[i]->h, walkArrows[i].x, walkArrows[i].y, x, y, 0)) return HOVER_WALK + i;
     return -1;
 }
 
@@ -553,6 +579,7 @@ int sa_dungeon_click(Dungeon *d, int x, int y) {
     int h = hit(d, x, y);
     if (h == HOVER_REST) return DUN_REST;
     if (h == HOVER_ACTION) return DUN_ACTION;
+    if (h >= HOVER_WALK) return act(d, walkArrows[h - HOVER_WALK].pad);
     return h >= 0 ? act(d, h) : DUN_STAY;
 }
 
@@ -788,6 +815,7 @@ static void draw_map(Dungeon *d, u32 *fb, int ox, int oy, int scale) {
 void sa_dungeon_draw_map(Dungeon *d, u32 *fb, int x, int y, int scale) { draw_map(d, fb, x, y, scale); }
 
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
+    if (d->hover >= HOVER_WALK) sa_blit_alpha(fb, d->walk[d->hover - HOVER_WALK], walkArrows[d->hover - HOVER_WALK].x, walkArrows[d->hover - HOVER_WALK].y, WALK_ALPHA);
     sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
     sa_blit_rect(fb, d->art[DUN_ART_COMPASS], 0, 0, d->art[DUN_ART_COMPASS] ? d->art[DUN_ART_COMPASS]->w : 0, 76, COMPASS_X,
                  COMPASS_Y);
@@ -803,8 +831,10 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
         const Image *im = d->art[DUN_ART_PAD0 + i];
         if (!im) continue;
         int h = padPos[i].h;
-        sa_blit_rect(fb, im, 0, i < 4 && d->hover == i ? h : 0, PAD_W, h, padPos[i].x, padPos[i].y);
-        if (i >= 4) sa_blit_rect(fb, im, 0, h, PAD_W, h, padPos[i].x, padPos[i].y + h);
+        int lit = d->hover == i ? 1 : 0;
+        if (i < PAD_CORNER_L) sa_blit_rect(fb, im, 0, lit * h, PAD_W, h, padPos[i].x, padPos[i].y);
+        else
+            for (int k = 0; k < 2; k++) sa_blit_rect(fb, im, 0, (lit * 2 + k) * h, PAD_W, h, padPos[i].x, padPos[i].y + k * h);
     }
     sa_blit_rect(fb, d->art[DUN_ART_REST], 0, d->hover == HOVER_REST ? REST_H : 0, REST_W, REST_H, REST_X, REST_Y);
     static const int actionArt[] = {0, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN};

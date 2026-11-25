@@ -265,6 +265,7 @@ struct Party;
 enum { DUN_ART_PANEL, DUN_ART_REST, DUN_ART_PAD0, DUN_ART_COMPASS = DUN_ART_PAD0 + 6, DUN_ART_NEEDLE, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN, DUN_ART_DIGITS, DUN_ART_PLATFORM, DUN_ART };
 enum { DUN_ICON_DOOR, DUN_ICON_CHEST, DUN_ICON_GROUP, DUN_ICON_PARTY, DUN_ICONS };
 #define DUN_MARKS 8
+#define DUN_WALKS 6
 #define DUN_LINKS 48
 #define DUN_STATUS 4
 #define DUN_TRAP_ICONS 20
@@ -312,7 +313,7 @@ typedef struct Dungeon {
     bool bumped;
     Image *art[DUN_ART];
     Image *needle[4];
-    Image *icon[DUN_ICONS], *arrow[4], *big[48];
+    Image *icon[DUN_ICONS], *arrow[4], *big[48], *walk[DUN_WALKS];
     const Image *bigFrom[48];
     int bigCount;
     int markCount, markX[DUN_MARKS], markY[DUN_MARKS];
