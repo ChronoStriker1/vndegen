@@ -21,6 +21,7 @@ enum {
     ATTR_Y = 208,
     RAISE_DX = 30,
     RAISE_ROW = 2,
+    LOWER_ROW = 1,
     CARD_LABELS = 22,
     SKILL_NAME_X = 91,
     SKILL_MP_RIGHT = 256,
@@ -104,7 +105,7 @@ static void value(const Card *c, u32 *fb, int v, int right, int y) {
 static void signed_value(const Card *c, u32 *fb, int v, int right, int y) {
     char t[16];
     snprintf(t, sizeof t, "%+d", v);
-    sa_draw_number(fb, c->digits, t, right, y, RAISE_ROW, CW, CH);
+    sa_draw_number(fb, c->digits, t, right, y, v < 0 ? LOWER_ROW : RAISE_ROW, CW, CH);
 }
 
 static void pair(const Card *c, u32 *fb, int a, int b, int right, int y) {
@@ -246,13 +247,10 @@ static void draw_status(SA *s, u32 *fb, const Member *m, int x, int y) {
     int gov = sa_party_member_value(p, m, 2 + STAT_GOVERN), lead = sa_party_member_value(p, m, 2 + STAT_COMMAND);
     value(c, fb, gov, x + RIGHT_C, y + ROW0 + 183);
     value(c, fb, lead, x + RIGHT_B, y + ROW0 + 183);
-    int post = sa_party_post_of(p, m->unit), raisedGov, raisedLead;
-    if (post && sa_party_post_stats(p, m->unit, post, &raisedGov, &raisedLead)) {
-        int base[2];
-        sa_party_post_stats(p, m->unit, 0, &base[0], &base[1]);
-        signed_value(c, fb, raisedGov - base[0], x + RIGHT_C + RAISE_DX, y + ROW0 + 183);
-        signed_value(c, fb, raisedLead - base[1], x + RIGHT_B + RAISE_DX, y + ROW0 + 183);
-    }
+    int shown[2], tone[2];
+    sa_deploy_govern(p, m->unit, sa_party_post_of(p, m->unit), shown, tone);
+    if (shown[0] != gov) signed_value(c, fb, shown[0] - gov, x + RIGHT_C + RAISE_DX, y + ROW0 + 183);
+    if (shown[1] != lead) signed_value(c, fb, shown[1] - lead, x + RIGHT_B + RAISE_DX, y + ROW0 + 183);
     value(c, fb, sa_party_member_value(p, m, 2 + STAT_ATTACK), x + RIGHT_C, y + ROW0 + 223);
     value(c, fb, sa_party_member_value(p, m, 2 + STAT_MAGIC), x + RIGHT_B, y + ROW0 + 223);
     value(c, fb, sa_party_member_value(p, m, 2 + STAT_DEFENCE), x + RIGHT_C, y + ROW0 + 243);

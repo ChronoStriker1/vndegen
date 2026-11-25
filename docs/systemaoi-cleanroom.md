@@ -582,7 +582,11 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   reads 10 blue and 10 red; ミアルテ as 街長補佐 (3/6 + 5/0, 政治家 +5/+4) 10/10 blue; クドア as 第二階層長 (2/0 + 0/9,
   小隊長 +2/+2) 4/10 blue. VNDegen's 配置 list, 組織図 post list and corner panel and 装備's list follow this (they
   showed the untrained table values before: 8/10, 4/7, 4/2 and 6/7 for those four); the list matches the original's
-  values and colours on all seventeen rows.
+  values and colours on all seventeen rows. The status card (on hover in 配置) shows the stored value followed by what
+  the post and the cap change it by, blue when it rises and red when it falls: キュリハ 12 −2 and 12 −2, ルーアルテ
+  9 +1 and 12 −2, ミアルテ 8 +2 and 6 +4, クドア 2 +2 and 9 +1 (measured; VNDegen showed the uncapped raise, +2,
+  +5 and the like, and matches all eight now). A member picked up to move shows no post and so only the cap's
+  red −2s.
 - **Effects.** Not measured beyond one turn: with ミアルテ as 街長 and ルーアルテ as 農業担当 the residents grew by
   5 where the same turn without them grew by 2 (residents' growth is random, so this proves nothing yet); food,
   money and resources were the same. VNDegen's posts change nothing in the town so far. `c3 "post"` answers
@@ -817,7 +821,8 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   status card and `pun_a02`, which shows the three abilities with their `ability.obj` texts and the equipped item
   (なし when none); 配置 and 育成 open in the status card. The card shows any member, posted or benched: the 役職
   badge is the post's (`uts_h00` onwards), フィールド (`h98`) or リザーブ (`h99`); the attribute (`unit.obj` column
-  14) has its 20-pixel `pun_d00` icon at (242, 208); a post's raises follow 統治 and 統率 in blue 30 pixels right;
+  14) has its 20-pixel `pun_d00` icon at (242, 208); a post's raises follow 統治 and 統率 in blue 30 pixels right
+  (what the raise adds up to the cap of 10, or a red fall where the stored value is over it, below);
   skill icons are 20 pixels; a fixed-skill unit lists only its first skill, marked ★ without its 固定／ prefix, over
   column 38 + 1 slots (ミアルテ 1/3, Darkus 5/6). Not matched: the card's portrait frame (another sheet of the unit).
 
