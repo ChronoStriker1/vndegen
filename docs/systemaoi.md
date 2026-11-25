@@ -134,7 +134,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Dungeon: where an area's enemy groups first stand and how they choose their way are VNDegen's own (the
   original's cells are kept when loading its saves); a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either); the purple passage markers aren't drawn.
-- Saves: a few ability numbers in the battle blocks (凶暴者 and the like) and the script cache after the town grid
-  are written empty; the original loads such files. The save comment box takes no text; the comment stays empty.
-  The Option screen and the Extra menu aren't built yet.
+- Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
+  学, 魔法全体防御, the 属性耐性 areas); abilities never seen in the original's saves (先制攻撃, 警戒心, 掛け声,
+  the 支援 abilities and others) are written as zeros, and 資金管理 and 食料管理 sit at inferred slots. Enemies list
+  all their skills and the base element attack, where the original lists only the skills they have learned by their
+  level and adds those skills' element bonuses. Battle orders are written as the default for every member. The save
+  comment box takes no text; the comment stays empty. The Option screen and the Extra menu aren't built yet.
 - The original's option settings (text speed, window transparency, volumes) are its defaults.

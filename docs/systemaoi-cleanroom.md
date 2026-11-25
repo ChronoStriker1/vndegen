@@ -82,6 +82,14 @@ where play couldn't pin it down.
   before value (measured: 1066 on the way from 1060 to 1090); over a second (inferred). The script's last operand is
   the text; what the four numbers before it do is still open (the defeat hook passes four variables, the unit-join
   messages pass a number first, perhaps a picture for `ret_a05`).
+- **`f6 N`**, town damage. Measured under Wine on a turn with F133 on and F134 off, where the town hook (`bo0102`)
+  runs `2e L8 -20 -10`, `ef 0 L8 0`, `2e L0 5 10`, `f6 L0` and then 街の施設がダメージを受けました。（経験値ダウン）:
+  after the turn's income box the town map shows `tmap.vfs` `event01.agf` (three 40 by 48 frames, the burst 3 pixels
+  higher each frame) on random facility tiles all at once for about a second, the frame's top left 19 pixels left
+  of and 34 above the tile's centre; then the message. Nothing in the save changes beyond the `ef` EXP loss (the
+  same turn without F133 differs only there). Inferred from captures 140 ms apart: about 150 ms a frame, one second
+  in all, N distinct tiles chosen among all facilities (6 and about 8 seen, some off screen). `bo0003` uses it the
+  same way before 街を大きな衝撃が襲った.
 - **`f1 N`** widens the town's build area to stage N (the turn script calls it with 建設エリアが広がりました once
   enough is built: stage 2 at 30 facility points, 3 at 70, from `f3`'s total). The engine keeps the stage in C490,
   which the turn script reads (inferred from those reads; no script writes it).
@@ -754,11 +762,18 @@ the same points (offsets in bytes, numbers little-endian):
   F000, F001, F021 and F924, which the original sets itself. The original also keeps numbers VNDegen doesn't yet:
   C000 (2^31 - 1), C002 to C013, C190 to C194 (-1), C209, C220 to C262, C393 and C400 to C409.
 - **Town grid** at 1,010,848: 90 cells of five 32-bit numbers: the cell's state (0 when `TownMass.obj` opens it at
-  the town's stage or lower, else -1), the facility type (100 the 魔王亭, 108 a field; 0 empty), a flag (1 the turn a
-  facility was built, -1 when empty), the level, and a counter that grows each turn (4, 9 and 44 at turns 1, 2 and 9).
-  The number after the grid is 1. From 1,012,652 come 56-byte records naming script files in UTF-16 (`ac0000.box`,
-  then the hook boxes the game has run, `bo0000` to `bo3100`) with two numbers each; a script cache rather than story
-  progress. The original loads images without it, so VNDegen leaves it empty.
+  the town's stage or lower, else -1), the facility type (100 the 魔王亭, 108 a field; 0 empty), the turn the facility
+  was built (-1 when empty), the level, and a counter that grows each turn (4, 9 and 44 at turns 1, 2 and 9).
+  Measured: the tutorial's 畑 keeps 1 from turn 1 to turn 56 in every save of the original's own games, the 魔王亭 0,
+  and a 住居 built on turn 42 under Wine wrote 42. VNDegen keeps it as `Facility.built`.
+- **Script cache** at 1,012,656: up to 400 records of 56 bytes, each a box file's UTF-16 name (48 bytes), the 16-bit
+  numbers 1 and the box's entry count, and a zero; the record count at 1,035,056. Measured on every save: the list is
+  sorted by name (`bo1000` comes before `bo3000` although the game ran `bo3000` first) and holds only boxes with more
+  than one entry, all of them reached through `6e` (`ac0000` 3, `bo0000` 6, `bo1200` 5, `bo3000` 10, `fa0000` 4;
+  `bo1100` and `bo1700`, one entry each, never appear although their hooks ran). A loaded game keeps the file's list
+  and adds what it runs after (a turn-42 dungeon autosave made after loading a save with an empty list holds only
+  `bo1200`). VNDegen writes the sorted multi-entry boxes its VM has loaded and, on loading, loads the listed boxes into
+  the VM. Inferred: that loading a box with more than one entry is the rule, rather than reaching one through `6e`.
 - **Hook slots** at 1,035,060: 50 slots of 48 bytes, each the UTF-16 name of the script registered there (`bo0000.box`
   for the turn script in slot 0, `bo0100.box` the town hook in 1, …, `bo3100.box` in 31) or `EVnn.box` when empty.
   Measured: a save without them loads, but the original then runs no turn script or hooks (no story events, and
@@ -786,9 +801,15 @@ the same points (offsets in bytes, numbers little-endian):
   areas in dungeon and floor order. Fitted on every save from Wine.
 - **Last position** at 998,016 (the formation list's cells 4 to 7): the area (dungeon << 16 | floor << 8) while in
   a dungeon and 0 in the town, then the cell and facing, kept after coming home (-1, -1, 0 before any expedition).
+  Measured: this is where the original places a loaded party. In 千樹庭 area (1, 3), a save with x 4 here and C073 6
+  walked one step east to 5, and one with x 6 here and C073 4 walked to 7; C073 to C075 are rewritten from it. A
+  VNDegen export made after turning in place had carried the old facing (the expedition's copy is only updated
+  after a move), so the original loaded the party facing the old way; VNDegen now writes this record and C073 to
+  C075 from the dungeon's own position, and reads C073 to C075 from it.
   The 36 bytes at 85,972 end with the area and cell of the last door the party came in by ((1, 1) at (6, 2) for
   every 千樹庭 save); zero before any expedition. The 52 bytes at 1,009,560 are thirteen -1s and a 0 in every save.
-- **Enemy groups** of the current area at 998,288: up to two records of 280 bytes (70 numbers): the group's
+- **Enemy groups** of the current area at 998,288: one record of 280 bytes (70 numbers) per group (up to six seen,
+  the phantoms' with flag -1; VNDegen keeps up to its twelve): the group's
   `party.obj` id, its number (1, 2), the area word, its cell and facing, its 15 board cells (row by row, three rows
   of five, `party.obj`'s row 0 first) holding the record numbers of its units or -1, ten -1s, zeros, five target
   cells as (x, y) pairs padded with -1, a flag word (1 for the first group, 0x101 for the second; 2 added after a
@@ -801,19 +822,45 @@ the same points (offsets in bytes, numbers little-endian):
 - **Battle blocks**, from the enemies and members: `unit.obj` columns 23 to 32 grown to the unit's level (`lvup.obj`
   by the unit's growth type, column 19: HP + (level - 1) × column 4, MP + (level - 1) × column 5, 攻撃 on both attack
   stats and 防御 on both defences by the type's `+1/N` steps; ベトＡ at level 5 is 42/12 and 8/8 from 30/8 and 7/7);
-  equipment bonuses 斬, 打, 射, 魔 at 10 to 13 and the element's attack 30 at 14 on (光 at 14, 闇 at 15, as the sisters
-  and ダークマン); resistances from 33 (斬 33, 打 34, 射 35 measured; 魔 36, 光 37, 闇 38, 火 39, 水 40, 風 41, 土 42 and
-  雷 43 inferred from the sisters' 光 and ルーアルテ's 雷), the unit's own element adding 20 and its opposite -50;
-  必殺耐性 at 44 and 異常耐性 at 46; the abilities' ids at 47 to 49; the skill slots at 114. The second block adds the
+  equipment bonuses 斬, 打, 射, 魔 at 10 to 13 and the element's attack 30 from 14 in the order 光, 闇, 火, 水, 土, 風;
+  resistances from 33: 斬, 打, 射, 魔, 光, 闇, 火, 水, 土, 風, 雷 (土 41 and 風 42 measured from キュリハ's 土耐性+35
+  and チャミ's 風 row), each with the unit's own resistance text (signed: モエルモン's 火耐性-50 is -50) plus its
+  element's row: 光 +20 光 and -50 闇, 闇 the reverse; 火, 水, 土 and 風 +10 on their own, -20 on 光, 闇 and 雷, and
+  +50 and -50 around the cycle 火, 水, 土, 風 (火 +50 水 and -50 風, 水 +50 土 and -50 火, 土 +50 風 and -50 水,
+  風 +50 火 and -50 土; measured on 炎の精霊, シュシュ, フロッグメン, モエルモン, クラ, キュリハ and チャミ);
+  異常耐性 at 44 and 必殺耐性 at 46 (モンエイＢ's 異常耐性+100 at 44, 天界兵Ａ's 必殺耐性+15 at 46); the abilities'
+  ids at 47 to 49; the skill slots at 114. Enemies with element skills carry more element attack and resistance than
+  30 (炎の精霊 40, 50 and 60, ボボボＣ's 火 resistance +40 from 火属性防御) and list only the skills they have
+  learned for their level; VNDegen writes the base numbers and every skill (not derived). The second block adds the
   position bonuses of the field abilities (`ability.obj` column 4 as the amount): 攻撃強化 on both attacks, 防御強化
   on both defences, 速度強化 and 回避強化, to all (全), the front row (前, the party's front row and an enemy board's
   row 0), the back row (後), the unit's column (縦) or row (横), each counted once per unit that has it (two
-  ダークマンＡ give the back row 攻撃 +10). Measured on fourteen enemy records across three groups. 生命力's 20 sits at
-  106 of the second block; 凶暴者 and others use slots after it that aren't mapped. Enemies list all their skills,
-  with 3 after a 固定 one and 1 after the rest, except that 一角ベトＡ lists two of its three (not explained).
-- **Other regions** not yet placed: 993,208 to 997,999 (four 1,200-byte records starting -1, 1, -1), 1,035,056 to
-  1,066,684 (the backlog's text) and an ascending list of offsets at 1,115,868 (the backlog's index).
-- **Engine numbers.** C000 is always 2^31 - 1, C007 and C008 100, C036 and C037 1, C190 to C194 -1. C004 and C005
+  ダークマンＡ give the back row 攻撃 +10). Measured on fourteen enemy records across three groups.
+- **Ability numbers** in the second block, measured from 628 distinct saves the original wrote and from saves it
+  rebuilt under Wine after 配置 and 組織図 moves (it rebuilds a member's block when the member changes place, not on
+  loading or at turn end). The active ability is the field one (`unit.obj` column 34) on a main tile and for an
+  enemy, the reserve one (column 35) on a reserve tile; posted and unplaced members use their government ability
+  (column 36) instead. Active abilities put `ability.obj` column 4 (or 5) at: 罠発見 52, 罠無効化 53, 遠視 57, 地図 59,
+  サブメンバー 92 and 93 (columns 4, 5), 邪魔回復 94, 身代わり 95, 囮 98, 援護射撃 103 and 104 (columns 4, 5), 自爆 105,
+  生命力 106, 凶暴者 107 and 108 (column 4) and 112 (column 5), 勤勉 113. 魔法耐性 adds its 50 to 36 to 43 (魔 and the
+  seven elements). Some apply to the whole party (main and reserve tiles) or an enemy's whole group: 学 adds 10 to 113
+  of each (a reserve クラム gave Darkus 113 = 10) and 魔法全体防御 adds 25 to 36 to 43 of each. 斬撃, 打撃 and
+  射撃属性耐性 add 20 to 33, 34 or 35 by area, as the 強化 abilities do (／前 on the front row, ／横 the holder's row,
+  ／後 the back row). Government abilities: 政治家 63, 大将軍 64, 人気者 78, 資源管理 80, and from 65 to 77 one number per
+  kind of post (街長, 街長補佐, the seven 担当, 迷宮長, 迷宮長補佐, 階層長, 隊長), the ability's 2 where its
+  description says it helps that post (天才 all thirteen, 内政向き the first nine, 内政の才 67 to 73, 農業 67, 商業 68,
+  教育 71, 娯楽 72, 指揮官 74 and 75, 小隊長 76). Inferred: 資金管理 79 and 食料管理 81, 無能 -2 on all thirteen, the
+  rest of the post kinds from the descriptions, 学 and 魔法全体防御 counted from the reserve too, and the slots of
+  abilities never seen in a save (先制攻撃, 警戒心, 掛け声, the 支援 abilities, 感知 and others), which VNDegen leaves
+  at zero. A posted member's 統治 and 統率 in the second block are raised as before; キュリハ (大将軍) at 街長補佐 went
+  from 6 and 7 to 10 and 10, as if capped at 10 (one sample).
+- **Order records** at 993,208: four records of 1,200 bytes, each one triple per member in roster order, (-1, 1, -1) in
+  every save seen (likely the battle orders and their three saved sets; not mapped, so VNDegen writes the default per
+  member). **Other regions** not yet placed: 1,037,468 to 1,066,684 (the backlog's text) and an ascending list of
+  offsets at 1,115,868 (the backlog's index).
+- **Engine numbers.** C000 is always 2^31 - 1, C007 and C008 100, C037 1, C190 to C194 -1; C036 is 1 to turn 9 and 3
+  from turn 10 in the original's games (5 to 8 in later edited saves), so VNDegen keeps the variable's value and
+  writes these defaults only where a variable is 0. C004 and C005
   are 6 and 1 in the town and 41 plus the area's backdrop number (62 in 千樹庭's bg021, 61 in 炎山洞's bg020) and 2 in
   a dungeon; the slot details read the place from them and an image without
   them opens a story scene instead of the town. C006 changes each turn, likely the random seed. The original
@@ -829,11 +876,13 @@ the same points (offsets in bytes, numbers little-endian):
   level at +12, EXP at +16, four bytes at +24 (00 01 02 00 for Darkus, 00 04 01 00 and 00 04 02 00 for the sisters),
   HP and MP at +28, skill points at +80, the trained gains from +84, two 544-byte battle blocks at +124 and +668, the
   equipped item at +1212 (-1 after it once one is set), the skills from +1220 and a number at +1284. In a battle
-  block: `unit.obj` columns 23 to 32 at +0; 必殺耐性 and 異常耐性 (column 33) at +176 and +184; the field, reserve and
+  block: `unit.obj` columns 23 to 32 at +0; 異常耐性 and 必殺耐性 (column 33) at +176 and +184; the field, reserve and
   government abilities (columns 34 to 36, as `ability.obj` ids) at +188 to +196; the skill slots (column 38) at
-  +456; the equipment's 斬補正 in the second block at +40. Not yet explained: ミアルテ's 30 at +56, 60 and -50 at
-  +148 (likely her 光 and 闇 affinities), a 5 at +252 of the second block, and her skills written as (531, 3). The
-  original doesn't rebuild these blocks on loading: with them zeroed, her card shows 300/0 and no abilities.
+  +456; the equipment's 斬補正 in the second block at +40. ミアルテ's 30 at +56 and 60 and -50 at +148 are her 光
+  attack and resistances, the 5 at +252 of the second block her 政治家, ルーアルテ's thirteen 2s her 天才. Darkus's
+  number at +1284 equals C710 in all 105 saves of the original's own games (0 to turn 5, then 1, 2 and 3; the
+  town hook counts C710 up); other members have 0. The original doesn't rebuild these blocks on loading: with them
+  zeroed, her card shows 300/0 and no abilities.
 - **Joining.** The turn script's event (`bo0002`, run while F2321 and F211 are on, F2322 off and C060 >= C704)
   joins ミアルテ and ルーアルテ and shows ミアルテ、ルーアルテが仲間になった。 in the message box with both units'
   pictures under the text.
@@ -845,9 +894,10 @@ the same points (offsets in bytes, numbers little-endian):
   clicking a member, whose sprite then follows the pointer, and clicking a tile.
 - **装備 and 育成** list every member, posted and benched included, in the roster's order (measured: the original's
   装備 shows ミアルテ and ルーアルテ while they hold posts).
-- **Member places in saves.** Measured: the +24 word's two upper bytes are (tag, place): place 1 on a main tile with
-  tag 1 (Darkus 2), place 2 on a reserve tile with tag 0, 3 in a post with the post's id, and 4 unplaced with the
-  member's index.
+- **Member places in saves.** Measured: the +24 word's two upper bytes are (tag, place): place 1 on a main tile
+  with the tile as tag (its formation cell minus 8: 1 to 3 on the front row, 6 to 8 on the back; Darkus on the middle
+  front tile 2), place 2 on a reserve tile with the cell minus 23, 3 in a post with the post's id, and 4 unplaced with
+  the member's index. With every field member tagged 1, the original's 配置 list marked only the one on cell 9.
 - **Joined members.** Measured: a new member joins unplaced (not on a tile). Units whose skills are 固定 keep only
   their first skill, with 3 after it (the mark of a fixed skill, as on enemies). Not derived yet, so VNDegen writes
   zeros there: ルーアルテ's thirteen 2s at +260 of the second block, a 5 at +252, and Darkus's 3 at +1284 (turn 9
