@@ -127,6 +127,11 @@ int main(int argc, char **argv) {
             alive = alive && run(s, 300);
         }
         int dd;
+        char gname[64];
+        if (sscanf(argv[a], "group=%63[^,],%d,%d", gname, &x, &y) == 3) {
+            sa_debug_group(s, gname, x, y);
+            alive = alive && run(s, 100);
+        }
         if (sscanf(argv[a], "place=%d,%d,%d", &x, &y, &dd) == 3) {
             sa_debug_place(s, x, y, dd);
             alive = alive && run(s, 100);

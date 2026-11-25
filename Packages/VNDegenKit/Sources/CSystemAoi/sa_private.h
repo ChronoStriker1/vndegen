@@ -146,7 +146,7 @@ typedef struct Expedition {
     int (*floorInfo)[EXP_FLOORS][4];
     int special[EXP_SPECIALS], specialValue[EXP_SPECIALS];
     int blindSteps, supportSteps, curse[2];
-    bool alarm, noResidents;
+    bool alarm, noResidents, cancelled;
     char notice[EXP_NOTICE_LINES][128];
     int noticeCount;
 } Expedition;
@@ -320,6 +320,8 @@ int sa_back_mode(const SA *s);
 bool sa_exp_special(SA *s, int id, int a, int b);
 bool sa_exp_special_active(const SA *s, int id);
 bool sa_exp_support_cut(const SA *s);
+void sa_exp_notice(SA *s, const char *text);
+void sa_exp_cancel_encounter(SA *s);
 int sa_exp_special_value(const SA *s, int id);
 void sa_maze_init(SA *s);
 void sa_maze_free(SA *s);

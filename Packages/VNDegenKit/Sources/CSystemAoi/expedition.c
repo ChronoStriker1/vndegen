@@ -11,7 +11,7 @@ enum {
 };
 
 enum { SPECIAL_RETURN = 1, SPECIAL_HP, SPECIAL_MP, SPECIAL_CURE, SPECIAL_NO_ENEMY, SPECIAL_NO_TRAP, SPECIAL_ATTACK, SPECIAL_DEFENCE, SPECIAL_EVASION, SPECIAL_SPEED, SPECIAL_RECRUIT, SPECIAL_SEARCH };
-enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST };
+enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST, AFTER_ENCOUNTER };
 
 enum {
     C_EXP_X = 0x49,
@@ -254,12 +254,15 @@ static void walk_view(SA *s) {
     s->dirty = true;
 }
 
+static void encounter(SA *s);
+
 static void finish_after(SA *s) {
     Expedition *e = &s->exp;
     int after = e->after;
     e->after = AFTER_NONE;
     switch (after) {
     case AFTER_WALK: walk_view(s); break;
+    case AFTER_ENCOUNTER: encounter(s); break;
     case AFTER_BATTLE:
         s->mode = MODE_BATTLE;
         s->dirty = true;
@@ -591,6 +594,7 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     s->mode = MODE_DUNGEON;
     if (autosave) sa_autosave(s);
     static const int first[] = {HOOK_SETUP, HOOK_DUNGEON, HOOK_FLOOR}, next[] = {HOOK_FLOOR}, resumed[] = {HOOK_DUNGEON};
+    if (e->resuming || fresh) s->vm.c[C_EXP_GROUP] = 0;
     if (e->resuming) run_hooks(s, resumed, 1, AFTER_WALK);
     else if (fresh) run_hooks(s, first, 3, AFTER_WALK);
     else run_hooks(s, next, 1, AFTER_WALK);
@@ -710,12 +714,32 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
 static void start_battle(SA *s, int which) {
     Expedition *e = &s->exp;
     if (which < 0 || which >= e->groupCount) return;
-    ExpGroup *g = &e->group[which];
-    const char *group = group_name(s, g->party);
-    if (!group) return;
     e->fighting = which;
+    e->cancelled = false;
+    s->vm.c[C_EXP_GROUP] = e->group[which].party;
+    static const int hooks[] = {HOOK_DUNGEON};
+    run_hooks(s, hooks, 1, AFTER_ENCOUNTER);
+}
+
+static void encounter(SA *s) {
+    Expedition *e = &s->exp;
+    if (e->fighting < 0 || e->fighting >= e->groupCount) {
+        walk_view(s);
+        return;
+    }
+    ExpGroup *g = &e->group[e->fighting];
+    const char *group = group_name(s, g->party);
+    if (e->cancelled || !group) {
+        g->alive = false;
+        e->fighting = -1;
+        sync_marks(s);
+        walk_view(s);
+        return;
+    }
     begin_battle(s, group, g->cells);
 }
+
+void sa_exp_cancel_encounter(SA *s) { s->exp.cancelled = true; }
 
 static void random_battle(SA *s) {
     char group[64];
@@ -943,7 +967,7 @@ static void change_floor(SA *s) {
 
 enum { TRAP_HAZARD, TRAP_BLIND, TRAP_MAP, TRAP_RESIDENTS, TRAP_SUPPORT, TRAP_PURGE, TRAP_SGP, TRAP_ALARM, TRAP_PHANTOM, TRAP_CURSE, TRAP_TELEPORT, TRAP_SPIN, TRAP_HEAL };
 enum { HIT_WALK = 1, HIT_FLY = 2, HIT_ALL = 3 };
-enum { TRAP_STEPS = 50, AVOID_PERCENT = 20, AVOID_FINDER_PERCENT = 50, UNIT_FLYING = 13 };
+enum { PHANTOMS = 4, TRAP_STEPS = 50, AVOID_PERCENT = 20, AVOID_FINDER_PERCENT = 50, UNIT_FLYING = 13 };
 
 static const struct {
     int object, kind, arg, hp, mp;
@@ -971,7 +995,7 @@ static const struct {
     {42, TRAP_HEAL, 0, 0, 0, NULL, NULL},
 };
 
-static void notice(SA *s, const char *text) {
+void sa_exp_notice(SA *s, const char *text) {
     Expedition *e = &s->exp;
     e->noticeCount = 0;
     for (const char *p = text; p && e->noticeCount < EXP_NOTICE_LINES;) {
@@ -1054,19 +1078,19 @@ static bool spring_trap(SA *s) {
         if (!sa_dungeon_link(d, DUN_LINK_TELEPORT, &l)) return false;
         bool away = l.target >= 0 && (l.target >> 8 & 0xff) != e->floor;
         follow_link(s, &l);
-        notice(s, traps[t].line);
+        sa_exp_notice(s, traps[t].line);
         return away;
     }
     if (kind != TRAP_HAZARD) {
         int avoid = sa_exp_special_active(s, SPECIAL_NO_TRAP) ? 100 : party_has(s, "罠発見") ? AVOID_FINDER_PERCENT : AVOID_PERCENT;
         if ((int)(sa_vm_random(&s->vm) % 100) < avoid) {
             snprintf(msg, sizeof msg, "%sを回避した", traps[t].name);
-            notice(s, msg);
+            sa_exp_notice(s, msg);
             return false;
         }
     }
     snprintf(msg, sizeof msg, "%sに引っかかった！%s%s", traps[t].name, traps[t].line ? "|" : "", traps[t].line ? traps[t].line : "");
-    notice(s, msg);
+    sa_exp_notice(s, msg);
     switch (kind) {
     case TRAP_HAZARD:
         hurt(s, traps[t].arg, traps[t].hp, traps[t].mp);
@@ -1094,8 +1118,8 @@ static bool spring_trap(SA *s) {
         e->stepsLeft /= 2;
         break;
     case TRAP_PHANTOM: {
-        char group[64];
-        pick_group(s, group, sizeof group);
+        char group[16];
+        snprintf(group, sizeof group, "罠幻%02d", (int)(sa_vm_random(&s->vm) % PHANTOMS));
         spawn_group(s, group);
         sync_marks(s);
         break;

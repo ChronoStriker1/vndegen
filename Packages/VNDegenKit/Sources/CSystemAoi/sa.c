@@ -570,6 +570,15 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     case 0xde:
         if (in->count >= 1) sa_vm_set(vm, &in->o[0], sa_exp_area_registered(s));
         break;
+    case 0x3c: {
+        char *t = opd_str(code, in, 0);
+        sa_exp_notice(s, t);
+        free(t);
+        break;
+    }
+    case 0xa9:
+        sa_exp_cancel_encounter(s);
+        break;
     case 0xa1:
         sa_mission_end(s, in->count >= 1 ? sa_vm_get(vm, code, &in->o[0]) : 0);
         break;
@@ -1715,6 +1724,8 @@ void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor) {
 }
 
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir) { sa_exp_debug_place((SA *)sa, x, y, dir); }
+
+void sa_debug_group(VNSystemAoi *sa, const char *name, int x, int y) { sa_exp_add_group_at((SA *)sa, name, x, y); }
 
 void sa_debug_finds(VNSystemAoi *sa, int *out) {
     SA *s = (SA *)sa;

@@ -326,11 +326,16 @@ calls it is inferred from that and from play, and marked so.
   music), C155 a battle's result (1 won, 2 lost; 3 fled is inferred). C210 to C213 hold what the expedition has found
   (residents, food, money, resources). Facing is inferred as 0 north, 1 east, 2 south, 3 west.
 - **Hooks.** 10 `bo1000` sets the pickup ranges per dungeon (C520 to C527); 25 `bo2500` plays the dungeon's music by
-  C151 (31 for 千樹庭); 11 `bo1100` sets up a floor (enemy groups by name with `a8`, floor objects with `d7`); 12
+  C151 (31 for 千樹庭) after running `bo2501`, which keys 81 encounter scenes on the group in C150 (the area bosses'
+  intros, ヤーヌ隊 9801's 「問答無用。お命、頂きます！」 among them) and the trap phantoms 9990 to 9993 (`party.obj`
+  罠幻00 to 罠幻03, no members), for which it says 「敵は幻だった。」 (`3c "text"`) and calls `a9` (its only use); 11 `bo1100` sets up a floor (enemy groups by name with `a8`, floor objects with `d7`); 12
   `bo1200` handles the cell the party stands on or faces (pickups, keyed doors `壁` 101 to 110, opened as 111); 17
   `bo1700` runs on the way home; 26 `bo2600` before a battle (battle music 35); 27 `bo2700` after one (on a loss
   Darkus's line, then the loss message). Inferred order on entering: 10, 25, 11; hook 12 after each step onto a cell
-  with a floor object and on walking into a wall; 17 on leaving.
+  with a floor object and on walking into a wall; 17 on leaving. Inferred from those scenes' words (「こんな所で遭遇す
+  るなんて……」): walking into a group runs 25 with C150 set to the group before its battle, and VNDegen clears C150
+  before the entry run (left at a boss's id, entering replayed that boss's intro). `a9` cancels the encounter: the
+  phantom vanishes and no battle follows.
 - **`d7` and `d8`.** Write and read the map: `d7 "name" value x y mode [facing]`, `d8 "name" var x y facing`. Names:
   床物 (the cell's object, `mpDDFF.amd` field 6), 壁 (the wall on a side) and 移動 (the field after it; 1 lets the
   party through). Mode 2 also writes the neighbour's facing side (inferred from doors being opened that way).
