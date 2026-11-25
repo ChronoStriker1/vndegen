@@ -603,8 +603,11 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     }
     case 0xef:
         if (in->count >= 2) {
-            int c = s->town.condition + sa_vm_get(vm, code, &in->o[1]);
-            s->town.condition = c < 0 ? 0 : c > 100 ? 100 : c;
+            int n = sa_vm_get(vm, code, &in->o[1]);
+            if (in->count >= 3 && sa_vm_get(vm, code, &in->o[2]) == 1) sa_town_grow_all(&s->town, vm, n);
+            else
+                for (int c = 0; c < TOWN_CELLS; c++)
+                    if (s->town.cell[c].type) s->town.cell[c].exp = s->town.cell[c].exp * (100 + n) / 100;
         }
         break;
     case 0xa4:
@@ -798,6 +801,11 @@ static void new_game(SA *s) {
     sa_start_script(s, "init.box", 0);
 }
 
+static int town_range(SA *s, int r, int level, int col) {
+    int lo = sa_town_value(&s->town, r, level, col), hi = sa_town_value(&s->town, r, level, col + 1);
+    return hi > lo ? lo + (int)(sa_vm_random(&s->vm) % (u32)(hi - lo + 1)) : lo;
+}
+
 void sa_end_turn(SA *s) {
     VM *vm = &s->vm;
     int food = 0, money = 0, res = 0, people = 0, cap = 0;
@@ -807,12 +815,14 @@ void sa_end_turn(SA *s) {
         if (r < 0) continue;
         cap += sa_table_int(&s->town.build, r, 9);
         if (!sa_town_staffed(&s->town, vm, c)) continue;
-        food += sa_table_int(&s->town.build, r, 25);
-        money += sa_table_int(&s->town.build, r, 27);
-        res += sa_table_int(&s->town.build, r, 29) - sa_table_int(&s->town.build, r, 34);
-        int lo = sa_table_int(&s->town.build, r, 23), hi = sa_table_int(&s->town.build, r, 24);
-        people += hi > lo ? lo + (int)(sa_vm_random(vm) % (u32)(hi - lo + 1)) : hi;
+        int level = s->town.cell[c].level;
+        food += town_range(s, r, level, 25);
+        money += town_range(s, r, level, 27);
+        res += town_range(s, r, level, 29) - sa_town_value(&s->town, r, level, 34);
+        people += town_range(s, r, level, 23);
     }
+    sa_town_grow_all(&s->town, vm, 1);
+    sa_town_level_up(&s->town);
     food -= vm->c[C_RESIDENTS] / 10;
     int maze[3];
     bool failed = sa_maze_turn(s, maze);

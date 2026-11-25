@@ -52,7 +52,6 @@ enum {
     C_EVENT = 492,
     POLICY_HOOK = 31,
     POLICY_ENTRY = 2,
-    LVUP_GROUP = 5,
 };
 
 enum { EXCHANGE_DESC_DY = 121, TRADES = 6, CAT_EXCHANGE = 2, TRADE_GIVE = 1000, NUM_SIZE = 20, NUM_SPACING = 6, GIVE_RIGHT = 178, GET_RIGHT = 378, NUM_DY = 9 };
@@ -270,26 +269,6 @@ static void draw(SA *s) {
     sa_blit_rect(fb, p->art[ART_CANCEL], 0, p->hover == HOVER_CANCEL ? BTN_H : 0, BTN_W, BTN_H, CANCEL_X, CONFIRM_BTN_Y);
 }
 
-static void grow_facilities(SA *s, int amount) {
-    if (amount <= 0) return;
-    const Table *lv = &s->town.lvup;
-    for (int c = 0; c < TOWN_CELLS; c++) {
-        Facility *f = &s->town.cell[c];
-        if (!f->type || !sa_town_staffed(&s->town, &s->vm, c)) continue;
-        int group = sa_table_int(&s->town.build, sa_town_type_row(&s->town, f->type), LVUP_GROUP);
-        f->exp += amount;
-        for (bool up = true; up;) {
-            up = false;
-            for (int r = 0; r < lv->rows; r++)
-                if (sa_table_int(lv, r, 0) == group && sa_table_int(lv, r, 1) == f->level + 1 && f->exp >= sa_table_int(lv, r, 2)) {
-                    f->level++;
-                    up = true;
-                    break;
-                }
-        }
-    }
-}
-
 static void trade(SA *s, int i) {
     VM *vm = &s->vm;
     int before[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
@@ -316,7 +295,7 @@ static void run(SA *s) {
     s->vm.c[C_FOOD] += sa_table_int(t, r, E_FOOD);
     s->vm.c[C_MONEY] += sa_table_int(t, r, E_MONEY);
     s->vm.c[C_RESOURCES] += sa_table_int(t, r, E_RESOURCES);
-    grow_facilities(s, sa_table_int(t, r, E_EXP));
+    if (sa_table_int(t, r, E_EXP) > 0) sa_town_grow_all(&s->town, &s->vm, sa_table_int(t, r, E_EXP));
     s->vm.c[C_EVENT] = sa_table_int(t, r, E_EVENT);
     sa_log(s, "policy: %s", sa_table_text(t, r, E_NAME));
     const char *box = s->vm.boxSlot[POLICY_HOOK];

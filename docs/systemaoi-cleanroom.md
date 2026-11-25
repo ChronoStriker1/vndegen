@@ -22,6 +22,12 @@ maintainer's approval.
 Measured means read from captures of the original under Wine at 1280x720; inferred means chosen to fit what play showed
 where play couldn't pin it down.
 
+- **Facility levels.** Measured over 14 turns of the original: EXP is cumulative and a facility reaches level L
+  when its EXP reaches `TownLvup.obj` column 2 of its group's row L (the 魔王亭 reached level 2 at 150 and kept
+  counting). The check runs at the turn's end after the engine's +1 per staffed facility; the turn script's
+  3 to 5 comes after it, so a level shows a turn later. A level adds every `TownLvup` row up to it to the
+  facility's `TownBuil` values (column c adds to column c + 6), except housing: three level-10 住居 still housed
+  200 each.
 - **Facilities.** `TownBuil.obj` columns: 9 housing, 18 build cost in resources, 19 workers needed, 23 and 24 residents a
   turn, 25 and 26 food, 27 and 28 money, 29 and 30 resources, 34 resources used a turn, 35 to 37 pictures, 66 and 67 the
   card's texts. Measured: costs and workers match the manual; a 魔王亭 makes 30 money a turn and a field costs 150
@@ -57,8 +63,10 @@ where play couldn't pin it down.
   skip held it runs about 16 times as fast. Inferred: mode 0 starts the move to (x, y) and mode 1 waits for it.
 - **`f8` and `f9`.** From the script around them: they set a flag when BUNNY BLACK 1 or 2 is installed, and the
   opening then offers special units; VNDegen reports neither.
-- **`ef 0 <n> <mode>`.** Inferred from the scripts: a percentage that falls with the message "the town's facilities
-  were damaged" (-60 to -40) and rises by 3 to 5 each turn; VNDegen keeps it, from 100, but nothing shows it yet.
+- **`ef 0 <n> <mode>`.** Facility EXP. Measured: the turn script opens with `2e CL8 3 5` and `ef 0 CL8 1`, and
+  every staffed facility gains that 3 to 5 (with the engine's own +1, the 4 to 6 a turn the saves show; with no
+  hooks registered only the +1 remains). Inferred: mode 0, which the damage events use with -40 to -30 before
+  "経験値ダウン", scales the EXP by that percentage.
 
 - **`8a`, the message box.** Measured from the original: the box from `chipB`'s `ret_a02` header at (430, 130), the
   `ret_a04` text area (text at (462, 178), 20 pixels a line) and the `ret_a00` foot with OK (`ret_a01`, normal and
@@ -652,6 +660,10 @@ the same points (offsets in bytes, numbers little-endian):
   The number after the grid is 1. From 1,012,652 come 56-byte records naming script files in UTF-16 (`ac0000.box`,
   then the hook boxes the game has run, `bo0000` to `bo3100`) with two numbers each; a script cache rather than story
   progress. The original loads images without it, so VNDegen leaves it empty.
+- **Hook slots** at 1,035,060: 50 slots of 48 bytes, each the UTF-16 name of the script registered there (`bo0000.box`
+  for the turn script in slot 0, `bo0100.box` the town hook in 1, …, `bo3100.box` in 31) or `EVnn.box` when empty.
+  Measured: a save without them loads, but the original then runs no turn script or hooks (no story events, and
+  facilities gain only the engine's +1 EXP a turn); VNDegen's export writes them.
 - **Equipment** at 1,004,728: (item, free, in use) triples, as the 装備 screen shows them (ダークスの剣 0/1 while
   Darkus wields it). Equipping 名剣ルージュ instead moved the counts, changed Darkus's item at 87,220 from 100 to 104,
   and his bonus at 86,716 (the second stat block's eleventh number) from 20 to 7, the items' 斬補正.

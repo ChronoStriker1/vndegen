@@ -94,16 +94,7 @@ bool sa_maze_post_open(const Maze *m, const VM *vm, int post) {
 }
 
 enum { POST_COMMERCE = 4, POST_INDUSTRY = 5, POST_GUARD = 6, POST_SCHOOL = 7, POST_HEALTH = 9, POST_HEAD = 10, POST_DEPUTY = 11, POST_FLOOR1 = 12, POST_RAID = 19, POST_SUPPORT = 20, EXP_PER_INTRUDER = 2, PARTY_SIZE = 3 };
-enum { COL_MAZE = 10, COL_GUARD, COL_CHEST, COL_TRAP, COL_RENOWN, LVUP_SHIFT = 6 };
-
-static int facility_value(const Town *t, int r, int level, int col) {
-    int v = sa_table_int(&t->build, r, col), group = sa_table_int(&t->build, r, 5);
-    for (int i = 0; i < t->lvup.rows; i++) {
-        int lv = sa_table_int(&t->lvup, i, 1);
-        if (sa_table_int(&t->lvup, i, 0) == group && lv >= 2 && lv <= level) v += sa_table_int(&t->lvup, i, col - LVUP_SHIFT);
-    }
-    return v;
-}
+enum { COL_MAZE = 10, COL_GUARD, COL_CHEST, COL_TRAP, COL_RENOWN };
 
 static void post_stats(const SA *s, int post, int *gov, int *lead) {
     *gov = *lead = 0;
@@ -140,7 +131,7 @@ void sa_maze_update(SA *s) {
     for (int c = 0; c < TOWN_CELLS; c++) {
         int r = t->cell[c].type ? sa_town_type_row(t, t->cell[c].type) : -1;
         if (r < 0 || !sa_town_staffed(t, &s->vm, c)) continue;
-        for (int i = 0; i < 5; i++) sum[i] += facility_value(t, r, t->cell[c].level, COL_MAZE + i);
+        for (int i = 0; i < 5; i++) sum[i] += sa_town_value(t, r, t->cell[c].level, COL_MAZE + i);
     }
     m->depthPoints = sum[0];
     m->renown = sum[4];

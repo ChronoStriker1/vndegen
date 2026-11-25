@@ -89,6 +89,9 @@ enum {
     MAZE_AT = 1009652,
     MAZE_FLOOR_SIZE = 168,
     MAZE_NET_AT = 1010836,
+    BOX_SLOTS_AT = 1035060,
+    BOX_SLOTS = 50,
+    BOX_NAME_SIZE = 48,
     MISSIONS_AT = 1008328,
 };
 
@@ -223,6 +226,16 @@ static void write_maze(SA *s, u8 *img) {
         for (int a = 0; a < 7; a++)
             for (int i = 0; i < 6; i++) put(img, MAZE_AT + 4 + (size_t)k * MAZE_FLOOR_SIZE + (size_t)(a * 6 + i) * 4, s->maze.event[k][a][i]);
     for (int i = 0; i < 3; i++) put(img, MAZE_NET_AT + (size_t)i * 4, s->vm.c[C_MAZE_FOOD + i]);
+}
+
+static void write_box_slots(SA *s, u8 *img) {
+    for (int i = 0; i < BOX_SLOTS; i++) {
+        char name[24];
+        if (s->vm.boxSlot[i]) snprintf(name, sizeof name, "%s", s->vm.boxSlot[i]);
+        else snprintf(name, sizeof name, "EV%02d.box", i);
+        u8 *o = img + BOX_SLOTS_AT + (size_t)i * BOX_NAME_SIZE;
+        for (int k = 0; name[k] && k < BOX_NAME_SIZE / 2 - 1; k++) o[k * 2] = (u8)name[k];
+    }
 }
 
 static void read_maze(SA *s, const u8 *img) {
@@ -588,6 +601,7 @@ bool sa_pcsave_write(SA *s, const char *path) {
     write_maps(s, img);
     write_dungeon(s, img);
     write_maze(s, img);
+    write_box_slots(s, img);
     for (int i = 0; i < s->missions.logCount; i++)
         for (int k = 0; k < 3; k++) put(img, MISSIONS_AT + (size_t)i * 12 + (size_t)k * 4, s->missions.log[i][k]);
     for (int i = 0; i < PC_C_VARS; i++) put(img, VM_AT + (size_t)i * 4, s->vm.c[i]);

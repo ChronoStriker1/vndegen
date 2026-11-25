@@ -185,6 +185,46 @@ static int workers_needed(const Town *t, int type) {
     return r >= 0 ? sa_table_int(&t->build, r, 19) : 0;
 }
 
+enum { LVUP_SHIFT = 6, LVUP_EXP = 2 };
+
+static int lvup_row(const Town *t, int group, int level) {
+    for (int i = 0; i < t->lvup.rows; i++)
+        if (sa_table_int(&t->lvup, i, 0) == group && sa_table_int(&t->lvup, i, 1) == level) return i;
+    return -1;
+}
+
+int sa_town_value(const Town *t, int r, int level, int col) {
+    int v = sa_table_int(&t->build, r, col), group = sa_table_int(&t->build, r, 5);
+    for (int lv = 2; lv <= level; lv++) {
+        int i = lvup_row(t, group, lv);
+        if (i >= 0) v += sa_table_int(&t->lvup, i, col - LVUP_SHIFT);
+    }
+    return v;
+}
+
+void sa_town_add_exp(Town *t, int cell, int amount) {
+    Facility *f = &t->cell[cell];
+    int r = f->type ? sa_town_type_row(t, f->type) : -1;
+    if (r < 0) return;
+    f->exp += amount;
+    if (f->exp < 0) f->exp = 0;
+}
+
+void sa_town_level_up(Town *t) {
+    for (int c = 0; c < TOWN_CELLS; c++) {
+        Facility *f = &t->cell[c];
+        int r = f->type ? sa_town_type_row(t, f->type) : -1;
+        if (r < 0) continue;
+        int group = sa_table_int(&t->build, r, 5), i;
+        while ((i = lvup_row(t, group, f->level + 1)) >= 0 && f->exp >= sa_table_int(&t->lvup, i, LVUP_EXP)) f->level++;
+    }
+}
+
+void sa_town_grow_all(Town *t, const VM *vm, int amount) {
+    for (int c = 0; c < TOWN_CELLS; c++)
+        if (t->cell[c].type && sa_town_staffed(t, vm, c)) sa_town_add_exp(t, c, amount);
+}
+
 int sa_town_staffed(const Town *t, const VM *vm, int cell) {
     int left = vm->c[C_RESIDENTS];
     for (int i = 0; i < TOWN_CELLS; i++) {
@@ -462,7 +502,6 @@ static void draw_info(Town *t, const VM *vm, u32 *fb, bool live) {
 void sa_town_draw_info(Town *t, const VM *vm, u32 *fb) { draw_info(t, vm, fb, false); }
 
 static void draw_maze(Town *t, const VM *vm, u32 *fb) {
-    (void)vm;
     if (draw_folded(t, fb, TW_MAZE)) return;
     const Maze *m = t->maze;
     const Image *dg = t->ui[UI_MAZE_DIGITS];
