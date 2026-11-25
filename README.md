@@ -2,7 +2,7 @@
 
 # VNDegen
 
-VNDegen runs PC visual novels and RPG Maker games natively on Mac, iPhone, and iPad. Copy a game's folder into the library, and VNDegen detects its engine and lists it in a game hub modeled on Steam's Big Picture mode, with artwork from Steam and other sources. Play starts it.
+VNDegen runs PC visual novels and RPG Maker games natively on Mac, iPhone, iPhone Duo, and iPad. Copy a game's folder into the library, and VNDegen detects its engine and lists it in a game hub modeled on Steam's Big Picture mode, with artwork from Steam and other sources. Play starts it.
 
 The games run unmodified. VNDegen does not convert or repack them, and their saves stay compatible with the PC versions.
 
@@ -22,7 +22,7 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 - **PC games on their own engines**, including RPG Maker, Ren'Py, KiriKiri, Godot, and Flash. See [Supported engines](#supported-engines).
 - **Engine detection.** VNDegen recognizes each game by its files and shows which file identified it. You can assign an engine by hand. [Engines](docs/engines.md)
 - **Artwork and metadata** from Steam, SteamGridDB, IGDB, and VNDB, and any art slot can be replaced. [Library](docs/library.md#artwork-and-metadata)
-- **Four library layouts**, Header list, Capsule rows, Featured, and Grid, that fit iPhone portrait and landscape, iPhone Duo, iPad full screen or in a window, and Mac windows of any size. [Layouts](#layouts-on-each-device)
+- **Four library layouts**, Header list, Capsule rows, Featured, and Grid, that fit iPhone in portrait and landscape, iPhone Duo on its front display or open, iPad full screen or in a window, and Mac windows of any size. [Layouts](#layouts-on-each-device)
 - **Touch, mouse and keyboard, and controllers** drive the hub and the games, with a library of controller layouts you can pick per game, edit, and add to, and a layout suggested from an RPG Maker MV, MZ, Godot, Artemis, or Wolf RPG Editor game's own files. [Controls](docs/controls.md)
 - **More than one games folder**, such as an external drive or a server, and archives unpack straight into the library. [Library](docs/library.md#adding-games)
 - **Game menu.** A long press, a right click, or X on a controller opens Play, Change artwork, Hide, Remove, and more. [Library](docs/library.md#the-game-menu)
@@ -38,17 +38,29 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 
 ## Layouts on each device
 
-The view button in the top bar switches between Header list, Capsule rows, Featured, and Grid, and each device keeps its own choice.
+The view button in the top bar switches between Header list, Capsule rows, Featured, and Grid, and each device keeps its own choice. iPhone, iPhone Duo, iPad, and Mac each arrange the hub their own way.
+
+### iPhone
+
+Header list by default, in portrait as at the top of this page and in landscape.
 
 <p align="center">
   <img src="docs/screenshots/hub-iphone-landscape.jpg" width="820" alt="iPhone in landscape in Featured: Nitz's Debt's hero art, a Godot badge, and Play and Details buttons above the Recently played shelf">
   <br><sub>iPhone in landscape: Featured</sub>
 </p>
 
+### iPad
+
+Capsule rows by default, full screen or in a window of any size, in either orientation.
+
 <p align="center">
   <img src="docs/screenshots/hub-ipad-featured.jpg" width="820" alt="iPad in Featured: Kaeru nyo Panyon, an AliceSoft System 3 game, with its hero art, description, and Play and Details buttons above the Recently played shelf">
   <br><sub>iPad: Featured</sub>
 </p>
+
+### iPhone Duo
+
+The iPhone Duo starts on Header list, like the iPhone, and arranges each display its own way. Closed, the front display puts the library's buttons in a side bar below the camera, upright or on its side. Open, the inner display shows an even number of columns, so the fold falls between two, and keeps its buttons in a side bar when held like a book. Closed and held on its side, a game uses the front display's full width by default, and the Game picture setting can fit it clear of the camera instead. Opening and closing the Duo keeps the library's place and a running game. [Library](docs/library.md#iphone-duo)
 
 <p align="center">
   <img src="docs/screenshots/duo-front-portrait-library.jpg" width="300" alt="iPhone Duo closed and held upright, on the front display, in Header list: one column of header art led by Kaeru nyo Panyon, with the Add game, view, lock, and Settings buttons in a side bar below the camera">
@@ -68,6 +80,10 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
   <br><sub>iPhone Duo open, inner display held like a book: library &nbsp;·&nbsp; Kaeru nyo Panyon</sub>
 </p>
 
+### Mac
+
+Featured by default, as at the top of this page, in a window of any size or full screen.
+
 <p align="center">
   <img src="docs/screenshots/hub-mac-headers.jpg" width="820" alt="A wide Mac window in Header list: sixteen games' header art in five columns, including Warding Witches, five Rance games, Lilipalace, and No Socks RPG">
   <br><sub>Mac, wide window: Header list</sub>
@@ -77,44 +93,44 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 
 | Engine | VNDegen detects | Platforms | Details |
 |---|---|---|---|
-| RPG Maker MZ | `js/rmmz_core.js` | Mac, iPhone, iPad | [engines.md](docs/engines.md#rpg-maker-mv-and-mz) |
-| RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad | [engines.md](docs/engines.md#rpg-maker-mv-and-mz) |
-| TyranoScript and TyranoBuilder | `tyrano/plugins/kag/kag.js`, also in NW.js and Electron builds | Mac, iPhone, iPad | [engines.md](docs/engines.md#tyranoscript) |
-| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder of scripts | Mac, iPhone, iPad | [engines.md](docs/engines.md#renpy) |
-| RPG Maker XP, VX, and VX Ace | `Game.ini` beside a `Game.rgss*` archive or `Data/Scripts.*` | Mac, iPhone, iPad | [rgss.md](docs/rgss.md) |
-| KiriKiri 2 and KiriKiri Z | `data.xp3`, `data/startup.tjs`, or an archive in the `.exe` | Mac, iPhone, iPad | [engines.md](docs/engines.md#kirikiri) |
-| Artemis | a `.pfs` archive or a `system.ini` | Mac, iPhone, iPad | [artemis.md](docs/artemis.md) |
-| SiglusEngine | `Scene.pck` or `Gameexe.dat` | Mac, iPhone, iPad | [siglus.md](docs/siglus.md) |
-| Godot 3 and Godot 4 | a `.pck` file, or a pack inside the game's `.exe` | Mac with Apple silicon, iPhone, iPad | [godot.md](docs/godot.md) |
-| Flash (ActionScript 1, 2, and 3) | a projector `.exe`, a `.swf`, or an HTML page that launches movies | Mac, iPhone, iPad | [flash.md](docs/flash.md) |
-| Visual Novel Maker | `index.html` with `data/ENGINE.js` and `data/SCRIPTS.js`, also in NW.js and Electron builds | Mac, iPhone, iPad | [htmlvn.md](docs/htmlvn.md) |
-| Twine 1 and 2 | an HTML file holding the story, also in a Unity player's Embedded Browser pack | Mac, iPhone, iPad | [htmlvn.md](docs/htmlvn.md) |
-| Construct 3 | `index.html`, `data.json` and `scripts/c3runtime.js`, also in Windows WebView2 builds | Mac, iPhone, iPad | [construct.md](docs/construct.md) |
-| NScripter and Ponscripter | `nscript.dat`, or `0.txt`, `00.txt` or Ponscripter's `0.utf` beside NScripter archives | Mac, iPhone, iPad | [nscripter.md](docs/nscripter.md) |
-| Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` | Mac, iPhone, iPad | [wolfrpg.md](docs/wolfrpg.md) |
-| AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` | Mac, iPhone, iPad | [system3.md](docs/system3.md) |
-| AliceSoft System 4 | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe` | Mac, iPhone, iPad | [system4.md](docs/system4.md) |
-| NekoSDK (17 games) | `cfg.pak` beside `scr.pak` | Mac, iPhone, iPad | [engines.md](docs/engines.md#nekosdk) |
-| YU-RIS | `yscfg.dat` or `ysbin.ypf` beside `.ypf` archives | Mac, iPhone, iPad | [yuris.md](docs/yuris.md) |
-| Nitroplus N2System | `system.npa` beside `nss.npa` | Mac, iPhone, iPad | [n2system.md](docs/n2system.md) |
-| Tmr-Hiro ADV System | `srp.pac` beside `Agrd.pac` | Mac, iPhone, iPad | [tmrhiro.md](docs/tmrhiro.md) |
-| IPAC | `DATA/Scr.PAK` beside `DATA/Parts.PAK` | Mac, iPhone, iPad | [ipac.md](docs/ipac.md) |
-| Ikura GDL | `SNR` beside `GRP` | Mac, iPhone, iPad | [ikura.md](docs/ikura.md) |
-| EAGLS | `Script/SCPACK.idx` beside `CG/CGPACK.idx` | Mac, iPhone, iPad | [eagls.md](docs/eagls.md) |
-| ExHibit | `ExHIBIT.ini` beside `resident.dll` and `rld/start.rld` | Mac, iPhone, iPad | [exhibit.md](docs/exhibit.md) |
-| Bruns | `ams.cfg` beside `binary/bruns.exe` and `scene/brs009000.bso` | Mac, iPhone, iPad | [bruns.md](docs/bruns.md) |
-| Eushully AGE | `SYS4INI.BIN` beside `DATA1.ALF` or `age.exe` | Mac, iPhone, iPad | [age.md](docs/age.md) |
-| BISHOP BSX | `bsxx.dat` beside `bsxx.cfg` and `Graphics*.bsa` | Mac, iPhone, iPad | [bsx.md](docs/bsx.md) |
-| PJADV | `archive.dat` holding `scenario.dat` and `textdata.bin` | Mac, iPhone, iPad | [pjadv.md](docs/pjadv.md) |
-| ANIM | `<name>_sce.dat` beside `<name>_define.dat`, `<name>_system.dat` and `cg/psbpack.dat` | Mac, iPhone, iPad | [anim.md](docs/anim.md) |
-| SystemAoi | `box.vfs` holding `init.box` and `pro.box` | Mac, iPhone, iPad | [systemaoi.md](docs/systemaoi.md) |
-| Unity, opened outside VNDegen | `Game_Data/globalgamemanagers`, `mainData`, or `data.unity3d` | Mac, through the game's own Mac version or your CrossOver. iPhone and iPad: the game's page says why not | [unity.md](docs/unity.md#mac-launcher) |
+| RPG Maker MZ | `js/rmmz_core.js` | Mac, iPhone, iPhone Duo, iPad | [engines.md](docs/engines.md#rpg-maker-mv-and-mz) |
+| RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPhone Duo, iPad | [engines.md](docs/engines.md#rpg-maker-mv-and-mz) |
+| TyranoScript and TyranoBuilder | `tyrano/plugins/kag/kag.js`, also in NW.js and Electron builds | Mac, iPhone, iPhone Duo, iPad | [engines.md](docs/engines.md#tyranoscript) |
+| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder of scripts | Mac, iPhone, iPhone Duo, iPad | [engines.md](docs/engines.md#renpy) |
+| RPG Maker XP, VX, and VX Ace | `Game.ini` beside a `Game.rgss*` archive or `Data/Scripts.*` | Mac, iPhone, iPhone Duo, iPad | [rgss.md](docs/rgss.md) |
+| KiriKiri 2 and KiriKiri Z | `data.xp3`, `data/startup.tjs`, or an archive in the `.exe` | Mac, iPhone, iPhone Duo, iPad | [engines.md](docs/engines.md#kirikiri) |
+| Artemis | a `.pfs` archive or a `system.ini` | Mac, iPhone, iPhone Duo, iPad | [artemis.md](docs/artemis.md) |
+| SiglusEngine | `Scene.pck` or `Gameexe.dat` | Mac, iPhone, iPhone Duo, iPad | [siglus.md](docs/siglus.md) |
+| Godot 3 and Godot 4 | a `.pck` file, or a pack inside the game's `.exe` | Mac with Apple silicon, iPhone, iPhone Duo, iPad | [godot.md](docs/godot.md) |
+| Flash (ActionScript 1, 2, and 3) | a projector `.exe`, a `.swf`, or an HTML page that launches movies | Mac, iPhone, iPhone Duo, iPad | [flash.md](docs/flash.md) |
+| Visual Novel Maker | `index.html` with `data/ENGINE.js` and `data/SCRIPTS.js`, also in NW.js and Electron builds | Mac, iPhone, iPhone Duo, iPad | [htmlvn.md](docs/htmlvn.md) |
+| Twine 1 and 2 | an HTML file holding the story, also in a Unity player's Embedded Browser pack | Mac, iPhone, iPhone Duo, iPad | [htmlvn.md](docs/htmlvn.md) |
+| Construct 3 | `index.html`, `data.json` and `scripts/c3runtime.js`, also in Windows WebView2 builds | Mac, iPhone, iPhone Duo, iPad | [construct.md](docs/construct.md) |
+| NScripter and Ponscripter | `nscript.dat`, or `0.txt`, `00.txt` or Ponscripter's `0.utf` beside NScripter archives | Mac, iPhone, iPhone Duo, iPad | [nscripter.md](docs/nscripter.md) |
+| Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` | Mac, iPhone, iPhone Duo, iPad | [wolfrpg.md](docs/wolfrpg.md) |
+| AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` | Mac, iPhone, iPhone Duo, iPad | [system3.md](docs/system3.md) |
+| AliceSoft System 4 | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe` | Mac, iPhone, iPhone Duo, iPad | [system4.md](docs/system4.md) |
+| NekoSDK (17 games) | `cfg.pak` beside `scr.pak` | Mac, iPhone, iPhone Duo, iPad | [engines.md](docs/engines.md#nekosdk) |
+| YU-RIS | `yscfg.dat` or `ysbin.ypf` beside `.ypf` archives | Mac, iPhone, iPhone Duo, iPad | [yuris.md](docs/yuris.md) |
+| Nitroplus N2System | `system.npa` beside `nss.npa` | Mac, iPhone, iPhone Duo, iPad | [n2system.md](docs/n2system.md) |
+| Tmr-Hiro ADV System | `srp.pac` beside `Agrd.pac` | Mac, iPhone, iPhone Duo, iPad | [tmrhiro.md](docs/tmrhiro.md) |
+| IPAC | `DATA/Scr.PAK` beside `DATA/Parts.PAK` | Mac, iPhone, iPhone Duo, iPad | [ipac.md](docs/ipac.md) |
+| Ikura GDL | `SNR` beside `GRP` | Mac, iPhone, iPhone Duo, iPad | [ikura.md](docs/ikura.md) |
+| EAGLS | `Script/SCPACK.idx` beside `CG/CGPACK.idx` | Mac, iPhone, iPhone Duo, iPad | [eagls.md](docs/eagls.md) |
+| ExHibit | `ExHIBIT.ini` beside `resident.dll` and `rld/start.rld` | Mac, iPhone, iPhone Duo, iPad | [exhibit.md](docs/exhibit.md) |
+| Bruns | `ams.cfg` beside `binary/bruns.exe` and `scene/brs009000.bso` | Mac, iPhone, iPhone Duo, iPad | [bruns.md](docs/bruns.md) |
+| Eushully AGE | `SYS4INI.BIN` beside `DATA1.ALF` or `age.exe` | Mac, iPhone, iPhone Duo, iPad | [age.md](docs/age.md) |
+| BISHOP BSX | `bsxx.dat` beside `bsxx.cfg` and `Graphics*.bsa` | Mac, iPhone, iPhone Duo, iPad | [bsx.md](docs/bsx.md) |
+| PJADV | `archive.dat` holding `scenario.dat` and `textdata.bin` | Mac, iPhone, iPhone Duo, iPad | [pjadv.md](docs/pjadv.md) |
+| ANIM | `<name>_sce.dat` beside `<name>_define.dat`, `<name>_system.dat` and `cg/psbpack.dat` | Mac, iPhone, iPhone Duo, iPad | [anim.md](docs/anim.md) |
+| SystemAoi | `box.vfs` holding `init.box` and `pro.box` | Mac, iPhone, iPhone Duo, iPad | [systemaoi.md](docs/systemaoi.md) |
+| Unity, opened outside VNDegen | `Game_Data/globalgamemanagers`, `mainData`, or `data.unity3d` | Mac, through the game's own Mac version or your CrossOver. iPhone, iPhone Duo, and iPad: the game's page says why not | [unity.md](docs/unity.md#mac-launcher) |
 
 [docs/engines.md](docs/engines.md) has the exact detection rules and how each engine runs, saves, and what it can't do yet. Some RPG Maker XP, VX, and VX Ace games need the RTP, which VNDegen downloads from the RPG Maker website when you ask. [docs/engine-survey.md](docs/engine-survey.md) covers other engines and how each could be supported.
 
 ## Installing
 
-- **Releases.** The [Releases](https://github.com/ChronoStriker1/vndegen/releases) page has an IPA for iPhone and iPad and a zipped app for Mac, with install steps in each release's notes.
+- **Releases.** The [Releases](https://github.com/ChronoStriker1/vndegen/releases) page has an IPA for iPhone, iPhone Duo, and iPad and a zipped app for Mac, with install steps in each release's notes.
 - **AltStore or SideStore.** Add this source to install VNDegen and get updates:
 
   ```
@@ -129,7 +145,7 @@ To build VNDegen yourself, see [docs/development.md](docs/development.md).
 
 Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game on several devices keeps its artwork and settings on each.
 
-- **iPhone and iPad.** In the Files app, open On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
+- **iPhone, iPhone Duo, and iPad.** In the Files app, open On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
 - **Mac.** Copy the game folders into `~/Games/VNDegen`, which sits outside `~/Documents` so iCloud Drive does not upload your games.
 - **Archives.** Add game in the library unpacks a zip, RAR, or 7z. You can also drop an archive on VNDegen or open it in VNDegen from Files or Finder.
 - **Installers and disc images.** Add game unpacks a game from its GOG installer, with any add-on beside it, or from an ISO disc image, without running the installer. [Library](docs/library.md#installers-and-disc-images)
