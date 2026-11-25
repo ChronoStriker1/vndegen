@@ -331,6 +331,7 @@ typedef struct Dungeon {
     R3 r3;
     int fogTex;
     float fogSpeed[2], fogAlpha[2], fogHeight;
+    int passCell, passSide;
 } Dungeon;
 
 enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };

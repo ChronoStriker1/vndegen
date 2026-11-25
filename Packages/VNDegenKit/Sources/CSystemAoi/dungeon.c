@@ -553,12 +553,15 @@ static bool walk(Dungeon *d, int side) {
     mark_passage(d, from, to, side);
     d->steps++;
     start_anim(d);
+    d->passCell = from;
+    d->passSide = side;
     return true;
 }
 
 static void turn(Dungeon *d, int by) {
     d->dir = (d->dir + by) & 3;
     start_anim(d);
+    d->passCell = -1;
     d->toYaw = d->yaw + (float)by * QUARTER;
 }
 
@@ -685,13 +688,15 @@ static float shade_of(const Dungeon *d, const float *n) {
     return s * LIGHT_GAIN;
 }
 
-static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a) {
+static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a, float swing) {
     int i = sa_pvm_find(&ps->pvm, name);
     if (i < 0) return;
     float ca = cosf(a), sa = sinf(a);
     for (int k = i; k <= ps->last[i]; k++) {
         const PvmLayer *ly = &ps->pvm.layer[k];
         if (ly->name[0] == '>' || (k != i && !strncmp(ly->name, "next", 4))) continue;
+        if (ly->hasTranslate && swing < 0) continue;
+        float hinge = ly->hasTranslate ? (ly->translate[2] > 0 ? -swing : swing) : 0, hc = cosf(hinge), hs = sinf(hinge);
         const Image *tex = ly->tcount && ps->layerTex[k] >= 0 ? d->tex[ps->layerTex[k]] : NULL;
         for (int t = 0; t < ly->tcount; t++) {
             R3Vert v[3];
@@ -700,8 +705,14 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
             if (bad) continue;
             for (int j = 0; j < 3; j++) {
                 const PvmVertex *pv = &ly->v[ly->tri[t * 3 + j]];
-                float wx = pv->pos[0] * ca + pv->pos[2] * sa + cx, wy = pv->pos[1], wz = -pv->pos[0] * sa + pv->pos[2] * ca + cz;
-                float n[3] = {pv->normal[0] * ca + pv->normal[2] * sa, pv->normal[1], -pv->normal[0] * sa + pv->normal[2] * ca};
+                float px = pv->pos[0] * hc + pv->pos[2] * hs, pz = -pv->pos[0] * hs + pv->pos[2] * hc;
+                float nx = pv->normal[0] * hc + pv->normal[2] * hs, nz = -pv->normal[0] * hs + pv->normal[2] * hc;
+                if (ly->hasTranslate) {
+                    px += ly->translate[0];
+                    pz += ly->translate[2];
+                }
+                float wx = px * ca + pz * sa + cx, wy = pv->pos[1] + (ly->hasTranslate ? ly->translate[1] : 0), wz = -px * sa + pz * ca + cz;
+                float n[3] = {nx * ca + nz * sa, pv->normal[1], -nx * sa + nz * ca};
                 float dx = wx - c->pos[0], dy = wy - c->pos[1], dz = wz - c->pos[2];
                 v[j].x = dx * c->r[0] + dy * c->r[1] + dz * c->r[2];
                 v[j].y = dx * c->u[0] + dy * c->u[1] + dz * c->u[2];
@@ -720,7 +731,14 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
 static float spin(const Dungeon *d) { return (float)(d->clock % DOOR_TURN_MS) * 6.2831853f / DOOR_TURN_MS; }
 
 static void draw_part(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, int quarter) {
-    draw_model(d, ps, c, name, cx, cz, (float)quarter * QUARTER);
+    draw_model(d, ps, c, name, cx, cz, (float)quarter * QUARTER, 0);
+}
+
+static float leaf_swing(const Dungeon *d, int cellIndex, int side) {
+    if (!d->animDur || d->passCell < 0) return 0;
+    if (cellIndex == d->passCell && side == d->passSide) return QUARTER * fminf(1, (float)d->animMs / (float)d->animDur);
+    int px = d->passCell % DUN_SIDE + stepX[d->passSide], py = d->passCell / DUN_SIDE + stepY[d->passSide];
+    return cellIndex == py * DUN_SIDE + px && side == ((d->passSide + 2) & 3) ? -1 : 0;
 }
 
 static void draw_fog_foot(Dungeon *d, const Cam *c, const int *order, int n) {
@@ -813,11 +831,11 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             if (w == WALL_PASSAGE) draw_part(d, &d->set, &c, "next000", cx, cz, sideQuarter[s]);
             if (w < 0 || w == WALL_PASSAGE) continue;
             snprintf(name, sizeof name, "w%03d", w);
-            draw_part(d, &d->set, &c, name, cx, cz, sideQuarter[s]);
+            draw_model(d, &d->set, &c, name, cx, cz, (float)sideQuarter[s] * QUARTER, leaf_swing(d, order[i], s));
         }
         if (cell[F_OBJECT] >= 0) {
             snprintf(name, sizeof name, "a%03d", cell[F_OBJECT]);
-            draw_model(d, &d->common, &c, name, cx, cz, cell[F_OBJECT] == OBJECT_DOOR ? spin(d) : 0);
+            draw_model(d, &d->common, &c, name, cx, cz, cell[F_OBJECT] == OBJECT_DOOR ? spin(d) : 0, 0);
         }
     }
     draw_fog_foot(d, &c, order, n);

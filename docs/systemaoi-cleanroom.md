@@ -274,6 +274,15 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   motes in 080 and 090) aren't drawn.
 - **Light and fog.** Back faces are culled. A texture whose top-left colour covers a tenth of it treats that colour
   as transparent (the grass `010w0x0`).
+- **Door leaves.** The door walls `w100` and `w111` hold two leaf layers (`door1`/`door2`, `door3`/`door4`) with a
+  `Translate` at their hinge, (4, 0, ±1.7): the leaf's vertices are relative to it. Measured under Wine at
+  千樹庭's key door (mp0103, cell 13,3, with 千樹の鍵 in the bag): bumping the locked door (107) runs the floor
+  hook, `d7` makes the side 111 and passable, `81` runs, then 鍵で、扉を開いた。 shows over the old door; after it
+  the door stands closed with the white ring of `w111`, and the next step swings both leaves away from the party as
+  it walks through. `81` changed nothing that could be seen (a sound or a redraw, inferred) and VNDegen skips it.
+  VNDegen applies the hinge offset and, while the party walks through a wall, turns that side's leaves 90° away
+  over the step and hides the copy drawn from the far cell; the angle and timing are inferred (the PC's leaves were
+  about 60° open a third of the way through).
 - **Floor tile scale.** Measured: the floor parts map their texture twice across a cell (u 0 to 2, v −1 to 1) in
   every set, and VNDegen draws them so. Against eight PC frames, the normalised cross-correlation of the high-passed
   floor peaks at the file's scale (0.67 to 0.91) and drops to 0.36 to 0.81 at ±5%, at half or double the repeat and
