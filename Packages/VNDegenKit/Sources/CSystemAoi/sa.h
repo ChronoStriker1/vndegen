@@ -279,6 +279,15 @@ typedef struct DunLink {
     int kind, x, y, target, tx, ty, dir;
 } DunLink;
 
+#define DUN_ROUTES 8
+#define DUN_ROUTE_POINTS 12
+#define DUN_CRYSTALS 8
+
+typedef struct DunRoute {
+    int count;
+    int point[DUN_ROUTE_POINTS][4];
+} DunRoute;
+
 typedef struct DunStatus {
     char label[24];
     int steps;
@@ -309,6 +318,10 @@ typedef struct Dungeon {
     int markCount, markX[DUN_MARKS], markY[DUN_MARKS];
     DunLink link[DUN_LINKS];
     int linkCount;
+    DunRoute route[DUN_ROUTES];
+    int routeCount;
+    int crystal[DUN_CRYSTALS][2];
+    int crystalCount;
     bool seen[DUN_CELLS], blind;
     Image *trapIcon[DUN_TRAP_ICONS], *plates;
     DunStatus status[DUN_STATUS];
@@ -343,6 +356,7 @@ void sa_dungeon_open_doors(Dungeon *d);
 bool sa_dungeon_find_mark(const Dungeon *d, int mark, int *x, int *y);
 void sa_dungeon_sense(bool on);
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side);
+int sa_dungeon_group_step(const Dungeon *d, int x, int y, int side);
 bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y);
 int sa_dungeon_passage_side(const Dungeon *d);
 bool sa_dungeon_passage_cell(const Dungeon *d, int side, int along, int *x, int *y);

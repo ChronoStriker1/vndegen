@@ -238,7 +238,8 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   neither is handled by the floor hook, so both are the engine's.
   `floor.obj` columns 36 onwards hold eight (table, minimum, maximum, count) entries such as 武器Ａ 1 1 1 and 宝箱Ａ 1 3
   1, whose names are `item.obj` column 30 tags. Inferred: standing on a crystal shows 開ける (`dgn_g07`); opening the
-  floor's k-th crystal (in map order) gives between the minimum and maximum of items from the k-th entry, each drawn
+  floor's k-th crystal (in the map trailer's crystal list, below) gives between the minimum and maximum of items from
+  the k-th entry, each drawn
   by `item.obj` column 31's weight, says 『name』を手に入れた。 and removes the crystal.
 - **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one. Its icons are 16-pixel
   tiles drawn twice the size: `mmf0003` the door, `mmf0004` a crystal, `mma0000` the party's arrow and `mma0001` an
@@ -269,13 +270,20 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   stepping on it, the floor hook (bo1200 entry 4) turns it into the door 100 and sets the area's flag; `de` tells
   that hook whether the current area's flag is already set (kept in F450), and a registered area shows its door
   from the start. Inferred from the scripts and maps.
-- **Links.** After its cells a map file holds 11-word records `kind, x, y, target, tx, ty, facing, 0, 0, 0, 0`, the
+- **Map trailer.** After its cells a map file holds, in order: a 0; header word 8's routes, each a count and that
+  many (x, y, a, b) points; three words (x, y, facing), a default arrival cell ((6, 2) facing south in 中央森, (1, 2)
+  facing east in 中央森の東; not the select screen's entry, which in 炎山洞's 中腹エリア is (13, 3), not the trailer's
+  (14, 1)); header word 9's links; and header word 11's (x, y) cells, which are exactly the map's crystals (floor
+  object 60). This reads every one of the 117 maps to its last byte. VNDegen opens crystals in the trailer's order
+  (inferred).
+- **Links.** Each link is 11 words `kind, x, y, target, tx, ty, facing, 0, 0, 0, 0`, the
   target −1 for the same area or dungeon << 16 | floor << 8 (`floor.obj` columns 0 and 1). Kind 1 sits on every
   stair cell (158 in all, floor parts 100 and 101) and kind 2 on every teleporter (object 39, all 30), with 56 more
   kind-2 records on plain cells. Measured: three teleporters sent the party exactly to their records' cells and
   facings (炎山洞 裾野エリア (15, 5) to 中腹エリア (13, 3) facing north, whatever the save's random seed), so the PC
-  reads them; VNDegen follows kind 1 for 上る/下りる and kind 2 for teleporters. The rest of the trailer (lists of
-  numbered cells) is unknown.
+  reads them; VNDegen follows kind 1 for 上る/下りる and kind 2 for teleporters. The kind-2 records on plain cells are
+  the edge passages (中央森 (14, 2) to 中央森の東 (1, 2) facing east), and a kind-1 record with target 0 marks the door
+  home.
 - **Traps and floor hazards.** Engine-side: the floor hook (bo1200) handles only pickups, keyed doors, door spots
   and story events. Measured on the PC by stepping onto each object from a save made next to it: the message is a
   battle-style popup (`pop_a`) at the view's centre, and the next key or click only dismisses it. Traps say
