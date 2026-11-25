@@ -311,7 +311,7 @@ typedef struct Dungeon {
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
     u32 animMs, animDur, clock;
     int hover, steps;
-    bool bumped;
+    bool bumped, folded;
     Image *art[DUN_ART];
     Image *needle[4];
     Image *icon[DUN_ICONS], *arrow[4], *big[48], *walk[DUN_WALKS];

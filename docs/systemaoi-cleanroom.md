@@ -299,7 +299,11 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   about 60° open a third of the way through).
 - **Side panel button.** The PC draws the side panel's fold button, `dgn_b01`'s ◀ frame (a 2-by-2 sheet of 30-pixel
   frames: ▶, ◀ and their hover versions), at (139, 0), in the notch of `dgn_b00` (measured, mean error 0.6 per
-  channel). VNDegen draws it; what a click on it does (folding the panel, inferred from the arrows) isn't built.
+  channel). Measured under Wine at 30 fps: clicking it folds the panel at once (the whole panel goes in one frame,
+  no slide) and leaves only the ▶ frame at (0, 0) over the view; clicking ▶ brings the panel back the same way. Both
+  buttons show the sheet's lower (hover) row under the pointer, and the click doesn't walk. VNDegen matches each state
+  (buttons within 0.7 to 2.4 per channel of the original's frames, the panel edge the same folded and unfolded).
+  Inferred: the status plates fold away with the panel, and the panel stays folded until clicked again.
 - **Floor tile scale.** Measured: the floor parts map their texture twice across a cell (u 0 to 2, v −1 to 1) in
   every set, and VNDegen draws them so. Against eight PC frames, the normalised cross-correlation of the high-passed
   floor peaks at the file's scale (0.67 to 0.91) and drops to 0.36 to 0.81 at ±5%, at half or double the repeat and
