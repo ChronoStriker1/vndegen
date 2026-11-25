@@ -69,6 +69,7 @@ extern int SDL_GetWindowWMInfo(void *window, WindowInfo *info);
 static volatile int requests;
 static volatile int paused;
 static void (*window_handler)(void *window);
+static void (*picture_handler)(int width, int height);
 
 int vndegen_renpy_run(const char *home, const char *code) {
     if (!Py_IsInitialized()) {
@@ -96,6 +97,8 @@ void vndegen_renpy_request(int request) { requests |= request; }
 void vndegen_renpy_set_paused(int value) { paused = value; }
 
 void vndegen_renpy_set_window_handler(void (*handler)(void *window)) { window_handler = handler; }
+
+void vndegen_renpy_set_picture_handler(void (*handler)(int width, int height)) { picture_handler = handler; }
 
 void vndegen_renpy_app_state(int state) {
     switch (state) {
@@ -126,6 +129,10 @@ EXPORTED void vndegen_renpy_window_ready(void) {
     if (window && window_handler && SDL_GetWindowWMInfo(window, &info)) window_handler(info.info.uikit.window);
 }
 
+EXPORTED void vndegen_renpy_picture(int width, int height) {
+    if (picture_handler && width > 0 && height > 0) picture_handler(width, height);
+}
+
 #else
 
 int vndegen_renpy_run(const char *home, const char *code) { return -1; }
@@ -138,5 +145,7 @@ int vndegen_renpy_is_paused(void) { return 0; }
 void vndegen_renpy_wait_while_paused(void) {}
 void vndegen_renpy_pump(void) {}
 void vndegen_renpy_window_ready(void) {}
+void vndegen_renpy_set_picture_handler(void (*handler)(int width, int height)) {}
+void vndegen_renpy_picture(int width, int height) {}
 
 #endif
