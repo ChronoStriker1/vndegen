@@ -148,7 +148,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   are inferred.
 - Dungeon: enemy groups that appear partway through a visit aren't rebuilt, and how a group behaves after a battle
   is inferred; a floor's taken pickups and opened doors aren't saved (the original's image doesn't seem to hold
-  them either). 絶命院 still draws about 6 to 9% darker than the original.
+  them either). The dungeon light is fitted to the original's frames (絶命院 within 3 to 5%, the ice dungeon 8% too
+  bright); the falling leaves, sparks, snow and light motes some dungeons show aren't drawn.
 - Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
   学, 魔法全体防御, the 属性耐性 areas); abilities never seen in the original's saves (先制攻撃, 警戒心, 掛け声,
   the 支援 abilities and others) are written as zeros, and 資金管理 and 食料管理 sit at inferred slots. Enemies list

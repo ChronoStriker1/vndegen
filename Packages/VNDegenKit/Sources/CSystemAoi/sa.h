@@ -243,6 +243,7 @@ typedef struct R3 {
     float focal, fogNear, fogFar;
     u32 fogColor;
     int cull;
+    float blend;
 } R3;
 
 void r3_init(R3 *r, int w, int h);
@@ -328,6 +329,8 @@ typedef struct Dungeon {
     DunStatus status[DUN_STATUS];
     int statusCount;
     R3 r3;
+    int fogTex;
+    float fogSpeed[2], fogAlpha[2], fogHeight;
 } Dungeon;
 
 enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };

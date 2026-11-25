@@ -247,14 +247,38 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   in five dungeons, the poles cut the 8-by-6 block-mean error by 12% and supply the pillars along 堕天牢's and the
   ice dungeon's walls (the ice dungeon's bare near walls were where the PC draws pillars). Poles in open space (every
   corner) fit worse. `mpDDFF.amd` field 22 (63 on most floor cells) didn't tell which corners.
-- **Ambient.** `Light.pvl` holds a global ambient light (32) and two directional lights, each with ambient 80 and
-  diffuse 80 shining along (±10, 4.5, 30): together the 192 of the fit below. `floor.obj` column 7 is 1 in the
-  dungeons from 絶命院 on except 9 and 0 in 千樹庭 and 炎山洞; where it is 1 the PC draws as if the global ambient
-  were off (ambient 160 cut the block error in those dungeons from 55 to 33 and made their roofs no longer too
-  bright), so VNDegen uses 160 there. Inferred from the fit; the flag's real meaning is unknown.
-- **Light and fog.** Inferred from colour fits: textures times 1.6 × (ambient 0.75 plus the two lights' diffuse), and
-  linear fog to (40, 45, 30) from −4 to 28 units. Back faces are culled. A texture whose top-left colour covers a
-  tenth of it treats that colour as transparent (the grass `010w0x0`).
+- **Ambient and light.** `Light.pvl` holds a global ambient light (32) and two directional lights (ambient 80,
+  diffuse 80, `Direct(±10, 4.5, 30)`), but drawn as written they don't match the PC. Measured on eleven PC frames
+  taken on known cells in five dungeons (`lightcmp.sh`, plus a pass that renders the bare textures, the fog factor and
+  each pixel's surface class and divides the PC's pixels by them): relative to the bare texture the PC lights
+  ceilings least (about 0.9), side walls more (about 1.15), walls facing the camera more again (about 1.35) and
+  floors most (1.45 to 1.7, with the ground fog below), with the same factors whichever way the party faces. Floors
+  bright and ceilings dark means light from above; front walls brighter than sides means light toward the camera.
+  The file's vector lit neither, which left 絶命院, the darkest set, 6 to 10% too dark. Fitted, inferred: textures
+  times 1.6 × (ambient plus 50/255 × the diffuse of two view-space lights toward (±0.46, 0.3, −0.44)), with ambient
+  140/255, or 130/255 where `floor.obj` column 7 is 1 (the dungeons from 絶命院 on except 9). Over the eleven frames
+  the 8-by-6 block-mean error fell from 66.4 to 56.3 and the mean log error of the per-surface factors from 0.21 to
+  0.10; 絶命院's two frames went from 9.5% and 6.1% too dark to 3.0% and 4.8%, 堕天牢's to within 2%. The ice
+  dungeon is the exception: its one frame went from 1.4% too dark to 7.6% too bright (its bright walls wash out,
+  where the PC keeps their detail), and a separate ambient for it would have no rule behind it. Fog stays linear
+  from −4 to 28 units to the floor's `floor.obj` column 10 colour (a fog fit didn't beat it). 炎山洞's 1.55 floor
+  gain is no longer needed: the ground fog gives its floor the same brightness.
+- **Ground fog.** Each part set names two effects in its `effect_box` (`>e,effectNN0` and `NN1`), `.def` text files
+  in the game's archives. `NN0` is a `FogFoot` in every set: a texture (`fogfootNN0.bmp`, a pale mottled 128×128),
+  a scroll speed per frame (`texSpdX`, `texSpdY`), an alpha range (`AlphaMin`, `AlphaMax`, out of 255) and heights
+  (`HighMin`, `HighMax`, `HighAdd`). VNDegen draws it as a plane `HighAdd` above every visible floor cell, one
+  texture repeat per cell, blended over the floor with an alpha that swings between the two values every 4 seconds
+  and scrolls at the given speed at 60 frames a second. The plane, the repeat, the blend and the swing are inferred;
+  measured: without it the PC's floors were on average 1.41 times as bright as VNDegen's, with it 1.08 (1.05 with
+  the fitted light), and the floors take on the PC's paler mottle. The `NN1` effects (falling leaves in 千樹庭, sparks in 炎山洞, snow in 060 and 070, light
+  motes in 080 and 090) aren't drawn.
+- **Light and fog.** Back faces are culled. A texture whose top-left colour covers a tenth of it treats that colour
+  as transparent (the grass `010w0x0`).
+- **Floor tile scale.** Measured: the floor parts map their texture twice across a cell (u 0 to 2, v −1 to 1) in
+  every set, and VNDegen draws them so. Against eight PC frames, the normalised cross-correlation of the high-passed
+  floor peaks at the file's scale (0.67 to 0.91) and drops to 0.36 to 0.81 at ±5%, at half or double the repeat and
+  with u and v swapped. What still looks different on the floors is the PC's texture filtering and the ground fog,
+  not the scale.
 - **Objects.** `mallset.pvm` holds the objects every dungeon shares (`action_box`): `a100` the gold-framed door,
   `a101` to `a108` the floor markers of pickups (101 to 104 glowing, 105 spent) and other marks. Measured: floor
   object 100 is the door home; it stands at its cell's centre and turns slowly, edge-on to face-on in about 4.5
