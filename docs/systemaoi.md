@@ -149,9 +149,13 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Dungeon: enemy groups that appear partway through a visit aren't rebuilt, and how a group behaves after a battle
   is inferred; a floor's taken pickups and opened doors aren't saved (the original's image doesn't seem to hold
   them either). 絶命院 still draws about 6 to 9% darker than the original.
-- Saves: a few ability numbers in the battle blocks (凶暴者 and the like) and the script cache after the town grid
-  are written empty; the original loads such files. Comments are typed as plain characters: there's no Japanese input
-  method in the field, and on a touch screen without a keyboard the comment stays empty.
+- Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
+  学, 魔法全体防御, the 属性耐性 areas); abilities never seen in the original's saves (先制攻撃, 警戒心, 掛け声,
+  the 支援 abilities and others) are written as zeros, and 資金管理 and 食料管理 sit at inferred slots. Enemies list
+  all their skills and the base element attack, where the original lists only the skills they have learned by their
+  level and adds those skills' element bonuses. Battle orders are written as the default for every member. Comments
+  are typed as plain characters: there's no Japanese input method in the field, and on a touch screen without a
+  keyboard the comment stays empty.
 - Option: the text speeds other than 最速 and 普通 and the auto speeds are inferred; the screen mode, message frame,
   popup, cursor, 3D, game speed, battle, ranks, autosave mode, VE and inactive-volume settings are kept but do
   nothing yet; the key config and the window reset do nothing (the app maps keys); the hover descriptions the

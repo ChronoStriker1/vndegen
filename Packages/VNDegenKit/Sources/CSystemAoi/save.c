@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 12u
+#define SAVE_VERSION 13u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
@@ -134,6 +134,7 @@ static bool write_sidecar(SA *s, int slot, int count) {
         put32(&w, (u32)s->town.cell[c].type);
         put32(&w, (u32)s->town.cell[c].level);
         put32(&w, (u32)s->town.cell[c].exp);
+        put32(&w, (u32)s->town.cell[c].built);
     }
     put32(&w, (u32)s->town.stage);
     put32(&w, (u32)s->town.condition);
@@ -176,7 +177,7 @@ static bool write_sidecar(SA *s, int slot, int count) {
     put32(&w, (u32)s->exp.groupCount);
     for (int i = 0; i < s->exp.groupCount; i++) {
         const ExpGroup *g = &s->exp.group[i];
-        const int v[11] = {g->alive, g->party, g->number, g->x, g->y, g->dir, g->flags, g->cooldown, g->fought, g->extra, g->stay};
+        const int v[11] = {g->alive, g->party, g->number, g->x, g->y, g->dir, g->flags, g->clock, g->fought, g->extra, g->stay};
         put_ints(&w, v, 11);
         put_ints(&w, g->cells, BATTLE_CELLS);
         put_ints(&w, &g->target[0][0], EXP_TARGETS * 2);
@@ -184,6 +185,8 @@ static bool write_sidecar(SA *s, int slot, int count) {
     put_ints(&w, &s->maze.event[0][0][0], sizeof s->maze.event / sizeof(int));
     put_ints(&w, s->exp.special, EXP_SPECIALS);
     put_ints(&w, s->exp.specialValue, EXP_SPECIALS);
+    put32(&w, (u32)s->vm.boxCount);
+    for (int i = 0; i < s->vm.boxCount; i++) put(&w, s->vm.boxes[i].file, sizeof s->vm.boxes[i].file);
     char *dir = sa_fmt("%s/vndegen", s->saveDir);
     sa_mkdirs(dir);
     free(dir);
@@ -260,6 +263,7 @@ static bool read_sidecar(SA *s, int slot) {
         s->town.cell[c].type = (int)get32(&r);
         s->town.cell[c].level = (int)get32(&r);
         s->town.cell[c].exp = (int)get32(&r);
+        s->town.cell[c].built = (int)get32(&r);
     }
     s->town.stage = (int)get32(&r);
     s->town.condition = (int)get32(&r);
@@ -315,7 +319,7 @@ static bool read_sidecar(SA *s, int slot) {
         ExpGroup *g = &s->exp.group[i];
         int v[11];
         get_ints(&r, v, 11);
-        g->alive = v[0] != 0, g->party = v[1], g->number = v[2], g->x = v[3], g->y = v[4], g->dir = v[5], g->flags = v[6], g->cooldown = v[7], g->fought = v[8];
+        g->alive = v[0] != 0, g->party = v[1], g->number = v[2], g->x = v[3], g->y = v[4], g->dir = v[5], g->flags = v[6], g->clock = v[7], g->fought = v[8];
         g->extra = v[9], g->stay = v[10] != 0;
         get_ints(&r, g->cells, BATTLE_CELLS);
         get_ints(&r, &g->target[0][0], EXP_TARGETS * 2);
@@ -323,6 +327,13 @@ static bool read_sidecar(SA *s, int slot) {
     get_ints(&r, &s->maze.event[0][0][0], sizeof s->maze.event / sizeof(int));
     get_ints(&r, s->exp.special, EXP_SPECIALS);
     get_ints(&r, s->exp.specialValue, EXP_SPECIALS);
+    int boxes = (int)get32(&r);
+    for (int i = 0; i < boxes && i < SA_BOXES && !r.bad; i++) {
+        char file[sizeof s->vm.boxes[0].file];
+        get(&r, file, sizeof file);
+        file[sizeof file - 1] = 0;
+        if (!r.bad && *file) sa_vm_register_hooks(&s->vm, &s->vfs, file);
+    }
     free(d);
     sa_log(s, "load slot %d: %s", slot, r.bad ? "short" : "ok");
     return !r.bad;

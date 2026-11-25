@@ -95,6 +95,11 @@ enum {
     GRID_Y = 48,
     CELL_DX = 76,
     CELL_DY = 38,
+    BURST_W = 40,
+    BURST_FRAMES = 3,
+    BURST_FRAME_MS = 150,
+    BURST_DX = 19,
+    BURST_DY = 34,
     TITLE_DY = 1,
     BTN_DY = 7,
     FOLD_W = 180,
@@ -152,6 +157,7 @@ bool sa_town_init(Town *t, Vfs *vfs) {
 
 void sa_town_free(Town *t) {
     for (int i = 0; i < 8; i++) sa_image_free(t->bg[i]);
+    sa_image_free(t->burst);
     for (int i = 0; i < UI_COUNT; i++) sa_image_free(t->ui[i]);
     if (t->tile)
         for (int i = 0; i < t->build.rows; i++) sa_image_free(t->tile[i]);
@@ -607,6 +613,38 @@ static int layout(const Town *t, const VM *vm, Placed *out) {
     return n;
 }
 
+void sa_town_burst(Town *t, VM *vm, int count) {
+    int cells[TOWN_CELLS], n = 0;
+    for (int c = 0; c < TOWN_CELLS; c++)
+        if (t->cell[c].type) cells[n++] = c;
+    t->burstCount = 0;
+    t->burstMs = 0;
+    while (t->burstCount < count && n > 0) {
+        int k = (int)(sa_vm_random(vm) % (u32)n);
+        t->burstCell[t->burstCount++] = cells[k];
+        cells[k] = cells[--n];
+    }
+}
+
+bool sa_town_burst_tick(Town *t, u32 elapsedMs) {
+    if (!t->burstCount) return false;
+    t->burstMs += elapsedMs;
+    if (t->burstMs >= SA_TOWN_BURST_MS) t->burstCount = 0;
+    return true;
+}
+
+static void draw_bursts(Town *t, Vfs *vfs, u32 *fb) {
+    if (!t->burstCount) return;
+    if (!t->burst) t->burst = sa_load_image(vfs, "event01.agf");
+    if (!t->burst) return;
+    int frame = (int)(t->burstMs / BURST_FRAME_MS) % BURST_FRAMES;
+    for (int i = 0; i < t->burstCount; i++) {
+        int cx, cy;
+        cell_center(t->burstCell[i], &cx, &cy);
+        sa_blit_rect(fb, t->burst, frame * BURST_W, 0, BURST_W, t->burst->h, cx - BURST_DX, cy - BURST_DY);
+    }
+}
+
 void sa_town_draw_map(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
     int stage = t->stage < 1 ? 1 : t->stage;
     static const char *const bgNames[] = {"tmap00a.agf", "tmap00a.agf", "tmap01a.agf", "tmap02a.agf"};
@@ -623,6 +661,7 @@ void sa_town_draw_map(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
             cell_center(c, &cx, &cy);
             blit_dim(fb, im, cx - 68, cy + 34 - im->h, sa_town_staffed(t, vm, c) ? 256 : 192);
         }
+    draw_bursts(t, vfs, fb);
 }
 
 void sa_town_draw(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {

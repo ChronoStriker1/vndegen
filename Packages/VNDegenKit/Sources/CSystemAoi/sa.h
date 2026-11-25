@@ -477,6 +477,7 @@ typedef struct Facility {
     int type;
     int level;
     int exp;
+    int built;
 } Facility;
 
 enum { ORDER_FREE, ORDER_ATTACK, ORDER_SUPPORT, ORDER_DEFEND, ORDER_SWAP, ORDER_INTRUDE, ORDER_FLEE, ORDER_SKILL };
@@ -698,10 +699,17 @@ typedef struct Town {
     const Table *missions;
     const Maze *maze;
     Vfs *vfs;
+    Image *burst;
+    int burstCell[TOWN_CELLS], burstCount;
+    u32 burstMs;
 } Town;
+
+#define SA_TOWN_BURST_MS 1000
 
 bool sa_town_init(Town *t, Vfs *vfs);
 void sa_town_free(Town *t);
+void sa_town_burst(Town *t, VM *vm, int count);
+bool sa_town_burst_tick(Town *t, u32 elapsedMs);
 void sa_town_new_game(Town *t);
 int sa_town_type_row(const Town *t, int id);
 int sa_town_staffed(const Town *t, const VM *vm, int cell);
