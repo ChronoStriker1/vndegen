@@ -49,6 +49,7 @@ struct SettingsView: View {
     #if os(iOS)
     @AppStorage(ControlMethod.storageKey) private var controlMethod = ControlMethod.automatic
     @AppStorage(PlayOrientation.storageKey) private var orientation = PlayOrientation.landscape
+    @AppStorage(SideCameraPicture.storageKey) private var picture = SideCameraPicture.fullWidth
     #endif
 
     var body: some View {
@@ -112,6 +113,16 @@ struct SettingsView: View {
                     } footer: {
                         Text("Each game's page can change these for that game, and the VNDegen menu switches the method while you play.")
                     }
+                    if metrics.landscapeSideCamera != nil {
+                        Section {
+                            Picker("Game picture", selection: $picture) {
+                                ForEach(SideCameraPicture.allCases, id: \.self) { Text($0.title).tag($0) }
+                            }
+                            .focusRow(.sideCameraPicture, nav)
+                        } footer: {
+                            Text("Full width lets the camera cover a corner of the game. Clear of the camera fits it below or beside the camera, whichever shows it larger. The VNDegen menu switches this while you play.")
+                        }
+                    }
                     #endif
 
                     Section("Engines") {
@@ -165,6 +176,9 @@ struct SettingsView: View {
         }
         .balancedHorizontalSafeArea(metrics)
         .background { Theme.background.ignoresSafeArea() }
+        #if os(iOS)
+        .onChange(of: metrics.landscapeSideCamera != nil, initial: true) { _, offers in nav.offersSideCameraPicture = offers }
+        #endif
     }
 
     /// The built-in games folder, which can't be removed.

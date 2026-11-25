@@ -53,6 +53,13 @@ extension GeometryProxy {
         }
         return nil
     }
+
+    nonisolated public func occlusions() -> [CGRect] {
+        if #available(iOS 27.1, macOS 27.1, *) {
+            return reservedRegions(kind: .occlusion).filter(\.isActive).map(\.frame)
+        }
+        return []
+    }
 }
 
 extension View {

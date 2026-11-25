@@ -23,7 +23,8 @@ public struct HubRootView: View {
         let fold = geo.fold()
         return HubMetrics(size: geo.size, insets: geo.safeAreaInsets, windowControls: windowControls,
                           foldable: geo.fold(includingInactive: true) != nil,
-                          foldGap: fold.map { $0.height >= $0.width ? $0.width : 0 } ?? 0)
+                          foldGap: fold.map { $0.height >= $0.width ? $0.width : 0 } ?? 0,
+                          occlusions: geo.occlusions().map { $0.offsetBy(dx: geo.safeAreaInsets.leading, dy: geo.safeAreaInsets.top) })
     }
 
     private func libraryMetrics(_ geo: GeometryProxy) -> HubMetrics {

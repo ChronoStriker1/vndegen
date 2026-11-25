@@ -214,7 +214,7 @@ final class WebGameSession: NSObject, EngineSession {
         configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
-        startScripts = [shim, fonts] + ogg + game.userScripts
+        startScripts = [shim, fonts, Self.pictureScript] + ogg + game.userScripts
         Self.add(startScripts, to: configuration.userContentController)
         webView = GameWebView(frame: .zero, configuration: configuration)
         view = webView
@@ -266,6 +266,21 @@ final class WebGameSession: NSObject, EngineSession {
     deinit {
         log.notice("session released")
     }
+
+    static let pictureScript = """
+        (() => {
+            let last = "";
+            setInterval(() => {
+                let best = null;
+                for (const canvas of document.getElementsByTagName("canvas")) {
+                    if (canvas.width > 0 && canvas.height > 0 && (!best || canvas.width * canvas.height > best.width * best.height)) best = canvas;
+                }
+                if (!best || last === best.width + "x" + best.height) return;
+                last = best.width + "x" + best.height;
+                try { window.webkit.messageHandlers.vndegen.postMessage({ picture: [best.width, best.height] }); } catch (e) {}
+            }, 1000);
+        })();
+        """
 
     private static func add(_ scripts: [String], to controller: WKUserContentController) {
         for source in scripts {
@@ -667,6 +682,12 @@ extension WebGameSession: WKNavigationDelegate {
 
 extension WebGameSession: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let body = message.body as? [String: Any], let picture = body["picture"] as? [Double], picture.count == 2 {
+            webView.pictureSize = CGSize(width: picture[0], height: picture[1])
+            log.notice("picture \(picture[0], privacy: .public)x\(picture[1], privacy: .public)")
+            NotificationCenter.default.post(name: .gamePictureSizeChanged, object: webView)
+            return
+        }
         guard let body = message.body as? [String: Any], let text = body["message"] as? String else { return }
         switch body["level"] as? String {
         case "error": log.error("js: \(text, privacy: .public)")
@@ -701,7 +722,9 @@ private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
 
 /// Takes keyboard focus whenever it is on screen. Without it the page's document never has focus, so `:focus` matches
 /// nothing and engines that move a keyboard focus between buttons, such as TyranoScript 5, cannot.
-final class GameWebView: WKWebView {
+final class GameWebView: WKWebView, GamePictureSource {
+    var pictureSize: CGSize?
+
     #if os(macOS)
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()

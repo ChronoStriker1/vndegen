@@ -14,11 +14,13 @@ struct PlayerView: View {
     /// Asks the game for its Game commands while VNDegen's menu is open.
     @State private var menuLoad: Task<Void, Never>?
     @AppStorage(ControlMethod.storageKey) private var defaultMethod = ControlMethod.automatic
+    @AppStorage(SideCameraPicture.storageKey) private var picture = SideCameraPicture.fullWidth
     /// Whether the menu or the unlock screen has input rather than the game. Nil until the view first takes input.
     @State private var navigating: Bool?
     @State private var needsRotation = false
     /// The game view's frame in the global space, for touch controls that keep below it.
     @State private var gameFrame = CGRect.zero
+    @State private var pictureSize: CGSize?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.hubMetrics) private var metrics
 
@@ -26,11 +28,11 @@ struct PlayerView: View {
         ZStack {
             SessionViewHost(session: session)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { gameFrame = $0 }
-                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, camera: metrics.landscapeSideCamera))
+                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, clearance: metrics.gameClearance(picture, pictureSize: pictureSize)))
             if !menu.isOpen, !isCovered, !session.drawsOwnMenu {
                 // The same frame as the game's view, so its normalized locations match the game's.
                 PointerView(mouse: hub.input.mouse, drawsArrow: overlayMode != .cursor)
-                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, camera: metrics.landscapeSideCamera))
+                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, clearance: metrics.gameClearance(picture, pictureSize: pictureSize)))
             }
             #if os(iOS)
             if #available(iOS 26, *), OrientationLock.usesSceneLock {
@@ -75,7 +77,8 @@ struct PlayerView: View {
             if menu.isOpen {
                 PlayerMenuView(menu: menu, title: title, method: method, showsFocus: hub.input.lastInputKind != .touch,
                                onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping,
-                               onGameMenu: menu.openGameMenu, onGameItem: choose, onCheats: openCheats)
+                               onGameMenu: menu.openGameMenu, onGameItem: choose, onCheats: openCheats,
+                               picture: picture, onPicture: { picture = $0 })
                     .besideSideCamera(metrics)
                     .transition(.opacity)
             } else if overlayMode?.hasOverlay != true {
@@ -112,6 +115,7 @@ struct PlayerView: View {
                 .environment(nav)
         }
         .onAppear {
+            readPictureSize()
             hub.input.mouse.start()
             applyInputMode()
             #if os(iOS)
@@ -122,6 +126,8 @@ struct PlayerView: View {
         .onChange(of: menu.page == .cheats && menu.cheats?.keyboard != nil) { _, typing in
             if menu.isOpen { hub.input.translatesKeyboard = !typing }
         }
+        .onChange(of: metrics.landscapeSideCamera != nil, initial: true) { _, offers in menu.offersPicture = offers }
+        .onReceive(NotificationCenter.default.publisher(for: .gamePictureSizeChanged, object: session.view)) { _ in readPictureSize() }
         .onChange(of: isCovered, initial: true) { _, covered in
             applyInputMode()
             if covered {
@@ -236,6 +242,7 @@ struct PlayerView: View {
             switch menu.focus {
             case .method: setMethod(method.stepped(by: button == .left ? -1 : 1))
             case .mouseStyle: setMethod(method.switchingMouseStyle)
+            case .picture: picture = picture.other
             case .resume, .gameMenu, .cheats, .quit, .controllerMouse, .mapping: break
             }
         case .confirm:
@@ -248,6 +255,7 @@ struct PlayerView: View {
             case .controllerMouse: setMethod(method.togglingMouse)
             case .mouseStyle: setMethod(method.switchingMouseStyle)
             case .mapping: openMapping()
+            case .picture: picture = picture.other
             }
         case .cancel, .hub, .menu: resume()
         default: break
@@ -346,6 +354,10 @@ struct PlayerView: View {
         if !menu.items(for: method).contains(menu.focus) { menu.focus = .method }
     }
 
+    private func readPictureSize() {
+        pictureSize = (session.view as? GamePictureSource)?.pictureSize
+    }
+
     private func setMenuButtonCorner(_ corner: MenuButtonCorner) {
         guard let id = game?.id else { return }
         hub.library.update(id) { $0.menuButtonCorner = corner }
@@ -374,7 +386,7 @@ struct PlayerView: View {
 @MainActor
 @Observable
 final class PlayerMenu {
-    enum Item { case resume, gameMenu, cheats, quit, method, controllerMouse, mouseStyle, mapping }
+    enum Item { case resume, gameMenu, cheats, quit, method, controllerMouse, mouseStyle, mapping, picture }
     /// What the menu's card shows: its main buttons, or a page that one of them opened.
     enum Page { case main, game, cheats }
 
@@ -385,7 +397,7 @@ final class PlayerMenu {
         var items = session + [.method]
         if method.kind == .controller { items.append(.controllerMouse) }
         if method.mouse != nil { items.append(.mouseStyle) }
-        return items + [.mapping]
+        return items + [.mapping] + (offersPicture ? [.picture] : [])
     }
 
     var isOpen = false
@@ -398,6 +410,7 @@ final class PlayerMenu {
     var gameFocus: GameMenuItem.ID?
     /// Whether the game offers cheats.
     var offersCheats = false
+    var offersPicture = false
     /// The Cheats page, made the first time it opens.
     var cheats: CheatsPage?
 
@@ -459,6 +472,8 @@ private struct PlayerMenuView: View {
     let onGameMenu: () -> Void
     let onGameItem: (GameMenuItem) -> Void
     let onCheats: () -> Void
+    let picture: SideCameraPicture
+    let onPicture: (SideCameraPicture) -> Void
     @State private var cardSize = CGSize.zero
 
     var body: some View {
@@ -503,7 +518,10 @@ private struct PlayerMenuView: View {
             ScrollView(.vertical) {
                 layout {
                     session
-                    controls
+                    VStack(spacing: 18) {
+                        controls
+                        if menu.items(for: method).contains(.picture) { pictureFit }
+                    }
                 }
                 .padding(isNarrow ? 20 : 28)
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { cardSize = $0 }
@@ -561,6 +579,17 @@ private struct PlayerMenuView: View {
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.mapping)))
                 .onHover { if $0 { menu.focus = .mapping } }
                 .id(PlayerMenu.Item.mapping)
+        }
+    }
+
+    private var pictureFit: some View {
+        VStack(spacing: 12) {
+            SectionLabel(text: "Picture", systemImage: "rectangle.inset.filled")
+            segments(.picture) {
+                ForEach(SideCameraPicture.allCases, id: \.self) { fit in
+                    segment(fit.title, selected: fit == picture, item: .picture) { onPicture(fit) }
+                }
+            }
         }
     }
 
@@ -701,19 +730,17 @@ private struct RotateHint: View {
 }
 
 /// Places the game's view: full screen, or `height` tall at the top, below the camera housing, when it sits above the touch
-/// controls. In landscape it keeps clear of a camera down one side. The engine keeps the game's aspect ratio inside the
-/// view either way.
+/// controls. The engine keeps the game's aspect ratio inside the view either way.
 private struct GamePane: ViewModifier {
     let height: CGFloat?
     let top: CGFloat
-    let camera: (edge: HorizontalEdge, width: CGFloat)?
+    let clearance: EdgeInsets
 
     func body(content: Content) -> some View {
         content
             .frame(height: height)
             .padding(.top, height == nil ? 0 : top)
-            .padding(.leading, camera?.edge == .leading ? camera?.width ?? 0 : 0)
-            .padding(.trailing, camera?.edge == .trailing ? camera?.width ?? 0 : 0)
+            .padding(clearance)
             .frame(maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
     }
