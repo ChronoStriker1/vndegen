@@ -694,8 +694,90 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   (the place reads 千樹庭 / 中央森, then 中央森の東) and in the town (9ターン 街 after an expedition). Inferred: the town
   autosave comes at the start of each turn. Loading a floor's autosave puts the party back on that floor with its
   explored map; loading a town autosave puts the game in the town.
+- **Comments.** Measured: the comment field takes 16 characters; the original turns what is typed into full-width
+  characters (`Test comment 12` becomes `Ｔｅｓｔ　ｃｏｍｍｅｎｔ　１２`) and keeps it as UTF-16 from offset 0 of the save
+  image, the bytes after it zero up to the map memory at 6,172. The field draws it 24 pixels a character from x 447
+  with the caret after the last; the details show it 24 apart from (442, 314) without an edge, and the slot's second
+  line puts it after the place, 20 pixels a character (街 at x + 47, the comment from x + 87). The original shows a
+  comment VNDegen wrote (`Ｈｅｌｌｏ　日本　４３`) in its own details and slot. Inferred: Enter is OK, Escape is CANCEL;
+  where the comment starts after a dungeon's longer place name.
 - **The original's files.** `Bunny30N.dat`, `Bunny3AN.dat` and `Bunny3.opt` unpack to 1,128,076 and 30,784 bytes
   with the codec below. `Bunny3.red` (text already read) is stored plain. `Bunny3.dsk` (32 bytes) hasn't been looked at.
+
+## Title, Option and Extra, from the screens
+
+- **Title.** Measured: Load opens the DATA LOG screen on the load side and loads the chosen slot, as in the town.
+  The screen opens on the page last used, also after a relaunch (page 5 after the original was restarted); VNDegen
+  keeps the page with the options.
+  Option and Extra open their screens; Option's タイトルに戻る closes it at the title without asking.
+- **Option.** Measured, every piece matched exactly against the original's screen: the background `opt_a00`, each
+  choice a three-frame button 27 high (dim, lit when hovered, green when chosen): 画面モード `opt_b00`/`b01` at (306, 55)
+  and (466, 55); ウインドウの透明度 `c00` to `c04` from (301, 97), 65 apart; ADV切り替え `d00`/`d01` and the message
+  frame `e00`/`e01` at x 496 and 561, y 139 and 181; 確認ポップアップ `f00` to `f02` at x 329, 394 and 505, y 223;
+  ポップアップウインドウ `g00` to `g03` from (366, 265); 文字表示中のクリック `h00`/`h01` at x 404 and 515, y 307; 右クリック
+  `i00`/`i01` at x 384 and 555, y 349; the cursor `j00` to `j04` from (326, 391), 60 apart; オートマウス `k00`/`k01` at
+  x 496 and 561, y 433; 文字の表示速度 `l00` to `l04` and オートモード速度 `m00` to `m04` from x 301, 65 apart, at y 475 and
+  517; オートモード音声 `n00`/`n01` at x 344 and 525, y 559; スキップ `o00`/`o01` at x 454 and 525, y 601. On the right:
+  3D演出 `s00`/`s01` at x 1043 and 1128, y 55; 明るさ `t00` to `t04` and カメラ `u00` to `u04` from x 888, 65 apart, at
+  y 97 and 139; ゲーム全体の速度 `p00` to `p02` from (1018, 181); 戦闘演出 `q00`/`q01` at x 1043 and 1128, y 223; 戦闘隊列
+  `r00`/`r01` at x 973 and 1118, y 265; オートセーブ `v00` to `v03` from (1033, 307), 45 apart; the four volumes (BGM, SE,
+  VE, 会話) on rows 391, 433, 475 and 517 with the level from the 35-pixel digit strips `w03`, `x03`, `y03`, `z03` at
+  x 921, ▼ and ▲ (`w02`/`w04` and the like, green at 0 and 15) at x 961 and 1006, and ON/OFF at x 1083 and 1148;
+  非アクティブ時音量 `000` to `002` at x 978, 1073 and 1148, y 559; ページ送り時の音声 `100`/`101` at x 1083 and 1148, y 601.
+  Below: キーコンフィグ `opt_a04` (138, 679), ゲームに戻る `a01` (389, 679, only in a game), タイトルに戻る `a02` (640, 679),
+  ゲームの終了 `a03` (891, 679), フローティングウインドウの初期化 `a06` (654, 644) and 全設定の初期化 `a05` (1028, 644). In a
+  game タイトルに戻る asks タイトルに戻りますか？; ゲームの終了 asks ゲームを終了しますか？, 全設定の初期化 全て初期設定に戻しますか？ and
+  the window reset 全てウインドウの位置を／初期位置に戻しますか？, each over the screen dimmed to 3/8 (measured 0.371) with YES
+  and NO at (440, 382) and (640, 382). The defaults are the screenshot's: 普通 for the transparency and both speeds,
+  早送り for the right click, 既読のみ, オートセーブ 2, volumes 8, 8, 8 and 10.
+- **What the settings do.** Measured: the message band's alpha for 最薄 to 最濃 is 64, 112, 160, 192 and 255 (fitted
+  from the band over `bg008a0`, spread 0.001); VNDegen's band matches within 0.6. A volume of v plays at v / 15 of
+  full scale (music room recordings at 12, 10, 8, 6, 4, 2, 1 gave 0.78, 0.66, 0.53, 0.40, 0.26, 0.13, 0.065 of 15);
+  the music room's vol is the BGM option. 文字の表示速度 最速 shows a page at once. The other speeds could only be timed
+  with the shared machine at a load of 30 to 40, which slows the original's frames under Wine; timing the second
+  line of the quiz's first page gave 速い 38, 普通 109, 遅い 91 and 最遅 250 to 320 ms a character, 遅い faster than 普通,
+  so the numbers only say 最遅 is about three times 普通 and 速い about a third. VNDegen keeps 30 ms for 普通 and uses
+  15, 60 and 90 for the others (inferred), 0.5, 1, 1.5, 2.5 and 4 s for the auto modes (inferred around the existing
+  1.5 s). 改ページ makes a click during text go straight to the next page; ウインドウOFF makes the right click hide
+  the window; 待たない lets auto mode go on while a voice plays; 停止 stops the voice when the page turns (残す, the
+  default, lets it finish); ADV なし drops the fades. Kept but without effect yet: the screen mode, the message frame,
+  the popups, the cursor, the 3D settings, the game speed, battle effects and ranks, the autosave mode, VE and the
+  inactive volume. The key config and the window reset do nothing; the app maps keys.
+- **Where they are kept.** The original keeps its options in `Bunny3.opt` (text speed at 28,342 as 0 to 4, the four
+  volumes from 28,359), written when a game is saved. VNDegen keeps them after the system flags in
+  `vndegen/global.dat` (2,048 flag bytes, 32 option bytes, then the viewed marks below), read at start and written on
+  change.
+- **Extra menu.** Measured, matched exactly: `exm_a00` with the items `exm_b00` (CG閲覧), `b01` (シーン回想), `b02` (音楽鑑賞),
+  `b03` (エクストラシナリオ), `b06` (ユニット図鑑), `b07` (アイテム図鑑), `b08` (迷宮踏破リスト), `b05` (クイズ) and `b04` (ヒント),
+  656 by 64 with a lit frame, from (320, 111), 64 apart; 戻る `exm_a01` (152 by 44) at (1125, 671), the same place
+  on every Extra screen.
+- **CG閲覧.** Measured: `exc_a00`, 6 by 5 cells 208 by 120 from (2, 62); each cell draws `exc_a01` (the locked
+  picture with its frame) and, when seen, the picture's 200 by 113 sample from `sam.vfs` at (+4, +3), its red and
+  green halved under the pointer; No.NNN on a box darkened to half at (+2, +3), NEW in cyan on grey at (+186, +3)
+  until the picture is opened. The scroll bar: ▲ `exc_a03` (1249, 63), the rail `exc_a05` (1249, 88, 549 high), ▼
+  `exc_a04` (1249, 637), a thumb from `exc_a06` as long as the visible share. The count `seen / 343  pct%` in the
+  `exc_1219` digits (12 by 19): seen right-aligned to 1,122, the total from 1,143, the percent (rounded down: 50 of
+  343 is 14) right-aligned to 1,241 at y 22. A click on a seen cell shows the picture full screen; a click returns.
+  `ExCg.obj` lists 343 pictures with an id from 100 to 448; no script sets those system flags, so VNDegen sets flag
+  id when the picture is shown (inferred; the original keeps its own record in `Bunny3.opt`).
+- **シーン回想 and エクストラシナリオ.** Measured: `ext_a00` or `ext_b00`, 13 rows `ext_a01` or `ext_b01` (912 by 50, lit
+  when hovered) from (30, 37), 50 apart; the title in a 20-pixel face 24 apart from (83, +15), or 12 ？ when locked; NEW
+  at x 886 until replayed. ▲ `ext_a04` (940, 6), the rail `ext_a06` (940, 41, 640 high), ▼ `ext_a05` (940, 681), the
+  thumb `ext_a07`. Hovering an open row shows its background's sample (`ExEvntA`/`B` column 4) at (1035, 118). A click
+  plays the row's script (column 2, entry column 3: `zz1000.box` to `zz4000.box`, `zz0000.box`) and returns to the
+  list. A row is open when the system flag in column 1 is on; the story sets those flags (`bo0003` sets 513 after
+  its scene, `pro.box` 460).
+- **音楽鑑賞.** Measured: `exs_a00`; tracks `exs_b01` to `b61` (204 by 38: dim, lit, playing with a green ▶) in five
+  columns from (13, 64), 205 by 40 apart, and `b62` to `b64` (512 wide) at (13, 584), (13, 624), (13, 664). ◀◀
+  `exs_a01` (1050, 89), ▶ `a02` (1115, 89, green while playing), ▶▶ `a03` (1204, 89), ■ `a04` (1115, 133); the
+  volume digit from `exs_c02` (70 by 50) at (1093, 179), + `exs_c00` (1168, 179) and − `exs_c01` (1218, 179). Track
+  n plays `bgm.asd` entry n + 1 for 1 to 61 (track 1 is `bgm002`, matched by its envelope); 62 to 64 (DICE full,
+  short, karaoke) play entries 63, 65 and 64. All 64 are listed (inferred: none is locked).
+- **クイズ and ヒント.** クイズ runs `quiz.box` and comes back to the menu. ヒント shows one of the 80 lines of
+  `ExHint.obj` (column 2, `|` breaking lines) in the popup box over the menu dimmed; a click closes it. Which line is
+  picked is inferred (at random).
+- **Not built.** ユニット図鑑, アイテム図鑑 and 迷宮踏破リスト (captures `ex-unit`, `ex-item`, `ex-dungeon`): they need a record of
+  the units met, items found and floors walked that VNDegen doesn't keep yet.
 
 ## The save codec: what was read, and why
 

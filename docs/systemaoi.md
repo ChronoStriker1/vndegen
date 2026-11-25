@@ -46,8 +46,17 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 ## What the runtime does so far
 
 - **Title.** The game's title with its six items. A first start plays the prologue, as the original does before
-  `Bunny3.sav` exists. Start runs `init.box` and then the turn script in `bo0000.box`, then opens the town. Load,
-  Option and Extra aren't built yet.
+  `Bunny3.sav` exists. Start runs `init.box` and then the turn script in `bo0000.box`, then opens the town. Load opens
+  the DATA LOG screen; Option and Extra open their screens.
+- **Option.** The original's option screen, from the title, the message window's Option button, the town's
+  Option and the dungeon rest screen's OPTION: every setting with its three-state buttons, the four volumes with their arrows, and タイトルに戻る, ゲームに戻る,
+  ゲームの終了 and 全設定の初期化 with the original's questions. The window transparency, text and auto speeds, the click
+  and right-click behaviour, waiting for voices in auto mode, stopping voices on a page turn, the fades and the BGM,
+  SE and voice volumes take effect; the settings are kept in `vndegen/global.dat` across launches.
+- **Extra.** The Extra menu with CG閲覧 (the gallery of event pictures seen, from `sam.vfs` samples, each opening full
+  screen), シーン回想 and エクストラシナリオ (the scenes the story has opened, replayed from their scripts), 音楽鑑賞 (all 64
+  tracks with play, stop, previous, next and the BGM volume), クイズ (`quiz.box`) and ヒント (a line from `ExHint.obj`).
+  Scenes and extra scenarios open with the story's own system flags; pictures are marked seen when shown.
 - **Script machine.** Text, speakers, waits, choices, integer and flag variables in five banks, text conditions with
   indexed variables (`CL000[CL019]`), jumps and calls within a script and into other scripts, random numbers, and the
   loop the quiz uses.
@@ -98,7 +107,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
-  loading and deleting ask YES or NO, saving shows the original's comment box with OK and CANCEL. Saves are the
+  loading and deleting ask YES or NO, saving shows the original's comment box with OK and CANCEL, where up to 16
+  typed characters become the save's comment, kept as the original keeps it (full-width, at the start of the image)
+  and shown in the slot and its details; the original shows VNDegen's comments and VNDegen shows the original's. Saves are the
   original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the save folder, packed with its codec
   (`aoicmp.c`, `pcsave.c`): the variables, the town, every member with their place (main or reserve tile), stats,
   resistances and position bonuses, the equipment, the map memory (visited cells and the steps walked) and, in a
@@ -135,6 +146,12 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   original's cells are kept when loading its saves); a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either); the purple passage markers aren't drawn.
 - Saves: a few ability numbers in the battle blocks (凶暴者 and the like) and the script cache after the town grid
-  are written empty; the original loads such files. The save comment box takes no text; the comment stays empty.
-  The Option screen and the Extra menu aren't built yet.
-- The original's option settings (text speed, window transparency, volumes) are its defaults.
+  are written empty; the original loads such files. Comments are typed as plain characters: there's no Japanese input
+  method in the field, and on a touch screen without a keyboard the comment stays empty.
+- Option: the text speeds other than 最速 and 普通 and the auto speeds are inferred; the screen mode, message frame,
+  popup, cursor, 3D, game speed, battle, ranks, autosave mode, VE and inactive-volume settings are kept but do
+  nothing yet; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
+  original shows in Windows tooltips aren't drawn.
+- Extra: ユニット図鑑, アイテム図鑑 and 迷宮踏破リスト aren't built (VNDegen doesn't yet record the units met, items found and
+  floors walked). Pictures seen before this version aren't in the gallery until shown again. The small labels use
+  the app's font.

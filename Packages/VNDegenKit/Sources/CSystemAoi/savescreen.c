@@ -65,6 +65,11 @@ enum {
     CARET_X = 447,
     CARET_Y = 385,
     CARET_H = 24,
+    COMMENT_SIZE = 24,
+    COMMENT_TEXT_Y = 384,
+    COMMENT_DETAIL_X = 442,
+    COMMENT_DETAIL_Y = 314,
+    ROW_COMMENT_PITCH = 20,
     TEXT = 15,
     HOVER_BACK = 1,
     HOVER_AUTO = 2,
@@ -142,6 +147,7 @@ static void refresh(SA *s) {
 void sa_savescreen_open(SA *s, bool saving) {
     SaveScreen *v = &s->saves;
     v->saving = saving;
+    v->page = s->opt.value[OPT_SAVE_PAGE] % 10;
     v->hover = v->confirm = v->picked = -1;
     v->ask = ASK_NONE;
     v->back = s->mode;
@@ -152,9 +158,89 @@ void sa_savescreen_open(SA *s, bool saving) {
 
 void sa_autosave(SA *s) {
     SaveScreen *v = &s->saves;
+    v->comment[0] = 0;
     refresh(s);
     int count = (v->autoLatest < 0 ? 0 : v->sum[v->autoLatest].count) + 1;
     sa_save_write(s, SAVE_SLOTS + count % SAVE_AUTOS, count);
+}
+
+static u32 full_width(u32 cp) {
+    if (cp == ' ') return 0x3000;
+    if (cp > ' ' && cp < 0x7f) return cp + 0xfee0;
+    return cp;
+}
+
+static int utf8_chars(const char *t) {
+    int n = 0;
+    for (u32 cp; *t; n++) t += sa_utf8_decode(t, &cp);
+    return n;
+}
+
+void sa_save_comment_put(const SA *s, u8 *img) {
+    int i = 0;
+    for (const char *t = s->saves.comment; *t && i < COMMENT_CHARS;) {
+        u32 cp;
+        t += sa_utf8_decode(t, &cp);
+        if (cp > 0xffff) continue;
+        img[i * 2] = (u8)cp;
+        img[i * 2 + 1] = (u8)(cp >> 8);
+        i++;
+    }
+}
+
+void sa_save_comment_get(const u8 *img, SaveSummary *out) {
+    int n = 0;
+    while (n < COMMENT_CHARS && rd16(img + n * 2)) n++;
+    char *t = sa_utf16_to_utf8(img, n);
+    snprintf(out->comment, sizeof out->comment, "%s", t);
+    free(t);
+}
+
+void sa_savescreen_text(SA *s, const char *utf8) {
+    SaveScreen *v = &s->saves;
+    if (s->mode != MODE_SAVES || v->ask != ASK_COMMENT) return;
+    size_t len = strlen(v->comment);
+    int n = utf8_chars(v->comment);
+    for (const char *t = utf8; *t && n < COMMENT_CHARS;) {
+        u32 cp;
+        t += sa_utf8_decode(t, &cp);
+        if (cp < ' ' || cp == 0x7f || (cp >= 0xe000 && cp < 0xf900)) continue;
+        char buf[8];
+        int k = sa_utf8_put(buf, full_width(cp));
+        if (len + (size_t)k >= sizeof v->comment) break;
+        memcpy(v->comment + len, buf, (size_t)k);
+        len += (size_t)k;
+        v->comment[len] = 0;
+        n++;
+    }
+    s->dirty = true;
+}
+
+static void answer(SA *s);
+
+void sa_savescreen_key(SA *s, int key) {
+    SaveScreen *v = &s->saves;
+    if (s->mode != MODE_SAVES || v->ask != ASK_COMMENT) return;
+    if (key == 0x08) {
+        size_t len = strlen(v->comment);
+        while (len && ((u8)v->comment[len - 1] & 0xc0) == 0x80) len--;
+        if (len) len--;
+        v->comment[len] = 0;
+    } else if (key == 0x0d)
+        answer(s);
+    else if (key == 0x1b) {
+        v->ask = ASK_NONE;
+        v->confirm = -1;
+    }
+    s->dirty = true;
+}
+
+static void cells(u32 *fb, const char *t, int x, int y, int size, int pitch, u32 color, u32 edge) {
+    for (u32 cp; *t; x += pitch) {
+        int k = sa_utf8_decode(t, &cp);
+        sa_text_draw(fb, SA_W, SA_H, t, 1, x, y, size, color, edge);
+        t += k;
+    }
 }
 
 static bool in(int x, int y, int rx, int ry, int w, int h) { return x >= rx && x < rx + w && y >= ry && y < ry + h; }
@@ -220,6 +306,9 @@ static void draw_row(SA *s, u32 *fb, int i) {
     snprintf(t, sizeof t, "%d", m->count);
     right(fb, t, x + COUNT_RIGHT, y + ROW_TEXT_Y, color);
     text(fb, m->place[0], x + ROW_TEXT_X + 30, y + ROW_TEXT_Y + ROW_LINE, color);
+    if (m->comment[0])
+        cells(fb, m->comment, x + ROW_TEXT_X + 30 + (utf8_chars(m->place[0]) + 1) * ROW_COMMENT_PITCH, y + ROW_TEXT_Y + ROW_LINE, TEXT,
+              ROW_COMMENT_PITCH, color, 0x000000);
 }
 
 static void atext(u32 *fb, const char *t, int x, int y, u32 color) { sa_text_draw(fb, SA_W, SA_H, t, -1, x, y, AUTO_SIZE, color, 0x000000); }
@@ -309,6 +398,7 @@ static void draw_detail(u32 *fb, const SaveSummary *m, int slot) {
     snprintf(t, sizeof t, "Lv %d ダークス", m->level);
     big(fb, t, DETAIL_LV_X, lvY);
     if (m->weapon[0]) big(fb, m->weapon, DETAIL_WEAPON_X, lvY);
+    if (m->comment[0]) cells(fb, m->comment, COMMENT_DETAIL_X, COMMENT_DETAIL_Y, COMMENT_SIZE, COMMENT_SIZE, 0xffffff, 0xffffffffu);
 }
 
 static void button(SaveScreen *v, u32 *fb, int art, int hover, int x, int y, int w, int h) {
@@ -355,7 +445,10 @@ static void draw(SA *s) {
         const char *lines[3] = {"セーブしますか？", "コメントを残す事が出来ます。", "必要であれば下記に入力してください。"};
         sa_popup_box(s->battle.pop, fb, lines, 3, COMMENT_X, COMMENT_Y, COMMENT_W, COMMENT_H);
         sa_fill(fb, FIELD_X, FIELD_Y, FIELD_W, FIELD_H, 0xff000000u);
-        sa_fill(fb, CARET_X, CARET_Y, 2, CARET_H, 0xffffffffu);
+        sa_font_set_spacing(0);
+        cells(fb, v->comment, CARET_X, COMMENT_TEXT_Y, COMMENT_SIZE, COMMENT_SIZE, 0xffffff, 0xffffffffu);
+        sa_font_set_spacing(1);
+        sa_fill(fb, CARET_X + utf8_chars(v->comment) * COMMENT_SIZE, CARET_Y, 2, CARET_H, 0xffffffffu);
         button(v, fb, ART_OK, HOVER_YES, YES_X, OK_Y, YES_W, YES_H);
         button(v, fb, ART_CANCEL, HOVER_NO, NO_X, OK_Y, YES_W, YES_H);
         return;
@@ -390,6 +483,7 @@ static void answer(SA *s) {
         for (int i = 0; i < SAVE_SLOTS; i++)
             if (v->sum[i].used && v->sum[i].count > count) count = v->sum[i].count;
         sa_save_write(s, slot, count + 1);
+        v->comment[0] = 0;
         refresh(s);
         return;
     }
@@ -399,6 +493,7 @@ static void answer(SA *s) {
 static void ask(SaveScreen *v, int slot, int what) {
     v->confirm = slot;
     v->ask = what;
+    v->comment[0] = 0;
 }
 
 static void click(SA *s, int h) {
@@ -421,6 +516,8 @@ static void click(SA *s, int h) {
     } else if (h >= HOVER_TAB) {
         v->page = h - HOVER_TAB;
         v->picked = -1;
+        s->opt.value[OPT_SAVE_PAGE] = (u8)v->page;
+        s->vm.gDirty = true;
     }
 }
 
