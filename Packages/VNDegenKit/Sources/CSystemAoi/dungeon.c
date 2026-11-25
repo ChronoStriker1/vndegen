@@ -90,10 +90,10 @@ static const struct {
 #define CAM_BACK 4.6f
 #define CAM_PITCH (-0.08f)
 #define FOV 47.2f
-#define LIGHT_GAIN 1.6f
-#define AMBIENT (140.0f / 255.0f)
-#define AMBIENT_DIM (130.0f / 255.0f)
-#define DIFFUSE (50.0f / 255.0f)
+#define AMBIENT (235.0f / 255.0f)
+#define AMBIENT_DIM (225.0f / 255.0f)
+#define DIFFUSE (35.0f / 255.0f)
+#define FOG_DENSITY 0.0475f
 #define AMBIENT_ALL (192.0f / 255.0f)
 #define POLE_SIDE (DUN_SIDE + 1)
 #define QUARTER 1.5707963f
@@ -300,8 +300,7 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     if (!sa_dungeon_read_map(d, vfs, map)) return false;
     if (!d->r3.zbuf) r3_init(&d->r3, SA_W, SA_H);
     d->fov = FOV;
-    d->r3.fogNear = -4;
-    d->r3.fogFar = 28;
+    d->r3.fogDensity = FOG_DENSITY;
     d->r3.fogColor = 0x1e2d28;
     d->r3.cull = -1;
     d->ambient = AMBIENT_ALL;
@@ -687,7 +686,7 @@ static float shade_of(const Dungeon *d, const float *n) {
         float dot = (n[0] * lights[i][0] + n[1] * lights[i][1] + n[2] * lights[i][2]) / l;
         if (dot > 0) s += DIFFUSE * dot;
     }
-    return s * LIGHT_GAIN;
+    return s;
 }
 
 static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a, float swing) {

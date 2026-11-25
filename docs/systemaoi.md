@@ -154,8 +154,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
   cell a fled group moves to is drawn by VNDegen's own random numbers, and when random battles start is known not
   to be the 40 steps VNDegen uses in 中腹エリア; a floor's taken pickups and opened doors aren't saved (the
-  original's image doesn't seem to hold them either). The dungeon light is fitted to the original's frames (絶命院
-  within 3 to 5%, the ice dungeon 8% too bright); the falling leaves, sparks, snow and light motes some dungeons
+  original's image doesn't seem to hold them either). The dungeon light and fog are fitted to eleven of the original's
+  frames (each within 4%, the ice dungeon 3% too bright); which walls get a set's variant textures isn't known (the
+  ice dungeon's diamond walls are drawn plain); the falling leaves, sparks, snow and light motes some dungeons
   show aren't drawn.
 - Story: the true ending (F161 after 真魔力塊隊) and 内政END play, but some story the original runs from its exe isn't
   rebuilt: the boss-side cutaways of the dungeon event hook (hook 14, bo1401, 74 scenes), the trap scenes (hook 19)

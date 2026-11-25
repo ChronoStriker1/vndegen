@@ -240,7 +240,7 @@ typedef struct R3 {
     int w, h;
     float *zbuf;
     u32 *fb;
-    float focal, fogNear, fogFar;
+    float focal, fogDensity;
     u32 fogColor;
     int cull;
     float blend;

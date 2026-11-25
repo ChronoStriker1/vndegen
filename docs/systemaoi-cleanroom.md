@@ -258,15 +258,25 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   ceilings least (about 0.9), side walls more (about 1.15), walls facing the camera more again (about 1.35) and
   floors most (1.45 to 1.7, with the ground fog below), with the same factors whichever way the party faces. Floors
   bright and ceilings dark means light from above; front walls brighter than sides means light toward the camera.
-  The file's vector lit neither, which left 絶命院, the darkest set, 6 to 10% too dark. Fitted, inferred: textures
-  times 1.6 × (ambient plus 50/255 × the diffuse of two view-space lights toward (±0.46, 0.3, −0.44)), with ambient
-  140/255, or 130/255 where `floor.obj` column 7 is 1 (the dungeons from 絶命院 on except 9). Over the eleven frames
-  the 8-by-6 block-mean error fell from 66.4 to 56.3 and the mean log error of the per-surface factors from 0.21 to
-  0.10; 絶命院's two frames went from 9.5% and 6.1% too dark to 3.0% and 4.8%, 堕天牢's to within 2%. The ice
-  dungeon is the exception: its one frame went from 1.4% too dark to 7.6% too bright (its bright walls wash out,
-  where the PC keeps their detail), and a separate ambient for it would have no rule behind it. Fog stays linear
-  from −4 to 28 units to the floor's `floor.obj` column 10 colour (a fog fit didn't beat it). 炎山洞's 1.55 floor
-  gain is no longer needed: the ground fog gives its floor the same brightness.
+  The file's vector lit neither, which left 絶命院, the darkest set, 6 to 10% too dark. A first fit (linear fog from
+  −4 to 28 units, textures times 1.6 × the light) took the 8-by-6 block-mean error over the eleven frames from 66.4 to
+  56.3 but left the ice dungeon 7.6% too bright and 堕天牢's ceilings 11 to 15% too bright, because linear fog greys
+  even the nearest surfaces and the 1.6 gain made up for it: right in the dark sets, too much where the fog colour is
+  as pale as the walls. Measured: over the eleven frames the PC's mean brightness is within 1 to 3% of the bare,
+  unlit, unfogged textures', and the PC keeps the textures' contrast (standard deviation 41 against VNDegen's 32 in
+  堕天牢), its nearest ceilings unfogged. Fitted, inferred: Direct3D's EXP2 fog curve on view depth,
+  f = exp(−(0.0475 z)²), toward the floor's `floor.obj` column 10 colour, and textures times (ambient plus 35/255 ×
+  the diffuse of two view-space lights toward (±0.46, 0.3, −0.44)), with ambient 235/255, or 225/255 where
+  `floor.obj` column 7 is 1 (the dungeons from 絶命院 on except 9). Block-mean error 57.1 → 42.4 (`lightcmp.sh`,
+  this checkout's baseline; the 56.3 above was measured before the door-leaf fix); the ice frame 13.4 → 7.6 (PC/VN
+  brightness 0.924 → 0.967), 堕天牢 5.6 → 4.4 and 6.5 → 2.9 with its ceilings at 0.96 and 0.99 of the PC's
+  (0.85 and 0.89 before), 千樹庭 4.2 → 1.3, 絶命院 2.7 → 1.7 and 1.5 → 1.4, 炎山洞 slightly worse (5.8 → 7.0,
+  5.5 → 6.5) and mixed (2.9 → 0.9, 2.4 → 2.6, 6.6 → 6.2). Linear fog with any near and far (−4 to 8, 28 to 100) and
+  gains 1.3 to 1.75, a darker fog colour (0.85 × or 0.7 × the table's) and EXP fog all fit worse (`grid1.txt`, `exp-fog.txt`).
+  What's left in the ice frame is partly the wall: the PC draws the diamond wall `070w001`/`w002` where the map
+  gives wall 0 and VNDegen draws `070w000` (3.5% brighter); drawn with `w001` the frame's error falls 13.4 → 10.7
+  under the first fit. Which walls the PC gives a variant isn't in the map cell (its two fields after the wall are
+  −1) and isn't built. 炎山洞's 1.55 floor gain isn't needed: the ground fog gives its floor the same brightness.
 - **Ground fog.** Each part set names two effects in its `effect_box` (`>e,effectNN0` and `NN1`), `.def` text files
   in the game's archives. `NN0` is a `FogFoot` in every set: a texture (`fogfootNN0.bmp`, a pale mottled 128×128),
   a scroll speed per frame (`texSpdX`, `texSpdY`), an alpha range (`AlphaMin`, `AlphaMax`, out of 255) and heights
