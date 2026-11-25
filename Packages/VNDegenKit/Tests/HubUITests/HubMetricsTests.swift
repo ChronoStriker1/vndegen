@@ -56,35 +56,50 @@ private func close(_ a: CGFloat, _ b: CGFloat) -> Bool { abs(a - b) < 0.01 }
 }
 
 private let duoOnItsSide = CGSize(width: 594, height: 432)
-
-@MainActor
-@Test func onTheClosedDuoOnItsSideTheGameTakesTheFullWidthUnlessAskedToKeepClearOfTheCamera() {
-    let leading = HubMetrics(size: duoOnItsSide, insets: EdgeInsets(top: 0, leading: 84, bottom: 34, trailing: 0),
-                             occlusions: [CGRect(x: 0, y: 0, width: 84, height: 82), CGRect(x: 23.67, y: 29.33, width: 37, height: 37)])
-    #expect(leading.gameClearance(.fullWidth) == EdgeInsets())
-    #expect(leading.gameClearance(.clearOfCamera) == EdgeInsets(top: 82, leading: 0, bottom: 0, trailing: 0))
-    #expect(!leading.cameraAtBottom)
-
-    let trailing = HubMetrics(size: duoOnItsSide, insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 84),
-                              occlusions: [CGRect(x: 594, y: 384, width: 84, height: 82), CGRect(x: 617.33, y: 399.67, width: 37, height: 37)])
-    #expect(trailing.gameClearance(.fullWidth) == EdgeInsets())
-    #expect(trailing.gameClearance(.clearOfCamera) == EdgeInsets(top: 0, leading: 0, bottom: 82, trailing: 0))
-    #expect(trailing.cameraAtBottom)
+@MainActor private var cameraLeading: HubMetrics {
+    HubMetrics(size: duoOnItsSide, insets: EdgeInsets(top: 0, leading: 84, bottom: 34, trailing: 0),
+               occlusions: [CGRect(x: 0, y: 0, width: 84, height: 82), CGRect(x: 23.67, y: 29.33, width: 37, height: 37)])
+}
+@MainActor private var cameraTrailing: HubMetrics {
+    HubMetrics(size: duoOnItsSide, insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 84),
+               occlusions: [CGRect(x: 594, y: 384, width: 84, height: 82), CGRect(x: 617.33, y: 399.67, width: 37, height: 37)])
 }
 
 @MainActor
-@Test func withoutTheCamerasRegionTheGameKeepsBesideTheCameraColumn() {
-    let metrics = HubMetrics(size: duoOnItsSide, insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 84))
-    #expect(metrics.gameClearance(.clearOfCamera) == EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 84))
+@Test func onTheClosedDuoOnItsSideFullWidthClearsNothing() {
+    #expect(cameraLeading.gameClearance(.fullWidth, pictureSize: CGSize(width: 640, height: 480)) == EdgeInsets())
+    #expect(cameraTrailing.gameClearance(.fullWidth, pictureSize: nil) == EdgeInsets())
+}
+
+@MainActor
+@Test func aFourByThreePictureClearOfTheCameraSitsBesideItsColumn() {
+    let picture = CGSize(width: 640, height: 480)
+    #expect(cameraLeading.gameClearance(.clearOfCamera, pictureSize: picture) == EdgeInsets(top: 0, leading: 84, bottom: 0, trailing: 0))
+    #expect(cameraTrailing.gameClearance(.clearOfCamera, pictureSize: picture) == EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 84))
+}
+
+@MainActor
+@Test func aWidePictureClearOfTheCameraSitsBelowOrAboveItsHousing() {
+    let picture = CGSize(width: 1280, height: 800)
+    #expect(cameraLeading.gameClearance(.clearOfCamera, pictureSize: picture) == EdgeInsets(top: 82, leading: 0, bottom: 0, trailing: 0))
+    #expect(cameraTrailing.gameClearance(.clearOfCamera, pictureSize: picture) == EdgeInsets(top: 0, leading: 0, bottom: 82, trailing: 0))
+}
+
+@MainActor
+@Test func clearOfTheCameraKeepsBesideTheColumnUntilThePictureSizeAndTheCameraAreKnown() {
+    #expect(cameraLeading.gameClearance(.clearOfCamera, pictureSize: nil) == EdgeInsets(top: 0, leading: 84, bottom: 0, trailing: 0))
+    let noRegions = HubMetrics(size: duoOnItsSide, insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 84))
+    #expect(noRegions.gameClearance(.clearOfCamera, pictureSize: CGSize(width: 1280, height: 800)) == EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 84))
 }
 
 @MainActor
 @Test func theGameClearsNothingWithoutASideCameraHeldSideways() {
+    let picture = CGSize(width: 1280, height: 800)
     let upright = HubMetrics(size: CGSize(width: 382, height: 644), insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 84),
                              occlusions: [CGRect(x: 399.67, y: 29.33, width: 37, height: 37), CGRect(x: 382, y: 0, width: 84, height: 82)])
-    #expect(upright.gameClearance(.clearOfCamera) == EdgeInsets())
+    #expect(upright.gameClearance(.clearOfCamera, pictureSize: picture) == EdgeInsets())
     let iPhone = HubMetrics(size: CGSize(width: 756, height: 381), insets: EdgeInsets(top: 0, leading: 59, bottom: 21, trailing: 59))
-    #expect(iPhone.gameClearance(.clearOfCamera) == EdgeInsets())
+    #expect(iPhone.gameClearance(.clearOfCamera, pictureSize: picture) == EdgeInsets())
     let book = HubMetrics(size: CGSize(width: 951, height: 635), insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 0))
-    #expect(book.gameClearance(.clearOfCamera) == EdgeInsets())
+    #expect(book.gameClearance(.clearOfCamera, pictureSize: picture) == EdgeInsets())
 }

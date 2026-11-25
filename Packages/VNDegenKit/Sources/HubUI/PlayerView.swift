@@ -20,6 +20,7 @@ struct PlayerView: View {
     @State private var needsRotation = false
     /// The game view's frame in the global space, for touch controls that keep below it.
     @State private var gameFrame = CGRect.zero
+    @State private var pictureSize: CGSize?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.hubMetrics) private var metrics
 
@@ -27,11 +28,11 @@ struct PlayerView: View {
         ZStack {
             SessionViewHost(session: session)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { gameFrame = $0 }
-                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, clearance: metrics.gameClearance(picture)))
+                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, clearance: metrics.gameClearance(picture, pictureSize: pictureSize)))
             if !menu.isOpen, !isCovered, !session.drawsOwnMenu {
                 // The same frame as the game's view, so its normalized locations match the game's.
                 PointerView(mouse: hub.input.mouse, drawsArrow: overlayMode != .cursor)
-                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, clearance: metrics.gameClearance(picture)))
+                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, clearance: metrics.gameClearance(picture, pictureSize: pictureSize)))
             }
             #if os(iOS)
             if #available(iOS 26, *), OrientationLock.usesSceneLock {
@@ -114,6 +115,7 @@ struct PlayerView: View {
                 .environment(nav)
         }
         .onAppear {
+            readPictureSize()
             hub.input.mouse.start()
             applyInputMode()
             #if os(iOS)
@@ -125,6 +127,7 @@ struct PlayerView: View {
             if menu.isOpen { hub.input.translatesKeyboard = !typing }
         }
         .onChange(of: metrics.landscapeSideCamera != nil, initial: true) { _, offers in menu.offersPicture = offers }
+        .onReceive(NotificationCenter.default.publisher(for: .gamePictureSizeChanged, object: session.view)) { _ in readPictureSize() }
         .onChange(of: isCovered, initial: true) { _, covered in
             applyInputMode()
             if covered {
@@ -349,6 +352,10 @@ struct PlayerView: View {
         guard let id = game?.id else { return }
         hub.library.update(id) { $0.controlMethod = method }
         if !menu.items(for: method).contains(menu.focus) { menu.focus = .method }
+    }
+
+    private func readPictureSize() {
+        pictureSize = (session.view as? GamePictureSource)?.pictureSize
     }
 
     private func setMenuButtonCorner(_ corner: MenuButtonCorner) {
@@ -580,7 +587,7 @@ private struct PlayerMenuView: View {
             SectionLabel(text: "Picture", systemImage: "rectangle.inset.filled")
             segments(.picture) {
                 ForEach(SideCameraPicture.allCases, id: \.self) { fit in
-                    segment(fit.title(cameraAtBottom: metrics.cameraAtBottom), selected: fit == picture, item: .picture) { onPicture(fit) }
+                    segment(fit.title, selected: fit == picture, item: .picture) { onPicture(fit) }
                 }
             }
         }

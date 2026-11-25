@@ -32,10 +32,10 @@ enum SideCameraPicture: String, CaseIterable {
         UserDefaults.standard.string(forKey: storageKey).flatMap(Self.init(rawValue:)) ?? .fullWidth
     }
 
-    func title(cameraAtBottom: Bool) -> String {
+    var title: String {
         switch self {
         case .fullWidth: "Full width"
-        case .clearOfCamera: cameraAtBottom ? "Above the camera" : "Below the camera"
+        case .clearOfCamera: "Clear of the camera"
         }
     }
 

@@ -116,11 +116,11 @@ struct SettingsView: View {
                     if metrics.landscapeSideCamera != nil {
                         Section {
                             Picker("Game picture", selection: $picture) {
-                                ForEach(SideCameraPicture.allCases, id: \.self) { Text($0.title(cameraAtBottom: metrics.cameraAtBottom)).tag($0) }
+                                ForEach(SideCameraPicture.allCases, id: \.self) { Text($0.title).tag($0) }
                             }
                             .focusRow(.sideCameraPicture, nav)
                         } footer: {
-                            Text("Full width lets the camera cover a corner of the game. The VNDegen menu switches this while you play.")
+                            Text("Full width lets the camera cover a corner of the game. Clear of the camera fits it below or beside the camera, whichever shows it larger. The VNDegen menu switches this while you play.")
                         }
                     }
                     #endif

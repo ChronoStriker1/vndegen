@@ -72,18 +72,17 @@ struct HubMetrics: Equatable {
         return insets.leading > 0 ? (.leading, insets.leading) : (.trailing, insets.trailing)
     }
 
-    var cameraAtBottom: Bool { occlusions.contains { $0.midY >= fullHeight / 2 } }
-
-    func gameClearance(_ picture: SideCameraPicture) -> EdgeInsets {
+    func gameClearance(_ picture: SideCameraPicture, pictureSize: CGSize?) -> EdgeInsets {
         guard picture == .clearOfCamera, let camera = landscapeSideCamera else { return EdgeInsets() }
-        guard !occlusions.isEmpty else {
-            return camera.edge == .leading
-                ? EdgeInsets(top: 0, leading: camera.width, bottom: 0, trailing: 0)
-                : EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: camera.width)
-        }
-        let top = occlusions.filter { $0.midY < fullHeight / 2 }.map(\.maxY).max() ?? 0
-        let bottom = occlusions.filter { $0.midY >= fullHeight / 2 }.map { fullHeight - $0.minY }.max() ?? 0
-        return EdgeInsets(top: max(0, top), leading: 0, bottom: max(0, bottom), trailing: 0)
+        let beside = camera.edge == .leading
+            ? EdgeInsets(top: 0, leading: camera.width, bottom: 0, trailing: 0)
+            : EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: camera.width)
+        guard let pictureSize, pictureSize.width > 0, pictureSize.height > 0, !occlusions.isEmpty else { return beside }
+        let top = max(0, occlusions.filter { $0.midY < fullHeight / 2 }.map(\.maxY).max() ?? 0)
+        let bottom = max(0, occlusions.filter { $0.midY >= fullHeight / 2 }.map { fullHeight - $0.minY }.max() ?? 0)
+        let besideScale = min((fullWidth - camera.width) / pictureSize.width, fullHeight / pictureSize.height)
+        let bandScale = min(fullWidth / pictureSize.width, (fullHeight - top - bottom) / pictureSize.height)
+        return bandScale > besideScale ? EdgeInsets(top: top, leading: 0, bottom: bottom, trailing: 0) : beside
     }
 
     /// These metrics for content that reaches across a side camera's inset below the camera: the full width, with the

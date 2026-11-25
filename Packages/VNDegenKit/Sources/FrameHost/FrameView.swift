@@ -97,6 +97,7 @@ public final class FrameView: FrameHostBaseView {
             textures = (0..<3).compactMap { _ in device.makeTexture(descriptor: desc) }
             lastUse = Array(repeating: nil, count: textures.count)
             current = 0
+            NotificationCenter.default.post(name: .gamePictureSizeChanged, object: self)
         } else {
             current = (current + 1) % textures.count
         }
@@ -307,4 +308,8 @@ public final class FrameView: FrameHostBaseView {
         onPointer?(PointerEvent(phase: phase, location: framePoint(point), button: button))
     }
     #endif
+}
+
+extension FrameView: GamePictureSource {
+    public var pictureSize: CGSize? { texture.map { CGSize(width: $0.width, height: $0.height) } }
 }

@@ -267,6 +267,12 @@ extension Notification.Name {
     /// A session whose game starts or stops waiting for typed text. The object is the session, and userInfo["wants"] a
     /// Bool. The hub opens or closes its keyboard for it.
     public static let gameWantsKeyboard = Notification.Name("VNDegen.gameWantsKeyboard")
+    public static let gamePictureSizeChanged = Notification.Name("VNDegen.gamePictureSizeChanged")
+}
+
+@MainActor
+public protocol GamePictureSource: AnyObject {
+    var pictureSize: CGSize? { get }
 }
 
 extension KeyboardKey {
