@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.9",
+          "buildVersion": "3420",
+          "date": "2026-11-25T17:55:51Z",
+          "localizedDescription": "BUNNY BLACK 3's later dungeons: traps, teleporters, stairs, floor hazards and resting in a dungeon.\n\n## Downloads\n\n- `VNDegen-0.60.9-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.9.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.9-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Added\n\n- **SystemAoi:** every trap found on the real maps works (ブラインド, 防御力/回避力低下, 地図破壊, 大警告, サポート分離, 浄化, 格減らし/格枯らし, 警報 and 幻影), with the PC's message, a chance to avoid it, and its icon left on the minimap.\n- **SystemAoi:** ブラインド blanks the view, and it and SP分断 show timed plates in the side panel, as on the PC.\n- **SystemAoi:** 堕天牢's floor hazards hurt walking or flying units and drain MP. Spinners and dark zones, which hide the minimap, work too.\n- **SystemAoi:** teleporters and stairs follow the link records in the map files, so every one leads where it does on the PC. All 92 areas of dungeons 3 to 10 can be entered, and their battles start.\n- **SystemAoi:** 休憩 in a dungeon opens the PC's rest screen, with 装備, 隊列 and SAVE/LOAD. Its スペシャルギュンギュスカー spends unused 格 on specials, and スキル casts healing skills on a member.\n\n## Known limits\n\n- What the magic circle does is still unknown.\n- The odds of avoiding a trap, the timers' lengths and some effects' sizes are inferred.\n- The later dungeons' 3D view is a little brighter or more contrasty than the PC's in places, and the ice dungeon's near walls look washed out.\n- The limits listed for 0.60.0 to 0.60.7 still apply.\n\n## What wasn't tested\n\n- No physical device or physical controller was used. The game was played in the Linux test build, the Mac app and an iPad simulator, and checked against the original engine under Wine.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.9/VNDegen-0.60.9.ipa",
+          "size": 132773322,
+          "sha256": "6f1ff361e42b99fa98179b1d5e0ce83b44450c991e44272b5a5f8cfabf969908",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.8",
           "buildVersion": "3414",
           "date": "2026-11-25T14:50:09Z",
