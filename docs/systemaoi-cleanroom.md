@@ -369,24 +369,56 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   when raised, `--` when empty). A window's buttons, from the right: × hides it (its tab goes dark), − folds it to its
   180-wide title (`flw_b00`, `b50`, `c00`, `d00`, `e00`, `f00`) right-aligned on the same row, and the round arrow
   narrows a 役職 window to its 272-wide form (`flw_e03`, `f03`) or folds a 施設 or 街 window's sections to their
-  headers (`flw_b11` to `b17`, `c08` to `c11`); a section's own header folds just that section. Inferred: the 迷宮
-  marks stay × (19, 48 and 30 still showed ×, so the steps are unknown); 迷宮長補佐, 遊撃隊隊長 and 支援隊隊長 stay
-  closed (no script opens them and turn 42 shows them blank); 街役 opens with F044.
+  headers (`flw_b11` to `b17`, `c08` to `c11`); a section's own header folds just that section. The marks, depth
+  and the posts that open with it are below. Inferred: 街役 opens with F044.
 - **The screen.** Measured pixel for pixel (both tabs, and with 最近の収支 hidden and the 役職 window narrowed): the
   command hook (`C095` 28) shows its help over the cross-section the first time (F108); the backdrop `dmap00`; each
-  floor K at size S is `dK_Sf`, right-aligned (floor 1 ends at x 1060 on row 162, floor 2 at 1119 on row 242), with
-  its stairs `dK_Ss` at (914, 120) and (977, 167); the deepest floor's shaft `dK_Sy` at (225, 121) and tunnel
+  floor K at size S is `dK_Sf` (positions below), with its stairs `dK_Ss`; the deepest floor's shaft `dK_Sy` at (225, 121) and tunnel
   `dK_Sx` at (244, the floor's row + 29); the tab bar `dmz_e00` at (54, 4) with 迷宮役職 and 最近収支 (`dmz_e01`,
   `e02`) from (68, 8), 63 apart; 最近の収支 (`dmz_b00`) at (30, 374) with `dmz_d00` digits; the 迷宮職情報 window
   shared with the town; 戻る (`dmz_c02`) at (1117, 675). `dK_S` exists for each floor's sizes up to
-  `maze.obj`'s 広さ最大 (3, 2, 4, 5, 3, 5, 5). Not known yet: where floors 3 to 7 sit, sizes above 1, and what
-  grows them; `dmap01` to `dmap03` are full mazes drawn with another layout and don't match. `dmappos.obj` lists
-  points per floor and size whose use isn't known.
-- **組織図.** Measured: the 迷宮 platform `uts_a03` at (9, 421) with 迷宮長 at (298, 382), 第一階層長 at (15, 459)
-  and 第二階層長 at (99, 501) (`uts_v00`); the list badges `uts_h09` to `h19`. Inferred: the other floor heads
-  continue the step (84, 42) as floors open.
-- **Stats.** Seen once, not derived: after ミアルテ took 警備担当 and ルーアルテ 商業担当, 迷宮情報 read 守備要員 19,
-  罠 48 and 宝箱 30.
+  `maze.obj`'s 広さ最大 (3, 2, 4, 5, 3, 5, 5). `dmap01` to `dmap03` are full mazes drawn with another layout and
+  don't match.
+- **組織図.** Measured: the 迷宮 platform `uts_a03` at (9, 421) and the list badges `uts_h09` to `h19`; the tiles and
+  rails are under Posts open with depth.
+- **迷宮情報's numbers.** Measured by editing post holders, their stored 統治/統率, facilities and depth in a turn-42
+  save and reading the window on the original (each value is the sum of all sources, floored once). Points: 守備 is
+  each staffed facility's `TownBuil.obj` column 11 plus the 統治 of 警備担当, 教育担当 and 衛生担当 plus 1.5 × the
+  統率 of each open floor head; 罠 is column 13 plus the 統治 of 工業担当 and 警備担当 plus the 統率 of 迷宮長 and
+  迷宮長補佐; 宝箱 is column 12 plus 商業担当's 統治 plus 3 × the 統治 of 迷宮長 and 補佐. With F floors, 守備要員 is
+  1.2·F·points, 罠 3·F·points, 宝箱 3.75·F·points and 通路 F × (10 × the 統率 of 迷宮長 and 補佐 + 15 × each floor
+  head's 統率). Stats are the raised ones the post shows. 遊撃隊隊長 and 支援隊隊長 add nothing, and an unopened floor
+  head counts for nothing. A facility counts only when staffed; its value at level L is the column plus every
+  `TownLvup.obj` row of its growth group up to L, where `TownLvup` column c adds to `TownBuil` column c + 6.
+- **Marks.** Measured by bisection: × below 300, △ from 300, ○ from 600, ◎ from 1200, ☆ from 2400, the same steps
+  for all four numbers and at every depth.
+- **評判.** Measured live on the original: the 迷宮評判 plate follows the staffed facilities' column 14 total (with
+  levels) plus 11: 噂 from 50, 普通 from 100, 話題 from 150, then 有名, 超有名 and 常識 at about 270, 370 and 470
+  (bisected to within 9). It never fell below 幻, even at −83; 皆無 wasn't seen.
+- **Depth.** C240 holds the floor count (2 from the start) and C248 the turn the 迷宮 first ran (42). Measured over
+  single turns: floor k (3 to 7) opens when the turns since C248 reach `maze.obj`'s 制限ターン (10 to 50) and the
+  staffed facilities' column 10 total plus residents / 2, less about 42, reaches its 階数 (1000 to 3000); several
+  floors can open in one turn. The 42 is inferred from brackets of 40 to 45.
+- **Width.** C251 to C257 hold each floor's width points: every turn the floor head's 統率 is added (removing the
+  head keeps the points), and C261 to C267 the sizes: 2 from 30 points, 3 from 50, 4 from 100 and 5 from 150
+  (`maze.obj` 広さ), capped by 広さ最大.
+- **Posts open with depth.** Measured: 支援隊隊長 at 4 floors, 迷宮長補佐 at 5, 遊撃隊隊長 at 6. The 組織図 tiles
+  (`uts_v00`): 迷宮長 (298, 382), 補佐 (418, 442), floors 1 to 4 from (15, 459) in steps of (84, 42), floors 5 to 7
+  from (12, 556), 遊撃 (320, 498), 支援 (442, 557); the rails `uts_y00` (358, 427) with 支援, `uts_y01` (357, 422) with
+  補佐 and `uts_y02` (348, 427) with 遊撃.
+- **Floors 3 to 7.** Measured pixel for pixel with all seven at every size: rows 162, 242, 312, 382, 462, 542 and
+  622; each floor's x per size is in `maze.c`; the stairs are fixed per floor. `dmappos.obj` lists each floor's
+  areas, one per size step: an event icon `d_evNNN` sits on the area's point, and the breakthrough icon `d_ev011` 60
+  left of the deepest floor at its row.
+- **The turn's record.** The save keeps the last turn at 1,009,652: the intruder count, then for each floor seven
+  areas of six numbers (the `maze.obj` event id or -1 for a quiet area, the people it sent back, 0, then food, money
+  and resources), and the net at 1,010,836 (also C271 to C273); C249 intruders, C278 sent back, C279 broke
+  through. 最近の収支 is drawn from these: an event counts as won when its result row is type 10 (500 when it sent
+  people back), a lost chest adds to 宝箱開封数, and the breakthrough column is what's left of the net.
+  完全突破 (`dmz_f00`) at (362, 564) shows when anyone broke through. Measured against six original turns.
+- **Breakthrough.** Measured over 20 turns: each adventurer who passes the deepest floor takes 0.25% of food, money
+  and resources, rounded up on the total (8 of them took 1000 from 50000, at any depth). The turn's income box then
+  adds ダークス宮の防衛に失敗しました; a turn where all were sent back adds nothing.
 
 ## Recruits and the turn order, from the scripts and play
 

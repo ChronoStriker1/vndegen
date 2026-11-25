@@ -471,7 +471,7 @@ static void draw_maze(Town *t, const VM *vm, u32 *fb) {
         sa_draw_int(fb, dg, m->floors, false, MAZE_X + 163, MAZE_Y + 33, 0, 10, 13);
         const int stats[4] = {m->guards, m->passages, m->traps, m->chests};
         for (int i = 0; i < 4; i++) {
-            sa_blit_rect(fb, t->ui[UI_MARK], 0, 0, MARK_W, MARK_H, MAZE_X + 122, MAZE_Y + 52 + i * 20);
+            sa_blit_rect(fb, t->ui[UI_MARK], 0, m->marks[i] * MARK_H, MARK_W, MARK_H, MAZE_X + 122, MAZE_Y + 52 + i * 20);
             sa_draw_int(fb, dg, stats[i], false, MAZE_X + 192, MAZE_Y + 54 + i * 20, 0, 10, 13);
         }
         const int money[3] = {m->food, m->money, m->resources};

@@ -86,6 +86,9 @@ enum {
     ENEMIES_MAX = 30,
     STAND_AT = 1009560,
     STAND_COUNT = 13,
+    MAZE_AT = 1009652,
+    MAZE_FLOOR_SIZE = 168,
+    MAZE_NET_AT = 1010836,
     MISSIONS_AT = 1008328,
 };
 
@@ -214,6 +217,20 @@ static void read_members(SA *s, const u8 *img) {
 
 static void read_dungeon(SA *s, const u8 *img);
 
+static void write_maze(SA *s, u8 *img) {
+    put(img, MAZE_AT, s->vm.c[C_MAZE_INTRUDERS]);
+    for (int k = 0; k < 7; k++)
+        for (int a = 0; a < 7; a++)
+            for (int i = 0; i < 6; i++) put(img, MAZE_AT + 4 + (size_t)k * MAZE_FLOOR_SIZE + (size_t)(a * 6 + i) * 4, s->maze.event[k][a][i]);
+    for (int i = 0; i < 3; i++) put(img, MAZE_NET_AT + (size_t)i * 4, s->vm.c[C_MAZE_FOOD + i]);
+}
+
+static void read_maze(SA *s, const u8 *img) {
+    for (int k = 0; k < 7; k++)
+        for (int a = 0; a < 7; a++)
+            for (int i = 0; i < 6; i++) s->maze.event[k][a][i] = at(img, MAZE_AT + 4 + (size_t)k * MAZE_FLOOR_SIZE + (size_t)(a * 6 + i) * 4);
+}
+
 bool sa_pcsave_read(SA *s, const char *path) {
     size_t n, size;
     u8 *file = sa_read_file(path, &n);
@@ -242,6 +259,7 @@ bool sa_pcsave_read(SA *s, const char *path) {
     s->exp.dungeon = s->vm.c[DUNGEON_VAR];
     s->exp.floor = s->vm.c[DUNGEON_VAR + 1];
     read_dungeon(s, img);
+    read_maze(s, img);
     s->missions.logCount = 0;
     for (int i = 0; i < MISSION_LOG && at(img, MISSIONS_AT + (size_t)i * 12); i++, s->missions.logCount++)
         for (int k = 0; k < 3; k++) s->missions.log[i][k] = at(img, MISSIONS_AT + (size_t)i * 12 + (size_t)k * 4);
@@ -569,6 +587,7 @@ bool sa_pcsave_write(SA *s, const char *path) {
     write_members(s, img);
     write_maps(s, img);
     write_dungeon(s, img);
+    write_maze(s, img);
     for (int i = 0; i < s->missions.logCount; i++)
         for (int k = 0; k < 3; k++) put(img, MISSIONS_AT + (size_t)i * 12 + (size_t)k * 4, s->missions.log[i][k]);
     for (int i = 0; i < PC_C_VARS; i++) put(img, VM_AT + (size_t)i * 4, s->vm.c[i]);

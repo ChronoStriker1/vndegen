@@ -49,7 +49,7 @@ enum {
     TAB_W = 76,
     TAB_H = 20,
     ORG_POSTS = 9,
-    MAZE_TILES = 8,
+    MAZE_TILES = 11,
     LABELS = 20,
     ICON_W = 24,
     ICON_H = 20,
@@ -78,14 +78,15 @@ static const struct {
 
 static const struct {
     int post, x, y;
-} mazeTile[MAZE_TILES] = {{10, 298, 382}, {12, 15, 459}, {13, 99, 501}, {14, 183, 543}, {15, 267, 585}, {16, 351, 627}, {17, 435, 669}, {18, 519, 711}};
+} mazeTile[MAZE_TILES] = {{10, 298, 382}, {11, 418, 442}, {12, 15, 459}, {19, 320, 498}, {13, 99, 501}, {14, 183, 543}, {16, 12, 556}, {20, 442, 557},
+                          {15, 267, 585}, {17, 96, 598}, {18, 180, 640}};
 
-enum { ART_TOP, ART_BOTTOM, ART_DISMISS, ART_TILE, ART_LIST, ART_ROWS, ART_BADGE, ART_BACK, ART_BG, ART_PLATFORM, ART_RANK, ART_FORM, ART_TAB0, ART_ORG = ART_TAB0 + 6, ART_BTN_LIST, ART_BTN_ORG, ART_POST_TILE, ART_FIRE, ART_MAZE_ORG, ART_MAZE_TILE, ART_ICON, ART_LABEL0, ART_COUNT = ART_LABEL0 + LABELS };
+enum { ART_TOP, ART_BOTTOM, ART_DISMISS, ART_TILE, ART_LIST, ART_ROWS, ART_BADGE, ART_BACK, ART_BG, ART_PLATFORM, ART_RANK, ART_FORM, ART_TAB0, ART_ORG = ART_TAB0 + 6, ART_BTN_LIST, ART_BTN_ORG, ART_POST_TILE, ART_FIRE, ART_MAZE_ORG, ART_MAZE_TILE, ART_ICON, ART_RAIL_SUPPORT, ART_RAIL_DEPUTY, ART_RAIL_RAID, ART_LABEL0, ART_COUNT = ART_LABEL0 + LABELS };
 
 static const char *const artNames[ART_COUNT] = {"ums_a00.agf", "ums_a01.agf", "ums_a02.agf", "ums_z00.agf", "uts_c00.agf", "uts_c01.agf",
                                                 "uts_h98.agf", "uts_g00.agf", "bg009a0.agf", "m997bt1a.agf", "uts_b03.agf", "uts_b02.agf", "uts_d01.agf", "uts_d02.agf",
                                                 "uts_d03.agf", "uts_d04.agf", "uts_d05.agf", "uts_d06.agf", "uts_a01.agf", "uts_b00.agf", "uts_b01.agf",
-                                                "uts_w00.agf", "uts_x01.agf", "uts_a03.agf", "uts_v00.agf", "uts_i02.agf", "uts_h00.agf", "uts_h01.agf",
+                                                "uts_w00.agf", "uts_x01.agf", "uts_a03.agf", "uts_v00.agf", "uts_i02.agf", "uts_y00.agf", "uts_y01.agf", "uts_y02.agf", "uts_h00.agf", "uts_h01.agf",
                                                 "uts_h02.agf", "uts_h03.agf", "uts_h04.agf", "uts_h05.agf", "uts_h06.agf", "uts_h07.agf", "uts_h08.agf",
                                                 "uts_h09.agf", "uts_h10.agf", "uts_h11.agf", "uts_h12.agf", "uts_h13.agf", "uts_h14.agf", "uts_h15.agf",
                                                 "uts_h16.agf", "uts_h17.agf", "uts_h18.agf", "uts_h19.agf"};
@@ -349,6 +350,11 @@ static void draw_org(SA *s, u32 *fb) {
     Party *p = &s->party;
     sa_blit(fb, d->art[ART_ORG], 2, 21);
     if (s->vm.f[F_MAZE]) sa_blit(fb, d->art[ART_MAZE_ORG], MAZE_ORG_X, MAZE_ORG_Y);
+    if (s->vm.f[F_MAZE]) {
+        if (sa_maze_post_open(&s->maze, &s->vm, 20)) sa_blit(fb, d->art[ART_RAIL_SUPPORT], 358, 427);
+        if (sa_maze_post_open(&s->maze, &s->vm, 11)) sa_blit(fb, d->art[ART_RAIL_DEPUTY], 357, 422);
+        if (sa_maze_post_open(&s->maze, &s->vm, 19)) sa_blit(fb, d->art[ART_RAIL_RAID], 348, 427);
+    }
     for (int i = 0; i < ORG_POSTS; i++) post_tile(s, fb, d->art[ART_POST_TILE], orgTile[i].post, orgTile[i].x, orgTile[i].y);
     for (int i = 0; i < MAZE_TILES; i++)
         if (maze_tile_open(s, i)) post_tile(s, fb, d->art[ART_MAZE_TILE], mazeTile[i].post, mazeTile[i].x, mazeTile[i].y);

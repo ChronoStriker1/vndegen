@@ -60,7 +60,8 @@ typedef struct Recent {
 typedef struct MazeView {
     Image *art[8];
     Image *piece[MAZE_FLOORS][MAZE_SIZES][4];
-    Recent recent;
+    Table rules, areas;
+    Image *icon[13];
     int size[MAZE_FLOORS];
     int hover;
     bool hideRecent;
@@ -290,6 +291,8 @@ void sa_maze_init(SA *s);
 void sa_maze_free(SA *s);
 void sa_maze_reset(SA *s);
 void sa_maze_open(SA *s);
+void sa_maze_update(SA *s);
+void sa_maze_summary(const SA *s, Recent *r);
 void sa_maze_draw_scene(SA *s, u32 *fb);
 bool sa_maze_frame(SA *s);
 void sa_exp_init(SA *s);

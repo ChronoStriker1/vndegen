@@ -423,8 +423,11 @@ enum { TOWN_SECTIONS = 4, TOWN_UI = 96 };
 typedef struct Maze {
     int floors;
     int guards, passages, traps, chests;
+    int marks[4];
     int food, money, resources;
     int fame, intruders;
+    int depthPoints, renown;
+    int event[7][7][6];
 } Maze;
 
 typedef struct Facility {
@@ -704,6 +707,7 @@ bool sa_build_hover(BuildScreen *b, Town *t, VM *vm, int x, int y);
 void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb);
 
 enum { F_MAZE = 38, F_POSTS = 44 };
+enum { C_MAZE_FLOORS = 240, C_MAZE_OPENED = 248, C_MAZE_INTRUDERS = 249, C_MAZE_WIDTH = 251, C_MAZE_SIZE = 261, C_MAZE_FOOD = 271, C_MAZE_REPELLED = 278, C_MAZE_THROUGH = 279 };
 enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_TOWN_STAGE = 490, C_PLACE_STEPS = 0x48, C_MISSION_ID = 55, C_MISSION_DUE = 57 };
 
 #endif

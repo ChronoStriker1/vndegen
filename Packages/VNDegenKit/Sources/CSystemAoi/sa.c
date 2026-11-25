@@ -1206,6 +1206,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         }
         return true;
     }
+    if (s->dirty) sa_maze_update(s);
     if (sa_exp_frame(s, elapsedMs)) return true;
     if (sa_policy_frame(s)) return true;
     if (sa_equip_frame(s)) return true;
