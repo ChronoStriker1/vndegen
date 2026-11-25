@@ -37,6 +37,7 @@ public struct WebGameConfiguration {
     /// Decodes Ogg Vorbis in the page, for engines that have no Ogg decoder of their own.
     public var decodesOgg: Bool
     public var convertsAlphaVideo = false
+    public var pictureSize: CGSize?
     /// Windows font names, as `FontPack.referencedNames` finds them in the game's files, whose substitutes load before
     /// the page draws. Every other substitute loads when the page first uses it.
     public var preloadFonts: Set<String> = []
@@ -214,9 +215,10 @@ final class WebGameSession: NSObject, EngineSession {
         configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
-        startScripts = [shim, fonts, Self.pictureScript] + ogg + game.userScripts
+        startScripts = [shim, fonts] + (game.pictureSize == nil ? [Self.pictureScript] : []) + ogg + game.userScripts
         Self.add(startScripts, to: configuration.userContentController)
         webView = GameWebView(frame: .zero, configuration: configuration)
+        webView.pictureSize = game.pictureSize
         view = webView
         askToOpen = { [weak webView] url, done in
             guard let webView else { return done() }
@@ -272,7 +274,9 @@ final class WebGameSession: NSObject, EngineSession {
             let last = "";
             setInterval(() => {
                 let best = null;
-                for (const canvas of document.getElementsByTagName("canvas")) {
+                const own = typeof window.__vndegenPicture === "function" ? window.__vndegenPicture() : null;
+                if (own) best = { width: own[0], height: own[1] };
+                else for (const canvas of document.getElementsByTagName("canvas")) {
                     if (canvas.width > 0 && canvas.height > 0 && (!best || canvas.width * canvas.height > best.width * best.height)) best = canvas;
                 }
                 if (!best || last === best.width + "x" + best.height) return;

@@ -46,6 +46,7 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
             buttonScript: { button, pressed in "__vndegenTyrano.button('\(button.rawValue)', \(pressed))" },
             scriptArgument: "tyrano-script", log: tyranoLog
         )
+        configuration.pictureSize = game.pictureSize
         // Text is HTML here, so a font face that loads late only redraws it. The game's default font, which its
         // Config.tjs names, loads up front so the first lines don't show the fallback.
         configuration.preloadFonts = folder.read(servedPath: "/data/system/Config.tjs", limit: 1 << 20)
