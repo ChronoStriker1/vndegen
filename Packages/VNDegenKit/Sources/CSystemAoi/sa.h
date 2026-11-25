@@ -504,7 +504,20 @@ typedef struct Party {
     int post[PARTY_POSTS];
     Image *reserveSprite[PARTY_RESERVE];
     int reserveUnit[PARTY_RESERVE];
+    Image *benchSprite[PARTY_BENCH];
+    int benchSpriteUnit[PARTY_BENCH];
 } Party;
+
+typedef struct Member {
+    int unit, slot, bench;
+    int *hp, *mp, *level, *exp, *equip, *sp, *trained;
+} Member;
+
+int sa_party_member_list(Party *p, Member *out);
+int sa_party_member_value(const Party *p, const Member *m, int index);
+const Image *sa_party_member_sprite(Party *p, const Member *m);
+int sa_party_member_badge(const Party *p, const Member *m);
+enum { BADGE_FIELD = 98, BADGE_RESERVE = 99 };
 
 bool sa_party_init(Party *p, Vfs *vfs);
 void sa_party_free(Party *p);

@@ -579,9 +579,25 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   apart, and the 解任 tile at (445, 536), each with the unit's sprite; the members list `uts_c00` at (567, 21) with
   the tabs ポジション to 統率 (`uts_d01` to `d06`) and a row per member; the status card; the party's diorama on the
   library platform `m997bt1a`; 戻る (`uts_g00`) at (1117, 675).
-- **Placing.** Inferred (the original didn't respond to clicks or a drag with Darkus alone): choose a member (tile
-  or row), then a tile: two main tiles swap, a reserve tile benches the member (one must stay), and a reserve
-  member goes to a main tile when the party's 格 stays within the limit. 解任 and 編成 aren't built.
+- **Placing.** Choose a member (tile or row), then a tile: two main tiles swap, a reserve tile benches the member
+  (one must stay), and a reserve member goes to a main tile when the party's 格 stays within the limit. Measured: a
+  post holder placed on a tile leaves the post; the members list keeps the recruit order (the roster), whatever the
+  members' places; 格 is drawn with `flw_c15` digits, and the list has the `uts_c03` scrollbar at (967, 76) with its
+  `c04`/`c05` ends (20 by 20) at y 56 and 686, as 装備 and 育成 have theirs.
+- **一覧.** Measured (100% of the post rows): `uts_a00` at (2, 21) and one row per open post, `uts_z00` to `z19`
+  (560 by 30: normal, hover, chosen, a fourth unused) at (2, 76 + 30 × (post − 1)), closed posts left empty; each
+  with the holder's name (16 px at x 147), the ability icon (`uts_i02`) at x 337, and LV, 格, 統治 and 統率 in
+  `uts_g02` digits (14 by 20, the raised values blue) right-aligned at x 403, 451, 499 and 547, `--` when vacant;
+  解任 (`uts_x01`) at (372, 675). Rows take a member like the 組織図's tiles.
+- **Post popup.** Measured: in 編成, hovering a post holder's row shows `pps_a00` at (10, 10) with the post's name,
+  its `Position.obj` description and what it needs (統治, 統率) in widely spaced small text.
+- **Status card.** Measured: the ステータス表示 / 能力詳細 button (`pun_e00`) at (1191, 2) switches the card between the
+  status card and `pun_a02`, which shows the three abilities with their `ability.obj` texts and the equipped item
+  (なし when none); 配置 and 育成 open in the status card. The card shows any member, posted or benched: the 役職
+  badge is the post's (`uts_h00` onwards), フィールド (`h98`) or リザーブ (`h99`); the attribute (`unit.obj` column
+  14) has its 20-pixel `pun_d00` icon at (242, 208); a post's raises follow 統治 and 統率 in blue 30 pixels right;
+  skill icons are 20 pixels; a fixed-skill unit lists only its first skill, marked ★ without its 固定／ prefix, over
+  column 38 + 1 slots (ミアルテ 1/3, Darkus 5/6). Not matched: the card's portrait frame (another sheet of the unit).
 
 ## Saves
 
@@ -756,6 +772,8 @@ the same points (offsets in bytes, numbers little-endian):
   position (above), not a member count as first thought. Placing her set her record's +25
   byte from 4 to 1, and added her 魔法耐性's 50 to a row of resistances in her second battle block only. 配置 works by
   clicking a member, whose sprite then follows the pointer, and clicking a tile.
+- **装備 and 育成** list every member, posted and benched included, in the roster's order (measured: the original's
+  装備 shows ミアルテ and ルーアルテ while they hold posts).
 - **Joined members.** Measured: a new member joins unplaced (not on a tile). Units whose skills are 固定 keep only
   their first skill, with 3 after it (the mark of a fixed skill, as on enemies). Not derived yet, so VNDegen writes
   zeros there: ルーアルテ's thirteen 2s at +260 of the second block, a 5 at +252, and Darkus's 3 at +1284 (turn 9

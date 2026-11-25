@@ -76,18 +76,12 @@ static int cost(const Train *t, int k) { return sa_table_int(&t->costs, 0, 2 + k
 
 static int gain(const Train *t, int k) { return sa_table_int(&t->costs, 0, 3 + k * 2); }
 
-static int members(const SA *s, int *slots) {
-    int n = 0;
-    for (int i = PARTY_FRONT; i < PARTY_SLOTS; i++)
-        if (s->party.unit[i]) slots[n++] = i;
-    for (int i = 0; i < PARTY_FRONT; i++)
-        if (s->party.unit[i]) slots[n++] = i;
-    return n;
-}
+static int members(SA *s, Member *out) { return sa_party_member_list(&s->party, out); }
 
 void sa_train_open(SA *s) {
     Train *t = &s->train;
     t->member = t->pick = t->hover = -1;
+    s->card.showDetail = false;
     s->mode = MODE_TRAIN;
     s->dirty = true;
 }
@@ -102,7 +96,8 @@ static int hit(SA *s, int x, int y) {
         return -1;
     }
     if (in(x, y, BACK_X, BACK_Y, BTN_W, BTN_H)) return HOVER_BACK;
-    int slots[PARTY_SLOTS], n = members(s, slots);
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int n = members(s, ms);
     for (int i = 0; i < n; i++)
         if (in(x, y, ROW_X, ROW_Y + i * ROW_H, ROW_W, ROW_H)) return HOVER_MEMBER + i;
     if (t->member >= 0)
@@ -117,7 +112,7 @@ static void num(const Train *t, u32 *fb, int v, int right, int y, int row) {
     sa_draw_number(fb, t->art[ART_DIGITS], n, right, y, row, CW, CH);
 }
 
-static void draw_row(SA *s, u32 *fb, int k, int y, int frame, int slot, int x) {
+static void draw_row(SA *s, u32 *fb, int k, int y, int frame, const Member *m, int x) {
     Train *t = &s->train;
     int dx = x - TRAIN_X;
     sa_blit_rect(fb, t->art[ART_TRAIN], 0, frame * TRAIN_H, TRAIN_W, TRAIN_H, x, y);
@@ -126,7 +121,7 @@ static void draw_row(SA *s, u32 *fb, int k, int y, int frame, int slot, int x) {
     snprintf(d, sizeof d, "ステータスの%sを%d上昇させます。", statNames[k], gain(t, k));
     sa_text_draw(fb, SA_W, SA_H, d, -1, DESC_X + dx, y + DESC_DY, 14, 0x000000, NO_EDGE);
     sa_draw_number(fb, t->art[ART_DIGITS], "---", MP_RIGHT + dx, y + TITLE_DY + 2, 0, CW, CH);
-    num(t, fb, cost(t, k), COST_RIGHT + dx, y + TITLE_DY + 2, cost(t, k) > s->party.sp[slot] ? 1 : 0);
+    num(t, fb, cost(t, k), COST_RIGHT + dx, y + TITLE_DY + 2, cost(t, k) > *m->sp ? 1 : 0);
 }
 
 static void draw(SA *s) {
@@ -137,41 +132,43 @@ static void draw(SA *s) {
     static const int tabX[3] = {31, 110, 189};
     for (int i = 0; i < 3; i++) sa_blit_rect(fb, t->art[ART_TAB0 + i], 0, 0, 76, 21, tabX[i], 21);
     sa_blit(fb, t->art[ART_BAR], 274, 44);
-    sa_blit_rect(fb, t->art[ART_BAR_TOP], 0, 10, 20, 10, 274, 34);
-    sa_blit_rect(fb, t->art[ART_BAR_END], 0, 0, 20, 10, 274, 689);
+    sa_blit_rect(fb, t->art[ART_BAR_TOP], 0, 0, 20, 20, 274, 24);
+    sa_blit_rect(fb, t->art[ART_BAR_END], 0, 0, 20, 20, 274, 689);
     sa_blit(fb, t->art[ART_PANEL], PANEL_X, PANEL_Y);
     sa_blit(fb, t->art[ART_BAR], 966, 44);
-    sa_blit_rect(fb, t->art[ART_BAR_TOP], 0, 10, 20, 10, 966, 34);
-    sa_blit_rect(fb, t->art[ART_BAR_END], 0, 0, 20, 10, 966, 689);
+    sa_blit_rect(fb, t->art[ART_BAR_TOP], 0, 0, 20, 20, 966, 24);
+    sa_blit_rect(fb, t->art[ART_BAR_END], 0, 0, 20, 20, 966, 689);
     sa_font_set_spacing(0);
     sa_font_set_plain(true);
-    int slots[PARTY_SLOTS], n = members(s, slots);
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int n = members(s, ms);
     for (int i = 0; i < n; i++) {
-        int sl = slots[i], y = ROW_Y + i * ROW_H;
+        int y = ROW_Y + i * ROW_H;
         int frame = t->member == i ? 2 : t->hover == HOVER_MEMBER + i ? 1 : 0;
         sa_blit_rect(fb, t->art[ART_ROWS], 0, frame * ROW_H, ROW_W, ROW_H, ROW_X, y);
-        num(t, fb, s->party.level[sl], LV_RIGHT, y + TEXT_DY + 1, 0);
-        int r = sa_party_unit_row(&s->party, s->party.unit[sl]);
+        num(t, fb, *ms[i].level, LV_RIGHT, y + TEXT_DY + 1, 0);
+        int r = sa_party_unit_row(&s->party, ms[i].unit);
         sa_text_draw(fb, SA_W, SA_H, sa_table_text(&s->party.units, r, 2), -1, NAME_X, y + TEXT_DY - 1, 16, 0x000000, NO_EDGE);
-        num(t, fb, s->party.sp[sl], SP_RIGHT, y + TEXT_DY + 1, 2);
+        num(t, fb, *ms[i].sp, SP_RIGHT, y + TEXT_DY + 1, 2);
     }
-    int slot = t->member >= 0 ? slots[t->member] : -1;
-    if (slot >= 0)
+    const Member *m = t->member >= 0 && t->member < n ? &ms[t->member] : NULL;
+    if (m)
         for (int k = 0; k < TRAIN_ROWS; k++) {
-            bool can = cost(t, k) <= s->party.sp[slot];
-            draw_row(s, fb, k, TRAIN_Y + k * TRAIN_PITCH, !can ? 1 : t->hover == HOVER_TRAIN + k ? 3 : 0, slot, TRAIN_X);
+            bool can = cost(t, k) <= *m->sp;
+            draw_row(s, fb, k, TRAIN_Y + k * TRAIN_PITCH, !can ? 1 : t->hover == HOVER_TRAIN + k ? 3 : 0, m, TRAIN_X);
         }
     sa_font_set_plain(false);
     sa_font_set_spacing(1);
-    sa_card_draw(s, fb, slot >= 0 ? slot : (t->hover >= HOVER_MEMBER && t->hover < HOVER_TRAIN ? slots[t->hover - HOVER_MEMBER] : -1), CARD_X, CARD_Y);
+    int shown = t->member >= 0 ? t->member : t->hover >= HOVER_MEMBER && t->hover < HOVER_TRAIN ? t->hover - HOVER_MEMBER : -1;
+    sa_card_draw(s, fb, shown >= 0 && shown < n ? &ms[shown] : NULL, CARD_X, CARD_Y);
     sa_blit_rect(fb, t->art[ART_BACK], 0, t->hover == HOVER_BACK ? BTN_H : 0, BTN_W, BTN_H, BACK_X, BACK_Y);
-    if (t->pick < 0 || slot < 0) return;
+    if (t->pick < 0 || !m) return;
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u | (fb[i] >> 1 & 0x7f7f7fu);
     sa_blit(fb, t->art[ART_CONFIRM], CONFIRM_X, CONFIRM_Y);
     sa_font_set_spacing(0);
     sa_font_set_plain(true);
-    draw_row(s, fb, t->pick, CONFIRM_ROW_Y, 0, slot, CONFIRM_X);
-    num(t, fb, s->party.sp[slot], CONFIRM_SP_RIGHT, CONFIRM_SP_Y, 0);
+    draw_row(s, fb, t->pick, CONFIRM_ROW_Y, 0, m, CONFIRM_X);
+    num(t, fb, *m->sp, CONFIRM_SP_RIGHT, CONFIRM_SP_Y, 0);
     sa_font_set_plain(false);
     sa_font_set_spacing(1);
     sa_blit_rect(fb, t->art[ART_OK], 0, t->hover == HOVER_OK ? BTN_H : 0, BTN_W, BTN_H, OK_X, CONFIRM_BTN_Y);
@@ -180,21 +177,23 @@ static void draw(SA *s) {
 
 static void apply(SA *s) {
     Train *t = &s->train;
-    int slots[PARTY_SLOTS];
-    members(s, slots);
-    int sl = slots[t->member], k = t->pick;
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int n = members(s, ms), k = t->pick;
     t->pick = -1;
-    if (cost(t, k) > s->party.sp[sl]) return;
-    s->party.sp[sl] -= cost(t, k);
-    s->party.trained[sl][k] += gain(t, k);
-    if (k == 0) s->party.hp[sl] += gain(t, k);
-    if (k == 1) s->party.mp[sl] += gain(t, k);
-    sa_log(s, "train: slot %d %s +%d", sl, trainNames[k], gain(t, k));
+    if (t->member < 0 || t->member >= n) return;
+    Member *m = &ms[t->member];
+    if (cost(t, k) > *m->sp) return;
+    *m->sp -= cost(t, k);
+    m->trained[k] += gain(t, k);
+    if (k == 0) *m->hp += gain(t, k);
+    if (k == 1) *m->mp += gain(t, k);
+    sa_log(s, "train: unit %d %s +%d", m->unit, trainNames[k], gain(t, k));
 }
 
 bool sa_train_frame(SA *s) {
     if (s->mode != MODE_TRAIN) return false;
     Train *t = &s->train;
+    if (t->pick < 0) sa_card_input(s);
     int h = hit(s, s->mouseX, s->mouseY);
     if (h != t->hover) {
         t->hover = h;

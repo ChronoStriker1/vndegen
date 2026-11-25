@@ -22,7 +22,7 @@ typedef struct Policy {
 
 typedef struct Equip {
     Table items;
-    Image *bg, *art[20], *icon[EQUIP_ICONS];
+    Image *bg, *art[20], *icon[EQUIP_ICONS], *label[21];
     int unit, item, hover;
 } Equip;
 
@@ -71,7 +71,8 @@ typedef struct MazeView {
 } MazeView;
 
 typedef struct Card {
-    Image *frame, *digits, *badge, *desc, *icon[CARD_ICONS];
+    Image *frame, *digits, *label[22], *desc, *detail, *toggle, *icon[CARD_ICONS];
+    bool showDetail, toggleHover;
 } Card;
 
 typedef struct Train {
@@ -81,7 +82,7 @@ typedef struct Train {
 } Train;
 
 typedef struct Deploy {
-    Image *art[56], *benchSprite[PARTY_BENCH];
+    Image *art[64], *benchSprite[PARTY_BENCH], *postRow[20];
     int benchUnit[PARTY_BENCH];
     int hover, picked, heldX, heldY, tab;
 } Deploy;
@@ -253,7 +254,8 @@ bool sa_shop_frame(SA *s);
 void sa_shop_wheel(SA *s, int notches);
 void sa_card_init(Card *c, Vfs *vfs);
 void sa_card_free(Card *c);
-void sa_card_draw(SA *s, u32 *fb, int slot, int x, int y);
+void sa_card_draw(SA *s, u32 *fb, const Member *m, int x, int y);
+void sa_card_input(SA *s);
 void sa_train_init(Train *t, Vfs *vfs);
 void sa_train_free(Train *t);
 void sa_train_open(SA *s);
