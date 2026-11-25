@@ -70,8 +70,8 @@ where play couldn't pin it down.
 - **`f1 N`** widens the town's build area to stage N (the turn script calls it with 建設エリアが広がりました once
   enough is built: stage 2 at 30 facility points, 3 at 70, from `f3`'s total). The engine keeps the stage in C490,
   which the turn script reads (inferred from those reads; no script writes it).
-- **`c3 "role" var var`** asks which unit holds a town role (街長, 農業担当 and the others 配置 assigns); not built
-  yet, so it answers none.
+- **`c3 "role" var var`** asks which unit holds a post (街長 to 第七階層長), answering whether it's held and the unit;
+  `bo3105` uses it for the appointment scenes.
 - **Missions (目標).** The turn script runs the target scene (`fa0000.box`) once F143 is set, after `9e var` gives
   1 or more, then `9f var`: inferred as "a mission is due" and "start it". `mission.obj` lists マクドゥの試験 1 to 15
   with numbers that look like turns (8 and 9, 17, 26 and 27, …) and three amounts (200, 1000, 200 for the first),
@@ -104,8 +104,9 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   needs it: a level 5 ベト's ベトハンマー (27 to 30, attack 7) hit Darkus for 21, one more than its base attack allows.
 - **Experience.** Measured: the panel's EXP bar is 100 pixels wide and fills by EXP × 100 / 120, where 120 is the
   first number in the unit's growth row (`lvup.obj` column 2): 9, 21 and 43 EXP showed 7, 17 and 35 pixels, and 11
-  and 21 showed 9 and 17. So level 2 takes 120. Inferred: each later level takes that number times the level, and
-  levels don't raise HP or MP until that is measured.
+  and 21 showed 9 and 17. So level 2 takes 120. Measured on a 迷宮長 earning 16 EXP a turn (万能タイプ, 120 and
+  10): levels 2, 3 and 4 took 120, 140 and 180, so level L to L + 1 takes column 2 + column 3 × L × (L − 1).
+  Inferred: levels don't raise HP or MP until that is measured.
 - **Damage.** A random number in the skill's power range (`skill.obj` columns 17 and 18), plus the attacker's
   physical attack, minus the target's physical defence. Measured: 44 hits by eleven skills, each inside its predicted
   range. Darkus's 剣撃 (27 to 30, attack 18) did 44, 44, 36, 33, 45, 44, 43, 41, 42, 48 and 46 to targets of defence
@@ -416,6 +417,32 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   through. 最近の収支 is drawn from these: an event counts as won when its result row is type 10 (500 when it sent
   people back), a lost chest adds to 宝箱開封数, and the breakthrough column is what's left of the net.
   完全突破 (`dmz_f00`) at (362, 564) shows when anyone broke through. Measured against six original turns.
+- **Intruders.** C249. Measured: 8 a turn whenever the 評判 value (above) is 0 or less, whatever the residents (1000
+  to 9000) or depth; with a positive value, some turns bring 9 or 10, more often as the value rises (16 to 70: 2 turns
+  in 12; 133 and 223: every turn seen), never above `maze.obj`'s 制限敵数 for the depth (10 at 2 floors). The
+  original's random numbers come from the save, so identical saves give identical turns. Inferred: a chance of
+  value / 2 + 5 percent (at most 90) of 1 to 1 + value / 50 extra.
+- **The turn's events.** Inferred from 330 turns of the original over 15 set-ups (each number on its own at three
+  strengths, then mixes), fitted to the counts within sampling noise. The intruders walk the floors in order and
+  every area of a floor (one per size step) gets at most one event while any remain. Weights, in points before
+  迷宮情報's multipliers: battle = the 守備 points from facilities and town posts + 0.9 × the floor head's 統率;
+  trap = the town 罠 points + 15 with a 迷宮長 (and 15 with a 補佐); chest = the town 宝箱 points + 10 with a
+  迷宮長 (and 10 with a 補佐); lost = 9 + 統率 / 5 with a 迷宮長 + 0.75 × the floor head's 統率. An area picks one
+  kind in proportion, out of 100 when the weights add to less (the rest is quiet, recorded -1). Measured along
+  the way: with only one kind, an area's chance is its points / 100, capped at 1 (宝箱 97, 300, 1200 gave 17%, 38%
+  and 100%; 罠 and 守備 the same shape).
+- **Each event's outcome.** Inferred weights, from `maze.obj`'s rows: a battle is won by 守備隊 (200, 0.4 × town
+  points) or by the floor head (201, 0.3 × 統率, only when there is one), lost to 205 (15) or, without a floor head,
+  206 (10); a trap fires (400, 0.6 × town points; 402 with a floor head, 401 with 支援隊) or is avoided (403, 10),
+  so traps from the 迷宮長 alone never fire (measured: 0 of 30); a chest is held by 宝箱守備隊 (300, 0.3 × town
+  points) or by the 迷宮長 (301, 3 + 統治 / 10), or robbed (303, 305, 307 at 1 each, and 304, 306, 308 at 3 each
+  when there is no 迷宮長); lost is 500, which sends people back 105 times in 108 (迷路を突破, sending none,
+  wasn't seen). Measured: a won event or a robbery sends back one party of 3 (or what's left), but a post holder's
+  win and, with a 迷宮長, a robbery send back everyone left; yields are the result row's ranges (battle 3 to 5
+  money, trap 1 resource, lost 1 food, robbery 20 to 100 of one stock) plus, for battles, ⌈town 守備 points / 20⌉
+  money and, for traps, ⌈town 罠 points / 10⌉ resources.
+- **EXP.** Measured: every open 迷宮 post's holder gains 2 EXP per intruder each turn (16 for 8), whatever
+  happened; town posts gain none.
 - **Breakthrough.** Measured over 20 turns: each adventurer who passes the deepest floor takes 0.25% of food, money
   and resources, rounded up on the total (8 of them took 1000 from 50000, at any depth). The turn's income box then
   adds ダークス宮の防衛に失敗しました; a turn where all were sent back adds nothing.

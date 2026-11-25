@@ -66,6 +66,12 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   The tab bar shows and hides the windows; each window folds, closes and (the 役職 windows) narrows, and a section's
   header folds it. From turn 42 the ダークス宮 button opens the cross-section of the 迷宮 with 最近の収支 and
   迷宮職情報, and the town gains 迷宮情報 and 迷宮職情報; 街役職情報 lists the town's post holders.
+- **ダークス宮.** Each turn adventurers walk the 迷宮 floor by floor: battles, traps, chests and getting lost send
+  parties back, and those who reach the bottom take a share of food, money and resources (the turn's box then
+  says the defence failed). 迷宮情報's numbers and marks come from the post holders, the staffed facilities and
+  the depth; 評判 from the facilities sets how many come. The 迷宮 deepens to seven floors as the town grows and
+  time passes, each floor widens with its 階層長, and 補佐, 支援 and 遊撃 open with depth. 迷宮 post holders gain
+  EXP every turn. The cross-section shows each area's event and the breakthrough.
   Each command first runs the game's hook for it (`bo3000.box` script 0 with `C095` set to the command), so its
   first-use help shows as in the original. 建設 opens the build screen: the list, the board, the card, Reset, Undo, 決定
   and 戻る, with the town window showing the result before 決定. 内政 shows the throne room with the 視察 and イベント actions
@@ -115,9 +121,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   defeat recruits their leaders.
   Hidden doors (wall 100) open with a 感知 unit in the party (inferred). 配置's 組織図 posts (the town's and, from
   turn 42, the 迷宮's) and 内政's 交換 are there, with the holders' ability raises; posts don't change the town's
-  numbers yet. The ダークス宮 screens are there; the 迷宮's turn (its numbers, intruders, growth and floors past
-  the second) isn't built yet, nor 編成 or the dungeons after 炎山洞. These live in
-  the original's exe, not its scripts, and are rebuilt from play (`docs/systemaoi-cleanroom.md`).
+  production yet. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
+  breakthrough damage are measured; the odds of each event are fitted to the original's counts. Not built yet:
+  the post holders' small figures on their floors in the cross-section, 編成, and the dungeons after 炎山洞. These
+  live in the original's exe, not its scripts, and are rebuilt from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the 3D dungeon behind the board (a placeholder picture for now), the area names in the top bar, the
   screen after a loss, and the panels' numbers, which use the app's font rather than the original's.
 - Dungeon: where an area's enemy groups first stand and how they choose their way are VNDegen's own (the

@@ -427,6 +427,7 @@ typedef struct Maze {
     int food, money, resources;
     int fame, intruders;
     int depthPoints, renown;
+    int townGuard, townTrap, townChest;
     int event[7][7][6];
 } Maze;
 
@@ -606,6 +607,7 @@ void sa_debug_new_game(VNSystemAoi *sa);
 void sa_debug_expedition(VNSystemAoi *sa, int dungeon, int floor);
 void sa_debug_place(VNSystemAoi *sa, int x, int y, int dir);
 double sa_debug_bench(VNSystemAoi *sa, int n);
+void sa_debug_maze(VNSystemAoi *sa, int turns);
 void sa_debug_set(VNSystemAoi *sa, bool flag, int index, int value);
 int sa_debug_get(VNSystemAoi *sa, bool flag, int index);
 void sa_debug_join(VNSystemAoi *sa, const char *key);

@@ -147,6 +147,7 @@ int main(int argc, char **argv) {
         if (sscanf(argv[a], "setc=%d,%d", &x, &y) == 2) sa_debug_set(s, false, x, y);
         if (sscanf(argv[a], "getc=%d", &n) == 1) printf("C%03d=%d\n", n, sa_debug_get(s, false, n));
         if (sscanf(argv[a], "getf=%d", &n) == 1) printf("F%04d=%d\n", n, sa_debug_get(s, true, n));
+        if (sscanf(argv[a], "mazesim=%d", &n) == 1) sa_debug_maze(s, n);
         if (sscanf(argv[a], "bench=%d", &n) == 1) printf("dungeon frame %.2f ms\n", sa_debug_bench(s, n));
         if (!strcmp(argv[a], "finds")) {
             int f[4];

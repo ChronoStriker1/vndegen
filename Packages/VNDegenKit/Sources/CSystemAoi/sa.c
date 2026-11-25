@@ -814,6 +814,11 @@ void sa_end_turn(SA *s) {
         people += hi > lo ? lo + (int)(sa_vm_random(vm) % (u32)(hi - lo + 1)) : hi;
     }
     food -= vm->c[C_RESIDENTS] / 10;
+    int maze[3];
+    bool failed = sa_maze_turn(s, maze);
+    food += maze[0];
+    money += maze[1];
+    res += maze[2];
     sa_log(s, "turn %d ends: residents %d%+d, food %d%+d, money %d%+d, resources %d%+d", vm->c[C_TURN], vm->c[C_RESIDENTS], people,
            vm->c[C_FOOD], food, vm->c[C_MONEY], money, vm->c[C_RESOURCES], res);
     int before[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
@@ -823,7 +828,7 @@ void sa_end_turn(SA *s) {
     vm->c[C_MONEY] += money;
     vm->c[C_RESOURCES] += res;
     int after[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
-    sa_dialog_open_turn(&s->dialog, before, after, "このターンの収支です");
+    sa_dialog_open_turn(&s->dialog, before, after, failed ? "このターンの収支です|ダークス宮の防衛に失敗しました" : "このターンの収支です");
     s->turnPending = true;
     s->town.mapOnly = true;
 }

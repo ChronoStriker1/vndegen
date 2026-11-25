@@ -42,7 +42,7 @@ static const struct {
     {622, 930, 547, {813, 655, 493, 335, 170}},
 };
 
-enum { RULE_FLOORS = 1, RULE_SIZE, RULE_MAX_SIZE, RULE_TURNS = 5, RULE_INTRUDERS };
+enum { RULE_FLOORS = 1, RULE_SIZE, RULE_MAX_SIZE, RULE_TURNS = 5, RULE_INTRUDERS, DEPTH_OFFSET = 42, THROUGH_SHARE = 400, FAME_OFFSET = 11, BASE_INTRUDERS = 8 };
 
 static int rule(const SA *s, int id, int col) {
     const Table *t = &s->mazeView.rules;
@@ -93,7 +93,7 @@ bool sa_maze_post_open(const Maze *m, const VM *vm, int post) {
     return post >= 12 && post <= 18 && post - 11 <= m->floors;
 }
 
-enum { POST_COMMERCE = 4, POST_INDUSTRY = 5, POST_GUARD = 6, POST_SCHOOL = 7, POST_HEALTH = 9, POST_HEAD = 10, POST_DEPUTY = 11, POST_FLOOR1 = 12 };
+enum { POST_COMMERCE = 4, POST_INDUSTRY = 5, POST_GUARD = 6, POST_SCHOOL = 7, POST_HEALTH = 9, POST_HEAD = 10, POST_DEPUTY = 11, POST_FLOOR1 = 12, POST_RAID = 19, POST_SUPPORT = 20, EXP_PER_INTRUDER = 2, PARTY_SIZE = 3 };
 enum { COL_MAZE = 10, COL_GUARD, COL_CHEST, COL_TRAP, COL_RENOWN, LVUP_SHIFT = 6 };
 
 static int facility_value(const Town *t, int r, int level, int col) {
@@ -113,7 +113,7 @@ static void post_stats(const SA *s, int post, int *gov, int *lead) {
 
 static int fame_of(int renown) {
     static const int steps[] = {50, 100, 150, 270, 370, 470};
-    int v = renown + 11, level = 1;
+    int v = renown + FAME_OFFSET, level = 1;
     for (int i = 0; i < 6 && v >= steps[i]; i++) level++;
     return level;
 }
@@ -158,6 +158,9 @@ void sa_maze_update(SA *s) {
     guard += gov;
     post_stats(s, POST_HEALTH, &gov, &lead);
     guard += gov;
+    m->townGuard = guard;
+    m->townTrap = trap;
+    m->townChest = chest;
     int heads = 0, chief = 0;
     for (int p = POST_HEAD; p <= POST_DEPUTY; p++) {
         post_stats(s, p, &gov, &lead);
@@ -190,13 +193,178 @@ static const Image *piece(SA *s, int floor, int size, int part) {
     return *slot;
 }
 
-enum { ICON_LOST = 9, ICON_FOUND_WAY = 10, ICON_EXIT = 11, EXIT_DX = 60, EVENT_LOST = 500 };
+enum { ICON_LOST = 9, ICON_FOUND_WAY = 10, ICON_EXIT = 11, EXIT_DX = 60, EVENT_LOST = 500, RESULT_WIN = 10 };
 
 static int rule_row(const SA *s, int id) {
     const Table *t = &s->mazeView.rules;
     for (int r = 0; r < t->rows; r++)
         if (sa_table_int(t, r, 0) == id) return r;
     return -1;
+}
+
+static void grow(SA *s) {
+    VM *vm = &s->vm;
+    Maze *m = &s->maze;
+    int points = m->depthPoints + vm->c[C_RESIDENTS] / 2 - DEPTH_OFFSET, since = vm->c[C_TURN] - vm->c[C_MAZE_OPENED];
+    while (vm->c[C_MAZE_FLOORS] < MAZE_FLOORS) {
+        int next = vm->c[C_MAZE_FLOORS] + 1, need = rule(s, RULE_FLOORS, next + 1);
+        if (need <= 0 || since < rule(s, RULE_TURNS, next + 1) || points < need) break;
+        vm->c[C_MAZE_FLOORS] = next;
+        if (vm->c[C_MAZE_SIZE + next - 1] < 1) vm->c[C_MAZE_SIZE + next - 1] = 1;
+    }
+    for (int k = 0; k < vm->c[C_MAZE_FLOORS]; k++) {
+        int gov, lead;
+        post_stats(s, POST_FLOOR1 + k, &gov, &lead);
+        vm->c[C_MAZE_WIDTH + k] += lead;
+        int size = 1, most = rule(s, RULE_MAX_SIZE, k + 2);
+        for (int z = 2; z <= MAZE_SIZES; z++) {
+            int step = rule(s, RULE_SIZE, z + 1);
+            if (step > 0 && vm->c[C_MAZE_WIDTH + k] >= step) size = z;
+        }
+        vm->c[C_MAZE_SIZE + k] = size < most || most <= 0 ? size : most;
+    }
+}
+
+static int roll(SA *s, int n);
+
+static int intruders(SA *s) {
+    int value = s->maze.renown + FAME_OFFSET, n = BASE_INTRUDERS;
+    int chance = value / 2 + 5 < 90 ? value / 2 + 5 : 90;
+    if (value > 0 && roll(s, 100) < chance) n += 1 + roll(s, 1 + value / 50);
+    int most = rule(s, RULE_INTRUDERS, s->maze.floors + 1);
+    return most > 0 && n > most ? most : n;
+}
+
+static int roll(SA *s, int n) { return n > 0 ? (int)(sa_vm_random(&s->vm) % (u32)n) : 0; }
+
+static int pick(SA *s, const int *weight, int count) {
+    int total = 0;
+    for (int i = 0; i < count; i++) total += weight[i] > 0 ? weight[i] : 0;
+    int r = roll(s, total);
+    for (int i = 0; i < count; i++) {
+        if (weight[i] <= 0) continue;
+        if (r < weight[i]) return i;
+        r -= weight[i];
+    }
+    return -1;
+}
+
+static int holder_lead(const SA *s, int post) {
+    int gov, lead;
+    post_stats(s, post, &gov, &lead);
+    return s->party.post[post] && sa_maze_post_open(&s->maze, &s->vm, post) ? lead : -1;
+}
+
+static int holder_gov(const SA *s, int post) {
+    int gov, lead;
+    post_stats(s, post, &gov, &lead);
+    return s->party.post[post] && sa_maze_post_open(&s->maze, &s->vm, post) ? gov : -1;
+}
+
+enum { KIND_BATTLE, KIND_TRAP, KIND_CHEST, KIND_LOST, KINDS };
+
+static void resolve(SA *s, int floor, int left, int *e) {
+    const Maze *m = &s->maze;
+    int head = holder_lead(s, POST_FLOOR1 + floor), chief = holder_lead(s, POST_HEAD), deputy = holder_lead(s, POST_DEPUTY);
+    int raid = holder_lead(s, POST_RAID), support = holder_lead(s, POST_SUPPORT);
+    int w[KINDS] = {20 * m->townGuard + (head >= 0 ? 18 * head : 0), 20 * m->townTrap + (chief >= 0 ? 300 : 0) + (deputy >= 0 ? 300 : 0),
+                    20 * m->townChest + (chief >= 0 ? 200 : 0) + (deputy >= 0 ? 200 : 0),
+                    (chief >= 0 ? 180 + 4 * chief : 0) + (head >= 0 ? 15 * head : 0)};
+    int total = 0;
+    for (int i = 0; i < KINDS; i++) total += w[i];
+    e[0] = -1;
+    int r = roll(s, total > 2000 ? total : 2000), kind = -1;
+    for (int i = 0; i < KINDS && kind < 0; i++) {
+        if (r < w[i]) kind = i;
+        r -= w[i];
+    }
+    if (kind < 0) return;
+    int id = 0, all = 0;
+    if (kind == KIND_BATTLE) {
+        static const int ids[] = {200, 201, 202, 203, 204, 205, 206};
+        int bw[7] = {head < 0 ? 4 * m->townGuard : 0, head >= 0 ? 3 * head : 0, raid >= 0 ? 3 * raid : 0, support >= 0 ? 3 * support : 0, raid >= 0 ? 10 : 0, 150,
+                     head < 0 ? 100 : 0};
+        int i = pick(s, bw, 7);
+        id = ids[i < 0 ? 5 : i];
+        all = i >= 1 && i <= 4;
+    } else if (kind == KIND_TRAP) {
+        static const int ids[] = {400, 401, 402, 403};
+        int tw[4] = {6 * m->townTrap, support >= 0 ? 3 * support : 0, head >= 0 ? 3 * head : 0, 100};
+        int i = pick(s, tw, 4);
+        id = ids[i < 0 ? 3 : i];
+    } else if (kind == KIND_CHEST) {
+        static const int ids[] = {300, 301, 302, 303, 304, 305, 306, 307, 308};
+        int govChief = holder_gov(s, POST_HEAD), govDeputy = holder_gov(s, POST_DEPUTY);
+        int cw[9] = {3 * m->townChest, chief >= 0 ? 30 + govChief : 0, deputy >= 0 ? 30 + govDeputy : 0, 10, chief < 0 ? 30 : 0, 10, chief < 0 ? 30 : 0, 10, chief < 0 ? 30 : 0};
+        int i = pick(s, cw, 9);
+        id = ids[i < 0 ? 3 : i];
+        all = i == 1 || i == 2 || (i >= 3 && chief >= 0);
+    } else
+        id = roll(s, 108) < 105 ? EVENT_LOST : -EVENT_LOST;
+    e[0] = id < 0 ? -id : id;
+    int row = rule_row(s, e[0]);
+    int result = row >= 0 ? rule_row(s, sa_table_int(&s->mazeView.rules, row, 3)) : -1;
+    bool takes = id > 0 && result >= 0 && (sa_table_int(&s->mazeView.rules, result, 2) == RESULT_WIN || kind == KIND_CHEST);
+    e[1] = takes ? (all ? left : left < PARTY_SIZE ? left : PARTY_SIZE) : 0;
+    e[2] = 0;
+    if (result < 0 || !takes) return;
+    const Table *t = &s->mazeView.rules;
+    for (int i = 0; i < 3; i++) {
+        int lo = sa_table_int(t, result, 7 + 2 * i), hi = sa_table_int(t, result, 8 + 2 * i);
+        int v = hi > lo ? lo + roll(s, hi - lo + 1) : lo;
+        if (v && kind == KIND_BATTLE && i == 1) v += (m->townGuard + 19) / 20;
+        if (v && kind == KIND_TRAP && i == 2) v += (m->townTrap + 9) / 10;
+        e[3 + i] = sa_table_int(t, result, 2) == RESULT_WIN ? v : -v;
+    }
+}
+
+static void give_exp(SA *s, int unit, int amount) {
+    Party *p = &s->party;
+    int *exp = NULL, *level = NULL;
+    for (int i = 0; i < PARTY_SLOTS && !exp; i++)
+        if (p->unit[i] == unit) exp = &p->exp[i], level = &p->level[i];
+    for (int i = 0; i < p->benchCount && !exp; i++)
+        if (p->bench[i].unit == unit) exp = &p->bench[i].exp, level = &p->bench[i].level;
+    int r = sa_party_unit_row(p, unit);
+    if (!exp || r < 0) return;
+    *exp += amount;
+    int need;
+    while ((need = sa_battle_exp_needed(&s->battle, r, *level)) > 0 && *exp >= need) {
+        *exp -= need;
+        ++*level;
+    }
+}
+
+bool sa_maze_turn(SA *s, int net[3]) {
+    VM *vm = &s->vm;
+    Maze *m = &s->maze;
+    memset(net, 0, 3 * sizeof *net);
+    if (!vm->f[F_MAZE]) return false;
+    sa_maze_update(s);
+    if (!vm->c[C_MAZE_OPENED]) vm->c[C_MAZE_OPENED] = vm->c[C_TURN];
+    memset(m->event, 0, sizeof m->event);
+    int n = intruders(s), left = n;
+    for (int k = 0; k < m->floors && left > 0; k++)
+        for (int a = 0; a < s->mazeView.size[k] && left > 0; a++) {
+            int *e = m->event[k][a];
+            resolve(s, k, left, e);
+            if (e[1] > left) e[1] = left;
+            left -= e[1];
+            for (int i = 0; i < 3; i++) net[i] += e[3 + i];
+        }
+    for (int i = 0; i < 3 && left > 0; i++) {
+        long long stock = vm->c[C_FOOD + i];
+        if (stock > 0) net[i] -= (int)((stock * left + THROUGH_SHARE - 1) / THROUGH_SHARE);
+    }
+    vm->c[C_MAZE_INTRUDERS] = n;
+    vm->c[C_MAZE_REPELLED] = n - left;
+    vm->c[C_MAZE_THROUGH] = left;
+    for (int i = 0; i < 3; i++) vm->c[C_MAZE_FOOD + i] = net[i];
+    for (int post = POST_HEAD; post <= POST_SUPPORT; post++)
+        if (s->party.post[post] && sa_maze_post_open(m, vm, post)) give_exp(s, s->party.post[post], EXP_PER_INTRUDER * n);
+    grow(s);
+    sa_maze_update(s);
+    return left > 0;
 }
 
 static int event_icon(const SA *s, int id, int people) {
@@ -272,7 +440,7 @@ static void number(SA *s, u32 *fb, int v, int right, int y, int row) {
     sa_draw_int(fb, s->mazeView.art[ART_DIGITS], v, false, RECENT_X + right, RECENT_Y + y, row, DIGIT_W, DIGIT_H);
 }
 
-enum { DIGIT_BLACK, DIGIT_RED, DIGIT_BLUE, RESULT_WIN = 10 };
+enum { DIGIT_BLACK, DIGIT_RED, DIGIT_BLUE };
 
 static bool event_won(const SA *s, const int *e) {
     if (e[0] == EVENT_LOST) return e[1] > 0;
@@ -383,4 +551,39 @@ bool sa_maze_frame(SA *s) {
         s->dirty = true;
     }
     return true;
+}
+
+void sa_debug_maze(VNSystemAoi *sa, int turns) {
+    SA *s = (SA *)sa;
+    int saved[SA_C_VARS];
+    memcpy(saved, s->vm.c, sizeof saved);
+    int count[1000] = {0}, quiet = 0, people[1000][9] = {{0}}, outcome[9][9] = {{0}};
+    for (int t = 0; t < turns; t++) {
+        memcpy(s->vm.c, saved, sizeof saved);
+        int net[3];
+        sa_maze_turn(s, net);
+        for (int k = 0; k < MAZE_FLOORS; k++)
+            for (int a = 0; a < 7; a++) {
+                const int *e = s->maze.event[k][a];
+                if (e[0] == -1) quiet++;
+                if (e[0] > 0 && e[0] < 1000) {
+                    count[e[0]]++;
+                    people[e[0]][e[1] < 8 ? e[1] : 8]++;
+                }
+            }
+        int rep = s->vm.c[C_MAZE_REPELLED], thr = s->vm.c[C_MAZE_THROUGH];
+        if (rep < 9 && thr < 9) outcome[rep][thr]++;
+    }
+    memcpy(s->vm.c, saved, sizeof saved);
+    printf("maze %d turns quiet %d\n", turns, quiet);
+    for (int i = 0; i < 1000; i++)
+        if (count[i]) {
+            printf("  %d %d people", i, count[i]);
+            for (int p = 0; p < 9; p++)
+                if (people[i][p]) printf(" %d:%d", p, people[i][p]);
+            printf("\n");
+        }
+    for (int r = 0; r < 9; r++)
+        for (int b = 0; b < 9; b++)
+            if (outcome[r][b]) printf("  rep %d thr %d: %d\n", r, b, outcome[r][b]);
 }

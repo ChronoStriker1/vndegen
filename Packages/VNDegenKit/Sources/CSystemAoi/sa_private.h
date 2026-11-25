@@ -292,6 +292,7 @@ void sa_maze_free(SA *s);
 void sa_maze_reset(SA *s);
 void sa_maze_open(SA *s);
 void sa_maze_update(SA *s);
+bool sa_maze_turn(SA *s, int net[3]);
 void sa_maze_summary(const SA *s, Recent *r);
 void sa_maze_draw_scene(SA *s, u32 *fb);
 bool sa_maze_frame(SA *s);

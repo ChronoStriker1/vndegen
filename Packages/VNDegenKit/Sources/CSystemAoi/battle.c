@@ -722,7 +722,7 @@ static void drop_item(Battle *b, const char *table) {
 int sa_battle_exp_needed(const Battle *b, int unitRow, int level) {
     int r = row_by_text(&b->lvup, 1, text_of(&b->party->units, unitRow, 19));
     int base = r >= 0 ? sa_table_int(&b->lvup, r, 2) : 0;
-    return base > 0 ? base * level : 0;
+    return base > 0 ? base + sa_table_int(&b->lvup, r, 3) * level * (level - 1) : 0;
 }
 
 static void reward(Battle *b) {
