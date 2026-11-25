@@ -1083,3 +1083,25 @@ the same points (offsets in bytes, numbers little-endian):
   entry and C076/C077 written, the original lists VNDegen's dungeon saves (8ターン 千樹庭 中央森の東 0歩目) and loads
   them onto the saved cell, facing, map memory and groups (checked on a save from a VNDegen game four steps in, and
   on VNDegen's re-export of a PC autosave). The slot's N歩目 read 0 on every save so far; VNDegen shows C072.
+
+## Ending, second playthrough and the story hooks VNDegen doesn't run
+
+- **True ending.** bo2701 sets F161 when 真魔力塊隊 (party 9907) is beaten; the town hook (bo0100) then plays bo0104
+  (the ending, the staff roll `data2.dat`, 109 seconds, which Ctrl doesn't skip), ac0001 (引継ぎデータを登録しますか？)
+  and `7a` back to the title. Measured under Wine with F161 set in a save that has its hook slots: the same scenes
+  in the same order as VNDegen. A save without hook slots runs no hooks, so it never reaches the ending.
+  `bo0105` (内政END, F137 with C580 ≥ 30) shares the hook.
+- **Carry-over (`85`, `86`).** Measured: 登録する sets the global flag the new game checks (FG801) without writing any
+  file within the next minute; a new game then asks 引き継ぎますか？, then whether to use the special units, then the
+  enemy strength (初期の強さ, 周回用の強さ, 極めの強さ), and turn 1 opens with the ending turn's food, money and
+  resources (48,996, 49,059 and 49,000) and the first five items, Darkus alone in the party. VNDegen ignores both
+  ops, so the offer never comes.
+- **Hooks never run by VNDegen.** init.box also registers 13, 14, 15, 19, 20, 21, 22 and 23. 14 (bo1400 → bo1401)
+  holds 74 boss-side cutaways keyed on C070/C071 and C095 = 1, C096 = n; the PC didn't play 千樹庭 11F's first on
+  entering, walking toward or meeting ヤーヌの部下隊, and C095 holds the town command (24) in the dungeon, so the exe
+  sets them when it calls the hook (trigger unknown). 19 (bo1900) holds scenes keyed on floor objects 22, 30, 32
+  and 33 with three or more in the party; 22 (bo2200) the dungeon rest conversations, once per expedition (F129,
+  cleared by bo1000) with three or more in the party, the next unseen one whose turn (0, 20, 40, …) has come. On
+  the PC, 休憩 with Darkus alone opened camp without one. 13, 15, 20 and 23 are empty or only set a backdrop;
+  21 turns a crystal (60) into 61. `ga0000.box` (ga0003: after ミアルテ防衛隊Ａ to Ｆ and 魔力塊隊, `b1` names the next
+  group, ending with 真魔力塊隊) is neither registered nor named by any script; when the PC runs it isn't measured.

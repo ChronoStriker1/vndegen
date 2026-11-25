@@ -150,6 +150,11 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   is inferred; a floor's taken pickups and opened doors aren't saved (the original's image doesn't seem to hold
   them either). The dungeon light is fitted to the original's frames (絶命院 within 3 to 5%, the ice dungeon 8% too
   bright); the falling leaves, sparks, snow and light motes some dungeons show aren't drawn.
+- Story: the true ending (F161 after 真魔力塊隊) and 内政END play, but some story the original runs from its exe isn't
+  rebuilt: the boss-side cutaways of the dungeon event hook (hook 14, bo1401, 74 scenes), the trap scenes (hook 19)
+  and the dungeon rest conversations (hook 22), the story groups that follow beaten ones (ga0003, which brings in
+  the final 真魔力塊隊), and the second playthrough's carried-over data (`85`/`86`: new games never offer 引き継ぐ).
+  The later dungeons' 探索, 調査, 押す, 引く, 切り替える and ワープ actions aren't built.
 - Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
   学, 魔法全体防御, the 属性耐性 areas); abilities never seen in the original's saves (先制攻撃, 警戒心, 掛け声,
   the 支援 abilities and others) are written as zeros, and 資金管理 and 食料管理 sit at inferred slots. Enemies list
