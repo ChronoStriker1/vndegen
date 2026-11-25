@@ -26,7 +26,6 @@ enum {
     TEXT_DY = 5,
     TEXT_SIZE = 18,
     POST_LABELS = 20,
-    BOOSTED = 0x0068b7,
     NUM_SIZE = 15,
     UNEQUIP_X = 934,
     BACK_X = 1117,
@@ -190,11 +189,10 @@ static void draw(SA *s) {
         if (badge) sa_blit(fb, badge, BADGE_X, y + BADGE_DY);
         int r = sa_party_unit_row(p, m->unit);
         text(fb, sa_table_text(&p->units, r, 2), NAME_X, y + TEXT_DY, TEXT_SIZE, 0x000000);
-        int gov, lead;
-        bool boosted = post && sa_party_post_stats(p, m->unit, post, &gov, &lead);
-        if (!boosted) sa_party_post_stats(p, m->unit, 0, &gov, &lead);
-        const int stats[4] = {*m->level, sa_table_int(&p->units, r, 15), gov, lead};
-        for (int k = 0; k < 4; k++) number(fb, stats[k], STAT_X + (k + 1) * STAT_W - 4, y + TEXT_DY + 1, k >= 2 && boosted ? BOOSTED : 0x000000);
+        int gov[2], tone[2];
+        sa_deploy_govern(p, m->unit, post, gov, tone);
+        const int stats[4] = {*m->level, sa_table_int(&p->units, r, 15), gov[0], gov[1]};
+        for (int k = 0; k < 4; k++) number(fb, stats[k], STAT_X + (k + 1) * STAT_W - 4, y + TEXT_DY + 1, k >= 2 ? sa_deploy_govern_color(tone[k - 2]) : 0x000000);
         int ir = *m->equip ? item_row(e, *m->equip) : -1;
         if (ir >= 0) text(fb, sa_table_text(&e->items, ir, I_NAME), EQUIP_X, y + TEXT_DY, TEXT_SIZE, 0x000000);
     }

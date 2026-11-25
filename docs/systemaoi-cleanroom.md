@@ -565,6 +565,15 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   lowers by the same amount with the red icon, and 人気者, 資金管理, 食料管理 and 資源管理 show their own icons
   (people, money, food, resources) without a raise. 配置's list also shows the first icon beside some rows in a
   way not pinned down; VNDegen doesn't draw it there.
+- **The cap at 10.** Measured from a turn-42 save of the original with members trained past 10 (`unit.obj` columns
+  31 and 32 plus the trained amounts at member +116 and +120) and moved between posts: 配置's list shows 統治 and 統率 as
+  the stored value plus the post's raise, at most 10. A value whose stored part is already over 10 shows in red
+  (0xE60012, the red row of the digit sheets) whether or not a raise applies; one the raise alone takes to 10 or past
+  stays blue. キュリハ (6/7 + 6/5 trained, no raise) reads 10/10 red; ルーアルテ as 農業担当 (2/5 + 7/7, 天才 +2/+2)
+  reads 10 blue and 10 red; ミアルテ as 街長補佐 (3/6 + 5/0, 政治家 +5/+4) 10/10 blue; クドア as 第二階層長 (2/0 + 0/9,
+  小隊長 +2/+2) 4/10 blue. VNDegen's 配置 list, 組織図 post list and corner panel and 装備's list follow this (they
+  showed the untrained table values before: 8/10, 4/7, 4/2 and 6/7 for those four); the list matches the original's
+  values and colours on all seventeen rows.
 - **Effects.** Not measured beyond one turn: with ミアルテ as 街長 and ルーアルテ as 農業担当 the residents grew by
   5 where the same turn without them grew by 2 (residents' growth is random, so this proves nothing yet); food,
   money and resources were the same. VNDegen's posts change nothing in the town so far. `c3 "post"` answers
