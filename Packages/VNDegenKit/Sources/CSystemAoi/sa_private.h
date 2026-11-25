@@ -85,6 +85,7 @@ typedef struct Deploy {
     Image *art[64], *benchSprite[PARTY_BENCH], *postRow[20];
     int benchUnit[PARTY_BENCH];
     int hover, picked, heldX, heldY, tab;
+    bool overRank;
 } Deploy;
 
 typedef struct SaveSummary {

@@ -246,6 +246,10 @@ int sa_party_rank(const Party *p) {
         int r = p->unit[i] ? sa_party_unit_row(p, p->unit[i]) : -1;
         if (r >= 0) sum += sa_table_int(&p->units, r, 15);
     }
+    for (int i = 0; i < p->benchCount; i++) {
+        int r = p->bench[i].tile >= 0 ? sa_party_unit_row(p, p->bench[i].unit) : -1;
+        if (r >= 0) sum += sa_table_int(&p->units, r, 15);
+    }
     return sum;
 }
 
@@ -303,9 +307,10 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platfo
     }
     sa_blit(fb, p->label, 1, LABEL_Y);
     char n[16];
-    snprintf(n, sizeof n, "%d", sa_party_rank(p));
-    int len = (int)strlen(n);
-    for (int i = 0; i < len; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, 0, 10, 13, COUNT_RIGHT - (len - i) * 10, DIGIT_Y);
+    int rank = sa_party_rank(p);
+    snprintf(n, sizeof n, "%d", rank);
+    int len = (int)strlen(n), row = rank > rankLimit ? 13 : 0;
+    for (int i = 0; i < len; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, row, 10, 13, COUNT_RIGHT - (len - i) * 10, DIGIT_Y);
     snprintf(n, sizeof n, "%d", rankLimit);
     for (int i = 0; n[i]; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, 0, 10, 13, LIMIT_X + i * 10, DIGIT_Y);
 }

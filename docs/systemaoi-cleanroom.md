@@ -580,9 +580,11 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   the tabs ポジション to 統率 (`uts_d01` to `d06`) and a row per member; the status card; the party's diorama on the
   library platform `m997bt1a`; 戻る (`uts_g00`) at (1117, 675).
 - **Placing.** Choose a member (tile or row), then a tile: two main tiles swap, a reserve tile benches the member
-  (one must stay), and a reserve member goes to a main tile when the party's 格 stays within the limit. Measured: a
-  post holder placed on a tile leaves the post; the members list keeps the recruit order (the roster), whatever the
-  members' places; 格 is drawn with `flw_c15` digits, and the list has the `uts_c03` scrollbar at (967, 76) with its
+  (one must stay), and a reserve member moves to a main tile. Measured: 格 counts the reserve tiles as well as the
+  main ones and may go over the limit (its digits then turn red, in 配置 and on the diorama), but 戻る (or a right
+  click) then shows 「格が足りません / 配置を変更してください。」 over the screen dimmed to 3/8, and a click closes it.
+  A post holder placed on a tile leaves the post; the members list keeps the recruit order (the roster), whatever
+  the members' places; 格 is drawn with `flw_c15` digits, and the list has the `uts_c03` scrollbar at (967, 76) with its
   `c04`/`c05` ends (20 by 20) at y 56 and 686, as 装備 and 育成 have theirs.
 - **一覧.** Measured (100% of the post rows): `uts_a00` at (2, 21) and one row per open post, `uts_z00` to `z19`
   (560 by 30: normal, hover, chosen, a fourth unused) at (2, 76 + 30 × (post − 1)), closed posts left empty; each
@@ -774,6 +776,9 @@ the same points (offsets in bytes, numbers little-endian):
   clicking a member, whose sprite then follows the pointer, and clicking a tile.
 - **装備 and 育成** list every member, posted and benched included, in the roster's order (measured: the original's
   装備 shows ミアルテ and ルーアルテ while they hold posts).
+- **Member places in saves.** Measured: the +24 word's two upper bytes are (tag, place): place 1 on a main tile with
+  tag 1 (Darkus 2), place 2 on a reserve tile with tag 0, 3 in a post with the post's id, and 4 unplaced with the
+  member's index.
 - **Joined members.** Measured: a new member joins unplaced (not on a tile). Units whose skills are 固定 keep only
   their first skill, with 3 after it (the mark of a fixed skill, as on enemies). Not derived yet, so VNDegen writes
   zeros there: ルーアルテ's thirteen 2s at +260 of the second block, a 5 at +252, and Darkus's 3 at +1284 (turn 9

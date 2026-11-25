@@ -93,6 +93,10 @@ enum {
     BOX_SLOTS = 50,
     BOX_NAME_SIZE = 48,
     MISSIONS_AT = 1008328,
+    PLACE_FIELD = 1,
+    PLACE_RESERVE = 2,
+    PLACE_NONE = 4,
+    DARKUS = 1,
 };
 
 static int at(const u8 *img, size_t off) { return (int)rd32(img + off); }
@@ -402,7 +406,7 @@ static void write_unit(SA *s, u8 *img, size_t m, const Bench *b, bool allSkills,
     }
 }
 
-static void write_member(SA *s, u8 *img, int k, const Bench *b, bool placed, const int *bonus) {
+static void write_member(SA *s, u8 *img, int k, const Bench *b, int place, const int *bonus) {
     size_t m = MEMBER_AT + (size_t)k * MEMBER_SIZE;
     write_unit(s, img, m, b, false, bonus);
     put(img, m + 4, k);
@@ -418,8 +422,12 @@ static void write_member(SA *s, u8 *img, int k, const Bench *b, bool placed, con
         put(img, c + (BLOCK_GOVERN + 1) * 4, lead + b->trained[BLOCK_GOVERN + 1]);
         int effect = sa_party_post_effect(&s->party, b->unit, post);
         for (int i = 0; i < POST_EFFECTS; i++) put(img, c + (size_t)(BLOCK_POST_EFFECT + i) * 4, effect);
-    } else
-        put(img, m + MEMBER_BYTES, (k ? k : 2) << 16 | (placed ? 1 : 4) << 8);
+    } else if (place == PLACE_FIELD)
+        put(img, m + MEMBER_BYTES, (b->unit == DARKUS ? 2 : 1) << 16 | PLACE_FIELD << 8);
+    else if (place == PLACE_RESERVE)
+        put(img, m + MEMBER_BYTES, PLACE_RESERVE << 8);
+    else
+        put(img, m + MEMBER_BYTES, (k ? k : 2) << 16 | PLACE_NONE << 8);
 }
 
 static void party_bonus(SA *s, int (*delta)[10]) {
@@ -460,7 +468,7 @@ static void write_members(SA *s, u8 *img) {
             if (p->bench[j].unit == id) b = p->bench[j];
         if (!b.unit) continue;
         if (cell < 0 && b.tile >= 0 && b.tile < RESERVE_TILES) cell = FORM_RESERVE + b.tile;
-        write_member(s, img, k, &b, cell >= 0, at >= 0 ? bonus[at] : NULL);
+        write_member(s, img, k, &b, cell < 0 ? PLACE_NONE : cell >= FORM_RESERVE ? PLACE_RESERVE : PLACE_FIELD, at >= 0 ? bonus[at] : NULL);
         if (cell >= 0) put(img, FORM_AT + (size_t)cell * 4, k);
         k++;
     }

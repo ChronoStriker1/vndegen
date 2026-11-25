@@ -147,6 +147,7 @@ void sa_deploy_open(SA *s) {
     Deploy *d = &s->deploy;
     d->hover = d->picked = -1;
     d->tab = TAB_FORM;
+    d->overRank = false;
     s->card.showDetail = false;
     s->mode = MODE_DEPLOY;
     s->dirty = true;
@@ -240,16 +241,6 @@ static int resolve(SA *s, int h) {
     return h;
 }
 
-static int rank_with(const SA *s, int slot, int unit) {
-    int sum = 0;
-    for (int i = 0; i < PARTY_SLOTS; i++) {
-        int u = i == slot ? unit : s->party.unit[i];
-        int r = u ? sa_party_unit_row(&s->party, u) : -1;
-        if (r >= 0) sum += sa_table_int(&s->party.units, r, 15);
-    }
-    return sum;
-}
-
 static bool is_main(int k) { return k >= HOVER_MAIN && k < HOVER_MAIN + 6; }
 
 static bool is_post(int k) { return k > HOVER_POST && k < HOVER_POST + PARTY_POSTS; }
@@ -316,11 +307,9 @@ static void apply(SA *s, int from, int to) {
     else if (is_main(from) && (is_tile(to) || to >= HOVER_UNIT)) {
         if (sa_party_bench(p, mainSlot[from - HOVER_MAIN]) && is_tile(to)) sa_party_set_reserve(p, p->benchCount - 1, to - HOVER_BENCH);
     } else if (b >= 0 && is_main(to)) {
-        int slot = mainSlot[to - HOVER_MAIN], unit = p->bench[b].unit;
-        if (rank_with(s, slot, unit) <= s->vm.c[C_RANK_MAX]) {
-            leave_post(p, unit);
-            sa_party_unbench(p, &s->vfs, b, slot);
-        }
+        int unit = p->bench[b].unit;
+        leave_post(p, unit);
+        sa_party_unbench(p, &s->vfs, b, mainSlot[to - HOVER_MAIN]);
     } else if (b >= 0 && is_tile(to)) {
         leave_post(p, p->bench[b].unit);
         sa_party_set_reserve(p, b, to - HOVER_BENCH);
@@ -521,7 +510,8 @@ static void draw_org(SA *s, u32 *fb) {
 static void draw_list(SA *s, u32 *fb) {
     Deploy *d = &s->deploy;
     Party *p = &s->party;
-    sa_draw_int(fb, d->art[ART_DIGITS], sa_party_rank(p), false, RANK_USED_RIGHT, RANK_DIGITS_Y, 0, 10, 13);
+    int rank = sa_party_rank(p);
+    sa_draw_int(fb, d->art[ART_DIGITS], rank, false, RANK_USED_RIGHT, RANK_DIGITS_Y, rank > s->vm.c[C_RANK_MAX] ? 1 : 0, 10, 13);
     sa_draw_int(fb, d->art[ART_DIGITS], s->vm.c[C_RANK_MAX], false, RANK_MAX_RIGHT, RANK_DIGITS_Y, 0, 10, 13);
     sa_blit(fb, d->art[ART_LIST], LIST_X, LIST_Y);
     sa_blit(fb, d->art[ART_SCROLL], SCROLL_X, SCROLL_Y);
@@ -577,6 +567,11 @@ static void draw_list(SA *s, u32 *fb) {
     else if (is_main(d->picked) && p->unit[mainSlot[d->picked - HOVER_MAIN]]) held = p->sprite[mainSlot[d->picked - HOVER_MAIN]];
     else if (bench_index(s, d->picked) >= 0) held = bench_sprite(s, bench_index(s, d->picked));
     if (held) sprite(fb, held, s->mouseX - TILE_W / 2, s->mouseY - FEET / 2);
+    if (d->overRank) {
+        sa_dim(fb);
+        const char *lines[2] = {"格が足りません", "配置を変更してください。"};
+        sa_popup_draw(s->battle.pop, fb, lines, 2);
+    }
 }
 
 bool sa_deploy_frame(SA *s, u32 ms) {
@@ -594,16 +589,30 @@ bool sa_deploy_frame(SA *s, u32 ms) {
         d->heldY = s->mouseY;
         s->dirty = true;
     }
+    if (d->overRank) {
+        if (s->clicked || s->rightClicked) {
+            s->clicked = s->rightClicked = false;
+            d->overRank = false;
+            s->dirty = true;
+        }
+        if (s->dirty) {
+            draw(s);
+            s->serial++;
+            s->dirty = false;
+        }
+        return true;
+    }
+    bool leave = false;
     if (s->rightClicked) {
         s->rightClicked = false;
         if (d->picked >= 0) d->picked = -1;
-        else s->mode = MODE_TOWN;
+        else leave = true;
         s->dirty = true;
     }
     if (s->clicked) {
         s->clicked = false;
         int k = resolve(s, h);
-        if (h == HOVER_BACK) s->mode = MODE_TOWN;
+        if (h == HOVER_BACK) leave = true;
         else if (h >= HOVER_TAB && h < HOVER_TAB + 3) {
             d->tab = h - HOVER_TAB;
             d->picked = -1;
@@ -615,6 +624,10 @@ bool sa_deploy_frame(SA *s, u32 ms) {
         } else
             d->picked = -1;
         s->dirty = true;
+    }
+    if (leave) {
+        if (sa_party_rank(&s->party) > s->vm.c[C_RANK_MAX]) d->overRank = true;
+        else s->mode = MODE_TOWN;
     }
     if (s->mode == MODE_DEPLOY && s->dirty) {
         draw(s);
