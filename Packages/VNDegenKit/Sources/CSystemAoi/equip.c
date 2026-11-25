@@ -25,6 +25,8 @@ enum {
     COUNT_RIGHT = 894,
     TEXT_DY = 5,
     TEXT_SIZE = 18,
+    POST_LABELS = 20,
+    BOOSTED = 0x0068b7,
     NUM_SIZE = 15,
     UNEQUIP_X = 934,
     BACK_X = 1117,
@@ -70,12 +72,18 @@ void sa_equip_init(Equip *e, Vfs *vfs) {
     sa_table_load(&e->items, vfs, "item.obj");
     e->bg = sa_load_image(vfs, "bg009a0.agf");
     for (int i = 0; i < ART_COUNT; i++) e->art[i] = sa_load_image(vfs, artNames[i]);
+    for (int i = 0; i <= POST_LABELS; i++) {
+        char n[16];
+        snprintf(n, sizeof n, "uts_h%02d.agf", i < POST_LABELS ? i : BADGE_RESERVE);
+        e->label[i] = sa_load_image(vfs, n);
+    }
     e->unit = e->item = e->hover = -1;
 }
 
 void sa_equip_free(Equip *e) {
     for (int i = 0; i < ART_COUNT; i++) sa_image_free(e->art[i]);
     for (int i = 0; i < EQUIP_ICONS; i++) sa_image_free(e->icon[i]);
+    for (int i = 0; i <= POST_LABELS; i++) sa_image_free(e->label[i]);
     sa_image_free(e->bg);
     sa_table_free(&e->items);
     memset(e, 0, sizeof *e);
@@ -87,20 +95,14 @@ static int item_row(const Equip *e, int id) {
     return -1;
 }
 
-static int equipped_count(const Party *p, int id) {
-    int n = 0;
-    for (int s = 0; s < PARTY_SLOTS; s++)
-        if (p->unit[s] && p->equip[s] == id) n++;
-    return n;
-}
+static int units(SA *s, Member *out) { return sa_party_member_list(&s->party, out); }
 
-static int units(const SA *s, int *slots) {
-    int n = 0;
-    for (int i = PARTY_FRONT; i < PARTY_SLOTS; i++)
-        if (s->party.unit[i]) slots[n++] = i;
-    for (int i = 0; i < PARTY_FRONT; i++)
-        if (s->party.unit[i]) slots[n++] = i;
-    return n;
+static int equipped_count(SA *s, int id) {
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int n = units(s, ms), count = 0;
+    for (int i = 0; i < n; i++)
+        if (*ms[i].equip == id) count++;
+    return count;
 }
 
 static int equipable(const SA *s, int *rows) {
@@ -125,7 +127,8 @@ static bool in(int x, int y, int rx, int ry, int w, int h) { return x >= rx && x
 static int hit(SA *s, int x, int y) {
     if (in(x, y, BACK_X, BTN_Y, BTN_W, BTN_H)) return HOVER_BACK;
     if (in(x, y, UNEQUIP_X, BTN_Y, BTN_W, BTN_H)) return HOVER_UNEQUIP;
-    int slots[PARTY_SLOTS], nu = units(s, slots);
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int nu = units(s, ms);
     for (int i = 0; i < nu; i++)
         if (in(x, y, UNIT_X, ROW_Y + i * ROW_H, UNIT_W, ROW_H)) return HOVER_UNIT + i;
     int rows[ROWS], ni = equipable(s, rows);
@@ -168,28 +171,36 @@ static void draw(SA *s) {
     static const int barX[2] = {586, 900};
     for (int i = 0; i < 2; i++) {
         sa_blit(fb, e->art[ART_BAR], barX[i], BAR_Y);
-        sa_blit_rect(fb, e->art[ART_BAR_TOP], 0, 10, 20, 10, barX[i], BAR_TOP_Y);
-        sa_blit_rect(fb, e->art[ART_BAR_END], 0, 0, 20, 10, barX[i], BAR_END_Y);
+        sa_blit_rect(fb, e->art[ART_BAR_TOP], 0, 0, 20, 20, barX[i], BAR_TOP_Y);
+        sa_blit_rect(fb, e->art[ART_BAR_END], 0, 0, 20, 20, barX[i], BAR_END_Y);
     }
     sa_font_set_spacing(0);
     sa_font_set_plain(true);
-    int slots[PARTY_SLOTS], nu = units(s, slots);
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int nu = units(s, ms);
     for (int i = 0; i < nu; i++) {
-        int sl = slots[i], y = ROW_Y + i * ROW_H;
+        const Member *m = &ms[i];
+        int y = ROW_Y + i * ROW_H;
         int frame = e->unit == i ? 2 : e->hover == HOVER_UNIT + i ? 3 : 0;
         sa_blit_rect(fb, e->art[ART_UNIT_ROWS], 0, frame * ROW_H, UNIT_W, ROW_H, UNIT_X, y);
-        sa_blit(fb, e->art[ART_BADGE], BADGE_X, y + BADGE_DY);
-        int r = sa_party_unit_row(p, p->unit[sl]);
+        int post = sa_party_post_of(p, m->unit);
+        int bi = sa_party_member_badge(p, m);
+        const Image *badge = bi >= 0 && bi < POST_LABELS ? e->label[bi] : bi == BADGE_FIELD ? e->art[ART_BADGE] : bi == BADGE_RESERVE ? e->label[POST_LABELS] : NULL;
+        if (badge) sa_blit(fb, badge, BADGE_X, y + BADGE_DY);
+        int r = sa_party_unit_row(p, m->unit);
         text(fb, sa_table_text(&p->units, r, 2), NAME_X, y + TEXT_DY, TEXT_SIZE, 0x000000);
-        const int stats[4] = {p->level[sl], sa_table_int(&p->units, r, 15), sa_table_int(&p->units, r, 31), sa_table_int(&p->units, r, 32)};
-        for (int k = 0; k < 4; k++) number(fb, stats[k], STAT_X + (k + 1) * STAT_W - 4, y + TEXT_DY + 1, 0x000000);
-        int ir = p->equip[sl] ? item_row(e, p->equip[sl]) : -1;
+        int gov, lead;
+        bool boosted = post && sa_party_post_stats(p, m->unit, post, &gov, &lead);
+        if (!boosted) sa_party_post_stats(p, m->unit, 0, &gov, &lead);
+        const int stats[4] = {*m->level, sa_table_int(&p->units, r, 15), gov, lead};
+        for (int k = 0; k < 4; k++) number(fb, stats[k], STAT_X + (k + 1) * STAT_W - 4, y + TEXT_DY + 1, k >= 2 && boosted ? BOOSTED : 0x000000);
+        int ir = *m->equip ? item_row(e, *m->equip) : -1;
         if (ir >= 0) text(fb, sa_table_text(&e->items, ir, I_NAME), EQUIP_X, y + TEXT_DY, TEXT_SIZE, 0x000000);
     }
     int rows[ROWS], ni = equipable(s, rows);
     for (int i = 0; i < ni; i++) {
         int idx = rows[i], y = ROW_Y + i * ROW_H, id = p->itemId[idx], total = p->itemCount[idx];
-        int free = total - equipped_count(p, id);
+        int free = total - equipped_count(s, id);
         int frame = free <= 0 ? 4 : e->item == i ? 2 : e->hover == HOVER_ITEM + i ? 3 : 0;
         sa_blit_rect(fb, e->art[ART_ITEM_ROWS], 0, frame * ROW_H, ITEM_W, ROW_H, ITEM_X, y);
         int r = item_row(e, id);
@@ -212,11 +223,12 @@ static void apply(SA *s) {
     Equip *e = &s->equip;
     Party *p = &s->party;
     if (e->unit < 0 || e->item < 0) return;
-    int slots[PARTY_SLOTS], rows[ROWS];
-    units(s, slots);
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int rows[ROWS], nu = units(s, ms);
     equipable(s, rows);
-    int sl = slots[e->unit], idx = rows[e->item], id = p->itemId[idx];
-    if (p->itemCount[idx] - equipped_count(p, id) > 0 || p->equip[sl] == id) p->equip[sl] = id;
+    if (e->unit >= nu) return;
+    int idx = rows[e->item], id = p->itemId[idx];
+    if (p->itemCount[idx] - equipped_count(s, id) > 0 || *ms[e->unit].equip == id) *ms[e->unit].equip = id;
     e->unit = e->item = -1;
 }
 
@@ -238,9 +250,9 @@ bool sa_equip_frame(SA *s) {
         s->clicked = false;
         if (h == HOVER_BACK) s->mode = MODE_TOWN;
         else if (h == HOVER_UNEQUIP) {
-            int slots[PARTY_SLOTS];
-            units(s, slots);
-            if (e->unit >= 0) s->party.equip[slots[e->unit]] = 0;
+            Member ms[PARTY_SLOTS + PARTY_BENCH];
+            int nu = units(s, ms);
+            if (e->unit >= 0 && e->unit < nu) *ms[e->unit].equip = 0;
             e->unit = e->item = -1;
         } else if (h >= HOVER_ITEM) {
             e->item = h - HOVER_ITEM;

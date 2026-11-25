@@ -71,6 +71,7 @@ bool sa_party_init(Party *p, Vfs *vfs) {
 void sa_party_free(Party *p) {
     for (int i = 0; i < PARTY_SLOTS; i++) sa_image_free(p->sprite[i]);
     for (int i = 0; i < PARTY_RESERVE; i++) sa_image_free(p->reserveSprite[i]);
+    for (int i = 0; i < PARTY_BENCH; i++) sa_image_free(p->benchSprite[i]);
     sa_image_free(p->platform);
     sa_image_free(p->tile);
     sa_image_free(p->smallTile);
@@ -245,6 +246,10 @@ int sa_party_rank(const Party *p) {
         int r = p->unit[i] ? sa_party_unit_row(p, p->unit[i]) : -1;
         if (r >= 0) sum += sa_table_int(&p->units, r, 15);
     }
+    for (int i = 0; i < p->benchCount; i++) {
+        int r = p->bench[i].tile >= 0 ? sa_party_unit_row(p, p->bench[i].unit) : -1;
+        if (r >= 0) sum += sa_table_int(&p->units, r, 15);
+    }
     return sum;
 }
 
@@ -302,9 +307,10 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platfo
     }
     sa_blit(fb, p->label, 1, LABEL_Y);
     char n[16];
-    snprintf(n, sizeof n, "%d", sa_party_rank(p));
-    int len = (int)strlen(n);
-    for (int i = 0; i < len; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, 0, 10, 13, COUNT_RIGHT - (len - i) * 10, DIGIT_Y);
+    int rank = sa_party_rank(p);
+    snprintf(n, sizeof n, "%d", rank);
+    int len = (int)strlen(n), row = rank > rankLimit ? 13 : 0;
+    for (int i = 0; i < len; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, row, 10, 13, COUNT_RIGHT - (len - i) * 10, DIGIT_Y);
     snprintf(n, sizeof n, "%d", rankLimit);
     for (int i = 0; n[i]; i++) sa_blit_rect(fb, p->digits, (n[i] - '0') * 10, 0, 10, 13, LIMIT_X + i * 10, DIGIT_Y);
 }
@@ -450,6 +456,73 @@ static int slot_value(const Party *p, int slot, int index) {
     int v[10];
     sa_party_unit_stats(p, sa_party_unit_row(p, p->unit[slot]), p->level[slot] > 0 ? p->level[slot] : 1, v);
     return v[index] + p->trained[slot][index];
+}
+
+static void fill_member(Party *p, int unit, Member *out) {
+    for (int i = 0; i < PARTY_SLOTS; i++)
+        if (p->unit[i] == unit) {
+            *out = (Member){unit, i, -1, &p->hp[i], &p->mp[i], &p->level[i], &p->exp[i], &p->equip[i], &p->sp[i], p->trained[i]};
+            return;
+        }
+    for (int i = 0; i < p->benchCount; i++)
+        if (p->bench[i].unit == unit) {
+            Bench *b = &p->bench[i];
+            *out = (Member){unit, -1, i, &b->hp, &b->mp, &b->level, &b->exp, &b->equip, &b->sp, b->trained};
+            return;
+        }
+    out->unit = 0;
+}
+
+int sa_party_member_list(Party *p, Member *out) {
+    int n = 0;
+    for (int r = 0; r < p->rosterCount; r++) {
+        Member m;
+        fill_member(p, p->roster[r], &m);
+        bool dup = false;
+        for (int i = 0; i < n && !dup; i++) dup = out[i].unit == m.unit;
+        if (m.unit && !dup) out[n++] = m;
+    }
+    for (int k = 0; k < PARTY_SLOTS; k++) {
+        int i = (k + PARTY_FRONT) % PARTY_SLOTS;
+        bool dup = false;
+        for (int j = 0; j < n && !dup; j++) dup = out[j].unit == p->unit[i];
+        if (p->unit[i] && !dup) out[n++] = (Member){p->unit[i], i, -1, &p->hp[i], &p->mp[i], &p->level[i], &p->exp[i], &p->equip[i], &p->sp[i], p->trained[i]};
+    }
+    for (int i = 0; i < p->benchCount; i++) {
+        bool dup = false;
+        for (int j = 0; j < n && !dup; j++) dup = out[j].unit == p->bench[i].unit;
+        Bench *b = &p->bench[i];
+        if (!dup) out[n++] = (Member){b->unit, -1, i, &b->hp, &b->mp, &b->level, &b->exp, &b->equip, &b->sp, b->trained};
+    }
+    return n;
+}
+
+int sa_party_member_value(const Party *p, const Member *m, int index) {
+    int v[10];
+    sa_party_unit_stats(p, sa_party_unit_row(p, m->unit), *m->level > 0 ? *m->level : 1, v);
+    return v[index] + m->trained[index];
+}
+
+const Image *sa_party_member_sprite(Party *p, const Member *m) {
+    if (m->slot >= 0) return p->sprite[m->slot];
+    int i = m->bench;
+    if (p->benchSpriteUnit[i] != m->unit) {
+        sa_image_free(p->benchSprite[i]);
+        p->benchSprite[i] = NULL;
+        p->benchSpriteUnit[i] = m->unit;
+        int r = sa_party_unit_row(p, m->unit);
+        char name[24];
+        snprintf(name, sizeof name, "u%04da0.agf", r >= 0 ? sa_table_int(&p->units, r, 11) : 0);
+        if (p->vfs) p->benchSprite[i] = sa_load_image(p->vfs, name);
+    }
+    return p->benchSprite[i];
+}
+
+int sa_party_member_badge(const Party *p, const Member *m) {
+    int post = sa_party_post_of(p, m->unit);
+    if (post > 0) return post - 1;
+    if (m->slot >= 0) return BADGE_FIELD;
+    return p->bench[m->bench].tile >= 0 ? BADGE_RESERVE : -1;
 }
 
 int sa_party_max_hp(const Party *p, int slot) { return slot_value(p, slot, 0); }
