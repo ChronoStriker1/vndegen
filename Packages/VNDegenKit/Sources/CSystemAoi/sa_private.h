@@ -66,7 +66,7 @@ typedef struct MazeView {
     int hover;
     bool hideRecent;
     Image *holder[11];
-    int holderX[11], holderFloor[11];
+    int holderX[11], holderFloor[11], holderCols[11], holderRows[11], holderFrames[11];
     u32 ms;
 } MazeView;
 

@@ -42,7 +42,7 @@ static const struct {
     {622, 930, 547, {813, 655, 493, 335, 170}},
 };
 
-enum { HOLDERS = 11, HOLDER_SCALE = 4, HOLDER_COLS = 5, HOLDER_ROWS = 4, HOLDER_FRAMES = 18, HOLDER_FRAME_MS = 100, HOLDER_DY = 13, HOLDER_MARGIN = 20 };
+enum { HOLDERS = 11, HOLDER_SCALE = 4, HOLDER_MAX_GRID = 9, HOLDER_SLACK = 64, HOLDER_FRAME_MS = 100, HOLDER_FEET = 38, HOLDER_MARGIN = 20 };
 enum { RULE_FLOORS = 1, RULE_SIZE, RULE_MAX_SIZE, RULE_TURNS = 5, RULE_INTRUDERS, DEPTH_OFFSET = 42, THROUGH_SHARE = 400, FAME_OFFSET = 11, BASE_INTRUDERS = 8 };
 
 static int rule(const SA *s, int id, int col) {
@@ -412,14 +412,46 @@ void sa_maze_draw_scene(SA *s, u32 *fb) {
     if (s->vm.c[C_MAZE_THROUGH] > 0 && area_at(s, deep, 0, &ax, &ay)) sa_blit(fb, icon(s, ICON_EXIT), floorAt[deep].x[size - 1] - EXIT_DX, ay);
 }
 
-static Image *scale_frames(const Image *sheet) {
-    int fw = sheet->w / HOLDER_COLS, fh = sheet->h / HOLDER_ROWS, w = fw / HOLDER_SCALE, h = fh / HOLDER_SCALE;
-    Image *out = sa_image_new(w * HOLDER_COLS, h * HOLDER_ROWS), *frame = sa_image_new(fw, fh);
-    for (int f = 0; f < HOLDER_COLS * HOLDER_ROWS; f++) {
-        int sx = f % HOLDER_COLS * sheet->w / HOLDER_COLS, sy = f / HOLDER_COLS * fh;
-        for (int y = 0; y < fh; y++) memcpy(frame->px + (size_t)y * fw, sheet->px + (size_t)(sy + y) * sheet->w + sx, (size_t)fw * 4);
+static int boundary_alpha(const Image *im, int count, bool across) {
+    int sum = 0, len = across ? im->h : im->w, span = across ? im->w : im->h;
+    for (int k = 1; k < count; k++) {
+        int at = k * span / count;
+        for (int d = -1; d <= 0; d++)
+            for (int t = 0; t < len; t++) {
+                int x = across ? at + d : t, y = across ? t : at + d;
+                if (x >= 0 && y >= 0 && im->px[(size_t)y * im->w + x] >> 24) sum++;
+            }
+    }
+    return sum;
+}
+
+static int grid_count(const Image *im, bool across) {
+    int sums[HOLDER_MAX_GRID + 1], least = -1, best = 1;
+    for (int n = 2; n <= HOLDER_MAX_GRID; n++) {
+        sums[n] = boundary_alpha(im, n, across);
+        if (least < 0 || sums[n] < least) least = sums[n];
+    }
+    for (int n = 2; n <= HOLDER_MAX_GRID; n++)
+        if (sums[n] <= least * 2 + HOLDER_SLACK) best = n;
+    return best;
+}
+
+static Image *scale_frames(const Image *sheet, int *cols, int *rows, int *frames) {
+    *cols = grid_count(sheet, true);
+    *rows = grid_count(sheet, false);
+    int fw = sheet->w / *cols, fh = sheet->h / *rows, w = fw / HOLDER_SCALE, h = fh / HOLDER_SCALE;
+    Image *out = sa_image_new(w * *cols, h * *rows), *frame = sa_image_new(fw, fh);
+    *frames = 0;
+    for (int f = 0; f < *cols * *rows; f++) {
+        int sx = f % *cols * sheet->w / *cols, sy = f / *cols * sheet->h / *rows;
+        bool any = false;
+        for (int y = 0; y < fh; y++) {
+            memcpy(frame->px + (size_t)y * fw, sheet->px + (size_t)(sy + y) * sheet->w + sx, (size_t)fw * 4);
+            for (int x = 0; x < fw && !any; x++) any = frame->px[(size_t)y * fw + x] >> 24;
+        }
+        if (any) *frames = f + 1;
         Image *small = sa_image_scale(frame, w, h);
-        for (int y = 0; y < h; y++) memcpy(out->px + (size_t)(f / HOLDER_COLS * h + y) * out->w + f % HOLDER_COLS * w, small->px + (size_t)y * w, (size_t)w * 4);
+        for (int y = 0; y < h; y++) memcpy(out->px + (size_t)(f / *cols * h + y) * out->w + f % *cols * w, small->px + (size_t)y * w, (size_t)w * 4);
         sa_image_free(small);
     }
     sa_image_free(frame);
@@ -439,7 +471,7 @@ static void place_holders(SA *s) {
         snprintf(name, sizeof name, "u%04de0.agf", sa_table_int(&s->party.units, r, 11));
         Image *sheet = sa_load_image(&s->vfs, name);
         if (!sheet) continue;
-        v->holder[i] = scale_frames(sheet);
+        v->holder[i] = scale_frames(sheet, &v->holderCols[i], &v->holderRows[i], &v->holderFrames[i]);
         sa_image_free(sheet);
         int k = post >= POST_FLOOR1 && post < POST_FLOOR1 + MAZE_FLOORS ? post - POST_FLOOR1 : s->maze.floors - 1;
         const Image *f = piece(s, k, v->size[k], PIECE_FLOOR);
@@ -454,8 +486,9 @@ static void draw_holders(SA *s, u32 *fb) {
     for (int i = 0; i < HOLDERS; i++) {
         const Image *h = v->holder[i];
         if (!h) continue;
-        int fw = h->w / HOLDER_COLS, fh = h->h / HOLDER_ROWS, frame = (int)(v->ms / HOLDER_FRAME_MS + (u32)i * 7) % HOLDER_FRAMES;
-        sa_blit_rect(fb, h, frame % HOLDER_COLS * fw, frame / HOLDER_COLS * fh, fw, fh, v->holderX[i], floorAt[v->holderFloor[i]].y - HOLDER_DY);
+        int cols = v->holderCols[i], fw = h->w / cols, fh = h->h / v->holderRows[i];
+        int frame = v->holderFrames[i] > 0 ? (int)(v->ms / HOLDER_FRAME_MS + (u32)i * 7) % v->holderFrames[i] : 0;
+        sa_blit_rect(fb, h, frame % cols * fw, frame / cols * fh, fw, fh, v->holderX[i], floorAt[v->holderFloor[i]].y + HOLDER_FEET - fh);
     }
 }
 

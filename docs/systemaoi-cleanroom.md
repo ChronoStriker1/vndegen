@@ -460,8 +460,9 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   happened; town posts gain none.
 - **Post holders on the floors.** Measured from captures: each 迷宮 post's holder stands on a floor of the
   cross-section (a floor head on its own, the 迷宮長 on the deepest) playing its attack animation, a different spot
-  each visit. Inferred: VNDegen draws the unit's `uNNNNe0` sheet (18 frames) at a quarter size, 100 ms a frame,
-  13 pixels above the floor's row (captures fit it to about 5 levels in 255, not exactly).
+  each visit. Inferred: VNDegen draws the unit's `uNNNNe0` sheet at a quarter size, 100 ms a frame, its frame's
+  foot 38 pixels below the floor's row (captures fit it to about 5 levels in 255, not exactly). The sheets' grids
+  differ by unit (ルーアルテ 5 by 4, ミアルテ 7 by 4), so the grid is found from the empty lines between frames.
 - **Breakthrough.** Measured over 20 turns: each adventurer who passes the deepest floor takes 0.25% of food, money
   and resources, rounded up on the total (8 of them took 1000 from 50000, at any depth). The turn's income box then
   adds ダークス宮の防衛に失敗しました; a turn where all were sent back adds nothing.
