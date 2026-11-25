@@ -164,7 +164,8 @@ static void draw(SA *s) {
     Equip *e = &s->equip;
     Party *p = &s->party;
     u32 *fb = s->fb;
-    sa_blit(fb, e->bg, 0, 0);
+    if (s->camp.active) sa_camp_draw_backdrop(s, fb);
+    else sa_blit(fb, e->bg, 0, 0);
     sa_blit(fb, e->art[ART_UNITS], UNIT_X, PANEL_Y);
     sa_blit(fb, e->art[ART_ITEMS], ITEM_X, PANEL_Y);
     for (int i = 0; i < 10; i++) sa_blit_rect(fb, e->art[ART_TAB0 + i], 0, 0, 60, 20, tabX[i], TAB_Y);
@@ -243,12 +244,12 @@ bool sa_equip_frame(SA *s) {
     if (s->rightClicked) {
         s->rightClicked = false;
         if (e->unit >= 0 || e->item >= 0) e->unit = e->item = -1;
-        else s->mode = MODE_TOWN;
+        else s->mode = sa_back_mode(s);
         s->dirty = true;
     }
     if (s->clicked) {
         s->clicked = false;
-        if (h == HOVER_BACK) s->mode = MODE_TOWN;
+        if (h == HOVER_BACK) s->mode = sa_back_mode(s);
         else if (h == HOVER_UNEQUIP) {
             Member ms[PARTY_SLOTS + PARTY_BENCH];
             int nu = units(s, ms);
@@ -272,5 +273,6 @@ bool sa_equip_frame(SA *s) {
         s->town.hover = -1;
         s->dirty = true;
     }
+    if (s->mode == MODE_CAMP) sa_camp_return(s);
     return true;
 }

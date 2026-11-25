@@ -291,7 +291,9 @@ typedef struct Dungeon {
     bool bumped;
     Image *art[DUN_ART];
     Image *needle[4];
-    Image *icon[DUN_ICONS], *arrow[4];
+    Image *icon[DUN_ICONS], *arrow[4], *big[16];
+    const Image *bigFrom[16];
+    int bigCount;
     int markCount, markX[DUN_MARKS], markY[DUN_MARKS];
     R3 r3;
 } Dungeon;
@@ -308,6 +310,9 @@ bool sa_dungeon_hover(Dungeon *d, int x, int y);
 int sa_dungeon_click(Dungeon *d, int x, int y);
 int sa_dungeon_key(Dungeon *d, int key);
 void sa_dungeon_draw(Dungeon *d, u32 *fb);
+void sa_dungeon_draw_map(Dungeon *d, u32 *fb, int x, int y, int scale);
+const Image *sa_dungeon_platform(const Dungeon *d);
+void sa_dungeon_draw_frame(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
 int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
@@ -504,8 +509,9 @@ typedef struct Party {
     int post[PARTY_POSTS];
     Image *reserveSprite[PARTY_RESERVE];
     int reserveUnit[PARTY_RESERVE];
-    Image *benchSprite[PARTY_BENCH];
+    Image *benchSprite[PARTY_BENCH], *sgpLabel;
     int benchSpriteUnit[PARTY_BENCH];
+    int sgp;
 } Party;
 
 typedef struct Member {
@@ -514,6 +520,7 @@ typedef struct Member {
 } Member;
 
 int sa_party_member_list(Party *p, Member *out);
+void sa_party_draw_board(Party *p, u32 *fb, const Image *platform, int ox, int oy, const int *frames);
 int sa_party_member_value(const Party *p, const Member *m, int index);
 const Image *sa_party_member_sprite(Party *p, const Member *m);
 int sa_party_member_badge(const Party *p, const Member *m);
@@ -727,6 +734,6 @@ void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb);
 
 enum { F_MAZE = 38, F_POSTS = 44 };
 enum { C_MAZE_FLOORS = 240, C_MAZE_OPENED = 248, C_MAZE_INTRUDERS = 249, C_MAZE_WIDTH = 251, C_MAZE_SIZE = 261, C_MAZE_FOOD = 271, C_MAZE_REPELLED = 278, C_MAZE_THROUGH = 279 };
-enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_TOWN_STAGE = 490, C_PLACE_STEPS = 0x48, C_MISSION_ID = 55, C_MISSION_DUE = 57 };
+enum { C_TURN = 0x3c, C_RESIDENTS = 0xc8, C_FOOD = 0xc9, C_MONEY = 0xca, C_RESOURCES = 0xcb, C_RANK_MAX = 0x28, C_SGP = 42, C_FINDS = 0xd2, C_TOWN_STAGE = 490, C_PLACE_STEPS = 0x48, C_MISSION_ID = 55, C_MISSION_DUE = 57 };
 
 #endif

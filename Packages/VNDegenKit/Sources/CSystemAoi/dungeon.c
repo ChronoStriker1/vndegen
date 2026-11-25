@@ -44,6 +44,7 @@ enum {
     MINI_CELLS = 5,
     MINI_WALL = 4,
     MINI_MARK = 16,
+    DUN_BIG_ICONS = 16,
     DIGIT_W = 10,
     STEPS_X = 994,
     STEPS_Y = 72,
@@ -210,6 +211,8 @@ void sa_dungeon_free(Dungeon *d) {
     for (int i = 0; i < DUN_ART; i++) sa_image_free(d->art[i]);
     for (int q = 0; q < 4; q++) sa_image_free(d->needle[q]);
     for (int i = 0; i < DUN_ICONS; i++) sa_image_free(d->icon[i]);
+    for (int i = 0; i < d->bigCount; i++) sa_image_free(d->big[i]);
+    d->bigCount = 0;
     for (int q = 0; q < 4; q++) sa_image_free(d->arrow[q]);
     R3 keep = d->r3;
     memset(d, 0, sizeof *d);
@@ -594,14 +597,25 @@ static void fill(u32 *fb, int x, int y, int w, int h, u32 c) {
 
 static u32 rgb(int r, int g, int b) { return 0xff000000u | (u32)b << 16 | (u32)g << 8 | (u32)r; }
 
-static void draw_minimap(Dungeon *d, u32 *fb) {
-    fill(fb, MINI_X, MINI_Y, MINI_CELL * MINI_CELLS, MINI_CELL * MINI_CELLS, rgb(0, 0, 0));
+static const Image *icon_at(Dungeon *d, const Image *base, int scale) {
+    if (scale == 1 || !base) return base;
+    for (int i = 0; i < d->bigCount; i++)
+        if (d->bigFrom[i] == base) return d->big[i];
+    if (d->bigCount >= DUN_BIG_ICONS) return base;
+    d->bigFrom[d->bigCount] = base;
+    d->big[d->bigCount] = sa_image_scale(base, base->w * scale, base->h * scale);
+    return d->big[d->bigCount++];
+}
+
+static void draw_map(Dungeon *d, u32 *fb, int ox, int oy, int scale) {
+    const int cs = MINI_CELL * scale, ws = MINI_WALL * scale, ms = MINI_MARK * scale, inset = 2 * scale;
+    fill(fb, ox, oy, cs * MINI_CELLS, cs * MINI_CELLS, rgb(0, 0, 0));
     u32 grid = rgb(56, 56, 56), wall = rgb(240, 240, 240);
     for (int k = 0; k <= MINI_CELLS; k++) {
-        int p = k * MINI_CELL - (k == MINI_CELLS ? 2 : 0);
-        for (int t = 0; t < MINI_CELL * MINI_CELLS; t += 6) {
-            fill(fb, MINI_X + p, MINI_Y + t, 2, 4, grid);
-            fill(fb, MINI_X + t, MINI_Y + p, 4, 2, grid);
+        int p = k * cs - (k == MINI_CELLS ? inset : 0);
+        for (int t = 0; t < cs * MINI_CELLS; t += 6 * scale) {
+            fill(fb, ox + p, oy + t, inset, 4 * scale, grid);
+            fill(fb, ox + t, oy + p, 4 * scale, inset, grid);
         }
     }
     for (int j = 0; j < MINI_CELLS; j++)
@@ -609,42 +623,44 @@ static void draw_minimap(Dungeon *d, u32 *fb) {
             int mx = d->x + i - MINI_CELLS / 2, my = d->y + j - MINI_CELLS / 2;
             const i32 *cell = cell_at(d, mx, my);
             if (!cell || !d->visited[my * DUN_SIDE + mx]) continue;
-            int x0 = MINI_X + i * MINI_CELL, y0 = MINI_Y + j * MINI_CELL;
-            for (int y = 2; y < MINI_CELL; y++)
-                for (int x = 2; x < MINI_CELL; x++) {
-                    float dx = (float)(x - MINI_CELL / 2) / (MINI_CELL / 2), dy = (float)(y - MINI_CELL / 2) / (MINI_CELL / 2);
+            int x0 = ox + i * cs, y0 = oy + j * cs;
+            for (int y = inset; y < cs; y++)
+                for (int x = inset; x < cs; x++) {
+                    float dx = (float)(x - cs / 2) / (cs / 2), dy = (float)(y - cs / 2) / (cs / 2);
                     int v = 60 + (int)(10 * (dx * dx + dy * dy) / 2);
                     fb[(size_t)(y0 + y) * SA_W + x0 + x] = rgb(v, v - 11, v - 11);
                 }
-            if (cell[F_WALL_N] >= 0 && cell[F_WALL_N] != WALL_PASSAGE && cell[F_WALL_N] != WALL_DOORWAY) fill(fb, x0 + 2, y0 + 2, MINI_CELL - 2, MINI_WALL, wall);
-            if (cell[F_WALL_S] >= 0 && cell[F_WALL_S] != WALL_PASSAGE && cell[F_WALL_S] != WALL_DOORWAY) fill(fb, x0 + 2, y0 + MINI_CELL - MINI_WALL, MINI_CELL - 2, MINI_WALL, wall);
-            if (cell[F_WALL_W] >= 0 && cell[F_WALL_W] != WALL_PASSAGE && cell[F_WALL_W] != WALL_DOORWAY) fill(fb, x0 + 2, y0 + 2, MINI_WALL, MINI_CELL - 2, wall);
-            if (cell[F_WALL_E] >= 0 && cell[F_WALL_E] != WALL_PASSAGE && cell[F_WALL_E] != WALL_DOORWAY) fill(fb, x0 + MINI_CELL - MINI_WALL, y0 + 2, MINI_WALL, MINI_CELL - 2, wall);
+            if (cell[F_WALL_N] >= 0 && cell[F_WALL_N] != WALL_PASSAGE && cell[F_WALL_N] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + inset, cs - inset, ws, wall);
+            if (cell[F_WALL_S] >= 0 && cell[F_WALL_S] != WALL_PASSAGE && cell[F_WALL_S] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + cs - ws, cs - inset, ws, wall);
+            if (cell[F_WALL_W] >= 0 && cell[F_WALL_W] != WALL_PASSAGE && cell[F_WALL_W] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + inset, ws, cs - inset, wall);
+            if (cell[F_WALL_E] >= 0 && cell[F_WALL_E] != WALL_PASSAGE && cell[F_WALL_E] != WALL_DOORWAY) fill(fb, x0 + cs - ws, y0 + inset, ws, cs - inset, wall);
         }
     for (int j = 0; j < MINI_CELLS; j++)
         for (int i = 0; i < MINI_CELLS; i++) {
             int mx = d->x + i - MINI_CELLS / 2, my = d->y + j - MINI_CELLS / 2;
             const i32 *cell = cell_at(d, mx, my);
             if (!cell || !d->visited[my * DUN_SIDE + mx]) continue;
-            int x0 = MINI_X + i * MINI_CELL, y0 = MINI_Y + j * MINI_CELL;
+            int x0 = ox + i * cs, y0 = oy + j * cs;
             for (int side = 0; side < 4; side++) {
                 if (cell[wallField[side]] != WALL_PASSAGE) continue;
-                int px = side == DIR_E ? x0 + MINI_CELL - MINI_WALL : side == DIR_W ? x0 + 2 : x0 + MINI_CELL / 2 - MINI_MARK / 2;
-                int py = side == DIR_S ? y0 + MINI_CELL - MINI_WALL : side == DIR_N ? y0 + 2 : y0 + MINI_CELL / 2 - MINI_MARK / 2;
+                int px = side == DIR_E ? x0 + cs - ws : side == DIR_W ? x0 + inset : x0 + cs / 2 - ms / 2;
+                int py = side == DIR_S ? y0 + cs - ws : side == DIR_N ? y0 + inset : y0 + cs / 2 - ms / 2;
                 bool across = side == DIR_N || side == DIR_S;
-                fill(fb, px, py, across ? MINI_MARK : MINI_WALL, across ? MINI_WALL : MINI_MARK, rgb(230, 40, 210));
+                fill(fb, px, py, across ? ms : ws, across ? ws : ms, rgb(230, 40, 210));
             }
             int icon = cell[F_OBJECT] == OBJECT_DOOR ? DUN_ICON_DOOR : cell[F_OBJECT] == OBJECT_CRYSTAL ? DUN_ICON_CHEST : -1;
-            if (icon >= 0 && d->icon[icon]) sa_blit(fb, d->icon[icon], x0, y0);
+            if (icon >= 0 && d->icon[icon]) sa_blit(fb, icon_at(d, d->icon[icon], scale), x0, y0);
         }
-    int cx = MINI_X + MINI_CELLS / 2 * MINI_CELL, cy = MINI_Y + MINI_CELLS / 2 * MINI_CELL;
+    int cx = ox + MINI_CELLS / 2 * cs, cy = oy + MINI_CELLS / 2 * cs;
     for (int g = 0; g < d->markCount; g++) {
         int dx = d->markX[g] - d->x, dy = d->markY[g] - d->y;
         if (abs(dx) > MINI_CELLS / 2 + 1 || abs(dy) > MINI_CELLS / 2 + 1 || !d->icon[DUN_ICON_GROUP]) continue;
-        sa_blit(fb, d->icon[DUN_ICON_GROUP], cx + dx * MINI_CELL, cy + dy * MINI_CELL);
+        sa_blit(fb, icon_at(d, d->icon[DUN_ICON_GROUP], scale), cx + dx * cs, cy + dy * cs);
     }
-    if (d->arrow[d->dir]) sa_blit(fb, d->arrow[d->dir], cx, cy);
+    if (d->arrow[d->dir]) sa_blit(fb, icon_at(d, d->arrow[d->dir], scale), cx, cy);
 }
+
+void sa_dungeon_draw_map(Dungeon *d, u32 *fb, int x, int y, int scale) { draw_map(d, fb, x, y, scale); }
 
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
     sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
@@ -653,7 +669,7 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
     static const int nudge[4][2] = {{2, 1}, {1, 0}, {0, 1}, {1, 2}};
     const Image *n = d->needle[(4 - d->dir) & 3];
     if (n) sa_blit(fb, n, NEEDLE_CX - n->w / 2 + nudge[d->dir][0], NEEDLE_CY - n->h / 2 + nudge[d->dir][1]);
-    draw_minimap(d, fb);
+    draw_map(d, fb, MINI_X, MINI_Y, 1);
     char digits[12];
     int len = snprintf(digits, sizeof digits, "%d", d->steps);
     for (int i = 0; i < len && d->art[DUN_ART_DIGITS]; i++)
@@ -669,6 +685,13 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
     static const int actionArt[] = {0, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN};
     int act = sa_dungeon_action(d);
     if (act) sa_blit_rect(fb, d->art[actionArt[act]], 0, d->hover == HOVER_ACTION ? ACTION_H : 0, ACTION_W, ACTION_H, ACTION_X, ACTION_Y);
+    if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
+}
+
+const Image *sa_dungeon_platform(const Dungeon *d) { return d->art[DUN_ART_PLATFORM]; }
+
+void sa_dungeon_draw_frame(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
+    sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
 }
 

@@ -1127,6 +1127,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     sa_shop_init(&s->shop, &s->vfs);
     sa_mission_init(s);
     sa_maze_init(s);
+    sa_camp_init(s);
     sa_card_init(&s->card, &s->vfs);
     sa_train_init(&s->train, &s->vfs);
     sa_deploy_init(&s->deploy, &s->vfs);
@@ -1189,6 +1190,7 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_shop_free(&s->shop);
     sa_mission_free(s);
     sa_maze_free(s);
+    sa_camp_free(s);
     sa_card_free(&s->card);
     sa_train_free(&s->train);
     sa_deploy_free(&s->deploy);
@@ -1265,6 +1267,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_shop_frame(s)) return true;
     if (sa_mission_frame(s)) return true;
     if (sa_maze_frame(s, elapsedMs)) return true;
+    if (sa_camp_frame(s)) return true;
     if (sa_train_frame(s)) return true;
     if (sa_deploy_frame(s, elapsedMs)) return true;
     if (sa_savescreen_frame(s)) return true;

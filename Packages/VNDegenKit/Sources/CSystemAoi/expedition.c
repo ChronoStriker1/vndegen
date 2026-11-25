@@ -10,6 +10,7 @@ enum {
     HOOK_BATTLE_END = 27,
 };
 
+enum { SPECIAL_RETURN = 1, SPECIAL_HP, SPECIAL_MP, SPECIAL_CURE, SPECIAL_NO_ENEMY, SPECIAL_NO_TRAP, SPECIAL_ATTACK, SPECIAL_DEFENCE, SPECIAL_EVASION, SPECIAL_SPEED, SPECIAL_RECRUIT, SPECIAL_SEARCH };
 enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST };
 
 enum {
@@ -282,7 +283,9 @@ static void finish_after(SA *s) {
 
 void sa_exp_draw_view(SA *s, u32 *fb) {
     sa_dungeon_draw(&s->dungeon, fb);
+    s->party.sgp = sa_camp_points(s);
     sa_dungeon_draw_hud(&s->dungeon, fb, &s->party, s->vm.c[C_RANK_MAX]);
+    s->party.sgp = -1;
     sa_town_draw_status_goal(&s->town, &s->vm, fb);
 }
 
@@ -540,6 +543,11 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
         e->steps = 0;
         reset_countdown(s);
         s->vm.c[C_EXP_ACTIONS] = 1;
+        if (!e->resuming) {
+            int left = s->vm.c[C_RANK_MAX] - sa_party_rank(&s->party);
+            s->vm.c[C_SGP] = left > 0 ? left : 0;
+            memset(e->special, 0, sizeof e->special);
+        }
     }
     if (!e->resuming) s->vm.c[C_AREA_ACTIONS] = 1;
     e->areaStart = e->steps;
@@ -657,6 +665,19 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
         sa_log(s, "no enemy group %s", group);
         return;
     }
+    static const int buffs[4][2] = {{SPECIAL_ATTACK, STAT_ATTACK}, {SPECIAL_DEFENCE, STAT_DEFENCE}, {SPECIAL_EVASION, STAT_EVASION}, {SPECIAL_SPEED, STAT_SPEED}};
+    for (int k = 0; k < 4; k++) {
+        if (!sa_exp_special_active(s, buffs[k][0])) continue;
+        int amount = sa_exp_special_value(s, buffs[k][0]);
+        for (int i = 0; i < s->battle.count; i++) {
+            Fighter *f = &s->battle.f[i];
+            if (f->enemy) continue;
+            f->stat[buffs[k][1]] += amount;
+            if (buffs[k][1] == STAT_ATTACK) f->stat[STAT_MAGIC] += amount;
+            if (buffs[k][1] == STAT_DEFENCE) f->stat[STAT_RESIST] += amount;
+        }
+        s->exp.special[buffs[k][0] - 1]--;
+    }
     sa_battle_set_names(&s->battle, text(&s->exp.dungeons, s->exp.dungeon - 1, 1), text(&s->exp.floors, s->exp.row, F_NAME));
     sa_log(s, "battle: %s, %d fighters", group, s->battle.count);
     s->vm.c[C_EXP_RESULT] = 1;
@@ -717,13 +738,79 @@ void sa_exp_battle_over(SA *s, int result) {
 
 void sa_exp_gain(SA *s, const int gain[4]) {
     if (!s->exp.active) return;
-    for (int i = 0; i < 4; i++) s->vm.c[C_FIND0 + i] += gain[i];
+    for (int i = 0; i < 4; i++) {
+        int boost = sa_exp_special_value(s, i ? SPECIAL_SEARCH : SPECIAL_RECRUIT);
+        s->vm.c[C_FIND0 + i] += gain[i] + gain[i] * boost / 100;
+    }
 }
 
 static void go_home(SA *s) {
     static const int hooks[] = {HOOK_RETURN};
     run_hooks(s, hooks, 1, AFTER_HOME);
 }
+
+static void heal_all(SA *s, bool hp, bool mp) {
+    Member ms[PARTY_SLOTS + PARTY_BENCH];
+    int n = sa_party_member_list(&s->party, ms);
+    for (int i = 0; i < n; i++) {
+        if (hp) *ms[i].hp = sa_party_member_value(&s->party, &ms[i], 0);
+        if (mp) *ms[i].mp = sa_party_member_value(&s->party, &ms[i], 1);
+    }
+}
+
+bool sa_exp_special(SA *s, int id, int a, int b) {
+    Expedition *e = &s->exp;
+    if (!e->active || id <= 0 || id > EXP_SPECIALS) return false;
+    switch (id) {
+    case SPECIAL_RETURN: {
+        int dungeon = e->entry[0] >> 16, floor = e->entry[0] >> 8 & 0xff;
+        if (dungeon != e->dungeon || floor <= 0) return false;
+        s->camp.active = false;
+        if (floor == e->floor) {
+            sa_dungeon_place(&s->dungeon, e->entry[2], e->entry[3], s->dungeon.dir);
+            sync_position(s);
+            s->mode = MODE_DUNGEON;
+            s->dirty = true;
+            return true;
+        }
+        e->resumeX = e->entry[2];
+        e->resumeY = e->entry[3];
+        e->resumeDir = s->dungeon.dir;
+        e->keepGroups = false;
+        enter(s, e->dungeon, floor, true);
+        return true;
+    }
+    case SPECIAL_HP:
+        heal_all(s, true, false);
+        return true;
+    case SPECIAL_MP:
+        heal_all(s, false, true);
+        return true;
+    case SPECIAL_CURE:
+        return true;
+    case SPECIAL_ATTACK:
+    case SPECIAL_DEFENCE:
+    case SPECIAL_EVASION:
+    case SPECIAL_SPEED:
+        e->special[id - 1]++;
+        e->specialValue[id - 1] = a;
+        return true;
+    default:
+        e->special[id - 1] = a;
+        e->specialValue[id - 1] = b;
+        return true;
+    }
+}
+
+static void count_down_specials(Expedition *e) {
+    static const int stepped[] = {SPECIAL_NO_ENEMY, SPECIAL_NO_TRAP, SPECIAL_RECRUIT, SPECIAL_SEARCH};
+    for (size_t i = 0; i < sizeof stepped / sizeof stepped[0]; i++)
+        if (e->special[stepped[i] - 1] > 0) e->special[stepped[i] - 1]--;
+}
+
+bool sa_exp_special_active(const SA *s, int id) { return s->exp.active && id > 0 && id <= EXP_SPECIALS && s->exp.special[id - 1] > 0; }
+
+int sa_exp_special_value(const SA *s, int id) { return sa_exp_special_active(s, id) ? s->exp.specialValue[id - 1] : 0; }
 
 static void open_crystal(SA *s) {
     int slot = sa_dungeon_crystal_index(&s->dungeon);
@@ -883,7 +970,7 @@ static bool run_step_hook(SA *s);
 static void after_move(SA *s, int r) {
     Dungeon *d = &s->dungeon;
     if (r == DUN_REST) {
-        go_home(s);
+        sa_camp_open(s);
         return;
     }
     if (r == DUN_ACTION) {
@@ -928,9 +1015,14 @@ static void after_move(SA *s, int r) {
         start_battle(s, hit);
         return;
     }
+    bool calm = sa_exp_special_active(s, SPECIAL_NO_ENEMY) && (int)(sa_vm_random(&s->vm) % 100) >= sa_exp_special_value(s, SPECIAL_NO_ENEMY);
+    count_down_specials(e);
     if (e->steps >= ENCOUNTER_FROM && --e->stepsLeft <= 0) {
-        random_battle(s);
-        return;
+        if (calm) reset_countdown(s);
+        else {
+            random_battle(s);
+            return;
+        }
     }
     e->stepHook = true;
 }

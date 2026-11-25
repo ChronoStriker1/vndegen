@@ -17,6 +17,9 @@ enum {
     FEET = 17,
     LABEL_Y = 695,
     COUNT_RIGHT = 44,
+    SGP_RIGHT = 55,
+    SGP_SIZE = 18,
+    SGP_TEXT_Y = 699,
     LIMIT_X = 66,
     DIGIT_Y = 700,
 };
@@ -52,6 +55,7 @@ static Image *crop(const Image *im, int sy, int h) {
 bool sa_party_init(Party *p, Vfs *vfs) {
     memset(p, 0, sizeof *p);
     p->vfs = vfs;
+    p->sgp = -1;
     sa_table_load(&p->positions, vfs, "Position.obj");
     if (!sa_table_load(&p->units, vfs, "unit.obj") || !sa_table_load(&p->abilities, vfs, "ability.obj")) return false;
     p->platform = sa_load_image(vfs, "m996bt1a.agf");
@@ -64,6 +68,7 @@ bool sa_party_init(Party *p, Vfs *vfs) {
     sa_image_free(hp);
     p->mpGauge = sa_load_image(vfs, "bat_o03.agf");
     p->label = sa_load_image(vfs, "mai_f00.agf");
+    p->sgpLabel = sa_load_image(vfs, "mai_f01.agf");
     p->digits = sa_load_image(vfs, "dgn_f00.agf");
     return true;
 }
@@ -79,6 +84,7 @@ void sa_party_free(Party *p) {
     sa_image_free(p->hpGauge);
     sa_image_free(p->mpGauge);
     sa_image_free(p->label);
+    sa_image_free(p->sgpLabel);
     sa_image_free(p->digits);
     sa_table_free(&p->units);
     sa_table_free(&p->abilities);
@@ -260,9 +266,9 @@ void sa_party_draw_bars(Party *p, u32 *fb, int x, int y, int hp, int maxHp, int 
     gauge(fb, p->mpGauge, mp, maxMp, x - 2, y - 7);
 }
 
-void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platform) {
-    sa_blit(fb, platform ? platform : p->platform, PLATFORM_X, PLATFORM_Y);
-    sa_party_draw_tiles(p, fb, PLATFORM_X, PLATFORM_Y, NULL);
+void sa_party_draw_board(Party *p, u32 *fb, const Image *platform, int ox, int oy, const int *frames) {
+    sa_blit(fb, platform ? platform : p->platform, PLATFORM_X + ox, PLATFORM_Y + oy);
+    sa_party_draw_tiles(p, fb, PLATFORM_X + ox, PLATFORM_Y + oy, frames);
     for (int k = 0; k < 3; k++)
         for (int row = 0; row < 2; row++) {
             int s = row ? PARTY_FRONT + k : k;
@@ -273,11 +279,15 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platfo
             int cw = im->w / cols, ch = im->h / rows;
             int cell = p->cells[s] > 0 ? (int)(p->ms / PARTY_CELL_MS % (u32)p->cells[s]) : 0;
             int cx, cy;
-            sa_party_tile_center(s, PLATFORM_X, PLATFORM_Y, &cx, &cy);
+            sa_party_tile_center(s, PLATFORM_X + ox, PLATFORM_Y + oy, &cx, &cy);
             int x = cx - cw / 2, y = cy + FEET - ch;
             sa_blit_rect(fb, im, cell % cols * cw, cell / cols * ch, cw, ch, x, y);
             sa_party_draw_bars(p, fb, cx - 22, y, p->hp[s], sa_party_max_hp(p, s), p->mp[s], sa_party_max_mp(p, s));
         }
+}
+
+void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platform) {
+    sa_party_draw_board(p, fb, platform, 0, 0, NULL);
     for (int t = 0; t < PARTY_RESERVE; t++) {
         int b = sa_party_reserve_at(p, t), unit = b >= 0 ? p->bench[b].unit : 0;
         if (p->reserveUnit[t] != unit) {
@@ -305,8 +315,16 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platfo
         int cy = RESERVE_Y + t * STEP_Y / 2 + p->smallTile->h / 2;
         sa_blit(fb, im, cx - im->w / 2, cy + FEET / 2 - im->h);
     }
-    sa_blit(fb, p->label, 1, LABEL_Y);
     char n[16];
+    if (p->sgp >= 0) {
+        sa_blit(fb, p->sgpLabel, 0, LABEL_Y);
+        snprintf(n, sizeof n, "%d", p->sgp);
+        sa_font_set_spacing(0);
+        sa_text_draw(fb, SA_W, SA_H, n, -1, SGP_RIGHT - sa_text_width(n, -1, SGP_SIZE), SGP_TEXT_Y, SGP_SIZE, 0xffffff, 0x000000);
+        sa_font_set_spacing(1);
+        return;
+    }
+    sa_blit(fb, p->label, 1, LABEL_Y);
     int rank = sa_party_rank(p);
     snprintf(n, sizeof n, "%d", rank);
     int len = (int)strlen(n), row = rank > rankLimit ? 13 : 0;

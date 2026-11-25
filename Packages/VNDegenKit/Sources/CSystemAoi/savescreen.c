@@ -368,7 +368,8 @@ static void draw(SA *s) {
 }
 
 static void close_screen(SA *s) {
-    s->mode = s->saves.back == MODE_TITLE ? MODE_TITLE : MODE_TOWN;
+    s->mode = s->saves.back == MODE_TITLE ? MODE_TITLE : sa_back_mode(s);
+    if (s->mode == MODE_CAMP) sa_camp_return(s);
     s->town.hover = -1;
     s->dirty = true;
 }

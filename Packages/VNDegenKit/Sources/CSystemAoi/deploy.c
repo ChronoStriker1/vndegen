@@ -199,7 +199,7 @@ static bool on_tile(const Image *im, int fx, int fy, int x0, int y0, int x, int 
 static int hit(SA *s, int x, int y) {
     Deploy *d = &s->deploy;
     if (in(x, y, BACK_X, BACK_Y, BTN_W, BTN_H)) return HOVER_BACK;
-    if (posts_open(s))
+    if (posts_open(s) && !s->camp.active)
         for (int t = TAB_LIST; t <= TAB_FORM; t++)
             if (in(x, y, TAB_X + t * TAB_DX, TAB_Y - 1, TAB_W, TAB_H)) return HOVER_TAB + t;
     if (d->tab == TAB_LIST) {
@@ -351,12 +351,13 @@ static void draw_list(SA *s, u32 *fb);
 static void draw(SA *s) {
     Deploy *d = &s->deploy;
     u32 *fb = s->fb;
-    sa_blit(fb, d->art[ART_BG], 0, 0);
+    if (s->camp.active) sa_camp_draw_backdrop(s, fb);
+    else sa_blit(fb, d->art[ART_BG], 0, 0);
     if (d->tab == TAB_ORG) draw_org(s, fb);
     else if (d->tab == TAB_LIST) draw_post_list(s, fb);
     else draw_form(s, fb);
     sa_blit_rect(fb, d->art[ART_RANK], 0, 0, 92, 21, 230, 26);
-    if (posts_open(s)) {
+    if (posts_open(s) && !s->camp.active) {
         const Image *btn[3] = {d->art[ART_BTN_LIST], d->art[ART_BTN_ORG], d->art[ART_FORM]};
         for (int t = 0; t < 3; t++)
             sa_blit_rect(fb, btn[t], d->tab == t ? TAB_W : 0, d->tab == t || d->hover == HOVER_TAB + t ? TAB_H : 0, TAB_W, TAB_H, TAB_X + t * TAB_DX, TAB_Y - 1);
@@ -560,7 +561,7 @@ static void draw_list(SA *s, u32 *fb) {
     for (int i = 0; i < count && unit; i++)
         if (members[i].unit == unit) shown = &members[i];
     sa_card_draw(s, fb, shown, CARD_X, CARD_Y);
-    if (d->tab == TAB_FORM) sa_party_draw_diorama(p, fb, s->vm.c[C_RANK_MAX], d->art[ART_PLATFORM]);
+    if (d->tab == TAB_FORM) sa_party_draw_diorama(p, fb, s->vm.c[C_RANK_MAX], s->camp.active ? sa_dungeon_platform(&s->dungeon) : d->art[ART_PLATFORM]);
     sa_blit_rect(fb, d->art[ART_BACK], 0, d->hover == HOVER_BACK ? BTN_H : 0, BTN_W, BTN_H, BACK_X, BACK_Y);
     const Image *held = NULL;
     if (is_post(d->picked) && p->post[d->picked - HOVER_POST]) held = unit_sprite(s, p->post[d->picked - HOVER_POST]);
@@ -627,7 +628,7 @@ bool sa_deploy_frame(SA *s, u32 ms) {
     }
     if (leave) {
         if (sa_party_rank(&s->party) > s->vm.c[C_RANK_MAX]) d->overRank = true;
-        else s->mode = MODE_TOWN;
+        else s->mode = sa_back_mode(s);
     }
     if (s->mode == MODE_DEPLOY && s->dirty) {
         draw(s);
@@ -638,5 +639,6 @@ bool sa_deploy_frame(SA *s, u32 ms) {
         s->town.hover = -1;
         s->dirty = true;
     }
+    if (s->mode == MODE_CAMP) sa_camp_return(s);
     return true;
 }

@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 11u
+#define SAVE_VERSION 12u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
@@ -182,6 +182,8 @@ static bool write_sidecar(SA *s, int slot, int count) {
         put_ints(&w, &g->target[0][0], EXP_TARGETS * 2);
     }
     put_ints(&w, &s->maze.event[0][0][0], sizeof s->maze.event / sizeof(int));
+    put_ints(&w, s->exp.special, EXP_SPECIALS);
+    put_ints(&w, s->exp.specialValue, EXP_SPECIALS);
     char *dir = sa_fmt("%s/vndegen", s->saveDir);
     sa_mkdirs(dir);
     free(dir);
@@ -319,6 +321,8 @@ static bool read_sidecar(SA *s, int slot) {
         get_ints(&r, &g->target[0][0], EXP_TARGETS * 2);
     }
     get_ints(&r, &s->maze.event[0][0][0], sizeof s->maze.event / sizeof(int));
+    get_ints(&r, s->exp.special, EXP_SPECIALS);
+    get_ints(&r, s->exp.specialValue, EXP_SPECIALS);
     free(d);
     sa_log(s, "load slot %d: %s", slot, r.bad ? "short" : "ok");
     return !r.bad;

@@ -300,6 +300,29 @@ calls it is inferred from that and from play, and marked so.
   nothing. Measured: the loss message reads 戦闘敗北した事により、遠征で得た物を全て失ってしまった。, then the turn
   ends with the income box.
 - **`89`** after an event's scenes fades back to the dungeon view (C070, C071, C072, fade 10).
+- **休憩 in a dungeon.** Measured pixel for pixel: the dungeon view at half brightness under the compass and minimap,
+  the bar `cmp_b00` at (397, 10) with the dungeon, the area (16 px at x 462 and 688) and the steps (`flw_c15` digits,
+  right edge 986), the map panel `cmp_b01` at (397, 45) holding the minimap at twice size from (535, 155), the stock
+  panel `cmp_f00` at (1065, 92) (住民, 食料, 資金 and 資源: town, found this expedition, total and the mission's
+  target, `--` without one), the buttons スペシャルギュンギュスカー, 装備, スキル and 隊列 (`cmp_d00` to `d03`,
+  204 by 54) at (396, 598), (602, 598), (396, 657) and (602, 655), log, SAVE, LOAD and OPTION (`cmp_e00` to `e03`)
+  at x 808 from y 597, 30 apart, and 戻る (`cmp_g00`) at (1120, 670). The corner label becomes `mai_f01` 格 N SGP.
+  装備, 隊列 (配置 without its tabs, the party on the dungeon's platform) and SAVE/LOAD draw over it and return to it.
+- **スペシャルギュンギュスカー.** C042 holds the points: set to the unused 格 when an expedition starts (7 with Darkus
+  alone) and spent by the specials. Measured: `sgn_a00` at (337, 25) over the screen at half brightness, the points
+  in `sgn_c01` digits (17 wide) right-aligned at 1013, twelve `sgn_a01` entries (`SpGyun.obj` rows: name 16 px and
+  column 6 in 12 px; a grey frame while column 2's flag is off, 4000 to 4002 here) in two columns of six from
+  (346, 71), 356 and 75 apart, and 戻る (`sgn_a02`) at (900, 524). Choosing one dims again and shows 効果 (`sgn_b00`
+  at (297, 112)) with the name, columns 6 and 7, 実行 (`sgn_b01`) and 戻る (`sgn_b02`) at (628, 406) and
+  (900, 406); 実行 takes column 3's cost (体力回復 1: 7 → 6). Effects from the table's columns 4 and 5, inferred:
+  帰還 goes to the last door, 体力回復 and 気力回復 fill HP or MP, 敵回避 skips random battles for column 4 steps
+  with column 5 percent, 罠回避 avoids traps, the stat ups add to the next battle, 大勧誘 and 大探索 add column 5
+  percent to finds; 状態回復 does nothing until ailments are tracked outside battle.
+- **スキル in 休憩.** Measured: `sku_a00` at (304, 21) with the tabs (`sku_b01` to `b03`) and one `sku_a01` row (82
+  high, yellow while hovered) per healing skill a member knows, with its icon, name, owner, MP and both texts, and
+  the owner's status card; choosing one dims the screen twice and shows the party on the dungeon platform moved by
+  (432, −350), with `sku_c00` (スキル使用) at (308, 475) and 戻る (`sku_c01`) at (787, 651); clicking a member heals by
+  the skill's range (小回復 gave 39 of 38 to 42) and spends its MP. Inferred: only 回復 skills are listed.
 - **Coming home.** 帰る (or 休憩, inferred) runs hook 17, adds the finds to the town and ends the turn (inferred).
 - **Encounters.** Measured: battles came on steps 48, 56, 69 and 81 of one expedition (7 to 12 steps after the
   previous one), and none in the first 34 steps of another. Inferred: random encounters start once the expedition

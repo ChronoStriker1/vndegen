@@ -70,6 +70,13 @@ typedef struct MazeView {
     u32 ms;
 } MazeView;
 
+typedef struct Camp {
+    Image *art[32], *backdrop;
+    Table sgp;
+    bool active, sgpOpen, skillPage;
+    int hover, confirm, skillPick, floatSlot, floatValue, floatMs;
+} Camp;
+
 typedef struct Card {
     Image *frame, *digits, *label[22], *desc, *detail, *toggle, *icon[CARD_ICONS];
     bool showDetail, toggleHover;
@@ -118,6 +125,8 @@ typedef struct ExpGroup {
     int target[EXP_TARGETS][2];
 } ExpGroup;
 
+#define EXP_SPECIALS 12
+
 typedef struct Expedition {
     bool active;
     int dungeon, floor, row;
@@ -134,11 +143,12 @@ typedef struct Expedition {
     bool (*explored)[EXP_FLOORS][DUN_CELLS];
     u8 (*passages)[EXP_FLOORS][DUN_CELLS];
     int (*floorInfo)[EXP_FLOORS][4];
+    int special[EXP_SPECIALS], specialValue[EXP_SPECIALS];
 } Expedition;
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES, MODE_SUBMIT, MODE_MAZE };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES, MODE_SUBMIT, MODE_MAZE, MODE_CAMP };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -213,6 +223,7 @@ struct SA {
     Missions missions;
     Maze maze;
     MazeView mazeView;
+    Camp camp;
     Card card;
     Train train;
     Deploy deploy;
@@ -293,6 +304,17 @@ void sa_mission_open(SA *s);
 void sa_mission_draw_confirm(SA *s, u32 *fb);
 bool sa_mission_confirm_input(SA *s);
 bool sa_mission_frame(SA *s);
+void sa_camp_init(SA *s);
+void sa_camp_free(SA *s);
+void sa_camp_open(SA *s);
+void sa_camp_return(SA *s);
+bool sa_camp_frame(SA *s);
+int sa_camp_points(const SA *s);
+void sa_camp_draw_backdrop(SA *s, u32 *fb);
+int sa_back_mode(const SA *s);
+bool sa_exp_special(SA *s, int id, int a, int b);
+bool sa_exp_special_active(const SA *s, int id);
+int sa_exp_special_value(const SA *s, int id);
 void sa_maze_init(SA *s);
 void sa_maze_free(SA *s);
 void sa_maze_reset(SA *s);
