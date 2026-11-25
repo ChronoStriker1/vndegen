@@ -150,7 +150,29 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   gaps between the opaque parts. Floor tile frames: grey, red, blue (the party while orders are given) and yellow
   (the unit being given orders, or the targets a choice covers). The Backs and Forward panels (`bat_j01`, `bat_j00`) at (103, 541) and (603, 541) with a `bat_j02` box per slot, the
   preset buttons `bat_d00` to `bat_d11` down the left, 戦闘開始 (`bat_l00`) at (500, 497) and the log (`bat_m00`) at
-  (1105, 270) with 12-pixel text on 18-pixel lines. The backdrop is the 3D dungeon, still to come.
+  (1105, 270) with 12-pixel text on 18-pixel lines.
+- **Backdrop.** Measured: the dungeon view of the cell the battle starts on, from the walking camera, without the HUD,
+  every channel halved (`x >> 1`). Against the original's own walking view of that cell (千樹庭 中央森, cell (2, 3)
+  facing east) the backdrop's visible parts were identical in 99.88% of pixels, with no shift, scaling or blur; the
+  same held in 雷貨の雲 一階 (cell (10, 0) facing west, 100%). Battles in different cells with the same walls nearby
+  share pixel-identical backdrop regions. The view before the last step doesn't count: the battle starts after it.
+- **Top bar.** Measured: the dungeon and floor names in the plain (not bold) 16-pixel face with no extra spacing, black,
+  at (76, 15) and (300, 15). This fits the original's glyphs best (overlap 0.69 against 0.48 to 0.56 for the 14 to
+  17-pixel and bold faces); the rest of the difference is Wine's own hinting.
+- **Panel numbers.** Measured: drawn with `bat_n00`, 14 cells of 10 by 13 (`0123456789+-/%`) in three rows: brown, red
+  and blue. 体力 and 気力 read `%3d/%3d` with the last digit ending 146 pixels right of the slot's label (y 620 and
+  645), the level `%3d` ending 46 right (y 669); an empty slot shows `---/---` twice and `---`, and ー on its action
+  button. Matched against 40 captures: the current value turns red at a quarter of its maximum or less (red at 37 of
+  170 and below, brown from 45), the maximum and the slash stay brown, and the HP bar uses the same cut (green full,
+  yellow from 45 to 163 of 170 including exactly half, red at 37 and below). Inferred: 気力 uses the same rule (no
+  capture had it under 23 of 35); the blue row's use isn't known.
+- **Order badge.** Measured: left of each name, a cell of `bat_k00` (19 by 19, numbers 1 to 30 on a 19-pixel grid)
+  at (label − 1, 684) gives the unit's place in the coming round's order: Darkus showed 1 against 千樹庭's slimes, and
+  3, then 2 after the first round, then 3 again against two faster 天界兵 in 雷貨の雲. A fallen unit shows the 10th cell
+  (brown 10). Inferred: the order for the next round is rolled when a round ends (speed with a small random part, as
+  before), and the badge counts every unit standing then.
+- **Unit name.** Measured: the plain 12-pixel face with 4 pixels between characters, white with a black edge, at
+  (label + 23, 688); glyph gaps within a pixel of the original's.
 - **Magic.** Inferred: the same rule with magic attack and magic defence. Darkus's 火矢三連 (fire, 28 to 30, magic
   attack 15) did 39 to a 二角ベト of magic defence 4 (predicted 39 to 41), and 20 to the second target; it did 36 to a
   ベト once, three short, which stays open.
@@ -183,8 +205,13 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   for a クラム and a フニ, whose `unit.obj` column 72 values are 8, 10, 10 and 10: inferred as their sum times 110 to
   125 per cent. Inferred: an item drops with the chance in `party.obj` column 65 (10), from the items whose `item.obj`
   column 30 names the group's table (column 67, 落物00), weighted by column 31. No money showed in these battles.
-- **Defeat.** Measured: a fallen ally is logged as ダークスが倒された. The screen after a loss wasn't captured; a
-  loss ends the expedition and loses what it found.
+- **Defeat.** Measured: a fallen ally is logged as ダークスが倒された. On a loss the battle screen isn't dimmed and no
+  click is needed: 1.7 to 4.4 seconds after the fall is logged (between captures) the battle closes by itself and
+  `bo2700`'s line (ダークス: くっ…… 逃げ帰るしかないか) shows over the bare dungeon view of the battle's cell, without
+  the HUD, at full brightness. Its `8a` box (戦闘敗北した事により、遠征で得た物を全て失ってしまった。) then shows over the
+  same view halved, identical to the backdrop without the board (99.99% of pixels); after OK the turn ends with the
+  town's income box. Inferred: the battle closes 2 seconds after the fall. A loss ends the expedition and loses what
+  it found.
 
 ## The dungeon view, from captures
 
@@ -382,8 +409,8 @@ calls it is inferred from that and from play, and marked so.
   its entries' plates (`gat_aNN` for dungeon NN, with the badge and the area's name in white, 22 pixels, centred 16
   pixels down) from (765, the chosen dungeon's row).
 - **Battles from the dungeon** use the dungeon's platforms (`mNNNbt1a` and `bt2a` to `bt2c`, NNN the dungeon less
-  one) and the top bar names the dungeon and floor. The backdrop is the dungeon view; the original's seems to look
-  further along, from a different camera.
+  one) and the top bar names the dungeon and floor. The backdrop is the battle cell's dungeon view at half
+  brightness (see Battles).
 
 ## Missions, from the scripts and play
 

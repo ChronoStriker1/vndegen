@@ -23,6 +23,8 @@ enum {
     ART_ICONS,
     ART_GAUGE_OFF,
     ART_GAUGE_VARY,
+    ART_DIGITS,
+    ART_BADGES,
     ART_NAMED,
     ART_MODE0 = ART_NAMED,
     ART_AIM0 = ART_MODE0 + 7,
@@ -34,6 +36,7 @@ static const char *const artNames[ART_NAMED] = {
     "bat_a00.agf", "bat_j01.agf", "bat_j00.agf", "bat_l00.agf", "bat_l01.agf", "bat_p00.agf", "bat_m00.agf",
     "bat_f99.agf", "bat_h99.agf", "bat_k01.agf", "bat_k02.agf", "bat_j02.agf", "bat_k03.agf", "bat_e01.agf",
     "bat_e02.agf", "bat_e03.agf", "bat_g01.agf", "bat_g02.agf", "bat_g03.agf", "pun_d00.agf", "bat_p01.agf", "bat_p02.agf",
+    "bat_n00.agf", "bat_k00.agf",
 };
 
 static const char *const iconOrder[] = {"斬", "打", "射", "無", "光", "闇", "火", "水", "土", "風", "雷", "回", "異"};
@@ -68,11 +71,27 @@ enum {
     MP_Y = 658,
     EXP_Y = 674,
     EXP_W = 100,
-    LV_RIGHT = 44,
-    LV_Y = 666,
+    LV_RIGHT = 46,
+    LV_Y = 669,
+    POINTS_RIGHT = 146,
+    HP_DIGITS_Y = 620,
+    MP_DIGITS_Y = 645,
+    DIGIT_W = 10,
+    DIGIT_H = 13,
+    DIGITS_LOW = 1,
+    UNIT_NAME_X = 23,
+    UNIT_NAME_Y = 688,
+    UNIT_NAME_SPACING = 4,
+    BADGE = 19,
+    BADGE_COLS = 10,
+    BADGE_CELLS = 30,
+    BADGE_FALLEN = 9,
+    BADGE_X = -1,
+    BADGE_Y = 684,
     NAME_X = 76,
     FLOOR_NAME_X = 300,
     NAME_Y = 15,
+    NAME_SIZE = 16,
     START_X = 500,
     START_Y = 497,
     START_W = 204,
@@ -103,6 +122,7 @@ enum {
     ICON = 20,
     SKILL_SIZE = 12,
     ACTION_MS = 1500,
+    LOSS_MS = 2000,
     SUBSTITUTE_CHANCE = 50,
     TILE_PLAIN = 0,
     TILE_BLUE = 2,
@@ -122,6 +142,8 @@ static const int sideY[12] = {414, 434, 474, 494, 514, 554, 574, 594, 634, 654, 
 static const struct {
     int x, y;
 } boards[4] = {{0, 0}, {406, 116}, {326, 130}, {250, 80}};
+
+static void roll_order(Battle *b);
 
 static const char *text_of(const Table *t, int row, int col) { return sa_table_text(t, row, col); }
 
@@ -339,6 +361,10 @@ void sa_battle_set_names(Battle *b, const char *dungeon, const char *floor) {
     snprintf(b->floorName, sizeof b->floorName, "%s", floor);
 }
 
+void sa_battle_shade(u32 *px, int n) {
+    for (int i = 0; i < n; i++) px[i] = (px[i] >> 1 & 0x7f7f7fu) | (px[i] & 0xff000000u);
+}
+
 bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, Image *backdrop, int boardSet, u32 seed) {
     clear_fighters(b);
     b->dungeonName[0] = b->floorName[0] = 0;
@@ -399,6 +425,7 @@ bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, I
     }
     sa_image_free(b->back);
     b->back = backdrop;
+    if (backdrop) sa_battle_shade(backdrop->px, backdrop->w * backdrop->h);
     b->open = true;
     b->result = BATTLE_RUNNING;
     b->acting = false;
@@ -406,6 +433,7 @@ bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, I
     b->picker = PICK_NONE;
     b->hover = 0;
     b->round = 0;
+    roll_order(b);
     return true;
 }
 
@@ -669,12 +697,10 @@ static void act(Battle *b, int who) {
     if (s >= 0) use_skill(b, who, s, o->aim);
 }
 
-static void plan_round(Battle *b) {
+static void roll_order(Battle *b) {
     b->orderCount = 0;
-    for (int i = 0; i < b->count; i++) {
-        b->f[i].guard = false;
+    for (int i = 0; i < b->count; i++)
         if (alive(&b->f[i])) b->order[b->orderCount++] = i;
-    }
     for (int i = 0; i < b->orderCount; i++)
         for (int j = i + 1; j < b->orderCount; j++) {
             int a = b->order[i], c = b->order[j];
@@ -684,6 +710,10 @@ static void plan_round(Battle *b) {
                 b->order[j] = a;
             }
         }
+}
+
+static void plan_round(Battle *b) {
+    for (int i = 0; i < b->count; i++) b->f[i].guard = false;
     b->next = 0;
     b->ms = ACTION_MS;
     b->acting = true;
@@ -752,8 +782,10 @@ static void finish_check(Battle *b) {
         if (!count_side(b, true)) {
             b->result = BATTLE_WON;
             reward(b);
-        } else if (!count_side(b, false))
+        } else if (!count_side(b, false)) {
             b->result = BATTLE_LOST;
+            b->ms = 0;
+        }
     }
     if (b->result != BATTLE_RUNNING) b->acting = false;
     for (int i = 0; i < b->count; i++)
@@ -766,6 +798,12 @@ static void finish_check(Battle *b) {
 bool sa_battle_tick(Battle *b, u32 ms) {
     b->animMs += ms;
     bool changed = b->animMs / PARTY_CELL_MS != (b->animMs - ms) / PARTY_CELL_MS;
+    if (b->result == BATTLE_LOST && b->open) {
+        b->ms += ms;
+        if (b->ms < LOSS_MS) return changed;
+        b->open = false;
+        return true;
+    }
     if (!b->acting) {
         if (b->autoBattle && b->result == BATTLE_RUNNING) {
             plan_round(b);
@@ -778,6 +816,7 @@ bool sa_battle_tick(Battle *b, u32 ms) {
         b->ms -= ACTION_MS;
         if (b->next >= b->orderCount) {
             b->acting = false;
+            roll_order(b);
             break;
         }
         act(b, b->order[b->next++]);
@@ -961,14 +1000,17 @@ static int icon_of(Battle *b, int skill) {
     return 3;
 }
 
-static void draw_skill_button(Battle *b, u32 *fb, int skill, int x, int y, bool lit) {
-    sa_blit_rect(fb, b->art[ART_NONE_ACTION], 0, lit ? LABEL_H : 0, LABEL_W, LABEL_H, x, y);
-    sa_blit_rect(fb, b->art[ART_ICONS], 0, icon_of(b, skill) * ICON, ICON, ICON, x - 1, y - 1);
-    const char *name = text_of(&b->skills, skill, 2);
+static void label_text(u32 *fb, const char *name, int x, int y) {
     sa_font_set_spacing(4);
     int w = sa_text_width(name, -1, SKILL_SIZE);
     sa_text_draw(fb, SA_W, SA_H, name, -1, x + (LABEL_W - w) / 2, y + 4, SKILL_SIZE, 0xffffff, 0x000000);
     sa_font_set_spacing(1);
+}
+
+static void draw_skill_button(Battle *b, u32 *fb, int skill, int x, int y, bool lit) {
+    sa_blit_rect(fb, b->art[ART_NONE_ACTION], 0, lit ? LABEL_H : 0, LABEL_W, LABEL_H, x, y);
+    sa_blit_rect(fb, b->art[ART_ICONS], 0, icon_of(b, skill) * ICON, ICON, ICON, x - 1, y - 1);
+    label_text(fb, text_of(&b->skills, skill, 2), x, y);
     char n[8];
     snprintf(n, sizeof n, "%d", sa_table_int(&b->skills, skill, 13));
     sa_text_draw(fb, SA_W, SA_H, n, -1, x + LABEL_W - 4 - sa_text_width(n, -1, 14), y + 3, 14, 0xc0c0c0, NO_EDGE);
@@ -979,6 +1021,18 @@ static void draw_order(Battle *b, u32 *fb, const Order *o, int x, int y, bool li
     else sa_blit_rect(fb, b->art[ART_MODE0 + o->mode], 0, lit ? LABEL_H : 0, LABEL_W, LABEL_H, x, y);
 }
 
+static void digits(const Battle *b, u32 *fb, const char *s, int right, int y) { sa_draw_number(fb, b->art[ART_DIGITS], s, right, y, 0, DIGIT_W, DIGIT_H); }
+
+static bool low(int value, int max) { return value * 4 <= max; }
+
+static void points(const Battle *b, u32 *fb, int value, int max, int right, int y) {
+    char n[16];
+    snprintf(n, sizeof n, "/%3d", max);
+    digits(b, fb, n, right, y);
+    snprintf(n, sizeof n, "%3d", value);
+    sa_draw_number(fb, b->art[ART_DIGITS], n, right - 4 * DIGIT_W, y, low(value, max) ? DIGITS_LOW : 0, DIGIT_W, DIGIT_H);
+}
+
 static void draw_slot(Battle *b, u32 *fb, int slot) {
     int x = label_x(slot);
     const Fighter *f = NULL;
@@ -987,6 +1041,10 @@ static void draw_slot(Battle *b, u32 *fb, int slot) {
     sa_blit(fb, b->art[ART_SLOT], box_x(slot), BOX_Y);
     if (!f) {
         sa_blit_rect(fb, b->art[ART_NONE_ACTION], 0, 0, LABEL_W, LABEL_H, x, LABEL_Y);
+        label_text(fb, "ー", x, LABEL_Y);
+        digits(b, fb, "---/---", x + POINTS_RIGHT, HP_DIGITS_Y);
+        digits(b, fb, "---/---", x + POINTS_RIGHT, MP_DIGITS_Y);
+        digits(b, fb, "---", x + LV_RIGHT, LV_Y);
         return;
     }
     const Order *o = &b->party->order[slot];
@@ -996,20 +1054,26 @@ static void draw_slot(Battle *b, u32 *fb, int slot) {
     draw_order(b, fb, o, x, LABEL_Y, litAction);
     sa_blit_rect(fb, b->art[ART_AIM0 + o->aim], 0, litTarget ? LABEL_H : 0, LABEL_W, LABEL_H, x, TARGET_Y);
     int hpw = f->maxHp > 0 ? f->hp * 100 / f->maxHp : 0, mpw = f->maxMp > 0 ? f->mp * 100 / f->maxMp : 0;
-    int band = f->hp * 2 > f->maxHp ? (f->hp == f->maxHp ? 0 : 1) : 2;
+    int band = f->hp >= f->maxHp ? 0 : low(f->hp, f->maxHp) ? 2 : 1;
     sa_blit_rect(fb, b->art[ART_HP], 0, band * 7, hpw, 7, x + HP_X, HP_Y);
     sa_blit_rect(fb, b->art[ART_MP], 0, 0, mpw, 7, x + HP_X, MP_Y);
+    points(b, fb, f->hp, f->maxHp, x + POINTS_RIGHT, HP_DIGITS_Y);
+    points(b, fb, f->mp, f->maxMp, x + POINTS_RIGHT, MP_DIGITS_Y);
     char n[32];
-    snprintf(n, sizeof n, "%d/%d", f->hp, f->maxHp);
-    sa_text_draw(fb, SA_W, SA_H, n, -1, x + 148 - sa_text_width(n, -1, 15), HP_Y - 17, 15, 0x503720, NO_EDGE);
-    snprintf(n, sizeof n, "%d/%d", f->mp, f->maxMp);
-    sa_text_draw(fb, SA_W, SA_H, n, -1, x + 148 - sa_text_width(n, -1, 15), MP_Y - 17, 15, 0x503720, NO_EDGE);
     int need = sa_battle_exp_needed(b, f->row, b->party->level[slot]);
     int expw = need > 0 ? b->party->exp[slot] * EXP_W / need : 0;
     sa_blit_rect(fb, b->art[ART_EXP], 0, 0, expw > EXP_W ? EXP_W : expw, 7, x + HP_X, EXP_Y);
-    snprintf(n, sizeof n, "%d", f->level);
-    sa_text_draw(fb, SA_W, SA_H, n, -1, x + LV_RIGHT - sa_text_width(n, -1, 15), LV_Y, 15, 0x503720, NO_EDGE);
-    sa_text_draw(fb, SA_W, SA_H, name_of(b, f), -1, x + 28, 690, 16, 0xffffff, 0x000000);
+    snprintf(n, sizeof n, "%3d", f->level);
+    digits(b, fb, n, x + LV_RIGHT, LV_Y);
+    int badge = BADGE_FALLEN;
+    for (int i = 0; i < b->orderCount && alive(f); i++)
+        if (&b->f[b->order[i]] == f) badge = i < BADGE_CELLS ? i : BADGE_CELLS - 1;
+    sa_blit_rect(fb, b->art[ART_BADGES], badge % BADGE_COLS * BADGE, badge / BADGE_COLS * BADGE, BADGE, BADGE, x + BADGE_X, BADGE_Y);
+    sa_font_set_spacing(UNIT_NAME_SPACING);
+    sa_font_set_plain(true);
+    sa_text_draw(fb, SA_W, SA_H, name_of(b, f), -1, x + UNIT_NAME_X, UNIT_NAME_Y, SKILL_SIZE, 0xffffff, 0x000000);
+    sa_font_set_plain(false);
+    sa_font_set_spacing(1);
 }
 
 static void draw_picker(Battle *b, u32 *fb) {
@@ -1090,8 +1154,12 @@ void sa_battle_draw(Battle *b, u32 *fb) {
     if (b->back) sa_blit(fb, b->back, 0, 0);
     draw_board(b, fb);
     sa_blit_rect(fb, b->art[ART_BAR], 0, 0, 448, 28, 10, 10);
-    sa_text_draw(fb, SA_W, SA_H, b->dungeonName, -1, NAME_X, NAME_Y, 15, 0x000000, NO_EDGE);
-    sa_text_draw(fb, SA_W, SA_H, b->floorName, -1, FLOOR_NAME_X, NAME_Y, 15, 0x000000, NO_EDGE);
+    sa_font_set_spacing(0);
+    sa_font_set_plain(true);
+    sa_text_draw(fb, SA_W, SA_H, b->dungeonName, -1, NAME_X, NAME_Y, NAME_SIZE, 0x000000, NO_EDGE);
+    sa_text_draw(fb, SA_W, SA_H, b->floorName, -1, FLOOR_NAME_X, NAME_Y, NAME_SIZE, 0x000000, NO_EDGE);
+    sa_font_set_plain(false);
+    sa_font_set_spacing(1);
     for (int i = 0; i < 12; i++)
         sa_blit_rect(fb, b->art[ART_SIDE0 + i], 0, b->hover == HOVER_SIDE + i || side_lit(b, i) ? SIDE_H : 0, SIDE_W, SIDE_H, SIDE_X,
                      sideY[i]);
@@ -1107,7 +1175,7 @@ void sa_battle_draw(Battle *b, u32 *fb) {
     sa_blit_rect(fb, b->art[gaugeArt[b->gaugeMode]], 0, b->hover == HOVER_GAUGE ? TOGGLE_H : 0, TOGGLE_W, TOGGLE_H, GAUGE_X, TOGGLE_Y);
     draw_log(b, fb);
     if (b->picker) draw_picker(b, fb);
-    if (b->result == BATTLE_RUNNING) return;
+    if (b->result == BATTLE_RUNNING || b->result == BATTLE_LOST) return;
     sa_dim(fb);
     if (b->result != BATTLE_WON) return;
     char *lines[3];
