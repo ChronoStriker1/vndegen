@@ -103,3 +103,17 @@ private let duoOnItsSide = CGSize(width: 594, height: 432)
     let book = HubMetrics(size: CGSize(width: 951, height: 635), insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 0))
     #expect(book.gameClearance(.clearOfCamera, pictureSize: picture) == EdgeInsets())
 }
+
+@MainActor
+@Test func onlyFullWidthOnTheDuoOnItsSideLaysTheControlsAcrossTheCamera() {
+    #expect(cameraLeading.controlsAcrossSideCamera(.fullWidth))
+    #expect(cameraTrailing.controlsAcrossSideCamera(.fullWidth))
+    #expect(!cameraLeading.controlsAcrossSideCamera(.clearOfCamera))
+    #expect(!cameraTrailing.controlsAcrossSideCamera(.clearOfCamera))
+    let upright = HubMetrics(size: CGSize(width: 382, height: 644), insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 84))
+    let iPhone = HubMetrics(size: CGSize(width: 756, height: 381), insets: EdgeInsets(top: 0, leading: 59, bottom: 21, trailing: 59))
+    let book = HubMetrics(size: CGSize(width: 951, height: 635), insets: EdgeInsets(top: 0, leading: 0, bottom: 34, trailing: 0))
+    #expect(!upright.controlsAcrossSideCamera(.fullWidth))
+    #expect(!iPhone.controlsAcrossSideCamera(.fullWidth))
+    #expect(!book.controlsAcrossSideCamera(.fullWidth))
+}
