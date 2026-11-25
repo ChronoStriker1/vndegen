@@ -283,6 +283,9 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   VNDegen applies the hinge offset and, while the party walks through a wall, turns that side's leaves 90° away
   over the step and hides the copy drawn from the far cell; the angle and timing are inferred (the PC's leaves were
   about 60° open a third of the way through).
+- **Side panel button.** The PC draws the side panel's fold button, `dgn_b01`'s ◀ frame (a 2-by-2 sheet of 30-pixel
+  frames: ▶, ◀ and their hover versions), at (139, 0), in the notch of `dgn_b00` (measured, mean error 0.6 per
+  channel). VNDegen draws it; what a click on it does (folding the panel, inferred from the arrows) isn't built.
 - **Floor tile scale.** Measured: the floor parts map their texture twice across a cell (u 0 to 2, v −1 to 1) in
   every set, and VNDegen draws them so. Against eight PC frames, the normalised cross-correlation of the high-passed
   floor peaks at the file's scale (0.67 to 0.91) and drops to 0.36 to 0.81 at ±5%, at half or double the repeat and

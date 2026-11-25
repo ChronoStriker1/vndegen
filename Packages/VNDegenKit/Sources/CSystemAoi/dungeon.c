@@ -49,6 +49,9 @@ enum {
     PLATE_NUMBER_RIGHT = 74,
     PANEL_X = 0,
     PANEL_Y = 0,
+    FOLD_X = 139,
+    FOLD_Y = 0,
+    FOLD_SIZE = 30,
     REST_X = 1101,
     REST_Y = 674,
     REST_W = 160,
@@ -352,7 +355,7 @@ void sa_dungeon_art(Dungeon *d, Vfs *vfs, const char *platform) {
     if (!d->art[DUN_ART_PANEL]) {
         static const char *const names[] = {"dgn_b00.agf", "dgn_c00.agf", "dgn_c01.agf", "dgn_c02.agf", "dgn_c03.agf", "dgn_c04.agf",
                                             "dgn_c05.agf", "dgn_c06.agf", "dgn_d00.agf", "dgn_d01.agf", "dgn_g02.agf", "dgn_g01.agf",
-                                            "dgn_g00.agf", "dgn_g07.agf", "dgn_f00.agf"};
+                                            "dgn_g00.agf", "dgn_g07.agf", "dgn_f00.agf", "dgn_b01.agf"};
         for (int i = 0; i < DUN_ART_PLATFORM; i++) d->art[i] = sa_load_image(vfs, names[i]);
         for (int q = 0; q < 4; q++) d->needle[q] = rotate_quarter(d->art[DUN_ART_NEEDLE], q);
         static const char *const icons[] = {"mmf0003.agf", "mmf0004.agf", "mma0001.agf", "mma0000.agf"};
@@ -925,6 +928,7 @@ void sa_dungeon_draw_map(Dungeon *d, u32 *fb, int x, int y, int scale) { draw_ma
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
     if (d->hover >= HOVER_WALK) sa_blit_alpha(fb, d->walk[d->hover - HOVER_WALK], walkArrows[d->hover - HOVER_WALK].x, walkArrows[d->hover - HOVER_WALK].y, WALK_ALPHA);
     sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
+    sa_blit_rect(fb, d->art[DUN_ART_FOLD], FOLD_SIZE, 0, FOLD_SIZE, FOLD_SIZE, FOLD_X, FOLD_Y);
     sa_blit_rect(fb, d->art[DUN_ART_COMPASS], 0, 0, d->art[DUN_ART_COMPASS] ? d->art[DUN_ART_COMPASS]->w : 0, 76, COMPASS_X,
                  COMPASS_Y);
     static const int nudge[4][2] = {{2, 1}, {1, 0}, {0, 1}, {1, 2}};
@@ -968,6 +972,7 @@ const Image *sa_dungeon_platform(const Dungeon *d) { return d->art[DUN_ART_PLATF
 
 void sa_dungeon_draw_frame(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
     sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
+    sa_blit_rect(fb, d->art[DUN_ART_FOLD], FOLD_SIZE, 0, FOLD_SIZE, FOLD_SIZE, FOLD_X, FOLD_Y);
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
 }
 
