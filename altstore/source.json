@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.10",
+          "buildVersion": "3427",
+          "date": "2026-11-25T18:19:59Z",
+          "localizedDescription": "BUNNY BLACK 3's later dungeons look like the PC's, the area bosses' intros play, and magic circles and phantom traps work.\n\n## Downloads\n\n- `VNDegen-0.60.10-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.10.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.10-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n\n## Added\n\n- **SystemAoi:** walking into an enemy group plays its encounter scene, so the area bosses' intros, such as ヤーヌ's, play before the battle.\n- **SystemAoi:** magic circles heal the whole party, silently, as on the PC.\n- **SystemAoi:** the 幻影 trap spawns phantom groups. Meeting one says 「敵は幻だった。」 and no battle follows.\n\n## Fixed\n\n- **SystemAoi:** the dungeon view draws the poles the PC stands where walls end. The ice dungeon's near walls are no longer bare and washed out, and 堕天牢 has its wall pillars.\n- **SystemAoi:** dungeons the PC lights without its global light are no longer too bright.\n- **SystemAoi:** after a boss fight, entering a dungeon no longer replays that boss's intro.\n\n## Known limits\n\n- The PC's mouse-hover walking arrows on the 3D view aren't there. Use the touch pad or the keys to walk.\n- Small 3D differences remain: dungeon 3 is a little dark, and floor tiles are scaled differently in places.\n- One command in the 迷宮's breakthrough script is still unknown.\n- The limits listed for 0.60.0 to 0.60.9 still apply.\n\n## What wasn't tested\n\n- No physical device or physical controller was used. The game was played in the Linux test build, the Mac app and an iPad simulator, and compared with the original engine under Wine.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.10/VNDegen-0.60.10.ipa",
+          "size": 132772987,
+          "sha256": "1f5f65cb4b771a81d29e22b5d95d0937ac264bd1d392f6103e45a35c1db18c03",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.9",
           "buildVersion": "3420",
           "date": "2026-11-25T17:55:51Z",
