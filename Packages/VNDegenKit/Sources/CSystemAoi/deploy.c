@@ -87,6 +87,7 @@ enum {
     MAZE_ORG_X = 9,
     MAZE_ORG_Y = 421,
     BOOSTED = 0x0068b7,
+    CAPPED = 0xe60012,
     POST_W = 98,
     POST_H = 64,
     DISMISS_X = 372,
@@ -366,6 +367,24 @@ static void draw(SA *s) {
     draw_list(s, fb);
 }
 
+void sa_deploy_govern(const Party *p, int unit, int post, int value[2], int tone[2]) {
+    int r = sa_party_unit_row(p, unit), base[2], raised[2];
+    const int *trained = NULL;
+    for (int i = 0; i < PARTY_SLOTS && !trained; i++)
+        if (p->unit[i] == unit) trained = p->trained[i];
+    for (int i = 0; i < p->benchCount && !trained; i++)
+        if (p->bench[i].unit == unit) trained = p->bench[i].trained;
+    sa_party_post_stats(p, unit, 0, &base[0], &base[1]);
+    bool boosted = post && sa_party_post_stats(p, unit, post, &raised[0], &raised[1]);
+    for (int k = 0; k < 2; k++) {
+        int stored = (r >= 0 ? sa_table_int(&p->units, r, 31 + k) : 0) + (trained ? trained[2 + STAT_GOVERN + k] : 0);
+        value[k] = sa_party_govern_cap(stored + (boosted ? raised[k] - base[k] : 0));
+        tone[k] = stored > PARTY_GOVERN_MAX ? GOVERN_CAPPED : boosted ? GOVERN_RAISED : GOVERN_PLAIN;
+    }
+}
+
+u32 sa_deploy_govern_color(int tone) { return tone == GOVERN_CAPPED ? CAPPED : tone == GOVERN_RAISED ? BOOSTED : 0x000000; }
+
 static void draw_post_list(SA *s, u32 *fb) {
     Deploy *d = &s->deploy;
     Party *p = &s->party;
@@ -385,14 +404,14 @@ static void draw_post_list(SA *s, u32 *fb) {
         sa_text_draw(fb, SA_W, SA_H, sa_table_text(&p->units, r, 2), -1, PLIST_NAME_X, y + PLIST_NAME_DY, 16, 0x000000, NO_EDGE);
         int icon = sa_party_post_icon(p, unit, post);
         if (icon >= 0) sa_blit_rect(fb, d->art[ART_ICON], icon % 2 * ICON_W, icon / 2 * ICON_H, ICON_W, ICON_H, PLIST_ICON_X, y + PLIST_ICON_DY);
-        int gov, lead, level = 1;
-        bool boosted = sa_party_post_stats(p, unit, post, &gov, &lead);
+        int gov[2], tone[2], level = 1;
+        sa_deploy_govern(p, unit, post, gov, tone);
         for (int i = 0; i < PARTY_SLOTS; i++)
             if (p->unit[i] == unit) level = p->level[i];
         for (int i = 0; i < p->benchCount; i++)
             if (p->bench[i].unit == unit) level = p->bench[i].level;
-        const int v[4] = {level, sa_table_int(&p->units, r, 15), gov, lead};
-        for (int j = 0; j < 4; j++) sa_draw_int(fb, d->art[ART_BIG_DIGITS], v[j], false, PLIST_NUM_RIGHT + j * PLIST_NUM_DX, y + PLIST_NUM_DY, j >= 2 && boosted ? 2 : 0, BIG_W, BIG_H);
+        const int v[4] = {level, sa_table_int(&p->units, r, 15), gov[0], gov[1]};
+        for (int j = 0; j < 4; j++) sa_draw_int(fb, d->art[ART_BIG_DIGITS], v[j], false, PLIST_NUM_RIGHT + j * PLIST_NUM_DX, y + PLIST_NUM_DY, j >= 2 ? tone[j - 2] : 0, BIG_W, BIG_H);
     }
     sa_font_set_plain(false);
     sa_font_set_spacing(1);
@@ -489,12 +508,12 @@ static void draw_org(SA *s, u32 *fb) {
         info_line(fb, sa_table_text(&p->positions, post, 0), INFO_Y);
         if (r >= 0) {
             char v[16];
-            int gov, lead;
-            sa_party_post_stats(p, unit, post, &gov, &lead);
+            int gov[2], tone[2];
+            sa_deploy_govern(p, unit, post, gov, tone);
             info_line(fb, sa_table_text(&p->units, r, 2), INFO_Y + INFO_DY);
-            snprintf(v, sizeof v, "%d", gov);
+            snprintf(v, sizeof v, "%d", gov[0]);
             info_line(fb, v, INFO_Y + 2 * INFO_DY);
-            snprintf(v, sizeof v, "%d", lead);
+            snprintf(v, sizeof v, "%d", gov[1]);
             info_line(fb, v, INFO_Y + 3 * INFO_DY);
         } else {
             info_line(fb, "--", INFO_Y + 2 * INFO_DY);
@@ -540,14 +559,13 @@ static void draw_list(SA *s, u32 *fb) {
         else if (p->bench[k - HOVER_UNIT].tile >= 0) sa_blit(fb, d->art[ART_RESERVE], BADGE_X, y + BADGE_DY);
         int r = sa_party_unit_row(p, unit);
         sa_text_draw(fb, SA_W, SA_H, sa_table_text(&p->units, r, 2), -1, NAME_X, y + TEXT_DY + 1, 16, 0x000000, NO_EDGE);
-        int gov, lead;
-        bool boosted = post && sa_party_post_stats(p, unit, post, &gov, &lead);
-        if (!boosted) sa_party_post_stats(p, unit, 0, &gov, &lead);
-        const int stats[4] = {level, sa_table_int(&p->units, r, 15), gov, lead};
+        int gov[2], tone[2];
+        sa_deploy_govern(p, unit, post, gov, tone);
+        const int stats[4] = {level, sa_table_int(&p->units, r, 15), gov[0], gov[1]};
         for (int j = 0; j < 4; j++) {
             char v[12];
             snprintf(v, sizeof v, "%d", stats[j]);
-            sa_text_draw(fb, SA_W, SA_H, v, -1, STAT_X + (j + 1) * STAT_W - 6 - sa_text_width(v, -1, 15), y + TEXT_DY + 1, 15, j >= 2 && boosted ? BOOSTED : 0x000000, NO_EDGE);
+            sa_text_draw(fb, SA_W, SA_H, v, -1, STAT_X + (j + 1) * STAT_W - 6 - sa_text_width(v, -1, 15), y + TEXT_DY + 1, 15, j >= 2 ? sa_deploy_govern_color(tone[j - 2]) : 0x000000, NO_EDGE);
         }
     }
     sa_font_set_plain(false);

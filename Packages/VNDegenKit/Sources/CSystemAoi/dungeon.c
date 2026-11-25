@@ -26,6 +26,7 @@ enum {
     ACTION_W = 160,
     ACTION_H = 40,
     HOVER_ACTION = 101,
+    HOVER_FOLD = 102,
     FLOOR_DOWN = 100,
     FLOOR_UP = 101,
     OBJECT_CRYSTAL = 60,
@@ -90,10 +91,10 @@ static const struct {
 #define CAM_BACK 4.6f
 #define CAM_PITCH (-0.08f)
 #define FOV 47.2f
-#define LIGHT_GAIN 1.6f
-#define AMBIENT (140.0f / 255.0f)
-#define AMBIENT_DIM (130.0f / 255.0f)
-#define DIFFUSE (50.0f / 255.0f)
+#define AMBIENT (235.0f / 255.0f)
+#define AMBIENT_DIM (225.0f / 255.0f)
+#define DIFFUSE (35.0f / 255.0f)
+#define FOG_DENSITY 0.0475f
 #define AMBIENT_ALL (192.0f / 255.0f)
 #define POLE_SIDE (DUN_SIDE + 1)
 #define QUARTER 1.5707963f
@@ -300,8 +301,7 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     if (!sa_dungeon_read_map(d, vfs, map)) return false;
     if (!d->r3.zbuf) r3_init(&d->r3, SA_W, SA_H);
     d->fov = FOV;
-    d->r3.fogNear = -4;
-    d->r3.fogFar = 28;
+    d->r3.fogDensity = FOG_DENSITY;
     d->r3.fogColor = 0x1e2d28;
     d->r3.cull = -1;
     d->ambient = AMBIENT_ALL;
@@ -621,7 +621,15 @@ static bool on_art(const Image *im, int sy, int fh, int ax, int ay, int x, int y
     return im->px[(size_t)(sy + y - ay) * im->w + (x - ax)] >> 24 > minAlpha;
 }
 
+static bool on_fold(const Dungeon *d, int x, int y) {
+    const Image *im = d->art[DUN_ART_FOLD];
+    int ax = d->folded ? 0 : FOLD_X, sx = d->folded ? 0 : FOLD_SIZE;
+    if (!im || x < ax || y < FOLD_Y || x >= ax + FOLD_SIZE || y >= FOLD_Y + FOLD_SIZE) return false;
+    return im->px[(size_t)(y - FOLD_Y) * im->w + sx + x - ax] >> 24 > 128;
+}
+
 static int hit(const Dungeon *d, int x, int y) {
+    if (on_fold(d, x, y)) return HOVER_FOLD;
     if (x >= REST_X && x < REST_X + REST_W && y >= REST_Y && y < REST_Y + REST_H) return HOVER_REST;
     if (sa_dungeon_action(d) && x >= ACTION_X && x < ACTION_X + ACTION_W && y >= ACTION_Y && y < ACTION_Y + ACTION_H) return HOVER_ACTION;
     for (int i = 0; i < 6; i++) {
@@ -643,6 +651,11 @@ bool sa_dungeon_hover(Dungeon *d, int x, int y) {
 
 int sa_dungeon_click(Dungeon *d, int x, int y) {
     int h = hit(d, x, y);
+    if (h == HOVER_FOLD) {
+        d->folded = !d->folded;
+        d->hover = -1;
+        return DUN_STAY;
+    }
     if (h == HOVER_REST) return DUN_REST;
     if (h == HOVER_ACTION) return DUN_ACTION;
     if (h >= HOVER_WALK) return act(d, walkArrows[h - HOVER_WALK].pad);
@@ -687,7 +700,7 @@ static float shade_of(const Dungeon *d, const float *n) {
         float dot = (n[0] * lights[i][0] + n[1] * lights[i][1] + n[2] * lights[i][2]) / l;
         if (dot > 0) s += DIFFUSE * dot;
     }
-    return s * LIGHT_GAIN;
+    return s;
 }
 
 static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a, float swing) {
@@ -924,10 +937,19 @@ static void draw_map(Dungeon *d, u32 *fb, int ox, int oy, int scale) {
 
 void sa_dungeon_draw_map(Dungeon *d, u32 *fb, int x, int y, int scale) { draw_map(d, fb, x, y, scale); }
 
+static void draw_panel(const Dungeon *d, u32 *fb) {
+    int lit = d->hover == HOVER_FOLD ? FOLD_SIZE : 0;
+    if (d->folded) {
+        sa_blit_rect(fb, d->art[DUN_ART_FOLD], 0, lit, FOLD_SIZE, FOLD_SIZE, 0, FOLD_Y);
+        return;
+    }
+    sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
+    sa_blit_rect(fb, d->art[DUN_ART_FOLD], FOLD_SIZE, lit, FOLD_SIZE, FOLD_SIZE, FOLD_X, FOLD_Y);
+}
+
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
     if (d->hover >= HOVER_WALK) sa_blit_alpha(fb, d->walk[d->hover - HOVER_WALK], walkArrows[d->hover - HOVER_WALK].x, walkArrows[d->hover - HOVER_WALK].y, WALK_ALPHA);
-    sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
-    sa_blit_rect(fb, d->art[DUN_ART_FOLD], FOLD_SIZE, 0, FOLD_SIZE, FOLD_SIZE, FOLD_X, FOLD_Y);
+    draw_panel(d, fb);
     sa_blit_rect(fb, d->art[DUN_ART_COMPASS], 0, 0, d->art[DUN_ART_COMPASS] ? d->art[DUN_ART_COMPASS]->w : 0, 76, COMPASS_X,
                  COMPASS_Y);
     static const int nudge[4][2] = {{2, 1}, {1, 0}, {0, 1}, {1, 2}};
@@ -951,7 +973,7 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
     static const int actionArt[] = {0, DUN_ART_HOME, DUN_ART_DOWN, DUN_ART_UP, DUN_ART_OPEN};
     int act = sa_dungeon_action(d);
     if (act) sa_blit_rect(fb, d->art[actionArt[act]], 0, d->hover == HOVER_ACTION ? ACTION_H : 0, ACTION_W, ACTION_H, ACTION_X, ACTION_Y);
-    for (int i = 0; i < d->statusCount && d->plates; i++) {
+    for (int i = 0; i < d->statusCount && d->plates && !d->folded; i++) {
         int y = PLATE_Y + i * PLATE_H;
         sa_blit_rect(fb, d->plates, 0, PLATE_SRC_Y, PLATE_W, PLATE_H, PLATE_X, y);
         char n[12];
@@ -970,8 +992,7 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
 const Image *sa_dungeon_platform(const Dungeon *d) { return d->art[DUN_ART_PLATFORM]; }
 
 void sa_dungeon_draw_frame(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
-    sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
-    sa_blit_rect(fb, d->art[DUN_ART_FOLD], FOLD_SIZE, 0, FOLD_SIZE, FOLD_SIZE, FOLD_X, FOLD_Y);
+    draw_panel(d, fb);
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
 }
 

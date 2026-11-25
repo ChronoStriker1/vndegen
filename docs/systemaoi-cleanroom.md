@@ -258,15 +258,25 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   ceilings least (about 0.9), side walls more (about 1.15), walls facing the camera more again (about 1.35) and
   floors most (1.45 to 1.7, with the ground fog below), with the same factors whichever way the party faces. Floors
   bright and ceilings dark means light from above; front walls brighter than sides means light toward the camera.
-  The file's vector lit neither, which left 絶命院, the darkest set, 6 to 10% too dark. Fitted, inferred: textures
-  times 1.6 × (ambient plus 50/255 × the diffuse of two view-space lights toward (±0.46, 0.3, −0.44)), with ambient
-  140/255, or 130/255 where `floor.obj` column 7 is 1 (the dungeons from 絶命院 on except 9). Over the eleven frames
-  the 8-by-6 block-mean error fell from 66.4 to 56.3 and the mean log error of the per-surface factors from 0.21 to
-  0.10; 絶命院's two frames went from 9.5% and 6.1% too dark to 3.0% and 4.8%, 堕天牢's to within 2%. The ice
-  dungeon is the exception: its one frame went from 1.4% too dark to 7.6% too bright (its bright walls wash out,
-  where the PC keeps their detail), and a separate ambient for it would have no rule behind it. Fog stays linear
-  from −4 to 28 units to the floor's `floor.obj` column 10 colour (a fog fit didn't beat it). 炎山洞's 1.55 floor
-  gain is no longer needed: the ground fog gives its floor the same brightness.
+  The file's vector lit neither, which left 絶命院, the darkest set, 6 to 10% too dark. A first fit (linear fog from
+  −4 to 28 units, textures times 1.6 × the light) took the 8-by-6 block-mean error over the eleven frames from 66.4 to
+  56.3 but left the ice dungeon 7.6% too bright and 堕天牢's ceilings 11 to 15% too bright, because linear fog greys
+  even the nearest surfaces and the 1.6 gain made up for it: right in the dark sets, too much where the fog colour is
+  as pale as the walls. Measured: over the eleven frames the PC's mean brightness is within 1 to 3% of the bare,
+  unlit, unfogged textures', and the PC keeps the textures' contrast (standard deviation 41 against VNDegen's 32 in
+  堕天牢), its nearest ceilings unfogged. Fitted, inferred: Direct3D's EXP2 fog curve on view depth,
+  f = exp(−(0.0475 z)²), toward the floor's `floor.obj` column 10 colour, and textures times (ambient plus 35/255 ×
+  the diffuse of two view-space lights toward (±0.46, 0.3, −0.44)), with ambient 235/255, or 225/255 where
+  `floor.obj` column 7 is 1 (the dungeons from 絶命院 on except 9). Block-mean error 57.1 → 42.4 (`lightcmp.sh`,
+  this checkout's baseline; the 56.3 above was measured before the door-leaf fix); the ice frame 13.4 → 7.6 (PC/VN
+  brightness 0.924 → 0.967), 堕天牢 5.6 → 4.4 and 6.5 → 2.9 with its ceilings at 0.96 and 0.99 of the PC's
+  (0.85 and 0.89 before), 千樹庭 4.2 → 1.3, 絶命院 2.7 → 1.7 and 1.5 → 1.4, 炎山洞 slightly worse (5.8 → 7.0,
+  5.5 → 6.5) and mixed (2.9 → 0.9, 2.4 → 2.6, 6.6 → 6.2). Linear fog with any near and far (−4 to 8, 28 to 100) and
+  gains 1.3 to 1.75, a darker fog colour (0.85 × or 0.7 × the table's) and EXP fog all fit worse (`grid1.txt`, `exp-fog.txt`).
+  What's left in the ice frame is partly the wall: the PC draws the diamond wall `070w001`/`w002` where the map
+  gives wall 0 and VNDegen draws `070w000` (3.5% brighter); drawn with `w001` the frame's error falls 13.4 → 10.7
+  under the first fit. Which walls the PC gives a variant isn't in the map cell (its two fields after the wall are
+  −1) and isn't built. 炎山洞's 1.55 floor gain isn't needed: the ground fog gives its floor the same brightness.
 - **Ground fog.** Each part set names two effects in its `effect_box` (`>e,effectNN0` and `NN1`), `.def` text files
   in the game's archives. `NN0` is a `FogFoot` in every set: a texture (`fogfootNN0.bmp`, a pale mottled 128×128),
   a scroll speed per frame (`texSpdX`, `texSpdY`), an alpha range (`AlphaMin`, `AlphaMax`, out of 255) and heights
@@ -289,7 +299,11 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   about 60° open a third of the way through).
 - **Side panel button.** The PC draws the side panel's fold button, `dgn_b01`'s ◀ frame (a 2-by-2 sheet of 30-pixel
   frames: ▶, ◀ and their hover versions), at (139, 0), in the notch of `dgn_b00` (measured, mean error 0.6 per
-  channel). VNDegen draws it; what a click on it does (folding the panel, inferred from the arrows) isn't built.
+  channel). Measured under Wine at 30 fps: clicking it folds the panel at once (the whole panel goes in one frame,
+  no slide) and leaves only the ▶ frame at (0, 0) over the view; clicking ▶ brings the panel back the same way. Both
+  buttons show the sheet's lower (hover) row under the pointer, and the click doesn't walk. VNDegen matches each state
+  (buttons within 0.7 to 2.4 per channel of the original's frames, the panel edge the same folded and unfolded).
+  Inferred: the status plates fold away with the panel, and the panel stays folded until clicked again.
 - **Floor tile scale.** Measured: the floor parts map their texture twice across a cell (u 0 to 2, v −1 to 1) in
   every set, and VNDegen draws them so. Against eight PC frames, the normalised cross-correlation of the high-passed
   floor peaks at the file's scale (0.67 to 0.91) and drops to 0.36 to 0.81 at ±5%, at half or double the repeat and
@@ -491,11 +505,20 @@ calls it is inferred from that and from play, and marked so.
   the skill's range (小回復 gave 39 of 38 to 42) and spends its MP. Inferred: only 回復 skills are listed.
 - **Coming home.** 帰る (or 休憩, inferred) runs hook 17, adds the finds to the town and ends the turn (inferred).
 - **Encounters.** Measured: battles came on steps 48, 56, 69 and 81 of one expedition (7 to 12 steps after the
-  previous one), and none in the first 34 steps of another. In 中腹エリア, walking from its autosave (an expedition 0
-  steps in), the first battles came on steps 14, 16, 21 and 45 of five runs and later ones 8 to 39 steps apart, so the
-  40-step start below doesn't hold there; the rule isn't known yet. Inferred: random encounters start once the
-  expedition has walked 40 steps, then come on a countdown drawn from `floor.obj` column 13 ± column 12 (10 ± 2). The
-  group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
+  previous one), and none in the first 34 steps of another. In 中腹エリア, walking back and forth from its autosave
+  (an expedition 0 steps in), the first random battle came on steps 14, 16, 21, 43 and 45 of five runs and 20, 34, 34,
+  40, 45 and 53 with the save's seed (C006) raised by 1 to 6 (none in 30 at the save's own seed), and later ones 10,
+  12, 14, 20, 20, 34 and 39 steps after the one before. The save keeps no countdown: between battles only C064 (steps
+  since the last battle: 1 on entering and after each battle, one more a step), the step and action counters and the
+  random seed words change. C064 drives it: set to 200 in the same saves there was no battle in 30, 25 and 36 steps
+  (seeds 0, 5 and 3, against 20 and 34 for seeds 5 and 3), and set to 15 seed 3's battle came at step 11 instead of
+  34 while seed 5's didn't come in 25 steps. Inferred, the simplest rule that fits the eighteen intervals: no random
+  battle while C064 is 10 or less, then 1 in 20 a step (the likeliest rate, 18 battles over 372 steps past the first
+  ten; the first battles alone give 1 in 26, the later ones 1 in 12), 1 in 10 under 警報. The game's texts call it a
+  rate (警戒心: 迷宮で敵との遭遇率が下がる; the bells' 引き寄せ ±10), which VNDegen doesn't apply yet. What C064 over
+  about 40 does isn't known (no battle came in 91 steps there). VNDegen keeps C064 as the original does, so PC saves
+  carry it both ways; before, it started random battles after 40 steps and then every 10 ± 2 (step 48 from that
+  autosave whatever the seed). The group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
   千05|千06), chosen by the weights in columns 32 to 34 (10, 60, 10). Measured in support: all eight random battles
   in 中腹エリア's runs were column 35 groups (炎01 twice, 炎02 twice, 炎03, 炎04 twice, 炎05), and the fixed
   seven-slime group 千固定0100 came up in 千樹庭's random battles.
@@ -555,6 +578,19 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   lowers by the same amount with the red icon, and 人気者, 資金管理, 食料管理 and 資源管理 show their own icons
   (people, money, food, resources) without a raise. 配置's list also shows the first icon beside some rows in a
   way not pinned down; VNDegen doesn't draw it there.
+- **The cap at 10.** Measured from a turn-42 save of the original with members trained past 10 (`unit.obj` columns
+  31 and 32 plus the trained amounts at member +116 and +120) and moved between posts: 配置's list shows 統治 and 統率 as
+  the stored value plus the post's raise, at most 10. A value whose stored part is already over 10 shows in red
+  (0xE60012, the red row of the digit sheets) whether or not a raise applies; one the raise alone takes to 10 or past
+  stays blue. キュリハ (6/7 + 6/5 trained, no raise) reads 10/10 red; ルーアルテ as 農業担当 (2/5 + 7/7, 天才 +2/+2)
+  reads 10 blue and 10 red; ミアルテ as 街長補佐 (3/6 + 5/0, 政治家 +5/+4) 10/10 blue; クドア as 第二階層長 (2/0 + 0/9,
+  小隊長 +2/+2) 4/10 blue. VNDegen's 配置 list, 組織図 post list and corner panel and 装備's list follow this (they
+  showed the untrained table values before: 8/10, 4/7, 4/2 and 6/7 for those four); the list matches the original's
+  values and colours on all seventeen rows. The status card (on hover in 配置) shows the stored value followed by what
+  the post and the cap change it by, blue when it rises and red when it falls: キュリハ 12 −2 and 12 −2, ルーアルテ
+  9 +1 and 12 −2, ミアルテ 8 +2 and 6 +4, クドア 2 +2 and 9 +1 (measured; VNDegen showed the uncapped raise, +2,
+  +5 and the like, and matches all eight now). A member picked up to move shows no post and so only the cap's
+  red −2s.
 - **Effects.** Not measured beyond one turn: with ミアルテ as 街長 and ルーアルテ as 農業担当 the residents grew by
   5 where the same turn without them grew by 2 (residents' growth is random, so this proves nothing yet); food,
   money and resources were the same. VNDegen's posts change nothing in the town so far. `c3 "post"` answers
@@ -789,7 +825,8 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   status card and `pun_a02`, which shows the three abilities with their `ability.obj` texts and the equipped item
   (なし when none); 配置 and 育成 open in the status card. The card shows any member, posted or benched: the 役職
   badge is the post's (`uts_h00` onwards), フィールド (`h98`) or リザーブ (`h99`); the attribute (`unit.obj` column
-  14) has its 20-pixel `pun_d00` icon at (242, 208); a post's raises follow 統治 and 統率 in blue 30 pixels right;
+  14) has its 20-pixel `pun_d00` icon at (242, 208); a post's raises follow 統治 and 統率 in blue 30 pixels right
+  (what the raise adds up to the cap of 10, or a red fall where the stored value is over it, below);
   skill icons are 20 pixels; a fixed-skill unit lists only its first skill, marked ★ without its 固定／ prefix, over
   column 38 + 1 slots (ミアルテ 1/3, Darkus 5/6). Not matched: the card's portrait frame (another sheet of the unit).
 
