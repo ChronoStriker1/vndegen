@@ -109,8 +109,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   moves to the neighbouring area. Each area's enemy groups walk the routes in its map file, or wander, as red crosses
   on the minimap, moving with the party's actions as in the original, and fight when met; more appear as the party
   walks, a beaten group is gone and one the party fled from moves out of sight; random encounters come once ten
-  steps have passed since the last battle. The game's hooks run on entering, on stepping onto floor objects and walls, before and after battles and on
-  the way home; a loss ends the expedition.
+  steps have passed since the last battle. The game's hooks run on entering, on stepping onto floor objects and walls,
+  before and after battles and on the way home; a loss ends the expedition. The boss-side cutaways (74 scenes in all
+  ten dungeons) play when the party ends a step or a turn on a cell its map marks with a scene number, or wins a
+  battle there, and the one that drops the floor (`d4`) takes the party to the area below as the original does.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
@@ -160,8 +162,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   ice dungeon's diamond walls are drawn plain); the falling leaves, sparks, snow and light motes some dungeons
   show aren't drawn.
 - Story: the true ending (F161 after 真魔力塊隊) and 内政END play, but some story the original runs from its exe isn't
-  rebuilt: the boss-side cutaways of the dungeon event hook (hook 14, bo1401, 74 scenes), the trap scenes (hook 19)
-  and the dungeon rest conversations (hook 22), the story groups that follow beaten ones (ga0003, which brings in
+  rebuilt: the trap scenes (hook 19) and the dungeon rest conversations (hook 22), the story groups that follow beaten ones (ga0003, which brings in
   the final 真魔力塊隊), and the second playthrough's carried-over data (`85`/`86`: new games never offer 引き継ぐ).
   The later dungeons' 探索, 調査, 押す, 引く, 切り替える and ワープ actions aren't built.
 - Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
