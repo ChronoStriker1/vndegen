@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 #include "png.h"
 #include "vnfont.h"
@@ -170,6 +171,21 @@ int main(int argc, char **argv) {
         if (sscanf(argv[a], "move=%d,%d", &x, &y) == 2) {
             vnsystemaoi_mouse_move(s, x, y);
             alive = alive && run(s, 100);
+        }
+        if (!strncmp(argv[a], "text=", 5)) {
+            vnsystemaoi_text(s, argv[a] + 5);
+            alive = alive && run(s, 100);
+        }
+        if (sscanf(argv[a], "rms=%d", &n) == 1) {
+            double sum = 0;
+            long count = 0;
+            for (int t = 0; alive && t < n; t += 16) {
+                alive = vnsystemaoi_frame(s, 16);
+                vnsystemaoi_audio(s, audio, 705);
+                for (int i = 0; i < 1410; i++) sum += (double)audio[i] * audio[i];
+                count += 1410;
+            }
+            printf("rms=%.5f\n", count ? sqrt(sum / (double)count) : 0.0);
         }
         if (sscanf(argv[a], "rpress=%d,%d", &x, &y) == 2) {
             vnsystemaoi_mouse_move(s, x, y);

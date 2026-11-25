@@ -241,10 +241,13 @@ static void play_bgm(SA *s, int id) {
 
 static void compose(SA *s);
 
-static u32 transition_ms(int kind) { return kind == 10 ? 500 : kind == 11 || kind == 12 ? 300 : 0; }
+static u32 transition_ms(const SA *s, int kind) {
+    if (sa_option(s, OPT_EFFECT)) return 0;
+    return kind == 10 ? 500 : kind == 11 || kind == 12 ? 300 : 0;
+}
 
 static void begin_transition(SA *s, VM *vm, int kind) {
-    u32 ms = transition_ms(kind);
+    u32 ms = transition_ms(s, kind);
     if (!ms) return;
     if (s->dirty) compose(s);
     memcpy(s->from, s->fb, (size_t)SA_W * SA_H * 4);
@@ -344,6 +347,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         char *n = opd_str(code, in, 0);
         begin_transition(s, vm, in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : 0);
         picture_set(s, &s->bg, n, 0, 0);
+        sa_extra_seen_picture(s, n);
         s->bgX = s->bgY = 0;
         s->panDur = 0;
         for (int i = 0; i < STD_SLOTS; i++) picture_clear(&s->std[i]);
@@ -690,7 +694,7 @@ static void compose(SA *s) {
         sa_blit(fb, p->img, cx - p->img->w / 2, SA_H - p->img->h);
     }
     if (window_shown(s)) {
-        sa_blit_alpha(fb, s->msgBand, MSG_X, MSG_Y, 160);
+        sa_blit_alpha(fb, s->msgBand, MSG_X, MSG_Y, sa_option_window_alpha(s));
         sa_blit(fb, s->msgFrame, MSG_X, MSG_Y);
         sa_blit_rect(fb, s->ui[UI_LEAF], 0, 0, 44, 41, 1044, 536);
         for (int i = 0; i < BTN_COUNT; i++) {
@@ -776,9 +780,10 @@ bool sa_start_script(SA *s, const char *box, int entry) {
     return false;
 }
 
-static void go_title(SA *s) {
+void sa_go_title(SA *s) {
     sa_reset_scene(s);
     s->inGame = false;
+    s->extra.resume = false;
     sa_stop(s->mix, CH_VOICE, 0, 0);
     sa_stop(s->mix, CH_BGM, 0, 500);
     s->mode = MODE_TITLE;
@@ -1017,6 +1022,9 @@ static void town_action(SA *s, int action) {
     case TOWN_BTN_LOAD:
         sa_savescreen_open(s, action == TOWN_BTN_SAVE);
         break;
+    case TOWN_BTN_OPTION:
+        sa_option_open(s);
+        break;
     case TOWN_NONE:
         if (s->town.hidden) s->town.hidden = false;
         break;
@@ -1043,8 +1051,11 @@ static void title_pick(SA *s, int item) {
     case TITLE_LOAD:
         sa_savescreen_open(s, false);
         break;
-    default:
-        sa_log(s, "title item %d not built yet", item);
+    case TITLE_OPTION:
+        sa_option_open(s);
+        break;
+    case TITLE_EXTRA:
+        sa_extra_open(s);
         break;
     }
     s->dirty = true;
@@ -1156,13 +1167,11 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     bool first = sa_path_resolve(sav, real, sizeof real) != 1;
     if (first) sa_mkdirs(sav);
     free(sav);
-    char *global = sa_fmt("%s/vndegen/global.dat", s->saveDir);
-    size_t gn;
-    u8 *g = sa_read_file(global, &gn);
-    if (g && gn == sizeof s->vm.g) memcpy(s->vm.g, g, gn);
-    free(g);
-    free(global);
-    go_title(s);
+    sa_option_init(&s->opt, &s->vfs);
+    sa_extra_init(s);
+    sa_global_load(s);
+    sa_option_apply(s);
+    sa_go_title(s);
     if (first) {
         title_pick(s, TITLE_PROLOGUE);
         sa_log(s, "first start: prologue");
@@ -1204,6 +1213,8 @@ void vnsystemaoi_close(VNSystemAoi *sa) {
     sa_train_free(&s->train);
     sa_deploy_free(&s->deploy);
     sa_savescreen_free(&s->saves);
+    sa_option_free(&s->opt);
+    sa_extra_free(s);
     sa_dungeon_free(&s->dungeon);
     r3_free(&s->dungeon.r3);
     picture_clear(&s->face);
@@ -1227,11 +1238,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (s->inGame) s->playMs += elapsedMs;
     if (s->vm.gDirty) {
         s->vm.gDirty = false;
-        char *dir = sa_fmt("%s/vndegen", s->saveDir), *path = sa_fmt("%s/global.dat", dir);
-        sa_mkdirs(dir);
-        sa_write_file(path, s->vm.g, sizeof s->vm.g);
-        free(dir);
-        free(path);
+        sa_global_save(s);
     }
     if (s->movie) {
         if (s->clicked) {
@@ -1280,6 +1287,8 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (sa_train_frame(s)) return true;
     if (sa_deploy_frame(s, elapsedMs)) return true;
     if (sa_savescreen_frame(s)) return true;
+    if (sa_option_frame(s)) return true;
+    if (sa_extra_frame(s)) return true;
     if (s->mode == MODE_BATTLE) {
         if (sa_battle_tick(&s->battle, elapsedMs)) s->dirty = true;
         if (sa_battle_hover(&s->battle, s->mouseX, s->mouseY)) s->dirty = true;
@@ -1353,13 +1362,14 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             s->serial++;
             s->dirty = false;
         }
-        if (s->mode == MODE_TOWN || s->mode == MODE_SAVES) return true;
+        if (s->mode == MODE_TOWN || s->mode == MODE_SAVES || s->mode == MODE_OPTION) return true;
     }
     dialog_input(s, elapsedMs);
     if (sa_mission_confirm_input(s)) s->dirty = true;
     if (s->total && s->shown < s->total) {
         s->textMs += elapsedMs;
-        int want = (int)(s->textMs / 30);
+        u32 per = sa_option_text_ms(s);
+        int want = per ? (int)(s->textMs / per) : s->total;
         if (want > s->total) want = s->total;
         if (want != s->shown) {
             s->shown = want;
@@ -1418,7 +1428,8 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         s->featherMs += elapsedMs;
         s->dirty = true;
         bool voice = sa_playing(s->mix, CH_VOICE, 0);
-        if (s->skipMode || (s->autoMode && !voice && (s->autoMs += elapsedMs) >= 1500)) {
+        if (sa_option(s, OPT_AUTO_VOICE)) voice = false;
+        if (s->skipMode || (s->autoMode && !voice && (s->autoMs += elapsedMs) >= sa_option_auto_ms(s))) {
             s->autoMs = 0;
             s->clicked = true;
             s->mouseX = s->mouseY = -1;
@@ -1456,6 +1467,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
     if (s->rightClicked) {
         s->rightClicked = false;
         if (s->windowHidden) s->windowHidden = false;
+        else if (!sa_option(s, OPT_RIGHT)) s->windowHidden = window_shown(s);
         else {
             s->skipMode = !s->skipMode;
             s->autoMode = false;
@@ -1494,9 +1506,10 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             sa_log_open(&s->log);
             s->autoMode = s->skipMode = false;
             break;
-        default:
-            sa_log(s, "button %d not built yet", btn);
-            break;
+        case BTN_OPTION:
+            s->autoMode = s->skipMode = false;
+            sa_option_open(s);
+            return true;
         }
     }
     if (s->clicked) {
@@ -1513,13 +1526,13 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
                 picture_clear(&s->face);
                 sa_vm_choose(&s->vm, c);
             }
-        } else if (s->shown < s->total) {
+        } else if (s->shown < s->total && !sa_option(s, OPT_CLICK)) {
             s->shown = s->total;
         } else if (s->vm.state == VM_WAIT_CLICK) {
             clear_text(s);
             s->name[0] = 0;
             picture_clear(&s->face);
-            sa_stop(s->mix, CH_VOICE, 0, 0);
+            if (!sa_option(s, OPT_PAGE_VOICE)) sa_stop(s->mix, CH_VOICE, 0, 0);
             sa_vm_click(&s->vm);
         }
         s->dirty = true;
@@ -1551,7 +1564,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             } else if (s->gameOver) {
                 s->gameOver = false;
                 sa_log(s, "game over: back to the title");
-                go_title(s);
+                sa_go_title(s);
             } else if (s->inGame) {
                 sa_reset_scene(s);
                 s->mode = MODE_TOWN;
@@ -1561,8 +1574,8 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
                     s->autosaveTurn = false;
                     sa_autosave(s);
                 }
-            } else {
-                go_title(s);
+            } else if (!sa_extra_script_done(s)) {
+                sa_go_title(s);
             }
             return true;
         }
@@ -1603,6 +1616,10 @@ void vnsystemaoi_mouse_button(VNSystemAoi *sa, int button, bool down) {
 void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down) {
     SA *s = (SA *)sa;
     if (!down) return;
+    if (s->mode == MODE_SAVES) {
+        sa_savescreen_key(s, virtualKey);
+        return;
+    }
     if (s->mode == MODE_DUNGEON) {
         sa_exp_key(s, virtualKey);
         return;
@@ -1629,10 +1646,16 @@ void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down) {
     }
 }
 
+void vnsystemaoi_text(VNSystemAoi *sa, const char *utf8) { sa_savescreen_text((SA *)sa, utf8); }
+
 void vnsystemaoi_wheel(VNSystemAoi *sa, int notches) {
     SA *s = (SA *)sa;
     if (s->mode == MODE_SHOP) {
         sa_shop_wheel(s, notches);
+        return;
+    }
+    if (s->mode == MODE_EXTRA) {
+        sa_extra_wheel(s, notches);
         return;
     }
     if (s->mode != MODE_STORY || s->movie) return;

@@ -95,11 +95,14 @@ typedef struct Deploy {
     bool overRank;
 } Deploy;
 
+#define COMMENT_CHARS 16
+
 typedef struct SaveSummary {
     bool used;
     u32 time;
     int turn, town[4], level, count, play, steps;
     char place[2][48], weapon[48];
+    char comment[COMMENT_CHARS * 4 + 1];
 } SaveSummary;
 
 #define SAVE_SLOTS 100
@@ -112,7 +115,77 @@ typedef struct SaveScreen {
     bool saving;
     int page, hover, confirm, ask, picked, latest, autoLatest, back;
     SaveSummary now;
+    char comment[COMMENT_CHARS * 4 + 1];
 } SaveScreen;
+
+enum {
+    OPT_SCREEN,
+    OPT_ALPHA,
+    OPT_EFFECT,
+    OPT_FRAME,
+    OPT_CONFIRM,
+    OPT_POPUP,
+    OPT_CLICK,
+    OPT_RIGHT,
+    OPT_CURSOR,
+    OPT_AUTOMOUSE,
+    OPT_TEXT_SPEED,
+    OPT_AUTO_SPEED,
+    OPT_AUTO_VOICE,
+    OPT_SKIP,
+    OPT_3D,
+    OPT_BRIGHTNESS,
+    OPT_CAMERA,
+    OPT_GAME_SPEED,
+    OPT_BATTLE_FX,
+    OPT_RANKS,
+    OPT_AUTOSAVE,
+    OPT_BGM_ON,
+    OPT_SE_ON,
+    OPT_VE_ON,
+    OPT_TALK_ON,
+    OPT_INACTIVE,
+    OPT_PAGE_VOICE,
+    OPT_BGM,
+    OPT_SE,
+    OPT_VE,
+    OPT_TALK,
+    OPT_COUNT,
+    OPT_SAVE_PAGE = OPT_COUNT
+};
+
+#define OPTION_ART 104
+#define OPTION_BYTES 32
+
+typedef struct OptionScreen {
+    Image *bg, *art[OPTION_ART];
+    u8 value[OPTION_BYTES];
+    int hover, back, ask;
+} OptionScreen;
+
+#define EXTRA_CG 384
+#define EXTRA_SCENES 256
+#define EXTRA_SCENARIOS 64
+#define EXTRA_TRACKS 64
+#define EXTRA_ART 128
+
+typedef struct SampleEntry {
+    char name[16];
+    u32 offset, size;
+} SampleEntry;
+
+typedef struct ExtraScreen {
+    Image *art[EXTRA_ART];
+    Table cg, scenes, scenarios, hints;
+    u8 viewedCg[EXTRA_CG], viewedScene[EXTRA_SCENES], viewedScenario[EXTRA_SCENARIOS];
+    int page, hover, scroll, track, playing, hint;
+    bool resume;
+    Image *view, *thumb[30];
+    int thumbFor[30];
+    SampleEntry *samples;
+    int sampleCount;
+    FILE *sampleFile;
+} ExtraScreen;
 
 #define EXP_GROUPS 12
 #define EXP_TARGETS 5
@@ -153,7 +226,7 @@ typedef struct Expedition {
 #define MSG_LINES 4
 
 enum { UI_CLOSE, UI_LEAF, UI_SKIP, UI_LOG, UI_REPEAT, UI_OPTION, UI_AUTO, UI_FEATHER, UI_CHOICE_TOP, UI_CHOICE_ROW, UI_CHOICE_BOTTOM, UI_COUNT };
-enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES, MODE_SUBMIT, MODE_MAZE, MODE_CAMP };
+enum { MODE_TITLE, MODE_STORY, MODE_TOWN, MODE_BATTLE, MODE_DUNGEON, MODE_SELECT, MODE_POLICY, MODE_EQUIP, MODE_SHOP, MODE_TRAIN, MODE_DEPLOY, MODE_SAVES, MODE_SUBMIT, MODE_MAZE, MODE_CAMP, MODE_OPTION, MODE_EXTRA };
 enum { TITLE_PROLOGUE, TITLE_START, TITLE_LOAD, TITLE_OPTION, TITLE_EXTRA, TITLE_END, TITLE_ITEMS };
 
 typedef struct BgmDef {
@@ -233,6 +306,8 @@ struct SA {
     Train train;
     Deploy deploy;
     SaveScreen saves;
+    OptionScreen opt;
+    ExtraScreen extra;
     bool turnPending, autosaveTurn;
     u32 playMs;
     bool inGame;
@@ -297,6 +372,30 @@ void sa_savescreen_free(SaveScreen *v);
 void sa_savescreen_open(SA *s, bool saving);
 bool sa_savescreen_frame(SA *s);
 void sa_autosave(SA *s);
+void sa_save_comment_put(const SA *s, u8 *img);
+void sa_save_comment_get(const u8 *img, SaveSummary *out);
+void sa_savescreen_text(SA *s, const char *utf8);
+void sa_savescreen_key(SA *s, int key);
+void sa_option_init(OptionScreen *o, Vfs *vfs);
+void sa_option_free(OptionScreen *o);
+void sa_option_defaults(OptionScreen *o);
+void sa_option_open(SA *s);
+bool sa_option_frame(SA *s);
+void sa_option_apply(SA *s);
+int sa_option(const SA *s, int which);
+u32 sa_option_text_ms(const SA *s);
+u32 sa_option_auto_ms(const SA *s);
+u32 sa_option_window_alpha(const SA *s);
+void sa_global_load(SA *s);
+void sa_global_save(SA *s);
+void sa_extra_init(SA *s);
+void sa_extra_free(SA *s);
+void sa_extra_open(SA *s);
+bool sa_extra_frame(SA *s);
+bool sa_extra_script_done(SA *s);
+void sa_extra_wheel(SA *s, int notches);
+void sa_extra_seen_picture(SA *s, const char *name);
+void sa_go_title(SA *s);
 void sa_mission_init(SA *s);
 void sa_mission_free(SA *s);
 void sa_mission_reset(SA *s);

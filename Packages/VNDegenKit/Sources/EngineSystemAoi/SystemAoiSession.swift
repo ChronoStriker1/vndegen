@@ -46,9 +46,10 @@ final class SystemAoiSession: EngineSession {
             let whole = Int(notches.rounded())
             if whole != 0 { deliver([.wheel(whole)]) }
         }
-        frameView.onKey = { [weak self] usage, pressed, _ in
+        frameView.onKey = { [weak self] usage, pressed, characters in
             guard let self else { return }
             deliver(router.hostKey(hidUsage: usage, pressed: pressed))
+            if let characters, !characters.isEmpty, let engine { vnsystemaoi_text(engine, characters) }
         }
     }
 

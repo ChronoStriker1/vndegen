@@ -54,6 +54,7 @@ void vnsystemaoi_mouse_move(VNSystemAoi *sa, int x, int y);
 void vnsystemaoi_mouse_button(VNSystemAoi *sa, int button, bool down);
 void vnsystemaoi_key(VNSystemAoi *sa, int virtualKey, bool down);
 void vnsystemaoi_wheel(VNSystemAoi *sa, int notches);
+void vnsystemaoi_text(VNSystemAoi *sa, const char *utf8);
 
 void vnsystemaoi_audio(VNSystemAoi *sa, float *out, int frames);
 void vnsystemaoi_set_paused(VNSystemAoi *sa, bool paused);
