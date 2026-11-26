@@ -380,6 +380,20 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   for all but the door). Wall-20 sides draw no wall. Measured: the original floats a small purple marker over the
   passage side, the part set's `next000` (a child of `w020`, textured from `updown.bmp`), still over time; VNDegen
   draws that layer on each passage side and its pixels come within about 5 levels of the PC's two cells away.
+- **Enemy symbols.** Each enemy group on the floor stands in the view as a glowing billboard from `mallset.pvm`:
+  `party.obj` column 13 names the model, `e001` to `e010` (6 for 千00 and 千41, 7 for 千固定0100, 9 for
+  ヤーヌの部下隊, 10 for ヤーヌ隊; pink rings with small wings, a yellow and a purple spiked burst). Each model is a
+  3.6 by 3.9 quad with `bill 17` in its `eNNN.txt` (faces the camera) and four or five frames `a10` to `a50` swapped
+  every 6 frames by its `eNNN_m.txt` (a10 a20 a30 a40 and a20 or a50), textured from 32-bit `enemyN_k.bmp` with an
+  alpha channel (`Blend(26)`, the only blend in the file; the `chara` and `event` markers of `a050` and `a051` use it
+  too). Measured under Wine on 千樹庭 抵抗勢力拠点 (party at (1, 2) and (5, 4) facing north, 千41 and ヤーヌの部下隊
+  on the cell ahead): the 「burst」 the round 4 notes saw before ヤーヌの部下隊's intro is this symbol at close range,
+  not a screen flash; nothing else is drawn between the step and the intro or the battle. VNDegen draws each group's
+  symbol on its cell, facing the camera, alpha blended after the walls and crystals: against the PC's frames the
+  千41 ring spans 169 by 107 pixels at (556, 296) where the PC's spans 185 by 106 at (547, 307), and its core is 192
+  where the PC's is 213 (both fogged; the PC's fog on it is lighter, inferred, not matched). The frame time (100 ms,
+  6 frames at 60) and the order of a40's successor are read from the files; the PC's symbols didn't visibly animate
+  during the hold, and the battle backdrop leaves the symbols out (measured: none in the PC's battle backdrop).
 - **Walk arrows.** Measured by hovering a 40-pixel grid over the view in 中央森: under the pointer the original shows
   one of `dgn_e00` (forward), `e01` (back), `e03` (turn left), `e02` (turn right), `e05` and `e04` (the side
   chevrons), each the picture's lower (hover) half at its own size and half opacity, with its top-left at (469, 164),
@@ -493,7 +507,19 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   home.
 - **Traps and floor hazards.** Engine-side: the floor hook (bo1200) handles only pickups, keyed doors, door spots
   and story events. Measured on the PC by stepping onto each object from a save made next to it: the message is a
-  battle-style popup (`pop_a`) at the view's centre, and the next key or click only dismisses it. Traps say
+  battle-style popup (`pop_a`) at the view's centre, and the next key or click only dismisses it. Left alone it
+  closes by itself after a number of drawn frames that grows with its text: measured under Wine with the game's
+  frame rate logged (`WINEDEBUG=+fps`, 29 to 39 fps) in 9 runs, 482 frames for 警報を回避した (twice, 13.3 and
+  16.4 seconds), 492 for 警報に引っかかった！, 525 and 532 for 空間が歪み、運ばれた！, 550 for ブラインド罠に引っかかった！,
+  709 for 大警告罠's two lines (29 characters) and 815 and 807 for 格減らし罠's (39), 30.9 and 22.9 seconds; the
+  seconds vary with the frame rate (13.3 to 30.9 here, which is where the earlier "about 18 seconds" came from)
+  but the frames don't. The fit is 407 + 10.4 frames a character (both lines, punctuation included; residuals
+  within 19 frames). It closes the same for trap, avoided-trap and teleport notices; moving the mouse every 2
+  seconds didn't delay it (492 frames), and any key (Shift included) or click dismisses it. The box opens and
+  closes with a zoom of about 200 ms (three frames at 15 fps; not drawn by VNDegen). VNDegen closes a notice after
+  410 + 10 frames a character at 60 frames a second (7.0 seconds plus a sixth of a second a character; 60 is
+  inferred: the original targets it, but under Wine it drew 29 to 39), then settles a crystal and runs hook 19 as on
+  a click. Traps say
   「name に引っかかった！」 with a second line, or 「name を回避した」: 10 ブラインド罠, 12 防御力低下罠, 13
   回避力低下罠, 20 地図破壊罠, 21 大警告罠 (このフロアから住民の気配が消えた！), 22 サポート分離罠
   (しばらくスペシャルギュンギュスカーが使えない！), 23 浄化罠 (スペシャルギュンギュスカー効果が消えた！), 24 格減らし罠 and 25
@@ -1324,9 +1350,29 @@ the same points (offsets in bytes, numbers little-endian):
   writes these defaults only where a variable is 0. C004 and C005
   are 6 and 1 in the town and 41 plus the area's backdrop number (62 in 千樹庭's bg021, 61 in 炎山洞's bg020) and 2 in
   a dungeon; the slot details read the place from them and an image without
-  them opens a story scene instead of the town. C006 changes each turn, likely the random seed. The original
+  them opens a story scene instead of the town. C006 changes each turn (see Random numbers). The original
   recomputes C209, C220 to C262 and C393 to C409 on loading (the town window shows the right numbers without them).
   C003 counts manual saves and autosaves separately across the game.
+- **Random numbers.** C006 is not the original's running random state, and identical saves don't repeat. Measured
+  under Wine: C006 stays the same through a whole turn, dungeon visit included (1,505,433,830 in all 38 dungeon
+  saves of turn 42, across hundreds of steps and several battles), and changes only when a turn ends, to another
+  value below 2^31 (360 rest turns: bits 0 to 30 each set about half the time, bit 31 never). The same town save
+  rested twice (fresh Wine each time) ended with different C006 (1,977,046,961 and 745,052,395) and different
+  turns (residents, C221, C224 and a facility event differed); four runs from it gave four C006 values and two
+  outcomes, and three runs with C006 set to 1 three more. The 中腹エリア autosave walked forward and back three times
+  with C064 40 met its first random battle at no step in 70, step 63 and step 39. The 警報 on 2/7 (13, 7) from one
+  VNDegen export, at its own C006, was avoided in three runs and sprung in four. So the earlier
+  notes' "identical saves repeat" doesn't hold: the original's rolls come from state the save doesn't carry. The new
+  C006 isn't reachable from the old one within 2^26 steps of minstd (16,807 and 48,271), the Visual C and ANSI C
+  rand states, Borland, Delphi (134,775,813), Numerical Recipes or 69,069 LCGs, nor among the first 2×10^7 outputs
+  of MT19937 (`>> 1` or `& 0x7fffffff`) or glibc `random()` seeded with the old C006 (345 consecutive pairs; hits at
+  the rate chance gives), nor among the first 2,000 outputs of those seeded with the save's clock (C002, a Unix time)
+  from 120 seconds before to 5 after (40 turns). Inferred: the original seeds from something outside the save (a
+  clock or tick count) and writes a fresh value to C006 each turn; its generator isn't identified. VNDegen keeps its
+  own generator's state in C006 instead, so its saves and PC exports carry it and a VNDegen save repeats exactly:
+  Park-Miller (48,271 mod 2^31 − 1, the state is C006, which stays below 2^31 like the original's), seeded from the
+  session's seed when C006 is 0 (a new game). It changes with every roll rather than once a turn; the original
+  ignores C006's value on loading as far as play shows, so an export behaves the same there.
 - **Writing.** VNDegen writes the image from its state: the scene-state pattern, the -1 run at 1,008,208, equipment,
   the grid, Darkus's records (stat blocks from `unit.obj` columns 23 to 32 plus training, 必殺耐性 and 異常耐性 from
   column 33, the skills from columns 41 on), the variables and the engine numbers. At turn 2 the party and scene
@@ -1470,8 +1516,9 @@ the same points (offsets in bytes, numbers little-endian):
   alarm scene played after the message (「あっ、マズイっ！」). The spinner on 10/9 (8, 4) has no message, and its
   scene played on the step itself. On 7/9 (12, 1) the support trap avoided played F3401 and sprung played the
   29-line キュリハ story with F3418 and F157 set. The healing circle (42) and a 棘の床 (1) turned F020 on with no
-  scene; two in the party played nothing. Left alone, the sprung alarm's message closed by itself after about 18
-  seconds and the scene began (one run; VNDegen doesn't time messages out). So the engine sets F020 to whether the
+  scene; two in the party played nothing. Left alone, the sprung alarm's message closed by itself and the scene
+  began (see Traps and floor hazards for the time; VNDegen runs hook 19 the same way when a notice closes by
+  itself). So the engine sets F020 to whether the
   object took effect and runs hook 19 after the object's message. VNDegen does that for every object in its trap
   table: F020 off on an avoided trap and on otherwise, hook 19 when the message is dismissed, or with the step's
   hooks (after hook 12, before hook 14) when there is none. Running it for the healing circle, hazards and

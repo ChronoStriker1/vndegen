@@ -38,6 +38,10 @@ enum {
     WALL_OPEN = -1,
     WALL_HIDDEN = 100,
     BACKDROP_FADE_MS = 500,
+    NOTICE_FRAMES = 410,
+    NOTICE_CHAR_FRAMES = 10,
+    FRAME_RATE = 60,
+    ENCOUNTER_HOLD_MS = 430,
     ABILITY_VALUE = 4,
     ITEM_EFFECT_FIRST = 15,
     ITEM_EFFECT_LAST = 22,
@@ -313,6 +317,7 @@ static void finish_after(SA *s) {
     }
     case AFTER_BATTLE:
         s->mode = MODE_BATTLE;
+        s->battle.fadeMs = 0;
         s->dirty = true;
         break;
     case AFTER_HOME:
@@ -764,6 +769,7 @@ static bool load_floor(SA *s, int dungeon, int floor, bool autosave) {
     e->fadeDur = 0;
     e->fadeBattle = false;
     e->hiddenDoor = 0;
+    s->battle.holdGroup = 0;
     sync_status(s);
     if (!e->resuming) s->vm.c[C_AREA_ACTIONS] = 1;
     e->areaStart = e->steps;
@@ -891,7 +897,12 @@ static void pick_group(SA *s, char *out, size_t size) {
 }
 
 static void begin_battle(SA *s, const char *group, const int *cells) {
+    if (!s->battle.from) s->battle.from = sa_image_new(SA_W, SA_H);
+    memcpy(s->battle.from->px, s->fb, sizeof(u32) * SA_W * SA_H);
+    int marks = s->dungeon.markCount;
+    s->dungeon.markCount = 0;
     sa_dungeon_draw(&s->dungeon, s->fb);
+    s->dungeon.markCount = marks;
     Image *view = sa_image_new(SA_W, SA_H);
     memcpy(view->px, s->fb, sizeof(u32) * SA_W * SA_H);
     s->battle.levelBonus = s->vm.c[C_ENEMY_LEVEL];
@@ -1213,6 +1224,13 @@ static const struct {
 void sa_exp_notice(SA *s, const char *text) {
     Expedition *e = &s->exp;
     e->noticeCount = 0;
+    int chars = 0;
+    for (const char *p = text; p && *p;) {
+        u32 cp;
+        p += sa_utf8_decode(p, &cp);
+        chars += cp != '|' && cp >= 4;
+    }
+    s->battle.noticeMs = (u32)(NOTICE_FRAMES + NOTICE_CHAR_FRAMES * chars) * 1000 / FRAME_RATE;
     for (const char *p = text; p && e->noticeCount < EXP_NOTICE_LINES;) {
         const char *bar = strchr(p, '|');
         size_t n = bar ? (size_t)(bar - p) : strlen(p);
@@ -1449,7 +1467,8 @@ static void after_move(SA *s, int r) {
     int hit = group_here(s);
     tick_groups(s, &hit);
     if (hit >= 0) {
-        start_battle(s, hit);
+        s->battle.holdGroup = hit + 1;
+        s->battle.holdMs = 0;
         return;
     }
     if (!e->calm) maybe_spawn_symbol(s);
@@ -1488,7 +1507,7 @@ static bool run_step_hook(SA *s) {
 
 void sa_exp_key(SA *s, int key) {
     if (s->mode == MODE_DUNGEON && s->exp.noticeCount) dismiss_notice(s);
-    else if (s->mode == MODE_DUNGEON && !s->dungeon.animDur && !s->exp.stepHook && !s->exp.fadeBattle) after_move(s, sa_dungeon_key(&s->dungeon, key));
+    else if (s->mode == MODE_DUNGEON && !s->dungeon.animDur && !s->exp.stepHook && !s->exp.fadeBattle && !s->battle.holdGroup) after_move(s, sa_dungeon_key(&s->dungeon, key));
     s->dirty = true;
 }
 
@@ -1537,7 +1556,25 @@ bool sa_exp_frame(SA *s, u32 ms) {
             return true;
         }
     }
+    if (s->battle.holdGroup) {
+        s->clicked = s->rightClicked = false;
+        if (!d->animDur) s->battle.holdMs += ms;
+        if (s->battle.holdMs >= ENCOUNTER_HOLD_MS) {
+            int g = s->battle.holdGroup - 1;
+            s->battle.holdGroup = 0;
+            start_battle(s, g);
+            return true;
+        }
+    }
     if (run_step_hook(s)) return true;
+    if (s->exp.noticeCount && !s->exp.fadeDur) {
+        s->battle.noticeMs = s->battle.noticeMs > ms ? s->battle.noticeMs - ms : 0;
+        if (!s->battle.noticeMs) {
+            dismiss_notice(s);
+            s->dirty = true;
+            return true;
+        }
+    }
     if (sa_party_tick(&s->party, ms)) s->dirty = true;
     if (sa_dungeon_hover(d, s->exp.lifted ? -1 : s->mouseX, s->exp.lifted ? -1 : s->mouseY)) s->dirty = true;
     s->rightClicked = false;

@@ -680,8 +680,9 @@ typedef struct Battle {
     Order pick[BATTLE_PICKS];
     int gainResources, gainExp;
     char gainItem[64];
-    Image *art[BATTLE_ART], *board[4], *back, *pop[4];
-    u32 ms, animMs, rng;
+    Image *art[BATTLE_ART], *board[4], *back, *pop[4], *from;
+    u32 ms, animMs, rng, noticeMs, holdMs, fadeMs;
+    int holdGroup;
 } Battle;
 
 bool sa_battle_init(Battle *b, Vfs *vfs, Party *party);
