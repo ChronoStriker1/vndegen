@@ -41,6 +41,7 @@ VNIkura *vnikura_open(const VNIkuraConfig *cfg, char *err, size_t errSize) {
     t->dun.compass = t->dun.marker = -1;
     t->buttonCount = 80;
     t->modeButton[0] = t->modeButton[1] = t->lastToggle = -1;
+    t->wheelVar = -1;
     for (int i = 0; i < 64; i++) t->settings[i] = i == 0 ? 1000 : i == 1 ? 1 : i == 3 || i == 4 ? 500 : i == 6 || i == 8 || i == 10 ? 128 : i >= 11 && i <= 36 ? 1 : 0;
     vm_start(t, "START.SNR");
     t->resumeSc = t->sc;
