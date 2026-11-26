@@ -157,6 +157,79 @@ These aren't port candidates.
 
 Two archives still can't be fully extracted. Summer Clover's 7z is truncated (35 MB of about 4.5 GB), but its readable start decodes to a Unity 2020.3.48f1 Naninovel game. VenusBlood -BRAVE-'s outer 7z has data errors and the RAR inside it is truncated; the surviving installer lists a Unity game.
 
+## Third survey (2026-11-26)
+
+The library now has 718 folders, and the TSV has a row for each. This pass covers the 30 folders added since the second survey, using the same method: archive and installer listings, file headers, version resources, imports and strings. No game was run. Their notes end with "third survey 2026-11-26".
+
+- 20 of the 30 are on engines VNDegen runs. 8 of those are already test games: Asher, EVISCERATETHISGIRL.COM, Forgotten Fiction, Siren's Call, Tawawa Oku-san x Happening Gym, Hanachirasu, Harmonia and planetarian HD.
+- 10 are Unity games, which VNDegen opens only outside itself on a Mac.
+- 1 is a console port on custom native code, and 2 are Game Boy games in an emulator wrapper.
+- None is unknown.
+
+| Engine | Games | Size (GB) | VNDegen |
+|---|---:|---:|---|
+| Unity | 10 | 6.9 | Opened outside VNDegen, Mac only |
+| RPG Maker MZ | 4 | 3.3 | Runs |
+| Twine | 3 | 0.2 | Runs |
+| SiglusEngine | 2 | 5.1 | Runs |
+| KiriKiri | 2 | 0.7 | Runs |
+| Game Boy ROM (GBCbag) | 2 | 0.1 | New, see below |
+| Wolf RPG Editor | 1 | 1.6 | Runs |
+| Visual Novel Maker | 1 | 1.0 | Runs |
+| N2System | 1 | 0.7 | Runs |
+| Ren'Py | 1 | 0.1 | Runs |
+| RPG Maker VX Ace | 1 | 0.1 | Runs |
+| Godot | 1 | 0.3 | Runs Godot 3 and 4, not Godot C# |
+| Custom native code | 1 | 4.4 | Not a target |
+
+### New test games for engines VNDegen runs
+
+"Standard" means the layout matches what the plugin already detects, so the game should just work. The others need something first.
+
+| Engine | Game folder | Size (MB) | Layout |
+|---|---|---:|---|
+| RPG Maker MZ | The Royal Knight's Risk Hedge | 241 | Standard. MZ 1.9.0, NW.js, encrypted assets. A fan translation's `gameupdate/` patch scripts sit beside the game |
+| RPG Maker MZ | Milf Busters! | 743 | Standard. MZ 1.4.0, unencrypted assets, 13 WebM movies |
+| RPG Maker MZ | Azure Steel Battle Princess Alvatia | 968 | Standard. MZ 1.9.0, encrypted assets, `Game.exe` renamed `0_Game.exe`, a fan translation's `gameupdate/` scripts |
+| RPG Maker MZ | Princess and Conquest - Queen Of Clubs | 1365 | Mostly standard. MZ 1.9.0, encrypted assets including `.m4a_`, 587 WebM movies, and the greenworks Steam module in `lib/` |
+| RPG Maker VX Ace | Bakana Imouto_ 10 Days A Bitch | 69 | Standard once imported. The game is VX Ace's compressed game data, a CAB (LZX) appended to the `.exe`, which the import unpacks as it does Succubus Hunt!'s. Needs the VX Ace RTP |
+| Ren'Py | Dead of the Brain | 120 | Unusual. Ren'Py 8.3 or later (Python 3.12), with `game/patches.rpe`. The 7z's file contents are password-protected and the folder has no password, so it can't be imported until the password is found |
+| Wolf RPG Editor | False Myth 2 | 1645 | Mostly standard. Wolf RPG Editor 3.343, 42 `.wolf` archives (DxLib archive version 8, which the runtime reads). Wolf 3.3x saves (versions 143 to 158) aren't read yet, so the Steam save it ships won't load, and this game would be the first test of that save version |
+| KiriKiri | Heated Battle! Lewd Sports Day! ~Sweat, Shout, and Shoot Your Load!~ | 336 | Likely standard. KiriKiri 2.31, the same developer's layout and `xp3dec.tpm` archive filter as Tawawa Oku-san x Happening Gym, which runs. 49 plugin DLLs ship, but the readable scripts link only `sigcheck.dll` and `wuvorbis.dll`, both built in. A fan translation adds loose `scenario/` folders through `AfterInit2.tjs` |
+
+The games already tested need nothing new. Their rows record what this pass saw: Hanachirasu's RAR also holds Kaigen's Ambition (see below), Harmonia and planetarian HD ship a Steam emulator, and Tawawa Oku-san x Happening Gym is a preservation copy with the PlayDRM launcher replaced by the stock KiriKiri 2.32 engine.
+
+### New engines
+
+None of the new engines is a visual novel or RPG engine with a library game of its own.
+
+| Engine | Games (GB) | Runtimes and format notes | Game logic | Work |
+|---|---:|---|---|---|
+| Game Boy ROM | 3 (0.4) | God Destroyer 2 and Yume Tenshi are GBCbag 2 builds, a Game Boy ROM (`Game/Game.gb`) beside the Mesen emulator (GPL-3.0). Kiana & Biscuit_ Pirates on a Visit!, from the first survey, runs its `.gbc` ROMs in binjgb (MIT) inside Electron. SameBoy's core (MIT, though its own iOS frontend was relicensed) and mGBA (MPL-2.0) are permissive emulator cores. Gambatte is GPL-2.0 | The ROM's own Game Boy code, run by an interpreting emulator, so the no-JIT rule isn't a problem | About 1 to 2 weeks on SameBoy's core: detection, Metal output, input and battery saves. Not visual novels or RPGs as far as the files show |
+| Godot C# | 2 (0.6) | Godot (MIT) with its .NET runtime (MIT). Byte - Desktop Pet is Godot 4.7.1 with .NET 8. Lust Arcanum, from the first survey, is Godot C# too. iOS has no JIT, so the games' IL assemblies would need Mono's interpreter or ahead-of-time compiling in the app | C# assemblies (`DesktopPets.dll`) beside the `.pck` | 4 to 8 weeks. One is a desktop pet, so only one game would gain |
+| NitroSystem (Nitroplus) | 1, inside the Hanachirasu folder | No runtime found. GARbro (MIT) reads the version 3 Nitroplus `.pak` archives | Compiled `.nps` scripts run by `system.dll`, a DirectDraw engine with Lua | 2 to 4 weeks for one bonus minigame, Kaigen's Ambition. Not worth it |
+
+The Game Boy ROM group now has as many library games as Smile Game Builder (3) and more than RealLive, which has none. The other two have fewer.
+
+Unity grows by 10 to 138 games. Married Into Hell is a Naninovel game. Five are IL2CPP: Breakthru, Dark Elf_ Descent into Corruption, Deadwalk Survival, Tokyo Valkyries and Wings of Seduction_ Bust 'em out!. Three are Unity 6. Asher is counted as Twine, not Unity, as `docs/engines.md` says.
+
+### Not visual novels or RPGs
+
+These aren't port candidates.
+- Console and arcade ports: SENRAN KAGURA Peach Ball (3D pinball on Direct3D 11), Breakthru (a Data East arcade shooter emulated inside Unity).
+- Game Boy games in an emulator wrapper: God Destroyer 2, Yume Tenshi.
+- Action and other games on Unity: LAST STAND Apocalypse (3D action, by its plugins), Deadwalk Survival (a survival game, by its title), Escape from the Room of the Serving Doll (3D room escape).
+- Desktop toys: Byte - Desktop Pet.
+
+### Still unknown
+
+The 8 rows left unknown by the second survey stay unknown. Nothing VNDegen gained since 2026-11-19 (SystemAoi, PJADV, ANIM, Eushully AGE, Bruns, and the VX Ace and electron-builder imports) reaches them.
+- Anthro Heat: its game is in a FreeArc archive, and no FreeArc unpacker is packaged for the survey machine.
+- Forbidden Solitaire: a custom scene installer with encrypted data.
+- Azure Striker Gunvolt Trilogy Enhanced_ Additional Mode - Azure Striker Gunvolt GX and the two Metal Gear Solid collections: over 8 GB with no engine in their file lists, so not opened.
+- プリンセスディフェンダー ～精霊姫エルトリーゼの物語～: the `.rar` is encrypted or damaged.
+- Loli Succu_ Cucu ~Easygoing Sex Around~ and Size Fetish One x Shota Battle 2 - Female Mutant VS Crossdressing Soldier: left out, not opened.
+
 ## Summary
 
 The library has 521 folders and 684.5 GB (637.5 GiB). Signatures identify the engine for 446 folders. 75 stay unknown.
