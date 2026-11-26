@@ -30,7 +30,7 @@ enum {
     SLOTS_Y = 395,
     ABILITY_RIGHT = 253,
     ABILITY_Y = 417,
-    SPRITE_X = 75,
+    SPRITE_X = 80,
     SPRITE_FEET = 171,
     DESC_X = 997,
     DESC_Y = 521,
@@ -90,6 +90,7 @@ void sa_card_free(Card *c) {
     sa_image_free(c->desc);
     sa_image_free(c->detail);
     sa_image_free(c->toggle);
+    sa_image_free(c->portrait);
     for (int i = 0; i < CARD_ICONS; i++) sa_image_free(c->icon[i]);
     memset(c, 0, sizeof *c);
 }
@@ -218,6 +219,21 @@ void sa_card_draw(SA *s, u32 *fb, const Member *m, int x, int y) {
     draw_status(s, fb, m, x, y);
 }
 
+static void draw_portrait(SA *s, u32 *fb, int number, int x, int y) {
+    Card *c = &s->card;
+    if (c->portraitNumber != number || !c->portrait) {
+        sa_image_free(c->portrait);
+        char name[24];
+        snprintf(name, sizeof name, "u%04da2.agf", number);
+        c->portrait = sa_load_image(&s->vfs, name);
+        c->portraitNumber = number;
+        c->portraitFrames = c->portrait ? sa_sprite_split(c->portrait, c->portraitFrame, SPRITE_FRAMES) : 0;
+    }
+    if (!c->portraitFrames) return;
+    SpriteFrame f = c->portraitFrame[s->party.ms / PARTY_CELL_MS % (u32)c->portraitFrames];
+    sa_blit_rect(fb, c->portrait, f.x, f.y, f.w, f.h, x + SPRITE_X - f.w / 2, y + SPRITE_FEET - f.h);
+}
+
 static void draw_status(SA *s, u32 *fb, const Member *m, int x, int y) {
     const Card *c = &s->card;
     Party *p = &s->party;
@@ -280,13 +296,7 @@ static void draw_status(SA *s, u32 *fb, const Member *m, int x, int y) {
     for (int k = 0; k < 3; k++) text_right(fb, sa_table_text(u, r, 34 + k), x + ABILITY_RIGHT, y + ABILITY_Y + k * PITCH, TEXT);
     const char *item = *m->equip ? item_name(s, *m->equip) : NULL;
     text_right(fb, item ? item : "なし", x + ABILITY_RIGHT, y + ABILITY_Y + 3 * PITCH, TEXT);
-    const Image *im = sa_party_member_sprite(p, m);
-    if (im) {
-        int cols, rows;
-        sa_sprite_layout(im, &cols, &rows);
-        int cw = im->w / cols, ch = im->h / rows;
-        sa_blit_rect(fb, im, 0, 0, cw, ch, x + SPRITE_X - cw / 2, y + SPRITE_FEET - ch);
-    }
+    draw_portrait(s, fb, sa_table_int(u, r, 11), x, y);
     wrap(fb, sa_table_text(u, r, 76), DESC_TEXT_X, DESC_TEXT_Y, DESC_W, DESC_SIZE, 17, 8);
     sa_font_set_plain(false);
     sa_font_set_spacing(1);

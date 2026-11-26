@@ -78,7 +78,9 @@ typedef struct Camp {
 } Camp;
 
 typedef struct Card {
-    Image *frame, *digits, *label[22], *desc, *detail, *toggle, *icon[CARD_ICONS];
+    Image *frame, *digits, *label[22], *desc, *detail, *toggle, *icon[CARD_ICONS], *portrait;
+    SpriteFrame portraitFrame[SPRITE_FRAMES];
+    int portraitNumber, portraitFrames;
     bool showDetail, toggleHover;
 } Card;
 
