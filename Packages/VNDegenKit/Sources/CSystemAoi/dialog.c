@@ -27,11 +27,14 @@ enum {
     UNITS_H = 166,
     UNITS_W = 424,
     CARD_W = 148,
+    CARD_PITCH = 145,
     CARD_DY = 10,
-    CARD_FEET = 125,
-    CARD_NAME_Y = 130,
+    CARD_ANCHOR_X = 75,
+    CARD_ANCHOR_Y = 110,
+    CARD_NAME_X = 71,
+    CARD_NAME_Y = 126,
     NAME_SIZE = 10,
-    NAME_SPACING = 3,
+    NAME_SPACING = 4,
 };
 
 enum { ART_FOOT, ART_OK, ART_HEAD, ART_TABLE, ART_TEXT, ART_CARD, ART_UNITS };
@@ -49,14 +52,17 @@ static void clear_lines(Dialog *d) {
     d->unitCount = 0;
 }
 
-void sa_dialog_add_unit(Dialog *d, Image *sprite, const char *name) {
+void sa_dialog_add_unit(Dialog *d, Image *sprite, const SpriteSheet *sheet, const char *name) {
     if (d->unitCount == DIALOG_UNITS) {
         sa_image_free(sprite);
         return;
     }
     memmove(d->unitSprite + 1, d->unitSprite, sizeof d->unitSprite[0] * (size_t)d->unitCount);
+    memmove(d->unitSheet + 1, d->unitSheet, sizeof d->unitSheet[0] * (size_t)d->unitCount);
     memmove(d->unitName + 1, d->unitName, sizeof d->unitName[0] * (size_t)d->unitCount);
     d->unitSprite[0] = sprite;
+    d->unitSheet[0] = *sheet;
+    d->unitMs = 0;
     snprintf(d->unitName[0], sizeof d->unitName[0], "%s", name);
     d->unitCount++;
 }
@@ -98,7 +104,13 @@ static int ok_y(const Dialog *d) { return DLG_Y + HEAD_H + (d->table ? TABLE_H :
 static bool on_ok(const Dialog *d, int x, int y) { return x >= OK_X && x < OK_X + OK_W && y >= ok_y(d) && y < ok_y(d) + OK_H; }
 
 bool sa_dialog_tick(Dialog *d, u32 ms) {
-    if (!d->table || d->ms >= COUNT_MS) return false;
+    bool redraw = false;
+    if (d->unitCount) {
+        u32 before = d->unitMs / PARTY_CELL_MS;
+        d->unitMs += ms;
+        redraw = d->unitMs / PARTY_CELL_MS != before;
+    }
+    if (!d->table || d->ms >= COUNT_MS) return redraw;
     d->ms += ms;
     return true;
 }
@@ -153,19 +165,14 @@ void sa_dialog_draw(Dialog *d, u32 *fb) {
     if (d->unitCount) {
         sa_blit(fb, d->art[ART_UNITS], DLG_X, y);
         const Image *card = d->art[ART_CARD];
-        int cw = card ? card->w : CARD_W, x0 = DLG_X + UNITS_W / 2 - cw * d->unitCount / 2;
+        int cw = card ? card->w : CARD_W, x0 = DLG_X + UNITS_W / 2 - (CARD_PITCH * (d->unitCount - 1) + cw + 1) / 2;
         for (int i = 0; i < d->unitCount; i++) {
-            int cx = x0 + i * cw, cy = y + CARD_DY;
+            int cx = x0 + i * CARD_PITCH, cy = y + CARD_DY;
             sa_blit(fb, card, cx, cy);
-            const Image *im = d->unitSprite[i];
-            if (im) {
-                SpriteFrame f[2];
-                if (sa_sprite_split(im, f, 1) < 1) f[0] = (SpriteFrame){0, 0, im->w, im->h};
-                sa_blit_rect(fb, im, f[0].x, f[0].y, f[0].w, f[0].h, cx + cw / 2 - f[0].w / 2, cy + CARD_FEET - f[0].h);
-            }
+            sa_sheet_draw(fb, d->unitSprite[i], &d->unitSheet[i], (int)(d->unitMs / PARTY_CELL_MS), cx + CARD_ANCHOR_X, cy + CARD_ANCHOR_Y);
             sa_font_set_spacing(NAME_SPACING);
             int w = sa_text_width(d->unitName[i], -1, NAME_SIZE) - NAME_SPACING;
-            sa_text_draw(fb, SA_W, SA_H, d->unitName[i], -1, cx + cw / 2 - w / 2, cy + CARD_NAME_Y, NAME_SIZE, 0xffffff, 0x000000);
+            sa_text_draw(fb, SA_W, SA_H, d->unitName[i], -1, cx + CARD_NAME_X - w / 2, cy + CARD_NAME_Y, NAME_SIZE, 0xffffff, 0x000000);
             sa_font_set_spacing(1);
         }
         y += UNITS_H;

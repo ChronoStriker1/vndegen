@@ -170,9 +170,12 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   frames (each within 6%); which walls get a set's variant textures wasn't found from play or data, so each cell
   takes one by a hash (right for about a third of the walls, as by chance); crystals are drawn see-through, unlit and turning (blends
   fitted to a few views, the spin speed taken from the door's); the falling leaves, sparks, snow and light motes
-  follow the sets' effect files, with their speeds fitted to a few PC recordings (the PC's snowflakes loop,
-  VNDegen's only wave).
-- Story: trap messages wait for a key or click; the original's also close by themselves after about 18 seconds
+  follow the sets' effect files, stepped 20 times a second (inferred from the PC's snow speed and the motes'
+  lifetime); the snowflakes loop as on the PC, but the PC's loops drift sideways where VNDegen's stack downward.
+- Story: choices, the message window, the join box's cards and the status card's portrait are placed as measured
+  (the sprites by the anchor in each sheet's header); the town diorama, 配置 and battles still cut unit sheets at
+  the gaps between figures, which is wrong for 40 of the 72 field sheets. `81` after a key door is still skipped
+  (nothing visible on the PC; its sound couldn't be recorded). Trap messages wait for a key or click; the original's also close by themselves after about 18 seconds
   (one run), and VNDegen doesn't time them out. The 探索, 調査, 押す, 引く, 切り替える and ワープ buttons have art but
   nothing in the game offers them (searched in the maps, scripts and PC play), so they aren't built.
 - Story groups: area bosses stand on their routes and stay beaten (measured), and a won battle with a story group

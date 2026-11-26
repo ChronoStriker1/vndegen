@@ -82,6 +82,20 @@ where play couldn't pin it down.
   before value (measured: 1066 on the way from 1060 to 1090); over a second (inferred). The script's last operand is
   the text; what the four numbers before it do is still open (the defeat hook passes four variables, the unit-join
   messages pass a number first, perhaps a picture for `ret_a05`).
+  Measured under Wine on the 学園 box and the join box: while the box is open the story scene under it is shown at
+  half brightness (0.498 of the backdrop on each channel, residual 0.25), with or without an `f2` before it; VNDegen
+  halves story backdrops while the box is open. Over the town map and the 迷宮 cross-section it wasn't measured.
+- **Choices (`07`).** Measured under Wine on every choice group the scripts hold: two choices (登録する, 引き継ぐ,
+  使用する and the quiz's チャレンジ, with one to four text lines, with and without a speaker face), three (the enemy
+  strength) and four (the quiz questions). The box (`msg_c00` top, 22 high; `msg_c01` rows, 50 high, normal and
+  hovered; `msg_c02` foot) sits at x 392 with its top at 130 − 14 × the number of choices (102, 88, 74), whatever the
+  message window shows; the choice text is white with a black edge, its top 10 pixels into the row, centred one pixel
+  left. Exact template matches; the quiz's 8x8 block error is 0.05 over the frame after the change (it was 3.5 over
+  the box). One choice never occurs, so its place is the same rule, inferred.
+- **Message window.** Measured by template matching: the buttons (Auto at (1087, 555), Skip, LOG, Repeat and Option
+  30 apart, close at (1192, 555)), the leaf at (1045, 537), the feather at (1047, 680) and the speaker's face at
+  (0, 295) sit one pixel right of and below where VNDegen first put them; the name and text ink centroids put the
+  name at y 554 and the text at y 590.
 - **`f6 N`**, town damage. Measured under Wine on a turn with F133 on and F134 off, where the town hook (`bo0102`)
   runs `2e L8 -20 -10`, `ef 0 L8 0`, `2e L0 5 10`, `f6 L0` and then 街の施設がダメージを受けました。（経験値ダウン）:
   after the turn's income box the town map shows `tmap.vfs` `event01.agf` (three 40 by 48 frames, the burst 3 pixels
@@ -93,6 +107,11 @@ where play couldn't pin it down.
 - **`f1 N`** widens the town's build area to stage N (the turn script calls it with 建設エリアが広がりました once
   enough is built: stage 2 at 30 facility points, 3 at 70, from `f3`'s total). The engine keeps the stage in C490,
   which the turn script reads (inferred from those reads; no script writes it).
+- **`f2 N`** picks the town map's variant. Measured under Wine: `bo0003`'s 学園 beat runs `f2 1` before
+  `ee "学園" 21`; the original's save then holds C491 = 1 (it was 0) and the town draws `tmapNNb` (the map with the
+  top plot cleared, 44% of the pixels where the a and b maps differ match b exactly, the rest under the 学園), where
+  it drew `tmapNNa` before (100% a). The 学園 tile (`f027aa`, 288 wide, two cells by two) is centred on cell 21's
+  centre (x 518), not 68 pixels left of it as the one-cell tiles are; 8x8 block error 14.1 before, 1.3 after.
 - **`c3 "role" var var`** asks which unit holds a post (街長 to 第七階層長), answering whether it's held and the unit;
   `bo3105` uses it for the appointment scenes.
 - **Missions (目標).** The turn script runs the target scene (`fa0000.box`) once F143 is set, after `9e var` gives
@@ -339,17 +358,25 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   0.005), a size (0.13), a speed (0.01, positive rises), clip distances (4 to 30) and fade-in and fade-out times (10
   and 40 frames). The textures are 32-bit with alpha. Measured under Wine from 30-second recordings at 15 frames a
   second (`particles/stats.txt`): in 千樹庭 one leaf crossed the view in 30 s (and one in an earlier 8 s), about 17 px
-  long, falling 323 px/s while turning, which fits a quad of side `Rate` falling `Fall` units every 1/60 s about 7
-  units away; in the ice dungeon five snowflakes in 30 s, about 9 px across, moving a median 78 px/s, sometimes in
-  loops with a period near 4 s; no sparks or motes crossed the 080 or 炎山洞 views in 30 to 60 s. Inferred: VNDegen
-  spreads the `Leaf` particles over the whole map, starts them at the ceiling (5.5) and respawns them there when they
-  reach the floor, sways them at 0.026 rad a step with a quarter of the given flutter (fitted to the snow's speed:
-  88 px/s against 78; at the full flutter they moved 218 px/s), and turns them by the spin values; `snow2` particles
-  live in the ring between the clip distances (count = `Num` × that ring's volume: 15 and 76), rise or fall at the
-  speed and fade in and out over the given frames. Each texel blends by its alpha; particles are fogged and lit
-  fully. Not matched: the PC's snowflakes loop (their vertical sway beats the fall) while VNDegen's only wave; the
-  effects' update rate. The view redraws every 66 ms while an effect runs, as near a door; drawing it costs the same
-  within noise (24.2 → 23.8 ms in 千樹庭, 19.4 → 20.4 ms in the ice dungeon, sarun `bench` on a loaded Linux host).
+  long, falling 323 px/s while turning, which fits a quad of side `Rate` falling `Fall` units a step at 20 steps a
+  second about 2.5 units away; in the ice dungeon five snowflakes in 30 s, about 9 px across, moving a median 78 px/s, sometimes in
+  loops with a period near 4 s; no sparks or motes crossed the 080 or 炎山洞 views in 30 to 60 s. Round 5 recorded
+  40 s at 30 frames a second in the ice dungeon (8-1, (12, 13)) and 090 (9-1, (1, 10)) and tracked each particle:
+  two snowflakes moved a median 91 and 92 px/s, one rising for 147 px while it neared the camera; 090's motes rose
+  at a median 12 px/s (8 to 20) and stayed in view up to 22.6 s. A `snow2` particle lives 5.5 / `Speed` = 550 steps,
+  9 s at 60 steps a second; 22.6 s needs at most 24 a second, and the snow's speed at the full flutter (218 px/s
+  at 60 a second) gives about 21. Inferred from that: the effects step 20 times a second (50 ms) with the full
+  `.def` amplitudes, and the sway turns 0.08 rad a step (a 3.9 s period, against the PC's 3.4 to 4 s). VNDegen
+  spreads the `Leaf` particles over the whole map, starts them at the ceiling (5.5) and respawns them there when
+  they reach the floor, sways them on one phase (x by sine, y and z by cosine) and turns them by the spin values;
+  `snow2` particles live in the ring between the clip distances (count = `Num` × that ring's volume: 15 and 76),
+  rise or fall at the speed and fade in and out over the given steps. Each texel blends by its alpha; particles are
+  fogged and lit fully. Same harness on VNDegen (sarun at 15 frames a second): snowflakes 113 and 118 px/s, looping
+  now (FlutterY 0.03 beats Fall 0.02, which the quarter flutter didn't); motes 9 px/s (8 to 41), up to 25.7 s in a
+  30 s recording. Not matched: the PC's loops drift sideways along the view where VNDegen's stack downward (the
+  3D paths didn't fit any single-phase model, rms 20 px), so the per-axis phases are unknown. The view redraws every
+  66 ms while an effect runs, as near a door; drawing it costs the same within noise (24.2 → 23.8 ms in 千樹庭,
+  19.4 → 20.4 ms in the ice dungeon, sarun `bench` on a loaded Linux host).
 - **Light and fog.** Back faces are culled. A texture whose top-left colour covers a tenth of it treats that colour
   as transparent (the grass `010w0x0`).
 - **Door leaves.** The door walls `w100` and `w111` hold two leaf layers (`door1`/`door2`, `door3`/`door4`) with a
@@ -358,6 +385,9 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   hook, `d7` makes the side 111 and passable, `81` runs, then 鍵で、扉を開いた。 shows over the old door; after it
   the door stands closed with the white ring of `w111`, and the next step swings both leaves away from the party as
   it walks through. `81` changed nothing that could be seen (a sound or a redraw, inferred) and VNDegen skips it.
+  A second look in round 5 didn't get that far: with 千樹の鍵 written into VNDegen exports (as 1007 or 1006, in the
+  first or the next free pair at 87,228, and also in VNDegen's stock list) the original still said
+  この扉を開くには鍵が必要なようだ。, so no sound was recorded.
   VNDegen applies the hinge offset and, while the party walks through a wall, turns that side's leaves 90° away
   over the step and hides the copy drawn from the far cell; the angle and timing are inferred (the PC's leaves were
   about 60° open a third of the way through).
@@ -961,9 +991,9 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   skill icons are 20 pixels; a fixed-skill unit lists only its first skill, marked ★ without its 固定／ prefix, over
   column 38 + 1 slots (ミアルテ 1/3, Darkus 5/6). Measured: the portrait is the unit's battle sheet (`u????a2`, the
   enemy sheet), animated frame by frame (each PC capture matched a different frame exactly), not the field sheet;
-  VNDegen cuts it with the battle's frame splitter and draws frame 0 onwards at the party's 100 ms. Placed centred 80
-  pixels into the card with its feet at 171: ルーアルテ lands exactly, キュリハ within 2 pixels and クドア 7 pixels
-  right of the original (its vases pack at 35 pixels; what centres them on the PC isn't known).
+  VNDegen cuts it on the grid in the sheet's header (Unit sheets, under Saves) and draws frame 0 onwards at the
+  party's 100 ms, with the sheet's anchor at (1072, 183): ルーアルテ (anchor 30, 67), キュリハ (26, 58) and クドア
+  (18, 61) all land on the original's pixels (exact frame matches at (1042, 116), (1046, 125) and (1054, 122)).
 
 ## Saves
 
@@ -1367,7 +1397,19 @@ the same points (offsets in bytes, numbers little-endian):
   to 27 with its +25 byte at 1 (inferred, as for a main tile).
 - **Joining box.** Measured: `8a 2 0 0 0` in the town adds its numbers to the town (住民 15 → 17) and shows the
   table; the units that joined just before get a card each under the text (`ret_a05` on the `ret_a06` panel, the
-  front sprite `uNNNNa2` and the name), newest first, then OK.
+  front sprite `uNNNNa2` and the name), newest first, then OK. Measured on the join capture (exact frame matches
+  over opaque pixels): the cards step 145 pixels (narrower than the 148-pixel card), centred under the box with the
+  half pixel to the left (495 and 640 for two), each sprite's anchor (below) at the card's (75, 110), animated
+  (ミアルテ on frame 8, ルーアルテ on 0); the name 4 pixels higher and 3 left of the card's centre, 4 pixels between
+  characters. Cards for one, three or four units follow the same rule, inferred.
+- **Unit sheets.** Every `u????a0` and `u????a2` sheet (482) carries its frame grid in the AGF header: the used width
+  and height at 0x24 and 0x28, the anchor x and y (floats) at 0x2c and 0x30, the cell width and height (floats) at
+  0x38 and 0x3c, two 0.5s, and the frame count at 0x64; for all 482 the cell divides the used area and the count fits
+  in it. Frames run row by row. クドア's sheet is 248 wide with 245 used (seven 35-pixel cells), which is why cutting
+  at the gaps between figures put it 7 pixels off. The original puts a sheet's anchor at a fixed point: the status
+  card's portrait at (1072, 183), the join card's at (75, 110) from the card. 40 of the 72 field sheets (`a0`) are cut
+  wrong by the gap heuristic the town diorama, 配置 and battles use (キュリハ's 15 by 5 sheet is drawn whole on the
+  組織図 board); they still use it.
 - **Dungeon saves.** Measured: an image with C004/C005 at 62/2 (in a dungeon) but nothing in the dungeon regions
   crashes the original as soon as its load screen lists it. With the groups, their enemies, the last position, the
   entry and C076/C077 written, the original lists VNDegen's dungeon saves (8ターン 千樹庭 中央森の東 0歩目) and loads
