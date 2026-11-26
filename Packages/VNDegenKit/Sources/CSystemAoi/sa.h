@@ -244,6 +244,8 @@ typedef struct R3 {
     u32 fogColor;
     int cull;
     float blend;
+    bool idMode;
+    u32 id;
 } R3;
 
 void r3_init(R3 *r, int w, int h);
@@ -309,7 +311,7 @@ typedef struct Dungeon {
     int x, y, dir;
     float fov, camX, camZ, yaw;
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
-    u32 animMs, animDur, clock;
+    u32 animMs, animDur, clock, variantSeed;
     int hover, steps;
     bool bumped, folded;
     Image *art[DUN_ART];
@@ -360,6 +362,7 @@ bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map);
 void sa_dungeon_open_doors(Dungeon *d);
 bool sa_dungeon_find_mark(const Dungeon *d, int mark, int *x, int *y);
 void sa_dungeon_sense(bool on);
+void sa_dungeon_debug_variant(int variant, int mode);
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side);
 int sa_dungeon_group_step(const Dungeon *d, int x, int y, int side);
 bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y);

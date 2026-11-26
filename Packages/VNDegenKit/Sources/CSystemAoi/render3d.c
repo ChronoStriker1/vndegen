@@ -96,6 +96,12 @@ static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Ima
                 c = tex->px[(size_t)ty * tw + tx];
                 if ((c >> 24) < 128) continue;
             }
+            if (r->idMode) {
+                if (r->blend > 0) continue;
+                zrow[x] = iz;
+                row[x] = 0xff000000u | r->id;
+                continue;
+            }
             float fz = z * r->fogDensity, f = expf(-fz * fz);
             float cr = fminf((float)(c & 0xff) * sh, 255), cg = fminf((float)(c >> 8 & 0xff) * sh, 255), cb = fminf((float)(c >> 16 & 0xff) * sh, 255);
             float g1 = 1 - f;
