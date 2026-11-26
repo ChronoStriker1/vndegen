@@ -58,6 +58,10 @@ Linux host and loaded in the app.
 | Test Game 55 | VX Ace | unpacked, no RTP | map at 1024x768, HUD, its own menus, save and load from the menu in the app |
 | Monster Girl Quest Paradox 2.35, with its data and pictures packs | VX Ace | unpacked, no RTP | title, new game, opening, walking to the village, menu save, autosave, Continue; a battle started by a script with the game's own troop and won on the Linux host, and its largest troop in the app; on the iPad simulator, a save made through the menu with every name's case swapped |
 
+Test Game 37's menus move the cursor again on a held Down's fourth repeat, the 28th frame, which at its 120 frames a
+second comes 0.23 s after the press. On its two-item title, Down held that long from Continue moves the cursor to New
+Game and back, from a key or a controller alike, as on PC. A shorter press moves it once.
+
 Frame rates, from `-frameMonitor YES` (DEBUG builds log `RGSSFRAMES` every 10 seconds) while walking or playing, with
 another thread's iPhone simulator running on the same Mac mini:
 
