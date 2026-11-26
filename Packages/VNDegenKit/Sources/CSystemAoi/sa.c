@@ -1034,6 +1034,9 @@ static void town_action(SA *s, int action) {
     case TOWN_BTN_OPTION:
         sa_option_open(s);
         break;
+    case TOWN_BTN_LOG:
+        sa_log_open(&s->log);
+        break;
     case TOWN_NONE:
         if (s->town.hidden) s->town.hidden = false;
         break;
@@ -1363,6 +1366,7 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
         if (s->mode == MODE_TOWN) return true;
     }
     if (s->mode == MODE_TOWN) {
+        if (sa_log_town_frame(s)) return true;
         if (sa_party_tick(&s->party, elapsedMs) && !s->town.hidden && !s->town.mapOnly) s->dirty = true;
         if (sa_town_hover(&s->town, &s->vm, s->mouseX, s->mouseY)) s->dirty = true;
         if (s->clicked) {

@@ -91,8 +91,7 @@ typedef struct Train {
 } Train;
 
 typedef struct Deploy {
-    Image *art[64], *benchSprite[PARTY_BENCH], *postRow[20];
-    int benchUnit[PARTY_BENCH];
+    Image *art[64], *postRow[20];
     int hover, picked, heldX, heldY, tab;
     bool overRank;
 } Deploy;

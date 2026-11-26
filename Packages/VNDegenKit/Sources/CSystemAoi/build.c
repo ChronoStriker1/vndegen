@@ -1,5 +1,6 @@
 #include "sa.h"
 
+enum { NAME_DX = -1, TEXT_DY = -1 };
 enum { ART_LIST, ART_ROW, ART_LABELS, ART_BACK, ART_DECIDE, ART_UNDO, ART_RESET, ART_INFO, ART_BOARD, ART_CURSOR, ART_DIGITS, ART_COUNT };
 
 static const char *const artNames[ART_COUNT] = {"bul_a00.agf", "bul_a01.agf", "bul_a02.agf", "bul_a03.agf",
@@ -247,7 +248,7 @@ static void draw_lines(u32 *fb, const char *text, int x, int y) {
         }
         if (brk || chars == LINE_CHARS || (!*p && n)) {
             line[n] = 0;
-            if (n) sa_text_draw(fb, SA_W, SA_H, line, -1, x, y, 15, 0x000000, 0xffffffffu);
+            if (n) sa_text_draw(fb, SA_W, SA_H, line, -1, x, y, 16, 0x000000, 0xffffffffu);
             y += LINE_H;
             n = chars = 0;
         }
@@ -274,8 +275,10 @@ static void draw_info(BuildScreen *b, Town *t, const VM *vm, u32 *fb, int row, c
     if (row < 0) return;
     const Image *dg = b->art[ART_DIGITS];
     int ox = INFO_X - 995, oy = INFO_Y - 326, level = f && f->level > 0 ? f->level : 1;
-    sa_text_draw(fb, SA_W, SA_H, sa_table_text(&t->build, row, 1), -1, 1048 + ox, 359 + oy, 15, 0x000000, 0xffffffffu);
-    sa_text_draw(fb, SA_W, SA_H, sa_table_text(&t->build, row, 2), -1, 1191 + ox, 359 + oy, 15, 0x000000, 0xffffffffu);
+    sa_font_set_spacing(0);
+    sa_font_set_plain(true);
+    sa_text_draw(fb, SA_W, SA_H, sa_table_text(&t->build, row, 1), -1, 1048 + ox + NAME_DX, 359 + oy, 16, 0x000000, 0xffffffffu);
+    sa_text_draw(fb, SA_W, SA_H, sa_table_text(&t->build, row, 2), -1, 1191 + ox + NAME_DX, 359 + oy, 16, 0x000000, 0xffffffffu);
     field(fb, dg, level, 1, 1088 + ox, 381 + oy, 0);
     field(fb, dg, f ? f->exp : 0, 9, 1268 + ox, 381 + oy, 0);
     field(fb, dg, sa_table_int(&t->build, row, 19), 3, 1138 + ox, 401 + oy, 0);
@@ -289,8 +292,10 @@ static void draw_info(BuildScreen *b, Town *t, const VM *vm, u32 *fb, int row, c
         int v = sa_town_value(t, row, level, COL_MAZE + i);
         sa_draw_int(fb, dg, v, false, MAZE_RIGHT + ox + i * MAZE_PITCH, MAZE_DIGIT_Y + oy, v > 0 ? 2 : v < 0 ? 1 : 0, 10, 13);
     }
-    draw_lines(fb, sa_table_text(&t->build, row, 66), TEXT_X + ox, DESC_Y + oy);
-    draw_lines(fb, sa_table_text(&t->build, row, 67), TEXT_X + ox, EFFECT_Y + oy);
+    draw_lines(fb, sa_table_text(&t->build, row, 66), TEXT_X + ox, DESC_Y + oy + TEXT_DY);
+    draw_lines(fb, sa_table_text(&t->build, row, 67), TEXT_X + ox, EFFECT_Y + oy + TEXT_DY);
+    sa_font_set_plain(false);
+    sa_font_set_spacing(1);
 }
 
 void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb) {
