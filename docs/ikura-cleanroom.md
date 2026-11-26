@@ -21,7 +21,7 @@ It derives from no GPL or LGPL code. Its sources:
 | Raidy II: automap | Saves the original wrote (bit order and plane layout) and test scripts drawing the map with each command alone and with its arguments swapped |
 | Raidy II: equipment | Black box only: test scripts set the equipment and base variables, ran `0f03` or `0f04`, and saved; the variables were read from the save files. The tables and formulas reproduce every variable in 98 compared saves |
 | Raidy II: backlog | The game's `BACKLOG.SNR` and screenshots of the original's log page |
-| Raidy II: saves (`RAIDY2R.SAV`) | Saves the original wrote under Wine and the game's own shipped save, walked field by field; checked both ways |
+| Raidy II: saves (`RAIDY2R.SAV`) | Saves the original wrote under Wine and the game's own shipped save, walked field by field; test scripts in `SNR0` saved by both games' exes, whose slots VNDegen's match byte for byte but for the date and thumbnail; checked both ways |
 | Raidy II: read marks | The shipped save's marks block against each script's `090a` slot and line numbers; lines cleared in the block and played under Wine (where Skip stopped, when the PC wrote the block back), and the skip setting and Nonstop changed one at a time. Raidy's PC, run the same way, wrote no marks and skipped unread lines |
 
 The exe was run under Wine for nearly everything. Its machine code was read in two places only, for facts: the
@@ -42,6 +42,22 @@ Things that were unsure and how they were settled:
 - The dungeon's camera: two faces of one wall seen from two cells give the distance and focal length; the texture's
   mortar spacing confirmed them.
 - The save state's resume point: the last label the main script reached, as both a message and a dungeon save show.
+  Where several labels name one line, the PC writes the highest, whether the script fell through to it or jumped to
+  a lower one (a test script in both games' exes under Wine, and the PC's saves from Raidy II's opening).
+- The names in a slot: the PC writes each file as the archive names it, with its extension, though Raidy II's
+  scripts name most files bare (its saves at three points in the opening and town, test scripts, the shipped save's
+  animation name). Its load page failed with "L2_OP open failed" on a slot that named the script bare.
+- The slot's message mode and the two words after it: test scripts in `SNR0` ran `090d`, `090e`, `0911` and `0910`
+  alone and in pairs before a message and saved on a right click bound with `0702`; the mode followed `090d`
+  (1) and `090e` or `0911` (0) in both exes and never `0910`. The next word was the slot the last `090a` named. In
+  Raidy the word after it followed the lines shown: k - 1 after one line k (0 to 20), 0 after lines 0, 1, 2 (also in
+  the PC's own save at the intro's third line), 4 after 5, 9 and after 5, 9, 3; Raidy II wrote 0.
+- The line in a slot: Raidy II's PC wrote the window's text only while `090d` held and the message had finished; a
+  line waiting for its click, named or not, left it empty, as in its saves from the opening. Raidy's PC wrote it while
+  the line waited. Both left it empty while the window was hidden.
+- The layers in a slot: with layers 1, 3 and 5 swapped round a cycle (Raidy II's opening and a test script), the PC's
+  layer records were VNDegen's in drawing order, and its order words the inverse of VNDegen's map; one swap of two
+  layers, the only case checked before, looks the same both ways.
 - Raidy II's `0212`: a content swap or a renumbering. Test scripts showed the content moves with the number, and the
   PC's saves showed each layer keeping its place in the drawing order; both together are a renumbering.
 - Raidy II's window font: Wine draws a proportional face because the prefix has no MS Gothic. A Windows install has
@@ -55,4 +71,6 @@ Things that were unsure and how they were settled:
 - Raidy II's layers after `0101` reloads their picture slot: the opening loads its logo into the slot the desert
   layer was built from, and the PC under Wine keeps showing the desert behind the logo and the lines that follow.
 - Raidy II's `0716`/`0717` trailing arguments: the last one isn't the starting mode (the load page's slot buttons have
-  0 and the script expects them enabled); both are accepted and ignored.
+  0 and the script expects them enabled). A test script made three `0717` buttons with 1, 2 and 0 before it: the PC
+  saved them as the buttons' state flags, as the town map's buttons in its own save show. The PC saved the last
+  argument as the button's mode, which VNDegen doesn't follow because of the load page.
