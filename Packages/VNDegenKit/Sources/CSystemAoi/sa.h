@@ -467,6 +467,7 @@ void sa_log_scroll(Backlog *b, int lines);
 int sa_log_click(Backlog *b, int x, int y, char *voice, size_t voiceSize);
 bool sa_log_hover(Backlog *b, int x, int y);
 void sa_log_draw(Backlog *b, u32 *fb, bool fast, bool autoMode);
+bool sa_log_town_frame(SA *s);
 
 typedef struct Table {
     int rows, cols;
@@ -552,6 +553,10 @@ typedef struct SpriteFrame {
     int x, y, w, h;
 } SpriteFrame;
 
+typedef struct SpriteSheet {
+    int cols, cellW, cellH, frames, anchorX, anchorY;
+} SpriteSheet;
+
 typedef struct Order {
     int mode, skill, aim;
 } Order;
@@ -563,6 +568,7 @@ typedef struct Order {
 #define PARTY_ITEMS 256
 #define PARTY_FRONT 3
 #define PARTY_CELL_MS 100
+#define PARTY_BARS_DY 63
 
 typedef struct Bench {
     int unit, hp, mp, level, exp, equip, sp, trained[10];
@@ -589,17 +595,19 @@ typedef struct Party {
     int skillLevel[PARTY_ROSTER];
     bool presetSaved[PARTY_PRESETS];
     Image *sprite[PARTY_SLOTS];
-    int cells[PARTY_SLOTS];
+    SpriteSheet sheet[PARTY_SLOTS];
     u32 ms;
-    Image *platform, *tile, *smallTile, *gaugeFrame, *hpGauge, *mpGauge, *label, *digits;
+    Image *platform, *tile, *smallTile, *gaugeFrame, *hpGauge, *mpGauge, *label, *digits, *smallBarEmpty, *smallBarFull;
     Vfs *vfs;
     const Table *lvup;
     Table positions;
     int post[PARTY_POSTS];
     Image *reserveSprite[PARTY_RESERVE];
+    SpriteSheet reserveSheet[PARTY_RESERVE];
     int reserveUnit[PARTY_RESERVE];
-    Image *benchSprite[PARTY_BENCH], *sgpLabel;
-    int benchSpriteUnit[PARTY_BENCH];
+    Image *frontSprite[PARTY_SLOTS + PARTY_BENCH], *sgpLabel;
+    SpriteSheet frontSheet[PARTY_SLOTS + PARTY_BENCH];
+    int frontUnit[PARTY_SLOTS + PARTY_BENCH];
     int sgp;
 } Party;
 
@@ -610,8 +618,10 @@ typedef struct Member {
 
 int sa_party_member_list(Party *p, Member *out);
 void sa_party_draw_board(Party *p, u32 *fb, const Image *platform, int ox, int oy, const int *frames);
+void sa_party_draw_reserve(Party *p, u32 *fb, int boardX, int boardY, u32 ms, bool bars);
+void sa_party_draw_small_tile(Party *p, u32 *fb, int cx, int cy);
 int sa_party_member_value(const Party *p, const Member *m, int index);
-const Image *sa_party_member_sprite(Party *p, const Member *m);
+const Image *sa_party_front_sprite(Party *p, int unit, const SpriteSheet **sheet);
 int sa_party_member_badge(const Party *p, const Member *m);
 enum { BADGE_FIELD = 98, BADGE_RESERVE = 99 };
 
@@ -651,8 +661,6 @@ void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y);
 void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy, int frame);
 void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY, const int *frames);
 void sa_party_draw_bars(Party *p, u32 *fb, int x, int y, int hp, int maxHp, int mp, int maxMp);
-void sa_sprite_layout(const Image *im, int *cols, int *rows);
-int sa_sprite_filled_cells(const Image *im);
 int sa_sprite_split(const Image *im, SpriteFrame *out, int max);
 
 enum { STAT_ATTACK, STAT_MAGIC, STAT_DEFENCE, STAT_RESIST, STAT_SPEED, STAT_EVASION, STAT_GOVERN, STAT_COMMAND };
@@ -673,8 +681,7 @@ typedef struct Fighter {
     int hp, mp, maxHp, maxMp;
     int stat[8];
     Image *sprite;
-    SpriteFrame frame[SPRITE_FRAMES];
-    int frames;
+    SpriteSheet sheet;
 } Fighter;
 
 typedef struct BattleLine {
@@ -692,7 +699,8 @@ typedef struct Battle {
     int count, levelBonus, expBonus;
     int order[BATTLE_FIGHTERS], orderCount, next;
     BattleLine log[BATTLE_LOG];
-    int logCount;
+    int logCount, hidden, speed;
+    bool queueing;
     int picker, pickSlot, pickCount;
     Order pick[BATTLE_PICKS];
     int gainResources, gainExp;
@@ -703,6 +711,7 @@ typedef struct Battle {
 } Battle;
 
 bool sa_battle_init(Battle *b, Vfs *vfs, Party *party);
+void sa_battle_set_speed(Battle *b, int speed);
 void sa_battle_free(Battle *b);
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed);
 bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, Image *backdrop, int boardSet, u32 seed);
@@ -797,10 +806,6 @@ void sa_debug_town(VNSystemAoi *sa, int turns);
 void sa_draw_number(u32 *fb, const Image *font, const char *s, int right, int y, int row, int cw, int ch);
 void sa_draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch);
 Image *sa_load_image(Vfs *vfs, const char *name);
-
-typedef struct SpriteSheet {
-    int cols, cellW, cellH, frames, anchorX, anchorY;
-} SpriteSheet;
 
 Image *sa_sheet_load(Vfs *vfs, const char *name, SpriteSheet *sheet);
 void sa_sheet_draw(u32 *fb, const Image *im, const SpriteSheet *sheet, int frame, int x, int y);

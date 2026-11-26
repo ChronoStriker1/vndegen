@@ -55,6 +55,11 @@ enum {
     STEP_Y = 29,
     ROW_X = -81,
     ROW_Y = 41,
+    PARTY_ANCHOR_DX = 1,
+    ENEMY_ANCHOR_DX = 1,
+    ENEMY_ANCHOR_DY = 1,
+    RESERVE_ROW_X = 41,
+    RESERVE_ROW_Y = -20,
     GRID_ROWS = 3,
     GRID_COLS = 5,
     BACKS_X = 103,
@@ -123,7 +128,6 @@ enum {
     PICK_INSET_Y = 4,
     ICON = 20,
     SKILL_SIZE = 12,
-    ACTION_MS = 1500,
     BATTLE_FADE_MS = 400,
     LOSS_MS = 2000,
     SUBSTITUTE_CHANCE = 50,
@@ -145,6 +149,10 @@ static const int sideY[12] = {414, 434, 474, 494, 514, 554, 574, 594, 634, 654, 
 static const struct {
     int x, y;
 } boards[4] = {{0, 0}, {406, 116}, {326, 130}, {250, 80}};
+
+static const struct {
+    int x, y;
+} reserveTiles[4] = {{0, 0}, {765, 190}, {0, 0}, {0, 0}};
 
 static void roll_order(Battle *b);
 
@@ -196,13 +204,13 @@ static void fighter_stats(Battle *b, Fighter *f) {
     for (int i = 0; i < 8; i++) f->stat[i] = v[2 + i];
 }
 
-static Image *sprite_for(Vfs *vfs, int number, bool enemy) {
+static Image *enemy_sprite(Vfs *vfs, int number, SpriteSheet *sheet) {
     char name[24];
-    snprintf(name, sizeof name, enemy ? "u%04da2.agf" : "u%04da0.agf", number);
-    Image *im = sa_load_image(vfs, name);
-    if (!im && enemy) {
+    snprintf(name, sizeof name, "u%04da2.agf", number);
+    Image *im = sa_sheet_load(vfs, name, sheet);
+    if (!im) {
         snprintf(name, sizeof name, "u%04da0.agf", number);
-        im = sa_load_image(vfs, name);
+        im = sa_sheet_load(vfs, name, sheet);
     }
     return im;
 }
@@ -277,8 +285,7 @@ static void add_enemy(Battle *b, Vfs *vfs, int r, int row, int col) {
     fighter_stats(b, f);
     f->hp = f->maxHp;
     f->mp = f->maxMp;
-    f->sprite = sprite_for(vfs, sa_table_int(&b->party->units, r, 11), true);
-    f->frames = f->sprite ? sa_sprite_split(f->sprite, f->frame, SPRITE_FRAMES) : 0;
+    f->sprite = enemy_sprite(vfs, sa_table_int(&b->party->units, r, 11), &f->sheet);
 }
 
 static void pick_from_list(Battle *b, const char *list, char *out, size_t size) {
@@ -450,6 +457,7 @@ static void log_line(Battle *b, const char *who, bool enemy, const char *rest, b
         b->logCount--;
     }
     BattleLine *l = &b->log[b->logCount++];
+    if (b->queueing) b->hidden++;
     l->text = sa_fmt("%s\t%s", who, rest);
     l->enemy = enemy;
     l->indent = indent;
@@ -718,10 +726,15 @@ static void roll_order(Battle *b) {
         }
 }
 
+static const u32 lineMs[3] = {906, 520, 340}, firstMs[3] = {500, 370, 300};
+
+void sa_battle_set_speed(Battle *b, int speed) { b->speed = speed >= 0 && speed < 3 ? speed : 0; }
+
 static void plan_round(Battle *b) {
     for (int i = 0; i < b->count; i++) b->f[i].guard = false;
     b->next = 0;
-    b->ms = ACTION_MS;
+    b->ms = lineMs[b->speed] - firstMs[b->speed];
+    b->hidden = 0;
     b->acting = true;
     b->picker = PICK_NONE;
     b->round++;
@@ -790,10 +803,8 @@ static void finish_check(Battle *b) {
             reward(b);
         } else if (!count_side(b, false)) {
             b->result = BATTLE_LOST;
-            b->ms = 0;
         }
     }
-    if (b->result != BATTLE_RUNNING) b->acting = false;
     for (int i = 0; i < b->count; i++)
         if (!b->f[i].enemy) {
             b->party->hp[b->f[i].slot] = b->f[i].hp;
@@ -808,7 +819,7 @@ bool sa_battle_tick(Battle *b, u32 ms) {
         b->fadeMs += ms;
         changed = true;
     }
-    if (b->result == BATTLE_LOST && b->open) {
+    if (b->result == BATTLE_LOST && b->open && !b->acting) {
         b->ms += ms;
         if (b->ms < LOSS_MS) return changed;
         b->open = false;
@@ -822,16 +833,29 @@ bool sa_battle_tick(Battle *b, u32 ms) {
         return changed;
     }
     b->ms += ms;
-    while (b->acting && b->ms >= ACTION_MS) {
-        b->ms -= ACTION_MS;
+    while (b->acting && b->ms >= lineMs[b->speed]) {
+        b->ms -= lineMs[b->speed];
+        changed = true;
+        if (b->hidden) {
+            b->hidden = 0;
+            continue;
+        }
+        if (b->result != BATTLE_RUNNING) {
+            b->acting = false;
+            b->ms = 0;
+            break;
+        }
+        while (b->next < b->orderCount && !alive(&b->f[b->order[b->next]])) b->next++;
         if (b->next >= b->orderCount) {
             b->acting = false;
             roll_order(b);
             break;
         }
+        b->queueing = true;
         act(b, b->order[b->next++]);
+        b->queueing = false;
+        if (b->hidden) b->hidden--;
         finish_check(b);
-        changed = true;
     }
     return changed;
 }
@@ -961,31 +985,21 @@ static void tile_center(const Fighter *f, int *x, int *y) {
 static void draw_fighter(Battle *b, u32 *fb, Fighter *f) {
     if (!alive(f)) return;
     const Image *im = f->enemy ? f->sprite : b->party->sprite[f->slot];
+    const SpriteSheet *sheet = f->enemy ? &f->sheet : &b->party->sheet[f->slot];
     if (!im) return;
-    SpriteFrame fr;
-    if (f->enemy) {
-        if (!f->frames) return;
-        fr = f->frame[b->animMs / PARTY_CELL_MS % (u32)f->frames];
-    } else {
-        int cols, rows, cells = b->party->cells[f->slot];
-        sa_sprite_layout(im, &cols, &rows);
-        int cw = im->w / cols, ch = im->h / rows;
-        int cell = cells > 0 ? (int)(b->animMs / PARTY_CELL_MS % (u32)cells) : 0;
-        fr = (SpriteFrame){cell % cols * cw, cell / cols * ch, cw, ch};
-    }
     int cx, cy;
     tile_center(f, &cx, &cy);
-    int x = cx - fr.w / 2, y = cy + 17 - fr.h;
-    sa_blit_rect(fb, im, fr.x, fr.y, fr.w, fr.h, x, y);
-    if (b->gaugeMode == 0 || (b->gaugeMode == 2 && b->acting)) sa_party_draw_bars(b->party, fb, cx - 22, y, f->hp, f->maxHp, f->mp, f->maxMp);
+    int dy = f->enemy ? ENEMY_ANCHOR_DY : 0;
+    sa_sheet_draw(fb, im, sheet, (int)(b->animMs / PARTY_CELL_MS), cx + (f->enemy ? ENEMY_ANCHOR_DX : PARTY_ANCHOR_DX), cy + dy);
+    if (b->gaugeMode == 0 || (b->gaugeMode == 2 && b->acting)) sa_party_draw_bars(b->party, fb, cx - 22, cy + dy - PARTY_BARS_DY, f->hp, f->maxHp, f->mp, f->maxMp);
 }
 
 static void draw_log(Battle *b, u32 *fb) {
     sa_blit_rect(fb, b->art[ART_LOG], 0, 0, b->art[ART_LOG] ? b->art[ART_LOG]->w : 0, 450, LOG_X, LOG_Y);
-    int first = b->logCount > LOG_LINES ? b->logCount - LOG_LINES : 0;
+    int shown = b->logCount - b->hidden, first = shown > LOG_LINES ? shown - LOG_LINES : 0;
     sa_font_set_spacing(0);
     sa_font_set_plain(true);
-    for (int i = first; i < b->logCount; i++) {
+    for (int i = first; i < shown; i++) {
         BattleLine *l = &b->log[i];
         int y = LOG_TEXT_Y + (i - first) * LOG_PITCH;
         char *tab = strchr(l->text, '\t');
@@ -1123,6 +1137,12 @@ static void draw_board(Battle *b, u32 *fb) {
     sa_blit(fb, b->board[b->boardSize], boards[b->boardSize].x, boards[b->boardSize].y);
     sa_blit(fb, b->board[0], PARTY_BOARD_X, PARTY_BOARD_Y);
     sa_party_draw_tiles(b->party, fb, PARTY_BOARD_X, PARTY_BOARD_Y, frames);
+    if (reserveTiles[b->boardSize].x)
+        for (int r = 0; r < 2; r++)
+            for (int k = 0; k < PARTY_RESERVE; k++)
+                sa_party_draw_small_tile(b->party, fb, reserveTiles[b->boardSize].x + r * RESERVE_ROW_X + k * STEP_X / 2,
+                                         reserveTiles[b->boardSize].y + r * RESERVE_ROW_Y + k * STEP_Y / 2);
+    sa_party_draw_reserve(b->party, fb, PARTY_BOARD_X, PARTY_BOARD_Y, b->animMs, b->gaugeMode == 0 || (b->gaugeMode == 2 && b->acting));
     for (int r = 0; r < GRID_ROWS; r++)
         for (int c = 0; c < GRID_COLS; c++) {
             if (!board_has(b, c)) continue;

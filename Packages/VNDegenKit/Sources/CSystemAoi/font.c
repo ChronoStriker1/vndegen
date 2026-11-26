@@ -143,7 +143,7 @@ static void put_glyph(u32 *dst, int dw, int dh, const Glyph *g, int x, int y, u3
             int px = x + i;
             if (px < 0 || px >= dw) continue;
             u32 a = g->bm[(size_t)j * g->w + i];
-            if (plain) a = a >= 100 ? 255 : 0;
+            if (plain) a = a >= 124 ? 255 : 0;
             a = a * ca / 255;
             if (!a) continue;
             u32 *d = &dst[(size_t)py * dw + px];
