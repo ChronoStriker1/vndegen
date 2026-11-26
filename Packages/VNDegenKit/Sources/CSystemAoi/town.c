@@ -647,8 +647,8 @@ static void draw_bursts(Town *t, Vfs *vfs, u32 *fb) {
 
 void sa_town_draw_map(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
     int stage = t->stage < 1 ? 1 : t->stage;
-    static const char *const bgNames[] = {"tmap00a.agf", "tmap00a.agf", "tmap01a.agf", "tmap02a.agf"};
-    int bi = stage > 3 ? 3 : stage;
+    static const char *const bgNames[] = {"tmap00a.agf", "tmap00a.agf", "tmap01a.agf", "tmap02a.agf", "tmap00b.agf", "tmap00b.agf", "tmap01b.agf", "tmap02b.agf"};
+    int bi = (stage > 3 ? 3 : stage) + (vm->c[C_TOWN_MAP] ? 4 : 0);
     if (!t->bg[bi]) t->bg[bi] = sa_load_image(vfs, bgNames[bi]);
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
     sa_blit(fb, t->bg[bi], 0, 0);
@@ -659,7 +659,7 @@ void sa_town_draw_map(Town *t, Vfs *vfs, const VM *vm, u32 *fb) {
             if (!im) continue;
             int cx, cy;
             cell_center(c, &cx, &cy);
-            blit_dim(fb, im, cx - 68, cy + 34 - im->h, sa_town_staffed(t, vm, c) ? 256 : 192);
+            blit_dim(fb, im, cx - im->w / 2, cy + 34 - im->h, sa_town_staffed(t, vm, c) ? 256 : 192);
         }
     draw_bursts(t, vfs, fb);
 }
