@@ -474,6 +474,13 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             sa_show_frame_as_bg(s, s->fb, "*dungeon");
         }
         break;
+    case 0xd4: {
+        int v[8] = {0};
+        for (int i = 0; i < in->count && i < 8; i++) v[i] = sa_vm_get(vm, code, &in->o[i]);
+        StoryWarp w;
+        if (sa_story_collapse(v, in->count, &w)) sa_exp_warp(s, w.dungeon, w.floor, w.x, w.y, w.dir);
+        break;
+    }
     case 0xbf:
         if (in->count >= 2) sa_vm_set(vm, &in->o[0], sa_exp_floors_reached(s, sa_vm_get(vm, code, &in->o[1]) + 1));
         break;

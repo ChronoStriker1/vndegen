@@ -755,11 +755,11 @@ static void write_dungeon(SA *s, u8 *img) {
             put(img, o + (size_t)(GROUP_TARGETS + t * 2 + 1) * 4, g->target[t][1]);
         }
         put(img, o + GROUP_FLAGS * 4, g->flags);
-        put(img, o + (GROUP_FLAGS + 1) * 4, -1);
+        put(img, o + (GROUP_FLAGS + 1) * 4, g->flags == -5 ? -5 : -1);
         put(img, o + GROUP_CLOCK * 4, g->clock);
         put(img, o + GROUP_FOUGHT * 4, g->fought);
         put(img, o + GROUP_EXTRA * 4, g->extra);
-        put(img, o + (GROUP_SIZE - 4), -1);
+        put(img, o + (GROUP_SIZE - 4), sa_exp_group_slot(s, g));
     }
 }
 

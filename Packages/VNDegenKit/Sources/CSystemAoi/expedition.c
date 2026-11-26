@@ -4,6 +4,7 @@ enum {
     HOOK_SETUP = 10,
     HOOK_FLOOR = 11,
     HOOK_STEP = 12,
+    HOOK_STORY = 14,
     HOOK_RETURN = 17,
     HOOK_DUNGEON = 25,
     HOOK_BATTLE_START = 26,
@@ -40,7 +41,6 @@ enum {
 enum {
     GROUP_AWAY = 3,
     SYMBOL_CHANCE = 100,
-    ENCOUNTER_FROM = 40,
     ALL_AMBIENT = 192,
     DIRECT_AMBIENT = 160,
 };
@@ -70,8 +70,6 @@ enum {
     F_MAP = 5,
     F_SET = 6,
     F_NO_AMBIENT = 7,
-    F_SPREAD = 12,
-    F_STEPS = 13,
     F_FOG = 10,
     F_BACKDROP = 8,
     PLACE_BASE = 41,
@@ -407,7 +405,6 @@ static int group_id(SA *s, const char *name) {
 }
 
 static void sync_marks(SA *s);
-static void reset_countdown(SA *s);
 static bool party_has(SA *s, const char *ability);
 static void sync_status(SA *s);
 
@@ -682,19 +679,19 @@ static int group_here(SA *s) {
     return -1;
 }
 
-static void enter(SA *s, int dungeon, int floor, bool autosave) {
+static bool load_floor(SA *s, int dungeon, int floor, bool autosave) {
     Expedition *e = &s->exp;
     int r = floor_row(e, dungeon, floor);
     if (r < 0) {
         sa_log(s, "no floor %d of dungeon %d", floor, dungeon);
-        return;
+        return false;
     }
     char set[24], platform[24];
     snprintf(set, sizeof set, "m%03dset.pvm", sa_table_int(&e->floors, r, F_SET));
     snprintf(platform, sizeof platform, "m%03dbt1a.agf", dungeon - 1);
     if (!sa_dungeon_load(&s->dungeon, &s->vfs, set, text(&e->floors, r, F_MAP))) {
         sa_log(s, "can't load %s with %s", text(&e->floors, r, F_MAP), set);
-        return;
+        return false;
     }
     sa_dungeon_art(&s->dungeon, &s->vfs, platform);
     sa_dungeon_sense(party_has(s, "感知"));
@@ -712,9 +709,10 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     e->dungeon = dungeon;
     e->floor = floor;
     e->row = r;
+    sa_actions_enter(s);
     if (fresh) {
         e->steps = 0;
-        reset_countdown(s);
+        s->vm.c[C_SINCE_BATTLE] = 1;
         s->vm.c[C_EXP_ACTIONS] = 1;
         if (!e->resuming) {
             int left = s->vm.c[C_RANK_MAX] - sa_party_rank(&s->party);
@@ -757,6 +755,13 @@ static void enter(SA *s, int dungeon, int floor, bool autosave) {
     sa_log(s, "expedition: %s %s", text(&e->dungeons, dungeon - 1, 1), text(&e->floors, r, F_NAME));
     s->mode = MODE_DUNGEON;
     if (autosave) sa_autosave(s);
+    return true;
+}
+
+static void enter(SA *s, int dungeon, int floor, bool autosave) {
+    Expedition *e = &s->exp;
+    bool fresh = !e->active;
+    if (!load_floor(s, dungeon, floor, autosave)) return;
     static const int first[] = {HOOK_SETUP, HOOK_DUNGEON, HOOK_FLOOR}, next[] = {HOOK_FLOOR}, resumed[] = {HOOK_DUNGEON};
     if (e->resuming || fresh) s->vm.c[C_EXP_GROUP] = 0;
     if (e->resuming) run_hooks(s, resumed, 1, AFTER_WALK);
@@ -786,6 +791,20 @@ void sa_exp_resume(SA *s, int dungeon, int floor, int x, int y, int dir, bool ke
     e->steps = steps;
     e->areaStart = steps - area;
     sync_steps(s);
+}
+
+void sa_exp_warp(SA *s, int dungeon, int floor, int x, int y, int dir) {
+    Expedition *e = &s->exp;
+    if (!e->active) return;
+    e->arriveSide = -1;
+    e->resumeX = x;
+    e->resumeY = y;
+    e->resumeDir = dir;
+    e->keepGroups = false;
+    int mode = s->mode;
+    if (!load_floor(s, dungeon, floor, true)) return;
+    s->mode = mode;
+    if (e->hookCount < EXP_HOOKS) e->hooks[e->hookCount++] = HOOK_FLOOR;
 }
 
 void sa_exp_names(SA *s, int dungeon, int floor, const char **dungeonName, const char **floorName) {
@@ -831,12 +850,6 @@ static void pick_group(SA *s, char *out, size_t size) {
     out[len] = 0;
 }
 
-static void reset_countdown(SA *s) {
-    int steps = sa_table_int(&s->exp.floors, s->exp.row, F_STEPS), spread = sa_table_int(&s->exp.floors, s->exp.row, F_SPREAD);
-    s->exp.stepsLeft = steps - spread + (int)(sa_vm_random(&s->vm) % (u32)(2 * spread + 1));
-    if (s->exp.alarm) s->exp.stepsLeft /= 2;
-}
-
 static void begin_battle(SA *s, const char *group, const int *cells) {
     sa_dungeon_draw(&s->dungeon, s->fb);
     Image *view = sa_image_new(SA_W, SA_H);
@@ -870,7 +883,7 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
     sa_log(s, "battle: %s, %d fighters", group, s->battle.count);
     s->vm.c[C_EXP_RESULT] = 1;
     s->vm.c[C_EXP_GROUP] = sa_table_int(&s->battle.groups, s->battle.group, 0);
-    reset_countdown(s);
+    s->vm.c[C_SINCE_BATTLE] = 1;
     static const int hooks[] = {HOOK_BATTLE_START};
     run_hooks(s, hooks, 1, AFTER_BATTLE);
 }
@@ -944,9 +957,9 @@ void sa_exp_battle_over(SA *s, int result) {
         snprintf(e->groupScript, sizeof e->groupScript, "%s", script);
         e->groupEntry = sa_table_int(&s->battle.groups, s->battle.group, P_AFTER_SCRIPT + 1);
     }
-    static const int hooks[] = {HOOK_BATTLE_END, HOOK_GROUP_SCRIPT};
+    static const int hooks[] = {HOOK_BATTLE_END, HOOK_GROUP_SCRIPT, HOOK_STORY};
     s->mode = MODE_DUNGEON;
-    run_hooks(s, hooks, 2, result == BATTLE_LOST ? AFTER_LOST : AFTER_WALK);
+    run_hooks(s, hooks, result == BATTLE_WON && sa_story_arm(s) ? 3 : 2, result == BATTLE_LOST ? AFTER_LOST : AFTER_WALK);
 }
 
 void sa_exp_chain_battle(SA *s, const char *name) {
@@ -1036,27 +1049,6 @@ static void count_down_specials(Expedition *e) {
 bool sa_exp_special_active(const SA *s, int id) { return s->exp.active && id > 0 && id <= EXP_SPECIALS && s->exp.special[id - 1] > 0; }
 
 int sa_exp_special_value(const SA *s, int id) { return sa_exp_special_active(s, id) ? s->exp.specialValue[id - 1] : 0; }
-
-static void open_crystal(SA *s) {
-    int slot = sa_dungeon_crystal_index(&s->dungeon);
-    if (slot > 7) slot = 7;
-    int col = F_CHESTS + slot * 4;
-    const char *table = text(&s->exp.floors, s->exp.row, col);
-    int lo = sa_table_int(&s->exp.floors, s->exp.row, col + 1), hi = sa_table_int(&s->exp.floors, s->exp.row, col + 2);
-    int n = hi > lo ? lo + (int)(sa_vm_random(&s->vm) % (u32)(hi - lo + 1)) : lo;
-    char msg[256] = "";
-    for (int i = 0; i < n; i++) {
-        int r = sa_item_pick(&s->battle.items, table, sa_vm_random(&s->vm));
-        if (r < 0) continue;
-        sa_party_add_item(&s->party, sa_table_int(&s->battle.items, r, 0), 1);
-        sa_records_item(s, sa_table_int(&s->battle.items, r, 0));
-        size_t len = strlen(msg);
-        snprintf(msg + len, sizeof msg - len, "%s『%s』を手に入れた。", len ? "|" : "", text(&s->battle.items, r, 1));
-    }
-    sa_dungeon_clear_object(&s->dungeon);
-    sa_log(s, "crystal %d (%s): %s", slot, table, msg);
-    if (msg[0]) sa_dialog_open(&s->dialog, msg);
-}
 
 static int area_at(SA *s, int dx, int dy) {
     Expedition *e = &s->exp;
@@ -1296,7 +1288,6 @@ static bool spring_trap(SA *s) {
         break;
     case TRAP_ALARM:
         e->alarm = true;
-        e->stepsLeft /= 2;
         break;
     case TRAP_PHANTOM: {
         char group[16];
@@ -1324,7 +1315,7 @@ static void after_move(SA *s, int r) {
     if (r == DUN_ACTION) {
         int act = sa_dungeon_action(d);
         if (act == DUN_ACT_HOME) go_home(s);
-        else if (act == DUN_ACT_OPEN) open_crystal(s);
+        else if (act == DUN_ACT_OPEN) sa_actions_open(s);
         else change_floor(s);
         return;
     }
@@ -1345,10 +1336,12 @@ static void after_move(SA *s, int r) {
         sync_position(s);
         tick_groups(s, &hit);
         if (hit >= 0) start_battle(s, hit);
+        else if (sa_story_scene(s)) s->exp.stepHook = true;
         return;
     }
     if (r != DUN_MOVED) return;
     s->vm.c[C_ALL_STEPS]++;
+    s->vm.c[C_SINCE_BATTLE]++;
     e->steps++;
     sync_steps(s);
     sync_position(s);
@@ -1369,12 +1362,9 @@ static void after_move(SA *s, int r) {
     sync_marks(s);
     bool calm = sa_exp_special_active(s, SPECIAL_NO_ENEMY) && (int)(sa_vm_random(&s->vm) % 100) >= sa_exp_special_value(s, SPECIAL_NO_ENEMY);
     count_down_specials(e);
-    if (!e->calm && e->steps >= ENCOUNTER_FROM && --e->stepsLeft <= 0) {
-        if (calm) reset_countdown(s);
-        else {
-            random_battle(s);
-            return;
-        }
+    if (!e->calm && !calm && sa_encounter_due(s->vm.c[C_SINCE_BATTLE], e->alarm, sa_vm_random(&s->vm))) {
+        random_battle(s);
+        return;
     }
     e->stepHook = true;
 }
@@ -1382,8 +1372,8 @@ static void after_move(SA *s, int r) {
 static bool run_step_hook(SA *s) {
     if (!s->exp.stepHook || s->dungeon.animDur) return false;
     s->exp.stepHook = false;
-    static const int hooks[] = {HOOK_STEP};
-    run_hooks(s, hooks, 1, AFTER_WALK);
+    static const int hooks[] = {HOOK_STEP, HOOK_STORY};
+    run_hooks(s, hooks, sa_story_arm(s) ? 2 : 1, AFTER_WALK);
     return true;
 }
 
