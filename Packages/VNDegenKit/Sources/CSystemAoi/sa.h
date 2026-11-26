@@ -711,14 +711,14 @@ typedef struct Battle {
     Party *party;
     Table groups, skills, lvup, items;
     Fighter f[BATTLE_FIGHTERS];
-    int count, levelBonus, expBonus;
+    int count, levelBonus;
     int order[BATTLE_FIGHTERS], orderCount, next;
     BattleLine log[BATTLE_LOG];
     int logCount, hidden, speed;
     bool queueing;
     int picker, pickSlot, pickCount;
     Order pick[BATTLE_PICKS];
-    int gainResources, gainExp;
+    BattleReward reward;
     char gainItem[64];
     Image *art[BATTLE_ART], *board[4], *back, *pop[4], *from;
     u32 ms, animMs, rng, noticeMs, holdMs, fadeMs;

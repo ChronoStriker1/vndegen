@@ -1731,9 +1731,8 @@ the same points (offsets in bytes, numbers little-endian):
   save, 千固定0100 placed in front of the party, six level-5 ベト whose column 72 sums to 48) gave 87 and 89 EXP at
   C392 0, 104 and 107 at 2, and 131 and 129 at 5: the EXP times 1 + C392 / 10. Food, money and resources were 15/23/22 and
   14/23/20 at 0, 20/35/28 and 18/30/30 at 2, 23/36/24 and 18/35/33 at 5, and every win at 2 and 5 added a resident (住民が
-  1人増えた); one at 5 dropped an item. VNDegen applies the EXP factor (`Battle.expBonus`); the other rewards'
-  rule isn't pinned and isn't applied. These fights also show that the turn-42 rewards don't follow VNDegen's
-  turn-2 rule (sum × 110 to 125%, no food or money): 87 for a sum of 48.
+  1人増えた); one at 5 dropped an item. Every reward scales the same way, rounded up, with at least one resident
+  (Reward rule and C392 under Battles).
 - **Boss-side cutaways (hook 14).** bo1400 clears F120 and, unless F155, F160 or F161 is on, runs bo1401, then
   bo1000 when a scene set F120. bo1401 holds 74 scenes keyed on C090 = 1, the area (C070/C071), C095 = 1 and
   C096 = n, each once (F2101 to F2173). Measured: n is field 7 of the party's cell in the area's map (`mpDDFF.amd`,

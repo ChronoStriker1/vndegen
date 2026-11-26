@@ -16,7 +16,7 @@ enum {
     POP_SRC_H = 720,
 };
 
-static const u32 popColors[] = {0xffffff, 0x00ff00, 0xffff00, 0xffffff};
+static const u32 popColors[] = {0xffffff, 0x00ff00, 0xffff00, 0xffffff, 0xff0000, 0xff00ff};
 
 void sa_popup_load(Image **frame, Vfs *vfs) {
     for (int i = 0; i < 4; i++) {
@@ -36,12 +36,12 @@ void sa_dim(u32 *fb) {
 static int line_width(const char *s) {
     int w = 0;
     while (*s) {
-        if ((u8)*s < 4) {
+        if ((u8)*s < 6) {
             s++;
             continue;
         }
         const char *e = s;
-        while (*e && (u8)*e >= 4) e++;
+        while (*e && (u8)*e >= 6) e++;
         int n = 0;
         for (const char *q = s; q < e; n++) {
             u32 cp;
@@ -56,13 +56,13 @@ static int line_width(const char *s) {
 static void draw_line(u32 *fb, const char *s, int x, int y) {
     u32 color = popColors[0];
     while (*s) {
-        if ((u8)*s < 4) {
+        if ((u8)*s < 6) {
             color = popColors[(u8)*s];
             s++;
             continue;
         }
         const char *e = s;
-        while (*e && (u8)*e >= 4) e++;
+        while (*e && (u8)*e >= 6) e++;
         int n = 0;
         for (const char *q = s; q < e; n++) {
             u32 cp;

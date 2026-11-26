@@ -917,7 +917,10 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
     Image *view = sa_image_new(SA_W, SA_H);
     memcpy(view->px, s->fb, sizeof(u32) * SA_W * SA_H);
     s->battle.levelBonus = s->vm.c[C_ENEMY_LEVEL];
-    s->battle.expBonus = s->vm.c[C_REWARD_BONUS];
+    s->battle.reward = (BattleReward){.strength = s->vm.c[C_REWARD_BONUS],
+                                      .recruit = sa_exp_special_value(s, SPECIAL_RECRUIT),
+                                      .search = sa_exp_special_value(s, SPECIAL_SEARCH),
+                                      .noResidents = s->exp.noResidents};
     if (!sa_battle_begin(&s->battle, &s->vfs, group, cells, view, s->exp.dungeon - 1, sa_vm_random(&s->vm))) {
         sa_log(s, "no enemy group %s", group);
         return;
@@ -999,6 +1002,10 @@ void sa_exp_battle_over(SA *s, int result) {
         return;
     }
     s->vm.c[C_EXP_RESULT] = result == BATTLE_WON ? 1 : result == BATTLE_LOST ? 2 : 3;
+    for (int k = 0; k < REWARD_KINDS; k++) {
+        if (result == BATTLE_WON) s->vm.c[C_FIND0 + k] += s->battle.reward.gain[k];
+        s->battle.reward.gain[k] = 0;
+    }
     Expedition *e = &s->exp;
     if (e->fighting >= 0 && e->fighting < e->groupCount) {
         ExpGroup *g = &e->group[e->fighting];

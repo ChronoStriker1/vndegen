@@ -400,7 +400,8 @@ bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, I
     }
     b->group = g;
     b->boardSize = board_size(b, g);
-    b->gainResources = b->gainExp = 0;
+    memset(b->reward.gain, 0, sizeof b->reward.gain);
+    b->reward.exp = 0;
     b->gainItem[0] = 0;
     place_group(b, vfs, g, cells);
     for (int side = 0; side < 2; side++) {
@@ -776,22 +777,22 @@ int sa_battle_exp_needed(const Battle *b, int unitRow, int level) {
 
 static void reward(Battle *b) {
     const Table *g = &b->groups;
-    b->gainResources = range(b, sa_table_int(g, b->group, 63), sa_table_int(g, b->group, 64));
-    int sum = 0;
+    int rows[BATTLE_FIGHTERS], n = 0;
     for (int i = 0; i < b->count; i++)
-        if (b->f[i].enemy) sum += sa_table_int(&b->party->units, b->f[i].row, 72);
-    b->gainExp = (sum * range(b, 110, 125) * (10 + b->expBonus) / 10 + 50) / 100;
+        if (b->f[i].enemy) rows[n++] = b->f[i].row;
+    sa_reward_roll(&b->reward, g, b->group, &b->party->units, rows, n, &b->rng);
     b->gainItem[0] = 0;
     if ((int)(rnd(b) % 100) < sa_table_int(g, b->group, 65)) drop_item(b, text_of(g, b->group, 67));
     for (int i = 0; i < b->count; i++) {
         Fighter *f = &b->f[i];
         if (f->enemy || !alive(f)) continue;
         int s = f->slot;
-        b->party->exp[s] += b->gainExp;
+        b->party->exp[s] += sa_reward_member_exp(&b->reward, b->party, s);
         int need;
         while ((need = sa_battle_exp_needed(b, f->row, b->party->level[s])) > 0 && b->party->exp[s] >= need) {
             b->party->exp[s] -= need;
             b->party->level[s]++;
+            b->reward.leveled[s] = true;
         }
     }
 }
@@ -1208,10 +1209,8 @@ static void draw_screen(Battle *b, u32 *fb) {
     if (b->result == BATTLE_RUNNING || b->result == BATTLE_LOST) return;
     sa_dim(fb);
     if (b->result != BATTLE_WON) return;
-    char *lines[3];
-    int n = 0;
-    lines[n++] = sa_fmt(POP_GREEN "資源" POP_WHITE "を" POP_GREEN "%d材" POP_WHITE "手に入れた", b->gainResources);
-    lines[n++] = sa_fmt(POP_YELLOW "%dP" POP_WHITE "の経験値を獲得した", b->gainExp);
+    char *lines[REWARD_KINDS + PARTY_SLOTS + 2];
+    int n = sa_reward_lines(&b->reward, b->party, lines, REWARD_KINDS + PARTY_SLOTS + 1);
     if (b->gainItem[0]) lines[n++] = sa_fmt(POP_YELLOW "%s" POP_WHITE "を手に入れた", b->gainItem);
     sa_popup_draw(b->pop, fb, (const char *const *)lines, n);
     for (int i = 0; i < n; i++) free(lines[i]);
