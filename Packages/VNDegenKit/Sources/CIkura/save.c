@@ -442,6 +442,11 @@ static void get_button(IK *t, Rd *r, Button *bt, u32 type, bool wide) {
     }
 }
 
+static int line_len(IK *t) {
+    bool shown = t->window && (!t->automap.bits || !t->msg.tags);
+    return shown && t->msg.raw ? t->msg.rawLen : 0;
+}
+
 static void snapshot(IK *t) {
     Buf b = {0};
     u8 head[THUMB_AT] = {0};
@@ -454,8 +459,8 @@ static void snapshot(IK *t) {
     head[8] = (u8)tm.tm_sec;
     head[9] = (u8)tm.tm_min;
     head[10] = (u8)tm.tm_hour;
-    int len = t->msg.rawLen < TEXT_END - TEXT_AT - 1 ? t->msg.rawLen : TEXT_END - TEXT_AT - 1;
-    if (t->msg.raw && len > 0) memcpy(head + TEXT_AT, t->msg.raw, (size_t)len);
+    int len = line_len(t) < TEXT_END - TEXT_AT - 1 ? line_len(t) : TEXT_END - TEXT_AT - 1;
+    if (len > 0) memcpy(head + TEXT_AT, t->msg.raw, (size_t)len);
     wr32(head + TEXT_END, THUMB_W);
     wr32(head + TEXT_END + 4, THUMB_H);
     put(&b, head, sizeof head);
@@ -816,7 +821,7 @@ bool save_exec(IK *t, u16 op, const u8 *a, int n) {
         char date[32];
         int len = snprintf(date, sizeof date, "%02d/%02d/%04d", tm.tm_mon + 1, tm.tm_mday, tm.tm_year + 1900);
         vm_set_text(t, base, date, len);
-        vm_set_text(t, base + 1, t->msg.raw ? t->msg.raw : "", t->msg.raw ? t->msg.rawLen : 0);
+        vm_set_text(t, base + 1, t->msg.raw ? t->msg.raw : "", line_len(t));
         break;
     }
     case 0x0a0d: t->save.haveSnap = false; break;
