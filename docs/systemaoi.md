@@ -67,7 +67,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   with its Auto, Skip, LOG, Repeat, Option and close buttons, the click-wait feather, and choices in the game's own
   box. Speakers with a face set in `evntFace.obj` show the face whose expression matches their last standing picture.
   Placement was measured against the original under Wine; text lines up within two pixels.
-- **Backlog.** Each page's speaker and lines, with a button that plays a voiced line again.
+- **Backlog.** Each page's speaker and lines, with a button that plays a voiced line again. The town's LOG opens it
+  over the town at half brightness, empty or not.
 - **Input.** A click or Enter goes on; the wheel opens and scrolls the backlog; a right click fast-forwards, the
   original's default.
 - **Sound.** BGM by its `bgm.asd` entry with the loop points the file gives, and voices as their lines show.
@@ -160,7 +161,12 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   from play (`docs/systemaoi-cleanroom.md`).
 - Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 3.4 to
   5.5 over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
-  are inferred.
+  are inferred. The enemy side's reserve tiles are measured on the small board only; the larger boards draw none
+  until measured. 乱舞斬 halves its second target's damage, as first measured, but in two later casts the original
+  hit two targets in one row for full damage each; which rule decides isn't known. ホリィ's 自動攻撃 before the first
+  round isn't built.
+- Text: the original draws its text with the same Ume Gothic but monochrome and hinted; VNDegen thresholds its
+  unhinted glyphs at the point that matches the hinted shapes best, so a stroke can still land a pixel off.
 - Random numbers: the original's rolls don't come from the save (the same save gives different turns and battles)
   and its generator wasn't found from play; VNDegen keeps its own generator's state in C006, so its saves and PC
   exports repeat exactly in VNDegen.
@@ -182,8 +188,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   follow the sets' effect files, stepped 20 times a second (inferred from the PC's snow speed and the motes'
   lifetime); the snowflakes loop as on the PC, but the PC's loops drift sideways where VNDegen's stack downward.
 - Story: choices, the message window, the join box's cards and the status card's portrait are placed as measured
-  (the sprites by the anchor in each sheet's header); the town diorama, 配置 and battles still cut unit sheets at
-  the gaps between figures, which is wrong for 40 of the 72 field sheets. `81` after a key door is still skipped
+  (the sprites by the anchor in each sheet's header). The town diorama, 配置's boards and battles place every unit
+  the same way, on the PC's pixels; the half-size reserve figures are scaled by VNDegen's own filter, so their
+  pixels differ slightly from the PC's GPU scaling. `81` after a key door is still skipped
   (nothing visible on the PC; its sound couldn't be recorded). Dungeon notices close by themselves after 410 + 10
   frames a character (fitted to the original's frame counts; VNDegen assumes 60 frames a second, where the
   original under Wine drew 29 to 39) and run hook 19 as a click would; the box's open and close zoom isn't drawn.

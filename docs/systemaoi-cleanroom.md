@@ -66,10 +66,15 @@ where play couldn't pin it down.
 - **Party diorama.** Measured against a turn 2 capture: the platform is `m996bt1a` from `bmap.vfs` at (-62, 504),
   drawn 1:1; the six slot tiles are the first 152x150 frame of `mfloor01`, front row at (108, 451) and back row at
   (27, 492), each 57 right and 29 down from the last; the five tiles on the step are that frame at half size, half a
-  step apart from (-16, 588). A unit's sprite sheet is `u` and `unit.obj` column 11 (Darkus 9990), centred on its
-  tile with its bottom 17 below the tile's centre; its HP and MP bars are two `bat_o00` frames 12 and 8 above the
-  sprite, with `bat_o01`'s first three rows and `bat_o03` inside, 50 wide when full. The idle animation plays the
-  sheet's filled cells in order, 100 ms each (measured at 30 fps under Wine). The 格 label is `mai_f00` at (1, 695).
+  step apart from (-16, 588). A unit's sprite sheet is `u` and `unit.obj` column 11 (Darkus 9990) with `a0`, the
+  field sheet; its header's anchor (Unit sheets, under Saves) sits one pixel right of the tile's centre: all six
+  slots, eight figures, land on the original's pixels with no error. The HP and MP bars are two `bat_o00` frames 75
+  and 71 above the tile's centre whatever the sheet (six units, every bar pixel equal), with `bat_o01`'s first three
+  rows and `bat_o03` inside, 50 wide when full. The idle animation plays every frame of the sheet, 100 ms each
+  (measured at 30 fps under Wine). A reserve unit stands on its step tile at half size, each frame of its sheet
+  halved, with the halved anchor at (20 + 28.5t, 643 + 14.5t) for tile t, rounded up in x and down in y (four
+  units, positions exact; the original's GPU scaling leaves 3 to 10 levels of mean difference against VNDegen's box
+  filter). The 格 label is `mai_f00` at (1, 695).
   The platform, tiles, bars and map match the capture pixel for pixel. Inferred: which tile each slot uses, the half
   size tiles' filter (6 levels off), the label's digits (the original's are bolder than `dgn_f00`), and the diorama
   hiding with the windows.
@@ -168,11 +173,14 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   range. Darkus's 剣撃 (27 to 30, attack 18) did 44, 44, 36, 33, 45, 44, 43, 41, 42, 48 and 46 to targets of defence
   3, 12, 0, 2, 5 and 0; enemies' hits on Darkus (defence 17) matched the same way, such as ホネ's 突き刺し (25 to 28,
   attack 9) for 18 each time and フニ's ひっかき (25 to 28, attack 10) for 20 and 21. 斬撃, 打撃 and 射撃 skills all
-  follow it.
+  follow it. Re-measured at turn 42 over five battles: ひっかき on Darkus did 18 four times, 19 four times, 20 five
+  times and 21 eight times, with one miss, the full predicted range (an earlier sample of three 18s was chance).
 - **Several targets.** 乱舞斬 and 火矢三連 (target 敵３) hit their first target for full damage, the second for half
   and, once seen, the third for a quarter (乱舞斬's 12 where a first hit would have done 50 to 53). Against two enemies
   乱舞斬 hit each once, so VNDegen picks different targets; 火矢三連 once hit the same slime twice (a miss, then 20),
-  which that doesn't explain yet.
+  which that doesn't explain yet. Measured again at turn 42 (Darkus at a higher level, three フニ in one row): in two
+  casts 乱舞斬 hit two フニ for 60 and 61, then 60 and 63, no halving; VNDegen's rule gave 63 and 30 on the same
+  battle. Which rule decides between the two isn't known, so VNDegen keeps the halving.
 - **Choosing a skill.** `unit.obj` lists up to eight skills in threes from column 40: the level the skill is learned
   at, its name and its weight. Measured on every enemy record the original rolled in 38 floor autosaves (ten earlier
   ones, four area-entry autosaves of 中央森 and 絶命院, and 24 new ones made by stepping through passages into
@@ -191,8 +199,15 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   the enemies' on a grid of three rows by five columns whose tile centres are (627 + 57k − 81r, 202 + 29k + 41r), row
   r from the back. `party.obj` column 17 picks the platform: 1 is `m000bt2a` at (406, 116) with columns 1 to 3, 2 is
   `m000bt2b` at (326, 130) with all five. Inferred: 10 is the larger `m000bt2c`, placed at (250, 80) until a capture
-  shows it. Enemy sprite sheets (`u????a2`) pack two rows of frames at uneven widths; the runtime splits them at the
-  gaps between the opaque parts. Floor tile frames: grey, red, blue (the party while orders are given) and yellow
+  shows it. Enemy sprite sheets (`u????a2`) are drawn by their header grid with the anchor one pixel right of and one
+  below the tile centre (two フニ exact); the party's `a0` sheets one pixel right of their tile centres as in the town
+  (all six exact), the enemies' bars likewise one pixel lower than the party's rule. The party's reserve units stand on
+  the platform's step as in the town, and in battle carry the bars at half size: the two-bar block halved, its top
+  left 13 left of and 38 above the figure's anchor (y from 14.5t rounded up). The small board (`bt2a`) has the
+  enemy's reserve step: two rows of five half-size tiles centred from (765, 190), each 28.5 right and 14.5 down
+  (rounded down), the second row 41 right and 20 up; the original draws them though the enemy has no reserve
+  (千樹庭, 千05). Inferred: `bt2b`'s step, which is placed differently in its art, and `bt2c`'s, which has none, draw
+  no tiles until measured. Floor tile frames: grey, red, blue (the party while orders are given) and yellow
   (the unit being given orders, or the targets a choice covers). The Backs and Forward panels (`bat_j01`, `bat_j00`) at (103, 541) and (603, 541) with a `bat_j02` box per slot, the
   preset buttons `bat_d00` to `bat_d11` down the left, 戦闘開始 (`bat_l00`) at (500, 497) and the log (`bat_m00`) at
   (1105, 270) with 12-pixel text on 18-pixel lines.
@@ -1028,6 +1043,12 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   apart, and the 解任 tile at (445, 536), each with the unit's sprite; the members list `uts_c00` at (567, 21) with
   the tabs ポジション to 統率 (`uts_d01` to `d06`) and a row per member; the status card; the party's diorama on the
   library platform `m997bt1a`; 戻る (`uts_g00`) at (1117, 675).
+- **Board figures.** Measured: the 編成 and 組織図 boards draw each unit's battle sheet (`u????a2`, facing out), not
+  the field sheet, animated; the anchor sits 53 right of and 95 below a main or reserve tile's corner, and 50 right
+  of and 26 below a post tile's (`POST_W` 98 by 64); a unit picked up follows the pointer with its anchor on it. Ten
+  figures and both post holders landed on the original's pixels with no error; the 編成 screen's whole-frame 8x8
+  error is 0.36 and the 組織図's 0.30, the rest being animation phase. The held figure is drawn over everything in
+  VNDegen; the original sorts it among the board's figures by height (inferred from one capture).
 - **Placing.** Choose a member (tile or row), then a tile: two main tiles swap, a reserve tile benches the member
   (one must stay), and a reserve member moves to a main tile. Measured: 格 counts the reserve tiles as well as the
   main ones and may go over the limit (its digits then turn red, in 配置 and on the diorama), but 戻る (or a right
@@ -1088,6 +1109,25 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   where the comment starts after a dungeon's longer place name.
 - **The original's files.** `Bunny30N.dat`, `Bunny3AN.dat` and `Bunny3.opt` unpack to 1,128,076 and 30,784 bytes
   with the codec below. `Bunny3.red` (text already read) is stored plain. `Bunny3.dsk` (32 bytes) hasn't been looked at.
+
+## Text and the town's backlog, from the screens
+
+- **Glyphs.** Measured: under Wine the original draws its text with the same Ume Gothic file VNDegen ships (the
+  prefix substitutes it for ＭＳ ゴシック), monochrome and hinted. The 建設 card's
+  lines are 16 pixels with no extra spacing: FreeType's hinted monochrome rendering at 16 pixels reproduces a whole
+  line of the card pixel for pixel. VNDegen has no hinter on Apple platforms, so it renders the unhinted outline and
+  keeps a pixel where its coverage reaches 124 of 255. Over 316 glyphs from the town's tables, against the hinted
+  monochrome shapes, that leaves 6 to 21% of the ink pixels different (12 pixels 20%, 16 pixels 11%, 26 pixels 6%),
+  against 12 to 21% for the earlier cut at 100, and keeps the ink within 1 to 10% of the original's. With the card
+  drawn that way (a snippet for `build.c`), its description differs from the original's in 306 pixels instead of
+  3,292 (2,462 ink pixels), its effect line in 130 instead of 1,587 and its name in 29 instead of 271; two more
+  cards gave 314 and 70. The town's post names (16 pixels, already monochrome) went from 30 and 26 differing pixels
+  to 23 and 17; they don't match any of the three Ume faces exactly, so they stay as they are.
+- **Town LOG.** Measured: LOG in the town opens the backlog over the town drawn at half brightness (every channel
+  halved), its panel darkening that a further 0.445 (VNDegen's story backlog draws the panel at 180 of 255, which
+  gives 0.371, so the town draws it at 159); with nothing in the backlog the scrollbar shows its rails and ends but
+  no thumb; 戻る returns to the town. Against the original's capture the 8x8 block error is 0.24 (82.8 when VNDegen
+  ignored the click). Inferred: 早送り and 自動再生 close it, as in the story.
 
 ## Title, Option and Extra, from the screens
 
@@ -1518,9 +1558,12 @@ the same points (offsets in bytes, numbers little-endian):
   0x38 and 0x3c, two 0.5s, and the frame count at 0x64; for all 482 the cell divides the used area and the count fits
   in it. Frames run row by row. クドア's sheet is 248 wide with 245 used (seven 35-pixel cells), which is why cutting
   at the gaps between figures put it 7 pixels off. The original puts a sheet's anchor at a fixed point: the status
-  card's portrait at (1072, 183), the join card's at (75, 110) from the card. 40 of the 72 field sheets (`a0`) are cut
-  wrong by the gap heuristic the town diorama, 配置 and battles use (キュリハ's 15 by 5 sheet is drawn whole on the
-  組織図 board); they still use it.
+  card's portrait at (1072, 183), the join card's at (75, 110) from the card. 40 of the 72 field sheets (`a0`) were
+  cut wrong by the gap heuristic the town diorama, 配置 and battles used (キュリハ's 15 by 5 sheet was drawn whole on
+  the 組織図 board); every board now draws by the header grid and anchor. Measured with a party of ルリエス, ホリィ,
+  ペリネ, ハンスイ, Darkus and キュリハ and the reserve ロウゼ, タマガ, １０１Ｐ and 天剣バリィーバ (a VNDegen export of
+  the turn-42 save loaded on the PC): the idle animation steps through every frame the header counts, 100 ms each,
+  then starts again (ルリエス's 35 and キュリハ's 66 frames tracked at 30 fps).
 - **Dungeon saves.** Measured: an image with C004/C005 at 62/2 (in a dungeon) but nothing in the dungeon regions
   crashes the original as soon as its load screen lists it. With the groups, their enemies, the last position, the
   entry and C076/C077 written, the original lists VNDegen's dungeon saves (8ターン 千樹庭 中央森の東 0歩目) and loads

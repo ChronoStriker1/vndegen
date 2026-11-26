@@ -14,7 +14,10 @@ enum {
     TILE_H = 150,
     RESERVE_X = -16,
     RESERVE_Y = 588,
-    FEET = 17,
+    ANCHOR_DX = 1,
+    BARS_GAP = 4,
+    SMALL_BARS_DX = 13,
+    SMALL_BARS_DY = 38,
     LABEL_Y = 695,
     COUNT_RIGHT = 44,
     SGP_RIGHT = 55,
@@ -24,25 +27,60 @@ enum {
     DIGIT_Y = 700,
 };
 
-static Image *half_size(const Image *im, int sy, int h) {
-    if (!im) return NULL;
-    Image *out = sa_image_new(im->w / 2, h / 2);
-    for (int y = 0; y < out->h; y++)
-        for (int x = 0; x < out->w; x++) {
+static void half_into(const Image *im, int sx, int sy, int w, int h, Image *out, int ox, int oy) {
+    for (int y = 0; y < h / 2; y++)
+        for (int x = 0; x < w / 2; x++) {
             u32 sum[4] = {0, 0, 0, 0};
             for (int j = 0; j < 2; j++)
                 for (int i = 0; i < 2; i++) {
-                    u32 p = im->px[(size_t)(sy + y * 2 + j) * im->w + x * 2 + i], a = p >> 24;
+                    u32 p = im->px[(size_t)(sy + y * 2 + j) * im->w + sx + x * 2 + i], a = p >> 24;
                     sum[0] += (p & 0xff) * a;
                     sum[1] += (p >> 8 & 0xff) * a;
                     sum[2] += (p >> 16 & 0xff) * a;
                     sum[3] += a;
                 }
             u32 a = sum[3];
-            out->px[(size_t)y * out->w + x] =
+            out->px[(size_t)(oy + y) * out->w + ox + x] =
                 a ? (a / 4) << 24 | (sum[2] / a) << 16 | (sum[1] / a) << 8 | sum[0] / a : 0;
         }
+}
+
+static Image *half_size(const Image *im, int sy, int h) {
+    if (!im) return NULL;
+    Image *out = sa_image_new(im->w / 2, h / 2);
+    half_into(im, 0, sy, im->w, h, out, 0, 0);
     return out;
+}
+
+static Image *half_sheet(const Image *im, const SpriteSheet *in, SpriteSheet *out) {
+    int cw = in->cellW / 2, ch = in->cellH / 2, rows = (in->frames + in->cols - 1) / in->cols;
+    *out = (SpriteSheet){in->cols, cw, ch, in->frames, in->anchorX / 2, in->anchorY / 2};
+    Image *half = sa_image_new(cw * in->cols, ch * rows);
+    for (int f = 0; f < in->frames; f++)
+        half_into(im, f % in->cols * in->cellW, f / in->cols * in->cellH, in->cellW, in->cellH, half, f % in->cols * cw, f / in->cols * ch);
+    return half;
+}
+
+static void paste(Image *dst, const Image *src, int x, int y) {
+    if (!src) return;
+    for (int j = 0; j < src->h && y + j < dst->h; j++)
+        for (int i = 0; i < src->w && x + i < dst->w; i++) {
+            u32 c = src->px[(size_t)j * src->w + i];
+            if (c >> 24) dst->px[(size_t)(y + j) * dst->w + x + i] = c;
+        }
+}
+
+static void build_small_bars(Party *p) {
+    if (!p->gaugeFrame) return;
+    int w = p->gaugeFrame->w, h = p->gaugeFrame->h + BARS_GAP + 1;
+    Image *bars = sa_image_new(w, h);
+    paste(bars, p->gaugeFrame, 0, 0);
+    paste(bars, p->gaugeFrame, 0, BARS_GAP);
+    p->smallBarEmpty = half_size(bars, 0, h);
+    paste(bars, p->hpGauge, 1, 1);
+    paste(bars, p->mpGauge, 1, BARS_GAP + 1);
+    p->smallBarFull = half_size(bars, 0, h);
+    sa_image_free(bars);
 }
 
 static Image *crop(const Image *im, int sy, int h) {
@@ -67,6 +105,7 @@ bool sa_party_init(Party *p, Vfs *vfs) {
     p->hpGauge = crop(hp, 0, 3);
     sa_image_free(hp);
     p->mpGauge = sa_load_image(vfs, "bat_o03.agf");
+    build_small_bars(p);
     p->label = sa_load_image(vfs, "mai_f00.agf");
     p->sgpLabel = sa_load_image(vfs, "mai_f01.agf");
     p->digits = sa_load_image(vfs, "dgn_f00.agf");
@@ -76,13 +115,15 @@ bool sa_party_init(Party *p, Vfs *vfs) {
 void sa_party_free(Party *p) {
     for (int i = 0; i < PARTY_SLOTS; i++) sa_image_free(p->sprite[i]);
     for (int i = 0; i < PARTY_RESERVE; i++) sa_image_free(p->reserveSprite[i]);
-    for (int i = 0; i < PARTY_BENCH; i++) sa_image_free(p->benchSprite[i]);
+    for (int i = 0; i < PARTY_SLOTS + PARTY_BENCH; i++) sa_image_free(p->frontSprite[i]);
     sa_image_free(p->platform);
     sa_image_free(p->tile);
     sa_image_free(p->smallTile);
     sa_image_free(p->gaugeFrame);
     sa_image_free(p->hpGauge);
     sa_image_free(p->mpGauge);
+    sa_image_free(p->smallBarEmpty);
+    sa_image_free(p->smallBarFull);
     sa_image_free(p->label);
     sa_image_free(p->sgpLabel);
     sa_image_free(p->digits);
@@ -90,78 +131,6 @@ void sa_party_free(Party *p) {
     sa_table_free(&p->abilities);
     sa_table_free(&p->positions);
     memset(p, 0, sizeof *p);
-}
-
-static bool solid(const Image *im, int x, int y) { return (im->px[(size_t)y * im->w + x] >> 24) > 128; }
-
-static bool clear_row(const Image *im, int y) {
-    for (int x = 0; x < im->w; x++)
-        if (solid(im, x, y)) return false;
-    return true;
-}
-
-static bool clear_column(const Image *im, int x, int h) {
-    for (int y = 0; y < h; y++)
-        if (solid(im, x, y)) return false;
-    return true;
-}
-
-static void find_layout(const Image *im, int *cols, int *rows) {
-    int y = 0;
-    while (y < im->h && clear_row(im, y)) y++;
-    while (y < im->h && !clear_row(im, y)) y++;
-    int ch = im->h;
-    for (int d = y; d <= im->h; d++)
-        if (im->h % d == 0 && (d == im->h || clear_row(im, d) || clear_row(im, d - 1))) {
-            ch = d;
-            break;
-        }
-    int x = 0;
-    while (x < im->w && clear_column(im, x, ch)) x++;
-    while (x < im->w && !clear_column(im, x, ch)) x++;
-    int cw = im->w;
-    for (int d = x; d <= im->w; d++)
-        if (im->w % d == 0 && (d == im->w || clear_column(im, d, ch) || clear_column(im, d - 1, ch))) {
-            cw = d;
-            break;
-        }
-    *cols = im->w / cw;
-    *rows = im->h / ch;
-}
-
-void sa_sprite_layout(const Image *im, int *cols, int *rows) {
-    static struct {
-        const Image *im;
-        int w, h, cols, rows;
-    } cache[32];
-    static int next;
-    for (int i = 0; i < 32; i++)
-        if (cache[i].im == im && cache[i].w == im->w && cache[i].h == im->h) {
-            *cols = cache[i].cols;
-            *rows = cache[i].rows;
-            return;
-        }
-    find_layout(im, cols, rows);
-    cache[next].im = im;
-    cache[next].w = im->w;
-    cache[next].h = im->h;
-    cache[next].cols = *cols;
-    cache[next].rows = *rows;
-    next = (next + 1) % 32;
-}
-
-int sa_sprite_filled_cells(const Image *im) {
-    int cols, rows;
-    sa_sprite_layout(im, &cols, &rows);
-    int cw = im->w / cols, ch = im->h / rows, n = 0;
-    for (int c = 0; c < cols * rows; c++) {
-        bool any = false;
-        for (int y = 0; y < ch && !any; y++)
-            for (int x = 0; x < cw && !any; x++) any = im->px[(size_t)(c / cols * ch + y) * im->w + c % cols * cw + x] >> 24;
-        if (!any) break;
-        n++;
-    }
-    return n;
 }
 
 int sa_party_unit_row(const Party *p, int id) {
@@ -203,8 +172,7 @@ void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
     memset(p->trained[slot], 0, sizeof p->trained[slot]);
     char name[24];
     snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&p->units, r, 11));
-    p->sprite[slot] = sa_load_image(vfs, name);
-    p->cells[slot] = p->sprite[slot] ? sa_sprite_filled_cells(p->sprite[slot]) : 0;
+    p->sprite[slot] = sa_sheet_load(vfs, name, &p->sheet[slot]);
 }
 
 void sa_party_new_game(Party *p, Vfs *vfs) {
@@ -223,7 +191,7 @@ bool sa_party_tick(Party *p, u32 ms) {
     p->ms += ms;
     if (p->ms / PARTY_CELL_MS == before) return false;
     for (int s = 0; s < PARTY_SLOTS; s++)
-        if (p->unit[s] && p->cells[s] > 1) return true;
+        if (p->unit[s] && p->sheet[s].frames > 1) return true;
     return false;
 }
 
@@ -244,6 +212,8 @@ void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy, int frame) {
     if (p->tile) sa_blit_rect(fb, p->tile, 0, frame * TILE_H, p->tile->w, TILE_H, cx - TILE_CX, cy - TILE_CY);
 }
 
+void sa_party_draw_small_tile(Party *p, u32 *fb, int cx, int cy) { sa_blit(fb, p->smallTile, cx - TILE_CX / 2, cy - TILE_CY / 2); }
+
 void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY, const int *frames) {
     for (int k = 0; k < PARTY_RESERVE; k++)
         sa_blit(fb, p->smallTile, boardX - PLATFORM_X + RESERVE_X + k * STEP_X / 2, boardY - PLATFORM_Y + RESERVE_Y + k * STEP_Y / 2);
@@ -254,10 +224,11 @@ void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY, const int *f
     }
 }
 
+static int gauge_width(int value, int max) { return max <= 0 || value <= 0 ? 0 : value >= max ? 50 : (value * 50 + max - 1) / max; }
+
 static void gauge(u32 *fb, const Image *im, int value, int max, int x, int y) {
     if (!im || max <= 0) return;
-    int w = value <= 0 ? 0 : value >= max ? 50 : (value * 50 + max - 1) / max;
-    sa_blit_rect(fb, im, 0, 0, w, im->h, x, y);
+    sa_blit_rect(fb, im, 0, 0, gauge_width(value, max), im->h, x, y);
 }
 
 int sa_party_rank(const Party *p) {
@@ -288,20 +259,23 @@ void sa_party_draw_board(Party *p, u32 *fb, const Image *platform, int ox, int o
             int s = row ? PARTY_FRONT + k : k;
             const Image *im = p->sprite[s];
             if (!p->unit[s] || !im) continue;
-            int cols, rows;
-            sa_sprite_layout(im, &cols, &rows);
-            int cw = im->w / cols, ch = im->h / rows;
-            int cell = p->cells[s] > 0 ? (int)(p->ms / PARTY_CELL_MS % (u32)p->cells[s]) : 0;
             int cx, cy;
             sa_party_tile_center(s, PLATFORM_X + ox, PLATFORM_Y + oy, &cx, &cy);
-            int x = cx - cw / 2, y = cy + FEET - ch;
-            sa_blit_rect(fb, im, cell % cols * cw, cell / cols * ch, cw, ch, x, y);
-            sa_party_draw_bars(p, fb, cx - 22, y, p->hp[s], sa_party_max_hp(p, s), p->mp[s], sa_party_max_mp(p, s));
+            sa_sheet_draw(fb, im, &p->sheet[s], (int)(p->ms / PARTY_CELL_MS), cx + ANCHOR_DX, cy);
+            sa_party_draw_bars(p, fb, cx - 22, cy - PARTY_BARS_DY, p->hp[s], sa_party_max_hp(p, s), p->mp[s], sa_party_max_mp(p, s));
         }
 }
 
-void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platform) {
-    sa_party_draw_board(p, fb, platform, 0, 0, NULL);
+static void small_bars(Party *p, u32 *fb, const Bench *b, int x, int y) {
+    if (!p->smallBarEmpty || !p->smallBarFull) return;
+    int r = sa_party_unit_row(p, b->unit), v[10];
+    sa_party_unit_stats(p, r, b->level > 0 ? b->level : 1, v);
+    sa_blit(fb, p->smallBarEmpty, x, y);
+    sa_blit_rect(fb, p->smallBarFull, 0, 0, (gauge_width(b->hp, v[0] + b->trained[0]) + 1) / 2, BARS_GAP / 2, x, y);
+    sa_blit_rect(fb, p->smallBarFull, 0, BARS_GAP / 2, (gauge_width(b->mp, v[1] + b->trained[1]) + 1) / 2, p->smallBarFull->h - BARS_GAP / 2, x, y + BARS_GAP / 2);
+}
+
+void sa_party_draw_reserve(Party *p, u32 *fb, int boardX, int boardY, u32 ms, bool bars) {
     for (int t = 0; t < PARTY_RESERVE; t++) {
         int b = sa_party_reserve_at(p, t), unit = b >= 0 ? p->bench[b].unit : 0;
         if (p->reserveUnit[t] != unit) {
@@ -311,24 +285,23 @@ void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platfo
             if (unit && p->vfs) {
                 char name[24];
                 snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&p->units, sa_party_unit_row(p, unit), 11));
-                Image *full = sa_load_image(p->vfs, name);
-                if (full) {
-                    int cols, rows;
-                    sa_sprite_layout(full, &cols, &rows);
-                    Image *cell = sa_image_new(full->w / cols, full->h / rows);
-                    for (int y = 0; y < cell->h; y++) memcpy(cell->px + (size_t)y * cell->w, full->px + (size_t)y * full->w, sizeof(u32) * (size_t)cell->w);
-                    p->reserveSprite[t] = half_size(cell, 0, cell->h);
-                    sa_image_free(cell);
-                    sa_image_free(full);
-                }
+                SpriteSheet sheet;
+                Image *full = sa_sheet_load(p->vfs, name, &sheet);
+                if (full && sheet.frames > 0) p->reserveSprite[t] = half_sheet(full, &sheet, &p->reserveSheet[t]);
+                sa_image_free(full);
             }
         }
         const Image *im = p->reserveSprite[t];
         if (!im) continue;
-        int cx = RESERVE_X + t * STEP_X / 2 + p->smallTile->w / 2;
-        int cy = RESERVE_Y + t * STEP_Y / 2 + p->smallTile->h / 2;
-        sa_blit(fb, im, cx - im->w / 2, cy + FEET / 2 - im->h);
+        int ax = boardX - PLATFORM_X + RESERVE_X + TILE_CX / 2 - 1 + (t * STEP_X + 1) / 2, ay = boardY - PLATFORM_Y + RESERVE_Y + TILE_CY / 2 + t * STEP_Y / 2;
+        sa_sheet_draw(fb, im, &p->reserveSheet[t], (int)(ms / PARTY_CELL_MS), ax, ay);
+        if (bars) small_bars(p, fb, &p->bench[sa_party_reserve_at(p, t)], ax - SMALL_BARS_DX, ay + (t * STEP_Y + 1) / 2 - t * STEP_Y / 2 - SMALL_BARS_DY);
     }
+}
+
+void sa_party_draw_diorama(Party *p, u32 *fb, int rankLimit, const Image *platform) {
+    sa_party_draw_board(p, fb, platform, 0, 0, NULL);
+    sa_party_draw_reserve(p, fb, PLATFORM_X, PLATFORM_Y, p->ms, false);
     char n[16];
     if (p->sgp >= 0) {
         sa_blit(fb, p->sgpLabel, 0, LABEL_Y);
@@ -537,19 +510,24 @@ int sa_party_member_value(const Party *p, const Member *m, int index) {
     return v[index] + m->trained[index];
 }
 
-const Image *sa_party_member_sprite(Party *p, const Member *m) {
-    if (m->slot >= 0) return p->sprite[m->slot];
-    int i = m->bench;
-    if (p->benchSpriteUnit[i] != m->unit) {
-        sa_image_free(p->benchSprite[i]);
-        p->benchSprite[i] = NULL;
-        p->benchSpriteUnit[i] = m->unit;
-        int r = sa_party_unit_row(p, m->unit);
+const Image *sa_party_front_sprite(Party *p, int unit, const SpriteSheet **sheet) {
+    int i = -1;
+    for (int s = 0; s < PARTY_SLOTS && i < 0; s++)
+        if (p->unit[s] == unit) i = s;
+    for (int b = 0; b < p->benchCount && i < 0; b++)
+        if (p->bench[b].unit == unit) i = PARTY_SLOTS + b;
+    if (i < 0) return NULL;
+    if (p->frontUnit[i] != unit) {
+        sa_image_free(p->frontSprite[i]);
+        p->frontSprite[i] = NULL;
+        p->frontUnit[i] = unit;
+        int r = sa_party_unit_row(p, unit);
         char name[24];
-        snprintf(name, sizeof name, "u%04da0.agf", r >= 0 ? sa_table_int(&p->units, r, 11) : 0);
-        if (p->vfs) p->benchSprite[i] = sa_load_image(p->vfs, name);
+        snprintf(name, sizeof name, "u%04da2.agf", r >= 0 ? sa_table_int(&p->units, r, 11) : 0);
+        if (p->vfs) p->frontSprite[i] = sa_sheet_load(p->vfs, name, &p->frontSheet[i]);
     }
-    return p->benchSprite[i];
+    *sheet = &p->frontSheet[i];
+    return p->frontSprite[i];
 }
 
 int sa_party_member_badge(const Party *p, const Member *m) {
@@ -697,7 +675,7 @@ void sa_party_swap(Party *p, int a, int b) {
     SWAP(equip);
     SWAP(sp);
     SWAP(sprite);
-    SWAP(cells);
+    SWAP(sheet);
     int t[10];
     memcpy(t, p->trained[a], sizeof t);
     memcpy(p->trained[a], p->trained[b], sizeof t);
@@ -725,7 +703,7 @@ bool sa_party_bench(Party *p, int slot) {
     sa_image_free(p->sprite[slot]);
     p->sprite[slot] = NULL;
     p->unit[slot] = 0;
-    p->cells[slot] = 0;
+    p->sheet[slot] = (SpriteSheet){0};
     return true;
 }
 

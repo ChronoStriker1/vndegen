@@ -11,7 +11,10 @@ enum {
     BENCH_SLOTS = 5,
     TILE_W = 108,
     TILE_H = 118,
-    FEET = 96,
+    ANCHOR_X = 53,
+    ANCHOR_Y = 95,
+    POST_ANCHOR_DX = 1,
+    POST_ANCHOR_DY = -6,
     LIST_X = 567,
     LIST_Y = 21,
     ROW_Y = 77,
@@ -140,7 +143,6 @@ void sa_deploy_init(Deploy *d, Vfs *vfs) {
 void sa_deploy_free(Deploy *d) {
     for (int i = 0; i < ART_COUNT; i++) sa_image_free(d->art[i]);
     for (int i = 0; i < POST_ROWS; i++) sa_image_free(d->postRow[i]);
-    for (int i = 0; i < PARTY_BENCH; i++) sa_image_free(d->benchSprite[i]);
     memset(d, 0, sizeof *d);
 }
 
@@ -317,27 +319,10 @@ static void apply(SA *s, int from, int to) {
     }
 }
 
-static const Image *bench_sprite(SA *s, int i) {
-    Deploy *d = &s->deploy;
-    int unit = s->party.bench[i].unit;
-    if (d->benchUnit[i] != unit) {
-        sa_image_free(d->benchSprite[i]);
-        d->benchSprite[i] = NULL;
-        d->benchUnit[i] = unit;
-        int r = sa_party_unit_row(&s->party, unit);
-        char name[24];
-        snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&s->party.units, r, 11));
-        d->benchSprite[i] = sa_load_image(&s->vfs, name);
-    }
-    return d->benchSprite[i];
-}
-
-static void sprite(u32 *fb, const Image *im, int x, int y) {
-    if (!im) return;
-    int cols, rows;
-    sa_sprite_layout(im, &cols, &rows);
-    int cw = im->w / cols, ch = im->h / rows;
-    sa_blit_rect(fb, im, 0, 0, cw, ch, x + TILE_W / 2 - cw / 2, y + FEET - ch);
+static void sprite(SA *s, u32 *fb, int unit, int x, int y) {
+    const SpriteSheet *sheet;
+    const Image *im = sa_party_front_sprite(&s->party, unit, &sheet);
+    if (im) sa_sheet_draw(fb, im, sheet, (int)(s->party.ms / PARTY_CELL_MS), x, y);
 }
 
 static void tile(const Deploy *d, u32 *fb, int x, int y, bool lit) {
@@ -445,23 +430,15 @@ static void draw_form(SA *s, u32 *fb) {
     for (int i = 0; i < 6; i++) {
         int k = HOVER_MAIN + i;
         tile(d, fb, main_x(i), main_y(i), d->picked == k || d->hover == k);
-        if (p->unit[mainSlot[i]] && d->picked != k) sprite(fb, p->sprite[mainSlot[i]], main_x(i), main_y(i));
+        if (p->unit[mainSlot[i]] && d->picked != k) sprite(s, fb, p->unit[mainSlot[i]], main_x(i) + ANCHOR_X, main_y(i) + ANCHOR_Y);
     }
     for (int i = 0; i < BENCH_SLOTS; i++) {
         int k = HOVER_BENCH + i, x = BENCH_X + i * BENCH_DX;
         tile(d, fb, x, BENCH_Y, d->picked == k || d->hover == k);
         int b = sa_party_reserve_at(p, i);
-        if (b >= 0 && d->picked != k && d->picked != HOVER_UNIT + b) sprite(fb, bench_sprite(s, b), x, BENCH_Y);
+        if (b >= 0 && d->picked != k && d->picked != HOVER_UNIT + b) sprite(s, fb, p->bench[b].unit, x + ANCHOR_X, BENCH_Y + ANCHOR_Y);
     }
     tile(d, fb, FIRE_X, FIRE_Y, d->hover == HOVER_FIRE);
-}
-
-static const Image *unit_sprite(SA *s, int unit) {
-    for (int i = 0; i < s->party.benchCount; i++)
-        if (s->party.bench[i].unit == unit) return bench_sprite(s, i);
-    for (int i = 0; i < PARTY_SLOTS; i++)
-        if (s->party.unit[i] == unit) return s->party.sprite[i];
-    return NULL;
 }
 
 static void info_line(u32 *fb, const char *t, int y) {
@@ -478,7 +455,7 @@ static void post_unit(SA *s, u32 *fb, int post, int x, int y) {
     Party *p = &s->party;
     int unit = p->post[post];
     if (!unit || s->deploy.picked == HOVER_POST + post) return;
-    sprite(fb, unit_sprite(s, unit), x + POST_W / 2 - TILE_W / 2, y + POST_H / 2 - FEET + 6);
+    sprite(s, fb, unit, x + POST_W / 2 + POST_ANCHOR_DX, y + POST_H / 2 + POST_ANCHOR_DY);
     int icon = sa_party_post_icon(p, unit, post);
     if (icon >= 0) sa_blit_rect(fb, s->deploy.art[ART_ICON], icon % 2 * ICON_W, icon / 2 * ICON_H, ICON_W, ICON_H, x, y + ICON_DY);
 }
@@ -581,11 +558,11 @@ static void draw_list(SA *s, u32 *fb) {
     sa_card_draw(s, fb, shown, CARD_X, CARD_Y);
     if (d->tab == TAB_FORM) sa_party_draw_diorama(p, fb, s->vm.c[C_RANK_MAX], s->camp.active ? sa_dungeon_platform(&s->dungeon) : d->art[ART_PLATFORM]);
     sa_blit_rect(fb, d->art[ART_BACK], 0, d->hover == HOVER_BACK ? BTN_H : 0, BTN_W, BTN_H, BACK_X, BACK_Y);
-    const Image *held = NULL;
-    if (is_post(d->picked) && p->post[d->picked - HOVER_POST]) held = unit_sprite(s, p->post[d->picked - HOVER_POST]);
-    else if (is_main(d->picked) && p->unit[mainSlot[d->picked - HOVER_MAIN]]) held = p->sprite[mainSlot[d->picked - HOVER_MAIN]];
-    else if (bench_index(s, d->picked) >= 0) held = bench_sprite(s, bench_index(s, d->picked));
-    if (held) sprite(fb, held, s->mouseX - TILE_W / 2, s->mouseY - FEET / 2);
+    int held = 0;
+    if (is_post(d->picked)) held = p->post[d->picked - HOVER_POST];
+    else if (is_main(d->picked)) held = p->unit[mainSlot[d->picked - HOVER_MAIN]];
+    else if (bench_index(s, d->picked) >= 0) held = p->bench[bench_index(s, d->picked)].unit;
+    if (held) sprite(s, fb, held, s->mouseX, s->mouseY);
     if (d->overRank) {
         sa_dim(fb);
         const char *lines[2] = {"格が足りません", "配置を変更してください。"};

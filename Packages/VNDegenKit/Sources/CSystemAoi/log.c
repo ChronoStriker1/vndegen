@@ -1,4 +1,4 @@
-#include "sa.h"
+#include "sa_private.h"
 
 enum {
     PANEL_X = 262,
@@ -19,6 +19,8 @@ enum {
     BACK_Y = 660,
     BTN_W = 130,
     BTN_H = 40,
+    STORY_PANEL_ALPHA = 180,
+    TOWN_PANEL_ALPHA = 159,
 };
 
 static const char *const artNames[LOG_ART_COUNT] = {"log_a00.agf", "log_a01.agf", "log_a02.agf", "log_b00.agf", "log_b01.agf",
@@ -140,9 +142,9 @@ int sa_log_click(Backlog *b, int x, int y, char *voice, size_t voiceSize) {
     return h.kind;
 }
 
-void sa_log_draw(Backlog *b, u32 *fb, bool fast, bool autoMode) {
+static void draw(Backlog *b, u32 *fb, bool fast, bool autoMode, int panelAlpha) {
     sa_font_set_spacing(3);
-    sa_blit_alpha(fb, b->art[LOG_ART_PANEL], PANEL_X, 0, 180);
+    sa_blit_alpha(fb, b->art[LOG_ART_PANEL], PANEL_X, 0, panelAlpha);
     int row = 0;
     for (int i = 0; i < b->count; i++) {
         LogEntry *e = entry(b, i);
@@ -175,10 +177,41 @@ void sa_log_draw(Backlog *b, u32 *fb, bool fast, bool autoMode) {
     int thumb = rows > vis ? TRACK_H * vis / rows : TRACK_H;
     if (thumb < 40) thumb = 40;
     int pos = rows > vis ? (TRACK_H - thumb) * (max_scroll(b) - b->scroll) / max_scroll(b) : 0;
-    sa_blit_rect(fb, b->art[LOG_ART_THUMB], 0, 0, 36, thumb, TRACK_X, TRACK_Y + pos);
+    if (b->count) sa_blit_rect(fb, b->art[LOG_ART_THUMB], 0, 0, 36, thumb, TRACK_X, TRACK_Y + pos);
     sa_blit_rect(fb, b->art[LOG_ART_UP], 0, 0, 36, 35, TRACK_X, 0);
     sa_blit_rect(fb, b->art[LOG_ART_DOWN], 0, 0, 36, 35, TRACK_X, 685);
     sa_blit_rect(fb, b->art[LOG_ART_FAST], fast ? BTN_W : 0, b->hover == LOG_ACT_FAST ? BTN_H : 0, BTN_W, BTN_H, BTN_X, FAST_Y);
     sa_blit_rect(fb, b->art[LOG_ART_AUTO], autoMode ? BTN_W : 0, b->hover == LOG_ACT_AUTO ? BTN_H : 0, BTN_W, BTN_H, BTN_X, AUTO_Y);
     sa_blit_rect(fb, b->art[LOG_ART_BACK], 0, b->hover == LOG_ACT_CLOSE ? BTN_H : 0, 132, BTN_H, BACK_X, BACK_Y);
+}
+
+void sa_log_draw(Backlog *b, u32 *fb, bool fast, bool autoMode) { draw(b, fb, fast, autoMode, STORY_PANEL_ALPHA); }
+
+bool sa_log_town_frame(SA *s) {
+    Backlog *b = &s->log;
+    if (!b->open) return false;
+    if (sa_log_hover(b, s->mouseX, s->mouseY)) s->dirty = true;
+    if (s->rightClicked) {
+        s->rightClicked = false;
+        b->open = false;
+        s->dirty = true;
+    }
+    if (s->clicked) {
+        s->clicked = false;
+        char voice[40] = "";
+        int act = sa_log_click(b, s->mouseX, s->mouseY, voice, sizeof voice);
+        if (act == LOG_ACT_VOICE) sa_play(s->mix, CH_VOICE, 0, voice, false);
+        if (act == LOG_ACT_FAST || act == LOG_ACT_AUTO) b->open = false;
+        s->dirty = true;
+    }
+    if (s->dirty) {
+        sa_town_draw(&s->town, &s->vfs, &s->vm, s->fb);
+        if (b->open) {
+            for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) s->fb[i] = 0xff000000u | (s->fb[i] >> 1 & 0x7f7f7f);
+            draw(b, s->fb, s->skipMode, s->autoMode, TOWN_PANEL_ALPHA);
+        }
+        s->serial++;
+        s->dirty = false;
+    }
+    return true;
 }
