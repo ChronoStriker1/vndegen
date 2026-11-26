@@ -682,6 +682,7 @@ int sa_debug_get(VNSystemAoi *sa, bool flag, int index);
 void sa_debug_join(VNSystemAoi *sa, const char *key);
 void sa_debug_reserve(VNSystemAoi *sa, const char *key, int tile);
 void sa_debug_equip(VNSystemAoi *sa, int slot, int item);
+void sa_debug_rng(VNSystemAoi *sa, u32 seed);
 void sa_debug_unbench(VNSystemAoi *sa, int index, int slot);
 void sa_debug_save(VNSystemAoi *sa, int slot, bool load);
 void sa_debug_pcload(VNSystemAoi *sa, const char *path);

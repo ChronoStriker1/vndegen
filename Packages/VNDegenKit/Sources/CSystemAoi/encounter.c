@@ -2,10 +2,14 @@
 
 enum {
     ENCOUNTER_QUIET = 10,
-    ENCOUNTER_ODDS = 20,
+    ENCOUNTER_LATE = 90,
+    ENCOUNTER_PERMILLE = 32,
+    ENCOUNTER_LATE_PERMILLE = 5,
 };
 
-bool sa_encounter_due(int sinceBattle, bool alarm, u32 roll) {
-    if (sinceBattle <= ENCOUNTER_QUIET) return false;
-    return roll % (u32)(alarm ? ENCOUNTER_ODDS / 2 : ENCOUNTER_ODDS) == 0;
+bool sa_encounter_due(int sinceBattle, int areaSteps, bool alarm, int percent, u32 roll) {
+    if (sinceBattle <= ENCOUNTER_QUIET || areaSteps <= ENCOUNTER_QUIET) return false;
+    int permille = sinceBattle > ENCOUNTER_LATE ? ENCOUNTER_LATE_PERMILLE : ENCOUNTER_PERMILLE;
+    if (alarm) permille *= 2;
+    return (int)(roll % 1000) < permille * percent / 100;
 }

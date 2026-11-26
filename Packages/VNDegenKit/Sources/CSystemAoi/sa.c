@@ -1842,6 +1842,10 @@ void sa_debug_reserve(VNSystemAoi *sa, const char *key, int tile) {
     s->dirty = true;
 }
 
+void sa_debug_rng(VNSystemAoi *sa, u32 seed) {
+    ((SA *)sa)->vm.rng = seed;
+}
+
 void sa_debug_equip(VNSystemAoi *sa, int slot, int item) {
     SA *s = (SA *)sa;
     for (int i = 0; slot < 0 && i < PARTY_SLOTS; i++)

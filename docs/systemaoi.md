@@ -157,9 +157,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred.
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
-  cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (1 in 20 a step
-  after a 10-step quiet) is fitted to eighteen of the original's intervals; 警戒心 and the bells' 引き寄せ don't
-  change it yet; a floor's taken pickups and opened doors aren't saved (the
+  cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (32 in 1,000 a
+  step after a 10-step quiet, 5 in 1,000 past 90 steps) is fitted to 60 runs of the original; 警戒心 halves it
+  (measured ×0.3, 95% 0.13 to 0.72) and the bells' 引き寄せ change it by ±10% (inferred: no change measurable); a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either; opened crystals are, and VNDegen keeps them the same way).
   The dungeon light and fog are fitted to eleven of the original's
   frames (each within 4%, the ice dungeon 3% too bright); which walls get a set's variant textures isn't known (the

@@ -554,13 +554,26 @@ calls it is inferred from that and from play, and marked so.
   since the last battle: 1 on entering and after each battle, one more a step), the step and action counters and the
   random seed words change. C064 drives it: set to 200 in the same saves there was no battle in 30, 25 and 36 steps
   (seeds 0, 5 and 3, against 20 and 34 for seeds 5 and 3), and set to 15 seed 3's battle came at step 11 instead of
-  34 while seed 5's didn't come in 25 steps. Inferred, the simplest rule that fits the eighteen intervals: no random
-  battle while C064 is 10 or less, then 1 in 20 a step (the likeliest rate, 18 battles over 372 steps past the first
-  ten; the first battles alone give 1 in 26, the later ones 1 in 12), 1 in 10 under 警報. The game's texts call it a
-  rate (警戒心: 迷宮で敵との遭遇率が下がる; the bells' 引き寄せ ±10), which VNDegen doesn't apply yet. What C064 over
-  about 40 does isn't known (no battle came in 91 steps there). VNDegen keeps C064 as the original does, so PC saves
-  carry it both ways; before, it started random battles after 40 steps and then every 10 ± 2 (step 48 from that
-  autosave whatever the seed). The group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
+  34 while seed 5's didn't come in 25 steps. A second set of 60 runs from VNDegen exports of the same autosave
+  (C064 set to 11, 40 or 70, the area's step count C068 starting at 0): battles never came in an area's
+  first 10 steps whatever C064 was (earliest 11, 14, 14, 16, 18, 20), which fits the earlier gaps of 10 to 14
+  steps after a battle only if both counts matter. Per eligible step, without modifiers 41 battles in 1,277 steps
+  (1 in 31); by C064, 1 in 76 at 11 to 30, 38 at 31 to 50, 22 at 51 to 70, 16 at 71 to 90 and 129 above 90. The
+  likeliest of the rules tried (constant rate, a rate rising with C064, either with a cut-off) is a constant rate
+  with a cut-off (log-likelihood −187.4 against −189.7 without the cut-off, −196.8 for a rising rate and −221.9 for
+  the earlier 1 in 20). VNDegen uses it: no random battle while C064 or the area's steps are 10 or less, then 32 in
+  1,000 a step up to C064 90 and 5 in 1,000 above (inferred from the fit; the drop also explains no battle in 91
+  steps at C064 200), doubled under 警報 (inferred). Modifiers, 12 runs each from C064 11 (battles by the area's
+  routed symbol group, which always met the party at step 75, counted as no random battle): a 警戒心 member on the
+  reserve gave 6 random battles in 613 eligible steps against 12 in 334 without, a rate ×0.27 to ×0.30 (95% 0.13 to
+  0.72); its `ability.obj` value is 50, so VNDegen halves the rate (inferred reading, inside the interval).
+  不幸の鐘 (引き寄せ+10, 敵と出会い易くなる) and 幸運の鐘 (−10) equipped on Darkus (the original saved the bell back
+  as equipped) gave ×0.91 and ×0.86 (95% about 0.4 to 2.0): no measurable change, which rules out ±10 points on
+  the rate; VNDegen applies 引き寄せ as ±10% (inferred). The rate is scaled by 100 − 警戒心's value + each main
+  member's equipped 引き寄せ, in percent; several 警戒心 members count once (inferred). VNDegen keeps C064 as the
+  original does, so PC saves carry it both ways. Earlier rules: 1 in 20 after C064 10, fitted to the first
+  eighteen intervals; before that, battles after 40 steps and then every 10 ± 2 (step 48 from that autosave
+  whatever the seed). The group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
   千05|千06), chosen by the weights in columns 32 to 34 (10, 60, 10). Measured in support: all eight random battles
   in 中腹エリア's runs were column 35 groups (炎01 twice, 炎02 twice, 炎03, 炎04 twice, 炎05), and the fixed
   seven-slime group 千固定0100 came up in 千樹庭's random battles.

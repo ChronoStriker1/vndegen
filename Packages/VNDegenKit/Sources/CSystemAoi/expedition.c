@@ -36,6 +36,9 @@ enum {
     WALL_OPEN = -1,
     WALL_HIDDEN = 100,
     BACKDROP_FADE_MS = 500,
+    ABILITY_VALUE = 4,
+    ITEM_EFFECT_FIRST = 15,
+    ITEM_EFFECT_LAST = 22,
     C_MAP_RANGE = 0x4d,
     VIEW_RANGE = 2,
     MAP_RANGE = 3,
@@ -955,6 +958,7 @@ void sa_exp_cancel_encounter(SA *s) { s->exp.cancelled = true; }
 static void random_battle(SA *s) {
     char group[64];
     pick_group(s, group, sizeof group);
+    sa_log(s, "random battle at C064 %d, area step %d", s->vm.c[C_SINCE_BATTLE], s->vm.c[C_AREA_STEPS]);
     s->exp.fighting = -1;
     begin_battle(s, group, NULL);
 }
@@ -1340,6 +1344,26 @@ static bool spring_trap(SA *s) {
 
 static bool run_step_hook(SA *s);
 
+static int encounter_percent(SA *s) {
+    int percent = 100;
+    if (party_has(s, "警戒心"))
+        for (int r = 0; r < s->party.abilities.rows; r++)
+            if (!strcmp(sa_table_text(&s->party.abilities, r, 2), "警戒心")) percent -= sa_table_int(&s->party.abilities, r, ABILITY_VALUE);
+    const Table *items = &s->battle.items;
+    for (int i = 0; i < PARTY_SLOTS; i++) {
+        if (!s->party.unit[i] || !s->party.equip[i]) continue;
+        for (int r = 0; r < items->rows; r++) {
+            if (sa_table_int(items, r, 0) != s->party.equip[i]) continue;
+            for (int col = ITEM_EFFECT_FIRST; col <= ITEM_EFFECT_LAST; col++) {
+                const char *p = strstr(sa_table_text(items, r, col), "引き寄せ");
+                if (p) percent += atoi(p + strlen("引き寄せ"));
+            }
+            break;
+        }
+    }
+    return percent > 0 ? percent : 0;
+}
+
 static void blend(u32 *fb, const u32 *from, size_t n, u32 a) {
     for (size_t i = 0; i < n; i++) {
         u32 p = fb[i], q = from[i];
@@ -1428,7 +1452,7 @@ static void after_move(SA *s, int r) {
     sync_marks(s);
     bool calm = sa_exp_special_active(s, SPECIAL_NO_ENEMY) && (int)(sa_vm_random(&s->vm) % 100) >= sa_exp_special_value(s, SPECIAL_NO_ENEMY);
     count_down_specials(e);
-    if (!e->calm && !calm && sa_encounter_due(s->vm.c[C_SINCE_BATTLE], e->alarm, sa_vm_random(&s->vm))) {
+    if (!e->calm && !calm && sa_encounter_due(s->vm.c[C_SINCE_BATTLE], s->vm.c[C_AREA_STEPS], e->alarm, encounter_percent(s), sa_vm_random(&s->vm))) {
         random_battle(s);
         return;
     }
