@@ -161,6 +161,13 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 3.4 to
   5.5 over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred.
+- Random numbers: the original's rolls don't come from the save (the same save gives different turns and battles)
+  and its generator wasn't found from play; VNDegen keeps its own generator's state in C006, so its saves and PC
+  exports repeat exactly in VNDegen.
+- Enemy groups stand in the view as the original's symbols (`e001` to `e010`, picked by `party.obj` column 13);
+  their size and fog are within about 10% of the original's, and how fast they animate is read from the files, not
+  measured. Walking into one holds the view for 430 ms, then crossfades into the battle over 400 ms (a random
+  battle the same; measured holds 400 to 667 ms and crossfades 267 to 530 ms, uneven under Wine).
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
   cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (32 in 1,000 a
   step after a 10-step quiet, 5 in 1,000 past 90 steps) is fitted to 60 runs of the original; 警戒心 halves it
@@ -177,8 +184,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Story: choices, the message window, the join box's cards and the status card's portrait are placed as measured
   (the sprites by the anchor in each sheet's header); the town diorama, 配置 and battles still cut unit sheets at
   the gaps between figures, which is wrong for 40 of the 72 field sheets. `81` after a key door is still skipped
-  (nothing visible on the PC; its sound couldn't be recorded). Trap messages wait for a key or click; the original's also close by themselves after about 18 seconds
-  (one run), and VNDegen doesn't time them out. The 探索, 調査, 押す, 引く, 切り替える and ワープ buttons have art but
+  (nothing visible on the PC; its sound couldn't be recorded). Dungeon notices close by themselves after 410 + 10
+  frames a character (fitted to the original's frame counts; VNDegen assumes 60 frames a second, where the
+  original under Wine drew 29 to 39) and run hook 19 as a click would; the box's open and close zoom isn't drawn.
+  The 探索, 調査, 押す, 引く, 切り替える and ワープ buttons have art but
   nothing in the game offers them (searched in the maps, scripts and PC play), so they aren't built.
 - Story groups: area bosses stand on their routes and stay beaten (measured), and a won battle with a story group
   runs its `party.obj` script, whose `b1` starts the next battle (ミアルテ防衛隊Ａ to Ｇ measured under Wine; 魔力塊隊

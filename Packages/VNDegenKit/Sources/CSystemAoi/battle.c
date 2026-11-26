@@ -124,6 +124,7 @@ enum {
     ICON = 20,
     SKILL_SIZE = 12,
     ACTION_MS = 1500,
+    BATTLE_FADE_MS = 400,
     LOSS_MS = 2000,
     SUBSTITUTE_CHANCE = 50,
     TILE_PLAIN = 0,
@@ -245,6 +246,7 @@ void sa_battle_free(Battle *b) {
     for (int i = 0; i < 4; i++) sa_image_free(b->board[i]);
     for (int i = 0; i < 4; i++) sa_image_free(b->pop[i]);
     sa_image_free(b->back);
+    sa_image_free(b->from);
     sa_table_free(&b->groups);
     sa_table_free(&b->skills);
     sa_table_free(&b->lvup);
@@ -339,6 +341,7 @@ bool sa_battle_roll(Battle *b, const char *group, u32 seed, int *cells) {
     u32 keepRng = b->rng;
     int keepSize = b->boardSize;
     b->rng = seed ? seed : 0x9e3779b9u;
+    b->fadeMs = BATTLE_FADE_MS;
     b->boardSize = board_size(b, g);
     roll_cells(b, g, cells);
     b->rng = keepRng;
@@ -371,6 +374,7 @@ bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, I
     clear_fighters(b);
     b->dungeonName[0] = b->floorName[0] = 0;
     b->rng = seed ? seed : 0x9e3779b9u;
+    b->fadeMs = BATTLE_FADE_MS;
     int g = row_by_text(&b->groups, 2, group);
     if (g < 0) return false;
     for (int s = 0; s < PARTY_SLOTS; s++) {
@@ -800,6 +804,10 @@ static void finish_check(Battle *b) {
 bool sa_battle_tick(Battle *b, u32 ms) {
     b->animMs += ms;
     bool changed = b->animMs / PARTY_CELL_MS != (b->animMs - ms) / PARTY_CELL_MS;
+    if (b->fadeMs < BATTLE_FADE_MS) {
+        b->fadeMs += ms;
+        changed = true;
+    }
     if (b->result == BATTLE_LOST && b->open) {
         b->ms += ms;
         if (b->ms < LOSS_MS) return changed;
@@ -1151,7 +1159,7 @@ static bool side_lit(const Battle *b, int i) {
     return any;
 }
 
-void sa_battle_draw(Battle *b, u32 *fb) {
+static void draw_screen(Battle *b, u32 *fb) {
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u;
     if (b->back) sa_blit(fb, b->back, 0, 0);
     draw_board(b, fb);
@@ -1187,4 +1195,17 @@ void sa_battle_draw(Battle *b, u32 *fb) {
     if (b->gainItem[0]) lines[n++] = sa_fmt(POP_YELLOW "%s" POP_WHITE "を手に入れた", b->gainItem);
     sa_popup_draw(b->pop, fb, (const char *const *)lines, n);
     for (int i = 0; i < n; i++) free(lines[i]);
+}
+
+void sa_battle_draw(Battle *b, u32 *fb) {
+    draw_screen(b, fb);
+    if (b->from && b->fadeMs < BATTLE_FADE_MS) {
+        u32 a = b->fadeMs * 256 / BATTLE_FADE_MS;
+        for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) {
+            u32 p = fb[i], q = b->from->px[i];
+            u32 rb = (((p & 0xff00ff) * a + (q & 0xff00ff) * (256 - a)) >> 8) & 0xff00ff;
+            u32 g = (((p & 0xff00) * a + (q & 0xff00) * (256 - a)) >> 8) & 0xff00;
+            fb[i] = 0xff000000u | rb | g;
+        }
+    }
 }

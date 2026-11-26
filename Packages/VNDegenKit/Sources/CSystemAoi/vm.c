@@ -128,12 +128,19 @@ static u32 next_random(VM *vm);
 
 u32 sa_vm_random(VM *vm) { return next_random(vm); }
 
+enum { RNG_VAR = 6 };
+#define RNG_MOD 2147483647u
+#define RNG_MUL 48271u
+#define RNG_FALLBACK 0x2545f491u
+
 static u32 next_random(VM *vm) {
-    if (!vm->rng) vm->rng = 0x9e3779b9u;
-    vm->rng ^= vm->rng << 13;
-    vm->rng ^= vm->rng >> 17;
-    vm->rng ^= vm->rng << 5;
-    return vm->rng;
+    u32 x = (u32)vm->c[RNG_VAR] % RNG_MOD;
+    if (!x) x = vm->rng % RNG_MOD;
+    if (!x) x = RNG_FALLBACK % RNG_MOD;
+    x = (u32)((u64)x * RNG_MUL % RNG_MOD);
+    vm->c[RNG_VAR] = (i32)x;
+    vm->rng = x;
+    return x;
 }
 
 static bool term(VM *vm, const char **s, i32 *out) {
