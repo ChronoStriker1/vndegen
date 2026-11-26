@@ -485,8 +485,10 @@ static void snapshot(IK *t) {
     put32(&b, (u32)t->imageCount);
     for (int i = 0; i < t->imageCount; i++) putfile(&b, t, AR_GRP, t->images[i] ? t->imageNames[i] : NULL);
     put32(&b, (u32)t->layerCount);
-    for (int i = 0; i < t->layerCount; i++) put32(&b, (u32)t->order[i]);
-    for (int i = 0; i < t->layerCount; i++) put_layer(&b, &t->layers[i]);
+    for (int n = 0; n < t->layerCount; n++)
+        for (int i = 0; i < t->layerCount; i++)
+            if (t->order[i] == n) put32(&b, (u32)i);
+    for (int i = 0; i < t->layerCount; i++) put_layer(&b, &t->layers[t->order[i]]);
     put32(&b, (u32)t->buttonCount);
     putfile(&b, t, AR_SNR, t->cancelBound && t->cancelSc ? t->cancelSc->name : NULL);
     put32(&b, t->cancelBound ? (u32)t->cancelLabel : 0xffffffffu);
@@ -612,25 +614,27 @@ static bool load_slot(IK *t, int slot) {
         }
     }
     u32 lc = get32(&r);
+    bool byPlace = false;
     if (lc == (u32)t->layerCount && r.at + 4 * (size_t)lc <= r.n) {
         int *order = ik_alloc(sizeof(int) * lc);
         bool *seen = ik_alloc(lc);
-        bool ok = true;
+        bool ok = true, legacy = !strchr(name, '.');
         for (u32 i = 0; i < lc; i++) {
             u32 v = rd32(r.p + r.at + 4 * i);
             if (v >= lc || seen[v]) ok = false;
             else {
                 seen[v] = true;
-                order[i] = (int)v;
+                order[legacy ? i : v] = (int)(legacy ? v : i);
             }
         }
         if (ok) memcpy(t->order, order, sizeof(int) * lc);
+        byPlace = ok && !legacy;
         free(order);
         free(seen);
     }
     for (u32 i = 0; i < lc; i++) get32(&r);
     for (u32 i = 0; i < lc; i++) {
-        if (i < (u32)t->layerCount) get_layer(t, &r, &t->layers[i]);
+        if (i < (u32)t->layerCount) get_layer(t, &r, &t->layers[byPlace ? t->order[i] : (int)i]);
         else
             for (int k = 0; k < 16; k++) get32(&r);
     }
