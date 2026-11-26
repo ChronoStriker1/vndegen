@@ -501,5 +501,7 @@ void sa_exp_debug_place(SA *s, int x, int y, int dir);
 void sa_reset_scene(SA *s);
 void sa_end_turn(SA *s);
 void sa_show_frame_as_bg(SA *s, const u32 *px, const char *name);
+void sa_actions_enter(SA *s);
+void sa_actions_open(SA *s);
 
 #endif
