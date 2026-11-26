@@ -113,13 +113,17 @@ void gfx_blit_min(IK *t, const int argb[4], int img, int sx, int sy, int w, int 
     image_blit(&screen, t->images[img], sx, sy, w, h, x0, y0, argb, minAlpha, false);
 }
 
-Image *layer_surface(IK *t, Layer *l) {
-    if (l->surf) return l->surf;
+Image *layer_build(Layer *l, const Image *src) {
+    image_free(l->surf);
     l->surf = image_new(l->w, l->h);
     memset(l->surf->px, 0, sizeof(u32) * (size_t)l->w * (size_t)l->h);
-    if (l->img >= 0 && l->img < t->imageCount && t->images[l->img])
-        image_blit(l->surf, t->images[l->img], l->sx, l->sy, l->w, l->h, 0, 0, fullColour, 0, true);
+    if (src) image_blit(l->surf, src, l->sx, l->sy, l->w, l->h, 0, 0, fullColour, 0, true);
     return l->surf;
+}
+
+Image *layer_surface(IK *t, Layer *l) {
+    if (l->surf) return l->surf;
+    return layer_build(l, l->img >= 0 && l->img < t->imageCount ? t->images[l->img] : NULL);
 }
 
 void layer_restore(IK *t, Layer *l, int x, int y, int w, int h) {

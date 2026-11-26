@@ -20,6 +20,7 @@
 #define WIDE_RECORDS 23
 #define WIDE_MIDDLE (4 * (6 + 9 * WIDE_RECORDS + 5))
 #define GAN_STATE 32
+#define KEPT_TAG 0x5450454bu
 #define READ_UNIT 128
 
 static const i32 defaultSettings[SETTINGS_USED] = {1000, 1, 0, 500, 500, 0, 128, 0, 128, 0, 128, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -501,6 +502,17 @@ static void snapshot(IK *t) {
         gan_save(t, g);
         put(&b, g, GAN_STATE);
     }
+    int kept = 0;
+    for (int i = 0; i < t->layerCount; i++) kept += t->layers[i].kept && t->layers[i].keptName[0];
+    if (kept) {
+        put32(&b, KEPT_TAG);
+        put32(&b, (u32)kept);
+        for (int i = 0; i < t->layerCount; i++)
+            if (t->layers[i].kept && t->layers[i].keptName[0]) {
+                put32(&b, (u32)i);
+                putname(&b, t->layers[i].keptName);
+            }
+    }
     wr32(b.p, (u32)b.n);
     free(t->save.snap);
     t->save.snap = b.p;
@@ -517,6 +529,24 @@ static void save_slot(IK *t, int slot) {
     wr32(d + 0x10, (u32)slot);
     write_save(t, d, n);
     free(d);
+}
+
+static void keep_layers(IK *t, Rd *r) {
+    get32(r);
+    u32 count = get32(r);
+    for (u32 k = 0; k < count && !r->bad; k++) {
+        u32 i = get32(r);
+        char name[16];
+        getname(r, name);
+        if (r->bad || i >= (u32)t->layerCount || !t->layers[i].made || !name[0]) continue;
+        Image *src = image_read(t, name);
+        if (!src) continue;
+        Layer *l = &t->layers[i];
+        layer_build(l, src);
+        image_free(src);
+        l->kept = true;
+        snprintf(l->keptName, sizeof l->keptName, "%s", name);
+    }
 }
 
 static bool load_slot(IK *t, int slot) {
@@ -630,7 +660,11 @@ static bool load_slot(IK *t, int slot) {
         if (i < IK_BUTTONS) t->buttons[i] = tmp;
     }
     u8 ganState[GAN_STATE] = {0};
-    if (wide && r.at + GAN_STATE <= r.n) memcpy(ganState, r.p + r.at, GAN_STATE);
+    if (wide && r.at + GAN_STATE <= r.n) {
+        memcpy(ganState, r.p + r.at, GAN_STATE);
+        r.at += GAN_STATE;
+    }
+    if (!r.bad && r.at + 8 <= r.n && rd32(r.p + r.at) == KEPT_TAG) keep_layers(t, &r);
     free(d);
     if (r.bad) ik_log(t, "save slot %d is shorter than its state", slot);
     t->msgMode = (int)(mode & 0xffff);
