@@ -1917,6 +1917,7 @@ void sa_load_into_town(SA *s, int slot) {
 
 void sa_enter_loaded(SA *s) {
     sa_vm_register_hooks(&s->vm, &s->vfs, "init.box");
+    sa_carry_refresh_skills(s);
     s->playMs = (u32)s->vm.c[11] * 1000;
     sa_reset_scene(s);
     s->inGame = true;

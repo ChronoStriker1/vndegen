@@ -909,6 +909,7 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
     Image *view = sa_image_new(SA_W, SA_H);
     memcpy(view->px, s->fb, sizeof(u32) * SA_W * SA_H);
     s->battle.levelBonus = s->vm.c[C_ENEMY_LEVEL];
+    s->battle.expBonus = s->vm.c[C_REWARD_BONUS];
     if (!sa_battle_begin(&s->battle, &s->vfs, group, cells, view, s->exp.dungeon - 1, sa_vm_random(&s->vm))) {
         sa_log(s, "no enemy group %s", group);
         return;

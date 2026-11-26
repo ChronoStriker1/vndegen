@@ -457,8 +457,7 @@ static int unit_skills(SA *s, int r, const Bench *b, bool enemy, int *rows, int 
     for (int k = 0; k < 8; k++) {
         const char *name = sa_table_text(u, r, 41 + k * 3);
         int row = *name && strcmp(name, "*") ? skill_row(s, name) : -1;
-        if (row < 0 || (enemy && !sa_party_unit_knows(&s->party, r, b->level, k))) continue;
-        if (!enemy && n && marks[0] == FIXED_MARK) break;
+        if (row < 0 || !sa_party_unit_knows(&s->party, r, enemy ? b->level : sa_party_skill_level(&s->party, b->unit, b->level), k)) continue;
         rows[n] = row;
         marks[n++] = strncmp(name, FIXED_SKILL, strlen(FIXED_SKILL)) ? 1 : FIXED_MARK;
     }

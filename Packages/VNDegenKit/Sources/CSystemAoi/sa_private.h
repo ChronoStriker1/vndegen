@@ -457,10 +457,11 @@ u8 *sa_records_opt_read(const SA *s);
 void sa_records_opt_write(const SA *s, const u8 *img);
 
 enum { CARRY_LEVEL = 4, CARRY_SP = 12, CARRY_TRAINED = 16, CARRY_EQUIP = 56, CARRY_FIELD = 128, CARRY_USED = 132, CARRY_FLAG = 2 };
-enum { C_ENEMY_LEVEL = 391 };
+enum { C_ENEMY_LEVEL = 391, C_REWARD_BONUS = 392 };
 void sa_carry_register(SA *s);
 void sa_carry_restore(SA *s);
 void sa_carry_join(SA *s, const char *key);
+void sa_carry_refresh_skills(SA *s);
 void sa_carry_load_flags(SA *s);
 u8 *sa_carry_block(const SA *s);
 const u8 *sa_carry_unit(const u8 *block, int unit);

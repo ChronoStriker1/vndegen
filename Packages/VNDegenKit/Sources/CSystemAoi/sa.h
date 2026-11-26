@@ -689,7 +689,7 @@ typedef struct Battle {
     Party *party;
     Table groups, skills, lvup, items;
     Fighter f[BATTLE_FIGHTERS];
-    int count, levelBonus;
+    int count, levelBonus, expBonus;
     int order[BATTLE_FIGHTERS], orderCount, next;
     BattleLine log[BATTLE_LOG];
     int logCount;

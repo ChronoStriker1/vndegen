@@ -560,7 +560,7 @@ static int unit_skills(Battle *b, int unitRow, int level, int *rows, int *weight
 
 static int choose_skill(Battle *b, Fighter *f, int mode) {
     int all[8], w[8], rows[8], weights[8], n = 0, total = 0;
-    int count = unit_skills(b, f->row, f->enemy ? f->level : INT_MAX, all, w);
+    int count = unit_skills(b, f->row, f->enemy ? f->level : sa_party_skill_level(b->party, f->id, f->level), all, w);
     for (int k = 0; k < count; k++) {
         int r = all[k];
         if (sa_table_int(&b->skills, r, 13) > f->mp) continue;
@@ -767,7 +767,7 @@ static void reward(Battle *b) {
     int sum = 0;
     for (int i = 0; i < b->count; i++)
         if (b->f[i].enemy) sum += sa_table_int(&b->party->units, b->f[i].row, 72);
-    b->gainExp = (sum * range(b, 110, 125) + 50) / 100;
+    b->gainExp = (sum * range(b, 110, 125) * (10 + b->expBonus) / 10 + 50) / 100;
     b->gainItem[0] = 0;
     if ((int)(rnd(b) % 100) < sa_table_int(g, b->group, 65)) drop_item(b, text_of(g, b->group, 67));
     for (int i = 0; i < b->count; i++) {
@@ -860,7 +860,7 @@ static void open_picker(Battle *b, int slot, int kind) {
     b->pickCount = 0;
     if (kind == PICK_ACTION) {
         int rows[8], weights[8];
-        int n = unit_skills(b, sa_party_unit_row(b->party, b->party->unit[slot]), INT_MAX, rows, weights);
+        int n = unit_skills(b, sa_party_unit_row(b->party, b->party->unit[slot]), sa_party_skill_level(b->party, b->party->unit[slot], b->party->level[slot]), rows, weights);
         for (int i = 0; i < n; i++) b->pick[b->pickCount++] = (Order){ORDER_SKILL, rows[i], 0};
         for (size_t i = 0; i < sizeof pickModes / sizeof pickModes[0]; i++) b->pick[b->pickCount++] = (Order){pickModes[i], -1, 0};
         return;
