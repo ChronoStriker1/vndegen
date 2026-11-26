@@ -244,7 +244,7 @@ typedef struct R3 {
     u32 fogColor;
     int cull;
     float blend;
-    bool idMode;
+    bool idMode, texAlpha;
     u32 id;
 } R3;
 
@@ -253,6 +253,33 @@ void r3_free(R3 *r);
 void r3_begin(R3 *r, u32 *fb, float fovDeg);
 void r3_tri(R3 *r, const R3Vert *v, const Image *tex);
 Image *sa_bmp_decode(const u8 *d, size_t n);
+Image *sa_bmp_decode_alpha(const u8 *d, size_t n);
+
+#define FX_PARTICLES 160
+
+enum { FX_NONE, FX_LEAF, FX_SNOW };
+
+typedef struct FxParticle {
+    float x, y, z, phase, angle, flip, age, life;
+} FxParticle;
+
+typedef struct DunFx {
+    int type;
+    Image *tex;
+    float size, fall, flutter[3], rot[3], num, clip[2], fadeIn, fadeOut, area[4];
+    FxParticle p[FX_PARTICLES];
+    int count;
+    u32 rng, ms;
+    bool placed;
+} DunFx;
+
+void sa_fx_load(DunFx *fx, Vfs *vfs, const char *def);
+void sa_fx_free(DunFx *fx);
+void sa_fx_area(DunFx *fx, float x0, float z0, float x1, float z1);
+bool sa_fx_tick(DunFx *fx, u32 ms, float camX, float camZ);
+void sa_fx_draw(DunFx *fx, R3 *r, const float pos[3], const float right[3], const float up[3], const float fwd[3]);
+float sa_def_value(const char *text, const char *key, float fallback);
+bool sa_def_string(const char *text, const char *key, char *out, size_t size);
 
 #define DUN_SIDE 20
 #define DUN_CELLS (DUN_SIDE * DUN_SIDE)
@@ -334,6 +361,7 @@ typedef struct Dungeon {
     int fogTex;
     float fogSpeed[2], fogAlpha[2], fogHeight;
     int passCell, passSide;
+    DunFx fx;
 } Dungeon;
 
 enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };

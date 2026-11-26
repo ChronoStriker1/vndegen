@@ -145,6 +145,7 @@ static void free_set(PartSet *p) {
 }
 
 static void free_level(Dungeon *d) {
+    sa_fx_free(&d->fx);
     free_set(&d->set);
     free_set(&d->common);
     for (int i = 0; i < d->texCount; i++) sa_image_free(d->tex[i]);
@@ -239,7 +240,7 @@ bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map) {
     return true;
 }
 
-static float def_value(const char *text, const char *key, float fallback) {
+float sa_def_value(const char *text, const char *key, float fallback) {
     size_t n = strlen(key);
     for (const char *p = text; *p; p++) {
         if ((p != text && p[-1] != '\n') || strncmp(p, key, n) || (p[n] != ' ' && p[n] != '\t' && p[n] != '=')) continue;
@@ -249,7 +250,7 @@ static float def_value(const char *text, const char *key, float fallback) {
     return fallback;
 }
 
-static bool def_string(const char *text, const char *key, char *out, size_t size) {
+bool sa_def_string(const char *text, const char *key, char *out, size_t size) {
     size_t n = strlen(key);
     for (const char *p = text; *p; p++) {
         if ((p != text && p[-1] != '\n') || strncmp(p, key, n) || (p[n] != ' ' && p[n] != '\t' && p[n] != '=')) continue;
@@ -283,13 +284,14 @@ static void load_effects(Dungeon *d, Vfs *vfs) {
         text[n] = 0;
         free(data);
         char type[32], tex[48];
-        if (def_string(text, "type", type, sizeof type) && !strcmp(type, "FogFoot") && def_string(text, "TexFile", tex, sizeof tex)) {
+        if (sa_def_string(text, "type", type, sizeof type) && strcmp(type, "FogFoot")) sa_fx_load(&d->fx, vfs, text);
+        if (sa_def_string(text, "type", type, sizeof type) && !strcmp(type, "FogFoot") && sa_def_string(text, "TexFile", tex, sizeof tex)) {
             d->fogTex = texture_index(d, vfs, tex);
-            d->fogSpeed[0] = def_value(text, "texSpdX", 0);
-            d->fogSpeed[1] = def_value(text, "texSpdY", 0);
-            d->fogAlpha[0] = def_value(text, "AlphaMin", 0);
-            d->fogAlpha[1] = def_value(text, "AlphaMax", 0);
-            d->fogHeight = def_value(text, "HighAdd", 0);
+            d->fogSpeed[0] = sa_def_value(text, "texSpdX", 0);
+            d->fogSpeed[1] = sa_def_value(text, "texSpdY", 0);
+            d->fogAlpha[0] = sa_def_value(text, "AlphaMin", 0);
+            d->fogAlpha[1] = sa_def_value(text, "AlphaMax", 0);
+            d->fogHeight = sa_def_value(text, "HighAdd", 0);
         }
         free(text);
     }
@@ -301,6 +303,7 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     load_effects(d, vfs);
     load_set(d, vfs, &d->common, "mallset.pvm");
     if (!sa_dungeon_read_map(d, vfs, map)) return false;
+    sa_fx_area(&d->fx, -CELL / 2, -((float)d->h - 0.5f) * CELL, ((float)d->w - 0.5f) * CELL, CELL / 2);
     d->variantSeed = 2166136261u;
     for (const char *p = map; *p; p++) d->variantSeed = (d->variantSeed ^ (u8)*p) * 16777619u;
     if (!d->r3.zbuf) r3_init(&d->r3, SA_W, SA_H);
@@ -619,7 +622,7 @@ static bool door_near(const Dungeon *d) {
     for (int y = d->y - VIEW_CELLS; y <= d->y + VIEW_CELLS; y++)
         for (int x = d->x - VIEW_CELLS; x <= d->x + VIEW_CELLS; x++) {
             const i32 *c = cell_at(d, x, y);
-            if (c && c[F_FLOOR] >= 0 && c[F_OBJECT] == OBJECT_DOOR) return true;
+            if (c && c[F_FLOOR] >= 0 && (c[F_OBJECT] == OBJECT_DOOR || c[F_OBJECT] == OBJECT_CRYSTAL || c[F_OBJECT] == OBJECT_CRYSTAL_OPEN)) return true;
         }
     return false;
 }
@@ -638,6 +641,7 @@ bool sa_dungeon_tick(Dungeon *d, u32 ms) {
     u32 before = d->clock / DOOR_FRAME_MS;
     d->clock += ms;
     bool turning = d->clock / DOOR_FRAME_MS != before && door_near(d);
+    if (d->clock / DOOR_FRAME_MS != before && sa_fx_tick(&d->fx, d->clock / DOOR_FRAME_MS * DOOR_FRAME_MS - before * DOOR_FRAME_MS, d->camX, d->camZ)) turning = true;
     if (!d->animDur) return turning;
     d->animMs += ms;
     float t = d->animMs >= d->animDur ? 1 : (float)d->animMs / (float)d->animDur;
@@ -919,6 +923,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     }
     draw_fog_foot(d, &c, order, n);
     draw_crystals(d, &c, crystals, nc);
+    if (!showIds) sa_fx_draw(&d->fx, &d->r3, c.pos, c.r, c.u, c.f);
 }
 
 static void fill(u32 *fb, int x, int y, int w, int h, u32 c) {
