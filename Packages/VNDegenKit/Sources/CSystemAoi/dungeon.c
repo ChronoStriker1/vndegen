@@ -30,6 +30,7 @@ enum {
     FLOOR_DOWN = 100,
     FLOOR_UP = 101,
     OBJECT_CRYSTAL = 60,
+    OBJECT_CRYSTAL_OPEN = 61,
     OBJECT_DARK = 41,
     LINK_INTS = 11,
     HEADER_ROUTES = 32,
@@ -99,6 +100,7 @@ static const struct {
 #define POLE_SIDE (DUN_SIDE + 1)
 #define QUARTER 1.5707963f
 #define VIEW_SLOPE 0.75f
+#define CRYSTAL_ALPHA 0.5f
 
 static const float lights[2][3] = {{0.46f, 0.3f, -0.44f}, {-0.46f, 0.3f, -0.44f}};
 static const int wallField[4] = {F_WALL_N, F_WALL_E, F_WALL_S, F_WALL_W};
@@ -736,7 +738,7 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
                                n[0] * c->f[0] + n[1] * c->f[1] + n[2] * c->f[2]};
                 v[j].u = pv->uv[0];
                 v[j].v = pv->uv[1];
-                v[j].shade = shade_of(d, cn);
+                v[j].shade = (ly->emissive & 0xffffff) == 0xffffff ? 1 : shade_of(d, cn);
             }
             r3_tri(&d->r3, v, tex);
         }
@@ -784,6 +786,23 @@ static void draw_fog_foot(Dungeon *d, const Cam *c, const int *order, int n) {
     d->r3.blend = 0;
 }
 
+static void draw_crystals(Dungeon *d, const Cam *c, const int *cells, int n) {
+    d->r3.blend = CRYSTAL_ALPHA;
+    float density = d->r3.fogDensity;
+    d->r3.fogDensity = 0;
+    for (int i = n - 1; i >= 0; i--) {
+        char name[16];
+        snprintf(name, sizeof name, "a%03d", d->cell[cells[i]][F_OBJECT]);
+        float cx = (float)(cells[i] % DUN_SIDE) * CELL, cz = -(float)(cells[i] / DUN_SIDE) * CELL;
+        d->r3.cull = 1;
+        draw_model(d, &d->common, c, name, cx, cz, spin(d), 0);
+        d->r3.cull = -1;
+        draw_model(d, &d->common, c, name, cx, cz, spin(d), 0);
+    }
+    d->r3.fogDensity = density;
+    d->r3.blend = 0;
+}
+
 void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     u32 fog = d->r3.fogColor;
     u32 bg = 0xff000000u | fog;
@@ -815,6 +834,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
         }
     bool pole[POLE_SIDE * POLE_SIDE];
     memset(pole, 0, sizeof pole);
+    int crystals[DUN_CELLS], nc = 0;
     for (int i = 0; i < n; i++) {
         int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
         const i32 *cell = d->cell[row * DUN_SIDE + col];
@@ -848,12 +868,15 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             snprintf(name, sizeof name, "w%03d", w);
             draw_model(d, &d->set, &c, name, cx, cz, (float)sideQuarter[s] * QUARTER, leaf_swing(d, order[i], s));
         }
-        if (cell[F_OBJECT] >= 0) {
+        if (cell[F_OBJECT] == OBJECT_CRYSTAL || cell[F_OBJECT] == OBJECT_CRYSTAL_OPEN) {
+            crystals[nc++] = order[i];
+        } else if (cell[F_OBJECT] >= 0) {
             snprintf(name, sizeof name, "a%03d", cell[F_OBJECT]);
             draw_model(d, &d->common, &c, name, cx, cz, cell[F_OBJECT] == OBJECT_DOOR ? spin(d) : 0, 0);
         }
     }
     draw_fog_foot(d, &c, order, n);
+    draw_crystals(d, &c, crystals, nc);
 }
 
 static void fill(u32 *fb, int x, int y, int w, int h, u32 c) {
