@@ -465,7 +465,7 @@ static void snapshot(IK *t) {
     free(thumb);
     putfile(&b, t, AR_SNR, t->resumeSc ? t->resumeSc->name : NULL);
     put32(&b, (u32)t->resumeLabel);
-    put32(&b, (u32)(t->msgMode & 0xffff) | (t->msg.count ? 0x10000u : 0));
+    put32(&b, (t->window ? 1u : 0u) | (t->msg.count ? 0x10000u : 0));
     put32(&b, 0);
     put32(&b, 0);
     putfile(&b, t, AR_BGM, t->bgmName);
@@ -673,7 +673,7 @@ static bool load_slot(IK *t, int slot) {
     if (!r.bad && r.at + 8 <= r.n && rd32(r.p + r.at) == KEPT_TAG) keep_layers(t, &r);
     free(d);
     if (r.bad) ik_log(t, "save slot %d is shorter than its state", slot);
-    t->msgMode = (int)(mode & 0xffff);
+    t->window = mode & 1;
     if (wide) gan_restore(t, ganState);
     if (bgm[0]) snd_bgm(t, bgm, loop);
     else snd_bgm_fade(t, 0);

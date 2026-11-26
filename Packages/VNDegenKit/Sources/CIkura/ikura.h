@@ -296,7 +296,7 @@ struct IK {
     bool wheelCall, wheelBound;
     Script *resumeSc;
     int resumeLabel;
-    int msgMode;
+    bool window;
     i32 settings[64];
     char **texts;
     int textCount;
