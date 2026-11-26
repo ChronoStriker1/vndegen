@@ -93,7 +93,7 @@ static char *opt_path(const SA *s) { return sa_fmt("%s/Bunny3.sav/Bunny3.opt", s
 
 static char *own_path(const SA *s) { return sa_fmt("%s/vndegen/records.dat", s->saveDir); }
 
-static u8 *read_opt(const SA *s) {
+u8 *sa_records_opt_read(const SA *s) {
     char *path = opt_path(s);
     size_t n, size = 0;
     u8 *file = sa_read_file(path, &n);
@@ -105,6 +105,15 @@ static u8 *read_opt(const SA *s) {
         img = NULL;
     }
     return img;
+}
+
+void sa_records_opt_write(const SA *s, const u8 *img) {
+    size_t n;
+    u8 *packed = vnsystemaoi_pack(img, OPT_SIZE, &n);
+    char *path = opt_path(s);
+    if (packed) sa_write_file(path, packed, n);
+    free(path);
+    free(packed);
 }
 
 static int count_back(const u8 *img, int end, int bytes, int limit) {
@@ -220,7 +229,7 @@ void sa_records_load(SA *s) {
     for (int d = 0; d < EXP_DUNGEONS; d++)
         for (int f = 0; f < EXP_FLOORS; f++) r->floorCells[d][f] = -1;
     read_own(r, s);
-    u8 *img = read_opt(s);
+    u8 *img = sa_records_opt_read(s);
     if (img) read_image(r, img);
     free(img);
 }
@@ -284,16 +293,11 @@ void sa_records_flush(SA *s) {
     Records *r = &s->extra.records;
     sa_records_sync(s);
     if (!r->dirty) return;
-    u8 *img = read_opt(s);
+    u8 *img = sa_records_opt_read(s);
     if (img) {
         read_image(r, img);
         write_image(r, img);
-        size_t n;
-        u8 *packed = vnsystemaoi_pack(img, OPT_SIZE, &n);
-        char *path = opt_path(s);
-        if (packed) sa_write_file(path, packed, n);
-        free(path);
-        free(packed);
+        sa_records_opt_write(s, img);
         free(img);
     }
     write_own(r, s);

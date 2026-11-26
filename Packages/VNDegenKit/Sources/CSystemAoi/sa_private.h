@@ -448,6 +448,18 @@ const UnitRecord *sa_records_unit(const SA *s, int id);
 int sa_records_floor(const SA *s, int dungeon, int floor);
 bool sa_records_has_item(const SA *s, int id);
 int sa_records_floor_cells(SA *s, int dungeon, int floor);
+u8 *sa_records_opt_read(const SA *s);
+void sa_records_opt_write(const SA *s, const u8 *img);
+
+enum { CARRY_LEVEL = 4, CARRY_SP = 12, CARRY_TRAINED = 16, CARRY_EQUIP = 56, CARRY_FIELD = 128, CARRY_USED = 132, CARRY_FLAG = 2 };
+enum { C_ENEMY_LEVEL = 391 };
+void sa_carry_register(SA *s);
+void sa_carry_restore(SA *s);
+void sa_carry_join(SA *s, const char *key);
+void sa_carry_load_flags(SA *s);
+u8 *sa_carry_block(const SA *s);
+const u8 *sa_carry_unit(const u8 *block, int unit);
+void sa_pcsave_carry_units(SA *s, u8 *out, int count, int size);
 void sa_go_title(SA *s);
 void sa_mission_init(SA *s);
 void sa_mission_free(SA *s);

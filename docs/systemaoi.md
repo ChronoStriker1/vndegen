@@ -168,15 +168,17 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   frames (each within 4%, the ice dungeon 3% too bright); which walls get a set's variant textures isn't known (the
   ice dungeon's diamond walls are drawn plain); the falling leaves, sparks, snow and light motes some dungeons
   show aren't drawn.
-- Story: the true ending (F161 after 真魔力塊隊) and 内政END play, but some story the original runs from its exe isn't
-  rebuilt: the second playthrough's carried-over data (`85`/`86`: new games never offer 引き継ぐ). Trap messages wait
-  for a key or click; the original's also close by themselves after about 18 seconds (one run), and VNDegen doesn't
-  time them out. The 探索, 調査, 押す, 引く, 切り替える and ワープ
-  buttons have art but nothing in the game offers them (searched in the maps, scripts and PC play), so they aren't
-  built.
+- Story: trap messages wait for a key or click; the original's also close by themselves after about 18 seconds
+  (one run), and VNDegen doesn't time them out. The 探索, 調査, 押す, 引く, 切り替える and ワープ buttons have art but
+  nothing in the game offers them (searched in the maps, scripts and PC play), so they aren't built.
 - Story groups: area bosses stand on their routes and stay beaten (measured), and a won battle with a story group
   runs its `party.obj` script, whose `b1` starts the next battle (ミアルテ防衛隊Ａ to Ｇ measured under Wine; 魔力塊隊
   to 真魔力塊隊 and the true ending by play in VNDegen). That the script runs after hook 27 is inferred.
+- Second playthrough: 登録する stores the carry-over in the original's `Bunny3.opt` format (and in
+  `vndegen/carry.dat`), so a registration made on either side offers 引き継ぐ on the other, with the same turn 1.
+  Skills a unit learned beyond its table aren't carried (VNDegen derives skills from the table); what 周回用 and
+  極め's second value (C392) changes and when the special units (使用する) join aren't known, so they do nothing yet.
+  VNDegen writes the registration at once; the original keeps it in memory until its next save.
 - Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
   学, 魔法全体防御, the 属性耐性 areas, and 先制攻撃, 前向精神, 魔法無効化 and いなし from enemies); abilities never
   seen in the original's saves (警戒心, 掛け声, the 支援 abilities and others) are written as zeros, and 資金管理 and
