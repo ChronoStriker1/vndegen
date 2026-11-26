@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.15",
+          "buildVersion": "3502",
+          "date": "2026-11-26T00:20:21Z",
+          "localizedDescription": "BUNNY BLACK 3 can now be played to its true ending, with the boss-side story scenes, PC-matched random battles and closer dungeon lighting.\n\n## Downloads\n\n- `VNDegen-0.60.15-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.15.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.15-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n\n\n\n\n## Added\n\n- **SystemAoi:** the story chain that brings in the final boss, so the true ending can be reached by play. The chained battles on 8F and 9F come in the same order as on the PC, and beaten bosses stay beaten.\n- **SystemAoi:** the boss-side story scenes, which play when the party stops on their map cell or wins a battle there, and the mid-scene floor drops.\n\n## Changed\n\n- **SystemAoi:** random battles follow the PC's rule: none in the first 10 steps after a battle, then about 1 in 20 per step, or 1 in 10 under 警報.\n- **SystemAoi:** the 3D view's lighting is refitted again. The ice dungeon, 堕天牢 and 千樹庭 are now within a few percent of the PC.\n- **SystemAoi:** 開ける works as on the PC, with its item rule, popup, opened crystal and save data.\n\n## Fixed\n\n- **SystemAoi:** capped 統治 and 統率 values show in red in 配置 and on the status card, as on the PC.\n- **SystemAoi:** the fold button folds and unfolds the side panel.\n\n## Known limits\n\n- Carrying over to a second playthrough, the rest conversations, the trap scenes and the weather particles aren't there yet.\n- Scene intros don't letterbox the view and hide the HUD as on the PC.\n- The ice dungeon's diamond walls and other wall variants, and the translucent crystals, aren't drawn yet.\n- The 探索, 調査, 押す, 引く, 切り替える and ワープ actions aren't built, because the PC never offers them: they look like features cut from the game. [docs/systemaoi.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/systemaoi.md) says how this was checked.\n- The limits listed for 0.60.0 to 0.60.14 still apply, except those fixed here.\n\n## What wasn't tested\n\n- No physical device or physical controller was used. The game was played in the Linux test build, the Mac app and an iPad simulator, and compared with the original engine under Wine, with saves exchanged both ways.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.15/VNDegen-0.60.15.ipa",
+          "size": 132824442,
+          "sha256": "a846ae7c4b4fc858136a8ba72f66658ccba66cf120c901d63769024ef7794bbc",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.14",
           "buildVersion": "3484",
           "date": "2026-11-25T22:51:05Z",
