@@ -273,6 +273,64 @@ import VNCore
         #expect(stats == expected)
     }
 
+    static func png(_ w: Int, _ h: Int, rgb: (UInt8, UInt8, UInt8)) -> [UInt8] {
+        let crcTable: [UInt32] = (0..<256).map { n in
+            (0..<8).reduce(UInt32(n)) { c, _ in c & 1 == 1 ? 0xedb8_8320 ^ (c >> 1) : c >> 1 }
+        }
+        func be(_ v: Int) -> [UInt8] { withUnsafeBytes(of: UInt32(truncatingIfNeeded: v).bigEndian) { Array($0) } }
+        func chunk(_ type: String, _ body: [UInt8]) -> [UInt8] {
+            let tagged = Array(type.utf8) + body
+            let crc = tagged.reduce(UInt32(0xffff_ffff)) { crcTable[Int(($0 ^ UInt32($1)) & 0xff)] ^ ($0 >> 8) } ^ 0xffff_ffff
+            return be(body.count) + tagged + be(Int(crc))
+        }
+        let pixel: [UInt8] = [rgb.0, rgb.1, rgb.2, 255]
+        let row: [UInt8] = [0] + Array(repeating: pixel, count: w).joined()
+        let raw: [UInt8] = Array(Array(repeating: row, count: h).joined())
+        var a = 1, b = 0
+        for x in raw {
+            a = (a + Int(x)) % 65521
+            b = (b + a) % 65521
+        }
+        let zlib: [UInt8] = [0x78, 0x01, 0x01] + u16(raw.count) + u16(~raw.count & 0xffff) + raw + be(b << 16 | a)
+        return [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] + chunk("IHDR", be(w) + be(h) + [8, 6, 0, 0, 0])
+            + chunk("IDAT", zlib) + chunk("IEND", [])
+    }
+
+    @Test func aLoadedLayerKeepsThePictureItWasBuiltFrom() throws {
+        let desert = Self.png(8, 8, rgb: (0x20, 0x80, 0x40)), logo = Self.png(8, 8, rgb: (0xc0, 0x10, 0x10))
+        let play = Self.script(raidy2Sizes + [
+            (0x0a00, Self.name("TEST.SAV") + Self.u32(50)),
+            (0x0101, Self.u16(8) + Array("DESERT".utf8) + [0]),
+            (0x0202, Self.u32(1) + Self.u32(8) + Self.u32(8)),
+            (0x0207, Self.u32(1) + Self.u32(8) + Self.u32(0) + Self.u32(0)),
+            (0x0208, Self.u32(1)),
+            (0x0205, Self.u32(1) + Self.u32(1)),
+            (0x0101, Self.u16(8) + Array("LOGO".utf8) + [0]),
+            (0x0a05, Self.u32(20) + Self.u32(112) + Self.u32(84)),
+            (0x0a06, Self.u32(3)),
+            (0x0706, []),
+        ], labels: [raidy2Sizes.count])
+        let root = TestFolders.root.appending(path: "ikura-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Self.archive([("START.SNR", play)]).write(to: root.appending(path: "SNR"))
+        try Self.archive([("DESERT", desert), ("LOGO", logo)]).write(to: root.appending(path: "GRP"))
+        var w: Int32 = 0, h: Int32 = 0
+        let live = try #require(run(root, frames: 4))
+        let livePixel = try #require(vnikura_pixels(live, &w, &h))[4 * 800 + 4]
+        vnikura_close(live)
+        #expect(livePixel == 0xff40_8020)
+        let load = Self.script(raidy2Sizes + [
+            (0x0a00, Self.name("TEST.SAV") + Self.u32(50)),
+            (0x0a07, Self.u32(3)),
+            (0x0706, []),
+        ], labels: [raidy2Sizes.count + 2])
+        try Self.archive([("START.SNR", load), ("LOAD.SNR", Self.script([(0x0003, [])]))]).write(to: root.appending(path: "SNR"))
+        let loaded = try #require(run(root, frames: 4))
+        defer { vnikura_close(loaded) }
+        let loadedPixel = try #require(vnikura_pixels(loaded, &w, &h))[4 * 800 + 4]
+        #expect(loadedPixel == livePixel)
+    }
+
     @Test func anAnimationFrameDrawsOnLayerFive() throws {
         var gan = Array("GANM0100".utf8) + Self.u32(3) + Self.u32(1)
         gan += Self.u32(1) + Self.u32(1) + Self.u32(2) + Self.u32(25) + Self.u32(5) + Self.u32(0)

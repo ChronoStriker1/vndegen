@@ -104,6 +104,7 @@ typedef struct Layer {
     int tw, th;
     u32 fillArgb;
     Image *surf;
+    char keptName[16];
     float rot;
     Anim fade, move;
 } Layer;
@@ -351,6 +352,7 @@ bool buttons_live(const IK *t);
 void image_blit(Image *dst, const Image *src, int sx, int sy, int w, int h, int x0, int y0, const int argb[4], u32 minAlpha,
                 bool copy);
 Image *layer_surface(IK *t, Layer *l);
+Image *layer_build(Layer *l, const Image *src);
 void layer_restore(IK *t, Layer *l, int x, int y, int w, int h);
 void gfx_blit(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0);
 void layer_move(IK *t, Layer *l, int ms, int x, int y);
@@ -389,6 +391,7 @@ void settings_apply(IK *t);
 void text_draw_on(IK *t, Image *dst, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]);
 void vm_set_text(IK *t, int slot, const char *s, int len);
 void image_load(IK *t, int slot, const char *name);
+Image *image_read(IK *t, const char *name);
 bool dun_exec(IK *t, u16 op, const u8 *a, int n);
 void dun_render(IK *t);
 void dun_update(IK *t);
