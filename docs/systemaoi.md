@@ -112,13 +112,14 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   steps have passed since the last battle. The game's hooks run on entering, on stepping onto floor objects and walls,
   before and after battles and on the way home; a loss ends the expedition. The boss-side cutaways (74 scenes in all
   ten dungeons) play when the party ends a step or a turn on a cell its map marks with a scene number, or wins a
-  battle there, and the one that drops the floor (`d4`) takes the party to the area below as the original does.
+  battle there, over the area's letterboxed backdrop picture as the original shows them, and the one that drops the
+  floor (`d4`) takes the party to the area below as the original does.
   With three or more in the party (reserve tiles count), 休憩 first plays the next rest conversation once per
   expedition, and a trap's scene (the alarm, the spinner, the hallucination, a warning on an avoided trap, and the
   support-separation story on 石葉層 九層 and 十層) plays when its message is dismissed, or on the step when there is no
   message.
-  開ける on a crystal gives one item of the floor's chest rank and leaves the crystal open, as the original records it
-  in its save.
+  開ける on a crystal gives one item of the floor's chest rank and leaves the crystal open once the item's popup
+  is closed, as the original records it in its save.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
@@ -147,7 +148,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   千樹庭's areas, 炎山洞 (opened by its event on 遠征 from turn 10 after five expeditions) with its stairs between
   areas, area entries registered at door spots, the missions (マクドゥの試験) from turn 17, recruits from the town's housing, and area bosses whose
   defeat recruits their leaders.
-  Hidden doors (wall 100) open with a 感知 unit in the party (inferred). 配置's 組織図 posts (the town's and, from
+  Hidden doors (wall 100) open one way, from their own side, with a 感知 unit on the board or in the reserve
+  (measured), and stay open behind the party (how they look afterwards from their own side is inferred). 配置's 組織図 posts (the town's and, from
   turn 42, the 迷宮's) and 内政's 交換 are there, with the holders' ability raises; posts change the town's
   production. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
   breakthrough damage are measured; the odds of each event are fitted to the original's counts. Facilities gain
@@ -160,9 +162,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   5.5 over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred.
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
-  cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (1 in 20 a step
-  after a 10-step quiet) is fitted to eighteen of the original's intervals; 警戒心 and the bells' 引き寄せ don't
-  change it yet; a floor's taken pickups and opened doors aren't saved (the
+  cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (32 in 1,000 a
+  step after a 10-step quiet, 5 in 1,000 past 90 steps) is fitted to 60 runs of the original; 警戒心 halves it
+  (measured ×0.3, 95% 0.13 to 0.72) and the bells' 引き寄せ change it by ±10% (inferred: no change measurable); a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either; opened crystals are, and VNDegen keeps them the same way).
   The dungeon light and fog are fitted to eleven of the original's
   frames (each within 6%); which walls get a set's variant textures wasn't found from play or data, so each cell

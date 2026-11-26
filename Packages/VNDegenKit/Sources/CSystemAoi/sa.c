@@ -467,11 +467,15 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     }
     case 0x89:
         if (s->exp.active) {
+            int dungeon = in->count > 0 ? sa_vm_get(vm, code, &in->o[0]) : s->exp.dungeon;
+            int floor = in->count > 1 ? sa_vm_get(vm, code, &in->o[1]) : s->exp.floor;
             begin_transition(s, vm, in->count > 3 ? sa_vm_get(vm, code, &in->o[3]) : 10);
             clear_text(s);
             s->name[0] = 0;
-            sa_exp_draw_view(s, s->fb);
-            sa_show_frame_as_bg(s, s->fb, "*dungeon");
+            picture_set(s, &s->bg, sa_exp_backdrop(s, dungeon, floor), 0, 0);
+            s->bgX = s->bgY = 0;
+            s->panDur = 0;
+            for (int i = 0; i < STD_SLOTS; i++) picture_clear(&s->std[i]);
         }
         break;
     case 0xd4: {
@@ -1827,6 +1831,26 @@ int sa_debug_get(VNSystemAoi *sa, bool flag, int index) {
 void sa_debug_unbench(VNSystemAoi *sa, int index, int slot) {
     SA *s = (SA *)sa;
     sa_party_unbench(&s->party, &s->vfs, index, slot);
+    s->dirty = true;
+}
+
+void sa_debug_reserve(VNSystemAoi *sa, const char *key, int tile) {
+    SA *s = (SA *)sa;
+    sa_party_join(&s->party, &s->vfs, key);
+    for (int i = 0; i < s->party.benchCount; i++)
+        if (!strcmp(sa_table_text(&s->party.units, sa_party_unit_row(&s->party, s->party.bench[i].unit), 1), key)) sa_party_set_reserve(&s->party, i, tile);
+    s->dirty = true;
+}
+
+void sa_debug_rng(VNSystemAoi *sa, u32 seed) {
+    ((SA *)sa)->vm.rng = seed;
+}
+
+void sa_debug_equip(VNSystemAoi *sa, int slot, int item) {
+    SA *s = (SA *)sa;
+    for (int i = 0; slot < 0 && i < PARTY_SLOTS; i++)
+        if (s->party.unit[i]) slot = i;
+    if (slot >= 0 && slot < PARTY_SLOTS) s->party.equip[slot] = item;
     s->dirty = true;
 }
 

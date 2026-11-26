@@ -52,6 +52,7 @@ static int *crystal_word(SA *s, int k, int *shift) {
 
 void sa_actions_enter(SA *s) {
     Dungeon *d = &s->dungeon;
+    s->exp.opening = 0;
     for (int k = 0; k < d->crystalCount; k++) {
         int shift, *w = crystal_word(s, k, &shift);
         if (!w || ((u32)*w >> shift & 0xff) != CRYSTAL_OPENED) continue;
@@ -68,11 +69,12 @@ void sa_actions_open(SA *s) {
     const char *table = sa_table_text(floors, s->exp.row, col);
     int lo = sa_table_int(floors, s->exp.row, col + 1), hi = sa_table_int(floors, s->exp.row, col + 2);
     int r = pick_item(items, table, lo, hi, sa_vm_random(&s->vm));
-    d->cell[d->y * DUN_SIDE + d->x][CELL_OBJECT] = OBJECT_OPENED;
+    s->exp.opening = d->y * DUN_SIDE + d->x + 1;
     int shift, *w = crystal_word(s, k, &shift);
     if (w) *w = (int)(((u32)*w & ~(0xffu << shift)) | (u32)CRYSTAL_OPENED << shift);
     if (r < 0) {
         sa_log(s, "crystal %d (%s %d-%d): nothing", k, table, lo, hi);
+        sa_actions_settle(s);
         return;
     }
     int id = sa_table_int(items, r, 0);
@@ -82,4 +84,13 @@ void sa_actions_open(SA *s) {
     snprintf(msg, sizeof msg, "%sを|手に入れた", sa_table_text(items, r, ITEM_NAME));
     sa_exp_notice(s, msg);
     sa_log(s, "crystal %d (%s %d-%d): %s", k, table, lo, hi, sa_table_text(items, r, ITEM_NAME));
+}
+
+void sa_actions_settle(SA *s) {
+    int c = s->exp.opening - 1;
+    s->exp.opening = 0;
+    if (c < 0 || c >= DUN_CELLS) return;
+    i32 *obj = &s->dungeon.cell[c][CELL_OBJECT];
+    if (*obj == OBJECT_CRYSTAL) *obj = OBJECT_OPENED;
+    s->dirty = true;
 }

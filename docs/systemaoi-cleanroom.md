@@ -245,10 +245,20 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   frame. Wall 100 stays a wall: measured, forty bumps into 中腹エリア's stair room from outside never opened it.
   `dunChang.obj` (100: 壁 0 to 100, 移動 0 to 1, 5) and 感知 ("迷宮で隠された扉の存在に気付く") suggest a hidden door
   that a 感知 unit reveals; a hundred and forty bumps without one never opened it, so not a chance per bump.
-  VNDegen lets the party through wall 100, from either side, while a main member's field ability or a reserve
-  member's reserve ability is 感知 (サキュー, スカイアン). Measured for the main board: with サキュー placed on it, the
-  original walks straight through 十一層's wall-100 door at (2, 4) south, with no button or message, and looking back
-  shows that side open with no door drawn (VNDegen still draws the door there). The reserve case is inferred.
+  VNDegen lets the party through a side whose own wall is 100 while a main member's field ability or a reserve
+  member's reserve ability is 感知 (サキュー, スカイアン). Measured under Wine at 十一層's door at (2, 4) south (the
+  cell below, (2, 5), has a plain wall 0 on its north side): with サキュー on the main board, and again with サキュー
+  only on the first reserve tile, the original swings the door's leaves open over about 0.5 s and walks through,
+  with no button or message; facing south on (2, 5) afterwards no door is in view; turned back north it draws
+  (2, 5)'s plain wall and F doesn't go back through; and from (2, 5) facing north before any pass (感知 in the
+  reserve) the same plain wall, F twice blocked. So a hidden door opens one way, from its own side. VNDegen now
+  opens the passed side (wall 100 to open) once the party walks through it, doesn't let the party through from the
+  far side, and doesn't draw a wall-100 door from behind its plane. Against the original's frames (8 by 8 block
+  error): after the pass facing south 101.3 before (the closed door filled the view), 5.0 now; turned back 9.1; the
+  step back from the far side 28.5 before (VNDegen walked through), 9.1 now (blocked, as the original). Inferred:
+  how the door looks afterwards from its own side (the original likely keeps its leaves open; VNDegen draws the side
+  open, with no door), since the way round to (2, 4) is 60 steps; whether two-sided wall-100 doors exist (none in
+  this map's pair) and that the opened side resets on leaving the area, as other doors do.
 - **Camera.** `Cam.pvc`'s position and target (3.2 high, 4.6 behind the cell's centre, tilted down slightly), with
   a 47.2° vertical field of view: the floor lines and wall edges fit that best (correlation 0.58 against 0.30 to 0.35
   at other angles); the file's Zoom(40) isn't used as given.
@@ -406,7 +416,11 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   命の鎧). The count is 1 everywhere except 1015's treasure room (−1), which also gives one. The message is the trap
   popup at the view's centre, 「name を」 over 「手に入れた」 (its frame within 1.7 levels of the PC's; the glyphs are the
   app's font). Hook 21 (`bo2100`) then turns object 60 into 61 and the original draws `a061`, the crystal split
-  open, with no minimap icon and no button on it. Not matched: the PC keeps 開ける drawn until the next input.
+  open, with no minimap icon and no button on it. Measured: while the item popup is up the original still draws the
+  closed crystal, its minimap icon and 開ける (the button's art matches exactly, mean error 0.0, in all three PC
+  popup frames); the next input closes the popup, and then the crystal splits and the button goes. VNDegen now
+  does the same, changing the object to 61 when the popup closes (0.0 under the popup, absent after; before, the
+  button went at once, error 56).
 - **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one. Its icons are 16-pixel
   tiles drawn twice the size: `mmf0003` the door, `mmf0004` a crystal, `mma0000` the party's arrow and `mma0001` an
   enemy group's red cross (drawn for groups up to a cell outside the 5 by 5 window, overlapping its edge). A passage
@@ -546,7 +560,20 @@ calls it is inferred from that and from play, and marked so.
   the change and after in its table (measured on the loss message: 資金 1 → 0, 資源 1 → 0); the loss hook passes their negatives, so a loss leaves
   nothing. Measured: the loss message reads 戦闘敗北した事により、遠征で得た物を全て失ってしまった。, then the turn
   ends with the income box.
-- **`89`** after an event's scenes fades back to the dungeon view (C070, C071, C072, fade 10).
+- **`89 C070 C071 C072 10`** shows the area's backdrop picture, `floor.obj` column 8 (`bg020a0` to `bg029a0`, one per
+  dungeon, a 1280 by 720 picture with the letterbox bars, their white edge lines at rows 74 and 525 and the wall
+  between drawn in), as a story background. Measured under Wine on four scenes in three dungeons (1/11 n = 4 after a
+  turn and after F, B, F; ヤーヌの部下隊's intro at (9, 11); 3/1 n = 1; 7/4 n = 1): every uncovered pixel equals the
+  picture, whichever cell and facing the party has, with no minimap, compass, pad, diorama or panel. It crossfades
+  in from the dungeon view over 500 ms (linear, from video at 30 fps); the message window appears after the fade.
+  When the hook ends, the window goes at the click and about 170 ms later the picture crossfades back to the dungeon
+  view with its HUD over about 500 ms; before an intro's battle it fades back the same way (with the encounter
+  flash) and the battle opens after. VNDegen picks the row by the first two operands (the current row if none
+  matches), fades in with transition 10 and fades back over 500 ms when the hook ends, before a group battle too;
+  its script's `56 -1 11` waits 300 ms first, so the return starts about 130 ms later than the original's. The
+  third operand isn't understood and is ignored. Before, VNDegen redrew the dungeon view with its HUD (8 by 8 block
+  error 29.6 against the original's letterbox frame, now 1.2, with 95% of pixels within 2 levels; the rest is the
+  text's glyphs).
 - **休憩 in a dungeon.** Measured pixel for pixel: the dungeon view at half brightness under the compass and minimap,
   the bar `cmp_b00` at (397, 10) with the dungeon, the area (16 px at x 462 and 688) and the steps (`flw_c15` digits,
   right edge 986), the map panel `cmp_b01` at (397, 45) holding the minimap at twice size from (535, 155), the stock
@@ -579,13 +606,26 @@ calls it is inferred from that and from play, and marked so.
   since the last battle: 1 on entering and after each battle, one more a step), the step and action counters and the
   random seed words change. C064 drives it: set to 200 in the same saves there was no battle in 30, 25 and 36 steps
   (seeds 0, 5 and 3, against 20 and 34 for seeds 5 and 3), and set to 15 seed 3's battle came at step 11 instead of
-  34 while seed 5's didn't come in 25 steps. Inferred, the simplest rule that fits the eighteen intervals: no random
-  battle while C064 is 10 or less, then 1 in 20 a step (the likeliest rate, 18 battles over 372 steps past the first
-  ten; the first battles alone give 1 in 26, the later ones 1 in 12), 1 in 10 under 警報. The game's texts call it a
-  rate (警戒心: 迷宮で敵との遭遇率が下がる; the bells' 引き寄せ ±10), which VNDegen doesn't apply yet. What C064 over
-  about 40 does isn't known (no battle came in 91 steps there). VNDegen keeps C064 as the original does, so PC saves
-  carry it both ways; before, it started random battles after 40 steps and then every 10 ± 2 (step 48 from that
-  autosave whatever the seed). The group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
+  34 while seed 5's didn't come in 25 steps. A second set of 60 runs from VNDegen exports of the same autosave
+  (C064 set to 11, 40 or 70, the area's step count C068 starting at 0): battles never came in an area's
+  first 10 steps whatever C064 was (earliest 11, 14, 14, 16, 18, 20), which fits the earlier gaps of 10 to 14
+  steps after a battle only if both counts matter. Per eligible step, without modifiers 41 battles in 1,277 steps
+  (1 in 31); by C064, 1 in 76 at 11 to 30, 38 at 31 to 50, 22 at 51 to 70, 16 at 71 to 90 and 129 above 90. The
+  likeliest of the rules tried (constant rate, a rate rising with C064, either with a cut-off) is a constant rate
+  with a cut-off (log-likelihood −187.4 against −189.7 without the cut-off, −196.8 for a rising rate and −221.9 for
+  the earlier 1 in 20). VNDegen uses it: no random battle while C064 or the area's steps are 10 or less, then 32 in
+  1,000 a step up to C064 90 and 5 in 1,000 above (inferred from the fit; the drop also explains no battle in 91
+  steps at C064 200), doubled under 警報 (inferred). Modifiers, 12 runs each from C064 11 (battles by the area's
+  routed symbol group, which always met the party at step 75, counted as no random battle): a 警戒心 member on the
+  reserve gave 6 random battles in 613 eligible steps against 12 in 334 without, a rate ×0.27 to ×0.30 (95% 0.13 to
+  0.72); its `ability.obj` value is 50, so VNDegen halves the rate (inferred reading, inside the interval).
+  不幸の鐘 (引き寄せ+10, 敵と出会い易くなる) and 幸運の鐘 (−10) equipped on Darkus (the original saved the bell back
+  as equipped) gave ×0.91 and ×0.86 (95% about 0.4 to 2.0): no measurable change, which rules out ±10 points on
+  the rate; VNDegen applies 引き寄せ as ±10% (inferred). The rate is scaled by 100 − 警戒心's value + each main
+  member's equipped 引き寄せ, in percent; several 警戒心 members count once (inferred). VNDegen keeps C064 as the
+  original does, so PC saves carry it both ways. Earlier rules: 1 in 20 after C064 10, fitted to the first
+  eighteen intervals; before that, battles after 40 steps and then every 10 ± 2 (step 48 from that autosave
+  whatever the seed). The group comes from one of three lists, columns 30, 35 and 31 (on the first floor 千固定0100|千固定0101, 千00|千01 and
   千05|千06), chosen by the weights in columns 32 to 34 (10, 60, 10). Measured in support: all eight random battles
   in 中腹エリア's runs were column 35 groups (炎01 twice, 炎02 twice, 炎03, 炎04 twice, 炎05), and the fixed
   seven-slime group 千固定0100 came up in 千樹庭's random battles.
