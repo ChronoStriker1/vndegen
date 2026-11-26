@@ -189,7 +189,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   exports repeat exactly in VNDegen.
 - Enemy groups stand in the view as the original's symbols (`e001` to `e010`, picked by `party.obj` column 13);
   their size and fog are within about 10% of the original's, and how fast they animate is read from the files, not
-  measured. Walking into one holds the view for 430 ms, then crossfades into the battle over 400 ms (a random
+  measured; the original's orange cross for a boss on the minimap isn't drawn. Walking into one holds the view for 430 ms, then crossfades into the battle over 400 ms (a random
   battle the same; measured holds 400 to 667 ms and crossfades 267 to 530 ms, uneven under Wine).
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
   cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (32 in 1,000 a
@@ -232,7 +232,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   are typed as plain characters: there's no Japanese input method in the field, and on a touch screen without a
   keyboard the comment stays empty.
 - Option: whether オートモード音声's 再生終了まで待つ adds the auto wait after the voice or overlaps it is inferred; the screen mode,
-  cursor, ranks, VE and inactive-volume settings are kept but do nothing yet; 切り替え時のメッセージフレーム (keep the
+  cursor, VE and inactive-volume settings are kept but do nothing yet; 切り替え時のメッセージフレーム (keep the
   message frame through a scene change) isn't followed; ポップアップウインドウ sets the delay of the hover descriptions,
   which VNDegen doesn't draw; the autosave after a flee, and a step's autosave coming before a trap or an encounter
   on that step, are inferred; 確認ポップアップ's rules for the in-game command panels (内政 and the like keep theirs) were
@@ -246,3 +246,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   original has created it (a file holding only records would make the original replay its prologue); otherwise
   they stay in `vndegen/records.dat`. Pictures seen before this version aren't in the gallery until shown again.
   The small labels use the app's font.
+- Not settled: whether 教育担当 adds to the 学園's residents, what the fourth word of a newly joined member's record
+  counts (the original writes 1, VNDegen 3), how the status card lists a fixed-skill unit's skills past level 10, and
+  whether an 8a box also dims the town map and the 迷宮 cross-section (it halves story backdrops, measured).
+- Not compared with the original: 商会's buy and sell screens and the turn report side by side, and, on the
+  original, the late battles, the 迷宮's defence battles and the final boss (VNDegen reaches the true ending by play).
