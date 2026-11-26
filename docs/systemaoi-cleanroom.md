@@ -214,13 +214,51 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   area falls back to any target, the party's 右側 is the third column of a row, and 自動戦闘 starts each round by
   itself. ゲージON steps through `bat_p00`, `p01` and `p02` (ゲージOFF, 戦闘時可変), the last showing the bars only
   while a round plays (inferred).
-- **Rewards.** Measured over five wins: the screen dims to 3/8 brightness and a box in the general popup frame
-  (`pop_a00` to `a03`, edges only) centred on (641, 360) says 資源を*N*材手に入れた, *N*Pの経験値を獲得した and, once,
-  使い込まれた杖を手に入れた, in white with the numbers and names in green or yellow, 24 pixels a line. Resources were
-  1 or 2, the range in `party.obj` columns 63 and 64. EXP was 9 and 10 for a ドリツル, 12 and 11 for a ナメッド and 22
-  for a クラム and a フニ, whose `unit.obj` column 72 values are 8, 10, 10 and 10: inferred as their sum times 110 to
-  125 per cent. Inferred: an item drops with the chance in `party.obj` column 65 (10), from the items whose `item.obj`
-  column 30 names the group's table (column 67, 落物00), weighted by column 31. No money showed in these battles.
+- **Rewards.** The win box: the screen dims to 3/8 brightness and a box in the general popup frame (`pop_a00` to
+  `a03`, edges only) centred on (641, 360) lists, 24 pixels a line, only the amounts above zero: 住民が*N*人増えた,
+  食料を*N*食手に入れた, 資金を*N*B手に入れた, 資源を*N*材手に入れた, then *N*Pの経験値を獲得した, a line *name*はレベルが上がった！ for each member who levelled,
+  and *item*を手に入れた. The words 住民, 食料, 資金 and 資源 and their amounts are magenta, red, yellow and green (ff00ff, ff0000,
+  ffff00, 00ff00, sampled), the EXP, names and item yellow, the rest white. The amounts go into the expedition's finds
+  (C210 to C213), which the 休憩 save read back equal to the box after every win.
+- **Reward rule.** Measured under Wine over 62 wins: VNDegen's export of the turn-42 save with a `party.obj` group
+  placed in front of the party in 千樹庭 中央森, its units, their number and the group row swapped by editing the export,
+  the enemies set to 1 HP, and each result read from the 休憩 save (`.audit` evidence `reward/`). Each enemy in the
+  battle adds a roll between the group's `party.obj` columns 57 and 58 to food, 59 and 60 to money, 61 and 62 to
+  resources and 63 and 64 to EXP, plus its own `unit.obj` columns 69, 70, 71 and 72 (food, money, resources, EXP). One
+  ベトＡ (columns 69 to 71 zero, 72 = 8) under 千固定0100 (2–3, 2–5, 2–5, 6–7) gave food 2 to 3, money 3 to 4, resources 2
+  to 5 and EXP 14 or 15 over four wins; the first three of the six below gave 6 to 9, 10 to 14, 8 to 10 and 45; six
+  (two each of ベトＡ, 一角ベトＡ and 二角ベトＡ, the last two with column 70 = 1) gave 13 to 18, 21 to 31, 20 to 26 and 87 to 90
+  over seven, money above the six rolls' 30 only through column 70; the same six under 千00's row (0, 0–1, 0–1, 1–2)
+  gave no food, 5 to 8 money, 3 to 5 resources and 56 to 60 EXP; three ダークマンＡ (columns 68 and 69 = 1, 72 = 15) gave
+  food 10 or 11 and EXP 64 to 66. Neither the enemy's level (a ベトＡ set to level 30 gave 14 and 15 EXP) nor the turn (5
+  against 42) changes them. Inferred: each enemy's rolls are separate (six enemies spread like a sum, never in steps
+  of six). Residents come by chance: `unit.obj` column 68 is 1 for people such as the ダークマン and 0 for beasts such as
+  the ベト, and at C392 0 one ダークマンＡ gave a resident in 3 of 6 wins, three gave 1, 3, 3, 2, 1, 1 and 2, and six gave 2
+  and 4: 22 of the 39 possible. Inferred: each enemy adds a roll between the group's columns 55 and 56 (0 and 0 in
+  every row) and that plus its column 68, an even chance for each such enemy.
+- **C392.** Every total, residents included, is multiplied by (10 + C392) / 10 and rounded up. Measured on one ベトＡ at
+  C392 3 over five wins: EXP 19, 19, 19, 19 and 20 (14 × 1.3 = 18.2 and 15 × 1.3 = 19.5; rounding to nearest can't
+  give 19, truncating can't give 20), money 3, 6, 6, 6 and 7 (5 × 1.3 = 6.5 gives 7, 6 only by rounding up 5.2); six
+  ベト at C392 1, 2 and 10 gave 98, 102 and 174 EXP and food, money and resources inside their ranges times 1.1, 1.2 and
+  2; three ダークマンＡ gave 2, 3 and 3 residents at C392 1 and 4 at 3, and six gave 2 at 10 (one resident doubled).
+  Whenever C392 is above 0 the win gives at least one resident: a ベト fight, whose rows give none, gave 1 at C392 1, 2,
+  3 (five wins), 5 and 10.
+- **大探索 and 大勧誘.** The SGP effects (`SpGyun.obj` rows 12 and 11, 20 for 50 steps) raise a win's food, money and
+  resources, or its residents, by 20 per cent, rounded up the same way, and 大勧誘 also gives at least one resident.
+  Measured, each bought on the 休憩 screen just before the fight: one ベトＡ under 大探索 gave food 4, 3 and 3 (4 is out of
+  reach without it), money 3, 4 and 4, resources 4, 5 and 4, EXP unchanged (15, 15, 14); six ベト gave food 18 and 18;
+  one ダークマンＡ under 大勧誘 gave 2, 1, 1 and 1 residents (2 from one, 1 from none), and six gave 5 and 4. Inferred: with
+  C392 the per cents add.
+- **Member EXP.** The box shows the battle's EXP; each member on the field gains it times (100 + bonus) / 100, rounded
+  down, where the bonus is 10 for each 学 in the party and 20 for the member's own 勤勉 (`ability.obj` column 4).
+  Measured: with スリーアイ (学 on the field) beside Darkus both gained 47 and 48 where the box said 43 and 44; with トウフ君
+  (勤勉) Darkus gained 43 and トウフ君 51, twice. Writing 50 into Darkus's slot 113 in the save (where the PC's own saves
+  hold 学 and 勤勉) changed nothing: the PC works the bonus out from the units. Inferred: 学 on a reserve tile counts (the
+  PC's saves count it there), and 学 and 勤勉 add, as that one slot holds their sum.
+- **Items.** One roll per battle at the group's column 65 per cent: 千固定0100 (20) dropped an item in 12 of 59 wins, 5
+  of 25 with one enemy, 6 of 19 with three and 1 of 15 with six, so not once per enemy; 千00 (10) in none of 3. The
+  item drawn from the items whose `item.obj` column 30 names the group's column 67 table, weighted by column 31, is
+  inferred as before. Column 66 (1 or 2) isn't known.
 - **Defeat.** Measured: a fallen ally is logged as ダークスが倒された. On a loss the battle screen isn't dimmed and no
   click is needed: 1.7 to 4.4 seconds after the fall is logged (between captures) the battle closes by itself and
   `bo2700`'s line (ダークス: くっ…… 逃げ帰るしかないか) shows over the bare dungeon view of the battle's cell, without
