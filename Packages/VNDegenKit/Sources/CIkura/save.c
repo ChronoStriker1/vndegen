@@ -466,8 +466,8 @@ static void snapshot(IK *t) {
     putfile(&b, t, AR_SNR, t->resumeSc ? t->resumeSc->name : NULL);
     put32(&b, (u32)t->resumeLabel);
     put32(&b, (t->window ? 1u : 0u) | (t->msg.count ? 0x10000u : 0));
-    put32(&b, 0);
-    put32(&b, 0);
+    put32(&b, (u32)t->markSlot);
+    put32(&b, t->automap.bits ? 0 : (u32)(t->lastLine - 1));
     putfile(&b, t, AR_BGM, t->bgmName);
     put32(&b, t->bgmLoop ? 1 : 0);
     put32(&b, (u32)(t->flagBits ? t->flagBits : t->flagCount * 8));
@@ -572,8 +572,7 @@ static bool load_slot(IK *t, int slot) {
     getname(&r, name);
     int label = (int)get32(&r);
     u32 mode = get32(&r);
-    get32(&r);
-    get32(&r);
+    int markSlot = (int)get32(&r), lastLine = (int)get32(&r) + 1;
     getname(&r, bgm);
     bool loop = get32(&r) != 0;
     u32 bits = get32(&r);
@@ -674,6 +673,8 @@ static bool load_slot(IK *t, int slot) {
     free(d);
     if (r.bad) ik_log(t, "save slot %d is shorter than its state", slot);
     t->window = mode & 1;
+    t->markSlot = markSlot;
+    if (!t->automap.bits) t->lastLine = lastLine;
     if (wide) gan_restore(t, ganState);
     if (bgm[0]) snd_bgm(t, bgm, loop);
     else snd_bgm_fade(t, 0);
