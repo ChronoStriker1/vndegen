@@ -572,6 +572,7 @@ typedef struct Party {
     int equip[PARTY_SLOTS];
     int sp[PARTY_SLOTS], trained[PARTY_SLOTS][10];
     int roster[PARTY_ROSTER], rosterCount;
+    int skillLevel[PARTY_ROSTER];
     bool presetSaved[PARTY_PRESETS];
     Image *sprite[PARTY_SLOTS];
     int cells[PARTY_SLOTS];
@@ -606,6 +607,8 @@ void sa_party_new_game(Party *p, Vfs *vfs);
 void sa_party_place(Party *p, Vfs *vfs, int slot, int id);
 int sa_party_unit_row(const Party *p, int id);
 bool sa_party_unit_knows(const Party *p, int row, int level, int k);
+int sa_party_skill_level(const Party *p, int unit, int level);
+void sa_party_set_skill_level(Party *p, int unit, int level);
 int sa_party_rank(const Party *p);
 void sa_party_add_item(Party *p, int id, int n);
 int sa_party_item_count(const Party *p, int id);

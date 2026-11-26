@@ -172,6 +172,17 @@ int sa_party_unit_row(const Party *p, int id) {
 
 bool sa_party_unit_knows(const Party *p, int row, int level, int k) { return sa_table_int(&p->units, row, 40 + k * 3) <= level; }
 
+int sa_party_skill_level(const Party *p, int unit, int level) {
+    for (int i = 0; i < p->rosterCount; i++)
+        if (p->roster[i] == unit && p->skillLevel[i] > level) return p->skillLevel[i];
+    return level;
+}
+
+void sa_party_set_skill_level(Party *p, int unit, int level) {
+    for (int i = 0; i < p->rosterCount; i++)
+        if (p->roster[i] == unit) p->skillLevel[i] = level;
+}
+
 void sa_party_place(Party *p, Vfs *vfs, int slot, int id) {
     if (slot < 0 || slot >= PARTY_SLOTS) return;
     sa_image_free(p->sprite[slot]);
@@ -201,6 +212,7 @@ void sa_party_new_game(Party *p, Vfs *vfs) {
     p->benchCount = 0;
     p->rosterCount = 1;
     p->roster[0] = 1;
+    memset(p->skillLevel, 0, sizeof p->skillLevel);
     memset(p->post, 0, sizeof p->post);
     for (int i = 0; i < PARTY_SLOTS; i++) sa_party_place(p, vfs, i, 0);
     sa_party_place(p, vfs, PARTY_FRONT + 1, 1);
@@ -561,7 +573,10 @@ bool sa_party_join(Party *p, Vfs *vfs, const char *key) {
     int id = sa_table_int(&p->units, r, 0);
     for (int i = 0; i < p->rosterCount; i++)
         if (p->roster[i] == id) return true;
-    if (p->rosterCount < PARTY_ROSTER) p->roster[p->rosterCount++] = id;
+    if (p->rosterCount < PARTY_ROSTER) {
+        p->skillLevel[p->rosterCount] = 0;
+        p->roster[p->rosterCount++] = id;
+    }
     if (!sa_party_members(p)) {
         sa_party_place(p, vfs, PARTY_FRONT + 1, id);
         return true;

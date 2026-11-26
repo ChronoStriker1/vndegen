@@ -11,6 +11,9 @@ enum {
     FLAG_CLEARED = 15,
     FLAG_REGISTERED = 801,
     FIRST_KEY_ITEM = 1001,
+    CARRY_SKILLS = 64,
+    SKILL_PAIRS = 8,
+    UNIT_SKILLS = 8,
     FILE_VERSION = 1,
     HEAD = 8,
     LEAD = 1,
@@ -103,10 +106,40 @@ const u8 *sa_carry_unit(const u8 *block, int unit) {
     return NULL;
 }
 
+static int record_skill_level(SA *s, const u8 *r, int unit) {
+    const Table *u = &s->party.units, *k = &s->battle.skills;
+    int row = sa_party_unit_row(&s->party, unit), level = 0;
+    if (row < 0) return 0;
+    for (int j = 0; j < SKILL_PAIRS; j++) {
+        int id = (int)rd32(r + CARRY_SKILLS + j * 8), sr = 0;
+        if (id <= 0) continue;
+        while (sr < k->rows && sa_table_int(k, sr, 0) != id) sr++;
+        if (sr == k->rows) continue;
+        for (int t = 0; t < UNIT_SKILLS; t++)
+            if (!strcmp(sa_table_text(u, row, 41 + t * 3), sa_table_text(k, sr, 1)) && sa_table_int(u, row, 40 + t * 3) > level)
+                level = sa_table_int(u, row, 40 + t * 3);
+    }
+    return level;
+}
+
+void sa_carry_refresh_skills(SA *s) {
+    Party *p = &s->party;
+    memset(p->skillLevel, 0, sizeof p->skillLevel);
+    if (!s->vm.f[CARRY_FLAG]) return;
+    u8 *b = sa_carry_block(s);
+    if (!b) return;
+    for (int i = 0; i < p->rosterCount; i++) {
+        const u8 *r = sa_carry_unit(b, p->roster[i]);
+        if (r) p->skillLevel[i] = record_skill_level(s, r, p->roster[i]);
+    }
+    free(b);
+}
+
 static void apply_unit(SA *s, const u8 *b, int unit) {
     const u8 *r = sa_carry_unit(b, unit);
     if (!r) return;
     Party *p = &s->party;
+    sa_party_set_skill_level(p, unit, record_skill_level(s, r, unit));
     Member m[PARTY_ROSTER + PARTY_SLOTS + PARTY_BENCH];
     int n = sa_party_member_list(p, m);
     for (int i = 0; i < n; i++) {
