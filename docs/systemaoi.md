@@ -158,7 +158,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   Hidden doors (wall 100) open one way, from their own side, with a 感知 unit on the board or in the reserve
   (measured), and stay open behind the party (how they look afterwards from their own side is inferred). 配置's 組織図 posts (the town's and, from
   turn 42, the 迷宮's) and 内政's 交換 are there, with the holders' ability raises; posts change the town's
-  production. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
+  production. Leaving 配置 after a change plays the appointment scenes for the places that changed, and 休憩 counts
+  the rests (C602) for the rest scenes, both measured; which board slot is メンバー１ to ６ is inferred. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
   breakthrough damage are measured; the odds of each event are fitted to the original's counts. Facilities gain
   EXP each turn and level up, and town posts raise their area's production by a roll of 0 to 統治 + 統率 (the
   街長's also raises residents), measured from turn 42; that each facility rolls on its own is inferred. The
@@ -200,8 +201,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   lifetime); the snowflakes loop as on the PC, but the PC's loops drift sideways where VNDegen's stack downward.
 - Story: choices, the message window, the join box's cards and the status card's portrait are placed as measured
   (the sprites by the anchor in each sheet's header). The town diorama, 配置's boards and battles place every unit
-  the same way, on the PC's pixels; the half-size reserve figures are scaled by VNDegen's own filter, so their
-  pixels differ slightly from the PC's GPU scaling. `81` after a key door is still skipped
+  the same way, on the PC's pixels; the half-size reserve figures and the 迷宮's post holders (0.31 of full size)
+  are scaled by VNDegen's own filter, so their pixels differ slightly from the PC's GPU scaling. Which motion a
+  post holder plays on each visit is VNDegen's own random pick among the four seen on the PC. `81` after a key door is still skipped
   (nothing visible on the PC; its sound couldn't be recorded). Dungeon notices close by themselves after 410 + 10
   frames a character (fitted to the original's frame counts; VNDegen assumes 60 frames a second, where the
   original under Wine drew 29 to 39) and run hook 19 as a click would; the box's open and close zoom isn't drawn.

@@ -793,6 +793,7 @@ typedef struct Town {
     Image *burst;
     int burstCell[TOWN_CELLS], burstCount;
     u32 burstMs;
+    int placedAtOpen[PARTY_POSTS + PARTY_SLOTS + PARTY_RESERVE];
 } Town;
 
 #define SA_TOWN_BURST_MS 1000
@@ -822,6 +823,9 @@ void sa_town_draw_status_goal(Town *t, const VM *vm, u32 *fb);
 void sa_town_derive(const Town *t, VM *vm);
 void sa_town_income(const Town *t, VM *vm, int out[4]);
 int sa_town_housing(const Town *t);
+bool sa_command_hook(SA *s, int command);
+int sa_deploy_appointed(const SA *s, const char *name);
+Image *sa_sheet_strip(const Image *sheet, const SpriteSheet *sh, int percent, int steps, int *frames);
 void sa_debug_town(VNSystemAoi *sa, int turns);
 void sa_draw_number(u32 *fb, const Image *font, const char *s, int right, int y, int row, int cw, int ch);
 void sa_draw_int(u32 *fb, const Image *font, int v, bool sign, int right, int y, int row, int cw, int ch);

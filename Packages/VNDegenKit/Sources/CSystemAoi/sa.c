@@ -573,7 +573,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     case 0xc3:
         if (in->count >= 3) {
             char *name = opd_str(code, in, 0);
-            int unit = s->party.post[sa_party_post_index(&s->party, name)];
+            int unit = sa_deploy_appointed(s, name);
             free(name);
             sa_vm_set(vm, &in->o[1], unit != 0);
             sa_vm_set(vm, &in->o[2], unit);
@@ -954,9 +954,24 @@ static int command_number(int action) {
     return -1;
 }
 
+bool sa_command_hook(SA *s, int command) {
+    const char *slot = s->vm.boxSlot[COMMAND_HOOK];
+    if (!slot) return false;
+    char box[32];
+    snprintf(box, sizeof box, "%s", slot);
+    s->vm.c[0x5f] = command;
+    sa_reset_scene(s);
+    if (sa_start_script(s, box, 0)) return true;
+    s->mode = MODE_TOWN;
+    return false;
+}
+
 static void run_command(SA *s, int action) {
     switch (action) {
     case TOWN_CMD_REST:
+        s->afterScript = TOWN_POLICY_DONE;
+        if (sa_command_hook(s, command_number(TOWN_CMD_REST))) break;
+        s->afterScript = 0;
         sa_end_turn(s);
         break;
     case TOWN_CMD_EXPEDITION:
@@ -1333,13 +1348,9 @@ bool vnsystemaoi_frame(VNSystemAoi *sa, uint32_t elapsedMs) {
             s->clicked = s->rightClicked = false;
             if (r == BUILD_CLOSED) s->town.mapOnly = false;
             if (r == BUILD_DECIDED && s->vm.boxSlot[COMMAND_HOOK]) {
-                char box[32];
-                snprintf(box, sizeof box, "%s", s->vm.boxSlot[COMMAND_HOOK]);
                 s->build.open = false;
-                s->vm.c[0x5f] = 23;
                 s->afterScript = TOWN_CMD_BUILD;
-                sa_reset_scene(s);
-                sa_start_script(s, box, 0);
+                sa_command_hook(s, command_number(TOWN_CMD_BUILD));
                 return true;
             }
             s->dirty = true;
