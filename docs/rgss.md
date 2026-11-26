@@ -58,6 +58,10 @@ Linux host and loaded in the app.
 | Test Game 55 | VX Ace | unpacked, no RTP | map at 1024x768, HUD, its own menus, save and load from the menu in the app |
 | Monster Girl Quest Paradox 2.35, with its data and pictures packs | VX Ace | unpacked, no RTP | title, new game, opening, walking to the village, menu save, autosave, Continue; a battle started by a script with the game's own troop and won on the Linux host, and its largest troop in the app; on the iPad simulator, a save made through the menu with every name's case swapped |
 
+Test Game 37's menus move the cursor again on a held Down's fourth repeat, the 28th frame, which at its 120 frames a
+second comes 0.23 s after the press. On its two-item title, Down held that long from Continue moves the cursor to New
+Game and back, from a key or a controller alike, as on PC. A shorter press moves it once.
+
 Frame rates, from `-frameMonitor YES` (DEBUG builds log `RGSSFRAMES` every 10 seconds) while walking or playing, with
 another thread's iPhone simulator running on the same Mac mini:
 
@@ -144,8 +148,8 @@ the screen beside each save. Neither is emulated, so those calls log once and re
   mouse's pad, which takes the drag. No library game shows a message that long in normal play.
 - F12's reset isn't available, as iPhones and iPads have no F12.
 - Tilemap flash data (`flash_data`) isn't drawn.
-- Blending onto a transparent bitmap, the order of a sprite's color and tone, held-key repeat timing and the
-  volume curve follow common formulas, not measurements of the PC engine.
+- Blending onto a transparent bitmap, the order of a sprite's color and tone, and the volume curve follow common
+  formulas, not measurements of the PC engine. VX's held-key repeat timing is VX Ace's, not measured on its own.
 - A module a game includes into one of Ruby's own classes stays included for the next game in the same session,
   because Ruby can't remove it.
 - A script that loops without calling `Graphics.update` can't be stopped; the app moves on after 5 seconds.
