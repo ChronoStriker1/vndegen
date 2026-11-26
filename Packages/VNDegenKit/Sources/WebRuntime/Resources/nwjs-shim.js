@@ -778,6 +778,31 @@
     };
     window.addEventListener('touchstart', moveMouseToTouch, { capture: true, passive: true });
 
+    const touchSlop = 15;
+    const touchStarts = new Map();
+    window.addEventListener('touchstart', (event) => {
+        for (const touch of Array.from(event.changedTouches || [])) {
+            touchStarts.set(touch.identifier, { x: touch.clientX, y: touch.clientY, event: event });
+        }
+    }, { capture: true, passive: true });
+    window.addEventListener('touchmove', (event) => {
+        const touches = Array.from(event.changedTouches || []);
+        let withinSlop = touches.length > 0;
+        for (const touch of touches) {
+            const start = touchStarts.get(touch.identifier);
+            if (!start || start.event.defaultPrevented || Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > touchSlop) {
+                touchStarts.delete(touch.identifier);
+                withinSlop = false;
+            }
+        }
+        if (withinSlop) event.stopImmediatePropagation();
+    }, { capture: true, passive: true });
+    const forgetTouches = (event) => {
+        for (const touch of Array.from(event.changedTouches || [])) touchStarts.delete(touch.identifier);
+    };
+    window.addEventListener('touchend', forgetTouches, { capture: true, passive: true });
+    window.addEventListener('touchcancel', forgetTouches, { capture: true, passive: true });
+
     // The text field typing goes into: the focused one, or else the only one showing, since a click the session sends
     // does not focus a field the way a real click does.
     const typable = (element) => !!element && !element.disabled && !element.readOnly

@@ -156,6 +156,37 @@ private final class ShimPage {
     #expect(try await page.takeLog() == [])
 }
 
+@Test @MainActor func touchMovesWithinTheTapSlopStayHiddenAsInChromium() async throws {
+    let page = try await ShimPage()
+    try await page.run("""
+        document.body.setAttribute('ontouchmove', 'event.preventDefault()');
+        for (const type of ['touchstart', 'touchmove', 'touchend']) {
+            document.addEventListener(type, (e) => log.push(type + ' ' + e.changedTouches[0].clientX + ',' + e.changedTouches[0].clientY));
+        }
+        window.touch = (type, x, y, cancel) => {
+            const event = new Event(type, { bubbles: true, cancelable: true });
+            Object.defineProperty(event, 'changedTouches', { value: [{ identifier: 1, clientX: x, clientY: y, screenX: x, screenY: y }] });
+            if (cancel) document.addEventListener(type, (e) => e.preventDefault(), { once: true, passive: false });
+            document.body.dispatchEvent(event);
+        };
+        0;
+        """)
+    func gesture(_ moves: [(Int, Int)], cancelStart: Bool = false) async throws -> [String] {
+        var steps = ["touch('touchstart', 100, 70, \(cancelStart))"]
+        steps += moves.map { "touch('touchmove', \($0.0), \($0.1))" }
+        steps.append("touch('touchend', \(moves.last?.0 ?? 100), \(moves.last?.1 ?? 70))")
+        try await page.run(steps.joined(separator: ";"))
+        return try await page.takeLog()
+    }
+    #expect(try await gesture([(101, 70)]) == ["touchstart 100,70", "touchend 101,70"])
+    #expect(try await gesture([(101, 70), (102, 71), (104, 70)]) == ["touchstart 100,70", "touchend 104,70"])
+    #expect(try await gesture([(115, 70)]) == ["touchstart 100,70", "touchend 115,70"])
+    #expect(try await gesture([(110, 80)]) == ["touchstart 100,70", "touchend 110,80"])
+    #expect(try await gesture([(116, 70)]) == ["touchstart 100,70", "touchmove 116,70", "touchend 116,70"])
+    #expect(try await gesture([(120, 70), (102, 70)]) == ["touchstart 100,70", "touchmove 120,70", "touchmove 102,70", "touchend 102,70"])
+    #expect(try await gesture([(104, 70)], cancelStart: true) == ["touchstart 100,70", "touchmove 104,70", "touchend 104,70"])
+}
+
 @Test @MainActor func aHoveringPointerHoldsNoButtonAndEntersWhatItCrosses() async throws {
     let page = try PageHarness(storage: false) { _ in .value(.null) }
     try await page.load("""
