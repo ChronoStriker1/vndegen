@@ -1173,9 +1173,36 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   it shows NoData. Hovering an empty slot shows its number and NoData.
 - **Autosaves.** Measured: `Bunny3A0.dat` to `A9.dat` hold a running count, and the count modulo ten picks the file
   (count 36 in `A6`, 41 in `A1`); the panel shows the highest count. The original autosaves on entering each floor
-  (the place reads 千樹庭 / 中央森, then 中央森の東) and in the town (9ターン 街 after an expedition). Inferred: the town
-  autosave comes at the start of each turn. Loading a floor's autosave puts the party back on that floor with its
-  explored map; loading a town autosave puts the game in the town.
+  (the place reads 千樹庭 / 中央森, then 中央森の東) and in the town (9ターン 街 after an expedition). Loading a floor's
+  autosave puts the party back on that floor with its explored map; loading a town autosave puts the game in the town.
+- **オートセーブモード.** The Option screen's hover descriptions name the events: 0 オートセーブを行いません; 1 at a turn's
+  advance, entering a dungeon, leaving it and moving to another floor; 2 (標準) also when a battle ends; 3 also on
+  every move in a dungeon. Measured under Wine from the turn-42 save by the `Bunny3AN.dat` files written and the
+  count and cell inside them: at 0, 休憩 to the next turn, entering 千樹庭 and four moves wrote nothing; at 1, entering
+  wrote one (count 673, 中央森 (6, 2) facing south, 0 steps), four presses forward against a wall and a whole battle
+  with 千05 wrote nothing, going home through the door wrote exactly one for the trip home and the new turn together
+  (count 678, turn 43, the town), and 休憩 wrote one (count 679, turn 44); at 2, about 30 steps wrote nothing and
+  the battle with 千05 wrote one once the party was back in the dungeon after the battle's story scene (count 677, the
+  cell of the battle, 1 step); at 3, a turn and a step each wrote one (674 at (6, 4) facing west, 675 at (5, 4), 676
+  facing south) and walking into a wall wrote nothing (three presses). Loading a save writes none. VNDegen gates
+  each autosave on the setting and was checked the same way with `sarun opt=20,N`: 0 and 1 for 休憩 (none, one), 0 to
+  3 for entering and four moves (one entry autosave each for 1 and 2, and at 3 a step back and a turn wrote one
+  each while two presses into a wall wrote none), 1 and 2 for winning the same battle (none, one with the PC's cell
+  and step count). Inferred: a flee counts as a battle's end, and a step's autosave is written before that step's
+  trap, encounter or area change runs (an area change writes only its floor's autosave).
+- **確認ポップアップ.** Measured on the PC at each level, from the town, the camp's SAVE and LOAD and the Option
+  screen. 通常 asks every time: the comment box (セーブしますか？ on an empty slot, 上書きしますか？ on a used one; VNDegen
+  said セーブしますか？ for both and now follows), 削除しますか？, ロードしますか？ for DATA LOAD and the autosave panel,
+  タイトルに戻りますか？, ゲームを終了しますか？, the settings reset and the window reset. 重要のみ loads at once from DATA
+  LOAD (slot 22 opened on its floor with no question); everything else still asks, the autosave panel included, and a
+  click on a row only picks it. 最重要のみ also loads the autosave panel at once and goes to the title at once from
+  the Option screen in a game (from the town and from the prologue's message window), and a click on a row asks at
+  once, ロードしますか？ or the comment box, leaving the row picked after NO or CANCEL; the comment box, DEL, ゲームの終了,
+  the settings reset and the window reset still ask. The game's own panels keep theirs at every level: 内政's 実行 /
+  キャンセル showed at 最重要のみ; 休憩 and the dungeon door's 帰る never ask. VNDegen does the same; checked with
+  `sarun opt=4,N` on its own slots (the autosave panel asks at 1 and loads at 2, DATA LOAD loads at 1, a row asks at
+  2, overwrite reads 上書きしますか？, タイトルに戻る asks at 1 and leaves at 2). Inferred: the other command panels (育成,
+  the mission's 提出, the camp's スペシャル) behave as 内政's.
 - **Comments.** Measured: the comment field takes 16 characters; the original turns what is typed into full-width
   characters (`Test comment 12` becomes `Ｔｅｓｔ　ｃｏｍｍｅｎｔ　１２`) and keeps it as UTF-16 from offset 0 of the save
   image, the bytes after it zero up to the map memory at 6,172. The field draws it 24 pixels a character from x 447
@@ -1245,8 +1272,11 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   timings, taken at a load of 30 to 40, were two to three times slower, so the original's text runs on its frames.
   改ページ makes a click during text go straight to the next page; ウインドウOFF makes the right click hide
   the window; 待たない lets auto mode go on while a voice plays; 停止 stops the voice when the page turns (残す, the
-  default, lets it finish); ADV なし drops the fades. Kept but without effect yet: the screen mode, the message frame,
-  the popups, the cursor, the game speed, battle effects and ranks, the autosave mode, VE and the inactive volume.
+  default, lets it finish); ADV なし drops the fades. The autosave mode and 確認ポップアップ are under Saves above.
+  ポップアップウインドウ is the delay of the hover descriptions (its OFF reads このウインドウを非表示にします, with Shift
+  showing them at any setting), and 切り替え時のメッセージフレーム 残す keeps the message frame through a scene change
+  (both from the hover descriptions). Kept but without effect yet: the screen mode, the message frame,
+  the hover-description delay, the cursor, the game speed, battle effects and ranks, VE and the inactive volume.
   The key config and the window reset do nothing; the app maps keys.
 - **The 3D settings.** Measured under Wine on one exported 千樹庭 view (中央森 (6, 2) facing south), each set on the
   camp's OPTION screen. 3D画面の明るさ scales the dungeon's light but not its fog colour: the view's mean was 1.075,

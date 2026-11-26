@@ -770,6 +770,11 @@ void sa_dim(u32 *fb);
 void sa_popup_draw(Image *const *frame, u32 *fb, const char *const *lines, int count);
 void sa_popup_box(Image *const *frame, u32 *fb, const char *const *lines, int count, int x, int y, int w, int h);
 
+enum { AUTOSAVE_TRAVEL = 1, AUTOSAVE_BATTLE = 2, AUTOSAVE_STEP = 3 };
+enum { CONFIRM_LEVEL_ALL, CONFIRM_LEVEL_IMPORTANT, CONFIRM_LEVEL_TOP };
+void sa_autosave_at(SA *s, int level);
+void sa_debug_option(VNSystemAoi *sa, int which, int value);
+
 typedef struct Town {
     Table build, mass, lvup;
     Facility cell[TOWN_CELLS];

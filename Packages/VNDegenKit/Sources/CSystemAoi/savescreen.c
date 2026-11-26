@@ -156,13 +156,18 @@ void sa_savescreen_open(SA *s, bool saving) {
     s->dirty = true;
 }
 
-void sa_autosave(SA *s) {
-    SaveScreen *v = &s->saves;
-    v->comment[0] = 0;
-    refresh(s);
-    int count = (v->autoLatest < 0 ? 0 : v->sum[v->autoLatest].count) + 1;
+void sa_autosave_at(SA *s, int level) {
+    if (s->opt.value[OPT_AUTOSAVE] < level) return;
+    s->saves.comment[0] = 0;
+    int count = 0;
+    SaveSummary sum;
+    for (int i = SAVE_SLOTS; i < SAVE_SLOTS + SAVE_AUTOS; i++)
+        if (sa_save_summary(s, i, &sum) && sum.used && sum.count > count) count = sum.count;
+    count++;
     sa_save_write(s, SAVE_SLOTS + count % SAVE_AUTOS, count);
 }
+
+void sa_autosave(SA *s) { sa_autosave_at(s, AUTOSAVE_TRAVEL); }
 
 static u32 full_width(u32 cp) {
     if (cp == ' ') return 0x3000;
@@ -442,7 +447,7 @@ static void draw(SA *s) {
     if (v->ask == ASK_NONE) return;
     if (v->ask == ASK_COMMENT) {
         dim(fb, 15, 32);
-        const char *lines[3] = {"セーブしますか？", "コメントを残す事が出来ます。", "必要であれば下記に入力してください。"};
+        const char *lines[3] = {v->sum[v->confirm].used ? "上書きしますか？" : "セーブしますか？", "コメントを残す事が出来ます。", "必要であれば下記に入力してください。"};
         sa_popup_box(s->battle.pop, fb, lines, 3, COMMENT_X, COMMENT_Y, COMMENT_W, COMMENT_H);
         sa_fill(fb, FIELD_X, FIELD_Y, FIELD_W, FIELD_H, 0xff000000u);
         sa_font_set_spacing(0);
@@ -496,8 +501,14 @@ static void ask(SaveScreen *v, int slot, int what) {
     v->comment[0] = 0;
 }
 
+static void load_now(SA *s, int slot) {
+    ask(&s->saves, slot, ASK_LOAD);
+    answer(s);
+}
+
 static void click(SA *s, int h) {
     SaveScreen *v = &s->saves;
+    int level = s->opt.value[OPT_CONFIRM];
     if (v->ask != ASK_NONE) {
         if (h == HOVER_YES) answer(s);
         else if (h == HOVER_NO) {
@@ -507,12 +518,17 @@ static void click(SA *s, int h) {
         return;
     }
     if (h == HOVER_BACK) close_screen(s);
-    else if (h == HOVER_AUTO) ask(v, v->autoLatest, ASK_LOAD);
-    else if (h == HOVER_ACTION) ask(v, v->picked, v->saving ? ASK_COMMENT : ASK_LOAD);
-    else if (h == HOVER_DEL) ask(v, v->picked, ASK_DELETE);
+    else if (h == HOVER_AUTO) {
+        if (level >= CONFIRM_LEVEL_TOP) load_now(s, v->autoLatest);
+        else ask(v, v->autoLatest, ASK_LOAD);
+    } else if (h == HOVER_ACTION) {
+        if (!v->saving && level >= CONFIRM_LEVEL_IMPORTANT) load_now(s, v->picked);
+        else ask(v, v->picked, v->saving ? ASK_COMMENT : ASK_LOAD);
+    } else if (h == HOVER_DEL) ask(v, v->picked, ASK_DELETE);
     else if (h >= HOVER_ROW) {
         int slot = v->page * SLOTS_PER_PAGE + h - HOVER_ROW;
         v->picked = v->saving || v->sum[slot].used ? slot : -1;
+        if (v->picked >= 0 && level >= CONFIRM_LEVEL_TOP) ask(v, slot, v->saving ? ASK_COMMENT : ASK_LOAD);
     } else if (h >= HOVER_TAB) {
         v->page = h - HOVER_TAB;
         v->picked = -1;

@@ -151,6 +151,7 @@ int main(int argc, char **argv) {
         }
         if (sscanf(argv[a], "equip=%d,%d", &x, &y) == 2) sa_debug_equip(s, x, y);
         if (sscanf(argv[a], "rng=%d", &n) == 1) sa_debug_rng(s, (uint32_t)n);
+        if (sscanf(argv[a], "opt=%d,%d", &x, &y) == 2) sa_debug_option(s, x, y);
         if (sscanf(argv[a], "battlespeed=%d", &n) == 1) sa_battle_set_speed(&((SA *)s)->battle, n);
         if (sscanf(argv[a], "item=%d,%d", &x, &y) == 2) sa_debug_item(s, x, y);
         if (sscanf(argv[a], "unbench=%d,%d", &x, &y) == 2) sa_debug_unbench(s, x, y);
