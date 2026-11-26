@@ -520,6 +520,12 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             s->dirty = true;
         }
         break;
+    case 0xf2:
+        if (in->count >= 1) {
+            vm->c[C_TOWN_MAP] = sa_vm_get(vm, code, &in->o[0]);
+            s->dirty = true;
+        }
+        break;
     case 0xf7:
         if (in->count >= 1) {
             int loss = sa_vm_get(vm, code, &in->o[0]);
@@ -771,6 +777,8 @@ static void compose(SA *s) {
         }
         sa_blit(fb, s->ui[UI_CHOICE_BOTTOM], x, choice_y(s, s->vm.choiceCount));
     }
+    if (s->dialog.open && s->bg.img && s->bg.name[0] != '*')
+        for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = 0xff000000u | (fb[i] >> 1 & 0x7f7f7f);
     sa_dialog_draw(&s->dialog, fb);
     sa_mission_draw_confirm(s, fb);
     if (s->log.open) sa_log_draw(&s->log, fb, s->skipMode, s->autoMode);

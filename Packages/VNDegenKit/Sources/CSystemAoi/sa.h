@@ -812,6 +812,8 @@ bool sa_dialog_click(Dialog *d, int x, int y);
 void sa_dialog_draw(Dialog *d, u32 *fb);
 void sa_debug_join_box(VNSystemAoi *sa, const char *keys, const int before[4], const int after[4], const char *text);
 
+enum { C_TOWN_MAP = 491 };
+
 #define BUILD_PENDING 32
 
 typedef struct BuildScreen {
