@@ -94,7 +94,13 @@ static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Ima
                     if (ty < 0) ty += th;
                 }
                 c = tex->px[(size_t)ty * tw + tx];
-                if ((c >> 24) < 128) continue;
+                if (r->texAlpha ? !(c >> 24) : (c >> 24) < 128) continue;
+            }
+            if (r->idMode) {
+                if (r->blend > 0) continue;
+                zrow[x] = iz;
+                row[x] = 0xff000000u | r->id;
+                continue;
             }
             float fz = z * r->fogDensity, f = expf(-fz * fz);
             float cr = fminf((float)(c & 0xff) * sh, 255), cg = fminf((float)(c >> 8 & 0xff) * sh, 255), cb = fminf((float)(c >> 16 & 0xff) * sh, 255);
@@ -102,7 +108,7 @@ static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Ima
             float or_ = cr * f + (float)fr * g1, og = cg * f + (float)fg * g1, ob = cb * f + (float)fbl * g1;
             if (r->blend > 0) {
                 u32 dst = row[x];
-                float a = r->blend, k = 1 - a;
+                float a = r->texAlpha ? r->blend * (float)(c >> 24) / 255.0f : r->blend, k = 1 - a;
                 or_ = or_ * a + (float)(dst & 0xff) * k;
                 og = og * a + (float)(dst >> 8 & 0xff) * k;
                 ob = ob * a + (float)(dst >> 16 & 0xff) * k;
@@ -147,6 +153,21 @@ void r3_tri(R3 *r, const R3Vert *v, const Image *tex) {
     Scr s[4];
     for (int i = 0; i < n; i++) s[i] = project(r, &poly[i]);
     for (int i = 1; i + 1 < n; i++) raster(r, &s[0], &s[i], &s[i + 1], tex);
+}
+
+Image *sa_bmp_decode_alpha(const u8 *d, size_t n) {
+    if (n < 54 || d[0] != 'B' || d[1] != 'M' || (d[28] | d[29] << 8) != 32) return NULL;
+    u32 off = rd32(d + 10);
+    int w = (int)rd32(d + 18), h = (int)rd32(d + 22);
+    bool flip = h > 0;
+    if (h < 0) h = -h;
+    if (w <= 0 || h <= 0 || off + (size_t)w * (size_t)h * 4 > n) return NULL;
+    Image *im = sa_image_new(w, h);
+    for (int y = 0; y < h; y++) {
+        const u8 *row = d + off + (size_t)w * 4 * (size_t)(flip ? h - 1 - y : y);
+        for (int x = 0; x < w; x++) im->px[(size_t)y * w + x] = (u32)row[x * 4 + 3] << 24 | (u32)row[x * 4] << 16 | (u32)row[x * 4 + 1] << 8 | row[x * 4 + 2];
+    }
+    return im;
 }
 
 Image *sa_bmp_decode(const u8 *d, size_t n) {

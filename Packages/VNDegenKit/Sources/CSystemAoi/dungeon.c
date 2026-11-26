@@ -30,6 +30,7 @@ enum {
     FLOOR_DOWN = 100,
     FLOOR_UP = 101,
     OBJECT_CRYSTAL = 60,
+    OBJECT_CRYSTAL_OPEN = 61,
     OBJECT_DARK = 41,
     LINK_INTS = 11,
     HEADER_ROUTES = 32,
@@ -99,6 +100,8 @@ static const struct {
 #define POLE_SIDE (DUN_SIDE + 1)
 #define QUARTER 1.5707963f
 #define VIEW_SLOPE 0.75f
+#define CRYSTAL_ALPHA 0.5f
+#define CRYSTAL_OPEN_ALPHA 0.22f
 
 static const float lights[2][3] = {{0.46f, 0.3f, -0.44f}, {-0.46f, 0.3f, -0.44f}};
 static const int wallField[4] = {F_WALL_N, F_WALL_E, F_WALL_S, F_WALL_W};
@@ -143,6 +146,7 @@ static void free_set(PartSet *p) {
 }
 
 static void free_level(Dungeon *d) {
+    sa_fx_free(&d->fx);
     free_set(&d->set);
     free_set(&d->common);
     for (int i = 0; i < d->texCount; i++) sa_image_free(d->tex[i]);
@@ -237,7 +241,7 @@ bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map) {
     return true;
 }
 
-static float def_value(const char *text, const char *key, float fallback) {
+float sa_def_value(const char *text, const char *key, float fallback) {
     size_t n = strlen(key);
     for (const char *p = text; *p; p++) {
         if ((p != text && p[-1] != '\n') || strncmp(p, key, n) || (p[n] != ' ' && p[n] != '\t' && p[n] != '=')) continue;
@@ -247,7 +251,7 @@ static float def_value(const char *text, const char *key, float fallback) {
     return fallback;
 }
 
-static bool def_string(const char *text, const char *key, char *out, size_t size) {
+bool sa_def_string(const char *text, const char *key, char *out, size_t size) {
     size_t n = strlen(key);
     for (const char *p = text; *p; p++) {
         if ((p != text && p[-1] != '\n') || strncmp(p, key, n) || (p[n] != ' ' && p[n] != '\t' && p[n] != '=')) continue;
@@ -281,13 +285,14 @@ static void load_effects(Dungeon *d, Vfs *vfs) {
         text[n] = 0;
         free(data);
         char type[32], tex[48];
-        if (def_string(text, "type", type, sizeof type) && !strcmp(type, "FogFoot") && def_string(text, "TexFile", tex, sizeof tex)) {
+        if (sa_def_string(text, "type", type, sizeof type) && strcmp(type, "FogFoot")) sa_fx_load(&d->fx, vfs, text);
+        if (sa_def_string(text, "type", type, sizeof type) && !strcmp(type, "FogFoot") && sa_def_string(text, "TexFile", tex, sizeof tex)) {
             d->fogTex = texture_index(d, vfs, tex);
-            d->fogSpeed[0] = def_value(text, "texSpdX", 0);
-            d->fogSpeed[1] = def_value(text, "texSpdY", 0);
-            d->fogAlpha[0] = def_value(text, "AlphaMin", 0);
-            d->fogAlpha[1] = def_value(text, "AlphaMax", 0);
-            d->fogHeight = def_value(text, "HighAdd", 0);
+            d->fogSpeed[0] = sa_def_value(text, "texSpdX", 0);
+            d->fogSpeed[1] = sa_def_value(text, "texSpdY", 0);
+            d->fogAlpha[0] = sa_def_value(text, "AlphaMin", 0);
+            d->fogAlpha[1] = sa_def_value(text, "AlphaMax", 0);
+            d->fogHeight = sa_def_value(text, "HighAdd", 0);
         }
         free(text);
     }
@@ -299,6 +304,9 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     load_effects(d, vfs);
     load_set(d, vfs, &d->common, "mallset.pvm");
     if (!sa_dungeon_read_map(d, vfs, map)) return false;
+    sa_fx_area(&d->fx, -CELL / 2, -((float)d->h - 0.5f) * CELL, ((float)d->w - 0.5f) * CELL, CELL / 2);
+    d->variantSeed = 2166136261u;
+    for (const char *p = map; *p; p++) d->variantSeed = (d->variantSeed ^ (u8)*p) * 16777619u;
     if (!d->r3.zbuf) r3_init(&d->r3, SA_W, SA_H);
     d->fov = FOV;
     d->r3.fogDensity = FOG_DENSITY;
@@ -390,6 +398,37 @@ void sa_dungeon_free(Dungeon *d) {
 }
 
 static bool hiddenOpen;
+static int forcedVariant = -1;
+static bool showIds, hideObjects;
+
+void sa_dungeon_debug_variant(int variant, int mode) {
+    forcedVariant = variant;
+    showIds = mode & 1;
+    hideObjects = mode & 2;
+}
+
+enum { PART_WALL, PART_POLE, PART_FLOOR, PART_ROOF };
+
+static int part_variant(const Dungeon *d, int kind, int x, int y) {
+    if (forcedVariant >= 0) return forcedVariant;
+    if (kind != PART_WALL && kind != PART_POLE) return 0;
+    u32 h = d->variantSeed ^ (u32)x * 73856093u ^ (u32)y * 19349663u;
+    h ^= h >> 13;
+    h *= 0x5bd1e995u;
+    h ^= h >> 15;
+    return (int)(h % 3);
+}
+
+static void part_name(const Dungeon *d, char *out, size_t size, char prefix, int base, int kind, int x, int y) {
+    snprintf(out, size, "%c%03d", prefix, base);
+    if (base != 0) return;
+    int v = part_variant(d, kind, x, y);
+    char alt[16];
+    snprintf(alt, sizeof alt, "%c%03d", prefix, v);
+    if (v && sa_pvm_find(&d->set.pvm, alt) >= 0) memcpy(out, alt, 5);
+}
+
+static void set_id(Dungeon *d, int kind, int index) { d->r3.id = showIds ? (u32)(kind << 16 | (index + 1)) : 0; }
 
 static const i32 *cell_at(const Dungeon *d, int x, int y);
 
@@ -584,7 +623,7 @@ static bool door_near(const Dungeon *d) {
     for (int y = d->y - VIEW_CELLS; y <= d->y + VIEW_CELLS; y++)
         for (int x = d->x - VIEW_CELLS; x <= d->x + VIEW_CELLS; x++) {
             const i32 *c = cell_at(d, x, y);
-            if (c && c[F_FLOOR] >= 0 && c[F_OBJECT] == OBJECT_DOOR) return true;
+            if (c && c[F_FLOOR] >= 0 && (c[F_OBJECT] == OBJECT_DOOR || c[F_OBJECT] == OBJECT_CRYSTAL || c[F_OBJECT] == OBJECT_CRYSTAL_OPEN)) return true;
         }
     return false;
 }
@@ -603,6 +642,7 @@ bool sa_dungeon_tick(Dungeon *d, u32 ms) {
     u32 before = d->clock / DOOR_FRAME_MS;
     d->clock += ms;
     bool turning = d->clock / DOOR_FRAME_MS != before && door_near(d);
+    if (d->clock / DOOR_FRAME_MS != before && sa_fx_tick(&d->fx, d->clock / DOOR_FRAME_MS * DOOR_FRAME_MS - before * DOOR_FRAME_MS, d->camX, d->camZ)) turning = true;
     if (!d->animDur) return turning;
     d->animMs += ms;
     float t = d->animMs >= d->animDur ? 1 : (float)d->animMs / (float)d->animDur;
@@ -736,7 +776,7 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
                                n[0] * c->f[0] + n[1] * c->f[1] + n[2] * c->f[2]};
                 v[j].u = pv->uv[0];
                 v[j].v = pv->uv[1];
-                v[j].shade = shade_of(d, cn);
+                v[j].shade = (ly->emissive & 0xffffff) == 0xffffff ? 1 : shade_of(d, cn);
             }
             r3_tri(&d->r3, v, tex);
         }
@@ -784,12 +824,30 @@ static void draw_fog_foot(Dungeon *d, const Cam *c, const int *order, int n) {
     d->r3.blend = 0;
 }
 
+static void draw_crystals(Dungeon *d, const Cam *c, const int *cells, int n) {
+    float density = d->r3.fogDensity;
+    d->r3.fogDensity = 0;
+    for (int i = n - 1; i >= 0; i--) {
+        char name[16];
+        snprintf(name, sizeof name, "a%03d", d->cell[cells[i]][F_OBJECT]);
+        d->r3.blend = d->cell[cells[i]][F_OBJECT] == OBJECT_CRYSTAL_OPEN ? CRYSTAL_OPEN_ALPHA : CRYSTAL_ALPHA;
+        float cx = (float)(cells[i] % DUN_SIDE) * CELL, cz = -(float)(cells[i] / DUN_SIDE) * CELL;
+        d->r3.cull = 1;
+        draw_model(d, &d->common, c, name, cx, cz, spin(d), 0);
+        d->r3.cull = -1;
+        draw_model(d, &d->common, c, name, cx, cz, spin(d), 0);
+    }
+    d->r3.fogDensity = density;
+    d->r3.blend = 0;
+}
+
 void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     u32 fog = d->r3.fogColor;
-    u32 bg = 0xff000000u | fog;
+    u32 bg = showIds ? 0xff000000u : 0xff000000u | fog;
     for (size_t i = 0; i < (size_t)SA_W * SA_H; i++) fb[i] = bg;
     if (!d->loaded || d->blind) return;
     r3_begin(&d->r3, fb, d->fov);
+    d->r3.idMode = showIds;
     Cam c;
     make_cam(d, &c);
     int order[DUN_CELLS], n = 0;
@@ -815,6 +873,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
         }
     bool pole[POLE_SIDE * POLE_SIDE];
     memset(pole, 0, sizeof pole);
+    int crystals[DUN_CELLS], nc = 0;
     for (int i = 0; i < n; i++) {
         int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
         const i32 *cell = d->cell[row * DUN_SIDE + col];
@@ -834,26 +893,38 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             int px = col + (k & 1), py = row + (k >> 1);
             if (!pole[py * POLE_SIDE + px]) continue;
             pole[py * POLE_SIDE + px] = false;
-            draw_part(d, &d->set, &c, "p000", ((float)px - 0.5f) * CELL, -((float)py - 0.5f) * CELL, 0);
+            char pname[16];
+            part_name(d, pname, sizeof pname, 'p', 0, PART_POLE, px, py);
+            set_id(d, PART_POLE, py * POLE_SIDE + px);
+            draw_part(d, &d->set, &c, pname, ((float)px - 0.5f) * CELL, -((float)py - 0.5f) * CELL, 0);
         }
         float cx = (float)col * CELL, cz = -(float)row * CELL;
         char name[16];
-        snprintf(name, sizeof name, "f%03d", cell[F_FLOOR]);
+        part_name(d, name, sizeof name, 'f', cell[F_FLOOR], PART_FLOOR, col, row);
+        set_id(d, PART_FLOOR, order[i]);
         draw_part(d, &d->set, &c, name, cx, cz, 0);
-        draw_part(d, &d->set, &c, "r000", cx, cz, 0);
+        part_name(d, name, sizeof name, 'r', 0, PART_ROOF, col, row);
+        set_id(d, PART_ROOF, order[i]);
+        draw_part(d, &d->set, &c, name, cx, cz, 0);
         for (int s = 0; s < 4; s++) {
             int w = cell[wallField[s]];
+            set_id(d, PART_WALL, order[i] * 4 + s);
             if (w == WALL_PASSAGE) draw_part(d, &d->set, &c, "next000", cx, cz, sideQuarter[s]);
             if (w < 0 || w == WALL_PASSAGE) continue;
-            snprintf(name, sizeof name, "w%03d", w);
+            part_name(d, name, sizeof name, 'w', w, PART_WALL, col, row);
             draw_model(d, &d->set, &c, name, cx, cz, (float)sideQuarter[s] * QUARTER, leaf_swing(d, order[i], s));
         }
-        if (cell[F_OBJECT] >= 0) {
+        set_id(d, 4, order[i]);
+        if (cell[F_OBJECT] == OBJECT_CRYSTAL || cell[F_OBJECT] == OBJECT_CRYSTAL_OPEN) {
+            if (!hideObjects) crystals[nc++] = order[i];
+        } else if (cell[F_OBJECT] >= 0 && !hideObjects) {
             snprintf(name, sizeof name, "a%03d", cell[F_OBJECT]);
             draw_model(d, &d->common, &c, name, cx, cz, cell[F_OBJECT] == OBJECT_DOOR ? spin(d) : 0, 0);
         }
     }
     draw_fog_foot(d, &c, order, n);
+    draw_crystals(d, &c, crystals, nc);
+    if (!showIds) sa_fx_draw(&d->fx, &d->r3, c.pos, c.r, c.u, c.f);
 }
 
 static void fill(u32 *fb, int x, int y, int w, int h, u32 c) {

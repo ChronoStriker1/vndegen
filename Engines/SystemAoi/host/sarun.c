@@ -200,6 +200,7 @@ int main(int argc, char **argv) {
             vnsystemaoi_mouse_button(s, VNSYSTEMAOI_MOUSE_RIGHT, 0);
         }
         if (sscanf(argv[a], "calm=%d", &n) == 1) sa_debug_calm(s, n);
+        if (sscanf(argv[a], "variant=%d,%d", &x, &y) == 2) sa_dungeon_debug_variant(x, y);
         if (sscanf(argv[a], "battleend=%d", &n) == 1) {
             sa_debug_battle_end(s, n);
             alive = alive && run(s, 300);

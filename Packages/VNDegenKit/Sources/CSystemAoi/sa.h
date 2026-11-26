@@ -244,6 +244,8 @@ typedef struct R3 {
     u32 fogColor;
     int cull;
     float blend;
+    bool idMode, texAlpha;
+    u32 id;
 } R3;
 
 void r3_init(R3 *r, int w, int h);
@@ -251,6 +253,33 @@ void r3_free(R3 *r);
 void r3_begin(R3 *r, u32 *fb, float fovDeg);
 void r3_tri(R3 *r, const R3Vert *v, const Image *tex);
 Image *sa_bmp_decode(const u8 *d, size_t n);
+Image *sa_bmp_decode_alpha(const u8 *d, size_t n);
+
+#define FX_PARTICLES 160
+
+enum { FX_NONE, FX_LEAF, FX_SNOW };
+
+typedef struct FxParticle {
+    float x, y, z, phase, angle, flip, age, life;
+} FxParticle;
+
+typedef struct DunFx {
+    int type;
+    Image *tex;
+    float size, fall, flutter[3], rot[3], num, clip[2], fadeIn, fadeOut, area[4];
+    FxParticle p[FX_PARTICLES];
+    int count;
+    u32 rng, ms;
+    bool placed;
+} DunFx;
+
+void sa_fx_load(DunFx *fx, Vfs *vfs, const char *def);
+void sa_fx_free(DunFx *fx);
+void sa_fx_area(DunFx *fx, float x0, float z0, float x1, float z1);
+bool sa_fx_tick(DunFx *fx, u32 ms, float camX, float camZ);
+void sa_fx_draw(DunFx *fx, R3 *r, const float pos[3], const float right[3], const float up[3], const float fwd[3]);
+float sa_def_value(const char *text, const char *key, float fallback);
+bool sa_def_string(const char *text, const char *key, char *out, size_t size);
 
 #define DUN_SIDE 20
 #define DUN_CELLS (DUN_SIDE * DUN_SIDE)
@@ -309,7 +338,7 @@ typedef struct Dungeon {
     int x, y, dir;
     float fov, camX, camZ, yaw;
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
-    u32 animMs, animDur, clock;
+    u32 animMs, animDur, clock, variantSeed;
     int hover, steps;
     bool bumped, folded;
     Image *art[DUN_ART];
@@ -332,6 +361,7 @@ typedef struct Dungeon {
     int fogTex;
     float fogSpeed[2], fogAlpha[2], fogHeight;
     int passCell, passSide;
+    DunFx fx;
 } Dungeon;
 
 enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };
@@ -360,6 +390,7 @@ bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map);
 void sa_dungeon_open_doors(Dungeon *d);
 bool sa_dungeon_find_mark(const Dungeon *d, int mark, int *x, int *y);
 void sa_dungeon_sense(bool on);
+void sa_dungeon_debug_variant(int variant, int mode);
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side);
 int sa_dungeon_group_step(const Dungeon *d, int x, int y, int side);
 bool sa_dungeon_cell_is_passage(const Dungeon *d, int x, int y);
