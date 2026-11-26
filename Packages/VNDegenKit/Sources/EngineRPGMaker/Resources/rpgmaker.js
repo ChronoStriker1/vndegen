@@ -154,6 +154,41 @@
         });
     }, true);
 
+    const touchesWaiting = [], touchesHeld = [];
+    let touchInput = null;
+    function touchesCanvas(event) {
+        const graphics = window.Graphics;
+        return !!graphics && Array.from(event.changedTouches || []).some((touch) => graphics.isInsideCanvas(
+            graphics.pageToCanvasX(touch.pageX), graphics.pageToCanvasY(touch.pageY)));
+    }
+    document.addEventListener('load', () => {
+        const touch = window.TouchInput;
+        if (!touch || touch === touchInput || typeof touch.update !== 'function' || typeof touch.clear !== 'function'
+            || typeof touch._onTouchStart !== 'function') return;
+        touchInput = touch;
+        for (const name of ['_onTouchStart', '_onTouchMove', '_onTouchEnd', '_onTouchCancel']) {
+            const handler = touch[name];
+            if (typeof handler !== 'function') continue;
+            touch[name] = function (event) {
+                if (name === '_onTouchStart' && (touchesCanvas(event) || window.cordova || window.navigator.standalone)) {
+                    event.preventDefault();
+                }
+                touchesWaiting.push(() => handler.call(this, event));
+            };
+        }
+        const update = touch.update, clear = touch.clear;
+        touch.update = function () {
+            const ready = touchesHeld.splice(0, touchesHeld.length, ...touchesWaiting.splice(0));
+            for (const run of ready) run();
+            return update.apply(this, arguments);
+        };
+        touch.clear = function () {
+            touchesWaiting.length = 0;
+            touchesHeld.length = 0;
+            return clear.apply(this, arguments);
+        };
+    }, true);
+
     // MZ's _onFetch tells the decoder a sound has finished loading only when chunks are left over at the end. When
     // _updateBufferOnFetch has just passed the last one on, the decoder never hears it: an Ogg decoder stays open with
     // its last seconds undecoded, and a sound decoded in WebKit, which waits for the whole file, never plays. At the end
