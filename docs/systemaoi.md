@@ -165,8 +165,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   change it yet; a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either; opened crystals are, and VNDegen keeps them the same way).
   The dungeon light and fog are fitted to eleven of the original's
-  frames (each within 6%); which walls get a set's variant textures isn't known, so each cell takes one by a hash
-  (right for about a third of the walls, as by chance); crystals are drawn see-through, unlit and turning (blends
+  frames (each within 6%); which walls get a set's variant textures wasn't found from play or data, so each cell
+  takes one by a hash (right for about a third of the walls, as by chance); crystals are drawn see-through, unlit and turning (blends
   fitted to a few views, the spin speed taken from the door's); the falling leaves, sparks, snow and light motes
   follow the sets' effect files, with their speeds fitted to a few PC recordings (the PC's snowflakes loop,
   VNDegen's only wave).
