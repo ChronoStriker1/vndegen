@@ -21,6 +21,9 @@ enum {
     VIEW_CELLS = 6,
     DOOR_TURN_MS = 18000,
     DOOR_FRAME_MS = 66,
+    SYMBOL_FRAME_MS = 100,
+    SYMBOL_FRAMES = 5,
+    BLEND_ALPHA = 26,
     FOG_PULSE_MS = 4000,
     ACTION_X = 1101,
     ACTION_Y = 498,
@@ -124,14 +127,14 @@ static int trap_icon(int object) {
     return -1;
 }
 
-static int texture_index(Dungeon *d, Vfs *vfs, const char *name) {
+static int texture_index(Dungeon *d, Vfs *vfs, const char *name, bool alpha) {
     if (!*name) return -1;
     for (int i = 0; i < d->texCount; i++)
         if (!strcmp(d->texName[i], name)) return i;
     if (d->texCount == DUN_TEX) return -1;
     size_t n;
     u8 *data = sa_vfs_read(vfs, name, &n);
-    Image *im = data ? sa_bmp_decode(data, n) : NULL;
+    Image *im = data ? alpha ? sa_bmp_decode_alpha(data, n) : sa_bmp_decode(data, n) : NULL;
     free(data);
     if (!im) return -1;
     d->tex[d->texCount] = im;
@@ -172,7 +175,7 @@ static bool load_set(Dungeon *d, Vfs *vfs, PartSet *p, const char *name) {
             j++;
         }
         p->last[i] = j;
-        p->layerTex[i] = texture_index(d, vfs, p->pvm.layer[i].texture);
+        p->layerTex[i] = texture_index(d, vfs, p->pvm.layer[i].texture, p->pvm.layer[i].blend == BLEND_ALPHA);
     }
     return true;
 }
@@ -288,7 +291,7 @@ static void load_effects(Dungeon *d, Vfs *vfs) {
         char type[32], tex[48];
         if (sa_def_string(text, "type", type, sizeof type) && strcmp(type, "FogFoot")) sa_fx_load(&d->fx, vfs, text);
         if (sa_def_string(text, "type", type, sizeof type) && !strcmp(type, "FogFoot") && sa_def_string(text, "TexFile", tex, sizeof tex)) {
-            d->fogTex = texture_index(d, vfs, tex);
+            d->fogTex = texture_index(d, vfs, tex, false);
             d->fogSpeed[0] = sa_def_value(text, "texSpdX", 0);
             d->fogSpeed[1] = sa_def_value(text, "texSpdY", 0);
             d->fogAlpha[0] = sa_def_value(text, "AlphaMin", 0);
@@ -772,11 +775,9 @@ static float shade_of(const Dungeon *d, const float *n) {
     return s * d->light;
 }
 
-static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a, float swing) {
-    int i = sa_pvm_find(&ps->pvm, name);
-    if (i < 0) return;
+static void draw_layers(Dungeon *d, const PartSet *ps, const Cam *c, int i, int last, float cx, float cz, float a, float swing) {
     float ca = cosf(a), sa = sinf(a);
-    for (int k = i; k <= ps->last[i]; k++) {
+    for (int k = i; k <= last; k++) {
         const PvmLayer *ly = &ps->pvm.layer[k];
         if (ly->name[0] == '>' || (k != i && !strncmp(ly->name, "next", 4))) continue;
         if (ly->hasTranslate && swing < 0) continue;
@@ -807,9 +808,47 @@ static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *
                 v[j].v = pv->uv[1];
                 v[j].shade = (ly->emissive & 0xffffff) == 0xffffff ? 1 : shade_of(d, cn);
             }
+            bool alpha = ly->blend == BLEND_ALPHA;
+            float keep = d->r3.blend;
+            if (alpha) {
+                d->r3.texAlpha = true;
+                d->r3.blend = 1;
+            }
             r3_tri(&d->r3, v, tex);
+            if (alpha) {
+                d->r3.texAlpha = false;
+                d->r3.blend = keep;
+            }
         }
     }
+}
+
+static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a, float swing) {
+    int i = sa_pvm_find(&ps->pvm, name);
+    if (i >= 0) draw_layers(d, ps, c, i, ps->last[i], cx, cz, a, swing);
+}
+
+static int child_layer(const PartSet *ps, int i, const char *name) {
+    for (int k = i + 1; k <= ps->last[i]; k++)
+        if (!strcmp(ps->pvm.layer[k].name, name)) return k;
+    return -1;
+}
+
+static void draw_symbols(Dungeon *d, const Cam *c, const int *order, int n) {
+    for (int i = n - 1; i >= 0; i--)
+        for (int g = 0; g < d->markCount; g++) {
+            if (d->markY[g] * DUN_SIDE + d->markX[g] != order[i] || d->markModel[g] <= 0) continue;
+            char name[16];
+            snprintf(name, sizeof name, "e%03d", d->markModel[g]);
+            int m = sa_pvm_find(&d->common.pvm, name);
+            if (m < 0) continue;
+            int frames = child_layer(&d->common, m, "a50") >= 0 ? SYMBOL_FRAMES : SYMBOL_FRAMES - 1;
+            int f = (int)(d->clock / SYMBOL_FRAME_MS % (u32)SYMBOL_FRAMES);
+            char frame[8];
+            snprintf(frame, sizeof frame, "a%d0", f < frames ? f + 1 : 2);
+            int k = child_layer(&d->common, m, frame);
+            if (k >= 0) draw_layers(d, &d->common, c, k, d->common.last[k], (float)d->markX[g] * CELL, -(float)d->markY[g] * CELL, d->yaw, 0);
+        }
 }
 
 static float spin(const Dungeon *d) { return (float)(d->clock % DOOR_TURN_MS) * 6.2831853f / DOOR_TURN_MS; }
@@ -958,6 +997,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     }
     draw_fog_foot(d, &c, order, n);
     draw_crystals(d, &c, crystals, nc);
+    if (!hideObjects) draw_symbols(d, &c, order, n);
     if (!showIds && !d->flat) sa_fx_draw(&d->fx, &d->r3, c.pos, c.r, c.u, c.f);
 }
 

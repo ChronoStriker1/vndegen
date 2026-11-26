@@ -352,7 +352,7 @@ typedef struct Dungeon {
     Image *icon[DUN_ICONS], *arrow[4], *big[48], *walk[DUN_WALKS];
     const Image *bigFrom[48];
     int bigCount;
-    int markCount, markX[DUN_MARKS], markY[DUN_MARKS];
+    int markCount, markX[DUN_MARKS], markY[DUN_MARKS], markModel[DUN_MARKS];
     DunLink link[DUN_LINKS];
     int linkCount;
     DunRoute route[DUN_ROUTES];

@@ -91,6 +91,7 @@ enum {
     F_BOSSES = 23,
     BOSS_SLOTS = 4,
     P_MOVE = 7,
+    P_SYMBOL = 13,
     P_AFTER_SCRIPT = 74,
     STAY_FLAGS = -5,
     BOSS_INFO = 0,
@@ -436,6 +437,12 @@ static const char *group_name(SA *s, int party) {
     return NULL;
 }
 
+static int group_symbol(SA *s, int party) {
+    for (int r = 0; r < s->battle.groups.rows; r++)
+        if (sa_table_int(&s->battle.groups, r, 0) == party) return sa_table_int(&s->battle.groups, r, P_SYMBOL);
+    return 0;
+}
+
 static int group_id(SA *s, const char *name) {
     for (int r = 0; r < s->battle.groups.rows; r++)
         if (!strcmp(text(&s->battle.groups, r, 2), name)) return sa_table_int(&s->battle.groups, r, 0);
@@ -668,7 +675,8 @@ static void sync_marks(SA *s) {
         const ExpGroup *g = &s->exp.group[i];
         if (!g->alive) continue;
         d->markX[d->markCount] = g->x;
-        d->markY[d->markCount++] = g->y;
+        d->markY[d->markCount] = g->y;
+        d->markModel[d->markCount++] = group_symbol(s, g->party);
     }
 }
 
