@@ -100,7 +100,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   buttons, 戦闘開始, 自動戦闘, ゲージON and the log. Each unit's action and target buttons open the
   game's skill and target pickers; the side buttons set every unit's order or target and save and load three sets.
   Rounds play in speed order with the damage, hit and target rules in `docs/systemaoi-cleanroom.md`. A win dims the
-  screen and shows the resources, EXP and any item found; EXP fills the panel's bar and raises levels. A loss
+  screen and shows the residents, food, money and resources won, the EXP, who levelled and any item found, each
+  rolled per enemy from the group's and the units' tables as the original does; they join the expedition's finds,
+  and EXP fills the panel's bar and raises levels, with 学 and 勤勉 adding their share. A loss
   goes on by itself to the defeat line and box over the dungeon view, then the turn's end.
 - **Expeditions.** 遠征 opens the dungeon select; an area's map is drawn in 3D from its part set (software rendered) in
   the original's own coordinates, walked with the pad, the arrow keys or the walk arrows that appear under the pointer
@@ -161,6 +163,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   minimap icons, teleporters and stairs from the maps' link records, spinners, dark zones, healing magic circles and 堕天牢's floor
   hazards; several effects' sizes are inferred. These live in the original's exe, not its scripts, and are rebuilt
   from play (`docs/systemaoi-cleanroom.md`).
+- Battle rewards follow the rule measured over 62 wins of the original; how often an enemy's resident joins (an even
+  chance, from 39 tries), how 大勧誘 and 大探索 combine with C392, whether 学 on a reserve tile counts and what
+  `party.obj` column 66 does for item drops are inferred.
 - Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 3.4 to
   5.5 over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred. The enemy side's reserve tiles are measured on the small board only; the larger boards draw none

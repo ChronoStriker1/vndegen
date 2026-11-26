@@ -674,6 +674,21 @@ enum { PICK_NONE, PICK_ACTION, PICK_TARGET };
 #define POP_GREEN "\x01"
 #define POP_YELLOW "\x02"
 #define POP_WHITE "\x03"
+#define POP_RED "\x04"
+#define POP_PINK "\x05"
+
+enum { REWARD_RESIDENTS, REWARD_FOOD, REWARD_MONEY, REWARD_RESOURCES, REWARD_KINDS };
+
+typedef struct BattleReward {
+    int strength, recruit, search;
+    bool noResidents;
+    int gain[REWARD_KINDS], exp;
+    bool leveled[PARTY_SLOTS];
+} BattleReward;
+
+void sa_reward_roll(BattleReward *r, const Table *groups, int group, const Table *units, const int *enemyRows, int enemies, u32 *rng);
+int sa_reward_member_exp(const BattleReward *r, const Party *p, int slot);
+int sa_reward_lines(const BattleReward *r, const Party *p, char **lines, int max);
 
 typedef struct Fighter {
     int id, row, level, slot, gridRow, gridCell;
