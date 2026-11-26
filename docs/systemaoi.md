@@ -153,7 +153,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   turn 42, the 迷宮's) and 内政's 交換 are there, with the holders' ability raises; posts change the town's
   production. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
   breakthrough damage are measured; the odds of each event are fitted to the original's counts. Facilities gain
-  EXP each turn and level up, and town posts raise their area's production. 配置 has 一覧, 組織図 and 編成, and the
+  EXP each turn and level up, and town posts raise their area's production by a roll of 0 to 統治 + 統率 (the
+  街長's also raises residents), measured from turn 42; that each facility rolls on its own is inferred. The
+  town's derived variables (C209, C220 to C239, C400 to C409, C420 to C424) are kept as the original keeps them. 配置 has 一覧, 組織図 and 編成, and the
   status card switches to 能力詳細. The later dungeons' floor objects work: traps with their messages, timers and
   minimap icons, teleporters and stairs from the maps' link records, spinners, dark zones, healing magic circles and 堕天牢's floor
   hazards; several effects' sizes are inferred. These live in the original's exe, not its scripts, and are rebuilt
