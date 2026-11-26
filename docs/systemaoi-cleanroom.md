@@ -29,12 +29,34 @@ where play couldn't pin it down.
   facility's `TownBuil` values (column c adds to column c + 6), except housing: three level-10 住居 still housed
   200 each.
 - **Posts and production.** Measured over 4 turns each (fields, shops and mines, holders' 統治 10 to 200): the town
-  window's 収支 ignores posts, but at the turn's end each staffed facility in a post's area gains about 統治 × 0.3 to
-  0.7 (one roll a turn) on its main product: 農業担当 on fields' food (+51%, +265%, +481% and +1040% at 10, 50,
+  window's 収支 ignores posts, but at the turn's end each staffed facility in a post's area gains a roll (re-measured
+  below) on its main product: 農業担当 on fields' food (+51%, +265%, +481% and +1040% at 10, 50,
   100 and 200), 商業担当 on shops' money, 工業担当 on mines' resources (not their money); 街長 the same on every
   area but the 魔王亭's money; 街長補佐 about half that, the 魔王亭 included. Inferred: 警備担当 covers 行政, 教育担当
   学園, 衛生担当 環境, and 娯楽担当 the 娯楽店, Ｈな娯楽店, スタジアム, プール and 酒造店 (which 商業担当 then
   leaves); the main product is the largest of the facility's food, money and resources columns.
+- **The post roll, re-measured (round 5).** From the turn-42 save with only a 街長 (統治/統率 10/1, 30/1, 50/1,
+  1/30 and the save's own 8/10) or only a 街長補佐 (20/1), 6 to 10 turns each on the original, reading both the
+  turn's change and the C221 to C224 the original stores in each autosave (two samples a turn): the bonus is a
+  roll from 0 up to 統治 + 統率, not 統治 alone. Field food over its 10: 0 to 11 at 10/1 (mean 5.4), 0 to 31 at
+  30/1, 1 to 49 at 50/1 (mean 23), 7 to 31 at 1/30 (mean 18.8). Each product rolls on its own (no correlation
+  between the food and residents bonuses of one turn). 街長補佐 at 20/1 added 4 to 10 money at the 魔王亭 and up
+  to 7 food at the field, and no residents. VNDegen rolls 0 to 統治 + 統率 for each post on each facility it
+  covers (街長補佐 half that). Inferred: one roll per facility rather than one per turn (one field can't tell them
+  apart), and the floor of about 7 seen at 1/30 (19 samples) isn't modelled.
+- **Residents and the 街長.** Measured on the same runs: with no posts residents grow 0 to 2 a turn (the 魔王亭's
+  columns 23 and 24); a 街長 adds a roll of 0 to 統治 + 統率 (10/1: 2 to 12; 30/1: 0 to 33; 50/1: 3 to 52; 1/30:
+  2 to 33; 8/10: 7 to 18), so turn 42's save grows by 7 to 18 a turn where VNDegen grew by 0 to 2 (the "+9 against
+  +1" round 5 saw). 街長補佐 adds none. VNDegen gives the 街長's roll to the 魔王亭's residents. Inferred: whether a
+  second residents facility (the 学園's 10 to 15) gets its own 街長 roll.
+- **Derived variables.** The original recomputes these on loading and keeps them current; VNDegen now does too
+  (measured against 40 of the original's saves): C209 housing (column 9 over all facilities), C220 workers needed
+  (column 19), C230 residents at work (the smaller of residents and C220), C225 to C227 the staffed facilities'
+  base food, money and resources (columns 25, 27, 29), C221 to C224 the last rolled food, money, resources and
+  residents with post bonuses, C238 and C239 food upkeep (residents / 10), C400 to C408 the number of facilities
+  of each `TownBuil.obj` column 3 kind (C400 also counts the open empty cells; the 学園, kind 2, counts once),
+  C409 their total, and C420 to C423 the staffed facilities' columns 10 to 13 with levels (C423 >= 20 opens a
+  `ca0003` scene). Inferred: C424 as C414 plus the column 14 total when that is positive (20 in every save seen).
 - **Facilities.** `TownBuil.obj` columns: 9 housing, 18 build cost in resources, 19 workers needed, 23 and 24 residents a
   turn, 25 and 26 food, 27 and 28 money, 29 and 30 resources, 34 resources used a turn, 35 to 37 pictures, 66 and 67 the
   card's texts. Measured: costs and workers match the manual; a 魔王亭 makes 30 money a turn and a field costs 150
@@ -43,8 +65,8 @@ where play couldn't pin it down.
   Measured: the original's first board shows the 魔王亭's cell and the twelve cells of stage 1.
 - **Workers.** Inferred: residents go to facilities in grid order, and a facility works only when all its workers are
   free. Measured: with 5 residents a field shows 0/30 and makes nothing, and the town window shows 5 - 30 = -25.
-- **Residents a turn.** Inferred: a random number between columns 23 and 24 for each working facility. Measured: from
-  the same save, +2 and then +1 on the next turn, and +2 again when the first turn was replayed.
+- **Residents a turn.** Measured: a random number between columns 23 and 24 for each working facility (0 to 2 from
+  the 魔王亭 over 6 turns without posts), plus the 街長's roll (above).
 - **Food.** Inferred: one food a turn for every ten residents. Measured: 5 and 7 residents used none.
 - **Placing.** Measured: a facility is chosen from the list and placed on an open cell; 決定 builds it and takes its cost
   in resources; the town window shows the result before 決定. VNDegen places with one click where the original holds the

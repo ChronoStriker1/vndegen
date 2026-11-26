@@ -83,6 +83,7 @@ enum {
     HEADER_H = 23,
     INFO_X = 1077,
     INFO_Y = 39,
+    BUILD_INFO_DY = 3,
     GOAL_X = 1077,
     SUBMIT_X = 16,
     SUBMIT_Y = 420,
@@ -244,6 +245,122 @@ int sa_town_staffed(const Town *t, const VM *vm, int cell) {
     return 0;
 }
 
+enum {
+    C_HOUSING = 209,
+    C_JOBS = 220,
+    C_BASE_FOOD = 225,
+    C_EMPLOYED = 230,
+    C_UPKEEP = 238,
+    C_KINDS = 400,
+    C_KIND_TOTAL = 409,
+    C_MAZE_SUMS = 420,
+    C_FAME_EVENTS = 414,
+    KIND_GROUPS = 9,
+    COL_KIND = 3,
+    COL_HOUSING = 9,
+    COL_MAZE_FIRST = 10,
+    COL_WORKERS = 19,
+    COL_BASE_FOOD = 25,
+};
+
+void sa_town_derive(const Town *t, VM *vm) {
+    int housing = 0, jobs = 0, base[3] = {0}, sums[5] = {0}, kinds[KIND_GROUPS] = {0};
+    for (int c = 0; c < TOWN_CELLS; c++) {
+        int type = t->cell[c].type, r = type ? sa_town_type_row(t, type) : -1;
+        if (r < 0) {
+            if (!type && c < t->mass.rows && sa_table_int(&t->mass, c, 1) <= t->stage) kinds[0]++;
+            continue;
+        }
+        int kind = sa_table_int(&t->build, r, COL_KIND);
+        if (kind >= 0 && kind < KIND_GROUPS) kinds[kind]++;
+        housing += sa_table_int(&t->build, r, COL_HOUSING);
+        jobs += sa_table_int(&t->build, r, COL_WORKERS);
+        if (!sa_town_staffed(t, vm, c)) continue;
+        int level = t->cell[c].level;
+        for (int i = 0; i < 3; i++) base[i] += sa_town_value(t, r, level, COL_BASE_FOOD + 2 * i);
+        for (int i = 0; i < 5; i++) sums[i] += sa_town_value(t, r, level, COL_MAZE_FIRST + i);
+    }
+    int residents = vm->c[C_RESIDENTS], total = 0;
+    vm->c[C_HOUSING] = housing;
+    vm->c[C_JOBS] = jobs;
+    vm->c[C_EMPLOYED] = residents < jobs ? residents : jobs;
+    for (int i = 0; i < 3; i++) vm->c[C_BASE_FOOD + i] = base[i];
+    vm->c[C_UPKEEP] = vm->c[C_UPKEEP + 1] = residents / 10;
+    for (int k = 0; k < KIND_GROUPS; k++) total += vm->c[C_KINDS + k] = kinds[k];
+    vm->c[C_KIND_TOTAL] = total;
+    for (int i = 0; i < 4; i++) vm->c[C_MAZE_SUMS + i] = sums[i];
+    vm->c[C_MAZE_SUMS + 4] = vm->c[C_FAME_EVENTS] + (sums[4] > 0 ? sums[4] : 0);
+}
+
+enum { FIRST_LEISURE = 116, LAST_LEISURE = 120, MAOU = 100, C_ROLLED = 221, C_ROLLED_PEOPLE = 224 };
+enum { POST_MAYOR = 1, POST_DEPUTY_MAYOR, POST_FARM, POST_TRADE, POST_INDUSTRY, POST_GUARD, POST_SCHOOL, POST_LEISURE, POST_HEALTH, TOWN_POSTS };
+
+static int roll_upto(VM *vm, int n) { return n > 0 ? (int)(sa_vm_random(vm) % (u32)(n + 1)) : 0; }
+
+static int roll_range(const Town *t, VM *vm, int r, int level, int col) {
+    int lo = sa_town_value(t, r, level, col), hi = sa_town_value(t, r, level, col + 1);
+    return hi > lo ? lo + roll_upto(vm, hi - lo) : lo;
+}
+
+static int post_of_facility(const Town *t, int r) {
+    int id = sa_table_int(&t->build, r, 0);
+    if (id >= FIRST_LEISURE && id <= LAST_LEISURE) return POST_LEISURE;
+    static const char *const areas[] = {"農業", "商業", "工業", "行政", "学園", "環境"};
+    static const int posts[] = {POST_FARM, POST_TRADE, POST_INDUSTRY, POST_GUARD, POST_SCHOOL, POST_HEALTH};
+    const char *area = sa_table_text(&t->build, r, 2);
+    for (int i = 0; i < 6; i++)
+        if (!strcmp(area, areas[i])) return posts[i];
+    return 0;
+}
+
+static int post_weight(const Town *t, int post) {
+    int unit = t->party ? t->party->post[post] : 0, gov = 0, lead = 0;
+    if (!unit) return 0;
+    sa_party_post_stats(t->party, unit, post, &gov, &lead);
+    int w = gov + lead;
+    return post == POST_DEPUTY_MAYOR ? w / 2 : w;
+}
+
+void sa_town_income(const Town *t, VM *vm, int out[4]) {
+    int people = 0, made[3] = {0}, upkeep = 0, weight[TOWN_POSTS];
+    for (int p = 1; p < TOWN_POSTS; p++) weight[p] = post_weight(t, p);
+    for (int c = 0; c < TOWN_CELLS; c++) {
+        int type = t->cell[c].type, r = type ? sa_town_type_row(t, type) : -1;
+        if (r < 0 || !sa_town_staffed(t, vm, c)) continue;
+        int level = t->cell[c].level, got[3];
+        people += roll_range(t, vm, r, level, 23);
+        for (int i = 0; i < 3; i++) made[i] += got[i] = roll_range(t, vm, r, level, 25 + 2 * i);
+        upkeep += sa_town_value(t, r, level, 34);
+        int base[3] = {sa_table_int(&t->build, r, 25), sa_table_int(&t->build, r, 27), sa_table_int(&t->build, r, 29)};
+        if (type == MAOU) {
+            people += roll_upto(vm, weight[POST_MAYOR]);
+            made[1] += roll_upto(vm, weight[POST_DEPUTY_MAYOR]);
+            continue;
+        }
+        if (!base[0] && !base[1] && !base[2]) continue;
+        int main = 0;
+        for (int i = 1; i < 3; i++)
+            if (base[i] > base[main]) main = i;
+        int post = post_of_facility(t, r);
+        made[main] += roll_upto(vm, weight[POST_MAYOR]) + roll_upto(vm, weight[POST_DEPUTY_MAYOR]) + (post ? roll_upto(vm, weight[post]) : 0);
+    }
+    for (int i = 0; i < 3; i++) vm->c[C_ROLLED + i] = made[i];
+    vm->c[C_ROLLED_PEOPLE] = people;
+    out[0] = people;
+    out[1] = made[0];
+    out[2] = made[1];
+    out[3] = made[2] - upkeep;
+}
+
+int sa_town_housing(const Town *t) {
+    int n = 0;
+    for (int c = 0; c < TOWN_CELLS; c++) {
+        int r = t->cell[c].type ? sa_town_type_row(t, t->cell[c].type) : -1;
+        if (r >= 0) n += sa_table_int(&t->build, r, 9);
+    }
+    return n;
+}
+
 static void cell_center(int cell, int *x, int *y) {
     int row = cell / TOWN_W, col = cell % TOWN_W;
     *x = GRID_X + (col - row) * CELL_DX;
@@ -398,8 +515,9 @@ static void draw_window(Town *t, Vfs *vfs, const VM *vm, u32 *fb, int w, int tit
             for (int c = 0; c < TOWN_CELLS; c++)
                 if (t->cell[c].type == type) {
                     count++;
-                    working += sa_town_staffed(t, vm, c);
-                    if (t->cell[c].level > level) level = t->cell[c].level;
+                    int staffed = sa_town_staffed(t, vm, c);
+                    working += staffed;
+                    if (staffed && t->cell[c].level > level) level = t->cell[c].level;
                 }
             built += count;
             int flag = sa_table_int(&t->build, r, 6);
@@ -409,11 +527,11 @@ static void draw_window(Town *t, Vfs *vfs, const VM *vm, u32 *fb, int w, int tit
             sa_blit(fb, row_art(t, vfs, area, index), x, ry);
             char buf[16];
             snprintf(buf, sizeof buf, "%d", working);
-            sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 117, ry + 5, 0, 10, 13);
+            sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 117, ry + 5, count && !working ? 1 : 0, 10, 13);
             snprintf(buf, sizeof buf, "%d", count);
             sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 147, ry + 5, 0, 10, 13);
             snprintf(buf, sizeof buf, "%d", level);
-            sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 193, ry + 5, 0, 10, 13);
+            sa_draw_number(fb, t->ui[UI_SMALLDIGITS], buf, x + 193, ry + 5, count && !working ? 1 : 0, 10, 13);
             slot++;
         }
         sa_draw_int(fb, t->ui[UI_SMALLDIGITS], built, false, x + 193, y + (shut ? FOLDED_DY : 5), 0, 10, 13);
@@ -426,15 +544,6 @@ static int section_height(const Town *t, Vfs *vfs, int w, int a, int area) {
     const Image *im = w == TW_INFO ? (t->sectionFolded[w][a] ? t->ui[UI_SECFOLD0 + 7 + a] : t->ui[UI_TOWNSEC0 + a])
                                    : (t->sectionFolded[w][a] ? t->ui[UI_SECFOLD0 + area - 3] : section_art(vfs, area));
     return im ? im->h : HEADER_H;
-}
-
-static int housing(const Town *t) {
-    int n = 0;
-    for (int c = 0; c < TOWN_CELLS; c++) {
-        int r = t->cell[c].type ? sa_town_type_row(t, t->cell[c].type) : -1;
-        if (r >= 0) n += sa_table_int(&t->build, r, 9);
-    }
-    return n;
 }
 
 static void income(const Town *t, const VM *vm, int *food, int *money, int *res, int *people) {
@@ -477,7 +586,8 @@ static void draw_info(Town *t, const VM *vm, u32 *fb, bool live) {
         if (t->cell[c].type) jobs += workers_needed(t, t->cell[c].type);
     int food, money, res, people;
     income(t, vm, &food, &money, &res, &people);
-    int y = INFO_Y + 29;
+    int top = live ? INFO_Y : INFO_Y - BUILD_INFO_DY;
+    int y = top + 29;
     int right = INFO_X + 191;
     const int values[4] = {vm->c[C_RESIDENTS], vm->c[C_FOOD], vm->c[C_MONEY], vm->c[C_RESOURCES]};
     const int incomes[4] = {0, food - vm->c[C_RESIDENTS] / 10, money, res};
@@ -486,23 +596,27 @@ static void draw_info(Town *t, const VM *vm, u32 *fb, bool live) {
     for (int i = 0; i < 4; i++) {
         bool shut = live && t->sectionFolded[TW_INFO][i];
         const Image *sec = t->ui[shut ? UI_SECFOLD0 + 7 + i : UI_TOWNSEC0 + i];
-        int sign = i == 0 ? (vm->c[C_RESIDENTS] - jobs < 0 ? 1 : 2) : incomes[i] > 0 ? 2 : incomes[i] < 0 ? 1 : 0;
+        int sign = !live ? 0 : i == 0 ? (vm->c[C_RESIDENTS] - jobs < 0 ? 1 : 2) : incomes[i] > 0 ? 2 : incomes[i] < 0 ? 1 : 0;
         sa_blit(fb, sec, INFO_X, y);
         sa_draw_int(fb, dg, values[i], false, right, y + (shut ? FOLDED_DY : 5), sign, 10, 13);
         if (!shut && i == 0) {
-            sa_draw_int(fb, dg, vm->c[C_RESIDENTS] - jobs, true, right, y + 25, vm->c[C_RESIDENTS] - jobs < 0 ? 1 : 2, 10, 13);
-            sa_draw_int(fb, dg, housing(t), false, right, y + 45, 0, 10, 13);
+            int spare = vm->c[C_RESIDENTS] - jobs;
+            sa_draw_int(fb, dg, spare, true, right, y + 25, live ? (spare < 0 ? 1 : 2) : 0, 10, 13);
+            sa_draw_int(fb, dg, sa_town_housing(t), false, right, y + 45, 0, 10, 13);
         } else if (!shut) {
-            sa_draw_int(fb, dg, incomes[i], true, right, y + 25, sign, 10, 13);
-            if (hasGoal) sa_draw_int(fb, dg, goal[i - 1], false, right, y + 45, values[i] >= goal[i - 1] ? 2 : 1, 10, 13);
-            else sa_draw_number(fb, dg, "--", right, y + 45, 0, 10, 13);
+            if (live) sa_draw_int(fb, dg, incomes[i], true, right, y + 25, sign, 10, 13);
+            else {
+                char buf[24];
+                snprintf(buf, sizeof buf, "%+d", incomes[i]);
+                sa_draw_number(fb, dg, buf, right, y + 25, 0, 10, 13);
+            }
+            if (hasGoal) sa_draw_int(fb, dg, goal[i - 1], false, right, y + 45, live ? (values[i] >= goal[i - 1] ? 2 : 1) : 0, 10, 13);
+            else sa_draw_number(fb, dg, live ? "--" : "-------", right, y + 45, 0, 10, 13);
         }
         y += sec ? sec->h : 64;
     }
-    sa_blit(fb, t->ui[UI_TOWNINFO], INFO_X, INFO_Y + TITLE_DY);
+    sa_blit(fb, t->ui[UI_TOWNINFO], INFO_X, top + TITLE_DY);
     if (live) draw_buttons(t, fb, TW_INFO);
-    else
-        for (int i = 0; i < 3; i++) sa_blit_rect(fb, t->ui[UI_BTN0 + TW_INFO * 3 + i], 0, 0, 20, 19, INFO_X + 134 + i * 20, INFO_Y + BTN_DY);
 }
 
 void sa_town_draw_info(Town *t, const VM *vm, u32 *fb) { draw_info(t, vm, fb, false); }

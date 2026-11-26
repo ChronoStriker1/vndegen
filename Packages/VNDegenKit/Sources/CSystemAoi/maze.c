@@ -119,6 +119,7 @@ static int mark_of(int v) {
 
 void sa_maze_update(SA *s) {
     Maze *m = &s->maze;
+    sa_town_derive(&s->town, &s->vm);
     m->floors = clamp(s->vm.c[C_MAZE_FLOORS], 1, MAZE_FLOORS);
     for (int k = 0; k < MAZE_FLOORS; k++) {
         int most = rule(s, RULE_MAX_SIZE, k + 2);
@@ -665,4 +666,25 @@ void sa_debug_maze(VNSystemAoi *sa, int turns) {
     for (int r = 0; r < 9; r++)
         for (int b = 0; b < 9; b++)
             if (outcome[r][b]) printf("  rep %d thr %d: %d\n", r, b, outcome[r][b]);
+}
+
+void sa_debug_town(VNSystemAoi *sa, int turns) {
+    SA *s = (SA *)sa;
+    int saved[SA_C_VARS];
+    memcpy(saved, s->vm.c, sizeof saved);
+    long long sum[4] = {0};
+    int lo[4], hi[4];
+    for (int t = 0; t < turns; t++) {
+        int v[4];
+        sa_town_income(&s->town, &s->vm, v);
+        for (int i = 0; i < 4; i++) {
+            sum[i] += v[i];
+            if (!t || v[i] < lo[i]) lo[i] = v[i];
+            if (!t || v[i] > hi[i]) hi[i] = v[i];
+        }
+    }
+    memcpy(s->vm.c, saved, sizeof saved);
+    static const char *const names[4] = {"residents", "food", "money", "resources"};
+    printf("town %d turns\n", turns);
+    for (int i = 0; i < 4 && turns > 0; i++) printf("  %s mean %.2f min %d max %d\n", names[i], (double)sum[i] / turns, lo[i], hi[i]);
 }
