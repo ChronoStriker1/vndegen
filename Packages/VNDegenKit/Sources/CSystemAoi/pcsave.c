@@ -61,6 +61,7 @@ enum {
     GOV_KINDS = 13,
     BLOCK_TEAM_EXP = 113,
     DARKUS_COUNTER = 1284,
+    MEMBER_CARRY = 1288,
     DARKUS_COUNTER_VAR = 710,
     FIELD_TAG_BASE = 8,
     TEAM_EXP = 0,
@@ -559,9 +560,11 @@ static void write_abilities(SA *s, u8 *img, size_t m, int unit, int place, const
     for (int k = 0; k < GOV_KINDS; k++) put(img, c + (size_t)(BLOCK_GOV_KIND + k) * 4, sa_party_post_effect(p, unit, govKindPost[k]));
 }
 
-static void write_member(SA *s, u8 *img, int k, const Bench *b, int cell, const int *bonus, const int *resists, const int *team) {
+static void write_member(SA *s, u8 *img, int k, const Bench *b, int cell, const int *bonus, const int *resists, const int *team, const u8 *carry) {
     size_t m = MEMBER_AT + (size_t)k * MEMBER_SIZE;
     write_unit(s, img, m, b, false, bonus);
+    const u8 *rec = carry ? sa_carry_unit(carry, b->unit) : NULL;
+    if (rec) memcpy(img + m + MEMBER_CARRY, rec + CARRY_FIELD, 8);
     put(img, m + 4, k);
     put(img, m + 8, k);
     if (b->unit == DARKUS) put(img, m + DARKUS_COUNTER, s->vm.c[DARKUS_COUNTER_VAR]);
@@ -619,6 +622,7 @@ static int write_members(SA *s, u8 *img) {
     party_bonus(s, bonus, resists, team);
     for (int cell = 8; cell < FORM_RESERVE + RESERVE_TILES + 5; cell++)
         put(img, FORM_AT + (size_t)cell * 4, form_slot(cell) >= 0 || (cell >= FORM_RESERVE && cell < FORM_RESERVE + RESERVE_TILES) ? -1 : -2);
+    u8 *carry = s->vm.f[CARRY_FLAG] ? sa_carry_block(s) : NULL;
     int k = 0;
     for (int i = 0; i < p->rosterCount && k < MEMBERS_MAX; i++) {
         int id = p->roster[i];
@@ -635,11 +639,29 @@ static int write_members(SA *s, u8 *img) {
             if (p->bench[j].unit == id) b = p->bench[j];
         if (!b.unit) continue;
         if (cell < 0 && b.tile >= 0 && b.tile < RESERVE_TILES) cell = FORM_RESERVE + b.tile;
-        write_member(s, img, k, &b, cell, at >= 0 ? bonus[at] : NULL, at >= 0 ? resists[at] : NULL, team);
+        write_member(s, img, k, &b, cell, at >= 0 ? bonus[at] : NULL, at >= 0 ? resists[at] : NULL, team, carry);
         if (cell >= 0) put(img, FORM_AT + (size_t)cell * 4, k);
         k++;
     }
+    free(carry);
     return k;
+}
+
+void sa_pcsave_carry_units(SA *s, u8 *out, int count, int size) {
+    u8 *img = sa_alloc(IMAGE_SIZE);
+    memset(img, 0, IMAGE_SIZE);
+    int n = write_members(s, img);
+    for (int k = 0; k < n && k < count; k++) {
+        const u8 *m = img + MEMBER_AT + (size_t)k * MEMBER_SIZE;
+        u8 *o = out + (size_t)k * (size_t)size;
+        memcpy(o, m, 4);
+        memcpy(o + CARRY_LEVEL, m + MEMBER_LEVEL, 8);
+        memcpy(o + CARRY_SP, m + MEMBER_SP, 44);
+        memcpy(o + CARRY_EQUIP, m + MEMBER_EQUIP, 72);
+        wr32(o + CARRY_FIELD, (rd32(m + MEMBER_BYTES) >> 8 & 0xff) == PLACE_FIELD);
+        wr32(o + CARRY_USED, 1);
+    }
+    free(img);
 }
 
 static const int modeCodes[] = {[ORDER_FREE] = -1, [ORDER_ATTACK] = -2, [ORDER_SUPPORT] = -4, [ORDER_DEFEND] = -3,
@@ -735,7 +757,7 @@ static void write_dungeon(SA *s, u8 *img) {
             int r = rows[at[c]];
             Bench b = {0};
             b.unit = g->cells[c];
-            b.level = sa_table_int(&s->party.units, r, 17);
+            b.level = sa_table_int(&s->party.units, r, 17) + s->vm.c[C_ENEMY_LEVEL];
             int v[10];
             sa_battle_unit_stats(&s->battle, r, b.level, v);
             b.hp = v[0];

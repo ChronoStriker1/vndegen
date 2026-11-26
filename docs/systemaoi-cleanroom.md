@@ -1285,11 +1285,45 @@ the same points (offsets in bytes, numbers little-endian):
   and `7a` back to the title. Measured under Wine with F161 set in a save that has its hook slots: the same scenes
   in the same order as VNDegen. A save without hook slots runs no hooks, so it never reaches the ending.
   `bo0105` (内政END, F137 with C580 ≥ 30) shares the hook.
-- **Carry-over (`85`, `86`).** Measured: 登録する sets the global flag the new game checks (FG801) without writing any
-  file within the next minute; a new game then asks 引き継ぎますか？, then whether to use the special units, then the
-  enemy strength (初期の強さ, 周回用の強さ, 極めの強さ), and turn 1 opens with the ending turn's food, money and
-  resources (48,996, 49,059 and 49,000) and the first five items, Darkus alone in the party. VNDegen ignores both
-  ops, so the offer never comes.
+- **Carry-over (`85`, `86`).** Measured under Wine from VNDegen exports of the turn-42 save with F161 set (two
+  endings with distinct resources, items, equipment and growth, and `Bunny3.opt` patched by hand for a third). ac0001
+  sets FG801 itself (`0a 44:321 b1`) and then calls `85`; bo0104 sets FG015 (cleared) at its end. `85` takes a
+  registration in memory, and the original writes it into `Bunny3.opt` with its next save or autosave (quitting
+  first loses it). The registration is the first 15,932 bytes of the unpacked file: 100 unit records of 136 bytes,
+  one for each member in member order (unit, level, exp, SP, the ten trained gains, the equipment pair, the eight
+  skill pairs of the member record, a word that was 1 for the one member on the field and 0 for posted ones, and 1),
+  then up to 290 (item, count) pairs from 13,600, one for each stock entry with its equipped copies counted and the
+  key items (1,001 and up) left out, then food, money and resources at 15,920, 15,924 and 15,928, as they stand when
+  `85` runs: 19,598, 39,230 and 44,764 after a turn whose report ended on those (the first ending stored 2% less
+  than its report showed, as a dungeon-defence loss would; the turn isn't repeatable under Wine to check). A new
+  registration rewrites the whole block. The global flags are bytes from 28,804 (FG015 at 28,819, FG801 at 29,605);
+  FG801 stays on after use, so every later new game offers 引き継ぐ again, also after a relaunch.
+  ac0002 (init.box's last call) offers 引き継ぐ when FG801 is on, over the new game's town map; `86` then sets food,
+  money and resources to the stored values, adds each stored item to the opening's three, sets F002, and applies
+  Darkus's record: his SP and trained gains (HP and MP to the new maximum, 172/38 from 170/35 with gains 2 and 3),
+  the record's equipment when the stock holds a free one (名剣オーガ from the stock rather than ダークスの剣), and the
+  record's last two words into member +1,288 and +1,292. Level and exp are not carried (Darkus Lv 1, exp 0, from a
+  record at level 12). In a game with F002 on, a unit that joins later gets its record the same way: SP 33 and
+  gains 1 to 10 for ミアルテ from a patched record, its skills including one the table doesn't give her, the
+  equipment's second word (-1) with the id dropped when the stock has no free copy, and 0, 1 at +1,288; with F002
+  off the same join applies nothing. With FG015 on, the special-unit question (F4500) and the enemy strength follow
+  whether or not 引き継ぐ was taken; the script writes C391 and C392 (0 and 0, 20 and 2, 50 and 5). C391 is added to
+  every rolled enemy's level: 千樹庭 中央森's groups rolled at level 55 instead of 5 with C391 = 50, with HP, MP and
+  stats grown to it by `lvup.obj` (192/62 for ベトＡ). C392 = 5 changed nothing in the rolled records; what it
+  scales isn't known. F4500 (使用する) added no unit by turn 3; when its units join isn't known.
+- **VNDegen's carry-over.** `85` builds the same block from the party (the member records of the PC export) and
+  writes it to `vndegen/carry.dat` and, when the original's `Bunny3.opt` exists, into that file with FG801 and
+  FG015, at once. `86` reads `Bunny3.opt`'s block when its FG801 is on, otherwise `carry.dat`, and applies it as
+  above; a join in a game with F002 on applies the unit's record. At launch FG801 and FG015 from `Bunny3.opt` are
+  added to VNDegen's global flags, so a registration made on the PC offers 引き継ぐ. Checked: the block VNDegen
+  wrote for the second ending equals the original's byte for byte except one skill pair the test had added to
+  Darkus that isn't in his table; the flags are the same; a new game on each side from the other's file (極めの強さ)
+  gives the same turn 1: food, money and resources, C391/C392, F002, the stock and Darkus's whole member record.
+  The PC export writes the enemies' level with C391 added and member +1,288/+1,292 from the record of each member
+  of a carried game; VNDegen's exported 千樹庭 groups at C391 = 50 equal the original's. Inferred: the
+  field/posted meaning of the record's next-to-last word; that a joining unit's equipment is taken only from a free
+  copy (VNDegen keeps no second equipment word, so a join without a free copy exports 0, 0); VNDegen derives skills
+  from the unit table, so a carried skill beyond it is dropped.
 - **Boss-side cutaways (hook 14).** bo1400 clears F120 and, unless F155, F160 or F161 is on, runs bo1401, then
   bo1000 when a scene set F120. bo1401 holds 74 scenes keyed on C090 = 1, the area (C070/C071), C095 = 1 and
   C096 = n, each once (F2101 to F2173). Measured: n is field 7 of the party's cell in the area's map (`mpDDFF.amd`,
