@@ -186,9 +186,10 @@ bool snd_voice_playing(IK *t) {
 }
 
 void snd_bgm(IK *t, const char *name, bool loop) {
+    bool named = !strcmp(store_name(&t->store, AR_BGM, t->bgmName), store_name(&t->store, AR_BGM, name));
     pthread_mutex_lock(&t->mixer->lock);
     Sound *s = t->mixer->ch[CH_BGM];
-    bool same = s && !s->done && s->delta >= 0 && !strcmp(t->bgmName, name);
+    bool same = s && !s->done && s->delta >= 0 && named;
     pthread_mutex_unlock(&t->mixer->lock);
     if (same) return;
     snprintf(t->bgmName, sizeof t->bgmName, "%s", name);

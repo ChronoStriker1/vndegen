@@ -25,7 +25,7 @@ Script *script_load(IK *t, const char *name) {
     s->codeSize = codeSize;
     s->labelAt = ik_alloc(sizeof(i16) * (size_t)(codeSize + 1));
     for (u32 i = 0; i <= codeSize; i++) s->labelAt[i] = -1;
-    for (int i = s->labelCount - 1; i >= 0; i--)
+    for (int i = 0; i < s->labelCount; i++)
         if (s->labels[i] <= codeSize) s->labelAt[s->labels[i]] = (i16)i;
     s->readSlot = -1;
     for (u32 pc = 0; pc + 4 <= codeSize;) {

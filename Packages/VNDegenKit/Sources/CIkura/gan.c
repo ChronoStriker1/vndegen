@@ -160,7 +160,7 @@ static void gan_load(IK *t, const char *name) {
         return;
     }
     Gan *g = ik_alloc(sizeof *g);
-    snprintf(g->name, sizeof g->name, "%s", name);
+    snprintf(g->name, sizeof g->name, "%s", store_name(&t->store, AR_GRP, file));
     g->data = d;
     g->size = n;
     g->progLen = (int)rd32(d + 8);

@@ -58,6 +58,8 @@ static void putname(Buf *b, const char *s) {
     put(b, q, NAME_LEN);
 }
 
+static void putfile(Buf *b, IK *t, int kind, const char *name) { putname(b, store_name(&t->store, kind, name)); }
+
 typedef struct Rd {
     const u8 *p;
     size_t n, at;
@@ -368,7 +370,7 @@ static void get_layer(IK *t, Rd *r, Layer *l) {
     (void)t;
 }
 
-static void put_button(Buf *b, const Button *bt, bool wide) {
+static void put_button(Buf *b, IK *t, const Button *bt, bool wide) {
     put32(b, (u32)bt->type);
     put32(b, (u32)bt->layer);
     put32(b, (u32)bt->x);
@@ -376,7 +378,7 @@ static void put_button(Buf *b, const Button *bt, bool wide) {
     put32(b, (u32)(bt->x + bt->w));
     put32(b, (u32)(bt->y + bt->h));
     put32(b, bt->mode);
-    putname(b, bt->bound && bt->sc ? bt->sc->name : NULL);
+    putfile(b, t, AR_SNR, bt->bound && bt->sc ? bt->sc->name : NULL);
     put32(b, bt->bound ? (u32)bt->label : 0xffffffffu);
     put32(b, bt->call ? 1 : 0);
     if (wide) {
@@ -440,6 +442,11 @@ static void get_button(IK *t, Rd *r, Button *bt, u32 type, bool wide) {
     }
 }
 
+static int line_len(IK *t) {
+    bool shown = t->window && (!t->automap.bits || !t->msg.tags);
+    return shown && t->msg.raw ? t->msg.rawLen : 0;
+}
+
 static void snapshot(IK *t) {
     Buf b = {0};
     u8 head[THUMB_AT] = {0};
@@ -452,8 +459,8 @@ static void snapshot(IK *t) {
     head[8] = (u8)tm.tm_sec;
     head[9] = (u8)tm.tm_min;
     head[10] = (u8)tm.tm_hour;
-    int len = t->msg.rawLen < TEXT_END - TEXT_AT - 1 ? t->msg.rawLen : TEXT_END - TEXT_AT - 1;
-    if (t->msg.raw && len > 0) memcpy(head + TEXT_AT, t->msg.raw, (size_t)len);
+    int len = line_len(t) < TEXT_END - TEXT_AT - 1 ? line_len(t) : TEXT_END - TEXT_AT - 1;
+    if (len > 0) memcpy(head + TEXT_AT, t->msg.raw, (size_t)len);
     wr32(head + TEXT_END, THUMB_W);
     wr32(head + TEXT_END + 4, THUMB_H);
     put(&b, head, sizeof head);
@@ -461,12 +468,12 @@ static void snapshot(IK *t) {
     thumbnail(t, thumb);
     put(&b, thumb, THUMB_W * THUMB_H * 3);
     free(thumb);
-    putname(&b, t->resumeSc ? t->resumeSc->name : NULL);
+    putfile(&b, t, AR_SNR, t->resumeSc ? t->resumeSc->name : NULL);
     put32(&b, (u32)t->resumeLabel);
-    put32(&b, (u32)(t->msgMode & 0xffff) | (t->msg.count ? 0x10000u : 0));
-    put32(&b, 0);
-    put32(&b, 0);
-    putname(&b, t->bgmName);
+    put32(&b, (t->window ? 1u : 0u) | (t->msg.count ? 0x10000u : 0));
+    put32(&b, (u32)t->markSlot);
+    put32(&b, t->automap.bits ? 0 : (u32)t->firstLine);
+    putfile(&b, t, AR_BGM, t->bgmName);
     put32(&b, t->bgmLoop ? 1 : 0);
     put32(&b, (u32)(t->flagBits ? t->flagBits : t->flagCount * 8));
     if (t->flagCount) put(&b, t->flags, (size_t)t->flagCount);
@@ -481,20 +488,22 @@ static void snapshot(IK *t) {
         put(&b, t->automap.bits, t->automap.size);
     }
     put32(&b, (u32)t->imageCount);
-    for (int i = 0; i < t->imageCount; i++) putname(&b, t->images[i] ? t->imageNames[i] : NULL);
+    for (int i = 0; i < t->imageCount; i++) putfile(&b, t, AR_GRP, t->images[i] ? t->imageNames[i] : NULL);
     put32(&b, (u32)t->layerCount);
-    for (int i = 0; i < t->layerCount; i++) put32(&b, (u32)t->order[i]);
-    for (int i = 0; i < t->layerCount; i++) put_layer(&b, &t->layers[i]);
+    for (int n = 0; n < t->layerCount; n++)
+        for (int i = 0; i < t->layerCount; i++)
+            if (t->order[i] == n) put32(&b, (u32)i);
+    for (int i = 0; i < t->layerCount; i++) put_layer(&b, &t->layers[t->order[i]]);
     put32(&b, (u32)t->buttonCount);
-    putname(&b, t->cancelBound && t->cancelSc ? t->cancelSc->name : NULL);
+    putfile(&b, t, AR_SNR, t->cancelBound && t->cancelSc ? t->cancelSc->name : NULL);
     put32(&b, t->cancelBound ? (u32)t->cancelLabel : 0xffffffffu);
     put32(&b, t->cancelCall ? 1 : 0);
-    putname(&b, t->wheelBound && t->wheelSc ? t->wheelSc->name : NULL);
+    putfile(&b, t, AR_SNR, t->wheelBound && t->wheelSc ? t->wheelSc->name : NULL);
     put32(&b, t->wheelBound ? (u32)t->wheelLabel : 0xffffffffu);
     put32(&b, (t->wheelCall ? 1u : 0u) | (t->wheelBound ? 0x10000u : 0));
     put32(&b, (u32)t->wheelVar);
     for (int i = 0; i < t->buttonCount; i++) {
-        if (t->buttons[i].made) put_button(&b, &t->buttons[i], wide);
+        if (t->buttons[i].made) put_button(&b, t, &t->buttons[i], wide);
         else put32(&b, 0xffffffffu);
     }
     if (wide) {
@@ -510,7 +519,7 @@ static void snapshot(IK *t) {
         for (int i = 0; i < t->layerCount; i++)
             if (t->layers[i].kept && t->layers[i].keptName[0]) {
                 put32(&b, (u32)i);
-                putname(&b, t->layers[i].keptName);
+                putfile(&b, t, AR_GRP, t->layers[i].keptName);
             }
     }
     wr32(b.p, (u32)b.n);
@@ -568,8 +577,7 @@ static bool load_slot(IK *t, int slot) {
     getname(&r, name);
     int label = (int)get32(&r);
     u32 mode = get32(&r);
-    get32(&r);
-    get32(&r);
+    int markSlot = (int)get32(&r), firstLine = (int)get32(&r);
     getname(&r, bgm);
     bool loop = get32(&r) != 0;
     u32 bits = get32(&r);
@@ -602,7 +610,7 @@ static bool load_slot(IK *t, int slot) {
         char img[16];
         getname(&r, img);
         if (i >= (u32)t->imageCount) continue;
-        if (strcmp(img, t->imageNames[i]) || !t->images[i]) {
+        if (strcmp(img, store_name(&t->store, AR_GRP, t->imageNames[i])) || !t->images[i]) {
             image_free(t->images[i]);
             t->images[i] = NULL;
             t->imageNames[i][0] = 0;
@@ -610,25 +618,27 @@ static bool load_slot(IK *t, int slot) {
         }
     }
     u32 lc = get32(&r);
+    bool byPlace = false;
     if (lc == (u32)t->layerCount && r.at + 4 * (size_t)lc <= r.n) {
         int *order = ik_alloc(sizeof(int) * lc);
         bool *seen = ik_alloc(lc);
-        bool ok = true;
+        bool ok = true, legacy = !strchr(name, '.');
         for (u32 i = 0; i < lc; i++) {
             u32 v = rd32(r.p + r.at + 4 * i);
             if (v >= lc || seen[v]) ok = false;
             else {
                 seen[v] = true;
-                order[i] = (int)v;
+                order[legacy ? i : v] = (int)(legacy ? v : i);
             }
         }
         if (ok) memcpy(t->order, order, sizeof(int) * lc);
+        byPlace = ok && !legacy;
         free(order);
         free(seen);
     }
     for (u32 i = 0; i < lc; i++) get32(&r);
     for (u32 i = 0; i < lc; i++) {
-        if (i < (u32)t->layerCount) get_layer(t, &r, &t->layers[i]);
+        if (i < (u32)t->layerCount) get_layer(t, &r, &t->layers[byPlace ? t->order[i] : (int)i]);
         else
             for (int k = 0; k < 16; k++) get32(&r);
     }
@@ -667,7 +677,9 @@ static bool load_slot(IK *t, int slot) {
     if (!r.bad && r.at + 8 <= r.n && rd32(r.p + r.at) == KEPT_TAG) keep_layers(t, &r);
     free(d);
     if (r.bad) ik_log(t, "save slot %d is shorter than its state", slot);
-    t->msgMode = (int)(mode & 0xffff);
+    t->window = mode & 1;
+    t->markSlot = markSlot;
+    if (!t->automap.bits) t->firstLine = firstLine;
     if (wide) gan_restore(t, ganState);
     if (bgm[0]) snd_bgm(t, bgm, loop);
     else snd_bgm_fade(t, 0);
@@ -809,7 +821,7 @@ bool save_exec(IK *t, u16 op, const u8 *a, int n) {
         char date[32];
         int len = snprintf(date, sizeof date, "%02d/%02d/%04d", tm.tm_mon + 1, tm.tm_mday, tm.tm_year + 1900);
         vm_set_text(t, base, date, len);
-        vm_set_text(t, base + 1, t->msg.raw ? t->msg.raw : "", t->msg.raw ? t->msg.rawLen : 0);
+        vm_set_text(t, base + 1, t->msg.raw ? t->msg.raw : "", line_len(t));
         break;
     }
     case 0x0a0d: t->save.haveSnap = false; break;

@@ -48,6 +48,7 @@
 #define snd_volume ik_snd_volume
 #define store_close ik_store_close
 #define store_load ik_store_load
+#define store_name ik_store_name
 #define store_open ik_store_open
 #define text_advance ik_text_advance
 #define text_close ik_text_close

@@ -823,9 +823,12 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), 0, 0, false, (int)ik_value(t, rd32(a + 8)), a + 12);
         break;
     case 0x0717:
-        if (n >= 44)
+        if (n >= 44) {
             cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)), true,
                         (int)ik_value(t, rd32(a + 16)), a + 20);
+            Button *b = button(t, rd32(a));
+            if (b) memset(b->stateFlag, (u8)ik_value(t, rd32(a + 36)), sizeof b->stateFlag);
+        }
         break;
     case 0x071f:
         if (n >= 40)

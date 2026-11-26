@@ -337,10 +337,14 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
         m->tagPos = 0;
         m->cursor = false;
         m->unread = t->sc && save_read_mark(t, t->sc->readSlot, rd32(a));
+        if (t->firstLine < 0) t->firstLine = (int)rd32(a) - 1;
         t->wait = W_MSG;
         run_tags(t);
         break;
-    case 0x0910: t->msgMode = val(t, a); break;
+    case 0x090a: t->markSlot = val(t, a); break;
+    case 0x090d: t->window = true; break;
+    case 0x090e:
+    case 0x0911: t->window = false; break;
     case 0x0914: {
         u32 v = rd32(a);
         if (v < (u32)t->varCount) t->vars[v] = t->logCount;
@@ -354,14 +358,11 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
         m->tags = NULL;
         t->dirty = true;
         break;
-    case 0x0911:
-    case 0x090d:
-    case 0x090e:
+    case 0x0910:
     case 0x0905:
     case 0x0906:
     case 0x0907:
     case 0x0909:
-    case 0x090a:
     case 0x090b:
     case 0x090c: break;
     default: return false;

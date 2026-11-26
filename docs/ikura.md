@@ -108,8 +108,22 @@ Raidy II, and so does VNDegen:
   script writes: the global block and, in Raidy II, the read marks. Without this the ending's clear flag and gallery
   unlocks since the last in-game quit were lost.
 - Each slot: the date, the line on screen, a 112x84 thumbnail and an 8544-byte state: the script and label to resume
-  at, the BGM, the flags, the variables, the picture names, every layer and every button with its binding. A load
-  restores the state, runs `LOAD.SNR` (which rebuilds the dungeon from the variables) and resumes.
+  at, the message mode, the BGM, the flags, the variables, the picture names, every layer and every button with its
+  binding. A load restores the state, runs `LOAD.SNR` (which rebuilds the dungeon from the variables) and resumes.
+- Files in a slot carry the name the archive stores them under, with the extension (`L2_OP.SNR`, `RD201.OGG`,
+  `R_LOG.GGP`, `A035.GAN`), whatever name the script used; the PC can't open a script named without it ("L2_OP open
+  failed").
+- The resume label is the highest of the labels that point at the line: `L2_OP` has 13 and 14 on "My name is
+  Raidy." and the PC writes 14, also after a jump to 13.
+- The message mode is 1 after `090d` and 0 after `090e` or `0911`, with `0x10000` added while the window holds a
+  message. The next word is the read-marks slot the last `090a` named. In Raidy the word after it is one less than the
+  line number of the first message shown with a line above 0 (-1 until then); Raidy II writes 0.
+- The line on screen is the window's text while the window is shown. Raidy II's PC writes it only once the message
+  has finished, so a slot saved while a line waits for its click lists no text, there and in VNDegen; Raidy's writes
+  it while the line waits too. The save page's confirm dialog (`0a0c`) shows the same text.
+- The layers are written in drawing order: for each layer number its place in the order, then the layers place by
+  place. A slot whose resume script has no extension was written by an older VNDegen with the reverse map and
+  the layers by number, and loads that way.
 - The PC rebuilds a loaded layer from its picture slot, so a layer that kept its picture after `0101` reloaded the slot
   comes back with the new picture: the PC's own save from the opening, after the logo, loads with the logo on black.
   VNDegen adds a block after the state when a layer keeps its picture: `KEPT`, a count, then each such layer's number
@@ -123,7 +137,9 @@ Raidy II, and so does VNDegen:
   save holds) and the animation's state at the end.
 - The save file is found whatever the case of its name in the folder.
 - Slots saved by the PC engine under Wine load here on the same screen, and slots saved here list and load in the PC
-  engine on the same screen, for both games.
+  engine at the same line with the same picture and music, for both games. A slot the PC wrote from a test script
+  and VNDegen's slot from the same script are the same bytes but for the date and the thumbnail (the PC's is black
+  under Wine).
 
 ## What runs
 
@@ -147,8 +163,12 @@ Games start on the "Visual novel" controller layout.
 - Layers drawn as rotated or skewed quads (`0204`) are drawn as their bounding box; Raidy uses quads only for
   full-screen fades.
 - The texture filtering and lighting of the 3D view are close to, not identical with, the PC's.
-- Raidy II: the arguments of `0716`/`0717` after the cells, `000e`, `0010`, `0011` and `0724` are accepted and do
-  nothing; what they do wasn't found. `090b`, at the end of most scenes, and `090c` are accepted and do nothing.
+- Raidy II: the arguments of `0716` after the cells, `000e`, `0010`, `0011` and `0724` are accepted and do nothing;
+  what they do wasn't found. `090b`, at the end of most scenes, and `090c` are accepted and do nothing. `0717`'s first
+  argument after the cells sets the button's four state flags, which are saved but draw nothing yet; the PC saves the
+  last one as the button's mode, while VNDegen keeps such a button enabled.
+- A slot differs from the PC's where the PC writes memory it never cleared: the middle of Raidy II's button records
+  and an unbound button's call word. Neither changes where or how a slot loads.
 - Raidy II was played by hand only on the first dungeon floor. The rest was run headless: each of its 135 story
   scripts started from a save built from the shipped unlock save's dungeon slot and auto-played 250 steps with no
   error, missing file or sanitizer report, and the ending (`L2_ED`), from the line before it, plays through the staff
