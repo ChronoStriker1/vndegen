@@ -169,9 +169,14 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 3.4 to
   5.5 over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred. The enemy side's reserve tiles are measured on the small board only; the larger boards draw none
-  until measured. 乱舞斬 halves its second target's damage, as first measured, but in two later casts the original
-  hit two targets in one row for full damage each (火矢三連 too); which rule decides isn't known. ホリィ's 自動攻撃 before the first
-  round isn't built.
+  until measured. Hits on a row behind the frontmost one a side holds do half damage, several-target skills hit one
+  to three enemies, 防御 adds 10 to physical defence, the opening 自動攻撃 of 先制攻撃, 先制暗殺攻撃 and 忍び寄る者 units and
+  先制攻撃無効化 are measured, and 交代 moves a unit to a picked tile, kept or put back after the battle by 戦闘隊列 as on
+  the PC. Inferred: the opening attack's target (random), 先制全体攻撃 and 先制攻撃迎撃 (no unit in the game has the first;
+  the second wasn't met), and the hit counts of `敵５` and wider skills. Open: VNDegen gives an enemy in the back row
+  +5 defence for each 防御強化／後 in its group, which fitted one battle of the original (a ベト behind two 二角ベト took
+  22 twice) but not two others (a back 二角ベト took 30 or 31 five times in six); and when a field unit falls the
+  original moves a reserve unit onto its tile mid-battle, which VNDegen doesn't.
 - Text: the original draws its text with the same Ume Gothic but monochrome and hinted; VNDegen thresholds its
   unhinted glyphs at the point that matches the hinted shapes best, so a stroke can still land a pixel off.
 - Random numbers: the original's rolls don't come from the save (the same save gives different turns and battles)

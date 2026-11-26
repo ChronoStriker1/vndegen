@@ -176,6 +176,12 @@ int main(int argc, char **argv) {
             sa_debug_finds(s, f);
             printf("finds residents %d food %d money %d resources %d\n", f[0], f[1], f[2], f[3]);
         }
+        if (sscanf(argv[a], "ranks=%d", &n) == 1) sa_battle_set_ranks(&((SA *)s)->battle, n);
+        if (sscanf(argv[a], "foehp=%d", &n) == 1) {
+            Battle *b = &((SA *)s)->battle;
+            for (int i = 0; i < b->count; i++)
+                if (b->f[i].enemy) b->f[i].hp = b->f[i].maxHp = n;
+        }
         if (!strcmp(argv[a], "battlelog")) {
             const Battle *b = &((SA *)s)->battle;
             for (int i = 0; i < b->logCount; i++) printf("log %s\n", b->log[i].text);
