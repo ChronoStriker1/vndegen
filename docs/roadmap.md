@@ -162,6 +162,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Every engine reports its picture size, so Clear of the camera places wide games below or above the camera (0.60.13).
 - SystemAoi's extra books, enemy skills by level, battle orders in saves, enemy groups that appear partway through a visit, and fog in the 3D dungeons (0.60.14).
 - SystemAoi's final-boss chain, so BUNNY BLACK 3's true ending can be reached by play, with the boss-side story scenes and PC-matched random battles (0.60.15).
+- Fixes from the 0.60.12 regression sweep: Raidy II's opening saves and the MZ Options tap (0.60.16).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
