@@ -57,6 +57,8 @@ iOS can end WebKit's GPU process, which loses the page's WebGL context. MZ games
 
 MV and MZ games also have a Cheats page in the VNDegen menu, described in [controls.md](controls.md#cheats).
 
+A touch reaches an MV or MZ game the way a click does on the PC, where the mouse is over a spot before it presses. VNDegen moves the mouse to each touch as it starts, which MZ reads as hovering, and the game reads the touch itself one engine update later. When both landed in the same update, a game that picks its command from what the mouse hovers acted on the command it had hovered before: in Fallen Kunoichi, tapping Options on the title also started New Game, which began once Options closed (#199). Known limit: Fallen Kunoichi's title takes no other command, by touch or by the gamepad, after one is picked by touch until a tap lands on the title away from its commands, because the PC version waits there for the mouse to move off the command.
+
 A game can name its files with Windows backslashes, as the Demon Queen game does for 277 of its 313 video references, and they load as they do on the PC. [development.md](development.md#file-name-case) has the details.
 
 WebKit ignores the alpha channel of VP9 WebM clips, so a see-through clip would show as a black or white box. The first time a game plays one, VNDegen converts it in the background to HEVC with alpha, which Apple's system plays with transparency, keeps it in a cache outside the game folder, and serves it at the clip's original address, so the game and its movie plugin don't change. The clip stays hidden until it's ready, so its first play can wait, and later plays start straight away. Settings has a Clear video cache button. [video.md](video.md) has the details.

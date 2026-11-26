@@ -43,7 +43,7 @@ static inline int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? 
 enum { AR_GRP, AR_SNR, AR_SE, AR_BGM, AR_DATA, AR_VOICE, AR_KINDS };
 
 typedef struct MpxEntry {
-    char name[16];
+    char name[16], stored[16];
     u32 offset, size;
     int file;
 } MpxEntry;
@@ -58,6 +58,7 @@ typedef struct Store {
 bool store_open(Store *s, const char *gameDir, char *err, size_t errSize);
 void store_close(Store *s);
 u8 *store_load(Store *s, int kind, const char *name, size_t *size);
+const char *store_name(Store *s, int kind, const char *name);
 
 typedef struct Cell {
     int dx, dy, sx, sy, w, h;
@@ -104,6 +105,7 @@ typedef struct Layer {
     int tw, th;
     u32 fillArgb;
     Image *surf;
+    char keptName[16];
     float rot;
     Anim fade, move;
 } Layer;
@@ -294,7 +296,8 @@ struct IK {
     bool wheelCall, wheelBound;
     Script *resumeSc;
     int resumeLabel;
-    int msgMode;
+    bool window;
+    int markSlot, firstLine;
     i32 settings[64];
     char **texts;
     int textCount;
@@ -351,6 +354,7 @@ bool buttons_live(const IK *t);
 void image_blit(Image *dst, const Image *src, int sx, int sy, int w, int h, int x0, int y0, const int argb[4], u32 minAlpha,
                 bool copy);
 Image *layer_surface(IK *t, Layer *l);
+Image *layer_build(Layer *l, const Image *src);
 void layer_restore(IK *t, Layer *l, int x, int y, int w, int h);
 void gfx_blit(IK *t, const int argb[4], int img, int sx, int sy, int w, int h, int x0, int y0);
 void layer_move(IK *t, Layer *l, int ms, int x, int y);
@@ -389,6 +393,7 @@ void settings_apply(IK *t);
 void text_draw_on(IK *t, Image *dst, int slot, u32 cp, int x, int y, u32 colour, u32 shadow, const int clip[4]);
 void vm_set_text(IK *t, int slot, const char *s, int len);
 void image_load(IK *t, int slot, const char *name);
+Image *image_read(IK *t, const char *name);
 bool dun_exec(IK *t, u16 op, const u8 *a, int n);
 void dun_render(IK *t);
 void dun_update(IK *t);

@@ -152,20 +152,25 @@ void image_load(IK *t, int slot, const char *name) {
         if (l->made && l->ready && !l->surf && l->img == slot && l->rot == 0) {
             layer_surface(t, l);
             l->kept = true;
+            snprintf(l->keptName, sizeof l->keptName, "%s", t->imageNames[slot]);
         }
     }
     image_free(t->images[slot]);
-    t->images[slot] = NULL;
     snprintf(t->imageNames[slot], sizeof t->imageNames[slot], "%s", name);
+    t->images[slot] = image_read(t, name);
+}
+
+Image *image_read(IK *t, const char *name) {
     size_t n;
     u8 *d = store_load(&t->store, AR_GRP, name, &n);
     if (!d) {
         ik_log(t, "missing picture %s", name);
-        return;
+        return NULL;
     }
-    t->images[slot] = image_decode(d, n);
+    Image *im = image_decode(d, n);
     free(d);
-    if (!t->images[slot]) ik_log(t, "can't decode %s", name);
+    if (!im) ik_log(t, "can't decode %s", name);
+    return im;
 }
 
 static void resize(IK *t, int which, int n) {
@@ -452,6 +457,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
                 image_free(l->surf);
                 l->surf = NULL;
                 l->kept = false;
+                l->keptName[0] = 0;
             }
             l->img = (int)ik_value(t, rd32(a + 4));
             l->sx = (int)ik_value(t, rd32(a + 8));
@@ -464,6 +470,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             image_free(l->surf);
             l->surf = NULL;
             l->kept = false;
+            l->keptName[0] = 0;
         }
         break;
     case 0x0209:
@@ -816,9 +823,12 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
             cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), 0, 0, false, (int)ik_value(t, rd32(a + 8)), a + 12);
         break;
     case 0x0717:
-        if (n >= 44)
+        if (n >= 44) {
             cell_button(t, rd32(a), 1, (int)ik_value(t, rd32(a + 4)), (int)ik_value(t, rd32(a + 8)), (int)ik_value(t, rd32(a + 12)), true,
                         (int)ik_value(t, rd32(a + 16)), a + 20);
+            Button *b = button(t, rd32(a));
+            if (b) memset(b->stateFlag, (u8)ik_value(t, rd32(a + 36)), sizeof b->stateFlag);
+        }
         break;
     case 0x071f:
         if (n >= 40)
