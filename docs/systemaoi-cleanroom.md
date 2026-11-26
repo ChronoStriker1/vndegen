@@ -365,7 +365,7 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   10 pixels apart) right-aligned with its last digit at (994, 72). Turning doesn't count; crossing to another area
   doesn't either. The 目標/時間 panel shows at the top right as in the town.
 - **Enemy groups.** Measured from Wine saves (two dungeons, 千樹庭's 中央森 and 絶命院's 十三層, and the autosaves of
-  炎山洞's areas). The k-th name in `floor.obj` column 30 walks the k-th route in the map trailer: it starts on the
+  炎山洞's areas). The k-th name in `floor.obj` column 30 walks the k-th of the map trailer's last routes (all of them here; see Area bosses): it starts on the
   route's first point ((4, 12) and (14, 7) in 中央森, (5, 6) in 十三層, every entry), and on reaching a point it heads
   for point a (or, where a < b, one of a to b at random; a −1 point is a resting place). Names past the routes
   (炎山洞's 裾野 areas have none) and column 18's count of names drawn at random from column 31 (0 in 千樹庭, 1 in
@@ -723,11 +723,35 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   the sheet's first frame (クマン's sheet holds a group of eight).
 - **Command hook.** Measured: 建設's 決定 runs the command hook (bo3100 #0 with C095 23), whose first run plays the
   carpenters' scene (bo3104).
-- **Area bosses.** `floor.obj` columns 23, 25, 27 and 29 name up to four groups; the area's map marks one cell for
-  each in field 7 (1 to 4). `party.obj` column 7 is the group's movement, 停止 or ランダム. Beating one sets C150 to
-  its id, and the battle hook (bo2701) recruits its leader (ヤーヌ隊 9801: アンゴラメイ; イシュ隊 9804:
-  サマキュー; …). Inferred from the tables, maps and scripts; the 抵抗勢力拠点 areas open after the turn-20 event
-  and three won battles (F2001 to F2003, then F1902), which weren't played through under Wine.
+- **Area bosses.** `floor.obj` columns 23, 25, 27 and 29 name up to four groups (boss slots 0 to 3). Slot k stands
+  on the first point of the map's route k. Measured: ミアルテ防衛隊Ａ at 光峰の壁 八階's route 0 (5, 9), entering
+  from the stairs in two runs, and ミアルテ防衛隊Ｄ at 九階's (5, 8); 黒い婦人隊 at 左足一本目's (1, 4) in an
+  original autosave. Field 7 of the map's cells, which VNDegen used to read as the bosses' cells, isn't: 八階 has no
+  field-7 cell at all, and 九階's are (5, 6) and (6, 6). Column 30's fixed groups take the map's last routes, one
+  each in order, and `a8 "name"` with no cell takes the next route after the boss slots: in 中央森の北東奥 (three
+  routes, two column-30 groups) 千固定1002 stood on route 2 and ネイマール隊 (bo1100's `a8`) on route 0, in an
+  original autosave. Every floor with bosses fits (炎山洞 山頂エリア: the boss on the one-point route 0, the five
+  fixed groups on routes 1 to 5, each 停止 group on a one-point route; リーフウッドの森: one boss and six `a8` groups,
+  seven routes). Groups numbered as the original does: column 30's, then the bosses, then column 31's (8F: the boss
+  first; the order of column 30 and bosses is inferred). `party.obj` column 7 is the group's movement, 停止 or
+  ランダム. Beating one sets C150 to its id, and the battle hook (bo2701) recruits its leader (ヤーヌ隊 9801:
+  アンゴラメイ; イシュ隊 9804: サマキュー; …). A beaten boss sets its slot's bit in the area's map memory (see Map
+  memory) and doesn't come back. The 抵抗勢力拠点 areas open after the turn-20 event and three won battles (F2001 to
+  F2003, then F1902): measured, the original played F2001's scene (情報を持つ魔族) after the first won battle on
+  光峰の壁 八階 in a save with F221 on and F1902 off.
+- **Story groups (`party.obj` columns 70 to 75, `b1`).** The last six columns of `party.obj` name three scripts and
+  entries per group; only ミアルテ防衛隊Ａ to Ｇ, 魔力塊隊 and 真魔力塊隊 have them, all `ga0000.box` 1, 2 and 3, and
+  entries 1 and 2 are empty. Measured under Wine on 光峰の壁 八階 and 九階 (boosted Darkus): after a won battle
+  with such a group the original shows the win box, fades to the bare dungeon view and runs entry 3 (ga0003), whose
+  scene plays over the dungeon backdrop; its `b1 "name"` then starts a battle with that group at once, with no
+  group on the map and no intro. 八階: Ａ, its scene (「どうだ？」 … 「次が来たか」), Ｂ, its scene (「壊れたか？」),
+  Ｃ, its scene (「破壊成功です！」 … 「同じのが無いとは言い切れないだろ」), then the dungeon with the party on
+  Ａ's cell; no flag changed, no group record was left, C150 9853, and the area's beaten-boss number went 0 to 1.
+  九階: Ｄ (its bo2501 intro first), Ｅ (「侵入者を叩きのめせ！」 … 「敵が来た。」), Ｆ (「次が来ます！」 … 「敵だ。」),
+  Ｇ (「こっちは、もうすぐです！」 … 「敵だ。」), then ga0003 sets F134 and plays 「完全に破壊しました！」 … 「後は……
+  ミアルテか。」; measured after it: F134 on, C150 9857, 九階's beaten-boss number 1. From the scripts, not played under Wine: 光峰の壁触手 十階's 魔力塊隊 (bo2501's intro 「ここか」)
+  brings 真魔力塊隊, whose bo2701 scene sets F161 (the true ending). Inferred: entry 3 runs after hook 27 (no group has both to show the order), for a lost or
+  fled battle too (ga0003 checks C155 itself).
 
 ## 内政, from the screens and the tables
 
@@ -1103,12 +1127,14 @@ the same points (offsets in bytes, numbers little-endian):
   top right of a slot's details, and the autosave panel's count), C011 the play time in seconds. Loading and saving
   again changes only these.
 - **Map memory** from 6,188: up to 150 records of 532 bytes, one per area visited, in turn: a word naming the area
-  (the dungeon in its third byte, the floor in its second), four layers of 32 words, and four numbers. The second
-  holds a byte per crystal in the trailer's order, 0x81 once opened (measured: 0 → 129 opening 九層 一階's crystal 0,
-  0 → 33024 opening 中央森の北東奥's crystal 1; reloading shows it still open); the third is taken as crystals 4 to 7
-  (inferred; no map has more than 7). VNDegen keeps an opened crystal open on later expeditions too (inferred from
-  the byte living in the map memory, which outlasts the expedition). The first and fourth (a 1 or 3 on some areas) aren't understood and are kept
-  as read. Measured on a 炎山洞 autosave: 中央森, 中央森の東, then 炎山洞
+  (the dungeon in its third byte, the floor in its second), four layers of 32 words, and four numbers. The first
+  holds the area's beaten boss slots (measured: 0 to 1 on 光峰の壁 八階 when ミアルテ防衛隊Ａ, boss slot 0, was
+  beaten, and the boss stayed away on coming back; a bit per slot is inferred). The second holds a byte per crystal
+  in the trailer's order, 0x81 once opened (measured: 0 → 129 opening 九層 一階's crystal 0, 0 → 33024 opening
+  中央森の北東奥's crystal 1; reloading shows it still open); the third is taken as crystals 4 to 7 (inferred; no
+  map has more than 7). VNDegen keeps an opened crystal open on later expeditions too (inferred from the byte living
+  in the map memory, which outlasts the expedition). The last is 3 in 中央森 and 炎山洞 中腹エリア whose fixed groups
+  still appear, so it isn't a beaten mark, and is kept as read. Measured on a 炎山洞 autosave: 中央森, 中央森の東, then 炎山洞
   中腹エリア, with no slot for the areas between. Word y holds row y with bit x for column x. Layer 0 is the visited
   cells and layer 3 a copy of it; layer 1 marks a step walked between a cell and the one east of it, layer 2 between
   a cell and the one south of it (cells next to each other but never walked between stay clear). VNDegen writes the
@@ -1126,9 +1152,11 @@ the same points (offsets in bytes, numbers little-endian):
   裾野エリア北東; VNDegen keeps up to twelve): the group's `party.obj` id, its number (1, 2, ...), the area word, its cell and facing, its 15 board
   cells (row by row, three rows of five, `party.obj`'s row 0 first) holding the record numbers of its units or -1,
   ten -1s, zeros, five target cells as (x, y) pairs padded with -1 (the target, then the corners of its path), a
-  flag word (route << 8 | target point, −1 for a wandering group), -1, the group's action counter (see Enemy groups
+  flag word (route << 8 | target point, −1 for a wandering group, −5 for a 停止 group standing on its route's
+  point), -1 (−5 with a −5 flag word), the group's action counter (see Enemy groups
   above), a number that was 3 on a group that had appeared during the visit and 0 ten actions later (0 after a flee;
-  what it counts isn't known), two zeros and -1. Its units are member records numbered from 100
+  what it counts isn't known), two zeros and the boss slot the group came from (0 for ミアルテ防衛隊Ａ, ミアルテ防衛隊Ｄ
+  and 黒い婦人隊, each their floor's slot 0; -1 for every other group, −5 ones included). Its units are member records numbered from 100
   (215,608 = 86,008 + 100 × 1,296): the unit at +0, -1 at +4, the record number at +8, the level, 0, the group
   number at +20, the group, 1 and the board cell as bytes at +24, HP and MP, then the battle blocks as for members.
   Measured on every Wine autosave: VNDegen's import and export of a floor autosave come out equal in these regions,
@@ -1295,5 +1323,5 @@ the same points (offsets in bytes, numbers little-endian):
   keyed on floor objects 22, 30, 32 and 33 with three or more in the party; 22 (bo2200) the dungeon rest conversations, once per expedition (F129,
   cleared by bo1000) with three or more in the party, the next unseen one whose turn (0, 20, 40, …) has come. On
   the PC, 休憩 with Darkus alone opened camp without one. 13, 15, 20 and 23 are empty or only set a backdrop;
-  21 turns a crystal (60) into 61. `ga0000.box` (ga0003: after ミアルテ防衛隊Ａ to Ｆ and 魔力塊隊, `b1` names the next
-  group, ending with 真魔力塊隊) is neither registered nor named by any script; when the PC runs it isn't measured.
+  21 turns a crystal (60) into 61. `ga0000.box` is named by `party.obj` instead (see Story groups), and VNDegen
+  runs it after hook 27; the true ending is reached by play.
