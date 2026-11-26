@@ -517,7 +517,7 @@ static VALUE input_repeat(VALUE self, VALUE b) {
     if (!n || held[n] == 0) return Qfalse;
     int h = held[n];
     int delay = rgss_version == RGSS1 ? 16 : 24, interval = rgss_version == RGSS1 ? 4 : 6;
-    return h == 1 || (h > delay && (h - delay - 1) % interval == 0) ? Qtrue : Qfalse;
+    return h == 1 || (h >= delay && (h - delay) % interval == 0) ? Qtrue : Qfalse;
 }
 
 static VALUE input_dir4(VALUE self) {
