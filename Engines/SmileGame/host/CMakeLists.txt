@@ -1,0 +1,32 @@
+cmake_minimum_required(VERSION 3.24)
+project(SmileGameHost C)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
+
+set(RUNTIME ${CMAKE_CURRENT_SOURCE_DIR}/../../../Packages/VNDegenKit/Sources/CSmileGame)
+
+file(GLOB RUNTIME_SOURCES ${RUNTIME}/*.c)
+add_library(smilegame STATIC ${RUNTIME_SOURCES})
+target_include_directories(smilegame PUBLIC ${RUNTIME} ${RUNTIME}/include)
+target_compile_options(smilegame PRIVATE -O2 -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function)
+set_source_files_properties(${RUNTIME}/ufbx_unit.c PROPERTIES COMPILE_OPTIONS "-w")
+target_compile_definitions(smilegame PRIVATE _GNU_SOURCE)
+target_link_libraries(smilegame PUBLIC m)
+
+add_executable(sgrun sgrun.c)
+target_link_libraries(sgrun PRIVATE smilegame)
+
+enable_testing()
+add_executable(sgtest sgtest.c)
+target_link_libraries(sgtest PRIVATE smilegame)
+add_test(NAME formats COMMAND sgtest)
+
+find_package(SDL2 CONFIG)
+if(SDL2_FOUND)
+  add_executable(sgplay sgplay.c)
+  target_link_libraries(sgplay PRIVATE smilegame SDL2::SDL2)
+endif()
