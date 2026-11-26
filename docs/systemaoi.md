@@ -160,11 +160,12 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   minimap icons, teleporters and stairs from the maps' link records, spinners, dark zones, healing magic circles and 堕天牢's floor
   hazards; several effects' sizes are inferred. These live in the original's exe, not its scripts, and are rebuilt
   from play (`docs/systemaoi-cleanroom.md`).
+- Battle rewards follow the rule measured over 62 wins of the original; how often an enemy's resident joins (an even
+  chance, from 39 tries), how 大勧誘 and 大探索 combine with C392, whether 学 on a reserve tile counts and what
+  `party.obj` column 66 does for item drops are inferred.
 - Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 3.4 to
   5.5 over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
-  are inferred. Rewards follow the rule measured over 62 wins of the original; how often an enemy's resident joins
-  (an even chance, from 39 tries), how 大勧誘 and 大探索 combine with C392, whether 学 on a reserve tile counts and
-  what `party.obj` column 66 does for item drops are inferred.
+  are inferred.
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
   cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (32 in 1,000 a
   step after a 10-step quiet, 5 in 1,000 past 90 steps) is fitted to 60 runs of the original; 警戒心 halves it
