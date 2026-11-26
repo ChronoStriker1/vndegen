@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.20",
+          "buildVersion": "3596",
+          "date": "2026-11-26T16:44:56Z",
+          "localizedDescription": "One fix from the 0.60.19 regression sweep: TyranoScript buttons take taps on iPhone and iPad again.\n\n## Downloads\n\n- `VNDegen-0.60.20-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.20.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.20-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n\n\n\n\n## Fixed\n\n- **TyranoScript:** on iPhone and iPad, a tap on a `[glink]` choice or button registers even when the finger slides a little. Games whose page blocks scrolling, as Tyrano's stock page does, made WebKit drop the tap. In Jingai Seitairoku the catalogue entries now open with one tap (#202). VNDegen now holds back small finger movements, up to 15 pixels, as Chromium does on the PC, for every web game.\n\n## What wasn't tested\n\n- No physical device or physical controller was used. The fix was checked on iPhone and iPad simulators, in Touch and Touch gamepad controls, with Jingai Seitairoku (TyranoScript), Mirena's Manor (MV) and No Socks RPG (MZ).\n- The Mac app wasn't run with the game, since the change only affects touch.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.20/VNDegen-0.60.20.ipa",
+          "size": 132843577,
+          "sha256": "1d39a9dbf12271fb8f50a90011bf245a46aae4e1fa010bbe45f5e175552d524f",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.19",
           "buildVersion": "3592",
           "date": "2026-11-26T11:36:14Z",
