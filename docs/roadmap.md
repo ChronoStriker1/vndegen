@@ -166,6 +166,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - SystemAoi's rest and trap scenes, second-playthrough carry-over and scene backdrops, and Ikura saves that load in the PC original (0.60.17).
 - SystemAoi's enemy symbols, battle rewards, town growth and exact sprites, and RPG Maker key repeat as on the PC (0.60.18).
 - SystemAoi's last round: BUNNY BLACK 3 is complete, with the battle row rule, opening attacks, 戦闘隊列 and the autosave options (0.60.19).
+- A fix from the 0.60.19 regression sweep: TyranoScript buttons take taps on iPhone and iPad (0.60.20).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
