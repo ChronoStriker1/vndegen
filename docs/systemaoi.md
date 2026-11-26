@@ -113,6 +113,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   before and after battles and on the way home; a loss ends the expedition. The boss-side cutaways (74 scenes in all
   ten dungeons) play when the party ends a step or a turn on a cell its map marks with a scene number, or wins a
   battle there, and the one that drops the floor (`d4`) takes the party to the area below as the original does.
+  開ける on a crystal gives one item of the floor's chest rank and leaves the crystal open, as the original records it
+  in its save.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
@@ -157,14 +159,16 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (1 in 20 a step
   after a 10-step quiet) is fitted to eighteen of the original's intervals; 警戒心 and the bells' 引き寄せ don't
   change it yet; a floor's taken pickups and opened doors aren't saved (the
-  original's image doesn't seem to hold them either). The dungeon light and fog are fitted to eleven of the original's
+  original's image doesn't seem to hold them either; opened crystals are, and VNDegen keeps them the same way).
+  The dungeon light and fog are fitted to eleven of the original's
   frames (each within 4%, the ice dungeon 3% too bright); which walls get a set's variant textures isn't known (the
   ice dungeon's diamond walls are drawn plain); the falling leaves, sparks, snow and light motes some dungeons
   show aren't drawn.
 - Story: the true ending (F161 after 真魔力塊隊) and 内政END play, but some story the original runs from its exe isn't
   rebuilt: the trap scenes (hook 19) and the dungeon rest conversations (hook 22), the story groups that follow beaten ones (ga0003, which brings in
   the final 真魔力塊隊), and the second playthrough's carried-over data (`85`/`86`: new games never offer 引き継ぐ).
-  The later dungeons' 探索, 調査, 押す, 引く, 切り替える and ワープ actions aren't built.
+  The 探索, 調査, 押す, 引く, 切り替える and ワープ buttons have art but nothing in the game offers them (searched in the
+  maps, scripts and PC play), so they aren't built.
 - Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
   学, 魔法全体防御, the 属性耐性 areas, and 先制攻撃, 前向精神, 魔法無効化 and いなし from enemies); abilities never
   seen in the original's saves (警戒心, 掛け声, the 支援 abilities and others) are written as zeros, and 資金管理 and

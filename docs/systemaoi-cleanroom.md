@@ -242,7 +242,9 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   `dunChang.obj` (100: 壁 0 to 100, 移動 0 to 1, 5) and 感知 ("迷宮で隠された扉の存在に気付く") suggest a hidden door
   that a 感知 unit reveals; a hundred and forty bumps without one never opened it, so not a chance per bump.
   VNDegen lets the party through wall 100, from either side, while a main member's field ability or a reserve
-  member's reserve ability is 感知 (サキュー, スカイアン); inferred.
+  member's reserve ability is 感知 (サキュー, スカイアン). Measured for the main board: with サキュー placed on it, the
+  original walks straight through 十一層's wall-100 door at (2, 4) south, with no button or message, and looking back
+  shows that side open with no door drawn (VNDegen still draws the door there). The reserve case is inferred.
 - **Camera.** `Cam.pvc`'s position and target (3.2 high, 4.6 behind the cell's centre, tilted down slightly), with
   a 47.2° vertical field of view: the floor lines and wall edges fit that best (correlation 0.58 against 0.30 to 0.35
   at other angles); the file's Zoom(40) isn't used as given.
@@ -326,6 +328,14 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   pieces (frames 2 and 3) under the pointer.
 - **Action buttons.** Measured: standing on the door's cell shows 帰る (`dgn_g02`) at (1101, 498), above the pad.
   Inferred: floor part 100 (`f100`, stairs down) shows 下りる (`g01`) and 101 (`f101`, up) shows 上る (`g00`).
+  Measured: a crystal shows 開ける (`g07`). `dgn_g03` to `g06`, `g08` and `g09` hold 探索, 調査, 押す, 引く, 切り替える
+  and ワープ, but nothing in the game offers them, so VNDegen builds none: no map cell, wall, link or script names
+  them (every field of the 117 maps is accounted for, and every link sits on a stair, door spot, teleporter or
+  passage); no PC capture shows them, among 4,247 earlier full frames and a sweep of 29 places in all four facings
+  (each trap and hazard, the dark zone, the magic circle, door spots, wall 100 with and without a 感知 unit, the
+  hedge wall 5, the sky wall 8, teleporter landings); and `bo1201.box` keeps 14 scenes nothing jumps to, about a
+  switch (「スイッチを発見しました。押します？」), 「ここに何か仕掛けが……」, warp devices and elevators (昇降機), which read as
+  cut gimmicks.
 - **Areas.** `floor.obj`'s rows of one dungeon are areas side by side, named from the first: 中央森, 中央森の東,
   中央森の東南 and so on (`奥` one further the same way). Measured: stepping onto a cell with a wall-20 side moves at
   once to the neighbouring area (a LOADING badge, then an autosave), arriving one cell in from that area's passage
@@ -336,10 +346,15 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Floor objects seen on the first floor.** 100 the door, 60 a yellow crystal (the original shows 開ける at one);
   neither is handled by the floor hook, so both are the engine's.
   `floor.obj` columns 36 onwards hold eight (table, minimum, maximum, count) entries such as 武器Ａ 1 1 1 and 宝箱Ａ 1 3
-  1, whose names are `item.obj` column 30 tags. Inferred: standing on a crystal shows 開ける (`dgn_g07`); opening the
-  floor's k-th crystal (in the map trailer's crystal list, below) gives between the minimum and maximum of items from
-  the k-th entry, each drawn
-  by `item.obj` column 31's weight, says 『name』を手に入れた。 and removes the crystal.
+  1, whose names are `item.obj` column 30 tags. Measured from five openings on the PC: opening the floor's k-th
+  crystal (in the map trailer's crystal list, below) gives one item from the k-th entry, an item tagged with the
+  entry's name whose rank (`item.obj` column 29) lies between the entry's two numbers, drawn by column 31's weight
+  (0101 武器Ａ 1 1 gave 綺麗な杖, rank 1; 0504 武器Ａ 3 3 gave one 流星剣, rank 3; 0110 武器Ａ 2 2 猛牛ナックル, 2; 0901
+  その他Ａ 3 3 進撃の旗, which column 4 as the rank would give only 2% of the time; 1015's count −1 entry 防具Ａ 3 3 one
+  命の鎧). The count is 1 everywhere except 1015's treasure room (−1), which also gives one. The message is the trap
+  popup at the view's centre, 「name を」 over 「手に入れた」 (its frame within 1.7 levels of the PC's; the glyphs are the
+  app's font). Hook 21 (`bo2100`) then turns object 60 into 61 and the original draws `a061`, the crystal split
+  open, with no minimap icon and no button on it. Not matched: the PC keeps 開ける drawn until the next input.
 - **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one. Its icons are 16-pixel
   tiles drawn twice the size: `mmf0003` the door, `mmf0004` a crystal, `mma0000` the party's arrow and `mma0001` an
   enemy group's red cross (drawn for groups up to a cell outside the 5 by 5 window, overlapping its edge). A passage
@@ -400,8 +415,8 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   many (x, y, a, b) points; three words (x, y, facing), a default arrival cell ((6, 2) facing south in 中央森, (1, 2)
   facing east in 中央森の東; not the select screen's entry, which in 炎山洞's 中腹エリア is (13, 3), not the trailer's
   (14, 1)); header word 9's links; and header word 11's (x, y) cells, which are exactly the map's crystals (floor
-  object 60). This reads every one of the 117 maps to its last byte. VNDegen opens crystals in the trailer's order
-  (inferred).
+  object 60). This reads every one of the 117 maps to its last byte. Crystals are numbered in the trailer's order
+  (measured: the entry and the save byte below follow it).
 - **Links.** Each link is 11 words `kind, x, y, target, tx, ty, facing, 0, 0, 0, 0`, the
   target −1 for the same area or dungeon << 16 | floor << 8 (`floor.obj` columns 0 and 1). Kind 1 sits on every
   stair cell (158 in all, floor parts 100 and 101) and kind 2 on every teleporter (object 39, all 30), with 56 more
@@ -1088,8 +1103,12 @@ the same points (offsets in bytes, numbers little-endian):
   top right of a slot's details, and the autosave panel's count), C011 the play time in seconds. Loading and saving
   again changes only these.
 - **Map memory** from 6,188: up to 150 records of 532 bytes, one per area visited, in turn: a word naming the area
-  (the dungeon in its third byte, the floor in its second), four layers of 32 words, and four numbers (a 1 or 3 on
-  some areas; not understood, kept as read). Measured on a 炎山洞 autosave: 中央森, 中央森の東, then 炎山洞
+  (the dungeon in its third byte, the floor in its second), four layers of 32 words, and four numbers. The second
+  holds a byte per crystal in the trailer's order, 0x81 once opened (measured: 0 → 129 opening 九層 一階's crystal 0,
+  0 → 33024 opening 中央森の北東奥's crystal 1; reloading shows it still open); the third is taken as crystals 4 to 7
+  (inferred; no map has more than 7). VNDegen keeps an opened crystal open on later expeditions too (inferred from
+  the byte living in the map memory, which outlasts the expedition). The first and fourth (a 1 or 3 on some areas) aren't understood and are kept
+  as read. Measured on a 炎山洞 autosave: 中央森, 中央森の東, then 炎山洞
   中腹エリア, with no slot for the areas between. Word y holds row y with bit x for column x. Layer 0 is the visited
   cells and layer 3 a copy of it; layer 1 marks a step walked between a cell and the one east of it, layer 2 between
   a cell and the one south of it (cells next to each other but never walked between stay clear). VNDegen writes the
