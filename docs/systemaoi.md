@@ -162,9 +162,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   original's image doesn't seem to hold them either; opened crystals are, and VNDegen keeps them the same way).
   The dungeon light and fog are fitted to eleven of the original's
   frames (each within 6%); which walls get a set's variant textures isn't known, so each cell takes one by a hash
-  (right for about a third of the walls, as by chance); crystals are drawn see-through, unlit and turning, with an
-  inferred 0.5 blend; the falling leaves, sparks, snow and light motes follow the sets' effect files, with their
-  speeds fitted to a few PC recordings (the PC's snowflakes loop, VNDegen's only wave).
+  (right for about a third of the walls, as by chance); crystals are drawn see-through, unlit and turning (blends
+  fitted to a few views, the spin speed taken from the door's); the falling leaves, sparks, snow and light motes
+  follow the sets' effect files, with their speeds fitted to a few PC recordings (the PC's snowflakes loop,
+  VNDegen's only wave).
 - Story: the true ending (F161 after 真魔力塊隊) and 内政END play, but some story the original runs from its exe isn't
   rebuilt: the trap scenes (hook 19), the dungeon rest conversations (hook 22) and the second playthrough's
   carried-over data (`85`/`86`: new games never offer 引き継ぐ). The 探索, 調査, 押す, 引く, 切り替える and ワープ

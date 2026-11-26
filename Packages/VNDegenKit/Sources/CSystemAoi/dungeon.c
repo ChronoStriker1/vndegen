@@ -101,6 +101,7 @@ static const struct {
 #define QUARTER 1.5707963f
 #define VIEW_SLOPE 0.75f
 #define CRYSTAL_ALPHA 0.5f
+#define CRYSTAL_OPEN_ALPHA 0.22f
 
 static const float lights[2][3] = {{0.46f, 0.3f, -0.44f}, {-0.46f, 0.3f, -0.44f}};
 static const int wallField[4] = {F_WALL_N, F_WALL_E, F_WALL_S, F_WALL_W};
@@ -824,12 +825,12 @@ static void draw_fog_foot(Dungeon *d, const Cam *c, const int *order, int n) {
 }
 
 static void draw_crystals(Dungeon *d, const Cam *c, const int *cells, int n) {
-    d->r3.blend = CRYSTAL_ALPHA;
     float density = d->r3.fogDensity;
     d->r3.fogDensity = 0;
     for (int i = n - 1; i >= 0; i--) {
         char name[16];
         snprintf(name, sizeof name, "a%03d", d->cell[cells[i]][F_OBJECT]);
+        d->r3.blend = d->cell[cells[i]][F_OBJECT] == OBJECT_CRYSTAL_OPEN ? CRYSTAL_OPEN_ALPHA : CRYSTAL_ALPHA;
         float cx = (float)(cells[i] % DUN_SIDE) * CELL, cz = -(float)(cells[i] / DUN_SIDE) * CELL;
         d->r3.cull = 1;
         draw_model(d, &d->common, c, name, cx, cz, spin(d), 0);

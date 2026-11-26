@@ -310,7 +310,9 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   which VNDegen reads as unlit. VNDegen draws crystals after the rest of the view, back faces and then front faces,
   blended at 0.5 (inferred as 128/255), unfogged. Their animation files (`a060.txt`, `a061.txt`) give the door's
   `rollSpeed 0 0.5`, and the PC's crystals turn, so they turn with the door (the speed is the door's, inferred). The
-  opened crystal `a061` is drawn the same way (not measured).
+  opened crystal `a061` (split in two) is much fainter on the PC: from its own cell its colour fits an alpha of
+  0.22 (one view, with the walls behind it partly different variants; 0.5 scored 14.9, 0.25 11.1), and VNDegen draws
+  it at 0.22.
 - **Ground fog.** Each part set names two effects in its `effect_box` (`>e,effectNN0` and `NN1`), `.def` text files
   in the game's archives. `NN0` is a `FogFoot` in every set: a texture (`fogfootNN0.bmp`, a pale mottled 128×128),
   a scroll speed per frame (`texSpdX`, `texSpdY`), an alpha range (`AlphaMin`, `AlphaMax`, out of 255) and heights
