@@ -370,6 +370,9 @@ typedef struct Dungeon {
     DunFx fx;
     DunEdit edit[DUN_EDITS];
     int editCount, area;
+    float light;
+    u32 moveMs;
+    bool flat;
 } Dungeon;
 
 enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };
@@ -395,6 +398,7 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
 int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
 void sa_dungeon_edit(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
 void sa_dungeon_end_expedition(Dungeon *d);
+void sa_dungeon_options(Dungeon *d, int brightness, int camera, bool effects);
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
 bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map);
 void sa_dungeon_open_doors(Dungeon *d);

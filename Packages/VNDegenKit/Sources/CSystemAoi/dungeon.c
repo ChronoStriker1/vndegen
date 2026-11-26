@@ -19,7 +19,6 @@ enum {
     WALL_DOORWAY = 10,
     WALL_HIDDEN = 100,
     VIEW_CELLS = 6,
-    MOVE_MS = 133,
     DOOR_TURN_MS = 18000,
     DOOR_FRAME_MS = 66,
     FOG_PULSE_MS = 4000,
@@ -418,11 +417,17 @@ void sa_dungeon_free(Dungeon *d) {
     R3 keep = d->r3;
     DunEdit edit[DUN_EDITS];
     int edits = d->editCount;
+    float light = d->light;
+    u32 moveMs = d->moveMs;
+    bool flat = d->flat;
     memcpy(edit, d->edit, sizeof edit);
     memset(d, 0, sizeof *d);
     d->r3 = keep;
     memcpy(d->edit, edit, sizeof edit);
     d->editCount = edits;
+    d->light = light;
+    d->moveMs = moveMs;
+    d->flat = flat;
 }
 
 static bool hiddenOpen;
@@ -590,7 +595,14 @@ static void start_anim(Dungeon *d) {
     d->toZ = -(float)d->y * CELL;
     d->toYaw = d->yaw;
     d->animMs = 0;
-    d->animDur = MOVE_MS;
+    d->animDur = d->moveMs;
+}
+
+static void finish_move(Dungeon *d) {
+    if (d->animDur) return;
+    d->camX = d->toX;
+    d->camZ = d->toZ;
+    d->yaw = (float)d->dir * QUARTER;
 }
 
 static bool walk(Dungeon *d, int side) {
@@ -611,6 +623,7 @@ static bool walk(Dungeon *d, int side) {
     start_anim(d);
     d->passCell = from;
     d->passSide = side;
+    finish_move(d);
     return true;
 }
 
@@ -619,6 +632,7 @@ static void turn(Dungeon *d, int by) {
     start_anim(d);
     d->passCell = -1;
     d->toYaw = d->yaw + (float)by * QUARTER;
+    finish_move(d);
 }
 
 static int act(Dungeon *d, int pad) {
@@ -657,7 +671,7 @@ bool sa_dungeon_tick(Dungeon *d, u32 ms) {
     u32 before = d->clock / DOOR_FRAME_MS;
     d->clock += ms;
     bool turning = d->clock / DOOR_FRAME_MS != before && door_near(d);
-    if (d->clock / DOOR_FRAME_MS != before && sa_fx_tick(&d->fx, d->clock / DOOR_FRAME_MS * DOOR_FRAME_MS - before * DOOR_FRAME_MS, d->camX, d->camZ)) turning = true;
+    if (!d->flat && d->clock / DOOR_FRAME_MS != before && sa_fx_tick(&d->fx, d->clock / DOOR_FRAME_MS * DOOR_FRAME_MS - before * DOOR_FRAME_MS, d->camX, d->camZ)) turning = true;
     if (!d->animDur) return turning;
     d->animMs += ms;
     float t = d->animMs >= d->animDur ? 1 : (float)d->animMs / (float)d->animDur;
@@ -755,7 +769,7 @@ static float shade_of(const Dungeon *d, const float *n) {
         float dot = (n[0] * lights[i][0] + n[1] * lights[i][1] + n[2] * lights[i][2]) / l;
         if (dot > 0) s += DIFFUSE * dot;
     }
-    return s;
+    return s * d->light;
 }
 
 static void draw_model(Dungeon *d, const PartSet *ps, const Cam *c, const char *name, float cx, float cz, float a, float swing) {
@@ -817,7 +831,7 @@ static float leaf_swing(const Dungeon *d, int cellIndex, int side) {
 }
 
 static void draw_fog_foot(Dungeon *d, const Cam *c, const int *order, int n) {
-    if (d->fogTex < 0) return;
+    if (d->fogTex < 0 || d->flat) return;
     float frames = (float)d->clock * 60.0f / 1000.0f;
     float su = d->fogSpeed[0] * frames, sv = d->fogSpeed[1] * frames;
     float pulse = 0.5f + 0.5f * sinf((float)(d->clock % FOG_PULSE_MS) * 6.2831853f / FOG_PULSE_MS);
@@ -836,7 +850,7 @@ static void draw_fog_foot(Dungeon *d, const Cam *c, const int *order, int n) {
             v[j].z = dx * c->f[0] + dy * c->f[1] + dz * c->f[2];
             v[j].u = wx / CELL + su;
             v[j].v = -wz / CELL + sv;
-            v[j].shade = 1;
+            v[j].shade = d->light;
         }
         r3_tri(&d->r3, v, d->tex[d->fogTex]);
         r3_tri(&d->r3, v + 3, d->tex[d->fogTex]);
@@ -944,7 +958,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
     }
     draw_fog_foot(d, &c, order, n);
     draw_crystals(d, &c, crystals, nc);
-    if (!showIds) sa_fx_draw(&d->fx, &d->r3, c.pos, c.r, c.u, c.f);
+    if (!showIds && !d->flat) sa_fx_draw(&d->fx, &d->r3, c.pos, c.r, c.u, c.f);
 }
 
 static void fill(u32 *fb, int x, int y, int w, int h, u32 c) {
@@ -993,10 +1007,6 @@ static void draw_map(Dungeon *d, u32 *fb, int ox, int oy, int scale) {
                     int v = 60 + (int)(10 * (dx * dx + dy * dy) / 2);
                     fb[(size_t)(y0 + y) * SA_W + x0 + x] = rgb(v, v - 11, v - 11);
                 }
-            if (cell[F_WALL_N] >= 0 && cell[F_WALL_N] != WALL_PASSAGE && cell[F_WALL_N] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + inset, cs - inset, ws, wall);
-            if (cell[F_WALL_S] >= 0 && cell[F_WALL_S] != WALL_PASSAGE && cell[F_WALL_S] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + cs - ws, cs - inset, ws, wall);
-            if (cell[F_WALL_W] >= 0 && cell[F_WALL_W] != WALL_PASSAGE && cell[F_WALL_W] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + inset, ws, cs - inset, wall);
-            if (cell[F_WALL_E] >= 0 && cell[F_WALL_E] != WALL_PASSAGE && cell[F_WALL_E] != WALL_DOORWAY) fill(fb, x0 + cs - ws, y0 + inset, ws, cs - inset, wall);
         }
     for (int j = 0; j < MINI_CELLS; j++)
         for (int i = 0; i < MINI_CELLS; i++) {
@@ -1016,6 +1026,10 @@ static void draw_map(Dungeon *d, u32 *fb, int ox, int oy, int scale) {
             int trap = trap_icon(cell[F_OBJECT]);
             if (trap >= 0 && d->trapIcon[trap] && (cell[F_OBJECT] == OBJECT_DARK || d->seen[my * DUN_SIDE + mx]))
                 sa_blit(fb, icon_at(d, d->trapIcon[trap], scale), x0, y0);
+            if (cell[F_WALL_N] >= 0 && cell[F_WALL_N] != WALL_PASSAGE && cell[F_WALL_N] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + inset, cs - inset, ws, wall);
+            if (cell[F_WALL_S] >= 0 && cell[F_WALL_S] != WALL_PASSAGE && cell[F_WALL_S] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + cs - ws, cs - inset, ws, wall);
+            if (cell[F_WALL_W] >= 0 && cell[F_WALL_W] != WALL_PASSAGE && cell[F_WALL_W] != WALL_DOORWAY) fill(fb, x0 + inset, y0 + inset, ws, cs - inset, wall);
+            if (cell[F_WALL_E] >= 0 && cell[F_WALL_E] != WALL_PASSAGE && cell[F_WALL_E] != WALL_DOORWAY) fill(fb, x0 + cs - ws, y0 + inset, ws, cs - inset, wall);
         }
     int cx = ox + MINI_CELLS / 2 * cs, cy = oy + MINI_CELLS / 2 * cs;
     for (int g = 0; g < d->markCount; g++) {
@@ -1083,7 +1097,7 @@ void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit
 const Image *sa_dungeon_platform(const Dungeon *d) { return d->art[DUN_ART_PLATFORM]; }
 
 void sa_dungeon_draw_frame(Dungeon *d, u32 *fb, struct Party *party, int rankLimit) {
-    draw_panel(d, fb);
+    sa_blit(fb, d->art[DUN_ART_PANEL], PANEL_X, PANEL_Y);
     if (party) sa_party_draw_diorama(party, fb, rankLimit, d->art[DUN_ART_PLATFORM]);
 }
 
@@ -1142,6 +1156,14 @@ void sa_dungeon_edit(Dungeon *d, const char *name, int value, int x, int y, int 
     edit_side(d, name, value, x, y, mode, dir);
     int nx = x + stepX[dir & 3], ny = y + stepY[dir & 3];
     if (mode == 2 && f != F_OBJECT && cell_at(d, nx, ny)) edit_side(d, name, value, nx, ny, mode, dir + 2);
+}
+
+void sa_dungeon_options(Dungeon *d, int brightness, int camera, bool effects) {
+    static const float light[5] = {1.07f, 1.04f, 1.00f, 0.88f, 0.77f};
+    static const u32 moveMs[5] = {0, 67, 133, 267, 533};
+    d->light = light[brightness % 5];
+    d->moveMs = moveMs[camera % 5];
+    d->flat = !effects;
 }
 
 void sa_dungeon_end_expedition(Dungeon *d) {

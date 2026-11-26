@@ -23,6 +23,12 @@ enum {
     INFO_X = 995,
     INFO_Y = 326,
     INFO_H = 288,
+    UNSTAFFED = 130,
+    COL_MAZE = 10,
+    MAZE_STATS = 5,
+    MAZE_RIGHT = 1048,
+    MAZE_PITCH = 50,
+    MAZE_DIGIT_Y = 648,
     BTN_Y = 674,
     BTN_W = 152,
     BTN_H = 44,
@@ -209,6 +215,19 @@ static Image *icon(BuildScreen *b, Town *t, Vfs *vfs, int type) {
     return b->icon[k];
 }
 
+static void blit_scaled(u32 *fb, const Image *im, int x, int y, u32 level) {
+    if (!im) return;
+    for (int j = 0; j < im->h; j++)
+        for (int i = 0; i < im->w; i++) {
+            int dx = x + i, dy = y + j;
+            u32 p = im->px[(size_t)j * im->w + i], a = p >> 24;
+            if (!a || dx < 0 || dy < 0 || dx >= SA_W || dy >= SA_H) continue;
+            u32 q = fb[(size_t)dy * SA_W + dx], ia = 255 - a, out = 0xff000000u;
+            for (int k = 0; k < 24; k += 8) out |= (((p >> k & 0xff) * level / 256 * a + (q >> k & 0xff) * ia) / 255) << k;
+            fb[(size_t)dy * SA_W + dx] = out;
+        }
+}
+
 static void draw_lines(u32 *fb, const char *text, int x, int *y) {
     char buf[512];
     snprintf(buf, sizeof buf, "%s", text);
@@ -220,9 +239,11 @@ static void draw_lines(u32 *fb, const char *text, int x, int *y) {
     }
 }
 
-static void draw_info(BuildScreen *b, Town *t, u32 *fb, int row) {
+static void draw_info(BuildScreen *b, Town *t, const VM *vm, u32 *fb, int row) {
     const Image *panel = b->art[ART_INFO];
-    if (panel) {
+    bool maze = vm->f[F_MAZE] != 0;
+    if (panel && maze) sa_blit(fb, panel, INFO_X, INFO_Y);
+    else if (panel) {
         sa_blit_rect(fb, panel, 0, 0, panel->w, INFO_H - 6, INFO_X, INFO_Y);
         sa_blit_rect(fb, panel, 0, panel->h - 6, panel->w, 6, INFO_X, INFO_Y + INFO_H - 6);
     }
@@ -244,6 +265,10 @@ static void draw_info(BuildScreen *b, Town *t, u32 *fb, int row) {
             if (prod[i]) sa_draw_int(fb, dg, prod[i], false, px[i], 437, 0, 10, 13);
         int use = sa_table_int(&t->build, row, 34);
         if (use) sa_draw_int(fb, dg, use, false, px[2], 459, 0, 10, 13);
+        for (int i = 0; maze && i < MAZE_STATS; i++) {
+            int v = sa_town_value(t, row, 1, COL_MAZE + i);
+            sa_draw_int(fb, dg, v, false, MAZE_RIGHT + i * MAZE_PITCH, MAZE_DIGIT_Y, v > 0 ? 2 : v < 0 ? 1 : 0, 10, 13);
+        }
     }
     int y = 482;
     draw_lines(fb, sa_table_text(&t->build, row, 66), 1008, &y);
@@ -274,7 +299,7 @@ void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb) {
             sa_fill(fb, x, y, CELL, CELL, 0xe0806868u);
             sa_blit_alpha(fb, icon(b, t, vfs, type), x, y, 110);
         } else {
-            sa_blit(fb, icon(b, t, vfs, type), x, y);
+            blit_scaled(fb, icon(b, t, vfs, type), x, y, sa_town_staffed(t, vm, c) ? 256 : UNSTAFFED);
         }
     }
     if (b->held >= 0 && b->cellHover >= 0) {
@@ -299,7 +324,7 @@ void sa_build_draw(BuildScreen *b, Town *t, Vfs *vfs, VM *vm, u32 *fb) {
         int p = pending_type(b, b->cellHover);
         infoRow = sa_town_type_row(t, p >= 0 ? p : t->cell[b->cellHover].type);
     }
-    draw_info(b, t, fb, infoRow);
+    draw_info(b, t, vm, fb, infoRow);
     for (int i = 0; i < B_COUNT; i++) {
         int frame = !button_enabled(b, i) ? 2 : b->buttonHover == i ? 1 : 0;
         sa_blit_rect(fb, b->art[btnArt[i]], 0, frame * BTN_H, BTN_W, BTN_H, btnX[i], BTN_Y);
