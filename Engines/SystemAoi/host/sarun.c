@@ -139,6 +139,12 @@ int main(int argc, char **argv) {
             alive = alive && run(s, 100);
         }
         if (!strncmp(argv[a], "join=", 5)) sa_debug_join(s, argv[a] + 5);
+        if (!strncmp(argv[a], "reserve=", 8)) {
+            char key[64];
+            int tile;
+            if (sscanf(argv[a] + 8, "%63[^,],%d", key, &tile) == 2) sa_debug_reserve(s, key, tile);
+        }
+        if (sscanf(argv[a], "equip=%d,%d", &x, &y) == 2) sa_debug_equip(s, x, y);
         if (sscanf(argv[a], "item=%d,%d", &x, &y) == 2) sa_debug_item(s, x, y);
         if (sscanf(argv[a], "unbench=%d,%d", &x, &y) == 2) sa_debug_unbench(s, x, y);
         if (sscanf(argv[a], "save=%d", &n) == 1) sa_debug_save(s, n, false);

@@ -112,9 +112,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   steps have passed since the last battle. The game's hooks run on entering, on stepping onto floor objects and walls,
   before and after battles and on the way home; a loss ends the expedition. The boss-side cutaways (74 scenes in all
   ten dungeons) play when the party ends a step or a turn on a cell its map marks with a scene number, or wins a
-  battle there, and the one that drops the floor (`d4`) takes the party to the area below as the original does.
-  開ける on a crystal gives one item of the floor's chest rank and leaves the crystal open, as the original records it
-  in its save.
+  battle there, over the area's letterboxed backdrop picture as the original shows them, and the one that drops the floor (`d4`) takes the party to the area below as the original does.
+  開ける on a crystal gives one item of the floor's chest rank and leaves the crystal open once the item's popup
+  is closed, as the original records it in its save.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
@@ -143,7 +143,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   千樹庭's areas, 炎山洞 (opened by its event on 遠征 from turn 10 after five expeditions) with its stairs between
   areas, area entries registered at door spots, the missions (マクドゥの試験) from turn 17, recruits from the town's housing, and area bosses whose
   defeat recruits their leaders.
-  Hidden doors (wall 100) open with a 感知 unit in the party (inferred). 配置's 組織図 posts (the town's and, from
+  Hidden doors (wall 100) open one way, from their own side, with a 感知 unit on the board or in the reserve
+  (measured), and stay open behind the party (how they look afterwards from their own side is inferred). 配置's 組織図 posts (the town's and, from
   turn 42, the 迷宮's) and 内政's 交換 are there, with the holders' ability raises; posts change the town's
   production. The 迷宮's turn is built from 330 turns of the original: its numbers, marks, depth, widths and
   breakthrough damage are measured; the odds of each event are fitted to the original's counts. Facilities gain

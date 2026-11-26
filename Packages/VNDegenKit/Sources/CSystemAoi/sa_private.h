@@ -259,6 +259,9 @@ typedef struct Expedition {
     int noticeCount;
     char groupScript[32], chain[64];
     int groupEntry, nextRoute;
+    int opening, hiddenDoor;
+    bool backdrop, fadeBattle;
+    u32 fadeMs, fadeDur;
 } Expedition;
 #define MSG_LINES 4
 
@@ -506,6 +509,7 @@ int sa_exp_floors_reached(const SA *s, int dungeon);
 void sa_exp_draw_view(SA *s, u32 *fb);
 void sa_exp_debug_place(SA *s, int x, int y, int dir);
 void sa_exp_chain_battle(SA *s, const char *name);
+const char *sa_exp_backdrop(SA *s, int dungeon, int floor);
 int sa_exp_group_slot(SA *s, const ExpGroup *g);
 void sa_exp_warp(SA *s, int dungeon, int floor, int x, int y, int dir);
 void sa_reset_scene(SA *s);
@@ -513,6 +517,7 @@ void sa_end_turn(SA *s);
 void sa_show_frame_as_bg(SA *s, const u32 *px, const char *name);
 void sa_actions_enter(SA *s);
 void sa_actions_open(SA *s);
+void sa_actions_settle(SA *s);
 
 typedef struct StoryWarp {
     int dungeon, floor, x, y, dir;
