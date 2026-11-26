@@ -42,6 +42,7 @@ enum {
     NOTICE_CHAR_FRAMES = 10,
     FRAME_RATE = 60,
     ENCOUNTER_HOLD_MS = 430,
+    HOLD_RANDOM = -1,
     ABILITY_VALUE = 4,
     ITEM_EFFECT_FIRST = 15,
     ITEM_EFFECT_LAST = 22,
@@ -1476,7 +1477,8 @@ static void after_move(SA *s, int r) {
     bool calm = sa_exp_special_active(s, SPECIAL_NO_ENEMY) && (int)(sa_vm_random(&s->vm) % 100) >= sa_exp_special_value(s, SPECIAL_NO_ENEMY);
     count_down_specials(e);
     if (!e->calm && !calm && sa_encounter_due(s->vm.c[C_SINCE_BATTLE], s->vm.c[C_AREA_STEPS], e->alarm, encounter_percent(s), sa_vm_random(&s->vm))) {
-        random_battle(s);
+        s->battle.holdGroup = HOLD_RANDOM;
+        s->battle.holdMs = 0;
         return;
     }
     e->stepHook = true;
@@ -1560,9 +1562,10 @@ bool sa_exp_frame(SA *s, u32 ms) {
         s->clicked = s->rightClicked = false;
         if (!d->animDur) s->battle.holdMs += ms;
         if (s->battle.holdMs >= ENCOUNTER_HOLD_MS) {
-            int g = s->battle.holdGroup - 1;
+            int g = s->battle.holdGroup;
             s->battle.holdGroup = 0;
-            start_battle(s, g);
+            if (g == HOLD_RANDOM) random_battle(s);
+            else start_battle(s, g - 1);
             return true;
         }
     }

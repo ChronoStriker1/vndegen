@@ -166,8 +166,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   exports repeat exactly in VNDegen.
 - Enemy groups stand in the view as the original's symbols (`e001` to `e010`, picked by `party.obj` column 13);
   their size and fog are within about 10% of the original's, and how fast they animate is read from the files, not
-  measured. Walking into one holds the view for 430 ms, then crossfades into the battle over 500 ms (measured 433
-  and 470 to 530 ms; before an ordinary group's battle the original held 667 ms, inferred as loading).
+  measured. Walking into one holds the view for 430 ms, then crossfades into the battle over 400 ms (a random
+  battle the same; measured holds 400 to 667 ms and crossfades 267 to 530 ms, uneven under Wine).
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
   cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (32 in 1,000 a
   step after a 10-step quiet, 5 in 1,000 past 90 steps) is fitted to 60 runs of the original; 警戒心 halves it

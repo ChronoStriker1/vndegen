@@ -124,7 +124,7 @@ enum {
     ICON = 20,
     SKILL_SIZE = 12,
     ACTION_MS = 1500,
-    BATTLE_FADE_MS = 500,
+    BATTLE_FADE_MS = 400,
     LOSS_MS = 2000,
     SUBSTITUTE_CHANCE = 50,
     TILE_PLAIN = 0,

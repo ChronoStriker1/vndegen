@@ -655,6 +655,16 @@ calls it is inferred from that and from play, and marked so.
   千05|千06), chosen by the weights in columns 32 to 34 (10, 60, 10). Measured in support: all eight random battles
   in 中腹エリア's runs were column 35 groups (炎01 twice, 炎02 twice, 炎03, 炎04 twice, 炎05), and the fixed
   seven-slime group 千固定0100 came up in 千樹庭's random battles.
+- **Encounter timing.** Measured under Wine at 30 fps (videos, about 30 to 40 game frames a second): walking into
+  a symbol group, the step plays out (4 to 5 video frames, as any step), the view then holds still, symbol and HUD
+  included, and a crossfade follows: into the battle screen after 667 ms for 千41 (fade 530 ms), into
+  ヤーヌの部下隊's intro backdrop after 433 ms (fade about 870 ms, the op 89 fade), and after the intro, the fade back
+  to the view and then a 470 ms crossfade into the battle. A random battle (中腹エリア, step 49 of a walk) does the
+  same: step, 400 ms hold, 267 ms crossfade. Nothing flashes. The fades start slowly and finish fast, as the game's
+  frame pacing varies under Wine, so the durations are rough. VNDegen holds the view 430 ms after the step's
+  animation ends (input ignored), then runs hook 25 as before, and crossfades from the last dungeon frame into the
+  battle over 400 ms (both inferred from these four: one hold for every encounter, the fades' mean); before, it cut
+  to the battle on the step itself.
 - **Dungeon select.** Measured (99% of pixels exact): the hall `bg005a0` with the party on the `m998bt1a` platform,
   a plate per open dungeon (`gat_bNN`, normal, hover, chosen) from (340, 40), its badge at (354, 52) (`gat_d01` NEW
   until one of its maps is visited, then `gat_d02`), and 戻る (`gat_c00`) at (444, 640). Choosing a dungeon shows
