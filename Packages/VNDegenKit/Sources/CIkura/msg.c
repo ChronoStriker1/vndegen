@@ -337,7 +337,7 @@ bool msg_exec(IK *t, u16 op, const u8 *a, int n) {
         m->tagPos = 0;
         m->cursor = false;
         m->unread = t->sc && save_read_mark(t, t->sc->readSlot, rd32(a));
-        t->lastLine = (int)rd32(a);
+        if (t->firstLine < 0) t->firstLine = (int)rd32(a) - 1;
         t->wait = W_MSG;
         run_tags(t);
         break;

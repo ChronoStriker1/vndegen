@@ -297,7 +297,7 @@ struct IK {
     Script *resumeSc;
     int resumeLabel;
     bool window;
-    int markSlot, lastLine;
+    int markSlot, firstLine;
     i32 settings[64];
     char **texts;
     int textCount;
