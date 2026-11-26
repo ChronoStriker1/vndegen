@@ -160,6 +160,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - BUNNY BLACK 3's title Load, Option and Extra, battle backdrops and digits, enemy groups moving as on the PC, walking arrows, and saves matching the PC's fields (0.60.11).
 - On the closed iPhone Duo held on its side at Full width, the touch gamepad spans the whole display, clear of the camera (0.60.12).
 - Every engine reports its picture size, so Clear of the camera places wide games below or above the camera (0.60.13).
+- SystemAoi's extra books, enemy skills by level, battle orders in saves, enemy groups that appear partway through a visit, and fog in the 3D dungeons (0.60.14).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -171,7 +172,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`, split across parallel delegates: what is left, chosen with the coordinator. The opening shipped in 0.60.0, then 炎山洞 and missions (0.60.1), recruiting (0.60.2), town posts (0.60.4), the 迷宮 defence (0.60.5), facility levels (0.60.6), 編成 (0.60.7), the later dungeons' traps and floors (0.60.9), their look and boss intros (0.60.10), and the menus, battles, enemy groups and saves (0.60.11).
+- SystemAoi's next slice of BUNNY BLACK 3, on `feat/systemaoi`, split across parallel delegates: what is left, chosen with the coordinator. The opening shipped in 0.60.0, then 炎山洞 and missions (0.60.1), recruiting (0.60.2), town posts (0.60.4), the 迷宮 defence (0.60.5), facility levels (0.60.6), 編成 (0.60.7), the later dungeons' traps and floors (0.60.9), their look and boss intros (0.60.10), the menus, battles, enemy groups and saves (0.60.11), and the extra books, enemy skills, battle orders and fog (0.60.14).
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses

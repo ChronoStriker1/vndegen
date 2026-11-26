@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.14",
+          "buildVersion": "3484",
+          "date": "2026-11-25T22:51:05Z",
+          "localizedDescription": "BUNNY BLACK 3's extra books, enemies that learn skills by level, battle orders in saves, enemy groups that appear partway through a visit, and fog in the 3D dungeons.\n\n## Downloads\n\n- `VNDegen-0.60.14-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.14.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.14-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n\n\n\n\n## Added\n\n- **SystemAoi:** Extra's ユニット図鑑, アイテム図鑑 and 迷宮踏破リスト. Their records are kept in the same global file the PC uses, and they carry over both ways.\n- **SystemAoi:** enemies know and use only the skills they have learned by their level, with the element bonuses those skills add. Enemy records now match the PC's in all 480 compared.\n- **SystemAoi:** battle orders are saved and loaded, and the PC loads them too.\n- **SystemAoi:** enemy groups appear partway through a visit as on the PC. After a win the group is gone, and after you flee it moves a few steps away.\n- **SystemAoi:** ground fog in the 3D dungeons, and door leaves that sit in the doorway and swing open.\n\n## Changed\n\n- **SystemAoi:** all five text speeds and the auto mode wait are measured from the PC, not inferred.\n- **SystemAoi:** the 3D view's lighting is refitted, so 絶命院 is now close to the PC.\n\n## Fixed\n\n- **SystemAoi:** with touch, a tapped walking arrow no longer stays drawn.\n- **SystemAoi:** the 商会's card star no longer draws an empty frame.\n\n## Known limits\n\n- The boss-side story scenes, the story chain that brings in the final boss, and the later dungeons' 探索, 調査, 押す, 引く, 切り替える and ワープ actions aren't there yet, so the true ending can't be reached by play.\n- Carrying over to a second playthrough, the rest conversations, the trap scenes and the weather particles aren't there yet.\n- The ice dungeon is a little too bright, and random battles in 中腹エリア start a little later than on the PC.\n- The limits listed for 0.60.0 to 0.60.11 still apply, except those fixed here.\n\n## What wasn't tested\n\n- No physical device or physical controller was used. The game was played in the Linux test build, the Mac app and an iPad simulator, and compared with the original engine under Wine, with saves exchanged both ways.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.14/VNDegen-0.60.14.ipa",
+          "size": 132822800,
+          "sha256": "cc7210a7291db06ec854b795f7e06d38dd1559c0a845d12094ce856ba18fc389",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.13",
           "buildVersion": "3466",
           "date": "2026-11-25T21:43:43Z",
