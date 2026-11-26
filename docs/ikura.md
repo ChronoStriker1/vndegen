@@ -110,6 +110,12 @@ Raidy II, and so does VNDegen:
 - Each slot: the date, the line on screen, a 112x84 thumbnail and an 8544-byte state: the script and label to resume
   at, the BGM, the flags, the variables, the picture names, every layer and every button with its binding. A load
   restores the state, runs `LOAD.SNR` (which rebuilds the dungeon from the variables) and resumes.
+- The PC rebuilds a loaded layer from its picture slot, so a layer that kept its picture after `0101` reloaded the slot
+  comes back with the new picture: the PC's own save from the opening, after the logo, loads with the logo on black.
+  VNDegen adds a block after the state when a layer keeps its picture: `KEPT`, a count, then each such layer's number
+  and the name of the picture it keeps (12 bytes). A load rebuilds those layers from those pictures, so the opening's
+  save loads with the desert, as live play shows it. The PC skips the block. Slots without it, the PC's and those
+  saved before the block was added, load as the PC loads them.
 - Raidy II's header gives the settings block at `0xdc` and the global block from `0x1dc` to `0x25d`. The read marks
   follow the global block: a count of slots (200), their size in bytes, then 128 bytes a slot, line n at byte n / 8,
   bit `0x80 >> (n % 8)`. Raidy's PC keeps no read marks, and its file has no such block. Its slot state adds the
