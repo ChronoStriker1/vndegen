@@ -850,6 +850,14 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   each visit. Inferred: VNDegen draws the unit's `uNNNNe0` sheet at a quarter size, 100 ms a frame, its frame's
   foot 38 pixels below the floor's row (captures fit it to about 5 levels in 255, not exactly). The sheets' grids
   differ by unit (ルーアルテ 5 by 4, ミアルテ 7 by 4), so the grid is found from the empty lines between frames.
+- **Defence, re-checked (round 5).** Round 5 saw the original repel all eight intruders on turn 42's save where
+  VNDegen lost; it is one roll. Measured: the same exported save (ルーアルテ 迷宮長, ミアルテ 街長, two floors of
+  size 1) loaded twice under Wine gave two different turns (all repelled, then a full breakthrough; the rolls
+  aren't fixed by the save once the turn's scenes play), and over 27 of the original's turns (two 12-turn runs from
+  that save, the 学園 built on the first, and 3 from the original's own turn-42 save) the eight broke through in 17, three were sent back
+  in 4 and all eight in 6. VNDegen's model gives 49%, 25% and 21% for the 学園 state (4,000 simulated turns),
+  against the original's 14, 4 and 6 of 24; the events seen (301, 305, 307, 400, 403, 500, 205) are the model's.
+  No change was needed.
 - **Breakthrough.** Measured over 20 turns: each adventurer who passes the deepest floor takes 0.25% of food, money
   and resources, rounded up on the total (8 of them took 1000 from 50000, at any depth). The turn's income box then
   adds ダークス宮の防衛に失敗しました; a turn where all were sent back adds nothing.
