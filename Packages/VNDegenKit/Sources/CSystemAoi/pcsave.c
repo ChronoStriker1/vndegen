@@ -23,6 +23,8 @@ enum {
     FORM_BOTTOM = 14,
     FORM_RESERVE = 23,
     RESERVE_TILES = 5,
+    EDITS_AT = 44,
+    EDIT_INTS = 6,
     MAPS_AT = 6172,
     MAP_RECORD = 532,
     MAP_HEAD = 16,
@@ -155,6 +157,26 @@ static void put_slot(SA *s, int slot, const Bench *b) {
 }
 
 static size_t map_record(int index) { return MAPS_AT + (size_t)index * MAP_RECORD; }
+
+static void read_edits(SA *s, const u8 *img) {
+    Dungeon *d = &s->dungeon;
+    d->editCount = 0;
+    for (size_t o = EDITS_AT; o + EDIT_INTS * 4 <= MAPS_AT && at(img, o) && d->editCount < DUN_EDITS; o += EDIT_INTS * 4) {
+        DunEdit *e = &d->edit[d->editCount++];
+        int v[EDIT_INTS];
+        for (int k = 0; k < EDIT_INTS; k++) v[k] = at(img, o + (size_t)k * 4);
+        *e = (DunEdit){v[0], v[1], v[2], v[3], v[4], v[5]};
+    }
+}
+
+static void write_edits(SA *s, u8 *img) {
+    const Dungeon *d = &s->dungeon;
+    for (int i = 0; i < d->editCount; i++) {
+        const DunEdit *e = &d->edit[i];
+        const int v[EDIT_INTS] = {e->area, e->x, e->y, e->off, e->value, e->mode};
+        for (int k = 0; k < EDIT_INTS; k++) put(img, EDITS_AT + ((size_t)i * EDIT_INTS + (size_t)k) * 4, v[k]);
+    }
+}
 
 static void read_maps(SA *s, const u8 *img) {
     if (!s->exp.explored) return;
@@ -326,6 +348,7 @@ bool sa_pcsave_read(SA *s, const char *path) {
     read_members(s, img);
     read_orders(s, img, s->party.rosterCount);
     read_maps(s, img);
+    read_edits(s, img);
     s->exp.active = s->vm.c[DUNGEON_VAR] > 0 && s->vm.c[DUNGEON_VAR + 1] > 0;
     s->exp.dungeon = s->vm.c[DUNGEON_VAR];
     s->exp.floor = s->vm.c[DUNGEON_VAR + 1];
@@ -853,6 +876,7 @@ bool sa_pcsave_write(SA *s, const char *path) {
     int members = write_members(s, img);
     write_orders(s, img, members);
     write_maps(s, img);
+    write_edits(s, img);
     write_dungeon(s, img);
     write_maze(s, img);
     write_box_slots(s, img);

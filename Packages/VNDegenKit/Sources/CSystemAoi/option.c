@@ -164,6 +164,7 @@ void sa_option_apply(SA *s) {
     sa_set_volume(s->mix, CH_BGM, gain(s, OPT_BGM_ON, OPT_BGM));
     sa_set_volume(s->mix, CH_SE, gain(s, OPT_SE_ON, OPT_SE));
     sa_set_volume(s->mix, CH_VOICE, gain(s, OPT_TALK_ON, OPT_TALK));
+    sa_dungeon_options(&s->dungeon, s->opt.value[OPT_BRIGHTNESS], s->opt.value[OPT_CAMERA], s->opt.value[OPT_3D] == 0);
 }
 
 enum { GLOBAL_OPTIONS = SA_G_VARS, GLOBAL_CG = GLOBAL_OPTIONS + OPTION_BYTES, GLOBAL_SCENES = GLOBAL_CG + EXTRA_CG,

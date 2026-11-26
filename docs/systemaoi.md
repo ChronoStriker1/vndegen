@@ -51,8 +51,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - **Option.** The original's option screen, from the title, the message window's Option button, the town's
   Option and the dungeon rest screen's OPTION: every setting with its three-state buttons, the four volumes with their arrows, and タイトルに戻る, ゲームに戻る,
   ゲームの終了 and 全設定の初期化 with the original's questions. The window transparency, text and auto speeds, the click
-  and right-click behaviour, waiting for voices in auto mode, stopping voices on a page turn, the fades and the BGM,
-  SE and voice volumes take effect; the settings are kept in `vndegen/global.dat` across launches.
+  and right-click behaviour, waiting for voices in auto mode, stopping voices on a page turn, the fades, the BGM,
+  SE and voice volumes and the three 3D settings (brightness, camera speed, effects) take effect; the settings are kept in `vndegen/global.dat` across launches.
 - **Extra.** The Extra menu with CG閲覧 (the gallery of event pictures seen, from `sam.vfs` samples, each opening full
   screen), シーン回想 and エクストラシナリオ (the scenes the story has opened, replayed from their scripts), 音楽鑑賞 (all 64
   tracks with play, stop, previous, next and the BGM volume), クイズ (`quiz.box`), ヒント (a line from `ExHint.obj`), and
@@ -128,7 +128,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   and shown in the slot and its details; the original shows VNDegen's comments and VNDegen shows the original's. Saves are the
   original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the save folder, packed with its codec
   (`aoicmp.c`, `pcsave.c`): the variables, the town, every member with their place (main or reserve tile), stats,
-  resistances and position bonuses, the equipment, the map memory (visited cells and the steps walked) and, in a
+  resistances and position bonuses, the equipment, the map memory (visited cells and the steps walked), the scripts' map edits (opened doors, taken pickups) and, in a
   dungeon, the cell, the area's enemy groups and their units, and the battle orders with their three saved sets. The
   original loads VNDegen's saves, town or dungeon, and VNDegen lists and loads the original's. Beside each,
   `vndegen/slotNN.sav` keeps VNDegen's own copy of the state; it is used only while its time matches the original
@@ -164,8 +164,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
   cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (32 in 1,000 a
   step after a 10-step quiet, 5 in 1,000 past 90 steps) is fitted to 60 runs of the original; 警戒心 halves it
-  (measured ×0.3, 95% 0.13 to 0.72) and the bells' 引き寄せ change it by ±10% (inferred: no change measurable); a floor's taken pickups and opened doors aren't saved (the
-  original's image doesn't seem to hold them either; opened crystals are, and VNDegen keeps them the same way).
+  (measured ×0.3, 95% 0.13 to 0.72) and the bells' 引き寄せ change it by ±10% (inferred: no change measurable). The scripts' map edits (opened key doors, door
+  spots, taken pickups) are kept as the original keeps them, in its save's edit list: pickups come back on the next
+  expedition, the rest stay (measured). After loading a dungeon save the original refuses a key door even with the
+  key; VNDegen opens it (deliberate).
   The dungeon light and fog are fitted to eleven of the original's
   frames (each within 6%); which walls get a set's variant textures wasn't found from play or data, so each cell
   takes one by a hash (right for about a third of the walls, as by chance); crystals are drawn see-through, unlit and turning (blends
@@ -197,8 +199,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   are typed as plain characters: there's no Japanese input method in the field, and on a touch screen without a
   keyboard the comment stays empty.
 - Option: whether オートモード音声's 再生終了まで待つ adds the auto wait after the voice or overlaps it is inferred; the screen mode,
-  message frame, popup, cursor, 3D, game speed, battle, ranks, autosave mode, VE and inactive-volume settings are kept
-  but do nothing yet; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
+  message frame, popup, cursor, game speed, battle, ranks, autosave mode, VE and inactive-volume settings are kept
+  but do nothing yet; the 3D brightness factors are fitted; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
   original shows in Windows tooltips aren't drawn.
 - Extra: the books' records follow the original's measured rules, but kill counts, floor percents from a loaded save
   and battle-drop and crystal items are counted by inferred rules; 名前 sorting approximates Shift JIS order; the
