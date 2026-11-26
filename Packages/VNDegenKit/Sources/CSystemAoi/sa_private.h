@@ -244,7 +244,7 @@ typedef struct Expedition {
     int steps, areaStart, fighting;
     int arriveSide, arriveAlong, resumeX, resumeY, resumeDir;
     int last[4], entry[4];
-    bool keepGroups, resuming, stepHook;
+    bool keepGroups, resuming, stepHook, trapHook;
     ExpGroup group[EXP_GROUPS];
     int groupCount;
     int hooks[EXP_HOOKS], hookCount, after;

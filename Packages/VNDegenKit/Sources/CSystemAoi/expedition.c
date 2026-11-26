@@ -5,6 +5,8 @@ enum {
     HOOK_FLOOR = 11,
     HOOK_STEP = 12,
     HOOK_STORY = 14,
+    HOOK_TRAP = 19,
+    HOOK_REST = 22,
     HOOK_RETURN = 17,
     HOOK_DUNGEON = 25,
     HOOK_BATTLE_START = 26,
@@ -13,7 +15,7 @@ enum {
 };
 
 enum { SPECIAL_RETURN = 1, SPECIAL_HP, SPECIAL_MP, SPECIAL_CURE, SPECIAL_NO_ENEMY, SPECIAL_NO_TRAP, SPECIAL_ATTACK, SPECIAL_DEFENCE, SPECIAL_EVASION, SPECIAL_SPEED, SPECIAL_RECRUIT, SPECIAL_SEARCH };
-enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST, AFTER_ENCOUNTER, AFTER_CHAIN };
+enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST, AFTER_ENCOUNTER, AFTER_CHAIN, AFTER_CAMP };
 
 enum {
     C_EXP_X = 0x49,
@@ -299,6 +301,7 @@ static void finish_after(SA *s) {
         } else
             encounter(s);
         break;
+    case AFTER_CAMP: sa_camp_open(s); break;
     case AFTER_CHAIN: {
         char group[sizeof e->chain];
         snprintf(group, sizeof group, "%s", e->chain);
@@ -756,7 +759,7 @@ static bool load_floor(SA *s, int dungeon, int floor, bool autosave) {
         e->blindSteps = e->supportSteps = 0;
         memset(e->curse, 0, sizeof e->curse);
     }
-    e->alarm = e->noResidents = false;
+    e->alarm = e->noResidents = e->trapHook = false;
     e->noticeCount = 0;
     e->fadeDur = 0;
     e->fadeBattle = false;
@@ -891,6 +894,7 @@ static void begin_battle(SA *s, const char *group, const int *cells) {
     sa_dungeon_draw(&s->dungeon, s->fb);
     Image *view = sa_image_new(SA_W, SA_H);
     memcpy(view->px, s->fb, sizeof(u32) * SA_W * SA_H);
+    s->battle.levelBonus = s->vm.c[C_ENEMY_LEVEL];
     if (!sa_battle_begin(&s->battle, &s->vfs, group, cells, view, s->exp.dungeon - 1, sa_vm_random(&s->vm))) {
         sa_log(s, "no enemy group %s", group);
         return;
@@ -1272,6 +1276,8 @@ static bool spring_trap(SA *s) {
     for (size_t i = 0; i < sizeof traps / sizeof traps[0] && t < 0; i++)
         if (traps[i].object == object) t = (int)i;
     if (t < 0) return false;
+    sa_story_trap(s, true);
+    e->trapHook = true;
     int kind = traps[t].kind;
     char msg[256];
     if (kind == TRAP_HEAL) {
@@ -1295,6 +1301,7 @@ static bool spring_trap(SA *s) {
     if (kind != TRAP_HAZARD) {
         int avoid = sa_exp_special_active(s, SPECIAL_NO_TRAP) ? 100 : party_has(s, "罠発見") ? AVOID_FINDER_PERCENT : AVOID_PERCENT;
         if ((int)(sa_vm_random(&s->vm) % 100) < avoid) {
+            sa_story_trap(s, false);
             snprintf(msg, sizeof msg, "%sを回避した", traps[t].name);
             sa_exp_notice(s, msg);
             return false;
@@ -1390,15 +1397,11 @@ static void open_hidden_door(SA *s) {
     s->dirty = true;
 }
 
-static void dismiss_notice(SA *s) {
-    s->exp.noticeCount = 0;
-    sa_actions_settle(s);
-}
-
 static void after_move(SA *s, int r) {
     Dungeon *d = &s->dungeon;
     if (r == DUN_REST) {
-        sa_camp_open(s);
+        static const int hooks[] = {HOOK_REST};
+        run_hooks(s, hooks, 1, AFTER_CAMP);
         return;
     }
     if (r == DUN_ACTION) {
@@ -1415,6 +1418,7 @@ static void after_move(SA *s, int r) {
         return;
     }
     if (r == DUN_MOVED || r == DUN_TURNED) {
+        sa_story_act(s);
         s->vm.c[C_ALL_ACTIONS]++;
         s->vm.c[C_EXP_ACTIONS]++;
         s->vm.c[C_AREA_ACTIONS]++;
@@ -1459,11 +1463,26 @@ static void after_move(SA *s, int r) {
     e->stepHook = true;
 }
 
+static void dismiss_notice(SA *s) {
+    s->exp.noticeCount = 0;
+    sa_actions_settle(s);
+    if (!s->exp.trapHook) return;
+    s->exp.trapHook = false;
+    static const int hooks[] = {HOOK_TRAP};
+    run_hooks(s, hooks, 1, AFTER_WALK);
+}
+
 static bool run_step_hook(SA *s) {
     if (!s->exp.stepHook || s->dungeon.animDur) return false;
     s->exp.stepHook = false;
-    static const int hooks[] = {HOOK_STEP, HOOK_STORY};
-    run_hooks(s, hooks, sa_story_arm(s) ? 2 : 1, AFTER_WALK);
+    int hooks[3], n = 0;
+    hooks[n++] = HOOK_STEP;
+    if (s->exp.trapHook && !s->exp.noticeCount) {
+        s->exp.trapHook = false;
+        hooks[n++] = HOOK_TRAP;
+    }
+    if (sa_story_arm(s)) hooks[n++] = HOOK_STORY;
+    run_hooks(s, hooks, n, AFTER_WALK);
     return true;
 }
 

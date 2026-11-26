@@ -430,14 +430,6 @@ static void part_name(const Dungeon *d, char *out, size_t size, char prefix, int
 
 static void set_id(Dungeon *d, int kind, int index) { d->r3.id = showIds ? (u32)(kind << 16 | (index + 1)) : 0; }
 
-static const i32 *cell_at(const Dungeon *d, int x, int y);
-
-static bool hidden_between(const Dungeon *d, int x, int y, int side) {
-    if (!hiddenOpen) return false;
-    const i32 *n = cell_at(d, x + stepX[side & 3], y + stepY[side & 3]);
-    return n && n[wallField[(side + 2) & 3]] == WALL_HIDDEN;
-}
-
 static const i32 *cell_at(const Dungeon *d, int x, int y) {
     if (x < 0 || y < 0 || x >= d->w || y >= d->h) return NULL;
     return d->cell[y * DUN_SIDE + x];
@@ -502,7 +494,7 @@ void sa_dungeon_open_doors(Dungeon *d) {
 
 int sa_dungeon_neighbour(const Dungeon *d, int x, int y, int side) {
     const i32 *c = cell_at(d, x, y);
-    if (!c || c[F_FLOOR] < 0 || (!passable(c, side & 3) && !hidden_between(d, x, y, side))) return -1;
+    if (!c || c[F_FLOOR] < 0 || !passable(c, side & 3)) return -1;
     const i32 *n = cell_at(d, x + stepX[side & 3], y + stepY[side & 3]);
     return n && n[F_FLOOR] >= 0 ? (y + stepY[side & 3]) * DUN_SIDE + x + stepX[side & 3] : -1;
 }
@@ -580,7 +572,7 @@ static void start_anim(Dungeon *d) {
 
 static bool walk(Dungeon *d, int side) {
     const i32 *here = cell_at(d, d->x, d->y);
-    if (!here || (!passable(here, side) && !hidden_between(d, d->x, d->y, side))) {
+    if (!here || !passable(here, side)) {
         if (here && side == d->dir) d->bumped = true;
         return false;
     }
@@ -789,6 +781,11 @@ static void draw_part(Dungeon *d, const PartSet *ps, const Cam *c, const char *n
     draw_model(d, ps, c, name, cx, cz, (float)quarter * QUARTER, 0);
 }
 
+static bool behind_side(const Cam *c, float cx, float cz, int side) {
+    float ex = cx + (float)stepX[side] * CELL * 0.5f, ez = cz - (float)stepY[side] * CELL * 0.5f;
+    return (c->pos[0] - ex) * (float)-stepX[side] + (c->pos[2] - ez) * (float)stepY[side] < 0;
+}
+
 static float leaf_swing(const Dungeon *d, int cellIndex, int side) {
     if (!d->animDur || d->passCell < 0) return 0;
     if (cellIndex == d->passCell && side == d->passSide) return QUARTER * fminf(1, (float)d->animMs / (float)d->animDur);
@@ -910,7 +907,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             int w = cell[wallField[s]];
             set_id(d, PART_WALL, order[i] * 4 + s);
             if (w == WALL_PASSAGE) draw_part(d, &d->set, &c, "next000", cx, cz, sideQuarter[s]);
-            if (w < 0 || w == WALL_PASSAGE) continue;
+            if (w < 0 || w == WALL_PASSAGE || (w == WALL_HIDDEN && behind_side(&c, cx, cz, s))) continue;
             part_name(d, name, sizeof name, 'w', w, PART_WALL, col, row);
             draw_model(d, &d->set, &c, name, cx, cz, (float)sideQuarter[s] * QUARTER, leaf_swing(d, order[i], s));
         }

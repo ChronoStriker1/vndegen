@@ -430,6 +430,8 @@ int sa_party_count_units(const Party *p, const char *key) {
         int r = sa_party_unit_row(p, p->unit[s]);
         if (!key || !*key || !strcmp(sa_table_text(&p->units, r, 1), key)) n++;
     }
+    for (int i = 0; i < p->benchCount; i++)
+        if (p->bench[i].tile >= 0 && (!key || !*key || !strcmp(sa_table_text(&p->units, sa_party_unit_row(p, p->bench[i].unit), 1), key))) n++;
     return n;
 }
 

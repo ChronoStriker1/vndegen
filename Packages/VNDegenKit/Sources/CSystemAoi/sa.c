@@ -574,6 +574,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             if (sa_party_join(&s->party, &s->vfs, key)) {
                 sa_log(s, "joined: %s", key);
                 sa_records_join(s, key);
+                sa_carry_join(s, key);
                 if (s->joinedCount < DIALOG_UNITS) snprintf(s->joined[s->joinedCount++], sizeof s->joined[0], "%s", key);
             }
             else sa_log(s, "no unit %s to join", key);
@@ -661,6 +662,12 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
         s->missions.hover = 0;
         vm->state = VM_WAIT_DIALOG;
         s->dirty = true;
+        break;
+    case 0x85:
+        sa_carry_register(s);
+        break;
+    case 0x86:
+        sa_carry_restore(s);
         break;
     case 0x7a:
         s->gameOver = true;
@@ -846,6 +853,8 @@ static void new_game(SA *s) {
     s->exp.groupCount = 0;
     sa_mission_reset(s);
     sa_maze_reset(s);
+    sa_town_draw_map(&s->town, &s->vfs, &s->vm, s->fb);
+    sa_show_frame_as_bg(s, s->fb, "*town");
     sa_start_script(s, "init.box", 0);
 }
 
@@ -1204,6 +1213,7 @@ VNSystemAoi *vnsystemaoi_open(const VNSystemAoiConfig *config, char *err, size_t
     sa_option_init(&s->opt, &s->vfs);
     sa_extra_init(s);
     sa_global_load(s);
+    sa_carry_load_flags(s);
     sa_option_apply(s);
     sa_go_title(s);
     if (first) {
@@ -1749,7 +1759,15 @@ const char *vnsystemaoi_problem(VNSystemAoi *sa) {
 void sa_debug_battle(VNSystemAoi *sa, const char *group, const char *backdrop) {
     SA *s = (SA *)sa;
     if (!s->party.unit[PARTY_FRONT + 1]) sa_party_new_game(&s->party, &s->vfs);
-    if (!sa_battle_start(&s->battle, &s->vfs, group, backdrop, sa_vm_random(&s->vm))) {
+    Image *back = NULL;
+    if (s->exp.active) {
+        sa_dungeon_draw(&s->dungeon, s->fb);
+        back = sa_image_new(SA_W, SA_H);
+        memcpy(back->px, s->fb, sizeof(u32) * SA_W * SA_H);
+    } else if (backdrop) {
+        back = sa_load_image(&s->vfs, backdrop);
+    }
+    if (!sa_battle_begin(&s->battle, &s->vfs, group, NULL, back, s->exp.active ? s->exp.dungeon - 1 : 0, sa_vm_random(&s->vm))) {
         sa_log(s, "no enemy group %s", group);
         return;
     }

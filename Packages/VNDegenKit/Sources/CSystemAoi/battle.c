@@ -269,7 +269,7 @@ static void add_enemy(Battle *b, Vfs *vfs, int r, int row, int col) {
     f->enemy = true;
     f->row = r;
     f->id = sa_table_int(&b->party->units, r, 0);
-    f->level = sa_table_int(&b->party->units, r, 17);
+    f->level = sa_table_int(&b->party->units, r, 17) + b->levelBonus;
     f->gridRow = row;
     f->gridCell = col;
     fighter_stats(b, f);
