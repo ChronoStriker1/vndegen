@@ -223,7 +223,10 @@ safe: ANGEL QUEST's engine (version 123) closes when it loads a save holding a p
   False Myth 2 (Wolf RPG Editor 3.343, crypt version 0x14B) is one: the header's magic, version, table size, code page and
   flags are in the clear, and the 32 bytes of addresses between them differ from archive to archive. No key of the
   table above, as DxLib's version 8 key or as the raw string, XORed at any offset, turns them into addresses inside the
-  file. How they are encrypted isn't known from the files alone.
+  file. How they are encrypted isn't known from the files alone. Such a game stops at launch with "Cannot read
+  BasicData.wolf: its header is encrypted, as Wolf RPG Editor 3.31 and later can do, which VNDegen doesn't read yet." A
+  version 8 archive that fails to open for another reason names that reason in the same way, where earlier versions said
+  only that `BasicData/Game.dat` was missing.
 - File downloads (command 260) aren't supported. Two Beasts' update check and the standard "sodeba" tools use them, and nothing needs the result.
 - Input a player doesn't have on VNDegen: a game's own gamepad button queries (key input kind 2) read nothing, since VNDegen delivers controllers as keyboard keys, and system variable 38 isn't read, so no key or click reaches an event while the player types. Multiple touch and analog stick queries aren't used by a library game.
 - YUME-SAME turns off the keys a touch gamepad or controller presses, so it plays by touch or pointer only: touches outside the gamepad's buttons work as the mouse under every control method that lets them through. A right click needs the Touch mouse method's two-finger tap or a controller's pointer layout. Two Beasts and Parade Buster also take a controller's Cancel for it.

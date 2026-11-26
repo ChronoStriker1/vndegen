@@ -32,7 +32,7 @@ Game::Game(fs::path root) : root_(root), files_(root) {}
 
 std::vector<uint8_t> Game::readData(const std::string &path) const {
     auto d = files_.read(path);
-    if (!d) throw FormatError("missing " + path);
+    if (!d) throw FormatError(files_.missingReason(path));
     return *d;
 }
 
