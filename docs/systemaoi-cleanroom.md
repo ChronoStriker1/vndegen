@@ -1319,9 +1319,37 @@ the same points (offsets in bytes, numbers little-endian):
   3/5's groups are spawned as on any entry (絶固定0500 at 8, 12 and two drawn from its list). VNDegen does the same
   without stopping the scene and runs the floor hook (11) after hook 14 ends (inferred: 3/5's bo1100 has nothing to
   show it). The two zero operands aren't understood and are ignored.
-- **Hooks never run by VNDegen.** init.box also registers 13, 15, 19, 20, 21, 22 and 23. 19 (bo1900) holds scenes
-  keyed on floor objects 22, 30, 32 and 33 with three or more in the party; 22 (bo2200) the dungeon rest conversations, once per expedition (F129,
-  cleared by bo1000) with three or more in the party, the next unseen one whose turn (0, 20, 40, …) has come. On
-  the PC, 休憩 with Darkus alone opened camp without one. 13, 15, 20 and 23 are empty or only set a backdrop;
-  21 turns a crystal (60) into 61. `ga0000.box` is named by `party.obj` instead (see Story groups), and VNDegen
-  runs it after hook 27; the true ending is reached by play.
+- **Dungeon rest conversations (hook 22).** bo2200 plays, once per expedition (F129, which hook 10's bo1000 clears),
+  with three or more in the party (`ad` into CL002), the first of its ten conversations not yet seen (F2801 to
+  F2810) whose turn has come (C060 ≥ 0, 20, 40, …, 120; the last three need F050 and C066 over 1,000, 2,000 and
+  3,000 steps). Measured under Wine on 千樹庭 一層 (1/1) from VNDegen exports of the turn-42 save: pressing 休憩 with
+  Darkus and both sisters on the main tiles faded the HUD and the view, played F2801's three lines (「ふう、一休み
+  一休み」) and then opened the camp screen (2 runs); a second 休憩 on the same expedition opened camp at once; two
+  on the main tiles and the third unplaced opened camp with no conversation and F129 still off; two on the main
+  tiles and one on a reserve tile played it (so the reserve counts); with F2801 already on, F2802's four lines
+  played. Each run saved from camp to read F129 and the F28xx flags back. VNDegen runs hook 22 when 休憩 is
+  pressed and opens camp when it ends, and `ad` counts the reserve tiles as well (the named form, `ad` with a
+  unit, counting them too is inferred).
+- **Trap scenes (hook 19).** bo1900 reads the floor object under the party (`d8`) and, with C090 = 1, plays: with
+  F020 on, the alarm (30, F3410 to F3412), the spinner (33, F3407 to F3409) and the hallucination (32, F3413 to
+  F3417) scenes with three or more in the party, and on 石葉層 九層 and 十層 the support-separation story (22,
+  F3418 to F3420, F157, no party check); with F020 off, one of six warnings about a trap (F3401 to F3406) whatever
+  the object. Measured under Wine with three in the party: the alarm on 2/7 (13, 7) said 「警報を回避した」 in four
+  runs, and when that message was dismissed the scene for F3401 played (「魔王様、ここに罠があります。」) and the save
+  had F020 off (also when it was on before); with C006 at 12,345 it said 「警報に引っかかった！」 (2 runs) and the
+  alarm scene played after the message (「あっ、マズイっ！」). The spinner on 10/9 (8, 4) has no message, and its
+  scene played on the step itself. On 7/9 (12, 1) the support trap avoided played F3401 and sprung played the
+  29-line キュリハ story with F3418 and F157 set. The healing circle (42) and a 棘の床 (1) turned F020 on with no
+  scene; two in the party played nothing. Left alone, the sprung alarm's message closed by itself after about 18
+  seconds and the scene began (one run; VNDegen doesn't time messages out). So the engine sets F020 to whether the
+  object took effect and runs hook 19 after the object's message. VNDegen does that for every object in its trap
+  table: F020 off on an avoided trap and on otherwise, hook 19 when the message is dismissed, or with the step's
+  hooks (after hook 12, before hook 14) when there is none. Running it for the healing circle, hazards and
+  teleporters (nothing plays there with F020 on) and the order after hook 12 are inferred; a teleport to another
+  floor drops it.
+- **C090.** No script writes it; hooks 13, 14 and 19 need it at 1. Measured: a PC save with C090 set to 0, loaded
+  and saved through 休憩, kept 0; one step or one turn set it to 1. The original's turn 1 and 2 saves hold 0, its
+  later ones 1. VNDegen sets it on every step and turn (that a wall bump does too isn't known, and VNDegen doesn't).
+- **Hooks never run by VNDegen.** init.box also registers 13, 15, 20, 21 and 23. 13, 15, 20 and 23 are empty or only
+  set a backdrop; 21 turns a crystal (60) into 61. `ga0000.box` is named by `party.obj` instead (see Story groups),
+  and VNDegen runs it after hook 27; the true ending is reached by play.
