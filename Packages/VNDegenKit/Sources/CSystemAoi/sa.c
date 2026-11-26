@@ -27,8 +27,8 @@ typedef struct Button {
 enum { BTN_AUTO, BTN_SKIP, BTN_LOG, BTN_REPEAT, BTN_OPTION, BTN_CLOSE, BTN_COUNT };
 
 static const Button buttons[BTN_COUNT] = {
-    {UI_AUTO, 1086, 554, 78, 30}, {UI_SKIP, 1086, 584, 78, 30},   {UI_LOG, 1086, 614, 80, 30},
-    {UI_REPEAT, 1086, 644, 80, 30}, {UI_OPTION, 1086, 674, 80, 30}, {UI_CLOSE, 1191, 554, 32, 30},
+    {UI_AUTO, 1087, 555, 78, 30}, {UI_SKIP, 1087, 585, 78, 30},   {UI_LOG, 1087, 615, 80, 30},
+    {UI_REPEAT, 1087, 645, 80, 30}, {UI_OPTION, 1087, 675, 80, 30}, {UI_CLOSE, 1192, 555, 32, 30},
 };
 
 
@@ -340,6 +340,25 @@ static char *opd_str(const u8 *code, const Insn *in, int i) {
     return sa_utf16_to_utf8(code + in->o[i].strOffset, in->o[i].strLen);
 }
 
+static void add_join_cards(SA *s) {
+    for (int i = 0; i < s->joinedCount; i++) {
+        int r = -1;
+        for (int k = 0; k < s->party.units.rows && r < 0; k++)
+            if (!strcmp(sa_table_text(&s->party.units, k, 1), s->joined[i])) r = k;
+        if (r < 0) continue;
+        char name[24];
+        snprintf(name, sizeof name, "u%04da2.agf", sa_table_int(&s->party.units, r, 11));
+        SpriteSheet sheet;
+        Image *im = sa_sheet_load(&s->vfs, name, &sheet);
+        if (!im) {
+            snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&s->party.units, r, 11));
+            im = sa_sheet_load(&s->vfs, name, &sheet);
+        }
+        sa_dialog_add_unit(&s->dialog, im, &sheet, sa_table_text(&s->party.units, r, 2));
+    }
+    s->joinedCount = 0;
+}
+
 static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     SA *s = ctx;
     switch (in->op) {
@@ -446,21 +465,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
             snprintf(s->bg.name, sizeof s->bg.name, "*dungeon");
         }
         free(t);
-        for (int i = 0; i < s->joinedCount; i++) {
-            int r = -1;
-            for (int k = 0; k < s->party.units.rows && r < 0; k++)
-                if (!strcmp(sa_table_text(&s->party.units, k, 1), s->joined[i])) r = k;
-            if (r < 0) continue;
-            char name[24];
-            snprintf(name, sizeof name, "u%04da2.agf", sa_table_int(&s->party.units, r, 11));
-            Image *im = sa_load_image(&s->vfs, name);
-            if (!im) {
-                snprintf(name, sizeof name, "u%04da0.agf", sa_table_int(&s->party.units, r, 11));
-                im = sa_load_image(&s->vfs, name);
-            }
-            sa_dialog_add_unit(&s->dialog, im, sa_table_text(&s->party.units, r, 2));
-        }
-        s->joinedCount = 0;
+        add_join_cards(s);
         vm->state = VM_WAIT_DIALOG;
         s->dirty = true;
         break;
@@ -704,13 +709,11 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
 
 
 
-enum { MSG_X = 0, MSG_Y = 546, TEXT_X = 324, TEXT_Y = 589, TEXT_SIZE = 28, TEXT_PITCH = 31, NAME_X = 305, NAME_Y = 553 };
-enum { CHOICE_W = 504, CHOICE_H = 50, CHOICE_EDGE = 22, FEATHER_X = 1046, FEATHER_Y = 679 };
+enum { MSG_X = 0, MSG_Y = 546, TEXT_X = 324, TEXT_Y = 590, TEXT_SIZE = 28, TEXT_PITCH = 31, NAME_X = 305, NAME_Y = 554 };
+enum { CHOICE_X = 392, CHOICE_W = 504, CHOICE_H = 50, CHOICE_EDGE = 22, CHOICE_TOP = 130, CHOICE_RISE = 14, CHOICE_TEXT_Y = 10, FEATHER_X = 1047, FEATHER_Y = 680 };
 
 static int choice_y(SA *s, int i) {
-    int n = s->vm.choiceCount;
-    int top = (MSG_Y - n * CHOICE_H - 2 * CHOICE_EDGE) / 2 + CHOICE_EDGE;
-    return top + i * CHOICE_H;
+    return CHOICE_TOP - CHOICE_RISE * s->vm.choiceCount + CHOICE_EDGE + i * CHOICE_H;
 }
 
 static int button_at(int x, int y) {
@@ -736,7 +739,7 @@ static void compose(SA *s) {
     if (window_shown(s)) {
         sa_blit_alpha(fb, s->msgBand, MSG_X, MSG_Y, sa_option_window_alpha(s));
         sa_blit(fb, s->msgFrame, MSG_X, MSG_Y);
-        sa_blit_rect(fb, s->ui[UI_LEAF], 0, 0, 44, 41, 1044, 536);
+        sa_blit_rect(fb, s->ui[UI_LEAF], 0, 0, 44, 41, 1045, 537);
         for (int i = 0; i < BTN_COUNT; i++) {
             const Button *b = &buttons[i];
             int col = (i == BTN_AUTO && s->autoMode) || (i == BTN_SKIP && s->skipMode) ? 1 : 0;
@@ -746,7 +749,7 @@ static void compose(SA *s) {
             int f = (int)(s->featherMs / 33) % 31;
             sa_blit_rect(fb, s->ui[UI_FEATHER], f * 32, 0, 32, 32, FEATHER_X, FEATHER_Y);
         }
-        sa_blit(fb, s->face.img, -1, 294);
+        sa_blit(fb, s->face.img, 0, 295);
         if (s->name[0]) sa_text_draw(fb, SA_W, SA_H, s->name, -1, NAME_X, NAME_Y, TEXT_SIZE, 0xffffff, 0x000000);
         int left = s->shown;
         for (int i = 0; i < s->lineCount && left > 0; i++) {
@@ -757,14 +760,14 @@ static void compose(SA *s) {
         }
     }
     if (s->vm.state == VM_WAIT_CHOICE) {
-        int x = (SA_W - CHOICE_W) / 2;
+        int x = CHOICE_X;
         sa_blit(fb, s->ui[UI_CHOICE_TOP], x, choice_y(s, 0) - CHOICE_EDGE);
         for (int i = 0; i < s->vm.choiceCount; i++) {
             int y = choice_y(s, i);
             sa_blit_rect(fb, s->ui[UI_CHOICE_ROW], 0, i == s->hover ? CHOICE_H : 0, CHOICE_W, CHOICE_H, x, y);
             const char *t = s->vm.choice[i].label;
             int w = sa_text_width(t, -1, TEXT_SIZE);
-            sa_text_draw(fb, SA_W, SA_H, t, -1, x + (CHOICE_W - w) / 2, y + (CHOICE_H - TEXT_SIZE) / 2, TEXT_SIZE, 0x302010, 0xffffffffu);
+            sa_text_draw(fb, SA_W, SA_H, t, -1, x + (CHOICE_W - w) / 2 - 1, y + CHOICE_TEXT_Y, TEXT_SIZE, 0xffffff, 0x000000);
         }
         sa_blit(fb, s->ui[UI_CHOICE_BOTTOM], x, choice_y(s, s->vm.choiceCount));
     }
@@ -1106,7 +1109,7 @@ static void title_pick(SA *s, int item) {
 
 static int choice_at(SA *s, int x, int y) {
     if (s->vm.state != VM_WAIT_CHOICE) return -1;
-    int cx = (SA_W - CHOICE_W) / 2;
+    int cx = CHOICE_X;
     for (int i = 0; i < s->vm.choiceCount; i++) {
         int cy = choice_y(s, i);
         if (x >= cx && x < cx + CHOICE_W && y >= cy && y < cy + CHOICE_H) return i;
@@ -1875,6 +1878,20 @@ void sa_debug_equip(VNSystemAoi *sa, int slot, int item) {
 void sa_debug_join(VNSystemAoi *sa, const char *key) {
     SA *s = (SA *)sa;
     sa_party_join(&s->party, &s->vfs, key);
+    s->dirty = true;
+}
+
+void sa_debug_join_box(VNSystemAoi *sa, const char *keys, const int before[4], const int after[4], const char *text) {
+    SA *s = (SA *)sa;
+    s->joinedCount = 0;
+    for (const char *p = keys; *p && s->joinedCount < DIALOG_UNITS;) {
+        const char *e = strchr(p, ',');
+        int n = e ? (int)(e - p) : (int)strlen(p);
+        snprintf(s->joined[s->joinedCount++], sizeof s->joined[0], "%.*s", n, p);
+        p += n + (e ? 1 : 0);
+    }
+    sa_dialog_open_turn(&s->dialog, before, after, text);
+    add_join_cards(s);
     s->dirty = true;
 }
 

@@ -30,8 +30,8 @@ enum {
     SLOTS_Y = 395,
     ABILITY_RIGHT = 253,
     ABILITY_Y = 417,
-    SPRITE_X = 80,
-    SPRITE_FEET = 171,
+    SPRITE_ANCHOR_X = 75,
+    SPRITE_ANCHOR_Y = 162,
     DESC_X = 997,
     DESC_Y = 521,
     DESC_TEXT_X = 1005,
@@ -219,19 +219,39 @@ void sa_card_draw(SA *s, u32 *fb, const Member *m, int x, int y) {
     draw_status(s, fb, m, x, y);
 }
 
+Image *sa_sheet_load(Vfs *vfs, const char *name, SpriteSheet *sheet) {
+    size_t n;
+    u8 *d = sa_vfs_read(vfs, name, &n);
+    Image *im = d ? sa_agf_decode(d, n) : NULL;
+    *sheet = (SpriteSheet){1, im ? im->w : 0, im ? im->h : 0, im ? 1 : 0, im ? im->w / 2 : 0, im ? im->h : 0};
+    if (im && n >= 0x68) {
+        float f[5];
+        memcpy(f, d + 0x2c, sizeof f);
+        int usedW = (int)rd32(d + 0x24), usedH = (int)rd32(d + 0x28), cw = (int)f[3], ch = (int)f[4], frames = (int)rd32(d + 0x64);
+        if (cw > 0 && ch > 0 && usedW >= cw && usedH >= ch && usedW <= im->w && usedH <= im->h && frames > 0 && frames <= (usedW / cw) * (usedH / ch))
+            *sheet = (SpriteSheet){usedW / cw, cw, ch, frames, (int)f[0], (int)f[1]};
+    }
+    free(d);
+    return im;
+}
+
+void sa_sheet_draw(u32 *fb, const Image *im, const SpriteSheet *sheet, int frame, int x, int y) {
+    if (!im || sheet->frames <= 0) return;
+    frame %= sheet->frames;
+    sa_blit_rect(fb, im, frame % sheet->cols * sheet->cellW, frame / sheet->cols * sheet->cellH, sheet->cellW, sheet->cellH, x - sheet->anchorX, y - sheet->anchorY);
+}
+
 static void draw_portrait(SA *s, u32 *fb, int number, int x, int y) {
+    static SpriteSheet sheet;
     Card *c = &s->card;
     if (c->portraitNumber != number || !c->portrait) {
         sa_image_free(c->portrait);
         char name[24];
         snprintf(name, sizeof name, "u%04da2.agf", number);
-        c->portrait = sa_load_image(&s->vfs, name);
+        c->portrait = sa_sheet_load(&s->vfs, name, &sheet);
         c->portraitNumber = number;
-        c->portraitFrames = c->portrait ? sa_sprite_split(c->portrait, c->portraitFrame, SPRITE_FRAMES) : 0;
     }
-    if (!c->portraitFrames) return;
-    SpriteFrame f = c->portraitFrame[s->party.ms / PARTY_CELL_MS % (u32)c->portraitFrames];
-    sa_blit_rect(fb, c->portrait, f.x, f.y, f.w, f.h, x + SPRITE_X - f.w / 2, y + SPRITE_FEET - f.h);
+    sa_sheet_draw(fb, c->portrait, &sheet, (int)(s->party.ms / PARTY_CELL_MS), x + SPRITE_ANCHOR_X, y + SPRITE_ANCHOR_Y);
 }
 
 static void draw_status(SA *s, u32 *fb, const Member *m, int x, int y) {

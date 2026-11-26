@@ -139,6 +139,11 @@ int main(int argc, char **argv) {
             alive = alive && run(s, 100);
         }
         if (!strncmp(argv[a], "join=", 5)) sa_debug_join(s, argv[a] + 5);
+        if (!strncmp(argv[a], "joinbox=", 8)) {
+            static const int before[4] = {15, 196, 1270, 850}, after[4] = {17, 196, 1270, 850};
+            sa_debug_join_box(s, argv[a] + 8, before, after, "ミアルテ、ルーアルテが仲間になった。");
+            alive = alive && run(s, 30);
+        }
         if (!strncmp(argv[a], "reserve=", 8)) {
             char key[64];
             int tile;
