@@ -32,6 +32,7 @@ static bool mpx_read(Store *s, int kind, const char *path) {
         const u8 *e = idx + (size_t)i * 0x14;
         MpxEntry *m = &list[n + i];
         memset(m, 0, sizeof *m);
+        memcpy(m->stored, e, 12);
         memcpy(m->name, e, 12);
         ik_lower(m->name);
         m->offset = rd32(e + 12);
@@ -70,28 +71,35 @@ void store_close(Store *s) {
     memset(s, 0, sizeof *s);
 }
 
-u8 *store_load(Store *s, int kind, const char *name, size_t *size) {
+static MpxEntry *find(Store *s, int kind, const char *name) {
     char key[64];
     snprintf(key, sizeof key, "%s", name);
     ik_lower(key);
     size_t keyLen = strlen(key);
     bool bare = !strchr(key, '.');
-    MpxEntry *e = NULL;
-    for (int i = 0; i < s->counts[kind] && !e; i++)
-        if (!strcmp(s->entries[kind][i].name, key)) e = &s->entries[kind][i];
-    for (int i = 0; i < s->counts[kind] && !e && bare; i++) {
+    for (int i = 0; i < s->counts[kind]; i++)
+        if (!strcmp(s->entries[kind][i].name, key)) return &s->entries[kind][i];
+    for (int i = 0; i < s->counts[kind] && bare; i++) {
         MpxEntry *c = &s->entries[kind][i];
-        if (!strncmp(c->name, key, keyLen) && c->name[keyLen] == '.') e = c;
-    }
-    if (e) {
-        FILE *f = s->files[e->file];
-        u8 *d = ik_alloc((size_t)e->size + 1);
-        if (fseek(f, (long)e->offset, SEEK_SET) || fread(d, 1, e->size, f) != e->size) {
-            free(d);
-            return NULL;
-        }
-        if (size) *size = e->size;
-        return d;
+        if (!strncmp(c->name, key, keyLen) && c->name[keyLen] == '.') return c;
     }
     return NULL;
+}
+
+const char *store_name(Store *s, int kind, const char *name) {
+    MpxEntry *e = name && name[0] ? find(s, kind, name) : NULL;
+    return e ? e->stored : name;
+}
+
+u8 *store_load(Store *s, int kind, const char *name, size_t *size) {
+    MpxEntry *e = find(s, kind, name);
+    if (!e) return NULL;
+    FILE *f = s->files[e->file];
+    u8 *d = ik_alloc((size_t)e->size + 1);
+    if (fseek(f, (long)e->offset, SEEK_SET) || fread(d, 1, e->size, f) != e->size) {
+        free(d);
+        return NULL;
+    }
+    if (size) *size = e->size;
+    return d;
 }

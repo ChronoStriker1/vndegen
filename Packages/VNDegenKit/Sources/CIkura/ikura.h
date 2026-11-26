@@ -43,7 +43,7 @@ static inline int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? 
 enum { AR_GRP, AR_SNR, AR_SE, AR_BGM, AR_DATA, AR_VOICE, AR_KINDS };
 
 typedef struct MpxEntry {
-    char name[16];
+    char name[16], stored[16];
     u32 offset, size;
     int file;
 } MpxEntry;
@@ -58,6 +58,7 @@ typedef struct Store {
 bool store_open(Store *s, const char *gameDir, char *err, size_t errSize);
 void store_close(Store *s);
 u8 *store_load(Store *s, int kind, const char *name, size_t *size);
+const char *store_name(Store *s, int kind, const char *name);
 
 typedef struct Cell {
     int dx, dy, sx, sy, w, h;
