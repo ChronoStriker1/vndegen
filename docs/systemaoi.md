@@ -113,6 +113,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   before and after battles and on the way home; a loss ends the expedition. The boss-side cutaways (74 scenes in all
   ten dungeons) play when the party ends a step or a turn on a cell its map marks with a scene number, or wins a
   battle there, and the one that drops the floor (`d4`) takes the party to the area below as the original does.
+  With three or more in the party (reserve tiles count), 休憩 first plays the next rest conversation once per
+  expedition, and a trap's scene (the alarm, the spinner, the hallucination, a warning on an avoided trap, and the
+  support-separation story on 石葉層 九層 and 十層) plays when its message is dismissed, or on the step when there is no
+  message.
   開ける on a crystal gives one item of the floor's chest rank and leaves the crystal open, as the original records it
   in its save.
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
@@ -165,8 +169,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   ice dungeon's diamond walls are drawn plain); the falling leaves, sparks, snow and light motes some dungeons
   show aren't drawn.
 - Story: the true ending (F161 after 真魔力塊隊) and 内政END play, but some story the original runs from its exe isn't
-  rebuilt: the trap scenes (hook 19), the dungeon rest conversations (hook 22) and the second playthrough's
-  carried-over data (`85`/`86`: new games never offer 引き継ぐ). The 探索, 調査, 押す, 引く, 切り替える and ワープ
+  rebuilt: the second playthrough's carried-over data (`85`/`86`: new games never offer 引き継ぐ). Trap messages wait
+  for a key or click; the original's also close by themselves after about 18 seconds (one run), and VNDegen doesn't
+  time them out. The 探索, 調査, 押す, 引く, 切り替える and ワープ
   buttons have art but nothing in the game offers them (searched in the maps, scripts and PC play), so they aren't
   built.
 - Story groups: area bosses stand on their routes and stay beaten (measured), and a won battle with a story group

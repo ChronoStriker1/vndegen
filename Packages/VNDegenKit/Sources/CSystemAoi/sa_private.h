@@ -520,6 +520,8 @@ typedef struct StoryWarp {
 
 int sa_story_scene(const SA *s);
 bool sa_story_arm(SA *s);
+void sa_story_act(SA *s);
+void sa_story_trap(SA *s, bool sprung);
 bool sa_story_collapse(const int *v, int count, StoryWarp *to);
 
 #endif

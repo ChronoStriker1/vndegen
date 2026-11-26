@@ -3,6 +3,8 @@
 enum {
     F_STORY = 7,
     STORY_KIND = 1,
+    C_ACTED = 90,
+    F_TRAP_SPRUNG = 20,
     C_STORY_KIND = 95,
     C_STORY_SCENE = 96,
     D4_DUNGEON = 0,
@@ -28,6 +30,10 @@ bool sa_story_arm(SA *s) {
     sa_log(s, "story cell %d,%d: scene %d", s->dungeon.x, s->dungeon.y, n);
     return true;
 }
+
+void sa_story_act(SA *s) { s->vm.c[C_ACTED] = 1; }
+
+void sa_story_trap(SA *s, bool sprung) { s->vm.f[F_TRAP_SPRUNG] = sprung; }
 
 bool sa_story_collapse(const int *v, int count, StoryWarp *to) {
     if (count < D4_OPERANDS) return false;
