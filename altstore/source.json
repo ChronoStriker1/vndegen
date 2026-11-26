@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.60.19",
+          "buildVersion": "3592",
+          "date": "2026-11-26T11:36:14Z",
+          "localizedDescription": "BUNNY BLACK 3 is complete: the PC's battle row rule and opening attacks, 戦闘隊列, autosave and popup options, rest scenes and appointment scenes.\n\n## Downloads\n\n- `VNDegen-0.60.19-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.60.19.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.60.19-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n\n\n\n\n## Added\n\n- **SystemAoi:** opening attacks before the first round, from 先制暗殺攻撃, 忍び寄る者 and 先制攻撃, on both sides, and 先制攻撃無効化 blocks them.\n- **SystemAoi:** 交代 moves a unit to a picked tile, and 戦闘隊列 keeps or restores the board after a battle.\n- **SystemAoi:** Option's オートセーブ, with the after-battle and per-step autosaves, and 確認ポップアップ's three levels. Saving over a used slot asks 上書きしますか？.\n- **SystemAoi:** leaving 配置 after a change plays the appointment scenes, and resting plays the second rest script's scenes at the PC's rests.\n\n## Changed\n\n- **SystemAoi:** a hit on a row behind the frontmost row its side still holds does half damage, as on the PC, and 防御 adds 10 defence until the unit's next action.\n- **SystemAoi:** the 図鑑 and the post holders cut their sprite sheets by the header grid, and in 配置 a held figure is drawn on top at 75% opacity, as on the PC.\n- **SystemAoi:** the 学園's cells keep the turn they were built, as in the PC's saves.\n\n## Known limits\n\n- **SystemAoi:** BUNNY BLACK 3 plays from the title to its true ending. What still differs from the PC, or couldn't be measured on it, is listed under Known limits in [docs/systemaoi.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/systemaoi.md). Among them: the wall variants, the PC's random rolls, the snowflakes' sideways drift, the boss's mark on the minimap, and some Option settings (screen mode, cursor and hover descriptions).\n- **SystemAoi:** 商会 buying and selling, the turn report, and the late battles, defence battles and final boss weren't compared side by side with the PC.\n\n## What wasn't tested\n\n- No physical device or physical controller was used. BUNNY BLACK 3 was played in the Linux test build, the Mac app and an iPad simulator, and compared with the original engine under Wine.\n- No code review was done on this release.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.60.19/VNDegen-0.60.19.ipa",
+          "size": 132843341,
+          "sha256": "ace03c39364e502bceeb7c580ddf526a70d604cce2f856f4cb3f8e229f2de2ae",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.60.18",
           "buildVersion": "3579",
           "date": "2026-11-26T10:04:33Z",
