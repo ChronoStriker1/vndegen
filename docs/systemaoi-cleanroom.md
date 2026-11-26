@@ -180,7 +180,15 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   乱舞斬 hit each once, so VNDegen picks different targets; 火矢三連 once hit the same slime twice (a miss, then 20),
   which that doesn't explain yet. Measured again at turn 42 (Darkus at a higher level, three フニ in one row): in two
   casts 乱舞斬 hit two フニ for 60 and 61, then 60 and 63, no halving; VNDegen's rule gave 63 and 30 on the same
-  battle. Which rule decides between the two isn't known, so VNDegen keeps the halving.
+  battle. 火矢三連 likewise hit one フニ twice for 43 and 45, and 45 and 45, in two casts. Which rule decides between
+  these and the earlier halving isn't known, so VNDegen keeps the halving.
+- **Pacing.** Measured from 30 fps recordings of the log under Wine, timed from the 戦闘開始 button's press: an
+  action shows its skill line, then all its result lines together one step later, and the next action comes one step
+  after that. With ゲーム全体の速度 at 通常 the first line came 0.50 s after the press and the steps were 0.83 to 1.00 s
+  (mean 0.91); at 速い 0.37 s and 0.46 to 0.57 s (mean 0.52); at 最速 0.30 s and 0.30 to 0.37 s (mean 0.34). 戦闘演出
+  簡略 gave 0.50 s and a mean of 0.93 s, the same as 通常. VNDegen uses 906, 520 and 340 ms steps with first lines at
+  500, 370 and 300 ms (it used to log each action whole every 1.5 s). Inferred: the steps are time, not frames (the
+  original drew 29 to 39 frames a second under Wine), and a fallen unit's turn takes no step.
 - **Choosing a skill.** `unit.obj` lists up to eight skills in threes from column 40: the level the skill is learned
   at, its name and its weight. Measured on every enemy record the original rolled in 38 floor autosaves (ten earlier
   ones, four area-entry autosaves of 中央森 and 絶命院, and 24 new ones made by stepping through passages into

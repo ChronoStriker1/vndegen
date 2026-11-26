@@ -699,7 +699,8 @@ typedef struct Battle {
     int count, levelBonus, expBonus;
     int order[BATTLE_FIGHTERS], orderCount, next;
     BattleLine log[BATTLE_LOG];
-    int logCount;
+    int logCount, hidden, speed;
+    bool queueing;
     int picker, pickSlot, pickCount;
     Order pick[BATTLE_PICKS];
     int gainResources, gainExp;
@@ -710,6 +711,7 @@ typedef struct Battle {
 } Battle;
 
 bool sa_battle_init(Battle *b, Vfs *vfs, Party *party);
+void sa_battle_set_speed(Battle *b, int speed);
 void sa_battle_free(Battle *b);
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed);
 bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, Image *backdrop, int boardSet, u32 seed);

@@ -163,7 +163,7 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   5.5 over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred. The enemy side's reserve tiles are measured on the small board only; the larger boards draw none
   until measured. 乱舞斬 halves its second target's damage, as first measured, but in two later casts the original
-  hit two targets in one row for full damage each; which rule decides isn't known. ホリィ's 自動攻撃 before the first
+  hit two targets in one row for full damage each (火矢三連 too); which rule decides isn't known. ホリィ's 自動攻撃 before the first
   round isn't built.
 - Text: the original draws its text with the same Ume Gothic but monochrome and hinted; VNDegen thresholds its
   unhinted glyphs at the point that matches the hinted shapes best, so a stroke can still land a pixel off.
@@ -215,8 +215,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   are typed as plain characters: there's no Japanese input method in the field, and on a touch screen without a
   keyboard the comment stays empty.
 - Option: whether オートモード音声's 再生終了まで待つ adds the auto wait after the voice or overlaps it is inferred; the screen mode,
-  message frame, popup, cursor, game speed, battle, ranks, autosave mode, VE and inactive-volume settings are kept
-  but do nothing yet; the 3D brightness factors are fitted; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
+  message frame, popup, cursor, ranks, autosave mode, VE and inactive-volume settings are kept but do nothing yet;
+  ゲーム全体の速度 paces battle rounds as measured, and what else it speeds up isn't measured; 戦闘演出 簡略 changed
+  nothing measurable in a round's pacing and VNDegen draws no skill effects for it to lighten; the 3D brightness factors are fitted; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
   original shows in Windows tooltips aren't drawn.
 - Extra: the books' records follow the original's measured rules, but kill counts, floor percents from a loaded save
   and battle-drop and crystal items are counted by inferred rules; 名前 sorting approximates Shift JIS order; the

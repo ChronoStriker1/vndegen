@@ -128,7 +128,6 @@ enum {
     PICK_INSET_Y = 4,
     ICON = 20,
     SKILL_SIZE = 12,
-    ACTION_MS = 1500,
     BATTLE_FADE_MS = 400,
     LOSS_MS = 2000,
     SUBSTITUTE_CHANCE = 50,
@@ -458,6 +457,7 @@ static void log_line(Battle *b, const char *who, bool enemy, const char *rest, b
         b->logCount--;
     }
     BattleLine *l = &b->log[b->logCount++];
+    if (b->queueing) b->hidden++;
     l->text = sa_fmt("%s\t%s", who, rest);
     l->enemy = enemy;
     l->indent = indent;
@@ -726,10 +726,15 @@ static void roll_order(Battle *b) {
         }
 }
 
+static const u32 lineMs[3] = {906, 520, 340}, firstMs[3] = {500, 370, 300};
+
+void sa_battle_set_speed(Battle *b, int speed) { b->speed = speed >= 0 && speed < 3 ? speed : 0; }
+
 static void plan_round(Battle *b) {
     for (int i = 0; i < b->count; i++) b->f[i].guard = false;
     b->next = 0;
-    b->ms = ACTION_MS;
+    b->ms = lineMs[b->speed] - firstMs[b->speed];
+    b->hidden = 0;
     b->acting = true;
     b->picker = PICK_NONE;
     b->round++;
@@ -798,10 +803,8 @@ static void finish_check(Battle *b) {
             reward(b);
         } else if (!count_side(b, false)) {
             b->result = BATTLE_LOST;
-            b->ms = 0;
         }
     }
-    if (b->result != BATTLE_RUNNING) b->acting = false;
     for (int i = 0; i < b->count; i++)
         if (!b->f[i].enemy) {
             b->party->hp[b->f[i].slot] = b->f[i].hp;
@@ -816,7 +819,7 @@ bool sa_battle_tick(Battle *b, u32 ms) {
         b->fadeMs += ms;
         changed = true;
     }
-    if (b->result == BATTLE_LOST && b->open) {
+    if (b->result == BATTLE_LOST && b->open && !b->acting) {
         b->ms += ms;
         if (b->ms < LOSS_MS) return changed;
         b->open = false;
@@ -830,16 +833,29 @@ bool sa_battle_tick(Battle *b, u32 ms) {
         return changed;
     }
     b->ms += ms;
-    while (b->acting && b->ms >= ACTION_MS) {
-        b->ms -= ACTION_MS;
+    while (b->acting && b->ms >= lineMs[b->speed]) {
+        b->ms -= lineMs[b->speed];
+        changed = true;
+        if (b->hidden) {
+            b->hidden = 0;
+            continue;
+        }
+        if (b->result != BATTLE_RUNNING) {
+            b->acting = false;
+            b->ms = 0;
+            break;
+        }
+        while (b->next < b->orderCount && !alive(&b->f[b->order[b->next]])) b->next++;
         if (b->next >= b->orderCount) {
             b->acting = false;
             roll_order(b);
             break;
         }
+        b->queueing = true;
         act(b, b->order[b->next++]);
+        b->queueing = false;
+        if (b->hidden) b->hidden--;
         finish_check(b);
-        changed = true;
     }
     return changed;
 }
@@ -980,10 +996,10 @@ static void draw_fighter(Battle *b, u32 *fb, Fighter *f) {
 
 static void draw_log(Battle *b, u32 *fb) {
     sa_blit_rect(fb, b->art[ART_LOG], 0, 0, b->art[ART_LOG] ? b->art[ART_LOG]->w : 0, 450, LOG_X, LOG_Y);
-    int first = b->logCount > LOG_LINES ? b->logCount - LOG_LINES : 0;
+    int shown = b->logCount - b->hidden, first = shown > LOG_LINES ? shown - LOG_LINES : 0;
     sa_font_set_spacing(0);
     sa_font_set_plain(true);
-    for (int i = first; i < b->logCount; i++) {
+    for (int i = first; i < shown; i++) {
         BattleLine *l = &b->log[i];
         int y = LOG_TEXT_Y + (i - first) * LOG_PITCH;
         char *tab = strchr(l->text, '\t');
