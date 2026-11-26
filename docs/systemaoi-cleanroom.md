@@ -198,13 +198,30 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   attack 9) for 18 each time and フニ's ひっかき (25 to 28, attack 10) for 20 and 21. 斬撃, 打撃 and 射撃 skills all
   follow it. Re-measured at turn 42 over five battles: ひっかき on Darkus did 18 four times, 19 four times, 20 five
   times and 21 eight times, with one miss, the full predicted range (an earlier sample of three 18s was chance).
-- **Several targets.** 乱舞斬 and 火矢三連 (target 敵３) hit their first target for full damage, the second for half
-  and, once seen, the third for a quarter (乱舞斬's 12 where a first hit would have done 50 to 53). Against two enemies
-  乱舞斬 hit each once, so VNDegen picks different targets; 火矢三連 once hit the same slime twice (a miss, then 20),
-  which that doesn't explain yet. Measured again at turn 42 (Darkus at a higher level, three フニ in one row): in two
-  casts 乱舞斬 hit two フニ for 60 and 61, then 60 and 63, no halving; VNDegen's rule gave 63 and 30 on the same
-  battle. 火矢三連 likewise hit one フニ twice for 43 and 45, and 45 and 45, in two casts. Which rule decides between
-  these and the earlier halving isn't known, so VNDegen keeps the halving.
+- **Rows.** Measured at turn 42 (Darkus's sword, `斬補正+20`, makes his 斬撃 hits 1.2 times the sum): a hit on a unit
+  standing behind the frontmost row its side still holds does half damage, rounded down, after defence; the order of
+  the hits doesn't matter. Against 二角ベト (defence 0) 乱舞斬 did 60 to 63 in the front row and 30 or 31 in the middle
+  or back row, first or second hit alike (`.audit` evidence `battle6/`: 27 casts over e3a, e3b, e3e); with only the
+  middle and back rows held the middle took 60 to 63 and the back 31; a lone middle enemy took 剣撃's full 54 to 57;
+  剣撃 aimed at 中衛 with the front held did 27 or 28 six times; once the front enemy fell, the middle one took 60 to 62.
+  Magic halves the same way (火矢三連 39 to 41 front, 19 or 20 middle), and so does the party's side: with Darkus in
+  Forward, ホリィ in Backs took ベトアタック 7 to 11 and 強射撃 15 against Darkus's 12 to 17 and 22 to 27. Where the
+  hitter stands doesn't matter (Darkus in Backs hit the same). The round-1 "second target half" samples were all hits
+  on a middle row (b02's クラム stood in front, its フニ behind; b03 and b05's 一角ベト in 千固定0100's middle row), and
+  round 5's full second hits were two フニ in one front row. Inferred: the quarter once read for a third hit was a
+  misread or a defence bonus; no rule beyond the half was seen.
+- **Several targets.** Measured: 乱舞斬 and 火矢三連 (`敵３`) hit one to three different enemies, each count equally
+  likely (one hit in 12 of 38 casts against two enemies), each hit rolling its own accuracy and damage. With three hits
+  landed the log shows one line, *first target*たち3体に最大*N*のダメージ with the largest hit, wrapped onto a second line
+  at the log's edge (イモモたち3体に最大41の / ダメージ, 二角ベトたち3体に最大57 / のダメージ); with a miss among them, or
+  two hits, each hit has its own line. Kill lines follow all the hit lines. Inferred: `敵５`, `敵７` and `敵９` hit
+  three to five, five to seven and seven to nine (the skills' descriptions), `敵２` and `敵４` one to two and two to
+  four; the summary line is used whenever three or more land.
+- **防御.** Measured: a unit that chose 防御 adds 10 to its physical defence until its next action (so through the
+  start of the next round): ベトアタック and 強射撃 on a defending Darkus (defence 17) did 2 to 7 and 17 against 12 to 17
+  and 22 to 27; defending enemies (ウルフ 5, ラッド 7, フニ 0) took 45 to 48, 21 or 22 and 50 to 52 from 乱舞斬 where 55 to
+  58, 26 to 28 and 60 to 63 were due. Magic ignores it (火矢三連 on a defending ウルフ: 40 to 42, the full range).
+  VNDegen used to halve the damage for the round.
 - **Pacing.** Measured from 30 fps recordings of the log under Wine, timed from the 戦闘開始 button's press: an
   action shows its skill line, then all its result lines together one step later, and the next action comes one step
   after that. With ゲーム全体の速度 at 通常 the first line came 0.50 s after the press and the steps were 0.83 to 1.00 s
@@ -275,7 +292,17 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   the log said クマンが身代わりになった, ウルフに0ダメージ, クマンに58ダメージ. 58 fits the damage against the ウルフ's
   defence (55 to 58 with the sword), not the クマン's (50 to 53). `ability.obj` says it covers allies with less HP
   "時々" and gives 50 in column 4: inferred as a 50% chance. That 乱舞斬 logged only this one hit against two
-  enemies; how many hits a several-target skill makes when fewer enemies stand is still open.
+  enemies, which the one-to-three hit count below explains.
+- **Opening attacks (自動攻撃).** Measured: before the first round, with the log already showing it, each unit whose
+  field ability (`unit.obj` column 34) is 先制攻撃 or 先制暗殺攻撃, and each party reserve unit whose reserve ability
+  (column 35) is 忍び寄る者, logs *name*の自動攻撃 and hits one enemy for the ability's `ability.obj` column 4, whatever
+  the target's defence or row: ホリィ (先制暗殺攻撃) did 100 in seven battles, to front and middle targets alike (ベト
+  with defence 9, a middle 二角ベト with the front held), and from the reserve (忍び寄る者) 50; フーウー's 忍び寄る者 did 50.
+  Enemies do it too: a ダレット (先制攻撃) opened with ダークスに50ダメージ and ホリィに50ダメージ. A 先制攻撃無効化 unit on the
+  target side (ウブズ) stops it: ウブズが無効化, then *target*に0ダメージ. With both sides armed the faster went first
+  (ダレット, speed 17, before ホリィ, 12). Inferred: the target is drawn at random (the middle one four times in five
+  with two standing); 先制全体攻撃 hits every enemy for its 30; 先制攻撃迎撃 stops the attack at its column 4 per cent
+  and cuts it by its column 5 per cent (100), logged *name*が迎撃; a kill logs as in a round.
 - **Healing.** 小回復 (38 to 42) healed 39 and 38: inferred as the power alone.
 - **Hit and miss.** Inferred: a hit when a roll under 100 is below the skill's accuracy (`skill.obj` column 16) minus
   the target's evasion. Too few misses were seen to pin it down: ツタ (accuracy 85) missed Darkus three times in seven,
@@ -289,10 +316,19 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   middle or front row; on the right, the two highest columns; in the middle, column 2; on the left, columns 0 and 1.
   行動全自由 lights while every order is 自由戦闘. The other buttons set every unit's order or target, or save and
   load three sets of orders. Inferred, until a capture shows it: 攻撃戦闘 and 支援戦闘 pick by weight among attacking or
-  supporting skills, 防御 halves damage taken that round, 逃走 ends the battle when that unit acts, an empty target
+  supporting skills, 逃走 ends the battle when that unit acts, an empty target
   area falls back to any target, the party's 右側 is the third column of a row, and 自動戦闘 starts each round by
   itself. ゲージON steps through `bat_p00`, `p01` and `p02` (ゲージOFF, 戦闘時可変), the last showing the bars only
   while a round plays (inferred).
+- **交代 and 戦闘隊列.** Measured: with 交代 as the action, the target button doesn't open a list: the unit's tile turns
+  yellow and a click on any of the party's six tiles picks the destination, shown on the button as 味方前衛右 or, with
+  a unit there, 味方後衛中央：ダークス (12-pixel text, or a smaller face when it doesn't fit); it starts as the unit's own
+  tile. On its turn the unit moves there, swapping with whoever stands there, and the log says *name*が位置を移動 (also
+  when it stays put); its order goes with it. A reserve tile can't be picked. After the battle the option 戦闘隊列 decides
+  the board: 戦闘前に戻す (the default) put Darkus back from Forward right to Forward middle (the 休憩 save's member
+  cell 10, the diorama), そのまま kept him there (cell 11), both read from the original's saves after a won battle.
+  VNDegen restores the board when the battle closes unless the option is そのまま. Seen and not built: when ホリィ fell, the
+  reserve フーウー stepped onto her tile during the battle.
 - **Rewards.** The win box: the screen dims to 3/8 brightness and a box in the general popup frame (`pop_a00` to
   `a03`, edges only) centred on (641, 360) lists, 24 pixels a line, only the amounts above zero: 住民が*N*人増えた,
   食料を*N*食手に入れた, 資金を*N*B手に入れた, 資源を*N*材手に入れた, then *N*Pの経験値を獲得した, a line *name*はレベルが上がった！ for each member who levelled,

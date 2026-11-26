@@ -665,7 +665,7 @@ int sa_sprite_split(const Image *im, SpriteFrame *out, int max);
 
 enum { STAT_ATTACK, STAT_MAGIC, STAT_DEFENCE, STAT_RESIST, STAT_SPEED, STAT_EVASION, STAT_GOVERN, STAT_COMMAND };
 enum { BATTLE_RUNNING, BATTLE_WON, BATTLE_LOST, BATTLE_FLED };
-enum { PICK_NONE, PICK_ACTION, PICK_TARGET };
+enum { PICK_NONE, PICK_ACTION, PICK_TARGET, PICK_TILE };
 
 #define BATTLE_FIGHTERS 24
 #define BATTLE_LOG 64
@@ -723,10 +723,13 @@ typedef struct Battle {
     Image *art[BATTLE_ART], *board[4], *back, *pop[4], *from;
     u32 ms, animMs, rng, noticeMs, holdMs, fadeMs;
     int holdGroup;
+    int startUnit[PARTY_SLOTS];
+    bool keepRanks;
 } Battle;
 
 bool sa_battle_init(Battle *b, Vfs *vfs, Party *party);
 void sa_battle_set_speed(Battle *b, int speed);
+void sa_battle_set_ranks(Battle *b, int keep);
 void sa_battle_free(Battle *b);
 bool sa_battle_start(Battle *b, Vfs *vfs, const char *group, const char *backdrop, u32 seed);
 bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, Image *backdrop, int boardSet, u32 seed);

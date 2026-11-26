@@ -131,6 +131,9 @@ enum {
     BATTLE_FADE_MS = 400,
     LOSS_MS = 2000,
     SUBSTITUTE_CHANCE = 50,
+    SUMMARY_HITS = 3,
+    GUARD_DEFENCE = 10,
+    LOG_RIGHT = 1276,
     TILE_PLAIN = 0,
     TILE_BLUE = 2,
     TILE_YELLOW = 3,
@@ -140,6 +143,12 @@ enum {
     HOVER_SIDE = 100,
     HOVER_PICK = 200,
     HOVER_LABEL = 300,
+    HOVER_TILE = 400,
+    TILE_HALF_W = 32,
+    TILE_HALF_H = 16,
+    PLACE_SIZE = 12,
+    PLACE_SMALL = 10,
+    PLACE_FIT = 125,
 };
 
 #define NO_EDGE 0xffffffffu
@@ -154,7 +163,19 @@ static const struct {
     int x, y;
 } reserveTiles[4] = {{0, 0}, {765, 190}, {0, 0}, {0, 0}};
 
+typedef struct Opener {
+    const char *name, *ability;
+    bool enemy;
+    int speed;
+} Opener;
+
+typedef struct Note {
+    int who, damage;
+} Note;
+
 static void roll_order(Battle *b);
+static void opening(Battle *b);
+static void finish_check(Battle *b);
 
 static const char *text_of(const Table *t, int row, int col) { return sa_table_text(t, row, col); }
 
@@ -162,6 +183,12 @@ static int row_by_text(const Table *t, int col, const char *s) {
     for (int r = 0; r < t->rows; r++)
         if (!strcmp(text_of(t, r, col), s)) return r;
     return -1;
+}
+
+static int ability_extra(const Table *abilities, const char *name) {
+    for (int r = 0; r < abilities->rows; r++)
+        if (!strcmp(sa_table_text(abilities, r, 1), name)) return sa_table_int(abilities, r, 5);
+    return 0;
 }
 
 void sa_battle_unit_stats(const Battle *b, int row, int level, int *out) { sa_party_unit_stats(b->party, row, level, out); }
@@ -447,6 +474,9 @@ bool sa_battle_begin(Battle *b, Vfs *vfs, const char *group, const int *cells, I
     b->picker = PICK_NONE;
     b->hover = 0;
     b->round = 0;
+    memcpy(b->startUnit, b->party->unit, sizeof b->startUnit);
+    opening(b);
+    finish_check(b);
     roll_order(b);
     return true;
 }
@@ -462,6 +492,23 @@ static void log_line(Battle *b, const char *who, bool enemy, const char *rest, b
     l->text = sa_fmt("%s\t%s", who, rest);
     l->enemy = enemy;
     l->indent = indent;
+}
+
+static void log_wrapped(Battle *b, const char *who, bool enemy, const char *rest) {
+    sa_font_set_spacing(0);
+    sa_font_set_plain(true);
+    int room = LOG_RIGHT - LOG_TEXT_X - LOG_INDENT - sa_text_width(who, -1, LOG_SIZE);
+    const char *cut = rest;
+    for (int k = 1; *cut && sa_text_width(rest, k, LOG_SIZE) <= room; k++) {
+        u32 cp;
+        cut += sa_utf8_decode(cut, &cp);
+    }
+    sa_font_set_plain(false);
+    sa_font_set_spacing(1);
+    char *head = sa_fmt("%.*s", (int)(cut - rest), rest);
+    log_line(b, who, enemy, head, true);
+    free(head);
+    if (*cut) log_line(b, "", enemy, cut, false);
 }
 
 static const char *name_of(Battle *b, const Fighter *f) { return text_of(&b->party->units, f->row, 2); }
@@ -595,12 +642,27 @@ static bool physical(const char *attribute) {
 }
 
 static int hits_of(const char *target) {
+    if (!strcmp(target, "敵２")) return 2;
     if (!strcmp(target, "敵３")) return 3;
+    if (!strcmp(target, "敵４")) return 4;
     if (!strcmp(target, "敵５")) return 5;
     if (!strcmp(target, "敵７")) return 7;
     if (!strcmp(target, "敵９")) return 9;
-    if (!strcmp(target, "敵４")) return 4;
     return 1;
+}
+
+static int hit_count(Battle *b, const char *target) {
+    int n = hits_of(target);
+    return n > 1 ? range(b, n > 3 ? n - 2 : 1, n) : 1;
+}
+
+static bool behind(const Battle *b, const Fighter *t) {
+    for (int i = 0; i < b->count; i++) {
+        const Fighter *o = &b->f[i];
+        if (o->enemy != t->enemy || !alive(o)) continue;
+        if (t->enemy ? o->gridRow > t->gridRow : o->slot >= PARTY_FRONT && t->slot < PARTY_FRONT) return true;
+    }
+    return false;
 }
 
 static int equip_bonus(Battle *b, const Fighter *f, const char *attribute) {
@@ -651,8 +713,10 @@ static void use_skill(Battle *b, int who, int s, int aim) {
         log_line(b, name_of(b, tf), tf->enemy, line, true);
         return;
     }
-    int hits = hits_of(target), landed = 0;
+    int hits = hit_count(b, target), landed = 0, most = 0, first = -1, fallen[BATTLE_FIGHTERS], falls = 0;
     bool taken[BATTLE_FIGHTERS] = {false};
+    Note notes[BATTLE_FIGHTERS * 3];
+    int n = 0;
     for (int h = 0; h < hits; h++) {
         int t = pick_target(b, !f->enemy, aim, taken);
         if (t < 0) break;
@@ -660,32 +724,149 @@ static void use_skill(Battle *b, int who, int s, int aim) {
         Fighter *tf = &b->f[t];
         int accuracy = sa_table_int(&b->skills, s, 16) - tf->stat[STAT_EVASION];
         if ((int)(rnd(b) % 100) >= accuracy) {
-            log_line(b, name_of(b, tf), tf->enemy, "は回避した", true);
+            notes[n++] = (Note){t, -1};
             continue;
         }
         bool phys = physical(attribute);
         int raw = range(b, lo, hi) + f->stat[phys ? STAT_ATTACK : STAT_MAGIC];
         if (!f->enemy) raw = raw * (100 + equip_bonus(b, f, attribute)) / 100;
-        int damage = raw - tf->stat[phys ? STAT_DEFENCE : STAT_RESIST];
+        int damage = raw - (phys ? tf->stat[STAT_DEFENCE] + (tf->guard ? GUARD_DEFENCE : 0) : tf->stat[STAT_RESIST]);
+        if (behind(b, tf)) damage /= 2;
         int cover = substitute(b, t);
         if (cover >= 0) {
-            log_line(b, name_of(b, &b->f[cover]), b->f[cover].enemy, "が身代わりになった", true);
-            log_line(b, name_of(b, tf), tf->enemy, "に0ダメージ", true);
+            notes[n++] = (Note){cover, -2};
+            notes[n++] = (Note){t, 0};
             tf = &b->f[cover];
         }
-        damage >>= landed++;
-        if (tf->guard) damage /= 2;
         if (damage < 1) damage = 1;
+        bool was = alive(tf);
         tf->hp = tf->hp > damage ? tf->hp - damage : 0;
-        snprintf(line, sizeof line, "に%dダメージ", damage);
-        log_line(b, name_of(b, tf), tf->enemy, line, true);
-        if (!alive(tf)) log_line(b, name_of(b, tf), tf->enemy, tf->enemy ? "を倒した" : "が倒された", false);
+        notes[n++] = (Note){(int)(tf - b->f), damage};
+        if (first < 0) first = (int)(tf - b->f);
+        if (damage > most) most = damage;
+        landed++;
+        if (was && !alive(tf)) fallen[falls++] = (int)(tf - b->f);
+    }
+    bool summary = landed >= SUMMARY_HITS;
+    for (int i = 0; i < n; i++) {
+        const Fighter *tf = &b->f[notes[i].who];
+        if (notes[i].damage == -1) log_line(b, name_of(b, tf), tf->enemy, "は回避した", true);
+        else if (notes[i].damage == -2) log_line(b, name_of(b, tf), tf->enemy, "が身代わりになった", true);
+        else if (!summary || notes[i].damage == 0) {
+            snprintf(line, sizeof line, "に%dダメージ", notes[i].damage);
+            log_line(b, name_of(b, tf), tf->enemy, line, true);
+        } else if (notes[i].who == first) {
+            snprintf(line, sizeof line, "たち%d体に最大%dのダメージ", landed, most);
+            log_wrapped(b, name_of(b, tf), tf->enemy, line);
+            first = -1;
+        }
+    }
+    for (int i = 0; i < falls; i++) {
+        const Fighter *tf = &b->f[fallen[i]];
+        log_line(b, name_of(b, tf), tf->enemy, tf->enemy ? "を倒した" : "が倒された", false);
     }
 }
+
+static int opening_blocker(Battle *b, bool targetEnemy, int *cut) {
+    for (int i = 0; i < b->count; i++) {
+        const Fighter *f = &b->f[i];
+        if (f->enemy != targetEnemy || !alive(f)) continue;
+        const char *name = text_of(&b->party->units, f->row, 34);
+        if (!strcmp(name, "先制攻撃無効化")) {
+            *cut = 100;
+            return i;
+        }
+        if (!strcmp(name, "先制攻撃迎撃") && (int)(rnd(b) % 100) < ability_value(&b->party->abilities, name)) {
+            *cut = ability_extra(&b->party->abilities, name);
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void opening_hit(Battle *b, const Opener *o) {
+    int power = ability_value(&b->party->abilities, o->ability);
+    if (power <= 0 || !count_side(b, !o->enemy)) return;
+    log_line(b, o->name, o->enemy, "の自動攻撃", false);
+    int cut = 0, blocker = opening_blocker(b, !o->enemy, &cut);
+    if (blocker >= 0) {
+        const Fighter *bf = &b->f[blocker];
+        log_line(b, name_of(b, bf), bf->enemy, strcmp(text_of(&b->party->units, bf->row, 34), "先制攻撃無効化") ? "が迎撃" : "が無効化", true);
+        power -= power * cut / 100;
+    }
+    int targets[BATTLE_FIGHTERS], n = 0, fallen[BATTLE_FIGHTERS], falls = 0;
+    if (!strcmp(o->ability, "先制全体攻撃")) n = candidates(b, !o->enemy, AIM_FREE, NULL, targets);
+    else targets[n++] = pick_target(b, !o->enemy, AIM_FREE, NULL);
+    char line[64];
+    snprintf(line, sizeof line, "に%dダメージ", power);
+    for (int i = 0; i < n; i++) {
+        Fighter *tf = &b->f[targets[i]];
+        tf->hp = tf->hp > power ? tf->hp - power : 0;
+        log_line(b, name_of(b, tf), tf->enemy, line, true);
+        if (!alive(tf)) fallen[falls++] = targets[i];
+    }
+    for (int i = 0; i < falls; i++) {
+        Fighter *tf = &b->f[fallen[i]];
+        log_line(b, name_of(b, tf), tf->enemy, tf->enemy ? "を倒した" : "が倒された", false);
+    }
+}
+
+static void opening(Battle *b) {
+    static const char *const field[] = {"先制攻撃", "先制暗殺攻撃", "先制全体攻撃"};
+    const Table *u = &b->party->units;
+    Opener list[BATTLE_FIGHTERS + PARTY_BENCH];
+    int n = 0;
+    for (int i = 0; i < b->count; i++) {
+        const Fighter *f = &b->f[i];
+        const char *name = text_of(u, f->row, 34);
+        for (size_t k = 0; k < sizeof field / sizeof field[0]; k++)
+            if (alive(f) && !strcmp(name, field[k])) list[n++] = (Opener){name_of(b, f), name, f->enemy, f->stat[STAT_SPEED]};
+    }
+    for (int i = 0; i < b->party->benchCount; i++) {
+        const Bench *m = &b->party->bench[i];
+        int r = m->tile >= 0 && m->hp > 0 ? sa_party_unit_row(b->party, m->unit) : -1;
+        if (r < 0 || strcmp(text_of(u, r, 35), "忍び寄る者")) continue;
+        int v[10];
+        sa_party_unit_stats(b->party, r, m->level > 0 ? m->level : 1, v);
+        list[n++] = (Opener){text_of(u, r, 2), "忍び寄る者", false, v[2 + STAT_SPEED] + m->trained[2 + STAT_SPEED]};
+    }
+    for (int i = 1; i < n; i++)
+        for (int j = i; j > 0 && list[j].speed > list[j - 1].speed; j--) {
+            Opener t = list[j];
+            list[j] = list[j - 1];
+            list[j - 1] = t;
+        }
+    for (int i = 0; i < n; i++) opening_hit(b, &list[i]);
+}
+
+static void move_to(Battle *b, Fighter *f, int slot) {
+    if (slot == f->slot) return;
+    for (int i = 0; i < b->count; i++)
+        if (!b->f[i].enemy && b->f[i].slot == slot) b->f[i].slot = f->slot;
+    sa_party_swap(b->party, f->slot, slot);
+    f->slot = slot;
+}
+
+static void restore_ranks(Battle *b) {
+    if (b->keepRanks) return;
+    for (int s = 0; s < PARTY_SLOTS; s++) {
+        if (!b->startUnit[s] || b->party->unit[s] == b->startUnit[s]) continue;
+        for (int i = 0; i < b->count; i++)
+            if (!b->f[i].enemy && b->f[i].id == b->startUnit[s]) move_to(b, &b->f[i], s);
+    }
+}
+
+static void close_battle(Battle *b) {
+    restore_ranks(b);
+    b->open = false;
+}
+
+void sa_battle_set_ranks(Battle *b, int keep) { b->keepRanks = keep != 0; }
 
 static void act(Battle *b, int who) {
     Fighter *f = &b->f[who];
     if (!alive(f)) return;
+    f->guard = false;
     if (f->enemy) {
         int s = choose_skill(b, f, ORDER_FREE);
         if (s >= 0) use_skill(b, who, s, AIM_FREE);
@@ -703,6 +884,9 @@ static void act(Battle *b, int who) {
         log_line(b, name_of(b, f), false, "は防御した", false);
         return;
     case ORDER_SWAP:
+        move_to(b, f, o->skill >= 0 && o->skill < PARTY_SLOTS ? o->skill : f->slot);
+        log_line(b, name_of(b, f), false, "が位置を移動", false);
+        return;
     case ORDER_INTRUDE: return;
     case ORDER_SKILL:
         s = o->skill >= 0 && sa_table_int(&b->skills, o->skill, 13) <= f->mp ? o->skill : choose_skill(b, f, ORDER_FREE);
@@ -732,7 +916,6 @@ static const u32 lineMs[3] = {906, 520, 340}, firstMs[3] = {500, 370, 300};
 void sa_battle_set_speed(Battle *b, int speed) { b->speed = speed >= 0 && speed < 3 ? speed : 0; }
 
 static void plan_round(Battle *b) {
-    for (int i = 0; i < b->count; i++) b->f[i].guard = false;
     b->next = 0;
     b->ms = lineMs[b->speed] - firstMs[b->speed];
     b->hidden = 0;
@@ -823,7 +1006,7 @@ bool sa_battle_tick(Battle *b, u32 ms) {
     if (b->result == BATTLE_LOST && b->open && !b->acting) {
         b->ms += ms;
         if (b->ms < LOSS_MS) return changed;
-        b->open = false;
+        close_battle(b);
         return true;
     }
     if (!b->acting) {
@@ -898,7 +1081,7 @@ static void choose(Battle *b, int i) {
     Order *o = &b->party->order[b->pickSlot];
     if (b->picker == PICK_ACTION) {
         o->mode = b->pick[i].mode;
-        o->skill = b->pick[i].skill;
+        o->skill = o->mode == ORDER_SWAP ? b->pickSlot : b->pick[i].skill;
         if (o->aim == AIM_FREE || o->aim == AIM_ENEMY || o->aim == AIM_ALLY) o->aim = first_aim(b, o);
     } else
         o->aim = b->pick[i].aim;
@@ -926,6 +1109,15 @@ static void side_button(Battle *b, int i) {
 
 static int hit(Battle *b, int x, int y) {
     if (b->result != BATTLE_RUNNING) return 0;
+    if (b->picker == PICK_TILE) {
+        for (int s = 0; s < PARTY_SLOTS; s++) {
+            int cx, cy;
+            sa_party_tile_center(s, PARTY_BOARD_X, PARTY_BOARD_Y, &cx, &cy);
+            int dx = abs(x - cx), dy = abs(y - cy);
+            if (dx * TILE_HALF_H + dy * TILE_HALF_W <= TILE_HALF_W * TILE_HALF_H) return HOVER_TILE + s;
+        }
+        return 0;
+    }
     if (b->picker) {
         int px = pick_x(b), top = pick_top(b);
         for (int i = 0; i < b->pickCount; i++)
@@ -948,10 +1140,15 @@ static int hit(Battle *b, int x, int y) {
 
 int sa_battle_click(Battle *b, int x, int y) {
     if (b->result != BATTLE_RUNNING) {
-        b->open = false;
+        close_battle(b);
         return b->result;
     }
     int h = hit(b, x, y);
+    if (b->picker == PICK_TILE) {
+        if (h >= HOVER_TILE) b->party->order[b->pickSlot].skill = h - HOVER_TILE;
+        b->picker = PICK_NONE;
+        return BATTLE_RUNNING;
+    }
     if (b->picker) {
         if (h >= HOVER_PICK) choose(b, h - HOVER_PICK);
         else b->picker = PICK_NONE;
@@ -960,7 +1157,10 @@ int sa_battle_click(Battle *b, int x, int y) {
     if (h == HOVER_AUTO) b->autoBattle = !b->autoBattle;
     else if (h == HOVER_GAUGE) b->gaugeMode = (b->gaugeMode + 1) % 3;
     else if (h == HOVER_START) plan_round(b);
-    else if (h >= HOVER_LABEL) open_picker(b, (h - HOVER_LABEL) / 2, (h - HOVER_LABEL) % 2 ? PICK_TARGET : PICK_ACTION);
+    else if (h >= HOVER_LABEL && (h - HOVER_LABEL) % 2 && b->party->order[(h - HOVER_LABEL) / 2].mode == ORDER_SWAP) {
+        b->picker = PICK_TILE;
+        b->pickSlot = (h - HOVER_LABEL) / 2;
+    } else if (h >= HOVER_LABEL) open_picker(b, (h - HOVER_LABEL) / 2, (h - HOVER_LABEL) % 2 ? PICK_TARGET : PICK_ACTION);
     else if (h >= HOVER_SIDE) side_button(b, h - HOVER_SIDE);
     return BATTLE_RUNNING;
 }
@@ -1058,6 +1258,28 @@ static void points(const Battle *b, u32 *fb, int value, int max, int right, int 
     sa_draw_number(fb, b->art[ART_DIGITS], n, right - 4 * DIGIT_W, y, low(value, max) ? DIGITS_LOW : 0, DIGIT_W, DIGIT_H);
 }
 
+static int swap_target(const Battle *b, int slot) {
+    int s = b->party->order[slot].skill;
+    return s >= 0 && s < PARTY_SLOTS ? s : slot;
+}
+
+static void draw_place(Battle *b, u32 *fb, int slot, int x, bool lit) {
+    static const char *const sides[3] = {"左", "中央", "右"};
+    sa_blit_rect(fb, b->art[ART_NONE_ACTION], 0, lit ? LABEL_H : 0, LABEL_W, LABEL_H, x, TARGET_Y);
+    const char *who = "";
+    for (int i = 0; i < b->count; i++)
+        if (!b->f[i].enemy && b->f[i].slot == slot) who = name_of(b, &b->f[i]);
+    char text[96];
+    snprintf(text, sizeof text, "味方%s%s%s%s", slot >= PARTY_FRONT ? "前衛" : "後衛", sides[slot % 3], *who ? "：" : "", who);
+    sa_font_set_spacing(0);
+    sa_font_set_plain(true);
+    int size = sa_text_width(text, -1, PLACE_SIZE) > PLACE_FIT ? PLACE_SMALL : PLACE_SIZE;
+    int w = sa_text_width(text, -1, size);
+    sa_text_draw(fb, SA_W, SA_H, text, -1, x + (LABEL_W - w) / 2, TARGET_Y + (LABEL_H - size) / 2, size, 0xffffff, 0x000000);
+    sa_font_set_plain(false);
+    sa_font_set_spacing(1);
+}
+
 static void draw_slot(Battle *b, u32 *fb, int slot) {
     int x = label_x(slot);
     const Fighter *f = NULL;
@@ -1075,9 +1297,10 @@ static void draw_slot(Battle *b, u32 *fb, int slot) {
     const Order *o = &b->party->order[slot];
     bool running = b->result == BATTLE_RUNNING && !b->acting;
     bool litAction = running && (b->hover == HOVER_LABEL + slot * 2 || (b->picker == PICK_ACTION && b->pickSlot == slot));
-    bool litTarget = running && (b->hover == HOVER_LABEL + slot * 2 + 1 || (b->picker == PICK_TARGET && b->pickSlot == slot));
+    bool litTarget = running && (b->hover == HOVER_LABEL + slot * 2 + 1 || ((b->picker == PICK_TARGET || b->picker == PICK_TILE) && b->pickSlot == slot));
     draw_order(b, fb, o, x, LABEL_Y, litAction);
-    sa_blit_rect(fb, b->art[ART_AIM0 + o->aim], 0, litTarget ? LABEL_H : 0, LABEL_W, LABEL_H, x, TARGET_Y);
+    if (o->mode == ORDER_SWAP) draw_place(b, fb, swap_target(b, slot), x, litTarget);
+    else sa_blit_rect(fb, b->art[ART_AIM0 + o->aim], 0, litTarget ? LABEL_H : 0, LABEL_W, LABEL_H, x, TARGET_Y);
     int hpw = f->maxHp > 0 ? f->hp * 100 / f->maxHp : 0, mpw = f->maxMp > 0 ? f->mp * 100 / f->maxMp : 0;
     int band = f->hp >= f->maxHp ? 0 : low(f->hp, f->maxHp) ? 2 : 1;
     sa_blit_rect(fb, b->art[ART_HP], 0, band * 7, hpw, 7, x + HP_X, HP_Y);
@@ -1133,6 +1356,7 @@ static void draw_board(Battle *b, u32 *fb) {
         if (!ordering) frames[s] = TILE_PLAIN;
         else if (b->picker == PICK_TARGET) frames[s] = allySide && in_area(b, &probe, aim) ? TILE_YELLOW : TILE_PLAIN;
         else if (b->picker == PICK_ACTION && b->pickSlot == s) frames[s] = TILE_YELLOW;
+        else if (b->picker == PICK_TILE) frames[s] = swap_target(b, b->pickSlot) == s ? TILE_YELLOW : TILE_BLUE;
         else frames[s] = TILE_BLUE;
     }
     sa_blit(fb, b->board[b->boardSize], boards[b->boardSize].x, boards[b->boardSize].y);
@@ -1205,7 +1429,7 @@ static void draw_screen(Battle *b, u32 *fb) {
     static const int gaugeArt[3] = {ART_GAUGE, ART_GAUGE_OFF, ART_GAUGE_VARY};
     sa_blit_rect(fb, b->art[gaugeArt[b->gaugeMode]], 0, b->hover == HOVER_GAUGE ? TOGGLE_H : 0, TOGGLE_W, TOGGLE_H, GAUGE_X, TOGGLE_Y);
     draw_log(b, fb);
-    if (b->picker) draw_picker(b, fb);
+    if (b->picker == PICK_ACTION || b->picker == PICK_TARGET) draw_picker(b, fb);
     if (b->result == BATTLE_RUNNING || b->result == BATTLE_LOST) return;
     sa_dim(fb);
     if (b->result != BATTLE_WON) return;
