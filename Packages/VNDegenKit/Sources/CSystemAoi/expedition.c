@@ -15,7 +15,7 @@ enum {
 };
 
 enum { SPECIAL_RETURN = 1, SPECIAL_HP, SPECIAL_MP, SPECIAL_CURE, SPECIAL_NO_ENEMY, SPECIAL_NO_TRAP, SPECIAL_ATTACK, SPECIAL_DEFENCE, SPECIAL_EVASION, SPECIAL_SPEED, SPECIAL_RECRUIT, SPECIAL_SEARCH };
-enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST, AFTER_ENCOUNTER, AFTER_CHAIN, AFTER_CAMP };
+enum { AFTER_NONE, AFTER_WALK, AFTER_BATTLE, AFTER_HOME, AFTER_LOST, AFTER_ENCOUNTER, AFTER_CHAIN, AFTER_CAMP, AFTER_BATTLE_END };
 
 enum {
     C_EXP_X = 0x49,
@@ -299,6 +299,11 @@ static void finish_after(SA *s) {
     case AFTER_WALK:
         fade_from_backdrop(s);
         walk_view(s);
+        break;
+    case AFTER_BATTLE_END:
+        fade_from_backdrop(s);
+        walk_view(s);
+        sa_autosave_at(s, AUTOSAVE_BATTLE);
         break;
     case AFTER_ENCOUNTER:
         if (fade_from_backdrop(s)) {
@@ -1031,7 +1036,7 @@ void sa_exp_battle_over(SA *s, int result) {
     }
     static const int hooks[] = {HOOK_BATTLE_END, HOOK_GROUP_SCRIPT, HOOK_STORY};
     s->mode = MODE_DUNGEON;
-    run_hooks(s, hooks, result == BATTLE_WON && sa_story_arm(s) ? 3 : 2, result == BATTLE_LOST ? AFTER_LOST : AFTER_WALK);
+    run_hooks(s, hooks, result == BATTLE_WON && sa_story_arm(s) ? 3 : 2, result == BATTLE_LOST ? AFTER_LOST : AFTER_BATTLE_END);
 }
 
 void sa_exp_chain_battle(SA *s, const char *name) {
@@ -1464,6 +1469,7 @@ static void after_move(SA *s, int r) {
     if (r == DUN_TURNED) {
         int hit = -1;
         sync_position(s);
+        sa_autosave_at(s, AUTOSAVE_STEP);
         tick_groups(s, &hit);
         if (hit >= 0) start_battle(s, hit);
         else if (sa_story_scene(s)) s->exp.stepHook = true;
@@ -1481,6 +1487,7 @@ static void after_move(SA *s, int r) {
         cross_area(s, side);
         return;
     }
+    sa_autosave_at(s, AUTOSAVE_STEP);
     count_down_traps(s);
     if (spring_trap(s)) return;
     int hit = group_here(s);
