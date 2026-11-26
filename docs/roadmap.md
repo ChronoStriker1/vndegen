@@ -178,6 +178,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
+- Smile Game Builder, on a clean-room runtime of VNDegen's own, with Sacred and Princess Colette's Great Adventure, on branch `feat/smilegame`. The maintainer left the choice of the next item to the coordinator on 2026-11-26, for visual novels and RPGs only; Smile Game Builder is the last such engine with library games VNDegen doesn't run. It is built in rounds of parallel delegates, as SystemAoi was.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
@@ -233,4 +234,5 @@ When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG
 - 3D for AliceSoft System 4 games (SealEngine). Evenicle sets up its 3D field before its title, so it can't run, and Rance IX stops at its first battle or map. It is a whole 3D engine, 330 functions, and Evenicle needs about 300 more PartsEngine functions and most of its sound and story libraries besides. The maintainer left the call to the coordinator on 2026-11-11, who put it here: it is the largest single piece of work on the list and serves two games. The instructions Evenicle stopped on (#84) run, and its game page says it can't run yet. [system4.md](system4.md) has what is missing.
 - Apple TV. When it comes, the library gets a TV layout modeled on Steam Deck's home screen: the focused game's hero art fills the screen with one row of capsules along the top or the bottom edge, and swiping up on the hero art opens a card view of every game. It joins the iPhone and iPad layouts in `LibraryLayout` and is the TV's default.
 - iCloud saves.
+- Game Boy games, such as the GBCbag builds in the third survey: the maintainer wants only visual novels and RPGs, so VNDegen won't ship a Game Boy emulator (2026-11-26).
 - GameMaker and the other general-purpose and custom engines in `docs/engine-survey.md` that are not listed under Next.
