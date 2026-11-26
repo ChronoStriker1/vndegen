@@ -168,6 +168,10 @@ font that Ume Gothic at 12 pixels matches exactly), over nine battles in 千樹�
   facing east) the backdrop's visible parts were identical in 99.88% of pixels, with no shift, scaling or blur; the
   same held in 雷貨の雲 一階 (cell (10, 0) facing west, 100%). Battles in different cells with the same walls nearby
   share pixel-identical backdrop regions. The view before the last step doesn't count: the battle starts after it.
+  Re-measured after the light refits, the wall variants and the crystals (8x8 block means over the visible
+  backdrop, against the same two PC battles): 千樹庭 6.02 → 5.46, 雷貨の雲 10.10 → 3.39. sarun's `battle=` command
+  always draws 千樹庭's `bg021a0` picture halved behind the board, whatever the dungeon (100% of its backdrop pixels);
+  that, not the runtime, is the forest seen once after `expedition=2,2 battle=炎01`. Real battles take the view.
 - **Top bar.** Measured: the dungeon and floor names in the plain (not bold) 16-pixel face with no extra spacing, black,
   at (76, 15) and (300, 15). This fits the original's glyphs best (overlap 0.69 against 0.48 to 0.56 for the 14 to
   17-pixel and bold faces); the rest of the difference is Wine's own hinting.
@@ -277,8 +281,36 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   gains 1.3 to 1.75, a darker fog colour (0.85 × or 0.7 × the table's) and EXP fog all fit worse (`grid1.txt`, `exp-fog.txt`).
   What's left in the ice frame is partly the wall: the PC draws the diamond wall `070w001`/`w002` where the map
   gives wall 0 and VNDegen draws `070w000` (3.5% brighter); drawn with `w001` the frame's error falls 13.4 → 10.7
-  under the first fit. Which walls the PC gives a variant isn't in the map cell (its two fields after the wall are
-  −1) and isn't built. 炎山洞's 1.55 floor gain isn't needed: the ground fog gives its floor the same brightness.
+  under the first fit (see Part variants below). 炎山洞's 1.55 floor gain isn't needed: the ground fog gives its floor
+  the same brightness.
+- **Part variants.** Every part set holds three walls `w000` to `w002` and three poles `p000` to `p002` (and floors and
+  roofs `f`/`r000` to `002`), and the original draws all three walls where the map gives wall 0. Measured under Wine
+  with a debug mode of sarun (`variant=V,MODE`: force a variant, draw part ids instead of colours, hide floor
+  objects) that renders each view with each variant and classifies every visible wall against the PC's frame:
+  60 PC views (four facings on each of 15 cells) on 11 floors in five sets (千樹庭, 炎山洞, 040, 060 and 070). The
+  choice is fixed per wall: the same pixels after changing the save's random seed (C006), after an in-game reload in
+  the same session and in a capture taken on another day. The three variants are about equally common (15, 20 and 25 of 60 cells). The walls
+  of one cell agree 79% of the time (11 of 14 confident pairs) and walls of neighbouring cells 23%, against 33% by
+  chance, but a cell's walls can genuinely differ (炎山洞 mp0203 cell (4, 1): north clearly `w001`, west clearly
+  `w002`). Not found: no map field holds it (the fields after each wall are −1; fields 8, 22 to 25 don't vary with
+  it), and the Visual C `rand` restarted from any 32-bit seed and walked over the cells (row or column order, every
+  cell or floor cells only, one to six calls a cell, or one call per wall in six side orders) reproduces none of the
+  57 confident cells, nor does a small per-map seed or a linear rule mod 3. Inferred: VNDegen gives each cell one
+  variant from a hash of the map file's name and the cell, used for its wall-0 sides and for the pole at a corner
+  (the poles also vary on the PC, mostly with the walls beside them); floors and roofs stay `000` (their variants
+  differ too little to classify). The hash agrees with 24 of 74 classified walls (always `w000`: 17). The eleven-frame
+  light comparison goes from 42.4 to 35.6 with it, the ice frame 7.6 → 5.3 and two 炎山洞 frames 6.5 → 2.0 and
+  6.2 → 1.6, while 千樹庭's magic-circle frame goes 1.3 → 6.7 because its cell draws a forest variant where the PC
+  draws `w000`; that gain is partly chance.
+- **Crystals.** Measured under Wine in 千樹庭 (mp0101, crystal (14, 4)) and the ice dungeon (mp0802, crystal (1, 13)):
+  standing on the crystal's cell the original shows the walls through both faces of the crystal; from a cell away
+  its colour fits half-opaque front and back layers drawn at full texture brightness with no fog (core mean error
+  5.0 and 5.0, 3.1 up close, against 10.6 and 9.3 for VNDegen's old opaque, lit, fogged crystal; an alpha of 0.6
+  fits worse overall, and with fog no alpha fits both distances). The model's material has a white emissive colour,
+  which VNDegen reads as unlit. VNDegen draws crystals after the rest of the view, back faces and then front faces,
+  blended at 0.5 (inferred as 128/255), unfogged. Their animation files (`a060.txt`, `a061.txt`) give the door's
+  `rollSpeed 0 0.5`, and the PC's crystals turn, so they turn with the door (the speed is the door's, inferred). The
+  opened crystal `a061` is drawn the same way (not measured).
 - **Ground fog.** Each part set names two effects in its `effect_box` (`>e,effectNN0` and `NN1`), `.def` text files
   in the game's archives. `NN0` is a `FogFoot` in every set: a texture (`fogfootNN0.bmp`, a pale mottled 128×128),
   a scroll speed per frame (`texSpdX`, `texSpdY`), an alpha range (`AlphaMin`, `AlphaMax`, out of 255) and heights
@@ -286,8 +318,26 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   texture repeat per cell, blended over the floor with an alpha that swings between the two values every 4 seconds
   and scrolls at the given speed at 60 frames a second. The plane, the repeat, the blend and the swing are inferred;
   measured: without it the PC's floors were on average 1.41 times as bright as VNDegen's, with it 1.08 (1.05 with
-  the fitted light), and the floors take on the PC's paler mottle. The `NN1` effects (falling leaves in 千樹庭, sparks in 炎山洞, snow in 060 and 070, light
-  motes in 080 and 090) aren't drawn.
+  the fitted light), and the floors take on the PC's paler mottle.
+- **Leaves, sparks, snow and motes.** `NN1` is a particle system: `Leaf` (falling leaves `leaf_k` in 千樹庭, sparks
+  `fire_k` in 炎山洞, snow `snow_k` in 070) or `snow2` (rising light motes `hikari1_k` in 080 and `hikari2_k` in 090);
+  060's `snow061_k` is switched off by its `non>` prefix, like the other sets' unused ones. `Leaf.def` documents the
+  defaults (count 10, fall 0.05, flutter 0.04 on each axis, spin 0, 5 and 2.5) and each effect overrides some
+  (`Rate`, the texture's scale; `Fall`; `FlutterX`, `FlutterY`); `snow2` gives a count per cubic unit (`Num` 0.001 and
+  0.005), a size (0.13), a speed (0.01, positive rises), clip distances (4 to 30) and fade-in and fade-out times (10
+  and 40 frames). The textures are 32-bit with alpha. Measured under Wine from 30-second recordings at 15 frames a
+  second (`particles/stats.txt`): in 千樹庭 one leaf crossed the view in 30 s (and one in an earlier 8 s), about 17 px
+  long, falling 323 px/s while turning, which fits a quad of side `Rate` falling `Fall` units every 1/60 s about 7
+  units away; in the ice dungeon five snowflakes in 30 s, about 9 px across, moving a median 78 px/s, sometimes in
+  loops with a period near 4 s; no sparks or motes crossed the 080 or 炎山洞 views in 30 to 60 s. Inferred: VNDegen
+  spreads the `Leaf` particles over the whole map, starts them at the ceiling (5.5) and respawns them there when they
+  reach the floor, sways them at 0.026 rad a step with a quarter of the given flutter (fitted to the snow's speed:
+  88 px/s against 78; at the full flutter they moved 218 px/s), and turns them by the spin values; `snow2` particles
+  live in the ring between the clip distances (count = `Num` × that ring's volume: 15 and 76), rise or fall at the
+  speed and fade in and out over the given frames. Each texel blends by its alpha; particles are fogged and lit
+  fully. Not matched: the PC's snowflakes loop (their vertical sway beats the fall) while VNDegen's only wave; the
+  effects' update rate. The view redraws every 66 ms while an effect runs, as near a door; drawing it costs the same
+  within noise (24.2 → 23.8 ms in 千樹庭, 19.4 → 20.4 ms in the ice dungeon, sarun `bench` on a loaded Linux host).
 - **Light and fog.** Back faces are culled. A texture whose top-left colour covers a tenth of it treats that colour
   as transparent (the grass `010w0x0`).
 - **Door leaves.** The door walls `w100` and `w111` hold two leaf layers (`door1`/`door2`, `door3`/`door4`) with a
@@ -867,7 +917,11 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   14) has its 20-pixel `pun_d00` icon at (242, 208); a post's raises follow 統治 and 統率 in blue 30 pixels right
   (what the raise adds up to the cap of 10, or a red fall where the stored value is over it, below);
   skill icons are 20 pixels; a fixed-skill unit lists only its first skill, marked ★ without its 固定／ prefix, over
-  column 38 + 1 slots (ミアルテ 1/3, Darkus 5/6). Not matched: the card's portrait frame (another sheet of the unit).
+  column 38 + 1 slots (ミアルテ 1/3, Darkus 5/6). Measured: the portrait is the unit's battle sheet (`u????a2`, the
+  enemy sheet), animated frame by frame (each PC capture matched a different frame exactly), not the field sheet;
+  VNDegen cuts it with the battle's frame splitter and draws frame 0 onwards at the party's 100 ms. Placed centred 80
+  pixels into the card with its feet at 171: ルーアルテ lands exactly, キュリハ within 2 pixels and クドア 7 pixels
+  right of the original (its vases pack at 35 pixels; what centres them on the PC isn't known).
 
 ## Saves
 

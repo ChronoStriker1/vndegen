@@ -152,8 +152,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   minimap icons, teleporters and stairs from the maps' link records, spinners, dark zones, healing magic circles and 堕天牢's floor
   hazards; several effects' sizes are inferred. These live in the original's exe, not its scripts, and are rebuilt
   from play (`docs/systemaoi-cleanroom.md`).
-- Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 6 to 10
-  over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
+- Battles: the backdrop matches the original as closely as the dungeon renderer does (8x8 block-mean error 3.4 to
+  5.5 over its visible parts, all from the 3D view itself). The blue digit row's use and the order badge's tie-breaking
   are inferred.
 - Dungeon: how often a group appears partway through a visit (one step in 100) is fitted to three sightings, the
   cell a fled group moves to is drawn by VNDegen's own random numbers, and the random battle rate (1 in 20 a step
@@ -161,9 +161,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   change it yet; a floor's taken pickups and opened doors aren't saved (the
   original's image doesn't seem to hold them either; opened crystals are, and VNDegen keeps them the same way).
   The dungeon light and fog are fitted to eleven of the original's
-  frames (each within 4%, the ice dungeon 3% too bright); which walls get a set's variant textures isn't known (the
-  ice dungeon's diamond walls are drawn plain); the falling leaves, sparks, snow and light motes some dungeons
-  show aren't drawn.
+  frames (each within 6%); which walls get a set's variant textures isn't known, so each cell takes one by a hash
+  (right for about a third of the walls, as by chance); crystals are drawn see-through, unlit and turning, with an
+  inferred 0.5 blend; the falling leaves, sparks, snow and light motes follow the sets' effect files, with their
+  speeds fitted to a few PC recordings (the PC's snowflakes loop, VNDegen's only wave).
 - Story: the true ending (F161 after 真魔力塊隊) and 内政END play, but some story the original runs from its exe isn't
   rebuilt: the trap scenes (hook 19), the dungeon rest conversations (hook 22) and the second playthrough's
   carried-over data (`85`/`86`: new games never offer 引き継ぐ). The 探索, 調査, 押す, 引く, 切り替える and ワープ
