@@ -126,7 +126,8 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
 - **Saves.** SAVE and LOAD in the town and LOAD on the title open the DATA LOG screen: ten pages of ten slots, the
   newest autosave in its panel (load only), and beside it the chosen or hovered slot's details (date, play time,
   count, turn and place, town, Darkus) or the current game (現在). A chosen slot offers DEL and DATA LOAD or DATA SAVE;
-  loading and deleting ask YES or NO, saving shows the original's comment box with OK and CANCEL, where up to 16
+  loading and deleting ask YES or NO, saving shows the original's comment box with OK and CANCEL (上書きしますか？ on a
+  used slot), where up to 16
   typed characters become the save's comment, kept as the original keeps it (full-width, at the start of the image)
   and shown in the slot and its details; the original shows VNDegen's comments and VNDegen shows the original's. Saves are the
   original's own files, `Bunny3.sav/Bunny3NN.dat` and `Bunny3AN.dat` in the save folder, packed with its codec
@@ -136,7 +137,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   original loads VNDegen's saves, town or dungeon, and VNDegen lists and loads the original's. Beside each,
   `vndegen/slotNN.sav` keeps VNDegen's own copy of the state; it is used only while its time matches the original
   file's. As in the original, the game
-  autosaves at the start of each turn and on entering each area, through ten slots in turn; a dungeon save loads
+  autosaves through ten slots in turn as オートセーブモード asks: 1 at the start of each turn, on entering a dungeon and
+  on moving to another floor, 2 (the default) also when a battle ends, 3 also on every step and turn in a dungeon, and
+  0 never. 確認ポップアップ drops the original's confirmations: 重要のみ loads from DATA LOAD at once, 最重要のみ also loads
+  the autosave panel and leaves for the title at once, and asks for a slot as soon as its row is clicked. A dungeon save loads
   back onto its cell, any other save into the town. New members join off the board and are shown on cards in the
   message box, as in the original. 配置's lower tiles are the reserve.
 - **App.** `EngineSystemAoi` finds a game by `box.vfs` holding `init.box` and `pro.box`, and runs the runtime in a
@@ -221,7 +225,11 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   are typed as plain characters: there's no Japanese input method in the field, and on a touch screen without a
   keyboard the comment stays empty.
 - Option: whether オートモード音声's 再生終了まで待つ adds the auto wait after the voice or overlaps it is inferred; the screen mode,
-  message frame, popup, cursor, ranks, autosave mode, VE and inactive-volume settings are kept but do nothing yet;
+  cursor, ranks, VE and inactive-volume settings are kept but do nothing yet; 切り替え時のメッセージフレーム (keep the
+  message frame through a scene change) isn't followed; ポップアップウインドウ sets the delay of the hover descriptions,
+  which VNDegen doesn't draw; the autosave after a flee, and a step's autosave coming before a trap or an encounter
+  on that step, are inferred; 確認ポップアップ's rules for the in-game command panels (内政 and the like keep theirs) were
+  checked on 内政 only;
   ゲーム全体の速度 paces battle rounds as measured, and what else it speeds up isn't measured; 戦闘演出 簡略 changed
   nothing measurable in a round's pacing and VNDegen draws no skill effects for it to lighten; the 3D brightness factors are fitted; the key config and the window reset do nothing (the app maps keys); the hover descriptions the
   original shows in Windows tooltips aren't drawn.

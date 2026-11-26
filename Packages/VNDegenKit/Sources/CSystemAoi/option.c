@@ -149,6 +149,13 @@ void sa_option_free(OptionScreen *o) {
 
 int sa_option(const SA *s, int which) { return s->opt.value[which]; }
 
+void sa_debug_option(VNSystemAoi *sa, int which, int value) {
+    SA *s = (SA *)sa;
+    if (which < 0 || which >= OPT_COUNT) return;
+    s->opt.value[which] = (u8)value;
+    sa_option_apply(s);
+}
+
 u32 sa_option_text_ms(const SA *s) { return textMs[s->opt.value[OPT_TEXT_SPEED] % 5]; }
 
 u32 sa_option_auto_ms(const SA *s, int chars, int lines) {
@@ -333,8 +340,9 @@ static void click(SA *s, int h) {
             close_screen(s);
             break;
         case BTN_TITLE:
-            if (in_game(s)) o->ask = ASK_TITLE;
-            else close_screen(s);
+            if (!in_game(s)) close_screen(s);
+            else if (o->value[OPT_CONFIRM] >= CONFIRM_LEVEL_TOP) sa_go_title(s);
+            else o->ask = ASK_TITLE;
             break;
         case BTN_END:
             o->ask = ASK_END;
