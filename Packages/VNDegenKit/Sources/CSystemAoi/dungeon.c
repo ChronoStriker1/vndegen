@@ -1160,7 +1160,7 @@ void sa_dungeon_edit(Dungeon *d, const char *name, int value, int x, int y, int 
 
 void sa_dungeon_options(Dungeon *d, int brightness, int camera, bool effects) {
     static const float light[5] = {1.07f, 1.04f, 1.00f, 0.88f, 0.77f};
-    static const u32 moveMs[5] = {0, 67, 133, 267, 533};
+    static const u32 moveMs[5] = {0, 50, 133, 200, 533};
     d->light = light[brightness % 5];
     d->moveMs = moveMs[camera % 5];
     d->flat = !effects;

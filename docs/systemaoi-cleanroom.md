@@ -43,6 +43,20 @@ where play couldn't pin it down.
   Measured: the original's first board shows the 魔王亭's cell and the twelve cells of stage 1.
 - **Workers.** Inferred: residents go to facilities in grid order, and a facility works only when all its workers are
   free. Measured: with 5 residents a field shows 0/30 and makes nothing, and the town window shows 5 - 30 = -25.
+  建設's board draws a facility without its workers at half brightness (0.51 of VNDegen's full tile for a field
+  with 27 residents; the town map uses 75%).
+- **建設's card.** Measured on the turn-42 save: once the 迷宮 exists the original draws all of `bul_a07`, whose foot
+  is a ダークス宮 section, and fills it with the hovered facility's level-1 迷宮, 守備, 宝箱, 罠 and 評判 (`TownBuil.obj`
+  columns 10 to 14; 住居 1, 2, 0, 0, -1), positive in blue, 0 in black and negative in red, every value drawn.
+  VNDegen does the same (before the 迷宮 it cuts the card above the section, as before). Measured on five hovers
+  (畑, 採掘場, 空き地, 住居 in the list, the placed 魔王亭): the card stands at (996, 327), one pixel right of and below
+  where VNDegen had it; texts wrap at 16 characters, and a `|` right after a full line leaves an empty line (住居's
+  effect); the description starts at y 483 and the effect text always at y 543, 16 pixels a line; LV is 1 for a list
+  entry (also 空き地) and a placed facility shows its own level and EXP; an empty field is dashes (EXP nine, 必要住民
+  three, 住民上限 seven, each 生産 and 消費 three), with the number fields' right edges at 1089, 1269, 1139, 1269 and
+  1099, 1169, 1239. VNDegen's card now matches within 1.4 to 1.6 per channel over the number fields and 1.4 to 2.2
+  over the ダークス宮 row; the text differs by the font (VNDegen's glyphs are heavier), not by place. Not drawn: the
+  post badge (街長) the original puts beside 施設説明 for a staffed post's facility.
 - **Residents a turn.** Inferred: a random number between columns 23 and 24 for each working facility. Measured: from
   the same save, +2 and then +1 on the next turn, and +2 again when the first turn was replayed.
 - **Food.** Inferred: one food a turn for every ten residents. Measured: 5 and 7 residents used none.
@@ -360,7 +374,10 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   it walks through. `81` changed nothing that could be seen (a sound or a redraw, inferred) and VNDegen skips it.
   VNDegen applies the hinge offset and, while the party walks through a wall, turns that side's leaves 90° away
   over the step and hides the copy drawn from the far cell; the angle and timing are inferred (the PC's leaves were
-  about 60° open a third of the way through).
+  about 60° open a third of the way through). Measured: once through, the camera stands 0.6 past the door's wall
+  plane, and the original shows the corridor ahead with nothing of the door (中央森の東南, (13, 3) facing north);
+  VNDegen drew the leaves' back faces over the whole view until its near plane moved from 0.05 to 1.0, which clips
+  them (8-by-8 block error 2.5 against the PC frame) and changes no more than 51 pixels of the eleven light frames.
 - **Side panel button.** The PC draws the side panel's fold button, `dgn_b01`'s ◀ frame (a 2-by-2 sheet of 30-pixel
   frames: ▶, ◀ and their hover versions), at (139, 0), in the notch of `dgn_b00` (measured, mean error 0.6 per
   channel). Measured under Wine at 30 fps: clicking it folds the panel at once (the whole panel goes in one frame,
@@ -371,8 +388,10 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Floor tile scale.** Measured: the floor parts map their texture twice across a cell (u 0 to 2, v −1 to 1) in
   every set, and VNDegen draws them so. Against eight PC frames, the normalised cross-correlation of the high-passed
   floor peaks at the file's scale (0.67 to 0.91) and drops to 0.36 to 0.81 at ±5%, at half or double the repeat and
-  with u and v swapped. What still looks different on the floors is the PC's texture filtering and the ground fog,
-  not the scale.
+  with u and v swapped. Texture filtering: measured on three of the light frames (炎山洞, 千樹庭, 絶命院), the
+  PC's mean horizontal gradient is 0 to 7% higher than VNDegen's in the far, middle and near bands of the view
+  (8.40 against 7.87 far in 炎山洞), so the original isn't blurring its far floors more than VNDegen's nearest
+  sampling does, and VNDegen adds no filtering.
 - **Objects.** `mallset.pvm` holds the objects every dungeon shares (`action_box`): `a100` the gold-framed door,
   `a101` to `a108` the floor markers of pickups (101 to 104 glowing, 105 spent) and other marks. Measured: floor
   object 100 is the door home; it stands at its cell's centre and turns slowly, edge-on to face-on in about 4.5
@@ -424,7 +443,12 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
 - **Minimap.** Measured: cells visited on earlier expeditions stay shaded on the next one. Its icons are 16-pixel
   tiles drawn twice the size: `mmf0003` the door, `mmf0004` a crystal, `mma0000` the party's arrow and `mma0001` an
   enemy group's red cross (drawn for groups up to a cell outside the 5 by 5 window, overlapping its edge). A passage
-  side is a magenta bar. `mmf`/`mmw` hold more floor and wall tiles VNDegen doesn't use yet.
+  side is a magenta bar. `mmf`/`mmw` hold more floor and wall tiles VNDegen doesn't use yet. Measured on the camp's
+  doubled map: the original draws a cell's walls over its door or chest icon; VNDegen now does too (the icon's
+  own border had hidden them). Still different (camp and HUD, mean error about 16 per channel over the map): the
+  original's walls are wider and sit over the grid line, its grid shows lighter over visited cells, and its
+  visited shading is a lighter radial fill. The camp draws the side panel with its notch empty, without the fold
+  button (measured).
 - **Start cell.** Measured: one cell from the door, through its open side, facing away from it ((6, 2) facing south
   in 中央森, every time).
 - **Step counter.** Measured: the number under the compass is the expedition's steps, drawn with `dgn_f00` (digits
@@ -1040,8 +1064,20 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   改ページ makes a click during text go straight to the next page; ウインドウOFF makes the right click hide
   the window; 待たない lets auto mode go on while a voice plays; 停止 stops the voice when the page turns (残す, the
   default, lets it finish); ADV なし drops the fades. Kept but without effect yet: the screen mode, the message frame,
-  the popups, the cursor, the 3D settings, the game speed, battle effects and ranks, the autosave mode, VE and the
-  inactive volume. The key config and the window reset do nothing; the app maps keys.
+  the popups, the cursor, the game speed, battle effects and ranks, the autosave mode, VE and the inactive volume.
+  The key config and the window reset do nothing; the app maps keys.
+- **The 3D settings.** Measured under Wine on one exported 千樹庭 view (中央森 (6, 2) facing south), each set on the
+  camp's OPTION screen. 3D画面の明るさ scales the dungeon's light but not its fog colour: the view's mean was 1.075,
+  1.052, 1, 0.937 and 0.875 of 普通's for 明るい, 明るめ, 普通, 暗め and 暗い, the fogged far wall barely moving and the
+  near walls and floor most. VNDegen multiplies the 3D light, the ground fog layer included, by 1.07, 1.04, 1, 0.88
+  and 0.77 (fitted: each level's mean within 1% of the original's; 8-by-6 block error 3.51 → 2.05 at 明るい and
+  7.61 → 5.51 at 暗い, against 4.1 between the two sides at 普通, the falling leaves and the fog pulse making the
+  rest). 3D画面のカメラ移動速度, timed from 60 fps captures of a right turn (first to last changed frame): 最速 jumps in
+  one frame, 速い takes 0.05 s, 普通 0.117 s (a step forward the same), 遅い 0.20 s and 最遅 0.533 s. VNDegen moves
+  in 0, 50, 133 (its earlier fit for 普通), 200 and 533 ms. 3D演出 しない drops the ground fog (the bottom of the view
+  20 to 27 levels darker, nothing else changed) and nothing in the view moved for three seconds; VNDegen then skips
+  the ground fog and the particles and stops redrawing for them (block error against that frame 7.41 → 4.13).
+  Inferred: that しない keeps the door's turn (no door was in view).
 - **Where they are kept.** The original keeps its options in `Bunny3.opt` (text speed at 28,342 as 0 to 4, the four
   volumes from 28,359), written when a game is saved. VNDegen keeps them after the system flags in
   `vndegen/global.dat` (2,048 flag bytes, 32 option bytes, then the viewed marks below), read at start and written on
@@ -1208,6 +1244,14 @@ the same points (offsets in bytes, numbers little-endian):
   for the turn script in slot 0, `bo0100.box` the town hook in 1, …, `bo3100.box` in 31) or `EVnn.box` when empty.
   Measured: a save without them loads, but the original then runs no turn script or hooks (no story events, and
   facilities gain only the engine's +1 EXP a turn); VNDegen's export writes them.
+- **Key items** live in the same list as everything else. Measured under Wine: opening 炎山洞 中腹エリア北's
+  crystal 0 (chest table 鍵107) added (1007, 1, 0), 千樹の鍵, after the three items there, and the camp's 装備 list
+  showed it. With the key in that list, a party that left the town for 中央森の東南 and bumped the key door from
+  (13, 4) played 鍵で、扉を開いた。; after loading any save made in a dungeon (VNDegen's exports and the original's own,
+  from either side of the door, also with all ten keys in the list or the key in Darkus's skill pairs) the original
+  answered この扉を開くには鍵が必要なようだ。 every time (six runs). The door hook's `96 22:1 1007 2` therefore counts
+  something the original builds when an expedition starts from the town and doesn't rebuild on loading. VNDegen
+  counts the list and opens the door either way (deliberate).
 - **Equipment** at 1,004,728: (item, free, in use) triples, as the 装備 screen shows them (ダークスの剣 0/1 while
   Darkus wields it). Equipping 名剣ルージュ instead moved the counts, changed Darkus's item at 87,220 from 100 to 104,
   and his bonus at 86,716 (the second stat block's eleventh number) from 20 to 7, the items' 斬補正.
@@ -1235,6 +1279,17 @@ the same points (offsets in bytes, numbers little-endian):
   cells and layer 3 a copy of it; layer 1 marks a step walked between a cell and the one east of it, layer 2 between
   a cell and the one south of it (cells next to each other but never walked between stay clear). VNDegen writes the
   areas in dungeon and floor order. Fitted on every save from Wine.
+- **Map edits** at 44, after the comment: one record of six words per edit a script made with `d7` (area as
+  dungeon << 16 | floor << 8, x, y, the field's byte offset in the cell record less 4, the new value, and `d7`'s
+  mode), until a zero area. Measured under Wine on 中央森の東南: opening the key door wrote four records with mode 2,
+  the wall (offset 32, the north wall, and 56, the south wall of the cell beyond, both 111) and the open-side mask
+  (offset 80, 4 → 5 and 1 → 5) on both sides; taking the pickup at (14, 9) wrote (20, 105) with mode 1; stepping on
+  the door spot wrote (20, 100) with mode 0. After going home the mode-1 record was gone and the others stayed; the
+  door stood open on the next expedition, and a reload of a save holding the records drew it open. VNDegen keeps the
+  same list (the pickup's record came out byte for byte), replays the area's records when it loads the area, drops
+  mode 1 at the end of an expedition and writes the list here and in its own copy. Inferred: that an edit to a
+  field already in the list replaces it, and that mode 1 lasts until the expedition ends rather than until the
+  area changes (not measured).
 - **Last position** at 998,016 (the formation list's cells 4 to 7): the area (dungeon << 16 | floor << 8) while in
   a dungeon and 0 in the town, then the cell and facing, kept after coming home (-1, -1, 0 before any expedition).
   Measured: this is where the original places a loaded party. In 千樹庭 area (1, 3), a save with x 4 here and C073 6
