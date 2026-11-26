@@ -2,7 +2,7 @@
 #include <time.h>
 
 #define SAVE_MAGIC 0x41534e56u
-#define SAVE_VERSION 13u
+#define SAVE_VERSION 14u
 #define LEADER (PARTY_FRONT + 1)
 
 typedef struct Writer {
@@ -188,6 +188,12 @@ static bool write_sidecar(SA *s, int slot, int count) {
     put_ints(&w, s->exp.specialValue, EXP_SPECIALS);
     put32(&w, (u32)s->vm.boxCount);
     for (int i = 0; i < s->vm.boxCount; i++) put(&w, s->vm.boxes[i].file, sizeof s->vm.boxes[i].file);
+    put32(&w, (u32)s->dungeon.editCount);
+    for (int i = 0; i < s->dungeon.editCount; i++) {
+        const DunEdit *e = &s->dungeon.edit[i];
+        const int v[6] = {e->area, e->x, e->y, e->off, e->value, e->mode};
+        put_ints(&w, v, 6);
+    }
     char *dir = sa_fmt("%s/vndegen", s->saveDir);
     sa_mkdirs(dir);
     free(dir);
@@ -334,6 +340,13 @@ static bool read_sidecar(SA *s, int slot) {
         get(&r, file, sizeof file);
         file[sizeof file - 1] = 0;
         if (!r.bad && *file) sa_vm_register_hooks(&s->vm, &s->vfs, file);
+    }
+    s->dungeon.editCount = (int)get32(&r);
+    if (s->dungeon.editCount < 0 || s->dungeon.editCount > DUN_EDITS) r.bad = true, s->dungeon.editCount = 0;
+    for (int i = 0; i < s->dungeon.editCount; i++) {
+        int v[6];
+        get_ints(&r, v, 6);
+        s->dungeon.edit[i] = (DunEdit){v[0], v[1], v[2], v[3], v[4], v[5]};
     }
     free(d);
     sa_log(s, "load slot %d: %s", slot, r.bad ? "short" : "ok");

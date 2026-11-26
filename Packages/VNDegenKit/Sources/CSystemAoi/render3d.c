@@ -1,7 +1,7 @@
 #include "sa.h"
 #include <math.h>
 
-#define NEAR_Z 0.05f
+#define NEAR_Z 1.0f
 
 void r3_init(R3 *r, int w, int h) {
     memset(r, 0, sizeof *r);

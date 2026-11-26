@@ -310,6 +310,12 @@ typedef struct DunLink {
     int kind, x, y, target, tx, ty, dir;
 } DunLink;
 
+#define DUN_EDITS 255
+
+typedef struct DunEdit {
+    i32 area, x, y, off, value, mode;
+} DunEdit;
+
 #define DUN_ROUTES 8
 #define DUN_ROUTE_POINTS 12
 #define DUN_CRYSTALS 8
@@ -362,6 +368,8 @@ typedef struct Dungeon {
     float fogSpeed[2], fogAlpha[2], fogHeight;
     int passCell, passSide;
     DunFx fx;
+    DunEdit edit[DUN_EDITS];
+    int editCount, area;
 } Dungeon;
 
 enum { DUN_STAY, DUN_REST, DUN_MOVED, DUN_ACTION, DUN_TURNED };
@@ -385,6 +393,8 @@ bool sa_dungeon_in_dark(const Dungeon *d);
 void sa_dungeon_draw_frame(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
 void sa_dungeon_draw_hud(Dungeon *d, u32 *fb, struct Party *party, int rankLimit);
 int sa_dungeon_get(const Dungeon *d, const char *name, int x, int y, int dir);
+void sa_dungeon_edit(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
+void sa_dungeon_end_expedition(Dungeon *d);
 void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir);
 bool sa_dungeon_read_map(Dungeon *d, Vfs *vfs, const char *map);
 void sa_dungeon_open_doors(Dungeon *d);

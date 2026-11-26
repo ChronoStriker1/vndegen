@@ -11,6 +11,8 @@ enum {
     F_WALL_E = 12,
     F_WALL_S = 15,
     F_WALL_W = 18,
+    F_OPEN = 21,
+    EDIT_EXPEDITION = 1,
     WALL_PASSAGE = 20,
     OBJECT_DOOR = 100,
     OBJECT_DOOR_SPOT = 99,
@@ -298,12 +300,33 @@ static void load_effects(Dungeon *d, Vfs *vfs) {
     }
 }
 
+static const i32 *cell_at(const Dungeon *d, int x, int y) {
+    if (x < 0 || y < 0 || x >= d->w || y >= d->h) return NULL;
+    return d->cell[y * DUN_SIDE + x];
+}
+
+static void replay_edits(Dungeon *d) {
+    for (int i = 0; i < d->editCount; i++) {
+        const DunEdit *e = &d->edit[i];
+        int f = e->off / 4 + 1;
+        if (e->area != d->area || !cell_at(d, e->x, e->y) || e->off % 4 || f < 0 || f >= DUN_FIELDS) continue;
+        i32 *c = d->cell[e->y * DUN_SIDE + e->x];
+        if (f == F_OPEN)
+            for (int side = 0; side < 4; side++)
+                if ((e->value ^ c[F_OPEN]) >> side & 1) c[wallField[side] + 1] = e->value >> side & 1;
+        c[f] = e->value;
+    }
+}
+
 bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     free_level(d);
     if (!load_set(d, vfs, &d->set, set)) return false;
     load_effects(d, vfs);
     load_set(d, vfs, &d->common, "mallset.pvm");
     if (!sa_dungeon_read_map(d, vfs, map)) return false;
+    int dungeon = 0, floor = 0;
+    d->area = sscanf(map, "mp%2d%2d", &dungeon, &floor) == 2 ? dungeon << 16 | floor << 8 : 0;
+    replay_edits(d);
     sa_fx_area(&d->fx, -CELL / 2, -((float)d->h - 0.5f) * CELL, ((float)d->w - 0.5f) * CELL, CELL / 2);
     d->variantSeed = 2166136261u;
     for (const char *p = map; *p; p++) d->variantSeed = (d->variantSeed ^ (u8)*p) * 16777619u;
@@ -393,8 +416,13 @@ void sa_dungeon_free(Dungeon *d) {
     for (int q = 0; q < 4; q++) sa_image_free(d->arrow[q]);
     for (int i = 0; i < DUN_WALKS; i++) sa_image_free(d->walk[i]);
     R3 keep = d->r3;
+    DunEdit edit[DUN_EDITS];
+    int edits = d->editCount;
+    memcpy(edit, d->edit, sizeof edit);
     memset(d, 0, sizeof *d);
     d->r3 = keep;
+    memcpy(d->edit, edit, sizeof edit);
+    d->editCount = edits;
 }
 
 static bool hiddenOpen;
@@ -429,11 +457,6 @@ static void part_name(const Dungeon *d, char *out, size_t size, char prefix, int
 }
 
 static void set_id(Dungeon *d, int kind, int index) { d->r3.id = showIds ? (u32)(kind << 16 | (index + 1)) : 0; }
-
-static const i32 *cell_at(const Dungeon *d, int x, int y) {
-    if (x < 0 || y < 0 || x >= d->w || y >= d->h) return NULL;
-    return d->cell[y * DUN_SIDE + x];
-}
 
 void sa_dungeon_place(Dungeon *d, int x, int y, int dir) {
     d->x = x;
@@ -1086,6 +1109,46 @@ void sa_dungeon_set(Dungeon *d, const char *name, int value, int x, int y, int m
         int g = field_of(name, dir + 2);
         if (cell_at(d, nx, ny)) d->cell[ny * DUN_SIDE + nx][g] = value;
     }
+}
+
+static void log_edit(Dungeon *d, int x, int y, int field, int value, int mode) {
+    DunEdit e = {d->area, x, y, (field - 1) * 4, value, mode};
+    for (int i = 0; i < d->editCount; i++) {
+        DunEdit *o = &d->edit[i];
+        if (o->area == e.area && o->x == x && o->y == y && o->off == e.off) {
+            *o = e;
+            return;
+        }
+    }
+    if (d->editCount < DUN_EDITS) d->edit[d->editCount++] = e;
+}
+
+static void edit_side(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir) {
+    i32 *c = d->cell[y * DUN_SIDE + x];
+    int f = field_of(name, dir);
+    if (f == wallField[dir & 3] + 1) {
+        c[f] = value;
+        c[F_OPEN] = value ? c[F_OPEN] | 1 << (dir & 3) : c[F_OPEN] & ~(1 << (dir & 3));
+        log_edit(d, x, y, F_OPEN, c[F_OPEN], mode);
+        return;
+    }
+    c[f] = value;
+    log_edit(d, x, y, f, value, mode);
+}
+
+void sa_dungeon_edit(Dungeon *d, const char *name, int value, int x, int y, int mode, int dir) {
+    int f = field_of(name, dir);
+    if (f < 0 || !cell_at(d, x, y)) return;
+    edit_side(d, name, value, x, y, mode, dir);
+    int nx = x + stepX[dir & 3], ny = y + stepY[dir & 3];
+    if (mode == 2 && f != F_OBJECT && cell_at(d, nx, ny)) edit_side(d, name, value, nx, ny, mode, dir + 2);
+}
+
+void sa_dungeon_end_expedition(Dungeon *d) {
+    int n = 0;
+    for (int i = 0; i < d->editCount; i++)
+        if (d->edit[i].mode != EDIT_EXPEDITION) d->edit[n++] = d->edit[i];
+    d->editCount = n;
 }
 
 int sa_dungeon_object(const Dungeon *d) {
