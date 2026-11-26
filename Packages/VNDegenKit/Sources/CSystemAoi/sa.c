@@ -638,7 +638,7 @@ static void host_command(void *ctx, const u8 *code, const Insn *in, VM *vm) {
     case 0xd7:
         if (in->count >= 5) {
             char *f = opd_str(code, in, 0);
-            sa_dungeon_set(&s->dungeon, f, sa_vm_get(vm, code, &in->o[1]), sa_vm_get(vm, code, &in->o[2]), sa_vm_get(vm, code, &in->o[3]),
+            sa_dungeon_edit(&s->dungeon, f, sa_vm_get(vm, code, &in->o[1]), sa_vm_get(vm, code, &in->o[2]), sa_vm_get(vm, code, &in->o[3]),
                            sa_vm_get(vm, code, &in->o[4]), in->count > 5 ? sa_vm_get(vm, code, &in->o[5]) : 0);
             free(f);
             s->dirty = true;
@@ -862,6 +862,7 @@ static void new_game(SA *s) {
     memcpy(s->exp.last, noPlace, sizeof noPlace);
     memset(s->exp.entry, 0, sizeof s->exp.entry);
     s->exp.groupCount = 0;
+    s->dungeon.editCount = 0;
     sa_mission_reset(s);
     sa_maze_reset(s);
     sa_town_draw_map(&s->town, &s->vfs, &s->vm, s->fb);
@@ -1060,6 +1061,12 @@ static void town_action(SA *s, int action) {
             sa_maze_draw_scene(s, s->bg.img->px);
             snprintf(s->bg.name, sizeof s->bg.name, "*maze");
         }
+        const char *backdrop = action == TOWN_CMD_POLICY ? "bg010a0.agf"
+                               : action == TOWN_CMD_DEPLOY || action == TOWN_CMD_EQUIP || action == TOWN_CMD_TRAIN || action == TOWN_CMD_SHOP ||
+                                         action == TOWN_CMD_SUBMIT
+                                   ? "bg009a0.agf"
+                                   : NULL;
+        if (backdrop) picture_set(s, &s->bg, backdrop, 0, 0);
         sa_start_script(s, "bo3000.box", 0);
         s->dirty = true;
         return;

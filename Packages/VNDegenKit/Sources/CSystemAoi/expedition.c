@@ -322,6 +322,7 @@ static void finish_after(SA *s) {
             s->vm.c[C_FIND0 + i] = 0;
         }
         e->active = false;
+        sa_dungeon_end_expedition(&s->dungeon);
         s->mode = MODE_TOWN;
         sa_end_turn(s);
         break;
@@ -329,6 +330,7 @@ static void finish_after(SA *s) {
         e->last[0] = 0;
         for (int i = 0; i < 4; i++) s->vm.c[C_FIND0 + i] = 0;
         e->active = false;
+        sa_dungeon_end_expedition(&s->dungeon);
         s->mode = MODE_TOWN;
         sa_end_turn(s);
         break;
