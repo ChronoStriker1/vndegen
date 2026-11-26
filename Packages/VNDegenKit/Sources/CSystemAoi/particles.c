@@ -1,11 +1,10 @@
 #include "sa.h"
 #include <math.h>
 
-#define FX_STEP_MS 16
+#define FX_STEP_MS 50
 #define FX_CEIL 5.5f
 #define FX_NEAR 1.0f
-#define FX_SWAY 0.026f
-#define FX_FLUTTER 0.25f
+#define FX_SWAY 0.08f
 #define DEG 0.017453293f
 
 static float frand(DunFx *fx) {
@@ -84,9 +83,9 @@ static void step(DunFx *fx, float camX, float camZ) {
         p->phase += FX_SWAY;
         if (fx->type == FX_LEAF) {
             p->y -= fx->fall;
-            p->x += fx->flutter[0] * FX_FLUTTER * sinf(p->phase);
-            p->y += fx->flutter[1] * FX_FLUTTER * cosf(p->phase);
-            p->z += fx->flutter[2] * FX_FLUTTER * cosf(p->phase);
+            p->x += fx->flutter[0] * sinf(p->phase);
+            p->y += fx->flutter[1] * cosf(p->phase);
+            p->z += fx->flutter[2] * cosf(p->phase);
             p->angle += fx->rot[2];
             p->flip += fx->rot[1];
             if (p->y < 0) spawn(fx, p, camX, camZ, false);
