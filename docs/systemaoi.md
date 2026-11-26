@@ -180,8 +180,11 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   to 真魔力塊隊 and the true ending by play in VNDegen). That the script runs after hook 27 is inferred.
 - Second playthrough: 登録する stores the carry-over in the original's `Bunny3.opt` format (and in
   `vndegen/carry.dat`), so a registration made on either side offers 引き継ぐ on the other, with the same turn 1.
-  Skills a unit learned beyond its table aren't carried (VNDegen derives skills from the table); what 周回用 and
-  極め's second value (C392) changes and when the special units (使用する) join aren't known, so they do nothing yet.
+  A carried unit keeps the skills its record holds, as the original does; skills in a record that its unit's table
+  doesn't list (only seen in hand-patched tests) are dropped. 使用する's six special units join from the housing
+  recruit list once their story flags are on, as on the PC. C392 (2 for 周回用, 5 for 極め) raises battle EXP by a
+  tenth a point (measured); it also raises the other rewards (food, money, resources, a resident), by a rule not
+  pinned from seven fights, and VNDegen doesn't apply that part.
   VNDegen writes the registration at once; the original keeps it in memory until its next save.
 - Saves: the battle blocks carry the ability numbers measured so far (field, reserve and government abilities,
   学, 魔法全体防御, the 属性耐性 areas, and 先制攻撃, 前向精神, 魔法無効化 and いなし from enemies); abilities never

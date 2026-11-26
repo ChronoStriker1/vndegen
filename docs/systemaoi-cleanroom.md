@@ -1405,8 +1405,8 @@ the same points (offsets in bytes, numbers little-endian):
   off the same join applies nothing. With FG015 on, the special-unit question (F4500) and the enemy strength follow
   whether or not 引き継ぐ was taken; the script writes C391 and C392 (0 and 0, 20 and 2, 50 and 5). C391 is added to
   every rolled enemy's level: 千樹庭 中央森's groups rolled at level 55 instead of 5 with C391 = 50, with HP, MP and
-  stats grown to it by `lvup.obj` (192/62 for ベトＡ). C392 = 5 changed nothing in the rolled records; what it
-  scales isn't known. F4500 (使用する) added no unit by turn 3; when its units join isn't known.
+  stats grown to it by `lvup.obj` (192/62 for ベトＡ). C392 changes the battle rewards, not the enemies; F4500 (使用する)
+  lets the housing recruit list add six special units. Both below.
 - **VNDegen's carry-over.** `85` builds the same block from the party (the member records of the PC export) and
   writes it to `vndegen/carry.dat` and, when the original's `Bunny3.opt` exists, into that file with FG801 and
   FG015, at once. `86` reads `Bunny3.opt`'s block when its FG801 is on, otherwise `carry.dat`, and applies it as
@@ -1418,8 +1418,50 @@ the same points (offsets in bytes, numbers little-endian):
   The PC export writes the enemies' level with C391 added and member +1,288/+1,292 from the record of each member
   of a carried game; VNDegen's exported 千樹庭 groups at C391 = 50 equal the original's. Inferred: the
   field/posted meaning of the record's next-to-last word; that a joining unit's equipment is taken only from a free
-  copy (VNDegen keeps no second equipment word, so a join without a free copy exports 0, 0); VNDegen derives skills
-  from the unit table, so a carried skill beyond it is dropped.
+  copy (VNDegen keeps no second equipment word, so a join without a free copy exports 0, 0); a record's skill that its
+  unit's table doesn't list is dropped (see Learned skills).
+- **Learned skills.** Measured under Wine: a unit's member record holds the skills it has learned, not its whole
+  table. サマキュー (fixed skills 悪魔の槍 at level 0, 悪魔王の槍 at 10, 突き飛ばし at 20) joined at level 1 with
+  only 悪魔の槍 (519, 3); set to level 9 with 839 EXP (840 needed) and on the field, she won one fight (87 EXP) and
+  the saved record held level 10, 86 EXP, and 519 and 520, both marked 3. In that fight at level 9 she used only
+  悪魔の槍 (about eight actions). Every 味方 unit whose table has a skill above level 0 is one of the twelve named
+  units (148 to 159, fixed skills at 10, 20 and 30). So a carried named unit, which restarts at level 1 with its
+  record's skills (the round 4 join above), keeps skills its level wouldn't give. VNDegen now gives party members
+  the table's skills up to their level, raised for a carried unit to the highest learn level among its record's
+  skills (the record's skills that its table lists); it keeps that level per roster unit and derives it again from
+  the registration on loading a game with F002 on, so its own save format is unchanged. Checked with sarun: the PC
+  save above loads and exports サマキュー's record unchanged (level 10, 519 and 520, every field equal); a game
+  with F002 on whose registration holds her with 519 and 520 exports her at level 1 with both, and the same save
+  with F002 off with 519 only; in battle the carried one used 悪魔王の槍 and the other didn't. Inferred: that the PC's
+  battles use the record's skills for party members (as measured for enemies), and that skills learned by level
+  are the only kind (no script or item adds one).
+- **Special units (使用する, F4500).** ac0002 asks 使用する or 使用しない whenever FG015 is on (or, without it, when
+  `f8`/`f9` report BUNNY BLACK 1 or 2 installed, which VNDegen never does) and 使用する sets F4500 (`0a 04:1194`,
+  the operand in hex). The only reader is the housing recruit list (ha0000, run by the town hook from turn 3): after
+  the regular recruits, with F4500 on, it adds the first of マリーアリス (167, needs F203), フィリアネ (168, F204),
+  エカテー (169, F208), パニバーナ (170, F205), イザナ (171, F206) and ウルティニア (172, F207) whose own flag (F442
+  to F447) is off, sets that flag and shows 部下が増えました。; one recruit a turn, regular or special. The story
+  sets F203 on turn 8 or later (bo0003), F205 when 炎山洞's 中腹エリア opens (bo3001), F204, F206, F207 and F208 in
+  town events (ca0002, ca0003, ca0006). マリーアリス's branch doesn't count C430 up as the others do. Measured under
+  Wine: VNDegen's export of the turn-42 save (F203 on, F442 off) with F4500 set, 休憩 once: the hook's recruit box
+  showed her card, and the turn-43 save held member 3 = unit 167 at level 1, 0 EXP, 250/40, SP 25 (column 37), the
+  table's stats in both blocks, no equipment (0, 0), 剣撃 and 光槍 (100, 218, marked 1), unplaced (00 04 03 00 at
+  +24), F442 on. VNDegen runs the same scripts: the same save gives the same join and a record equal to the PC's
+  except +4 (VNDegen 3, the PC 1; what +4 counts isn't known). The original save itself has no hook slots, so it
+  runs no hooks at all; only exports do. A VNDegen new game with FG015 on asks the question and, with 使用する and
+  極めの強さ, starts turn 1 with F4500 1, C391 50 and C392 5.
+- **Enemy strength, C392.** No script reads C391 or C392; both are the engine's. Measured under Wine, C392 changes
+  nothing in the enemies: entering 中央森の東 (two fixed groups, random rows of 3 to 5 and 1 to 3) and 炎山洞
+  裾野エリア南東 (five 炎固定9999 groups, rows of 3 to 5, 1 to 2 and 0 to 2) through their passages, at C392 0, 2 and
+  5 (11 entries, 150 rolled rows), gave the same levels, stats and skills, and row counts with the same spread (the
+  3-to-5 rows averaged 4.1 at 0, 4.1 at 2 and 3.7 at 5). The PC doesn't repeat its rolls from the same save here
+  (two entries at C006 12,345 differed). It changes the rewards: the same fight (VNDegen's export of the turn-42
+  save, 千固定0100 placed in front of the party, six level-5 ベト whose column 72 sums to 48) gave 87 and 89 EXP at
+  C392 0, 104 and 107 at 2, and 131 and 129 at 5: the EXP times 1 + C392 / 10. Food, money and resources were 15/23/22 and
+  14/23/20 at 0, 20/35/28 and 18/30/30 at 2, 23/36/24 and 18/35/33 at 5, and every win at 2 and 5 added a resident (住民が
+  1人増えた); one at 5 dropped an item. VNDegen applies the EXP factor (`Battle.expBonus`); the other rewards'
+  rule isn't pinned and isn't applied. These fights also show that the turn-42 rewards don't follow VNDegen's
+  turn-2 rule (sum × 110 to 125%, no food or money): 87 for a sum of 48.
 - **Boss-side cutaways (hook 14).** bo1400 clears F120 and, unless F155, F160 or F161 is on, runs bo1401, then
   bo1000 when a scene set F120. bo1401 holds 74 scenes keyed on C090 = 1, the area (C070/C071), C095 = 1 and
   C096 = n, each once (F2101 to F2173). Measured: n is field 7 of the party's cell in the area's map (`mpDDFF.amd`,
