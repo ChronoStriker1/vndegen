@@ -70,6 +70,7 @@ enum {
     TEAM_MAGIC,
     TEAM_KINDS,
     GRID_AT = 1010848,
+    BLOCK_RING = 10,
     GRID_AFTER = 1012648,
     CACHE_AT = 1012656,
     CACHE_RECORD = 56,
@@ -860,11 +861,15 @@ bool sa_pcsave_write(SA *s, const char *path) {
         put(img, o + 8, used);
     }
     const Town *t = &s->town;
+    int blockBuilt = -1;
+    for (int c = 0; c < TOWN_CELLS && c < t->mass.rows; c++)
+        if (sa_table_int(&t->mass, c, 1) == BLOCK_RING && t->cell[c].type) blockBuilt = t->cell[c].built;
     for (int c = 0; c < TOWN_CELLS; c++) {
         size_t o = GRID_AT + (size_t)c * CELL_SIZE;
         const Facility *f = &t->cell[c];
-        bool open = c < t->mass.rows && sa_table_int(&t->mass, c, 1) <= t->stage;
-        put(img, o, open || f->type ? 0 : -1);
+        int ring = c < t->mass.rows ? sa_table_int(&t->mass, c, 1) : -1;
+        bool open = ring >= 0 && ring <= t->stage;
+        put(img, o, ring == BLOCK_RING && blockBuilt >= 0 ? blockBuilt : open || f->type ? 0 : -1);
         put(img, o + 4, f->type);
         put(img, o + 8, f->type ? f->built : -1);
         put(img, o + 12, f->type ? f->level : 0);

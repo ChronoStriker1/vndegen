@@ -127,6 +127,35 @@ static const char *const artNames[ART_COUNT] = {"ums_a00.agf", "ums_a01.agf", "u
 
 static const int mainSlot[6] = {PARTY_FRONT, PARTY_FRONT + 1, PARTY_FRONT + 2, 0, 1, 2};
 
+enum { PLACES = PARTY_POSTS + PARTY_SLOTS + PARTY_RESERVE, DEPLOY_COMMAND = 24, HELD_ALPHA = 192 };
+
+static const char *const placeName[PARTY_SLOTS + PARTY_RESERVE] = {"メンバー１", "メンバー２", "メンバー３", "メンバー４", "メンバー５", "メンバー６",
+                                                                  "リザーブ１", "リザーブ２", "リザーブ３", "リザーブ４", "リザーブ５"};
+
+static int place_holder(const SA *s, int k) {
+    const Party *p = &s->party;
+    if (k < PARTY_POSTS) return p->post[k];
+    k -= PARTY_POSTS;
+    if (k < PARTY_SLOTS) return p->unit[mainSlot[k]];
+    int b = sa_party_reserve_at(p, k - PARTY_SLOTS);
+    return b >= 0 ? p->bench[b].unit : 0;
+}
+
+static bool placements_changed(const SA *s) {
+    for (int k = 1; k < PLACES; k++)
+        if (place_holder(s, k) != s->town.placedAtOpen[k]) return true;
+    return false;
+}
+
+int sa_deploy_appointed(const SA *s, const char *name) {
+    int k = sa_party_post_index(&s->party, name);
+    for (int i = 0; i < PARTY_SLOTS + PARTY_RESERVE && !k; i++)
+        if (!strcmp(placeName[i], name)) k = PARTY_POSTS + i;
+    if (!k) return 0;
+    int unit = place_holder(s, k);
+    return unit != s->town.placedAtOpen[k] ? unit : 0;
+}
+
 #define NO_EDGE 0xffffffffu
 
 void sa_deploy_init(Deploy *d, Vfs *vfs) {
@@ -151,6 +180,7 @@ void sa_deploy_open(SA *s) {
     d->hover = d->picked = -1;
     d->tab = TAB_FORM;
     d->overRank = false;
+    for (int k = 0; k < PLACES; k++) s->town.placedAtOpen[k] = place_holder(s, k);
     s->card.showDetail = false;
     s->mode = MODE_DEPLOY;
     s->dirty = true;
@@ -323,6 +353,28 @@ static void sprite(SA *s, u32 *fb, int unit, int x, int y) {
     const SpriteSheet *sheet;
     const Image *im = sa_party_front_sprite(&s->party, unit, &sheet);
     if (im) sa_sheet_draw(fb, im, sheet, (int)(s->party.ms / PARTY_CELL_MS), x, y);
+}
+
+static void held_sprite(SA *s, u32 *fb, int unit, int x, int y) {
+    const SpriteSheet *sh;
+    const Image *im = sa_party_front_sprite(&s->party, unit, &sh);
+    if (!im || sh->frames <= 0) return;
+    int f = (int)(s->party.ms / PARTY_CELL_MS) % sh->frames, sx = f % sh->cols * sh->cellW, sy = f / sh->cols * sh->cellH;
+    for (int j = 0; j < sh->cellH; j++) {
+        int dy = y - sh->anchorY + j;
+        if (dy < 0 || dy >= SA_H || sy + j >= im->h) continue;
+        for (int i = 0; i < sh->cellW; i++) {
+            int dx = x - sh->anchorX + i;
+            if (dx < 0 || dx >= SA_W || sx + i >= im->w) continue;
+            u32 p = im->px[(size_t)(sy + j) * im->w + sx + i], a = (p >> 24) * HELD_ALPHA / 255;
+            if (!a) continue;
+            u32 *d = &fb[(size_t)dy * SA_W + dx], q = *d, ia = 255 - a;
+            u32 r = ((p & 0xff) * a + (q & 0xff) * ia) / 255;
+            u32 g = ((p >> 8 & 0xff) * a + (q >> 8 & 0xff) * ia) / 255;
+            u32 b = ((p >> 16 & 0xff) * a + (q >> 16 & 0xff) * ia) / 255;
+            *d = 0xff000000u | b << 16 | g << 8 | r;
+        }
+    }
 }
 
 static void tile(const Deploy *d, u32 *fb, int x, int y, bool lit) {
@@ -562,7 +614,7 @@ static void draw_list(SA *s, u32 *fb) {
     if (is_post(d->picked)) held = p->post[d->picked - HOVER_POST];
     else if (is_main(d->picked)) held = p->unit[mainSlot[d->picked - HOVER_MAIN]];
     else if (bench_index(s, d->picked) >= 0) held = p->bench[bench_index(s, d->picked)].unit;
-    if (held) sprite(s, fb, held, s->mouseX, s->mouseY);
+    if (held) held_sprite(s, fb, held, s->mouseX, s->mouseY);
     if (d->overRank) {
         sa_dim(fb);
         const char *lines[2] = {"格が足りません", "配置を変更してください。"};
@@ -623,7 +675,10 @@ bool sa_deploy_frame(SA *s, u32 ms) {
     }
     if (leave) {
         if (sa_party_rank(&s->party) > s->vm.c[C_RANK_MAX]) d->overRank = true;
-        else s->mode = sa_back_mode(s);
+        else {
+            s->mode = sa_back_mode(s);
+            if (s->mode == MODE_TOWN && placements_changed(s)) sa_command_hook(s, DEPLOY_COMMAND);
+        }
     }
     if (s->mode == MODE_DEPLOY && s->dirty) {
         draw(s);

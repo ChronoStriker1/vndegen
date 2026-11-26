@@ -593,6 +593,8 @@ enum {
     UNIT_NONE_X = 677,
     UNIT_CARD_X = 814,
     UNIT_CARD_Y = 70,
+    SPRITE_ANCHOR_X = 75,
+    SPRITE_ANCHOR_Y = 162,
     MOTION_X = 1094,
     MOTION_Y = 58,
     MOTION_BTN_X = 1100,
@@ -992,8 +994,11 @@ static Image *motion_sprite(SA *s, int row, int motion) {
         sa_image_free(b->sprite);
         char n[24];
         snprintf(n, sizeof n, "u%04d%c%d.agf", sa_table_int(&s->party.units, row, 11), motionLetter[motion % MOTIONS], motion >= MOTIONS ? 2 : 0);
-        b->sprite = sa_load_image(&s->vfs, n);
-        b->frames = b->sprite ? sa_sprite_split(b->sprite, b->frame, SPRITE_FRAMES) : 0;
+        SpriteSheet sh;
+        Image *sheet = sa_sheet_load(&s->vfs, n, &sh);
+        b->frames = 0;
+        b->sprite = sheet && sh.frames > 0 ? sa_sheet_strip(sheet, &sh, 100, 1, &b->frames) : NULL;
+        sa_image_free(sheet);
         b->spriteUnit = key;
     }
     return b->sprite;
@@ -1071,11 +1076,8 @@ static void draw_unit_card(SA *s, u32 *fb, int row, int motion) {
         book_right(fb, "なし", x + 253, y + 477, 15, 0x000000);
         const Image *im = motion_sprite(s, row, motion);
         if (im && b->frames > 0) {
-            int i = (int)(b->ms / MOTION_MS % (u32)b->frames), cols = 0;
-            while (cols < b->frames && b->frame[cols].y == b->frame[0].y) cols++;
-            const SpriteFrame *f = &b->frame[i];
-            int cw = im->w / (cols > 0 ? cols : 1), cx = f->x / cw * cw;
-            sa_blit_rect(fb, im, cx, f->y, cw, f->h, x + 75 - cw / 2, y + 171 - f->h);
+            int i = (int)(b->ms / MOTION_MS % (u32)b->frames), cw = im->w / b->frames;
+            sa_blit_rect(fb, im, i * cw, 0, cw, im->h, x + SPRITE_ANCHOR_X - cw / 2, y + SPRITE_ANCHOR_Y - im->h / 2);
         }
     }
     card_wrap(fb, sa_table_text(u, row, 76), x + 8, y + 524, 250, 16, 17, 8);

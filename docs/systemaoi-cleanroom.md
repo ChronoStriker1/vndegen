@@ -153,8 +153,9 @@ where play couldn't pin it down.
   top plot cleared, 44% of the pixels where the a and b maps differ match b exactly, the rest under the 学園), where
   it drew `tmapNNa` before (100% a). The 学園 tile (`f027aa`, 288 wide, two cells by two) is centred on cell 21's
   centre (x 518), not 68 pixels left of it as the one-cell tiles are; 8x8 block error 14.1 before, 1.3 after.
-- **`c3 "role" var var`** asks which unit holds a post (街長 to 第七階層長), answering whether it's held and the unit;
-  `bo3105` uses it for the appointment scenes.
+- **`c3 "role" var var`** asks which unit holds a post (街長 to 支援隊隊長) or a slot (メンバー１ to ６, リザーブ１ to ５),
+  answering whether it's held and the unit, but only for a place whose holder changed since 配置 opened (0 and 0
+  otherwise; measured, see 配置's appointment scenes). Only `bo3105` uses it.
 - **Missions (目標).** The turn script runs the target scene (`fa0000.box`) once F143 is set, after `9e var` gives
   1 or more, then `9f var`: inferred as "a mission is due" and "start it". `mission.obj` lists マクドゥの試験 1 to 15
   with numbers that look like turns (8 and 9, 17, 26 and 27, …) and three amounts (200, 1000, 200 for the first),
@@ -966,11 +967,17 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   money and, for traps, ⌈town 罠 points / 10⌉ resources.
 - **EXP.** Measured: every open 迷宮 post's holder gains 2 EXP per intruder each turn (16 for 8), whatever
   happened; town posts gain none.
-- **Post holders on the floors.** Measured from captures: each 迷宮 post's holder stands on a floor of the
-  cross-section (a floor head on its own, the 迷宮長 on the deepest) playing its attack animation, a different spot
-  each visit. Inferred: VNDegen draws the unit's `uNNNNe0` sheet at a quarter size, 100 ms a frame, its frame's
-  foot 38 pixels below the floor's row (captures fit it to about 5 levels in 255, not exactly). The sheets' grids
-  differ by unit (ルーアルテ 5 by 4, ミアルテ 7 by 4), so the grid is found from the empty lines between frames.
+- **Post holders on the floors.** Measured under Wine (ルーアルテ 迷宮長 and ミアルテ 第一階層長, 18 visits, 10 fps
+  lossless recordings of five): each 迷宮 post's holder stands still at a random spot of a floor (a floor head on its
+  own, the 迷宮長 on floor 1 or 2 in different visits) and loops one of its sheets for the whole visit, chosen per
+  visit: the back idle `a0`, the front idle `a2`, the walk `b0` or the attack `e0` (with its effects), drawn by the
+  header grid at 0.31 of full size with the sheet's anchor on the feet, 36 pixels below the floor's row (198 on
+  floor 1, 278 on floor 2). `a0`, `a2` and `b0` step 100 ms a frame (ミアルテ's 28-frame `a2` repeated every 28
+  captures), `e0` 50 ms (frames 14, 16, 18, 20, 22, 0 in captures 100 ms apart). Fits on the original's frames with
+  a background from the median of the visits: mean error 1.0 to 2.2 where the background alone gives 3.6 to 7.5;
+  scale 0.31 beat 0.30 and 0.32. VNDegen does the same, scaling each frame with its box filter (its holders fit the
+  same model with error 0.4 to 0.6 at the same feet). Inferred: the four motions are equally likely (a2 and a0 were
+  seen most, `c0` maybe once); where on the floor follows VNDegen's own random numbers.
 - **Defence, re-checked (round 5).** Round 5 saw the original repel all eight intruders on turn 42's save where
   VNDegen lost; it is one roll. Measured: the same exported save (ルーアルテ 迷宮長, ミアルテ 街長, two floors of
   size 1) loaded twice under Wine gave two different turns (all repelled, then a full breakthrough; the rolls
@@ -995,7 +1002,22 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   at turn 19 gave ベト and クマン at the next turn; VNDegen's box matches the original's to 95% of pixels. Cards show
   the sheet's first frame (クマン's sheet holds a group of eight).
 - **Command hook.** Measured: 建設's 決定 runs the command hook (bo3100 #0 with C095 23), whose first run plays the
-  carpenters' scene (bo3104).
+  carpenters' scene (bo3104). Its entry 0 sends each command number to entry `C095 − 19` once a turn (F190 to F198,
+  which bo0000 clears each turn); entries 1, 6 to 9 are empty. 休憩 runs it too (C095 22, entry 3: `C602 += 1`), after
+  the command's help hook (bo3000 #0, whose entry 3 plays bo3003's scenes when C602 reaches 10 and 20) and before the
+  turn ends. Measured under Wine over 12 rests of an export with hook slots: C602 went 14, 15 … 26, one a rest, and
+  F707 (the C602 ≥ 20 scene) turned on at the rest that began at 20; the turn-42 save without hook slots kept 14. VNDegen
+  matches it rest for rest (sarun, same export: C602 = turn − 28 throughout, F707 at the same rest).
+- **配置's appointment scenes.** Measured under Wine: leaving 配置 runs the command hook (C095 24, entry 5, bo3105)
+  when a post, field or reserve slot holds someone else than when 配置 opened, and `c3` then answers only for the
+  places that changed (held 0 and unit 0 otherwise). Appointing ルーアルテ 街長補佐 played her scene (F1112) while
+  ミアルテ, 街長 since before the visit and F1106 off, got none; dismissing ミアルテ and appointing her again in one
+  visit played nothing; the next turn, appointing her 街長 again played F1106 (お姉様、街長への就任おめでとうございます).
+  A visit with no change left F194 off (a second visit that turn still played a scene); a dismissal alone used the
+  turn's run (an appointment later that turn played none). Putting ミアルテ in the field took her post and played no
+  member scene, so an unchanged slot gives 0 (bo3105 reads the members' and reserves' `c3` one after the other and
+  only the last, リザーブ５, decides). Inferred: メンバー１ to ６ follow the board's order (back row left to right, then
+  the front row); leaving 配置 for the camp runs no hook.
 - **Area bosses.** `floor.obj` columns 23, 25, 27 and 29 name up to four groups (boss slots 0 to 3). Slot k stands
   on the first point of the map's route k. Measured: ミアルテ防衛隊Ａ at 光峰の壁 八階's route 0 (5, 9), entering
   from the stairs in two runs, and ミアルテ防衛隊Ｄ at 九階's (5, 8); 黒い婦人隊 at 左足一本目's (1, 4) in an
@@ -1123,8 +1145,11 @@ Measured under Wine from a turn-16 save, through to the deadline and a submissio
   the field sheet, animated; the anchor sits 53 right of and 95 below a main or reserve tile's corner, and 50 right
   of and 26 below a post tile's (`POST_W` 98 by 64); a unit picked up follows the pointer with its anchor on it. Ten
   figures and both post holders landed on the original's pixels with no error; the 編成 screen's whole-frame 8x8
-  error is 0.36 and the 組織図's 0.30, the rest being animation phase. The held figure is drawn over everything in
-  VNDegen; the original sorts it among the board's figures by height (inferred from one capture).
+  error is 0.36 and the 組織図's 0.30, the rest being animation phase. The held figure is drawn over everything,
+  three quarters opaque. Measured under Wine: held over the members list, `B + a × (sprite − B)` fits with a = 0.752
+  (mean error 0.17, anchor exactly on the pointer); held just above and just below a standing figure on both boards,
+  that model fits the overlap with error 1.0 to 1.9 where drawing it behind the figure gives 73 to 84. VNDegen blends
+  it at 192/255 (a = 0.75 by the same fit, error 0.21).
 - **Placing.** Choose a member (tile or row), then a tile: two main tiles swap, a reserve tile benches the member
   (one must stay), and a reserve member moves to a main tile. Measured: 格 counts the reserve tiles as well as the
   main ones and may go over the limit (its digits then turn red, in 配置 and on the diorama), but 戻る (or a right
@@ -1413,7 +1438,12 @@ the same points (offsets in bytes, numbers little-endian):
   the town's stage or lower, else -1), the facility type (100 the 魔王亭, 108 a field; 0 empty), the turn the facility
   was built (-1 when empty), the level, and a counter that grows each turn (4, 9 and 44 at turns 1, 2 and 9).
   Measured: the tutorial's 畑 keeps 1 from turn 1 to turn 56 in every save of the original's own games, the 魔王亭 0,
-  and a 住居 built on turn 42 under Wine wrote 42. VNDegen keeps it as `Facility.built`.
+  and a 住居 built on turn 42 under Wine wrote 42. VNDegen keeps it as `Facility.built`. The 学園's four cells (10,
+  11, 20 and 21, stage 10 in `TownMass.obj`) hold its build turn as their state, the facility itself on cell 21 and
+  the other three empty (type 0, built −1): measured with the 学園 beat on turn 43 and again on turn 48 (all four
+  cells 43, then 48), while a one-cell 住居 built with 建設 on turn 48 kept state 0. VNDegen writes the same; its
+  export after the turn-43 beat and the round trip of the original's turn-48 and turn-49 saves match the original's
+  grid block byte for byte.
 - **Script cache** at 1,012,656: up to 400 records of 56 bytes, each a box file's UTF-16 name (48 bytes), the 16-bit
   numbers 1 and the box's entry count, and a zero; the record count at 1,035,056. Measured on every save: the list is
   sorted by name (`bo1000` comes before `bo3000` although the game ran `bo3000` first) and holds only boxes with more
@@ -1639,7 +1669,9 @@ the same points (offsets in bytes, numbers little-endian):
   the 組織図 board); every board now draws by the header grid and anchor. Measured with a party of ルリエス, ホリィ,
   ペリネ, ハンスイ, Darkus and キュリハ and the reserve ロウゼ, タマガ, １０１Ｐ and 天剣バリィーバ (a VNDegen export of
   the turn-42 save loaded on the PC): the idle animation steps through every frame the header counts, 100 ms each,
-  then starts again (ルリエス's 35 and キュリハ's 66 frames tracked at 30 fps).
+  then starts again (ルリエス's 35 and キュリハ's 66 frames tracked at 30 fps). The ユニット図鑑's figure uses the same
+  rule, its anchor at the card's (75, 162), as the status card's: Darkus's `a2`, ルリエス's `a2` and her walk `b0`
+  land at (889, 232) with no error on the original and in VNDegen (it drew Darkus one pixel left before).
 - **Dungeon saves.** Measured: an image with C004/C005 at 62/2 (in a dungeon) but nothing in the dungeon regions
   crashes the original as soon as its load screen lists it. With the groups, their enemies, the last position, the
   entry and C076/C077 written, the original lists VNDegen's dungeon saves (8ターン 千樹庭 中央森の東 0歩目) and loads
