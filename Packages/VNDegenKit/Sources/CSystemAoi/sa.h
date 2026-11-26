@@ -547,12 +547,6 @@ enum {
     AIM_COUNT
 };
 
-#define SPRITE_FRAMES 32
-
-typedef struct SpriteFrame {
-    int x, y, w, h;
-} SpriteFrame;
-
 typedef struct SpriteSheet {
     int cols, cellW, cellH, frames, anchorX, anchorY;
 } SpriteSheet;
@@ -661,7 +655,6 @@ void sa_party_tile_center(int slot, int boardX, int boardY, int *x, int *y);
 void sa_party_draw_tile(Party *p, u32 *fb, int cx, int cy, int frame);
 void sa_party_draw_tiles(Party *p, u32 *fb, int boardX, int boardY, const int *frames);
 void sa_party_draw_bars(Party *p, u32 *fb, int x, int y, int hp, int maxHp, int mp, int maxMp);
-int sa_sprite_split(const Image *im, SpriteFrame *out, int max);
 
 enum { STAT_ATTACK, STAT_MAGIC, STAT_DEFENCE, STAT_RESIST, STAT_SPEED, STAT_EVASION, STAT_GOVERN, STAT_COMMAND };
 enum { BATTLE_RUNNING, BATTLE_WON, BATTLE_LOST, BATTLE_FLED };

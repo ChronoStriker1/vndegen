@@ -173,6 +173,7 @@ void sa_option_apply(SA *s) {
     sa_set_volume(s->mix, CH_VOICE, gain(s, OPT_TALK_ON, OPT_TALK));
     sa_dungeon_options(&s->dungeon, s->opt.value[OPT_BRIGHTNESS], s->opt.value[OPT_CAMERA], s->opt.value[OPT_3D] == 0);
     sa_battle_set_speed(&s->battle, s->opt.value[OPT_GAME_SPEED]);
+    sa_battle_set_ranks(&s->battle, s->opt.value[OPT_RANKS]);
 }
 
 enum { GLOBAL_OPTIONS = SA_G_VARS, GLOBAL_CG = GLOBAL_OPTIONS + OPTION_BYTES, GLOBAL_SCENES = GLOBAL_CG + EXTRA_CG,

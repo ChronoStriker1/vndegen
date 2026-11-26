@@ -79,8 +79,7 @@ typedef struct Camp {
 
 typedef struct Card {
     Image *frame, *digits, *label[22], *desc, *detail, *toggle, *icon[CARD_ICONS], *portrait;
-    SpriteFrame portraitFrame[SPRITE_FRAMES];
-    int portraitNumber, portraitFrames;
+    int portraitNumber;
     bool showDetail, toggleHover;
 } Card;
 
@@ -201,7 +200,6 @@ typedef struct Records {
 typedef struct BookScreen {
     Image *art[BOOK_ART], *icon[100], *bigIcon[100], *sprite, *mapIcon[24];
     Table items;
-    SpriteFrame frame[SPRITE_FRAMES];
     int order[BOOK_ROWS], count, sortKey, sortDir, pick, motion, spriteUnit, frames;
     int pickPos;
     bool shown;
