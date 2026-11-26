@@ -144,8 +144,8 @@ the screen beside each save. Neither is emulated, so those calls log once and re
   mouse's pad, which takes the drag. No library game shows a message that long in normal play.
 - F12's reset isn't available, as iPhones and iPads have no F12.
 - Tilemap flash data (`flash_data`) isn't drawn.
-- Blending onto a transparent bitmap, the order of a sprite's color and tone, held-key repeat timing and the
-  volume curve follow common formulas, not measurements of the PC engine.
+- Blending onto a transparent bitmap, the order of a sprite's color and tone, and the volume curve follow common
+  formulas, not measurements of the PC engine. VX's held-key repeat timing is VX Ace's, not measured on its own.
 - A module a game includes into one of Ruby's own classes stays included for the next game in the same session,
   because Ruby can't remove it.
 - A script that loops without calling `Graphics.update` can't be stopped; the app moves on after 5 seconds.

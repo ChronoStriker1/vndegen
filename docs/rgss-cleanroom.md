@@ -63,5 +63,9 @@ comes from.
 
 - Bitmap blending onto a transparent bitmap, color and tone order on sprites, and the viewport tone's scope follow the
   usual source-over and tint formulas. The help doesn't give them, and the test games look right with them.
-- Input repeat timing (24 frames, then every 6; XP 16 and 4) and the audio volume curve (squared) are estimates.
+- Input repeat timing was measured from RPG Maker XP's and VX Ace's engines under Wine, with a held key logged each
+  frame: `repeat?` is true on the first frame, then on the 16th held frame and every 4th after it in XP, and on the 24th
+  and every 6th after it in VX Ace, counted in frames whatever `Graphics.frame_rate` is. VX shares VX Ace's numbers
+  unmeasured. `ruby Engines/RGSSRuntime/tests/input.rb build/rgss/host/rgssrun` checks them on the Linux host. The
+  audio volume curve (squared) is an estimate.
 - Text metrics: stb_truetype with the font's Windows ascent and descent, sized so a font's height equals Font#size.
