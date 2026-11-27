@@ -301,6 +301,8 @@ typedef struct Tri {
     const Image *tex;
     u8 alphaTest;
     u8 modulate;
+    u8 mode;
+    u8 flags;
 } Tri;
 
 typedef struct Cam {
@@ -315,6 +317,8 @@ typedef struct R3 {
     u32 *fb;
     float *zbuf;
     int tint[3];
+    struct R3x *x;
+    struct View *view;
 } R3;
 
 void r3_init(R3 *r, int w, int h);
@@ -338,6 +342,7 @@ typedef struct Model {
     Image **textures;
     u8 *modulate;
     int textureCount;
+    struct Rig *rig;
 } Model;
 
 Model *model_load(SG *g, const char *path);
@@ -450,5 +455,7 @@ struct SG {
 bool sg_pressed(SG *g, u32 key);
 bool sg_local_switch(SG *g, Guid event, int index);
 void text_outlined(SG *g, int x, int y, int px, const char *s, u32 color);
+
+#include "sg_D.h"
 
 #endif

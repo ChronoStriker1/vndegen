@@ -24,6 +24,8 @@ enable_testing()
 add_executable(sgtest sgtest.c)
 target_link_libraries(sgtest PRIVATE smilegame)
 add_test(NAME formats COMMAND sgtest)
+add_executable(sgview sgview.c)
+target_link_libraries(sgview PRIVATE smilegame)
 
 find_package(SDL2 CONFIG)
 if(SDL2_FOUND)
