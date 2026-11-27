@@ -1490,6 +1490,72 @@ state. What they do:
 VNDegen's codec (`aoicmp.c`) was written from this description. It repacks all fourteen saves and option files written
 under Wine byte for byte (`satool codec`).
 
+## The wall variants: what was read, and why
+
+Play and data showed that the original draws all three of a part set's walls `w000` to `w002` where the map gives
+wall 0, and that the choice is fixed per wall (Part variants, in The dungeon view), but not what decides it: no map
+field held it, and no restarted Visual C `rand` walked over the cells reproduced it. With the maintainer's approval
+(2026-11-27), the reading is limited to:
+
+- the routine in `Bunny3.exe` that picks a wall's part when the dungeon view is built, and the small helpers it calls
+  for that choice and its seed.
+
+Nothing else is read: no game logic, no other rule, no screen. What was read is recorded below as a description of
+the rule, and VNDegen's choice is to be written from that description, not from the code.
+
+Read on 2026-11-27 in `Bunny3.exe`:
+
+- 0x430020 loads a part set (`m%03dset.pvm`, or `mallset.pvm` for the shared parts) and finds its boxes in the order
+  floor, wall, roof, pole, action, enemy and effect. Read only for that order.
+- 0x430c40 sets up the dungeon view: it clears the old parts and loads the area's set and the shared set. Read only to
+  find where the loader is called.
+- 0x430180 makes a copy of one part from its kind (1 floor, 2 wall, 3 roof, 4 pole, 5 action, 6 enemy) and number,
+  by the name pattern `f%03d*`, `w%03d*` and so on, looking in the area's set first and `mallset.pvm` second.
+- 0x430230 builds one cell's parts: floor, floor object, roof and four walls, each wall turned onto its side. The wall
+  variant is chosen inside it, with no helper. Its floor and roof choices call a helper (0x430120) that wasn't read.
+- 0x42ce60, where the current area is set: only the lines that make the seed and keep the area's `floor.obj` row.
+
+Poles (made in 0x430510) and the helper for floors and roofs weren't read. The rule, for each wall of a cell:
+
+- **Which sides.** The cell's four walls are taken in the order north, east, south, west, the map fields 9, 12, 15
+  and 18 (Map layout, in The dungeon view). A negative value draws no wall, a positive value draws that part number as
+  it is (the doors `w100`, `w107`, `w111`), and 0 picks a variant from 0 to 2, drawn as `w000`, `w001` or `w002`.
+- **Seed.** From the area's `floor.obj` row: the low byte of column 0 (the dungeon) times 65,536, plus the low byte of
+  column 1 (the floor) times 256, plus the low byte of column 2. Column 2 is 0 in every row of this game, so the seed
+  is the same number as an edge passage's target (dungeon << 16 | floor << 8): 0x080200 for the ice dungeon's 二層.
+- **Key.** Where `floor.obj` column 7 isn't 0, every side uses the key 0x8F2E37AB. Where it is 0 (dungeons 1, 2 and
+  9: 千樹庭, 炎山洞 and part set 90), each side has its own: north 0x2388ACBD, east 0x56091EFC, south 0x37E8D81B,
+  west 0x0980F3B7.
+- **Value.** With x and y the cell's map coordinates (x east, y south, as in Map layout): (x + y) times 8,192, plus x,
+  plus the seed, as a 32-bit unsigned number, exclusive-or the key.
+- **Variant.** Add six pieces of the value: bits 0 to 3, bits 4 to 7, the whole of bits 8 to 15 (0 to 255), bits 16
+  to 19, bits 20 to 23 and the whole of bits 24 to 31 (0 to 255). The total's remainder after dividing by 3 is the
+  variant.
+
+Nothing random or saved goes in, so a wall's variant is the same on every expedition, after a reload and in every
+playthrough, as measured. With column 7 set, the four walls of a cell share one variant; with it clear, each side has
+its own, which is why one cell's walls agreed only 79% of the time in the measurement.
+
+Worked examples, from the ice dungeon's 二層 (`mp0802`, seed 0x080200, column 7 is 1, so the key is 0x8F2E37AB for
+every side):
+
+- (2, 9), south: 11 × 8,192 + 2 + 0x080200 is 0x00096202; with the key, 0x8F2755A9. The pieces are 9, 10, 85, 7, 2
+  and 143, 256 in all; 256 leaves 1 after 3, so `070w001`.
+- (3, 9), south: 0x00098203, then 0x8F27B5A8; 8 + 10 + 181 + 7 + 2 + 143 = 351, remainder 0: `070w000`.
+- (11, 5), north: 0x000A020B, then 0x8F2435A0; 0 + 10 + 53 + 4 + 2 + 143 = 212, remainder 2: `070w002`.
+- (0, 1), east: 0x00082200, then 0x8F2615AB; 11 + 10 + 21 + 6 + 2 + 143 = 193, remainder 1: `070w001`.
+- (4, 0), north: 0x00088204, then 0x8F26B5AF; 15 + 10 + 181 + 6 + 2 + 143 = 357, remainder 0: `070w000`.
+
+And one where each side has its own key, 炎山洞's 中腹エリア東 (`mp0203`, seed 0x020300, column 7 is 0), cell (4, 1),
+whose sum before the key is 0x0002A304 for every side: north gives 0x238A0FB9, pieces 9, 11, 15, 10, 8 and 35, 88 in
+all, `000w001`; west gives 0x098250B3, 3 + 11 + 80 + 2 + 8 + 9 = 113, `000w002` (the pair the measurement found
+clearly different); east gives 0x560BBDF8, 309, `000w000`; south gives 0x37EA7B1F, 218, `000w002`.
+
+Checked against the PC: the rule gives the variant the original draws on all 74 walls classified with confidence in
+the 60-view capture behind Part variants, in eleven areas of five part sets (千樹庭 mp0101; 炎山洞 mp0202, mp0203 and
+mp0204; set 40 mp0303; set 60 mp0702 and mp0703; the ice dungeon mp0802 to mp0805): 39 walls under the shared key
+and 35 under the per-side keys, 74 of 74, against 24 of 74 for VNDegen's hash.
+
 ## The original's save image, from diffs
 
 Saves unpack to 1,128,076 bytes. Found by comparing the fourteen saves written under Wine with the runtime's state at
