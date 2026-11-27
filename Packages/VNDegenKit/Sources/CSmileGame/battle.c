@@ -100,6 +100,7 @@ typedef struct Battle {
     Guid fieldMap, fieldBgm;
     bool hadBgm, front;
     u32 enterMs;
+    Image *gameover;
     struct {
         BattleFxDef def;
         u32 ms;
@@ -1143,6 +1144,7 @@ static void free_battle(SG *g) {
             model_free(b->f[i].model);
             for (int k = 0; k < MO_COUNT; k++) img_free(b->f[i].motion[k]);
         }
+        img_free(b->gameover);
         free(b);
     }
     registry[s].b = NULL;
@@ -1767,10 +1769,14 @@ static void draw(Battle *b) {
     SG *g = b->g;
     if (b->phase == PH_GAMEOVER) {
         field_draw(g);
-        fill_rect(g->fb, g->w, g->h, 0, 0, g->w, g->h, 0x80000000u);
-        const char *s = "GAME OVER";
-        int tw = font_width(g->font, 48, s);
-        text_outlined(g, (g->w - tw) / 2, g->h / 2 - 30, 48, s, 0xffe0e0e0u);
+        if (!b->gameover) {
+            size_t n = 0;
+            u8 *data = pack_read(&g->data.pack, "samples/common/res/system/gameover.png", &n);
+            if (data) b->gameover = img_decode(data, n);
+            free(data);
+        }
+        int a = b->phaseMs >= 1000 ? 255 : (int)(b->phaseMs * 255 / 1000);
+        if (b->gameover) blit(g->fb, g->w, g->h, b->gameover, 0, 0, b->gameover->w, b->gameover->h, 0, 0, g->w, g->h, a);
         return;
     }
     Field *f = &g->field;
