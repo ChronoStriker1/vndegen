@@ -6,6 +6,7 @@
 #define CHUNK 8
 #define BORDER 12
 #define WATER_DROP 0.25f
+#define EDGE_DEPTH 16.0f
 #define TILE 48.0f
 
 static const float kDefaultPitch = -48.0f, kDefaultDistance = 3.5f, kDefaultFov = 70.0f;
@@ -308,7 +309,9 @@ static int cell_slope(const View *v, const Map *m, int x, int z) {
 }
 
 static float surf_height(Build *b, int x, int z) {
-    int h = map_height(&b->f->map, &b->v->look, x, z);
+    const Map *m = &b->f->map;
+    if (b->v->border && b->v->look.sky == 0 && !b->v->look.sun && (x < 0 || z < 0 || x >= m->w || z >= m->h)) return -EDGE_DEPTH;
+    int h = map_height(m, &b->v->look, x, z);
     int slot = chip_slot(b->f, x, z);
     if (slot >= 0) chip_image(b, slot);
     if (slot >= 0 && liquid(b->v->chipAttr[slot])) return (float)h - WATER_DROP;

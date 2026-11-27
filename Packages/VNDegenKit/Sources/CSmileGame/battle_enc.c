@@ -86,11 +86,13 @@ bool battle_encounter_roll(BattleEnc *e) {
     return ++e->steps >= e->next;
 }
 
-void battle_encounter_setup(BattleEnc *e, BattleSetup *s) {
+void battle_encounter_setup(SG *g, BattleEnc *e, BattleSetup *s) {
     memset(s, 0, sizeof *s);
     const BattleEncounterEntry *en = &e->info.entries[enc_rand(e) % (u32)e->info.count];
-    int lo = en->a > 0 ? en->a : 1, hi = en->b >= lo ? en->b : lo;
-    int n = lo + (int)(enc_rand(e) % (u32)(hi - lo + 1));
+    const MonsterDef *m = monster_def(&sgb(g)->tables, en->monster);
+    static const int most[3] = {1, 2, 5};
+    int size = m && m->tail > 0 ? (m->tail < 2 ? m->tail : 2) : 0;
+    int n = 1 + (int)(enc_rand(e) % (u32)most[size]);
     for (int i = 0; i < n && i < BATTLE_MAX_MONSTERS; i++) s->monsters[s->count++] = en->monster;
 }
 
@@ -111,7 +113,7 @@ void battle_encounter_tick(SG *g) {
     if (!e->valid || g->interp.active || menu_active(g) || !sgi_encounters_on(g)) return;
     if (!battle_encounter_roll(e)) return;
     BattleSetup s;
-    battle_encounter_setup(e, &s);
+    battle_encounter_setup(g, e, &s);
     if (!s.count) return;
     sg_log(g, "encounter after %d steps", e->steps);
     enc_next(e);

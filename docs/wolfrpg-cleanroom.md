@@ -15,9 +15,10 @@ VNDegen's Wolf RPG Editor runtime is its own code under VNDegen's MIT license. N
 | The official manual, [silversecond.com/WolfRPGEditor/Help](https://silversecond.com/WolfRPGEditor/Help/), read 2026-11-01 | Maker's documentation | Key input, command 125 and 126 behavior, key codes, system variables, the string command's operations and hidden codes, string conditions, XY arrays, CSV, `<CUT>` and `<XY_IMAGE>` pictures, flash, the picture zoom effect |
 | The LZ4 project's block format description, `lz4_Block_format.md` | BSD-2-Clause | The LZ4 decoder and encoder in `data.cpp` and `savefile.cpp`, written from the description. No LZ4 code is used |
 | DxLib's own archive source, DxLib 3.19f and 3.25a from dxlib.xsrv.jp | DxLib's own notice (no standard license) | Read only by one agent, with the coordinator's approval (2026-11-01), who wrote the prose section "DxLib archive versions 7 and 8" below and then deleted the source. A second agent that never saw DxLib wrote the version 8 reader in `dxa.cpp` from that section and the archive bytes. No DxLib code is in VNDegen |
+| The DxLib copy in UberWolf's `3rdParty/DXLib`, commit `f4191375d289171b1f29dbc5ca320133b2b4b96a`: `DXArchive.h` and the archive decode path of `DXArchive.cpp` | None; the copy carries no license | Read only for prose, by one agent, with the maintainer's approval (2026-11-27), together with UberWolf's MIT `UberWolfLib/WolfCrypt` files it calls. That agent wrote the section "Wolf RPG Editor 3.31 archives (crypt version 0x14B)" below and then deleted the sources. No code from it is in VNDegen |
 | `GamePro.exe` of The Clumsy Witch Seris, Wolf RPG Editor 3.714 (file version 3.714.2026.728, SHA-256 `7bd0b31f…79fce4`) | The game's own engine | Disassembled with the coordinator's approval (2026-11-01), limited to the save path: the routine that writes a save file, the body writer and its section writers, the two routines that encrypt a save, and the check value routine. The encrypt routine was also run on test buffers in an emulator to confirm the keystream. The findings are written as prose below ("Wolf RPG Editor 3.5 saves"); no listing is kept in the repository |
 
-Not used: the DxLib archiver source that UberWolf bundles in `3rdParty/DXLib`. It carries no license. During the feasibility test, before the licensing rule reached this thread, it was read and an archive reader was written after it. When the rule arrived, that reader was moved out of the repository, never committed, and is kept out for good; the local DxLib copy was deleted. The archive format was then written down as prose (below), from what had been learned of it. A separate agent that had never seen the DxLib source or the discarded reader wrote `src/dxa.cpp` from that prose and the bytes of the test archives alone, and its corrections to the description, each checked against those bytes, are folded in below.
+Not used: the DxLib archiver source that UberWolf bundles in `3rdParty/DXLib`. It carries no license. During the feasibility test, before the licensing rule reached this thread, it was read and an archive reader was written after it. When the rule arrived, that reader was moved out of the repository, never committed, and is kept out for good; the local DxLib copy was deleted. The archive format was then written down as prose (below), from what had been learned of it. A separate agent that had never seen the DxLib source or the discarded reader wrote `src/dxa.cpp` from that prose and the bytes of the test archives alone, and its corrections to the description, each checked against those bytes, are folded in below. A later, separate reading of that copy's decode path, approved by the maintainer on 2026-11-27 and limited to prose, is in the table above.
 
 ## DxLib archive format (.wolf files)
 
@@ -212,6 +213,126 @@ The weight of byte value 0 is its magnitude. Each later weight is the previous w
 The decoder rebuilds the code tree from the weights, so it must build it exactly the way the encoder did. There are 511 nodes. Nodes 0 to 255 are the byte values, with their weights, and all 256 take part, including those with weight 0. The inner nodes are numbered 256 to 510 in the order they are made. To make each one, look at the nodes that do not yet have a parent. Take the one with the lowest weight, with ties going to the lowest node number. Then take the lowest of the rest by the same rule. The new node's weight is the sum of the two. The first one taken is its 0 child and the second is its 1 child. Node 510 is the root.
 
 The coded data is read least significant bit of each byte first, the opposite order from the header. For each output byte, start at the root and follow the 0 or 1 child for each bit until reaching a node numbered below 256. That number is the output byte. Stop after the decoded size.
+
+## Wolf RPG Editor 3.31 archives (crypt version 0x14B)
+
+This section was written by an agent that read UberWolf at commit `f4191375d289171b1f29dbc5ca320133b2b4b96a`, with the maintainer's approval (2026-11-27): from the DxLib copy in `3rdParty/DXLib`, `DXArchive.h` and, in `DXArchive.cpp`, the routines that unpack an archive and a directory, build the per-file key string, make a key and XOR with it; and from UberWolf's own MIT code, `UberWolfLib/WolfCrypt/WolfCrypt.hpp`, `WolfAes.hpp`, `WolfRng.hpp` and `WolfCryptUtils.hpp`, and the crypt version table in `UberWolfLib/WolfDec.cpp`. It describes the bytes in prose and copies no code. The sources were deleted afterwards. The Wolf-specific steps are in UberWolf's MIT files; the unlicensed DxLib copy only decides where and in what order they apply.
+
+The rules were checked by decoding all 42 archives of False Myth 2 (Wolf RPG Editor 3.343) with a throwaway script written from this section. All 42 opened, and their 11,203 files came out at exactly the unpacked sizes their entries give, with every table block and LZ stage decoding to its recorded size. `BasicData/Game.dat` (29,351 bytes) and the other `.dat` and `.mps` files start with Wolf RPG Editor's data headers, all 3,177 pictures open, all 7,889 OGG, MP3 and WAV sounds probe as valid, and a sample of 30 decodes without errors.
+
+All numbers are little-endian. Unless a rule below says otherwise, these archives follow the version 8 rules above.
+
+### Which archives
+
+A Wolf RPG Editor 3.x archive is a DxLib version 8 archive whose flags field at 0x2C carries Wolf's crypt version in its upper 16 bits, the u16 at 0x2E. UberWolf applies the scheme below to crypt versions 0x14B to 0x3E7 and from 0x3F2 up, and changes several of its steps for 0x15E and later and for 0x3F2. Only 0x14B is described here; it is what Wolf RPG Editor 3.31 to at least 3.343 write. Crypt versions below 0x14B, such as the 0x13A test archives, use the plain version 8 rules.
+
+The key string for 0x14B is the 52 bytes `CA 08 4C 5D 17 0D DA A1 D7 27 C8 41 54 38 82 32 54 B7 F9 46 8E 13 6B CA D0 5C 95 95 E2 DC 03 53 60 9B 4A 38 17 F3 69 59 A4 C7 9A 43 63 E6 54 AF DB BB 43 58`. It is used only for the salt below. The 7-byte version 8 archive key and the per-file keys are not used at all.
+
+### Layers
+
+A reader undoes four layers, in this order:
+
+1. The four address fields of the header are XORed with random numbers.
+2. The file pass: most of the file is XORed with the file stream.
+3. The AES pass: two ranges are XORed with an AES-128 counter-mode keystream.
+4. The tables and file data are read by the version 8 rules, except that each version 8 XOR uses the data stream instead.
+
+The writer applies them in the reverse order. Steps 2 and 3 work on the whole file image, so do them before reading any table or file.
+
+### Password and random numbers
+
+The 15 reserved bytes at 0x31 to 0x3F, called P0 to P14 here, are stored in the clear and differ in every archive. Every key below is made from them. Header bytes 0x00 to 0x07 and 0x28 to 0x30 (`DX`, the version 8, the table size, the code page, the flags and the Huffman size) are in the clear too.
+
+The random numbers are those of Microsoft C's `rand`: a 32-bit state, set to the seed when seeding. Each call sets the state to state × 214013 + 2531011, modulo 2^32, and returns bits 16 to 30 of the new state, a number from 0 to 32767. Seeds are sums and products of P bytes taken as unsigned numbers.
+
+### Header addresses
+
+Seed with P0 + P7 × P12. Then take the four u64 fields at 0x08, 0x10, 0x18 and 0x20 in that order. Treat each as four u16s and XOR them with the next four random numbers, starting from its last u16 (at +6) and moving to its first (at +0). That is 16 calls in all. The fields are then the data start, the table start, the file table offset and the directory table offset, as in version 8.
+
+### Stream tables
+
+The file pass and the data stream each use a 768-byte table in three rows of 256 bytes: row 0 is bytes 0 to 255, row 1 bytes 256 to 511, row 2 bytes 512 to 767. The data table and the file table are built the same way, with different parameters:
+
+1. Compute a byte s, starting at 0. For the data table let n be P11 divided by 3, rounded down, and r be 3. For the file table let n be P8 divided by 4, rounded down, and r be 2. For each i from 0 to n − 1, s becomes i XOR (s XOR P(i mod 15), rotated right by r bits within the byte).
+2. Seed with P2 × P5 + P12 + s.
+3. Three factor bytes f0, f1, f2 start at 0. Set factor number s mod 3 to the next random number mod 256.
+4. For each column i from 0 to 255, take two random numbers, a and then b. Row 0 at column i is f0 XOR the low byte of b. Row 1 is f1 XOR (a shifted right by 8). Row 2 is f2 XOR the low byte of a.
+
+That completes the data table. The file table then gets a salt pass:
+
+5. The salt is 128 bytes. Byte i is (i divided by 52, rounded down, plus key string byte i mod 52) mod 256, where 52 is the key string's length.
+6. For each row k from 0 to 2, set a counter t to s, the file table's s from step 1. Then for each column j from 0 to 255, let c be salt byte j mod 128, d be salt byte (j + k) mod 128, e be the table byte at row k, column j, and x be c XOR e. Let m be (256 × c + d) mod 7. The new byte v starts as x and changes by m:
+   - m = 1: if d mod 11 is 0, v is e.
+   - m = 2: if c mod 29 is 0, v is NOT x.
+   - m = 3: if (j + 3) mod 37 is 0, v is d XOR x.
+   - m = 4: if (c + d) mod 97 is 0, v is (c + x) mod 256.
+   - m = 5: if 5 × j mod 123 is 0, v is x XOR the low byte of t.
+   - m = 6: if c is 255 and d is 0, v is 0 and the column is marked.
+   - m = 0: no change.
+
+   Then, if (j + k) mod (c mod 5 + 1) is 0, XOR v with the low byte of t. Otherwise, if the column is marked, v is NOT x. Store v at row k, column j, and add k to t.
+
+The stream byte at position p, for either table, is row 0 at column p mod 256, XOR row 1 at column (p ÷ 256) mod 256, XOR row 2 at column (p ÷ 65536) mod 256, with each division rounded down. The stream repeats every 2^24 bytes.
+
+### File pass
+
+XOR each byte at file offset p, for p from 64 up to the file size minus 65, with the file stream byte at position p. The 64-byte header and the last 64 bytes of the file are left alone.
+
+### AES pass
+
+The key K and the initial counter C are 16 bytes each, made from the password. For each i from 0 to 14, with arithmetic modulo 256:
+- K byte i is P(7 × i mod 15) + i × i.
+- C byte i is P(11 × i mod 15) − i × i.
+- K byte 15 is XORed with P(i) + 3 × i, and C byte 15 with P(i) + 5 × i. Both start at 0.
+
+The cipher is AES-128 encryption with one change to the key expansion. For every fourth word (words 4, 8, up to 40), rotate the bytes of the previous word one place left as usual, giving b1, b2, b3, b0. The four bytes are then S(b1) XOR the round constant, S(b2) shifted right by 4 bits, NOT S(b3), and S(b0) rotated left by 1 bit, where S is the AES S-box. Standard AES uses S of each byte, with the round constant only on the first. The round constants, the S-box, the rounds, ShiftRows and MixColumns are standard.
+
+In counter mode, each 16-byte keystream block is the cipher applied to the counter, and the counter then goes up by 1 as a 128-bit big-endian number. Two ranges are XORed:
+
+1. The first min(1024, file size − 64) bytes from offset 64, normally the start of file data.
+2. The bytes from the table start to the end of the file.
+
+The counter runs on from the first range into the second, but the second range starts with a fresh block: when the first range ends partway through a block, the rest of that block is not used. The two ranges overlap when the file data is shorter than 1024 bytes, and the overlapping bytes are then XORed by both. This short case is not from the source, which stops before the AES pass for such archives; it was found from False Myth 2's 388-byte `AutoBackup_Before_Ver3.33_MapFile.wolf`, whose tables start at offset 64 and decode only this way.
+
+### Tables and file data
+
+After the AES pass, read the archive by the version 8 rules: the table block runs from the table start to the end of the file and is Huffman-decoded, then LZ-decoded; file entries are 72 bytes; file data has its Huffman and LZ stages. Wherever version 8 XORs with the archive key or a file's key, XOR with the data stream instead, at the same stream positions: the table block from position 0, and a file's stored bytes from the position equal to its unpacked size, running on across all its stored parts. The data stream is the same for every file in the archive. When flags bit 0 is set the XOR is skipped as in version 8; the False Myth 2 archives have it clear.
+
+UberWolf strips one more thing after unpacking: when `Game.dat`, `CDataBase.dat`, `DataBase.dat` or `CommonEvent.dat` starts with the 61 ASCII bytes `Extracting data from encrypted files violates the guidelines.` and a zero byte, it removes those 62 bytes. None of False Myth 2's files start that way.
+
+### Worked example
+
+`Data/MapData.wolf` of False Myth 2, 252,043 bytes. The header as stored:
+
+```
+00  44 58 08 00 AC 30 00 00 C6 1D 41 4D CE 6D 24 3B
+10  DF D8 9A 79 EF 30 0B 22 90 0E 3D 11 54 40 2E 4E
+20  FB 56 80 5E 10 60 78 2D A4 03 00 00 00 00 4B 01
+30  0C EA 4A 14 23 22 55 16 F2 77 50 7B 05 B8 5A 34
+```
+
+The password is `EA 4A 14 23 22 55 16 F2 77 50 7B 05 B8 5A 34`. The header seed is 234 + 242 × 184 = 44762, and the header after step 1:
+
+```
+00  44 58 08 00 AC 30 00 00 40 00 00 00 00 00 00 00
+10  58 C7 03 00 00 00 00 00 F4 0D 00 00 00 00 00 00
+20  8C 30 00 00 00 00 00 00 A4 03 00 00 00 00 4B 01
+```
+
+So the data start is 0x40, the table start 0x3C758, the file table offset 0xDF4, the directory table offset 0x308C and the table size 0x30AC (12,460). The crypt version is 0x014B and the Huffman size 12 KiB.
+
+| Value | Data table | File table |
+|---|---|---|
+| n | 5 ÷ 3 = 1 | 119 ÷ 4 = 29 |
+| s | 93 | 225 |
+| seed | 20 × 85 + 184 + 93 = 1977 | 20 × 85 + 184 + 225 = 2109 |
+| first 8 bytes of row 0 | `8F DE 4F 76 FD 3A F4 4B` | `21 F1 4C A2 A4 BF 57 B0` |
+
+The data table's row 1 starts `5C 72 22 2F` and row 2 `66 38 DE C7`, so the data stream starts `B5 E4 75 4C C7 00 CE 71`.
+
+The AES key is `EA F3 38 1F 6A 6E DC 53 45 74 DF 8D E0 F3 3B AC` and the initial counter `EA 04 EE 1A 24 62 F2 E3 1A FF F1 D1 28 CE 5E 96`. The expanded key's second round key is `E6 FD 56 DC 8C 93 8A 8F C9 E7 55 02 29 14 6E AE`, and the first keystream block is `25 30 66 71 8B ED BB 61 13 04 7D 75 2F DB B8 BF`.
+
+The table block's first 16 bytes are `30 59 6C EF 36 D7 0E F7 28 A3 D9 51 57 70 81 1F` as stored and `87 4B 13 73 95 2C 74 F0 46 1C 16 7A B3 2E 55 73` after the file pass and the AES pass. After the data stream XOR, Huffman and LZ, the 12,460 table bytes start `00 00 00 00 03 00 8D 02 4D 41 50 30 30 31 2E 4D`: the root's empty name entry, then the entry for `MAP001.MPS` / `Map001.mps`. The file table's second entry is that file: data address 0, unpacked size 2,051 (0x803), packed size 1,740 (0x6CC) and Huffman size 1,567 (0x61F). Since 1,740 is at most 2 × 12 KiB, its 1,567 stored bytes are XORed with the data stream from position 2,051 (`2A A1 66 A8` first), Huffman-decoded whole to 1,740 bytes and LZ-decoded to 2,051 bytes, which start with ten zero bytes and `57 4F 4C 46 4D`, the map file's magic number.
 
 ## Wolf RPG Editor 3.5 data files
 

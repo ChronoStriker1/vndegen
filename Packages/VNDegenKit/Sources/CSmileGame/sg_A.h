@@ -183,6 +183,7 @@ bool sga_in_party(SG *g, Guid hero);
 void sga_window(SG *g, Image *im, const Res *r, int x, int y, int w, int h);
 Image *sga_default_window(SG *g, const Res **res);
 Image *sga_selected_window(SG *g, const Res **res);
+Image *sga_selectable_window(SG *g, const Res **res);
 Image *sga_face(SG *g, Guid folder, int expr);
 Image *sga_path_image(SG *g, const char *path);
 

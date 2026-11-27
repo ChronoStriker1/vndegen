@@ -81,6 +81,11 @@ Image *sga_selected_window(SG *g, const Res **res) {
     return *res ? sg_image(g, (*res)->id) : NULL;
 }
 
+Image *sga_selectable_window(SG *g, const Res **res) {
+    *res = named_window(g, "default_selectable");
+    return *res ? sg_image(g, (*res)->id) : NULL;
+}
+
 static void set_fade(SG *g, float to, u32 ms) {
     SgaState *a = st(g);
     a->fadeFrom = a->fade;

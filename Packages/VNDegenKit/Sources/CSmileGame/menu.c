@@ -56,6 +56,7 @@ struct Menu {
     i32 shopPrices[32];
     int shopCount;
     int innPrice;
+    bool innFaceDown;
     int innPhase;
     u32 innMs, innMeMs;
     int qty;
@@ -972,7 +973,7 @@ static void use_skill(SG *g, Menu *m, const SkillDef *s, Member *user, int targe
         if (s->target == TARGET_ALLY && i != target) continue;
         Member *mb = &p->members[i];
         if (mb->hp <= 0) continue;
-        heal(g, mb, s->power, 0, 0, 0);
+        heal(g, mb, s->power, 0, s->percent, 0);
     }
     sgb_sound(g, SND_ITEM);
     sg_log(g, "menu: skill %s", s->name);
@@ -1423,7 +1424,7 @@ static bool inn_sleep_frame(SG *g, Menu *m, u32 ms) {
     m->innMs += ms;
     if (!black && m->innMs >= kInnFadeOutMs) {
         party_recover(g);
-        g->field.player.dir = 2;
+        if (m->innFaceDown) g->field.player.dir = 2;
         m->result = true;
         sg_log(g, "menu: inn, party healed");
     }
@@ -1481,10 +1482,11 @@ void shop_open(SG *g, const Guid *items, const i32 *prices, int count) {
     begin(g, m, MENU_SHOP, P_SHOP);
 }
 
-void inn_open(SG *g, int price) {
+void inn_open(SG *g, int price, bool faceDown) {
     Menu *m = menu_get(g);
     if (!m) return;
     m->innPrice = price;
+    m->innFaceDown = faceDown;
     m->innPhase = INN_CHOOSE;
     m->cur[P_INN] = 0;
     m->result = false;
