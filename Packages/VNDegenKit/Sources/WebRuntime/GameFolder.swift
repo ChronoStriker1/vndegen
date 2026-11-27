@@ -12,6 +12,7 @@ nonisolated public struct GameFolder: Sendable {
     public static let origin = "\(scheme)://game"
     /// Where pages find the Windows font substitutes, by file name, such as `/.vndegen/fonts/ume-pgo4.ttf`.
     public static let fontPath = "/.vndegen/fonts/"
+    public static let alphaPath = "/.vndegen/alpha/"
 
     /// The game folder on disk, as the user copied it in.
     public let root: URL

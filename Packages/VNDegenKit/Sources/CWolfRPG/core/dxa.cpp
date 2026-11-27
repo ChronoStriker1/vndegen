@@ -238,7 +238,9 @@ std::unique_ptr<Archive> Archive::open(const std::string &path, std::string *err
         uint64_t end = a->fileSize_;
         if (hd.tableStart > end || hd.dataStart > end || ((hd.flags & 2) && hd.tableSize > end - hd.tableStart) ||
             hd.fileTable > hd.dirTable || hd.dirTable > hd.tableSize)
-            return fail("header points outside the file");
+            return fail(hd.flags >> 16 >= 0x14B ? "its header is encrypted, as Wolf RPG Editor 3.31 and later can do, "
+                                                  "which VNDegen doesn't read yet"
+                                                : "header points outside the file");
         // Wolf RPG Editor 3 keeps its crypt version in the upper half of the flags, which DxLib does not use.
         a->cryptVersion_ = uint16_t(hd.flags >> 16);
         std::string err;

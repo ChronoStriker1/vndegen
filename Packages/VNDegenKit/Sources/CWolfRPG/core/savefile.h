@@ -217,8 +217,6 @@ struct SavePicture {
     std::array<int32_t, 5> v87{};
     std::vector<std::vector<int32_t>> v89Lists;
     std::array<int32_t, 7> v89{};
-    // From version 0x9F, carried over: six values after b, eight more in the run before v89Lists (their exact place in
-    // that run is not known; they are kept after v87), and after v89 two values and a flag, then 13 values when it is set.
     std::array<int32_t, 6> v9fA{};
     std::array<int32_t, 8> v9fB{};
     std::array<int32_t, 2> v9fC{};

@@ -138,6 +138,14 @@ A presence byte, 0 in every test save.
 
 **Save variables** (221 and 222): the slot argument is a slot number, or a string variable that names a file under the game folder. The address is the third argument, or the value of the variable it names when bit 0 of the fourth is set. Reading 9000024 gives 1 when the save could be read and 0 otherwise, which is how load screens tell empty slots. Reads and writes cover normal and spare variables, string variables, common event self variables, the CDB, and system variables 0 to 7, 28, 29 and 100 to 102. Writing to a file that doesn't exist first creates it as the engine does: no map, a 20 by 15 map of tile 100000, every variable 0, an empty CDB.
 
+## Version 145 (Wolf RPG Editor 3.3x)
+
+False Myth 2's engine, Wolf RPG Editor 3.343, writes save version 145 (0x91) in a container of its own, marked by 2 in header byte 8. It is the 3.5 container (`docs/wolfrpg-cleanroom.md`) without the swapped blocks: the unpacked and packed sizes, then the body as one LZ4 block, XORed from byte 20 with the same 128-byte stream seeded by header bytes 0, 1 and 5, with header byte 3 the byte sum and bytes 4 and 7 the check value. The body is version 142's, with no arrays and no map layer count, plus two u32 at the end of each picture, after `v89`: 0 and 1 in all 135 pictures of two menu saves. Version 159 writes the same pair there, before its flag.
+
+Established from the game's own files: the save it ships, the save the engine rewrites at every start (`SaveData101.sav`, its title map, 110), and saves made from its menu under Wine (`SaveData02.sav` with the menu's 109 pictures on screen, and `SaveData102.sav`, which it writes when the menu opens). Each parses to the end marker and writes back to the same body bytes. Load test: the PC engine lists saves VNDegen wrote, with the play time they hold (12780 seconds shows as 003:33), and loads them, both a copy of its own menu save with all 109 pictures and one with no pictures, as the runtime writes; after a load its own events draw the menu and HUD again. A save the PC engine then made from that state reads in VNDegen, with the play time carried on from VNDegen's. The game puts the hero back where its own variables say after a load, so the hero's saved position wasn't seen to matter.
+
+The runtime treats 145 as 142: pictures aren't written and a load clears them. Versions 143, 144 and 146 to 158 are still refused, since no save of those versions has been seen.
+
 ## Known limits
 
 - The screen tint and the playing BGM and BGS weren't located in the saves. After a load the map's music plays and the tint stays as it was. Music an event started before the save is lost.

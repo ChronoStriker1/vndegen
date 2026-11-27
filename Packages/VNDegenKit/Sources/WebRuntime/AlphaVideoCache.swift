@@ -14,7 +14,7 @@ nonisolated final class AlphaVideoCancellation: @unchecked Sendable {
 public actor AlphaVideoCache {
     public static let shared = AlphaVideoCache()
     public static let limit = 512 << 20
-    private let root = URL.cachesDirectory.appendingPathComponent("AlphaVideo-v1", isDirectory: true)
+    private nonisolated let root = URL.cachesDirectory.appendingPathComponent("AlphaVideo-v1", isDirectory: true)
     private var cleaned = false
     /// Clips already logged as having no alpha, so their repeated range requests don't log again.
     private var opaqueLogged = Set<String>()
@@ -104,6 +104,53 @@ public actor AlphaVideoCache {
         guard fstat(handle.fileDescriptor, &info) == 0 else { throw CocoaError(.fileReadUnknown) }
         let identity = "\(info.st_dev):\(info.st_ino):\(info.st_size):\(info.st_mtimespec.tv_sec):\(info.st_mtimespec.tv_nsec)"
         let key = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
+        return try await serve(key: key, source: source, name: name, method: method, range: range, cancellation: cancellation, log: log)
+    }
+
+    nonisolated func stash(_ clip: Data, in stash: URL, log: Logger) throws -> String? {
+        let key = SHA256.hash(data: clip).map { String(format: "%02x", $0) }.joined()
+        let file = stash.appendingPathComponent(key + ".webm")
+        if !FileManager.default.fileExists(atPath: file.path) {
+            try FileManager.default.createDirectory(at: stash, withIntermediateDirectories: true)
+            try clip.write(to: file, options: .atomic)
+        }
+        if FileManager.default.fileExists(atPath: root.appendingPathComponent(key + ".mov").path) { return key }
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        var error = [CChar](repeating: 0, count: 512)
+        switch vnalpha_inspect(handle.fileDescriptor, &error, Int32(error.count)) {
+        case 1:
+            return key
+        case 0:
+            try? FileManager.default.removeItem(at: file)
+            return nil
+        default:
+            try? FileManager.default.removeItem(at: file)
+            let reason = String(decoding: error.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            log.error("alpha video blob \(key.prefix(12), privacy: .public): can't be checked, \(reason, privacy: .public)")
+            return nil
+        }
+    }
+
+    nonisolated func stashedResponse(key: String, stash: URL, method: String, range: String?,
+                                     cancellation: AlphaVideoCancellation, log: Logger) async throws -> FileResponse? {
+        let name = "blob \(key.prefix(12))"
+        do {
+            try Task.checkCancellation()
+            guard let handle = try? FileHandle(forReadingFrom: stash.appendingPathComponent(key + ".webm")) else { return nil }
+            defer { try? handle.close() }
+            return try await serve(key: key, source: handle.fileDescriptor, name: name, method: method, range: range,
+                                   cancellation: cancellation, log: log)
+        } catch {
+            if !(error is CancellationError) && !Task.isCancelled {
+                log.error("alpha video \(name, privacy: .public) not served: \(error.localizedDescription, privacy: .public)")
+            }
+            throw error
+        }
+    }
+
+    private nonisolated func serve(key: String, source: Int32, name: String, method: String, range: String?,
+                                   cancellation: AlphaVideoCancellation, log: Logger) async throws -> FileResponse {
         let cached = try await directory().appendingPathComponent(key + ".mov")
         if !FileManager.default.fileExists(atPath: cached.path) {
             try await converter.convert(source, to: cached, name: name, cancellation: cancellation, log: log, cache: self)

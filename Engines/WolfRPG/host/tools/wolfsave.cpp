@@ -215,9 +215,9 @@ void dump(const SaveFile &f) {
         o.list("v87", pic.v87);
         for (size_t j = 0; j < pic.v89Lists.size(); j++) o.list("v89Lists[" + std::to_string(j) + "]", pic.v89Lists[j]);
         o.list("v89", pic.v89);
+        if (f.version >= 0x9F) o.list("v9fB", pic.v9fB);
+        if (f.version >= 0x91) o.list("v9fC", pic.v9fC);
         if (f.version >= 0x9F) {
-            o.list("v9fB", pic.v9fB);
-            o.list("v9fC", pic.v9fC);
             o.num("v9fFlag", pic.v9fFlag);
             if (pic.v9fFlag) o.list("v9fD", pic.v9fD);
         }
@@ -269,7 +269,7 @@ int main(int argc, char **argv) {
                     bool same = again == bytes;
                     // A Wolf RPG Editor 3.5 save is LZ4-compressed, and VNDegen's encoder picks other matches than the
                     // engine's, so its content is compared instead: both written in the older container must agree.
-                    if (!same && bytes.size() > 8 && bytes[8] == 3) {
+                    if (!same && bytes.size() > 8 && (bytes[8] == 2 || bytes[8] == 3)) {
                         SaveFile reparsed = parseSave(again);
                         // The packed bytes' sum lives in header byte 3, so the headers are taken as equal.
                         reparsed.header = parsed.header;

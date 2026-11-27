@@ -30,6 +30,7 @@ public:
     // The names of the files in a folder on disk, relative to the game folder ("" is the game folder itself), sorted.
     // Nullopt when there is no such folder, as for one packed in an archive.
     std::optional<std::vector<std::string>> listFolder(std::string path) const;
+    std::string missingReason(const std::string &path) const;
 
 private:
     std::optional<std::filesystem::path> findCaseless(const std::filesystem::path &base, const std::string &rel) const;
@@ -38,6 +39,7 @@ private:
     std::filesystem::path root_, data_;
     std::unique_ptr<Archive> whole_;
     mutable std::map<std::string, std::unique_ptr<Archive>> folders_;  // upper-case folder name to archive or null
+    mutable std::map<std::string, std::string> archiveErrors_;
 };
 
 // Normalises a game path: backslashes become slashes and a leading "Data/" is dropped.

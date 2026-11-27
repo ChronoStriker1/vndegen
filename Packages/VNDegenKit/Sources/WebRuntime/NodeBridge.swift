@@ -8,6 +8,7 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
     case stat(path: String)
     /// `text` true returns UTF-8 text; false returns base64 bytes.
     case readFile(path: String, text: Bool)
+    case read(path: String, position: Int64, length: Int)
     /// `text` true writes `data` as UTF-8, which is what Node does for a string; false decodes base64 bytes.
     case writeFile(path: String, data: String, text: Bool)
     case mkdir(path: String, recursive: Bool)
@@ -24,8 +25,9 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
     case storageSet(key: String, value: String)
     case storageRemove(key: String)
     case storageClear
+    case alphaVideo(data: String)
 
-    private enum Key: String, CodingKey { case op, path, text, data, recursive, from, to, url, key, value }
+    private enum Key: String, CodingKey { case op, path, text, data, recursive, from, to, url, key, value, position, length }
 
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: Key.self)
@@ -36,6 +38,9 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
         case "readFile":
             self = .readFile(path: try c.decode(String.self, forKey: .path),
                              text: try c.decodeIfPresent(Bool.self, forKey: .text) ?? false)
+        case "read":
+            self = .read(path: try c.decode(String.self, forKey: .path), position: try c.decode(Int64.self, forKey: .position),
+                         length: try c.decode(Int.self, forKey: .length))
         case "writeFile":
             self = .writeFile(path: try c.decode(String.self, forKey: .path),
                               data: try c.decode(String.self, forKey: .data),
@@ -54,6 +59,7 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
         case "storageSet": self = .storageSet(key: try c.decode(String.self, forKey: .key), value: try c.decode(String.self, forKey: .value))
         case "storageRemove": self = .storageRemove(key: try c.decode(String.self, forKey: .key))
         case "storageClear": self = .storageClear
+        case "alphaVideo": self = .alphaVideo(data: try c.decode(String.self, forKey: .data))
         default: throw DecodingError.dataCorruptedError(forKey: .op, in: c, debugDescription: "unknown op \(op)")
         }
     }
@@ -153,6 +159,14 @@ nonisolated struct NodeBridge: Sendable {
             let data = try file.readToEnd() ?? Data()
             return .string(text ? String(decoding: data, as: UTF8.self) : data.base64EncodedString())
 
+        case let .read(path, position, length):
+            let file = try open(path)
+            guard Self.kind(try Self.info(file)) != S_IFDIR else { throw BridgeError(code: "EISDIR", message: "illegal operation on a directory") }
+            guard position >= 0, length >= 0 else { throw BridgeError(code: "EINVAL", message: "invalid argument") }
+            try file.seek(toOffset: UInt64(position))
+            let data = length == 0 ? Data() : try file.read(upToCount: length) ?? Data()
+            return .string(data.base64EncodedString())
+
         case let .writeFile(path, payload, text):
             let (directory, name) = try openParent(path)
             guard let data = text ? Data(payload.utf8) : Data(base64Encoded: payload) else {
@@ -222,7 +236,7 @@ nonisolated struct NodeBridge: Sendable {
             }
             return .null
 
-        case .openExternal, .quit, .storageLoad, .storageSet, .storageRemove, .storageClear:
+        case .openExternal, .quit, .storageLoad, .storageSet, .storageRemove, .storageClear, .alphaVideo:
             throw BridgeError(code: "ENOSYS", message: "handled by the session, not the bridge")
         }
     }

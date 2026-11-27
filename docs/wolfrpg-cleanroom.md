@@ -266,7 +266,14 @@ What the new fields mean isn't known. VNDegen carries them over from the last sa
 ### Uncertain points
 
 - The engine writes the two u32 in each character before `unknown5`, and VNDegen keeps them there. The eight extra u32 in each picture lie somewhere in the run between `v72b` and `v89Lists`; VNDegen keeps them after `v87`. Neither placement matters while those fields are only carried over.
-- Saves of versions 0x8F to 0x9E, from Wolf RPG Editor 3.3x, haven't been seen. VNDegen refuses them rather than guess.
+- Of versions 0x8F to 0x9E, from Wolf RPG Editor 3.3x, only 0x91 has been seen (below). VNDegen refuses the others rather than guess.
+
+## Wolf RPG Editor 3.3x saves (version 0x91)
+
+Source: False Myth 2's own save files and its engine, Wolf RPG Editor 3.343, run under Wine, with no disassembly. `docs/wolfrpg-save-format.md` has the layout and the load tests.
+
+- The container has 2 in header byte 8. Decoding it as the 3.5 container without the block swap gives the two sizes (the packed size is the file size minus 28) and an LZ4 block that unpacks to the unpacked size, and header byte 3 and bytes 4 and 7 match the byte sum and the check value as the 3.5 container defines them, in each of the eleven saves the engine wrote. Applying the swap breaks the sizes.
+- The body parses with version 142's layout to the end marker in saves without pictures. In saves with pictures each picture record is 8 bytes longer than version 142's. The fields up to `v73b` line up (it reads 1, 123, 195, the common event and line that drew the picture), so the 8 bytes are two u32 after `v89`, the place version 0x9F has `v9fC` and the same values.
 
 ## Input, CSV and arrays
 

@@ -374,6 +374,7 @@ final class WebGameSession: NSObject, EngineSession {
         if game.storage != nil { config["storage"] = "files" }
         if game.scrollsPage { config["scrolling"] = "page" }
         if alwaysFocused { config["focus"] = "always" }
+        if game.convertsAlphaVideo { config["alphaVideo"] = "convert" }
         let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
         return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_CONFIG__", with: json)
     }
@@ -569,6 +570,8 @@ final class WebGameSession: NSObject, EngineSession {
         case .openExternal(let raw):
             if let url = URL(string: raw) { openExternal(url) }
             return BridgeReply.value(.null).json
+        case .alphaVideo(let data):
+            return schemeHandler.stash(base64: data).json
         case .storageLoad, .storageSet, .storageRemove, .storageClear:
             guard let storage else { return BridgeReply.failure(BridgeError(code: "ENOSYS", message: "no storage for this game")).json }
             return storage.handle(request).json

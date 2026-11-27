@@ -54,6 +54,8 @@ WebKit can't decode Ogg Vorbis, so MZ uses the decoder it ships with, and MV gam
 
 Up to 0.13.0, MV games on the community core (`rpg_managers.js` "community-1.3b") saved to the game's top-level `save/` in VNDegen, because the layer lacked the `fs.rmdirSync` that core uses to test `www/`. The first launch of such a game after updating moves those saves into `www/save/` and adds them to the game's slot index there, unless a slot is in both folders or the move would hide a save, in which case both folders stay. Early MV cores, such as 1.2.0, save to the game's top-level `save/`, as they do on the PC.
 
+Plugins can read part of a file through file descriptors, with `fs.openSync`, `readSync` and `closeSync`, as Princess and Conquest's movie plugin does to check each movie's first bytes. They behave as Node's do, read-only: opening a file to write fails.
+
 iOS can end WebKit's GPU process, which loses the page's WebGL context. MZ games and MV games on PIXI 4 recover from that with their map, sprites, and battles drawn as before. The earliest MV cores use PIXI 2, and those games stay black until the game restarts: The Midsummer Night's Sabbat and Queena's Legend in the library.
 
 MV and MZ games also have a Cheats page in the VNDegen menu, described in [controls.md](controls.md#cheats).
@@ -62,11 +64,12 @@ A touch reaches an MV or MZ game the way a click does on the PC, where the mouse
 
 A game can name its files with Windows backslashes, as the Demon Queen game does for 277 of its 313 video references, and they load as they do on the PC. [development.md](development.md#file-name-case) has the details.
 
-WebKit ignores the alpha channel of VP9 WebM clips, so a see-through clip would show as a black or white box. The first time a game plays one, VNDegen converts it in the background to HEVC with alpha, which Apple's system plays with transparency, keeps it in a cache outside the game folder, and serves it at the clip's original address, so the game and its movie plugin don't change. The clip stays hidden until it's ready, so its first play can wait, and later plays start straight away. Settings has a Clear video cache button. [video.md](video.md) has the details.
+WebKit ignores the alpha channel of VP9 WebM clips, so a see-through clip would show as a black or white box. The first time a game plays one, VNDegen converts it in the background to HEVC with alpha, which Apple's system plays with transparency, keeps it in a cache outside the game folder, and serves it at the clip's original address, so the game and its movie plugin don't change. A clip the game decrypts in its own page and plays from a blob URL, as Princess and Conquest does, is converted too and served from an address of VNDegen's own. The clip stays hidden until it's ready, so its first play can wait, and later plays start straight away. Settings has a Clear video cache button. [video.md](video.md) has the details.
 
 Known limits for those clips, from a scan of the movies in the library's 118 MV and MZ games and No Socks RPG on 2026-11-01:
 
 - Converting uses a lot of memory while it runs: about 160 MB on a Mac and up to about 390 MB on an iPad simulator. Real iPad speed and memory haven't been measured.
+- Princess and Conquest decrypts its 587 movies, 862 MB of VP9 with alpha, and its portraits come in pairs. The first time a character's portrait shows, the scene waits for both to convert: 9 to 12 s each for the Faun Princess's 2 s, 876 by 1292 pair on an iPhone simulator with the mini's load around 8, and over a minute when the mini was busy with builds. Later sessions reuse the cache. A converted portrait is about 3.4 times its WebM, 2.3 to 5.6 MB, so the whole game would need about 2.9 GB and the 512 MiB cache holds the portraits played most recently.
 - Four games were checked through their own plugin commands: Cornelica, Holding Hands, Fallen Kunoichi, and No Socks RPG. The other seven with clips weren't played through. Five Nights with Maids and Lovey-Dovey Lockdown name no clips in their data, so they may not use them.
 - Only VP9 clips with 8-bit 4:2:0 video and Opus or no sound are converted. VP8 clips with alpha and VP9 clips in profile 2 or 3 aren't, and no library game has one.
 - `siru.webm` (50 by 200) in Trinity Dungeon is the library's only clip under 64 pixels on a side, and it hasn't been played through the converter.

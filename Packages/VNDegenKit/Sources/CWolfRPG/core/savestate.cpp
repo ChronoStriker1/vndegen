@@ -416,7 +416,7 @@ SaveFile Game::snapshot() {
     std::random_device rd;
     // Fresh seeds, as each PC save has: at 0, 3 and 9 for the XOR, and in the 3.5 container the whole header but the
     // encoding mark and the container byte.
-    if (f.header[8] == 3) {
+    if (f.header[8] == 2 || f.header[8] == 3) {
         for (int i = 0; i < 20; i++)
             if (i != 6 && i != 8) f.header[i] = uint8_t(rd());
     } else {

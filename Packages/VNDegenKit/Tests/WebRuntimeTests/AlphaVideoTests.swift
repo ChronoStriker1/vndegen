@@ -1,7 +1,9 @@
 import CVNAlpha
 import Foundation
+import OSLog
 import TestSupport
 import Testing
+@testable import WebRuntime
 
 private let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
 
@@ -52,4 +54,43 @@ private func inspect(_ descriptor: Int32) -> (Int32, String) {
     #expect(status == 0)
     #expect(result.width == 64 && result.height == 64 && result.frames == 3)
     #expect(FileManager.default.fileExists(atPath: output.path))
+}
+
+@Test @MainActor func aWebMBlobWithAlphaIsServedConverted() async throws {
+    let root = TestFolders.root.appending(path: "vndegen-alpha-blob-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let key = "998b446bd8ed571a955cb38250026178a918d2a4857ea95e78803d2da2e89791"
+    defer {
+        try? FileManager.default.removeItem(at: root)
+        try? FileManager.default.removeItem(at: URL.cachesDirectory.appending(path: "AlphaVideo-v1/\(key).mov"))
+    }
+    try Data("<html><body></body></html>".utf8).write(to: root.appending(path: "index.html"))
+    for name in ["alpha-clip", "opaque-clip"] {
+        try FileManager.default.copyItem(at: fixtures.appendingPathComponent("\(name).webm"), to: root.appending(path: "\(name).bin"))
+    }
+    let folder = GameFolder(root: root, webRoot: "")
+    let handler = GameSchemeHandler(folder: folder, log: Logger(), alpha: true)
+    let page = try PageHarness(storage: false, scripts: ["window.__vndegen.alphaVideo = (url) => { window.converted = url; };"],
+                               scheme: handler, alphaVideo: true) { request in
+        guard case .alphaVideo(let data) = request else { return .failure(BridgeError(code: "ENOSYS", message: "")) }
+        return handler.stash(base64: data)
+    }
+    try await page.load(URLRequest(url: folder.indexURL))
+    let values = try await page.run("""
+        const blob = async (name) => new Blob([new Uint8Array(await (await fetch(name)).arrayBuffer())], { type: 'video/webm' });
+        const alpha = URL.createObjectURL(await blob('alpha-clip.bin'));
+        const opaque = URL.createObjectURL(await blob('opaque-clip.bin'));
+        const response = await fetch(alpha);
+        const movie = new Uint8Array(await response.arrayBuffer());
+        return {
+            alpha, opaque: opaque.slice(0, 5), type: response.headers.get('Content-Type'),
+            atom: String.fromCharCode(...movie.slice(4, 8)), converted: window.converted,
+        };
+        """) as? [String: Any] ?? [:]
+    let address = "vndegen://game/.vndegen/alpha/\(key).webm"
+    #expect(values["alpha"] as? String == address)
+    #expect(values["opaque"] as? String == "blob:")
+    #expect(values["type"] as? String == "video/quicktime")
+    #expect(values["atom"] as? String == "ftyp")
+    #expect(values["converted"] as? String == address)
 }
