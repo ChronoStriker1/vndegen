@@ -202,6 +202,19 @@ from runner saves (another delegate's build ran beside some of it; load averages
 With the touch gamepad shown, the iPad simulator's world map ran at 44.6 to 46.1 frames a second with the runtime at
 3.4 ms, the same gamepad compositing cost as below.
 
+Colette's second half, DEBUG builds of this round's branch on the Mac mini, 2026-11-27, measured the same way from
+runner saves (load averages given; a simulator build ran beside the first Mac row). Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator, gamepad hidden | iPhone 18 Pro simulator |
+|---|---|---|---|
+| Cat's mansion | 60.0, 59.9, 6.1 ms (load 27) | 59.9 to 60.0, 48.7 to 60.0, 3.0 to 3.6 ms (load 7) | 60.0, 60.0, 4.0 ms (load 6) |
+| North Tower 1F | 60.0, 59.9 to 60.0, 2.0 ms (load 14) | 60.0, 60.0, 2.2 to 2.6 ms (load 6) | not measured |
+| 集会場 battle, four heroes and five monsters | 60.0, 59.9 to 60.0, 7.0 ms (load 7) | not measured | not measured |
+| Staff roll | 60.0, 59.9 to 60.0, 6.6 ms (load 5) | 60.0, 60.0, 3.8 ms (load 6) | not measured |
+
+With the touch gamepad shown, the iPad simulator's cat's mansion ran at 35.7 to 40.1 frames a second with the runtime at
+3.6 to 3.9 ms, the gamepad compositing cost described below.
+
 Colette's first release, DEBUG builds of 208c06cf on the Mac mini, 2026-11-27, measured the same way (Mac app with no
 other app or build running, load average 3 to 5; one simulator booted at a time). The world map is the cell below
 the castle where the first monster reaches the player, the battle the command list of that battle. Target 60.
