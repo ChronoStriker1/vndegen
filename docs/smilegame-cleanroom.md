@@ -145,6 +145,86 @@ byte with this rule.
 
 A message page ends at a blank line.
 
+## 3D rendering (round 2, delegate D)
+
+Everything here was read from the two games' map records and resources, then checked by rendering the same cell as
+a PC capture under Wine and comparing them side by side (`sgview` in the Linux host draws a map at a cell).
+
+### Map header and tail
+
+The 36 bytes after the encounter list start with an `int32` background: 0 draws the built-in noon sky
+(`samples/common/res/system/Sky noon - 01`, `Cloud noon - 01` and `Sun noon - 01`, models centred on the camera), 2
+leaves the background black. Sacred's field uses 1, which the PC camera can't be tilted far enough to show.
+
+After the chip list:
+
+| Field | Type |
+|---|---|
+| slope chips | `int32` n, n × (`int32` index, chip GUID): the stair and slope textures this map uses |
+| | `uint8` |
+| outside chip | GUID: the chip drawn around the map |
+| outside height | `int32` |
+| sun | `int32` 1 on |
+| sun pitch, yaw | `float` each, radians; both games use -1.2 and -0.7 |
+| sun colour | three `int32` |
+| | 4 bytes, `uint8` |
+| camera kind | `int32` |
+| has camera | `uint8`; when 1, an `int32` byte count and that many bytes of `float` |
+
+With camera kind 0 the eight floats are pitch, yaw, an unused 0, field of view, distance, -1, 0, 0 (Sacred's castle:
+-3, 5, 0, 70, 3.5, -1, 0, 0). Kind 1 holds two floats (Colette's event rooms: 27.5 and 1.7). `GameSettings.sgr` holds
+the default map camera as the same eight floats after an `int32` 32: Colette -49, 0, 0, 70, 3.0, -1, 0, 0 and Sacred
+-48, 0, 0, 70, 3.5, -1, 0, 0.
+
+Fitting renders to PC captures pinned how those numbers make a view: the eye looks at a point one unit above the
+player's feet (the -1), from twenty times the stored distance, with a vertical field of view of a tenth of the stored
+value (7°). Carpet edges in Colette's throne room then land within a pixel of the PC's. Yaw turns the other way from a
+right-handed reading, for the camera and for the sun.
+
+### Stairs and slopes
+
+Each record in the map's stair list is `x`, `z`, an index into the slope chip list, and a shape:
+
+| Shape | High corners |
+|---|---|
+| 0, 1, 2, 3 | south, north, east, west edge: a ramp, or three steps when the chip is a stair chip |
+| 4, 5, 6, 7 | one corner: south-east, north-west, north-east, south-west |
+| 8, 9, 10, 11 | three corners, low at north-west, south-east, south-west, north-east |
+
+The shapes were read from which neighbours stand one unit higher, over all 2,356 records in both games. A slope rises
+one unit from the cell's height.
+
+### Chips
+
+A chip's attribute byte (after its path in `ResourceItem.sgr`): low nibble 1 natural ground, 3 built ground, 4 a liquid
+(sea, lava, ice), 5 field, 7 poison swamp; 0x11 a stair chip, 0x21 a slope chip. Liquids are 384 pixels wide, eight
+48-pixel frames side by side, and sit a quarter unit below their cell's height. A stair chip's top 48 rows are the
+treads seen from above, the next 48 the risers, and the last 48 the side of the flight.
+
+### Light
+
+The two map colours are a key and a fill. Measured on lit and shadowed floor, wall fronts and grass in both games,
+a texel shows as texture × (0.77 × fill + 0.74 × key × sun colour × N·L), with N·L zero in the sun's shadow. The PC
+darkens the foot of walls a little more than this (it looks like ambient occlusion); the runtime doesn't.
+
+### Models and motions
+
+A model's `.def` gives each material's blending (`blend modulate` for shadow quads, `blend add` for glows,
+`depthwrite false`) and, after `anim`, named frame ranges at the scene's frame rate (`walk 1 90 loop`) for models that
+carry their motions. Characters without ranges keep their motions as separate files in a `motion` folder beside the
+model, `motNNN_name.fbx` (an `o_` before the name is dropped), each sharing the model's bone names. Map objects rest in
+their `wait`, `keepClose`, `close` or `lightOff` motion. Texture names that end in `.psd` load the `.png` of the same
+name.
+
+### Characters on the map
+
+- 2D sheets step through frames 1, 0, 1, 2 at the sheet's frame time, walking or standing (a 30 fps recording of the
+  PC), and stand a quarter cell toward the camera from the cell's centre.
+- 3D characters face south at rest and turn by quarter turns; they play `wait` standing and `walk` moving.
+- Where map geometry hides the player, the PC draws its silhouette in white at about 40%, one layer deep.
+- 3D characters cast shadows from the sun; 2D sheets don't. The round blob under characters appears only on maps
+  without a sun.
+
 ## Saves
 
 `savedata\Save_NN.sgs` in the game folder: a `YUKRDATA` header, then plain `BinaryWriter` data. Layout not read yet.

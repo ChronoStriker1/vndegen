@@ -27,6 +27,22 @@ Both games use the same data format.
   with pages, scrolling text, fades, variables, moving to another map.
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
 
+## Drawing the map
+
+`fielddraw.c` builds each map once into 8 by 8 cell chunks: terrain with stairs, slopes and sunken animated liquids,
+a border of the map's outside chip, and the map objects at rest. A frame culls chunks to the view, draws them front to
+back, then the characters, then blended surfaces back to front. The sun's shadows come from a depth map built once per
+map; 3D characters are added to it every frame. `r3d.c` rasterizes on up to six threads, each filling a band of rows
+in the order triangles were queued, so the image is the same as on one thread.
+
+`sg_D.h` is the camera interface event commands call: `sg_camera_get`, `sg_camera_to` (a pose and a time in ms),
+`sg_camera_reset` to the map's default, `sg_camera_moving`, and `sg_camera_command` for command 53's modes 0 and 3.
+`sg_actor_motion` plays a named motion on a 3D character.
+
+Frame times on a 14-core Linux VM, 960 by 544, six threads, measured with `sgview` while other work ran (load average about 15
+on 14 cores): Sacred's 150 by 150 field about 8 to 10 ms average, 99th percentile under 16 ms; Colette's throne room
+about 5 ms. Sacred's castle and forest, with 50,000 to 75,000 triangles in view, take 14 to 23 ms.
+
 ## The Linux host
 
 `Engines/SmileGame/host` builds with CMake:
@@ -36,11 +52,18 @@ Both games use the same data format.
 - `sgplay <game>`: an SDL window with the keyboard (arrows, Enter or Z, Esc or X, Shift).
 - `sgtest`: the format reader tests. With `SG_COLETTE` and `SG_SACRED` set to the game folders it also checks values
   read from the games' files.
+- `sgtest_D`: the renderer's tests: coverage, the map tail and cameras of both games, the throne room's projection
+  against the PC's pixels, and a skinned character's motions.
+- `sgview <game> <out.png> <map> <x> <z> <dir> [frames] [hero:name] [hold:vk,ms] [threads:n]`: draws a map at a cell
+  and prints frame times.
 
 ## Known limits
 
 - No sound, menus, battles, saves, choices or pictures over the map yet; unknown commands are skipped and logged.
-- Shadows and the sky are not drawn; skinned characters stand in their bind pose.
-- Stairs are drawn as plain columns, not as steps.
-- The camera is fixed at one angle and distance close to the player's default; events that move the camera are skipped.
+- Command 53's modes 1 and 2 (Colette's event rooms) are not mapped; mode 3's target point matches the PC's opening
+  scene only roughly.
+- Background value 1 (Sacred's field) draws black; the PC never shows it in play.
+- The PC darkens wall feet slightly more. Map objects with lights stay in their unlit motion until an event changes
+  them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
+- Sacred's castle and forest views take up to 23 ms a frame on that VM, over the 16.7 ms a 60 fps frame allows.
 - The message window's fill differs between the two games on the PC and is drawn the same in both.

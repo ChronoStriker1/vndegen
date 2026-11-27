@@ -101,6 +101,8 @@ static u8 chip_attr(SG *g, Guid id) {
     return 0;
 }
 
+static bool liquid(u8 attr) { return (attr & 0x0f) == 4 || (attr & 0x0f) == 7; }
+
 static int map_height(const Map *m, const MapLook *l, int x, int z) {
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return l->outsideHeight;
     return m->height[(size_t)z * (size_t)m->w + (size_t)x];
@@ -308,7 +310,7 @@ static float surf_height(Build *b, int x, int z) {
     int h = map_height(&b->f->map, &b->v->look, x, z);
     int slot = chip_slot(b->f, x, z);
     if (slot >= 0) chip_image(b, slot);
-    if (slot >= 0 && (b->v->chipAttr[slot] & 4)) return (float)h - WATER_DROP;
+    if (slot >= 0 && liquid(b->v->chipAttr[slot])) return (float)h - WATER_DROP;
     return (float)h;
 }
 
@@ -321,7 +323,7 @@ static void build_cell(Build *b, int x, int z) {
     int hi = map_height(m, &v->look, x, z);
     float h = (float)hi;
     u8 attr = slot >= 0 ? v->chipAttr[slot] : 0;
-    bool water = attr & 4;
+    bool water = liquid(attr);
     float top = water ? h - WATER_DROP : h;
     u8 flags = TF_LIT | TF_SHADOW | TF_CAST | TF_CULL;
     if (water) flags |= TF_ANIM;
