@@ -228,10 +228,7 @@ Known limits:
 - A seek still unfinished after a second counts as hung, so one that slow on a loaded machine would restart its clip.
 - A short MZ WebM with Vorbis sound that ends with its kept frames only part done takes WebKit's loop and hangs. The picture still plays from the kept frames if they complete, but its sound stops. No library game loops such a clip.
 
-Smile Game Builder on the iPad simulator: with the touch gamepad shown, each display tick takes 16 to 24 ms, against
-about 5.5 ms with it hidden, while the runtime's own frame stays at 4 to 5 ms. The simulator spends the difference
-compositing the gamepad's translucent buttons over the game's view. It was not measured on a real iPad, and the other
-rows don't say whether the gamepad was shown.
+Smile Game Builder on the iPad simulator: with the touch gamepad shown, each display tick takes 16 to 24 ms, against about 5.5 ms with it hidden, while the runtime's own frame stays at 4 to 5 ms. The simulator spends the difference compositing the gamepad's translucent buttons over the game's view. It was not measured on a real iPad, and the other rows don't say whether the gamepad was shown.
 
 ## One line each
 
