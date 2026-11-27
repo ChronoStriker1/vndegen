@@ -68,6 +68,7 @@ WebKit ignores the alpha channel of VP9 WebM clips, so a see-through clip would 
 Known limits for those clips, from a scan of the movies in the library's 118 MV and MZ games and No Socks RPG on 2026-11-01:
 
 - Converting uses a lot of memory while it runs: about 160 MB on a Mac and up to about 390 MB on an iPad simulator. Real iPad speed and memory haven't been measured.
+- Princess and Conquest decrypts its 587 movies, 862 MB of VP9 with alpha, and its portraits come in pairs. The first time a character's portrait shows, the scene waits for both to convert: 9 to 12 s each for the Faun Princess's 2 s, 876 by 1292 pair on an iPhone simulator with the mini's load around 8, and over a minute when the mini was busy with builds. Later sessions reuse the cache. A converted portrait is about 3.4 times its WebM, 2.3 to 5.6 MB, so the whole game would need about 2.9 GB and the 512 MiB cache holds the portraits played most recently.
 - Four games were checked through their own plugin commands: Cornelica, Holding Hands, Fallen Kunoichi, and No Socks RPG. The other seven with clips weren't played through. Five Nights with Maids and Lovey-Dovey Lockdown name no clips in their data, so they may not use them.
 - Only VP9 clips with 8-bit 4:2:0 video and Opus or no sound are converted. VP8 clips with alpha and VP9 clips in profile 2 or 3 aren't, and no library game has one.
 - `siru.webm` (50 by 200) in Trinity Dungeon is the library's only clip under 64 pixels on a side, and it hasn't been played through the converter.
