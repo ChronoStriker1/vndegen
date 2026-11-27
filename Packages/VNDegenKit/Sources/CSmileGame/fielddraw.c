@@ -848,7 +848,7 @@ static void cast_model(SG *g, Actor *a, float ang) {
 
 int sg_sprite_rows(const Res *res, const Image *im) {
     int frames = res->frames > 0 ? res->frames : 1;
-    return res->divisions == 1 && im->h / 4 >= im->w / frames ? 4 : 1;
+    return (res->divisions == 1 || res->flagA) && im->h / 4 >= im->w / frames ? 4 : 1;
 }
 
 static void draw_sprite(SG *g, const Actor *a, bool xray) {
