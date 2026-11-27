@@ -1,5 +1,6 @@
 #include "sg.h"
 
+#include <ctype.h>
 #include <math.h>
 #include <time.h>
 
@@ -791,9 +792,19 @@ static float actor_lift(SG *g, const Actor *a) {
     return c[0] * (1 - fx) * (1 - fz) + c[1] * fx * (1 - fz) + c[2] * fx * fz + c[3] * (1 - fx) * fz;
 }
 
+static bool map_object_path(const char *path) {
+    static const char key[] = "mapobject";
+    for (const char *p = path; *p; p++) {
+        size_t k = 0;
+        while (key[k] && p[k] && tolower((unsigned char)p[k]) == key[k]) k++;
+        if (!key[k]) return true;
+    }
+    return false;
+}
+
 static void draw_blob(SG *g, const Actor *a, float size) {
     View *v = g->r3.view;
-    if (!v->blob) return;
+    if (!v->blob || (a->graphic && map_object_path(a->graphic->path))) return;
     float y = a->y + actor_lift(g, a) + 0.02f, r = size * 0.5f;
     Tri t1 = {.tex = v->blob, .mode = TRI_MODULATE, .flags = TF_NOZWRITE};
     Vert p[4] = {{a->x - r, y, a->z - r, 0, 0, 1}, {a->x - r, y, a->z + r, 0, 1, 1}, {a->x + r, y, a->z + r, 1, 1, 1}, {a->x + r, y, a->z - r, 1, 0, 1}};

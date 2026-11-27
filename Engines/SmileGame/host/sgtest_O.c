@@ -230,6 +230,18 @@ static void test_vertex_colors(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_no_shadow_under_map_objects(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    warp(g, "幽玄の塔01Ｆ", 27, 3, 0);
+    for (int i = 0; i < 10 && strcmp(vnsmilegame_scene((VNSmileGame *)g), "field"); i++) press(g, VK_OK, 48);
+    run(g, 500);
+    int r, gr, b;
+    rgb(g, 405, 205, &r, &gr, &b);
+    CHECK(r + gr + b > 250);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
@@ -240,6 +252,7 @@ int main(void) {
         test_front_row(colette);
         test_poison_bubbles(colette);
         test_vertex_colors(colette);
+        test_no_shadow_under_map_objects(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
