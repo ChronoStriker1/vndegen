@@ -86,15 +86,18 @@ int sga_event_sheet(SG *g, int npc) {
 
 void sga_actor_graphic(SG *g, Actor *a, Guid graphic) {
     const Res *res = res_find(&g->res, graphic);
-    if (res == a->graphic && (a->sheet || a->model)) return;
+    if (res == a->graphic && (a->sheet || a->model || a->ptcl)) return;
     if (a->model) model_free(a->model);
     a->model = NULL;
+    sg_ptcl_free(a->ptcl);
+    a->ptcl = NULL;
     a->sheet = NULL;
     a->waitSheet = NULL;
     a->graphic = res;
     if (!res) return;
     size_t n = strlen(res->path);
     if (n > 4 && strcasecmp(res->path + n - 4, ".fbx") == 0) a->model = model_load(g, res->path);
+    else if (n > 5 && strcasecmp(res->path + n - 5, ".ptcl") == 0) a->ptcl = sg_ptcl_load(g, res->path);
     else a->sheet = sg_image(g, res->id);
 }
 
@@ -248,6 +251,7 @@ void sga_map_loaded(SG *g) {
             if (ev->sheet >= 0 && ev->sheets[ev->sheet].trigger == TRIG_AUTO && guid_eq(ev->sheets[ev->sheet].script, ip->script.id)) {
                 ev->autoSheet = ev->sheet;
                 ip->a.eventIndex = i;
+                ip->a.eventId = f->npcs[i].eventId;
                 match = true;
             }
         }
@@ -280,6 +284,7 @@ void sga_start_event(SG *g, int npc, int sheet) {
     if (s.count > 0) {
         interp_start(g, &s);
         g->interp.a.eventIndex = npc;
+        g->interp.a.eventId = g->field.npcs[npc].eventId;
         sg_log(g, "start %s sheet %d trigger %d", g->field.events[npc].name ? g->field.events[npc].name : "?", sheet, sh->trigger);
     }
     script_free(&s);

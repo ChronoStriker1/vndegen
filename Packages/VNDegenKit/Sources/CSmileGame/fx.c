@@ -119,6 +119,8 @@ static void draw_cell(SG *g, const SgiFx *f, int cell, float cx, float cy, float
     }
 }
 
+static const u32 kPoisonCycleMs = 1950, kPoisonShownMs = 1300;
+
 static void state_balloon(SG *g) {
     const Party *p = &g->b.party;
     bool poisoned = false;
@@ -137,11 +139,16 @@ static void state_balloon(SG *g) {
     float sx, sy;
     if (!im || !to_screen(g, a->x, a->y + actor_height(a), a->z, &sx, &sy)) return;
     SgiFx f = {.im = im, .cols = res->divisions & 255 ? res->divisions & 255 : 1};
-    int icon = balloon_icon(e->name), phase = (int)(g->clockMs / 250 % 4);
+    int icon = balloon_icon(e->name);
+    u32 cyc = (u32)(g->clockMs % kPoisonCycleMs);
     draw_cell(g, &f, 0, sx, sy + 2.0f, 1.0f, 255, false);
-    draw_cell(g, &f, icon, sx + 6.0f, sy - 5.0f - (float)phase, 0.7f, 255, false);
-    draw_cell(g, &f, icon, sx - 9.0f, sy + 3.0f - (float)((phase + 2) % 4), 0.45f, 255, false);
-    draw_cell(g, &f, icon, sx - 1.0f, sy + 6.0f, 0.4f, 255, false);
+    if (cyc >= kPoisonShownMs) return;
+    float grow = cyc < 150 ? 0.5f + 0.5f * (float)cyc / 150.0f : 1.0f;
+    int alpha = cyc > kPoisonShownMs - 300 ? (int)(255 * (kPoisonShownMs - cyc) / 300) : 255;
+    float rise = (float)cyc / (float)kPoisonShownMs * 6.0f;
+    draw_cell(g, &f, icon, sx + 6.0f, sy - 5.0f - rise, 0.7f * grow, alpha, false);
+    draw_cell(g, &f, icon, sx - 9.0f, sy + 3.0f - rise * 0.7f, 0.45f * grow, alpha, false);
+    draw_cell(g, &f, icon, sx - 1.0f, sy + 6.0f - rise * 0.5f, 0.4f * grow, alpha, false);
 }
 
 void sgi_fx_draw(SG *g) {

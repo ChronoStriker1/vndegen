@@ -306,6 +306,7 @@ typedef struct Tri {
     u8 mode;
     u8 flags;
     u8 model;
+    u16 color[4];
 } Tri;
 
 typedef struct Cam {
@@ -351,6 +352,8 @@ typedef struct Model {
 Model *model_load(SG *g, const char *path);
 void model_free(Model *m);
 
+typedef struct Ptcl Ptcl;
+
 typedef struct Actor {
     float x, z, y;
     int dir;
@@ -361,6 +364,7 @@ typedef struct Actor {
     Image *waitSheet;
     int waitFrames, waitMs;
     Model *model;
+    Ptcl *ptcl;
     Guid eventId;
     bool visible;
     bool moving;
@@ -478,5 +482,6 @@ void text_outlined(SG *g, int x, int y, int px, const char *s, u32 color);
 #include "sg_K.h"
 #include "sg_L.h"
 #include "sg_M.h"
+#include "sg_O.h"
 
 #endif

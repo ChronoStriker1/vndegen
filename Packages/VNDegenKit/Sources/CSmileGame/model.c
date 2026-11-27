@@ -256,6 +256,17 @@ Model *model_load(SG *g, const char *path) {
                     rig->nrm[ti * 9 + c * 3] = (float)n.x, rig->nrm[ti * 9 + c * 3 + 1] = (float)n.y, rig->nrm[ti * 9 + c * 3 + 2] = (float)n.z;
                     tri.v[c] = (Vert){(float)wp.x, (float)wp.y, (float)wp.z, (float)uv.x, 1.0f - (float)uv.y, 1.0f};
                 }
+                if (mesh->vertex_color.exists) {
+                    float rgb[3] = {0, 0, 0};
+                    for (int c = 0; c < 3; c++) {
+                        ufbx_vec4 vc = ufbx_get_vertex_vec4(&mesh->vertex_color, idx[t * 3 + (uint32_t)c]);
+                        rgb[0] += (float)vc.x / 3.0f, rgb[1] += (float)vc.y / 3.0f, rgb[2] += (float)vc.z / 3.0f;
+                    }
+                    if (rgb[0] < 0.99f || rgb[1] < 0.99f || rgb[2] < 0.99f) {
+                        for (int k = 0; k < 3; k++) tri.color[k] = (u16)(fminf(fmaxf(rgb[k], 0.0f), 1.0f) * 256.0f);
+                        tri.color[3] = 256;
+                    }
+                }
                 mesh_add(&m->mesh, &tri);
             }
         }

@@ -17,10 +17,11 @@ party, the world map with its wandering monsters, the east cave and its boss, th
 through コムコムの穴 with its bridges, the public square, the witch's forest where メイリ joins, the サキュバスタワー and
 its boss (サキュバス joins), the sewer and the gargoyle, the cat's mansion with its fishing where ニャンニャ joins, the
 walls of ice, fire and lightning, the North Tower (幽玄の塔) to its hall, the former king's battle, ユグドラシル, the
-last scene in the throne room and the staff roll, with the scenes between them and their replays in the log room. It
-was played that far in VNDegen. The optional places (the cape, the catacombs, the golem cave) and the post-game after
-the staff roll (the tower's upper floors, the prison scene and ドラコ) haven't been played. The game is in Japanese, as
-on the PC.
+last scene in the throne room and the staff roll, with the scenes between them and their replays in the log room. The
+optional places were played too: ヤーマ岬 to its minotaur, the golem cave past its walls of fire and lightning to its
+boss and the moon flowers, and the クサレィ catacombs, opened with the key their old keeper sells, to their last floor.
+After the staff roll the post-game opens the North Tower's upper floors. It was all played that far in VNDegen,
+beside the PC. The game is in Japanese, as on the PC.
 
 - **Saves** are the PC version's own files in the game's `savedata` folder, so a save moves both ways between VNDegen
   and the PC copy, and Ludusavi backs them up as it does on Windows. Save from the game's menu (Escape, X, or Y and
@@ -29,8 +30,7 @@ on the PC.
 - **Controls** start on the RPG Maker layout: A confirms, B cancels, Y and Menu open the game's menu, X dashes. On a
   touch screen, a tap outside the touch gamepad confirms, as a click does on the PC, and holding a finger on the map
   opens the menu.
-- **What isn't there yet:** the optional dungeons and the post-game haven't been played in VNDegen, so they may show
-  problems. Battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
+- **What isn't there yet:** see the post-game note under Known limits. Battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
   the PC's. Known limits below lists the rest.
 
 ## Sacred
@@ -98,6 +98,9 @@ Both games use the same data format.
   not model yet kept and written back unchanged, so saves move both ways between VNDegen and the original. Pictures on
   screen and skills learned by command are saved and restored as the PC does. `saveDir`
   in the config is the folder holding the saves; it defaults to the game's `savedata`.
+- Particle effects (`.ptcl`, plain text: emitter shape, rate, lifetime, velocity, colours, alpha, brightness and scale
+  over life, texture cells) on events: Colette's walls of fire and lightning, the sewer's dark fire and the golem
+  cave's flame.
 - Sound: the title and map BGM and ambient sound, with the files' loop points (after a battle the map's BGM goes on from
   where it stopped), through `vnsmilegame_audio` as stereo floats at `audioRate`. Commands 21 (BGM), 22 (sound) and 64
   (music effect) play through the same mixer.
@@ -234,6 +237,21 @@ runner saves (load averages given; a simulator build ran beside the first Mac ro
 With the touch gamepad shown, the iPad simulator's cat's mansion ran at 35.7 to 40.1 frames a second with the runtime at
 3.6 to 3.9 ms, the gamepad compositing cost described below.
 
+Colette's optional places, a DEBUG build of this round's branch on the Mac mini, 2026-11-27, from runner saves, the
+player idle or walking, no other build running (load 5 to 7). Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator, gamepad hidden |
+|---|---|---|
+| ヤーマ岬 B2F | 59.6 to 60.0, 33.3 to 60.0, 6.9 ms | 59.8 to 60.0, 42.9 to 60.0, 4.0 ms (load 4) |
+| Golem cave B1F, the flame | 60.0, 59.9 to 60.0, 4.2 to 4.7 ms | 59.8 to 60.0, 42.9 to 60.0, 2.9 to 3.1 ms (load 4) |
+| Golem cave battle, two golems | 59.8 to 60.0, 42.9 to 60.0, 6.6 to 7.1 ms | not measured |
+| Catacombs B1F | 60.0, 59.9 to 60.0, 2.9 to 3.1 ms | 59.7 to 60.0, 37.5 to 60.0, 2.7 ms (load 4) |
+| North Tower 6F | 60.0, 59.9 to 60.0, 2.6 to 3.5 ms | not measured |
+
+With the touch gamepad shown, the iPad simulator ran the cape and a slime battle at 41 to 47 frames a second with the
+runtime at 3.5 to 4.0 ms, the gamepad compositing cost described below. The iPad check loaded the optional places'
+saves from a copy of the game with every name's case swapped on a case-sensitive volume (`scripts/case-check.sh`).
+
 Colette's first release, DEBUG builds of 208c06cf on the Mac mini, 2026-11-27, measured the same way (Mac app with no
 other app or build running, load average 3 to 5; one simulator booted at a time). The world map is the cell below
 the castle where the first monster reaches the player, the battle the command list of that battle. Target 60.
@@ -293,16 +311,21 @@ were taken with the gamepad shown.
 - `sgtest_M`: Colette's second half against the PC: a talk pressed mid-step, the fishing spot and its first catch, an
   opened chest, the fourth hero's place in battle, the experience curve, the noon sky's edge and the staff roll's
   sprites.
+- `sgtest_O`: Colette's optional places against the PC: the edge faces under the noon sky, water that stops the player,
+  the golem cave's flame, an event's own switch after it moves the player, the first two heroes standing in front in
+  battle, the poison bubbles coming and going, the bookshelf's vertex colours and no round shadow under the warp gates.
 - `sgtest_I`: the field against the PC: sheet facing, turn, step and place codes, random variables, the encounter
   switch, learned skills and pictures in saves (byte for byte against PC saves), the help bar after a load, caption
   fades per player version and Colette's opening music.
 
 ## Known limits
 
-- Colette's optional places (ヤーマ岬, the クサレィ catacombs, the golem cave) and its post-game (the North Tower's
-  floors 6 to 15 on the way back, the prison scene, ドラコ) haven't been played in VNDegen.
-- In battles the PC stands the first two heroes a little nearer the camera than the others; the runtime keeps all four
-  on one line, so ダーク and コレット stand about 20 pixels higher than on the PC.
+- Colette's post-game: VNDegen played the North Tower's floors 6 to 15 on the first of the five laps that lead to
+  ドラコ. The later laps, ドラコ and the prison scene weren't reached in VNDegen and may show problems.
+- In battles with three or four heroes the PC draws the first two a little larger than the camera alone would; the
+  runtime stands them a cell forward, which puts their feet where the PC's are.
+- Particle effects are drawn from their emitter settings; the PC's flame is a little narrower and redder, and sparks
+  that the PC attaches to the scene (rain, snow) haven't been compared.
 - Effects play their sheet's cells in order; the keyframe timeline inside each effect (positions, scales, screen
   flashes) is not read. The camera does not push towards the acting fighter as the PC's does.
 - Critical hits, skill damage, escape chance, defend and charge, the chance that a state lands and the recovery from
@@ -330,9 +353,6 @@ were taken with the gamepad shown.
   it where the PC shows sky. Mode 3's target point matches the
   PC's opening scene only roughly.
 - Background value 1 (Sacred's field) draws black; the PC never shows it in play.
-- Colette's cat's mansion bookshelf shows white book spines where the PC's are coloured, and the North Tower's warp
-  gates have a round shadow under them that the PC doesn't draw.
-- The poison balloon shows over the player all the time; the PC shows it only now and then.
 - The PC darkens wall feet slightly more. Map objects with lights stay in their unlit motion until an event changes
   them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
 - Sacred's castle courtyard averages about 13 ms a frame on the Linux VM, with its 99th percentile (about 19 ms) over
@@ -352,8 +372,9 @@ were taken with the gamepad shown.
   layout has A confirm and B cancel, as in the other RPG engines.
 - Holding a finger on the map opens the menu without the PC's quirk of then choosing the first menu item when the
   finger comes up.
-- The poison balloon's bubbles bob in a simple loop instead of the effect's keyframes. It shows for poison only; the
-  other states end with the battle.
+- The poison balloon's bubbles grow, rise and fade on the PC's 1.95-second cycle rather than the effect's keyframes. It
+  shows for poison only; the other states end with the battle.
+- Sacred's battle skill and item lists use the grid Colette's PC shows; Sacred's own weren't compared on the PC.
 - Townspeople who wander can step onto an invisible door or exit cell, such as the castle door or the town's pier,
   and wait there while the player stands in the way; step back and they move on. Whether the PC lets them was not
   checked.

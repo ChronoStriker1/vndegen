@@ -136,6 +136,7 @@ typedef struct RCmd {
     float bias;
     int y0, y1;
     u8 alphaTest, mode, flags, na, model;
+    u16 color[4];
 } RCmd;
 
 struct Pool {
@@ -267,7 +268,7 @@ static void submit(R3 *r, const Scr *a, const Scr *b, const Scr *c, const Tri *t
     float miny = mn3(a->y, b->y, c->y), maxy = mx3(a->y, b->y, c->y);
     float minx = mn3(a->x, b->x, c->x), maxx = mx3(a->x, b->x, c->x);
     if (maxy < 0 || miny > (float)r->h || maxx < 0 || minx > (float)r->w) return;
-    RCmd cmd = {{*a, *b, *c}, t->tex, bias, (int)miny - 1, (int)maxy + 1, t->alphaTest, mode, flags, (u8)na, t->model};
+    RCmd cmd = {{*a, *b, *c}, t->tex, bias, (int)miny - 1, (int)maxy + 1, t->alphaTest, mode, flags, (u8)na, t->model, {t->color[0], t->color[1], t->color[2], t->color[3]}};
     Pool *pl = r->x->pool;
     if (!pl) {
         raster(r, &cmd, 0, r->h);
@@ -316,6 +317,8 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
     float ambR = amb[0], ambG = amb[1], ambB = amb[2];
     float sunR = sun[0], sunG = sun[1], sunB = sun[2];
     int tr = r->tint[0], tg = r->tint[1], tb = r->tint[2];
+    bool colored = cmd->color[3] != 0;
+    u32 kr = cmd->color[0], kg = cmd->color[1], kb = cmd->color[2], ka = cmd->color[3];
     for (int y = y0; y <= y1; y++) {
         float py = (float)y + 0.5f;
         float xl = -1e30f, xr = 1e30f;
@@ -373,6 +376,16 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
                 if (cr > 255) cr = 255;
                 if (cg > 255) cg = 255;
                 if (cb > 255) cb = 255;
+            }
+            if (colored) {
+                cr = cr * kr >> 8;
+                cg = cg * kg >> 8;
+                cb = cb * kb >> 8;
+                if (cr > 255) cr = 255;
+                if (cg > 255) cg = 255;
+                if (cb > 255) cb = 255;
+                a = a * ka >> 8;
+                if (a > 255) a = 255;
             }
             u32 d = row[x];
             u32 dr = d & 255, dg = d >> 8 & 255, db = d >> 16 & 255;

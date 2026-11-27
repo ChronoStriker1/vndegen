@@ -401,6 +401,51 @@ static void draw_item_page(SG *g, Menu *m, int page, const List *l, bool prices,
     quit_button(g, 490, 380, 300, cur == (l->count ? l->count : 1));
 }
 
+void sg_battle_list_draw(SG *g, bool skills, const void *const *list, int count, int cursor, int mp) {
+    panel(g, 176, 10, 624, 424);
+    int row = (cursor < count ? cursor : count - 1) / 2;
+    int top = row >= LIST_ROWS ? row - LIST_ROWS + 1 : 0;
+    for (int i = top * 2; i < count && i < (top + LIST_ROWS) * 2; i++) {
+        int x = 189 + (i % 2) * 302, y = 21 + (i / 2 - top) * 46;
+        if (skills) {
+            const SkillDef *s = list[i];
+            draw_entry(g, s->icon, s->iconX, s->iconY, s->name, NULL, x, y, i == cursor, s->mpCost > mp);
+        } else {
+            const ItemDef *it = list[i];
+            char right[16];
+            snprintf(right, sizeof right, "%d", party_item_count(P(g), it->id));
+            draw_entry(g, it->icon, it->iconX, it->iconY, it->name, right, x, y, i == cursor, false);
+        }
+    }
+    if (count == 0) draw_entry(g, (Guid){{0}}, 0, 0, MT(g, skills ? MT_NO_SKILLS : MT_NO_ITEMS), NULL, 189, 21, false, false);
+    quit_button(g, 337, 377, 300, cursor >= count);
+    panel(g, 176, 433, 624, 74);
+    if (cursor >= count) return;
+    if (skills) {
+        const SkillDef *s = list[cursor];
+        char cost[16], line[128];
+        snprintf(cost, sizeof cost, "%d", s->mpCost);
+        const char *fmt = MT(g, MT_COST);
+        size_t o = 0;
+        for (const char *p = fmt; *p && o + 1 < sizeof line; p++) {
+            const char *sub = !strncmp(p, "{0}", 3) ? MT(g, MT_MP) : !strncmp(p, "{1}", 3) ? cost : NULL;
+            if (sub) {
+                o += (size_t)snprintf(line + o, sizeof line - o, "%s", sub);
+                if (o >= sizeof line) o = sizeof line - 1;
+                p += 2;
+            } else {
+                line[o++] = *p;
+            }
+        }
+        line[o] = 0;
+        text(g, 186, 444, 21, line, kWhite);
+        text(g, 186, 476, 21, s->desc, kWhite);
+    } else {
+        const ItemDef *it = list[cursor];
+        text(g, 186, 444, 21, it->desc, kWhite);
+    }
+}
+
 static void shop_list(SG *g, Menu *m, List *l) {
     l->count = 0;
     for (int i = 0; i < m->shopCount; i++) {
