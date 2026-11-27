@@ -61,7 +61,7 @@ bool sga_cond_holds(SG *g, Guid event, const SgaCond *c) {
         return on == (c->value == 0);
     }
     case COND_VARIABLE: return compare_op(c->index >= 0 && c->index < 1024 ? g->vars[c->index] : 0, c->value, c->op);
-    case COND_MONEY: return compare_op(g->interp.a.money, c->value, c->op);
+    case COND_MONEY: return compare_op(g->b.party.money, c->value, c->op);
     case COND_ITEM:
     case COND_ITEM_ALL: return compare_op(sga_item_count(g, c->id), c->value, c->op);
     case COND_HERO: return sga_in_party(g, c->id) == (c->value == 0 ? true : c->value == 1);
@@ -203,7 +203,7 @@ void sga_map_loaded(SG *g) {
         if (rec) parse_sheets(&a->ev[i], rec, &g->data);
     }
     sga_refresh_events(g);
-    if (!guid_zero(a->heroGraphic)) sga_actor_graphic(g, &f->player, a->heroGraphic);
+    sga_actor_graphic(g, &f->player, party_leader_graphic(g));
     a->lastX = (int)f->player.x;
     a->lastZ = (int)f->player.z;
     a->playerMoveLeft = 0;

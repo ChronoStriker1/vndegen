@@ -7,14 +7,7 @@ static int cell_height(const Map *m, int x, int z) {
     return m->height[(size_t)z * (size_t)m->w + (size_t)x];
 }
 
-static const Res *hero_graphic(SG *g) {
-    const SgrRec *hero = game_hero(&g->data, g->data.settings.party[0]);
-    if (!hero) return NULL;
-    Rd r = rd_make(hero->body, hero->size);
-    rd_guid(&r);
-    free(rd_str(&r));
-    return res_find(&g->res, rd_guid(&r));
-}
+static const Res *hero_graphic(SG *g) { return res_find(&g->res, party_leader_graphic(g)); }
 
 static void actor_set_graphic(SG *g, Actor *a, const Res *res) {
     a->graphic = res;

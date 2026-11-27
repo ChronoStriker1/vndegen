@@ -185,7 +185,7 @@ static void test_new_game(const char *game, int heroSize, int flagsTail) {
     SaveData s;
     CHECK(data && save_parse(&s, data, n));
     if (data) {
-        CHECK(s.partyCount == g->data.settings.partyCount && s.partyCount > 0 && s.party[0].size == heroSize);
+        CHECK(s.partyCount == 1 && s.party[0].size == heroSize);
         CHECK(guid_eq(s.map, g->data.settings.startMap));
         CHECK(s.x == g->data.settings.startX && s.z == g->data.settings.startZ);
         CHECK(s.eventCount == g->field.npcCount);

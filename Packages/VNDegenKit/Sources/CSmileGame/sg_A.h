@@ -1,7 +1,7 @@
 #ifndef SMILEGAME_A_H
 #define SMILEGAME_A_H
 
-enum { SGA_PICTURES = 40, SGA_PARTY = 8, SGA_CONDS = 8 };
+enum { SGA_PICTURES = 40, SGA_CONDS = 8 };
 
 enum {
     CMD_WAIT = 9,
@@ -94,11 +94,6 @@ typedef struct SgaPicture {
     bool eraseAfter;
 } SgaPicture;
 
-typedef struct SgaItem {
-    Guid id;
-    i32 count;
-} SgaItem;
-
 typedef struct SgaFaceImage {
     char *key;
     Image *im;
@@ -130,12 +125,6 @@ typedef struct SgaState {
     u32 flashColor, flashMs, flashTotal;
     u32 shakeMs, shakeTotal;
     int shakePower;
-    SgaItem *items;
-    int itemCount;
-    i32 money;
-    Guid party[SGA_PARTY];
-    int partyCount;
-    Guid heroGraphic;
     SgaEvent *ev;
     int evCount;
     Guid mapId;

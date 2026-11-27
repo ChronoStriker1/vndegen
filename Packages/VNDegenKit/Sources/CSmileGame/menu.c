@@ -1223,12 +1223,7 @@ static void update_inn(SG *g, Menu *m) {
         return;
     }
     p->money -= m->innPrice;
-    for (int i = 0; i < p->count; i++) {
-        Member *mb = &p->members[i];
-        mb->hp = member_max_hp(T(g), mb);
-        mb->mp = member_max_mp(T(g), mb);
-        mb->state = 0;
-    }
+    party_recover(g);
     sgb_sound(g, SND_STATUS_UP);
     sg_log(g, "menu: inn, party healed for %dG", m->innPrice);
     close_menu(g, m);

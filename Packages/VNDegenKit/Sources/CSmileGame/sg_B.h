@@ -271,9 +271,14 @@ int exp_for_level(int level);
 typedef struct Member {
     Guid hero;
     i32 level, exp, hp, mp;
+    i32 maxHp, maxMp, stat[STAT_COUNT];
     Guid equip[SLOT_COUNT];
     u8 state;
 } Member;
+
+typedef struct Look {
+    Guid hero, face, graphic;
+} Look;
 
 typedef struct Stack {
     Guid item;
@@ -283,17 +288,29 @@ typedef struct Stack {
 typedef struct Party {
     Member members[8];
     int count;
+    Member reserve[16];
+    int reserveCount;
     Stack *items;
     int itemCount, itemCap;
+    Guid *seen;
+    int seenCount;
+    Look *looks;
+    int lookCount;
     i32 money;
     u64 playMs;
 } Party;
 
 void party_new(SG *g);
+void party_clear(Party *p);
 void party_add_hero(SG *g, Guid hero);
 void party_remove_hero(SG *g, Guid hero);
+bool party_has_hero(const Party *p, Guid hero);
 int party_item_count(const Party *p, Guid item);
 void party_give_item(Party *p, Guid item, int delta);
+void party_set_look(Party *p, Guid hero, Guid face, Guid graphic);
+Guid party_leader_graphic(SG *g);
+void party_recover(SG *g);
+void member_init(const Tables *t, Member *m, const HeroDef *h);
 int member_max_hp(const Tables *t, const Member *m);
 int member_max_mp(const Tables *t, const Member *m);
 int member_stat(const Tables *t, const Member *m, int stat);

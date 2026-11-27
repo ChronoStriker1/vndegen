@@ -103,8 +103,7 @@ typedef struct SgE {
     Mixer *mix;
     SaveData save;
     bool haveSave;
-    float baseSeconds;
-    u32 baseClock;
+    int heroSize;
     Guid curMap;
     int curScene;
 } SgE;

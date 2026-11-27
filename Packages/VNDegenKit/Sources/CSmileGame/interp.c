@@ -140,7 +140,6 @@ static void runner_reset(Interp *ip) {
 void interp_free(Interp *ip) {
     runner_reset(ip);
     SgaState *a = &ip->a;
-    free(a->items);
     free(a->floor);
     for (int i = 0; i < a->evCount; i++) {
         for (int k = 0; k < a->ev[i].sheetCount; k++) free(a->ev[i].sheets[k].motion);
