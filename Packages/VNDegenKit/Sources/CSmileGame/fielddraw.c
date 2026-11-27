@@ -674,6 +674,7 @@ void sg_camera_to(SG *g, const ViewPose *pose, u32 ms) {
 
 void sg_camera_reset(SG *g, u32 ms) {
     View *v = sg_view(g);
+    v->eye = false;
     sg_camera_to(g, &v->base, ms);
 }
 
@@ -683,6 +684,7 @@ void sg_camera_command(SG *g, const Cmd *c) {
     View *v = sg_view(g);
     ViewPose p = v->pose;
     i32 mode = cmd_int(c, 0);
+    v->eye = mode == 2;
     u32 ms = 0;
     if (mode == 0 && c->argCount >= 6) {
         p.pitch = (float)cmd_int(c, 1) / 1000.0f;
@@ -699,6 +701,19 @@ void sg_camera_command(SG *g, const Cmd *c) {
         p.fov = (float)cmd_int(c, 7) / 1000.0f;
         p.follow = false;
         ms = (u32)cmd_int(c, 8);
+    } else if (mode == 2 && c->argCount >= 4) {
+        static const float yaws[4] = {0.0f, 90.0f, 180.0f, 270.0f};
+        static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
+        const Actor *pl = &g->field.player;
+        int d = pl->dir & 3;
+        p.target = (Vec3){pl->x + (float)dx[d], pl->y + (float)cmd_int(c, 2) / 1000.0f, pl->z + (float)dz[d]};
+        p.pitch = 0.0f;
+        p.yaw = yaws[d];
+        p.distance = 1.0f / kDistScale;
+        p.fov = (float)cmd_int(c, 1) / 500.0f / kFovScale;
+        p.lift = 0.0f;
+        p.follow = false;
+        ms = (u32)cmd_int(c, 3);
     } else {
         sg_log(g, "camera mode %d not handled", mode);
         return;
@@ -886,7 +901,7 @@ void field_draw(SG *g) {
         r3_shadow_restore(&g->r3);
         for (int i = 0; i < f->npcCount; i++)
             if (f->npcs[i].visible && f->npcs[i].model) cast_model(g, &f->npcs[i], kFacing[f->npcs[i].dir & 3]);
-        if (f->player.visible && f->player.model) cast_model(g, &f->player, kFacing[f->player.dir & 3]);
+        if (f->player.visible && f->player.model && !v->eye) cast_model(g, &f->player, kFacing[f->player.dir & 3]);
     }
     ChunkOrder *order = sg_alloc(sizeof(ChunkOrder) * (size_t)(v->chunkCount + 1));
     int n = 0;
@@ -906,7 +921,7 @@ void field_draw(SG *g) {
     }
     for (int i = 0; i < f->npcCount; i++)
         if (f->npcs[i].visible && f->npcs[i].model) draw_actor(g, &f->npcs[i]);
-    if (f->player.visible && f->player.model) draw_actor(g, &f->player);
+    if (f->player.visible && f->player.model && !v->eye) draw_actor(g, &f->player);
     for (int k = n - 1; k >= 0; k--) {
         Chunk *c = &v->chunks[order[k].index];
         for (int i = c->afirst; i < c->afirst + c->acount; i++) r3_tri(&g->r3, &f->cam, &v->alpha.tris[i]);
@@ -915,11 +930,11 @@ void field_draw(SG *g) {
     if (!g->r3.x->shadow.base) {
         for (int i = 0; i < f->npcCount; i++)
             if (f->npcs[i].visible && f->npcs[i].model) draw_blob(g, &f->npcs[i], 0.9f);
-        if (f->player.visible && f->player.model) draw_blob(g, &f->player, 0.9f);
+        if (f->player.visible && f->player.model && !v->eye) draw_blob(g, &f->player, 0.9f);
     }
     for (int i = 0; i < f->npcCount; i++)
         if (f->npcs[i].visible && !f->npcs[i].model) draw_actor(g, &f->npcs[i]);
-    if (f->player.visible && !f->player.model) draw_actor(g, &f->player);
+    if (f->player.visible && !f->player.model && !v->eye) draw_actor(g, &f->player);
     free(order);
     v->stats.submitMs = now_ms() - t0;
     r3_flush(&g->r3);
