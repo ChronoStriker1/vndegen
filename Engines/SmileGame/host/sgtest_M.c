@@ -208,6 +208,10 @@ static void test_noon_sky_edge(const char *dir) {
     run(g, 500);
     u32 c = g->fb[20 * g->w + 20], d = g->fb[300 * g->w + 60];
     CHECK((c & 0xffffff) == 0xffffff && (d & 0xffffff) == 0xffffff);
+    warp(g, "幽玄の塔01Ｆ", 27, 3, 0);
+    run(g, 500);
+    u32 e = g->fb[300 * g->w + 800];
+    CHECK((e & 0xffffff) == 0);
     vnsmilegame_close((VNSmileGame *)g);
 }
 

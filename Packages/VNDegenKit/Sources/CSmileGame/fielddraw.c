@@ -997,7 +997,7 @@ void field_draw(SG *g) {
     pose_to_cam(&v->pose, &f->cam, g->w, g->h);
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
     for (int k = 0; k < 3; k++) g->r3.tint[k] = 256;
-    if (v->look.sky == 0 && !(v->look.hasCamera && v->look.cameraKind == 1)) draw_sky(g, v);
+    if (v->look.sky == 0 && !(v->look.hasCamera && v->look.cameraKind == 1) && (v->border || v->look.sun)) draw_sky(g, v);
     if (g->r3.x->shadow.base) {
         r3_shadow_restore(&g->r3);
         for (int i = 0; i < f->npcCount; i++)
