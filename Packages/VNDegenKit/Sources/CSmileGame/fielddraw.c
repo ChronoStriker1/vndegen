@@ -492,7 +492,7 @@ void view_free(View *v) {
     free(v->slopeDir);
     free(v->slopeIdx);
     img_free(v->blob);
-    model_free(v->sky);
+    for (int i = 0; i < 3; i++) model_free(v->sky[i]);
     free(v);
 }
 
@@ -508,10 +508,10 @@ void view_unload(SG *g) {
     free(v->slopeIdx);
     r3_shadow_free(&g->r3);
     Image *blob = v->blob;
-    Model *sky = v->sky;
+    Model *sky[3] = {v->sky[0], v->sky[1], v->sky[2]};
     memset(v, 0, sizeof *v);
     v->blob = blob;
-    v->sky = sky;
+    memcpy(v->sky, sky, sizeof sky);
 }
 
 static double now_ms(void) {
@@ -615,6 +615,14 @@ void view_load(SG *g) {
             if (f->terrain.tris[i].flags & TF_CAST) r3_shadow_tri(&g->r3, &f->terrain.tris[i]);
         r3_shadow_seal(&g->r3);
     }
+    if (v->look.sky == 0 && !v->sky[0]) {
+        static const char *parts[3] = {"Sky noon - 01", "Cloud noon - 01", "Sun noon - 01"};
+        for (int i = 0; i < 3; i++) {
+            char *path = sg_fmt("samples/common/res/system/%s.fbx", parts[i]);
+            v->sky[i] = model_load(g, path);
+            free(path);
+        }
+    }
     pose_default(g, v);
     v->pose = v->base;
     v->ready = true;
@@ -624,6 +632,8 @@ void view_load(SG *g) {
 
 void view_follow(SG *g, float x, float y, float z, u32 ms) {
     View *v = sg_view(g);
+    v->waterMs += ms;
+    for (int i = 0; i < g->field.npcCount; i++) g->field.npcs[i].animMs += ms;
     if (v->moveTotal) {
         v->moveMs += ms;
         float t = v->moveMs >= v->moveTotal ? 1.0f : (float)v->moveMs / (float)v->moveTotal;
@@ -797,7 +807,8 @@ static void draw_sprite(SG *g, const Actor *a) {
     if (a->graphic->frameMs > 0) frame = (int)(a->animMs / (u32)a->graphic->frameMs) % frames;
     if (frames == 3 && rows == 4) {
         static const int cycle[4] = {1, 0, 1, 2};
-        frame = a->moving ? cycle[(a->animMs / (u32)(a->graphic->frameMs > 0 ? a->graphic->frameMs / 2 : 125)) % 4] : 1;
+        u32 step = (u32)(a->graphic->frameMs > 0 ? a->graphic->frameMs : 250);
+        frame = a->moving || a->graphic->flagA ? cycle[(a->animMs / step) % 4] : 1;
     }
     int row = rows == 4 ? sprite_row(a->dir) : 0;
     float w = (float)cw / TILE, h = (float)ch / TILE;
@@ -810,14 +821,33 @@ static void draw_sprite(SG *g, const Actor *a) {
     float inset = 0.5f / (float)im->w;
     Vert va = {a->x - rx, a->y + tall, a->z - rz, u0 + inset, v0, 1}, vb = {a->x + rx, a->y + tall, a->z + rz, u1 - inset, v0, 1};
     Vert vc = {a->x + rx, a->y, a->z + rz, u1 - inset, v1, 1}, vd = {a->x - rx, a->y, a->z - rz, u0 + inset, v1, 1};
-    r3_tri(&g->r3, &f->cam, &(Tri){{va, vb, vc}, im, true, false});
-    r3_tri(&g->r3, &f->cam, &(Tri){{va, vc, vd}, im, true, false});
+    r3_tri(&g->r3, &f->cam, &(Tri){.v = {va, vb, vc}, .tex = im, .alphaTest = true});
+    r3_tri(&g->r3, &f->cam, &(Tri){.v = {va, vc, vd}, .tex = im, .alphaTest = true});
 }
 
 static void draw_actor(SG *g, Actor *a) {
     if (!a->visible) return;
     if (a->model) draw_model(g, a, kFacing[a->dir & 3]);
     else draw_sprite(g, a);
+}
+
+static void draw_sky(SG *g, View *v) {
+    Cam *c = &g->field.cam;
+    for (int k = 0; k < 3; k++) {
+        Model *mdl = v->sky[k];
+        if (!mdl) continue;
+        for (int i = 0; i < mdl->mesh.count; i++) {
+            Tri t = mdl->mesh.tris[i];
+            for (int j = 0; j < 3; j++) {
+                t.v[j].x += c->m[12];
+                t.v[j].y += c->m[13] - 4.0f;
+                t.v[j].z += c->m[14];
+            }
+            u8 mode = t.mode == TRI_ADD ? TRI_ADD : k == 1 ? TRI_BLEND : TRI_OPAQUE;
+            t.alphaTest = false;
+            r3_tri_ex(&g->r3, c, &t, mode, TF_NOZTEST | TF_NOZWRITE);
+        }
+    }
 }
 
 typedef struct ChunkOrder {
@@ -837,9 +867,9 @@ void field_draw(SG *g) {
     View *v = g->r3.view;
     if (!f->loaded || !v || !v->ready) return;
     pose_to_cam(&v->pose, &f->cam, g->w, g->h);
-    v->waterMs += 16;
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
     for (int k = 0; k < 3; k++) g->r3.tint[k] = 256;
+    if (v->look.sky == 0) draw_sky(g, v);
     if (g->r3.x->shadow.base) {
         r3_shadow_restore(&g->r3);
         for (int i = 0; i < f->npcCount; i++)

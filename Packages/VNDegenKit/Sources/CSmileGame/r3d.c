@@ -561,8 +561,8 @@ void mesh_quad(Mesh *m, const Image *tex, Vec3 a, Vec3 b, Vec3 c, Vec3 d, float 
                bool alphaTest) {
     Vert va = {a.x, a.y, a.z, u0, v0, shade}, vb = {b.x, b.y, b.z, u1, v0, shade};
     Vert vc = {c.x, c.y, c.z, u1, v1, shade}, vd = {d.x, d.y, d.z, u0, v1, shade};
-    mesh_add(m, &(Tri){{va, vb, vc}, tex, alphaTest, false});
-    mesh_add(m, &(Tri){{va, vc, vd}, tex, alphaTest, false});
+    mesh_add(m, &(Tri){.v = {va, vb, vc}, .tex = tex, .alphaTest = alphaTest});
+    mesh_add(m, &(Tri){.v = {va, vc, vd}, .tex = tex, .alphaTest = alphaTest});
 }
 
 void mesh_free(Mesh *m) {

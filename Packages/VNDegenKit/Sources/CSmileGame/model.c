@@ -4,6 +4,22 @@
 
 #include "third_party/ufbx.h"
 
+static u8 *read_texture(SG *g, const char *dir, const char *base, size_t *size) {
+    char *path = sg_fmt("%s%s", dir, base);
+    u8 *data = pack_read(&g->data.pack, path, size);
+    free(path);
+    if (data) return data;
+    char key[512];
+    pack_key(base, key, sizeof key);
+    size_t kn = strlen(key);
+    for (int i = 0; i < g->data.pack.count; i++) {
+        const char *k = g->data.pack.entries[i].key;
+        size_t n = strlen(k);
+        if (n > kn && k[n - kn - 1] == '/' && strcmp(k + n - kn, key) == 0) return pack_read(&g->data.pack, k, size);
+    }
+    return NULL;
+}
+
 static Image *find_texture(SG *g, const char *modelPath, const char *file) {
     const char *base = file;
     for (const char *p = file; *p; p++)
@@ -14,18 +30,15 @@ static Image *find_texture(SG *g, const char *modelPath, const char *file) {
     char *slash = strrchr(dir, '/');
     if (slash) slash[1] = 0;
     else dir[0] = 0;
-    char *path = sg_fmt("%s%s", dir, base);
     size_t size = 0;
-    u8 *data = pack_read(&g->data.pack, path, &size);
-    free(path);
+    u8 *data = read_texture(g, dir, base, &size);
     if (!data) {
-        char key[512];
-        pack_key(base, key, sizeof key);
-        size_t kn = strlen(key);
-        for (int i = 0; i < g->data.pack.count && !data; i++) {
-            const char *k = g->data.pack.entries[i].key;
-            size_t n = strlen(k);
-            if (n > kn && k[n - kn - 1] == '/' && strcmp(k + n - kn, key) == 0) data = pack_read(&g->data.pack, k, &size);
+        char png[512];
+        snprintf(png, sizeof png, "%s", base);
+        char *dot = strrchr(png, '.');
+        if (dot && strcasecmp(dot, ".png") != 0 && (size_t)(dot - png) + 5 <= sizeof png) {
+            strcpy(dot, ".png");
+            data = read_texture(g, dir, png, &size);
         }
     }
     if (!data) return NULL;
@@ -93,9 +106,9 @@ static void read_def(SG *g, const char *path, ufbx_scene *scene, MatInfo *info, 
             continue;
         }
         if (anim && rig && scene->anim_stacks.count) {
-            char name[64], loop[16] = {0};
+            char name[32], loop[16] = {0};
             int a = 0, b = -1;
-            if (sscanf(line, "%63s %d %d %15s", name, &a, &b, loop) >= 2) {
+            if (sscanf(line, "%31s %d %d %15s", name, &a, &b, loop) >= 2) {
                 if (b < a) b = a;
                 rig->clips = sg_realloc(rig->clips, sizeof(Clip) * (size_t)(rig->clipCount + 1));
                 Clip *c = &rig->clips[rig->clipCount++];
@@ -231,7 +244,7 @@ Model *model_load(SG *g, const char *path) {
                     uint32_t ix = idx[t * 3 + (uint32_t)c];
                     int v = vbase + (int)mesh->vertex_indices.data[ix];
                     ufbx_vec2 uv = mesh->vertex_uv.exists ? ufbx_get_vertex_vec2(&mesh->vertex_uv, ix) : ufbx_zero_vec2;
-                    ufbx_vec3 n = mesh->vertex_normal.exists ? ufbx_get_vertex_vec3(&mesh->vertex_normal, ix) : (ufbx_vec3){0, 1, 0};
+                    ufbx_vec3 n = mesh->vertex_normal.exists ? ufbx_get_vertex_vec3(&mesh->vertex_normal, ix) : (ufbx_vec3){.y = 1};
                     ufbx_vec3 wp = mesh->vertices.data[mesh->vertex_indices.data[ix]];
                     if (!skin) {
                         n = ufbx_transform_direction(&g2w, n);

@@ -115,7 +115,7 @@ typedef struct View {
     int chunkCount, chunkW, chunkH, border;
     ViewPose pose, from, to, base;
     u32 moveMs, moveTotal;
-    Model *sky;
+    Model *sky[3];
     Image *blob;
     Mesh alpha;
     Image **slopeImages;
