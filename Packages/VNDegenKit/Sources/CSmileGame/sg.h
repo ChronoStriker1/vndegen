@@ -386,6 +386,7 @@ void field_draw(SG *g);
 #include "sg_A.h"
 #include "sg_B.h"
 #include "sg_E.h"
+#include "sg_I.h"
 
 typedef struct Interp {
     Script script;
@@ -457,6 +458,7 @@ struct SG {
     bool pendingTransfer;
     SgB b;
     SgE e;
+    SgI fi;
 };
 
 bool sg_pressed(SG *g, u32 key);

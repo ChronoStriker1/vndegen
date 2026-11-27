@@ -27,10 +27,10 @@ static void parse_sheets(SgaEvent *ev, const SgrRec *rec, Game *d) {
         s->dir = rd_i32(&r);
         s->fixDir = rd_i32(&r);
         s->solid = rd_u8(&r);
-        rd_i32(&r);
+        s->moveSpeed = rd_i32(&r);
         s->still = rd_u8(&r);
         s->moveType = rd_i32(&r);
-        s->moveSpeed = rd_i32(&r);
+        s->moveFreq = rd_i32(&r);
         s->script = rd_guid(&r);
         s->motion = rd_str(&r);
         const SgrRec *sr = game_record(d, SGR_EVENT, 16, s->script, NULL);
@@ -110,6 +110,10 @@ static void apply_sheet(SG *g, int i) {
         return;
     }
     const SgaSheet *sh = &ev->sheets[s];
+    static const int fromSave[4] = {0, 2, 3, 1};
+    ac->dir = fromSave[sh->dir & 3];
+    ev->wanderStarted = false;
+    ev->wanderLeft = 0;
     sga_actor_graphic(g, ac, sh->graphic);
     ac->visible = ac->graphic != NULL;
     ev->motion = sg_strdup(sh->motion ? sh->motion : "");

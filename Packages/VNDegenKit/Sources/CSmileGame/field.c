@@ -132,18 +132,8 @@ void field_free(Field *f) {
 }
 
 static bool walkable(SG *g, Field *f, int fromX, int fromZ, int x, int z) {
-    Map *m = &f->map;
-    if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
-    int h0 = sga_floor(g, fromX, fromZ), h1 = sga_floor(g, x, z);
-    if (h1 != h0) {
-        bool stair = false;
-        for (int i = 0; i < m->stairCount; i++)
-            if ((m->stairs[i].x == x && m->stairs[i].z == z) || (m->stairs[i].x == fromX && m->stairs[i].z == fromZ)) stair = true;
-        if (!stair || abs(h1 - h0) > 1) return false;
-    }
-    for (int i = 0; i < f->npcCount; i++)
-        if (f->npcs[i].visible && (int)f->npcs[i].x == x && (int)f->npcs[i].z == z) return false;
-    return true;
+    (void)f;
+    return sgi_cell_free(g, fromX, fromZ, x, z, -1);
 }
 
 void field_update(SG *g, u32 ms) {

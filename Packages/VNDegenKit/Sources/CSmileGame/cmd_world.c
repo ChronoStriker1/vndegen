@@ -297,6 +297,7 @@ bool sga_exec(SG *g, const Cmd *c) {
     case CMD_MOVE_PICTURE: cmd_picture(g, c); return false;
     case CMD_MOVE_EVENT:
     case CMD_MOVE_PLAYER:
+        if (c->type == CMD_MOVE_EVENT && c->argCount == 1) return sgi_move_one(g, c);
         if (c->argCount < 6) {
             sg_log(g, "command %d with %d arguments not known", c->type, c->argCount);
             return false;
@@ -304,18 +305,8 @@ bool sga_exec(SG *g, const Cmd *c) {
         sga_move_command(g, c, c->type == CMD_MOVE_PLAYER);
         a->waitMoves = cmd_int(c, 5) == 0;
         return a->waitMoves;
-    case CMD_TURN_EVENT: {
-        int code = cmd_int(c, 0), i = a->eventIndex;
-        if (code <= 3 && i >= 0 && i < a->evCount) g->field.npcs[i].dir = sga_dir_from_code(code);
-        sg_log(g, "turn event %d", code);
-        return false;
-    }
-    case CMD_TURN_PLAYER: {
-        int code = cmd_int(c, 0);
-        if (code <= 3) g->field.player.dir = sga_dir_from_code(code);
-        sg_log(g, "turn player %d", code);
-        return false;
-    }
+    case CMD_TURN_EVENT:
+    case CMD_TURN_PLAYER: sgi_turn_command(g, c, c->type == CMD_TURN_PLAYER); return false;
     case CMD_ERASE_EVENT: {
         int i = a->eventIndex;
         if (i >= 0 && i < a->evCount) {
@@ -347,7 +338,12 @@ bool sga_exec(SG *g, const Cmd *c) {
         party_recover(g);
         sg_log(g, "party recovered");
         return false;
-    default: sg_log(g, "command %d not handled (%d args)", c->type, c->argCount); return false;
+    default: {
+        bool busy = false;
+        if (sgi_exec(g, c, &busy)) return busy;
+        sg_log(g, "command %d not handled (%d args)", c->type, c->argCount);
+        return false;
+    }
     }
 }
 
@@ -403,7 +399,11 @@ void sga_frame(SG *g, u32 ms) {
             if (p->eraseAfter) *p = (SgaPicture){0};
         }
     }
-    if (f->loaded) sga_step_moves(g, ms);
+    if (f->loaded) {
+        sga_step_moves(g, ms);
+        sgi_wander(g, ms);
+        sgi_spins(g, ms);
+    }
 }
 
 void sga_draw_under(SG *g) { (void)g; }

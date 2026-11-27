@@ -632,9 +632,9 @@ static void capture(SG *g, SaveData *s) {
         else if (old && guid_eq(old->graphic, ev[i].graphic)) ev[i].motion = sg_strdup(old->motion);
         else ev[i].motion = sheet_motion(g, a->eventId, event_sheet(g, &f->events[i]));
         ev[i].dir = kToSave[a->dir & 3];
-        ev[i].x = a->x;
+        ev[i].x = a->moving ? a->tx : a->x;
         ev[i].y = a->y;
-        ev[i].z = a->z;
+        ev[i].z = a->moving ? a->tz : a->z;
     }
     for (int i = 0; i < s->eventCount; i++) free(s->events[i].motion);
     free(s->events);
