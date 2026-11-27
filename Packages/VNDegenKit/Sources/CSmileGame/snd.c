@@ -53,7 +53,7 @@ typedef struct Voice {
 
 static const float kPlayerLevel = 0.5f;
 
-enum { V_BGM, V_BGM_OLD, V_BGS, V_BGS_OLD, V_ME, V_SE, V_SE_COUNT = 16, V_COUNT = V_SE + V_SE_COUNT };
+enum { V_BGM, V_BGM_OLD, V_BGS, V_BGS_OLD, V_ME, V_BGM_HELD, V_SE, V_SE_COUNT = 16, V_COUNT = V_SE + V_SE_COUNT };
 
 struct Mixer {
     int rate;
@@ -165,7 +165,7 @@ void snd_mix(SG *g, float *out, int frames) {
     bool me = m->v[V_ME] && !m->v[V_ME]->done;
     for (int s = 0; s < V_COUNT; s++) {
         Voice *v = m->v[s];
-        if (!v || v->done) continue;
+        if (!v || v->done || s == V_BGM_HELD) continue;
         if (me && (s == V_BGM || s == V_BGM_OLD)) continue;
         mix_voice(m, v, out, frames);
     }
@@ -360,6 +360,47 @@ void snd_set_master(SG *g, int bgmPercent, int sePercent) {
     e->mix->bgmMaster = (float)bgmPercent / 100.0f;
     e->mix->seMaster = (float)sePercent / 100.0f;
     pthread_mutex_unlock(&e->mix->lock);
+}
+
+void snd_bgm_hold(SG *g) {
+    Mixer *m = g->e.mix;
+    if (!m) return;
+    pthread_mutex_lock(&m->lock);
+    voice_free(m->v[V_BGM_HELD]);
+    m->v[V_BGM_HELD] = NULL;
+    Voice *v = m->v[V_BGM];
+    if (v && !v->done && !v->stopAtZero) {
+        m->v[V_BGM_HELD] = v;
+        m->v[V_BGM] = NULL;
+    }
+    pthread_mutex_unlock(&m->lock);
+}
+
+bool snd_bgm_release(SG *g, bool resume) {
+    Mixer *m = g->e.mix;
+    if (!m) return false;
+    pthread_mutex_lock(&m->lock);
+    Voice *v = m->v[V_BGM_HELD];
+    m->v[V_BGM_HELD] = NULL;
+    if (v && resume) {
+        replace(m, V_BGM, V_BGM_OLD, v, 0);
+        voice_free(m->v[V_BGM_OLD]);
+        m->v[V_BGM_OLD] = NULL;
+    } else {
+        voice_free(v);
+    }
+    pthread_mutex_unlock(&m->lock);
+    return v && resume;
+}
+
+u32 snd_bgm_position(SG *g) {
+    Mixer *m = g->e.mix;
+    if (!m) return 0;
+    pthread_mutex_lock(&m->lock);
+    Voice *v = m->v[V_BGM];
+    u32 at = v && !v->done ? v->played : 0;
+    pthread_mutex_unlock(&m->lock);
+    return at;
 }
 
 bool snd_bgm_playing(SG *g, Guid *id) {

@@ -1145,6 +1145,7 @@ static void restore_field(Battle *b) {
 
 static void resume_music(Battle *b) {
     SG *g = b->g;
+    if (snd_bgm_release(g, true)) return;
     if (b->hadBgm) snd_bgm(g, b->fieldBgm, 100, 100);
     else snd_bgm_stop(g, 0);
 }
@@ -1170,6 +1171,7 @@ static void finish(Battle *b, int result) {
     for (int i = 0; i < b->partyCount; i++) sync_member(g, &b->f[i]);
     restore_field(b);
     if (b->staged && (result != BATTLE_LOST || b->setup.continueOnLose)) resume_music(b);
+    else snd_bgm_release(g, false);
     if (result == BATTLE_LOST && !b->setup.continueOnLose) {
         interp_free(&g->interp);
         g->scene = SCENE_TITLE;
@@ -1264,7 +1266,10 @@ static void setup_stage(Battle *b) {
     for (int i = 0; i < b->count; i++) b->f[i].fadeMs = 0;
     f->loaded = loaded;
     g->e.curMap = f->map.id;
-    if (!guid_zero(bgm)) snd_bgm(g, bgm, 100, 100);
+    if (!guid_zero(bgm)) {
+        snd_bgm_hold(g);
+        snd_bgm(g, bgm, 100, 100);
+    }
     b->staged = true;
 }
 

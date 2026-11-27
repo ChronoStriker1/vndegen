@@ -419,6 +419,10 @@ static void test_colette_symbol(const char *dir, const char *tmp) {
     CHECK(dark && col);
     if (!dark || !col) return;
     col->state = 1;
+    static float pcm[44100 * 2];
+    vnsmilegame_audio((VNSmileGame *)g, pcm, 44100);
+    u32 worldAt = snd_bgm_position(g);
+    CHECK(worldAt >= 44100);
     press(g, VK_UP, 48);
     run(g, 300);
     CHECK(showing(g, "モンスターめっ"));
@@ -432,12 +436,32 @@ static void test_colette_symbol(const char *dir, const char *tmp) {
     run(g, 500);
     CHECK(strcmp(g->field.map.name, "ワールド") == 0);
     CHECK(strcmp(bgm_name(g), worldBgm) == 0);
+    CHECK(snd_bgm_position(g) == worldAt);
     CHECK(g->switches[31] == 1);
     CHECK(dark->exp == 32 && col->exp == 32 && dark->level == 2 && col->level == 2);
     CHECK(member_max_hp(&sgb(g)->tables, dark) == 45 && member_max_hp(&sgb(g)->tables, col) == 41);
     CHECK(dark->hp <= 32 && col->hp < hp0);
     CHECK(sgb(g)->party.money == 13);
     CHECK(col->state == 1);
+    const SkillDef *cure = skill_named(g, "キュアー");
+    CHECK(cure && dark->learnedCount == 1 && guid_eq(dark->learned[0], cure->id) && col->learnedCount == 0);
+    CHECK(sg_save_write(g, 7));
+    char *path = sg_save_path(g, 7);
+    size_t size = 0;
+    u8 *data = sg_read_file(path, &size);
+    free(path);
+    SaveData sd;
+    CHECK(data && save_parse(&sd, data, size));
+    if (data && sd.partyCount == 2) {
+        CHECK(sd.party[0].size == 204 && sd.party[1].size == 188);
+        CHECK(sd.party[0].learnedCount == 1 && cure && guid_eq(sd.party[0].learned[0], cure->id));
+        CHECK(sd.party[1].state == 1 && sd.party[1].learnedCount == 0);
+        CHECK(sd.party[0].exp == 32 && sd.party[1].exp == 32);
+        save_free(&sd);
+    } else {
+        CHECK(false);
+    }
+    free(data);
     vnsmilegame_close((VNSmileGame *)g);
     int dmg[64], n = log_damage(log, "ゾンビーナＬＶ01", dmg, 64);
     CHECK(n >= 6);

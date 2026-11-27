@@ -129,6 +129,9 @@ void snd_se(SG *g, Guid id, int volume, int tempo);
 void snd_se_stop(SG *g);
 void snd_set_master(SG *g, int bgmPercent, int sePercent);
 bool snd_bgm_playing(SG *g, Guid *id);
+void snd_bgm_hold(SG *g);
+bool snd_bgm_release(SG *g, bool resume);
+u32 snd_bgm_position(SG *g);
 void snd_enable(SG *g, bool on);
 
 #endif
