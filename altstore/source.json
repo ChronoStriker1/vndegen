@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.61.8",
+          "buildVersion": "3839",
+          "date": "2026-11-27T23:58:40Z",
+          "localizedDescription": "Sacred plays to its ending.\n\n## Downloads\n\n- `VNDegen-0.61.8-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.61.8.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.61.8-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Changed\n\n- **Sacred (セイクリッド～砕かれた光の冠～)** now plays to its ending on Mac, iPhone and iPad: the six 炎の悪魔 in the volcano, the gates back to ルディアノ, the town and castle dungeons and the queen, the cursed land, the last dungeon, the last battle and the ending. Saves after the volcano fight, in the last dungeon and after the ending were checked both ways with the PC.\n- **Smile Game Builder:** in battle, the heroes after the first have 戻る (back) where the first has 逃げる, as on the PC.\n\n## Fixed\n\n- **Smile Game Builder:** after loading a game, the menu's save page starts on the first slot, as on the PC; it opened on the slot that was loaded.\n- **Smile Game Builder:** Sacred's ending shows the play time and gives マオー and ファフニール their experience; it showed `\\Variable[15]` codes and random numbers.\n- **Smile Game Builder:** レイズ revives the fallen hero it targets, and the ally cursor starts on the first hero, as on the PC.\n\n## Known limits\n\n- **Sacred:** the queen's fight was played in VNDegen but not compared with the PC. The power spots, the CG room and the post-game after the ending haven't been played.\n- **Sacred:** in the cursed land the PC tints the sea outside the map purple; VNDegen draws it blue. The ally cursor also moves with up and down, where the PC's moves only with left and right.\n\n## What wasn't tested\n\n- Real iPhones and iPads.\n- Sacred's case check on the iPad simulator.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.61.8/VNDegen-0.61.8.ipa",
+          "size": 133258955,
+          "sha256": "ae8d4496b7cfa9afc8b834d6d08b402b6a5823c29f5dce7ff4dcf06f44398bcd",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.61.7",
           "buildVersion": "3824",
           "date": "2026-11-27T23:48:34Z",
