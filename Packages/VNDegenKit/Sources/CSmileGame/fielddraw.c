@@ -351,7 +351,7 @@ static void build_cell(Build *b, int x, int z) {
     }
     for (int s = 0; s < 4; s++) {
         int nx = x + kDx[s], nz = z + kDz[s];
-        if (nx < -v->border || nz < -v->border || nx >= m->w + v->border || nz >= m->h + v->border) continue;
+        if (v->border && (nx < -v->border || nz < -v->border || nx >= m->w + v->border || nz >= m->h + v->border)) continue;
         float ns = surf_height(b, nx, nz);
         int nsd = cell_slope(v, m, nx, nz);
         if (nsd >= 0) {
