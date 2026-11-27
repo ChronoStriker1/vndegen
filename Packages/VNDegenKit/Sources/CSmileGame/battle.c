@@ -39,6 +39,7 @@ static const float kMonsterScale = 0.63f;
 static const float kPartyX = 2.83f;
 static const float kPartyZ = 2.57f;
 static const float kPartySpacing = 3.3f;
+static const float kPartyRowSpacing = 2.4f;
 
 typedef struct Fighter {
     bool monster;
@@ -1242,8 +1243,14 @@ static void setup_stage(Battle *b) {
     float ground = 0;
     if (loaded && cx >= 0 && cz >= 0 && cx < f->map.w && cz < f->map.h) ground = (float)f->map.height[(size_t)cz * (size_t)f->map.w + (size_t)cx];
     float bx = (float)cx + 0.5f, bz = (float)cz + 0.5f;
+    float offsets[8], mean = 0;
+    int placed = b->partyCount < 8 ? b->partyCount : 8;
+    for (int i = 0; i < placed; i++) {
+        offsets[i] = i == 0 ? 0.0f : kPartySpacing + (float)(i - 1) * kPartyRowSpacing;
+        mean += offsets[i] / (float)placed;
+    }
     for (int i = 0; i < b->partyCount; i++) {
-        b->f[i].x = bx + kPartyX + ((float)i - (float)(b->partyCount - 1) / 2.0f) * kPartySpacing;
+        b->f[i].x = bx + kPartyX + (i < placed ? offsets[i] - mean : 0.0f);
         b->f[i].z = bz + kPartyZ;
     }
     for (int i = b->partyCount; i < b->count; i++) {
