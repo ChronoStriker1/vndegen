@@ -104,6 +104,15 @@ static u8 chip_attr(SG *g, Guid id) {
 
 static bool liquid(u8 attr) { return (attr & 0x0f) == 4 || (attr & 0x0f) == 7; }
 
+bool sg_cell_water(SG *g, int x, int z) {
+    const Field *f = &g->field;
+    const Map *m = &f->map;
+    const View *v = g->r3.view;
+    if (!v || !v->chipAttr || x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
+    int c = m->chip[(size_t)z * (size_t)m->w + (size_t)x];
+    return c >= 0 && c < f->chipImageCount - 1 && (v->chipAttr[c] & 0x0f) == 4;
+}
+
 static int map_height(const Map *m, const MapLook *l, int x, int z) {
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return l->outsideHeight;
     return m->height[(size_t)z * (size_t)m->w + (size_t)x];

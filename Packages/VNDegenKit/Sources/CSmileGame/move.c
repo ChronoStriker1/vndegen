@@ -61,6 +61,7 @@ bool sg_step_free(SG *g, int fromX, int fromZ, int h0, int x, int z, int self) {
     int h1 = sg_floor_level(g, x, z, h0);
     if (h0 != h1 && (abs(h1 - h0) > 1 || !(on_stairs(m, x, z) || on_stairs(m, fromX, fromZ)))) return false;
     if (across_ramp(m, fromX, fromZ, x, z)) return false;
+    if (self < 0 && h1 == m->height[(size_t)z * (size_t)m->w + (size_t)x] && sg_cell_water(g, x, z)) return false;
     if (self >= 0 && occupies(&f->player, x, z)) return false;
     const SgaState *st = &g->interp.a;
     bool sheets = st->evCount == f->npcCount && guid_eq(st->mapId, m->id);
