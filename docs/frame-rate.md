@@ -138,6 +138,13 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | ANIM | Magical Sword, the goddess at 300% in the opening close-up, Debug build | Mac app, mini | 60 | 25.4 to 25.7 | 16.9 to 17.9 | 30 s | | 11-21 | 6c8aab9c |
 | ANIM | Magical Sword, the goddess (1,051 sprites) alone with her idle motion | iPad simulator | 60 | 33.4 to 34.0 | 24.1 | 30 s | | 11-21 | 6c8aab9c |
 | ANIM | Magical Sword, the goddess at 300% in the opening close-up | iPad simulator | 60 | 20.0 | 17.9 to 18.9 | 40 s | | 11-21 | 6c8aab9c |
+| Smile Game Builder | Princess Colette's Great Adventure, throne room, from a save | Mac app, mini | 60 | 59.6 to 60.0 | 33.3 to 60.0 | 30 s | 3.4 | 11-27 | 208c06cf |
+| Smile Game Builder | Princess Colette's Great Adventure, world map with a monster walking in | Mac app, mini | 60 | 60.0 | 60.0 | 30 s | 4.2 | 11-27 | 208c06cf |
+| Smile Game Builder | Princess Colette's Great Adventure, first battle, command list | Mac app, mini | 60 | 59.7 to 60.0 | 37.5 to 60.0 | 30 s | 4.6 | 11-27 | 208c06cf |
+| Smile Game Builder | Princess Colette's Great Adventure, throne room, touch gamepad hidden | iPad simulator | 60 | 59.7 to 60.0 | 37.5 to 60.0 | 30 s | 4.1 | 11-27 | 208c06cf |
+| Smile Game Builder | Princess Colette's Great Adventure, first battle, touch gamepad hidden | iPad simulator | 60 | 59.9 to 60.0 | 49.7 to 60.0 | 30 s | 4.0 | 11-27 | 208c06cf |
+| Smile Game Builder | Princess Colette's Great Adventure, throne room, touch gamepad shown | iPad simulator | 60 | **34.0 to 35.4**, runtime 4.5 ms | 19.8 to 20.8 | 30 s | 4.3 | 11-27 | 208c06cf |
+| Smile Game Builder | Princess Colette's Great Adventure, first battle, touch gamepad shown | iPad simulator | 60 | **47.4 to 50.5**, runtime 4.5 ms | 20.3 to 26.3 | 40 s | 4.0 | 11-27 | 208c06cf |
 
 Before #49's fix (2026-11-07), NScripter, Ponscripter, NekoSDK and Wolf RPG rounded each display refresh to whole milliseconds, so their clocks ran 4% slow at 120 Hz and 2% fast at 60 Hz. Rows marked "was" give the number before it. A Wolf RPG game at 60 Hz drew 60.0 then too, but ran 61.2 game frames a second, with a double step every 50 refreshes.
 
@@ -220,6 +227,11 @@ Known limits:
 - A paused Vorbis WebM that seeks still hangs, and so does a finished, non-looping one that the game plays again, which is a seek inside WebKit.
 - A seek still unfinished after a second counts as hung, so one that slow on a loaded machine would restart its clip.
 - A short MZ WebM with Vorbis sound that ends with its kept frames only part done takes WebKit's loop and hangs. The picture still plays from the kept frames if they complete, but its sound stops. No library game loops such a clip.
+
+Smile Game Builder on the iPad simulator: with the touch gamepad shown, each display tick takes 16 to 24 ms, against
+about 5.5 ms with it hidden, while the runtime's own frame stays at 4 to 5 ms. The simulator spends the difference
+compositing the gamepad's translucent buttons over the game's view. It was not measured on a real iPad, and the other
+rows don't say whether the gamepad was shown.
 
 ## One line each
 

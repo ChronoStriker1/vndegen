@@ -9,6 +9,28 @@ records every layout and where it came from.
 The runtime runs in the app on Mac, iPhone and iPad through the `EngineSmileGame` plugin, and on Linux through the
 runners below.
 
+## Princess Colette's Great Adventure (first release)
+
+VNDegen's first Smile Game Builder release plays Princess Colette's Great Adventure (Smoothly Animated Pixel Art RPG)
+from the title through the opening, the throne room and the castle town, the dungeon scenes in which Colette joins
+your party, the bridge guard and out onto the world map, with its wandering monsters and battles, on Mac, iPhone and
+iPad. The game is in Japanese, as on the PC.
+
+- **Saves** are the PC version's own files in the game's `savedata` folder, so a save moves both ways between VNDegen
+  and the PC copy, and Ludusavi backs them up as it does on Windows. Save from the game's menu (Escape, X, or Y and
+  Menu on a controller) or from Game commands in the VNDegen menu, and load from the title's Continue or from Game
+  commands.
+- **Controls** start on the RPG Maker layout: A confirms, B cancels, Y and Menu open the game's menu, X dashes. On a
+  touch screen, a tap outside the touch gamepad confirms, as a click does on the PC, and holding a finger on the map
+  opens the menu.
+- **What isn't there yet:** the game past its first world-map area hasn't been played through in VNDegen, so later
+  towns, dungeons and bosses may show problems. Battle effects play simpler than on the PC, and the camera doesn't
+  swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
+  the PC's. Known limits below lists the rest.
+
+Sacred (セイクリッド～砕かれた光の冠～) is recognised and starts, and plays through its castle and first dungeon, but
+it isn't part of this release.
+
 ## Test games
 
 | Game | Player | Maps | Notes |
@@ -21,7 +43,9 @@ Both games use the same data format.
 ## What runs
 
 - The package, every `.sgr` file, resources from the game and its resource packs, PNG pictures and the game's font.
-- The title screen: picture, overlay, the three items as a column or a row, the cursor. New game only.
+- The title screen: picture, overlay, the three items as a column or a row, the cursor. New game, Continue (lit when
+  a save exists, and where the cursor starts; it opens the save page over the darkened title to load a slot) and
+  Config.
 - Maps: chip terrain in 3D with the map's light colour, map objects and event graphics from FBX, 2D character sheets
   drawn upright, the player walking cell by cell (stairs let it change height), talking to the event in front.
   Events face their sheet's direction, wander or walk toward the player at their sheet's speed and frequency, and a
@@ -37,23 +61,25 @@ Both games use the same data format.
 - Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
   and windows. One party state (`Party` in `sg_B.h`, `g->b.party`) holds the heroes with their stats, the reserve,
   items, obtained items, money, hero looks and play time; event commands change it, the menu shows it, and saves write
-  and read it.
+  and read it, with each hero's state (poison) and the skills learned by level-ups and command 56.
 - The field menu (Esc or X): items, skills, equipment, status, saving to a slot with each slot's map and party, quit
   and config, laid out as the PC draws them, with faces, and the menu sounds. Shop (37) and inn (38) commands open
   their screens and branch on the result; 59 recovers the party.
 - Battles: event command 65 starts a battle and waits for it, then branches on the result as the PC does; maps with an
-  encounter table start battles from steps. The battle is drawn on the battle background map from behind the party,
-  with the entry flash and intro, the command list, targets, skills, items, defend and escape, monster actions,
-  damage, states, drain and effects from `Effect.sgr` with their sounds, the battle BGM and victory music, the result
-  seen from the front, level-ups and GAME OVER. 3D heroes play their battle motions. `vnsmilegame_scene` reports
-  `battle`.
+  encounter table start battles from steps while the encounter switch (command 66) is on. A poisoned member puts the
+  poison balloon over the player on the map. The battle is drawn on the battle background map from behind the party,
+  with the entry flash and intro, the command list, targets, skills, items, defend and escape, monster actions, damage,
+  states, drain and effects from `Effect.sgr` with their sounds, learned skills beside the hero table's, the battle BGM
+  and victory music, the result seen from the front, level-ups and GAME OVER. 3D heroes play their battle motions.
+  `vnsmilegame_scene` reports `battle`.
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
 - Saves: the PC's own `savedata/Save_NN.sgs` files, read and written field for field, with everything the runtime does
   not model yet kept and written back unchanged, so saves move both ways between VNDegen and the original. Pictures on
   screen and skills learned by command are saved and restored as the PC does. `saveDir`
   in the config is the folder holding the saves; it defaults to the game's `savedata`.
-- Sound: the title and map BGM and ambient sound, with the files' loop points, through `vnsmilegame_audio` as stereo
-  floats at `audioRate`. Commands 21 (BGM), 22 (sound) and 64 (music effect) play through the same mixer.
+- Sound: the title and map BGM and ambient sound, with the files' loop points (after a battle the map's BGM goes on from
+  where it stopped), through `vnsmilegame_audio` as stereo floats at `audioRate`. Commands 21 (BGM), 22 (sound) and 64
+  (music effect) play through the same mixer.
 - Camera command 53 (modes 0 and 3) and motions from commands 14 and 69 and from each event sheet.
 
 ## Drawing the map
@@ -93,11 +119,14 @@ thread, at most once per 15 ms, so a 120 Hz display doesn't draw the scene twice
 - Keys: Return, Space and Z confirm, Escape and X cancel and open the menu, Shift dashes, the arrows and WASD move. A
   game starts on the RPG Maker layout: A confirms, B cancels, Y and Menu press X, X holds Shift, the D-pad and left
   stick move. The player reads no other key, so LB, RB, LT, RT and View start unbound instead of pressing Q, W, A, S and
-  D, which would move the player. Touches outside the touch gamepad do nothing, since the player takes no mouse input.
+  D, which would move the player.
+- Touches and clicks outside the touch gamepad do what the PC's left mouse button does: a tap confirms when the finger
+  comes up, and holding about 0.6 s on the map opens the menu. `vnsmilegame_pointer` takes the presses.
 - Game commands in the VNDegen menu has Save and Load with the 40 slots the PC's save page shows, written and read
-  with `vnsmilegame_save` and `vnsmilegame_load`, until the game's own save page writes.
+  with `vnsmilegame_save` and `vnsmilegame_load`. Save is refused at the title and during a battle, where the PC can't
+  save either; a load closes the game's menu and leaves a battle.
 - The game's font comes from its package. `VNSmileGameConfig.fallbackFont` carries the MS PGothic substitute
-  (`docs/fonts.md`) for text the game font can't draw; the runtime doesn't read it yet.
+  (`docs/fonts.md`); characters the game font lacks (Colette's text has 嚙) are drawn from it on the same baseline.
 - With `-frameMonitor YES` a DEBUG build logs `SGFRAMES` every 10 seconds: display ticks, frames drawn, the 1% low,
   the slowest step, the average work per tick, the scene, and `runtime=`, the average time `vnsmilegame_frame` takes.
 
@@ -122,10 +151,28 @@ A-series iPhones and iPads are slower per core and were not measured. A Metal pa
 it would take moving `r3d.c`'s triangle setup and raster stage to a Metal render pass fed from the same chunk lists,
 with the shadow map as a depth texture, and keeping the software path for Linux.
 
+Colette's first release, DEBUG builds of 208c06cf on the Mac mini, 2026-11-27, measured the same way (Mac app with no
+other app or build running, load average 3 to 5; one simulator booted at a time). The world map is the cell below
+the castle where the first monster reaches the player, the battle the command list of that battle. Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator | iPad, touch gamepad shown | iPhone 18 Pro simulator |
+|---|---|---|---|---|
+| Throne room | 59.6 to 60.0, 33.3 to 60.0, 6.7 ms | 59.7 to 60.0, 37.5 to 60.0, 3.8 ms | 34.0 to 35.4, 19.8 to 20.8, 4.5 ms | 59.8 to 60.0, 42.9 to 60.0, 3.9 ms |
+| Castle town | 60.0, 60.0, 7.0 ms | 59.8 to 60.0, 42.2 to 60.0, 4.1 ms | 40.2 to 41.4, 20.3 to 23.2, 4.2 ms | not measured |
+| World map | 60.0, 60.0, 7.0 ms | 59.7 to 60.0, 37.5 to 60.0, 4.2 ms | 43.4 to 46.2, 18.9 to 24.5, 4.2 ms | 60.0, 60.0, 4.3 ms |
+| First battle | 59.7 to 60.0, 37.5 to 60.0, 7.4 ms | 59.9 to 60.0, 49.7 to 60.0, 4.6 ms | 47.4 to 50.5, 20.3 to 26.3, 4.5 ms | 60.0, 60.0, 4.5 ms |
+
+The runtime's own time stays under 8 ms everywhere. On the iPad simulator each display tick takes about 5.5 ms with
+the touch gamepad hidden and 16 to 24 ms with it shown, so the drop to 34 to 50 frames a second there is the
+simulator compositing the gamepad's translucent buttons over the game's view, not the runtime. That cost was not
+measured on a real iPad, and other engines' rows in `docs/frame-rate.md` don't say whether their simulator numbers
+were taken with the gamepad shown.
+
 ## The Linux host
 
 `Engines/SmileGame/host` builds with CMake:
 
+- `sgrun` and `sgplay` take the fallback font from `SG_FALLBACK_FONT`.
 - `sgrun <game> <out> [wait:ms] [key:vk] [hold:vk,ms] [okuntil:n] [shot:name] [save:slot] [load:slot]`: headless;
   writes `sgrun.log` and PNG frames to `<out>`, which is also its save folder.
 - `sgplay <game>`: an SDL window with the keyboard (arrows, Enter or Z, Esc or X, Shift).
@@ -153,28 +200,26 @@ with the shadow map as a depth texture, and keeping the software path for Linux.
   `to:x,z` (walks there), `talk:U|D|L|R`, `hold:U,ms`, `ok`, `wait:ms`, `shot:name`, `where:tag`, `save:N`, `load:N`.
 - `sgtest_G`: the joined paths: new-game hero stats against the PC's saves, a load keeping the party, shop and inn
   branches, the BGM command, the menu's save page, and Sacred's castle after a load (queen, king, camera).
+- `sgtest_J`: the first release's fixes: fallback glyphs, a case-swapped `sgb_rpgplayer.exe`, a load closing the
+  menu, the title's Continue and Config, and taps and holds.
 - `sgtest_I`: the field against the PC: sheet facing, turn, step and place codes, random variables, the encounter
   switch, learned skills and pictures in saves (byte for byte against PC saves), the help bar after a load, caption
   fades per player version and Colette's opening music.
 
 ## Known limits
 
-- After a battle the map's BGM starts again from the beginning; the PC resumes it where it stopped (the mixer has no
-  pause yet).
 - Effects play their sheet's cells in order; the keyframe timeline inside each effect (positions, scales, screen
   flashes) is not read. The camera does not push towards the acting fighter as the PC's does.
 - Critical hits, skill damage, healing, escape chance, defend and charge, the chance that a state lands and the
   recovery from sleep, paralysis, confusion and charm are inferred (see `docs/smilegame-cleanroom.md`). A random
   encounter always brings one monster; the PC sometimes brings two スライミー.
-- Saves don't write a hero's state (poison).
 - Effects (27) play their picture sheet's cells in order over the effect's length; the PC composes layered,
   keyframed sprites with flashes (Sacred's 46光全体 is a rune circle and a pillar of light), and the key format is
   only partly read. Balloons draw the right bubble and icon with a simple pop, not the PC's keyframes.
 - Events wander and chase with step speeds and pauses measured at -3, 0 and 3 and interpolated between; the PC's
   choice of direction when a chaser is blocked, and whether events walk during menus, were not pinned down.
 - Commands 55 (experience), 58, 68, 76 and 77 are logged and skipped; none is on either path (Sacred's debug and CG
-  rooms and ending, Colette's adult scenes). 56's message for forgetting a skill and 66's random encounters themselves
-  (Sacred's royal cave has them; battles belong to `battle*.c`) are not done.
+  rooms and ending, Colette's adult scenes). 56's message for forgetting a skill is not done.
 - The inn screen was not compared with the PC (neither first-release path has one); the shop was, in Sacred's weapon
   shop. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
   these games' menus. Where a slot's page shows a second to fourth hero is a guess (two columns); both games have one
@@ -195,9 +240,11 @@ with the shadow map as a depth texture, and keeping the software path for Linux.
   16.7 ms a 60 fps frame allows while other work runs; the rest needs the Metal path or a parallel transform stage.
 - The game's own button guide in its menu shows Xbox B (red) deciding and A (green) cancelling; VNDegen's RPG Maker
   layout has A confirm and B cancel, as in the other RPG engines.
-- The runtime reads no mouse or touches, so under Automatic on a touch device the touch gamepad shows once the
-  player touches the screen; nothing else happens on a touch outside it.
-- Loading from Game commands while the game's field menu is open leaves the menu open over the loaded map.
-- A new game's save picks its layout from `sgb_rpgplayer.exe`'s version, read by its exact lower-case name, so a copy
-  whose exe name differs in case on a case-sensitive volume writes Colette's saves in the 1.0 layout.
+- Holding a finger on the map opens the menu without the PC's quirk of then choosing the first menu item when the
+  finger comes up.
+- The poison balloon's bubbles bob in a simple loop instead of the effect's keyframes. It shows for poison only; the
+  other states end with the battle.
+- Townspeople who wander can step onto an invisible door or exit cell, such as the castle door or the town's pier,
+  and wait there while the player stands in the way; step back and they move on. Whether the PC lets them was not
+  checked.
 - The message window's fill differs between the two games on the PC and is drawn the same in both.

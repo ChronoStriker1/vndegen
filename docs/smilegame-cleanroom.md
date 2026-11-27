@@ -767,3 +767,56 @@ item's kind, the count held, its attack, and for each hero who can equip it the 
 and the attack and elemental attack before and after (the new value in light blue), and the description along the
 bottom at (13,473). Choosing an item opens a 239 by 65 box at (606,381) with the item, "x1" and the total price
 before it is bought.
+
+## First release (round 4, J)
+
+Seen on the PC player under Wine (Colette, player 1.8.1), playing Colette from the title to its first world-map battle
+and back, beside the SDL runner playing the same path with real key events.
+
+### Saves after the first battle
+
+- The hero's `int32` after experience is its state: the PC wrote 1 for コレット, poisoned, and 0 for ダーク after a
+  battle in which only she was poisoned. The runtime reads it into the member and writes it back; recovery and the inn
+  clear it.
+- The learned-skill list after the equipment holds the skills a hero reached by levelling up: ダーク's record grew to
+  204 bytes at level 2 with キュアー (his level 2 skill) in it, and round 3's patched save, levelled to 6 by command
+  55 after command 56 taught ファイア and アイス, held those two and then his level 2, 5 and 6 skills: ファイア, his level
+  3 skill, was not added twice. Level 1 skills are not in it. The runtime appends the
+  skills of each level passed at a level-up and lists the learned skills in battle after the hero table's.
+- The monster table's two `int32` before the drops are the money and then the experience (ゾンビーナＬＶ01's result:
+  経験値 32 and 13 G, the table holds 13 then 32).
+
+### Title
+
+- With a save in `savedata`, つづきから (Continue) is lit and the cursor starts on it; without one the PC draws it
+  grey. It opens the save page's layout (eight slots a page, five pages, the selected slot's date, map and party on
+  the right) over the title darkened by about half, and loading a slot starts the game there. The third item,
+  コンフィグ, opens the config page over the title.
+- The save page's overwrite question defaults to はい.
+
+### Mouse
+
+- A left click acts as the confirm key, when the button comes up: on the map it talked to the aide the player faced,
+  in a message it went to the next page, in the menu it chose the highlighted item.
+- Holding the left button on the map opens the menu: at 0.3 s it was a click, at 0.7 s and 1.0 s the menu opened
+  while the button was down, and the release then chose the highlighted item (アイテム). Holding in a menu page did
+  nothing.
+- The right button did nothing on the map, in messages or in the menu, and moving the pointer over a menu item did
+  not move the cursor. The player does not walk to a clicked cell.
+
+### After a battle
+
+- With a member poisoned, the PC keeps the `!Poison` balloon over the leading hero on the map: the balloon is cell 0
+  of `emotion.png`, about 28 pixels lower than the event balloons of command 45, with purple bubbles (cell 19) moving
+  inside it. It showed while コレット, not the leader, was the poisoned one.
+- A wandering monster that loses the battle without the continue flag ends the game: the party lost to a
+  ゴーレムＬＶ01 on the world map (variable 9 had picked its set), GAME OVER showed and the title followed.
+
+### The path
+
+The PC and the runner show the same scenes in the same order: the opening scroll, the throne room and the aide's
+pages, the corridor, the dungeon's three visits with their choices (the PC leaves an empty message window up while
+the choice returns), the town and the king's hideout, コレット joining, the bridge guard, the world map and a
+monster reaching the player on the bridge. Townspeople who wander can step onto an invisible exit or door cell with a
+pass-through sheet, such as the castle door and the town's pier, and stand there while the player blocks the way
+out; whether the PC lets them was not checked.

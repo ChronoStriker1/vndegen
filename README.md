@@ -124,6 +124,7 @@ Featured by default, as at the top of this page, in a window of any size or full
 | PJADV | `archive.dat` holding `scenario.dat` and `textdata.bin` | Mac, iPhone, iPhone Duo, iPad | [pjadv.md](docs/pjadv.md) |
 | ANIM | `<name>_sce.dat` beside `<name>_define.dat`, `<name>_system.dat` and `cg/psbpack.dat` | Mac, iPhone, iPhone Duo, iPad | [anim.md](docs/anim.md) |
 | SystemAoi | `box.vfs` holding `init.box` and `pro.box` | Mac, iPhone, iPhone Duo, iPad | [systemaoi.md](docs/systemaoi.md) |
+| Smile Game Builder (Princess Colette's Great Adventure) | `data.sgbpack` beside `sgb_rpgplayer.exe` | Mac, iPhone, iPhone Duo, iPad | [smilegame.md](docs/smilegame.md) |
 | Unity, opened outside VNDegen | `Game_Data/globalgamemanagers`, `mainData`, or `data.unity3d` | Mac, through the game's own Mac version or your CrossOver. iPhone, iPhone Duo, and iPad: the game's page says why not | [unity.md](docs/unity.md#mac-launcher) |
 
 [docs/engines.md](docs/engines.md) has the exact detection rules and how each engine runs, saves, and what it can't do yet. Some RPG Maker XP, VX, and VX Ace games need the RTP, which VNDegen downloads from the RPG Maker website when you ask. [docs/engine-survey.md](docs/engine-survey.md) covers other engines and how each could be supported.
