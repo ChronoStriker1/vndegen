@@ -94,6 +94,7 @@ bool Game::startNewGame(std::string *error) {
     // known; -1 keeps the text of a game that never sets them where the runtime always put it, not at the top left.
     system_[1] = system_[2] = -1;
     system_[100] = system_[101] = system_[102] = 100;
+    partyTransparent_ = false;
     strings_.assign(std::max<size_t>(rows(SysStringVarNames), 100), "");
     systemStrings_.assign(std::max<size_t>(rows(SysSystemStrings), 100), "");
     int maxCommon = 0;

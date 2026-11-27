@@ -167,6 +167,7 @@ struct Character {
     bool visible = true;    // false for erased events and hidden party members
     bool above = false;     // drawn over everything else on the map
     int shadow = 0;         // shadow graphic number from the system database, 0 for none
+    bool moving = false;
 };
 
 // One running event: a map event page or a common event, with its call stack.
@@ -478,6 +479,7 @@ private:
     std::map<std::pair<int, int>, std::array<int32_t, 10>> eventSelf_;
     Actor hero_;
     std::array<Actor, 5> party_;
+    bool partyTransparent_ = false;
     double cameraX_ = 0, cameraY_ = 0;
 
     // Autorun and called events, run in order. A deque, so an event that queues another (command 211) while it runs

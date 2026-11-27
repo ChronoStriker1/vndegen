@@ -942,7 +942,13 @@ void Game::partyCommand(Thread &t, const Command &c) {
             std::erase(members, graphic);
             break;
         default:
-            if (((flags & 0xF0) >> 4) == 1) members.assign(1, "");  // erase every character
+            switch ((flags & 0xF0) >> 4) {
+                case 0: std::erase(members, std::string()); break;
+                case 1: members.assign(1, ""); break;
+                case 5: partyTransparent_ = true; break;
+                case 6: partyTransparent_ = false; break;
+                default: break;
+            }
             break;
     }
     members.resize(6);
