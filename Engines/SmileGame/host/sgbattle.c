@@ -210,12 +210,9 @@ int main(int argc, char **argv) {
                                 strcmp(battle_phase(g), "result") != 0 && strcmp(battle_phase(g), "gameover") != 0;
                      t++)
                     step(g, 16);
-                if (strcmp(battle_phase(g), "command") == 0) {
-                    press(g, 0x0d);
-                    press(g, 0x0d);
-                } else if (sg_battle_active(g)) {
-                    press(g, 0x0d);
-                }
+                if (strcmp(battle_phase(g), "command") != 0) break;
+                press(g, 0x0d);
+                press(g, 0x0d);
             }
         } else if (sscanf(c, "until:%255s", name) == 1) {
             for (int t = 0; t < 4000 && sg_battle_active(g) && strcmp(battle_phase(g), name) != 0; t++) step(g, 16);

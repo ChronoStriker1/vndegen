@@ -1337,7 +1337,7 @@ static void draw(Battle *b) {
     if (b->phase == PH_GAMEOVER) {
         field_draw(g);
         fill_rect(g->fb, g->w, g->h, 0, 0, g->w, g->h, 0x80000000u);
-        const char *s = MT(g, MT_GAMEOVER);
+        const char *s = "GAME OVER";
         int tw = font_width(g->font, 48, s);
         text_outlined(g, (g->w - tw) / 2, g->h / 2 - 30, 48, s, 0xffe0e0e0u);
         return;
