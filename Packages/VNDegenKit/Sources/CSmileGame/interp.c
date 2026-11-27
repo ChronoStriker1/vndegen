@@ -10,7 +10,6 @@ static const int kWinX = 120, kWinW = 720, kWinH = 160;
 static const int kTextPadX = 18, kTextPadY = 19;
 static const int kWrapW = 684;
 static const float kRevealPerMs = 0.12f;
-static const u32 kCaptionFadeMs = 500;
 
 static void clear_pages(Interp *ip) {
     for (int i = 0; i < ip->pageCount; i++) free(ip->pages[i]);
@@ -426,9 +425,10 @@ void interp_update(SG *g, u32 ms) {
     case ST_SCROLL: {
         ip->shownMs += ms;
         if (a->scrollStatic) {
-            if (a->captionFadeMs) {
+            u32 fade = g->fi.captionFadeMs;
+            if (a->captionFadeMs || (!fade && sg_pressed(g, KEY_OK))) {
                 a->captionFadeMs += ms;
-                if (a->captionFadeMs > kCaptionFadeMs) {
+                if (a->captionFadeMs > fade) {
                     a->captionFadeMs = 0;
                     ip->state = ST_RUN;
                     a->scrollImage = NULL;
@@ -629,8 +629,12 @@ void interp_draw(SG *g) {
     if (!ip->active) return;
     if (ip->state == ST_SCROLL && ip->scrollText && ip->a.scrollStatic) {
         Image *im = ip->a.scrollImage;
-        u32 fade = ip->a.captionFadeMs > kCaptionFadeMs ? kCaptionFadeMs : ip->a.captionFadeMs;
-        u32 alpha = 255 - fade * 255 / kCaptionFadeMs;
+        u32 span = g->fi.captionFadeMs, alpha = 255;
+        if (span) {
+            u32 in = ip->shownMs >= span ? 255 : ip->shownMs * 255 / span;
+            u32 out = ip->a.captionFadeMs >= span ? 0 : 255 - ip->a.captionFadeMs * 255 / span;
+            alpha = in < out ? in : out;
+        }
         if (im) {
             blit(g->fb, g->w, g->h, im, 0, 0, im->w, im->h, (g->w - im->w) / 2, (g->h - im->h) / 2, im->w, im->h, (int)alpha);
         } else {

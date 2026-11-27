@@ -400,7 +400,7 @@ SaveData *sg_save_state(SG *g) { return &g->e.save; }
 
 float sg_play_seconds(SG *g) { return (float)g->b.party.playMs / 1000.0f; }
 
-static bool player_at_least(SG *g, int major, int minor) {
+bool sg_player_at_least(SG *g, int major, int minor) {
     char *path = sg_fmt("%s/sgb_rpgplayer.exe", g->gameDir);
     size_t n = 0;
     u8 *d = sg_read_file(path, &n);
@@ -445,7 +445,7 @@ void sg_save_new_game(SG *g) {
     SgE *e = &g->e;
     SaveData *s = &e->save;
     save_free(s);
-    bool newer = player_at_least(g, 1, 8);
+    bool newer = sg_player_at_least(g, 1, 8);
     e->heroSize = newer ? 188 : 160;
     s->party = sg_alloc(sizeof(SaveHero));
     s->reserve = sg_alloc(sizeof(SaveHero));

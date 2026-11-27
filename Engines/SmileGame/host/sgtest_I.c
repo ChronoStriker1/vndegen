@@ -477,6 +477,66 @@ static void test_learn_skill(const char *dir) {
     close_game(g, tmp);
 }
 
+static int caption_end_ms(const char *dir, const char *map, int x, int z) {
+    char tmp[32];
+    SG *g = open_game(dir, tmp);
+    if (!g) return -1;
+    run(g, 16);
+    vnsmilegame_key((VNSmileGame *)g, VK_OK, true);
+    run(g, 48);
+    vnsmilegame_key((VNSmileGame *)g, VK_OK, false);
+    sg_debug_warp((VNSmileGame *)g, map, x, z, 2);
+    run(g, 48);
+    Script sc = {.count = 1};
+    Cmd cmd = {.type = CMD_SCROLL_TEXT, .argCount = 3};
+    CmdArg args[3] = {{.kind = ARG_STR, .s = "caption"}, {.kind = ARG_INT, .i = 2}, {.kind = ARG_INT, .i = 0}};
+    cmd.args = args;
+    sc.cmds = &cmd;
+    interp_start(g, &sc);
+    run(g, 1000);
+    int ms = -1;
+    if (g->interp.active && g->interp.state == 2) {
+        vnsmilegame_key((VNSmileGame *)g, VK_OK, true);
+        for (int t = 16; t <= 2000; t += 16) {
+            vnsmilegame_frame((VNSmileGame *)g, 16);
+            if (t == 48) vnsmilegame_key((VNSmileGame *)g, VK_OK, false);
+            if (!g->interp.active) {
+                ms = t;
+                break;
+            }
+        }
+    }
+    close_game(g, tmp);
+    return ms;
+}
+
+static void test_caption_fade(const char *colette, const char *sacred) {
+    if (colette) {
+        int ms = caption_end_ms(colette, "Map_069", 14, 6);
+        CHECK(ms >= 0 && ms <= 48);
+    }
+    if (sacred) {
+        int ms = caption_end_ms(sacred, "Map_007", 35, 10);
+        CHECK(ms >= 380 && ms <= 460);
+    }
+}
+
+static void test_opening_bgm(const char *dir) {
+    char tmp[32];
+    SG *g = open_game(dir, tmp);
+    if (!g) return;
+    run(g, 16);
+    vnsmilegame_key((VNSmileGame *)g, VK_OK, true);
+    run(g, 48);
+    vnsmilegame_key((VNSmileGame *)g, VK_OK, false);
+    run(g, 6000);
+    Guid id;
+    CHECK(snd_bgm_playing(g, &id) && guid_eq(id, guid("ee92df94-3ab0-4250-b94d-a51dcf3845d7")));
+    const Res *r = res_find(&g->res, id);
+    CHECK(r && r->kind == RES_BGM && strstr(r->path, "samples/common") != NULL);
+    close_game(g, tmp);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE"), *sacred = getenv("SG_SACRED");
     if (colette) {
@@ -487,6 +547,7 @@ int main(void) {
         test_encounter_switch(colette);
         test_pictures_saved(colette);
         test_learn_skill(colette);
+        test_opening_bgm(colette);
     } else {
         printf("SG_COLETTE not set: Colette checks skipped\n");
     }
@@ -496,6 +557,7 @@ int main(void) {
     } else {
         printf("SG_SACRED not set: Sacred checks skipped\n");
     }
+    test_caption_fade(colette, sacred);
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
 }

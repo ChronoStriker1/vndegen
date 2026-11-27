@@ -19,9 +19,11 @@ typedef struct SgI {
     u32 playerSpinMs;
     int playerSpinBase;
     SgiFx fx[SGI_FX];
+    u32 captionFadeMs;
 } SgI;
 
 u32 sgi_rand(SG *g, u32 n);
+bool sg_player_at_least(SG *g, int major, int minor);
 float sgi_step_speed(i32 speed);
 u32 sgi_step_pause(i32 freq);
 bool sgi_cell_free(SG *g, int fromX, int fromZ, int x, int z, int self);
