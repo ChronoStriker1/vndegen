@@ -305,6 +305,7 @@ typedef struct Tri {
     u8 modulate;
     u8 mode;
     u8 flags;
+    u8 model;
 } Tri;
 
 typedef struct Cam {

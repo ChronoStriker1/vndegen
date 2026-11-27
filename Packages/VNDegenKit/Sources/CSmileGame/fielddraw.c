@@ -438,15 +438,21 @@ static void light_setup(SG *g, View *v, float sun[3]) {
     sun[0] = cosf(p) * cosf(y);
     sun[1] = sinf(p);
     sun[2] = cosf(p) * sinf(y);
-    float a[3], s[3];
+    float a[3], s[3], ma[3], ms[3];
     for (int i = 0; i < 3; i++) {
         float key = (float)m->colors[1 + i] / 255.0f, fill = (float)m->colors[5 + i] / 255.0f;
         float col = l->sun ? (float)l->sunColor[i] / 255.0f : 0.0f;
         a[i] = fill * kFillK;
         s[i] = key * col * kKeyK;
-        if (!l->sun) a[i] = fill * kFillK + key * kKeyK;
+        ma[i] = fill;
+        ms[i] = key * col;
+        if (!l->sun) {
+            a[i] = fill * kFillK + key * kKeyK;
+            ma[i] = fill + key;
+        }
     }
     r3_light(&g->r3, a, s, sun);
+    sg_r3_light_models(&g->r3, ma, ms);
 }
 
 static bool game_camera(SG *g, float out[8]) {

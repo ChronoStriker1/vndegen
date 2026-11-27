@@ -52,9 +52,16 @@ void r3_begin(R3 *r, u32 *fb, u32 clear) {
 
 void r3_light(R3 *r, const float amb[3], const float sun[3], const float dir[3]) {
     for (int i = 0; i < 3; i++) {
-        r->x->amb[i] = amb[i];
-        r->x->sun[i] = sun[i];
+        r->x->amb[i] = r->x->modelAmb[i] = amb[i];
+        r->x->sun[i] = r->x->modelSun[i] = sun[i];
         r->x->sunDir[i] = dir[i];
+    }
+}
+
+void sg_r3_light_models(R3 *r, const float amb[3], const float sun[3]) {
+    for (int i = 0; i < 3; i++) {
+        r->x->modelAmb[i] = amb[i];
+        r->x->modelSun[i] = sun[i];
     }
 }
 
@@ -128,7 +135,7 @@ typedef struct RCmd {
     const Image *tex;
     float bias;
     int y0, y1;
-    u8 alphaTest, mode, flags, na;
+    u8 alphaTest, mode, flags, na, model;
 } RCmd;
 
 struct Pool {
@@ -260,7 +267,7 @@ static void submit(R3 *r, const Scr *a, const Scr *b, const Scr *c, const Tri *t
     float miny = mn3(a->y, b->y, c->y), maxy = mx3(a->y, b->y, c->y);
     float minx = mn3(a->x, b->x, c->x), maxx = mx3(a->x, b->x, c->x);
     if (maxy < 0 || miny > (float)r->h || maxx < 0 || minx > (float)r->w) return;
-    RCmd cmd = {{*a, *b, *c}, t->tex, bias, (int)miny - 1, (int)maxy + 1, t->alphaTest, mode, flags, (u8)na};
+    RCmd cmd = {{*a, *b, *c}, t->tex, bias, (int)miny - 1, (int)maxy + 1, t->alphaTest, mode, flags, (u8)na, t->model};
     Pool *pl = r->x->pool;
     if (!pl) {
         raster(r, &cmd, 0, r->h);
@@ -305,8 +312,9 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
     const R3x *x3 = r->x;
     bool shadow = (flags & TF_SHADOW) && x3->shadowOn;
     float animU = (flags & TF_ANIM) ? x3->animU : 0;
-    float ambR = x3->amb[0], ambG = x3->amb[1], ambB = x3->amb[2];
-    float sunR = x3->sun[0], sunG = x3->sun[1], sunB = x3->sun[2];
+    const float *amb = cmd->model ? x3->modelAmb : x3->amb, *sun = cmd->model ? x3->modelSun : x3->sun;
+    float ambR = amb[0], ambG = amb[1], ambB = amb[2];
+    float sunR = sun[0], sunG = sun[1], sunB = sun[2];
     int tr = r->tint[0], tg = r->tint[1], tb = r->tint[2];
     for (int y = y0; y <= y1; y++) {
         float py = (float)y + 0.5f;
