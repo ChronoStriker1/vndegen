@@ -357,6 +357,8 @@ typedef struct Actor {
     u32 animMs;
     const Res *graphic;
     Image *sheet;
+    Image *waitSheet;
+    int waitFrames, waitMs;
     Model *model;
     Guid eventId;
     bool visible;
@@ -473,5 +475,6 @@ void text_outlined(SG *g, int x, int y, int px, const char *s, u32 color);
 #include "sg_D.h"
 #include "sg_C.h"
 #include "sg_L.h"
+#include "sg_M.h"
 
 #endif

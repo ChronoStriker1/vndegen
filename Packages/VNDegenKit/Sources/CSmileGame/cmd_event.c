@@ -90,11 +90,13 @@ void sga_actor_graphic(SG *g, Actor *a, Guid graphic) {
     if (a->model) model_free(a->model);
     a->model = NULL;
     a->sheet = NULL;
+    a->waitSheet = NULL;
     a->graphic = res;
     if (!res) return;
     size_t n = strlen(res->path);
     if (n > 4 && strcasecmp(res->path + n - 4, ".fbx") == 0) a->model = model_load(g, res->path);
     else a->sheet = sg_image(g, res->id);
+    sg_actor_wait_sheet(g, a);
 }
 
 static void apply_sheet(SG *g, int i) {

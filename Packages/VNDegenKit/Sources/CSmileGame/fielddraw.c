@@ -851,16 +851,78 @@ int sg_sprite_rows(const Res *res, const Image *im) {
     return (res->divisions == 1 || res->flagA) && im->h / 4 >= im->w / frames ? 4 : 1;
 }
 
+void sg_actor_wait_sheet(SG *g, Actor *a) {
+    a->waitSheet = NULL;
+    a->waitFrames = a->waitMs = 0;
+    if (!a->graphic || !a->sheet) return;
+    const SgrRec *rec = NULL;
+    Game *d = &g->data;
+    for (int k = -1; k < d->packCount && !rec; k++) {
+        Sgr *s = k < 0 ? &d->resFile : &d->packRes[k];
+        for (int i = 0; i < s->count && !rec; i++)
+            if (s->recs[i].size >= 16 && memcmp(s->recs[i].body, a->graphic->id.b, 16) == 0) rec = &s->recs[i];
+    }
+    if (!rec) return;
+    Rd r = rd_make(rec->body, rec->size);
+    rd_guid(&r);
+    free(rd_str(&r));
+    free(rd_str(&r));
+    for (int i = 0; i < 4; i++) rd_i32(&r);
+    int n = rd_i32(&r);
+    for (int m = 0; m < n && !r.bad; m++) {
+        i32 size = rd_i32(&r);
+        if (size <= 0 || !rd_need(&r, (size_t)size)) break;
+        Rd e = rd_make(r.p, (size_t)size);
+        rd_skip(&r, (size_t)size);
+        Guid id = rd_guid(&e);
+        char *name = rd_str(&e), *path = rd_str(&e);
+        i32 frames = rd_i32(&e), ms = rd_i32(&e);
+        if (name && path && !e.bad && strcmp(name, "wait") == 0) {
+            Image *im = NULL;
+            bool cached = false;
+            for (int i = 0; i < g->imageCacheCount && !cached; i++)
+                if (guid_eq(g->imageCache[i].id, id)) im = g->imageCache[i].im, cached = true;
+            if (!cached) {
+                const char *base = a->graphic->path, *slash = base, *file = path;
+                for (const char *p = base; *p; p++)
+                    if (*p == '\\' || *p == '/') slash = p + 1;
+                for (const char *p = path; *p; p++)
+                    if (*p == '\\' || *p == '/') file = p + 1;
+                char *full = sg_fmt("%.*s%s", (int)(slash - base), base, file);
+                size_t sz = 0;
+                u8 *data = pack_read(&g->data.pack, full, &sz);
+                if (data) im = img_decode(data, sz);
+                free(data);
+                free(full);
+                g->imageCache = sg_realloc(g->imageCache, sizeof *g->imageCache * (size_t)(g->imageCacheCount + 1));
+                g->imageCache[g->imageCacheCount].id = id;
+                g->imageCache[g->imageCacheCount].im = im;
+                g->imageCacheCount++;
+            }
+            if (im && frames > 0) {
+                a->waitSheet = im;
+                a->waitFrames = frames;
+                a->waitMs = ms > 0 ? ms : 100;
+            }
+        }
+        free(name);
+        free(path);
+    }
+}
+
 static void draw_sprite(SG *g, const Actor *a, bool xray) {
     Field *f = &g->field;
     const Image *im = a->sheet;
     if (!im || !a->graphic) return;
-    int frames = a->graphic->frames > 0 ? a->graphic->frames : 1;
-    int rows = sg_sprite_rows(a->graphic, im);
+    bool idle = !a->moving && a->waitSheet;
+    if (idle) im = a->waitSheet;
+    int frames = idle ? a->waitFrames : a->graphic->frames > 0 ? a->graphic->frames : 1;
+    int rows = idle ? 1 : sg_sprite_rows(a->graphic, im);
     int cw = im->w / frames, ch = im->h / rows;
     int frame = 0;
-    if (a->graphic->frameMs > 0) frame = (int)(a->animMs / (u32)a->graphic->frameMs) % frames;
-    if (frames == 3 && rows == 4) {
+    int stepMs = idle ? a->waitMs : a->graphic->frameMs;
+    if (stepMs > 0) frame = (int)(a->animMs / (u32)stepMs) % frames;
+    if (!idle && frames == 3 && rows == 4) {
         static const int cycle[4] = {1, 0, 1, 2};
         u32 step = (u32)(a->graphic->frameMs > 0 ? a->graphic->frameMs : 250);
         frame = a->moving || a->graphic->flagA ? cycle[(a->animMs / step) % 4] : 1;
