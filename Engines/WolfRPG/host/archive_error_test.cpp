@@ -37,10 +37,14 @@ int main() {
                                    0x33B87593, 0x67E841A1, 0x36D89CE9, 0x779552A3};
     for (int i = 0; i < 8; i++) put32(header, 8 + 4 * size_t(i), scrambled[i]);
     put32(header, 0x28, 932);
+    put32(header, 0x2C, 0x015E0000);
+    std::ofstream(root / "Data" / "BasicData.wolf", std::ios::binary).write(header.data(), std::streamsize(header.size()));
+    assert(startError(root) == "cannot read BasicData.wolf: its header is encrypted with a Wolf RPG Editor crypt version "
+                               "later than 3.31's, which VNDegen doesn't read yet");
+
     put32(header, 0x2C, 0x014B0000);
     std::ofstream(root / "Data" / "BasicData.wolf", std::ios::binary).write(header.data(), std::streamsize(header.size()));
-    assert(startError(root) == "cannot read BasicData.wolf: its header is encrypted, as Wolf RPG Editor 3.31 and later can do, "
-                               "which VNDegen doesn't read yet");
+    assert(startError(root) == "cannot read BasicData.wolf: header points outside the file");
 
     put32(header, 0x2C, 0x013A0000);
     std::ofstream(root / "Data" / "BasicData.wolf", std::ios::binary).write(header.data(), std::streamsize(header.size()));

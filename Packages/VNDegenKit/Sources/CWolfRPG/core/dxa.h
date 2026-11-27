@@ -1,6 +1,7 @@
 // Reader for DxLib archives (.wolf files), the format Wolf RPG Editor packs game data into.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
@@ -35,11 +36,13 @@ private:
         std::vector<uint8_t> key;  // version 8: the file's own key, empty when the archive is not encrypted
     };
     struct Header8;
+    struct Crypt14B;
 
-    Archive() = default;
+    Archive();
     bool load(const std::vector<uint8_t> &key, std::string *error);
     bool load8(const Header8 &h, std::string_view keyString, std::string *error);
     std::optional<std::vector<uint8_t>> read8(const Entry &e, std::vector<uint8_t> stored) const;
+    bool readImage(uint64_t pos, uint8_t *buf, size_t n) const;
     void walk(const std::vector<uint8_t> &head, uint64_t fileTable, uint64_t dirTable, uint64_t dir,
               const std::string &prefix, const std::string &dirKey);
 
@@ -53,7 +56,27 @@ private:
     bool utf8Names_ = false;
     uint64_t dataStart_ = 0;
     std::unordered_map<std::string, Entry> entries_;  // keyed by upper-case path
+    std::unique_ptr<Crypt14B> crypt14B_;
 };
+
+namespace crypt14b {
+
+using Password = std::array<uint8_t, 15>;
+using Block = std::array<uint8_t, 16>;
+using RoundKeys = std::array<uint8_t, 176>;
+using StreamTable = std::array<uint8_t, 768>;
+
+void unscrambleHeader(uint8_t *header);
+uint8_t tableSum(const Password &p, bool fileTable);
+uint32_t tableSeed(const Password &p, bool fileTable);
+StreamTable streamTable(const Password &p, bool fileTable);
+uint8_t streamByte(const StreamTable &t, uint64_t position);
+Block aesKey(const Password &p);
+Block initialCounter(const Password &p);
+RoundKeys expandKey(const Block &key);
+Block encryptBlock(const RoundKeys &keys, Block block);
+
+}
 
 // DxLib's LZ decompression. The source starts with the decoded size, the packed size, and the escape byte. Returns
 // nothing for damaged data, and before allocating when the decoded size isn't `expected` or exceeds 512 MB, so a damaged

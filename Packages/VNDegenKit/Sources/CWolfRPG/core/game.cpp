@@ -93,6 +93,8 @@ bool Game::startNewGame(std::string *error) {
     // System variables 1 and 2 place a message's text, and -1 means the default place. The PC's starting value isn't
     // known; -1 keeps the text of a game that never sets them where the runtime always put it, not at the top left.
     system_[1] = system_[2] = -1;
+    system_[100] = system_[101] = system_[102] = 100;
+    partyTransparent_ = false;
     strings_.assign(std::max<size_t>(rows(SysStringVarNames), 100), "");
     systemStrings_.assign(std::max<size_t>(rows(SysSystemStrings), 100), "");
     int maxCommon = 0;
@@ -656,6 +658,15 @@ bool Game::commonConditionMet(const CommonEvent &ce) {
 // ---------------------------------------------------------------------------------------------------------------
 // Frame
 
+void Game::applyVolumes() {
+    if (!audio_ || system_.size() <= 102) return;
+    for (int i = 0; i < 3; i++) {
+        if (appliedVolumes_[i] == system_[100 + i]) continue;
+        appliedVolumes_[i] = system_[100 + i];
+        audio_->setMasterVolume(SoundKind(i), float(appliedVolumes_[i]) / 100);
+    }
+}
+
 void Game::update(const Input &input) {
     gatherInput(input);
     updateTextEntry();
@@ -668,6 +679,7 @@ void Game::update(const Input &input) {
         system_[28]++;
         if (system_[28] % gameDat_.fps() == 0) system_[29]++;
     }
+    applyVolumes();
 
     // System variable 73 lets a click work the game's messages and choices.
     bool mouseText = (system_.size() > 73 && system_[73] == 1) || (input_.touched && (input_.mousePressed & MouseLeft));
@@ -815,6 +827,7 @@ void Game::updatePictures() {
             p.shakeOffset = p.shakeFrames ? std::sin(frame_ * 0.3 * std::max(1, p.shakeSpeed)) * p.shakePower : 0;
         }
         if (p.flickerFrames > 0) p.flickerFrames--;
+        if (p.flashLeft > 0) p.flashLeft--;
     }
     std::erase_if(pictures_, [](auto &kv) {
         // A picture faded out by an erase with a duration goes once it is invisible.

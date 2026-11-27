@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
             }
             if (sysLists.count(f)) {
                 std::printf("frame %d sys:", f);
-                for (int i : {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12}) std::printf(" %d=%d", i, game.systemNumber(i));
+                for (int i : {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 26, 27}) std::printf(" %d=%d", i, game.systemNumber(i));
                 std::printf("\n");
             }
             if (f >= drawFrom && f <= drawTo) {

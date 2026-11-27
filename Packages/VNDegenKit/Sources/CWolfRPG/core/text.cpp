@@ -70,7 +70,7 @@ std::vector<TextToken> parseText(const std::string &s) {
             {"mx", TextToken::MoveX},  {"my", TextToken::MoveY},     {"c", TextToken::Color},
             {"f", TextToken::Size},    {"i", TextToken::Icon},       {"space", TextToken::LineSpace},
             {"-", TextToken::Tighten}, {"cE", TextToken::EdgeColor}, {"font", TextToken::Face},
-            {"m", TextToken::LineMax},
+            {"m", TextToken::LineMax}, {"wE", TextToken::EdgeWidth},
         };
         bool matched = false;
         if (codeWithArg(s, at, "r", arg, next)) {
@@ -109,6 +109,7 @@ std::vector<TextToken> parseText(const std::string &s) {
         size_t j = at;
         while (j < s.size() && std::isalpha(static_cast<unsigned char>(s[j]))) j++;
         if (j == at) j++;
+        else if (s[at] == 'A' && j == at + 1 && j < s.size() && (s[j] == '+' || s[j] == '-')) j++;
         if (j < s.size() && s[j] == '[') {
             size_t close = s.find(']', j);
             j = close == std::string::npos ? j : close + 1;
@@ -166,7 +167,7 @@ struct TextRenderer::Layout {
         int y;  // the line's top
         int size, face, segment;
         std::array<uint8_t, 3> color, edgeColor;
-        bool edge;
+        int edge;
         const GlyphImage *g = nullptr;
         BitmapPtr icon;
     };
@@ -188,7 +189,8 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
     int lineTop = 0, size = style.size, lineSize = size, lineSpacing = style.lineSpacing, height = 0, face = 0;
     auto color = style.color;
     std::array<uint8_t, 3> edgeColor{0, 0, 0};
-    bool edge = false;
+    int edge = 0, edgeWidth = 1, lineFloor = 0;
+    bool lineEmpty = true;
     size_t shown = 0;
     out.segments.push_back({0, 0, 0});
 
@@ -200,9 +202,11 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
     auto place = [&](uint32_t cp, int sz) {
         const GlyphImage *g = glyph(cp, sz, face);
         if (shown < visible)
-            out.items.push_back({x, lineTop, sz, face, int(out.segments.size()) - 1, color, edgeColor, edge, g, nullptr});
+            out.items.push_back({x + float(edge), lineTop, sz, face, int(out.segments.size()) - 1, color, edgeColor, edge,
+                                 g, nullptr});
         shown++;
-        x += g->advance + spacing;
+        lineEmpty = false;
+        x += g->advance + spacing + float(edge * 2);
         lineSize = std::max(lineSize, sz);
         extend();
         height = std::max(height, lineTop + lineSize);
@@ -214,6 +218,8 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
             case TextToken::Newline:
                 lineTop += lineSize + lineSpacing;
                 lineSize = size;
+                lineFloor = 0;
+                lineEmpty = true;
                 x = 0;
                 out.segments.push_back({out.segments.back().align, 0, 0});
                 break;
@@ -221,14 +227,19 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
                 out.segments.push_back({t.value, x, x});
                 break;
             case TextToken::Color: color = game_.textColor(t.value); break;
-            case TextToken::Size: size = std::clamp(t.value, 4, kMaxTextSize); break;
+            case TextToken::Size:
+                size = std::clamp(t.value, 4, kMaxTextSize);
+                if (lineEmpty) lineSize = std::max(size, lineFloor);
+                break;
             case TextToken::LineSpace: lineSpacing = t.value; break;
             case TextToken::Tighten: spacing = float(style.letterSpacing) - t.value / unit; break;
-            case TextToken::Edge: edge = t.value != 0; break;
+            case TextToken::Edge: edge = t.value != 0 ? edgeWidth : 0; break;
+            case TextToken::EdgeWidth: edge = edgeWidth = std::clamp(t.value, 1, 5); break;
             case TextToken::EdgeColor: edgeColor = game_.textColor(t.value); break;
             case TextToken::Face: face = std::clamp(t.value, 0, 3); break;
             case TextToken::LineMax:
-                lineSize = std::max(lineSize, std::min(t.value, kMaxTextSide));
+                lineFloor = std::min(t.value, kMaxTextSide);
+                lineSize = std::max(lineSize, lineFloor);
                 height = std::max(height, lineTop + lineSize);
                 break;
             // \ax[n] also widens the text to n, which the standard systems use to right-align a later line.
@@ -249,6 +260,7 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
                     out.items.push_back({x, lineTop, size, face, int(out.segments.size()) - 1, color, edgeColor, edge,
                                          nullptr, icon});
                 shown++;
+                lineEmpty = false;
                 x += size + spacing;
                 extend();
                 height = std::max(height, lineTop + size);
@@ -337,9 +349,8 @@ TextBlock TextRenderer::render(const std::string &text, const TextStyle &style, 
         if (!it.g || it.g->coverage.empty()) continue;
         int gx = left + it.g->left, gy = top + font(it.face).ascent(it.size) - it.g->top;
         if (it.edge) {
-            // \E outlines each character: the edge colour one pixel out in every direction, then the character.
-            for (int oy = -1; oy <= 1; oy++)
-                for (int ox = -1; ox <= 1; ox++)
+            for (int oy = -it.edge; oy <= it.edge; oy++)
+                for (int ox = -it.edge; ox <= it.edge; ox++)
                     if (ox || oy) blendCoverage(*it.g, gx + ox, gy + oy, it.edgeColor, 256);
         } else if (style.shadow) {
             blendCoverage(*it.g, gx + 1, gy + 1, {0, 0, 0}, 192);

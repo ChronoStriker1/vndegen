@@ -1,7 +1,9 @@
 #include "maprender.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <string_view>
 #include <vector>
 
 namespace wolf {
@@ -81,9 +83,19 @@ void MapRenderer::drawCharacter(Canvas &canvas, const Tileset &ts, const Charact
     const auto &settings = game_.gameDat().settings;
     bool eight = settings.size() > 1 && settings[1] == 8;
     int patterns = settings.size() > 7 && settings[7] == 5 ? 5 : 3;
+    auto endsWith = [&](std::string_view tail) {
+        if (c.graphic.size() < tail.size()) return false;
+        for (size_t i = 0; i < tail.size(); i++)
+            if (std::toupper(static_cast<unsigned char>(c.graphic[c.graphic.size() - tail.size() + i])) !=
+                std::toupper(static_cast<unsigned char>(tail[i])))
+                return false;
+        return true;
+    };
+    int stops = endsWith("TX.png") ? patterns : endsWith("T.png") ? 1 : 0;
+    int perBlock = patterns + stops;
     // An eight-direction image has two blocks of four rows side by side: down, left, right and up, then down left, down
     // right, up left and up right (the manual's material page).
-    int cellW = img->w / (eight ? patterns * 2 : patterns), cellH = img->h / 4;
+    int cellW = img->w / (eight ? perBlock * 2 : perBlock), cellH = img->h / 4;
     if (cellW <= 0 || cellH <= 0) return;
     int row, block = 0;
     switch (c.direction) {
@@ -97,7 +109,9 @@ void MapRenderer::drawCharacter(Canvas &canvas, const Tileset &ts, const Charact
         case 9: row = eight ? 3 : 2; block = eight; break;
         default: row = 0; break;
     }
-    int col = std::clamp(c.pattern, 0, patterns - 1) + block * patterns;
+    int pattern = std::clamp(c.pattern, 0, patterns - 1);
+    int col = stops == 0 ? pattern : c.moving ? stops + pattern : stops == 1 ? 0 : pattern;
+    col += block * perBlock;
     canvas.draw(*img, {col * cellW, row * cellH, cellW, cellH},
                 {float(tx + (tile - cellW) / 2), float(ty + tile - cellH), float(cellW), float(cellH)}, o);
 }
