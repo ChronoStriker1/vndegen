@@ -41,13 +41,13 @@ and the voyage, the sand temple, the ambush on the bridge and the prison where �
 snow town マウンティ, the dragon tower where ファフニール joins and its boss パンドラゴン, the labyrinth, シュワントー's
 tournament, the demon castle and マオー's scene there, the デオズズ volcano and its six 炎の悪魔, the gates back to
 ルディアノ, the town and castle dungeons and the queen, the cursed land, the last dungeon, the last battle and the
-ending. It was played that far in VNDegen, by play. Each stage up to the volcano's six 炎の悪魔 was checked beside
-the PC under Wine, and the last dungeon by saves both ways; the queen's fight, the last battle and the ending were
-played in VNDegen only. The game is in Japanese, as on the PC.
+ending. It was played that far in VNDegen, by play. The volcano's six 炎の悪魔, the last battle and the ending were
+played beside the PC under Wine from the same saves, and the last dungeon checked by saves both ways; the queen's
+fight was played in VNDegen only. The game is in Japanese, as on the PC.
 
 - **Saves** work as for Colette: the PC's own `savedata` files, both ways. Saves at the royal cave, サンプール, the
-  prison, the volcano depths, after the six 炎の悪魔 and in the last dungeon load in the PC with the same place, party,
-  items, money and levels, and the PC's saves from there load in VNDegen.
+  prison, the volcano depths, after the six 炎の悪魔, in the last dungeon and after the ending load in the PC with the
+  same place, party, items, money and levels, and the PC's saves from there load in VNDegen.
 - **Controls** are the same as Colette's.
 - **What isn't there yet:** the optional places (the power spots' fights, the CG and debug rooms) and the post-game in
   the castle after the ending haven't been played in VNDegen. Known limits below lists the rest.
@@ -362,9 +362,7 @@ were taken with the gamepad shown.
   them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
 - Sacred's castle courtyard averages about 13 ms a frame on the Linux VM, with its 99th percentile (about 19 ms) over
   16.7 ms while other work runs; in the app on Apple silicon it holds 60 (above).
-- Sacred's queen fight, last battle and ending were played in VNDegen only; a hand-played attempt at the PC's last
-  battle from the same save wasn't won, so the PC's ending wasn't compared. The ending's play time line (command 70
-  with game data) and the experience it gives (command 55) are read from the script and the text, not seen on the PC.
+- Sacred's queen fight was played in VNDegen only.
 - Sacred's power spots, its CG and debug rooms and the post-game after the ending haven't been played in VNDegen. The
   four-golem fight where アリア rejoins was won at level 4 on the PC and in VNDegen; at level 1 VNDegen loses it, and
   the PC's odds at that level weren't measured. The six 炎の悪魔 in the volcano win against N's party (levels 17, 14

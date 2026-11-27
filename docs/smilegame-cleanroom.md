@@ -1168,8 +1168,12 @@ backing out on slot 6.
 
 ### The ending
 
-- Command 55 is hero GUID, amount and 0: the ending gives マオー and ファフニール 20000 experience each with it (inferred
-  from the script; the PC's ending wasn't reached).
+- The last battle (深淵の化身, from the runner's save in the final room) was won on the PC and in the runner, and the
+  ending played on both.
+- Command 55 is hero GUID, amount and 0: the ending gives マオー and ファフニール 20000 experience each with it. The
+  PC's save after the ending holds ファフニール at level 25 with 111,410 points and マオー at 23 with 76,686, 20,000
+  more than before the last battle, as the runner's does.
 - Command 70 with 8 as its third value reads game data: item 4, 5 and 6 are the play time's hours, minutes and
-  seconds (inferred from the text that prints them, `プレイ時間/\Variable[15]時間\Variable[16]分\Variable[17]秒`).
+  seconds. The PC's ending showed `プレイ時間` and `7時間14分19秒` on one page for
+  `プレイ時間/\Variable[15]時間\Variable[16]分\Variable[17]秒`, then THANK YOU FOR PLAYING on the next.
 - `\Variable[n]` in a message is variable n's value.
