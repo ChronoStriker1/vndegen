@@ -148,3 +148,108 @@ A message page ends at a blank line.
 ## Saves
 
 `savedata\Save_NN.sgs` in the game folder: a `YUKRDATA` header, then plain `BinaryWriter` data. Layout not read yet.
+
+## Data tables (round 2, delegate B)
+
+Every table below was read from both games' files and the values checked against the PC player's menus under Wine
+(status, equipment and item pages). Both player versions use the same layouts. Fields marked "inferred" fit every
+record of both games but were not yet seen to change anything on the PC.
+
+### Game settings beyond the title
+
+After the six window GUIDs: 2 bytes, 8 inn and shop strings (stay, leave, not enough money, buy, sell, quit, bought
+`{0}`, sold `{0}`), the elements (`int32` n and n strings: 無 火 氷 風 雷 聖 冥, then the states 毒 眠り 麻痺 即死 混乱
+魅了), a GUID, the 50 menu strings in a fixed order (result, saved, overwrite question, quit question, the button guide
+words, item and equipment labels, the menu items, LV HP MP, state names, the who-uses questions, なし はずす, the four
+base stat names, exp, next level, game over), the battle BGM GUID, 23 battle strings, 10 sound GUIDs (victory ME, game
+over ME, start, cancel, decide, cursor, item use, status up, two not identified), 33 bytes, the text colour, the title
+block, はい and いいえ, the empty-world text, 13 config strings (the four message speeds, remember and forget, BGM,
+sound effects, message speed, cursor position, reset, the config title, 属性攻撃力), `int32` n and n GUIDs (2 in
+Colette, 0 in Sacred), the money and play time labels, 1 byte, 14 battle state messages, 3 GUIDs, 1 byte, and the save
+slot name (セーブデータ). Camera settings follow.
+
+### Heroes (`Hero.sgr`, type 2)
+
+GUID, name, graphic GUID, `int32` start level, four stats as (`int32` base, `float` growth, `float` curve) in the
+order 腕力 体力 魔力 素早さ, skills (`int32` n, n × (skill GUID, `int32` level learned)), equipment exceptions
+(`int32` n, n × (item GUID, `uint8`)), five equipment GUIDs (weapon, shield, head, body, accessory), 2 bytes, battle
+commands (`int32` n, n GUIDs), 16 bytes, description, face GUID, HP and MP as base, growth and curve, then 6 bytes.
+
+A stat at level L is base + growth × (L − 1)^curve, truncated: Sacred's アリア at level 2 has HP 40 + 15 = 55 and
+腕力 32, as the PC shows. 攻撃力 on the status page is 腕力 plus the weapon's attack, 防御力 is 体力 plus the armour's
+defence, 素早さ is the stat plus equipment. An item in the exception list can't be equipped by that hero (Colette's
+ダーク and アイスロッド, inferred from the editor's default of "everything").
+
+Experience: the next level needs 26 at level 1 (Colette's ダーク) and 84 in total at level 3 (アリア has 26 and needs 58
+more). The tables hold no curve; levels above 3 use 3.5 × L^2.89, a fit to those two points that the battle round must
+replace with values seen on the PC.
+
+### Battle commands (`Hero.sgr`, type 6)
+
+GUID, name, description, icon sheet GUID, `uint8` icon column and row, `int32` kind (0 attack, 1 or 4 skill, 2 defend,
+5 item), `int32` 100, `int32` 1, `int32` 50 or 70 (inferred: rate and priority), then zeros.
+
+### Items (`Item.sgr`, type 4)
+
+GUID, name, description, `int32` price, icon sheet GUID, `uint8` icon column and row (icons are 32 × 32 cells of a
+512 × 512 sheet), `int32` kind, then an `int32` length and a block of that length, then for a weapon a second
+length-prefixed block, then a model GUID (zero for most items).
+
+| Kind | What | Block |
+|---|---|---|
+| 1 | expendable (60 bytes) | effect GUID, `int32` HP, MP, HP %, MP %, 20 bytes, five state cures (bytes), two usable flags (inferred: battle, field), revive |
+| 2 | skill book (18 bytes) | 2 bytes, the skill GUID |
+| 3 to 7 | weapon, shield, head, body, accessory (101 bytes) | 24 `int32` (0 defence, 2 max HP, 3 max MP, 4 attack bonus, 7 speed, 8 evasion, 9 hit %, 11–16 element resistances 火 to 冥, 17–22 state resistances: 17 poison and 22 instant death by the items' names), 1 byte, `int32` (inferred: critical %) |
+| 3 | weapon, second block (29 bytes) | effect GUID, `int32` attack, 1 byte, `int32` element, `int32` element attack |
+
+The PC's equipment page shows ナイフ as 攻撃力 5 and 古びた剣 as 攻撃力 10, the second block's attack.
+
+### Skills (`Skill.sgr`, type 5)
+
+GUID, name, description, icon sheet GUID, `uint8` icon column and row, then two length-prefixed blocks. The first
+(21 bytes, 27 in one Colette skill) holds `uint8` usable in the field, `uint8` usable in battle, `int32` 0, `int32` MP
+cost, `int32` target (0 one ally, 1 all allies, 2 one enemy, 3 all enemies, 4 the user; 5 and 10 seen once each). The
+second (94 bytes) starts with the effect GUID and the `int32` power; the rest is left for the battle round.
+
+### Monsters (`Monster.sgr`, type 8)
+
+GUID, name, graphic GUID, attack effect GUID, description, 10 `int32` (the first is HP; the others, inferred: MP,
+attack, defence, magic, hit %, two flags, evasion, speed), 13 `int32` resistances in the element list's order (negative
+is a weakness), actions (`int32` n, n × (`int32` condition, two arguments, rate, kind (0 attack, 2 defend, 3 skill),
+skill GUID, `int32` priority)), `int32` exp, `int32` money, two drops (item GUID, `int32` percent), `int32`. All 91
+monsters of both games read to their last byte.
+
+### Effects (`Effect.sgr`, type 9)
+
+GUID, name, then the 2D and 3D effect resources; only the name is read so far.
+
+### Event commands seen by the menu
+
+37 opens a shop: `int32` n, n item GUIDs (zero GUIDs pad Sacred's to 6), then in most uses n prices and a trailing
+`int32`. 38 opens an inn: `int32` price, then flags. 42 and 50 add and remove a party member by hero GUID.
+
+## Menus (round 2, delegate B)
+
+Measured from captures of the PC player under Wine at 960 × 544:
+
+- Main menu: a 208 × 440 panel at (60, 40) with eight 192 × 53 buttons (アイテム, スキル, 装備, ステータス, セーブ, ゲーム終了,
+  コンフィグ, 閉じる), a 624 × 422 party panel at (328, 16) holding up to four 298 × 196 member boxes, and a 624 × 66
+  panel at (328, 436) with the map name, money and play time. Panels use the built-in `default` window, buttons
+  `default_selectable`, the cursor `default_selected`. Menu text is 21 px, member boxes 17 to 18 px.
+- A face is drawn at 80 % in the member box, its source window starting at (60, 106) of the 320 × 544 bust, and at full
+  size at (14, 10) on the status page; both found by matching the PC's pixels.
+- Items, skills and shop lists are two columns of 298 × 44 entries with a やめる button at (490, 380); the bottom panel
+  shows the description at 24 px, shrunk to fit. Pages that pick a member first show the member boxes with the cursor
+  on a box.
+- Equipment: the member on a 312 × 486 panel at the left with the six stats, six slots (weapon, shield, head, body, two
+  accessories) with the `equip_icons.png` cells, and the comparison `25 → 20` when a candidate is chosen.
+- Status: a 624 × 486 panel with the stats, equipment, exp and next level, the hero's description, and the face at the
+  left.
+- Save: 8 slots a page, 5 pages; a slot's date is the save file's modification time, which the PC shows for a file
+  copied in by hand.
+- The quit dialog (640 × 160 at (160, 192)) starts on いいえ; はい ends the PC player at once. The overwrite question starts
+  on はい.
+- Config: BGM and sound volume, message speed, cursor memory (on by default: the menu returns to the last item), reset.
+- The bottom row shows the button guide from `button_guide.png` at 90 %.
+- Opening the menu scales the panels in from about 85 % over roughly 0.2 s; the PC ran near 9 fps under Wine, so the
+  time is approximate. The cursor jumps without animation. Esc or X opens the menu when no event runs.

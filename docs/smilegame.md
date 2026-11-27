@@ -25,6 +25,10 @@ Both games use the same data format.
   drawn upright, the player walking cell by cell (stairs let it change height), talking to the event in front.
 - Events: sheets chosen by switch, local switch and variable conditions; autorun scripts on entering a map; messages
   with pages, scrolling text, fades, variables, moving to another map.
+- Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
+  and windows. The party, inventory, money and play time with stats as the PC computes them.
+- The field menu (Esc or X): items, skills, equipment, status, save slots, quit and config, laid out as the PC draws
+  them, with faces; the shop and inn screens (`shop_open`, `inn_open` in `sg_B.h`).
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
 
 ## The Linux host
@@ -36,10 +40,18 @@ Both games use the same data format.
 - `sgplay <game>`: an SDL window with the keyboard (arrows, Enter or Z, Esc or X, Shift).
 - `sgtest`: the format reader tests. With `SG_COLETTE` and `SG_SACRED` set to the game folders it also checks values
   read from the games' files.
+- `sgtest_B`: the data table tests against values from the PC's menus and the game files. `sgtest_B shots
+  colette|sacred <game> <out>` writes every menu page as PNG for comparison with the PC.
 
 ## Known limits
 
-- No sound, menus, battles, saves, choices or pictures over the map yet; unknown commands are skipped and logged.
+- No sound, battles, saves, choices or pictures over the map yet; unknown commands are skipped and logged.
+- The menu's save page lists slots and dates but doesn't write yet, and doesn't show a slot's map and party.
+- Commands that give items or money, change the party, or open a shop or inn are not wired to the menu yet, so
+  Sacred's party is the game settings' first member until they are.
+- The shop and inn screens were not compared with the PC; the party order page is not in these games' menus.
+- Experience above level 3 uses a fitted curve, and a few item, skill and monster fields are inferred (see
+  `docs/smilegame-cleanroom.md`).
 - Shadows and the sky are not drawn; skinned characters stand in their bind pose.
 - Stairs are drawn as plain columns, not as steps.
 - The camera is fixed at one angle and distance close to the player's default; events that move the camera are skipped.
