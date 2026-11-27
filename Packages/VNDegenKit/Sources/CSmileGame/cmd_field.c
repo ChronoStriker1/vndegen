@@ -106,6 +106,28 @@ static void random_variable(SG *g, const Cmd *c) {
     sg_log(g, "variable %d = %d (random %d..%d)", index, g->vars[index], lo, hi);
 }
 
+static void learn_skill(SG *g, const Cmd *c) {
+    Party *p = &g->b.party;
+    Guid hero = cmd_guid(c, 0), skill = cmd_guid(c, 1);
+    bool forget = cmd_int(c, 2) != 0;
+    Member *m = NULL;
+    for (int i = 0; i < p->count && !m; i++)
+        if (guid_eq(p->members[i].hero, hero)) m = &p->members[i];
+    for (int i = 0; i < p->reserveCount && !m; i++)
+        if (guid_eq(p->reserve[i].hero, hero)) m = &p->reserve[i];
+    if (!m) return;
+    int at = -1;
+    for (int i = 0; i < m->learnedCount && at < 0; i++)
+        if (guid_eq(m->learned[i], skill)) at = i;
+    if (forget && at >= 0) {
+        memmove(&m->learned[at], &m->learned[at + 1], sizeof(Guid) * (size_t)(m->learnedCount - at - 1));
+        m->learnedCount--;
+    } else if (!forget && at < 0 && m->learnedCount < 16) {
+        m->learned[m->learnedCount++] = skill;
+    }
+    sg_log(g, "skill %s, hero knows %d added skills", forget ? "forgotten" : "learned", m->learnedCount);
+}
+
 bool sgi_encounters_on(SG *g) { return g->e.save.config[1] != 0; }
 
 bool sgi_exec(SG *g, const Cmd *c, bool *busy) {
@@ -117,6 +139,7 @@ bool sgi_exec(SG *g, const Cmd *c, bool *busy) {
         sg_log(g, "encounters %s", cmd_int(c, 0) == 0 ? "on" : "off");
         return true;
     case 70: random_variable(g, c); return true;
+    case 56: learn_skill(g, c); return true;
     default: return false;
     }
 }

@@ -91,10 +91,12 @@ typedef struct SgaEvent {
 
 typedef struct SgaPicture {
     bool used;
+    bool kept;
     Guid id;
     Image *im;
     float alpha, alphaFrom, alphaTo;
     float x, y, xFrom, yFrom, xTo, yTo, zoom, zoomFrom, zoomTo;
+    u32 color, colorFrom, colorTo;
     u32 ms, total;
     bool eraseAfter;
 } SgaPicture;

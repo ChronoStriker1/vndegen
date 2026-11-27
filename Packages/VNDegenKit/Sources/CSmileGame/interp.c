@@ -10,6 +10,7 @@ static const int kWinX = 120, kWinW = 720, kWinH = 160;
 static const int kTextPadX = 18, kTextPadY = 19;
 static const int kWrapW = 684;
 static const float kRevealPerMs = 0.12f;
+static const u32 kCaptionFadeMs = 500;
 
 static void clear_pages(Interp *ip) {
     for (int i = 0; i < ip->pageCount; i++) free(ip->pages[i]);
@@ -361,6 +362,7 @@ static void step(SG *g) {
             a->scrollImage = image ? sg_image(g, cmd_guid(c, 2)) : NULL;
             a->msgPos = cmd_int(c, 1);
             a->scrollStatic = cmd_int(c, image ? 3 : 2) == 0;
+            a->captionFadeMs = 0;
             ip->state = ST_SCROLL;
             sg_log(g, "screen text: %s, %d bytes", a->scrollStatic ? "static" : "scrolling", (int)strlen(ip->scrollText));
             break;
@@ -424,9 +426,15 @@ void interp_update(SG *g, u32 ms) {
     case ST_SCROLL: {
         ip->shownMs += ms;
         if (a->scrollStatic) {
-            if (sg_pressed(g, KEY_OK)) {
-                ip->state = ST_RUN;
-                a->scrollImage = NULL;
+            if (a->captionFadeMs) {
+                a->captionFadeMs += ms;
+                if (a->captionFadeMs > kCaptionFadeMs) {
+                    a->captionFadeMs = 0;
+                    ip->state = ST_RUN;
+                    a->scrollImage = NULL;
+                }
+            } else if (sg_pressed(g, KEY_OK)) {
+                a->captionFadeMs = 1;
             }
             break;
         }
@@ -508,6 +516,26 @@ static void draw_lines(SG *g, const char *text, int x, int y, bool center, u32 c
         }
         line++;
         while (*e && *e != '\n' && *e != '\r') e++;
+        p = e;
+        if (*p == '\r') p++;
+        if (*p == '\n') p++;
+    }
+}
+
+static void draw_lines_alpha(SG *g, const char *text, int y, u32 alpha) {
+    const char *p = text;
+    int line = 0;
+    while (*p) {
+        const char *e = p;
+        while (*e && *e != '\n' && *e != '\r') e++;
+        char buf[1024];
+        size_t n = (size_t)(e - p) < sizeof buf - 1 ? (size_t)(e - p) : sizeof buf - 1;
+        memcpy(buf, p, n);
+        buf[n] = 0;
+        int lx = (g->w - font_width(g->font, kTextPx, buf)) / 2, ly = y + line * kLinePx;
+        font_draw(g->font, g->fb, g->w, g->h, lx + 2, ly + 2, kTextPx, buf, (0xc0u * alpha / 255) << 24);
+        font_draw(g->font, g->fb, g->w, g->h, lx, ly, kTextPx, buf, alpha << 24 | 0xffffffu);
+        line++;
         p = e;
         if (*p == '\r') p++;
         if (*p == '\n') p++;
@@ -601,14 +629,16 @@ void interp_draw(SG *g) {
     if (!ip->active) return;
     if (ip->state == ST_SCROLL && ip->scrollText && ip->a.scrollStatic) {
         Image *im = ip->a.scrollImage;
+        u32 fade = ip->a.captionFadeMs > kCaptionFadeMs ? kCaptionFadeMs : ip->a.captionFadeMs;
+        u32 alpha = 255 - fade * 255 / kCaptionFadeMs;
         if (im) {
-            blit(g->fb, g->w, g->h, im, 0, 0, im->w, im->h, (g->w - im->w) / 2, (g->h - im->h) / 2, im->w, im->h, 255);
+            blit(g->fb, g->w, g->h, im, 0, 0, im->w, im->h, (g->w - im->w) / 2, (g->h - im->h) / 2, im->w, im->h, (int)alpha);
         } else {
             int lines = 1;
             for (const char *p = ip->scrollText; *p; p++)
                 if (*p == '\n') lines++;
             int y = ip->a.msgPos == 0 ? 40 : ip->a.msgPos == 1 ? g->h - 40 - lines * kLinePx : (g->h - lines * kLinePx) / 2;
-            draw_lines(g, ip->scrollText, 0, y, true, 0xffffffffu, true, -1);
+            draw_lines_alpha(g, ip->scrollText, y, alpha);
         }
     } else if (ip->state == ST_SCROLL && ip->scrollText) {
         if (ip->a.scrollImage) {

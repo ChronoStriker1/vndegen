@@ -410,6 +410,13 @@ static void skill_list(SG *g, const Member *mb, List *l) {
         l->ids[l->count] = h->skills[i].skill;
         l->counts[l->count++] = 0;
     }
+    for (int i = 0; i < mb->learnedCount && l->count < 256; i++) {
+        bool dup = false;
+        for (int k = 0; k < l->count && !dup; k++) dup = guid_eq(l->ids[k], mb->learned[i]);
+        if (dup) continue;
+        l->ids[l->count] = mb->learned[i];
+        l->counts[l->count++] = 0;
+    }
 }
 
 static void draw_skills(SG *g, Menu *m) {

@@ -36,5 +36,10 @@ u32 sgi_fx_start(SG *g, Guid effect, int target, bool balloon);
 void sgi_fx_frame(SG *g, u32 ms);
 void sgi_fx_draw(SG *g);
 void sgi_fx_clear(SG *g);
+void sgi_picture_cmd(SG *g, const Cmd *c);
+void sgi_pictures_frame(SG *g, u32 ms);
+void sgi_pictures_draw(SG *g);
+void sgi_pictures_save(SG *g, SaveData *s);
+void sgi_pictures_load(SG *g, const SaveData *s);
 
 #endif
