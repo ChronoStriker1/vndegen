@@ -1,6 +1,18 @@
 #ifndef SG_F_H
 #define SG_F_H
 
+#define battle_attack_damage smilegame_battle_attack_damage
+#define battle_bar smilegame_battle_bar
+#define battle_close smilegame_battle_close
+#define battle_escape_roll smilegame_battle_escape_roll
+#define battle_exp_for_level smilegame_battle_exp_for_level
+#define battle_frame smilegame_battle_frame
+#define battle_monster_hp smilegame_battle_monster_hp
+#define battle_phase smilegame_battle_phase
+#define battle_seed smilegame_battle_seed
+#define battle_setup_cmd smilegame_battle_setup_cmd
+#define battle_skill_damage smilegame_battle_skill_damage
+#define battle_spread smilegame_battle_spread
 #define blit smilegame_blit
 #define cam_update smilegame_cam_update
 #define cmd_guid smilegame_cmd_guid
@@ -54,8 +66,10 @@
 #define member_equip_sum smilegame_member_equip_sum
 #define member_evasion smilegame_member_evasion
 #define member_hit smilegame_member_hit
+#define member_init smilegame_member_init
 #define member_max_hp smilegame_member_max_hp
 #define member_max_mp smilegame_member_max_mp
+#define member_set_level smilegame_member_set_level
 #define member_speed smilegame_member_speed
 #define member_stat smilegame_member_stat
 #define menu_active smilegame_menu_active
@@ -63,6 +77,7 @@
 #define menu_free smilegame_menu_free
 #define menu_open smilegame_menu_open
 #define menu_page smilegame_menu_page
+#define menu_result smilegame_menu_result
 #define mesh_add smilegame_mesh_add
 #define mesh_free smilegame_mesh_free
 #define mesh_quad smilegame_mesh_quad
@@ -81,10 +96,15 @@
 #define pack_open smilegame_pack_open
 #define pack_read smilegame_pack_read
 #define party_add_hero smilegame_party_add_hero
+#define party_clear smilegame_party_clear
 #define party_give_item smilegame_party_give_item
+#define party_has_hero smilegame_party_has_hero
 #define party_item_count smilegame_party_item_count
+#define party_leader_graphic smilegame_party_leader_graphic
 #define party_new smilegame_party_new
+#define party_recover smilegame_party_recover
 #define party_remove_hero smilegame_party_remove_hero
+#define party_set_look smilegame_party_set_look
 #define r3_begin smilegame_r3_begin
 #define r3_box_visible smilegame_r3_box_visible
 #define r3_flush smilegame_r3_flush
