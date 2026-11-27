@@ -227,7 +227,14 @@ uint32_t vnsmilegame_frame_serial(VNSmileGame *vg) { return ((SG *)vg)->serial; 
 
 void vnsmilegame_audio(VNSmileGame *vg, float *out, int frames) { snd_mix((SG *)vg, out, frames); }
 
-bool vnsmilegame_save(VNSmileGame *vg, int slot) { return sg_save_write((SG *)vg, slot); }
+bool vnsmilegame_save(VNSmileGame *vg, int slot) {
+    SG *g = (SG *)vg;
+    if (g->scene == SCENE_TITLE || sg_battle_active(g)) {
+        sg_log(g, "save slot %d refused: %s", slot, g->scene == SCENE_TITLE ? "title" : "battle");
+        return false;
+    }
+    return sg_save_write(g, slot);
+}
 
 bool vnsmilegame_load(VNSmileGame *vg, int slot) { return sg_save_read((SG *)vg, slot); }
 
