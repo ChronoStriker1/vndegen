@@ -1,6 +1,6 @@
 #include "sg.h"
 
-enum { ST_RUN, ST_MESSAGE, ST_SCROLL, ST_WAIT, ST_CHOICE, ST_BUSY };
+enum { ST_RUN, ST_MESSAGE, ST_SCROLL, ST_WAIT, ST_CHOICE, ST_BUSY, ST_SCREEN };
 
 static const int kTextPx = 24;
 static const int kLinePx = 36;
@@ -140,7 +140,6 @@ static void runner_reset(Interp *ip) {
 void interp_free(Interp *ip) {
     runner_reset(ip);
     SgaState *a = &ip->a;
-    free(a->items);
     free(a->floor);
     for (int i = 0; i < a->evCount; i++) {
         for (int k = 0; k < a->ev[i].sheetCount; k++) free(a->ev[i].sheets[k].motion);
@@ -246,15 +245,33 @@ static bool eval_branch(SG *g, const Cmd *c) {
     }
     case CMD_IF_PARTY: return sga_in_party(g, cmd_guid(c, 0)) == (cmd_int(c, 1) == 0);
     case CMD_BATTLE: sg_log(g, "battle (not run): taken as won"); return true;
-    case CMD_INN: sg_log(g, "inn %d (not run): taken as declined", cmd_int(c, 0)); return false;
-    case CMD_SHOP: sg_log(g, "shop (not run)"); return false;
     default: return false;
     }
 }
 
 static bool is_branch(int type) {
-    return type == CMD_IF_SWITCH || type == CMD_IF_VARIABLE || type == CMD_IF_ITEM || type == CMD_IF_PARTY || type == CMD_BATTLE ||
-           type == CMD_INN || type == CMD_SHOP;
+    return type == CMD_IF_SWITCH || type == CMD_IF_VARIABLE || type == CMD_IF_ITEM || type == CMD_IF_PARTY || type == CMD_BATTLE;
+}
+
+static void open_shop(SG *g, const Cmd *c) {
+    int n = cmd_int(c, 0);
+    if (n < 0 || n > 64) n = 0;
+    Guid items[64];
+    i32 prices[64];
+    bool priced = c->argCount >= 1 + 2 * n;
+    for (int i = 0; i < n; i++) {
+        items[i] = cmd_guid(c, 1 + i);
+        prices[i] = priced ? cmd_int(c, 1 + n + i) : 0;
+    }
+    shop_open(g, items, priced ? prices : NULL, n);
+}
+
+static void start_screen(SG *g, const Cmd *c, int header) {
+    Interp *ip = &g->interp;
+    if (c->type == CMD_SHOP) open_shop(g, c);
+    else inn_open(g, cmd_int(c, 0));
+    ip->a.screenHeader = header;
+    ip->state = ST_SCREEN;
 }
 
 static void start_message(SG *g, const Cmd *c) {
@@ -333,6 +350,8 @@ static void step(SG *g) {
         case CMD_CHOICES:
             start_choices(g, c, here);
             break;
+        case CMD_SHOP:
+        case CMD_INN: start_screen(g, c, here); break;
         case CMD_SCROLL_TEXT: {
             bool image = c->argCount > 2 && c->args[2].kind == ARG_GUID;
             ip->scrollText = cmd_str(c, 0);
@@ -433,6 +452,11 @@ void interp_update(SG *g, u32 ms) {
         break;
     case ST_BUSY:
         if (!sga_busy(g)) ip->state = ST_RUN;
+        break;
+    case ST_SCREEN:
+        if (menu_active(g)) break;
+        if (!menu_result(g)) ip->pc = branch_false(&ip->script, a->screenHeader);
+        ip->state = ST_RUN;
         break;
     default: break;
     }

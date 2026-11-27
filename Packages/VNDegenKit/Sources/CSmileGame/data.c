@@ -459,19 +459,33 @@ int member_equip_sum(const Tables *t, const Member *m, int eq) {
     return sum;
 }
 
-int member_stat(const Tables *t, const Member *m, int stat) {
-    const HeroDef *h = hero_def(t, m->hero);
-    return h ? grow_stat(&h->stats[stat], m->level) : 0;
+int member_stat(const Tables *t, const Member *m, int stat) { return stat >= 0 && stat < STAT_COUNT ? m->stat[stat] : 0; }
+
+int member_max_hp(const Tables *t, const Member *m) { return m->maxHp + member_equip_sum(t, m, EQ_HP); }
+
+int member_max_mp(const Tables *t, const Member *m) { return m->maxMp + member_equip_sum(t, m, EQ_MP); }
+
+void member_init(const Tables *t, Member *m, const HeroDef *h) {
+    memset(m, 0, sizeof *m);
+    m->hero = h->id;
+    m->level = h->level > 0 ? h->level : 1;
+    m->exp = exp_for_level(m->level);
+    for (int i = 0; i < STAT_COUNT; i++) m->stat[i] = grow_stat(&h->stats[i], m->level);
+    m->maxHp = grow_stat(&h->hp, m->level);
+    m->maxMp = grow_stat(&h->mp, m->level);
+    for (int i = 0; i < 5; i++) m->equip[i] = h->equip[i];
+    m->hp = member_max_hp(t, m);
+    m->mp = member_max_mp(t, m);
 }
 
-int member_max_hp(const Tables *t, const Member *m) {
+void member_set_level(const Tables *t, Member *m, int level) {
     const HeroDef *h = hero_def(t, m->hero);
-    return h ? grow_stat(&h->hp, m->level) + member_equip_sum(t, m, EQ_HP) : 0;
-}
-
-int member_max_mp(const Tables *t, const Member *m) {
-    const HeroDef *h = hero_def(t, m->hero);
-    return h ? grow_stat(&h->mp, m->level) + member_equip_sum(t, m, EQ_MP) : 0;
+    if (h) {
+        for (int i = 0; i < STAT_COUNT; i++) m->stat[i] += grow_stat(&h->stats[i], level) - grow_stat(&h->stats[i], m->level);
+        m->maxHp += grow_stat(&h->hp, level) - grow_stat(&h->hp, m->level);
+        m->maxMp += grow_stat(&h->mp, level) - grow_stat(&h->mp, m->level);
+    }
+    m->level = level;
 }
 
 int member_attack(const Tables *t, const Member *m) {
@@ -507,82 +521,96 @@ bool member_can_equip(const Tables *t, const Member *m, const ItemDef *it) {
     return true;
 }
 
-static struct {
-    SG *g;
-    SgB *b;
-} registry[8];
-
-SgB *sgb(SG *g) {
-    for (int i = 0; i < 8; i++)
-        if (registry[i].g == g) return registry[i].b;
-    for (int i = 0; i < 8; i++) {
-        if (registry[i].g) continue;
-        SgB *b = sg_alloc(sizeof *b);
-        b->g = g;
-        registry[i].g = g;
-        registry[i].b = b;
-        return b;
-    }
-    return NULL;
-}
+SgB *sgb(SG *g) { return &g->b; }
 
 void menu_free(SgB *b);
 
 void sgb_open(SG *g) {
-    SgB *b = sgb(g);
-    if (!b || b->loaded) return;
+    SgB *b = &g->b;
+    if (b->loaded) return;
     tables_load(g, &b->tables);
     b->loaded = true;
     party_new(g);
 }
 
 void sgb_close(SG *g) {
-    for (int i = 0; i < 8; i++) {
-        if (registry[i].g != g) continue;
-        SgB *b = registry[i].b;
-        menu_free(b);
-        tables_free(&b->tables);
-        free(b->party.items);
-        free(b);
-        registry[i].g = NULL;
-        registry[i].b = NULL;
-    }
+    SgB *b = &g->b;
+    menu_free(b);
+    tables_free(&b->tables);
+    party_clear(&b->party);
+    memset(b, 0, sizeof *b);
 }
 
 void party_add_hero(SG *g, Guid hero) {
-    SgB *b = sgb(g);
-    Party *p = &b->party;
-    const HeroDef *h = hero_def(&b->tables, hero);
-    if (!h || p->count >= 8) return;
-    for (int i = 0; i < p->count; i++)
-        if (guid_eq(p->members[i].hero, hero)) return;
-    Member *m = &p->members[p->count++];
-    memset(m, 0, sizeof *m);
-    m->hero = hero;
-    m->level = h->level > 0 ? h->level : 1;
-    m->exp = exp_for_level(m->level);
-    for (int i = 0; i < 5; i++) m->equip[i] = h->equip[i];
-    m->hp = member_max_hp(&b->tables, m);
-    m->mp = member_max_mp(&b->tables, m);
+    Party *p = &g->b.party;
+    if (party_has_hero(p, hero) || p->count >= 8) return;
+    for (int i = 0; i < p->reserveCount; i++) {
+        if (!guid_eq(p->reserve[i].hero, hero)) continue;
+        p->members[p->count++] = p->reserve[i];
+        memmove(&p->reserve[i], &p->reserve[i + 1], sizeof(Member) * (size_t)(p->reserveCount - i - 1));
+        p->reserveCount--;
+        return;
+    }
+    const HeroDef *h = hero_def(&g->b.tables, hero);
+    if (h) member_init(&g->b.tables, &p->members[p->count++], h);
 }
 
 void party_remove_hero(SG *g, Guid hero) {
-    Party *p = &sgb(g)->party;
+    Party *p = &g->b.party;
     for (int i = 0; i < p->count; i++) {
         if (!guid_eq(p->members[i].hero, hero)) continue;
+        if (p->reserveCount < 16) p->reserve[p->reserveCount++] = p->members[i];
         memmove(&p->members[i], &p->members[i + 1], sizeof(Member) * (size_t)(p->count - i - 1));
         p->count--;
         return;
     }
 }
 
-void party_new(SG *g) {
-    SgB *b = sgb(g);
-    Party *p = &b->party;
+bool party_has_hero(const Party *p, Guid hero) {
+    for (int i = 0; i < p->count; i++)
+        if (guid_eq(p->members[i].hero, hero)) return true;
+    return false;
+}
+
+void party_clear(Party *p) {
     free(p->items);
+    free(p->seen);
+    free(p->looks);
     memset(p, 0, sizeof *p);
+}
+
+void party_new(SG *g) {
+    party_clear(&g->b.party);
     const Settings *s = &g->data.settings;
-    for (int i = 0; i < s->partyCount; i++) party_add_hero(g, s->party[i]);
+    for (int i = 0; i < s->partyCount; i++)
+        if (!guid_zero(s->party[i])) party_add_hero(g, s->party[i]);
+}
+
+void party_set_look(Party *p, Guid hero, Guid face, Guid graphic) {
+    int i = 0;
+    while (i < p->lookCount && !guid_eq(p->looks[i].hero, hero)) i++;
+    if (i == p->lookCount) p->looks = sg_realloc(p->looks, sizeof(Look) * (size_t)++p->lookCount);
+    p->looks[i] = (Look){hero, face, graphic};
+}
+
+Guid party_leader_graphic(SG *g) {
+    Party *p = &g->b.party;
+    if (!p->count) return (Guid){{0}};
+    Guid hero = p->members[0].hero;
+    for (int i = 0; i < p->lookCount; i++)
+        if (guid_eq(p->looks[i].hero, hero) && !guid_zero(p->looks[i].graphic)) return p->looks[i].graphic;
+    const HeroDef *h = hero_def(&g->b.tables, hero);
+    return h ? h->graphic : (Guid){{0}};
+}
+
+void party_recover(SG *g) {
+    Party *p = &g->b.party;
+    for (int i = 0; i < p->count; i++) {
+        Member *mb = &p->members[i];
+        mb->hp = member_max_hp(&g->b.tables, mb);
+        mb->mp = member_max_mp(&g->b.tables, mb);
+        mb->state = 0;
+    }
 }
 
 int party_item_count(const Party *p, Guid item) {
@@ -603,6 +631,12 @@ void party_give_item(Party *p, Guid item, int delta) {
         return;
     }
     if (delta <= 0) return;
+    bool seen = false;
+    for (int i = 0; i < p->seenCount && !seen; i++) seen = guid_eq(p->seen[i], item);
+    if (!seen) {
+        p->seen = sg_realloc(p->seen, sizeof(Guid) * (size_t)(p->seenCount + 1));
+        p->seen[p->seenCount++] = item;
+    }
     if (p->itemCount == p->itemCap) {
         p->itemCap = p->itemCap ? p->itemCap * 2 : 16;
         p->items = sg_realloc(p->items, sizeof(Stack) * (size_t)p->itemCap);

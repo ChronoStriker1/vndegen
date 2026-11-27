@@ -29,9 +29,12 @@ Both games use the same data format.
   the title to the bridge guard who opens the way to its first battle, and Sacred from the title to the guard at (35,30)
   in the castle.
 - Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
-  and windows. The party, inventory, money and play time with stats as the PC computes them.
-- The field menu (Esc or X): items, skills, equipment, status, save slots, quit and config, laid out as the PC draws
-  them, with faces; the shop and inn screens (`shop_open`, `inn_open` in `sg_B.h`).
+  and windows. One party state (`Party` in `sg_B.h`, `g->b.party`) holds the heroes with their stats, the reserve,
+  items, obtained items, money, hero looks and play time; event commands change it, the menu shows it, and saves write
+  and read it.
+- The field menu (Esc or X): items, skills, equipment, status, saving to a slot with each slot's map and party, quit
+  and config, laid out as the PC draws them, with faces, and the menu sounds. Shop (37) and inn (38) commands open
+  their screens and branch on the result; 59 recovers the party.
 - Battles: event command 65 through `sg_battle_start`, drawn on the battle background map from behind the party,
   with the command list, targets, skills, items, defend and escape, monster actions, damage as measured on the PC,
   the result panel, level-ups and GAME OVER.
@@ -40,7 +43,8 @@ Both games use the same data format.
   not model yet kept and written back unchanged, so saves move both ways between VNDegen and the original. `saveDir`
   in the config is the folder holding the saves; it defaults to the game's `savedata`.
 - Sound: the title and map BGM and ambient sound, with the files' loop points, through `vnsmilegame_audio` as stereo
-  floats at `audioRate`. Event commands and menus call the sound functions in `sg_E.h`.
+  floats at `audioRate`. Commands 21 (BGM), 22 (sound) and 64 (music effect) play through the same mixer.
+- Camera command 53 (modes 0 and 3) and motions from commands 14 and 69 and from each event sheet.
 
 ## Drawing the map
 
@@ -81,7 +85,9 @@ percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred'
   and prints frame times.
 - `sgtest_A`: the event command tests; with the game folders set it plays both openings (about five minutes).
   `sgtest_A drive <game> <out> ...` plays a scripted path: `until:field|choice|message`, `upto:<text>`, `pick:N`,
-  `to:x,z` (walks there), `talk:U|D|L|R`, `hold:U,ms`, `ok`, `wait:ms`, `shot:name`, `where:tag`.
+  `to:x,z` (walks there), `talk:U|D|L|R`, `hold:U,ms`, `ok`, `wait:ms`, `shot:name`, `where:tag`, `save:N`, `load:N`.
+- `sgtest_G`: the joined paths: new-game hero stats against the PC's saves, a load keeping the party, shop and inn
+  branches, the BGM command, the menu's save page, and Sacred's castle after a load (queen, king, camera).
 
 ## Known limits
 
@@ -89,21 +95,22 @@ percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred'
   `sg_battle_start` (`battle_setup_cmd` decodes its arguments) and branches on `sg_battle_result`. No battle BGM or
   effect animations; states and elements are not applied; critical, skill, escape and shared experience rules are
   inferred (see `docs/smilegame-cleanroom.md`).
-- Commands for sound, shops, inns and party recovery are decoded and logged but not yet wired to the audio and menu
-  code, so only the title and map music plays and an inn counts as declined.
-- The items, money and party that commands change are kept apart from the menu's party state until the two are
-  joined, so Sacred's menu shows the game settings' first member.
-- The camera command (53) is decoded but not yet wired to the camera; effects (27) and balloons (45) are not drawn,
-  though balloons take their time.
+- Effects (27) and balloons (45) are not drawn, though balloons take their time.
 - Events never wander or chase the player; the movement type in their sheets is read but not used.
 - Command 10's and 16's codes 4 to 7, 11's one-argument form, and 15, 55, 56, 58, 66, 68, 70, 76 and 77 are logged and
   skipped; none is on either opening path.
-- The menu's save page lists slots and dates but doesn't write yet, and doesn't show a slot's map and party.
-- The shop and inn screens were not compared with the PC; the party order page is not in these games' menus.
+- The shop and inn screens were not compared with the PC; the party order page is not in these games' menus. Where
+  a slot's page shows a second to fourth hero is a guess (two columns); both games have one hero there.
+- Pictures on screen are not saved or restored, so after a load the help bar Sacred shows is missing until an event
+  shows it again, and the PC loading a VNDegen save shows none either (see the picture body in
+  `docs/smilegame-cleanroom.md`).
+- Saves write the motion of events that wander as the sheet's, where the PC writes `wait` after they have moved.
+- Static captions end at once; the PC fades them out over about half a second, so the camera move after them starts
+  that much earlier than on the PC.
 - Experience above level 6 uses a fitted curve, and a few item, skill and monster fields are inferred (see
   `docs/smilegame-cleanroom.md`).
-- A save made from a new game started in VNDegen has its heroes' stats at zero, since the hero tables and level
-  growth are not read yet; saves that started as PC saves keep their heroes' values.
+- A hero's magic is taken from the hero tables; saves keep whatever the PC stored in that field (0 for every hero
+  seen). Level-ups (round 3) must update the stats a member stores.
 - Colette's opening calls for music by a resource pack's GUID; the original plays music none of the game's shipped
   files match there, and VNDegen keeps the title music.
 - Sound-effect and music-effect levels and the music effect pausing the BGM follow the BGM measurement and common

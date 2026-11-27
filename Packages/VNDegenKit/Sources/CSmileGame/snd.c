@@ -63,17 +63,8 @@ struct Mixer {
     bool enabled;
 };
 
-static pthread_mutex_t gRegLock = PTHREAD_MUTEX_INITIALIZER;
-static SgE *gReg[16];
 
-SgE *sg_e(SG *g) {
-    SgE *e = NULL;
-    pthread_mutex_lock(&gRegLock);
-    for (int i = 0; i < 16 && !e; i++)
-        if (gReg[i] && gReg[i]->g == g) e = gReg[i];
-    pthread_mutex_unlock(&gRegLock);
-    return e;
-}
+SgE *sg_e(SG *g) { return &g->e; }
 
 static void voice_free(Voice *v) {
     if (!v) return;
@@ -83,8 +74,7 @@ static void voice_free(Voice *v) {
 }
 
 void sg_e_open(SG *g) {
-    SgE *e = sg_alloc(sizeof *e);
-    e->g = g;
+    SgE *e = &g->e;
     e->curScene = -1;
     Mixer *m = sg_alloc(sizeof *m);
     m->rate = g->cfg.audioRate > 0 ? g->cfg.audioRate : 44100;
@@ -92,28 +82,17 @@ void sg_e_open(SG *g) {
     m->enabled = true;
     pthread_mutex_init(&m->lock, NULL);
     e->mix = m;
-    pthread_mutex_lock(&gRegLock);
-    for (int i = 0; i < 16; i++)
-        if (!gReg[i]) {
-            gReg[i] = e;
-            break;
-        }
-    pthread_mutex_unlock(&gRegLock);
 }
 
 void sg_e_close(SG *g) {
-    SgE *e = sg_e(g);
-    if (!e) return;
-    pthread_mutex_lock(&gRegLock);
-    for (int i = 0; i < 16; i++)
-        if (gReg[i] == e) gReg[i] = NULL;
-    pthread_mutex_unlock(&gRegLock);
+    SgE *e = &g->e;
     Mixer *m = e->mix;
+    if (!m) return;
     for (int i = 0; i < V_COUNT; i++) voice_free(m->v[i]);
     pthread_mutex_destroy(&m->lock);
     free(m);
     save_free(&e->save);
-    free(e);
+    memset(e, 0, sizeof *e);
 }
 
 static bool refill(Voice *v) {
@@ -179,8 +158,8 @@ static void mix_voice(Mixer *m, Voice *v, float *out, int frames) {
 
 void snd_mix(SG *g, float *out, int frames) {
     memset(out, 0, sizeof(float) * (size_t)frames * 2);
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
+    if (!e->mix) return;
     Mixer *m = e->mix;
     pthread_mutex_lock(&m->lock);
     bool me = m->v[V_ME] && !m->v[V_ME]->done;
@@ -299,9 +278,9 @@ static void replace(Mixer *m, int slot, int oldSlot, Voice *nv, int fadeMs) {
 }
 
 static void play_loop(SG *g, int slot, int oldSlot, int ch, Guid id, int volume, int tempo) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
     Mixer *m = e->mix;
+    if (!m) return;
     pthread_mutex_lock(&m->lock);
     Voice *cur = m->v[slot];
     if (cur && !cur->done && !cur->stopAtZero && guid_eq(cur->id, id)) {
@@ -323,9 +302,9 @@ void snd_bgm(SG *g, Guid id, int volume, int tempo) { play_loop(g, V_BGM, V_BGM_
 void snd_bgs(SG *g, Guid id, int volume, int tempo) { play_loop(g, V_BGS, V_BGS_OLD, SND_BGS, id, volume, tempo); }
 
 static void stop_loop(SG *g, int slot, int oldSlot, int fadeMs) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
     Mixer *m = e->mix;
+    if (!m) return;
     pthread_mutex_lock(&m->lock);
     replace(m, slot, oldSlot, NULL, fadeMs);
     pthread_mutex_unlock(&m->lock);
@@ -336,8 +315,8 @@ void snd_bgm_stop(SG *g, int fadeMs) { stop_loop(g, V_BGM, V_BGM_OLD, fadeMs); }
 void snd_bgs_stop(SG *g, int fadeMs) { stop_loop(g, V_BGS, V_BGS_OLD, fadeMs); }
 
 void snd_me(SG *g, Guid id, int volume, int tempo) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
+    if (!e->mix) return;
     Voice *v = open_voice(g, e->mix, id, SND_ME, volume, tempo);
     pthread_mutex_lock(&e->mix->lock);
     voice_free(e->mix->v[V_ME]);
@@ -346,8 +325,8 @@ void snd_me(SG *g, Guid id, int volume, int tempo) {
 }
 
 void snd_se(SG *g, Guid id, int volume, int tempo) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
+    if (!e->mix) return;
     Voice *v = open_voice(g, e->mix, id, SND_SE, volume, tempo);
     if (!v) return;
     Mixer *m = e->mix;
@@ -366,8 +345,7 @@ void snd_se(SG *g, Guid id, int volume, int tempo) {
 }
 
 void snd_se_stop(SG *g) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
     pthread_mutex_lock(&e->mix->lock);
     for (int i = V_SE; i < V_COUNT; i++) {
         voice_free(e->mix->v[i]);
@@ -377,8 +355,7 @@ void snd_se_stop(SG *g) {
 }
 
 void snd_set_master(SG *g, int bgmPercent, int sePercent) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
     pthread_mutex_lock(&e->mix->lock);
     e->mix->bgmMaster = (float)bgmPercent / 100.0f;
     e->mix->seMaster = (float)sePercent / 100.0f;
@@ -386,8 +363,7 @@ void snd_set_master(SG *g, int bgmPercent, int sePercent) {
 }
 
 bool snd_bgm_playing(SG *g, Guid *id) {
-    SgE *e = sg_e(g);
-    if (!e) return false;
+    SgE *e = &g->e;
     pthread_mutex_lock(&e->mix->lock);
     Voice *v = e->mix->v[V_BGM];
     bool on = v && !v->done;
@@ -419,8 +395,7 @@ static Guid map_bgs(const SgrRec *rec) {
 }
 
 void sg_e_frame(SG *g) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
     if (g->scene == SCENE_TITLE) {
         if (e->curScene != SCENE_TITLE) {
             e->curMap = (Guid){{0}};

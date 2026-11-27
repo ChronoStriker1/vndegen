@@ -166,7 +166,7 @@ static void shot(SG *g, const char *dir, const char *name) {
 static void where(SG *g, const char *tag) {
     printf("%s: %s map %s at %d,%d dir %d vars %d %d %d %d sw4 %d sw5 %d money %d\n", tag, state_name(g), g->field.map.name ? g->field.map.name : "-",
            (int)floorf(g->field.player.x), (int)floorf(g->field.player.z), g->field.player.dir, g->vars[0], g->vars[1], g->vars[2], g->vars[3],
-           g->switches[4], g->switches[5], g->interp.a.money);
+           g->switches[4], g->switches[5], g->b.party.money);
 }
 
 static int drive(int argc, char **argv) {
@@ -235,6 +235,11 @@ static int drive(int argc, char **argv) {
             run(g, 100);
             press(g, VK_OK, 48);
             run(g, 300);
+        } else if (sscanf(c, "save:%d", &a) == 1) {
+            if (!sg_save_write(g, a)) rc = 1;
+        } else if (sscanf(c, "load:%d", &a) == 1) {
+            if (!sg_save_read(g, a)) rc = 1;
+            run(g, 500);
         } else if (sscanf(c, "shot:%255s", s) == 1) shot(g, argv[3], s);
         else if (sscanf(c, "where:%255s", s) == 1) where(g, s);
         else {
@@ -455,7 +460,7 @@ static void test_sacred(const char *dir) {
     CHECK(upto(g, "ルディアノ王が3年前から", 200));
     CHECK(g->field.map.name && strcmp(g->field.map.name, "ルディアノ城") == 0);
     CHECK(g->field.player.dir == 0);
-    CHECK(g->interp.a.partyCount == 1 && guid_eq(g->interp.a.party[0], guid("1d9dc79e-ec79-452b-bf79-f5a7f5a51ac6")));
+    CHECK(g->b.party.count == 1 && guid_eq(g->b.party.members[0].hero, guid("1d9dc79e-ec79-452b-bf79-f5a7f5a51ac6")));
     CHECK(upto(g, "女王様がお呼び", 100));
     CHECK(g->field.player.graphic && strcmp(g->field.player.graphic->name, "c_023a") == 0);
     CHECK(until_state(g, "field", 100));
@@ -465,7 +470,7 @@ static void test_sacred(const char *dir) {
     press(g, VK_UP, 48);
     press(g, VK_OK, 48);
     CHECK(until_state(g, "field", 100));
-    CHECK(g->interp.a.money == 100);
+    CHECK(g->b.party.money == 100);
     CHECK(g->switches[21] == 1);
     CHECK(walk_to(g, 35, 29));
     press(g, VK_DOWN, 48);

@@ -6,59 +6,19 @@ static const u32 kBalloonMs = 1000;
 
 static SgaState *st(SG *g) { return &g->interp.a; }
 
-i32 sga_item_count(SG *g, Guid id) {
-    SgaState *a = st(g);
-    for (int i = 0; i < a->itemCount; i++)
-        if (guid_eq(a->items[i].id, id)) return a->items[i].count;
-    return 0;
-}
+i32 sga_item_count(SG *g, Guid id) { return party_item_count(&g->b.party, id); }
 
-void sga_item_add(SG *g, Guid id, i32 n) {
-    SgaState *a = st(g);
-    for (int i = 0; i < a->itemCount; i++)
-        if (guid_eq(a->items[i].id, id)) {
-            a->items[i].count += n;
-            if (a->items[i].count < 0) a->items[i].count = 0;
-            return;
-        }
-    if (n <= 0) return;
-    a->items = sg_realloc(a->items, sizeof(SgaItem) * (size_t)(a->itemCount + 1));
-    a->items[a->itemCount++] = (SgaItem){id, n};
-}
+void sga_item_add(SG *g, Guid id, i32 n) { party_give_item(&g->b.party, id, n); }
 
-bool sga_in_party(SG *g, Guid hero) {
-    SgaState *a = st(g);
-    for (int i = 0; i < a->partyCount; i++)
-        if (guid_eq(a->party[i], hero)) return true;
-    return false;
-}
-
-static Guid hero_default_graphic(SG *g, Guid hero) {
-    const SgrRec *rec = game_hero(&g->data, hero);
-    if (!rec) return (Guid){{0}};
-    Rd r = rd_make(rec->body, rec->size);
-    rd_guid(&r);
-    free(rd_str(&r));
-    return rd_guid(&r);
-}
+bool sga_in_party(SG *g, Guid hero) { return party_has_hero(&g->b.party, hero); }
 
 static void update_leader_graphic(SG *g) {
-    SgaState *a = st(g);
-    if (!a->partyCount) return;
-    Guid gr = guid_zero(a->heroGraphic) ? hero_default_graphic(g, a->party[0]) : a->heroGraphic;
-    sga_actor_graphic(g, &g->field.player, gr);
+    Guid gr = party_leader_graphic(g);
+    if (!guid_zero(gr)) sga_actor_graphic(g, &g->field.player, gr);
 }
 
 void sga_new_game(SG *g) {
     SgaState *a = st(g);
-    free(a->items);
-    a->items = NULL;
-    a->itemCount = 0;
-    a->money = 0;
-    a->partyCount = 0;
-    for (int i = 0; i < g->data.settings.partyCount && i < SGA_PARTY; i++)
-        if (!guid_zero(g->data.settings.party[i])) a->party[a->partyCount++] = g->data.settings.party[i];
-    a->heroGraphic = (Guid){{0}};
     memset(a->pics, 0, sizeof a->pics);
     a->tint = 0;
     a->tintTotal = 0;
@@ -211,29 +171,21 @@ static void cmd_picture(SG *g, const Cmd *c) {
 }
 
 static void cmd_party(SG *g, const Cmd *c) {
-    SgaState *a = st(g);
     Guid hero = cmd_guid(c, 0);
-    if (cmd_int(c, 1) == 0) {
-        if (!sga_in_party(g, hero) && a->partyCount < SGA_PARTY) a->party[a->partyCount++] = hero;
-    } else {
-        for (int i = 0; i < a->partyCount; i++)
-            if (guid_eq(a->party[i], hero)) {
-                memmove(&a->party[i], &a->party[i + 1], sizeof(Guid) * (size_t)(a->partyCount - i - 1));
-                a->partyCount--;
-                break;
-            }
-    }
-    a->heroGraphic = (Guid){{0}};
+    if (cmd_int(c, 1) == 0) party_add_hero(g, hero);
+    else party_remove_hero(g, hero);
     update_leader_graphic(g);
-    sg_log(g, "party now %d", a->partyCount);
+    sg_log(g, "party now %d", g->b.party.count);
 }
 
 static void cmd_hero_graphic(SG *g, const Cmd *c) {
-    SgaState *a = st(g);
+    Party *p = &g->b.party;
     Guid hero = cmd_guid(c, 0);
-    if (a->partyCount && !guid_eq(a->party[0], hero)) return;
-    a->heroGraphic = cmd_guid(c, 2);
-    update_leader_graphic(g);
+    party_set_look(p, hero, cmd_guid(c, 1), cmd_guid(c, 2));
+    if (p->count && guid_eq(p->members[0].hero, hero)) {
+        update_leader_graphic(g);
+        sg_actor_motion(g, &g->field.player, cmd_str(c, 3));
+    }
     sg_log(g, "hero graphic %s motion %s", g->field.player.graphic ? g->field.player.graphic->name : "default", cmd_str(c, 3));
 }
 
@@ -249,6 +201,7 @@ static void cmd_event_graphic(SG *g, const Cmd *c) {
     Actor *ac = &g->field.npcs[i];
     sga_actor_graphic(g, ac, ev->graphic);
     ac->visible = ac->graphic != NULL;
+    sg_actor_motion(g, ac, ev->motion);
     sg_log(g, "event graphic %s motion %s", ac->graphic ? ac->graphic->name : "none", ev->motion);
 }
 
@@ -273,7 +226,8 @@ bool sga_busy(SG *g) {
     if (a->balloonTotal && a->balloonMs < a->balloonTotal) return true;
     if (a->fadeWait && a->fadeTotal) return true;
     if (a->tintWait && a->tintTotal) return true;
-    a->waitMoves = a->fadeWait = a->tintWait = false;
+    if (a->camWait && sg_camera_moving(g)) return true;
+    a->waitMoves = a->fadeWait = a->tintWait = a->camWait = false;
     return false;
 }
 
@@ -300,10 +254,11 @@ bool sga_exec(SG *g, const Cmd *c) {
     }
     case CMD_MONEY: {
         i32 n = cmd_int(c, 1) * (cmd_int(c, 2) == 2 ? -1 : 1);
-        a->money += n;
-        if (a->money < 0) a->money = 0;
+        Party *p = &g->b.party;
+        p->money += n;
+        if (p->money < 0) p->money = 0;
         a->dirty = true;
-        sg_log(g, "money %+d, now %d", n, a->money);
+        sg_log(g, "money %+d, now %d", n, p->money);
         return false;
     }
     case CMD_PARTY: cmd_party(g, c); a->dirty = true; return false;
@@ -377,17 +332,21 @@ bool sga_exec(SG *g, const Cmd *c) {
         sg_log(g, "balloon on %s", cmd_int(c, 0) ? "player" : "event");
         return true;
     case CMD_CAMERA:
-        sg_log(g, "camera mode %d (%d args) not applied", cmd_int(c, 0), c->argCount);
-        return false;
+        sg_camera_command(g, c);
+        a->camWait = cmd_int(c, c->argCount - 1) == 0 && sg_camera_moving(g);
+        sg_log(g, "camera mode %d%s", cmd_int(c, 0), a->camWait ? ", waiting" : "");
+        return a->camWait;
     case CMD_BGM:
-    case CMD_SE:
-    case CMD_BGS: {
-        const Res *r = res_find(&g->res, cmd_guid(c, 0));
-        sg_log(g, "sound %d %s vol %d (not played)", c->type, r ? r->name : "stop", cmd_int(c, 1));
+        if (guid_zero(cmd_guid(c, 0))) snd_bgm_stop(g, 0);
+        else snd_bgm(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2));
         return false;
-    }
+    case CMD_SE: snd_se(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
+    case CMD_ME: snd_me(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
     case CMD_EFFECT: sg_log(g, "effect on %d (not drawn)", cmd_int(c, 0)); return false;
-    case CMD_TITLE: sg_log(g, "party recovered (not run)"); return false;
+    case CMD_RECOVER:
+        party_recover(g);
+        sg_log(g, "party recovered");
+        return false;
     default: sg_log(g, "command %d not handled (%d args)", c->type, c->argCount); return false;
     }
 }

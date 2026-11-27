@@ -662,10 +662,12 @@ static void grant_rewards(Battle *b) {
         int oldMax = member_max_hp(t, m), oldMaxMp = member_max_mp(t, m);
         m->exp += b->expGain;
         bool up = false;
-        while (m->level < 99 && m->exp >= battle_exp_for_level(m->level + 1)) {
-            m->level++;
+        int level = m->level;
+        while (level < 99 && m->exp >= battle_exp_for_level(level + 1)) {
+            level++;
             up = true;
         }
+        if (up) member_set_level(t, m, level);
         if (up) {
             m->hp += member_max_hp(t, m) - oldMax;
             m->mp += member_max_mp(t, m) - oldMaxMp;

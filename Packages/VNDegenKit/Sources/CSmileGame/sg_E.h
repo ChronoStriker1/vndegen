@@ -74,12 +74,17 @@ typedef struct SaveData {
     int mapTailSize;
 } SaveData;
 
+typedef struct SlotHero {
+    Guid id;
+    i32 level, hp, maxHp, mp, maxMp;
+} SlotHero;
+
 typedef struct SaveSlot {
     bool used;
     time_t written;
     Guid map;
-    Guid hero;
-    i32 level, hp, maxHp, mp, maxMp;
+    SlotHero party[4];
+    int partyCount;
 } SaveSlot;
 
 bool save_parse(SaveData *s, const u8 *data, size_t size);
@@ -100,12 +105,10 @@ enum { SND_BGM, SND_BGS, SND_ME, SND_SE };
 typedef struct Mixer Mixer;
 
 typedef struct SgE {
-    SG *g;
     Mixer *mix;
     SaveData save;
     bool haveSave;
-    float baseSeconds;
-    u32 baseClock;
+    int heroSize;
     Guid curMap;
     int curScene;
 } SgE;

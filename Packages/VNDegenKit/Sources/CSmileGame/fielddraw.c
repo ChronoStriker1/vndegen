@@ -647,13 +647,11 @@ void view_follow(SG *g, float x, float y, float z, u32 ms) {
         v->pose.distance = a->distance + (b->distance - a->distance) * s;
         v->pose.fov = a->fov + (b->fov - a->fov) * s;
         v->pose.lift = a->lift + (b->lift - a->lift) * s;
-        v->pose.follow = b->follow;
-        if (!b->follow) {
-            Vec3 at = a->follow ? (Vec3){x, y, z} : a->target;
-            v->pose.target.x = at.x + (b->target.x - at.x) * s;
-            v->pose.target.y = at.y + (b->target.y - at.y) * s;
-            v->pose.target.z = at.z + (b->target.z - at.z) * s;
-        }
+        Vec3 at = a->follow ? (Vec3){x, y, z} : a->target, to = b->follow ? (Vec3){x, y, z} : b->target;
+        v->pose.target.x = at.x + (to.x - at.x) * s;
+        v->pose.target.y = at.y + (to.y - at.y) * s;
+        v->pose.target.z = at.z + (to.z - at.z) * s;
+        v->pose.follow = t >= 1.0f && b->follow;
         if (t >= 1.0f) v->moveTotal = 0;
     }
     if (v->pose.follow) v->pose.target = (Vec3){x, y, z};

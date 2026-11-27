@@ -214,14 +214,16 @@ each later choice after a 74 whose argument is its number. Branches: 46 switch (
 | 45 | balloon | 0 the event or 1 the player, effect GUID | about a second each, one after another |
 | 51 | screen | 1 black, 0 shown | |
 | 52 | hide event | 1 hide, 0 show | Colette's monsters hide on a win |
-| 53 | camera | mode, then values in thousandths: mode 0 pitch, yaw, distance, field of view, ms, wait; mode 3 adds a target x, y, z first | |
+| 37 | shop | n, n item GUIDs, n prices when present, flag | a branch: runs when something was bought ("まいどあり" follows it) |
+| 38 | inn | price, 1, 1 | a branch: runs when the party stayed |
+| 53 | camera | mode, then values in thousandths: mode 0 pitch, yaw, distance, field of view, ms, wait; mode 3 adds a target x, y, z first | the last argument 0 makes the event wait: Sacred's 5000 ms move into the king's room ends before "ごほっ" appears |
 | 59 | recover party | none | "全員のHPとMPが回復した" follows it |
 | 60 | fade | ms, 1 out or 0 in, wait | covers the map and pictures, not windows |
 | 61 | screen tint | ms, ARGB colour, wait | |
 | 62 | shake | ms, strength, wait | |
 | 63 | flash | ms | |
 | 69 | hero graphic | hero GUID, face folder, graphic GUID (zero: the hero's own), motion | applies when the hero leads the party |
-| 21, 22, 64 | BGM, sound, ambient sound | GUID, volume, tempo, … | |
+| 21, 22, 64 | BGM, sound, music effect | GUID, volume, tempo, … | 21 with a zero GUID stops the BGM; 64's resources are ME_item_get, ME_lodging and fanfares |
 
 Direction codes for 10, 11, 16 and 17 are 0 up, 1 down, 2 left, 3 right; Sacred's castle scene ends with the player and
 the soldier where these codes put them. 10 and 16 also take 4 to 7, and 11 a one-argument form; their meaning is not
@@ -344,8 +346,10 @@ n, n × (item GUID, `int32` count). `int32` money. Items ever obtained: the same
 `int32` n, n × (hero GUID, face GUID, graphic GUID).
 
 A hero is 188 bytes in player 1.8.1 and 160 in 1.0.6: hero GUID, then `int32` level, max HP, max MP, HP, MP, power,
-vitality, magic, speed and two more, six equipment GUIDs (weapon, shield, head, body, two accessories), `int32`
-experience, and in 1.8.1 28 bytes more. The original shows these values as stored and does not recompute them: a
+vitality, an `int32` the PC writes as 0 for every hero seen (read as magic, though the hero tables give 10 and 12),
+speed, experience (Sacred's level 2 hero has 26 here, as its status page shows), one more, six equipment GUIDs
+(weapon, shield, head, body, two accessories), an `int32` not yet read (0 in every save seen), and in 1.8.1 28 bytes
+more. Heroes that leave the party stay in the second list with their stats; a new game's party holds only the settings' non-empty slots. The original shows these values as stored and does not recompute them: a
 save with power 77 showed 82 with a +5 knife, and HP 99 over a maximum of 20 showed as 99/20.
 
 **Flags.** `int32` 1000, 1000 switch bytes; `int32` 1000, 1000 `int32` variables; 22 config bytes (two flags, `int32`
@@ -559,3 +563,24 @@ map's centre when absent), `1001` and one `x, z` pair per monster is each monste
   a weakness (inferred, not seen in these battles). States (poison, sleep, paralysis, confusion, charm) are not
   applied yet.
 
+## Joining the pieces (round 2, G)
+
+Checked under Wine against the PC player, both games.
+
+- One party: a save made by VNDegen at Colette's bridge guard and at Sacred's guard at (35,30) loaded in the PC at
+  the same cell, with the same party, items, money and hero looks in its menu, and the PC's own save made there
+  afterwards has the same party, reserve, items, obtained list and look list as VNDegen's. VNDegen loads that save
+  back at the same cell.
+- A new game's hero stats come from the hero tables at the hero's start level; the PC's own new-game saves give the
+  same values (Colette's Dark 32 HP, 10 MP, power 20, vitality 10, speed 15; Sacred's starting hero 50, 20, 25, 20, 10).
+- Command 69 adds or replaces the hero's entry in the save's look list (hero, face, graphic), whichever hero it names.
+- Events stand on top of map objects, as the player does: Sacred's queen sits on her throne two units above the floor,
+  and the king lies on his bed, both in their event sheet's motion (`chair`, `bed`). After loading the castle save
+  the PC shows both so, and runs no event.
+- Camera moves glide the whole view, the target too: Sacred's opening goes from the courtyard over the wall into the
+  king's room.
+- The save page of the menu shows the slot's date, map name and each hero's name, face, level, HP, MP and state in the
+  same box the main menu uses, at the place the PC draws it.
+- A saved picture's body is `int32` number, `int32` 0, picture GUID, `int32` opacity, an `int32` that is `0x7f7f7f7f`
+  for the help bar the PC shows after a load and 0 for a tutorial picture it does not show, `int32` x, `int32` y, two
+  bytes and `int32` -1. What the fifth field means is not known, so pictures are not restored from saves yet.

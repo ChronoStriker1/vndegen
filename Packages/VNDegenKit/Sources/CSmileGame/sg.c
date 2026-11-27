@@ -103,8 +103,16 @@ static void start_new_game(SG *g) {
     const Settings *s = &g->data.settings;
     memset(g->vars, 0, sizeof g->vars);
     memset(g->switches, 0, sizeof g->switches);
+    free(g->locals);
+    g->locals = NULL;
+    g->localCount = 0;
+    interp_free(&g->interp);
+    g->pendingTransfer = false;
+    g->fadeLevel = 0;
+    g->fadeTotal = 0;
     g->scene = SCENE_FIELD;
     party_new(g);
+    sga_new_game(g);
     sg_log(g, "new game");
     sg_save_new_game(g);
     field_load(g, s->startMap, s->startX, s->startZ, 2);

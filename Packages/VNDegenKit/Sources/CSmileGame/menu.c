@@ -53,6 +53,8 @@ struct Menu {
     i32 shopPrices[32];
     int shopCount;
     int innPrice;
+    bool result;
+    SaveSlot slots[SAVE_SLOTS];
     char note[256];
     Image *faces[8];
     Guid faceIds[8];
@@ -178,31 +180,29 @@ static Tables *T(SG *g) { return &sgb(g)->tables; }
 static Party *P(SG *g) { return &sgb(g)->party; }
 static const char *MT(SG *g, int i) { return T(g)->text.menu[i] ? T(g)->text.menu[i] : ""; }
 
-void sgb_sound(SG *g, int which) {
-    const Guid *s = &T(g)->text.sounds[which];
-    const Res *r = res_find(&g->res, *s);
-    sg_log(g, "menu sound %d %s", which, r ? r->name : "-");
-}
+void sgb_sound(SG *g, int which) { snd_se(g, T(g)->text.sounds[which], 100, 100); }
 
-static char *slot_path(SG *g, int slot) {
-    return g->saveDir ? sg_fmt("%s/Save_%02d.sgs", g->saveDir, slot) : sg_fmt("%s/savedata/Save_%02d.sgs", g->gameDir, slot);
-}
-
-bool sgb_slot_info(SG *g, int slot, char *date, size_t dateSize) {
-    char *path = slot_path(g, slot);
-    struct stat st;
-    bool ok = stat(path, &st) == 0;
-    free(path);
-    if (!ok) return false;
+static const SaveSlot *slot_info(Menu *m, int slot, char *date, size_t dateSize) {
+    if (slot < 0 || slot >= SAVE_SLOTS || !m->slots[slot].used) return NULL;
     struct tm tm;
-    localtime_r(&st.st_mtime, &tm);
+    localtime_r(&m->slots[slot].written, &tm);
     strftime(date, dateSize, "%Y/%m/%d %H:%M:%S", &tm);
-    return true;
+    return &m->slots[slot];
 }
 
-bool sgb_save_slot(SG *g, int slot) {
-    sg_log(g, "menu: save to slot %d requested (save writer not wired yet)", slot);
-    return false;
+static bool save_slot(SG *g, Menu *m, int slot) {
+    bool ok = sg_save_write(g, slot);
+    sg_save_slots(g, m->slots, SAVE_SLOTS);
+    return ok;
+}
+
+static char *map_name(SG *g, Guid id) {
+    const SgrRec *rec = game_record(&g->data, SGR_MAP, 0, id, NULL);
+    if (!rec) return sg_strdup("");
+    Rd r = rd_make(rec->body, rec->size);
+    rd_guid(&r);
+    char *name = rd_str(&r);
+    return name ? name : sg_strdup("");
 }
 
 static Image *face_image(SG *g, Menu *m, Guid face) {
@@ -603,7 +603,7 @@ static void draw_save(SG *g, Menu *m) {
         if (i == cur) highlight(g, 18, y, 290, 46);
         snprintf(name, sizeof name, "%s%d", T(g)->text.saveName ? T(g)->text.saveName : "", slot + 1);
         text(g, 24, y + 8, 22, name, kWhite);
-        if (sgb_slot_info(g, slot, date, sizeof date)) {
+        if (slot_info(m, slot, date, sizeof date)) {
             char d[16], tm[16];
             snprintf(d, sizeof d, "%.10s", date);
             snprintf(tm, sizeof tm, "%.8s", date + 11);
@@ -615,7 +615,17 @@ static void draw_save(SG *g, Menu *m) {
         for (int i = 0; i < SAVE_PAGES; i++)
             blit(g->fb, g->w, g->h, m->pageIcons, i == m->savePage ? 0 : 16, 0, 16, 16, 126 + i * 16, 430, 16, 16, 255);
     quit_button(g, 18, 446, 290, cur == SLOTS_PER_PAGE);
-    if (cur < SLOTS_PER_PAGE && sgb_slot_info(g, m->savePage * SLOTS_PER_PAGE + cur, date, sizeof date)) text(g, 355, 46, 21, date, kWhite);
+    const SaveSlot *sel = cur < SLOTS_PER_PAGE ? slot_info(m, m->savePage * SLOTS_PER_PAGE + cur, date, sizeof date) : NULL;
+    if (!sel) return;
+    text(g, 355, 46, 21, date, kWhite);
+    char *where = map_name(g, sel->map);
+    text(g, 355, 82, 21, where, kWhite);
+    free(where);
+    for (int i = 0; i < sel->partyCount; i++) {
+        const SlotHero *h = &sel->party[i];
+        Member mb = {.hero = h->id, .level = h->level, .hp = h->hp, .mp = h->mp, .maxHp = h->maxHp, .maxMp = h->maxMp};
+        member_box(g, m, &mb, 341 + (i % 2) * 300, 108 + (i / 2) * 190, -7);
+    }
 }
 
 static void dialog(SG *g, const char *question, int sel) {
@@ -875,7 +885,10 @@ static void update_main(SG *g, Menu *m) {
     case MAIN_SKILLS: go(m, P_SKILL_WHO); break;
     case MAIN_EQUIP: go(m, P_EQUIP_WHO); break;
     case MAIN_STATUS: go(m, P_STATUS_WHO); break;
-    case MAIN_SAVE: go(m, P_SAVE); break;
+    case MAIN_SAVE:
+        sg_save_slots(g, m->slots, SAVE_SLOTS);
+        go(m, P_SAVE);
+        break;
     case MAIN_QUIT:
         m->cur[P_QUIT] = 1;
         go(m, P_QUIT);
@@ -1074,10 +1087,10 @@ static void update_save(SG *g, Menu *m) {
     }
     char date[64];
     sgb_sound(g, SND_DECIDE);
-    if (sgb_slot_info(g, m->savePage * SLOTS_PER_PAGE + c, date, sizeof date)) {
+    if (slot_info(m, m->savePage * SLOTS_PER_PAGE + c, date, sizeof date)) {
         m->cur[P_SAVE_CONFIRM] = 0;
         go(m, P_SAVE_CONFIRM);
-    } else if (sgb_save_slot(g, m->savePage * SLOTS_PER_PAGE + c)) {
+    } else if (save_slot(g, m, m->savePage * SLOTS_PER_PAGE + c)) {
         snprintf(m->note, sizeof m->note, "%s", MT(g, MT_SAVED));
     }
 }
@@ -1101,7 +1114,7 @@ static void update_confirm(SG *g, Menu *m, int page, int backTo) {
         return;
     }
     go(m, backTo);
-    if (sgb_save_slot(g, m->savePage * SLOTS_PER_PAGE + m->cur[P_SAVE])) snprintf(m->note, sizeof m->note, "%s", MT(g, MT_SAVED));
+    if (save_slot(g, m, m->savePage * SLOTS_PER_PAGE + m->cur[P_SAVE])) snprintf(m->note, sizeof m->note, "%s", MT(g, MT_SAVED));
 }
 
 static void update_config(SG *g, Menu *m) {
@@ -1154,6 +1167,7 @@ static void update_shop(SG *g, Menu *m) {
         }
         p->money -= price;
         party_give_item(p, it->id, 1);
+        m->result = true;
         sgb_sound(g, SND_DECIDE);
         const char *f = T(g)->text.shop[SHOP_BOUGHT];
         const char *at = f ? strstr(f, "{0}") : NULL;
@@ -1223,12 +1237,8 @@ static void update_inn(SG *g, Menu *m) {
         return;
     }
     p->money -= m->innPrice;
-    for (int i = 0; i < p->count; i++) {
-        Member *mb = &p->members[i];
-        mb->hp = member_max_hp(T(g), mb);
-        mb->mp = member_max_mp(T(g), mb);
-        mb->state = 0;
-    }
+    party_recover(g);
+    m->result = true;
     sgb_sound(g, SND_STATUS_UP);
     sg_log(g, "menu: inn, party healed for %dG", m->innPrice);
     close_menu(g, m);
@@ -1261,6 +1271,7 @@ void shop_open(SG *g, const Guid *items, const i32 *prices, int count) {
         m->shopPrices[m->shopCount++] = prices ? prices[i] : it->price;
     }
     m->cur[P_SHOP] = 0;
+    m->result = false;
     begin(g, m, MENU_SHOP, P_SHOP);
 }
 
@@ -1269,6 +1280,7 @@ void inn_open(SG *g, int price) {
     if (!m) return;
     m->innPrice = price;
     m->cur[P_INN] = 0;
+    m->result = false;
     begin(g, m, MENU_INN, P_INN);
 }
 
@@ -1276,6 +1288,8 @@ bool menu_active(SG *g) {
     SgB *b = sgb(g);
     return b && b->menu && b->menu->mode != MENU_CLOSED;
 }
+
+bool menu_result(SG *g) { return g->b.menu && g->b.menu->result; }
 
 bool sgb_quit(SG *g) {
     SgB *b = sgb(g);

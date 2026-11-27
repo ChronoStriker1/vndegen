@@ -186,7 +186,7 @@ static void test_sacred(const char *dir) {
     CHECK(aria->level == 2);
     CHECK(sgb(g)->party.money == money + 5);
 
-    aria->level = 4;
+    member_set_level(&sgb(g)->tables, aria, 4);
     aria->exp = 346;
     aria->hp = member_max_hp(&sgb(g)->tables, aria);
     CHECK(aria->hp == 85);

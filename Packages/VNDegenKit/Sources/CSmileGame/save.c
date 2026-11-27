@@ -3,7 +3,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-enum { HERO_GUID = 0, HERO_STATS = 16, HERO_EQUIP = 60, HERO_EXP = 156, HERO_MIN = 160 };
+enum { HERO_GUID = 0, HERO_STATS = 16, HERO_EXP = 52, HERO_EQUIP = 60, HERO_MIN = 160 };
 
 typedef struct Wr {
     u8 *p;
@@ -370,13 +370,9 @@ int sg_save_slots(SG *g, SaveSlot *out, int max) {
             out[i].used = true;
             out[i].written = st.st_mtime;
             out[i].map = s.map;
-            if (s.partyCount) {
-                out[i].hero = s.party[0].id;
-                out[i].level = s.party[0].level;
-                out[i].hp = s.party[0].hp;
-                out[i].maxHp = s.party[0].maxHp;
-                out[i].mp = s.party[0].mp;
-                out[i].maxMp = s.party[0].maxMp;
+            for (int k = 0; k < s.partyCount && k < 4; k++) {
+                const SaveHero *h = &s.party[k];
+                out[i].party[out[i].partyCount++] = (SlotHero){h->id, h->level, h->hp, h->maxHp, h->mp, h->maxMp};
             }
             save_free(&s);
         }
@@ -389,16 +385,9 @@ int sg_save_slots(SG *g, SaveSlot *out, int max) {
 static const int kToSave[4] = {0, 3, 1, 2};
 static const int kFromSave[4] = {0, 2, 3, 1};
 
-SaveData *sg_save_state(SG *g) {
-    SgE *e = sg_e(g);
-    return e ? &e->save : NULL;
-}
+SaveData *sg_save_state(SG *g) { return &g->e.save; }
 
-float sg_play_seconds(SG *g) {
-    SgE *e = sg_e(g);
-    if (!e) return 0;
-    return e->baseSeconds + (float)(g->clockMs - e->baseClock) / 1000.0f;
-}
+float sg_play_seconds(SG *g) { return (float)g->b.party.playMs / 1000.0f; }
 
 static bool player_at_least(SG *g, int major, int minor) {
     char *path = sg_fmt("%s/sgb_rpgplayer.exe", g->gameDir);
@@ -442,21 +431,12 @@ static bool default_camera(SG *g, float *pitch, float *dist, float *fov) {
 }
 
 void sg_save_new_game(SG *g) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
     SaveData *s = &e->save;
     save_free(s);
     bool newer = player_at_least(g, 1, 8);
-    int heroSize = newer ? 188 : 160;
-    const Settings *st = &g->data.settings;
-    s->party = sg_alloc(sizeof(SaveHero) * (size_t)(st->partyCount ? st->partyCount : 1));
-    s->partyCount = st->partyCount;
-    for (int i = 0; i < st->partyCount; i++) {
-        s->party[i].id = st->party[i];
-        s->party[i].level = 1;
-        s->party[i].size = heroSize;
-        s->party[i].body = sg_alloc((size_t)heroSize);
-    }
+    e->heroSize = newer ? 188 : 160;
+    s->party = sg_alloc(sizeof(SaveHero));
     s->reserve = sg_alloc(sizeof(SaveHero));
     s->items = sg_alloc(sizeof(SaveItem));
     s->seen = sg_alloc(sizeof(SaveItem));
@@ -481,8 +461,6 @@ void sg_save_new_game(SG *g) {
     s->cameraScale = 0.9f;
     if (!default_camera(g, &s->cameraPitch, &s->cameraDistance, &s->cameraFov)) sg_log(g, "save: no default camera in game settings");
     e->haveSave = true;
-    e->baseSeconds = 0;
-    e->baseClock = g->clockMs;
 }
 
 static char *sheet_motion(SG *g, Guid event, int sheet) {
@@ -505,7 +483,109 @@ static char *sheet_motion(SG *g, Guid event, int sheet) {
     return sg_strdup("");
 }
 
+static const SaveHero *find_hero(const SaveData *s, Guid id) {
+    for (int i = 0; i < s->partyCount; i++)
+        if (guid_eq(s->party[i].id, id)) return &s->party[i];
+    for (int i = 0; i < s->reserveCount; i++)
+        if (guid_eq(s->reserve[i].id, id)) return &s->reserve[i];
+    return NULL;
+}
+
+static SaveHero *heroes_from(const SaveData *s, const Member *m, int n, int heroSize) {
+    SaveHero *out = sg_alloc(sizeof(SaveHero) * (size_t)(n ? n : 1));
+    for (int i = 0; i < n; i++) {
+        const SaveHero *old = find_hero(s, m[i].hero);
+        SaveHero *h = &out[i];
+        h->size = old ? old->size : heroSize;
+        h->body = sg_alloc((size_t)h->size);
+        if (old) memcpy(h->body, old->body, (size_t)h->size);
+        h->id = m[i].hero;
+        h->level = m[i].level;
+        h->maxHp = m[i].maxHp;
+        h->maxMp = m[i].maxMp;
+        h->hp = m[i].hp;
+        h->mp = m[i].mp;
+        h->power = m[i].stat[STAT_POWER];
+        h->vitality = m[i].stat[STAT_VITALITY];
+        h->magic = old ? old->magic : 0;
+        h->speed = m[i].stat[STAT_SPEED];
+        memcpy(h->equip, m[i].equip, sizeof h->equip);
+        h->exp = m[i].exp;
+    }
+    return out;
+}
+
+static void free_heroes(SaveHero *h, int n) {
+    for (int i = 0; i < n; i++) free(h[i].body);
+    free(h);
+}
+
+static void capture_party(SG *g, SaveData *s) {
+    const Party *p = &g->b.party;
+    int heroSize = g->e.heroSize ? g->e.heroSize : HERO_MIN;
+    SaveHero *party = heroes_from(s, p->members, p->count, heroSize);
+    SaveHero *reserve = heroes_from(s, p->reserve, p->reserveCount, heroSize);
+    free_heroes(s->party, s->partyCount);
+    free_heroes(s->reserve, s->reserveCount);
+    s->party = party;
+    s->partyCount = p->count;
+    s->reserve = reserve;
+    s->reserveCount = p->reserveCount;
+    free(s->items);
+    s->items = sg_alloc(sizeof(SaveItem) * (size_t)(p->itemCount + 1));
+    s->itemCount = p->itemCount;
+    for (int i = 0; i < p->itemCount; i++) s->items[i] = (SaveItem){p->items[i].item, p->items[i].count};
+    s->money = p->money;
+    SaveItem *seen = sg_alloc(sizeof(SaveItem) * (size_t)(p->seenCount + 1));
+    for (int i = 0; i < p->seenCount; i++) {
+        seen[i] = (SaveItem){p->seen[i], 1};
+        for (int k = 0; k < s->seenCount; k++)
+            if (guid_eq(s->seen[k].id, p->seen[i])) seen[i].count = s->seen[k].count;
+    }
+    free(s->seen);
+    s->seen = seen;
+    s->seenCount = p->seenCount;
+    free(s->looks);
+    s->looks = sg_alloc(sizeof(SaveLook) * (size_t)(p->lookCount + 1));
+    s->lookCount = p->lookCount;
+    for (int i = 0; i < p->lookCount; i++) s->looks[i] = (SaveLook){p->looks[i].hero, p->looks[i].face, p->looks[i].graphic};
+}
+
+static void member_from(SG *g, Member *m, const SaveHero *h) {
+    memset(m, 0, sizeof *m);
+    m->hero = h->id;
+    m->level = h->level;
+    m->exp = h->exp;
+    m->hp = h->hp;
+    m->mp = h->mp;
+    m->maxHp = h->maxHp;
+    m->maxMp = h->maxMp;
+    m->stat[STAT_POWER] = h->power;
+    m->stat[STAT_VITALITY] = h->vitality;
+    m->stat[STAT_SPEED] = h->speed;
+    const HeroDef *def = hero_def(&g->b.tables, h->id);
+    m->stat[STAT_MAGIC] = def ? grow_stat(&def->stats[STAT_MAGIC], h->level) : h->magic;
+    memcpy(m->equip, h->equip, sizeof m->equip);
+}
+
+static void restore_party(SG *g, const SaveData *s) {
+    Party *p = &g->b.party;
+    party_clear(p);
+    for (int i = 0; i < s->partyCount && p->count < 8; i++) member_from(g, &p->members[p->count++], &s->party[i]);
+    for (int i = 0; i < s->reserveCount && p->reserveCount < 16; i++) member_from(g, &p->reserve[p->reserveCount++], &s->reserve[i]);
+    p->itemCap = s->itemCount + 16;
+    p->items = sg_alloc(sizeof(Stack) * (size_t)p->itemCap);
+    for (int i = 0; i < s->itemCount; i++)
+        if (s->items[i].count > 0) p->items[p->itemCount++] = (Stack){s->items[i].id, s->items[i].count};
+    p->seen = sg_alloc(sizeof(Guid) * (size_t)(s->seenCount + 1));
+    for (int i = 0; i < s->seenCount; i++) p->seen[p->seenCount++] = s->seen[i].id;
+    for (int i = 0; i < s->lookCount; i++) party_set_look(p, s->looks[i].hero, s->looks[i].face, s->looks[i].graphic);
+    p->money = s->money;
+    p->playMs = s->playSeconds > 0 ? (u64)((double)s->playSeconds * 1000.0) : 0;
+}
+
 static void capture(SG *g, SaveData *s) {
+    capture_party(g, s);
     memcpy(s->switches, g->switches, SAVE_SWITCHES);
     memcpy(s->vars, g->vars, sizeof(i32) * SAVE_VARS);
     SaveLocal *locals = sg_alloc(sizeof(SaveLocal) * (size_t)(g->localCount * 4 + s->localCount + 1));
@@ -531,6 +611,12 @@ static void capture(SG *g, SaveData *s) {
     s->z = (i32)f->player.z;
     s->dir = kToSave[f->player.dir & 3];
     s->playerY = f->player.y;
+    ViewPose pose;
+    sg_camera_get(g, &pose);
+    s->cameraPitch = pose.pitch;
+    s->cameraYaw = pose.yaw;
+    s->cameraDistance = pose.distance;
+    s->cameraFov = pose.fov;
     SaveEvent *ev = sg_alloc(sizeof(SaveEvent) * (size_t)(f->npcCount ? f->npcCount : 1));
     for (int i = 0; i < f->npcCount; i++) {
         const Actor *a = &f->npcs[i];
@@ -540,7 +626,10 @@ static void capture(SG *g, SaveData *s) {
         ev[i].id = a->eventId;
         ev[i].graphic = a->graphic ? a->graphic->id : old ? old->graphic : (Guid){{0}};
         ev[i].flag = old ? old->flag : 0;
-        if (old && guid_eq(old->graphic, ev[i].graphic)) ev[i].motion = sg_strdup(old->motion);
+        const SgaState *st = &g->interp.a;
+        bool ready = st->evCount == f->npcCount && guid_eq(st->mapId, f->map.id);
+        if (ready && st->ev[i].motion) ev[i].motion = sg_strdup(st->ev[i].motion);
+        else if (old && guid_eq(old->graphic, ev[i].graphic)) ev[i].motion = sg_strdup(old->motion);
         else ev[i].motion = sheet_motion(g, a->eventId, event_sheet(g, &f->events[i]));
         ev[i].dir = kToSave[a->dir & 3];
         ev[i].x = a->x;
@@ -565,7 +654,7 @@ static bool write_file(const char *path, const u8 *data, size_t size) {
 }
 
 bool sg_save_write(SG *g, int slot) {
-    SgE *e = sg_e(g);
+    SgE *e = &g->e;
     if (!e || slot < 0 || slot >= SAVE_SLOTS) return false;
     if (!e->haveSave) sg_save_new_game(g);
     capture(g, &e->save);
@@ -584,8 +673,7 @@ bool sg_save_write(SG *g, int slot) {
 }
 
 bool sg_save_read(SG *g, int slot) {
-    SgE *e = sg_e(g);
-    if (!e) return false;
+    SgE *e = &g->e;
     char *path = sg_save_path(g, slot);
     size_t size = 0;
     u8 *data = sg_read_file(path, &size);
@@ -625,8 +713,8 @@ bool sg_save_read(SG *g, int slot) {
     save_free(&e->save);
     e->save = s;
     e->haveSave = true;
-    e->baseSeconds = s.playSeconds;
-    e->baseClock = g->clockMs;
+    if (!e->heroSize) e->heroSize = s.partyCount ? s.party[0].size : HERO_MIN;
+    restore_party(g, &s);
     g->fadeLevel = 0;
     g->fadeTotal = 0;
     g->pendingTransfer = false;
@@ -634,14 +722,39 @@ bool sg_save_read(SG *g, int slot) {
     if (!field_load(g, s.map, s.x, s.z, kFromSave[s.dir & 3])) return false;
     Field *f = &g->field;
     f->player.y = s.playerY;
+    ViewPose pose;
+    sg_camera_get(g, &pose);
+    pose.pitch = s.cameraPitch;
+    pose.yaw = s.cameraYaw;
+    pose.distance = s.cameraDistance;
+    pose.fov = s.cameraFov;
+    pose.follow = true;
+    sg_camera_to(g, &pose, 0);
+    sga_map_loaded(g);
+    SgaState *st = &g->interp.a;
     for (int i = 0; i < f->npcCount; i++)
         for (int k = 0; k < s.eventCount; k++) {
-            if (!guid_eq(s.events[k].id, f->npcs[i].eventId)) continue;
+            const SaveEvent *se = &s.events[k];
+            if (!guid_eq(se->id, f->npcs[i].eventId)) continue;
             Actor *a = &f->npcs[i];
-            a->x = a->tx = s.events[k].x;
-            a->z = a->tz = s.events[k].z;
-            a->y = s.events[k].y;
-            a->dir = kFromSave[s.events[k].dir & 3];
+            a->x = a->tx = se->x;
+            a->z = a->tz = se->z;
+            a->y = se->y;
+            a->dir = kFromSave[se->dir & 3];
+            if (i < st->evCount && st->ev[i].sheet >= 0) {
+                SgaEvent *ev = &st->ev[i];
+                if (!guid_zero(se->graphic) && !guid_eq(se->graphic, ev->sheets[ev->sheet].graphic)) {
+                    ev->graphicOverride = true;
+                    ev->graphic = se->graphic;
+                    sga_actor_graphic(g, a, se->graphic);
+                    a->visible = a->graphic != NULL;
+                }
+                if (se->motion && (!ev->motion || strcmp(se->motion, ev->motion) != 0)) {
+                    free(ev->motion);
+                    ev->motion = sg_strdup(se->motion);
+                    sg_actor_motion(g, a, ev->motion);
+                }
+            }
             break;
         }
     snd_set_master(g, get_i32(s.config + 2), get_i32(s.config + 6));
