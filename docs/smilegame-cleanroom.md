@@ -399,8 +399,10 @@ order 腕力 体力 魔力 素早さ, skills (`int32` n, n × (skill GUID, `int3
 (`int32` n, n × (item GUID, `uint8`)), five equipment GUIDs (weapon, shield, head, body, accessory), 2 bytes, battle
 commands (`int32` n, n GUIDs), 16 bytes, description, face GUID, HP and MP as base, growth and curve, then 6 bytes.
 
-A stat at level L is base + growth × (L − 1)^curve, truncated: Sacred's アリア at level 2 has HP 40 + 15 = 55 and
-腕力 32, as the PC shows. 攻撃力 on the status page is 腕力 plus the weapon's attack, 防御力 is 体力 plus the armour's
+A stat at level L is base + growth × (1 + curve + curve² + … + curve^(L−2)), truncated, so each level adds the growth
+times the curve to the power of the levels before it: Sacred's アリア at level 2 has HP 40 + 15 = 55 and 腕力 32, as
+the PC shows, and HP 85 at level 4 and 100 at level 5; マオー, who joins at level 12, has 腕力 88 (curve 0.99), 素早さ
+135 and MP 152 (curve 1.01) on the PC (round 5, N). 攻撃力 on the status page is 腕力 plus the weapon's attack, 防御力 is 体力 plus the armour's
 defence, 素早さ is the stat plus equipment. An item in the exception list can't be equipped by that hero (Colette's
 ダーク and アイスロッド, inferred from the editor's default of "everything").
 
@@ -431,7 +433,9 @@ The PC's equipment page shows ナイフ as 攻撃力 5 and 古びた剣 as 攻�
 GUID, name, description, icon sheet GUID, `uint8` icon column and row, then two length-prefixed blocks. The first
 (21 bytes, 27 in one Colette skill) holds `uint8` usable in the field, `uint8` usable in battle, `int32` 0, `int32` MP
 cost, `int32` target (0 one ally, 1 all allies, 2 one enemy, 3 all enemies, 4 the user; 5 and 10 seen once each). The
-second (94 bytes) starts with the effect GUID and the `int32` power; the rest is left for the battle round.
+second (94 bytes) starts with the effect GUID, the `int32` power, an `int32` and an `int32` that for friendly skills is
+the share of the target's maximum HP restored, in percent (Sacred's ヒール 50, Colette's ヒーリング 15; attack spells
+hold 1 there, 毒牙 3, 即死攻撃 100); the rest is left for the battle round.
 
 ### Monsters (`Monster.sgr`, type 8)
 
@@ -567,7 +571,8 @@ map's centre when absent), `1001` and one `x, z` pair per monster is each monste
   84, level 4 between 182 and 186, level 5 350, level 6 600. Colette's status pages (経験値 plus つぎのレベルまで) with
   the runner's saves loaded in the PC add level 7 966, level 8 1484, level 9 2196 and level 10 3150, and round 5 adds
   level 11 4400, 12 6006, 13 8034, 14 10556, 15 13650 and 16 17400 (see Colette's second half below). All of them are
-  L(L−1)(L²−L+50)/4, which the runtime uses; it puts level 4 at 186. A runner save that called メイリ level 9 at 1984
+  L(L−1)(L²−L+50)/4, which the runtime uses; it puts level 4 at 186. Sacred's PC gives the same up to level 50
+  (1531250) and adds 120000 a level above it: 1651250 at 51, 2131250 at 55, 7411250 at 99 (round 5, N). A runner save that called メイリ level 9 at 1984
   points showed level 8 in the PC before the table was right.
 - A level-up raises the maximum HP and MP and leaves the current values as they were: after that ゾンビーナ battle
   the PC's menu showed ダーク at 24/45 and コレット at 12/41, the HP each had at the end of the battle.
@@ -1004,3 +1009,62 @@ Saves move both ways at three more places, each loaded at the same cell with the
 items and money: the cat's mansion (the runner's save in the PC, and the PC's save there back in the runner), the
 tower's 集会場 (after three steps in the PC, each poisoned member 3 HP lower in both), and the throne room after the
 staff roll (the PC's save matched the runner's own state field for field, variables and switches too).
+
+## Sacred past the first dungeon (round 5, N)
+
+Sacred was played on from the Vord forest in the runner, and each stage was checked in the PC under Wine by loading
+the runner's save there or playing the same route from it. Values below come from the PC's saves and captures.
+
+### Choices and the inn
+
+- A choice window (command 30, and the inn's offer) draws every choice on the `default_selectable` panel, 44 pixels
+  high at a 46-pixel pitch inside the `default` window, with `default_selected` over the cursor's row and the text
+  shadowed. The PC also pulses the cursor row: at サンプール's inn a pixel inside it went from blue 76 to 104 and back
+  about once a second. The menus don't pulse in the runtime, and neither does this.
+- Sacred's inn command (38) has three values (price, 1, 1) and the PC leaves the player facing the innkeeper after the
+  stay; Colette's (player 1.8.1) has a fourth, 4, and its PC turns the player down. The turn follows the fourth value.
+- サンプール's inn, compared with the PC from the same save: the offer, the price taken, HP and MP restored, the
+  stayed branch and the money window all match.
+
+### Experience and stats
+
+- The status page of Sacred's player shows the hero's level as saved and, under つぎのレベルまで, the next level's
+  total minus the hero's experience. Saves with each hero at experience 0 and a chosen level gave the totals for 2 to
+  12, 30, 40, 50, 51, 55, 60, 70, 80, 90 and 99 (see Battles above).
+- Hero stats follow the rule under Heroes above. A hero who joins above level 1 (マオー at 12) has, in the PC's save,
+  every skill of her table up to that level in the learned list, in table order.
+- A save's maximum HP and MP include the equipment's bonuses: マオー's maximum MP is 162 with her メイジローブ (+10) and
+  152 after the PC took it off. Power, vitality and speed are saved without equipment.
+
+### Random encounters
+
+The last `int32` of a monster record (0, 1 or 2) sets how many of it a random encounter brings: at 0 one (ミニゴーレム,
+10 of 10), at 1 one or two (スライミー, 3 and 5 of 8), at 2 up to five (ベスライミー in the sand temple: one 8 times in
+19, two 2, three 4, four 3, five 2). Every group seen was of one kind. The runtime picks one to 1, 2 or 5 uniformly;
+the PC brings a lone small monster somewhat more often. A random group stands in one row in the runtime; the PC
+staggers four or five in two rows. Scripted battles (65) give their own layout.
+
+### Encounters off
+
+The prison's opening scene turns random encounters off (66 1) and the first step into 牢屋2 turns them on again (66
+0), so 牢屋 itself has none until then, as on the PC.
+
+### Healing
+
+On the PC ヒール (power 0, 50 in the field above) took ロイ from 100 to 236 HP of 273 from the field menu: half his
+maximum. The runtime restores that share in battle and from the menu, plus power and magic in battle as before when
+the power is above 0 (inferred). Before this ヒール healed nothing in the runtime.
+
+### The rest of the path
+
+- The ship from サンプール needs a ticket from the shop beside the pier and plays its scene on the world map with the
+  screen off; the pier town (桟橋) has a shop and an inn.
+- The prison opening turns random encounters off and 牢屋2's first step turns them on; マオー joins through the bars of
+  牢屋3 (talk from the cell in front of the bars).
+- The dragon tower's gatekeeper steps aside once ファフニール is in the party; the tower's top boss パンドラゴン opens the way
+  through the labyrinth to シュワントー.
+- In シュワントー's tournament ロイ fights alone; losing the final shows a scene and then GAME OVER.
+- The depths of the デオズズ volcano hold a scripted fight with six 炎の悪魔 (500 HP each); the runner's party
+  (ロイ 17, ファフニール 14, アリア 11) lost it, and play stopped there.
+- A runner save in the volcano depths loaded in the PC with the same party, levels, HP, MP, items and money, and the
+  PC's save there loaded back in the runner the same; the prison save did as well.
