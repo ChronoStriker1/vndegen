@@ -278,8 +278,10 @@ void Renderer::drawMessage(Canvas &canvas) {
             int frames = std::max(1, game_.pauseIconFrames());
             int ph = pause->h / frames;
             int frame = int(game_.frameCount() / 6 % frames);
-            canvas.draw(*pause, {0, frame * ph, pause->w, ph},
-                        {box.x + box.w / 2 - pause->w / 2.0f, box.y + box.h - ph - 2, float(pause->w), float(ph)});
+            float px = box.x + box.w / 2, py = box.y + box.h - ph - 2;
+            int sx = game_.systemNumber(5), sy = game_.systemNumber(6);
+            if (sx != 0 || sy != 0) px = float(sx), py = textY + float(sy);
+            canvas.draw(*pause, {0, frame * ph, pause->w, ph}, {px - pause->w / 2.0f, py, float(pause->w), float(ph)});
         }
     }
 }
@@ -305,6 +307,7 @@ void Renderer::drawChoices(Canvas &canvas) {
     // System variable 4 moves the choice window's top to a given height; -1 leaves Wolf's own placement. A game with a
     // picture menu hides the window by moving it far off the screen, as Succubus Prison's title does with -1000.
     if (int top = game_.choiceTop(); top != -1) box.y = float(top);
+    if (int center = game_.choiceCenterX(); center != -1) box.x = float(center) - w / 2;
     game_.setChoiceBox(box.x + pad, box.y + pad, w - pad * 2, lineH);
     drawWindow(canvas, *images_.get(game_.windowSkin()), box, 0.9f);
     BitmapPtr cursor = images_.get(game_.cursorSkin());

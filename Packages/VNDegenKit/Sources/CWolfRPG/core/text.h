@@ -47,6 +47,7 @@ struct TextToken {
         Tighten,    // \-[n]: pixels taken off each character's advance from here on
         Edge,       // \E (1) and \N (0): outlined text or plain
         EdgeColor,  // \cE[n]
+        EdgeWidth,
         Face,       // \font[n]: the base font (0) or a sub font (1 to 3)
         LineMax,    // \m[n]: the line is at least as tall as text of size n
     };

@@ -277,6 +277,7 @@ public:
     std::string pauseIcon() const;
     int pauseIconFrames() const;
     int choiceTop() const { return system_.size() > 4 ? system_[4] : -1; }
+    int choiceCenterX() const { return system_.size() > 3 ? system_[3] : -1; }
     std::string systemString(int i) const;
     int32_t systemNumber(int i) const;
     std::array<uint8_t, 3> textColor(int i) const;

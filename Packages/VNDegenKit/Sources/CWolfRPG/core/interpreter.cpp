@@ -58,7 +58,7 @@ bool Game::jumpToCase(Thread::Call &c, int indent, int caseValue) {
 }
 
 void Game::unsupported(const Command &c) {
-    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet (%x)", c.code, c.arg(1)));
+    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet (%x, %x)", c.code, c.arg(0), c.arg(1)));
 }
 
 bool Game::step(Thread &t) {
@@ -142,7 +142,6 @@ bool Game::step(Thread &t) {
         case 111: {  // numeric condition
             int flags = cmd.arg(0);
             int count = flags & 0x0F;
-            bool elseCase = (flags & 0xF0) != 0;
             int chosen = 0;
             for (int i = 0; i < count; i++) {
                 int32_t left = readVar(cmd.arg(1 + i * 3), t);
@@ -153,7 +152,6 @@ bool Game::step(Thread &t) {
                     break;
                 }
             }
-            if (chosen == 0 && !elseCase) chosen = -1;
             jumpToCase(c, indent, chosen);
             return true;
         }
@@ -161,7 +159,6 @@ bool Game::step(Thread &t) {
         case 112: {  // string condition
             int flags = cmd.arg(0);
             int count = flags & 0x0F;
-            bool elseCase = (flags & 0xF0) != 0;
             int chosen = 0;
             for (int i = 0; i < count; i++) {
                 int32_t leftWord = cmd.arg(1 + i);
@@ -194,7 +191,6 @@ bool Game::step(Thread &t) {
                     break;
                 }
             }
-            if (chosen == 0 && !elseCase) chosen = -1;
             jumpToCase(c, indent, chosen);
             return true;
         }
