@@ -55,8 +55,13 @@ bool sg_step_free(SG *g, int fromX, int fromZ, int h0, int x, int z, int self) {
     if (h0 != h1 && (abs(h1 - h0) > 1 || !(on_stairs(m, x, z) || on_stairs(m, fromX, fromZ)))) return false;
     if (!deck && sg_ground(g, fromX, fromZ) != sg_ground(g, x, z) && (across_stairs(g, fromX, fromZ, x - fromX) || across_stairs(g, x, z, x - fromX))) return false;
     if (self >= 0 && occupies(&f->player, x, z)) return false;
-    for (int i = 0; i < f->npcCount; i++)
-        if (i != self && f->npcs[i].visible && occupies(&f->npcs[i], x, z)) return false;
+    const SgaState *st = &g->interp.a;
+    bool sheets = st->evCount == f->npcCount && guid_eq(st->mapId, m->id);
+    for (int i = 0; i < f->npcCount; i++) {
+        if (i == self || !f->npcs[i].visible || !occupies(&f->npcs[i], x, z)) continue;
+        if (sheets && st->ev[i].sheet >= 0 && !st->ev[i].sheets[st->ev[i].sheet].solid) continue;
+        return false;
+    }
     return true;
 }
 
