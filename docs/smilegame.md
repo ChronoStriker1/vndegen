@@ -6,7 +6,8 @@ interprets the data. VNDegen runs these games on a runtime of its own, `Packages
 written in C from the games' files and the original player's behaviour under Wine. `docs/smilegame-cleanroom.md`
 records every layout and where it came from.
 
-The runtime is in its first stage: it has a Linux runner and no app plugin yet.
+The runtime runs in the app on Mac, iPhone and iPad through the `EngineSmileGame` plugin, and on Linux through the
+runners below.
 
 ## Test games
 
@@ -52,6 +53,27 @@ Frame times on a 14-core Linux VM, 960 by 544, six threads, measured with `sgvie
 PC games and a test ran beside it (load average about 10): walking Sacred's 150 by 150 field 9.7 ms average, 99th
 percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred's forest 11.0 ms (99th percentile
 17.6 ms) and its castle courtyard, 74,000 triangles in view, 22.2 ms. On one thread the same views take 12 to 38 ms.
+
+## In the app (round 2, F)
+
+`EngineSmileGame` takes a folder as a Smile Game Builder game when `data.sgbpack`, starting with `YUKARPKG`, is beside
+`sgb_rpgplayer.exe`, up to two folders down, ignoring case: Colette's archive has the game at its top, Sacred's two
+folders down beside the download site's pictures. The session runs `vnsmilegame_frame` from the display link on the main
+thread, at most once per 15 ms, so a 120 Hz display doesn't draw the scene twice per game frame, and hands the frame to
+`FrameView` through the shared frame host; sound goes through `PCMAudioOutput` at 44.1 kHz.
+
+- Saves are the PC's `savedata/Save_NN.sgs` and `settings.dat` beside the game, which is where Ludusavi looks on
+  Windows, so a backup restores into the folder the runtime reads.
+- Keys: Return, Space and Z confirm, Escape and X cancel and open the menu, Shift dashes, the arrows and WASD move. A
+  game starts on the RPG Maker layout: A confirms, B cancels, Y and Menu press X, X holds Shift, the D-pad and left
+  stick move. The player reads no other key, so LB, RB, LT, RT and View start unbound instead of pressing Q, W, A, S and
+  D, which would move the player. Touches outside the touch gamepad do nothing, since the player takes no mouse input.
+- Game commands in the VNDegen menu has Save and Load with the 40 slots the PC's save page shows, written and read
+  with `vnsmilegame_save` and `vnsmilegame_load`, until the game's own save page writes.
+- The game's font comes from its package. `VNSmileGameConfig.fallbackFont` carries the MS PGothic substitute
+  (`docs/fonts.md`) for text the game font can't draw; the runtime doesn't read it yet.
+- With `-frameMonitor YES` a DEBUG build logs `SGFRAMES` every 10 seconds: display ticks, frames drawn, the 1% low,
+  the slowest step, the average work per tick and the scene.
 
 ## The Linux host
 
