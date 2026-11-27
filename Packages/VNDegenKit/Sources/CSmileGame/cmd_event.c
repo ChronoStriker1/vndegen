@@ -3,6 +3,7 @@
 #include <math.h>
 
 static const float kWalkCellsPerSec = 4.0f;
+static const i16 kNoUnder = -32768;
 
 static void parse_sheets(SgaEvent *ev, const SgrRec *rec, Game *d) {
     Rd r = rd_make(rec->body, rec->size);
@@ -151,10 +152,13 @@ static void build_floor(SG *g) {
     SgaState *a = &g->interp.a;
     const Map *m = &g->field.map;
     free(a->floor);
+    free(a->under);
     a->floorW = m->w;
     a->floorH = m->h;
     a->floor = sg_alloc(sizeof(i16) * (size_t)m->w * (size_t)m->h);
     memcpy(a->floor, m->height, sizeof(i16) * (size_t)m->w * (size_t)m->h);
+    a->under = sg_alloc(sizeof(i16) * (size_t)m->w * (size_t)m->h);
+    for (int i = 0; i < m->w * m->h; i++) a->under[i] = kNoUnder;
     for (int i = 0; i < m->objectCount; i++) {
         const MapObject *o = &m->objects[i];
         const SgrRec *rec = resource_record(g, o->id);
@@ -165,23 +169,35 @@ static void build_floor(SG *g) {
         free(rd_str(&r));
         rd_i32(&r);
         int n = rd_i16(&r);
+        bool inside = o->x >= 0 && o->z >= 0 && o->x < m->w && o->z < m->h;
+        int base = inside ? m->height[(size_t)o->z * (size_t)m->w + (size_t)o->x] : 0;
         for (int k = 0; k < n && !r.bad; k++) {
             int ex = rd_i16(&r) - 32, ez = rd_i16(&r) - 32, h = rd_i16(&r);
-            rd_i16(&r);
+            bool deck = rd_i16(&r) != 0;
             int dx = ex, dz = ez;
             switch (o->dir & 3) {
-            case 1: dx = -ez, dz = ex; break;
+            case 1: dx = ez, dz = -ex; break;
             case 2: dx = -ex, dz = -ez; break;
-            case 3: dx = ez, dz = -ex; break;
+            case 3: dx = -ez, dz = ex; break;
             default: break;
             }
             int x = o->x + dx, z = o->z + dz;
             if (x < 0 || z < 0 || x >= m->w || z >= m->h || h <= 0) continue;
-            i16 *f = &a->floor[(size_t)z * (size_t)m->w + (size_t)x];
-            i16 top = (i16)(m->height[(size_t)z * (size_t)m->w + (size_t)x] + h);
-            if (top > *f) *f = top;
+            size_t at = (size_t)z * (size_t)m->w + (size_t)x;
+            i16 top = (i16)(base + h);
+            if (top > a->floor[at]) a->floor[at] = top;
+            if (deck && top - m->height[at] >= 2) a->under[at] = m->height[at];
         }
     }
+}
+
+int sg_floor_level(SG *g, int x, int z, int from) {
+    SgaState *a = &g->interp.a;
+    const Map *m = &g->field.map;
+    int top = sga_floor(g, x, z);
+    if (x < 0 || z < 0 || x >= m->w || z >= m->h || !a->under || a->floorW != m->w || a->floorH != m->h || !guid_eq(a->mapId, m->id)) return top;
+    int u = a->under[(size_t)z * (size_t)m->w + (size_t)x];
+    return u != kNoUnder && abs(from - u) < abs(from - top) ? u : top;
 }
 
 int sga_floor(SG *g, int x, int z) {
@@ -374,7 +390,7 @@ void sga_move_actor(SG *g, Actor *a, int *dir, int *left, float speed, bool thro
             a->z += ddz / d * budget;
             budget = 0;
         }
-        a->y = (float)sga_floor(g, (int)floorf(a->x), (int)floorf(a->z));
+        a->y = (float)sg_floor_level(g, (int)floorf(a->x), (int)floorf(a->z), (int)lroundf(a->y));
     }
     (void)through;
     if (*left <= 0) a->moving = false;

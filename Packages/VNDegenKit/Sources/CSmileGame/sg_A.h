@@ -137,6 +137,7 @@ typedef struct SgaState {
     int evCount;
     Guid mapId;
     i16 *floor;
+    i16 *under;
     int floorW, floorH;
     bool mapPending;
     bool dirty;

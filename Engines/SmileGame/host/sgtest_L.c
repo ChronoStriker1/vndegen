@@ -15,7 +15,7 @@ static int failures, checks;
         }                                                                                                              \
     } while (0)
 
-enum { VK_UP = 0x26, VK_DOWN = 0x28, VK_OK = 0x0d, VK_CANCEL = 0x1b };
+enum { VK_UP = 0x26, VK_DOWN = 0x28, VK_RIGHT = 0x27, VK_OK = 0x0d, VK_CANCEL = 0x1b };
 
 static SG *open_game(const char *dir) {
     VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = "/nonexistent-sgtest-l", .audioRate = 44100};
@@ -141,12 +141,49 @@ static void test_inn_bed(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void step(SG *g, int vk) {
+    vnsmilegame_key((VNSmileGame *)g, vk, true);
+    for (int t = 0; t < 1000 && !g->field.player.moving; t += 16) run(g, 16);
+    vnsmilegame_key((VNSmileGame *)g, vk, false);
+    for (int t = 0; t < 1000 && g->field.player.moving; t += 16) run(g, 16);
+    run(g, 100);
+}
+
+static void warp(SG *g, const char *map, int x, int z, int dir) {
+    sg_debug_warp((VNSmileGame *)g, map, x, z, dir);
+    run(g, 1500);
+    for (int i = 0; i < 20 && g->interp.active; i++) press(g, VK_OK), run(g, 300);
+}
+
+static bool at(SG *g, int x, int z) { return (int)g->field.player.x == x && (int)g->field.player.z == z; }
+
+static void test_bridges(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    g->switches[69] = 1;
+    for (int i = 30; i <= 36; i++) g->switches[i] = 1;
+    warp(g, "コムコムの穴Ｂ02Ｆ", 11, 15, 1);
+    for (int i = 0; i < 4; i++) step(g, VK_RIGHT);
+    CHECK(at(g, 15, 15));
+    warp(g, "コムコムの穴Ｂ03Ｆ", 9, 16, 0);
+    for (int i = 0; i < 4; i++) step(g, VK_UP);
+    CHECK(at(g, 9, 12));
+    warp(g, "コムコムの穴Ｂ03Ｆ", 6, 15, 0);
+    step(g, VK_UP);
+    CHECK(at(g, 6, 15));
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
         test_inn_stay(colette);
         test_inn_no_money(colette);
         test_inn_bed(colette);
+        test_bridges(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;

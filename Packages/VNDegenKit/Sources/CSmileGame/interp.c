@@ -141,6 +141,7 @@ void interp_free(Interp *ip) {
     runner_reset(ip);
     SgaState *a = &ip->a;
     free(a->floor);
+    free(a->under);
     for (int i = 0; i < a->evCount; i++) {
         for (int k = 0; k < a->ev[i].sheetCount; k++) free(a->ev[i].sheets[k].motion);
         free(a->ev[i].sheets);
