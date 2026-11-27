@@ -644,10 +644,12 @@ static void capture(SG *g, SaveData *s) {
         for (int k = 0; k < s->eventCount && sameMap && !old; k++)
             if (guid_eq(s->events[k].id, a->eventId)) old = &s->events[k];
         ev[i].id = a->eventId;
-        ev[i].graphic = a->graphic ? a->graphic->id : old ? old->graphic : (Guid){{0}};
         ev[i].flag = old ? old->flag : 0;
         const SgaState *st = &g->interp.a;
         bool ready = st->evCount == f->npcCount && guid_eq(st->mapId, f->map.id);
+        if (ready && st->ev[i].sheet >= 0) ev[i].graphic = st->ev[i].graphicOverride ? st->ev[i].graphic : st->ev[i].sheets[st->ev[i].sheet].graphic;
+        else if (ready) ev[i].graphic = (Guid){{0}};
+        else ev[i].graphic = a->graphic ? a->graphic->id : old ? old->graphic : (Guid){{0}};
         if (ready && st->ev[i].motion) ev[i].motion = sg_strdup(st->ev[i].motion);
         else if (old && guid_eq(old->graphic, ev[i].graphic)) ev[i].motion = sg_strdup(old->motion);
         else ev[i].motion = sheet_motion(g, a->eventId, event_sheet(g, &f->events[i]));
