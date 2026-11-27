@@ -13,8 +13,7 @@ void sga_item_add(SG *g, Guid id, i32 n) { party_give_item(&g->b.party, id, n); 
 bool sga_in_party(SG *g, Guid hero) { return party_has_hero(&g->b.party, hero); }
 
 static void update_leader_graphic(SG *g) {
-    Guid gr = party_leader_graphic(g);
-    if (!guid_zero(gr)) sga_actor_graphic(g, &g->field.player, gr);
+    if (g->b.party.count) sga_actor_graphic(g, &g->field.player, party_leader_graphic(g));
 }
 
 void sga_new_game(SG *g) {
