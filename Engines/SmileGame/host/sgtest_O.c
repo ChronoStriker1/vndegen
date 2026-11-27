@@ -206,6 +206,30 @@ static void test_poison_bubbles(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_vertex_colors(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    Model *m = NULL;
+    for (int i = 0; i < g->res.count && !m; i++)
+        if (!strcmp(g->res.items[i].name, "Bookshelf")) m = model_load(g, g->res.items[i].path);
+    CHECK(m != NULL);
+    if (m) {
+        int colored = 0, chroma = 0;
+        for (int i = 0; i < m->mesh.count; i++) {
+            const u16 *c = m->mesh.tris[i].color;
+            if (!c[3]) continue;
+            colored++;
+            int mx = c[0] > c[1] ? (c[0] > c[2] ? c[0] : c[2]) : (c[1] > c[2] ? c[1] : c[2]);
+            int mn = c[0] < c[1] ? (c[0] < c[2] ? c[0] : c[2]) : (c[1] < c[2] ? c[1] : c[2]);
+            if (mx - mn > 30) chroma++;
+        }
+        CHECK(colored > 50);
+        CHECK(chroma > 5);
+        model_free(m);
+    }
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
@@ -215,6 +239,7 @@ int main(void) {
         test_switch_after_transfer(colette);
         test_front_row(colette);
         test_poison_bubbles(colette);
+        test_vertex_colors(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
