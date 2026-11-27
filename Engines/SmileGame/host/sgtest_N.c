@@ -196,6 +196,55 @@ static void test_mao_joins(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static const SkillDef *skill_named(SG *g, const char *name) {
+    const Tables *t = &g->b.tables;
+    for (int i = 0; i < t->skillCount; i++)
+        if (strcmp(t->skills[i].name, name) == 0) return &t->skills[i];
+    return NULL;
+}
+
+static void test_heal_skill(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    const Tables *t = &g->b.tables;
+    Party *p = &g->b.party;
+    while (p->count > 0) party_remove_hero(g, p->members[0].hero);
+    for (int i = 0; i < t->heroCount; i++)
+        if (strcmp(t->heroes[i].name, "ロイ") == 0) party_add_hero(g, t->heroes[i].id);
+    Member *roy = member_named(g, "ロイ");
+    const SkillDef *heal = skill_named(g, "ヒール");
+    CHECK(roy && heal && heal->percent == 50);
+    if (!roy || !heal) {
+        vnsmilegame_close((VNSmileGame *)g);
+        return;
+    }
+    member_set_level(t, roy, 15);
+    roy->exp = battle_exp_for_level(15);
+    roy->learned[roy->learnedCount++] = heal->id;
+    roy->mp = member_max_mp(t, roy);
+    roy->maxHp = 273;
+    roy->hp = 100;
+    BattleSetup s;
+    memset(&s, 0, sizeof s);
+    for (int i = 0; i < t->monsterCount; i++)
+        if (strcmp(t->monsters[i].name, "スライミー") == 0) s.monsters[s.count++] = t->monsters[i].id;
+    battle_seed(g, 7);
+    sg_battle_start(g, &s);
+    for (int k = 0; k < 2000 && sg_battle_active(g) && strcmp(battle_phase(g), "command") != 0; k++) run(g, 16);
+    press(g, 0x28);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "list") == 0);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "ally") == 0);
+    press(g, VK_OK);
+    for (int k = 0; k < 2000 && sg_battle_active(g) && strcmp(battle_phase(g), "command") != 0; k++) run(g, 16);
+    CHECK(roy->hp == 236);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     test_exp_curve();
     const char *sacred = getenv("SG_SACRED");
@@ -203,6 +252,7 @@ int main(void) {
         test_pier_inn_keeps_facing(sacred);
         test_encounter_groups(sacred);
         test_mao_joins(sacred);
+        test_heal_skill(sacred);
     } else
         printf("SG_SACRED not set: Sacred checks skipped\n");
     printf("%d checks, %d failed\n", checks, failures);
