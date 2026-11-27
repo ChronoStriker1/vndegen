@@ -671,3 +671,19 @@ void interp_draw_last_window(SG *g) {
     Interp *ip = &g->interp;
     if (ip->active && ip->a.lastPage && ip->a.msgCmd) draw_message(g, ip->a.lastPage, 1 << 30);
 }
+
+void interp_show_text(SG *g, const char *text) {
+    Interp *ip = &g->interp;
+    if (!ip->active) return;
+    SgaState *a = &ip->a;
+    split_pages(g, ip, text);
+    a->msgCmd = CMD_MESSAGE;
+    a->msgPos = 2;
+    a->faceL = a->faceR = (Guid){{0}};
+    a->speaker = 0;
+    a->windowOpen = true;
+    a->textMs = 0;
+    ip->shownMs = 0;
+    ip->state = ST_MESSAGE;
+    sg_log(g, "message: %s", ip->pages[0]);
+}

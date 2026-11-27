@@ -124,6 +124,13 @@ static void learn_skill(SG *g, const Cmd *c) {
         m->learnedCount--;
     } else if (!forget && at < 0 && m->learnedCount < 16) {
         m->learned[m->learnedCount++] = skill;
+        const HeroDef *h = hero_def(&g->b.tables, hero);
+        const SkillDef *sk = skill_def(&g->b.tables, skill);
+        if (h && sk) {
+            char *text = sg_fmt("%s\xe3\x81\xaf\xe3\x80\x8c%s\xe3\x80\x8d\xe3\x82\x92\xe8\xa6\x9a\xe3\x81\x88\xe3\x81\x9f", h->name, sk->name);
+            interp_show_text(g, text);
+            free(text);
+        }
     }
     sg_log(g, "skill %s, hero knows %d added skills", forget ? "forgotten" : "learned", m->learnedCount);
 }

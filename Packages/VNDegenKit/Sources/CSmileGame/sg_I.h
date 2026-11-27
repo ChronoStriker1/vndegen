@@ -44,5 +44,6 @@ void sgi_pictures_draw(SG *g);
 void sgi_pictures_save(SG *g, SaveData *s);
 void sgi_pictures_load(SG *g, const SaveData *s);
 void interp_draw_last_window(SG *g);
+void interp_show_text(SG *g, const char *text);
 
 #endif
