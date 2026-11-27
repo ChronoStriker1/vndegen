@@ -403,7 +403,7 @@ SaveData *sg_save_state(SG *g) { return &g->e.save; }
 float sg_play_seconds(SG *g) { return (float)g->b.party.playMs / 1000.0f; }
 
 bool sg_player_at_least(SG *g, int major, int minor) {
-    char *path = sg_fmt("%s/sgb_rpgplayer.exe", g->gameDir);
+    char *path = find_ci(g->gameDir, "sgb_rpgplayer.exe");
     size_t n = 0;
     u8 *d = sg_read_file(path, &n);
     free(path);
