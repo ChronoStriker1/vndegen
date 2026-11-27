@@ -780,10 +780,11 @@ static void draw_shop(SG *g, Menu *m) {
         button(g, 23, y, 377, 48);
         if (i == cur) highlight(g, 23, y, 377, 48);
         icon(g, it->icon, it->iconX, it->iconY, 34, y + 8);
-        text(g, 68, y + 11, 21, it->name, kWhite);
+        u32 c = !sell && P(g)->money < m->shopPrices[i] ? kGray : kWhite;
+        text(g, 68, y + 11, 21, it->name, c);
         char right[32];
         snprintf(right, sizeof right, "%d", sell ? it->price / 2 : m->shopPrices[i]);
-        text_right(g, 393, y + 14, 17, right, kWhite);
+        text_right(g, 393, y + 14, 17, right, c);
     }
     quit_button(g, 23, 414, 377, cur == l.count);
     const ItemDef *it = cur < l.count ? item_def(T(g), l.ids[cur]) : NULL;
@@ -791,15 +792,15 @@ static void draw_shop(SG *g, Menu *m) {
     panel(g, 13, 473, 933, 62);
     text_fit(g, 480, 490, 22, 900, m->note[0] ? m->note : it ? it->desc : "", kWhite);
     if (m->qty && it) {
-        panel(g, 606, 381, 239, 65);
-        icon(g, it->icon, it->iconX, it->iconY, 616, 392);
-        text(g, 650, 394, 20, it->name, kWhite);
+        panel(g, 240, 206, 480, 132);
+        icon(g, it->icon, it->iconX, it->iconY, 265, 233);
+        text(g, 302, 229, 24, it->name, kWhite);
         char q[16], price[32];
         snprintf(q, sizeof q, "x%d", m->qty);
-        highlight(g, 793, 389, 44, 28);
-        text_center(g, 815, 392, 17, q, kWhite);
+        highlight(g, 615, 224, 77, 47);
+        text_right(g, 678, 231, 24, q, kWhite);
         snprintf(price, sizeof price, "%dG", (sell ? it->price / 2 : m->shopPrices[cur]) * m->qty);
-        text(g, 795, 420, 17, price, kWhite);
+        text_right(g, 678, 277, 24, price, kWhite);
     }
 }
 
