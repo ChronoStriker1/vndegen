@@ -168,10 +168,12 @@ Comparisons: 0 equal, 1 not equal, 2 at least, 3 at most, 4 more than, 5 less th
 with its key (the PC opens it once the key is held), its castle stairs use 3 and 2 with variable 0.
 
 The 22 bytes after the graphic GUID are `int32` direction, `int32` fixed direction, a byte that is 1 on sheets with a
-graphic, an `int32` from -3 to 3, a byte that is 1 on map objects such as doors and chests, `int32` movement (0 still,
-1 random walk, 2 toward the player) and `int32` speed from -3 to 3. Only the direction is used so far: an event whose
-direction is 1 and not fixed turns to the player when talked to and turns back afterwards (Colette's aide does, the
-bridge guard with direction 3 does not).
+graphic, `int32` step speed from -3 to 3, a byte that is 1 on map objects such as doors and chests, `int32` movement
+(0 still, 1 random walk, 2 toward the player) and `int32` step frequency from -3 to 3 (round 3 found which is which;
+see "The field" below). The direction is the event's facing when its sheet becomes active, in the save's codes (0 up,
+1 down, 2 left, 3 right): Sacred's training soldiers (3) face right in the PC's saves. An event whose direction is 1
+and not fixed turns to the player when talked to and turns back afterwards (Colette's aide does, the bridge guard
+with direction 3 does not).
 
 ### Triggers
 
@@ -200,8 +202,8 @@ each later choice after a 74 whose argument is its number. Branches: 46 switch (
 | 17 | move player | as 11 | Colette's stairs push the player back up two cells |
 | 20 | move to map | map GUID (zero: this map), x, z, facing | facing 0 keeps, 1 up, 2 down, 3 left, 4 right |
 | 23 | erase picture | number, fade flag | |
-| 24 | change picture | number, opacity %, ms, … | |
-| 25 | show picture | number, picture GUID, opacity %, colour (-1 plain), 1, x, y, -1, fade flag | full-screen pictures centred |
+| 24 | change picture | number, zoom %, ms, 1, colour, 1, x, y | moves zoom, colour and position over the time |
+| 25 | show picture | number, picture GUID, zoom %, colour (-1 plain), 1, x, y, -1, fade flag | pictures centred, then offset by x, y |
 | 27 | effect | 0 the event or 1 the player, effect GUID | effect from `Effect.sgr` |
 | 29 | message | text, position (0 top, 1 middle, 2 bottom), flag | dark `default` window, white text |
 | 31 | variable | target 0, index, operand 0 constant or 1 variable, value, operation 0 set, 1 add, 2 subtract | |
@@ -226,8 +228,7 @@ each later choice after a 74 whose argument is its number. Branches: 46 switch (
 | 21, 22, 64 | BGM, sound, music effect | GUID, volume, tempo, … | 21 with a zero GUID stops the BGM; 64's resources are ME_item_get, ME_lodging and fanfares |
 
 Direction codes for 10, 11, 16 and 17 are 0 up, 1 down, 2 left, 3 right; Sacred's castle scene ends with the player and
-the soldier where these codes put them. 10 and 16 also take 4 to 7, and 11 a one-argument form; their meaning is not
-known yet.
+the soldier where these codes put them. 10 and 16 also take 4 to 7, and 11 a one-argument form (round 3, below).
 
 ### Messages
 
@@ -485,8 +486,8 @@ runtime's output carries that level. Changing BGM cuts over with no gap.
 
 Commands seen: 21 play BGM (GUID, volume, tempo, flag), 22 play sound (GUID, volume, tempo; tempo 75, 100, 125, 150
 and 175 occur), 64 play a music effect (GUID, volume, tempo, flag; Sacred's item jingles). Colette's opening calls 21
-with the GUID of a resource pack rather than of a sound; the original then plays music that matches none of the
-game's 26 shipped music files, and why is not known yet.
+with a GUID that two resource packs also use for a folder record (type 18); it is also the GUID of the BGM
+`BGM_town_countryside` in `samples/common`, and that is what the PC plays (round 3, below).
 
 ## Battles (round 2, delegate C)
 
@@ -581,6 +582,97 @@ Checked under Wine against the PC player, both games.
   king's room.
 - The save page of the menu shows the slot's date, map name and each hero's name, face, level, HP, MP and state in the
   same box the main menu uses, at the place the PC draws it.
-- A saved picture's body is `int32` number, `int32` 0, picture GUID, `int32` opacity, an `int32` that is `0x7f7f7f7f`
-  for the help bar the PC shows after a load and 0 for a tutorial picture it does not show, `int32` x, `int32` y, two
-  bytes and `int32` -1. What the fifth field means is not known, so pictures are not restored from saves yet.
+- A saved picture's body is `int32` number, `int32` 0, picture GUID, `int32` zoom, the colour, a byte, `int32` x,
+  `int32` y, a shown flag and `int32` -1 (round 3 decoded it; see "The field" below).
+
+## The field (round 3, delegate I)
+
+Learned by black-box experiments on the PC player under Wine: a copy of a game's package with one event's scripts or
+sheet bytes replaced (re-zipped with the `YUKARPKG` magic, which the player accepts), loaded from a PC save, then the
+PC's own save read back or the window filmed at 30 frames a second. No player code was read.
+
+### Event movement
+
+- Sheet movement 1 walks one cell in a random direction, 2 one cell toward the player along the longer axis (the other
+  axis when blocked). Blocked steps are skipped and tried again after the next pause. Events walk while other events
+  run, except the running one.
+- Step speed (the `int32` before the map-object byte): 0 crosses a cell in about 0.25 s (4 cells a second, the
+  player's walking pace), -3 in 0.77 s, 3 in under 0.1 s. In between VNDegen uses 1.33, 2, 2.8, 4, 5.5, 7.5 and 10
+  cells a second for -3 to 3.
+- Step frequency (the last `int32`): the pause after a step is about 1.05 s at 0, 1.85 s at -3 and none at 3; VNDegen
+  interpolates linearly.
+- A chaser (movement 2) whose trigger is 4 starts its event when it walks into the player: Colette's world-map
+  monsters, which then say "くっ、モンスターめっ！" and start their battle.
+- In a save, an event that has started walking has motion `wait`, as E and G saw for Sacred's townspeople.
+
+### Direction and position commands
+
+From saves written after patched scripts (aide at (15,6), player at (14,6), Colette's throne room):
+
+| Command | Code | Effect |
+|---|---|---|
+| 10, 16 | 4 | a random direction |
+| 10, 16 | 5 | toward the player (10) or the running event (16) |
+| 10, 16 | 6 | away from it |
+| 10, 16 | 7 | the direction does not change; Sacred spins characters with four in a row, drawn as a quick turn |
+| 11 (one argument) | 4 to 6 | one step in the direction 10 would turn to (Sacred's pushable boxes use 6: away from the player); blocked steps only turn |
+| 11 (one argument) | 7 | no step |
+| 15 | x, z, event GUID (zero: this event), code | places the event at x, z; code 0 keeps its facing, 1 up, 2 down, 3 left, 4 right |
+
+### Other commands
+
+- 66 `int32`: 1 clears and 0 sets the second config byte of the save, the one that allows random encounters
+  (Sacred's royal cave turns them off while the hero is alone and on again after the fairy). The menu and dash still
+  work with it cleared.
+- 70 `int32` 0, variable, 1, low, high, 0: sets the variable to a random value from low to high inclusive (twenty
+  draws of 0 to 4 on the PC gave every value and nothing else). Colette picks its world-map monster set with it.
+- 56 hero GUID, skill GUID, 0 learn or 1 forget. A hero's save entry holds, at byte 156, `int32` n and n skill GUIDs
+  it has learned outside its table, in the order learned (level-ups append there too); the entry grows by 16 bytes a
+  skill (1.8.1's 28 extra bytes come after the list).
+- After 56 teaches a skill the PC shows "ロイは「ヒール」を覚えた" (hero, 「skill」, を覚えた) in the dark message
+  window and waits for the key (filmed in Sacred's royal cave).
+- 21 with a zero GUID stops the BGM at once (recorded on the PC: silence within 0.1 s).
+- 53 mode 2 (view angle, eye height, ms, wait), seen in Sacred's forest as 30000, 898 and then 23000, 999: the PC
+  shows the cave entrance from the hero's eyes along its facing with nobody in view, and the smaller angle zooms in.
+  VNDegen takes the first value in thousandths as a view angle, the second in thousandths as the eye height, and hides
+  the hero; the door then comes out the same width as on the PC.
+- 44's second argument is 1 for a picture caption (the GUID follows); 0 and 2 are text.
+
+### Pictures
+
+25's third argument is the zoom in percent: Colette's `rogo` at 50 showed at half size, centred on the screen plus
+(x, y). The colour is ABGR: `0xff0000ff` turned white text red. Each channel scales by its byte over 127.5, so
+`0x7f7f7f7f` (Sacred's help bar) looks plain and -1 means no colour at all; the alpha byte over 127.5, capped at 1,
+is the opacity (`0xff0000ff` covered the map fully). 24 moves zoom, colour and position.
+
+In a save each picture is 46 bytes: `int32` number, `int32` 0, GUID, `int32` zoom, the colour with its bytes reversed
+(the PC wrote `40 ff 00 00` for `0x40ff0000`), a 0 byte, `int32` x, `int32` y, a shown byte and `int32` -1. Erased
+pictures stay in the list with the shown byte 0; one erased with a fade keeps colour 0. On loading, the PC shows every
+picture whose shown byte is 1 (Colette's half-size `rogo` came back), which is why Sacred's help bar returns and its
+faded tutorial picture does not.
+
+### Captions, balloons and effects
+
+- Static captions (44 with scroll flag 0): Sacred's player (1.0.6) fades one in over about 0.4 s and, after the key,
+  out over 0.4 s before the event goes on; Colette's player (1.8.1) shows and removes it within a frame.
+- An effect record (`Effect.sgr`, type 9) is GUID, name, the first picture-sheet resource GUID, then `int32` layers,
+  `int32` 0, `int32` keys, and an `int32` that VNDegen reads as the length in 60ths of a second (66 for the balloons,
+  about the second A measured). Keys follow: per key a frame and an entry count, and per entry a layer byte, a mask
+  byte, and fields by mask (colour and a byte for bit 0, then position, scale, an `int32`, the sheet cell byte and one
+  more byte). The keys are not fully read yet.
+- Effect picture sheets (resource kind 9) carry two bytes after the path: columns and rows (`emotion.png` 10 by 11,
+  48-pixel cells). Balloons draw cell 0 (the bubble) and the icon cell inside it: ! 8, ? 7, the dots 9 (twice), the
+  skull 3, the bulb 10, the heart 6.
+- Colette's opening music is `samples/common/res/bgm/BGM_town_countryside.ogg`: recorded from the PC, it matches that
+  file at half amplitude with no residual, from 4.2 s after the new game starts.
+
+### Shop screen
+
+Filmed in Sacred's weapon shop (25,19) after loading a VNDegen save there. The shopkeeper's message (from the event,
+before 37) stays in its window while a 103 by 158 column at (428,193) offers buy, sell and quit, and a money box at
+(728,3), 218 by 48, shows "100 G". Buying opens a list panel at (13,73), 397 by 397, with one item a row (48 pixels,
+icon, name, price without "G") and the quit button at the bottom, a detail panel at (414,73), 532 by 397, with the
+item's kind, the count held, its attack, and for each hero who can equip it the face (a 125 by 135 crop), the name
+and the attack and elemental attack before and after (the new value in light blue), and the description along the
+bottom at (13,473). Choosing an item opens a 239 by 65 box at (606,381) with the item, "x1" and the total price
+before it is bought.
