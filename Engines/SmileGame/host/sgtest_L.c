@@ -181,6 +181,36 @@ static void test_bridges(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static double loudness(SG *g) {
+    static float buf[4096 * 2];
+    double e = 0;
+    for (int k = 0; k < 4; k++) {
+        snd_mix(g, buf, 4096);
+        for (int i = 0; i < 4096 * 2; i++) e += (double)buf[i] * buf[i];
+    }
+    return e;
+}
+
+static void test_stop_se(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    snd_bgm_stop(g, 0);
+    snd_bgs_stop(g, 0);
+    loudness(g);
+    Guid se;
+    guid_parse("5ab73fad-366b-499c-8688-c3501652dd4e", &se);
+    snd_se(g, se, 100, 100);
+    CHECK(loudness(g) > 1.0);
+    CmdArg arg = {ARG_GUID, 0, se, NULL};
+    Cmd stop = {CMD_STOP_SE, 0, &arg, 1};
+    sga_exec(g, &stop);
+    CHECK(loudness(g) == 0.0);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
@@ -188,6 +218,7 @@ int main(void) {
         test_inn_no_money(colette);
         test_inn_bed(colette);
         test_bridges(colette);
+        test_stop_se(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;

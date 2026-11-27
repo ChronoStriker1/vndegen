@@ -363,6 +363,18 @@ void snd_se(SG *g, Guid id, int volume, int tempo) {
     pthread_mutex_unlock(&m->lock);
 }
 
+void sg_se_stop_id(SG *g, Guid id) {
+    SgE *e = &g->e;
+    if (!e->mix) return;
+    pthread_mutex_lock(&e->mix->lock);
+    for (int i = V_SE; i < V_COUNT; i++)
+        if (e->mix->v[i] && (guid_zero(id) || guid_eq(e->mix->v[i]->id, id))) {
+            voice_free(e->mix->v[i]);
+            e->mix->v[i] = NULL;
+        }
+    pthread_mutex_unlock(&e->mix->lock);
+}
+
 void snd_se_stop(SG *g) {
     SgE *e = &g->e;
     pthread_mutex_lock(&e->mix->lock);

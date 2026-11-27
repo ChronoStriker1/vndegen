@@ -292,6 +292,10 @@ bool sga_exec(SG *g, const Cmd *c) {
     case CMD_SE: snd_se(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
     case CMD_ME: snd_me(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
     case CMD_EFFECT: sgi_fx_start(g, cmd_guid(c, 1), cmd_int(c, 0) ? -1 : a->eventIndex, false); return false;
+    case CMD_STOP_SE:
+        sg_se_stop_id(g, cmd_guid(c, 0));
+        sg_log(g, "sound stopped");
+        return false;
     case CMD_RECOVER:
         party_recover(g);
         sg_log(g, "party recovered");
