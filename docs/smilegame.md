@@ -26,20 +26,32 @@ Both games use the same data format.
 - Events: sheets chosen by switch, local switch and variable conditions; autorun scripts on entering a map; messages
   with pages, scrolling text, fades, variables, moving to another map.
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
+- Saves: the PC's own `savedata/Save_NN.sgs` files, read and written field for field, with everything the runtime does
+  not model yet kept and written back unchanged, so saves move both ways between VNDegen and the original. `saveDir`
+  in the config is the folder holding the saves; it defaults to the game's `savedata`.
+- Sound: the title and map BGM and ambient sound, with the files' loop points, through `vnsmilegame_audio` as stereo
+  floats at `audioRate`. Event commands and menus call the sound functions in `sg_E.h`.
 
 ## The Linux host
 
 `Engines/SmileGame/host` builds with CMake:
 
-- `sgrun <game> <out> [wait:ms] [key:vk] [hold:vk,ms] [okuntil:n] [shot:name]`: headless; writes `sgrun.log` and
-  PNG frames to `<out>`.
+- `sgrun <game> <out> [wait:ms] [key:vk] [hold:vk,ms] [okuntil:n] [shot:name] [save:slot] [load:slot]`: headless;
+  writes `sgrun.log` and PNG frames to `<out>`, which is also its save folder.
 - `sgplay <game>`: an SDL window with the keyboard (arrows, Enter or Z, Esc or X, Shift).
 - `sgtest`: the format reader tests. With `SG_COLETTE` and `SG_SACRED` set to the game folders it also checks values
   read from the games' files.
 
 ## Known limits
 
-- No sound, menus, battles, saves, choices or pictures over the map yet; unknown commands are skipped and logged.
+- No menus, battles, choices or pictures over the map yet; unknown commands are skipped and logged. Sound commands
+  are not wired to the interpreter yet, so only the title and map music plays.
+- A save made from a new game started in VNDegen has its heroes' stats at zero, since the hero tables and level
+  growth are not read yet; saves that started as PC saves keep their heroes' values.
+- Colette's opening calls for music by a resource pack's GUID; the original plays music none of the game's shipped
+  files match there, and VNDegen keeps the title music.
+- Sound-effect and music-effect levels and the music effect pausing the BGM follow the BGM measurement and common
+  practice; they were not measured on the PC.
 - Shadows and the sky are not drawn; skinned characters stand in their bind pose.
 - Stairs are drawn as plain columns, not as steps.
 - The camera is fixed at one angle and distance close to the player's default; events that move the camera are skipped.
