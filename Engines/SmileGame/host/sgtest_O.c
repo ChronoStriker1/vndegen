@@ -134,6 +134,51 @@ static void test_switch_after_transfer(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static int dark_bottom(SG *g) {
+    int bottom = -1;
+    for (int y = 280; y < 440; y++)
+        for (int x = 250; x < 400; x++) {
+            int r, gr, b;
+            rgb(g, x, y, &r, &gr, &b);
+            if (r < 40 && gr < 40 && b < 45) bottom = y;
+        }
+    return bottom;
+}
+
+static void test_front_row(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    Tables *t = &sgb(g)->tables;
+    const char *names[3] = {"コレット", "メイリ", "サキュバス"};
+    for (int k = 0; k < 3; k++)
+        for (int i = 0; i < t->heroCount; i++)
+            if (!strcmp(t->heroes[i].name, names[k])) party_add_hero(g, t->heroes[i].id);
+    warp(g, "ワールド", 6, 14, 0);
+    int slime = -1;
+    for (int i = 0; i < g->field.npcCount; i++)
+        if (!strcmp(g->field.events[i].name, "歩行-話すとバトル（逃げられる）_2_2_3_4_2_2")) slime = i;
+    CHECK(slime >= 0);
+    if (slime >= 0) {
+        const SgrRec *sr = game_record(&g->data, SGR_EVENT, 16, g->field.events[slime].sheets[0].script, NULL);
+        Script sc;
+        BattleSetup setup = {0};
+        bool ok = false;
+        if (sr && script_parse(&sc, sr)) {
+            for (int k = 0; k < sc.count && !ok; k++)
+                if (sc.cmds[k].type == 65) ok = battle_setup_cmd(&setup, &sc.cmds[k]);
+            script_free(&sc);
+        }
+        CHECK(ok);
+        if (ok) {
+            sg_battle_start(g, &setup);
+            for (int ms = 0; ms < 15000 && strcmp(battle_phase(g), "command") != 0; ms += 16) vnsmilegame_frame((VNSmileGame *)g, 16);
+            int bottom = dark_bottom(g);
+            CHECK(bottom >= 416 && bottom <= 432);
+        }
+    }
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
@@ -141,6 +186,7 @@ int main(void) {
         test_water_blocks_player(colette);
         test_fire_particles(colette);
         test_switch_after_transfer(colette);
+        test_front_row(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;

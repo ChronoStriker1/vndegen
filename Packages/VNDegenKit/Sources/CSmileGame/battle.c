@@ -39,6 +39,7 @@ static const float kPartyX = 2.83f;
 static const float kPartyZ = 2.57f;
 static const float kPartySpacing = 3.3f;
 static const float kPartyRowSpacing = 2.4f;
+static const float kFrontRow = 1.0f;
 
 typedef struct Fighter {
     bool monster;
@@ -1259,7 +1260,7 @@ static void setup_stage(Battle *b) {
     }
     for (int i = 0; i < b->partyCount; i++) {
         b->f[i].x = bx + kPartyX + (i < placed ? offsets[i] - mean : 0.0f);
-        b->f[i].z = bz + kPartyZ;
+        b->f[i].z = bz + kPartyZ + (b->partyCount >= 3 && i < 2 ? kFrontRow : 0.0f);
     }
     for (int i = b->partyCount; i < b->count; i++) {
         int k = i - b->partyCount, n = b->count - b->partyCount;
