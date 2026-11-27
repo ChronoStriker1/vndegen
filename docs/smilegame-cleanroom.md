@@ -59,7 +59,7 @@ folder for a file under `samples/`; a `dlc:<guid>|` prefix names the pack by its
 | 1 | BGM, Ogg | `bool` loop |
 | 2 | sound effect | |
 | 3 | chip set | |
-| 4 | character: a PNG sheet or an FBX model | `int32` frames, frame time in ms, a flag, `int32` 1 when the sheet has four direction rows, a count of extra motions, then the motions as nested records |
+| 4 | character: a PNG sheet or an FBX model | `int32` frames, frame time in ms, a flag that is 1 on every sheet with four direction rows, `int32` divisions (1 on four-row sheets, but 2 on Colette's large ones such as `w_hime001`, `wsura_001` and `wzon_01`), a count of extra motions, then the motions as nested records |
 | 5 | icon sheet | |
 | 6 | monster picture | |
 | 7 | picture | |
@@ -73,7 +73,9 @@ folder for a file under `samples/`; a `dlc:<guid>|` prefix names the pack by its
 | 23 | 3D item model | |
 
 A 2D character sheet with four rows has its frames side by side; the rows face away, toward, left and right. In the
-built-in sets a frame is 48 by 64 pixels, and 48 pixels are one map cell.
+built-in sets a frame is 48 by 64 pixels, and 48 pixels are one map cell. A character standing still on the map is drawn
+from its `wait` motion's sheet when its resource lists one (コレット's `w_hime001_wait`, eight frames in one row, in
+the staff roll's epilogue), and from its walk sheet otherwise.
 
 ## Game settings (`GameSettings.sgr`)
 
@@ -188,7 +190,7 @@ one cell further when the cell in front is higher than the player's, as with Sac
 Branch commands open a block: the commands after them sit one nesting level deeper. Type 71 at the header's level
 starts the else part and 72 ends the block. Choices (30) put the first choice's commands right after the header and
 each later choice after a 74 whose argument is its number. Branches: 46 switch (index, 0 on or 1 off), 47 variable
-(index, value, comparison 0 equal), 48 item (item GUID, count, a flag, 1 for at least), 50 hero in party (hero GUID,
+(index, value, comparison 0 equal), 48 item (item GUID, count, 1 for "does not have", 1 for at least), 50 hero in party (hero GUID,
 0 in), 65 battle (its first part runs on a win, the else part on a loss), 37 shop and 38 inn.
 
 ### Commands
@@ -224,7 +226,7 @@ each later choice after a 74 whose argument is its number. Branches: 46 switch (
 | 61 | screen tint | ms, ARGB colour, wait | |
 | 62 | shake | ms, strength, wait | |
 | 63 | flash | ms | |
-| 69 | hero graphic | hero GUID, face folder, graphic GUID (zero: the hero's own), motion | applies when the hero leads the party |
+| 69 | hero graphic | hero GUID, face folder, graphic GUID (zero: no graphic, which hides the leader), motion | applies when the hero leads the party |
 | 21, 22, 64 | BGM, sound, music effect | GUID, volume, tempo, … | 21 with a zero GUID stops the BGM; 64's resources are ME_item_get, ME_lodging and fanfares |
 
 Direction codes for 10, 11, 16 and 17 are 0 up, 1 down, 2 left, 3 right; Sacred's castle scene ends with the player and
@@ -512,7 +514,8 @@ map's centre when absent), `1001` and one `x, z` pair per monster is each monste
 
 - The battle is drawn on the background map in 3D: a front view from behind the party at about 28° down, a long lens
   (about 19° of vertical view from 33 cells away), centred a little right of the monsters. Monsters stand three cells
-  beyond the centre; the party stands 2.6 cells in front of it and 2.8 cells to the right, members 3.3 cells apart.
+  beyond the centre; the party stands 2.6 cells in front of it and 2.8 cells to the right, centred on its members: the leader 3.3 cells
+  from the second member and the others 2.4 cells apart (three- and four-hero battles from the same world-map cell).
   These are a fit to the positions of ダーク, コレット and the golem in the PC's frame, within about 6 pixels.
 - Monsters are their picture as a billboard at 0.63 of the map's 48 pixels per cell. 2D heroes use their character's
   motions (`wait`, `attack`, `damage`, `guard`, `KO`, `skill`, nested in the character resource: `int32` count, then
@@ -561,10 +564,10 @@ map's centre when absent), `1001` and one `x, z` pair per monster is each monste
   of one ゾンビーナ.
 - Experience totals for each level, from アリア's status page and the battle in which her HP rose: level 2 26, level 3
   84, level 4 between 182 and 186, level 5 350, level 6 600. Colette's status pages (経験値 plus つぎのレベルまで) with
-  the runner's saves loaded in the PC add level 7 966, level 8 1484, level 9 2196 and level 10 3150. The runtime uses
-  these (184 for level 4) and 3.7984 × L^2.5 × 1.101^L + 3.05 above level 10, a fit that matches all nine within 4.
-  The PC shows the level these totals give, not the level a save holds: a runner save that called メイリ level 9 at
-  1984 points showed level 8 there before this table.
+  the runner's saves loaded in the PC add level 7 966, level 8 1484, level 9 2196 and level 10 3150, and round 5 adds
+  level 11 4400, 12 6006, 13 8034, 14 10556, 15 13650 and 16 17400 (see Colette's second half below). All of them are
+  L(L−1)(L²−L+50)/4, which the runtime uses; it puts level 4 at 186. A runner save that called メイリ level 9 at 1984
+  points showed level 8 in the PC before the table was right.
 - A level-up raises the maximum HP and MP and leaves the current values as they were: after that ゾンビーナ battle
   the PC's menu showed ダーク at 24/45 and コレット at 12/41, the HP each had at the end of the battle.
 - Elements and states: see Battles from the story below.
@@ -888,3 +891,58 @@ poisoned, 636 G, nine kinds of items) loaded in the PC at (12,12) facing down wi
 money, play time and item list, and the PC's save made there loaded in the runner the same. A runner save on the
 サキュバスタワー's sixth floor loaded in the PC with its floor caption showing again, as the runner shows it, and the
 PC's save made there loaded in the runner at (4,5).
+
+## Colette's second half (round 5, M)
+
+Played in the runner from round 5 L's save after the sewer's gargoyle to the staff roll, and compared with the PC
+under Wine by loading the runner's saves there and playing the same steps.
+
+### The way to the North Tower
+
+- The walls of ice (メイリ), fire (サキュバス with the アイスロッド) and lightning (ニャンニャ with the アイスロッド)
+  are talk events that clear when the named hero is in the party; the three on the world map's row z 10, x 29 to 31,
+  are the only way east to the tower, and two more guard the cat's mansion. The party holds four, with ダーク and
+  コレット fixed, so the player swaps heroes at the mansion in between.
+- Fishing spots are graphic-less trigger 4 events on the water beside the mansion; walking into one starts the cast.
+  The first cast always gives the 調教バイブ (command 48 with its "does not have" flag). Later casts draw variable 15
+  from 0 to 5 with command 70: 0 and 4 give a ヤーマンマグロ, 2 and 3 a 小アジ, 5 a ゴールデンフィッシュ, 1 nothing
+  (the "bait stolen" branch tests variable 0, never 1 in play). 120 casts in the runner gave 19, 12, 24, 29, 15 and 21.
+- ニャンニャ joins after two ヤーマンマグロ and her scene, at level 1 in the runner (her table's start level; not
+  compared with the PC), and then swaps with メイリ or サキュバス.
+
+### Party in battle
+
+- With four heroes the PC's purple サキュバス stands with her centre at x 773 on the world map's battle at (6,14),
+  within 8 pixels of the runner's after the spacing change (it was 847).
+- 幽玄の塔集会場's former king and four ガーゴイルＬＶ02 (800 HP each) wipe a level 14 party that only attacks, in the
+  PC and the runner alike; fire and holy skills (resistance −100) win it at that level.
+
+### Experience
+
+The status page shows the level a save holds and つぎのレベルまで as the next level's total minus the points: probe
+saves with levels 10, 11, 12 and 15 at 0 points showed 4400, 6006, 8034 and 17400, and the party's own saves at levels
+13 and 14 gave 10556 and 13650.
+
+### Maps
+
+- Under the noon sky (background 0) on player 1.8 the PC draws no outside chip past the map's edge: the cat's mansion
+  and the staff roll, whose sun is on, show white there, and the tower's floors and hall, sun off, show black. The world
+  map, background 2, shows its sea past the edge.
+- A model motion of one frame (`keepOpen 45` in the chest's `.def`) holds that frame: an opened chest stays open.
+- Command 69 with no graphic hides the leader: the castle's last scene does it before the staff roll and gives ダーク
+  back his sprite after it, so the PC shows only the epilogue's characters.
+
+### The ending
+
+The castle's 副官 (sheet for variable 2 = 16, set by ユグドラシル's defeat) starts the last scene, then the staff roll
+(エンドロール): a scrolling caption, the epilogue's four captions with each character beside them, and 制作 WILD FLOWER.
+It sets variable 2 to 17 and returns to the throne room, where the post-game starts (the 副官 asks about the tower; its
+15th floor, the prison scene and ドラコ follow). The PC and the runner play the same captions and characters.
+
+### Saves in the second half
+
+Saves move both ways at three more places, each loaded at the same cell with the same party, levels, HP, MP, states,
+items and money: the cat's mansion (the runner's save in the PC, and the PC's save there back in the runner), the
+tower's 集会場 (after three steps in the PC, each poisoned member 3 HP lower in both), and the throne room after the
+staff roll (the PC's save matched the runner's own state field for field, variables and switches too).
+
