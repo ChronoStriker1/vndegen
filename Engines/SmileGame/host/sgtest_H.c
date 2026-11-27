@@ -248,6 +248,13 @@ static int drive(int argc, char **argv) {
             run(g, 100);
             press(g, VK_OK, 48);
             run(g, 300);
+        } else if (sscanf(c, "phase:%255s", s) == 1) {
+            for (int t = 0; t < 60000 && sg_battle_active(g) && strcmp(battle_phase(g), s) != 0; t += 16) {
+                const char *ph = battle_phase(g);
+                if (!strcmp(ph, "command") || !strcmp(ph, "target")) press(g, VK_OK, 48);
+                else run(g, 16);
+            }
+            if (strcmp(battle_phase(g), s) != 0) where(g, "phase failed"), rc = 1;
         } else if (sscanf(c, "fight:%255s", s) == 1) {
             if (!fight(g, s, 60)) where(g, "fight unfinished"), rc = 1;
         } else if (sscanf(c, "var:%d=%d", &a, &b) == 2) g->vars[a] = b;
