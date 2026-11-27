@@ -23,8 +23,11 @@ Both games use the same data format.
 - The title screen: picture, overlay, the three items as a column or a row, the cursor. New game only.
 - Maps: chip terrain in 3D with the map's light colour, map objects and event graphics from FBX, 2D character sheets
   drawn upright, the player walking cell by cell (stairs let it change height), talking to the event in front.
-- Events: sheets chosen by switch, local switch and variable conditions; autorun scripts on entering a map; messages
-  with pages, scrolling text, fades, variables, moving to another map.
+- Events: sheets chosen by every condition kind the games use; talk, touch, autorun and repeating triggers; messages
+  with faces, choices and branches, captions and scrolling text, pictures, fades and tint, variables, switches, items,
+  money, the party, moving and turning the player and events, event graphics, moving to another map. Colette plays from
+  the title to the bridge guard who opens the way to its first battle, and Sacred from the title to the guard at (35,30)
+  in the castle.
 - Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
   and windows. The party, inventory, money and play time with stats as the PC computes them.
 - The field menu (Esc or X): items, skills, equipment, status, save slots, quit and config, laid out as the PC draws
@@ -68,14 +71,22 @@ percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred'
   against the PC's pixels, and a skinned character's motions.
 - `sgview <game> <out.png> <map> <x> <z> <dir> [frames] [hero:name] [hold:vk,ms] [threads:n]`: draws a map at a cell
   and prints frame times.
+- `sgtest_A`: the event command tests; with the game folders set it plays both openings (about five minutes).
+  `sgtest_A drive <game> <out> ...` plays a scripted path: `until:field|choice|message`, `upto:<text>`, `pick:N`,
+  `to:x,z` (walks there), `talk:U|D|L|R`, `hold:U,ms`, `ok`, `wait:ms`, `shot:name`, `where:tag`.
 
 ## Known limits
 
-- No battles, choices or pictures over the map yet; unknown commands are skipped and logged. Sound commands
-  are not wired to the interpreter yet, so only the title and map music plays.
+- No battles yet: command 65 counts as won. Commands for sound, shops, inns and party recovery are decoded and logged
+  but not yet wired to the audio and menu code, so only the title and map music plays and an inn counts as declined.
+- The items, money and party that commands change are kept apart from the menu's party state until the two are
+  joined, so Sacred's menu shows the game settings' first member.
+- The camera command (53) is decoded but not yet wired to the camera; effects (27) and balloons (45) are not drawn,
+  though balloons take their time.
+- Events never wander or chase the player; the movement type in their sheets is read but not used.
+- Command 10's and 16's codes 4 to 7, 11's one-argument form, and 15, 55, 56, 58, 66, 68, 70, 76 and 77 are logged and
+  skipped; none is on either opening path.
 - The menu's save page lists slots and dates but doesn't write yet, and doesn't show a slot's map and party.
-- Commands that give items or money, change the party, or open a shop or inn are not wired to the menu yet, so
-  Sacred's party is the game settings' first member until they are.
 - The shop and inn screens were not compared with the PC; the party order page is not in these games' menus.
 - Experience above level 3 uses a fitted curve, and a few item, skill and monster fields are inferred (see
   `docs/smilegame-cleanroom.md`).

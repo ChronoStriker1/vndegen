@@ -35,6 +35,7 @@ target_link_libraries(sgtest_D PRIVATE smilegame)
 add_test(NAME render COMMAND sgtest_D)
 add_executable(sgview sgview.c)
 target_link_libraries(sgview PRIVATE smilegame)
+include(sgtest_A.cmake)
 
 find_package(SDL2 CONFIG)
 if(SDL2_FOUND)
