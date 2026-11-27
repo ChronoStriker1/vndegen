@@ -10,6 +10,7 @@ static const int kWinX = 120, kWinW = 720, kWinH = 160;
 static const int kTextPadX = 18, kTextPadY = 19;
 static const int kWrapW = 684;
 static const float kRevealPerMs = 0.12f;
+static const int kCaptionBandPad = 20;
 
 static void clear_pages(Interp *ip) {
     for (int i = 0; i < ip->pageCount; i++) free(ip->pages[i]);
@@ -670,7 +671,11 @@ void interp_draw(SG *g) {
             int lines = 1;
             for (const char *p = ip->scrollText; *p; p++)
                 if (*p == '\n') lines++;
-            int y = ip->a.msgPos == 0 ? 40 : ip->a.msgPos == 1 ? g->h - 40 - lines * kLinePx : (g->h - lines * kLinePx) / 2;
+            int y = ip->a.msgPos == 1 ? g->h - 40 - lines * kLinePx : (g->h - lines * kLinePx) / 2;
+            if (ip->a.msgPos == 0) {
+                int band = kCaptionBandPad + lines * kLinePx;
+                fill_rect(g->fb, g->w, g->h, 0, (g->h - band) / 2, g->w, band, (alpha / 2) << 24);
+            }
             draw_lines_alpha(g, ip->scrollText, y, alpha);
         }
     } else if (ip->state == ST_SCROLL && ip->scrollText) {

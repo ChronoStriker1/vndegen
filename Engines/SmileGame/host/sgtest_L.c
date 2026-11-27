@@ -231,6 +231,26 @@ static void test_event_room(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static double row_luma(SG *g, int y) {
+    double r, gg, b;
+    region(g, 600, y, 80, 1, &r, &gg, &b);
+    return r + gg + b;
+}
+
+static void test_map_caption(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    sg_debug_warp((VNSmileGame *)g, "サキュバスタワー06Ｆ", 4, 5, 0);
+    run(g, 1500);
+    CHECK(g->interp.active && g->interp.scrollText && strcmp(g->interp.scrollText, "タワー6Ｆ") == 0);
+    double above = row_luma(g, 243), top = row_luma(g, 244), bottom = row_luma(g, 299), below = row_luma(g, 300);
+    CHECK(top < above * 0.6 && bottom < below * 0.6 && top > above * 0.4);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 static void test_experience(void) {
     CHECK(battle_exp_for_level(7) == 966);
     CHECK(battle_exp_for_level(8) == 1484);
@@ -249,6 +269,7 @@ int main(void) {
         test_bridges(colette);
         test_stop_se(colette);
         test_event_room(colette);
+        test_map_caption(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
