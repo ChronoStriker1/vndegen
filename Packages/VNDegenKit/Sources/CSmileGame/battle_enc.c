@@ -66,18 +66,24 @@ static u32 enc_rand(BattleEnc *e) {
     return x;
 }
 
+static void enc_next(BattleEnc *e) {
+    int r = e->info.rate > 0 ? e->info.rate : 0;
+    e->steps = 0;
+    e->next = r * 3 / 4 + (int)(enc_rand(e) % (u32)(r / 2 + 1));
+}
+
 static void enc_load(SG *g, BattleEnc *e) {
     e->map = g->field.map.id;
     e->valid = battle_map_info(g, e->map, &e->info);
     e->cellX = (int)g->field.player.x;
     e->cellZ = (int)g->field.player.z;
-    e->steps = 0;
+    enc_next(e);
 }
 
 bool battle_encounter_roll(BattleEnc *e) {
     if (e->info.rate <= 0 || e->info.count <= 0) return false;
-    e->steps++;
-    return (int)(enc_rand(e) % 1000u) < e->info.rate;
+    if (e->next <= 0) enc_next(e);
+    return ++e->steps >= e->next;
 }
 
 void battle_encounter_setup(BattleEnc *e, BattleSetup *s) {
@@ -108,6 +114,6 @@ void battle_encounter_tick(SG *g) {
     battle_encounter_setup(e, &s);
     if (!s.count) return;
     sg_log(g, "encounter after %d steps", e->steps);
-    e->steps = 0;
+    enc_next(e);
     sg_battle_start(g, &s);
 }

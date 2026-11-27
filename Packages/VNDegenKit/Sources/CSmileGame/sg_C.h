@@ -39,7 +39,7 @@ typedef struct BattleEnc {
     bool valid;
     BattleMapInfo info;
     int cellX, cellZ;
-    int steps;
+    int steps, next;
     u32 rng;
 } BattleEnc;
 
