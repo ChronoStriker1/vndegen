@@ -191,6 +191,7 @@ struct Thread {
     bool waitingMessage = false, waitingChoice = false, waitingText = false;
     int choiceIndent = 0;
     const struct Actor *waitingRoute = nullptr;
+    const struct MoveRoute *waitingRouteData = nullptr;
     bool done() const { return stack.empty(); }
 };
 

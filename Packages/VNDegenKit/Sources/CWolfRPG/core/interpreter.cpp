@@ -68,7 +68,7 @@ bool Game::step(Thread &t) {
         t.waitingMessage = false;
     }
     if (t.waitingRoute) {
-        if (t.waitingRoute->route) return false;
+        if (t.waitingRoute->route.get() == t.waitingRouteData) return false;
         t.waitingRoute = nullptr;
     }
     if (t.waitingText) {
@@ -394,6 +394,7 @@ bool Game::step(Thread &t) {
                 // With "wait until done", the event waits for the route to finish.
                 if (cmd.route->flags & 0x04) {
                     t.waitingRoute = a;
+                    t.waitingRouteData = cmd.route.get();
                     return false;
                 }
             }
