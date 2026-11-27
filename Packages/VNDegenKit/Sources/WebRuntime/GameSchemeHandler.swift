@@ -13,8 +13,9 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
     private var nextSerial = 0
     private let alpha: Bool
     private let cancellation = AlphaVideoCancellation()
-    private let stashFolder = FileManager.default.temporaryDirectory
-        .appendingPathComponent("AlphaVideo-stash", isDirectory: true).appendingPathComponent(UUID().uuidString, isDirectory: true)
+    private static let stashRoot = FileManager.default.temporaryDirectory.appendingPathComponent("AlphaVideo-stash", isDirectory: true)
+    private static var leftoversRemoved = false
+    private let stashFolder = GameSchemeHandler.stashRoot.appendingPathComponent(UUID().uuidString, isDirectory: true)
     private var reads: [Int: Task<Void, Never>] = [:]
     private weak var page: WKWebView?
 
@@ -77,6 +78,10 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
     func stash(base64: String) -> BridgeReply {
         guard alpha else { return .value(.null) }
         guard let clip = Data(base64Encoded: base64) else { return .failure(BridgeError(code: "EINVAL", message: "data is not base64")) }
+        if !Self.leftoversRemoved {
+            Self.leftoversRemoved = true
+            try? FileManager.default.removeItem(at: Self.stashRoot)
+        }
         do {
             guard let key = try AlphaVideoCache.shared.stash(clip, in: stashFolder, log: log) else { return .value(.null) }
             return .value(.string(GameFolder.origin + GameFolder.alphaPath + key + ".webm"))
