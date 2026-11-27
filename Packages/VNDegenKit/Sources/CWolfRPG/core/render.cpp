@@ -145,10 +145,15 @@ void Renderer::drawWindow(Canvas &canvas, const Bitmap &skin, RectF d, float opa
         }
 }
 
+namespace {
+constexpr std::string_view kScreenshot = "<SCREENSHOT>";
+}
+
 const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offsetX, float &offsetY) {
     CachedImage &cached = pictureImages_[number];
     int w = p.kind == PictureKind::Window ? p.windowW : 0, h = p.kind == PictureKind::Window ? p.windowH : 0;
     bool fromArrays = p.kind == PictureKind::File;
+    bool screenshot = fromArrays && p.source == kScreenshot;
     // An image made from arrays is made when shown, so it follows the generation rather than the name.
     if (cached.kind != p.kind || cached.source != p.source || cached.w != w || cached.h != h ||
         (fromArrays && cached.generation != p.generation)) {
@@ -158,7 +163,9 @@ const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offset
         cached.h = h;
         cached.generation = p.generation;
         cached.offsetX = cached.offsetY = 0;
-        if (fromArrays) {
+        if (screenshot) {
+            cached.bitmap = screen_;
+        } else if (fromArrays) {
             static const XYImage empty;
             const XYImage &xy = p.xyImage ? *p.xyImage : empty;
             cached.bitmap = xy.w > 0 && xy.h > 0 ? Bitmap(xy.w, xy.h) : Bitmap();
@@ -194,10 +201,11 @@ const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offset
 }
 
 void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
+    if (p.opacity.value() <= 0) return;
     const Bitmap *img = nullptr;
     BitmapPtr file;
     float offsetX = 0, offsetY = 0;
-    if (p.kind == PictureKind::File && !p.source.starts_with("<XY")) {
+    if (p.kind == PictureKind::File && !p.source.starts_with("<XY") && p.source != kScreenshot) {
         file = images_.get(p.source);
         img = file.get();
     } else {
@@ -336,6 +344,14 @@ void Renderer::draw(Bitmap &frame) {
     if (tr.prepared && frozenGeneration_ == tr.generation && !frozen_.empty()) {
         frame = frozen_;
         return;
+    }
+    for (auto &[n, p] : game_.pictures()) {
+        if (p.kind != PictureKind::File || p.source != kScreenshot) continue;
+        auto it = pictureImages_.find(n);
+        if (it == pictureImages_.end() || it->second.source != p.source || it->second.generation != p.generation) {
+            screen_ = frame;
+            break;
+        }
     }
     Canvas canvas(frame);
     canvas.clear(0, 0, 0);
