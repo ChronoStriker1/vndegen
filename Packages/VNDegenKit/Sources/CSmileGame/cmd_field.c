@@ -80,7 +80,7 @@ static void place_event(SG *g, const Cmd *c) {
     int x = cmd_int(c, 0), z = cmd_int(c, 1), code = cmd_int(c, 3);
     ac->x = ac->tx = (float)x + 0.5f;
     ac->z = ac->tz = (float)z + 0.5f;
-    ac->y = sg_ground(g, x, z);
+    ac->y = sg_ground_at(g, x, z, ac->y);
     ac->moving = false;
     if (i < g->interp.a.evCount) {
         g->interp.a.ev[i].moveLeft = 0;

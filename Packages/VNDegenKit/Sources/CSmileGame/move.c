@@ -40,9 +40,20 @@ bool sgi_cell_free(SG *g, int fromX, int fromZ, int x, int z, int self) {
     Field *f = &g->field;
     const Map *m = &f->map;
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
-    int h0 = sga_floor(g, fromX, fromZ), h1 = sga_floor(g, x, z);
+    const Actor *mover = self >= 0 && self < f->npcCount ? &f->npcs[self] : &f->player;
+    int h0 = sga_floor(g, fromX, fromZ);
+    if (sg_deck(g, fromX, fromZ) != SG_NO_DECK && (int)floorf(mover->x) == fromX && (int)floorf(mover->z) == fromZ) h0 = (int)floorf(mover->y + 0.01f);
+    return sg_step_free(g, fromX, fromZ, h0, x, z, self);
+}
+
+bool sg_step_free(SG *g, int fromX, int fromZ, int h0, int x, int z, int self) {
+    Field *f = &g->field;
+    const Map *m = &f->map;
+    if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
+    int h1 = sg_level_into(g, x, z, h0);
+    bool deck = (sg_deck(g, fromX, fromZ) == h0 && h0 != sga_floor(g, fromX, fromZ)) || (sg_deck(g, x, z) == h1 && h1 != sga_floor(g, x, z));
     if (h0 != h1 && (abs(h1 - h0) > 1 || !(on_stairs(m, x, z) || on_stairs(m, fromX, fromZ)))) return false;
-    if (sg_ground(g, fromX, fromZ) != sg_ground(g, x, z) && (across_stairs(g, fromX, fromZ, x - fromX) || across_stairs(g, x, z, x - fromX))) return false;
+    if (!deck && sg_ground(g, fromX, fromZ) != sg_ground(g, x, z) && (across_stairs(g, fromX, fromZ, x - fromX) || across_stairs(g, x, z, x - fromX))) return false;
     if (self >= 0 && occupies(&f->player, x, z)) return false;
     for (int i = 0; i < f->npcCount; i++)
         if (i != self && f->npcs[i].visible && occupies(&f->npcs[i], x, z)) return false;

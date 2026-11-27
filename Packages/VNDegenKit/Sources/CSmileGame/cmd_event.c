@@ -151,10 +151,13 @@ static void build_floor(SG *g) {
     SgaState *a = &g->interp.a;
     const Map *m = &g->field.map;
     free(a->floor);
+    free(a->deck);
     a->floorW = m->w;
     a->floorH = m->h;
     a->floor = sg_alloc(sizeof(i16) * (size_t)m->w * (size_t)m->h);
     memcpy(a->floor, m->height, sizeof(i16) * (size_t)m->w * (size_t)m->h);
+    a->deck = sg_alloc(sizeof(i16) * (size_t)m->w * (size_t)m->h);
+    for (size_t i = 0; i < (size_t)m->w * (size_t)m->h; i++) a->deck[i] = SG_NO_DECK;
     for (int i = 0; i < m->objectCount; i++) {
         const MapObject *o = &m->objects[i];
         const SgrRec *rec = resource_record(g, o->id);
@@ -167,16 +170,22 @@ static void build_floor(SG *g) {
         int n = rd_i16(&r);
         for (int k = 0; k < n && !r.bad; k++) {
             int ex = rd_i16(&r) - 32, ez = rd_i16(&r) - 32, h = rd_i16(&r);
-            rd_i16(&r);
+            bool bridge = rd_i16(&r) == 1;
             int dx = ex, dz = ez;
             switch (o->dir & 3) {
-            case 1: dx = -ez, dz = ex; break;
+            case 1: dx = ez, dz = -ex; break;
             case 2: dx = -ex, dz = -ez; break;
-            case 3: dx = ez, dz = -ex; break;
+            case 3: dx = -ez, dz = ex; break;
             default: break;
             }
             int x = o->x + dx, z = o->z + dz;
             if (x < 0 || z < 0 || x >= m->w || z >= m->h || h <= 0) continue;
+            if (bridge && o->x >= 0 && o->z >= 0 && o->x < m->w && o->z < m->h) {
+                i16 *d = &a->deck[(size_t)z * (size_t)m->w + (size_t)x];
+                i16 top = (i16)(m->height[(size_t)o->z * (size_t)m->w + (size_t)o->x] + h);
+                if (*d == SG_NO_DECK || top > *d) *d = top;
+                continue;
+            }
             i16 *f = &a->floor[(size_t)z * (size_t)m->w + (size_t)x];
             i16 top = (i16)(m->height[(size_t)z * (size_t)m->w + (size_t)x] + h);
             if (top > *f) *f = top;
@@ -211,6 +220,26 @@ float sg_ground(SG *g, int x, int z) {
     return (float)sga_floor(g, x, z) + (slope_kind(g, x, z, false) >= 0 ? 0.6f : 0.0f);
 }
 
+int sg_deck(SG *g, int x, int z) {
+    SgaState *a = &g->interp.a;
+    const Map *m = &g->field.map;
+    if (x < 0 || z < 0 || x >= m->w || z >= m->h || !a->deck || a->floorW != m->w || a->floorH != m->h || !guid_eq(a->mapId, m->id))
+        return SG_NO_DECK;
+    return a->deck[(size_t)z * (size_t)m->w + (size_t)x];
+}
+
+int sg_level_into(SG *g, int x, int z, int from) {
+    int d = sg_deck(g, x, z), h = sga_floor(g, x, z);
+    if (d == SG_NO_DECK) return h;
+    return d == from || (abs(d - from) <= 1 && abs(h - from) > 1) ? d : h;
+}
+
+float sg_ground_at(SG *g, int x, int z, float y) {
+    int d = sg_deck(g, x, z);
+    if (d != SG_NO_DECK && sg_level_into(g, x, z, (int)floorf(y + 0.01f)) == d) return (float)d;
+    return sg_ground(g, x, z);
+}
+
 void sga_map_loaded(SG *g) {
     SgaState *a = &g->interp.a;
     Field *f = &g->field;
@@ -219,7 +248,7 @@ void sga_map_loaded(SG *g) {
     a->mapPending = false;
     build_floor(g);
     for (int i = 0; i < f->npcCount; i++) f->npcs[i].y = sg_ground(g, (int)floorf(f->npcs[i].x), (int)floorf(f->npcs[i].z));
-    f->player.y = sg_ground(g, (int)floorf(f->player.x), (int)floorf(f->player.z));
+    f->player.y = sg_ground_at(g, (int)floorf(f->player.x), (int)floorf(f->player.z), f->player.y);
     a->evCount = f->npcCount;
     a->ev = sg_alloc(sizeof(SgaEvent) * (size_t)(a->evCount ? a->evCount : 1));
     for (int i = 0; i < a->evCount; i++) {
@@ -394,7 +423,7 @@ void sga_move_actor(SG *g, Actor *a, int *dir, int *left, float speed, bool thro
             a->z += ddz / d * budget;
             budget = 0;
         }
-        a->y = sg_ground(g, (int)floorf(a->x), (int)floorf(a->z));
+        a->y = sg_ground_at(g, (int)floorf(a->x), (int)floorf(a->z), a->y);
     }
     (void)through;
     if (*left <= 0) a->moving = false;
