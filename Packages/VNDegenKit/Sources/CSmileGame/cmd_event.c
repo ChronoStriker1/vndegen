@@ -192,16 +192,20 @@ int sga_floor(SG *g, int x, int z) {
     return m->height[(size_t)z * (size_t)m->w + (size_t)x];
 }
 
-float sg_ground(SG *g, int x, int z) {
+int sg_stair_kind(SG *g, int x, int z) {
     const Map *m = &g->field.map;
-    int h = sga_floor(g, x, z);
-    if (x < 0 || z < 0 || x >= m->w || z >= m->h || h != m->height[(size_t)z * (size_t)m->w + (size_t)x]) return (float)h;
-    View *v = sg_view(g);
-    if (!v->slopeDir || !v->slopeIdx || !v->chipAttr) return (float)h;
+    if (x < 0 || z < 0 || x >= m->w || z >= m->h) return -1;
     size_t i = (size_t)z * (size_t)m->w + (size_t)x;
+    if (sga_floor(g, x, z) != m->height[i]) return -1;
+    View *v = sg_view(g);
+    if (!v->slopeDir || !v->slopeIdx || !v->chipAttr) return -1;
     int kind = v->slopeDir[i];
-    if (kind < 0 || kind > 3 || !(v->chipAttr[g->field.chipImageCount + v->slopeIdx[i]] & 0x10)) return (float)h;
-    return (float)h + 0.6f;
+    if (kind < 0 || kind > 3 || !(v->chipAttr[g->field.chipImageCount + v->slopeIdx[i]] & 0x10)) return -1;
+    return kind;
+}
+
+float sg_ground(SG *g, int x, int z) {
+    return (float)sga_floor(g, x, z) + (sg_stair_kind(g, x, z) >= 0 ? 0.6f : 0.0f);
 }
 
 void sga_map_loaded(SG *g) {

@@ -26,6 +26,11 @@ static bool on_stairs(const Map *m, int x, int z) {
     return false;
 }
 
+static bool across_stairs(SG *g, int x, int z, int dx) {
+    int kind = sg_stair_kind(g, x, z);
+    return kind >= 0 && (kind < 2) == (dx != 0);
+}
+
 static bool occupies(const Actor *a, int x, int z) {
     if ((int)floorf(a->x) == x && (int)floorf(a->z) == z) return true;
     return a->moving && (int)floorf(a->tx) == x && (int)floorf(a->tz) == z;
@@ -37,6 +42,7 @@ bool sgi_cell_free(SG *g, int fromX, int fromZ, int x, int z, int self) {
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
     int h0 = sga_floor(g, fromX, fromZ), h1 = sga_floor(g, x, z);
     if (h0 != h1 && (abs(h1 - h0) > 1 || !(on_stairs(m, x, z) || on_stairs(m, fromX, fromZ)))) return false;
+    if (sg_ground(g, fromX, fromZ) != sg_ground(g, x, z) && (across_stairs(g, fromX, fromZ, x - fromX) || across_stairs(g, x, z, x - fromX))) return false;
     if (self >= 0 && occupies(&f->player, x, z)) return false;
     for (int i = 0; i < f->npcCount; i++)
         if (i != self && f->npcs[i].visible && occupies(&f->npcs[i], x, z)) return false;
