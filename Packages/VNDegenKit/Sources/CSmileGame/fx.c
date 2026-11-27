@@ -84,7 +84,7 @@ static bool to_screen(SG *g, float x, float y, float z, float *sx, float *sy) {
 static float actor_height(const Actor *a) {
     if (a->model) return 1.6f;
     if (a->sheet && a->graphic) {
-        int rows = a->graphic->divisions == 1 ? 4 : 1;
+        int rows = sg_sprite_rows(a->graphic, a->sheet);
         return (float)(a->sheet->h / rows) / 32.0f;
     }
     return 1.0f;

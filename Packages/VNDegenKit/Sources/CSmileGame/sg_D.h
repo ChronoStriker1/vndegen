@@ -163,6 +163,7 @@ const char *model_rest_clip(Model *m);
 const Mesh *model_mesh(const Model *m);
 const float *model_normals(const Model *m);
 
+int sg_sprite_rows(const Res *res, const Image *im);
 bool sg_debug_warp(VNSmileGame *vg, const char *mapName, int x, int z, int dir);
 void sg_debug_pose(VNSmileGame *vg, float pitch, float yaw, float distance, float fov);
 const FrameStats *sg_debug_stats(VNSmileGame *vg);

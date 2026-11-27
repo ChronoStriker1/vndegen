@@ -815,12 +815,17 @@ static void cast_model(SG *g, Actor *a, float ang) {
     free(tris);
 }
 
+int sg_sprite_rows(const Res *res, const Image *im) {
+    int frames = res->frames > 0 ? res->frames : 1;
+    return res->divisions == 1 && im->h / 4 >= im->w / frames ? 4 : 1;
+}
+
 static void draw_sprite(SG *g, const Actor *a, bool xray) {
     Field *f = &g->field;
     const Image *im = a->sheet;
     if (!im || !a->graphic) return;
     int frames = a->graphic->frames > 0 ? a->graphic->frames : 1;
-    int rows = a->graphic->divisions == 1 ? 4 : 1;
+    int rows = sg_sprite_rows(a->graphic, im);
     int cw = im->w / frames, ch = im->h / rows;
     int frame = 0;
     if (a->graphic->frameMs > 0) frame = (int)(a->animMs / (u32)a->graphic->frameMs) % frames;
