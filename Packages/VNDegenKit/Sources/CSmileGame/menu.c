@@ -388,7 +388,7 @@ static void draw_item_page(SG *g, Menu *m, int page, const List *l, bool prices,
         char right[32];
         if (prices) snprintf(right, sizeof right, "%dG", sell ? it->price / 2 : m->shopPrices[i]);
         else snprintf(right, sizeof right, "%d", l->counts[i]);
-        bool dim = page == P_ITEMS && !item_field_usable(it);
+        bool dim = page == P_ITEMS && !item_field_usable(it) && !(it->kind >= ITEM_WEAPON && it->kind <= ITEM_ACCESSORY);
         draw_entry(g, it->icon, it->iconX, it->iconY, it->name, right, 340 + (i % 2) * 305, 28 + row * 48, i == cur, dim);
     }
     if (l->count == 0) draw_entry(g, (Guid){{0}}, 0, 0, MT(g, MT_NO_ITEMS), NULL, 340, 28, cur == 0, false);
@@ -845,7 +845,8 @@ static void draw(SG *g, Menu *m) {
             draw_item_page(g, m, P_ITEMS, &l, false, false);
             int cur = m->cur[P_ITEMS];
             char buf[256] = "";
-            if (cur < l.count) item_line(g, item_def(T(g), l.ids[cur]), buf, sizeof buf);
+            const ItemDef *it = cur < l.count ? item_def(T(g), l.ids[cur]) : NULL;
+            if (it) snprintf(buf, sizeof buf, "%s", it->desc);
             bottom_text(g, buf);
         }
         guide(g, m, false);
