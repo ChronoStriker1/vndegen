@@ -441,6 +441,8 @@ struct SG {
     R3 r3;
     int scene;
     u32 keys, pressed;
+    bool pointerDown, pointerUsed;
+    u32 pointerMs;
     int titleCursor;
     int titleSaves;
     u32 titleMs;

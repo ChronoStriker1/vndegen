@@ -1,6 +1,7 @@
 #include "sg.h"
 
 static const int kTitlePx = 23;
+static const u32 kPointerMenuMs = 600;
 
 bool sg_pressed(SG *g, u32 key) {
     if (!(g->pressed & key)) return false;
@@ -38,6 +39,26 @@ void vnsmilegame_key(VNSmileGame *vg, int vk, bool down) {
     } else {
         g->keys &= ~bit;
     }
+}
+
+void vnsmilegame_pointer(VNSmileGame *vg, int phase) {
+    SG *g = (SG *)vg;
+    if (phase == VNSMILEGAME_POINTER_DOWN) {
+        g->pointerDown = true;
+        g->pointerUsed = false;
+        g->pointerMs = 0;
+        return;
+    }
+    if (phase == VNSMILEGAME_POINTER_UP && g->pointerDown && !g->pointerUsed) g->pressed |= KEY_OK;
+    g->pointerDown = false;
+}
+
+static void pointer_hold(SG *g, u32 ms) {
+    if (!g->pointerDown || g->pointerUsed) return;
+    g->pointerMs += ms;
+    if (g->pointerMs < kPointerMenuMs || g->scene != SCENE_FIELD || sg_battle_active(g) || menu_active(g) || g->interp.active) return;
+    g->pressed |= KEY_CANCEL;
+    g->pointerUsed = true;
 }
 
 VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t errSize) {
@@ -186,6 +207,7 @@ static void title_draw(SG *g) {
 bool vnsmilegame_frame(VNSmileGame *vg, uint32_t ms) {
     SG *g = (SG *)vg;
     g->clockMs += ms;
+    pointer_hold(g, ms);
     if (g->scene == SCENE_TITLE) {
         bool menu = menu_active(g);
         if (!menu) title_update(g);

@@ -36,6 +36,15 @@ final class SmileGameSession: EngineSession {
         }, onExit: launch.onExit)
         view = driver.view
         frameView.onReady = { [weak self] in self?.start() }
+        frameView.onPointer = { [weak self] event in
+            guard let self, event.button == .primary, let engine else { return }
+            switch event.phase {
+            case .began: vnsmilegame_pointer(engine, Int32(VNSMILEGAME_POINTER_DOWN))
+            case .ended: vnsmilegame_pointer(engine, Int32(VNSMILEGAME_POINTER_UP))
+            case .cancelled: vnsmilegame_pointer(engine, Int32(VNSMILEGAME_POINTER_CANCEL))
+            case .moved: break
+            }
+        }
         frameView.onKey = { [weak self] usage, pressed, _ in
             guard let self else { return }
             deliver(router.hostKey(hidUsage: usage, pressed: pressed))

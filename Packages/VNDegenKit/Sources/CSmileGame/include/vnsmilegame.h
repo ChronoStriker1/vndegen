@@ -29,6 +29,9 @@ const uint32_t *vnsmilegame_pixels(VNSmileGame *g, int *width, int *height);
 uint32_t vnsmilegame_frame_serial(VNSmileGame *g);
 
 void vnsmilegame_key(VNSmileGame *g, int virtualKey, bool down);
+
+enum { VNSMILEGAME_POINTER_DOWN, VNSMILEGAME_POINTER_UP, VNSMILEGAME_POINTER_CANCEL };
+void vnsmilegame_pointer(VNSmileGame *g, int phase);
 void vnsmilegame_audio(VNSmileGame *g, float *out, int frames);
 bool vnsmilegame_save(VNSmileGame *g, int slot);
 bool vnsmilegame_load(VNSmileGame *g, int slot);
