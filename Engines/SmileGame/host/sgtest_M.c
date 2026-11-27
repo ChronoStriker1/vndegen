@@ -201,8 +201,18 @@ static void test_four_heroes(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_experience(void) {
+    CHECK(battle_exp_for_level(11) == 4400);
+    CHECK(battle_exp_for_level(12) == 6006);
+    CHECK(battle_exp_for_level(13) == 8034);
+    CHECK(battle_exp_for_level(14) == 10556);
+    CHECK(battle_exp_for_level(15) == 13650);
+    CHECK(battle_exp_for_level(16) == 17400);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
+    test_experience();
     if (colette) {
         test_talk_while_stepping(colette);
         test_fishing(colette);
