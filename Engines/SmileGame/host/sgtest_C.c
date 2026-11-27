@@ -185,6 +185,25 @@ static void test_sacred(const char *dir) {
     CHECK(aria->exp == 31);
     CHECK(aria->level == 2);
     CHECK(sgb(g)->party.money == money + 5);
+
+    aria->level = 4;
+    aria->exp = 346;
+    aria->hp = member_max_hp(&sgb(g)->tables, aria);
+    CHECK(aria->hp == 85);
+    sg_battle_start(g, &s);
+    for (int n = 0; n < 6 && sg_battle_active(g); n++) {
+        wait_phase(g, "command");
+        if (strcmp(battle_phase(g), "command") != 0) break;
+        press(g, 0x0d);
+        press(g, 0x0d);
+    }
+    wait_phase(g, "result");
+    press(g, 0x0d);
+    CHECK(sg_battle_result(g) == BATTLE_WON);
+    CHECK(aria->exp == 351);
+    CHECK(aria->level == 5);
+    CHECK(member_max_hp(&sgb(g)->tables, aria) == 100);
+    CHECK(aria->hp == 100);
     vnsmilegame_close((VNSmileGame *)g);
 }
 

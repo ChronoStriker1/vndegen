@@ -669,6 +669,10 @@ static void grant_rewards(Battle *b) {
         if (up) {
             m->hp += member_max_hp(t, m) - oldMax;
             m->mp += member_max_mp(t, m) - oldMaxMp;
+            f->hp = m->hp;
+            f->mp = m->mp;
+            f->maxHp = member_max_hp(t, m);
+            f->maxMp = member_max_mp(t, m);
             snprintf(line, sizeof line, "%s %s %d", f->name, btext(g, 18, "レベルアップ！"), m->level);
             if (b->lineCount < 12) snprintf(b->lines[b->lineCount++], sizeof b->lines[0], "%s", line);
             sg_log(g, "battle: %s level %d exp %d", f->name, m->level, m->exp);
