@@ -973,7 +973,7 @@ static void use_skill(SG *g, Menu *m, const SkillDef *s, Member *user, int targe
         if (s->target == TARGET_ALLY && i != target) continue;
         Member *mb = &p->members[i];
         if (mb->hp <= 0) continue;
-        heal(g, mb, s->power, 0, 0, 0);
+        heal(g, mb, s->power, 0, s->percent, 0);
     }
     sgb_sound(g, SND_ITEM);
     sg_log(g, "menu: skill %s", s->name);

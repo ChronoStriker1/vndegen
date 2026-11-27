@@ -241,6 +241,8 @@ bool skill_parse(SkillDef *s, const SgrRec *rec) {
     if (!sub_block(&r, &a, &s->act, &s->actSize)) return false;
     s->effect = rd_guid(&a);
     s->power = rd_i32(&a);
+    rd_i32(&a);
+    s->percent = rd_i32(&a);
     return !r.bad && !u.bad && !a.bad;
 }
 

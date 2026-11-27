@@ -705,7 +705,7 @@ static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
     if (friendly) {
         if ((k.states & 32) && t->hp <= 0) t->hp = 1;
         cure(b, t, k.states);
-        int v = s->power > 0 ? s->power + a->mag : 0;
+        int v = (s->power > 0 ? s->power + a->mag : 0) + t->maxHp * s->percent / 100;
         if (v > 0 && t->hp > 0) {
             t->hp += v;
             if (t->hp > t->maxHp) t->hp = t->maxHp;

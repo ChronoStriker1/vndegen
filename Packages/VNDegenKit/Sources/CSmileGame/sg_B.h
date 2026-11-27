@@ -94,7 +94,7 @@ typedef struct SkillDef {
     i32 mpCost;
     i32 target;
     Guid effect;
-    i32 power;
+    i32 power, percent;
     const u8 *use;
     i32 useSize;
     const u8 *act;
