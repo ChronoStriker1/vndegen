@@ -1551,9 +1551,10 @@ static void draw_fighter(Battle *b, const Fighter *f, bool active) {
     }
     const Res *r = f->graphic;
     int frames = r && r->frames > 0 ? r->frames : 1;
-    int rows = r && r->divisions >= 1 ? 4 : 1;
+    int rows = r ? sg_sprite_rows(r, im) : 1;
     int cw = im->w / frames, ch = im->h / rows;
-    draw_billboard(g, cam, im, (frames == 3 ? 1 : 0) * cw, b->front && rows > 1 ? ch : 0, cw, ch, f->x, y, f->z, kHeroScale);
+    int frame = frames == 3 && rows > 1 ? 1 : rows == 1 && r->frameMs > 0 ? (int)(f->poseMs / (u32)r->frameMs) % frames : 0;
+    draw_billboard(g, cam, im, frame * cw, b->front && rows > 1 ? ch : 0, cw, ch, f->x, y, f->z, kHeroScale);
 }
 
 static void project_point(const Cam *c, float x, float y, float z, int *sx, int *sy) {
