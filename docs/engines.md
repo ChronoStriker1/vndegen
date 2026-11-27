@@ -63,7 +63,7 @@ A touch reaches an MV or MZ game the way a click does on the PC, where the mouse
 
 A game can name its files with Windows backslashes, as the Demon Queen game does for 277 of its 313 video references, and they load as they do on the PC. [development.md](development.md#file-name-case) has the details.
 
-WebKit ignores the alpha channel of VP9 WebM clips, so a see-through clip would show as a black or white box. The first time a game plays one, VNDegen converts it in the background to HEVC with alpha, which Apple's system plays with transparency, keeps it in a cache outside the game folder, and serves it at the clip's original address, so the game and its movie plugin don't change. The clip stays hidden until it's ready, so its first play can wait, and later plays start straight away. Settings has a Clear video cache button. [video.md](video.md) has the details.
+WebKit ignores the alpha channel of VP9 WebM clips, so a see-through clip would show as a black or white box. The first time a game plays one, VNDegen converts it in the background to HEVC with alpha, which Apple's system plays with transparency, keeps it in a cache outside the game folder, and serves it at the clip's original address, so the game and its movie plugin don't change. A clip the game decrypts in its own page and plays from a blob URL, as Princess and Conquest does, is converted too and served from an address of VNDegen's own. The clip stays hidden until it's ready, so its first play can wait, and later plays start straight away. Settings has a Clear video cache button. [video.md](video.md) has the details.
 
 Known limits for those clips, from a scan of the movies in the library's 118 MV and MZ games and No Socks RPG on 2026-11-01:
 

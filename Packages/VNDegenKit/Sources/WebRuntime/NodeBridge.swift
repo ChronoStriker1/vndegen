@@ -26,6 +26,8 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
     case storageSet(key: String, value: String)
     case storageRemove(key: String)
     case storageClear
+    /// A WebM the page made in memory, as base64, to play converted when it has alpha.
+    case alphaVideo(data: String)
 
     private enum Key: String, CodingKey { case op, path, text, data, recursive, from, to, url, key, value, position, length }
 
@@ -59,6 +61,7 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
         case "storageSet": self = .storageSet(key: try c.decode(String.self, forKey: .key), value: try c.decode(String.self, forKey: .value))
         case "storageRemove": self = .storageRemove(key: try c.decode(String.self, forKey: .key))
         case "storageClear": self = .storageClear
+        case "alphaVideo": self = .alphaVideo(data: try c.decode(String.self, forKey: .data))
         default: throw DecodingError.dataCorruptedError(forKey: .op, in: c, debugDescription: "unknown op \(op)")
         }
     }
@@ -235,7 +238,7 @@ nonisolated struct NodeBridge: Sendable {
             }
             return .null
 
-        case .openExternal, .quit, .storageLoad, .storageSet, .storageRemove, .storageClear:
+        case .openExternal, .quit, .storageLoad, .storageSet, .storageRemove, .storageClear, .alphaVideo:
             throw BridgeError(code: "ENOSYS", message: "handled by the session, not the bridge")
         }
     }

@@ -713,6 +713,31 @@
         return play.apply(this, arguments);
     };
 
+    if (config.alphaVideo) {
+        const createObjectURL = URL.createObjectURL.bind(URL);
+        const revokeObjectURL = URL.revokeObjectURL.bind(URL);
+        URL.createObjectURL = (object) => {
+            const url = createObjectURL(object);
+            if (!(object instanceof Blob) || !/^video\/webm\b/i.test(object.type)) return url;
+            try {
+                const request = new XMLHttpRequest();
+                request.open('GET', url, false);
+                request.overrideMimeType('text/plain; charset=x-user-defined');
+                request.send();
+                const text = request.responseText;
+                const bytes = new Uint8Array(text.length);
+                for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+                const served = call('alphaVideo', { data: btoa(binaryString(bytes)) });
+                if (!served) return url;
+                revokeObjectURL(url);
+                return served;
+            } catch (e) {
+                post({ level: 'error', message: 'alpha video blob not converted: ' + e.message });
+                return url;
+            }
+        };
+    }
+
     // An AudioContext starts suspended and the engine resumes it only on a touch or key event, which a gamepad player
     // never produces on the web view. The app allows playback without a gesture, so every context is resumed unless
     // the session is paused. WebKit on iOS also suspends a new context once, about 100 ms after it starts running.

@@ -13,6 +13,8 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
     private var nextSerial = 0
     private let alpha: Bool
     private let cancellation = AlphaVideoCancellation()
+    private let stashFolder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("AlphaVideo-stash", isDirectory: true).appendingPathComponent(UUID().uuidString, isDirectory: true)
     private var reads: [Int: Task<Void, Never>] = [:]
     private weak var page: WKWebView?
 
@@ -36,12 +38,19 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
         let method = request.httpMethod ?? "GET"
         let range = request.value(forHTTPHeaderField: "Range")
         let folder = folder
-        let alpha = alpha, cancellation = cancellation, log = log
+        let alpha = alpha, cancellation = cancellation, log = log, stash = stashFolder
         reads[serial] = Task.detached(priority: .userInitiated) {
             do {
-                let movie = alpha && path.lowercased().hasSuffix(".webm")
-                    ? try await AlphaVideoCache.shared.response(folder: folder, path: path,
-                        method: method, range: range, cancellation: cancellation, log: log) : nil
+                let stashed = alpha ? Self.stashKey(path: path) : nil
+                let movie: FileResponse? = if let stashed {
+                    try await AlphaVideoCache.shared.stashedResponse(key: stashed, stash: stash, method: method, range: range,
+                                                                     cancellation: cancellation, log: log) ?? .empty(404)
+                } else if alpha && path.lowercased().hasSuffix(".webm") {
+                    try await AlphaVideoCache.shared.response(folder: folder, path: path,
+                        method: method, range: range, cancellation: cancellation, log: log)
+                } else {
+                    nil
+                }
                 let response = movie ?? Self.serveFont(path: path, method: method, range: range)
                     ?? folder.serve(path: path, method: method, range: range)
                 guard await self.respond(serial, url: url, with: response) else { return }
@@ -60,6 +69,29 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
 
     func waitUntilStopped() async {
         for read in reads.values { await read.value }
+        try? FileManager.default.removeItem(at: stashFolder)
+    }
+
+    /// Keeps a WebM the page holds in memory for conversion, and answers with the address that serves it converted, or
+    /// null when the clip has no alpha or this game's movies aren't converted.
+    func stash(base64: String) -> BridgeReply {
+        guard alpha else { return .value(.null) }
+        guard let clip = Data(base64Encoded: base64) else { return .failure(BridgeError(code: "EINVAL", message: "data is not base64")) }
+        do {
+            guard let key = try AlphaVideoCache.shared.stash(clip, in: stashFolder, log: log) else { return .value(.null) }
+            return .value(.string(GameFolder.origin + GameFolder.alphaPath + key + ".webm"))
+        } catch {
+            return .failure(BridgeError(code: "EIO", message: error.localizedDescription))
+        }
+    }
+
+    nonisolated static func stashKey(path: String) -> String? {
+        guard path.hasPrefix(GameFolder.alphaPath) else { return nil }
+        let name = path.dropFirst(GameFolder.alphaPath.count)
+        guard name.hasSuffix(".webm") else { return nil }
+        let key = name.dropLast(5)
+        guard key.count == 64, key.allSatisfy({ $0.isHexDigit && !$0.isUppercase }) else { return nil }
+        return String(key)
     }
 
     /// The response for a font substitute's path, or nil when the path is not under the font path.
