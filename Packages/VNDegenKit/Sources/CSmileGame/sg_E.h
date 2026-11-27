@@ -100,7 +100,6 @@ enum { SND_BGM, SND_BGS, SND_ME, SND_SE };
 typedef struct Mixer Mixer;
 
 typedef struct SgE {
-    SG *g;
     Mixer *mix;
     SaveData save;
     bool haveSave;

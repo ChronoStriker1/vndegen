@@ -384,6 +384,8 @@ void field_update(SG *g, u32 ms);
 void field_draw(SG *g);
 
 #include "sg_A.h"
+#include "sg_B.h"
+#include "sg_E.h"
 
 typedef struct Interp {
     Script script;
@@ -453,14 +455,14 @@ struct SG {
     Guid pendingMap;
     int pendingX, pendingZ, pendingDir;
     bool pendingTransfer;
+    SgB b;
+    SgE e;
 };
 
 bool sg_pressed(SG *g, u32 key);
 bool sg_local_switch(SG *g, Guid event, int index);
 void text_outlined(SG *g, int x, int y, int px, const char *s, u32 color);
 
-#include "sg_B.h"
-#include "sg_E.h"
 #include "sg_D.h"
 
 #endif

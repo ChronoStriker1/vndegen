@@ -511,46 +511,24 @@ bool member_can_equip(const Tables *t, const Member *m, const ItemDef *it) {
     return true;
 }
 
-static struct {
-    SG *g;
-    SgB *b;
-} registry[8];
-
-SgB *sgb(SG *g) {
-    for (int i = 0; i < 8; i++)
-        if (registry[i].g == g) return registry[i].b;
-    for (int i = 0; i < 8; i++) {
-        if (registry[i].g) continue;
-        SgB *b = sg_alloc(sizeof *b);
-        b->g = g;
-        registry[i].g = g;
-        registry[i].b = b;
-        return b;
-    }
-    return NULL;
-}
+SgB *sgb(SG *g) { return &g->b; }
 
 void menu_free(SgB *b);
 
 void sgb_open(SG *g) {
-    SgB *b = sgb(g);
-    if (!b || b->loaded) return;
+    SgB *b = &g->b;
+    if (b->loaded) return;
     tables_load(g, &b->tables);
     b->loaded = true;
     party_new(g);
 }
 
 void sgb_close(SG *g) {
-    for (int i = 0; i < 8; i++) {
-        if (registry[i].g != g) continue;
-        SgB *b = registry[i].b;
-        menu_free(b);
-        tables_free(&b->tables);
-        free(b->party.items);
-        free(b);
-        registry[i].g = NULL;
-        registry[i].b = NULL;
-    }
+    SgB *b = &g->b;
+    menu_free(b);
+    tables_free(&b->tables);
+    free(b->party.items);
+    memset(b, 0, sizeof *b);
 }
 
 void party_add_hero(SG *g, Guid hero) {

@@ -312,7 +312,6 @@ enum { MENU_CLOSED, MENU_MAIN, MENU_SHOP, MENU_INN };
 typedef struct Menu Menu;
 
 typedef struct SgB {
-    SG *g;
     Tables tables;
     Party party;
     Menu *menu;

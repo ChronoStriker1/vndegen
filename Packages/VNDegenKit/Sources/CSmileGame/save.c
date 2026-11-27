@@ -390,13 +390,12 @@ static const int kToSave[4] = {0, 3, 1, 2};
 static const int kFromSave[4] = {0, 2, 3, 1};
 
 SaveData *sg_save_state(SG *g) {
-    SgE *e = sg_e(g);
+    SgE *e = &g->e;
     return e ? &e->save : NULL;
 }
 
 float sg_play_seconds(SG *g) {
-    SgE *e = sg_e(g);
-    if (!e) return 0;
+    SgE *e = &g->e;
     return e->baseSeconds + (float)(g->clockMs - e->baseClock) / 1000.0f;
 }
 
@@ -442,8 +441,7 @@ static bool default_camera(SG *g, float *pitch, float *dist, float *fov) {
 }
 
 void sg_save_new_game(SG *g) {
-    SgE *e = sg_e(g);
-    if (!e) return;
+    SgE *e = &g->e;
     SaveData *s = &e->save;
     save_free(s);
     bool newer = player_at_least(g, 1, 8);
@@ -565,7 +563,7 @@ static bool write_file(const char *path, const u8 *data, size_t size) {
 }
 
 bool sg_save_write(SG *g, int slot) {
-    SgE *e = sg_e(g);
+    SgE *e = &g->e;
     if (!e || slot < 0 || slot >= SAVE_SLOTS) return false;
     if (!e->haveSave) sg_save_new_game(g);
     capture(g, &e->save);
@@ -584,8 +582,7 @@ bool sg_save_write(SG *g, int slot) {
 }
 
 bool sg_save_read(SG *g, int slot) {
-    SgE *e = sg_e(g);
-    if (!e) return false;
+    SgE *e = &g->e;
     char *path = sg_save_path(g, slot);
     size_t size = 0;
     u8 *data = sg_read_file(path, &size);
