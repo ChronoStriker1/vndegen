@@ -74,12 +74,17 @@ typedef struct SaveData {
     int mapTailSize;
 } SaveData;
 
+typedef struct SlotHero {
+    Guid id;
+    i32 level, hp, maxHp, mp, maxMp;
+} SlotHero;
+
 typedef struct SaveSlot {
     bool used;
     time_t written;
     Guid map;
-    Guid hero;
-    i32 level, hp, maxHp, mp, maxMp;
+    SlotHero party[4];
+    int partyCount;
 } SaveSlot;
 
 bool save_parse(SaveData *s, const u8 *data, size_t size);

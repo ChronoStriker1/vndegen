@@ -281,6 +281,45 @@ static void test_sacred_castle_load(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_menu_save(const char *dir) {
+    char tmp[] = "/tmp/sgtestG.XXXXXX";
+    if (!mkdtemp(tmp)) return;
+    SG *g = open_game(dir, tmp);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    run(g, 16);
+    press(g, VK_OK);
+    for (int i = 0; i < 400 && g->interp.active; i++) {
+        press(g, VK_OK);
+        run(g, 200);
+    }
+    run(g, 200);
+    press(g, VK_CANCEL);
+    run(g, 300);
+    for (int i = 0; i < 4; i++) press(g, VK_DOWN);
+    press(g, VK_OK);
+    run(g, 100);
+    CHECK(menu_page(g) && strcmp(menu_page(g), "save") == 0);
+    press(g, VK_DOWN);
+    press(g, VK_OK);
+    run(g, 100);
+    SaveData s;
+    CHECK(read_slot(g, 1, &s));
+    if (s.partyCount) {
+        CHECK(guid_eq(s.map, g->field.map.id));
+        CHECK(s.partyCount == 1 && guid_eq(s.party[0].id, g->b.party.members[0].hero));
+        save_free(&s);
+    }
+    SaveSlot slots[SAVE_SLOTS];
+    sg_save_slots(g, slots, SAVE_SLOTS);
+    CHECK(!slots[0].used && slots[1].used && slots[1].partyCount == 1 && slots[1].party[0].maxHp == 32);
+    remove_slot(g, 1);
+    rmdir(tmp);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE"), *sacred = getenv("SG_SACRED");
     if (colette) {
@@ -289,6 +328,7 @@ int main(void) {
         test_load_keeps_party(colette);
         test_shop(colette);
         test_bgm_command(colette);
+        test_menu_save(colette);
     } else {
         printf("SG_COLETTE not set: Colette checks skipped\n");
     }

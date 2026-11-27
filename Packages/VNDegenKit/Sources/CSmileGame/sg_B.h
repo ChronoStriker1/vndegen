@@ -346,8 +346,6 @@ bool sgb_quit(SG *g);
 bool menu_result(SG *g);
 void inn_open(SG *g, int price);
 const char *menu_page(SG *g);
-bool sgb_save_slot(SG *g, int slot);
-bool sgb_slot_info(SG *g, int slot, char *date, size_t dateSize);
 void sgb_sound(SG *g, int which);
 
 #endif

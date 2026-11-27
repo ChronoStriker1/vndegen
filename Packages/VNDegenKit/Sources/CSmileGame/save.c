@@ -370,13 +370,9 @@ int sg_save_slots(SG *g, SaveSlot *out, int max) {
             out[i].used = true;
             out[i].written = st.st_mtime;
             out[i].map = s.map;
-            if (s.partyCount) {
-                out[i].hero = s.party[0].id;
-                out[i].level = s.party[0].level;
-                out[i].hp = s.party[0].hp;
-                out[i].maxHp = s.party[0].maxHp;
-                out[i].mp = s.party[0].mp;
-                out[i].maxMp = s.party[0].maxMp;
+            for (int k = 0; k < s.partyCount && k < 4; k++) {
+                const SaveHero *h = &s.party[k];
+                out[i].party[out[i].partyCount++] = (SlotHero){h->id, h->level, h->hp, h->maxHp, h->mp, h->maxMp};
             }
             save_free(&s);
         }
