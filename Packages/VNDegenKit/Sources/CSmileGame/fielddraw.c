@@ -779,9 +779,13 @@ static Tri *posed_actor(SG *g, Actor *a, float ang, int *count) {
     return out;
 }
 
-static void draw_model(SG *g, Actor *a, float ang) {
+static void draw_model(SG *g, Actor *a, float ang, bool xray) {
     int n = 0;
     Tri *tris = posed_actor(g, a, ang, &n);
+    if (xray)
+        for (int i = 0; i < n; i++)
+            if (tris[i].mode == TRI_OPAQUE) r3_tri_ex(&g->r3, &g->field.cam, &tris[i], TRI_OPAQUE, TF_XRAY | TF_CULL);
+    r3_flush(&g->r3);
     for (int i = 0; i < n; i++) {
         Tri *t = &tris[i];
         r3_tri_ex(&g->r3, &g->field.cam, t, t->mode, t->mode == TRI_OPAQUE ? (u8)(t->flags | TF_LIT | TF_SHADOW) : t->flags);
@@ -797,7 +801,7 @@ static void cast_model(SG *g, Actor *a, float ang) {
     free(tris);
 }
 
-static void draw_sprite(SG *g, const Actor *a) {
+static void draw_sprite(SG *g, const Actor *a, bool xray) {
     Field *f = &g->field;
     const Image *im = a->sheet;
     if (!im || !a->graphic) return;
@@ -823,14 +827,21 @@ static void draw_sprite(SG *g, const Actor *a) {
     float inset = 0.5f / (float)im->w;
     Vert va = {ax - rx, a->y + tall, az - rz, u0 + inset, v0, 1}, vb = {ax + rx, a->y + tall, az + rz, u1 - inset, v0, 1};
     Vert vc = {ax + rx, a->y, az + rz, u1 - inset, v1, 1}, vd = {ax - rx, a->y, az - rz, u0 + inset, v1, 1};
-    r3_tri(&g->r3, &f->cam, &(Tri){.v = {va, vb, vc}, .tex = im, .alphaTest = true});
-    r3_tri(&g->r3, &f->cam, &(Tri){.v = {va, vc, vd}, .tex = im, .alphaTest = true});
+    Tri t1 = {.v = {va, vb, vc}, .tex = im, .alphaTest = true}, t2 = {.v = {va, vc, vd}, .tex = im, .alphaTest = true};
+    if (xray) {
+        r3_tri_ex(&g->r3, &f->cam, &t1, TRI_OPAQUE, TF_XRAY);
+        r3_tri_ex(&g->r3, &f->cam, &t2, TRI_OPAQUE, TF_XRAY);
+        r3_flush(&g->r3);
+    }
+    r3_tri(&g->r3, &f->cam, &t1);
+    r3_tri(&g->r3, &f->cam, &t2);
 }
 
 static void draw_actor(SG *g, Actor *a) {
     if (!a->visible) return;
-    if (a->model) draw_model(g, a, kFacing[a->dir & 3]);
-    else draw_sprite(g, a);
+    bool xray = a == &g->field.player;
+    if (a->model) draw_model(g, a, kFacing[a->dir & 3], xray);
+    else draw_sprite(g, a, xray);
 }
 
 static void draw_sky(SG *g, View *v) {

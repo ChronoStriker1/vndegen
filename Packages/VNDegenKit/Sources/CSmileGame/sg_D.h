@@ -16,6 +16,7 @@ enum {
     TF_NOZTEST = 1 << 4,
     TF_CAST = 1 << 5,
     TF_CULL = 1 << 6,
+    TF_XRAY = 1 << 7,
 };
 
 typedef struct ViewPose {
@@ -69,6 +70,8 @@ typedef struct Pool Pool;
 
 typedef struct R3x {
     Pool *pool;
+    u8 *mark;
+    u8 markSerial;
     ShadowMap shadow;
     bool shadowOn;
     float amb[3], sun[3];

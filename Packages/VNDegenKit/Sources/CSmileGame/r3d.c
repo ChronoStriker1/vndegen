@@ -7,6 +7,8 @@
 #define NEAR_Z 0.05f
 #define SHADOW_BIAS 0.08f
 
+static const u32 kXrayAlpha = 102;
+
 static void pool_free(R3 *r);
 
 void r3_init(R3 *r, int w, int h) {
@@ -15,6 +17,7 @@ void r3_init(R3 *r, int w, int h) {
     r->h = h;
     r->zbuf = sg_alloc(sizeof(float) * (size_t)w * (size_t)h);
     r->x = sg_alloc(sizeof *r->x);
+    r->x->mark = sg_alloc((size_t)w * (size_t)h);
     for (int i = 0; i < 3; i++) r->x->amb[i] = 1.0f;
     long cores = sysconf(_SC_NPROCESSORS_ONLN);
     r3_threads(r, cores >= 6 ? 6 : (int)cores);
@@ -24,7 +27,8 @@ void r3_free(R3 *r) {
     view_free(r->view);
     if (r->x) {
         pool_free(r);
-        free(r->x->shadow.depth);
+        r3_shadow_free(r);
+        free(r->x->mark);
         free(r->x);
     }
     free(r->zbuf);
@@ -33,6 +37,10 @@ void r3_free(R3 *r) {
 
 void r3_begin(R3 *r, u32 *fb, u32 clear) {
     r3_flush(r);
+    if (++r->x->markSerial == 0) {
+        memset(r->x->mark, 0, (size_t)r->w * (size_t)r->h);
+        r->x->markSerial = 1;
+    }
     r->fb = fb;
     r->tint[0] = r->tint[1] = r->tint[2] = 256;
     size_t n = (size_t)r->w * (size_t)r->h;
@@ -281,6 +289,8 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
     bool alphaTest = cmd->alphaTest;
     bool zwrite = !(flags & TF_NOZWRITE) && mode == TRI_OPAQUE;
     bool ztest = !(flags & TF_NOZTEST);
+    bool xray = flags & TF_XRAY;
+    u8 markSerial = r->x->markSerial;
     bool lit = flags & TF_LIT;
     const R3x *x3 = r->x;
     bool shadow = (flags & TF_SHADOW) && x3->shadowOn;
@@ -314,10 +324,15 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
         for (int i = 0; i < na; i++) at[i] = base[i] + dx[i] * pxa + dy[i] * py;
         u32 *row = r->fb + (size_t)y * (size_t)r->w;
         float *zrow = r->zbuf + (size_t)y * (size_t)r->w;
+        u8 *markRow = x3->mark + (size_t)y * (size_t)r->w;
         for (int x = xa; x <= xb; x++, at[0] += dx[0], at[1] += dx[1], at[2] += dx[2], at[3] += dx[3], at[4] += dx[4], at[5] += dx[5],
                  at[6] += dx[6]) {
             float iz = at[A_IZ];
-            if (ztest && iz <= zrow[x]) continue;
+            if (xray) {
+                if (iz >= zrow[x] * 0.999f || markRow[x] == markSerial) continue;
+            } else if (ztest && iz <= zrow[x]) {
+                continue;
+            }
             float z = 1.0f / iz;
             u32 c = 0xffffffffu;
             if (tex) c = tex_fetch(tex, at[A_UZ] * z + animU, at[A_VZ] * z);
@@ -356,7 +371,13 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
                 row[x] = 0xff000000u | (db > 255 ? 255 : db) << 16 | (dg > 255 ? 255 : dg) << 8 | (dr > 255 ? 255 : dr);
                 continue;
             }
-            if ((mode == TRI_BLEND || !alphaTest) && a < 255) {
+            if (xray) {
+                if (alphaTest && a < 128) continue;
+                markRow[x] = markSerial;
+                a = kXrayAlpha;
+                cr = cg = cb = 255;
+            }
+            if ((mode == TRI_BLEND || !alphaTest || xray) && a < 255) {
                 u32 ia = 255 - a;
                 row[x] = 0xff000000u | ((cb * a + db * ia) / 255) << 16 | ((cg * a + dg * ia) / 255) << 8 | ((cr * a + dr * ia) / 255);
                 continue;
