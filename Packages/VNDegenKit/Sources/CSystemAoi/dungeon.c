@@ -4,6 +4,7 @@
 enum {
     MAP_HEADER = 48,
     CELL_BYTES = 104,
+    F_ROOF = 1,
     F_FLOOR = 5,
     F_OBJECT = 6,
     F_MARK = 7,
@@ -102,6 +103,7 @@ static const struct {
 #define FOG_DENSITY 0.0475f
 #define AMBIENT_ALL (192.0f / 255.0f)
 #define POLE_SIDE (DUN_SIDE + 1)
+#define SHARED_KEY 0x8F2E37ABu
 #define QUARTER 1.5707963f
 #define VIEW_SLOPE 0.75f
 #define CRYSTAL_ALPHA 0.5f
@@ -328,12 +330,10 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     if (!sa_dungeon_read_map(d, vfs, map)) return false;
     int dungeon = 0, floor = 0;
     d->area = sscanf(map, "mp%2d%2d", &dungeon, &floor) == 2 ? dungeon << 16 | floor << 8 : 0;
-    d->wallSeed = (u32)d->area;
-    d->wallSharedKey = true;
+    d->partSeed = (u32)d->area;
+    d->sharedKey = true;
     replay_edits(d);
     sa_fx_area(&d->fx, -CELL / 2, -((float)d->h - 0.5f) * CELL, ((float)d->w - 0.5f) * CELL, CELL / 2);
-    d->variantSeed = 2166136261u;
-    for (const char *p = map; *p; p++) d->variantSeed = (d->variantSeed ^ (u8)*p) * 16777619u;
     if (!d->r3.zbuf) r3_init(&d->r3, SA_W, SA_H);
     d->fov = FOV;
     d->r3.fogDensity = FOG_DENSITY;
@@ -447,22 +447,44 @@ void sa_dungeon_debug_variant(int variant, int mode) {
 
 enum { PART_WALL, PART_POLE, PART_FLOOR, PART_ROOF };
 
-int vnsystemaoi_wall_variant(uint32_t seed, bool sharedKey, int x, int y, int side) {
-    static const u32 sideKey[4] = {0x2388ACBDu, 0x56091EFCu, 0x37E8D81Bu, 0x0980F3B7u};
-    u32 v = ((u32)(x + y) * 8192u + (u32)x + seed) ^ (sharedKey ? 0x8F2E37ABu : sideKey[side & 3]);
+static int part_hash(u32 seed, u32 key, int x, int y) {
+    u32 v = ((u32)(x + y) * 8192u + (u32)x + seed) ^ key;
     u32 sum = (v & 15) + (v >> 4 & 15) + (v >> 8 & 255) + (v >> 16 & 15) + (v >> 20 & 15) + (v >> 24);
     return (int)(sum % 3);
 }
 
+int vnsystemaoi_wall_variant(uint32_t seed, bool sharedKey, int x, int y, int side) {
+    static const u32 sideKey[4] = {0x2388ACBDu, 0x56091EFCu, 0x37E8D81Bu, 0x0980F3B7u};
+    return part_hash(seed, sharedKey ? SHARED_KEY : sideKey[side & 3], x, y);
+}
+
+int vnsystemaoi_floor_variant(uint32_t seed, int x, int y) { return part_hash(seed, SHARED_KEY, x, y); }
+
+int vnsystemaoi_roof_variant(uint32_t seed, bool sharedKey, int x, int y) { return part_hash(seed, sharedKey ? SHARED_KEY : 0x0A0C246Du, x, y); }
+
+int vnsystemaoi_pole_variant(uint32_t seed, bool sharedKey, int x, int y, int partyX, int partyY) {
+    return part_hash(seed, sharedKey ? SHARED_KEY : 0x0ABC0283u, x <= partyX ? x : x - 1, y <= partyY ? y : y - 1);
+}
+
 static int part_variant(const Dungeon *d, int kind, int x, int y, int side) {
     if (forcedVariant >= 0) return forcedVariant;
-    if (kind == PART_WALL) return vnsystemaoi_wall_variant(d->wallSeed, d->wallSharedKey, x, y, side);
-    if (kind != PART_POLE) return 0;
-    u32 h = d->variantSeed ^ (u32)x * 73856093u ^ (u32)y * 19349663u;
-    h ^= h >> 13;
-    h *= 0x5bd1e995u;
-    h ^= h >> 15;
-    return (int)(h % 3);
+    switch (kind) {
+    case PART_WALL: return vnsystemaoi_wall_variant(d->partSeed, d->sharedKey, x, y, side);
+    case PART_FLOOR: return vnsystemaoi_floor_variant(d->partSeed, x, y);
+    case PART_ROOF: return vnsystemaoi_roof_variant(d->partSeed, d->sharedKey, x, y);
+    default: return vnsystemaoi_pole_variant(d->partSeed, d->sharedKey, x, y, d->x, d->y);
+    }
+}
+
+bool sa_dungeon_pole_stands(const Dungeon *d, int x, int y) {
+    static const struct {
+        int dx, dy, a, b;
+    } around[4] = {{0, 0, F_WALL_N, F_WALL_W}, {-1, 0, F_WALL_N, F_WALL_E}, {-1, -1, F_WALL_E, F_WALL_S}, {0, -1, F_WALL_S, F_WALL_W}};
+    for (int i = 0; i < 4; i++) {
+        const i32 *c = cell_at(d, x + around[i].dx, y + around[i].dy);
+        if (c && (c[around[i].a] >= 0 || c[around[i].b] >= 0)) return true;
+    }
+    return false;
 }
 
 static void part_name(const Dungeon *d, char *out, size_t size, char prefix, int base, int kind, int x, int y, int side) {
@@ -954,28 +976,18 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
                 k--;
             }
         }
-    bool pole[POLE_SIDE * POLE_SIDE];
-    memset(pole, 0, sizeof pole);
+    bool poleDone[POLE_SIDE * POLE_SIDE];
+    memset(poleDone, 0, sizeof poleDone);
     int crystals[DUN_CELLS], nc = 0;
-    for (int i = 0; i < n; i++) {
-        int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
-        const i32 *cell = d->cell[row * DUN_SIDE + col];
-        if (cell[F_FLOOR] < 0) continue;
-        for (int s = 0; s < 4; s++) {
-            int w = cell[wallField[s]];
-            if (w < 0 || w == WALL_PASSAGE) continue;
-            int ax = col + (s == DIR_E), ay = row + (s == DIR_S), bx = col + (s != DIR_W), by = row + (s != DIR_N);
-            pole[ay * POLE_SIDE + ax] = pole[by * POLE_SIDE + bx] = true;
-        }
-    }
     for (int i = 0; i < n; i++) {
         int row = order[i] / DUN_SIDE, col = order[i] % DUN_SIDE;
         const i32 *cell = d->cell[row * DUN_SIDE + col];
         if (cell[F_FLOOR] < 0) continue;
         for (int k = 0; k < 4; k++) {
             int px = col + (k & 1), py = row + (k >> 1);
-            if (!pole[py * POLE_SIDE + px]) continue;
-            pole[py * POLE_SIDE + px] = false;
+            if (poleDone[py * POLE_SIDE + px]) continue;
+            poleDone[py * POLE_SIDE + px] = true;
+            if (!sa_dungeon_pole_stands(d, px, py)) continue;
             char pname[16];
             part_name(d, pname, sizeof pname, 'p', 0, PART_POLE, px, py, 0);
             set_id(d, PART_POLE, py * POLE_SIDE + px);
@@ -986,9 +998,11 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
         part_name(d, name, sizeof name, 'f', cell[F_FLOOR], PART_FLOOR, col, row, 0);
         set_id(d, PART_FLOOR, order[i]);
         draw_part(d, &d->set, &c, name, cx, cz, 0);
-        part_name(d, name, sizeof name, 'r', 0, PART_ROOF, col, row, 0);
-        set_id(d, PART_ROOF, order[i]);
-        draw_part(d, &d->set, &c, name, cx, cz, 0);
+        if (cell[F_ROOF] >= 0) {
+            part_name(d, name, sizeof name, 'r', cell[F_ROOF], PART_ROOF, col, row, 0);
+            set_id(d, PART_ROOF, order[i]);
+            draw_part(d, &d->set, &c, name, cx, cz, 0);
+        }
         for (int s = 0; s < 4; s++) {
             int w = cell[wallField[s]];
             set_id(d, PART_WALL, order[i] * 4 + s);

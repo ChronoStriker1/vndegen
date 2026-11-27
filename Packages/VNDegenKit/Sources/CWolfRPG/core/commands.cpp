@@ -942,7 +942,13 @@ void Game::partyCommand(Thread &t, const Command &c) {
             std::erase(members, graphic);
             break;
         default:
-            if (((flags & 0xF0) >> 4) == 1) members.assign(1, "");  // erase every character
+            switch ((flags & 0xF0) >> 4) {
+                case 0: std::erase(members, std::string()); break;
+                case 1: members.assign(1, ""); break;
+                case 5: partyTransparent_ = true; break;
+                case 6: partyTransparent_ = false; break;
+                default: break;
+            }
             break;
     }
     members.resize(6);
@@ -965,10 +971,9 @@ void Game::effectCommand(Thread &t, const Command &c) {
             if (it == pictures_.end()) continue;
             Picture &p = it->second;
             switch (type) {
-                case 0x00:  // flash: tint toward a colour and back
-                    p.r.set(a1, frames / 2);
-                    p.g.set(a2, frames / 2);
-                    p.b.set(a3, frames / 2);
+                case 0x00:
+                    p.flash = {a1, a2, a3};
+                    p.flashFrames = p.flashLeft = std::max(1, frames);
                     break;
                 case 0x10:  // colour correction, as offsets from the normal 100
                     p.r.set(100 + a1, frames);

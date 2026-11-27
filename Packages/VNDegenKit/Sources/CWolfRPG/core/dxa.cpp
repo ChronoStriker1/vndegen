@@ -205,7 +205,245 @@ size_t fileEntrySize(int version, size_t width) {
     return version >= 8 ? n + width * 2 : version >= 2 ? n + width : n;
 }
 
+uint8_t rotateLeft(uint8_t b, int n) { return uint8_t(b << n | b >> (8 - n)); }
+
+uint32_t msRand(uint32_t &state) {
+    state = state * 214013u + 2531011u;
+    return state >> 16 & 0x7FFF;
+}
+
+constexpr std::array<uint8_t, 256> makeSbox() {
+    std::array<uint8_t, 256> s{};
+    uint8_t p = 1, q = 1;
+    do {
+        p = uint8_t(p ^ uint8_t(p << 1) ^ (p & 0x80 ? 0x1B : 0));
+        q = uint8_t(q ^ uint8_t(q << 1));
+        q = uint8_t(q ^ uint8_t(q << 2));
+        q = uint8_t(q ^ uint8_t(q << 4));
+        if (q & 0x80) q ^= 0x09;
+        uint8_t x = uint8_t(q ^ uint8_t(q << 1 | q >> 7) ^ uint8_t(q << 2 | q >> 6) ^ uint8_t(q << 3 | q >> 5) ^
+                            uint8_t(q << 4 | q >> 4));
+        s[p] = uint8_t(x ^ 0x63);
+    } while (p != 1);
+    s[0] = 0x63;
+    return s;
+}
+
+constexpr std::array<uint8_t, 256> sbox = makeSbox();
+
+uint8_t xtime(uint8_t b) { return uint8_t(b << 1 ^ (b & 0x80 ? 0x1B : 0)); }
+
+std::string_view keyString14B() {
+    for (auto &k : wolf3Keys)
+        if (k.cryptVersion == 0x14B) return k.key;
+    return {};
+}
+
+void xorTable(uint8_t *data, size_t size, const crypt14b::StreamTable &table, uint64_t position) {
+    for (size_t i = 0; i < size; i++) data[i] ^= crypt14b::streamByte(table, position + i);
+}
+
+crypt14b::Block addToCounter(crypt14b::Block counter, uint64_t n) {
+    for (int i = 15; i >= 0 && n; i--) {
+        uint64_t sum = uint64_t(counter[size_t(i)]) + (n & 0xFF);
+        counter[size_t(i)] = uint8_t(sum);
+        n = (n >> 8) + (sum >> 8);
+    }
+    return counter;
+}
+
 }  // namespace
+
+namespace crypt14b {
+
+void unscrambleHeader(uint8_t *header) {
+    const uint8_t *p = header + 0x31;
+    uint32_t state = uint32_t(p[0]) + uint32_t(p[7]) * p[12];
+    for (size_t field = 0; field < 4; field++) {
+        for (size_t u = 4; u-- > 0;) {
+            uint8_t *at = header + 8 + field * 8 + u * 2;
+            uint16_t v = uint16_t(at[0] | at[1] << 8) ^ uint16_t(msRand(state));
+            at[0] = uint8_t(v);
+            at[1] = uint8_t(v >> 8);
+        }
+    }
+}
+
+uint8_t tableSum(const Password &p, bool fileTable) {
+    unsigned n = fileTable ? p[8] / 4u : p[11] / 3u;
+    int r = fileTable ? 2 : 3;
+    uint8_t s = 0;
+    for (unsigned i = 0; i < n; i++) s = uint8_t(i ^ rotateRight(uint8_t(s ^ p[i % 15]), r));
+    return s;
+}
+
+uint32_t tableSeed(const Password &p, bool fileTable) {
+    return uint32_t(p[2]) * p[5] + p[12] + tableSum(p, fileTable);
+}
+
+StreamTable streamTable(const Password &p, bool fileTable) {
+    uint8_t s = tableSum(p, fileTable);
+    uint32_t state = tableSeed(p, fileTable);
+    std::array<uint8_t, 3> f{};
+    f[s % 3] = uint8_t(msRand(state));
+    StreamTable t{};
+    for (size_t i = 0; i < 256; i++) {
+        uint32_t a = msRand(state), b = msRand(state);
+        t[i] = uint8_t(f[0] ^ uint8_t(b));
+        t[256 + i] = uint8_t(f[1] ^ uint8_t(a >> 8));
+        t[512 + i] = uint8_t(f[2] ^ uint8_t(a));
+    }
+    if (!fileTable) return t;
+
+    std::string_view key = keyString14B();
+    std::array<uint8_t, 128> salt;
+    for (size_t i = 0; i < salt.size(); i++) salt[i] = uint8_t(i / key.size() + uint8_t(key[i % key.size()]));
+    for (unsigned k = 0; k < 3; k++) {
+        uint32_t counter = s;
+        for (unsigned j = 0; j < 256; j++) {
+            uint8_t c = salt[j % 128], d = salt[(j + k) % 128];
+            uint8_t &e = t[256 * k + j];
+            uint8_t x = c ^ e;
+            uint8_t v = x;
+            bool marked = false;
+            switch ((256u * c + d) % 7) {
+            case 1:
+                if (d % 11 == 0) v = e;
+                break;
+            case 2:
+                if (c % 29 == 0) v = uint8_t(~x);
+                break;
+            case 3:
+                if ((j + 3) % 37 == 0) v = d ^ x;
+                break;
+            case 4:
+                if ((c + d) % 97 == 0) v = uint8_t(c + x);
+                break;
+            case 5:
+                if (5 * j % 123 == 0) v = x ^ uint8_t(counter);
+                break;
+            case 6:
+                if (c == 255 && d == 0) {
+                    v = 0;
+                    marked = true;
+                }
+                break;
+            default:
+                break;
+            }
+            if ((j + k) % (c % 5u + 1) == 0) v ^= uint8_t(counter);
+            else if (marked) v = uint8_t(~x);
+            e = v;
+            counter += k;
+        }
+    }
+    return t;
+}
+
+uint8_t streamByte(const StreamTable &t, uint64_t position) {
+    return t[position & 0xFF] ^ t[256 + (position >> 8 & 0xFF)] ^ t[512 + (position >> 16 & 0xFF)];
+}
+
+Block aesKey(const Password &p) {
+    Block k{};
+    for (unsigned i = 0; i < 15; i++) {
+        k[i] = uint8_t(p[7 * i % 15] + i * i);
+        k[15] ^= uint8_t(p[i] + 3 * i);
+    }
+    return k;
+}
+
+Block initialCounter(const Password &p) {
+    Block c{};
+    for (unsigned i = 0; i < 15; i++) {
+        c[i] = uint8_t(p[11 * i % 15] - i * i);
+        c[15] ^= uint8_t(p[i] + 5 * i);
+    }
+    return c;
+}
+
+RoundKeys expandKey(const Block &key) {
+    constexpr std::array<uint8_t, 10> rcon = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36};
+    RoundKeys w{};
+    std::copy(key.begin(), key.end(), w.begin());
+    for (size_t i = 4; i < 44; i++) {
+        std::array<uint8_t, 4> t = {w[4 * i - 4], w[4 * i - 3], w[4 * i - 2], w[4 * i - 1]};
+        if (i % 4 == 0) {
+            t = {uint8_t(sbox[t[1]] ^ rcon[i / 4 - 1]), uint8_t(sbox[t[2]] >> 4), uint8_t(~sbox[t[3]]),
+                 rotateLeft(sbox[t[0]], 1)};
+        }
+        for (size_t b = 0; b < 4; b++) w[4 * i + b] = w[4 * i - 16 + b] ^ t[b];
+    }
+    return w;
+}
+
+Block encryptBlock(const RoundKeys &keys, Block s) {
+    for (size_t i = 0; i < 16; i++) s[i] ^= keys[i];
+    for (size_t round = 1; round <= 10; round++) {
+        for (auto &b : s) b = sbox[b];
+        Block t = s;
+        for (size_t c = 0; c < 4; c++)
+            for (size_t r = 1; r < 4; r++) s[4 * c + r] = t[4 * ((c + r) % 4) + r];
+        if (round < 10) {
+            for (size_t c = 0; c < 4; c++) {
+                uint8_t *a = &s[4 * c];
+                uint8_t a0 = a[0], a1 = a[1], a2 = a[2], a3 = a[3], all = a0 ^ a1 ^ a2 ^ a3;
+                a[0] = a0 ^ all ^ xtime(a0 ^ a1);
+                a[1] = a1 ^ all ^ xtime(a1 ^ a2);
+                a[2] = a2 ^ all ^ xtime(a2 ^ a3);
+                a[3] = a3 ^ all ^ xtime(a3 ^ a0);
+            }
+        }
+        for (size_t i = 0; i < 16; i++) s[i] ^= keys[16 * round + i];
+    }
+    return s;
+}
+
+}
+
+struct Archive::Crypt14B {
+    crypt14b::StreamTable fileStream, dataStream;
+    crypt14b::RoundKeys keys;
+    crypt14b::Block counter;
+    uint64_t fileSize, firstEnd, tableStart, secondBlock;
+    bool dataXor;
+
+    Crypt14B(const uint8_t *header, uint64_t size, uint64_t tables) : fileSize(size), tableStart(tables) {
+        crypt14b::Password p;
+        std::copy(header + 0x31, header + 0x40, p.begin());
+        fileStream = crypt14b::streamTable(p, true);
+        dataStream = crypt14b::streamTable(p, false);
+        keys = crypt14b::expandKey(crypt14b::aesKey(p));
+        counter = crypt14b::initialCounter(p);
+        firstEnd = 64 + std::min<uint64_t>(1024, size - 64);
+        secondBlock = (firstEnd - 64 + 15) / 16;
+        dataXor = !(header[0x2C] & 1);
+    }
+
+    void counterRange(uint64_t pos, uint8_t *buf, size_t n, uint64_t start, uint64_t end, uint64_t firstBlock) const {
+        uint64_t from = std::max(pos, start), to = std::min(pos + n, end);
+        crypt14b::Block stream{};
+        uint64_t current = UINT64_MAX;
+        for (uint64_t p = from; p < to; p++) {
+            uint64_t block = (p - start) / 16;
+            if (block != current) {
+                stream = crypt14b::encryptBlock(keys, addToCounter(counter, firstBlock + block));
+                current = block;
+            }
+            buf[p - pos] ^= stream[(p - start) % 16];
+        }
+    }
+
+    void apply(uint64_t pos, uint8_t *buf, size_t n) const {
+        if (fileSize > 128)
+            for (uint64_t p = std::max<uint64_t>(pos, 64), end = std::min(pos + n, fileSize - 64); p < end; p++)
+                buf[p - pos] ^= crypt14b::streamByte(fileStream, p);
+        counterRange(pos, buf, n, 64, firstEnd, 0);
+        counterRange(pos, buf, n, tableStart, fileSize, secondBlock);
+    }
+};
+
+Archive::Archive() = default;
 
 struct Archive::Header8 {
     uint64_t tableSize, dataStart, tableStart, fileTable, dirTable;
@@ -232,18 +470,25 @@ std::unique_ptr<Archive> Archive::open(const std::string &path, std::string *err
     size_t got = size_t(std::min<uint64_t>(a->fileSize_, sizeof(h)));
     if (got >= 4 && readAt(f, 0, h, got) && h[0] == 'D' && h[1] == 'X' && h[2] == 8 && h[3] == 0) {
         if (got < sizeof(h)) return fail("truncated header");
+        uint16_t cryptVersion = uint16_t(h[0x2E] | h[0x2F] << 8);
+        if (cryptVersion == 0x14B) crypt14b::unscrambleHeader(h);
         Tables t{std::span<const uint8_t>(h), 8};
         Header8 hd{t.field(4, 4), t.addr(0x08), t.addr(0x10), t.addr(0x18), t.addr(0x20),
                    uint32_t(t.field(0x28, 4)), uint32_t(t.field(0x2C, 4)), h[0x30]};
         uint64_t end = a->fileSize_;
         if (hd.tableStart > end || hd.dataStart > end || ((hd.flags & 2) && hd.tableSize > end - hd.tableStart) ||
             hd.fileTable > hd.dirTable || hd.dirTable > hd.tableSize)
-            return fail(hd.flags >> 16 >= 0x14B ? "its header is encrypted, as Wolf RPG Editor 3.31 and later can do, "
-                                                  "which VNDegen doesn't read yet"
-                                                : "header points outside the file");
+            return fail(cryptVersion > 0x14B ? "its header is encrypted with a Wolf RPG Editor crypt version later than "
+                                               "3.31's, which VNDegen doesn't read yet"
+                                             : "header points outside the file");
         // Wolf RPG Editor 3 keeps its crypt version in the upper half of the flags, which DxLib does not use.
         a->cryptVersion_ = uint16_t(hd.flags >> 16);
         std::string err;
+        if (cryptVersion == 0x14B) {
+            if (a->fileSize_ < 64 + 16) return fail("truncated archive");
+            a->crypt14B_ = std::make_unique<Crypt14B>(h, a->fileSize_, hd.tableStart);
+            return a->load8(hd, "", &err) ? std::move(a) : fail(err);
+        }
         if (hd.flags & 1) return a->load8(hd, "", &err) ? std::move(a) : fail(err);
         // The header names the editor's crypt version, so its key goes first; the rest are tried in case a game
         // changed the field.
@@ -330,7 +575,7 @@ bool Archive::load(const std::vector<uint8_t> &key, std::string *error) {
 // A wrong key shows as tables that do not decode or do not hold together, which leaves the reason in `error`.
 bool Archive::load8(const Header8 &h, std::string_view keyString, std::string *error) {
     keyString_ = std::string(keyString.substr(0, 63));
-    key_ = h.flags & 1 ? std::vector<uint8_t>() : makeKey8(keyString_);
+    key_ = h.flags & 1 || crypt14B_ ? std::vector<uint8_t>() : makeKey8(keyString_);
     // Compressed tables run to the end of the file; nothing records their stored length. The largest library archive
     // has tables of under 1 MB, so tables, their stored bytes and their Huffman output past 64 MB are damage, refused
     // before anything that size is allocated. A stored table cut at 64 MB still decodes, as decoding stops at its size.
@@ -341,11 +586,12 @@ bool Archive::load8(const Header8 &h, std::string_view keyString, std::string *e
     }
     bool compressed = !(h.flags & 2);
     std::vector<uint8_t> head(compressed ? std::min<uint64_t>(fileSize_ - h.tableStart, kTableLimit) : h.tableSize);
-    if (!readAt(file_, h.tableStart, head.data(), head.size())) {
+    if (!readImage(h.tableStart, head.data(), head.size())) {
         *error = "cannot read tables";
         return false;
     }
-    xorStream(head.data(), head.size(), key_, 0);
+    if (crypt14B_ && crypt14B_->dataXor) xorTable(head.data(), head.size(), crypt14B_->dataStream, 0);
+    else xorStream(head.data(), head.size(), key_, 0);
     if (compressed) {
         auto coded = huffmanDecode(head, UINT64_MAX, kTableLimit);
         // Checking the LZ header's size first keeps a wrong key from asking for a large buffer.
@@ -453,7 +699,7 @@ std::optional<std::vector<uint8_t>> Archive::read(const std::string &path) const
     // No file in the library comes near 512 MB, stored or unpacked; a larger claim is damage.
     if (e.stored > kFileLimit || e.size > kFileLimit) return std::nullopt;
     std::vector<uint8_t> stored(e.stored);
-    if (!readAt(file_, e.offset, stored.data(), stored.size())) return std::nullopt;
+    if (!readImage(e.offset, stored.data(), stored.size())) return std::nullopt;
     if (version_ >= 8) return read8(e, std::move(stored));
     // Versions 5 and 6 key each file's bytes from its unpacked size rather than its place in the archive.
     xorStream(stored.data(), stored.size(), key_, version_ >= 5 ? e.size : e.offset);
@@ -463,7 +709,8 @@ std::optional<std::vector<uint8_t>> Archive::read(const std::string &path) const
 
 // The encoder applies LZ, then Huffman, then XOR, so they are undone in the reverse order.
 std::optional<std::vector<uint8_t>> Archive::read8(const Entry &e, std::vector<uint8_t> stored) const {
-    xorStream(stored.data(), stored.size(), e.key, e.size);
+    if (crypt14B_ && crypt14B_->dataXor) xorTable(stored.data(), stored.size(), crypt14B_->dataStream, e.size);
+    else xorStream(stored.data(), stored.size(), e.key, e.size);
     bool packed = e.packedSize != UINT64_MAX;
     uint64_t length = packed ? e.packedSize : e.size;
     std::vector<uint8_t> data;
@@ -484,6 +731,12 @@ std::optional<std::vector<uint8_t>> Archive::read8(const Entry &e, std::vector<u
     }
     if (!packed) return data;
     return dxlibDecode(data.data(), data.size(), e.size);
+}
+
+bool Archive::readImage(uint64_t pos, uint8_t *buf, size_t n) const {
+    if (!readAt(file_, pos, buf, n)) return false;
+    if (crypt14B_) crypt14B_->apply(pos, buf, n);
+    return true;
 }
 
 std::vector<std::string> Archive::paths() const {

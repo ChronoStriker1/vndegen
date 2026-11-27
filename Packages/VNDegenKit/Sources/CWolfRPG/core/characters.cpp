@@ -28,6 +28,17 @@ enum RouteCode : uint8_t {
     ApproachEvent = 0x35, ApproachPosition, AddVariable, Pattern4, Pattern5, SetHeight,
 };
 
+bool routeTakesTime(const Actor &a) {
+    if (!a.route) return false;
+    for (size_t i = a.routeStep; i < a.route->steps.size(); i++) {
+        uint8_t id = a.route->steps[i].id;
+        if (id <= MoveUpRight || (id >= MoveRandom && id <= Jump) || id == Wait || id == ApproachEvent ||
+            id == ApproachPosition)
+            return true;
+    }
+    return false;
+}
+
 constexpr int kStepFrames[7] = {64, 32, 24, 16, 12, 8, 4};
 constexpr int kIdleFrames[6] = {0, 15, 30, 60, 120, 240};
 
@@ -36,9 +47,12 @@ constexpr int kIdleFrames[6] = {0, 15, 30, 60, 120, 240};
 int Game::framesPerStep(const Actor &a) const { return kStepFrames[std::clamp(a.speed, 0, 6)]; }
 
 std::vector<const Character *> Game::characters() const {
-    std::vector<const Character *> out{&hero_.chara};
-    for (auto &p : party_)
-        if (p.chara.visible && !p.chara.graphic.empty()) out.push_back(&p.chara);
+    std::vector<const Character *> out;
+    if (!partyTransparent_) {
+        out.push_back(&hero_.chara);
+        for (auto &p : party_)
+            if (p.chara.visible && !p.chara.graphic.empty()) out.push_back(&p.chara);
+    }
     for (auto &e : events_)
         if (e.actor.chara.visible) out.push_back(&e.actor.chara);
     return out;
@@ -243,6 +257,7 @@ void Game::updateActor(Actor &a, bool isHero) {
     }
 
     // Walking cycles the frames 1 0 1 2 for three-frame sets; standing returns to the middle frame.
+    a.chara.moving = a.moving();
     bool animate = (a.moving() && a.walkAnimation) || a.idleAnimation;
     if (animate) {
         if (++a.animTimer >= std::max(2, 18 - a.animSpeed * 3)) {
@@ -326,7 +341,9 @@ bool Game::anyRouteRunning() const {
 void Game::heroControl() {
     // Commands 230 and 231 let the hero walk while an event runs; the event goes on meanwhile.
     bool eventRunning = !threads_.empty();
-    if ((eventRunning && !moveDuringEvents_) || message_.active || choice_.active || hero_.moving() || hero_.route) return;
+    if ((eventRunning && !moveDuringEvents_) || message_.active || choice_.active || hero_.moving() ||
+        routeTakesTime(hero_))
+        return;
     // Keys command 126 stopped from moving the hero or starting events still reach key input commands.
     auto moves = [&](Key key) { return (input_.held & key) && basicControl_[std::countr_zero(uint32_t(key))] == 0; };
     int dir = 0;

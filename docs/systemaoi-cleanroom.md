@@ -462,8 +462,12 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   (The wall variants: what was read, and why, below), and VNDegen's wall-0 sides use it: the seed from the area's
   `floor.obj` row, the shared key or the per-side keys by column 7, the six-piece sum mod 3. Measured: VNDegen's own
   choice, taken through the expedition's floor loading, matches all 74 classified walls (the earlier per-cell hash
-  matched 24). VNDegen's poles still use a hash of the map file's name and the corner, and its floors and roofs stay
-  `000`. Their rule was read and measured afterwards (Pole, floor and roof variants: what was read, and why, below).
+  matched 24). The pole, floor and roof rules were read and measured afterwards (Pole, floor and roof variants: what
+  was read, and why, below), and VNDegen uses them too: floors by field 5 with the shared key, roofs by field 1 with
+  the shared key or 0x0A0C246D by column 7, and poles where any wall side of 0 or more ends at the corner, passages
+  and floorless cells included, with the variant of the cell around the corner nearest the party (the measured rule,
+  not the corner's own hash). Measured: VNDegen's own choice, taken through the expedition's floor loading, matches
+  65 of 65 poles, 24 of 25 floors and 23 of 24 roofs, the same cells the rule fits.
 - **Crystals.** Measured under Wine in 千樹庭 (mp0101, crystal (14, 4)) and the ice dungeon (mp0802, crystal (1, 13)):
   standing on the crystal's cell the original shows the walls through both faces of the crystal; from a cell away
   its colour fits half-opaque front and back layers drawn at full texture brightness with no fog (core mean error
@@ -1593,7 +1597,7 @@ file's wall fields 9, 12, 15 and 18. The rule, with fields as Map layout numbers
   around it: the north and west sides of the cell south-east of the corner, the north and east sides of the cell
   south-west of it, the east and south sides of the cell north-west of it, and the south and west sides of the cell
   north-east of it. Cells outside the map are skipped. Doorways (10), edge passages (20) and doors (100 and up) count
-  as walls here. VNDegen draws fewer: it skips edge passages and the walls of cells with no floor.
+  as walls here. VNDegen follows this, for the corners of the floor cells it draws.
 - **Pole, which, as read.** The variant comes from the corner's own x and y through the same hash, with the key
   0x8F2E37AB where column 7 isn't 0 and 0x0ABC0283 where it is. So with column 7 set, a corner gets the same number as
   the cell whose north-west corner it is.

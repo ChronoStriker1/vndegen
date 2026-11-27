@@ -44,7 +44,7 @@ Map events, the hero and the five party members share one layout.
 | `x`, `y` | Position in half tiles | Controlled saves: one step right adds 2 to the hero's `x`. Load test: a hero written at tile (6,9) stands there in the PC engine |
 | `graphic` | Character image file; empty for none | Game data, load test |
 | `appearance` | Opacity, blend mode, direction (numeric keypad: 2 down, 4 left, 6 right, 8 up), animation frame | Controlled saves: a step right turns the hero from 2 to 6. Load test: a hero written facing 4 faces left |
-| `hidden` | 1 when the character shows nothing: an event with no active page, an empty party slot | Game data: the events whose page conditions fail have it set |
+| `hidden` | 1 when the character shows nothing: an event with no active page, an empty party slot | Game data: the events whose page conditions fail have it set. The hero's carries the party command's transparency in VNDegen: inferred, as False Myth 2's PC saves where the hero shows have it 0 and none was made while the party was transparent |
 | `route.flags` | For the event's page: animation speed, move speed, frequency, move type, the page's option bits, and the route's flags | Game data, compared for one map's events; not changed and reloaded |
 | `selfVariables` | Always empty in the test saves; map event self variables are in section 3 | |
 | the rest | Movement state and counters | Not known; VNDegen writes the values the engine wrote for the same character, else its usual ones |

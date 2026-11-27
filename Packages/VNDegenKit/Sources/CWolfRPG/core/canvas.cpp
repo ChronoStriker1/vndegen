@@ -88,11 +88,14 @@ void Canvas::draw(const Bitmap &src, RectI from, RectF to, const DrawOptions &o)
         if (x0 >= x1 || y0 >= y1) return;
         thread_local std::vector<int> columns;
         columns.resize(size_t(x1 - x0));
-        for (int x = x0; x < x1; x++)
-            columns[x - x0] = (from.x + std::min(from.w - 1, std::max(0, int((x + 0.5 - to.x) * sx)))) * 4;
+        for (int x = x0; x < x1; x++) {
+            int u = std::min(from.w - 1, std::max(0, int((x + 0.5 - to.x) * sx)));
+            columns[x - x0] = (from.x + (o.flipX ? from.w - 1 - u : u)) * 4;
+        }
         bool plain = opacity == 255 && plainColour && o.blend == Blend::Normal;
         for (int y = y0; y < y1; y++) {
             int v = std::min(from.h - 1, std::max(0, int((y + 0.5 - to.y) * sy)));
+            if (o.flipY) v = from.h - 1 - v;
             const uint8_t *srow = src.row(from.y + v);
             uint8_t *d = t_.row(y) + x0 * 4;
             for (int i = 0; i < x1 - x0; i++, d += 4) {
@@ -143,6 +146,10 @@ void Canvas::draw(const Bitmap &src, RectI from, RectF to, const DrawOptions &o)
             }
             double u = (px - to.x) * sx, v = (py - to.y) * sy;
             if (u < 0 || v < 0 || u >= from.w || v >= from.h) continue;
+            if (o.flipX) u = from.w - u;
+            if (o.flipY) v = from.h - v;
+            u = std::min(u, from.w - 0.001);
+            v = std::min(v, from.h - 0.001);
             int r, g, b, a;
             if (o.smooth) {
                 double fu = std::max(0.0, u - 0.5), fv = std::max(0.0, v - 0.5);

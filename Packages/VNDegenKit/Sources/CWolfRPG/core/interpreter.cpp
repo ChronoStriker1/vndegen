@@ -58,7 +58,7 @@ bool Game::jumpToCase(Thread::Call &c, int indent, int caseValue) {
 }
 
 void Game::unsupported(const Command &c) {
-    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet (%x)", c.code, c.arg(1)));
+    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet (%x, %x)", c.code, c.arg(0), c.arg(1)));
 }
 
 bool Game::step(Thread &t) {
@@ -68,7 +68,7 @@ bool Game::step(Thread &t) {
         t.waitingMessage = false;
     }
     if (t.waitingRoute) {
-        if (t.waitingRoute->route) return false;
+        if (t.waitingRoute->route.get() == t.waitingRouteData) return false;
         t.waitingRoute = nullptr;
     }
     if (t.waitingText) {
@@ -142,7 +142,6 @@ bool Game::step(Thread &t) {
         case 111: {  // numeric condition
             int flags = cmd.arg(0);
             int count = flags & 0x0F;
-            bool elseCase = (flags & 0xF0) != 0;
             int chosen = 0;
             for (int i = 0; i < count; i++) {
                 int32_t left = readVar(cmd.arg(1 + i * 3), t);
@@ -153,7 +152,6 @@ bool Game::step(Thread &t) {
                     break;
                 }
             }
-            if (chosen == 0 && !elseCase) chosen = -1;
             jumpToCase(c, indent, chosen);
             return true;
         }
@@ -161,7 +159,6 @@ bool Game::step(Thread &t) {
         case 112: {  // string condition
             int flags = cmd.arg(0);
             int count = flags & 0x0F;
-            bool elseCase = (flags & 0xF0) != 0;
             int chosen = 0;
             for (int i = 0; i < count; i++) {
                 int32_t leftWord = cmd.arg(1 + i);
@@ -194,7 +191,6 @@ bool Game::step(Thread &t) {
                     break;
                 }
             }
-            if (chosen == 0 && !elseCase) chosen = -1;
             jumpToCase(c, indent, chosen);
             return true;
         }
@@ -398,6 +394,7 @@ bool Game::step(Thread &t) {
                 // With "wait until done", the event waits for the route to finish.
                 if (cmd.route->flags & 0x04) {
                     t.waitingRoute = a;
+                    t.waitingRouteData = cmd.route.get();
                     return false;
                 }
             }
@@ -1017,7 +1014,14 @@ void Game::pictureCommand(Thread &t, const Command &c) {
     int first = value(c.arg(1), t);
     int last = first;
     if (multi) last = value((flags & 0x0F) == 2 ? c.arg(5) : c.arg(14), t);
-    for (int n = first; n <= std::max(first, last) && n - first < 10000; n++) pictureCommandOne(t, c, n);
+    last = std::max(first, last);
+    if ((flags & 0x0F) == 0) {
+        for (int n = first; n <= last && n - first < 10000; n++) pictureCommandOne(t, c, n);
+        return;
+    }
+    std::vector<int> numbers;
+    for (auto it = pictures_.lower_bound(first); it != pictures_.end() && it->first <= last; ++it) numbers.push_back(it->first);
+    for (int n : numbers) pictureCommandOne(t, c, n);
 }
 
 std::array<int, 2> Game::fileImageSize(const std::string &source) {

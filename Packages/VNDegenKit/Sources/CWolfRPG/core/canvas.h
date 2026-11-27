@@ -37,6 +37,7 @@ struct DrawOptions {
     Blend blend = Blend::Normal;
     double angle = 0;                  // degrees clockwise, about the centre of the destination
     bool smooth = false;               // bilinear filtering; Wolf draws pixel art with nearest-neighbour by default
+    bool flipX = false, flipY = false;
 };
 
 // A frame being drawn. Coordinates are in the frame's pixels; anything outside is clipped.

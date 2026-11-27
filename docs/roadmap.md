@@ -174,6 +174,8 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Princess Colette's Great Adventure to its ending (0.61.3).
 - Sacred through about two thirds of its story, to the デオズズ volcano (0.61.4).
 - Princess Colette's Great Adventure's optional dungeons and the post-game tower's first lap, and Smile Game Builder's particle effects (0.61.5).
+- False Myth 2 plays, from Wolf RPG Editor 3.31 and later archives, and BUNNY BLACK 3's walls use the original's texture variants (0.61.6).
+- BUNNY BLACK 3's floors, ceilings and pillars use the original's texture variants (0.61.7).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.

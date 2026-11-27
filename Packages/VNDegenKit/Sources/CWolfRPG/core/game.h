@@ -111,6 +111,8 @@ struct Picture {
     std::array<int, 3> pulse{0, 0, 0};
     int pulseInterval = 0;
     int flickerFrames = 0, flickerInterval = 0;
+    std::array<int, 3> flash{0, 0, 0};
+    int flashFrames = 0, flashLeft = 0;
     bool erasing = false;
 };
 
@@ -165,6 +167,7 @@ struct Character {
     bool visible = true;    // false for erased events and hidden party members
     bool above = false;     // drawn over everything else on the map
     int shadow = 0;         // shadow graphic number from the system database, 0 for none
+    bool moving = false;
 };
 
 // One running event: a map event page or a common event, with its call stack.
@@ -189,6 +192,7 @@ struct Thread {
     bool waitingMessage = false, waitingChoice = false, waitingText = false;
     int choiceIndent = 0;
     const struct Actor *waitingRoute = nullptr;
+    const struct MoveRoute *waitingRouteData = nullptr;
     bool done() const { return stack.empty(); }
 };
 
@@ -277,6 +281,7 @@ public:
     std::string pauseIcon() const;
     int pauseIconFrames() const;
     int choiceTop() const { return system_.size() > 4 ? system_[4] : -1; }
+    int choiceCenterX() const { return system_.size() > 3 ? system_[3] : -1; }
     std::string systemString(int i) const;
     int32_t systemNumber(int i) const;
     std::array<uint8_t, 3> textColor(int i) const;
@@ -428,6 +433,7 @@ private:
     bool commonConditionMet(const CommonEvent &ce);
     void updateCamera();
     void updatePictures();
+    void applyVolumes();
     void syncPartyGraphics();
 
     // Characters (characters.cpp).
@@ -473,6 +479,7 @@ private:
     std::map<std::pair<int, int>, std::array<int32_t, 10>> eventSelf_;
     Actor hero_;
     std::array<Actor, 5> party_;
+    bool partyTransparent_ = false;
     double cameraX_ = 0, cameraY_ = 0;
 
     // Autorun and called events, run in order. A deque, so an event that queues another (command 211) while it runs
@@ -497,6 +504,7 @@ private:
     std::mt19937 rng_{12345};
     std::map<int, int> unsupported_;
     std::unique_ptr<Audio> audio_;
+    std::array<int32_t, 3> appliedVolumes_{100, 100, 100};
     void playListed(SoundKind kind, int id, int fadeFrames, int startMs = 0);
     void playMapMusic();
 

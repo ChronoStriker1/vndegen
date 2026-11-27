@@ -145,10 +145,15 @@ void Renderer::drawWindow(Canvas &canvas, const Bitmap &skin, RectF d, float opa
         }
 }
 
+namespace {
+constexpr std::string_view kScreenshot = "<SCREENSHOT>";
+}
+
 const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offsetX, float &offsetY) {
     CachedImage &cached = pictureImages_[number];
     int w = p.kind == PictureKind::Window ? p.windowW : 0, h = p.kind == PictureKind::Window ? p.windowH : 0;
     bool fromArrays = p.kind == PictureKind::File;
+    bool screenshot = fromArrays && p.source == kScreenshot;
     // An image made from arrays is made when shown, so it follows the generation rather than the name.
     if (cached.kind != p.kind || cached.source != p.source || cached.w != w || cached.h != h ||
         (fromArrays && cached.generation != p.generation)) {
@@ -158,7 +163,9 @@ const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offset
         cached.h = h;
         cached.generation = p.generation;
         cached.offsetX = cached.offsetY = 0;
-        if (fromArrays) {
+        if (screenshot) {
+            cached.bitmap = screen_;
+        } else if (fromArrays) {
             static const XYImage empty;
             const XYImage &xy = p.xyImage ? *p.xyImage : empty;
             cached.bitmap = xy.w > 0 && xy.h > 0 ? Bitmap(xy.w, xy.h) : Bitmap();
@@ -194,10 +201,11 @@ const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offset
 }
 
 void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
+    if (p.opacity.value() <= 0) return;
     const Bitmap *img = nullptr;
     BitmapPtr file;
     float offsetX = 0, offsetY = 0;
-    if (p.kind == PictureKind::File && !p.source.starts_with("<XY")) {
+    if (p.kind == PictureKind::File && !p.source.starts_with("<XY") && p.source != kScreenshot) {
         file = images_.get(p.source);
         img = file.get();
     } else {
@@ -249,12 +257,23 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
         int period = p.pulseInterval * 2, at = int(game_.frameCount() % uint64_t(period));
         swing = float(at < p.pulseInterval ? at : period - at) / p.pulseInterval;
     }
-    o.r = float(p.r.value() + p.pulse[0] * swing) / 100;
-    o.g = float(p.g.value() + p.pulse[1] * swing) / 100;
-    o.b = float(p.b.value() + p.pulse[2] * swing) / 100;
+    float flash = p.flashFrames > 0 ? float(p.flashLeft) / float(p.flashFrames) : 0;
+    o.r = float(p.r.value() + p.pulse[0] * swing + p.flash[0] * flash) / 100;
+    o.g = float(p.g.value() + p.pulse[1] * swing + p.flash[1] * flash) / 100;
+    o.b = float(p.b.value() + p.pulse[2] * swing + p.flash[2] * flash) / 100;
     o.blend = p.blend == 1 ? Blend::Add : p.blend == 2 ? Blend::Subtract : p.blend == 3 ? Blend::Multiply : Blend::Normal;
     // Windows and shapes ignore the angle, as Wolf's manual says.
     o.angle = pictureAngleDegrees(p);
+    if (w < 0) {
+        x += w;
+        w = -w;
+        o.flipX = true;
+    }
+    if (h < 0) {
+        y += h;
+        h = -h;
+        o.flipY = true;
+    }
     canvas.draw(*img, from, {x, y, w, h}, o);
 }
 
@@ -278,8 +297,10 @@ void Renderer::drawMessage(Canvas &canvas) {
             int frames = std::max(1, game_.pauseIconFrames());
             int ph = pause->h / frames;
             int frame = int(game_.frameCount() / 6 % frames);
-            canvas.draw(*pause, {0, frame * ph, pause->w, ph},
-                        {box.x + box.w / 2 - pause->w / 2.0f, box.y + box.h - ph - 2, float(pause->w), float(ph)});
+            float px = box.x + box.w / 2, py = box.y + box.h - ph - 2;
+            int sx = game_.systemNumber(5), sy = game_.systemNumber(6);
+            if (sx != 0 || sy != 0) px = float(sx), py = textY + float(sy);
+            canvas.draw(*pause, {0, frame * ph, pause->w, ph}, {px - pause->w / 2.0f, py, float(pause->w), float(ph)});
         }
     }
 }
@@ -305,6 +326,7 @@ void Renderer::drawChoices(Canvas &canvas) {
     // System variable 4 moves the choice window's top to a given height; -1 leaves Wolf's own placement. A game with a
     // picture menu hides the window by moving it far off the screen, as Succubus Prison's title does with -1000.
     if (int top = game_.choiceTop(); top != -1) box.y = float(top);
+    if (int center = game_.choiceCenterX(); center != -1) box.x = float(center) - w / 2;
     game_.setChoiceBox(box.x + pad, box.y + pad, w - pad * 2, lineH);
     drawWindow(canvas, *images_.get(game_.windowSkin()), box, 0.9f);
     BitmapPtr cursor = images_.get(game_.cursorSkin());
@@ -333,6 +355,14 @@ void Renderer::draw(Bitmap &frame) {
     if (tr.prepared && frozenGeneration_ == tr.generation && !frozen_.empty()) {
         frame = frozen_;
         return;
+    }
+    for (auto &[n, p] : game_.pictures()) {
+        if (p.kind != PictureKind::File || p.source != kScreenshot) continue;
+        auto it = pictureImages_.find(n);
+        if (it == pictureImages_.end() || it->second.source != p.source || it->second.generation != p.generation) {
+            screen_ = frame;
+            break;
+        }
     }
     Canvas canvas(frame);
     canvas.clear(0, 0, 0);
