@@ -10,6 +10,7 @@
 
 static const float kDefaultPitch = -48.0f, kDefaultDistance = 3.5f, kDefaultFov = 70.0f;
 static const float kDistScale = 20.0f, kFovScale = 0.1f;
+static const float kEyePitchScale = 0.58f;
 static const float kFillK = 0.77f, kKeyK = 0.74f;
 static const int kShadowTexels = 12;
 static const float kSpriteForward = 0.235f;
@@ -415,12 +416,12 @@ static void add_model(Build *b, Model *mdl, float bx, float by, float bz, int di
         float sh[3] = {1, 1, 1};
         for (int c = 0; c < 3; c++) {
             float x = t.v[c].x, z = t.v[c].z;
-            t.v[c].x = bx + x * cs - z * sn;
-            t.v[c].z = bz + x * sn + z * cs;
+            t.v[c].x = bx + x * cs + z * sn;
+            t.v[c].z = bz - x * sn + z * cs;
             t.v[c].y += by;
             if (nrm) {
                 const float *n = nrm + k * 9 + c * 3;
-                float nx = n[0] * cs - n[2] * sn, nz = n[0] * sn + n[2] * cs;
+                float nx = n[0] * cs + n[2] * sn, nz = -n[0] * sn + n[2] * cs;
                 sh[c] = face_shade(b, nx, n[1], nz);
             }
             t.v[c].shade = sh[c];
@@ -530,6 +531,8 @@ static double now_ms(void) {
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
 }
 
+static void eye_pose(SG *g, ViewPose *p, float pitch, float yaw, float angle, float height);
+
 void view_load(SG *g) {
     double t0 = now_ms();
     Field *f = &g->field;
@@ -634,6 +637,11 @@ void view_load(SG *g) {
         }
     }
     pose_default(g, v);
+    if (v->look.hasCamera && v->look.cameraKind == 1) {
+        static const float yaws[4] = {0.0f, 90.0f, 180.0f, 270.0f};
+        eye_pose(g, &v->base, 0.0f, yaws[f->player.dir & 3], v->look.camera[0], v->look.camera[1]);
+        v->eye = true;
+    }
     v->pose = v->base;
     v->ready = true;
     sg_log(g, "view: %d opaque, %d alpha triangles, %d chunks, sky %d, sun %d (%.2f %.2f), camera %d kind %d, %.1f ms", f->terrain.count, v->alpha.count,
@@ -681,17 +689,29 @@ void sg_camera_to(SG *g, const ViewPose *pose, u32 ms) {
 
 void sg_camera_reset(SG *g, u32 ms) {
     View *v = sg_view(g);
-    v->eye = false;
+    v->eye = v->look.hasCamera && v->look.cameraKind == 1;
     sg_camera_to(g, &v->base, ms);
 }
 
 bool sg_camera_moving(SG *g) { return sg_view(g)->moveTotal != 0; }
 
+static void eye_pose(SG *g, ViewPose *p, float pitch, float yaw, float angle, float height) {
+    const Actor *pl = &g->field.player;
+    float pr = pitch * 3.14159265f / 180.0f, yr = yaw * 3.14159265f / 180.0f;
+    p->target = (Vec3){pl->x + sinf(yr) * cosf(pr), pl->y + height + sinf(pr), pl->z - cosf(yr) * cosf(pr)};
+    p->pitch = pitch;
+    p->yaw = yaw;
+    p->distance = 1.0f / kDistScale;
+    p->fov = angle * 2.0f / kFovScale;
+    p->lift = 0.0f;
+    p->follow = false;
+}
+
 void sg_camera_command(SG *g, const Cmd *c) {
     View *v = sg_view(g);
     ViewPose p = v->pose;
     i32 mode = cmd_int(c, 0);
-    v->eye = mode == 2;
+    v->eye = mode == 1 || mode == 2;
     u32 ms = 0;
     if (mode == 0 && c->argCount >= 6) {
         p.pitch = (float)cmd_int(c, 1) / 1000.0f;
@@ -710,17 +730,12 @@ void sg_camera_command(SG *g, const Cmd *c) {
         ms = (u32)cmd_int(c, 8);
     } else if (mode == 2 && c->argCount >= 4) {
         static const float yaws[4] = {0.0f, 90.0f, 180.0f, 270.0f};
-        static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
-        const Actor *pl = &g->field.player;
-        int d = pl->dir & 3;
-        p.target = (Vec3){pl->x + (float)dx[d], pl->y + (float)cmd_int(c, 2) / 1000.0f, pl->z + (float)dz[d]};
-        p.pitch = 0.0f;
-        p.yaw = yaws[d];
-        p.distance = 1.0f / kDistScale;
-        p.fov = (float)cmd_int(c, 1) / 500.0f / kFovScale;
-        p.lift = 0.0f;
-        p.follow = false;
+        eye_pose(g, &p, 0.0f, yaws[g->field.player.dir & 3], (float)cmd_int(c, 1) / 1000.0f, (float)cmd_int(c, 2) / 1000.0f);
         ms = (u32)cmd_int(c, 3);
+    } else if (mode == 1 && c->argCount >= 6) {
+        eye_pose(g, &p, (float)cmd_int(c, 1) / 1000.0f * kEyePitchScale, (float)cmd_int(c, 2) / 1000.0f, (float)cmd_int(c, 3) / 1000.0f,
+                 (float)cmd_int(c, 4) / 1000.0f);
+        ms = (u32)cmd_int(c, 5);
     } else {
         sg_log(g, "camera mode %d not handled", mode);
         return;
@@ -752,10 +767,22 @@ static float ground_at(SG *g, float x, float z) {
     return (float)map_height(m, &g->r3.view->look, (int)floorf(x), (int)floorf(z));
 }
 
+static float actor_lift(SG *g, const Actor *a) {
+    const Map *m = &g->field.map;
+    View *v = g->r3.view;
+    int x = (int)floorf(a->x), z = (int)floorf(a->z);
+    if (!v || !v->slopeDir || x < 0 || z < 0 || x >= m->w || z >= m->h) return 0;
+    int sdir = v->slopeDir[(size_t)z * (size_t)m->w + (size_t)x];
+    if (sdir < 0 || (int)lroundf(a->y) != m->height[(size_t)z * (size_t)m->w + (size_t)x]) return 0;
+    const u8 *c = kCorners[sdir];
+    float fx = a->x - (float)x, fz = a->z - (float)z;
+    return c[0] * (1 - fx) * (1 - fz) + c[1] * fx * (1 - fz) + c[2] * fx * fz + c[3] * (1 - fx) * fz;
+}
+
 static void draw_blob(SG *g, const Actor *a, float size) {
     View *v = g->r3.view;
     if (!v->blob) return;
-    float y = a->y + 0.02f, r = size * 0.5f;
+    float y = a->y + actor_lift(g, a) + 0.02f, r = size * 0.5f;
     Tri t1 = {.tex = v->blob, .mode = TRI_MODULATE, .flags = TF_NOZWRITE};
     Vert p[4] = {{a->x - r, y, a->z - r, 0, 0, 1}, {a->x - r, y, a->z + r, 0, 1, 1}, {a->x + r, y, a->z + r, 1, 1, 1}, {a->x + r, y, a->z - r, 1, 0, 1}};
     t1.v[0] = p[0], t1.v[1] = p[1], t1.v[2] = p[2];
@@ -816,7 +843,10 @@ static void draw_model(SG *g, Actor *a, float ang, bool xray) {
 
 static void cast_model(SG *g, Actor *a, float ang) {
     int n = 0;
+    float y = a->y;
+    a->y += actor_lift(g, a);
     Tri *tris = posed_actor(g, a, ang, &n);
+    a->y = y;
     for (int i = 0; i < n; i++)
         if (tris[i].mode == TRI_OPAQUE && !(tris[i].flags & TF_NOZWRITE)) r3_shadow_tri(&g->r3, &tris[i]);
     free(tris);
@@ -866,8 +896,11 @@ static void draw_sprite(SG *g, const Actor *a, bool xray) {
 static void draw_actor(SG *g, Actor *a) {
     if (!a->visible) return;
     bool xray = a == &g->field.player;
+    float y = a->y;
+    a->y += actor_lift(g, a);
     if (a->model) draw_model(g, a, kFacing[a->dir & 3], xray);
     else draw_sprite(g, a, xray);
+    a->y = y;
 }
 
 static void draw_sky(SG *g, View *v) {
@@ -908,7 +941,7 @@ void field_draw(SG *g) {
     pose_to_cam(&v->pose, &f->cam, g->w, g->h);
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
     for (int k = 0; k < 3; k++) g->r3.tint[k] = 256;
-    if (v->look.sky == 0 && v->look.sun) draw_sky(g, v);
+    if (v->look.sky == 0 && v->look.sun && !(v->look.hasCamera && v->look.cameraKind == 1)) draw_sky(g, v);
     if (g->r3.x->shadow.base) {
         r3_shadow_restore(&g->r3);
         for (int i = 0; i < f->npcCount; i++)

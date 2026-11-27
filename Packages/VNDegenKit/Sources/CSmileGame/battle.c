@@ -171,9 +171,9 @@ int battle_skill_damage(int power, int magic, int defense, float spread) {
 }
 
 int battle_exp_for_level(int level) {
-    static const int seen[] = {0, 0, 26, 84, 184, 350, 600};
-    if (level < 7) return seen[level < 0 ? 0 : level];
-    return (int)(3.137 * pow((double)level, 2.928) + 3.29 + 0.5);
+    static const int seen[] = {0, 0, 26, 84, 184, 350, 600, 966, 1484, 2196, 3150};
+    if (level <= 10) return seen[level < 0 ? 0 : level];
+    return (int)(3.7984 * pow((double)level, 2.5) * pow(1.101, (double)level) + 3.05 + 0.5);
 }
 
 bool battle_escape_roll(u32 *rng, int partySpeed, int monsterSpeed) {
@@ -1551,9 +1551,10 @@ static void draw_fighter(Battle *b, const Fighter *f, bool active) {
     }
     const Res *r = f->graphic;
     int frames = r && r->frames > 0 ? r->frames : 1;
-    int rows = r && r->divisions >= 1 ? 4 : 1;
+    int rows = r ? sg_sprite_rows(r, im) : 1;
     int cw = im->w / frames, ch = im->h / rows;
-    draw_billboard(g, cam, im, (frames == 3 ? 1 : 0) * cw, b->front && rows > 1 ? ch : 0, cw, ch, f->x, y, f->z, kHeroScale);
+    int frame = frames == 3 && rows > 1 ? 1 : rows == 1 && r->frameMs > 0 ? (int)(f->poseMs / (u32)r->frameMs) % frames : 0;
+    draw_billboard(g, cam, im, frame * cw, b->front && rows > 1 ? ch : 0, cw, ch, f->x, y, f->z, kHeroScale);
 }
 
 static void project_point(const Cam *c, float x, float y, float z, int *sx, int *sy) {

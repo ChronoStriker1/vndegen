@@ -9,12 +9,15 @@ records every layout and where it came from.
 The runtime runs in the app on Mac, iPhone and iPad through the `EngineSmileGame` plugin, and on Linux through the
 runners below.
 
-## Princess Colette's Great Adventure (first release)
+## Princess Colette's Great Adventure
 
-VNDegen's first Smile Game Builder release plays Princess Colette's Great Adventure (Smoothly Animated Pixel Art RPG)
-from the title through the opening, the throne room and the castle town, the dungeon scenes in which Colette joins
-your party, the bridge guard and out onto the world map, with its wandering monsters and battles, on Mac, iPhone and
-iPad. The game is in Japanese, as on the PC.
+VNDegen plays Princess Colette's Great Adventure (Smoothly Animated Pixel Art RPG) on Mac, iPhone and iPad from the
+title through about the first half of the story: the opening, the throne room and the castle town, the dungeon scenes
+in which Colette joins your party, the world map with its wandering monsters, the east cave and its boss, the inn,
+the rumour-monger's quest through コムコムの穴 with its bridges, the public square, the witch's forest where メイリ
+joins, the サキュバスタワー and its boss (サキュバス joins), the sewer and the gargoyle, and the scenes between them
+and their replays in the log room. It was played that far in VNDegen; the North Tower, the cape, the cat's mansion,
+the catacombs, the golem cave and the ending haven't been played yet. The game is in Japanese, as on the PC.
 
 - **Saves** are the PC version's own files in the game's `savedata` folder, so a save moves both ways between VNDegen
   and the PC copy, and Ludusavi backs them up as it does on Windows. Save from the game's menu (Escape, X, or Y and
@@ -23,8 +26,8 @@ iPad. The game is in Japanese, as on the PC.
 - **Controls** start on the RPG Maker layout: A confirms, B cancels, Y and Menu open the game's menu, X dashes. On a
   touch screen, a tap outside the touch gamepad confirms, as a click does on the PC, and holding a finger on the map
   opens the menu.
-- **What isn't there yet:** the game past its first world-map area hasn't been played through in VNDegen, so later
-  towns, dungeons and bosses may show problems. Battle effects play simpler than on the PC, and the camera doesn't
+- **What isn't there yet:** the second half of the game (from the walls of fire, ice and lightning on the way to
+  the North Tower) hasn't been played in VNDegen, so its dungeons and bosses may show problems. Battle effects play simpler than on the PC, and the camera doesn't
   swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
   the PC's. Known limits below lists the rest.
 
@@ -55,7 +58,9 @@ Both games use the same data format.
   and branches, captions (fading on Sacred's player version) and scrolling text, pictures with zoom and colour,
   balloons and effects over characters, fades and tint, variables (random ones too), switches, items, money, the
   party, learned skills, the encounter switch, moving, turning and placing the player and events, event graphics,
-  moving to another map. Colette plays from the title to its first world-map monster, and Sacred from the title
+  moving to another map, stopping a sound effect (76), Colette's floor names in a band across the screen, and the
+  eye-level camera of its event rooms (command 53's mode 1 and maps whose camera record has kind 1). Colette plays
+  from the title to the gargoyle in the sewer (the story variable at 15), and Sacred from the title
   through the castle, the town's weapon shop and the forest into its first dungeon, the royal cave, and through the
   fairy's scene there.
 - Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
@@ -63,8 +68,8 @@ Both games use the same data format.
   items, obtained items, money, hero looks and play time; event commands change it, the menu shows it, and saves write
   and read it, with each hero's state (poison) and the skills learned by level-ups and command 56.
 - The field menu (Esc or X): items, skills, equipment, status, saving to a slot with each slot's map and party, quit
-  and config, laid out as the PC draws them, with faces, and the menu sounds. Shop (37) and inn (38) commands open
-  their screens and branch on the result; 59 recovers the party.
+  and config, laid out as the PC draws them, with faces, and the menu sounds. Shop (37) and inn (38, with the PC's
+  choice window, music and fade) commands open their screens and branch on the result; 59 recovers the party.
 - Battles: event command 65 starts a battle and waits for it, then branches on the result as the PC does; maps with an
   encounter table start battles from steps while the encounter switch (command 66) is on. A poisoned member puts the
   poison balloon over the player on the map. The battle is drawn on the battle background map from behind the party,
@@ -151,6 +156,21 @@ A-series iPhones and iPads are slower per core and were not measured. A Metal pa
 it would take moving `r3d.c`'s triangle setup and raster stage to a Metal render pass fed from the same chunk lists,
 with the shadow map as a depth texture, and keeping the software path for Linux.
 
+Colette past the first area, a DEBUG build of this round's branch on the Mac mini, 2026-11-27, measured the same way
+from runner saves (another delegate's build ran beside some of it; load averages are given). Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator, gamepad hidden |
+|---|---|---|
+| East cave B1F | 60.0, 59.9 to 60.0, 3.6 ms (load 7) | not measured |
+| コムコムの穴 B2F, the suspension bridge | 60.0, 59.9 to 60.0, 3.4 ms (load 7) | not measured |
+| Inn, the stay | 59.7 to 60.0, 37.2 to 60.0, 6.7 ms (load 6) | not measured |
+| Event room (a log room replay) | 60.0, 59.9 to 60.0, 5.5 ms | 60.0, 60.0, 2.6 ms (load 20 to 35) |
+| サキュバスタワー 6F, four heroes | 60.0, 59.9 to 60.0, 2.8 to 4.5 ms (load 17) | not measured |
+| Battle with three heroes | 60.0, 59.9 to 60.0, 7.0 ms (load 4) | 60.0, 60.0, 5.3 ms (load 25 to 33) |
+
+With the touch gamepad shown, the iPad simulator's world map ran at 44.6 to 46.1 frames a second with the runtime at
+3.4 ms, the same gamepad compositing cost as below.
+
 Colette's first release, DEBUG builds of 208c06cf on the Mac mini, 2026-11-27, measured the same way (Mac app with no
 other app or build running, load average 3 to 5; one simulator booted at a time). The world map is the cell below
 the castle where the first monster reaches the player, the battle the command list of that battle. Target 60.
@@ -202,12 +222,18 @@ were taken with the gamepad shown.
   branches, the BGM command, the menu's save page, and Sacred's castle after a load (queen, king, camera).
 - `sgtest_J`: the first release's fixes: fallback glyphs, a case-swapped `sgb_rpgplayer.exe`, a load closing the
   menu, the title's Continue and Config, and taps and holds.
+- `sgtest_L`: Colette past the first area: the inn's stay and its refusal, the inn's bed, crossing コムコムの穴's
+  suspension bridge, walking under its stone bridge, a stair's side, the player standing on stairs, and command 76.
 - `sgtest_I`: the field against the PC: sheet facing, turn, step and place codes, random variables, the encounter
   switch, learned skills and pictures in saves (byte for byte against PC saves), the help bar after a load, caption
   fades per player version and Colette's opening music.
 
 ## Known limits
 
+- A battle with four heroes spreads them so far that the fourth stands at the right edge of the screen; the PC's
+  four-hero layout wasn't compared.
+- The second half of the game hasn't been played: the walls on the way to the North Tower need ニャンニャ, who
+  joins after a fishing side quest at the cat's mansion, and the tower, the other dungeons and the ending follow.
 - Effects play their sheet's cells in order; the keyframe timeline inside each effect (positions, scales, screen
   flashes) is not read. The camera does not push towards the acting fighter as the PC's does.
 - Critical hits, skill damage, healing, escape chance, defend and charge, the chance that a state lands and the
@@ -218,20 +244,20 @@ were taken with the gamepad shown.
   only partly read. Balloons draw the right bubble and icon with a simple pop, not the PC's keyframes.
 - Events wander and chase with step speeds and pauses measured at -3, 0 and 3 and interpolated between; the PC's
   choice of direction when a chaser is blocked, and whether events walk during menus, were not pinned down.
-- Commands 55 (experience), 58, 68, 76 and 77 are logged and skipped; none is on either path (Sacred's debug and CG
-  rooms and ending, Colette's adult scenes). 56's message for forgetting a skill is not done.
-- The inn screen was not compared with the PC (neither first-release path has one); the shop was, in Sacred's weapon
-  shop. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
+- Commands 55 (experience), 58, 68 and 77 are logged and skipped, and 56's message for forgetting a skill is not done;
+  Colette uses none of them, and Sacred only in its debug and CG rooms and its ending. Command 76 stops a sound effect.
+- The inn was compared with the PC in Colette's town; the shop was, in Sacred's weapon shop. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
   these games' menus. Where a slot's page shows a second to fourth hero is a guess (two columns); both games have one
   hero there.
-- Experience above level 6 uses a fitted curve, and a few item, skill and monster fields are inferred (see
+- Experience above level 10 uses a fitted curve, and a few item, skill and monster fields are inferred (see
   `docs/smilegame-cleanroom.md`).
 - A hero's magic is taken from the hero tables; saves keep whatever the PC stored in that field (0 for every hero
   seen).
 - Sound-effect and music-effect levels and the music effect pausing the BGM follow the BGM measurement and common
   practice; they were not measured on the PC.
-- Command 53's mode 1 (Colette's event rooms) is not mapped; mode 2's eye height and view angle are fitted to one
-  scene, and the map's sky value 2 draws black behind it where the PC shows sky. Mode 3's target point matches the
+- Command 53's mode 1 (Colette's event rooms) is fitted to the public square scene; its other pitches weren't
+  compared. Mode 2's eye height and view angle are fitted to one scene, and the map's sky value 2 draws black behind
+  it where the PC shows sky. Mode 3's target point matches the
   PC's opening scene only roughly.
 - Background value 1 (Sacred's field) draws black; the PC never shows it in play.
 - The PC darkens wall feet slightly more. Map objects with lights stay in their unlit motion until an event changes

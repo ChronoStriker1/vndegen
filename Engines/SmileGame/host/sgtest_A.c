@@ -92,12 +92,7 @@ static bool blocked_by_npc(SG *g, int x, int z) {
     return false;
 }
 
-static bool step_ok(SG *g, int x0, int z0, int x1, int z1) {
-    const Map *m = &g->field.map;
-    if (x1 < 0 || z1 < 0 || x1 >= m->w || z1 >= m->h) return false;
-    if (!sgi_cell_free(g, x0, z0, x1, z1, -1)) return false;
-    return !blocked_by_npc(g, x1, z1);
-}
+static bool step_ok(SG *g, int x0, int z0, int x1, int z1) { return sgi_cell_free(g, x0, z0, x1, z1, -1) && !blocked_by_npc(g, x1, z1); }
 
 static bool walk_to(SG *g, int tx, int tz) {
     const Map *m = &g->field.map;

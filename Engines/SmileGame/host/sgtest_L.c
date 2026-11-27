@@ -1,0 +1,276 @@
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "sg.h"
+
+static int failures, checks;
+
+#define CHECK(cond)                                                                                                    \
+    do {                                                                                                               \
+        checks++;                                                                                                      \
+        if (!(cond)) {                                                                                                 \
+            failures++;                                                                                                \
+            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond);                                                 \
+        }                                                                                                              \
+    } while (0)
+
+enum { VK_UP = 0x26, VK_DOWN = 0x28, VK_RIGHT = 0x27, VK_OK = 0x0d, VK_CANCEL = 0x1b };
+
+static SG *open_game(const char *dir) {
+    VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = "/nonexistent-sgtest-l", .audioRate = 44100};
+    char err[512];
+    SG *g = (SG *)vnsmilegame_open(&cfg, err, sizeof err);
+    if (!g) fprintf(stderr, "open %s: %s\n", dir, err);
+    return g;
+}
+
+static void run(SG *g, int ms) {
+    for (int t = 0; t < ms; t += 16) vnsmilegame_frame((VNSmileGame *)g, 16);
+}
+
+static void press(SG *g, int vk) {
+    vnsmilegame_key((VNSmileGame *)g, vk, true);
+    run(g, 48);
+    vnsmilegame_key((VNSmileGame *)g, vk, false);
+    run(g, 48);
+}
+
+static SG *new_game(const char *dir) {
+    SG *g = open_game(dir);
+    if (!g) return NULL;
+    run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP);
+    press(g, VK_OK);
+    run(g, 200);
+    interp_free(&g->interp);
+    return g;
+}
+
+static bool showing(SG *g, const char *text) {
+    Interp *ip = &g->interp;
+    return ip->active && ip->state == 1 && ip->page < ip->pageCount && strstr(ip->pages[ip->page], text);
+}
+
+static void region(SG *g, int x0, int y0, int w, int h, double *r, double *gr, double *b) {
+    double sr = 0, sg = 0, sb = 0;
+    for (int y = y0; y < y0 + h; y++)
+        for (int x = x0; x < x0 + w; x++) {
+            u32 c = g->fb[y * g->w + x];
+            sr += c & 255, sg += c >> 8 & 255, sb += c >> 16 & 255;
+        }
+    double n = (double)w * h;
+    *r = sr / n, *gr = sg / n, *b = sb / n;
+}
+
+static double luma(SG *g) {
+    double r, gg, b;
+    region(g, 0, 0, g->w, g->h, &r, &gg, &b);
+    return (r + gg + b) / 3;
+}
+
+static void to_innkeeper(SG *g) {
+    sg_debug_warp((VNSmileGame *)g, "宿屋", 15, 15, 0);
+    run(g, 1500);
+    press(g, VK_OK);
+    for (int i = 0; i < 20 && !menu_active(g); i++) press(g, VK_OK), run(g, 200);
+    run(g, 300);
+}
+
+static void test_inn_stay(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    Party *p = &g->b.party;
+    p->money = 77;
+    g->vars[8] = 1;
+    p->members[0].hp = 1;
+    to_innkeeper(g);
+    CHECK(menu_page(g) && strcmp(menu_page(g), "inn") == 0);
+    double before = luma(g);
+    press(g, VK_OK);
+    CHECK(p->money == 27);
+    run(g, 3000);
+    CHECK(luma(g) < 2.0 && before > 60.0);
+    CHECK(menu_active(g));
+    run(g, 4500);
+    CHECK(luma(g) < 2.0);
+    run(g, 3500);
+    CHECK(!menu_active(g));
+    run(g, 300);
+    CHECK(showing(g, "おはようございます"));
+    CHECK(p->members[0].hp == member_max_hp(&g->b.tables, &p->members[0]));
+    CHECK(g->field.player.dir == 2);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static void test_inn_no_money(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    Party *p = &g->b.party;
+    p->money = 27;
+    g->vars[8] = 1;
+    to_innkeeper(g);
+    press(g, VK_OK);
+    run(g, 500);
+    CHECK(p->money == 27 && menu_active(g));
+    press(g, VK_OK);
+    run(g, 600);
+    CHECK(showing(g, "そうですか"));
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static void test_inn_bed(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    sg_debug_warp((VNSmileGame *)g, "宿屋", 15, 15, 2);
+    run(g, 1500);
+    double r, gg, b;
+    region(g, 240, 120, 40, 30, &r, &gg, &b);
+    CHECK(r > 0 && gg / r > 0.76);
+    region(g, 110, 120, 40, 30, &r, &gg, &b);
+    CHECK(r > 0 && gg / r < 0.76);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static void step(SG *g, int vk) {
+    vnsmilegame_key((VNSmileGame *)g, vk, true);
+    for (int t = 0; t < 1000 && !g->field.player.moving; t += 16) run(g, 16);
+    vnsmilegame_key((VNSmileGame *)g, vk, false);
+    for (int t = 0; t < 1000 && g->field.player.moving; t += 16) run(g, 16);
+    run(g, 100);
+}
+
+static void warp(SG *g, const char *map, int x, int z, int dir) {
+    sg_debug_warp((VNSmileGame *)g, map, x, z, dir);
+    run(g, 1500);
+    for (int i = 0; i < 20 && g->interp.active; i++) press(g, VK_OK), run(g, 300);
+}
+
+static bool at(SG *g, int x, int z) { return (int)g->field.player.x == x && (int)g->field.player.z == z; }
+
+static void test_bridges(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    g->switches[69] = 1;
+    for (int i = 30; i <= 36; i++) g->switches[i] = 1;
+    warp(g, "コムコムの穴Ｂ02Ｆ", 11, 15, 1);
+    for (int i = 0; i < 4; i++) step(g, VK_RIGHT);
+    CHECK(at(g, 15, 15));
+    double r, gg, b;
+    warp(g, "コムコムの穴Ｂ02Ｆ", 11, 15, 3);
+    region(g, 470, 272, 20, 20, &r, &gg, &b);
+    CHECK((r + gg + b) / 3 < 80);
+    warp(g, "コムコムの穴Ｂ03Ｆ", 9, 16, 0);
+    for (int i = 0; i < 4; i++) step(g, VK_UP);
+    CHECK(at(g, 9, 12));
+    warp(g, "コムコムの穴Ｂ03Ｆ", 6, 15, 0);
+    step(g, VK_UP);
+    CHECK(at(g, 6, 15));
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static double loudness(SG *g) {
+    static float buf[4096 * 2];
+    double e = 0;
+    for (int k = 0; k < 4; k++) {
+        snd_mix(g, buf, 4096);
+        for (int i = 0; i < 4096 * 2; i++) e += (double)buf[i] * buf[i];
+    }
+    return e;
+}
+
+static void test_stop_se(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    snd_bgm_stop(g, 0);
+    snd_bgs_stop(g, 0);
+    loudness(g);
+    Guid se;
+    guid_parse("5ab73fad-366b-499c-8688-c3501652dd4e", &se);
+    snd_se(g, se, 100, 100);
+    CHECK(loudness(g) > 1.0);
+    CmdArg arg = {ARG_GUID, 0, se, NULL};
+    Cmd stop = {CMD_STOP_SE, 0, &arg, 1};
+    sga_exec(g, &stop);
+    CHECK(loudness(g) == 0.0);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static void test_event_room(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    sg_debug_warp((VNSmileGame *)g, "ログサキュバスＨ", 7, 12, 0);
+    run(g, 1500);
+    View *v = sg_view(g);
+    CHECK(v->eye);
+    ViewPose p;
+    sg_camera_get(g, &p);
+    CHECK(fabsf(p.target.z - 11.5f) < 0.01f && fabsf(p.target.y - (g->field.player.y + 1.7f)) < 0.01f);
+    double r, gg, b;
+    region(g, 0, 0, g->w, 20, &r, &gg, &b);
+    CHECK(r + gg + b < 30);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static double row_luma(SG *g, int y) {
+    double r, gg, b;
+    region(g, 600, y, 80, 1, &r, &gg, &b);
+    return r + gg + b;
+}
+
+static void test_map_caption(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    sg_debug_warp((VNSmileGame *)g, "サキュバスタワー06Ｆ", 4, 5, 0);
+    run(g, 1500);
+    CHECK(g->interp.active && g->interp.scrollText && strcmp(g->interp.scrollText, "タワー6Ｆ") == 0);
+    double above = row_luma(g, 243), top = row_luma(g, 244), bottom = row_luma(g, 299), below = row_luma(g, 300);
+    CHECK(top < above * 0.6 && bottom < below * 0.6 && top > above * 0.4);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static void test_experience(void) {
+    CHECK(battle_exp_for_level(7) == 966);
+    CHECK(battle_exp_for_level(8) == 1484);
+    CHECK(battle_exp_for_level(9) == 2196);
+    CHECK(battle_exp_for_level(10) == 3150);
+    CHECK(battle_exp_for_level(11) > 3150 + 954);
+}
+
+int main(void) {
+    const char *colette = getenv("SG_COLETTE");
+    test_experience();
+    if (colette) {
+        test_inn_stay(colette);
+        test_inn_no_money(colette);
+        test_inn_bed(colette);
+        test_bridges(colette);
+        test_stop_se(colette);
+        test_event_room(colette);
+        test_map_caption(colette);
+    }
+    printf("%d checks, %d failed\n", checks, failures);
+    return failures ? 1 : 0;
+}

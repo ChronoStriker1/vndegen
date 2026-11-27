@@ -167,7 +167,7 @@ static void test_inn(const char *dir) {
     inn_script(g, 30);
     CHECK(menu_page(g) && strcmp(menu_page(g), "inn") == 0);
     press(g, VK_OK);
-    run(g, 400);
+    run(g, 11000);
     CHECK(message_is(g, "stayed"));
     CHECK(p->money == 70 && p->members[0].hp == member_max_hp(&g->b.tables, &p->members[0]));
     press(g, VK_OK);

@@ -560,8 +560,11 @@ map's centre when absent), `1001` and one `x, z` pair per monster is each monste
   percentage. Each living member gets the full experience: ダーク and コレット both reached level 2 on the 32 points
   of one ゾンビーナ.
 - Experience totals for each level, from アリア's status page and the battle in which her HP rose: level 2 26, level 3
-  84, level 4 between 182 and 186, level 5 350, level 6 600. The runtime uses these (184 for level 4) and
-  3.137 × L^2.928 + 3.29 above level 6, a fit that matches all five within 3.
+  84, level 4 between 182 and 186, level 5 350, level 6 600. Colette's status pages (経験値 plus つぎのレベルまで) with
+  the runner's saves loaded in the PC add level 7 966, level 8 1484, level 9 2196 and level 10 3150. The runtime uses
+  these (184 for level 4) and 3.7984 × L^2.5 × 1.101^L + 3.05 above level 10, a fit that matches all nine within 4.
+  The PC shows the level these totals give, not the level a save holds: a runner save that called メイリ level 9 at
+  1984 points showed level 8 there before this table.
 - A level-up raises the maximum HP and MP and leaves the current values as they were: after that ゾンビーナ battle
   the PC's menu showed ダーク at 24/45 and コレット at 12/41, the HP each had at the end of the battle.
 - Elements and states: see Battles from the story below.
@@ -820,3 +823,68 @@ the choice returns), the town and the king's hideout, コレット joining, the 
 monster reaching the player on the bridge. Townspeople who wander can step onto an invisible exit or door cell with a
 pass-through sheet, such as the castle door and the town's pier, and stand there while the player blocks the way
 out; whether the PC lets them was not checked.
+
+## Colette past the first area (round 5, L)
+
+Played in the runner from round 4's save on the world map, and compared with the PC under Wine by loading the
+runner's saves there (each loaded at the same cell with the same party, items, money and levels).
+
+### Inn (command 38)
+
+- The offer is a choice window like an event's, `泊まる：<price>G` (the game text's stay string, a full-width colon,
+  the price) and `泊まらない`, over the innkeeper's message, which stays up. The party's money shows top right in a
+  `default` window at (729, 3), 219 × 49, right-aligned at x 937 as `27 G`. There is no button guide.
+- Staying closes the windows and plays `samples/common/res/bgm/me_lodging.ogg` (8.93 s; a recording of the PC matched
+  it by its envelope, correlation 0.92, starting with the key press). The screen fades to black over about 1 s, stays
+  black until the music effect ends and fades back in over about 1.2 s; the map's BGM resumes when the effect ends.
+  The party is healed and the player faces down when the picture returns, then the script's "stayed" branch runs.
+- Without enough money the player shows the game text's `お金が足りない...` in a plain message window in the middle of
+  the screen (position 1), waits for a press, and the script takes its other branch.
+
+### Map objects
+
+- Directions 1 and 3 turn a map object the other way from what the runtime first assumed: the inn's SingleBed at
+  (11,12), direction 1, has its head on the west side of its cell and its foot one cell east in the PC. The model and
+  its collision cells turn the same way.
+- Collision heights count from the ground under the object's own cell. Colette's suspension bridge in コムコムの穴
+  B2F is anchored at (12,15) on height 9 with deck cells of height 1, so its deck is at 10 all the way over the chasm,
+  level with the stairs at each end; the PC walks across it.
+- A collision cell's second `int16` (1 on bridge decks and rails) marks a cell that can also be walked under at
+  ground height. B3F's stone bridge arches over the only way into the pit with the stairs down: the runtime lets a
+  walker at ground level through when the deck is at least two units up. The PC wasn't walked through that arch; the
+  pit has no other way in.
+
+### Stairs
+
+- A ramp-shaped stair (shapes 0 to 3) can be entered and left along its slope only: in B3F the PC player at (6,15)
+  could not step north onto the west-rising stair at (6,14), at the same height. Stepping sideways between cells of
+  the same ramp at the same height (a staircase several cells wide) stays allowed.
+- Characters on a stair or slope stand on its surface; drawn at the cell's base height they sank into the steps and
+  showed as the see-through outline, while the PC draws the player on the steps.
+
+### Camera mode 1
+
+`53 1 pitch yaw angle height ms wait`, all in thousandths, is a view from the player's cell like mode 2: the eye sits
+`height` above the player, looking along `yaw` and down, and the player isn't drawn. Fitted to the public square scene
+(`53 1 -13000 0 20000 2595 1000 0`) against a PC capture: the view angle is twice the value as in mode 2 (40° for
+20000), the eye height is as given, and the PC looks down about 0.58 times the given pitch (7.5° for 13). Colette's
+other mode 1 pitches (−22, −30, −55, in scenes after a defeat and their replays) weren't compared.
+
+### Other commands
+
+- 76 names a sound effect and stops it: Colette's three uses come at the end of a scene that started the same
+  20-second effect with 22.
+- Colette uses none of 55, 56, 58, 68 and 77.
+
+### Battles
+
+メイリ's character resource has no `wait` motion; her character picture is an eight-frame standing animation in one
+row (152 × 152 frames). The PC shows her standing, facing the camera, beside コレット.
+
+### Saves after the first area
+
+Saves move both ways at two more places. A runner save in the castle town (party of three at level 9, メイリ
+poisoned, 636 G, nine kinds of items) loaded in the PC at (12,12) facing down with the same levels, HP, MP, state,
+money, play time and item list, and the PC's save made there loaded in the runner the same. A runner save on the
+サキュバスタワー's sixth floor loaded in the PC with its floor caption showing again, as the runner shows it, and the
+PC's save made there loaded in the runner at (4,5).

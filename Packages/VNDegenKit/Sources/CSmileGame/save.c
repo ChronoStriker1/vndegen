@@ -1,5 +1,7 @@
 #include "sg.h"
 
+#include <math.h>
+
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -630,7 +632,7 @@ static void capture(SG *g, SaveData *s) {
     s->x = (i32)f->player.x;
     s->z = (i32)f->player.z;
     s->dir = kToSave[f->player.dir & 3];
-    s->playerY = f->player.y;
+    s->playerY = sg_save_height(g, (int)floorf(f->player.x), (int)floorf(f->player.z), f->player.y);
     ViewPose pose;
     sg_camera_get(g, &pose);
     s->cameraPitch = pose.pitch;
@@ -655,8 +657,8 @@ static void capture(SG *g, SaveData *s) {
         else ev[i].motion = sheet_motion(g, a->eventId, event_sheet(g, &f->events[i]));
         ev[i].dir = kToSave[a->dir & 3];
         ev[i].x = a->moving ? a->tx : a->x;
-        ev[i].y = a->y;
         ev[i].z = a->moving ? a->tz : a->z;
+        ev[i].y = sg_save_height(g, (int)floorf(ev[i].x), (int)floorf(ev[i].z), a->y);
     }
     for (int i = 0; i < s->eventCount; i++) free(s->events[i].motion);
     free(s->events);
@@ -745,7 +747,7 @@ bool sg_save_read(SG *g, int slot) {
     g->scene = SCENE_FIELD;
     if (!field_load(g, s.map, s.x, s.z, kFromSave[s.dir & 3])) return false;
     Field *f = &g->field;
-    f->player.y = s.playerY;
+    f->player.y = floorf(s.playerY + 0.01f);
     ViewPose pose;
     sg_camera_get(g, &pose);
     pose.pitch = s.cameraPitch;
@@ -763,7 +765,7 @@ bool sg_save_read(SG *g, int slot) {
             Actor *a = &f->npcs[i];
             a->x = a->tx = se->x;
             a->z = a->tz = se->z;
-            a->y = se->y;
+            a->y = floorf(se->y + 0.01f);
             a->dir = kFromSave[se->dir & 3];
             if (i < st->evCount && st->ev[i].sheet >= 0) {
                 SgaEvent *ev = &st->ev[i];

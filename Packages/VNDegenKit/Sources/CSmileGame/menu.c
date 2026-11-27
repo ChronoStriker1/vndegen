@@ -37,6 +37,9 @@ static const u32 kGray = 0xff808080u;
 static const u32 kDown = 0xffb4a0ffu;
 static const u32 kUp = 0xffffd090u;
 static const int kOpenMs = 160;
+static const u32 kInnFadeOutMs = 1000, kInnFadeInMs = 1200, kInnMeMs = 8930;
+
+enum { INN_CHOOSE, INN_NO_MONEY, INN_SLEEP };
 
 struct Menu {
     int mode;
@@ -53,6 +56,8 @@ struct Menu {
     i32 shopPrices[32];
     int shopCount;
     int innPrice;
+    int innPhase;
+    u32 innMs, innMeMs;
     int qty;
     bool result;
     SaveSlot slots[SAVE_SLOTS];
@@ -805,20 +810,24 @@ static void draw_shop(SG *g, Menu *m) {
 }
 
 static void draw_inn(SG *g, Menu *m) {
-    char q[128];
-    snprintf(q, sizeof q, "%dG", m->innPrice);
-    panel(g, 160, 192, 640, 160);
-    text_center(g, 480, 222, 21, m->note[0] ? m->note : q, kWhite);
-    for (int i = 0; i < 2; i++) {
-        int x = 170 + i * 311;
-        button(g, x, 294, 308, 48);
-        if (i == m->cur[P_INN]) highlight(g, x, 294, 308, 48);
-        text(g, x + 10, 306, 20, T(g)->text.shop[i == 0 ? SHOP_STAY : SHOP_LEAVE], kWhite);
+    if (m->innPhase == INN_SLEEP) {
+        u32 t = m->innMs, hold = m->innMeMs > kInnFadeOutMs ? m->innMeMs : kInnFadeOutMs;
+        float a = t < kInnFadeOutMs ? (float)t / kInnFadeOutMs : t < hold ? 1.0f : 1.0f - (float)(t - hold) / kInnFadeInMs;
+        if (a > 0) fill_rect(g->fb, g->w, g->h, 0, 0, g->w, g->h, (u32)(a * 255.0f + 0.5f) << 24);
+        return;
     }
+    if (m->innPhase == INN_NO_MONEY) {
+        sg_draw_text_box(g, T(g)->text.shop[SHOP_NO_MONEY], 1);
+        return;
+    }
+    interp_draw_last_window(g);
+    char stay[128], *items[2] = {stay, T(g)->text.shop[SHOP_LEAVE]};
+    snprintf(stay, sizeof stay, "%s\xef\xbc\x9a%dG", T(g)->text.shop[SHOP_STAY] ? T(g)->text.shop[SHOP_STAY] : "", m->innPrice);
+    sg_draw_choice_box(g, items, 2, m->cur[P_INN]);
     char money[64];
-    snprintf(money, sizeof money, "%s : %dG", T(g)->text.money ? T(g)->text.money : "", P(g)->money);
-    panel(g, 700, 120, 252, 50);
-    text_right(g, 936, 133, 17, money, kWhite);
+    snprintf(money, sizeof money, "%d G", P(g)->money);
+    panel(g, 729, 3, 219, 49);
+    text_right(g, 937, 15, 24, money, kWhite);
 }
 
 static void draw(SG *g, Menu *m) {
@@ -898,10 +907,7 @@ static void draw(SG *g, Menu *m) {
     case P_SHOP_SELL:
         draw_shop(g, m);
         break;
-    case P_INN:
-        draw_inn(g, m);
-        guide(g, m, false);
-        break;
+    case P_INN: draw_inn(g, m); break;
     }
 }
 
@@ -1380,16 +1386,17 @@ static void update_shop_main(SG *g, Menu *m) {
 
 static void update_inn(SG *g, Menu *m) {
     Party *p = P(g);
-    int c = m->cur[P_INN], old = c;
-    if (sg_pressed(g, KEY_LEFT) || sg_pressed(g, KEY_RIGHT)) c = 1 - c;
-    m->cur[P_INN] = c;
-    if (c != old) sgb_sound(g, SND_CURSOR);
+    if (m->innPhase == INN_SLEEP) return;
     bool cancel = sg_pressed(g, KEY_CANCEL);
     bool ok = sg_pressed(g, KEY_OK);
-    if (m->note[0] && (ok || cancel)) {
-        close_menu(g, m);
+    if (m->innPhase == INN_NO_MONEY) {
+        if (ok || cancel) close_menu(g, m);
         return;
     }
+    int c = m->cur[P_INN], old = c;
+    if (sg_pressed(g, KEY_UP) || sg_pressed(g, KEY_DOWN)) c = 1 - c;
+    m->cur[P_INN] = c;
+    if (c != old) sgb_sound(g, SND_CURSOR);
     if (cancel || (ok && c == 1)) {
         sgb_sound(g, SND_CANCEL);
         close_menu(g, m);
@@ -1398,15 +1405,38 @@ static void update_inn(SG *g, Menu *m) {
     if (!ok) return;
     if (p->money < m->innPrice) {
         sgb_sound(g, SND_CANCEL);
-        snprintf(m->note, sizeof m->note, "%s", T(g)->text.shop[SHOP_NO_MONEY]);
+        m->innPhase = INN_NO_MONEY;
         return;
     }
     p->money -= m->innPrice;
-    party_recover(g);
-    m->result = true;
-    sgb_sound(g, SND_STATUS_UP);
-    sg_log(g, "menu: inn, party healed for %dG", m->innPrice);
-    close_menu(g, m);
+    m->innPhase = INN_SLEEP;
+    m->innMs = 0;
+    m->innMeMs = sg_me_file(g, "samples/common/res/bgm/me_lodging.ogg", 100);
+    if (!m->innMeMs) m->innMeMs = kInnMeMs;
+    sg_log(g, "menu: inn, party stays for %dG", m->innPrice);
+}
+
+static bool inn_sleep_frame(SG *g, Menu *m, u32 ms) {
+    if (m->mode == MENU_CLOSED || m->page != P_INN || m->innPhase != INN_SLEEP) return false;
+    u32 hold = m->innMeMs > kInnFadeOutMs ? m->innMeMs : kInnFadeOutMs;
+    bool black = m->innMs >= kInnFadeOutMs;
+    m->innMs += ms;
+    if (!black && m->innMs >= kInnFadeOutMs) {
+        party_recover(g);
+        g->field.player.dir = 2;
+        m->result = true;
+        sg_log(g, "menu: inn, party healed");
+    }
+    if (m->innMs >= hold + kInnFadeInMs) {
+        m->mode = MENU_CLOSED;
+        m->innPhase = INN_CHOOSE;
+        field_draw(g);
+        sg_log(g, "menu: closed");
+        return true;
+    }
+    field_draw(g);
+    draw_inn(g, m);
+    return true;
 }
 
 static void begin(SG *g, Menu *m, int mode, int page) {
@@ -1455,6 +1485,7 @@ void inn_open(SG *g, int price) {
     Menu *m = menu_get(g);
     if (!m) return;
     m->innPrice = price;
+    m->innPhase = INN_CHOOSE;
     m->cur[P_INN] = 0;
     m->result = false;
     begin(g, m, MENU_INN, P_INN);
@@ -1542,6 +1573,7 @@ bool menu_frame(SG *g, u32 ms) {
             return false;
         }
     }
+    if (inn_sleep_frame(g, m, ms)) return true;
     m->animMs += ms;
     if (!m->closing && m->animMs >= (u32)kOpenMs) update(g, m);
     field_draw(g);

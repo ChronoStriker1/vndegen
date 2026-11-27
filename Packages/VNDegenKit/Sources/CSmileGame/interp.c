@@ -10,6 +10,7 @@ static const int kWinX = 120, kWinW = 720, kWinH = 160;
 static const int kTextPadX = 18, kTextPadY = 19;
 static const int kWrapW = 684;
 static const float kRevealPerMs = 0.12f;
+static const int kCaptionBandPad = 20;
 
 static void clear_pages(Interp *ip) {
     for (int i = 0; i < ip->pageCount; i++) free(ip->pages[i]);
@@ -141,7 +142,7 @@ void interp_free(Interp *ip) {
     runner_reset(ip);
     SgaState *a = &ip->a;
     free(a->floor);
-    free(a->deck);
+    free(a->under);
     for (int i = 0; i < a->evCount; i++) {
         for (int k = 0; k < a->ev[i].sheetCount; k++) free(a->ev[i].sheets[k].motion);
         free(a->ev[i].sheets);
@@ -241,12 +242,7 @@ static bool eval_branch(SG *g, const Cmd *c) {
         return compare(i >= 0 && i < 1024 ? g->vars[i] : 0, cmd_int(c, 1), cmd_int(c, 2));
     }
     case CMD_IF_ITEM: {
-        Guid id = cmd_guid(c, 0);
-        i32 have = sga_item_count(g, id);
-        const Party *p = &g->b.party;
-        for (int i = 0; i < p->count && cmd_int(c, 2) == 0; i++)
-            for (int k = 0; k < SLOT_COUNT; k++)
-                if (guid_eq(p->members[i].equip[k], id)) have++;
+        i32 have = sga_item_count(g, cmd_guid(c, 0));
         return cmd_int(c, 3) == 1 ? have >= cmd_int(c, 1) : have == cmd_int(c, 1);
     }
     case CMD_IF_PARTY: return sga_in_party(g, cmd_guid(c, 0)) == (cmd_int(c, 1) == 0);
@@ -620,25 +616,41 @@ static void draw_message(SG *g, const char *text, int shown) {
     }
 }
 
-static void draw_choices(SG *g) {
-    SgaState *a = &g->interp.a;
+void sg_draw_choice_box(SG *g, char *const *items, int n, int cursor) {
     int maxW = 0;
-    for (int i = 0; i < a->choiceCount; i++) {
-        int w = font_width(g->font, kTextPx, a->choices[i]);
+    for (int i = 0; i < n; i++) {
+        int w = font_width(g->font, kTextPx, items[i]);
         if (w > maxW) maxW = w;
     }
-    int itemH = 50, w = maxW + 36, h = a->choiceCount * itemH + 12;
+    int itemH = 50, w = maxW + 36, h = n * itemH + 12;
     int x = (g->w - w) / 2, y = (g->h - h) / 2;
     const Res *res = NULL;
     Image *im = sga_default_window(g, &res);
     sga_window(g, im, res, x, y, w, h);
     const Res *sr = NULL;
     Image *sel = sga_selected_window(g, &sr);
-    for (int i = 0; i < a->choiceCount; i++) {
+    for (int i = 0; i < n; i++) {
         int iy = y + 6 + i * itemH;
-        if (i == a->choiceCursor) sga_window(g, sel, sr, x + 6, iy + 4, w - 12, itemH - 8);
-        font_draw(g->font, g->fb, g->w, g->h, x + 18, iy + 12, kTextPx, a->choices[i], 0xffffffffu);
+        if (i == cursor) sga_window(g, sel, sr, x + 6, iy + 4, w - 12, itemH - 8);
+        font_draw(g->font, g->fb, g->w, g->h, x + 18, iy + 12, kTextPx, items[i], 0xffffffffu);
     }
+}
+
+static void draw_choices(SG *g) {
+    SgaState *a = &g->interp.a;
+    sg_draw_choice_box(g, a->choices, a->choiceCount, a->choiceCursor);
+}
+
+void sg_draw_text_box(SG *g, const char *text, int pos) {
+    SgaState *a = &g->interp.a;
+    int cmd = a->msgCmd, msgPos = a->msgPos, state = g->interp.state;
+    a->msgCmd = CMD_MESSAGE;
+    a->msgPos = pos;
+    g->interp.state = ST_MESSAGE;
+    draw_message(g, text, 1 << 30);
+    a->msgCmd = cmd;
+    a->msgPos = msgPos;
+    g->interp.state = state;
 }
 
 void interp_draw(SG *g) {
@@ -659,7 +671,11 @@ void interp_draw(SG *g) {
             int lines = 1;
             for (const char *p = ip->scrollText; *p; p++)
                 if (*p == '\n') lines++;
-            int y = ip->a.msgPos == 0 ? 40 : ip->a.msgPos == 1 ? g->h - 40 - lines * kLinePx : (g->h - lines * kLinePx) / 2;
+            int y = ip->a.msgPos == 1 ? g->h - 40 - lines * kLinePx : (g->h - lines * kLinePx) / 2;
+            if (ip->a.msgPos == 0) {
+                int band = kCaptionBandPad + lines * kLinePx;
+                fill_rect(g->fb, g->w, g->h, 0, (g->h - band) / 2, g->w, band, (alpha / 2) << 24);
+            }
             draw_lines_alpha(g, ip->scrollText, y, alpha);
         }
     } else if (ip->state == ST_SCROLL && ip->scrollText) {

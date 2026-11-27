@@ -26,9 +26,18 @@ static bool on_stairs(const Map *m, int x, int z) {
     return false;
 }
 
-static bool across_stairs(SG *g, int x, int z, int dx) {
-    int kind = sg_stair_kind(g, x, z);
-    return kind >= 0 && (kind < 2) == (dx != 0);
+static int ramp_at(const Map *m, int x, int z) {
+    for (int i = 0; i < m->stairCount; i++)
+        if (m->stairs[i].x == x && m->stairs[i].z == z && m->stairs[i].kind >= 0 && m->stairs[i].kind <= 3) return m->stairs[i].kind;
+    return -1;
+}
+
+static bool across_ramp(const Map *m, int x0, int z0, int x1, int z1) {
+    int a = ramp_at(m, x0, z0), b = ramp_at(m, x1, z1);
+    if (a < 0 && b < 0) return false;
+    int k = a >= 0 ? a : b;
+    if ((k >= 2) == (x1 != x0)) return false;
+    return a != b || m->height[(size_t)z0 * (size_t)m->w + (size_t)x0] != m->height[(size_t)z1 * (size_t)m->w + (size_t)x1];
 }
 
 static bool occupies(const Actor *a, int x, int z) {
@@ -40,9 +49,8 @@ bool sgi_cell_free(SG *g, int fromX, int fromZ, int x, int z, int self) {
     Field *f = &g->field;
     const Map *m = &f->map;
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
-    const Actor *mover = self >= 0 && self < f->npcCount ? &f->npcs[self] : &f->player;
-    int h0 = sga_floor(g, fromX, fromZ);
-    if (sg_deck(g, fromX, fromZ) != SG_NO_DECK && (int)floorf(mover->x) == fromX && (int)floorf(mover->z) == fromZ) h0 = (int)floorf(mover->y + 0.01f);
+    const Actor *me = self >= 0 && self < f->npcCount ? &f->npcs[self] : &f->player;
+    int h0 = sg_floor_level(g, fromX, fromZ, (int)lroundf(me->y));
     return sg_step_free(g, fromX, fromZ, h0, x, z, self);
 }
 
@@ -50,10 +58,9 @@ bool sg_step_free(SG *g, int fromX, int fromZ, int h0, int x, int z, int self) {
     Field *f = &g->field;
     const Map *m = &f->map;
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
-    int h1 = sg_level_into(g, x, z, h0);
-    bool deck = (sg_deck(g, fromX, fromZ) == h0 && h0 != sga_floor(g, fromX, fromZ)) || (sg_deck(g, x, z) == h1 && h1 != sga_floor(g, x, z));
+    int h1 = sg_floor_level(g, x, z, h0);
     if (h0 != h1 && (abs(h1 - h0) > 1 || !(on_stairs(m, x, z) || on_stairs(m, fromX, fromZ)))) return false;
-    if (!deck && sg_ground(g, fromX, fromZ) != sg_ground(g, x, z) && (across_stairs(g, fromX, fromZ, x - fromX) || across_stairs(g, x, z, x - fromX))) return false;
+    if (across_ramp(m, fromX, fromZ, x, z)) return false;
     if (self >= 0 && occupies(&f->player, x, z)) return false;
     const SgaState *st = &g->interp.a;
     bool sheets = st->evCount == f->npcCount && guid_eq(st->mapId, m->id);
