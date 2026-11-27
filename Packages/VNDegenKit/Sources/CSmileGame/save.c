@@ -3,7 +3,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-enum { HERO_GUID = 0, HERO_STATS = 16, HERO_EXP = 52, HERO_EQUIP = 60, HERO_SKILLS = 156, HERO_MIN = 160 };
+enum { HERO_GUID = 0, HERO_STATS = 16, HERO_EXP = 52, HERO_STATE = 56, HERO_EQUIP = 60, HERO_SKILLS = 156, HERO_MIN = 160 };
 
 typedef struct Wr {
     u8 *p;
@@ -77,6 +77,7 @@ static bool read_heroes(Rd *r, SaveHero **out, int *count) {
         for (int k = 0; k < 9; k++) f[k] = get_i32(h->body + HERO_STATS + 4 * k);
         for (int k = 0; k < 6; k++) memcpy(h->equip[k].b, h->body + HERO_EQUIP + 16 * k, 16);
         h->exp = get_i32(h->body + HERO_EXP);
+        h->state = get_i32(h->body + HERO_STATE);
         i32 n = get_i32(h->body + HERO_SKILLS);
         if (n < 0 || HERO_MIN + 16 * n > h->size) return false;
         h->learnedCount = n < 16 ? n : 16;
@@ -228,6 +229,7 @@ static void write_heroes(Wr *w, const SaveHero *h, int n) {
         for (int k = 0; k < 9; k++) put_i32(body + HERO_STATS + 4 * k, f[k]);
         for (int k = 0; k < 6; k++) memcpy(body + HERO_EQUIP + 16 * k, h[i].equip[k].b, 16);
         put_i32(body + HERO_EXP, h[i].exp);
+        put_i32(body + HERO_STATE, h[i].state);
         w_i32(w, size);
         w_bytes(w, body, (size_t)size);
         free(body);
@@ -522,6 +524,7 @@ static SaveHero *heroes_from(const SaveData *s, const Member *m, int n, int hero
         h->speed = m[i].stat[STAT_SPEED];
         memcpy(h->equip, m[i].equip, sizeof h->equip);
         h->exp = m[i].exp;
+        h->state = m[i].state;
         h->learnedCount = m[i].learnedCount;
         memcpy(h->learned, m[i].learned, sizeof h->learned);
     }
@@ -569,6 +572,7 @@ static void member_from(SG *g, Member *m, const SaveHero *h) {
     m->hero = h->id;
     m->level = h->level;
     m->exp = h->exp;
+    m->state = (u8)h->state;
     m->hp = h->hp;
     m->mp = h->mp;
     m->maxHp = h->maxHp;
