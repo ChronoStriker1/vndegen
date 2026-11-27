@@ -19,6 +19,38 @@ typedef struct BattleSetup {
     int layout[BATTLE_MAX_MONSTERS][2];
 } BattleSetup;
 
+enum { BATTLE_MAX_ENCOUNTERS = 16 };
+
+typedef struct BattleEncounterEntry {
+    Guid monster;
+    i32 a, b;
+} BattleEncounterEntry;
+
+typedef struct BattleMapInfo {
+    i32 rate;
+    BattleEncounterEntry entries[BATTLE_MAX_ENCOUNTERS];
+    int count;
+    Guid background;
+    Guid bgm;
+} BattleMapInfo;
+
+typedef struct BattleEnc {
+    Guid map;
+    bool valid;
+    BattleMapInfo info;
+    int cellX, cellZ;
+    int steps;
+    u32 rng;
+} BattleEnc;
+
+bool battle_map_info(SG *g, Guid mapId, BattleMapInfo *out);
+Guid battle_bgm_for(SG *g, const BattleSetup *s, Guid mapId);
+Guid battle_background_for(SG *g, const BattleSetup *s, Guid mapId);
+bool battle_encounter_roll(BattleEnc *e);
+void battle_encounter_setup(BattleEnc *e, BattleSetup *s);
+void battle_encounter_tick(SG *g);
+BattleEnc *battle_enc(SG *g);
+
 bool battle_setup_cmd(BattleSetup *s, const Cmd *c);
 void sg_battle_start(SG *g, const BattleSetup *s);
 bool sg_battle_active(SG *g);

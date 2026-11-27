@@ -83,7 +83,13 @@ typedef struct Battle {
     char lines[12][160];
     int lineCount;
     int turn;
-    bool applied, started, restored;
+    bool applied, started, restored, staged;
+    Guid fieldMap, fieldBgm;
+    bool hadBgm;
+    View *fieldView;
+    ShadowMap fieldShadow;
+    bool fieldShadowOn;
+    float fieldLight[9], fieldAnimU;
 } Battle;
 
 static struct {
@@ -91,6 +97,7 @@ static struct {
     Battle *b;
     u32 seed;
     bool seeded;
+    BattleEnc enc;
 } registry[8];
 
 static int slot_of(SG *g, bool create) {
@@ -108,6 +115,11 @@ static int slot_of(SG *g, bool create) {
 static Battle *get(SG *g) {
     int s = slot_of(g, false);
     return s >= 0 ? registry[s].b : NULL;
+}
+
+BattleEnc *battle_enc(SG *g) {
+    int s = slot_of(g, true);
+    return s >= 0 ? &registry[s].enc : NULL;
 }
 
 static u32 next_rand(u32 *s) {
@@ -687,6 +699,8 @@ static void after_actions(Battle *b) {
     if (!living(b, true)) {
         set_phase(b, PH_VICTORY);
         fmt(b->bar, sizeof b->bar, btext(b->g, 12, "戦闘に勝利した！"), "", "");
+        snd_bgm_stop(b->g, 0);
+        snd_me(b->g, TB(b->g)->text.sounds[SND_VICTORY], 100, 100);
         grant_rewards(b);
         return;
     }
@@ -904,10 +918,30 @@ static void input(Battle *b) {
 }
 
 static void restore_field(Battle *b) {
-    if (b->restored) return;
+    if (b->restored || !b->staged) return;
     b->restored = true;
-    field_free(&b->g->field);
-    b->g->field = b->saved;
+    SG *g = b->g;
+    field_free(&g->field);
+    g->field = b->saved;
+    g->e.curMap = b->fieldMap;
+    R3x *x = g->r3.x;
+    if (g->r3.view != b->fieldView) {
+        r3_shadow_free(&g->r3);
+        view_free(g->r3.view);
+    }
+    g->r3.view = b->fieldView;
+    x->shadow = b->fieldShadow;
+    x->shadowOn = b->fieldShadowOn;
+    memcpy(x->amb, b->fieldLight, sizeof x->amb);
+    memcpy(x->sun, b->fieldLight + 3, sizeof x->sun);
+    memcpy(x->sunDir, b->fieldLight + 6, sizeof x->sunDir);
+    x->animU = b->fieldAnimU;
+}
+
+static void resume_music(Battle *b) {
+    SG *g = b->g;
+    if (b->hadBgm) snd_bgm(g, b->fieldBgm, 100, 100);
+    else snd_bgm_stop(g, 0);
 }
 
 static void free_battle(SG *g) {
@@ -922,7 +956,6 @@ static void free_battle(SG *g) {
         free(b);
     }
     registry[s].b = NULL;
-    if (!registry[s].seeded) registry[s].g = NULL;
 }
 
 static void finish(Battle *b, int result) {
@@ -930,6 +963,7 @@ static void finish(Battle *b, int result) {
     b->result = result;
     for (int i = 0; i < b->partyCount; i++) sync_member(g, &b->f[i]);
     restore_field(b);
+    if (b->staged && (result != BATTLE_LOST || b->setup.continueOnLose)) resume_music(b);
     if (result == BATTLE_LOST && !b->setup.continueOnLose) {
         interp_free(&g->interp);
         g->scene = SCENE_TITLE;
@@ -952,10 +986,25 @@ static void setup_stage(Battle *b) {
     SG *g = b->g;
     const BattleSetup *s = &b->setup;
     b->saved = g->field;
+    b->fieldMap = g->e.curMap;
+    b->hadBgm = snd_bgm_playing(g, &b->fieldBgm);
+    Guid mapId = g->field.map.id;
+    Guid bg = battle_background_for(g, s, mapId);
+    Guid bgm = battle_bgm_for(g, s, mapId);
+    R3x *x = g->r3.x;
+    b->fieldView = g->r3.view;
+    b->fieldShadow = x->shadow;
+    b->fieldShadowOn = x->shadowOn;
+    memcpy(b->fieldLight, x->amb, sizeof x->amb);
+    memcpy(b->fieldLight + 3, x->sun, sizeof x->sun);
+    memcpy(b->fieldLight + 6, x->sunDir, sizeof x->sunDir);
+    b->fieldAnimU = x->animU;
+    g->r3.view = NULL;
+    memset(&x->shadow, 0, sizeof x->shadow);
+    x->shadowOn = false;
     Actor player = g->field.player;
     memset(&g->field, 0, sizeof g->field);
     g->field.player = player;
-    Guid bg = s->background;
     int cx = 0, cz = 0;
     bool loaded = false;
     if (!guid_zero(bg) && game_record(&g->data, SGR_MAP, 0, bg, NULL)) {
@@ -963,6 +1012,7 @@ static void setup_stage(Battle *b) {
         g->interp.active = true;
         loaded = field_load(g, bg, 0, 0, 0);
         g->interp.active = interpWasActive;
+        for (int i = 0; i < g->field.npcCount; i++) g->field.npcs[i].visible = false;
         if (loaded) {
             cx = s->hasCenter ? s->centerX : g->field.map.w / 2;
             cz = s->hasCenter ? s->centerZ : g->field.map.h / 2;
@@ -992,14 +1042,18 @@ static void setup_stage(Battle *b) {
     f->cam.fov = 19.0f;
     f->cam.distance = 33.0f;
     f->cam.target = (Vec3){bx + 1.44f, ground + 0.49f, bz - 1.31f};
+    if (loaded) sg_camera_to(g, &(ViewPose){f->cam.target, -f->cam.pitch, -f->cam.yaw, f->cam.distance / 20.0f, f->cam.fov * 10.0f, 0, false}, 0);
     for (int i = 0; i < b->count; i++) b->f[i].fadeMs = 0;
     f->loaded = loaded;
+    g->e.curMap = f->map.id;
+    if (!guid_zero(bgm)) snd_bgm(g, bgm, 100, 100);
+    b->staged = true;
 }
 
 void sg_battle_start(SG *g, const BattleSetup *s) {
     int slot = slot_of(g, true);
     if (slot < 0) return;
-    if (registry[slot].b) free_battle(g), slot = slot_of(g, true);
+    if (registry[slot].b) free_battle(g);
     Battle *b = sg_alloc(sizeof *b);
     registry[slot].b = b;
     b->g = g;
@@ -1012,7 +1066,6 @@ void sg_battle_start(SG *g, const BattleSetup *s) {
         const MonsterDef *m = monster_def(TB(g), s->monsters[i]);
         if (m) add_monster(b, m, 0, 0);
     }
-    setup_stage(b);
     fmt(b->bar, sizeof b->bar, btext(g, 11, "モンスターが現れた！"), "", "");
     sg_log(g, "battle: start, %d members, %d monsters", b->partyCount, b->count - b->partyCount);
     set_phase(b, PH_INTRO);
@@ -1054,7 +1107,7 @@ const char *battle_bar(SG *g) {
 void battle_close(SG *g) {
     free_battle(g);
     int s = slot_of(g, false);
-    if (s >= 0) registry[s].g = NULL, registry[s].seeded = false;
+    if (s >= 0) memset(&registry[s], 0, sizeof registry[s]);
 }
 
 static void update(Battle *b, u32 ms) {
@@ -1101,6 +1154,9 @@ static void update(Battle *b, u32 ms) {
                 finish(b, BATTLE_LOST);
             } else {
                 restore_field(b);
+                snd_bgm_stop(b->g, 0);
+                snd_bgs_stop(b->g, 0);
+                snd_me(b->g, TB(b->g)->text.sounds[SND_GAMEOVER], 100, 100);
                 set_phase(b, PH_GAMEOVER);
             }
         }
@@ -1373,6 +1429,7 @@ static void draw(Battle *b) {
         draw_fighter(b, &b->f[k], active);
     }
     (void)cam;
+    r3_flush(&g->r3);
     draw_popups(b);
     if (b->phase == PH_RESULT) {
         draw_result(b);
@@ -1390,7 +1447,12 @@ static void draw(Battle *b) {
 
 bool battle_frame(SG *g, u32 ms) {
     Battle *b = get(g);
-    if (!b || b->phase == PH_DONE) return false;
+    if (!b || b->phase == PH_DONE) {
+        battle_encounter_tick(g);
+        b = get(g);
+        if (!b || b->phase == PH_DONE) return false;
+    }
+    if (!b->staged) setup_stage(b);
     update(b, ms);
     if (b->phase == PH_DONE) return false;
     draw(b);
