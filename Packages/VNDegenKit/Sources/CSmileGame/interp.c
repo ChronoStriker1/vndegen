@@ -1,6 +1,6 @@
 #include "sg.h"
 
-enum { ST_RUN, ST_MESSAGE, ST_SCROLL, ST_WAIT, ST_CHOICE, ST_BUSY, ST_SCREEN };
+enum { ST_RUN, ST_MESSAGE, ST_SCROLL, ST_WAIT, ST_CHOICE, ST_BUSY, ST_SCREEN, ST_BATTLE };
 
 static const int kTextPx = 24;
 static const int kLinePx = 36;
@@ -244,13 +244,12 @@ static bool eval_branch(SG *g, const Cmd *c) {
         return cmd_int(c, 3) == 1 ? have >= cmd_int(c, 1) : have == cmd_int(c, 1);
     }
     case CMD_IF_PARTY: return sga_in_party(g, cmd_guid(c, 0)) == (cmd_int(c, 1) == 0);
-    case CMD_BATTLE: sg_log(g, "battle (not run): taken as won"); return true;
     default: return false;
     }
 }
 
 static bool is_branch(int type) {
-    return type == CMD_IF_SWITCH || type == CMD_IF_VARIABLE || type == CMD_IF_ITEM || type == CMD_IF_PARTY || type == CMD_BATTLE;
+    return type == CMD_IF_SWITCH || type == CMD_IF_VARIABLE || type == CMD_IF_ITEM || type == CMD_IF_PARTY;
 }
 
 static void open_shop(SG *g, const Cmd *c) {
@@ -352,6 +351,14 @@ static void step(SG *g) {
             break;
         case CMD_SHOP:
         case CMD_INN: start_screen(g, c, here); break;
+        case CMD_BATTLE: {
+            BattleSetup bs;
+            if (!battle_setup_cmd(&bs, c)) break;
+            sg_battle_start(g, &bs);
+            a->screenHeader = here;
+            ip->state = ST_BATTLE;
+            break;
+        }
         case CMD_SCROLL_TEXT: {
             bool image = c->argCount > 2 && c->args[2].kind == ARG_GUID;
             ip->scrollText = cmd_str(c, 0);
@@ -452,6 +459,11 @@ void interp_update(SG *g, u32 ms) {
         break;
     case ST_BUSY:
         if (!sga_busy(g)) ip->state = ST_RUN;
+        break;
+    case ST_BATTLE:
+        if (sg_battle_active(g)) break;
+        if (sg_battle_result(g) != BATTLE_WON) ip->pc = branch_false(&ip->script, a->screenHeader);
+        ip->state = ST_RUN;
         break;
     case ST_SCREEN:
         if (menu_active(g)) break;

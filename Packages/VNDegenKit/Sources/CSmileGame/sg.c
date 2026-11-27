@@ -234,6 +234,7 @@ const char *vnsmilegame_problem(VNSmileGame *vg) {
 const char *vnsmilegame_scene(VNSmileGame *vg) {
     SG *g = (SG *)vg;
     if (g->scene == SCENE_TITLE) return "title";
+    if (sg_battle_active(g)) return "battle";
     if (menu_page(g)) return menu_page(g);
     if (g->interp.active) return g->interp.state == 1 ? "message" : g->interp.state == 2 ? "scroll" : "event";
     return "field";
