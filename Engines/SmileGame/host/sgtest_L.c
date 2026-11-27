@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -211,6 +212,25 @@ static void test_stop_se(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_event_room(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    sg_debug_warp((VNSmileGame *)g, "ログサキュバスＨ", 7, 12, 0);
+    run(g, 1500);
+    View *v = sg_view(g);
+    CHECK(v->eye);
+    ViewPose p;
+    sg_camera_get(g, &p);
+    CHECK(fabsf(p.target.z - 11.5f) < 0.01f && fabsf(p.target.y - (g->field.player.y + 1.7f)) < 0.01f);
+    double r, gg, b;
+    region(g, 0, 0, g->w, 20, &r, &gg, &b);
+    CHECK(r + gg + b < 30);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 static void test_experience(void) {
     CHECK(battle_exp_for_level(7) == 966);
     CHECK(battle_exp_for_level(8) == 1484);
@@ -228,6 +248,7 @@ int main(void) {
         test_inn_bed(colette);
         test_bridges(colette);
         test_stop_se(colette);
+        test_event_room(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
