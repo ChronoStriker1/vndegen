@@ -29,6 +29,9 @@ Both games use the same data format.
   and windows. The party, inventory, money and play time with stats as the PC computes them.
 - The field menu (Esc or X): items, skills, equipment, status, save slots, quit and config, laid out as the PC draws
   them, with faces; the shop and inn screens (`shop_open`, `inn_open` in `sg_B.h`).
+- Battles: event command 65 through `sg_battle_start`, drawn on the battle background map from behind the party,
+  with the command list, targets, skills, items, defend and escape, monster actions, damage as measured on the PC,
+  the result panel, level-ups and GAME OVER.
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
 
 ## The Linux host
@@ -40,17 +43,25 @@ Both games use the same data format.
 - `sgplay <game>`: an SDL window with the keyboard (arrows, Enter or Z, Esc or X, Shift).
 - `sgtest`: the format reader tests. With `SG_COLETTE` and `SG_SACRED` set to the game folders it also checks values
   read from the games' files.
+- `sgbattle <game> <out> [seed:n] party:Name[@level],... troop:<script GUID hex>|monsters:Name,... [bg:<map>]
+  [wait:ms] [key:vk] [shot:name] [attack:n] [until:phase]`: starts the battle command of an event script (for
+  example `troop:4ff8bc66` for Colette's first slime on the world map, `troop:c426b710` for Sacred's practice battle)
+  headless; `sgbattleplay` takes the same arguments with `-` as `<out>` and opens an SDL window.
+- `sgtest_C`: the battle tests against numbers seen in PC battles.
 - `sgtest_B`: the data table tests against values from the PC's menus and the game files. `sgtest_B shots
   colette|sacred <game> <out>` writes every menu page as PNG for comparison with the PC.
 
 ## Known limits
 
-- No sound, battles, saves, choices or pictures over the map yet; unknown commands are skipped and logged.
+- No sound, saves, choices or pictures over the map yet; unknown commands are skipped and logged.
+- Battles: event command 65 still has to call `sg_battle_start` (`battle_setup_cmd` decodes its arguments) and branch
+  on `sg_battle_result`. No battle BGM or effect animations; states and elements are not applied; critical, skill,
+  escape and shared experience rules are inferred (see `docs/smilegame-cleanroom.md`).
 - The menu's save page lists slots and dates but doesn't write yet, and doesn't show a slot's map and party.
 - Commands that give items or money, change the party, or open a shop or inn are not wired to the menu yet, so
   Sacred's party is the game settings' first member until they are.
 - The shop and inn screens were not compared with the PC; the party order page is not in these games' menus.
-- Experience above level 3 uses a fitted curve, and a few item, skill and monster fields are inferred (see
+- Experience above level 6 uses a fitted curve, and a few item, skill and monster fields are inferred (see
   `docs/smilegame-cleanroom.md`).
 - Shadows and the sky are not drawn; skinned characters stand in their bind pose.
 - Stairs are drawn as plain columns, not as steps.

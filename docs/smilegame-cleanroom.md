@@ -180,9 +180,7 @@ A stat at level L is base + growth × (L − 1)^curve, truncated: Sacred's ア�
 defence, 素早さ is the stat plus equipment. An item in the exception list can't be equipped by that hero (Colette's
 ダーク and アイスロッド, inferred from the editor's default of "everything").
 
-Experience: the next level needs 26 at level 1 (Colette's ダーク) and 84 in total at level 3 (アリア has 26 and needs 58
-more). The tables hold no curve; levels above 3 use 3.5 × L^2.89, a fit to those two points that the battle round must
-replace with values seen on the PC.
+Experience: the tables hold no curve. The totals seen on the PC are listed under Battles below.
 
 ### Battle commands (`Hero.sgr`, type 6)
 
@@ -215,7 +213,7 @@ second (94 bytes) starts with the effect GUID and the `int32` power; the rest is
 
 GUID, name, graphic GUID, attack effect GUID, description, 10 `int32` (the first is HP; the others, inferred: MP,
 attack, defence, magic, hit %, two flags, evasion, speed), 13 `int32` resistances in the element list's order (negative
-is a weakness), actions (`int32` n, n × (`int32` condition, two arguments, rate, kind (0 attack, 2 defend, 3 skill),
+is a weakness), actions (`int32` n, n × (`int32` condition, two arguments, rate, kind (see Battles below),
 skill GUID, `int32` priority)), `int32` exp, `int32` money, two drops (item GUID, `int32` percent), `int32`. All 91
 monsters of both games read to their last byte.
 
@@ -253,3 +251,79 @@ Measured from captures of the PC player under Wine at 960 × 544:
 - The bottom row shows the button guide from `button_guide.png` at 90 %.
 - Opening the menu scales the panels in from about 85 % over roughly 0.2 s; the PC ran near 9 fps under Wine, so the
   time is approximate. The cursor jumps without animation. Esc or X opens the menu when no event runs.
+
+## Battles (round 2, delegate C)
+
+Measured from battles on the PC player under Wine: 69 of Sacred's practice battles (the guard at (35,30) on the castle
+map, one スライミー, アリア at levels 2 to 5) and one Colette battle on the world map (ダーク and コレット at level 1
+against a wandering ゴーレムＬＶ01, lost, with six tries at escaping). Everything not marked otherwise was seen on the PC.
+
+### Command 65
+
+`int32` n, n monster GUIDs, then three `int32`: continue after a loss (1 in the practice battle and some boss fights;
+inferred: the event goes on to its `else` branch instead of GAME OVER), escape forbidden (1 in the practice battle:
+逃げる is listed but choosing it does nothing), and one more (always 0). Then the battle BGM GUID (zero or an empty
+resource reference for the default) and the background map GUID (zero for the default background, a flat grass
+plane). Optional tagged groups follow: `1000, x, z` is the cell of the background map the battle is centred on (the
+map's centre when absent), `1001` and one `x, z` pair per monster is each monster's cell relative to that centre
+((0, −3) for one monster, (−2, −3) and (2, −3) for two). The commands nested one level deeper run after a win; the
+`71` at the same level opens the branch for a loss or escape and `72` closes it.
+
+### Screen
+
+- The battle is drawn on the background map in 3D: a front view from behind the party at about 28° down, a long lens
+  (about 19° of vertical view from 33 cells away), centred a little right of the monsters. Monsters stand three cells
+  beyond the centre; the party stands 2.6 cells in front of it and 2.8 cells to the right, members 3.3 cells apart.
+  These are a fit to the positions of ダーク, コレット and the golem in the PC's frame, within about 6 pixels.
+- Monsters are their picture as a billboard at 0.63 of the map's 48 pixels per cell. 2D heroes use their character's
+  motions (`wait`, `attack`, `damage`, `guard`, `KO`, `skill`, nested in the character resource: `int32` count, then
+  per motion an `int32` size, GUID, name, file, frames, frame time, flag and divisions) at 1.29 × 48 pixels per cell;
+  コレット faces the camera in her `wait` motion. A hero without motions (ダーク) shows the walk sheet's back row. 3D
+  heroes (アリア) are their model from behind.
+- The member choosing a command stands on a light green square and has a light row in the status list.
+- Bottom left: `Command` over a rule, then the hero's commands from the hero table with their icons, then 逃げる,
+  34 pixels apart; the cursor is a light blue bar. Bottom right: `Name`, `HP`, `MP` headers with a row of name, value
+  and gauge per member.
+- A dark bar across the top shows what is happening: モンスターが現れた！, the target's name while choosing one,
+  `{0}の攻撃！`, the skill's name, `{0}は様子を見ている`, `{0}の会心の一撃！`, 逃げることができなかった！. Damage
+  rises over the target in white digits; a miss shows ミス.
+- Victory shows a result panel across the top (リザルト, 経験値, G, アイテム), then returns to the map. A wiped party
+  fades back to the map darkened with GAME OVER, then the title screen.
+
+### Rules
+
+- Turn order: every living fighter acts once a turn in order of speed, highest first. The golem (speed 40) acted
+  before コレット (16) and ダーク (15) in each round; アリア (33 and up) always acted before the slime (0).
+- Attack damage is (1.5 × attack − defence) / 4 × a random factor, rounded, never below 0. The factor is uniform
+  between 0.94 and 1.04: of 105 hits on the slime (defence 5), attack 42 gave 14 (16) or 15 (3), attack 54 gave 18
+  (11), 19 (15) or 20 (6), attack 66 gave 22 (10), 23 (22) or 24 (16), attack 78 gave 27 to 29 (6). The same formula
+  gives the slime's 2 or 3 against defence 35 and 0 against 45 and 55, ダーク's and コレット's 3 against the golem
+  (defence 25), and the golem's 26 and 27 against ダーク (defence 15) and コレット.
+- Hit chance is the attacker's hit % minus the target's evasion: monsters 90 to 95, heroes their weapon's hit (95).
+  アリア (hit 95) missed the slime 3 times in about 155 attacks.
+- Critical hits (`{0}の会心の一撃！`): 8 in about 155 of アリア's attacks with a weapon whose critical field is 10, so the
+  runtime uses half that field as the percentage (inferred). The damage number was hidden behind the slash effect;
+  the runtime ignores defence on a critical hit (inferred).
+- Skill damage: the golem's 落石ＬＶ01 (power 20) took 21 from コレット and missed ダーク twice. The runtime uses
+  (power + magic) × the factor − defence / 4 (one sample, inferred). Healing skills restore power + magic (inferred).
+- Escape: chosen by one member, it is tried at once and ends the party's turn whether or not it works; on a failure
+  the monsters still act. Against the golem (speed 40, party 15 and 16) all six tries failed. The runtime uses 50 % ×
+  party speed / monster speed, between 5 % and 100 % (inferred).
+- Defending (身を守っている) halves damage and a charge (力をためている) doubles the next attack (both inferred).
+- Monster actions: the table's entries are (`int32` 36, `int32` turn (0 every turn, 1 odd turns, 2 even turns,
+  inferred from Sacred's slimes), `int32` 0, `int32` weight, `int32` kind, skill GUID, `int32` 50). Each turn one
+  entry is drawn by weight. Kinds: 0 attack, 2 watch (`{0}は様子を見ている`: the slime has four attacks and one
+  watch at equal weight and watched 6 times in 33 turns), 3 skill, 4 charge, 6 run away (`{0}は逃げ出した！`). A skill
+  the monster has no MP for is not drawn. Targets are random among living members (inferred).
+- Rewards: the monsters' experience and money (the slime: 経験値 5, G 5, as the table says), each drop rolled at its
+  percentage. With one member the whole experience went to アリア; with more, the runtime gives each living member
+  the full amount (inferred, not seen).
+- Experience totals for each level, from アリア's status page and the battle in which her HP rose: level 2 26, level 3
+  84, level 4 between 182 and 186, level 5 350, level 6 600. The runtime uses these (184 for level 4) and
+  3.137 × L^2.928 + 3.29 above level 6, a fit that matches all five within 3.
+- A level-up raises HP and MP by the growth of their maximum (inferred); the guard's script heals after the practice
+  battle, so the PC's own rule was not seen.
+- Elements and states: a weapon's element scales damage by (100 − the target's resistance) %, negative resistance being
+  a weakness (inferred, not seen in these battles). States (poison, sleep, paralysis, confusion, charm) are not
+  applied yet.
+
