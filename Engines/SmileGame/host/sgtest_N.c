@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "sg.h"
 
@@ -130,12 +132,77 @@ static void test_encounter_groups(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static Member *member_named(SG *g, const char *name) {
+    Party *p = &g->b.party;
+    for (int i = 0; i < p->count; i++) {
+        const HeroDef *h = hero_def(&g->b.tables, p->members[i].hero);
+        if (h && strcmp(h->name, name) == 0) return &p->members[i];
+    }
+    return NULL;
+}
+
+static void test_mao_joins(const char *dir) {
+    char saves[64];
+    snprintf(saves, sizeof saves, "/tmp/sgtest-n-%d", (int)getpid());
+    mkdir(saves, 0700);
+    VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = saves, .audioRate = 44100};
+    char err[512];
+    SG *g = (SG *)vnsmilegame_open(&cfg, err, sizeof err);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP);
+    press(g, VK_OK);
+    run(g, 200);
+    interp_free(&g->interp);
+    const Tables *t = &g->b.tables;
+    for (int i = 0; i < t->heroCount; i++)
+        if (strcmp(t->heroes[i].name, "マオー") == 0) party_add_hero(g, t->heroes[i].id);
+    Member *m = member_named(g, "マオー");
+    CHECK(m != NULL);
+    if (m) {
+        CHECK(m->level == 12);
+        CHECK(member_max_hp(t, m) == 151);
+        CHECK(member_max_mp(t, m) == 162 && m->mp == 162);
+        CHECK(member_stat(t, m, STAT_POWER) == 88);
+        CHECK(member_stat(t, m, STAT_VITALITY) == 92);
+        CHECK(member_stat(t, m, STAT_SPEED) == 135);
+        static const char *learned[5] = {"ヒール", "レイズ", "ファイアーボール", "アイスランス", "アタックブースト"};
+        CHECK(m->learnedCount == 5);
+        for (int i = 0; i < 5 && i < m->learnedCount; i++) {
+            const SkillDef *sk = skill_def(t, m->learned[i]);
+            CHECK(sk && strcmp(sk->name, learned[i]) == 0);
+        }
+        CHECK(sg_save_write(g, 3));
+        size_t n;
+        char path[128];
+        snprintf(path, sizeof path, "%s/Save_03.sgs", saves);
+        u8 *d = sg_read_file(path, &n);
+        SaveData sd;
+        memset(&sd, 0, sizeof sd);
+        CHECK(d && save_parse(&sd, d, n));
+        for (int i = 0; d && i < sd.partyCount; i++)
+            if (guid_eq(sd.party[i].id, m->hero)) CHECK(sd.party[i].maxMp == 162 && sd.party[i].maxHp == 151);
+        save_free(&sd);
+        free(d);
+        CHECK(sg_save_read(g, 3));
+        m = member_named(g, "マオー");
+        CHECK(m && member_max_mp(t, m) == 162 && m->mp == 162);
+        remove(path);
+    }
+    rmdir(saves);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     test_exp_curve();
     const char *sacred = getenv("SG_SACRED");
     if (sacred) {
         test_pier_inn_keeps_facing(sacred);
         test_encounter_groups(sacred);
+        test_mao_joins(sacred);
     } else
         printf("SG_SACRED not set: Sacred checks skipped\n");
     printf("%d checks, %d failed\n", checks, failures);
