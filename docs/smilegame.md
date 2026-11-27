@@ -36,6 +36,23 @@ Both games use the same data format.
 - Sound: the title and map BGM and ambient sound, with the files' loop points, through `vnsmilegame_audio` as stereo
   floats at `audioRate`. Event commands and menus call the sound functions in `sg_E.h`.
 
+## Drawing the map
+
+`fielddraw.c` builds each map once into 8 by 8 cell chunks: terrain with stairs, slopes and sunken animated liquids,
+a border of the map's outside chip, and the map objects at rest. A frame culls chunks to the view, draws them front to
+back, then the characters, then blended surfaces back to front. The sun's shadows come from a depth map built once per
+map; 3D characters are added to it every frame. `r3d.c` rasterizes on up to six threads, each filling a band of rows
+in the order triangles were queued, so the image is the same as on one thread.
+
+`sg_D.h` is the camera interface event commands call: `sg_camera_get`, `sg_camera_to` (a pose and a time in ms),
+`sg_camera_reset` to the map's default, `sg_camera_moving`, and `sg_camera_command` for command 53's modes 0 and 3.
+`sg_actor_motion` plays a named motion on a 3D character.
+
+Frame times on a 14-core Linux VM, 960 by 544, six threads, measured with `sgview` over 300 to 1,200 frames while two
+PC games and a test ran beside it (load average about 10): walking Sacred's 150 by 150 field 9.7 ms average, 99th
+percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred's forest 11.0 ms (99th percentile
+17.6 ms) and its castle courtyard, 74,000 triangles in view, 22.2 ms. On one thread the same views take 12 to 38 ms.
+
 ## The Linux host
 
 `Engines/SmileGame/host` builds with CMake:
@@ -47,6 +64,10 @@ Both games use the same data format.
   read from the games' files.
 - `sgtest_B`: the data table tests against values from the PC's menus and the game files. `sgtest_B shots
   colette|sacred <game> <out>` writes every menu page as PNG for comparison with the PC.
+- `sgtest_D`: the renderer's tests: coverage, the map tail and cameras of both games, the throne room's projection
+  against the PC's pixels, and a skinned character's motions.
+- `sgview <game> <out.png> <map> <x> <z> <dir> [frames] [hero:name] [hold:vk,ms] [threads:n]`: draws a map at a cell
+  and prints frame times.
 
 ## Known limits
 
@@ -64,7 +85,10 @@ Both games use the same data format.
   files match there, and VNDegen keeps the title music.
 - Sound-effect and music-effect levels and the music effect pausing the BGM follow the BGM measurement and common
   practice; they were not measured on the PC.
-- Shadows and the sky are not drawn; skinned characters stand in their bind pose.
-- Stairs are drawn as plain columns, not as steps.
-- The camera is fixed at one angle and distance close to the player's default; events that move the camera are skipped.
+- Command 53's modes 1 and 2 (Colette's event rooms) are not mapped; mode 3's target point matches the PC's opening
+  scene only roughly.
+- Background value 1 (Sacred's field) draws black; the PC never shows it in play.
+- The PC darkens wall feet slightly more. Map objects with lights stay in their unlit motion until an event changes
+  them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
+- Sacred's castle courtyard takes about 22 ms a frame on that VM, over the 16.7 ms a 60 fps frame allows.
 - The message window's fill differs between the two games on the PC and is drawn the same in both.

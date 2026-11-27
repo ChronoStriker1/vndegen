@@ -2,69 +2,9 @@
 
 #include <math.h>
 
-static const float kTileTop = 48.0f;
-
 static int cell_height(const Map *m, int x, int z) {
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return 0;
     return m->height[(size_t)z * (size_t)m->w + (size_t)x];
-}
-
-static Image *chip_image(SG *g, Field *f, int index) {
-    if (index < 0 || index >= f->chipImageCount) return NULL;
-    if (!f->chipImages[index]) f->chipImages[index] = sg_image(g, map_chip_guid(&f->map, index));
-    return f->chipImages[index];
-}
-
-static void side_quad(Mesh *mesh, const Image *im, Vec3 a, Vec3 b, int unitFromTop, float shade) {
-    float th = (float)im->h;
-    float v0, v1;
-    if (th >= kTileTop * 3 && unitFromTop > 0) {
-        v0 = kTileTop * 2 / th;
-        v1 = kTileTop * 3 / th;
-    } else if (th >= kTileTop * 2) {
-        v0 = kTileTop / th;
-        v1 = kTileTop * 2 / th;
-    } else {
-        v0 = 0;
-        v1 = 1;
-    }
-    Vec3 c = {b.x, b.y - 1, b.z}, d = {a.x, a.y - 1, a.z};
-    mesh_quad(mesh, im, a, b, c, d, 0, v0, 1, v1, shade, false);
-}
-
-static void build_terrain(SG *g, Field *f) {
-    Map *m = &f->map;
-    int maxIndex = 0;
-    for (int i = 0; i < m->chipCount; i++)
-        if (m->chips[i].index > maxIndex) maxIndex = m->chips[i].index;
-    f->chipImageCount = maxIndex + 1;
-    f->chipImages = sg_alloc(sizeof(Image *) * (size_t)f->chipImageCount);
-    for (int z = 0; z < m->h; z++) {
-        for (int x = 0; x < m->w; x++) {
-            int h = cell_height(m, x, z);
-            Image *im = chip_image(g, f, m->chip[(size_t)z * (size_t)m->w + (size_t)x]);
-            if (!im || h <= 0) continue;
-            float fx = (float)x, fz = (float)z, fh = (float)h;
-            float topV = fminf(1.0f, kTileTop / (float)im->h);
-            mesh_quad(&f->terrain, im, (Vec3){fx, fh, fz}, (Vec3){fx + 1, fh, fz}, (Vec3){fx + 1, fh, fz + 1}, (Vec3){fx, fh, fz + 1}, 0,
-                      0, 1, topV, 1.0f, false);
-            static const int dx[4] = {0, 0, -1, 1}, dz[4] = {1, -1, 0, 0};
-            static const float shade[4] = {0.78f, 0.6f, 0.68f, 0.68f};
-            for (int s = 0; s < 4; s++) {
-                int nh = cell_height(m, x + dx[s], z + dz[s]);
-                if (nh >= h) continue;
-                for (int k = h; k > nh; k--) {
-                    float y = (float)k;
-                    Vec3 a, b;
-                    if (s == 0) a = (Vec3){fx, y, fz + 1}, b = (Vec3){fx + 1, y, fz + 1};
-                    else if (s == 1) a = (Vec3){fx + 1, y, fz}, b = (Vec3){fx, y, fz};
-                    else if (s == 2) a = (Vec3){fx, y, fz}, b = (Vec3){fx, y, fz + 1};
-                    else a = (Vec3){fx + 1, y, fz + 1}, b = (Vec3){fx + 1, y, fz};
-                    side_quad(&f->terrain, im, a, b, h - k, shade[s]);
-                }
-            }
-        }
-    }
 }
 
 static const Res *hero_graphic(SG *g) {
@@ -128,12 +68,6 @@ bool field_load(SG *g, Guid mapId, int x, int z, int dir) {
     }
     sg_log(g, "map %s %dx%d events %d objects %d chips %d", f->map.name, f->map.w, f->map.h, f->map.eventCount, f->map.objectCount,
            f->map.chipCount);
-    build_terrain(g, f);
-    f->objectModels = sg_alloc(sizeof(Model *) * (size_t)(f->map.objectCount ? f->map.objectCount : 1));
-    for (int i = 0; i < f->map.objectCount; i++) {
-        const Res *r = res_find(&g->res, f->map.objects[i].id);
-        if (r) f->objectModels[i] = model_load(g, r->path);
-    }
     f->events = sg_alloc(sizeof(EventDef) * (size_t)(f->map.eventCount ? f->map.eventCount : 1));
     f->npcs = sg_alloc(sizeof(Actor) * (size_t)(f->map.eventCount ? f->map.eventCount : 1));
     for (int i = 0; i < f->map.eventCount; i++) {
@@ -165,11 +99,8 @@ bool field_load(SG *g, Guid mapId, int x, int z, int dir) {
     f->player.moving = false;
     if (!f->player.graphic) actor_set_graphic(g, &f->player, hero_graphic(g));
     f->player.visible = true;
-    f->cam.pitch = 49.0f;
-    f->cam.yaw = 0.0f;
-    f->cam.fov = 30.0f;
-    f->cam.distance = 15.5f;
     f->loaded = true;
+    view_load(g);
     for (int i = 0; i < f->npcCount; i++) {
         const EventDef *e = &f->events[i];
         int sheet = event_sheet(g, e);
@@ -259,94 +190,5 @@ void field_update(SG *g, u32 ms) {
             p->y = (float)cell_height(&f->map, (int)p->x, (int)p->z);
         }
     }
-    f->cam.target = (Vec3){p->x, p->y, p->z - 1.0f};
-}
-
-static int sprite_row(int dir) {
-    switch (dir) {
-    case 0: return 0;
-    case 1: return 3;
-    case 3: return 2;
-    default: return 1;
-    }
-}
-
-static void draw_actor(SG *g, Field *f, const Actor *a) {
-    if (!a->visible) return;
-    if (a->model) {
-        Mesh *m = &a->model->mesh;
-        float ang = (float)a->dir * 1.5707963f;
-        float cs = cosf(ang), sn = sinf(ang);
-        for (int i = 0; i < m->count; i++) {
-            Tri t = m->tris[i];
-            for (int k = 0; k < 3; k++) {
-                float x = t.v[k].x, z = t.v[k].z;
-                t.v[k].x = a->x + x * cs - z * sn;
-                t.v[k].z = a->z + x * sn + z * cs;
-                t.v[k].y += a->y;
-            }
-            r3_tri(&g->r3, &f->cam, &t);
-        }
-        return;
-    }
-    const Image *im = a->sheet;
-    if (!im || !a->graphic) return;
-    int frames = a->graphic->frames > 0 ? a->graphic->frames : 1;
-    int rows = a->graphic->divisions == 1 ? 4 : 1;
-    int cw = im->w / frames, ch = im->h / rows;
-    int frame = 0;
-    if (a->graphic->frameMs > 0) frame = (int)(a->animMs / (u32)a->graphic->frameMs) % frames;
-    if (frames == 3 && rows == 4) {
-        static const int cycle[4] = {1, 0, 1, 2};
-        frame = a->moving ? cycle[(a->animMs / (u32)(a->graphic->frameMs > 0 ? a->graphic->frameMs / 2 : 125)) % 4] : 1;
-    }
-    int row = rows == 4 ? sprite_row(a->dir) : 0;
-    float w = (float)cw / kTileTop, h = (float)ch / kTileTop;
-    float p = f->cam.pitch * 3.14159265f / 180.0f;
-    float tall = h / cosf(p);
-    Vec3 base = {a->x, a->y, a->z};
-    Vec3 tl = {base.x - w / 2, base.y + tall, base.z};
-    Vec3 tr = {base.x + w / 2, base.y + tall, base.z};
-    Vec3 br = {base.x + w / 2, base.y, base.z};
-    Vec3 bl = {base.x - w / 2, base.y, base.z};
-    float u0 = (float)(frame * cw) / (float)im->w, u1 = (float)((frame + 1) * cw) / (float)im->w;
-    float v0 = (float)(row * ch) / (float)im->h, v1 = (float)((row + 1) * ch) / (float)im->h;
-    float inset = 0.5f / (float)im->w;
-    Vert va = {tl.x, tl.y, tl.z, u0 + inset, v0, 1}, vb = {tr.x, tr.y, tr.z, u1 - inset, v0, 1};
-    Vert vc = {br.x, br.y, br.z, u1 - inset, v1, 1}, vd = {bl.x, bl.y, bl.z, u0 + inset, v1, 1};
-    r3_tri(&g->r3, &f->cam, &(Tri){{va, vb, vc}, im, true, false});
-    r3_tri(&g->r3, &f->cam, &(Tri){{va, vc, vd}, im, true, false});
-}
-
-void field_draw(SG *g) {
-    Field *f = &g->field;
-    r3_begin(&g->r3, g->fb, 0xff000000u);
-    if (!f->loaded) return;
-    cam_update(&f->cam, g->w, g->h);
-    for (int k = 0; k < 3; k++) g->r3.tint[k] = f->map.colors[1 + k] * 384 / 255;
-    for (int i = 0; i < f->terrain.count; i++) r3_tri(&g->r3, &f->cam, &f->terrain.tris[i]);
-    for (int i = 0; i < f->map.objectCount; i++) {
-        Model *m = f->objectModels[i];
-        if (!m) continue;
-        const MapObject *o = &f->map.objects[i];
-        float ang = (float)o->dir * 1.5707963f;
-        float cs = cosf(ang), sn = sinf(ang);
-        float bx = (float)o->x + 0.5f, bz = (float)o->z + 0.5f, by = (float)cell_height(&f->map, o->x, o->z);
-        for (int k = 0; k < m->mesh.count; k++) {
-            Tri t = m->mesh.tris[k];
-            for (int c = 0; c < 3; c++) {
-                float x = t.v[c].x, z = t.v[c].z;
-                t.v[c].x = bx + x * cs - z * sn;
-                t.v[c].z = bz + x * sn + z * cs;
-                t.v[c].y += by;
-            }
-            r3_tri(&g->r3, &f->cam, &t);
-        }
-    }
-    for (int i = 0; i < f->npcCount; i++)
-        if (f->npcs[i].model) draw_actor(g, f, &f->npcs[i]);
-    g->r3.tint[0] = g->r3.tint[1] = g->r3.tint[2] = 256;
-    for (int i = 0; i < f->npcCount; i++)
-        if (!f->npcs[i].model) draw_actor(g, f, &f->npcs[i]);
-    draw_actor(g, f, &f->player);
+    view_follow(g, p->x, p->y, p->z, ms);
 }
