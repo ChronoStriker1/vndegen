@@ -24,6 +24,7 @@ enable_testing()
 add_executable(sgtest sgtest.c)
 target_link_libraries(sgtest PRIVATE smilegame)
 add_test(NAME formats COMMAND sgtest)
+include(sgtest_A.cmake)
 
 find_package(SDL2 CONFIG)
 if(SDL2_FOUND)

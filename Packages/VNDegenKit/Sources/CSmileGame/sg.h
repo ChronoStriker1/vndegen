@@ -378,6 +378,8 @@ void field_free(Field *f);
 void field_update(SG *g, u32 ms);
 void field_draw(SG *g);
 
+#include "sg_A.h"
+
 typedef struct Interp {
     Script script;
     bool active;
@@ -389,6 +391,7 @@ typedef struct Interp {
     const char *scrollText;
     float scroll;
     u32 shownMs;
+    SgaState a;
 } Interp;
 
 void interp_start(SG *g, const Script *s);

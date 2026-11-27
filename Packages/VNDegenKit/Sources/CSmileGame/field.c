@@ -207,10 +207,10 @@ void field_free(Field *f) {
     f->player = player;
 }
 
-static bool walkable(Field *f, int fromX, int fromZ, int x, int z) {
+static bool walkable(SG *g, Field *f, int fromX, int fromZ, int x, int z) {
     Map *m = &f->map;
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
-    int h0 = cell_height(m, fromX, fromZ), h1 = cell_height(m, x, z);
+    int h0 = sga_floor(g, fromX, fromZ), h1 = sga_floor(g, x, z);
     if (h1 != h0) {
         bool stair = false;
         for (int i = 0; i < m->stairCount; i++)
@@ -237,7 +237,7 @@ void field_update(SG *g, u32 ms) {
             if (dx || dz) {
                 p->dir = dir;
                 int cx = (int)p->x, cz = (int)p->z;
-                if (walkable(f, cx, cz, cx + dx, cz + dz)) {
+                if (walkable(g, f, cx, cz, cx + dx, cz + dz)) {
                     p->tx = (float)(cx + dx) + 0.5f;
                     p->tz = (float)(cz + dz) + 0.5f;
                     p->moving = true;
@@ -256,7 +256,7 @@ void field_update(SG *g, u32 ms) {
                 p->x += ddx / d * speed;
                 p->z += ddz / d * speed;
             }
-            p->y = (float)cell_height(&f->map, (int)p->x, (int)p->z);
+            p->y = (float)sga_floor(g, (int)p->x, (int)p->z);
         }
     }
     f->cam.target = (Vec3){p->x, p->y, p->z - 1.0f};
