@@ -805,6 +805,16 @@ static void apply_plan(Battle *b, const Plan *p) {
 
 static void finish(Battle *b, int result);
 
+static void learn_levels(const HeroDef *h, Member *m, int from, int to) {
+    if (!h) return;
+    for (int i = 0; i < h->skillCount; i++) {
+        if (h->skills[i].level <= from || h->skills[i].level > to) continue;
+        bool dup = false;
+        for (int k = 0; k < m->learnedCount && !dup; k++) dup = guid_eq(m->learned[k], h->skills[i].skill);
+        if (!dup && m->learnedCount < 16) m->learned[m->learnedCount++] = h->skills[i].skill;
+    }
+}
+
 static void grant_rewards(Battle *b) {
     SG *g = b->g;
     Tables *t = TB(g);
@@ -835,8 +845,9 @@ static void grant_rewards(Battle *b) {
             level++;
             up = true;
         }
-        if (up) member_set_level(t, m, level);
         if (up) {
+            learn_levels(hero_def(t, m->hero), m, m->level, level);
+            member_set_level(t, m, level);
             f->maxHp = member_max_hp(t, m);
             f->maxMp = member_max_mp(t, m);
             snprintf(line, sizeof line, "%s %s %d", f->name, btext(g, 18, "レベルアップ！"), m->level);
@@ -973,6 +984,12 @@ static void build_list(Battle *b) {
             if (h->skills[i].level > m->level) continue;
             const SkillDef *s = skill_def(TB(g), h->skills[i].skill);
             if (s && s->battleUse) b->list[b->listCount++] = s;
+        }
+        for (int i = 0; i < m->learnedCount && b->listCount < MAX_LIST; i++) {
+            const SkillDef *s = skill_def(TB(g), m->learned[i]);
+            bool dup = false;
+            for (int k = 0; k < b->listCount && !dup; k++) dup = b->list[k] == s;
+            if (s && s->battleUse && !dup) b->list[b->listCount++] = s;
         }
     } else {
         Party *p = PT(g);
