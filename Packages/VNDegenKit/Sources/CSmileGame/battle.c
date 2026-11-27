@@ -827,6 +827,16 @@ static void learn_levels(const HeroDef *h, Member *m, int from, int to) {
     }
 }
 
+void sg_give_exp(SG *g, Member *m, int amount) {
+    Tables *t = TB(g);
+    m->exp += amount;
+    int level = m->level;
+    while (level < 99 && m->exp >= battle_exp_for_level(level + 1)) level++;
+    if (level == m->level) return;
+    learn_levels(hero_def(t, m->hero), m, m->level, level);
+    member_set_level(t, m, level);
+}
+
 static void grant_rewards(Battle *b) {
     SG *g = b->g;
     Tables *t = TB(g);
