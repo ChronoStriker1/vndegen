@@ -1223,7 +1223,8 @@ static void setup_stage(Battle *b) {
         g->interp.active = interpWasActive;
         for (int i = 0; i < g->field.npcCount; i++) g->field.npcs[i].visible = false;
         View *v = g->r3.view;
-        if (loaded && v && v->look.sky != 0) {
+        if (loaded && v && v->look.sky == 0 && !v->border) v->look.sky = 2;
+        else if (loaded && v && v->look.sky != 0) {
             static const char *parts[3] = {"Sky noon - 01", "Cloud noon - 01", "Sun noon - 01"};
             v->look.sky = 0;
             for (int i = 0; i < 3; i++)

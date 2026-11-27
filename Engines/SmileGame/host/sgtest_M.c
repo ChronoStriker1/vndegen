@@ -158,6 +158,35 @@ static void test_chest_stays_open(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static bool start_event_battle(SG *g, const char *eventName) {
+    int ev = event_named(g, eventName);
+    if (ev < 0) return false;
+    const EventDef *e = &g->field.events[ev];
+    bool ok = false;
+    for (int sh = 0; sh < e->sheetCount && !ok; sh++) {
+        const SgrRec *sr = game_record(&g->data, SGR_EVENT, 16, e->sheets[sh].script, NULL);
+        Script sc;
+        BattleSetup setup = {0};
+        if (!sr || !script_parse(&sc, sr)) continue;
+        for (int k = 0; k < sc.count && !ok; k++)
+            if (sc.cmds[k].type == 65) ok = battle_setup_cmd(&setup, &sc.cmds[k]);
+        script_free(&sc);
+        if (ok) sg_battle_start(g, &setup);
+    }
+    for (int t = 0; ok && t < 15000 && strcmp(battle_phase(g), "command") != 0; t += 16) vnsmilegame_frame((VNSmileGame *)g, 16);
+    return ok;
+}
+
+static void test_hall_battle_backdrop(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    warp(g, "幽玄の塔集会場", 16, 7, 0);
+    CHECK(start_event_battle(g, "静止-話す_3"));
+    CHECK(strcmp(battle_phase(g), "command") == 0);
+    CHECK((g->fb[20 * g->w + 900] & 0xffffff) == 0);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 static void test_four_heroes(const char *dir) {
     SG *g = new_game(dir);
     if (!g) return;
@@ -268,6 +297,7 @@ int main(void) {
         test_chest_stays_open(colette);
         test_four_heroes(colette);
         test_noon_sky_edge(colette);
+        test_hall_battle_backdrop(colette);
         test_ending_sprites(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
