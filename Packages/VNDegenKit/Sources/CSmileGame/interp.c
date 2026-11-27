@@ -243,7 +243,8 @@ static bool eval_branch(SG *g, const Cmd *c) {
     }
     case CMD_IF_ITEM: {
         i32 have = sga_item_count(g, cmd_guid(c, 0));
-        return cmd_int(c, 3) == 1 ? have >= cmd_int(c, 1) : have == cmd_int(c, 1);
+        bool holds = cmd_int(c, 3) == 1 ? have >= cmd_int(c, 1) : have == cmd_int(c, 1);
+        return cmd_int(c, 2) == 1 ? !holds : holds;
     }
     case CMD_IF_PARTY: return sga_in_party(g, cmd_guid(c, 0)) == (cmd_int(c, 1) == 0);
     default: return false;
