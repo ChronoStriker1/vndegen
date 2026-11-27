@@ -210,6 +210,14 @@ int sga_floor(SG *g, int x, int z) {
     return m->height[(size_t)z * (size_t)m->w + (size_t)x];
 }
 
+float sg_save_height(SG *g, int x, int z, float y) {
+    const Map *m = &g->field.map;
+    if (x < 0 || z < 0 || x >= m->w || z >= m->h) return y;
+    View *v = sg_view(g);
+    int kind = v->slopeDir ? v->slopeDir[(size_t)z * (size_t)m->w + (size_t)x] : -1;
+    return kind >= 0 && kind <= 3 && lroundf(y) == m->height[(size_t)z * (size_t)m->w + (size_t)x] ? y + 0.6f : y;
+}
+
 void sga_map_loaded(SG *g) {
     SgaState *a = &g->interp.a;
     Field *f = &g->field;

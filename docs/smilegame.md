@@ -33,8 +33,21 @@ on the PC.
   problems. Battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
   the PC's. Known limits below lists the rest.
 
-Sacred (セイクリッド～砕かれた光の冠～) is recognised and starts, and plays through its castle and first dungeon, but
-it isn't part of this release.
+## Sacred
+
+VNDegen plays Sacred (セイクリッド～砕かれた光の冠～) on Mac, iPhone and iPad from the title through its opening
+and its first dungeon: the dream and the forest, the castle with the king and the queen, the guard's practice
+battle, the castle town and its weapon shop, the ride to 王家の洞窟, the fairy's scene there, the golem fight where
+アリア rejoins, the stone bridge to the crown, the second cave with its floor switch and iron door, the Vord forest
+and its scene, and out onto the world map. It was played that far in VNDegen, by play, beside the PC under Wine. The
+game is in Japanese, as on the PC.
+
+- **Saves** work as for Colette: the PC's own `savedata` files, both ways. A save made in the royal cave loads in the
+  PC with the same place, party, items, money and levels, and the PC's save from there loads in VNDegen.
+- **Controls** are the same as Colette's.
+- **What isn't there yet:** the world map past the first forest, the port town, the later dungeons and the ending
+  haven't been played in VNDegen. The first inn is in a later town, so Sacred's inn wasn't seen; the cave's bed heals
+  the party as on the PC. Known limits below lists the rest.
 
 ## Test games
 
@@ -62,9 +75,8 @@ Both games use the same data format.
   party, learned skills, the encounter switch, moving, turning and placing the player and events, event graphics,
   moving to another map, stopping a sound effect (76), Colette's floor names in a band across the screen, and the
   eye-level camera of its event rooms (command 53's mode 1 and maps whose camera record has kind 1). Colette plays
-  from the title to the staff roll (the story variables at 19 and 17), and Sacred from the title
-  through the castle, the town's weapon shop and the forest into its first dungeon, the royal cave, and through the
-  fairy's scene there.
+  from the title to the staff roll (the story variables at 19 and 17), and Sacred from the title through the castle,
+  the town's weapon shop, the royal cave and its second floor to the Vord forest and the world map.
 - Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
   and windows. One party state (`Party` in `sg_B.h`, `g->b.party`) holds the heroes with their stats, the reserve,
   items, obtained items, money, hero looks and play time; event commands change it, the menu shows it, and saves write
@@ -157,6 +169,23 @@ iPad has the Mac mini's cores and uploads a 2 MB texture in well under a millise
 A-series iPhones and iPads are slower per core and were not measured. A Metal path isn't needed for these scenes;
 it would take moving `r3d.c`'s triangle setup and raster stage to a Metal render pass fed from the same chunk lists,
 with the shadow map as a depth texture, and keeping the software path for Linux.
+
+Sacred's first release, a DEBUG build of this round's branch (K) on the Mac mini, 2026-11-27, from runner saves at
+the courtyard (Map_007 25,40), the town square (Map_003 19,35) and the Vord forest entrance (Map_016 7,11), the
+player idle. Mac app: no other build, load 3 to 6. iPad simulator with the touch gamepad hidden: another thread's
+build ran beside it (load 16 to 24); iPhone simulator: load 54 to 86. The 1% lows under 30 fall in windows where the
+load rose. Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator | iPhone 18 Pro simulator |
+|---|---|---|---|
+| Castle courtyard | 60.0, 59.9 to 60.0, 7.3 to 7.4 ms | 58.6 to 60.0, 18.2 to 60.0, 4.8 to 5.2 ms | 59.4 to 60.0, 27.0 to 60.0, 6.7 to 7.1 ms |
+| Town square | 60.0, 59.9 to 60.0, 7.3 to 7.4 ms | 57.6 to 60.0, 11.1 to 60.0, 5.1 to 7.2 ms | not measured |
+| Vord forest | 60.0, 59.9 to 60.0, 6.9 to 7.1 ms | 60.0, 60.0, 3.9 to 4.7 ms | 56.2 to 60.0, 10.3 to 60.0, 3.9 to 5.5 ms |
+| Practice battle | 60.0, 59.9 to 60.0, 7.0 to 7.4 ms | not measured (gamepad shown, below) | not measured |
+
+With the touch gamepad shown, the iPad simulator ran the practice battle at 41.1 to 48.2 frames a second with the
+runtime at 4.6 to 5.0 ms, the gamepad compositing cost described below. The software path holds the courtyard, the
+heaviest Sacred scene, at 60 on all three, so no Metal path is needed for it.
 
 Colette past the first area, a DEBUG build of this round's branch on the Mac mini, 2026-11-27, measured the same way
 from runner saves (another delegate's build ran beside some of it; load averages are given). Target 60.
@@ -251,7 +280,7 @@ were taken with the gamepad shown.
   choice of direction when a chaser is blocked, and whether events walk during menus, were not pinned down.
 - Commands 55 (experience), 58, 68 and 77 are logged and skipped, and 56's message for forgetting a skill is not done;
   Colette uses none of them, and Sacred only in its debug and CG rooms and its ending. Command 76 stops a sound effect.
-- The inn was compared with the PC in Colette's town; the shop was, in Sacred's weapon shop. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
+- The inn was compared with the PC in Colette's town; the shop was, in Sacred's weapon shop, with its quantity box. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
   these games' menus. Where a slot's page shows a second to fourth hero is a guess (two columns); both games have one
   hero there.
 - A few item, skill and monster fields are inferred (see `docs/smilegame-cleanroom.md`).
@@ -269,8 +298,14 @@ were taken with the gamepad shown.
 - The poison balloon shows over the player all the time; the PC shows it only now and then.
 - The PC darkens wall feet slightly more. Map objects with lights stay in their unlit motion until an event changes
   them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
-- Sacred's castle courtyard averages about 13 ms a frame on that VM, but its 99th percentile (about 19 ms) is over the
-  16.7 ms a 60 fps frame allows while other work runs; the rest needs the Metal path or a parallel transform stage.
+- Sacred's castle courtyard averages about 13 ms a frame on the Linux VM, with its 99th percentile (about 19 ms) over
+  16.7 ms while other work runs; in the app on Apple silicon it holds 60 (above).
+- Sacred past the Vord forest hasn't been played: the world map, the port town サンプール and its inn, the later
+  dungeons and the ending may show problems. A random encounter in Sacred's caves always brings one monster; the PC
+  sometimes brings more. The four-golem fight where アリア rejoins was won at level 4 on the PC and in
+  VNDegen; at level 1 VNDegen loses it, and the PC's odds at that level weren't measured.
+- A ramp or stair cell's character height is kept as a whole level in play and written 0.6 higher in a save, as the
+  PC writes it; the PC's height while walking up a ramp wasn't compared frame by frame.
 - The game's own button guide in its menu shows Xbox B (red) deciding and A (green) cancelling; VNDegen's RPG Maker
   layout has A confirm and B cancel, as in the other RPG engines.
 - Holding a finger on the map opens the menu without the PC's quirk of then choosing the first menu item when the

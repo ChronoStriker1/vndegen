@@ -318,7 +318,7 @@ static float surf_height(Build *b, int x, int z) {
 static void build_cell(Build *b, int x, int z) {
     Map *m = &b->f->map;
     View *v = b->v;
-    if (!v->border && (x < 0 || z < 0 || x >= m->w || z >= m->h)) return;
+    if ((!v->border || !v->look.sun) && (x < 0 || z < 0 || x >= m->w || z >= m->h)) return;
     int slot = chip_slot(b->f, x, z);
     Image *im = chip_image(b, slot);
     if (!im) return;
@@ -440,15 +440,21 @@ static void light_setup(SG *g, View *v, float sun[3]) {
     sun[0] = cosf(p) * cosf(y);
     sun[1] = sinf(p);
     sun[2] = cosf(p) * sinf(y);
-    float a[3], s[3];
+    float a[3], s[3], ma[3], ms[3];
     for (int i = 0; i < 3; i++) {
         float key = (float)m->colors[1 + i] / 255.0f, fill = (float)m->colors[5 + i] / 255.0f;
         float col = l->sun ? (float)l->sunColor[i] / 255.0f : 0.0f;
         a[i] = fill * kFillK;
         s[i] = key * col * kKeyK;
-        if (!l->sun) a[i] = fill * kFillK + key * kKeyK;
+        ma[i] = fill;
+        ms[i] = key * col;
+        if (!l->sun) {
+            a[i] = fill * kFillK + key * kKeyK;
+            ma[i] = fill + key;
+        }
     }
     r3_light(&g->r3, a, s, sun);
+    sg_r3_light_models(&g->r3, ma, ms);
 }
 
 static bool game_camera(SG *g, float out[8]) {
@@ -997,7 +1003,7 @@ void field_draw(SG *g) {
     pose_to_cam(&v->pose, &f->cam, g->w, g->h);
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
     for (int k = 0; k < 3; k++) g->r3.tint[k] = 256;
-    if (v->look.sky == 0 && !(v->look.hasCamera && v->look.cameraKind == 1) && (v->border || v->look.sun)) draw_sky(g, v);
+    if (v->look.sky == 0 && v->look.sun && !(v->look.hasCamera && v->look.cameraKind == 1)) draw_sky(g, v);
     if (g->r3.x->shadow.base) {
         r3_shadow_restore(&g->r3);
         for (int i = 0; i < f->npcCount; i++)

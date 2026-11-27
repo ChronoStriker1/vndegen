@@ -169,6 +169,17 @@ static void cmd_transfer(SG *g, const Cmd *c) {
     g->pendingZ = cmd_int(c, 2);
     int code = cmd_int(c, 3);
     g->pendingDir = code == 0 ? g->field.player.dir : code == 1 ? 0 : code == 2 ? 2 : code == 3 ? 3 : 1;
+    a->playerMoveLeft = 0;
+    if (guid_zero(map) && g->field.loaded) {
+        Actor *p = &g->field.player;
+        p->x = p->tx = (float)g->pendingX + 0.5f;
+        p->z = p->tz = (float)g->pendingZ + 0.5f;
+        p->y = (float)sg_floor_level(g, g->pendingX, g->pendingZ, (int)lroundf(p->y));
+        p->dir = g->pendingDir;
+        p->moving = false;
+        sg_log(g, "transfer within the map %d,%d dir code %d", g->pendingX, g->pendingZ, code);
+        return;
+    }
     g->pendingTransfer = true;
     a->mapPending = true;
     a->playerMoveLeft = 0;
@@ -330,7 +341,10 @@ void sga_frame(SG *g, u32 ms) {
     if (f->loaded && (a->mapPending || !guid_eq(a->mapId, f->map.id)) && !g->pendingTransfer) {
         bool fromScript = a->mapPending, sameMap = guid_eq(a->mapId, f->map.id);
         sga_map_loaded(g);
-        if (fromScript && !sameMap) a->eventIndex = -1;
+        if (fromScript && !sameMap) {
+            a->eventIndex = -1;
+            memset(a->pics, 0, sizeof a->pics);
+        }
     }
     if (a->dirty) sga_refresh_events(g);
     if (a->fadeTotal) {

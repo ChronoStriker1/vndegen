@@ -75,6 +75,7 @@ typedef struct R3x {
     ShadowMap shadow;
     bool shadowOn;
     float amb[3], sun[3];
+    float modelAmb[3], modelSun[3];
     float sunDir[3];
     float animU;
     int threads;

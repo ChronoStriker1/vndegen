@@ -170,6 +170,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Fixes from the third survey's test games: Princess and Conquest's movies, Wolf RPG Editor 3.3x saves (0.60.21).
 - Smile Game Builder, on a clean-room runtime of VNDegen's own: Princess Colette's Great Adventure from the title to its world map and battles, with saves both ways with the PC (0.61.0).
 - Princess Colette's Great Adventure through about the first half of its story, to the sewer's gargoyle (0.61.1).
+- Sacred on Smile Game Builder, from the title through its first dungeon and the Vord forest to the world map, with saves both ways with the PC (0.61.2).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -181,7 +182,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- Smile Game Builder, on a clean-room runtime of VNDegen's own, on branch `feat/smilegame`: Princess Colette's Great Adventure shipped its opening path in 0.61.0 and about the first half of its story in 0.61.1; next are its second half and Sacred. The maintainer left the choice of the next item to the coordinator on 2026-11-26, for visual novels and RPGs only; Smile Game Builder is the last such engine with library games VNDegen doesn't run. It is built in rounds of parallel delegates, as SystemAoi was.
+- Smile Game Builder, on a clean-room runtime of VNDegen's own, on branch `feat/smilegame`: Princess Colette's Great Adventure shipped its opening path in 0.61.0 and about the first half of its story in 0.61.1, and Sacred through its first dungeon in 0.61.2; next are Colette's second half and the rest of Sacred. The maintainer left the choice of the next item to the coordinator on 2026-11-26, for visual novels and RPGs only; Smile Game Builder is the last such engine with library games VNDegen doesn't run. It is built in rounds of parallel delegates, as SystemAoi was.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses

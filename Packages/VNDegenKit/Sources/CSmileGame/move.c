@@ -50,12 +50,25 @@ bool sgi_cell_free(SG *g, int fromX, int fromZ, int x, int z, int self) {
     const Map *m = &f->map;
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
     const Actor *me = self >= 0 && self < f->npcCount ? &f->npcs[self] : &f->player;
-    int h0 = sg_floor_level(g, fromX, fromZ, (int)lroundf(me->y)), h1 = sg_floor_level(g, x, z, h0);
+    int h0 = sg_floor_level(g, fromX, fromZ, (int)lroundf(me->y));
+    return sg_step_free(g, fromX, fromZ, h0, x, z, self);
+}
+
+bool sg_step_free(SG *g, int fromX, int fromZ, int h0, int x, int z, int self) {
+    Field *f = &g->field;
+    const Map *m = &f->map;
+    if (x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
+    int h1 = sg_floor_level(g, x, z, h0);
     if (h0 != h1 && (abs(h1 - h0) > 1 || !(on_stairs(m, x, z) || on_stairs(m, fromX, fromZ)))) return false;
     if (across_ramp(m, fromX, fromZ, x, z)) return false;
     if (self >= 0 && occupies(&f->player, x, z)) return false;
-    for (int i = 0; i < f->npcCount; i++)
-        if (i != self && f->npcs[i].visible && occupies(&f->npcs[i], x, z)) return false;
+    const SgaState *st = &g->interp.a;
+    bool sheets = st->evCount == f->npcCount && guid_eq(st->mapId, m->id);
+    for (int i = 0; i < f->npcCount; i++) {
+        if (i == self || !f->npcs[i].visible || !occupies(&f->npcs[i], x, z)) continue;
+        if (sheets && st->ev[i].sheet >= 0 && !st->ev[i].sheets[st->ev[i].sheet].solid) continue;
+        return false;
+    }
     return true;
 }
 

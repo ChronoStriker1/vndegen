@@ -224,7 +224,7 @@ Model *model_load(SG *g, const char *path) {
             } else if (node->materials.count) {
                 mat = node->materials.data[0];
             }
-            Tri base = {.alphaTest = true};
+            Tri base = {.alphaTest = true, .model = 1};
             for (size_t k = 0; k < nm && mat; k++)
                 if (scene->materials.data[k] == mat) {
                     base.tex = m->textures[k];
