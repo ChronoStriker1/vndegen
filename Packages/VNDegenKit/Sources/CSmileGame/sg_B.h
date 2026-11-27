@@ -344,6 +344,7 @@ void sgb_close(SG *g);
 bool menu_frame(SG *g, u32 ms);
 bool menu_active(SG *g);
 void menu_open(SG *g);
+void menu_close(SG *g);
 void shop_open(SG *g, const Guid *items, const i32 *prices, int count);
 bool sgb_quit(SG *g);
 bool menu_result(SG *g);

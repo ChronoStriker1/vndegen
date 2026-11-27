@@ -707,6 +707,8 @@ bool sg_save_read(SG *g, int slot) {
     }
     sg_log(g, "load slot %d %s", slot, path);
     free(path);
+    battle_abort(g);
+    menu_close(g);
     interp_free(&g->interp);
     memset(&g->interp, 0, sizeof g->interp);
     memcpy(g->switches, s.switches, SAVE_SWITCHES);

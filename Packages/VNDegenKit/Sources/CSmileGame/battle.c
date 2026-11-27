@@ -1327,6 +1327,15 @@ const char *battle_bar(SG *g) {
     return b ? shown_bar(b) : "";
 }
 
+void battle_abort(SG *g) {
+    Battle *b = get(g);
+    if (!b || b->phase == PH_DONE) return;
+    restore_field(b);
+    snd_bgm_release(g, false);
+    set_phase(b, PH_DONE);
+    sg_log(g, "battle: abandoned");
+}
+
 void battle_close(SG *g) {
     free_battle(g);
     int s = slot_of(g, false);

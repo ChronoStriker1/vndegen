@@ -75,6 +75,7 @@ bool sg_battle_active(SG *g);
 int sg_battle_result(SG *g);
 bool battle_frame(SG *g, u32 ms);
 void battle_close(SG *g);
+void battle_abort(SG *g);
 void battle_seed(SG *g, u32 seed);
 const char *battle_phase(SG *g);
 int battle_monster_hp(SG *g, int index);

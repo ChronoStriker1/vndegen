@@ -1418,6 +1418,14 @@ void inn_open(SG *g, int price) {
     begin(g, m, MENU_INN, P_INN);
 }
 
+void menu_close(SG *g) {
+    Menu *m = g->b.menu;
+    if (!m || m->mode == MENU_CLOSED) return;
+    m->mode = MENU_CLOSED;
+    m->closing = false;
+    sg_log(g, "menu: closed for a load");
+}
+
 bool menu_active(SG *g) {
     SgB *b = sgb(g);
     return b && b->menu && b->menu->mode != MENU_CLOSED;
