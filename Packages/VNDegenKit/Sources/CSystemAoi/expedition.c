@@ -83,6 +83,8 @@ enum {
     F_MAP = 5,
     F_SET = 6,
     F_NO_AMBIENT = 7,
+    F_AREA_PART = 2,
+    F_SHARED_WALL_KEY = 7,
     F_FOG = 10,
     F_BACKDROP = 8,
     PLACE_BASE = 41,
@@ -758,6 +760,9 @@ static bool load_floor(SA *s, int dungeon, int floor, bool autosave) {
     u32 fog = (u32)sa_table_int(&e->floors, r, F_FOG);
     s->dungeon.r3.fogColor = (fog >> 16 & 0xff) | (fog & 0xff00) | (fog & 0xff) << 16;
     s->dungeon.ambient = (sa_table_int(&e->floors, r, F_NO_AMBIENT) ? DIRECT_AMBIENT : ALL_AMBIENT) / 255.0f;
+    s->dungeon.wallSeed = (u32)(sa_table_int(&e->floors, r, F_DUNGEON) & 255) << 16 | (u32)(sa_table_int(&e->floors, r, F_FLOOR) & 255) << 8 |
+                          (u32)(sa_table_int(&e->floors, r, F_AREA_PART) & 255);
+    s->dungeon.wallSharedKey = sa_table_int(&e->floors, r, F_SHARED_WALL_KEY) != 0;
     if (e->explored && dungeon < EXP_DUNGEONS && floor < EXP_FLOORS) {
         s->dungeon.visited = e->explored[dungeon][floor];
         s->dungeon.passage = e->passages[dungeon][floor];

@@ -1,0 +1,260 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include "sg.h"
+
+static int failures, checks;
+
+#define CHECK(cond)                                                                                                    \
+    do {                                                                                                               \
+        checks++;                                                                                                      \
+        if (!(cond)) {                                                                                                 \
+            failures++;                                                                                                \
+            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond);                                                 \
+        }                                                                                                              \
+    } while (0)
+
+enum { VK_UP = 0x26, VK_OK = 0x0d };
+
+static SG *open_game(const char *dir) {
+    VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = "/nonexistent-sgtest-n", .audioRate = 44100};
+    char err[512];
+    SG *g = (SG *)vnsmilegame_open(&cfg, err, sizeof err);
+    if (!g) fprintf(stderr, "open %s: %s\n", dir, err);
+    return g;
+}
+
+static void run(SG *g, int ms) {
+    for (int t = 0; t < ms; t += 16) vnsmilegame_frame((VNSmileGame *)g, 16);
+}
+
+static void press(SG *g, int vk) {
+    vnsmilegame_key((VNSmileGame *)g, vk, true);
+    run(g, 48);
+    vnsmilegame_key((VNSmileGame *)g, vk, false);
+    run(g, 48);
+}
+
+static SG *new_game(const char *dir) {
+    SG *g = open_game(dir);
+    if (!g) return NULL;
+    run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP);
+    press(g, VK_OK);
+    run(g, 200);
+    interp_free(&g->interp);
+    return g;
+}
+
+static bool showing(SG *g, const char *text) {
+    Interp *ip = &g->interp;
+    return ip->active && ip->state == 1 && ip->page < ip->pageCount && strstr(ip->pages[ip->page], text);
+}
+
+static void test_exp_curve(void) {
+    static const struct { int level, exp; } pc[] = {
+        {2, 26}, {3, 84}, {4, 186}, {5, 350}, {6, 600}, {7, 966}, {8, 1484}, {9, 2196}, {10, 3150}, {11, 4400},
+        {12, 6006}, {30, 200100}, {40, 627900}, {50, 1531250}, {51, 1651250}, {55, 2131250}, {60, 2731250},
+        {70, 3931250}, {80, 5131250}, {90, 6331250}, {99, 7411250},
+    };
+    CHECK(battle_exp_for_level(1) == 0);
+    for (size_t i = 0; i < sizeof pc / sizeof pc[0]; i++) {
+        if (battle_exp_for_level(pc[i].level) != pc[i].exp)
+            fprintf(stderr, "level %d: %d, PC %d\n", pc[i].level, battle_exp_for_level(pc[i].level), pc[i].exp);
+        CHECK(battle_exp_for_level(pc[i].level) == pc[i].exp);
+    }
+}
+
+static void test_pier_inn_keeps_facing(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    Party *p = &g->b.party;
+    p->money = 80;
+    p->members[0].hp = 1;
+    sg_debug_warp((VNSmileGame *)g, "桟橋", 6, 16, 0);
+    run(g, 1500);
+    for (int i = 0; i < 10 && g->interp.active; i++) press(g, VK_OK), run(g, 300);
+    CHECK(g->field.player.dir == 0);
+    press(g, VK_OK);
+    for (int i = 0; i < 20 && !menu_active(g); i++) press(g, VK_OK), run(g, 200);
+    run(g, 300);
+    CHECK(menu_page(g) && strcmp(menu_page(g), "inn") == 0);
+    press(g, VK_OK);
+    CHECK(p->money == 30);
+    run(g, 12000);
+    CHECK(!menu_active(g));
+    run(g, 300);
+    CHECK(showing(g, "おはようございます"));
+    CHECK(p->members[0].hp == member_max_hp(&g->b.tables, &p->members[0]));
+    CHECK(g->field.player.dir == 0);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static int group_sizes(SG *g, const char *name, int *seen) {
+    const Tables *t = &g->b.tables;
+    BattleEnc e;
+    memset(&e, 0, sizeof e);
+    for (int i = 0; i < t->monsterCount; i++)
+        if (strcmp(t->monsters[i].name, name) == 0) e.info.entries[0].monster = t->monsters[i].id;
+    e.info.entries[0].a = e.info.entries[0].b = 1;
+    e.info.count = 1;
+    e.info.rate = 40;
+    int most = 0;
+    for (int k = 0; k < 400; k++) {
+        BattleSetup s;
+        battle_encounter_setup(g, &e, &s);
+        if (s.count > most) most = s.count;
+        if (s.count >= 1 && s.count <= 8) seen[s.count]++;
+    }
+    return most;
+}
+
+static void test_encounter_groups(const char *dir) {
+    SG *g = open_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    int seen[9] = {0};
+    CHECK(group_sizes(g, "ベスライミー", seen) == 5);
+    for (int n = 1; n <= 5; n++) CHECK(seen[n] > 0);
+    memset(seen, 0, sizeof seen);
+    CHECK(group_sizes(g, "スライミー", seen) == 2);
+    CHECK(seen[1] > 0 && seen[2] > 0);
+    memset(seen, 0, sizeof seen);
+    CHECK(group_sizes(g, "ミニゴーレム", seen) == 1);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static Member *member_named(SG *g, const char *name) {
+    Party *p = &g->b.party;
+    for (int i = 0; i < p->count; i++) {
+        const HeroDef *h = hero_def(&g->b.tables, p->members[i].hero);
+        if (h && strcmp(h->name, name) == 0) return &p->members[i];
+    }
+    return NULL;
+}
+
+static void test_mao_joins(const char *dir) {
+    char saves[64];
+    snprintf(saves, sizeof saves, "/tmp/sgtest-n-%d", (int)getpid());
+    mkdir(saves, 0700);
+    VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = saves, .audioRate = 44100};
+    char err[512];
+    SG *g = (SG *)vnsmilegame_open(&cfg, err, sizeof err);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP);
+    press(g, VK_OK);
+    run(g, 200);
+    interp_free(&g->interp);
+    const Tables *t = &g->b.tables;
+    for (int i = 0; i < t->heroCount; i++)
+        if (strcmp(t->heroes[i].name, "マオー") == 0) party_add_hero(g, t->heroes[i].id);
+    Member *m = member_named(g, "マオー");
+    CHECK(m != NULL);
+    if (m) {
+        CHECK(m->level == 12);
+        CHECK(member_max_hp(t, m) == 151);
+        CHECK(member_max_mp(t, m) == 162 && m->mp == 162);
+        CHECK(member_stat(t, m, STAT_POWER) == 88);
+        CHECK(member_stat(t, m, STAT_VITALITY) == 92);
+        CHECK(member_stat(t, m, STAT_SPEED) == 135);
+        static const char *learned[5] = {"ヒール", "レイズ", "ファイアーボール", "アイスランス", "アタックブースト"};
+        CHECK(m->learnedCount == 5);
+        for (int i = 0; i < 5 && i < m->learnedCount; i++) {
+            const SkillDef *sk = skill_def(t, m->learned[i]);
+            CHECK(sk && strcmp(sk->name, learned[i]) == 0);
+        }
+        CHECK(sg_save_write(g, 3));
+        size_t n;
+        char path[128];
+        snprintf(path, sizeof path, "%s/Save_03.sgs", saves);
+        u8 *d = sg_read_file(path, &n);
+        SaveData sd;
+        memset(&sd, 0, sizeof sd);
+        CHECK(d && save_parse(&sd, d, n));
+        for (int i = 0; d && i < sd.partyCount; i++)
+            if (guid_eq(sd.party[i].id, m->hero)) CHECK(sd.party[i].maxMp == 162 && sd.party[i].maxHp == 151);
+        save_free(&sd);
+        free(d);
+        CHECK(sg_save_read(g, 3));
+        m = member_named(g, "マオー");
+        CHECK(m && member_max_mp(t, m) == 162 && m->mp == 162);
+        remove(path);
+    }
+    rmdir(saves);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static const SkillDef *skill_named(SG *g, const char *name) {
+    const Tables *t = &g->b.tables;
+    for (int i = 0; i < t->skillCount; i++)
+        if (strcmp(t->skills[i].name, name) == 0) return &t->skills[i];
+    return NULL;
+}
+
+static void test_heal_skill(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    const Tables *t = &g->b.tables;
+    Party *p = &g->b.party;
+    while (p->count > 0) party_remove_hero(g, p->members[0].hero);
+    for (int i = 0; i < t->heroCount; i++)
+        if (strcmp(t->heroes[i].name, "ロイ") == 0) party_add_hero(g, t->heroes[i].id);
+    Member *roy = member_named(g, "ロイ");
+    const SkillDef *heal = skill_named(g, "ヒール");
+    CHECK(roy && heal && heal->percent == 50);
+    if (!roy || !heal) {
+        vnsmilegame_close((VNSmileGame *)g);
+        return;
+    }
+    member_set_level(t, roy, 15);
+    roy->exp = battle_exp_for_level(15);
+    roy->learned[roy->learnedCount++] = heal->id;
+    roy->mp = member_max_mp(t, roy);
+    roy->maxHp = 273;
+    roy->hp = 100;
+    BattleSetup s;
+    memset(&s, 0, sizeof s);
+    for (int i = 0; i < t->monsterCount; i++)
+        if (strcmp(t->monsters[i].name, "スライミー") == 0) s.monsters[s.count++] = t->monsters[i].id;
+    battle_seed(g, 7);
+    sg_battle_start(g, &s);
+    for (int k = 0; k < 2000 && sg_battle_active(g) && strcmp(battle_phase(g), "command") != 0; k++) run(g, 16);
+    press(g, 0x28);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "list") == 0);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "ally") == 0);
+    press(g, VK_OK);
+    for (int k = 0; k < 2000 && sg_battle_active(g) && strcmp(battle_phase(g), "command") != 0; k++) run(g, 16);
+    CHECK(roy->hp == 236);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+int main(void) {
+    test_exp_curve();
+    const char *sacred = getenv("SG_SACRED");
+    if (sacred) {
+        test_pier_inn_keeps_facing(sacred);
+        test_encounter_groups(sacred);
+        test_mao_joins(sacred);
+        test_heal_skill(sacred);
+    } else
+        printf("SG_SACRED not set: Sacred checks skipped\n");
+    printf("%d checks, %d failed\n", checks, failures);
+    return failures ? 1 : 0;
+}

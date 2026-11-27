@@ -458,13 +458,12 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   `w002`). Not found: no map field holds it (the fields after each wall are −1; fields 8, 22 to 25 don't vary with
   it), and the Visual C `rand` restarted from any 32-bit seed and walked over the cells (row or column order, every
   cell or floor cells only, one to six calls a cell, or one call per wall in six side orders) reproduces none of the
-  57 confident cells, nor does a small per-map seed or a linear rule mod 3. Inferred: VNDegen gives each cell one
-  variant from a hash of the map file's name and the cell, used for its wall-0 sides and for the pole at a corner
-  (the poles also vary on the PC, mostly with the walls beside them); floors and roofs stay `000` (their variants
-  differ too little to classify). The hash agrees with 24 of 74 classified walls (always `w000`: 17). The eleven-frame
-  light comparison goes from 42.4 to 35.6 with it, the ice frame 7.6 → 5.3 and two 炎山洞 frames 6.5 → 2.0 and
-  6.2 → 1.6, while 千樹庭's magic-circle frame goes 1.3 → 6.7 because its cell draws a forest variant where the PC
-  draws `w000`; that gain is partly chance.
+  57 confident cells, nor does a small per-map seed or a linear rule mod 3. The rule was then read from the exe
+  (The wall variants: what was read, and why, below), and VNDegen's wall-0 sides use it: the seed from the area's
+  `floor.obj` row, the shared key or the per-side keys by column 7, the six-piece sum mod 3. Measured: VNDegen's own
+  choice, taken through the expedition's floor loading, matches all 74 classified walls (the earlier per-cell hash
+  matched 24). Not read: the poles keep a hash of the map file's name and the corner (they also vary on the PC,
+  mostly with the walls beside them), and floors and roofs stay `000` (their variants differ too little to classify).
 - **Crystals.** Measured under Wine in 千樹庭 (mp0101, crystal (14, 4)) and the ice dungeon (mp0802, crystal (1, 13)):
   standing on the crystal's cell the original shows the walls through both faces of the crystal; from a cell away
   its colour fits half-opaque front and back layers drawn at full texture brightness with no fog (core mean error

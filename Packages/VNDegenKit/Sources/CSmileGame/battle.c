@@ -22,7 +22,6 @@ static const int kTickMs = 900;
 static const int kRecoverPct = 34;
 
 static const u32 kWhite = 0xffffffffu;
-static const u32 kGray = 0xff808080u;
 static const int kIntroMs = 1100;
 static const int kEnterMs = 400;
 static const int kDefeatMs = 500;
@@ -40,6 +39,7 @@ static const float kPartyX = 2.83f;
 static const float kPartyZ = 2.57f;
 static const float kPartySpacing = 3.3f;
 static const float kPartyRowSpacing = 2.4f;
+static const float kFrontRow = 1.0f;
 
 typedef struct Fighter {
     bool monster;
@@ -173,6 +173,7 @@ int battle_skill_damage(int power, int magic, int defense, float spread) {
 
 int battle_exp_for_level(int level) {
     if (level <= 1) return 0;
+    if (level > 50) return battle_exp_for_level(50) + 120000 * (level - 50);
     long long l = level;
     return (int)(l * (l - 1) * (l * l - l + 50) / 4);
 }
@@ -704,7 +705,7 @@ static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
     if (friendly) {
         if ((k.states & 32) && t->hp <= 0) t->hp = 1;
         cure(b, t, k.states);
-        int v = s->power > 0 ? s->power + a->mag : 0;
+        int v = (s->power > 0 ? s->power + a->mag : 0) + t->maxHp * s->percent / 100;
         if (v > 0 && t->hp > 0) {
             t->hp += v;
             if (t->hp > t->maxHp) t->hp = t->maxHp;
@@ -1102,17 +1103,25 @@ static void input(Battle *b) {
             set_phase(b, PH_LIST);
         }
         break;
-    case PH_LIST:
-        if (b->listCount) {
-            if (sg_pressed(g, KEY_UP)) b->listCursor = (b->listCursor + b->listCount - 1) % b->listCount;
-            if (sg_pressed(g, KEY_DOWN)) b->listCursor = (b->listCursor + 1) % b->listCount;
+    case PH_LIST: {
+        int n = b->listCount, c = b->listCursor, old = c;
+        if (sg_pressed(g, KEY_DOWN)) c = c >= n ? c : c + 2 <= n - 1 ? c + 2 : n;
+        if (sg_pressed(g, KEY_UP)) c = c >= n ? (n > 0 ? n - 1 : 0) : c >= 2 ? c - 2 : c;
+        if (sg_pressed(g, KEY_RIGHT) && c < n - 1 && c % 2 == 0) c++;
+        if (sg_pressed(g, KEY_LEFT) && c < n && c % 2 == 1) c--;
+        b->listCursor = c;
+        if (c != old) sgb_sound(g, SND_CURSOR);
+        bool quit = sg_pressed(g, KEY_CANCEL);
+        if (sg_pressed(g, KEY_OK)) {
+            if (c < n) choose_list(b);
+            else quit = true;
         }
-        if (sg_pressed(g, KEY_OK)) choose_list(b);
-        else if (sg_pressed(g, KEY_CANCEL)) {
+        if (quit) {
             b->plan[b->member] = (Plan){b->member, ACT_NONE, -1, NULL, NULL};
             set_phase(b, PH_COMMAND);
         }
         break;
+    }
     case PH_RESULT:
         if (b->phaseMs > 300 && sg_pressed(g, KEY_OK)) finish(b, BATTLE_WON);
         break;
@@ -1252,7 +1261,7 @@ static void setup_stage(Battle *b) {
     }
     for (int i = 0; i < b->partyCount; i++) {
         b->f[i].x = bx + kPartyX + (i < placed ? offsets[i] - mean : 0.0f);
-        b->f[i].z = bz + kPartyZ;
+        b->f[i].z = bz + kPartyZ + (b->partyCount >= 3 && i < 2 ? kFrontRow : 0.0f);
     }
     for (int i = b->partyCount; i < b->count; i++) {
         int k = i - b->partyCount, n = b->count - b->partyCount;
@@ -1317,6 +1326,17 @@ const char *battle_phase(SG *g) {
     static const char *names[] = {"intro", "command", "target", "list", "ally", "act", "escape", "victory", "result", "defeat", "gameover", "done"};
     Battle *b = get(g);
     return b ? names[b->phase] : "none";
+}
+
+int sg_battle_member(SG *g) {
+    Battle *b = get(g);
+    return b && (b->phase == PH_COMMAND || b->phase == PH_LIST || b->phase == PH_TARGET || b->phase == PH_ALLY) ? b->member : -1;
+}
+
+int sg_battle_cursor(SG *g) {
+    Battle *b = get(g);
+    if (!b) return -1;
+    return b->phase == PH_LIST ? b->listCursor : b->phase == PH_COMMAND ? b->cmdCursor : b->targetCursor;
 }
 
 int battle_monster_hp(SG *g, int index) {
@@ -1715,32 +1735,7 @@ static void draw_commands(Battle *b) {
 }
 
 static void draw_list(Battle *b) {
-    SG *g = b->g;
-    int x = 240, y = 300, w = 300, rows = 6;
-    int top = b->listCursor >= rows ? b->listCursor - rows + 1 : 0;
-    fill_rect(g->fb, g->w, g->h, x, y - 4, w, rows * 30 + 8, 0xc0202020u);
-    if (!b->listCount) {
-        text_shadow(g, x + 10, y + 2, 18, b->listKind == LIST_SKILLS ? MT(g, MT_NO_SKILLS) : MT(g, MT_NO_ITEMS), kGray);
-        return;
-    }
-    for (int i = top; i < b->listCount && i < top + rows; i++) {
-        int ry = y + (i - top) * 30;
-        if (i == b->listCursor) fill_rect(g->fb, g->w, g->h, x + 2, ry, w - 4, 28, 0xb0e8d898u);
-        char right[32];
-        if (b->listKind == LIST_SKILLS) {
-            const SkillDef *s = b->list[i];
-            icon_at(g, s->icon, s->iconX, s->iconY, x + 4, ry);
-            snprintf(right, sizeof right, "%d", s->mpCost);
-            u32 color = s->mpCost > b->f[b->member].mp ? kGray : kWhite;
-            text_shadow(g, x + 36, ry + 3, 18, s->name, color);
-        } else {
-            const ItemDef *it = b->list[i];
-            icon_at(g, it->icon, it->iconX, it->iconY, x + 4, ry);
-            snprintf(right, sizeof right, "%d", party_item_count(PT(g), it->id));
-            text_shadow(g, x + 36, ry + 3, 18, it->name, kWhite);
-        }
-        text_shadow(g, x + w - 10 - font_width(g->font, 18, right), ry + 3, 18, right, kWhite);
-    }
+    sg_battle_list_draw(b->g, b->listKind == LIST_SKILLS, (const void *const *)b->list, b->listCount, b->listCursor, b->f[b->member].mp);
 }
 
 static void draw_popups(Battle *b) {
@@ -1859,8 +1854,8 @@ static void draw(Battle *b) {
     draw_states(b);
     if (b->phase == PH_INTRO) intro_box(b);
     else bar_box(g, shown_bar(b));
-    if (b->phase == PH_COMMAND || b->phase == PH_TARGET || b->phase == PH_LIST || b->phase == PH_ALLY) draw_commands(b);
-    if (b->phase == PH_LIST || (b->phase == PH_ALLY && b->plan[b->member].kind != ACT_ATTACK)) draw_list(b);
+    if (b->phase == PH_COMMAND || b->phase == PH_TARGET || b->phase == PH_ALLY) draw_commands(b);
+    if (b->phase == PH_LIST) draw_list(b);
     draw_status(b);
     if (b->totalMs < 300) {
         u32 a = 255 - b->totalMs * 255 / 300;

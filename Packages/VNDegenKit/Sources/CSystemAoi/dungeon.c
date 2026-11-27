@@ -328,6 +328,8 @@ bool sa_dungeon_load(Dungeon *d, Vfs *vfs, const char *set, const char *map) {
     if (!sa_dungeon_read_map(d, vfs, map)) return false;
     int dungeon = 0, floor = 0;
     d->area = sscanf(map, "mp%2d%2d", &dungeon, &floor) == 2 ? dungeon << 16 | floor << 8 : 0;
+    d->wallSeed = (u32)d->area;
+    d->wallSharedKey = true;
     replay_edits(d);
     sa_fx_area(&d->fx, -CELL / 2, -((float)d->h - 0.5f) * CELL, ((float)d->w - 0.5f) * CELL, CELL / 2);
     d->variantSeed = 2166136261u;
@@ -445,9 +447,17 @@ void sa_dungeon_debug_variant(int variant, int mode) {
 
 enum { PART_WALL, PART_POLE, PART_FLOOR, PART_ROOF };
 
-static int part_variant(const Dungeon *d, int kind, int x, int y) {
+int vnsystemaoi_wall_variant(uint32_t seed, bool sharedKey, int x, int y, int side) {
+    static const u32 sideKey[4] = {0x2388ACBDu, 0x56091EFCu, 0x37E8D81Bu, 0x0980F3B7u};
+    u32 v = ((u32)(x + y) * 8192u + (u32)x + seed) ^ (sharedKey ? 0x8F2E37ABu : sideKey[side & 3]);
+    u32 sum = (v & 15) + (v >> 4 & 15) + (v >> 8 & 255) + (v >> 16 & 15) + (v >> 20 & 15) + (v >> 24);
+    return (int)(sum % 3);
+}
+
+static int part_variant(const Dungeon *d, int kind, int x, int y, int side) {
     if (forcedVariant >= 0) return forcedVariant;
-    if (kind != PART_WALL && kind != PART_POLE) return 0;
+    if (kind == PART_WALL) return vnsystemaoi_wall_variant(d->wallSeed, d->wallSharedKey, x, y, side);
+    if (kind != PART_POLE) return 0;
     u32 h = d->variantSeed ^ (u32)x * 73856093u ^ (u32)y * 19349663u;
     h ^= h >> 13;
     h *= 0x5bd1e995u;
@@ -455,10 +465,10 @@ static int part_variant(const Dungeon *d, int kind, int x, int y) {
     return (int)(h % 3);
 }
 
-static void part_name(const Dungeon *d, char *out, size_t size, char prefix, int base, int kind, int x, int y) {
+static void part_name(const Dungeon *d, char *out, size_t size, char prefix, int base, int kind, int x, int y, int side) {
     snprintf(out, size, "%c%03d", prefix, base);
     if (base != 0) return;
-    int v = part_variant(d, kind, x, y);
+    int v = part_variant(d, kind, x, y, side);
     char alt[16];
     snprintf(alt, sizeof alt, "%c%03d", prefix, v);
     if (v && sa_pvm_find(&d->set.pvm, alt) >= 0) memcpy(out, alt, 5);
@@ -967,16 +977,16 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             if (!pole[py * POLE_SIDE + px]) continue;
             pole[py * POLE_SIDE + px] = false;
             char pname[16];
-            part_name(d, pname, sizeof pname, 'p', 0, PART_POLE, px, py);
+            part_name(d, pname, sizeof pname, 'p', 0, PART_POLE, px, py, 0);
             set_id(d, PART_POLE, py * POLE_SIDE + px);
             draw_part(d, &d->set, &c, pname, ((float)px - 0.5f) * CELL, -((float)py - 0.5f) * CELL, 0);
         }
         float cx = (float)col * CELL, cz = -(float)row * CELL;
         char name[16];
-        part_name(d, name, sizeof name, 'f', cell[F_FLOOR], PART_FLOOR, col, row);
+        part_name(d, name, sizeof name, 'f', cell[F_FLOOR], PART_FLOOR, col, row, 0);
         set_id(d, PART_FLOOR, order[i]);
         draw_part(d, &d->set, &c, name, cx, cz, 0);
-        part_name(d, name, sizeof name, 'r', 0, PART_ROOF, col, row);
+        part_name(d, name, sizeof name, 'r', 0, PART_ROOF, col, row, 0);
         set_id(d, PART_ROOF, order[i]);
         draw_part(d, &d->set, &c, name, cx, cz, 0);
         for (int s = 0; s < 4; s++) {
@@ -984,7 +994,7 @@ void sa_dungeon_draw(Dungeon *d, u32 *fb) {
             set_id(d, PART_WALL, order[i] * 4 + s);
             if (w == WALL_PASSAGE) draw_part(d, &d->set, &c, "next000", cx, cz, sideQuarter[s]);
             if (w < 0 || w == WALL_PASSAGE || (w == WALL_HIDDEN && behind_side(&c, cx, cz, s))) continue;
-            part_name(d, name, sizeof name, 'w', w, PART_WALL, col, row);
+            part_name(d, name, sizeof name, 'w', w, PART_WALL, col, row, s);
             draw_model(d, &d->set, &c, name, cx, cz, (float)sideQuarter[s] * QUARTER, leaf_swing(d, order[i], s));
         }
         set_id(d, 4, order[i]);
