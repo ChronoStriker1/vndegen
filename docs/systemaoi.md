@@ -201,7 +201,10 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   The dungeon light and fog are fitted to eleven of the original's
   frames (each within 6%); a wall-0 side takes the set's variant `w000` to `w002` by the original's rule, seeded from
   the area's `floor.obj` row (read from the exe, see The wall variants in the cleanroom notes; all 74 walls classified
-  from the PC match), while poles still take a per-cell hash and floors and roofs stay `000` (their rules unread); crystals are drawn see-through, unlit and turning (blends
+  from the PC match); floors and roofs take `f`/`r000` to `002` by the same hash with their own keys, and poles stand
+  where any wall side of 0 or more ends at the corner and take the variant of the cell around the corner nearest the
+  party, as measured (see Pole, floor and roof variants in the cleanroom notes; 65 of 65 poles, 24 of 25 floors and 23
+  of 24 roofs classified from the PC match), so poles near the party can change as it moves; crystals are drawn see-through, unlit and turning (blends
   fitted to a few views, the spin speed taken from the door's); the falling leaves, sparks, snow and light motes
   follow the sets' effect files, stepped 20 times a second (inferred from the PC's snow speed and the motes'
   lifetime); the snowflakes loop as on the PC, but the PC's loops drift sideways where VNDegen's stack downward.

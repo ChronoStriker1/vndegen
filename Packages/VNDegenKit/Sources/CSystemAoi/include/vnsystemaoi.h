@@ -69,6 +69,9 @@ const char *vnsystemaoi_title(VNSystemAoi *sa);
 const char *vnsystemaoi_problem(VNSystemAoi *sa);
 
 int vnsystemaoi_wall_variant(uint32_t seed, bool sharedKey, int x, int y, int side);
+int vnsystemaoi_floor_variant(uint32_t seed, int x, int y);
+int vnsystemaoi_roof_variant(uint32_t seed, bool sharedKey, int x, int y);
+int vnsystemaoi_pole_variant(uint32_t seed, bool sharedKey, int x, int y, int partyX, int partyY);
 
 #ifdef __cplusplus
 }
