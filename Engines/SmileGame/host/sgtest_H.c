@@ -378,7 +378,7 @@ static void test_tables(const char *colette, const char *sacred) {
                 CHECK(k.states == 8 && k.hit == 78);
             }
             const MonsterDef *z = monster_named(g, "ゾンビーナＬＶ01");
-            CHECK(z && z->money == 32 && z->exp == 13);
+            CHECK(z && z->exp == 32 && z->money == 13);
             vnsmilegame_close((VNSmileGame *)g);
         }
     }

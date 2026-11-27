@@ -109,7 +109,7 @@ static void test_colette(const char *dir) {
     CHECK(area && area->target == TARGET_ALLIES);
 
     const MonsterDef *slime = monster_named(t, "スライムＬＶ01");
-    CHECK(slime && slime->stats[0] == 25 && slime->exp == 5 && slime->money == 12 && slime->actionCount == 3);
+    CHECK(slime && slime->stats[0] == 25 && slime->money == 5 && slime->exp == 12 && slime->actionCount == 3);
     const ItemDef *drop = slime ? item_def(t, slime->drops[0].item) : NULL;
     CHECK(drop && strcmp(drop->name, "緑石") == 0 && slime->drops[0].rate == 9);
 
@@ -171,7 +171,7 @@ static void test_sacred(const char *dir) {
     CHECK(p->count == 0);
 
     const MonsterDef *golem = monster_named(t, "ゴーレム");
-    CHECK(golem && golem->exp == 300 && golem->money == 250 && golem->drops[0].rate == 100);
+    CHECK(golem && golem->money == 300 && golem->exp == 250 && golem->drops[0].rate == 100);
     vnsmilegame_close((VNSmileGame *)g);
 }
 

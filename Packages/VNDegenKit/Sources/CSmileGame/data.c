@@ -273,8 +273,8 @@ bool monster_parse(MonsterDef *m, const SgrRec *rec) {
         a->skill = rd_guid(&r);
         a->priority = rd_i32(&r);
     }
-    m->exp = rd_i32(&r);
     m->money = rd_i32(&r);
+    m->exp = rd_i32(&r);
     for (int i = 0; i < 2; i++) {
         m->drops[i].item = rd_guid(&r);
         m->drops[i].rate = rd_i32(&r);

@@ -814,8 +814,8 @@ static void grant_rewards(Battle *b) {
     for (int i = b->partyCount; i < b->count; i++) {
         const Fighter *f = &b->f[i];
         if (f->fled) continue;
-        b->expGain += f->def->money;
-        b->moneyGain += f->def->exp;
+        b->expGain += f->def->exp;
+        b->moneyGain += f->def->money;
         for (int k = 0; k < 2; k++)
             if (!guid_zero(f->def->drops[k].item) && rand_pct(&b->rng) < f->def->drops[k].rate && b->dropCount < 16)
                 b->drops[b->dropCount++] = f->def->drops[k].item;
