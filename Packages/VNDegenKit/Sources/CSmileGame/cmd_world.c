@@ -338,7 +338,10 @@ void sga_frame(SG *g, u32 ms) {
     if (f->loaded && (a->mapPending || !guid_eq(a->mapId, f->map.id)) && !g->pendingTransfer) {
         bool fromScript = a->mapPending, sameMap = guid_eq(a->mapId, f->map.id);
         sga_map_loaded(g);
-        if (fromScript && !sameMap) a->eventIndex = -1;
+        if (fromScript && !sameMap) {
+            a->eventIndex = -1;
+            memset(a->pics, 0, sizeof a->pics);
+        }
     }
     if (a->dirty) sga_refresh_events(g);
     if (a->fadeTotal) {
