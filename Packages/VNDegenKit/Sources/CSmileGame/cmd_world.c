@@ -170,6 +170,17 @@ static void cmd_transfer(SG *g, const Cmd *c) {
     g->pendingZ = cmd_int(c, 2);
     int code = cmd_int(c, 3);
     g->pendingDir = code == 0 ? g->field.player.dir : code == 1 ? 0 : code == 2 ? 2 : code == 3 ? 3 : 1;
+    a->playerMoveLeft = 0;
+    if (guid_zero(map) && g->field.loaded) {
+        Actor *p = &g->field.player;
+        p->x = p->tx = (float)g->pendingX + 0.5f;
+        p->z = p->tz = (float)g->pendingZ + 0.5f;
+        p->y = sg_ground(g, g->pendingX, g->pendingZ);
+        p->dir = g->pendingDir;
+        p->moving = false;
+        sg_log(g, "transfer within the map %d,%d dir code %d", g->pendingX, g->pendingZ, code);
+        return;
+    }
     g->pendingTransfer = true;
     a->mapPending = true;
     a->playerMoveLeft = 0;
