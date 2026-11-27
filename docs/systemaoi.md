@@ -199,8 +199,9 @@ The game is the `Bunny3/` folder of the DVD image. The installer only copies it 
   expedition, the rest stay (measured). After loading a dungeon save the original refuses a key door even with the
   key; VNDegen opens it (deliberate).
   The dungeon light and fog are fitted to eleven of the original's
-  frames (each within 6%); which walls get a set's variant textures wasn't found from play or data, so each cell
-  takes one by a hash (right for about a third of the walls, as by chance); crystals are drawn see-through, unlit and turning (blends
+  frames (each within 6%); a wall-0 side takes the set's variant `w000` to `w002` by the original's rule, seeded from
+  the area's `floor.obj` row (read from the exe, see The wall variants in the cleanroom notes; all 74 walls classified
+  from the PC match), while poles still take a per-cell hash and floors and roofs stay `000` (their rules unread); crystals are drawn see-through, unlit and turning (blends
   fitted to a few views, the spin speed taken from the door's); the falling leaves, sparks, snow and light motes
   follow the sets' effect files, stepped 20 times a second (inferred from the PC's snow speed and the motes'
   lifetime); the snowflakes loop as on the PC, but the PC's loops drift sideways where VNDegen's stack downward.

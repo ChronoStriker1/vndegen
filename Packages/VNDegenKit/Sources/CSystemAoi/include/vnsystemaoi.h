@@ -68,6 +68,8 @@ uint8_t *vnsystemaoi_pack(const uint8_t *data, size_t size, size_t *outSize);
 const char *vnsystemaoi_title(VNSystemAoi *sa);
 const char *vnsystemaoi_problem(VNSystemAoi *sa);
 
+int vnsystemaoi_wall_variant(uint32_t seed, bool sharedKey, int x, int y, int side);
+
 #ifdef __cplusplus
 }
 #endif
