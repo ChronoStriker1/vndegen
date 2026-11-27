@@ -506,7 +506,7 @@ static const SaveHero *find_hero(const SaveData *s, Guid id) {
     return NULL;
 }
 
-static SaveHero *heroes_from(const SaveData *s, const Member *m, int n, int heroSize) {
+static SaveHero *heroes_from(const Tables *t, const SaveData *s, const Member *m, int n, int heroSize) {
     SaveHero *out = sg_alloc(sizeof(SaveHero) * (size_t)(n ? n : 1));
     for (int i = 0; i < n; i++) {
         const SaveHero *old = find_hero(s, m[i].hero);
@@ -516,8 +516,8 @@ static SaveHero *heroes_from(const SaveData *s, const Member *m, int n, int hero
         if (old) memcpy(h->body, old->body, (size_t)h->size);
         h->id = m[i].hero;
         h->level = m[i].level;
-        h->maxHp = m[i].maxHp;
-        h->maxMp = m[i].maxMp;
+        h->maxHp = member_max_hp(t, &m[i]);
+        h->maxMp = member_max_mp(t, &m[i]);
         h->hp = m[i].hp;
         h->mp = m[i].mp;
         h->power = m[i].stat[STAT_POWER];
@@ -541,8 +541,8 @@ static void free_heroes(SaveHero *h, int n) {
 static void capture_party(SG *g, SaveData *s) {
     const Party *p = &g->b.party;
     int heroSize = g->e.heroSize ? g->e.heroSize : HERO_MIN;
-    SaveHero *party = heroes_from(s, p->members, p->count, heroSize);
-    SaveHero *reserve = heroes_from(s, p->reserve, p->reserveCount, heroSize);
+    SaveHero *party = heroes_from(&g->b.tables, s, p->members, p->count, heroSize);
+    SaveHero *reserve = heroes_from(&g->b.tables, s, p->reserve, p->reserveCount, heroSize);
     free_heroes(s->party, s->partyCount);
     free_heroes(s->reserve, s->reserveCount);
     s->party = party;
@@ -585,6 +585,8 @@ static void member_from(SG *g, Member *m, const SaveHero *h) {
     const HeroDef *def = hero_def(&g->b.tables, h->id);
     m->stat[STAT_MAGIC] = def ? grow_stat(&def->stats[STAT_MAGIC], h->level) : h->magic;
     memcpy(m->equip, h->equip, sizeof m->equip);
+    m->maxHp -= member_equip_sum(&g->b.tables, m, EQ_HP);
+    m->maxMp -= member_equip_sum(&g->b.tables, m, EQ_MP);
     m->learnedCount = h->learnedCount;
     memcpy(m->learned, h->learned, sizeof m->learned);
 }
