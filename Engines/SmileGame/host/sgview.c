@@ -14,7 +14,7 @@ static double now_ms(void) {
 
 int main(int argc, char **argv) {
     if (argc < 7) {
-        fprintf(stderr, "usage: sgview <game> <out.png> <map> <x> <z> <dir> [frames] [pose:pitch,yaw,dist,fov] [cal:dist,fov,lift] [hold:key,ms]\n");
+        fprintf(stderr, "usage: sgview <game> <out.png> <map> <x> <z> <dir> [frames] [pose:pitch,yaw,dist,fov] [cam3:x,y,z,pitch,yaw,dist,fov] [hero:name] [hold:vk,ms] [threads:n]\n");
         return 2;
     }
     char log[1200];
@@ -25,10 +25,6 @@ int main(int argc, char **argv) {
     if (!vg) {
         fprintf(stderr, "open failed: %s\n", err);
         return 1;
-    }
-    for (int i = 8; i < argc; i++) {
-        float a, b;
-        if (sscanf(argv[i], "light:%f,%f", &a, &b) == 2) sg_debug_pose(vg, -2000, a, b, 0);
     }
     if (!sg_debug_warp(vg, argv[3], atoi(argv[4]), atoi(argv[5]), atoi(argv[6]))) {
         fprintf(stderr, "map %s not found\n", argv[3]);
@@ -53,7 +49,6 @@ int main(int argc, char **argv) {
         } else if (sscanf(argv[i], "hero:%127s", name) == 1) sg_debug_player(vg, name);
         else if (sscanf(argv[i], "threads:%d", &k) == 1) r3_threads(&((SG *)vg)->r3, k);
         else if (sscanf(argv[i], "pose:%f,%f,%f,%f", &a, &b, &c, &d) == 4) sg_debug_pose(vg, a, b, c, d);
-        else if (sscanf(argv[i], "cal:%f,%f,%f", &a, &b, &c) == 3) sg_debug_pose(vg, -1000, a, b, c);
         else if (sscanf(argv[i], "hold:%i,%d", &k, &ms) == 2) {
             vnsmilegame_key(vg, k, true);
             for (int t = 0; t < ms; t += 16) {

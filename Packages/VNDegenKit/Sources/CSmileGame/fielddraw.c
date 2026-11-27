@@ -9,8 +9,8 @@
 #define TILE 48.0f
 
 static const float kDefaultPitch = -48.0f, kDefaultDistance = 3.5f, kDefaultFov = 70.0f;
-static float gDistScale = 20.0f, gFovScale = 0.1f, gTargetLift = 0.0f;
-static float gAmbK = 0.77f, gSunK = 0.74f;
+static const float kDistScale = 20.0f, kFovScale = 0.1f;
+static const float kFillK = 0.77f, kKeyK = 0.74f;
 static const int kShadowTexels = 12;
 static const float kSpriteForward = 0.235f;
 
@@ -442,9 +442,9 @@ static void light_setup(SG *g, View *v, float sun[3]) {
     for (int i = 0; i < 3; i++) {
         float key = (float)m->colors[1 + i] / 255.0f, fill = (float)m->colors[5 + i] / 255.0f;
         float col = l->sun ? (float)l->sunColor[i] / 255.0f : 0.0f;
-        a[i] = fill * gAmbK;
-        s[i] = key * col * gSunK;
-        if (!l->sun) a[i] = fill * gAmbK + key * gSunK;
+        a[i] = fill * kFillK;
+        s[i] = key * col * kKeyK;
+        if (!l->sun) a[i] = fill * kFillK + key * kKeyK;
     }
     r3_light(&g->r3, a, s, sun);
 }
@@ -710,11 +710,11 @@ void sg_camera_command(SG *g, const Cmd *c) {
 
 static void pose_to_cam(const ViewPose *p, Cam *c, int w, int h) {
     c->target = p->target;
-    c->target.y += p->lift + gTargetLift;
+    c->target.y += p->lift;
     c->pitch = -p->pitch;
     c->yaw = -p->yaw;
-    c->distance = p->distance * gDistScale;
-    c->fov = p->fov * gFovScale;
+    c->distance = p->distance * kDistScale;
+    c->fov = p->fov * kFovScale;
     cam_update(c, w, h);
 }
 
@@ -970,17 +970,6 @@ bool sg_debug_warp(VNSmileGame *vg, const char *mapName, int x, int z, int dir) 
 void sg_debug_pose(VNSmileGame *vg, float pitch, float yaw, float distance, float fov) {
     SG *g = (SG *)vg;
     View *v = sg_view(g);
-    if (pitch < -1900) {
-        gAmbK = yaw;
-        gSunK = distance;
-        return;
-    }
-    if (pitch < -900) {
-        gDistScale = yaw;
-        gFovScale = distance;
-        gTargetLift = fov;
-        return;
-    }
     v->pose.pitch = pitch;
     v->pose.yaw = yaw;
     v->pose.distance = distance;
