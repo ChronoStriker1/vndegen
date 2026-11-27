@@ -27,6 +27,8 @@ static const int kIntroMs = 1100;
 static const int kEnterMs = 400;
 static const int kPushMs = 800;
 static const float kFrontZoom = 1.886f;
+static const float kActorPull = 0.35f;
+static const float kActorZoom = 0.85f;
 static const float kFrontPitch = 8.8f;
 static const float kFrontLift = 2.4f;
 static const int kActMs = 1250;
@@ -1364,7 +1366,22 @@ static void update(Battle *b, u32 ms) {
         }
         break;
     }
-    case PH_ACT: act_update(b); break;
+    case PH_ACT: {
+        act_update(b);
+        if (b->phase != PH_ACT || b->queuePos >= b->queueCount) {
+            if (b->phase == PH_COMMAND) apply_cam(b, b->stage);
+            break;
+        }
+        const Fighter *a = &b->f[b->queue[b->queuePos].actor];
+        float in = ease((float)b->phaseMs / 300.0f), out = ease((float)((int)kActMs - (int)b->phaseMs) / 300.0f);
+        float t = in < out ? in : out;
+        Cam c = b->stage;
+        c.target.x += (a->x - c.target.x) * kActorPull * t;
+        c.target.z += (a->z - c.target.z) * kActorPull * t;
+        c.distance *= 1.0f - (1.0f - kActorZoom) * t;
+        apply_cam(b, c);
+        break;
+    }
     case PH_ESCAPE:
         if (b->phaseMs >= 1200) {
             if (b->result == BATTLE_ESCAPED) finish(b, BATTLE_ESCAPED);

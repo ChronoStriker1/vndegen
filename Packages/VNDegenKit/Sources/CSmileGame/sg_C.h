@@ -61,7 +61,7 @@ BattleSkillInfo battle_skill_info(const SkillDef *s);
 
 typedef struct BattleFxDef {
     Image *image;
-    int cols, rows, frames;
+    int cols, rows, cells, frames;
     Guid sound;
 } BattleFxDef;
 
