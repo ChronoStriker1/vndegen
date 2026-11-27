@@ -350,7 +350,7 @@ bool title_menu_frame(SG *g, u32 ms);
 void shop_open(SG *g, const Guid *items, const i32 *prices, int count);
 bool sgb_quit(SG *g);
 bool menu_result(SG *g);
-void inn_open(SG *g, int price);
+void inn_open(SG *g, int price, bool faceDown);
 const char *menu_page(SG *g);
 void sgb_sound(SG *g, int which);
 
