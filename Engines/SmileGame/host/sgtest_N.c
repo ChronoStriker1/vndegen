@@ -94,11 +94,50 @@ static void test_pier_inn_keeps_facing(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static int group_sizes(SG *g, const char *name, int *seen) {
+    const Tables *t = &g->b.tables;
+    BattleEnc e;
+    memset(&e, 0, sizeof e);
+    for (int i = 0; i < t->monsterCount; i++)
+        if (strcmp(t->monsters[i].name, name) == 0) e.info.entries[0].monster = t->monsters[i].id;
+    e.info.entries[0].a = e.info.entries[0].b = 1;
+    e.info.count = 1;
+    e.info.rate = 40;
+    int most = 0;
+    for (int k = 0; k < 400; k++) {
+        BattleSetup s;
+        battle_encounter_setup(g, &e, &s);
+        if (s.count > most) most = s.count;
+        if (s.count >= 1 && s.count <= 8) seen[s.count]++;
+    }
+    return most;
+}
+
+static void test_encounter_groups(const char *dir) {
+    SG *g = open_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    int seen[9] = {0};
+    CHECK(group_sizes(g, "ベスライミー", seen) == 5);
+    for (int n = 1; n <= 5; n++) CHECK(seen[n] > 0);
+    memset(seen, 0, sizeof seen);
+    CHECK(group_sizes(g, "スライミー", seen) == 2);
+    CHECK(seen[1] > 0 && seen[2] > 0);
+    memset(seen, 0, sizeof seen);
+    CHECK(group_sizes(g, "ミニゴーレム", seen) == 1);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     test_exp_curve();
     const char *sacred = getenv("SG_SACRED");
-    if (sacred) test_pier_inn_keeps_facing(sacred);
-    else printf("SG_SACRED not set: Sacred checks skipped\n");
+    if (sacred) {
+        test_pier_inn_keeps_facing(sacred);
+        test_encounter_groups(sacred);
+    } else
+        printf("SG_SACRED not set: Sacred checks skipped\n");
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
 }
