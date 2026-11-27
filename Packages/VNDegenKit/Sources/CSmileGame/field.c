@@ -170,7 +170,7 @@ void field_update(SG *g, u32 ms) {
                 p->x += ddx / d * speed;
                 p->z += ddz / d * speed;
             }
-            p->y = (float)sga_floor(g, (int)p->x, (int)p->z);
+            p->y = sg_ground(g, (int)p->x, (int)p->z);
         }
     }
     view_follow(g, p->x, p->y, p->z, ms);

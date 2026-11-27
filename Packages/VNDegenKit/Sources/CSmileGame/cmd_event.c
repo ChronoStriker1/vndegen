@@ -192,6 +192,18 @@ int sga_floor(SG *g, int x, int z) {
     return m->height[(size_t)z * (size_t)m->w + (size_t)x];
 }
 
+float sg_ground(SG *g, int x, int z) {
+    const Map *m = &g->field.map;
+    int h = sga_floor(g, x, z);
+    if (x < 0 || z < 0 || x >= m->w || z >= m->h || h != m->height[(size_t)z * (size_t)m->w + (size_t)x]) return (float)h;
+    View *v = sg_view(g);
+    if (!v->slopeDir || !v->slopeIdx || !v->chipAttr) return (float)h;
+    size_t i = (size_t)z * (size_t)m->w + (size_t)x;
+    int kind = v->slopeDir[i];
+    if (kind < 0 || kind > 3 || !(v->chipAttr[g->field.chipImageCount + v->slopeIdx[i]] & 0x10)) return (float)h;
+    return (float)h + 0.6f;
+}
+
 void sga_map_loaded(SG *g) {
     SgaState *a = &g->interp.a;
     Field *f = &g->field;
@@ -199,7 +211,8 @@ void sga_map_loaded(SG *g) {
     a->mapId = f->map.id;
     a->mapPending = false;
     build_floor(g);
-    for (int i = 0; i < f->npcCount; i++) f->npcs[i].y = (float)sga_floor(g, (int)floorf(f->npcs[i].x), (int)floorf(f->npcs[i].z));
+    for (int i = 0; i < f->npcCount; i++) f->npcs[i].y = sg_ground(g, (int)floorf(f->npcs[i].x), (int)floorf(f->npcs[i].z));
+    f->player.y = sg_ground(g, (int)floorf(f->player.x), (int)floorf(f->player.z));
     a->evCount = f->npcCount;
     a->ev = sg_alloc(sizeof(SgaEvent) * (size_t)(a->evCount ? a->evCount : 1));
     for (int i = 0; i < a->evCount; i++) {
@@ -374,7 +387,7 @@ void sga_move_actor(SG *g, Actor *a, int *dir, int *left, float speed, bool thro
             a->z += ddz / d * budget;
             budget = 0;
         }
-        a->y = (float)sga_floor(g, (int)floorf(a->x), (int)floorf(a->z));
+        a->y = sg_ground(g, (int)floorf(a->x), (int)floorf(a->z));
     }
     (void)through;
     if (*left <= 0) a->moving = false;

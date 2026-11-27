@@ -472,5 +472,6 @@ void text_outlined(SG *g, int x, int y, int px, const char *s, u32 color);
 
 #include "sg_D.h"
 #include "sg_C.h"
+#include "sg_K.h"
 
 #endif
