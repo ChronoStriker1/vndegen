@@ -440,7 +440,8 @@ const CommandDef *command_def(const Tables *t, Guid id) {
 
 int grow_stat(const GrowStat *s, int level) {
     if (level <= 1) return s->base;
-    return s->base + (int)((double)s->growth * pow((double)(level - 1), (double)s->curve));
+    double c = s->curve, sum = fabs(c - 1.0) < 1e-6 ? (double)(level - 1) : (pow(c, (double)(level - 1)) - 1.0) / (c - 1.0);
+    return s->base + (int)((double)s->growth * sum + 1e-6);
 }
 
 int exp_for_level(int level) { return battle_exp_for_level(level); }
