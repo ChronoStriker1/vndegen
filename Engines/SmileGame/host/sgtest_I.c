@@ -34,7 +34,7 @@ static void run(SG *g, int ms) {
 static SG *open_game(const char *dir, char *tmp) {
     strcpy(tmp, "/tmp/sgtestI.XXXXXX");
     if (!mkdtemp(tmp)) return NULL;
-    VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = tmp, .audioRate = 44100};
+    VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = tmp, .audioRate = 44100, .logPath = getenv("SGI_LOG")};
     char err[512];
     SG *g = (SG *)vnsmilegame_open(&cfg, err, sizeof err);
     if (!g) fprintf(stderr, "open %s: %s\n", dir, err);
@@ -537,6 +537,35 @@ static void test_opening_bgm(const char *dir) {
     close_game(g, tmp);
 }
 
+static void test_parallel_trigger(const char *dir) {
+    char tmp[32];
+    SG *g = open_game(dir, tmp);
+    if (!g) return;
+    run(g, 16);
+    vnsmilegame_key((VNSmileGame *)g, VK_OK, true);
+    run(g, 48);
+    vnsmilegame_key((VNSmileGame *)g, VK_OK, false);
+    sg_debug_warp((VNSmileGame *)g, "デバッグ", 8, 2, 0);
+    run(g, 100);
+    int cart = find_npc(g, "646b3c2c-5c22-4947-a232-2fbd30c0b3d9");
+    CHECK(cart >= 0);
+    for (int i = 0; i < 40 && g->interp.active; i++) {
+        vnsmilegame_key((VNSmileGame *)g, VK_OK, true);
+        run(g, 48);
+        vnsmilegame_key((VNSmileGame *)g, VK_OK, false);
+        run(g, 300);
+    }
+    g->field.player.dir = 0;
+    vnsmilegame_key((VNSmileGame *)g, VK_OK, true);
+    run(g, 48);
+    vnsmilegame_key((VNSmileGame *)g, VK_OK, false);
+    run(g, 6000);
+    if (cart >= 0) CHECK((int)floorf(g->field.npcs[cart].x) == 3 && (int)floorf(g->field.npcs[cart].z) == 1);
+    CHECK((int)floorf(g->field.player.x) == 3 && (int)floorf(g->field.player.z) == 2);
+    CHECK(!sg_local_switch(g, guid("646b3c2c-5c22-4947-a232-2fbd30c0b3d9"), 0));
+    close_game(g, tmp);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE"), *sacred = getenv("SG_SACRED");
     if (colette) {
@@ -554,6 +583,7 @@ int main(void) {
     if (sacred) {
         test_sheet_facing(sacred);
         test_pictures_restored(sacred);
+        test_parallel_trigger(sacred);
     } else {
         printf("SG_SACRED not set: Sacred checks skipped\n");
     }

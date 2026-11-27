@@ -302,7 +302,7 @@ static bool try_autoruns(SG *g) {
             ev->autoSheet = ev->sheet;
             sga_start_event(g, i, ev->sheet);
             if (g->interp.active) return true;
-        } else if (t == TRIG_REPEAT) {
+        } else if (t == TRIG_REPEAT || t == TRIG_PARALLEL) {
             sga_start_event(g, i, ev->sheet);
             if (g->interp.active) return true;
         }
