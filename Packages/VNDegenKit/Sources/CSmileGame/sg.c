@@ -46,6 +46,7 @@ VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t er
     g->gameDir = sg_strdup(cfg->gameDir);
     g->saveDir = cfg->saveDir ? sg_strdup(cfg->saveDir) : NULL;
     if (cfg->logPath) g->log = fopen(cfg->logPath, "w");
+    sg_e_open(g);
     if (!game_load(g, err, errSize)) {
         vnsmilegame_close((VNSmileGame *)g);
         return NULL;
@@ -67,6 +68,7 @@ VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t er
 void vnsmilegame_close(VNSmileGame *vg) {
     SG *g = (SG *)vg;
     if (!g) return;
+    sg_e_close(g);
     interp_free(&g->interp);
     field_free(&g->field);
     model_free(g->field.player.model);
@@ -100,6 +102,7 @@ static void start_new_game(SG *g) {
     memset(g->switches, 0, sizeof g->switches);
     g->scene = SCENE_FIELD;
     sg_log(g, "new game");
+    sg_save_new_game(g);
     field_load(g, s->startMap, s->startX, s->startZ, 2);
 }
 
@@ -188,6 +191,7 @@ bool vnsmilegame_frame(VNSmileGame *vg, uint32_t ms) {
         }
         interp_draw(g);
     }
+    sg_e_frame(g);
     g->pressed = 0;
     g->serial++;
     return true;
@@ -202,10 +206,11 @@ const uint32_t *vnsmilegame_pixels(VNSmileGame *vg, int *w, int *h) {
 
 uint32_t vnsmilegame_frame_serial(VNSmileGame *vg) { return ((SG *)vg)->serial; }
 
-void vnsmilegame_audio(VNSmileGame *vg, float *out, int frames) {
-    (void)vg;
-    memset(out, 0, sizeof(float) * (size_t)frames * 2);
-}
+void vnsmilegame_audio(VNSmileGame *vg, float *out, int frames) { snd_mix((SG *)vg, out, frames); }
+
+bool vnsmilegame_save(VNSmileGame *vg, int slot) { return sg_save_write((SG *)vg, slot); }
+
+bool vnsmilegame_load(VNSmileGame *vg, int slot) { return sg_save_read((SG *)vg, slot); }
 
 const char *vnsmilegame_title(VNSmileGame *vg) { return ((SG *)vg)->data.settings.name; }
 

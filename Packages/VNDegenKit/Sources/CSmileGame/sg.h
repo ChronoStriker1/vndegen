@@ -451,4 +451,6 @@ bool sg_pressed(SG *g, u32 key);
 bool sg_local_switch(SG *g, Guid event, int index);
 void text_outlined(SG *g, int x, int y, int px, const char *s, u32 color);
 
+#include "sg_E.h"
+
 #endif

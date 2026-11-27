@@ -29,6 +29,8 @@ uint32_t vnsmilegame_frame_serial(VNSmileGame *g);
 
 void vnsmilegame_key(VNSmileGame *g, int virtualKey, bool down);
 void vnsmilegame_audio(VNSmileGame *g, float *out, int frames);
+bool vnsmilegame_save(VNSmileGame *g, int slot);
+bool vnsmilegame_load(VNSmileGame *g, int slot);
 
 const char *vnsmilegame_title(VNSmileGame *g);
 const char *vnsmilegame_problem(VNSmileGame *g);
