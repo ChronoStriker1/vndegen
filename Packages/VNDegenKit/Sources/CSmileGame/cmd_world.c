@@ -92,7 +92,7 @@ static void set_fade(SG *g, float to, u32 ms) {
 
 static Guid run_event_id(SG *g) {
     int i = st(g)->eventIndex;
-    return i >= 0 && i < g->field.npcCount ? g->field.npcs[i].eventId : (Guid){{0}};
+    return i >= 0 && i < g->field.npcCount ? g->field.npcs[i].eventId : st(g)->eventId;
 }
 
 static void set_local_switch(SG *g, Guid event, int index, bool on) {

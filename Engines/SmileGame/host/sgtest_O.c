@@ -109,12 +109,38 @@ static void test_fire_particles(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_switch_after_transfer(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    Tables *t = &sgb(g)->tables;
+    Party *p = &sgb(g)->party;
+    for (int i = 0; i < p->count; i++) {
+        member_set_level(t, &p->members[i], 40);
+        p->members[i].hp = member_max_hp(t, &p->members[i]);
+    }
+    warp(g, "ゴーレム洞窟Ｂ02Ｆ", 4, 11, 0);
+    for (int i = 0; i < 10 && strcmp(vnsmilegame_scene((VNSmileGame *)g), "field"); i++) press(g, VK_OK, 48);
+    Guid golem = g->field.npcs[1].eventId;
+    CHECK(g->field.npcs[1].visible && !sg_local_switch(g, golem, 0));
+    press(g, VK_UP, 200);
+    for (int i = 0; i < 400 && !(g->field.loaded && strcmp(g->field.map.name, "ゴーレム洞窟Ｂ02Ｆ") == 0 && !g->interp.active && i > 20); i++) {
+        if (sg_battle_active(g) && strcmp(battle_phase(g), "command") == 0) press(g, VK_OK, 48);
+        else if (strcmp(vnsmilegame_scene((VNSmileGame *)g), "message") == 0 || strcmp(vnsmilegame_scene((VNSmileGame *)g), "scroll") == 0 || strcmp(vnsmilegame_scene((VNSmileGame *)g), "battle") == 0) press(g, VK_OK, 48);
+        else run(g, 200);
+    }
+    CHECK(strcmp(g->field.map.name, "ゴーレム洞窟Ｂ02Ｆ") == 0);
+    CHECK(sg_local_switch(g, golem, 0));
+    CHECK(!g->field.npcs[1].visible);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
         test_edge_faces(colette);
         test_water_blocks_player(colette);
         test_fire_particles(colette);
+        test_switch_after_transfer(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;

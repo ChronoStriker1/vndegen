@@ -109,6 +109,7 @@ typedef struct SgaFaceImage {
 typedef struct SgaState {
     bool started;
     int eventIndex;
+    Guid eventId;
     i32 trigger;
     int msgCmd, msgPos, speaker;
     Guid faceL, faceR;

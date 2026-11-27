@@ -251,6 +251,7 @@ void sga_map_loaded(SG *g) {
             if (ev->sheet >= 0 && ev->sheets[ev->sheet].trigger == TRIG_AUTO && guid_eq(ev->sheets[ev->sheet].script, ip->script.id)) {
                 ev->autoSheet = ev->sheet;
                 ip->a.eventIndex = i;
+                ip->a.eventId = f->npcs[i].eventId;
                 match = true;
             }
         }
@@ -283,6 +284,7 @@ void sga_start_event(SG *g, int npc, int sheet) {
     if (s.count > 0) {
         interp_start(g, &s);
         g->interp.a.eventIndex = npc;
+        g->interp.a.eventId = g->field.npcs[npc].eventId;
         sg_log(g, "start %s sheet %d trigger %d", g->field.events[npc].name ? g->field.events[npc].name : "?", sheet, sh->trigger);
     }
     script_free(&s);
