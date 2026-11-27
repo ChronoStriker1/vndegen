@@ -173,6 +173,7 @@ int battle_skill_damage(int power, int magic, int defense, float spread) {
 
 int battle_exp_for_level(int level) {
     if (level <= 1) return 0;
+    if (level > 50) return battle_exp_for_level(50) + 120000 * (level - 50);
     long long l = level;
     return (int)(l * (l - 1) * (l * l - l + 50) / 4);
 }
@@ -704,7 +705,7 @@ static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
     if (friendly) {
         if ((k.states & 32) && t->hp <= 0) t->hp = 1;
         cure(b, t, k.states);
-        int v = s->power > 0 ? s->power + a->mag : 0;
+        int v = (s->power > 0 ? s->power + a->mag : 0) + t->maxHp * s->percent / 100;
         if (v > 0 && t->hp > 0) {
             t->hp += v;
             if (t->hp > t->maxHp) t->hp = t->maxHp;
@@ -1325,6 +1326,17 @@ const char *battle_phase(SG *g) {
     static const char *names[] = {"intro", "command", "target", "list", "ally", "act", "escape", "victory", "result", "defeat", "gameover", "done"};
     Battle *b = get(g);
     return b ? names[b->phase] : "none";
+}
+
+int sg_battle_member(SG *g) {
+    Battle *b = get(g);
+    return b && (b->phase == PH_COMMAND || b->phase == PH_LIST || b->phase == PH_TARGET || b->phase == PH_ALLY) ? b->member : -1;
+}
+
+int sg_battle_cursor(SG *g) {
+    Battle *b = get(g);
+    if (!b) return -1;
+    return b->phase == PH_LIST ? b->listCursor : b->phase == PH_COMMAND ? b->cmdCursor : b->targetCursor;
 }
 
 int battle_monster_hp(SG *g, int index) {
