@@ -273,7 +273,17 @@ static void face_player(SG *g, int npc) {
     const SgaSheet *sh = &ev->sheets[ev->sheet];
     if (sh->fixDir || sh->dir != 1 || sh->still) return;
     static const int back[4] = {2, 3, 0, 1};
+    ev->savedDir = g->field.npcs[npc].dir;
+    ev->turned = true;
     g->field.npcs[npc].dir = back[g->field.player.dir & 3];
+}
+
+void sga_event_ended(SG *g) {
+    SgaState *a = &g->interp.a;
+    int i = a->eventIndex;
+    if (i < 0 || i >= a->evCount || !a->ev[i].turned) return;
+    a->ev[i].turned = false;
+    g->field.npcs[i].dir = a->ev[i].savedDir;
 }
 
 static bool try_autoruns(SG *g) {
@@ -316,6 +326,7 @@ bool sga_field_input(SG *g) {
     int tx = px + dx[dir], tz = pz + dz[dir];
     if (sg_pressed(g, KEY_OK)) {
         int i = npc_at(g, tx, tz, false);
+        if ((i < 0 || trigger_of(g, i) != TRIG_TALK) && sga_floor(g, tx, tz) > sga_floor(g, px, pz)) i = npc_at(g, tx + dx[dir], tz + dz[dir], false);
         if (i < 0) i = npc_at(g, px, pz, false);
         if (i >= 0 && trigger_of(g, i) == TRIG_TALK) {
             face_player(g, i);

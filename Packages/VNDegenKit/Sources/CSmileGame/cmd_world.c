@@ -56,7 +56,8 @@ void sga_new_game(SG *g) {
     a->itemCount = 0;
     a->money = 0;
     a->partyCount = 0;
-    for (int i = 0; i < g->data.settings.partyCount && i < SGA_PARTY; i++) a->party[a->partyCount++] = g->data.settings.party[i];
+    for (int i = 0; i < g->data.settings.partyCount && i < SGA_PARTY; i++)
+        if (!guid_zero(g->data.settings.party[i])) a->party[a->partyCount++] = g->data.settings.party[i];
     a->heroGraphic = (Guid){{0}};
     memset(a->pics, 0, sizeof a->pics);
     a->tint = 0;
@@ -348,6 +349,12 @@ bool sga_exec(SG *g, const Cmd *c) {
         sga_move_command(g, c, c->type == CMD_MOVE_PLAYER);
         a->waitMoves = cmd_int(c, 5) == 0;
         return a->waitMoves;
+    case CMD_TURN_EVENT: {
+        int code = cmd_int(c, 0), i = a->eventIndex;
+        if (code <= 3 && i >= 0 && i < a->evCount) g->field.npcs[i].dir = sga_dir_from_code(code);
+        sg_log(g, "turn event %d", code);
+        return false;
+    }
     case CMD_TURN_PLAYER: {
         int code = cmd_int(c, 0);
         if (code <= 3) g->field.player.dir = sga_dir_from_code(code);
@@ -404,9 +411,9 @@ void sga_frame(SG *g, u32 ms) {
     g->fadeLevel = 0;
     g->fadeTotal = 0;
     if (f->loaded && (a->mapPending || !guid_eq(a->mapId, f->map.id)) && !g->pendingTransfer) {
-        bool fromScript = a->mapPending;
+        bool fromScript = a->mapPending, sameMap = guid_eq(a->mapId, f->map.id);
         sga_map_loaded(g);
-        if (fromScript) a->eventIndex = -1;
+        if (fromScript && !sameMap) a->eventIndex = -1;
     }
     if (a->dirty) sga_refresh_events(g);
     if (a->fadeTotal) {

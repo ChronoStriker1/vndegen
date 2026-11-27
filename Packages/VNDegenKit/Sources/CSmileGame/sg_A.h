@@ -80,6 +80,8 @@ typedef struct SgaEvent {
     int moveDir, moveLeft;
     float moveSpeed;
     bool moveThrough;
+    int savedDir;
+    bool turned;
 } SgaEvent;
 
 typedef struct SgaPicture {
@@ -110,10 +112,13 @@ typedef struct SgaState {
     Guid faceL, faceR;
     int exprL, exprR;
     bool windowOpen;
+    char *lastPage;
+    int carryWindow;
     u32 textMs;
     char **choices;
     int choiceCount, choiceCursor, choiceCancel, choiceHeader;
     float scrollSpeed;
+    bool scrollStatic;
     Image *scrollImage;
     SgaPicture pics[SGA_PICTURES];
     float fade, fadeFrom, fadeTo;
@@ -163,6 +168,7 @@ int sga_event_sheet(SG *g, int npc);
 bool sga_cond_holds(SG *g, Guid event, const SgaCond *c);
 bool sga_field_input(SG *g);
 void sga_start_event(SG *g, int npc, int sheet);
+void sga_event_ended(SG *g);
 bool sga_exec(SG *g, const Cmd *c);
 void sga_actor_graphic(SG *g, Actor *a, Guid graphic);
 void sga_move_actor(SG *g, Actor *a, int *dir, int *left, float speed, bool through, u32 ms);

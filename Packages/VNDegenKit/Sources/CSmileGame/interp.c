@@ -2,11 +2,13 @@
 
 enum { ST_RUN, ST_MESSAGE, ST_SCROLL, ST_WAIT, ST_CHOICE, ST_BUSY };
 
-static const int kTextPx = 22;
+static const int kTextPx = 24;
 static const int kLinePx = 36;
 static const int kPageLines = 3;
+static const float kScrollPxPerSec = 30.0f;
 static const int kWinX = 120, kWinW = 720, kWinH = 160;
-static const int kTextPadX = 18, kTextPadY = 22;
+static const int kTextPadX = 18, kTextPadY = 19;
+static const int kWrapW = 684;
 static const float kRevealPerMs = 0.12f;
 
 static void clear_pages(Interp *ip) {
@@ -30,11 +32,20 @@ static void push_page(Interp *ip, const char *s, size_t n) {
     ip->pages[ip->pageCount++] = page;
 }
 
+static bool no_line_start(const char *ch) {
+    static const char *set[] = {"、", "。", "，", "．", "・", "：", "；", "？", "！", "ー", "）", "］", "｝", "」", "』", "〕", "〉", "》", "】", "ぁ",
+                                "ぃ", "ぅ", "ぇ", "ぉ", "っ", "ゃ", "ゅ", "ょ", "ゎ", "ァ", "ィ", "ゥ", "ェ", "ォ", "ッ", "ャ", "ュ", "ョ", "ヮ",
+                                "ヵ", "ヶ", "…", "‥", "･", ".", ",", "!", "?", ")", "]", "}"};
+    for (size_t i = 0; i < sizeof set / sizeof set[0]; i++)
+        if (strcmp(ch, set[i]) == 0) return true;
+    return false;
+}
+
 static char *wrap_text(SG *g, const char *text, int width) {
     size_t n = strlen(text);
     char *out = sg_alloc(n * 2 + 1);
-    size_t o = 0;
-    int lineW = 0;
+    size_t o = 0, lastChar = 0;
+    int lineW = 0, lastW = 0;
     const char *p = text;
     while (*p) {
         if (*p == '\r') {
@@ -53,9 +64,19 @@ static char *wrap_text(SG *g, const char *text, int width) {
         memcpy(ch, p, (size_t)len);
         int cw = font_width(g->font, kTextPx, ch);
         if (lineW + cw > width && lineW > 0) {
-            out[o++] = '\n';
-            lineW = 0;
+            if (no_line_start(ch) && lineW > lastW) {
+                memmove(out + lastChar + 1, out + lastChar, o - lastChar);
+                out[lastChar] = '\n';
+                o++;
+                out[o] = 0;
+                lineW = font_width(g->font, kTextPx, out + lastChar + 1);
+            } else {
+                out[o++] = '\n';
+                lineW = 0;
+            }
         }
+        lastChar = o;
+        lastW = lineW;
         memcpy(out + o, p, (size_t)len);
         o += (size_t)len;
         lineW += cw;
@@ -67,7 +88,7 @@ static char *wrap_text(SG *g, const char *text, int width) {
 
 static void split_pages(SG *g, Interp *ip, const char *text) {
     clear_pages(ip);
-    char *wrapped = wrap_text(g, text, kWinW - kTextPadX * 2);
+    char *wrapped = wrap_text(g, text, kWrapW);
     const char *p = wrapped;
     while (*p) {
         const char *brk = strstr(p, "\n\n");
@@ -112,6 +133,8 @@ static void runner_reset(Interp *ip) {
     ip->shownMs = 0;
     ip->a.windowOpen = false;
     ip->a.msgCmd = 0;
+    free(ip->a.lastPage);
+    ip->a.lastPage = NULL;
 }
 
 void interp_free(Interp *ip) {
@@ -285,12 +308,15 @@ static void step(SG *g) {
         }
         if (ip->pc >= ip->script.count) {
             ip->active = false;
+            a->carryWindow = a->windowOpen ? a->msgCmd : 0;
             a->windowOpen = false;
+            sga_event_ended(g);
             sg_log(g, "event end");
             return;
         }
         int here = ip->pc;
         const Cmd *c = &ip->script.cmds[ip->pc++];
+        if (c->type != CMD_CHOICES) a->carryWindow = 0;
         if (c->type != CMD_MESSAGE && c->type != CMD_FACE_MESSAGE && c->type != CMD_CHOICES && c->type != CMD_CASE &&
             c->type != CMD_ELSE && c->type != CMD_END)
             a->windowOpen = false;
@@ -304,15 +330,22 @@ static void step(SG *g) {
         case CMD_END: break;
         case CMD_MESSAGE:
         case CMD_FACE_MESSAGE: start_message(g, c); break;
-        case CMD_CHOICES: start_choices(g, c, here); break;
-        case CMD_SCROLL_TEXT:
+        case CMD_CHOICES:
+            start_choices(g, c, here);
+            break;
+        case CMD_SCROLL_TEXT: {
+            bool image = c->argCount > 2 && c->args[2].kind == ARG_GUID;
             ip->scrollText = cmd_str(c, 0);
             ip->scroll = 0;
-            a->scrollSpeed = 30.0f * (float)(1 + cmd_int(c, 1));
-            a->scrollImage = c->argCount > 2 && c->args[2].kind == ARG_GUID ? sg_image(g, cmd_guid(c, 2)) : NULL;
+            ip->shownMs = 0;
+            a->scrollSpeed = kScrollPxPerSec;
+            a->scrollImage = image ? sg_image(g, cmd_guid(c, 2)) : NULL;
+            a->msgPos = cmd_int(c, 1);
+            a->scrollStatic = cmd_int(c, image ? 3 : 2) == 0;
             ip->state = ST_SCROLL;
-            sg_log(g, "scroll text: %d bytes, speed %d", (int)strlen(ip->scrollText), cmd_int(c, 1));
+            sg_log(g, "screen text: %s, %d bytes", a->scrollStatic ? "static" : "scrolling", (int)strlen(ip->scrollText));
             break;
+        }
         case CMD_WAIT:
             ip->waitMs = (u32)cmd_int(c, 0);
             ip->state = ST_WAIT;
@@ -352,6 +385,8 @@ void interp_update(SG *g, u32 ms) {
             if (!revealed) {
                 a->textMs = (u32)((float)total / kRevealPerMs) + 1;
             } else if (++ip->page >= ip->pageCount) {
+                free(a->lastPage);
+                a->lastPage = sg_strdup(ip->pages[ip->pageCount - 1]);
                 clear_pages(ip);
                 ip->state = ST_RUN;
             } else {
@@ -368,6 +403,14 @@ void interp_update(SG *g, u32 ms) {
         else if (sg_pressed(g, KEY_CANCEL) && a->choiceCancel >= 0 && a->choiceCancel < a->choiceCount) finish_choice(g, a->choiceCancel);
         break;
     case ST_SCROLL: {
+        ip->shownMs += ms;
+        if (a->scrollStatic) {
+            if (sg_pressed(g, KEY_OK)) {
+                ip->state = ST_RUN;
+                a->scrollImage = NULL;
+            }
+            break;
+        }
         float speed = (g->keys & KEY_OK) ? a->scrollSpeed * 4.0f : a->scrollSpeed;
         ip->scroll += speed * (float)ms / 1000.0f;
         int lines = 1;
@@ -476,13 +519,13 @@ static int window_y(SG *g, int pos) {
     return 351 * g->h / 544;
 }
 
-static void draw_message(SG *g) {
+static void draw_message(SG *g, const char *text, int shown) {
     Interp *ip = &g->interp;
     SgaState *a = &ip->a;
     if (a->msgCmd == CMD_FACE_MESSAGE) {
         Image *l = sga_face(g, a->faceL, a->exprL), *r = sga_face(g, a->faceR, a->exprR);
-        if (l) darken(l, g->fb, g->w, g->h, 0, g->h - l->h, l->w, l->h, a->speaker == 1);
-        if (r) darken(r, g->fb, g->w, g->h, g->w - r->w, g->h - r->h, r->w, r->h, a->speaker == 0);
+        if (l) darken(l, g->fb, g->w, g->h, 0, g->h - l->h, l->w, l->h, r && a->speaker == 1);
+        if (r) darken(r, g->fb, g->w, g->h, g->w - r->w, g->h - r->h, r->w, r->h, l && a->speaker == 0);
     }
     int wy = window_y(g, a->msgPos);
     const Res *res = NULL;
@@ -497,11 +540,10 @@ static void draw_message(SG *g) {
         color = 0xffffffffu;
     }
     sga_window(g, im, res, kWinX * g->w / 960, wy, kWinW * g->w / 960, kWinH);
-    if (ip->state == ST_MESSAGE && ip->page < ip->pageCount) {
-        int total = page_chars(ip->pages[ip->page]);
-        int shown = (int)((float)a->textMs * kRevealPerMs);
-        draw_lines(g, ip->pages[ip->page], kWinX * g->w / 960 + kTextPadX, wy + kTextPadY, false, color, false, shown < total ? shown : -1);
-        if (shown >= total && (ip->shownMs / 400) % 3 != 2) {
+    if (text) {
+        int total = page_chars(text);
+        draw_lines(g, text, kWinX * g->w / 960 + kTextPadX, wy + kTextPadY, false, color, false, shown < total ? shown : -1);
+        if (ip->state == ST_MESSAGE && shown >= total && (ip->shownMs / 400) % 3 != 2) {
             int cx = g->w / 2, cy = wy + kWinH - 14;
             for (int k = 0; k < 7; k++) fill_rect(g->fb, g->w, g->h, cx - 6 + k, cy - 5 + k, 13 - k * 2, 1, color);
         }
@@ -533,7 +575,18 @@ void interp_draw(SG *g) {
     Interp *ip = &g->interp;
     sga_draw_over(g);
     if (!ip->active) return;
-    if (ip->state == ST_SCROLL && ip->scrollText) {
+    if (ip->state == ST_SCROLL && ip->scrollText && ip->a.scrollStatic) {
+        Image *im = ip->a.scrollImage;
+        if (im) {
+            blit(g->fb, g->w, g->h, im, 0, 0, im->w, im->h, (g->w - im->w) / 2, (g->h - im->h) / 2, im->w, im->h, 255);
+        } else {
+            int lines = 1;
+            for (const char *p = ip->scrollText; *p; p++)
+                if (*p == '\n') lines++;
+            int y = ip->a.msgPos == 0 ? 40 : ip->a.msgPos == 1 ? g->h - 40 - lines * kLinePx : (g->h - lines * kLinePx) / 2;
+            draw_lines(g, ip->scrollText, 0, y, true, 0xffffffffu, true, -1);
+        }
+    } else if (ip->state == ST_SCROLL && ip->scrollText) {
         if (ip->a.scrollImage) {
             Image *im = ip->a.scrollImage;
             blit(g->fb, g->w, g->h, im, 0, 0, im->w, im->h, (g->w - im->w) / 2, g->h - (int)ip->scroll, im->w, im->h, 255);
@@ -541,8 +594,17 @@ void interp_draw(SG *g) {
             draw_lines(g, ip->scrollText, 0, g->h - (int)ip->scroll, true, 0xffffffffu, true, -1);
         }
     } else if (ip->state == ST_MESSAGE && ip->page < ip->pageCount) {
-        draw_message(g);
+        draw_message(g, ip->pages[ip->page], (int)((float)ip->a.textMs * kRevealPerMs));
     } else if (ip->state == ST_CHOICE) {
+        if (ip->a.windowOpen && ip->a.lastPage) {
+            draw_message(g, ip->a.lastPage, 1 << 30);
+        } else if (ip->a.carryWindow) {
+            int keep = ip->a.msgCmd;
+            ip->a.msgCmd = ip->a.carryWindow;
+            ip->a.faceL = ip->a.faceR = (Guid){{0}};
+            draw_message(g, NULL, 0);
+            ip->a.msgCmd = keep;
+        }
         draw_choices(g);
     }
 }
