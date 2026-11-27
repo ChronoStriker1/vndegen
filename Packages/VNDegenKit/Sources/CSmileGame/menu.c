@@ -53,6 +53,7 @@ struct Menu {
     i32 shopPrices[32];
     int shopCount;
     int innPrice;
+    bool result;
     char note[256];
     Image *faces[8];
     Guid faceIds[8];
@@ -178,11 +179,7 @@ static Tables *T(SG *g) { return &sgb(g)->tables; }
 static Party *P(SG *g) { return &sgb(g)->party; }
 static const char *MT(SG *g, int i) { return T(g)->text.menu[i] ? T(g)->text.menu[i] : ""; }
 
-void sgb_sound(SG *g, int which) {
-    const Guid *s = &T(g)->text.sounds[which];
-    const Res *r = res_find(&g->res, *s);
-    sg_log(g, "menu sound %d %s", which, r ? r->name : "-");
-}
+void sgb_sound(SG *g, int which) { snd_se(g, T(g)->text.sounds[which], 100, 100); }
 
 static char *slot_path(SG *g, int slot) {
     return g->saveDir ? sg_fmt("%s/Save_%02d.sgs", g->saveDir, slot) : sg_fmt("%s/savedata/Save_%02d.sgs", g->gameDir, slot);
@@ -1154,6 +1151,7 @@ static void update_shop(SG *g, Menu *m) {
         }
         p->money -= price;
         party_give_item(p, it->id, 1);
+        m->result = true;
         sgb_sound(g, SND_DECIDE);
         const char *f = T(g)->text.shop[SHOP_BOUGHT];
         const char *at = f ? strstr(f, "{0}") : NULL;
@@ -1224,6 +1222,7 @@ static void update_inn(SG *g, Menu *m) {
     }
     p->money -= m->innPrice;
     party_recover(g);
+    m->result = true;
     sgb_sound(g, SND_STATUS_UP);
     sg_log(g, "menu: inn, party healed for %dG", m->innPrice);
     close_menu(g, m);
@@ -1256,6 +1255,7 @@ void shop_open(SG *g, const Guid *items, const i32 *prices, int count) {
         m->shopPrices[m->shopCount++] = prices ? prices[i] : it->price;
     }
     m->cur[P_SHOP] = 0;
+    m->result = false;
     begin(g, m, MENU_SHOP, P_SHOP);
 }
 
@@ -1264,6 +1264,7 @@ void inn_open(SG *g, int price) {
     if (!m) return;
     m->innPrice = price;
     m->cur[P_INN] = 0;
+    m->result = false;
     begin(g, m, MENU_INN, P_INN);
 }
 
@@ -1271,6 +1272,8 @@ bool menu_active(SG *g) {
     SgB *b = sgb(g);
     return b && b->menu && b->menu->mode != MENU_CLOSED;
 }
+
+bool menu_result(SG *g) { return g->b.menu && g->b.menu->result; }
 
 bool sgb_quit(SG *g) {
     SgB *b = sgb(g);

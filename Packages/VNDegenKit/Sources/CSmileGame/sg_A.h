@@ -36,12 +36,12 @@ enum {
     CMD_SCREEN = 51,
     CMD_ERASE_EVENT = 52,
     CMD_CAMERA = 53,
-    CMD_TITLE = 59,
+    CMD_RECOVER = 59,
     CMD_FADE = 60,
     CMD_TINT = 61,
     CMD_SHAKE = 62,
     CMD_FLASH = 63,
-    CMD_BGS = 64,
+    CMD_ME = 64,
     CMD_BATTLE = 65,
     CMD_HERO_GRAPHIC = 69,
     CMD_ELSE = 71,
@@ -136,6 +136,7 @@ typedef struct SgaState {
     int playerMoveDir, playerMoveLeft;
     float playerMoveSpeed;
     bool waitMoves;
+    int screenHeader;
     Image *balloon;
     int balloonTarget;
     u32 balloonMs, balloonTotal;

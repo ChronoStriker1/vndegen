@@ -330,14 +330,16 @@ bool sga_exec(SG *g, const Cmd *c) {
         sg_log(g, "camera mode %d (%d args) not applied", cmd_int(c, 0), c->argCount);
         return false;
     case CMD_BGM:
-    case CMD_SE:
-    case CMD_BGS: {
-        const Res *r = res_find(&g->res, cmd_guid(c, 0));
-        sg_log(g, "sound %d %s vol %d (not played)", c->type, r ? r->name : "stop", cmd_int(c, 1));
+        if (guid_zero(cmd_guid(c, 0))) snd_bgm_stop(g, 0);
+        else snd_bgm(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2));
         return false;
-    }
+    case CMD_SE: snd_se(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
+    case CMD_ME: snd_me(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
     case CMD_EFFECT: sg_log(g, "effect on %d (not drawn)", cmd_int(c, 0)); return false;
-    case CMD_TITLE: sg_log(g, "party recovered (not run)"); return false;
+    case CMD_RECOVER:
+        party_recover(g);
+        sg_log(g, "party recovered");
+        return false;
     default: sg_log(g, "command %d not handled (%d args)", c->type, c->argCount); return false;
     }
 }

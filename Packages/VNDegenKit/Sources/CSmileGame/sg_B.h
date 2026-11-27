@@ -343,6 +343,7 @@ bool menu_active(SG *g);
 void menu_open(SG *g);
 void shop_open(SG *g, const Guid *items, const i32 *prices, int count);
 bool sgb_quit(SG *g);
+bool menu_result(SG *g);
 void inn_open(SG *g, int price);
 const char *menu_page(SG *g);
 bool sgb_save_slot(SG *g, int slot);

@@ -280,6 +280,7 @@ static void replace(Mixer *m, int slot, int oldSlot, Voice *nv, int fadeMs) {
 static void play_loop(SG *g, int slot, int oldSlot, int ch, Guid id, int volume, int tempo) {
     SgE *e = &g->e;
     Mixer *m = e->mix;
+    if (!m) return;
     pthread_mutex_lock(&m->lock);
     Voice *cur = m->v[slot];
     if (cur && !cur->done && !cur->stopAtZero && guid_eq(cur->id, id)) {
@@ -303,6 +304,7 @@ void snd_bgs(SG *g, Guid id, int volume, int tempo) { play_loop(g, V_BGS, V_BGS_
 static void stop_loop(SG *g, int slot, int oldSlot, int fadeMs) {
     SgE *e = &g->e;
     Mixer *m = e->mix;
+    if (!m) return;
     pthread_mutex_lock(&m->lock);
     replace(m, slot, oldSlot, NULL, fadeMs);
     pthread_mutex_unlock(&m->lock);
@@ -314,6 +316,7 @@ void snd_bgs_stop(SG *g, int fadeMs) { stop_loop(g, V_BGS, V_BGS_OLD, fadeMs); }
 
 void snd_me(SG *g, Guid id, int volume, int tempo) {
     SgE *e = &g->e;
+    if (!e->mix) return;
     Voice *v = open_voice(g, e->mix, id, SND_ME, volume, tempo);
     pthread_mutex_lock(&e->mix->lock);
     voice_free(e->mix->v[V_ME]);
@@ -323,6 +326,7 @@ void snd_me(SG *g, Guid id, int volume, int tempo) {
 
 void snd_se(SG *g, Guid id, int volume, int tempo) {
     SgE *e = &g->e;
+    if (!e->mix) return;
     Voice *v = open_voice(g, e->mix, id, SND_SE, volume, tempo);
     if (!v) return;
     Mixer *m = e->mix;
