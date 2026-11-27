@@ -785,7 +785,6 @@ static void draw_model(SG *g, Actor *a, float ang, bool xray) {
     if (xray)
         for (int i = 0; i < n; i++)
             if (tris[i].mode == TRI_OPAQUE) r3_tri_ex(&g->r3, &g->field.cam, &tris[i], TRI_OPAQUE, TF_XRAY | TF_CULL);
-    r3_flush(&g->r3);
     for (int i = 0; i < n; i++) {
         Tri *t = &tris[i];
         r3_tri_ex(&g->r3, &g->field.cam, t, t->mode, t->mode == TRI_OPAQUE ? (u8)(t->flags | TF_LIT | TF_SHADOW) : t->flags);
