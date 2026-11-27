@@ -8,7 +8,6 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
     case stat(path: String)
     /// `text` true returns UTF-8 text; false returns base64 bytes.
     case readFile(path: String, text: Bool)
-    /// Up to `length` bytes from `position`, as base64, for `fs.readSync`.
     case read(path: String, position: Int64, length: Int)
     /// `text` true writes `data` as UTF-8, which is what Node does for a string; false decodes base64 bytes.
     case writeFile(path: String, data: String, text: Bool)
@@ -26,7 +25,6 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
     case storageSet(key: String, value: String)
     case storageRemove(key: String)
     case storageClear
-    /// A WebM the page made in memory, as base64, to play converted when it has alpha.
     case alphaVideo(data: String)
 
     private enum Key: String, CodingKey { case op, path, text, data, recursive, from, to, url, key, value, position, length }

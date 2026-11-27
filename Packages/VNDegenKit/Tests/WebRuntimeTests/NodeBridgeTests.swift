@@ -211,8 +211,6 @@ private func decode(_ json: String) throws -> BridgeRequest {
     #expect(outside.code == "EACCES")
 }
 
-/// Princess and Conquest's Club_VideoDecrypt reads each movie's first four bytes with openSync, readSync and closeSync.
-/// The expected values are what Node 26's fs returned for the same calls on the same 20-byte file.
 @Test @MainActor func descriptorReadsBehaveAsNode() async throws {
     let root = TestFolders.root.appendingPathComponent("vndegen-fd-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root.appendingPathComponent("movies"), withIntermediateDirectories: true)

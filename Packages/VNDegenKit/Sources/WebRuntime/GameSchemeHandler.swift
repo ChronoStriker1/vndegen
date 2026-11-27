@@ -73,8 +73,6 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
         try? FileManager.default.removeItem(at: stashFolder)
     }
 
-    /// Keeps a WebM the page holds in memory for conversion, and answers with the address that serves it converted, or
-    /// null when the clip has no alpha or this game's movies aren't converted.
     func stash(base64: String) -> BridgeReply {
         guard alpha else { return .value(.null) }
         guard let clip = Data(base64Encoded: base64) else { return .failure(BridgeError(code: "EINVAL", message: "data is not base64")) }

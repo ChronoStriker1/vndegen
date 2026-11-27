@@ -107,8 +107,6 @@ public actor AlphaVideoCache {
         return try await serve(key: key, source: source, name: name, method: method, range: range, cancellation: cancellation, log: log)
     }
 
-    /// Keeps a clip the page made in memory, such as a decrypted movie behind a blob URL, in `stash` under its content's
-    /// hash, and returns that key when it has alpha. Nil for a clip without alpha, which the page plays as it is.
     nonisolated func stash(_ clip: Data, in stash: URL, log: Logger) throws -> String? {
         let key = SHA256.hash(data: clip).map { String(format: "%02x", $0) }.joined()
         let file = stash.appendingPathComponent(key + ".webm")
@@ -134,7 +132,6 @@ public actor AlphaVideoCache {
         }
     }
 
-    /// The converted movie for a clip `stash` kept, nil when the page never stashed `key`.
     nonisolated func stashedResponse(key: String, stash: URL, method: String, range: String?,
                                      cancellation: AlphaVideoCancellation, log: Logger) async throws -> FileResponse? {
         let name = "blob \(key.prefix(12))"

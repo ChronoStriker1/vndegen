@@ -56,8 +56,6 @@ private func inspect(_ descriptor: Int32) -> (Int32, String) {
     #expect(FileManager.default.fileExists(atPath: output.path))
 }
 
-/// Princess and Conquest decrypts its movies in the page and plays them from blob URLs, which never reach the scheme
-/// handler. A WebM blob with alpha is kept by the app instead and served converted; one without alpha stays a blob.
 @Test @MainActor func aWebMBlobWithAlphaIsServedConverted() async throws {
     let root = TestFolders.root.appending(path: "vndegen-alpha-blob-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
