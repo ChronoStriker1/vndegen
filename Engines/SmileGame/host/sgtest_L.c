@@ -211,8 +211,17 @@ static void test_stop_se(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_experience(void) {
+    CHECK(battle_exp_for_level(7) == 966);
+    CHECK(battle_exp_for_level(8) == 1484);
+    CHECK(battle_exp_for_level(9) == 2196);
+    CHECK(battle_exp_for_level(10) == 3150);
+    CHECK(battle_exp_for_level(11) > 3150 + 954);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
+    test_experience();
     if (colette) {
         test_inn_stay(colette);
         test_inn_no_money(colette);
