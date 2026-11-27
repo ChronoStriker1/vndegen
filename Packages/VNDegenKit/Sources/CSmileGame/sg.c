@@ -51,6 +51,7 @@ VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t er
         return NULL;
     }
     res_load(g);
+    sgb_open(g);
     size_t fontSize = 0;
     u8 *fontData = pack_read(&g->data.pack, "font.ttf", &fontSize);
     if (fontData) g->font = font_load(fontData, fontSize);
@@ -67,6 +68,7 @@ VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t er
 void vnsmilegame_close(VNSmileGame *vg) {
     SG *g = (SG *)vg;
     if (!g) return;
+    sgb_close(g);
     interp_free(&g->interp);
     field_free(&g->field);
     model_free(g->field.player.model);
@@ -99,6 +101,7 @@ static void start_new_game(SG *g) {
     memset(g->vars, 0, sizeof g->vars);
     memset(g->switches, 0, sizeof g->switches);
     g->scene = SCENE_FIELD;
+    party_new(g);
     sg_log(g, "new game");
     field_load(g, s->startMap, s->startX, s->startZ, 2);
 }
@@ -150,7 +153,7 @@ bool vnsmilegame_frame(VNSmileGame *vg, uint32_t ms) {
     if (g->scene == SCENE_TITLE) {
         title_update(g);
         title_draw(g);
-    } else {
+    } else if (!menu_frame(g, ms)) {
         interp_update(g, ms);
         if (g->pendingTransfer) {
             g->pendingTransfer = false;
@@ -190,7 +193,7 @@ bool vnsmilegame_frame(VNSmileGame *vg, uint32_t ms) {
     }
     g->pressed = 0;
     g->serial++;
-    return true;
+    return !sgb_quit(g);
 }
 
 const uint32_t *vnsmilegame_pixels(VNSmileGame *vg, int *w, int *h) {
@@ -217,6 +220,7 @@ const char *vnsmilegame_problem(VNSmileGame *vg) {
 const char *vnsmilegame_scene(VNSmileGame *vg) {
     SG *g = (SG *)vg;
     if (g->scene == SCENE_TITLE) return "title";
+    if (menu_page(g)) return menu_page(g);
     if (g->interp.active) return g->interp.state == 1 ? "message" : g->interp.state == 2 ? "scroll" : "event";
     return "field";
 }
