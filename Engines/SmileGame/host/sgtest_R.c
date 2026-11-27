@@ -176,6 +176,71 @@ static void test_back_command(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static Member *member_named(SG *g, const char *name) {
+    Party *p = &g->b.party;
+    for (int i = 0; i < p->count + p->reserveCount; i++) {
+        Member *m = i < p->count ? &p->members[i] : &p->reserve[i - p->count];
+        const HeroDef *h = hero_def(&g->b.tables, m->hero);
+        if (h && strcmp(h->name, name) == 0) return m;
+    }
+    return NULL;
+}
+
+static bool page_has(SG *g, const char *text) {
+    Interp *ip = &g->interp;
+    return ip->active && ip->page < ip->pageCount && strstr(ip->pages[ip->page], text);
+}
+
+static bool pages_have(SG *g, const char *text) {
+    Interp *ip = &g->interp;
+    for (int i = 0; ip->active && i < ip->pageCount; i++)
+        if (strstr(ip->pages[i], text)) return true;
+    return false;
+}
+
+static void test_ending_commands(const char *dir) {
+    SG *g = open_game(dir, "/nonexistent-sgtest-r");
+    CHECK(g != NULL);
+    if (!g) return;
+    run(g, 32);
+    press(g, VK_OK);
+    run(g, 200);
+    interp_free(&g->interp);
+    Tables *t = &g->b.tables;
+    const char *names[] = {"アリア", "マオー", "ファフニール"};
+    for (int i = 0; i < 3; i++) {
+        const HeroDef *h = hero_named(t, names[i]);
+        CHECK(h != NULL);
+        if (h) party_add_hero(g, h->id);
+    }
+    Member *mao = member_named(g, "マオー"), *fafnir = member_named(g, "ファフニール");
+    CHECK(mao && fafnir);
+    if (!mao || !fafnir) {
+        vnsmilegame_close((VNSmileGame *)g);
+        return;
+    }
+    member_set_level(t, mao, 20);
+    mao->exp = battle_exp_for_level(20);
+    int fafLevel = fafnir->level, fafExp = fafnir->exp;
+    g->b.party.playMs = (u64)(3 * 3600 + 25 * 60) * 1000;
+    CHECK(sg_debug_warp((VNSmileGame *)g, "エンディング", 2, 3, 0));
+    for (int i = 0; i < 400 && !page_has(g, "THANK YOU"); i++) {
+        if (g->interp.active && g->interp.state == 4) press(g, VK_OK);
+        else press(g, VK_OK);
+        run(g, 100);
+    }
+    CHECK(page_has(g, "THANK YOU"));
+    CHECK(g->vars[15] == 3 && g->vars[16] >= 25 && g->vars[16] <= 27 && g->vars[17] >= 0 && g->vars[17] < 60);
+    char shown[64];
+    snprintf(shown, sizeof shown, "3時間%d分%d秒", g->vars[16], g->vars[17]);
+    CHECK(pages_have(g, shown) && !pages_have(g, "Variable"));
+    mao = member_named(g, "マオー");
+    fafnir = member_named(g, "ファフニール");
+    CHECK(mao && mao->exp == 40850 + 20000 && mao->level == 22);
+    CHECK(fafnir && fafnir->exp == fafExp + 20000 && fafnir->level > fafLevel);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *sacred = getenv("SG_SACRED");
     if (sacred) {
@@ -183,6 +248,7 @@ int main(void) {
         if (!mkdtemp(tmp)) return 1;
         test_save_cursor_after_load(sacred, tmp);
         test_back_command(sacred);
+        test_ending_commands(sacred);
         rmdir(tmp);
     } else
         printf("SG_SACRED not set: Sacred checks skipped\n");
