@@ -257,12 +257,23 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
         int period = p.pulseInterval * 2, at = int(game_.frameCount() % uint64_t(period));
         swing = float(at < p.pulseInterval ? at : period - at) / p.pulseInterval;
     }
-    o.r = float(p.r.value() + p.pulse[0] * swing) / 100;
-    o.g = float(p.g.value() + p.pulse[1] * swing) / 100;
-    o.b = float(p.b.value() + p.pulse[2] * swing) / 100;
+    float flash = p.flashFrames > 0 ? float(p.flashLeft) / float(p.flashFrames) : 0;
+    o.r = float(p.r.value() + p.pulse[0] * swing + p.flash[0] * flash) / 100;
+    o.g = float(p.g.value() + p.pulse[1] * swing + p.flash[1] * flash) / 100;
+    o.b = float(p.b.value() + p.pulse[2] * swing + p.flash[2] * flash) / 100;
     o.blend = p.blend == 1 ? Blend::Add : p.blend == 2 ? Blend::Subtract : p.blend == 3 ? Blend::Multiply : Blend::Normal;
     // Windows and shapes ignore the angle, as Wolf's manual says.
     o.angle = pictureAngleDegrees(p);
+    if (w < 0) {
+        x += w;
+        w = -w;
+        o.flipX = true;
+    }
+    if (h < 0) {
+        y += h;
+        h = -h;
+        o.flipY = true;
+    }
     canvas.draw(*img, from, {x, y, w, h}, o);
 }
 

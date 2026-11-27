@@ -111,6 +111,8 @@ struct Picture {
     std::array<int, 3> pulse{0, 0, 0};
     int pulseInterval = 0;
     int flickerFrames = 0, flickerInterval = 0;
+    std::array<int, 3> flash{0, 0, 0};
+    int flashFrames = 0, flashLeft = 0;
     bool erasing = false;
 };
 
@@ -429,6 +431,7 @@ private:
     bool commonConditionMet(const CommonEvent &ce);
     void updateCamera();
     void updatePictures();
+    void applyVolumes();
     void syncPartyGraphics();
 
     // Characters (characters.cpp).
@@ -498,6 +501,7 @@ private:
     std::mt19937 rng_{12345};
     std::map<int, int> unsupported_;
     std::unique_ptr<Audio> audio_;
+    std::array<int32_t, 3> appliedVolumes_{100, 100, 100};
     void playListed(SoundKind kind, int id, int fadeFrames, int startMs = 0);
     void playMapMusic();
 

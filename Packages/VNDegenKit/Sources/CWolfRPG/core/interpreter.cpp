@@ -1013,7 +1013,14 @@ void Game::pictureCommand(Thread &t, const Command &c) {
     int first = value(c.arg(1), t);
     int last = first;
     if (multi) last = value((flags & 0x0F) == 2 ? c.arg(5) : c.arg(14), t);
-    for (int n = first; n <= std::max(first, last) && n - first < 10000; n++) pictureCommandOne(t, c, n);
+    last = std::max(first, last);
+    if ((flags & 0x0F) == 0) {
+        for (int n = first; n <= last && n - first < 10000; n++) pictureCommandOne(t, c, n);
+        return;
+    }
+    std::vector<int> numbers;
+    for (auto it = pictures_.lower_bound(first); it != pictures_.end() && it->first <= last; ++it) numbers.push_back(it->first);
+    for (int n : numbers) pictureCommandOne(t, c, n);
 }
 
 std::array<int, 2> Game::fileImageSize(const std::string &source) {

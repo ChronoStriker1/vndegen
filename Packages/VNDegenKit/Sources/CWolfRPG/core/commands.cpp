@@ -965,10 +965,9 @@ void Game::effectCommand(Thread &t, const Command &c) {
             if (it == pictures_.end()) continue;
             Picture &p = it->second;
             switch (type) {
-                case 0x00:  // flash: tint toward a colour and back
-                    p.r.set(a1, frames / 2);
-                    p.g.set(a2, frames / 2);
-                    p.b.set(a3, frames / 2);
+                case 0x00:
+                    p.flash = {a1, a2, a3};
+                    p.flashFrames = p.flashLeft = std::max(1, frames);
                     break;
                 case 0x10:  // colour correction, as offsets from the normal 100
                     p.r.set(100 + a1, frames);
