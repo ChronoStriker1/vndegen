@@ -14,7 +14,7 @@ static int balloon_icon(const char *name) {
         const char *name;
         int cell;
     } map[] = {{"!Surprise", 8}, {"!Question", 7}, {"!Speechless", 9}, {"!Death", 3}, {"!Lucky", 10}, {"!Heart", 6},
-               {"!Sleep", 1},    {"!Devil", 4},    {"!Shy", 12},       {"!Poison", 2}};
+               {"!Sleep", 1},    {"!Devil", 4},    {"!Shy", 12},       {"!Poison", 19}};
     for (size_t i = 0; i < sizeof map / sizeof map[0]; i++)
         if (strcmp(name, map[i].name) == 0) return map[i].cell;
     return 9;
@@ -119,9 +119,35 @@ static void draw_cell(SG *g, const SgiFx *f, int cell, float cx, float cy, float
     }
 }
 
+static void state_balloon(SG *g) {
+    const Party *p = &g->b.party;
+    bool poisoned = false;
+    for (int i = 0; i < p->count; i++) poisoned |= p->members[i].hp > 0 && (p->members[i].state & 1);
+    const Actor *a = &g->field.player;
+    if (!poisoned || !a->visible) return;
+    const Tables *t = &g->b.tables;
+    const EffectDef *e = NULL;
+    for (int i = 0; i < t->effectCount && !e; i++)
+        if (t->effects[i].name && strcmp(t->effects[i].name, "!Poison") == 0) e = &t->effects[i];
+    Guid resId;
+    u32 ms;
+    if (!e || !effect_header(g, e, &resId, &ms)) return;
+    const Res *res = res_find(&g->res, resId);
+    Image *im = res ? sg_image(g, res->id) : NULL;
+    float sx, sy;
+    if (!im || !to_screen(g, a->x, a->y + actor_height(a), a->z, &sx, &sy)) return;
+    SgiFx f = {.im = im, .cols = res->divisions & 255 ? res->divisions & 255 : 1};
+    int icon = balloon_icon(e->name), phase = (int)(g->clockMs / 250 % 4);
+    draw_cell(g, &f, 0, sx, sy + 2.0f, 1.0f, 255, false);
+    draw_cell(g, &f, icon, sx + 6.0f, sy - 5.0f - (float)phase, 0.7f, 255, false);
+    draw_cell(g, &f, icon, sx - 9.0f, sy + 3.0f - (float)((phase + 2) % 4), 0.45f, 255, false);
+    draw_cell(g, &f, icon, sx - 1.0f, sy + 6.0f, 0.4f, 255, false);
+}
+
 void sgi_fx_draw(SG *g) {
     Field *fl = &g->field;
     if (!fl->loaded) return;
+    if (g->scene == SCENE_FIELD && !sg_battle_active(g)) state_balloon(g);
     for (int i = 0; i < SGI_FX; i++) {
         const SgiFx *f = &g->fi.fx[i];
         if (!f->im) continue;
