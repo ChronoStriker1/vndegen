@@ -888,3 +888,60 @@ poisoned, 636 G, nine kinds of items) loaded in the PC at (12,12) facing down wi
 money, play time and item list, and the PC's save made there loaded in the runner the same. A runner save on the
 サキュバスタワー's sixth floor loaded in the PC with its floor caption showing again, as the runner shows it, and the
 PC's save made there loaded in the runner at (4,5).
+
+## Sacred's first dungeon (round 5, K)
+
+Sacred was played from the title to the world map in the runner and in the PC under Wine side by side: the opening,
+the castle and the queen, the practice battle, the town and its weapon shop, the escort to 王家の洞窟, the fairy's
+scene, the golems where アリア rejoins, the crown behind the stone bridge, the second cave and the Vord forest. Heights,
+positions and graphics below were read from saves the PC wrote at each spot; the rest from captures of the same spot.
+
+### Heights in saves
+
+- A character on a stair or ramp cell is saved 0.6 above the cell's height: the soldiers on the throne-room stairs at
+  7.6 (floor 7), the castle's exit-stair events at 3.6 (floor 3), and the player going up the royal cave's first ramp
+  at 6.6, 5.6 and 4.6. Elsewhere the saved height is the floor's. The runtime keeps whole levels and writes and reads
+  the 0.6 at the save.
+
+### Stairs and bridges
+
+- On Sacred's castle stairs (a flight along x) the PC player can't step north onto the ground at the flight's foot
+  height, but steps along the flight's cells and down it; this is the sideways rule of round 5 L.
+- A map object cell whose fourth value is 1 is a bridge deck. The royal cave's `Stone Bridge W4` at (24,4) facing 3
+  covers (24,4) to (24,7), the deck standing at the bridge's own cell height plus its value; the PC's saves put the
+  player at 8 on (24,7), (24,5) and (24,3) and at 4, the ground's height, under it at (24,6). An object turned to direction 1 or 3 covers the
+  cells its model is drawn on; the earlier footprint was mirrored.
+
+### Events
+
+- The byte after a sheet's fixed direction is the solid flag (`solid` in `SgaSheet`): the second cave's iron door
+  opens into a sheet with 0, and the PC player walks through the open door cell; the floor switch also has 0.
+- A transfer (20) that names no map moves only the player: after the queen's talk the PC's save keeps the opening
+  scene's soldier at (27,12), where he walked, not at his editor cell (35,8).
+- A save writes no graphic for an event whose active sheet has none: the PC writes zero for the throne-room soldiers
+  who leave after the queen's talk, and an event so saved stays hidden when loaded.
+- Command 48 with its third value 0 counts items worn by the party with those in the bag: the escort soldier's check
+  for one ロングソード passes on the PC with the sword equipped and none in the bag.
+- Pictures go when the player moves to another map: Sacred's help bar (picture 5) is gone in the town on the PC and
+  its save there lists no pictures.
+
+### Drawing
+
+- Map objects and 3D characters are lit by the map's fill colour plus its key colour times N·L, without the 0.77 and
+  0.74 that terrain takes: Sacred's town pavement measured 222,181,116 on the PC, 174,140,88 before and 221,180,115
+  after; its castle statues, beds and chests, and Colette's castle and trees, match the PC the same way.
+- Maps with the sun off show no sky and nothing past the map's edge: the PC draws black around the royal cave and
+  Colette's dungeon cell, where the runtime drew the noon sky and the outside sea chip.
+
+### Menus
+
+- The item page shows a weapon in white with only its description; the attack value is on the equipment page.
+- The shop's quantity box is 480 by 132 in the middle of the screen: icon and name at 24 pixels, the count in a
+  highlight at its right and the total below it. Items the party can't afford are listed in grey.
+
+### Saves after the first dungeon
+
+A runner save in the royal cave (ロイ at level 2, 75 G, a herb) loaded in the PC at (15,21) with the same level, HP,
+MP, money and items, and one at level 4 loaded there at the same spot with its level, HP and MP on the save page. The
+PC's save beside アリア's fight at (32,13) (ロイ at level 1, 40 HP, 15 G, ヒール learned in the fairy's scene) loaded in
+the runner at the same cell with the same menu. The cave's bed heals the party (59) as on the PC; Sacred's first inn is in a later town.
