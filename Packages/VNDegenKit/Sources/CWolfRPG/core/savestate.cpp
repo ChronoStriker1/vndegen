@@ -518,7 +518,7 @@ SaveFile Game::snapshot() {
 
     // Section 4: the hero and the party.
     fill(f.party.hero, hero_);
-    f.party.hero.hidden = 0;
+    f.party.hero.hidden = partyTransparent_ ? 1 : 0;
     f.party.members.resize(party_.size(), defaultCharacter(0));
     for (size_t i = 0; i < party_.size(); i++) {
         SaveCharacter &c = f.party.members[i];
@@ -801,6 +801,7 @@ void Game::applySave(const SaveFile &s) {
         }
     };
     place(hero_, s.party.hero);
+    partyTransparent_ = s.party.hero.hidden == 1;
     for (size_t i = 0; i < party_.size() && i < s.party.members.size(); i++) place(party_[i], s.party.members[i]);
 
     // The map: its events take their pages from the variables restored above, then their saved positions.
