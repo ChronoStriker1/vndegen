@@ -79,6 +79,8 @@ void battle_abort(SG *g);
 void battle_seed(SG *g, u32 seed);
 const char *battle_phase(SG *g);
 int battle_monster_hp(SG *g, int index);
+int sg_battle_member(SG *g);
+int sg_battle_cursor(SG *g);
 const char *battle_bar(SG *g);
 
 int battle_attack_damage(int attack, int defense, float spread);

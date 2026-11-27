@@ -1320,6 +1320,17 @@ const char *battle_phase(SG *g) {
     return b ? names[b->phase] : "none";
 }
 
+int sg_battle_member(SG *g) {
+    Battle *b = get(g);
+    return b && (b->phase == PH_COMMAND || b->phase == PH_LIST || b->phase == PH_TARGET || b->phase == PH_ALLY) ? b->member : -1;
+}
+
+int sg_battle_cursor(SG *g) {
+    Battle *b = get(g);
+    if (!b) return -1;
+    return b->phase == PH_LIST ? b->listCursor : b->phase == PH_COMMAND ? b->cmdCursor : b->targetCursor;
+}
+
 int battle_monster_hp(SG *g, int index) {
     Battle *b = get(g);
     if (!b || index < 0 || b->partyCount + index >= b->count) return -1;
