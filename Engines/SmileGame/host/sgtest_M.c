@@ -201,6 +201,51 @@ static void test_four_heroes(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_noon_sky_edge(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    warp(g, "ネコ屋敷", 4, 2, 0);
+    run(g, 500);
+    u32 c = g->fb[20 * g->w + 20], d = g->fb[300 * g->w + 60];
+    CHECK((c & 0xffffff) == 0xffffff && (d & 0xffffff) == 0xffffff);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static const Res *res_named(SG *g, const char *name) {
+    for (int i = 0; i < g->res.count; i++)
+        if (strcmp(g->res.items[i].name, name) == 0) return &g->res.items[i];
+    return NULL;
+}
+
+static void test_ending_sprites(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    warp(g, "エンドロール", 9, 17, 0);
+    const Res *hime = res_named(g, "w_hime001");
+    CHECK(hime != NULL);
+    if (hime) {
+        Image *im = sg_image(g, hime->id);
+        CHECK(im && sg_sprite_rows(hime, im) == 4);
+        Actor a = {0};
+        a.graphic = hime;
+        a.sheet = im;
+        sg_actor_wait_sheet(g, &a);
+        CHECK(a.waitSheet && a.waitFrames == 8 && a.waitSheet->w == 1088 && a.waitSheet->h == 136);
+    }
+    Tables *t = &sgb(g)->tables;
+    Guid dark = sgb(g)->party.members[0].hero;
+    CHECK(t->heroCount > 0 && sgb(g)->party.count > 0);
+    g->interp.active = true;
+    Cmd c = {69, 0, NULL, 0};
+    CmdArg args[4] = {{.kind = ARG_GUID, .g = dark}, {.kind = ARG_GUID}, {.kind = ARG_GUID}, {.kind = ARG_STR, .s = ""}};
+    c.args = args;
+    c.argCount = 4;
+    sga_exec(g, &c);
+    g->interp.active = false;
+    CHECK(g->field.player.graphic == NULL);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 static void test_experience(void) {
     CHECK(battle_exp_for_level(11) == 4400);
     CHECK(battle_exp_for_level(12) == 6006);
@@ -218,6 +263,8 @@ int main(void) {
         test_fishing(colette);
         test_chest_stays_open(colette);
         test_four_heroes(colette);
+        test_noon_sky_edge(colette);
+        test_ending_sprites(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
