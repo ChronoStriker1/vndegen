@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.61.7",
+          "buildVersion": "3824",
+          "date": "2026-11-27T23:48:34Z",
+          "localizedDescription": "BUNNY BLACK 3's dungeon floors, ceilings and pillars use the original's texture variants.\n\n## Downloads\n\n- `VNDegen-0.61.7-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.61.7.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.61.7-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **BUNNY BLACK 3:** dungeon floors, ceilings and pillars now use the same texture variants as the original, and pillars stand at the same corners.\n\n## Known limits\n\n- **BUNNY BLACK 3:** when a pillar's texture changes as the party steps isn't known from the PC; VNDegen changes it as the step starts. A few distant parts the PC leaves out are still drawn.\n\n## What wasn't tested\n\n- Real iPhones and iPads.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.61.7/VNDegen-0.61.7.ipa",
+          "size": 133261784,
+          "sha256": "1b3baaefe3a80142384dc307eae7e6a3628e82ed4f24aaffdbd867ffda2d39a6",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.61.6",
           "buildVersion": "3818",
           "date": "2026-11-27T23:38:43Z",
