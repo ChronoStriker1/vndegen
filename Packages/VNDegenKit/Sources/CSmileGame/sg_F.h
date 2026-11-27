@@ -60,7 +60,9 @@
 #define img_free smilegame_img_free
 #define inn_open smilegame_inn_open
 #define interp_draw smilegame_interp_draw
+#define interp_draw_last_window smilegame_interp_draw_last_window
 #define interp_free smilegame_interp_free
+#define interp_show_text smilegame_interp_show_text
 #define interp_start smilegame_interp_start
 #define interp_update smilegame_interp_update
 #define item_def smilegame_item_def

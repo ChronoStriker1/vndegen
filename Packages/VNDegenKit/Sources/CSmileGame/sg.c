@@ -57,6 +57,7 @@ VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t er
     u8 *fontData = pack_read(&g->data.pack, "font.ttf", &fontSize);
     if (fontData) g->font = font_load(fontData, fontSize);
     free(fontData);
+    g->fi.captionFadeMs = sg_player_at_least(g, 1, 8) ? 0 : 400;
     g->w = g->data.settings.screenW;
     g->h = g->data.settings.screenH;
     g->fb = sg_alloc(sizeof(u32) * (size_t)g->w * (size_t)g->h);

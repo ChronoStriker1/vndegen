@@ -62,7 +62,7 @@ typedef struct SgaSheet {
     SgaCond conds[SGA_CONDS];
     int condCount;
     Guid graphic, script;
-    i32 dir, fixDir, moveType, moveSpeed;
+    i32 dir, fixDir, moveType, moveSpeed, moveFreq;
     u8 solid, still;
     char *motion;
     i32 trigger;
@@ -82,14 +82,21 @@ typedef struct SgaEvent {
     bool moveThrough;
     int savedDir;
     bool turned;
+    int wanderDir, wanderLeft;
+    u32 wanderWait;
+    bool wanderStarted;
+    u32 spinMs;
+    int spinBase;
 } SgaEvent;
 
 typedef struct SgaPicture {
     bool used;
+    bool kept;
     Guid id;
     Image *im;
     float alpha, alphaFrom, alphaTo;
     float x, y, xFrom, yFrom, xTo, yTo, zoom, zoomFrom, zoomTo;
+    u32 color, colorFrom, colorTo;
     u32 ms, total;
     bool eraseAfter;
 } SgaPicture;
@@ -114,6 +121,7 @@ typedef struct SgaState {
     int choiceCount, choiceCursor, choiceCancel, choiceHeader;
     float scrollSpeed;
     bool scrollStatic;
+    u32 captionFadeMs;
     Image *scrollImage;
     SgaPicture pics[SGA_PICTURES];
     float fade, fadeFrom, fadeTo;

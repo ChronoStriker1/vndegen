@@ -150,6 +150,9 @@ static void add_res(ResTable *t, int *cap, const SgrRec *rec, const char *dir, c
         res.frameMs = rd_i32(&r);
         res.flagA = rd_i32(&r);
         res.divisions = rd_i32(&r);
+    } else if (res.kind == RES_EFFECT) {
+        int cols = rd_u8(&r), rows = rd_u8(&r);
+        res.divisions = r.bad ? 0 : cols | rows << 8;
     } else if (res.kind == RES_WINDOW) {
         for (int i = 0; i < 4; i++) res.border[i] = rd_i32(&r);
     }

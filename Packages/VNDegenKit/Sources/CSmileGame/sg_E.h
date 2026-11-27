@@ -10,6 +10,8 @@ typedef struct SaveHero {
     i32 level, maxHp, maxMp, hp, mp, power, vitality, magic, speed;
     Guid equip[6];
     i32 exp;
+    Guid learned[16];
+    int learnedCount;
     u8 *body;
     i32 size;
 } SaveHero;

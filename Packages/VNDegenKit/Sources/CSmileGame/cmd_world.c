@@ -127,49 +127,6 @@ static void cmd_variable(SG *g, const Cmd *c) {
     sg_log(g, "variable %d = %d", index, *v);
 }
 
-static void cmd_picture(SG *g, const Cmd *c) {
-    SgaState *a = st(g);
-    int n = cmd_int(c, 0);
-    if (n < 0 || n >= SGA_PICTURES) return;
-    SgaPicture *p = &a->pics[n];
-    if (c->type == CMD_SHOW_PICTURE) {
-        Image *im = sg_image(g, cmd_guid(c, 1));
-        *p = (SgaPicture){0};
-        p->used = im != NULL;
-        p->id = cmd_guid(c, 1);
-        p->im = im;
-        p->alphaTo = (float)cmd_int(c, 2) / 100.0f;
-        p->x = p->xTo = (float)cmd_int(c, 5);
-        p->y = p->yTo = (float)cmd_int(c, 6);
-        p->zoom = p->zoomTo = 1.0f;
-        bool fade = cmd_int(c, 8) != 0;
-        p->alphaFrom = fade ? 0.0f : p->alphaTo;
-        p->alpha = p->alphaFrom;
-        p->total = fade ? 500 : 0;
-        p->ms = 0;
-        sg_log(g, "picture %d shown%s", n, fade ? ", fading in" : "");
-    } else if (c->type == CMD_ERASE_PICTURE) {
-        if (!p->used) return;
-        if (cmd_int(c, 1)) {
-            p->alphaFrom = p->alpha;
-            p->alphaTo = 0;
-            p->ms = 0;
-            p->total = 500;
-            p->eraseAfter = true;
-        } else {
-            *p = (SgaPicture){0};
-        }
-        sg_log(g, "picture %d erased", n);
-    } else if (c->type == CMD_MOVE_PICTURE) {
-        if (!p->used) return;
-        p->alphaFrom = p->alpha;
-        p->alphaTo = (float)cmd_int(c, 1) / 100.0f;
-        p->ms = 0;
-        p->total = (u32)cmd_int(c, 2);
-        sg_log(g, "picture %d to alpha %d over %d ms", n, cmd_int(c, 1), cmd_int(c, 2));
-    }
-}
-
 static void cmd_party(SG *g, const Cmd *c) {
     Guid hero = cmd_guid(c, 0);
     if (cmd_int(c, 1) == 0) party_add_hero(g, hero);
@@ -294,9 +251,10 @@ bool sga_exec(SG *g, const Cmd *c) {
         return false;
     case CMD_SHOW_PICTURE:
     case CMD_ERASE_PICTURE:
-    case CMD_MOVE_PICTURE: cmd_picture(g, c); return false;
+    case CMD_MOVE_PICTURE: sgi_picture_cmd(g, c); return false;
     case CMD_MOVE_EVENT:
     case CMD_MOVE_PLAYER:
+        if (c->type == CMD_MOVE_EVENT && c->argCount == 1) return sgi_move_one(g, c);
         if (c->argCount < 6) {
             sg_log(g, "command %d with %d arguments not known", c->type, c->argCount);
             return false;
@@ -304,18 +262,8 @@ bool sga_exec(SG *g, const Cmd *c) {
         sga_move_command(g, c, c->type == CMD_MOVE_PLAYER);
         a->waitMoves = cmd_int(c, 5) == 0;
         return a->waitMoves;
-    case CMD_TURN_EVENT: {
-        int code = cmd_int(c, 0), i = a->eventIndex;
-        if (code <= 3 && i >= 0 && i < a->evCount) g->field.npcs[i].dir = sga_dir_from_code(code);
-        sg_log(g, "turn event %d", code);
-        return false;
-    }
-    case CMD_TURN_PLAYER: {
-        int code = cmd_int(c, 0);
-        if (code <= 3) g->field.player.dir = sga_dir_from_code(code);
-        sg_log(g, "turn player %d", code);
-        return false;
-    }
+    case CMD_TURN_EVENT:
+    case CMD_TURN_PLAYER: sgi_turn_command(g, c, c->type == CMD_TURN_PLAYER); return false;
     case CMD_ERASE_EVENT: {
         int i = a->eventIndex;
         if (i >= 0 && i < a->evCount) {
@@ -328,7 +276,8 @@ bool sga_exec(SG *g, const Cmd *c) {
     case CMD_BALLOON:
         a->balloonTarget = cmd_int(c, 0);
         a->balloonMs = 0;
-        a->balloonTotal = kBalloonMs;
+        a->balloonTotal = sgi_fx_start(g, cmd_guid(c, 1), cmd_int(c, 0) ? -1 : a->eventIndex, true);
+        if (!a->balloonTotal) a->balloonTotal = kBalloonMs;
         sg_log(g, "balloon on %s", cmd_int(c, 0) ? "player" : "event");
         return true;
     case CMD_CAMERA:
@@ -342,12 +291,17 @@ bool sga_exec(SG *g, const Cmd *c) {
         return false;
     case CMD_SE: snd_se(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
     case CMD_ME: snd_me(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
-    case CMD_EFFECT: sg_log(g, "effect on %d (not drawn)", cmd_int(c, 0)); return false;
+    case CMD_EFFECT: sgi_fx_start(g, cmd_guid(c, 1), cmd_int(c, 0) ? -1 : a->eventIndex, false); return false;
     case CMD_RECOVER:
         party_recover(g);
         sg_log(g, "party recovered");
         return false;
-    default: sg_log(g, "command %d not handled (%d args)", c->type, c->argCount); return false;
+    default: {
+        bool busy = false;
+        if (sgi_exec(g, c, &busy)) return busy;
+        sg_log(g, "command %d not handled (%d args)", c->type, c->argCount);
+        return false;
+    }
     }
 }
 
@@ -391,19 +345,14 @@ void sga_frame(SG *g, u32 ms) {
     tick(&a->flashMs, a->flashTotal, ms);
     tick(&a->shakeMs, a->shakeTotal, ms);
     tick(&a->balloonMs, a->balloonTotal, ms);
+    sgi_fx_frame(g, ms);
     if (a->balloonTotal && a->balloonMs >= a->balloonTotal) a->balloonTotal = 0;
-    for (int i = 0; i < SGA_PICTURES; i++) {
-        SgaPicture *p = &a->pics[i];
-        if (!p->used || !p->total) continue;
-        p->ms += ms;
-        float t = p->ms >= p->total ? 1.0f : (float)p->ms / (float)p->total;
-        p->alpha = p->alphaFrom + (p->alphaTo - p->alphaFrom) * t;
-        if (t >= 1.0f) {
-            p->total = 0;
-            if (p->eraseAfter) *p = (SgaPicture){0};
-        }
+    sgi_pictures_frame(g, ms);
+    if (f->loaded) {
+        sga_step_moves(g, ms);
+        sgi_wander(g, ms);
+        sgi_spins(g, ms);
     }
-    if (f->loaded) sga_step_moves(g, ms);
 }
 
 void sga_draw_under(SG *g) { (void)g; }
@@ -411,15 +360,9 @@ void sga_draw_under(SG *g) { (void)g; }
 void sga_draw_over(SG *g) {
     SgaState *a = st(g);
     u32 *fb = g->fb;
+    sgi_fx_draw(g);
     if (a->tint >> 24) fill_rect(fb, g->w, g->h, 0, 0, g->w, g->h, (a->tint & 0xff00ff00u) | (a->tint >> 16 & 255) | (a->tint & 255) << 16);
-    for (int i = 0; i < SGA_PICTURES; i++) {
-        SgaPicture *p = &a->pics[i];
-        if (!p->used || !p->im || p->alpha <= 0) continue;
-        int al = (int)(p->alpha * 255.0f + 0.5f);
-        if (al > 255) al = 255;
-        int x = (g->w - p->im->w) / 2 + (int)p->x, y = (g->h - p->im->h) / 2 + (int)p->y;
-        blit(fb, g->w, g->h, p->im, 0, 0, p->im->w, p->im->h, x, y, p->im->w, p->im->h, al);
-    }
+    sgi_pictures_draw(g);
     if (a->flashTotal && a->flashMs < a->flashTotal) {
         u32 al = (u32)(160.0f * (1.0f - (float)a->flashMs / (float)a->flashTotal));
         fill_rect(fb, g->w, g->h, 0, 0, g->w, g->h, al << 24 | 0xffffffu);

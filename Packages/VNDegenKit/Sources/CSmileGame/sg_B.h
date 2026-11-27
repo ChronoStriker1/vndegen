@@ -274,6 +274,8 @@ typedef struct Member {
     i32 maxHp, maxMp, stat[STAT_COUNT];
     Guid equip[SLOT_COUNT];
     u8 state;
+    Guid learned[16];
+    int learnedCount;
 } Member;
 
 typedef struct Look {

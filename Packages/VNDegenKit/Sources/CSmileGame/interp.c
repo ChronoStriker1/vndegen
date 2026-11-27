@@ -368,6 +368,7 @@ static void step(SG *g) {
             a->scrollImage = image ? sg_image(g, cmd_guid(c, 2)) : NULL;
             a->msgPos = cmd_int(c, 1);
             a->scrollStatic = cmd_int(c, image ? 3 : 2) == 0;
+            a->captionFadeMs = 0;
             ip->state = ST_SCROLL;
             sg_log(g, "screen text: %s, %d bytes", a->scrollStatic ? "static" : "scrolling", (int)strlen(ip->scrollText));
             break;
@@ -431,9 +432,16 @@ void interp_update(SG *g, u32 ms) {
     case ST_SCROLL: {
         ip->shownMs += ms;
         if (a->scrollStatic) {
-            if (sg_pressed(g, KEY_OK)) {
-                ip->state = ST_RUN;
-                a->scrollImage = NULL;
+            u32 fade = g->fi.captionFadeMs;
+            if (a->captionFadeMs || (!fade && sg_pressed(g, KEY_OK))) {
+                a->captionFadeMs += ms;
+                if (a->captionFadeMs > fade) {
+                    a->captionFadeMs = 0;
+                    ip->state = ST_RUN;
+                    a->scrollImage = NULL;
+                }
+            } else if (sg_pressed(g, KEY_OK)) {
+                a->captionFadeMs = 1;
             }
             break;
         }
@@ -520,6 +528,26 @@ static void draw_lines(SG *g, const char *text, int x, int y, bool center, u32 c
         }
         line++;
         while (*e && *e != '\n' && *e != '\r') e++;
+        p = e;
+        if (*p == '\r') p++;
+        if (*p == '\n') p++;
+    }
+}
+
+static void draw_lines_alpha(SG *g, const char *text, int y, u32 alpha) {
+    const char *p = text;
+    int line = 0;
+    while (*p) {
+        const char *e = p;
+        while (*e && *e != '\n' && *e != '\r') e++;
+        char buf[1024];
+        size_t n = (size_t)(e - p) < sizeof buf - 1 ? (size_t)(e - p) : sizeof buf - 1;
+        memcpy(buf, p, n);
+        buf[n] = 0;
+        int lx = (g->w - font_width(g->font, kTextPx, buf)) / 2, ly = y + line * kLinePx;
+        font_draw(g->font, g->fb, g->w, g->h, lx + 2, ly + 2, kTextPx, buf, (0xc0u * alpha / 255) << 24);
+        font_draw(g->font, g->fb, g->w, g->h, lx, ly, kTextPx, buf, alpha << 24 | 0xffffffu);
+        line++;
         p = e;
         if (*p == '\r') p++;
         if (*p == '\n') p++;
@@ -613,14 +641,20 @@ void interp_draw(SG *g) {
     if (!ip->active) return;
     if (ip->state == ST_SCROLL && ip->scrollText && ip->a.scrollStatic) {
         Image *im = ip->a.scrollImage;
+        u32 span = g->fi.captionFadeMs, alpha = 255;
+        if (span) {
+            u32 in = ip->shownMs >= span ? 255 : ip->shownMs * 255 / span;
+            u32 out = ip->a.captionFadeMs >= span ? 0 : 255 - ip->a.captionFadeMs * 255 / span;
+            alpha = in < out ? in : out;
+        }
         if (im) {
-            blit(g->fb, g->w, g->h, im, 0, 0, im->w, im->h, (g->w - im->w) / 2, (g->h - im->h) / 2, im->w, im->h, 255);
+            blit(g->fb, g->w, g->h, im, 0, 0, im->w, im->h, (g->w - im->w) / 2, (g->h - im->h) / 2, im->w, im->h, (int)alpha);
         } else {
             int lines = 1;
             for (const char *p = ip->scrollText; *p; p++)
                 if (*p == '\n') lines++;
             int y = ip->a.msgPos == 0 ? 40 : ip->a.msgPos == 1 ? g->h - 40 - lines * kLinePx : (g->h - lines * kLinePx) / 2;
-            draw_lines(g, ip->scrollText, 0, y, true, 0xffffffffu, true, -1);
+            draw_lines_alpha(g, ip->scrollText, y, alpha);
         }
     } else if (ip->state == ST_SCROLL && ip->scrollText) {
         if (ip->a.scrollImage) {
@@ -643,4 +677,25 @@ void interp_draw(SG *g) {
         }
         draw_choices(g);
     }
+}
+
+void interp_draw_last_window(SG *g) {
+    Interp *ip = &g->interp;
+    if (ip->active && ip->a.lastPage && ip->a.msgCmd) draw_message(g, ip->a.lastPage, 1 << 30);
+}
+
+void interp_show_text(SG *g, const char *text) {
+    Interp *ip = &g->interp;
+    if (!ip->active) return;
+    SgaState *a = &ip->a;
+    split_pages(g, ip, text);
+    a->msgCmd = CMD_MESSAGE;
+    a->msgPos = 2;
+    a->faceL = a->faceR = (Guid){{0}};
+    a->speaker = 0;
+    a->windowOpen = true;
+    a->textMs = 0;
+    ip->shownMs = 0;
+    ip->state = ST_MESSAGE;
+    sg_log(g, "message: %s", ip->pages[0]);
 }

@@ -128,6 +128,7 @@ typedef struct View {
     u32 waterMs;
     FrameStats stats;
     bool ready;
+    bool eye;
 } View;
 
 void view_load(SG *g);

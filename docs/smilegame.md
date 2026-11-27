@@ -24,11 +24,16 @@ Both games use the same data format.
 - The title screen: picture, overlay, the three items as a column or a row, the cursor. New game only.
 - Maps: chip terrain in 3D with the map's light colour, map objects and event graphics from FBX, 2D character sheets
   drawn upright, the player walking cell by cell (stairs let it change height), talking to the event in front.
-- Events: sheets chosen by every condition kind the games use; talk, touch, autorun and repeating triggers; messages
-  with faces, choices and branches, captions and scrolling text, pictures, fades and tint, variables, switches, items,
-  money, the party, moving and turning the player and events, event graphics, moving to another map. Colette plays from
-  the title to the bridge guard who opens the way to its first battle, and Sacred from the title to the guard at (35,30)
-  in the castle.
+  Events face their sheet's direction, wander or walk toward the player at their sheet's speed and frequency, and a
+  chaser whose trigger is 4 starts its event when it reaches the player (Colette's world-map monsters).
+- Events: sheets chosen by every condition kind the games use; talk, touch, event-touch, autorun, repeating and
+  parallel triggers (parallel ones run in the one event runner, as repeating ones do); messages with faces, choices
+  and branches, captions (fading on Sacred's player version) and scrolling text, pictures with zoom and colour,
+  balloons and effects over characters, fades and tint, variables (random ones too), switches, items, money, the
+  party, learned skills, the encounter switch, moving, turning and placing the player and events, event graphics,
+  moving to another map. Colette plays from the title to its first world-map monster, and Sacred from the title
+  through the castle, the town's weapon shop and the forest into its first dungeon, the royal cave, and through the
+  fairy's scene there.
 - Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
   and windows. One party state (`Party` in `sg_B.h`, `g->b.party`) holds the heroes with their stats, the reserve,
   items, obtained items, money, hero looks and play time; event commands change it, the menu shows it, and saves write
@@ -44,7 +49,8 @@ Both games use the same data format.
   `battle`.
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
 - Saves: the PC's own `savedata/Save_NN.sgs` files, read and written field for field, with everything the runtime does
-  not model yet kept and written back unchanged, so saves move both ways between VNDegen and the original. `saveDir`
+  not model yet kept and written back unchanged, so saves move both ways between VNDegen and the original. Pictures on
+  screen and skills learned by command are saved and restored as the PC does. `saveDir`
   in the config is the folder holding the saves; it defaults to the game's `savedata`.
 - Sound: the title and map BGM and ambient sound, with the files' loop points, through `vnsmilegame_audio` as stereo
   floats at `audioRate`. Commands 21 (BGM), 22 (sound) and 64 (music effect) play through the same mixer.
@@ -66,6 +72,13 @@ Frame times on a 14-core Linux VM, 960 by 544, six threads, measured with `sgvie
 PC games and a test ran beside it (load average about 10): walking Sacred's 150 by 150 field 9.7 ms average, 99th
 percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred's forest 11.0 ms (99th percentile
 17.6 ms) and its castle courtyard, 74,000 triangles in view, 22.2 ms. On one thread the same views take 12 to 38 ms.
+
+Round 3 stopped each 3D character from flushing the triangle queue (the raster threads waited for every character)
+and lets the raster threads take bands from a shared counter, four per thread, with the same pixels as one thread.
+At load average 12, six threads, 300 frames: Sacred's castle at (35,10) 11.4 ms (99th percentile 17.0 ms), the
+courtyard at (25,40), 68,000 triangles, 13.1 ms (18.7 ms), the field at (120,66) 6.1 ms and the forest 7.0 ms. What
+is left on the CPU is transforming and queueing triangles on one thread (about 5 ms in the courtyard) and the
+rasterizer itself; a Metal path would take both off the CPU.
 
 ## In the app (round 2, F)
 
@@ -140,6 +153,9 @@ with the shadow map as a depth texture, and keeping the software path for Linux.
   `to:x,z` (walks there), `talk:U|D|L|R`, `hold:U,ms`, `ok`, `wait:ms`, `shot:name`, `where:tag`, `save:N`, `load:N`.
 - `sgtest_G`: the joined paths: new-game hero stats against the PC's saves, a load keeping the party, shop and inn
   branches, the BGM command, the menu's save page, and Sacred's castle after a load (queen, king, camera).
+- `sgtest_I`: the field against the PC: sheet facing, turn, step and place codes, random variables, the encounter
+  switch, learned skills and pictures in saves (byte for byte against PC saves), the help bar after a load, caption
+  fades per player version and Colette's opening music.
 
 ## Known limits
 
@@ -150,34 +166,33 @@ with the shadow map as a depth texture, and keeping the software path for Linux.
 - Critical hits, skill damage, healing, escape chance, defend and charge, the chance that a state lands and the
   recovery from sleep, paralysis, confusion and charm are inferred (see `docs/smilegame-cleanroom.md`). A random
   encounter always brings one monster; the PC sometimes brings two スライミー.
-- Saves don't write a hero's state (poison) or the learned-skill list the PC keeps after the equipment.
-- Effects (27) and balloons (45) are not drawn, though balloons take their time.
-- Events never wander or chase the player; the movement type in their sheets is read but not used.
-- Command 10's and 16's codes 4 to 7, 11's one-argument form, and 15, 55, 56, 58, 66, 68, 70, 76 and 77 are logged and
-  skipped; none is on either opening path.
-- The shop and inn screens were not compared with the PC; the party order page is not in these games' menus. Where
-  a slot's page shows a second to fourth hero is a guess (two columns); both games have one hero there.
-- Pictures on screen are not saved or restored, so after a load the help bar Sacred shows is missing until an event
-  shows it again, and the PC loading a VNDegen save shows none either (see the picture body in
-  `docs/smilegame-cleanroom.md`).
-- Saves write the motion of events that wander as the sheet's, where the PC writes `wait` after they have moved.
-- Static captions end at once; the PC fades them out over about half a second, so the camera move after them starts
-  that much earlier than on the PC.
+- Saves don't write a hero's state (poison).
+- Effects (27) play their picture sheet's cells in order over the effect's length; the PC composes layered,
+  keyframed sprites with flashes (Sacred's 46光全体 is a rune circle and a pillar of light), and the key format is
+  only partly read. Balloons draw the right bubble and icon with a simple pop, not the PC's keyframes.
+- Events wander and chase with step speeds and pauses measured at -3, 0 and 3 and interpolated between; the PC's
+  choice of direction when a chaser is blocked, and whether events walk during menus, were not pinned down.
+- Commands 55 (experience), 58, 68, 76 and 77 are logged and skipped; none is on either path (Sacred's debug and CG
+  rooms and ending, Colette's adult scenes). 56's message for forgetting a skill and 66's random encounters themselves
+  (Sacred's royal cave has them; battles belong to `battle*.c`) are not done.
+- The inn screen was not compared with the PC (neither first-release path has one); the shop was, in Sacred's weapon
+  shop. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
+  these games' menus. Where a slot's page shows a second to fourth hero is a guess (two columns); both games have one
+  hero there.
 - Experience above level 6 uses a fitted curve, and a few item, skill and monster fields are inferred (see
   `docs/smilegame-cleanroom.md`).
 - A hero's magic is taken from the hero tables; saves keep whatever the PC stored in that field (0 for every hero
-  seen). Level-ups (round 3) must update the stats a member stores.
-- Colette's opening calls for music by a resource pack's GUID; the original plays music none of the game's shipped
-  files match there, and VNDegen keeps the title music.
+  seen).
 - Sound-effect and music-effect levels and the music effect pausing the BGM follow the BGM measurement and common
   practice; they were not measured on the PC.
-- Command 53's modes 1 and 2 (Colette's event rooms) are not mapped; mode 3's target point matches the PC's opening
-  scene only roughly.
+- Command 53's mode 1 (Colette's event rooms) is not mapped; mode 2's eye height and view angle are fitted to one
+  scene, and the map's sky value 2 draws black behind it where the PC shows sky. Mode 3's target point matches the
+  PC's opening scene only roughly.
 - Background value 1 (Sacred's field) draws black; the PC never shows it in play.
 - The PC darkens wall feet slightly more. Map objects with lights stay in their unlit motion until an event changes
   them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
-- Sacred's castle courtyard takes about 22 ms a frame on that VM, over the 16.7 ms a 60 fps frame allows; in the app
-  on an M4 it takes 7.7 ms.
+- Sacred's castle courtyard averages about 13 ms a frame on that VM, but its 99th percentile (about 19 ms) is over the
+  16.7 ms a 60 fps frame allows while other work runs; the rest needs the Metal path or a parallel transform stage.
 - The game's own button guide in its menu shows Xbox B (red) deciding and A (green) cancelling; VNDegen's RPG Maker
   layout has A confirm and B cancel, as in the other RPG engines.
 - The runtime reads no mouse or touches, so under Automatic on a touch device the touch gamepad shows once the

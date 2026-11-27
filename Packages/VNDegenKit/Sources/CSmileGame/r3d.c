@@ -2,12 +2,14 @@
 
 #include <math.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <unistd.h>
 
 #define NEAR_Z 0.05f
 #define SHADOW_BIAS 0.08f
 
 static const u32 kXrayAlpha = 102;
+static const int kBandsPerThread = 4;
 
 static void pool_free(R3 *r);
 
@@ -140,6 +142,8 @@ struct Pool {
     R3 *r;
     RCmd *q;
     int qn, qcap;
+    atomic_int next;
+    int bands;
 };
 
 static void raster(R3 *r, const RCmd *cmd, int band0, int band1);
@@ -169,6 +173,10 @@ typedef struct WorkerArg {
     int index;
 } WorkerArg;
 
+static void run_bands(Pool *pl) {
+    for (int b; (b = atomic_fetch_add(&pl->next, 1)) < pl->bands;) run_band(pl->r, b, pl->bands);
+}
+
 static void *worker(void *arg) {
     WorkerArg wa = *(WorkerArg *)arg;
     free(arg);
@@ -180,7 +188,7 @@ static void *worker(void *arg) {
         if (pl->quit) break;
         seen = pl->gen;
         pthread_mutex_unlock(&pl->mu);
-        run_band(pl->r, wa.index, pl->count + 1);
+        run_bands(pl);
         pthread_mutex_lock(&pl->mu);
         if (--pl->pending == 0) pthread_cond_signal(&pl->done);
     }
@@ -230,10 +238,12 @@ void r3_flush(R3 *r) {
     if (!pl || !pl->qn) return;
     pthread_mutex_lock(&pl->mu);
     pl->pending = pl->count;
+    pl->bands = (pl->count + 1) * kBandsPerThread;
+    atomic_store(&pl->next, 0);
     pl->gen++;
     pthread_cond_broadcast(&pl->go);
     pthread_mutex_unlock(&pl->mu);
-    run_band(r, 0, pl->count + 1);
+    run_bands(pl);
     pthread_mutex_lock(&pl->mu);
     while (pl->pending > 0) pthread_cond_wait(&pl->done, &pl->mu);
     pthread_mutex_unlock(&pl->mu);

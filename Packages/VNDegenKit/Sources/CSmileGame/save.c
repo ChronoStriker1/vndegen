@@ -3,7 +3,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-enum { HERO_GUID = 0, HERO_STATS = 16, HERO_EXP = 52, HERO_EQUIP = 60, HERO_MIN = 160 };
+enum { HERO_GUID = 0, HERO_STATS = 16, HERO_EXP = 52, HERO_EQUIP = 60, HERO_SKILLS = 156, HERO_MIN = 160 };
 
 typedef struct Wr {
     u8 *p;
@@ -77,6 +77,10 @@ static bool read_heroes(Rd *r, SaveHero **out, int *count) {
         for (int k = 0; k < 9; k++) f[k] = get_i32(h->body + HERO_STATS + 4 * k);
         for (int k = 0; k < 6; k++) memcpy(h->equip[k].b, h->body + HERO_EQUIP + 16 * k, 16);
         h->exp = get_i32(h->body + HERO_EXP);
+        i32 n = get_i32(h->body + HERO_SKILLS);
+        if (n < 0 || HERO_MIN + 16 * n > h->size) return false;
+        h->learnedCount = n < 16 ? n : 16;
+        for (int k = 0; k < h->learnedCount; k++) memcpy(h->learned[k].b, h->body + HERO_MIN + 16 * k, 16);
     }
     return !r->bad;
 }
@@ -210,15 +214,22 @@ bool save_parse(SaveData *s, const u8 *data, size_t size) {
 static void write_heroes(Wr *w, const SaveHero *h, int n) {
     w_i32(w, n);
     for (int i = 0; i < n; i++) {
-        u8 *body = sg_alloc((size_t)h[i].size);
-        memcpy(body, h[i].body, (size_t)h[i].size);
+        i32 old = get_i32(h[i].body + HERO_SKILLS);
+        if (old < 0 || HERO_MIN + 16 * old > h[i].size) old = 0;
+        int tail = h[i].size - HERO_MIN - 16 * old;
+        int size = HERO_MIN + 16 * h[i].learnedCount + tail;
+        u8 *body = sg_alloc((size_t)size);
+        memcpy(body, h[i].body, HERO_SKILLS);
+        put_i32(body + HERO_SKILLS, h[i].learnedCount);
+        for (int k = 0; k < h[i].learnedCount; k++) memcpy(body + HERO_MIN + 16 * k, h[i].learned[k].b, 16);
+        memcpy(body + HERO_MIN + 16 * h[i].learnedCount, h[i].body + HERO_MIN + 16 * old, (size_t)tail);
         memcpy(body + HERO_GUID, h[i].id.b, 16);
         const i32 *f = &h[i].level;
         for (int k = 0; k < 9; k++) put_i32(body + HERO_STATS + 4 * k, f[k]);
         for (int k = 0; k < 6; k++) memcpy(body + HERO_EQUIP + 16 * k, h[i].equip[k].b, 16);
         put_i32(body + HERO_EXP, h[i].exp);
-        w_i32(w, h[i].size);
-        w_bytes(w, body, (size_t)h[i].size);
+        w_i32(w, size);
+        w_bytes(w, body, (size_t)size);
         free(body);
     }
 }
@@ -389,7 +400,7 @@ SaveData *sg_save_state(SG *g) { return &g->e.save; }
 
 float sg_play_seconds(SG *g) { return (float)g->b.party.playMs / 1000.0f; }
 
-static bool player_at_least(SG *g, int major, int minor) {
+bool sg_player_at_least(SG *g, int major, int minor) {
     char *path = sg_fmt("%s/sgb_rpgplayer.exe", g->gameDir);
     size_t n = 0;
     u8 *d = sg_read_file(path, &n);
@@ -434,7 +445,7 @@ void sg_save_new_game(SG *g) {
     SgE *e = &g->e;
     SaveData *s = &e->save;
     save_free(s);
-    bool newer = player_at_least(g, 1, 8);
+    bool newer = sg_player_at_least(g, 1, 8);
     e->heroSize = newer ? 188 : 160;
     s->party = sg_alloc(sizeof(SaveHero));
     s->reserve = sg_alloc(sizeof(SaveHero));
@@ -511,6 +522,8 @@ static SaveHero *heroes_from(const SaveData *s, const Member *m, int n, int hero
         h->speed = m[i].stat[STAT_SPEED];
         memcpy(h->equip, m[i].equip, sizeof h->equip);
         h->exp = m[i].exp;
+        h->learnedCount = m[i].learnedCount;
+        memcpy(h->learned, m[i].learned, sizeof h->learned);
     }
     return out;
 }
@@ -566,6 +579,8 @@ static void member_from(SG *g, Member *m, const SaveHero *h) {
     const HeroDef *def = hero_def(&g->b.tables, h->id);
     m->stat[STAT_MAGIC] = def ? grow_stat(&def->stats[STAT_MAGIC], h->level) : h->magic;
     memcpy(m->equip, h->equip, sizeof m->equip);
+    m->learnedCount = h->learnedCount;
+    memcpy(m->learned, h->learned, sizeof m->learned);
 }
 
 static void restore_party(SG *g, const SaveData *s) {
@@ -605,6 +620,7 @@ static void capture(SG *g, SaveData *s) {
     s->playSeconds = sg_play_seconds(g);
     Field *f = &g->field;
     if (!f->loaded) return;
+    sgi_pictures_save(g, s);
     bool sameMap = guid_eq(s->map, f->map.id);
     s->map = f->map.id;
     s->x = (i32)f->player.x;
@@ -632,9 +648,9 @@ static void capture(SG *g, SaveData *s) {
         else if (old && guid_eq(old->graphic, ev[i].graphic)) ev[i].motion = sg_strdup(old->motion);
         else ev[i].motion = sheet_motion(g, a->eventId, event_sheet(g, &f->events[i]));
         ev[i].dir = kToSave[a->dir & 3];
-        ev[i].x = a->x;
+        ev[i].x = a->moving ? a->tx : a->x;
         ev[i].y = a->y;
-        ev[i].z = a->z;
+        ev[i].z = a->moving ? a->tz : a->z;
     }
     for (int i = 0; i < s->eventCount; i++) free(s->events[i].motion);
     free(s->events);
@@ -757,6 +773,8 @@ bool sg_save_read(SG *g, int slot) {
             }
             break;
         }
+    sgi_pictures_load(g, &e->save);
+    st->started = true;
     snd_set_master(g, get_i32(s.config + 2), get_i32(s.config + 6));
     return true;
 }
