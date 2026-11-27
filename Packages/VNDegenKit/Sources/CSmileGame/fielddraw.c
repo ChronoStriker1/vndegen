@@ -710,7 +710,7 @@ static void pose_to_cam(const ViewPose *p, Cam *c, int w, int h) {
     c->target = p->target;
     c->target.y += p->lift + gTargetLift;
     c->pitch = -p->pitch;
-    c->yaw = p->yaw;
+    c->yaw = -p->yaw;
     c->distance = p->distance * gDistScale;
     c->fov = p->fov * gFovScale;
     cam_update(c, w, h);
