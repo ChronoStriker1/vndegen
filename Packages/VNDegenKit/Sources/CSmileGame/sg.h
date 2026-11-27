@@ -452,5 +452,6 @@ bool sg_local_switch(SG *g, Guid event, int index);
 void text_outlined(SG *g, int x, int y, int px, const char *s, u32 color);
 
 #include "sg_B.h"
+#include "sg_E.h"
 
 #endif

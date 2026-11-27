@@ -13,9 +13,11 @@ and every behaviour from running the original player under Wine as a black box.
 | Package (`data.sgbpack`) | The game files: a ZIP whose first local header starts with `YUKARPKG`. Deflate by stb_image's zlib decoder (public domain or MIT) |
 | `.sgr` container, resources, game settings, maps, events, scripts | The game files of Princess Colette's Great Adventure and Sacred, compared field by field across both games, with values checked against what the editor names show and what the player does under Wine |
 | Pictures | PNG, by stb_image |
+| Ogg Vorbis | stb_vorbis (public domain or MIT, `third_party/LICENSE-stb.txt`) |
 | Text | The game's own `font.ttf`, drawn with stb_truetype (public domain or MIT) |
 | 3D models | Binary FBX 7.4, read with ufbx 0.23.1 (MIT or public domain, `third_party/LICENSE-ufbx.txt`) |
 | Material blending | The `.def` text file next to each model (`mtl`, `blend modulate`, `depthwrite false`) |
+| Saves, config, music levels and loops | Saves the original wrote under Wine, edited saves it loaded, and its audio recorded from a PulseAudio null sink |
 | Map look, camera, message window, title screen | Captures of the original player under Wine (Wine 11.21, .NET Framework 4.8 from winetricks), compared with the runtime's frames |
 
 ## Package
@@ -145,9 +147,46 @@ byte with this rule.
 
 A message page ends at a blank line.
 
-## Saves
+## Saves (round 2, E)
 
-`savedata\Save_NN.sgs` in the game folder: a `YUKRDATA` header, then plain `BinaryWriter` data. Layout not read yet.
+Learned from saves the original player wrote under Wine at known states (a fresh start, one cell moved, each of the
+four facings, after opening a chest and an urn, after rotating and zooming Sacred's camera, after changing the
+volume), and checked by editing a save, loading it in the original and reading what its menu shows. The original
+loaded every edited and every VNDegen-written save, and a save it wrote back after loading one differed only in play
+time (and, in Sacred, in the positions of townspeople who wander).
+
+`savedata\Save_NN.sgs` in the game folder, NN from 00, 8 slots a page over 5 pages. The slot list shows the file's
+modification time as the save date; the date is not stored in the file. `settings.dat` is named in the player but was
+never written in either game: the config screen's values (BGM and sound volume, message speed, cursor memory) are kept
+in each save and reset to the defaults when the player starts again.
+
+The file is `YUKRDATA`, an `int32` 0, then three sections, each an `int32` byte length and its body.
+
+**Party.** Heroes in the party: `int32` n, n × (`int32` size, hero). Heroes out of the party: the same. Items: `int32`
+n, n × (item GUID, `int32` count). `int32` money. Items ever obtained: the same as items. Changed hero looks:
+`int32` n, n × (hero GUID, face GUID, graphic GUID).
+
+A hero is 188 bytes in player 1.8.1 and 160 in 1.0.6: hero GUID, then `int32` level, max HP, max MP, HP, MP, power,
+vitality, magic, speed and two more, six equipment GUIDs (weapon, shield, head, body, two accessories), `int32`
+experience, and in 1.8.1 28 bytes more. The original shows these values as stored and does not recompute them: a
+save with power 77 showed 82 with a +5 knife, and HP 99 over a maximum of 20 showed as 99/20.
+
+**Flags.** `int32` 1000, 1000 switch bytes; `int32` 1000, 1000 `int32` variables; 22 config bytes (two flags, `int32`
+BGM volume, `int32` sound volume, `int32` message speed, two `int32`); local switches: `int32` n, n × (event GUID,
+`int32` index from 65536 for A, `bool` on); `float` play time in seconds; then 1 byte in 1.0.6, 6 bytes in 1.8.1.
+
+**Map.** Map GUID, `int32` player x, `int32` player z, `int32` n, n × (`int32` size, event state) in the map's own
+event order. An event state is the event GUID, its current graphic GUID, its motion name, `int32` direction, `float`
+x, y, z (cell centres, so x + 0.5) and a byte. Then the player's `float` height, an `int32` (37 in every save seen),
+the camera as six `float`s (0, pitch, yaw, distance, field of view 70, 0.9; Sacred's E/Q, R/F and C/V keys change
+pitch, yaw and distance), three `float`s (a point Sacred's opening camera looks at, zero in Colette), a byte, the
+pictures on screen (`int32` n, n × (`int32` size, body: number, picture GUID, scale, colour, position and flags)),
+`int32` player direction, and 4 bytes.
+
+Directions are 0 up, 1 down, 2 left, 3 right, in the player and in event states.
+
+The default camera of a new game is in GameSettings: pitch, two zeros, 70, distance (Colette -49 and 3, Sacred -48
+and 3.5).
 
 ## Data tables (round 2, delegate B)
 
@@ -253,3 +292,19 @@ Measured from captures of the PC player under Wine at 960 × 544:
 - The bottom row shows the button guide from `button_guide.png` at 90 %.
 - Opening the menu scales the panels in from about 85 % over roughly 0.2 s; the PC ran near 9 fps under Wine, so the
   time is approximate. The cursor jumps without animation. Esc or X opens the menu when no event runs.
+
+## Audio (round 2, E)
+
+BGM, ambient sound and sound effects are Ogg Vorbis; neither game ships WAV. A resource of kind 1 carries a loop flag.
+Fifteen of Colette's and nine of Sacred's Ogg files carry `LOOPSTART` and `LOOPLENGTH` comments in samples; the
+original honours them: recorded under Wine, Colette's title music runs to 102.25 s and goes on from 6.25 s, as the
+two comments say. A map's environment holds, after its BGM GUID, an ambient sound GUID and a battle BGM GUID.
+
+The title plays GameSettings' title BGM; entering a map plays the map's BGM. Recorded through the same capture path as
+VNDegen's SDL runner, the original plays a BGM at volume 100 at half the amplitude of the decoded file (-6 dB), so the
+runtime's output carries that level. Changing BGM cuts over with no gap.
+
+Commands seen: 21 play BGM (GUID, volume, tempo, flag), 22 play sound (GUID, volume, tempo; tempo 75, 100, 125, 150
+and 175 occur), 64 play a music effect (GUID, volume, tempo, flag; Sacred's item jingles). Colette's opening calls 21
+with the GUID of a resource pack rather than of a sound; the original then plays music that matches none of the
+game's 26 shipped music files, and why is not known yet.

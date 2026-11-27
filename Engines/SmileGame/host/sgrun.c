@@ -50,6 +50,11 @@ int main(int argc, char **argv) {
                 alive = alive && step(g, 400);
             }
             printf("okuntil scene %s\n", vnsmilegame_scene(g));
+        } else if (sscanf(c, "save:%d", &k) == 1) {
+            printf("save %d %s\n", k, vnsmilegame_save(g, k) ? "ok" : "failed");
+        } else if (sscanf(c, "load:%d", &k) == 1) {
+            printf("load %d %s\n", k, vnsmilegame_load(g, k) ? "ok" : "failed");
+            alive = step(g, 16);
         } else if (sscanf(c, "shot:%255s", name) == 1) {
             int w, h;
             const uint32_t *px = vnsmilegame_pixels(g, &w, &h);
