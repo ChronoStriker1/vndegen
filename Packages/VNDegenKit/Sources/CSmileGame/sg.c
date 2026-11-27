@@ -57,13 +57,19 @@ VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t er
     u8 *fontData = pack_read(&g->data.pack, "font.ttf", &fontSize);
     if (fontData) g->font = font_load(fontData, fontSize);
     free(fontData);
+    bool gameFont = g->font != NULL;
+    u8 *fallbackData = cfg->fallbackFont ? sg_read_file(cfg->fallbackFont, &fontSize) : NULL;
+    Font *fallback = fallbackData ? font_load(fallbackData, fontSize) : NULL;
+    free(fallbackData);
+    if (!g->font) g->font = fallback;
+    else if (fallback) font_set_fallback(g->font, fallback);
     g->fi.captionFadeMs = sg_player_at_least(g, 1, 8) ? 0 : 400;
     g->w = g->data.settings.screenW;
     g->h = g->data.settings.screenH;
     g->fb = sg_alloc(sizeof(u32) * (size_t)g->w * (size_t)g->h);
     r3_init(&g->r3, g->w, g->h);
     g->scene = SCENE_TITLE;
-    sg_log(g, "title: %s, screen %dx%d, font %s", g->data.settings.name, g->w, g->h, g->font ? "game" : "none");
+    sg_log(g, "title: %s, screen %dx%d, font %s", g->data.settings.name, g->w, g->h, gameFont ? "game" : g->font ? "fallback" : "none");
     return (VNSmileGame *)g;
 }
 

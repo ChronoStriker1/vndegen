@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "vnsmilegame.h"
 
@@ -31,7 +32,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: sgplay gameDir [saveDir]\n");
         return 2;
     }
-    VNSmileGameConfig cfg = {.gameDir = argv[1], .saveDir = argc > 2 ? argv[2] : NULL, .audioRate = 44100, .logPath = "/dev/stderr"};
+    VNSmileGameConfig cfg = {.gameDir = argv[1], .saveDir = argc > 2 ? argv[2] : NULL, .audioRate = 44100, .logPath = "/dev/stderr", .fallbackFont = getenv("SG_FALLBACK_FONT")};
     char err[512];
     game = vnsmilegame_open(&cfg, err, sizeof err);
     if (!game) {

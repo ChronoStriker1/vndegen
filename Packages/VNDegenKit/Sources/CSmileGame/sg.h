@@ -283,6 +283,7 @@ const SgrRec *game_hero(Game *d, Guid id);
 typedef struct Font Font;
 Font *font_load(const u8 *data, size_t size);
 void font_free(Font *f);
+void font_set_fallback(Font *f, Font *fallback);
 int font_draw(Font *f, u32 *fb, int fw, int fh, int x, int y, int px, const char *utf8, u32 color);
 int font_width(Font *f, int px, const char *utf8);
 

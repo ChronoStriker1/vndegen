@@ -65,6 +65,7 @@ void fill_rect(u32 *fb, int fw, int fh, int x, int y, int w, int h, u32 color) {
 struct Font {
     u8 *data;
     stbtt_fontinfo info;
+    Font *fallback;
 };
 
 Font *font_load(const u8 *data, size_t size) {
@@ -81,8 +82,19 @@ Font *font_load(const u8 *data, size_t size) {
 
 void font_free(Font *f) {
     if (!f) return;
+    font_free(f->fallback);
     free(f->data);
     free(f);
+}
+
+void font_set_fallback(Font *f, Font *fallback) {
+    font_free(f->fallback);
+    f->fallback = fallback;
+}
+
+static Font *glyph_font(Font *f, u32 cp) {
+    if (cp <= ' ' || !f->fallback || stbtt_FindGlyphIndex(&f->info, (int)cp)) return f;
+    return stbtt_FindGlyphIndex(&f->fallback->info, (int)cp) ? f->fallback : f;
 }
 
 int font_width(Font *f, int px, const char *s) {
@@ -92,9 +104,11 @@ int font_width(Font *f, int px, const char *s) {
     while (*s) {
         u32 cp;
         s += utf8_decode(s, &cp);
+        Font *gf = glyph_font(f, cp);
+        float gs = gf == f ? sc : stbtt_ScaleForMappingEmToPixels(&gf->info, (float)px);
         int adv, lsb;
-        stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
-        x += (float)adv * sc;
+        stbtt_GetCodepointHMetrics(&gf->info, (int)cp, &adv, &lsb);
+        x += (float)adv * gs;
     }
     return (int)(x + 0.5f);
 }
@@ -110,10 +124,12 @@ int font_draw(Font *f, u32 *fb, int fw, int fh, int x0, int y0, int px, const ch
         u32 cp;
         s += utf8_decode(s, &cp);
         if (cp == '\r' || cp == '\n') continue;
+        Font *gf = glyph_font(f, cp);
+        float gs = gf == f ? sc : stbtt_ScaleForMappingEmToPixels(&gf->info, (float)px);
         int adv, lsb;
-        stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
+        stbtt_GetCodepointHMetrics(&gf->info, (int)cp, &adv, &lsb);
         int w, h, xo, yo;
-        u8 *bmp = stbtt_GetCodepointBitmapSubpixel(&f->info, sc, sc, x - (float)(int)x, 0, (int)cp, &w, &h, &xo, &yo);
+        u8 *bmp = stbtt_GetCodepointBitmapSubpixel(&gf->info, gs, gs, x - (float)(int)x, 0, (int)cp, &w, &h, &xo, &yo);
         if (bmp) {
             for (int yy = 0; yy < h; yy++) {
                 int ty = base + yo + yy;
@@ -129,7 +145,7 @@ int font_draw(Font *f, u32 *fb, int fw, int fh, int x0, int y0, int px, const ch
             }
             stbtt_FreeBitmap(bmp, NULL);
         }
-        x += (float)adv * sc;
+        x += (float)adv * gs;
     }
     return (int)x;
 }

@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     }
     char log[1024];
     snprintf(log, sizeof log, "%s/sgrun.log", argv[2]);
-    VNSmileGameConfig cfg = {.gameDir = argv[1], .saveDir = argv[2], .logPath = log, .audioRate = 44100};
+    VNSmileGameConfig cfg = {.gameDir = argv[1], .saveDir = argv[2], .logPath = log, .audioRate = 44100, .fallbackFont = getenv("SG_FALLBACK_FONT")};
     char err[512];
     VNSmileGame *g = vnsmilegame_open(&cfg, err, sizeof err);
     if (!g) {
