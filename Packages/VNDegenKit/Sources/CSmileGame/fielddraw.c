@@ -745,10 +745,22 @@ static float ground_at(SG *g, float x, float z) {
     return (float)map_height(m, &g->r3.view->look, (int)floorf(x), (int)floorf(z));
 }
 
+static float actor_lift(SG *g, const Actor *a) {
+    const Map *m = &g->field.map;
+    View *v = g->r3.view;
+    int x = (int)floorf(a->x), z = (int)floorf(a->z);
+    if (!v || !v->slopeDir || x < 0 || z < 0 || x >= m->w || z >= m->h) return 0;
+    int sdir = v->slopeDir[(size_t)z * (size_t)m->w + (size_t)x];
+    if (sdir < 0 || (int)lroundf(a->y) != m->height[(size_t)z * (size_t)m->w + (size_t)x]) return 0;
+    const u8 *c = kCorners[sdir];
+    float fx = a->x - (float)x, fz = a->z - (float)z;
+    return c[0] * (1 - fx) * (1 - fz) + c[1] * fx * (1 - fz) + c[2] * fx * fz + c[3] * (1 - fx) * fz;
+}
+
 static void draw_blob(SG *g, const Actor *a, float size) {
     View *v = g->r3.view;
     if (!v->blob) return;
-    float y = a->y + 0.02f, r = size * 0.5f;
+    float y = a->y + actor_lift(g, a) + 0.02f, r = size * 0.5f;
     Tri t1 = {.tex = v->blob, .mode = TRI_MODULATE, .flags = TF_NOZWRITE};
     Vert p[4] = {{a->x - r, y, a->z - r, 0, 0, 1}, {a->x - r, y, a->z + r, 0, 1, 1}, {a->x + r, y, a->z + r, 1, 1, 1}, {a->x + r, y, a->z - r, 1, 0, 1}};
     t1.v[0] = p[0], t1.v[1] = p[1], t1.v[2] = p[2];
@@ -809,7 +821,10 @@ static void draw_model(SG *g, Actor *a, float ang, bool xray) {
 
 static void cast_model(SG *g, Actor *a, float ang) {
     int n = 0;
+    float y = a->y;
+    a->y += actor_lift(g, a);
     Tri *tris = posed_actor(g, a, ang, &n);
+    a->y = y;
     for (int i = 0; i < n; i++)
         if (tris[i].mode == TRI_OPAQUE && !(tris[i].flags & TF_NOZWRITE)) r3_shadow_tri(&g->r3, &tris[i]);
     free(tris);
@@ -859,8 +874,11 @@ static void draw_sprite(SG *g, const Actor *a, bool xray) {
 static void draw_actor(SG *g, Actor *a) {
     if (!a->visible) return;
     bool xray = a == &g->field.player;
+    float y = a->y;
+    a->y += actor_lift(g, a);
     if (a->model) draw_model(g, a, kFacing[a->dir & 3], xray);
     else draw_sprite(g, a, xray);
+    a->y = y;
 }
 
 static void draw_sky(SG *g, View *v) {

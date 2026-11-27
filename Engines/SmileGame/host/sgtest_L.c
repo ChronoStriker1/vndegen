@@ -168,6 +168,10 @@ static void test_bridges(const char *dir) {
     warp(g, "コムコムの穴Ｂ02Ｆ", 11, 15, 1);
     for (int i = 0; i < 4; i++) step(g, VK_RIGHT);
     CHECK(at(g, 15, 15));
+    double r, gg, b;
+    warp(g, "コムコムの穴Ｂ02Ｆ", 11, 15, 3);
+    region(g, 470, 272, 20, 20, &r, &gg, &b);
+    CHECK((r + gg + b) / 3 < 80);
     warp(g, "コムコムの穴Ｂ03Ｆ", 9, 16, 0);
     for (int i = 0; i < 4; i++) step(g, VK_UP);
     CHECK(at(g, 9, 12));
