@@ -276,7 +276,7 @@ static void open_shop(SG *g, const Cmd *c) {
 static void start_screen(SG *g, const Cmd *c, int header) {
     Interp *ip = &g->interp;
     if (c->type == CMD_SHOP) open_shop(g, c);
-    else inn_open(g, cmd_int(c, 0));
+    else inn_open(g, cmd_int(c, 0), c->argCount > 3);
     ip->a.screenHeader = header;
     ip->state = ST_SCREEN;
 }
@@ -628,17 +628,19 @@ void sg_draw_choice_box(SG *g, char *const *items, int n, int cursor) {
         int w = font_width(g->font, kTextPx, items[i]);
         if (w > maxW) maxW = w;
     }
-    int itemH = 50, w = maxW + 36, h = n * itemH + 12;
+    int itemH = 46, w = maxW + 36, h = n * itemH + 22;
     int x = (g->w - w) / 2, y = (g->h - h) / 2;
     const Res *res = NULL;
     Image *im = sga_default_window(g, &res);
     sga_window(g, im, res, x, y, w, h);
-    const Res *sr = NULL;
-    Image *sel = sga_selected_window(g, &sr);
+    const Res *sr = NULL, *br = NULL;
+    Image *sel = sga_selected_window(g, &sr), *btn = sga_selectable_window(g, &br);
     for (int i = 0; i < n; i++) {
-        int iy = y + 6 + i * itemH;
-        if (i == cursor) sga_window(g, sel, sr, x + 6, iy + 4, w - 12, itemH - 8);
-        font_draw(g->font, g->fb, g->w, g->h, x + 18, iy + 12, kTextPx, items[i], 0xffffffffu);
+        int iy = y + 13 + i * itemH;
+        if (btn) sga_window(g, btn, br, x + 10, iy, w - 20, itemH - 2);
+        if (i == cursor) sga_window(g, sel, sr, x + 10, iy, w - 20, itemH - 2);
+        font_draw(g->font, g->fb, g->w, g->h, x + 19, iy + 8, kTextPx, items[i], 0x80000000u);
+        font_draw(g->font, g->fb, g->w, g->h, x + 18, iy + 7, kTextPx, items[i], 0xffffffffu);
     }
 }
 

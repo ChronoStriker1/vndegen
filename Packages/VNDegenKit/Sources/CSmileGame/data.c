@@ -241,6 +241,8 @@ bool skill_parse(SkillDef *s, const SgrRec *rec) {
     if (!sub_block(&r, &a, &s->act, &s->actSize)) return false;
     s->effect = rd_guid(&a);
     s->power = rd_i32(&a);
+    rd_i32(&a);
+    s->percent = rd_i32(&a);
     return !r.bad && !u.bad && !a.bad;
 }
 
@@ -440,7 +442,8 @@ const CommandDef *command_def(const Tables *t, Guid id) {
 
 int grow_stat(const GrowStat *s, int level) {
     if (level <= 1) return s->base;
-    return s->base + (int)((double)s->growth * pow((double)(level - 1), (double)s->curve));
+    double c = s->curve, sum = fabs(c - 1.0) < 1e-6 ? (double)(level - 1) : (pow(c, (double)(level - 1)) - 1.0) / (c - 1.0);
+    return s->base + (int)((double)s->growth * sum + 1e-6);
 }
 
 int exp_for_level(int level) { return battle_exp_for_level(level); }
@@ -552,7 +555,11 @@ void party_add_hero(SG *g, Guid hero) {
         return;
     }
     const HeroDef *h = hero_def(&g->b.tables, hero);
-    if (h) member_init(&g->b.tables, &p->members[p->count++], h);
+    if (!h) return;
+    Member *m = &p->members[p->count++];
+    member_init(&g->b.tables, m, h);
+    for (int i = 0; i < h->skillCount && m->learnedCount < 16; i++)
+        if (h->skills[i].level <= m->level) m->learned[m->learnedCount++] = h->skills[i].skill;
 }
 
 void party_remove_hero(SG *g, Guid hero) {

@@ -260,7 +260,7 @@ static int shots(const char *which, const char *dir, const char *out) {
         keys(g, "O");
         shot(g, out, "shop-bought");
         keys(g, "XX");
-        inn_open(g, 20);
+        inn_open(g, 20, true);
         frames(g, 300);
         shot(g, out, "inn");
         keys(g, "X");

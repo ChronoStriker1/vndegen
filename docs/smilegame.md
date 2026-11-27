@@ -35,19 +35,20 @@ on the PC.
 
 ## Sacred
 
-VNDegen plays Sacred (セイクリッド～砕かれた光の冠～) on Mac, iPhone and iPad from the title through its opening
-and its first dungeon: the dream and the forest, the castle with the king and the queen, the guard's practice
-battle, the castle town and its weapon shop, the ride to 王家の洞窟, the fairy's scene there, the golem fight where
-アリア rejoins, the stone bridge to the crown, the second cave with its floor switch and iron door, the Vord forest
-and its scene, and out onto the world map. It was played that far in VNDegen, by play, beside the PC under Wine. The
-game is in Japanese, as on the PC.
+VNDegen plays Sacred (セイクリッド～砕かれた光の冠～) on Mac, iPhone and iPad from the title through about two
+thirds of its story: the opening, the castle and the queen, 王家の洞窟 and the Vord forest, the world map, the port
+town サンプール with its inn and the voyage, the sand temple, the ambush on the bridge and the prison where マオー joins,
+the snow mountain and the snow town マウンティ, the dragon tower where ファフニール joins and its boss パンドラゴン, the
+labyrinth, シュワントー's tournament, the demon castle and マオー's scene there, and into the depths of the デオズズ
+volcano. It was played that far in VNDegen, by play, with each stage checked beside the PC under Wine. The game is in
+Japanese, as on the PC.
 
-- **Saves** work as for Colette: the PC's own `savedata` files, both ways. A save made in the royal cave loads in the
-  PC with the same place, party, items, money and levels, and the PC's save from there loads in VNDegen.
+- **Saves** work as for Colette: the PC's own `savedata` files, both ways. Saves at the royal cave, サンプール, the
+  prison and the volcano depths load in the PC with the same place, party, items, money and levels, and the PC's
+  saves from there load in VNDegen.
 - **Controls** are the same as Colette's.
-- **What isn't there yet:** the world map past the first forest, the port town, the later dungeons and the ending
-  haven't been played in VNDegen. The first inn is in a later town, so Sacred's inn wasn't seen; the cave's bed heals
-  the party as on the PC. Known limits below lists the rest.
+- **What isn't there yet:** from the volcano depths on (the fight with six 炎の悪魔, the return to ルディアノ and the
+  queen, the last dungeon and the ending) hasn't been played in VNDegen. Known limits below lists the rest.
 
 ## Test games
 
@@ -76,7 +77,8 @@ Both games use the same data format.
   moving to another map, stopping a sound effect (76), Colette's floor names in a band across the screen, and the
   eye-level camera of its event rooms (command 53's mode 1 and maps whose camera record has kind 1). Colette plays
   from the title to the staff roll (the story variables at 19 and 17), and Sacred from the title through the castle,
-  the town's weapon shop, the royal cave and its second floor to the Vord forest and the world map.
+  the royal cave, サンプール, the sand temple, the prison, マウンティ, the dragon tower, シュワントー and the demon
+  castle to the depths of the デオズズ volcano.
 - Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
   and windows. One party state (`Party` in `sg_B.h`, `g->b.party`) holds the heroes with their stats, the reserve,
   items, obtained items, money, hero looks and play time; event commands change it, the menu shows it, and saves write
@@ -187,6 +189,23 @@ With the touch gamepad shown, the iPad simulator ran the practice battle at 41.1
 runtime at 4.6 to 5.0 ms, the gamepad compositing cost described below. The software path holds the courtyard, the
 heaviest Sacred scene, at 60 on all three, so no Metal path is needed for it.
 
+Sacred past the first dungeon, a DEBUG build of round 5 N's branch on the Mac mini, 2026-11-27, from runner saves at
+each place, measured the same way. Another thread's build ran throughout (load averages 33 to 62). Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator, gamepad hidden | iPhone 18 Pro simulator |
+|---|---|---|---|
+| サンプール | 60.0, 59.9, 6.8 to 7.0 ms | not measured | not measured |
+| Sand temple | 60.0, 59.9, 3.4 to 3.5 ms | not measured | not measured |
+| マウンティ | 60.0, 59.9, 4.5 to 4.7 ms | not measured | not measured |
+| Dragon tower base (108,000 triangles) | 58.3 to 59.3, 26.6 to 28.3, 14.4 to 14.6 ms (load 62) | 56.2 to 58.4, 19.9 to 27.8, 11.8 to 12.6 ms | not measured |
+| Volcano depths | 60.0, 59.9, 2.7 to 3.1 ms | 60.0, 60.0, 2.0 to 2.2 ms | 60.0, 60.0, 2.0 to 2.1 ms |
+| Battle on the volcano's first floor | 59.8 to 60.0, 42.8 to 59.9, 5.0 to 6.4 ms | not measured | not measured |
+
+The dragon tower's base, with its rows of trees around the tower, is the heaviest Sacred scene measured; with three
+of this delegate's own builds running beside it (load 36 to 55) the Mac app drew 48 to 51 frames a second at 18 ms
+a frame. It wasn't measured at a low load. With the touch gamepad shown the iPad simulator ran the volcano at 46 frames
+a second, the gamepad compositing cost described below.
+
 Colette past the first area, a DEBUG build of this round's branch on the Mac mini, 2026-11-27, measured the same way
 from runner saves (another delegate's build ran beside some of it; load averages are given). Target 60.
 
@@ -268,6 +287,9 @@ were taken with the gamepad shown.
   menu, the title's Continue and Config, and taps and holds.
 - `sgtest_L`: Colette past the first area: the inn's stay and its refusal, the inn's bed, crossing コムコムの穴's
   suspension bridge, walking under its stone bridge, a stair's side, the player standing on stairs, and command 76.
+- `sgtest_N`: Sacred past the first dungeon: the experience totals the PC shows for 21 levels, the pier inn keeping
+  the player's facing, random encounter group sizes, マオー's stats, skills and saved maximum MP when she joins, and
+  ヒール healing half of ロイ's maximum HP.
 - `sgtest_M`: Colette's second half against the PC: a talk pressed mid-step, the fishing spot and its first catch, an
   opened chest, the fourth hero's place in battle, the experience curve, the noon sky's edge and the staff roll's
   sprites.
@@ -283,9 +305,11 @@ were taken with the gamepad shown.
   on one line, so ダーク and コレット stand about 20 pixels higher than on the PC.
 - Effects play their sheet's cells in order; the keyframe timeline inside each effect (positions, scales, screen
   flashes) is not read. The camera does not push towards the acting fighter as the PC's does.
-- Critical hits, skill damage, healing, escape chance, defend and charge, the chance that a state lands and the
-  recovery from sleep, paralysis, confusion and charm are inferred (see `docs/smilegame-cleanroom.md`). A random
-  encounter always brings one monster; the PC sometimes brings two スライミー.
+- Critical hits, skill damage, escape chance, defend and charge, the chance that a state lands and the recovery from
+  sleep, paralysis, confusion and charm are inferred (see `docs/smilegame-cleanroom.md`). Healing skills restore their
+  share of maximum HP as Sacred's ヒール does on the PC; the power and magic added for Colette's heals are inferred.
+- A random encounter brings one to one, two or five of a monster, picked uniformly; the PC brings a lone small
+  monster somewhat more often, and stands a group of four or five in two rows where the runtime uses one.
 - Effects (27) play their picture sheet's cells in order over the effect's length; the PC composes layered,
   keyframed sprites with flashes (Sacred's 46光全体 is a rune circle and a pillar of light), and the key format is
   only partly read. Balloons draw the right bubble and icon with a simple pop, not the PC's keyframes.
@@ -293,7 +317,7 @@ were taken with the gamepad shown.
   choice of direction when a chaser is blocked, and whether events walk during menus, were not pinned down.
 - Commands 55 (experience), 58, 68 and 77 are logged and skipped, and 56's message for forgetting a skill is not done;
   Colette uses none of them, and Sacred only in its debug and CG rooms and its ending. Command 76 stops a sound effect.
-- The inn was compared with the PC in Colette's town; the shop was, in Sacred's weapon shop, with its quantity box. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
+- The inn was compared with the PC in Colette's town and at Sacred's サンプール; the shop was, in Sacred's weapon shop, with its quantity box. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
   these games' menus. Where a slot's page shows a second to fourth hero is a guess (two columns); both games have one
   hero there.
 - A few item, skill and monster fields are inferred (see `docs/smilegame-cleanroom.md`).
@@ -313,10 +337,15 @@ were taken with the gamepad shown.
   them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
 - Sacred's castle courtyard averages about 13 ms a frame on the Linux VM, with its 99th percentile (about 19 ms) over
   16.7 ms while other work runs; in the app on Apple silicon it holds 60 (above).
-- Sacred past the Vord forest hasn't been played: the world map, the port town サンプール and its inn, the later
-  dungeons and the ending may show problems. A random encounter in Sacred's caves always brings one monster; the PC
-  sometimes brings more. The four-golem fight where アリア rejoins was won at level 4 on the PC and in
-  VNDegen; at level 1 VNDegen loses it, and the PC's odds at that level weren't measured.
+- Sacred past the depths of the デオズズ volcano hasn't been played: the fight with six 炎の悪魔 there, the return to
+  ルディアノ with its town and castle dungeons and the queen, the cursed land, the last dungeon and the ending may show
+  problems. The four-golem fight where アリア rejoins was won at level 4 on the PC and in VNDegen; at level 1 VNDegen
+  loses it, and the PC's odds at that level weren't measured.
+- Sacred's dragon tower base (about 108,000 triangles in view) takes 12 to 19 ms a frame in the runtime on Apple
+  silicon under load and fell below 60 frames a second while other builds ran; not measured on a quiet machine.
+- The PC pulses the cursor row of a choice window about once a second; the runtime draws it steady, as in the menus.
+- Under a noon sky with the sun off (Sacred's マウンティ) the PC draws the map's edge faces darker than the runtime does,
+  and Sacred's lava darker; snow, rain and the save points' sparkles are particle effects and aren't drawn.
 - A ramp or stair cell's character height is kept as a whole level in play and written 0.6 higher in a save, as the
   PC writes it; the PC's height while walking up a ramp wasn't compared frame by frame.
 - The game's own button guide in its menu shows Xbox B (red) deciding and A (green) cancelling; VNDegen's RPG Maker
