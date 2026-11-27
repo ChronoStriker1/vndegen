@@ -23,12 +23,26 @@
         return err;
     }
 
-    function call(op, args) {
+    function call(op, args, syscall = op) {
         const raw = nativePrompt(BRIDGE + JSON.stringify(Object.assign({ op: op }, args)));
-        if (raw == null) throw nodeError('EIO', 'bridge unavailable', op, args.path || args.from || '');
+        if (raw == null) throw nodeError('EIO', 'bridge unavailable', syscall, args.path || args.from || '');
         const reply = JSON.parse(raw);
-        if (reply.error) throw nodeError(reply.error.code, reply.error.message, op, args.path || args.from || '');
+        if (reply.error) throw nodeError(reply.error.code, reply.error.message, syscall, args.path || args.from || '');
         return reply.value;
+    }
+
+    function badDescriptor(syscall) {
+        const err = new Error('EBADF: bad file descriptor, ' + syscall);
+        err.code = 'EBADF';
+        err.errno = -9;
+        err.syscall = syscall;
+        return err;
+    }
+
+    function argumentError(Kind, code, message) {
+        const err = new Kind(message);
+        err.code = code;
+        return err;
     }
 
     // path: Node's posix implementation, the subset the engine and plugins use.
@@ -167,6 +181,24 @@
         };
     }
 
+    const descriptors = new Map();
+    let nextDescriptor = 3;
+    function outOfRange(name, range, value) {
+        return argumentError(RangeError, 'ERR_OUT_OF_RANGE', 'The value of "' + name + '" is out of range. It must be ' + range + '. Received ' + value);
+    }
+    function validateFd(fd) {
+        if (typeof fd !== 'number') {
+            throw argumentError(TypeError, 'ERR_INVALID_ARG_TYPE', 'The "fd" argument must be of type number. Received type ' + typeof fd);
+        }
+        if (!Number.isInteger(fd)) throw outOfRange('fd', 'an integer', fd);
+        if (fd < 0 || fd > 2147483647) throw outOfRange('fd', '>= 0 && <= 2147483647', fd);
+    }
+    function descriptor(fd, syscall) {
+        const open = descriptors.get(fd);
+        if (!open) throw badDescriptor(syscall);
+        return open;
+    }
+
     const fs = {
         existsSync(p) {
             try { return call('exists', { path: absolute(p) }); } catch (e) { return false; }
@@ -201,6 +233,53 @@
         unlinkSync(p) { call('unlink', { path: absolute(p) }); },
         rmSync(p) { fs.unlinkSync(p); },
         copyFileSync(from, to) { call('copyFile', { from: absolute(from), to: absolute(to) }); },
+        openSync(p, flags) {
+            if (flags != null && flags !== 'r' && flags !== 'rs' && flags !== 'sr' && flags !== 0) {
+                throw nodeError('ENOSYS', 'only reading is supported', 'open', String(p));
+            }
+            const target = absolute(p);
+            call('stat', { path: target }, 'open');
+            const fd = nextDescriptor++;
+            descriptors.set(fd, { path: target, position: 0 });
+            return fd;
+        },
+        readSync(fd, buffer, offsetOrOptions, length, position) {
+            validateFd(fd);
+            if (!ArrayBuffer.isView(buffer)) {
+                throw argumentError(TypeError, 'ERR_INVALID_ARG_TYPE', 'The "buffer" argument must be an instance of Buffer, TypedArray, or DataView.');
+            }
+            let offset = offsetOrOptions;
+            if (arguments.length <= 3 || typeof offsetOrOptions === 'object') {
+                const options = offsetOrOptions || {};
+                offset = options.offset === undefined ? 0 : options.offset;
+                length = options.length === undefined ? buffer.byteLength - offset : options.length;
+                position = options.position === undefined ? null : options.position;
+            }
+            if (offset === undefined) offset = 0;
+            if (!Number.isInteger(offset)) throw outOfRange('offset', 'an integer', offset);
+            if (offset < 0) throw outOfRange('offset', '>= 0', offset);
+            length |= 0;
+            if (length === 0) return 0;
+            if (buffer.byteLength === 0) {
+                throw argumentError(TypeError, 'ERR_INVALID_ARG_VALUE', "The argument 'buffer' is empty and cannot be written.");
+            }
+            if (length < 0) throw outOfRange('length', '>= 0', length);
+            if (offset + length > buffer.byteLength) throw outOfRange('length', '<= ' + (buffer.byteLength - offset), length);
+            if (position === null || position === undefined || position === -1 || position === -1n) position = -1;
+            else if (typeof position === 'bigint') position = Number(position);
+            if (!Number.isInteger(position) || position < -1) throw outOfRange('position', '>= -1 && <= 9223372036854775807', position);
+            const open = descriptor(fd, 'read');
+            const at = position === -1 ? open.position : position;
+            const bytes = Buffer.from(call('read', { path: open.path, position: at, length: length }), 'base64');
+            new Uint8Array(buffer.buffer, buffer.byteOffset + offset, bytes.length).set(bytes);
+            if (position === -1) open.position += bytes.length;
+            return bytes.length;
+        },
+        closeSync(fd) {
+            validateFd(fd);
+            descriptor(fd, 'close');
+            descriptors.delete(fd);
+        },
         accessSync(p) { if (!fs.existsSync(p)) throw nodeError('ENOENT', 'no such file or directory', 'access', String(p)); },
         constants: { F_OK: 0, R_OK: 4, W_OK: 2, X_OK: 1 },
         promises: {},

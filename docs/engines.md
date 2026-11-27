@@ -53,6 +53,8 @@ WebKit can't decode Ogg Vorbis, so MZ uses the decoder it ships with, and MV gam
 
 Up to 0.13.0, MV games on the community core (`rpg_managers.js` "community-1.3b") saved to the game's top-level `save/` in VNDegen, because the layer lacked the `fs.rmdirSync` that core uses to test `www/`. The first launch of such a game after updating moves those saves into `www/save/` and adds them to the game's slot index there, unless a slot is in both folders or the move would hide a save, in which case both folders stay. Early MV cores, such as 1.2.0, save to the game's top-level `save/`, as they do on the PC.
 
+Plugins can read part of a file through file descriptors, with `fs.openSync`, `readSync` and `closeSync`, as Princess and Conquest's movie plugin does to check each movie's first bytes. They behave as Node's do, read-only: opening a file to write fails.
+
 iOS can end WebKit's GPU process, which loses the page's WebGL context. MZ games and MV games on PIXI 4 recover from that with their map, sprites, and battles drawn as before. The earliest MV cores use PIXI 2, and those games stay black until the game restarts: The Midsummer Night's Sabbat and Queena's Legend in the library.
 
 MV and MZ games also have a Cheats page in the VNDegen menu, described in [controls.md](controls.md#cheats).

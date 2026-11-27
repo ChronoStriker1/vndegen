@@ -196,3 +196,80 @@ private func decode(_ json: String) throws -> BridgeRequest {
     #expect(BridgeReply.value(.null).json == #"{"value":null}"#)
     #expect(BridgeReply.failure(BridgeError(code: "ENOENT", message: "gone")).json == #"{"error":{"code":"ENOENT","message":"gone"}}"#)
 }
+
+@Test func rangeReadsStopAtTheEndOfTheFile() throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let bridge = sandbox.bridge
+    #expect(try decode(#"{"op":"read","path":"/game/a","position":4,"length":2}"#) == .read(path: "/game/a", position: 4, length: 2))
+    try Data("0123456789".utf8).write(to: sandbox.root.appendingPathComponent("digits.txt"))
+    #expect(bridge.handle(.read(path: "/game/digits.txt", position: 3, length: 4)) == .value(.string(Data("3456".utf8).base64EncodedString())))
+    #expect(bridge.handle(.read(path: "/game/digits.txt", position: 8, length: 4)) == .value(.string(Data("89".utf8).base64EncodedString())))
+    #expect(bridge.handle(.read(path: "/game/digits.txt", position: 20, length: 4)) == .value(.string("")))
+    #expect(bridge.handle(.read(path: "/game", position: 0, length: 1)) == .failure(BridgeError(code: "EISDIR", message: "illegal operation on a directory")))
+    guard case .failure(let outside) = bridge.handle(.read(path: "/etc/passwd", position: 0, length: 1)) else { Issue.record("read outside"); return }
+    #expect(outside.code == "EACCES")
+}
+
+/// Princess and Conquest's Club_VideoDecrypt reads each movie's first four bytes with openSync, readSync and closeSync.
+/// The expected values are what Node 26's fs returned for the same calls on the same 20-byte file.
+@Test @MainActor func descriptorReadsBehaveAsNode() async throws {
+    let root = TestFolders.root.appendingPathComponent("vndegen-fd-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root.appendingPathComponent("movies"), withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try (Data([0x1a, 0x45, 0xdf, 0xa3]) + Data("ABCDEFGHIJKLMNOP".utf8)).write(to: root.appendingPathComponent("movies/clip.webm"))
+    let folder = GameFolder(root: root, webRoot: "")
+    let bridge = NodeBridge(folder: folder)
+    let page = try PageHarness(storage: false, folder: folder) { bridge.handle($0) }
+    try await page.load("<html><body></body></html>")
+    let lines = try await page.run("""
+        const fs = require('fs');
+        const out = [];
+        const rec = (label, f) => {
+            try { out.push(label + ' = ' + JSON.stringify(f())); } catch (e) { out.push(label + ' ! ' + e.constructor.name + ' ' + e.code + ' ' + (e.syscall || '')); }
+        };
+        const fd = fs.openSync('movies/clip.webm', 'r');
+        const head = Buffer.alloc(8);
+        rec('positional', () => [fs.readSync(fd, head, 0, 4, 0), Array.from(head)]);
+        rec('current 1', () => [fs.readSync(fd, head, 0, 3, null), Array.from(head)]);
+        rec('current 2', () => [fs.readSync(fd, head, 2, 3, -1), Array.from(head)]);
+        rec('positional keeps', () => [fs.readSync(fd, head, 0, 2, 10), fs.readSync(fd, head, 0, 2, null), Array.from(head)]);
+        rec('bigint', () => [fs.readSync(fd, head, 0, 1, 5n), head[0]]);
+        rec('options', () => [fs.readSync(fd, head, { offset: 1, length: 2, position: 1 }), Array.from(head)]);
+        rec('three args', () => [fs.readSync(fd, head, { position: 0 }), Array.from(head)]);
+        rec('past end', () => fs.readSync(fd, head, 0, 4, 100000));
+        rec('near end', () => fs.readSync(fd, head, 0, 8, 14));
+        rec('zero length', () => fs.readSync(fd, head, 0, 0, 0));
+        rec('length too long', () => fs.readSync(fd, head, 4, 5, 0));
+        rec('not a buffer', () => fs.readSync(fd, 'abc', 0, 1, 0));
+        rec('typed', () => { const a = new Uint16Array(2); fs.readSync(fd, a, 1, 2, 0); return Array.from(new Uint8Array(a.buffer)); });
+        rec('close', () => fs.closeSync(fd));
+        rec('read closed', () => fs.readSync(fd, head, 0, 1, 0));
+        rec('close closed', () => fs.closeSync(fd));
+        rec('missing', () => fs.openSync('movies/none.webm', 'r'));
+        const dir = fs.openSync('movies', 'r');
+        rec('dir read', () => fs.readSync(dir, head, 0, 1, 0));
+        fs.closeSync(dir);
+        return out;
+        """) as? [String]
+    #expect(lines == [
+        "positional = [4,[26,69,223,163,0,0,0,0]]",
+        "current 1 = [3,[26,69,223,163,0,0,0,0]]",
+        "current 2 = [3,[26,69,163,65,66,0,0,0]]",
+        "positional keeps = [2,2,[67,68,163,65,66,0,0,0]]",
+        "bigint = [1,66]",
+        "options = [2,[66,69,223,65,66,0,0,0]]",
+        "three args = [8,[26,69,223,163,65,66,67,68]]",
+        "past end = 0",
+        "near end = 6",
+        "zero length = 0",
+        "length too long ! RangeError ERR_OUT_OF_RANGE ",
+        "not a buffer ! TypeError ERR_INVALID_ARG_TYPE ",
+        "typed = [0,26,69,0]",
+        "close = undefined",
+        "read closed ! Error EBADF read",
+        "close closed ! Error EBADF close",
+        "missing ! Error ENOENT open",
+        "dir read ! Error EISDIR read",
+    ])
+}
