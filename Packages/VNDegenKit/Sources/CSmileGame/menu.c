@@ -689,8 +689,8 @@ static void draw_shop(SG *g, Menu *m) {
     text_fit(g, 640, 452, 24, 580, buf, kWhite);
     char money[64];
     snprintf(money, sizeof money, "%s : %dG", T(g)->text.money ? T(g)->text.money : "", P(g)->money);
-    panel(g, 700, 380, 252, 50);
-    text_right(g, 936, 393, 17, money, kWhite);
+    panel(g, 60, 452, 260, 50);
+    text_right(g, 304, 465, 17, money, kWhite);
 }
 
 static void draw_inn(SG *g, Menu *m) {
