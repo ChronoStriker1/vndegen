@@ -129,12 +129,60 @@ static void test_save_cursor_after_load(const char *dir, const char *tmp) {
     rmdir(saves);
 }
 
+static const HeroDef *hero_named(Tables *t, const char *name) {
+    for (int i = 0; i < t->heroCount; i++)
+        if (strcmp(t->heroes[i].name, name) == 0) return &t->heroes[i];
+    return NULL;
+}
+
+static void wait_command(SG *g) {
+    for (int k = 0; k < 2000 && sg_battle_active(g) && strcmp(battle_phase(g), "command") != 0; k++) run(g, 16);
+}
+
+static void test_back_command(const char *dir) {
+    SG *g = open_game(dir, "/nonexistent-sgtest-r");
+    CHECK(g != NULL);
+    if (!g) return;
+    run(g, 32);
+    press(g, VK_OK);
+    run(g, 200);
+    interp_free(&g->interp);
+    Tables *t = &g->b.tables;
+    const HeroDef *aria = hero_named(t, "アリア"), *fafnir = hero_named(t, "ファフニール");
+    CHECK(aria && fafnir);
+    if (!aria || !fafnir) {
+        vnsmilegame_close((VNSmileGame *)g);
+        return;
+    }
+    g->b.party.count = 0;
+    party_add_hero(g, aria->id);
+    party_add_hero(g, fafnir->id);
+    BattleSetup s;
+    memset(&s, 0, sizeof s);
+    for (int i = 0; i < t->monsterCount && !s.count; i++)
+        if (strcmp(t->monsters[i].name, "スライミー") == 0) s.monsters[s.count++] = t->monsters[i].id;
+    battle_seed(g, 3);
+    sg_battle_start(g, &s);
+    wait_command(g);
+    CHECK(sg_battle_member(g) == 0);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "target") == 0);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "command") == 0 && sg_battle_member(g) == 1);
+    press(g, VK_UP);
+    CHECK(sg_battle_cursor(g) == 3);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "command") == 0 && sg_battle_member(g) == 0 && sg_battle_cursor(g) == 0);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *sacred = getenv("SG_SACRED");
     if (sacred) {
         char tmp[] = "/tmp/sgtest_R_XXXXXX";
         if (!mkdtemp(tmp)) return 1;
         test_save_cursor_after_load(sacred, tmp);
+        test_back_command(sacred);
         rmdir(tmp);
     } else
         printf("SG_SACRED not set: Sacred checks skipped\n");

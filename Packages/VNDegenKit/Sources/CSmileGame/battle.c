@@ -8,7 +8,7 @@ enum { ACT_NONE, ACT_ATTACK, ACT_DEFEND, ACT_SKILL, ACT_ITEM, ACT_WATCH, ACT_CHA
 
 enum { LIST_SKILLS, LIST_ITEMS };
 
-enum { CMD_KIND_ATTACK = 0, CMD_KIND_SKILL = 1, CMD_KIND_DEFEND = 2, CMD_KIND_SKILL2 = 4, CMD_KIND_ITEM = 5, CMD_KIND_ESCAPE = 99 };
+enum { CMD_KIND_ATTACK = 0, CMD_KIND_SKILL = 1, CMD_KIND_DEFEND = 2, CMD_KIND_SKILL2 = 4, CMD_KIND_ITEM = 5, CMD_KIND_BACK = 98, CMD_KIND_ESCAPE = 99 };
 
 enum { MON_ATTACK = 0, MON_WATCH = 2, MON_SKILL = 3, MON_CHARGE = 4, MON_FLEE = 6 };
 
@@ -376,6 +376,14 @@ static void add_member(Battle *b, int index, float x, float z) {
     load_graphic(g, f, h->graphic);
 }
 
+static bool commandable(const Fighter *f) { return alive(f) && !(f->state & (ST_SLEEP | ST_PARALYSIS | ST_CONFUSION | ST_CHARM)); }
+
+static int prev_member(Battle *b, int from) {
+    for (int i = from; i >= 0; i--)
+        if (commandable(&b->f[i])) return i;
+    return -1;
+}
+
 static void build_commands(Battle *b) {
     SG *g = b->g;
     const HeroDef *h = hero_of(g, &b->f[b->member]);
@@ -392,8 +400,17 @@ static void build_commands(Battle *b) {
         b->cmds[b->cmdCount++] = CMD_KIND_ATTACK;
     }
     b->cmdDefs[b->cmdCount] = NULL;
-    b->cmds[b->cmdCount++] = CMD_KIND_ESCAPE;
+    b->cmds[b->cmdCount++] = prev_member(b, b->member - 1) >= 0 ? CMD_KIND_BACK : CMD_KIND_ESCAPE;
     if (b->cmdCursor >= b->cmdCount) b->cmdCursor = 0;
+}
+
+static void back_to_previous(Battle *b) {
+    int pm = prev_member(b, b->member - 1);
+    if (pm < 0) return;
+    b->member = pm;
+    b->plan[pm].kind = ACT_NONE;
+    b->cmdCursor = 0;
+    build_commands(b);
 }
 
 static void set_phase(Battle *b, int phase) {
@@ -425,19 +442,12 @@ static void front_cam(Battle *b) {
     apply_cam(b, c);
 }
 
-static bool commandable(const Fighter *f) { return alive(f) && !(f->state & (ST_SLEEP | ST_PARALYSIS | ST_CONFUSION | ST_CHARM)); }
-
 static int next_member(Battle *b, int from) {
     for (int i = from; i < b->partyCount; i++)
         if (commandable(&b->f[i])) return i;
     return -1;
 }
 
-static int prev_member(Battle *b, int from) {
-    for (int i = from; i >= 0; i--)
-        if (commandable(&b->f[i])) return i;
-    return -1;
-}
 
 static void build_queue(Battle *b);
 
@@ -1023,6 +1033,9 @@ static void choose_command(Battle *b) {
         build_list(b);
         set_phase(b, PH_LIST);
         break;
+    case CMD_KIND_BACK:
+        back_to_previous(b);
+        break;
     case CMD_KIND_ESCAPE:
         if (b->setup.noEscape) {
             sgb_sound(b->g, SND_CANCEL);
@@ -1072,15 +1085,7 @@ static void input(Battle *b) {
         if (sg_pressed(g, KEY_UP)) b->cmdCursor = (b->cmdCursor + b->cmdCount - 1) % b->cmdCount;
         if (sg_pressed(g, KEY_DOWN)) b->cmdCursor = (b->cmdCursor + 1) % b->cmdCount;
         if (sg_pressed(g, KEY_OK)) choose_command(b);
-        else if (sg_pressed(g, KEY_CANCEL)) {
-            int pm = prev_member(b, b->member - 1);
-            if (pm >= 0) {
-                b->member = pm;
-                b->plan[pm].kind = ACT_NONE;
-                b->cmdCursor = 0;
-                build_commands(b);
-            }
-        }
+        else if (sg_pressed(g, KEY_CANCEL)) back_to_previous(b);
         break;
     case PH_TARGET:
         if (sg_pressed(g, KEY_LEFT) || sg_pressed(g, KEY_UP)) b->targetCursor = cycle_target(b, b->targetCursor, -1, true);
@@ -1701,13 +1706,13 @@ static void icon_at(SG *g, Guid sheet, int ix, int iy, int x, int y) {
     blit(g->fb, g->w, g->h, im, ix * cell, iy * cell, cell, cell, x, y, 28, 28, 255);
 }
 
-static void escape_icon(SG *g, int x, int y) {
+static void system_icon(SG *g, int which, int x, int y) {
     const SgrRec *r = g->data.settingsFile.count ? &g->data.settingsFile.recs[0] : NULL;
     if (!r) return;
     int found = 0;
     Guid id = {{0}};
     u8 ix = 0, iy = 0;
-    for (u32 k = r->size >= 18 ? r->size - 18 : 0; k > 0 && found < 3; k--) {
+    for (u32 k = r->size >= 18 ? r->size - 18 : 0; k > 0 && found < which; k--) {
         Guid gg;
         memcpy(gg.b, r->body + k, 16);
         const Res *res = res_find(&g->res, gg);
@@ -1716,7 +1721,7 @@ static void escape_icon(SG *g, int x, int y) {
         found++;
         k -= 15;
     }
-    if (found == 3) icon_at(g, id, ix, iy, x, y);
+    if (found == which) icon_at(g, id, ix, iy, x, y);
 }
 
 static void draw_commands(Battle *b) {
@@ -1727,9 +1732,10 @@ static void draw_commands(Battle *b) {
         int ry = y + 6 + i * 34;
         if (i == b->cmdCursor) fill_rect(g->fb, g->w, g->h, x + 4, ry, 222, 28, b->phase == PH_COMMAND ? 0xb0e8d898u : 0x60e8d898u);
         const CommandDef *c = b->cmdDefs[i];
-        const char *name = c ? c->name : btext(g, 19, "逃げる");
+        bool back = b->cmds[i] == CMD_KIND_BACK;
+        const char *name = c ? c->name : back ? btext(g, 22, "戻る") : btext(g, 19, "逃げる");
         if (c) icon_at(g, c->icon, c->iconX, c->iconY, x + 6, ry);
-        else escape_icon(g, x + 6, ry);
+        else system_icon(g, back ? 2 : 3, x + 6, ry);
         text_shadow(g, x + 38, ry + 2, 19, name, kWhite);
     }
 }
