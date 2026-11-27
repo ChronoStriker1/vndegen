@@ -363,6 +363,9 @@ were taken with the gamepad shown.
 - Sacred's castle courtyard averages about 13 ms a frame on the Linux VM, with its 99th percentile (about 19 ms) over
   16.7 ms while other work runs; in the app on Apple silicon it holds 60 (above).
 - Sacred's queen fight was played in VNDegen only.
+- In Sacred's cursed places (the town and castle dungeons, the cursed land, the last dungeon and its final room) the
+  PC tints the sea outside the map purple, and the battle backgrounds there with it; the runtime draws the outside's
+  sea chip in its own blue.
 - Sacred's power spots, its CG and debug rooms and the post-game after the ending haven't been played in VNDegen. The
   four-golem fight where アリア rejoins was won at level 4 on the PC and in VNDegen; at level 1 VNDegen loses it, and
   the PC's odds at that level weren't measured. The six 炎の悪魔 in the volcano win against N's party (levels 17, 14
