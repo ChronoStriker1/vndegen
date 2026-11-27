@@ -70,8 +70,11 @@ Archive *GameFiles::archiveFor(const std::string &top) const {
     auto it = folders_.find(key);
     if (it != folders_.end()) return it->second.get();
     std::unique_ptr<Archive> a;
-    if (auto p = findCaseless(data_.parent_path(), data_.filename().string() + "/" + top + ".wolf"))
-        a = Archive::open(p->string());
+    if (auto p = findCaseless(data_.parent_path(), data_.filename().string() + "/" + top + ".wolf")) {
+        std::string error;
+        a = Archive::open(p->string(), &error);
+        if (!a) archiveErrors_[key] = "cannot read " + p->filename().string() + ": " + error;
+    }
     Archive *raw = a.get();
     folders_[key] = std::move(a);
     return raw;
@@ -95,6 +98,16 @@ std::optional<std::vector<std::string>> GameFiles::listFolder(std::string path) 
         if (entry.is_regular_file(ec)) names.push_back(entry.path().filename().string());
     std::sort(names.begin(), names.end());
     return names;
+}
+
+std::string GameFiles::missingReason(const std::string &raw) const {
+    std::string path = normalizePath(raw);
+    size_t slash = path.find('/');
+    if (slash != std::string::npos) {
+        archiveFor(path.substr(0, slash));
+        if (auto it = archiveErrors_.find(upperAscii(path.substr(0, slash))); it != archiveErrors_.end()) return it->second;
+    }
+    return "missing " + raw;
 }
 
 std::optional<std::vector<uint8_t>> GameFiles::read(const std::string &raw) const {

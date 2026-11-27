@@ -27,6 +27,8 @@ struct MsvcRand {
 // docs/wolfrpg-cleanroom.md describes: the body is LZ4-compressed behind its two sizes, XORed with 128 bytes of an
 // MT19937 stream, and two 20-byte blocks are swapped.
 constexpr uint8_t kContainer35 = 3;
+constexpr uint8_t kContainer33 = 2;
+bool packedContainer(uint8_t kind) { return kind == kContainer35 || kind == kContainer33; }
 
 // The MT19937 seed from header bytes 0, 1 and 5 (UberWolf's genMTSeed, MIT).
 uint32_t container35Seed(uint8_t a, uint8_t b, uint8_t c) {
@@ -538,8 +540,8 @@ template <class IO, class P> void picture(IO &io, P &p) {
         }
         io.s32s(p.v89);
     }
+    if (io.version >= 0x91) io.s32s(p.v9fC);
     if (io.version >= 0x9F) {
-        io.s32s(p.v9fC);
         io.u8(p.v9fFlag);
         if (p.v9fFlag) io.s32s(p.v9fD);
     }
@@ -641,8 +643,7 @@ template <class IO, class F> void body(IO &io, F &f) {
     io.str(f.title, true);
     io.u16(f.version);
     io.version = f.version;
-    // Versions 0x8F to 0x9E (Wolf RPG Editor 3.3x) add fields that no test save has shown; 0x9F is Wolf RPG Editor 3.5.
-    if (f.version > 0x9F || (f.version > 0x8E && f.version < 0x9F))
+    if (f.version > 0x9F || (f.version > 0x8E && f.version < 0x9F && f.version != 0x91))
         throw FormatError("save version " + std::to_string(f.version) + " is not supported");
     if (f.version >= 0x9F) arrays(io, f);
     mapSection(io, f.map);
@@ -678,8 +679,8 @@ void cryptSave(std::span<uint8_t> b) {
 SaveFile parseSave(std::span<const uint8_t> fileBytes) {
     if (fileBytes.size() < kHeaderSize + 1) throw FormatError("save too short");
     std::vector<uint8_t> plain(fileBytes.begin(), fileBytes.end());
-    if (plain[8] == kContainer35) {
-        container35Swap(plain);
+    if (packedContainer(plain[8])) {
+        if (plain[8] == kContainer35) container35Swap(plain);
         container35Xor(plain);
         uint8_t sum = 0;
         for (size_t i = kHeaderSize; i < plain.size(); i++) sum += plain[i];
@@ -710,7 +711,7 @@ std::vector<uint8_t> serializeSave(const SaveFile &save) {
     Out out;
     out.bytes.assign(save.header.begin(), save.header.end());
     body(out, save);
-    if (save.header[8] == kContainer35) {
+    if (packedContainer(save.header[8])) {
         std::vector<uint8_t> &b = out.bytes;
         uint16_t check = container35Check(std::span(b).subspan(kHeaderSize), b[9]);
         b[4] = uint8_t(check >> 8);
@@ -727,7 +728,7 @@ std::vector<uint8_t> serializeSave(const SaveFile &save) {
         // The engine never uses three zero seeds.
         if (!b[0] && !b[1] && !b[5]) b[0] = 1;
         container35Xor(b);
-        container35Swap(b);
+        if (b[8] == kContainer35) container35Swap(b);
         return std::move(b);
     }
     uint8_t sum = 0;

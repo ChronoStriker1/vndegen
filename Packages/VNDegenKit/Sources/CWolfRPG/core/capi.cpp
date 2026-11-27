@@ -303,7 +303,7 @@ const char *vnwolf_key_checks(const char *gameRoot) {
         GameFiles files(gameRoot ? gameRoot : "");
         auto read = [&](const std::string &path, std::optional<BasicFile> kind) {
             auto data = files.read(path);
-            if (!data) throw std::runtime_error("missing " + path);
+            if (!data) throw std::runtime_error(files.missingReason(path));
             if (kind) decryptBasicData(*data, *kind);
             return *data;
         };
