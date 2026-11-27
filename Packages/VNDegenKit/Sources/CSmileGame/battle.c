@@ -448,7 +448,6 @@ static int next_member(Battle *b, int from) {
     return -1;
 }
 
-
 static void build_queue(Battle *b);
 
 static void begin_commands(Battle *b) {

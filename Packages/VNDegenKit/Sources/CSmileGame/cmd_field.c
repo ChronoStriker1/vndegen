@@ -143,14 +143,9 @@ static void give_exp(SG *g, const Cmd *c) {
 }
 
 static void learn_skill(SG *g, const Cmd *c) {
-    Party *p = &g->b.party;
-    Guid hero = cmd_guid(c, 0), skill = cmd_guid(c, 1);
+    Guid skill = cmd_guid(c, 1);
     bool forget = cmd_int(c, 2) != 0;
-    Member *m = NULL;
-    for (int i = 0; i < p->count && !m; i++)
-        if (guid_eq(p->members[i].hero, hero)) m = &p->members[i];
-    for (int i = 0; i < p->reserveCount && !m; i++)
-        if (guid_eq(p->reserve[i].hero, hero)) m = &p->reserve[i];
+    Member *m = member_by_hero(g, cmd_guid(c, 0));
     if (!m) return;
     int at = -1;
     for (int i = 0; i < m->learnedCount && at < 0; i++)
@@ -160,7 +155,7 @@ static void learn_skill(SG *g, const Cmd *c) {
         m->learnedCount--;
     } else if (!forget && at < 0 && m->learnedCount < 16) {
         m->learned[m->learnedCount++] = skill;
-        const HeroDef *h = hero_def(&g->b.tables, hero);
+        const HeroDef *h = hero_def(&g->b.tables, m->hero);
         const SkillDef *sk = skill_def(&g->b.tables, skill);
         if (h && sk) {
             char *text = sg_fmt("%s\xe3\x81\xaf\xe3\x80\x8c%s\xe3\x80\x8d\xe3\x82\x92\xe8\xa6\x9a\xe3\x81\x88\xe3\x81\x9f", h->name, sk->name);
