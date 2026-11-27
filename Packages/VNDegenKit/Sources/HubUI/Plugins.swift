@@ -60,6 +60,8 @@ struct PluginInfo {
                                              license: "VNDegen, MIT"),
             EngineID("tmrhiro"): PluginInfo(versions: "Tmr-Hiro ADV System", runtime: "VNDegen's Tmr-Hiro runtime, in C",
                                             license: "VNDegen, MIT"),
+            EngineID("smilegame"): PluginInfo(versions: "Smile Game Builder", runtime: "VNDegen's Smile Game Builder runtime, in C",
+                                              license: "VNDegen, MIT. ufbx and stb, MIT or public domain"),
             EngineID("alicesoft"): PluginInfo(versions: "AliceSoft System 3.0 to 3.9 and System 4",
                                               runtime: "VNDegen's System 3 runtime, in C, and System 4 runtime, in C++",
                                               license: "VNDegen, MIT"),
