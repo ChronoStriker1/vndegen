@@ -242,7 +242,12 @@ static bool eval_branch(SG *g, const Cmd *c) {
         return compare(i >= 0 && i < 1024 ? g->vars[i] : 0, cmd_int(c, 1), cmd_int(c, 2));
     }
     case CMD_IF_ITEM: {
-        i32 have = sga_item_count(g, cmd_guid(c, 0));
+        Guid id = cmd_guid(c, 0);
+        i32 have = sga_item_count(g, id);
+        const Party *p = &g->b.party;
+        for (int i = 0; i < p->count && cmd_int(c, 2) == 0; i++)
+            for (int k = 0; k < SLOT_COUNT; k++)
+                if (guid_eq(p->members[i].equip[k], id)) have++;
         return cmd_int(c, 3) == 1 ? have >= cmd_int(c, 1) : have == cmd_int(c, 1);
     }
     case CMD_IF_PARTY: return sga_in_party(g, cmd_guid(c, 0)) == (cmd_int(c, 1) == 0);
