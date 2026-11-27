@@ -2,16 +2,27 @@
 #define SG_F_H
 
 #define battle_attack_damage smilegame_battle_attack_damage
+#define battle_background_for smilegame_battle_background_for
 #define battle_bar smilegame_battle_bar
+#define battle_bgm_for smilegame_battle_bgm_for
 #define battle_close smilegame_battle_close
+#define battle_enc smilegame_battle_enc
+#define battle_encounter_roll smilegame_battle_encounter_roll
+#define battle_encounter_setup smilegame_battle_encounter_setup
+#define battle_encounter_tick smilegame_battle_encounter_tick
 #define battle_escape_roll smilegame_battle_escape_roll
 #define battle_exp_for_level smilegame_battle_exp_for_level
 #define battle_frame smilegame_battle_frame
+#define battle_fx_def smilegame_battle_fx_def
+#define battle_fx_draw smilegame_battle_fx_draw
+#define battle_fx_ms smilegame_battle_fx_ms
+#define battle_map_info smilegame_battle_map_info
 #define battle_monster_hp smilegame_battle_monster_hp
 #define battle_phase smilegame_battle_phase
 #define battle_seed smilegame_battle_seed
 #define battle_setup_cmd smilegame_battle_setup_cmd
 #define battle_skill_damage smilegame_battle_skill_damage
+#define battle_skill_info smilegame_battle_skill_info
 #define battle_spread smilegame_battle_spread
 #define blit smilegame_blit
 #define cam_update smilegame_cam_update
