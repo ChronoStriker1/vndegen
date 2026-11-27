@@ -11,6 +11,7 @@
 static const float kDefaultPitch = -48.0f, kDefaultDistance = 3.5f, kDefaultFov = 70.0f;
 static float gDistScale = 20.0f, gFovScale = 0.1f, gTargetLift = 0.0f;
 static float gAmbK = 0.77f, gSunK = 0.74f;
+static const int kShadowTexels = 12;
 
 bool maplook_parse(MapLook *l, const SgrRec *rec) {
     memset(l, 0, sizeof *l);
@@ -609,10 +610,10 @@ void view_load(SG *g) {
     for (int i = 0; i < v->chunkCount; i++)
         if (v->chunks[i].count) mx[1] = fmaxf(mx[1], v->chunks[i].max[1]), mn[1] = fminf(mn[1], v->chunks[i].min[1]);
     if (v->look.sun) {
-        int tpu = m->w * m->h > 4096 ? 8 : 16;
-        r3_shadow_begin(&g->r3, b.sun, mn, mx, tpu);
+        r3_shadow_begin(&g->r3, b.sun, mn, mx, kShadowTexels);
         for (int i = 0; i < f->terrain.count; i++)
             if (f->terrain.tris[i].flags & TF_CAST) r3_shadow_tri(&g->r3, &f->terrain.tris[i]);
+        r3_shadow_seal(&g->r3);
     }
     pose_default(g, v);
     v->pose = v->base;
@@ -731,8 +732,9 @@ static void draw_blob(SG *g, const Actor *a, float size) {
     r3_tri(&g->r3, &g->field.cam, &t2);
 }
 
-static void draw_model(SG *g, Actor *a, float ang) {
-    Field *f = &g->field;
+static const float kFacing[4] = {3.14159265f, 1.5707963f, 0.0f, -1.5707963f};
+
+static Tri *posed_actor(SG *g, Actor *a, float ang, int *count) {
     Model *mdl = a->model;
     Rig *rig = mdl->rig;
     if (rig && rig->animated) {
@@ -744,6 +746,7 @@ static void draw_model(SG *g, Actor *a, float ang) {
     const float *nrm = model_normals(mdl);
     float cs = cosf(ang), sn = sinf(ang);
     const float *sun = g->r3.x->sunDir;
+    Tri *out = sg_alloc(sizeof(Tri) * (size_t)(m->count + 1));
     for (int i = 0; i < m->count; i++) {
         Tri t = m->tris[i];
         for (int k = 0; k < 3; k++) {
@@ -758,12 +761,30 @@ static void draw_model(SG *g, Actor *a, float ang) {
                 t.v[k].shade = d > 0 ? d : 0;
             }
         }
-        u8 mode = t.mode ? t.mode : t.modulate ? TRI_MODULATE : TRI_OPAQUE;
-        r3_tri_ex(&g->r3, &f->cam, &t, mode, mode == TRI_OPAQUE ? (u8)(t.flags | TF_LIT | TF_SHADOW) : t.flags);
+        if (!t.mode && t.modulate) t.mode = TRI_MODULATE;
+        out[i] = t;
     }
+    *count = m->count;
+    return out;
 }
 
-static const float kFacing[4] = {3.14159265f, 1.5707963f, 0.0f, -1.5707963f};
+static void draw_model(SG *g, Actor *a, float ang) {
+    int n = 0;
+    Tri *tris = posed_actor(g, a, ang, &n);
+    for (int i = 0; i < n; i++) {
+        Tri *t = &tris[i];
+        r3_tri_ex(&g->r3, &g->field.cam, t, t->mode, t->mode == TRI_OPAQUE ? (u8)(t->flags | TF_LIT | TF_SHADOW) : t->flags);
+    }
+    free(tris);
+}
+
+static void cast_model(SG *g, Actor *a, float ang) {
+    int n = 0;
+    Tri *tris = posed_actor(g, a, ang, &n);
+    for (int i = 0; i < n; i++)
+        if (tris[i].mode == TRI_OPAQUE && !(tris[i].flags & TF_NOZWRITE)) r3_shadow_tri(&g->r3, &tris[i]);
+    free(tris);
+}
 
 static void draw_sprite(SG *g, const Actor *a) {
     Field *f = &g->field;
@@ -819,6 +840,12 @@ void field_draw(SG *g) {
     v->waterMs += 16;
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
     for (int k = 0; k < 3; k++) g->r3.tint[k] = 256;
+    if (g->r3.x->shadow.base) {
+        r3_shadow_restore(&g->r3);
+        for (int i = 0; i < f->npcCount; i++)
+            if (f->npcs[i].visible && f->npcs[i].model) cast_model(g, &f->npcs[i], kFacing[f->npcs[i].dir & 3]);
+        if (f->player.visible && f->player.model) cast_model(g, &f->player, kFacing[f->player.dir & 3]);
+    }
     ChunkOrder *order = sg_alloc(sizeof(ChunkOrder) * (size_t)(v->chunkCount + 1));
     int n = 0;
     for (int i = 0; i < v->chunkCount; i++) {
@@ -843,13 +870,16 @@ void field_draw(SG *g) {
         for (int i = c->afirst; i < c->afirst + c->acount; i++) r3_tri(&g->r3, &f->cam, &v->alpha.tris[i]);
         tris += c->acount;
     }
-    for (int i = 0; i < f->npcCount; i++)
-        if (f->npcs[i].visible) draw_blob(g, &f->npcs[i], f->npcs[i].model ? 0.9f : 0.7f);
-    if (f->player.visible) draw_blob(g, &f->player, f->player.model ? 0.9f : 0.7f);
+    if (!g->r3.x->shadow.base) {
+        for (int i = 0; i < f->npcCount; i++)
+            if (f->npcs[i].visible && f->npcs[i].model) draw_blob(g, &f->npcs[i], 0.9f);
+        if (f->player.visible && f->player.model) draw_blob(g, &f->player, 0.9f);
+    }
     for (int i = 0; i < f->npcCount; i++)
         if (f->npcs[i].visible && !f->npcs[i].model) draw_actor(g, &f->npcs[i]);
     if (f->player.visible && !f->player.model) draw_actor(g, &f->player);
     free(order);
+    r3_flush(&g->r3);
     v->stats.drawMs = now_ms() - t0;
     v->stats.tris = tris;
     v->stats.chunksDrawn = n;

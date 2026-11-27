@@ -53,7 +53,8 @@ typedef struct Chunk {
 
 typedef struct ShadowMap {
     int w, h;
-    float *depth;
+    float *depth, *base;
+    int dirty[4];
     float axis[3][3];
     float origin[3];
     float scale;
@@ -64,7 +65,10 @@ typedef struct FrameStats {
     int tris, chunksDrawn, chunksTotal;
 } FrameStats;
 
+typedef struct Pool Pool;
+
 typedef struct R3x {
+    Pool *pool;
     ShadowMap shadow;
     bool shadowOn;
     float amb[3], sun[3];
@@ -141,8 +145,12 @@ void r3_light(R3 *r, const float amb[3], const float sun[3], const float dir[3])
 void r3_shadow_begin(R3 *r, const float dir[3], const float min[3], const float max[3], int texelsPerUnit);
 void r3_shadow_tri(R3 *r, const Tri *t);
 void r3_shadow_free(R3 *r);
+void r3_shadow_seal(R3 *r);
+void r3_shadow_restore(R3 *r);
 void r3_tri_ex(R3 *r, const Cam *c, const Tri *t, u8 mode, u8 flags);
 void r3_set_anim(R3 *r, float u);
+void r3_threads(R3 *r, int n);
+void r3_flush(R3 *r);
 bool r3_box_visible(const Cam *c, int w, int h, const float min[3], const float max[3]);
 
 void model_pose(Model *m, const char *motion, float seconds);

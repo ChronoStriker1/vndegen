@@ -1,9 +1,13 @@
 #include "sg.h"
 
 #include <math.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #define NEAR_Z 0.05f
-#define SHADOW_BIAS 0.04f
+#define SHADOW_BIAS 0.08f
+
+static void pool_free(R3 *r);
 
 void r3_init(R3 *r, int w, int h) {
     memset(r, 0, sizeof *r);
@@ -12,11 +16,14 @@ void r3_init(R3 *r, int w, int h) {
     r->zbuf = sg_alloc(sizeof(float) * (size_t)w * (size_t)h);
     r->x = sg_alloc(sizeof *r->x);
     for (int i = 0; i < 3; i++) r->x->amb[i] = 1.0f;
+    long cores = sysconf(_SC_NPROCESSORS_ONLN);
+    r3_threads(r, cores >= 4 ? 4 : (int)cores);
 }
 
 void r3_free(R3 *r) {
     view_free(r->view);
     if (r->x) {
+        pool_free(r);
         free(r->x->shadow.depth);
         free(r->x);
     }
@@ -25,6 +32,7 @@ void r3_free(R3 *r) {
 }
 
 void r3_begin(R3 *r, u32 *fb, u32 clear) {
+    r3_flush(r);
     r->fb = fb;
     r->tint[0] = r->tint[1] = r->tint[2] = 256;
     size_t n = (size_t)r->w * (size_t)r->h;
@@ -84,7 +92,7 @@ static inline u32 tex_fetch(const Image *tex, float u, float v) {
     return tex->px[(size_t)ty * (size_t)tex->w + (size_t)tx];
 }
 
-static inline float shadow_sample(const ShadowMap *sm, float lx, float ly, float lz) {
+static inline float shadow_sample(const ShadowMap *sm, float lx, float ly, float lz, float bias) {
     float fx = lx - 0.5f, fy = ly - 0.5f;
     int ix = (int)fx, iy = (int)fy;
     if (fx < (float)ix) ix--;
@@ -92,22 +100,143 @@ static inline float shadow_sample(const ShadowMap *sm, float lx, float ly, float
     if (ix < 0 || iy < 0 || ix + 1 >= sm->w || iy + 1 >= sm->h) return 1.0f;
     float wx = fx - (float)ix, wy = fy - (float)iy;
     const float *d = sm->depth + (size_t)iy * (size_t)sm->w + (size_t)ix;
-    float z = lz - SHADOW_BIAS;
+    float z = lz - bias;
     float a = z <= d[0] ? 1.0f : 0.0f, b = z <= d[1] ? 1.0f : 0.0f;
     float c = z <= d[sm->w] ? 1.0f : 0.0f, e = z <= d[sm->w + 1] ? 1.0f : 0.0f;
     float top = a + (b - a) * wx, bot = c + (e - c) * wx;
     return top + (bot - top) * wy;
 }
 
+static inline float soft_shadow(const ShadowMap *sm, float lx, float ly, float lz, float bias) {
+    return 0.5f * (shadow_sample(sm, lx - 0.8f, ly - 0.8f, lz, bias) + shadow_sample(sm, lx + 0.8f, ly + 0.8f, lz, bias));
+}
+
 static inline u32 clamp255(float v) { return v >= 255.0f ? 255u : (u32)v; }
 
-static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Tri *t, u8 mode, u8 flags, int na) {
+typedef struct RCmd {
+    Scr s[3];
+    const Image *tex;
+    float bias;
+    u8 alphaTest, mode, flags, na;
+} RCmd;
+
+struct Pool {
+    pthread_t thr[8];
+    int count;
+    pthread_mutex_t mu;
+    pthread_cond_t go, done;
+    unsigned gen;
+    int pending;
+    bool quit;
+    R3 *r;
+    RCmd *q;
+    int qn, qcap;
+};
+
+static void raster(R3 *r, const RCmd *cmd, int band0, int band1);
+
+static void run_band(R3 *r, int band, int bands) {
+    Pool *pl = r->x->pool;
+    int y0 = r->h * band / bands, y1 = r->h * (band + 1) / bands;
+    for (int i = 0; i < pl->qn; i++) raster(r, &pl->q[i], y0, y1);
+}
+
+static void *worker(void *arg) {
+    Pool *pl = arg;
+    unsigned seen = 0;
+    int index = -1;
+    pthread_mutex_lock(&pl->mu);
+    for (int i = 0; i < pl->count; i++)
+        if (pthread_equal(pl->thr[i], pthread_self())) index = i;
+    for (;;) {
+        while (pl->gen == seen && !pl->quit) pthread_cond_wait(&pl->go, &pl->mu);
+        if (pl->quit) break;
+        seen = pl->gen;
+        pthread_mutex_unlock(&pl->mu);
+        run_band(pl->r, index + 1, pl->count + 1);
+        pthread_mutex_lock(&pl->mu);
+        if (--pl->pending == 0) pthread_cond_signal(&pl->done);
+    }
+    pthread_mutex_unlock(&pl->mu);
+    return NULL;
+}
+
+void r3_threads(R3 *r, int n) {
+    if (r->x->pool || n <= 1) return;
+    if (n > 9) n = 9;
+    Pool *pl = sg_alloc(sizeof *pl);
+    pl->r = r;
+    pthread_mutex_init(&pl->mu, NULL);
+    pthread_cond_init(&pl->go, NULL);
+    pthread_cond_init(&pl->done, NULL);
+    r->x->pool = pl;
+    pthread_mutex_lock(&pl->mu);
+    for (int i = 0; i < n - 1; i++)
+        if (pthread_create(&pl->thr[pl->count], NULL, worker, pl) == 0) pl->count++;
+    pthread_mutex_unlock(&pl->mu);
+}
+
+static void pool_free(R3 *r) {
+    Pool *pl = r->x->pool;
+    if (!pl) return;
+    pthread_mutex_lock(&pl->mu);
+    pl->quit = true;
+    pthread_cond_broadcast(&pl->go);
+    pthread_mutex_unlock(&pl->mu);
+    for (int i = 0; i < pl->count; i++) pthread_join(pl->thr[i], NULL);
+    pthread_mutex_destroy(&pl->mu);
+    pthread_cond_destroy(&pl->go);
+    pthread_cond_destroy(&pl->done);
+    free(pl->q);
+    free(pl);
+    r->x->pool = NULL;
+}
+
+void r3_flush(R3 *r) {
+    Pool *pl = r->x ? r->x->pool : NULL;
+    if (!pl || !pl->qn) return;
+    pthread_mutex_lock(&pl->mu);
+    pl->pending = pl->count;
+    pl->gen++;
+    pthread_cond_broadcast(&pl->go);
+    pthread_mutex_unlock(&pl->mu);
+    run_band(r, 0, pl->count + 1);
+    pthread_mutex_lock(&pl->mu);
+    while (pl->pending > 0) pthread_cond_wait(&pl->done, &pl->mu);
+    pthread_mutex_unlock(&pl->mu);
+    pl->qn = 0;
+}
+
+static void submit(R3 *r, const Scr *a, const Scr *b, const Scr *c, const Tri *t, u8 mode, u8 flags, int na) {
+    float sh = (t->v[0].shade + t->v[1].shade + t->v[2].shade) / 3.0f;
+    float bias = SHADOW_BIAS;
+    if (na > 4 && sh > 0.01f) {
+        float tanA = sqrtf(fmaxf(0.0f, 1.0f - sh * sh)) / sh;
+        bias += fminf(tanA, 8.0f) * 1.5f / r->x->shadow.scale;
+    }
+    RCmd cmd = {{*a, *b, *c}, t->tex, bias, t->alphaTest, mode, flags, (u8)na};
+    Pool *pl = r->x->pool;
+    if (!pl) {
+        raster(r, &cmd, 0, r->h);
+        return;
+    }
+    if (pl->qn == pl->qcap) {
+        pl->qcap = pl->qcap ? pl->qcap * 2 : 4096;
+        pl->q = sg_realloc(pl->q, sizeof(RCmd) * (size_t)pl->qcap);
+    }
+    pl->q[pl->qn++] = cmd;
+}
+
+static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
+    const Scr *p0 = &cmd->s[0], *p1 = &cmd->s[1], *p2 = &cmd->s[2];
+    u8 mode = cmd->mode, flags = cmd->flags;
+    int na = cmd->na;
     float x10 = p1->x - p0->x, y10 = p1->y - p0->y, x20 = p2->x - p0->x, y20 = p2->y - p0->y;
     float det = x10 * y20 - x20 * y10;
     if (fabsf(det) < 1e-6f) return;
     float minx = fminf(p0->x, fminf(p1->x, p2->x)), maxx = fmaxf(p0->x, fmaxf(p1->x, p2->x));
     float miny = fminf(p0->y, fminf(p1->y, p2->y)), maxy = fmaxf(p0->y, fmaxf(p1->y, p2->y));
-    int y0 = (int)fmaxf(0, ceilf(miny - 0.5f)), y1 = (int)fminf((float)r->h - 1, floorf(maxy - 0.5f));
+    int y0 = (int)fmaxf((float)band0, ceilf(miny - 0.5f)), y1 = (int)fminf((float)band1 - 1, floorf(maxy - 0.5f));
     if (y0 > y1 || maxx < 0 || minx > (float)r->w) return;
     float inv = 1.0f / det;
     float dx[8] = {0}, dy[8] = {0}, base[8] = {0};
@@ -119,8 +248,8 @@ static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Tri
     }
     const Scr *v[3] = {p0, p1, p2};
     float sgn = det > 0 ? 1.0f : -1.0f;
-    const Image *tex = t->tex;
-    bool alphaTest = t->alphaTest;
+    const Image *tex = cmd->tex;
+    bool alphaTest = cmd->alphaTest;
     bool zwrite = !(flags & TF_NOZWRITE) && mode == TRI_OPAQUE;
     bool ztest = !(flags & TF_NOZTEST);
     bool lit = flags & TF_LIT;
@@ -162,7 +291,7 @@ static void raster(R3 *r, const Scr *p0, const Scr *p1, const Scr *p2, const Tri
             if (lit) {
                 float s = at[A_S];
                 if (s < 0) s = 0;
-                if (shadow && s > 0) s *= shadow_sample(&x3->shadow, at[A_LX] * z, at[A_LY] * z, at[A_LZ] * z);
+                if (shadow && s > 0) s *= soft_shadow(&x3->shadow, at[A_LX] * z, at[A_LY] * z, at[A_LZ] * z, cmd->bias);
                 float lr = ambR + sunR * s, lg = ambG + sunG * s, lb = ambB + sunB * s;
                 cr = clamp255((float)cr * lr);
                 cg = clamp255((float)cg * lg);
@@ -272,8 +401,8 @@ void r3_tri_ex(R3 *r, const Cam *c, const Tri *t, u8 mode, u8 flags) {
     Scr s[4];
     for (int i = 0; i < n; i++) s[i] = project(c, &out[i]);
     int na = shadow ? 7 : 4;
-    raster(r, &s[0], &s[1], &s[2], t, mode, flags, na);
-    if (n == 4) raster(r, &s[0], &s[2], &s[3], t, mode, flags, na);
+    submit(r, &s[0], &s[1], &s[2], t, mode, flags, na);
+    if (n == 4) submit(r, &s[0], &s[2], &s[3], t, mode, flags, na);
 }
 
 void r3_tri(R3 *r, const Cam *c, const Tri *t) {
@@ -309,6 +438,7 @@ static void norm3(float v[3]) {
 
 void r3_shadow_free(R3 *r) {
     free(r->x->shadow.depth);
+    free(r->x->shadow.base);
     memset(&r->x->shadow, 0, sizeof r->x->shadow);
     r->x->shadowOn = false;
 }
@@ -347,6 +477,28 @@ void r3_shadow_begin(R3 *r, const float dir[3], const float mn[3], const float m
     r->x->shadowOn = true;
 }
 
+void r3_shadow_seal(R3 *r) {
+    ShadowMap *sm = &r->x->shadow;
+    if (!sm->depth) return;
+    size_t n = (size_t)sm->w * (size_t)sm->h;
+    free(sm->base);
+    sm->base = sg_alloc(sizeof(float) * n);
+    memcpy(sm->base, sm->depth, sizeof(float) * n);
+    sm->dirty[0] = sm->dirty[1] = 1 << 30;
+    sm->dirty[2] = sm->dirty[3] = -1;
+}
+
+void r3_shadow_restore(R3 *r) {
+    ShadowMap *sm = &r->x->shadow;
+    if (!sm->base || sm->dirty[2] < sm->dirty[0]) return;
+    for (int y = sm->dirty[1]; y <= sm->dirty[3]; y++) {
+        size_t o = (size_t)y * (size_t)sm->w + (size_t)sm->dirty[0];
+        memcpy(sm->depth + o, sm->base + o, sizeof(float) * (size_t)(sm->dirty[2] - sm->dirty[0] + 1));
+    }
+    sm->dirty[0] = sm->dirty[1] = 1 << 30;
+    sm->dirty[2] = sm->dirty[3] = -1;
+}
+
 void r3_shadow_tri(R3 *r, const Tri *t) {
     ShadowMap *sm = &r->x->shadow;
     if (!sm->depth) return;
@@ -370,6 +522,12 @@ void r3_shadow_tri(R3 *r, const Tri *t) {
     int y1 = (int)fminf((float)sm->h - 1, ceilf(fmaxf(p[0].ly, fmaxf(p[1].ly, p[2].ly))));
     float sgn = det > 0 ? 1.0f : -1.0f;
     const Image *tex = t->alphaTest ? t->tex : NULL;
+    if (sm->base && x0 <= x1 && y0 <= y1) {
+        if (x0 < sm->dirty[0]) sm->dirty[0] = x0;
+        if (y0 < sm->dirty[1]) sm->dirty[1] = y0;
+        if (x1 > sm->dirty[2]) sm->dirty[2] = x1;
+        if (y1 > sm->dirty[3]) sm->dirty[3] = y1;
+    }
     for (int y = y0; y <= y1; y++) {
         float py = (float)y + 0.5f;
         for (int x = x0; x <= x1; x++) {

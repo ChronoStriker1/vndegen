@@ -35,6 +35,11 @@ int main(int argc, char **argv) {
         return 1;
     }
     int frames = argc > 7 ? atoi(argv[7]) : 1;
+    int cap = 1 << 16, n = 0;
+    double *times = calloc((size_t)cap, sizeof(double));
+    double maxDraw = 0;
+    int maxTris = 0;
+    const FrameStats *st = sg_debug_stats(vg);
     for (int i = 8; i < argc; i++) {
         float a, b, c, d, e, f, h;
         int k, ms;
@@ -48,26 +53,36 @@ int main(int argc, char **argv) {
         } else if (sscanf(argv[i], "hero:%127s", name) == 1) sg_debug_player(vg, name);
         else if (sscanf(argv[i], "pose:%f,%f,%f,%f", &a, &b, &c, &d) == 4) sg_debug_pose(vg, a, b, c, d);
         else if (sscanf(argv[i], "cal:%f,%f,%f", &a, &b, &c) == 3) sg_debug_pose(vg, -1000, a, b, c);
-        else if (sscanf(argv[i], "light:%f,%f", &a, &b) == 2) sg_debug_pose(vg, -2000, a, b, 0);
         else if (sscanf(argv[i], "hold:%i,%d", &k, &ms) == 2) {
             vnsmilegame_key(vg, k, true);
-            for (int t = 0; t < ms; t += 16) vnsmilegame_frame(vg, 16);
+            for (int t = 0; t < ms; t += 16) {
+                double t0 = now_ms();
+                vnsmilegame_frame(vg, 16);
+                if (n < cap) times[n++] = now_ms() - t0;
+                if (st->drawMs > maxDraw) maxDraw = st->drawMs;
+                if (st->tris > maxTris) maxTris = st->tris;
+            }
             vnsmilegame_key(vg, k, false);
         }
     }
-    double total = 0, worst = 0;
-    double *times = calloc((size_t)frames + 1, sizeof(double));
     for (int i = 0; i < frames; i++) {
         double t0 = now_ms();
         vnsmilegame_frame(vg, 16);
-        double dt = now_ms() - t0;
-        times[i] = dt;
-        total += dt;
-        if (dt > worst) worst = dt;
+        if (n < cap) times[n++] = now_ms() - t0;
+        if (st->drawMs > maxDraw) maxDraw = st->drawMs;
+        if (st->tris > maxTris) maxTris = st->tris;
     }
-    const FrameStats *st = sg_debug_stats(vg);
-    printf("frames %d avg %.2f ms worst %.2f ms draw %.2f ms tris %d chunks %d/%d\n", frames, total / frames, worst, st->drawMs, st->tris, st->chunksDrawn,
-           st->chunksTotal);
+    double total = 0;
+    for (int i = 0; i < n; i++) total += times[i];
+    for (int i = 1; i < n; i++)
+        for (int j = i; j > 0 && times[j] < times[j - 1]; j--) {
+            double t = times[j];
+            times[j] = times[j - 1];
+            times[j - 1] = t;
+        }
+    int p99 = n > 0 ? (n * 99) / 100 : 0;
+    printf("frames %d avg %.2f ms p99 %.2f ms worst %.2f ms max draw %.2f ms max tris %d last tris %d chunks %d/%d\n", n, n ? total / n : 0, n ? times[p99 < n ? p99 : n - 1] : 0,
+           n ? times[n - 1] : 0, maxDraw, maxTris, st->tris, st->chunksDrawn, st->chunksTotal);
     free(times);
     int w, h;
     const uint32_t *px = vnsmilegame_pixels(vg, &w, &h);
