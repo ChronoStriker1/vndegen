@@ -32,6 +32,9 @@ Both games use the same data format.
   and windows. The party, inventory, money and play time with stats as the PC computes them.
 - The field menu (Esc or X): items, skills, equipment, status, save slots, quit and config, laid out as the PC draws
   them, with faces; the shop and inn screens (`shop_open`, `inn_open` in `sg_B.h`).
+- Battles: event command 65 through `sg_battle_start`, drawn on the battle background map from behind the party,
+  with the command list, targets, skills, items, defend and escape, monster actions, damage as measured on the PC,
+  the result panel, level-ups and GAME OVER.
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
 - Saves: the PC's own `savedata/Save_NN.sgs` files, read and written field for field, with everything the runtime does
   not model yet kept and written back unchanged, so saves move both ways between VNDegen and the original. `saveDir`
@@ -65,6 +68,11 @@ percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred'
 - `sgplay <game>`: an SDL window with the keyboard (arrows, Enter or Z, Esc or X, Shift).
 - `sgtest`: the format reader tests. With `SG_COLETTE` and `SG_SACRED` set to the game folders it also checks values
   read from the games' files.
+- `sgbattle <game> <out> [seed:n] party:Name[@level],... troop:<script GUID hex>|monsters:Name,... [bg:<map>]
+  [wait:ms] [key:vk] [shot:name] [attack:n] [until:phase]`: starts the battle command of an event script (for
+  example `troop:4ff8bc66` for Colette's first slime on the world map, `troop:c426b710` for Sacred's practice battle)
+  headless; `sgbattleplay` takes the same arguments with `-` as `<out>` and opens an SDL window.
+- `sgtest_C`: the battle tests against numbers seen in PC battles.
 - `sgtest_B`: the data table tests against values from the PC's menus and the game files. `sgtest_B shots
   colette|sacred <game> <out>` writes every menu page as PNG for comparison with the PC.
 - `sgtest_D`: the renderer's tests: coverage, the map tail and cameras of both games, the throne room's projection
@@ -77,8 +85,12 @@ percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred'
 
 ## Known limits
 
-- No battles yet: command 65 counts as won. Commands for sound, shops, inns and party recovery are decoded and logged
-  but not yet wired to the audio and menu code, so only the title and map music plays and an inn counts as declined.
+- Battles play, but command 65 doesn't start them yet: in the story a battle counts as won until it calls
+  `sg_battle_start` (`battle_setup_cmd` decodes its arguments) and branches on `sg_battle_result`. No battle BGM or
+  effect animations; states and elements are not applied; critical, skill, escape and shared experience rules are
+  inferred (see `docs/smilegame-cleanroom.md`).
+- Commands for sound, shops, inns and party recovery are decoded and logged but not yet wired to the audio and menu
+  code, so only the title and map music plays and an inn counts as declined.
 - The items, money and party that commands change are kept apart from the menu's party state until the two are
   joined, so Sacred's menu shows the game settings' first member.
 - The camera command (53) is decoded but not yet wired to the camera; effects (27) and balloons (45) are not drawn,
@@ -88,7 +100,7 @@ percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred'
   skipped; none is on either opening path.
 - The menu's save page lists slots and dates but doesn't write yet, and doesn't show a slot's map and party.
 - The shop and inn screens were not compared with the PC; the party order page is not in these games' menus.
-- Experience above level 3 uses a fitted curve, and a few item, skill and monster fields are inferred (see
+- Experience above level 6 uses a fitted curve, and a few item, skill and monster fields are inferred (see
   `docs/smilegame-cleanroom.md`).
 - A save made from a new game started in VNDegen has its heroes' stats at zero, since the hero tables and level
   growth are not read yet; saves that started as PC saves keep their heroes' values.

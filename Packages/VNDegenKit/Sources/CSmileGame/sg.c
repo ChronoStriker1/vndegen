@@ -69,6 +69,7 @@ VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t er
 void vnsmilegame_close(VNSmileGame *vg) {
     SG *g = (SG *)vg;
     if (!g) return;
+    battle_close(g);
     sgb_close(g);
     sg_e_close(g);
     interp_free(&g->interp);
@@ -156,7 +157,7 @@ bool vnsmilegame_frame(VNSmileGame *vg, uint32_t ms) {
     if (g->scene == SCENE_TITLE) {
         title_update(g);
         title_draw(g);
-    } else if (!menu_frame(g, ms)) {
+    } else if (!battle_frame(g, ms) && !menu_frame(g, ms)) {
         interp_update(g, ms);
         if (g->pendingTransfer) {
             g->pendingTransfer = false;
