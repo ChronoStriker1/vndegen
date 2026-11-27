@@ -16,6 +16,7 @@ typedef struct VNSmileGameConfig {
     const char *saveDir;
     const char *logPath;
     int audioRate;
+    const char *fallbackFont;
 } VNSmileGameConfig;
 
 VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *config, char *err, size_t errSize);

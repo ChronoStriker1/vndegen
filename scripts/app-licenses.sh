@@ -46,4 +46,6 @@ cp "$kit/Sources/CEXHIBIT/third_party/LICENSE-dr_libs.txt" "$out.part/dr_wav (Ex
 cp "$kit/Sources/CBRUNS/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (Bruns images and Ogg).txt"
 cp "$kit/Sources/CAGE/third_party/LICENSE-stb.txt" "$out.part/stb_truetype and stb_vorbis (Eushully AGE text and Ogg).txt"
 cp "$kit/Sources/CAGE/third_party/LICENSE-dr_libs.txt" "$out.part/dr_wav (Eushully AGE WAV).txt"
+cp "$kit/Sources/CSmileGame/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (Smile Game Builder images, text and Ogg).txt"
+cp "$kit/Sources/CSmileGame/third_party/LICENSE-ufbx.txt" "$out.part/ufbx (Smile Game Builder models).txt"
 rm -rf "$out" && mv "$out.part" "$out"

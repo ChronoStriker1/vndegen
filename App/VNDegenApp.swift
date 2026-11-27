@@ -22,6 +22,7 @@ import EngineBSX
 import EngineANIM
 import EnginePJADV
 import EngineSystemAoi
+import EngineSmileGame
 import EngineExHibit
 import EngineBruns
 import EngineAGE
@@ -65,6 +66,7 @@ let engines: [any EnginePlugin] = {
         ANIMPlugin(),
         PJADVPlugin(),
         SystemAoiPlugin(),
+        SmileGamePlugin(),
         ExHibitPlugin(),
         BrunsPlugin(),
         AGEPlugin(),
