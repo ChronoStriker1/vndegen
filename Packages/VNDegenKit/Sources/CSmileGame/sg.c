@@ -229,17 +229,12 @@ bool vnsmilegame_frame(VNSmileGame *vg, uint32_t ms) {
             Field *f = &g->field;
             static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
             int tx = (int)f->player.x + dx[f->player.dir & 3], tz = (int)f->player.z + dz[f->player.dir & 3];
-            for (int i = 0; i < f->npcCount; i++) {
+            for (int i = 0; i < f->npcCount && i < g->interp.a.evCount; i++) {
                 if ((int)f->npcs[i].x != tx || (int)f->npcs[i].z != tz) continue;
-                int sheet = event_sheet(g, &f->events[i]);
-                if (sheet < 0) continue;
-                const SgrRec *sr = game_record(&g->data, SGR_EVENT, 16, f->events[i].sheets[sheet].script, NULL);
-                Script s;
-                if (sr && script_parse(&s, sr)) {
-                    sg_log(g, "talk to %s", f->events[i].name);
-                    interp_start(g, &s);
-                    script_free(&s);
-                }
+                const SgaEvent *ev = &g->interp.a.ev[i];
+                if (ev->sheet < 0 || ev->sheets[ev->sheet].trigger != TRIG_TALK) continue;
+                sg_log(g, "talk to %s", f->events[i].name);
+                sga_start_event(g, i, ev->sheet);
                 break;
             }
         }
