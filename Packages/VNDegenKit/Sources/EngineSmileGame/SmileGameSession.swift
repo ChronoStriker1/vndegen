@@ -81,13 +81,30 @@ final class SmileGameSession: EngineSession {
                 driver.finish(byGame: true)
                 return
             }
+            #if DEBUG
+            gameSeconds += CACurrentMediaTime() - began
+            gameFrames += 1
+            #endif
             owedMs = 0
             presented = present(engine)
         }
         #if DEBUG
-        driver.pacing?.note(link, presented: presented, began: began, progress: vnsmilegame_scene(engine).map { String(cString: $0) })
+        driver.pacing?.note(link, presented: presented, began: began, progress: progress(engine))
         #endif
     }
+
+    #if DEBUG
+    private var gameSeconds = 0.0
+    private var gameFrames = 0
+
+    private func progress(_ engine: OpaquePointer) -> String {
+        let scene = vnsmilegame_scene(engine).map { String(cString: $0) } ?? ""
+        let line = String(format: "%@ runtime=%.1fms", scene, gameSeconds / Double(max(gameFrames, 1)) * 1000)
+        gameSeconds = 0
+        gameFrames = 0
+        return line
+    }
+    #endif
 
     private func present(_ engine: OpaquePointer) -> Bool {
         let serial = vnsmilegame_frame_serial(engine)
