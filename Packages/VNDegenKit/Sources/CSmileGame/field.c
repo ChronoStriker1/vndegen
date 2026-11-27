@@ -17,6 +17,8 @@ static void actor_set_graphic(SG *g, Actor *a, const Res *res) {
     size_t n = strlen(res->path);
     if (n > 4 && strcasecmp(res->path + n - 4, ".fbx") == 0) {
         a->model = model_load(g, res->path);
+    } else if (n > 5 && strcasecmp(res->path + n - 5, ".ptcl") == 0) {
+        a->ptcl = sg_ptcl_load(g, res->path);
     } else {
         a->sheet = sg_image(g, res->id);
     }
@@ -123,6 +125,7 @@ void field_free(Field *f) {
     for (int i = 0; i < f->npcCount; i++) {
         event_free(&f->events[i]);
         model_free(f->npcs[i].model);
+        sg_ptcl_free(f->npcs[i].ptcl);
     }
     free(f->events);
     free(f->npcs);

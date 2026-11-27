@@ -1068,3 +1068,68 @@ the power is above 0 (inferred). Before this ヒール healed nothing in the run
   (ロイ 17, ファフニール 14, アリア 11) lost it, and play stopped there.
 - A runner save in the volcano depths loaded in the PC with the same party, levels, HP, MP, items and money, and the
   PC's save there loaded back in the runner the same; the prison save did as well.
+
+## Colette's optional places (round 5, O)
+
+Played in the runner from round M's saves and compared with the PC under Wine, with runner saves loaded into the PC
+and PC saves into the runner.
+
+### Maps and walking
+
+- Under the noon sky with the outside left empty, the PC still draws each edge cell's outward faces down to the
+  outside height: under ヤーマ岬's entrance path a rock face, under its sea a dark band of water.
+- A chip whose attribute's low nibble is 4 (010_Sea, 013_Lava, 014_Ice1) stops the player when it lies at ground
+  level, even level with the cell beside it: walking from the cape's rock shelf into its sea and onto the ice column on
+  コムコムの穴 B04F did nothing on the PC. Wandering events still may; the PC's save put a cape zombie at a sea cell.
+- 3D models carry a vertex colour set that multiplies their texture: the cat's mansion's bookshelf texture has white
+  spines that the PC shows cream, pink, green, blue and tan, the colours in `Bookshelf.fbx`.
+- No round shadow is drawn under 3D events whose model is a map object (`mapobject` in its path): the North Tower's
+  warp gates have none on the PC.
+
+### Particles
+
+`.ptcl` files in `res/character/3D/particle` are plain text: per group `name`, then `key value` lines (`emitterType`
+point, sphere or box, `emitterAmount` per second, `emitInterval`, `emitterSize`, `gravity`, `airDrag`, `billboard`,
+`particleLifeTime` and its random share, `baseSpeed`, `linearVelocity` and its random share, up to four
+`randomColor`s, `minSize`, `maxSize`, start, middle and end alpha, brightness and scale with their start and end times,
+`angle`, `angleRandRange`, `angluarVelocity`, `texPatternH`/`V`, `Start`, `End`, `positionOffset`, `texture`) and
+`end`. Textures are `texture/<name>.png` beside the file. Events use them as their graphic. Fitted to the PC's golem
+cave flame (three frames at 0.33 s): the colour multiplies the texture, alpha blends it, brightness adds the coloured
+texture at twice its value, and the sizes are radii in cells.
+
+### Events
+
+- Commands after a transfer (20) still run in the same event, and an event's own switch (32 65536) set after the
+  transfer belongs to it: the golem cave's boss moves the player to its scene and then sets its switch, and the PC's
+  save back in the cave writes the golem with no graphic.
+- The cape's minotaur ends its scene with a transfer that names no map (26,5 on the same map).
+- Each North Tower lap has its own bed (sheet condition on variable 10): none on the first, 1F on the second, 8F on
+  the third, 9F on the fourth, 11F and 12F on the fifth. 15F's exit sends the player back to 1F and raises variable
+  10, and on the fifth lap to ドラコ.
+
+### Battles
+
+- With three or four heroes the PC stands the first two nearer the camera: ダーク's feet were 22 and 33 pixels lower
+  than the runtime drew them in three- and four-hero battles. One cell forward puts them within 3 to 9 pixels.
+- The battle skill and item lists are a 624 × 424 window at (176, 10) with two columns of 298 × 44 buttons, 302 apart
+  and 46 down from (189, 21), a 300 × 48 やめる button at (337, 377) that the cursor reaches by going down, and a
+  624 × 74 box at (176, 433) with `消費{0} : {1}` (MP and the cost) and the description, or the item's description.
+  The command column is hidden while it is open.
+- The PC's golem boss fight (four golems) and a catacomb zombie fight gave the same experience and money as the
+  runtime's.
+
+### Balloons
+
+The poison balloon's box stays up while its bubbles appear, rise and vanish: 26 seconds of captures in the throne room
+show a 1.95-second cycle with the bubbles gone for about 0.65 of it.
+
+### Save slots
+
+A click on a save slot that isn't highlighted chooses the highlighted one; moving the pointer doesn't move the
+highlight.
+
+### Saves at the optional places
+
+The PC's save in the golem cave after its boss loaded in the runner at the same cell with the same party, money and
+items, and the golem gone. The runner's save on the catacombs' last floor loaded in the PC at the same cell, and the
+battle that starts there ended with the same experience (13,851) and money (3,518 G) in both.

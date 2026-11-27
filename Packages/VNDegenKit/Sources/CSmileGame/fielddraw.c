@@ -1,5 +1,6 @@
 #include "sg.h"
 
+#include <ctype.h>
 #include <math.h>
 #include <time.h>
 
@@ -104,6 +105,15 @@ static u8 chip_attr(SG *g, Guid id) {
 }
 
 static bool liquid(u8 attr) { return (attr & 0x0f) == 4 || (attr & 0x0f) == 7; }
+
+bool sg_cell_water(SG *g, int x, int z) {
+    const Field *f = &g->field;
+    const Map *m = &f->map;
+    const View *v = g->r3.view;
+    if (!v || !v->chipAttr || x < 0 || z < 0 || x >= m->w || z >= m->h) return false;
+    int c = m->chip[(size_t)z * (size_t)m->w + (size_t)x];
+    return c >= 0 && c < f->chipImageCount - 1 && (v->chipAttr[c] & 0x0f) == 4;
+}
 
 static int map_height(const Map *m, const MapLook *l, int x, int z) {
     if (x < 0 || z < 0 || x >= m->w || z >= m->h) return l->outsideHeight;
@@ -354,7 +364,7 @@ static void build_cell(Build *b, int x, int z) {
     }
     for (int s = 0; s < 4; s++) {
         int nx = x + kDx[s], nz = z + kDz[s];
-        if (nx < -v->border || nz < -v->border || nx >= m->w + v->border || nz >= m->h + v->border) continue;
+        if (v->border && (nx < -v->border || nz < -v->border || nx >= m->w + v->border || nz >= m->h + v->border)) continue;
         float ns = surf_height(b, nx, nz);
         int nsd = cell_slope(v, m, nx, nz);
         if (nsd >= 0) {
@@ -654,7 +664,10 @@ void view_load(SG *g) {
 void view_follow(SG *g, float x, float y, float z, u32 ms) {
     View *v = sg_view(g);
     v->waterMs += ms;
-    for (int i = 0; i < g->field.npcCount; i++) g->field.npcs[i].animMs += ms;
+    for (int i = 0; i < g->field.npcCount; i++) {
+        g->field.npcs[i].animMs += ms;
+        if (g->field.npcs[i].visible) sg_ptcl_update(g->field.npcs[i].ptcl, ms);
+    }
     if (v->moveTotal) {
         v->moveMs += ms;
         float t = v->moveMs >= v->moveTotal ? 1.0f : (float)v->moveMs / (float)v->moveTotal;
@@ -782,9 +795,19 @@ static float actor_lift(SG *g, const Actor *a) {
     return c[0] * (1 - fx) * (1 - fz) + c[1] * fx * (1 - fz) + c[2] * fx * fz + c[3] * (1 - fx) * fz;
 }
 
+static bool map_object_path(const char *path) {
+    static const char key[] = "mapobject";
+    for (const char *p = path; *p; p++) {
+        size_t k = 0;
+        while (key[k] && p[k] && tolower((unsigned char)p[k]) == key[k]) k++;
+        if (!key[k]) return true;
+    }
+    return false;
+}
+
 static void draw_blob(SG *g, const Actor *a, float size) {
     View *v = g->r3.view;
-    if (!v->blob) return;
+    if (!v->blob || (a->graphic && map_object_path(a->graphic->path))) return;
     float y = a->y + actor_lift(g, a) + 0.02f, r = size * 0.5f;
     Tri t1 = {.tex = v->blob, .mode = TRI_MODULATE, .flags = TF_NOZWRITE};
     Vert p[4] = {{a->x - r, y, a->z - r, 0, 0, 1}, {a->x - r, y, a->z + r, 0, 1, 1}, {a->x + r, y, a->z + r, 1, 1, 1}, {a->x + r, y, a->z - r, 1, 0, 1}};
@@ -1045,6 +1068,8 @@ void field_draw(SG *g) {
     for (int i = 0; i < f->npcCount; i++)
         if (f->npcs[i].visible && !f->npcs[i].model) draw_actor(g, &f->npcs[i]);
     if (f->player.visible && !f->player.model && !v->eye) draw_actor(g, &f->player);
+    for (int i = 0; i < f->npcCount; i++)
+        if (f->npcs[i].visible && f->npcs[i].ptcl) sg_ptcl_draw(g, f->npcs[i].ptcl, &f->cam, f->npcs[i].x, f->npcs[i].y, f->npcs[i].z);
     free(order);
     v->stats.submitMs = now_ms() - t0;
     r3_flush(&g->r3);

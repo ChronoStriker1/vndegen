@@ -178,6 +178,7 @@ void interp_start(SG *g, const Script *s) {
     ip->active = true;
     ip->state = ST_RUN;
     ip->a.eventIndex = -2;
+    ip->a.eventId = (Guid){{0}};
     ip->a.trigger = s->trigger;
 }
 
