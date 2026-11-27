@@ -318,6 +318,7 @@ static float surf_height(Build *b, int x, int z) {
 static void build_cell(Build *b, int x, int z) {
     Map *m = &b->f->map;
     View *v = b->v;
+    if (!v->border && (x < 0 || z < 0 || x >= m->w || z >= m->h)) return;
     int slot = chip_slot(b->f, x, z);
     Image *im = chip_image(b, slot);
     if (!im) return;
@@ -561,7 +562,7 @@ void view_load(SG *g) {
         v->slopeDir[(size_t)s->z * (size_t)m->w + (size_t)s->x] = (i16)s->kind;
         v->slopeIdx[(size_t)s->z * (size_t)m->w + (size_t)s->x] = (u8)si;
     }
-    v->border = BORDER;
+    v->border = v->look.sky == 0 && sg_player_at_least(g, 1, 8) ? 0 : BORDER;
     v->chunkW = (m->w + 2 * BORDER + CHUNK - 1) / CHUNK;
     v->chunkH = (m->h + 2 * BORDER + CHUNK - 1) / CHUNK;
     v->chunkCount = v->chunkW * v->chunkH;
