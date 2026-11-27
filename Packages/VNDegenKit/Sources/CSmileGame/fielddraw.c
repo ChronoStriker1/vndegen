@@ -12,6 +12,7 @@ static const float kDefaultPitch = -48.0f, kDefaultDistance = 3.5f, kDefaultFov 
 static float gDistScale = 20.0f, gFovScale = 0.1f, gTargetLift = 0.0f;
 static float gAmbK = 0.77f, gSunK = 0.74f;
 static const int kShadowTexels = 12;
+static const float kSpriteForward = 0.235f;
 
 bool maplook_parse(MapLook *l, const SgrRec *rec) {
     memset(l, 0, sizeof *l);
@@ -816,11 +817,12 @@ static void draw_sprite(SG *g, const Actor *a) {
     float tall = h / cosf(p);
     float yaw = f->cam.yaw * 3.14159265f / 180.0f;
     float rx = cosf(yaw) * w / 2, rz = sinf(yaw) * w / 2;
+    float ax = a->x - sinf(yaw) * kSpriteForward, az = a->z + cosf(yaw) * kSpriteForward;
     float u0 = (float)(frame * cw) / (float)im->w, u1 = (float)((frame + 1) * cw) / (float)im->w;
     float v0 = (float)(row * ch) / (float)im->h, v1 = (float)((row + 1) * ch) / (float)im->h;
     float inset = 0.5f / (float)im->w;
-    Vert va = {a->x - rx, a->y + tall, a->z - rz, u0 + inset, v0, 1}, vb = {a->x + rx, a->y + tall, a->z + rz, u1 - inset, v0, 1};
-    Vert vc = {a->x + rx, a->y, a->z + rz, u1 - inset, v1, 1}, vd = {a->x - rx, a->y, a->z - rz, u0 + inset, v1, 1};
+    Vert va = {ax - rx, a->y + tall, az - rz, u0 + inset, v0, 1}, vb = {ax + rx, a->y + tall, az + rz, u1 - inset, v0, 1};
+    Vert vc = {ax + rx, a->y, az + rz, u1 - inset, v1, 1}, vd = {ax - rx, a->y, az - rz, u0 + inset, v1, 1};
     r3_tri(&g->r3, &f->cam, &(Tri){.v = {va, vb, vc}, .tex = im, .alphaTest = true});
     r3_tri(&g->r3, &f->cam, &(Tri){.v = {va, vc, vd}, .tex = im, .alphaTest = true});
 }

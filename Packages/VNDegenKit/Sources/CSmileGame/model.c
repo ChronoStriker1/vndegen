@@ -301,7 +301,7 @@ static Clip *find_clip(Model *m, const char *name, SG *g) {
     rig->clipsScanned = true;
     for (int i = 0; i < rig->clipCount; i++) {
         Clip *c = &rig->clips[i];
-        if (strcmp(c->name, name) != 0) continue;
+        if (strcasecmp(c->name, name) != 0) continue;
         if (c->start < 0) {
             ufbx_scene *s = g ? load_scene(g, (const char *)c->scene) : NULL;
             free(c->scene);
