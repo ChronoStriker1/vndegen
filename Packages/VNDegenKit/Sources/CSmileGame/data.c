@@ -443,11 +443,7 @@ int grow_stat(const GrowStat *s, int level) {
     return s->base + (int)((double)s->growth * pow((double)(level - 1), (double)s->curve));
 }
 
-int exp_for_level(int level) {
-    static const int known[] = {0, 0, 26, 84};
-    if (level < 4) return known[level < 0 ? 0 : level];
-    return (int)(3.5 * pow((double)level, 2.89) + 0.5);
-}
+int exp_for_level(int level) { return battle_exp_for_level(level); }
 
 int slot_kind(int slot) {
     static const int kinds[SLOT_COUNT] = {ITEM_WEAPON, ITEM_SHIELD, ITEM_HEAD, ITEM_BODY, ITEM_ACCESSORY, ITEM_ACCESSORY};
