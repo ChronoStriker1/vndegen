@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.61.1",
+          "buildVersion": "3719",
+          "date": "2026-11-27T12:26:00Z",
+          "localizedDescription": "Princess Colette's Great Adventure plays through about the first half of its story, to the gargoyle in the sewer.\n\n## Downloads\n\n- `VNDegen-0.61.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.61.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.61.1-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Added\n\n- **Princess Colette's Great Adventure** now plays well past its first world-map area: the east cave and its boss, the inn, the quest through コムコムの穴, the witch's forest where メイリ joins, the サキュバスタワー where サキュバス joins, and the sewer up to its gargoyle, with their story scenes and the log room's replays. Saves in the castle town and the サキュバスタワー were checked both ways with the PC.\n- **Smile Game Builder inns** work as on the PC: the stay or leave choice with the price, the money window, the sleep music, the fade to black and the message when you can't pay.\n\n## Changed\n\n- **Smile Game Builder:** event rooms are seen at eye level, as on the PC, and floor names show in a band across the middle of the screen.\n- **Smile Game Builder:** experience needed for levels 7 to 10 matches the PC's, so heroes no longer level up early.\n\n## Fixed\n\n- **Smile Game Builder:** コムコムの穴's suspension bridge can be crossed, and its stone bridge walked under. Characters stand on stairs and slopes instead of sinking into them, and ramp-shaped stairs can't be climbed from the side.\n- **Smile Game Builder:** beds, counters and other furniture facing left or right were turned the wrong way round.\n- **Smile Game Builder:** メイリ showed only her hat's tip in battle.\n- **Smile Game Builder:** a sound effect the game stops by name now stops.\n\n## Known limits\n\n- **Princess Colette's Great Adventure:** the second half, from the walls on the road to the North Tower to the ending, hasn't been played in VNDegen yet.\n- **Smile Game Builder battles:** with four heroes, the fourth stands at the right edge of the screen.\n- **Sacred** is still recognised but not supported.\n\n## What wasn't tested\n\n- Real iPhones and iPads, and the iPhone simulator for the new areas.\n- iPad simulator frame times for the cave, bridge, inn and tower. The Mac app holds 60 fps in each.\n- Walking under the stone bridge on the PC, to compare.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.61.1/VNDegen-0.61.1.ipa",
+          "size": 133246021,
+          "sha256": "41300a96c4d196cca8fa6d5f267bcef5a0908bf1049e791a3030d8b990d16381",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.61.0",
           "buildVersion": "3704",
           "date": "2026-11-27T09:23:46Z",
