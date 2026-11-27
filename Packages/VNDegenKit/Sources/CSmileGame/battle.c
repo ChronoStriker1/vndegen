@@ -171,9 +171,10 @@ int battle_skill_damage(int power, int magic, int defense, float spread) {
 }
 
 int battle_exp_for_level(int level) {
-    static const int seen[] = {0, 0, 26, 84, 184, 350, 600, 966, 1484, 2196, 3150};
-    if (level <= 10) return seen[level < 0 ? 0 : level];
-    return (int)(3.7984 * pow((double)level, 2.5) * pow(1.101, (double)level) + 3.05 + 0.5);
+    if (level <= 1) return 0;
+    if (level > 50) return battle_exp_for_level(50) + 120000 * (level - 50);
+    long long l = level;
+    return (int)(l * (l - 1) * (l * l - l + 50) / 4);
 }
 
 bool battle_escape_roll(u32 *rng, int partySpeed, int monsterSpeed) {
