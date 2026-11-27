@@ -354,8 +354,7 @@ void model_pose(Model *m, const char *motion, float seconds) {
     double t = 0;
     if (c) {
         double len = c->end - c->start;
-        t = seconds;
-        if (len > 0) t = c->loop ? fmod(t, len) : fmin(t, len);
+        t = len > 0 ? (c->loop ? fmod(seconds, len) : fmin(seconds, len)) : 0;
         t += c->start;
     }
     for (size_t ni = 0; ni < s->nodes.count; ni++) {

@@ -12,12 +12,15 @@ runners below.
 ## Princess Colette's Great Adventure
 
 VNDegen plays Princess Colette's Great Adventure (Smoothly Animated Pixel Art RPG) on Mac, iPhone and iPad from the
-title through about the first half of the story: the opening, the throne room and the castle town, the dungeon scenes
-in which Colette joins your party, the world map with its wandering monsters, the east cave and its boss, the inn,
-the rumour-monger's quest through コムコムの穴 with its bridges, the public square, the witch's forest where メイリ
-joins, the サキュバスタワー and its boss (サキュバス joins), the sewer and the gargoyle, and the scenes between them
-and their replays in the log room. It was played that far in VNDegen; the North Tower, the cape, the cat's mansion,
-the catacombs, the golem cave and the ending haven't been played yet. The game is in Japanese, as on the PC.
+title to its ending: the opening, the throne room and the castle town, the dungeon scenes in which Colette joins your
+party, the world map with its wandering monsters, the east cave and its boss, the inn, the rumour-monger's quest
+through コムコムの穴 with its bridges, the public square, the witch's forest where メイリ joins, the サキュバスタワー and
+its boss (サキュバス joins), the sewer and the gargoyle, the cat's mansion with its fishing where ニャンニャ joins, the
+walls of ice, fire and lightning, the North Tower (幽玄の塔) to its hall, the former king's battle, ユグドラシル, the
+last scene in the throne room and the staff roll, with the scenes between them and their replays in the log room. It
+was played that far in VNDegen. The optional places (the cape, the catacombs, the golem cave) and the post-game after
+the staff roll (the tower's upper floors, the prison scene and ドラコ) haven't been played. The game is in Japanese, as
+on the PC.
 
 - **Saves** are the PC version's own files in the game's `savedata` folder, so a save moves both ways between VNDegen
   and the PC copy, and Ludusavi backs them up as it does on Windows. Save from the game's menu (Escape, X, or Y and
@@ -26,9 +29,8 @@ the catacombs, the golem cave and the ending haven't been played yet. The game i
 - **Controls** start on the RPG Maker layout: A confirms, B cancels, Y and Menu open the game's menu, X dashes. On a
   touch screen, a tap outside the touch gamepad confirms, as a click does on the PC, and holding a finger on the map
   opens the menu.
-- **What isn't there yet:** the second half of the game (from the walls of fire, ice and lightning on the way to
-  the North Tower) hasn't been played in VNDegen, so its dungeons and bosses may show problems. Battle effects play simpler than on the PC, and the camera doesn't
-  swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
+- **What isn't there yet:** the optional dungeons and the post-game haven't been played in VNDegen, so they may show
+  problems. Battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
   the PC's. Known limits below lists the rest.
 
 ## Sacred
@@ -73,7 +75,7 @@ Both games use the same data format.
   party, learned skills, the encounter switch, moving, turning and placing the player and events, event graphics,
   moving to another map, stopping a sound effect (76), Colette's floor names in a band across the screen, and the
   eye-level camera of its event rooms (command 53's mode 1 and maps whose camera record has kind 1). Colette plays
-  from the title to the gargoyle in the sewer (the story variable at 15), and Sacred from the title through the castle,
+  from the title to the staff roll (the story variables at 19 and 17), and Sacred from the title through the castle,
   the town's weapon shop, the royal cave and its second floor to the Vord forest and the world map.
 - Data tables: heroes, battle commands, items, skills, monsters and effects, and the game settings' menu text, sounds
   and windows. One party state (`Party` in `sg_B.h`, `g->b.party`) holds the heroes with their stats, the reserve,
@@ -200,6 +202,19 @@ from runner saves (another delegate's build ran beside some of it; load averages
 With the touch gamepad shown, the iPad simulator's world map ran at 44.6 to 46.1 frames a second with the runtime at
 3.4 ms, the same gamepad compositing cost as below.
 
+Colette's second half, DEBUG builds of this round's branch on the Mac mini, 2026-11-27, measured the same way from
+runner saves (load averages given; a simulator build ran beside the first Mac row). Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator, gamepad hidden | iPhone 18 Pro simulator |
+|---|---|---|---|
+| Cat's mansion | 60.0, 59.9, 6.1 ms (load 27) | 59.9 to 60.0, 48.7 to 60.0, 3.0 to 3.6 ms (load 7) | 60.0, 60.0, 4.0 ms (load 6) |
+| North Tower 1F | 60.0, 59.9 to 60.0, 2.0 ms (load 14) | 60.0, 60.0, 2.2 to 2.6 ms (load 6) | not measured |
+| 集会場 battle, four heroes and five monsters | 60.0, 59.9 to 60.0, 7.0 ms (load 7) | not measured | not measured |
+| Staff roll | 60.0, 59.9 to 60.0, 6.6 ms (load 5) | 60.0, 60.0, 3.8 ms (load 6) | not measured |
+
+With the touch gamepad shown, the iPad simulator's cat's mansion ran at 35.7 to 40.1 frames a second with the runtime at
+3.6 to 3.9 ms, the gamepad compositing cost described below.
+
 Colette's first release, DEBUG builds of 208c06cf on the Mac mini, 2026-11-27, measured the same way (Mac app with no
 other app or build running, load average 3 to 5; one simulator booted at a time). The world map is the cell below
 the castle where the first monster reaches the player, the battle the command list of that battle. Target 60.
@@ -253,16 +268,19 @@ were taken with the gamepad shown.
   menu, the title's Continue and Config, and taps and holds.
 - `sgtest_L`: Colette past the first area: the inn's stay and its refusal, the inn's bed, crossing コムコムの穴's
   suspension bridge, walking under its stone bridge, a stair's side, the player standing on stairs, and command 76.
+- `sgtest_M`: Colette's second half against the PC: a talk pressed mid-step, the fishing spot and its first catch, an
+  opened chest, the fourth hero's place in battle, the experience curve, the noon sky's edge and the staff roll's
+  sprites.
 - `sgtest_I`: the field against the PC: sheet facing, turn, step and place codes, random variables, the encounter
   switch, learned skills and pictures in saves (byte for byte against PC saves), the help bar after a load, caption
   fades per player version and Colette's opening music.
 
 ## Known limits
 
-- A battle with four heroes spreads them so far that the fourth stands at the right edge of the screen; the PC's
-  four-hero layout wasn't compared.
-- The second half of the game hasn't been played: the walls on the way to the North Tower need ニャンニャ, who
-  joins after a fishing side quest at the cat's mansion, and the tower, the other dungeons and the ending follow.
+- Colette's optional places (ヤーマ岬, the クサレィ catacombs, the golem cave) and its post-game (the North Tower's
+  floors 6 to 15 on the way back, the prison scene, ドラコ) haven't been played in VNDegen.
+- In battles the PC stands the first two heroes a little nearer the camera than the others; the runtime keeps all four
+  on one line, so ダーク and コレット stand about 20 pixels higher than on the PC.
 - Effects play their sheet's cells in order; the keyframe timeline inside each effect (positions, scales, screen
   flashes) is not read. The camera does not push towards the acting fighter as the PC's does.
 - Critical hits, skill damage, healing, escape chance, defend and charge, the chance that a state lands and the
@@ -278,8 +296,7 @@ were taken with the gamepad shown.
 - The inn was compared with the PC in Colette's town; the shop was, in Sacred's weapon shop, with its quantity box. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
   these games' menus. Where a slot's page shows a second to fourth hero is a guess (two columns); both games have one
   hero there.
-- Experience above level 10 uses a fitted curve, and a few item, skill and monster fields are inferred (see
-  `docs/smilegame-cleanroom.md`).
+- A few item, skill and monster fields are inferred (see `docs/smilegame-cleanroom.md`).
 - A hero's magic is taken from the hero tables; saves keep whatever the PC stored in that field (0 for every hero
   seen).
 - Sound-effect and music-effect levels and the music effect pausing the BGM follow the BGM measurement and common
@@ -289,6 +306,9 @@ were taken with the gamepad shown.
   it where the PC shows sky. Mode 3's target point matches the
   PC's opening scene only roughly.
 - Background value 1 (Sacred's field) draws black; the PC never shows it in play.
+- Colette's cat's mansion bookshelf shows white book spines where the PC's are coloured, and the North Tower's warp
+  gates have a round shadow under them that the PC doesn't draw.
+- The poison balloon shows over the player all the time; the PC shows it only now and then.
 - The PC darkens wall feet slightly more. Map objects with lights stay in their unlit motion until an event changes
   them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
 - Sacred's castle courtyard averages about 13 ms a frame on the Linux VM, with its 99th percentile (about 19 ms) over

@@ -124,7 +124,7 @@ static void state_balloon(SG *g) {
     bool poisoned = false;
     for (int i = 0; i < p->count; i++) poisoned |= p->members[i].hp > 0 && (p->members[i].state & 1);
     const Actor *a = &g->field.player;
-    if (!poisoned || !a->visible) return;
+    if (!poisoned || !a->visible || !a->graphic) return;
     const Tables *t = &g->b.tables;
     const EffectDef *e = NULL;
     for (int i = 0; i < t->effectCount && !e; i++)

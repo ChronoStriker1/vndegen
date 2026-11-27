@@ -598,7 +598,7 @@ Guid party_leader_graphic(SG *g) {
     if (!p->count) return (Guid){{0}};
     Guid hero = p->members[0].hero;
     for (int i = 0; i < p->lookCount; i++)
-        if (guid_eq(p->looks[i].hero, hero) && !guid_zero(p->looks[i].graphic)) return p->looks[i].graphic;
+        if (guid_eq(p->looks[i].hero, hero)) return p->looks[i].graphic;
     const HeroDef *h = hero_def(&g->b.tables, hero);
     return h ? h->graphic : (Guid){{0}};
 }

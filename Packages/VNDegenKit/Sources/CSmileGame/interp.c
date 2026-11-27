@@ -248,7 +248,8 @@ static bool eval_branch(SG *g, const Cmd *c) {
         for (int i = 0; i < p->count && cmd_int(c, 2) == 0; i++)
             for (int k = 0; k < SLOT_COUNT; k++)
                 if (guid_eq(p->members[i].equip[k], id)) have++;
-        return cmd_int(c, 3) == 1 ? have >= cmd_int(c, 1) : have == cmd_int(c, 1);
+        bool holds = cmd_int(c, 3) == 1 ? have >= cmd_int(c, 1) : have == cmd_int(c, 1);
+        return cmd_int(c, 2) == 1 ? !holds : holds;
     }
     case CMD_IF_PARTY: return sga_in_party(g, cmd_guid(c, 0)) == (cmd_int(c, 1) == 0);
     default: return false;

@@ -90,6 +90,7 @@ void sga_actor_graphic(SG *g, Actor *a, Guid graphic) {
     if (a->model) model_free(a->model);
     a->model = NULL;
     a->sheet = NULL;
+    a->waitSheet = NULL;
     a->graphic = res;
     if (!res) return;
     size_t n = strlen(res->path);
@@ -116,6 +117,8 @@ static void apply_sheet(SG *g, int i) {
     ev->wanderStarted = false;
     ev->wanderLeft = 0;
     sga_actor_graphic(g, ac, sh->graphic);
+    if (sh->moveType == 0) sg_actor_wait_sheet(g, ac);
+    else ac->waitSheet = NULL;
     ac->visible = ac->graphic != NULL;
     ev->motion = sg_strdup(sh->motion ? sh->motion : "");
     sg_actor_motion(g, ac, ev->motion);
@@ -366,8 +369,8 @@ bool sga_field_input(SG *g) {
     }
     u32 want = dir == 0 ? KEY_UP : dir == 1 ? KEY_RIGHT : dir == 2 ? KEY_DOWN : KEY_LEFT;
     if (g->keys & want) {
-        int i = npc_at(g, tx, tz, true);
-        if (i >= 0 && (trigger_of(g, i) == TRIG_TOUCH || trigger_of(g, i) == TRIG_EVENT_TOUCH)) {
+        int i = npc_at(g, tx, tz, false);
+        if (i >= 0 && (trigger_of(g, i) == TRIG_EVENT_TOUCH || (trigger_of(g, i) == TRIG_TOUCH && g->field.npcs[i].visible))) {
             sga_start_event(g, i, a->ev[i].sheet);
             if (g->interp.active) return true;
         }
