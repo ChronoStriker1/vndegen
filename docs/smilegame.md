@@ -25,7 +25,8 @@ Both games use the same data format.
   drawn upright, the player walking cell by cell (stairs let it change height), talking to the event in front.
   Events face their sheet's direction, wander or walk toward the player at their sheet's speed and frequency, and a
   chaser whose trigger is 4 starts its event when it reaches the player (Colette's world-map monsters).
-- Events: sheets chosen by every condition kind the games use; talk, touch, autorun and repeating triggers; messages
+- Events: sheets chosen by every condition kind the games use; talk, touch, event-touch, autorun, repeating and parallel triggers (parallel ones run in the one event runner, as
+  repeating ones do); messages
   with faces, choices and branches, captions (fading on Sacred's player version) and scrolling text, pictures with
   zoom and colour, balloons and effects over characters, fades and tint, variables (random ones too), switches,
   items, money, the party, learned skills, the encounter switch, moving, turning and placing the player and events,
