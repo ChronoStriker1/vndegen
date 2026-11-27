@@ -92,18 +92,7 @@ static bool blocked_by_npc(SG *g, int x, int z) {
     return false;
 }
 
-static bool step_ok(SG *g, int x0, int z0, int x1, int z1) {
-    const Map *m = &g->field.map;
-    if (x1 < 0 || z1 < 0 || x1 >= m->w || z1 >= m->h) return false;
-    int h0 = sga_floor(g, x0, z0), h1 = sga_floor(g, x1, z1);
-    if (h0 != h1) {
-        bool stair = false;
-        for (int i = 0; i < m->stairCount; i++)
-            if ((m->stairs[i].x == x1 && m->stairs[i].z == z1) || (m->stairs[i].x == x0 && m->stairs[i].z == z0)) stair = true;
-        if (!stair || abs(h1 - h0) > 1) return false;
-    }
-    return !blocked_by_npc(g, x1, z1);
-}
+static bool step_ok(SG *g, int x0, int z0, int x1, int z1) { return sgi_cell_free(g, x0, z0, x1, z1, -1) && !blocked_by_npc(g, x1, z1); }
 
 static bool walk_to(SG *g, int tx, int tz) {
     const Map *m = &g->field.map;

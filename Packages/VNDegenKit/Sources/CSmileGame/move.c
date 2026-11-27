@@ -26,11 +26,18 @@ static bool on_stairs(const Map *m, int x, int z) {
     return false;
 }
 
-static bool side_of_stair(const Map *m, int x, int z, int dx) {
+static int ramp_at(const Map *m, int x, int z) {
     for (int i = 0; i < m->stairCount; i++)
-        if (m->stairs[i].x == x && m->stairs[i].z == z && m->stairs[i].kind >= 0 && m->stairs[i].kind <= 3)
-            return (m->stairs[i].kind >= 2) != (dx != 0);
-    return false;
+        if (m->stairs[i].x == x && m->stairs[i].z == z && m->stairs[i].kind >= 0 && m->stairs[i].kind <= 3) return m->stairs[i].kind;
+    return -1;
+}
+
+static bool across_ramp(const Map *m, int x0, int z0, int x1, int z1) {
+    int a = ramp_at(m, x0, z0), b = ramp_at(m, x1, z1);
+    if (a < 0 && b < 0) return false;
+    int k = a >= 0 ? a : b;
+    if ((k >= 2) == (x1 != x0)) return false;
+    return a != b || m->height[(size_t)z0 * (size_t)m->w + (size_t)x0] != m->height[(size_t)z1 * (size_t)m->w + (size_t)x1];
 }
 
 static bool occupies(const Actor *a, int x, int z) {
@@ -45,7 +52,7 @@ bool sgi_cell_free(SG *g, int fromX, int fromZ, int x, int z, int self) {
     const Actor *me = self >= 0 && self < f->npcCount ? &f->npcs[self] : &f->player;
     int h0 = sg_floor_level(g, fromX, fromZ, (int)lroundf(me->y)), h1 = sg_floor_level(g, x, z, h0);
     if (h0 != h1 && (abs(h1 - h0) > 1 || !(on_stairs(m, x, z) || on_stairs(m, fromX, fromZ)))) return false;
-    if (side_of_stair(m, x, z, x - fromX) || side_of_stair(m, fromX, fromZ, x - fromX)) return false;
+    if (across_ramp(m, fromX, fromZ, x, z)) return false;
     if (self >= 0 && occupies(&f->player, x, z)) return false;
     for (int i = 0; i < f->npcCount; i++)
         if (i != self && f->npcs[i].visible && occupies(&f->npcs[i], x, z)) return false;
