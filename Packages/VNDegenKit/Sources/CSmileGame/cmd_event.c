@@ -113,6 +113,7 @@ static void apply_sheet(SG *g, int i) {
     sga_actor_graphic(g, ac, sh->graphic);
     ac->visible = ac->graphic != NULL;
     ev->motion = sg_strdup(sh->motion ? sh->motion : "");
+    sg_actor_motion(g, ac, ev->motion);
 }
 
 void sga_refresh_events(SG *g) {
@@ -194,6 +195,7 @@ void sga_map_loaded(SG *g) {
     a->mapId = f->map.id;
     a->mapPending = false;
     build_floor(g);
+    for (int i = 0; i < f->npcCount; i++) f->npcs[i].y = (float)sga_floor(g, (int)floorf(f->npcs[i].x), (int)floorf(f->npcs[i].z));
     a->evCount = f->npcCount;
     a->ev = sg_alloc(sizeof(SgaEvent) * (size_t)(a->evCount ? a->evCount : 1));
     for (int i = 0; i < a->evCount; i++) {

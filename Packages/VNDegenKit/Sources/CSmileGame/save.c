@@ -615,6 +615,12 @@ static void capture(SG *g, SaveData *s) {
     s->z = (i32)f->player.z;
     s->dir = kToSave[f->player.dir & 3];
     s->playerY = f->player.y;
+    ViewPose pose;
+    sg_camera_get(g, &pose);
+    s->cameraPitch = pose.pitch;
+    s->cameraYaw = pose.yaw;
+    s->cameraDistance = pose.distance;
+    s->cameraFov = pose.fov;
     SaveEvent *ev = sg_alloc(sizeof(SaveEvent) * (size_t)(f->npcCount ? f->npcCount : 1));
     for (int i = 0; i < f->npcCount; i++) {
         const Actor *a = &f->npcs[i];
@@ -624,7 +630,10 @@ static void capture(SG *g, SaveData *s) {
         ev[i].id = a->eventId;
         ev[i].graphic = a->graphic ? a->graphic->id : old ? old->graphic : (Guid){{0}};
         ev[i].flag = old ? old->flag : 0;
-        if (old && guid_eq(old->graphic, ev[i].graphic)) ev[i].motion = sg_strdup(old->motion);
+        const SgaState *st = &g->interp.a;
+        bool ready = st->evCount == f->npcCount && guid_eq(st->mapId, f->map.id);
+        if (ready && st->ev[i].motion) ev[i].motion = sg_strdup(st->ev[i].motion);
+        else if (old && guid_eq(old->graphic, ev[i].graphic)) ev[i].motion = sg_strdup(old->motion);
         else ev[i].motion = sheet_motion(g, a->eventId, event_sheet(g, &f->events[i]));
         ev[i].dir = kToSave[a->dir & 3];
         ev[i].x = a->x;
@@ -717,14 +726,39 @@ bool sg_save_read(SG *g, int slot) {
     if (!field_load(g, s.map, s.x, s.z, kFromSave[s.dir & 3])) return false;
     Field *f = &g->field;
     f->player.y = s.playerY;
+    ViewPose pose;
+    sg_camera_get(g, &pose);
+    pose.pitch = s.cameraPitch;
+    pose.yaw = s.cameraYaw;
+    pose.distance = s.cameraDistance;
+    pose.fov = s.cameraFov;
+    pose.follow = true;
+    sg_camera_to(g, &pose, 0);
+    sga_map_loaded(g);
+    SgaState *st = &g->interp.a;
     for (int i = 0; i < f->npcCount; i++)
         for (int k = 0; k < s.eventCount; k++) {
-            if (!guid_eq(s.events[k].id, f->npcs[i].eventId)) continue;
+            const SaveEvent *se = &s.events[k];
+            if (!guid_eq(se->id, f->npcs[i].eventId)) continue;
             Actor *a = &f->npcs[i];
-            a->x = a->tx = s.events[k].x;
-            a->z = a->tz = s.events[k].z;
-            a->y = s.events[k].y;
-            a->dir = kFromSave[s.events[k].dir & 3];
+            a->x = a->tx = se->x;
+            a->z = a->tz = se->z;
+            a->y = se->y;
+            a->dir = kFromSave[se->dir & 3];
+            if (i < st->evCount && st->ev[i].sheet >= 0) {
+                SgaEvent *ev = &st->ev[i];
+                if (!guid_zero(se->graphic) && !guid_eq(se->graphic, ev->sheets[ev->sheet].graphic)) {
+                    ev->graphicOverride = true;
+                    ev->graphic = se->graphic;
+                    sga_actor_graphic(g, a, se->graphic);
+                    a->visible = a->graphic != NULL;
+                }
+                if (se->motion && (!ev->motion || strcmp(se->motion, ev->motion) != 0)) {
+                    free(ev->motion);
+                    ev->motion = sg_strdup(se->motion);
+                    sg_actor_motion(g, a, ev->motion);
+                }
+            }
             break;
         }
     snd_set_master(g, get_i32(s.config + 2), get_i32(s.config + 6));

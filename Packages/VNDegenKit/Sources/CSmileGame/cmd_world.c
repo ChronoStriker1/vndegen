@@ -182,7 +182,10 @@ static void cmd_hero_graphic(SG *g, const Cmd *c) {
     Party *p = &g->b.party;
     Guid hero = cmd_guid(c, 0);
     party_set_look(p, hero, cmd_guid(c, 1), cmd_guid(c, 2));
-    if (p->count && guid_eq(p->members[0].hero, hero)) update_leader_graphic(g);
+    if (p->count && guid_eq(p->members[0].hero, hero)) {
+        update_leader_graphic(g);
+        sg_actor_motion(g, &g->field.player, cmd_str(c, 3));
+    }
     sg_log(g, "hero graphic %s motion %s", g->field.player.graphic ? g->field.player.graphic->name : "default", cmd_str(c, 3));
 }
 
@@ -198,6 +201,7 @@ static void cmd_event_graphic(SG *g, const Cmd *c) {
     Actor *ac = &g->field.npcs[i];
     sga_actor_graphic(g, ac, ev->graphic);
     ac->visible = ac->graphic != NULL;
+    sg_actor_motion(g, ac, ev->motion);
     sg_log(g, "event graphic %s motion %s", ac->graphic ? ac->graphic->name : "none", ev->motion);
 }
 
@@ -222,7 +226,8 @@ bool sga_busy(SG *g) {
     if (a->balloonTotal && a->balloonMs < a->balloonTotal) return true;
     if (a->fadeWait && a->fadeTotal) return true;
     if (a->tintWait && a->tintTotal) return true;
-    a->waitMoves = a->fadeWait = a->tintWait = false;
+    if (a->camWait && sg_camera_moving(g)) return true;
+    a->waitMoves = a->fadeWait = a->tintWait = a->camWait = false;
     return false;
 }
 
@@ -327,8 +332,10 @@ bool sga_exec(SG *g, const Cmd *c) {
         sg_log(g, "balloon on %s", cmd_int(c, 0) ? "player" : "event");
         return true;
     case CMD_CAMERA:
-        sg_log(g, "camera mode %d (%d args) not applied", cmd_int(c, 0), c->argCount);
-        return false;
+        sg_camera_command(g, c);
+        a->camWait = cmd_int(c, c->argCount - 1) == 0 && sg_camera_moving(g);
+        sg_log(g, "camera mode %d%s", cmd_int(c, 0), a->camWait ? ", waiting" : "");
+        return a->camWait;
     case CMD_BGM:
         if (guid_zero(cmd_guid(c, 0))) snd_bgm_stop(g, 0);
         else snd_bgm(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2));

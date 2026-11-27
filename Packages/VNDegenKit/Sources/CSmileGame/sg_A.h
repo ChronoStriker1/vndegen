@@ -140,8 +140,7 @@ typedef struct SgaState {
     Image *balloon;
     int balloonTarget;
     u32 balloonMs, balloonTotal;
-    float camFrom[4], camTo[4];
-    u32 camMs, camTotal;
+    bool camWait;
     SgaFaceImage *faces;
     int faceCount;
 } SgaState;

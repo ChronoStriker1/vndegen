@@ -245,6 +245,42 @@ static void test_bgm_command(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static int npc_named(SG *g, const char *eventPrefix) {
+    for (int i = 0; i < g->field.npcCount; i++) {
+        char id[37];
+        guid_str(g->field.npcs[i].eventId, id);
+        if (strncmp(id, eventPrefix, strlen(eventPrefix)) == 0) return i;
+    }
+    return -1;
+}
+
+static void test_sacred_castle_load(const char *dir) {
+    SG *g = open_game(dir, NULL);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    run(g, 16);
+    CHECK(vnsmilegame_load((VNSmileGame *)g, 0));
+    run(g, 500);
+    int queen = npc_named(g, "2d01b68d"), king = npc_named(g, "e6e6e827");
+    CHECK(queen >= 0 && king >= 0);
+    if (queen >= 0) {
+        Actor *a = &g->field.npcs[queen];
+        CHECK(a->visible && a->model && a->model->rig && strcmp(a->model->rig->motion, "chair") == 0);
+        CHECK(a->y == 10.0f);
+    }
+    if (king >= 0) {
+        Actor *a = &g->field.npcs[king];
+        CHECK(a->model && a->model->rig && strcmp(a->model->rig->motion, "bed") == 0);
+    }
+    CHECK(!g->interp.active);
+    ViewPose pose;
+    sg_camera_get(g, &pose);
+    CHECK(pose.pitch == -48.0f && pose.yaw == 0.0f && pose.distance == 3.5f && pose.fov == 70.0f);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE"), *sacred = getenv("SG_SACRED");
     if (colette) {
@@ -260,6 +296,7 @@ int main(void) {
         test_new_game_party(sacred, "6e648100-18ef-4a00-a0a0-351654881c51", 1, 50, 20, 25, 20, 10, 0, "0d0ce646-5b74-448b-9ecf-6ee5cfba8183",
                             "42d3e093-74df-49f1-a6ff-aaa112554f3a");
         test_inn(sacred);
+        test_sacred_castle_load(sacred);
     } else {
         printf("SG_SACRED not set: Sacred checks skipped\n");
     }
