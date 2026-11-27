@@ -35,9 +35,12 @@ Both games use the same data format.
 - The field menu (Esc or X): items, skills, equipment, status, saving to a slot with each slot's map and party, quit
   and config, laid out as the PC draws them, with faces, and the menu sounds. Shop (37) and inn (38) commands open
   their screens and branch on the result; 59 recovers the party.
-- Battles: event command 65 through `sg_battle_start`, drawn on the battle background map from behind the party,
-  with the command list, targets, skills, items, defend and escape, monster actions, damage as measured on the PC,
-  the result panel, level-ups and GAME OVER.
+- Battles: event command 65 starts a battle and waits for it, then branches on the result as the PC does; maps with an
+  encounter table start battles from steps. The battle is drawn on the battle background map from behind the party,
+  with the entry flash and intro, the command list, targets, skills, items, defend and escape, monster actions,
+  damage, states, drain and effects from `Effect.sgr` with their sounds, the battle BGM and victory music, the result
+  seen from the front, level-ups and GAME OVER. 3D heroes play their battle motions. `vnsmilegame_scene` reports
+  `battle`.
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
 - Saves: the PC's own `savedata/Save_NN.sgs` files, read and written field for field, with everything the runtime does
   not model yet kept and written back unchanged, so saves move both ways between VNDegen and the original. `saveDir`
@@ -77,6 +80,12 @@ percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred'
   example `troop:4ff8bc66` for Colette's first slime on the world map, `troop:c426b710` for Sacred's practice battle)
   headless; `sgbattleplay` takes the same arguments with `-` as `<out>` and opens an SDL window.
 - `sgtest_C`: the battle tests against numbers seen in PC battles.
+- `sgtest_H`: battles from the story: skill and monster fields, map encounter tables, Colette's first wandering
+  monster from its message to the world map with the PC's rewards and level-ups, Sacred's practice battle won and
+  lost, and a random encounter in Sacred's first dungeon. `sgtest_H drive <game> <out> ...` plays a scripted path
+  like `sgtest_A drive`, with `warp:<map>,x,z,dir`, `var:i=v`, `sw:i=v`, `join:<hero>`, `hp:i=v`, `seed:n`,
+  `script:<GUID hex>`, `phase:<battle phase>`, `fight:attack|defend|escape`, `path:x,z` (prints the walk) and
+  `until:battle`.
 - `sgtest_B`: the data table tests against values from the PC's menus and the game files. `sgtest_B shots
   colette|sacred <game> <out>` writes every menu page as PNG for comparison with the PC.
 - `sgtest_D`: the renderer's tests: coverage, the map tail and cameras of both games, the throne room's projection
@@ -91,10 +100,14 @@ percentile 16.2 ms; Colette's throne room 8.6 ms and castle town 7.6 ms; Sacred'
 
 ## Known limits
 
-- Battles play, but command 65 doesn't start them yet: in the story a battle counts as won until it calls
-  `sg_battle_start` (`battle_setup_cmd` decodes its arguments) and branches on `sg_battle_result`. No battle BGM or
-  effect animations; states and elements are not applied; critical, skill, escape and shared experience rules are
-  inferred (see `docs/smilegame-cleanroom.md`).
+- After a battle the map's BGM starts again from the beginning; the PC resumes it where it stopped (the mixer has no
+  pause yet).
+- Effects play their sheet's cells in order; the keyframe timeline inside each effect (positions, scales, screen
+  flashes) is not read. The camera does not push towards the acting fighter as the PC's does.
+- Critical hits, skill damage, healing, escape chance, defend and charge, the chance that a state lands and the
+  recovery from sleep, paralysis, confusion and charm are inferred (see `docs/smilegame-cleanroom.md`). A random
+  encounter always brings one monster; the PC sometimes brings two スライミー.
+- Saves don't write a hero's state (poison) or the learned-skill list the PC keeps after the equipment.
 - Effects (27) and balloons (45) are not drawn, though balloons take their time.
 - Events never wander or chase the player; the movement type in their sheets is read but not used.
 - Command 10's and 16's codes 4 to 7, 11's one-argument form, and 15, 55, 56, 58, 66, 68, 70, 76 and 77 are logged and

@@ -506,7 +506,7 @@ static void test_sacred_practice(const char *dir, const char *tmp, bool lose) {
     CHECK(strcmp(g->field.map.name, "Default") == 0);
     CHECK(strcmp(bgm_name(g), "BGM_battle1") == 0);
     CHECK(battle_monster_hp(g, 0) == 30);
-    fight(g, lose ? "defend" : "attack", 40);
+    fight(g, "attack", 40);
     CHECK(sg_battle_result(g) == (lose ? BATTLE_LOST : BATTLE_WON));
     CHECK(g->scene == SCENE_FIELD);
     CHECK(upto(g, "お疲れ様でした", 20));

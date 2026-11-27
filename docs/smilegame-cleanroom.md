@@ -432,10 +432,12 @@ second (94 bytes) starts with the effect GUID and the `int32` power; the rest is
 ### Monsters (`Monster.sgr`, type 8)
 
 GUID, name, graphic GUID, attack effect GUID, description, 10 `int32` (the first is HP; the others, inferred: MP,
-attack, defence, magic, hit %, two flags, evasion, speed), 13 `int32` resistances in the element list's order (negative
+attack, defence, magic, hit %, two flags, evasion, speed), 13 `int32`: resistances to the six elements 火 to 冥, then
+to the six states in the skills' order (毒 眠り 麻痺 混乱 魅了 即死), then a value of 0, 1 or 2 not yet read (negative
 is a weakness), actions (`int32` n, n × (`int32` condition, two arguments, rate, kind (see Battles below),
-skill GUID, `int32` priority)), `int32` exp, `int32` money, two drops (item GUID, `int32` percent), `int32`. All 91
-monsters of both games read to their last byte.
+skill GUID, `int32` priority)), then the money and the experience the monster gives, in that order (the PC's result
+for ゾンビーナＬＶ01 showed 経験値 32 and 13 G, the table holds 13 then 32), two drops (item GUID, `int32` percent),
+`int32`. All 91 monsters of both games read to their last byte.
 
 ### Effects (`Effect.sgr`, type 9)
 
@@ -545,23 +547,23 @@ map's centre when absent), `1001` and one `x, z` pair per monster is each monste
 - Escape: chosen by one member, it is tried at once and ends the party's turn whether or not it works; on a failure
   the monsters still act. Against the golem (speed 40, party 15 and 16) all six tries failed. The runtime uses 50 % ×
   party speed / monster speed, between 5 % and 100 % (inferred).
-- Defending (身を守っている) halves damage and a charge (力をためている) doubles the next attack (both inferred).
+- Defending (身を守っている): アリア at 1 HP defended through three of the practice slime's turns and kept her 1 HP,
+  where its normal hits do 2 or 3, so defending more than halves damage; the runtime doubles the defender's defence
+  (inferred). A charge (力をためている) doubles the next attack (inferred).
 - Monster actions: the table's entries are (`int32` 36, `int32` turn (0 every turn, 1 odd turns, 2 even turns,
   inferred from Sacred's slimes), `int32` 0, `int32` weight, `int32` kind, skill GUID, `int32` 50). Each turn one
   entry is drawn by weight. Kinds: 0 attack, 2 watch (`{0}は様子を見ている`: the slime has four attacks and one
   watch at equal weight and watched 6 times in 33 turns), 3 skill, 4 charge, 6 run away (`{0}は逃げ出した！`). A skill
   the monster has no MP for is not drawn. Targets are random among living members (inferred).
 - Rewards: the monsters' experience and money (the slime: 経験値 5, G 5, as the table says), each drop rolled at its
-  percentage. With one member the whole experience went to アリア; with more, the runtime gives each living member
-  the full amount (inferred, not seen).
+  percentage. Each living member gets the full experience: ダーク and コレット both reached level 2 on the 32 points
+  of one ゾンビーナ.
 - Experience totals for each level, from アリア's status page and the battle in which her HP rose: level 2 26, level 3
   84, level 4 between 182 and 186, level 5 350, level 6 600. The runtime uses these (184 for level 4) and
   3.137 × L^2.928 + 3.29 above level 6, a fit that matches all five within 3.
-- A level-up raises HP and MP by the growth of their maximum (inferred); the guard's script heals after the practice
-  battle, so the PC's own rule was not seen.
-- Elements and states: a weapon's element scales damage by (100 − the target's resistance) %, negative resistance being
-  a weakness (inferred, not seen in these battles). States (poison, sleep, paralysis, confusion, charm) are not
-  applied yet.
+- A level-up raises the maximum HP and MP and leaves the current values as they were: after that ゾンビーナ battle
+  the PC's menu showed ダーク at 24/45 and コレット at 12/41, the HP each had at the end of the battle.
+- Elements and states: see Battles from the story below.
 
 ## Joining the pieces (round 2, G)
 
@@ -584,3 +586,93 @@ Checked under Wine against the PC player, both games.
 - A saved picture's body is `int32` number, `int32` 0, picture GUID, `int32` opacity, an `int32` that is `0x7f7f7f7f`
   for the help bar the PC shows after a load and 0 for a tutorial picture it does not show, `int32` x, `int32` y, two
   bytes and `int32` -1. What the fifth field means is not known, so pictures are not restored from saves yet.
+
+## Battles from the story (round 3, H)
+
+Seen on the PC player under Wine in Colette's first world-map battle (ダーク and コレット against a wandering
+ゾンビーナＬＶ01, from a save made at the bridge guard after the dungeon scene in which コレット joins), Sacred's
+practice battle, and 18 random encounters in Sacred's first dungeon, 王家の洞窟. Audio was recorded from the PC
+through a PulseAudio null sink and matched against the game's Ogg files by cross-correlation.
+
+### Starting and ending
+
+- Command 65 runs inside the event: the commands before it (Colette's monsters say くっ、モンスターめっ！ with a face)
+  show first, the battle runs, and a win goes on with the commands nested under 65 (Colette's monsters hide with 52
+  and set their switch). A loss with the continue flag, and an escape, take the 71 branch: on the PC, アリア at 1 HP
+  fell to the practice slime's 3, the battle ended at once with no 全滅した message, and the event went on to recover
+  the party (59) and say お疲れ様でした. A loss without the flag ends at GAME OVER: the PC fades the
+  `res/system/gameover.png` picture in over the map. What happens to a wandering monster after an escape was not
+  seen.
+- Colette's world-map monsters are events with trigger 4 that walk towards the player; which set wanders is chosen by
+  variable 9, which command 70 (in the world map's entrance scripts) sets at random. On the PC a ゾンビーナ (variable
+  9 = 2) reached the player on the bridge below the castle.
+- Background: the command's map, else the current map's battle background, which is the GUID read as the map's
+  environment (`env` in `sg.h`): `Default` (a flat grass map) for Sacred's castle, `Cave` for 王家の洞窟, the map
+  itself for some. Battle maps use look value 2 for their sky; the PC draws a blue noon sky over them.
+- Music: the command's BGM, else the map's battle BGM (the third GUID after the map's BGM: BGM, ambient sound, battle
+  BGM), else GameSettings' battle BGM (BGM_battle1 in both games). The PC starts it 0.5 s after the key that closes the
+  last message, as the screen fades. At a victory the BGM stops and the victory music effect (ME_fanfare1) plays once;
+  the result screen is then silent. After the battle the map's BGM goes on from where it was: Colette's world-map
+  track resumed at 41.4 s, about the time it had played before the battle.
+- Entry: the field flashes white and fades to black, the battle fades in while the camera pushes in from further out,
+  and モンスターが現れた！ shows in a centred rounded box (dark, white border) that folds away before the first command.
+- Victory: the camera turns to face the party from the monsters' side, a little above them and about 1.9 times
+  closer than the battle view; 3D heroes play their `win` motion; the result panel is two bars across the top
+  (リザルト, then 経験値 and G) with アイテム and each dropped item (icon and name) below on the open sky. No
+  level-up text shows there or after it.
+- During a turn the acting monster flashes white, and the camera pushes towards the actor (not done yet).
+
+### Encounters
+
+A map's encounter table (after its events: `int32` rate, `int32` n, n × (`int32` 1, `int32` 1, monster GUID)) starts
+battles from steps. The rate is a step count, not a chance per step: 18 encounters in 王家の洞窟 (rate 40) came after
+44, 49, 35, 39, 37, 32, 36, 40, 52, 39, 51, 47, 34, 49, 49, 34, 48 and 42 key presses walking a corridor back and
+forth, up to three of each against its end wall. The runtime draws the next encounter between three quarters and five
+quarters of the rate (inferred from that spread). Of 21 encounters there, the 10 with ミニゴーレム had one each and
+the 8 with スライミー had one (3) or two (5); how the count is chosen, and what the two 1s in each entry mean, is not
+known (every entry in both games is 1, 1), so the runtime brings one. All showed the `Cave` background. Colette's maps
+have no tables; its monsters are events.
+
+### Skills, states and drain
+
+A skill's second block: effect GUID, `int32` power, `int32` 0, `int32` (values 1 to 13, not read), seven `int32` 0,
+then at byte 56 six state bytes in the order 毒 眠り 麻痺 混乱 魅了 即死 (毒牙 sets the first, スリープ the second,
+麻痺にらみ the third, パニックボイス the fourth, 魅惑のキッス the fifth, デス・ストライク and レイズ the sixth;
+キュアー sets the first five), bytes 62 to 85 (呪い 25 and ファイアガード 35 at byte 62, not read), `int32` element
+at 86 (氷 for ブリザード) and `int32` hit % at 90 (毒牙 90, スリープ 68). Byte 14 of the first block marks a drain
+skill (the 吸血 skills). On a friendly skill the state bytes cure, and the sixth revives.
+
+- 毒牙ＬＶ01 (power 0) took 1 HP and poisoned コレット and later ダーク; 吸血ＬＶ01 (power 0) took 1 HP from ダーク and
+  the ゾンビーナ gained 1. The runtime gives a damaging skill that hits at least 1 (two samples).
+- Poison takes a tenth of maximum HP, rounded down, after the poisoned fighter's own action, with
+  `{0}は毒を受けている！`: コレット (29) lost 2 and ダーク (32) lost 3 each turn. Poison stays after the battle: the
+  menu shows 状態: 毒, and the PC's save holds 1 in the hero's `int32` after experience. The field shows the state's
+  icon over the leading hero.
+- A state shows as a cell of `icon_system.png` over the fighter (poison: column 7, row 1; sleep, paralysis,
+  confusion and charm at columns 2 to 5 of the same row). The game settings' three icon references after the
+  battle state messages are 逃げる's icon and two menu icons, not states.
+- Not seen yet, so inferred in the runtime: whether a state lands (100 − the target's resistance) %; sleep and
+  paralysis skip the turn with the game's messages and end with a one-in-three chance at each turn; confused
+  fighters attack anyone, charmed ones their own side; only poison outlasts the battle.
+
+### Effects
+
+An effect (`Effect.sgr`) names its sheet, its sound (Weak_Hit_3D for 01打撃小) and a frame count; the sheet's
+resource record ends with its grid after the path (01_Weak_Hit 5 × 1, 02_Medium_Hit 4 × 2, 03_Strong_Hit 4 × 3).
+Attacks use the weapon's effect (a monster's: its attack effect), skills and items their own. The runtime plays the
+cells in order over the frame count at 30 frames a second, centred on the target at 0.6 of the cell size, with the
+sound at the start; sizes and timing were matched by eye. Each effect also holds a keyframe timeline (positions,
+scales, a flag byte with optional colour, which looks like the screen flash the PC shows for 吸血) that is not read.
+
+### 3D heroes
+
+A 3D hero's model folder has `motion/motNNN_<name>.fbx` clips: wait, attack, skill, item, damage, guard, charge,
+ko, win, escape (アリア's c_023a). The PC plays attack while the hero strikes and win at the result; the runtime
+plays them for the clip's length.
+
+### Still inferred
+
+Critical hits (half the weapon's critical field, defence ignored), the skill damage formula, healing (power +
+magic), the escape chance, defend and charge, the state chances above, and the recovery of sleep, paralysis,
+confusion and charm, and the monster count of a random encounter.
+

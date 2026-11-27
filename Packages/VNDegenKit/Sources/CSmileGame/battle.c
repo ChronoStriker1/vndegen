@@ -25,6 +25,7 @@ static const u32 kWhite = 0xffffffffu;
 static const u32 kGray = 0xff808080u;
 static const int kIntroMs = 1100;
 static const int kEnterMs = 400;
+static const int kDefeatMs = 500;
 static const int kPushMs = 800;
 static const float kFrontZoom = 1.886f;
 static const float kActorPull = 0.35f;
@@ -623,7 +624,6 @@ static Guid attack_effect(Battle *b, const Fighter *a) {
 }
 
 static void hurt(Battle *b, Fighter *t, int dmg) {
-    if (t->defending) dmg /= 2;
     if (dmg < 0) dmg = 0;
     sg_log(b->g, "battle: %s takes %d", t->name, dmg);
     t->hp -= dmg;
@@ -639,7 +639,7 @@ static void do_attack(Battle *b, Fighter *a, Fighter *t) {
         popup(t, 0, true, false);
         return;
     }
-    int dmg = battle_attack_damage(a->atk, t->dfn, battle_spread(&b->rng));
+    int dmg = battle_attack_damage(a->atk, t->defending ? t->dfn * 2 : t->dfn, battle_spread(&b->rng));
     if (a->charged) {
         dmg *= 2;
         a->charged = false;
@@ -716,7 +716,7 @@ static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
         popup(t, 0, true, false);
         return;
     }
-    int dmg = battle_skill_damage(s->power, a->mag, t->dfn, battle_spread(&b->rng));
+    int dmg = battle_skill_damage(s->power, a->mag, t->defending ? t->dfn * 2 : t->dfn, battle_spread(&b->rng));
     if (dmg < 1) dmg = 1;
     dmg = element_scale(t, k.element, dmg);
     int before = t->hp;
@@ -858,7 +858,7 @@ static void after_actions(Battle *b) {
     }
     if (!living(b, false)) {
         set_phase(b, PH_DEFEAT);
-        fmt(b->bar, sizeof b->bar, btext(b->g, 13, "全滅した……"), "", "");
+        b->bar[0] = 0;
         sg_log(b->g, "battle: party defeated");
         return;
     }
@@ -919,10 +919,7 @@ static void act_update(Battle *b) {
         b->ticked = true;
         int dmg = actor->maxHp / 10;
         fmt(b->bar, sizeof b->bar, stext(b->g, 1, "{0}は毒を受けている！"), actor->name, "");
-        bool def = actor->defending;
-        actor->defending = false;
         hurt(b, actor, dmg);
-        actor->defending = def;
         b->phaseMs = (u32)(kActMs - kTickMs);
         return;
     }
@@ -1400,7 +1397,7 @@ static void update(Battle *b, u32 ms) {
         }
         break;
     case PH_DEFEAT:
-        if (b->phaseMs >= 1500) {
+        if (b->phaseMs >= (u32)kDefeatMs) {
             if (b->setup.continueOnLose) {
                 finish(b, BATTLE_LOST);
             } else {
