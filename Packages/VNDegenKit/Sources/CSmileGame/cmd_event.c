@@ -100,7 +100,7 @@ static void apply_sheet(SG *g, int i) {
     SgaEvent *ev = &g->interp.a.ev[i];
     Actor *ac = &g->field.npcs[i];
     int s = sga_event_sheet(g, i);
-    if (s == ev->sheet && !ev->erased) return;
+    if (s == ev->sheet) return;
     ev->sheet = s;
     ev->graphicOverride = false;
     free(ev->motion);

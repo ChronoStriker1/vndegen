@@ -364,7 +364,8 @@ bool sga_exec(SG *g, const Cmd *c) {
     case CMD_ERASE_EVENT: {
         int i = a->eventIndex;
         if (i >= 0 && i < a->evCount) {
-            g->field.npcs[i].visible = cmd_int(c, 0) == 0 && g->field.npcs[i].graphic;
+            a->ev[i].erased = cmd_int(c, 0) != 0;
+            sga_refresh_events(g);
             sg_log(g, "event %d %s", i, cmd_int(c, 0) ? "hidden" : "shown");
         }
         return false;
