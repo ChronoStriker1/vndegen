@@ -235,6 +235,11 @@ static int drive(int argc, char **argv) {
             run(g, 100);
             press(g, VK_OK, 48);
             run(g, 300);
+        } else if (sscanf(c, "save:%d", &a) == 1) {
+            if (!sg_save_write(g, a)) rc = 1;
+        } else if (sscanf(c, "load:%d", &a) == 1) {
+            if (!sg_save_read(g, a)) rc = 1;
+            run(g, 500);
         } else if (sscanf(c, "shot:%255s", s) == 1) shot(g, argv[3], s);
         else if (sscanf(c, "where:%255s", s) == 1) where(g, s);
         else {
