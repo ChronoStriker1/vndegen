@@ -241,6 +241,49 @@ static void test_ending_commands(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_revive_fallen_ally(const char *dir) {
+    SG *g = open_game(dir, "/nonexistent-sgtest-r");
+    CHECK(g != NULL);
+    if (!g) return;
+    run(g, 32);
+    press(g, VK_OK);
+    run(g, 200);
+    interp_free(&g->interp);
+    Tables *t = &g->b.tables;
+    const HeroDef *aria = hero_named(t, "アリア"), *mao = hero_named(t, "マオー");
+    CHECK(aria && mao);
+    if (!aria || !mao) {
+        vnsmilegame_close((VNSmileGame *)g);
+        return;
+    }
+    g->b.party.count = 0;
+    party_add_hero(g, aria->id);
+    party_add_hero(g, mao->id);
+    Member *healer = &g->b.party.members[1];
+    member_set_level(t, healer, 12);
+    healer->mp = member_max_mp(t, healer);
+    g->b.party.members[0].hp = 0;
+    BattleSetup s;
+    memset(&s, 0, sizeof s);
+    for (int i = 0; i < t->monsterCount && !s.count; i++)
+        if (strcmp(t->monsters[i].name, "スライミー") == 0) s.monsters[s.count++] = t->monsters[i].id;
+    battle_seed(g, 5);
+    sg_battle_start(g, &s);
+    wait_command(g);
+    CHECK(sg_battle_member(g) == 1);
+    presses(g, VK_DOWN, 2);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "list") == 0);
+    press(g, 0x27);
+    press(g, VK_OK);
+    CHECK(strcmp(battle_phase(g), "ally") == 0);
+    CHECK(strcmp(battle_bar(g), "アリア") == 0);
+    press(g, VK_OK);
+    wait_command(g);
+    CHECK(g->b.party.members[0].hp > 0);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *sacred = getenv("SG_SACRED");
     if (sacred) {
@@ -249,6 +292,7 @@ int main(void) {
         test_save_cursor_after_load(sacred, tmp);
         test_back_command(sacred);
         test_ending_commands(sacred);
+        test_revive_fallen_ally(sacred);
         rmdir(tmp);
     } else
         printf("SG_SACRED not set: Sacred checks skipped\n");

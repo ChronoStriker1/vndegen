@@ -797,13 +797,15 @@ static void apply_plan(Battle *b, const Plan *p) {
         if (!a->monster) sync_member(b->g, a);
         bool foes = s->target == TARGET_ENEMY || s->target == TARGET_ENEMIES;
         bool targetsMonsters = foes ? !a->monster : a->monster;
+        bool revive = !foes && (battle_skill_info(s).states & 32);
         if (s->target == TARGET_ENEMIES || s->target == TARGET_ALLIES) {
             for (int i = 0; i < b->count; i++)
-                if (b->f[i].monster == targetsMonsters && alive(&b->f[i])) apply_skill(b, a, &b->f[i], s);
+                if (b->f[i].monster == targetsMonsters && (revive || alive(&b->f[i]))) apply_skill(b, a, &b->f[i], s);
         } else if (s->target == TARGET_SELF) {
             apply_skill(b, a, a, s);
         } else {
-            int t = retarget(b, p->target, targetsMonsters);
+            bool keep = revive && p->target >= 0 && b->f[p->target].monster == targetsMonsters && !b->f[p->target].fled;
+            int t = keep ? p->target : retarget(b, p->target, targetsMonsters);
             if (t >= 0) apply_skill(b, a, &b->f[t], s);
         }
         break;
@@ -1073,7 +1075,7 @@ static void choose_list(Battle *b) {
             b->targetCursor = first_target(b, true);
             set_phase(b, PH_TARGET);
         } else if (s->target == TARGET_ALLY) {
-            b->targetCursor = b->member;
+            b->targetCursor = 0;
             set_phase(b, PH_ALLY);
         } else {
             p->target = s->target == TARGET_SELF ? b->member : -1;
@@ -1083,7 +1085,7 @@ static void choose_list(Battle *b) {
         p->kind = ACT_ITEM;
         p->item = b->list[b->listCursor];
         p->skill = NULL;
-        b->targetCursor = b->member;
+        b->targetCursor = 0;
         set_phase(b, PH_ALLY);
     }
 }
