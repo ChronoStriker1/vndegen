@@ -553,7 +553,11 @@ void party_add_hero(SG *g, Guid hero) {
         return;
     }
     const HeroDef *h = hero_def(&g->b.tables, hero);
-    if (h) member_init(&g->b.tables, &p->members[p->count++], h);
+    if (!h) return;
+    Member *m = &p->members[p->count++];
+    member_init(&g->b.tables, m, h);
+    for (int i = 0; i < h->skillCount && m->learnedCount < 16; i++)
+        if (h->skills[i].level <= m->level) m->learned[m->learnedCount++] = h->skills[i].skill;
 }
 
 void party_remove_hero(SG *g, Guid hero) {
