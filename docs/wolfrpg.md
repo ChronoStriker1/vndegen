@@ -207,7 +207,8 @@ safe: ANGEL QUEST's engine (version 123) closes when it loads a save holding a p
 
 False Myth 2 (Wolf RPG Editor 3.343) is an action-battle RPG made of 42 crypt version 0x14B archives. It plays in
 VNDegen from the joypad question through the prologue, its first battle and tutorial panels, the title, the config
-book, the visual novel scenes at the Main Gate and the Sanctuary, where the player walks, opens the menu and saves.
+book, the visual novel scenes at the Main Gate and the Sanctuary, where the player walks, opens the menu and saves, to
+the first dungeon's tutorial panels; a save from its menu loads at the same place after a restart.
 Each part was compared with the game under Wine. Getting there needed, beyond the archives:
 
 - Conditions run their else case whenever the branch has one, also without the else flag; its tutorial body text sits
@@ -220,6 +221,14 @@ Each part was compared with the game under Wine. Getting there needed, beyond th
 - System variable 3 places the choice window's top centre, as the manual's system variable page says. When a game sets
   system variables 5 and 6, the pause icon's top centre goes to x = Sys5 and y = the text's top + Sys6, where the PC
   draws it in False Myth 2 (the manual calls both relative to Sys1 and Sys2, which doesn't match the PC's x here).
+- A character image whose name ends in `T.png` has a standing frame before its walk frames in each block, and one
+  ending in `TX.png` a standing frame per walk frame, as the manual's material page says. Its heroine's image (5
+  patterns, 8 directions, `T.png`) has 12 columns.
+- The party command's specials 0 (close the gaps), 5 (make the party transparent) and 6 (show it again) run. A new
+  game puts the heroine in slot 1 and closes the gap. Transparency goes into saves as the hero's hidden flag; PC saves
+  made where the hero shows have it 0, and none made while the party was transparent has been read.
+- A move route made only of steps that take no time, such as setting the speed, doesn't stop the player walking. A
+  parallel event gives the hero such a route every frame.
 - Pictures at opacity 0 aren't decoded. Its battles keep a dozen hidden sprite sheets of up to 5760 by 3240 pixels,
   more than the image cache holds, and decoding them every frame took over 500 ms a frame.
 
@@ -294,8 +303,8 @@ Its battle events read keys every other frame, so the Linux host's scripted pres
   picture again with its opacity kept, and up to 0.41.6 the face vanished and the map showed through her bust (#179).
 - System variable 115, the engine version the standard systems read, is set to 2.24 for Shift-JIS games and 3.28 for
   UTF-8 ones, since no Game.dat field is known to hold the real one.
-- False Myth 2: a party member with the hero's own image stands on the hero's tile, and the hero stands in a walking
-  pose about a tile left of where the PC shows it in the Sanctuary; the PC shows the hero alone. In the tutorial battle,
-  which starts during a scene the player can skip, the scene's "Hold X key: Skip" stays over the battle's "Hold: End
-  Turn" label. From the Sanctuary on, False Myth 2 hasn't been played in VNDegen.
+- False Myth 2: in the tutorial battle, which starts during a scene the player can skip, the scene's "Hold X key:
+  Skip" stays over the battle's "Hold: End Turn" label. Past the first dungeon's tutorial panels it hasn't been played
+  in VNDegen. The party command's other specials (warping the party to the hero, sync, remembering graphics, the
+  caterpillar switch) aren't run.
 - Of the effect command's map effects only the zoom is drawn; the library uses no other.
