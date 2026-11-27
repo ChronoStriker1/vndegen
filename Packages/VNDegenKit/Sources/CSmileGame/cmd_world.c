@@ -319,7 +319,8 @@ bool sga_exec(SG *g, const Cmd *c) {
     case CMD_BALLOON:
         a->balloonTarget = cmd_int(c, 0);
         a->balloonMs = 0;
-        a->balloonTotal = kBalloonMs;
+        a->balloonTotal = sgi_fx_start(g, cmd_guid(c, 1), cmd_int(c, 0) ? -1 : a->eventIndex, true);
+        if (!a->balloonTotal) a->balloonTotal = kBalloonMs;
         sg_log(g, "balloon on %s", cmd_int(c, 0) ? "player" : "event");
         return true;
     case CMD_CAMERA:
@@ -333,7 +334,7 @@ bool sga_exec(SG *g, const Cmd *c) {
         return false;
     case CMD_SE: snd_se(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
     case CMD_ME: snd_me(g, cmd_guid(c, 0), cmd_int(c, 1), cmd_int(c, 2)); return false;
-    case CMD_EFFECT: sg_log(g, "effect on %d (not drawn)", cmd_int(c, 0)); return false;
+    case CMD_EFFECT: sgi_fx_start(g, cmd_guid(c, 1), cmd_int(c, 0) ? -1 : a->eventIndex, false); return false;
     case CMD_RECOVER:
         party_recover(g);
         sg_log(g, "party recovered");
@@ -387,6 +388,7 @@ void sga_frame(SG *g, u32 ms) {
     tick(&a->flashMs, a->flashTotal, ms);
     tick(&a->shakeMs, a->shakeTotal, ms);
     tick(&a->balloonMs, a->balloonTotal, ms);
+    sgi_fx_frame(g, ms);
     if (a->balloonTotal && a->balloonMs >= a->balloonTotal) a->balloonTotal = 0;
     for (int i = 0; i < SGA_PICTURES; i++) {
         SgaPicture *p = &a->pics[i];
@@ -411,6 +413,7 @@ void sga_draw_under(SG *g) { (void)g; }
 void sga_draw_over(SG *g) {
     SgaState *a = st(g);
     u32 *fb = g->fb;
+    sgi_fx_draw(g);
     if (a->tint >> 24) fill_rect(fb, g->w, g->h, 0, 0, g->w, g->h, (a->tint & 0xff00ff00u) | (a->tint >> 16 & 255) | (a->tint & 255) << 16);
     for (int i = 0; i < SGA_PICTURES; i++) {
         SgaPicture *p = &a->pics[i];
