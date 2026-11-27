@@ -179,6 +179,33 @@ static void test_front_row(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static int bubble_pixels(SG *g) {
+    int n = 0;
+    for (int y = 200; y < 240; y++)
+        for (int x = 455; x < 505; x++) {
+            int r, gr, b;
+            rgb(g, x, y, &r, &gr, &b);
+            if (b > 150 && r > 100 && gr < 140 && b - gr > 60) n++;
+        }
+    return n;
+}
+
+static void test_poison_bubbles(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    Party *p = &sgb(g)->party;
+    for (int i = 0; i < p->count; i++) p->members[i].state = 1;
+    warp(g, "NO NAME", 14, 7, 0);
+    int shown = 0, hidden = 0;
+    for (int i = 0; i < 60; i++) {
+        run(g, 64);
+        if (bubble_pixels(g) > 40) shown++;
+        else hidden++;
+    }
+    CHECK(shown > 25 && hidden > 10);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
@@ -187,6 +214,7 @@ int main(void) {
         test_fire_particles(colette);
         test_switch_after_transfer(colette);
         test_front_row(colette);
+        test_poison_bubbles(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
