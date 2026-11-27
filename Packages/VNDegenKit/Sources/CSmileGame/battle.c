@@ -98,6 +98,12 @@ typedef struct Battle {
     Guid fieldMap, fieldBgm;
     bool hadBgm, front;
     u32 enterMs;
+    struct {
+        BattleFxDef def;
+        u32 ms;
+        int target;
+        bool on;
+    } fx[8];
     Cam stage;
     View *fieldView;
     ShadowMap fieldShadow;
@@ -585,6 +591,34 @@ static int element_scale(const Fighter *t, int element, int dmg) {
     return out < 0 ? 0 : out;
 }
 
+static void start_fx(Battle *b, Guid effect, const Fighter *t) {
+    if (guid_zero(effect)) {
+        const Tables *tb = TB(b->g);
+        if (!tb->effectCount) return;
+        effect = tb->effects[0].id;
+    }
+    for (int i = 0; i < 8; i++) {
+        if (b->fx[i].on) continue;
+        if (!battle_fx_def(b->g, effect, &b->fx[i].def)) {
+            sg_log(b->g, "battle: effect not read");
+            return;
+        }
+        sg_log(b->g, "battle: effect %dx%d %d frames", b->fx[i].def.cols, b->fx[i].def.rows, b->fx[i].def.frames);
+        b->fx[i].on = true;
+        b->fx[i].ms = 0;
+        b->fx[i].target = (int)(t - b->f);
+        if (!guid_zero(b->fx[i].def.sound)) snd_se(b->g, b->fx[i].def.sound, 100, 100);
+        return;
+    }
+}
+
+static Guid attack_effect(Battle *b, const Fighter *a) {
+    if (a->monster) return a->def->attackEffect;
+    const Member *m = member_of(b->g, a);
+    const ItemDef *w = m ? item_def(TB(b->g), m->equip[SLOT_WEAPON]) : NULL;
+    return w ? w->effect : (Guid){{0}};
+}
+
 static void hurt(Battle *b, Fighter *t, int dmg) {
     if (t->defending) dmg /= 2;
     if (dmg < 0) dmg = 0;
@@ -596,6 +630,7 @@ static void hurt(Battle *b, Fighter *t, int dmg) {
 }
 
 static void do_attack(Battle *b, Fighter *a, Fighter *t) {
+    start_fx(b, attack_effect(b, a), t);
     int chance = a->hit - t->eva;
     if (rand_pct(&b->rng) >= chance) {
         popup(t, 0, true, false);
@@ -660,6 +695,7 @@ static void cure(Battle *b, Fighter *t, u8 states) {
 
 static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
     BattleSkillInfo k = battle_skill_info(s);
+    if (!guid_zero(s->effect)) start_fx(b, s->effect, t);
     bool friendly = s->target == TARGET_ALLY || s->target == TARGET_ALLIES || s->target == TARGET_SELF;
     if (friendly) {
         if ((k.states & 32) && t->hp <= 0) t->hp = 1;
@@ -693,6 +729,7 @@ static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
 }
 
 static void apply_item(Battle *b, Fighter *t, const ItemDef *it) {
+    if (!guid_zero(it->effect)) start_fx(b, it->effect, t);
     int hp = it->hp + t->maxHp * it->hpPercent / 100;
     int mp = it->mp + t->maxMp * it->mpPercent / 100;
     if (it->revive && t->hp <= 0) t->hp = 1;
@@ -1292,6 +1329,14 @@ static void update(Battle *b, u32 ms) {
         Fighter *f = &b->f[i];
         if (f->popupMs) f->popupMs = f->popupMs + ms > 900 ? 0 : f->popupMs + ms;
         if (f->flashMs) f->flashMs = f->flashMs + ms > 300 ? 0 : f->flashMs + ms;
+    }
+    for (int i = 0; i < 8; i++) {
+        if (!b->fx[i].on) continue;
+        b->fx[i].ms += ms;
+        if (b->fx[i].ms >= battle_fx_ms(&b->fx[i].def)) b->fx[i].on = false;
+    }
+    for (int i = 0; i < b->count; i++) {
+        Fighter *f = &b->f[i];
         if (f->hitMs) f->hitMs = f->hitMs + ms > 300 ? 0 : f->hitMs + ms;
         if (f->monster && !alive(f)) f->fadeMs += ms;
         f->poseMs += ms;
@@ -1738,6 +1783,14 @@ static void draw(Battle *b) {
     }
     (void)cam;
     r3_flush(&g->r3);
+    for (int i = 0; i < 8; i++) {
+        if (!b->fx[i].on) continue;
+        const Fighter *t = &b->f[b->fx[i].target];
+        float h = t->monster && t->image ? (float)t->image->h / 48.0f * kMonsterScale * 0.5f : 1.0f;
+        int sx, sy;
+        project_point(cam, t->x, stage_ground(g, t->x, t->z) + h, t->z, &sx, &sy);
+        battle_fx_draw(g, &b->fx[i].def, b->fx[i].ms, sx, sy);
+    }
     draw_popups(b);
     if (b->phase == PH_RESULT) {
         draw_result(b);

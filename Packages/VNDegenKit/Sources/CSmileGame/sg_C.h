@@ -59,6 +59,16 @@ typedef struct BattleSkillInfo {
 
 BattleSkillInfo battle_skill_info(const SkillDef *s);
 
+typedef struct BattleFxDef {
+    Image *image;
+    int cols, rows, frames;
+    Guid sound;
+} BattleFxDef;
+
+bool battle_fx_def(SG *g, Guid effect, BattleFxDef *out);
+u32 battle_fx_ms(const BattleFxDef *d);
+void battle_fx_draw(SG *g, const BattleFxDef *d, u32 ms, int cx, int cy);
+
 bool battle_setup_cmd(BattleSetup *s, const Cmd *c);
 void sg_battle_start(SG *g, const BattleSetup *s);
 bool sg_battle_active(SG *g);
