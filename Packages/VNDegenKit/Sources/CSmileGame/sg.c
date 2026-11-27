@@ -69,6 +69,7 @@ VNSmileGame *vnsmilegame_open(const VNSmileGameConfig *cfg, char *err, size_t er
     g->fb = sg_alloc(sizeof(u32) * (size_t)g->w * (size_t)g->h);
     r3_init(&g->r3, g->w, g->h);
     g->scene = SCENE_TITLE;
+    g->titleSaves = -1;
     sg_log(g, "title: %s, screen %dx%d, font %s", g->data.settings.name, g->w, g->h, gameFont ? "game" : g->font ? "fallback" : "none");
     return (VNSmileGame *)g;
 }
@@ -126,9 +127,25 @@ static void start_new_game(SG *g) {
 }
 
 static void title_update(SG *g) {
+    if (g->titleSaves < 0) {
+        SaveSlot slots[SAVE_SLOTS];
+        int n = sg_save_slots(g, slots, SAVE_SLOTS);
+        g->titleSaves = 0;
+        for (int i = 0; i < n; i++)
+            if (slots[i].used) g->titleSaves = 1;
+        g->titleCursor = g->titleSaves ? 1 : 0;
+    }
     if (sg_pressed(g, KEY_DOWN) || sg_pressed(g, KEY_RIGHT)) g->titleCursor = (g->titleCursor + 1) % 3;
     if (sg_pressed(g, KEY_UP) || sg_pressed(g, KEY_LEFT)) g->titleCursor = (g->titleCursor + 2) % 3;
-    if (sg_pressed(g, KEY_OK) && g->titleCursor == 0) start_new_game(g);
+    if (!sg_pressed(g, KEY_OK)) return;
+    if (g->titleCursor == 0) {
+        start_new_game(g);
+    } else if (g->titleCursor == 2 || g->titleSaves) {
+        sgb_sound(g, SND_DECIDE);
+        title_menu_open(g, g->titleCursor == 1);
+    } else {
+        sgb_sound(g, SND_CANCEL);
+    }
 }
 
 void text_outlined(SG *g, int x, int y, int px, const char *s, u32 color) {
@@ -156,7 +173,7 @@ static void title_draw(SG *g) {
             x = (g->w - tw) / 2;
             y = g->h - 160 + i * 54;
         }
-        u32 color = i == 1 ? 0xff808080u : s->titleColor;
+        u32 color = i == 1 && !g->titleSaves ? 0xff808080u : s->titleColor;
         text_outlined(g, x, y, kTitlePx, item, color);
         if (i == g->titleCursor) {
             fill_rect(g->fb, g->w, g->h, x - 17, y + 5, 7, 14, 0xffffffffu);
@@ -170,8 +187,10 @@ bool vnsmilegame_frame(VNSmileGame *vg, uint32_t ms) {
     SG *g = (SG *)vg;
     g->clockMs += ms;
     if (g->scene == SCENE_TITLE) {
-        title_update(g);
+        bool menu = menu_active(g);
+        if (!menu) title_update(g);
         title_draw(g);
+        if (menu) title_menu_frame(g, ms);
     } else if (!battle_frame(g, ms) && !menu_frame(g, ms)) {
         interp_update(g, ms);
         if (g->pendingTransfer) {
@@ -210,6 +229,7 @@ bool vnsmilegame_frame(VNSmileGame *vg, uint32_t ms) {
         }
         interp_draw(g);
     }
+    if (g->scene != SCENE_TITLE) g->titleSaves = -1;
     sg_e_frame(g);
     g->pressed = 0;
     g->serial++;

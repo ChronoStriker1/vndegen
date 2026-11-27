@@ -442,6 +442,7 @@ struct SG {
     int scene;
     u32 keys, pressed;
     int titleCursor;
+    int titleSaves;
     u32 titleMs;
     Field field;
     Interp interp;

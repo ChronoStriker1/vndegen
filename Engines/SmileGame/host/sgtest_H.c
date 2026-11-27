@@ -219,6 +219,7 @@ static int drive(int argc, char **argv) {
         return 1;
     }
     run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP, 48);
     int rc = 0;
     for (int i = 4; i < argc && !rc; i++) {
         const char *c = argv[i];
@@ -345,6 +346,8 @@ static Member *member_named(SG *g, const char *name) {
 }
 
 static void new_game(SG *g) {
+    run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP, 48);
     press(g, VK_OK, 48);
     run(g, 200);
     interp_free(&g->interp);

@@ -115,6 +115,51 @@ static void test_load_closes_menu(const char *colette, const char *tmp) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_title_continue(const char *colette, const char *tmp) {
+    char dir[512];
+    snprintf(dir, sizeof dir, "%s/title", tmp);
+    CHECK(mkdir(dir, 0700) == 0);
+    SG *g = open_game(colette, dir, NULL);
+    CHECK(g != NULL);
+    if (!g) return;
+    run(g, 32);
+    CHECK(g->titleCursor == 0 && g->titleSaves == 0);
+    CHECK(!vnsmilegame_save((VNSmileGame *)g, 0));
+    press(g, 0x28);
+    press(g, 0x0d);
+    CHECK(g->scene == SCENE_TITLE && !menu_active(g));
+    press(g, 0x26);
+    press(g, 0x0d);
+    for (int i = 0; i < 400 && g->interp.active; i++) press(g, 0x0d);
+    CHECK(g->scene == SCENE_FIELD);
+    int x = (int)g->field.player.x, z = (int)g->field.player.z;
+    CHECK(vnsmilegame_save((VNSmileGame *)g, 9));
+    vnsmilegame_close((VNSmileGame *)g);
+
+    g = open_game(colette, dir, NULL);
+    CHECK(g != NULL);
+    if (!g) return;
+    run(g, 32);
+    CHECK(g->titleCursor == 1 && g->titleSaves == 1);
+    press(g, 0x28);
+    press(g, 0x0d);
+    CHECK(menu_page(g) && strcmp(menu_page(g), "config") == 0);
+    press(g, 0x1b);
+    run(g, 32);
+    CHECK(g->scene == SCENE_TITLE && !menu_active(g));
+    press(g, 0x26);
+    press(g, 0x0d);
+    CHECK(menu_page(g) && strcmp(menu_page(g), "save") == 0);
+    press(g, 0x0d);
+    CHECK(g->scene == SCENE_TITLE && menu_active(g));
+    press(g, 0x27);
+    press(g, 0x28);
+    press(g, 0x0d);
+    CHECK(g->scene == SCENE_FIELD && !menu_active(g));
+    CHECK((int)g->field.player.x == x && (int)g->field.player.z == z);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     char tmp[64];
@@ -124,6 +169,7 @@ int main(void) {
         test_fallback(colette, SG_FONTS "/ume-pgo4.ttf");
         test_exe_case(colette, tmp);
         test_load_closes_menu(colette, tmp);
+        test_title_continue(colette, tmp);
     }
     char cmd[128];
     snprintf(cmd, sizeof cmd, "rm -rf %s", tmp);

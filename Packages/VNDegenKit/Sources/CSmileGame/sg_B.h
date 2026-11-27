@@ -327,7 +327,7 @@ int member_evasion(const Tables *t, const Member *m);
 bool member_can_equip(const Tables *t, const Member *m, const ItemDef *it);
 int slot_kind(int slot);
 
-enum { MENU_CLOSED, MENU_MAIN, MENU_SHOP, MENU_INN };
+enum { MENU_CLOSED, MENU_MAIN, MENU_SHOP, MENU_INN, MENU_TITLE };
 
 typedef struct Menu Menu;
 
@@ -345,6 +345,8 @@ bool menu_frame(SG *g, u32 ms);
 bool menu_active(SG *g);
 void menu_open(SG *g);
 void menu_close(SG *g);
+void title_menu_open(SG *g, bool load);
+bool title_menu_frame(SG *g, u32 ms);
 void shop_open(SG *g, const Guid *items, const i32 *prices, int count);
 bool sgb_quit(SG *g);
 bool menu_result(SG *g);

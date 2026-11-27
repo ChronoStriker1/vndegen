@@ -1165,7 +1165,7 @@ static void update_status(SG *g, Menu *m) {
     }
 }
 
-static void update_save(SG *g, Menu *m) {
+static int save_cursor(SG *g, Menu *m) {
     int c = m->cur[P_SAVE], old = c, oldPage = m->savePage;
     if (sg_pressed(g, KEY_DOWN)) c = (c + 1) % (SLOTS_PER_PAGE + 1);
     if (sg_pressed(g, KEY_UP)) c = (c + SLOTS_PER_PAGE) % (SLOTS_PER_PAGE + 1);
@@ -1176,6 +1176,34 @@ static void update_save(SG *g, Menu *m) {
         sgb_sound(g, SND_CURSOR);
         m->note[0] = 0;
     }
+    return c;
+}
+
+static void update_load(SG *g, Menu *m) {
+    int c = save_cursor(g, m);
+    if (back(g, m, P_MAIN)) return;
+    if (!sg_pressed(g, KEY_OK)) return;
+    if (c == SLOTS_PER_PAGE) {
+        sgb_sound(g, SND_CANCEL);
+        go(m, P_MAIN);
+        return;
+    }
+    char date[64];
+    int slot = m->savePage * SLOTS_PER_PAGE + c;
+    if (!slot_info(m, slot, date, sizeof date)) {
+        sgb_sound(g, SND_CANCEL);
+        return;
+    }
+    sgb_sound(g, SND_DECIDE);
+    if (!sg_save_read(g, slot)) snprintf(m->note, sizeof m->note, "%s", MT(g, MT_NONE));
+}
+
+static void update_save(SG *g, Menu *m) {
+    if (m->mode == MENU_TITLE) {
+        update_load(g, m);
+        return;
+    }
+    int c = save_cursor(g, m);
     if (back(g, m, P_MAIN)) return;
     if (!sg_pressed(g, KEY_OK)) return;
     if (c == SLOTS_PER_PAGE) {
@@ -1394,6 +1422,17 @@ void menu_open(SG *g) {
     if (m) begin(g, m, MENU_MAIN, P_MAIN);
 }
 
+void title_menu_open(SG *g, bool load) {
+    Menu *m = menu_get(g);
+    if (!m) return;
+    begin(g, m, MENU_TITLE, load ? P_SAVE : P_CONFIG);
+    if (load) {
+        sg_save_slots(g, m->slots, SAVE_SLOTS);
+        m->savePage = 0;
+        m->cur[P_SAVE] = 0;
+    }
+}
+
 void shop_open(SG *g, const Guid *items, const i32 *prices, int count) {
     Menu *m = menu_get(g);
     if (!m) return;
@@ -1523,5 +1562,17 @@ bool menu_frame(SG *g, u32 ms) {
         field_draw(g);
         sg_log(g, "menu: closed");
     }
+    return true;
+}
+
+bool title_menu_frame(SG *g, u32 ms) {
+    Menu *m = g->b.menu;
+    if (!m || m->mode != MENU_TITLE) return false;
+    m->animMs += ms;
+    update(g, m);
+    if (m->mode == MENU_TITLE && m->page == P_MAIN) m->mode = MENU_CLOSED;
+    if (m->mode != MENU_TITLE) return g->scene != SCENE_TITLE;
+    fill_rect(g->fb, g->w, g->h, 0, 0, g->w, g->h, 0x80000000u);
+    draw(g, m);
     return true;
 }

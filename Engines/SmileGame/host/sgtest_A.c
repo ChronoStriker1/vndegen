@@ -181,6 +181,7 @@ static int drive(int argc, char **argv) {
         return 1;
     }
     run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP, 48);
     int rc = 0;
     for (int i = 4; i < argc && !rc; i++) {
         const char *c = argv[i];
@@ -369,7 +370,12 @@ static SG *open_game(const char *dir, const char *log) {
     VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = NULL, .logPath = log, .audioRate = 44100};
     char err[512];
     SG *g = (SG *)vnsmilegame_open(&cfg, err, sizeof err);
-    if (!g) fprintf(stderr, "open %s: %s\n", dir, err);
+    if (!g) {
+        fprintf(stderr, "open %s: %s\n", dir, err);
+        return NULL;
+    }
+    run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP, 48);
     return g;
 }
 

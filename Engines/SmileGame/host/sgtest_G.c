@@ -39,7 +39,12 @@ static SG *open_game(const char *dir, const char *saveDir) {
     VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = saveDir, .audioRate = 44100};
     char err[512];
     SG *g = (SG *)vnsmilegame_open(&cfg, err, sizeof err);
-    if (!g) fprintf(stderr, "open %s: %s\n", dir, err);
+    if (!g) {
+        fprintf(stderr, "open %s: %s\n", dir, err);
+        return NULL;
+    }
+    run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP);
     return g;
 }
 
