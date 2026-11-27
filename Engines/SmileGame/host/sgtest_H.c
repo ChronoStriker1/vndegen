@@ -87,7 +87,7 @@ static bool step_ok(SG *g, int x0, int z0, int x1, int z1) {
     return !blocked(g, x1, z1);
 }
 
-static bool walk_to(SG *g, int tx, int tz) {
+static bool walk_to(SG *g, int tx, int tz, bool dry) {
     const Map *m = &g->field.map;
     int n = m->w * m->h;
     int *prev = malloc(sizeof(int) * (size_t)n), *q = malloc(sizeof(int) * (size_t)n), qh = 0, qt = 0;
@@ -108,7 +108,16 @@ static bool walk_to(SG *g, int tx, int tz) {
         }
     }
     bool ok = prev[tz * m->w + tx] != -2;
-    if (ok) {
+    if (ok && dry) {
+        int path[4096], len = 0, px = sx, pz = sz;
+        for (int c = tz * m->w + tx; c != sz * m->w + sx && len < 4096; c = prev[c]) path[len++] = c;
+        for (int i = len - 1; i >= 0; i--) {
+            int nx = path[i] % m->w, nz = path[i] / m->w;
+            putchar(nx > px ? 'R' : nx < px ? 'L' : nz > pz ? 'D' : 'U');
+            px = nx, pz = nz;
+        }
+        putchar('\n');
+    } else if (ok) {
         int path[4096], len = 0;
         for (int c = tz * m->w + tx; c != sz * m->w + sx && len < 4096; c = prev[c]) path[len++] = c;
         for (int i = len - 1; i >= 0 && ok; i--) {
@@ -230,8 +239,10 @@ static int drive(int argc, char **argv) {
             press(g, VK_OK, 48);
             run(g, 200);
         } else if (sscanf(c, "to:%d,%d", &a, &b) == 2) {
-            if (!walk_to(g, a, b)) where(g, "walk failed"), rc = 1;
+            if (!walk_to(g, a, b, false)) where(g, "walk failed"), rc = 1;
             run(g, 100);
+        } else if (sscanf(c, "path:%d,%d", &a, &b) == 2) {
+            walk_to(g, a, b, true);
         } else if (sscanf(c, "talk:%c", s) == 1) {
             press(g, vk_of(s[0]), 48);
             run(g, 100);

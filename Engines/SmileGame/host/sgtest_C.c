@@ -203,7 +203,7 @@ static void test_sacred(const char *dir) {
     CHECK(aria->exp == 351);
     CHECK(aria->level == 5);
     CHECK(member_max_hp(&sgb(g)->tables, aria) == 100);
-    CHECK(aria->hp == 100);
+    CHECK(aria->hp == 85);
     vnsmilegame_close((VNSmileGame *)g);
 }
 

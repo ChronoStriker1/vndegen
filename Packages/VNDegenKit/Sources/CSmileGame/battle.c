@@ -16,6 +16,11 @@ enum { MAX_FIGHTERS = 16, MAX_CMDS = 8, MAX_LIST = 64 };
 
 enum { MO_WAIT, MO_ATTACK, MO_DAMAGE, MO_GUARD, MO_KO, MO_SKILL, MO_COUNT };
 
+enum { ST_POISON = 1, ST_SLEEP = 2, ST_PARALYSIS = 4, ST_CONFUSION = 8, ST_CHARM = 16, ST_DEATH = 32 };
+
+static const int kTickMs = 900;
+static const int kRecoverPct = 34;
+
 static const u32 kWhite = 0xffffffffu;
 static const u32 kGray = 0xff808080u;
 static const int kIntroMs = 1100;
@@ -34,8 +39,9 @@ typedef struct Fighter {
     const char *name;
     i32 hp, maxHp, mp, maxMp;
     i32 atk, dfn, mag, spd, hit, eva;
-    i32 resist[13];
+    i32 resist[12];
     i32 element;
+    u8 state;
     float x, z;
     bool defending, charged, fled;
     const Res *graphic;
@@ -83,7 +89,7 @@ typedef struct Battle {
     char lines[12][160];
     int lineCount;
     int turn;
-    bool applied, started, restored, staged;
+    bool applied, started, restored, staged, ticked;
     Guid fieldMap, fieldBgm;
     bool hadBgm;
     View *fieldView;
@@ -234,6 +240,7 @@ static void sync_member(SG *g, Fighter *f) {
     if (!m) return;
     m->hp = f->hp;
     m->mp = f->mp;
+    m->state = f->hp > 0 ? (u8)(f->state & ST_POISON) : 0;
 }
 
 static const SgrRec *res_record(SG *g, Guid id) {
@@ -342,7 +349,9 @@ static void add_member(Battle *b, int index, float x, float z) {
     f->eva = member_evasion(TB(g), m);
     const ItemDef *w = item_def(TB(g), m->equip[SLOT_WEAPON]);
     f->element = w ? w->element : 0;
-    for (int i = 0; i < 6; i++) f->resist[1 + i] = member_equip_sum(TB(g), m, EQ_RESIST + i);
+    for (int i = 0; i < 6; i++) f->resist[i] = member_equip_sum(TB(g), m, EQ_RESIST + i);
+    for (int i = 0; i < 6; i++) f->resist[6 + i] = member_equip_sum(TB(g), m, EQ_STATE_RESIST + i);
+    f->state = m->state & ST_POISON;
     f->x = x;
     f->z = z;
     load_graphic(g, f, h->graphic);
@@ -373,17 +382,21 @@ static void set_phase(Battle *b, int phase) {
     b->phaseMs = 0;
 }
 
+static bool commandable(const Fighter *f) { return alive(f) && !(f->state & (ST_SLEEP | ST_PARALYSIS | ST_CONFUSION | ST_CHARM)); }
+
 static int next_member(Battle *b, int from) {
     for (int i = from; i < b->partyCount; i++)
-        if (alive(&b->f[i])) return i;
+        if (commandable(&b->f[i])) return i;
     return -1;
 }
 
 static int prev_member(Battle *b, int from) {
     for (int i = from; i >= 0; i--)
-        if (alive(&b->f[i])) return i;
+        if (commandable(&b->f[i])) return i;
     return -1;
 }
+
+static void build_queue(Battle *b);
 
 static void begin_commands(Battle *b) {
     b->turn++;
@@ -394,6 +407,10 @@ static void begin_commands(Battle *b) {
     b->member = next_member(b, 0);
     b->cmdCursor = 0;
     b->bar[0] = 0;
+    if (b->member < 0) {
+        build_queue(b);
+        return;
+    }
     build_commands(b);
     set_phase(b, PH_COMMAND);
 }
@@ -449,6 +466,16 @@ static const MonsterAction *pick_monster_action(Battle *b, const Fighter *f) {
     return NULL;
 }
 
+static int random_any(Battle *b) {
+    int n = 0;
+    for (int i = 0; i < b->count; i++) n += alive(&b->f[i]);
+    if (!n) return -1;
+    int k = (int)(next_rand(&b->rng) % (u32)n);
+    for (int i = 0; i < b->count; i++)
+        if (alive(&b->f[i]) && k-- == 0) return i;
+    return -1;
+}
+
 static int random_target(Battle *b, bool monsters) {
     int n = living(b, monsters);
     if (!n) return -1;
@@ -482,6 +509,8 @@ static void plan_monsters(Battle *b) {
 
 static void build_queue(Battle *b) {
     plan_monsters(b);
+    for (int i = 0; i < b->partyCount; i++)
+        if (alive(&b->f[i]) && !commandable(&b->f[i])) b->plan[i] = (Plan){i, ACT_ATTACK, -1, NULL, NULL};
     b->queueCount = 0;
     for (int i = 0; i < b->count; i++)
         if (alive(&b->f[i]) && b->plan[i].kind != ACT_NONE) b->queue[b->queueCount++] = b->plan[i];
@@ -519,8 +548,8 @@ static void popup(Fighter *t, int value, bool miss, bool heal) {
 }
 
 static int element_scale(const Fighter *t, int element, int dmg) {
-    if (element <= 0 || element > 12) return dmg;
-    int r = t->resist[element];
+    if (element <= 0 || element > 6) return dmg;
+    int r = t->resist[element - 1];
     int out = dmg * (100 - r) / 100;
     return out < 0 ? 0 : out;
 }
@@ -528,6 +557,7 @@ static int element_scale(const Fighter *t, int element, int dmg) {
 static void hurt(Battle *b, Fighter *t, int dmg) {
     if (t->defending) dmg /= 2;
     if (dmg < 0) dmg = 0;
+    sg_log(b->g, "battle: %s takes %d", t->name, dmg);
     t->hp -= dmg;
     if (t->hp < 0) t->hp = 0;
     popup(t, dmg, false, false);
@@ -557,23 +587,78 @@ static void do_attack(Battle *b, Fighter *a, Fighter *t) {
     hurt(b, t, element_scale(t, a->element, dmg));
 }
 
+BattleSkillInfo battle_skill_info(const SkillDef *s) {
+    BattleSkillInfo k = {0};
+    k.hit = 100;
+    if (s->act && s->actSize >= 94) {
+        for (int i = 0; i < 6; i++)
+            if (s->act[56 + i]) k.states |= (u8)(1u << i);
+        memcpy(&k.element, s->act + 86, 4);
+        memcpy(&k.hit, s->act + 90, 4);
+    }
+    if (s->use && s->useSize > 14) k.drain = s->use[14] != 0;
+    return k;
+}
+
+static const char *const kStateRecover[6] = {"{0}は毒から回復した！", "{0}は目を覚ました！", "{0}は麻痺から回復した！", "{0}は混乱から回復した！",
+                                              "{0}は魅了から回復した！", "{0}は立ち上がった！"};
+static const int kStateRecoverText[6] = {9, 10, 8, 5, 7, 6};
+
+static void inflict(Battle *b, Fighter *t, u8 states) {
+    for (int i = 0; i < 6; i++) {
+        if (!(states & (1u << i)) || !alive(t)) continue;
+        int chance = 100 - t->resist[6 + i];
+        if (chance <= 0 || rand_pct(&b->rng) >= chance) continue;
+        if (i == 5) {
+            t->hp = 0;
+            if (!t->monster) sync_member(b->g, t);
+            continue;
+        }
+        t->state |= (u8)(1u << i);
+        sg_log(b->g, "battle: %s state %d", t->name, i);
+    }
+}
+
+static void cure(Battle *b, Fighter *t, u8 states) {
+    for (int i = 0; i < 5; i++)
+        if ((states & (1u << i)) && (t->state & (1u << i))) {
+            t->state &= (u8)~(1u << i);
+            fmt(b->bar, sizeof b->bar, stext(b->g, kStateRecoverText[i], kStateRecover[i]), t->name, "");
+        }
+}
+
 static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
-    bool heal = s->target == TARGET_ALLY || s->target == TARGET_ALLIES || s->target == TARGET_SELF;
-    if (heal) {
-        int v = s->power + a->mag;
-        if (v <= 0) return;
-        t->hp += v;
-        if (t->hp > t->maxHp) t->hp = t->maxHp;
-        popup(t, v, false, true);
+    BattleSkillInfo k = battle_skill_info(s);
+    bool friendly = s->target == TARGET_ALLY || s->target == TARGET_ALLIES || s->target == TARGET_SELF;
+    if (friendly) {
+        if ((k.states & 32) && t->hp <= 0) t->hp = 1;
+        cure(b, t, k.states);
+        int v = s->power > 0 ? s->power + a->mag : 0;
+        if (v > 0 && t->hp > 0) {
+            t->hp += v;
+            if (t->hp > t->maxHp) t->hp = t->maxHp;
+            popup(t, v, false, true);
+        }
         if (!t->monster) sync_member(b->g, t);
         return;
     }
-    if (rand_pct(&b->rng) >= a->hit - t->eva) {
+    if (rand_pct(&b->rng) >= k.hit - t->eva) {
         popup(t, 0, true, false);
         return;
     }
     int dmg = battle_skill_damage(s->power, a->mag, t->dfn, battle_spread(&b->rng));
+    if (dmg < 1) dmg = 1;
+    dmg = element_scale(t, k.element, dmg);
+    int before = t->hp;
     hurt(b, t, dmg);
+    if (k.drain && before > t->hp) {
+        int v = before - t->hp;
+        a->hp += v;
+        if (a->hp > a->maxHp) a->hp = a->maxHp;
+        popup(a, v, false, true);
+        if (!a->monster) sync_member(b->g, a);
+    }
+    inflict(b, t, k.states);
 }
 
 static void apply_item(Battle *b, Fighter *t, const ItemDef *it) {
@@ -615,7 +700,8 @@ static void apply_plan(Battle *b, const Plan *p) {
     Fighter *a = &b->f[p->actor];
     switch (p->kind) {
     case ACT_ATTACK: {
-        int t = retarget(b, p->target, !a->monster);
+        bool lost = a->state & (ST_CONFUSION | ST_CHARM);
+        int t = lost && p->target >= 0 && alive(&b->f[p->target]) ? p->target : retarget(b, p->target, !a->monster);
         if (t >= 0) do_attack(b, a, &b->f[t]);
         break;
     }
@@ -657,8 +743,8 @@ static void grant_rewards(Battle *b) {
     for (int i = b->partyCount; i < b->count; i++) {
         const Fighter *f = &b->f[i];
         if (f->fled) continue;
-        b->expGain += f->def->exp;
-        b->moneyGain += f->def->money;
+        b->expGain += f->def->money;
+        b->moneyGain += f->def->exp;
         for (int k = 0; k < 2; k++)
             if (!guid_zero(f->def->drops[k].item) && rand_pct(&b->rng) < f->def->drops[k].rate && b->dropCount < 16)
                 b->drops[b->dropCount++] = f->def->drops[k].item;
@@ -671,7 +757,6 @@ static void grant_rewards(Battle *b) {
         Fighter *f = &b->f[i];
         if (f->hp <= 0) continue;
         Member *m = member_of(g, f);
-        int oldMax = member_max_hp(t, m), oldMaxMp = member_max_mp(t, m);
         m->exp += b->expGain;
         bool up = false;
         int level = m->level;
@@ -681,10 +766,6 @@ static void grant_rewards(Battle *b) {
         }
         if (up) member_set_level(t, m, level);
         if (up) {
-            m->hp += member_max_hp(t, m) - oldMax;
-            m->mp += member_max_mp(t, m) - oldMaxMp;
-            f->hp = m->hp;
-            f->mp = m->mp;
             f->maxHp = member_max_hp(t, m);
             f->maxMp = member_max_mp(t, m);
             snprintf(line, sizeof line, "%s %s %d", f->name, btext(g, 18, "レベルアップ！"), m->level);
@@ -723,10 +804,37 @@ static void act_update(Battle *b) {
         after_actions(b);
         return;
     }
-    const Plan *p = &b->queue[b->queuePos];
+    Plan *p = &b->queue[b->queuePos];
+    Fighter *actor = &b->f[p->actor];
     if (!b->started) {
-        action_text(b, p);
         b->started = true;
+        b->ticked = false;
+        if (actor->state & (ST_SLEEP | ST_PARALYSIS)) {
+            bool sleep = actor->state & ST_SLEEP;
+            if (rand_pct(&b->rng) < kRecoverPct) {
+                actor->state &= (u8)~(ST_SLEEP | ST_PARALYSIS);
+                fmt(b->bar, sizeof b->bar, sleep ? stext(b->g, 10, "{0}は目を覚ました！") : stext(b->g, 8, "{0}は麻痺から回復した！"), actor->name, "");
+            } else {
+                fmt(b->bar, sizeof b->bar, sleep ? btext(b->g, 3, "{0}は眠っている……") : btext(b->g, 4, "{0}は麻痺で動けない！"), actor->name, "");
+            }
+            p->kind = ACT_NONE;
+            b->applied = true;
+        } else if (actor->state & (ST_CONFUSION | ST_CHARM)) {
+            bool charm = actor->state & ST_CHARM;
+            if (rand_pct(&b->rng) < kRecoverPct) {
+                actor->state &= (u8)~(ST_CONFUSION | ST_CHARM);
+                fmt(b->bar, sizeof b->bar, charm ? stext(b->g, 7, "{0}は魅了から回復した！") : stext(b->g, 5, "{0}は混乱から回復した！"), actor->name, "");
+                p->kind = ACT_NONE;
+                b->applied = true;
+            } else {
+                p->kind = ACT_ATTACK;
+                p->skill = NULL;
+                p->target = charm ? random_target(b, actor->monster) : random_any(b);
+                action_text(b, p);
+            }
+        } else {
+            action_text(b, p);
+        }
     }
     if (!b->applied && b->phaseMs >= (u32)kHitMs) {
         b->applied = true;
@@ -735,6 +843,17 @@ static void act_update(Battle *b) {
         set_pose(&b->f[p->actor], p->kind == ACT_SKILL ? MO_SKILL : p->kind == ACT_DEFEND ? MO_GUARD : MO_ATTACK);
     }
     if (b->phaseMs < (u32)kActMs) return;
+    if (!b->ticked && alive(actor) && (actor->state & ST_POISON)) {
+        b->ticked = true;
+        int dmg = actor->maxHp / 10;
+        fmt(b->bar, sizeof b->bar, stext(b->g, 1, "{0}は毒を受けている！"), actor->name, "");
+        bool def = actor->defending;
+        actor->defending = false;
+        hurt(b, actor, dmg);
+        actor->defending = def;
+        b->phaseMs = (u32)(kActMs - kTickMs);
+        return;
+    }
     b->queuePos++;
     b->applied = b->started = false;
     b->phaseMs = 0;

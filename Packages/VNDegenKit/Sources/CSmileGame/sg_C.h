@@ -51,6 +51,14 @@ void battle_encounter_setup(BattleEnc *e, BattleSetup *s);
 void battle_encounter_tick(SG *g);
 BattleEnc *battle_enc(SG *g);
 
+typedef struct BattleSkillInfo {
+    u8 states;
+    bool drain;
+    i32 element, hit;
+} BattleSkillInfo;
+
+BattleSkillInfo battle_skill_info(const SkillDef *s);
+
 bool battle_setup_cmd(BattleSetup *s, const Cmd *c);
 void sg_battle_start(SG *g, const BattleSetup *s);
 bool sg_battle_active(SG *g);
