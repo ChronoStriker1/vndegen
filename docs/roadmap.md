@@ -176,6 +176,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Princess Colette's Great Adventure's optional dungeons and the post-game tower's first lap, and Smile Game Builder's particle effects (0.61.5).
 - False Myth 2 plays, from Wolf RPG Editor 3.31 and later archives, and BUNNY BLACK 3's walls use the original's texture variants (0.61.6).
 - BUNNY BLACK 3's floors, ceilings and pillars use the original's texture variants (0.61.7).
+- Sacred plays to its ending, so both Smile Game Builder games do (0.61.8).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -187,7 +188,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - RealLive, which siglus_rs also runs, is built behind a feature that is off and its plugin isn't registered (0.43.0). It waits for a test game: Planetarian Steam Edition, CLANNAD or Tomoyo After, in English on Steam. Before it ships, the `reallive` crate's two comments citing rlvm (GPL-3.0) need checking.
-- Smile Game Builder, on a clean-room runtime of VNDegen's own, on branch `feat/smilegame`: Princess Colette's Great Adventure shipped its opening path in 0.61.0 and about the first half of its story in 0.61.1, Sacred through its first dungeon in 0.61.2, Colette to her ending in 0.61.3, and Sacred to the デオズズ volcano in 0.61.4; Colette's optional dungeons in 0.61.5; next is the rest of Sacred. The maintainer left the choice of the next item to the coordinator on 2026-11-26, for visual novels and RPGs only; Smile Game Builder is the last such engine with library games VNDegen doesn't run. It is built in rounds of parallel delegates, as SystemAoi was.
+- Smile Game Builder, on a clean-room runtime of VNDegen's own, on branch `feat/smilegame`: Princess Colette's Great Adventure shipped its opening path in 0.61.0 and about the first half of its story in 0.61.1, Sacred through its first dungeon in 0.61.2, Colette to her ending in 0.61.3, Sacred to the デオズズ volcano in 0.61.4, Colette's optional dungeons in 0.61.5, and Sacred to its ending in 0.61.8. Left: Colette's post-game tower after its first lap, and Sacred's power spots, CG room and post-game. The maintainer left the choice of the next item to the coordinator on 2026-11-26, for visual novels and RPGs only; Smile Game Builder is the last such engine with library games VNDegen doesn't run. It is built in rounds of parallel delegates, as SystemAoi was.
 - NekoSDK's last open points were settled on 2026-11-14; only the blur radius and motion-blur strength, which are decoration, are unmeasured ([nekosdk-cleanroom.md](nekosdk-cleanroom.md)).
 
 ## Licenses
