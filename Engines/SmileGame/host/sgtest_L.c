@@ -1,0 +1,84 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "sg.h"
+
+static int failures, checks;
+
+#define CHECK(cond)                                                                                                    \
+    do {                                                                                                               \
+        checks++;                                                                                                      \
+        if (!(cond)) {                                                                                                 \
+            failures++;                                                                                                \
+            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond);                                                 \
+        }                                                                                                              \
+    } while (0)
+
+enum { VK_UP = 0x26, VK_OK = 0x0d };
+
+static SG *open_game(const char *dir) {
+    VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = "/nonexistent-sgtest-l", .audioRate = 44100};
+    char err[512];
+    SG *g = (SG *)vnsmilegame_open(&cfg, err, sizeof err);
+    if (!g) fprintf(stderr, "open %s: %s\n", dir, err);
+    return g;
+}
+
+static void run(SG *g, int ms) {
+    for (int t = 0; t < ms; t += 16) vnsmilegame_frame((VNSmileGame *)g, 16);
+}
+
+static void press(SG *g, int vk) {
+    vnsmilegame_key((VNSmileGame *)g, vk, true);
+    run(g, 48);
+    vnsmilegame_key((VNSmileGame *)g, vk, false);
+    run(g, 48);
+}
+
+static SG *new_game(const char *dir) {
+    SG *g = open_game(dir);
+    if (!g) return NULL;
+    run(g, 16);
+    if (g->titleCursor == 1) press(g, VK_UP);
+    press(g, VK_OK);
+    run(g, 200);
+    interp_free(&g->interp);
+    return g;
+}
+
+static void region(SG *g, int x0, int y0, int w, int h, double *r, double *gr, double *b) {
+    double sr = 0, sg = 0, sb = 0;
+    for (int y = y0; y < y0 + h; y++)
+        for (int x = x0; x < x0 + w; x++) {
+            u32 c = g->fb[y * g->w + x];
+            sr += c & 255, sg += c >> 8 & 255, sb += c >> 16 & 255;
+        }
+    double n = (double)w * h;
+    *r = sr / n, *gr = sg / n, *b = sb / n;
+}
+
+static void test_inn_bed(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    sg_debug_warp((VNSmileGame *)g, "宿屋", 15, 15, 2);
+    run(g, 1500);
+    double r, gg, b;
+    region(g, 240, 120, 40, 30, &r, &gg, &b);
+    CHECK(r > 0 && gg / r > 0.76);
+    region(g, 110, 120, 40, 30, &r, &gg, &b);
+    CHECK(r > 0 && gg / r < 0.76);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+int main(void) {
+    const char *colette = getenv("SG_COLETTE");
+    if (colette) {
+        test_inn_bed(colette);
+    }
+    printf("%d checks, %d failed\n", checks, failures);
+    return failures ? 1 : 0;
+}

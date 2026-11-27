@@ -414,12 +414,12 @@ static void add_model(Build *b, Model *mdl, float bx, float by, float bz, int di
         float sh[3] = {1, 1, 1};
         for (int c = 0; c < 3; c++) {
             float x = t.v[c].x, z = t.v[c].z;
-            t.v[c].x = bx + x * cs - z * sn;
-            t.v[c].z = bz + x * sn + z * cs;
+            t.v[c].x = bx + x * cs + z * sn;
+            t.v[c].z = bz - x * sn + z * cs;
             t.v[c].y += by;
             if (nrm) {
                 const float *n = nrm + k * 9 + c * 3;
-                float nx = n[0] * cs - n[2] * sn, nz = n[0] * sn + n[2] * cs;
+                float nx = n[0] * cs + n[2] * sn, nz = -n[0] * sn + n[2] * cs;
                 sh[c] = face_shade(b, nx, n[1], nz);
             }
             t.v[c].shade = sh[c];
