@@ -10,6 +10,7 @@
 
 static const float kDefaultPitch = -48.0f, kDefaultDistance = 3.5f, kDefaultFov = 70.0f;
 static const float kDistScale = 20.0f, kFovScale = 0.1f;
+static const float kEyePitchScale = 0.58f;
 static const float kFillK = 0.77f, kKeyK = 0.74f;
 static const int kShadowTexels = 12;
 static const float kSpriteForward = 0.235f;
@@ -684,7 +685,7 @@ void sg_camera_command(SG *g, const Cmd *c) {
     View *v = sg_view(g);
     ViewPose p = v->pose;
     i32 mode = cmd_int(c, 0);
-    v->eye = mode == 2;
+    v->eye = mode == 1 || mode == 2;
     u32 ms = 0;
     if (mode == 0 && c->argCount >= 6) {
         p.pitch = (float)cmd_int(c, 1) / 1000.0f;
@@ -714,6 +715,18 @@ void sg_camera_command(SG *g, const Cmd *c) {
         p.lift = 0.0f;
         p.follow = false;
         ms = (u32)cmd_int(c, 3);
+    } else if (mode == 1 && c->argCount >= 6) {
+        const Actor *pl = &g->field.player;
+        float pitch = (float)cmd_int(c, 1) / 1000.0f * kEyePitchScale, yaw = (float)cmd_int(c, 2) / 1000.0f;
+        float pr = pitch * 3.14159265f / 180.0f, yr = yaw * 3.14159265f / 180.0f;
+        p.target = (Vec3){pl->x + sinf(yr) * cosf(pr), pl->y + (float)cmd_int(c, 4) / 1000.0f + sinf(pr), pl->z - cosf(yr) * cosf(pr)};
+        p.pitch = pitch;
+        p.yaw = yaw;
+        p.distance = 1.0f / kDistScale;
+        p.fov = (float)cmd_int(c, 3) / 500.0f / kFovScale;
+        p.lift = 0.0f;
+        p.follow = false;
+        ms = (u32)cmd_int(c, 5);
     } else {
         sg_log(g, "camera mode %d not handled", mode);
         return;
