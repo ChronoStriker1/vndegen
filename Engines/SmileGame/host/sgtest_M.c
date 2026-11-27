@@ -253,7 +253,11 @@ static const Res *res_named(SG *g, const char *name) {
 static void test_ending_sprites(const char *dir) {
     SG *g = new_game(dir);
     if (!g) return;
+    g->vars[17] = 1;
     warp(g, "エンドロール", 9, 17, 0);
+    int epilogue = event_named(g, "イベント2");
+    CHECK(epilogue >= 0 && g->field.npcs[epilogue].waitSheet != NULL);
+    g->vars[17] = 0;
     const Res *hime = res_named(g, "w_hime001");
     CHECK(hime != NULL);
     if (hime) {

@@ -73,9 +73,10 @@ folder for a file under `samples/`; a `dlc:<guid>|` prefix names the pack by its
 | 23 | 3D item model | |
 
 A 2D character sheet with four rows has its frames side by side; the rows face away, toward, left and right. In the
-built-in sets a frame is 48 by 64 pixels, and 48 pixels are one map cell. A character standing still on the map is drawn
+built-in sets a frame is 48 by 64 pixels, and 48 pixels are one map cell. An event that doesn't wander or chase is drawn
 from its `wait` motion's sheet when its resource lists one (コレット's `w_hime001_wait`, eight frames in one row, in
-the staff roll's epilogue), and from its walk sheet otherwise.
+the staff roll's epilogue), and from its walk sheet otherwise. The tower's wandering copies of コレット use the same
+resource; how the PC draws them between steps wasn't seen, so they keep the walk sheet.
 
 ## Game settings (`GameSettings.sgr`)
 

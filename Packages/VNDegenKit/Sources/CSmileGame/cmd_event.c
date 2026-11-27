@@ -96,7 +96,6 @@ void sga_actor_graphic(SG *g, Actor *a, Guid graphic) {
     size_t n = strlen(res->path);
     if (n > 4 && strcasecmp(res->path + n - 4, ".fbx") == 0) a->model = model_load(g, res->path);
     else a->sheet = sg_image(g, res->id);
-    sg_actor_wait_sheet(g, a);
 }
 
 static void apply_sheet(SG *g, int i) {
@@ -118,6 +117,8 @@ static void apply_sheet(SG *g, int i) {
     ev->wanderStarted = false;
     ev->wanderLeft = 0;
     sga_actor_graphic(g, ac, sh->graphic);
+    if (sh->moveType == 0) sg_actor_wait_sheet(g, ac);
+    else ac->waitSheet = NULL;
     ac->visible = ac->graphic != NULL;
     ev->motion = sg_strdup(sh->motion ? sh->motion : "");
     sg_actor_motion(g, ac, ev->motion);
