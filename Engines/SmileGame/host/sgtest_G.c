@@ -203,6 +203,8 @@ static void test_shop(const char *dir) {
     CHECK(menu_page(g) && strcmp(menu_page(g), "shop-buy") == 0);
     press(g, VK_OK);
     run(g, 100);
+    press(g, VK_OK);
+    run(g, 100);
     CHECK(p->money == 85 && party_item_count(p, herb) == 1);
     press(g, VK_CANCEL);
     run(g, 100);

@@ -53,6 +53,7 @@ struct Menu {
     i32 shopPrices[32];
     int shopCount;
     int innPrice;
+    int qty;
     bool result;
     SaveSlot slots[SAVE_SLOTS];
     char note[256];
@@ -675,39 +676,130 @@ static void draw_config(SG *g, Menu *m) {
     quit_button(g, 27, 446, 318, cur == CONFIG_QUIT);
 }
 
+enum { SHOP_ROWS = 6 };
+
+static void money_box(SG *g) {
+    panel(g, 728, 3, 218, 48);
+    char buf[32];
+    snprintf(buf, sizeof buf, "%d G", P(g)->money);
+    text_right(g, 936, 12, 22, buf, kWhite);
+}
+
+static int shop_slot(const ItemDef *it) {
+    switch (it ? it->kind : 0) {
+    case ITEM_WEAPON: return SLOT_WEAPON;
+    case ITEM_SHIELD: return SLOT_SHIELD;
+    case ITEM_HEAD: return SLOT_HEAD;
+    case ITEM_BODY: return SLOT_BODY;
+    case ITEM_ACCESSORY: return SLOT_ACC1;
+    default: return -1;
+    }
+}
+
+static const char *kind_label(SG *g, const ItemDef *it) {
+    switch (it->kind) {
+    case ITEM_WEAPON: return MT(g, MT_WEAPON);
+    case ITEM_SHIELD: return MT(g, MT_SHIELD);
+    case ITEM_HEAD: return MT(g, MT_HEAD);
+    case ITEM_BODY: return MT(g, MT_BODY);
+    case ITEM_ACCESSORY: return MT(g, MT_ACCESSORY);
+    default: return MT(g, MT_EXPENDABLE);
+    }
+}
+
+static void compare_line(SG *g, int x, int y, const char *label, int before, int after) {
+    text(g, x, y, 17, label, kWhite);
+    char buf[48];
+    snprintf(buf, sizeof buf, "%d \xe2\x86\x92 ", before);
+    text(g, x, y + 22, 17, buf, kWhite);
+    char v[16];
+    snprintf(v, sizeof v, "%d", after);
+    text(g, x + font_width(g->font, 17, buf), y + 22, 17, v, after < before ? kDown : kUp);
+}
+
+static void shop_detail(SG *g, Menu *m, const ItemDef *it) {
+    panel(g, 414, 73, 532, 397);
+    if (!it) return;
+    text(g, 423, 88, 22, kind_label(g, it), kWhite);
+    char buf[64];
+    snprintf(buf, sizeof buf, "%s : %d", MT(g, MT_OWNED), party_item_count(P(g), it->id));
+    text(g, 690, 88, 22, buf, kWhite);
+    if (it->kind == ITEM_WEAPON) snprintf(buf, sizeof buf, "%s : %d", MT(g, MT_ATTACK), it->attack);
+    else if (it->kind >= ITEM_SHIELD && it->kind <= ITEM_ACCESSORY) snprintf(buf, sizeof buf, "%s : %d", MT(g, MT_DEFENSE), it->eq[EQ_DEFENSE]);
+    else buf[0] = 0;
+    text(g, 423, 123, 22, buf, kWhite);
+    int slot = shop_slot(it);
+    if (slot < 0) return;
+    Tables *t = T(g);
+    Party *p = P(g);
+    for (int i = 0, shown = 0; i < p->count && shown < 2; i++) {
+        const Member *mb = &p->members[i];
+        if (!member_can_equip(t, mb, it)) continue;
+        const HeroDef *h = hero_def(t, mb->hero);
+        int y = 193 + shown * 140;
+        Image *face = h ? face_image(g, m, h->face) : NULL;
+        if (face && face->w >= 201 && face->h >= 253) blit(g->fb, g->w, g->h, face, 76, 118, 125, 135, 423, y, 125, 135, 255);
+        if (h) text_center(g, 645, y + 7, 17, h->name, kWhite);
+        Member after = *mb;
+        after.equip[slot] = it->id;
+        if (it->kind == ITEM_WEAPON) {
+            compare_line(g, 552, y + 38, MT(g, MT_ATTACK), member_attack(t, mb), member_attack(t, &after));
+            compare_line(g, 552, y + 82, t->text.config[CFG_ELEMENT_ATTACK], member_element_attack(t, mb), member_element_attack(t, &after));
+        } else {
+            compare_line(g, 552, y + 38, MT(g, MT_DEFENSE), member_defense(t, mb), member_defense(t, &after));
+        }
+        shown++;
+    }
+}
+
 static void draw_shop(SG *g, Menu *m) {
-    List l;
-    if (m->page == P_SHOP_BUY) {
-        shop_list(g, m, &l);
-        draw_item_page(g, m, P_SHOP_BUY, &l, true, false);
-    } else if (m->page == P_SHOP_SELL) {
-        item_list(g, &l, 0);
-        draw_item_page(g, m, P_SHOP_SELL, &l, true, true);
-    } else {
-        panel(g, 60, 40, 208, 4 * 53 + 16);
+    money_box(g);
+    if (m->page == P_SHOP) {
+        interp_draw_last_window(g);
+        panel(g, 428, 193, 103, 158);
         int labels[3] = {SHOP_BUY, SHOP_SELL, SHOP_QUIT};
         for (int i = 0; i < 3; i++) {
-            int y = 48 + 53 * i;
-            button(g, 68, y, 192, 53);
-            if (i == m->cur[P_SHOP]) highlight(g, 68, y, 192, 53);
-            text(g, 78, y + 15, 20, T(g)->text.shop[labels[i]], kWhite);
+            int y = 205 + 46 * i;
+            button(g, 437, y, 86, 44);
+            if (i == m->cur[P_SHOP]) highlight(g, 437, y, 86, 44);
+            text(g, 446, y + 8, 22, T(g)->text.shop[labels[i]], kWhite);
         }
+        return;
     }
-    panel(g, 328, 436, 624, 66);
-    char buf[256] = "";
-    int page = m->page;
-    if (m->note[0]) snprintf(buf, sizeof buf, "%s", m->note);
-    else if (page == P_SHOP_BUY || page == P_SHOP_SELL) {
-        if (page == P_SHOP_BUY) shop_list(g, m, &l);
-        else item_list(g, &l, 0);
-        int cur = m->cur[page];
-        if (cur < l.count) item_line(g, item_def(T(g), l.ids[cur]), buf, sizeof buf);
+    List l;
+    bool sell = m->page == P_SHOP_SELL;
+    if (sell) item_list(g, &l, 0);
+    else shop_list(g, m, &l);
+    int page = m->page, cur = m->cur[page];
+    panel(g, 13, 73, 397, 397);
+    for (int i = m->top[page]; i < l.count && i < m->top[page] + SHOP_ROWS; i++) {
+        const ItemDef *it = item_def(T(g), l.ids[i]);
+        if (!it) continue;
+        int y = 84 + (i - m->top[page]) * 50;
+        button(g, 23, y, 377, 48);
+        if (i == cur) highlight(g, 23, y, 377, 48);
+        icon(g, it->icon, it->iconX, it->iconY, 34, y + 8);
+        text(g, 68, y + 11, 21, it->name, kWhite);
+        char right[32];
+        snprintf(right, sizeof right, "%d", sell ? it->price / 2 : m->shopPrices[i]);
+        text_right(g, 393, y + 14, 17, right, kWhite);
     }
-    text_fit(g, 640, 452, 24, 580, buf, kWhite);
-    char money[64];
-    snprintf(money, sizeof money, "%s : %dG", T(g)->text.money ? T(g)->text.money : "", P(g)->money);
-    panel(g, 60, 452, 260, 50);
-    text_right(g, 304, 465, 17, money, kWhite);
+    quit_button(g, 23, 414, 377, cur == l.count);
+    const ItemDef *it = cur < l.count ? item_def(T(g), l.ids[cur]) : NULL;
+    shop_detail(g, m, it);
+    panel(g, 13, 473, 933, 62);
+    text_fit(g, 480, 490, 22, 900, m->note[0] ? m->note : it ? it->desc : "", kWhite);
+    if (m->qty && it) {
+        panel(g, 606, 381, 239, 65);
+        icon(g, it->icon, it->iconX, it->iconY, 616, 392);
+        text(g, 650, 394, 20, it->name, kWhite);
+        char q[16], price[32];
+        snprintf(q, sizeof q, "x%d", m->qty);
+        highlight(g, 793, 389, 44, 28);
+        text_center(g, 815, 392, 17, q, kWhite);
+        snprintf(price, sizeof price, "%dG", (sell ? it->price / 2 : m->shopPrices[cur]) * m->qty);
+        text(g, 795, 420, 17, price, kWhite);
+    }
 }
 
 static void draw_inn(SG *g, Menu *m) {
@@ -802,7 +894,6 @@ static void draw(SG *g, Menu *m) {
     case P_SHOP_BUY:
     case P_SHOP_SELL:
         draw_shop(g, m);
-        guide(g, m, false);
         break;
     case P_INN:
         draw_inn(g, m);
@@ -1148,51 +1239,86 @@ static void update_config(SG *g, Menu *m) {
     }
 }
 
+static void shop_scroll(Menu *m, int page) {
+    int c = m->cur[page];
+    if (c < m->top[page]) m->top[page] = c;
+    if (c >= m->top[page] + SHOP_ROWS) m->top[page] = c - SHOP_ROWS + 1;
+}
+
 static void update_shop(SG *g, Menu *m) {
     Party *p = P(g);
     List l;
     int page = m->page;
-    if (page == P_SHOP_BUY) shop_list(g, m, &l);
-    else item_list(g, &l, 0);
-    if (move_grid(g, m, page, l.count, true)) m->note[0] = 0;
+    bool sell = page == P_SHOP_SELL;
+    if (sell) item_list(g, &l, 0);
+    else shop_list(g, m, &l);
+    int c = m->cur[page];
+    const ItemDef *it = c < l.count ? item_def(T(g), l.ids[c]) : NULL;
+    if (m->qty) {
+        int price = it ? (sell ? it->price / 2 : m->shopPrices[c]) : 0;
+        int most = sell ? l.counts[c] : (price > 0 ? p->money / price : 99);
+        int have = it ? party_item_count(p, it->id) : 0;
+        if (!sell && most > 99 - have) most = 99 - have;
+        if (most < 1) most = 1;
+        int q = m->qty;
+        if (sg_pressed(g, KEY_RIGHT) || sg_pressed(g, KEY_UP)) q = q < most ? q + 1 : q;
+        if (sg_pressed(g, KEY_LEFT) || sg_pressed(g, KEY_DOWN)) q = q > 1 ? q - 1 : q;
+        if (q != m->qty) sgb_sound(g, SND_CURSOR);
+        m->qty = q;
+        if (sg_pressed(g, KEY_CANCEL)) {
+            sgb_sound(g, SND_CANCEL);
+            m->qty = 0;
+            return;
+        }
+        if (!sg_pressed(g, KEY_OK) || !it) return;
+        m->qty = 0;
+        if (!sell) {
+            if (p->money < price * q || have + q > 99) {
+                sgb_sound(g, SND_CANCEL);
+                snprintf(m->note, sizeof m->note, "%s", T(g)->text.shop[SHOP_NO_MONEY]);
+                return;
+            }
+            p->money -= price * q;
+            party_give_item(p, it->id, q);
+            m->result = true;
+            sgb_sound(g, SND_DECIDE);
+            const char *f = T(g)->text.shop[SHOP_BOUGHT];
+            const char *at = f ? strstr(f, "{0}") : NULL;
+            if (at) snprintf(m->note, sizeof m->note, "%.*s%s%s", (int)(at - f), f, it->name, at + 3);
+        } else {
+            p->money += price * q;
+            party_give_item(p, it->id, -q);
+            sgb_sound(g, SND_DECIDE);
+            const char *f = T(g)->text.shop[SHOP_SOLD];
+            const char *at = f ? strstr(f, "{0}") : NULL;
+            if (at) snprintf(m->note, sizeof m->note, "%.*s%s%s", (int)(at - f), f, it->name, at + 3);
+            item_list(g, &l, 0);
+            m->cur[page] = clampi(m->cur[page], 0, l.count);
+        }
+        return;
+    }
+    if (move_column(g, m, page, l.count + 1)) m->note[0] = 0;
+    shop_scroll(m, page);
     if (back(g, m, P_SHOP)) return;
     if (!sg_pressed(g, KEY_OK)) return;
-    int c = m->cur[page];
     if (c >= l.count) {
         sgb_sound(g, SND_CANCEL);
         go(m, P_SHOP);
         return;
     }
-    const ItemDef *it = item_def(T(g), l.ids[c]);
     if (!it) return;
-    if (page == P_SHOP_BUY) {
-        int price = m->shopPrices[c];
-        if (p->money < price || party_item_count(p, it->id) >= 99) {
-            sgb_sound(g, SND_CANCEL);
-            snprintf(m->note, sizeof m->note, "%s", T(g)->text.shop[SHOP_NO_MONEY]);
-            return;
-        }
-        p->money -= price;
-        party_give_item(p, it->id, 1);
-        m->result = true;
-        sgb_sound(g, SND_DECIDE);
-        const char *f = T(g)->text.shop[SHOP_BOUGHT];
-        const char *at = f ? strstr(f, "{0}") : NULL;
-        if (at) snprintf(m->note, sizeof m->note, "%.*s%s%s", (int)(at - f), f, it->name, at + 3);
-    } else {
-        if (it->price <= 0) {
-            sgb_sound(g, SND_CANCEL);
-            return;
-        }
-        p->money += it->price / 2;
-        party_give_item(p, it->id, -1);
-        sgb_sound(g, SND_DECIDE);
-        const char *f = T(g)->text.shop[SHOP_SOLD];
-        const char *at = f ? strstr(f, "{0}") : NULL;
-        if (at) snprintf(m->note, sizeof m->note, "%.*s%s%s", (int)(at - f), f, it->name, at + 3);
-        item_list(g, &l, 0);
-        m->cur[page] = clampi(m->cur[page], 0, l.count);
+    if (sell && it->price <= 0) {
+        sgb_sound(g, SND_CANCEL);
+        return;
     }
+    if (!sell && p->money < m->shopPrices[c]) {
+        sgb_sound(g, SND_CANCEL);
+        snprintf(m->note, sizeof m->note, "%s", T(g)->text.shop[SHOP_NO_MONEY]);
+        return;
+    }
+    sgb_sound(g, SND_DECIDE);
+    m->note[0] = 0;
+    m->qty = 1;
 }
 
 static void update_shop_main(SG *g, Menu *m) {
@@ -1217,6 +1343,7 @@ static void update_shop_main(SG *g, Menu *m) {
     int page = c == 0 ? P_SHOP_BUY : P_SHOP_SELL;
     m->cur[page] = 0;
     m->top[page] = 0;
+    m->qty = 0;
     go(m, page);
 }
 

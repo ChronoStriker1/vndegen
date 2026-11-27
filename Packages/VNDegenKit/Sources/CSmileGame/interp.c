@@ -666,3 +666,8 @@ void interp_draw(SG *g) {
         draw_choices(g);
     }
 }
+
+void interp_draw_last_window(SG *g) {
+    Interp *ip = &g->interp;
+    if (ip->active && ip->a.lastPage && ip->a.msgCmd) draw_message(g, ip->a.lastPage, 1 << 30);
+}
