@@ -189,6 +189,23 @@ With the touch gamepad shown, the iPad simulator ran the practice battle at 41.1
 runtime at 4.6 to 5.0 ms, the gamepad compositing cost described below. The software path holds the courtyard, the
 heaviest Sacred scene, at 60 on all three, so no Metal path is needed for it.
 
+Sacred past the first dungeon, a DEBUG build of round 5 N's branch on the Mac mini, 2026-11-27, from runner saves at
+each place, measured the same way. Another thread's build ran throughout (load averages 33 to 62). Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator, gamepad hidden | iPhone 18 Pro simulator |
+|---|---|---|---|
+| サンプール | 60.0, 59.9, 6.8 to 7.0 ms | not measured | not measured |
+| Sand temple | 60.0, 59.9, 3.4 to 3.5 ms | not measured | not measured |
+| マウンティ | 60.0, 59.9, 4.5 to 4.7 ms | not measured | not measured |
+| Dragon tower base (108,000 triangles) | 58.3 to 59.3, 26.6 to 28.3, 14.4 to 14.6 ms (load 62) | 56.2 to 58.4, 19.9 to 27.8, 11.8 to 12.6 ms | not measured |
+| Volcano depths | 60.0, 59.9, 2.7 to 3.1 ms | 60.0, 60.0, 2.0 to 2.2 ms | 60.0, 60.0, 2.0 to 2.1 ms |
+| Battle on the volcano's first floor | 59.8 to 60.0, 42.8 to 59.9, 5.0 to 6.4 ms | not measured | not measured |
+
+The dragon tower's base, with its rows of trees around the tower, is the heaviest Sacred scene measured; with three
+of this delegate's own builds running beside it (load 36 to 55) the Mac app drew 48 to 51 frames a second at 18 ms
+a frame. It wasn't measured at a low load. With the touch gamepad shown the iPad simulator ran the volcano at 46 frames
+a second, the gamepad compositing cost described below.
+
 Colette past the first area, a DEBUG build of this round's branch on the Mac mini, 2026-11-27, measured the same way
 from runner saves (another delegate's build ran beside some of it; load averages are given). Target 60.
 
@@ -324,6 +341,8 @@ were taken with the gamepad shown.
   ルディアノ with its town and castle dungeons and the queen, the cursed land, the last dungeon and the ending may show
   problems. The four-golem fight where アリア rejoins was won at level 4 on the PC and in VNDegen; at level 1 VNDegen
   loses it, and the PC's odds at that level weren't measured.
+- Sacred's dragon tower base (about 108,000 triangles in view) takes 12 to 19 ms a frame in the runtime on Apple
+  silicon under load and fell below 60 frames a second while other builds ran; not measured on a quiet machine.
 - The PC pulses the cursor row of a choice window about once a second; the runtime draws it steady, as in the menus.
 - Under a noon sky with the sun off (Sacred's マウンティ) the PC draws the map's edge faces darker than the runtime does,
   and Sacred's lava darker; snow, rain and the save points' sparkles are particle effects and aren't drawn.
