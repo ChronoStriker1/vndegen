@@ -345,6 +345,8 @@ typedef struct Dungeon {
     float fov, camX, camZ, yaw;
     float fromX, fromZ, fromYaw, toX, toZ, toYaw;
     u32 animMs, animDur, clock, variantSeed;
+    u32 wallSeed;
+    bool wallSharedKey;
     int hover, steps;
     bool bumped, folded;
     Image *art[DUN_ART];

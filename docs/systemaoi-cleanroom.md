@@ -2,8 +2,8 @@
 
 The SystemAoi runtime (`Packages/VNDegenKit/Sources/CSystemAoi`, hosts in `Engines/SystemAoi/host`) is being written
 for VNDegen. It derives from no GPL or LGPL code. The game's exe and DLLs are run under Wine as a black box and not
-disassembled; their strings were read for file names only. The one exception is the save codec below, read with the
-maintainer's approval.
+disassembled; their strings were read for file names only. The exceptions are the save codec and the dungeon's wall,
+pole, floor and roof variants below, each read with the maintainer's approval.
 
 | Part | Sources |
 |---|---|
@@ -458,13 +458,12 @@ Measured under Wine in 千樹庭's first area (`mp0101.amd`), from the start cel
   `w002`). Not found: no map field holds it (the fields after each wall are −1; fields 8, 22 to 25 don't vary with
   it), and the Visual C `rand` restarted from any 32-bit seed and walked over the cells (row or column order, every
   cell or floor cells only, one to six calls a cell, or one call per wall in six side orders) reproduces none of the
-  57 confident cells, nor does a small per-map seed or a linear rule mod 3. Inferred: VNDegen gives each cell one
-  variant from a hash of the map file's name and the cell, used for its wall-0 sides and for the pole at a corner
-  (the poles also vary on the PC, mostly with the walls beside them); floors and roofs stay `000` (their variants
-  differ too little to classify). The hash agrees with 24 of 74 classified walls (always `w000`: 17). The eleven-frame
-  light comparison goes from 42.4 to 35.6 with it, the ice frame 7.6 → 5.3 and two 炎山洞 frames 6.5 → 2.0 and
-  6.2 → 1.6, while 千樹庭's magic-circle frame goes 1.3 → 6.7 because its cell draws a forest variant where the PC
-  draws `w000`; that gain is partly chance.
+  57 confident cells, nor does a small per-map seed or a linear rule mod 3. The rule was then read from the exe
+  (The wall variants: what was read, and why, below), and VNDegen's wall-0 sides use it: the seed from the area's
+  `floor.obj` row, the shared key or the per-side keys by column 7, the six-piece sum mod 3. Measured: VNDegen's own
+  choice, taken through the expedition's floor loading, matches all 74 classified walls (the earlier per-cell hash
+  matched 24). VNDegen's poles still use a hash of the map file's name and the corner, and its floors and roofs stay
+  `000`. Their rule was read and measured afterwards (Pole, floor and roof variants: what was read, and why, below).
 - **Crystals.** Measured under Wine in 千樹庭 (mp0101, crystal (14, 4)) and the ice dungeon (mp0802, crystal (1, 13)):
   standing on the crystal's cell the original shows the walls through both faces of the crystal; from a cell away
   its colour fits half-opaque front and back layers drawn at full texture brightness with no fog (core mean error
@@ -1555,6 +1554,100 @@ Checked against the PC: the rule gives the variant the original draws on all 74 
 the 60-view capture behind Part variants, in eleven areas of five part sets (千樹庭 mp0101; 炎山洞 mp0202, mp0203 and
 mp0204; set 40 mp0303; set 60 mp0702 and mp0703; the ice dungeon mp0802 to mp0805): 39 walls under the shared key
 and 35 under the per-side keys, 74 of 74, against 24 of 74 for VNDegen's hash.
+
+## Pole, floor and roof variants: what was read, and why
+
+After the wall rule, VNDegen's poles still picked their variant by its own hash and its floors and roofs always drew
+`000`, though the original varies them too (Part variants, in The dungeon view). The wall reading found that poles
+are made in 0x430510 and that the floor and roof choices in 0x430230 call a helper at 0x430120. With the maintainer's
+approval (2026-11-27), the reading is limited to:
+
+- 0x430510 (poles), 0x430120 (the floor and roof helper), the parts of 0x430230 that call 0x430120, and the small
+  helpers these call for the choice and its seed.
+
+Nothing else is read: not 0x430510's caller, no game logic, no other rule, no screen. What was read is recorded
+below as a description, and VNDegen's choice is to be written from it, not from the code.
+
+Read on 2026-11-27 in `Bunny3.exe`:
+
+- 0x430120 turns a cell's x and y, a seed and a key into a variant from 0 to 2. It is the wall's hash (The wall
+  variants, above): (x + y) times 8,192, plus x, plus the seed, exclusive-or the key, then the six-piece sum mod 3.
+- 0x430230, its floor and roof choices only. Each takes one map field and treats it as the walls do: negative draws
+  nothing, positive draws that part number as it is, and 0 calls 0x430120 with the cell's x and y and the area's seed
+  (the one the walls use) and draws `f000` to `f002` or `r000` to `r002`.
+- 0x430510 makes one pole for a corner given as x and y, from 0 to the map's width and height: whether it stands,
+  where, and its variant. It uses the same seed and the area's `floor.obj` row (column 7), then 0x430180 (read
+  before) to copy `p000` to `p002`.
+
+The exe keeps each cell's fields one place earlier than the map file does, so the routines' offsets are the file's
+fields less one. This was found from the walls: 0x430510 tests the exe's fields 8, 11, 14 and 17, which are the
+file's wall fields 9, 12, 15 and 18. The rule, with fields as Map layout numbers them:
+
+- **Floor.** Field 5 (VNDegen's floor field: −1 on 6,768 cells, 100 and 101 on 79 each, 0 on the rest). Where it is
+  0, the key is always 0x8F2E37AB, whatever column 7 says.
+- **Roof.** Field 1, 0 on every cell of every map. The key is 0x8F2E37AB where `floor.obj` column 7 isn't 0, and
+  0x0A0C246D where it is (dungeons 1, 2 and 9).
+- **Pole, where.** Corner (x, y) is the north-west corner of cell (x, y): the exe stands it at 8x − 4 east and
+  8y − 4 south of the map's origin, where cell (x, y)'s centre is at 8x and 8y, which is where VNDegen already draws
+  it. A pole stands when any wall side that ends at the corner has a field of 0 or more, among the up to four cells
+  around it: the north and west sides of the cell south-east of the corner, the north and east sides of the cell
+  south-west of it, the east and south sides of the cell north-west of it, and the south and west sides of the cell
+  north-east of it. Cells outside the map are skipped. Doorways (10), edge passages (20) and doors (100 and up) count
+  as walls here. VNDegen draws fewer: it skips edge passages and the walls of cells with no floor.
+- **Pole, which, as read.** The variant comes from the corner's own x and y through the same hash, with the key
+  0x8F2E37AB where column 7 isn't 0 and 0x0ABC0283 where it is. So with column 7 set, a corner gets the same number as
+  the cell whose north-west corner it is.
+- **Pole, which, as measured.** The PC doesn't follow the reading. A pole shows the variant of whichever of the cells
+  around its corner is nearest the party's cell (by the distance between cell centres), worked out with that
+  cell's x and y. The four corners of the party's own cell all show that cell's variant. So a corner's pole can look
+  different from the next cell. Nothing in the routines read explains this. Its cause is outside them (0x430510's
+  caller, which wasn't read, or the order or state the original draws in), so the measurement is stated as found and
+  VNDegen should follow it.
+
+Only two part sets have poles that differ: in `m070set` (the ice dungeon) `p001` and `p002` use the `w001` and
+`w002` textures, and in `m100set`, which no area uses, the same. In the other sets all three poles are one model
+with one texture, so any variant draws the same thing. The ice dungeon has column 7 set, so the measured pole rule
+was seen only under the shared key, and 0x0ABC0283 never shows. On the ice poles, `p000` and `p001` look almost the
+same (their textures differ little where the pole's faces map them), so the PC tells only `p002` from the other two.
+
+Nothing random or saved goes in. Floors and roofs are fixed per cell. Poles are fixed for a given party cell.
+
+Worked examples:
+
+- 千樹庭 `mp0101` (seed 0x010100, column 7 is 0), cell (4, 3). The sum before the key is 0x0001E104. Floor: with
+  0x8F2E37AB, 0x8F2FD6AF; the pieces are 15, 10, 214, 15, 2 and 143, 399 in all, remainder 0: `010f000`. Roof: with
+  0x0A0C246D, 0x0A0DC569; 9 + 6 + 197 + 13 + 0 + 10 = 235, remainder 1: `010r001`.
+- 炎山洞 `mp0202` (seed 0x020200, column 7 is 0), cell (5, 4). The sum is 0x00032205. Floor: 0x8F2D15AE;
+  14 + 10 + 21 + 13 + 2 + 143 = 203, remainder 2: `000f002`. Roof: 0x0A0F0668; 8 + 6 + 6 + 15 + 0 + 10 = 45,
+  remainder 0: `000r000`. Cell (6, 1)'s roof: 0x0002E206, then 0x0A0EC66B; 11 + 6 + 198 + 14 + 0 + 10 = 239,
+  remainder 2: `000r002`.
+- The ice dungeon's 二層 `mp0802` (seed 0x080200, column 7 is 1): floor and roof use the walls' key, so cell (2, 9)
+  draws `070f001` and `070r001`, like its walls `070w001`.
+- Poles in `mp0802`, the party standing on (11, 5), facing any way. The cell hashes are (11, 5) 2 (0x8F2435A0,
+  212), (12, 5) 1 (0x8F2415A7, 187), (11, 6) 0 (0x8F2415A0, 180) and (12, 7) 2 (0x8F2455A7, 251). Corner (12, 5): as
+  read, its own hash gives `p001`; the nearest cell around it is (11, 5), and the PC draws `p002`. Corner (11, 6):
+  as read `p000`; nearest cell (11, 5), PC `p002`. Corner (12, 7): as read `p002`; nearest cell (11, 6), 0, and
+  the PC draws one that isn't `p002`.
+
+Checked against the PC: new captures under Wine of 19 cells, four facings each (76 views), in the ice dungeon
+(`mp0802` to `mp0805`), 千樹庭 (`mp0101`, `mp0102`) and 炎山洞 (`mp0202` to `mp0204`). Each view was rendered by
+VNDegen with every part forced to each variant and with part ids, and each visible part was compared with the PC's
+frame. Two measures were needed. The earlier mean-difference classifier was biased by the light model; for example it
+picked `r001` in every ice view.
+
+- Poles, by high-pass correlation with a ±3 pixel search, kept where the best variant correlates at least 0.3, beats
+  the others by 0.1, and `p002` differs from the other two. Far parts that the PC doesn't draw at all fail the first
+  test. That leaves 65 poles on four ice floors, with no view disagreeing: the nearest-cell rule gives 65 of 65, the
+  corner's own hash as read 49 of 65, and always "not `p002`" 41 of 65. The 28 corners of the party's own cell match
+  that cell's variant 28 of 28 and their own hash 23 of 28.
+- Floors and roofs. Their variants differ in brightness and colour, not in pattern (high-pass correlation 0.99
+  between variants), so in each view one brightness ratio between the PC and VNDegen is fitted for all floors, and
+  one for all roofs. Each cell keeps the variants whose ratio fits within 0.03 of the best (in log terms), and a cell
+  counts only when that leaves out at least one variant and the best fit is within 0.05. In 千樹庭, `010f001` and
+  `010f002` can't be told apart, and in the ice set `070f000` to `002` not at all. Floors: 24 of 25 cells (千樹庭 9
+  of 10, 炎山洞 15 of 15), where chance gives 12.4. Roofs: 23 of 24 (千樹庭 6 of 7, 炎山洞 10 of 10, ice 7 of 7),
+  where chance gives 12.7. The two misses are single views in 千樹庭. Swapping the keys (0x0A0C246D for floors,
+  0x8F2E37AB for 千樹庭's and 炎山洞's roofs) fits 12 of 25 and 5 of 17.
 
 ## The original's save image, from diffs
 
