@@ -614,25 +614,41 @@ static void draw_message(SG *g, const char *text, int shown) {
     }
 }
 
-static void draw_choices(SG *g) {
-    SgaState *a = &g->interp.a;
+void sg_draw_choice_box(SG *g, char *const *items, int n, int cursor) {
     int maxW = 0;
-    for (int i = 0; i < a->choiceCount; i++) {
-        int w = font_width(g->font, kTextPx, a->choices[i]);
+    for (int i = 0; i < n; i++) {
+        int w = font_width(g->font, kTextPx, items[i]);
         if (w > maxW) maxW = w;
     }
-    int itemH = 50, w = maxW + 36, h = a->choiceCount * itemH + 12;
+    int itemH = 50, w = maxW + 36, h = n * itemH + 12;
     int x = (g->w - w) / 2, y = (g->h - h) / 2;
     const Res *res = NULL;
     Image *im = sga_default_window(g, &res);
     sga_window(g, im, res, x, y, w, h);
     const Res *sr = NULL;
     Image *sel = sga_selected_window(g, &sr);
-    for (int i = 0; i < a->choiceCount; i++) {
+    for (int i = 0; i < n; i++) {
         int iy = y + 6 + i * itemH;
-        if (i == a->choiceCursor) sga_window(g, sel, sr, x + 6, iy + 4, w - 12, itemH - 8);
-        font_draw(g->font, g->fb, g->w, g->h, x + 18, iy + 12, kTextPx, a->choices[i], 0xffffffffu);
+        if (i == cursor) sga_window(g, sel, sr, x + 6, iy + 4, w - 12, itemH - 8);
+        font_draw(g->font, g->fb, g->w, g->h, x + 18, iy + 12, kTextPx, items[i], 0xffffffffu);
     }
+}
+
+static void draw_choices(SG *g) {
+    SgaState *a = &g->interp.a;
+    sg_draw_choice_box(g, a->choices, a->choiceCount, a->choiceCursor);
+}
+
+void sg_draw_text_box(SG *g, const char *text, int pos) {
+    SgaState *a = &g->interp.a;
+    int cmd = a->msgCmd, msgPos = a->msgPos, state = g->interp.state;
+    a->msgCmd = CMD_MESSAGE;
+    a->msgPos = pos;
+    g->interp.state = ST_MESSAGE;
+    draw_message(g, text, 1 << 30);
+    a->msgCmd = cmd;
+    a->msgPos = msgPos;
+    g->interp.state = state;
 }
 
 void interp_draw(SG *g) {

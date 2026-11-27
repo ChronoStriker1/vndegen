@@ -15,7 +15,7 @@ static int failures, checks;
         }                                                                                                              \
     } while (0)
 
-enum { VK_UP = 0x26, VK_OK = 0x0d };
+enum { VK_UP = 0x26, VK_DOWN = 0x28, VK_OK = 0x0d, VK_CANCEL = 0x1b };
 
 static SG *open_game(const char *dir) {
     VNSmileGameConfig cfg = {.gameDir = dir, .saveDir = "/nonexistent-sgtest-l", .audioRate = 44100};
@@ -47,6 +47,11 @@ static SG *new_game(const char *dir) {
     return g;
 }
 
+static bool showing(SG *g, const char *text) {
+    Interp *ip = &g->interp;
+    return ip->active && ip->state == 1 && ip->page < ip->pageCount && strstr(ip->pages[ip->page], text);
+}
+
 static void region(SG *g, int x0, int y0, int w, int h, double *r, double *gr, double *b) {
     double sr = 0, sg = 0, sb = 0;
     for (int y = y0; y < y0 + h; y++)
@@ -56,6 +61,68 @@ static void region(SG *g, int x0, int y0, int w, int h, double *r, double *gr, d
         }
     double n = (double)w * h;
     *r = sr / n, *gr = sg / n, *b = sb / n;
+}
+
+static double luma(SG *g) {
+    double r, gg, b;
+    region(g, 0, 0, g->w, g->h, &r, &gg, &b);
+    return (r + gg + b) / 3;
+}
+
+static void to_innkeeper(SG *g) {
+    sg_debug_warp((VNSmileGame *)g, "宿屋", 15, 15, 0);
+    run(g, 1500);
+    press(g, VK_OK);
+    for (int i = 0; i < 20 && !menu_active(g); i++) press(g, VK_OK), run(g, 200);
+    run(g, 300);
+}
+
+static void test_inn_stay(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    Party *p = &g->b.party;
+    p->money = 77;
+    g->vars[8] = 1;
+    p->members[0].hp = 1;
+    to_innkeeper(g);
+    CHECK(menu_page(g) && strcmp(menu_page(g), "inn") == 0);
+    double before = luma(g);
+    press(g, VK_OK);
+    CHECK(p->money == 27);
+    run(g, 3000);
+    CHECK(luma(g) < 2.0 && before > 60.0);
+    CHECK(menu_active(g));
+    run(g, 4500);
+    CHECK(luma(g) < 2.0);
+    run(g, 3500);
+    CHECK(!menu_active(g));
+    run(g, 300);
+    CHECK(showing(g, "おはようございます"));
+    CHECK(p->members[0].hp == member_max_hp(&g->b.tables, &p->members[0]));
+    CHECK(g->field.player.dir == 2);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
+static void test_inn_no_money(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) {
+        CHECK(false);
+        return;
+    }
+    Party *p = &g->b.party;
+    p->money = 27;
+    g->vars[8] = 1;
+    to_innkeeper(g);
+    press(g, VK_OK);
+    run(g, 500);
+    CHECK(p->money == 27 && menu_active(g));
+    press(g, VK_OK);
+    run(g, 600);
+    CHECK(showing(g, "そうですか"));
+    vnsmilegame_close((VNSmileGame *)g);
 }
 
 static void test_inn_bed(const char *dir) {
@@ -77,6 +144,8 @@ static void test_inn_bed(const char *dir) {
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
+        test_inn_stay(colette);
+        test_inn_no_money(colette);
         test_inn_bed(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);

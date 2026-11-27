@@ -211,6 +211,8 @@ static bool res_loops(SG *g, const Res *res) {
     return r.bad || loop != 0;
 }
 
+static Voice *open_path(SG *g, Mixer *m, const char *path, Guid id, int ch, int volume, int tempo, bool loop);
+
 static Voice *open_voice(SG *g, Mixer *m, Guid id, int ch, int volume, int tempo) {
     if (guid_zero(id)) return NULL;
     const Res *res = res_find(&g->res, id);
@@ -220,10 +222,14 @@ static Voice *open_voice(SG *g, Mixer *m, Guid id, int ch, int volume, int tempo
         sg_log(g, "sound %s is not a sound resource", s);
         return NULL;
     }
+    return open_path(g, m, res->path, id, ch, volume, tempo, ch != SND_SE && ch != SND_ME && res_loops(g, res));
+}
+
+static Voice *open_path(SG *g, Mixer *m, const char *path, Guid id, int ch, int volume, int tempo, bool loop) {
     size_t n = 0;
-    u8 *d = pack_read(&g->data.pack, res->path, &n);
+    u8 *d = pack_read(&g->data.pack, path, &n);
     if (!d) {
-        sg_log(g, "sound missing: %s", res->path);
+        sg_log(g, "sound missing: %s", path);
         return NULL;
     }
     Voice *v = sg_alloc(sizeof *v);
@@ -239,16 +245,16 @@ static Voice *open_voice(SG *g, Mixer *m, Guid id, int ch, int volume, int tempo
         if (len) v->loopEnd = v->loopStart + len;
     }
     if (!v->ogg) {
-        sg_log(g, "can't decode sound %s", res->path);
+        sg_log(g, "can't decode sound %s", path);
         voice_free(v);
         return NULL;
     }
-    v->loop = ch != SND_SE && ch != SND_ME && res_loops(g, res);
+    v->loop = loop;
     if (tempo <= 0) tempo = 100;
     v->step = (double)v->rate / (double)m->rate * (double)tempo / 100.0;
     if (volume < 0) volume = 0;
     v->gain = v->target = (float)volume / 100.0f;
-    sg_log(g, "sound %s %s vol %d tempo %d%s", ch == SND_BGM ? "bgm" : ch == SND_BGS ? "bgs" : ch == SND_ME ? "me" : "se", res->path, volume, tempo,
+    sg_log(g, "sound %s %s vol %d tempo %d%s", ch == SND_BGM ? "bgm" : ch == SND_BGS ? "bgs" : ch == SND_ME ? "me" : "se", path, volume, tempo,
            v->loopEnd ? " loop points" : "");
     return v;
 }
@@ -322,6 +328,19 @@ void snd_me(SG *g, Guid id, int volume, int tempo) {
     voice_free(e->mix->v[V_ME]);
     e->mix->v[V_ME] = v;
     pthread_mutex_unlock(&e->mix->lock);
+}
+
+u32 sg_me_file(SG *g, const char *path, int volume) {
+    SgE *e = &g->e;
+    if (!e->mix) return 0;
+    Voice *v = open_path(g, e->mix, path, (Guid){{0}}, SND_ME, volume, 100, false);
+    if (!v) return 0;
+    u32 ms = (u32)((double)stb_vorbis_stream_length_in_samples(v->ogg) * 1000.0 / (double)v->rate);
+    pthread_mutex_lock(&e->mix->lock);
+    voice_free(e->mix->v[V_ME]);
+    e->mix->v[V_ME] = v;
+    pthread_mutex_unlock(&e->mix->lock);
+    return ms;
 }
 
 void snd_se(SG *g, Guid id, int volume, int tempo) {
