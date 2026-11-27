@@ -108,7 +108,7 @@ void battle_encounter_tick(SG *g) {
     if (cx == e->cellX && cz == e->cellZ) return;
     e->cellX = cx;
     e->cellZ = cz;
-    if (!e->valid || g->interp.active || menu_active(g)) return;
+    if (!e->valid || g->interp.active || menu_active(g) || !sgi_encounters_on(g)) return;
     if (!battle_encounter_roll(e)) return;
     BattleSetup s;
     battle_encounter_setup(e, &s);

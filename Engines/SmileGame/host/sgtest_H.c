@@ -553,6 +553,15 @@ static void test_cave(const char *dir, const char *tmp) {
     run(g, 300);
     interp_free(&g->interp);
     battle_seed(g, 3);
+    CmdArg off = {.kind = ARG_INT, .i = 1}, on = {.kind = ARG_INT, .i = 0};
+    Cmd gate = {.type = 66, .args = &off, .argCount = 1};
+    bool busy = false;
+    CHECK(sgi_exec(g, &gate, &busy) && !sgi_encounters_on(g));
+    for (int k = 0; k < 24; k++) walk_to(g, 11, k % 2 ? 19 : 16, false);
+    CHECK(!sg_battle_active(g));
+    gate.args = &on;
+    CHECK(sgi_exec(g, &gate, &busy) && sgi_encounters_on(g));
+    walk_to(g, 11, 19, false);
     int steps = 0;
     for (int k = 0; k < 40 && !sg_battle_active(g); k++) {
         walk_to(g, 11, k % 2 ? 19 : 16, false);
