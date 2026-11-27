@@ -266,26 +266,31 @@ static void cell_button(IK *t, u32 id, int type, int lay, int x, int y, bool pla
     b->shown = true;
 }
 
-static const char *name_arg(const u8 *a, int n) {
-    static char buf[64];
+typedef struct {
+    char s[64];
+} Name;
+
+static Name name_arg(const u8 *a, int n) {
+    Name r;
     int k = 0;
     while (k < n && k < 63 && a[k]) {
-        buf[k] = (char)a[k];
+        r.s[k] = (char)a[k];
         k++;
     }
-    buf[k] = 0;
-    return buf;
+    r.s[k] = 0;
+    return r;
 }
 
-static const char *bgm_name(IK *t, const u8 *a, int n) {
-    const char *f = name_arg(a, n < 12 ? n : 12), *p = strchr(f, '%');
+static Name bgm_name(IK *t, const u8 *a, int n) {
+    Name f = name_arg(a, n < 12 ? n : 12);
+    const char *p = strchr(f.s, '%');
     if (!p) return f;
     const char *q = p + 1;
     int w = 0;
     while (*q >= '0' && *q <= '9') w = w * 10 + (*q++ - '0');
     if (!*q) return f;
-    static char out[64];
-    snprintf(out, sizeof out, "%.*s%0*d%s", (int)(p - f), f, w, t->varCount ? (int)t->vars[0] : 0, q + 1);
+    Name out;
+    snprintf(out.s, sizeof out.s, "%.*s%0*d%s", (int)(p - f.s), f.s, w, t->varCount ? (int)t->vars[0] : 0, q + 1);
     return out;
 }
 
@@ -294,13 +299,13 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
     switch (op) {
     case 0x0000: t->wait = W_QUIT; break;
     case 0x0001:
-        vm_start(t, name_arg(a, n));
+        vm_start(t, name_arg(a, n).s);
         if (!t->sp) {
             t->resumeSc = t->sc;
             t->resumeLabel = -1;
         }
         break;
-    case 0x0002: push(t); vm_start(t, name_arg(a, n)); break;
+    case 0x0002: push(t); vm_start(t, name_arg(a, n).s); break;
     case 0x0003: pop(t); break;
     case 0x0004: goto_label(t, rd16(a)); break;
     case 0x0005: push(t); goto_label(t, rd16(a)); break;
@@ -325,7 +330,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         t->waitUntil = t->now + ik_value(t, rd32(a));
         break;
     case 0x0100: resize(t, 1, rd16(a)); break;
-    case 0x0101: image_load(t, rd16(a), name_arg(a + 2, n - 2)); break;
+    case 0x0101: image_load(t, rd16(a), name_arg(a + 2, n - 2).s); break;
     case 0x0108: {
         int slot = (int)ik_value(t, rd32(a)), ts = (int)ik_value(t, rd32(a + 4));
         if (ts >= 0 && ts < t->textCount && t->texts[ts]) image_load(t, slot, t->texts[ts]);
@@ -562,13 +567,13 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         break;
     case 0x000c: break;
     case 0x0500: break;
-    case 0x0501: snd_se_load(t, (int)ik_value(t, rd32(a)), name_arg(a + 4, n - 4)); break;
+    case 0x0501: snd_se_load(t, (int)ik_value(t, rd32(a)), name_arg(a + 4, n - 4).s); break;
     case 0x0502: snd_se_stop(t, (int)ik_value(t, rd32(a))); break;
     case 0x0503: snd_se_play(t, (int)ik_value(t, rd32(a)), n >= 8 && ik_value(t, rd32(a + 4)) != 0); break;
     case 0x050b:
         if (n >= 16) {
             int slot = (int)ik_value(t, rd32(a));
-            snd_se_load(t, slot, name_arg(a + 4, 12));
+            snd_se_load(t, slot, name_arg(a + 4, 12).s);
             snd_se_play(t, slot, n >= 20 && ik_value(t, rd32(a + 16)) != 0);
         }
         break;
@@ -579,10 +584,10 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         if (v) *v = 0;
         break;
     }
-    case 0x0506: snd_voice(t, name_arg(a, n)); break;
+    case 0x0506: snd_voice(t, name_arg(a, n).s); break;
     case 0x0507: snd_voice_stop(t); break;
     case 0x0508: t->wait = W_VOICE; break;
-    case 0x0600: snd_bgm(t, bgm_name(t, a, n), n >= 16 && ik_value(t, rd32(a + 12)) != 0); break;
+    case 0x0600: snd_bgm(t, bgm_name(t, a, n).s, n >= 16 && ik_value(t, rd32(a + 12)) != 0); break;
     case 0x0602: snd_bgm_fade(t, (int)ik_value(t, rd32(a))); break;
     case 0x020b:
         if ((l = layer(t, rd32(a)))) {
@@ -700,7 +705,7 @@ static void exec(IK *t, u16 op, const u8 *a, int n) {
         automap_exec(t, op, a, n);
         break;
     case 0x0e00:
-        if (n >= 40 && movie_play(t, name_arg(a + 4, 12), (int)ik_value(t, rd32(a + 16)), (int)ik_value(t, rd32(a + 20)),
+        if (n >= 40 && movie_play(t, name_arg(a + 4, 12).s, (int)ik_value(t, rd32(a + 16)), (int)ik_value(t, rd32(a + 20)),
                                   (int)ik_value(t, rd32(a + 24)), (int)ik_value(t, rd32(a + 28)), ik_value(t, rd32(a + 36)) != 0))
             t->wait = W_MOVIE;
         break;
