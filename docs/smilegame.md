@@ -23,8 +23,11 @@ Both games use the same data format.
 - The title screen: picture, overlay, the three items as a column or a row, the cursor. New game only.
 - Maps: chip terrain in 3D with the map's light colour, map objects and event graphics from FBX, 2D character sheets
   drawn upright, the player walking cell by cell (stairs let it change height), talking to the event in front.
-- Events: sheets chosen by switch, local switch and variable conditions; autorun scripts on entering a map; messages
-  with pages, scrolling text, fades, variables, moving to another map.
+- Events: sheets chosen by every condition kind the games use; talk, touch, autorun and repeating triggers; messages
+  with faces, choices and branches, captions and scrolling text, pictures, fades and tint, variables, switches, items,
+  money, the party, moving and turning the player and events, event graphics, moving to another map. Colette plays from
+  the title to the bridge guard who opens the way to its first battle, and Sacred from the title to the guard at (35,30)
+  in the castle.
 - A software rasterizer draws the 3D scene into the same pixel buffer the other runtimes hand to the frame host.
 
 ## The Linux host
@@ -36,11 +39,19 @@ Both games use the same data format.
 - `sgplay <game>`: an SDL window with the keyboard (arrows, Enter or Z, Esc or X, Shift).
 - `sgtest`: the format reader tests. With `SG_COLETTE` and `SG_SACRED` set to the game folders it also checks values
   read from the games' files.
+- `sgtest_A`: the event command tests; with the game folders set it plays both openings (about five minutes).
+  `sgtest_A drive <game> <out> ...` plays a scripted path: `until:field|choice|message`, `upto:<text>`, `pick:N`,
+  `to:x,z` (walks there), `talk:U|D|L|R`, `hold:U,ms`, `ok`, `wait:ms`, `shot:name`, `where:tag`.
 
 ## Known limits
 
-- No sound, menus, battles, saves, choices or pictures over the map yet; unknown commands are skipped and logged.
+- No sound, menus, battles, saves yet. Their commands (BGM, sounds, battles, shops, inns, party recovery) are decoded and
+  logged; a battle counts as won and an inn as declined.
+- The camera command (53) is decoded and logged but not applied; effects (27) and balloons (45) are not drawn, though
+  balloons take their time.
+- Events never wander or chase the player; the movement type in their sheets is read but not used.
+- Command 10's and 16's codes 4 to 7, 11's one-argument form, and 15, 55, 56, 58, 66, 68, 70, 76 and 77 are logged and
+  skipped; none is on either opening path.
 - Shadows and the sky are not drawn; skinned characters stand in their bind pose.
 - Stairs are drawn as plain columns, not as steps.
 - The camera is fixed at one angle and distance close to the player's default; events that move the camera are skipped.
-- The message window's fill differs between the two games on the PC and is drawn the same in both.

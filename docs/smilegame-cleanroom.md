@@ -136,14 +136,111 @@ byte with this rule.
 | 25 | show picture | number, picture name, … |
 | 29 | message | text, window, flag |
 | 30 | choices | count, the choices, flag |
-| 31 | set variable | index, operation, kind, value, flag |
+| 31 | set variable | target, index, operand kind, value, operation |
 | 32 | set switch | index, value |
-| 43 | message with face | text, window, flag, face |
-| 44 | scrolling text | text, speed, flag |
+| 43 | message with faces | text, position, flag, left face, expression, right face, expression, speaker |
+| 44 | screen caption | text, position, scroll flag (or text, position, picture, scroll flag) |
 | 51 | screen on or off | 1 black, 0 shown |
 | 60 | fade | ms, 0 in or 1 out, wait |
 
-A message page ends at a blank line.
+A message page ends at a blank line or after three lines. Round 2's section below has the rest of the commands.
+
+## Event commands (round 2, commands)
+
+Everything here was read from the two games' scripts with separate tools and checked against the original player under
+Wine, playing Colette from the title to the bridge guard and Sacred from the title to the guard at (35,30).
+
+### Event sheets in full
+
+Each condition is eight `int32`: kind, comparison, index, value, and a GUID in the last four.
+
+| Kind | Tests |
+|---|---|
+| 0 | switch `index` (65536 up: the event's local switch); `value` 0 means on, 1 off |
+| 1 | variable `index` against `value` |
+| 2 | money against `value` |
+| 3, 5 | the count of the item named by the GUID against `value` (both kinds appear with items) |
+| 4 | the hero named by the GUID is in the party |
+
+Comparisons: 0 equal, 1 not equal, 2 at least, 3 at most, 4 more than, 5 less than. Colette's throne door uses 2 and 3
+with its key (the PC opens it once the key is held), its castle stairs use 3 and 2 with variable 0.
+
+The 22 bytes after the graphic GUID are `int32` direction, `int32` fixed direction, a byte that is 1 on sheets with a
+graphic, an `int32` from -3 to 3, a byte that is 1 on map objects such as doors and chests, `int32` movement (0 still,
+1 random walk, 2 toward the player) and `int32` speed from -3 to 3. Only the direction is used so far: an event whose
+direction is 1 and not fixed turns to the player when talked to and turns back afterwards (Colette's aide does, the
+bridge guard with direction 3 does not).
+
+### Triggers
+
+The script's trigger: 1 runs once when its sheet becomes active (on entering the map, or later when a switch changes),
+2 on talking from the cell in front, 3 when the player steps onto the event's cell or walks into it, 4 when the event
+touches the player (Colette's roaming monsters), 5 runs again each time it ends while its sheet stays active (Colette's
+dungeon keeps offering its three choices until one leaves), 6 runs alongside play (one Sacred event). Talking reaches
+one cell further when the cell in front is higher than the player's, as with Sacred's queen behind the dais step.
+
+### Blocks
+
+Branch commands open a block: the commands after them sit one nesting level deeper. Type 71 at the header's level
+starts the else part and 72 ends the block. Choices (30) put the first choice's commands right after the header and
+each later choice after a 74 whose argument is its number. Branches: 46 switch (index, 0 on or 1 off), 47 variable
+(index, value, comparison 0 equal), 48 item (item GUID, count, a flag, 1 for at least), 50 hero in party (hero GUID,
+0 in), 65 battle (its first part runs on a win, the else part on a loss), 37 shop and 38 inn.
+
+### Commands
+
+| Type | Command | Arguments | What the PC does |
+|---|---|---|---|
+| 10 | turn event | direction code | turns the running event |
+| 11 | move event | direction code, cells, 0, 1, a flag, no-wait flag | walks the running event cell by cell |
+| 14 | event graphic | graphic GUID, motion name | changes the running event's graphic until its sheet changes |
+| 16 | turn player | direction code | |
+| 17 | move player | as 11 | Colette's stairs push the player back up two cells |
+| 20 | move to map | map GUID (zero: this map), x, z, facing | facing 0 keeps, 1 up, 2 down, 3 left, 4 right |
+| 23 | erase picture | number, fade flag | |
+| 24 | change picture | number, opacity %, ms, … | |
+| 25 | show picture | number, picture GUID, opacity %, colour (-1 plain), 1, x, y, -1, fade flag | full-screen pictures centred |
+| 27 | effect | 0 the event or 1 the player, effect GUID | effect from `Effect.sgr` |
+| 29 | message | text, position (0 top, 1 middle, 2 bottom), flag | dark `default` window, white text |
+| 31 | variable | target 0, index, operand 0 constant or 1 variable, value, operation 0 set, 1 add, 2 subtract | |
+| 32 | switch | index, 0 on or 1 off | |
+| 33 | item | item GUID, 0, count, 1 add or 2 remove | |
+| 34 | money | 0, amount, 1 add or 2 remove | |
+| 42 | party | hero GUID, 0 join or 1 leave | the first member is the player's graphic |
+| 43 | message with faces | see above | light `message` window (the settings' window), black text |
+| 44 | screen caption | text, position, scroll flag | static captions are centred with an outline and wait for a key; scrolling ones rise at 30 pixels a second |
+| 45 | balloon | 0 the event or 1 the player, effect GUID | about a second each, one after another |
+| 51 | screen | 1 black, 0 shown | |
+| 52 | hide event | 1 hide, 0 show | Colette's monsters hide on a win |
+| 53 | camera | mode, then values in thousandths: mode 0 pitch, yaw, distance, field of view, ms, wait; mode 3 adds a target x, y, z first | |
+| 59 | recover party | none | "全員のHPとMPが回復した" follows it |
+| 60 | fade | ms, 1 out or 0 in, wait | covers the map and pictures, not windows |
+| 61 | screen tint | ms, ARGB colour, wait | |
+| 62 | shake | ms, strength, wait | |
+| 63 | flash | ms | |
+| 69 | hero graphic | hero GUID, face folder, graphic GUID (zero: the hero's own), motion | applies when the hero leads the party |
+| 21, 22, 64 | BGM, sound, ambient sound | GUID, volume, tempo, … | |
+
+Direction codes for 10, 11, 16 and 17 are 0 up, 1 down, 2 left, 3 right; Sacred's castle scene ends with the player and
+the soldier where these codes put them. 10 and 16 also take 4 to 7, and 11 a one-argument form; their meaning is not
+known yet.
+
+### Messages
+
+The window is 720 by 160 pixels at x 120; position 2 puts it at y 351, position 0 at y 33. Text is the game's font at
+24 pixels, 36 pixels a line, three lines a page, from 18 pixels in and 19 down. Lines break at 684 pixels, and a closing
+mark or small kana never starts a line: Colette's aide's "…くださいっ。" breaks before "っ". 43's faces are the face
+folder's `_normal`, `_smile`, `_anger` and `_sorrow` pictures for expressions 0 to 3 (a folder with one picture uses it
+for all), drawn at the bottom-left and bottom-right corners behind the window; when both sides have a face, the one
+not speaking is darker. A choice keeps the message before it on screen; choices sit in a centred `default` window with
+a `default_selected` bar under the cursor.
+
+### Map object collision
+
+A map object resource ends with its collision list: `int32` 32, `int16` count, and per cell `int16` x and z (32 is the
+object's own cell), `int16` height and `int16` 0 or 1, then 4 bytes. The height is added to the map's height under the
+object, turned with the object's direction. The player walks only between cells of equal height (or onto stairs), so
+Colette's town bridges (height 1 over water at height 1) join the grass at height 2, and trees and houses block.
 
 ## Saves
 
