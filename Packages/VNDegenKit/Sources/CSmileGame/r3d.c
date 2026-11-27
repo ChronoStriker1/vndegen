@@ -17,7 +17,7 @@ void r3_init(R3 *r, int w, int h) {
     r->x = sg_alloc(sizeof *r->x);
     for (int i = 0; i < 3; i++) r->x->amb[i] = 1.0f;
     long cores = sysconf(_SC_NPROCESSORS_ONLN);
-    r3_threads(r, cores >= 4 ? 4 : (int)cores);
+    r3_threads(r, cores >= 6 ? 6 : (int)cores);
 }
 
 void r3_free(R3 *r) {
@@ -117,6 +117,7 @@ typedef struct RCmd {
     Scr s[3];
     const Image *tex;
     float bias;
+    int y0, y1;
     u8 alphaTest, mode, flags, na;
 } RCmd;
 
@@ -138,22 +139,40 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1);
 static void run_band(R3 *r, int band, int bands) {
     Pool *pl = r->x->pool;
     int y0 = r->h * band / bands, y1 = r->h * (band + 1) / bands;
-    for (int i = 0; i < pl->qn; i++) raster(r, &pl->q[i], y0, y1);
+    for (int i = 0; i < pl->qn; i++) {
+        const RCmd *c = &pl->q[i];
+        if (c->y1 < y0 || c->y0 >= y1) continue;
+        raster(r, c, y0, y1);
+    }
 }
 
+static inline float mn3(float a, float b, float c) {
+    float m = a < b ? a : b;
+    return m < c ? m : c;
+}
+
+static inline float mx3(float a, float b, float c) {
+    float m = a > b ? a : b;
+    return m > c ? m : c;
+}
+
+typedef struct WorkerArg {
+    Pool *pl;
+    int index;
+} WorkerArg;
+
 static void *worker(void *arg) {
-    Pool *pl = arg;
+    WorkerArg wa = *(WorkerArg *)arg;
+    free(arg);
+    Pool *pl = wa.pl;
     unsigned seen = 0;
-    int index = -1;
     pthread_mutex_lock(&pl->mu);
-    for (int i = 0; i < pl->count; i++)
-        if (pthread_equal(pl->thr[i], pthread_self())) index = i;
     for (;;) {
         while (pl->gen == seen && !pl->quit) pthread_cond_wait(&pl->go, &pl->mu);
         if (pl->quit) break;
         seen = pl->gen;
         pthread_mutex_unlock(&pl->mu);
-        run_band(pl->r, index + 1, pl->count + 1);
+        run_band(pl->r, wa.index, pl->count + 1);
         pthread_mutex_lock(&pl->mu);
         if (--pl->pending == 0) pthread_cond_signal(&pl->done);
     }
@@ -162,7 +181,8 @@ static void *worker(void *arg) {
 }
 
 void r3_threads(R3 *r, int n) {
-    if (r->x->pool || n <= 1) return;
+    pool_free(r);
+    if (n <= 1) return;
     if (n > 9) n = 9;
     Pool *pl = sg_alloc(sizeof *pl);
     pl->r = r;
@@ -171,8 +191,13 @@ void r3_threads(R3 *r, int n) {
     pthread_cond_init(&pl->done, NULL);
     r->x->pool = pl;
     pthread_mutex_lock(&pl->mu);
-    for (int i = 0; i < n - 1; i++)
-        if (pthread_create(&pl->thr[pl->count], NULL, worker, pl) == 0) pl->count++;
+    for (int i = 0; i < n - 1; i++) {
+        WorkerArg *wa = sg_alloc(sizeof *wa);
+        wa->pl = pl;
+        wa->index = pl->count + 1;
+        if (pthread_create(&pl->thr[pl->count], NULL, worker, wa) == 0) pl->count++;
+        else free(wa);
+    }
     pthread_mutex_unlock(&pl->mu);
 }
 
@@ -214,7 +239,10 @@ static void submit(R3 *r, const Scr *a, const Scr *b, const Scr *c, const Tri *t
         float tanA = sqrtf(fmaxf(0.0f, 1.0f - sh * sh)) / sh;
         bias += fminf(tanA, 8.0f) * 1.5f / r->x->shadow.scale;
     }
-    RCmd cmd = {{*a, *b, *c}, t->tex, bias, t->alphaTest, mode, flags, (u8)na};
+    float miny = mn3(a->y, b->y, c->y), maxy = mx3(a->y, b->y, c->y);
+    float minx = mn3(a->x, b->x, c->x), maxx = mx3(a->x, b->x, c->x);
+    if (maxy < 0 || miny > (float)r->h || maxx < 0 || minx > (float)r->w) return;
+    RCmd cmd = {{*a, *b, *c}, t->tex, bias, (int)miny - 1, (int)maxy + 1, t->alphaTest, mode, flags, (u8)na};
     Pool *pl = r->x->pool;
     if (!pl) {
         raster(r, &cmd, 0, r->h);
@@ -234,10 +262,11 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
     float x10 = p1->x - p0->x, y10 = p1->y - p0->y, x20 = p2->x - p0->x, y20 = p2->y - p0->y;
     float det = x10 * y20 - x20 * y10;
     if (fabsf(det) < 1e-6f) return;
-    float minx = fminf(p0->x, fminf(p1->x, p2->x)), maxx = fmaxf(p0->x, fmaxf(p1->x, p2->x));
-    float miny = fminf(p0->y, fminf(p1->y, p2->y)), maxy = fmaxf(p0->y, fmaxf(p1->y, p2->y));
-    int y0 = (int)fmaxf((float)band0, ceilf(miny - 0.5f)), y1 = (int)fminf((float)band1 - 1, floorf(maxy - 0.5f));
-    if (y0 > y1 || maxx < 0 || minx > (float)r->w) return;
+    float miny = mn3(p0->y, p1->y, p2->y), maxy = mx3(p0->y, p1->y, p2->y);
+    int y0 = (int)ceilf(miny - 0.5f), y1 = (int)floorf(maxy - 0.5f);
+    if (y0 < band0) y0 = band0;
+    if (y1 > band1 - 1) y1 = band1 - 1;
+    if (y0 > y1) return;
     float inv = 1.0f / det;
     float dx[8] = {0}, dy[8] = {0}, base[8] = {0};
     for (int i = 0; i < na; i++) {
@@ -266,11 +295,19 @@ static void raster(R3 *r, const RCmd *cmd, int band0, int band1) {
             const Scr *a = v[e], *b = v[(e + 1) % 3];
             float ex = b->x - a->x, ey = b->y - a->y;
             float c0 = (ex * (py - a->y) + ey * a->x) * sgn, cx = -ey * sgn;
-            if (cx > 0) xl = fmaxf(xl, -c0 / cx);
-            else if (cx < 0) xr = fminf(xr, -c0 / cx);
-            else if (c0 < 0) xr = -1e30f;
+            if (cx > 0) {
+                float q = -c0 / cx;
+                if (q > xl) xl = q;
+            } else if (cx < 0) {
+                float q = -c0 / cx;
+                if (q < xr) xr = q;
+            } else if (c0 < 0) {
+                xr = -1e30f;
+            }
         }
-        int xa = (int)fmaxf(0, ceilf(xl - 0.5f)), xb = (int)fminf((float)r->w - 1, ceilf(xr - 0.5f) - 1);
+        if (xl < 0) xl = 0;
+        if (xr > (float)r->w) xr = (float)r->w;
+        int xa = (int)ceilf(xl - 0.5f), xb = (int)ceilf(xr - 0.5f) - 1;
         if (xa > xb) continue;
         float pxa = (float)xa + 0.5f;
         float at[8] = {0};

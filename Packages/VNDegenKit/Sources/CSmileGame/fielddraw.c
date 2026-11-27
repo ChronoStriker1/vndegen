@@ -424,7 +424,7 @@ static void add_model(Build *b, Model *mdl, float bx, float by, float bz, int di
         }
         u8 mode = t.mode ? t.mode : t.modulate ? TRI_MODULATE : TRI_OPAQUE;
         t.mode = mode;
-        if (mode == TRI_OPAQUE) t.flags |= TF_LIT | TF_SHADOW | TF_CAST;
+        if (mode == TRI_OPAQUE) t.flags |= TF_LIT | TF_SHADOW | TF_CAST | TF_CULL;
         mesh_add(mode == TRI_OPAQUE && !(t.flags & TF_NOZWRITE) ? b->op : b->al, &t);
     }
 }
@@ -911,6 +911,7 @@ void field_draw(SG *g) {
         if (f->npcs[i].visible && !f->npcs[i].model) draw_actor(g, &f->npcs[i]);
     if (f->player.visible && !f->player.model) draw_actor(g, &f->player);
     free(order);
+    v->stats.submitMs = now_ms() - t0;
     r3_flush(&g->r3);
     v->stats.drawMs = now_ms() - t0;
     v->stats.tris = tris;

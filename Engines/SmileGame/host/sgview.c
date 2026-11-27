@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     int frames = argc > 7 ? atoi(argv[7]) : 1;
     int cap = 1 << 16, n = 0;
     double *times = calloc((size_t)cap, sizeof(double));
-    double maxDraw = 0;
+    double maxDraw = 0, sumSubmit = 0, sumDraw = 0;
     int maxTris = 0;
     const FrameStats *st = sg_debug_stats(vg);
     for (int i = 8; i < argc; i++) {
@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
             p.pitch = d, p.yaw = e, p.distance = f, p.fov = h, p.follow = false;
             sg_camera_to((SG *)vg, &p, 0);
         } else if (sscanf(argv[i], "hero:%127s", name) == 1) sg_debug_player(vg, name);
+        else if (sscanf(argv[i], "threads:%d", &k) == 1) r3_threads(&((SG *)vg)->r3, k);
         else if (sscanf(argv[i], "pose:%f,%f,%f,%f", &a, &b, &c, &d) == 4) sg_debug_pose(vg, a, b, c, d);
         else if (sscanf(argv[i], "cal:%f,%f,%f", &a, &b, &c) == 3) sg_debug_pose(vg, -1000, a, b, c);
         else if (sscanf(argv[i], "hold:%i,%d", &k, &ms) == 2) {
@@ -71,6 +72,8 @@ int main(int argc, char **argv) {
         if (n < cap) times[n++] = now_ms() - t0;
         if (st->drawMs > maxDraw) maxDraw = st->drawMs;
         if (st->tris > maxTris) maxTris = st->tris;
+        sumSubmit += st->submitMs;
+        sumDraw += st->drawMs;
     }
     double total = 0;
     for (int i = 0; i < n; i++) total += times[i];
@@ -81,6 +84,7 @@ int main(int argc, char **argv) {
             times[j - 1] = t;
         }
     int p99 = n > 0 ? (n * 99) / 100 : 0;
+    if (frames > 0) printf("still frames: draw %.2f ms of which transform and submit %.2f ms\n", sumDraw / frames, sumSubmit / frames);
     printf("frames %d avg %.2f ms p99 %.2f ms worst %.2f ms max draw %.2f ms max tris %d last tris %d chunks %d/%d\n", n, n ? total / n : 0, n ? times[p99 < n ? p99 : n - 1] : 0,
            n ? times[n - 1] : 0, maxDraw, maxTris, st->tris, st->chunksDrawn, st->chunksTotal);
     free(times);

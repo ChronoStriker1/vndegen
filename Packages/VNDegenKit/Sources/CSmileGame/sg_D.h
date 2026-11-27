@@ -61,7 +61,7 @@ typedef struct ShadowMap {
 } ShadowMap;
 
 typedef struct FrameStats {
-    double drawMs;
+    double drawMs, submitMs;
     int tris, chunksDrawn, chunksTotal;
 } FrameStats;
 
