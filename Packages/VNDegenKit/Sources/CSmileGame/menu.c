@@ -289,6 +289,7 @@ static int guide_item(SG *g, Menu *m, int x, int c1, int r1, int c2, int r2, con
 }
 
 static void guide(SG *g, Menu *m, bool status) {
+    if (m->mode == MENU_TITLE) return;
     const char *labels[3] = {status ? MT(g, MT_CHOOSE_CHAR) : MT(g, MT_CURSOR), status ? MT(g, MT_CLOSE) : MT(g, MT_DECIDE),
                              T(g)->text.shop[SHOP_QUIT] ? T(g)->text.shop[SHOP_QUIT] : ""};
     static const int icons[3][4] = {{0, 3, 0, 0}, {1, 3, 2, 0}, {2, 3, 1, 0}};
