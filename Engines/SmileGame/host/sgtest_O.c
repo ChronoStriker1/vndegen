@@ -92,11 +92,29 @@ static void test_water_blocks_player(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static void test_fire_particles(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    warp(g, "ゴーレム洞窟Ｂ01Ｆ", 23, 5, 3);
+    for (int i = 0; i < 10 && strcmp(vnsmilegame_scene((VNSmileGame *)g), "field"); i++) press(g, VK_OK, 48);
+    run(g, 1000);
+    int fire = 0;
+    for (int y = 330; y < 470; y++)
+        for (int x = 410; x < 550; x++) {
+            int r, gr, b;
+            rgb(g, x, y, &r, &gr, &b);
+            if (r > 200 && b < 110 && r > gr + 40) fire++;
+        }
+    CHECK(fire > 800);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
         test_edge_faces(colette);
         test_water_blocks_player(colette);
+        test_fire_particles(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;

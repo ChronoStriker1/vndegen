@@ -660,7 +660,10 @@ void view_load(SG *g) {
 void view_follow(SG *g, float x, float y, float z, u32 ms) {
     View *v = sg_view(g);
     v->waterMs += ms;
-    for (int i = 0; i < g->field.npcCount; i++) g->field.npcs[i].animMs += ms;
+    for (int i = 0; i < g->field.npcCount; i++) {
+        g->field.npcs[i].animMs += ms;
+        if (g->field.npcs[i].visible) sg_ptcl_update(g->field.npcs[i].ptcl, ms);
+    }
     if (v->moveTotal) {
         v->moveMs += ms;
         float t = v->moveMs >= v->moveTotal ? 1.0f : (float)v->moveMs / (float)v->moveTotal;
@@ -1051,6 +1054,8 @@ void field_draw(SG *g) {
     for (int i = 0; i < f->npcCount; i++)
         if (f->npcs[i].visible && !f->npcs[i].model) draw_actor(g, &f->npcs[i]);
     if (f->player.visible && !f->player.model && !v->eye) draw_actor(g, &f->player);
+    for (int i = 0; i < f->npcCount; i++)
+        if (f->npcs[i].visible && f->npcs[i].ptcl) sg_ptcl_draw(g, f->npcs[i].ptcl, &f->cam, f->npcs[i].x, f->npcs[i].y, f->npcs[i].z);
     free(order);
     v->stats.submitMs = now_ms() - t0;
     r3_flush(&g->r3);

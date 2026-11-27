@@ -86,15 +86,18 @@ int sga_event_sheet(SG *g, int npc) {
 
 void sga_actor_graphic(SG *g, Actor *a, Guid graphic) {
     const Res *res = res_find(&g->res, graphic);
-    if (res == a->graphic && (a->sheet || a->model)) return;
+    if (res == a->graphic && (a->sheet || a->model || a->ptcl)) return;
     if (a->model) model_free(a->model);
     a->model = NULL;
+    sg_ptcl_free(a->ptcl);
+    a->ptcl = NULL;
     a->sheet = NULL;
     a->waitSheet = NULL;
     a->graphic = res;
     if (!res) return;
     size_t n = strlen(res->path);
     if (n > 4 && strcasecmp(res->path + n - 4, ".fbx") == 0) a->model = model_load(g, res->path);
+    else if (n > 5 && strcasecmp(res->path + n - 5, ".ptcl") == 0) a->ptcl = sg_ptcl_load(g, res->path);
     else a->sheet = sg_image(g, res->id);
 }
 
