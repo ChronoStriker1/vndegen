@@ -87,9 +87,33 @@ static char *wrap_text(SG *g, const char *text, int width) {
     return out;
 }
 
+static char *expand_variables(SG *g, const char *text) {
+    static const char tag[] = "\\Variable[";
+    size_t cap = strlen(text) + 1, n = 0;
+    char *out = sg_alloc(cap);
+    for (const char *p = text; *p;) {
+        char *end;
+        long index;
+        if (strncmp(p, tag, sizeof tag - 1) == 0 && (index = strtol(p + sizeof tag - 1, &end, 10)) >= 0 && index < 1024 && *end == ']') {
+            char num[16];
+            int len = snprintf(num, sizeof num, "%d", g->vars[index]);
+            cap += (size_t)len;
+            out = sg_realloc(out, cap);
+            memcpy(out + n, num, (size_t)len);
+            n += (size_t)len;
+            p = end + 1;
+        } else
+            out[n++] = *p++;
+    }
+    out[n] = 0;
+    return out;
+}
+
 static void split_pages(SG *g, Interp *ip, const char *text) {
     clear_pages(ip);
-    char *wrapped = wrap_text(g, text, kWrapW);
+    char *expanded = expand_variables(g, text);
+    char *wrapped = wrap_text(g, expanded, kWrapW);
+    free(expanded);
     const char *p = wrapped;
     while (*p) {
         const char *brk = strstr(p, "\n\n");

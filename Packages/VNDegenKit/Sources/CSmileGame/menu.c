@@ -1540,7 +1540,10 @@ void inn_open(SG *g, int price, bool faceDown) {
 
 void menu_close(SG *g) {
     Menu *m = g->b.menu;
-    if (!m || m->mode == MENU_CLOSED) return;
+    if (!m) return;
+    m->cur[P_SAVE] = 0;
+    m->savePage = 0;
+    if (m->mode == MENU_CLOSED) return;
     m->mode = MENU_CLOSED;
     m->closing = false;
     sg_log(g, "menu: closed for a load");

@@ -1133,3 +1133,47 @@ highlight.
 The PC's save in the golem cave after its boss loaded in the runner at the same cell with the same party, money and
 items, and the golem gone. The runner's save on the catacombs' last floor loaded in the PC at the same cell, and the
 battle that starts there ended with the same experience (13,851) and money (3,518 G) in both.
+
+## Sacred to its ending (round 5, R)
+
+Seen on the PC player under Wine from N's volcano save and the runner's saves after it.
+
+### The six 炎の悪魔
+
+- The fight in the volcano depths (command 65 with no continue flag and no escape) ends in GAME OVER on the PC as in
+  the runner with N's party (ロイ 17, ファフニール 14 with 17 MP, アリア 11). The PC's HP counts down after a hit, so a
+  capture mid-count shows a part of it; whole turns match the attack formula above (アリア, defence 133 on the PC's
+  status page and in the runtime, took three hits of about 41 from attack 200).
+- At levels 20, 21 and 22 with ファフニール's アイスストーム (the demons resist fire 150 and ice −50) both win; the PC
+  took four storms, the runner three. Both gave 2400 experience, 1800 G and six 超薬草.
+- After the fight マオー rejoins at the HP she left with (70 of 195) on both.
+
+### Battle commands and healing
+
+- Only the first hero to choose has 逃げる as the last command. The heroes after it have 戻る (battle text 22) with
+  the back arrow, column 1 of `icon_system.png`'s first row: the game settings' second icon reference after the battle
+  state messages (the third is 逃げる's runner at column 6, the first the NEW mark at column 0). Choosing 戻る goes
+  back to the previous hero, as cancel does.
+- Choosing an ally for a skill moves with left and right on the PC; up and down do nothing there. The runtime takes
+  all four.
+- ヒール in battle took ファフニール from 47 to 164 of 235: half her maximum, as in the field. 薬草 (30 %) in the
+  field menu took アリア from 130 to 188 of 195: 30 % of the maximum, rounded down.
+
+### Save page
+
+The title's Continue opens the load page on the first slot, whichever save is newest. The menu's save page keeps its
+cursor where it was last left, also across closing the menu, and starts on the first slot again after a game is
+loaded: after loading slot 4 it opened on slot 1, after saving to slot 4 on slot 4, and after moving to slot 6 and
+backing out on slot 6.
+
+### The ending
+
+- The last battle (深淵の化身, from the runner's save in the final room) was won on the PC and in the runner, and the
+  ending played on both.
+- Command 55 is hero GUID, amount and 0: the ending gives マオー and ファフニール 20000 experience each with it. The
+  PC's save after the ending holds ファフニール at level 25 with 111,410 points and マオー at 23 with 76,686, 20,000
+  more than before the last battle, as the runner's does.
+- Command 70 with 8 as its third value reads game data: item 4, 5 and 6 are the play time's hours, minutes and
+  seconds. The PC's ending showed `プレイ時間` and `7時間14分19秒` on one page for
+  `プレイ時間/\Variable[15]時間\Variable[16]分\Variable[17]秒`, then THANK YOU FOR PLAYING on the next.
+- `\Variable[n]` in a message is variable n's value.

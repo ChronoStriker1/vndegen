@@ -93,9 +93,26 @@ static void place_event(SG *g, const Cmd *c) {
     sg_log(g, "event %d placed at %d,%d code %d", i, x, z, code);
 }
 
+static void play_time_variable(SG *g, i32 index, i32 item) {
+    u64 s = g->b.party.playMs / 1000;
+    if (item == 4) g->vars[index] = (i32)(s / 3600);
+    else if (item == 5) g->vars[index] = (i32)(s / 60 % 60);
+    else if (item == 6) g->vars[index] = (i32)(s % 60);
+    else {
+        sg_log(g, "variable %d: game data %d not handled", index, item);
+        return;
+    }
+    g->interp.a.dirty = true;
+    sg_log(g, "variable %d = %d (play time)", index, g->vars[index]);
+}
+
 static void random_variable(SG *g, const Cmd *c) {
     i32 index = cmd_int(c, 1), lo = cmd_int(c, 3), hi = cmd_int(c, 4);
     if (index < 0 || index >= 1024) return;
+    if (cmd_int(c, 2) == 8) {
+        play_time_variable(g, index, lo);
+        return;
+    }
     if (hi < lo) {
         i32 t = hi;
         hi = lo;
@@ -106,15 +123,29 @@ static void random_variable(SG *g, const Cmd *c) {
     sg_log(g, "variable %d = %d (random %d..%d)", index, g->vars[index], lo, hi);
 }
 
-static void learn_skill(SG *g, const Cmd *c) {
+static Member *member_by_hero(SG *g, Guid hero) {
     Party *p = &g->b.party;
-    Guid hero = cmd_guid(c, 0), skill = cmd_guid(c, 1);
+    for (int i = 0; i < p->count; i++)
+        if (guid_eq(p->members[i].hero, hero)) return &p->members[i];
+    for (int i = 0; i < p->reserveCount; i++)
+        if (guid_eq(p->reserve[i].hero, hero)) return &p->reserve[i];
+    return NULL;
+}
+
+static void give_exp(SG *g, const Cmd *c) {
+    Member *m = member_by_hero(g, cmd_guid(c, 0));
+    if (!m || cmd_int(c, 2) != 0) {
+        sg_log(g, "experience command not applied (mode %d)", cmd_int(c, 2));
+        return;
+    }
+    sg_give_exp(g, m, cmd_int(c, 1));
+    sg_log(g, "experience +%d: level %d exp %d", cmd_int(c, 1), m->level, m->exp);
+}
+
+static void learn_skill(SG *g, const Cmd *c) {
+    Guid skill = cmd_guid(c, 1);
     bool forget = cmd_int(c, 2) != 0;
-    Member *m = NULL;
-    for (int i = 0; i < p->count && !m; i++)
-        if (guid_eq(p->members[i].hero, hero)) m = &p->members[i];
-    for (int i = 0; i < p->reserveCount && !m; i++)
-        if (guid_eq(p->reserve[i].hero, hero)) m = &p->reserve[i];
+    Member *m = member_by_hero(g, cmd_guid(c, 0));
     if (!m) return;
     int at = -1;
     for (int i = 0; i < m->learnedCount && at < 0; i++)
@@ -124,7 +155,7 @@ static void learn_skill(SG *g, const Cmd *c) {
         m->learnedCount--;
     } else if (!forget && at < 0 && m->learnedCount < 16) {
         m->learned[m->learnedCount++] = skill;
-        const HeroDef *h = hero_def(&g->b.tables, hero);
+        const HeroDef *h = hero_def(&g->b.tables, m->hero);
         const SkillDef *sk = skill_def(&g->b.tables, skill);
         if (h && sk) {
             char *text = sg_fmt("%s\xe3\x81\xaf\xe3\x80\x8c%s\xe3\x80\x8d\xe3\x82\x92\xe8\xa6\x9a\xe3\x81\x88\xe3\x81\x9f", h->name, sk->name);
@@ -147,6 +178,7 @@ bool sgi_exec(SG *g, const Cmd *c, bool *busy) {
         return true;
     case 70: random_variable(g, c); return true;
     case 56: learn_skill(g, c); return true;
+    case 55: give_exp(g, c); return true;
     default: return false;
     }
 }
