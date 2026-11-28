@@ -500,9 +500,7 @@ int member_defense(const Tables *t, const Member *m) {
     return member_stat(t, m, STAT_VITALITY) + member_equip_sum(t, m, EQ_DEFENSE);
 }
 
-int member_speed(const Tables *t, const Member *m) {
-    return member_stat(t, m, STAT_SPEED) + member_equip_sum(t, m, EQ_SPEED);
-}
+int member_speed(const Tables *t, const Member *m) { return member_stat(t, m, STAT_SPEED); }
 
 int member_element_attack(const Tables *t, const Member *m) {
     const ItemDef *w = item_def(t, m->equip[SLOT_WEAPON]);
@@ -511,7 +509,7 @@ int member_element_attack(const Tables *t, const Member *m) {
 
 int member_hit(const Tables *t, const Member *m) {
     const ItemDef *w = item_def(t, m->equip[SLOT_WEAPON]);
-    return w ? w->eq[EQ_HIT] : 95;
+    return member_equip_sum(t, m, EQ_HIT) + (w ? 0 : 95);
 }
 
 int member_evasion(const Tables *t, const Member *m) { return member_equip_sum(t, m, EQ_EVASION); }

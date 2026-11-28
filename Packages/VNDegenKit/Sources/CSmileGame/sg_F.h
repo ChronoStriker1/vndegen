@@ -6,6 +6,7 @@
 #define battle_bar smilegame_battle_bar
 #define battle_bgm_for smilegame_battle_bgm_for
 #define battle_close smilegame_battle_close
+#define battle_critical_damage smilegame_battle_critical_damage
 #define battle_enc smilegame_battle_enc
 #define battle_encounter_roll smilegame_battle_encounter_roll
 #define battle_encounter_setup smilegame_battle_encounter_setup
@@ -16,6 +17,7 @@
 #define battle_fx_def smilegame_battle_fx_def
 #define battle_fx_draw smilegame_battle_fx_draw
 #define battle_fx_ms smilegame_battle_fx_ms
+#define battle_hero_defense smilegame_battle_hero_defense
 #define battle_map_info smilegame_battle_map_info
 #define battle_monster_hp smilegame_battle_monster_hp
 #define battle_phase smilegame_battle_phase

@@ -10,7 +10,7 @@ enum { LIST_SKILLS, LIST_ITEMS };
 
 enum { CMD_KIND_ATTACK = 0, CMD_KIND_SKILL = 1, CMD_KIND_DEFEND = 2, CMD_KIND_SKILL2 = 4, CMD_KIND_ITEM = 5, CMD_KIND_BACK = 98, CMD_KIND_ESCAPE = 99 };
 
-enum { MON_ATTACK = 0, MON_WATCH = 2, MON_SKILL = 3, MON_CHARGE = 4, MON_FLEE = 6 };
+enum { MON_ATTACK = 0, MON_CRITICAL = 1, MON_WATCH = 2, MON_SKILL = 3, MON_CHARGE = 4, MON_FLEE = 6 };
 
 enum { MAX_FIGHTERS = 16, MAX_CMDS = 8, MAX_LIST = 64 };
 
@@ -70,6 +70,7 @@ typedef struct Plan {
     int actor, kind, target;
     const SkillDef *skill;
     const ItemDef *item;
+    bool crit;
 } Plan;
 
 typedef struct Battle {
@@ -162,6 +163,17 @@ float battle_spread(u32 *rng) { return 0.94f + (float)(next_rand(rng) % 1001u) /
 
 int battle_attack_damage(int attack, int defense, float spread) {
     float base = ((float)attack * 1.5f - (float)defense) / 4.0f;
+    if (base <= 0) return 0;
+    return (int)floorf(base * spread + 0.5f);
+}
+
+int battle_hero_defense(int defense, int level) {
+    int cut = level * 2 / 3;
+    return defense > cut ? defense - cut : 0;
+}
+
+int battle_critical_damage(int attack, int defense, float spread) {
+    float base = ((float)attack * 2.5f - (float)defense) / 4.0f;
     if (base <= 0) return 0;
     return (int)floorf(base * spread + 0.5f);
 }
@@ -454,7 +466,7 @@ static void build_queue(Battle *b);
 static void begin_commands(Battle *b) {
     b->turn++;
     for (int i = 0; i < b->count; i++) {
-        b->plan[i] = (Plan){i, ACT_NONE, -1, NULL, NULL};
+        b->plan[i] = (Plan){i, ACT_NONE, -1, NULL, NULL, false};
         b->f[i].defending = false;
     }
     b->member = next_member(b, 0);
@@ -544,9 +556,10 @@ static void plan_monsters(Battle *b) {
         if (!alive(f)) continue;
         const MonsterAction *a = pick_monster_action(b, f);
         Plan *p = &b->plan[i];
-        *p = (Plan){i, ACT_ATTACK, random_target(b, false), NULL, NULL};
+        *p = (Plan){i, ACT_ATTACK, random_target(b, false), NULL, NULL, false};
         if (!a) continue;
         switch (a->kind) {
+        case MON_CRITICAL: p->crit = true; break;
         case MON_WATCH: p->kind = ACT_WATCH; break;
         case MON_CHARGE: p->kind = ACT_CHARGE; break;
         case MON_FLEE: p->kind = ACT_FLEE; break;
@@ -563,7 +576,7 @@ static void plan_monsters(Battle *b) {
 static void build_queue(Battle *b) {
     plan_monsters(b);
     for (int i = 0; i < b->partyCount; i++)
-        if (alive(&b->f[i]) && !commandable(&b->f[i])) b->plan[i] = (Plan){i, ACT_ATTACK, -1, NULL, NULL};
+        if (alive(&b->f[i]) && !commandable(&b->f[i])) b->plan[i] = (Plan){i, ACT_ATTACK, -1, NULL, NULL, false};
     b->queueCount = 0;
     for (int i = 0; i < b->count; i++)
         if (alive(&b->f[i]) && b->plan[i].kind != ACT_NONE) b->queue[b->queueCount++] = b->plan[i];
@@ -644,26 +657,40 @@ static void hurt(Battle *b, Fighter *t, int dmg) {
     if (!t->monster) sync_member(b->g, t);
 }
 
-static void do_attack(Battle *b, Fighter *a, Fighter *t) {
+static int crit_chance(Battle *b, const Fighter *a) {
+    const Member *m = member_of(b->g, a);
+    if (!m) return 0;
+    int sum = 0;
+    for (int i = 0; i < SLOT_COUNT; i++) {
+        const ItemDef *it = item_def(TB(b->g), m->equip[i]);
+        if (it && it->kind >= ITEM_WEAPON) sum += it->eqExtra;
+    }
+    return sum / 2;
+}
+
+static void do_attack(Battle *b, Fighter *a, Fighter *t, bool crit) {
     start_fx(b, attack_effect(b, a), t);
     int chance = a->hit - t->eva;
     if (rand_pct(&b->rng) >= chance) {
         popup(t, 0, true, false);
         return;
     }
-    int dmg = battle_attack_damage(a->atk, t->defending ? t->dfn * 2 : t->dfn, battle_spread(&b->rng));
+    int def = t->defending ? t->dfn * 2 : t->dfn;
+    const Member *tm = member_of(b->g, t);
+    if (a->monster && tm && !crit) def = battle_hero_defense(def, tm->level);
+    float spread = battle_spread(&b->rng);
+    if (!crit && !a->monster) {
+        int rate = crit_chance(b, a);
+        if (rate > 0 && rand_pct(&b->rng) < rate) {
+            crit = true;
+            spread = battle_spread(&b->rng);
+            fmt(b->bar, sizeof b->bar, btext(b->g, 5, "{0}の会心の一撃！"), a->name, "");
+        }
+    }
+    int dmg = crit ? battle_critical_damage(a->atk, def, spread) : battle_attack_damage(a->atk, def, spread);
     if (a->charged) {
         dmg *= 2;
         a->charged = false;
-    }
-    if (!a->monster) {
-        const Member *m = member_of(b->g, a);
-        const ItemDef *w = item_def(TB(b->g), m->equip[SLOT_WEAPON]);
-        int crit = w ? w->eqExtra / 2 : 0;
-        if (crit > 0 && rand_pct(&b->rng) < crit) {
-            dmg = battle_attack_damage(a->atk, 0, battle_spread(&b->rng));
-            fmt(b->bar, sizeof b->bar, btext(b->g, 5, "{0}の会心の一撃！"), a->name, "");
-        }
     }
     hurt(b, t, element_scale(t, a->element, dmg));
 }
@@ -763,7 +790,10 @@ static void action_text(Battle *b, const Plan *p) {
     Fighter *a = &b->f[p->actor];
     SG *g = b->g;
     switch (p->kind) {
-    case ACT_ATTACK: fmt(b->bar, sizeof b->bar, btext(g, 8, "{0}の攻撃！"), a->name, ""); break;
+    case ACT_ATTACK:
+        if (p->crit) fmt(b->bar, sizeof b->bar, btext(g, 5, "{0}の会心の一撃！"), a->name, "");
+        else fmt(b->bar, sizeof b->bar, btext(g, 8, "{0}の攻撃！"), a->name, "");
+        break;
     case ACT_DEFEND: fmt(b->bar, sizeof b->bar, btext(g, 6, "{0}は身を守っている……"), a->name, ""); break;
     case ACT_WATCH: fmt(b->bar, sizeof b->bar, btext(g, 2, "{0}は様子を見ている"), a->name, ""); break;
     case ACT_CHARGE: fmt(b->bar, sizeof b->bar, btext(g, 7, "{0}は力をためている……"), a->name, ""); break;
@@ -785,7 +815,7 @@ static void apply_plan(Battle *b, const Plan *p) {
     case ACT_ATTACK: {
         bool lost = a->state & (ST_CONFUSION | ST_CHARM);
         int t = lost && p->target >= 0 && alive(&b->f[p->target]) ? p->target : retarget(b, p->target, !a->monster);
-        if (t >= 0) do_attack(b, a, &b->f[t]);
+        if (t >= 0) do_attack(b, a, &b->f[t], p->crit && !lost);
         break;
     }
     case ACT_CHARGE: a->charged = true; break;
@@ -935,6 +965,7 @@ static void act_update(Battle *b) {
             } else {
                 p->kind = ACT_ATTACK;
                 p->skill = NULL;
+                p->crit = false;
                 p->target = charm ? random_target(b, actor->monster) : random_any(b);
                 action_text(b, p);
             }
@@ -1128,7 +1159,7 @@ static void input(Battle *b) {
             else quit = true;
         }
         if (quit) {
-            b->plan[b->member] = (Plan){b->member, ACT_NONE, -1, NULL, NULL};
+            b->plan[b->member] = (Plan){b->member, ACT_NONE, -1, NULL, NULL, false};
             set_phase(b, PH_COMMAND);
         }
         break;
