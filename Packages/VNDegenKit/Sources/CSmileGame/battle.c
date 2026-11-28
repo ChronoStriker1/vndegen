@@ -1001,13 +1001,7 @@ static void build_list(Battle *b) {
     b->listCount = 0;
     if (b->listKind == LIST_SKILLS) {
         const Member *m = member_of(g, &b->f[b->member]);
-        const HeroDef *h = hero_of(g, &b->f[b->member]);
-        if (!h) return;
-        for (int i = 0; i < h->skillCount && b->listCount < MAX_LIST; i++) {
-            if (h->skills[i].level > m->level) continue;
-            const SkillDef *s = skill_def(TB(g), h->skills[i].skill);
-            if (s && s->battleUse) b->list[b->listCount++] = s;
-        }
+        if (!m) return;
         for (int i = 0; i < m->learnedCount && b->listCount < MAX_LIST; i++) {
             const SkillDef *s = skill_def(TB(g), m->learned[i]);
             bool dup = false;

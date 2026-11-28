@@ -794,7 +794,7 @@ and back, beside the SDL runner playing the same path with real key events.
   204 bytes at level 2 with キュアー (his level 2 skill) in it, and round 3's patched save, levelled to 6 by command
   55 after command 56 taught ファイア and アイス, held those two and then his level 2, 5 and 6 skills: ファイア, his level
   3 skill, was not added twice. Level 1 skills are not in it. The runtime appends the
-  skills of each level passed at a level-up and lists the learned skills in battle after the hero table's.
+  skills of each level passed at a level-up; battle and menu skill lists show the learned list alone (round 6, T).
 - The monster table's two `int32` before the drops are the money and then the experience (ゾンビーナＬＶ01's result:
   経験値 32 and 13 G, the table holds 13 then 32).
 

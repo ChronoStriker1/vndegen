@@ -106,11 +106,64 @@ static void test_prison_blank_last_line(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static const SkillDef *skill_named(const Tables *t, const char *name) {
+    for (int i = 0; i < t->skillCount; i++)
+        if (!strcmp(t->skills[i].name, name)) return &t->skills[i];
+    return NULL;
+}
+
+static void test_battle_skills_are_learned_list(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    const Tables *t = &g->b.tables;
+    const HeroDef *meiri = NULL;
+    for (int i = 0; i < t->heroCount; i++)
+        if (!strcmp(t->heroes[i].name, "メイリ")) meiri = &t->heroes[i];
+    CHECK(meiri != NULL);
+    if (!meiri) {
+        vnsmilegame_close((VNSmileGame *)g);
+        return;
+    }
+    g->b.party.count = 0;
+    party_add_hero(g, meiri->id);
+    Member *m = &g->b.party.members[0];
+    member_set_level(t, m, 20);
+    static const char *learned[] = {"キュアラル", "エリアヒール", "ファイアストーム", "レイズ", "ハイエリアヒール", "メテオボム"};
+    m->learnedCount = 0;
+    for (int i = 0; i < 6; i++) {
+        const SkillDef *sk = skill_named(t, learned[i]);
+        CHECK(sk != NULL);
+        if (sk) m->learned[m->learnedCount++] = sk->id;
+    }
+    m->mp = member_max_mp(t, m);
+    int mp = m->mp;
+    BattleSetup s;
+    memset(&s, 0, sizeof s);
+    for (int i = 0; i < t->monsterCount && !s.count; i++)
+        if (!strcmp(t->monsters[i].name, "スライムＬＶ01")) s.monsters[s.count++] = t->monsters[i].id;
+    battle_seed(g, 5);
+    sg_battle_start(g, &s);
+    for (int k = 0; k < 2000 && sg_battle_active(g) && strcmp(battle_phase(g), "command"); k++) run(g, 16);
+    press(g, VK_DOWN, 48);
+    press(g, VK_DOWN, 48);
+    press(g, VK_OK, 48);
+    CHECK(!strcmp(battle_phase(g), "list"));
+    press(g, VK_RIGHT, 48);
+    press(g, VK_OK, 48);
+    CHECK(strcmp(battle_phase(g), "target") != 0);
+    for (int k = 0; k < 4 && sg_battle_active(g) && strcmp(battle_phase(g), "command") && strcmp(battle_phase(g), "act"); k++)
+        if (!strcmp(battle_phase(g), "ally")) press(g, VK_OK, 48);
+    for (int k = 0; k < 2000 && sg_battle_active(g) && strcmp(battle_phase(g), "command"); k++) run(g, 16);
+    CHECK(mp - g->b.party.members[0].mp == 6);
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
         test_escape_gate_keeps_lap(colette);
         test_prison_blank_last_line(colette);
+        test_battle_skills_are_learned_list(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
