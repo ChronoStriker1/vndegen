@@ -59,15 +59,11 @@ inline void blendPixel(uint8_t *d, int r, int g, int b, int a, Blend blend) {
 }  // namespace
 
 void Canvas::clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-    for (int y = 0; y < t_.h; y++) {
-        uint8_t *d = t_.row(y);
-        for (int x = 0; x < t_.w; x++, d += 4) {
-            d[0] = r;
-            d[1] = g;
-            d[2] = b;
-            d[3] = a;
-        }
-    }
+    if (t_.empty()) return;
+    uint8_t *first = t_.row(0);
+    const uint8_t pixel[4] = {r, g, b, a};
+    for (int x = 0; x < t_.w; x++) std::memcpy(first + x * 4, pixel, 4);
+    for (int y = 1; y < t_.h; y++) std::memcpy(t_.row(y), first, size_t(t_.w) * 4);
 }
 
 void Canvas::draw(const Bitmap &src, RectI from, RectF to, const DrawOptions &o) {

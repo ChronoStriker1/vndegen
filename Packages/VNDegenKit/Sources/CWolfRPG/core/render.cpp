@@ -437,8 +437,9 @@ void Renderer::draw(Bitmap &frame) {
         }
     }
     Canvas canvas(frame);
-    canvas.clear(0, 0, 0);
-    if (auto [rate, cx, cy] = game_.mapZoom(); std::abs(rate - 100) > 0.01) {
+    auto [rate, cx, cy] = game_.mapZoom();
+    if (rate < 100 || cx < 0 || cy < 0 || cx > w || cy > h || std::abs(rate - 100) <= 0.01) canvas.clear(0, 0, 0);
+    if (std::abs(rate - 100) > 0.01) {
         // A zoomed map is drawn at its normal size first, then scaled around the zoom's centre.
         if (mapLayer_.w != w || mapLayer_.h != h) mapLayer_ = Bitmap(w, h);
         Canvas layer(mapLayer_);
