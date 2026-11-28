@@ -97,13 +97,18 @@ struct Picture {
     std::shared_ptr<const XYImage> xyImage;  // for a picture made from XY arrays
     int windowW = 0, windowH = 0;  // size of a window picture: a window skin stretched, or a shape
     Tween x, y, opacity, zoomX, zoomY, angle, r, g, b;
+    bool freeForm = false;
+    std::array<Tween, 6> corners;
     uint64_t generation = 0;  // changes whenever the source changes, so the renderer reloads it
     // Effects from the effect command.
     int autoPatternMode = 0;  // 0 none, 1 once, 2 loop, 3 back and forth
-    int autoFrom = 1, autoTo = 1, autoInterval = 1, autoTimer = 0, autoDir = 1;
+    int autoFrom = 1, autoTo = 1, autoInterval = 1, autoTimer = 0, autoDir = 1, autoPattern = 1;
+    int shownPattern() const { return autoPatternMode ? autoPattern : pattern; }
     int shakePower = 0, shakeSpeed = 0, shakeFrames = 0;
     double shakeOffset = 0;
     int shiftX = 0, shiftY = 0;  // the effect command's draw position shift, added to the position when drawing
+    int shift2X = 0, shift2Y = 0;
+    Tween fixZoomX{100, 100}, fixZoomY{100, 100}, fixAngle, fixOpacity;
     // The effect command's zoom: the picture scales around a screen point by this rate, on top of its own zoom.
     Tween effectZoom{100, 100}, effectZoomX, effectZoomY;
     // The effect command's pulse (点滅A): the colour swings to its value plus these offsets and back, once every two
@@ -113,6 +118,7 @@ struct Picture {
     int flickerFrames = 0, flickerInterval = 0;
     std::array<int, 3> flash{0, 0, 0};
     int flashFrames = 0, flashLeft = 0;
+    int blur = 0;
     bool erasing = false;
 };
 
@@ -143,6 +149,8 @@ struct MessageState {
     size_t shown = 0, total = 0;  // characters typed so far, and in all
     bool instant = false;
     bool heldForChoice = false;  // stays up until the choice after it is answered
+    bool autoClose = false;
+    std::vector<std::pair<size_t, size_t>> instantRanges;
 };
 
 // The string command's keyboard mode while the player types.

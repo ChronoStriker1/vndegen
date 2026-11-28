@@ -355,7 +355,7 @@ bool Game::step(Thread &t) {
             return true;
 
         case 130: {  // move a character, the hero by default, to a position or another map
-            int target = cmd.arg(0);
+            int target = value(cmd.arg(0), t);
             int x = value(cmd.arg(1), t), y = value(cmd.arg(2), t);
             int mapId = value(cmd.arg(3), t);
             if (target <= -10000) {
@@ -620,10 +620,26 @@ void Game::showMessage(std::string text) {
         if (end < text.size() && text[end] == '\n') end++;
         text.erase(0, end);
     }
+    auto added = [&](size_t i) { return i < systemStrings_.size() ? systemStrings_[i] : std::string(); };
+    text = added(26) + text + added(27);
     if (systemStrings_.size() > 25) systemStrings_[25] = text;
     message_.text = std::move(text);
     message_.total = visibleChars(message_.text);
     message_.active = true;
+    size_t at = 0;
+    bool instant = false;
+    for (auto &tok : parseText(message_.text)) {
+        if (tok.kind == TextToken::AutoClose) message_.autoClose = true;
+        else if (tok.kind == TextToken::Instant && (tok.value != 0) != instant) {
+            instant = tok.value != 0;
+            if (instant) message_.instantRanges.push_back({at, message_.total});
+            else message_.instantRanges.back().second = at;
+        } else if (tok.kind == TextToken::Char || tok.kind == TextToken::Icon || tok.kind == TextToken::Image) {
+            at++;
+        } else if (tok.kind == TextToken::Ruby) {
+            at += visibleChars(tok.base);
+        }
+    }
 }
 
 // The text at a variable address: a string variable's text, or a number written out.
@@ -1139,7 +1155,40 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
             for (auto [to, from] : {std::pair{&fresh.opacity, &p.opacity}, {&fresh.zoomX, &p.zoomX}, {&fresh.zoomY, &p.zoomY},
                                     {&fresh.angle, &p.angle}, {&fresh.r, &p.r}, {&fresh.g, &p.g}, {&fresh.b, &p.b}})
                 to->set(from->to, 0);
-        } else {
+        }
+        if (existing != pictures_.end()) {
+            fresh.autoPatternMode = p.autoPatternMode;
+            fresh.autoFrom = p.autoFrom;
+            fresh.autoTo = p.autoTo;
+            fresh.autoInterval = p.autoInterval;
+            fresh.autoTimer = p.autoTimer;
+            fresh.autoDir = p.autoDir;
+            fresh.autoPattern = p.autoPattern;
+            fresh.shakePower = p.shakePower;
+            fresh.shakeSpeed = p.shakeSpeed;
+            fresh.shakeFrames = p.shakeFrames;
+            fresh.shakeOffset = p.shakeOffset;
+            fresh.shiftX = p.shiftX;
+            fresh.shiftY = p.shiftY;
+            fresh.shift2X = p.shift2X;
+            fresh.shift2Y = p.shift2Y;
+            fresh.fixZoomX = p.fixZoomX;
+            fresh.fixZoomY = p.fixZoomY;
+            fresh.fixAngle = p.fixAngle;
+            fresh.fixOpacity = p.fixOpacity;
+            fresh.effectZoom = p.effectZoom;
+            fresh.effectZoomX = p.effectZoomX;
+            fresh.effectZoomY = p.effectZoomY;
+            fresh.pulse = p.pulse;
+            fresh.pulseInterval = p.pulseInterval;
+            fresh.flickerFrames = p.flickerFrames;
+            fresh.flickerInterval = p.flickerInterval;
+            fresh.flash = p.flash;
+            fresh.flashFrames = p.flashFrames;
+            fresh.flashLeft = p.flashLeft;
+            fresh.blur = p.blur;
+        }
+        if (!shown) {
             fresh.opacity.set(0, 0);
             fresh.zoomX.set(100, 0);
             fresh.zoomY.set(100, 0);
@@ -1168,6 +1217,13 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         p.zoomY.set(field(18, int32_t(p.zoomY.to)), over);
     }
     p.angle.set(field(10, int32_t(p.angle.to)), over);
+    if (flags & 0x4000000) {
+        if (show) p.freeForm = true;
+        for (size_t i = 0; i < p.corners.size(); i++) {
+            int32_t at = field(19 + i, int32_t(p.corners[i].to));
+            p.corners[i].set(at, show ? 0 : frames);
+        }
+    }
     // Field 12's top byte is 1 when the colour stays as it is. Otherwise the editor stores the colour only when it
     // isn't 100 (WodiLib's PictureDrawBase), so a command without colour fields sets it back to 100: a game can show
     // a picture at colour 0 and fade it in from black with a plain move.

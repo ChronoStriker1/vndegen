@@ -185,6 +185,44 @@ void Canvas::draw(const Bitmap &src, RectI from, RectF to, const DrawOptions &o)
     }
 }
 
+void Canvas::drawQuad(const Bitmap &src, RectI from, const std::array<float, 8> &c, const DrawOptions &o) {
+    if (src.empty() || o.opacity <= 0) return;
+    from.x = std::clamp(from.x, 0, src.w);
+    from.y = std::clamp(from.y, 0, src.h);
+    from.w = std::clamp(from.w, 0, src.w - from.x);
+    from.h = std::clamp(from.h, 0, src.h - from.y);
+    if (from.w <= 0 || from.h <= 0) return;
+    const int opacity = int(std::lround(std::clamp(o.opacity, 0.0f, 1.0f) * 255));
+    const int mr = int(std::lround(std::clamp(o.r, 0.0f, 2.0f) * 256));
+    const int mg = int(std::lround(std::clamp(o.g, 0.0f, 2.0f) * 256));
+    const int mb = int(std::lround(std::clamp(o.b, 0.0f, 2.0f) * 256));
+    struct Point { double x, y, u, v; };
+    const Point tl{c[0], c[1], 0, 0}, tr{c[2], c[3], 1, 0}, bl{c[4], c[5], 0, 1}, br{c[6], c[7], 1, 1};
+    auto triangle = [&](const Point &a, const Point &b, const Point &d) {
+        double area = (b.x - a.x) * (d.y - a.y) - (d.x - a.x) * (b.y - a.y);
+        if (std::abs(area) < 1e-9) return;
+        int x0 = std::max(0, int(std::floor(std::min({a.x, b.x, d.x})))), x1 = std::min(t_.w, int(std::ceil(std::max({a.x, b.x, d.x}))));
+        int y0 = std::max(0, int(std::floor(std::min({a.y, b.y, d.y})))), y1 = std::min(t_.h, int(std::ceil(std::max({a.y, b.y, d.y}))));
+        for (int y = y0; y < y1; y++) {
+            uint8_t *dst = t_.row(y) + x0 * 4;
+            for (int x = x0; x < x1; x++, dst += 4) {
+                double px = x + 0.5, py = y + 0.5;
+                double wb = ((px - a.x) * (d.y - a.y) - (d.x - a.x) * (py - a.y)) / area;
+                double wd = ((b.x - a.x) * (py - a.y) - (px - a.x) * (b.y - a.y)) / area;
+                double wa = 1 - wb - wd;
+                if (wa < -1e-9 || wb < -1e-9 || wd < -1e-9) continue;
+                double u = wa * a.u + wb * b.u + wd * d.u, v = wa * a.v + wb * b.v + wd * d.v;
+                int iu = std::clamp(int(u * from.w), 0, from.w - 1), iv = std::clamp(int(v * from.h), 0, from.h - 1);
+                const uint8_t *sp = src.row(from.y + iv) + (from.x + iu) * 4;
+                if (!sp[3]) continue;
+                blendPixel(dst, sp[0] * mr >> 8, sp[1] * mg >> 8, sp[2] * mb >> 8, sp[3] * opacity / 255, o.blend);
+            }
+        }
+    };
+    triangle(tl, tr, bl);
+    triangle(tr, br, bl);
+}
+
 void Canvas::fill(RectF to, uint8_t r, uint8_t g, uint8_t b, uint8_t a, Blend blend) {
     int x0 = std::max(0, int(std::floor(to.x))), x1 = std::min(t_.w, int(std::ceil(to.x + to.w)));
     int y0 = std::max(0, int(std::floor(to.y))), y1 = std::min(t_.h, int(std::ceil(to.y + to.h)));
