@@ -386,7 +386,7 @@ static void add_member(Battle *b, int index, float x, float z) {
     f->state = m->state & ST_POISON;
     f->x = x;
     f->z = z;
-    load_graphic(g, f, h->graphic);
+    load_graphic(g, f, sg_hero_graphic(g, m->hero));
 }
 
 static bool commandable(const Fighter *f) { return alive(f) && !(f->state & (ST_SLEEP | ST_PARALYSIS | ST_CONFUSION | ST_CHARM)); }

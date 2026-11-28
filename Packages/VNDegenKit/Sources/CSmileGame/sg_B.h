@@ -311,6 +311,7 @@ int party_item_count(const Party *p, Guid item);
 void party_give_item(Party *p, Guid item, int delta);
 void party_set_look(Party *p, Guid hero, Guid face, Guid graphic);
 Guid party_leader_graphic(SG *g);
+Guid sg_hero_graphic(SG *g, Guid hero);
 void party_recover(SG *g);
 void member_init(const Tables *t, Member *m, const HeroDef *h);
 void member_set_level(const Tables *t, Member *m, int level);

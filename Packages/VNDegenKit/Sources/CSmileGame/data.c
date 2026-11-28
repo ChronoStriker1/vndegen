@@ -601,7 +601,11 @@ void party_set_look(Party *p, Guid hero, Guid face, Guid graphic) {
 Guid party_leader_graphic(SG *g) {
     Party *p = &g->b.party;
     if (!p->count) return (Guid){{0}};
-    Guid hero = p->members[0].hero;
+    return sg_hero_graphic(g, p->members[0].hero);
+}
+
+Guid sg_hero_graphic(SG *g, Guid hero) {
+    Party *p = &g->b.party;
     for (int i = 0; i < p->lookCount; i++)
         if (guid_eq(p->looks[i].hero, hero)) return p->looks[i].graphic;
     const HeroDef *h = hero_def(&g->b.tables, hero);
