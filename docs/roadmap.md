@@ -183,6 +183,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Wolf RPG Editor half-tile movement, so False Myth 2's saves walk on the PC (0.61.12).
 - Smile Game Builder's monster critical hits, item speed and accuracy, dark maps' background and the message box under a choice (0.61.13).
 - False Myth 2 past the South Tower to its "Unwanted Deathmatch" battle, with loads resetting the hero's walk-through (0.61.14).
+- Smile Game Builder battles take the map's light, ロイ shows in Sacred's battles, and skill damage and heals follow the PC's rule (0.61.15).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -190,8 +191,8 @@ New bugs get a GitHub issue and a line here.
 - Audit: every issue is closed. #164's part 3 was closed as won't-fix on 2026-11-16, since it needs the RPG Maker editors' help files.
 - From the new test games (0.56.2): #190's checks were done in 0.58.1, and restoring Wolf pictures from saves in 0.58.2. #187 was fixed in 0.57.2; #188 and #189 needed no change (Tenioha's bar opens with a tap on its strip, and Wolf's save screen takes keys only on the PC too).
 - From the regression sweep of 2026-11-23: #193 was fixed in 0.59.14. #194 and #195 needed no change: Project Hadal's black panels are its empty Load screen, and Fallen Kunoichi waited on an animation that MZ plays only while its page has focus, which a test run in the background didn't have. #196 and #197, web games' links, were fixed in 0.59.15.
-- #205: Sacred's status page speed, dark maps' background and most of its post-game damage were fixed in 0.61.13. Skill damage, the spread of normal hits and Colette's ailment rates are open.
-- #207: Sacred's campfire battle draws its snow dark and doesn't show ロイ's model (found 2026-11-28).
+- #205: Sacred's status page speed, dark maps' background and post-game damage were fixed in 0.61.13, and skill damage in 0.61.15; the spread of normal hits needed no change. Open: how often status ailments land, 雪山's light, 王家の洞窟's battle walls and the dragon girl's shading.
+- #207: Sacred's campfire battle, fixed in 0.61.15.
 - #206: half-tile movement was fixed in 0.61.12. False Myth 2 stutters for a moment every few seconds while drawing its pictures (found 2026-11-27).
 
 ## In progress
