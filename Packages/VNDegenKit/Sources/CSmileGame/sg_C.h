@@ -84,6 +84,8 @@ int sg_battle_cursor(SG *g);
 const char *battle_bar(SG *g);
 
 int battle_attack_damage(int attack, int defense, float spread);
+int battle_critical_damage(int attack, int defense, float spread);
+int battle_hero_defense(int defense, int level);
 int battle_skill_damage(int power, int magic, int defense, float spread);
 float battle_spread(u32 *rng);
 int battle_exp_for_level(int level);

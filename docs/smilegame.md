@@ -351,19 +351,25 @@ were taken with the gamepad shown.
   裸のドラコ's battle with plain attacks, and VNDegen won it with skills. Leaving the tower by a gate and resting keeps
   the lap, as the tower's adventurer says.
 - The odds that a state lands are inferred: マンドラゴラ's パニックボイスLV02 confuses most of the party at once in
-  VNDegen. On the PC it took 6 HP from each hero where VNDegen takes 1, and the PC showed ダーク's recovery from
-  confusion after every action of the turn, where VNDegen recovers a fighter when its own turn comes.
-- After a message, the PC keeps an empty message window under the choice that follows; VNDegen shows the choice
-  alone.
+  VNDegen. On the PC it took 6 HP from each hero (round 6) and 7 in a later fight where VNDegen takes 1, and the PC
+  showed ダーク's recovery from confusion after every action of the turn, where VNDegen recovers a fighter when its
+  own turn comes. Colette's player shows no action bar for these turns, so the casts and the confusions couldn't be
+  counted from captures.
 - In battles with three or four heroes the PC draws the first two a little larger than the camera alone would; the
   runtime stands them a cell forward, which puts their feet where the PC's are.
 - Particle effects are drawn from their emitter settings; the PC's flame is a little narrower and redder, and sparks
   that the PC attaches to the scene (rain, snow) haven't been compared.
 - Effects play their sheet's cells in order; the keyframe timeline inside each effect (positions, scales, screen
   flashes) is not read. The camera does not push towards the acting fighter as the PC's does.
-- Critical hits, skill damage, escape chance, defend and charge, the chance that a state lands and the recovery from
-  sleep, paralysis, confusion and charm are inferred (see `docs/smilegame-cleanroom.md`). Healing skills restore their
-  share of maximum HP as Sacred's ヒール does on the PC; the power and magic added for Colette's heals are inferred.
+- Skill damage, escape chance, defend and charge, the chance that a state lands and the recovery from sleep,
+  paralysis, confusion and charm are inferred (see `docs/smilegame-cleanroom.md`). Healing skills restore their share
+  of maximum HP as Sacred's ヒール does on the PC; the power and magic added for Colette's heals are inferred.
+- Normal and critical monster hits follow the PC's measured means at attack 260 and 350 within a few points, but the
+  PC's spread isn't reproduced: ロイ without armour took 71 or 72 every time where the runtime draws 70 to 77, and
+  アリア at defence 360 took up to 49 where the runtime stops at 47. A critical hit at defence 169 was 160 on the PC
+  and 166 to 184 in the runtime. How a hero's level enters is a fit, not a measured rule.
+- Sacred's ドラゴンサンダー did exactly 124 to every hero at any defence (62 through a shield that halves all
+  elements, 122 to マオー); the runtime's skill formula subtracts defence and gives ロイ about 65.
 - A random encounter brings one to one, two or five of a monster, picked uniformly; the PC brings a lone small
   monster somewhat more often, and stands a group of four or five in two rows where the runtime uses one.
 - Effects (27) play their picture sheet's cells in order over the effect's length; the PC composes layered,
@@ -392,18 +398,17 @@ were taken with the gamepad shown.
   them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
 - Sacred's castle courtyard averages about 13 ms a frame on the Linux VM, with its 99th percentile (about 19 ms) over
   16.7 ms while other work runs; in the app on Apple silicon it holds 60 (above).
-- Past the map's edge under a noon sky with the sun on, both games' PC players draw nothing; on a dark map (Sacred's
-  last dungeon and cursed places) the PC darkens that empty background with the map's light, where the runtime shows
-  the noon sky's white.
+- Past the map's edge under a noon sky with the sun on, the background takes the map's sun colour about 1.09 times
+  as bright, as on the PC: grey below Sacred's last dungeon, purple below 城下町ダンジョン. Where the noon sky model
+  shows there, it is tinted the same way and comes out about 7 % darker than the PC's purple.
 - Sacred's queen fight was lost on the PC and in VNDegen alike from the same save with attacks only, and won in
   VNDegen with healing; a win on the PC wasn't played.
-- Sacred's post-game fights hit harder on the PC: from the same full-HP save, attacking only, the dragon girl's
-  竜王（予定） beats the party on the PC and loses in VNDegen. The PC's dragon hits ロイ (defence 265 on both status
-  pages) for 72 to 73, above the attack formula's 61 to 68, and lands critical hits for about twice that several
-  times a fight. With healing VNDegen wins it; the last fight with リリアーヌ was likewise won in VNDegen with healing
-  and lost on the PC attacking only.
-- The status page shows ロイ's speed with 風のブーツ as 164; the PC shows 144, as if the boots' speed field didn't count
-  there. Whether it counts in battle wasn't measured.
+- Sacred's dragon girl beat the party in all 13 of the PC's fights from the same full-HP save with attacks only; in
+  the runtime she wins 8 of 10 seeded fights there. The last fight with リリアーヌ was won in VNDegen with healing and
+  lost on the PC attacking only.
+- A hero's speed on the status page and in battle comes from the hero alone, as on both PC players: an item's speed
+  field (風のブーツ, 盗賊のブーツ) doesn't count. Speeds the runtime computes from the hero table can be one point
+  below the PC's at high levels (ロイ 143 against the PC's 144 at level 26); saved heroes keep the PC's value.
 - Sacred's second power spot runs the same script as the others and wasn't played; the third was played in VNDegen
   only. Its debug room isn't
   reachable in play and wasn't run. The four-golem fight where アリア rejoins was won at level 4 on the PC and in VNDegen; at level 1 VNDegen loses it, and

@@ -549,8 +549,8 @@ map's centre when absent), `1001` and one `x, z` pair per monster is each monste
 - Hit chance is the attacker's hit % minus the target's evasion: monsters 90 to 95, heroes their weapon's hit (95).
   アリア (hit 95) missed the slime 3 times in about 155 attacks.
 - Critical hits (`{0}の会心の一撃！`): 8 in about 155 of アリア's attacks with a weapon whose critical field is 10, so the
-  runtime uses half that field as the percentage (inferred). The damage number was hidden behind the slash effect;
-  the runtime ignores defence on a critical hit (inferred).
+  runtime uses half that field as the percentage. The damage number was hidden behind the slash effect; round 7 (U)
+  measured monsters' critical hits and the chance from all equipment.
 - Skill damage: the golem's 落石ＬＶ01 (power 20) took 21 from コレット and missed ダーク twice. The runtime uses
   (power + magic) × the factor − defence / 4 (one sample, inferred). Healing skills restore power + magic (inferred).
 - Escape: chosen by one member, it is tried at once and ends the party's turn whether or not it works; on a failure
@@ -684,9 +684,8 @@ plays them for the clip's length.
 
 ### Still inferred
 
-Critical hits (half the weapon's critical field, defence ignored), the skill damage formula, healing (power +
-magic), the escape chance, defend and charge, the state chances above, and the recovery of sleep, paralysis,
-confusion and charm, and the monster count of a random encounter.
+The skill damage formula, healing (power + magic), the escape chance, defend and charge, the state chances above, and
+the recovery of sleep, paralysis, confusion and charm, and the monster count of a random encounter.
 
 ## The field (round 3, delegate I)
 
@@ -1325,3 +1324,63 @@ six; her table's level 1 ヒーリング and ファイア are not offered. サ�
 Runner saves loaded in the PC at the same cell and state: lap 2's 4F, lap 3's 1F and 5F, lap 4's 15F beside the
 statue, the basement, ドラコ's map and the world map after her. PC saves loaded in the runner: the world map beside the
 tower after the lap 3 escape and the throne room after the basement scene.
+
+## Battle numbers, status and drawing (round 7, U)
+
+Measured on both PC players under Wine from round 6's saves, with the heroes' equipment changed in the saves to
+separate the terms. HP was read from the PC's status list at each command phase and after each action, and the
+action from the top bar.
+
+### Monster attacks
+
+- Sacred's dragon girl 竜王（予定） (attack 350) against heroes at levels 23 to 26: normal hits of 71 or 72 at defence
+  245 (nine hits), 69 to 74 at 255, 70 to 74 at 260, 67 at 265, 66 to 70 at 273, 57 to 62 at 305, 45 to 49 at 360 and
+  95 at 169 (マオー, with her poison tick of 27 taken off). The four 強いスライミー on the demon castle's B3F (attack
+  260) hit ロイ (236, level 25) for 41 to 44 and アリア (245, level 24) for 38 to 42. (1.5 × attack − defence) / 4 is
+  about four points low at these levels on average, while round 2's level 1 golem (26 and 27 against defence 15)
+  and slime fit it. The runtime takes two thirds of the hero's level off the defence for a monster's normal hit,
+  which fits the means within about two points; the PC's spread doesn't match (ロイ at 245 never varied more than a
+  point).
+- Monster action kind 1 is a critical attack: its bar reads `{0}の会心の一撃！` from the start of the action. The dragon
+  girl's five entries hold one, and 18 of about 85 of her actions were critical. Critical hits: 151 to 163 at defence
+  245, 152 to 159 at 255, 147 to 153 at 260, 152 and 155 at 265, 148 at 273, 145 to 155 at 280, 144 at 305, 130 and
+  141 at 360, 160 at 169. (2.5 × attack − defence) / 4 with the usual spread fits all but 360 and 169 within about
+  three points, and the runtime uses it for heroes' critical hits too.
+- A hero's critical chance is half the sum of the equipment's critical fields: ロイ with バトルアックス (12) and
+  クリティカルネックレス (10) landed 10 critical hits in 58 attacks. Round 2's アリア (one weapon with 10) landed 8 in
+  about 155.
+- ドラゴンサンダー (power 120, thunder) did exactly 124 to アリア and ロイ at defence 245 to 360 in twelve casts, 62 when
+  ゴールデンスライミーの盾 halved every element, and 122 to マオー. Skill damage doesn't take the target's defence there;
+  the runtime's skill formula is unchanged.
+
+### Status
+
+- An item's speed field doesn't count on either player. Sacred: 風のブーツ (speed 20) in either accessory slot leaves
+  ロイ's 素早さ at 144, and in battle he acted after the dragon girl (160) in every turn of five fights. Colette:
+  盗賊のブーツ (speed 10, evasion 10) leaves ダーク's 素早さ at 110 and shows 回避率 10 %.
+- The hit field adds up over all equipment: アリア with バトルアックス (75) and 命中の指輪 (20) in her second accessory
+  slot shows 命中率 95 %.
+
+### Past the map's edge
+
+Under the noon sky with the sun on, the PC fills the empty background with the map's sun colour (the three values
+after the sun's angles) about 1.09 times as bright: (20, 19, 20) below the last dungeon, whose sun colour is 18, 18, 18,
+and on average (140, 101, 183) below 城下町ダンジョン at (19, 38), sun colour 129, 91, 170. Every white-sun map stays
+white. The runtime clears to that colour and tints the noon sky model by it.
+
+### Choices after a message
+
+The PC shrinks a message window towards its centre after its last page. When a choice opens before it has gone, the
+window stays under the choice at that size, empty. In Colette's basement, 話す's face message ends the event and the
+autorun shows its choice again at once: the empty window was 675 × 150 at (142, 357), 15/16 of the 720 × 160 window,
+the same in captures 1.5 and 6.5 seconds apart. Round 6's capture after the scene, where the player talked again after
+the event's fades, showed it at about half size. A choice that opens an event with no message before it has no
+window. The runtime shrinks the window over 16 frames while no event runs and stops the shrink while one does; the
+fades not counting is inferred from the two sizes.
+
+### Colette's status ailments
+
+マンドラゴラＬＶ03's fights on the North Tower's 3F (four of them, lap 3 and later) were played with every hero
+defending. Colette's player shows no action bar on those turns, so which skill each mandrake used couldn't be read; one
+turn took exactly 7 from all four heroes. The landing rate of confusion and the end-of-turn recovery stay as round 6
+left them.

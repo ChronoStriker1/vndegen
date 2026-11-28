@@ -117,6 +117,8 @@ typedef struct SgaState {
     bool windowOpen;
     char *lastPage;
     int carryWindow;
+    int closeWindow, closePos;
+    u32 closeMs;
     u32 textMs;
     char **choices;
     int choiceCount, choiceCursor, choiceCancel, choiceHeader;
