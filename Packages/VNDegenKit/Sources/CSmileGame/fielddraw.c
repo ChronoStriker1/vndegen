@@ -16,6 +16,7 @@ static const float kEyePitchScale = 0.58f;
 static const float kFillK = 0.77f, kKeyK = 0.74f;
 static const int kShadowTexels = 12;
 static const float kSpriteForward = 0.235f;
+static const float kSkyGain = 1.09f;
 
 bool maplook_parse(MapLook *l, const SgrRec *rec) {
     memset(l, 0, sizeof *l);
@@ -991,8 +992,21 @@ static void draw_actor(SG *g, Actor *a) {
     a->y = y;
 }
 
-static void draw_sky(SG *g, View *v) {
+static u32 sky_clear(const MapLook *l, u16 tint[3]) {
+    u32 c = 0xff000000u;
+    for (int i = 0; i < 3; i++) {
+        int k = (int)((float)l->sunColor[i] * kSkyGain + 0.5f);
+        if (k > 255) k = 255;
+        if (k < 0) k = 0;
+        tint[i] = (u16)(k * 256 / 255);
+        c |= (u32)k << (8 * i);
+    }
+    return c;
+}
+
+static void draw_sky(SG *g, View *v, const u16 tint[3]) {
     Cam *c = &g->field.cam;
+    bool tinted = tint[0] < 256 || tint[1] < 256 || tint[2] < 256;
     for (int k = 0; k < 3; k++) {
         Model *mdl = v->sky[k];
         if (!mdl) continue;
@@ -1005,6 +1019,10 @@ static void draw_sky(SG *g, View *v) {
             }
             u8 mode = t.mode == TRI_ADD ? TRI_ADD : k == 1 ? TRI_BLEND : TRI_OPAQUE;
             t.alphaTest = false;
+            if (tinted) {
+                if (!t.color[3]) t.color[0] = t.color[1] = t.color[2] = t.color[3] = 256;
+                for (int j = 0; j < 3; j++) t.color[j] = (u16)(t.color[j] * tint[j] >> 8);
+            }
             r3_tri_ex(&g->r3, c, &t, mode, TF_NOZTEST | TF_NOZWRITE);
         }
     }
@@ -1025,12 +1043,14 @@ void field_draw(SG *g) {
     Field *f = &g->field;
     View *v = g->r3.view;
     bool skyView = v && v->ready && v->look.sky == 0 && v->look.sun && !(v->look.hasCamera && v->look.cameraKind == 1);
-    r3_begin(&g->r3, g->fb, skyView ? 0xffffffffu : 0xff000000u);
+    u16 tint[3] = {256, 256, 256};
+    u32 clear = skyView ? sky_clear(&v->look, tint) : 0xff000000u;
+    r3_begin(&g->r3, g->fb, clear);
     if (!f->loaded || !v || !v->ready) return;
     pose_to_cam(&v->pose, &f->cam, g->w, g->h);
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
     for (int k = 0; k < 3; k++) g->r3.tint[k] = 256;
-    if (skyView) draw_sky(g, v);
+    if (skyView) draw_sky(g, v, tint);
     if (g->r3.x->shadow.base) {
         r3_shadow_restore(&g->r3);
         for (int i = 0; i < f->npcCount; i++)
