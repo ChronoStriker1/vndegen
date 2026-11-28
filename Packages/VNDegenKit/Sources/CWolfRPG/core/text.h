@@ -50,6 +50,8 @@ struct TextToken {
         EdgeWidth,
         Face,       // \font[n]: the base font (0) or a sub font (1 to 3)
         LineMax,    // \m[n]: the line is at least as tall as text of size n
+        Image,
+        ImageScale,
     };
     Kind kind = Char;
     uint32_t cp = 0;

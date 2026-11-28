@@ -1,6 +1,7 @@
 #include "text.h"
 
 #include "game.h"
+#include "images.h"
 
 #include <algorithm>
 #include <cmath>
@@ -73,6 +74,18 @@ std::vector<TextToken> parseText(const std::string &s) {
             {"m", TextToken::LineMax}, {"wE", TextToken::EdgeWidth},
         };
         bool matched = false;
+        if (codeWithArg(s, at, "imgS", arg, next) || codeWithArg(s, at, "img", arg, next)) {
+            TextToken t{TextToken::Image};
+            t.base = arg;
+            out.push_back(t);
+            i = next;
+            continue;
+        }
+        if (codeWithArg(s, at, "isize", arg, next)) {
+            out.push_back({TextToken::ImageScale, 0, std::atoi(arg.c_str())});
+            i = next;
+            continue;
+        }
         if (codeWithArg(s, at, "r", arg, next)) {
             size_t comma = arg.find(',');
             TextToken t{TextToken::Ruby};
@@ -122,7 +135,7 @@ std::vector<TextToken> parseText(const std::string &s) {
 size_t visibleChars(const std::string &text) {
     size_t n = 0;
     for (auto &t : parseText(text)) {
-        if (t.kind == TextToken::Char || t.kind == TextToken::Icon) n++;
+        if (t.kind == TextToken::Char || t.kind == TextToken::Icon || t.kind == TextToken::Image) n++;
         else if (t.kind == TextToken::Ruby) n += visibleChars(t.base);
     }
     return n;
@@ -171,6 +184,7 @@ struct TextRenderer::Layout {
         int edge;
         const GlyphImage *g = nullptr;
         BitmapPtr icon;
+        int iconW = 0, iconH = 0;
     };
     // A run of text with one alignment on one line. <C> and <R> place a segment within the widest line.
     struct Segment {
@@ -190,7 +204,7 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
     int lineTop = 0, size = style.size, lineSize = size, lineSpacing = style.lineSpacing, height = 0, face = 0;
     auto color = style.color;
     std::array<uint8_t, 3> edgeColor{0, 0, 0};
-    int edge = 0, lineFloor = 0;
+    int edge = 0, lineFloor = 0, imageScale = 100;
     bool lineEmpty = true;
     size_t shown = 0;
     out.segments.push_back({0, 0, 0});
@@ -265,6 +279,22 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
                 x += size + spacing;
                 extend();
                 height = std::max(height, lineTop + size);
+                break;
+            }
+            case TextToken::ImageScale: imageScale = std::max(0, t.value); break;
+            case TextToken::Image: {
+                int w = 0, h = 0;
+                if (auto bytes = game_.files().read(t.base)) imageSize(*bytes, w, h);
+                w = w * imageScale / 100;
+                h = h * imageScale / 100;
+                if (shown < visible && images_)
+                    out.items.push_back({x, lineTop, size, face, int(out.segments.size()) - 1, color, edgeColor, edge,
+                                         nullptr, images_->get(t.base), w, h});
+                shown++;
+                lineEmpty = false;
+                x += w + spacing;
+                extend();
+                height = std::max(height, lineTop + std::max(size, h));
                 break;
             }
             case TextToken::Ruby: {
@@ -342,9 +372,8 @@ TextBlock TextRenderer::render(const std::string &text, const TextStyle &style, 
         float shift = seg.align == 2 ? l.w - seg.end : seg.align == 1 ? (l.w - (seg.end - seg.start)) / 2 - seg.start : 0;
         int left = int(std::lround(it.x + shift)) + pad, top = it.y - minY + pad;
         if (it.icon) {
-            if (!it.icon->empty())
-                canvas.draw(*it.icon, {0, 0, it.icon->w, it.icon->h},
-                            {float(left), float(top), float(it.size), float(it.size)});
+            float iw = it.iconW ? float(it.iconW) : float(it.size), ih = it.iconH ? float(it.iconH) : float(it.size);
+            if (!it.icon->empty()) canvas.draw(*it.icon, {0, 0, it.icon->w, it.icon->h}, {float(left), float(top), iw, ih});
             continue;
         }
         if (!it.g || it.g->coverage.empty()) continue;
