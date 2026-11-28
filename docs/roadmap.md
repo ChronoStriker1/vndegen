@@ -182,6 +182,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - False Myth 2 through its first dungeon and the story after it, to the South Tower (0.61.11).
 - Wolf RPG Editor half-tile movement, so False Myth 2's saves walk on the PC (0.61.12).
 - Smile Game Builder's monster critical hits, item speed and accuracy, dark maps' background and the message box under a choice (0.61.13).
+- False Myth 2 past the South Tower to its "Unwanted Deathmatch" battle, with loads resetting the hero's walk-through (0.61.14).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
