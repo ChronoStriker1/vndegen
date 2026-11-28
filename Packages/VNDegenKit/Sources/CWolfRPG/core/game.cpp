@@ -74,6 +74,10 @@ void Game::setSoundFont(std::string path, std::string fallback) {
 
 // Variables at their starts, the hero at the first start position, and the start map with its music.
 bool Game::startNewGame(std::string *error) {
+    for (Actor *a : {&hero_, &party_[0], &party_[1], &party_[2], &party_[3], &party_[4]}) {
+        a->unit = halfSteps() ? 1 : 2;
+        a->tileSquare = gameDat_.squareHitbox();
+    }
     auto rows = [&](int type) { return type < int(sdb_.types.size()) ? sdb_.types[type].rows.size() : 0; };
     normal_.assign(std::max<size_t>(rows(SysNormalVarNames), 100), 0);
     for (int i = 0; i < 9; i++) spare_[i].assign(std::max<size_t>(rows(SysSpare1 + i), 100), 0);
@@ -343,10 +347,10 @@ int32_t Game::readVar(int32_t id, const Thread &t) {
     if (Actor *a = actorAtAddress(id, t)) {
         // The fields of a character's address (the manual's variable list): tile, half tile, height, shadow, direction.
         switch ((id - 9100000) % 10) {
-            case 0: return a->tx;
-            case 1: return a->ty;
-            case 2: return a->tx * 2;
-            case 3: return a->ty * 2;
+            case 0: return a->tx();
+            case 1: return a->ty();
+            case 2: return a->px;
+            case 3: return a->py;
             case 4: return a->chara.lift;
             case 5: return a->chara.shadow;
             case 6: return a->chara.direction;
@@ -373,10 +377,10 @@ void Game::writeVar(int32_t id, int32_t v, const Thread &t) {
     if (Actor *a = actorAtAddress(id, t)) {
         // Writing a position moves the character there at once. The PC engine walks it at its speed.
         switch ((id - 9100000) % 10) {
-            case 0: a->placeAt(v, a->ty); break;
-            case 1: a->placeAt(a->tx, v); break;
-            case 2: a->placeAt(v / 2, a->ty); break;
-            case 3: a->placeAt(a->tx, v / 2); break;
+            case 0: a->placeHalf(v * 2, a->py); break;
+            case 1: a->placeHalf(a->px, v * 2); break;
+            case 2: halfSteps() ? a->placeHalf(v, a->py) : a->placeAt(v / 2, a->ty()); break;
+            case 3: halfSteps() ? a->placeHalf(a->px, v) : a->placeAt(a->tx(), v / 2); break;
             case 4: a->chara.lift = v; break;
             case 5: a->chara.shadow = v; break;
             case 6: a->chara.direction = v; break;
@@ -571,6 +575,7 @@ bool Game::loadMap(int id) {
     }
     mapParallel_.clear();
     refreshPages();
+    placeEventsOnEntry();
     playMapMusic();
     return true;
 }
@@ -629,6 +634,7 @@ void Game::refreshPages() {
                 a.fixedDirection = pg.flags & 0x04;
                 a.through = pg.flags & 0x08;
                 c.above = pg.flags & 0x10;
+                a.square = a.tileSquare = pg.flags & 0x20;
                 if (pg.moveType == 1 && !pg.route.steps.empty()) {
                     a.route = std::shared_ptr<const MoveRoute>(map_, &pg.route);
                     a.routeStep = 0;
@@ -738,7 +744,10 @@ void Game::update(const Input &input) {
     }
     // An event that starts on touching the hero also starts while the hero stands on it. The manual's specification
     // page has touch events checked every frame with the autorun ones, so a hero placed onto such an event starts it.
-    if (threads_.empty() && !hero_.moving()) eventAt(hero_.tx, hero_.ty, 4, true);
+    if (threads_.empty() && !hero_.moving()) {
+        if (halfSteps()) touchHalf(4, 0, 0, true);
+        else eventAt(hero_.tx(), hero_.ty(), 4, true);
+    }
     if (threads_.empty()) {
         for (auto &ce : commons_) {
             if (ce.runCondition == 1 && ce.commands.size() > 1 && commonConditionMet(ce)) {

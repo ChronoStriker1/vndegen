@@ -42,9 +42,21 @@ bool routeTakesTime(const Actor &a) {
 constexpr int kStepFrames[7] = {64, 32, 24, 16, 12, 8, 4};
 constexpr int kIdleFrames[6] = {0, 15, 30, 60, 120, 240};
 
+void actorBox(const Actor &a, int x, int y, int box[4], bool tiles = false) {
+    box[0] = x;
+    box[1] = (tiles ? a.tileSquare : a.square) ? y : y + 1;
+    box[2] = x + 2;
+    box[3] = y + 2;
+}
+
+bool overlaps(const int a[4], const int b[4]) { return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]; }
+
 }  // namespace
 
-int Game::framesPerStep(const Actor &a) const { return kStepFrames[std::clamp(a.speed, 0, 6)]; }
+int Game::framesPerStep(const Actor &a) const {
+    int frames = kStepFrames[std::clamp(a.speed, 0, 6)];
+    return halfSteps() ? std::max(1, frames * a.unit / 2) : frames;
+}
 
 std::vector<const Character *> Game::characters() const {
     std::vector<const Character *> out;
@@ -88,15 +100,100 @@ uint32_t Game::tileFlags(int x, int y) const {
     return 0;
 }
 
+bool Game::quarterBlocked(int qx, int qy) const {
+    if (!map_ || qx < 0 || qy < 0 || qx >= map_->width * 2 || qy >= map_->height * 2) return true;
+    static const uint32_t bits[4] = {0x08, 0x04, 0x02, 0x01};
+    return tileFlags(qx >> 1, qy >> 1) & bits[(qx & 1) + 2 * (qy & 1)];
+}
+
+bool Game::boxBlocked(const Actor &a, int x, int y) const {
+    int box[4];
+    actorBox(a, x, y, box, true);
+    for (int qy = box[1]; qy < box[3]; qy++)
+        for (int qx = box[0]; qx < box[2]; qx++)
+            if (quarterBlocked(qx, qy)) return true;
+    return false;
+}
+
+bool Game::canMoveHalf(const Actor &a, int dir) const {
+    int nx = a.px + dirX(dir) * a.unit, ny = a.py + dirY(dir) * a.unit;
+    if (!map_ || nx < 0 || ny < 0 || nx + 2 > map_->width * 2 || ny + 2 > map_->height * 2) return false;
+    if (a.through || (walkThroughWalls_ && &a == &hero_)) return true;
+    if (boxBlocked(a, a.px, a.py) || boxBlocked(a, nx, ny)) return false;
+    int box[4];
+    actorBox(a, nx, ny, box);
+    auto blocks = [&](const Actor &o) {
+        if (&o == &a || !o.chara.visible || o.through || (o.chara.graphic.empty() && o.chara.chip < 0)) return false;
+        int other[4];
+        actorBox(o, o.px, o.py, other);
+        return overlaps(box, other);
+    };
+    if (blocks(hero_)) return false;
+    for (auto &e : events_)
+        if (blocks(e.actor)) return false;
+    return true;
+}
+
+void Game::eventArea(const MapEventState &e, int box[4]) const {
+    const MapPage &pg = e.data->pages[e.page];
+    actorBox(e.actor, e.actor.px, e.actor.py, box);
+    box[0] -= pg.rangeX * 2;
+    box[2] += pg.rangeX * 2;
+    box[1] -= pg.rangeY * 2;
+    box[3] += pg.rangeY * 2;
+}
+
+bool Game::eventSolid(const MapEventState &e) const {
+    const Actor &a = e.actor;
+    if (!a.through && (!a.chara.graphic.empty() || a.chara.chip >= 0)) return true;
+    return boxBlocked(a, a.px, a.py);
+}
+
+bool Game::touchHalf(int trigger, int dir, int reach, bool startIt) {
+    int hero[4];
+    actorBox(hero_, hero_.px + dirX(dir) * reach, hero_.py + dirY(dir) * reach, hero);
+    for (size_t i = 0; i < events_.size(); i++) {
+        auto &e = events_[i];
+        if (e.page < 0) continue;
+        const MapPage &pg = e.data->pages[e.page];
+        if (pg.trigger != trigger || pg.commands.size() <= 1) continue;
+        int area[4];
+        eventArea(e, area);
+        if (!overlaps(hero, area)) continue;
+        if (reach) {
+            if (!eventSolid(e)) continue;
+        } else if (trigger != 4 && (hero[0] < area[0] || hero[2] > area[2])) {
+            continue;
+        }
+        if (startIt) {
+            Thread t;
+            startPage(int(i), t);
+            threads_.push_back(std::move(t));
+        }
+        return true;
+    }
+    return false;
+}
+
+void Game::placeEventsOnEntry() {
+    for (auto &e : events_) {
+        e.actor.unit = halfSteps() ? 1 : 2;
+        if (e.page < 0 || !halfSteps()) continue;
+        uint8_t flags = e.data->pages[e.page].flags;
+        e.actor.placeHalf(e.actor.px - (flags & 0x80 ? 1 : 0), e.actor.py - (flags & 0x40 ? 1 : 0));
+    }
+}
+
 bool Game::canMove(const Actor &a, int dir) const {
-    int nx = a.tx + dirX(dir), ny = a.ty + dirY(dir);
+    if (halfSteps()) return canMoveHalf(a, dir);
+    int nx = a.tx() + dirX(dir), ny = a.ty() + dirY(dir);
     if (!map_ || nx < 0 || ny < 0 || nx >= map_->width || ny >= map_->height) return false;
     if (a.through || (walkThroughWalls_ && &a == &hero_)) return true;
     if ((tileFlags(nx, ny) & 0x0F) == 0x0F) return false;
     // Other characters with a graphic block the way.
     auto blocks = [&](const Actor &o) {
         return &o != &a && o.chara.visible && !o.through && (!o.chara.graphic.empty() || o.chara.chip >= 0) &&
-               o.tx == nx && o.ty == ny;
+               o.tx() == nx && o.ty() == ny;
     };
     if (blocks(hero_)) return false;
     for (auto &e : events_)
@@ -111,10 +208,11 @@ void Game::turn(Actor &a, int dir) {
 bool Game::step(Actor &a, int dir) {
     turn(a, dir);
     if (!canMove(a, dir)) return false;
-    a.fromX = a.tx;
-    a.fromY = a.ty;
-    a.tx += dirX(dir);
-    a.ty += dirY(dir);
+    int unit = halfSteps() ? a.unit : 2;
+    a.fromX = a.px / 2.0;
+    a.fromY = a.py / 2.0;
+    a.px += dirX(dir) * unit;
+    a.py += dirY(dir) * unit;
     a.moveFrame = 0;
     a.moveFrames = framesPerStep(a);
     return true;
@@ -138,7 +236,7 @@ void Game::runRoute(Actor &a, bool isHero) {
     auto arg = [&](size_t i) { return i < s.args.size() ? s.args[i] : 0; };
     bool done = true;
     auto towardHero = [&](bool away) {
-        int dx = hero_.tx - a.tx, dy = hero_.ty - a.ty;
+        int dx = hero_.px - a.px, dy = hero_.py - a.py;
         int dir = std::abs(dx) > std::abs(dy) ? (dx > 0 ? 6 : 4) : (dy > 0 ? 2 : 8);
         if (dx == 0 && dy == 0) return 0;
         return away ? opposite(dir) : dir;
@@ -174,10 +272,10 @@ void Game::runRoute(Actor &a, bool isHero) {
             break;
         }
         case Jump: {
-            a.fromX = a.tx;
-            a.fromY = a.ty;
-            a.tx += arg(0);
-            a.ty += arg(1);
+            a.fromX = a.px / 2.0;
+            a.fromY = a.py / 2.0;
+            a.px += arg(0) * 2;
+            a.py += arg(1) * 2;
             a.moveFrame = 0;
             a.moveFrames = framesPerStep(a) * 2;
             a.jumpHeight = gameDat_.tileSize();
@@ -225,7 +323,12 @@ void Game::runRoute(Actor &a, bool isHero) {
             playSoundEffect(arg(0));
             break;
         case Wait: a.routeWait = arg(0); break;
-        case FullStep: break;  // characters already move a whole tile a step; half steps aren't supported
+        case HalfStep:
+        case FullStep:
+            if (halfSteps()) a.unit = s.id == HalfStep ? 1 : 2;
+            else if (s.id == HalfStep && unsupported_[10000 + s.id]++ == 0)
+                log(format("move route step %d is not supported yet", s.id));
+            break;
         case Pattern1: a.chara.pattern = 0; break;
         case Pattern2: a.chara.pattern = 1; break;
         case Pattern3: a.chara.pattern = 2; break;
@@ -244,16 +347,16 @@ void Game::updateActor(Actor &a, bool isHero) {
     if (a.moving()) {
         a.moveFrame++;
         double f = double(a.moveFrame) / a.moveFrames;
-        a.chara.x = a.fromX + (a.tx - a.fromX) * f;
-        a.chara.y = a.fromY + (a.ty - a.fromY) * f;
+        a.chara.x = a.fromX + (a.px / 2.0 - a.fromX) * f;
+        a.chara.y = a.fromY + (a.py / 2.0 - a.fromY) * f;
         a.chara.lift = a.jumpHeight ? int(std::sin(f * M_PI) * a.jumpHeight) : a.chara.lift;
         if (!a.moving()) {
             a.jumpHeight = 0;
-            if (isHero) checkTouch(a.tx, a.ty, true);
+            if (isHero) checkTouch(a.tx(), a.ty(), true);
         }
     } else {
-        a.chara.x = a.tx;
-        a.chara.y = a.ty;
+        a.chara.x = a.px / 2.0;
+        a.chara.y = a.py / 2.0;
     }
 
     // Walking cycles the frames 1 0 1 2 for three-frame sets; standing returns to the middle frame.
@@ -277,7 +380,7 @@ void Game::updateActor(Actor &a, bool isHero) {
 bool Game::eventAt(int x, int y, int trigger, bool startIt) {
     for (size_t i = 0; i < events_.size(); i++) {
         auto &e = events_[i];
-        if (e.page < 0 || e.actor.tx != x || e.actor.ty != y) continue;
+        if (e.page < 0 || e.actor.tx() != x || e.actor.ty() != y) continue;
         const MapPage &pg = e.data->pages[e.page];
         if (pg.trigger != trigger || pg.commands.size() <= 1) continue;
         if (startIt) {
@@ -291,7 +394,9 @@ bool Game::eventAt(int x, int y, int trigger, bool startIt) {
 }
 
 void Game::checkTouch(int x, int y, bool heroMoved) {
-    if (heroMoved) eventAt(x, y, 3, true);
+    if (!heroMoved) return;
+    if (halfSteps()) touchHalf(3, 0, 0, true);
+    else eventAt(x, y, 3, true);
 }
 
 // Events that walk on their own: random walks and walking toward the hero, at the page's frequency.
@@ -305,10 +410,17 @@ void Game::autonomousMove(MapEventState &e) {
     static const int dirs[4] = {2, 4, 6, 8};
     int dir = dirs[std::uniform_int_distribution<int>(0, 3)(rng_)];
     if (pg.moveType == 3) {
-        int dx = hero_.tx - a.tx, dy = hero_.ty - a.ty;
+        int dx = hero_.px - a.px, dy = hero_.py - a.py;
         if (dx || dy) dir = std::abs(dx) > std::abs(dy) ? (dx > 0 ? 6 : 4) : (dy > 0 ? 2 : 8);
     }
-    if (!step(a, dir) && pg.trigger == 4 && hero_.tx == a.tx + dirX(dir) && hero_.ty == a.ty + dirY(dir)) {
+    auto reachesHero = [&] {
+        if (!halfSteps()) return hero_.tx() == a.tx() + dirX(dir) && hero_.ty() == a.ty() + dirY(dir);
+        int box[4], hero[4];
+        actorBox(a, a.px + dirX(dir) * a.unit, a.py + dirY(dir) * a.unit, box);
+        actorBox(hero_, hero_.px, hero_.py, hero);
+        return overlaps(box, hero);
+    };
+    if (!step(a, dir) && pg.trigger == 4 && reachesHero()) {
         // An event that starts on touching the hero starts when it walks into the hero.
         Thread t;
         for (size_t i = 0; i < events_.size(); i++)
@@ -353,16 +465,22 @@ void Game::heroControl() {
     else if (moves(KeyUp)) dir = 8;
     if ((input_.pressed & KeyConfirm) && !eventRunning && basicControl_[std::countr_zero(uint32_t(KeyConfirm))] == 0) {
         // The event on the hero's tile, then the one in front, then one across a counter.
-        int fx = hero_.tx + dirX(hero_.chara.direction), fy = hero_.ty + dirY(hero_.chara.direction);
-        if (eventAt(hero_.tx, hero_.ty, 0, true) || eventAt(fx, fy, 0, true)) return;
-        if (tileFlags(fx, fy) & 0x80) {
-            if (eventAt(fx + dirX(hero_.chara.direction), fy + dirY(hero_.chara.direction), 0, true)) return;
+        int facing = hero_.chara.direction;
+        if (halfSteps()) {
+            if (touchHalf(0, 0, 0, true) || touchHalf(0, facing, 1, true)) return;
+            int cx = (hero_.px + 1 + dirX(facing) * 2) >> 1, cy = (hero_.py + 1 + dirY(facing) * 2) >> 1;
+            if ((tileFlags(cx, cy) & 0x80) && touchHalf(0, facing, 3, true)) return;
+        } else {
+            int fx = hero_.tx() + dirX(facing), fy = hero_.ty() + dirY(facing);
+            if (eventAt(hero_.tx(), hero_.ty(), 0, true) || eventAt(fx, fy, 0, true)) return;
+            if ((tileFlags(fx, fy) & 0x80) && eventAt(fx + dirX(facing), fy + dirY(facing), 0, true)) return;
         }
     }
     if (dir) {
         if (!step(hero_, dir)) {
             // Walking into an event that starts on touch starts it.
-            eventAt(hero_.tx + dirX(dir), hero_.ty + dirY(dir), 3, true);
+            if (halfSteps()) touchHalf(3, dir, 1, true) || touchHalf(4, dir, 1, true);
+            else eventAt(hero_.tx() + dirX(dir), hero_.ty() + dirY(dir), 3, true);
         }
     }
 }

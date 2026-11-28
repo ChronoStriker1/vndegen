@@ -74,6 +74,8 @@ struct GameDat {
     }
     int fps() const { return settings.size() > 4 && settings[4] == 30 ? 30 : 60; }
     int language() const { return settings.size() > 17 && settings[17] == 5 ? 2 : 1; }
+    bool halfSteps() const { return settings.size() > 9 && settings[9] == 0; }
+    bool squareHitbox() const { return settings.size() > 8 && settings[8] != 0; }
 };
 
 constexpr int kMaxDatabaseRows = 100000;

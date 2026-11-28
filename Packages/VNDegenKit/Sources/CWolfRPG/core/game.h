@@ -207,7 +207,10 @@ struct Thread {
 // A character that moves on the map, with its movement state.
 struct Actor {
     Character chara;
-    int tx = 0, ty = 0;  // the tile it stands on, or is moving to
+    int px = 0, py = 0;
+    int unit = 2;
+    bool square = true;
+    bool tileSquare = true;
     double fromX = 0, fromY = 0;
     int moveFrame = 0, moveFrames = 0;  // a step in progress
     int jumpHeight = 0;
@@ -223,11 +226,14 @@ struct Actor {
     bool routeFromCommand = false;
     int idleTimer = 0;
     bool moving() const { return moveFrame < moveFrames; }
-    void placeAt(int x, int y) {
-        tx = x;
-        ty = y;
-        chara.x = x;
-        chara.y = y;
+    int tx() const { return px >> 1; }
+    int ty() const { return py >> 1; }
+    void placeAt(int x, int y) { placeHalf(x * 2, y * 2); }
+    void placeHalf(int x, int y) {
+        px = x;
+        py = y;
+        chara.x = x / 2.0;
+        chara.y = y / 2.0;
         moveFrame = moveFrames = 0;
     }
 };
@@ -270,7 +276,8 @@ public:
     const Map *map() const { return map_.get(); }
     int mapId() const { return mapId_; }
     // The hero's tile and facing, for tests and the debug status.
-    std::array<int, 3> heroTile() const { return {hero_.tx, hero_.ty, hero_.chara.direction}; }
+    std::array<int, 3> heroTile() const { return {hero_.tx(), hero_.ty(), hero_.chara.direction}; }
+    std::array<int, 2> heroHalfTile() const { return {hero_.px, hero_.py}; }
     const std::vector<Tileset> &tilesets() const { return tilesets_; }
     // The hero, party members and map events, in no particular order. The map renderer sorts them.
     std::vector<const Character *> characters() const;
@@ -449,6 +456,14 @@ private:
     Actor *actorAtAddress(int32_t id, const Thread &t);
     uint32_t tileFlags(int x, int y) const;         // passability of the uppermost tile that decides it
     bool canMove(const Actor &a, int dir) const;
+    bool halfSteps() const { return gameDat_.halfSteps(); }
+    bool quarterBlocked(int qx, int qy) const;
+    bool boxBlocked(const Actor &a, int x, int y) const;
+    bool canMoveHalf(const Actor &a, int dir) const;
+    void eventArea(const MapEventState &e, int box[4]) const;
+    bool eventSolid(const MapEventState &e) const;
+    bool touchHalf(int trigger, int dir, int reach, bool startIt);
+    void placeEventsOnEntry();
     bool step(Actor &a, int dir);                  // starts a step; false when blocked
     void turn(Actor &a, int dir);
     void updateActor(Actor &a, bool isHero);

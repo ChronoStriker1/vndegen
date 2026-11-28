@@ -453,8 +453,9 @@ SaveFile Game::snapshot() {
         }
     }
     auto fill = [&](SaveCharacter &c, const Actor &a) {
-        c.x = int32_t(std::lround(a.chara.x * 2));
-        c.y = int32_t(std::lround(a.chara.y * 2));
+        c.x = halfSteps() ? a.px : int32_t(std::lround(a.chara.x * 2));
+        c.y = halfSteps() ? a.py : int32_t(std::lround(a.chara.y * 2));
+        if (halfSteps()) c.v78 = a.unit;
         c.graphic = saveString(a.chara.graphic, enc);
         c.appearance = {uint16_t(a.chara.opacity), uint16_t(a.chara.blend), uint16_t(a.chara.direction),
                         uint16_t(a.chara.pattern)};
@@ -786,10 +787,15 @@ void Game::applySave(const SaveFile &s) {
         systemStrings_[11 + i] = i < s.party.members.size() ? text(s.party.members[i].graphic, enc) : std::string();
     syncPartyGraphics();
 
-    auto place = [](Actor &a, const SaveCharacter &c) {
-        a.placeAt(c.x / 2, c.y / 2);
-        a.chara.x = c.x / 2.0;
-        a.chara.y = c.y / 2.0;
+    auto place = [&](Actor &a, const SaveCharacter &c) {
+        if (halfSteps()) {
+            a.placeHalf(c.x, c.y);
+            if (c.v78 == 1 || c.v78 == 2) a.unit = c.v78;
+        } else {
+            a.placeAt(c.x / 2, c.y / 2);
+            a.chara.x = c.x / 2.0;
+            a.chara.y = c.y / 2.0;
+        }
         a.chara.opacity = c.appearance[0];
         a.chara.blend = c.appearance[1];
         if (c.appearance[2]) a.chara.direction = validDirection(c.appearance[2]);
@@ -842,7 +848,7 @@ void Game::applySave(const SaveFile &s) {
     restorePictures(s, enc);
     saveBase_ = std::make_shared<SaveFile>(s);
     updateCamera();
-    log(format("loaded a save: map %d, hero at %d,%d", mapId_, hero_.tx, hero_.ty));
+    log(format("loaded a save: map %d, hero at %d,%d", mapId_, hero_.tx(), hero_.ty()));
 }
 
 // ---------------------------------------------------------------------------------------------------------------

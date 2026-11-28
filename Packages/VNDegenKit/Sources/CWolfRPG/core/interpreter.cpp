@@ -358,19 +358,25 @@ bool Game::step(Thread &t) {
             int target = value(cmd.arg(0), t);
             int x = value(cmd.arg(1), t), y = value(cmd.arg(2), t);
             int mapId = value(cmd.arg(3), t);
+            bool precise = cmd.arg(4) & 0x01;
             if (target <= -10000) {
                 int row = x;
                 target += 10000;
                 mapId = dbNumber(sdb_, SysPositions, row, 0);
                 x = dbNumber(sdb_, SysPositions, row, 1);
                 y = dbNumber(sdb_, SysPositions, row, 2);
-            } else if (cmd.arg(4) & 0x01) {  // precise coordinates, in half tiles
-                x /= 2;
-                y /= 2;
+                precise = false;
+            }
+            if (!precise) {
+                x *= 2;
+                y *= 2;
+            } else if (!halfSteps()) {
+                x = x / 2 * 2;
+                y = y / 2 * 2;
             }
             if (target == -1) {
-                hero_.placeAt(x, y);
-                for (auto &p : party_) p.placeAt(x, y);
+                hero_.placeHalf(x, y);
+                for (auto &p : party_) p.placeHalf(x, y);
                 if (mapId >= 0 && mapId != mapId_) {
                     loadMap(mapId);
                     updateCamera();
@@ -379,7 +385,7 @@ bool Game::step(Thread &t) {
                 }
                 updateCamera();
             } else if (Actor *a = actorFor(target == -2 ? -1 : target, t)) {
-                a->placeAt(x, y);
+                a->placeHalf(x, y);
             }
             return true;
         }
@@ -916,7 +922,9 @@ std::string Game::makeEvent(const std::string &options, const std::string &image
     }
     MapEventState state;
     state.data = &madeEvents_.emplace_back(std::move(made));
-    state.actor.placeAt(state.data->x, state.data->y);
+    if (half && halfSteps()) state.actor.placeHalf(x, y);
+    else state.actor.placeAt(state.data->x, state.data->y);
+    state.actor.unit = halfSteps() ? 1 : 2;
     state.actor.chara.visible = false;
     events_.push_back(state);
     refreshPages();
@@ -936,11 +944,11 @@ std::string Game::findPath(const std::string &options) {
     std::deque<std::pair<int, int>> queue{{sx, sy}};
     from[size_t(sy) * w + sx] = 5;  // 5 marks the start
     Actor walker;
+    walker.tileSquare = hero_.tileSquare;
     while (!queue.empty() && from[size_t(ey) * w + ex] == 0) {
         auto [x, y] = queue.front();
         queue.pop_front();
-        walker.tx = x;
-        walker.ty = y;
+        walker.placeAt(x, y);
         for (int dir : {2, 4, 6, 8}) {
             int nx = x + (dir == 4 ? -1 : dir == 6 ? 1 : 0), ny = y + (dir == 8 ? -1 : dir == 2 ? 1 : 0);
             if (!inside(nx, ny) || from[size_t(ny) * w + nx] != 0 || !canMove(walker, dir)) continue;

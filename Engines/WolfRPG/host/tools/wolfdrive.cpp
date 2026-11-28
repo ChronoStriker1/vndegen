@@ -144,7 +144,9 @@ int main(int argc, char **argv) {
             while (ss >> i) std::printf("sys %d=%d\n", i, game.systemNumber(i));
         } else if (cmd == "state") {
             auto h = game.heroTile();
-            std::printf("frame %ld map %d hero %d,%d facing %d\n", frameNo, game.mapId(), h[0], h[1], h[2]);
+            auto hh = game.heroHalfTile();
+            std::printf("frame %ld map %d hero %d,%d facing %d half %d,%d\n", frameNo, game.mapId(), h[0], h[1], h[2], hh[0],
+                        hh[1]);
             if (game.message().active) std::printf("message: %s\n", game.message().text.c_str());
             if (game.choice().active) {
                 std::printf("choice cursor %d:", game.choice().cursor);

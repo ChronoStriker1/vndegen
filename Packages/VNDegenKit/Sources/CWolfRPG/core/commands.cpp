@@ -507,17 +507,17 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
         const Actor *a = actorFor(value(c.arg(2), t), t);
         switch (a ? info : -1) {
             case -1: v = -1; break;
-            case 0: v = a->tx; break;
-            case 1: v = a->ty; break;
-            case 2: v = a->tx * 2; break;
-            case 3: v = a->ty * 2; break;
+            case 0: v = a->tx(); break;
+            case 1: v = a->ty(); break;
+            case 2: v = a->px; break;
+            case 3: v = a->py; break;
             case 4: v = a->chara.lift; break;
             case 5: v = a->chara.direction; break;
             case 6: v = int(std::lround((a->chara.x + 0.5) * tile - cameraX_)); break;
             case 7: v = int(std::lround((a->chara.y + 1) * tile - cameraY_)); break;
             case 8: v = a->chara.shadow; break;
             case 9: {
-                uint32_t f = tileFlags(a->tx, a->ty);
+                uint32_t f = tileFlags(a->tx(), a->ty());
                 (void)f;
                 v = 0;
                 break;
@@ -551,22 +551,26 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
         }
     } else if (exec == 0x20) {  // map position
         int x = value(c.arg(2), t), y = value(c.arg(3), t);
+        bool quarter = (info & 0x80) && halfSteps();
+        int qx = x, qy = y;
         if (info & 0x80) {  // precise coordinates
             x /= 2;
             y /= 2;
         }
+        auto standsAt = [&](const Actor &a) { return quarter ? a.px == qx && a.py == qy : a.tx() == x && a.ty() == y; };
+        auto blocked = [&] { return quarter ? quarterBlocked(qx, qy) : (tileFlags(x, y) & 0x0F) == 0x0F; };
         switch (info & 0x0F) {
             case 1: {
                 v = -1;
                 for (auto &e : events_)
-                    if (e.page >= 0 && e.actor.tx == x && e.actor.ty == y) v = e.data->id;
+                    if (e.page >= 0 && standsAt(e.actor)) v = e.data->id;
                 break;
             }
-            case 2: v = (tileFlags(x, y) & 0x0F) == 0x0F ? 1 : 0; break;
+            case 2: v = blocked() ? 1 : 0; break;
             case 3: {
-                v = (tileFlags(x, y) & 0x0F) == 0x0F ? 1 : 0;
+                v = blocked() ? 1 : 0;
                 for (auto &e : events_)
-                    if (e.page >= 0 && e.actor.tx == x && e.actor.ty == y && !e.actor.through) v = 1;
+                    if (e.page >= 0 && standsAt(e.actor) && !e.actor.through) v = 1;
                 break;
             }
             case 4: case 5: case 6: case 7: {
